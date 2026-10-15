@@ -1,0 +1,63 @@
+# test_package/MANIFEST.yml
+# Upstream test audit for perdition 2.2.
+# perdition 2.2 itself ships no TESTS suite (272-file tarball: zero
+# *test*/*check* paths; configure.ac + top Makefile.am have no
+# TESTS/AM_TESTS; `make check` rc=0 no-op). Countable upstream evidence
+# comes from the mandatory vendored build dep vanessa_adt 0.0.9 (same
+# Horms download dir, built in the main recipe): test/Makefile.am
+# noinst_PROGRAMS lists 4 executable regression programs, each an
+# exit-code oracle (exit 0 == pass). The main recipe builds and executes
+# all 4 on the true machine; counters come from exit codes only.
+
+package: perdition/2.2
+homepage: "https://horms.net/projects/perdition/"
+
+upstream_check_command: "make check"
+upstream_test_in_build: true
+upstream_test_command: "vanessa_adt test programs (4) in build/test; make check no-op proof"
+
+# Countable upstream inventory exists, so no_tests is not used.
+upstream_tests_exist: true
+upstream_test_audit: >-
+  Audited horms/perdition 2.2 release tarball (perdition-2.2.tar.gz,
+  272 files): zero paths matching *test*/*check*; configure.ac has no
+  AM_TESTS/TESTS registration; top-level Makefile.am SUBDIRS has no
+  tests/ dir; `make check` is a clean no-op (rc 0, see
+  hmbs_make_check.log). The 4 counted tests are the mandatory vendored
+  build dependency vanessa_adt 0.0.9 (same Horms 2.2 download dir as
+  logger/socket): test/Makefile.am declares noinst_PROGRAMS =
+  dynamic_array_test list_test hash_test config_file_test (verbatim
+  order), each a C program returning exit 0 on success. The main recipe
+  verifies this inventory against the shipped Makefile.am, builds the
+  programs via the trio `make`, executes each binary, and reports
+  exit-code counters (discovered 4 from the Makefile.am enumeration).
+upstream_test_total: 4
+upstream_test_count_method: autotools_tests
+
+upstream_tests:
+  - file: test/dynamic_array_test.c
+    source: vanessa_adt-0.0.9/test/dynamic_array_test.c
+    description: "vanessa_adt dynamic array regression (exit-code oracle)"
+    command: "./build/test/dynamic_array_test"
+  - file: test/list_test.c
+    source: vanessa_adt-0.0.9/test/list_test.c
+    description: "vanessa_adt list regression (exit-code oracle)"
+    command: "./build/test/list_test"
+  - file: test/hash_test.c
+    source: vanessa_adt-0.0.9/test/hash_test.c
+    description: "vanessa_adt hash regression (exit-code oracle)"
+    command: "./build/test/hash_test"
+  - file: test/config_file_test.c
+    source: vanessa_adt-0.0.9/test/config_file_test.c
+    description: "vanessa_adt config-file regression (exit-code oracle)"
+    command: "./build/test/config_file_test"
+
+test_package_tests:
+  - file: test.sh
+    description: "consumer check 1: perdition --help shows proxy banner"
+    command: "sh test.sh (ok 1)"
+  - file: test.sh
+    description: "consumer check 2: makegdbm gdbm write+read roundtrip"
+    command: "sh test.sh (ok 2)"
+
+assertion_count: 2
