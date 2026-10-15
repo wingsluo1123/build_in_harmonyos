@@ -1,0 +1,21 @@
+cmake_minimum_required(VERSION 3.22)
+project(marisa_python3 LANGUAGES CXX)
+find_package(marisa CONFIG REQUIRED)
+find_package(python CONFIG REQUIRED)
+add_library(_marisa MODULE
+  "${MARISA_BINDING_BUILD}/marisa_wrap.cxx"
+  "${MARISA_SOURCE}/bindings/marisa-swig-python3.cxx")
+target_include_directories(_marisa PRIVATE "${MARISA_SOURCE}/bindings")
+target_link_libraries(_marisa PRIVATE marisa::marisa python::python)
+set_target_properties(_marisa PROPERTIES PREFIX "" SUFFIX ".so"
+  LIBRARY_OUTPUT_DIRECTORY "${MARISA_BINDING_BUILD}")
+enable_testing()
+foreach(group base-test io-test vector-test trie-test marisa-test)
+  add_executable(${group} "${MARISA_SOURCE}/tests/${group}.cc")
+  target_include_directories(${group} PRIVATE "${MARISA_SOURCE}/tests" "${MARISA_SOURCE}/lib")
+  target_compile_features(${group} PRIVATE cxx_std_20)
+  target_link_libraries(${group} PRIVATE marisa::marisa)
+  add_test(NAME ${group} COMMAND ${group})
+endforeach()
+install(TARGETS _marisa LIBRARY DESTINATION lib/python3.12/site-packages)
+install(FILES "${MARISA_BINDING_BUILD}/marisa.py" DESTINATION lib/python3.12/site-packages)
