@@ -1,0 +1,49 @@
+# ═══ Draft knowledge entry — ohc E017 ghfast.top 镜像注入劫持与 .ghfast-bak 回滚覆盖 ═══
+# Timestamp: 2026-10-14
+# Software: 框架层（ohc 管线 E017 预防机制，影响所有 github.com 源 URL 的配方）
+# Gate: ohc conan-verify / finish W3 本地 CI 模拟（构建前 conandata.yml 预处理）
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id: E430
+trigger_tool: ohc-run.py (conan-verify/finish W3 的 E017 镜像注入预处理)
+phase: compilation
+error_signature: ghfast\.top.*(timed out|timeout)|conandata\.yml\.ghfast-bak
+severity: 3
+category: build-system, network, ohos
+match_keywords: ghfast.top, E017, 镜像注入, ghfast-bak, conandata, connect timeout, 回滚覆盖
+title: ohc E017 只对 github.com URL 注入 ghfast.top 镜像且写 .ghfast-bak；镜像不可达时 conan create 下载超时，崩溃残留的 .ghfast-bak 还会在下次启动"恢复"覆盖手工修改的 conandata.yml
+root_cause: ohc 管线（防 E017 GitHub 网络不稳）在 conan create 前把 conandata.yml 中匹配 github.com 的 URL 临时改写为 ghfast.top 镜像前缀，原文件备份为 conandata.yml.ghfast-bak，构建后回滚。两个陷阱：(1) 注入只匹配 github.com URL，codeload.github.com 形态不命中——在 ghfast.top 从当前设备 connect timeout 不可达的网络环境下，github.com URL 必被劫持到不可达镜像导致下载超时，而 codeload 直连可达；(2) 若构建中途崩溃/被杀，.ghfast-bak 残留，下次 ohc 启动检测到残留会执行"恢复上次崩溃残留"逻辑，用 bak 内容覆盖 conandata.yml——直接吞掉期间的手工修改，且用户无感知（日志仅一行 ℹ️）。
+affected_scope: 所有 source URL 为 github.com/<org>/<repo>/archive 形态的配方（conan-verify/W3 构建阶段）；以及任何在 ohc 两次运行之间手工编辑过 conandata.yml 的场景
+verification_cmd: ls <archive>/*.ghfast-bak（存在即有崩溃残留）；grep -c ghfast <archive>/conandata.yml（构建后应回 0）；重跑前对比 conandata.yml 与手工版本差异
+rec_priority: 1
+rec_approach: codeload-url-plus-bak-cleanup
+rec_description: 网络侧用 codeload 裸 URL 形态避开注入匹配（配合 E429 的显式 filename）；每次重跑前删除 conandata.yml.ghfast-bak 残留并核对 conandata.yml 内容未被回滚覆盖
+rec_command: rm -f <archive>/conandata.yml.ghfast-bak && grep -n "url:" <archive>/conandata.yml
+rec_auto_fix: false
+rec_impl: manual
+fallback_priority: 2
+fallback_approach: 修复/放行 ghfast.top 网络可达性（设备网络策略），保持 github.com archive URL
+fallback_description: 仅当设备策略允许 ghfast.top 出网时可用；否则回退方案无效
+fallback_command:
+fallback_auto_fix: false
+fallback_impl: manual
+forbid_1_pattern: 构建失败后直接重跑 ohc 而不删除 conandata\.yml\.ghfast-bak
+forbid_1_reason: 残留 bak 会在启动时覆盖 conandata.yml，吞掉手工修复，导致反复用错误的 URL 构建
+forbid_1_consequence: 修复不生效且难以定位（内容被静默回滚，日志仅一行提示）
+doc_file: doc/E430.md
+last_updated: 2026-10-14
+source_event: keycloak-config-cli 6.4.0 conan-verify 第三轮 G2 失败（ghfast.top connect timeout）+ 第四轮发现 bak 回滚覆盖手工修改
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used: 2026-10-14
+
+draft: true
+contributor_id: 461D

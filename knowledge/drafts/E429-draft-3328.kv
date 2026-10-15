@@ -1,0 +1,46 @@
+# ═══ Draft knowledge entry — codeload 裸 URL 无扩展名触发 conan BadZipFile ═══
+# Timestamp: 2026-10-14
+# Software: keycloak-config-cli 6.4.0（conan 配方 source() 下载）
+# Gate: ohc conan-verify G2 conan create / W3 本地 CI 模拟
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id: E429
+trigger_tool: conan (conan create → conan.tools.files.get/unzip)
+phase: compilation
+error_signature: BadZipFile: File is not a zip file|Error in source\(\) method
+severity: 3
+category: build-system, ohos
+match_keywords: BadZipFile, codeload, conandata, filename, 无扩展名, strip_root
+title: codeload 裸 tarball URL 基名无扩展名时，conan get() 按 zip 处理触发 BadZipFile，conandata sources 必须显式声明 filename
+root_cause: GitHub codeload 裸 URL（https://codeload.github.com/<org>/<repo>/tar.gz/refs/tags/<tag>）的 URL 基名是 tag 名（如 v6.4.0）而非文件名，不带 .tar.gz 扩展名。conan 2.x 的 get()/unzip() 按下载文件的扩展名识别解压格式，无扩展名时回退按 zip 处理，gzip 内容触发 zipfile.BadZipFile（"File is not a zip file"），conan create 在 source() 阶段失败（Error in source() method, line N）。下载字节本身完全正确（sha256 一致），纯文件名识别问题。
+affected_scope: 所有用 codeload 裸 URL（/tar.gz/refs/tags/ 形态，基名无扩展名）做 source() 的 conan 配方，在 conan 2.x 下必现；影响 conan-verify G2 与 W3 本地 CI 模拟
+verification_cmd: 对已下载文件执行 file <file> 确认为 "gzip compressed data"，同时 URL 基名无 .tar.gz → 命中本模式；修复后重跑 conan create 应通过 source() 阶段
+rec_priority: 1
+rec_approach: conandata-explicit-filename
+rec_description: conandata.yml sources 段显式声明 filename: "<name>-<ver>.tar.gz"（get() 支持 filename 参数覆盖 URL 基名），URL 保持不变
+rec_command: 编辑 conandata.yml: sources:\n  url: "https://codeload.github.com/<org>/<repo>/tar.gz/refs/tags/<tag>"\n  sha256: "<sha256>"\n  filename: "<repo>-<ver>.tar.gz"
+rec_auto_fix: false
+rec_impl: manual
+fallback_priority: 2
+fallback_approach: 改用 github.com/<org>/<repo>/archive/refs/tags/<tag>.tar.gz 形态 URL（基名天然带 .tar.gz 扩展名）
+fallback_description: archive URL 重定向到 codeload，返回相同字节；但需确认 CI 镜像注入/网络策略对该 URL 形态可达
+fallback_command:
+fallback_auto_fix: false
+fallback_impl: manual
+doc_file: doc/E429.md
+last_updated: 2026-10-14
+source_event: keycloak-config-cli 6.4.0 conan-verify 第二轮 G2 失败（codeload URL，sha256 正确仍 BadZipFile）
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used: 2026-10-14
+
+draft: true
+contributor_id: 3328

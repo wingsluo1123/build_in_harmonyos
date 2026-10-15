@@ -1,0 +1,40 @@
+# ═══ Draft knowledge entry — Spring Boot fat jar MANIFEST 真实值（ZIP layout → PropertiesLauncher）═══
+# Timestamp: 2026-10-14
+# Software: keycloak-config-cli 6.4.0（spring-boot-maven-plugin layout=ZIP）
+# Gate: test_package 结构断言（MANIFEST 校验）
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id: E434
+trigger_tool: unzip -p <fat-jar> META-INF/MANIFEST.MF（test_package 结构断言）
+phase: testing
+error_signature: Main-Class: org\.springframework\.boot\.loader\.launch\.PropertiesLauncher|Start-Class:
+severity: 1
+category: build-system, compat
+match_keywords: PropertiesLauncher, JarLauncher, Start-Class, ZIP layout, spring-boot-maven-plugin, MANIFEST, finalName
+title: Spring Boot fat jar（layout=ZIP）MANIFEST 的 Main-Class 是 org.springframework.boot.loader.launch.PropertiesLauncher 而非 JarLauncher，Start-Class 才是应用主类；断言写错 loader 类名会导致 test_package A8 误报
+root_cause: spring-boot-maven-plugin 的 layout 决定启动器：JAR layout → JarLauncher；ZIP layout（keycloak-config-cli 6.4.0 pom 显式配置，支持 -Dloader.path 追加 classpath）→ PropertiesLauncher；WAR → WarLauncher。Spring Boot 3.x 的 loader 包为 org.springframework.boot.loader.launch.*（2.x 旧包名 org.springframework.boot.loader.*）。应用真正的主类在 Start-Class 头（本包 de.adorsys.keycloak.config.KeycloakConfigApplication，非直觉的 Main）。另外 pom <finalName>${project.artifactId}</finalName> 使产物 jar 名不带版本号（keycloak-config-cli.jar）。这些必须真机实测 MANIFEST 后写入断言，凭经验猜 JarLauncher/Main 类名会写错。
+affected_scope: 所有用 spring-boot-maven-plugin layout=ZIP 打 fat jar 的包的 test_package 结构断言（keycloak 系 CLI 常见）
+verification_cmd: unzip -p libexec/<app>.jar META-INF/MANIFEST.MF | grep -E "Main-Class|Start-Class" → 与 test.sh A8 断言逐字一致
+rec_priority: 1
+rec_approach: assert-actual-manifest
+rec_description: test_package 断言以实测 MANIFEST 为准（Main-Class 断言到具体 loader 全类名 + Start-Class 断言到应用主类），不凭 Spring Boot 经验假设
+rec_command: unzip -p "$JAR_PATH" META-INF/MANIFEST.MF | grep -E "^Main-Class:|^Start-Class:"
+rec_auto_fix: false
+rec_impl: manual
+doc_file: doc/E434.md
+last_updated: 2026-10-14
+source_event: keycloak-config-cli 6.4.0 test_package A8 迭代（首版断言 JarLauncher 误报，实测为 PropertiesLauncher）
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used: 2026-10-14
+
+draft: true
+contributor_id: E329
