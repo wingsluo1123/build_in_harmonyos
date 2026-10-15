@@ -1,0 +1,29 @@
+package: kmer/0-20150903-r2013
+homepage: "http://kmer.sourceforge.net/"
+
+upstream_check_command: "n/a"
+upstream_test_in_build: false
+upstream_test_command: "n/a"
+
+upstream_tests:
+  - name: upstream-suite-audit
+    command: "ls libutil/test libseq/test-*.C meryl/test libkmer/test sim4db/test 2>/dev/null"
+    expected: >
+      the 2013 tarball ships developer scratch programs (libutil/test/*,
+      libseq/test-*.C, meryl/test/exhaustive.C, libkmer/test/*) but no test
+      driver, no `check` target and no expected-output fixtures, so the upstream
+      tests are not runnable as a suite (N=0 runnable cases); the audit runs in
+      build() and its output is recorded in the conan create log
+
+test_package_tests:
+  - file: test_kmer.cc
+    description: >
+      Consumer (application) view: link the installed static libraries through
+      the exported kmer::kmer target and drive the public C API from the
+      installed headers - the libutil MD5 helpers against the RFC 1321 test
+      vectors (including the empty string) and the libbio sequence helpers
+      (reverseString, reverseComplementSequence on a normal and on a palindromic
+      k-mer). Prints one CHECK-OK line per assertion plus KMER_CONSUMER_OK.
+    command: "./test_kmer"
+
+assertion_count: 6

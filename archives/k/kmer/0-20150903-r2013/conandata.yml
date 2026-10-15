@@ -1,0 +1,32 @@
+sources:
+  "0-20150903-r2013":
+    url: "https://deb.debian.org/debian/pool/main/k/kmer/kmer_0~20150903+r2013.orig.tar.gz"
+    sha256: "8fd9c289244e69e38bb7709f3523d39edf1c2ced2cbcc687fcf00ecfca78ea47"
+
+patches:
+  - patch_file: "patches/0001-configure-add-ohos-arm64-target.patch"
+    patch_description: >
+      Add an OHOS-arm64 target block to configure.sh, which is the only place the
+      build system keeps its per-OS compiler flags (it writes Make.compilers).
+      HarmonyOS is not one of the names the script's uname switch knows and the
+      inherited Linux blocks pass -m64, so the configuration must be requested
+      explicitly (same shape as the repository's other custom-configure recipes)
+    patch_type: "portability"
+  - patch_file: "patches/0002-util-h-pri-macro-spacing.patch"
+    patch_description: >
+      libutil/util.h defines its printf format macros as "%"PRIu64. clang's C++11
+      lexer reads a string literal glued to an identifier as a user-defined
+      literal suffix and rejects the definition, so the closing quote needs a
+      space; the macro expands to the same concatenated literal (knowledge base:
+      DRAFT-cohomcalg-0.32-cpp11-literal-concat)
+    patch_type: "portability"
+  - patch_file: "patches/0003-cxx11-literal-macro-spacing.patch"
+    patch_description: >
+      Same C++11 user-defined-literal issue at the call sites: the 2013 sources
+      concatenate a string literal directly with a format macro
+      ("count: "uint64FMT" mers"). The patch inserts one space between the
+      closing quote and the macro identifier in every affected translation unit;
+      whitespace is dropped during literal concatenation, so the expanded format
+      strings are byte-identical (knowledge base:
+      DRAFT-cohomcalg-0.32-cpp11-literal-concat)
+    patch_type: "portability"

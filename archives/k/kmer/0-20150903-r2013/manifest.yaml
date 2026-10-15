@@ -1,0 +1,70 @@
+# 版本级 manifest — kmer 0-20150903-r2013
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "0-20150903-r2013"
+software: "kmer"
+status: built
+build_date: "2026-10-11"
+build_system: makefile
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/k/kmer/kmer_0~20150903+r2013.orig.tar.gz"
+  sha256: "8fd9c289244e69e38bb7709f3523d39edf1c2ced2cbcc687fcf00ecfca78ea47"
+  tar_format: tar.gz
+  upstream: "http://kmer.sourceforge.net/"
+
+build:
+  system: makefile
+  configure_options:
+    - "./configure.sh OHOS-arm64（配合 patches/0001 新增的目标块；configure.sh 生成 Make.compilers）"
+    - "CC=clang CXX=clang++ PYTHON=/nonexistent-python（R33：编译器取自 conan conf）"
+    - "make -j1 && make -j1 install（R9；产物落在 OHOS-arm64/）"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-configure-add-ohos-arm64-target.patch"
+  - "0002-util-h-pri-macro-spacing.patch"
+  - "0003-cxx11-literal-macro-spacing.patch"
+
+package_type: library
+artifacts:
+  - "bin/（58 个可执行文件与 Perl 脚本：meryl、leaff、sim4db、snapper2、tapper、seagen、sim4dbutils/* ...）"
+  - "lib/libkmer.a、libmeryl.a、libmerylguts.a、libseq.a、libbio.a、libsim4.a、libutil.a、libkaz.a、libmt19937ar.a"
+  - "lib/scheduler.pm、sim4polish.pm（Perl 模块）"
+  - "include/（58 个头文件：util.h、bio.h、alphabet.h、kmer.H、positionDB.H ...）"
+  - "licenses/README*（上游 README 附带 GPL-2.0-or-later 声明）"
+libs:
+  - sim4
+  - kmer
+  - meryl
+  - merylguts
+  - seq
+  - bio
+  - util
+  - kaz
+  - mt19937ar
+requires: []
+
+tests:
+  upstream_suite: >
+    29 个草稿用例（*/test/ 目录：libutil/test 18、libbio/test 3、libkmer/test 3、meryl/test 2、libseq/test 1、seagen/test 2；
+    其中 25 个文件名含 test）；无 check 目标、无测试驱动、无期望输出文件，
+    且这些目录没有 Make.include（上游 make 从不编译它们）
+  upstream_audit: "build(): grep check_PROGRAMS/TESTS/check 目标 + ls */test/Make.include（均 No such file），结果随 conan create 日志留证"
+  upstream_run: >
+    build() 内主动编译并运行全部 29 个草稿用例（脚本由配方生成），输出 SCRATCH-PASS / SCRATCH-FAIL-COMPILE /
+    SCRATCH-FAIL-RUN 与 SCRATCH-SUMMARY；实测 pass=17 run_fail=2 compile_fail=10
+  upstream_pass_rate: "17/29（58.6%）；test 命名的 25 个中 15/25（60%）"
+  upstream_fail_reasons: >
+    9 个引用同一 tarball 内已不存在的内部 API（seqCache / bzipBuffer / merToString / pdumppalloc 签名 / libbri.H 缺失），
+    1 个为上游自带停用开关（merTable.H: #error merTable should be unused），
+    1 个需预构建的 meryl 内部数据库，1 个启动即 SIGTRAP（atomic.C），
+    1 个上游硬编码了作者本机绝对路径（/home/work/src/genomics/...）
+  consumer_checks: 6
+  consumer_failures: 0
+  consumer_pass_rate: "6/6 (100%)（test_package/test_kmer.cc：md5_string 两条 RFC 1321 向量、reverseString、reverseComplementSequence 两条、uint64MAX/uint32MAX）"
+  command: "conan create archives/k/kmer/0-20150903-r2013 -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64"
+
+knowledge_gained: []
