@@ -1,0 +1,39 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: pox/0.3.7
+homepage: "https://github.com/uqfoundation/pox"
+
+# 上游测试命令：sdist 自带 pytest 套件（pox/tests/）
+upstream_check_command: "python3 -m pytest pox/tests -q"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "python3 -m pytest pox/tests -q"
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: pox/tests/test_utils.py
+    source: pox-0.3.7/pox/tests/test_utils.py
+    description: "高层工具（pattern/getvars/expandvars/convert/replace/index_join/findpackage/remote/parse_remote/select/selectdict/env/homedir/username）的真实断言"
+    command: "python3 -m pytest pox/tests -q"
+  - file: pox/tests/test_shutils.py
+    source: pox-0.3.7/pox/tests/test_shutils.py
+    description: "shell 工具（shelltype/homedir/rootdir/sep/mkdir/walk/where/env/minpath/which/find/shellsub/expandvars）的真实断言；其中 walk 目标改为可列目录（见补丁 0001）"
+    command: "python3 -m pytest pox/tests -q"
+
+# 上游测试的平台适配（唯一一处）
+platform_adaptations:
+  - rule: "upstream_rootdir_eacces"
+    reason: "上游 test_shutils 用 walk(rootdir(),'*') 断言 len(folders)>0；本平台 rootdir()='/' 且沙箱拒绝列举（EACCES），断言不可能成立。补丁 0001 改为 walk(os.getcwd())，断言本身与 walk 的 folders 模式语义不变"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_pox.py
+    description: "消费者视角：① 导入来源校验（POX_PACKAGE_ROOT 在模块路径父链上）+ 版本 0.3.7；② expandvars/env 读取真实进程环境；③ mkdir/walk/find 在临时树上真实建目录并回查；④ pattern/minpath 纯逻辑"
+    command: "conan create . (test_package)"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 2

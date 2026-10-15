@@ -1,0 +1,21 @@
+sources:
+  # 源可达性证据（2026-10-14 实测，字节与 sha256 均与官方一致）：
+  #   files.pythonhosted.org  -> 连接被拒（Errno 111，CI 与本地同样失败）
+  #   pypi.tuna.tsinghua.edu.cn/packages/... -> 200，119442 bytes
+  #   mirrors.aliyun.com/pypi/packages/...   -> 200，119442 bytes
+  # 故把两个 PyPI 镜像放前面、官方源保留兜底；sha256 不变。
+  url:
+    - "https://pypi.tuna.tsinghua.edu.cn/packages/44/58/4385741dea1d74fe9dfed7ff42975266634ef8000f2c8e96717079c916b1/pox-0.3.7.tar.gz"
+    - "https://mirrors.aliyun.com/pypi/packages/44/58/4385741dea1d74fe9dfed7ff42975266634ef8000f2c8e96717079c916b1/pox-0.3.7.tar.gz"
+    - "https://files.pythonhosted.org/packages/44/58/4385741dea1d74fe9dfed7ff42975266634ef8000f2c8e96717079c916b1/pox-0.3.7.tar.gz"
+  sha256: "0652f6f2103fe6d4ba638beb6fa8d3e8a68fd44bcb63315c614118515bcc3afb"
+
+patches:
+  - patch_file: "patches/0001-test-walk-listable-dir.patch"
+    patch_description: "pox/tests/test_shutils.py: walk the current directory instead of rootdir() — on this platform rootdir() is '/' which the sandbox refuses to list (EACCES), so walk() legitimately returns nothing and the upstream assertion len(folders) > 0 cannot hold. The assertion still exercises walk()'s folders mode"
+    patch_type: "portability"
+    strip: 1
+  - patch_file: "patches/0002-shutils-username-empty-getlogin-fallback.patch"
+    patch_description: "pox/shutils.py: username() must fall back to $USER/$USERNAME when getlogin() returns an EMPTY STRING — musl (OHOS) returns '' instead of raising, which the upstream try/except does not catch, so username() reported no user at all and the library's own contract was broken on this platform"
+    patch_type: "portability"
+    strip: 1
