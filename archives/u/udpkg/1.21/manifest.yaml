@@ -1,0 +1,111 @@
+# 版本级 manifest — udpkg 1.21
+# 遵循 ARCHIVE-SPEC v3.0
+
+# 版本号
+version: "1.21"
+
+# 软件名
+software: udpkg
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-13"
+build_system: autotools
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://deb.debian.org/debian/pool/main/u/udpkg/udpkg_1.21.tar.xz"
+
+  # 源码校验和
+  sha256: "de3ad5b987fd8b892b4babb51f5858debc35a1be6bd3d1469fcdfdee7d605b96"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  system: autotools
+
+  # 配置选项列表
+  configure_options:
+    - "--build=aarch64-unknown-linux-ohos"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - libdebian-installer/0.121
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - category: L1
+    content: "makefile.in 用 `$(shell dpkg-architecture -q...)` 取架构/OS（DEB_HOST_ARCH/DEB_HOST_ARCH_OS）——OHOS 无 dpkg-architecture，命令找不到返回空串，-DARCH_TEXT='' 编译错——配方 replace_in_file 硬编码 arm64/linux（OHOS aarch64 对应 dpkg 架构 arm64）"
+    reason: "makefile.in L1-2 原文核对 + OHOS 无 dpkg-architecture 实测"
+  - category: L1
+    content: "makefile.in 用 `$(wildcard *.c)` 收集源文件——若用 basic_layout(out-of-source) 构建，构建目录 OBJS 为空、链接缺 udpkg.o 目标。udpkg 配方刻意不设 layout()，Autotools 在 source_folder 内 in-source 构建"
+    reason: "makefile.in OBJS 定义核对 + out-of-source 布局缺陷分析"
+  - category: L1
+    content: "Debian native 包未预生成 configure/config.h.in——autoreconf -i 生成（autoheader 产出 config.h.in）；configure.ac 的 AC_INIT 用 m4_esyscmd(dpkg-parsechangelog) 取版本（环境无 dpkg 报 'AC_INIT should be called'）配方硬编码 1.21；configure.ac 无 AC_PROG_LIBTOOL（纯 C 无 .lo）build_requirements 只需 automake，不需要 libtool"
+    reason: "configure.ac 全文核对 + 同 cdebootstrap CLA1 实测"
+  - category: L1
+    content: "config.status mktemp 沙箱限制同 libdi/cdebootstrap/dpkg：configure 执行前替换 mktemp 模板为 TMPDIR 绝对路径 + TMPDIR 指可写目录（/data/storage/el2/base/cache）"
+    reason: "同 SKILL autotools-config-status-mktemp-sandbox"
+  - category: L1
+    content: "autotools 配方 generate() 必须 AutotoolsToolchain + AutotoolsDeps 双生成——只生成 Toolchain 时依赖 -I/-L 不注入，'debian-installer.h' file not found"
+    reason: "同 cdebootstrap CLA4 实测"
+
+# ============================================================
+# 测试信息
+# ============================================================
+
+upstream_tests:
+  unit: 0
+  integration: 0
+  other: 0
+  note: >-
+    udpkg 无任何上游测试套件：源码树仅 udpkg.c（746 行）/depends.c/status.c
+    + udpkg.h，无 test/ 目录，configure.ac/makefile.in 均无 check 目标，
+    tarball 全树核对无 test_*.c 文件。udpkg 是 Debian 安装程序 ramdisk 的
+    微型 dpkg 前端，其反编译/配置/卸载功能依赖真实 .deb 包与 dpkg 状态
+    目录（/var/lib/dpkg），上游交付即无自动化测试（Debian 本包仅靠
+    buildd 编进 di 镜像做人工冒烟）。上游测试通过率 N/A（无测试）。
+
+test_package:
+  unit: 0
+  integration: 4
+  note: >-
+    OHOS 真机消费测试（conan create 通过，EXIT=0）：
+    1. ELF 头确认（\x7fELF，OHOS aarch64）
+    2. --print-architecture -> arm64（退出码 0；该命令不依赖任何 dpkg
+       状态文件，直接输出编译期 -DARCH_TEXT）
+    3. --print-os -> linux（同上，-DOS_TEXT）
+    4. 无参数调用输出用法（stderr 含 "udpkg ["）退出码 0（源码 main 末尾
+       FPRINTF 后 return 0）
+    注：--unpack/--configure/--remove 等需真实 .deb + /var/lib/dpkg 状态
+    文件与 root 路径，非 ramdisk 上下文（OHOS 非 root、无 dpkg）不实际
+    执行，仅验证二进制到命令行分发的可用性。
