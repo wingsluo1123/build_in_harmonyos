@@ -1,0 +1,67 @@
+# 版本级 manifest — you-get 0.4.1743（Python 类适配，R47 用户决策覆盖）
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "0.4.1743"
+software: you-get
+
+# 编译状态（published | built | failed | archived）
+status: built
+
+# 编译日期（YYYY-MM-DD；conan create 由主编执行，若与实测不符请更新）
+build_date: "2026-10-14"
+build_system: python
+
+# ============================================================
+# 源码信息
+# ============================================================
+source:
+  # 源码下载 URL（官方 GitHub tag v0.4.1743，R39）
+  url: "https://github.com/soimort/you-get/archive/refs/tags/v0.4.1743.tar.gz"
+  # 源码校验和（主编实测）
+  sha256: "c01f0892f530a1624260345c6881059c6d00c4f722403060cf1cc31c5568e460"
+  # 压缩格式: tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+build:
+  # 构建系统类型（Python 类：纯 Python 无编译，直接拷贝 src/you_get 至
+  # site-packages，无 wheel 构建）
+  system: python
+
+  configure_options:
+    - "shutil.copytree src/you_get → <prefix>/lib/pythonX.Y/site-packages（纯 Python 无编译，无 wheel 构建；规避 pip build isolation 在受限 OHOS CI worker 上的 EAGAIN 子进程失败）"
+    - "生成 relocatable bin/you-get 启动器（PYTHONPATH 注入后 exec python3 -m you_get）"
+
+  # 编译依赖列表（格式: name/version；you-get 纯 Python 无 C 扩展，
+  # 运行时仅需 python3 解释器；dukpy 不声明为 Conan 依赖，见 notes.md）
+  dependencies:
+    - python/3.12.9
+
+  # 编译器（纯 Python 无编译；解释器为 python3）
+  cc: "n/a（纯 Python 无编译，解释器 python3）"
+  cxx: "n/a（纯 Python 无编译）"
+
+# ============================================================
+# 补丁信息
+# ============================================================
+patches_applied: []
+# 无需补丁：纯 Python 官方源码按原样打包，未修改任何上游文件
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+knowledge_gained:
+  - "you-get 为纯 Python（src/you_get/，无 C/C++ 源文件），任务标记 cpp 系误标；按用户决策覆盖 R47 以 Python application 适配（直接拷贝 src/you_get → site-packages → bin 启动器；不用 pip wheel，规避受限 CI worker 上 build isolation 的子进程 EAGAIN）。"
+  - "dukpy 仅被 src/you_get/extractors/youtube.py 顶层 import（try/except ImportError → log.e + exit(0)），且 extractors/__init__.py 会 from .youtube import *，因此 import you_get.extractors 即触发 dukpy；但 `you-get --version` 与 common 主流程惰性加载 extractors，不需要 dukpy。配方不声明 dukpy Conan 依赖（制品仓无此配方、CI 无外网 pip），YouTube 站点下载受限为已知限制。"
+  - "test_package 实质测试：运行 bin/you-get --version 并断言输出含 0.4.1743（不触发 dukpy、无需网络）；R34 满足。"
+
+# ============================================================
+# R47 覆盖决策（用户决策，记入 notes.md）
+# ============================================================
+r47_override: >-
+  lang-preflight 实测 detected_language=python（纯 Python 源码），按 R47 本应 env_unsupported 终态。
+  用户明确指示走完整适配+PR 流程，且本仓库有 pyparsing/3.1.4、check-jsonschema/0.28.4、
+  laniakea-spark/0.1.1、bambam/1.4.1 纯 Python 包适配先例（以解释器为运行时依赖交付）。
+  按用户决策覆盖 R47 走成功路径适配；覆盖决策与依据详见 notes.md。
