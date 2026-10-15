@@ -1,0 +1,36 @@
+Description: Fix string buffer size
+Bug-Debian: https://bugs.debian.org/908459
+Author: Andreas Tille <tille@debian.org>
+Last-Update: Wed, 10 Oct 2018 07:35:18 +0200
+
+--- a/libmsa/msa.c
++++ b/libmsa/msa.c
+@@ -608,7 +608,7 @@ MSA
+ {
+     int             i, j, cnt, dig;
+     int             len = 11;
+-    char            digit[len];
++    char            digit[len+1];
+ 
+     for(i = 0; i < msa->seqnum; ++i)
+         msa->name[i][len] = '\0';
+@@ -637,7 +637,7 @@ MSA
+                 }
+ 
+                 //printf("\n## %d %d %d %s %s  (%d,%d)", cnt, dig, len-dig, msa->name[i], msa->name[j], i ,j);
+-                strncpy(&msa->name[j][len-dig], digit, len);
++                strncpy(&msa->name[j][len-dig], digit, len+1);
+                 //printf("\n## %d %d %d %s %s\n", cnt, dig, len-dig, msa->name[i], msa->name[j]);
+                 ++cnt;
+             }
+--- a/MultiPose2MSA.c
++++ b/MultiPose2MSA.c
+@@ -156,7 +156,7 @@ Align2segID(PDBCdsArray *pdbA)
+     MSA            *msa = pdbA->seq2pdb->msa;
+     char           *seq = NULL;
+     int             resSeq = 0;
+-    char            alnindex[5];
++    char            alnindex[11];
+     PDBCds         *cdsi = NULL;
+ 
+     for (i = 0; i < cnum; ++i)
