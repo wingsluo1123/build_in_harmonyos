@@ -1,0 +1,86 @@
+--- /dev/null
++++ b/src/ohos_pthread_compat.c
+@@ -0,0 +1,83 @@
++/*
++ *   This file is part of ubridge, a program to bridge network interfaces
++ *   to UDP tunnels.
++ *
++ *   Copyright (C) 2015 GNS3 Technologies Inc.
++ *
++ *   ubridge is free software: you can redistribute it and/or modify it
++ *   under the terms of the GNU General Public License as published by
++ *   the Free Software Foundation, either version 3 of the License, or
++ *   (at your option) any later version.
++ *
++ *   ubridge is distributed in the hope that it will be useful,
++ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *   GNU General Public License for more details.
++ *
++ *   You should have received a copy of the GNU General Public License
++ *   along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++/*
++ * OHOS 兼容层 —— POSIX 线程取消 API。
++ *
++ * OpenHarmony 的 musl libc 不实现线程取消：pthread_cancel / pthread_testcancel
++ * 既没有在 <pthread.h> 里声明，也不在 libc.so 的动态符号表里（只在静态
++ * libc.a 中有，无法用于动态链接），链接时报 undefined symbol（知识库
++ * E085 / E513）。
++ *
++ * ubridge 的用法恒为成对的
++ *     pthread_cancel(tid); pthread_join(tid, NULL);
++ * 因此空实现会让 pthread_join() 永久阻塞。按 E513 推荐的「保留信号的线程
++ * 定向退出」方案：进程级安装一次 SIGUSR1 处理器（处理器内 pthread_exit），
++ * pthread_cancel 改为向目标线程 pthread_kill 该信号，从而同时保留
++ * 「只退出目标线程」与「随后可 join」两个语义。
++ *
++ * SIGUSR1 在 ubridge 中未被占用（它只用 SIGHUP/SIGTERM/SIGINT/SIGPIPE）。
++ * 非 OHOS 平台不编译任何替换实现，本文件只提供一个空的初始化函数。
++ */
++
++#include <pthread.h>
++#include <signal.h>
++#include <string.h>
++
++#include "ubridge.h"
++
++#ifdef __OHOS__
++
++#define UBRIDGE_CANCEL_SIGNAL SIGUSR1
++
++static void ubridge_cancel_handler(int sig)
++{
++   (void)sig;
++   pthread_exit(NULL);
++}
++
++void ubridge_ohos_pthread_cancel_init(void)
++{
++   struct sigaction act;
++
++   memset(&act, 0, sizeof(act));
++   act.sa_handler = ubridge_cancel_handler;
++   sigemptyset(&act.sa_mask);
++   act.sa_flags = 0; /* 不设 SA_RESTART：让阻塞中的系统调用被信号打断 */
++   sigaction(UBRIDGE_CANCEL_SIGNAL, &act, NULL);
++}
++
++int pthread_cancel(pthread_t thread)
++{
++   return pthread_kill(thread, UBRIDGE_CANCEL_SIGNAL);
++}
++
++void pthread_testcancel(void)
++{
++   /* OHOS 无取消点概念：ubridge 只在 pcap 超时轮询里调用它，空实现即可 */
++}
++
++#else
++
++void ubridge_ohos_pthread_cancel_init(void)
++{
++}
++
++#endif /* __OHOS__ */

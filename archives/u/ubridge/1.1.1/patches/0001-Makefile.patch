@@ -1,0 +1,37 @@
+--- a/Makefile
++++ b/Makefile
+@@ -49,28 +49,32 @@
+    SRC +=   src/nio_fusion_vmnet.c    \
+ 
+ else ifeq ($(shell uname -o), Cygwin)
+    CFLAGS += -DCYGWIN
+    LIBS =   -lpthread -lwpcap
+ else
+    LIBS =   -lpthread -lpcap
+ endif
+ 
+ # RAW Ethernet support for Linux
+-ifeq ($(shell uname), Linux)
++# HarmonyOS/OHOS exposes the same Linux raw-socket and netlink interfaces, but
++# `uname` reports "HarmonyOS" rather than "Linux"; accept both spellings so the
++# LINUX_RAW code path and the brctl/link/docker modules are compiled in.
++ifneq ($(filter Linux HarmonyOS,$(shell uname)),)
+     CFLAGS += -DLINUX_RAW
+     SRC += src/nio_linux_raw.c             \
+            src/hypervisor_docker.c         \
+            src/hypervisor_iol_bridge.c     \
+            src/hypervisor_brctl.c   \
+            src/hypervisor_link.c   \
+-           src/netlink/nl.c
++           src/netlink/nl.c        \
++           src/ohos_pthread_compat.c
+ endif
+ 
+ ifeq ($(SYSTEM_INIPARSER),1)
+     CFLAGS += -DUSE_SYSTEM_INIPARSER
+     LIBS += -liniparser
+ else
+     SRC += src/iniparser/iniparser.c   \
+ 	   src/iniparser/dictionary.c
+ endif
+ 

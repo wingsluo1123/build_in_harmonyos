@@ -1,0 +1,33 @@
+--- a/src/hypervisor_brctl.c
++++ b/src/hypervisor_brctl.c
+@@ -20,24 +20,30 @@
+ 
+ #include <unistd.h>
+ #include <string.h>
+ #include <strings.h>
+ #include <assert.h>
+ #include <errno.h>
+ #include <stdlib.h>
+ #include <netinet/in.h>
+ #include <arpa/inet.h>
+ #include <net/if.h>
++/* E091 (define-guard): 本 libc 的 <sys/socket.h> 与内核 UAPI <linux/socket.h>
++ * （经下面这些 linux/* 头间接引入）都定义 struct sockaddr_storage；本文件只用
++ * libc 的定义，故包含内核头期间把该 tag 改名、包含后恢复（详见
++ * src/nio_linux_raw.c 的说明，此处无平台条件编译）。 */
++#define sockaddr_storage __linux_sockaddr_storage
+ #include <linux/netlink.h>
+ #include <linux/rtnetlink.h>
+ #include <linux/if_link.h>
+ #include <linux/if_addr.h>
++#undef sockaddr_storage
+ #include "netlink/nl.h"
+ #include "ubridge.h"
+ #include "hypervisor.h"
+ #include "hypervisor_brctl.h"
+ 
+ 
+ /*
+  * Create a Linux bridge device (RTM_NEWLINK + IFLA_INFO_KIND "bridge").
+  * Returns 0 on success or a negative errno on failure (NOT -1).
+  */

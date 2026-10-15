@@ -1,0 +1,30 @@
+--- a/src/nio_tap.c
++++ b/src/nio_tap.c
+@@ -21,21 +21,27 @@
+ #include <stdio.h>
+ #include <unistd.h>
+ #include <string.h>
+ #include <sys/socket.h>
+ #include <fcntl.h>
+ #include <sys/ioctl.h>
+ #include <netdb.h>
+ 
+ #ifdef __linux__
+ #include <net/if.h>
++/* E091 (define-guard): 本 libc 的 <sys/socket.h> 与内核 UAPI <linux/socket.h>
++ * （经 <linux/if_tun.h> 间接引入）都定义 struct sockaddr_storage；本文件只用
++ * libc 的定义，故包含内核头期间把该 tag 改名、包含后恢复（详见
++ * src/nio_linux_raw.c 的说明，此处无平台条件编译）。 */
++#define sockaddr_storage __linux_sockaddr_storage
+ #include <linux/if_tun.h>
++#undef sockaddr_storage
+ #endif
+ 
+ #include "ubridge.h"
+ #include "nio_tap.h"
+ 
+ 
+ /* Open a TAP device */
+ static int nio_tap_open(char *tap_devname)
+ {
+ #ifdef __linux__

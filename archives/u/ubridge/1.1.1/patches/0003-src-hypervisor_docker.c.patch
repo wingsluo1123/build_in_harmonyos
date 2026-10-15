@@ -1,0 +1,33 @@
+--- a/src/hypervisor_docker.c
++++ b/src/hypervisor_docker.c
+@@ -31,24 +31,30 @@
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <sys/socket.h>
+ #include <sys/param.h>
+ #include <sys/ioctl.h>
+ #include <arpa/inet.h>
+ #include <net/if.h>
+ #include <net/if_arp.h>
+ #include <net/ethernet.h>
+ #include <netinet/in.h>
++/* E091 (define-guard): 本 libc 的 <sys/socket.h> 与内核 UAPI <linux/socket.h>
++ * （经下面这些 linux/* 头间接引入）都定义 struct sockaddr_storage；本文件只用
++ * libc 的定义，故包含内核头期间把该 tag 改名、包含后恢复（详见
++ * src/nio_linux_raw.c 的说明，此处无平台条件编译）。 */
++#define sockaddr_storage __linux_sockaddr_storage
+ #include <linux/netlink.h>
+ #include <linux/rtnetlink.h>
+ #include <linux/sockios.h>
+ #include <linux/if_bridge.h>
++#undef sockaddr_storage
+ #include <sched.h>
+ #include <linux/ethtool.h>
+ #include <regex.h>
+ 
+ #include "ubridge.h"
+ #include "hypervisor.h"
+ #include "hypervisor_docker.h"
+ #include "netlink/nl.h"
+ 
+ struct link_req {
