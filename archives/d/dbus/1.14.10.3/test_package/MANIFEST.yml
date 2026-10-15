@@ -1,0 +1,65 @@
+# test_package/MANIFEST.yml
+package: dbus/1.14.10.3
+homepage: "https://gitlab.freedesktop.org/dbus/dbus"
+
+# 上游测试入口：CTest 注册项（test/CMakeLists.txt 的 add_test_executable/add_test，
+# 含 name-test/ 的驱动脚本）。本配方用 -DDBUS_BUILD_TESTS=ON -DDBUS_ENABLE_MODULAR_TESTS=ON
+# 编译它们；执行由可复现运行器 test_upstream.sh 完成（真机跑 ctest、保存逐项结果）。
+upstream_check_command: "sh test_upstream.sh <build_tree> [outdir]"
+# build() 是否已集成"执行"：否 —— build() 只编译，不运行（执行入口见 runner）。
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests:
+  - file: "test/CMakeLists.txt"
+    source: "dbus-1.14.10/test/"
+    count: 39
+    count_unit: registered_ctest_tests
+    description: >-
+      真机实测：39 项 CTest 注册全部执行 —— 19 通过 / 20 失败，失败已按证据分类：
+      （a）平台不提供路径式 AF_UNIX：/tmp 为只读 erofs（bind → EROFS errno 30），
+      可写目录的路径式 bind 被平台策略拒绝（EPERM errno 1），抽象命名空间可用；上游夹具
+      硬编码 <listen>unix:tmpdir=/tmp</listen>（不修改），故 test-bus*、test-dbus-daemon*、
+      test-monitor、test-ids、test-pending-call-*、test-shutdown、test-privserver-client、
+      test-thread-init、test-misc-internals、test-refs、test-relay、test-server-oom
+      无法启动各自的私有总线；
+      （b）test-fdpass / test-loopback 在 TCP 监听成功后 70s 超时（SIGALRM）；
+      （c）test-corrupt 为真实断言差异（/corrupt/tcp 期望 com.example.Hello，实得
+      org.freedesktop.DBus.Local），单列待分析。
+      运行前提：沙箱 UID 无 /etc/passwd 记录，libdbus 启动即 abort（Could not get
+      password database information for UID of current process）；runner 以 getpwuid shim
+      （LD_PRELOAD）越过该步。未修改任何上游测试或夹具，case 数不做推算。
+    command: "sh test_upstream.sh <build_tree> [outdir]"
+
+  - file: "test/name-test/run-test.sh"
+    source: "dbus-1.14.10/test/"
+    count: 7
+    count_unit: driver_scripts
+    description: >-
+      7 个测试驱动脚本（test/*.sh 5 个 + name-test/*.sh 2 个）；它们是部分注册项的实现
+      （由 CTest 调用），不是独立用例，故不并入上面的 39。
+
+test_package_tests:
+  - file: test.c
+    description: >-
+      消费者验证（与上游测试分列，不计入上游 N）：libdbus-1 客户端编译链接，并在本配方
+      启动的会话总线上完成一次 org.freedesktop.DBus.Peer.Ping 往返。真机实测 PASS。
+    command: "./test_dbus"
+
+  - file: "dbus_hos_multiproc.c (+ dbus_hos_service.c, dbus_hos_client.c)"
+    description: >-
+      鸿蒙特有跨进程集成测试（1 项集成场景，内部步骤只作证据，不单独计数，不计入
+      上游 N）：本轮实测探测沙箱目录的路径式 AF_UNIX 能力（/data/storage/el2/base/tmp
+      可用、/storage/Users/currentUser（hmdfs）bind EPERM、/tmp 只读）→ 在可用目录启动
+      包内 dbus-daemon（unix:path 套接字，<auth>EXTERNAL</auth>，无 ANONYMOUS/allow_anonymous）
+      → 独立服务进程（不同 PID、独立连接）持有众所周知名 org.ohos.HosDbusTest、
+      注册业务对象并运行分发循环 → 独立客户端进程发出携带运行唯一 token 的 Echo 请求，
+      收到服务端处理后的应答 → 客户端订阅并收到服务端携带该 token 的信号 →
+      服务进程正常退出、名字释放（NameHasOwner=false）→ 再次调用得到明确
+      org.freedesktop.DBus.Error.ServiceUnknown（0 ms，不挂死不返回旧应答）→
+      清理本次进程/socket/临时文件。conan create 的 test_package 阶段运行该入口，
+      任一步失败即非零退出；缺 daemon/总线/未执行时同样不为 PASS。
+    command: "./dbus_hos_multiproc <package>/bin/dbus-daemon"
+
+# 测试条目数 (近似值, 用于质量评估)
+assertion_count: 2

@@ -1,0 +1,41 @@
+software: dbus
+version: 1.14.10.3
+status: published
+build_system: cmake
+created_at: 2026-04-28
+updated_at: 2026-10-13
+knowledge_gained:
+  - "路径式 AF_UNIX bind 受目录限制（2026-10-13 真机逐目录实测）：/tmp 为只读 erofs（errno 30）；hmdfs（/storage/Users/currentUser，登录会话 TMPDIR 亦指向其中）bind 返回 EPERM（errno 1）；/data/storage/el2/base/{tmp,cache,files} 可用——bind+listen+connect 全通过，SO_PEERCRED 返回真实 pid/uid。不能把整个平台说成不支持路径式 AF_UNIX"
+  - "运行 uid 20020101 无 /etc/passwd 记录：dbus-daemon 在完成 EXTERNAL 认证时解析该 uid 的 passwd 条目失败（日志 Could not get password database information for UID of current process），连接被断开、客户端表现为超时。测试运行器以 getpwuid/getpwuid_r shim（LD_PRELOAD，仅注入 daemon 进程）越过此步；shim 对任意 uid 返回固定的合成记录，不改变认证数值（EXTERNAL 比对的是 SO_PEERCRED 的内核 uid）。正式包不含 shim"
+  - "hmdfs 对全部文件统一报告属主 uid=20001006（实测：本进程新建文件 stat 亦为 20001006:1006），而 el2 沙箱目录保留真实 uid。dbus-keyring 的属主一致性检查（目录属主须等于进程 uid）因此在 hmdfs 上永远失败，DBUS_COOKIE_SHA1 无法完成；把测试 home（DBUS_TEST_HOMEDIR）放到 el2 目录即恢复正常（Linux 同版本对照三个测试全过）"
+  - "dbus 顶层 CMake 用标准 find_package(EXPAT)（FindEXPAT 模块），conan CMakeDeps 只提供 expat::expat 目标；需在配方注入 EXPAT_INCLUDE_DIR/EXPAT_LIBRARY/EXPAT_LIBRARIES 使 dbus-daemon 链接成功"
+  - "本平台实测：AF_INET 套接字的 SO_PEERCRED 返回未知凭据（pid=-38，uid/gid=(uid_t)-1），AF_UNIX 返回真实 uid/pid。本配方自身为消费者测试启动的 TCP 测试总线因此配置 ANONYMOUS+allow_anonymous 完成往返；该配置仅用于那条测试总线，不代表上游放宽认证，也不作为上游 TCP 用例的结论"
+patches_applied:
+  - patches/0002-build-aux-config.guess.patch
+  - patches/0003-build-aux-config.sub.patch
+  - patches/0005-dbus-daemon-link-expat.patch
+build_log: logs/build.log
+source_url: https://dbus.freedesktop.org/releases/dbus/dbus-1.14.10.tar.xz
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/dbus-1.14.10.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/dbus-1.14.10.work
+  source_orig_hash: 462caa9ad936e6b6
+  source_work_hash: 5db41cd00f54db84
+  generated_at: '2026-04-28T04:47:51'
+  patches_count: 3
+
+runtime_verification:
+  dbus_daemon_session_start: true
+  dbus_daemon_session_method: "unix:path 套接字（/data/storage/el2/base/tmp，本轮实测支持路径式 AF_UNIX）"
+  dbus_run_session_in_session_command: true
+  consumer_roundtrip: true
+  consumer_api: org.freedesktop.DBus.Peer.Ping via dbus-send (libdbus client)
+  hos_multiproc_integration:
+    entry: "test_package/dbus_hos_multiproc(+ dbus_hos_service/dbus_hos_client)"
+    method: "包内 dbus-daemon（EXTERNAL 认证）+ 独立服务进程 + 独立客户端进程，跨进程请求/应答/信号/退出/清理，真机实测 PASS"
+    recorded_at: "2026-10-13"
+  platform_limits:
+    - "路径式 AF_UNIX 受目录限制：/tmp 只读 erofs；hmdfs 目录 bind EPERM；/data/storage/el2/base/{tmp,cache,files} 可用"
+    - "运行 uid 20020101 无 passwd 记录：EXTERNAL 认证完成需 getpwuid 可解析，测试运行器用 LD_PRELOAD shim（仅 daemon）；正式包不含"
