@@ -1,0 +1,48 @@
+software: spaln
+version: "3.0.7"
+status: built
+build_system: custom-configure+make
+build_date: "2026-10-14"
+
+source:
+  url: "https://github.com/ogotoh/spaln/archive/refs/tags/ver.3.0.7.tar.gz"
+  sha256: "391de895a6bcfc426edb661348e7ab55107c5c7d726411851ef3c1df5226ba20"
+  tar_format: tar.gz
+  official: true
+
+build:
+  system: "upstream src/configure (hand-written, not autoconf) + GNU make"
+  configure_options:
+    - "--exec_prefix=<package>/bin"
+    - "--table_dir=<package>/share/spaln/table"
+    - "--alndbs_dir=<package>/share/spaln/seqdb"
+  build_variables:
+    - "CFLAGS=\"-O3 <dependency -I flags>\" (upstream default minus -march=native)"
+    - "LLIB/GLIB overridden on the make command line with the Conan zlib/gsl flags"
+    - "AR/RANLIB taken from tools.build:compiler_executables"
+  dependencies:
+    - zlib/1.3.1.1
+  cc: clang
+  cxx: clang++
+  cppstd: 17
+  programs_built: 10
+  programs_excluded:
+    - "fitild, compild, decompild, plotild (PROG_F): need glibc-only exp10(), drand48_r() and struct drand48_data, none of which the OHOS musl libc provides; upstream's Makefile documents the same reduced PROG set for non-glibc platforms"
+  make_install_used: false
+  make_install_reason: "`make install` executes the freshly cross-compiled `makmdm`; a target binary cannot be run during a cross build"
+
+patches_applied: []
+
+knowledge_gained:
+  - "spaln's src/configure defaults CFLAGS to `-O3 -march=native`, which silently describes the x86_64 build host during a cross build; the script honours an explicit CFLAGS from the environment, so the recipe injects its own flag set instead of patching the script"
+  - "The Makefile variable that carries the link libraries is LLIB, but configure's sed only rewrites the ILIB line that does not exist in Makefile.in - the hard-coded `-lz` therefore survives configure and must be overridden on the make command line"
+  - "src/configure generates iolib.h and dbs.h from iolib.src/dbs.src by substituting table_dir/alndbs_dir, so the table path is compiled into the binaries; Ftable resolves it as `.` -> $ALN_TAB -> baked-in path"
+  - "make install runs the target makmdm to regenerate mdm_cmp/mdm_mtx, which a cross build cannot do; the release archive already ships both tables and they are packaged verbatim"
+  - "makmdm is deterministic (two consecutive runs are byte-identical) and derives the tables from a hard-coded PAM matrix rather than from the table directory, so skipping the install-time regeneration does not lose information"
+  - "PROG_F (fitild/compild/decompild/plotild) is the only part of the tree that uses GSL and the only part that uses glibc-only libc APIs; excluding it removes the GSL dependency as well as exp10/drand48_r"
+  - "the OHOS musl sysroot declares no exp10() in <math.h> (even with _GNU_SOURCE) and has neither drand48_r() nor struct drand48_data; libc.so exports drand48() only"
+
+risks:
+  - "table/mdm_mtx shipped by upstream differs from a freshly regenerated table in 9 of 74896 bytes (compiler floating-point ordering); see notes.md"
+  - "the four PROG_F distribution-fitting tools are not packaged; porting them would require reimplementing glibc's reentrant drand48_r in the source"
+  - "spaln ships no automated test suite, so behaviour coverage comes from test_package"
