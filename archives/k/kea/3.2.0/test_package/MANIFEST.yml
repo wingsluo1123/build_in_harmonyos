@@ -1,0 +1,76 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI 脚本 L0e 要求存在；真机实测计数见版本级 manifest.yaml / notes.md）
+package: kea/3.2.0
+homepage: "https://www.isc.org/kea/"
+
+# 上游测试入口：Meson 注册的整棵源码树 test() 套件（build() 内真实执行，无过滤）
+upstream_check_command: "meson test -C <builddir>"
+upstream_test_in_build: true
+upstream_test_command: "meson test -v --timeout-multiplier 4 -C <builddir>"
+
+# 上游实际运行的测试程序（本配方适配整棵树，故全树套件均为验证范围；
+# 源码书写 105 处 test()（1 处 foreach 展开 7 项），19 处条件不注册
+# （mysql 4 / pgsql 4 / netconf 6 / krb5·gss-tsig 2 + 无 sudo 环境 3）
+# → 真机实测注册 92 套件（66 gtest + 26 脚本）；
+# 用例宏计数：TEST_F 10741 + TEST 1538 + TEST_P 2 = 12281，
+# 配置裁剪与真机注册/通过数见版本级 manifest.yaml 与 notes.md）
+upstream_tests:
+  - file: (整棵树 · 实测注册 92 套件)
+    source: src/lib/**、src/bin/**、src/hooks/**（各模块 tests/ 目录）
+    description: >-
+      ISC Kea 3.2.0 全树 Meson 测试套件：核心库（asiolink/cc/config/dhcp/
+      dhcpsrv/dns/eval/hooks/http/log/process/stats/tcp/util 等）、守护进程
+      （dhcp4/dhcp6/dhcp-ddns/lfc/perfdhcp）与内置 hook 插件（bootp/class_cmds/
+      ddns_tuning/flex_id/flex_option/forensic_log/high_availability/host_cache/
+      host_cmds/lease_cmds/lease_query/limits/perfmon/ping_check/radius/
+      run_script/stat_cmds/subnet_cmds/user_chk 等）的单元测试。本配方适配整棵树，
+      故不设套件过滤，全部注册套件真实执行；实测计数见版本级 manifest.yaml。
+    command: "meson test -v --timeout-multiplier 4 -C <builddir>"
+
+# test_package 中自带的测试（2 项通用消费者检查 + 2 项鸿蒙特有）
+test_package_tests:
+  - file: test_kea_api.cpp
+    description: >-
+      消费者契约（C++）：按包内 include/kea 头文件编译（含 boost 依赖的
+      dhcp/pkt.h、util/str.h，证明传递性头文件可用），链接包内
+      libkea-exceptions.so 与 libkea-util.so，驱动 isc::Exception 异常模型
+      （isc_throw/what()/what(true)/file-line 上下文/std::exception 层级/
+      流式消息）与 util::str::trim 真实符号，共 10 项检查
+    command: "./test_kea_api"
+  - file: test_kea_daemons.py
+    description: >-
+      消费者执行检查（Python 驱动）：5 个可执行文件 -v 版本输出（kea-dhcp4/
+      kea-dhcp6/kea-dhcp-ddns/kea-lfc/perfdhcp）、kea-dhcp4 与 kea-dhcp-ddns 的
+      -W 构建配置报告（config_report.cc 生成路径）、kea-dhcp4/kea-dhcp6 的 -t
+      配置检查（合法配置退出 0；未知参数与缺失文件非 0 退出），共 12 项检查
+    command: "python3 test_kea_daemons.py <package-folder>"
+  - file: test_ohos_platform.c
+    description: >-
+      鸿蒙特有 #1（平台 ABI）：校验包内 kea-dhcp4 守护进程的 OHOS 平台 ABI
+      特征（ELFCLASS64 / EM_AARCH64、DT_NEEDED 链接 musl libc.so 且非 glibc
+      libc.so.6、链接 libc++_shared.so）并验证 OHOS 加载器可 dlopen(RTLD_NOW)
+      解析其 libkea-* 闭包，共 11 项检查
+    command: "./test_ohos_platform <package>/bin/kea-dhcp4"
+    ohos_specific: true
+  - file: test_ohos_runtime.c
+    description: >-
+      鸿蒙特有 #2（运行时闭包）：在 OHOS 加载器下逐个 dlopen(RTLD_NOW) 包内
+      全部 libkea-*.so*（>= 20 个去重库）与 lib/kea/hooks/ 全部 hook 插件
+      （>= 15 个），校验完整 NEEDED 闭包可解析；并校验 hook 契约符号
+      version()/load()/unload() 可解析、version() 返回 30200（Kea 3.2.0
+      KEA_HOOKS_VERSION），共 96 项检查
+    command: "./test_ohos_runtime <package>/lib"
+    ohos_specific: true
+
+# 鸿蒙特有测试用例统计（test_package 内，实测结果见版本级 notes.md）
+ohos_specific_tests:
+  count: 2
+  entries:
+    - test_ohos_platform
+    - test_ohos_runtime
+  command: "./test_ohos_platform <package>/bin/kea-dhcp4 && ./test_ohos_runtime <package>/lib"
+
+# 上游测试用例宏总数（本次适配源码计数：TEST_F 10741 + TEST 1538 + TEST_P 2 = 12281，
+# 列首 ^TEST(_F|_P)? 锚定 src/**.cc+.h，含 38 处 DISABLED_；
+# 实际注册执行数与通过率以真机日志为准，见版本级 manifest.yaml）
+assertion_count: 12281

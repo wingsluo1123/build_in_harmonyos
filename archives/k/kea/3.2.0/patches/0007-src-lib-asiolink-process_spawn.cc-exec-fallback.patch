@@ -1,0 +1,48 @@
+--- a/src/lib/asiolink/process_spawn.cc
++++ b/src/lib/asiolink/process_spawn.cc
+@@ -231,6 +231,11 @@
+     /// @brief An array holding arguments for the executable.
+     boost::shared_ptr<char*[]> args_;
+ 
++    /// @brief An argv array for the POSIX shell fallback used in spawn():
++    /// "/bin/sh", the executable and its arguments.  Pre-built so that the
++    /// post-fork() retry path needs no allocation.
++    boost::shared_ptr<char*[]> sh_args_;
++
+     /// @brief An array holding environment variables for the executable.
+     boost::shared_ptr<char*[]> vars_;
+ 
+@@ -296,6 +301,15 @@
+     // Copy arguments to the array.
+     for (size_t i = 1; i <= args.size(); ++i) {
+         args_[i] = allocateInternal(args[i - 1]);
++    }
++    // Pre-build the argv of the POSIX shell fallback used in spawn():
++    // the shell itself, then the executable, then the original arguments.
++    sh_args_ = boost::shared_ptr<char*[]>(new char*[args.size() + 3]);
++    memset(sh_args_.get(), 0, (args.size() + 3) * sizeof(char*));
++    sh_args_[0] = allocateInternal("/bin/sh");
++    sh_args_[1] = args_[0];
++    for (size_t i = 1; i <= args.size(); ++i) {
++        sh_args_[i + 1] = args_[i];
+     }
+     // Copy environment variables to the array.
+     size_t i(0);
+@@ -363,6 +377,17 @@
+         execve(executable_.c_str(), args_.get(), vars_.get());
+         // We may end up here if the execve failed, e.g. as a result
+         // of issue with permissions or invalid executable name.
++        //
++        // The HarmonyOS PC kernel refuses to execve() scripts whose
++        // interpreter line names /bin/sh and reports EACCES instead.
++        // POSIX shells fall back to interpreting executables that the
++        // kernel cannot run; mirror that fallback for scripts so that
++        // hooks spawning scripts (run_script) keep working there: retry
++        // through /bin/sh with the same arguments and environment.  On
++        // systems where execve() succeeds this branch is never reached.
++        if ((errno == EACCES) || (errno == ENOEXEC)) {
++            execve("/bin/sh", sh_args_.get(), vars_.get());
++        }
+         _exit(EXIT_FAILURE);
+     }
+ 

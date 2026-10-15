@@ -1,0 +1,252 @@
+--- a/meson.build
++++ b/meson.build
+@@ -122,6 +122,11 @@
+ PIP_COMPILE = find_program('pip-compile', required: false)
+ PLANTUML = find_program('plantuml', required: false)
+ PYTHON = find_program('python3', 'python', required: true)
++# The HarmonyOS PC kernel refuses to execute #! scripts whose interpreter
++# line names /bin/sh (EACCES); launch every script-based test through the
++# POSIX shell explicitly (the test() registrations in the subdirectories
++# pass this program as the test executable).
++SH = find_program('/bin/sh')
+ SPHINX = find_program('sphinx-build', 'sphinx-build-3', required: false)
+ SUDO = find_program('sudo', required: false)
+ XMLLINT = find_program('xmllint', required: false)
+--- a/src/lib/log/tests/meson.build
++++ b/src/lib/log/tests/meson.build
+@@ -83,7 +83,8 @@
+     name = 'kea-log-' + shtest
+     test(
+         name,
+-        shfile,
++        SH,
++        args: [shfile],
+         workdir: current_build_dir,
+         is_parallel: false,
+         priority: -1,
+--- a/src/bin/dhcp4/tests/meson.build
++++ b/src/bin/dhcp4/tests/meson.build
+@@ -41,7 +41,8 @@
+ )
+ test(
+     'dhcp4_process_tests.sh',
+-    dhcp4_process_tests,
++    SH,
++    args: [dhcp4_process_tests],
+     workdir: current_build_dir,
+     is_parallel: false,
+     priority: -1,
+--- a/src/bin/dhcp6/tests/meson.build
++++ b/src/bin/dhcp6/tests/meson.build
+@@ -41,7 +41,8 @@
+ )
+ test(
+     'dhcp6_process_tests.sh',
+-    dhcp6_process_tests,
++    SH,
++    args: [dhcp6_process_tests],
+     workdir: current_build_dir,
+     is_parallel: false,
+     priority: -1,
+--- a/src/bin/lfc/tests/meson.build
++++ b/src/bin/lfc/tests/meson.build
+@@ -38,7 +38,8 @@
+ )
+ test(
+     'lfc_process_tests.sh',
+-    lfc_process_tests,
++    SH,
++    args: [lfc_process_tests],
+     workdir: current_build_dir,
+     is_parallel: false,
+     priority: -1,
+--- a/src/bin/d2/tests/meson.build
++++ b/src/bin/d2/tests/meson.build
+@@ -14,7 +14,8 @@
+ )
+ test(
+     'd2_process_tests.sh',
+-    d2_process_tests,
++    SH,
++    args: [d2_process_tests],
+     workdir: current_build_dir,
+     is_parallel: false,
+     priority: -1,
+--- a/src/bin/perfdhcp/tests/meson.build
++++ b/src/bin/perfdhcp/tests/meson.build
+@@ -40,7 +40,8 @@
+ )
+ test(
+     'perfdhcp_process_tests.sh',
+-    perfdhcp_process_tests,
++    SH,
++    args: [perfdhcp_process_tests],
+     workdir: current_build_dir,
+     is_parallel: false,
+     priority: -1,
+--- a/src/bin/admin/tests/meson.build
++++ b/src/bin/admin/tests/meson.build
+@@ -14,7 +14,8 @@
+ )
+ test(
+     'admin_tests.sh',
+-    admin_tests,
++    SH,
++    args: [admin_tests],
+     is_parallel: false,
+     priority: -1,
+     suite: 'shell-tests',
+@@ -26,7 +27,8 @@
+ )
+ test(
+     'memfile_tests.sh',
+-    memfile_tests,
++    SH,
++    args: [memfile_tests],
+     # depends: [kea_admin, kea_dhcp4, kea_dhcp6, kea_lfc],
+     is_parallel: false,
+     priority: -1,
+@@ -40,7 +42,8 @@
+ if MYSQL_DEP.found()
+     test(
+         'kea_admin_mysql_tests.sh',
+-        mysql_tests,
++        SH,
++        args: [mysql_tests],
+         is_parallel: false,
+         priority: -1,
+         suite: 'shell-tests',
+@@ -55,7 +58,8 @@
+ if POSTGRESQL_DEP.found()
+     test(
+         'kea_admin_pgsql_tests.sh',
+-        pgsql_tests,
++        SH,
++        args: [pgsql_tests],
+         is_parallel: false,
+         priority: -1,
+         suite: 'shell-tests',
+--- a/src/bin/keactrl/tests/meson.build
++++ b/src/bin/keactrl/tests/meson.build
+@@ -17,7 +17,8 @@
+ )
+ test(
+     'keactrl_tests.sh',
+-    keactrl_tests,
++    SH,
++    args: [keactrl_tests],
+     # depends [kea_dhcp4, kea_dhcp6, kea-dhcp-ddns],
+     is_parallel: false,
+     priority: -1,
+--- a/src/bin/shell/tests/meson.build
++++ b/src/bin/shell/tests/meson.build
+@@ -15,7 +15,8 @@
+ pythonpath.append('PYTHONPATH', TOP_BUILD_DIR / 'src/bin/shell')
+ test(
+     'shell_unittest.py',
+-    shell_unittest,
++    PYTHON,
++    args: [shell_unittest],
+     is_parallel: false,
+     priority: -1,
+     env: pythonpath,
+@@ -28,7 +29,8 @@
+ )
+ test(
+     'd2_basic_auth_tests.sh',
+-    d2_basic_auth_tests,
++    SH,
++    args: [d2_basic_auth_tests],
+     is_parallel: false,
+     priority: -1,
+     suite: 'shell-tests',
+@@ -40,7 +42,8 @@
+ )
+ test(
+     'dhcp4_basic_auth_tests.sh',
+-    dhcp4_basic_auth_tests,
++    SH,
++    args: [dhcp4_basic_auth_tests],
+     is_parallel: false,
+     priority: -1,
+     suite: 'shell-tests',
+@@ -52,7 +55,8 @@
+ )
+ test(
+     'dhcp6_basic_auth_tests.sh',
+-    dhcp6_basic_auth_tests,
++    SH,
++    args: [dhcp6_basic_auth_tests],
+     is_parallel: false,
+     priority: -1,
+     suite: 'shell-tests',
+@@ -64,7 +68,8 @@
+ )
+ test(
+     'shell_d2_process_tests.sh',
+-    shell_d2_process_tests,
++    SH,
++    args: [shell_d2_process_tests],
+     is_parallel: false,
+     priority: -1,
+     suite: 'shell-tests',
+@@ -76,7 +81,8 @@
+ )
+ test(
+     'shell_dhcp4_process_tests.sh',
+-    shell_dhcp4_process_tests,
++    SH,
++    args: [shell_dhcp4_process_tests],
+     is_parallel: false,
+     priority: -1,
+     suite: 'shell-tests',
+@@ -88,7 +94,8 @@
+ )
+ test(
+     'shell_dhcp6_process_tests.sh',
+-    shell_dhcp6_process_tests,
++    SH,
++    args: [shell_dhcp6_process_tests],
+     is_parallel: false,
+     priority: -1,
+     suite: 'shell-tests',
+@@ -100,7 +107,8 @@
+ )
+ test(
+     'tls_d2_process_tests.sh',
+-    tls_d2_process_tests,
++    SH,
++    args: [tls_d2_process_tests],
+     is_parallel: false,
+     priority: -1,
+     suite: 'shell-tests',
+@@ -112,7 +120,8 @@
+ )
+ test(
+     'tls_dhcp4_process_tests.sh',
+-    tls_dhcp4_process_tests,
++    SH,
++    args: [tls_dhcp4_process_tests],
+     is_parallel: false,
+     priority: -1,
+     suite: 'shell-tests',
+@@ -124,7 +133,8 @@
+ )
+ test(
+     'tls_dhcp6_process_tests.sh',
+-    tls_dhcp6_process_tests,
++    SH,
++    args: [tls_dhcp6_process_tests],
+     is_parallel: false,
+     priority: -1,
+     suite: 'shell-tests',
+@@ -136,7 +146,8 @@
+ )
+ test(
+     'shell_process_tests.sh',
+-    shell_process_tests,
++    SH,
++    args: [shell_process_tests],
+     workdir: current_build_dir,
+     is_parallel: false,
+     priority: -1,

@@ -1,0 +1,143 @@
+--- a/src/lib/dhcpsrv/tests/memfile_lease_mgr_unittest.cc
++++ b/src/lib/dhcpsrv/tests/memfile_lease_mgr_unittest.cc
+@@ -37,6 +37,10 @@
+ #include <fstream>
+ #include <queue>
+ #include <sstream>
++#include <string.h>
++#include <sys/socket.h>
++#include <sys/un.h>
++#include <unistd.h>
+ 
+ #include <unistd.h>
+ 
+@@ -571,9 +575,17 @@
+ /// the environment variable KEA_DHCP_DATA_DIR.
+ TEST_F(MemfileLeaseMgrTest, dataDirEnvVarOverride) {
+     ASSERT_TRUE(data_dir_env_var_.getValue().empty());
+-    data_dir_env_var_.setValue("/tmp");
++    // Prefer the POSIX temporary directory when set: some sandboxed
++    // platforms provide no writable /tmp (HarmonyOS PC mounts /tmp
++    // read-only), while this test needs a writable override directory.
++    const char* tmpdir = getenv("TMPDIR");
++    if ((tmpdir == NULL) || (*tmpdir == 0)) {
++        tmpdir = "/tmp";
++    }
++    const std::string data_dir = tmpdir;
++    data_dir_env_var_.setValue(data_dir);
+     auto valid_path = CfgMgr::instance().getDataDir(true);
+-    ASSERT_EQ(valid_path, "/tmp");
++    ASSERT_EQ(valid_path, data_dir);
+ 
+     DatabaseConnection::ParameterMap pmap;
+     pmap["universe"] = "6";
+@@ -584,19 +596,28 @@
+ 
+     ASSERT_NO_THROW(lease_mgr.reset(new Memfile_LeaseMgr(pmap)));
+     EXPECT_EQ(lease_mgr->getLeaseFilePath(Memfile_LeaseMgr::V6),
+-              "/tmp/leasefile6_1.csv");
++              data_dir + "/leasefile6_1.csv");
+     ConstElementPtr status = lease_mgr->getStatus();
+     ASSERT_TRUE(status);
+     EXPECT_EQ(status->str(),
+-              "{ \"csv-lease-file\": \"/tmp/leasefile6_1.csv\" }");
++              "{ \"csv-lease-file\": \"" + data_dir +
++              "/leasefile6_1.csv\" }");
+ }
+ 
+ /// @brief Verifies that the supported path may be overridden with
+ /// an explicit path even though its really only for UT testing.
+ TEST_F(MemfileLeaseMgrTest, dataDirExplicitOveride) {
+     ASSERT_TRUE(data_dir_env_var_.getValue().empty());
+-    auto valid_path = CfgMgr::instance().getDataDir(true, "/tmp");
+-    ASSERT_EQ(valid_path, "/tmp");
++    // Prefer the POSIX temporary directory when set: some sandboxed
++    // platforms provide no writable /tmp (HarmonyOS PC mounts /tmp
++    // read-only), while this test needs a writable override directory.
++    const char* tmpdir = getenv("TMPDIR");
++    if ((tmpdir == NULL) || (*tmpdir == 0)) {
++        tmpdir = "/tmp";
++    }
++    const std::string data_dir = tmpdir;
++    auto valid_path = CfgMgr::instance().getDataDir(true, data_dir);
++    ASSERT_EQ(valid_path, data_dir);
+ 
+     DatabaseConnection::ParameterMap pmap;
+     pmap["universe"] = "6";
+@@ -607,11 +628,12 @@
+ 
+     ASSERT_NO_THROW(lease_mgr.reset(new Memfile_LeaseMgr(pmap)));
+     EXPECT_EQ(lease_mgr->getLeaseFilePath(Memfile_LeaseMgr::V6),
+-              "/tmp/leasefile6_1.csv");
++              data_dir + "/leasefile6_1.csv");
+     ConstElementPtr status = lease_mgr->getStatus();
+     ASSERT_TRUE(status);
+     EXPECT_EQ(status->str(),
+-              "{ \"csv-lease-file\": \"/tmp/leasefile6_1.csv\" }");
++              "{ \"csv-lease-file\": \"" + data_dir +
++              "/leasefile6_1.csv\" }");
+ }
+ 
+ /// @brief Checks if there is no lease manager NoLeaseManager is thrown.
+@@ -4738,20 +4760,29 @@
+     ASSERT_TRUE(data_dir_env_var_.getValue().empty());
+     file::PathChecker::enableEnforcement(false);
+ 
++    // Prefer the POSIX temporary directory when set: some sandboxed
++    // platforms provide no writable /tmp (HarmonyOS PC mounts /tmp
++    // read-only), while this test needs a writable invalid path.
++    const char* tmpdir = getenv("TMPDIR");
++    if ((tmpdir == NULL) || (*tmpdir == 0)) {
++        tmpdir = "/tmp";
++    }
++    const std::string data_dir = tmpdir;
++
+     DatabaseConnection::ParameterMap pmap;
+     pmap["universe"] = "6";
+     pmap["persist"] = "true";
+     pmap["lfc-interval"] = "0";
+-    pmap["name"] = "/tmp/leasefile6_0.csv";
++    pmap["name"] = data_dir + "/leasefile6_0.csv";
+     boost::scoped_ptr<Memfile_LeaseMgr> lease_mgr;
+ 
+     ASSERT_NO_THROW(lease_mgr.reset(new Memfile_LeaseMgr(pmap)));
+     EXPECT_EQ(lease_mgr->getLeaseFilePath(Memfile_LeaseMgr::V6),
+-              "/tmp/leasefile6_0.csv");
++              data_dir + "/leasefile6_0.csv");
+ 
+     std::ostringstream oss;
+     oss << "DHCPSRV_MEMFILE_PATH_SECURITY_WARNING Lease file path specified is NOT SECURE:"
+-        << " invalid path specified: '/tmp', supported path is '"
++        << " invalid path specified: '" << data_dir << "', supported path is '"
+         << CfgMgr::instance().getDataDir() << "'";
+ 
+     EXPECT_EQ(1U, countFile(oss.str()));
+@@ -4985,6 +5016,28 @@
+         static_cast<void>(chmod(pid_file_->getFilename().c_str(), 0400));
+     }
+ 
++    // Probe whether the permission bits set above are actually
++    // enforced by the filesystem.  Some filesystems (the HMDFS-based
++    // storage of the HarmonyOS PC application sandbox) do not honor
++    // chmod; there the unwritable-PID-file premise cannot be
++    // established, so skip instead of reporting a spurious failure.
++    // Where the premise holds (any regular filesystem) the checks
++    // below run unchanged.
++    {
++        std::ofstream probe(pid_file_->getFilename().c_str(),
++                            std::ofstream::app);
++        if (probe.is_open()) {
++            probe.close();
++            // Restore the write bit right before skipping, for the
++            // tests which follow.
++            static_cast<void>(chmod(pid_file_->getFilename().c_str(),
++                                    S_IRUSR | S_IWUSR));
++            GTEST_SKIP() << "filesystem does not enforce permission "
++                            "bits; the unwritable pid file premise "
++                            "cannot be established";
++        }
++    }
++
+     ConstElementPtr response;
+     EXPECT_NO_THROW(response = lease_mgr->lfcStartHandler());
+     ASSERT_TRUE(response);

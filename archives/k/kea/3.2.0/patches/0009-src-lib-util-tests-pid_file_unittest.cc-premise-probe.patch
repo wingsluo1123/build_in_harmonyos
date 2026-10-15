@@ -1,0 +1,25 @@
+--- a/src/lib/util/tests/pid_file_unittest.cc
++++ b/src/lib/util/tests/pid_file_unittest.cc
+@@ -198,6 +198,22 @@
+     // Now try a write to the file, expecting an exception
+     // root has superpowers so it throws only when not root
+     if (getuid() != 0  && geteuid() != 0) {
++        // Probe whether the permission bits set above are actually
++        // enforced by the filesystem.  Some filesystems (the HMDFS-based
++        // storage of the HarmonyOS PC application sandbox) do not honor
++        // chmod; there the unwritable-file premise cannot be established,
++        // so skip instead of reporting a spurious failure.  Where the
++        // premise holds (any normal filesystem) the upstream check below
++        // runs unchanged.
++        std::ofstream probe(absolutePath(TESTNAME).c_str(), std::ofstream::app);
++        if (probe.is_open()) {
++            probe.close();
++            // Restore the write right before skipping, for the tests that
++            // follow.
++            chmod(absolutePath(TESTNAME).c_str(), S_IRUSR | S_IWUSR);
++            GTEST_SKIP() << "filesystem does not enforce permission bits; "
++                         << "the unwritable-file premise cannot be established";
++        }
+         EXPECT_THROW(pid_file.write(10), PIDFileError);
+     }
+ 

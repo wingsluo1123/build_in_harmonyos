@@ -1,0 +1,80 @@
+--- a/src/lib/dhcp/tests/iface_mgr_unittest.cc
++++ b/src/lib/dhcp/tests/iface_mgr_unittest.cc
+@@ -3813,6 +3813,7 @@
+ 
+ #include <sys/socket.h>
+ #include <net/if.h>
++#include <netpacket/packet.h>
+ #include <ifaddrs.h>
+ 
+ /// @brief Checks the index of this interface
+@@ -3864,23 +3865,58 @@
+ 
+         int s = -1; // Socket descriptor
+ 
+-        if ((s = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+-            isc_throw(Unexpected, "Cannot create AF_INET socket");
+-        }
++        if ((s = socket(AF_INET, SOCK_DGRAM, 0)) >= 0) {
++            if (ioctl(s, SIOCGIFHWADDR, & ifr) >= 0) {
++                p = reinterpret_cast<uint8_t *>(ifr.ifr_ifru.ifru_hwaddr.sa_data);
++                close(s);
+ 
+-        if (ioctl(s, SIOCGIFHWADDR, & ifr) < 0) {
++                /// @todo: Check MAC address length. For some
++                /// interfaces it is different than 6. Some have 0,
++                /// while some exotic ones (like infiniband) have 20.
++                ///
++                /// Compare only the bytes this buffer can carry: some
++                /// interfaces report a link address longer than the 14-byte
++                /// sockaddr::sa_data (the ip6tnl0 and ip6_vti0 tunnels -
++                /// ARPHRD_TUNNEL6 - report a 16-byte all-zero one, which the
++                /// kernel also hands to IfaceMgr through netlink). Comparing
++                /// the full length reads past sa_data into the ifreq union,
++                /// which this test does not initialize, so the outcome depends
++                /// on stack contents and the check fails spuriously on hosts
++                /// carrying such interfaces.
++                size_t hw_len = iface.getMacLen();
++                if (hw_len > sizeof(ifr.ifr_ifru.ifru_hwaddr.sa_data)) {
++                    hw_len = sizeof(ifr.ifr_ifru.ifru_hwaddr.sa_data);
++                }
++
++                return (!memcmp(p, iface.getMac(), hw_len));
++            }
+             close(s);
+-            isc_throw(Unexpected, "Cannot set SIOCGIFHWADDR flag");
+         }
+ 
+-        p = reinterpret_cast<uint8_t *>(ifr.ifr_ifru.ifru_hwaddr.sa_data);
++        // The SIOCGIFHWADDR ioctl requires privileges some sandboxed
++        // environments do not grant (the HarmonyOS PC sandbox answers
++        // EPERM), while the very same getifaddrs() entry carries the
++        // hardware address in its AF_PACKET sockaddr_ll; this is what
++        // the getifaddrs fallback of the production IfaceMgr reads.
++        // Compare against it exactly like the BSD branch does.
++        struct sockaddr_ll * hwdata =
++            reinterpret_cast<struct sockaddr_ll *>(ifptr->ifa_addr);
++        if (!hwdata || (hwdata->sll_halen != iface.getMacLen())) {
++            return (false);
++        }
+ 
+-        close(s);
++        // Same truncation applies here: sll_addr holds at most 8 bytes while
++        // the kernel reports longer link addresses for some interfaces
++        // (ip6tnl0 and ip6_vti0: 16 bytes), so compare the representable
++        // prefix only.
++        size_t hw_len = iface.getMacLen();
++        if (hw_len > sizeof(hwdata->sll_addr)) {
++            hw_len = sizeof(hwdata->sll_addr);
++        }
+ 
+-        /// @todo: Check MAC address length. For some interfaces it is
+-        /// different than 6. Some have 0, while some exotic ones (like
+-        /// infiniband) have 20.
+-        return (!memcmp(p, iface.getMac(), iface.getMacLen()));
++        p = reinterpret_cast<uint8_t *>(hwdata->sll_addr);
++
++        return (!memcmp(p, iface.getMac(), hw_len));
+     }
+ #endif
+ 

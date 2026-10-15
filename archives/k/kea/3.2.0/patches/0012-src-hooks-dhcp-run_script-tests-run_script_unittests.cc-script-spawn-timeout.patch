@@ -1,0 +1,15 @@
+--- a/src/hooks/dhcp/run_script/tests/run_script_unittests.cc
++++ b/src/hooks/dhcp/run_script/tests/run_script_unittests.cc
+@@ -854,7 +854,11 @@
+                 test_log.close();
+                 break;
+             }
+-            ASSERT_LT(time(0), now + 3) << "timeout";
++            // Allow more wall-clock time: on slow or heavily loaded
++            // sandboxed build hosts (the whole suite runs in parallel
++            // on an OpenHarmony PC device) spawning the script alone
++            // can exceed three seconds even though it succeeds.
++            ASSERT_LT(time(0), now + 10) << "timeout";
+             usleep(100000);
+         }
+         ASSERT_EQ(join(extracted_lines), "SUCCESS\n");
