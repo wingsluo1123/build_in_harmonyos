@@ -1,0 +1,56 @@
+--- a/cpp/CMakeLists.txt
++++ b/cpp/CMakeLists.txt
+@@ -1,15 +1,21 @@
+ cmake_minimum_required(VERSION 3.21)
+ 
+ # Set the version
+ project(Basix VERSION "0.11.0" LANGUAGES CXX)
+ include(GNUInstallDirs)
++
++# The native HarmonyOS CMake platform lacks the ELF SONAME linker rule.
++# Without it, consumers retain relative build-tree paths in DT_NEEDED.
++if(CMAKE_SYSTEM_NAME MATCHES "^(OHOS|HarmonyOS)$")
++  set(CMAKE_SHARED_LIBRARY_SONAME_CXX_FLAG "-Wl,-soname,")
++endif()
+ 
+ if(SKBUILD AND UNIX)
+   # Avoid lib64/ which can lead to linking issues.
+   set(CMAKE_INSTALL_LIBDIR basix/lib)
+ endif()
+ 
+ if (SKBUILD)
+   # Make sure includes end up inside basix/ subdirectory in wheel. 
+   set(CMAKE_INSTALL_INCLUDEDIR basix/include)
+   # Make sure all binaries end up inside basix/ subdirectory in wheel.
+@@ -165,23 +171,30 @@
+ endif()
+ 
+ target_compile_options(basix PRIVATE $<$<CONFIG:Developer>:${BASIX_CXX_DEVELOPER_FLAGS}>)
+ target_compile_definitions(basix PRIVATE $<$<CONFIG:Developer>:${BASIX_CXX_DEVELOPER_DEFINITIONS}>) 
+ 
+ if (MSVC)
+     # M_PI etc. are not not in the standard-compliant MSVC headers.
+     target_compile_definitions(basix PUBLIC _USE_MATH_DEFINES)
+ endif()
+ 
++# Runtime dependency collection serves the Windows-only optional DLL install
++# below. Do not invoke an unsupported collector when that feature is disabled.
++set(BASIX_RUNTIME_DEPENDENCY_ARGS)
++if(INSTALL_RUNTIME_DEPENDENCIES AND WIN32)
++  list(APPEND BASIX_RUNTIME_DEPENDENCY_ARGS RUNTIME_DEPENDENCY_SET dependencies)
++endif()
++
+ install(TARGETS basix
+   EXPORT BasixTargets
+-  RUNTIME_DEPENDENCY_SET dependencies
++  ${BASIX_RUNTIME_DEPENDENCY_ARGS}
+   PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+   PRIVATE_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/basix
+   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT RuntimeExecutables
+   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT RuntimeLibraries
+   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development
+ )
+ if (INSTALL_RUNTIME_DEPENDENCIES AND WIN32)
+   # https://discourse.cmake.org/t/migration-experiences-comparison-runtime-dependency-set-vs-fixup-bundle-bundleutilities
+   install(RUNTIME_DEPENDENCY_SET dependencies DESTINATION ${CMAKE_INSTALL_BINDIR} PRE_EXCLUDE_REGEXES [[api-ms-win-.*]] [[ext-ms-.*]] POST_EXCLUDE_REGEXES [[.*(\\|/)system32(\\|/).*\.dll]])
+ endif()

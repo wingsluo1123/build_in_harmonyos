@@ -1,0 +1,48 @@
+--- a/cpp/basix/cell.cpp
++++ b/cpp/basix/cell.cpp
+@@ -453,21 +453,21 @@
+   std::vector<std::vector<int>> facets = cell::topology(cell_type)[tdim - 1];
+   auto [xdata, xshape] = cell::geometry<T>(cell_type);
+ 
+   mdspan_t<const T, 2> x(xdata.data(), xshape);
+   std::array<std::size_t, 2> shape = {facets.size(), tdim};
+   std::vector<T> normal(shape[0] * shape[1]);
+   mdspan_t<T, 2> n(normal.data(), shape);
+   switch (tdim)
+   {
+   case 1:
+-    std::ranges::fill(normal, 1.0);
++    std::fill(normal.begin(), normal.end(), 1.0);
+     return {normal, shape};
+   case 2:
+   {
+     for (std::size_t f = 0; f < facets.size(); ++f)
+     {
+       const std::vector<int>& facet = facets[f];
+       assert(facet.size() == 2);
+       n(f, 0) = x(facet[1], 1) - x(facet[0], 1);
+       n(f, 1) = x(facet[0], 0) - x(facet[1], 0);
+       T L = std::sqrt(n(f, 0) * n(f, 0) + n(f, 1) * n(f, 1));
+@@ -510,21 +510,21 @@
+   std::vector<std::vector<int>> facets = cell::topology(cell_type)[tdim - 1];
+   auto [xdata, xshape] = cell::geometry<T>(cell_type);
+ 
+   mdspan_t<const T, 2> x(xdata.data(), xshape);
+   std::array<std::size_t, 2> shape = {facets.size(), tdim};
+   std::vector<T> normal(shape[0] * shape[1]);
+   mdspan_t<T, 2> n(normal.data(), shape);
+   switch (tdim)
+   {
+   case 1:
+-    std::ranges::fill(normal, 1.0);
++    std::fill(normal.begin(), normal.end(), 1.0);
+     return {normal, shape};
+   case 2:
+   {
+     for (std::size_t f = 0; f < facets.size(); ++f)
+     {
+       const std::vector<int>& facet = facets[f];
+       assert(facet.size() == 2);
+       n(f, 0) = x(facet[1], 1) - x(facet[0], 1);
+       n(f, 1) = x(facet[0], 0) - x(facet[1], 0);
+     }

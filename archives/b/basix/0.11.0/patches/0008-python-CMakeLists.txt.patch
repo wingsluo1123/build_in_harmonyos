@@ -1,0 +1,31 @@
+--- a/python/CMakeLists.txt
++++ b/python/CMakeLists.txt
+@@ -43,20 +43,28 @@
+ endif()
+ nanobind_add_module(_basixcpp NB_SUPPRESS_WARNINGS ${NANOBIND_SABI} wrapper.cpp)
+ target_compile_definitions(_basixcpp PRIVATE cxx_std_20)
+ 
+ if(ENABLE_CLANG_TIDY)
+   find_program(CLANG_TIDY NAMES clang-tidy REQUIRED)
+   set_target_properties(_basixcpp PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY};--config-file=${CMAKE_CURRENT_SOURCE_DIR}/../.clang-tidy")
+ endif()
+ 
+ target_link_libraries(_basixcpp PRIVATE Basix::basix)
++
++# OHOS does not resolve CPython API symbols from the executable's namespace.
++# Bind the matching shared Python runtime instead of leaving the module's API
++# references unresolved (the default Unix extension convention).
++if(CMAKE_SYSTEM_NAME MATCHES "^(OHOS|HarmonyOS)$")
++  find_package(Python COMPONENTS Development.Embed REQUIRED)
++  target_link_libraries(_basixcpp PRIVATE Python::Python)
++endif()
+ 
+ # Add strict compiler flags
+ include(CheckCXXCompilerFlag)
+ 
+ # Add some strict compiler checks
+ check_cxx_compiler_flag("-Wall -Werror -Wextra -pedantic -Wno-comment" HAVE_PEDANTIC)
+ 
+ if(HAVE_PEDANTIC)
+ 	list(APPEND BASIX_PY_CXX_DEVELOPER_FLAGS -Wall;-Werror;-Wextra;-pedantic;-Wno-comment)
+ endif()

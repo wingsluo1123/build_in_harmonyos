@@ -1,0 +1,72 @@
+--- a/cpp/basix/finite-element.cpp
++++ b/cpp/basix/finite-element.cpp
+@@ -1239,21 +1239,21 @@
+       auto& closure_dofs = edofs_d[e];
+       for (std::size_t dim = 0; dim <= d; ++dim)
+       {
+         for (int c : connectivity[d][e][dim])
+         {
+           closure_dofs.insert(closure_dofs.end(), _edofs[dim][c].begin(),
+                               _edofs[dim][c].end());
+         }
+       }
+ 
+-      std::ranges::sort(_e_closure_dofs[d][e]);
++      std::sort(_e_closure_dofs[d][e].begin(), _e_closure_dofs[d][e].end());
+     }
+   }
+ 
+   // Check if base transformations are all permutations
+   _dof_transformations_are_permutations = true;
+   _dof_transformations_are_identity = true;
+   for (const auto& [ctype, trans_data] : _entity_transformations)
+   {
+     mdspan_t<const F, 3> trans(trans_data.first.data(), trans_data.second);
+     for (std::size_t i = 0;
+@@ -1319,21 +1319,21 @@
+           // Store the permutations
+           auto& eperm = _eperm.try_emplace(ctype).first->second;
+           auto& eperm_inv = _eperm_inv.try_emplace(ctype).first->second;
+           eperm.push_back(perm);
+           eperm_inv.push_back(inv_perm);
+ 
+           // Generate the entity transformations from the permutations
+           std::pair<std::vector<F>, std::array<std::size_t, 2>> identity
+               = {std::vector<F>(perm.size() * perm.size()),
+                  {perm.size(), perm.size()}};
+-          std::ranges::fill(identity.first, 0.);
++          std::fill(identity.first.begin(), identity.first.end(), 0.);
+           for (std::size_t i = 0; i < perm.size(); ++i)
+             identity.first[i * perm.size() + i] = 1;
+ 
+           auto& etrans = _etrans.try_emplace(ctype).first->second;
+           auto& etransT = _etransT.try_emplace(ctype).first->second;
+           auto& etrans_invT = _etrans_invT.try_emplace(ctype).first->second;
+           auto& etrans_inv = _etrans_inv.try_emplace(ctype).first->second;
+           etrans.push_back({perm, identity});
+           etrans_invT.push_back({perm, identity});
+           etransT.push_back({inv_perm, identity});
+@@ -1721,21 +1721,22 @@
+ bool FiniteElement<F>::operator==(const FiniteElement& e) const
+ {
+   if (this == &e)
+     return true;
+   else if (family() == element::family::custom
+            and e.family() == element::family::custom)
+   {
+     bool coeff_equal = false;
+     if (_coeffs.first.size() == e.coefficient_matrix().first.size()
+         and _coeffs.second == e.coefficient_matrix().second
+-        and std::ranges::equal(_coeffs.first, e.coefficient_matrix().first,
++        and std::equal(_coeffs.first.begin(), _coeffs.first.end(),
++                       e.coefficient_matrix().first.begin(),
+                                [](auto x, auto y)
+                                { return std::abs(x - y) < 1.0e-10; }))
+     {
+       coeff_equal = true;
+     }
+ 
+     return cell_type() == e.cell_type() and discontinuous() == e.discontinuous()
+            and map_type() == e.map_type()
+            and sobolev_space() == e.sobolev_space()
+            and value_shape() == e.value_shape()

@@ -1,0 +1,25 @@
+--- a/cpp/basix/dof-transformations.cpp
++++ b/cpp/basix/dof-transformations.cpp
+@@ -27,21 +27,21 @@
+     = std::tuple<std::function<std::array<T, 3>(std::span<const T>)>,
+                  mdarray_t<T, 2>, T, mdarray_t<T, 2>>;
+ template <typename T>
+ using mapinfo_t = std::map<cell::type, std::vector<map_data_t<T>>>;
+ 
+ //-----------------------------------------------------------------------------
+ int find_first_subentity(cell::type cell_type, cell::type entity_type)
+ {
+   const int edim = cell::topological_dimension(entity_type);
+   std::vector<cell::type> entities = cell::subentity_types(cell_type)[edim];
+-  if (auto it = std::ranges::find(entities, entity_type); it != entities.end())
++  if (auto it = std::find(entities.begin(), entities.end(), entity_type); it != entities.end())
+     return std::distance(entities.begin(), it);
+   else
+     throw std::runtime_error("Entity not found");
+ }
+ //-----------------------------------------------------------------------------
+ template <typename Q, typename P, typename R, typename S>
+ void push_forward(maps::type map_type, Q&& u, const P& U, const R& J,
+                   double detJ, const S& K)
+ {
+   switch (map_type)
