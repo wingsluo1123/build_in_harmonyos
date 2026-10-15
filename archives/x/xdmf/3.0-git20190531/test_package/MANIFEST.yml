@@ -1,0 +1,45 @@
+package: xdmf/3.0-git20190531
+homepage: "http://www.xdmf.org"
+
+# Upstream tests run inside conanfile.py build() via
+# `ctest --output-on-failure --timeout 600` (CMake/CTest harness).
+upstream_test_in_build: true
+upstream_test_command: "ctest --output-on-failure --timeout 600"
+
+# Official registered ctest entries with TIFF/MPI/DSM/Python/Java disabled:
+# tests/Cxx 31 + tests/C 16 + core/tests/Cxx 13 + core/tests/C 8 = 68.
+# Method: count of ADD_TEST_CXX/ADD_TEST_C entries in the four CMakeLists files.
+upstream_test_total: 68
+upstream_test_count_method: "ctest_entries"
+upstream_tests_exist: true
+upstream_tests:
+  - file: tests/Cxx/CMakeLists.txt
+    source: xdmf/tests/Cxx/CMakeLists.txt
+    description: "31 C++ API tests (grids, topology, HDF5 I/O, writer, XPath)"
+    command: "ctest --output-on-failure"
+  - file: tests/C/CMakeLists.txt
+    source: xdmf/tests/C/CMakeLists.txt
+    description: "16 C wrapper tests (domain, grids, topology, geometry, sets)"
+    command: "ctest --output-on-failure"
+  - file: core/tests/Cxx/CMakeLists.txt
+    source: xdmf/core/tests/Cxx/CMakeLists.txt
+    description: "13 core C++ tests (array, HDF5 controller/writer, sparse matrix)"
+    command: "ctest --output-on-failure"
+  - file: core/tests/C/CMakeLists.txt
+    source: xdmf/core/tests/C/CMakeLists.txt
+    description: "8 core C wrapper tests (array, error, HDF5, information, subset)"
+    command: "ctest --output-on-failure"
+
+test_package_tests:
+  - file: test_xdmf.cpp
+    description: "XdmfArray insert/readback and XdmfInformation round-trip (XdmfCore)"
+    command: "./test_xdmf"
+  - file: test_xdmf.cpp
+    description: "XdmfTopologyType::Hexahedron nodes-per-element (Xdmf)"
+    command: "./test_xdmf"
+  - file: test_xdmf.cpp
+    description: "XdmfGeometryType::XYZ dimensions (Xdmf)"
+    command: "./test_xdmf"
+
+test_package_test_count: 6
+assertion_count: 6
