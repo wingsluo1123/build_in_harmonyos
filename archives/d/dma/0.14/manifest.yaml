@@ -1,0 +1,97 @@
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/0.14/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.14"
+
+# 软件名
+software: "dma"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-08"
+build_system: "makefile"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（官方 GitHub 归档直连端点，手册/07 §12.3；与 conandata.yml 同源同 sha）
+  url: "https://codeload.github.com/corecode/dma/tar.gz/refs/tags/v0.14"
+
+  # 源码校验和
+  sha256: "a36e77a59dd288a582dbeed7166ac4212e39120323bac75c74d7923e1d7b63e8"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: makefile
+
+  # 配置选项列表
+  configure_options: []
+  # 例如:
+  # - "-DCMAKE_BUILD_TYPE=Release"
+  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+
+  # 编译依赖列表（格式: name/version）
+  # preflight_check.sh dma/0.14 实测三项均已发布到 ohpcd（2026-10-08, rc=0）
+  dependencies:
+    - openssl/1.1.1w        # requires   — rrev a29b10b89b32a0410043b40c1d7db4fc
+    - bison/3.8.2           # tool_requires — rrev 27704878ab972a7b7a0a560e22360cbb
+    - flex/2.6.4            # tool_requires — rrev dae8938545a70afe5596b280fc4ad124
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-ohos-getprogname.patch"   # 出处 knowledge/doc/E203.md；+12 行（实现 7 + 注释 3 + 空行 2），中性能力宏 HAVE_BSD_PROGNAME（补丁零平台宏），只动 dfcompat.c 非 glibc 分支
+# 例如:
+# - "0001-bootstrap-ohos-toolchain.patch"
+
+# ============================================================
+# 测试统计（五维，手册/04 §10.1）
+# 与 notes.md / test_package/MANIFEST.yml 三处同源，数值必须一致
+# ============================================================
+
+test:
+  n_static: 0            # 上游静态声明的测试数：0
+  n_registered: 0        # 构建系统注册的测试目标数：0（顶层 Makefile 无 check/test）
+  n_executed: 0          # 实际执行的上游测试数：0
+  n_not_executed: 0      # 未执行分类数：0（N_executed=0 源于 N_static=0，非"跑了没过"）
+  n_consumer: 2          # 新增消费者测试数：2（test_package 两条参数期断言）
+  n_runner: 0            # 无 runner 层
+  assertion_count: 2     # 断言数（括注，不替代原子用例数）
+  upstream_check_command: ""   # 上游无 check 目标，不声称跑过不存在的 make check
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained: []
+# 例如:
+# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
+# - "内嵌 libuv 需要禁用，使用系统 libuv"

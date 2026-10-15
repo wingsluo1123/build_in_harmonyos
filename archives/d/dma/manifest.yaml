@@ -1,0 +1,65 @@
+# 软件级 manifest
+# 文件位置: archives/d/dma/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0 §2.1（软件级文件 — manifest.yaml 标注「必须」）
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 软件名称（小写，与目录名一致）
+software: dma
+
+# 显示名
+display: "DragonFly Mail Agent"
+
+# 一句话描述
+description: "极简 MTA：本地投递到 /var/mail，并经明文 SMTP 或 SSL/TLS relay 到 smart host，充当 sendmail(8) 替代"
+
+# 分类标签
+# foundation|build-tool|compress|crypto|db|network|system|doc|gfx|data|library|utility
+category: network
+
+# 官网 URL
+homepage: "https://github.com/corecode/dma"
+
+# 开源许可证（SPDX 标识）
+license: BSD-3-Clause
+
+# ============================================================
+# 构建信息
+# ============================================================
+
+# 常用构建系统（可被版本级覆盖）
+# cmake | autotools | makefile | meson | custom
+build_system: makefile
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  # 关键适配要点
+  key_points:
+    - "上游为裸 BSD 风格 Makefile（无 configure/Makefile.am/CMakeLists/meson.build）⇒ 构建系统判 makefile；init-build 按 URL 会误猜 autotools"
+    - "上游 install 目标在 OHOS 四重不可用（Makefile:53-54）：install 不在 PATH(rc=127) / -o root 而 uid=20020084 / -g mail 组不存在(KeyError) / -m 4754·2755 的 setuid·setgid 位被文件系统剥离（chmod u+s 返回 ok 而 stat 为 setuid=False、mode 实得 0o770）⇒ package() 走 self.copy + os.chmod(0o755) 手工安装"
+    - "上游 LDADD 默认含 -lresolv（Makefile:18），musl/OHOS 把 resolver 内置进 libc ⇒ 命令行覆盖 LDADD=-lssl -lcrypto 去掉它（命令行优先级高于 LDADD?=，不改上游文件）"
+    - "不能覆盖 CFLAGS：Makefile 向其追加 -DDMA_VERSION/-DLIBEXEC_PATH/-DCONF_PATH，覆盖即触发 dma.h:76 #error ⇒ OpenSSL 头走 CPPFLAGS（.c.o suffix rule 已消费）"
+    - "运行期特权语义：dma.c:464 仅在 geteuid()/getuid()==0 时才走 setuid 降权（dma.c:476），当前非 root 整块跳过；/var 目录不存在(ENOENT)、/etc 只读(EROFS) ⇒ 上游 DMASPOOL=${VAR}/spool/dma 无处安放"
+    - "本机无 lex（只有 flex），且上游 tags 归档不含 yacc/lex 生成产物 ⇒ tool_requires bison/3.8.2 + flex/2.6.4 并传 YACC=bison LEX=flex"
+    - "上游无测试套件（顶层 Makefile 无 check/test 目标、test/ 仅含数据文件 quote.rfc2822）⇒ 测试靠 test_package 两条参数期消费者断言"
+
+  # 跨版本通用依赖
+  common_dependencies:
+    - openssl/1.1.1w
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "0.14":
+    status: built
+    build_date: "2026-10-08"
+    # 换取源端点（官方 codeload 直链）后 G2 conan create 通过、W3 本地 CI 通过。
+    # 换源前曾在 source() 期停损（E017 注入的 ghfast.top 不可达），逐端点实测
+    # 读数与全过程见 0.14/notes.md「取源端点换到官方 codeload 直连」节。
