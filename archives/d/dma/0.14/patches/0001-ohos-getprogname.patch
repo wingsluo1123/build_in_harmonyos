@@ -1,0 +1,31 @@
+dma 0.14 dfcompat.c 只在 __GLIBC__ 分支提供 getprogname() shim，非 glibc 直接 #error
+(dfcompat.c:119 "no getprogname implementation available")。OpenHarmony 是 musl libc：
+实测无 getprogname()（undeclared + undefined symbol），但导出 BSD 风格的 __progname 全局
+(extern 声明后编译+运行打印真实 argv0)。补丁在非 glibc 分支只加一个**中性能力宏**分支
+HAVE_BSD_PROGNAME（命名对齐 Makefile:1-9 的 HAVE_* 语义，不含任何平台宏）；该宏由
+conanfile.py 在 build() 里做构建期链接探测（能链接 __progname 才注入）后经 CPPFLAGS 传入。
+⇒ 补丁内零平台宏（R8/PF5），未注入该宏的平台一律落到上游原 #error，对非鸿蒙平台完全透明。
+Makefile:1-9 自述 HAVE_* 语义要求「系统已提供 getprogname」才可定义 —— OHOS 未提供，故不走
+HAVE_GETPROGNAME 这条路；本宏的语义是「libc 导出 __progname 符号」，与是否提供 getprogname 无关。
+
+--- dfcompat.c
++++ dfcompat.c
+@@ -115,6 +115,18 @@
+ 	return (program_invocation_short_name);
+ }
+ 
++#elif defined(HAVE_BSD_PROGNAME)
++/* The libc exports the BSD-style __progname global but provides no
++ * getprogname(): same substitution as knowledge E203, selected by a neutral
++ * capability macro the recipe injects after a build-time link probe. */
++extern char *__progname;
++
++const char *
++getprogname(void)
++{
++	return (__progname);
++}
++
+ #else /* __GLIBC__ */
+ #error "no getprogname implementation available"
+ #endif

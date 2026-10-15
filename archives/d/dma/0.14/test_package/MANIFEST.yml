@@ -1,0 +1,51 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: dma/0.14
+homepage: "https://github.com/corecode/dma"
+
+# 上游清点证据（R51 三步法第 1 步，2026-10-08 对 v0.14 tag 实测）：
+#   * 顶层 Makefile 的全部顶层目标只有
+#       all / clean / install / install-spool-dirs / install-etc /
+#       sendmail-link / mailq-link / permissions / dch / ppa
+#     —— 没有 check、没有 test。
+#   * 全仓 grep 不到 make check / ctest / pytest / prove / "TESTS =" 任何一处。
+#   * test/ 目录只有 1 个文件 quote.rfc2822（289 B，是被引用邮件的样例数据，
+#     不是可执行测试）。
+#   * README.markdown / INSTALL / TODO 均无测试说明。
+# ⇒ 上游确无自动化测试套件，upstream_check_command 留空，
+#   不得声称跑过不存在的 make check。
+upstream_check_command: ""
+
+# 上游无测试套件，因此 build() 中没有可集成的上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证，R34: 实质驱动被测二进制)
+# 两条断言都停在 getopt 参数期内、早于 dma.c:606 parse_conf，
+# 不读配置、不碰 spool、不碰投递路径（详见 test.sh 与 conanfile.py 注释）。
+test_package_tests:
+  - file: test.sh
+    description: "断言1：dma -Z 未知选项被拒绝 —— stderr 含 'invalid argument' 且回显 '-Z'，退出码非 0（dma.c:581-582）"
+    command: "dma -Z"
+  - file: test.sh
+    description: "断言2：dma -bp -q 队列模式互斥在参数期被拒绝 —— stderr 含 'sending mail and queue operations are mutually exclusive'，退出码非 0（dma.c:585 argc -= optind 因 musl getopt 缺参得 -1 ⇒ dma.c:589-590 先触发；早于 dma.c:606 parse_conf）"
+    command: "dma -bp -q"
+
+# 测试断言总数 (test.sh 中的断言数)
+assertion_count: 2
+
+# ── 五维账本（手册/04 §10.1）── 与 manifest.yaml / notes.md 三处同源
+five_dimension:
+  n_static: 0            # 上游静态声明的测试数：0（清点证据见上方注释）
+  n_registered: 0        # 构建系统注册/可执行测试目标数：0（Makefile 无 check/test 目标）
+  n_executed: 0          # 实际执行的上游测试数：0（无上游测试可执行）
+  n_not_executed: 0      # 未执行分类数：0（不存在被跳过的上游用例；
+                         #   N_executed=0 源于 N_static=0，不是"跑了但没过"）
+  n_consumer: 2          # 新增消费者测试数：2（本 test_package 的两条断言）
+  n_runner: 0            # 无 runner 层（无 CASE/TEST_CASE 分层）
+  assertion_count: 2     # 断言数（括注用，不替代原子用例数）
