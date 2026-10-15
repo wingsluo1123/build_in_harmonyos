@@ -1,0 +1,98 @@
+# megactl 0.4.5 版本级 manifest
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "0.4.5"
+software: "megactl"
+status: built
+build_date: "2026-10-03"
+
+upstream:
+  url: "https://github.com/namiltd/megactl/archive/refs/tags/v0.4.5.tar.gz"
+  sha256: "3343edab107a33a70d2fa72e9fe0382bc4be2f428ccd1497609b5595e0871bbb"
+  upstream_tag: "v0.4.5 (commit 8f86e0be53b273188bf2779d974fcf3f9c68b8f0, 2024-08-14)"
+  crosscheck: >-
+    同一份字节可从两条独立途径取到且逐字节相同：GitHub tag 归档与 Debian pool 的
+    megactl_0.4.5.orig.tar.gz（均 182212 B、sha256 一致、cmp 判定 byte-identical，
+    Debian 公布 md5 585b2e1d63b256702a19edb6af79b892 亦一致）。归档 103 个条目，
+    保留构建必需的符号链接 megaraid → kernel-2.6.9-55.0.2.EL/megaraid-2.20.4.6-rh2。
+  homepage: "https://github.com/namiltd/megactl"
+
+build_system: "makefile"
+compiler: "clang 15 (--target=aarch64-linux-ohos, conf tools.build:compiler_executables)"
+toolchain_profile: "CI 用 ci/conan/profiles/ohos-aarch64；本地 W3/W4 复核用 ohos-aarch64-wsl（同一 OHOS clang 15 交叉编译器，CC=/opt/lpk-fixed/clang）"
+
+dependencies: []
+
+patches_applied: []
+patches_note: >-
+  构建零补丁。上游手写 Makefile 在 OHOS clang 15 下直接编译通过（上游只 include
+  POSIX 头，OHOS musl sysroot 全部具备），patches/ 目录不存在。
+
+# ── 构建命令（原样可复现）────────────────────────────────────────────
+build:
+  system: makefile
+  configure_options: []
+  command: "make -j1 CC='<profile CC>' ARCH= LDFLAGS='-g -Wl,--strip-debug -Wl,--build-id=sha1'"
+  cc: clang
+  cxx: null
+  artifacts:
+    - "bin/megactl"
+    - "bin/megasasctl"
+    - "share/man/man1/megactl.1"
+    - "share/man/man1/megasasctl.1"
+    - "share/metainfo/megactl.metainfo.xml"
+    - "licenses/COPYING"
+
+# ── 测试统计 ─────────────────────────────────────────────────────────
+test_summary:
+  upstream_static: 0          # 上游确无自动化测试（清点证据见 notes.md §4）
+  upstream_executed: 0
+  upstream_passed: 0
+  upstream_reduced: 0         # 无「删减上游用例」问题
+  consumer_programs: 2
+  consumer_assertions: 69
+  consumer_assertions_passed: 69
+  harmony_specific_assertions: 9
+  note: >-
+    上游 Makefile 无 check/test 目标、无测试目录、无 automake 测试变量，唯一
+    GitHub Actions 是 codeql-analysis.yml（静态扫描）；megactl 的真实验收前提是
+    MegaRAID 硬件 + 设备节点，本环境不具备。验证全部由 test_package 的两个消费者
+    脚本承担：test_megactl.py（38 项，真执行两个 CLI 的参数解析/usage/
+    target 解析/设备打开与 ioctl 失败分支）+ test_layout.py（31 项，纯 Python
+    解析 ELF 字节验证 aarch64/PIE/musl DT_NEEDED/OHOS hnp .interp/
+    .note.ohos.ident/交付纯净性）。
+
+task:
+  activity: "开源鸿蒙PC专项积分赛"
+  task_id: 8774
+
+# ── 上游 quirk（如实记录，未改上游源码）──────────────────────────────
+upstream_quirks:
+  - >-
+    发布 tarball 是 0.4.5，但 megactl.c:91 的 `static char *version` 仍是
+    "0.4.3-hmage"（上游发布时漏改，与 rtl-sdr 2.0.2 的 VERSION_INFO_PATCH_VERSION
+    同类）。因此 `megactl -V` 打印 0.4.3-hmage；测试按实测值断言。
+  - >-
+    上游 Makefile 的 pattern rule `%.o: Makefile.bak %.c` 依赖一个发布 tarball 里
+    不存在的 Makefile.bak；实测 GNU Make 4.3 下 make 与 make -j8 均正常（已用最小
+    复现件证实），故无需补丁。
+  - >-
+    megatrace 不在 PROGRAMS 里、不属 all 目标，且 include x86 专有的 <asm/user.h>
+    （aarch64 的 asm/ 指向 asm-generic，无 user.h）—— 只构建上游默认目标，与
+    上游 make 行为一致，不擅自扩大交付范围。
+
+notes: >-
+  零外部依赖；构建零补丁。五处关键处置：①上游把 -g 硬编码进 CFLAGS/LDFLAGS，
+  DWARF 会把交叉工具链 sysroot 的构建机绝对路径写进二进制（实测该路径在
+  .debug_str 中出现 2 处），改为链接期 -Wl,--strip-debug（降为 0，
+  .interp/.note.ohos.ident/.note.gnu.build-id 与符号表均保留）；②不用
+  make install（HMDFS 用户态无 install(1)，且 install 的 -d/-m644 用法无法用
+  cp 等价覆盖），改用 copy() 落包并 chmod，同时规避 T105 的 install 产物 EPERM；
+  ③ARCH= 显式置空防环境串味；④conandata.yml 注释里不写裸 URL——门禁
+  Pre-download 会扫描注释并做子串替换，前缀 URL 会把 sources.url 改坏
+  （详见 notes.md §3.9）；⑤链接期**显式**索取 -Wl,--build-id=sha1：真机 OHOS
+  clang 驱动不会自动给 build-id（本机 shim 会，故本地绿、CI 红，CI #79116 实证），
+  而 test_package 用 build-id 证明两个 CLI 是分别编译的两个目标（详见 notes.md §3.10）。
+  绝不能用
+  make CFLAGS=... 追加选项——上游用 CFLAGS+=，命令行赋值会连 -I./schily 一起
+  清掉导致 scg/scsi 头找不到（须走 CPPFLAGS）。详见 notes.md。
