@@ -1,0 +1,29 @@
+--- a/irc.h
++++ b/irc.h
+@@ -207,8 +207,11 @@
+ int xscandir(char *dir, char *prefix, char **ret);
+ 
+ #define TRACE(fmt, ...) \
+-    trace("%s/%d: " fmt, __FUNCTION__, __LINE__, ## __VA_ARGS__)
++    xaric_trace("%s/%d: " fmt, __FUNCTION__, __LINE__, ## __VA_ARGS__)
+ 
+-void trace(const char *fmt, ...);
++/* xaric's own debug logger was named trace(); ncurses exports a trace() of
++   its own (lib_trace.c), so linking the static libncursesw.a dies with
++   "duplicate symbol: trace".  Renamed, behaviour unchanged. */
++void xaric_trace(const char *fmt, ...);
+ 
+ #endif				/* __irc_h__ */
+--- a/irc.c
++++ b/irc.c
+@@ -116,7 +116,9 @@
+ static FILE *traceout;
+ 
+ /* for TRACE(), xaric -d */
+-void trace(const char *fmt, ...)
++/* xaric_trace: renamed from trace() to avoid colliding with ncurses'
++   trace() symbol in the static libncursesw.a (see irc.h). */
++void xaric_trace(const char *fmt, ...)
+ {
+     if (traceout) {
+ 	va_list ma;

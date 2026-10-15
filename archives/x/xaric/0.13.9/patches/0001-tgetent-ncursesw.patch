@@ -1,0 +1,72 @@
+--- a/configure.ac	2021-02-21 03:58:59
++++ b/configure.ac	2026-10-12 16:34:27
+@@ -278,8 +278,9 @@
+   AC_CHECK_LIB(termcap, tgetent, LIBS="-ltermcap $olibs",
+     AC_CHECK_LIB(termlib, tgetent, LIBS="-ltermlib $olibs",
+       AC_CHECK_LIB(curses, tgetent, LIBS="-lcurses $olibs",
+-        AC_CHECK_LIB(xtermcap, tgetent, LIBS="-lxtermcap $olibs",
+-          AC_MSG_ERROR([i can not find tgetent.  you need to help me])))))
++        AC_CHECK_LIB(ncursesw, tgetent, LIBS="-lncursesw $olibs",
++          AC_CHECK_LIB(xtermcap, tgetent, LIBS="-lxtermcap $olibs",
++            AC_MSG_ERROR([i can not find tgetent.  you need to help me])))))
+ fi
+ 
+ dnl ----------------------------------------------------------
+--- a/configure	2021-02-21 12:36:01
++++ b/configure	2026-10-12 16:34:27
+@@ -6522,7 +6522,46 @@
+ $as_echo "$ac_cv_lib_curses_tgetent" >&6; }
+ if test "x$ac_cv_lib_curses_tgetent" = xyes; then :
+   LIBS="-lcurses $olibs"
++else
++  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for tgetent in -lncursesw" >&5
++$as_echo_n "checking for tgetent in -lncursesw... " >&6; }
++if ${ac_cv_lib_ncursesw_tgetent+:} false; then :
++  $as_echo_n "(cached) " >&6
+ else
++  ac_check_lib_save_LIBS=$LIBS
++LIBS="-lncursesw  $LIBS"
++cat confdefs.h - <<_ACEOF >conftest.$ac_ext
++/* end confdefs.h.  */
++
++/* Override any GCC internal prototype to avoid an error.
++   Use char because int might match the return type of a GCC
++   builtin and then its argument prototype would still apply.  */
++#ifdef __cplusplus
++extern "C"
++#endif
++char tgetent ();
++int
++main ()
++{
++return tgetent ();
++  ;
++  return 0;
++}
++_ACEOF
++if ac_fn_c_try_link "$LINENO"; then :
++  ac_cv_lib_ncursesw_tgetent=yes
++else
++  ac_cv_lib_ncursesw_tgetent=no
++fi
++rm -f core conftest.err conftest.$ac_objext \
++    conftest$ac_exeext conftest.$ac_ext
++LIBS=$ac_check_lib_save_LIBS
++fi
++{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_ncursesw_tgetent" >&5
++$as_echo "$ac_cv_lib_ncursesw_tgetent" >&6; }
++if test "x$ac_cv_lib_ncursesw_tgetent" = xyes; then :
++  LIBS="-lncursesw $olibs"
++else
+   { $as_echo "$as_me:${as_lineno-$LINENO}: checking for tgetent in -lxtermcap" >&5
+ $as_echo_n "checking for tgetent in -lxtermcap... " >&6; }
+ if ${ac_cv_lib_xtermcap_tgetent+:} false; then :
+@@ -6563,6 +6602,8 @@
+   LIBS="-lxtermcap $olibs"
+ else
+   as_fn_error $? "i can not find tgetent.  you need to help me" "$LINENO" 5
++fi
++
+ fi
+ 
+ fi

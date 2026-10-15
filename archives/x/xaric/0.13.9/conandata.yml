@@ -1,0 +1,54 @@
+# conandata.yml - xaric 0.13.9
+#
+# Official upstream release tarball from xaric.org (the project's own
+# download server, also used by Homebrew).  R39: official source, not a
+# personal fork or third-party mirror.
+sources:
+  "0.13.9":
+    url: "https://xaric.org/software/xaric/releases/xaric-0.13.9.tar.gz"
+    sha256: "cb6c23fd20b9f54e663fff7cab22e8c11088319c95c90904175accf125d2fc11"
+
+patches:
+  "0.13.9":
+    - patch_file: "patches/0001-tgetent-ncursesw.patch"
+      patch_description: >-
+        Add -lncursesw to the tgetent probe chain: OHOS ships no
+        libtermcap/libcurses and the Conan ncurses package only provides
+        libncursesw.a, so the stock termcap/termlib/curses/xtermcap chain
+        fails with "i can not find tgetent".
+      patch_type: "portability"
+    - patch_file: "patches/0002-sockopt-cross-fallback.patch"
+      patch_description: >-
+        Give the SA_CHECK_SOCKOPT AC_RUN_IFELSE probes (SO_RCVTIMEO /
+        SO_SNDTIMEO) a cross-compiling branch.  Upstream leaves the
+        action-if-cross empty, so any cross build aborts with "cannot run
+        test program while cross compiling".  The fallback answers yes, which
+        is what the same probe detects natively on OHOS: musl declares both
+        options and the kernel implements them.  Native builds (the HarmonyOS
+        CI worker) never take this branch.  sa.ac (the macro definition) and
+        the generated configure are patched in sync.
+      patch_type: "portability"
+    - patch_file: "patches/0003-trace-symbol-collision-ncursesw.patch"
+      patch_description: >-
+        Rename xaric's own debug logger trace() to xaric_trace() (the irc.c
+        definition, the irc.h declaration and the TRACE() macro that calls
+        it).  ncurses exports a trace() of its own from lib_trace.c, and the
+        Conan ncurses package is consumed as the static libncursesw.a, so that
+        archive member is pulled into the link and lld aborts with
+        "duplicate symbol: trace".  A shared system ncurses (for example
+        libncurses.dylib on macOS) lets the executable's own definition win
+        and hides the collision, which is why it only surfaces on the OHOS
+        static link.  Symbol rename only, no behaviour change.
+      patch_type: "portability"
+    - patch_file: "patches/0004-config-status-tmpdir-umask-hmdfs.patch"
+      patch_description: >-
+        Drop the two `umask 077` calls from the config.status temporary
+        directory creation in the shipped configure.  On the HarmonyOS
+        worker's HMDFS the setgid bit plus UID remapping turns a 0700
+        directory into drwx--S---, which even its own owner cannot write:
+        the `echo 'BEGIN {' >"$ac_tmp/subs1.awk"` redirection (config.status
+        line 615) fails with EACCES and configure dies with "config.status:
+        error: could not setup config files machinery" (observed in CI
+        #91585).  Standard repository fix for this class (E011/E114;
+        precedents qsopt/2.5.10.3, roll/2.7.0, a52dec/0.7.4).
+      patch_type: "portability"

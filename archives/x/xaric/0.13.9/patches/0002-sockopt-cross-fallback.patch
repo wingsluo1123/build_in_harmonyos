@@ -1,0 +1,49 @@
+--- a/sa.ac
++++ b/sa.ac
+@@ -92,7 +92,7 @@
+ 
+ ]])],[ AC_MSG_RESULT([yes]) AC_DEFINE(USE_$1, 1, [Define to use $1 with setsockopt(2)]) 
+ ],[ AC_MSG_RESULT([no]) 
+-],[])
++],[AC_MSG_RESULT([yes (assumed while cross compiling)]) AC_DEFINE(USE_$1, 1, [Define to use $1 with setsockopt(2)])])
+ ])dnl
+ 
+ dnl #   Check for anything OSSP SA wants to know
+--- a/configure
++++ b/configure
+@@ -5301,10 +5301,13 @@
+ { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to use SO_RCVTIMEO with setsockopt(2)" >&5
+ $as_echo_n "checking whether to use SO_RCVTIMEO with setsockopt(2)... " >&6; }
+ if test "$cross_compiling" = yes; then :
+-  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+-as_fn_error $? "cannot run test program while cross compiling
+-See \`config.log' for more details" "$LINENO" 5; }
++  # Cross compiling cannot execute the setsockopt(2) probe below.  OHOS (musl)
++  # declares SO_RCVTIMEO in <sys/socket.h> and the kernel implements it, so the
++  # native probe answers yes; assume the same instead of aborting the run.
++  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes (assumed while cross compiling)" >&5
++$as_echo "yes (assumed while cross compiling)" >&6; }
++$as_echo "#define USE_SO_RCVTIMEO 1" >>confdefs.h
++
+ else
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+@@ -5357,10 +5360,13 @@
+ { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to use SO_SNDTIMEO with setsockopt(2)" >&5
+ $as_echo_n "checking whether to use SO_SNDTIMEO with setsockopt(2)... " >&6; }
+ if test "$cross_compiling" = yes; then :
+-  { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+-$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+-as_fn_error $? "cannot run test program while cross compiling
+-See \`config.log' for more details" "$LINENO" 5; }
++  # Cross compiling cannot execute the setsockopt(2) probe below.  OHOS (musl)
++  # declares SO_SNDTIMEO in <sys/socket.h> and the kernel implements it, so the
++  # native probe answers yes; assume the same instead of aborting the run.
++  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes (assumed while cross compiling)" >&5
++$as_echo "yes (assumed while cross compiling)" >&6; }
++$as_echo "#define USE_SO_SNDTIMEO 1" >>confdefs.h
++
+ else
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
