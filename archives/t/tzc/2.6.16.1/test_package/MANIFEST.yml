@@ -1,0 +1,23 @@
+# test_package/MANIFEST.yml for tzc 2.6.16.1
+
+package: tzc/2.6.16.1
+homepage: "https://packages.debian.org/source/trixie/tzc"
+
+# R51 上游测试清点（三步法）：tzc 为 Debian native 包（上游 CMU cclub），
+# 源码树无 tests/ 目录，Makefile 目标仅 tzc / lread.o / tzc.o / clean，
+# debian/rules 无测试钩子 —— 确无上游自动化测试入口。
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# test_package 消费者端到端用例（每步校验退出码，不使用 Python assert）
+# 设计约束（对照 xsct 2.3，PR #15143 build #80198）：不做宿主 python dlopen
+# （HNP python3 受限 linker namespace 会拒绝对缓存路径共享库 dlopen），
+# 「闭包真实加载」由 B 节原生执行强制校验（加载器须完整解析闭包才能进 main）。
+test_package_tests:
+  - file: consumer_test.sh
+    description: "消费者端到端用例：A) 鸿蒙特有非断言测试（tzc 原生 aarch64 ELF + DT_NEEDED 闭包含 libzephyr.so.4 + com_err 静态链入证据）；B) 真实执行 tzc（-o 触发 libzephyr ZInitialize 业务 API 失败并优雅 EXIT_FAILURE(1)，--bogus 走上游 usage 路径），每步退出码校验"
+    command: "sh consumer_test.sh <bindir>"
+
+assertion_count: 22
