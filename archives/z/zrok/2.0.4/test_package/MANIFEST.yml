@@ -1,0 +1,75 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: zrok/2.0.4
+homepage: "https://zrok.io/"
+
+# 上游测试命令：zrok 顶层 Makefile 的 `test` 目标为 `go test ./... -count=1`。
+# 上游 CI 构建 UI（npm）后 go build；本适配用 `-tags no_zrok_ui`（上游自带
+# embed_stub.go 占位）绕开 UI，测试同样带该 tag 逐包编译-签名-运行。
+upstream_check_command: "make test -> go test ./... -count=1 && go vet ./..."
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "go test -mod=mod -tags no_zrok_ui -c <each pkg> + signed run -test.v (12 packages, offline)"
+
+# 上游实际运行的测试程序（12 个含 *_test.go 的包）
+upstream_tests:
+  - file: cmd/zrok2/deleteAccess_test.go
+    source: zrok-2.0.4/cmd/zrok2/
+    description: "access/delete/unaccess request resolution helpers"
+    command: "go test -mod=mod -tags no_zrok_ui -c ./cmd/zrok2 + signed run"
+  - file: controller/{share_name_lifecycle_test.go,unaccess_test.go}
+    source: zrok-2.0.4/controller/
+    description: "controller share-name lifecycle and unaccess handling"
+    command: "go test -mod=mod -tags no_zrok_ui -c ./controller + signed run"
+  - file: controller/automation/interface_test.go
+    source: zrok-2.0.4/controller/automation/
+    description: "ziti automation client interface contract"
+    command: "go test -mod=mod -tags no_zrok_ui -c ./controller/automation + signed run"
+  - file: controller/limits/*_test.go (9 files)
+    source: zrok-2.0.4/controller/limits/
+    description: "limit classes / bandwidth / resource count / user limits"
+    command: "go test -mod=mod -tags no_zrok_ui -c ./controller/limits + signed run"
+  - file: controller/store/{account,bandwidthLimitJournal,environment,frontend}_test.go
+    source: zrok-2.0.4/controller/store/
+    description: "store model marshalling (account/journal/environment/frontend)"
+    command: "go test -mod=mod -tags no_zrok_ui -c ./controller/store + signed run"
+  - file: drives/davServer/*_test.go (6 files)
+    source: zrok-2.0.4/drives/davServer/
+    description: "WebDAV server file/if/lock/prop/xml/webdav handlers"
+    command: "go test -mod=mod -tags no_zrok_ui -c ./drives/davServer + signed run"
+  - file: drives/davServer/internal/xml/*_test.go (5 files)
+    source: zrok-2.0.4/drives/davServer/internal/xml/
+    description: "XML encoding/marshalling used by WebDAV"
+    command: "go test -mod=mod -tags no_zrok_ui -c ./drives/davServer/internal/xml + signed run"
+  - file: drives/sync/sync_security_test.go
+    source: zrok-2.0.4/drives/sync/
+    description: "drive sync security (path traversal guards)"
+    command: "go test -mod=mod -tags no_zrok_ui -c ./drives/sync + signed run"
+  - file: endpoints/oauthCookies_test.go
+    source: zrok-2.0.4/endpoints/
+    description: "OAuth cookie serialization"
+    command: "go test -mod=mod -tags no_zrok_ui -c ./endpoints + signed run"
+  - file: endpoints/proxyUi/template_test.go
+    source: zrok-2.0.4/endpoints/proxyUi/
+    description: "interstitial/template rendering"
+    command: "go test -mod=mod -tags no_zrok_ui -c ./endpoints/proxyUi + signed run"
+  - file: sdk/golang/sdk/{config,integration,model}_test.go
+    source: zrok-2.0.4/sdk/golang/sdk/
+    description: "SDK config/model unit tests; 4 integration tests self-skip without ZROK2_API_ENDPOINT/ZROK2_ADMIN_TOKEN"
+    command: "go test -mod=mod -tags no_zrok_ui -c ./sdk/golang/sdk + signed run"
+  - file: util/duration_test.go
+    source: zrok-2.0.4/util/
+    description: "duration parsing helpers"
+    command: "go test -mod=mod -tags no_zrok_ui -c ./util + signed run"
+
+# test_package 中自带的测试 (消费者视角验证，实际执行被测二进制)
+test_package_tests:
+  - file: test.sh
+    description: "Execute packaged zrok2: version banner+version, --help command list, completion bash, unknown-command error handling; OHOS-only: signature section and musl ABI linkage"
+    command: "bash test.sh <bin/zrok2> [--ohos]"
+
+# 测试断言总数 (近似值, 用于质量评估): 上游 164 项（含 4 项集成测试跳过）+ test_package 6 项（OHOS）
+assertion_count: 170
