@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.15)
+project(kannel_consumer LANGUAGES C)
+find_package(kannel CONFIG REQUIRED)
+add_executable(consumer test.c)
+target_link_libraries(consumer PRIVATE kannel::kannel)
