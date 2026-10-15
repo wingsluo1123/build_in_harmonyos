@@ -1,0 +1,78 @@
+# ═══ Draft knowledge entry — icmake/icmbuild 构建的项目在无 icmake 的 OHOS 环境按 icmconf/CLASSES 复刻编译语义 ═══
+# Timestamp: 2026-10-12
+# Software: xd 5.00.03 (fbb-git / Frank B. Brokken) — 第二例；第一例 bobcat 6.14.00（已合并）
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     DRAFT-xd-5.00.03-icmake-icmbuild-build-emulation
+trigger_tool:           icmake|icmbuild|conan|make
+phase:                  build-system|compilation
+error_signature:        bad interpreter: /usr/bin/icmake: no such file or directory|icmake: (command not found|No such file or directory)|icmbuild: (command not found|not found)|./build: line [0-9]+: (string|syntax error)
+severity:               2
+category:               build-system, toolchain, conan, compilation, cross-compile
+match_keywords:         icmake, icmbuild, icmconf, INSTALL.im, CLASSES, bobcat, fbb-git,
+                        Brokken, 自定义构建工具, build 脚本, ICMAKE_CPPSTD, icmbuild program,
+                        icmbuild libraries, catFile, ADD_LIBRARIES, 构建语义复刻
+title:                  icmake/icmbuild 驱动的上游项目（fbb-git 家族）在无 icmake 的 OHOS 环境下按 icmconf/CLASSES 复刻编译语义
+
+# ═══ Layer 2: 诊断层 ═══
+root_cause:             上游（fbb-git: bobcat/xd/bisonc++/flexc++/yodl…）用作者自有构建工具 icmake 驱动：顶层 `build` 脚本本身就是 icmake 脚本（首行 `#!/usr/bin/icmake -t.`），program/libraries 目标再由 `icmbuild` 依据 icmconf/INSTALL.im/CLASSES 决定源集合、对象目录与链接库。OHOS 制品仓没有 icmake 配方、设备与 CI 也没有该工具，且 icmake 是自举型 C++ 程序（无官方预编译二进制可直接替代），于是 `./build program` 立刻以 rc=127 退出；又因为 build 是 icmake 语法而非 shell 语法，改用 `sh ./build` 只会得到 `string: command not found` 与 `syntax error near unexpected token '('` 的二次误导，掩盖真正根因。
+affected_scope:         上游自带 icmake 驱动的任何 C/C++ 项目（判定标志：顶层存在 icmake 脚本 `build` 且首行 shebang 指向 /usr/bin/icmake，同目录有 `icmconf`、可选的 `icmconf.lib`、`CLASSES`、`INSTALL.im`、`icmake/` 辅助脚本）。已在 OHOS 实证两例、覆盖两种模式：bobcat 6.14.00（libraries 模式，128 类 / 1051 TU，已合并并过 CI）、xd 5.00.03（program 模式，68 TU，本 PR）。
+verification_cmd:       sh -c 'cd "$(mktemp -d)" && tar xzf <xd_5.00.03.orig.tar.gz> && cd xd-5.00.03 && ./build program; echo rc=$?'
+
+# ═══ Layer 3: 方案层 ═══
+rec_priority:           1
+rec_approach:           replicate-icmbuild-semantics-in-conanfile
+rec_description:        不引入 icmake，在 conanfile.py 内用 Python 复刻 icmbuild 语义（对上游源码零补丁）：(1) 解析 CLASSES（逐行、跳过 // 注释）得模块目录清单；(2) program 模式源集合 = 顶层 MAIN（main.cc）及顶层其余 *.cc + 各模块目录下 *.cc；libraries 模式 = 各模块目录分别产出 .a/.so，且公共头按 `<class>/<class>` 用 catFile 语义（`#include "x.f"` 行内联展开）生成；(3) 每个 TU 以「自身所在目录 + 源码根」为包含根编译（模块内 `#include "xxx.ih"` 依赖同目录，main.ih 形如 `#include "dir/dir.h"` 依赖源码根）；(4) 链接按 icmconf 的 ADD_LIBRARIES（fbb-git 家族多为 bobcat）追加 `-l<bobcat>`，保留 INSTALL.im 的 -Wall/-Werror/-pthread 语义（实测 OHOS clang15 零告警，无需放松 -Werror）；(5) 复刻 `./build clean` 语义：build() 开头清空对象目录，避免残留 .o 参与链接造成重复符号；(6) 编译器/ar 取自 Conan conf（tools.build:compiler_executables），不经 shell 环境变量，并按 E2175 给编译/链接子进程注入 realpath(cxx)/../lib（SDK lld 需要 libxml2.so.16）。
+rec_command:            conan create archives/x/xd/5.00.03 -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 --build=missing
+rec_auto_fix:           false
+rec_impl:               custom-build-driver
+
+fallback_priority:      2
+fallback_approach:      package-icmake-as-tool-requires
+fallback_description:   先单独立项并发布 icmake 配方（icmake 自身有 shell 引导脚本可生成首版 icmake，再自举编译），下游改用 tool_requires("icmake/<ver>") 复用。好处是一次性解除整族阻塞、不必为每个项目各写一份语义复刻；代价是多一个前置库任务，且需逐项验证 icmbuild 的 program/libraries 语义在 OHOS 工具链下完整可用（尤其 MULTICOMP jobs、SPCH/PCH、USE_ALL 等开关）。
+fallback_command:       conan download icmake/13.00.03 -r=ohpcd --only-recipe
+fallback_auto_fix:      false
+fallback_impl:
+
+# ★ 禁止策略 ★
+forbid_1_pattern:       (?:sh|bash|zsh)\s+\./build|\bsource\s+\./build
+forbid_1_reason:        顶层 `build` 是 icmake 脚本（首行 #!/usr/bin/icmake -t.），不是 shell 脚本
+forbid_1_consequence:   得到 `string: command not found` / `syntax error near unexpected token` 类二次报错，把排查方向误导为“上游脚本坏了”，掩盖 icmake 缺失这一真正根因
+
+forbid_2_pattern:       只编 MAIN|仅编译 main\.cc|忽略 CLASSES|--exclude=CLASSES
+forbid_2_reason:        icmbuild program 编译 MAIN + CLASSES 各模块目录的全部 Sources；漏掉模块目录即漏掉程序主体实现
+forbid_2_consequence:   链接期 undefined symbol（或静默产出残缺二进制），通常到测试阶段才暴露
+
+forbid_3_pattern:       (?:^|[\s;])(?:g\+\+|/usr/bin/g\+\+)(?:[\s;]|$)
+forbid_3_reason:        违反 P-TOOLCHAIN-001：OHOS 只有 LLVM/Clang 工具链，g++ 不存在；上游 INSTALL.im 的 "CXX = ccache g++" 必须映射为 Conan conf 提供的 clang++
+forbid_3_consequence:   CI/真机 127 失败，或产出非 OHOS ABI 的产物
+
+forbid_4_pattern:       rm -rf\s+(?:tmp|spch)\b(?![^\n]*\bobj\b)
+forbid_4_reason:        上游 clean 语义只需清对象/库/头缓存；无条件 rm -rf 目录会波及源码树内同名内容（如 xd 顶层的 build 脚本、version/ 目录）
+forbid_4_consequence:   误删源码导致后续构建失败，且难与编译错误区分
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             P-TOOLCHAIN-001, P-BUILD-001
+
+# ═══ 关系图 ═══
+causes:                 []
+caused_by:              []
+similar_to:             E359, DRAFT-E628-rtklib-handwritten-makefile-multi-app-adaptation
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file:               doc/DRAFT-xd-5.00.03-icmake-icmbuild-build-emulation.md
+last_updated:           2026-10-12
+source_event:           xd 5.00.03 适配（feat/xd-5.00.03）：./build program -> bad interpreter: /usr/bin/icmake: no such file or directory（rc=127）
+
+# ═══ 知识协作 ═══
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 ═══
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:

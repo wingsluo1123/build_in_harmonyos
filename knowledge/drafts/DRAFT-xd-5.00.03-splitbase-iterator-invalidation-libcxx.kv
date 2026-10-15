@@ -1,0 +1,73 @@
+# ═══ Draft knowledge entry — 遍历容器元素的同时 push_back 同一容器：libstdc++ 侥幸、libc++/OHOS 读到乱码并 SIGTRAP ═══
+# Timestamp: 2026-10-14
+# Software: xd 5.00.03（Command::splitBase）— 触发实例
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     DRAFT-xd-5.00.03-splitbase-iterator-invalidation-libcxx
+trigger_tool:           clang|test
+phase:                  runtime
+error_signature:        Signal 5 \(core dumped\)|Initial characters of directories:.*[^ -~]
+severity:               3
+category:               c++, portability, libc, memory, compilation
+match_keywords:         iterator invalidation, 迭代器失效, push_back 自身, SSO, 短字符串, for_each,
+                        Signal 5, SIGTRAP, 乱码, libc++, libstdc++, 未定义行为
+title:                  遍历容器某元素的字符同时 push_back 同一容器（SSO 缓冲随 vector 重分配搬移）——libstdc++ 侥幸通过、libc++/OHOS 读到乱码并 SIGTRAP
+
+# ═══ Layer 2: 诊断层 ═══
+root_cause:             Command::splitBase() 先取 `front().begin()+1 .. front().end()` 迭代器，再在回调里 `push_back(string(1, ch))` 修改同一个 vector< string>。push_back 触发重分配时，vector 会把已有元素（含 string 对象）搬移到新缓冲；而短字符串（本例 "0zzz" 的 "zzz"，SSO）的字符数据就存在 string 对象内部，搬移即让先前取得的迭代器失效。此后回调从失效地址读字符 → 读到乱码（CI 日志 `Initial characters of directories: z z <乱码>`）→ 拼出畸形 glob 模式 → 崩溃（rc=133 = Signal 5 / 128+5）。libstdc++ 的 SSO 布局/搬移顺序不同，常"看起来正常"，因此这类自失效 UB 往往只在 libc++/OHOS 上暴露，且表现为时好时坏。
+affected_scope:         任何"边遍历容器元素边修改该容器"的 C++ 代码，尤其迭代器指向被搬移元素内部缓冲的形态（string SSO、vector 内小对象）；在 OHOS（clang + libc++）上表现为乱码/越界读/SIGTRAP，在 glibc + libstdc++ 上常静默通过。跨平台移植时属于"必须真修、不能靠优化开关压掉"的类别。
+verification_cmd:       conan create archives/x/xd/5.00.03 -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 --build=missing
+
+# ═══ Layer 3: 方案层 ═══
+rec_priority:           1
+rec_approach:           copy-before-mutate
+rec_description:        先把被遍历的数据拷出来，再修改容器：`string const base{ front() }; for (size_t idx = 1; idx != base.size(); ++idx) push_back(string(1, base[idx])); front().resize(1);`。通用形态：任何 "for_each(container.front().begin(), ..., [&](auto v){ container.push_back(...); })" 都先 `auto snapshot = container.front();`（或先收集到临时 vector，再 append），保证遍历期间不依赖会被搬移的地址。本包以 patches/0002 落地，TC3（`xd 0zzz`，多字符拆分）作为回归检查。
+rec_command:            conan create archives/x/xd/5.00.03 -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 --build=missing
+rec_auto_fix:           false
+rec_impl:               manual-patch-set
+
+fallback_priority:      2
+fallback_approach:      reserve-then-iterate
+fallback_description:   若必须就地遍历（不便拷贝大对象）：在**取迭代器之前**先 `reserve(size() + n)` 保证后续 push_back 不再重分配，地址保持稳定；也可改为索引循环并避免取元素内部指针/迭代器。注意 reserve 本身也会搬移元素，必须在取迭代器之前调用。
+fallback_command:
+fallback_auto_fix:      false
+fallback_impl:
+
+# ★ 禁止策略 ★
+forbid_1_pattern:       -O0|-fno-strict-aliasing|-fno-delete-null-pointer-checks(?![^\n]*#)
+forbid_1_reason:        用优化开关/降低优化"压掉"自失效 UB 的现场：UB 仍在，换 libc++ 版本/优化级别还会复发
+forbid_1_consequence:   CI 变绿但隐患保留；后续换工具链或加 flag 时再次 SIGTRAP，且更难定位
+
+forbid_2_pattern:       catch\s*\(\s*(?:\.\.\.|std::exception)
+forbid_2_reason:        在业务层 try/catch 包住崩溃点（SIGTRAP 不是 C++ 异常，抓不住；抓得住也掩盖了根因）
+forbid_2_consequence:   现象被移到别处或直接变成静默错误输出（乱码）→ 更难发现
+
+forbid_3_pattern:       把.*(?:乱码|SIGTRAP).*(?:归因|算作).*(?:OHOS|鸿蒙).*(?:平台缺陷|bug)
+forbid_3_reason:        把它归因为"OHOS 平台缺陷"而不修代码：同一份 UB 在 libstdc++ 上侥幸通过，说明问题在上游代码
+forbid_3_consequence:   知识沉淀成"平台不行"，下一个同样写法的库还要重踩；也无法上游化
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             P-BUILD-001
+
+# ═══ 关系图 ═══
+causes:                 []
+caused_by:              []
+similar_to:             E2175
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file:               doc/DRAFT-xd-5.00.03-splitbase-iterator-invalidation-libcxx.md
+last_updated:           2026-10-14
+source_event:           PR #15428 第四轮 CI：TC3 rc=133（Signal 5 (core dumped)），xd -V 打印 `Initial characters of directories: z z <乱码>`
+
+# ═══ 知识协作 ═══
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 ═══
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:

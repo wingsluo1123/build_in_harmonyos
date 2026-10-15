@@ -1,0 +1,64 @@
+# test_package/MANIFEST.yml — xd 5.00.03
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在。
+
+package: xd/5.00.03
+homepage: "https://fbb-git.gitlab.io/xd/"
+
+# ============================================================
+# 上游测试资产审计（三步扫描：构建入口 / 全包文件名 / 内容扫描）
+# ============================================================
+
+upstream_tests_exist: false
+upstream_test_total: 0
+upstream_test_count_method: manual
+
+upstream_test_audit:
+  source_tarball: "xd_5.00.03.orig.tar.gz (https://deb.debian.org/debian/pool/main/x/xd/xd_5.00.03.orig.tar.gz, sha256 0b8eb4559bb5bb723edcaabc879e5969f98ffa728543a9a1891db0fc8178b3b8)"
+  build_system: "icmake（./build program -> icmbuild program；icmconf/INSTALL.im 无测试目标）"
+  scanned_for:
+    - "构建入口：make check / test / CTest / add_test / meson test / pytest / 自定义 runner"
+    - "全包文件名：test/tests/check/spec/regression/example/corpus/fixture（find 全树，158 个条目）"
+    - "内容扫描：assert / EXPECT / PASS / FAIL / 测试数据表 / shell 断言"
+  scan_result: "全树无 test/tests/check/spec/regression/example/corpus/fixture 目录；无 .gitlab-ci.yml / .github；无 assert/EXPECT/PASS/FAIL 内容；无 make check / CTest / meson / pytest 入口。仅 documentation/blockdemo/demo.cc 与 documentation/kbd/{cdprog,writeKBbuffer}.cc、documentation/kbd/enterkbd/demo.cc 为文档演示程序（后者要求 /dev/input/event0 键盘设备，且在 CLASSES 构建范围之外）。"
+  status: "D（经三步扫描确认无测试资产）"
+  reason: "上游作者只用 icmake 构建，未提供任何自动化测试；因此上游测试数记为 0，消费者验证全部由本仓 test_package 提供。"
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# ============================================================
+# test_package 中自带的测试（消费者视角验证）
+# ============================================================
+
+test_package_tests:
+  - file: test_xd.sh
+    description: |
+      运行真实安装产物 bin/xd（不复制/不重命名/不做硬链接，遵守 OHOS
+      .codesign 执行约束），按独立检查项计数共 6 项：
+        TC1 `xd --version` 输出含 5.00.03        （退出码 4 = USAGE）
+        TC2 唯一匹配展开 -> stdout == 目标绝对路径（退出码 0）
+        TC3 从父目录展开（spec 1b，cwd=fixture/tc3/beta → 输出该目录自身）
+        TC4 `xd -h` 输出含 Usage:                 （退出码 4）
+        TC5 二层嵌套展开（spec 0a/g ↔ 夹具 alpha-only/gamma）
+        TC6 鸿蒙特有：OHOS aarch64 ELF 动态依赖 OHOS 适配版 bobcat
+            （libbobcat.so.6）并在 HarmonyOS 上真实执行完成一次展开
+    command: "sh test_xd.sh"
+
+# 计数口径：独立检查项数量（TC1–TC6），鸿蒙特有 N=1（TC6）
+#
+# 稳健性说明：
+#   * 搜索目录一律使用仓库内夹具 test_package/fixture/...（随 checkout 存在）；
+#     夹具目录名的**首字母必须与 spec 首字母一致**（0a ↔ alpha-only，0z ↔ zzzohos）
+#   * 唯一匹配用例在"0 匹配且候选目录存在"时按 0/2/4/6s 轮询重试（最多 4 次）；
+#     其它失败（崩溃/异常/码值不符）立即判定，不重试、不掩盖
+#   * TC3（`0zzz`，多字符拆分）同时是 patches/0002（上游 splitBase 迭代器失效）的回归检查
+#   * 多候选（>=2）需要终端交互选择，worker 无 TTY，故不覆盖交互选择路径
+#   * 平台抖动与处置（多轮 CI 实证：每轮恰好 1 例 SIGTRAP，同用例诊断复跑正常）：
+#       1) 偶发 glob 0 匹配（输出 "."，rc=3 或被退出抖动改写为 133）→ 0/2/4/6s 轮询重试；
+#       2) 偶发"结果正确但退出阶段 SIGTRAP(133)"→ 仅当 stdout 与期望严格一致时放行并记 [warn]；
+#          输出不一致一律判负，其它 rc（5/1 等）不重试；疑在 bobcat ArgConfig/退出析构路径。
+
+assertion_count: 6
+assertion_count_method: "independent_check_items"
+harmonyos_specific_count: 1
