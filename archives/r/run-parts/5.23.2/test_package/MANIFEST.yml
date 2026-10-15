@@ -1,0 +1,30 @@
+package: run-parts/5.23.2
+homepage: "https://salsa.debian.org/debian/debianutils"
+
+# Upstream has no `make check` target; its tests are the autopkgtest scripts
+# debian/tests/{smoke,run-parts.test} (declared in debian/tests/control).
+upstream_check_command: "bash debian/tests/run-parts.test"
+
+# conanfile.py build() does not run the upstream script (it needs the runner shell
+# environment and `mktemp --tmpdir`); it was run locally under qemu-aarch64 against
+# the cross-compiled binary (see notes.md).
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests:
+  - file: debian/tests/run-parts.test
+    source: debianutils-debian-5.23.2/debian/tests/run-parts.test
+    description: "run-parts --version/--help/--list/--test/-v/--report/--reverse/--exit-on-error, directory precedence"
+    command: "bash debian/tests/run-parts.test"
+  - file: debian/tests/smoke
+    source: debianutils-debian-5.23.2/debian/tests/smoke
+    description: "which/ischroot/tempfile/savelog smoke test (not part of the run-parts package, not run)"
+    command: "sh debian/tests/smoke"
+
+# test_package: OHOS consumer flow, run on every `conan create`
+test_package_tests:
+  - file: consumer_hook.c
+    description: "OHOS ELF consumer program built with the Conan toolchain, executed as hooks by the packaged run-parts (--list/--test/-a/--stdin/-u/--exit-on-error); --stdin covers the patched temporary-file path"
+    command: "conan create (test_package/conanfile.py test())"
+
+assertion_count: 9
