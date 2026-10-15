@@ -1,0 +1,38 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "R52",
+      "file": "archives/k/kcachegrind/README.md",
+      "line": 21,
+      "description": "软件级 README 与包的真实内容矛盾：第 21 行写「上游源码补丁：**无**（patches_applied: []）」，但本包确实带补丁——conandata.yml:7-17 声明了 patches/0001-kcachegrind-main.cpp.patch（patch_type: portability），manifest.yaml:53-54 的 patches_applied 也列出了同一补丁，且该补丁正是本 PR 的核心适配（不打则任何参数下启动即退出）。README 第 38 行「功能裁剪为零：所有视图、D-Bus 单实例（KDBusService）……均保留」同样未提无会话总线时 KDBusService 不再构造的降级行为。README 看起来是加补丁前生成的旧稿，属自审/文档与现实不一致（对比 manifest.yaml、notes.md 均已如实登记该补丁）。",
+      "fix_suggestion": "更新 archives/k/kcachegrind/README.md：第 21 行改为列出 patches/0001-kcachegrind-main.cpp.patch（patch_type: portability，+13/-1），并在「与上游的差异」表中补一行「KDBusService 构造 | 无条件 | 仅当 QDBusConnection::sessionBus().isConnected() 时构造 | OHOS 无 D-Bus 会话总线，无总线时上游构造期即终止进程」，第 38 行的“功能裁剪为零”改为“功能零裁剪，唯一差异是无会话总线时关闭 D-Bus 激活”。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R52",
+      "file": "archives/k/kcachegrind/26.04.0/reports/test-report.md",
+      "line": 31,
+      "description": "（审计输入快照 b94b73440c 中的内容，已在 HEAD b4e31f074b 修复，故不阻塞）被审计快照的 test-report 第 31 行写「L2 smoke（kcachegrind --version → rc=0…）✅ 通过」，但同一报告的 reports/w3-local-ci.log:947-952 明确为「[warn] L2: kcachegrind --version/--help failed (non-blocking)」且 L2_RESULT=skip，ci-metadata.json 也如实记 L2={\"result\":\"skip\"}；真实的 rc=0 来自 test_package（conanrun 环境 + QT_QPA_PLATFORM=offscreen），并非 CI 内置 L2 探针。同快照还把 L4 描述为「NX/PIE/BIND_NOW/RELRO」通过，而 L4 实际只是补丁危险函数扫描（L4_RESULT=pass: patches clean），BIND_NOW/RELRO 从未被任何步骤校验。HEAD b4e31f074b 已把 L2 改为「⚠️ skip（原因说明）」，并把 L4 改成「补丁规范/危险函数」，与新加的 PF9 取证说明一并回填，结论与工具输出一致。",
+      "fix_suggestion": "无需再改（HEAD 已修复）。建议后续报告统一只引用工具原始 RESULT 行（L2_RESULT / L4_RESULT / L5_RESULT），不要用 test_package 的通过结论替代 CI 探针结论。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R19",
+      "file": "archives/k/kcachegrind/26.04.0/.staging-verified",
+      "line": 1,
+      "description": "提交了一个空文件 .staging-verified。它是流程运行时标记，.gitignore:264 明确以 **/.staging-verified 忽略（junk_check JC1/JC5 口径），属被强制加入的运行时噪声，与 R19 禁止把运行时/生成物带进 PR 的精神相悖（不在 R19 明文清单内，且仓内已有 7 个包同样误提交：cloog/kics/libbfio/libdazzle/oscpack/reflex/thc，属可接受的既成先例）。",
+      "fix_suggestion": "可选：git rm --cached archives/k/kcachegrind/26.04.0/.staging-verified 后再提交（不影响 W3/staging 状态，CI 会重建该标记）。非阻塞。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "W2",
+      "file": "archives/l/libXext/README.md",
+      "line": 1,
+      "description": "共享 worktree 里存在与本 PR 无关的未提交改动（git status: M archives/l/libXext/README.md、M archives/l/libXext/manifest.yaml）。它们不在 origin/main...HEAD 的 15 个文件内，本 PR 目前是干净的单一配方；但若提交步骤使用 git add -A / git commit -a，会把 libXext 一起带进 PR，直接破坏 W2 原子性（一个 PR 只含一个包）。",
+      "fix_suggestion": "提交/推送时显式按路径 add（只加 archives/k/kcachegrind/** 与本次知识草稿），或先 stash/restore 掉 archives/l/libXext 的两处改动。"
+    }
+  ],
+  "summary": "结论：verdict=pass（P0=0、P1=0）。审计对象为分支 feat/kcachegrind-26.04.0，diff origin/main...HEAD 恰为 15 个文件且全部属于单一包 archives/k/kcachegrind/（版本目录 11 个 + 软件级 README.md/commands.json + 2 个 knowledge/drafts），未触碰 SKILL.md/scripts/ci/templates/references/SUMMARY.md 等框架文件（类别四 W2 通过）。注意：审计输入 JSON 的快照 HEAD 为 b94b73440c（01:09:49），审计期间作者又提交了 b4e31f074b（01:11:00，修 L2 表述 + 补 PF9 取证），本报告按最新 HEAD 判定，。已核对的地面真相：(1) conandata.yml:5 的 sha256 与 /storage/Users/currentUser/tmp/builds/kcachegrind-26.04.0.tar.xz 实算值一致 476919c3…8fa4，URL 为 https://download.kde.org 官方 release-service，无镜像前缀/无 http/file/绝对路径（R39、R13 通过）；(2) 上游测试三步法（R51）实测成立：pristine 树 find -iname '*test*' = 0、全部 CMakeLists.txt 的 add_test/enable_testing/BUILD_TESTING = 0 命中、无 include(CTest)/ecm_add_tests，与 MANIFEST.yml/notes.md/pr-body 的「N_static=0」申报一致；test_package 断言的 31 条与 w3-local-ci.log:932「== 31/31 checks passed ==」实测吻合，无占位符（R51 通过）；(3) R34 成立：test_package/test_kcachegrind.py 真实执行安装后的 bin/kcachegrind（--version 取 rc=0，并 offscreen 加载自造 mini.callgrind，断言输出 Selected  \"main\"、GUI 存活 30s、无 loader/symbol 错误），CI 还做了 L1e 破坏性反向验证（移走 bin → 测试失败，日志 L1e: Negative test confirmed）；(4) R9 通过：test() 中无 pass/强制 exit 0，conanfile.py 没有跳过 test 的写法；(5) R8 通过：唯一补丁 0001-kcachegrind-main.cpp.patch 不含 __OHOS__/-D__OHOS__/replace() 平台宏注入，改用运行期能力探测 QDBusConnection::sessionBus().isConnected() 守卫 KDBusService 构造；在 pristine 树上 patch -p1 --dry-run 干净应用；补丁命名 NNNN-*.patch、conandata.yml 有 patch_description + patch_type: portability（R3/文件规范通过）；(6) R40 通过（GUI 应用类）：有实质平台适配（无会话总线启动期守卫，否则任何参数都启动即退出）+ DT_RPATH 注入（OHOS musl 不认 LD_LIBRARY_PATH）+ offscreen 真实 GUI 功能冒烟，非 stub/return-0；(7) E537 生态限制描述诚实：w3-local-ci.log:903 实测 27 个 DT_NEEDED 中 12 个为 conan 缓存绝对路径，test_package 记 INFO 不判失败，pr-body/notes/test-report/manifest 四处口径一致并附仓内同族先例（kbreakout/kcolorchooser/ktelnetservice6/kiconfinder6），不是用来掩盖其它问题；(8) R38 通过：软件级 commands.json 存在且 schema 合规（name=kcachegrind、type=tool、versions[\"26.04.0\"].ref==\"kcachegrind/26.04.0\"），路径在 archives/k/kcachegrind/ 而非版本目录；本包 package_type=application，应当有；(9) R37 通过：26.04.0 为上游首发版、无适配后缀，archives/k/kcachegrind/ 在 main 上不存在，属首次入库；(10) R26 不适用/通过：应用包 cpp_info.libs=[]、无 lib/ 交付物，不污染 /lib，conan-verify G3 也报了无系统同名库；(11) R32：validate() 用 not in (\"Linux\",\"OHOS\") 正确；generate()/build_env 中的 == \"OHOS\" 是显式匹配 OHOS 分支，不构成 R32 漏匹配（判断点，见下）；R33：build() 未裸用 CC/CXX/CFLAGS 等 shell 环境变量，工具链均走 CMakeToolchain/Conan，通过；(12) R36 通过：pr-body 记录 W0 逐包 conan download --only-recipe 预检 + conan graph info 实测仅 kio 需本地重建，其余 31 包命中已发布二进制。判断取舍（judgement calls）：①软件级 README.md/commands.json 与版本目录同时出现在一个 PR 里，形式上命中 PF9「变更须落在单一 archives/<字母>/<包>/<版本>/ 目录」——但这是框架自相矛盾（L0k/PF8 又强制要求软件级 commands.json），且仓内已有完全同形的合并先例 ktimer（d3c1f8cf84 同时新增 archives/k/ktimer/README.md + commands.json + 26.04.0/**），故判为惯例合规、不算 W2 违规，仅建议提交时显式 --no-preflight 并在 PR 正文说明（作者已在 HEAD 的 pr-body「PR 前置硬闸取证」中补齐该说明；我尝试本地复跑 preflight.py 时该脚本因取不到 git 可执行文件在 PF0 即 fail-closed 退出，无法独立复核 PF1–PF8，此项按脚本逻辑与作者取证采信，属审计留白）。②knowledge/drafts 两个草稿文件在 PR 内，不属第 21 条禁改清单，且有 synscan/perl-b-cow 先例（同样在包 PR 内 2 个草稿），不判违规。③reports/pr-body.md、reports/test-report.md 虽被 .gitignore 的 reports/ 规则覆盖，但仓内 1298 个包、3546 个文件均强制入库，属既定惯例，不判 R19 违规。④L4 仅补丁危险函数扫描（L4_RESULT=pass: patches clean），L5 仅 bin/ 非空基线，均为非阻塞 P2/P3 级观察，不上纲到 fail。遗留唯一实质性发现是软件级 README.md 仍称「上游源码补丁：无」，与 conandata.yml/manifest.yaml 的实际补丁清单矛盾（P2，非阻塞，建议提交前顺手改掉以免 PR 评审引用旧口径）。 【审计修订与证据 sha256（R52）】HEAD=b4e31f074b920a212c4f6d56648cc622b1929ec1（branch feat/kcachegrind-26.04.0，base origin/main，diff 15 文件；审计输入快照 HEAD=b94b73440c，审计期间作者新增 1 个修复提交）；被检文件 sha256：conanfile.py 12e031349008…f12825c、conandata.yml 98bc136eea6d…78cf9f68、patches/0001-kcachegrind-main.cpp.patch bd8b2de966e0…02700e71、test_package/test_kcachegrind.py c50e6650b499…20922983、archives/k/kcachegrind/README.md 2f9c46b304ad…e0e20bae、archives/k/kcachegrind/commands.json 85afbf259a31…ac66c2ff8、reports/test-report.md e7fb29853374…123c05f7、reports/pr-body.md 03bbebbd3e3f…c4fe2860、上游 kcachegrind-26.04.0.tar.xz 476919c3a9be…537c8fa4。"
+}

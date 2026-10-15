@@ -1,0 +1,60 @@
+--- a/kcachegrind/main.cpp
++++ b/kcachegrind/main.cpp
+@@ -7,22 +7,25 @@
+ */
+ 
+ /*
+  * KCachegrind startup
+  */
+ 
+ // for KCACHEGRIND_VERSION
+ #include "../version.h"
+ 
+ 
++#include <memory>
++
+ #include <QApplication>
+ #include <QCommandLineParser>
++#include <QDBusConnection>
+ #include <KAboutData>
+ #include <KLocalizedString>
+ #include <KSharedConfig>
+ #include <KDBusService>
+ 
+ #include "kdeconfig.h"
+ #include "toplevel.h"
+ #include "tracedata.h"
+ #include "loader.h"
+ 
+@@ -39,21 +42,30 @@
+                          QStringLiteral("https://kcachegrind.github.io"));
+     aboutData.addAuthor(i18n("Josef Weidendorfer"),
+                         i18n("Author/Maintainer"),
+                         QStringLiteral("Josef.Weidendorfer@gmx.de"));
+     aboutData.setOrganizationDomain("kde.org");
+     aboutData.setDesktopFileName(QStringLiteral("org.kde.kcachegrind"));
+ 
+     KAboutData::setApplicationData(aboutData);
+     QApplication::setWindowIcon(QIcon::fromTheme(QStringLiteral("kcachegrind")));
+ 
+-    KDBusService service(KDBusService::Multiple);
++    // Create the D-Bus service only when a session bus is actually reachable.
++    // KDBusService's constructor terminates the whole process when no session
++    // bus can be found, which makes kcachegrind unusable on systems without
++    // one (e.g. OpenHarmony, which has no D-Bus session bus).  Nothing else in
++    // this program uses the service object, so skipping it only disables
++    // D-Bus based application activation.
++    std::unique_ptr<KDBusService> service;
++    if (QDBusConnection::sessionBus().isConnected()) {
++        service.reset(new KDBusService(KDBusService::Multiple));
++    }
+ 
+     //   KGlobal::locale()->insertCatalog("kcachegrind_qt");
+     Loader::initLoaders();
+ 
+     KConfig* kc = KSharedConfig::openConfig().data();
+     ConfigStorage::setStorage(new KDEConfigStorage(kc));
+ 
+     if (a.isSessionRestored()){
+         int n = 1;
+         while (KMainWindow::canBeRestored(n)){

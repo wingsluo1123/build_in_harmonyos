@@ -1,0 +1,56 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI build_and_test.sh L0e 强制要求存在）
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# 清点证据（R51 三步法第一步）：解压 kcachegrind-26.04.0.tar.xz 后
+#   - `find . -iname '*test*'` → 0 个文件（无 tests/、autotests/、unittests/）
+#   - 全部 CMakeLists.txt 中 `add_test` / `enable_testing` / `BUILD_TESTING`
+#     出现 0 次
+#   - 根 CMakeLists.txt 无 `include(CTest)`、无 ecm_add_tests
+#   ⇒ 上游确无测试目标，N_static = 0。
+
+package: kcachegrind/26.04.0
+homepage: "https://invent.kde.org/sdk/kcachegrind"
+
+# 上游测试命令（本包无测试目标，如实申报空）
+upstream_check_command: ""
+
+# conanfile.py build() 方法中是否已集成上游测试（无测试可集成）
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序：无
+upstream_tests: []
+
+# test_package 中自带的测试（消费者视角验证，适配后补全）
+# 共 3 个消费者「用例」（rule12 口径：鸿蒙特有测试必须含完整端到端消费者用例）
+test_package_tests:
+  - file: test_kcachegrind.py
+    name: "CASE 2：完整消费者用例 —— Callgrind 剖面分析端到端流程（鸿蒙特有）"
+    description: >-
+      四段式：**构造输入** 内嵌确定性 callgrind 语料（main→parse_trace→
+      build_model 真实调用链，summary=2100；对照语料结构相同、仅入口改名）+
+      每次运行一个可写 XDG_CONFIG_HOME；**真实执行** offscreen 启动安装后的
+      bin/kcachegrind <trace>，走完整产品链路（进程启动 → Qt6/KF6 平台与 UI
+      初始化 → loader/插件发现 → 解析 callgrind → 构建 TraceData/CostItem 模型
+      → 视图选中入口函数 → 退出写回 KConfig）；**产出结果** stderr 的
+      `Selected  "<fn>"`、<XDG_CONFIG_HOME>/kcachegrindrc、进程存活状态、stderr
+      清洁度；**校验内容** ①与独立 Python 参考实现（自带 callgrind 文本解析）
+      算出的入口函数一致 ②参考实现总自身开销 == 语料自带 summary 声明（交叉
+      验证参考实现）③对照语料（入口改名）不再选中 main（输入驱动、非硬编码）
+      ④kcachegrindrc 写出且含 [Layouts]（KConfig 流程走通）⑤两次运行均无
+      loader/symbol 错误 ⑥主语料运行期间 GUI 存活未崩。
+    command: "python3 test_kcachegrind.py   # CASE 2"
+  - file: test_kcachegrind.py
+    name: "CASE 1：运行期冒烟 + CASE 3：产物布局与 OHOS ELF 专项校验（鸿蒙特有）"
+    description: >-
+      CASE 1：offscreen 运行安装后的 bin/kcachegrind --version（验证
+      Qt6/KF6/DBus 运行期依赖经 conanrun + DT_RPATH 完整解析）。
+      CASE 3：交付物布局（bin/kcachegrind、5 个 callgrind 转换脚本、
+      desktop/appdata 元数据）+ OHOS ELF 属性（PIE/GNU_STACK/DT_RPATH/13 个
+      关键 KF6-Qt6 依赖链接；绝对路径 DT_NEEDED 属 E537 族已知生态现象，脚本
+      如实记录为 INFO 不判失败）。
+    command: "python3 test_kcachegrind.py   # CASE 1 + CASE 3"
+
+# 断言总数（实测：test_kcachegrind.py 的 check() 调用数 35/35 全过，3 个用例）
+assertion_count: 35
