@@ -1,0 +1,81 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: vxi/0.0.20121221
+homepage: "https://tracker.debian.org/pkg/vxi"
+
+# 上游测试套件存在性 (经审计上游源码包确认：无任何测试)
+upstream_tests_exist: false
+
+# 上游测试审计（源码：vxi_0.0.20121221.orig.tar.gz，95500 B，
+# sha256 12b04dbc8f8538dfebb062c16fbaa8fdf11a3ca110e8ffabdeba60363e3af8d8）
+# 2026-10-14 实拉 Aliyun Debian 镜像归档逐文件验证：共 14 个条目，
+# 无 tests/test/t/spec 目录，无 *test*/*check* 文件；
+# Makefile.am 仅定义 lib_LIBRARIES（libvxiclient.a/libvxiserver.a）与
+# nodist_include_HEADERS，无 TESTS/check_PROGRAMS/check-local；
+# configure.ac 仅 AC_PROG_CC/AC_PROG_RANLIB，无测试框架注册。
+# 对齐已合入主干的 bwm/0.6.3 与 cvechecker/4 范例（结构化映射 +
+# upstream_test_in_build: false），供 hmbs 清单器机器解析覆盖。
+upstream_test_audit:
+  source_tarball: "vxi_0.0.20121221.orig.tar.gz (Debian vxi source package)"
+  source_sha256: "12b04dbc8f8538dfebb062c16fbaa8fdf11a3ca110e8ffabdeba60363e3af8d8"
+  source_origin: "https://deb.debian.org/debian/pool/main/v/vxi/vxi_0.0.20121221.orig.tar.gz"
+  top_level_files:
+    - file: "Makefile.am"
+      role: "automake 入口，仅 lib_LIBRARIES + nodist 头/源（rpcgen 生成）"
+      test_targets: "none（无 TESTS/check_PROGRAMS/check-local）"
+      is_test: false
+    - file: "configure.ac"
+      role: "autoconf 输入，仅 AC_PROG_CC/AC_PROG_RANLIB + AC_OUTPUT"
+      test_targets: "none（无测试框架探测与注册）"
+      is_test: false
+    - file: "vxi.x / vxi_intr.x"
+      role: "VXI-11 RPC 规范源（附录 C），Public Domain"
+      test_targets: "none（规范定义，非测试）"
+      is_test: false
+    - file: "configure / Makefile.in / aclocal.m4 / config.* / depcomp / install-sh / missing"
+      role: "预生成 autotools 产物与辅助脚本"
+      test_targets: "none"
+      is_test: false
+  scanned_for:
+    - "TEST( / TEST_F (gtest)"
+    - "def test_ (pytest)"
+    - "Makefile.am TESTS / check_PROGRAMS / check-local"
+    - "tests/ / test/ / t/ / spec/ 目录"
+    - "*_test.c / test_*.py / *check*.c 测试源"
+    - "configure.ac enable_testing / add_test"
+    - "ctest / meson test / pytest 入口"
+  scan_result: "0 matches — orig.tar.gz 归档 14 条目逐项核对：无 tests/test 目录，无 *test* 文件，Makefile.am 无 TESTS/check_PROGRAMS/check-local，configure.ac 无测试框架注册"
+  make_check_output: "automake 默认 no-op（Makefile.am 无 TESTS，check 目标无用例可执行）；build() 不调用 make check（upstream_test_in_build: false），证据由 test_package 阶段 no_tests 标记给出（对齐 bwm/0.6.3 范例）"
+  reason: "vxi 0.0.20121221 上游（Debian vxi 源码包）为纯 RPC 桩库发布包，不含任何测试套件：无 tests/test 目录，无 TESTS/check_PROGRAMS 定义，无测试源文件与测试框架注册"
+
+# 上游注册测试总数（口径：autotools TESTS 条目数；审计确认 0）
+upstream_test_total: 0
+upstream_test_count_method: autotools_tests
+
+# 上游测试命令（上游无测试套件，故为空；对齐 bwm/0.6.3 范例）
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（upstream_tests_exist: false，见上方审计）
+upstream_tests: []
+
+# test_package 自带的测试（消费者视角验证：真实调用 RPC 头/XDR 编解码/桩符号）
+test_package_tests:
+  - file: test_vxi.c
+    description: "消费者测试：DEVICE_CORE/ASYNC/INTR 程序号与规范常量比对"
+    command: "./test_vxi"
+  - file: test_vxi.c
+    description: "消费者测试：xdr_Create_LinkParms 内存流编解码往返"
+    command: "./test_vxi"
+  - file: test_vxi.c
+    description: "消费者测试：xdr_Device_WriteParms 负载编解码往返"
+    command: "./test_vxi"
+  - file: test_vxi.c
+    description: "消费者测试：libvxiclient/libvxiserver XDR 符号链接解析"
+    command: "./test_vxi"
+
+# 测试断言总数（test_vxi.c 内 4 项 CHECK，全部断言真实行为）
+assertion_count: 4
