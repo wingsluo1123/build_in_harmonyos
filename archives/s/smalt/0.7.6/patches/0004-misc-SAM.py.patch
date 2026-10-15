@@ -1,0 +1,230 @@
+--- a/misc/SAM.py
++++ b/misc/SAM.py
+@@ -78,42 +78,42 @@
+             if len(m.groups()) > 11:
+                 tags = m.group(12).split('\t')
+                 #print "TAGS", tags
+                 for tag in tags:
+                     n = Sam.TAGSTR.match(tag)
+                     if n:
+                         (tagnam, typ, fld) = n.groups()
+                         self.tags[tagnam] = (typ, fld)
+             self.ok = True
+         else:
+-            if is_verbose: print "NOT PARSED '%s'" % lin
++            if is_verbose: print("NOT PARSED '%s'" % lin)
+             self.blank()
+ 
+     def clip(self):
+         s = 0
+         e = 0
+         typ = 'H'
+         isCorrect = False
+         ms = Sam.CLIPSTART.match(self.cigar)
+         if ms:
+             s = int(ms.group(1))
+             typ = ms.group(2)
+         
+         me = Sam.CLIPSTART.search(self.cigar)
+         if me:
+             e = int(me.group(1))
+             if ms and ms.group(2) == me.group(2):
+                 isCorrect = True
+         return (typ, isCorrect, s, e)
+ 
+     def strand(self):
+-        print "(%i, %s)" % (self.flag, bool(self.flag & Sam.FLAG_STRAND))
++        print("(%i, %s)" % (self.flag, bool(self.flag & Sam.FLAG_STRAND)))
+         return bool(self.flag & Sam.FLAG_STRAND)
+     
+     def calcUnclippedStart(self):
+         rs = self.pos
+         (typ, ok, s, e) = self.clip()
+         #print rs
+         #print (typ, ok, s, e)
+         if typ == 'H' and ok:
+             rs = rs - s
+         return rs
+@@ -200,32 +200,32 @@
+         qual=""
+         if self.flag & Sam.FLAG_1stMATE:
+             namstr = '%s/1' % self.qname
+         elif self.flag & Sam.FLAG_2ndMATE:
+             namstr = '%s/2' % self.qname
+         else:
+             namstr = self.qname
+         if  bool(self.flag & Sam.FLAG_STRAND):
+             (seq, qual, okflg) = self.reverseComplement()
+             if not okflg:
+-              print "ERROR: when reverse complementing sequence!"
++              print("ERROR: when reverse complementing sequence!")
+               exit(1)
+         else:
+             seq = self.nt
+             qual = self.qual
+ 
+         return namstr, seq, qual
+     
+     def asFastq(self, clip=0):
+         namstr, seq, qual = self.asFastqStr()
+         if clip >= len(self.nt):
+-            print "ERROR: clipped fragment > sequence length\n%s" % (self.qname)
++            print("ERROR: clipped fragment > sequence length\n%s" % (self.qname))
+         return Sam.FASTQ_FORMAT % (namstr, seq[clip:], qual[clip:])
+ 
+     def reverseComplement(self):
+         s = list(self.qual)
+         s.reverse()
+         qual = ""
+         for i in range(len(self.qual)):
+             qual = qual + s[i]
+     
+         s = list(self.nt)
+@@ -238,35 +238,35 @@
+                 seq = seq + 'N'
+ 
+         return (seq, qual, len(self.nt) == len(self.qual))
+ 
+     def next(self, infil, is_verbose=False):
+         while 1:
+             lin = infil.readline()
+             if not lin: break
+             self.parse(lin, is_verbose)
+             if self.ok: break
+-            if is_verbose: print "not parsed: %s" % lin
++            if is_verbose: print("not parsed: %s" % lin)
+         return not lin # True if EOF
+     
+         
+ def fetchNextRead(infil, read):
+     isEOF = False
+     currnam = read.qname
+     while 1:
+         lin = infil.readline()
+         if not lin:
+             isEOF = True
+             break
+         read.parse(lin)
+         if not read.ok:
+-            print "not parsed: %s" % lin
++            print("not parsed: %s" % lin)
+             continue
+         break
+         #print read.target.varnum()
+         #if read.qname != currnam:
+         #    break
+ 
+     return isEOF
+ 
+ def fetchNextPair(infil, samA, samB):
+     # assumes sorted file
+@@ -284,46 +284,46 @@
+                 switch_flag = 1
+                 
+             if switch_flag == 0:
+                 if (samB.flag & Sam.FLAG_2ndMATE) == 0:
+                     errflg = True
+             else:
+                 if (samB.flag & Sam.FLAG_2ndMATE) == 1:
+                     errflg = True
+   
+             if errflg:
+-                print "ERROR: unexpected pair flags.\n%s\n%s\n%s\n%s" % \
+-                      (samA.qname, samA.strFlags(), samB.qname, samB.strFlags())
++                print("ERROR: unexpected pair flags.\n%s\n%s\n%s\n%s" % \
++                      (samA.qname, samA.strFlags(), samB.qname, samB.strFlags()))
+                 exit(1)
+ 
+     return (isEOF, switch_flag)
+ 
+ def openFile(filnam, mode):
+     import gzip
+ 
+     is_compressed = len(filnam) > 3 and filnam[-3:] == ".gz"
+     try:
+         if is_compressed:
+             oufil = gzip.open(filnam, mode)
+         else:
+             oufil = open(filnam, mode)
+     except:
+-        print "ERROR when opening file '%s'" % filnam
++        print("ERROR when opening file '%s'" % filnam)
+         exit(1)
+ 
+     return oufil
+ 
+ if __name__ == '__main__':
+     from sys import argv, exit
+ 
+     if len(argv) < 3:
+-        print "usage: %s <SAM file (input)> <mapping score threshold>" % argv[0]
++        print("usage: %s <SAM file (input)> <mapping score threshold>" % argv[0])
+         exit(1)
+ 
+     infilnam = argv[1]
+     mapq_min = int(argv[2])
+ 
+     infil = openFile(infilnam, 'r')
+     
+     read = Sam()
+     readctr = 0
+     pairctr = 0
+@@ -353,43 +353,43 @@
+                     if (flg & Sam.FLAG_PROPER) == 0:
+                         # not a proper pair
+                         (mnam, mno) = read.getMateNam()
+                         if mno == 1: #print mnam
+                             old_qnam = mnam
+                             old_rnam = read.rname
+                         else:
+                             if mnam == old_qnam:
+                                 if read.rname != old_rnam:
+                                     chimictr = chimictr + 1
+-                                    print "[%i, %i]%s: rname1: %s, rname2: %s" % \
+-                                          (readctr, chimictr, mnam, old_rnam, read.rname)
++                                    print("[%i, %i]%s: rname1: %s, rname2: %s" % \
++                                          (readctr, chimictr, mnam, old_rnam, read.rname))
+ 
+                     else:
+                         # a 'proper' pair
+-                        print "%s %i %i %x" % (read.qname, abs(read.isize), read.mapq, int(read.flag))
++                        print("%s %i %i %x" % (read.qname, abs(read.isize), read.mapq, int(read.flag)))
+                         propctr =  propctr + 1
+                 isizarr.append(abs(read.isize))
+             else:
+                 lowqctr = lowqctr + 1
+         if readctr % 100000 == 0:
+-            print "%i reads ..." % readctr
++            print("%i reads ..." % readctr)
+     pairctr = pairctr/2
+     
+     infil.close()
+ 
+-    print "%i out of a total of %i reads (%5.2f%%) were mapped." % \
+-          (readctr - nomapctr, readctr, 100*float(readctr - nomapctr)/readctr)
+-    print "%i out of a total of %i reads (%5.2f%%) mapped with a mapping score > %i" % \
+-          (minqctr, readctr, 100*float(minqctr)/readctr, Sam.MAPQ_NONRANDOM)
++    print("%i out of a total of %i reads (%5.2f%%) were mapped." % \
++          (readctr - nomapctr, readctr, 100*float(readctr - nomapctr)/readctr))
++    print("%i out of a total of %i reads (%5.2f%%) mapped with a mapping score > %i" % \
++          (minqctr, readctr, 100*float(minqctr)/readctr, Sam.MAPQ_NONRANDOM))
+     if Sam.MAPQ_NONRANDOM != mapq_min:
+-        print "%i out of a total of %i reads (%5.2f%%) mapped with a mapping score > %i" % \
+-              (highqctr, readctr, 100*float(highqctr)/readctr, mapq_min)
++        print("%i out of a total of %i reads (%5.2f%%) mapped with a mapping score > %i" % \
++              (highqctr, readctr, 100*float(highqctr)/readctr, mapq_min))
+         
+     if pairctr > 0:
+-        print "%i out of a total of %i reads (%5.2f%%) mapped as a proper pair with a mapping score > %i" % \
+-              (propctr, readctr, 100*float(propctr)/readctr, mapq_min)
+-        print "%i of %i pairs (%6.3f%%) with a mapping score >= %i mapped to different chromosomes" % \
+-              (chimictr, pairctr, 200*float(chimictr)/pairctr, mapq_min)
++        print("%i out of a total of %i reads (%5.2f%%) mapped as a proper pair with a mapping score > %i" % \
++              (propctr, readctr, 100*float(propctr)/readctr, mapq_min))
++        print("%i of %i pairs (%6.3f%%) with a mapping score >= %i mapped to different chromosomes" % \
++              (chimictr, pairctr, 200*float(chimictr)/pairctr, mapq_min))
+     else:
+-        print "There were no reads mapped as pairs."
++        print("There were no reads mapped as pairs.")
+         
+     exit(0)

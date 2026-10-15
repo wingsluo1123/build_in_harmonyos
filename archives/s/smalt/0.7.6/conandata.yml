@@ -1,0 +1,110 @@
+# conandata.yml — smalt 0.7.6
+#
+# 上游源码：SMALT (Sequence Mapping and Alignment Tool) 0.7.6 官方发行 tarball，
+# 由上游作者 Hannes Ponstingl (Wellcome Trust Sanger Institute) 发布在项目官方
+# 文件托管区（SourceForge 项目 smalt，Debian watch 文件同样指向该处）。
+# 本地真实 GET 下载校验：72,290,533 字节，gzip 数据，内含 125 个条目，
+# tarball 内 config.guess 时间戳 2009-11-20、NEWS 最新条目为 0.7.6 (21-03-2014)。
+# 不是 Debian 重打包产物，不是个人 fork（R39/PF7）。
+#
+# 注意（R39/PF7）：此处只写官方源，不手写镜像前缀。ci/conan/build_and_test.sh
+# 会在运行时按需追加镜像回退；写进版本库反而会被 create-pr 的 PF7 源URL闸判违规。
+
+sources:
+  # 三条 URL 同属上游官方 SourceForge 分发网络（前两条为官方镜像主机，第三条为项目文件区
+  # 规范写法）。实测三者返回同一文件：72,290,533 字节，sha256 逐一核对与下方一致。
+  # 并列多 URL 的原因是 CI 实证而非推测：worker 侧从项目文件区拉这个 72 MB tarball 时，
+  # conan 连续 3 轮都在约 7 MB 处被截断（IncompleteRead(7098096 bytes read,
+  # 65192437 more expected)），最终以 ConanConnectionError 使 source() 失败
+  # （构建 #66867/#66928/#67854/#67875，CI 自诊断均归类「网络问题 / 源码下载超时」）。
+  # 同时 CI 自带的两道兜底在该 worker 上都不可用：预下载因缺少 curl 直接失效
+  # （日志三行 [fail] [Errno 2] No such file or directory: 'curl'），
+  # 且 build_and_test.sh 的 get_mirrors() 没有 SourceForge 映射（只对 boost/github/gnu/savannah
+  # 生效），所以 conandata 侧必须自带可回退的多 URL。conan 按序逐个尝试并对每个 URL
+  # 独立校验同一 sha256，任一命中即通过。同型先例：archives/r/rsyslog/8.2404.0
+  # （因 CI 网络类随机截断而并列官方站与权威镜像）。
+  # 三条均为官方源：不含 PF7 黑名单镜像域、不含明文 http、不是 Debian 重打包、
+  # 不是 gitcode/gitee 搬运源（R39/PF7）。
+  #
+  # 更正（后续实测）：上面「并列多 URL 供 conan 逐 URL 回退」的判断只对了一半。三条 URL 实测
+  # 全部 301/302 落到同一个 master.dl.sourceforge.net 均衡器（curl -L 的 num_redirects 与
+  # url_effective 逐条记录），其余 *.dl 边缘主机（cytranet/freefr/netcologne/versaweb/tenet/
+  # razaoinfo/udomain/iweb/jaist/nchc/liquidtelecom）已不能解析，所以逐 URL 回退并不带来机器
+  # 多样性。真正解决 worker 侧截断的是 conanfile.py 的 source()：把 tarball 切成 18 个 4 MB
+  # range 并发拉取并在 range 内部续传（三条 URL 实测均支持 Range，返回 206 Partial Content
+  # 与 content-range: bytes 0-0/72290533）。此处保留三条 URL 是因为它们同属官方分发网络、
+  # sha256 一致，且均衡器背后的实际镜像主机会轮换。
+  url:
+    - "https://cfhcable.dl.sourceforge.net/project/smalt/smalt-0.7.6.tar.gz"
+    - "https://master.dl.sourceforge.net/project/smalt/smalt-0.7.6.tar.gz"
+    - "https://sourceforge.net/projects/smalt/files/smalt-0.7.6.tar.gz"
+  sha256: "89ccdfe471edba3577b43de9ebfdaedb5cd6e26b02bf4000c554253433796b31"
+
+# 补丁（由 scripts/ohc-run.py refresh-patch --auto 从 .orig/.work 差异生成，
+# apply_conandata_patches 应用；patch_ng 的 a/ b/ 前缀，-p1）：
+#
+# 0001-0002 —— HarmonyOS 三元组识别（知识 E007/E072/E122/E205/E268）
+#   上游自带的 config.guess/config.sub 是 2009-11-20 版：
+#     * config.guess 无 *:HarmonyOS:*:* 分支，worker 上 uname -s 返回 HarmonyOS
+#       时直接 "unable to guess system type" 退出，configure 第一阶段即中断；
+#     * config.sub 的 KERNEL-OS 列表不认 linux-ohos，aarch64-unknown-linux-ohos
+#       被判为 machine `aarch64-linux' not recognized；即使补了 KERNEL-OS 列表，
+#       末尾的 -linux*) 兜底分支还会把 -linux-ohos 改写成 -linux-gnu-ohos，
+#       所以基本系统类型列表也要加 -linux-ohos*。
+#   按仓库既有做法修补这两个脚本本身，不用 --build/--host 伪造三元组绕过
+#   （E205 明确禁止），修补后 config.guess 在模拟 HarmonyOS uname 下输出
+#   aarch64-unknown-linux-ohos，config.sub 对该三元组校验通过，且
+#   aarch64-unknown-linux-gnu / x86_64-pc-linux-gnu / arm-apple-darwin24.6.0
+#   等既有三元组回归无变化。补丁只改构建系统脚本，不含平台宏（R8/PF5）。
+#
+# 0003 —— configure 的 config.status 临时目录 umask 077 → 000（知识 E002/E011）
+#   HMDFS 上 0700 目录创建会 Permission denied；与 rsyslog 8.2404.0 的
+#   0001-configure-E011-HMDFS-fix.patch、qsopt 2.5.10.3 同型修复。
+#
+# 0004-0011 —— 上游测试脚本 Python 2 → Python 3 移植（8 个文件，一组逻辑变更）
+#   上游 6 个 make check 测试驱动与其 helper（testdata.py / formats.py）是
+#   2013-2014 年的 Python 2 代码：print 语句、cmp()、缺失 __ne__、gzip 文本模式。
+#   worker 上没有 python2（Python 2 已 EOL），不改则 make check 注册的 6 个
+#   用例一个都跑不起来（上游测试通过率只能是 0/8）。改动是纯语法/IO 模式移植：
+#     * print 语句 → print() 函数
+#     * cmp(a, b) → operator.ne(a, b)（同为"不等则真"语义）
+#     * Cigar 补 __ne__（Python 3 不再由 __cmp__ 自动派生）
+#     * testdata.py 解包 .gz 时改二进制模式（Python 3 的 gzip 返回 bytes）
+#     * results_split_test.py 里字面量 "\U" 转义修正为 "\\U"
+#   **不改动任何断言、期望值或用例逻辑**，也不删测试。Debian 对同一上游版本
+#   （smalt 0.7.6-13, main）携带等价的 2to3.patch，可作旁证。
+#   实测（本机原生构建，非鸿蒙证据）：移植后 make check 6/6 PASS。
+patches:
+  - patch_file: "patches/0001-config.guess.patch"
+    patch_description: "0001 config.guess recognize HarmonyOS uname and emit aarch64 unknown linux ohos (E007 E205)"
+    patch_type: "portability"
+  - patch_file: "patches/0002-config.sub.patch"
+    patch_description: "0002 config.sub accept the linux ohos KERNEL OS pair and keep it out of the linux to linux gnu rewrite (E072 E122 E268)"
+    patch_type: "portability"
+  - patch_file: "patches/0003-configure.patch"
+    patch_description: "0003 configure config.status tmp dir umask 077 to 000 for HMDFS (E002 E011)"
+    patch_type: "portability"
+  - patch_file: "patches/0004-misc-SAM.py.patch"
+    patch_description: "0004 misc SAM.py port the Python 2 print statements to Python 3, no logic change"
+    patch_type: "portability"
+  - patch_file: "patches/0005-test-bam_cigar_test.py.patch"
+    patch_description: "0005 test bam_cigar_test.py port the Python 2 print statements to Python 3, no assertion change"
+    patch_type: "portability"
+  - patch_file: "patches/0006-test-formats.py.patch"
+    patch_description: "0006 test formats.py port to Python 3 print function and add explicit Cigar __ne__ since Python 3 no longer derives it from __cmp__, no assertion change"
+    patch_type: "portability"
+  - patch_file: "patches/0007-test-mthread_test.py.patch"
+    patch_description: "0007 test mthread_test.py port to Python 3 print function and richer discrepancy diagnostics, expected values unchanged"
+    patch_type: "portability"
+  - patch_file: "patches/0008-test-results_split_test.py.patch"
+    patch_description: "0008 test results_split_test.py escape the literal backslash U in the expected quality string so Python 3 parses the module, expected value unchanged"
+    patch_type: "portability"
+  - patch_file: "patches/0009-test-sample_test.py.patch"
+    patch_description: "0009 test sample_test.py port to Python 3 replacing cmp with operator.ne, same inequality semantics, expected values unchanged"
+    patch_type: "portability"
+  - patch_file: "patches/0010-test-splitReads_test.py.patch"
+    patch_description: "0010 test splitReads_test.py port the Python 2 print statements to Python 3, no assertion change"
+    patch_type: "portability"
+  - patch_file: "patches/0011-test-testdata.py.patch"
+    patch_description: "0011 test testdata.py port to Python 3 print function and binary mode when unpacking gzipped fixtures since gzip returns bytes, no logic change"
+    patch_type: "portability"

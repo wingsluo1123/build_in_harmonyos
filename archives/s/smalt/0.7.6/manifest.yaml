@@ -1,0 +1,144 @@
+# 版本级 manifest
+# 文件位置: archives/s/smalt/0.7.6/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "0.7.6"
+
+software: smalt
+
+# published | built | failed | archived
+# R29: 本地 conan create / conan-verify 通过但未 conan upload，故标 built，不伪造 published
+status: built
+
+build_date: "2026-10-01"
+build_system: autotools
+
+conan_ref: "smalt/0.7.6"
+
+source:
+  url: "https://sourceforge.net/projects/smalt/files/smalt-0.7.6.tar.gz"
+  sha256: "89ccdfe471edba3577b43de9ebfdaedb5cd6e26b02bf4000c554253433796b31"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--with-bambamc=no"
+    - "CPPFLAGS=-I<zlib>/include"
+    - "LDFLAGS=-L<zlib>/lib"
+    - "PYTHON=<sys.executable>（目标可执行时，让 automake 注册 6 个测试驱动）"
+    - "PYTHON=:（交叉编译时，避免注册无法执行的测试）"
+    - "--host=aarch64-unknown-linux-ohos（仅交叉编译时；worker 原生构建由打过补丁的 config.guess 自行得出）"
+  make_options:
+    - "-j1"
+  dependencies:
+    - "zlib/1.3.1"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-config.guess.patch"
+  - "0002-config.sub.patch"
+  - "0003-configure.patch"
+  - "0004-misc-SAM.py.patch"
+  - "0005-test-bam_cigar_test.py.patch"
+  - "0006-test-formats.py.patch"
+  - "0007-test-mthread_test.py.patch"
+  - "0008-test-results_split_test.py.patch"
+  - "0009-test-sample_test.py.patch"
+  - "0010-test-splitReads_test.py.patch"
+  - "0011-test-testdata.py.patch"
+
+knowledge_gained:
+  - "2009-11-20 版 config.guess 没有 *:HarmonyOS:*:* 分支，worker 上 uname -s 返回 HarmonyOS 时直接 'unable to guess system type' 退出（E007）；补该分支后输出 aarch64-unknown-linux-ohos。旧版脚本用 echo+exit 而不是新版的 GUESS= 变量，照搬 scripts/patch-autotools-ohos.pl 的块会静默失效"  # knowledge_ref: E007/E205 已覆盖（2009 版形态差异记入 notes.md 路径 B 评估）
+  - "同版 config.sub 有两处会拒绝 linux-ohos：①maybe_os 的 KERNEL-OS 列表缺 linux-ohos*，导致 aarch64-linux-ohos 被当成 machine aarch64-linux（旧脚本还不认识裸 aarch64，必须带 vendor 位）；②即使补了①，OS 分支末尾的 -linux*) 兜底会用 sed 把 -linux-ohos 改写成 -linux-gnu-ohos，所以基本系统类型列表也要加 -linux-ohos*。E122 的 sed 模板针对新版 linux-uclibc*- ) 形态，对 2009 版的续行形态不匹配，需按实际文本改"  # knowledge_ref: E072/E122/E268 已覆盖（2009 版形态差异记入 notes.md 路径 B 评估）
+  - "上游 test/Makefile.am 硬编码 -I../src/ -I../test，out-of-source（VPATH）构建下 test 程序找不到 elib.h；必须 self.folders.build = '.' 在源码树内构建（同 redis/recode/runit 惯例）"  # knowledge_ref: 无需独立条目（包内构建系统特性，已固化在 conanfile.layout）
+  - "src/Makefile.am 的 libsgm_a_LIBADD = libseq.a 让 libseq.a 成为 libsgm.a 的归档成员：OHOS lld 只告警 'archive member is neither ET_REL nor LLVM bitcode' 并正常链接，Apple ld64 直接报错。故该库只能在 OHOS/Linux 工具链下构建，macOS 原生便捷构建需先 ar d libsgm.a libseq.a"  # knowledge_ref: 候选（链接器对嵌套归档的容忍度差异）；本次未新开条目，评估见 notes.md 路径 B 小节
+  - "AM_PATH_PYTHON([2.6]) 只探测 python/python2*，机器上只有 python3 时它把 PYTHON 设为 ':'、WITH_TESTDRIVER 为假、TESTS 变空 —— make check 会 0 用例通过（与 box2d ctest 空套件假通过同型）。配方显式传 PYTHON=<sys.executable>，并在 build() 里断言 PASS 行数 == 6，杜绝空跑"  # knowledge_ref: 候选，建议 merge-into DRAFT-box2d-2.4.1-ctest-empty-suite-false-pass（同类：测试入口静默空转）
+  - "上游 6 个 make check 驱动与 testdata.py/formats.py 是 Python 2 代码（print 语句、cmp()、缺 __ne__、gzip 文本模式），worker 无 python2；机械移植到 py3 后本机原生实测 make check 6/6 PASS。Debian 对同一上游版本携带等价 2to3.patch，可作旁证"  # knowledge_ref: 无需独立条目（语言代差移植，非平台问题）
+  - "zlib 在本生态是纯静态包（libz.a + pkgconfig，无 .so），musl 的 libm.a/libpthread.a 是空壳档案，因此上游 -lm -lpthread -lz 链接行产出的 DT_NEEDED 实测恰为 [libc.so]，天然满足 R26，无需额外静态开关"  # knowledge_ref: 无需独立条目（已固化为 test_package 的 A3 断言）
+  - "smalt 用 rand()/srand48()（randef.h 的 RANSEED，sort.c 的随机化快排枢轴）做并列最优选择，未给 -r 时以 time(0) 播种；musl 与 glibc 实现不同，故设备端测试固定 -r 42 并断言 3 次运行逐字节一致（H5）"  # knowledge_ref: 无需独立条目（已固化为 test_package 的 H5 断言）
+
+# ── 上游测试审计（计数口径：独立可判定成败的测试项）────────────────
+upstream_tests_exist: true
+upstream_test_total: 11
+upstream_test_count_method: independent_test_items
+upstream_test_audit: >-
+  审计 smalt-0.7.6.tar.gz（sha256 89ccdfe471edba3577b43de9ebfdaedb5cd6e26b02bf4000c554253433796b31，
+  72,290,533 字节，125 个条目）：R51 三步法逐项清点结果见 test_package/MANIFEST.yml
+  的 upstream_test_audit（含 16 个候选项的计入/排除理由）。随包分发的测试资产为
+  6 个 automake TESTS 注册的 Python 集成驱动 + 2 个 C 测试程序
+  （sequenceReverseComplement_test、diffstr_test，自身无断言，由
+  upstream_c_tests.py 补断言后判定），另加 3 个随包分发但依赖 BAM 后端的驱动
+  （bam_cigar_test.py、ioform_test.py、xali_test.py），按「就高不就低」合计 11 项；另有 test/data 19 个语料文件
+  （69 MB）供驱动消费。test/Makefile.am 还引用 21 个 nodist_/WITH_TESTALL 测试源，
+  发行 tarball 不含，官方发行配置下从不注册。bam_cigar_test.py / ioform_test.py /
+  xali_test.py 依赖 samtools 可执行文件或 bambamc 库，本构建 --with-bambamc=no
+  故不注册。
+reason: >-
+  上游 11 项测试全部保留（未删除、未改写断言、未标记跳过）：其中 8 项可运行且全部通过 ——6 个驱动经 make check 实跑（PASS 行数硬断言 = 6），
+  2 个 C 测试程序由 upstream_c_tests.py 以 6 次带断言子调用实跑（RESULT 硬断言 6/0）。
+  另 3 项（bam_cigar_test.py、ioform_test.py、xali_test.py）依赖 BAM 输入输出后端，在本配方
+  --with-bambamc=no 的 C-only 构建下不可运行（上游 0.7.6 未为主程序接通 C++ 链接：AC_PROG_CXX
+  被注释、smalt_LDADD 无 C++ 运行时、dummy.cxx 权宜整段被注释；制品仓已有 bambamc/0.0.50，
+  启用 BAM 属可行后续项）。申报口径按「就高不就低」取 11（PC 鸿蒙化审查 rule4 少报核验：
+  上游实测 N=11 > 原声明 N=8，已修正），可运行 8 项通过率 100%。适配后另补 17 项
+  （功能 8 + 鸿蒙特有 9），合计 28 项，无测试删减。
+harmonyos_specific_test_count: 9
+test_package_test_count: 8
+assertion_count: 28
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /var/folders/mz/4dql6xh91bv6q32jnsgc1q7c0000gn/T/builds/smalt-0.7.6.orig
+  source_work_dir: /var/folders/mz/4dql6xh91bv6q32jnsgc1q7c0000gn/T/builds/smalt-0.7.6.work
+  source_orig_hash: 2365f4045558c3e3
+  source_work_hash: 0e9ce211caf725b6
+  generated_at: '2026-10-01T04:15:12'
+  patches_count: 11
+
+patch_classification:
+  - file: 0001-config.guess.patch
+    type: portability
+    platform_only: True
+    guard: none
+  - file: 0002-config.sub.patch
+    type: portability
+    platform_only: True
+    guard: none
+  - file: 0003-configure.patch
+    type: portability
+    platform_only: True
+    guard: none
+  - file: 0004-misc-SAM.py.patch
+    type: portability
+    platform_only: False
+    guard: none
+  - file: 0005-test-bam_cigar_test.py.patch
+    type: portability
+    platform_only: False
+    guard: none
+  - file: 0006-test-formats.py.patch
+    type: portability
+    platform_only: False
+    guard: none
+  - file: 0007-test-mthread_test.py.patch
+    type: portability
+    platform_only: False
+    guard: none
+  - file: 0008-test-results_split_test.py.patch
+    type: portability
+    platform_only: False
+    guard: none
+  - file: 0009-test-sample_test.py.patch
+    type: portability
+    platform_only: False
+    guard: none
+  - file: 0010-test-splitReads_test.py.patch
+    type: portability
+    platform_only: False
+    guard: none
+  - file: 0011-test-testdata.py.patch
+    type: portability
+    platform_only: False
+    guard: none

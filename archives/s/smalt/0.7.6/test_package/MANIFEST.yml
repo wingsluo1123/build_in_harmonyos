@@ -1,0 +1,304 @@
+# test_package/MANIFEST.yml — smalt 0.7.6
+# 上游官方测试声明（CI build_and_test.sh L0e 强制要求）。详见 docs/TEST_QUALITY_SPEC.md
+#
+# 计数口径（唯一口径，贯穿 MANIFEST / notes.md / 测试日志 / PR 两张表）：
+#   按「独立可判定成败的测试项」计数 —— 每个测试项单独执行、单独输出 PASS/FAIL、
+#   单独判定成败。上游侧一个测试项 = 一个随发行包分发的测试程序/脚本（automake
+#   TESTS 的一个条目，或一个 C 测试程序）；适配侧一个测试项 = test_package 里一个
+#   单独输出 PASS/FAIL 的检查项。两侧都不按断言条数或子调用次数展开（子调用明细
+#   见 upstream_tests 的 sub_checks 字段，仅说明用，不计入总数）。
+#   适配后合计 28 项 = 上游 11 项（不变）+ 功能补全 8 项（F1-F8）
+#                     + 鸿蒙特有 9 项（A1-A4、H1-H5）。
+#   上游 11 项 = 发行 tarball 内分发的全部测试程序/脚本（9 个 .py + 2 个 .c），按「先全量发现、
+#   后排除、就高不就低」计入；其中 8 项在本构建配置下可运行且全部通过，3 项（bam_cigar_test.py、
+#   ioform_test.py、xali_test.py）依赖 BAM 后端，在 --with-bambamc=no 下不可运行，原因见
+#   upstream_test_not_runnable_reason；三者文件原样保留，未删除、未改写断言、未标记跳过。
+
+package: smalt/0.7.6
+homepage: "https://sourceforge.net/projects/smalt/"
+
+# ── 上游测试套件存在性（经审计官方 tar 包确认）──────────────────────
+upstream_tests_exist: true
+upstream_test_total: 11
+upstream_test_count_method: independent_test_programs
+
+upstream_test_audit:
+  source_tarball: "smalt-0.7.6.tar.gz（官方 SourceForge 项目文件区，Debian watch 同源）"
+  source_sha256: "89ccdfe471edba3577b43de9ebfdaedb5cd6e26b02bf4000c554253433796b31"
+  tarball_size_bytes: 72290533
+  tarball_entries: 125
+  upstream_version_evidence: "configure.ac: AC_INIT([smalt],[0.7.6],[hp3@sanger.ac.uk])；NEWS 最新条目 0.7.6 (21-03-2014)"
+  build_system: "autotools（tarball 自带 2014-03-21 生成的 configure 与 Makefile.in；config.guess/config.sub 为 2009-11-20 版）"
+
+  # R51 三步法
+  step1_build_entry: >-
+    configure.ac 通过 AM_PATH_PYTHON([2.6]) 设置 with_testdriver，
+    AM_CONDITIONAL([WITH_TESTDRIVER]) / WITH_TESTALL / WITH_BAMBAMC /
+    WITH_SAMTOOLS_EXEC 决定 test/Makefile 里 TESTS 的内容；
+    test/Makefile.in:42 的 @WITH_TESTALL_FALSE@@WITH_TESTDRIVER_TRUE@TESTS =
+    $(am__EXEEXT_6)（= ${TEST_DRIVERS}，6 个 Python 驱动）+ 条件追加项；
+    TESTS_ENVIRONMENT = $(PYTHON)。check_PROGRAMS = sequenceReverseComplement_test
+    （automake 只构建、不自动运行，TESTS 未列出它）。EXTRA_PROGRAMS 18 项，
+    其中只有 diffstr_test 的源码随包分发。
+  step2_filename_scan: >-
+    全包扫描 test/tests/check/spec/regression/example/corpus/fixture 命名：
+    命中 test/ 目录 16 个条目（6 个 *_test.py 驱动 + bam_cigar_test.py +
+    ioform_test.py + xali_test.py + 2 个 *_test.c + testdata.py + formats.py +
+    Makefile.am/.in + data/）与 test/data/ 19 个语料文件（69 MB）。
+    src/ 与 misc/ 下无测试文件（misc/*.c 是随包安装的工具，不是测试）。
+  step3_content_scan: >-
+    内容扫描 assert/expect/PASS/FAIL/期望输出表：6 个 Python 驱动经
+    testdata.DataFiles.call() 对每次 smalt 调用检查返回码（非 0 即 exitErr 退出），
+    并用 formats.Cigar / getNextCigarPair / areFilesIdentical 逐条比对 CIGAR、
+    比对文件内容；mthread_test.py 还校验 pairctr == n_pairs_expected。
+    两个 C 测试程序内部**没有**断言：sequenceReverseComplement_test 打印
+    "Revese complement of N sequences."（上游原拼写）后 return ERRCODE_SUCCESS，
+    diffstr_test 打印 CIGAR 的 5 种表示后 exit(errcode)，二者都是"用法驱动 +
+    打印结果"的 harness，判定需要外部比对。
+
+  asset_status: >-
+    A 类（正式 runner + case）：automake TESTS 注册的 6 个 Python 集成驱动，
+    `make check` 逐条输出 PASS/FAIL 并汇总；
+    B 类（有测试程序但未接入标准入口）：2 个随包分发的 C 测试程序
+    （sequenceReverseComplement_test 在 check_PROGRAMS 中被构建但不被 TESTS 运行，
+    diffstr_test 属 EXTRA_PROGRAMS 需显式 make），且自身无断言；
+    C 类语料：test/data 19 个文件被驱动直接消费。
+
+  candidates:
+    - path: "test/splitReads_test.py"
+      counted: true
+      reason: "TEST_DRIVERS 成员，make check 注册；实测 PASS"
+    - path: "test/results_split_test.py"
+      counted: true
+      reason: "TEST_DRIVERS 成员，make check 注册；实测 PASS"
+    - path: "test/ouform_cigar_test.py"
+      counted: true
+      reason: "TEST_DRIVERS 成员，make check 注册；实测 PASS"
+    - path: "test/sample_test.py"
+      counted: true
+      reason: "TEST_DRIVERS 成员，make check 注册；实测 PASS（本机 38s）"
+    - path: "test/cigar_test.py"
+      counted: true
+      reason: "TEST_DRIVERS 成员，make check 注册；实测 PASS"
+    - path: "test/mthread_test.py"
+      counted: true
+      reason: "TEST_DRIVERS 成员，make check 注册；实测 PASS（本机 54s，多线程一致性）"
+    - path: "test/sequenceReverseComplement_test.c"
+      counted: true
+      reason: "随包分发的 check_PROGRAMS 测试程序；配方显式运行并补断言（子调用 C1-C4）"
+    - path: "test/diffstr_test.c"
+      counted: true
+      reason: "随包分发的 EXTRA_PROGRAMS 测试程序；配方显式 make 并运行、补断言（子调用 C5-C6）"
+    - path: "test/bam_cigar_test.py"
+      counted: true
+      runnable: false
+      reason: >-
+        仅在 WITH_SAMTOOLS_EXEC 为真时注册，且脚本用 `smalt map -f bam`，
+        BAM 输出需要 HAVE_BAMBAMC。本配方按 --with-bambamc=no 构建（见下），
+        故本配置下不注册、不可运行；文件随发行包分发，按就高不就低仍计入上游申报总数
+        （counted: true、runnable: false），未删除、未改写断言、未标记跳过。
+    - path: "test/ioform_test.py"
+      counted: true
+      runnable: false
+      reason: "随发行包分发，按就高不就低计入上游申报总数；仅在 WITH_BAMBAMC 为真时注册，本构建 --with-bambamc=no 故不可运行（文件原样保留，未删除、未改断言）"
+    - path: "test/xali_test.py"
+      counted: true
+      runnable: false
+      reason: "随发行包分发，按就高不就低计入上游申报总数；仅在 WITH_BAMBAMC 为真时注册，本构建 --with-bambamc=no 故不可运行（文件原样保留，未删除、未改断言）"
+    - path: "test/testdata.py"
+      counted: false
+      reason: "驱动的 helper 模块（DataFiles/openFile/areFilesIdentical），非独立测试"
+    - path: "test/formats.py"
+      counted: false
+      reason: "驱动的 helper 模块（Cigar 解析/比较），非独立测试"
+    - path: "misc/SAM.py"
+      counted: false
+      reason: "SAM 解析 helper，供 bam_cigar_test.py 使用，非独立测试"
+    - path: "test/data/（19 个文件，69 MB）"
+      counted: false
+      reason: "C 类语料/夹具，被上述驱动消费，本身不是测试项"
+    - path: "test/Makefile.am 引用的 21 个 nodist_/WITH_TESTALL 测试源"
+      counted: false
+      reason: >-
+        sequence_test.py、consistentFR_test.py、diffstr_test.py 以及
+        sequenceReadWrite_test.c、sequenceCompress_test.c、seqSetIO_test.c、
+        hashhit_test.c、hashidx_test.c、segment_test.c、array_test.c、
+        alignment_test.c、rmap_test.c、smalt_test.c、basqual_test.c、
+        infmt_test.c、swsimd_test.c 等均为 nodist_（不随发行包分发），
+        tarball 内不存在；WITH_TESTALL 的条件 `test -e ./test/seqSetIO_test.c`
+        因此为假，这些用例在官方发行配置下从不注册。
+
+  bambamc_scope_note: >-
+    BAM 输入/输出是上游可选特性，依赖 German Tischler 的 C++ 库 bambamc。
+    上游 0.7.6 没有为主程序接通 C++ 链接：configure.ac 的 AC_PROG_CXX 被注释，
+    src/Makefile.am 的 smalt_LDADD 不含任何 C++ 运行时，test/Makefile.am 里
+    用于触发 C++ 链接的 dummy.cxx 也整段被注释。因此本配方按上游 README 自己
+    记录的 C-only 配置 `--with-bambamc=no` 构建，核心能力（FASTA/FASTQ 含 gzip
+    输入 → SAM/SMALT 输出、单双端、多线程）完整；启用 BAM 需要先补 C++ 链接路径，
+    已在 notes.md 记为后续项。
+
+# ── 上游测试如何执行（层 1，在 conanfile.py 的 build() 内）──────────
+upstream_check_command: "make -j1 check    # TESTS = 6 个 Python 驱动，TESTS_ENVIRONMENT = $(PYTHON)"
+upstream_test_in_build: true
+upstream_test_command: >-
+  build() 内：make -j1 check（6 个驱动）→ make -j1 diffstr_test →
+  python3 upstream_c_tests.py --test-dir <build>/test --workdir <build>/ohos-tmp
+  （2 个 C 测试程序，6 次带断言子调用 C1-C6）
+upstream_test_gate: >-
+  两层都是硬门禁：make check 的 PASS 行数必须等于 6，upstream_c_tests.py 必须输出
+  RESULT: passed=6 failed=0，否则抛 ConanException 让 conan create 失败。
+  交叉编译（本机 OHOS SDK）时目标 ELF 不可执行，层 1 跳过并在日志中说明，
+  由 HarmonyOS worker 实跑。
+
+upstream_tests:
+  - file: test/splitReads_test.py
+    type: integration
+    description: "双端 reads 拆分映射：smalt index + map，用 formats.Cigar 逐条比对期望的 (mapcls, mateno, qseg, snam, sseg) 元组表，缺一条即失败"
+    command: "make check（automake TESTS 条目）"
+    result: "PASS（本机原生实测；鸿蒙 worker 由 CI 实跑）"
+  - file: test/results_split_test.py
+    type: integration
+    description: "跨相邻参考序列的比对拆分：内嵌期望 CIGAR/质量串，逐条比对 smalt 输出"
+    command: "make check（automake TESTS 条目）"
+    result: "PASS（同上）"
+  - file: test/ouform_cigar_test.py
+    type: integration
+    description: "输出格式与 CIGAR 一致性：用 getNextCigarPair 成对读取并比较两份输出的 CIGAR"
+    command: "make check（automake TESTS 条目）"
+    result: "PASS（同上）"
+  - file: test/sample_test.py
+    type: integration
+    description: "`smalt sample` 插入片段长度采样：对 genome_1.fa.gz + gen1l75i300e0_{1,2}.fq.gz 采样后比对 CIGAR，readname 不匹配或 mapq>5 的比对不一致即 exit"
+    command: "make check（automake TESTS 条目）"
+    result: "PASS（同上，本机 38s）"
+  - file: test/cigar_test.py
+    type: integration
+    description: "CIGAR 生成：对 cigar_ref.fa.gz + cigar_read{1,2}.fq 以 `map -f sam -x` 建索引并映射，要求全部调用返回 0"
+    command: "make check（automake TESTS 条目）"
+    result: "PASS（同上）"
+  - file: test/mthread_test.py
+    type: integration
+    description: "多线程一致性：单线程与多线程两次映射结果逐对比较 CIGAR，mapq 双高于阈值却不一致即 exit，且 pairctr 必须等于期望对数"
+    command: "make check（automake TESTS 条目）"
+    result: "PASS（同上，本机 54s）"
+  - file: test/sequenceReverseComplement_test.c
+    type: unit
+    description: "序列反向互补 harness（上游无断言，判定由 upstream_c_tests.py 补齐）"
+    command: "python3 upstream_c_tests.py --test-dir <build>/test --workdir <writable>"
+    sub_checks:
+      - "C1 FASTA 3 条记录：rc=0、计数行 'Revese complement of 3 sequences.'、输出序列逐条等于输入的反向互补（含 N）"
+      - "C2 FASTQ 2 条读段：序列反向互补**且质量串逆序**（seqFastqReverse 的另一条代码路径），头部与 '+' 分隔行保留"
+      - "C3 错误路径：空输入文件 rc!=0 且报 'wrong FASTQ/FASTA format'"
+      - "C4 错误路径：输入文件不存在 rc!=0 且报 'could not open file'"
+    result: "PASS 4/4 子调用（本机原生实测）"
+  - file: test/diffstr_test.c
+    type: unit
+    description: "CIGAR 解析/格式化 harness（上游无断言，判定由 upstream_c_tests.py 补齐）"
+    command: "make -j1 diffstr_test && python3 upstream_c_tests.py ..."
+    sub_checks:
+      - "C5 '3M2I5M' → RAW (I:03|I:00|S:05|M:00) / SSAHA 'M 3 I 2 M 5' / EXT 3M2I5M / SAM 3M2I5M / SAMX 3M2I5M 全部逐字匹配"
+      - "C6 '10M1X10M' → SAM 归一化为 21M 而 SAMX 保留 10M1X10M（DIFFSTRFORM_CIGEXT_XMISMATCH 分支确实不同于普通分支）"
+    result: "PASS 2/2 子调用（本机原生实测）"
+
+# ── test_package 功能补全（消费者视角，设备端实跑）──────────────────
+test_package_tests:
+  - file: ohos_e2e_test.py
+    description: >-
+      功能补全 8 项（F1-F8），覆盖上游文档化的 CLI 面：
+      F1 `smalt help` rc=0 且含横幅与 6 个 task 名（check/help/index/map/sample/version）；
+      F2 无参数调用 rc=51（上游返回值）并打印 SYNOPSIS；
+      F3 未知 task `smalt bogus` rc=51 且报 "ERROR: unknown task switch bogus"；
+      F4 `index -H` 与 `map -H` 均 rc=0 且含 SYNOPSIS；
+      F5 `smalt check reads.fq` rc=0 且输出 "checked 5 reads: ok."；
+      F6 index+map 端到端：1200 bp 合成参考 + 5 条 100 bp 读段，
+      5 条 SAM 记录的 flag/POS/CIGAR/NM/AS 与上游未修改源码的实测值逐项一致
+      （41/301/706/501/901，100M，错配读段 NM=1 AS=97，反向互补读段 flag=16），
+      并校验 @SQ SN:ref1 LN:1200 与 @PG VN:0.7.6；
+      F7 无法比对的读段报为未比对（flag=4、RNAME=*、POS=0、CIGAR=*）；
+      F8 伴随工具消费者验证：readstats 输出 5 行 "<name> 100"，
+      fetchseq <index> ref1 41 20 返回与参考完全一致的 20 bp 窗口。
+    command: "python3 ohos_e2e_test.py --bindir <pkg>/bin --workdir <build>/e2e-workdir"
+    assertion_count: 8
+
+# ── 鸿蒙特有测试（rule12: N >= 1，本包 N = 9）──────────────────────
+harmonyos_specific_tests:
+  - file: ohos_abi_check.py
+    description: >-
+      鸿蒙特有 A1: 包内 10 个可执行文件全部是 ELF64 小端、e_machine == EM_AARCH64(183)、
+      e_type == ET_DYN（PIE），即 HarmonyOS PC aarch64 目标产物。
+    command: "python3 ohos_abi_check.py --bindir <pkg>/bin"
+    assertion_count: 1
+  - file: ohos_abi_check.py
+    description: >-
+      鸿蒙特有 A2: PT_INTERP == /lib/ld-musl-aarch64.so.1，即鸿蒙 musl 动态加载器；
+      glibc 产物会是 /lib/ld-linux-aarch64.so.1，故该断言能区分"真的为 OHOS 构建"
+      与"为其他 aarch64 Linux 构建"。
+    command: "python3 ohos_abi_check.py --bindir <pkg>/bin"
+    assertion_count: 1
+  - file: ohos_abi_check.py
+    description: >-
+      鸿蒙特有 A3: 全部二进制的 DT_NEEDED 实测恰为 [libc.so] —— zlib 以静态库
+      链入（R26：系统同名库不向鸿蒙 /lib 投放 .so），musl 的 libm.a/libpthread.a
+      是空壳兼容档案，所以上游 `-lm -lpthread -lz` 链接行不会留下任何第三方运行时依赖。
+    command: "python3 ohos_abi_check.py --bindir <pkg>/bin"
+    assertion_count: 1
+  - file: ohos_abi_check.py
+    description: >-
+      鸿蒙特有 A4: .dynamic 中不存在 DT_RPATH/DT_RUNPATH。鸿蒙包会被装进版本化前缀
+      并从 conan 缓存搬移，构建期 RPATH 会让加载器去找只存在于构建机的库。
+    command: "python3 ohos_abi_check.py --bindir <pkg>/bin"
+    assertion_count: 1
+  - file: ohos_e2e_test.py
+    description: >-
+      鸿蒙特有 H1: 已签名的安装产物就地可执行。鸿蒙对 ELF 有 .codesign 执行约束，
+      复制/改名/硬链接后再执行会 "Operation not permitted"；本项直接以真实安装路径
+      调用 <pkg>/bin/smalt version，要求 rc=0 且输出 "Version: 0.7.6"。
+    command: "python3 ohos_e2e_test.py --bindir <pkg>/bin --workdir <writable>"
+    assertion_count: 1
+  - file: ohos_e2e_test.py
+    description: >-
+      鸿蒙特有 H2: 静态链入的 zlib 在 musl 上真的能解压。用 Python gzip 把同一参考
+      序列压成 .fa.gz，`smalt index` 从压缩参考建索引再映射，要求 5 条比对记录与
+      未压缩索引的结果完全一致（HAVE_ZLIB 路径 + 静态 libz.a 在鸿蒙上的行为）。
+    command: "python3 ohos_e2e_test.py --bindir <pkg>/bin --workdir <writable>"
+    assertion_count: 1
+  - file: ohos_e2e_test.py
+    description: >-
+      鸿蒙特有 H3: 多线程映射在鸿蒙 musl 上保持确定。src/threads.c 用 pthread +
+      未命名 POSIX 信号量（sem_init/sem_post/sem_wait）分派读段；上游明确 -n 不保证
+      读段顺序，故按查询名排序后比较 `map -n 4` 与 `map -n 1` 的记录集合，要求完全一致。
+    command: "python3 ohos_e2e_test.py --bindir <pkg>/bin --workdir <writable>"
+    assertion_count: 1
+  - file: ohos_e2e_test.py
+    description: >-
+      鸿蒙特有 H4: HMDFS/沙箱文件系统语义。索引 .smi/.sma 必须落在调用方指定的可写
+      目录（不是 /tmp —— 鸿蒙上 / 为只读 erofs、/tmp 不可写，E002），两者非空，
+      且能被**第二个进程**重新打开使用（再跑一次 map 并由 fetchseq 读取 .sma 序列库）。
+    command: "python3 ohos_e2e_test.py --bindir <pkg>/bin --workdir <writable>"
+    assertion_count: 1
+  - file: ohos_e2e_test.py
+    description: >-
+      鸿蒙特有 H5: musl 的 rand()/srand48() 与 glibc 实现不同，而 smalt 用它们做
+      并列最优比对的随机选择（randef.h 的 RANSEED/RANDRAW_UNIFORM_1，sort.c 的
+      随机化快排枢轴）。固定 `-r 42` 连续跑 3 次，要求 3 份 SAM 记录逐字节一致，
+      把鸿蒙上的可复现性钉死。
+    command: "python3 ohos_e2e_test.py --bindir <pkg>/bin --workdir <writable>"
+    assertion_count: 1
+
+# ── 计数汇总（与 PR 两张表、notes.md、测试日志同口径）───────────────
+upstream_unit_tests: 2
+upstream_integration_tests: 9
+test_package_test_count: 8
+harmonyos_specific_test_count: 9
+assertion_count: 28
+upstream_test_declared: 11
+upstream_test_runnable: 8
+upstream_test_not_runnable: 3
+count_method: "independent_test_items"
+
+# 测试资产自包含性（不依赖构建机偶然存在的 recipe 源码树）
+self_contained: >-
+  test_package 只依赖包内 bin/ 与自己目录下的 case_gen.py（1200 bp 定长 LCG 合成
+  参考 + 5 条读段 + 1 条不可比对读段，固定种子，可复现），不读取 recipe 源码树，
+  也不携带上游 69 MB 的 test/data 语料。所有临时文件写在 --workdir
+  （conan build folder 下），不使用 /tmp。
