@@ -1,0 +1,101 @@
+# 版本级 manifest
+# 文件位置: archives/m/mbtserver/0.17/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.17"
+
+# 软件名
+software: "mbtserver"
+
+# 编译状态
+# published | built | failed | archived
+# 首轮工作树状态：待 HMBS 真机预检通过后确认（见 notes.md）。
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-14"
+build_system: "custom"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（官方 GitHub tag 归档；CI 自动追加镜像 fallback）
+  url: "https://github.com/LanguageMachines/mbtserver/archive/refs/tags/v0.17.tar.gz"
+
+  # 源码校验和（实拉官方归档计算，308642 字节）
+  sha256: "733aa3916dc75ab93d83c20c917cbf4a50ba32498046b922d1167900617bf861"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  # 上游是 autotools，但发布包不含 configure 脚本且 OHOS 无 autoreconf，
+  # 故走 custom 手动编译（同组织 timbl/6.1 配方先例）。
+  system: custom
+
+  # 配置选项列表
+  configure_options: []
+
+  # 编译依赖列表（格式: name/version）
+  # 版本下限来自上游 configure.ac 的 PKG_CHECK_MODULES：
+  # ticcutils >= 0.36, timbl >= 6.4.14, mbt >= 3.5, icu-uc/io >= 50。
+  dependencies:
+    - icu/76.1
+    - libxml2/2.15.3
+    - zlib/1.3.2
+    - bzip2/1.0.8.2
+  vendored_dependencies:
+    # ohpcd 远端缺失、私有静态子构建并合包（serf/1.3.10 先例）：
+    # 上游 configure.ac 要求 ticcutils>=0.36 / timbl>=6.4.14 / mbt>=3.5，
+    # 真机预检证实 ticcutils/0.38 等远端无发布，故在配方内按自底向上
+    # ticcutils 0.38 -> timbl 7.0 -> mbt 3.13 顺序源码构建并合包。
+    - ticcutils/0.38
+    - timbl/7.0
+    - mbt/3.13
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表（首轮无补丁：适配全部收敛在 conanfile.py 内）
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+vendored_sources:
+  ticcutils:
+    url: "https://github.com/LanguageMachines/ticcutils/archive/refs/tags/v0.38.tar.gz"
+    sha256: "021eec6a8a51f4ffba2bec1ef88f6c321524498eb7d7dfa07fee922309a49a4b"
+  timbl:
+    url: "https://github.com/LanguageMachines/timbl/archive/refs/tags/v7.0.tar.gz"
+    sha256: "70494edf4afe1865d2bdf253032959fa172361f80b760acf308a8f5176059c4a"
+  mbt:
+    url: "https://github.com/LanguageMachines/mbt/archive/refs/tags/v3.13.tar.gz"
+    sha256: "ceb60255da30da6e04eabe349ae1557695aeb8fccff44155fc33e19e718461e2"
+
+knowledge_gained:
+  - "LanguageMachines 系配方在 OHOS 上绕过 autotools 做手动编译（timbl/6.1 先例：conanbuild.conf 取编译器 + 手写 config.h）"
+  - "mbtserver 上游 MbtServerBase.h 声明了从未定义的 VersionInfo(bool)，消费者测试不得引用它，改用 StartServer/StartJSONServer 符号解析做链接验证"
+  - "mbtserver 二进制的 -h/--help 与 -V/--version 走立即退出路径（MbtServerBase.cxx StartServer），适合做无挂起风险的冒烟测试"
+  - "远端缺失依赖改为配方内私有静态子构建（ticcutils/timbl/mbt 自底向上编译并合包，cpp_info.libs 按被依赖优先排序，config.h 按库隔离且自身目录优先）"

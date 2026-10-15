@@ -1,0 +1,88 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: mbtserver/0.17
+homepage: "https://github.com/LanguageMachines/mbtserver"
+
+# 上游测试套件存在性 (经审计上游 v0.17 源码归档确认：不存在)
+upstream_tests_exist: false
+
+# 上游测试审计 (源码: LanguageMachines/mbtserver tag v0.17,
+# 归档 39 条目，sha256 733aa3916dc75ab93d83c20c917cbf4a50ba32498046b922d1167900617bf861)
+# 2026-10-14 实拉官方 tag 归档逐文件验证。
+upstream_test_audit:
+  source_tarball: "mbtserver-0.17.tar.gz (LanguageMachines/mbtserver tag v0.17)"
+  source_sha256: "733aa3916dc75ab93d83c20c917cbf4a50ba32498046b922d1167900617bf861"
+  source_origin: "https://github.com/LanguageMachines/mbtserver/archive/refs/tags/v0.17.tar.gz"
+  top_level_files:
+    - file: "Makefile.am"
+      role: "automake 入口，仅 SUBDIRS=src include docs example + pkgconfig_DATA"
+      test_targets: "none (无 TESTS/check_PROGRAMS/check-local)"
+      is_test: false
+    - file: "src/Makefile.am"
+      role: "仅 bin_PROGRAMS=mbtserver + lib_LTLIBRARIES=libmbtserver.la"
+      test_targets: "none (无 TESTS/check_PROGRAMS/check-local)"
+      is_test: false
+    - file: "include/Makefile.am + include/mbtserver/Makefile.am"
+      role: "头文件安装声明 (pkginclude_HEADERS=MbtServerBase.h)"
+      test_targets: "none"
+      is_test: false
+    - file: "docs/Makefile.am + example/Makefile.am"
+      role: "man 页与示例数据安装 (eindh.data/eindh.test 为示例数据，非可执行测试)"
+      test_targets: "none"
+      is_test: false
+    - file: "configure.ac"
+      role: "autoconf 输入，仅编译器/特性探测 + PKG_CHECK_MODULES (ICU/ticcutils/timbl/mbt)"
+      test_targets: "none (无测试框架注册)"
+      is_test: false
+    - file: "src/*.cxx (MbtServer.cxx/MbtServerBase.cxx/MbtJSONServerBase.cxx)"
+      role: "服务器实现，无测试入口"
+      test_targets: "none (无 TEST()/TEST_F()/def test_ 包裹)"
+      is_test: false
+    - file: ".github/workflows/mbtserver.yml"
+      role: "上游 CI：多平台构建 + cppcheck 静态检查，无测试执行步骤"
+      test_targets: "none"
+      is_test: false
+  scanned_for:
+    - "TEST( / TEST_F (gtest)"
+    - "def test_ (pytest)"
+    - "Makefile.am TESTS / check_PROGRAMS / check-local"
+    - "tests/ / test/ / t/ / spec/ 目录"
+    - "*_test.cxx / test_*.py / *check* 测试源"
+    - "configure.ac 测试框架注册"
+    - "ctest / meson test / pytest 入口"
+  scan_result: "0 matches — v0.17 归档 39 条目逐项核对：无 tests/test 目录，无 *test* 源文件，各 Makefile.am 均无 TESTS/check_PROGRAMS/check-local，configure.ac 无测试框架注册"
+  make_check_output: "automake 默认 no-op (各 Makefile.am 均无 TESTS，check 目标无用例可执行)；build() 不调用 make check (upstream_test_in_build: false)，证据由 conanfile.py build() 与 test_package 阶段的 no_tests 标记给出"
+  reason: "mbtserver 0.17 上游 (LanguageMachines/mbtserver v0.17) 为 MBT 标注服务器（库 + CLI 二进制），发布包不含任何自动化测试套件：无 tests/test 目录，无 TESTS/check_PROGRAMS 定义，无测试源文件与测试框架注册"
+
+# rule4 强制字段：upstream_test_total 必须显式声明。
+# 上游经完整审计确认确实没有任何自动化测试，官方注册总数即 0，
+# 口径为 autotools_tests（automake 无测试注册）。
+upstream_test_total: 0
+upstream_test_count_method: autotools_tests
+upstream_test_passed: 0
+upstream_test_failed: 0
+upstream_test_skipped: 0
+
+# 上游测试命令 (上游无测试套件，故 check 命令不适用；
+# upstream_tests_exist:false 的库一律 upstream_check_command:"")
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_mbtserver.cxx
+    description: "消费者链接测试：引用公共头并取 StartServer/StartJSONServer 地址，强制链接器解析 libmbtserver 真实符号（VersionInfo 上游未定义，故不引用）"
+    command: "./test_mbtserver"
+  - file: test_package/conanfile.py
+    description: "mbtserver --help 冒烟测试：走 StartServer 立即退出路径（exit 0），输出必须含 usage 横幅（非空输出校验）"
+    command: "mbtserver --help"
+  - file: test_package/conanfile.py
+    description: "mbtserver --version 冒烟测试：走 StartServer 立即退出路径（exit 0），不启动服务器、无挂起风险"
+    command: "mbtserver --version"
+
+assertion_count: 4
