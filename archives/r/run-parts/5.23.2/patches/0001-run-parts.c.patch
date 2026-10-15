@@ -1,0 +1,36 @@
+--- a/run-parts.c
++++ b/run-parts.c
+@@ -403,21 +403,32 @@
+ #ifdef O_TMPFILE
+ static int open_tmpfile_rw(void)
+ {
+ 	const char *tmpdir;
+ 
+ 	tmpdir = getenv("TMPDIR");
+ 	if (!tmpdir) {
+ 		tmpdir = "/tmp";
+ 	}
+ 
+-	return open(tmpdir, O_TMPFILE|O_RDWR|O_EXCL, S_IRUSR | S_IWUSR);
++	int fd = open(tmpdir, O_TMPFILE|O_RDWR|O_EXCL, S_IRUSR | S_IWUSR);
++	if (fd == -1) {
++		/* O_TMPFILE is not supported on every filesystem (and the result
++		 * was never checked): fall back to a named file, unlinked at once. */
++		char path[4096];
++		snprintf(path, sizeof(path), "%s/run-parts.stdin.XXXXXX", tmpdir);
++		fd = mkstemp(path);
++		if (fd != -1) {
++			unlink(path);
++		}
++	}
++	return fd;
+ }
+ #else
+ static char tmpfile_path[] = "/tmp/run-parts.stdin.XXXXXX";
+ static void cleanup_tmpfile(void)
+ {
+ 	unlink(tmpfile_path);
+ }
+ 
+ static int open_tmpfile_rw(void)
+ {
