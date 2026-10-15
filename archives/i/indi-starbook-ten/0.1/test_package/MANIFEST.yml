@@ -1,0 +1,41 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for indi-starbook-ten.
+
+package: indi-starbook-ten/0.1
+homepage: https://github.com/indilib/indi-3rdparty
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests:
+  - file: "(none)"
+    source: indi-starbook-ten-0.1
+    description: >
+      Upstream ships no test suite. The package is a 3-source-file INDI
+      driver (indi_starbook_ten.cpp + starbook_ten.cpp + connectionhttp.cpp,
+      plus bundled httplib.h). The exercisable public API without a
+      connected Vixen StarBook Ten mount is the StarbookTen protocol client,
+      which we vendor-compile and drive against a localhost mock server in
+      the consumer probe below.
+    command: "(none upstream)"
+
+test_package_tests:
+  - file: test_package/test.cpp
+    description: >
+      Consumer probe compiles the vendored starbook_ten.cpp (+ bundled
+      httplib.h), starts an httplib::Server on 127.0.0.1 (bind_to_any_port,
+      no fixed port) answering canned StarBook responses, then calls the
+      real public API: getFirmwareVersion() (regex parse of <!--VERSION=..-->),
+      getStatus() (RA/DEC/GOTO/STATE structured parse), getPierSide() (enum
+      mapping), stop() (<!--OK--> command acknowledgment). Asserts parsed
+      values end to end through real HTTP request/response cycles.
+    command: "c++ -std=c++14 test.cpp starbook_ten.cpp -lnova -lpthread -lm && run"
+  - file: test_package/conanfile.py
+    description: >
+      Driver binary presence hard assert (R34/L1e: test must fail without
+      package artifacts) + best-effort --help probe; exec-restricted
+      environments (EPERM) only warn, presence is what is asserted.
+    command: "test -f bin/indi_starbook_ten && indi_starbook_ten --help"
+
+assertion_count: 6
