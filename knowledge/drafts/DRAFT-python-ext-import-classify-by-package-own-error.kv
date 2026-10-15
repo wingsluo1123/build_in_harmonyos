@@ -1,0 +1,31 @@
+#====================================================================
+# DRAFT-python-ext-import-classify-by-package-own-error.kv
+# 主题: 消费测试枚举 Python C 扩展 import 时，按包自抛异常分类（E212/缺依赖/真失败），禁止硬编码"哪个模块需要哪个依赖"的分组
+# 来源: biopython 1.88 #14021（Bio.motifs._pwm 漏网，提交 3dda766ba5）
+#====================================================================
+
+id:                     DRAFT-PYTHON-EXT-IMPORT-CLASSIFY-BY-PACKAGE-OWN-ERROR
+title:                  test_package 逐个 import 上游 C 扩展时不得硬编码"哪些模块需要 numpy"之类的分组——父包 __init__ 也会在缺依赖时 raise（实测 Bio.motifs._pwm 漏网）；应由包自抛异常分类：MissingPythonDependencyError→needs-numpy、E212 加载签名→env-limited、其余→真失败 raise；并加台账断言（三类之和=总数）与 HAVE_NUMPY 矛盾检查
+trigger_tool:           conan|pytest|python
+phase:                  test
+error_signature:        Bio\.MissingPythonDependencyError: Install NumPy|ModuleNotFoundError|ImportError while importing|ImportError: .*requires numpy
+severity:               2
+category:               conan, python, test_package, dependency-cascade, e212
+match_keywords:         MissingPythonDependencyError, Install NumPy, Bio.motifs, Bio.Align, 父包, 硬编码分组, 台账断言, accounting gap, E212, Error loading shared library
+root_cause:             上游包把"缺某依赖"实现为**包级异常**：不只直接模块，其父包 __init__.py 在 import 子模块时也会先检查依赖并 raise（biopython：Bio/Align/__init__.py、Bio/motifs/__init__.py 都在缺 numpy 时抛 MissingPythonDependencyError）。按"哪些模块需要 numpy"手工分组必然漏——第一轮把 5 个 Bio.Align.* 挪进 numpy 分支后，Bio.motifs._pwm 仍在 CI 实测翻车：Bio.MissingPythonDependencyError: Install NumPy if you want to use Bio.motifs.。名单是开放集合，源码推导不如让运行时自己说话。
+affected_scope:         任何 conan Python 配方的 test_package / 冒烟脚本：枚举 import 上游 C 扩展或可选依赖模块、且上游用"包级 Missing*DependencyError"声明缺依赖的场景（biopython/numpy 族为主）。
+verification_cmd:       python - <<'PY' 前置 sys.path 后逐个 importlib.import_module(EXTS)，打印三类清单; assert len(loaded)+len(env_limited)+len(need_numpy)==len(EXTS)
+rec_priority:           1
+rec_approach:           classify-by-raised-exception-with-ledger-assertion
+rec_description:        import 循环里按异常分类而非按模块名单：type 名为 MissingPythonDependencyError 或消息含 "nstall NumPy" → need_numpy（该能力需 numpy，与本包适配无关）；消息含 "Error loading shared library" 或 "symbol not found" → env_limited（E212 族：HMDFS 拒载用户可写路径 .so）；其余异常 → print 原文并 raise（真失败不吞）。加载成功者校验 __file__ 确为 .so（防把纯 py 垫片当扩展计入）。末尾两道硬断言：①台账——loaded+env_limited+need_numpy 必须等于枚举总数（任何"消失的扩展"不许溜过）；②矛盾——HAVE_NUMPY 为真却仍有模块报缺 numpy 时 raise（探测与包口径打架不许放行）。
+rec_command:            python -c "import importlib; importlib.import_module('Bio.motifs._pwm')"  # 复现漏网形态
+rec_auto_fix:           false
+rec_impl:               manual-test-package
+forbid_1_pattern:       ALIGN_EXTS|PLAIN_EXTS|需要 numpy 的模块|numpy 相关扩展单独分组
+forbid_1_reason:        按模块名单硬编码分组是开放集合上的封闭假设：父包 __init__ 同样抛缺依赖异常（Bio.motifs 实证），下一轮 CI 必在漏网模块上翻车，且分组代码随上游演进而持续腐化
+forbid_1_consequence:   每漏一个模块就烧一轮 CI；分组与上游真实依赖面漂移后，消费测试验证的"能力面"失真
+distinct_from:          E212 知识（hmmac 标签）讲的是"用户可写路径 .so 无法 dlopen"这一平台机理及其替代证据口径；本条是消费测试**分类器**该怎么写（按包自抛异常分类+台账），把 E212 族与缺依赖族、真失败区分开而不互相污染。DRAFT-E733（numpy 沙箱 pip）是测试环境供给问题，与分类无关。
+principles:
+causes:                 []
+notes:                  biopython #14021 实测链：27 个 unknown 全为带点号的异常名（正则 \w*(?:Error|Exception) 匹配不上）→ 判据修正后归因成功；随后 test_package 在 Bio.motifs._pwm 漏网 → 改按包自抛异常分类 + 台账断言 + 矛盾检查，三类计数进日志。反向对照夹具（NumPy 块→needs-numpy、手构 Expected/Got→仍 mismatch）防"分类器洗白真失败"。
+last_updated:           2026-10-14

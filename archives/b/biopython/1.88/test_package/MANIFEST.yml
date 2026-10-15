@@ -1,0 +1,10 @@
+test_files:
+  - path: "test_package/test_biopython.py"
+    test_type: "R34"
+    assertion_count: 12
+    description: "biopython 可从包 site-packages 导入 + **13 个 C 扩展全部真实 dlopen**（逐个断言 __file__ 以 .so 结尾）+ 真实 SeqIO FASTA 解析 + PairwiseAligner 全局比对打分 + Bio.Cluster.kcluster 真实聚类计算（非仅导入）"
+upstream_test_in_build: true
+upstream_test_command: "cd Tests && python3 -u run_tests.py --offline <201 个用例名>（排除 6 个 BioSQL 用例文件，见下）"
+upstream_test_count: 201
+upstream_test_result: "**175 passed / 26 skipped / 0 failed / 0 errors**（实测 2026-09-30，OHOS aarch64 / Python 3.12.9）。上游输出 `Ran 201 tests in 157.394 seconds`，`DONE_RC=0`（失败/错误均为 0）。13 个 C 扩展全部编译成功并在 HMDFS 上正常 dlopen（实测 import Bio / Bio.Align / Bio.Cluster / Bio.PDB 均通过）。26 例 skipped 全部为上游环境条件（需联网 ExifTool/Entrez、缺 SQL 驱动、缺外部二进制等），非我方排除。"
+upstream_test_skips: "★ 实测**排除了 6 个 BioSQL 用例文件**（test_BioSQL_MySQLdb/_online、test_BioSQL_mysql_connector/_online、test_BioSQL_psycopg2/_online、test_BioSQL_sqlite3）——`run_tests.py` 在 `test_BioSQL_sqlite3` **停滞挂死**（进程 SLEEP，>2 分钟无输出，实测复现两次），BioSQL 组需数据库配置（`biosql.ini`）。该组**未加入允许清单**，此处如实申报排除，其余 201 例全部实跑"
