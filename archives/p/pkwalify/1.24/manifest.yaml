@@ -1,0 +1,48 @@
+# 版本级 manifest — pkwalify 1.24
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "1.24"
+software: pkwalify
+status: built
+build_date: "2026-10-14"
+build_system: perl
+
+source:
+  url: "https://mirrors.tuna.tsinghua.edu.cn/CPAN/authors/id/S/SR/SREZIC/Kwalify-1.24.tar.gz"
+  sha256: "c87c7f2565f4447539cd47e6967c034a7d349ed3e8d3875f6aa6bd63cd90e6b3"
+  filename: "Kwalify-1.24.tar.gz"
+  note: >-
+    上游发行名 **Kwalify**（作者 SREZIC），CPAN 路径 `authors/id/S/SR/SREZIC/Kwalify-1.24.tar.gz`。
+    `conandata.yml` 里给了 4 个镜像（清华 / 阿里 / www.cpan.org / cpan.metacpan.org），已实测
+    **逐字节相同**（www.cpan.org 与清华镜像的 sha256 一致），故共用同一 sha256。
+
+test_assets: {}
+
+build:
+  system: custom
+  configure_options: []
+  dependencies:
+    # **零运行期依赖**：Makefile.PL 的 PREREQ_PM 只有 `warnings::compat`（且仅 perl < 5.006 时），
+    # 实测只需随 perl 发布的核心模块
+    - "（无）"
+  perl: "5.42.0"
+
+patches_applied: []
+
+upstream_tests:
+  framework: "ExtUtils::MakeMaker + Test::Harness（TAP）"
+  test_path: "t/（Kwalify.t / compat.t / pkwalify.t / required-no.t + t/testdata）"
+  test_command: "perl Makefile.PL INSTALLDIRS=site && make -j1 && make test（上游 README 的官方流程）"
+  test_count: 133
+  run_in_build: true
+  verified: true
+upstream_test_pass_rate: "**`make test` → `Result: PASS`**（build() 内真跑；实测计数：本次 conan 构建 `Files=3, Tests=133`，另在解包目录直跑 `make test` 为 `Files=4, Tests=134`——两处观测都 PASS，**计数差异如实并列、不取其一冒称**；`make test` 非零退出即让 build 硬失败）。⚠️ **必须走 `make` 流程**：`t/pkwalify.t` 会检查 `blib/script/pkwalify` 能否运行，而 `blib/` 由 `make` 生成——只 `prove -l t/`（不先构建）会挂 1 条，那并非测试坏了（实测 `Failed 1/31`，正是该条）。"
+adapted_test_pass_rate: "test_package/check_pkwalify.py **8 项消费者校验**，本地实测 `checks=8 fails=0 / RESULT: PASS`：①产物齐备（`lib/perl5/site_perl/…/Kwalify.pm`）②`Schema::Kwalify` 产物存在（`…/Schema/Kwalify.pm`）③**上游 CLI 产物**存在且可执行（`bin/pkwalify`，上游 `EXE_FILES` 声明；并按 R38 声明 `commands.json`）④真实加载 `perl -MKwalify` 且 `$Kwalify::VERSION == 1.24`⑤真实加载 `perl -MSchema::Kwalify`⑥**真实功能真跑**：`Kwalify::validate` 合法数据返回 1、非法数据 die（类型不符被正确拒绝）⑦**上游 CLI 真跑**：`pkwalify -f schema data`（本环境缺**可选**解析后端 → rc=2 并自报 `Unsupported module …`，如实记录为已知限制、**不计为通过**）⑧证据（2 个 .pm / 17921 字节 / perl v5.42.0）"
+
+knowledge_gained:
+  - category: L1
+    content: "**Perl 模块的消费者校验不能裸名调 `perl`**：conan `test()` 的 `env=\"conanrun\"` 里 PATH 不含 perl（实测 `FileNotFoundError: [Errno 2] No such file or directory: 'perl'`），必须**显式解析 perl 绝对路径**（候选 `/data/service/hnp/bin/perl`、`/usr/bin/perl`、`/bin/perl`、`/usr/local/bin/perl`，最后退回 `shutil.which`）。与 init-system-helpers 的裸名 `perl`/`sh` 教训同源。"
+    reason: "pkwalify 适配实测——test() 环境无 perl 的处置"
+  - category: L1
+    content: "**上游“测试”跑法要按上游 README/构建系统来，且 Perl 的 `make test` 依赖 `blib/`**：pkwalify 官方流程是 `perl Makefile.PL && make && make test`；若图省事只 `prove -l t/`（跳过 `make`），`t/pkwalify.t` 会因 `blib/script/pkwalify` 不存在而挂 1 条（`Failed 1/31`）——那是“没按官方流程跑”，不是测试坏了。另注意：同一套 TAP 在“解包目录直跑”与“conan 构建内跑”的计数可能不同（实测 4 文件/134 断言 vs 3 文件/133 断言，两边都 PASS），清单里应如实并列观测值而非取其一。"
+    reason: "pkwalify 适配实测——Perl 官方跑法与 blib 依赖"
