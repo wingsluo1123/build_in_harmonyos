@@ -1,0 +1,55 @@
+--- a/libtlsrpt.c
++++ b/libtlsrpt.c
+@@ -19,6 +19,7 @@
+ 
+ #include "tlsrpt.h"
+ #include <errno.h>
++#include <stddef.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+@@ -29,6 +30,7 @@
+ 
+ typedef struct tlsrpt_connection_t {
+   struct sockaddr_un addr;
++  socklen_t addrlen;
+   int sock_fd; /* file descriptor of socket */
+ } tlsrpt_connection_t;
+ 
+@@ -201,6 +203,14 @@
+   con->addr.sun_family = AF_UNIX;
+   strncpy(con->addr.sun_path, socketname, sizeof(con->addr.sun_path) - 1);
+ 
++  con->addrlen = sizeof(con->addr);
++  /* An explicit @name selects the Linux/OHOS abstract namespace. Unlike a
++   * pathname socket this does not require filesystem socket-node support. */
++  if (socketname[0] == '@') {
++    con->addr.sun_path[0] = '\0';
++    con->addrlen = offsetof(struct sockaddr_un, sun_path) + strlen(socketname);
++  }
++
+   /* Create local socket */
+   con->sock_fd = socket(AF_UNIX, SOCK_DGRAM, 0);
+   if (con->sock_fd == -1) {
+@@ -559,7 +569,7 @@
+   if(dr->status == 0) { // everything looks fine, we can send the datagram
+     res = sendto(dr->con->sock_fd, dr->memstreambuffer, dr->memstreamsize,
+ 		 tlsrpt_sendto_flags, (const struct sockaddr *) &dr->con->addr,
+-		 sizeof(struct sockaddr_un));
++		 dr->con->addrlen);
+     if(res<0) errorcode(dr,TLSRPT_ERR_SENDTO+errno);
+   }
+ 
+--- a/tlsrpt.h
++++ b/tlsrpt.h
+@@ -72,7 +72,9 @@
+ int tlsrpt_version_check(int major, int minor, int patch);
+ const char* tlsrpt_version();
+ 
+-/* Handling of the connection */
++/* Handling of the connection.
++ * socketname is a pathname, or @name for a Linux/OHOS abstract datagram
++ * endpoint. The collector must bind the same namespace and name. */
+ int tlsrpt_open(struct tlsrpt_connection_t** pcon, const char* socketname);
+ int tlsrpt_close(struct tlsrpt_connection_t** pcon);
+ 
