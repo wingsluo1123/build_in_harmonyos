@@ -1,0 +1,36 @@
+# 版本级 manifest — vector-blf 2.4.2
+# 人读索引 / 与 conanfile.py、conandata.yml 交叉校验；CI 不读取本文件。
+version: "2.4.2"
+software: vector-blf
+status: built
+build_date: "2026-10-15"
+build_system: cmake
+conan_ref: "vector-blf/2.4.2"
+# 上游 Boost.Test 套件 126 项 + test_package 消费者用例 2 项（含 1 项鸿蒙特有端到端用例），全部通过（见 reports/test-report.md）
+test_passed: 128
+test_failed: 0
+
+source:
+  url: "https://github.com/Technica-Engineering/vector_blf/archive/refs/tags/v2.4.2.tar.gz"
+  sha256: "02d4bdccc2a4bfa93a3d2f62d95c77c3166bc94d2df55dd49298e8099dc7c090"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DOPTION_RUN_DOXYGEN=OFF"
+    - "-DOPTION_BUILD_TESTS=OFF"
+  dependencies:
+    - zlib/1.3.2.1
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "CMake 在 OHOS 上把 clang 默认 target 三元组 aarch64-unknown-linux-ohos 识别为系统 HarmonyOS，而 CMake 没有该平台的 soname 支持：上游 SOVERSION 2 / VERSION 2.4.2 不生效，产物是无 SONAME 的扁平 libVector_BLF.so，也没有 .so.2 符号链接链（HMDFS 软链接受限，反而无需处理）"
+  - "上游 CMakeLists 用 ${ZLIB_LIBRARIES} 接收 find_package(ZLIB) 的旧式变量；Conan CMakeDeps 生成的 ZLIBConfig.cmake 会填充该变量，因此 zlib 静态库（libz.a）被静态链入 libVector_BLF.so，消费者无需额外运行库"
+  - "OPTION_RUN_DOXYGEN 上游默认 ON，会 find_package(Doxygen REQUIRED) 拉入 Graphviz；纯文档目标，必须显式 OFF 才能在没有 doxygen 的环境构建"
+  - "鸿蒙特有端到端验证链：安装后的库在 $TMPDIR(HMDFS) 写 6000 条报文 → 4 个 zlib 压缩 LOG_CONTAINER → dlopen 校验 OHOS ELF 可加载性 → 由不链接本库的独立实现 ref_blf_parser 重新解析容器/对象字节，23 个共享字段 0 不一致（digest 4964f8fbec9dd913）"
+  - "上游 126 个 Boost.Test 用例在 OHOS 上不能按上游方式构建（OHOS Boost 包无 libboost_unit_test_framework）；改用 <boost/test/included/unit_test.hpp> 头文件版入口 + -DBOOST_SP_NO_PTHREAD_SETCANCELSTATE（OHOS musl 无 pthread_setcancelstate）后 126/126 通过"
+  - "配方 generate() 必须显式 CMakeDeps(self).generate()：漏掉后 build 目录无 ZLIBConfig.cmake，上游 find_package(ZLIB)+旧式 ${ZLIB_LIBRARIES} 会退到 CMake 内置 FindZLIB 模块模式，静默链上构建机 ~/.harmonybrew/lib 的 zlib-ng 共享库（NEEDED libz.so.1），既违反 R26 又依赖 CI 上不存在的宿主路径；修复后 NEEDED 仅 libc++_shared.so/libc.so"
