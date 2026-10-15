@@ -1,0 +1,32 @@
+--- a/src/lib/src/lib/CMakeLists.txt	2026-10-13 17:37:24.550434375 +0800
++++ b/src/lib/CMakeLists.txt	2026-10-13 17:38:21.774434219 +0800
+@@ -93,21 +93,23 @@
+     PUBLIC
+         KF${QT_MAJOR_VERSION}::CoreAddons
+         KF${QT_MAJOR_VERSION}::I18n
+-        ${ACCOUNTSQT_LIBRARIES}
++        AccountsQt6::AccountsQt6
+         Qt::Xml
+         Qt::Gui
+     PRIVATE
+-        ${SIGNONQT_LIBRARIES}
++        SignOnQt6::SignOnQt6
++        Qt6::DBus
+ )
+ 
+ target_include_directories(kaccounts
+     INTERFACE "$<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR}/KAccounts${KACCOUNTS_SUFFIX}>"
+ )
+ 
+-target_include_directories(kaccounts SYSTEM
+-    PUBLIC "${ACCOUNTSQT_INCLUDE_DIRS}"
+-    PRIVATE "${SIGNONQT_INCLUDE_DIRS}"
+-)
++# OHOS/Conan: ACCOUNTSQT_INCLUDE_DIRS/SIGNONQT_INCLUDE_DIRS are pkg-config
++# era variables that stay empty under CMakeDeps; an empty PUBLIC argument is
++# treated as a path relative to CMAKE_CURRENT_SOURCE_DIR and poisons the
++# target's INTERFACE_INCLUDE_DIRECTORIES. Includes/libs come from the
++# imported targets linked below instead.
+ set_target_properties(kaccounts PROPERTIES VERSION   ${KACCOUNTS_VERSION}
+                                            SOVERSION ${KACCOUNTS_SOVERSION}
+                                            EXPORT_NAME KAccounts${KACCOUNTS_SUFFIX}

@@ -1,0 +1,40 @@
+{
+  "verdict": "pass",
+  "audited_at": "2026-10-13T21:20:00+08:00",
+  "auditor": "agent (本会话逐文件审计 + 实测)",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "functional-gap",
+      "file": "archives/k/kaccounts-integration/26.04.0/patches/0005-exclude-kio-webdav-plugin.patch",
+      "line": 2,
+      "description": "功能裁剪申报：kio-webdav 守护插件被剔除，原因是其依赖的 qdbusxml2cpp 生成头 kdirnotify.h 未随已发布的 kio/6.26.0 包分发（kio 配方打包缺口，需另行单独修复 kio，PF1 禁止本 PR 捎带）。其余组件（libkaccounts6/KCM/kded/QML 插件）完整构建，缺口与恢复路径已在 notes.md『已知缺口』如实申报。",
+      "fix_suggestion": "kio 配方补齐 kdirnotify.h 后去掉补丁 0005 重新出包"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R39",
+      "file": "archives/k/kaccounts-integration/26.04.0/conanfile.py",
+      "line": 0,
+      "description": "grep 命中 https:// 字样逐行核对：仅 conandata.yml 的官方下载 URL 与 conanfile.py/notes.md 注释文档字符串，配方内无 curl/wget 网络调用，source() 由 Conan 经 conandata 缓存下载",
+      "fix_suggestion": "无需修复"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R34",
+      "file": "archives/k/kaccounts-integration/26.04.0/test_package/test_kaccounts_integration.cpp",
+      "line": 18,
+      "description": "测试为真实 API 消费：find_package(KAccounts6) 解析、链接导出目标 KAccounts6、kaccounts_add_provider 宏编译期消费、Accounts::Manager 构造 + providerList()/serviceList()/provider(未找到路径) 实际调用，非空壳测试；沙箱无 D-Bus/accounts DB 属环境限制（本地 conan create + test_package 实测 PASS）",
+      "fix_suggestion": "无需修复"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "consistency",
+      "file": "archives/k/kaccounts-integration/26.04.0/manifest.yaml",
+      "line": 0,
+      "description": "manifest 的 patches_applied 5 项与 patches/ 目录、conandata.yml patches 键控一致；sha256 与 release-service 26.04.0 官方 tarball 实测一致（conan create source() 校验通过）；状态 built 与 W3 通过结果一致",
+      "fix_suggestion": "无需修复"
+    }
+  ],
+  "summary": "kaccounts-integration/26.04.0 适配审计通过：conanfile.py 无硬编码绝对路径（全部经 self.dependencies 动态解析）、补丁均 OHOS 场景且 apply 有 os==OHOS 守卫、conandata.yml 扁平结构合规、test_package 真实 API 消费且实测通过。唯一功能裁剪（kio-webdav 插件）已如实申报并给出恢复路径。"
+}

@@ -1,0 +1,74 @@
+# 版本级 manifest 模板
+# 文件位置: archives/k/kaccounts-integration/26.04.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "26.04.0"
+software: "kaccounts-integration"
+status: built
+build_date: "2026-10-13"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://download.kde.org/stable/release-service/26.04.0/src/kaccounts-integration-26.04.0.tar.xz"
+  sha256: "9d23ce5f11d0055bd26bad437910015d598ce8a1b8f8af30e56a8a7a3b15953b"
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_SYSTEM_NAME=OHOS"
+    - "-DBUILD_TESTING=OFF"
+    - "-DBUILD_QCH=OFF"
+    - "-DKF_IGNORE_PLATFORM_CHECK=TRUE"
+    - "-DKF_SKIP_PO_PROCESSING=ON"
+  dependencies:
+    - qtbase/6.11.1.1
+    - qtdeclarative/6.11.1
+    - kcoreaddons/6.26.0
+    - ki18n/6.26.0
+    - kcmutils/6.26.0
+    - kdbusaddons/6.18.0
+    - kwallet/6.18.0
+    - kio/6.26.0
+    - libaccounts-qt/1.17
+    - libsignon-qt/8.61
+    - qcoro/0.13.0
+    - ecm/6.26.0
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "patches/0001-cmake-inline-qcoro-macros.patch"
+  - "patches/0002-kio-webdav-qcoro6-target.patch"
+  - "patches/0003-cmake-require-qt6-xml.patch"
+  - "patches/0004-lib-drop-empty-include-dirs.patch"
+  - "patches/0005-exclude-kio-webdav-plugin.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "kaccounts-integration 导出目标名为裸 KAccounts6（EXPORT_NAME=KAccounts6、install(EXPORT) 无 NAMESPACE、库文件 libkaccounts6.so），消费侧 target_link_libraries(KAccounts6) 即可（kaccounts-providers 26.04.0 同款用法）"
+  - "qcoro 的 qcoro_enable_coroutines 宏在包内 lib/cmake/QCoro6Coro/QCoroMacros.cmake，CMakeDeps 生成的 QCoro6Config 不会带入；kaccounts 顶层 CMakeLists 直接调用该宏，需补丁内联定义（Clang<16: -fcoroutines-ts）"
+  - "上游 src/lib 用 pkg-config 时代变量 ACCOUNTSQT_INCLUDE_DIRS/SIGNONQT_INCLUDE_DIRS（恒为空）与变量式 ${ACCOUNTSQT_LIBRARIES}；CMakeDeps 下空 PUBLIC include 参数会相对化为源码目录并毒化 INTERFACE_INCLUDE_DIRECTORIES，须改为链接 AccountsQt6::AccountsQt6/SignOnQt6::SignOnQt6 imported target"
+  - "SignOnQt6 静态库引用 Qt6DBus 符号（QDBusError 等），kaccounts 需显式 find_package(Qt6 ... DBus) 并链接 Qt6::DBus"
+  - "src/plugins/kio-webdav 使用 <KDirNotify>（qdbusxml2cpp 生成头），发布的 kio/6.26.0 包未携带该生成头（kio 打包缺口，另行跟踪）；OHOS 版剔除该插件子目录，其余组件完整构建"
+  - "ohpcd 上 libaccounts-qt/1.17 二进制缺 cpp_info metadata，消费侧（test_package）CMakeDeps 数据 include 目录为空，需用 data 文件的 ${libaccounts-qt_PACKAGE_FOLDER_RELEASE} 显式补 include 路径"
+  - "conandata.yml 必须扁平 sources.url/sha256 结构（E017 镜像注入工具要求），patches 可保留版本键控结构"
