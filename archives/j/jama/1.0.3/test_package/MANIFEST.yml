@@ -1,0 +1,85 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: jama/1.0.3
+homepage: "https://math.nist.gov/javanumerics/jama/"
+
+# ── 上游测试审计（真实清点，非估计）─────────────────────────────────────
+# jama 1.0.3 的官方 tarball（sha256 a8f4c8f3…，40 个文件）自带测试入口：
+#   Jama/test/TestMatrix.java —— 957 行，单一 main()，无外部数据文件依赖
+# 入口运行方式：java Jama.test.TestMatrix（上游 javadoc 注释内即写明该命令）
+# 输出契约：每项检查一行 ">    <名称>... success" 或 "*** failure ***" /
+#           "*** warning ***"，结尾打印 "TestMatrix completed." 与
+#           "Total errors reported: N" / "Total warnings reported: N"
+upstream_tests_exist: true
+
+upstream_check_command: "java -cp <classes>:<test-classes> Jama.test.TestMatrix"
+
+upstream_test_command: "java -cp <classes>:<test-classes> Jama.test.TestMatrix"
+upstream_test_in_build: true
+
+upstream_tests:
+  - file: test/TestMatrix.java
+    source: "Jama-1.0.3.tar.gz → Jama/test/TestMatrix.java（957 行，main() 自包含）"
+    description: >-
+      上游唯一测试程序，覆盖 6 个测试段：constructors and constructor-like
+      methods / access methods / array-like methods / I/O methods / linear
+      algebra methods / Eigenvalue（含 hqr2 死循环回归用例）。本次真机实测
+      执行 74 项检查：通过 74、失败 0、跳过 0、警告 0；summary 行为
+      "TestMatrix completed." + "Total errors reported: 0" +
+      "Total warnings reported: 0"。
+    command: "java -cp <classes>:<test-classes> Jama.test.TestMatrix"
+    run_in_build: true
+
+# 上游测试实测统计（真机执行，日志见 notes.md「上游测试」小节）
+upstream_test_stats:
+  framework: "custom (Jama.test.TestMatrix, 无第三方测试框架)"
+  discovered: 74
+  executed: 74
+  passed: 74
+  failed: 0
+  skipped: 0
+  warnings: 0
+  sections: 6
+  reported_errors: 0
+  log: "conan create 日志（build() 内 upstream-test-run/upstream-test.log）；本机复现日志见 notes.md"
+
+# test_package 中自带的测试（消费者视角，在鸿蒙真机运行，R34 实质性验证）
+test_package_tests:
+  - file: TestJama.java
+    description: >-
+      对打包 JAR 做真实 API 断言，共 31 项：API-01..API-27 覆盖 Matrix
+      构造/存取/算术/范数/行列式、LU 分解（det/solve/L/U）、QR 分解
+      （isFullRank/最小二乘/正交性/Q*R==A）、Cholesky（isSPD/solve/L）、
+      SVD（奇异值/norm2/rank/cond）、特征分解（特征值/getD）、
+      print/read 往返；OHOS-1..OHOS-4 为鸿蒙消费者用例（见下）。
+    command: "bash test.sh"
+  - file: test.sh
+    description: >-
+      解析 JDK → javac 编译 TestJama.java → 在可写工作目录运行 → 从
+      "RESULT CHECKS: passed=N failed=M total=T" 行取真实计数，输出
+      HMBS_TEST_PACKAGE_RESULT。上游测试结果由 test_package/conanfile.py
+      从包内 share/jama/upstream_test_result.json 复发 HMBS_UPSTREAM_TEST_RESULT。
+    command: "bash test.sh"
+
+# 新增的鸿蒙（消费者）测试用例 —— 本次适配新增，上游没有
+ohos_consumer_tests:
+  - id: OHOS-1
+    file: TestJama.java
+    description: "HarmonyOS aarch64 JVM：os.name=HarmonyOS + os.arch=aarch64 + BiSheng JDK 17.0.13"
+  - id: OHOS-2
+    file: TestJama.java
+    description: "打包 JAR 经 Conan 包布局被消费（JAMA_JAR 指向包内 libexec/jama-1.0.3.jar，且 Matrix 的 codeSource 即该 JAR）"
+  - id: OHOS-3
+    file: TestJama.java
+    description: "鸿蒙文件系统真实矩阵读写（不依赖可写 /tmp，HarmonyOS 上 /tmp 只读）"
+  - id: OHOS-4
+    file: TestJama.java
+    description: "打包 JAR 为纯平台无关字节码（无本地代码条目），即同一制品可在 OHOS aarch64 上消费"
+
+# 测试断言总数
+# 上游：74 项（build() 内真实执行）
+# test_package：31 项（27 API + 4 OHOS 消费者用例）
+assertion_count: 105
