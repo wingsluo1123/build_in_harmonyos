@@ -1,0 +1,114 @@
+# 版本级 manifest
+# 文件位置: archives/k/kscreenlocker/6.7.2/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "6.7.2"
+
+# 软件名
+software: "kscreenlocker"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-04"
+build_system: "cmake"
+
+# Conan 引用
+conan_ref: "kscreenlocker/6.7.2"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://download.kde.org/stable/plasma/6.7.2/kscreenlocker-6.7.2.tar.xz"
+  sha256: "77f02418b61a62727cb43c03c7ed7772c67b1c2cbc3691e4f36726a4720a1cba"
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+
+  configure_options:
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DBUILD_TESTING=OFF"
+    - "-DKF_IGNORE_PLATFORM_CHECK=TRUE"
+    - "-DKSCREENLOCKER_BUILD_GREETER=OFF"
+    - "-DKSCREENLOCKER_BUILD_KCM=OFF"
+    - "-DCMAKE_CXX_STANDARD=20"
+    - "-DECM_MODULE_PATH=<ecm>/share/ECM/{modules,find-modules,kde-modules}"
+  # 不设 CMAKE_SHARED_LIBRARY_SONAME flags：真机 /storage 禁 symlink，
+  # 版本化 .so 符号链创建必 EPERM；DT_SONAME 由补丁 0008 直传
+  # -Wl,-soname,libKScreenLocker.so
+
+  dependencies:
+    - "qtbase/6.11.1"
+    - "qtbase-sql-dbus/6.11.1"
+    - "qtdeclarative/6.11.1"
+    - "wayland/1.22.0"
+    - "kconfig/6.26.0"
+    - "kcoreaddons/6.26.0"
+    - "kglobalaccel/6.26.0"
+    - "ki18n/6.26.0"
+    - "kidletime/6.26.0"
+    - "knotifications/6.26.0"
+    - "kpackage/6.26.0.1"
+    - "solid/6.26.0"
+    - "kwindowsystem/6.26.0"
+    - "kxmlgui/6.26.0"
+    - "ecm/6.26.0"
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-ohos-optional-x11.patch"
+  - "0002-ohos-optional-greeter-kcm.patch"
+  - "0003-ohos-qt6guiprivate-optional.patch"
+  - "0004-ohos-cxx20-compat.patch"
+  - "0005-install-public-headers.patch"
+  - "0006-ohos-explicit-kf6-component-finds.patch"
+  - "0007-ohos-vendor-kconfigpropertymap.patch"
+  - "0008-ohos-basename-soname-link.patch"
+  - "0009-ohos-expose-isinhibited-for-testing.patch"
+
+# ============================================================
+# 测试信息
+# ============================================================
+
+upstream_tests:
+  framework: "ctest"
+  test_targets: 7
+  test_command: "ctest -N（上游 5 autotests + 2 tests；本适配 BUILD_TESTING=OFF 未构建未执行，逐条口径见 notes.md 与 test_package/MANIFEST.yml）"
+  run_in_build: false
+upstream_test_pass_rate: "0/7（平台约束裁剪：X11×3、greeter 依赖×2、会话 D-Bus×1、交互式演示×1）"
+adapted_test_pass_rate: "50/50（真机 conan-verify 八门禁 Verdict PASS，2026-10-02：KSldApp 无头 E2E 18/18 + OHOS 制品检查 32/32）"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "kscreenlocker 的 X11 代码不是独立后端而是散落在 ksldapp.cpp/globalaccel.cpp 的抓取路径 + x11locker.cpp 锁窗口：HAVE_X11 门控必须覆盖 config-unix.h.cmake(#cmakedefine01)、ksld_SRCS 条件源、条件链接、autotests 三个 X11 测试，漏一处即链接错误"
+  - "greeter 依赖 PAM/PlasmaQuick/LayerShellQt/KF6Screen，KCM 依赖 KCMUtils——全部不在 ohpcd 池；上游把它们 find_package 在主 CMakeLists 顶层硬 REQUIRED，必须整块搬进 KSCREENLOCKER_BUILD_* 选项守卫才能裁剪"
+  - "std::expected 是 C++23 专属，OHOS clang15/libc++15 无 <expected>；PowerInhibitor 的 expected<uint, QDBusError> 语义与 QDBusReply<uint> 完全同构（值或错误），替换后行为不变且无需 C++23"
+  - "上游 6.7.2 从未定义 KScreenLocker_HEADERS，ecm_generate_headers 产出为空、install 一个公共头都不装——不补 set() 消费者连 KsldApp 头都拿不到（打包缺陷级 patch）"
+  - "kscreenlocker_test 是交互式演示程序：立即 lock() 拉起 greeter 并 exec() 直到解锁，无头环境必挂起；logindTest 的 fakelogind 注册 org.freedesktop.login1 需要会话 D-Bus——两者都无法进 conan 构建期 ctest，BUILD_TESTING=OFF 并在 MANIFEST 给 rule4 口径"
+  - "qtbase-sql-dbus 与 qtbase 双包共存：DBus 组件只在 sql-dbus 变体里，conan_cmakedeps_paths.cmake 末尾必须 set(Qt6_DIR)+PREPEND 把 sql-dbus 抬回第一，否则 find_package(Qt6 COMPONENTS DBus) 撞上 FEATURE_dbus=OFF 的裸 qtbase"
+  - "原生 OHOS 构建落在 CMake Generic 平台模块：共享库默认无 DT_SONAME，按绝对缓存路径链接会把机器私有路径烧进 DT_NEEDED（E537）——0008 直传 -Wl,-soname,libKScreenLocker.so + KF6 依赖改 -l: 精确文件名链接（lld 按命令行原样记录基名）；不设 CMAKE_SHARED_LIBRARY_SONAME flags（真机 /storage 禁 symlink，版本化符号链创建必 EPERM）；install 重写 RUNPATH 使构建期 .codesign 失效，package() 必须 objcopy 去段 + binary-sign-tool 重签（knotifyconfig 先例）"
+  - "ohpcd kconfig/6.26.0 只发布一个 KF6Config 包（targets 同时导出 KF6::ConfigCore/KF6::ConfigGui，无 KF6ConfigGuiConfig.cmake）——KF6 meta find 的组件名应写 Config；settings 的 KF6::ConfigQml 是虚链接（KConfigQml 未构建），KConfigPropertyMap 头与符号全缓存缺失，需按 KF 5.89 后 kconfig src/qml/ 原码 vendor（仅剥 export 宏）；KConfigSkeleton（KConfigGui 头）与 KCoreConfigSkeleton 分居 libKF6ConfigGui/libKF6ConfigCore，-l: 列表必须显式带 ConfigGui 否则 undefined KConfigSkeleton::qt_metacast/qt_metacall（round 34 实证）"
+  - "OHOS 加载器按基名解析 DT_NEEDED 时读 LD_LIBRARY_PATH，不搜主程序所在目录；依赖库内相对条目按进程 CWD 解析（compat bin ../../bin 手法的依据）；依赖制品内部残留的绝对缓存路径条目属 E537 现象面，生产侧根治=基名 -l: 链接（消费者侧只能按 E537 口径补建路径）"

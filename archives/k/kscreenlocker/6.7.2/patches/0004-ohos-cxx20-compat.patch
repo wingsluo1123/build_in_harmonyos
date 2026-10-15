@@ -1,0 +1,66 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index ef725d7..722ac97 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -9,7 +9,10 @@ set(PROJECT_DEP_VERSION "6.7.0")
+ set(QT_MIN_VERSION "6.10.0")
+ set(KF6_MIN_VERSION "6.26.0")
+ 
+-set(CMAKE_CXX_STANDARD 23)
++# OHOS toolchain (clang 15 / libc++ 15) has no C++23 standard library
++# support; the code compiles cleanly under C++20 after patch 0004 replaces
++# std::expected with QDBusReply (knighttime 6.7.2 precedent).
++set(CMAKE_CXX_STANDARD 20)
+ set(CMAKE_CXX_STANDARD_REQUIRED ON)
+ 
+ option(KSCREENLOCKER_BUILD_GREETER "Build the greeter (requires PlasmaQuick, LayerShellQt, KF6Screen and PAM)" ON)
+diff --git a/interface.cpp b/interface.cpp
+index e096e38..d148384 100644
+--- a/interface.cpp
++++ b/interface.cpp
+@@ -57,9 +57,9 @@ void PowerInhibitor::inhibit(const QString &applicationName, const QString &reas
+ 
+         if (!reply.isValid()) {
+             qCWarning(KSCREENLOCKER) << "org.kde.Solid.PowerManagement.PolicyAgent.AddInhibition failed:" << reply.error();
+-            m_cookie = std::unexpected(reply.error());
++            m_cookie = QDBusReply<uint>(reply.error());
+         } else {
+-            m_cookie = reply.value();
++            m_cookie = QDBusReply<uint>(reply);
+         }
+ 
+         if (m_released) {
+@@ -70,7 +70,7 @@ void PowerInhibitor::inhibit(const QString &applicationName, const QString &reas
+ 
+ void PowerInhibitor::uninhibit()
+ {
+-    if (const auto &result = m_cookie.value()) {
++    if (const auto &result = m_cookie.value(); result.isValid()) {
+         OrgKdeSolidPowerManagementPolicyAgentInterface policyAgent(QStringLiteral("org.kde.Solid.PowerManagement.PolicyAgent"),
+                                                                    QStringLiteral("/org/kde/Solid/PowerManagement/PolicyAgent"),
+                                                                    QDBusConnection::sessionBus());
+diff --git a/interface.h b/interface.h
+index 04b1f33..093541b 100644
+--- a/interface.h
++++ b/interface.h
+@@ -8,10 +8,9 @@ SPDX-License-Identifier: GPL-2.0-or-later
+ 
+ #include <QDBusContext>
+ #include <QDBusMessage>
++#include <QDBusReply>
+ #include <QObject>
+ 
+-#include <expected>
+-
+ class QDBusServiceWatcher;
+ 
+ namespace ScreenLocker
+@@ -31,7 +30,7 @@ private:
+     void inhibit(const QString &applicationName, const QString &reason);
+     void uninhibit();
+ 
+-    std::optional<std::expected<uint, QDBusError>> m_cookie;
++    std::optional<QDBusReply<uint>> m_cookie;
+     bool m_released = false;
+ };
+ 
