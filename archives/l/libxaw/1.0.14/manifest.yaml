@@ -1,0 +1,73 @@
+# 版本级 manifest — libxaw 1.0.14
+# 遵循 ARCHIVE-SPEC v3.0（版本级字段）
+#
+# 上游库名是 libXaw（大写 X/A，X.Org Athena Widgets）。本仓 registry 键与
+# 归档目录按仓内主流小写约定取 libxaw（同 libx11/libxmu/libxt/libxpm 先例），
+# 上游 tarball 名 libXaw-1.0.14.tar.gz，1.0.14 只有 .tar.gz/.tar.bz2（无 .xz）。
+
+version: "1.0.14"
+software: libxaw
+display: "libXaw"
+upstream_name: libXaw
+upstream_version: "1.0.14"
+conan_ref: "libxaw/1.0.14"
+
+status: built
+build_date: "2026-10-13"
+build_system: autotools
+target_platform: aarch64-unknown-linux-ohos
+issue: TBD
+
+source:
+  url: "https://xorg.freedesktop.org/releases/individual/lib/libXaw-1.0.14.tar.gz"
+  sha256: "59cfed2712cc80bbfe62dd1aacf24f58d74a76dd08329a922077b134a8d8048f"
+  tar_format: tar.gz
+
+build:
+  system: autotools（/system/bin/sh 交叉 configure，--host=aarch64-linux-ohos）
+  configure_options:
+    - "--build=aarch64-unknown-linux-gnu --host=aarch64-linux-ohos（显式交叉：OHOS worker 不能 RUN conftest 二进制）"
+    - "--enable-shared --disable-static"
+    - "--disable-docs --disable-specs --without-xmlto --without-fop --without-xsltproc"
+    - "LDFLAGS=-L<build>/linker-view（.la 重定位私有链接视图）"
+  dependencies:
+    - "libx11/1.8.13 (force，对齐 main 上 libxmu/1.3.1.1 的 .la 保留轨)"
+    - "libxext/6.4.0.1（package_id 随 libx11 1.8.13 变更 → 源码重建）"
+    - "libxt/1.3.1"
+    - "libxmu/1.3.1.1"
+    - "libxpm/3.5.17（package_id 随 libx11 1.8.13 变更 → 源码重建）"
+    - "xorgproto/2025.1"
+  transitive_dependencies:
+    - "libxau/1.0.11, libxcb/1.17.0, libxdmcp/1.1.5, xtrans/1.4.0"
+    - "libsm/1.2.6, libice/1.1.2（经 libxt）"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-config.sub.patch（config.sub 识别 linux-ohos OS，使 --host=aarch64-linux-ohos 规范化为 aarch64-unknown-linux-ohos）"
+
+validation:
+  local:
+    - "conan create archives/l/libxaw/1.0.14 -pr:h/-pr:b=ci/conan/profiles/ohos-aarch64 --build=missing --user=ohpcd --channel=stable → 成功"
+    - "一次构建产出双库并校验 SONAME：libXaw6.so.6.0.1(SONAME libXaw.so.6) + libXaw7.so.7.0.0(SONAME libXaw.so.7)；install-exec-hook 另建 libXaw.so / libXaw.so.6 / libXaw.so.7"
+    - "make -j1 check 为上游空操作（Makefile.am 无 TESTS/check_PROGRAMS）"
+    - "test_package 两个可执行文件真跑并断言：libxaw7_widget_set_contract（16 类 + XawVersion 7000002）、libxaw6_widget_set_contract（-DOLDXAW，15 类 + XawVersion 6700002）"
+    - "官方源 sha256 已对 xorg.freedesktop.org 与 www.x.org 两个官方镜像交叉核对一致：59cfed27…8048f"
+    - "包内容核对：lib/ 下无 .la 残留；xaw6.pc / xaw7.pc 的 prefix 重定位为 ${pcfiledir}/../..；licenses/COPYING 已导出"
+    - "conan graph info 实测双 force pin 不冲突：Overrides: libx11/6.4.0: ['libx11/1.8.13']"
+    - "conan-verify（G0–G4）PASS：archives/l/libxaw/1.0.14/reports/conan-verify-report.md"
+    - "L4 等价手工核验（conan-verify 的 L2/L4/L5 因工具侧 package_id 正则未命中而跳过）：两个 .so 均 Type=DYN、GNU_RELRO + BIND_NOW（full RELRO）、GNU_STACK=RW（不可执行栈）"
+    - "构建包 package_id：3b049a3b46bb1a66ab1931289c4447c8399b392a"
+    - "RUNPATH 指向 build-local linker-view，与同族已上架制品（libxmu/1.3.1.1、libxt/1.3.1、libxpm/3.5.17、libxext/6.4.0.1）一致，详见 notes.md 注意事项 4"
+  remote:
+    - "OHOS 单包 CI：CI_PACKAGES=archives/l/libxaw/1.0.14 zsh ci/conan/build_and_test.sh"
+  pending:
+    - "GitCode CI build_and_test.sh run on PR"
+    - "REL upload（合并后）发布 libxaw/1.0.14 到 ohpcd，解锁 xdu 3.0 / xmix 2.1 等 Athena Widgets 消费者"
+
+knowledge_gained:
+  - "libXaw 一次 configure/build 产双库：libXaw6（-DOLDXAW, -version-info 6:1:0）+ libXaw7（-DXAW7, 7:0:0），共用一套 include/X11/Xaw/*.h；package_info 用组件 libxaw::xaw6 / libxaw::xaw7 分别暴露（ref: E565 同族，X11 族组件化先例 libxmu::xmu/xmuu）"
+  - "autotools 包在 HMFS 上 config.status 用 (umask 077 && mktemp -d ./confXXXXXX) 建 0700 临时目录后写 subs*.awk 会被拒（Permission denied）；把 configure 的 umask 077→022 全量替换即修（TMPDIR 重定向无效，conf 目录建在 cwd）——ref: DRAFT-E565"
+  - "1.0.14 自带的 config.sub（2020-06-20）不认识 linux-ohos：需把 linux-ohos* 同时加进 maybe_os 列表与 portable OS 列表，否则 --host=aarch64-linux-ohos 会被下方 linux* 分支改写成 linux-gnu（ref: config.sub canonical target 适配，同 libxpm/libxmu 的 --host=aarch64-linux-ohos 先例）"
+  - "X11 族依赖存在两条并行 libx11 轨：libxmu/1.3.1.1 以 force=True 钉 libx11/1.8.13（其 .la 保留轨为 libxt 合成 libX11.la 所需），libxpm/3.5.17 钉 libx11/6.4.0；两处 force 不报错而是图根的 1.8.13 胜出，代价是 libxext/6.4.0.1 与 libxpm/3.5.17 的 package_id 变化、需源码重建（ref: libxmu/1.3.1.1 notes「为什么重出 1.3.1.1」）"
+  - "免 display 契约测试模式（headless OHOS CI 无 X server）：XtToolkitInitialize + XtCreateApplicationContext + XawInitializeWidgetSet 不触 Display；widget class 记录是链接期常量，class_name 可在类初始化后直接比对；XawInit.h 用 OLDXAW 宏区分 XawVersion 6700002L/7000002L（ref: libxmu/1.3.1.1 test_package 免 display 断言先例）"

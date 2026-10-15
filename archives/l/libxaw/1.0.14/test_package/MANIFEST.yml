@@ -1,0 +1,45 @@
+package: "libxaw/1.0.14"
+homepage: "https://gitlab.freedesktop.org/xorg/lib/libxaw"
+
+upstream_check_command: "make -j1 check"
+upstream_test_in_build: true
+upstream_test_command: "make -j1 check"
+
+upstream_tests: []
+upstream_tests_note: >-
+  libXaw 1.0.14 上游没有自动化测试套件：Makefile.am / src/Makefile.am 全仓
+  无 TESTS、check_PROGRAMS（make check 为空操作，0 用例，仅在 build() 中保留
+  以捕获未来上游新增测试）；1.0.14 的 tarball 里也没有 automake 的 test-driver
+  脚本，更没有 examples/ 目录（顶层目录只有 include/ man/ old-doc/ specs/
+  src/），不存在可自动化的用例或 demo。
+
+test_package_tests:
+  - id: "xaw7-widget-set-contract"
+    source: "xaw7_contract.c"
+    command: "libxaw7_widget_set_contract"
+    description: >-
+      免 display 契约（headless OHOS CI worker 无 X server）：
+      XtToolkitInitialize + XtCreateApplicationContext +
+      XawInitializeWidgetSet + XawInitializeDefaultConverters（Xaw7 专有，
+      OLDXAW 编译期裁掉），校验 16 个 widget 类的 class_name
+      （含 libXaw7 独有的 Tip；Tree.c 在 COMMON_SOURCES 里、libXaw6 同样导出
+      treeWidgetClass，已用 llvm-nm 实测确认），XawVersion==7000002。
+      链接 libxaw::xaw7 组件。
+  - id: "xaw6-widget-set-contract"
+    source: "xaw6_contract.c"
+    command: "libxaw6_widget_set_contract"
+    description: >-
+      同契约的 OLDXAW 变体：以 -DOLDXAW 编译（XawVersion==6700002），
+      校验两库共有的 15 个 widget 类 class_name（即 libXaw7 的 16 类去掉
+      唯一的 Xaw7 专属类 Tip；OLDXAW 下不调用
+      XawInitializeDefaultConverters）。链接 libxaw::xaw6 组件。
+
+test_counting:
+  upstream_independent_total: 0
+  upstream_launcher_total: 0
+  integration_independent_total: 2
+  shared_static_counted_once: true
+  internal_assertions_counted_as_cases: false
+
+test_case_count: 2
+assertion_count: 66
