@@ -1,0 +1,75 @@
+software: rover
+version: "1.0"
+status: built
+build_system: makefile
+compile_date: "2026-10-13"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/lecram/rover/archive/refs/tags/v1.0.0.tar.gz"
+  sha256: "f2e6629107f80cc71e64cf1f2c79afe8c76d3aa0d53074bd221e5ddcda895a4e"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: makefile
+  compiler: clang
+  compiler_version: "15"
+  options:
+    - "CC=clang（tools.build:compiler_executables 注入）"
+    - "CFLAGS='-I<ncurses>/include -DNCURSES_WIDECHAR -Wall -O2'"
+    - "LDFLAGS='-L<ncurses>/lib -lncursesw'"
+  dependencies:
+    - ncurses/6.5
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 依赖
+# ============================================================
+
+dependencies:
+  required:
+    - ncurses/6.5
+  optional: []
+
+# ============================================================
+# 测试结果
+# ============================================================
+
+test_results:
+  type: manual
+  total: 3
+  passed: 3
+  failed: 0
+  detail:
+    - "conan create 全绿，产包含 bin/rover 与 share/man/man1/rover.1"
+    - "file 确认产物为 ELF 64-bit LSB ARM aarch64（OHOS 交叉目标，NEEDED 仅 libc.so）"
+    - "qemu-aarch64 -L /opt/ohos-guest bin/rover -v → 'rover 1.0.0'（rc=0）"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "上游单文件 C 程序的 Makefile 未接 pkg-config/依赖注入，交叉编译必须在 make 命令行覆盖 CFLAGS/LDFLAGS 显式给出 conan 依赖头/库路径"
+  - "rover 为宽字符 curses 程序，OHOS ncurses 头文件需 -DNCURSES_WIDECHAR 才暴露 wchar 声明，并链接 ncursesw"
+  - "上游无自动化测试（无 make check），交叉产物无法在 x86_64 宿主直接运行，运行期验证由 test_package 在 can_run 时执行"
+
+knowledge_ref: []
+
+functional_verification:
+  version_check: "rover 1.0.0（qemu-aarch64 实测 `bin/rover -v` 输出 rover 1.0.0，rc=0）"
+  help_check: "rover -h/--help 打印 Usage: rover [OPTIONS] [DIR [DIR [...]]]"
+  runtime_test: "qemu-aarch64 -L /opt/ohos-guest <pkg>/bin/rover -v → rover 1.0.0"
+  binary_type: "ELF64 AArch64 PIE，NEEDED 仅 libc.so（ncursesw 静态链接）"
