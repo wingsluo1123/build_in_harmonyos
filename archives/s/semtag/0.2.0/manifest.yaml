@@ -1,0 +1,68 @@
+software: semtag
+version: "0.2.0"
+upstream_version: "0.2.0"
+status: built
+build_date: "2026-10-03"
+build_system: custom
+conan_ref: "semtag/0.2.0"
+
+source:
+  url: "https://github.com/nico2sh/semtag/archive/refs/tags/v0.2.0.tar.gz"
+  sha256: "37890fc5bbdeba923b51ff615c4e99b002c95d922925ed1efefd117ad7934548"
+  tar_format: tar.gz
+  upstream_tag: "v0.2.0"
+
+build:
+  system: custom
+  configure_options: []
+  dependencies: []
+  cc: clang
+  outputs:
+    - "bin/semtag"
+    - "share/doc/semtag/README.md"
+    - "licenses/LICENSE"
+
+patches_applied:
+  - "0001-semtag.patch"
+
+knowledge_gained:
+  - "鸿蒙没有 /usr/bin/env（E037）：脚本类工具包改写 shebang 为 /data/service/hnp/bin/bash，否则 commands.json 声明的直接执行不可用"
+  - "上游 bash 脚本 `set -e` 下 `status=$(check_fn)`，check_fn 返回非零会令脚本静默退出（rc=1、无输出）：适配时先用 x86 参照 + 最小复现确认是上游行为再决定是否修补，避免误归因于鸿蒙 bash/toybox 差异；测试应断言退出码与副作用而非输出文本"
+  - "Git 驱动型脚本工具的 test_package 需隔离 Git 配置（HOME + GIT_CONFIG_NOSYSTEM + GIT_CONFIG_GLOBAL=/dev/null）并用 `git symbolic-ref HEAD refs/heads/master` 代替 `git init -b`，才能在无 Git 身份的账号上复现真实行为"
+  - "lang-preflight 对纯 Shell 项目判 other（无 manifest/构建系统/可统计源文件）：用 --lang other 显式声明后放行"
+
+conan:
+  reference: "semtag/0.2.0"
+  package_type: application
+  architecture_independent: true
+  user_channel: "ohpcd/stable"
+
+test_scope:
+  upstream_functional_cases: 0
+  upstream_functional_passed: 0
+  upstream_test_file: "none"
+  test_package_assertions: 24
+  generic_assertions: 19
+  harmonyos_assertions: 5
+  harmonyos_test_files:
+    - "test_package/test_semtag_ohos.sh"
+  upstream_test_evidence: >-
+    The v0.2.0 tag tarball has 7 files (semtag, semtag_bkp, release.sh,
+    release_v2.sh, README.md, LICENSE, .gitignore): no tests directory, no
+    build system, no CI workflow. Upstream test count N=0.
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /root/tmp/builds/semtag-0.2.0.orig
+  source_work_dir: /root/tmp/builds/semtag-0.2.0.work
+  source_orig_hash: 0a9872cc5703e9ab
+  source_work_hash: 0329d6ccdee25dfb
+  generated_at: '2026-10-03T10:01:40'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-semtag.patch
+    type: portability
+    platform_only: false
+    guard: none
+    note: "无平台宏/条件编译：shebang 为静态路径改写"
