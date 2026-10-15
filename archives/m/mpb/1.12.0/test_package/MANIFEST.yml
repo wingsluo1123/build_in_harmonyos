@@ -1,0 +1,40 @@
+# test_package/MANIFEST.yml
+package: mpb/1.12.0
+homepage: "https://github.com/NanoComp/mpb"
+
+# Upstream test suite (tests/Makefile.am check-local + mpb/Makefile.am check-local).
+# `make check` builds noinst_PROGRAMS and runs:
+#   tests/    : blastest (diff vs tests/blastest.<real|complex>.out), maxwell_test (2 runs)
+#   mpb/      : `mpb examples/check.ctl` and `mpb force-mu?=true examples/check.ctl`
+# See notes.md "上游测试申报表" for the per-test census.
+upstream_check_command: "make check"
+upstream_test_in_build: true
+upstream_test_command: "make check"
+upstream_tests:
+  - file: blastest.c
+    source: mpb-1.12.0/tests/blastest.c
+    description: "BLAS sanity: solve a small eigenproblem and diff against blastest.complex.out"
+    command: "./blastest | sed ... | diff tests/blastest.complex.out -"
+  - file: maxwell_test.c
+    source: mpb-1.12.0/tests/maxwell_test.c
+    description: "Maxwell operator symmetry/convergence check (two configurations)"
+    command: "./maxwell_test -1 -c 1e-9 -x 256 -E 1e-3"
+  - file: malloctest.c
+    source: mpb-1.12.0/tests/malloctest.c
+    description: "Memory allocator bookkeeping test (built, not run by check-local)"
+    command: "./malloctest"
+  - file: eigs_test.c
+    source: mpb-1.12.0/tests/eigs_test.c
+    description: "Eigensolver test (built, not run by check-local)"
+    command: "./eigs_test"
+  - file: check.ctl
+    source: mpb-1.12.0/examples/check.ctl
+    description: "Upstream libctl self-test: multiple band-structure cases checked against known frequencies"
+    command: "mpb examples/check.ctl"
+
+test_package_tests:
+  - file: test.sh
+    description: "Run the installed mpb binary on a 2D rod lattice, assert 4 TE band frequencies against upstream reference values"
+    command: "mpb <ctl> (MPB_CONSUMER_PASS)"
+
+assertion_count: 5

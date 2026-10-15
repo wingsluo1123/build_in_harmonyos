@@ -1,0 +1,98 @@
+software: mpb
+# 版本级 manifest
+# 文件位置: archives/{letter}/{name}/1.12.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "1.12.0"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-15"
+
+# 构建系统类型
+build_system: autotools
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/NanoComp/mpb/releases/download/v1.12.0/mpb-1.12.0.tar.gz"
+
+  sha256: "8d2b206254b217f66a53c1ad20cc0c369b93b0e71ee671d68e333a583eaaeda4"
+
+  # 压缩格式
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: autotools
+
+  configure_options:
+    - "--disable-dependency-tracking"
+    - "--without-hdf5"
+    - "--without-openmp"
+    - "--without-mpi"
+    - "--with-libctl=<libctl>/share/libctl"
+
+  # Conan 依赖
+  dependencies:
+    - "fftw/3.3.10.3"
+    - "lapack/3.12.1"
+    - "libctl/4.5.1"
+  system_dependencies: []
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-config.guess.patch"
+  - "0002-config.sub.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "mpb 通过 CTL_DEFS/SPEC_SCM 把 $(pkgdatadir)/mpb.scm 与 libctl 的 scheme 路径编译进二进制；运行期靠 make_name(argv[0]) 先找程序目录、再回退编译期绝对路径，因此 conan prefix 必须等于最终安装根（--prefix=package_folder 且 make install 不带 DESTDIR）。"
+  - "libctl 4.5.1 的 make install 会安装 base/main.c、base/ctl.scm、utils/geom.c、utils/geom.scm 以及 bin/gen-ctl-io，满足 mpb configure 对 libctl 支持文件的要求。"
+  - "AutotoolsDeps 会把 hdf5 的 C++ 库灌进 C 工程的 LIBS，导致 autoconf conftest 加载失败；本次用 --without-hdf5 规避（HDF5 为上游可选输出功能）。"
+  - "uname -s 在 OHOS 返回 'HarmonyOS'，config.guess 需加分支（E007），config.sub 需接受 linux-ohos 组合（E007/E072）。"
+  - "无 Fortran 编译器时 AC_F77_FUNC 得 'unknown' 使 AX_BLAS/AX_LAPACK 失败；导出 ac_cv_f77_mangling='lower case, underscore'（E064 允许的 cache 覆盖）可解决。"
+  - "无 Fortran 时 mpb 跳过 AC_F77_WRAPPERS，config.h 缺 F77_FUNC/F77_FUNC_，而 blasglue.c 依赖它们；configure 后向 config.h 补 name##_ 定义（harminv 先例）。"
+  - "ohpcd 依赖包以 prefix=/ 构建，.la 携带 libdir='//lib' 与 dependency_libs 里的 //lib 引用及旧缓存 -L 路径；需 build 私有目录 + 净化 .la（E236/E522/E544），不改 Conan 缓存。"
+  - "libctl 的 bin/gen-ctl-io 在构建期把当时 guile 绝对路径写死；其缓存路径漂移后需 build 私有 shim 改写路径后置于 PATH 首位。"
+
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/ohpc-porting/builds/mpb-1.12.0.orig
+  source_work_dir: /storage/Users/currentUser/tmp/ohpc-porting/builds/mpb-1.12.0.work
+  source_orig_hash: 8fcda808c4717764
+  source_work_hash: c50459731048ad40
+  generated_at: '2026-10-15T12:10:47'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-config.sub.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
