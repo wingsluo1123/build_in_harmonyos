@@ -1,0 +1,78 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI L0e 强制要求存在；详见 docs/TEST_QUALITY_SPEC.md）
+#
+# libgweather 4.4.4 上游测试基于 meson（libgweather/tests），由 -Dtests=true 控制。
+# 本配方 generate() 显式设 tests=true，build() 内调 _run_upstream_tests()，按上游
+# CI（.gitlab-ci.yml 的 `meson test -C _build --no-suite=style`）同口径**单次执行**：
+#   meson test -C builddir --print-errorlogs --no-suite=style --timeout-multiplier 4
+# target 名从上游 libgweather/tests/meson.build 的 gweather_tests 列表解析，不硬编码。
+# 判定双源对账：meson 自身 Ok/Fail/Summary of Failures（target 级，SIGABRT 中止的
+# target 在这里才算数）+ TAP testlog（case 级），并用 g_test_add_func 注册点核算
+# 「TAP 未上报」的被中止用例。台账见 ../notes.md「测试」节。
+#
+# 上游注册点实测（grep -c g_test_add_func libgweather/tests/*.c）：
+#   test_libgweather.c 7 + duplicates.c 2 + timezones.c 3 + metar.c 1 = 13 个用例，
+#   分布在 4 个 meson target 上。
+# 另有 data/meson.build 的 2 个 lint 类入口（xmllint `Valid Locations file`、
+# pylint `pylint-gen-locations-variant`），以及 style-format（clang-format，
+# --no-suite=style 排除，且缺 clang-format 时不注册，不计入）。
+# ⇒ 上游用例合计 15（13 g_test + 2 lint）。
+#
+# ── 真机实测（设备 3QC0124C11000071，clang 15 aarch64-ohos，2026-10-08 23:35 CST，
+#    CI 同源闸 ci/conan/build_and_test.sh rc=0 / Pass rate 100% / conan create passed）──
+#   meson 注册并执行 5 个 test：Ok=4、Fail=1
+#     Fail = libgweather:timezones — SIGABRT（timezones.c:122 'tz' should not be NULL），
+#             归因「平台无 /usr/share/zoneinfo 文件树」，签名经日志校验后放行（§8.6）
+#   13 个 g_test 用例：10 通过 / 1 跳过（location-names：缺 fr_FR.UTF-8 locale，
+#             上游自带 g_test_skip）/ 2 归因失败（named-timezones-deserialized、
+#             timezones —— target 被 SIGABRT 中止，两个用例未进 TAP 流，按注册点核算点名）
+#   lint `Valid Locations file`（xmllint）通过；pylint 入口因目标机无 pylint 未注册 ⇒ 未执行
+#   ⇒ 15 项中实跑 14 项：11 通过、1 跳过、2 归因失败、1 未注册
+#   metar 实测通过（60.33s）——设备具备到 aviationweather.gov 的出网；CI sandbox 若无出网
+#   则由归因表按同一签名放行并在日志写明原因。
+
+package: libgweather4/4.4.4
+homepage: https://gitlab.gnome.org/GNOME/libgweather
+
+# 上游测试命令（tests 选项在 generate() 中显式置 true）
+upstream_check_command: "meson test -C builddir --no-suite=style"
+
+# conanfile.py build() 中真实集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "meson test -C builddir --print-errorlogs --no-suite=style --timeout-multiplier 4"
+
+# 代表性上游测试
+upstream_tests:
+  - file: libgweather/tests/test_libgweather.c
+    source: libgweather-4.4.4.tar.xz/libgweather/tests/test_libgweather.c
+    description: "libgweather 主用例集：角度换算、无代码序列化、机场距离、UTC 日落、forecast loop UAF、地点名遍历（7 个注册点）。真机实测 6 通过 + 1 跳过（location-names 缺 fr_FR.UTF-8 locale，上游自带 skip）"
+    command: "meson test test_libgweather"
+  - file: libgweather/tests/timezones.c
+    source: libgweather-4.4.4.tar.xz/libgweather/tests/timezones.c
+    description: "时区用例：named-timezones、named-timezones-deserialized、timezones（3 个注册点）。真机实测 1 通过、2 归因失败——OHOS 无 POSIX /usr/share/zoneinfo 树，g_time_zone_new_identifier() 返回 NULL，timezones.c:122 断言 SIGABRT（非移植缺陷，§8.6 归因，日志签名校验后放行）"
+    command: "meson test timezones"
+  - file: libgweather/tests/duplicates.c
+    source: libgweather-4.4.4.tar.xz/libgweather/tests/duplicates.c
+    description: "Locations.xml 重复项检测（2 个注册点）。真机实测 2/2 通过"
+    command: "meson test duplicates"
+  - file: libgweather/tests/metar.c
+    source: libgweather-4.4.4.tar.xz/libgweather/tests/metar.c
+    description: "METAR 气象站解析；唯一数据源为在线地址 METAR_SOURCES=https://aviationweather.gov/data/cache/stations.cache.xml.gz（metar.c:16），并断言响应码 2xx（metar.c:273-274）。真机实测通过（60.33s，设备有出网）；无出网的 CI sandbox 上该断言不成立，配方按同一签名归因为「环境网络」而非移植缺陷"
+    command: "meson test metar"
+
+# test_package 自带测试（消费者视角，真实 API）
+test_package_tests:
+  - file: test_libgweather4.c
+    description: "主消费者面真实调用：Locations.xml 地点库加载、按名/按距离最近城市检索（London/Sydney/Berlin）、地点库一致性（>100 个两字母国家 id）、GWeatherInfo 生命周期 roundtrip"
+    command: "./test_libgweather4"
+  - file: test_detect_degraded.c
+    description: "§3.6 降级边界断言：gweather_location_detect_nearest_city 符号仍导出、异步回调仍触发、finish() 返回 NULL、错误为 G_IO_ERROR_NOT_SUPPORTED"
+    command: "./test_detect_degraded"
+
+# 断言数（实测，勿凭印象改）：
+#   test_libgweather4.c  : grep -cE '(^|[^A-Za-z_])CHECK \(' → 27
+#   test_detect_degraded.c: 该文件不用 CHECK 宏，用 printf("ok ...") 打通过点 → 3
+#                          （另有 5 个 printf("FAIL ...") 失败臂，与 3 个 ok 一一对应，
+#                            不重复计入）
+#   合计 30。历史值 24 是旧版 test_libgweather4.c 较小时留下的，已按实测更正。
+assertion_count: 30

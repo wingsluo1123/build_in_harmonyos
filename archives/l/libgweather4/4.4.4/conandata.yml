@@ -1,0 +1,46 @@
+# conandata.yml — libgweather4 4.4.4
+# 官方源优先（download.gnome.org）；NJU 镜像仅为 CI 网络受限时的兜底，
+# 不含 file://、缓存路径或执行端绝对路径。
+
+sources:
+  url:
+    - "https://download.gnome.org/sources/libgweather/4.4/libgweather-4.4.4.tar.xz"
+    - "https://mirror.nju.edu.cn/gnome/sources/libgweather/4.4/libgweather-4.4.4.tar.xz"
+  sha256: "7017677753cdf7d1fdc355e4bfcdb1eba8369793a8df24d241427a939cbf4283"
+
+patches:
+  "4.4.4":
+    - patch_file: "patches/0002-locations-variant-generator.patch"
+      description: >
+        Locations.bin 生成器去除 PyGObject 依赖。单文件改动：把
+        build-aux/meson/gen_locations_variant.py 的 "from gi.repository import GLib"
+        换为 from gvariant_ctypes import Variant as GLib（并补 os 导入），shim 目录取自配方
+        通过 buildenv 注入的 GW_GVARIANT_DIR（export_sources 已把 tools/gvariant_ctypes.py
+        复制进源码树）。根因：OHOS 的 python3 3.12.9 加载已发布的
+        pygobject/3.58.0 时，_gi.cpython-312-aarch64-linux-ohos.so 在动态链接期报
+        "PyType_Ready: symbol not found"（设备实测 ImportError: Error relocating），
+        属目标 CPython ABI 与模块不匹配，加包或换解释器都无法解决，导致
+        data/Locations.bin 这个 custom target 失败、ninja 中止。shim 用 ctypes（标准库）
+        直连 libglib-2.0.so.0 的 C ABI 实现生成器所需的三个 GLib.Variant 调用，
+        字节取自 g_variant_get_normal_form（与 g_variant_new_from_data 读回的规范形式
+        一致），构建路径即 GLib 自己的 g_variant_new_tuple/g_variant_new_array，
+        产物与 PyGObject 一致。其余构建期不依赖 gi。
+    - patch_file: "patches/0001-optional-geocode-glib.patch"
+      description: >
+        §3.6 可退化移植补丁，四处改动：(1) meson_options.txt 新增
+        option('geocode_glib', type:'feature', value:'auto')；(2) meson.build:50
+        的 find_installation('python3', modules:['gi']) 加 required:false（OHOS 的
+        python3 3.12.9 无可用 PyGObject，且 py 变量全树未被引用，不改则 meson setup
+        失败）；(3) libgweather/meson.build 把 geocode-glib 改为受 geocode_glib 开关
+        控制的可选依赖，并按探测结果 add_project_arguments
+        ('-DHAVE_GEOCODE_GLIB=0/1')；(4) gweather-location.c 用该宏守卫
+        geocode-glib 的 include（:13 无条件 include，漏守卫会直接 fatal error
+        'geocode-glib/geocode-glib.h file not found'）、_got_place() 回调与
+        gweather_location_detect_nearest_city() 的反向地理编码调用点。根因：上游
+        libgweather/meson.build:115 无条件 dependency('geocode-glib-2.0')（无
+        required:false、无对应 -D 开关），而 ohpcd 制品仓既无 geocode-glib 档案也无发布
+        （设备侧 conan list -r=ohpcd 实测 0 recipes），meson configure 直接失败；该依赖
+        由平台依赖任务 14281 / 在途 PR #12915 认领中，不重复导入。降级后该 API 保留
+        符号并返回 G_IO_ERROR_NOT_SUPPORTED，其余功能面（Locations.xml 解析、
+        按名/按距离最近城市、时区、月相、metar/nws/metno/owm/iwin 预报解析）
+        不受影响。

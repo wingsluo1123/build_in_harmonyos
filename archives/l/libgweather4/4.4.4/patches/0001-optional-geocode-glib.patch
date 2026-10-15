@@ -1,0 +1,146 @@
+Make geocode-glib an optional dependency (OHOS: not packaged)
+
+libgweather 4.4.4 requires geocode-glib unconditionally (libgweather/meson.build:
+dependency('geocode-glib-2.0') with no required:false and no -D switch), but the
+OpenHarmony PC artifact registry has neither an archive nor a published build of
+geocode-glib, so "meson setup" fails outright.  geocode-glib is used by exactly
+one call site: the reverse-geocoding entry point
+gweather_location_detect_nearest_city() in gweather-location.c.
+
+Turn the dependency into a meson feature option (default 'auto', so a build that
+still has geocode-glib available behaves exactly as upstream) and guard the
+reverse-geocoding code with HAVE_GEOCODE_GLIB: the <geocode-glib/geocode-glib.h>
+include, the _got_place() callback and its callers.  Without geocode-glib the
+public symbol is still exported and still honours the documented async contract;
+it just completes with G_IO_ERROR_NOT_SUPPORTED.
+
+The include needs guarding too, not just the call sites: gweather-location.c
+includes geocode-glib.h unconditionally at line 13, so leaving it out of the
+guard makes the compile fail with "geocode-glib/geocode-glib.h file not found"
+even though nothing in the guarded region is compiled.
+
+The patch also relaxes the PyGObject requirement at the top of meson.build:
+find_installation('python3', modules: ['gi']) is what makes "meson setup" fail
+on a target whose python3 has no PyGObject.  The 'py' variable it binds is never
+referenced anywhere else in the build (gen_locations_variant.py only uses the
+standard library), so the module requirement is marked optional rather than the
+variable being dropped.
+
+--- a/meson_options.txt
++++ b/meson_options.txt
+@@ -12,3 +12,5 @@
+        description: 'Whether to build the tests and tools')
+ option('soup2', type: 'boolean', value: false,
+        description: 'Whether to build with libsoup2')
++option('geocode_glib', type: 'feature', value: 'auto',
++       description: 'Build the geocode-glib based reverse geocoding API')
+
+--- a/meson.build
++++ b/meson.build
+@@ -47,7 +47,12 @@
+   '-d', 'C0326',
+ ]
+ 
+-py = import('python').find_installation('python3', modules: ['gi'])
++# 'py' is bound but never referenced anywhere in the build (upstream only needs
++# the python3 installation to run gen_locations_variant.py, which uses nothing
++# but the standard library).  Requiring the PyGObject 'gi' module here makes
++# meson setup fail on targets without PyGObject, so make that requirement
++# optional instead of dropping the variable.
++py = import('python').find_installation('python3', modules: ['gi'], required: false)
+ gen_locations_variant = find_program('build-aux/meson/gen_locations_variant.py')
+ 
+ g_ir_scanner = find_program('g-ir-scanner', required: get_option('introspection'))
+
+--- a/libgweather/meson.build
++++ b/libgweather/meson.build
+@@ -107,15 +107,28 @@
+   libsoup_name = 'libsoup-2.4'
+   libsoup_req_version = '>= 2.44.0'
+   libsoup_api_version = '2.4'
+-  geocode_glib_dep = dependency('geocode-glib-1.0')
++  geocode_glib_pc_name = 'geocode-glib-1.0'
+ else
+   libsoup_name = 'libsoup-3.0'
+   libsoup_req_version = '>= 2.99.2'
+   libsoup_api_version = '3.0'
+-  geocode_glib_dep = dependency('geocode-glib-2.0')
++  geocode_glib_pc_name = 'geocode-glib-2.0'
+ endif
+ 
+ libsoup_dep = dependency(libsoup_name, version: libsoup_req_version)
++
++# geocode-glib backs exactly one public API, the reverse-geocoding entry point
++# gweather_location_detect_nearest_city(). Make it optional so the library still
++# builds where geocode-glib is not available: the symbol stays exported and
++# reports G_IO_ERROR_NOT_SUPPORTED (see the HAVE_GEOCODE_GLIB guard in
++# gweather-location.c).
++geocode_glib_dep = dependency(geocode_glib_pc_name, required: get_option('geocode_glib'))
++have_geocode_glib = geocode_glib_dep.found()
++conf = configuration_data()
++conf.set10('HAVE_GEOCODE_GLIB', have_geocode_glib)
++configure_file(output: 'config-geocode-glib.h', configuration: conf)
++add_project_arguments('-DHAVE_GEOCODE_GLIB=@0@'.format(have_geocode_glib ? 1 : 0),
++                      language: 'c')
+ 
+ deps_libgweather = [
+   dependency('gio-2.0', version: glib_req_version),
+
+--- a/libgweather/gweather-location.c
++++ b/libgweather/gweather-location.c
+@@ -10,7 +10,9 @@
+ 
+ #include "gweather-private.h"
+ 
++#if HAVE_GEOCODE_GLIB
+ #include <geocode-glib/geocode-glib.h>
++#endif
+ #include <glib/gi18n-lib.h>
+ #include <libxml/xmlreader.h>
+ #include <locale.h>
+@@ -770,6 +772,7 @@
+     return data.location;
+ }
+ 
++#if HAVE_GEOCODE_GLIB
+ static void
+ _got_place (GObject *source_object,
+             GAsyncResult *result,
+@@ -817,6 +820,7 @@
+ 
+     g_object_unref (task);
+ }
++#endif /* HAVE_GEOCODE_GLIB */
+ 
+ /**
+  * gweather_location_detect_nearest_city: (finish-func detect_nearest_city_finish)
+@@ -842,6 +846,7 @@
+                                        GAsyncReadyCallback callback,
+                                        gpointer user_data)
+ {
++#if HAVE_GEOCODE_GLIB
+     ArgData *data;
+     GeocodeLocation *location;
+     GeocodeReverse *reverse;
+@@ -862,6 +867,20 @@
+     data->task = task;
+ 
+     geocode_reverse_resolve_async (reverse, cancellable, _got_place, data);
++#else
++    /* libgweather was built without geocode-glib: keep the symbol and the
++     * documented async contract, but report the feature as unsupported so a
++     * consumer gets a clean G_IO_ERROR_NOT_SUPPORTED instead of a link error. */
++    GTask *task;
++
++    g_return_if_fail (GWEATHER_IS_LOCATION (loc));
++    g_return_if_fail (loc->level < GWEATHER_LOCATION_CITY || loc->level == GWEATHER_LOCATION_NAMED_TIMEZONE);
++
++    task = g_task_new (NULL, cancellable, callback, user_data);
++    g_task_return_new_error (task, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED,
++                             "Reverse geocoding is unavailable: libgweather was "
++                             "built without geocode-glib.");
++#endif /* HAVE_GEOCODE_GLIB */
+ }
+ 
+ /**
+
