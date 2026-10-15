@@ -1,0 +1,66 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件 (R51 三步法)
+# 上游为无构建系统 .c/.h 源码集合，无 configure/make/ctest 注册；
+# 官方自带 10 个 *_test.c known-answer 自检程序。
+
+package: crypto-algorithms/cfbde48414
+homepage: "https://github.com/B-Con/crypto-algorithms"
+
+# 上游无构建系统：无 make check / ctest -N / meson test --list 可注册
+upstream_check_command: "N/A (no build system; per-algorithm *_test.c known-answer programs)"
+
+# conanfile.py build() 中已集成上游测试（编译并运行全部 10 个 *_test.c）
+upstream_test_in_build: true
+upstream_test_command: "clang -O2 <impl>.c <impl>_test.c -o <impl>_test && ./<impl>_test"
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: aes_test.c
+    source: crypto-algorithms-cfbde48414/aes_test.c
+    description: "AES known-answer self test"
+    command: "./aes_test"
+  - file: arcfour_test.c
+    source: crypto-algorithms-cfbde48414/arcfour_test.c
+    description: "ARCFOUR known-answer self test"
+    command: "./arcfour_test"
+  - file: base64_test.c
+    source: crypto-algorithms-cfbde48414/base64_test.c
+    description: "Base64 known-answer self test"
+    command: "./base64_test"
+  - file: blowfish_test.c
+    source: crypto-algorithms-cfbde48414/blowfish_test.c
+    description: "Blowfish known-answer self test"
+    command: "./blowfish_test"
+  - file: des_test.c
+    source: crypto-algorithms-cfbde48414/des_test.c
+    description: "DES known-answer self test"
+    command: "./des_test"
+  - file: md2_test.c
+    source: crypto-algorithms-cfbde48414/md2_test.c
+    description: "MD2 known-answer self test"
+    command: "./md2_test"
+  - file: md5_test.c
+    source: crypto-algorithms-cfbde48414/md5_test.c
+    description: "MD5 known-answer self test"
+    command: "./md5_test"
+  - file: rot-13_test.c
+    source: crypto-algorithms-cfbde48414/rot-13_test.c
+    description: "ROT-13 known-answer self test"
+    command: "./rot-13_test"
+  - file: sha1_test.c
+    source: crypto-algorithms-cfbde48414/sha1_test.c
+    description: "SHA-1 known-answer self test"
+    command: "./sha1_test"
+  - file: sha256_test.c
+    source: crypto-algorithms-cfbde48414/sha256_test.c
+    description: "SHA-256 known-answer self test"
+    command: "./sha256_test"
+
+# test_package 自带的测试（消费者视角验证，编译打包的 sha256.c 调用真实 API）
+test_package_tests:
+  - file: test.c
+    description: "消费者测试：SHA-256(\"abc\") known-answer 校验"
+    command: "./test_crypto-algorithms"
+
+# 测试断言总数（10 个上游程序均为多向量 known-answer 校验；SHA-256 即 3 组向量）
+assertion_count: 30
