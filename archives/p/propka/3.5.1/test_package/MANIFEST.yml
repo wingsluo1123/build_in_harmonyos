@@ -1,0 +1,33 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: propka/3.5.1
+homepage: "https://github.com/jensengroup/propka"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "python3 -m pytest tests -q（测试代码来自 sdist，测试数据来自 conandata.test_assets 的上游仓库 tag v3.5.1 归档；PYTHONPATH = pkg : assets : test-deps）"
+
+upstream_tests:
+  - name: "tests/（sdist 自带 11 个 test_*.py；数据由仓库归档补齐）"
+    count: 49
+    description: >-
+      sdist 带 `tests/*.py` 但**不带测试数据**（`tests/pdb`、`tests/results` 未发布，缺了会直接
+      `FileNotFoundError: Can't find pdbs test files …`）→ 配方在 `conandata.yml` 的
+      `test_assets` 里钉死上游仓库 **tag v3.5.1** 归档（sha256 固定，含 12 个 PDB + 7 个期望结果；
+      **不进产物**）。测试期依赖 `pytest` + `numpy`（上游 `tests_require` 声明；仓内无归档 →
+      pip 装到 `<build>/test-deps`，**不进产物**，源为平台私有源 pypi.cnb.cool 优先）。
+      实测：**49 passed**。
+    command: "python3 -m pytest tests -q"
+
+test_package_tests:
+  - file: check_propka.py
+    description: >-
+      R34 消费者校验 7 项（全部离线）：①产物齐备 ②关键文件齐备（8 个实测模块名，含
+      `hybrid36.py`；**无 `protein.py`**）③真实 `import propka`（零运行期依赖）④
+      `__version__ == '3.5.1'` ⑤**真实离线功能**：`hybrid36.decode('A0000') == 100000`
+      ⑥子模块面（`molecular_container`/`atom`/`group`/`run`/`hybrid36` 可导入）⑦证据。
+    command: "python3 check_propka.py <package-folder>"
+
+assertion_count: 7
