@@ -1,0 +1,42 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: matio/1.5.26
+homepage: "https://sourceforge.net/projects/matio/"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+# matio 1.5.26 官方测试入口：test_mat（CMake 构建产物，41 个分派子测试）+ test_snprintf（条件构建）
+upstream_check_command: "ctest --output-on-failure (CMake 未注册 ctest；实际入口 ./test_mat)"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（源码声明清单，详见 notes.md 双口径台账）
+upstream_tests:
+  - file: test/test_mat.c
+    source: matio-1.5.26/test/test_mat.c
+    description: "上游主测试程序（--list-tests 枚举 31 个公开测试 + 41 个分派子测试），覆盖 MAT4/MAT5 读写、稀疏、结构、单元数组、字符、sub2ind/ind2sub"
+    command: "./test_mat <test>"
+  - file: test/test_snprintf.c
+    source: matio-1.5.26/test/test_snprintf.c
+    description: "snprintf 行为测试（CMake 条件构建：HAVE_SNPRINTF 为真时未实例化）"
+    command: "./test_snprintf"
+  - file: test/test_matf.f90
+    source: matio-1.5.26/test/test_matf.f90
+    description: "Fortran 接口测试（本配置 C 工具链不构建 Fortran，未实例化）"
+    command: "N/A"
+  - file: test/tests/*.at
+    source: matio-1.5.26/test/tests/
+    description: "Autotools testsuite 3200 个 AT_SETUP 用例（mat4/mat5/mat73 读写、readslab 等；mat73 依赖 HDF5 已禁用，Autotools 套件未在 CMake 配置实例化）"
+    command: "make check (Autotools)"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "消费者测试：Mat_CreateVer/Mat_VarCreate/Mat_VarWrite/Mat_Open/Mat_VarRead 写读回环验证"
+    command: "./test_matio"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 12
