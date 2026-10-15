@@ -1,0 +1,119 @@
+{
+  "package": "sfront/0.99",
+  "audit_type": "pre-pr-independent",
+  "auditor": "independent subagent (context-isolated) + orchestrator verification of the P1 fixes",
+  "audit_date": "2026-10-03",
+  "audited_sha": "worktree feat/sfront-0.99 based on origin/main 2446216757",
+  "scope": [
+    "archives/s/sfront/commands.json",
+    "archives/s/sfront/0.99/conanfile.py",
+    "archives/s/sfront/0.99/conandata.yml",
+    "archives/s/sfront/0.99/manifest.yaml",
+    "archives/s/sfront/0.99/notes.md",
+    "archives/s/sfront/0.99/test_package/conanfile.py",
+    "archives/s/sfront/0.99/test_package/MANIFEST.yml",
+    "archives/s/sfront/0.99/test_package/test_sfront.sh",
+    "knowledge/drafts/DRAFT-sfront-0.99-nested-make-pregenerated-parser-and-cpp-gcc.kv",
+    "knowledge/drafts/DRAFT-sfront-0.99-nested-make-pregenerated-parser-and-cpp-gcc.md"
+  ],
+  "verdict": "pass",
+  "p0_count": 0,
+  "p1_count": 0,
+  "p2_count": 0,
+  "p3_count": 0,
+  "checks": {
+    "recipe_R32_settings_os": "pass - conanfile.py validate() uses settings.os not in ('Linux','OHOS')",
+    "recipe_R33_no_bare_shell_vars": "pass - compiler read from tools.build:compiler_executables, no ${CC}/${CFLAGS}",
+    "recipe_L0g_no_hardcoded_remote": "pass",
+    "recipe_L0o_no_external_download_cmd": "pass - uses conan.tools.files.get",
+    "recipe_L0p_settings_complete": "pass - os/arch/compiler/build_type",
+    "recipe_R39_official_source_url": "pass - https://john-lazzaro.github.io/sa/sfront0.99.tar.gz, sha256 independently reproduced as 97296d8308ad7fabc8944a44592bbb996293ee66975b3c07c4022a548ef68862",
+    "recipe_R8_no_platform_macro_patches": "pass - patches: [], no patch files",
+    "test_R34_not_hollow": "pass - test() runs bash test_sfront.sh against the installed package; 68 real assertions, no echo/print-only body",
+    "test_qemu_absence_is_hard_failure": "pass - exit 1 when qemu-aarch64 is missing",
+    "test_python3_dependency_guarded": "pass - explicit command -v python3 check exits 1",
+    "test_no_absolute_host_paths": "pass",
+    "test_no_mktemp_d": "pass - plain mkdir -p under the given work dir (HMDFS E011)",
+    "package_payload_counts": "pass - 26 .saol, 20 .sasl, 10 lib files, README.HTML, book/, licenses/bsd.html, licenses/gfdl.html all verified against the extracted upstream tree",
+    "package_macos_junk_excluded": "pass - excludes ['*.DS_Store','._*'] drops the 6 .DS_Store and 32 ._* upstream leftovers",
+    "commands_json_R38": "pass - valid JSON, type tool, name/version/ref match the package layout",
+    "manifest_manifest_yml_consistency": "pass - 68 assertions = A2+B5+C29+D7+E1+F21+G3, matches conan create log SFRONT_TEST_SUMMARY pass=68 fail=0",
+    "knowledge_draft_complete": "pass - all required .kv fields non-empty, paired .md present, draft: true",
+    "deception_check": "pass - no PIE/NX/RELRO claim anywhere; execution target disclosed honestly as x86_64 build host + qemu-aarch64 user mode; every claimed test is executed by the script; every recipe step matches build()"
+  },
+  "findings_fixed": [
+    {
+      "id": "P1-1",
+      "severity": "P1",
+      "issue": "manifest.yaml, conandata.yml and the knowledge draft claimed Debian's orig tarball carries 5 examples; it actually carries 16 (.saol) / 12 (.sasl). Verified by extracting the Debian orig tarball.",
+      "fix": "Corrected to 16 example orchestras / 12 SASL scores in archives/s/sfront/0.99/manifest.yaml (source.provenance and knowledge_gained), archives/s/sfront/0.99/conandata.yml, and knowledge/drafts/DRAFT-sfront-0.99-...md",
+      "verified_by": "tar xzf sfront_0.99.orig.tar.gz | find examples -name '*.saol' | wc -l = 16"
+    },
+    {
+      "id": "P1-2",
+      "severity": "P1",
+      "issue": "notes.md per-group assertion counts summed to 63 instead of the stated 68 (C was 28 not 29, F was 17 not 21).",
+      "fix": "notes.md now states A2+B5+C29+D7+E1+F21+G3 = 68 and both group headers carry the corrected counts",
+      "verified_by": "68 PASS lines in /root/logs/sfront-create1.log; group boundaries A=1-2, B=3-7, C=8-36, D=37-43, E=44, F=45-65, G=66-68"
+    },
+    {
+      "id": "P2-3",
+      "severity": "P2",
+      "issue": "The provenance comment said the two upstream tarballs differ only in README.HTML's author link; diff -rq actually reports 133 differing entries (the same link rewrite in 39 book/*/index.html and 3 copyright/*.html, plus 10 example dirs only in the official tarball).",
+      "fix": "Scoped the claim to src/ and lib/ (diff -r empty) and enumerated the real differences in manifest.yaml and conandata.yml",
+      "verified_by": "diff -rq official debian = 133 entries; diff -r src/ and lib/ = 0"
+    },
+    {
+      "id": "P2-4",
+      "severity": "P2",
+      "issue": "The package shipped 38 macOS resource-fork leftovers (6 .DS_Store + 32 ._*) out of 195 example files.",
+      "fix": "package() passes excludes=['*.DS_Store','._*'] for examples/ and book/",
+      "verified_by": "find upstream \\( -name '.DS_Store' -o -name '._*' \\) | wc -l = 38; excluded from the copy set"
+    },
+    {
+      "id": "P2-5",
+      "severity": "P2",
+      "issue": "test_sfront.sh depends on python3 for WAV parsing but never checked for it, so a missing python3 would have emitted one misleading PASS before dying.",
+      "fix": "Added a command -v python3 hard check next to the qemu-aarch64 check (exit 1 when absent)",
+      "verified_by": "bash -n syntax check; the check runs before any ok() call"
+    },
+    {
+      "id": "P2-6",
+      "severity": "P2",
+      "issue": "7 rows of the EXAMPLES table omitted options their own upstream Makefile passes (-fixedseed, -sco, -midi, -cin, -latency), so those Makefile paths were not exercised.",
+      "fix": "Every row now mirrors the example Makefile's first $(SFRONT) line, minus the soundcard/network options; the header documents that omission and re-verifies the JC target files",
+      "verified_by": "conan create rc=0 with 25/25 examples translating under their Makefile-faithful options"
+    },
+    {
+      "id": "P2-7",
+      "severity": "P2",
+      "issue": "notes.md asserted both the native AArch64-worker and the qemu path of system(NULL) were verified; only the qemu path was executed.",
+      "fix": "Reworded as a platform-independent capability statement and stated explicitly that this round executed the qemu path",
+      "verified_by": "manifest.yaml target field already disclosed '本地 x86_64 构建机经 qemu-aarch64'"
+    },
+    {
+      "id": "P3-group",
+      "severity": "P3",
+      "issue": "Minor accuracy items: script header said 26 examples where the table has 25; .c counts quoted as 95 (lang_detect reports 93 in src/, 99 at the tarball root); all 10 lib files called .hs (9 .hs + reson/README); test_package compiler default 'cc' vs recipe 'clang'; no trailing newline in any of the 10 new files; the bach bitstream audio difference described as low-order.",
+      "fix": "All corrected; trailing LF appended to all 10 files; bach magnitude now stated as 2868555/2976792 samples (96.4%) differing with max delta 13755",
+      "verified_by": "conan create rc=0 after the edits; bash -n on the script"
+    }
+  ],
+  "environment_notes": [
+    "The local gate reported JC_RESULT=fail because of five pre-existing tracked junk files (archives/c/cloog/0.21.1/.build-closed, archives/c/cloog/0.21.1/.staging-verified, archives/k/kics/2.1.20/.staging-verified, archives/l/libbfio/20260623/.staging-verified, archives/t/thc/3.8/.staging-verified). All five exist in origin/main and are not part of this change; confirmed with git cat-file -e origin/main:<path>.",
+    "junk_check.sh had selected 'full' mode (112969 entries) only because the new files were still uncommitted, so 'git diff origin/main...HEAD' was empty. After committing, the check runs in incremental mode over this PR's files only.",
+    "archives/s/sfront/0.99/test_package/build-release/ (324 files) is gitignored via .gitignore:218 and is not part of the change."
+  ],
+  "verification_evidence": {
+    "conan_create": "conan create archives/s/sfront/0.99 --name=sfront --version=0.99 -pr:h=ohos-aarch64-wsl -pr:b=ohos-aarch64-wsl --build=missing -> rc=0",
+    "test_summary": "SFRONT_TEST_SUMMARY pass=68 fail=0 total=68",
+    "log": "/root/logs/sfront-create1.log",
+    "delivered_binary": "bin/sfront, statically linked, ELF 64-bit LSB ARM aarch64, e_machine=b700 (EM_AARCH64)",
+    "harmonyos_specific": [
+      "examples/min: generated C compiled with the OHOS toolchain into an AArch64 binary, executed, rendered 176841 frames of mono 44.1 kHz/16-bit PCM with 167195 non-zero samples",
+      "examples/torvalds: decoded the real 8 kHz english.wav input and rendered 41464 frames of stereo 8 kHz/16-bit PCM, covering the whole 41461-frame input",
+      "upstream mp4test: the program regenerated from the MP4-SA bitstream renders a WAV byte-identical to the one generated straight from the orchestra"
+    ]
+  },
+  "review_boundary": "Independent pre-PR audit of this change set only. It does not speak to the platform AI review verdict, which remains authoritative when the platform bot responds."
+}

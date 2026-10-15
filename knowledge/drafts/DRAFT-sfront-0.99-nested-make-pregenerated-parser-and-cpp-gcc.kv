@@ -1,0 +1,168 @@
+#====================================================================
+# DRAFT-sfront-0.99-nested-make-pregenerated-parser-and-cpp-gcc
+# sfront on HarmonyOS: nested-make build entry, pre-generated bison
+# parser determinism, and the -cpp mode that hard-codes gcc
+#====================================================================
+
+id:                     DRAFT-sfront-0.99-nested-make-pregenerated-parser-and-cpp-gcc
+trigger_tool:           clang|make|bison|qemu-aarch64|conan|python3
+phase:                  source|build|testing
+error_signature:        make.*jobserver unavailable|optimization flag '-fno-schedule-insns'
+                        is not supported|cannot open rcrt1.o|Pre-processing for file .* was not
+                        successful|Cannot open -orc file|Misformed token or string on SASL line
+
+severity:               2
+category:               raw-makefile|nested-make|codegen|pregenerated-parser|cli-tool|consumer-test|OHOS
+match_keywords:         sfront, SAOL, MP4-SA, libmaker, nested make, MAKEFLAGS, jobserver,
+                        parser.tab.c, bison, pre-generated parser, touch, -m32, -fno-schedule-insns,
+                        -ansi, __STRICT_ANSI__, -cpp, cppsystemcall, SAOLLIBDIR, /usr/share/sfront,
+                        system(NULL), -static, -static-pie, rcrt1.o, qemu-aarch64, EM_AARCH64,
+                        bitstream round-trip, symbol renaming, float literal formatting,
+                        R38, commands.json, test_package, HarmonyOS, aarch64, musl
+title:                  sfront 0.99 on HarmonyOS needs the nested src/lib make entry, a deterministic pre-generated parser, and -cpp ruled out
+
+root_cause:             >
+                        sfront 0.99 is 2011-era C89 with two hand-written Makefiles and no
+                        configure. src/Makefile hard-codes CC=gcc, MODEL=-m32,
+                        ECHECK="-ansi -Wall" and SLOWSCHED=-fno-schedule-insns, so a
+                        cross build has to override CFLAGS wholesale (the -m32 ABI does not
+                        exist on AArch64) and clear SLOWSCHED (a GCC-only switch clang
+                        merely warns about). The real build entry point is src/lib/Makefile,
+                        not src/Makefile: its all target builds the libmaker code generator,
+                        regenerates the five *lib.[ch] runtime sources from
+                        src/lib/{csrc,asys,csys,nsys,psys} templates and only then descends
+                        into src/Makefile, so command-line variable overrides have to travel
+                        through MAKEFLAGS and the sub-make cannot inherit a jobserver over
+                        HMDFS. src/Makefile also carries a parser.tab.c rule whose recipe is
+                        "-bison -d parser.y" with a leading '-' that makes make ignore the
+                        failure: the official tarball already ships the bison 2.3 output, but
+                        conan get() does not preserve mtimes, so whether make treats the
+                        shipped parser as stale depends on extraction order and on whether
+                        bison happens to exist - the build silently becomes non-deterministic.
+                        Finally the -cpp mode is unavailable on OHOS: sfmain.c:cppsystemcall
+                        hard-codes the external program "gcc -nostdinc -x c++ -E" and appends
+                        the compile-time constant SAOLLIBDIR (tree.h:667) = "/usr/share/sfront".
+
+affected_scope:         >
+                        Historical C projects whose real build lives in a nested Makefile that
+                        re-enters the top-level one, that ship pre-generated parser/lexer
+                        output next to the grammar, and whose optional preprocessing mode
+                        names an external tool by absolute/literal name. Directly applicable to
+                        raw-Makefile OHOS CLI adaptations; the -static vs -static-pie and
+                        nested-make findings generalise to any OHOS CLI package.
+
+verification_cmd:       >
+                        conan create archives/s/sfront/0.99 --name=sfront --version=0.99
+                        -pr:h=ohos-aarch64-wsl -pr:b=ohos-aarch64-wsl --build=missing
+        (expect rc=0 and "SFRONT_TEST_SUMMARY pass=68 fail=0 total=68");
+        CI_PACKAGES="archives/s/sfront/0.99" zsh ci/conan/build_and_test.sh;
+        after packaging, `od -An -tx1 -j18 -N2 <package>/bin/sfront` must print b700 (EM_AARCH64).
+
+rec_priority:           1
+rec_approach:           nested-make-entry-touch-pregenerated-parser-static-delivery
+rec_description:        >
+                        Build through src/lib/Makefile with -j1, overriding
+                        CFLAGS="-O2 -Wall -Werror=implicit-function-declaration -static" and
+                        SLOWSCHED=, reading the compiler from
+                        tools.build:compiler_executables. Touch the shipped parser.tab.c /
+                        parser.tab.h so the pre-generated bison output is authoritative and the
+                        build no longer depends on bison being installed. Deliver a -static
+                        executable so it runs both natively on an AArch64 worker and under
+                        qemu-aarch64 on x86 without a guest rootfs. Declare -cpp as
+                        unavailable on OHOS with the sfmain.c/tree.h evidence instead of
+                        dropping the one example that needs it.
+
+rec_command:            >
+        touch parser.tab.c parser.tab.h;
+        make -C src/lib -j1 "CC=$cc" SLOWSCHED= LINKLIB=-lm \
+          CFLAGS="-O2 -Wall -Werror=implicit-function-declaration -static";
+        # -static-pie is unavailable on OHOS: ld.lld-15: error: cannot open rcrt1.o
+
+rec_auto_fix:           false
+rec_impl:               sfront-conan-recipe-nested-make
+
+fallback_priority:      2
+fallback_approach:      bison-tool-requires-instead-of-touch
+fallback_description:   >
+                        If a project genuinely needs a regenerated parser (its shipped
+        parser output is stale, not merely mis-dated), declare
+        tool_requires = "bison/3.8.2" and run "make parser.tab.c" explicitly instead of
+        touching. Cross-check first that the regenerated parser accepts the grammar without
+        errors and produces equivalent translator output.
+fallback_command:       >
+        conan create archives/<pkg>/<ver> --build=missing -pr:h=ohos-aarch64-wsl \
+          -pr:b=ohos-aarch64-wsl   with tool_requires = "bison/3.8.2"
+fallback_auto_fix:      false
+fallback_impl:          bison-tool-requires
+
+forbid_1_pattern:       make\s+-C\s+src\s|make\s+src/Makefile|cd src\s*&&\s*make\s+sfront
+forbid_1_reason:        >
+                        Building src/Makefile directly skips libmaker, so the five
+                        *lib.[ch] runtime sources the translator embeds into every generated
+                        program are never regenerated from src/lib/*/ templates.
+forbid_1_consequence:   >
+                        The translator links against whatever stale copies the tarball
+                        happens to carry, or fails to link on a clean tree.
+
+forbid_2_pattern:       touch\s+parser\.tab\.[ch].*\n.*bison|apt.*bison.*install.*without.*tool_requires
+forbid_2_reason:        >
+                        Either regenerating with an undeclared bison, or trusting extraction
+                        order to decide whether the shipped parser is current, makes the
+                        build result depend on the machine.
+forbid_2_consequence:   >
+                        The same recipe produces different binaries on a developer box and on
+                        a CI worker, and CI fails with "bison: command not found" only on the
+                machines that lack it.
+
+forbid_3_pattern:       -cpp|SAOLLIBDIR
+forbid_3_reason:        >
+                        sfront's -cpp path shells out to a literal "gcc" and to the absolute
+                        path /usr/share/sfront; neither exists in the OHOS toolchain, and
+                pretending otherwise yields "Pre-processing for file X was not successful".
+forbid_3_consequence:   >
+                        Any test or recipe that depends on -cpp fails at runtime on OHOS while
+        looking correct on a desktop Linux box with gcc installed.
+
+forbid_4_pattern:       -static-pie|rcrt1\.o
+forbid_4_reason:        >
+                        The OHOS NDK ships no static-pie startup files, so -static-pie fails to
+        link with "cannot open rcrt1.o".
+forbid_4_consequence:   >
+                        The link step fails late, after the whole tree has been compiled.
+
+forbid_5_pattern:       cmp.*orc\.c.*frombit\.c|diff.*orc\.c.*frombit\.c
+forbid_5_reason:        >
+                        A bitstream round-trip renames SAOL identifiers to generated names
+                        (a7_*) and re-formats float literals (1.95F -> 1.950000e+00F); the
+                two programs are semantically equal but never textually equal, and -symtab
+                        does not preserve the names.
+forbid_5_consequence:   >
+                        A correct translator looks broken, and the real equivalence (the
+        rendered audio) is never checked.
+
+principles:             P001, P005, P010, P016, P020
+causes:                 []
+caused_by:              []
+similar_to:             [E074, E525]
+conflicts_with:         []
+prerequisite_of:        >
+                        raw Makefile CLI adaptations on HarmonyOS that need a deterministic
+                        code-generation step
+
+doc_file:               knowledge/drafts/DRAFT-sfront-0.99-nested-make-pregenerated-parser-and-cpp-gcc.md
+last_updated:           2026-10-03
+source_event:           sfront/0.99 HarmonyOS PC adaptation; 68/68 local assertions and conan create rc=0 on the first cross build
+authors:                opencode
+source_pr:
+source_commit:
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     0.95
+metrics_last_used:      2026-10-03
+
+draft:                  true
+difficulty_candidate:   B
+review_boundary:        >
+                        Candidate evidence only. Formal E-number promotion and B-class
+                        recognition require knowledge-base maintainer review.

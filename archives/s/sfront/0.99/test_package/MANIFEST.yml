@@ -1,0 +1,64 @@
+# test_package/MANIFEST.yml — sfront 0.99
+
+package: sfront/0.99
+homepage: "https://john-lazzaro.github.io/sa/"
+
+upstream_tests_exist: false
+upstream_test_audit: >
+  sfront0.99.tar.gz (10,110,266 bytes, top directory sfront/, 601 entries) ships no
+  tests/ or test/ directory, no test sources and no test harness. src/Makefile has
+  the targets all, install, clean, cleanall and newdist only — there is no check or
+  test target, and src/lib/Makefile (libmaker) has all, cfiles, do_csrc, do_asys,
+  do_csys, do_nsys, do_psys and clean only. The only executable specification is
+  examples/ (26 SAOL orchestras + 20 SASL scores, each with a Makefile whose
+  audio/mp4test/compare rules drive sfront), plus the command-line surface
+  documented in sfront's own -help and Debian's autopkgtest
+  (debian/tests/tests: `sfront -help | grep "Usage: sfront"`). Upstream automated
+  tests: 0.
+upstream_check_command: "none — neither upstream Makefile has a check/test target"
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# The executable specification that does exist: 26 example orchestras, the mp4test
+# bitstream round-trip and the documented CLI surface. 31 items discovered, 30 of
+# them executed and passing (see MANIFEST notes in manifest.yaml).
+upstream_documented_examples:
+  source: "sfront0.99.tar.gz examples/ + book/ + src/sfmain.c usage text"
+  count: 31
+
+test_package_tests:
+  - file: test_sfront.sh
+    description: >
+      Runs the packaged bin/sfront (natively on AArch64, via qemu-aarch64 on an x86
+      host): the -help banner and usage synopsis, the documented -orc/-bit/-bitout/
+      -o/-ain/-aout/-cin options, the -license BSD notice, the no-argument synopsis
+      with its non-zero exit, rejection of an unknown option, all 25 translatable
+      upstream example orchestras, the -cin control-driver selection reaching the
+      generated program, a hand-written inline-instrument orchestra, MP4-SA
+      bitstream encode/decode for min and bach, -symtab growing the bitstream, and
+      the line-accurate diagnostic for a malformed orchestra.
+    command: "bash test_sfront.sh <package> <work-dir> <cc>"
+  - file: test_sfront.sh
+    category: "harmonyos-specific end-to-end consumer use case"
+    description: >
+      HarmonyOS PC build-pipeline consumer: the packaged aarch64 sfront translates an
+      upstream orchestra, the OHOS toolchain compiles the generated C into an
+      AArch64 executable, and that executable is run (natively on AArch64, through
+      qemu-aarch64 elsewhere). examples/min renders mono 44.1 kHz PCM;
+      examples/torvalds decodes the real 8 kHz english.wav input, runs the vocal
+      cleanup chain and renders stereo 8 kHz PCM covering the whole input;
+      examples/min additionally goes through the upstream mp4test flow, where the
+      program regenerated from the MP4-SA bitstream must render byte-identical
+      audio to the program generated straight from the orchestra. Every case also
+      asserts e_machine == EM_AARCH64 on the generated binary.
+    command: "sfront -aout out.wav -orc min.saol -sco min.sasl -o sa.c; <cc> -O2 -static sa.c -lm -o sa; ./sa"
+
+test_files:
+  - path: "test_package/test_sfront.sh"
+    test_type: "R34"
+    assertion_count: 68
+
+harmonyos_specific_test_count: 3
+test_package_test_count: 2
+assertion_count: 68
