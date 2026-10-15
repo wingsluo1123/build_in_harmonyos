@@ -1,0 +1,116 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: toot/0.52.1
+homepage: "https://toot.bezdomni.net/"
+
+# 上游测试命令 —— 上游用 pytest，测试套件随 sdist 发布（本包从 sdist 构建）
+upstream_check_command: "python3 -m pytest tests/"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "python3 -m pytest tests -q -p no:cacheprovider"
+
+# 114 个 tests/integration/* 用例由环境变量 TOOT_TEST_BASE_URL 门控，需要一个
+# 可达的 Mastodon API 才能执行。真实 Mastodon 栈（Ruby/Rails + postgres + redis
+# + elasticsearch）在 HarmonyOS PC 与 CI worker 上均不可得（也无容器运行时），
+# 故 build() 启动配方自带的纯 stdlib 有状态桩服务
+# test_support/mastodon_api_stub.py，监听 127.0.0.1:3000（端口与 host 由
+# tests/integration/test_auth.py 的硬编码断言决定），并把
+# TOOT_TEST_BASE_URL=http://localhost:3000 交给 pytest —— 114 个用例真实发出
+# 725 次 HTTP 请求、覆盖 94 个不同 API 路径，全部真实执行。
+# 同一模式已合并的先例：restclient-cpp/0.5.3（loopback_httpbin.py）、
+# libetebase/0.5.8（etebase_stub_server.py）。
+# 桩服务是**仅测试期**产物：随 export_sources() 导出，绝不进入 package()。
+upstream_test_services:
+  - name: mastodon_api_stub
+    file: test_support/mastodon_api_stub.py
+    listener: "127.0.0.1:3000"
+    env:
+      TOOT_TEST_BASE_URL: "http://localhost:3000"
+    log: "<build_folder>/build-release/testlogs/mastodon_api_stub.log"
+    packaged: false
+
+# 上游实际运行的测试程序 —— 如实申报 sdist 内 tests/ 的全部 13 个测试文件
+# 实测：152 collected → **150 passed / 0 failed / 2 skipped**
+#   * 114 个 tests/integration/* 用例在桩服务上真实执行并全部通过
+#   * 仅 2 个用例跳过：tests/test_config.py L63 / L110，语句体第一行即
+#     pytest.skip("TODO: fix mocking")，上游自身 CI 同样跳过
+upstream_tests:
+  - file: tests/test_utils.py
+    source: toot-0.52.1/tests/test_utils.py
+    description: "工具函数测试（31 用例；模块级 from PIL import Image，需 PIL）"
+    command: "python3 -m pytest tests/test_utils.py -q"
+    result: "31 passed"
+  - file: tests/test_config.py
+    source: toot-0.52.1/tests/test_config.py
+    description: "配置读写测试（5 用例；2 个带上游 pytest.skip(\"TODO: fix mocking\")）"
+    command: "python3 -m pytest tests/test_config.py -q"
+    result: "3 passed / 2 skipped（上游声明的跳过，非本适配屏蔽）"
+  - file: tests/tui/test_rich_text.py
+    source: toot-0.52.1/tests/tui/test_rich_text.py
+    description: "TUI 富文本渲染测试（2 用例；依赖 urwid，验证 urwid 版本边界）"
+    command: "python3 -m pytest tests/tui/test_rich_text.py -q"
+    result: "2 passed"
+  - file: tests/integration/test_post.py
+    source: toot-0.52.1/tests/integration/test_post.py
+    description: "Mastodon 发帖集成测试（23 用例，经桩服务真实执行）"
+    command: "TOOT_TEST_BASE_URL=http://localhost:3000 python3 -m pytest tests/integration/test_post.py -q"
+    result: "23 passed"
+  - file: tests/integration/test_read.py
+    source: toot-0.52.1/tests/integration/test_read.py
+    description: "读取相关集成测试（16 用例，经桩服务真实执行）"
+    command: "TOOT_TEST_BASE_URL=http://localhost:3000 python3 -m pytest tests/integration/test_read.py -q"
+    result: "16 passed"
+  - file: tests/integration/test_accounts.py
+    source: toot-0.52.1/tests/integration/test_accounts.py
+    description: "账户相关集成测试（15 用例，经桩服务真实执行）"
+    command: "TOOT_TEST_BASE_URL=http://localhost:3000 python3 -m pytest tests/integration/test_accounts.py -q"
+    result: "15 passed"
+  - file: tests/integration/test_auth.py
+    source: toot-0.52.1/tests/integration/test_auth.py
+    description: "认证流程集成测试（13 用例，经桩服务真实执行；含硬编码 http://localhost:3000 断言）"
+    command: "TOOT_TEST_BASE_URL=http://localhost:3000 python3 -m pytest tests/integration/test_auth.py -q"
+    result: "13 passed"
+  - file: tests/integration/test_update_account.py
+    source: toot-0.52.1/tests/integration/test_update_account.py
+    description: "账户更新集成测试（12 用例，经桩服务真实执行；multipart 头像/背景上传）"
+    command: "TOOT_TEST_BASE_URL=http://localhost:3000 python3 -m pytest tests/integration/test_update_account.py -q"
+    result: "12 passed"
+  - file: tests/integration/test_status.py
+    source: toot-0.52.1/tests/integration/test_status.py
+    description: "状态相关集成测试（10 用例，经桩服务真实执行）"
+    command: "TOOT_TEST_BASE_URL=http://localhost:3000 python3 -m pytest tests/integration/test_status.py -q"
+    result: "10 passed"
+  - file: tests/integration/test_timelines.py
+    source: toot-0.52.1/tests/integration/test_timelines.py
+    description: "时间线集成测试（9 用例，经桩服务真实执行；home/public/tag/list/account/通知/分页）"
+    command: "TOOT_TEST_BASE_URL=http://localhost:3000 python3 -m pytest tests/integration/test_timelines.py -q"
+    result: "9 passed"
+  - file: tests/integration/test_polls.py
+    source: toot-0.52.1/tests/integration/test_polls.py
+    description: "投票集成测试（6 用例，经桩服务真实执行）"
+    command: "TOOT_TEST_BASE_URL=http://localhost:3000 python3 -m pytest tests/integration/test_polls.py -q"
+    result: "6 passed"
+  - file: tests/integration/test_lists.py
+    source: toot-0.52.1/tests/integration/test_lists.py
+    description: "列表集成测试（6 用例，经桩服务真实执行）"
+    command: "TOOT_TEST_BASE_URL=http://localhost:3000 python3 -m pytest tests/integration/test_lists.py -q"
+    result: "6 passed"
+  - file: tests/integration/test_tags.py
+    source: toot-0.52.1/tests/integration/test_tags.py
+    description: "标签集成测试（4 用例，经桩服务真实执行）"
+    command: "TOOT_TEST_BASE_URL=http://localhost:3000 python3 -m pytest tests/integration/test_tags.py -q"
+    result: "4 passed"
+
+# test_package 中自带的测试 (消费者视角验证，含鸿蒙特有断言)
+test_package_tests:
+  - file: test_toot.py
+    description: "消费者测试 — 安装布局/元数据版本/入口可执行 + 鸿蒙特有断言（H1 平铺布局、H2 setuptools_scm 版本落定、H3 HarmonyOS 平台指纹、H4 wrapper shebang、H5 剥离 LD_LIBRARY_PATH、H6 无 site-packages 隔离解释器仍可运行）"
+    command: "python3 test_toot.py <package_folder> 0.52.1"
+
+# 测试断言总数 (近似值, 用于质量评估)
+# 实测 test_toot.py 输出 "结果: 14/14 全部通过"；声明数必须与实际执行数一致
+assertion_count: 14

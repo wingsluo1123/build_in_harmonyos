@@ -1,0 +1,59 @@
+# manifest.yaml — toot 0.52.1 适配元数据
+# AI 元数据（CI 不读取）。CI 只读 conanfile.py / conandata.yml /
+# test_package/ / patches/ 与软件级 commands.json。
+
+software: toot
+version: "0.52.1"
+status: built
+
+build_date: "2026-10-08"
+build_system: setuptools
+
+source:
+  url: "https://files.pythonhosted.org/packages/87/37/e7356d7fe39c609d6dd4d43849e6e48debc949ef64b2f7f226c3e72093ee/toot-0.52.1.tar.gz"
+  sha256: "b737173be5587522077c18c4024eb1741a4a30e59d3165e72fd6ce4519d2fecb"
+  tar_format: ".tar.gz"
+
+build:
+  system: pip
+  configure_options: []
+  dependencies:
+    # 上游 requires_dist 直接声明（制品仓已有配方）
+    - beautifulsoup4/4.15.0
+    - click/8.4.2
+    - python-dateutil/2.9.0.post0
+    - requests/2.22.0
+    - wcwidth/0.2.12
+    # requests / python-dateutil / beautifulsoup4 的运行时传递依赖。
+    # 必须显式提升为直接依赖：Conan 2 的 process_package_type() 没有
+    # python-require 分支，纯 Python 传递依赖的 run 保持 False →
+    # Requirement.files 为 False → graph_binaries._skip_binaries() 标
+    # BINARY_SKIP（无 package_folder、无 runenv PYTHONPATH）。
+    # 实测：提升前 9 个节点被 Skip（外部消费者 conan install 同样受影响），
+    # 提升后为 0。详见 notes.md §3 与 reports/test-report.md §3.1。
+    - chardet/5.2.0
+    - idna/3.18
+    - urllib3/2.7.0
+    - six/1.17.0
+    - soupsieve/2.4.1
+    - typing-extensions/4.16.0
+  # 制品仓无配方、构建期 pip 装配进包内的运行时依赖
+  pip_dependencies:
+    - urwid==3.0.2
+    - tomlkit==0.15.1
+    - PySocks==1.7.1
+  # toot 版本由 setuptools_scm 动态生成，sdist 无 git 元数据，
+  # 必须注入该变量否则产物为 toot-0.0.0（实测）
+  build_env:
+    SETUPTOOLS_SCM_PRETEND_VERSION: "0.52.1"
+  cc: ""
+  cxx: ""
+
+patches: []
+
+# 本任务产出的知识草稿（E587 见 archives/t/toot/0.52.1/notes.md §3；
+# DRAFT-toot-0-52-1-upstream-integration-stub-server 见 §4.1，
+# 源自 PR !15046 审核意见 193803344 的规则 4 条件 2 整改）
+knowledge_ref:
+  - "E587-draft-8794"
+  - "DRAFT-toot-0-52-1-upstream-integration-stub-server"
