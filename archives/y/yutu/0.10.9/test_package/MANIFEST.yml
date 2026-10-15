@@ -1,0 +1,166 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: yutu/0.10.9
+homepage: "https://github.com/eat-pray-ai/yutu"
+
+# 上游测试入口（上游 CI 实际使用的命令）
+# .github/workflows/test.yml -> job go-test -> "go test ./... -coverprofile=... -coverpkg=./pkg/..."
+upstream_check_command: "go test -count=1 ./..."
+
+# 上游测试在 conanfile.py build() 中执行（OHOS 需先编译再签名，见下）
+upstream_test_in_build: true
+
+# OHOS 上不能直接 `go test ./...`：它会链接出测试二进制并立即 execve，
+# 而未带 .codesign 的 ELF 在 OHOS 上无法执行（知识 E128）。因此逐包
+# `go test -c` 编译 → binary-sign-tool 签名 → 执行测试二进制（同 kor/0.6.8 策略）。
+upstream_test_command: "go test -c -count=1 -timeout 1200s -o <ext2>/<pkg>.test <pkg> && sign <pkg>.test && <pkg>.test -test.v"
+
+# 上游测试包（30 个 *_test.go，按包归并；括号内为顶层 Test/Benchmark/Example 函数数）
+upstream_tests:
+  - file: cmd/flags_test.go
+    source: yutu-0.10.9/cmd/flags_test.go
+    description: "--dry-run / --yes 确认逻辑与 ErrDryRun 语义（10 个顶层测试函数）"
+    command: "go test ./cmd/"
+  - file: pkg/common/common_test.go
+    source: yutu-0.10.9/pkg/common/common_test.go
+    description: "共享客户端/上下文工具（16）"
+    command: "go test ./pkg/common/"
+  - file: pkg/auth/{auth,service,verifier}_test.go
+    source: yutu-0.10.9/pkg/auth/
+    description: "OAuth 客户端/令牌缓存/Google TokenVerifier（13+2+3=18）"
+    command: "go test ./pkg/auth/"
+  - file: pkg/utils/utils_test.go
+    source: yutu-0.10.9/pkg/utils/utils_test.go
+    description: "flag/字符串工具（11）"
+    command: "go test ./pkg/utils/"
+  - file: pkg/video/video_test.go
+    source: yutu-0.10.9/pkg/video/video_test.go
+    description: "video 资源 API 请求构造（httptest 桩，12）"
+    command: "go test ./pkg/video/"
+  - file: pkg/caption/caption_test.go
+    source: yutu-0.10.9/pkg/caption/caption_test.go
+    description: "caption 资源（12）"
+    command: "go test ./pkg/caption/"
+  - file: pkg/playlist/playlist_test.go
+    source: yutu-0.10.9/pkg/playlist/playlist_test.go
+    description: "playlist 资源（7）"
+    command: "go test ./pkg/playlist/"
+  - file: pkg/playlistImage/playlistImage_test.go
+    source: yutu-0.10.9/pkg/playlistImage/playlistImage_test.go
+    description: "playlistImage 资源（7）"
+    command: "go test ./pkg/playlistImage/"
+  - file: pkg/playlistItem/playlistItem_test.go
+    source: yutu-0.10.9/pkg/playlistItem/playlistItem_test.go
+    description: "playlistItem 资源（7）"
+    command: "go test ./pkg/playlistItem/"
+  - file: pkg/subscription/subscription_test.go
+    source: yutu-0.10.9/pkg/subscription/subscription_test.go
+    description: "subscription 资源（6）"
+    command: "go test ./pkg/subscription/"
+  - file: pkg/thirdPartyLink/thirdPartyLink_test.go
+    source: yutu-0.10.9/pkg/thirdPartyLink/thirdPartyLink_test.go
+    description: "thirdPartyLink 资源（6）"
+    command: "go test ./pkg/thirdPartyLink/"
+  - file: pkg/channel/channel_test.go
+    source: yutu-0.10.9/pkg/channel/channel_test.go
+    description: "channel 资源（5）"
+    command: "go test ./pkg/channel/"
+  - file: pkg/commentThread/commentThread_test.go
+    source: yutu-0.10.9/pkg/commentThread/commentThread_test.go
+    description: "commentThread 资源（5）"
+    command: "go test ./pkg/commentThread/"
+  - file: pkg/activity/activity_test.go
+    source: yutu-0.10.9/pkg/activity/activity_test.go
+    description: "activity 资源（4）"
+    command: "go test ./pkg/activity/"
+  - file: pkg/channelBanner/channelBanner_test.go
+    source: yutu-0.10.9/pkg/channelBanner/channelBanner_test.go
+    description: "channelBanner 资源（4）"
+    command: "go test ./pkg/channelBanner/"
+  - file: pkg/channelSection/channelSection_test.go
+    source: yutu-0.10.9/pkg/channelSection/channelSection_test.go
+    description: "channelSection 资源（4）"
+    command: "go test ./pkg/channelSection/"
+  - file: pkg/member/member_test.go
+    source: yutu-0.10.9/pkg/member/member_test.go
+    description: "member 资源（4）"
+    command: "go test ./pkg/member/"
+  - file: pkg/search/search_test.go
+    source: yutu-0.10.9/pkg/search/search_test.go
+    description: "search 资源（4）"
+    command: "go test ./pkg/search/"
+  - file: pkg/superChatEvent/superChatEvent_test.go
+    source: yutu-0.10.9/pkg/superChatEvent/superChatEvent_test.go
+    description: "superChatEvent 资源（4）"
+    command: "go test ./pkg/superChatEvent/"
+  - file: pkg/comment/comment_test.go
+    source: yutu-0.10.9/pkg/comment/comment_test.go
+    description: "comment 资源（9）"
+    command: "go test ./pkg/comment/"
+  - file: pkg/i18nLanguage/i18nLanguage_test.go
+    source: yutu-0.10.9/pkg/i18nLanguage/i18nLanguage_test.go
+    description: "i18nLanguage 资源（3）"
+    command: "go test ./pkg/i18nLanguage/"
+  - file: pkg/i18nRegion/i18nRegion_test.go
+    source: yutu-0.10.9/pkg/i18nRegion/i18nRegion_test.go
+    description: "i18nRegion 资源（3）"
+    command: "go test ./pkg/i18nRegion/"
+  - file: pkg/membershipsLevel/membershipsLevel_test.go
+    source: yutu-0.10.9/pkg/membershipsLevel/membershipsLevel_test.go
+    description: "membershipsLevel 资源（3）"
+    command: "go test ./pkg/membershipsLevel/"
+  - file: pkg/videoAbuseReportReason/videoAbuseReportReason_test.go
+    source: yutu-0.10.9/pkg/videoAbuseReportReason/videoAbuseReportReason_test.go
+    description: "videoAbuseReportReason 资源（3）"
+    command: "go test ./pkg/videoAbuseReportReason/"
+  - file: pkg/videoCategory/videoCategory_test.go
+    source: yutu-0.10.9/pkg/videoCategory/videoCategory_test.go
+    description: "videoCategory 资源（3）"
+    command: "go test ./pkg/videoCategory/"
+  - file: pkg/watermark/watermark_test.go
+    source: yutu-0.10.9/pkg/watermark/watermark_test.go
+    description: "watermark 资源（3）"
+    command: "go test ./pkg/watermark/"
+  - file: pkg/init_test.go
+    source: yutu-0.10.9/pkg/init_test.go
+    description: "pkg 包初始化/根 FS（2）"
+    command: "go test ./pkg/"
+  - file: pkg/thumbnail/thumbnail_test.go
+    source: yutu-0.10.9/pkg/thumbnail/thumbnail_test.go
+    description: "thumbnail 资源（2）"
+    command: "go test ./pkg/thumbnail/"
+
+# ── 上游测试审计（upstream_tests_exist=true 的证据）──
+upstream_tests_exist: true
+upstream_test_audit:
+  - source: "yutu-0.10.9 source tree (`find . -name '*_test.go' | wc -l`)"
+    reason: "共 30 个 *_test.go；顶层 Test/Benchmark/Example 函数 177 个（grep '^func (Test|Benchmark|Example)')。"
+  - source: ".github/workflows/test.yml"
+    reason: "job `go-test` 执行 `go test ./... -coverprofile=coverage.out -coverpkg=./pkg/...`，随后 `./scripts/command-test.sh`；另有 job `bazel-test` 执行 `bazel test //... --test_output=errors`。"
+  - source: "docs/HOW_TO_TEST.md"
+    reason: "上游测试策略文档：TDD + httptest 桩，目标 >80% 覆盖率，声明测试为 hermetic（不依赖外网）。"
+  - source: "scripts/command-test.sh"
+    reason: "CLI 级测试脚本：对 help/completion/version 及各资源子命令逐个 `--help` 断言，可接受被测二进制路径。"
+  - conclusion: "上游 0.10.9 提供完整的自动化测试入口；本适配在 build() 中实际执行全部 30 个测试包（compile+sign+run），真实用例数与通过/失败/跳过数见 reports/ 与 conan create 日志。"
+upstream_test_count: 177
+
+# test_package 中自带的测试 (消费者视角验证，不冒充上游覆盖)
+test_package_tests:
+  - file: test.sh
+    description: "冒烟测试: ELF magic / yutu version 断言 v0.10.9 + linux/arm64 / help 暴露 video·playlist / yutu video --help / 静态链接无 DT_NEEDED"
+    command: "sh test.sh <bin/yutu>"
+
+# test.sh 中的断言数:
+#   1. 包内产物为 ELF 可执行文件（magic 7f454c46）
+#   2. `yutu version` 退出码为 0
+#   3. version 输出包含 "v0.10.9"
+#   4. version 输出包含 "linux/arm64"
+#   5. `yutu help` 退出码为 0
+#   6. help 输出包含 "video"
+#   7. help 输出包含 "playlist"
+#   8. `yutu video --help` 退出码为 0
+#   9. 二进制为静态链接（无 DT_NEEDED）
+assertion_count: 9

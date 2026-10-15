@@ -1,0 +1,23 @@
+# 软件级 manifest — yutu
+software: yutu
+display: "yutu"
+description: "面向 YouTube 的 AI 命令行工具、MCP 服务器与 Agent（纯 Go 实现）"
+category: build-tool
+homepage: "https://github.com/eat-pray-ai/yutu"
+license: Apache-2.0
+build_system: custom
+
+ohos_adaptation:
+  key_points:
+    - "纯 Go 静态编译：CGO_ENABLED=0 + -tags=netgo + -trimpath，产物不依赖 libc/OpenSSL/libcurl"
+    - "OHOS 镜像不含 Go 工具链，按知识 E250（download-go-sdk / inline-build-method）在 build() 内联下载 Go SDK，不声明 conan requires"
+    - "Go 链接器在 HMDFS 上 mmap 失败（E051/E046），链接输出改写到 ext2 类可写工作区 /data/storage/el2/base/haps/entry/files"
+    - "OHOS 上未带 .codesign 的 ELF 无法 execve（E128）：yutu 二进制与 Go SDK 工具二进制均用 binary-sign-tool 自签名"
+    - "上游测试无法直接 `go test ./...`（测试二进制未签名不可执行），改为逐包 `go test -c` → 签名 → 执行"
+  common_dependencies: []
+
+versions:
+  "0.10.9":
+    status: built
+    build_date: "2026-10-11"
+    conan_ref: "yutu/0.10.9"
