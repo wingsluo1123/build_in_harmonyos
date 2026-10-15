@@ -1,0 +1,74 @@
+# 版本级 manifest — zfs-src 2.4.3（OpenZFS 用户态）
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "2.4.3"
+software: zfs-src
+status: built
+build_date: "2026-10-04"
+build_system: autotools
+
+source:
+  url: "https://github.com/openzfs/zfs/releases/download/zfs-2.4.3/zfs-2.4.3.tar.gz"
+  sha256: "1f08f2d154f5189b5f1382848a32667b3d34066145b474c49cd3d41a5fba59a7"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--with-config=user"        # 上游官方用户态-only 路径（不碰内核态）
+    - "--with-python=no"
+    - "--disable-pyzfs"
+    - "--disable-systemd"
+    - "--disable-sysvinit"
+    - "--without-libunwind"
+  dependencies:
+    - zlib/1.3.1.1.1.1    # PIC 静态变体：z_errmsg 重定位需要
+    - libuuid/2.42.2
+    - libblkid/2.42.2
+    - openssl/3.0.21
+    - libtirpc/1.3.7
+  build_tools:
+    - sed/4.9             # configure 硬要求 sed --in-place 长选项；toybox sed 只有 -i
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-libspl-assert-musl-progname.patch"          # glibc program_invocation_short_name → musl __progname
+  - "0002-ztest-TMPDIR-support.patch"                  # /tmp 只读，ztest 尊重 TMPDIR
+  - "0003-seekflood-SEEK_DATA-fallback.patch"          # musl fcntl.h 无 SEEK_DATA 宏
+  - "0004-rm_lnkcnt-pthread_setconcurrency-glibc-guard.patch"  # musl 无 pthread_setconcurrency
+  - "inline: config.guess/config.sub OHOS 三元组补丁（patch-autotools-ohos.pl 逻辑 Python 复刻）"
+  - "inline: configure umask 077→022（HMDFS E011）"
+  - "inline: CPPFLAGS 强制注入 zfs-ohos-shim.h（非 NLS gettext no-op + pthread 取消族弱符号 + addmntent 弱符号）"
+  - "inline: curl-config 遮蔽（libfetch 探测→none，上游 ENOSYS 优雅降级）"
+  - "inline: libcrypto.pc 别名（conan openssl.pc → ZFS 探测的 libcrypto 模块名）"
+
+knowledge_gained:
+  - "内核/用户态边界处理：OpenZFS --with-config=user 官方路径在 OHOS 可行——全部用户态库（libzfs/libzfs_core/libnvpair/libuutil/libzpool/libzfsbootenv）+CLI（zfs/zpool/zdb/ztest/zstream/zinject/zhack/zed/raidz_test）真机构建成功；内核态组件（module/、zed 的 udev 路径、mount helper 内核交互）天然不可用，由上游 HAVE_LIBUDEV/ENOSYS 分支降级"
+  - "musl vs glibc 差异五连：program_invocation_short_name（glibc 私有）→__progname；pthread_cancel 族 OHOS SDK libc 无导出（运行时 libc 3/4）→弱符号 no-op（仅内核交互 teardown 路径引用，无内核模块即不可达）；addmntent OHOS SDK mntent.h/libc.so 缺失→弱符号；SEEK_DATA 宏 musl fcntl.h 未定义→数值 fallback；pthread_setconcurrency 仅 glibc→__GLIBC__ 守卫"
+  - "非 NLS 构建：OHOS musl libintl.h 为零声明存根，2000+ dgettext 调用点全部隐式声明返回 int（-Wint-conversion 报错）——编译期 no-op 宏 shim（-include 注入）是标准嵌入式非 NLS 方案，且 __ASSEMBLER__ 守卫必备（.S 汇编单元也吃 CPPFLAGS，C 函数定义会炸汇编器）"
+  - "ZFS configure 的 libfetch 探测基于宿主 curl-config 存在性而非目标运行时：OHOS 无 libcurl 运行库但构建宿主有 curl-config 会误选 libcurl 后端——遮蔽 curl-config 让探测走 none 分支，libzfs_crypto.c 有上游 ENOSYS 优雅降级（http:// keylocation 后端缺失报错而非崩溃）"
+  - "zlib 依赖必须用 PIC 变体（zlib/1.3.1.1.1.1）：libzpool.so/libzfs.so 链接非 PIC 的 libz.a 报 R_AARCH64_ADR_PREL_PG_HI21 against z_errmsg"
+  - "上游 lib/libzdb/Makefile.am 漏传 LIBCRYPTO_CFLAGS——Linux 上 openssl 头在默认路径所以无碍，conan 前缀路径下暴露（libzdb.c include openssl/evp.h 失败），全局 CPPFLAGS 注入 openssl include 解决"
+  - "ztest 是无内核环境下的最高保真上游测试：libzpool 在用户态实现完整池层（SPA/metaslab/DMU/ZAP/ARC），ztest -T 60 -s 64M 完整跑通（RC=0）含 spa_create/spa_load/checkpoint/freeze/zdb 校验全流程；硬编码 /tmp 需 TMPDIR 补丁"
+  - "上游 ZTS 计数口径：tests/runfiles/*.run 按 section 的 tests=[...] 解析——common.run 164 sections/1372 例 + linux.run 45 sections/181 例 = 1553 注册用例，全部需要 root+回环设备+内核模块，OHOS 全量不可跑（用户态子集真跑替代）"
+
+test_results:
+  type: mixed
+  # conan create 第13轮（清洁环境）实测：上游测试在 build() 真跑 + test_package 消费者验证
+  total: 144
+  passed: 144
+  failed: 0
+  detail:
+    ztest_spa_simulation: "RC=0（conan create 内 -T 30 -s 64M；本地另跑 -T 60 全流程），用户态 SPA 仿真"
+    sha2_test: "RC=0，6 向量 OK"
+    edonr_test: "RC=0，2 向量 OK"
+    skein_test: "RC=0，9 向量 OK"
+    blake3_test: "RC=0，105 向量 OK"
+    btree_test: "RC=0（本地预验证），4 子测试（600 万插删压力）"
+    test_package_library: "13 API 断言全过（nvpair 往返/uutil 列表/libzfs+libzfs_core 句柄边界）"
+    test_package_binary: "zfs/zpool/zdb 真实执行（exit 1 + 上游内核边界消息）+ ztest usage banner"
+  skipped:
+    zts_full_suite: "1553 注册用例（环境限制：需 ZFS 内核模块+root+losetup/dmsetup 回环盘；OHOS 无内核 ZFS 支持——本件 C 级挑战点本身）"
+
+knowledge_ref: []

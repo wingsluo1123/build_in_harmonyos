@@ -1,0 +1,31 @@
+# 软件级 manifest — zfs-src（OpenZFS 用户态）
+# 遵循 ARCHIVE-SPEC v2.0
+
+software: zfs-src
+display: "OpenZFS userland"
+description: "OpenZFS 用户态栈：libzfs/libzfs_core/libnvpair/libuutil/libzpool + zfs/zpool/zdb/ztest CLI（--with-config=user；OHOS 无 ZFS 内核模块）"
+category: system
+homepage: "https://openzfs.github.io/"
+license: CDDL-1.0
+
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "必须走上游官方 --with-config=user 用户态路径（OHOS 无 ZFS 内核模块，内核态天然裁剪）"
+    - "ZFS configure 硬要求 sed --in-place 长选项：tool_requires sed/4.9 + SED 环境变量强选（PATH 优先级不够）"
+    - "OHOS musl libintl.h 为零声明存根：2000+ dgettext 调用点需 CPPFLAGS -include 注入 no-op 宏 shim（带 __ASSEMBLER__ 守卫）"
+    - "musl 差异五连：program_invocation_short_name/pthread_cancel 族/addmntent/SEEK_DATA/pthread_setconcurrency 均需补丁或弱符号兜底"
+    - "zlib 必须用 PIC 变体 zlib/1.3.1.1.1.1（否则 .so 链接报 R_AARCH64_ADR_PREL_PG_HI21 against z_errmsg）"
+    - "libfetch 探测需遮蔽（宿主 curl-config 误选 libcurl 后端，目标无 libcurl 运行时）"
+  common_dependencies:
+    - zlib
+    - libuuid
+    - libblkid
+    - openssl
+    - libtirpc
+
+versions:
+  "2.4.3":
+    status: built
+    build_date: "2026-10-04"

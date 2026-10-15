@@ -1,0 +1,15 @@
+--- a/lib/libspl/assert.c	2026-06-12 00:59:05.000000000 +0800
++++ b/lib/libspl/assert.c	2026-10-04 18:20:56.553178750 +0800
+@@ -40,7 +40,12 @@
+ #include <sys/syscall.h>
+ #define	libspl_gettid()		((pid_t)syscall(__NR_gettid))
+ #endif
++#if defined(__GLIBC__)
+ #define	libspl_getprogname()	(program_invocation_short_name)
++#else
++extern char *__progname;
++#define	libspl_getprogname()	(__progname)
++#endif
+ #define	libspl_getthreadname(buf, len)	\
+ 	prctl(PR_GET_NAME, (unsigned long)(buf), 0, 0, 0)
+ #elif defined(__FreeBSD__) || defined(__APPLE__)

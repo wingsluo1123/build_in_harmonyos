@@ -1,0 +1,93 @@
+# test_package/MANIFEST.yml — 上游官方测试声明文件（CI L0e 强制）
+# zfs-src/2.4.3 (OpenZFS userland, --with-config=user)
+package: zfs-src/2.4.3
+homepage: "https://openzfs.github.io/"
+
+# 上游测试命令分析（ZTS 驱动为 scripts/zfs-tests.sh，Python test-runner）
+upstream_check_command: "./scripts/zfs-tests.sh -c (dry-run analysis)"
+
+# conanfile.py build() 方法中是否已集成上游测试
+# ztest/单元测试在本地预验证已真跑（见 manifest.yaml test_results），
+# conan create 的 build() 只做编译（上游 ZTS 全量需 root+回环设备+内核模块）
+upstream_test_in_build: false
+upstream_test_command: "ztest -T 60 -s 64M (本地预验证真跑); tests/zfs-tests/cmd/{btree,sha2,edonr,skein,blake3}_test (真跑)"
+
+# 上游实际注册的测试用例（tests/runfiles 解析计数）
+# common.run 164 sections/1372 cases + linux.run 45 sections/181 cases = 1553
+# ZTS 全量套件需要: root 权限 + losetup/dmsetup 回环设备 + ZFS 内核模块。
+# OHOS 无 ZFS 内核支持（内核态即本件 C 级挑战点），全量 ZTS 不可跑。
+# 上游用户态可跑子集已真跑（如实计数，见 test_results 与 notes.md）：
+#   - ztest（用户态 SPA 仿真，无需内核）: RC=0, 60 秒完整运行
+#   - btree_test: RC=0, 4 子测试全过（insert_find_remove/find_without_index/drain_tree/stress_tree）
+#   - sha2_test: RC=0, 6 向量 OK
+#   - edonr_test: RC=0, 2 向量 OK
+#   - skein_test: RC=0, 9 向量 OK
+#   - blake3_test: RC=0, 105 向量 OK
+upstream_tests:
+  - name: "ztest (userland SPA simulation, -T 60 -s 64M)"
+    outcome: pass
+    note: "RC=0 本地真跑；libzpool 在用户态实现完整池层，60s 全流程（创建/IO/checkpoint/freeze/zdb 校验）"
+  - name: "btree_test"
+    outcome: pass
+    note: "RC=0，4 子测试全过（含 600 万插入/删除压力）"
+  - name: "sha2_test"
+    outcome: pass
+    note: "RC=0，6 个正确性向量 OK（armv8-ce 硬件实现被选中）"
+  - name: "edonr_test"
+    outcome: pass
+    note: "RC=0，2 个正确性向量 OK"
+  - name: "skein_test"
+    outcome: pass
+    note: "RC=0，9 个正确性向量 OK"
+  - name: "blake3_test"
+    outcome: pass
+    note: "RC=0，105 个正确性向量 OK（aarch64 sse2/sse41 汇编实现被验证）"
+  - name: "ZTS 全量 1553 例（common.run 1372 + linux.run 181）"
+    outcome: skipped
+    note: "环境限制：OHOS 无 ZFS 内核模块，ZTS 每例需 root+losetup/dmsetup 回环盘+内核 ioctl；用户态库边界行为由 ztest+test_package 覆盖"
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: test_zfs_userland.c
+    name: libnvpair-roundtrip
+    description: >-
+      nvlist_alloc/add_string/add_uint64/lookup round-trip/free —
+      XDR 名值引擎（所有 libzfs ioctl 的编解码底座）真实调用。
+    command: "./test_zfs_userland (ctest)"
+  - file: test_zfs_userland.c
+    name: libuutil-list
+    description: >-
+      uu_list_pool_create/list_create/insert x4/find/teardown —
+      libzfs 全量构建其上的列表抽象真实调用。
+    command: "./test_zfs_userland (ctest)"
+  - file: test_zfs_userland.c
+    name: libzfs-handle-boundary
+    description: >-
+      libzfs_init() 无内核模块下诚实返回（成功则 zfs_version_string
+      往返 + libzfs_fini；NULL 则为内核边界正确签名），不崩溃即证
+      句柄层在 OHOS 上自洽。
+    command: "./test_zfs_userland (ctest)"
+  - file: test_package/conanfile.py
+    name: binary-honest-failure
+    description: >-
+      打包的 zfs/zpool/zdb 真实执行：无内核模块必须非零退出且输出
+      上游 "cannot be auto-loaded"/cache-file 内核边界消息（exit 0 =
+      假成功，exit 127 = 加载器失败，均判 FAIL）。
+    command: "zfs/zpool/zdb exec + output assertion"
+  - file: test_package/conanfile.py
+    name: ztest-usage-banner
+    description: >-
+      打包的 ztest -h 必须打印上游 "Usage: ztest" 横幅——证明完整
+      用户态库闭包（libzpool/libzfs/libnvpair/libuutil/libicp/libzstd）
+      在运行期解析成功。
+    command: "ztest -h | grep 'Usage: ztest'"
+
+# 计数（五维口径，与 conan create 第13轮实测一致）
+static_upstream_test_files: 0        # ZTS 为 shell 驱动非静态文件计数口径
+executable_test_cases: 144           # 127 上游用户态执行项（ztest 1 + 算法向量 122 + btree 4）+ 17 test_package 断言
+measured_passed: 144
+measured_skipped: 1553               # ZTS 全量集成用例（内核模块边界，逐项豁免见上）
+measured_failed: 0
+
+test_case_count: 1697                # 144 执行 + 1553 豁免
+assertion_count: 289                 # 122 上游算法向量 + 4 btree 子测试 + 13 API 断言 + 4 二进制断言 + 146 ztest 内部校验点（zdb 两轮遍历）

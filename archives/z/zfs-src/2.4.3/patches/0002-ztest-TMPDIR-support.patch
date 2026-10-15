@@ -1,0 +1,22 @@
+--- a/cmd/ztest.c	2026-06-12 00:59:05.000000000 +0800
++++ b/cmd/ztest.c	2026-10-04 20:14:01.811078437 +0800
+@@ -8716,8 +8716,18 @@
+ static void
+ setup_data_fd(void)
+ {
+-	static char ztest_name_data[] = "/tmp/ztest.data.XXXXXX";
++	/*
++	 * OHOS adaptation: /tmp is read-only on HarmonyOS PC; honour TMPDIR
++	 * (POSIX convention) so ztest can place its scratch data file in a
++	 * writable location.
++	 */
++	const char *tmpdir = getenv("TMPDIR");
++	if (tmpdir == NULL || tmpdir[0] == '\0')
++		tmpdir = "/tmp";
++	char ztest_name_data[PATH_MAX];
+ 
++	(void) snprintf(ztest_name_data, sizeof (ztest_name_data),
++	    "%s/ztest.data.XXXXXX", tmpdir);
+ 	ztest_fd_data = mkstemp(ztest_name_data);
+ 	ASSERT3S(ztest_fd_data, >=, 0);
+ 	(void) unlink(ztest_name_data);
