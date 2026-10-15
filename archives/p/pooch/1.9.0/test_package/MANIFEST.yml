@@ -1,0 +1,36 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: pooch/1.9.0
+homepage: "https://github.com/fatiando/pooch"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "python3 -m pytest pooch/tests/ -q -m 'not network'；测试期 pip 源为平台私有源 pypi.cnb.cool 优先（只有它给 OHOS 轮子：pyOpenSSL 依赖的 cffi/cryptography 是原生扩展，manylinux 轮子在 OHOS 上加载不了 → pyftpdlib 条件导出 TLS_FTPHandler 失败 → pytest_localftpserver 无条件 import 报错，见 notes.md 的 CI #89930 记录）；另有测试期 shim（如实披露）：pyftpdlib 缺 TLS_FTPHandler 时补占位（明文 FTP 夹具不触碰；真有 FTPS 用例会立刻报错），配 shim 自检（OpenSSL 置 None 时仍可导入，否则响亮失败），并对 pip 安装按源重试 1 次"
+
+upstream_tests:
+  - name: "pooch/tests/（包内测试，9 个 .py；离线子集）"
+    count: "62 passed / 13 skipped（-m 'not network'；另有 85 deselected）"
+    description: >-
+      sdist 的测试位于**包内** `pooch/tests/`（`test_core` / `test_downloaders` /
+      `test_hashes` / `test_integration` / `test_processors` / `test_utils` /
+      `test_version` 等 9 个 .py），**sdist 没有顶层 `tests/`**（第 1 轮本地 CI 因此报
+      `ERROR: file or directory not found: tests/`，已改为包内路径）。
+      上游用 `@pytest.mark.network` 标记需要真实外网的用例（实测 38 处），本环境访问外网
+      会 `requests.exceptions.ConnectTimeout` → 按**上游自己的标记** deselect：
+      实测 `-m 'not network'` → **62 passed / 13 skipped / 85 deselected**。
+      未被标记的用例失败仍会让 build **硬失败**（不宽恕、不冒充通过）。
+
+test_package_tests:
+  - file: check_pooch.py
+    description: >-
+      R34 消费者校验（全部离线、不触网）：①产物齐备（`pooch/` 模块）②关键文件
+      （`__init__.py`/`core.py`/`downloaders/`/`hashes.py`/`processors/`/`utils.py`/`version.py`）
+      ③真实 `import pooch` ④`__version__ == 1.9.0`
+      ⑤真实离线 API：`pooch.file_hash()` 对确定内容算出正确 sha256
+      ⑥真实离线 API：`pooch.create()` 构造 Pooch 对象且 registry 保留（无网络访问）
+      ⑦证据（模块总字节 + python 版本）
+    command: "python3 check_pooch.py <package-folder>"
+
+assertion_count: 7
