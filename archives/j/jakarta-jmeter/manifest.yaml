@@ -1,0 +1,24 @@
+# 软件级 manifest — jakarta-jmeter
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: jakarta-jmeter
+display: "Apache JMeter"
+description: "Apache JMeter 负载与性能测试工具（HTTP/JDBC/JMS/FTP/LDAP 采样器、无头 CLI 运行器、测试计划录制与回放）"
+category: utility
+homepage: "https://jmeter.apache.org/"
+license: Apache-2.0
+build_system: custom
+
+ohos_adaptation:
+  key_points:
+    - "纯 Java 应用（无 native）：官方源码归档（archive.apache.org）+ Ant 构建，产出可运行 JMeter home 布局入 libexec/jmeter/（bin/ApacheJMeter.jar + lib/ + lib/ext/，NewDriver 按 jar 位置推断 jmeter.home）"
+    - "工具链自取：bishengjdk 17.0.13（cmd-pkgs，优先 JAVA_HOME~/bishengjdk17，HNP 自带 JVM 在部分环境启动失败）+ apache-ant 1.10.15（archive.apache.org，sha256 钉校验，sh 调用避免 HMDFS 执行位问题）"
+    - "JDK 17 兼容：build.xml 默认 -source/-target 1.6 已被 JDK 17 移除——命令行 -Dsrc.java.version=1.8 -Dtarget.java.version=1.8 覆盖（免 patch）；Swing JDK9+ 泛型化与 javax.activation 摘除由两个 portability 补丁承担"
+    - "上游有官方测试套件（ant test-headless，1596 用例）：CI 外真机原样运行并如实记录（92.4% 通过），不在 conan build() 内跑（保持权威 CI 时限可控）；消费者验证由 test_package 承担（--version 实跑 + 反射断言）"
+  common_dependencies: []
+
+versions:
+  "2.13":
+    status: built
+    build_date: "2026-10-13"
+    conan_ref: "jakarta-jmeter/2.13"

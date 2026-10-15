@@ -1,0 +1,109 @@
+--- a/src/jorphan/org/apache/jorphan/gui/JTreeTable.java
++++ b/src/jorphan/org/apache/jorphan/gui/JTreeTable.java
+@@ -61,7 +61,7 @@
+      * @param columnNames the names for the columns
+      */
+     public JTreeTable(Vector<?> rowData, Vector<?> columnNames) {
+-        super(rowData, columnNames);
++        super((Vector) rowData, (Vector) columnNames);
+     }
+ 
+ }
+--- a/src/core/org/apache/jmeter/gui/tree/JMeterTreeNode.java
++++ b/src/core/org/apache/jmeter/gui/tree/JMeterTreeNode.java
+@@ -197,7 +197,7 @@
+     // Override in order to provide type safety
+     @Override
+     @SuppressWarnings("unchecked")
+-    public Enumeration<JMeterTreeNode> children() {
++    public Enumeration<TreeNode> children() {
+         return super.children();
+     }
+ }
+--- a/src/core/org/apache/jmeter/gui/tree/JMeterTreeModel.java
++++ b/src/core/org/apache/jmeter/gui/tree/JMeterTreeModel.java
+@@ -180,7 +180,7 @@
+         if (type.isInstance(node.getUserObject())) {
+             nodeList.add(node);
+         }
+-        Enumeration<JMeterTreeNode> enumNode = node.children();
++        Enumeration<JMeterTreeNode> enumNode = (Enumeration<JMeterTreeNode>) (Enumeration<?>) node.children();
+         while (enumNode.hasMoreElements()) {
+             JMeterTreeNode child = enumNode.nextElement();
+             traverseAndFind(type, child, nodeList);
+@@ -191,7 +191,7 @@
+         if (userObject == node.getUserObject()) {
+             return node;
+         }
+-        Enumeration<JMeterTreeNode> enumNode = node.children();
++        Enumeration<JMeterTreeNode> enumNode = (Enumeration<JMeterTreeNode>) (Enumeration<?>) node.children();
+         while (enumNode.hasMoreElements()) {
+             JMeterTreeNode child = enumNode.nextElement();
+             JMeterTreeNode result = traverseAndFind(userObject, child);
+@@ -209,7 +209,7 @@
+      */
+     public HashTree getCurrentSubTree(JMeterTreeNode node) {
+         ListedHashTree hashTree = new ListedHashTree(node);
+-        Enumeration<JMeterTreeNode> enumNode = node.children();
++        Enumeration<JMeterTreeNode> enumNode = (Enumeration<JMeterTreeNode>) (Enumeration<?>) node.children();
+         while (enumNode.hasMoreElements()) {
+             JMeterTreeNode child = enumNode.nextElement();
+             hashTree.add(node, getCurrentSubTree(child));
+--- a/src/components/org/apache/jmeter/control/ModuleController.java
++++ b/src/components/org/apache/jmeter/control/ModuleController.java
+@@ -178,7 +178,7 @@
+     }
+ 
+     private void createSubTree(HashTree tree, JMeterTreeNode node) {
+-        Enumeration<JMeterTreeNode> e = node.children();
++        Enumeration<JMeterTreeNode> e = (Enumeration<JMeterTreeNode>) (Enumeration<?>) node.children();
+         while (e.hasMoreElements()) {
+             JMeterTreeNode subNode = e.nextElement();
+             tree.add(subNode);
+@@ -194,7 +194,7 @@
+     }
+ 
+     private static void cloneChildren(JMeterTreeNode to, JMeterTreeNode from) {
+-        Enumeration<JMeterTreeNode> enumr = from.children();
++        Enumeration<JMeterTreeNode> enumr = (Enumeration<JMeterTreeNode>) (Enumeration<?>) from.children();
+         while (enumr.hasMoreElements()) {
+             JMeterTreeNode child = enumr.nextElement();
+             JMeterTreeNode childClone = (JMeterTreeNode) child.clone();
+--- a/src/protocol/http/org/apache/jmeter/protocol/http/proxy/ProxyControl.java
++++ b/src/protocol/http/org/apache/jmeter/protocol/http/proxy/ProxyControl.java
+@@ -936,7 +936,7 @@
+         variables.addParameter("T", Long.toString(deltaT)); // $NON-NLS-1$
+         ValueReplacer replacer = new ValueReplacer(variables);
+         JMeterTreeNode mySelf = model.getNodeOf(this);
+-        Enumeration<JMeterTreeNode> children = mySelf.children();
++        Enumeration<JMeterTreeNode> children = (Enumeration<JMeterTreeNode>) (Enumeration<?>) mySelf.children();
+         while (children.hasMoreElements()) {
+             JMeterTreeNode templateNode = children.nextElement();
+             if (templateNode.isEnabled()) {
+@@ -1293,7 +1293,7 @@
+     private void notifySampleListeners(SampleEvent event) {
+         JMeterTreeModel treeModel = GuiPackage.getInstance().getTreeModel();
+         JMeterTreeNode myNode = treeModel.getNodeOf(this);
+-        Enumeration<JMeterTreeNode> kids = myNode.children();
++        Enumeration<JMeterTreeNode> kids = (Enumeration<JMeterTreeNode>) (Enumeration<?>) myNode.children();
+         while (kids.hasMoreElements()) {
+             JMeterTreeNode subNode = kids.nextElement();
+             if (subNode.isEnabled()) {
+@@ -1312,7 +1312,7 @@
+     private void notifyTestListenersOfStart() {
+         JMeterTreeModel treeModel = GuiPackage.getInstance().getTreeModel();
+         JMeterTreeNode myNode = treeModel.getNodeOf(this);
+-        Enumeration<JMeterTreeNode> kids = myNode.children();
++        Enumeration<JMeterTreeNode> kids = (Enumeration<JMeterTreeNode>) (Enumeration<?>) myNode.children();
+         while (kids.hasMoreElements()) {
+             JMeterTreeNode subNode = kids.nextElement();
+             if (subNode.isEnabled()) {
+@@ -1331,7 +1331,7 @@
+     private void notifyTestListenersOfEnd() {
+         JMeterTreeModel treeModel = GuiPackage.getInstance().getTreeModel();
+         JMeterTreeNode myNode = treeModel.getNodeOf(this);
+-        Enumeration<JMeterTreeNode> kids = myNode.children();
++        Enumeration<JMeterTreeNode> kids = (Enumeration<JMeterTreeNode>) (Enumeration<?>) myNode.children();
+         while (kids.hasMoreElements()) {
+             JMeterTreeNode subNode = kids.nextElement();
+             if (subNode.isEnabled()) {
