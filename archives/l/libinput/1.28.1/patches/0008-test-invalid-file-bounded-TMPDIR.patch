@@ -1,0 +1,21 @@
+--- a/test/test-path.c
++++ b/test/test-path.c
+@@ -159,9 +159,17 @@
+ {
+ 	struct libinput *li;
+ 	struct libinput_device *device;
+-	char path[] = "/tmp/litest_path_XXXXXX";
++	char path[PATH_MAX];
++	const char *tmpdir = getenv("TMPDIR");
++	int path_length;
+ 	int fd;
+ 	struct counter counter;
++
++	if (!tmpdir || !tmpdir[0])
++		tmpdir = "/tmp";
++	path_length = snprintf(path, sizeof(path), "%s/litest_path_XXXXXX", tmpdir);
++	litest_assert_int_gt(path_length, 0);
++	litest_assert_int_lt(path_length, sizeof(path));
+ 
+ 	umask(002);
+ 	fd = mkstemp(path);

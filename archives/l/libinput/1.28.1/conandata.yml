@@ -1,0 +1,41 @@
+# conandata.yml — libinput 1.28.1
+# 来源策略:Debian 源包 orig(上游 meson dist 产物);补丁上下文基于
+# 该树生成并实测可干净应用。
+
+sources:
+  "1.28.1":
+    url: "https://deb.debian.org/debian/pool/main/libi/libinput/libinput_1.28.1.orig.tar.gz"
+    sha256: "a13f8c9a7d93df3c85c66afd135f0296701d8d32f911991b7aa4273fdd6a42a3"
+    tar_format: tar.gz
+
+patches:
+  "1.28.1":
+    - patch_file: "patches/0001-ohos-musl-program-invocation-name-fallback.patch"
+      patch_description: >-
+        meson.build 的 program_invocation_short_name 探测加第三级 fallback:
+        glibc 直接可用;BSD getprogname() 次之;两者皆无(musl,如
+        OHOS PC)时回退为字面量 "libinput"。该符号仅 tools 的
+        usage() 输出使用(tools/libinput-record.c 与
+        tools/ptraccel-debug.c),字面量不损失功能。
+      patch_type: "portability"
+    - patch_file: "patches/0002-record-handle-missing-device-list.patch"
+      patch_description: "Return the existing failure status when input device enumeration yields no paths, rather than dereferencing NULL."
+      patch_type: "bugfix"
+    - patch_file: "patches/0003-tests-recognize-actual-broadway-backend.patch"
+      patch_description: "Recognize GTK3's actual Broadway display selector in the original GUI test precondition; retain gtk_init_check, RC77 and all original parser assertions."
+      patch_type: "portability"
+    - patch_file: "patches/0004-tests-use-environment-working-directory.patch"
+      patch_description: "Keep the original installed-tool lookup outside the build directory while selecting its working directory from TMPDIR, with the portable /tmp default."
+      patch_type: "portability"
+    - patch_file: "patches/0005-test-quirks-use-bounded-TMPDIR.patch"
+      patch_description: "Construct the original quirk temporary-directory template under TMPDIR with checked snprintf bounds; retain all original mkdtemp and quirk assertions."
+      patch_type: "portability"
+    - patch_file: "patches/0006-gtk3-event-callback-and-unrealized-mask.patch"
+      patch_description: "Honor GTK3's gboolean event-callback ABI and configure event masks before realizing the window; preserve the original device handling, GTK4 behavior and test assertions."
+      patch_type: "bugfix"
+    - patch_file: "patches/0007-test-pure-context-deviceless-registration.patch"
+      patch_description: "Register eleven original context/path cases that require no device fixture as deviceless; retain every test body and the original root/uinput guard for device tests."
+      patch_type: "portability"
+    - patch_file: "patches/0008-test-invalid-file-bounded-TMPDIR.patch"
+      patch_description: "Keep the original invalid regular-file test and all callback/fd assertions, constructing its real mkstemp template under bounded TMPDIR with a portable /tmp default."
+      patch_type: "portability"

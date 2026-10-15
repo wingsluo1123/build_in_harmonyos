@@ -1,0 +1,30 @@
+--- a/test/test-quirks.c
++++ b/test/test-quirks.c
+@@ -42,21 +42,26 @@
+ 
+ struct data_dir {
+ 	char *dirname;
+ 	char *filename;
+ };
+ 
+ static struct data_dir
+ make_data_dir(const char *file_content)
+ {
+ 	struct data_dir dir = {0};
+-	char dirname[PATH_MAX] = "/tmp/litest-quirk-test-XXXXXX";
++	char dirname[PATH_MAX];
++	const char *tmpdir = getenv("TMPDIR");
++	int length = snprintf(dirname, sizeof(dirname), "%s/litest-quirk-test-XXXXXX",
++			      tmpdir && *tmpdir ? tmpdir : "/tmp");
++	litest_assert_int_gt(length, 0);
++	litest_assert_int_lt(length, (int)sizeof(dirname));
+ 	char *filename;
+ 	FILE *fp;
+ 	int rc;
+ 
+ 	litest_assert_notnull(mkdtemp(dirname));
+ 	dir.dirname = safe_strdup(dirname);
+ 
+ 	if (file_content) {
+ 		rc = xasprintf(&filename, "%s/testfile.quirks", dirname);
+ 		litest_assert_int_eq(rc, (int)(strlen(dirname) + 16));

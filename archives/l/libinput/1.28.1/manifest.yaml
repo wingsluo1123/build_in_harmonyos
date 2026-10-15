@@ -1,0 +1,76 @@
+# 版本级 manifest — libinput 1.28.1
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "1.28.1"
+software: libinput
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+build_date: "2026-09-28"
+build_system: meson
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # Debian 源包 orig(上游 meson dist 产物)
+  url: "https://deb.debian.org/debian/pool/main/libi/libinput/libinput_1.28.1.orig.tar.gz"
+  upstream_url: "https://gitlab.freedesktop.org/libinput/libinput/-/tags/1.28.1"
+  sha256: "a13f8c9a7d93df3c85c66afd135f0296701d8d32f911991b7aa4273fdd6a42a3"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: meson
+
+  configure_options:
+    - "-Ddefault_library=shared"
+    - "-Dlibwacom=false"
+    - "-Ddebug-gui=false"
+    - "-Dtests=false"
+    - "-Dinstall-tests=false"
+    - "-Ddocumentation=false"
+    # 必须显式指定:Conan 的 MesonToolchain 默认把 libexecdir 设成 bindir,
+    # 上游「主命令 bin/libinput(文件)」与「子工具 libexec/libinput/(目录)」
+    # 会撞车,install 报 "Destination ... already exists and is not a file"。
+    - "-Dlibexecdir=libexec"
+
+  # 编译依赖(格式: name/version)——沿用 main 上已发布的 1.26.2 同款组合
+  dependencies:
+    - libevdev/1.13.7
+    - mtdev/1.1.7
+    # 提供 libudev(配方内 pkg_config_name=libudev)。
+    # 注意该包 package_type=application,Conan 会默认其 headers/libs=False
+    # 并丢弃 cpp_info,故本配方在 requires() 上显式声明
+    # headers=True, libs=True, transitive_headers=True, transitive_libs=True。
+    - eudev/3.2.14
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-ohos-musl-program-invocation-name-fallback.patch"
+  # meson.build 的 program_invocation_short_name 探测加第三级 fallback:
+  #   glibc 直接可用 → BSD getprogname() → 字面量 "libinput"。
+  # 仅 tools 的 usage() 输出使用该符号,字面量不损失功能。
+  # (1.26.2 的同类问题用 per-file 的 __progname 别名解决;本补丁在
+  #  meson 层一处收敛,不引入逐文件 extern。)
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "program_invocation_short_name 探测链:glibc 全局 → getprogname() → 字面量;meson 层一处收敛优于逐文件 #define(1.26.2 补丁的 per-file __progname 别名亦可)"
+  - "其余构建要点承 1.26.2:eudev 的 pkg_config_name=libudev 直接满足 dependency('libudev')、eudev 的 application 包类型需显式 traits、libwacom 无 no-op 之外的损失、libexecdir 必须显式、meson install 后 ELF 需重签名、/dev/uinput 不可访问故 -Dtests=false 如实申报"
+  - "1.28.x 的 meson 选项面与 1.26.x 一致(libwacom/debug-gui/tests/install-tests/documentation/libexecdir 全部存在),1.26.2 的配方知识直接平移"
