@@ -1,0 +1,26 @@
+import os
+import sys
+
+from conan import ConanFile
+from conan.tools.build import can_run
+
+
+class TestPackageConan(ConanFile):
+    settings = "os", "compiler", "build_type", "arch"
+    test_type = "explicit"
+
+    def requirements(self):
+        self.requires(self.tested_reference_str)
+
+    def test(self):
+        if can_run(self):
+            pkg = self.dependencies["update_checker"].package_folder
+            test_script = os.path.join(os.path.dirname(__file__),
+                                       "check_update_checker.py")
+            py_ver = "python%s.%s" % (sys.version_info.major,
+                                      sys.version_info.minor)
+            site = os.path.join(pkg, "lib", py_ver, "site-packages")
+            cmd = ('bash -c \'PYTHONPATH="{}" TMPDIR=/data/storage/el2/base/cache '
+                   'exec "{}" "{}" "{}"\''.format(site, sys.executable,
+                                                  test_script, pkg))
+            self.run(cmd, env="conanrun")
