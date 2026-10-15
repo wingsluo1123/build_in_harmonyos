@@ -1,0 +1,27 @@
+# test_package/MANIFEST.yml
+# test_package consumer-side test declaration
+# CI script (build_and_test.sh L0e) requires this file
+
+package: k40-whisperer/0.71
+homepage: "https://www.scorchworks.com/K40whisperer/k40_whisperer.html"
+
+# Upstream test suite：源码包（K40_Whisperer-0.71_src.zip）无任何测试，
+# 上游测试用例数 N=0（无 test 目录、无 test_*.py / *_test.py / tests/）
+upstream_check_command: "无（上游源码包不含测试：ls 核实无 test*/tests/ 目录、无 test_*.py、无 *_test.py）"
+upstream_tests_total: 0
+upstream_tests_passed: 0
+upstream_tests_skipped_reason: "上游 N=0（无测试框架/测试文件，已核实）。按审查规则 rule8：上游 N=0 必须补测，适配后鸿蒙特有测试 M=22 断言（消费者 test_package 实质调用核心算法模块 API，见下）"
+
+# Upstream tests run inside conan build
+upstream_test_in_build: false
+upstream_test_in_build_reason: "纯 Python 无编译包，build() 不定义；上游无测试可运行。test_package 对已安装制品做实质执行验证（R34）"
+
+# test_package consumer-side tests（R34 实质执行）
+test_package_tests:
+  - file: test_k40_ohos.py
+    description: "HarmonyOS 专项测试 22 断言：interpolate 线性插值 4 + ecoords 路径长度/包围盒 3 + LaserSpeed 速度码 round-trip 2 + convex_hull 凸包 2 + egv EGV 指令编码/字节流 5 + g_code_library G 代码解析 5 + site-packages 全量 py_compile 语法 1（python3.12 实际运行，exit 0）；GUI 因 OHOS 缺 _tkinter 不可运行（docstring 如实说明，不编造 GUI 测试）"
+  - file: conanfile.py
+    description: "启动包装实际运行：bin/k40-whisperer --version 输出 'K40 Whisperer 0.71' 并 exit 0（R34 不空壳）"
+
+# Test assertion count（上游 N=0；鸿蒙专项 22 断言 + CLI --version 1 断言）
+assertion_count: 23

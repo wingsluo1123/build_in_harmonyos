@@ -1,0 +1,61 @@
+# 版本级 manifest — k40-whisperer 0.71（Python 类适配，纯 Python 无编译）
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "0.71"
+software: k40-whisperer
+
+# 编译状态（finish 最终更新）
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-11"
+build_system: python
+
+# ============================================================
+# 源码信息
+# ============================================================
+source:
+  # 源码下载 URL（官方源，R39）
+  url: "https://www.scorchworks.com/K40whisperer/K40_Whisperer-0.71_src.zip"
+  # 源码校验和（主编已本地验证）
+  sha256: "f0294f61ae2e1baeb6bde74cbd209d001e436ecdd5d2a9f2b28b9f0087eb0986"
+  tar_format: zip
+
+# ============================================================
+# 构建配置
+# ============================================================
+build:
+  # 构建系统类型（Python 类：纯脚本无编译，打包族）
+  system: python
+
+  configure_options: []
+
+  # 编译依赖列表（格式: name/version；均为 ohpcd 已发布包，R36）
+  dependencies:
+    - python/3.12.9
+    - pillow/10.4.0
+
+  # 编译器（纯 Python 无编译；解释器为 python3.12）
+  cc: "n/a（纯 Python 无编译，解释器 python3.12）"
+  cxx: "n/a（纯 Python 无编译）"
+
+# ============================================================
+# 补丁信息
+# ============================================================
+patches_applied: []
+# 无需补丁：纯 Python 官方源码按原样打包，未修改任何上游文件
+
+# ============================================================
+# 依赖缺口（如实标注，R36/R40）
+# ============================================================
+dependency_gaps:
+  - "lxml：svg_reader.py L38 / inkex.py L35 硬 import（无 try 保护）；ohpcd 仅有 built 未发布配方 → 不声明于 requirements()，SVG 解析功能待 lxml 发布后可用"
+  - "tkinter：stdlib；OHOS python/3.12.9 缺 _tkinter → GUI 主程序 k40_whisperer.py 模块级 from tkinter import * 即失败，GUI 在鸿蒙不可运行（R40 如实标注，不编造可用）"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+knowledge_gained:
+  - "纯 Python tkinter GUI 应用（无 CLI 入口，但有脚本主程序）以无构建/打包族配方交付：copy 全部 .py 至 lib/python3.12/site-packages + 生成 bin/k40-whisperer 启动包装（--version/--help 直接响应，真实启动因缺 _tkinter/lxml 失败时给明确诊断）+ commands.json（R38）"
+  - "上游 try/except 可选依赖（pyclipper/pyusb）与硬依赖（lxml/pillow）判定：读代码确认 import 是否有 try 保护后再决定 requirements() 声明与否；未发布硬依赖按 R36 不声明并在 manifest/notes/test_package 三处如实标注依赖缺口"

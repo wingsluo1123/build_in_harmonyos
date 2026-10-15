@@ -1,0 +1,23 @@
+software: k40-whisperer
+display: "k40-whisperer"
+description: "K40 激光雕刻机控制软件：tkinter GUI，读取 SVG/DXF 生成 EGV 指令发送到 K40 控制器（纯 Python）"
+category: cad
+homepage: "https://www.scorchworks.com/K40whisperer/k40_whisperer.html"
+license: GPL-3.0
+build_system: python
+ohos_adaptation:
+  key_points:
+    - "纯 Python（21 个 .py、0 个 C/C++ 源文件），无编译：模块铺 lib/python3.12/site-packages + bin/k40-whisperer 启动包装（仿 pyjson5/0.15.0 先例）"
+    - "OHOS python/3.12.9 缺 _tkinter → GUI 主程序 k40_whisperer.py 模块级 from tkinter import * 即失败，GUI 在鸿蒙不可运行（R40 如实标注，不编造可用）"
+    - "svg_reader.py/inkex.py 硬依赖 lxml（无 try 保护），ohpcd 仅有 built 未发布配方 → 不声明（R36），SVG 解析功能待 lxml 发布后可用"
+    - "pyclipper/pyusb 为代码自身 try/except 可选降级（k40_whisperer.py L105-110、nano_library.py L21-26），与上游行为一致不声明"
+    - "核心算法模块（egv/dxf/interpolate/ecoords/convex_hull/g_code_library/LaserSpeed）纯 stdlib，可独立导入，test_package 实质调用"
+versions:
+  "0.71":
+    status: built
+    build_date: "2026-10-11"
+    packaging: conan
+    notes: "conan recipe（os=OHOS arch=armv8），纯 Python 无编译；requires python/3.12.9 + pillow/10.4.0（已发布）；上游测试 N=0，鸿蒙特有测试 22 断言全过"
+    dependencies:
+      - python/3.12.9
+      - pillow/10.4.0
