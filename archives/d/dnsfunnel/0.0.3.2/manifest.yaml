@@ -1,0 +1,90 @@
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/0.0.3.2/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.0.3.2"
+
+# 软件名
+software: "dnsfunnel"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-08"
+# 上游是 skarnet 家族自带的 POSIX configure（非 GNU autoconf），但本仓库
+# build_system 枚举只有 cmake|autotools|makefile|meson，configure + make 归 autotools；
+# 实际不是 autoconf 的事实见 notes.md 与 conanfile.py 注释。
+build_system: "autotools"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（skarnet.org 官方 GitHub 镜像，CI 自动加镜像 fallback）
+  url: "https://github.com/skarnet/dnsfunnel/archive/refs/tags/v0.0.3.2.tar.gz"
+
+  # 源码校验和
+  sha256: "a9f3d1749ebd02116437dea913afc06949e918f656c30e052edd34d298f9698f"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: custom
+
+  # 配置选项列表
+  # skarnet 自有 configure，依赖路径取自 conan 包目录
+  # （conanfile.py build() 中的 self.dependencies[...].package_folder）
+  configure_options:
+    - "--disable-shared"
+    - "--with-sysdeps=<skalibs package folder>/lib/skalibs/sysdeps"
+    - "--with-include=<skalibs package folder>/include"
+    - "--with-include=<s6-dns package folder>/include"
+    - "--with-lib=<skalibs package folder>/lib"
+    - "--with-lib=<s6-dns package folder>/lib"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - "skalibs/2.15.1.0"
+    - "s6-dns/2.4.1.0"
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+# 例如:
+# - "0001-bootstrap-ohos-toolchain.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+# 本包 B判定=none（四范围查重后无新机制、无命中条目），故各项 knowledge_ref 均为 none；
+# 过程性结论全部落在 notes.md 的「遇到的问题与解决方案」「源码核对」两节。
+knowledge_gained:
+  - "dnsfunnel 是 skarnet 自有 configure 构建（非 autotools/cmake），不使用 Conan AutotoolsToolchain"  # knowledge_ref: none
+  - "实际依赖是 skalibs + s6-dns（源码 include s6-dns 头、deps.mak 链 -ls6dns -lskarnet），台账原写只有 skalibs"  # knowledge_ref: none
+  - "上游 TEST_BINS 为空、src/tests 目录不存在，make check 是空循环 => N_static=0，交付物只有消费者测试"  # knowledge_ref: none
+  - "上游发布归档与 GitHub tag 归档内容一致（仅差 .gitignore 与三个空目录）"  # knowledge_ref: none
