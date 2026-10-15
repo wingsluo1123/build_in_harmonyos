@@ -1,0 +1,24 @@
+software: isc-dhcp
+display: "ISC DHCP client/server/relay suite"
+description: "ISC DHCP 4.4.3-P1 suite: dhcpd server, dhclient client, dhcrelay relay and omshell, with libdhcp/libomapi/libdhcpctl and the bundled BIND 9.11.36 libraries they link against"
+category: network
+homepage: "https://www.isc.org/dhcp/"
+license: MPL-2.0
+build_system: autotools
+
+# 跨版本通用的 OHOS 适配知识
+ohos_adaptation:
+  key_points:
+    - "config.guess/config.sub 是 2014 年代的版本，不识别 HarmonyOS：需要加 HarmonyOS 主机探测（输出 aarch64-unknown-linux-ohos）与 *-linux-ohos 模式，顶层与捆绑的 BIND 9.11.36 各一份"
+    - "HMDFS 用户卷拒收 configure 临时目录探测创建的 0700 目录（E011）：探测的 umask 077 需改为 022"
+    - "OHOS 内核拒绝直接 exec 非签名解释器脚本：bind/Makefile 里调用捆绑 BIND configure 必须加 $(SHELL) 前缀；configure 生成的 Makefile 里 automake 的 MKDIR_P 回退（install-sh -c -d）同样要改写为 mkdir -p"
+    - "发布 tarball 捆绑的 BIND 以 bind/bind.tar.gz 内嵌：补丁作用于解包后的 bind/bind-9.11.36，配方须先解包再应用补丁链（解包后 bind/Makefile 的 bind1/bind2 规则幂等，自动完成 configure 与四库构建安装）"
+    - "无第三方依赖（捆绑 BIND，--without-openssl/libxml2/libjson/gssapi/lmdb、--disable-threads）；构建在 OHOS 真机上为 in-source"
+  common_dependencies: []
+
+# 版本索引（所有已归档版本，含状态）
+versions:
+  "4.4.3-p1":
+    status: built
+    build_date: "2026-10-14"
+    conan_ref: "isc-dhcp/4.4.3-p1"

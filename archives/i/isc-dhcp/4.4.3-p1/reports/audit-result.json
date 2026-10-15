@@ -1,0 +1,70 @@
+{
+  "metadata": {
+    "timestamp": "2026-10-14T18:25:32+08:00",
+    "branch": "feat/isc-dhcp-4.4.3-p1",
+    "base_branch": "upstream/main",
+    "package": "isc-dhcp",
+    "version": "4.4.3-p1",
+    "auditor": "W4-pre-pr-independent-auditor"
+  },
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "PF9",
+      "file": "archives/i/isc-dhcp/commands.json",
+      "line": 1,
+      "description": "非阻断门禁口径观察：仓库脚本 scripts/ohc/preflight.py 的 PF9 分支/路径闸会把变更集中任何 archives/ 下少于 5 段的路径判为『变更路径缺版本目录层——CI 将报 No packages to build』，本次 3 个软件级支撑文件（archives/i/isc-dhcp/ 下的 manifest.yaml、README.md、commands.json）命中，令本仓 preflight 对变更集返回 BLOCKED（findings: 1，其余 PF1-PF8 全通过）。三点实证反证该命中为过宽判定：① 铁律 R38 明确要求构建可执行文件的包在软件级目录创建 commands.json，其规定路径 archives/{letter}/{name}/commands.json 天然只有 3 段，与 PF9 首分支自相矛盾；② 仓库已有 797 个已合并包为 package_type=library 且带软件级 commands.json（同形态），其中 3 例（google-sparsehash c7be8a03b4、m4ri 884ded7e07、automake db215a9198）在同一次提交内同时包含软件级与版本级文件并已合入 main；③ CI 的包发现按 */conanfile.py 匹配（find -name conanfile.py，见 ci/conan/build_and_test.sh），软件级支撑文件不产生构建任务，PF9 声明的失败现象不成立。另测：仅用版本级文件送 PF9 时通过首分支（进入分支名检查），说明命中来源仅此三文件。",
+      "fix_suggestion": "分支名已符合 PF9 认可形态（当前 = feat/isc-dhcp-4.4.3-p1）。包内容本身无需修改；若 create-pr 侧 CI 与本地 preflight 同口径拦截，在 PR 说明中注明『软件级支撑文件由 R38 强制』即可。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R6",
+      "file": "archives/i/isc-dhcp/4.4.3-p1/patches/0003-configure-E011-HMDFS-umask-fix.patch",
+      "line": 1,
+      "description": "非阻断口径记录（无需改动）：铁律 R6 字面禁止修改生成文件（configure / Makefile.in），本包 0003、0006 改发布树 configure，0007 改 bind/Makefile.in；源码树中确实存在 configure.ac（45002 字节，configure 由 Autoconf 2.71 生成）。但仓库既有形态即为补丁直改 configure——实测 1000 个补丁以 --- a/configure 为改点，其中含与本次完全同型的 configure-umask-022 修复（a52dec、achilles、activity-log），且 R6 真正禁止的是 sed 手改（不可复现），非 refresh-patch 产物（R3 流程）；若改 configure.ac 则需在构建环境引入 autoconf 重生成 configure，与 R1 参数最少化冲突。",
+      "fix_suggestion": "无需改动。若要完全贴合 R6 字面口径，可在 notes.md 补一句取舍理由：configure.ac 存在但其重生成需 autoconf 构建依赖，故沿用仓库惯例（补丁直改 configure）。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R40",
+      "file": "archives/i/isc-dhcp/4.4.3-p1/notes.md",
+      "line": 80,
+      "description": "非阻断标注（R40 要求的『需人工确认适配完整性』）：本包属系统底层类（套接字/网络守护进程），dhcpd/dhclient/dhcrelay 的真实流量验证需绑定接口、开套接字、维护租约库，CI 环境不可提供，申报已如实写明。经核并非 R40 违规：无 stub/return 0 式空壳，适配语料由 8 个补丁（config.guess/config.sub 三方探测、E011 HMDFS umask、脚本直执行受限的 $(SHELL) 前缀 + stdin 恒开重定向、ATF 工具探测 POSIX 化）+ 配方级两处实质处置（MKDIR_P 回退归一、ATF_WORKDIR 可写目录）构成；test_package 亦非仅调 version()——实跑 4 个二进制并实调 omapi_init/dhcpctl_initialize/dhcpctl_connect。",
+      "fix_suggestion": "按 R40 口径在评审中标注『需人工确认适配完整性』：建议合并前由评审人抽样复跑 dhcpd --version 与 dhcpd_unittests，确认加载与协议状态机测试在目标机可复现（逐用例证据已随 reports/atf-run-*.out 归档）。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "审查规则§19（PR 禁止文件）",
+      "file": "archives/i/isc-dhcp/4.4.3-p1/reports/",
+      "line": 1,
+      "description": "非阻断记录：审查规则§19 字面禁止 PR 含 test-report 与 *.log，本最终变更集 reports/ 含 test-report.md、conan-create-tests.log、conan-create.log、w3-local-ci.log、atf-run-*.out 等文本证据。经仓库实测，该条在 reports/ 归档体系下不适用：main 已跟踪 3389 个 reports/ 文件（其中 test-report.md 734 个、*.log 372 个，含同日合并的 automake、re2c 等），代码规范§22 反向要求 test-report.md 作为 submit 的测试统计数据源。另注：铁律 R19（禁止手动打包/预编译二进制）已独立核验为零命中——变更集内无 .so/.a/.o/预编译产物（PF2 通过），全部 reports/ 件为文本证据而非目标文件，勿与本条混同。",
+      "fix_suggestion": "无需改动。若评审坚持字面口径，可在 PR 说明中标注『reports/ 归档仅为文本证据，无预编译产物』，或改由 CI 侧生成归档。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code-style#16",
+      "file": "archives/i/isc-dhcp/4.4.3-p1/test_package/conanfile.py",
+      "line": 11,
+      "description": "非阻断风格建议：test_package/conanfile.py 第 11 行 import os 全文未使用（无任何 os. 调用）。",
+      "fix_suggestion": "删除该未使用 import；纯清理项，不影响功能与门禁。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "健壮性建议",
+      "file": "archives/i/isc-dhcp/4.4.3-p1/conanfile.py",
+      "line": 248,
+      "description": "非阻断健壮性建议：package() 末尾 shutil.rmtree(os.path.join(self.package_folder, 'etc')) 无存在性守卫。当上游 make install 未产出 etc/ 时（例如配置样例路径随上游变更），该行会抛 FileNotFoundError 中断打包；本次真机与 CI 构建均通过、etc 样例已确认产出，故仅为潜在脆弱点。",
+      "fix_suggestion": "改为 shutil.rmtree(..., ignore_errors=True) 或在删除前加 os.path.isdir 判断，使该步骤对上游安装布局变化免疫。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code-style#14（manifest）",
+      "file": "archives/i/isc-dhcp/4.4.3-p1/manifest.yaml",
+      "line": 1,
+      "description": "非阻断一致性建议：版本 manifest 的 package.type 为 application，而 conanfile.py 的 package_type = library、软件级 commands.json 的 type 为 tool，同一包三处类型表述不一致（该字段在各规则文档中均未定义，仓库内另有同型组合漂移若干；不影响任何门禁）。",
+      "fix_suggestion": "统一为 library（与 Conan package_type 对齐），或在 manifest 中补注『库 + 可执行文件套件，Conan 侧以 library 声明以暴露 cpp_info.libs/bindirs』。"
+    }
+  ],
+  "summary": "审计对象：isc-dhcp 4.4.3-P1 归档包（archives/i/isc-dhcp/），最终变更集 30 个文件（软件级 3：manifest.yaml/README.md/commands.json；版本级 27：conanfile.py、conandata.yml、manifest.yaml、notes.md、patches/ 8、test_package/ 4、reports/ 11——pr-body.md、test-report.md、conan-verify-report.md、conan-create.log、conan-create-tests.log、atf-run-{common,client,relay,server}.out、w3-local-ci.log、audit-result.json）。\n\n本轮复审覆盖面（相对上一轮 pass 结论的增量）：① 离线 AI 检视（真机 atomcode，报告已发 MR）共 7 项 P3（P0/P1/P2=0），其中问题 1（test_package.c 主机字面量 \"127.0.0.1.\" 带尾点、实测报 host unknown，属以错误原因通过）与问题 2（断言过宽，仅查 != ISC_R_SUCCESS）已在本轮修复落地：去尾点 + 白名单断言 {CONNREFUSED, NETUNREACH, NOMORE}。白名单中 NOMORE 经源码链解剖（dhcpctl_connect→omapi_protocol_connect→omapi_wait_for_completion→omapi_dispatch）与两组真机实验（非阻塞 connect=EINPROGRESS、SO_ERROR=ECONNREFUSED）及包内 omshell 交叉复现确认：OHOS 上异步拒绝先被 dispatch 层消费并拆除套接字、等待层取不到细码而如实上报，证明连接确已到达套接字层；修复后 test_package.c sha256 2fa2b02fc3aee8f04ce3332f2df8bf1b5c916d4636657d8a7093b488cc5b263d（上轮 62a518f8… 已随修复废止）。② 归档刷新：reports/conan-create-tests.log 更新为修复后全量轮（tests=True，2501 行，RC=0，consumer 输出 reported: no more，sha256 248a17221bcce11145e01812181107d456c77b61a3e5a8da835f07e0578ed291）；reports/w3-local-ci.log 更新为修复后 W3 重跑（W3_SETUP_RC=0 + W3_RC=0，Success 1/1、Pass rate 100.0%，sha256 121122a7205a8a692c5c044702c5769b5fa035f5067f291c7ebd69ed59804337）；reports/test-report.md 两处描述校正（输出串 host unknown→no more、log SHA-256 更新）；test_package/MANIFEST.yml 校验点 3 描述校正（白名单口径，sha256 d178cf74a35da357b20d1ea26189479c92f8a1a1f38b4e28eacbed000a5f4d8d）；notes.md 增补 dhcpctl_connect 负向断言口径 bullet（sha256 8ab957b3c92178629cac47a9ebd41d3fd9d8a56636ad80d3b39fc542030e76bc）。问题 3-7（rmtree 守卫/shlex.quote/拷贝优化/死导入）为可选加固，按迭代项保留不改，避免使本轮 W3/审计证据失效。\n\n证据锚定（sha256）：conanfile.py 9e621fbdd5c46eb92e919a832bcdf56c237eb0e3e4c242f1cdfee74531532212（未漂移）；conandata.yml 9e82702b31024ba6a5e7048f3cf984d9bac6b788496a48593b86f0011eb4a37a（未漂移）；test_package/test_package.c 2fa2b02fc3aee8f04ce3332f2df8bf1b5c916d4636657d8a7093b488cc5b263d（本轮修复后）；commands.json ca2bf987711d7780081f2062ee082a09c38ea659b89731f6393f6d10e2d28059（未漂移）；patches/0007-bind-makefile-shell-prefix.patch ce4c781a463d940694e550c4eaaff689458dea7ef46c911545f9bac5f6a1e0cb；notes.md 8ab957b3c92178629cac47a9ebd41d3fd9d8a56636ad80d3b39fc542030e76bc（本轮增补后）；test_package/MANIFEST.yml d178cf74a35da357b20d1ea26189479c92f8a1a1f38b4e28eacbed000a5f4d8d（本轮校正后）；reports/w3-local-ci.log 121122a7205a8a692c5c044702c5769b5fa035f5067f291c7ebd69ed59804337（与本地 CI 结果件 .ci-result.json 的 log_sha256 一致）；reports/conan-create-tests.log 248a17221bcce11145e01812181107d456c77b61a3e5a8da835f07e0578ed291；reports/conan-create.log 5738ed185bd24c9054dfc26aeade6a92fb769f42fe195cfa7978ffc06968d5c3（早期轮次归档，recipe rev 4124a455，保留作构建演进记录）；reports/conan-verify-report.md 6ee1ef8df44d6c7f96bf04d8263d5dfd7c3e95aa9665edaa7ed847aab32c464d。\n\nW3 本地 CI（平台同款 setup.sh + build_and_test.sh，修复后重跑全量链闭合）：W3_SETUP_RC=0 + W3_RC=0；G0/G0e/KC/JC 全过；conan create passed；L0/L1a/L1b/L1e/L2/L5 全 pass，L1e 破坏性负向测试确认消费者对包的真实依赖（sabotage bin/lib/include 后测试如实失败）；L4 为补丁函数扫描告警（config.guess/config.sub 属上游 autoconf 脚本内容，非注入，非阻塞）；L2 的 omshell 条目为上游客观形态（omshell 无 --version/--help 旗标，非失败），非阻塞。Success 1/1，Pass rate 100.0%。\n\n欺骗检测：零命中（承上轮全项结论，本轮变更面内复核维持）。R34——test_package 真调 API 实跑二进制，本轮修复正是为排除假通过（解析期早错不再被接受）；R9——无跳过/伪造通过；R8——补丁 0 处平台宏；R19——无预编译产物；伪造状态/伪造 sha256——零命中。\n\nR51 上游测试三步法：清点 13 个 ATF 程序、真机全量执行（56/56，0 失败 0 跳过）、逐用例输出随档（atf-run-*.out）；本轮未触碰测试本体，结论沿用。\n\n门禁交叉核验：PF1-PF8 通过；PF9 观察项见 P2（分支名已符合其认可形态）。\n\n结论：verdict=pass；P0=0、P1=0；非阻断项 7（P2×1、P3×6）均可后续迭代处理，不阻塞提交。离线检视 7 项中问题 1/2 已整改并真机复验，问题 3-7 列为后续迭代。"
+}
