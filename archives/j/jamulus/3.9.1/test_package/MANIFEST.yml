@@ -1,0 +1,29 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: jamulus/3.9.1
+homepage: "https://jamulus.io"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+# 上游 jamulus r3_9_1 源码树无 tests/ 目录、无 make check / ctest / pytest 目标
+# （Jamulus.pro 仅定义 build/install/clang_format 目标；tools/ 为发行维护脚本），
+# 上游构建系统不提供任何自动化测试 → 如实申报"上游确无测试"（R51 清点证据见 notes.md）
+upstream_check_command: "none (upstream has no test target)"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.sh
+    description: "T1 二进制可执行性（Jamulus/jamulus 双名兼容解析）；T2 jamulus --version（main.cpp:158 真实参数解析，断言 exit 0 + 输出含 3.9.1）；T3 --help 用法文本完整性（含 -s/--server、-v/--version）；T4 服务器模式真实启动冒烟（-s 存活至 5s timeout，HEADLESS QCoreApplication + 网络监听真实路径，非空壳断言）"
+    command: "bash test.sh"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 6
