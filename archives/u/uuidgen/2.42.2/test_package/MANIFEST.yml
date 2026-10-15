@@ -1,0 +1,26 @@
+package: uuidgen/2.42.2
+homepage: "https://github.com/util-linux/util-linux"
+
+upstream_check_command: "bash tests/ts/uuidgen/uuidgen && bash tests/ts/uuidgen/oids"
+upstream_test_in_build: true
+upstream_test_command: "bash tests/ts/uuidgen/uuidgen && bash tests/ts/uuidgen/oids"
+
+upstream_tests:
+  - file: tests/ts/uuidgen/uuidgen
+    source: util-linux-2.42.2/tests/ts/uuidgen/uuidgen
+    description: "Eight uuidgen generation modes, each parsed by test_uuid_parser"
+    command: "bash tests/ts/uuidgen/uuidgen"
+    assertions: 8
+  - file: tests/ts/uuidgen/oids
+    source: util-linux-2.42.2/tests/ts/uuidgen/oids
+    description: "Four deterministic namespace/hash UUID outputs"
+    command: "bash tests/ts/uuidgen/oids"
+    assertions: 4
+
+test_package_tests:
+  - file: test_uuidgen.sh
+    description: "Consumer-side execution of the installed uuidgen command on OHOS"
+    command: "./test_uuidgen.sh <bin>/uuidgen"
+    assertions: 12
+
+assertion_count: 12
