@@ -39,3 +39,6 @@
 ## 注意事项
 
 {需要特别注意的点；无则删除此节}
+
+<!-- Actual build: autotools, 2026-09-04, deps: freetype, libfontenc, xorgproto, xtrans -->
+<!-- Issues: umask 077, shebang, config.guess, freetype2 pkg-config mapping -->
