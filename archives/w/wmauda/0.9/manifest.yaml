@@ -1,0 +1,50 @@
+# 版本级 manifest — wmauda 0.9
+# 文件位置: archives/w/wmauda/0.9/manifest.yaml
+
+software: wmauda
+version: "0.9"
+status: built
+build_date: "2026-10-06"
+created_at: 2026-10-06
+build_system: Makefile
+
+# 上游无自动化测试（手写 Makefile 仅 all/clean/install，无 check 目标、无 tests/ 目录），
+# 上游用例数 0/0；消费者侧 test_package/test.sh 共 18 个已执行用例（17 断言 + 1 鸿蒙消费者用例）全部通过。
+test_passed: 18
+test_failed: 0
+
+dependencies:
+  required:
+    - gtk2/2.24.33
+    - dbus-glib/0.114.1
+    - libaudclient/3.5-rc2.1
+    - dbus/1.14.10
+  optional: []
+
+patches_applied: []
+
+test_results:
+  profile: "ohos-aarch64-6.0"
+  upstream_framework: "无（上游无测试框架：手写 Makefile，无 check 目标、无 tests/ 目录）"
+  upstream_total: 0
+  upstream_passed: 0
+  upstream_failed: 0
+  test_package_total: 18
+  test_package_passed: 18
+  test_package_failed: 0
+  test_package_assertions: 17
+  harmonyos_consumer_usecase: "1 个已执行的鸿蒙消费者用例（门控于宿主内核，不计入 17 条断言）；18 = 17 断言 + 1 用例，与 test.sh 的 RESULT 行一致"
+  note: "上游无自动化测试（手写 Makefile 仅 all/clean/install，无 check 目标、无 tests/ 目录），不虚报上游用例数；消费者侧由 test_package/test.sh 驱动已安装二进制共 18 个已执行用例（17 条断言：OHOS ELF64/AArch64 形状、无 RPATH/RUNPATH、pixmaps+man page、真实 DT_NEEDED 链 libgtk-x11-2.0/libgdk-x11-2.0/libaudclient/libglib-2.0/libX11、audacious_remote_* 与 dbus_g_* 未定义符号、DT_NEEDED 闭包 62/62 在 OHOS 可完整解析、链接 musl libc.so；另 1 个鸿蒙特有消费者用例：无 X server 启动 → 干净拒绝 \"cannot open display\" exit 1，证明 musl 加载器解析整条 63 项 DT_NEEDED 链且 GTK+2 初始化被真实到达）。"
+
+knowledge_gained:
+  - "CI L0c 门禁只把 test_package/ 下 .c/.cpp/.cc/.cxx/.sh/.py 视为测试源文件（conanfile.py 显式排除）：把测试逻辑全部内联在 test_package/conanfile.py 的 test() 里，即使真跑 self.run 也必挂 L0c。本地 W3 会『假绿』——conan 在 test_package/ 就地生成的 conanbuild.sh/conanrun.sh 等恰好命中 .sh 白名单，而 CI 是全新 checkout 无这些生成物。修法：真实测试源落 test_package/test.sh，conanfile.py 只做 bash 派发（本包即为该形态）。"
+  - "CI L0k（R38）要求构建可执行文件的包必须在软件级目录 archives/w/wmauda/commands.json 声明：name 须含包名、type 必须为 \"tool\"、versions 须含当前版本且 ref 对齐。该文件只放在本地而未 git add 时，本地 W3 通过、CI 因全新 checkout 看不到文件而失败——commands.json 属于必须提交的配方文件。"
+  - "配方内严禁用硬编码 conan 缓存路径（如 glob(\"/data/storage/el2/base/cache/conan-home/p/<pkg>*/p\")）来补依赖信息：本地沙箱该路径存在所以全绿，但 CI worker 的 CONAN_HOME 是 $HOME/.conan2（ci/conan/setup.sh 与 cleanup.sh 均默认该值），路径不存在即静默拿到 None。本包原配方即因此丢 glib，链接期报 g_free/g_strdup/g_object_unref/g_type_check_instance_cast 等未定义符号。修法：改从 self.dependencies 依赖图取 package_folder，或直接收集组件库名。"
+  - "glib 把库声明在 cpp_info 的 **组件（components）** 里，顶层 cpp_info.libs 为空——只读 dep.cpp_info.libs 会静默丢 -lglib-2.0/-lgobject-2.0/-lgio-2.0/-lgthread-2.0/-lgmodule-2.0 并导致链接失败。取证细节：glib 的 -I 与 -L 路径其实都收进来了（说明 glib 确在依赖图中），唯有库名缺失，即『头文件在、库名丢』的典型组件症状。修法：遍历 dep.cpp_info.components[*].libs 合并收集。"
+  - "wmauda 的 main() 在 getopt_long() 之前调用 gtk_init()（src/wmauda.c:833），因此 -v/-h 同样需要 X display，无 DISPLAY 时不存在可用的参数路径。无头环境下唯一可执行的消费者路径是直接启动：预期干净拒绝 \"cannot open display\"（exit 1），该行为恰好证明 OHOS musl 加载器已解析整条 DT_NEEDED 链（含 libaudclient.so.2）且 GTK+2 初始化被真实到达，可作为 rule12 鸿蒙消费者可行性观测。"
+  - "wmauda 通过 audacious_remote_*（libaudclient）与 dbus_g_*（dbus-glib）未定义符号证明 Audacious D-Bus 客户端 stub 真正被链接使用；在 test_package 中对二进制做 nm -D --undefined-only 符号断言，比只查 DT_NEEDED 条目更能发现『声明了依赖但实际未链接』的假阳性。"
+
+knowledge_ref: []
+build_log: ""
+source_url: "http://ftp.debian.org/debian/pool/main/w/wmauda/wmauda_0.9.orig.tar.gz"
+source_sha256: "4d34ad389b5a305cb83ddea706e828462eedee9f0bbb59c879ed09f57f18a6ea"

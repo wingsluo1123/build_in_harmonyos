@@ -1,0 +1,34 @@
+software: wmauda
+display: wmauda
+description: Audacious 音乐播放器的 Window Maker dockapp 遥控前端（经 D-Bus / libaudclient 的 audctrl API 驱动播放器）
+category: multimedia
+homepage: https://www.netswarm.net/
+license: GPL-2.0-or-later
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "上游 Makefile 用 $(shell pkg-config ...) 取编译/链接参数，交叉编译下 .pc 不可用；配方把这几行改写为显式 -I/-L/-l（取自 Conan 依赖图）"
+    - "CC/AR/RANLIB 从 Conan conf tools.build:compiler_executables 解析（R33），不依赖 shell 环境变量"
+    - "配方不读取任何本机 Conan 缓存路径，依赖目录全部来自图上解析结果，保证 CI worker 上行为一致"
+    - "上游 install 目标漏装运行时 pixmap dock-master.xpm，配方显式补装，否则 applet 无法启动"
+    - "glib/dbus-glib/expat 以 override=True、libjpeg-turbo 以 force=True 收敛整图版本，避免版本冲突"
+    - "依赖取 libaudclient/3.5-rc2.1 而非 3.5-rc2：其配方已 pin glib/2.84.0.1 + dbus-glib/0.114.1，package_id 与本图一致，直接复用制品仓二进制而不触发依赖源码重建"
+    - "上游无自动化测试（Makefile 仅 all/clean/install，无 check 目标、无 tests/ 目录），由 test_package 做产物与 DT_NEEDED 闭包验证"
+  common_dependencies:
+    - gtk2/2.24.33
+    - glib/2.84.0.1
+    - dbus-glib/0.114.1
+    - libaudclient/3.5-rc2.1
+    - dbus/1.14.10
+    - expat/2.8.2.1
+    - libjpeg-turbo/3.2.0
+
+versions:
+  "0.9":
+    status: built
+    build_date: "2026-10-06"
+    patches: 0
+    conan_ref: "wmauda/0.9"
+
+last_updated: "2026-10-15"
