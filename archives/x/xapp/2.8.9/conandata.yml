@@ -1,0 +1,23 @@
+# conandata.yml — xapp 2.8.9
+# 源：linuxmint/xapp 官方 GitHub tag 2.8.9（tag 指向 commit aa7162e4，
+# 与归档内 meson.build:4 自声明 version '2.8.9' 一致，Scout-A 双重核验）。
+
+sources:
+  url:
+    - "https://github.com/linuxmint/xapp/archive/refs/tags/2.8.9.tar.gz"
+  sha256: "cc2de98f8b2c73f7611af770d398a05560c4419b9390000464b8bcd517c70375"
+
+patches:
+  2.8.9:
+    - patch_file: "patches/0001-gdk-windowing-x11-guard.patch"
+      patch_description: >-
+        Guard the X11/Xlib code paths in libxapp/xapp-gtk-window.c behind
+        GTK's own GDK_WINDOWING_X11 window-system macro. The OHOS
+        gtk/3.24.43 is broadway-only: no gdk/gdkx.h is installed and
+        gdkconfig.h carries "#undef GDK_WINDOWING_X11", so the unguarded
+        upstream includes (X11/Xlib.h, X11/Xatom.h, gdk/gdkx.h) and the
+        gdk_x11_*/XChangeProperty/GDK_IS_X11_DISPLAY/GDK_WINDOW_XID call
+        sites cannot compile. On non-X11 builds the WM-hint entry points
+        degrade to no-ops (public API/ABI unchanged); is_x11_session()
+        reports FALSE, matching the runtime guard upstream already applies.
+      patch_type: "portability"

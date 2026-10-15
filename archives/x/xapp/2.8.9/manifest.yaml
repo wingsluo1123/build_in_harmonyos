@@ -1,0 +1,116 @@
+# xapp 2.8.9 版本级 manifest
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "2.8.9"
+
+software: xapp
+
+# 编译状态
+# published | built | failed | archived
+# built = 配方 + test_package 就绪，实编与用例执行由权威 CI（同配方同 profile
+# ohos-aarch64）复现；结果以 CI 日志（UPSTREAM-TEST-* / L*_RESULT 行）为准。
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-09"
+build_system: meson
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（linuxmint/xapp 官方 GitHub tag 2.8.9，commit aa7162e4）
+  url: "https://github.com/linuxmint/xapp/archive/refs/tags/2.8.9.tar.gz"
+
+  # 源码校验和
+  sha256: "cc2de98f8b2c73f7611af770d398a05560c4419b9390000464b8bcd517c70375"
+
+  # 压缩格式
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  system: meson
+
+  # 配置选项列表（全部为上游一等公民 meson 开关，见 meson_options.txt）
+  # app-lib-only=true：只建核心库 libxapp.so——绕开 libgnomekbdui（X11/XKB
+  #   栈，无 OHOS 配方）、dbusmenu-gtk3（配方目录在树但 ohpcd 未发布）、
+  #   gtk3-module/icons/applets/scripts/data/sn-watcher；
+  #   仍产出 libxapp.so + xapp.pc + 头文件 + gsettings schema（xed 消费面完整）。
+  # introspection/vapi 必须成对关（libxapp/meson.build:149-150 有 assert）；
+  #   g-ir-scanner 需加载自定义 C 扩展，OHOS 拒绝执行未签名 ELF（E179）。
+  configure_options:
+    - "-Dapp-lib-only=true"
+    - "-Dintrospection=false"
+    - "-Dvapi=false"
+    - "-Dstatus-notifier=false"
+    - "-Ddocs=false"
+
+  # 编译依赖列表（格式: name/version）
+  # glib/gio/gmodule/gdk-pixbuf/cairo 经 gtk 传递（与 gtksourceview4/4.8.4
+  # 同构 pin 链；glib 停 2.84.0.1，禁用 glib2/2.88 新族）。
+  dependencies:
+    - gtk/3.24.43
+    - libx11/6.4.0
+    - libxkbfile/1.1.3
+    - dbus/1.14.10.1
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "patches/0001-gdk-windowing-x11-guard.patch"
+# 0001：xapp-gtk-window.c 未守卫直用 <X11/*.h>/<gdk/gdkx.h>/gdk_x11_*/
+# GDK_IS_X11_DISPLAY/XChangeProperty/GDK_WINDOW_XID，而 OHOS 的 gtk/3.24.43
+# 为 broadway-only（设备缓存实证：无 gdk/gdkx.h；gdkconfig.h 为
+# "#undef GDK_WINDOWING_X11"；libgtk-3.so 的 DT_NEEDED 无 libX11）。
+# 用 GTK 自带的 GDK_WINDOWING_X11 窗口系统宏守卫（非平台条件宏），非 X11
+# 构建下 WM-hint 入口退化为 no-op，公开 API/ABI 不变。
+
+# ============================================================
+# 测试统计（rule4：N=上游源码包 test/tests 目录文件数）
+# ============================================================
+
+test_summary:
+  upstream_test_files: 0            # 无 tests/ 目录（N 口径；test-scripts/ 为 7 个未接入构建的人工 GUI 演示脚本，不计）
+  upstream_registered: 0            # 13 个 meson.build 零 test() 调用
+  upstream_runnable: 0              # 无自动化用例可跑（NO_UPSTREAM_TESTS，discovery EVIDENCE_COMPLETE）
+  upstream_display_limited: 0
+  consumer_assertion_count: 20      # test_package 消费者用例 TAP 断言数
+  notes: >-
+    上游 2.8.9 无任何自动化测试（全 13 个 meson.build 零 test()、无 tests/
+    目录、test-scripts/ 为需真实显示的人工脚本、.github 唯一 workflow 仅
+    build/package、meson_options.txt 无测试开关）——按 policy 记录
+    NO_UPSTREAM_TESTS（discovery EVIDENCE_COMPLETE）。按强制要求新增鸿蒙特有
+    消费者用例 test_package/test_xapp.c（20 项 TAP 断言，全部在权威 CI
+    ohos-aarch64 真实运行计入统计）：xapp.pc 元数据闭包（含
+    Requires.private:xkbfile 在 pkg-config 0.29.2 严格解析下）、libxapp.so.1
+    headless GType 注册（GtkWindow 子类 / favorites / mkenums 枚举经 dlsym）、
+    dlopen+g_libintl_bindtextdomain 全局可解析（proxy-libintl 经 libglib 链
+    全局可达实证；musl 下 libxapp 自身 gettext 走 libc/glib，--as-needed 后
+    自身无 libintl DT_NEEDED——CI run-4 实证）、产物无 libX11 DT_NEEDED
+    （GDK_WINDOWING_X11 守卫生效）且 NEEDED 闭包落在 conan 图内（gio/glib/
+    gtk）、
+    gsettings schema glib-compile-schemas 编译 + memory 后端 set/get 往返
+    （无 dconf、无 session bus）。全部断言不开显示连接。
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "broadway-only gtk3 的头文件面实证：gtk/3.24.43（OHOS shared）不安装 gdk/gdkx.h，gdkconfig.h 为 '#undef GDK_WINDOWING_X11 / #define GDK_WINDOWING_BROADWAY'，libgtk-3.so DT_NEEDED 无 libX11——下游凡直用 gdkx/Xlib 的代码必须以 #ifdef GDK_WINDOWING_X11 守卫（GTK 自带窗口系统宏，非平台条件宏），Xlib 直调面退化为 no-op 是合法上游语义（is_x11_session 运行时守卫已存在）"
+  - "glib>=2.84 proxy-libintl 闭包是 GTK3 生态配方必做项：PkgConfigDeps 重生成的 .pc 丢 -lintl，meson b_lundef 默认开 → 链接 g_libintl_* undefined；照抄 gtksourceview4/4.8.4 _augment_pcs_intl 即可（xapp 五件套 glib/gio/gio-unix/gmodule/gtk+-3.0 全在清单内）"
+  - "meson dependency() 按 .pc 文件名解析的两个别名缺口：glib 配方无 gio-unix-2.0 组件、dbus 配方 pkg_config_name 为 dbus（且 dbus-1.pc 需带 session_bus_services_dir 变量，xapp 无 default_value 直接 get_variable）——在消费方 generate() 合成别名 .pc，不改上游配方"
+  - "gdbus-codegen/glib-mkenums 宿主工具链复用 gtksourceview4 成品：_pin_build_env 绝对路径钉工具 + conanbuildenv 追加 NINJA/LD_LIBRARY_PATH + E077 自签名 + _fix_glib_pcs 注入 pc 工具变量，四件套缺一即死"
+  - "OHOS 消费者断言可零显示验证链接闭包与守卫生效：dlsym(RTLD_DEFAULT, g_libintl_*) 证 -lintl 闭包真被解析（非静默跳过），二进制搜 libX11/libintl DT_NEEDED 串证守卫补丁生效——两步均可进 CI 统计"
