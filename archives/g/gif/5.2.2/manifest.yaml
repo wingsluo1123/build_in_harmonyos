@@ -1,0 +1,44 @@
+# 版本级 manifest — gif 5.2.2 (giflib upstream)
+
+version: "5.2.2"
+software: "gif"
+status: built
+build_date: "2026-10-04"
+build_system: makefile
+
+source:
+  url: "https://sourceforge.net/projects/giflib/files/giflib-5.2.2.tar.gz/download"
+  sha256: "be7ffbd057cadebe2aa144542fd90c6838c6a083b5e8a9048b8ee3b66b29d5fb"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options: []
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-tests-makefile.patch: replace GNU head --bytes=-20 with POSIX wc -c + dd in tests/makefile"
+
+knowledge_gained:
+  - "giflib 5.2.2 使用纯 Makefile 构建（无 configure），库与工具目标可直接 make 命令行构建"
+  - "OHOS head(1) 不支持 GNU 负数 --bytes 扩展（--bytes=-20 失败），上游回归套件 giffix 截断输入需改用 POSIX wc -c + dd 保持语义"
+  - "SourceForge /download URL 需在 conan source() 显式指定 giflib-5.2.2.tar.gz 文件名"
+  - "编译器和归档器从 tools.build:compiler_executables conf 获取，flags 经 make 命令行注入"
+  - "giflib 消费者测试：EGif* 编码 + DGif* 解码往返，逐像素验证公开 API 数据面"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/gif-5.2.2.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/gif-5.2.2.work
+  source_orig_hash: 58feaea354953518
+  source_work_hash: 04abc67f1978d5da
+  generated_at: '2026-10-04T09:43:31'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-tests-makefile.patch
+    type: portability
+    platform_only: false
+    guard: 'none'
