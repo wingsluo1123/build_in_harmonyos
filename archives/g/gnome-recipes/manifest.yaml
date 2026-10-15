@@ -1,0 +1,30 @@
+software: gnome-recipes
+display: "GNOME Recipes"
+description: "GNOME desktop application for finding, cooking and sharing recipes"
+category: utility
+homepage: "https://gitlab.gnome.org/GNOME/gnome-recipes"
+license: GPL-3.0-or-later
+build_system: meson
+
+ohos_adaptation:
+  key_points:
+    - "Port the Todoist shopping-list export from librest (rest-0.7) to libsoup 2.4 form POSTs; the registry's librest/0.10.2 is the rest-1.0/libsoup3 generation, which cannot serve rest-0.7."
+    - "Unify the graph DOWN on the glib/2.84.0.1.1 + zlib/1.3.1.1 generation with a root override: every published GTK3-stack binary was built against that generation, while libgoa/json-glib/gnome-autoar pin glib/2.88.3 — unifying up would orphan all 13 published binaries. libgoa stays at 3.58.1 and is rebuilt from source against glib/2.84.0.1.1 (sole source build in the graph)."
+    - "Skip the appdata translation merge (msgfmt cannot locate ITS rules on OHOS)."
+    - "Disable the help/ subdirectory build (itstool and yelp-tools are unavailable)."
+    - "Drop gtk-update-icon-cache / update-desktop-database post-install hooks and compile the GSettings schema with a staged glib-compile-schemas."
+  common_dependencies:
+    - gtk
+    - glib
+    - libsoup
+    - libgoa
+    - json-glib
+    - gnome-autoar
+    - gspell
+    - libcanberra
+
+versions:
+  "2.0.4":
+    status: pending_ci
+    build_date: "2026-10-14"
+    conan_ref: "gnome-recipes/2.0.4"

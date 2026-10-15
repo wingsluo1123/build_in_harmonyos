@@ -1,0 +1,21 @@
+--- a/data/meson.build
++++ b/data/meson.build
+@@ -53,12 +53,12 @@ custom_target('desktop-file',
+               install_dir: join_paths([datadir,'applications']),
+               command: [msgfmt, '--desktop', '-d', '../po', '--template', '@INPUT@', '-o', '@OUTPUT@'])
+ 
+-custom_target('appdata',
+-              output: 'org.gnome.Recipes.appdata.xml',
+-              input: files('appdata/org.gnome.Recipes.appdata.xml.in'),
+-              install: true,
+-              install_dir: join_paths([datadir,'metainfo']),
+-              command: [msgfmt, '--xml', '-d', '../po', '--template', '@INPUT@', '-o', '@OUTPUT@'])
++# OHOS 缺 itstool 的 ITS 规则（msgfmt: cannot locate ITS rules for
++# appdata/org.gnome.Recipes.appdata.xml.in），跳过 appdata 的多语言合并，
++# 直接安装未翻译的 appdata 文件。
++install_data('appdata/org.gnome.Recipes.appdata.xml.in',
++             rename: 'org.gnome.Recipes.appdata.xml',
++             install_dir: join_paths([datadir,'metainfo']))
+ 
+ configure_file(input: 'org.gnome.Recipes.service.in',
+                output: 'org.gnome.Recipes.service',
