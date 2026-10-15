@@ -1,0 +1,42 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# 上游测试清点（§12.72 四口径，2026-10-08 于 ddccontrol-1.0.3 git tag 源码树实测）：
+#   ① test*/ 框架源码: 0（find -type d -name 'test*' → 0）
+#      注册口径: 0（全部 Makefile.am 无 TESTS= / check_PROGRAMS=；configure.ac 无测试宏）
+#      未注册测试脚本资产: 5 = scripts/common_test.sh + scripts/valgrind_{ddccontrol,dbus_service}
+#        {,_launcher}.sh（不走 automake，源码树内手动脚本）
+#   ② */res 语料     : 0（find -type d -name 'res' → 0）
+#   ③ **/*RUNTEST*   : 0
+#   ④ src/demo|examples 示例 .c: 0
+#   ⇒ `make check` 注册口径为 0（空转，见 notes.md 实测）
+#   5 个脚本均无法在本设备执行（逐条具体技术原因，非“没环境”笼统说法）：
+#     - common_test.sh 开头 `EUID != 0 → Run as root` 强制 root（本进程非 root）
+#     - valgrind_* 需要 valgrind 二进制（设备实测 `command -v valgrind` → MISSING）
+#     - 脚本对真实 DDC/CI 设备跑寄存器读写（`ddccontrol -p` 扫 /dev/i2c-*；本机
+#       /dev/i2c-* ENOENT、内核无 i2c 模块 —— 见 notes.md 能力面披露）
+#     - 脚本用 mktemp /tmp/... 写日志（设备 /tmp 只读，E002）
+
+package: ddccontrol/1.0.3
+homepage: "https://github.com/ddccontrol/ddccontrol"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序 —— 无（四口径清点与不可执行原因见文件头注释）
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证, 调用已安装二进制)
+test_package_tests:
+  - file: test.sh
+    description: "消费者测试 — 调用已安装 ddccontrol 二进制，断言 -h 与裸调用的版本横幅、usage 文本、退出码（4 条断言，全部在参数解析阶段返回、不碰设备节点）"
+    command: "bash test.sh"
+
+# 测试断言总数 (test_package 实测断言数)
+assertion_count: 4

@@ -1,0 +1,101 @@
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/1.0.3/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.0.3"
+
+# 软件名
+software: "ddccontrol"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-08"
+build_system: "autotools"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://codeload.github.com/ddccontrol/ddccontrol/tar.gz/refs/tags/1.0.3"
+
+  # 源码校验和（本机 sha256sum 实测，175621B 与 ST 取证一致）
+  sha256: "4f3a3d9a00e09b07423d2aed308b21dccfe57642f5d9bbf79802a0656dd11d1e"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表（配方 generate() 实际传给 configure 的参数；
+  # gettext_datadir / ACLOCAL_PATH / PATH / CPPFLAGS / LDFLAGS / LIBS 走
+  # AutotoolsToolchain env，见 conanfile.py generate() 注释）
+  configure_options:
+    - "--disable-gnome"
+    - "--build=aarch64-linux"
+    - "--host=aarch64-linux"
+    - "ac_cv_header_sys_io_h=no"
+    - "--enable-static"
+    - "--disable-shared"
+
+  # 编译依赖列表（格式: name/version；preflight --deps 与 conan graph 实测已发布/可解）
+  dependencies:
+    - libxml2/2.15.3.1
+    - glib/2.88.3.1
+    - pciutils/3.13.0
+    - gettext/0.22.5.1
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 测试口径（三处同源：本件 / notes.md / test_package/MANIFEST.yml）
+# ============================================================
+tests:
+  # 上游测试资产 —— §12.72 四口径 2026-10-08 于 git tag 源码树实测
+  #   test*/ 框架 0 · */res 语料 0 · **/*RUNTEST* 0 · demo|examples .c 0
+  #   全部 Makefile.am 无 TESTS=/check_PROGRAMS=；configure.ac 无测试宏
+  #   未注册脚本资产 5（scripts/*.sh）——2026-10-15 返修轮已逐条真实执行：执行 5 / 通过 0，
+  #   逐项首条真实错误与先决条件探针见 notes.md「对话 #2」；失败原因分类同 test_package/MANIFEST.yml 文件头
+  upstream: 0
+  # test_package 消费者断言（conan create 内实测 4/4 PASS）
+  after_adapt: 4
+  evidence: "reports/conan-verify-report.md"
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 0 个补丁：构建期改写均为生成物/参数/工具副本层面，明细见 notes.md「源码修改」
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识（每条带 ref）
+knowledge_gained:
+  - "config.status 用 umask 077 && mktemp 建 700 目录，HMDFS 拒写 ⇒ 放宽 022（ref: E110, E112）"
+  - "conan 默认注入 GitHub 镜像防 E017 下载失败，跑后自动恢复原 conandata.yml（ref: E017）"
+  - "codeload tag URL 结尾无扩展名 ⇒ get() 必须显式 filename=*.tar.gz（ref: abcmidi/20260609 先例）"
+  - "conan gettext/intltool 的 autopoint/intltoolize 烘死 prefix=/ ⇒ env 覆盖 / shim 前缀改写（ref: l3afpad/0.8.18.1.11 先例）"
+  - "conan2 VirtualBuildEnv 不合成根配方自己的 buildenv_info ⇒ 消费者侧环境走 AutotoolsToolchain env（ref: klavaro/3.14 先例）"
+  - "静态 library 包 Require.run 默认 False ⇒ test_package 须 tested_reference run=True 才有 PATH（ref: depqbf/5.01 先例）"
