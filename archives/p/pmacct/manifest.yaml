@@ -1,0 +1,26 @@
+software: pmacct
+display: "pmacct 被动网络监控工具集"
+description: "被动网络监控工具集：IP 流量统计、BGP/BMP 路由监控与 RPKI 校验"
+category: network
+homepage: "http://www.pmacct.net/"
+license: GPL-2.0-only
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "上游 tag 归档不含 configure（git 树快照），build() 内 autoreconf -f -i -I m4 自举"
+    - "同 profile 非 cross build ⇒ AutotoolsToolchain 不自动补三元组；设备 uname -s=HarmonyOS 而 config.guess(2024-07-27) 不识别 ⇒ 必须显式传 --build/--host=aarch64-unknown-linux-ohos"
+    - "conan perl 5.42.2 与 hnp perl 5.42.0 的 XS 模块 ABI 不兼容（automake/1.18 的 .aclocal-real/.automake-real shebang 写死 hnp perl）⇒ 需 perl shim 把 aclocal/automake 指向 conan perl"
+    - "libcdada 为 git submodule 且制品仓未发布 ⇒ 随包 vendored，交由上游 --with-external-deps=yes 机制就地编译"
+    - "OHOS clang 把 -lstdc++ 归一化为 -lc++，上游硬编码 LIBS=-lstdc++ 无需补丁"
+    - "上游把守护进程装到 sbin/ ⇒ package() 折叠进 bin/（conan 约定）"
+  common_dependencies:
+    - libpcap
+    - libcdada
+
+versions:
+  "1.7.8":
+    status: built
+    build_date: "2026-10-08"
+    upstream_version: "1.7.8"
+    source_url: "https://github.com/pmacct/pmacct/archive/refs/tags/v1.7.8.tar.gz"

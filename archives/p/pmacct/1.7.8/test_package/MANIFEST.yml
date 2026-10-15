@@ -1,0 +1,53 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI 脚本 build_and_test.sh L0e 强制要求存在）
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# pmacct 1.7.8 的上游测试事实（实测，非推测）:
+#   1. 全树无 tests/ 目录；Makefile.am / src/Makefile.am 内
+#      TESTS / check_PROGRAMS / check-local / check-am 全部 0 命中 ⇒
+#      `make check` 无目标，上游没有自动化测试套件。
+#   2. 上游真实的测试入口是 ci/ 目录下的两处:
+#        a) ci/script.sh  —— 构建后测两步: `ls -l src/nfacctd` 与 `src/nfacctd -V`
+#           （逐字复现于 conanfile.py 的 _run_upstream_tests()，已实跑）
+#        b) ci/smoke-test/docker-compose.yml —— 7 个守护进程容器 + restart-count
+#           检查；依赖 docker，沙箱内不可执行 ⇒ 不纳入 build()。
+#   3. 适配后新增的鸿蒙消费者用例见 test_package/test_pmacct.py（10 条断言）。
+
+package: pmacct/1.7.8
+homepage: "http://www.pmacct.net/"
+
+# 上游测试发现命令（用于 make -n check / ctest -N 类分析）
+upstream_check_command: "make -n check  # 实测无 check 目标：Makefile.am 无 TESTS/check_PROGRAMS/check-local"
+
+# conanfile.py build() 中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "src/nfacctd -V  # 逐字复现上游 ci/script.sh 的测试段；另对全部 7 个交付二进制逐个 -V 自检"
+
+# 上游实际运行的测试程序（上游只有命令级冒烟测试，无单元测试）
+upstream_tests:
+  - file: ci/script.sh
+    source: pmacct-1.7.8/ci/script.sh
+    description: "上游 CI 测试段：ls -l src/nfacctd + src/nfacctd -V（断言输出含 cdada / libpcap version / clang 指纹）"
+    command: "src/nfacctd -V"
+  - file: ci/smoke-test/docker-compose.yml
+    source: pmacct-1.7.8/ci/smoke-test/docker-compose.yml
+    description: "上游冒烟测试（7 守护进程容器 + restart-count 判定）；需 docker，OHOS 沙箱不可执行，仅登记不执行"
+    command: "docker compose up --abort-on-container-exit  # 沙箱不可执行"
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: test_pmacct.py
+    description: "A 交付面：7 个可执行文件齐备且可执行"
+    command: "test_pmacct.py <package>"
+  - file: test_pmacct.py
+    description: "A2 七个二进制 -V 全部 rc=0"
+    command: "test_pmacct.py <package>"
+  - file: test_pmacct.py
+    description: "B 依赖指纹：nfacctd -V 含 cdada / libpcap version / clang"
+    command: "test_pmacct.py <package>"
+  - file: test_pmacct.py
+    description: "C OHOS 消费者端到端运行时用例：构造 3 帧 UDP pcap → pmacctd 离线消费 → 断言 CSV 聚合逐字相等（含 pcap_savefile_replay 语义）"
+    command: "test_pmacct.py <package>"
+
+# 测试断言总数（test_pmacct.py 实测: 总 10 / 通过 10 / 失败 0）
+assertion_count: 10
