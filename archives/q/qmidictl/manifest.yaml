@@ -1,0 +1,24 @@
+software: qmidictl
+display: "QmidiCtl"
+description: "MIDI remote controller application that sends MIDI data over the network using UDP/IP multicast (Qt6 GUI application)"
+category: audio
+homepage: "https://qmidictl.sourceforge.io"
+license: GPL-2.0-or-later
+build_system: cmake
+ohos_adaptation:
+  key_points:
+    - "E438: qtbase 自带可重定位 Qt6Config.cmake（cmake_find_mode=none），Qt6 组件只能靠 CMAKE_PREFIX_PATH + Qt6_DIR + Qt6Svg_DIR + CMAKE_MODULE_PATH(<qtbase>/lib/cmake/Qt6/platforms, Platform/HarmonyOS.cmake include Linux) 交给 CMake"
+    - "R35/R36: qtsvg/6.11.1.1 配方自身钉住 qtbase/6.11.1.3；图解析取 qtbase/6.11.1.1 会报 Version conflict，必须跟随 qtsvg 的钉版（两 revision 均已以 conan install --build=never 实测二进制齐备）"
+    - "R38: 产物含 bin/qmidictl（package_type=application），软件级 commands.json 声明 type=tool / ref=qmidictl/1.0.2"
+    - "E077: OHOS 内核只允许 exec 带有效 .codesign 的 ELF（未签名 rc=126 EPERM），package() 打包期用 binary-sign-tool 自签，test_package 的真实 exec 探针才有效"
+    - "R51: 上游无任何自动化测试（tarball 仅 CMakeLists.txt/ChangeLog/LICENSE/README/src，无 tests/ 树、无 enable_testing()/add_test()），L1 验证全部由 test_package 承担（TP-001..011，16 项断言）"
+    - "测试环境：OHOS 无 X11/Wayland，探针以 QT_QPA_PLATFORM=offscreen 运行（上游 main() 在建 QApplication 之后才处理 --version/--help）"
+versions:
+  "1.0.2":
+    status: built
+    build_date: "2026-10-02"
+    packaging: conan
+    notes: "conan recipe (os=OHOS arch=armv8); Qt6 CMake application; deps qtbase/6.11.1.3 + qtsvg/6.11.1.1; 上游零补丁 (patches: []); 本地 conan create 全绿，test_package PASSED (16/16)"
+    dependencies:
+      - qtbase/6.11.1.3
+      - qtsvg/6.11.1.1
