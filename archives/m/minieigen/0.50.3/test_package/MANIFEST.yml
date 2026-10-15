@@ -1,0 +1,30 @@
+package: minieigen/0.50.3
+homepage: "https://github.com/eudoxos/minieigen"
+
+upstream_check_command: "python3 src/basic-test.py"
+upstream_test_in_build: true
+upstream_test_command: "target python3 src/basic-test.py"
+upstream_test_status: "passed"
+
+upstream_tests:
+  - file: "src/basic-test.py"
+    source: "minieigen-0.5.3/src/basic-test.py"
+    description: "唯一上游 smoke runner；执行向量、矩阵、复数、四元数和包围盒的 31 个可观察操作"
+    command: "target python3 src/basic-test.py"
+    observed_checks: 31
+
+test_package_tests:
+  - file: "test_minieigen.py"
+    description: "12 项消费者断言，覆盖目标 Python ABI 后缀、AArch64 ELF 及主要数学 API"
+    command: "target python3 test_minieigen.py"
+    assertion_count: 12
+  - file: "conanfile.py"
+    description: "HarmonyOS 专项静态检查与扩展发现对照：动态依赖、PyInit_minieigen、.codesign、实测构建端 3.14 后缀拒绝、目标后缀导入及两臂字节一致"
+    command: "readelf -d/-Ws/-S minieigen*.so; target python3 probe_import.py"
+    assertion_count: 3
+
+upstream_observed_check_count: 31
+upstream_runner_count: 1
+consumer_assertion_count: 15
+assertion_count: 15
+total_test_gate_count: 16

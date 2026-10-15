@@ -1,0 +1,41 @@
+--- a/src/common.hpp
++++ b/src/common.hpp
+@@ -57,29 +57,36 @@
+ 	typedef Eigen::Matrix<complex<Real>,Eigen::Dynamic,Eigen::Dynamic> MatrixXcr;
+ #endif
+ 
+ 
+ #include<string>
+ using std::string;
+ #include<stdexcept>
+ #include<sstream>
+ #include<iomanip>
+ #include<vector>
+-
++#include<boost/type_traits/integral_constant.hpp>
++// Boost 1.89 removed boost::is_complex, which this 2014 code used as a
++// compile-time dispatch trait.  Eigen already exposes the same property for
++// every scalar supported by minieigen.
++namespace boost {
++	template<typename T>
++	struct is_complex: boost::integral_constant<bool,Eigen::NumTraits<T>::IsComplex> {};
++}
+ #include<boost/python.hpp>
+ namespace py=boost::python;
+ #include<boost/lexical_cast.hpp>
+ using boost::lexical_cast;
+ #include<boost/static_assert.hpp>
+ 
+ /**** double-conversion helpers *****/
+-#include"double-conversion/double-conversion.h"
++#include<double-conversion/double-conversion.h>
+ 
+ static double_conversion::DoubleToStringConverter doubleToString(
+ 	double_conversion::DoubleToStringConverter::NO_FLAGS,
+ 	"inf", /* infinity symbol */
+ 	"nan", /* NaN symbol */
+ 	'e', /*exponent symbol*/
+ 	-5, /* decimal_in_shortest_low: 0.0001, but 0.00001->1e-5 */
+ 	7, /* decimal_in_shortest_high */
+ 	/* the following are irrelevant for the shortest representation */
+ 	6, /* max_leading_padding_zeroes_in_precision_mode */
