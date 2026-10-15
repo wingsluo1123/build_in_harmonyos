@@ -1,0 +1,19 @@
+# conandata.yml — jakarta-jmeter 2.13
+# Apache JMeter 2.13 官方源码归档（archive.apache.org 官方归档主机）
+# 2015-03 发布；License Apache-2.0
+# SHA256 与官方 archive.apache.org 同目录 .md5 校验一致
+
+sources:
+  url: "https://archive.apache.org/dist/jmeter/source/apache-jmeter-2.13_src.tgz"
+  sha256: "f5aeda5db5266aef8b2de1c7c65229ac81339401b3cf64c810b2d34e2ae8957f"
+
+# JDK 9+（含 17）编译兼容补丁（详见各 patch 说明）：
+# 1) Swing 自 JDK 9 泛型化后，2.13 时代源码的两处泛型签名在新 javac 下不再合法
+# 2) javax.activation 曾由 JDK 自带（JDK 11 移除）——classpath 补一行外部 jar
+patches:
+  - patch_file: "patches/jm-0001-jdk9-swing-generics.patch"
+    patch_description: "JTreeTable/JMeterTreeNode 泛型签名适配 JDK 9+ 泛型化后的 Swing API（JTable(Vector,Vector)/DefaultMutableTreeNode.children()）"
+    patch_type: "portability"
+  - patch_file: "patches/jm-0002-javax-activation-classpath.patch"
+    patch_description: "build.xml classpath 增加 lib/activation-1.1.1.jar（javax.activation 自 JDK 11 起不再随 JDK 提供；jar 由配方自 Maven Central 自取并 sha256 钉校验）"
+    patch_type: "portability"

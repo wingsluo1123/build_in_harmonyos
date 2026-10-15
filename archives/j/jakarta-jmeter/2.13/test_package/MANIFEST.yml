@@ -1,0 +1,40 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: jakarta-jmeter/2.13
+homepage: "https://jmeter.apache.org/"
+
+# 上游存在官方测试套件（JUnit 单测 + batchtest）：
+#   官方无头入口 `ant test-headless`（org.apache.jorphan.test.AllTests，1596 用例）
+#   与 batchtest（golden 文件 diff）。
+# 本包的 conan build() 只做工程构建（download_jars + package），不在 build() 内跑上游
+# 测试——上游测试作为独立验证步骤在 CI 外真机运行并如实记录（含通过率与失败清单），
+# 以保证权威 CI 时限可控、工程语义可复现。证据见 notes.md 与本机 runs 目录：
+#   upstream-tests/test-headless-run1.log（官方入口原样运行）
+#   upstream-tests/test-headless-rerun-add-opens.log（JPMS --add-opens 诊断性重跑）
+upstream_check_command: "ant test-headless（官方支持的无头入口，build.xml test-headless 目标）"
+upstream_test_in_build: false
+upstream_test_command: "ant -Dsrc.java.version=1.8 -Dtarget.java.version=1.8 test-headless（CI 外真机运行）"
+
+# 上游测试用例（入口级说明；1596 个 JUnit 用例的逐用例清单见日志）
+upstream_tests:
+  - file: "test/src/**（JUnit 单测，org.apache.jorphan.test.AllTests 汇集）"
+    description: "官方无头单测套件：JDK 17 真机原样运行 1596 用例，1475 通过 / 1 失败 / 120 错误（92.4%）。失败根因三类：xstream 1.4.8 触发 JDK17 JPMS InaccessibleObjectException（java.util 未开放）、本机 headless 字体栈 SunFontManager 初始化失败、2006 年代 htmlparser 的 [B→[C ClassCastException（JDK9+ compact strings）"
+    command: "ant -Dsrc.java.version=1.8 -Dtarget.java.version=1.8 test-headless"
+  - file: "testfiles/**（batchtest golden diff）"
+    description: "batchtest 为 `ant test`（非 test-headless）目标的一部分，本轮未运行（记录为未覆盖，非 PASS）"
+    command: "ant test（未运行）"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.sh
+    description: "三段式消费者验证（记账以 CI 实测输出为准）：1) 结构校验 4 个 OK 断言——bin/ApacheJMeter.jar 存在、lib/ext/ApacheJMeter_core.jar 存在、lib/=57 与 lib/ext/=15 jar 计数（同一 OK 行输出）、lib/activation-1.1.1.jar 存在；2) 真实运行打包产物 java -jar ApacheJMeter.jar --version 并断言报告 Version 2.13（1 项）；3) 编译并运行 Java 反射消费者程序 TestApacheJMeter.java——12 项断言 OK[1]–OK[12]（7 项核心类存在、不触发静态初始化：JMeter/StandardJMeterEngine/SampleResult/JMeterContextService/JMeterUtils/SaveService/HashTree + StandardJMeterEngine 无 GUI 实例化 + getJMeterVersion() 以 2.13 开头 + 版权含 Apache + SampleResult 方法契约 + NewDriver(Main-Class) 的 main(String[]) 存在）；javac 编译成功 OK 行为过程输出，不计断言 (R34 实质性验证)"
+    command: "bash test.sh"
+
+# 测试断言总数
+# 上游：1596 用例（官方入口实测 1475 通过 / 1 失败 / 120 错误）+ batchtest 未运行
+# test_package：结构校验 4 项 + 二进制运行断言 1 项 + 反射断言 12 项 = 17
+#   （ci-run6.log 实测 OK 行构成：结构 4 + --version 1 + javac 编译过程输出 1（不计）
+#    + OK[1]–OK[12]；反射段结论行 "12 assertions passed"）
+assertion_count: 17
