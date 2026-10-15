@@ -1,0 +1,38 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index eb44ff6..ef725d7 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -48,7 +48,10 @@ add_feature_info("prctl/procctl tracing control"
+ find_package(Qt6 ${QT_MIN_VERSION} CONFIG REQUIRED COMPONENTS DBus Widgets Quick Test)
+ 
+ if (Qt6Gui_VERSION VERSION_GREATER_EQUAL "6.10.0")
+-    find_package(Qt6GuiPrivate ${REQUIRED_QT_VERSION} REQUIRED NO_MODULE)
++    # Qt6GuiPrivate is only used by the X11 locker autotest (private
++    # qtx11extras_p.h); make it optional so the core library builds
++    # without it (e.g. on HarmonyOS PC where X11 is unavailable).
++    find_package(Qt6GuiPrivate ${REQUIRED_QT_VERSION} NO_MODULE)
+ endif()
+ 
+ # Crash / KIO / Svg are only used by the greeter, KCMUtils only by the
+diff --git a/autotests/CMakeLists.txt b/autotests/CMakeLists.txt
+index 94a6db0..81a2557 100644
+--- a/autotests/CMakeLists.txt
++++ b/autotests/CMakeLists.txt
+@@ -64,6 +64,11 @@
+     ../kscreenlocker_logging.cpp
+ )
+ 
++# x11lockertest.cpp includes private/qtx11extras_p.h from the
++# (optional, see top-level CMakeLists.txt) Qt6GuiPrivate package;
++# gate the whole target so a missing package skips the test cleanly
++# instead of failing later inside the compiler.
++if (Qt6GuiPrivate_FOUND)
+ add_executable(x11LockerTest ${x11LockerTest_SRCS})
+ target_link_libraries(x11LockerTest
+     KF6::GlobalAccel
+@@ -82,3 +87,5 @@
+ ecm_mark_as_test(x11LockerTest)
+ 
+ endif ()
++
++endif ()

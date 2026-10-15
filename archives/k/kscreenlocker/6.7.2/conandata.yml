@@ -1,0 +1,36 @@
+# conandata.yml — kscreenlocker 6.7.2
+# sha256 verified against the official KDE tarball.
+
+sources:
+  url: "https://download.kde.org/stable/plasma/6.7.2/kscreenlocker-6.7.2.tar.xz"
+  sha256: "77f02418b61a62727cb43c03c7ed7772c67b1c2cbc3691e4f36726a4720a1cba"
+
+patches:
+  "6.7.2":
+    - patch_file: "patches/0001-ohos-optional-x11.patch"
+      patch_description: "HAVE_X11 gate: X11/XCB finds become OPTIONAL, the X11 locker (x11locker.cpp) and the X11 grab paths in ksldapp.cpp/globalaccel.cpp compile out when X11 is unavailable"
+      patch_type: "portability"
+    - patch_file: "patches/0002-ohos-optional-greeter-kcm.patch"
+      patch_description: "KSCREENLOCKER_BUILD_GREETER/KCM options: the greeter (PAM/PlasmaQuick/LayerShellQt/KF6Screen) and the KCM (KCMUtils) become optional, their find_package calls move inside the option guards"
+      patch_type: "portability"
+    - patch_file: "patches/0003-ohos-qt6guiprivate-optional.patch"
+      patch_description: "Qt6GuiPrivate find_package becomes optional: only the X11 locker autotest uses it (private qtx11extras_p.h)"
+      patch_type: "portability"
+    - patch_file: "patches/0004-ohos-cxx20-compat.patch"
+      patch_description: "C++20 compatibility for the clang15/libc++15 OHOS toolchain: std::expected is C++23-only, PowerInhibitor's expected<uint, QDBusError> becomes QDBusReply<uint>; CMAKE_CXX_STANDARD lowered from 23 to 20"
+      patch_type: "portability"
+    - patch_file: "patches/0005-install-public-headers.patch"
+      patch_description: "Upstream 6.7.2 never defines KScreenLocker_HEADERS so install() ships no public headers; define it (ksldapp.h + KsldApp forwarding header)"
+      patch_type: "bugfix"
+    - patch_file: "patches/0006-ohos-explicit-kf6-component-finds.patch"
+      patch_description: "CoreAddons/Package added to the main KF6 COMPONENTS find (linked by the core KScreenLocker target but absent upstream; published KF6 configs gate their find_dependency chains behind OFF feature flags), the ConfigGui component replaced by Config (the published kconfig/6.26.0 ships a single KF6Config package exporting ConfigCore+ConfigGui), and KF6::ConfigQml dropped from settings (KConfigQml not built in the published kconfig/6.26.0 package)"
+      patch_type: "portability"
+    - patch_file: "patches/0007-ohos-vendor-kconfigpropertymap.patch"
+      patch_description: "Vendor KConfigPropertyMap (kconfig 6.26.0 src/qml/, verbatim LGPL-2.0-or-later, export macro stripped) into settings/: since KF 5.89 the class lives in the KConfigQml component which the published kconfig/6.26.0 does not build (no header and no symbols anywhere in the package); settings' QML-facing config wrappers require the class"
+      patch_type: "portability"
+    - patch_file: "patches/0008-ohos-basename-soname-link.patch"
+      patch_description: "Relocatable basename SONAME linkage: the published KF6 libraries carry no DT_SONAME, so linking them by their absolute Conan cache paths bakes machine-private paths into DT_NEEDED (non-relocatable, E537). lld records the name as given on the command line, so the KF6 dependencies are linked by exact-file-name -l: flags (bare basenames) with the dependency directories attached PRIVATE to KScreenLocker, and the imported KF6:: targets are removed from the link declaration entirely: the public header ksldapp.h includes only Qt headers, so consumers need no KF6 usage requirements, and keeping the KF6 targets on the link interface would drag ECM into the consumer graph unconditionally through the KF6Package macros (round 28 caught that; the export also generates no find_dependency for the bare INTERFACE names, round 27). Only the KF6 components the sources actually consume are linked: an earlier all-imported-targets revision dragged the imported EXECUTABLE targets (kconfig_compiler_kf6/kconf_update/kpackagetool6 -- their IMPORTED_LOCATION is a bin/ tool) and libraries no source uses (Solid/Codecs/WidgetsAddons/ColorScheme/GuiAddons/I18nLocaleData) into DT_NEEDED, which the loader then cannot resolve (round 29 caught this); KF6::ConfigGui is deliberately absent (no source includes KConfigGui headers, and the published kconfig 6.26.0's libKF6ConfigGui.so carries a build-tree-relative DT_NEEDED ../../bin/libKF6ConfigCore.so that cannot resolve from any consumer context). Since the KF6 targets leave the link line, the usage requirements are copied by walking the INTERFACE_LINK_LIBRARIES transitive closure of the direct deps (KCoreConfigSkeleton/KPluginMetaData from the KF6 chain, QWidgetAction from the Qt6::Widgets target reachable through KF6::XmlGui -- rounds 25/26 caught each). The KDE-installed targets files set the per-config IMPORTED_LOCATION_RELEASE only, so every get_target_property lookup carries -NOTFOUND sentinel guards (a plain if(NOT var) misreads the non-empty sentinel as set; round 23 caught this); settings likewise links by -l: flags, and its search directories are attached INTERFACE -- settings is STATIC, so its -l: flags propagate to the KScreenLocker link line while PRIVATE link directories do not (round 31 G2: -l:libKF6XmlGui.so reached the KScreenLocker link line without its kxmlgui -L directory; round 32 adds the INTERFACE target_link_directories; round 34 adds KF6::ConfigGui to the settings loop -- the generated settings base includes kconfigskeleton.h and the KConfigSkeleton class lives in libKF6ConfigGui.so while libKF6ConfigCore.so exports only the KCoreConfigSkeleton class; libKF6ConfigGui.so's build-tree-relative DT_NEEDED (../../bin/libKF6ConfigCore.so) is staged by the recipe's test_package compatibility bin, the kconfig recipe's _prepare_ctest_runtime_links precedent); KScreenLocker additionally passes -Wl,-soname,libKScreenLocker.so explicitly where the platform module defines no soname flag (kpackage/6.26.0.1 0005 precedent, device-proven)"
+      patch_type: "portability"
+    - patch_file: "patches/0009-ohos-expose-isinhibited-for-testing.patch"
+      patch_description: "Expose KSldApp::isInhibited for the consumer test: upstream declares it in the private section; move the declaration into the public For-testing block where the same kind of test hooks (idleId/setIdleId/setGraceTime) already live, so test_package can verify the inhibit/uninhibit counter round trip black-box (definition and internal call sites unchanged)"
+      patch_type: "testability"

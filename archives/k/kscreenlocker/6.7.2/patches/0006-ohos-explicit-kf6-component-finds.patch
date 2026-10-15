@@ -1,0 +1,40 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -64,8 +64,21 @@ find_package(KF6 ${KF6_MIN_VERSION} REQUIRED COMPONENTS
++# KF6::CoreAddons / KF6::ConfigGui / KF6::Package are linked by the core
++# KScreenLocker target (below) but are absent from the upstream
++# COMPONENTS list; the published KF6 config files gate their
++# find_dependency chains behind feature flags that are OFF in the ohpcd
++# builds, so they are found explicitly here (round 14 G2 evidence).
++# The published kconfig/6.26.0 ships a single KF6Config package
++# (KF6ConfigConfig.cmake) whose targets file exports both KF6::ConfigCore
++# and KF6::ConfigGui; the KF6 meta-find component name is therefore
++# "Config" (round 16 G2 evidence: no KF6ConfigGuiConfig.cmake exists in
++# the published package).
+ find_package(KF6 ${KF6_MIN_VERSION} REQUIRED COMPONENTS
++    CoreAddons
++    Config
+     GlobalAccel
+     I18n
+     IdleTime
+     Notifications
++    Package
+     Solid
+     WindowSystem
+     XmlGui
+diff --git a/settings/CMakeLists.txt b/settings/CMakeLists.txt
+--- a/settings/CMakeLists.txt
++++ b/settings/CMakeLists.txt
+@@ -12,8 +12,10 @@ kconfig_add_kcfg_files(settings GENERATE_MOC kscreensaversettingsbase.kcfgc)
+ target_link_libraries(settings
+     Qt6::Quick
+-    KF6::ConfigQml
++# KConfigQml is not built in the published kconfig/6.26.0 package
++# (KF6ConfigTargets exports only ConfigCore/ConfigGui); nothing in
++# settings/ uses the QML API (round 14 G2 evidence).
+     KF6::GlobalAccel
+     KF6::I18n
+     KF6::Package
+     KF6::XmlGui
+ )

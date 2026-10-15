@@ -1,0 +1,209 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 345e970cea376ac889a1226edcb116d36bbafdab..acd42269d78756bcbf3b6e6441ddea59d97b2681 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -257,17 +257,105 @@ PUBLIC
+ PRIVATE
+    settings
+    Qt::DBus
+-   KF6::I18n
+-   KF6::IdleTime
+-   KF6::GlobalAccel
+-   KF6::Notifications
+-   KF6::CoreAddons
+-   KF6::ConfigGui
+-   KF6::Package
+-   KF6::WindowSystem
+    Wayland::Server
+ )
+ 
++# 0008: relocatable basename SONAME linkage (kpackage/6.26.0.1 0005
++# precedent, device-proven). The published KF6 dependency libraries carry
++# no DT_SONAME, so linking them by their absolute Conan cache paths bakes
++# machine-private paths into DT_NEEDED (non-relocatable, E537). lld
++# records the name as given on the command line, so the KF6 dependencies
++# are linked by exact-file-name -l: flags (bare basenames) with the
++# dependency directories attached PRIVATE to this target; the KF6::
++# targets are removed from the link declaration entirely -- the public
++# header ksldapp.h includes only Qt headers, so consumers need no KF6
++# usage requirements (keeping the KF6 targets on the link interface also
++# drags ECM into the consumer graph unconditionally; round 28 caught
++# that). Only the KF6 components the sources actually consume are
++# linked: the earlier all-imported-targets revision dragged the imported
++# EXECUTABLE targets (kconfig_compiler_kf6/kconf_update/kpackagetool6 --
++# their IMPORTED_LOCATION is a bin/ tool, not a library) and libraries
++# no source uses (Solid/Codecs/WidgetsAddons/ColorScheme/GuiAddons/
++# I18nLocaleData) into DT_NEEDED, which the loader then cannot resolve
++# (round 29 caught this). KF6::ConfigGui is absent from the
++# KScreenLocker link: the KScreenLocker sources proper include no
++# KConfigGui headers -- settings, which does (kconfigskeleton.h),
++# links KF6::ConfigGui itself through its own -l: loop (see the
++# settings/CMakeLists.txt 0008 block). The published kconfig 6.26.0's
++# libKF6ConfigGui.so carries a build-tree-relative DT_NEEDED
++# (../../bin/libKF6ConfigCore.so); the recipe's test_package stages a
++# compatibility bin for exactly that entry before running the consumer
++# tests (the kconfig recipe's _prepare_ctest_runtime_links precedent),
++# so it resolves at run time. The KDE-installed targets files set the
++# per-config
++# IMPORTED_LOCATION_RELEASE only; get_target_property returns the
++# "<var>-NOTFOUND" sentinel string for an unset property, so every
++# lookup must be sentinel-guarded (a plain if(NOT var) sees the non-empty
++# sentinel as "set" and silently skips the fallback -- round 23 caught
++# this).
++set(_ksld_direct_deps
++    KF6::I18n KF6::IdleTime KF6::GlobalAccel KF6::Notifications
++    KF6::CoreAddons KF6::Package KF6::WindowSystem
++    KF6::ConfigCore KF6::ConfigWidgets
++)
++set(_ksld_kf6_dirs "")
++set(_ksld_kf6_libs "")
++foreach(_ksld_t IN LISTS _ksld_direct_deps)
++    set(_ksld_loc "")
++    get_target_property(_ksld_loc ${_ksld_t} IMPORTED_LOCATION_RELEASE)
++    if(NOT _ksld_loc OR _ksld_loc MATCHES "-NOTFOUND$")
++        get_target_property(_ksld_loc ${_ksld_t} IMPORTED_LOCATION)
++    endif()
++    if(_ksld_loc AND NOT _ksld_loc MATCHES "-NOTFOUND$")
++        get_filename_component(_ksld_dir "${_ksld_loc}" DIRECTORY)
++        get_filename_component(_ksld_base "${_ksld_loc}" NAME)
++        list(APPEND _ksld_kf6_dirs "${_ksld_dir}")
++        list(APPEND _ksld_kf6_libs "-l:${_ksld_base}")
++    endif()
++endforeach()
++if(_ksld_kf6_dirs)
++    list(REMOVE_DUPLICATES _ksld_kf6_dirs)
++    list(REMOVE_DUPLICATES _ksld_kf6_libs)
++    target_link_directories(KScreenLocker PRIVATE ${_ksld_kf6_dirs})
++    target_link_libraries(KScreenLocker PRIVATE ${_ksld_kf6_libs})
++endif()
++# Usage requirements (include dirs/definitions) of the KF6 deps no longer
++# arrive through the link line; walk the transitive closure of the direct
++# KF6 deps and copy them (rounds 25/26 caught the missing transitive
++# headers: KCoreConfigSkeleton/KPluginMetaData from KF6, QWidgetAction
++# from the Qt6::Widgets target reachable through KF6::XmlGui).
++set(_ksld_walk KF6::I18n KF6::IdleTime KF6::GlobalAccel KF6::Notifications KF6::CoreAddons KF6::ConfigGui KF6::Package KF6::WindowSystem)
++set(_ksld_seen "")
++while(_ksld_walk)
++    list(GET _ksld_walk 0 _ksld_cur)
++    list(REMOVE_AT _ksld_walk 0)
++    list(FIND _ksld_seen "${_ksld_cur}" _ksld_idx)
++    if(_ksld_idx EQUAL -1 AND TARGET ${_ksld_cur})
++        list(APPEND _ksld_seen "${_ksld_cur}")
++        get_target_property(_ksld_inc ${_ksld_cur} INTERFACE_INCLUDE_DIRECTORIES)
++        if(_ksld_inc AND NOT _ksld_inc MATCHES "-NOTFOUND$")
++            target_include_directories(KScreenLocker SYSTEM PRIVATE ${_ksld_inc})
++        endif()
++        get_target_property(_ksld_defs ${_ksld_cur} INTERFACE_COMPILE_DEFINITIONS)
++        if(_ksld_defs AND NOT _ksld_defs MATCHES "-NOTFOUND$")
++            target_compile_definitions(KScreenLocker PRIVATE ${_ksld_defs})
++        endif()
++        get_target_property(_ksld_ll ${_ksld_cur} INTERFACE_LINK_LIBRARIES)
++        foreach(_ksld_item IN LISTS _ksld_ll)
++            if(TARGET ${_ksld_item})
++                list(APPEND _ksld_walk "${_ksld_item}")
++            endif()
++        endforeach()
++    endif()
++endwhile()
++# The OHOS platform module defines no soname flag, so without this the
++# shared library would be linked without DT_SONAME. Pass the basename
++# soname explicitly (kpackage/6.26.0.1 0005 precedent). Gated on the
++# platform soname flag so Linux keeps the versioned SOVERSION chain.
++if(NOT CMAKE_SHARED_LIBRARY_SONAME_CXX_FLAG)
++    target_link_options(KScreenLocker PRIVATE "-Wl,-soname,libKScreenLocker.so")
++endif()
++
+ if (HAVE_X11)
+     target_link_libraries(KScreenLocker PRIVATE X11::X11 XCB::XCB XCB::KEYSYMS)
+ endif ()
+diff --git a/settings/CMakeLists.txt b/settings/CMakeLists.txt
+index 58518195862ddf20537d3f076d1a81a8b7caf06a..c640bc200d47a48209120b3562f264b87943ac98 100644
+--- a/settings/CMakeLists.txt
++++ b/settings/CMakeLists.txt
+@@ -11,13 +11,80 @@ target_include_directories(settings PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+ set_property(TARGET settings PROPERTY POSITION_INDEPENDENT_CODE ON)
+ 
+ kconfig_add_kcfg_files(settings GENERATE_MOC kscreensaversettingsbase.kcfgc)
+-target_link_libraries(settings
+-    Qt6::Quick
++# 0008: relocatable linkage (see the top-level CMakeLists.txt 0008 block).
++# settings is a static library, so any KF6:: target linked here would
++# propagate its absolute Conan cache path through to the KScreenLocker
++# link line and bake machine-private paths into DT_NEEDED (E537). Link
++# the KF6 deps by exact-file-name -l: flags instead (lld records the name
++# as given, i.e. a bare basename); the imported targets still provide the
++# include dirs/definitions for compilation. KF6::ConfigGui is on the
++# list: settings includes KConfigGui/kconfigskeleton.h and the
++# KConfigSkeleton class lives in libKF6ConfigGui.so -- the published
++# kconfig 6.26.0's libKF6ConfigCore.so exports only the
++# KCoreConfigSkeleton core class (round 34 G2: undefined
++# KConfigSkeleton::qt_metacast/qt_metacall ct-ors with only
++# -l:libKF6ConfigCore.so on the link line). That library carries a
++# build-tree-relative DT_NEEDED (../../bin/libKF6ConfigCore.so); the
++# recipe's test_package stages a compatibility bin for exactly that
++# entry before running the consumer tests (the kconfig recipe's
++# _prepare_ctest_runtime_links precedent), so it resolves at run time.
+ # KConfigQml is not built in the published kconfig/6.26.0 package
+ # (KF6ConfigTargets exports only ConfigCore/ConfigGui); nothing in
+ # settings/ uses the QML API (round 14 G2 evidence).
+-    KF6::GlobalAccel
+-    KF6::I18n
+-    KF6::Package
+-    KF6::XmlGui
++set(_ksld_libs "")
++set(_ksld_dirs "")
++foreach(_ksld_dep KF6::GlobalAccel KF6::I18n KF6::Package KF6::XmlGui KF6::ConfigGui)
++    set(_ksld_loc "")
++    get_target_property(_ksld_loc ${_ksld_dep} IMPORTED_LOCATION_RELEASE)
++    if(NOT _ksld_loc OR _ksld_loc MATCHES "-NOTFOUND$")
++        get_target_property(_ksld_loc ${_ksld_dep} IMPORTED_LOCATION)
++    endif()
++    if(_ksld_loc AND NOT _ksld_loc MATCHES "-NOTFOUND$")
++        get_filename_component(_ksld_base "${_ksld_loc}" NAME)
++        get_filename_component(_ksld_dir "${_ksld_loc}" DIRECTORY)
++        list(APPEND _ksld_libs "-l:${_ksld_base}")
++        list(APPEND _ksld_dirs "${_ksld_dir}")
++    endif()
++endforeach()
++# INTERFACE, not PRIVATE: settings is a static library, so its -l: flags
++# propagate to KScreenLocker through the link interface; the matching
++# search directories must propagate too or the final link cannot resolve
++# them (round 31 G2: -l:libKF6XmlGui.so reached the KScreenLocker link
++# line without the kxmlgui -L directory).
++if(_ksld_dirs)
++    target_link_directories(settings INTERFACE ${_ksld_dirs})
++endif()
++# The transitive include dirs/definitions (KCoreConfigSkeleton from
++# KF6::ConfigCore, KPluginMetaData from KF6::CoreAddons, QWidgetAction
++# from the Qt6::Widgets target reachable through KF6::XmlGui, ...) no
++# longer arrive through the link line, so walk the transitive closure of
++# the direct KF6 deps and copy them (rounds 25/26 caught the missing
++# headers).
++set(_ksld_walk KF6::GlobalAccel KF6::I18n KF6::Package KF6::XmlGui)
++set(_ksld_seen "")
++while(_ksld_walk)
++    list(GET _ksld_walk 0 _ksld_cur)
++    list(REMOVE_AT _ksld_walk 0)
++    list(FIND _ksld_seen "${_ksld_cur}" _ksld_idx)
++    if(_ksld_idx EQUAL -1 AND TARGET ${_ksld_cur})
++        list(APPEND _ksld_seen "${_ksld_cur}")
++        get_target_property(_ksld_inc ${_ksld_cur} INTERFACE_INCLUDE_DIRECTORIES)
++        if(_ksld_inc AND NOT _ksld_inc MATCHES "-NOTFOUND$")
++            target_include_directories(settings SYSTEM PRIVATE ${_ksld_inc})
++        endif()
++        get_target_property(_ksld_defs ${_ksld_cur} INTERFACE_COMPILE_DEFINITIONS)
++        if(_ksld_defs AND NOT _ksld_defs MATCHES "-NOTFOUND$")
++            target_compile_definitions(settings PRIVATE ${_ksld_defs})
++        endif()
++        get_target_property(_ksld_ll ${_ksld_cur} INTERFACE_LINK_LIBRARIES)
++        foreach(_ksld_item IN LISTS _ksld_ll)
++            if(TARGET ${_ksld_item})
++                list(APPEND _ksld_walk "${_ksld_item}")
++            endif()
++        endforeach()
++    endif()
++endwhile()
++target_link_libraries(settings
++    Qt6::Quick
++    ${_ksld_libs}
+ )

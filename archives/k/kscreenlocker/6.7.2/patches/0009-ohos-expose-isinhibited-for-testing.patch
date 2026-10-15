@@ -1,0 +1,47 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: LIMInGZE666 <limingze666@users.noreply.gitcode.com>
+Date: Thu, 1 Oct 2026 12:00:00 +0800
+Subject: [PATCH] Expose KSldApp::isInhibited for the consumer test
+
+The test_package consumer verifies the inhibit/uninhibit counter round
+trip black-box, which requires reading the effective inhibit state.
+Upstream declares isInhibited() in the private section; move the
+declaration into the public "For testing" block where the same kind of
+test hooks (idleId/setIdleId/setGraceTime) already live. The definition
+(ksldapp.cpp) and the internal call sites are unchanged.
+
+---
+ ksldapp.h | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/ksldapp.h b/ksldapp.h
+index bcc711c..7ae8194 100644
+--- a/ksldapp.h
++++ b/ksldapp.h
+@@ -211,6 +211,17 @@ public:
+     {
+         m_lockGrace = msec;
+     }
++    /**
++     * For testing
++     * @internal
++     *
++     * Moved here from the private section: the test_package consumer
++     * verifies the inhibit/uninhibit counter round trip black-box,
++     * which requires reading the effective inhibit state. The upstream
++     * header already exposes the same kind of test hooks publicly
++     * (idleId/setIdleId/setGraceTime).
++     **/
++    bool isInhibited() const;
+ 
+     /**
+      * @brief Returns whether software rendering is forced.
+@@ -344,8 +355,6 @@ private:
+      */
+     void lockProcessRequestedUnlock();
+ 
+-    bool isInhibited() const;
+-
+     void updateIdleTimeout();
+ 
+     /**
