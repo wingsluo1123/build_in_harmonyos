@@ -1,0 +1,34 @@
+--- a/src/bin/Makefile.am
++++ b/src/bin/Makefile.am
+@@ -1,23 +1,29 @@
+ if HAVE_READLINE
+   AM_CPPFLAGS = -I$(srcdir)/../include -DHAVE_READLINE
+ else
+   AM_CPPFLAGS = -I$(srcdir)/../include
+ endif
+ 
+ if HAVE_BIN
+ bin_PROGRAMS = thraxcompiler thraxrewrite-tester thraxrandom-generator
+ 
++# -Wl,--whole-archive,... below is deliberately a single -Wl argument list:
++# libtool re-orders two separate -Wl options away from -lfst, and the FST type
++# registration objects (local symbols in libfst.a:fst-types.o, reachable only
++# through static initializers) would then be dropped, leaving the FST type
++# registry empty at run time.
++
+ if HAVE_READLINE
+-  LDADD= -L/usr/local/lib/fst ../lib/libthrax.la -lfstscript -lfstfar -lfst -lm -ldl -lreadline -lcurses
++  LDADD= -L/usr/local/lib/fst ../lib/libthrax.la -lfstscript -lfstfar -Wl,--whole-archive,-lfst,--no-whole-archive -lm -ldl -lreadline -lcurses
+ else
+-  LDADD= -L/usr/local/lib/fst ../lib/libthrax.la -lfstscript -lfstfar -lfst -lm -ldl
++  LDADD= -L/usr/local/lib/fst ../lib/libthrax.la -lfstscript -lfstfar -Wl,--whole-archive,-lfst,--no-whole-archive -lm -ldl
+ endif
+ 
+ thraxcompiler_SOURCES = compiler.cc
+ 
+ thraxrewrite_tester_SOURCES = rewrite-tester.cc rewrite-tester-main.cc
+ 
+ thraxrandom_generator_SOURCES = random-generator.cc
+ endif
+ 
+ EXTRA_DIST = thraxmakedep regression_test.cc

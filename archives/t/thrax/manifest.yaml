@@ -1,0 +1,23 @@
+software: thrax
+display: "OpenGrm Thrax"
+description: "加权有限状态转换器（FST）语法编译器与改写工具集，支持语法编译、串改写与随机生成"
+category: utility
+homepage: "https://www.openfst.org/twiki/bin/view/GRM/ThraxDownload"
+license: Apache-2.0
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "config.guess 需补 aarch64 + HarmonyOS 识别（复用 Linux 三元组分支）"
+    - "三个编译出的 CLI（thraxcompiler/random-generator/rewrite-tester）的 LDADD 必须把 -lfst 包进 whole-archive：REGISTER_FST 在 libfst.a 内是文件局部符号，裸 -lfst 按需抽取会丢弃 FST 类型注册，运行期报 Unknown FST type / import 语法 Signal 11"
+    - "whole-archive 必须写成单个 -Wl 参数（-Wl,--whole-archive,-lfst,--no-whole-archive），拆成两个 -Wl 会被 libtool 重排失效"
+    - "AutotoolsToolchain 会整段覆盖自定义 CPPFLAGS（只剩 -DNDEBUG）且不注入依赖 include，改走 extra_cflags/extra_cxxflags；-L 走 extra_ldflags 保证位于链接行最前"
+    - "上游无测试套件（make check 空操作），消费者测试见版本目录 test_package/check_thrax.sh"
+  common_dependencies:
+    - "openfst/1.8.4.1"
+
+versions:
+  "1.3.10":
+    status: built
+    build_date: "2026-10-11"
+    notes: "whole-archive 链接口径 + 消费者测试；构建预算 7200s"
