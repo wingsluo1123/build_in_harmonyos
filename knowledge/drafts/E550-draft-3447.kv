@@ -1,0 +1,56 @@
+#====================================================================
+# E550-draft-3447.kv — 非 C/C++ 主体语言库（Node.js/npm 前端）误入 Conan 适配流程
+#====================================================================
+id:                     E550
+trigger_tool:           lang-preflight
+phase:                  pre-adaptation
+error_signature:        语言不匹配.*detected=nodejs|package.json.*webpack|package-lock.json|
+                        vite.config|tsconfig.json.*npm|detected_language.*nodejs
+severity:               2
+category:               toolchain
+match_keywords:         package.json, npm, nodejs, webpack, vite, babel, tsconfig,
+                        yarn, 前端, lang-preflight, env_unsupported
+root_cause:             任务对象为纯 JavaScript/TypeScript 前端库（如 jellyfin-web），
+                        构建主体是 npm + webpack/vite 工具链而非 C/C++ 编译器。
+                        CI 远端 clean 环境无 Node.js 工具链，且依赖是数百个 npm 包
+                        （不在 conan 制品仓生态内），R36 依赖发布检查无从满足。
+                        若跳过语言预检硬着头皮走 conan create，会在 configure/build
+                        阶段因找不到 node/npm 或无法解析依赖而大量浪费预算。
+affected_scope:         所有以 npm/yarn/pnpm 为主构建系统的 JS/TS 库（web 前端、
+                        Node 工具、Electron 应用等）；判定依据：根目录 package.json
+                        + package-lock/yarn.lock + webpack/vite/babel/tsconfig 配置，
+                        且 src/ 下 JS/TS 源文件占比 >= 70%
+verification_cmd:       python3 $SKILL_ROOT/scripts/ohc-run.py lang-preflight <name> <ver> --src $BUILD_SRC_DIR
+
+rec_priority:           1
+rec_approach:           lang-preflight-gate
+rec_description:        在进入适配主流程前（checkout 源码后立即）强制执行 R47 语言预检。
+                        判定为 nodejs 等非 C/C++ 主体语言时：立即以 env_unsupported +
+                        detected_language=nodejs + language_evidence 三项证据上报终态
+                        （协议 v0.8 附录 D），平台按 lang_hold 挂起等生态（非失败记录），
+                        禁止硬着头皮适配。若 CI 能力矩阵未来补齐 Node 工具链包
+                        （类似 pdfsandwich 的 tool_requires ocaml 路线），可重新评估。
+rec_command:            python3 $SKILL_ROOT/scripts/ohc-run.py lang-preflight <name> <ver> --src $BUILD_SRC_DIR
+rec_auto_fix:          false
+
+forbid_1_pattern:       在 nodejs 主体项目上手工编写 conanfile.py 调用 npm install
+principles:             P003
+causes:
+caused_by:
+similar_to:
+conflicts_with:
+prerequisite_of:
+
+doc_file:               doc/E550.md
+last_updated:           2026-10-15
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:                3447
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count: 0
+metrics_fail_count: 0
+metrics_confidence: 0.0
+metrics_last_used:
