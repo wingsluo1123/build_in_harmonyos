@@ -1,0 +1,51 @@
+version: "0.33"
+software: yamcha
+status: built
+build_date: "2026-09-30"
+conan_ref: "yamcha/0.33"
+build_system: autotools
+
+source:
+  url: "https://distfiles.macports.org/yamcha/yamcha-0.33.tar.gz"
+  sha256: "413d4fc0a4c13895f5eb1468e15c9d2828151882f27aea4daf2399c876be27d5"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix={package_folder}"
+    - "--host/--build: passed by conan.tools.gnu.Autotools (local cross build=aarch64-apple-darwin, host=aarch64-unknown-linux-ohos)"
+  dependencies:
+    - "tinysvm/0.09"
+  cc: clang
+  cxx: clang++
+  layout: in-source (srcdir == builddir, required by libexec/Makefile.am's relative -I../src)
+
+patches_applied:
+  - "0001-config.guess.patch"
+  - "0002-config.sub.patch"
+  - "0003-cxx11-make_pair.patch"
+  - "0004-umask-000.patch"
+  - "0005-c-api-try-catch.patch"
+
+upstream_tests:
+  command: "make check"
+  test_count: 4
+  notes: "The four official scripts (test1.sh-test4.sh) train a chunking model with svm_learn, annotate test.data, score with conlleval.pl, compress the model with mkmodel, and re-annotate; test2/4 use DIRECTION=-B and test3/4 use MULTI_CLASS=2."
+
+test_package:
+  assertion_count: 9
+  description: "HarmonyOS-specific installed-package tests cover the yamcha CLI (binary presence, version, help) and the public C API error path through the installed library."
+
+knowledge_gained:
+  - "yamcha 0.33 ships 2005-era config.guess/config.sub scripts that do not recognize HarmonyOS or aarch64, and are also too old for modern macOS arm64 (Darwin 24); the native linux-ohos triplet patch plus an arm64 Darwin branch keeps build==host without forbidden configure triplet overrides"
+  - "The 2005 C++ sources use explicit std::make_pair<int,int>(lvalue, lvalue) calls; libc++'s C++11 forwarding-reference make_pair cannot bind lvalues to int&&, so dropping the explicit template arguments restores deduction and compiles under every standard"
+  - "configure hard-requires perl (>=5.004), svm_learn (TinySVM or SVM-light via AC_PATH_PROGS) and gzip at configure time; the training pipeline additionally needs the svm_learn binary, so tinysvm/0.09 must be a recipe dependency even though the runtime library itself does not link against it; host-context requires do not contribute bindirs to the conan build env, so the recipe exposes tinysvm/bin on the build PATH explicitly"
+  - "The 2005 libtool probe disables shared libraries for clang/aarch64-linux-ohos (the C linker check reports no), so the package ships the static library, matching the tinysvm/0.09 precedent; on the macOS cross host the native ranlib warns about an empty table of contents, which is expected for aarch64-ohos ELF objects"
+  - "libyamcha carries libtool version-info 3:0:2 (soname libyamcha.so.1 upstream); LTVERSION is exported through configure.in so the source layout preserves the upstream ABI naming even though OHOS packages link statically"
+  - "autoconf 2.59 config.status creates its confstatXXXXXX temp dir with umask 077; on OHOS HMDFS a 0700 dir lands group-untraversable (drwx--S---), so subs.sed/out writes fail with Permission denied and no Makefile is generated (CI PR #14172 evidence); fix is patching configure's two 'umask 077' to 'umask 000' (cdcd 0.6.6 0002 precedent, E011/E206 family)"
+  - "yamcha 0.33's public C API (yamcha_svm_new) does not honor its own failure contract: SVM::Impl::open rethrows std::runtime_error on a missing/broken model (Mmap::open failure), the exception escapes the extern \"C\" boundary and aborts the process (libc++abi terminate) instead of returning NULL; the consumer test on the native OHOS worker proved it, so the recipe adds 0005 to wrap open() in try/catch and surface the error through yamcha_svm_strerror"
+
+knowledge_drafts:
+  - "DRAFT-yamcha-0.33-legacy-libtool-shared-probe-no.kv/.md (路径B: 老 libtool 在 OHOS 交叉下共享库探测失败→只产静态库；E236/E457/cdcd E688 撞车判定见 md)"
+  - "DRAFT-yamcha-0.33-conan-buildenv-path-injection.kv/.md (路径B: conan 2 构建环境不注入 host 依赖 bin，须 prepend_path 而非 define_path；similar_to cdcd E688/E232)"

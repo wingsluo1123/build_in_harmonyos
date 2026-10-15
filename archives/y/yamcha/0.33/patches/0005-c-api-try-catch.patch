@@ -1,0 +1,24 @@
+diff --git a/src/libyamcha.cpp b/src/libyamcha.cpp
+--- a/src/libyamcha.cpp
++++ b/src/libyamcha.cpp
+@@ -65,10 +65,17 @@
+   }
+   c->allocated = 0;
+ 
+-  if (! ptr->open (file)) {
+-    errorStr = std::string ("yamcha_new(): ")  + ptr->what ();
++  try {
++    if (! ptr->open (file)) {
++      errorStr = std::string ("yamcha_new(): ")  + ptr->what ();
++      delete ptr;
++      delete c;  
++      return 0;
++    }
++  } catch (std::exception &e) {
++    errorStr = std::string ("yamcha_new(): ") + e.what ();
+     delete ptr;
+-    delete c;  
++    delete c;
+     return 0;
+   }
+ 
