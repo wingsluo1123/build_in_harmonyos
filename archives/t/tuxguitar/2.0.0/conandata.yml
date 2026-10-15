@@ -1,0 +1,16 @@
+# conandata.yml — tuxguitar 2.0.0
+# 官方源码：GitHub tag 归档（上游 release 页仅提供二进制分发包，无源码包资产）
+#   https://github.com/helge17/tuxguitar/releases/tag/2.0.0
+#   commit 1190aa2b063c8e441600d2c334c9798256528c7a
+
+sources:
+  url: "https://github.com/helge17/tuxguitar/archive/refs/tags/2.0.0.tar.gz"
+  sha256: "a582ef93155619ef000baac38ea201de59dcb796503cb7ea71ef93a87d96312e"
+
+patches:
+  - patch_file: "patches/0001-common-TuxGuitar-lib-src-main-java-app-tuxguitar-util-TGUserFileUtils.java.patch"
+    patch_description: "HarmonyOS 用户目录修复：JVM 在鸿蒙上把 user.home 报告为不可用的相对占位符（实测为字面量 \"?\"），导致 TuxGuitar 的配置/缓存/模板目录被写到相对当前工作目录的 \"?/.config/tuxguitar\"。改为在 user.home 不可用时回退到 POSIX HOME 环境变量（unix 系平台恒为绝对路径），无副作用：user.home 正常时行为完全不变"
+    patch_type: "portability"
+  - patch_file: "patches/0002-desktop-pom.xml.patch"
+    patch_description: "HarmonyOS 构建修复：聚合器父 POM 仅按 Maven OS family（linux/windows/macos/freebsd）激活平台 profile 定义 org.eclipse.swt.groupId/artifactId，os.name=HarmonyOS 不匹配任何 family，属性未定义导致 Maven 直接 ProjectBuildingException。新增 os.name=HarmonyOS 激活的 platform-harmonyos profile"
+    patch_type: "portability"

@@ -1,0 +1,30 @@
+software: tuxguitar
+display: "TuxGuitar"
+description: "吉他六线谱（Tablature）编辑/播放引擎。本仓适配其可移植的 Java 引擎层（歌曲模型、TG/GP/PTB 文件格式、播放序列与乐理工具），不含 SWT/JFx/Qt GUI 与平台原生 MIDI 后端"
+category: multimedia
+homepage: "https://github.com/helge17/tuxguitar"
+license: LGPL-2.1-or-later
+build_system: maven
+package_type: library
+
+ohos_adaptation:
+  key_points:
+    - "语言为 Java（主体占比 99%），按本仓 Java house pattern 适配：Maven + BiShengJDK 17 源码编译，产物 JAR 置于 libexec/"
+    - "上游聚合器父 POM（desktop/pom.xml）只按 Maven OS family 激活平台 profile，HarmonyOS 不匹配任何 family → ProjectBuildingException；补丁 0002 增加 os.name=HarmonyOS 的 platform-harmonyos profile"
+    - "鸿蒙 BiShengJDK 17 的 user.home 为不可用相对占位符（字面量 \"?\"），会把应用目录写到相对 CWD 的 \"?\"；补丁 0001 在 user.home 不可用时回退 POSIX HOME"
+    - "仅构建可移植模块：用聚合器 -pl <artifactId 列表> -am 圈定 common/* + 无头核心，排除 SWT/JNI/android"
+    - "产物为纯 JAR 库（R38：库类型包，无需 commands.json）"
+  common_dependencies: []
+
+versions:
+  "2.0.0":
+    status: built
+    build_date: "2026-10-14"
+    conan_ref: "tuxguitar/2.0.0"
+    source_url: "https://github.com/helge17/tuxguitar/archive/refs/tags/2.0.0.tar.gz"
+    build_system: maven
+    notes:
+      - "上游测试 58 / 58 通过（13 个 JUnit5 测试类，0 失败 0 错误 0 跳过）"
+      - "test_package 12 例全过，其中鸿蒙特有用例 5 例"
+      - "2 个可移植性补丁（见 2.0.0/manifest.yaml patches_applied）"
+      - "conan-verify Verdict=PASS（G1/G2/G3/G4 全绿）"

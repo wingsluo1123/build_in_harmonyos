@@ -1,0 +1,82 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: tuxguitar/2.0.0
+homepage: "https://github.com/helge17/tuxguitar"
+
+# 上游测试命令（Maven surefire 在 package 阶段执行）
+upstream_check_command: "mvn -pl <common modules> -am clean package"
+# conanfile.py build() 中已集成上游测试（surefire 随 package 运行）
+upstream_test_in_build: true
+upstream_test_command: "mvn -pl <common modules> -am clean package"
+
+# ── 上游实际运行的测试（JUnit 5.9.2，surefire 报告为准）──────────────────
+# 总数 58 用例 / 13 个测试类；0 失败 / 0 错误 / 0 跳过
+# 原始证据：source_folder/**/target/surefire-reports/TEST-*.xml
+#   与 build_folder/upstream-test-result.json
+upstream_tests:
+  - file: common/TuxGuitar-lib/src/test/java/app/tuxguitar/io/tg/TestFileFormat20.java
+    source: tuxguitar-2.0.0/common/TuxGuitar-lib/src/test/java/app/tuxguitar/io/tg/TestFileFormat20.java
+    description: "TG 2.0 文件格式读写/校验（13 用例：testNewMajorVersionIsDetected, testTempoBase, testInvalidFile, testOpenValidXMLFile, testCheckLineBreak, testCanOpenValidFile, testMaxFret, testAlternativeEnharmonic, testRecognizeValidFile, testCanOpenCompatibleExtendedFormat, testWrittenFileValidatesSchema, testPickStroke, testXmlCanBeExtended）"
+    command: "mvn -pl :tuxguitar-lib -am test"
+  - file: common/TuxGuitar-lib/src/test/java/app/tuxguitar/util/TestMusicKeyUtils.java
+    source: tuxguitar-2.0.0/common/TuxGuitar-lib/src/test/java/app/tuxguitar/util/TestMusicKeyUtils.java
+    description: "乐理工具（12 用例：testScaleKeySignature, testAltOctave, testAltPosition, testAltName, testAlterations, testNoteIndexAlteration, testAddInterval, testNotesNames, testNoteIsNatural, testNotesPosition, testNotesOctave, testNoteIndexToMidi）"
+    command: "mvn -pl :tuxguitar-lib -am test"
+  - file: common/TuxGuitar-lib/src/test/java/app/tuxguitar/player/base/TestLetRing.java
+    source: tuxguitar-2.0.0/common/TuxGuitar-lib/src/test/java/app/tuxguitar/player/base/TestLetRing.java
+    description: "Let Ring 延音播放语义（8 用例：testMeasure1, testMeasure3, testMeasure8, testMeasure9, testMeasure12, testMeasure14, testMeasure16, testMeasures5_6）"
+    command: "mvn -pl :tuxguitar-lib -am test"
+  - file: common/TuxGuitar-lib/src/test/java/app/tuxguitar/player/base/TestRepeatController.java
+    source: tuxguitar-2.0.0/common/TuxGuitar-lib/src/test/java/app/tuxguitar/player/base/TestRepeatController.java
+    description: "反复记号控制（5 用例：testLooPAltRepeat4, testNominalSequence, testLoop1, testLoop123, testLooPAltRepeat2_3）"
+    command: "mvn -pl :tuxguitar-lib -am test"
+  - file: common/TuxGuitar-lib/src/test/java/app/tuxguitar/song/managers/TestAllocateNotesToStrings.java
+    source: tuxguitar-2.0.0/common/TuxGuitar-lib/src/test/java/app/tuxguitar/song/managers/TestAllocateNotesToStrings.java
+    description: "音符到弦的分配（5 用例：testDistributeNotes, testNoTuningChange, testToTrackWithLessStrings, testMove1chord, testMove1note）"
+    command: "mvn -pl :tuxguitar-lib -am test"
+  - file: common/TuxGuitar-lib/src/test/java/app/tuxguitar/song/managers/TestFreeEditionMode.java
+    source: tuxguitar-2.0.0/common/TuxGuitar-lib/src/test/java/app/tuxguitar/song/managers/TestFreeEditionMode.java
+    description: "自由编辑模式（5 用例：testChangeTimeSignature, testFix, testInsertBeatVoice2, testInsertBeat, testChangeDuration）"
+    command: "mvn -pl :tuxguitar-lib -am test"
+  - file: common/TuxGuitar-lib/src/test/java/app/tuxguitar/song/models/TestTGDuration.java
+    source: tuxguitar-2.0.0/common/TuxGuitar-lib/src/test/java/app/tuxguitar/song/models/TestTGDuration.java
+    description: "时值精度（3 用例：testSplitDuration, testPreciseDuration, testTimePreciseTime）"
+    command: "mvn -pl :tuxguitar-lib -am test"
+  - file: common/TuxGuitar-lib/src/test/java/app/tuxguitar/util/TestVersion.java
+    source: tuxguitar-2.0.0/common/TuxGuitar-lib/src/test/java/app/tuxguitar/util/TestVersion.java
+    description: "版本号解析/排序（2 用例：testVersionFromString, testOrdering）"
+    command: "mvn -pl :tuxguitar-lib -am test"
+  - file: common/TuxGuitar-lib/src/test/java/app/tuxguitar/player/base/TestSequenceParser.java
+    source: tuxguitar-2.0.0/common/TuxGuitar-lib/src/test/java/app/tuxguitar/player/base/TestSequenceParser.java
+    description: "序列解析（1 用例：testTempoTimestampMap）"
+    command: "mvn -pl :tuxguitar-lib -am test"
+  - file: common/TuxGuitar-lib/src/test/java/app/tuxguitar/song/managers/TestTrackManager.java
+    source: tuxguitar-2.0.0/common/TuxGuitar-lib/src/test/java/app/tuxguitar/song/managers/TestTrackManager.java
+    description: "轨道延音音符查找（1 用例：testGetNextTiedNote）"
+    command: "mvn -pl :tuxguitar-lib -am test"
+  - file: common/TuxGuitar-lib/src/test/java/app/tuxguitar/song/models/TestTrack.java
+    source: tuxguitar-2.0.0/common/TuxGuitar-lib/src/test/java/app/tuxguitar/song/models/TestTrack.java
+    description: "轨道音高范围（1 用例：testMinMaxPitch）"
+    command: "mvn -pl :tuxguitar-lib -am test"
+  - file: common/TuxGuitar-editor-utils/src/test/java/app/tuxguitar/editor/TestTiedNotes.java
+    source: tuxguitar-2.0.0/common/TuxGuitar-editor-utils/src/test/java/app/tuxguitar/editor/TestTiedNotes.java
+    description: "连音生成（1 用例：testCreateTiedNotes）"
+    command: "mvn -pl :tuxguitar-editor-utils -am test"
+  - file: common/TuxGuitar-compat/src/test/java/app/tuxguitar/io/tg/v15/TestFileFormat20.java
+    source: tuxguitar-2.0.0/common/TuxGuitar-compat/src/test/java/app/tuxguitar/io/tg/v15/TestFileFormat20.java
+    description: "旧版格式兼容读写（1 用例：testFileFormatEquivalence）"
+    command: "mvn -pl :tuxguitar-compat -am test"
+
+# ── test_package 自带测试（消费者视角，在鸿蒙真机运行）─────────────────
+test_package_tests:
+  - file: TestTuxGuitarCore.java + TestHarmonyOSPlatform.java
+    description: "编译并运行 Java 消费者测试：TestTuxGuitarCore 7 例（版本解析/打包版本=2.0.0/版本排序/TGSongManager 建曲/默认 6 弦/经 TGMeasureManager 加音符回读/乐理工具 MIDI 69→A4）+ TestHarmonyOSPlatform 5 例（os.name=HarmonyOS / 用户目录走可移植分支 / 目录为绝对路径 / 位于 $HOME 之下 / 目录可写），每例独立 TEST PASS/FAIL 判定"
+    command: "bash test.sh <package_folder>"
+
+# 测试检查项总数
+# 上游：58（13 类）
+# test_package：12（7 核心 + 5 鸿蒙）
+assertion_count: 12
