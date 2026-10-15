@@ -29,3 +29,15 @@ through libX11.
 
 - https://gitlab.freedesktop.org/xorg/lib/libxrender
 - https://xorg.freedesktop.org/archive/individual/lib/
+
+## Conan revision 0.9.12.1
+
+This revision uses published libx11/6.4.0 for the Cairo-GObject/librsvg closure,
+without replacing 0.9.12. It preserves libXrender.so.1, signs final ELF bytes,
+removes producer build-private RUNPATH and uses relative pkg-config metadata.
+Native shared/static builds each passed three consumers and one relocated
+HarmonyOS provider test; upstream registers zero cases and make check returned 0.
+Official finish/local CI completed successfully; legacy clean-verify context
+and release/debug archive warnings remain recorded. Platform CI, AI Review and
+formal publication still require the normal PR and post-merge release flow.
+See 0.9.12.1/reports and E16334-draft-XR14 for evidence and the reusable counterexample.
