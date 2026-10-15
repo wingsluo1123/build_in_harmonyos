@@ -1,0 +1,45 @@
+--- a/ref10/CMakeLists.txt
++++ b/ref10/CMakeLists.txt
+@@ -1,18 +1,18 @@
+ cmake_minimum_required(VERSION 3.10)
+ project(ref10 LANGUAGES C)
+ 
+ include(CTest)
+ 
+ include(CheckSymbolExists)
+ 
+-if (UNIX)
++if (UNIX OR CMAKE_SYSTEM_NAME STREQUAL "HarmonyOS")
+     if (DEFINED ENV{FORCE_URANDOM})
+         set(RANDOM_SOURCE_getentropy  FALSE)
+         set(RANDOM_SOURCE_getentropy2 FALSE)
+         set(RANDOM_SOURCE_getrandom   FALSE)
+         set(RANDOM_SOURCE_getrandom2  FALSE)
+         set(RANDOM_SOURCE_getrandom3  FALSE)
+         set(RANDOM_SOURCE_urandom     TRUE)
+     else ()
+         CHECK_SYMBOL_EXISTS(getentropy    "sys/random.h"            RANDOM_SOURCE_getentropy)
+         CHECK_SYMBOL_EXISTS(getentropy    "unistd.h"                RANDOM_SOURCE_getentropy2)
+@@ -34,21 +34,21 @@
+     set(RANDOM_SOURCE_getrandom3  FALSE)
+     set(RANDOM_SOURCE_urandom     FALSE)
+ endif (UNIX)
+ 
+ if (WIN32)
+     set(RANDOM_SOURCE_rtlgenrandom TRUE)
+ else (WIN32)
+     set(RANDOM_SOURCE_rtlgenrandom FALSE)
+ endif (WIN32)
+ 
+-if (NOT (UNIX OR WIN32))
++if (NOT (UNIX OR WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "HarmonyOS"))
+     message(FATAL_ERROR "Unsupported operating system (neither UNIX nor Windows). CMake will exit.")
+ endif ()
+ 
+ if (WIN32)
+     # On Windows, don't even try to organize the outputs logically
+     set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
+     set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
+     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
+ 
+     foreach (OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES})
