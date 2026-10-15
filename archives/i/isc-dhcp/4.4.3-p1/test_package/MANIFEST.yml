@@ -1,0 +1,68 @@
+# test_package/MANIFEST.yml
+# CI L0e 强制要求此文件存在
+# R51 上游测试三步法：清点 -> 运行 -> 如实回填
+
+package: isc-dhcp/4.4.3-p1
+homepage: "https://www.isc.org/dhcp/"
+
+# ── 上游测试清点结论（R51 第一步）─────────────────────────────
+#   * isc-dhcp 是 Autotools 单体工程；`make check` 是唯一定义的上游测试
+#     入口，经生成的 tests/unittest.sh 运行 common/client/relay/server
+#     四个 tests 目录、共 13 个 ATF 程序（Autotools check_PROGRAMS）。
+#   * ATF（Automated Testing Framework 0.19）不随发布树分发、需外带；
+#     configure 经 --with-atf=<prefix> 探测接入。未接入时 make check 只
+#     编译 tests/libt_api.a 即返回成功、不执行任何用例（空转陷阱）。
+#   * 本包把上游测试挂在配方 option 上：-o tests=True 且
+#     -c user.isc-dhcp:atf_prefix=<prefix> 才运行；tests=True 而未提供
+#     atf_prefix 时配方 validate() 直接拒绝（fail-closed，杜绝空转当绿）。
+#     默认构建（tests=False）不跑上游测试，故 upstream_test_in_build=false。
+#   * 真机全量执行（R51 第二步）结果见下方 result（13 程序 / 56 用例 /
+#     0 失败 / 0 跳过）；完整日志（make check 与各目录 atf-run 原始输出）
+#     随 reports/ 归档，另有 notes.md「上游测试」节记录。
+upstream_check_command: "make check"
+upstream_test_in_build: false
+upstream_test_command: "make check（经 -o tests=True -c user.isc-dhcp:atf_prefix=<atf-0.19 安装前缀> 启用；配方自动置 ATF_WORKDIR 指向可写目录）"
+
+# ── 上游实际运行的测试程序（四个 tests 目录，13 个 ATF 程序）────
+upstream_tests:
+  # common/tests（6 程序，25 用例）
+  - name: "common/tests/alloc_unittest"
+    result: "pass"
+  - name: "common/tests/dns_unittest"
+    result: "pass"
+  - name: "common/tests/domain_name_unittest"
+    result: "pass"
+  - name: "common/tests/misc_unittest"
+    result: "pass"
+  - name: "common/tests/ns_name_unittest"
+    result: "pass"
+  - name: "common/tests/option_unittest"
+    result: "pass"
+  # client/tests（1 程序，1 用例）
+  - name: "client/tests/duid_unittests"
+    result: "pass"
+  # relay/tests（1 程序，3 用例）
+  - name: "relay/tests/relay_unittests"
+    result: "pass"
+  # server/tests（5 程序，27 用例）
+  - name: "server/tests/dhcpd_unittests"
+    result: "pass"
+  - name: "server/tests/hash_unittests"
+    result: "pass"
+  - name: "server/tests/leaseq_unittests"
+    result: "pass"
+  - name: "server/tests/legacy_unittests"
+    result: "pass"
+  - name: "server/tests/load_bal_unittests"
+    result: "pass"
+
+# ── test_package 自带测试（消费者视角，均真实调用包内容）──────
+test_package_tests:
+  - file: test_package.c
+    description: "消费者 API 核验（3 个校验点）：CMake 消费者链接随包 libdhcp/libomapi/libdhcpctl 与捆绑 BIND 闭包；omapi_init()、dhcpctl_initialize() 实调；dhcpctl_connect 连接路径实际执行（无服务器环境，仅接受套接字层拒绝：CONNREFUSED/NETUNREACH，及 OHOS 非阻塞 connect 下经 dispatch 层上报的 NOMORE；解析期错误不在白名单内）"
+    command: "./test_package"
+  - file: conanfile.py
+    description: "打包程序实跑（4 个校验点）：dhcpd/dhclient/dhcrelay --version 退出 0；omshell 加载运行（可执行文件与静态链接闭包在目标环境完成加载执行）"
+    command: "conan test（test() 内 self.run 实跑）"
+
+assertion_count: 7

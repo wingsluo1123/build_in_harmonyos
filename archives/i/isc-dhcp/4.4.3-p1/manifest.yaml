@@ -1,0 +1,45 @@
+# 版本级 manifest
+# 文件位置: archives/i/isc-dhcp/4.4.3-p1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "4.4.3-p1"
+software: "isc-dhcp"
+status: built
+build_date: "2026-10-14"
+build_system: "autotools"
+
+source:
+  url: "https://ftp.isc.org/isc/dhcp/4.4.3-P1/dhcp-4.4.3-P1.tar.gz"
+  sha256: "0ac416bb55997ca8632174fd10737fd61cdb8dba2752160a335775bc21dc73c7"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "in-source configure/make（与真机 bring-up 一致）"
+    - "捆绑 BIND 由 bind/Makefile 驱动：--without-openssl --without-libxml2 --without-libjson --without-gssapi --disable-threads --without-lmdb --without-python --disable-kqueue --disable-epoll --disable-devpoll --with-randomdev=/dev/random"
+    - "tests=True 时 --with-atf=<user.isc-dhcp:atf_prefix>"
+  dependencies: []
+  cc: clang
+
+patches_applied:
+  - "0001-config.guess-harmonyos.patch"
+  - "0002-config.sub-linux-ohos.patch"
+  - "0003-configure-E011-HMDFS-umask-fix.patch"
+  - "0004-bind-config.guess-harmonyos.patch"
+  - "0005-bind-config.sub-linux-ohos.patch"
+  - "0006-bind-configure-E011-HMDFS-umask-fix.patch"
+  - "0007-bind-makefile-shell-prefix.patch"
+  - "0008-tests-unittest-atfrun-command-v.patch"
+
+test:
+  upstream_entry: "make check（tests=True + atf-0.19）——common/client/relay/server 四个 tests 目录共 13 个 ATF 程序、56 用例（common 6 程序 25 用例 / client 1 程序 1 用例 / relay 1 程序 3 用例 / server 5 程序 27 用例）"
+  consumer: "test_package：dhcpd/dhclient/dhcrelay --version 实跑 + omshell 加载 + 链接三库的 OMAPI API 消费者（omapi_init/dhcpctl_initialize/dhcpctl_connect）"
+
+package:
+  contents:
+    - "bin/: dhcpd dhclient dhcrelay omshell"
+    - "lib/: libdhcp.a libomapi.a libdhcpctl.a + 捆绑 BIND 四库（libisc/libdns/libisccfg/libirs，静态链接闭包）"
+    - "include/: omapip/ 与 dhcpctl/ 公共 API 头 + 捆绑 BIND 头（isc/dns/isccfg/irs/dst/pk11/pkcs11）"
+    - "res/isc-dhcp/: dhcpd.conf.example dhclient.conf.example"
+  type: application
