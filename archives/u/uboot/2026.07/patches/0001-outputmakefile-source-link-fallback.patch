@@ -1,0 +1,13 @@
+--- a/Makefile
++++ b/Makefile
+@@ -640,7 +640,9 @@
+ 		echo >&2 "***"; \
+ 		false; \
+ 	fi
+-	$(Q)ln -fsn $(srctree) source
++	$(Q){ ln -fsn $(srctree) source 2>/dev/null || \
++		{ echo "$(abs_srctree)" > source; \
++		  echo "NOTICE: $(objtree)/source materialized as path file (filesystem forbids symlinks)"; }; }
+ 	$(call cmd,makefile)
+ 	$(Q)test -e .gitignore || \
+ 	{ echo "# this is build directory, ignore it"; echo "*"; } > .gitignore

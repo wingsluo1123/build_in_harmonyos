@@ -1,0 +1,51 @@
+software: uboot
+version: "2026.07"
+status: published
+build_date: "2026-10-10"
+conan_ref: "uboot/2026.07"
+source:
+  url: "https://ftp.denx.de/pub/u-boot/u-boot-2026.07.tar.bz2"
+  sha256: "78e8bfc382fe388f9b55aa1daf8c563522a037779b5d4c349d1415e381f1243e"
+  tar_format: tar.bz2
+build:
+  system: makefile
+  configure_options: [sandbox_defconfig, qemu_arm64_defconfig]
+  dependencies: ["sdl2/2.30.10"]
+  cc: clang
+  cxx: clang++
+patches_applied:
+  - "0001-outputmakefile-source-link-fallback.patch"
+  - "0002-kbuild-script-exec-via-shell.patch"
+  - "0003-binman-stamp-python-enable-guard.patch"
+  - "0004-tools-version-h-for-host-tools.patch"
+  - "0005-image-host-fit-check-sign-tools-gate.patch"
+  - "0006-fit-check-sign-gated-by-tools-fit-signature.patch"
+  - "0007-fit-cipher-host-gate-via-tools-symbol.patch"
+  - "0008-sandbox-syshdrs-wchar-musl.patch"
+  - "0009-capsule-esl-gen-via-python.patch"
+  - "0010-dhcpv6-ethaddr-compound-literal.patch"
+  - "0011-keep-syms-lto-script-via-shell.patch"
+  - "0012-ldflags-no-warn-rwx-guard-for-lld.patch"
+  - "0013-create-symlink-cp-fallback.patch"
+  - "0015-sandbox-nand-tmpdir.patch"
+  - "0017-expo-textline-cursor-at-text-end.patch"
+knowledge_gained:
+  - "OHOS 全域禁 symlink（ln -fsn EPERM）：O= 分离构建的 source 链接物化为路径文件；create_symlink 的 cp 回退必须带源存在性门以对齐 ln 的悬空语义（缺失源跳过而非硬错误）"
+  - "OHOS 内核无脚本 execve（binfmt_script 缺失，EACCES rc=126）：Kbuild/Kconfig 直接 exec 的辅助脚本一律改经 sh/$(CONFIG_SHELL) 解释执行，bash 脚本以 CONFIG_SHELL=bash 提供 POSIX 超集；调用方为上游不可改写文字且以命令形式调用（Kconfig $(success,) 探测的 popen PATH 查找、config.mk $(shell ...) 命令行）时改用同名 ELF 包装器置 PATH 前位——内核可执行 ELF，包装器 execv /bin/sh 打开真脚本执行（sdl2-config 实务实证：探测由静默 n 翻 y；另实测 busybox sh 对 <script> 操作数不做 PATH 查找，sh <裸名> 不可行）"
+  - "NO_PYTHON=1 + 宿主无 OpenSSL 构建：上游裸 #ifdef CONFIG_FIT_* 目标符号守卫在 host 工具侧须改 CONFIG_IS_ENABLED（USE_HOSTCC 重映射到 CONFIG_TOOLS_*），binman 戳记加 PYTHON_ENABLE 门"
+  - "musl 硬编码 32-bit wchar_t × clang -fshort-wchar 重定义冲突：syshdrs 构建去 -fshort-wchar（对齐上游 sdl.o 先例）；-flto 下仅 filter-out 不够，必须加 -fno-lto（bitcode module flags wchar_size 冲突）"
+  - "外部 C 工具不可用（efitools）→ 忠实 Python 移植 + openssl DER 字节级交叉验证，保住 EFI 胶囊认证自测面"
+  - "clang C99 6.6：const 全局对象的成员下标初始化器改复合字面量（文件作用域静态存储期），字节值不变"
+  - "ld-option 探测链接器与实际链接器错配：探 GNU ld、实际经 -fuse-ld=lld 链接 → 仅 lld 路由时跳过该探测"
+  - "sandbox 测试驱动挂在可选宿主显示库（SDL2）上时，无该库的宿主被 syncconfig 按 depends 静默收敛丢整条测试面 → 正确接法=先查平台制品仓（sdl2/2.30.10 已适配），conanfile requires + PATH/SDL_CONFIG/KCFLAGS 三件套接线使 HOST_HAS_SDL 探测命中、回到上游 CI 同形（无需自造存根/补丁；OHOS 上三件套两处为命令式调用，脚本 execve 禁令下须配同名 ELF 包装器消解，见 execve 条）；接入后以 pairs.txt 的 dm_test_video_base 锚定在位校验防静默收敛"
+  - "上游 pytest 逐子测试口径：从 u-boot.sym 链接器列表符号 _u_boot_list_2_ut_<suite>_2_<name> 枚举（非 C 符号）；单进程 ut all 有跨用例状态污染（dm_test_post_run 全量拆 uclass），必须每子测试独立进程"
+  - "E2E 块设备夹具：blk devnum 是 hex（设备 10 写 mmc a）、usb read 全参数 hex；有状态介质保存副本不可信（测试中途格式化载体）→ 每次从零重建（dd 零建 + 逐扇区显式覆盖）；sandbox usb 枚举顺序跨运行不稳 → 三 stick 经 stage.img 单载体同指一文件（读取不再依赖设备索引），写完以 cmp.b 回读 + 成品 flash1.img 复查做硬校验；mkimage 生成段先于文件系统构造段（boot.scr 被 ext2 构造器消费）"
+  - "上游 sandbox 无读取宿主环境变量的接口（os_getenv）：依赖 TMPDIR 等宿主变量的适配补丁须自带实现与声明（os.c 直通 getenv() + include/os.h），否则引用即编译失败；宿主路径长度不可假设，固定长度栈缓冲须改按实际长度动态分配"
+  - "环境文件的 #ifdef 门控与 defconfig 开关是两套独立事实：board/sandbox/sandbox.env 的 usbkbd stdin 条目被 CONFIG_SANDBOX_SDL 门控，非 SDL 构建静默丢失整条键盘输入测试面（dm_test_usb_keyb 的 tstc 判定必失败）——修复取向优先回上游同形（本交付经制品仓 sdl2 依赖接入使门控自然命中），无 SDL 宿主时才用 #elif 门控解耦（留档备选）；上游 CI（SDL=y）的绿不蕴含全部配置组合可用，遇测试失败先排查环境/配置差异再怀疑驱动逻辑"
+  - "构建树内相对路径假设在打包安装后断裂：sandbox 的 other.dtb 按 argv[0] 所在目录相对解析（state_get_rel_filename）、测试数据 README 按 CWD 相对读取——in-tree 全绿不蕴含包可用（in-tree 全绿也不覆盖包布局缺口），安装布局回放才显形；修复=随包镜像相对布局（bin/arch/sandbox/dts/other.dtb）+ 数据副本随包 + 第 0 步在位校验防回归"
+  - "平台 PR 检查按 gitcode .diff 端点取补丁——该端点对二进制文件只输出占位行（不带 GIT binary patch 数据），git apply 必然失败且被机器人误诊为网络问题；MR 中的二进制资产一律 base64 文本随包 + sha256 钉死 + 构建时物化复验（fixture-blobs.py 模式）"
+  - "适配缺件（宿主库/工具）第一反应=查平台制品仓（conan list -r ohpcd）：自写存根/降级裁剪既白工又与上游分叉（测试面被裁是隐性损失）；sdl2 缺失即典型——制品仓 requires 直取即回上游同形（本项实踩后返工）"
+  - "上游烘焙常量=行为语义锚：测试面因依赖静默收敛未执行时，被测路径的源码重构破坏不会被上游 CI 暴露（scene_textline 打开渲染把光标从文本末尾回卷到字段起始）；启用测试面后遇『常量 vs 行为』分歧，先查测试引入提交的提交信息（意图判词）再定『源码回归 vs 测试过期』；测试文件零修改约束下修复取向=恢复源码的行为语义并全量回归其余烘焙常量（帧压缩长度非单射、无法由标量差反推像素，定位须 dump 原始帧实证）"
+upstream_test_pass_rate: "919/919 (100%)"
+adapted_test_pass_rate: "919/919 (100%)"
+test_command: "conan create . --build=missing"

@@ -1,0 +1,44 @@
+--- a/scripts/Makefile.autoconf
++++ b/scripts/Makefile.autoconf
+@@ -128,6 +128,14 @@
+ # If arch/$(ARCH)/mach-$(SOC)/include/mach exists,
+ # make a symbolic link to that directory.
+ # Otherwise, create a symbolic link to arch/$(ARCH)/include/asm/arch-$(SOC).
++# OHOS filesystems forbid symlinks outright (EPERM), so when ln fails fall
++# back to a real directory copy; the include path resolves identically.
++# rm -rf first: a leftover directory from a previous cp fallback would make
++# 'ln -fsn' create a nested link inside it instead of replacing it.
++# cp only when the source exists: upstream ln -fsn silently creates a
++# dangling symlink when the arch-$(SOC)/arch-$(CPU) dir is absent (e.g.
++# qemu_arm64: CPU=armv8 but no arch-armv8 dir exists upstream, nothing
++# includes <asm/arch/*>); cp -r of a missing source is a hard error.
+ PHONY += create_symlink
+ create_symlink:
+ ifdef CONFIG_CREATE_ARCH_SYMLINK
+@@ -138,14 +146,24 @@
+ 	else									\
+ 		dest=arch/$(ARCH)/include/asm/arch-$(if $(SOC),$(SOC),$(CPU));	\
+ 	fi;									\
+-	ln -fsn $(abs_srctree)/$$dest include/asm/arch
++	rm -rf include/asm/arch;						\
++	if ln -fsn $(abs_srctree)/$$dest include/asm/arch 2>/dev/null; then	\
++		:;								\
++	elif [ -e $(abs_srctree)/$$dest ]; then				\
++		cp -r $(abs_srctree)/$$dest include/asm/arch;			\
++	fi
+ else
+ 	$(Q)if [ -d arch/$(ARCH)/mach-$(SOC)/include/mach ]; then	\
+ 		dest=../../mach-$(SOC)/include/mach;			\
+ 	else								\
+ 		dest=arch-$(if $(SOC),$(SOC),$(CPU));			\
+ 	fi;								\
+-	ln -fsn $$dest arch/$(ARCH)/include/asm/arch
++	rm -rf arch/$(ARCH)/include/asm/arch;					\
++	if ln -fsn $$dest arch/$(ARCH)/include/asm/arch 2>/dev/null; then	\
++		:;							\
++	elif [ -e arch/$(ARCH)/include/asm/$$dest ]; then			\
++		cp -r arch/$(ARCH)/include/asm/$$dest arch/$(ARCH)/include/asm/arch;	\
++	fi
+ endif
+ endif
+ 

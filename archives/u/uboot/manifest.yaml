@@ -1,0 +1,21 @@
+software: uboot
+display: "U-Boot"
+description: "U-Boot 通用引导加载器（sandbox 测试二进制 + qemu_arm64 aarch64 固件 + mkimage/dumpimage 等宿主工具链）"
+category: build-tool
+homepage: "https://docs.u-boot.org"
+license: GPL-2.0-or-later
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "sandbox 目标把 U-Boot 编译为宿主 userspace 二进制：全量 C 侧单元测试（DM_TEST/CMD_TEST/UNIT_TEST，919 子测试按 u-boot.sym 链接器列表符号枚举）逐子测试独立进程执行（上游 pytest 同款口径），无需 QEMU/开发板"
+    - "qemu_arm64_defconfig 产出真实 aarch64 固件 u-boot.bin；OHOS 上以 clang 原生构建（显式 HOSTCC=clang CC=clang，2026.07 上游已移除 LLVM=1 伞开关；LTO 链接经 ld.lld）"
+    - "host 工具 mkimage/dumpimage/fit_info/mkenvimage/fdtgrep 随 sandbox 构建产出，供消费者直接执行"
+    - "发行包内 ~25 个 symlink（目录链/文件链）经容错解包物化为副本，兼容 HMDFS 全域 EPERM（包内零软链）"
+    - "第三方依赖仅制品仓 sdl2/2.30.10（sandbox SDL 门控测试面接线）；其余 in-tree mbedtls + 内置 zlib；Kconfig 所需 bison/flex 由 OHOS 工具链提供"
+  common_dependencies: ["sdl2/2.30.10"]
+
+versions:
+  "2026.07":
+    status: published
+    build_date: "2026-10-10"

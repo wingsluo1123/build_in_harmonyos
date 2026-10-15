@@ -1,0 +1,50 @@
+--- a/Kconfig
++++ b/Kconfig
+@@ -87,7 +87,7 @@
+ 
+ config GCC_VERSION
+ 	int
+-	default $(shell,$(srctree)/scripts/gcc-version.sh -p $(CC) | sed 's/^0*//') if CC_IS_GCC
++	default $(shell,sh $(srctree)/scripts/gcc-version.sh -p $(CC) | sed 's/^0*//') if CC_IS_GCC
+ 	default 0
+ 
+ config CC_IS_CLANG
+@@ -95,7 +95,7 @@
+ 
+ config CLANG_VERSION
+ 	int
+-	default $(shell,$(srctree)/scripts/clang-version.sh $(CC))
++	default $(shell,sh $(srctree)/scripts/clang-version.sh $(CC))
+ 
+ choice
+ 	prompt "Optimization level"
+--- a/scripts/Kconfig.include
++++ b/scripts/Kconfig.include
+@@ -31,4 +31,4 @@
+ ld-option = $(success,$(LD) -v $(1))
+ 
+ # gcc version including patch level
+-gcc-version := $(shell,$(srctree)/scripts/gcc-version.sh -p $(CC) | sed 's/^0*//')
++gcc-version := $(shell,sh $(srctree)/scripts/gcc-version.sh -p $(CC) | sed 's/^0*//')
+--- a/Makefile
++++ b/Makefile
+@@ -1361,7 +1361,7 @@
+ cfg: u-boot.cfg
+ 
+ quiet_cmd_ofcheck = OFCHK   $2
+-cmd_ofcheck = $(srctree)/scripts/check-of.sh $2 \
++cmd_ofcheck = $(CONFIG_SHELL) $(srctree)/scripts/check-of.sh $2 \
+ 		$(srctree)/scripts/of_allowlist.txt
+ 
+ # Concat the value of all the CONFIGs (result is 'y' or 'yy', etc. )
+--- a/scripts/Makefile.build
++++ b/scripts/Makefile.build
+@@ -246,7 +246,7 @@
+ 	$(CONFIG_SHELL) $(srctree)/scripts/gen_ksymdeps.sh $@ >> $(dot-target).cmd
+ endif
+ 
+-cmd_check_local_export = $(srctree)/scripts/check-local-export $@
++cmd_check_local_export = $(CONFIG_SHELL) $(srctree)/scripts/check-local-export $@
+ 
+ define rule_cc_o_c
+ 	$(call cmd_and_fixdep,cc_o_c)

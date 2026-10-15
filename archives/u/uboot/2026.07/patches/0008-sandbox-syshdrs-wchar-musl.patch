@@ -1,0 +1,20 @@
+--- a/arch/sandbox/cpu/Makefile
++++ b/arch/sandbox/cpu/Makefile
+@@ -31,3 +31,17 @@
+ # the generated rule
+ cmd_cc_sdl.o = $(CC) $(filter-out -nostdinc -fshort-wchar, \
+ 	$(patsubst -I%,-idirafter%,$(c_flags))) -fno-lto -c -o $@ $<
++# initjmp.c / os.c / eth-raw-os.c hit the same musl wchar_t clash as
++# sdl.c: musl's <bits/alltypes.h> hardcodes 'typedef unsigned wchar_t'
++# (32-bit on aarch64), which collides with clang's __WCHAR_TYPE__
++# typedef under -fshort-wchar (16-bit). These files use no wide-char
++# APIs, so drop the flag and let the C library own wchar_t, matching
++# the sdl.o override above.
++# They must then also opt out of LTO, exactly like the sdl.o override:
++# their bitcode would otherwise carry a wchar_size=4 module flag that
++# ld.lld rejects at merge time against the rest of the tree's
++# -fshort-wchar (16-bit) world ("linking module flags 'wchar_size':
++# IDs have conflicting values").
++$(foreach f,initjmp.o os.o eth-raw-os.o, \
++	$(eval cmd_cc_$(f) = $$(CC) $$(filter-out -nostdinc -fshort-wchar, \
++		$$(patsubst -I%,-idirafter%,$$(c_flags))) -fno-lto -c -o $$@ $$<))

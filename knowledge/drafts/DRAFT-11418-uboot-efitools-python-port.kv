@@ -1,0 +1,44 @@
+#====================================================================
+# Draft: build rules hardcode external host tool (efitools) that
+#        upstream CI apt-installs; OHOS has neither the binary nor
+#        OpenSSL headers to build it - vendor a stdlib-only Python
+#        port of the exact data-wrap operation (u-boot 2026.07
+#        lib/efi_loader capsule_esl_file)
+#====================================================================
+
+id:                     DRAFT-11418-UBOOT-EFITOOLS-PYTHON-PORT
+trigger_tool:           make|efi_loader|capsule_esl_file|cert-to-efi-sig-list|efitools|Error 127|OpenSSL|conan
+phase:                  build
+error_signature:        /bin/sh: cert-to-efi-sig-list: (inaccessible|not found)|capsule_esl_file.*Error 127|command not found.*efitools
+
+severity:               2
+category:               external-build-tool-vendor
+match_keywords:         efitools, cert-to-efi-sig-list, capsule_esl_file, EFI_CAPSULE_AUTHENTICATE, Error 127, ESL, EFI_SIGNATURE_LIST, OpenSSL, apt, u-boot, OHOS, vendor, python port
+
+title:                  u-boot lib/efi_loader generates capsule_esl_file by invoking the external efitools command 'cert-to-efi-sig-list' - upstream CI installs efitools via apt; OHOS toolchain has neither the command nor OpenSSL development headers, so the rule dies with Error 127
+
+root_cause:             lib/efi_loader/Makefile gates on CONFIG_EFI_CAPSULE_AUTHENTICATE=y (enabled by sandbox_defconfig) and hardcodes `cmd_capsule_esl_gen = cert-to-efi-sig-list $(capsule_crt_full) $@`. Upstream assumes build hosts have efitools (installed via apt in .azure-pipelines); OHOS has no package manager story for it and the tool is a C program built against OpenSSL dev headers, which the OHOS SDK sysroot/HNP toolchain do not provide (same OpenSSL absence documented in notes.md row 11). The rule fails with `/bin/sh: cert-to-efi-sig-list: inaccessible or not found` / make Error 127, killing the whole sandbox build even though the operation itself is trivial data wrapping: read PEM cert (PEM_read_bio_X509), serialize to DER (i2d_X509), wrap in EFI_SIGNATURE_LIST {SignatureType=EFI_CERT_X509_GUID, SignatureListSize, SignatureHeaderSize=0, SignatureSize=PkCertLen-sizeof(EFI_SIGNATURE_LIST)} + EFI_SIGNATURE_DATA {SignatureOwner=all-zero GUID (u-boot passes no -g), SignatureData=DER bytes}. No signing, no crypto - pure bytes.
+
+affected_scope:         Any OHOS/embedded build of u-boot (or similar UEFI-related firmware) with CONFIG_EFI_CAPSULE_AUTHENTICATE=y and no efitools/OpenSSL on the build host. Verified instance - u-boot 2026.07 sandbox target on OHOS aarch64 device: make[3] *** [.../lib/efi_loader/Makefile:87: capsule_esl_file] Error 127.
+
+verification_cmd:       conan create uboot/2026.07 -pr:h=ohos-aarch64.profile -pr:b=ohos-aarch64.profile (OHOS device) and confirm capsule_esl_file rule succeeds; cross-validate the vendored port byte-for-byte against openssl: `openssl x509 -in <crt> -outform DER` must equal the port's embedded DER (i2d_X509 equivalence)
+
+rec_priority:           1
+rec_approach:           vendor-stdlib-python-port
+rec_description:        Ship a faithful Python port of the exact tool operation as scripts/cert-to-efi-sig-list.py (pure stdlib: base64-decode the PEM body = the same DER bytes i2d_X509 emits for a well-formed cert; wrap per the UEFI spec layout above) and change the rule to `cmd_capsule_esl_gen = python3 $(srctree)/scripts/cert-to-efi-sig-list.py $(capsule_crt_full) $@`. python3 exists on every side that matters: the OHOS device (conan itself runs on python3) and upstream CI. Feature, config, and test surface (test/lib/efi_loader capsule authenticate tests) are fully preserved. Local cross-check with openssl x509 -outform DER proved byte-identical output (787-byte DER for the sandbox test cert; 831-byte ESL with correct GUID/header/owner fields).
+rec_command:            apply patch 0009 and rebuild; run the sandbox `ut efi` capsule tests to confirm the generated ESL parses
+rec_auto_fix:           false
+rec_impl:               patches/0009-capsule-esl-gen-via-python.patch (new file scripts/cert-to-efi-sig-list.py + lib/efi_loader/Makefile one-line rule change)
+
+fallback_priority:      2
+fallback_approach:      disable-config-feature
+fallback_description:   `-d EFI_CAPSULE_AUTHENTICATE` (or drop EFI_LOADER-side capsule config) to make the ifeq block vanish. Build succeeds but the EFI capsule-authenticate unit tests (test/lib/efi_loader/efi_capsule*.c) are compiled out - direct test-surface loss on a task whose bar is >=90% test coverage; strictly worse.
+fallback_command:       bash scripts/config -d EFI_CAPSULE_AUTHENTICATE && make ...
+fallback_auto_fix:      false
+fallback_impl:
+
+forbid_1_pattern:       apt install efitools|opkg install|pacman.*efitools|curl .*efitools.*\.deb|compile efitools from source
+forbid_1_reason:        OHOS has no distro package manager for third-party host tools, and building the real efitools C program requires OpenSSL development headers which the OHOS SDK/HNP toolchain deliberately does not ship (privacy crypto stack is libohcrypto, not OpenSSL). Chasing the C tool is a dead end on this platform.
+forbid_1_consequence:   Dependency loop (efitools needs OpenSSL, OpenSSL headers unavailable), or untracked binary blobs that break conan reproducibility and CI L-gates.
+
+principles:             minimal-patch, upstream-precedent, real-evidence-over-assumption, test-surface-preservation

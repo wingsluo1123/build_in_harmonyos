@@ -1,0 +1,15 @@
+--- a/Makefile
++++ b/Makefile
+@@ -1035,7 +1035,12 @@
+ 
+ KBUILD_LDFLAGS  += -z noexecstack
+ KBUILD_LDFLAGS  += -z norelro
++# --no-warn-rwx-segments 是 GNU ld 的警告抑制旗标；lld 无此旗标
++# 且硬报 unknown argument。经 lld 链接（如 OHOS 上 LTO_FINAL_LDFLAGS
++# 带 -fuse-ld=lld）时跳过该探测，其余环境保持上游原样。
++ifeq ($(filter -fuse-ld=lld,$(LTO_FINAL_LDFLAGS)),)
+ KBUILD_LDFLAGS  += $(call ld-option,--no-warn-rwx-segments)
++endif
+ 
+ KBUILD_HOSTCFLAGS += $(if $(CONFIG_TOOLS_DEBUG),-g)
+ 
