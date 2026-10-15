@@ -1,0 +1,57 @@
+--- a/test/test_musicxml.py
++++ b/test/test_musicxml.py
+@@ -14,25 +14,54 @@
+ # implied; without malicious intent or gross negligence. In no event
+ # may a licensor, author or contributor be held liable for indirect,
+ # direct, other damage, loss, or other issues arising in any way out
+ # of dealing in the work, even if advised of the possibility of such
+ # damage or existence of a defect, except proven that it results out
+ # of said person’s immediate fault when using the work as intended.
+ 
+ from __future__ import with_statement
+ 
+ import os
++import tempfile
+ import unittest
++from xml.dom import minidom
+ 
+ from mmllib.musicxml import convert_mml_file
+ 
+ class MusicXMLTests(unittest.TestCase):
+     def setUp(self):
+         self.datadir = os.path.join(os.path.dirname(__file__), "data")
+ 
+     def test_convert_mml_file(self):
+         mmlfile = os.path.join(self.datadir, "loreley.mml")
+         xmlfile = os.path.join(self.datadir, "loreley.xml")
+         xml = convert_mml_file(mmlfile)
+         with open(xmlfile, "rb") as f:
+             expected = f.read()
+         self.assertEqual(xml, expected[:-1])
++
++    def _convert_macro(self, macro):
++        with tempfile.TemporaryDirectory() as directory:
++            filename = os.path.join(directory, "note.mml")
++            with open(filename, "w", encoding="utf-8") as handle:
++                handle.write("# Title: Regression\n\nT120L4" + macro + "\n")
++            return convert_mml_file(filename)
++
++    def test_numeric_notes_match_equivalent_letters(self):
++        for numeric, letter in (("N1", "O0C"), ("N60", "O4B"), ("N84", "O6B")):
++            with self.subTest(numeric=numeric, letter=letter):
++                self.assertEqual(self._convert_macro(numeric), self._convert_macro(letter))
++
++    def test_numeric_zero_remains_rest(self):
++        numeric = self._convert_macro("N0")
++        self.assertEqual(numeric, self._convert_macro("P4"))
++        document = minidom.parseString(numeric)
++        self.assertEqual(len(document.getElementsByTagName("rest")), 1)
++        self.assertEqual(len(document.getElementsByTagName("pitch")), 0)
++
++    def test_letter_accidental_spelling_is_preserved(self):
++        for macro, step, alter in (("O4C+", "C", "1"), ("O4D-", "D", "-1")):
++            with self.subTest(macro=macro):
++                document = minidom.parseString(self._convert_macro(macro))
++                pitch = document.getElementsByTagName("pitch")[0]
++                self.assertEqual(pitch.getElementsByTagName("step")[0].firstChild.data, step)
++                self.assertEqual(pitch.getElementsByTagName("alter")[0].firstChild.data, alter)

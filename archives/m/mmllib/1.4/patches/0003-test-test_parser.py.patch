@@ -1,0 +1,28 @@
+--- a/test/test_parser.py
++++ b/test/test_parser.py
+@@ -46,21 +46,24 @@
+                          'lyrics': u'Heinrich Heine (1797\u20131856), 1824',
+                          'measures': u'16',
+                          'mml tracks': u'4 (5)',
+                          'pickup measure': u'1/8',
+                          'source': u'Linder, August (Hrsg.): Deutsche Weisen : Die beliebtesten Volks- und geistlichen Lieder. Stuttgart: Albert Auer\u2019s Musikverlag, n.d., c. 1900.',
+                          'tempo': u'Andante',
+                          'time signature': u'6/8',
+                          'title': u'Loreley',
+                          'verses': u'3',
+                          'voices': 4}
+-        self.assertDictEqual(res_meta, expected_meta)
++        # Python 3.12's more accurate float sum can differ in the last bit.
++        self.assertAlmostEqual(res_meta['duration'], expected_meta['duration'], places=12)
++        self.assertDictEqual({key: value for key, value in res_meta.items() if key != 'duration'},
++                             {key: value for key, value in expected_meta.items() if key != 'duration'})
+ 
+     def test_mml_file(self):
+         mmlfile = os.path.join(self.datadir, "loreley.mml")
+         res = mml_file(mmlfile)
+         expected = [[(391.99543598174927, 0.29605263157894735),
+                      (0, 0.098684210526315819),
+                      1,
+                      (391.99543598174927, 0.5921052631578948),
+                      (440.0, 0.17269736842105263),
+                      (0, 0.024671052631578955),
