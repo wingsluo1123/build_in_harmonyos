@@ -1,0 +1,56 @@
+--- a/src/Fortran/psa2msa.f
++++ b/src/Fortran/psa2msa.f
+@@ -22,20 +22,23 @@
+       Character*512     RCIO
+       Character         B
+ 
+       Logical           OPTL
+       Logical           OPTU
+       Logical           OPTP
+       Logical           OPTD
+       Logical           LEOF
+ 
+       Integer           Getc
++
++      Character*256     TMPNAM
++      Integer           LTMP
+ 
+       Include          'sterr.f'
+ 
+ *----------------------------------------------------------------------*
+ * INPUT SECTION
+ *----------------------------------------------------------------------*
+ 
+       RC=0
+       LPRF=0
+       RCIO=' '
+@@ -71,21 +74,28 @@
+      *      ''   valid (but deprecated) parameters are:'',/,
+      *      ''    [M=max-insert-length]  use option -M instead'',/
+      *      ''    [W=output-width]       use option -W instead'',/
+      *      )')
+          Call Exit(IRC)
+       End if
+ 
+ * open input file
+ 
+       If(FSEQ.EQ.'-') then
+- 1       Open(NSEQ,Status='SCRATCH',Err=901)
++* OHOS: /tmp is read-only on HarmonyOS -> Status='SCRATCH' is unusable.
++*       Buffer stdin in a named work file below $TMPDIR instead.
++      TMPNAM=' '
++      Call Get_environment_variable('TMPDIR',TMPNAM)
++      LTMP=LEN_TRIM(TMPNAM)
++      If (LTMP.GT.0) TMPNAM=TMPNAM(1:LTMP)//'/pftools_psa2msa.scr'
++      If (LTMP.LE.0) TMPNAM='pftools_psa2msa.scr'
++ 1    Open(NSEQ,File=TMPNAM,Status='UNKNOWN',Err=901)
+  2       Continue
+          Do I1=1,512
+             If(Getc(B).NE.0) go to 3
+             If(Ichar(B).EQ.10) then
+                Write(NSEQ,'(512A)')(CSEQ(ii1),ii1=1,I1-1)
+                Go to   2
+             Else
+                CSEQ(I1)=B
+             End if
+          End do

@@ -1,0 +1,78 @@
+# DRAFT-9011: conan 报 `Error, the file to download already exists: …/conan_package.tgz` —— 脏缓存条目清理
+
+- 条目主题：`conan create/install` 在拉取已发布的依赖或工具链时报缓存内已有同名下载临时文件而中断；
+  根因是上一次中断（超时/被杀/断网）留下的 `conan_export.tgz` / `conan_package.tgz` 残片，
+  处置是按报错路径删掉该缓存条目后重试（可重建，不影响制品仓）。
+- 状态：草稿（待知识库主编审核，拟提升编号 Exxxx）
+- 关联 PR：feat/pftools-3.2.12（本题由 pftools 3.2.12 适配实证）
+
+## 现象
+
+```console
+$ conan create archives/p/pftools/3.2.12 -pr:h=ohos-aarch64 -pr:b=ohos-aarch64
+libfile-slurp-perl/9999.32: ERROR: Error downloading from remote 'ohpcd'
+ERROR: Package 'libfile-slurp-perl/9999.32' not resolved:
+       Error, the file to download already exists:
+       '/storage/Users/<user>/.conan2/p/libfibbf9a7773c82a/d/conan_export.tgz'. [Remote: ohpcd]
+```
+
+第二次运行可能换个路径继续报：
+
+```console
+libfile-slurp-perl/9999.32: ERROR: Exception while getting package: 6b129b068851896169fae42d399fa922d239ce8a
+ERROR: Error, the file to download already exists:
+       '/storage/Users/<user>/.conan2/p/libfi62f835cc92129/d/conan_package.tgz'. [Remote: ohpcd]
+```
+
+特征：
+
+- 报错**不是**制品仓/网络问题（同一个包 `conan download` 单独跑 `exit 0`）；
+- 报错路径固定在 `~/.conan2/p/<pkg-hash>/d/conan_{export,package}.tgz`；
+- 常见触发：上一次 `conan create` 被超时/被杀/断网打断，下载临时文件留下但状态未提交；
+- **注意**：报错里的 hash 目录名可能在重试间变化（export 条目 vs package 条目），要按每次报错的实际路径清。
+
+## 处置
+
+```bash
+# 1) 按报错路径清（推荐：直接删该条目目录，conan 会重建）
+rm -rf /storage/Users/<user>/.conan2/p/libfibbf9a7773c82a    # = …/p/<hash> （含 d/ 残片）
+
+# 2) 重试（失败会再次给出新的 hash 路径 → 重复步骤 1）
+conan create <pkg_dir> -pr:h=<profile> -pr:b=<profile>
+```
+
+更省事的写法：把报错里的 `…/p/<hash>/d/…tgz` 路径抽出来取父目录批量清理：
+
+```bash
+grep -oE "/[^ ]*/.conan2/p/[A-Za-z0-9]+/d/conan_(package|export)\.tgz" build.log \
+  | xargs -n1 dirname | sort -u | xargs -r rm -rf
+```
+
+## 判定与止损（避免误判为依赖缺失）
+
+1. 先确认**不是制品仓缺失**：对同一包单跑 `conan download <pkg>/<ver> -r=ohpcd --only-recipe`；
+   `exit 0` ⇒ 包存在，问题是本地缓存脏 → 清缓存重试（**不要**上报 `dependency_missing`）。
+2. 清理后仍报同一路径 ⇒ 检查是否有并发进程占用该缓存（多会话共享 `CONAN_HOME` 时可能出现）——
+   改用独立 `CONAN_HOME`（如 `export CONAN_HOME=<workdir>/.conan-probe`）规避。
+3. 网络类特征（reset/timeout/SSL/5xx/DNS）触发的下载中断，按 SKILL 的 conan 重试策略（退避 15/30s，3 次）处理；
+   本条目专治**非网络性的脏缓存**。
+
+## 证据（真实执行）
+
+pftools 3.2.12（HarmonyOS/aarch64）适配期间实测：
+
+- 第 1 次 `conan create` → `Error, the file to download already exists: …/libfibbf9a7773c82a/d/conan_export.tgz`（exit 1）；
+- `rm -rf ~/.conan2/p/libfibbf9a7773c82a` 后重试 → 换成 `…/libfi62f835cc92129/d/conan_package.tgz`（exit 1）；
+- `rm -rf ~/.conan2/p/libfi62f835cc92129` 后重试 → `libfile-slurp-perl` 与 `flang-ohos` 均正常下载安装；
+- 同一包独立验证：`conan download libfile-slurp-perl/9999.32 -r=ohpcd` → **exit 0**（证明非制品仓缺失）；
+- 最终 `conan create` **exit 0**，包成功创建。
+
+## 推广价值
+
+- 所有使用 conan 2.x 的适配/CI 场景；把"缓存脏 vs 依赖缺失 vs 网络故障"三者区分开，
+  避免把本地缓存问题错误上报为 `dependency_missing` 浪费整轮排查与重试。
+
+## 查重关键词
+
+Error, the file to download already exists、conan_package.tgz、conan_export.tgz、
+~/.conan2/p/<hash>/d、脏缓存、conan download exit 0 但 create 失败、CONAN_HOME 并发

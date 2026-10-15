@@ -1,0 +1,25 @@
+software: pftools
+display: "pftools"
+description: "PROSITE generalized profile toolkit (pftoolsV3 C programs + legacy Fortran release 2.3 suite + Perl helpers)"
+category: utility
+homepage: "https://github.com/sib-swiss/pftools3"
+license: GPL-3.0-or-later
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "pftoolsV3 的对齐内核是 x86 SSE2/SSE4.1 intrinsic 专用：src/C/include/pfProfile.h 无条件 #include <emmintrin.h>，9 个内核文件（sse2/sse41，约 4.6k 行）无标量/NEON 回退，aarch64 下 clang 直接报 'This header is only meant to be used on x86 and x64 architecture'"
+    - "适配方式：新增 src/C/simd/ 垫片目录，非 x86 架构下把 <emmintrin.h>/<smmintrin.h>/<xmmintrin.h>/<mm_malloc.h> 重定向到 sse2neon.h（MIT，SSE->NEON 转译层，conanfile.py 拉取）"
+    - "内核中的 x86 内联汇编（xorps/maxps/pmaxsd/phaddd/movsd/movss/cvtsi2ss/pshufd）改写为等价 intrinsic；utils/system.c 的 cpuid/xgetbv/bsrq 探测增加非 x86 分支"
+    - "USE_AFFINITY=OFF：OHOS 使用 musl，features.h 不定义 __USE_GNU，上游 system.c 在 USE_AFFINITY 下 #error（INSTALL 记载的官方构型）"
+    - "Fortran release 2.3 组件由 tool_requires flang-ohos/20.1.0 提供（OHOS 无 gfortran），flang 不接受 -std=legacy，且只带编译器不带 crt/运行时，需注入 OHOS SDK 的 crtbeginS/crtendS/libclang_rt.builtins/libunwind"
+    - "HarmonyOS 的 /tmp 是只读文件系统：Fortran 的 Status='SCRATCH' 改为 $TMPDIR 具名工作文件；FDATE（LLVM Flang 未实现）改用标准 DATE_AND_TIME；测试脚本 /tmp 改为 ${TMPDIR:-/tmp}"
+    - "-ffp-contract=off：AArch64 有 FMA，clang 默认浮点收缩会让 pfsearchV3 分数与 x86 参考差 1 ULP（上游测试逐字节比对）"
+  common_dependencies:
+    - pcre2/10.47
+    - libfile-slurp-perl/9999.32
+
+versions:
+  "3.2.12":
+    status: built
+    build_date: "2026-10-13"

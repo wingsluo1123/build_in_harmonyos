@@ -1,0 +1,40 @@
+--- a/src/Fortran/regpr.f
++++ b/src/Fortran/regpr.f
+@@ -28,26 +28,36 @@
+ 
+       Include          'sterr.f'
+       
+       Integer           IPRF(32)
+       Character         CPRF
+ 
+       Logical           LSYM
+ 
+       Integer           Getc
+ 
++      Character*256     TMPNAM
++      Integer           LTMP
++
+       IRC=0
+ 
+ * open input file
+       
+       If(FGPR.EQ.'-') then
+- 1       Open(NGPR,Status='SCRATCH',Err=901)
++* OHOS: /tmp is read-only on HarmonyOS -> Status='SCRATCH' is unusable.
++*       Buffer stdin in a named work file below $TMPDIR instead.
++      TMPNAM=' '
++      Call Get_environment_variable('TMPDIR',TMPNAM)
++      LTMP=LEN_TRIM(TMPNAM)
++      If (LTMP.GT.0) TMPNAM=TMPNAM(1:LTMP)//'/pftools_regpr.scr'
++      If (LTMP.LE.0) TMPNAM='pftools_regpr.scr'
++ 1    Open(NGPR,File=TMPNAM,Status='UNKNOWN',Err=901)
+  2       Continue 
+          Do I1=1,512
+             If(Getc(B).NE.0) go to 3
+             If(Ichar(B).EQ.10) then
+                Write(NGPR,'(512A)',Err=903)(RCIN(ii1:ii1),ii1=1,I1-1)
+                Go to   2  
+             Else
+                RCIN(I1:I1)=B
+             End if
+          End do 

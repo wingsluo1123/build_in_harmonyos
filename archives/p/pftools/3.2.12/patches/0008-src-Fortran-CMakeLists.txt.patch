@@ -1,0 +1,26 @@
+--- a/src/Fortran/CMakeLists.txt
++++ b/src/Fortran/CMakeLists.txt
+@@ -1,13 +1,22 @@
++# NOTE: -std=legacy is a GNU Fortran only switch.  LLVM Flang (used by the OHOS
++#       toolchain) rejects it ("Only -std=f2018 is allowed currently") and does not
++#       need it, so the legacy flag is only passed to gfortran.
++IF(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
++	SET(PFTOOLS_FORTRAN_LEGACY_FLAGS "-fno-automatic")
++ELSE(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
++	SET(PFTOOLS_FORTRAN_LEGACY_FLAGS "-fno-automatic -std=legacy")
++ENDIF(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
++
+ SET_PROPERTY(SOURCE gtop.f htop.f ptoh.f ptof.f 2ft.f 6ft.f psa2msa.f pfscan.f pfsearch.f
+                     pfw.f pfscale.f pfmake.f
+-             APPEND PROPERTY COMPILE_FLAGS "-fno-automatic -std=legacy" )
++             APPEND PROPERTY COMPILE_FLAGS "${PFTOOLS_FORTRAN_LEGACY_FLAGS}" )
+ 
+ ######################################## DATA #######################################
+ SET(DAT_OBJECTS psdat.f gsdat.f djdat.f nodat.f codat.f pfdat.f dfdat.f)
+ 
+ ######################################## GTOP #######################################
+ ADD_EXECUTABLE(gtop gtop.f io.c)
+ 
+ ######################################## HTOP #######################################
+ ADD_EXECUTABLE(htop htop.f)
+ 

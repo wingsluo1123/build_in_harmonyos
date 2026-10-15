@@ -1,0 +1,204 @@
+--- a/src/C/sse2/heuristic_sse2.c
++++ b/src/C/sse2/heuristic_sse2.c
+@@ -49,25 +49,32 @@
+ //     );
+   do {
+     __m128 __sc1, __sc2, __sc3, __sc4;
+     __m128 __m1, __m2, __m3, __m4;
+ 
+     __m1  = _mm_load_ps(&lMatch[iprf]);
+     __m2  = _mm_load_ps(&lMatch[iprf+4]);
+     __m3  = _mm_load_ps(&lMatch[iprf+8]);
+     __m4  = _mm_load_ps(&lMatch[iprf+12]);
+ 
+-    __asm__ __volatile__ ("xorps %0, %0;" : "=x"(__Zero1) );
+-    __asm__ __volatile__ ("movaps %1, %0; maxps %2, %0;" : "=x"(__sc1) : "x"(__m1), "x"(__Zero1));
+-    __asm__ __volatile__ ("movaps %1, %0; maxps %2, %0;" : "=x"(__sc2) : "x"(__m2), "x"(__Zero1));
+-    __asm__ __volatile__ ("movaps %1, %0; maxps %2, %0;" : "=x"(__sc3) : "x"(__m3), "x"(__Zero1));
+-    __asm__ __volatile__ ("movaps %1, %0; maxps %2, %0;" : "=x"(__sc4) : "x"(__m4), "x"(__Zero1));
++//    __asm__ __volatile__ ("xorps %0, %0;" : "=x"(__Zero1) );
++//    __asm__ __volatile__ ("movaps %1, %0; maxps %2, %0;" : "=x"(__sc1) : "x"(__m1), "x"(__Zero1));
++//    __asm__ __volatile__ ("movaps %1, %0; maxps %2, %0;" : "=x"(__sc2) : "x"(__m2), "x"(__Zero1));
++//    __asm__ __volatile__ ("movaps %1, %0; maxps %2, %0;" : "=x"(__sc3) : "x"(__m3), "x"(__Zero1));
++//    __asm__ __volatile__ ("movaps %1, %0; maxps %2, %0;" : "=x"(__sc4) : "x"(__m4), "x"(__Zero1));
++    /* x86 inline asm replaced by the equivalent intrinsics so that the file also
++       compiles through the portable SIMD shim (src/C/simd/) on non-x86 targets. */
++    __Zero1 = _mm_setzero_ps();
++    __sc1 = _mm_max_ps(__m1, __Zero1);
++    __sc2 = _mm_max_ps(__m2, __Zero1);
++    __sc3 = _mm_max_ps(__m3, __Zero1);
++    __sc4 = _mm_max_ps(__m4, __Zero1);
+ 
+ //     __sc1 = _mm_max_ps(__Zero1, __m1);
+ //     __sc2 = _mm_max_ps(__Zero1, __m2);
+ //     __sc3 = _mm_max_ps(__Zero1, __m3);
+ //     __sc4 = _mm_max_ps(__Zero1, __m4);
+ 
+ //     __Zero1 = _mm_max_ps(__Zero1, __m1);
+ //     __Zero2 = _mm_max_ps(__Zero2, __m2);
+ //     __Zero3 = _mm_max_ps(__Zero3, __m3);
+ //     __Zero4 = _mm_max_ps(__Zero4, __m4);
+@@ -141,28 +148,30 @@
+ 
+       __V_R_0        = _mm_add_ps(__V_R_0, *((__m128*)&lMatch[iprf   ]));
+       __V_R_1        = _mm_add_ps(__V_R_1, *((__m128*)&lMatch[iprf+ 4]));
+       __V_R_2        = _mm_add_ps(__V_R_2, *((__m128*)&lMatch[iprf+ 8]));
+       __V_R_3        = _mm_add_ps(__V_R_3, *((__m128*)&lMatch[iprf+12]));
+ 
+ //       __V_R_0        = _mm_max_ps( __Zero1, __V_R_0);
+ //       __V_R_1        = _mm_max_ps( __Zero1, __V_R_1);
+ //       __V_R_2        = _mm_max_ps( __Zero1, __V_R_2);
+ //       __V_R_3        = _mm_max_ps( __Zero1, __V_R_3);
+-      __asm__ __volatile__ ( "xorps %0, %0;" : "=x"(__Zero1) );
+-      __asm__ __volatile__ ("maxps %2, %0;" : "=x"(__V_R_0) : "0"(__V_R_0), "x"(__Zero1) );
+-//       __asm__ __volatile__ ( "xorps %0, %0;" : "=x"(__Zero2) );
+-      __asm__ __volatile__ ("maxps %2, %0;" : "=x"(__V_R_1) : "0"(__V_R_1), "x"(__Zero1) );
+-//       __asm__ __volatile__ ( "xorps %0, %0;" : "=x"(__Zero3) );
+-      __asm__ __volatile__ ("maxps %2, %0;" : "=x"(__V_R_2) : "0"(__V_R_2), "x"(__Zero1) );
+-//       __asm__ __volatile__ ( "xorps %0, %0;" : "=x"(__Zero4) );
+-      __asm__ __volatile__ ("maxps %2, %0;" : "=x"(__V_R_3) : "0"(__V_R_3), "x"(__Zero1) );
++//       __asm__ __volatile__ ( "xorps %0, %0;" : "=x"(__Zero1) );
++//       __asm__ __volatile__ ("maxps %2, %0;" : "=x"(__V_R_0) : "0"(__V_R_0), "x"(__Zero1) );
++//       __asm__ __volatile__ ("maxps %2, %0;" : "=x"(__V_R_1) : "0"(__V_R_1), "x"(__Zero1) );
++//       __asm__ __volatile__ ("maxps %2, %0;" : "=x"(__V_R_2) : "0"(__V_R_2), "x"(__Zero1) );
++//       __asm__ __volatile__ ("maxps %2, %0;" : "=x"(__V_R_3) : "0"(__V_R_3), "x"(__Zero1) );
++      __Zero1 = _mm_setzero_ps();
++      __V_R_0 = _mm_max_ps(__V_R_0, __Zero1);
++      __V_R_1 = _mm_max_ps(__V_R_1, __Zero1);
++      __V_R_2 = _mm_max_ps(__V_R_2, __Zero1);
++      __V_R_3 = _mm_max_ps(__V_R_3, __Zero1);
+ 
+ //       __V_R_0        = _mm_max_ps( __Zero1, __V_R_0);
+ //       __V_R_1        = _mm_max_ps( __Zero2, __V_R_1);
+ //       __V_R_2        = _mm_max_ps( __Zero3, __V_R_2);
+ //       __V_R_3        = _mm_max_ps( __Zero4, __V_R_3);
+ 
+       _mm_store_ps(&v_w[iprf   ], __V_R_0);
+       _mm_store_ps(&v_w[iprf+4 ], __V_R_1);
+       _mm_store_ps(&v_w[iprf+8 ], __V_R_2);
+       _mm_store_ps(&v_w[iprf+12], __V_R_3);
+@@ -175,28 +184,32 @@
+ //       __SC_0 = _mm_max_ps(__SC_0, __V_R_0);
+ //       __SC_1 = _mm_max_ps(__SC_1, __V_R_1);
+ //       __SC_2 = _mm_max_ps(__SC_2, __V_R_2);
+ //       __SC_3 = _mm_max_ps(__SC_3, __V_R_3);
+ //
+ //       _mm_store_ps(&Sc[iprf   ], __SC_0);
+ //       _mm_store_ps(&Sc[iprf+4 ], __SC_1);
+ //       _mm_store_ps(&Sc[iprf+8 ], __SC_2);
+ //       _mm_store_ps(&Sc[iprf+12], __SC_3);
+ 
+-      __asm__ __volatile__ (
+-	    "maxps   (%8,%9,4), %0;"
+-	    "maxps 16(%8,%9,4), %1;"
+-	    "maxps 32(%8,%9,4), %2;"
+-	    "maxps 48(%8,%9,4), %3;"
+-	    : "=x"(__V_R_0), "=x"(__V_R_1), "=x"(__V_R_2), "=x"(__V_R_3)
+-	    : "0"(__V_R_0), "1"(__V_R_1), "2"(__V_R_2), "3"(__V_R_3), "r"(Sc), "r"(iprf)
+-      );
++//       __asm__ __volatile__ (
++// 	    "maxps   (%8,%9,4), %0;"
++// 	    "maxps 16(%8,%9,4), %1;"
++// 	    "maxps 32(%8,%9,4), %2;"
++// 	    "maxps 48(%8,%9,4), %3;"
++// 	    : "=x"(__V_R_0), "=x"(__V_R_1), "=x"(__V_R_2), "=x"(__V_R_3)
++// 	    : "0"(__V_R_0), "1"(__V_R_1), "2"(__V_R_2), "3"(__V_R_3), "r"(Sc), "r"(iprf)
++//       );
++      __V_R_0 = _mm_max_ps(__V_R_0, _mm_loadu_ps(&Sc[iprf   ]));
++      __V_R_1 = _mm_max_ps(__V_R_1, _mm_loadu_ps(&Sc[iprf+ 4]));
++      __V_R_2 = _mm_max_ps(__V_R_2, _mm_loadu_ps(&Sc[iprf+ 8]));
++      __V_R_3 = _mm_max_ps(__V_R_3, _mm_loadu_ps(&Sc[iprf+12]));
+ 
+       _mm_store_ps(&Sc[iprf   ], __V_R_0);
+       _mm_store_ps(&Sc[iprf+4 ], __V_R_1);
+       _mm_store_ps(&Sc[iprf+8 ], __V_R_2);
+       _mm_store_ps(&Sc[iprf+12], __V_R_3);
+ 
+ 
+       iprf += 16;
+ 
+       if ( iprf<Profile_Length) goto Loop;
+@@ -205,56 +218,67 @@
+ 
+     // Swap pointers
+     const float * ptr = v_w;
+     v_w = (float*) v_r;
+     v_r = ptr;
+   }
+ #if 1
+   unsigned int Score;
+   {
+     register __m128 __Sum, __Sum1, __Sum2, __Sum3;
+-    __asm__ __volatile__ ("xorps %0, %0;"
+-			  "xorps %1, %1;"
+-			  "xorps %2, %2;"
+-			  "xorps %3, %3;"
+-			  : "=x"(__Sum) , "=x"(__Sum1), "=x"(__Sum2), "=x"(__Sum3) );
++//     __asm__ __volatile__ ("xorps %0, %0;"
++// 			  "xorps %1, %1;"
++// 			  "xorps %2, %2;"
++// 			  "xorps %3, %3;"
++// 			  : "=x"(__Sum) , "=x"(__Sum1), "=x"(__Sum2), "=x"(__Sum3) );
++    __Sum = _mm_setzero_ps();
++    __Sum1 = _mm_setzero_ps();
++    __Sum2 = _mm_setzero_ps();
++    __Sum3 = _mm_setzero_ps();
+     iprf = 0;
+     do  {
+       __Sum  = _mm_add_ps(__Sum,  *((__m128*) &Sc[iprf]));
+       __Sum1 = _mm_add_ps(__Sum1, *((__m128*) &Sc[iprf+4]));
+       __Sum2 = _mm_add_ps(__Sum2, *((__m128*) &Sc[iprf+8]));
+       __Sum3 = _mm_add_ps(__Sum3, *((__m128*) &Sc[iprf+12]));
+       iprf+=16;
+     } while (iprf < (Profile_Length & ~0xF));
+ 
+ //     while ( iprf + 4 < Profile_Length & ~0x7) {
+ //       __Sum  = _mm_add_ps(__Sum,  *((__m128*) &Sc[iprf]));
+ //       iprf  += 4;
+ //     }
+ 
+     __Sum  = _mm_add_ps(__Sum,  __Sum1);
+     __Sum2 = _mm_add_ps(__Sum2, __Sum3);
+     __Sum  = _mm_add_ps(__Sum,  __Sum2);
+ 
+-    __asm__ __volatile__ (
+-	      "movaps    %1, %2   ;"
+-	      "movhlps   %1, %2   ;"
+-	      "addps     %2, %1   ;"
+-	      "movaps    %1, %3   ;"
+-	      "shufps    $245, %1, %3 ;"
+-	      "addss     %3, %0 ;"
+-	      : "=x"(__Sum)
+-	      : "0"(__Sum), "x"(__Sum2), "x"(__Sum3)
+-	    );
++//     __asm__ __volatile__ (
++// 	      "movaps    %1, %2   ;"
++// 	      "movhlps   %1, %2   ;"
++// 	      "addps     %2, %1   ;"
++// 	      "movaps    %1, %3   ;"
++// 	      "shufps    $245, %1, %3 ;"
++// 	      "addss     %3, %0 ;"
++// 	      : "=x"(__Sum)
++// 	      : "0"(__Sum), "x"(__Sum2), "x"(__Sum3)
++// 	    );
++    {
++      /* Horizontal add of the 4 lanes of __Sum into lane 0 (SSE2 only, no haddps). */
++      const __m128 __hi   = _mm_movehl_ps(__Sum, __Sum);
++      const __m128 __pair = _mm_add_ps(__Sum, __hi);
++      const __m128 __lane1 = _mm_shuffle_ps(__pair, __pair, _MM_SHUFFLE(1,1,1,1));
++      __Sum = _mm_add_ss(__pair, __lane1);
++    }
+ 
+     while ( iprf < Profile_Length ) {
+-      __asm__ __volatile__ ("addss (%1,%2,4), %0;" : "=x"(__Sum) : "r"(Sc), "r"(iprf) );
++      __Sum = _mm_add_ss(__Sum, _mm_load_ss(&Sc[iprf]));
+       ++iprf;
+     }
+ 
+     Score = (unsigned int) _mm_cvttss_si32(__Sum);
+   }
+   return Score;
+ #else
+   float fScore = 0.0f;
+   for (iprf=0; iprf<Profile_Length; ++iprf) fScore += Sc[iprf];
+   return (unsigned int) fScore;

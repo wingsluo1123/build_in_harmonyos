@@ -1,0 +1,113 @@
+# DRAFT-9008: 用 flang-ohos 编译 OHOS 上的 Fortran 组件 —— 工具链缺口的四类报错与处置（-std=legacy / FDATE / 缺 crt 运行时 / 无 gfortran）
+
+- 条目主题：HarmonyOS 无 gfortran，Fortran 上游包必须 `tool_requires("flang-ohos/20.1.0")`；
+  flang 与 gfortran 的差异会依次暴露四类报错，逐条对应固定处置。
+- 状态：草稿（待知识库主编审核，拟提升编号 Exxxx）
+- 关联 PR：feat/pftools-3.2.12（本题由 pftools 3.2.12 适配实证，参照 archives/a/alfa/2.2）
+
+## 适用场景
+
+- 目标库含 Fortran 组件（`PROJECT(... Fortran ...)`、`*.f`/`*.f90`、`ADD_LIBRARY(... .f)`）；
+- 本机与 ohpcd 制品仓都**没有 gfortran**：
+  `conan download gcc/9.5.0 -r=ohpcd --only-recipe` 可见其配方为 `--enable-languages=c`（无 Fortran）；
+- 直接 `cmake` 会先报 `No CMAKE_Fortran_COMPILER could be found`。
+
+## 四类报错与处置（按出现顺序）
+
+### ① 找不到 Fortran 编译器 → 引入 tool_requires
+
+```python
+def build_requirements(self):
+    self.tool_requires("flang-ohos/20.1.0")   # ohpcd 有 os=OHOS arch=armv8 binary
+
+def generate(self):
+    flang = self.dependencies.build["flang-ohos"].package_folder
+    tc.variables["CMAKE_Fortran_COMPILER"] = os.path.join(flang, "bin", "flang")
+    # 编译器检查阶段只编译不链接（flang 的 crt/运行时此时尚未就绪）
+    tc.variables["CMAKE_TRY_COMPILE_TARGET_TYPE"] = "STATIC_LIBRARY"
+```
+
+> **重要**：设置 `CMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY`，否则 `PROJECT(... Fortran ...)`
+> 的 try-compile 会因缺 crt 直接判定编译器不可用，configure 阶段就失败。
+
+### ② `error: Only -std=f2018 is allowed currently.`
+
+- 根因：上游 CMake 里传了 gfortran 专用 `-std=legacy`；
+- 处置：按编译器 ID 分支
+
+```cmake
+IF(CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
+    SET(F2K_FLAGS "-fno-automatic")            # flang 支持 -fno-automatic
+ELSE()
+    SET(F2K_FLAGS "-fno-automatic -std=legacy")
+ENDIF()
+SET_PROPERTY(SOURCE a.f b.f APPEND PROPERTY COMPILE_FLAGS "${F2K_FLAGS}")
+```
+
+### ③ `fatal Fortran runtime error(...): fdate is not supported.`（Signal 6）
+
+- 根因：LLVM Flang 未实现 `FDATE` 扩展（常见于 1990 年代 F77 代码的时间戳）；
+- 处置：改用标准 `DATE_AND_TIME`
+
+```fortran
+* OHOS/LLVM Flang: the FDATE extension is not implemented; use standard DATE_AND_TIME.
+      FDAT=' '
+      Call Date_and_time(Date=FDAT(1:8),Time=FDAT(10:15))
+```
+
+### ④ 链接期 `cannot open Scrt1.o / crti.o / crtbeginS.o / libclang_rt.builtins.a / -l:libunwind.a / -lc`
+
+- 根因：**flang-ohos 只带编译器，不带 crt 与运行时**；
+- 处置（同 `archives/a/alfa/2.2`）：把 OHOS SDK clang 的资源注入 flang 期望的 resource-dir
+
+```python
+sdk_llvm  = sorted(glob.glob("/data/service/hnp/ohos-sdk.org/*/ohos/native/llvm"))[-1]
+sdk_sys   = os.path.join(sdk_llvm, "..", "sysroot")
+sdk_resdir= os.path.join(sdk_llvm, "lib/clang/15.0.4")
+sdk_lib   = os.path.join(sdk_llvm, "lib/aarch64-linux-ohos")
+fl_res    = os.path.join(flang_pkg, "lib/clang/20/lib/aarch64-linux-ohos")
+os.makedirs(fl_res, exist_ok=True)
+for name, src_name in (("crtbeginS.o", "clang_rt.crtbegin.o"),
+                       ("crtendS.o",   "clang_rt.crtend.o"),
+                       ("libclang_rt.builtins.a", "libclang_rt.builtins.a"),
+                       ("libunwind.a", "libunwind.a")):
+    src = os.path.join(sdk_resdir, "lib/aarch64-linux-ohos", src_name)
+    if not os.path.isfile(src):
+        src = os.path.join(sdk_lib, src_name)
+    if os.path.isfile(src):
+        shutil.copy2(src, os.path.join(fl_res, name))
+```
+
+CMake 侧再补：
+```cmake
+CMAKE_Fortran_FLAGS      = "--sysroot=<sdk>/sysroot -ffp-contract=off"
+CMAKE_Fortran_LINK_FLAGS = "--sysroot=<sdk>/sysroot -L<sdk>/llvm/lib/clang/15.0.4/lib/aarch64-linux-ohos -L<sdk>/llvm/lib/aarch64-linux-ohos"
+# C 目标若链接 Fortran 目标文件（如 quantile/rq0.f），C 链接行也要带：
+CMAKE_EXE_LINKER_FLAGS  += "<flang>/lib/libFortranRuntime.a <flang>/lib/libFortranDecimal.a"
+```
+
+> `tc.extra_exelinkflags` 是 conan 侧的正规入口；注意上游若 `SET(CMAKE_EXE_LINKER_FLAGS ...)`
+> 会覆盖 cache 值，必要时同时用 `-DUSE_RPATH=OFF` 绕开该覆盖（pftools 即如此）。
+
+## 证据（真实执行）
+
+pftools 3.2.12（`PROJECT(PFTOOLS Fortran C)` + 12 个 F77 程序 + `quantile(rq0.f)`）：
+
+- `conan download gcc/9.5.0 -r=ohpcd --only-recipe` → 配方 `--enable-languages=c`（确认无 gfortran）；
+- `conan download flang-ohos/20.1.0 -r=ohpcd` → exit 0，OHOS/armv8 binary；
+  `flang --version` → `flang version 20.1.0 / Target: aarch64-unknown-linux-ohos`；
+- 依次踩到上述 ①②③④，逐条处置后 `make` exit 0，12 个 Fortran 程序 + `pfcalibrateV3`
+  全部链接成功（`readelf -d` 仅依赖 libc，Fortran 运行时静态链接）；
+- 上游 CTest **6/6 通过**（含 `test_V2.sh` 跑 gtop/htop/pfw/psa2msa/pfmake）。
+
+## 推广价值
+
+- 所有含 Fortran 的鸿蒙 PC 适配（arpack-ng / blas / alfa / devicexlib / kim-api / pftools …）；
+- 把"OHOS 没有 Fortran 编译器"从选型否决条件变成可复用工具链方案（flang-ohos + 资源注入），
+  同时给出 flang 与 gfortran 的四处语义差异清单，避免逐个试错。
+
+## 查重关键词
+
+flang-ohos、LLVMFlang、No CMAKE_Fortran_COMPILER、-std=legacy、Only -std=f2018 is allowed、
+fdate is not supported、libFortranRuntime、libclang_rt.builtins、crtbeginS.o、libunwind.a、
+CMAKE_TRY_COMPILE_TARGET_TYPE、tool_requires Fortran、OHOS Fortran 组件

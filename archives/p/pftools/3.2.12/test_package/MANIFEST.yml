@@ -1,0 +1,81 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+#
+# 上游测试入口: tests/examples/CMakeLists.txt 用 ADD_TEST 注册 6 个 CTest 用例
+# （`ctest -N` 实测: Total Tests: 6）。本机 OHOS/aarch64 实测 6/6 通过。
+
+package: pftools/3.2.12
+homepage: "https://github.com/sib-swiss/pftools3"
+
+# 上游测试命令 (用于 ctest -N / make test 分析)
+upstream_check_command: "ctest"
+
+# conanfile.py 的 build() 未内置上游测试（上游测试依赖 <PROJECT_SOURCE_DIR>/testing
+# 的源码树内生成目录，不适合在 recipe build 阶段跑）；上游测试在适配阶段单独执行并统计
+upstream_test_in_build: false
+upstream_test_command: "ctest --output-on-failure"
+
+# 上游实际运行的测试（tests/examples/CMakeLists.txt 注册，全部实跑）
+upstream_tests:
+  - file: test_V2.sh
+    source: pftools3-3.2.12/tests/examples/test_V2.sh.cmake
+    description: "pftools release 2.3 旧工具链回归（pfsearch -f/-bx、pfscan、psa2msa -du、pfw、gtop/htop）"
+    command: "sh -ve test_V2.sh"
+  - file: test_V3.sh
+    source: pftools3-3.2.12/tests/examples/test_V3.sh.cmake
+    description: "pftoolsV3 全流程回归（pfsearchV3/pfscanV3/pfcalibrateV3/pfindex/pfdump/pfemit + Perl 脚本 + 8 种输出格式）"
+    command: "sh -ve test_V3.sh"
+  - file: test_V3_output.sh
+    source: pftools3-3.2.12/tests/examples/test_V3_output.sh.cmake
+    description: "test_V3.sh 输出与上游参考 tests/examples/test_V3.out 逐字节比对（1959 行）"
+    command: "sh -e test_V3_output.sh"
+  - file: test_scan_search.pl
+    source: pftools3-3.2.12/tests/examples/test_scan_search.pl.cmake
+    description: "pfscanV3/pfsearchV3 在 --sse2/--sse41 两种内核模式下的命中与分数一致性比对"
+    command: "perl test_scan_search.pl all.prf all.seq <workdir>"
+  - file: test_pfsearchV3_iupac.pl
+    source: pftools3-3.2.12/tests/examples/test_pfsearchV3_iupac.pl.cmake
+    description: "IUPAC 模糊字符 profile 生成（pfmake）+ 正反向搜索分数一致性"
+    command: "perl test_pfsearchV3_iupac.pl <workdir>"
+  - file: test_pfsearchV3_pattern-regexp.sh
+    source: pftools3-3.2.12/tests/examples/test_pfsearchV3_pattern-regexp.sh.cmake
+    description: "pattern{...}/regex{...} 查询模式（PCRE2 路径）与真值文件比对"
+    command: "sh -ve test_pfsearchV3_pattern-regexp.sh"
+
+# test_package 中自带的测试 (消费者视角验证，实跑安装后的产物)
+test_package_tests:
+  - file: test_pftools.sh
+    description: "pfsearchV3 用随包安装的 sh2.prf + sh3.seq 做真实搜索并校验命中数 ≥1（实测 12）"
+    command: "test_pftools.sh <pkg>/bin <pkg>/share/examples"
+  - file: test_pftools.sh
+    description: "pfscanV3（PCRE2 链接路径）在 PS50002 profile 上输出命中"
+    command: "test_pftools.sh <pkg>/bin <pkg>/share/examples"
+  - file: test_pftools.sh
+    description: "Fortran release 2.3 组件 gtop（flang-ohos 构建）可执行并输出 banner"
+    command: "test_pftools.sh <pkg>/bin <pkg>/share/examples"
+  - file: test_pftools.sh
+    description: "Perl 脚本 ps_scan.pl 在 File::Slurp (libfile-slurp-perl) 下 perl -c 通过"
+    command: "test_pftools.sh <pkg>/bin <pkg>/share/examples"
+
+# 鸿蒙特有用例（仅在本平台适配成立；用于证明适配代码真实生效）
+ohos_specific_tests:
+  - file: test_pftools.sh
+    description: >-
+      [鸿蒙特有] /tmp 只读下 psa2msa 的 $TMPDIR SCRATCH 回退：pfsearchV3 -o 4 管道进
+      psa2msa -du，断言 (1) 产出 MSA、(2) 工作文件确实落在 $TMPDIR/pftools_psa2msa.scr。
+      未适配的上游版本在 HarmonyOS 上必然报 "Error: Unable to create temporary file."
+      （上游用 Open(Status='SCRATCH')，/tmp 不可写），本用例即该改动的回归测试。
+    command: "test_pftools.sh <pkg>/bin <pkg>/share/examples"
+    patch: "patches/0011-src-Fortran-psa2msa.f.patch"
+
+# 上游测试用例数 = 6（CTest 注册）；本机实跑 6 passed / 0 failed
+test_scenario_count: 6
+ohos_specific_test_count: 1
+assertion_count: 11
+assertion_count_basis:
+  upstream_ctest: 6
+  test_package: 5
+upstream_test_result: "6/6 passed (ctest, HarmonyOS aarch64)"
+test_package_result: "5/5 passed (conan create, HarmonyOS aarch64)"
+
