@@ -1,0 +1,142 @@
+#====================================================================
+# E671 (draft) — KCountry 运行时数据依赖进入构建期测试（构建组合方案，触发器④）
+# Software: kcontacts5/5.116.0（泛化：任何 KCountry/KF5::I18nLocaleData 测试消费件）
+# Source: PR #14832（任务卡 #14897，j669539）
+# Status: pending-editor-review（拟提升 E671，定稿编号由主编确认）
+#====================================================================
+
+draft: E671-draft-j669539
+status: pending-editor-review
+title: "KCountry 运行时数据依赖进入构建期测试：iso-codes 从传递依赖升级为直接依赖（package_folder=None TypeError 修复）+ QStandardPaths::GenericDataLocation 的 JSON 国家表/翻译目录部署组合（XDG_DATA_HOME 而非 .qttest/share）"
+trigger_tool: conan / ctest (QStandardPaths)
+phase: test
+category: conan, testing, kde
+severity: 3
+
+error_signature: >
+  TypeError: .*NoneType.*package_folder|'NoneType' object has no attribute|self\.dependencies\.get\("iso-codes"\).*None|kf\.i18n\.localeData: Unable to open iso_3166-1\.json|KCountry.*fallback|countryToISO.*empty|mismatch.*country.*iso|addressformat.*repository.*validation.*failed
+
+match_keywords: >
+  KCountry, iso-codes, iso_3166-1.json, package_folder None,
+  transitive dependency, self.dependencies.get, GenericDataLocation,
+  QStandardPaths, XDG_DATA_HOME, .qttest/share, QStandardPaths test mode,
+  setTestModeEnabled, addresstest, addressformattest, countryToISO,
+  ISOtoCountry, AddressFormatRepository, ki18n5, I18nLocaleData,
+  ecm_add_tests, BUILD_TESTING, ctest, KDE PIM, kcontacts5, kcaladdons,
+  akonadi, test data deployment, per-test XDG_DATA_HOME, locale catalog
+
+root_cause: >
+  KDE/KF5 库的上游 autotest 中存在一类「库链接关系之外的运行时数据依赖」：
+  KCountry（KF5::I18nLocaleData 内部使用）在运行时经
+  QStandardPaths::GenericDataLocation 定位 iso-codes 的 JSON 国家表
+  （iso-codes/json/iso_3166-1.json）与翻译目录（locale/<lang>/LC_MESSAGES/
+  iso_3166-1.mo）。两层独立故障在 OHOS conan 交叉构建图里叠加：
+  (1) 依赖图层：iso-codes 仅作为 ki18n5 的传递依赖入图时，消费者配方里
+  self.dependencies.get("iso-codes") 取到的节点 package_folder 解析为
+  None——传递节点对直接消费者不物化包目录，测试数据部署函数直接
+  TypeError；
+  (2) 数据根层：kcontacts 测试未启用 QStandardPaths 测试模式
+  （不调 setTestModeEnabled），因此 GenericDataLocation 的数据根不是
+  ki18n5 自测试用的 .qttest/share，而是真实 XDG_DATA_HOME——按
+  .qttest/share 部署或完全不部署都导致 KCountry 系函数（countryToISO/
+  ISOtoCountry/AddressFormatRepository 校验）读不到数据，测试失败。
+
+solution: |
+  组合修复（kcontacts5/5.116.0 实证，PR #14832，上游 32/32 + test_package
+  26/26 全绿）：
+
+  1. iso-codes 从传递依赖升级为直接依赖（requirements() 显式声明，
+     版本与 ki18n5 pin 的完全一致，不引入图分裂）：
+  ```python
+  def requirements(self):
+      self.requires("kcoreaddons5/5.116.0")
+      self.requires("ki18n5/5.116.0")      # iso-codes 的传递入口
+      self.requires("kconfig5/5.116.0")
+      self.requires("kcodecs5/5.116.0")
+      # KCountry 系测试函数（countryToISO/ISOtoCountry、addressformat
+      # repository 校验）读 iso-codes JSON 国家表 + 翻译目录。声明为直接
+      # 依赖使 package_folder 对测试数据部署可用（传递节点解析为 None）。
+      self.requires("iso-codes/4.20.1")
+      self.requires("qt5-qtbase/5.15.2.2", force=True)
+  ```
+
+  2. 测试数据部署到 per-test XDG_DATA_HOME（build() 的 ctest 执行环境）：
+  ```python
+  def _run_upstream_tests(self):
+      test_env = self._library_runtime_env()
+      test_home = os.path.join(self.build_folder, "test-home")
+      test_env.define("HOME", test_home)
+      test_env.define("XDG_DATA_HOME",
+                      os.path.join(test_home, ".local", "share"))
+      ...
+      self._deploy_iso_codes_test_data(
+          os.path.join(test_home, ".local", "share"))
+
+  def _deploy_iso_codes_test_data(self, xdg_data):
+      isocodes = self.dependencies.get("iso-codes")
+      if not isocodes:
+          return
+      pkg = isocodes.package_folder        # 直接依赖 → 非 None
+      data_root = os.path.join(pkg, "share")
+      pairs = [("iso-codes/json", "iso-codes/json"),   # KCountry JSON 表
+               ("locale", "locale")]                    # 翻译目录
+      for src_rel, dst_rel in pairs:
+          src = os.path.join(data_root, src_rel)
+          if not os.path.exists(src):
+              self.output.warn("iso-codes data missing: {}".format(src))
+              continue
+          dst = os.path.join(xdg_data, dst_rel)
+          os.makedirs(os.path.dirname(dst), exist_ok=True)
+          if os.path.isdir(src):
+              if os.path.exists(dst):
+                  shutil.rmtree(dst)
+              shutil.copytree(src, dst, dirs_exist_ok=True)
+          else:
+              shutil.copy2(src, dst)
+  ```
+  关键点：(a) 部署目标是 XDG_DATA_HOME 而非 .qttest/share——前提是
+  逐条核对被测库的测试代码是否启用 QStandardPaths 测试模式（kcontacts
+  未启用→XDG_DATA_HOME；ki18n5 自测试启用→.qttest/share，两者不可混）；
+  (b) JSON 表与翻译目录必须成对部署（缺翻译目录时国名查询仍退化）；
+  (c) 配 QTEST_MAIN 系用 QT_QPA_PLATFORM=offscreen 头less 执行。
+
+fallback: >
+  若数据部署后 KCountry 仍读不到（QStandardPaths 版本行为差异），退化为
+  XDG_DATA_DIRS 双通道注入（把 iso-codes 包内 share/ 直接 prepend 到
+  XDG_DATA_DIRS，khealthcertificate #10745 先例）；或构建树内复制数据文件
+  （kfilemetadata staged share 树模式）。若上游测试强制测试模式
+  （setTestModeEnabled 已调），则改部署到 .qttest/share。禁止跳过/豁免
+  KCountry 系测试——数据部署后应真实跑通（kcontacts addresstest/
+  addressformattest 均 Passed 无豁免）。
+
+verify_builds: "#14832 kcontacts5 5.116.0（本机 conan create 三轮全绿：BUILD_TESTING=ON 注册 32 上游 ctest 用例全部真实执行，第二轮起 100% passed 0 failed，第三轮 conan remove 后干净重跑可复现；test_package 26/26）"
+
+reference_impl: |
+  kcontacts5/5.116.0 conanfile.py（PR #14832，任务卡 #14897）：
+  requirements() + _run_upstream_tests() + _deploy_iso_codes_test_data()
+  先例对照：ki18n5/5.116.0（iso-codes 直接依赖同款先例，但其自测试用
+  .qttest/share——部署根差异是本条增量）；khealthcertificate 26.04.3
+  #10745（XDG_DATA_DIRS 通道）；kfilemetadata 6.28.0（staged share 树）
+
+similar_to: DRAFT-kde-pim-testdata-iso-codes-tzdata（main 已合入：KF6 线 iso-codes+tzdata 双注入，走 tool_requires + XDG_DATA_DIRS 通道）——本条为 KF5 线 conan1/2 依赖图语义差异版（requires 直接依赖而非 tool_requires、package_folder 物化条件、XDG_DATA_HOME 部署根判定），重叠的 iso-codes 数据注入主题作融合上下文，KF5 线增量独立成立。
+
+related_knowledge: |
+  1. 传递依赖节点的 package_folder 语义：conan 图中传递节点（仅经他人
+     requires 入图）对直接消费者的 self.dependencies.get() 返回的节点
+     package_folder 为 None——任何需要读取依赖包内文件的部署逻辑都必须
+     显式声明直接依赖（iso-codes 如此，任何数据型包亦然）。
+  2. QStandardPaths 数据根判定速查：被测代码启用测试模式
+     （setTestModeEnabled）→ .qttest/share；未启用 → XDG_DATA_HOME
+     （默认 ~/.local/share）。KF5/KF6 线同规则。逐条核对被测库测试源码
+     是唯一可靠判定法。
+  3. 后续 KF5 PIM 系列（kcaladdons、akonadi 系等同样依赖 KCountry 的
+     库）可直接复用本组合：iso-codes 直接 requires + per-test
+     XDG_DATA_HOME 部署对。
+
+id: E671
+doc_file: knowledge/drafts/E671-draft-j669539.md
+authors: j669539
+source_pr: "14832"
+source_task: "14897"
+source_commit: 0b59d7c6ad
+last_updated: 2026-10-07
