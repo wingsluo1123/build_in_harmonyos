@@ -1,0 +1,31 @@
+id:                     DRAFT-truecrack-3.5-autotools-mktemp-dir-config-status-fallback
+trigger_tool:           conan|autotools|make
+phase:                  configure|compile
+error_signature:        config.status: error: could not setup config files machinery|can't create \./conf[^ ]*/subs1\.awk: Permission denied|Permission denied
+severity:               3
+category:               autotools, build-system, ohos, hmdfs, detection, platform
+match_keywords:         config.status, mktemp, autoconf_mktemp_fallback, umask, config.guess, readonly_tmp, HMBS_AUTOCONF_MKTEMP_FALLBACK, HMBS_CAP_LOCAL_MKTEMP
+title:                  autotools 配方在真机只读/不可写 TMPDIR 下 mktemp -d 生成坏目录导致 config.status 失败时回退到 autoconf mkdir fallback 的通用修复内核
+root_cause:             autoconf AS_TMPDIR 在 configure 中执行 mktemp -d "./confXXXXXX" 生成 0700 目录；真机 HMFS 上因 UID 映射/setgid 使该目录对当前进程不可写，但 test -d 通过令 configure 采用坏目录，写 subs1.awk 时 Permission denied，最终 config.status: error: could not setup config files machinery
+affected_scope:         HMFS 只读/不可写 TMPDIR 上（HMBS_CAP_LOCAL_MKTEMP=1/HMBS_AUTOCONF_MKTEMP_FALLBACK=1）运行 autotools/autoconf 配方的 C/C++ 库；含 config.guess 无法识别 OHOS 三元组、configure umask 077 的配方
+verification_cmd:       真机日志确认 configure 成功生成 config.status 且无 mktemp/umask/config.status 错误；再经 make 与 test_package 门禁全绿
+rec_priority:           1
+rec_approach:           autoconf-mktemp-fallback
+rec_description:        用独立 hmbs_conf_env 只注入 configure 步骤的 mktemp 包装脚本（exit 1），触发 autoconf 的 mkdir fallback，绕过坏目录；同时修正 configure umask 077→022、显式指定 --build/--host 绕过 config.guess 无法识别 OHOS
+rec_command:            generate(): 创建 mktemp 包装脚本（exit 1）经仅注入 configure 的 hmbs_conf_env 启用 HMBS_AUTOCONF_MKTEMP_FALLBACK；./configure 增加 --build/--host=<triple>；将 autoconf 生成 config.status 中的 umask 077→022
+rec_auto_fix:           false
+rec_impl:               conan-recipe-plus-patch
+fallback_priority:      2
+fallback_approach:      tmpdir-pin-recreate
+fallback_description:   若上游不接受 mkdir fallback，则在 configure 前的独立生成阶段将 TMPDIR/TMP/TEMP 固定到真实可写目录并 os.makedirs，再 define CONFIG_SHELL/SHELL=/bin/sh 以规避 getcwd/can't create
+details
+fallback_auto_fix:      false
+forbid_1_pattern:       config.guess: \[0-9]*: .*dummy\.c: Permission denied|cannot guess build type; you must specify one
+forbid_1_reason:        禁止忽略 config.guess 无法识别 OHOS 的直接失败而只修后置症状
+forbid_1_consequence:   不显式 --build/--host 会持续 cannot guess build type，configure 无法进入后续阶段，任务退回
+similar_to:             [DRAFT-ccrtp-1.0.0-demo-as-upstream-regression]
+doc_file:               knowledge/drafts/DRAFT-truecrack-3.5-autotools-mktemp-dir-config-status-fallback.md
+last_updated:           2026-10-11
+source_event:           truecrack/3.5 configure 阶段 mktemp 生成 0700 坏目录导致 config.status 失败并修复
+authors:                hmbs-executor
+source_pr:              15159
