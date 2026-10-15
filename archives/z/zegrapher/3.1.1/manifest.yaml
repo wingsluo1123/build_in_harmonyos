@@ -1,0 +1,42 @@
+# 版本级 manifest — zegrapher 3.1.1
+# 文件位置: archives/z/zegrapher/3.1.1/manifest.yaml
+
+version: "3.1.1"
+software: zegrapher
+status: published
+build_date: "2026-10-05"
+build_system: qmake
+
+source:
+  url: "https://github.com/AdelKS/ZeGrapher/archive/refs/tags/v3.1.1.tar.gz"
+  sha256: "d140f2940b7fd47e65c780650d74970bc6304be1e735da5430504acccfa20078"
+  tar_format: tar.gz
+
+build:
+  system: qmake
+  configure_options:
+    - "-spec linux-clang-libc++"
+    - "CONFIG+=c++17"
+    - "INCLUDEPATH+=<boost包include目录>（由 conanfile build() 运行时注入）"
+  dependencies:
+    - qt5-qtbase/5.15.2.2
+    - boost/1.90.0.4.1
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "qt5-qtbase 包内 qmake 的 QMAKESPEC 未定义（qmake -query QMAKESPEC = **Unknown**），qmake 驱动的上游项目必须显式传 -spec linux-clang-libc++（OHOS 本机 clang+libc++ 匹配该 spec），否则报 Could not read qmake configuration file"
+  - "上游 .pro 钉死 CONFIG += c++11 时，qmake 命令行 CONFIG+=c++17 可覆盖（.pro 后写优先）；boost 1.90 头文件（std::decay_t/enable_if_t）要求 C++14+，c++11 下 20+ 编译错误"
+  - "qmake 的 strip -s（QMAKE_LFLAGS_RELEASE=-s / install 步骤）在 ELF 留下陈旧 .codesign 段，binary-sign-tool 报 '.codesign section already exists / sign elf failed'；签名前先 llvm-objcopy --remove-section .codesign"
+  - "OHOS 未签名 ELF 可执行文件运行 rc=126 Operation not permitted（§7 ELF 签名陷阱），package() 内对 bin/* 自签名（binary-sign-tool sign -selfSign 1）"
+
+notes: |
+  zegrapher 3.1.1 是 Qt5 Widgets GUI 应用（二维数学绘图工具），在鸿蒙PC aarch64
+  上原生构建，qmake 驱动（上游 ZeGrapher.pro，QT += widgets printsupport network）。
+  - 依赖 qt5-qtbase/5.15.2.2（含 moc/uic/rcc/offscreen 插件）+ boost/1.90.0.4.1
+    （头文件级：math/binomial + multiprecision/cpp_dec_float）
+  - 上游无测试套件（无 tests/ 目录，ZeGrapher.pro 无 test target，R51 第 1 步清点）
+  - test_package 冒烟测试：offscreen 启动 + timeout 存活性断言（T1）+ aarch64 ELF
+    检查（T2），conan create 实测 ALL PASS
