@@ -1,0 +1,162 @@
+--- a/dialogs.c
++++ b/dialogs.c
+@@ -260,23 +260,23 @@
+ { 2,SAME_ROW, 100, NULL, (void*) &TagButton, NULL, NULL, Button, N_("Print") },
+ { 3,SAME_ROW, 100, NULL, (void*) &TagButton, NULL, NULL, Button, N_("Exit") },
+ { 0,  NO_OK,   40, NULL, (void*) &NewTagsCallback, "", (char**) "#008080", EndMark , "" }
+ };
+ 
+ static Option *
+ ExpTags (int n, int x, int y)
+ {
+     char buf[MSG_SIZ];
+     if(n == 10) {
+-	snprintf(buf, MSG_SIZ, DATADIR "/titles/%sTit.png", general ? general : Choice);
++	snprintf(buf, MSG_SIZ, "%s", DataPath("/titles/%sTit.png", general ? general : Choice));
+ 	DrawLogo(&tagsOptions[1], buf);
+-	snprintf(buf, MSG_SIZ, DATADIR "/titles/Piece.png");
++	snprintf(buf, MSG_SIZ, "%s", DataPath("/titles/Piece.png"));
+ 	DrawLogo(&tagsOptions[2], buf);
+ 	DrawLogo(&tagsOptions[0], buf);
+     }
+     return NULL;
+ }
+ 
+ static int TagsClick (Option *opt, int n, int x, int y, char *val, int index)
+ {
+ //    PlayBookMove(val, index);
+     return TRUE;
+@@ -402,21 +402,21 @@
+ 
+ static Option aboutOptions[] = {
+ { 201, L2L|T2T, 321,NULL, (char*) &ExpAbout, NULL, NULL, Graph, "logo" }, // image
+ { 0,  NO_OK, 0, NULL, NULL, "", NULL, EndMark , "" }
+ };
+ 
+ static Option *
+ ExpAbout (int n, int x, int y)
+ {
+     if(n == 10) {
+-	DrawLogo(&aboutOptions[0], DATADIR "/titles/About.png");
++	DrawLogo(&aboutOptions[0], DataPath("/titles/About.png"));
+     }
+     return NULL;
+ }
+ 
+ void
+ AboutProc()
+ {
+     GenericPopUp(aboutOptions, "About", TransientDlg, BoardDlg, MODAL, 0);
+     ExpAbout(10, 0, 0);
+ }
+@@ -448,33 +448,33 @@
+ { 1,    0,    60, NULL, (void*) &MoreClick, NULL, NULL, Button, N_("More") },
+ { 2,    0,    60, NULL, (void*) &RulesClick, NULL, NULL, Button, N_("Rules") },
+ { 3,    0,    60, NULL, (void*) &ExitClick, NULL, NULL, Button, N_("Exit") },
+ { 0,  NO_OK, 0, NULL, NULL, "", NULL, EndMark , "" }
+ };
+ 
+ static void
+ MoreClick (int n)
+ {
+     FILE *f;
+-    snprintf(helpFile, MSG_SIZ, DATADIR "/help/%sHelp%d.png", Choice, 3 - helpNr);
++    snprintf(helpFile, MSG_SIZ, "%s", DataPath("/help/%sHelp%d.png", Choice, 3 - helpNr));
+     if((f = fopen(helpFile, "r"))) {
+ 	fclose(f);
+         helpNr = 3 - helpNr; // toggle between 1 and 2
+ 	DrawLogo(&pieceOptions[0], helpFile);
+     }
+ }
+ 
+ static Option *
+ ExpHelp (int n, int x, int y)
+ {
+     if(n == 10) {
+-	snprintf(helpFile, MSG_SIZ, DATADIR "/help/%sHelp%d.png", Choice, helpNr);
++	snprintf(helpFile, MSG_SIZ, "%s", DataPath("/help/%sHelp%d.png", Choice, helpNr));
+ 	DrawLogo(&pieceOptions[0], helpFile);
+     }
+     return NULL;
+ }
+ 
+ void
+ LoadPieceHelp ()
+ {
+     helpNr = 1;
+     GenericPopUp(pieceOptions, "Piece Help", PieceDlg, BoardDlg, NONMODAL, 0);
+@@ -508,21 +508,21 @@
+ { 400,  LR,      0, NULL, (void*) pieceList, (char*) &AddClick, NULL, ListBox, "" }, // list of pieces
+ { 1,    0,     100, NULL, (void*) &AddClick, NULL, NULL, Button, N_("Add Piece") },
+ { 2, SAME_ROW, 100, NULL, (void*) &CancelClick, NULL, NULL, Button, N_("Cancel") },
+ { 0,  NO_OK, 0, NULL, NULL, "", NULL, EndMark , "" }
+ };
+ 
+ static Option *
+ ExpAdd (int n, int x, int y)
+ {
+     if(n == 10) {
+-	DrawLogo(&addOptions[0], DATADIR "/titles/AddBanner.png");
++	DrawLogo(&addOptions[0], DataPath("/titles/AddBanner.png"));
+     }
+     return NULL;
+ }
+ 
+ static void
+ AddClick (int n)
+ {
+     Selection = SelectedListBoxItem(&addOptions[1]) + 1;
+     if(Selection > 0) AddSomePieces();
+     UpdateCaptions();
+@@ -686,28 +686,28 @@
+ 	case 2: *Choice = '\0'; LoadGameProc(); break; // FIXME: this uses LoadGame instead of LoadGame2
+ 	case 3: if(used) QuitProc(); else exit(0); break; // Quit
+     }
+     InitMenuMarkers();
+     PopDown(RootWindow);
+ }
+ 
+ static Option *
+ ExpLogo(int n, int x, int y)
+ {
+-    if(n == 10) DrawLogo(&startOptions[1], DATADIR "/titles/logo.png");
++    if(n == 10) DrawLogo(&startOptions[1], DataPath("/titles/logo.png"));
+     return NULL;
+ }
+ 
+ static Option *
+ ExpSamurai(int n, int x, int y)
+ {
+-    if(n == 10) DrawLogo(&startOptions[7], DATADIR "/titles/armour.png");
++    if(n == 10) DrawLogo(&startOptions[7], DataPath("/titles/armour.png"));
+     return NULL;
+ }
+ 
+ void
+ UnloadStart()
+ {
+     PopDown(RootWindow);
+ }
+ 
+ void
+@@ -1140,16 +1140,16 @@
+     Board.Circle = &DrawCircleWrapper;
+ 
+     Board.Timer1.Enabled = True;
+     StartClockTimer(1000);
+ 
+     for(i=0; i<NTYPES; i++) Board.HandPic[i].Visible = False;
+     for(i=0; i<NSQUARES; i++) {
+ 	Board.showpic[i].Visible = False;
+ 	Board.showpic[i].Picture = NULL;
+     }
+-    ReadIcon(DATADIR "/WhiteUp.png", 1);
+-    ReadIcon(DATADIR "/WhiteDn.png", 2);
+-    ReadIcon(DATADIR "/BlackUp.png", 3);
+-    ReadIcon(DATADIR "/BlackDn.png", 4);
++    ReadIcon(DataPath("/WhiteUp.png"), 1);
++    ReadIcon(DataPath("/WhiteDn.png"), 2);
++    ReadIcon(DataPath("/BlackUp.png"), 3);
++    ReadIcon(DataPath("/BlackDn.png"), 4);
+     LoadPieces(name);
+ }

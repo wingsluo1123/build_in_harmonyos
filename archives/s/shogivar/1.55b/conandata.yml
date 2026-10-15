@@ -1,0 +1,142 @@
+# conandata.yml — shogivar C-port 1.55b (HarmonyOS PC / OHOS aarch64)
+#
+# 上游：ShogiVar 的 C 移植版（原作者 Steve Evans 的 16-bit Visual Basic 程序，
+#       H.G. Muller 把棋规逻辑改写为 C，并用改编自 GNU XBoard 的 GTK 前端
+#       接上）。上游仅通过作者自建 gitweb（hgm.nubati.net，分支 C-port）以
+#       git 快照分发；该 gitweb 现已下线（HTTP 404），作者主页上的
+#       "Browse git source repository" 链接同步失效，上游不再提供任何可
+#       下载的发布归档。
+#       现存唯一稳定的分发件是 Debian 归档中的 pristine 上游快照
+#       shogivar_1.55b.orig.tar.gz：顶层目录名为 shogivar-C-port-1.55b，
+#       与 configure.ac 的 AC_INIT([shogivar],[C-port-1.55b]) 一致，包内
+#       不含任何 debian/ 目录（即未经下游改写的上游原始源码）。此处取
+#       华为云 Debian 权威镜像直链，与 deb.debian.org 上的同一文件逐字节
+#       一致（sha256 见下，两处实测相同）。
+#
+# 版本：1.55b（上游 AC_INIT 写作 C-port-1.55b）
+# 许可：GPL-3.0-or-later（包内 COPYING / Copyright.txt）
+#
+# 补丁由 refresh-patch --auto 按编辑追踪器逐文件生成（每个文件一个补丁）。
+#
+# 注意：本文件（含注释）只保留下面 sources.url 一处 URL 字面量。
+#       CI 的 Pre-download 会按"文件中出现的全部 URL"做下载与字符串替换，
+#       注释里再写仓库/官网地址会被当成源码 URL 一并预下载并改写
+#       （zpaq 7.15 实证）。
+
+sources:
+  url: "https://repo.huaweicloud.com/debian/pool/main/s/shogivar/shogivar_1.55b.orig.tar.gz"
+  sha256: "e4bfb4e1a3951e45fa0e865d1f172e27f68670751f99c9fde4126e0449704bdc"
+
+patches:
+  "1.55b":
+    - patch_file: "patches/0001-Makefile.in.patch"
+      patch_description: >-
+        Makefile.in 把 ACLOCAL/AUTOCONF/AUTOHEADER/AUTOMAKE 置为 true。
+        OHOS worker 无 automake/aclocal/libtool（实测 command -v automake
+        为空），而本适配改过 configure.ac，automake 的 maintainer-mode 规则
+        会执行 "missing aclocal-1.14" 并以致命错误中断 make
+        （Makefile:997: aclocal.m4 Error 127）。
+      patch_type: "portability"
+    - patch_file: "patches/0002-backend.h.patch"
+      patch_description: >-
+        backend.h 两处：(1) STRING 由 char[80] 放宽为 char[512] —— 该上限
+        沿用 16-bit Visual Basic 版本，却同时用于承载文件系统路径
+        （Direct / Datafile / StringTmp，如
+        sprintf(Datafile, "%s/%s.dat", Direct, Choice)），本适配把资源目录
+        改为可重定位的安装路径后 80 字节会被写穿；(2) 导出
+        `extern STRING Direct;`，使前端能在启动时把解析出的资源根写进这个
+        棋规文件目录（backend.c 本身不改）。
+      patch_type: "portability"
+    - patch_file: "patches/0003-common.h.patch"
+      patch_description: >-
+        common.h 集中声明跨文件契约：currBoard 改为 extern（它在 draw.c 与
+        gtk/gui.c 各有一份定义，clang 15 默认 -fno-common 下链接报
+        duplicate symbol，与 Debian 对 GCC 10 的修法一致），并声明可重定位
+        资源根 shogivarDataDir 与 DataPath()/InitDataDir()。
+      patch_type: "portability"
+    - patch_file: "patches/0004-config.guess.patch"
+      patch_description: >-
+        config.guess 增加 HarmonyOS 识别分支：uname -s 返回 HarmonyOS 时
+        输出 aarch64-unknown-linux-ohos。随包分发的 config.guess 为
+        2014-03-23 版，没有任何 OHOS/HarmonyOS 分支，configure 第一步即
+        "unable to guess system type" 中止（知识条目 E007）。不使用
+        --build/--host 绕过：那会让 configure 误判为交叉编译，
+        cross_compiling=yes 后 AC_RUN_IFELSE 等运行时探测全部跳过，
+        config.h 与实际平台不符。
+      patch_type: "portability"
+    - patch_file: "patches/0005-config.sub.patch"
+      patch_description: >-
+        config.sub 接受 aarch64-*-linux-ohos 三元组（知识条目 E072）：
+        linux-ohos 纳入 kernel-os 组合表、新增 ohos-linux 别名映射、ohos
+        纳入基本 OS 白名单，并阻止 -linux-ohos 被通用 -linux* 规则改写成
+        linux-gnu-ohos（实测未加该分支时 config.sub 返回
+        aarch64-unknown-linux-gnu-ohos）。
+      patch_type: "portability"
+    - patch_file: "patches/0006-configure.patch"
+      patch_description: >-
+        configure 四处适配：(1) 前端依赖由 gtk+-2.0 + gmodule-2.0 改为
+        gtk+-3.0（OHOS 制品仓只有 GTK3；gmodule 随 gtk-3.0 传递提供且代码
+        未直接引用，去掉硬要求）；(2) 去掉 CAIRO 检查里未被任何代码引用的
+        librsvg-2.0 要求；(3) makeinfo 缺失由"报错中止"改为告警继续——该
+        检查继承自 XBoard，而 shogivar 不含任何 Texinfo 手册，OHOS 工具链亦
+        无 makeinfo；(4) config.status 的临时目录去掉 umask 077 并补
+        chmod 755：HMDFS 忽略 umask/chmod 语义，077 建出的 ./confXXXXXX
+        随后不可遍历，configure 尾部必然以
+        "./confXXXXXX/subs1.awk: Permission denied" 失败（E524 同类，与
+        archives/a/abook 的既有修法一致）。
+      patch_type: "portability"
+    - patch_file: "patches/0007-configure.ac.patch"
+      patch_description: >-
+        configure.ac 与 0006 对应的三处源头修改（gtk+-3.0、去
+        librsvg-2.0、makeinfo 降级为告警），保持 configure.ac 与生成的
+        configure 语义一致；config.status 临时目录属于 autoconf 自身生成
+        代码，只在 configure 里改。
+      patch_type: "portability"
+    - patch_file: "patches/0008-dialogs.c.patch"
+      patch_description: >-
+        dialogs.c 的标题图、帮助图与白黑方图标路径改用可重定位的
+        DataPath()（共 12 处 DATADIR 字面量拼接）。
+      patch_type: "portability"
+    - patch_file: "patches/0009-draw.c.patch"
+      patch_description: >-
+        draw.c：(1) 删除三行未被使用的头文件包含——cairo/cairo-xlib.h
+        （仅 X11 版 cairo 提供，OHOS 侧 cairo/1.18.4 不含该头，且全文无
+        cairo_xlib_* 调用）与 librsvg/rsvg.h、librsvg/rsvg-cairo.h（全文零
+        rsvg 符号引用，librsvg 2.62 亦已移除 rsvg-cairo.h）；
+        (2) 棋子/标题图片路径改用可重定位的 DataPath()。
+      patch_type: "portability"
+    - patch_file: "patches/0010-gtk-gui.c.patch"
+      patch_description: >-
+        gtk/gui.c 三处适配：(1) GTK_DIALOG_NO_SEPARATOR 在 GTK3 已删除；
+        (2) 在 gtk_init() 之前处理 -v/--version 与 -h/--help 并 exit(0)
+        ——上游这两行本就存在但被 #if 0 关闭（且引用了未定义宏
+        CONFIGURE_OPTIONS，直接放开无法编译），无显示环境下唯一的可执行
+        冒烟入口就靠它，cmd-pkgs 安装脚本的首次执行预触发也依赖它；
+        (3) 新增可重定位资源根：定义 shogivarDataDir / DataPath() /
+        InitDataDir()，启动时用 /proc/self/exe 定位可执行文件，优先采用
+        其同级 ../share/games/shogivar，找不到再回落到 configure 时写入的
+        默认路径——conan 缓存目录与 cmd-pkgs 扁平 tar 包解包目录的长度、
+        层级各不相同，编译期绝对路径无法通用。--help 会打印解析结果，
+        便于消费者侧验证。
+      patch_type: "portability"
+    - patch_file: "patches/0011-gtk-xoptions.c.patch"
+      patch_description: >-
+        gtk/xoptions.c 的 GTK2→GTK3 API 移植：gtk_menu_append /
+        gtk_menu_bar_append → gtk_menu_shell_append、
+        gtk_combo_box_new_text/append_text → gtk_combo_box_text_*、
+        GDK_Return/Escape → GDK_KEY_*、gtk_signal_connect_object →
+        g_signal_connect_swapped、GtkWidget->window 直取成员改为
+        gtk_widget_get_window()、GtkCheckMenuItem->active 直写改为
+        set_active() 并临时阻塞信号避免递归、expose-event 改为 GTK3 的
+        draw 信号（新增 DrawEventProc 直传后备 image surface 并做
+        [0,0,w,h] 全幅重绘，否则局部暴露区会被裁剪成黑块）、GraphExpose
+        改为 gtk_widget_queue_draw()、True/False 改用 GLib 的 TRUE/FALSE
+        （原先由 Xlib.h 间接提供，去掉 cairo-xlib.h 后即未定义）。
+      patch_type: "portability"
+    - patch_file: "patches/0012-menus.h.patch"
+      patch_description: >-
+        menus.h 的 MenuItem 增加 activate_id 字段，记录
+        g_signal_connect_swapped 返回的处理函数 id，供 MarkMenuItem 在设置
+        勾选态时阻塞/恢复信号（GTK3 下 GtkCheckMenuItem 结构体成员不再
+        可直写）。
+      patch_type: "portability"

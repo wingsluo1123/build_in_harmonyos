@@ -1,0 +1,181 @@
+--- a/gtk/gui.c
++++ b/gtk/gui.c
+@@ -54,22 +54,22 @@
+ #include "config.h"
+ 
+ #include <stdio.h>
+ #include <ctype.h>
+ #include <signal.h>
+ #include <errno.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <pwd.h>
+ #include <math.h>
++#include <stdarg.h>
+ #include <cairo/cairo.h>
+-#include <cairo/cairo-xlib.h>
+ #include <gtk/gtk.h>
+ 
+ #if !OMIT_SOCKETS
+ # if HAVE_SYS_SOCKET_H
+ #  include <sys/socket.h>
+ #  include <netinet/in.h>
+ #  include <netdb.h>
+ # else /* not HAVE_SYS_SOCKET_H */
+ #  if HAVE_LAN_SOCKET_H
+ #   include <lan/socket.h>
+@@ -224,39 +224,85 @@
+ #else
+ void *shellWidget, *formWidget, *boardWidget, *titleWidget, *dropMenu, *menuBarWidget;
+ GtkWidget       *mainwindow;
+ #endif
+ Option *optList; // contains all widgets of main window
+ char *layoutName;
+ char *clockFont = "Sans Bold 9";
+ 
+ char installDir[] = "."; // [HGM] UCI: needed for UCI; probably needs run-time initializtion
+ 
++/* Asset directory (boards, pieces, titles, help images, *.dat / *.rul).
++   The compile-time default is the --datadir of configure; InitDataDir()
++   re-points it at the share/games/shogivar tree that lives next to the
++   executable, so an installed package keeps working from any prefix
++   (conan cache, $HOME/usr/local, a flat release tarball, ...). */
++char shogivarDataDir[MSG_SIZ] = DATADIR;
++
++char *
++DataPath (const char *fmt, ...)
++{   // compose a path below the (possibly relocated) asset directory
++    static char path[MSG_SIZ];
++    va_list ap;
++    size_t used = strlen(shogivarDataDir);
++
++    snprintf(path, MSG_SIZ, "%s", shogivarDataDir);
++    va_start(ap, fmt);
++    vsnprintf(path + used, MSG_SIZ - used, fmt, ap);
++    va_end(ap);
++    return path;
++}
++
++void
++InitDataDir (const char *argv0)
++{   // prefer <directory-of-executable>/../share/games/shogivar
++    char exe[MSG_SIZ], candidate[MSG_SIZ];
++    struct stat st;
++    ssize_t len;
++    char *slash;
++
++    len = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
++    if(len > 0) exe[len] = '\0';
++    else if(argv0 && *argv0 && strlen(argv0) < sizeof(exe)) strcpy(exe, argv0);
++    else return;                // keep the compile-time default
++
++    slash = strrchr(exe, '/');
++    if(slash == NULL) return;   // no directory component: keep default
++    *slash = '\0';
++
++    snprintf(candidate, MSG_SIZ, "%s/../share/games/shogivar", exe);
++    if(stat(candidate, &st) == 0 && S_ISDIR(st.st_mode)) {
++        if(realpath(candidate, shogivarDataDir) == NULL)
++            snprintf(shogivarDataDir, MSG_SIZ, "%s", candidate);
++    }
++    /* keep the game/rules file directory (backend.c: `Direct`) in step */
++    snprintf(Direct, sizeof(Direct), "%s", shogivarDataDir);
++}
++
+ /* pixbufs */
+ static GdkPixbuf       *mainwindowIcon=NULL;
+ static GdkPixbuf       *WhiteIcon=NULL;
+ static GdkPixbuf       *BlackIcon=NULL;
+ 
+ /* key board accelerators */
+ GtkAccelGroup *GtkAccelerators;
+ 
+ typedef unsigned int BoardSize;
+ BoardSize boardSize;
+ Boolean chessProgram;
+ 
+ int  minX, minY; // [HGM] placement: volatile limits on upper-left corner
+ int smallLayout = 0, tinyLayout = 0,
+   marginW, marginH, // [HGM] for run-time resizing
+   fromX = -1, fromY = -1, toX, toY, commentUp = False,
+   errorExitStatus = -1, defaultLineGap;
+ 
+-void *currBoard;
+ char *chessDir, *programName, *programVersion;
+ Boolean alwaysOnTop = False;
+ 
+ TimeMark programStartTime;
+ 
+ WindowPlacement wpMain;
+ 
+ /* This magic number is the number of intermediate frames used
+    in each half of the animation. For short moves it's reduced
+    by 1. The total number of frames will be factor * 2 + 1.  */
+@@ -409,26 +455,41 @@
+     int i;
+ //    int boardWidth, w, h; //, boardHeight;
+     char *p;
+ 
+     srandom(time(0)); // [HGM] book: make random truly random
+     GetTimeMark(&programStartTime);
+ 
+     setbuf(stdout, NULL);
+     setbuf(stderr, NULL);
+ 
+-#if 0
++    /* locate the asset tree before anything reads it */
++    InitDataDir(argv[0]);
++
++    // Print version / usage and exit before touching the display: the GTK
++    // initialisation below needs a window system, which headless build and
++    // packaging checks do not have.
+     if(argc > 1 && (!strcmp(argv[1], "-v" ) || !strcmp(argv[1], "--version" ))) {
+-        printf("%s version %s\n\n  configure options: %s\n", PACKAGE_NAME, PACKAGE_VERSION, CONFIGURE_OPTIONS);
++        printf("%s version %s\n", PACKAGE_NAME, PACKAGE_VERSION);
+ 	exit(0);
+     }
+-#endif
++    if(argc > 1 && (!strcmp(argv[1], "-h" ) || !strcmp(argv[1], "--help" ))) {
++        printf("Usage: %s [options] [file]\n\n", argv[0]);
++        printf("%s %s - referee and play %d shogi variants.\n\n",
++               PACKAGE_NAME, PACKAGE_VERSION, 17);
++        printf("  -v, --version   print version and exit\n");
++        printf("  -h, --help      print this help and exit\n");
++        printf("\nWithout options the graphical board is started, which requires\n"
++               "a window system (GTK+ 3) and a display.\n");
++        printf("\nData directory: %s\n", shogivarDataDir);
++	exit(0);
++    }
+ 
+     /* set up GTK */
+     gtk_init (&argc, &argv);
+ #ifdef __APPLE__
+     {   // prepare to catch OX OpenFile signal, which will tell us the clicked file
+ 	GtkosxApplication *theApp = g_object_new(GTKOSX_TYPE_APPLICATION, NULL);
+ 	char *path = gtkosx_application_get_bundle_path();
+ 	strncpy(dataDir, path, MSG_SIZ);
+ 	snprintf(masterSettings, MSG_SIZ, "%s/Contents/Resources/etc/xboard.conf", path);
+ 	g_signal_connect(theApp, "NSApplicationOpenFile", G_CALLBACK(StartNewXBoard), NULL);
+@@ -1101,21 +1162,21 @@
+     switch(content) {
+ 	case 1: text1 = GTK_STOCK_OK; text2 = GTK_STOCK_CANCEL; resp1 = 1; resp2 = 2; break;
+ 	case 4: text1 = "Yes"; text2 = "No"; resp1 = 6; resp2 = 7; break;
+ 	default: text1 = GTK_STOCK_OK; text2 = NULL; resp1 = 1; break;
+     }
+ 
+     if(shell == NULL) shell = shells[RootWindow];
+ 
+     dialog = gtk_dialog_new_with_buttons( title,
+ 					  GTK_WINDOW(shell),
+-					  GTK_DIALOG_DESTROY_WITH_PARENT | GTK_DIALOG_NO_SEPARATOR |
++					  GTK_DIALOG_DESTROY_WITH_PARENT |
+ 					  GTK_DIALOG_MODAL,
+ 					  text1, resp1,
+ 					  text2, resp2,
+ 					  NULL );
+     box = gtk_dialog_get_content_area( GTK_DIALOG( dialog ) );
+     if(def) {
+ 	label = gtk_entry_new();
+ 	gtk_entry_set_text (GTK_ENTRY (label), def);
+     } else label = gtk_label_new(msg);
+     gtk_box_pack_start(GTK_BOX (box), label, TRUE, TRUE, 0);

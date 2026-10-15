@@ -1,0 +1,622 @@
+--- a/gtk/xoptions.c
++++ b/gtk/xoptions.c
+@@ -41,21 +41,20 @@
+ #  include <strings.h>
+ # endif /* not HAVE_STRING_H */
+ #endif /* not STDC_HEADERS */
+ 
+ #if HAVE_UNISTD_H
+ # include <unistd.h>
+ #endif
+ #include <stdint.h>
+ 
+ #include <cairo/cairo.h>
+-#include <cairo/cairo-xlib.h>
+ #include <gtk/gtk.h>
+ #include <gdk/gdkkeysyms.h>
+ #ifdef __APPLE__
+ #  include <gtkmacintegration/gtkosxapplication.h>
+ #endif
+ 
+ #include "common.h"
+ #include "gui.h"
+ #include "dialogs.h"
+ #include "menus.h"
+@@ -76,40 +75,40 @@
+ static Boolean browserUp;
+ static GdkPixbuf *iconsGTK[8];
+ 
+ void
+ UnCaret ()
+ {
+ #ifdef TODO_GTK
+     Arg args[2];
+ 
+     if(previous) {
+-	XtSetArg(args[0], XtNdisplayCaret, False);
++	XtSetArg(args[0], XtNdisplayCaret, FALSE);
+ 	XtSetValues(previous, args, 1);
+     }
+     previous = NULL;
+ #endif
+ }
+ 
+ #ifdef TODO_GTK
+ void
+ SetFocus (Widget w, XtPointer data, XEvent *event, Boolean *b)
+ {
+     Arg args[2];
+     char *s;
+     int j;
+ 
+     UnCaret();
+     XtSetArg(args[0], XtNstring, &s);
+     XtGetValues(w, args, 1);
+     j = 1;
+-    XtSetArg(args[0], XtNdisplayCaret, True);
++    XtSetArg(args[0], XtNdisplayCaret, TRUE);
+     if(!strchr(s, '\n') && strlen(s) < 80) XtSetArg(args[1], XtNinsertPosition, strlen(s)), j++;
+     XtSetValues(w, args, j);
+     XtSetKeyboardFocus((Widget) data, w);
+     previous = w;
+ }
+ #endif
+ 
+ void
+ BoardFocus ()
+ {
+@@ -124,31 +123,35 @@
+ Option *dialogOptions[NrOfDialogs];
+ 
+ #ifdef TODO_GTK
+ static Arg layoutArgs[] = {
+     { XtNborderWidth, 0 },
+     { XtNdefaultDistance, 0 },
+ };
+ 
+ static Arg formArgs[] = {
+     { XtNborderWidth, 0 },
+-    { XtNresizable, (XtArgVal) True },
++    { XtNresizable, (XtArgVal) TRUE },
+ };
+ #endif
+ 
+ void
+ MarkMenuItem (char *menuRef, int state)
+ {
+     MenuItem *item = MenuNameToItem(menuRef);
+ 
+     if(item && item->handle) {
+-        ((GtkCheckMenuItem *) (item->handle))->active = state;
++        // block signal while we adjust the state, to avoid infinite
++        // recursion on handler
++        g_signal_handler_block(item->handle, item->activate_id);
++        gtk_check_menu_item_set_active(item->handle, state);
++        g_signal_handler_unblock(item->handle, item->activate_id);
+     }
+ }
+ 
+ void GetWidgetTextGTK(GtkWidget *w, char **buf)
+ {
+     GtkTextIter start;
+     GtkTextIter end;
+ 
+     if (GTK_IS_ENTRY(w)) {
+ 	*buf = (char *) gtk_entry_get_text(GTK_ENTRY (w));
+@@ -218,21 +221,21 @@
+       case Fractional:
+       case FileName:
+       case PathName:
+       case TextBox: SetWidgetTextGTK((GtkWidget *) opt->handle, buf); break;
+       case Spin: SetSpinValue(opt, buf, n); break;
+       default:
+ 	printf("unexpected case (%d) in GetWidgetText\n", opt->type);
+     }
+ #ifdef TODO_GTK
+ // focus is automatic in GTK?
+-    if(n >= 0) SetFocus(opt->handle, shells[n], NULL, False);
++    if(n >= 0) SetFocus(opt->handle, shells[n], NULL, FALSE);
+ #endif
+ }
+ 
+ void
+ GetWidgetState (Option *opt, int *state)
+ {
+     *state = gtk_toggle_button_get_active(opt->handle);
+ }
+ 
+ void
+@@ -353,21 +356,21 @@
+ }
+ 
+ void
+ NewCursor (Option *opt, char *src)
+ {
+     static GdkCursor *cursor;
+     GdkDisplay *gdisp = gdk_display_get_default();
+     if (gdisp == NULL) return;
+ //    if(!cursor) cursor = gdk_cursor_new_from_pixbuf(gdisp, GDK_PIXBUF(iconsGTK[3]), 0, 0);
+     if(!cursor) cursor = gdk_cursor_new_for_display(gdisp, GDK_FLEUR);
+-    gdk_window_set_cursor(((GtkWidget*) opt->handle)->window, src ? cursor : NULL);
++    gdk_window_set_cursor(gtk_widget_get_window(opt->handle), src ? cursor : NULL);
+ }
+ 
+ void
+ FocusOnWidget (Option *opt, DialogClass dlg)
+ {
+     UnCaret();
+ #ifdef TODO_GTK
+     XtSetKeyboardFocus(shells[dlg], opt->handle);
+ #endif
+     if(dlg) gtk_window_present(GTK_WINDOW(shells[dlg]));
+@@ -448,41 +451,41 @@
+ 	if(!msg) break;
+ #ifdef __APPLE__
+ 	if(!strcmp(msg, "Quit ")) continue;             // Quit item will appear automatically in App menu
+ 	if(!strcmp(msg, "About XBoard")) msg = "About"; // 'XBoard' will be appended automatically when moved to App menu 1st item
+ #endif
+         if(!strcmp(msg, "ICS Input Box")) { mb[i].handle = NULL; continue; } // suppress ICS Input Box in GTK
+ 	if(strcmp(msg, "----")) { //
+ 	  if(!(opt->min & NO_GETTEXT)) msg = _(msg);
+ 	  if(mb[i].type) {
+ 	    entry = gtk_check_menu_item_new_with_label(msg); // should be used for items that can be checkmarked
+-	    if(mb[i].type == RADIO) gtk_check_menu_item_set_draw_as_radio(GTK_CHECK_MENU_ITEM(entry), True);
++	    if(mb[i].type == RADIO) gtk_check_menu_item_set_draw_as_radio(GTK_CHECK_MENU_ITEM(entry), TRUE);
+ 	  } else
+ 	    entry = gtk_menu_item_new_with_label(msg);
+-	  gtk_signal_connect_object (GTK_OBJECT (entry), "activate", GTK_SIGNAL_FUNC(MenuSelect), (gpointer) (intptr_t) ((n<<16)+i));
++	  mb[i].activate_id = g_signal_connect_swapped (GTK_WIDGET (entry), "activate", G_CALLBACK(MenuSelect), (gpointer) (intptr_t) ((n<<16)+i));
+ 	  if(mb[i].accel) {
+ 	    guint accelerator_key;
+ 	    GdkModifierType accelerator_mods;
+ 
+ 	    gtk_accelerator_parse(mb[i].accel, &accelerator_key, &accelerator_mods);
+ #ifdef __APPLE__
+    	    if(accelerator_mods & GDK_CONTROL_MASK) {  // in OSX use Meta where Linux uses Ctrl
+ 		accelerator_mods &= ~GDK_CONTROL_MASK; // clear Ctrl flag
+ 		accelerator_mods |= GDK_META_MASK;     // set Meta flag
+ 	    }
+ #endif
+ 	    gtk_widget_add_accelerator (GTK_WIDGET(entry), "activate",GtkAccelerators,
+ 					accelerator_key, accelerator_mods, GTK_ACCEL_VISIBLE);
+ 	  }
+ 	} else entry = gtk_separator_menu_item_new();
+ 	gtk_widget_show(entry);
+-	gtk_menu_append(GTK_MENU (menu), entry);
++	gtk_menu_shell_append(GTK_MENU_SHELL (menu), entry);
+ //CreateMenuItem(menu, opt->min & NO_GETTEXT ? msg : _(msg), (XtCallbackProc) ComboSelect, (n<<16)+i);
+ 	mb[i].handle = (void*) entry; // save item ID, for enabling / checkmarking
+ //	if(i==def) {
+ //	    XtSetArg(arg, XtNpopupOnEntry, entry);
+ //	    XtSetValues(menu, &arg, 1);
+ //	}
+       }
+       return menu;
+ }
+ 
+@@ -521,24 +524,24 @@
+     if(opt == icsBox) return ICSKeyEvent(event->keyval); // Intercept ICS Input Box, which needs special treatment
+ 
+     shiftState = event->state & GDK_SHIFT_MASK;
+     controlState = event->state & GDK_CONTROL_MASK;
+     switch(event->keyval) {
+ //      case 'n':       return (controlState && IcsHist(14, opt, dlg));
+ //      case 'o':       return (controlState && IcsHist(15, opt, dlg));
+ //      case GDK_Tab:   IcsHist(10, opt, dlg); break;
+ //      case GDK_Up:     IcsHist(1, opt, dlg); break;
+ //      case GDK_Down:  IcsHist(-1, opt, dlg); break;
+-      case GDK_Return:
++      case GDK_KEY_Return:
+ 	if(GenericReadout(dialogOptions[dlg], -1)) PopDown(dlg);
+ 	break;
+-      case GDK_Escape:
++      case GDK_KEY_Escape:
+ /*	if(!IcsHist(33, opt, dlg)) */ PopDown(dlg);
+ 	break;
+       default:
+ 	return FALSE;
+     }
+     return TRUE;
+ }
+ 
+ void
+ HighlightText (Option *opt, int from, int to, Boolean highlight)
+@@ -717,41 +720,41 @@
+ {   // accessor for use in back-end
+     return shells[n] != NULL;
+ }
+ 
+ void
+ RaiseWindow (DialogClass dlg)
+ {
+ #ifdef TODO_GTK
+     static XEvent xev;
+     Window root = RootWindow(xDisplay, DefaultScreen(xDisplay));
+-    Atom atom = XInternAtom (xDisplay, "_NET_ACTIVE_WINDOW", False);
++    Atom atom = XInternAtom (xDisplay, "_NET_ACTIVE_WINDOW", FALSE);
+ 
+     xev.xclient.type = ClientMessage;
+     xev.xclient.serial = 0;
+-    xev.xclient.send_event = True;
++    xev.xclient.send_event = TRUE;
+     xev.xclient.display = xDisplay;
+     xev.xclient.window = XtWindow(shells[dlg]);
+     xev.xclient.message_type = atom;
+     xev.xclient.format = 32;
+     xev.xclient.data.l[0] = 1;
+     xev.xclient.data.l[1] = CurrentTime;
+ 
+     XSendEvent (xDisplay,
+-          root, False,static gboolean
++          root, FALSE,static gboolean
+ MemoEvent(GtkWidget *widget, GdkEvent *event, gpointer gdata)
+ 
+           SubstructureRedirectMask | SubstructureNotifyMask,
+           &xev);
+ 
+     XFlush(xDisplay);
+-    XSync(xDisplay, False);
++    XSync(xDisplay, FALSE);
+ #endif
+ }
+ 
+ void
+ Destroy(DialogClass n)
+ {
+     if(!shells[n]) return;
+     gtk_widget_destroy(shells[n]);
+     shells[n] = NULL;
+ }
+@@ -768,21 +771,21 @@
+ 
+     gtk_widget_hide(shells[n]);
+     shellUp[n]--; // count rather than clear
+ 
+     if(n == 0 || n >= PromoDlg && n != BoardDlg) {
+         gtk_widget_destroy(shells[n]);
+         shells[n] = NULL;
+     }
+ 
+     if(marked[n]) {
+-	MarkMenuItem(marked[n], False);
++	MarkMenuItem(marked[n], FALSE);
+ 	marked[n] = NULL;
+     }
+ 
+     if(!n) currentCps = NULL; // if an Engine Settings dialog was up, we must be popping it down now
+     currentOption = dialogOptions[TransientDlg]; // just in case a transient dialog was up (to allow its check and combo callbacks to work)
+ #ifdef TODO_GTK
+     RaiseWindow(parents[n]); // automatic in GTK?
+     if(parents[n] == RootWindow) XtSetKeyboardFocus(shellWidget, formWidget); // also automatic???
+ #endif
+     return 1;
+@@ -794,24 +797,24 @@
+      GtkResponseType  resptype;
+      gpointer  gdata;
+ {
+     DialogClass dlg = (intptr_t) gdata; /* dialog number dlgnr */
+     GtkWidget *sh = shells[dlg];
+ 
+     currentOption = dialogOptions[dlg];
+ 
+ #ifdef TODO_GTK
+ // I guess BrowserDlg will be abandoned, as GTK has a better browser of its own
+-    if(shellUp[BrowserDlg] && dlg != BrowserDlg || dialogError) return True; // prevent closing dialog when it has an open file-browse daughter
++    if(shellUp[BrowserDlg] && dlg != BrowserDlg || dialogError) return TRUE; // prevent closing dialog when it has an open file-browse daughter
+ #else
+     if(browserUp || dialogError && dlg != FatalDlg || dlg == MasterDlg && shellUp[TransientDlg])
+-	return True; // prevent closing dialog when it has an open file-browse, transient or error-popup daughter
++	return TRUE; // prevent closing dialog when it has an open file-browse, transient or error-popup daughter
+ #endif
+     shells[dlg] = w; // make sure we pop down the right one in case of multiple instances
+ 
+     /* OK pressed */
+     if (resptype == GTK_RESPONSE_ACCEPT) {
+         if (GenericReadout(currentOption, -1)) PopDown(dlg);
+         return TRUE;
+     } else
+     /* cancel pressed */
+     {
+@@ -852,122 +855,80 @@
+ void
+ ColorChanged (Widget w, XtPointer data, XEvent *event, Boolean *b)
+ {   // for detecting a typed change in color
+     char buf[10];
+     if ( (XLookupString(&(event->xkey), buf, 2, NULL, NULL) == 1) && *buf == '\r' )
+ 	RefreshColor((int)(intptr_t) data, 0);
+ }
+ #endif
+ 
+ static void
++DrawEventProc(GtkWidget *widget, cairo_t *cr, gpointer gdata)
++{   // copy the memory buffer (->choice) to the display
++    Option *graph = (Option *) gdata;
++
++    if(!graph->choice) return;
++    cairo_set_source_surface(cr, (cairo_surface_t *) graph->choice, 0, 0);
++//cairo_set_source_rgb(cr, 1, 0, 0);
++    cairo_set_antialias(cr, CAIRO_ANTIALIAS_NONE);
++    cairo_rectangle(cr, 0, 0,
++                    gtk_widget_get_allocated_width(widget),
++                    gtk_widget_get_allocated_height(widget));
++    cairo_fill(cr);
++}
++
++static void
+ GraphEventProc(GtkWidget *widget, GdkEvent *event, gpointer gdata)
+-{   // handle expose and mouse events on Graph widget
++{   // handle mouse events on Graph widget
+     int w, h;
+-    int button=10, f=1, sizing=0;
++    int button=10, f=1;
+     Option *opt, *graph = (Option *) gdata;
+     PointerCallback *userHandler = graph->target;
+-    GdkEventExpose *eevent = (GdkEventExpose *) event;
+     GdkEventButton *bevent = (GdkEventButton *) event;
+     GdkEventMotion *mevent = (GdkEventMotion *) event;
+-    GtkAllocation a;
+-    cairo_t *cr;
+ 
+ //    if (!XtIsRealized(widget)) return;
+ 
+     switch(event->type) {
+-	case GDK_EXPOSE: // make handling of expose events generic, just copying from memory buffer (->choice) to display (->textValue)
+-	    /* Get window size */
+-	    gtk_widget_get_allocation(widget, &a);
+-	    w = a.width; h = a.height;
+-//printf("expose %dx%d @ (%d,%d): %dx%d @(%d,%d) opt: %dx%d\n", w, h, a.x, a.y, eevent->area.width, eevent->area.height, eevent->area.x, eevent->area.y, graph->max, graph->value);
+-#ifdef TODO_GTK
+-	    j = 0;
+-	    XtSetArg(args[j], XtNwidth, &w); j++;
+-	    XtSetArg(args[j], XtNheight, &h); j++;
+-	    XtGetValues(widget, args, j);
+-#endif
+-	    if(w < graph->max || w > graph->max + 1 || h != graph->value) { // use width fudge of 1 pixel
+-		if(eevent->count >= 0) { // suppress sizing on expose for ordered redraw in response to sizing.
+-		    sizing = 1;
+-		    graph->max = w; graph->value = h; // note: old values are kept if we we don't exceed width fudge
+-		}
+-	    } else w = graph->max;
+-	    if(sizing && eevent->count > 0) { graph->max = 0; return; } // don't bother if further exposure is pending during resize
+-#ifdef TODO_GTK
+-	    if(!graph->textValue || sizing) { // create surfaces of new size for display widget
+-		if(graph->textValue) cairo_surface_destroy((cairo_surface_t *)graph->textValue);
+-		graph->textValue = (char*) cairo_xlib_surface_create(xDisplay, XtWindow(widget), DefaultVisual(xDisplay, 0), w, h);
+-	    }
+-#endif
+-	    if(sizing) { // the memory buffer was already created in GenericPopup(),
+-			 // to give drawing routines opportunity to use it before first expose event
+-			 // (which are only processed when main gets to the event loop, so after all init!)
+-			 // so only change when size is no longer good
+-		cairo_t *cr;
+-		if(graph->choice) cairo_surface_destroy((cairo_surface_t *) graph->choice);
+-		graph->choice = (char**) cairo_image_surface_create (CAIRO_FORMAT_ARGB32, w, h);
+-		// paint white, to prevent weirdness when people maximize window and drag pieces over space next to board
+-		cr = cairo_create ((cairo_surface_t *) graph->choice);
+-		cairo_rectangle (cr, 0, 0, w, h);
+-		cairo_set_source_rgba(cr, 1.0, 1.0, 1.0, 1.0);
+-		cairo_fill(cr);
+-		cairo_destroy (cr);
+-		break;
+-	    }
+-	    w = eevent->area.width;
+-	    if(eevent->area.x + w > graph->max) w--; // cut off fudge pixel
+-	    cr = gdk_cairo_create(((GtkWidget *) (graph->handle))->window);
+-	    cairo_set_source_surface(cr, (cairo_surface_t *) graph->choice, 0, 0);
+-//cairo_set_source_rgb(cr, 1, 0, 0);
+-	    cairo_set_antialias(cr, CAIRO_ANTIALIAS_NONE);
+-	    cairo_rectangle(cr, eevent->area.x, eevent->area.y, w, eevent->area.height);
+-	    cairo_fill(cr);
+-	    cairo_destroy(cr);
+-	default:
+-	    return;
+ 	case GDK_MOTION_NOTIFY:
+ 	    f = 0;
+ 	    w = mevent->x; h = mevent->y;
+ 	    break;
+ 	case GDK_BUTTON_RELEASE:
+ 	    f = -1; // release indicated by negative button numbers
+ 	case GDK_BUTTON_PRESS:
+ 	    w = bevent->x; h = bevent->y;
+ 	    button = bevent->button;
+ 	    shiftState = bevent->state & GDK_SHIFT_MASK;
+ 	    controlState = bevent->state & GDK_CONTROL_MASK;
++	    break;
++	default:
++	    return;
+     }
+     button *= f;
+ 
+     opt = userHandler(button, w, h);
+ #ifdef TODO_GTK
+     if(opt) { // user callback specifies a context menu; pop it up
+ 	XUngrabPointer(xDisplay, CurrentTime);
+ 	XtCallActionProc(widget, "XawPositionSimpleMenu", event, &(opt->name), 1);
+ 	XtPopupSpringLoaded(opt->handle);
+     }
+-    XSync(xDisplay, False);
++    XSync(xDisplay, FALSE);
+ #endif
+ }
+ 
+ void
+ GraphExpose (Option *opt, int x, int y, int w, int h)
+-{
+-#if 0
+-  GdkRectangle r;
+-  r.x = x; r.y = y; r.width = w; r.height = h;
+-  gdk_window_invalidate_rect(((GtkWidget *)(opt->handle))->window, &r, FALSE);
+-#endif
+-  GdkEventExpose e;
++{   // invalidate the graph widget; GTK3 repaints it through the "draw" signal
+   if(!opt->handle) return;
+-  e.area.x = x; e.area.y = y; e.area.width = w; e.area.height = h; e.count = -1; e.type = GDK_EXPOSE; // count = -1: kludge to suppress sizing
+-  GraphEventProc(opt->handle, (GdkEvent *) &e, (gpointer) opt); // fake expose event
++  gtk_widget_queue_draw(GTK_WIDGET(opt->handle));
+ }
+ 
+ void GenericCallback(GtkWidget *widget, gpointer gdata)
+ {
+     int data = (intptr_t) gdata;
+     DialogClass dlg;
+ #ifdef TODO_GTK
+     GtkWidget *sh = XtParent(XtParent(XtParent(w))), *oldSh;
+ #else
+     GtkWidget *sh, *oldSh;
+@@ -1185,21 +1146,21 @@
+     GtkWidget *menu;
+ 
+     int i, j, arraysize, left, top, height=999, boxStart=0, breakType = 0, r;
+     char def[MSG_SIZ], *msg;
+     gboolean expandable = FALSE;
+ 
+     if(dlgNr != ErrorDlg && shellUp[dlgNr]) return 0; // already up
+ 
+     if(dlgNr && dlgNr < PromoDlg && shells[dlgNr]) { // reusable, and used before (but popped down)
+         gtk_widget_show(shells[dlgNr]);
+-        shellUp[dlgNr] = True;
++        shellUp[dlgNr] = TRUE;
+ 	if(wp[dlgNr]) gtk_window_move(GTK_WINDOW(shells[dlgNr]), wp[dlgNr]->x, wp[dlgNr]->y);
+         return 0;
+     }
+     if(dlgNr == TransientDlg && parent == RootWindow && shellUp[MasterDlg]) parent = MasterDlg; // MasterDlg can always take role of main window
+ 
+     dialogOptions[dlgNr] = option; // make available to callback
+     // post currentOption globally, so Spin and Combo callbacks can already use it
+     // WARNING: this kludge does not work for persistent dialogs, so that these cannot have spin or combo controls!
+     currentOption = option;
+ 
+@@ -1217,21 +1178,21 @@
+       {
+ 	dialog = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+ 	gtk_window_set_title(GTK_WINDOW(dialog), title);
+ 	box = gtk_vbox_new(FALSE,0);
+ 	gtk_container_add (GTK_CONTAINER (dialog), box);
+       }
+     else
+       {
+ 	dialog = gtk_dialog_new_with_buttons( title,
+ 					      GTK_WINDOW(shells[parent]),
+-					      GTK_DIALOG_DESTROY_WITH_PARENT | GTK_DIALOG_NO_SEPARATOR |
++					      GTK_DIALOG_DESTROY_WITH_PARENT |
+ 					      (modal ? GTK_DIALOG_MODAL : 0),
+ 					      GTK_STOCK_OK, GTK_RESPONSE_ACCEPT,
+ 					      GTK_STOCK_CANCEL, GTK_RESPONSE_REJECT,
+ 					      NULL );
+ 	box = gtk_dialog_get_content_area( GTK_DIALOG( dialog ) );
+       }
+ 
+     shells[dlgNr] = dialog;
+ //    gtk_box_set_spacing(GTK_BOX(box), 5);
+ 
+@@ -1308,21 +1269,21 @@
+             /* width */
+             w = option[i].type == Spin || option[i].type == Fractional ? 70 : option[i].max ? option[i].max : 205;
+ 	    if(option[i].type == FileName || option[i].type == PathName) w -= 55;
+ 
+             if (option[i].type==TextBox && option[i].value > 80){
+                 GtkTextIter iter;
+                 expandable = TRUE;
+                 textview = gtk_text_view_new();
+                 gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(textview), option[i].min & T_WRAP ? GTK_WRAP_WORD : GTK_WRAP_NONE);
+ #ifdef TODO_GTK
+-		if(option[i].min & T_FILL)  { XtSetArg(args[j], XtNautoFill, True);  j++; }
++		if(option[i].min & T_FILL)  { XtSetArg(args[j], XtNautoFill, TRUE);  j++; }
+ 		if(option[i].min & T_TOP)   { XtSetArg(args[j], XtNtop, XtChainTop); j++;
+ #endif
+                 /* add textview to scrolled window so we have vertical scroll bar */
+                 sw = gtk_scrolled_window_new(NULL, NULL);
+                 gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(sw),
+                                                option[i].min & T_HSCRL ? GTK_POLICY_ALWAYS : GTK_POLICY_AUTOMATIC,
+                                                option[i].min & T_VSCRL ? GTK_POLICY_ALWAYS : GTK_POLICY_NEVER);
+                 gtk_container_add(GTK_CONTAINER(sw), textview);
+                 gtk_widget_set_size_request(GTK_WIDGET(sw), w, option[i].value);
+                 gtk_scrolled_window_set_shadow_type(GTK_SCROLLED_WINDOW(sw), GTK_SHADOW_OUT);
+@@ -1428,38 +1389,38 @@
+             /* set button color on view board dialog */
+             if(option[i].choice && ((char*)option[i].choice)[0] == '#' && !currentCps) {
+                 gdk_color_parse( *(char**) option[i-1].target, &color );
+                 gtk_widget_modify_bg ( GTK_WIDGET(button), GTK_STATE_NORMAL, &color );
+ 	    }
+ 
+             /* set button color on new variant dialog */
+             if(option[i].textValue) {
+                 gdk_color_parse( option[i].textValue, &color );
+                 gtk_widget_modify_bg ( GTK_WIDGET(button), GTK_STATE_NORMAL, &color );
+-                gtk_widget_set_sensitive(button, True);
++                gtk_widget_set_sensitive(button, TRUE);
+             }
+ 
+             Pack(hbox, table, button, left, left+1, top, 0);
+             g_signal_connect (button, "clicked", G_CALLBACK (GenericCallback), (gpointer)(intptr_t) i + (dlgNr<<16));
+             option[i].handle = (void*)button;
+             break;
+ 	  case ComboBox:
+             label = gtk_label_new(option[i].name);
+             /* Left Justify */
+             gtk_misc_set_alignment(GTK_MISC(label), 0, 0.5);
+             gtk_table_attach(GTK_TABLE(table), label, left, left+1, top, top+1, GTK_FILL, GTK_FILL, 2, 1);
+ 
+-            combobox = gtk_combo_box_new_text();
++            combobox = gtk_combo_box_text_new();
+ 
+             for(j=0;;j++) {
+                if (  ((char **) option[i].textValue)[j] == NULL) break;
+-               gtk_combo_box_append_text(GTK_COMBO_BOX(combobox), ((char **) option[i].choice)[j]);
++               gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(combobox), ((char **) option[i].choice)[j]);
+             }
+ 
+             if(currentCps)
+                 option[i].choice = (char**) option[i].textValue;
+             else if(!(option[i].min & COMBO_CALLBACK)) {
+                 for(j=0; option[i].choice[j]; j++) {
+                     if(*(char**)option[i].target && !strcmp(*(char**)option[i].target, ((char**)(option[i].textValue))[j])) break;
+                 }
+                 /* If choice is NULL set to first */
+                 if (option[i].choice[j] == NULL)
+@@ -1511,21 +1472,21 @@
+             }
+ 	    break;
+ 	  case Graph:
+ 	    option[i].handle = (void*) (graph = gtk_drawing_area_new());
+ //            gtk_widget_set_size_request(graph, option[i].max, option[i].value);
+             gtk_widget_set_size_request(GTK_WIDGET(graph), option[i].max, option[i].value);
+ 	    if(0){ GtkAllocation a;
+ 		a.x = 0; a.y = 0; a.width = option[i].max, a.height = option[i].value;
+ 		gtk_widget_set_allocation(graph, &a);
+ 	    }
+-            g_signal_connect (graph, "expose-event", G_CALLBACK (GraphEventProc), (gpointer) &option[i]);
++            g_signal_connect (graph, "draw", G_CALLBACK (DrawEventProc), (gpointer) &option[i]);
+ 	    gtk_widget_add_events(GTK_WIDGET(graph), GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK | GDK_POINTER_MOTION_MASK);
+             g_signal_connect (graph, "button-press-event", G_CALLBACK (GraphEventProc), (gpointer) &option[i]);
+             g_signal_connect (graph, "button-release-event", G_CALLBACK (GraphEventProc), (gpointer) &option[i]);
+             g_signal_connect (graph, "motion-notify-event", G_CALLBACK (GraphEventProc), (gpointer) &option[i]);
+ 	    if(option[i].min & FIX_H) { // logo
+ 		GtkWidget *frame = gtk_aspect_frame_new(NULL, 0.5, 0.5, option[i].max/(float)option[i].value, FALSE);
+ 		gtk_frame_set_shadow_type(GTK_FRAME(frame), GTK_SHADOW_NONE);
+                 gtk_container_add(GTK_CONTAINER(frame), graph);
+ 		graph = frame;
+ 	    }
+@@ -1551,21 +1512,21 @@
+ 	    top--;
+ 	    msg = _(option[i].name); // write name on the menu button
+ #ifndef __APPLE__
+ //	    if(tinyLayout) { strcpy(def, msg); def[tinyLayout] = NULLCHAR; msg = def; } // clip menu text to keep menu bar small
+ #endif
+ 	    option[i].handle = (void*)
+ 		(menuButton = gtk_menu_item_new_with_label(msg));
+ 	    gtk_widget_show(menuButton);
+ 	    option[i].textValue = (char*) (menu = CreateMenuPopup(option + i, i + 256*dlgNr, -1));
+ 	    gtk_menu_item_set_submenu(GTK_MENU_ITEM (menuButton), menu);
+-	    gtk_menu_bar_append (GTK_MENU_BAR (menuBar), menuButton);
++	    gtk_menu_shell_append (GTK_MENU_SHELL (menuBar), menuButton);
+ 
+ 	    break;
+ 	  case BarBegin:
+ 	    menuBar = gtk_menu_bar_new ();
+ 	    gtk_widget_show (menuBar);
+ 	    boxStart = i;
+ 	    break;
+ 	  case BoxBegin:
+ 	    option[i+1].min |= SAME_ROW; // kludge to suppress allocation of new hbox
+ 	    oldHbox = hbox;

@@ -1,0 +1,106 @@
+software: shogivar
+version: "1.55b"
+status: built
+build_date: "2026-10-14"
+build_system: autotools
+
+source:
+  url: "https://repo.huaweicloud.com/debian/pool/main/s/shogivar/shogivar_1.55b.orig.tar.gz"
+  sha256: "e4bfb4e1a3951e45fa0e865d1f172e27f68670751f99c9fde4126e0449704bdc"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--disable-update-mimedb"
+    - "--disable-silent-rules"
+  dependencies:
+    - gtk/3.24.43
+    - cairo/1.18.4
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-Makefile.in.patch"
+  - "0002-backend.h.patch"
+  - "0003-common.h.patch"
+  - "0004-config.guess.patch"
+  - "0005-config.sub.patch"
+  - "0006-configure.patch"
+  - "0007-configure.ac.patch"
+  - "0008-dialogs.c.patch"
+  - "0009-draw.c.patch"
+  - "0010-gtk-gui.c.patch"
+  - "0011-gtk-xoptions.c.patch"
+  - "0012-menus.h.patch"
+
+knowledge_gained:
+  - "GNU config.guess/config.sub 必须配套改：只补 config.guess 的 HarmonyOS 分支不够，config.sub 还须收 linux-ohos 三元组并把 -linux-ohos 从通用 -linux* 规则里摘出来，否则返回 aarch64-unknown-linux-gnu-ohos (ref: knowledge/graph/E007.kv, knowledge/graph/E072.kv)"
+  - "config.guess 的分支必须自带 echo/exit：它与 configure 的 case 不同，只赋值不输出会直接落到 'unable to guess system type' 兜底分支 (ref: knowledge/graph/E007.kv)"
+  - "HMDFS 忽略 umask/chmod 语义：autoconf 生成的 config.status 用 umask 077 && mktemp -d ./confXXXXXX 建临时目录，随后无法遍历，configure 尾部固定报 ./confXXXXXX/subs1.awk: Permission denied；在 configure 里改写这段（去 umask + chmod 755）即可，不必运行时修补 (ref: knowledge/operations/harmonyos-specifics.md)"
+  - "OHOS worker 无 automake/aclocal/libtool：改过 configure.ac 会触发 automake maintainer-mode 规则并以 missing aclocal-1.14 中断 make；把 Makefile.in 的 ACLOCAL/AUTOCONF/AUTOHEADER/AUTOMAKE 置 true 即可（与 archives/a/abook 同法） (ref: knowledge/operations/build-systems.md)"
+  - "GNU make 的 jobserver 在 OHOS 上不可用（jobserver mkfifo: Operation not permitted），make 必须 -j1；conan 的 Autotools.make 在未显式传 -j 时会自动补 -j<nproc>，因此每个 target 都要显式带 -j1 (ref: knowledge/operations/build-systems.md)"
+  - "conan 的 AutotoolsToolchain 默认 --prefix=/，故 -DDATADIR 会编译成 /share/games/shogivar；GUI 程序的资源目录必须在运行时按可执行文件位置解析（/proc/self/exe + ../share/<pkg>），否则 conan 缓存路径与 cmd-pkgs 扁平 tar 包解包路径都命中不了 (ref: knowledge/operations/packaging.md)"
+  - "16-bit 时代遗留的 char[80] 字符串缓冲（backend.h 的 STRING）被复用来拼文件系统路径，可重定位安装后必然写穿，须一并放宽 (ref: knowledge/operations/ohos-adaptation-patterns.md)"
+  - "GTK2 前端移植 GTK3 时 expose-event 要换成 draw 信号，且 draw 回调必须按 [0,0,allocated_w,allocated_h] 全幅重绘后备 surface；沿用旧的 eevent->area 局部裁剪会把暴露区以外留成黑块 (ref: knowledge/operations/ohos-adaptation-patterns.md)"
+  - "去掉 #include <cairo/cairo-xlib.h> 会连带丢掉 Xlib.h 提供的 True/False 宏，GTK3 代码里应改用 GLib 的 TRUE/FALSE (ref: knowledge/operations/ohos-adaptation-patterns.md)"
+  - "只有 gtk+-3.0.pc 时，configure 里 gmodule-2.0 的历史包袱要去掉：glib 仍提供 gmodule-2.0.pc，但 shogivar 代码并未直接引用它 (ref: knowledge/operations/dependencies.md)"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/shogivar-1.55b.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/shogivar-1.55b.work
+  source_orig_hash: 787f7158a8c2f5ef
+  source_work_hash: d2ff752f375ccd37
+  generated_at: '2026-10-14T19:58:02'
+  patches_count: 12
+
+patch_classification:
+  - file: 0001-Makefile.in.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-backend.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-common.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0005-config.sub.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0006-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0007-configure.ac.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0008-dialogs.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0009-draw.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0010-gtk-gui.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0011-gtk-xoptions.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0012-menus.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

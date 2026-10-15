@@ -1,0 +1,75 @@
+--- a/configure.ac
++++ b/configure.ac
+@@ -69,22 +69,24 @@
+ dnl| need this to be able to compile files in a subdir
+ AM_PROG_CC_C_O
+ 
+ AC_PROG_CPP
+ AC_ISC_POSIX
+ AC_PROG_INSTALL
+ 
+ AC_CHECK_PROGS(RSH, remsh rsh, rsh)
+ AC_CHECK_PROGS(MINFO, makeinfo, makeinfo_not_found)
+ if test "$MINFO" = makeinfo_not_found ; then
+-   echo Please install \"makeinfo\"
+-   exit 1
++   dnl shogivar ships no Texinfo manual (the rule is inherited from XBoard),
++   dnl so a missing makeinfo must not abort the build.
++   echo WARNING: \"makeinfo\" not found - continuing without Texinfo manual
++   MINFO=cat
+ fi
+ AC_DEFINE_UNQUOTED(REMOTE_SHELL, "$RSH")
+ AC_CHECK_PROG(NROFF, nroff, [nroff -man], cat)
+ AC_SUBST(NROFFFLAGS)
+ AC_PATH_PROGS(AWKPATH, awk mawk gawk nawk)
+ AC_PATH_PROGS(PERLPATH, perl)
+ 
+ AC_HEADER_STDC
+ AC_HEADER_TIME
+ AC_HEADER_SYS_WAIT
+@@ -112,21 +114,21 @@
+   AC_MSG_RESULT(yes),
+   AC_MSG_RESULT(no)
+   CFLAGS="$SAVE_CFLAGS")
+ 
+ dnl | check for pkg-config
+ AC_CHECK_PROGS([PKGCONFIG], [pkg-config], pkgconfig_not_found)
+ AS_IF( [test "x$PKGCONFIG" = xpkgconfig_not_found],
+        AC_MSG_ERROR([cannot find pkg-config! Please install it.]))
+ 
+ dnl | check for cairo and librsvg
+-PKG_CHECK_MODULES([CAIRO], [ cairo >= 1.2.0 librsvg-2.0 >= 2.14.0 ])
++PKG_CHECK_MODULES([CAIRO], [ cairo >= 1.2.0 ])
+ AC_SUBST(CAIRO_CFLAGS)
+ AC_SUBST(CAIRO_LIBS)
+ 
+ dnl | check which front end to use
+ dnl | first check for gtk
+ FRONTEND_CFLAGS=""
+ FRONTEND_LIBS=""
+ 
+ AC_ARG_WITH([gtk],
+             [AS_HELP_STRING([--with-gtk],[use GTK front-end (default)])],
+@@ -164,21 +166,21 @@
+             [GAMEDATADIR='$(datadir)/games/shogivar'])
+ 
+ AC_SUBST(ICONSDIR)
+ AC_SUBST(SVGICONSDIR)
+ AC_SUBST(DESKTOPDIR)
+ AC_SUBST(MIMEDIR)
+ AC_SUBST(GAMEDATADIR)
+ 
+ dnl | check for libraries
+ if test x"$with_GTK" = x"yes" ; then
+-  PKG_CHECK_MODULES([GTK], [ gtk+-2.0 >= 2.16.0 gmodule-2.0 ])
++  PKG_CHECK_MODULES([GTK], [ gtk+-3.0 ])
+   FRONTEND_CFLAGS=$GTK_CFLAGS
+   FRONTEND_LIBS=$GTK_LIBS
+ else
+   AC_MSG_ERROR([Gtk headers not found. Please install the Gtk package and headers.])
+ fi
+ 
+ dnl | make results available in Makefile.am
+ AM_CONDITIONAL([withGTK],   [test x"$with_GTK" = x"yes"])
+ 
+ dnl | end Front-end check
