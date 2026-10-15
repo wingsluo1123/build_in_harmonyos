@@ -1,0 +1,93 @@
+--- /dev/null
++++ b/src/net_tcp_queue.c
+@@ -0,0 +1,90 @@
++/*
++Copyright (C) 2026 MVDSV contributors
++
++This program is free software; you can redistribute it and/or
++modify it under the terms of the GNU General Public License as
++published by the Free Software Foundation; either version 2 of the
++License, or (at your option) any later version.
++*/
++
++#include "net_tcp_queue.h"
++
++#include <errno.h>
++#include <string.h>
++
++#ifdef _WIN32
++#include <winsock2.h>
++#define NET_TCP_ERROR WSAGetLastError()
++#define NET_TCP_INTERRUPTED WSAEINTR
++#define NET_TCP_WOULD_BLOCK WSAEWOULDBLOCK
++#else
++#include <sys/socket.h>
++#define NET_TCP_ERROR errno
++#define NET_TCP_INTERRUPTED EINTR
++#define NET_TCP_WOULD_BLOCK EWOULDBLOCK
++#endif
++
++int NET_TCP_IsSelectableSocket(int socketnum)
++{
++#ifdef _WIN32
++	return socketnum >= 0;
++#else
++	return socketnum >= 0 && socketnum < FD_SETSIZE;
++#endif
++}
++
++net_tcp_interest_result_t NET_TCP_AddWriteInterest(int socketnum, int length,
++	fd_set *writeset, int *maxfd)
++{
++	if (length <= 0)
++		return NET_TCP_INTEREST_EMPTY;
++	if (!NET_TCP_IsSelectableSocket(socketnum))
++		return NET_TCP_INTEREST_INVALID;
++
++	FD_SET(socketnum, writeset);
++	if (socketnum > *maxfd)
++		*maxfd = socketnum;
++	return NET_TCP_INTEREST_ADDED;
++}
++
++static int NET_TCP_SystemSend(int socketnum, const void *buffer, int length,
++	int flags, void *context)
++{
++	(void)context;
++	return send(socketnum, buffer, length, flags);
++}
++
++net_tcp_flush_result_t NET_TCP_FlushQueueWithSender(int socketnum, char *buffer,
++	int *length, net_tcp_send_fn_t send_fn, void *context)
++{
++	while (*length > 0)
++	{
++		int error;
++		int sent = send_fn(socketnum, buffer, *length, 0, context);
++
++		if (sent > 0)
++		{
++			*length -= sent;
++			memmove(buffer, buffer + sent, *length);
++			continue;
++		}
++
++		if (sent == 0)
++			return NET_TCP_FLUSH_FATAL;
++
++		error = NET_TCP_ERROR;
++		if (error == NET_TCP_INTERRUPTED)
++			continue;
++		if (error == NET_TCP_WOULD_BLOCK || error == EAGAIN)
++			return NET_TCP_FLUSH_PENDING;
++		return NET_TCP_FLUSH_FATAL;
++	}
++
++	return NET_TCP_FLUSH_DRAINED;
++}
++
++net_tcp_flush_result_t NET_TCP_FlushQueue(int socketnum, char *buffer, int *length)
++{
++	return NET_TCP_FlushQueueWithSender(socketnum, buffer, length,
++		NET_TCP_SystemSend, NULL);
++}

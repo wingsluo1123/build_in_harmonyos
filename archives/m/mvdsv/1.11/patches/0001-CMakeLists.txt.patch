@@ -1,0 +1,179 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,16 +1,21 @@
+ cmake_minimum_required(VERSION 3.9.0)
+ 
+ set(CMAKE_VERBOSE_MAKEFILE ON)
+ 
+ # Set project name and languge.
+ project(mvdsv C)
++
++set(MVDSV_POSIX OFF)
++if(UNIX OR CMAKE_SYSTEM_NAME STREQUAL "HarmonyOS")
++	set(MVDSV_POSIX ON)
++endif()
+ 
+ 
+ ######################################################################################################
+ 
+ # Checkout shared qwprot repository
+ find_package(Git QUIET)
+ if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
+     option(GIT_SUBMODULE "Check submodules during build" ON)
+     if(GIT_SUBMODULE)
+         message(STATUS "Submodule update")
+@@ -36,20 +41,22 @@
+ 	"${DIR_SRC}/cmd.c"
+ 	"${DIR_SRC}/cmodel.c"
+ 	"${DIR_SRC}/common.c"
+ 	"${DIR_SRC}/crc.c"
+ 	"${DIR_SRC}/cvar.c"
+ 	"${DIR_SRC}/fs.c"
+ 	"${DIR_SRC}/hash.c"
+ 	"${DIR_SRC}/mathlib.c"
+ 	"${DIR_SRC}/md4.c"
+ 	"${DIR_SRC}/net.c"
++	"${DIR_SRC}/net_tcp_queue.c"
++	"${DIR_SRC}/net_tcp_stream.c"
+ 	"${DIR_SRC}/net_chan.c"
+ 	"${DIR_SRC}/pmove.c"
+ 	"${DIR_SRC}/pmovetst.c"
+ 	"${DIR_SRC}/pr2_cmds.c"
+ 	"${DIR_SRC}/pr2_edict.c"
+ 	"${DIR_SRC}/pr2_exec.c"
+ 	"${DIR_SRC}/vm.c"
+ 	"${DIR_SRC}/vm_interpreted.c"
+ 	"${DIR_SRC}/vm_x86.c"
+ 	"${DIR_SRC}/pr_cmds.c"
+@@ -73,41 +80,60 @@
+ 	"${DIR_SRC}/sv_save.c"
+ 	"${DIR_SRC}/sv_send.c"
+ 	"${DIR_SRC}/sv_user.c"
+ 	"${DIR_SRC}/vfs_os.c"
+ 	"${DIR_SRC}/vfs_pak.c"
+ 	"${DIR_SRC}/sv_world.c"
+ 	"${DIR_SRC}/zone.c"
+ 	)
+ 
+ # Check build target, and included sources
+-if(UNIX)
++if(MVDSV_POSIX)
+ 	list(APPEND SRC_COMMON
+ 		"${DIR_SRC}/sv_sys_unix.c"
+ 	)
+ 	# Check for curl, and include sources and libs, if found
+ 	find_package(CURL)
+ 	if(NOT CURL_FOUND)
+ 		message(STATUS "Curl library not found")
+ 	else()
+ 		list(APPEND SRC_COMMON
+ 			"${DIR_SRC}/central.c"
+ 		)
+ 	endif()
+ else()
+ 	list(APPEND SRC_COMMON
+ 		"${DIR_SRC}/sv_sys_win.c"
+ 		"${DIR_SRC}/sv_windows.c"
+ 		"${DIR_SRC}/winquake.rc"
+ 	)
+ endif()
+ 
++include(CTest)
++if(BUILD_TESTING AND MVDSV_POSIX)
++	add_executable(tcp_queue_test
++		"tests/tcp_queue_test.c"
++		"${DIR_SRC}/net_tcp_queue.c"
++		"${DIR_SRC}/net_tcp_stream.c"
++	)
++	target_compile_definitions(tcp_queue_test PRIVATE SERVERONLY USE_PR2)
++	set_target_properties(tcp_queue_test PROPERTIES
++		C_STANDARD 17
++		C_STANDARD_REQUIRED YES
++	)
++	target_include_directories(tcp_queue_test PRIVATE
++		"${DIR_SRC}"
++		"${DIR_SRC}/qwprot/src"
++	)
++	add_test(NAME tcp_queue_liveness COMMAND tcp_queue_test)
++endif()
++
+ ######################################################################################################
+  
+ # Check for PCRE. if found, include it; if not found, use bundled PCRE.
+ find_library(PCRE_LIBRARIES pcre)
+ if(PCRE_LIBRARIES)
+ 	set(PCRE_FOUND 1)
+ 	find_path(PCRE_INCLUDE_DIR pcre.h)
+ endif(PCRE_LIBRARIES)
+ 
+ if(NOT PCRE_FOUND)
+@@ -128,36 +154,38 @@
+ 
+ 
+ ######################################################################################################
+ # Mark the executable as a non-console application
+ if(CMAKE_C_COMPILER_ID STREQUAL "MSVC")
+ 	set(TARGET_TYPE WIN32)
+ endif()
+ add_executable(${PROJECT_NAME} ${TARGET_TYPE} ${SRC_COMMON})
+ set_target_properties(${PROJECT_NAME}
+ 	PROPERTIES #PREFIX "" # Strip lib prefix.
++	C_STANDARD 17
++	C_STANDARD_REQUIRED YES
+ 	C_VISIBILITY_PRESET hidden # Hide all symbols unless excplicitly marked to export.
+ 	)
+ 
+ 
+ ######################################################################################################
+ 
+ # Set include directories
+ target_include_directories(${PROJECT_NAME} PRIVATE ${DIR_SRC}/qwprot/src)
+ target_include_directories(${PROJECT_NAME} PRIVATE ${CURL_INCLUDE_DIRS})
+ target_include_directories(${PROJECT_NAME} PRIVATE ${PCRE_INCLUDE_DIR})
+ 
+ 
+ ######################################################################################################
+ 
+ # Check build target, and included sources and libs
+-if(UNIX)
++if(MVDSV_POSIX)
+ 	target_link_libraries(${PROJECT_NAME} m)
+ 	target_link_libraries(${PROJECT_NAME} ${CMAKE_DL_LIBS})
+ else()
+ 	target_link_libraries(${PROJECT_NAME} ws2_32)
+ 	target_link_libraries(${PROJECT_NAME} winmm)
+ 	if(NOT CMAKE_C_COMPILER_ID STREQUAL "MSVC")
+ 		set(CMAKE_EXE_LINKER_FLAGS "-static-libgcc")
+ 	endif()
+ endif()
+ 
+@@ -168,23 +196,29 @@
+ target_compile_definitions(${PROJECT_NAME} PRIVATE SERVERONLY)
+ target_compile_definitions(${PROJECT_NAME} PRIVATE USE_PR2)
+ target_compile_definitions(${PROJECT_NAME} PRIVATE MVD_PEXT1_SERVERSIDEWEAPON)
+ target_compile_definitions(${PROJECT_NAME} PRIVATE MVD_PEXT1_SERVERSIDEWEAPON2)
+ target_compile_definitions(${PROJECT_NAME} PRIVATE FTE_PEXT2_VOICECHAT)
+ 
+ include (TestBigEndian)
+ TEST_BIG_ENDIAN(IS_BIG_ENDIAN)
+ if(IS_BIG_ENDIAN)
+ 	target_compile_definitions(${PROJECT_NAME} PRIVATE __BIG_ENDIAN__Q__)
++	if(TARGET tcp_queue_test)
++		target_compile_definitions(tcp_queue_test PRIVATE __BIG_ENDIAN__Q__)
++	endif()
+ 	message(STATUS "BIG_ENDIAN")
+ else()
+ 	target_compile_definitions(${PROJECT_NAME} PRIVATE __LITTLE_ENDIAN__Q__)
++	if(TARGET tcp_queue_test)
++		target_compile_definitions(tcp_queue_test PRIVATE __LITTLE_ENDIAN__Q__)
++	endif()
+ 	message(STATUS "LITTLE_ENDIAN")
+ endif()
+ 
+ if(CURL_FOUND)
+ 	target_compile_definitions(${PROJECT_NAME} PRIVATE WWW_INTEGRATION)
+ 	target_link_libraries(${PROJECT_NAME} ${CURL_LIBRARIES})
+ endif()
+ 
+ if(PCRE_FOUND)
+ 	target_link_libraries(${PROJECT_NAME} ${PCRE_LIBRARIES})

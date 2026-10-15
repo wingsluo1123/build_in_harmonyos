@@ -1,0 +1,34 @@
+version: "1.11"
+software: "mvdsv"
+status: built
+build_date: "2026-10-14"
+build_system: cmake
+conan_ref: "mvdsv/1.11"
+
+source:
+  url: "https://github.com/QW-Group/mvdsv/archive/11166a7f2a12838198ba253baa316c215271e357.tar.gz"
+  sha256: "655956b207a2ac72081c1ff2633c326a51e9a06a6afdd7f2ec9a5b973c932242"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DBUILD_TESTING=ON"
+    - "-DCMAKE_DISABLE_FIND_PACKAGE_CURL=ON"
+    - "-DPCRE_FOUND=OFF"
+    - "-DCMAKE_SKIP_RPATH=ON"
+  dependencies: []
+  cc: clang
+  cxx: null
+
+patches_applied:
+  - "0001-CMakeLists.txt.patch"
+  - "0002-src-net.c.patch"
+  - "0003-src-net_tcp_queue.c.patch"
+  - "0004-src-net_tcp_queue.h.patch"
+  - "0005-src-net_tcp_stream.c.patch"
+  - "0006-src-net_tcp_stream.h.patch"
+  - "0007-tests-tcp_queue_test.c.patch"
+
+knowledge_gained:
+  - "非阻塞流式发送队列保留短写尾部并不保证最终送达；积压后必须由独立于后续业务入队的按需写就绪事件继续推进，且队列清空后取消监听。"  # knowledge_ref: E549 draft

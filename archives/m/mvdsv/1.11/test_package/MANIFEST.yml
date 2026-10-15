@@ -1,0 +1,39 @@
+package: mvdsv/1.11
+homepage: "https://github.com/QW-Group/mvdsv"
+
+upstream_check_command: "none"
+upstream_test_in_build: false
+upstream_test_command: "none"
+upstream_tests_skip_reason: >-
+  The official 1.11 source has no test or tests directory, CTest registration,
+  make check target, or executable upstream test runner (N_static = 0 and
+  N_runtime = 0).
+upstream_tests: []
+
+test_package_tests:
+  - file: test_mvdsv.py
+    description: "Require one .codesign section and reject RPATH/RUNPATH"
+    command: "readelf -SW/-d <package>/bin/mvdsv"
+  - file: test_mvdsv.py
+    description: "Reject Conan and package-folder strings in the final ELF"
+    command: "python3 test_mvdsv.py <package>"
+  - file: test_mvdsv.py
+    description: "Execute the packaged server and verify the 1.11 startup path"
+    command: "mvdsv +quit"
+  - file: tcp_queue_test.c
+    description: "Deterministically cover partial send, EINTR, EAGAIN and fatal queue outcomes, including fd range rejection"
+    command: "ctest -R tcp_queue_liveness"
+  - file: tcp_queue_test.c
+    description: "Reject unconditional writable subscription through 128 idle wakeups"
+    command: "ctest -R tcp_queue_liveness"
+  - file: tcp_queue_test.c
+    description: "Use the production svtcpstream_t list wiring to reproduce the original stall, deliver all 7000 bytes and stop monitoring when empty"
+    command: "ctest -R tcp_queue_liveness"
+  - file: test_mvdsv.py
+    description: "HarmonyOS-specific kernel identity and signed-ELF execution"
+    command: "param get const.ohos.fullname; mvdsv +quit"
+
+scenario_count: 7
+external_assertion_count: 25
+ohos_target_specific_scenarios: 1
+max_rss_mb: 64
