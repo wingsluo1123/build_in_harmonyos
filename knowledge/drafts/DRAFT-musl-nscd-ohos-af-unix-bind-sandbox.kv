@@ -1,0 +1,58 @@
+id:                     DRAFT-musl-nscd-ohos-af-unix-bind-sandbox
+trigger_tool:           runtime|test
+phase:                  testing|runtime
+error_signature:        Operation not permitted|EPERM.*bind|bind.*Operation not permitted|AF_UNIX.*(EPERM|bleed)|Unix.*domain.*socket.*(EPERM|not permitted)
+
+severity:               2
+category:               selinux, socket, limitation, ohos, platform
+match_keywords:         AF_UNIX, unix domain socket, bind, EPERM, Operation not permitted, hmmac, SELinux, /data/storage/el2/base, nscd, daemon smoke test, sandbox
+title:                  OHOS 仅在应用沙箱数据目录下允许 bind() AF_UNIX socket（沙箱外一律 EPERM）
+
+root_cause:             OHOS 安全策略（hmmac/SELinux）对 AF_UNIX 文件系统 socket 的 bind() 做路径级管控，只放行应用沙箱数据目录 /data/storage/el2/base 及其子目录；$HOME、$TMPDIR（/storage/Users/currentUser/tmp）、构建目录、/dev/shm 等沙箱外路径一律返回 EPERM，而同环境下 socket()、socketpair(AF_UNIX)、AF_INET bind() 全部正常，说明限制精确落在「文件系统 socket 的 bind()」这一点上。
+affected_scope:         所有守护进程型 / IPC 型三方库在 OHOS 上的 smoke test 与运行期验证：nscd、syslogd、dbus 风格 D-Bus system bus、依赖 /var/run/*.sock 或 $TMPDIR/*.sock 的服务；以及测试脚本自行创建 AF_UNIX 监听端的场景。
+verification_cmd:        |-
+  python3 -c 'import socket
+  for lab,fn in [("socketpair",lambda: socket.socketpair(socket.AF_UNIX,socket.SOCK_STREAM)),
+                 ("socket()",lambda: socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)),
+                 ("bind $HOME",lambda: (lambda s: s.bind("$HOME/tmp/x.sock"))(socket.socket(socket.AF_UNIX,socket.SOCK_STREAM))),
+                 ("bind el2",lambda: (lambda s: s.bind("/data/storage/el2/base/probe.sock"))(socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)))]:
+      try: fn(); print(lab,"OK")
+      except OSError as e: print(lab,"FAIL",e.errno,e.strerror)'
+
+rec_priority:           1
+rec_approach:           relocate-bind-to-app-sandbox-dir
+rec_description:        测试/运行期把 socket 路径改道到应用沙箱数据目录（如 /data/storage/el2/base/<pkg>-$$），该目录是 OHOS 唯一放行 AF_UNIX bind() 的位置；脚本按候选目录顺序探测，探测成功才启用端到端协议测试。
+rec_command:            nscd -c \${CONF} -s /data/storage/el2/base/\${PKG}-e2e-\$\$/nscd.sock -p \${PIDFILE}
+rec_auto_fix:           false
+rec_impl:
+
+fallback_priority:      2
+fallback_approach:      declare-platform-exemption-with-evidence
+fallback_description:   若所有候选目录都不可 bind，不伪造通过：把端到端组标记为 SKIP（不计入 PASS），在 MANIFEST.yml 的 platform_exemptions 中声明并附实测证据；同时仍断言被测进程已越过配置解析/依赖加载，仅因 bind 被拒而退出，避免豁免掩盖真实缺陷。
+fallback_command:       grep -q 'Operation not permitted' daemon.log && echo PLATFORM_EXEMPT
+fallback_auto_fix:      false
+fallback_impl:
+
+forbid_1_pattern:       AF_INET|127\.0\.0\.1.*replac.*AF_UNIX|patch.*AF_UNIX.*tcp
+forbid_1_reason:        为绕开 bind 限制而把协议从 AF_UNIX 改成 AF_INET 会破坏上游协议契约（NSCD 的客户端即 musl libc 固定连 AF_UNIX），包虽然"测试通过"但对消费者不可用。
+forbid_1_consequence:   适配被视为伪通过（R8/L1e 口径），下游依赖该守护进程的功能全部失效。
+
+principles:             P004, P011, P015
+causes:                 []
+caused_by:              []
+similar_to:             [E024, E253]
+conflicts_with:         []
+prerequisite_of:        []
+
+doc_file:               drafts/DRAFT-musl-nscd-ohos-af-unix-bind-sandbox.md
+last_updated:           2026-10-14
+source_event:           musl-nscd 1.1.1 OHOS 适配：test_package 端到端测试首次运行 nscd 守护进程时 bind() 返回 EPERM
+
+authors:
+source_pr:
+source_commit:
+
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:

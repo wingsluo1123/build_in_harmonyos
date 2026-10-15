@@ -1,0 +1,82 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI 脚本 build_and_test.sh L0e 强制要求存在）
+#
+# ── 上游测试清点结论（R51 三步法第 1 步，清点证据见 1.1.1/notes.md）──
+#   * Makefile 无 check / test 目标：
+#       grep -nE '^check|^test|check:' Makefile   → 无命中
+#   * 归档内无 tests/ 目录，无 ctest / pytest / meson test 注册
+#   * port/*.c（gr_passwd.c / pw_gecos.c / pw_passwd.c）是**编译期特征探针**：
+#     由 Makefile 的 obj/test/% 规则以 -DTEST 编译，tools/gen_config.sh 据此生成
+#     obj/include/config.h 的 HAVE_PW_PASSWD / HAVE_PW_GECOS / HAVE_GR_PASSWD 宏。
+#     只编译不运行，故不计为测试用例；配方 build() 已验证探针产物与生成宏一致。
+#   => 上游测试用例数 = 0，适配后按 R51 补全测试（见 test_package_tests）。
+
+package: musl-nscd/1.1.1
+homepage: "https://github.com/pikhq/musl-nscd"
+
+# 上游测试命令：无（上游无测试套件）
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序：无
+upstream_tests: []
+
+# test_package 中自带的测试（消费者视角，真实执行被测包产物）
+test_package_tests:
+  - file: test.sh
+    description: >-
+      端到端测试：写入 nsswitch.conf → 真实启动被测 nscd 守护进程（-c/-s/-p 改道到临时目录）
+      → 经 AF_UNIX socket 按 NSCD 二进制协议取回 passwd/group 条目 → 逐字段断言；
+      另覆盖两条上游错误路径（配置缺失、merge 动作不支持）与反复连接复用。
+    command: "bash test.sh"
+  - file: nscd_client.c
+    description: >-
+      NSCD 二进制协议客户端，覆盖 GETPWBYNAME / GETPWBYUID / GETGRBYNAME / GETGRBYGID
+      四类请求的请求编码与应答解码（含命中与未命中两条分支）。
+    command: "./nscd_client <socket> pw-name ohostest-user"
+  - file: nss_ohostest_module.c
+    description: >-
+      桩 NSS 模块 libnss_ohostest.so.2，由被测 nscd 运行期 dlopen + dlsym 加载；
+      该文件 #include 被测包安装的 <nss.h>，同时验证头文件产物可被消费者使用。
+    command: "（由被测 nscd 通过 dlopen 加载，不单独运行）"
+
+# 测试断言总数（test.sh 中 pass/fail 计数点）
+#   完整环境（socket 可绑定）：32 = 5（产物与错误路径）+ 27（端到端协议组）
+#   受限环境（平台豁免降级）： 6 = 5（产物与错误路径）+ 1（仅 bind 被拒断言）
+assertion_count: 32
+
+# ══════════════════════════════════════════════════════════════════
+# 平台豁免声明（TEST_QUALITY_SPEC §3.3：平台硬限制无法修复时须声明并说明原因）
+# ══════════════════════════════════════════════════════════════════
+platform_exemptions:
+  - id: ohos-af-unix-bind-restricted
+    scope: "端到端协议组的 socket 监听部分（27 项断言）"
+    symptom: >-
+      守护进程 nscd 启动到 AF_UNIX bind() 时以 1 退出，报 "Operation not permitted"（EPERM）
+    root_cause: >-
+      OHOS 安全策略（hmmac / SELinux）只允许在应用沙箱数据目录（/data/storage/el2/base）
+      下 bind() AF_UNIX 文件系统 socket；在 $HOME、$TMPDIR、仓库目录等沙箱外路径下
+      bind() 一律返回 EPERM。同环境下 socket()/socketpair()/AF_INET bind() 均正常，
+      已用 python 探针与 nscd 自身（-s 指向不存在目录时返回 ENOENT，证明已越过 socket()
+      到达 bind()）双重定位。
+    evidence: |
+      $ python3 -c 's=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM); s.bind("$HOME/tmp/x.sock")'
+      AF_UNIX socketpair: OK
+      AF_UNIX socket():   OK
+      AF_UNIX bind():     FAIL errno=1 Operation not permitted
+      AF_INET  bind():    OK
+
+      $ nscd -c conf -s "$HOME/tmp/nscd.sock"      → nscd: Operation not permitted
+      $ nscd -c conf -s /no/such/dir/x.sock        → nscd: No such file or directory
+        （后者证明 socket() 成功、失败点在 bind()）
+      $ nscd -c conf -s /data/storage/el2/base/…/nscd.sock  → 正常监听，协议往返成功
+    mitigation: >-
+      test.sh 按候选目录顺序探测可 bind 的位置（$NSCD_SOCK_DIR → /data/storage/el2/base
+      → $TMPDIR）。探测成功则端到端协议组全部执行；全部失败时不伪造通过，而是把该组
+      标记为 SKIP（不计入 PASS），并额外断言「守护进程已越过配置解析与 NSS 模块 dlopen、
+      仅因 bind 被安全策略拒绝而退出」，确保平台豁免不会掩盖解析或加载失败。
+    upstream_change_required: false
+    note: >-
+      不需要（也不应该）打补丁把 AF_UNIX 改成 AF_INET：NSCD 协议契约就是 musl libc
+      客户端连接 AF_UNIX socket，改协议会破坏包的可用性。

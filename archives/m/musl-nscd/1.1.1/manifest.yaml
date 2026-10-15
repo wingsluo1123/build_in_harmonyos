@@ -1,0 +1,55 @@
+# 版本级 manifest — musl-nscd 1.1.1
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "1.1.1"
+software: "musl-nscd"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-14"
+build_system: makefile
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/pikhq/musl-nscd/archive/refs/tags/v1.1.1.tar.gz"
+  sha256: "ddd5924f0355568a483cb8c83e63c7e3425b8c3f1dce4b9883ca75ed1a276675"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: makefile
+  # R1：参数最小化 —— 上游自研 configure 只需要 --prefix（安装期用 DESTDIR 隔离）
+  configure_options:
+    - "--prefix=/"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "musl-nscd 1.1.1 是 musl 风格的手写 configure（sh）+ 顶层 Makefile 项目，不是 Autotools：没有 configure.ac/Makefile.in，configure 仅接受 --prefix/--bindir/--sbindir/--includedir/--sysldir 与 VAR=VALUE 形式的 CC/CFLAGS/LDFLAGS，未知的 --enable-*/--disable-*/--with-* 会被静默忽略"
+  - "构建系统判定要按文档决策树走：只有 configure + Makefile 而无 configure.ac 时属 makefile 项目；init-build 的启发式会把它猜成 autotools，需人工纠正（否则会套错模板并传无效的 --enable-static/--disable-shared）"
+  - "上游无任何测试套件（Makefile 无 check/test 目标、无 tests/ 目录），唯一自检设施是 port/*.c 的 -DTEST 编译探针 + tools/gen_config.sh 生成的 config.h HAVE_* 宏；Makefile 的 obj/test/% 规则在探针编译失败时会静默写入空文件，宏退化为 undef 而不报错"
+  - "OHOS 上 port/pw_passwd.c、port/pw_gecos.c、port/gr_passwd.c 三个探针的编译结果决定协议序列化是否带对应字段（write_pwd/write_grp 用 HAVE_PW_PASSWD/HAVE_PW_GECOS/HAVE_GR_PASSWD 守卫），是 musl 派生 libc 下必须验证的 ABI 适配点"
+  - "musl-nscd 的产物是可执行文件 sbin/nscd（R38：需在软件级目录声明 commands.json），同时安装 include/nss.h 供 NSS 模块开发使用；包类型应为 application 而非 library"
+  - "零外部依赖：configure 自探测 -lpthread/-ll/-ly/-lxnet/-ldl，OHOS 上 -ll/-ly 不存在但会被自动跳过，不构成依赖缺失"
+  - "守护进程默认路径 /etc/nsswitch.conf 与 /var/run/nscd/socket 在 OHOS 上未必可用；测试与部署都必须用 -c/-s/-p 改道到可写目录"
+  - "R33 高危形态：Makefile 项目无法由 Conan Toolchain 注入编译器，必须从 tools.build:compiler_executables 取 CC 并写入 conanbuild env 脚本"

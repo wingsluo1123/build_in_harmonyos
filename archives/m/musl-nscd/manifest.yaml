@@ -1,0 +1,34 @@
+# 软件级 manifest — musl-nscd
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: musl-nscd
+display: "musl-nscd"
+description: "NSCD 协议实现 —— 为 musl 提供基于 NSS 模块的 passwd/group 数据库缓存守护进程"
+category: system
+homepage: "https://github.com/pikhq/musl-nscd"
+license: MIT
+build_system: makefile
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "构建系统是 musl 风格的手写 configure（sh）+ 顶层 Makefile，不是 Autotools：无 configure.ac/Makefile.in，configure 只接受 --prefix/--bindir/--sbindir/--includedir/--syslibdir 与 VAR=VALUE 形式的 CC/CFLAGS/LDFLAGS；未知的 --enable-*/--disable-*/--with-* 会被静默忽略，套 Autotools 模板会静默传错参数"
+    - "R33 高危：Makefile 直接用 $(CC)，自研 configure 只认 CC= 变量，Conan Toolchain 无法注入编译器；必须从 tools.build:compiler_executables 取编译器并写入 conanbuild env 脚本"
+    - "产物是可执行守护进程 sbin/nscd（R38：软件级目录必须有 commands.json）+ 头文件 include/nss.h + 手册页，包类型为 application 而非 library"
+    - "上游无测试套件（Makefile 无 check/test 目标）：唯一自检设施是 port/*.c 的 -DTEST 编译探针驱动 tools/gen_config.sh 生成 config.h 的 HAVE_* 宏；探针编译失败会被 Makefile 静默写成空文件，宏退化不报错，配方 build() 显式校验探针产物与生成宏一致"
+    - "零外部依赖：configure 自探测 -lpthread/-ll/-ly/-lxnet/-ldl，OHOS 上 -ll/-ly 不存在但会自动跳过"
+    - "默认路径 /etc/nsswitch.conf 与 /var/run/nscd/socket 在 OHOS 上未必可写，测试与部署须用 -c/-s/-p 改道"
+  common_dependencies: []
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "1.1.1":
+    status: built
+    build_date: "2026-10-14"
+    note: "首次适配：上游 v1.1.1 零外部依赖、纯 POSIX C，OHOS 开箱可编译，无需补丁；补全 32 项消费者端到端测试（真实启动守护进程并走 NSCD 二进制协议）"
