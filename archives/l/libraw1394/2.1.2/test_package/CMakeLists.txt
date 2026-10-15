@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.15)
+project(test_libraw1394 C)
+find_package(libraw1394 REQUIRED)
+add_executable(test_libraw1394 test_libraw1394.c)
+target_link_libraries(test_libraw1394 libraw1394::libraw1394)
+enable_testing()
+add_test(NAME test_libraw1394 COMMAND test_libraw1394)
