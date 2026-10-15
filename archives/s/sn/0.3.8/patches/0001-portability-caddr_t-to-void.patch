@@ -1,0 +1,93 @@
+--- a/allocate.c
++++ b/allocate.c
+@@ -196,7 +196,7 @@
+    if (st.st_size <= table.size)
+       return 0;
+ 
+-   munmap((caddr_t) table.map, table.size);
++   munmap((void *) table.map, table.size);
+    return mapfile();
+ }
+ 
+--- a/dh_find.c
++++ b/dh_find.c
+@@ -277,7 +277,7 @@
+    }
+    if (dh_table != NULL)
+    {
+-      munmap((caddr_t) dh_table, sizeof (struct table));
++      munmap((void *) dh_table, sizeof (struct table));
+       dh_table = NULL;
+    }
+    allo_destroy();
+--- a/group.c
++++ b/group.c
+@@ -73,7 +73,7 @@
+    if (gop->dir.dir)
+       closedir(gop->dir.dir);
+    if (gop->lastf.f)
+-      munmap((caddr_t) gop->lastf.f, sizeof (struct file));
++      munmap((void *) gop->lastf.f, sizeof (struct file));
+    free(p);
+ }
+ 
+@@ -197,7 +197,7 @@
+ 
+       if (lp->f)
+       {
+-         munmap((caddr_t) lp->f, sizeof (struct file));
++         munmap((void *) lp->f, sizeof (struct file));
+          lp->f = NULL;
+       }
+       if (isemptygroup)
+@@ -275,7 +275,7 @@
+ 
+    if (ARTSPERFILE == gop->lastf.slotsfilled)
+    {
+-      munmap((caddr_t) gop->lastf.f, sizeof (struct file));
++      munmap((void *) gop->lastf.f, sizeof (struct file));
+       gop->lastf.f = NULL;
+    }
+ 
+--- a/newsgroup.c
++++ b/newsgroup.c
+@@ -166,7 +166,7 @@
+    if (newsize > mapsize || !mapsize)
+    {
+       if (mapbuf)
+-         munmap((caddr_t) mapbuf, mapsize);
++         munmap((void *) mapbuf, mapsize);
+       mapsize = st.st_size + pagesize - (st.st_size % pagesize);
+       mapbuf = mmap(0, mapsize, PROT_READ, MAP_SHARED, groupfd, 0);
+       if (!mapbuf || mapbuf == MAP_FAILED)
+--- a/store.c
++++ b/store.c
+@@ -229,7 +229,7 @@
+    struct storeobj *sp = (struct storeobj *) p;
+ 
+    close(sp->fd);
+-   if (-1 == munmap((caddr_t) sp->file, sizeof (struct file)))
++   if (-1 == munmap((void *) sp->file, sizeof (struct file)))
+       LOG("sto_free:munmap:%m");
+    free(sp);
+ }
+--- a/times.c
++++ b/times.c
+@@ -70,7 +70,7 @@
+          int size;
+ 
+          if (tp->times)
+-            munmap((caddr_t) tp->times, tp->mapsize);
++            munmap((void *) tp->times, tp->mapsize);
+          if (0 == (st.st_size % sizeof (struct times)))
+          {
+             size = (st.st_size + 2048) - (st.st_size % 1024);
+@@ -127,7 +127,7 @@
+    struct timesobj *tp = (struct timesobj *) p;
+ 
+    if (tp->times)
+-      munmap((caddr_t) tp->times, tp->mapsize);
++      munmap((void *) tp->times, tp->mapsize);
+    if (tp->fd > -1)
+       close(tp->fd);
+    free(tp);
