@@ -1,0 +1,36 @@
+# manifest.yaml — yutu 0.10.9 (HarmonyOS PC)
+version: "0.10.9"
+software: "yutu"
+status: "built"
+arch:
+  - "armv8"
+build_system:
+  - "conan2"
+  - "go1.26.5"
+toolchain:
+  go: "1.26.5"
+  cgo: false
+source:
+  upstream: "https://github.com/eat-pray-ai/yutu"
+  tag: "v0.10.9"
+  commit: "99b34436360193aeae0555a1fb2e77a2e3071054"
+  url: "https://github.com/eat-pray-ai/yutu/archive/refs/tags/v0.10.9.tar.gz"
+  sha256: "4d5481ce801f5747e5e518ad750d22eba2235d93627ddd2934d6f1c660b86bbc"
+  license: "Apache-2.0"
+build:
+  entry: "go build -trimpath -tags netgo ."
+  output_binary: "yutu"
+  ldflags: "-s -w -X github.com/eat-pray-ai/yutu/cmd.Version=v0.10.9 -X .../cmd.Commit=99b3443 -X .../cmd.CommitDate=2026-06-21T10:38:47Z -X .../cmd.Os=linux -X .../cmd.Arch=arm64 -X .../cmd.Builder=OpenHarmonyPCDeveloper"
+  dependencies: []
+patches_applied: []
+upstream_tests:
+  command: "go test -c -count=1 -timeout 1200s -o <ext2>/<pkg>.test <pkg> && sign <pkg>.test && <pkg>.test -test.v"
+  files: 30
+  top_level_test_functions: 177
+knowledge_gained:
+  - "OHOS 镜像不自带 Go 工具链，且制品仓无 go/ 、golang/ 配方（conan download exit=1 / HTTP 404）：按 E250 在 build() 内联下载 Go SDK 并GOROOT/PATH 注入，不声明 conan requires (ref: E250)"
+  - "Go 链接器 mmap 输出文件在 HMDFS 上失败（mapping output file failed: permission denied）：链接输出必须写到非 HMDFS 的可写工作区 /data/storage/el2/base/haps/entry/files，否则 go build 直接失败 (ref: E124)"
+  - "OHOS 拒绝 execve 未带 .codesign section 的 ELF：产物 yutu 与 Go SDK 的 pkg/tool/linux_arm64/* 工具二进制都必须用 binary-sign-tool 自签名 (ref: E128)"
+  - "上游 `go test ./...` 在 OHOS 上不可用——它会链接测试 ELF 并立即 execve，未签名被拒：须逐包 `go test -c` → llvm-objcopy 移除旧 .codesign → binary-sign-tool 自签 → 从原源码目录执行 -test.v (ref: E318)"
+  - "CI #91930（conan-build-test）在 go build 阶段因 compile/asm 的 fork/exec 返回 EAGAIN（resource temporarily unavailable）而失败：Go 默认按 nproc 并行、每包一个多线程 compile 进程，打满 worker 的进程/线程槽位。对策：GOMAXPROCS=1 + go build/-test -c 加 -p 1，并对资源类输出做有界退避重试（仓内同类先例 libcom_err/1.47.4、tinyarray/1.2.5、wchartype/0.1） (ref: E525)"
+  - "CI #92484 的网络失败是回归而非 worker 问题：go 命令改走直接 subprocess 后，_go_env_dict() 漏搬 generate() 的 GOPROXY/GOSUMDB，Go 静默回落内建默认 https://proxy.golang.org 并连接超时。对策：抽出 _go_env_overrides() 作单一事实源供两条路径共用；代理列表用 `|` 分隔（Go 语义下 `,` 只在 404/410 回退，超时会直接失败），顺序为 mirrors.aliyun.com/goproxy/ → goproxy.cn → proxy.golang.org → direct；并把生效代理打印进日志。验证必须清空 GOMODCACHE 以覆盖真实网络路径（热模块缓存会让 go mod download 零网络调用而掩盖回归）"
