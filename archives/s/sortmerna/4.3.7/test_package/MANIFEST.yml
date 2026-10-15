@@ -1,0 +1,19 @@
+package: sortmerna/4.3.7
+homepage: "https://github.com/sortmerna/sortmerna"
+
+upstream_check_command: "python3 scripts/run.py --name all"
+upstream_test_in_build: false
+upstream_test_command: "python3 scripts/run.py (scripts/run.py + scripts/test.jinja, 上游 CI 仅构建不执行)"
+
+upstream_tests:
+  - file: scripts/test.jinja
+    source: sortmerna-4.3.7/scripts/test.jinja
+    description: "上游功能测试套件共定义 78 个场景; 其中 24 个仅用仓内 data/ 即可运行, 其余 54 个依赖未随仓分发的外部 DATA_DIR 大文件; 本适配移植执行数据体积可随仓分发的 7 个场景 (t0/t0_1/t1/t2/t4/t9/t10)"
+    command: "python3 scripts/run.py --name <t0|t0_1|t1|t2|t4|t9|t10>"
+
+test_package_tests:
+  - file: test_sortmerna.sh
+    description: "9 个独立场景: S1-S7 上游 t0/t0_1/t1/t2/t4/t9/t10 移植（t0 校验由全文件 diff 调整为语义头部事实，pairwise 渲染有平台敏感差异；t4 由路径相关 hash 文件名调整为索引文件总数 22）; S8 gz 双端 FASTQ 场景(适配补全; .gz 由 test_package/conanfile.py 用 python gzip 从 test_read.fasta 现场生成, 规避 PR 禁带压缩包); S9 鸿蒙特有 索引跨进程复用 + RocksDB KVDB 重建（HMDFS）"
+    command: "sh test_sortmerna.sh <sortmerna-binary>"
+
+assertion_count: 9
