@@ -1,0 +1,39 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+
+package: sokol/0.0-git.2e75443
+homepage: "https://github.com/floooh/sokol"
+
+# 上游官方测试入口：tests/ CMake 工程（CMakePresets.json 驱动）。
+#   tests/CMakeLists.txt 默认 SOKOL_BACKEND=SOKOL_DUMMY_BACKEND；
+#   functional 子目录构建 sokol-test（UTEST 套件，tests/functional/）；
+#   compile 子目录构建编译冒烟 TU（tests/compile/，C 与 C++ 双形态）。
+# 配方 build() 内按上游默认 dummy 后端模式真编译真运行，故
+# upstream_test_in_build: true。
+upstream_check_command: "cmake --preset <platform> && cmake --build --preset <platform> && ./build/<cfg>/sokol-test (tests/CMakeLists.txt, SOKOL_DUMMY_BACKEND default)"
+
+upstream_test_in_build: true
+upstream_test_command: "./sokol-test (294/294 UTEST cases pass, dummy backend; 29 compile TUs + 3 extra risk TUs compile clean)"
+
+# 上游官方测试：sokol-test functional 套件 + compile 编译冒烟套件
+# （进统计表；平台无关子集，排除项如实记录）
+upstream_tests:
+  - file: tests/functional/sokol_test.c (+11 test TUs)
+    source: "sokol-master/tests/functional/sokol_test.c, sokol_args_test.c, sokol_audio_test.c, sokol_cmdbuf_test.c, sokol_color_test.c, sokol_debugtext_test.c, sokol_fetch_test.c, sokol_gfx_test.c, sokol_gl_test.c, sokol_log_test.c, sokol_shape_test.c"
+    description: "上游官方 functional 套件（sokol-test 目标，UTEST 框架）：294 用例全量真跑（args 12 + audio 2 + cmdbuf 52 + color 3 + debugtext 22 + fetch 30 + gfx 137 + gl 16 + log 0* + shape 20）— SOKOL_DUMMY_BACKEND 模式，OHOS aarch64 clang15 musl 实测 294/294 PASS（fetch 用例需 comsi.s3m 资产就位于 CWD，配方已按上游 file(COPY) 语义拷贝）。*sokol_log_test.c 上游即无 UTEST 用例（仅 impl 包含冒烟 TU，与 sokol_test.c 同属 main TU 集合）"
+    command: "./sokol-test (exit code 0, 294/294 passed)"
+  - file: tests/compile/*.c|*.cc
+    source: "sokol-master/tests/compile/"
+    description: "上游官方 compile 编译冒烟套件（C 15 TU + C++ 14 TU，平台无关子集）：gfx/audio/fetch/time/args/log/glue/color/debugtext/gl/shape/letterbox/cmdbuf/framebuffer/main 双语言形态全编译通过 — SOKOL_DUMMY_BACKEND。排除项（平台限制）：sokol_app.c/.cc 需 X11+真实 3D 后端（上游 sokol_app.h Linux 路径硬性要求，无 dummy 支持）；sokol_all.c 及 imgui/nuklear/fontstash/spine 桥接 TU 需 tests/ext git clone 外部库（cimgui/spine-c/nuklear），CI 站点白名单不可达；sokol_memtrack.c 上游目录即无此 TU"
+    command: "compile-only suite (clang -c, 15 C + 14 C++ TUs, zero errors)"
+
+# 消费者测试（test_package）：C 54 断言 + C++ cmdbuf impl 段
+test_package_tests:
+  - file: test_sokol.c
+    description: "消费者 C99 套件：11 个 core/util 头真用（dummy 后端 setup/shutdown 生命周期 + args 解析 + time 单位换算 + fetch 真文件异步加载 256B + color/shape 数学 + letterbox 视口 + memtrack 分配释放 + log 冒烟 + framebuffer 生命周期）— 54 断言全部 OHOS aarch64 目标机实测校准"
+    command: "./test_sokol_c (exit code 0, 54/54 checks)"
+  - file: test_sokol.cc
+    description: "消费者 C++11 套件：sokol_cmdbuf.h 实现段以 C++ 编译并运行（上游 compile 契约 scb_setup({})/scb_shutdown()，s0001 补丁目标代码路径）"
+    command: "./test_sokol_cxx (exit code 0)"
+
+assertion_count: 294

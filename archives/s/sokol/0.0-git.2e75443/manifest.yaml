@@ -1,0 +1,51 @@
+# 版本级 manifest
+# 文件位置: archives/s/sokol/0.0-git.2e75443/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "0.0-git.2e75443"
+software: sokol
+status: built
+build_date: "2026-10-03"
+build_system: "custom"
+
+source:
+  url:
+    - "https://ghfast.top/https://github.com/floooh/sokol/archive/refs/heads/master.tar.gz"
+    - "https://github.com/floooh/sokol/archive/refs/heads/master.tar.gz"
+  sha256: "3b2d0ec363419680324f289f1a7414b199a7a8b9deac30558b1a1ab215b53833"
+  tar_format: tar.gz
+  upstream_commit: "2e75443dbd4940b5aa8d76a8e479f8e4b270b9a3"
+
+build:
+  system: custom
+  configure_options: []
+  dependencies: []
+  cc: clang
+  cxx: clang++
+  notes: >-
+    header-only 单头库集（8 core + 14 util 头，零第三方依赖）。上游无
+    构建系统（tests/ CMake 工程仅供上游自测）。配方 build() 以
+    SOKOL_DUMMY_BACKEND 模式真跑上游官方测试：functional 套件
+    sokol-test 294 UTEST 用例（spine 88 例排除：tests/ext 需 git
+    clone spine-c 运行时）+ compile 套件 15 C + 14 C++ 编译冒烟 TU。
+    消费者测试（test_package）C 54 断言 + C++ cmdbuf impl 段。
+
+patches_applied:
+  - file: patches/s0001-sokol_cmdbuf-cxx-voidptr-cast.patch
+    type: portability
+    description: >-
+      _scb_init_cmdbuf 中 void* → uint8_t* 显式转换：上游 C 隐式
+      转换在 C++ 编译 sokol_cmdbuf.h 实现段时为硬错误（上游自身
+      compile 套件 sokol_cmdbuf.cc 契约路径），一行 cast 修复。
+
+knowledge_gained:
+  - "utest.h（sheredom）在 OHOS musl 下不可直接编译：Linux 分支用 syscall(SYS_clock_gettime,…) 而 OHOS musl 的 sys/syscall.h 无 SYS_* 宏；且 __GLIBC__ 探测分支不命中导致 time.h 未包含 → 解法纯编译 flag：-DUTEST_USE_CLOCKGETTIME -include time.h，零补丁"
+  - "sokol 单头库集 header-only 打包：8 core 头平铺 include/、util 头进 include/util/，cpp_info.includedirs 双根（['include','include/util']）对齐上游 -I<root> -I<root>/util 消费契约"
+  - "sokol_app.h 实现段 Linux 路径硬性要求 X11+真实 3D 后端（无 dummy 支持）——OHOS 无 X11，app/glue 的 app 相关 TU 排除出编译套件；glue.h 本身可 dummy 编译"
+  - "sokol_gfx/audio 支持 SOKOL_DUMMY_BACKEND（上游为 CLI 测试设计），是 headless 环境验证逻辑层的官方通道"
+
+test_results:
+  type: local_full_run
+  upstream_functional: "294/294 passed (dummy backend, OHOS aarch64 clang15)"
+  upstream_compile: "15 C + 14 C++ TUs compile clean (dummy backend)"
+  test_package: "C 54/54 checks + C++ cmdbuf impl OK"
