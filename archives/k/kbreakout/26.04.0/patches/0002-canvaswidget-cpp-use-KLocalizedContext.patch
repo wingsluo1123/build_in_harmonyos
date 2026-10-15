@@ -1,0 +1,46 @@
+--- a/src/canvaswidget.cpp
++++ b/src/canvaswidget.cpp
+@@ -13,10 +13,10 @@
+ // KDEGames
+ #include <KGameThemeProvider>
+ // KF
++// OHOS: KF6::I18nQml (KLocalizedQmlContext / KLocalization::setupLocalizedContext)
++// is not published in the conan registry, so the equivalent KLocalizedContext
++// context object from KF6::I18n is used below (alligator 26.04.0 precedent).
+ #include <KLocalizedContext>
+-#if KI18N_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+-#include <KLocalizedQmlContext>
+-#endif
+ 
+ // Qt
+ #include <QAction>
+@@ -33,11 +33,10 @@
+     QQmlEngine *engine = this->engine();
+ 
+ 
+-#if KI18N_VERSION < QT_VERSION_CHECK(6, 8, 0)
++    // OHOS: KLocalizedQmlContext (KF6::I18nQml) is not available in the
++    // published ki18n package; KLocalizedContext provides the same
++    // i18n()/xi18n() QML context object mechanism (alligator 26.04.0 precedent).
+     engine->rootContext()->setContextObject(new KLocalizedContext(engine));
+-#else
+-    engine->rootContext()->setContextObject(new KLocalizedQmlContext(engine));
+-#endif
+ 
+     setResizeMode(SizeRootObjectToView);
+ 
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -42,6 +42,12 @@
+     Qt6::Xml
+ )
+ 
++# OHOS: KF6::I18nQml is not published in the conan registry. KLocalizedContext
++# from KF6::I18n is the equivalent API, but it is deprecated at KI18N 6.8 and
++# hidden behind ecm_set_disabled_deprecation_versions(KF 6.21.0); keep it
++# visible (alligator 26.04.0 precedent).
++target_compile_definitions(kbreakout PRIVATE KI18N_DISABLE_DEPRECATED_BEFORE_AND_AT=0)
++
+ if(TARGET KF6::I18nQml)
+     target_link_libraries(kbreakout KF6::I18nQml)
+ endif()

@@ -1,0 +1,49 @@
+# 软件级 manifest
+# 文件位置: archives/k/kbreakout/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+software: kbreakout
+
+display: "KBreakOut"
+
+description: "KDE 打砖块游戏（KBreakOut）——Qt6/KF6 QML 渲染的图形应用，基于 KDEGames6"
+
+category: game
+
+homepage: "https://invent.kde.org/games/kbreakout"
+
+license: GPL-2.0-or-later
+
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "KF6 DocTools 不在已发布 KF6 闭包内：从 find_package(KF6 COMPONENTS ...) 移除 DocTools，并去掉 add_subdirectory(doc) 与 kdoctools_install(po)"
+    - "KF6::I18nQml（KLocalizedQmlContext）未发布：改用 KF6::I18n 的 KLocalizedContext，并加 KI18N_DISABLE_DEPRECATED_BEFORE_AND_AT=0（alligator 26.04.0 先例）"
+    - "KF_IGNORE_PLATFORM_CHECK=TRUE + KF_SKIP_PO_PROCESSING=ON（KDE 应用 OHOS 标准 env 组合）"
+    - "karchive/6.18.0 override=True（libkdegames 图约束：kiconthemes 最新 recipe revision 需要 karchive/6.19.0，与 knewstuff 冲突）"
+    - "DT_NEEDED 绝对路径归一化 + 重签（E537/E077）：已发布 KF6 库无 DT_SONAME，链接期会把 conan 缓存绝对路径写进下游 DT_NEEDED"
+    - "QML 运行时需要 qtdeclarative（Qt6 Qml/Quick/QuickWidgets）+ package share 目录进 XDG_DATA_DIRS"
+  common_dependencies:
+    - qtbase
+    - qtdeclarative
+    - qtsvg
+    - libkdegames
+    - ki18n
+    - kcoreaddons
+    - kconfig
+    - kconfigwidgets
+    - kcrash
+    - kdbusaddons
+    - kwidgetsaddons
+    - kxmlgui
+    - kiconthemes
+    - kdnssd
+    - ecm
+
+versions:
+  "26.04.0":
+    status: built
+    build_date: 2026-10-15
+    conan_ref: "kbreakout/26.04.0"
+    package_id: "746c2160d3c6fe3986c11d7c780c535dfafc3126"

@@ -1,0 +1,21 @@
+package: kbreakout/26.04.0
+homepage: https://apps.kde.org/kbreakout
+
+# kbreakout 26.04.0 ships NO upstream test suite (R51 inventory).
+# Evidence (extracted tarball kbreakout-26.04.0/):
+#   - no tests/, autotests/ or test/ directory (find . -iname "*test*" -not -path "./po/*" -> empty)
+#   - no enable_testing()/add_test()/ecm_add_test()/BUILD_TESTING in any
+#     CMakeLists.txt or cmake module (grep -rn over the tree -> no match)
+# Upstream QA for this module runs through KDE CI source builds only, so the
+# consumer verification below is the verification path for this package.
+upstream_test_in_build: false
+upstream_tests: []
+
+upstream_check_command: "none (no upstream test suite in 26.04.0)"
+
+test_package_tests:
+  - file: test.sh
+    description: "Consumer cases: 4 cases / 6 assertions, incl. 1 HarmonyOS-specific non-assertion case — (0) packaged bin/kbreakout exists and is executable; (1) --version reports 26.04.0; (2) --help identifies kbreakout (Qt/KDE runtime link complete); (3a) --author lists the upstream author (KAboutData metadata); (3b) --license prints the GPL license; (4) [OHOS-specific, non-assertion] shared-library closure load: launches the shipped kbreakout binary so the OHOS dynamic linker resolves the whole DT_NEEDED closure (relative \"../../bin/libX.so\" entries of the published KF6 libraries fail on OHOS musl without the patchelf rewrite, resolve trivially on glibc)"
+    command: "sh test.sh <kbreakout-bin>"
+
+assertion_count: 6
