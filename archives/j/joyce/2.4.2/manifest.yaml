@@ -1,0 +1,37 @@
+software: joyce
+version: "2.4.2"
+status: built
+build_date: "2026-10-12"
+build_system: autotools
+
+source:
+  url: "https://www.seasip.info/Unix/Joyce/joyce-2.4.2.tar.gz"
+  sha256: "85659a6ac9b94fdf78c28d5d8d65a4f69e7520e1c02a915b971c2754695ab82c"
+  tar_format: tar.gz
+  homepage: "https://www.seasip.info/Unix/Joyce/"
+
+build:
+  system: autotools
+  configure_options:
+    - "--disable-silent-rules"
+    - "--disable-floppy"
+  dependencies:
+    - "sdl12-compat/1.2.68"
+    - "libpng/1.6.58.3"
+    - "libxml2/2.15.3.1"
+  bundled_libraries:
+    - LibDsk
+    - Lib765
+    - LibLink
+    - cpmredir
+
+patches_applied: []
+
+knowledge_gained:
+  - "joyce bundles LibDsk/Lib765/LibLink/cpmredir and builds them in-source via autotools; its configure ACL_DISABLE_SHARED so all bundled libs are static and the GUI binaries (xjoyce/xanne) link them statically."
+  - "The SDL 1.2 GUI front ends require `sdl-config` (AM_PATH_SDL); sdl12-compat installs headers/libs but no `sdl-config`, so the recipe injects a small shim reporting package include/SDL and -lSDL-1.2."
+  - "Passing --disable-floppy avoids the host floppy probe and the linux/fd.h dependency (not available on OHOS)."
+  - "Upstream tests live in the bundled LibDsk as `check_PROGRAMS = check1 check2 check3` (autotools/automake test-driver count 3); check1 is a pure geometry round-trip, check2/check3 open /dev/fd0 (a physical floppy device absent on HarmonyOS PC) and fail with a concrete ohos_feature reason."
+  - "On the device filesystem `mktemp -d` creates a temp dir that Autoconf cannot write later (config.status: can't create ./confXXXXXX/subs*.awk: Permission denied -> could not setup config files machinery). Following the HMBS [unsafe_local_mktemp] guidance with HMBS_AUTOCONF_MKTEMP_FALLBACK=1, the recipe shadows mktemp so ./conf* calls fail and Autoconf falls back to its writable mkdir path (same pattern as serf / cyrus-sasl family)."
+
+adaptation_path: "路径 C（高难度挑战）"
