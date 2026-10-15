@@ -1,0 +1,389 @@
+# test_package/MANIFEST.yml — 上游官方测试声明文件（L0e 门禁要求存在）
+# 详见 docs/TEST_QUALITY_SPEC.md
+#
+# 本文件中的每一个计数都由 tools 生成器从真机逐目录 pytest --junitxml 结果
+# (tmp/sktest2/xml/*.xml，34 个目录) 直接读取求和得到：模块路径取自执行脚本自身的
+# MODULES 列表，xfailed 取自 JUnit 的 skipped[type=pytest.xfail]，xpassed 取自各
+# 目录 pytest 汇总行，跳过原因分类取自 JUnit 的 skip message。无手工填写数字。
+
+package: scikit-learn/1.6.1
+homepage: https://scikit-learn.org
+
+# 上游官方测试方式：pytest（测试目录随 sdist 安装进 site-packages/sklearn/**/tests）
+upstream_check_command: "python3 -m pytest sklearn/"
+
+# conanfile.py build() 是否集成上游测试：false。
+#   原因：跑上游 pytest 需要 scipy、joblib、threadpoolctl 三个运行期依赖，它们未发布
+#   到 OHPCD Conan 制品仓（该仓只有 numpy/meson/ninja/cython/openblas/python），CI
+#   worker 的 build() 阶段拿不到，硬塞进 build() 只会产出假通过或假失败。上游全量套件
+#   因此在真机离线执行：用本配方构建出的 68 个扩展 + 平台 OHOS wheel 的
+#   scipy 1.14.1 / joblib 1.4.2 / threadpoolctl，逐目录 --junitxml 收集，聚合见
+#   reports/test-report.md 与 manifest.yaml 的 upstream_test_run。
+upstream_test_in_build: false
+upstream_test_command: "python3 -m pytest <site-packages>/sklearn/<MODULE>/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=<MODULE>.xml"
+
+# 上游实际运行结果（34 个 pytest 目录，真机 JUnit）
+upstream_tests:
+  - file: sklearn/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_tests.xml"
+    passed: 13072
+    failed: 0
+    errors: 0
+    skipped: 1408
+    xfailed: 107
+    xpassed: 64
+  - file: sklearn/metrics/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/metrics/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/metrics/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_metrics_tests.xml"
+    passed: 2676
+    failed: 0
+    errors: 0
+    skipped: 607
+    xfailed: 2
+  - file: sklearn/utils/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/utils/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/utils/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_utils_tests.xml"
+    passed: 1734
+    failed: 0
+    errors: 0
+    skipped: 1264
+  - file: sklearn/linear_model/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/linear_model/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/linear_model/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_linear_model_tests.xml"
+    passed: 2291
+    failed: 0
+    errors: 0
+    skipped: 112
+    xfailed: 41
+    xpassed: 11
+  - file: sklearn/neighbors/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/neighbors/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/neighbors/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_neighbors_tests.xml"
+    passed: 1502
+    failed: 0
+    errors: 0
+    skipped: 460
+  - file: sklearn/_loss/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/_loss/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/_loss/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn__loss_tests.xml"
+    passed: 1856
+    failed: 0
+    errors: 0
+    skipped: 4
+  - file: sklearn/preprocessing/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/preprocessing/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/preprocessing/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_preprocessing_tests.xml"
+    passed: 1509
+    failed: 0
+    errors: 0
+    skipped: 219
+  - file: sklearn/decomposition/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/decomposition/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/decomposition/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_decomposition_tests.xml"
+    passed: 1084
+    failed: 0
+    errors: 0
+    skipped: 144
+  - file: sklearn/cluster/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/cluster/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/cluster/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_cluster_tests.xml"
+    passed: 718
+    failed: 0
+    errors: 0
+    skipped: 93
+  - file: sklearn/ensemble/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/ensemble/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/ensemble/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_ensemble_tests.xml"
+    passed: 764
+    failed: 0
+    errors: 0
+    skipped: 2
+  - file: sklearn/model_selection/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/model_selection/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/model_selection/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_model_selection_tests.xml"
+    passed: 624
+    failed: 0
+    errors: 0
+    skipped: 74
+  - file: sklearn/tree/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/tree/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/tree/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_tree_tests.xml"
+    passed: 631
+    failed: 0
+    errors: 0
+    skipped: 5
+  - file: sklearn/datasets/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/datasets/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/datasets/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_datasets_tests.xml"
+    passed: 238
+    failed: 0
+    errors: 0
+    skipped: 246
+  - file: sklearn/ensemble/_hist_gradient_boosting/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/ensemble/_hist_gradient_boosting/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/ensemble/_hist_gradient_boosting/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_ensemble__hist_gradient_boosting_tests.xml"
+    passed: 328
+    failed: 0
+    errors: 0
+    skipped: 118
+  - file: sklearn/gaussian_process/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/gaussian_process/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/gaussian_process/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_gaussian_process_tests.xml"
+    passed: 445
+    failed: 0
+    errors: 0
+    skipped: 0
+  - file: sklearn/impute/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/impute/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/impute/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_impute_tests.xml"
+    passed: 365
+    failed: 0
+    errors: 0
+    skipped: 24
+  - file: sklearn/inspection/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/inspection/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/inspection/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_inspection_tests.xml"
+    passed: 279
+    failed: 0
+    errors: 0
+    skipped: 36
+  - file: sklearn/svm/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/svm/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/svm/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_svm_tests.xml"
+    passed: 315
+    failed: 0
+    errors: 0
+    skipped: 0
+  - file: sklearn/manifold/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/manifold/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/manifold/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_manifold_tests.xml"
+    passed: 208
+    failed: 0
+    errors: 0
+    skipped: 96
+    xfailed: 1
+  - file: sklearn/feature_selection/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/feature_selection/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/feature_selection/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_feature_selection_tests.xml"
+    passed: 291
+    failed: 0
+    errors: 0
+    skipped: 13
+  - file: sklearn/linear_model/_glm/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/linear_model/_glm/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/linear_model/_glm/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_linear_model__glm_tests.xml"
+    passed: 274
+    failed: 0
+    errors: 0
+    skipped: 0
+  - file: sklearn/compose/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/compose/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/compose/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_compose_tests.xml"
+    passed: 120
+    failed: 0
+    errors: 0
+    skipped: 131
+  - file: sklearn/metrics/_plot/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/metrics/_plot/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/metrics/_plot/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_metrics__plot_tests.xml"
+    passed: 0
+    failed: 0
+    errors: 0
+    skipped: 240
+  - file: sklearn/feature_extraction/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/feature_extraction/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/feature_extraction/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_feature_extraction_tests.xml"
+    passed: 183
+    failed: 0
+    errors: 0
+    skipped: 17
+  - file: sklearn/semi_supervised/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/semi_supervised/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/semi_supervised/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_semi_supervised_tests.xml"
+    passed: 139
+    failed: 0
+    errors: 0
+    skipped: 58
+  - file: sklearn/inspection/_plot/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/inspection/_plot/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/inspection/_plot/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_inspection__plot_tests.xml"
+    passed: 10
+    failed: 0
+    errors: 0
+    skipped: 159
+  - file: sklearn/metrics/cluster/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/metrics/cluster/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/metrics/cluster/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_metrics_cluster_tests.xml"
+    passed: 155
+    failed: 0
+    errors: 0
+    skipped: 8
+  - file: sklearn/neural_network/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/neural_network/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/neural_network/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_neural_network_tests.xml"
+    passed: 86
+    failed: 0
+    errors: 0
+    skipped: 2
+  - file: sklearn/cross_decomposition/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/cross_decomposition/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/cross_decomposition/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_cross_decomposition_tests.xml"
+    passed: 73
+    failed: 0
+    errors: 0
+    skipped: 4
+  - file: sklearn/mixture/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/mixture/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/mixture/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_mixture_tests.xml"
+    passed: 74
+    failed: 0
+    errors: 0
+    skipped: 0
+  - file: sklearn/frozen/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/frozen/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/frozen/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_frozen_tests.xml"
+    passed: 46
+    failed: 0
+    errors: 0
+    skipped: 0
+  - file: sklearn/covariance/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/covariance/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/covariance/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_covariance_tests.xml"
+    passed: 36
+    failed: 0
+    errors: 0
+    skipped: 0
+  - file: sklearn/cluster/_hdbscan/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/cluster/_hdbscan/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/cluster/_hdbscan/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_cluster__hdbscan_tests.xml"
+    passed: 8
+    failed: 0
+    errors: 0
+    skipped: 0
+  - file: sklearn/experimental/tests
+    source: scikit_learn-1.6.1.tar.gz/sklearn/experimental/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）"
+    command: "python3 -m pytest sklearn/experimental/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=sklearn_experimental_tests.xml"
+    passed: 3
+    failed: 0
+    errors: 0
+    skipped: 0
+
+# 上游总计（34 目录 JUnit 求和，failed/errors 均为 0）
+upstream_total:
+  collected: 37832
+  passed: 32137
+  skipped: 5544
+  failed: 0
+  errors: 0
+  xfailed: 151
+  xpassed: 75
+  reconciliation: "collected(37832) = passed(32137) + skipped(5544) + xfailed(151) + failed(0) + errors(0)；xpassed(75) 按 JUnit 语义已计入 passed"
+  modules: 34
+  pass_rate: "100.00% (0 failed / 0 errors of 37832 collected)"
+  run_date: "2026-10-14"
+  run_environment: "HarmonyOS PC aarch64 (HongMeng Kernel 1.13.0), CPython 3.12.9 musl 端口, numpy 2.2.1 + scipy 1.14.1 + joblib 1.4.2 + threadpoolctl 3.5.0 OHOS wheels, 68 个 scikit-learn 扩展由本配方构建" 
+  skip_breakdown:  # 按 JUnit skip message 分类，全部为上游 optional-dependency 或环境门控，非适配失败
+    pandas: 1521
+    torch: 983
+    float32 需 SKLEARN_RUN_FLOAT32_TESTS=1: 792
+    array-api (array_api_compat / strict / cupy): 660
+    matplotlib: 450
+    upstream 条件跳过（估计器/参数组合不支持、内存/配置门控）: 382
+    polars: 337
+    numpydoc: 225
+    lightgbm: 100
+    network: 67
+    PyAMG: 18
+    pyarrow: 5
+    PIL: 4
+
+# test_package 自带的消费者视角测试（真实调用 API，非打印空壳）
+test_package_tests:
+  - file: test_sklearn.py
+    description: >-
+      12 项公开 API 消费者验证：版本断言；12 个编译扩展必须以 .so 形式被导入；
+      sklearn.utils._cython_blas 的裸名 enum 成员（NoTrans/Trans/RowMajor/ColMajor，
+      Cython ≥ 3.1 不再自动导出，见补丁 0002）可 import，且其声明的 BLAS 入口点在
+      float32/float64 两种实例化下 dot/asum/nrm2/copy/axpy/scal/gemv/gemm 全与 numpy 参考一致；RandomForest 在 iris
+      测试集精度 > 0.9；KDTree/BallTree/brute 三条 Cython 近邻实现 3-NN 结果完全一致；
+      ElasticNet(cd_fast)/liblinear/SGD/saga 四条 Cython 优化路径收敛；PCA 残差恒等式
+      rel == sqrt(1 - explained_variance_ratio_.sum())（1e-9）；randomized_svd 前 10 个
+      奇异值与精确 svd 相对偏差 < 1e-5；KMeans/DBSCAN/Agglomerative 恢复三点云；
+      pairwise euclidean/manhattan/sqeuclidean/cosine 与 numpy 参考一致到 1e-12；
+      Pipeline + 3 折 CV；OpenMP 与 joblib 线程数不变性；pickle + joblib 落盘往返预测一致。
+    command: "python3 test_sklearn.py --json <out>.json"
+    checks: 12
+  - file: test_ohos_platform.py
+    description: >-
+      9 项鸿蒙平台验证（6 静态 + 3 运行期），见下方 added_tests。
+    command: "python3 test_ohos_platform.py --site-dir <site-packages> --runtime --json <out>.json"
+    checks: 9
+
+# 新增鸿蒙特有测试 (rule12)
+added_tests:
+  - name: "harmonyos-specific-test"
+    source: test_package/test_ohos_platform.py
+    description: >-
+      鸿蒙特有断言，用纯 stdlib 自行解析 ELF64（不依赖 readelf，因而在拒绝 dlopen 用户路径的
+      E212 AppSpawn 沙箱内同样可执行），逐一覆盖本配方产出的 68 个扩展，并把扩展总数钉在
+      EXPECTED_EXTENSIONS=68（上游 meson 构建的固定值）——只移走一个产物也会 6 项全红，
+      而不是 "67/67 全绿"：
+      1) ELF 魔数 + ELF64 + e_machine == EM_AARCH64(183)；
+      2) 必须存在 .codesign 段——OHOS E077 对未签名映射直接拒绝 dlopen；
+      3) 必须自带 DT_NEEDED libpython3.12.so——musl 不把解释器符号导出给 dlopen 对象，
+      否则 PyModuleDef_Init 等符号不可解析（E004）；
+      4) C 库必须是 musl 的 libc.so，出现 libc.so.6/libm.so.6/libdl.so.2/ld-linux* 即失败，
+      且不得直接链接 BLAS/OpenBLAS（SciPy 在 import 期经 __Pyx_ImportFunction 供给符号）；
+      5) 扩展文件名后缀必须等于当前解释器的 EXT_SUFFIX（本端口
+      .cpython-312-aarch64-linux-ohos.so），防止把 Linux glibc wheel 误当 OHOS 产物；
+      参与比对的解释器取自 test_package 自身的 tool_requires("python/3.12.9")（制品仓已发布），
+      并先校验其 EXT_SUFFIX 含 -linux-ohos，因而不会拿设备上 PATH 里的 HNP 解释器
+      （.cpython-312.so）当作基准误判扩展；
+      6) 包内布局：sklearn/__init__.py 的 __version__ == 1.6.1，
+      utils/linear_model/ensemble/model_selection/datasets/metrics 子包齐全。
+      运行期追加 3 项：平台字符串 harmonyos-*-aarch64 且核心扩展确实从 .so 载入；
+      OpenMP 线程数不变性（_openmp_parallelism_enabled、_openmp_effective_n_threads(1/3)，
+      KMeans 1 线程 vs 8 线程预测逐位一致、HistGradientBoosting 重复拟合一致）；
+      hmdfs 文件系统上 np.load(mmap_mode='r') + PCA 拟合（模型持久化/数据缓存的真实路径）。
+    command: "python3 test_ohos_platform.py --site-dir <site-packages> [--runtime] --json <out>.json"
+    ohos_specific: true
+
+# 测试断言总数（用于质量评估）
+#   test_sklearn.py 12 项检查 50 条 assert；test_ohos_platform.py 9 项检查 27 条 assert；
+#   后者 6 项静态检查还会对 68 个扩展逐个执行 ELF 校验（运行时展开为 408 次断言级检查）。
+assertion_count: 77

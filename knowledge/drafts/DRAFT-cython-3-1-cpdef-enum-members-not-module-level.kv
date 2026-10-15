@@ -1,0 +1,105 @@
+#====================================================================
+# DRAFT-cython-3-1-cpdef-enum-members-not-module-level — Cython ≥ 3.1 不再把具名
+#   cpdef enum 的成员平铺到模块级；平台只有一份新版 Cython 时，只能在 .pyx 末尾
+#   显式回填成员，否则构建全绿而 import/上游测试在收集阶段就报错。
+#   来源：scikit-learn 1.6.1（OHOS aarch64，Cython 3.3.0）真机适配
+#
+# 对应的人类文档: knowledge/drafts/DRAFT-cython-3-1-cpdef-enum-members-not-module-level.md
+#
+# 与 DRAFT-scikit-learn-1.6.1-cython-pxd-vendoring 的关系：那条解决「构建期拿不到 SciPy 声明」，
+#   本条解决「构建期工具换代改变了生成物的 Python 可见名字」——同一个配方的两个不同失效面。
+# 与 DRAFT-cython-3.3.0-conan-package-missing-top-level-pymodules 的关系：同为 Cython 3.3.0，
+#   那条是 Cython 自身 Conan 交付物缺顶层 `cython` 模块（交付内容问题），本条是生成语义变更（移植问题）。
+#
+# 本条目为 draft（草稿），尚未由主编审核合入。正式编号由 graph promote 分配。
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     DRAFT-cython-3-1-cpdef-enum-members-not-module-level
+trigger_tool:           cython|python|pytest|conan
+phase:                  testing
+error_signature:        ImportError: cannot import name '\w+' from '\w+(\.\w+)*' \(.*\.cpython-\d+-[a-z0-9_]+-linux-ohos\.so\)|
+                        ImportError: cannot import name '(ColMajor|RowMajor|NoTrans|Trans)'.*_cython_blas|
+                        error during collection.*ImportError
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               2
+category:               portability, python-extension, cython, testing, detection
+match_keywords:         cpdef enum, 具名 enum, enum class, 成员未导出, module namespace, Cython 3.1, Cython 3.3.0,
+                        ImportError cannot import name, collection error, 收集阶段报错, 构建全绿但 import 失败,
+                        只有一份 Cython, 制品仓无旧版本, 工具换代, _cython_blas, BLAS_Order, BLAS_Trans,
+                        globals().update, 名字表回填, conan create 成功但测试报错
+title:                  具名 cpdef enum 的成员在 Cython ≥ 3.1 不再进模块全局：构建全绿、ELF/ABI 全合规，破坏只在 import 期出现——平台只有一份新版 Cython 时须由 .pyx 自己回填成员
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             Cython 官方 CHANGES 在 3.1.0rc1（2025-05-01）明写「Named "cpdef enums" no longer copy
+                        their item names into the global module namespace」：具名 cpdef enum 只导出 enum 类本身
+                        （BLAS_Order/BLAS_Trans 可 import），成员裸名（RowMajor/ColMajor/NoTrans/Trans）不再进模块字典。
+                        scikit-learn 1.6.1 的 sklearn/utils/_cython_blas.pxd 正是具名 cpdef enum，
+                        而 sklearn/utils/tests/test_cython_blas.py 用裸名 import → 收集阶段 ImportError。
+                        OHOS 侧没有退路：Conan 制品仓 probe 过 3.0.x/3.1.x/0.29.x 全部无二进制，
+                        平台 pip 索引 pypi.cnb.cool/OpenHarmonyPCDeveloper/pypi 的 cython simple 页只列 3.3.0，
+                        配方只能 tool_requires 那一份新版。由于生成器行为变化不产生编译错误，
+                        conan create 退出码 0、68 个扩展齐备、静态 ELF 断言全绿，
+                        所有「看构建」的门禁都拦不住它。
+affected_scope:         任何含 .pyx 且使用具名 cpdef enum 的 Python 扩展包（scipy/sklearn 生态及其下游）；
+                        更一般地，任何「构建期工具换代 → 生成物 Python 可见名字变化」的移植问题；
+                        也包括证据面：编译工具链换代后，旧产物上测得的上游测试计数不再描述将要交付的制品。
+verification_cmd:       # 1) 命中判据：源码用具名 cpdef enum（不是 cdef enum / 匿名 enum）
+                        grep -rnE "^cpdef enum +[A-Za-z_]" <src>/**/*.pxd <src>/**/*.pyx
+                        # 2) 裸名 import 是否失败，而 enum 类本身可用 → 就是本模式而非扩展缺失/ABI 错
+                        <target-python> -c "import sklearn.utils._cython_blas as m; print(hasattr(m,'BLAS_Order'), hasattr(m,'ColMajor'))"
+                        # 3) 上游侧同判据：收集阶段就报错
+                        <target-python> -m pytest <site-packages>/sklearn/utils/tests/test_cython_blas.py --no-header -q 2>&1 | tail -5
+                        # 4) 平台 Cython 版本可得性（别假设能降级）
+                        conan graph info -pr:h=<ohos> -pr:b=<ohos> -c tool_requires.cython/3.0.11 --build=missing 2>&1 | tail -3
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+# 推荐方案 (priority 越小越优先, 从 1 开始)
+rec_priority:           1
+rec_approach:           republish-enum-members-in-pyx
+rec_description:        在被打补丁的 .pyx 末尾按 Cython 官方建议显式把成员回填进模块字典，值与语义都不变：
+                        for e in (BLAS_Order, BLAS_Trans): globals().update({m.name: m for m in e}); del e。
+                        配套三件事：(a) 补丁登记进 conandata.yml，description 写清「Cython ≥ 3.1 不再导出成员」
+                        与「本机只有 3.3.0」两条平台约束；(b) test_package 里加一条真实消费者用例直接调用裸名接口
+                        （dot/asum/nrm2/copy/axpy/scal/gemv/gemm 对 float32/float64 往返），因为 CI 拿不到运行期依赖时
+                        上游套件不会替它把关；(c) 换代后在**将要交付的产物**上重跑上游计数，别沿用旧工具链的数字。
+                        用成员自己的 .name 与成员对象，不要手抄常量（110/116 由 enum 成员携带）。
+rec_command:            printf 'for _e in (BLAS_Order, BLAS_Trans):\n    globals().update({_m.name: _m for _m in _e})\ndel _e\n' >> sklearn/utils/_cython_blas.pyx
+rec_auto_fix:           false
+rec_impl:               patch
+
+fallback_priority:      2
+fallback_approach:      pin-older-cython-when-registry-has-it
+fallback_description:   若制品仓里确实存在 3.0.x 二进制，把它写进 tool_requires（并加一条「为什么必须降版本」的注释）
+                        比改上游源码更可审计。前提是先 probe：本机 registry 与平台 pip 索引都只有 3.3.0 时这条路不存在，
+                        不要凭印象 pin 一个仓里没有的版本——那只会让 CI 卡在 Missing binary。
+fallback_command:       conan download cython/3.0.11 -r=ohpcd --only-recipe   # 先验证配方存在；再 conan graph info 验证有二进制
+fallback_auto_fix:      false
+fallback_impl:          conan-recipe
+
+forbid_1_pattern:       (skip|xfail).*test_cython_blas|pytest\.skip.*cannot import name|collect_ignore.*_cython_blas
+forbid_1_reason:        用 skip/xfail「恢复绿色」等于少报上游用例——本条的失效面是交付物的公开名字表，是真实缺陷，不是环境门控。
+forbid_1_consequence:   PR 被判「测试少报/伪造通过」直接退回；平台用户装上新包后照常 ImportError。
+
+forbid_2_pattern:       (replace|sed).*import.*(ColMajor|NoTrans)|patch every (import|call) site
+forbid_2_reason:        逐个改 import 点只覆盖仓库内可见引用，覆盖不到下游用户代码与未来新增的测试；且把上游源码改成平台方言，下个版本还要再改一遍。
+forbid_2_consequence:   上游测试暂时变绿，但制品暴露的 API 仍缺一半名字，问题以更隐蔽的形式回归。
+
+principles:             honest-evidence, reproducible-build-test, fix-at-artifact-level
+causes:                 []
+caused_by:              []
+similar_to:             [DRAFT-scikit-learn-1.6.1-cython-pxd-vendoring, DRAFT-cython-3.3.0-conan-package-missing-top-level-pymodules, DRAFT-static-artifact-count-pinning]
+conflicts_with:         []
+prerequisite_of:        []
+
+doc_file:               knowledge/drafts/DRAFT-cython-3-1-cpdef-enum-members-not-module-level.md
+last_updated:           2026-10-14
+source_event:           scikit-learn 1.6.1 OHOS aarch64 适配：conan create（cython/3.3.0）全绿，但真机 import 裸名与上游 test_cython_blas.py 收集阶段失败
+
+authors: AtomCode <atomcode@atomgit.com>
+source_pr: feat/scikit-learn-1.6.1
+source_commit:
+
+draft: true
+contributor_id: 9DB5
