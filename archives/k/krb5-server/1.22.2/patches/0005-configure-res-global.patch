@@ -1,0 +1,56 @@
+diff --git a/configure b/configure
+index ed823e9..61bfbf3 100755
+--- a/configure
++++ b/configure
+@@ -6928,6 +6928,51 @@ fi
+   fi
+ 
+ 
++fi
++
++# Check whether the _res global resolver variable is available.
++# musl libc does not provide it; glibc does.  Used by dnsglue.c to decide
++# whether PRIMARY_DOMAIN() may reference _res.defdname.
++{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for _res global variable" >&5
++printf %s "checking for _res global variable... " >&6; }
++if eval test \${krb5_cv_have_res_global+y}
++then :
++  printf %s "(cached) " >&6
++else $as_nop
++  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
++/* end confdefs.h.  */
++#include <sys/types.h>
++      #include <netinet/in.h>
++      #include <arpa/nameser.h>
++      #include <resolv.h>
++
++int
++main (void)
++{
++  return _res.defdname == NULL;
++  ;
++  return 0;
++}
++_ACEOF
++if ac_fn_c_try_link "$LINENO"
++then :
++  eval "krb5_cv_have_res_global=yes"
++else $as_nop
++  eval "krb5_cv_have_res_global=no"
++fi
++rm -f core conftest.err conftest.$ac_objext conftest.beam \
++    conftest$ac_exeext conftest.$ac_ext
++fi
++eval ac_res=\$krb5_cv_have_res_global
++	       { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
++printf "%s\n" "$ac_res" >&6; }
++if test `eval 'as_val=${'krb5_cv_have_res_global'};printf "%s\n" "$as_val"'` = yes
++then :
++
++cat >>confdefs.h <<_ACEOF
++#define HAVE_RES_GLOBAL 1
++_ACEOF
++
+ fi
+ 
+ # Check whether --with-hesiod was given.

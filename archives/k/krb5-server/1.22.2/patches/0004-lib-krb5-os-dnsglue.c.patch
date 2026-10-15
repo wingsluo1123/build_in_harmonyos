@@ -1,0 +1,30 @@
+diff -ruN a/lib/krb5/os/dnsglue.c b/lib/krb5/os/dnsglue.c
+--- a/lib/krb5/os/dnsglue.c
++++ b/lib/krb5/os/dnsglue.c
+@@ -97,15 +97,24 @@
+ #else
+ #define DESTROY_HANDLE(h) res_nclose(&h)
+ #endif
+ 
+ #else
+ 
+ /* Use res_init and res_search. */
+ #define DECLARE_HANDLE(h)
+ #define INIT_HANDLE(h) (res_init() == 0)
+ #define SEARCH(h, n, c, t, a, l) res_search(n, c, t, a, l)
+-#define PRIMARY_DOMAIN(h) \
+-    ((_res.defdname == NULL) ? NULL : strdup(_res.defdname))
++#if defined(HAVE_RES_GLOBAL)
++/* libc provides the _res global resolver variable (glibc); use the
++ * first search domain. */
++#define PRIMARY_DOMAIN(h) \
++    ((_res.defdname == NULL) ? NULL : strdup(_res.defdname))
++#else
++/* libc lacks the _res global (e.g. musl/OHOS); primary domain lookup
++ * unavailable, return NULL.  Configure detects this feature
++ * (HAVE_RES_GLOBAL, see 0005/0006 patches). */
++#define PRIMARY_DOMAIN(h) NULL
++#endif
+ #define DESTROY_HANDLE(h)
+ 
+ #endif

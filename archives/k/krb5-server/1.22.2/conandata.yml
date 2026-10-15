@@ -1,0 +1,27 @@
+sources:
+  # web.mit.edu 在 CI worker 网络不可达（#63282 下载超时）；
+  # kerberos.org 是 MIT 官方镜像站（Homebrew 等主源），同一官方 tarball
+  # （含预生成 configure），sha256 不变。CI mirror fallback 不支持
+  # web.mit.edu，故直接指向可达镜像。
+  url: "https://kerberos.org/dist/krb5/1.22/krb5-1.22.2.tar.gz"
+  sha256: "3243ffbc8ea4d4ac22ddc7dd2a1dc54c57874c40648b60ff97009763554eaf13"
+
+patches:
+  - patch_file: "patches/0001-config-config.guess.patch"
+    patch_description: "Update config.guess to support HarmonyOS platform detection"
+    patch_type: "portability"
+  - patch_file: "patches/0002-config-config.sub.patch"
+    patch_description: "Update config.sub to support ohos-linux triplet"
+    patch_type: "portability"
+  - patch_file: "patches/0003-configure.patch"
+    patch_description: "Fix TMPDIR umask 077 issue on HarmonyOS (E082) — umask 077 creates 0700 temp dirs that are unwritable in the OHOS sandbox (librrd precedent); 022 is the necessary minimal relaxation, dirs use mktemp random names with short lifetime"
+    patch_type: "portability"
+  - patch_file: "patches/0004-lib-krb5-os-dnsglue.c.patch"
+    patch_description: "Use configure-detected HAVE_RES_GLOBAL feature macro (glibc has _res, musl does not)"
+    patch_type: "portability"
+  - patch_file: "patches/0005-configure-res-global.patch"
+    patch_description: "Add configure check for the _res global resolver variable, defining HAVE_RES_GLOBAL (feature detection, not platform macro)"
+    patch_type: "portability"
+  - patch_file: "patches/0006-autoconf-h-res-global.patch"
+    patch_description: "Declare HAVE_RES_GLOBAL in autoconf.h.in so the feature macro lands in config.h"
+    patch_type: "portability"
