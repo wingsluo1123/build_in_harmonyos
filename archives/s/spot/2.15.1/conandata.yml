@@ -1,0 +1,11 @@
+sources:
+  url: "https://www.lre.epita.fr/dload/spot/spot-2.15.1.tar.gz"
+  sha256: "65013a2edf3f314854d7619888145f52c8dd36bfd27894d9db9b272d9a16ce4b"
+
+patches:
+  - patch_file: "patches/0001-unversioned-shared-libs.patch"
+    patch_description: "hmdfs 家目录拒绝符号链接（ln -s 返回 EPERM，PC 与真机双端实测）：libtool 对未显式给出版本四元组的可安装共享库按默认 0:0:0 生成 libX.so.0.0.0 实体 + .so.0/.so 两级符号链接（上游 spot.spec 中针对 libspot.so.0.0.0/libspotgen.so.0.0.0/libspotltsmin.so.0.0.0 的 chrpath 行即实证），在 HMDFS 上链接/安装步骤必然失败，且消费者缺少 libX.so 开发链接无法解析（先例 spice 0.16.0 #0005）。给四个可安装库（顶层 spot、spot/gen、spot/ltsmin、buddy/src）的 libtool LDFLAGS 追加 -avoid-version（buddy 为把 -version-info 0:0:0 替换为 -avoid-version），产出单文件 libX.so（SONAME 同名），与平台已发布库形态一致（先例 alsa-lib ALSA_LIBTOOL_VERSION_FLAGS=-avoid-version、libopusenc OHOS 分支、cmake 侧 CMAKE_PLATFORM_NO_VERSIONED_SONAME）；对 Linux 宿主仅影响文件名与 SONAME，行为无差异。noinst 便利库（libgnu/libpico 及 spot 子目录 14 个）在 libtool convenience 模式下不产生版本化产物，无需修改"
+    patch_type: "portability"
+  - patch_file: "patches/0002-autoconf-mktemp-fallback.patch"
+    patch_description: "OHOS hmdfs 拒写 autoconf config.status 的 mktemp 临时目录（真机实证）：config.status 在建文件机制阶段以 `(umask 077 && mktemp -d \"./confXXXXXX\")` 建目录存放 awk 生成脚本，hmdfs 上该 0700 目录对沙箱身份不可写（写 subs1.awk 返回 EACCES，config.status 报 Permission denied 并以 Error 1 中止；ls 显示 drwx--S---，chmod 被 hmdfs 掩蔽无法修复，而同 umask 下普通 mkdir 的目录反而可写）。修复：三级 configure（顶层/buddy/ltdl，均为 autoconf 2.72 模板且各仅此一处，buddy 与 ltdl 由顶层 configure 的 CONFIG_SUBDIRS 段经 $SHELL 递归调用、各自生成自己的 config.status）中 mktemp 分支替换为立即失败（false），使 config.status 落入 autoconf 自带的可移植回退分支（tmp=./conf$$-$RANDOM + mkdir）；真机实证：替换后 `sh ./config.status` rc=0，全部 Makefile、config.h、依赖文件与 libtool 命令正常生成。补丁打在随源码分发的 configure 上而非构建期改 config.status：config.status --recheck 会从 configure 模板重新生成 config.status，运行期修改会被还原；回退分支为 autoconf 为无 mktemp 系统准备的原生路径，对 mktemp 可用的 host 行为等价"
+    patch_type: "portability"

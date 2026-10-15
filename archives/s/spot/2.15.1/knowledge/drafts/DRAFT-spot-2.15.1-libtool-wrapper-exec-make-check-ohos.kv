@@ -1,0 +1,55 @@
+#====================================================================
+# DRAFT-spot-2.15.1-libtool-wrapper-exec-make-check-ohos
+# OHOS upstream `make check` for libtool/automake projects: replace
+# wrapper scripts with real ELFs + absolute LD_LIBRARY_PATH, per-dir driver
+#====================================================================
+
+id:                     DRAFT-spot-2.15.1-libtool-wrapper-exec-make-check-ohos
+trigger_tool:           autotools|libtool|automake|make|conan
+phase:                  upstream-validation|target-runtime
+error_signature:        Permission denied|exit status: 127|Error relocating|Error loading shared library|./run: No such file or directory|make check
+severity:               2
+category:               autotools|upstream-tests|libtool|execve|harmonyos
+match_keywords:         make check, automake parallel-tests, libtool wrapper, .libs, LOG_COMPILER, LD_LIBRARY_PATH, musl, Error relocating, symbol not found, exit 126, exit 127, OHOS, HarmonyOS, spot
+title:                  OHOS upstream `make check` on libtool projects: convert wrapper scripts to real ELFs, export ABSOLUTE LD_LIBRARY_PATH, keep LOG_COMPILER per-directory
+
+root_cause:             Three layered OHOS constraints hit automake's parallel test harness:
+                        1) OHOS denies execve of any `#!` script (EACCES -> exit 126) even with exec bits set (hmdfs masks modes). The test driver directly execs test entries; compiled check_PROGRAMS are libtool wrapper scripts (real ELF in sibling .libs/), and plain *.test scripts are driven by the upstream `LOG_COMPILER=./run`, which is itself a `#!` script.
+                        2) In-place replacement of wrappers with their .libs real ELFs removes the wrapper's own LD_LIBRARY_PATH setup. It only works if the caller exports LD_LIBRARY_PATH covering every .libs directory, and those entries MUST be absolute: tests execute with cwd=<their own subdir>, so relative ./... entries resolve elsewhere -> musl `Error loading shared library libX.so` + `Error relocating ...: symbol not found` (exit 127).
+                        3) A blanket `make check LOG_COMPILER="/bin/sh ./run"` override breaks every subdir that has TESTS but ships no ./run (spot's buddy/src TESTS=bddtest): the driver then runs `sh ./run bddtest` -> `/bin/sh: ./run: No such file or directory` (exit 127), and check-recursive aborts the whole tree at that subdir before tests/ ever runs. Upstream sets LOG_COMPILER only where ./run exists.
+                        These three cover build/framework-time scripts. For scripts created AT RUNTIME by the test binaries and spawned via posix_spawn of `#!` (spot's ltlcross* `fake` translators), a suite needs the libc-level sibling fix: DRAFT-ohos-script-execve-denied-posix-spawn-shim.
+
+affected_scope:         C/C++ autotools+libtool projects whose upstream test suite is automake parallel-tests (compiled check_PROGRAMS and/or #!-script tests) executed on OHOS-class devices (no script execve; musl loader resolving libraries via LD_LIBRARY_PATH). Not applicable when make check runs on a Linux host from the cross tree.
+
+verification_cmd:       bash reports/run-upstream-tests.sh <spot-build-dir> [jobs]   # per-dir evidence round; final lines '[run-upstream-tests] buddy/src check rc=0' + '[run-upstream-tests] tests check rc=0', tests/check.log ends with '# FAIL: 0'
+
+rec_priority:           1
+rec_approach:           two-pass-wrapper-elf-conversion-absolute-libs-perdir-driver
+rec_description:        Pass A (build-only): `make check TESTS=` compiles all check_PROGRAMS without running cases. Then convert every libtool wrapper in place: for each .libs/<name>, if sibling <name> is executable and starts with `#!`, cp -f .libs/<name> over it (idempotent; already-ELF entries are skipped). Compute LIB dirs with the build dir as an ABSOLUTE path before any cd: `find "$B" -type d -name .libs` and export LD_LIBRARY_PATH as their colon-join. Pass B (evidence): run `make -k check` PER test subdir - where the project ships its own LOG_COMPILER driver (tests/: command-line `LOG_COMPILER="/bin/sh ./run"`, automake-official mechanism) and where it does not (buddy/src: default driver directly execs the converted real ELF). No upstream test logic is modified; all changes live in the build-tree copy.
+rec_command:            bash reports/run-upstream-tests.sh "$B" 4
+rec_auto_fix:           false
+rec_impl:               ohos-libtool-test-wrapper-conversion
+
+fallback_priority:      2
+fallback_approach:      record-suite-as-build-only
+fallback_description:   If a wrapper cannot be converted (contains more than env-setup/dirname/exec logic) or the suite cannot run on the device, record upstream tests as built-not-run (`make check TESTS=` rc=0 only, exit 126/127 seen at exec time) and state explicitly that runtime evidence is missing. Never report a host-side run as device evidence.
+fallback_command:       make -k check TESTS= && grep -c '^PASS:' check.log
+fallback_auto_fix:      false
+
+forbid_1_pattern:       make check.*(passed|PASS: *[0-9]+).*without.*(convert|conversion|LD_LIBRARY_PATH)
+forbid_1_reason:        On OHOS, unconverted libtool wrappers and cwd-relative LD_LIBRARY_PATH make the suite die at exec/load time (126/127), not at test logic; a pass claim without conversion+absolute env is not reproducible.
+forbid_1_consequence:   False upstream-validation evidence.
+
+forbid_2_pattern:       make check.*LOG_COMPILER=.*\$\{?SHELL\}? ./run.*(whole|all|recursive)|LOG_COMPILER=.*run.*all subdirs
+forbid_2_reason:        A recursive LOG_COMPILER override reaches subdirs without ./run (upstream sets it per-directory) and exits 127 before any test runs; check-recursive then aborts the tree at the first such subdir.
+forbid_2_consequence:   Only partial evidence; the main tests/ suite may never execute.
+
+doc_file:               archives/s/spot/2.15.1/knowledge/drafts/DRAFT-spot-2.15.1-libtool-wrapper-exec-make-check-ohos.md
+last_updated:           2026-10-04
+source_event:           spot/2.15.1 upstream full `make check` reproduction on OHOS PC real device (contrib task 10869)
+source_package:         archives/s/spot/2.15.1
+evidence:               reports/run-upstream-tests.sh, reports/upstream-test-run.md, reports/upstream-test.out (round 1: ./run 127 + musl relocating failures; round 2 after fixes: all green), conan-create.log (test_package 12/12), l2-smoke.log (L2 16/16 + codesign 20/20)
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     0.9
+draft:                  true

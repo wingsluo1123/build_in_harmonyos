@@ -1,0 +1,52 @@
+#====================================================================
+# DRAFT-ohos-toybox-grep-utf8-style-test-failure
+# OHOS default grep (toybox) ignores LC_ALL=C; GNU-grep-semantics style
+# tests false-positive on multibyte UTF-8 glyphs -> arm GNU grep for the run
+#====================================================================
+
+id:                     DRAFT-ohos-toybox-grep-utf8-style-test-failure
+trigger_tool:           grep|toybox|automake|make|make-check|sanity-test
+phase:                  upstream-validation|target-runtime
+error_signature:        Use << 'c' instead of << "c".|The following files contain style errors|is not GNU grep|exit status: 1
+severity:               2
+category:               grep|toybox|locale|upstream-tests|harmonyos
+match_keywords:         style.test, sanity, toybox grep, GNU grep, LC_ALL=C, LANG, UTF-8, multibyte, false positive, hnp, PATH, locale
+title:                  OHOS default grep (toybox) ignores LC_ALL=C: upstream style/sanity tests false-positive on multibyte UTF-8 glyphs; arm a GNU grep wrapper for the run
+
+root_cause:             Some upstream sanity/style checks are grep-rule-based and assume POSIX/GNU grep byte semantics under LC_ALL=C (the test itself exports LC_ALL=C for exactly this reason, and its source comment warns 'If some grep implementation ignores LC_ALL=C, this rule might be a problem on utf-8 characters such as "δ"'). The OHOS device default grep is toybox 0.8.12: it is UTF-8-aware regardless of LC_ALL=C, so a single-byte class such as [^\\] inside `<< *"\([^\\]\|\\.\)"` consumes one whole multibyte character and the rule matches string literals holding glyphs like U+2329 or U+0305 - a false positive that fails style.test although the tree is upstream-pristine. Note the matrix: GNU grep honors LC_ALL=C (byte semantics -> no match) and only matches characters in a UTF-8 locale; toybox matches in BOTH; busybox grep is byte-oriented in both. Reproducing with the wrong grep thus produces a device/toolchain artifact, not an upstream test defect.
+
+affected_scope:         Upstream test suites executed on OHOS devices that (a) contain grep-rule-based style/sanity checks (spots tests/sanity/style.test is one instance) and (b) invoke grep by name through PATH, while the device default grep is toybox (or any always-UTF-8 implementation). Applies to any run where the harness cannot avoid the default PATH; does not apply when a GNU grep already resolves first.
+
+verification_cmd:       LC_ALL=C <gnu-grep> -f <rule-file> <multibyte-sample>   # expect rc 1 (no match)
+                        LC_ALL=C <gnu-grep> -f <rule-file> <plain-char-sample>  # expect rc 0 (true positive kept)
+
+rec_priority:           1
+rec_approach:           arm-gnu-grep-private-wrapper-prepend-path
+rec_description:        Do not touch any upstream test file. Provide GNU grep to the run only: on this device /data/service/hnp/bin/grep is GNU grep 3.12. Copying it may be denied (SELinux lists hnp modi as exec-only), and prepending /data/service/hnp/bin itself would shadow sed/awk and the rest of the toolchain. Instead compile a 5-line execv wrapper (`v[0]="grep"; execv("<gnu-grep>", v);`) with the device clang into a private dir and prepend ONLY that dir to PATH for the duration of the suite. Detection uses the same probe the test itself uses: `grep --color=auto -n --version` (GNU -> rc 0, toybox -> rc 2). Verify with the rule file extracted verbatim from style.test plus one multibyte and one plain-char sample under LC_ALL=C.
+rec_command:            bash reports/run-upstream-tests.sh "$B" 4   # script self-arms the GNU grep wrapper; SPOT_GNU_GREP overrides the source path
+rec_auto_fix:           false
+rec_impl:               ohos-arm-hnp-gnu-grep
+
+fallback_priority:      2
+fallback_approach:      busybox-grep-as-second-choice
+fallback_description:   If no GNU grep exists on the device, a copy of busybox named `grep` gives byte-oriented semantics and supports \| alternation (measured on the same rule: no match on the glyph, match on the plain char), which is close to GNU under LC_ALL=C. However its BRE engine is not GNU, so state the tool substitution explicitly and treat the sanity result accordingly.
+fallback_command:       mkdir -p tb && cp /bin/busybox tb/grep && PATH=$PWD/tb:$PATH make -k check
+fallback_auto_fix:      false
+
+forbid_1_pattern:       export PATH=/data/service/hnp/bin:.*|PATH=/data/service/hnp/bin.*make check
+forbid_1_reason:        The hnp bin directory carries the whole GNU toolchain; prepending it wholesale shadows sed/awk/sh/linker tools and silently changes every later tool call, making results non-reproducible.
+forbid_1_consequence:   Unpinnable environment; failures or passes that cannot be attributed.
+
+forbid_2_pattern:       (patch|modify|sed|edit).*style\.test|skip.*style\.test.*(pass|ignore)
+forbid_2_reason:        The false positive is a device grep-semantics artifact, not a test defect; the upstream test must stay byte-identical (zero upstream test modifications), and declaring it passed/skipped under the mismatched grep would hide the real signal.
+forbid_2_consequence:   Either deviating from upstream tests or losing sanity coverage.
+
+doc_file:               archives/s/spot/2.15.1/knowledge/drafts/DRAFT-ohos-toybox-grep-utf8-style-test-failure.md
+last_updated:           2026-10-04
+source_event:           spot/2.15.1 upstream full `make check` reproduction on OHOS PC real device (contrib task 10869)
+source_package:         archives/s/spot/2.15.1
+evidence:               reports/run-upstream-tests.sh (GNU grep arming block), reports/upstream-test-run.md, reports/upstream-test.out (arming line + round results: 188/214 pass, 0 fail, 26 env-guard skips; check.log # PASS 187 / # SKIP 26 / # FAIL 0), round-5 style.test.log false-positive record (reports/style-v5-toybox-fp.log), measurement matrix toybox/GNU/busybox x locale
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     0.88
+draft:                  true

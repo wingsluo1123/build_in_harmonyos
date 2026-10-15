@@ -1,0 +1,57 @@
+software: spot
+# 版本级 manifest
+# 文件位置: archives/s/spot/2.15.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "2.15.1"
+
+# published | built | failed | archived
+# R29: conan_verify 通过后才可标记 published；本地 create 通过先标 built
+status: built
+
+build_date: "2026-10-04"
+build_system: autotools
+conan_ref: "spot/2.15.1"
+
+source:
+  url: "https://www.lre.epita.fr/dload/spot/spot-2.15.1.tar.gz"
+  sha256: "65013a2edf3f314854d7619888145f52c8dd36bfd27894d9db9b272d9a16ce4b"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--disable-python"
+    - "--build=aarch64-unknown-linux-musl"
+    - "--host=aarch64-unknown-linux-musl"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-unversioned-shared-libs.patch"
+  - "0002-autoconf-mktemp-fallback.patch"
+
+knowledge_gained:
+  - "OHOS hmdfs 上 autoconf（2.72 模板）config.status 的 mktemp 临时目录不可写：config.status 以 `(umask 077 && mktemp -d \"./confXXXXXX\")` 建 0700 目录放 awk 生成脚本，hmdfs 对该目录拒写（写 subs1.awk EACCES → Permission denied → Error 1；目录显示 drwx--S---，chmod 被 hmdfs 掩蔽无效，同 umask 下普通 mkdir 的目录反而可写）。适配：补丁替换 mktemp 分支为立即失败，走 autoconf 自带 mkdir 回退分支（真机实证 rc=0 全部生成）；三级 configure（顶层 + buddy/ltdl，后者经顶层 configure CONFIG_SUBDIRS 段 $SHELL 递归调用）各有一处，需全部修补；补丁须打在 configure 模板上——config.status --recheck 会从 configure 重新生成 config.status，运行期 sed 会被还原"
+  - "OHOS 运行时拒绝对含 #! 的脚本文件直接 execve（EACCES → sh 报 Permission denied、conan 报 Error 126）：同权限位（rwxrwx---）下 ELF 可执行而 `./configure` 被拒；新建 755 脚本同样被拒，chmod 至 777 仍被拒且 hmdfs 会把 modes 掩蔽回 770；`sh configure`、`bash script` 等显式解释路径正常。适配：Conan Autotools.configure 为直接 exec → 配方中改为经 shell 显式解释（复用 helper 自 toolchain json 读入的 _configure_args 保证参数逐字一致）；automake 测试框架默认直接 exec 测试驱动（spot 的 tests/ 驱动为 ./run）→ 全量 make check 复现时对 tests/ 各子目录按目录设置 `LOG_COMPILER=\"${SHELL} ./run\"`；不可全局覆盖——buddy/src 等目录也被套上会 127 并令 check-recursive 中止（上游 run 内部对 .test 本就用 `sh -x`）"
+  - "libtool 默认版本四元组：可安装共享库（lib_LTLIBRARIES + -rpath）未显式给 -version-info 时按 0:0:0 生成 libX.so.0.0.0 实体与 .so.0/.so 两级符号链接（spot.spec 中 libspot.so.0.0.0 的 chrpath 行为实证）；hmdfs 家目录 ln -s EPERM（PC/真机双端实测），autotools 侧平台等价物为 -avoid-version（先例 alsa-lib ALSA_LIBTOOL_VERSION_FLAGS=-avoid-version、libopusenc；cmake 侧 CMAKE_PLATFORM_NO_VERSIONED_SONAME），产出单文件 libX.so，SONAME 同名"
+  - "noinst 便利库（libgnu/libpico 及 spot 各子目录 14 个）经 libtool convenience 模式构建，不产生版本化共享产物，无需任何处理（ltmain.sh：version-info 对 convenience 库被忽略）"
+  - "OHOS 代码签名（E077）：构建/安装流程改写 ELF 后链接期自签名失效，须 llvm-objcopy --remove-section .codesign → binary-sign-tool sign -selfSign 1 → chmod 恢复权限位；package() 对包内全部 ELF 统一重签（先例 libwebp 1.6.0.1 _sign_shared_libs）"
+  - "构建环境：SHELL/CONFIG_SHELL 须指向真实存在的 shell（profile 钉的 /data/service/hnp/bin/bash 在部分 HMBS 主机缺失 → configure Error 127；save_script 加载顺序晚于 profile [buildenv]，可覆盖）；TMPDIR 必须可写（/tmp 只读 E002）"
+  - "spot 对 ltsmin 接口为环境自动探测：无 ltsmin 时关闭对应构建（tests/ltsmin 用例按上游 skip 机制处理）；--disable-python 关闭 SWIG 绑定，消除构建期 python 依赖"
+  - "libtool 在 bin/ 生成的工具是包装脚本：测试框架直接 exec build 树中的 wrapper 会失败 → 两遍法（先触发构建再 `cp -f .libs/<name> <name>` 覆回真身 ELF，幂等）；运行测试需 LD_LIBRARY_PATH 指向全部 33 个 .libs 绝对路径"
+  - "运行期生成的 #! 脚本（ltlcross/ltlcrossce/ltlcrossce2/ltlcrossgrind 的 fake 翻译器）由 posix_spawnp 直接 exec 触发 EACCES → LD_PRELOAD 垫片（reports/spot-shexec-shim.c）：路径含 / 时读 2 字节判 #! 并改写为 /bin/sh <script>、裸名先按 PATH 解析再同判、ELF 原样放行"
+  - "设备默认 grep 为 toybox 0.8.12：无视 LC_ALL=C（按字符而非字节匹配）→ 上游 tests/sanity/style.test 对多字节字形（〈/̅）字面量误报；适配=编译 5 行 execv 包装器到私有目录、仅前置该目录到 PATH（源用 /data/service/hnp/bin/grep 的 GNU 3.12；禁止整目录前置，会遮蔽 sed/awk）"
+
+test_result:
+  # 上游 automake testsuite 全量真机复现（tests/ 213 项 + buddy/src bddtest 1 项 = 214）
+  total: 214
+  passed: 188
+  failed: 0
+  skipped: 26
+  method: "上游 make check 全量真机执行；26 项跳过全部为上游环境守卫（18 核心 + 8 ltsmin），0 失败"
+  framework: "automake"
+  command: "make check -j4（经 reports/run-upstream-tests.sh 武装：按目录 LOG_COMPILER / 包装两遍法 / posix_spawn 垫片 / GNU grep）"
+  consumer_total: 12
+  consumer_passed: 12
