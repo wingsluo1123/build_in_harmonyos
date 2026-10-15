@@ -1,0 +1,41 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+#
+# mailx 8.1.2_git20220412 上游测试清点结论（R51 三步法）：
+#   上游源码包（bsd-mailx_8.1.2-0.20220412cvs.orig.tar.xz，53 个文件；
+#   与已合入 bsd-mailx/8.1.2-0.20220412cvs 同一归档）穷尽核查：
+#   - 无 tests/ 目录、无 test/check/regress 目标（Makefile 为 OpenBSD
+#     bsd.prog.mk，仅有 all/clean/install/distribution 目标）
+#   - 无测试源文件、无测试框架（gtest/ctest/pytest/autotest 均无）、
+#     文档中 "check" 均为功能描述而非测试命令
+#   → 上游测试用例 0；test_package 以自研功能测试集（test_mailx.py）补全覆盖
+#   （结论与已合入的 bsd-mailx 8.1.2-0.20220412cvs 审计一致）
+
+package: mailx/8.1.2_git20220412
+homepage: "https://salsa.debian.org/debian/bsd-mailx"
+
+# 上游测试是否存在（hmbs 机器证据硬门禁：no_tests 需同时给出审计）
+upstream_tests_exist: false
+upstream_test_audit: "审计 mailx 8.1.2_git20220412 上游归档（与 bsd-mailx 同源：https://salsa.debian.org/debian/bsd-mailx/-/archive/debian/8.1.2-0.20220412cvs-1.1/bsd-mailx-debian-8.1.2-0.20220412cvs-1.1.tar.gz，sha256 e1de87409b4c7040d57e793632af6d261b8833e4aec547d652c46563932327f6）：归档共 53 个文件，Makefile 为 OpenBSD bsd.prog.mk（仅 all/clean/install/distribution 目标，无 check/test 目标）；无 tests/ 目录、无测试源文件、无 gtest/ctest/pytest/autotest 测试框架。结论：上游无任何测试用例（discovered=0/executed=0），test_package 以自研功能测试集补全覆盖。"
+
+# 上游测试总数（显式审计结论：0；口径 auto：单一 make 构建系统，可解析目标枚举，无测试目标）
+upstream_test_total: 0
+upstream_test_count_method: "auto"
+
+# 上游测试命令（穷尽核查后确认上游无测试目标）
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（上游无测试，保持空）
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_mailx.py
+    description: "mailx 命令行功能测试：usage 输出 / 空 mailbox 处理 / mailbox 读取打印 / 版本 banner（9 个检查点，计数由检查函数显式累加）"
+    command: "python3 test_mailx.py <bin>/mailx"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 9
