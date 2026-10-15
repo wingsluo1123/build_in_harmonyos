@@ -1,0 +1,72 @@
+software: kbreakout
+version: "26.04.0"
+status: built
+package_type: application
+build_system: cmake
+created_at: 2026-10-15
+build_date: "2026-10-15"
+language: cpp
+description: "KDE 打砖块游戏（KBreakOut）——Qt6/KF6 QML 渲染图形应用，球场由 QQuickWidget 加载 src/qml/*.qml，基于 KDEGames6（libkdegames）"
+homepage: https://invent.kde.org/games/kbreakout
+upstream_source: https://download.kde.org/stable/release-service/26.04.0/src/kbreakout-26.04.0.tar.xz
+source_url: https://download.kde.org/stable/release-service/26.04.0/src/kbreakout-26.04.0.tar.xz
+source_sha256: "952d60415830052ad6854cb1665035a0aee65a54616fed97544e676bb510eb4e"
+license: GPL-2.0-or-later
+
+dependencies:
+  required:
+    - qtbase/6.11.1
+    - qtdeclarative/6.11.1
+    - qtsvg/6.11.1
+    - kconfig/6.18.0
+    - kconfigwidgets/6.18.0
+    - kcoreaddons/6.18.0
+    - kcrash/6.18.0
+    - kdbusaddons/6.18.0
+    - kdnssd/6.29.0
+    - ki18n/6.18.0
+    - kwidgetsaddons/6.18.0
+    - kxmlgui/6.18.0
+    - kiconthemes/6.18.0
+    - libkdegames/26.04.0.1
+  build:
+    - ecm/6.26.0
+  forced:
+    - karchive/6.18.0 (override=True: libkdegames 26.04.0.1 graph precedent — the newest kiconthemes/6.18.0 recipe revision requires karchive/6.19.0 which conflicts with knewstuff/6.18.0 (karchive/6.18.0))
+  optional:
+    - 7Zip (absent in the OHOS baseline; themes/ SVGZ generation falls back to gzip -9 -n -c)
+
+patches_applied:
+  - patches/0001-ohos-skip-kdoctools.patch
+  - patches/0002-canvaswidget-cpp-use-KLocalizedContext.patch
+
+test_results:
+  type: no_upstream_tests_consumer_verified
+  upstream: "none (N=0): the 26.04.0 release tarball has no tests/, autotests/ or test/ directory and no enable_testing()/add_test()/ecm_add_test() call in any CMakeLists.txt (find/grep evidence in reports/test-report.md §2.4); upstream QA runs through KDE CI source builds only"
+  test_package: "passed 4/4 consumer cases (6 assertions / 6 passed, 100%): (0) packaged bin/kbreakout exists and is executable; (1) --version -> 'kbreakout 26.04.0'; (2) --help -> 'A Breakout like game by KDE' + option table; (3a) --author -> upstream authors; (3b) --license -> GPL; (4) [OHOS-specific, non-assertion] shared-library closure load — the shipped binary is launched and the OHOS dynamic linker resolves all 24 DT_NEEDED entries (no 'cannot open shared object file' / 'undefined symbol'). Log: reports/conan-create.log ('ALL CONSUMER CASES PASSED (4 用例 / 6 断言)')"
+  package_id: "746c2160d3c6fe3986c11d7c780c535dfafc3126"
+  package_revision: "f0982e621f65cdcb49c68d20dfc3e649"
+  artifact_checks: "readelf -d bin/kbreakout -> 24 NEEDED entries, all plain basenames (no absolute/relative path; E537 normalization applied in package()); .codesign section present after re-sign; 4 LOAD segments (4K page layout)"
+  ohos_run: "passed: conan create + test_package executed natively on the HarmonyOS PC device (OHOS aarch64 profile)"
+
+platform_adaptations:
+  - "KF6 DocTools dropped from the REQUIRED component list plus add_subdirectory(doc) and kdoctools_install(po) removed (patch 0001): kdoctools is not part of the published KF6 6.18/6.26 closure and the DocBook handbook is not a runtime requirement (kblocks 26.04.0 / kfourinline 26.04.0 precedent)"
+  - "KF6::I18nQml is not published in the registry (ki18n 6.18.0 ships only libKF6I18n/libKF6I18nLocaleData, no qml/ dir): KLocalizedQmlContext replaced by the equivalent KLocalizedContext from KF6::I18n + KI18N_DISABLE_DEPRECATED_BEFORE_AND_AT=0 (patch 0002, alligator 26.04.0 precedent)"
+  - "KF_IGNORE_PLATFORM_CHECK=TRUE (KDE platform detection does not know OHOS)"
+  - "KF_SKIP_PO_PROCESSING=ON (translation catalog generation skipped; no gettext msgfmt toolchain needed for the deliverable)"
+  - "karchive/6.18.0 override=True pin (libkdegames 26.04.0.1 graph precedent)"
+  - "-Wl,-z,max-page-size=0x1000 appended to CMAKE_EXE_LINKER_FLAGS: the OHOS musl loader refuses the lld default 0x10000 multi-RW-LOAD layout (DRAFT-3888 audiocd precedent); a non-empty CMAKE_EXE_LINKER_FLAGS assigned in the toolchain makes CMake skip the *_INIT variable, so the flag is set directly"
+  - "ECM_MODULE_PATH + conan_cmakedeps_paths.cmake written manually (qtbase/KF6 packages use cmake_find_mode=none)"
+  - "package(): path-form DT_NEEDED entries normalized to bare basenames in place (.dynstr only, same length) and the ELF re-signed (llvm-objcopy --remove-section .codesign + binary-sign-tool -selfSign 1) — E537 absolute-DT_NEEDED leakage + E077 re-sign-after-dynstr-edit; 12 entries normalized on the reference build"
+  - "7Zip stays optional and absent: theme SVGZ generation uses the gzip -9 -n -c fallback of cmake/InternalMacros.cmake"
+
+known_issues:
+  - "R40 适配完整性：本包未对渲染/输入路径做任何 stub 或裁剪，但本次验证只覆盖「可执行文件加载 + QML 运行时依赖 closure 解析 + KAboutData/命令行接口」；QML 场景实际渲染、键盘/鼠标输入与音频输出需真机人工确认（本机无显示/音频环境），编译通过与消费者用例通过不等于渲染/交互适配已完整验证"
+  - "kbreakout is a GUI game: on a headless machine it needs QT_QPA_PLATFORM=offscreen for the metadata smoke; full gameplay requires a display/launcher environment"
+  - "QML i18n is served by KLocalizedContext (KF6::I18n) instead of KLocalizedQmlContext (KF6::I18nQml) until the I18nQml module is published; the QML-side i18n()/xi18n() API surface is identical"
+  - "LAN/highscore features of KDEGames6 depend on KDNSSD mDNS infrastructure on the target"
+
+knowledge_gained:
+  - "KF6::I18nQml (KLocalizedQmlContext / KLocalization::setupLocalizedContext) is not published in the registry; the deprecated KLocalizedContext API from KF6::I18n provides the same QML i18n context object mechanism — it requires KI18N_DISABLE_DEPRECATED_BEFORE_AND_AT=0 because ecm_set_disabled_deprecation_versions(KF 6.21.0) otherwise hides it (alligator 26.04.0 precedent, second instance)"
+  - "kbreakout 26.04.0 is a QML application: it needs qtdeclarative (Qt6::Qml/Qt6::Quick/Qt6::QuickWidgets) on top of the libkdegames closure; the QML scenes are installed to share/kbreakout/qml and resolved through QStandardPaths::AppDataLocation, so consumers must expose the package share dir via XDG_DATA_DIRS"
+  - "kbreakout 26.04.0 has no upstream test suite (no tests/autotests dir, no add_test/ecm_add_test in any CMakeLists) — consumer verification is the only verification path (R51 inventory evidence in reports/test-report.md)"
