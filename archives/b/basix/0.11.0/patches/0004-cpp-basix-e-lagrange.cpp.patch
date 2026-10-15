@@ -1,0 +1,25 @@
+--- a/cpp/basix/e-lagrange.cpp
++++ b/cpp/basix/e-lagrange.cpp
+@@ -376,21 +376,21 @@
+         for (std::size_t j = 0; j < nb[d]; ++j)
+           for (std::size_t k = 0; k < wts.size(); ++k)
+             mat(i, j) += wts[k] * bern(j, k) * phi(i, k);
+ 
+       impl::mdarray_t<T, 2> minv(mat.extents());
+       {
+         std::vector<T> id = math::eye<T>(nb[d]);
+         impl::mdspan_t<T, 2> _id(id.data(), nb[d], nb[d]);
+         impl::mdspan_t<T, 2> _mat(mat.data(), mat.extents());
+         std::vector<T> minv_data = math::solve<T>(_mat, _id);
+-        std::ranges::copy(minv_data, minv.data());
++        std::copy(minv_data.begin(), minv_data.end(), minv.data());
+       }
+ 
+       M[d] = std::vector<impl::mdarray_t<T, 4>>(
+           cell::num_sub_entities(celltype, d),
+           impl::mdarray_t<T, 4>(nb_interior[d], 1, npts, 1));
+       for (std::size_t e = 0; e < topology[d].size(); ++e)
+       {
+         auto [_entity_x, shape] = cell::sub_entity_geometry<T>(celltype, d, e);
+         impl::mdspan_t<T, 2> entity_x(_entity_x.data(), shape);
+         std::span<const T> x0(entity_x.data_handle(), shape[1]);

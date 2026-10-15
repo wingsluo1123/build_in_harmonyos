@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.21)
+project(BasixPackageConsumer LANGUAGES CXX)
+find_package(Basix CONFIG REQUIRED)
+add_executable(basix_consumer test.cpp)
+target_compile_features(basix_consumer PRIVATE cxx_std_23)
+target_link_libraries(basix_consumer PRIVATE Basix::basix)

@@ -1,0 +1,110 @@
+--- a/cpp/basix/quadrature.cpp
++++ b/cpp/basix/quadrature.cpp
+@@ -41,31 +41,31 @@
+ template <std::floating_point T>
+ std::array<std::vector<T>, 2> rec_jacobi(int N, T a, T b)
+ {
+   const T nu = (b - a) / (a + b + 2.0);
+   const T mu = std::pow(2.0, (a + b + 1)) * std::tgamma(a + 1.0)
+                * std::tgamma(b + 1.0) / std::tgamma(a + b + 2.0);
+ 
+   std::vector<T> n(N - 1);
+   std::iota(n.begin(), n.end(), 1.0);
+   std::vector<T> nab(n.size());
+-  std::ranges::transform(n, nab.begin(),
++  std::transform(n.begin(), n.end(), nab.begin(),
+                          [a, b](auto x) { return 2.0 * x + a + b; });
+ 
+   std::vector<T> alpha(N);
+   alpha.front() = nu;
+-  std::ranges::transform(nab, std::next(alpha.begin()), [a, b](auto nab)
++  std::transform(nab.begin(), nab.end(), std::next(alpha.begin()), [a, b](auto nab)
+                          { return (b * b - a * a) / (nab * (nab + 2.0)); });
+ 
+   std::vector<T> beta(N);
+   beta.front() = mu;
+-  std::ranges::transform(n, nab, std::next(beta.begin()),
++  std::transform(n.begin(), n.end(), nab.begin(), std::next(beta.begin()),
+                          [a, b](auto n, auto nab)
+                          {
+                            return 4 * (n + a) * (n + b) * n * (n + a + b)
+                                   / (nab * nab * (nab + 1.0) * (nab - 1.0));
+                          });
+ 
+   return {std::move(alpha), std::move(beta)};
+ }
+ //----------------------------------------------------------------------------
+ 
+@@ -267,22 +267,22 @@
+     wts[i] = a1 / (1.0 - x * x) / (f * f);
+   }
+ 
+   return {std::move(pts), std::move(wts)};
+ }
+ //-----------------------------------------------------------------------------
+ template <std::floating_point T>
+ std::array<std::vector<T>, 2> make_quadrature_line(int m)
+ {
+   auto [ptx, wx] = compute_gauss_jacobi_rule<T>(0.0, m);
+-  std::ranges::transform(wx, wx.begin(), [](auto w) { return 0.5 * w; });
+-  std::ranges::transform(ptx, ptx.begin(),
++  std::transform(wx.begin(), wx.end(), wx.begin(), [](auto w) { return 0.5 * w; });
++  std::transform(ptx.begin(), ptx.end(), ptx.begin(),
+                          [](auto x) { return 0.5 * (x + 1.0); });
+   return {std::move(ptx), std::move(wx)};
+ }
+ //-----------------------------------------------------------------------------
+ template <std::floating_point T>
+ std::array<std::vector<T>, 2> make_quadrature_triangle_collapsed(std::size_t m)
+ {
+   auto [ptx, wx] = compute_gauss_jacobi_rule<T>(0.0, m);
+   auto [pty, wy] = compute_gauss_jacobi_rule<T>(1.0, m);
+ 
+@@ -457,22 +457,22 @@
+   // Reorder to match 1d dof ordering
+   std::rotate(xs_ref.rbegin(), xs_ref.rbegin() + 1, xs_ref.rend() - 1);
+   std::rotate(ws_ref.rbegin(), ws_ref.rbegin() + 1, ws_ref.rend() - 1);
+   return {xs_ref, ws_ref};
+ }
+ //-----------------------------------------------------------------------------
+ template <std::floating_point T>
+ std::array<std::vector<T>, 2> make_gll_line(int m)
+ {
+   auto [ptx, wx] = compute_gll_rule<T>(m);
+-  std::ranges::transform(wx, wx.begin(), [](auto w) { return 0.5 * w; });
+-  std::ranges::transform(ptx, ptx.begin(),
++  std::transform(wx.begin(), wx.end(), wx.begin(), [](auto w) { return 0.5 * w; });
++  std::transform(ptx.begin(), ptx.end(), ptx.begin(),
+                          [](auto x) { return 0.5 * (x + 1.0); });
+   return {ptx, wx};
+ }
+ //-----------------------------------------------------------------------------
+ template <std::floating_point T>
+ std::array<std::vector<T>, 2> make_gll_quadrature(cell::type celltype,
+                                                   std::size_t m)
+ {
+   const std::size_t np = (m + 4) / 2;
+   switch (celltype)
+@@ -4961,21 +4961,21 @@
+     return make_macroedge_quadrature<T>(rule, celltype, m);
+   default:
+     throw std::runtime_error("Unsupported polyset type");
+   }
+ }
+ //-----------------------------------------------------------------------------
+ template <std::floating_point T>
+ std::vector<T> quadrature::get_gl_points(int m)
+ {
+   std::vector<T> pts = compute_gauss_jacobi_points<T>(0, m);
+-  std::ranges::transform(pts, pts.begin(),
++  std::transform(pts.begin(), pts.end(), pts.begin(),
+                          [](auto x) { return 0.5 + 0.5 * x; });
+   return pts;
+ }
+ //-----------------------------------------------------------------------------
+ template <std::floating_point T>
+ std::vector<T> quadrature::get_gll_points(int m)
+ {
+   return make_gll_line<T>(m)[0];
+ }
+ //-----------------------------------------------------------------------------
