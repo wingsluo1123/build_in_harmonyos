@@ -1,0 +1,19 @@
+--- a/iceoryx_meta/tests.cmake
++++ b/iceoryx_meta/tests.cmake
+@@ -23,6 +23,16 @@
+     find_package(GTest CONFIG REQUIRED)
+ 
+     ### create component list
++    # OHOS/conan adaptation: with TOML_CONFIG=OFF (cpptoml is not available in the
++    # artifact registry) the upstream `iceoryx_posh_config` target is not created,
++    # while the test CMakeLists link against it unconditionally.  Provide an empty
++    # interface stand-in so the *test binaries* still build; the runtime library
++    # set that is installed/exported is unaffected (ROUDI_EXPORT is empty).
++    if(NOT TOML_CONFIG)
++        add_library(iceoryx_posh_config INTERFACE)
++        add_library(iceoryx_posh::iceoryx_posh_config ALIAS iceoryx_posh_config)
++    endif()
++
+     set(COMPONENTS "hoofs" "posh")
+ 
+     ### possible place for more extensions

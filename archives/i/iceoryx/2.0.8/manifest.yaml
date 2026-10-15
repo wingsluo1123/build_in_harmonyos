@@ -1,0 +1,83 @@
+version: "2.0.8"
+status: built
+build_date: "2026-10-08"
+conan_ref: "iceoryx/2.0.8"
+
+source:
+  url: "https://github.com/eclipse-iceoryx/iceoryx/archive/refs/tags/v2.0.8.tar.gz"
+  sha256: "375b8e635185cd39821b676847bfe4c67f2ef70af9b598c00bd9e8d8e8659bd9"
+  tar_format: tar.gz
+  tar_entries: 1655
+
+build:
+  system: cmake
+  build_script_folder: "iceoryx_meta"
+  configure_options:
+    - "BUILD_SHARED_LIBS=ON  BINDING_C=ON  BUILD_TEST=ON  BUILD_STRICT=OFF  CCACHE=OFF"
+    - "TOML_CONFIG=OFF  DOWNLOAD_TOML_LIB=OFF  (cpptoml 不在制品仓；见 capability_reductions)"
+    - "INTROSPECTION=OFF (ncurses)  DDS_GATEWAY=OFF (cyclonedds+cpptoml)  EXAMPLES=OFF  SANITIZE=OFF"
+    - "CMAKE_SKIP_INSTALL_RPATH=ON  (交付库不得带构建机 RPATH)"
+    - "CMAKE_SHARED_LIBRARY_SONAME_CXX_FLAG=-Wl,-soname,  (OHOS 无 Platform/HarmonyOS.cmake，CMake 不会写 SONAME)"
+    - "UNIX=TRUE  (CMake 对未知 CMAKE_SYSTEM_NAME=HarmonyOS 不置 UNIX，而 iceoryx 用 if(UNIX)/if(LINUX) 选实现；本仓先例 allegro4/5、cling、i2pd、libfltk、log4cplus)"
+    - "OHOS: CMAKE_C/CXX_COMPILER_TARGET=<cpu>-unknown-linux-ohos"
+  dependencies:
+    - gtest/1.17.0.1
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-tests-use-conan-googletest.patch  (test harness：上游 tests.cmake 会在 configure 期 ExternalProject 下载 googletest；改为 find_package(GTest CONFIG REQUIRED) 用 conan 依赖)"
+  - "0002-tests-tolerate-toml-config-off.patch  (test harness：TOML_CONFIG=OFF 时上游不生成 iceoryx_posh_config 目标，但测试 CMakeLists 无条件链接它；补一个空 INTERFACE 替身，安装/导出集合不变)"
+  - "0003-tests-skip-toml-gateway-test.patch  (test harness：TOML_CONFIG=OFF 时把两个 TOML 单元测试从 GLOB 剔除，测试源文件本身未改)"
+
+adaptation_scope:
+  delivered:
+    - "lib/libiceoryx_platform.so         —— 平台抽象层"
+    - "lib/libiceoryx_hoofs.so            —— POSIX 封装 + cxx 容器/工具"
+    - "lib/libiceoryx_posh.so             —— 共享内存传输（pub/sub、chunk、RouDi 运行时库 iceoryx_posh_roudi）"
+    - "lib/libiceoryx_posh_roudi.so       —— RouDi 运行时库"
+    - "lib/libiceoryx_posh_gateway.so     —— gateway 库"
+    - "lib/libiceoryx_binding_c.so        —— C 语言绑定"
+    - "include/iceoryx/v2.0.8/**          —— 公共头（hoofs/posh/binding_c 三套）"
+    - "lib/cmake/iceoryx_{hoofs,posh,binding_c}/**  —— 上游安装的 CMake 包配置（非 conan 消费者可用）"
+    - "licenses/LICENSE + NOTICE.md        —— Apache-2.0 原文与上游 NOTICE"
+  capability_reductions:
+    - "**不交付 iox-roudi 可执行文件与 iceoryx_posh_config 库**：二者在上游 CMake 里都位于 if(TOML_CONFIG) 内。TOML_CONFIG=OFF 的原因是它唯一的依赖 cpptoml 在制品仓只有 manifest 占位、没有实际包（已实测 `conan list -r ohpc 'cpptoml/*'` 零命中），PF4 不允许本 PR 捎带该依赖。⇒ 运行时需要消费者用交付的 iceoryx_posh_roudi 库自行写 RouDi 主程序（上游测试用的 roudi_env 亦基于它）。**建议调度侧补一个 cpptoml 任务，之后本包改一行即可 TOML_CONFIG=ON 并补回 iox-roudi**。"
+    - "未构建 introspection 客户端（需 ncurses）与 DDS gateway（需 cyclonedds + cpptoml）——两者在制品仓均无对应依赖。"
+    - "不交付上游的 *_testing.a 与 benchmark 二进制（BUILD_TEST=ON 会安装它们，但它们是测试产物，不是交付物）"
+  runtime_notes:
+    - "iceoryx 运行期需要 POSIX 共享内存（/dev/shm）、POSIX 消息队列（/dev/mqueue）与 unix domain socket；build() 三项都会探测，探测失败时如实打印分类而不假装通过"
+    - "交付的 6 个 .so 在 OHOS 上逐个签名（加载器拒载未签名 .so）"
+
+test_results:
+  type: upstream + consumer + layout
+  upstream:
+    binaries: 5
+    cases_listed: 4974
+    executed: 4826
+    passed: 4826
+    failed: 0
+    skipped: 0
+    notes:
+      - "hoofs/hoofs_moduletests 2885 通过（列 2937，差额为上游 --gtest_filter=-*.TimingTest_* 过滤）"
+      - "posh/posh_moduletests 1603、posh/posh_integrationtests 78、binding_c/binding_c_moduletests 260 全部通过"
+      - "hoofs/hoofs_integrationtests：executed=0，但上游把全部 25 个用例都加了 DISABLED_ 前缀（gtest 报 “YOU HAVE 25 DISABLED TESTS”），配方逐个打印该事实，不计为通过"
+      - "测试二进制在 build 树内直接执行（上游用 custom target 而非 ctest）；执行时给 LD_LIBRARY_PATH 注入刚构建的库目录（OHOS 无 RPATH 兜底）"
+  consumer:
+    file: "test_package/test_package.cpp"
+    checks: 13
+    description: "真链接交付库：cxx::string/vector/optional/expected 的确定语义 + POSIX 共享内存往返（iceoryx 句柄写入，独立 POSIX 读者读回并核对字节与文件大小）"
+  layout_self_check:
+    file: "test_package/test_layout.py"
+    checks: 16
+    executed: 15
+    skipped: 1
+    skipped_detail: ".codesign 段检查仅在 os=OHOS 构建时执行（脚本显式打印平台限制）"
+
+knowledge_gained:
+  - "iceoryx 2.0.8 的 ICEORYX_CXX_STANDARD 只在 CMAKE_SYSTEM_NAME 匹配 Linux/QNX 时取 14，其余（含 HarmonyOS）取 17 ⇒ 用 gtest >= 1.17（要求 C++17）时，Linux 构建反而会失败而 OHOS 构建正常"
+  - "iceoryx 的构建入口是 iceoryx_meta/CMakeLists.txt（顶层无 CMakeLists.txt）⇒ conan 的 CMake helper 要 build_script_folder='iceoryx_meta'"
+  - "iceoryx 的上游测试入口是 custom target（make module_tests / integration_tests）而非 ctest；且 tests.cmake 会在 configure 期下载 googletest ⇒ 无网 worker 必须改走 find_package(GTest)"
+  - "iox-roudi 与 iceoryx_posh_config 都在 if(TOML_CONFIG) 内；cpptoml 缺失时 iceoryx 会退化成“只有库、没有守护进程”"
+  - "CMake 对未知 CMAKE_SYSTEM_NAME=HarmonyOS 不置 UNIX，而 iceoryx 用 if(UNIX) 选择 POSIX 实现 ⇒ 必须显式 -DUNIX=TRUE（本仓 7 个先例）"
+  - "iceoryx_hoofs 的 cxx::string 只用 string(const char (&)[N]) 接受字面量；运行期 const char* 需要 string(TruncateToCapacity_t, const char*)（否则编译报“no matching function”）"

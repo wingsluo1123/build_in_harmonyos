@@ -1,0 +1,59 @@
+# test_package/MANIFEST.yml
+package: iceoryx/2.0.8
+homepage: "https://iceoryx.io/"
+
+# 上游测试入口：iceoryx_meta/tests.cmake 注册的 custom target
+# （module_tests / integration_tests / all_tests），不是 ctest。
+upstream_check_command: "make module_tests integration_tests"
+
+upstream_test_in_build: true
+upstream_test_command: "make module_tests integration_tests (build() 内直接执行 gtest 二进制，过滤 -*.TimingTest_*)"
+
+upstream_tests:
+  - file: hoofs/test/hoofs_moduletests
+    source: iceoryx_hoofs/test/moduletests/*
+    description: "iceoryx_hoofs 模块测试（POSIX 封装、cxx 容器、expected/optional、共享内存…）"
+    command: "./hoofs/test/hoofs_moduletests --gtest_filter=-*.TimingTest_*"
+    cases_listed: 2937
+    executed: 2885
+    failed: 0
+  - file: posh/test/posh_moduletests
+    source: iceoryx_posh/test/moduletests/*
+    description: "iceoryx_posh 模块测试（publisher/subscriber/chunk/roudi_env 端到端 IPC——本包最强证据）"
+    command: "./posh/test/posh_moduletests --gtest_filter=-*.TimingTest_*"
+    cases_listed: 1649
+    executed: 1603
+    failed: 0
+  - file: posh/test/posh_integrationtests
+    source: iceoryx_posh/test/integrationtests/*
+    description: "iceoryx_posh 集成测试"
+    command: "./posh/test/posh_integrationtests --gtest_filter=-*.TimingTest_*"
+    cases_listed: 83
+    executed: 78
+    failed: 0
+  - file: binding_c/test/binding_c_moduletests
+    source: iceoryx_binding_c/test/moduletests/*
+    description: "C 语言绑定模块测试"
+    command: "./binding_c/test/binding_c_moduletests --gtest_filter=-*.TimingTest_*"
+    cases_listed: 280
+    executed: 260
+    failed: 0
+  - file: hoofs/test/hoofs_integrationtests
+    source: iceoryx_hoofs/test/integrationtests/*
+    description: "iceoryx_hoofs 集成测试：上游把全部 25 个用例加了 DISABLED_ 前缀（gtest 不执行），配方逐个打印该事实"
+    command: "./hoofs/test/hoofs_integrationtests --gtest_filter=-*.TimingTest_*"
+    cases_listed: 25
+    executed: 0
+    upstream_disabled: 25
+
+test_package_tests:
+  - file: test_package.cpp
+    description: "消费者用例：真链接交付的 iceoryx_posh/binding_c/hoofs，验证 cxx::string/vector/optional/expected 的确定语义（外部真值）与 POSIX 共享内存往返（写经 iceoryx 句柄，读由独立 POSIX 读者完成）"
+    command: "./test_package"
+    checks: 13
+  - file: test_layout.py
+    description: "交付形态自检（M）：6 个库的集合/soname/架构/无宿主路径、DT_NEEDED 链、.codesign（OHOS）、头文件树、Apache-2.0 原文、无测试产物与隐藏文件、CMake 与 pkg-config 契约、消费者 DT_NEEDED、裁剪负向检查"
+    command: "python3 test_layout.py ..."
+    checks: 16
+
+assertion_count: 29

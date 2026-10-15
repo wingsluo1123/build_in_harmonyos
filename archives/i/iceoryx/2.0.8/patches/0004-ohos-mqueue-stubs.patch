@@ -1,0 +1,198 @@
+diff -ruN a/iceoryx_hoofs/platform/unix/include/iceoryx_hoofs/platform/mqueue.hpp b/iceoryx_hoofs/platform/unix/include/iceoryx_hoofs/platform/mqueue.hpp
+--- a/iceoryx_hoofs/platform/unix/include/iceoryx_hoofs/platform/mqueue.hpp
++++ b/iceoryx_hoofs/platform/unix/include/iceoryx_hoofs/platform/mqueue.hpp
+@@ -17,9 +17,132 @@
+ #ifndef IOX_HOOFS_UNIX_PLATFORM_MQUEUE_HPP
+ #define IOX_HOOFS_UNIX_PLATFORM_MQUEUE_HPP
+ 
++#include <errno.h>
+ #include <mqueue.h>
++#include <sys/types.h>
++
++#if defined(IOX_NO_POSIX_MQ)
++
++// Compatibility fallback for C libraries whose <mqueue.h> only defines the
++// message queue types (`mqd_t`, `struct mq_attr`) without declaring - and
++// without implementing - a single mq_* function.  The generic POSIX platform
++// layer has to provide the whole interface itself then; the configure-time
++// probe in iceoryx_meta/CMakeLists.txt sets IOX_NO_POSIX_MQ only when
++// `mq_open` is not declared, so on any libc that has POSIX message queues this
++// file is identical to upstream.  Every call reports "not implemented"
++// (ENOSYS) instead of failing to compile or linking against a missing symbol;
++// iceoryx's posixCall wrapper turns that into a clean MessageQueueError.
++// (The mac/win platform layers use exactly the same technique.)
++//
++// <sys/types.h> is needed explicitly here: a <mqueue.h> without the mq_*
++// declarations does not pull in `mode_t` either.
++
++static inline mqd_t mq_open(const char* name, int oflag, ...)
++{
++    (void)name;
++    (void)oflag;
++    errno = ENOSYS;
++    return (mqd_t)-1;
++}
++
++static inline int mq_close(mqd_t mqdes)
++{
++    (void)mqdes;
++    errno = ENOSYS;
++    return -1;
++}
++
++static inline int mq_unlink(const char* name)
++{
++    (void)name;
++    errno = ENOSYS;
++    return -1;
++}
++
++static inline int mq_getattr(mqd_t mqdes, struct mq_attr* attr)
++{
++    (void)mqdes;
++    (void)attr;
++    errno = ENOSYS;
++    return -1;
++}
++
++static inline int mq_setattr(mqd_t mqdes, const struct mq_attr* newattr, struct mq_attr* oldattr)
++{
++    (void)mqdes;
++    (void)newattr;
++    (void)oldattr;
++    errno = ENOSYS;
++    return -1;
++}
++
++static inline int mq_notify(mqd_t mqdes, const struct sigevent* notification)
++{
++    (void)mqdes;
++    (void)notification;
++    errno = ENOSYS;
++    return -1;
++}
++
++static inline int mq_send(mqd_t mqdes, const char* msg_ptr, size_t msg_len, unsigned int msg_prio)
++{
++    (void)mqdes;
++    (void)msg_ptr;
++    (void)msg_len;
++    (void)msg_prio;
++    errno = ENOSYS;
++    return -1;
++}
++
++static inline ssize_t mq_receive(mqd_t mqdes, char* msg_ptr, size_t msg_len, unsigned int* msg_prio)
++{
++    (void)mqdes;
++    (void)msg_ptr;
++    (void)msg_len;
++    (void)msg_prio;
++    errno = ENOSYS;
++    return -1;
++}
++
++static inline int mq_timedsend(
++    mqd_t mqdes, const char* msg_ptr, size_t msg_len, unsigned int msg_prio, const struct timespec* abs_timeout)
++{
++    (void)mqdes;
++    (void)msg_ptr;
++    (void)msg_len;
++    (void)msg_prio;
++    (void)abs_timeout;
++    errno = ENOSYS;
++    return -1;
++}
++
++static inline ssize_t mq_timedreceive(
++    mqd_t mqdes, char* msg_ptr, size_t msg_len, unsigned int* msg_prio, const struct timespec* abs_timeout)
++{
++    (void)mqdes;
++    (void)msg_ptr;
++    (void)msg_len;
++    (void)msg_prio;
++    (void)abs_timeout;
++    errno = ENOSYS;
++    return -1;
++}
++
++static inline mqd_t iox_mq_open2(const char* name, int oflag)
++{
++    return mq_open(name, oflag);
++}
++
++static inline mqd_t iox_mq_open4(const char* name, int oflag, mode_t mode, struct mq_attr* attr)
++{
++    return mq_open(name, oflag, mode, attr);
++}
++
++#else
+ 
+ mqd_t iox_mq_open2(const char* name, int oflag);
+ mqd_t iox_mq_open4(const char* name, int oflag, mode_t mode, struct mq_attr* attr);
+ 
++#endif // defined(IOX_NO_POSIX_MQ)
++
+ #endif // IOX_HOOFS_UNIX_PLATFORM_MQUEUE_HPP
+diff -ruN a/iceoryx_hoofs/platform/unix/source/mqueue.cpp b/iceoryx_hoofs/platform/unix/source/mqueue.cpp
+--- a/iceoryx_hoofs/platform/unix/source/mqueue.cpp
++++ b/iceoryx_hoofs/platform/unix/source/mqueue.cpp
+@@ -16,6 +16,11 @@
+ 
+ #include "iceoryx_hoofs/platform/mqueue.hpp"
+ 
++// If the C library has no POSIX message queues at all (<mqueue.h> without the
++// mq_* declarations), the platform header provides self-contained ENOSYS stubs
++// - there is nothing to forward to then.
++#if !defined(IOX_NO_POSIX_MQ)
++
+ // NOLINTNEXTLINE(readability-identifier-naming)
+ mqd_t iox_mq_open2(const char* name, int oflag)
+ {
+@@ -27,3 +32,5 @@
+ {
+     return mq_open(name, oflag, mode, attr);
+ }
++
++#endif // !defined(IOX_NO_POSIX_MQ)
+diff -ruN a/iceoryx_meta/CMakeLists.txt b/iceoryx_meta/CMakeLists.txt
+--- a/iceoryx_meta/CMakeLists.txt
++++ b/iceoryx_meta/CMakeLists.txt
+@@ -34,6 +34,37 @@
+     endif()
+ endif()
+ 
++# ── POSIX message queue capability detection ────────────────────────────────
++# Some C libraries ship a <mqueue.h> that only defines the message queue types
++# (mqd_t, struct mq_attr) without declaring - and without implementing - any
++# mq_* function.  The generic POSIX platform layer
++# (iceoryx_hoofs/platform/unix) calls those functions directly, so the build
++# would stop with "use of undeclared identifier 'mq_open'".
++#
++# Whether the interface exists is a property of the C library, not of a
++# platform name, so probe it at configure time: compile (do not link - on such a
++# library the interface is neither declared nor implemented, and a link probe
++# would conflate "declared but not implemented" with "absent") a translation
++# unit that calls mq_open, and compile the ENOSYS fallback of the platform layer
++# instead when it is not available.
++include(CheckCXXSourceCompiles)
++set(_iox_try_compile_target_type "${CMAKE_TRY_COMPILE_TARGET_TYPE}")
++set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
++check_cxx_source_compiles("
++#include <mqueue.h>
++#include <sys/types.h>
++int main()
++{
++    mqd_t handle = mq_open(\"/iceoryx-mq-probe\", 0);
++    (void)handle;
++    return 0;
++}" IOX_HAS_POSIX_MQ_OPEN)
++set(CMAKE_TRY_COMPILE_TARGET_TYPE "${_iox_try_compile_target_type}")
++if(NOT IOX_HAS_POSIX_MQ_OPEN)
++    message(STATUS "iceoryx: <mqueue.h> declares no mq_open -> POSIX message queue stubs enabled")
++    add_compile_definitions(IOX_NO_POSIX_MQ=1)
++endif()
++
+ # ===== Core
+ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../iceoryx_hoofs ${CMAKE_BINARY_DIR}/hoofs)
+ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../iceoryx_posh ${CMAKE_BINARY_DIR}/posh)
