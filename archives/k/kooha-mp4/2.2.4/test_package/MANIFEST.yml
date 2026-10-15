@@ -1,0 +1,48 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（R51：上游测试三步法申报）
+
+package: kooha-mp4/2.2.4
+homepage: "https://github.com/Seadve/Kooha"
+
+# 上游测试命令（cargo 项目，无 make check / ctest / meson test 注册——
+# 上游 meson test 定义了 cargo-test/cargo-clippy/validate-desktop/
+# validate-appdata/validate-gschema 五个测试目标，全部经由 cargo 执行）
+upstream_check_command: "cargo test --release --target aarch64-unknown-linux-ohos"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "cargo test --release --target aarch64-unknown-linux-ohos --no-fail-fast"
+
+# 上游实际运行的测试程序（cargo 单元测试，静态统计 37 个 #[test] 宏）
+upstream_tests:
+  - file: "src/element_properties.rs (3), src/i18n.rs (4), src/pipeline.rs (5), src/profile.rs (4), src/settings.rs (1), src/window.rs (2), src/screencast_session/handle_token.rs (2), src/screencast_session/mod.rs (2), src/screencast_session/types.rs (3), src/screencast_session/variant_dict.rs (11)"
+    source: "Kooha-2.2.4/src/**/*.rs 内嵌 #[cfg(test)] 模块"
+    description: "上游单元测试（37 个 #[test]：纯逻辑用例全绿；需 gst 元素工厂的用例因发布链无 gst-plugins-good（vp8enc/x264enc/opusenc/lamemp3enc）与静态插件未注册而环境性失败，见 notes.md R51 申报）"
+    command: "cargo test --release --target aarch64-unknown-linux-ohos --no-fail-fast"
+
+# test_package 中自带的测试 (消费者视角)
+test_package:
+  - file: test.sh
+    description: "消费者冒烟测试：kooha --version 无头早退路径（patch 0001，zenity E252 先例）+ gresource 清单 + gschema --strict 编译 + 桌面/metainfo/locale 数据盘点"
+    command: "bash test.sh"
+
+# 鸿蒙特有测试 (HarmonyOS-specific)：断言产物在本平台可用所必需的特性
+harmonyos_specific_tests:
+  - file: test.sh
+    description: "鸿蒙特有测试 3 项（ELF machine = AArch64 / PT_INTERP = OHOS musl loader / .codesign 段存在——未签名 ELF 在 HarmonyOS 上无法 execve，正是配方 _sign_binaries() 修复的失败点）"
+    command: "bash test.sh (第 4 段)"
+    assertion_count: 3
+
+# 依赖测试 (dependency functional test)：本包链接的动态侧依赖
+# （gtk4/libadwaita/glib/gstreamer 静态档案）均通过 cargo 构建时的
+# system-deps/pkg-config 真实消费（链接期已验证符号闭合：gstreamer
+# 静态库 745 个 g_* 未定义符号全部由 glib/2.84 动态库满足，llvm-nm
+# 验证）；运行期 --version 冒烟路径不触碰 gst::init（gtk/gst 初始化
+# 需要显示会话），故未单列独立依赖探针程序。
+
+# 测试断言总数 (近似值, 用于质量评估)
+# 上游 cargo 测试 37（纯逻辑用例通过；工厂依赖用例环境性失败见 notes.md）
+# + test_package 消费者冒烟 3（--version / gresource / gschema）
+# + 鸿蒙特有测试 3（AArch64 / musl 解释器 / code signature）
+# + 数据盘点 1（desktop/metainfo/locale）
+assertion_count: 44

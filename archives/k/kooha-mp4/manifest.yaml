@@ -1,0 +1,32 @@
+# 版本级包清单 — kooha-mp4
+# 包级聚合元数据（每个软件一份）
+
+software: kooha-mp4
+display: "Kooha"
+description: "GNOME 极简录屏应用（GTK4）：WebM/MP4/Matroska/GIF 录制、麦克风与桌面音频捕获、区域选择"
+category: multimedia
+homepage: "https://github.com/Seadve/Kooha"
+license: GPL-3.0-or-later
+build_system: cargo
+
+ohos_adaptation:
+  key_points:
+    - "gtk4/4.22.4 为 Broadway-only 后端：gdk4-wayland/gdk4-x11 crate 裁除，WindowIdentifier 退化为空标识（portal parent_window 传空串合法）"
+    - "gtk4paintablesink 预览降级 fakesink + MemoryTexture 占位（paintable_rect 被 unwrap，占位纹理必须有具体尺寸）"
+    - "libpulse-binding/libpulse-glib-binding 裁除（pulseaudio/17.0 制品无 libpulse-mainloop-glib），音频设备发现保留 gstreamer DeviceMonitor 路径"
+    - "单一 GLib 运行时：gstreamer 静态档案 745 个 g_* 未定义符号全部由 glib/2.84.0.1.1 动态库满足（llvm-nm 验证），glib2/2.88.0 的 pkg-config 目录刻意排除出 PKG_CONFIG_PATH"
+    - "gettext 链接期缺口（sysroot libc.so 无 gettext 符号）由 identity shim libintl.a 填补（C locale 语义）+ GETTEXT_DIR/GETTEXT_STATIC=1"
+    - "Rust 工具链 rust-toolchain/1.97.1（tool_requires）+ rsproxy.cn sparse 镜像 + binary-sign-tool 自签（below/0.11.0 先例）"
+    - "meson 数据层由配方复现：glib-compile-resources/glib-compile-schemas/msgfmt 全部实测可用"
+  common_dependencies:
+    - libadwaita/1.7.12
+    - gtk4/4.22.4
+    - glib/2.84.0.1.1
+    - gstreamer/1.28.3
+    - gst-plugins-base/1.28.3
+
+versions:
+  "2.2.4":
+    status: built
+    build_date: "2026-10-04"
+    ref: "kooha-mp4/2.2.4"

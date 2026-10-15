@@ -1,0 +1,70 @@
+# 版本级 manifest — kooha-mp4 2.2.4
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "2.2.4"
+software: "kooha-mp4"
+status: built
+build_date: "2026-10-04"
+build_system: "cargo"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（官方源，R39）
+  url: "https://github.com/Seadve/Kooha/archive/refs/tags/v2.2.4.tar.gz"
+
+  # 源码校验和（双源实测 sha256，两次独立下载 cmp IDENTICAL）
+  sha256: "f5109ec1bf534fd7bf9387795ade5b2c5faf9c08f8bd72776e4931993b4fbca4"
+
+  # 压缩格式
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型（上游 Meson 驱动 cargo custom_target；配方绕过 meson
+  # 直接用 cargo 构建，数据层由配方复现——below/0.11.0 先例）
+  system: custom
+
+  # 配置选项列表（cargo 无 configure 选项）
+  configure_options: []
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - "libadwaita/1.7.12"
+    - "gtk4/4.22.4"
+    - "glib/2.84.0.1.1"
+    - "gstreamer/1.28.3"
+    - "gst-plugins-base/1.28.3"
+    - "orc/0.4.42"
+    - "libdrm/2.4.133"
+
+  # 构建期工具依赖（tool_requires）
+  build_tools:
+    - "rust-toolchain/1.97.1"
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-ohos-broadway-gtk4-only-adaptation.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "GTK4 Broadway-only 后端适配：gdk4-wayland/gdk4-x11 crate 裁除后 WindowIdentifier 退化为空标识（portal 请求 parent_window 传空串合法）；gtk4paintablesink 预览降级 fakesink+MemoryTexture 占位（paintable_rect 被 unwrap，占位纹理必须有具体尺寸）"
+  - "Rust+GTK4+GStreamer 组合的单一 GLib 运行时方案：gstreamer 静态制品的 745 个未定义 g_* 符号全部由 glib/2.84.0.1.1 动态库满足（llvm-nm 验证），glib2/2.88.0 只留作传递依赖且其 pkg-config 目录刻意排除出 PKG_CONFIG_PATH，避免 glib-2.0.pc 遮蔽造成双 GLib 运行时（GType 双注册崩溃）"
+  - "payload .pc 的 prefix=/ 改写聚合方案：conan 制品的 lib/pkgconfig/*.pc 全部 prefix=/，需逐 pc 改写为 payload 真实绝对路径并剔除 Requires.private 中缺失项后才能喂给 cargo 的 system-deps（PKG_CONFIG_LIBDIR 需清空防系统默认路径混入）"
+  - "OHOS gettext 链接期缺口：sysroot libc.so 不导出 gettext 族符号（运行时 ld-musl 有实现但 ld 找不到定义），gettext-sys 的 gettext-system 快速路径只认 *-gnu/*-musl triplet；解法=identity shim（libintl.a 返回 msgid 原样，C locale 语义）+ GETTEXT_DIR/GETTEXT_STATIC=1 静态链接"
+  - "GTK4 GUI 应用的无头验证路径（zenity E252 先例推广）：--version 在 gtk::init/gst::init/gresource 加载之前早退，可作为 test_package 的冒烟断言"
