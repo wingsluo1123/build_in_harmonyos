@@ -1,0 +1,49 @@
+# 版本级 manifest — sn 0.3.8
+# 文件位置: archives/s/sn/0.3.8/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "0.3.8"
+software: "sn"
+status: built
+build_date: "2026-10-14"
+build_system: "makefile"
+
+source:
+  # 上游源站（www.iki.fi/patrik/sn/，2004 年项目）已不再提供 0.3.8 归档；
+  # Debian pool 的 .orig.tar.gz 为纯净上游 tarball，https 权威镜像（R39，
+  # 同 jpegpixi 1.1.1 先例）。
+  url: "https://deb.debian.org/debian/pool/main/s/sn/sn_0.3.8.orig.tar.gz"
+  sha256: "e415a019c556ffbf148d052ee84cdb990a6385cb272f438013d448d90914d8e1"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options:
+    - 'make -j1 CC=$(clang) LD=$(clang) ZLIB="-L<zlib/1.3.1 libdir> -lz"（上游自有 make 体系；ZLIB 非空使 cc-flags 自动加 -DUSE_ZLIB 启用文章压缩；zlib 头文件在构建期拷入已在 -I 路径上的 lib/ 目录，不改源码）'
+  dependencies:
+    - zlib/1.3.1
+  cc: clang
+  cxx: ""
+
+patches_applied: [0001-portability-caddr_t-to-void.patch]
+
+knowledge_gained:
+  - "caddr_t 为 glibc 遗留类型（void* 别名，2004 年前代码常见）；musl/OHOS libc 不提供，移植需替换为 void *（语义等价，6 文件 9 处 munmap 强转）"
+  - "OHOS sysroot sys/select.h 的 FD_SET/FD_CLR 宏内联调用 __fd_chk(fd) 边界检查（fd 越界即 abort）：凡用 FD_SET/FD_CLR 的代码必然动态引用 __fd_chk。该符号由 OHOS 官方 musl 导出（openharmony/third_party_musl libc.map.txt 版本脚本条目），SDK sysroot libc 亦导出，设备端无缺失；本地 qemu 仿真 guest 旧 musl 无此符号，需 LD_PRELOAD guest 自带 libfdchkshim.so"
+  - "上游 Makefile 硬编码 ar/ranlib/strip（无 $(AR)/$(RANLIB) 变量）：交叉构建时宿主 GNU binutils 可直接处理目标架构对象（ar 仅打包、ranlib 建索引、strip 多架构），无需工具 shim"
+  - "上游 Makefile 的 cc-flags 无 CFLAGS 变量：编译期 include 路径注入只能靠把依赖头文件拷入已在 -I 路径上的 lib/ 目录（构建期操作，不改源码）"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /root/ohpcd-work/src/sn-0.3.8
+  source_work_dir: /root/ohpcd-work/sn-0.3.8.work
+  source_orig_hash: 965fe49b2aaf
+  source_work_hash: 1de98507eef4
+  generated_at: '2026-10-14T16:40:00'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-portability-caddr_t-to-void.patch
+    type: portability
+    platform_only: False
+    guard: 'none'
