@@ -1,0 +1,34 @@
+# 版本级 manifest
+# 文件位置: archives/x/xtrs/4.9d/manifest.yaml
+
+version: "4.9d"
+software: "xtrs"
+status: built
+build_date: "2026-10-12"
+build_system: "makefile"
+
+source:
+  url: "https://mirrors.aliyun.com/ubuntu/pool/multiverse/x/xtrs/xtrs_4.9d.orig.tar.gz"
+  sha256: "3985f2331e76198dfc027bc2afcd09a158d2bcad0348aeb4a4958a8fb99cf5c4"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options:
+    - 'CC=<OHOS clang，来自 tools.build:compiler_executables>'
+    - 'DEBUG="-O2"（上游默认 -O2 -g -Wall）'
+    - 'IFLAGS="-I<libx11 include> -I<xorgproto include>"'
+    - 'LDFLAGS="-L<libx11 lib>"  XLIB="-lX11"'
+    - 'READLINE= READLINELIBS=（关闭可选 readline/ncurses 调试器）'
+    - 'targets: xtrs mkdisk hex2cmd cmddump'
+  dependencies:
+    - libx11/1.8.13
+  cc: clang
+
+patches_applied:
+  - "0001-ohos-guard-linux-only-feature-blocks.patch"
+
+knowledge_gained:
+  - "OHOS clang 定义 __linux/__linux__/linux，厂商 #if __linux 特性块被误激活，拉入 Linux 专有头 <sys/soundcard.h>（OSS）、<linux/fd.h>/<linux/fdreg.h>（物理软驱）→ 编译期 fatal error；按能力探测收敛为 #if defined(__linux) && __has_include(<header>)（不以平台身份宏分支）"
+  - "X11 客户端的头来自两处：libX11（Xlib.h/Xutil.h/Xresource.h）与 xorgproto（keysym.h/keysymdef.h/X.h），后者是 libx11 的传递依赖，需自行聚合其 include 目录"
+  - "xtrs 模拟器为 X11 客户端，运行时必须有 X display（无 display 时打印 Unable to open display 退出）；仅 mkdisk/hex2cmd/cmddump 三个工具可无头运行"

@@ -1,0 +1,21 @@
+software: xtrs
+display: "xtrs"
+description: "基于 Z80 的 TRS-80 Model I/III/4/4P 模拟器（X11），含 mkdisk/hex2cmd/cmddump 工具"
+category: emulator
+homepage: "http://www.tim-mann.org/xtrs"
+license: Clarendon-Hill
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "OHOS clang 定义 __linux/__linux__/linux → 厂商 #if __linux 特性块被误激活，拉入 <sys/soundcard.h>/<linux/fd.h>；补丁按能力探测收敛（#if defined(__linux) && __has_include(<header>)，不以平台身份宏分支）"
+    - "X11 头来自 libX11 + 传递依赖 xorgproto（X11/keysym.h），构建时聚合依赖 include 目录"
+    - "依赖 libx11/1.8.13（制品仓预编译）"
+    - "xtrs 运行需 X display；消费者测试驱动 mkdisk/hex2cmd/cmddump 并验证 xtrs 可加载到显示初始化（5/5）"
+  common_dependencies:
+    - libx11/1.8.13
+
+versions:
+  - version: "4.9d"
+    status: built
+    build_date: "2026-10-12"
