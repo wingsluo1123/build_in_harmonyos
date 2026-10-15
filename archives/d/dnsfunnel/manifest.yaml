@@ -1,0 +1,28 @@
+# 软件级 manifest（跨版本共享；遵循 ARCHIVE-SPEC v2.0）
+software: dnsfunnel
+display: "dnsfunnel"
+description: "skarnet.org 本地 DNS 转发漏斗：dnsfunneld 守护进程按 caches 列表把本地 DNS 查询转发给上游解析器并回送响应，dnsfunnel-translate 从 resolv.conf 生成该缓存列表"
+category: tool
+homepage: "https://skarnet.org/software/dnsfunnel/"
+license: ISC
+package_type: application
+status: built
+
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "上游是 skarnet 自有 POSIX configure + GNU make（非 GNU autoconf），配方直接调用 configure/make，不使用 Conan Autotools 工具链"
+    - "依赖以包目录传入：--with-sysdeps=<skalibs>/lib/skalibs/sysdeps、--with-include/--with-lib 同时给 skalibs 与 s6-dns（s6-dns 自身配方是 application，cpp_info 不向消费者传播）"
+    - "OHOS clang 无默认 sysroot，configure 的链接探测需注入 --sysroot（OHOS_NATIVE_SYSROOT 优先、SDK glob 其次；两者皆空时配方显式 warning，不静默跳过）"
+    - "纯可执行包：package_type=application、无库产物，软件级提供 commands.json（R38）"
+    - "上游零注册测试（TEST_BINS 空、src/tests/ 不存在，N_static=0）；消费者测试 5 条断言覆盖 usage 契约、resolv.conf 解析、缺输入错误码、非特权端口监听就绪与端到端真实 DNS 转发"
+
+  common_dependencies:
+    - "skalibs/2.15.1.0"
+    - "s6-dns/2.4.1.0"
+
+versions:
+  "0.0.3.2":
+    status: built
+    build_date: 2026-10-08
