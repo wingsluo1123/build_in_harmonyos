@@ -1,0 +1,41 @@
+--- a/sklearn/meson.build
++++ b/sklearn/meson.build
+@@ -31,18 +31,28 @@
+     error('scikit-learn requires Cython>=' + cython_min_version + ', got ' + cython.version() + ' instead')
+   endif
+ 
+-  numpy_version = run_command(py,
+-    ['-c', 'import numpy; print(numpy.__version__)'], check: true).stdout().strip()
+-  numpy_min_version = run_command(py, ['_min_dependencies.py', 'numpy'], check: true).stdout().strip()
+-  if not numpy_version.version_compare('>=' + numpy_min_version)
+-    error('scikit-learn requires numpy>=' + numpy_min_version + ', got ' + numpy_version + ' instead')
++  numpy_probe = run_command(py,
++    ['-c', 'import numpy; print(numpy.__version__)'], check: false)
++  if numpy_probe.returncode() == 0
++    numpy_version = numpy_probe.stdout().strip()
++    numpy_min_version = run_command(py, ['_min_dependencies.py', 'numpy'], check: true).stdout().strip()
++    if not numpy_version.version_compare('>=' + numpy_min_version)
++      error('scikit-learn requires numpy>=' + numpy_min_version + ', got ' + numpy_version + ' instead')
++    endif
++  else
++    message('sklearn: numpy is not importable by the build interpreter (the OHOS\n            Conan build passes numpy C headers through the "numpy-include-dir" meson\n            property); skipping the build-time numpy version probe')
+   endif
+ 
+-  scipy_version = run_command(py,
+-    ['-c', 'import scipy; print(scipy.__version__)'], check: true).stdout().strip()
+-  scipy_min_version = run_command(py, ['_min_dependencies.py', 'scipy'], check: true).stdout().strip()
+-  if not scipy_version.version_compare('>=' + scipy_min_version)
+-    error('scikit-learn requires scipy>=' + scipy_min_version + ', got ' + scipy_version + ' instead')
++  scipy_probe = run_command(py,
++    ['-c', 'import scipy; print(scipy.__version__)'], check: false)
++  if scipy_probe.returncode() == 0
++    scipy_version = scipy_probe.stdout().strip()
++    scipy_min_version = run_command(py, ['_min_dependencies.py', 'scipy'], check: true).stdout().strip()
++    if not scipy_version.version_compare('>=' + scipy_min_version)
++      error('scikit-learn requires scipy>=' + scipy_min_version + ', got ' + scipy_version + ' instead')
++    endif
++  else
++    message('sklearn: scipy is a runtime-only dependency on OHOS (provided by the\n            target Python environment); skipping the build-time scipy version probe')
+   endif
+ 
+   # meson-python is required only when going through pip. Using meson directly

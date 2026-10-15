@@ -1,0 +1,42 @@
+# conandata.yml — scikit-learn 1.6.1
+# Source: official PyPI sdist (https://pypi.org/project/scikit-learn/1.6.1/)
+# The Tsinghua PyPI mirror serves the byte-identical artifact (same sha256) and is
+# the only PyPI endpoint reachable from CI workers (files.pythonhosted.org is
+# blocked by their network policy — same finding as numpy/2.5.2, PR #5882).
+sources:
+  url: "https://pypi.tuna.tsinghua.edu.cn/packages/9e/a5/4ae3b3a0755f7b35a280ac90b28817d1f380318973cff14075ab41ef50d9/scikit_learn-1.6.1.tar.gz"
+  filename: "scikit_learn-1.6.1.tar.gz"
+  sha256: "b4fc2525eca2c69a59260f583c56a7557c6ccdf8deafdba6e060f94c1c59738e"
+
+patches:
+  - patch_file: "patches/0001-ohos-tolerate-build-time-numpy-scipy-probe.patch"
+    patch_description: "meson.build: numpy/scipy build-time version probes must not abort when the build interpreter cannot import them (OHOS)"
+    patch_type: "portability"
+  - patch_file: "patches/0002-ohos-cython31-cpdef-enum-member-exports.patch"
+    patch_description: "_cython_blas.pyx: republish the named cpdef enum members at module level, which Cython >= 3.1 no longer exports (only 3.3.0 is available on OHOS)"
+    patch_type: "portability"
+
+# ---------------------------------------------------------------------------
+# Runtime Python dependencies (NOT Conan requirements — explained):
+#   scipy>=1.6.0        hard runtime dep (sklearn/__init__ version probe, and
+#                       scipy.linalg.cython_blas supplies the BLAS function
+#                       pointers that sklearn's Cython modules import at load).
+#                       Not published in the OHPCD Conan registry; the platform
+#                       ships it for HarmonyOS PC as an OHOS wheel
+#                       (pypi.cnb.cool/OpenHarmonyPCDeveloper/pypi: scipy-1.14.1
+#                       /-1.17.1-cp312-cp312-ohos_aarch64.whl) and the HNP
+#                       Python runtime has it in its site-packages.
+#                       Build-time need is DECLARATION-ONLY: 2 .pyx files
+#                       cimport SciPy declarations directly
+#                       (utils/_cython_blas.pyx: 11 scipy.linalg.cython_blas
+#                       pairs; tree/_criterion.pyx: scipy.special.cython_special
+#                       xlogy) and 6 more take the same BLAS entry points
+#                       through sklearn.utils._cython_blas; the
+#                       generated C resolves those symbols through
+#                       __Pyx_ImportFunction at import time, so scipy's .pxd is
+#                       vendored verbatim under pxd/ (15.6 KB, scipy 1.14.1,
+#                       BSD-3-Clause) instead of requiring a scipy build.
+#   joblib>=1.2.0       runtime dep, py3-none-any on the same OHOS index.
+#   threadpoolctl>=3.1.0 runtime dep, py3-none-any on the same OHOS index.
+# numpy is a real Conan requirement (see conanfile.py requirements()).
+# ---------------------------------------------------------------------------

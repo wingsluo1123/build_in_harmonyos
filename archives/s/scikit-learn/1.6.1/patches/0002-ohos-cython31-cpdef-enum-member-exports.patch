@@ -1,0 +1,18 @@
+--- a/sklearn/utils/_cython_blas.pyx
++++ b/sklearn/utils/_cython_blas.pyx
+@@ -231,3 +231,15 @@
+ 
+     _gemm(order, ta, tb, m, n, k, alpha, &A[0, 0],
+           lda, &B[0, 0], ldb, beta, &C[0, 0], ldc)
++
++# Cython >= 3.1 exports a named `cpdef enum` only as an enum class; its members
++# are no longer published as module-level names.  Upstream (and downstream Cython
++# consumers) still import them directly -- e.g. sklearn/utils/tests/test_cython_blas.py
++# does `from sklearn.utils._cython_blas import ColMajor, NoTrans, RowMajor, Trans`
++# -- which raises ImportError under the only Cython available on this platform
++# (3.3.0, both in the OHPCD Conan registry and in the OHOS wheel index).
++# Republish the members on the module without changing their values.
++for _blas_enum in (BLAS_Order, BLAS_Trans):
++    globals().update(
++        {_blas_member.name: _blas_member for _blas_member in _blas_enum})
++del _blas_enum

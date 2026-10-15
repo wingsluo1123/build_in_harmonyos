@@ -1,0 +1,174 @@
+# 版本级 manifest — archives/s/scikit-learn/1.6.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "1.6.1"
+software: "scikit-learn"
+
+# 编译状态：published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-14"
+build_system: meson
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # conanfile.py source() 实际下载的 URL（conandata.yml 为唯一真值）
+  url: "https://pypi.tuna.tsinghua.edu.cn/packages/9e/a5/4ae3b3a0755f7b35a280ac90b28817d1f380318973cff14075ab41ef50d9/scikit_learn-1.6.1.tar.gz"
+  sha256: "b4fc2525eca2c69a59260f583c56a7557c6ccdf8deafdba6e060f94c1c59738e"
+  tar_format: tar.gz
+  # 说明：官方 PyPI sdist 的同一份字节（files.pythonhosted.org 同 sha256）。
+  # CI worker 网络策略阻断 files.pythonhosted.org，清华镜像是唯一可达端点，
+  # 与 numpy/2.5.2（PR #5882）同一结论。
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: meson
+  configure_options:
+    - "meson setup <builddir> <src> --prefix=<package_folder> --buildtype=release --native-file=ohos-native.ini"
+    - "--native-file: [binaries] clang/clang++/llvm-ar/llvm-strip/llvm-objcopy/ninja 全部指向 OHOS SDK (ohos-sdk_26.0.0.18)"
+    - "--native-file: [properties] numpy-include-dir = <numpy/2.5.2 package_folder>/include/numpy"
+    - "--native-file: [built-in options] c/cpp_link_args = ['-L<python libdir>', '-lpython3.12']（musl E004：解释器符号不导出给 dlopen 对象）"
+    - "--native-file: [host_machine] system=Linux / cpu_family=aarch64 / cpu=aarch64，build 与 host 完全相同（本机编译 + exe_wrapper 校验）"
+  dependencies:
+    - "numpy/2.5.2"        # host requires：C 头 + numpy/__init__.pxd + 运行期同一份 numpy
+    - "python/3.12.9"      # tool_requires：构建/校验解释器，EXT_SUFFIX 为 .cpython-312-aarch64-linux-ohos
+    - "meson/1.11.0"       # tool_requires
+    - "ninja/1.12.1"       # tool_requires
+    - "cython/3.3.0"       # tool_requires
+  cc: "clang (OHOS SDK aarch64-linux-ohos)"
+  cxx: "clang++ (OHOS SDK aarch64-linux-ohos)"
+
+# 构建产物规模（由本配方在真机/CI-sim 各构建一次，两次一致）
+build_output:
+  ninja_targets: 251
+  extension_modules: 68          # sklearn/**/*.so，全部由 package() 重新签名
+  openmp: "detected, version 5.0 (meson required:false)"
+
+# ============================================================
+# 运行期依赖（不是 Conan requires；由目标 Python 环境提供）
+# ============================================================
+
+runtime_dependencies:
+  - "numpy>=1.19.5（上游 pyproject 声明；制品仓已有 numpy/2.5.2，本配方直接 requires）"
+  - "scipy>=1.6.0（构建期只需 .pxd 声明，见 pxds/；运行期由平台 OHOS wheel 提供：scipy-1.14.1/-1.17.1-cp312-cp312-ohos_aarch64.whl @ pypi.cnb.cool/OpenHarmonyPCDeveloper/pypi）"
+  - "joblib>=1.2.0（纯 Python，同一平台 OHOS 索引有 py3-none-any / ohos wheel）"
+  - "threadpoolctl>=3.1.0（纯 Python，同上）"
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "patches/0001-ohos-tolerate-build-time-numpy-scipy-probe.patch"
+  - "patches/0002-ohos-cython31-cpdef-enum-member-exports.patch"
+
+# ============================================================
+# 上游测试真实运行结果
+# ============================================================
+# upstream_test_in_build=false（见 test_package/MANIFEST.yml 中的原因说明），
+# 全量套件在真机离线执行：把本配方 conan create 产出的那份 package 目录（含补丁 0001/0002、
+# 由 cython/3.3.0 构建的 68 个已签名扩展）整树复制到 ~/.tmp/test-install-ohos-scikit-learn-1.6.1/，
+# 逐目录 pytest --junitxml，34 个目录并行（6 路），聚合脚本直接求和 JUnit 属性。
+# 注：本轮计数是在**将要交付的产物**上重测的；更早一轮（tmp/sktest/）来自另一条工具链的产物，
+# 在 Cython 换代后不再能描述本制品，故弃用。
+upstream_test_run:
+  date: "2026-10-14"
+  command: "python3 -m pytest <site-packages>/sklearn/<MODULE>/tests -q -rf --no-header --tb=short -o addopts='' --junitxml=<MODULE>.xml"
+  modules: 34
+  collected: 37832
+  passed: 32137
+  failed: 0
+  errors: 0
+  skipped: 5544
+  xfailed: 151
+  xpassed: 75
+  pass_rate: "100.00%（0 failed / 0 errors，非跳过用例全部通过）"
+  run_environment: "HarmonyOS PC aarch64 (HongMeng Kernel 1.13.0)；CPython 3.12.9 musl 端口；numpy 2.2.1 + scipy 1.14.1 + joblib 1.4.2 + threadpoolctl 3.5.0（均为平台 OHOS wheel）；被测试的 sklearn 目录树由本配方 meson+ninja+Cython 构建产出"
+  # 逐目录计数见 test_package/MANIFEST.yml::upstream_tests（由同一批 JUnit XML 生成）
+  skip_reason_breakdown:
+    pandas: 1521
+    torch: 983
+    "float32 需 SKLEARN_RUN_FLOAT32_TESTS=1": 792
+    "array-api (array_api_compat / strict / cupy)": 660
+    matplotlib: 450
+    "upstream 条件跳过（估计器/参数组合不支持、内存/配置门控）": 382
+    polars: 337
+    numpydoc: 225
+    lightgbm: 100
+    network: 67
+    PyAMG: 18
+    pyarrow: 5
+    PIL: 4
+  skip_reason_conclusion: "全部 5544 个跳过 + 151 个 xfail 均为上游 pytest 自带的
+    optional-dependency / 环境门控（skip 的 message 直接取自 JUnit，分类见上表），
+    与本次 OHOS 适配无关；无任何因移植导致的 skip 或 fail。"
+  reruns:
+    - "sklearn/datasets/tests 首轮报 4 errors（'fixture cache not found'）——根因是本次
+       执行脚本自加的 -p no:cacheprovider 参数与该目录的 cache fixture 冲突，不是产品缺陷。
+       去掉该参数单独重跑后 238 passed / 246 skipped / 0 failed / 0 errors
+       （证据 tmp/sktest2/rerun/datasets.log），JUnit XML 已用重跑结果覆盖。"
+
+# ============================================================
+# test_package 验证结果
+# ============================================================
+test_package_run:
+  consumer_checks: 12          # test_sklearn.py，真机 12/12 PASS
+  ohos_checks_live: 9          # test_ohos_platform.py：6 静态 + 3 运行期，真机 9/9 PASS
+  ohos_checks_static_only: 6   # E212 沙箱（无法 dlopen 用户路径）下的静态回退通道
+  markers: "HMBS_TEST_PACKAGE_RESULT（discovered/passedCount 由脚本 --json 输出，配方校验后透传）"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "OHOS E004（musl）：dlopen 的扩展拿不到解释器符号，必须显式 -lpython3.12；用纯 stdlib 解析 ELF 的 DT_NEEDED 即可批量验证 68 个扩展（不依赖 readelf，因 E212 沙箱里连 dlopen 都不允许）。"
+  - "OHOS E077：DevBox lld 会自动带 .codesign，CI lld 不会，故 package() 必须对每个打包 .so 执行 llvm-objcopy --remove-section .codesign → binary-sign-tool -selfSign 1 → chmod a+x，且重复执行幂等。"
+  - "SciPy 未发布到 OHPCD Conan 制品仓，但 sklearn 构建期对它只有『声明依赖』：只有 utils/_cython_blas.pyx 与 tree/_criterion.pyx 直接 cimport SciPy，Cython 生成 __Pyx_ImportFunction 在 import 期取符号，因此扩展的 DT_NEEDED 里没有 BLAS。vendor 两个 .pxd（BSD-3-Clause，声明文件，不编译不链接不安装）即可让 CI 离线构建。"
+  - "目标解释器能 import scipy 时应优先用真实 SciPy 自带的 .pxd（无版本漂移），vendor 目录只作回退——配方里 _scipy_declaration_root() 实现这条优先级。"
+  - "上游 meson.build 的 numpy/scipy 版本探测用 run_command() 且默认 check:true，构建解释器缺包时直接 fatal；portability 补丁改为 check:false + returncode() 判断，可导入时仍是权威判据。"
+  - "Conan 2：tool_requires 只能在 self.dependencies.build[name] 取到，host 上下文 self.dependencies[name] 会 KeyError；self.dependencies 也没有 .keys()。"
+  - "Conan 2：export_sources 的内容落在 <cache>/p/<hash>/es/，配方里要用 self.export_sources_folder 回落 self.recipe_folder 才能同时适配 export 后与本地路径。"
+  - "调用目标解释器做任何探测之前就必须先备好 LD_LIBRARY_PATH（musl 版 libpython3.12.so.1.0 在 <pyroot>/py/lib），否则连 python3.12 -c 都起不来。"
+  - "sklearn 1.6.1 的 OpenMP 辅助函数是 _openmp_parallelism_enabled/_openmp_effective_n_threads(n)，≥1.7 才导出 get_num_threads/set_num_threads/openmp_enabled/get_thread_limit；且 OMP_NUM_THREADS 不是每次调用重读，配方测试不能声称 honoring env。"
+  - "Cython >= 3.1 起，具名 cpdef enum 只导出 enum 类本身，不再把成员平铺到模块级：sklearn/utils/_cython_blas.pyx 的 ColMajor/RowMajor/NoTrans/Trans 因此在 3.3.0 下 import 失败，上游 test_cython_blas.py 直接在收集阶段报错。OHOS 制品仓与平台 pip 索引都只有 3.3.0，降版本不是选项，只能补丁重新发布成员。"
+  - "构建期与校验期的 Python 都必须显式 tool_requires 平台 CPython：worker PATH 上的 /data/service/hnp/bin/python3 EXT_SUFFIX 是 '.cpython-312.so'，用它驱动 meson 会给扩展打上错误 ABI 标签，而静态通道若改用它的解释器做基线，又会把 68 个正确命名的 .so 全判成缺陷。校验顺序应为『先验证候选解释器的 EXT_SUFFIX，再拿它当基线』。"
+  - "meson install 不产出 wheel 的 *.dist-info/METADATA，包完整性校验应改用 sklearn/__init__.py 的 __version__ 与子包存在性。"
+  - "平台 pip 索引 pypi.cnb.cool/OpenHarmonyPCDeveloper/pypi 确实提供 ohos_aarch64 wheel（scipy 1.14.1/1.17.1、torch、joblib、threadpoolctl、scikit_learn 1.8+、skorch 1.4.0）。判断 Python 库能否适配 OHOS 时不能只看 Conan 制品仓，必须同时查该平台 pip 索引，否则会误判为『依赖不可得』。"
+
+# ============================================================
+# 本 PR 随附的知识草稿（路径 B：适配 + 知识条目同 PR）
+# ============================================================
+
+knowledge_ref:
+  - "DRAFT-scikit-learn-1.6.1-cython-pxd-vendoring"
+  - "DRAFT-static-artifact-count-pinning"
+  - "DRAFT-cython-3-1-cpdef-enum-members-not-module-level"
+
+knowledge_drafts:
+  - id: "DRAFT-scikit-learn-1.6.1-cython-pxd-vendoring"
+    files:
+      - "knowledge/drafts/DRAFT-scikit-learn-1.6.1-cython-pxd-vendoring.md"
+      - "knowledge/drafts/DRAFT-scikit-learn-1.6.1-cython-pxd-vendoring.kv"
+    summary: "Cython 跨包 cimport 只需声明文件：SciPy 不在 Conan 制品仓时逐字 vendor 所需 .pxd 并用 --include-dir 喂给编译器，同时把上游 meson 的 numpy/scipy 版本探测从 check:true 改为非致命；真实可 import 的 SciPy 优先，声明文件不编译不链接不安装。"
+  - id: "DRAFT-static-artifact-count-pinning"
+    files:
+      - "knowledge/drafts/DRAFT-static-artifact-count-pinning.md"
+      - "knowledge/drafts/DRAFT-static-artifact-count-pinning.kv"
+    summary: "『枚举产物 + 逐文件断言』的静态校验通道必须把产物总数钉成构建系统已知值：本例移走 1 个扩展后 6 项静态检查仍全绿（67/67），加入 EXPECTED_EXTENSIONS=68 后才让 L1e 破坏性反向验证具备判别力。"
+  - id: "DRAFT-cython-3-1-cpdef-enum-members-not-module-level"
+    files:
+      - "knowledge/drafts/DRAFT-cython-3-1-cpdef-enum-members-not-module-level.md"
+      - "knowledge/drafts/DRAFT-cython-3-1-cpdef-enum-members-not-module-level.kv"
+    summary: "Cython ≥ 3.1 不再把具名 cpdef enum 的成员平铺到模块级（官方 CHANGES 3.1.0rc1），而 OHOS 制品仓与平台 pip 索引只有 3.3.0：conan create 全绿、68 个扩展 ELF/ABI 全合规，破坏只在 import 期出现（上游 test_cython_blas.py 收集阶段 ImportError）。补丁在 .pyx 末尾按官方建议回填成员，并要求换代后在将要交付的产物上重跑上游计数。"
