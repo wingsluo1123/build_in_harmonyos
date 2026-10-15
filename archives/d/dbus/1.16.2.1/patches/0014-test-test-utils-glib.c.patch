@@ -1,0 +1,58 @@
+--- a/test/test-utils-glib.c
++++ b/test/test-utils-glib.c
+@@ -624,34 +624,55 @@
+   gboolean *result = user_data;
+ 
+   g_assert (result != NULL);
+   g_assert (!*result);
+   *result = TRUE;
+ }
+ 
+ void
+ test_kill_pid (GPid pid)
+ {
++#ifndef DBUS_WIN
++  int status;
++  pid_t reaped;
++
++  /* This helper owns exactly the child returned by spawn. Use the portable
++   * POSIX termination status rather than relying on child-watch readiness
++   * being equivalent to a successful reap on every supported POSIX runtime.
++   * The original enclosing test timeout still bounds this wait. */
++  g_assert_cmpint (pid, >, 0);
++  if (kill (pid, SIGTERM) != 0 && errno != ESRCH)
++    g_error ("kill owned test child: %s", g_strerror (errno));
++
++  do
++    reaped = waitpid (pid, &status, 0);
++  while (reaped < 0 && errno == EINTR);
++
++  if (reaped != pid)
++    g_error ("waitpid owned test child: %s", g_strerror (errno));
++  g_assert_true (WIFEXITED (status) || WIFSIGNALED (status));
++#else
+   gint died = FALSE;
+ 
+   g_child_watch_add (pid, pid_died, &died);
+ 
+ #ifdef DBUS_WIN
+   if (pid != NULL)
+     TerminateProcess (pid, 1);
+ #else
+   if (pid > 0)
+     kill (pid, SIGTERM);
+ #endif
+ 
+   while (!died)
+     g_main_context_iteration (NULL, TRUE);
++#endif
+ }
+ 
+ static gboolean
+ time_out (gpointer data)
+ {
+   puts ("Bail out! Test timed out (GLib main loop timeout callback reached)");
+   fflush (stdout);
+   abort ();
+   return FALSE;
+ }

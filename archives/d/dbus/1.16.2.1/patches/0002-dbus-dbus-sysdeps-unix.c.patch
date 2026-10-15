@@ -1,0 +1,68 @@
+--- a/dbus/dbus-sysdeps-unix.c
++++ b/dbus/dbus-sysdeps-unix.c
+@@ -139,21 +139,21 @@
+ #   define CMSG_SPACE(len) (CMSG_ALIGN (sizeof (struct cmsghdr)) + \
+                             CMSG_ALIGN (len))
+ # endif
+ 
+ # ifndef CMSG_LEN
+ #   define CMSG_LEN(len) (CMSG_ALIGN (sizeof (struct cmsghdr)) + (len))
+ # endif
+ 
+ #endif /* Solaris */
+ 
+-#if defined(__linux__) && defined(__NR_close_range) && !defined(HAVE_CLOSE_RANGE)
++#if defined(__linux__) && !defined(DBUS_DISABLE_CLOSE_RANGE) && defined(__NR_close_range) && !defined(HAVE_CLOSE_RANGE)
+ /* The kernel headers are new enough to have the close_range syscall,
+  * but glibc isn't new enough to have the syscall wrapper, so call the
+  * syscall directly. */
+ static inline int
+ close_range (unsigned int first,
+              unsigned int last,
+              int flags)
+ {
+   return syscall (__NR_close_range, first, last, flags);
+ }
+@@ -4955,40 +4955,40 @@
+ }
+ #endif
+ 
+ /**
+  * Closes all file descriptors except the first three (i.e. stdin,
+  * stdout, stderr).
+  */
+ void
+ _dbus_close_all (void)
+ {
+-#ifdef HAVE_CLOSE_RANGE
++#if defined(HAVE_CLOSE_RANGE) && !defined(DBUS_DISABLE_CLOSE_RANGE)
+   if (close_range (3, INT_MAX, 0) == 0)
+     return;
+ #endif
+ 
+ #if CLOSEFROM_SIGNAL_SAFE
+   closefrom (3);
+ #else
+   act_on_fds_3_and_up (close_ignore_error);
+ #endif
+ }
+ 
+ /**
+  * Sets all file descriptors except the first three (i.e. stdin,
+  * stdout, stderr) to be close-on-execute.
+  */
+ void
+ _dbus_fd_set_all_close_on_exec (void)
+ {
+-#if defined(HAVE_CLOSE_RANGE) && defined(CLOSE_RANGE_CLOEXEC)
++#if defined(HAVE_CLOSE_RANGE) && defined(CLOSE_RANGE_CLOEXEC) && !defined(DBUS_DISABLE_CLOSE_RANGE)
+   if (close_range (3, INT_MAX, CLOSE_RANGE_CLOEXEC) == 0)
+     return;
+ #endif
+ 
+   act_on_fds_3_and_up (_dbus_fd_set_close_on_exec);
+ }
+ 
+ /**
+  * **NOTE**: If you modify this function, please also consider making
+  * the corresponding change in GLib.  See
