@@ -1,0 +1,23 @@
+software: xaric
+display: "xaric"
+description: "Terminal IRC client in the ircII family"
+category: network
+homepage: "https://xaric.org/"
+license: GPL-2.0-or-later
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "tgetent 来自 libncursesw.a（OHOS 无 libtermcap/libcurses）；补丁在 tgetent 搜索链中插入 -lncursesw"
+    - "OpenSSL 是 configure 硬依赖（AX_CHECK_OPENSSL），--with-openssl=<prefix> 绕过 pkg-config 指向 Conan openssl 静态包"
+    - "main() 先 isatty(0) 再解析参数（irc.c:798），运行时必须提供 TTY；test_package 用 python3 pty 驱动"
+    - "上游无正式测试框架：make check 为空目标"
+  common_dependencies:
+    - "openssl/3.5.6.1"
+    - "ncurses/6.6"
+
+versions:
+  "0.13.9":
+    status: built
+    build_date: "2026-10-12"
+    conan_ref: "xaric/0.13.9"

@@ -1,0 +1,67 @@
+# 版本级 manifest — xaric 0.13.9
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "0.13.9"
+software: xaric
+# published | built | failed | archived
+status: built
+build_date: "2026-10-14"
+build_system: autotools
+
+# 源码信息
+source:
+  url: "https://xaric.org/software/xaric/releases/xaric-0.13.9.tar.gz"
+  sha256: "cb6c23fd20b9f54e663fff7cab22e8c11088319c95c90904175accf125d2fc11"
+  tar_format: tar.gz
+
+# 构建配置
+build:
+  system: autotools
+  configure_options:
+    - "--with-openssl=<openssl.package_folder>"
+    - "CFLAGS 注入 -I<ncurses>/include（termcap.h/curses.h）"
+    - "LDFLAGS 注入 -L<ncurses>/lib（tgetent/-lncursesw）"
+    - "CFLAGS 追加 -fcommon（ircterm.h 的 term_* 是暂定定义，clang>=10 默认 -fno-common 会重复定义）"
+    - "--host=aarch64-unknown-linux-ohos；真机 --build 取同值走原生探测，本机交叉 --build=x86_64-apple-darwin 进 cross 模式"
+    - "交叉模式钉住 ac_cv_ipv4=yes ac_cv_ipv6=yes（与真机原生 AC_RUN_IFELSE 结果一致，保证编译同一批源码路径）"
+  dependencies:
+    - openssl/3.5.6.1
+    - ncurses/6.6
+  cc: clang
+  cxx: clang++
+
+# 已应用补丁
+patches_applied:
+  - "0001-tgetent-ncursesw.patch"
+  - "0002-sockopt-cross-fallback.patch"
+  - "0003-trace-symbol-collision-ncursesw.patch"
+  - "0004-config-status-tmpdir-umask-hmdfs.patch"
+
+# 测试
+tests:
+  upstream: 0
+  harmonyos_added: 1
+  assertion_count: 3
+  upstream_check: "make check（Automake 空目标）；build() 内真跑并输出 HMBS_UPSTREAM_TEST_RESULT status=no_tests discovered=0 executed=0"
+  test_package: "真机 PTY 运行 xaric -v：断言 bin 可执行 + help 数据已安装 + 版本串（3 项断言）；交叉构建下退化为产物校验（AArch64 ELF + help 存在），不计入 rule12 断言数"
+
+# 本次实际引用/命中的知识条目（路径均存在，供 submit Check 8 校验）
+knowledge_ref:
+  - "knowledge/drafts/DRAFT-xaric-0.13.9-autotools-tgetent-chain-ncursesw.kv"
+  - "knowledge/graph/E248.kv"
+  - "knowledge/drafts/DRAFT-14410-static-ncurses-beep-duplicate-symbol.kv"
+  - "knowledge/drafts/DRAFT-fermi-lite-0.1-header-tentative-definition-duplicate-symbol.kv"
+  - "knowledge/graph/E205.kv"
+  - "knowledge/graph/E114.kv"
+  - "knowledge/graph/E011.kv"
+
+# 知识沉淀
+knowledge_gained:
+  - "Autotools tgetent 检测链（termcap/termlib/curses/xtermcap）不识别 ncursesw；OHOS 无 libtermcap/libcurses 时需补 -lncursesw 探测；嵌套 AC_CHECK_LIB 链插入探测时 configure.ac 与生成的 configure 均须同步补闭合括号/fi # knowledge_ref: DRAFT-xaric-0.13.9-autotools-tgetent-chain-ncursesw"
+  - "AX_CHECK_OPENSSL 支持 --with-openssl=<prefix> 绕过 pkg-config，指向 Conan openssl 静态包即可；产物 DT_NEEDED 仅 libc.so # knowledge_ref: none（本次实测结论，知识库暂无对应条目）"
+  - "终端类程序若 main() 先 isatty(0) 再解析参数，运行时验证需用 PTY（python3 pty 模块）；交叉构建下 test() 仍须校验产物，否则 CI 的 L1e 破坏性反向测试会判空壳 # knowledge_ref: none（本次实测结论；仓内先例 tarlz/0.29、wavegain/1.3.1 的 shell 型 test_package）"
+  - "补丁触及 configure.ac/sa.ac 后 mtime 倒挂，make 会调 build-aux/missing aclocal-1.16 重生成并 Error 127；按依赖序 os.utime 重打 aclocal.m4/configure/config.h.in/Makefile.in 即可 # knowledge_ref: knowledge/graph/E248.kv"
+  - "静态 libncursesw.a 会整体拉入符号表，程序自带 trace() 与 ncurses 的 trace() 冲突（动态链接时可执行文件覆盖故不暴露）；语义不同不能用 --allow-multiple-definition，须改名 # knowledge_ref: knowledge/drafts/DRAFT-14410-static-ncurses-beep-duplicate-symbol.kv"
+  - "头文件里的暂定定义（term_* 函数指针）在 clang>=10 默认 -fno-common 下变成多个强符号；-fcommon 恢复合并语义 # knowledge_ref: knowledge/drafts/DRAFT-fermi-lite-0.1-header-tentative-definition-duplicate-symbol.kv"
+  - "HMDFS 上 config.status 以 umask 077 建的临时目录变 drwx--S--- 且 owner UID 被重映射，连属主都写不进 subs1.awk（line 615 EACCES → could not setup config files machinery）；去掉 shipped configure 里两处 umask 077 即可 # knowledge_ref: knowledge/graph/E011.kv, knowledge/graph/E114.kv（先例 qsopt/2.5.10.3、roll/2.7.0、a52dec/0.7.4）"
+  - "无 config.sub/config.guess 且无 AC_CANONICAL_HOST 的 autoconf 2.69 脚本，交叉构建须显式 --host/--build 才进 cross 模式；AC_RUN_IFELSE 缺 action-if-cross 会直接 hard fail，需补 cross 分支 # knowledge_ref: knowledge/graph/E205.kv（其 patch-script 处方针对带 config.sub 的项目，本包无该文件故不适用；仓内先例 slrn/1.0.3、scws/1.2.3）"

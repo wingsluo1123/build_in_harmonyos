@@ -1,0 +1,71 @@
+# test_package/MANIFEST.yml
+# Upstream test declaration - required by ci/conan/build_and_test.sh (L0e).
+package: xaric/0.13.9
+homepage: "https://xaric.org/"
+
+# --- upstream automated tests ---------------------------------------------
+# xaric 0.13.9 ships no automated test suite.  Makefile.am declares only
+# bin_PROGRAMS / man_MANS / EXTRA_xaric_SOURCES (no TESTS, check_PROGRAMS,
+# check_SCRIPTS or check-local), so `make check` is the Automake default empty
+# target.  The recipe still executes it for real and then emits the machine
+# marker HMBS_UPSTREAM_TEST_RESULT (status "no_tests", discovered/executed 0),
+# so the zero count is executed evidence rather than a claim.
+upstream_tests_exist: false
+upstream_test_audit:
+  source_tarball: "xaric-0.13.9.tar.gz"
+  source_sha256: "cb6c23fd20b9f54e663fff7cab22e8c11088319c95c90904175accf125d2fc11"
+  top_level_files:
+    - Makefile.am   # bin_PROGRAMS = xaric (l.1), EXTRA_xaric_SOURCES (l.24), man_MANS = xaric.1 (l.33); no TESTS / check_PROGRAMS / check_SCRIPTS / check-local
+    - Makefile.in   # generated; only the two Automake default targets `check:` and `check-am:`, no registered cases
+    - configure.ac  # AC_CHECK_LIB probes + AX_CHECK_OPENSSL; no test framework, no tests/ entry in AC_CONFIG_FILES
+  scanned_for:
+    - "Makefile.am TESTS / check_PROGRAMS / check_SCRIPTS / check-local"
+    - "test/ tests/ check/ spec/ regression/ corpus/ fixture/ directories"
+    - "TEST( / TEST_F( (gtest), def test_ (pytest), *_test.c naming"
+  scan_result: >-
+    0 matches.  The official tarball holds 143 entries, all flat under
+    xaric-0.13.9/ plus build-aux/ and help/ (3 directory entries): C sources,
+    headers, Autotools scaffolding, help data and docs.  No test directory and
+    no test framework binding exists.  The only *check*-named file,
+    ga_echeck.c, is a getaddrinfo helper compiled into the binary
+    (EXTRA_xaric_SOURCES), not a test program, and is excluded from the count.
+  make_check_output: >-
+    `make check -j1` runs the Automake empty check target and exits 0 with no
+    case output; conanfile.py build() executes it and then prints
+    HMBS_UPSTREAM_TEST_RESULT with status "no_tests" and discovered / executed
+    / passed / failed / skipped all 0.
+  reason: >-
+    xaric 0.13.9 upstream release contains no test suite: Makefile.am declares
+    no TESTS or check_PROGRAMS, configure.ac configures no test framework, and
+    no tests/ directory exists anywhere in the tree (R51 three-step audit, see
+    notes.md).
+
+# No upstream suite, so no check command is declared.  The device-side evidence
+# gate reads a non-empty upstream_check_command as "upstream has a test
+# command" and then requires real discovery/execution on the worker, which a
+# 0-test package cannot satisfy; kept empty to match the no_tests packages
+# already through that gate (sipcalc, most, analog, virtualpg).
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# --- test_package (consumer view, runs inside `conan create`) --------------
+test_package_tests:
+  - file: test_xaric.sh
+    description: >-
+      HarmonyOS-specific run-time case (rule12): drives the installed xaric
+      through a PTY, because main() rejects a non-TTY stdin (irc.c:798), and
+      asserts the binary is executable, the XARIC_DATA_PATH help data is
+      installed, and `xaric -v` prints "Xaric 0.13.9".  A successful start
+      proves the OHOS-only -lncursesw tgetent link (patches/0001) and the
+      static libssl/libcrypto injected through --with-openssl resolve and
+      execute on the device.
+    command: "sh test_xaric.sh <pkg>/bin <pkg>/share/xaric"
+
+# Counting rule: 3 platform assertions in test_xaric.sh (binary executable,
+# help data installed, PTY version string), excluding the 3 argument /
+# environment guards.  Reproducible with:
+#   grep -n '|| fail' test_package/test_xaric.sh  ->  6 sites = 3 guards + 3 assertions
+assertion_count: 3
+ohos_specific_cases: 1
