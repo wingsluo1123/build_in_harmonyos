@@ -1,0 +1,72 @@
+--- /dev/null
++++ b/indi-pentax/image_convert.cpp
+@@ -0,0 +1,69 @@
++/* Offline image conversion through the same reader used by indi_pentax.
++ * LGPL-2.1-or-later, 2026 OpenHarmony adaptation contributors.
++ */
++#include "gphoto_readimage.h"
++#include <fitsio.h>
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
++#include <limits>
++
++int main(int argc, char **argv)
++{
++    if (argc == 2 && !std::strcmp(argv[1], "--version"))
++    {
++        std::puts("indi_pentax_image 1.0");
++        return 0;
++    }
++    if (argc != 4 || (std::strcmp(argv[1], "jpeg") && std::strcmp(argv[1], "raw")) ||
++        argv[3][0] == '!')
++    {
++        std::fprintf(stderr, "Usage: indi_pentax_image jpeg|raw INPUT OUTPUT.fits\n");
++        return 2;
++    }
++    uint8_t *pixels = nullptr;
++    size_t size = 0;
++    int channels = 0, width = 0, height = 0, bits = 8;
++    char bayer[8] = {};
++    gphoto_read_set_debug("Pentax image conversion");
++    int rc = !std::strcmp(argv[1], "jpeg") ?
++        read_jpeg(argv[2], &pixels, &size, &channels, &width, &height) :
++        read_libraw(argv[2], &pixels, &size, &channels, &width, &height, &bits, bayer);
++    if (rc || !pixels || width <= 0 || height <= 0)
++    {
++        std::fprintf(stderr, "Image decode failed: %s\n", argv[2]);
++        std::free(pixels);
++        return 3;
++    }
++    long axes[3] = {width, height, 3};
++    const int dimensions = bits == 8 && channels == 3 ? 3 : 2;
++    const size_t count = (size_t)width * height * (dimensions == 3 ? 3 : 1);
++    if ((bits != 8 && bits != 16) || count > (size_t)std::numeric_limits<long>::max() ||
++        count > std::numeric_limits<size_t>::max() / (bits / 8) || size != count * (bits / 8))
++    {
++        std::fprintf(stderr, "Inconsistent image layout\n");
++        std::free(pixels);
++        return 3;
++    }
++    fitsfile *output = nullptr;
++    int status = 0;
++    fits_create_diskfile(&output, argv[3], &status);
++    fits_create_img(output, bits == 16 ? USHORT_IMG : BYTE_IMG, dimensions, axes, &status);
++    fits_write_img(output, bits == 16 ? TUSHORT : TBYTE, 1, (long)count, pixels, &status);
++    if (bits == 16 && bayer[0])
++        fits_update_key(output, TSTRING, "BAYERPAT", bayer, "Bayer pattern", &status);
++    if (output)
++    {
++        int close_status = 0;
++        fits_close_file(output, &close_status);
++        if (!status) status = close_status;
++    }
++    std::free(pixels);
++    if (status)
++    {
++        fits_report_error(stderr, status);
++        return 4;
++    }
++    std::printf("CONVERTED width=%d height=%d axes=%d bits=%d bytes=%zu\n", width, height, dimensions, bits, size);
++    return 0;
++}

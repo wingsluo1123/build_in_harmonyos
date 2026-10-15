@@ -1,0 +1,266 @@
+--- a/indi-pentax/gphoto_readimage.cpp
++++ b/indi-pentax/gphoto_readimage.cpp
+@@ -1,21 +1,39 @@
+ 
+ #include "gphoto_readimage.h"
+ 
++#ifdef PENTAX_OFFLINE_IMAGE
++#include <cstdio>
++#include <cstdarg>
++static void IDLog(const char *format, ...)
++{
++    va_list args;
++    va_start(args, format);
++    vfprintf(stderr, format, args);
++    va_end(args);
++}
++#define DEBUGFDEVICE(device, level, ...) IDLog(__VA_ARGS__)
++#define DEBUGDEVICE(device, level, message) IDLog("%s\n", message)
++#else
+ #include <indilogger.h>
++#endif
+ 
+ #include <jpeglib.h>
+ #include <fitsio.h>
+ #include <libraw.h>
+ 
+ #include <unistd.h>
+ #include <arpa/inet.h>
++#include <csetjmp>
++#include <climits>
++#include <cstring>
++#include <limits>
+ 
+ 
+ char dcraw_cmd[] = "dcraw";
+ char device[64];
+ 
+ #define err_printf IDLog,
+ struct dcraw_header
+ {
+     time_t time;
+     float exposure;
+@@ -28,21 +46,21 @@
+     float wbb;
+ };
+ 
+ enum
+ {
+     CFA_RGGB,
+ };
+ 
+ void gphoto_read_set_debug(const char *name)
+ {
+-    strncpy(device, name, 64);
++    snprintf(device, sizeof(device), "%s", name);
+ }
+ 
+ void *tstrealloc(void *ptr, size_t size)
+ {
+     DEBUGFDEVICE(device, INDI::Logger::DBG_DEBUG, "Realloc: %lu", (unsigned long)size);
+     return realloc(ptr, size);
+ }
+ 
+ static void skip_line(FILE *fp)
+ {
+@@ -351,25 +369,33 @@
+     bayer_pattern[4] = '\0';
+ 
+     int first_visible_pixel = RawProcessor.imgdata.rawdata.sizes.raw_width * RawProcessor.imgdata.sizes.top_margin +
+                               RawProcessor.imgdata.sizes.left_margin;
+ 
+     DEBUGFDEVICE(device, INDI::Logger::DBG_DEBUG,
+                  "read_libraw: raw_width: %d top_margin %d left_margin %d first_visible_pixel %d",
+                  RawProcessor.imgdata.rawdata.sizes.raw_width, RawProcessor.imgdata.sizes.top_margin,
+                  RawProcessor.imgdata.sizes.left_margin, first_visible_pixel);
+ 
+-    *memsize = RawProcessor.imgdata.rawdata.sizes.width * RawProcessor.imgdata.rawdata.sizes.height * sizeof(uint16_t);
+-    *memptr  = (uint8_t *)realloc(*memptr, *memsize);
++    const auto &sizes = RawProcessor.imgdata.rawdata.sizes;
++    if (!RawProcessor.imgdata.rawdata.raw_image || !sizes.width || !sizes.height ||
++        sizes.left_margin + sizes.width > sizes.raw_width ||
++        sizes.top_margin + sizes.height > sizes.raw_height ||
++        (size_t)sizes.width > std::numeric_limits<size_t>::max() / sizes.height / sizeof(uint16_t))
++        return -1;
++    *memsize = (size_t)sizes.width * sizes.height * sizeof(uint16_t);
++    uint8_t *resized = (uint8_t *)realloc(*memptr, *memsize);
++    if (!resized) return -1;
++    *memptr = resized;
+ 
+     DEBUGFDEVICE(device, INDI::Logger::DBG_DEBUG,
+-                 "read_libraw: rawdata.sizes.width: %d rawdata.sizes.height %d memsize %d bayer_pattern %s",
++                 "read_libraw: rawdata.sizes.width: %d rawdata.sizes.height %d memsize %zu bayer_pattern %s",
+                  RawProcessor.imgdata.rawdata.sizes.width, RawProcessor.imgdata.rawdata.sizes.height, *memsize,
+                  bayer_pattern);
+ 
+     uint16_t *image = reinterpret_cast<uint16_t *>(*memptr);
+     uint16_t *src   = RawProcessor.imgdata.rawdata.raw_image + first_visible_pixel;
+ 
+     for (int i = 0; i < RawProcessor.imgdata.rawdata.sizes.height; i++)
+     {
+         memcpy(image, src, RawProcessor.imgdata.rawdata.sizes.width * 2);
+         image += RawProcessor.imgdata.rawdata.sizes.width;
+@@ -405,98 +431,89 @@
+         return -1;
+     }
+ 
+     int rc = read_ppm(handle, &header, memptr, memsize, n_axis, w, h, bitsperpixel);
+ 
+     pclose(handle);
+ 
+     return rc;
+ }
+ 
++struct PentaxJpegError
++{
++    jpeg_error_mgr base;
++    jmp_buf jump;
++};
++
++static void pentax_jpeg_error(j_common_ptr context)
++{
++    (*context->err->output_message)(context);
++    longjmp(reinterpret_cast<PentaxJpegError *>(context->err)->jump, 1);
++}
++
+ int read_jpeg(const char *filename, uint8_t **memptr, size_t *memsize, int *naxis, int *w, int *h)
+ {
+-    unsigned char *r_data = nullptr, *g_data = nullptr, *b_data = nullptr;
+-
+-    /* these are standard libjpeg structures for reading(decompression) */
+-    struct jpeg_decompress_struct cinfo;
+-    struct jpeg_error_mgr jerr;
+-    /* libjpeg data structure for storing one row, that is, scanline of an image */
+-    JSAMPROW row_pointer[1] = { nullptr };
+-
+     FILE *infile = fopen(filename, "rb");
+-
+-    if (!infile)
+-    {
+-        DEBUGFDEVICE(device, INDI::Logger::DBG_DEBUG, "Error opening jpeg file %s!", filename);
+-        return -1;
+-    }
+-    /* here we set up the standard libjpeg error handler */
+-    cinfo.err = jpeg_std_error(&jerr);
+-    /* setup decompression process and source, then read JPEG header */
+-    jpeg_create_decompress(&cinfo);
+-    /* this makes the library read from infile */
+-    jpeg_stdio_src(&cinfo, infile);
+-    /* reading the image header which contains image information */
+-    jpeg_read_header(&cinfo, (boolean)TRUE);
+-
+-    /* Start decompression jpeg here */
+-    jpeg_start_decompress(&cinfo);
+-
+-    *memsize = cinfo.output_width * cinfo.output_height * cinfo.num_components;
+-    *memptr  = (uint8_t *)realloc(*memptr, *memsize);
+-    uint8_t *oldmem =
+-        *memptr; // if you do some ugly pointer math, remember to restore the original pointer or some random crashes will happen. This is why I do not like pointers!!
+-    *naxis = cinfo.num_components;
+-    *w     = cinfo.output_width;
+-    *h     = cinfo.output_height;
+-
+-    /* now actually read the jpeg into the raw buffer */
+-    row_pointer[0] = (unsigned char *)malloc(cinfo.output_width * cinfo.num_components);
+-    if (cinfo.num_components)
+-    {
+-        r_data = (unsigned char *)*memptr;
+-        g_data = r_data + cinfo.output_width * cinfo.output_height;
+-        b_data = r_data + 2 * cinfo.output_width * cinfo.output_height;
+-    }
+-    /* read one scan line at a time */
+-    for (unsigned int row = 0; row < cinfo.image_height; row++)
+-    {
+-        unsigned char *ppm8 = row_pointer[0];
+-        jpeg_read_scanlines(&cinfo, row_pointer, 1);
+-
+-        if (cinfo.num_components == 3)
+-        {
+-            for (unsigned int i = 0; i < cinfo.output_width; i++)
+-            {
+-                *r_data++ = *ppm8++;
+-                *g_data++ = *ppm8++;
+-                *b_data++ = *ppm8++;
+-            }
+-        }
+-        else
+-        {
+-            memcpy(*memptr, ppm8, cinfo.output_width);
+-            *memptr += cinfo.output_width;
+-        }
+-    }
+-
+-    /* wrap up decompression, destroy objects, free pointers and close open files */
+-    jpeg_finish_decompress(&cinfo);
+-    jpeg_destroy_decompress(&cinfo);
+-
+-    if (row_pointer[0])
+-        free(row_pointer[0]);
+-    if (infile)
++    if (!infile) return -1;
++    // Keep libjpeg state in allocated storage: its contents can change across
++    // longjmp without making automatic non-volatile variables indeterminate.
++    auto *cinfo = static_cast<jpeg_decompress_struct *>(calloc(1, sizeof(jpeg_decompress_struct)));
++    if (!cinfo) { fclose(infile); return -1; }
++    PentaxJpegError error;
++    uint8_t *volatile decoded = nullptr;
++    cinfo->err = jpeg_std_error(&error.base);
++    error.base.error_exit = pentax_jpeg_error;
++    if (setjmp(error.jump))
++    {
++        free(decoded);
++        jpeg_destroy_decompress(cinfo);
++        free(cinfo);
+         fclose(infile);
+-
+-    *memptr = oldmem;
+-
++        return -1;
++    }
++    jpeg_create_decompress(cinfo);
++    jpeg_stdio_src(cinfo, infile);
++    jpeg_read_header(cinfo, static_cast<boolean>(TRUE));
++    if (cinfo->jpeg_color_space != JCS_GRAYSCALE)
++        cinfo->out_color_space = JCS_RGB;
++    jpeg_start_decompress(cinfo);
++    const size_t width = cinfo->output_width, height = cinfo->output_height;
++    const size_t channels = cinfo->output_components;
++    if (!width || !height || width > INT_MAX || height > INT_MAX ||
++        (channels != 1 && channels != 3) ||
++        width > std::numeric_limits<size_t>::max() / height / channels)
++    {
++        jpeg_destroy_decompress(cinfo); free(cinfo); fclose(infile); return -1;
++    }
++    const size_t plane = width * height, bytes = plane * channels;
++    decoded = static_cast<uint8_t *>(malloc(bytes));
++    if (!decoded)
++    {
++        jpeg_destroy_decompress(cinfo); free(cinfo); fclose(infile); return -1;
++    }
++    JSAMPARRAY scanline = (*cinfo->mem->alloc_sarray)(reinterpret_cast<j_common_ptr>(cinfo),
++                                                   JPOOL_IMAGE, width * channels, 1);
++    for (size_t row = 0; row < height; ++row)
++    {
++        jpeg_read_scanlines(cinfo, scanline, 1);
++        for (size_t x = 0; x < width; ++x)
++            for (size_t c = 0; c < channels; ++c)
++                decoded[c * plane + row * width + x] = scanline[0][x * channels + c];
++    }
++    jpeg_finish_decompress(cinfo);
++    jpeg_destroy_decompress(cinfo);
++    free(cinfo);
++    fclose(infile);
++    // A failed decode must leave the caller's existing CCD frame untouched.
++    free(*memptr);
++    *memptr = decoded;
++    *memsize = bytes; *naxis = channels == 3 ? 3 : 2; *w = (int)width; *h = (int)height;
+     return 0;
+ }
+ 
+ int read_jpeg_mem(unsigned char *inBuffer, unsigned long inSize, uint8_t **memptr, size_t *memsize, int *naxis, int *w,
+                   int *h)
+ {
+     /* these are standard libjpeg structures for reading(decompression) */
+     struct jpeg_decompress_struct cinfo;
+     struct jpeg_error_mgr jerr;
+     /* libjpeg data structure for storing one row, that is, scanline of an image */

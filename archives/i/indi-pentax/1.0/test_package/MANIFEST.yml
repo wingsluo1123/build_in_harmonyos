@@ -1,0 +1,30 @@
+package: indi-pentax/1.0
+homepage: "https://github.com/indilib/indi-3rdparty/tree/4e700ab0487f1e636a84c927e3e4e368bb1e896a/indi-pentax"
+upstream_tests_exist: false
+upstream_test_in_build: false
+upstream_test_case_count: 0
+upstream_check_command: "inspect indi-pentax directory and CMakeLists.txt; ctest --show-only"
+upstream_test_audit: >
+  The pinned 1.0 indi-pentax subproject has no tests directory, add_test,
+  enable_testing, or check target. Tests in sibling drivers and dependency
+  source trees are outside the target subproject and are not counted.
+upstream_tests: []
+test_package_tests:
+  - file: run_tests.py
+    command: "python3 run_tests.py --bin-dir <installed-package>/bin --report consumer-results.json"
+    description: >
+      New CLI consumer: astronomical image ingestion through the installed
+      indi_pentax_image interface; validate color/gray JPEG and 16-bit DNG FITS
+      pixels, dimensions, planes and Bayer metadata. Exercise missing/invalid
+      inputs, preserve existing output, argument errors and driver empty
+      camera discovery through INDI XML stdin. Uses no private source/API.
+test_package_test_case_count: 10
+hardware_pending:
+  - "Real Pentax MSC discovery, settings, exposure, transfer, disconnect/reconnect"
+  - "PTP Ricoh backend: upstream 1.0 provides no aarch64 vendor binary"
+
+fixture_transport: >
+  JPEG/DNG fixtures are stored as Base64 text for CI PR diff transport.
+  run_tests.py strictly decodes them into its temporary directory and verifies
+  pinned SHA256 before invoking any executable. Decoded bytes are identical
+  to the original fixtures; the 10 test cases and pixel assertions are unchanged.
