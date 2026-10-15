@@ -1,0 +1,64 @@
+# test_package/MANIFEST.yml
+# Upstream test declaration for semtag 0.2.0 (required by CI L0e).
+package: "semtag/0.2.0"
+homepage: "https://github.com/nico2sh/semtag"
+upstream_repo: "https://github.com/nico2sh/semtag"
+
+# ── R51 upstream test inventory ──────────────────────────────────────────────
+# The v0.2.0 source tree contains no tests at all:
+#   $ find . -type f
+#   ./semtag ./semtag_bkp ./release.sh ./release_v2.sh ./README.md ./LICENSE ./.gitignore
+#   $ find . -iname '*test*' -o -name Makefile -o -name CMakeLists.txt  -> (empty)
+# There is no tests/ directory, no ctest/pytest/bats registration and no CI
+# workflow in the tarball. The upstream case count is therefore 0 (N=0) and
+# there is nothing to execute (N'=0); functional coverage comes entirely from
+# the test_package scripts below, which run the installed tool.
+upstream_test_in_build: false
+upstream_test_command: "none (upstream ships no tests)"
+upstream_test_count: 0
+upstream_test_passed: 0
+upstream_tests: []
+upstream_test_evidence: >-
+  The tag tarball (sha256 37890fc5...7934548) unpacks to 7 files: semtag,
+  semtag_bkp (legacy copy of the script), release.sh, release_v2.sh (the
+  maintainer's own release helpers), README.md, LICENSE, .gitignore. No file
+  or directory name contains "test"; no build system or test runner is
+  referenced anywhere.
+
+# ── test_package supplied tests ──────────────────────────────────────────────
+test_package_tests:
+  - file: "test_semtag.sh"
+    count: 19
+    description: >-
+      Generic behaviour of the installed tool, each assertion running
+      `bash <pkg>/bin/semtag` inside a throw-away Git repository built by the
+      test: --version/--help; getlast/getfinal with a final and a pre-release
+      tag; display-only bumping (-s minor/major, -p, alpha, candidate) that
+      must create no tag; rejection of -v lower than the last tag; "No commits
+      since last final version" creating nothing; real annotated tag creation
+      after a new commit with the commit log in the tag message; getcurrent on
+      a clean tagged tree; dirty tree refused without -f (no tag) and tagged
+      with -f; unknown command rejected.
+    command: "sh test_semtag.sh <package>/bin/semtag"
+  - file: "test_semtag_ohos.sh"
+    count: 5
+    description: >-
+      HarmonyOS runtime constraints (5 assertions, 1 conditional): packaged
+      shebang is #!/data/service/hnp/bin/bash (E037); that interpreter really
+      runs the packaged script and answers getlast correctly (direct exec
+      first, explicit interpreter when HMDFS exec bits block direct exec;
+      SKIP when the hnp bash is absent); `semtag final` creates the annotated
+      tag and records a tagger on an account with no Git identity configured
+      (semtag derives user.name/user.email from `id -u -n` and `hostname`, 2
+      assertions); getfinal works with TMPDIR pointing at a nonexistent
+      directory (no temp file needed, /tmp is read-only on HarmonyOS, E002).
+    command: "sh test_semtag_ohos.sh <package>/bin/semtag"
+test_package_assertion_count: 24
+generic_assertion_count: 19
+harmonyos_test_count: 5
+harmonyos_assertion_count: 5
+assertion_count: 24
+counting_policy: >-
+  Each ok()/no() call counts as one assertion; sk() (precondition absent)
+  counts in the total but is reported as SKIP, never as a pass. Adaptation
+  host result: 19/19 generic, 5/5 HarmonyOS (hnp bash symlink present).
