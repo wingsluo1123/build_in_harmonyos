@@ -1,0 +1,155 @@
+# fix#10: 把 Zip Shp/Zip Dbf 代码面包进 #ifdef ENABLE_MINIZIP（上游 AC_DEFINE 了该宏却无任何使用点）
+--- a/Classdef.h
++++ b/Classdef.h
+@@ -5251,8 +5251,10 @@
+   void DoCheckGrantPermissions(void *pg_conn, wxString & user,
+                                MyPostgresSchema * schema,
+                                MyPostgresView * view);
++#ifdef ENABLE_MINIZIP
+   void DoLoadZipShp(wxString & path);
+   void DoLoadZipDbf(wxString & path);
++#endif /* ENABLE_MINIZIP */
+ public:
+     MyFrame(const wxString & title, const wxPoint & pos, const wxSize & size);
+     virtual ~ MyFrame();
+@@ -6870,6 +6872,7 @@
+   void OnUpdateStatistics(wxCommandEvent & event);
+ };
+ 
++#ifdef ENABLE_MINIZIP
+ class LoadZipShpDialog:public wxDialog
+ {
+ //
+@@ -7023,6 +7026,7 @@
+   }
+   void OnOk(wxCommandEvent & event);
+ };
++#endif /* ENABLE_MINIZIP */
+ 
+ class LoadGeoJsonDialog:public wxDialog
+ {
+@@ -7384,6 +7388,7 @@
+   void OnTextDates(wxCommandEvent & event);
+ };
+ 
++#ifdef ENABLE_MINIZIP
+ class LoadZipDbfDialog:public wxDialog
+ {
+ //
+@@ -7442,6 +7447,7 @@
+   void OnUserPKey(wxCommandEvent & event);
+   void OnTextDates(wxCommandEvent & event);
+ };
++#endif /* ENABLE_MINIZIP */
+ 
+ class NetworkDialog:public wxDialog
+ {
+--- a/Main.cpp
++++ b/Main.cpp
+@@ -3703,11 +3703,13 @@
+     {
+       wxFileName file(fileDialog.GetPath());
+       lastDir = file.GetPath();
++#ifdef ENABLE_MINIZIP
+       if (file.GetExt().CmpNoCase(wxT("zip")) == 0)
+         {
+           wxString path = fileDialog.GetPath();
+           return DoLoadZipShp(path);
+         }
++#endif /* ENABLE_MINIZIP */
+       table = file.GetName();
+       path = file.GetPath();
+       path += file.GetPathSeparator();
+@@ -3804,6 +3806,7 @@
+     }
+ }
+ 
++#ifdef ENABLE_MINIZIP
+ void MyFrame::DoLoadZipShp(wxString & str_path)
+ {
+ //
+@@ -3937,6 +3940,7 @@
+   if (zip_path != NULL)
+     free(zip_path);
+ }
++#endif /* ENABLE_MINIZIP */
+ 
+ void MyFrame::OnVirtualShp(wxCommandEvent & WXUNUSED(event))
+ {
+@@ -4406,11 +4410,13 @@
+     {
+       path = fileDialog.GetPath();
+       wxFileName file(path);
++#ifdef ENABLE_MINIZIP
+       if (file.GetExt().CmpNoCase(wxT("zip")) == 0)
+         {
+           wxString path = fileDialog.GetPath();
+           return DoLoadZipDbf(path);
+         }
++#endif /* ENABLE_MINIZIP */
+       table = file.GetName();
+       LoadDbfDialog dlg;
+       dlg.Create(this, path, table, LocaleCharset);
+@@ -4456,6 +4462,7 @@
+     }
+ }
+ 
++#ifdef ENABLE_MINIZIP
+ void MyFrame::DoLoadZipDbf(wxString & str_path)
+ {
+ //
+@@ -4541,6 +4548,7 @@
+   if (zip_path != NULL)
+     free(zip_path);
+ }
++#endif /* ENABLE_MINIZIP */
+ 
+ void MyFrame::OnVirtualDbf(wxCommandEvent & WXUNUSED(event))
+ {
+--- a/Dialogs.cpp
++++ b/Dialogs.cpp
+@@ -2118,6 +2118,7 @@
+   wxDialog::EndModal(wxID_OK);
+ }
+ 
++#ifdef ENABLE_MINIZIP
+ LoadZipDbfDialog::~LoadZipDbfDialog()
+ {
+ // destructor
+@@ -2491,6 +2492,7 @@
+     ColnameCase = GAIA_DBF_COLNAME_CASE_IGNORE;
+   wxDialog::EndModal(wxID_OK);
+ }
++#endif /* ENABLE_MINIZIP */
+ 
+ LoadShpDialog::~LoadShpDialog()
+ {
+@@ -3047,6 +3049,7 @@
+   wxDialog::EndModal(wxID_OK);
+ }
+ 
++#ifdef ENABLE_MINIZIP
+ LoadZipShpDialog::~LoadZipShpDialog()
+ {
+ // destructor
+@@ -3623,6 +3626,7 @@
+     ColnameCase = GAIA_DBF_COLNAME_CASE_IGNORE;
+   wxDialog::EndModal(wxID_OK);
+ }
++#endif /* ENABLE_MINIZIP */
+ 
+ bool DumpShpDialog::Create(MyFrame * parent, wxString & path, wxString & table,
+                            wxString & column, wxString & defCs)
+@@ -8299,6 +8303,7 @@
+   wxDialog::EndModal(wxID_OK);
+ }
+ 
++#ifdef ENABLE_MINIZIP
+ ChoooseZipShpDialog::~ChoooseZipShpDialog()
+ {
+ // dtor
+@@ -8505,3 +8510,4 @@
+   Filename = *(DBFs + idSel);
+   wxDialog::EndModal(wxID_OK);
+ }
++#endif /* ENABLE_MINIZIP */

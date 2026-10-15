@@ -1,0 +1,92 @@
+# test_package/MANIFEST.yml — spatialite-gui 2.1.0-beta1
+# CI L0e requires this file to exist. 上游测试入口清点遵循 R51 三步法。
+
+package: spatialite-gui/2.1.0-beta1
+homepage: "https://www.gaia-gis.it/fossgis/spatialite-gui"
+
+# ── 上游测试入口清点（R51 三步法 · 第 1 步：扫描）─────────────────────────
+# 清点命令与原始输出（源码树为 sources.url 的官方 tarball，231 文件）：
+#   ls -d test tests                        -> 不存在（无输出）
+#   grep -nE 'check' Makefile.am            -> 无输出
+#   grep -nE '^(TESTS|check_PROGRAMS|check_LTLIBRARIES)' Makefile.am -> 无输出
+#   grep -nE '^(check|check-am|check-TESTS|check-recursive)' Makefile.in
+#       -> 957:check-am: all-am
+#          958:check: check-recursive
+#
+# 结论：上游没有可执行的自动化测试套件（no runnable automated suite）。
+#
+# `make check` 存在但为空目标：Makefile.am 只声明 bin_PROGRAMS = spatialite_gui
+# 与四个 SUBDIRS（icons/win_resource/mac_resource/gnome_resource），既无 TESTS
+# 变量也无 check_PROGRAMS / check-local，因此 check-recursive 最终只会 all-am
+# 后返回，不运行任何用例。
+#
+# ── 第 2 步：清点结论对本次移植的处置 ──────────────────────────────────────
+# 上游无自动化断言可执行，故 upstream_test_in_build = false；本配方不虚报上游
+# 套件数量（upstream_case_count = 0 是「上游确实为 0」，不是漏记）。消费者
+# 测试（下方 test_package_tests）独立于上游套件，在 CI L1 始终执行。
+
+upstream_check_command: "make check"
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_case_count: 0
+upstream_executed_count: 0
+upstream_passed_count: 0
+upstream_failed_count: 0
+upstream_not_run_count: 0
+upstream_test_note: >-
+  上游 tarball 无 test/ tests/ 目录，Makefile.am 无 TESTS / check_PROGRAMS /
+  check-local；make check 仅 check-recursive -> all-am，为空目标，不运行任何
+  用例。唯一的 helpgen/ 是维护期手工工具（把 SpatiaLite 与 Rasterlite2 的
+  HTML 文档压成 C++ 源），需外部下载 wiki 页面并手工 gcc 编译，不是测试用例。
+
+# 上游源码中与测试相关的文件（均非自动化断言，故不构建、不执行）
+upstream_tests:
+  - file: helpgen/helpgen.c
+    source: "spatialite_gui-2.1.0-beta1.tarball: helpgen/helpgen.c"
+    runnable: false
+    description: "维护期文档生成器：合并 SpatiaLite/Rasterlite2 的 HTML 参考手册并压缩为 C++ 源码（HtmlHelp.cpp）。按 helpgen/READ_ME.txt 需先自行放置 spatialite-sql-latest.html 与 rl2-sql-latest.html（后者要从 Fossil Wiki 下载），再用 gcc helpgen.c -o helpgen -lz 手工编译；不注册进任何 make 目标"
+    command: "gcc helpgen.c -o helpgen -lz"
+  - file: helpgen/READ_ME.txt
+    source: "spatialite_gui-2.1.0-beta1.tarball: helpgen/READ_ME.txt"
+    runnable: false
+    description: "helpgen 的使用说明文档（纯文本），无任何断言"
+    command: ""
+  - file: indent_me
+    source: "spatialite_gui-2.1.0-beta1.tarball: indent_me"
+    runnable: false
+    description: "源码格式化辅助脚本（调用 indent），无断言"
+    command: "sh indent_me"
+
+# ── 第 3 步：test_package 自带测试（消费者视角）──────────────────────────
+# spatialite_gui 是纯 GUI 应用：Main.cpp:99-115 把 argv[1] 当 SQLite 库路径，
+# 随即构造 MyFrame 进入事件循环，既无 --version/--help 短路，也无法在本目标
+# 无头启动（gtk/3.24.43 为 broadway-only 且设备无 broadwayd runtime，参见
+# wxwidgets-gtk3/3.2.10 notes.md 实测 RC=255「Unable to initialize GTK+, is
+# DISPLAY set properly?」）。故消费者测试断言产物契约，而不是尝试抓取 GUI
+# 程序的 stdout —— 后者在本目标上只会挂起或必然失败。
+test_package_tests:
+  - file: test_spatialite_gui.sh
+    description: "消费者产物契约测试：bin/ 在 PATH、AArch64 可执行 ELF、.codesign 段存在（缺失则 execve 失败）、6 个 SpatiaLite 栈库（libspatialite/librasterlite2/libgeos_c/libproj/libcurl/libsqlite3）确实进入 DT_NEEDED、非 libc 的 NEEDED 全部能在 conanrun 库路径解析、GUI 标题串在（证明 wxFrame 入口真被链接）。liblzma 不在 DT_NEEDED 断言清单（fix#11）：GUI 无任何直接 lzma_* 符号调用（仅 rl2_* SQL 函数名字符串比较），ld.lld 默认 --as-needed 丢弃 -llzma（config.log LIBLZMA_LIBS 可证），且闭包内 libspatialite.so/librasterlite2.so 的 NEEDED 均无 liblzma 条目——要求它等于断言一个工具链语义上恒假的事实"
+    command: "bash test_spatialite_gui.sh <packaged>/bin/spatialite_gui"
+    asserts: 11
+
+# 断言总数：test_spatialite_gui.sh 的 11 条（分 6 组，其中 [4/6] 内含 6 个
+# 逐库断言（fix#11 移除 liblzma）、[5/6] 为逐库解析断言合并计 1 条）
+assertion_count: 11
+
+pass_rate: "11/11 (100%) — 任一断言失败即 exit 1，不存在跳过后仍通过的情况"
+
+notes:
+  - >-
+    本测试刻意不链接也不 dlopen 任何库：本配方产出 application，没有可供
+    消费者编译的 API 面。GUI 之后的 SQL/地图/栅格行为由各依赖包自身的
+    test_package 覆盖。
+  - >-
+    [3/6] 的 .codesign 断言直接对应本次移植处理的上游契约之一：autotools 的
+    AC_CHECK_LIB / AC_SEARCH_LIBS 探针在 OHOS 上必须逐个签名后才能执行，
+    否则每个依赖判定都会误报「link failed」。同一套签名要求最终也适用于交付
+    的可执行文件，故在此断言而非只在构建期静默修复。
+  - >-
+    [4/6] 的 DT_NEEDED 断言覆盖「requirements() 里声明了但没真正进链接行」
+    这类回归——对无 stdout 的 GUI 程序，这是唯一可观测的依赖面证据。
