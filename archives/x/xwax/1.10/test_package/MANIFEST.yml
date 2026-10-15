@@ -1,0 +1,72 @@
+# test_package/MANIFEST.yml — xwax 1.10
+# CI L0e requires this file to exist.
+
+package: xwax/1.10
+homepage: "https://www.xwax.co.uk/"
+
+# ── R51 upstream test inventory ──
+# Upstream has NO `make check` target. `make all` builds eight stand-alone
+# "manual test" programs declared in the TESTS variable of the top-level
+# Makefile (cues external library observer status timecoder track ttf).
+# The conanfile build() *executes* the headless, argument-free ones on the
+# device; the rest need a font/display, an audio device or pathname
+# arguments and are recorded as not-run with the concrete reason.
+#
+#   TOTAL = PASS + FAIL + SKIP + NOT_RUN = 5 + 0 + 0 + 3 = 8
+upstream_check_command: "none (upstream has no check target; `make all` builds tests/)"
+upstream_test_in_build: true
+upstream_test_command: "./tests/<program> (each executed individually in conanfile build())"
+
+upstream_tests:
+  - file: tests/cues.c
+    source: xwax-1.10/tests/cues.c
+    description: "cue-point store (2 asserts)"
+    command: "./tests/cues < /dev/null"
+    status: pass
+  - file: tests/external.c
+    source: xwax-1.10/tests/external.c
+    description: "fork_pipe_nb()/get_line() plumbing against /usr/bin/find (assert wait()==pid)"
+    command: "./tests/external < /dev/null"
+    status: pass
+  - file: tests/observer.c
+    source: xwax-1.10/tests/observer.c
+    description: "observer watch/fire/ignore notification (output-only manual test)"
+    command: "./tests/observer < /dev/null"
+    status: pass
+  - file: tests/status.c
+    source: xwax-1.10/tests/status.c
+    description: "status string store + change notification (output-only manual test)"
+    command: "./tests/status < /dev/null"
+    status: pass
+  - file: tests/timecoder.c
+    source: xwax-1.10/tests/timecoder.c
+    description: "timecoder definition lookup + init (assert def != NULL); reads PCM from stdin"
+    command: "./tests/timecoder < /dev/null"
+    status: pass
+  - file: tests/library.c
+    source: xwax-1.10/tests/library.c
+    description: "manual record-library import; requires 'usage: <scan> <path> [...]' arguments and a real scanner/audio path"
+    command: "./tests/library <scan> <path>"
+    status: not_run
+    reason: "argument-driven manual test (needs a scanner program and a real music-library path); not runnable headless"
+  - file: tests/track.c
+    source: xwax-1.10/tests/track.c
+    description: "manual single-track import; requires 'usage: <command> <path>' arguments"
+    command: "./tests/track <command> <path>"
+    status: not_run
+    reason: "argument-driven manual test (needs an importer command and an audio file); not runnable headless"
+  - file: tests/ttf.c
+    source: xwax-1.10/tests/ttf.c
+    description: "SDL_ttf glyph-clipping illustration; opens an SDL window and loads a font file"
+    command: "./tests/ttf <font-file>"
+    status: not_run
+    reason: "needs a display (SDL_CreateWindow) and a TTF font; OHOS image ships no /usr/share/fonts and the runner is headless"
+
+# test_package test (consumer view: executes the packaged ELF)
+test_package_tests:
+  - file: test.sh
+    description: "run packaged bin/xwax --help; assert rc=0, compiled-in banner 'xwax 1.10' on stderr, usage text on stdout, --dummy listed, helper scripts packaged"
+    command: "bash test.sh <package_bin>/xwax <package_dir>"
+
+# test_package assertions: banner, usage text, --dummy option, xwax-scan, xwax-import
+assertion_count: 5

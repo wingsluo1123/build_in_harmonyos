@@ -1,0 +1,61 @@
+# 版本级 manifest — xwax 1.10
+# 遵循 ARCHIVE-SPEC v3.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "1.10"
+software: "xwax"
+
+# published | built | failed | archived
+status: built
+
+build_date: "2026-10-15"
+build_system: makefile
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # R39 官方源: GitHub release tag tarball (xwax/xwax)
+  url: "https://github.com/xwax/xwax/archive/refs/tags/1.10.tar.gz"
+  sha256: "5d9c7aa46582bf3bb53a4336f4b2668e7c4e4382e29989d5b902e26e7c5d76de"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: makefile
+
+  # 上游 configure 是手写 shim，只写 .config；本平台为原生 build=host，
+  # 禁止 --host/--build/--target（铁律 #0）
+  configure_options:
+    - "--prefix /"
+    - "--enable-alsa"
+
+  dependencies:
+    - sdl2/2.30.10
+    - sdl2_ttf/2.24.0
+    - alsa-lib/1.2.16.1
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "E019: OHOS musl ld.so 不展开 $ORIGIN，链接了共享依赖（libasound/libatopology/libfreetype）"
+  - "    时运行期必须设置 LD_LIBRARY_PATH；本包 test_package 在 conanrun 环境下执行"
+  - "E537/E490 已在 G0 预查询中核对：本包无 .so 产物、无 autotools helper 脚本权限问题，均不适用"
