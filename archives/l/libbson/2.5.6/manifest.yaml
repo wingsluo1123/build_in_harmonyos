@@ -1,0 +1,89 @@
+# 版本级 manifest — libbson 2.5.6
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: libbson
+version: "2.5.6"
+status: built
+build_date: "2026-10-09"
+conan_ref: "libbson/2.5.6"
+
+source:
+  url: "https://github.com/mongodb/mongo-c-driver/archive/refs/tags/2.5.6.tar.gz"
+  sha256: "c5434768381c84e18088078223a8075ed768c82ae6145e30a1f1b5f07cd43dc8"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+
+  configure_options:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DENABLE_MONGOC=OFF"
+    - "-DBUILD_TESTING=OFF"
+    - "-DENABLE_TESTS=OFF"
+    - "-DENABLE_EXAMPLES=OFF"
+    - "-DENABLE_UNINSTALL=OFF"
+    - "-DENABLE_HTML_DOCS=OFF"
+    - "-DENABLE_MAN_PAGES=OFF"
+    - "-DENABLE_MAINTAINER_FLAGS=OFF"
+    - "-DENABLE_TRACING=OFF"
+    - "-DENABLE_COVERAGE=OFF"
+    - "-DENABLE_DEBUG_ASSERTIONS=OFF"
+    - "-DENABLE_RDTSCP=OFF"
+    - "-DUSE_SYSTEM_LIBBSON=OFF"
+    - "-DMONGO_USE_LLD=OFF"
+    - "-DCMAKE_DISABLE_FIND_LIBRARY_M_LIBRARY=ON"
+
+  # W0 核验：零外部依赖（压缩/加密库均为 libmongoc 关注点）
+  dependencies: []
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "2.x 包线命名体系（与 1.x 线并存）：共享库 libbson2.so.2（OUTPUT_NAME=bson+major）、静态 libbson2.a、头文件 include/bson-2.5.6/bson/（版本化 infix 上游设计）、CMake 配置包 bson（导出目标 bson::shared/bson::static）位于 lib/cmake/bson-2.5.6/、pkg-config 文件 bson2.pc/bson2-static.pc——与 1.x 线（libbson-1.0.so.0）无文件/SONAME 冲突，可共存"
+  - "ENABLE_MONGOC=OFF 是上游钦定的 libbson 单独构建开关（mongo_bool_setting），libbson 的全部源码 + src/common/ 公共源都进 bson2 目标；零外部依赖（USE_SYSTEM_LIBBSON=OFF 保持捆绑源码）"
+  - "上游测试真实执行方案（2026-10-11 rule4 整改）：上游测试树挂在 test-libmongoc 可执行文件（TestSuite 框架位于 src/libmongoc/tests/ 且引用 mongoc 私有头），libbson-only 形态（ENABLE_MONGOC=OFF）确实无法构建——但可在 build() 内对同一份未打补丁源码做第二次 test-only configure（ENABLE_MONGOC=ON 全树形态 + ENABLE_TESTS=ON + BUILD_TESTING=OFF 防Python3 + 全部可选依赖 OFF）构建该车辆，本机 OHOS aarch64 原生执行 libbson 全部套件：529 条目（501 libbson 树 + 28 src/common 层）526 pass/3 skip/0 fail，用例级 1476/1479。要点：①命令行 -D 在 conan_toolchain.cmake include 之前预置 cache，无需改工具链即可覆盖包构建的 pin；②测试必须从源码根目录运行（BSON_JSON_DIR 是相对路径，realpath 解析相对 cwd）；③TestSuite 原生 --skip-tests 机制带 reason 跳过已知分歧用例；④结果 pin 进配方（计数漂移即 raise）防上游变动静默漏测"
+  - "OHOS musl scanf int64 溢出分歧（唯一非门控 skip）：bson_decimal128_from_string 用 sscanf(SCNd64) 解析指数，超 int64 输入（0E+99999999999999999999）musl 饱和返回 -1（落在 int32 范围被错误接受）而 glibc 钳制 LLONG_MAX（被 mlib_in_range 守卫正确拒绝）——C 标准对不可表示转换未定义，libc 分歧而非 libbson 逻辑缺陷；最小复现：sscanf(\"+99999999999999999999\",\"%ld\",&v) 本机实测 v=-1 返回 1"
+  - "交叉编译坑位：①MONGO_USE_LLD=OFF 必须 pin（上游 LLDLinker 的 check_c_source_compiles 探测在交叉环境误判）；②CMAKE_DISABLE_FIND_LIBRARY_M_LIBRARY=ON 必须 pin（根 CMakeLists 的 find_library(M_LIBRARY m) 在 musl/OHOS sysroot 会找到绝对路径并写进导出 CMake 目标和 pkg-config，污染下游）；③BUILD_TESTING=OFF 跳过 CTest 注册（否则 import-tests.cmake/TestFixtures.cmake 会在 configure 期拉 Python3 依赖）"
+  - "mongoc-warning-options 无条件 -Werror 集（implicit/return-type/uninitialized/format 等）——clang 15 对 2.5.6 源码零警告，原生通过，无需降级；OHOS musl 下 pthread/m 并入 libc（system_libs 声明后链接期无多余 DT_NEEDED）"
+
+patch_generation:
+  method: none
+  patches_count: 0
+
+patch_classification: []
+
+# ============================================================
+# 测试报告
+# ============================================================
+
+test_report:
+  upstream_shape: "464 TestSuite_Add C-registered + 1015 JSON-driven internal cases = 1479 registered upstream (all compiled into test-libmongoc)"
+  upstream_execution: "build() 内零补丁测试车辆真实执行（2026-10-11 rule4 整改）：第二次 test-only configure（ENABLE_MONGOC=ON 全树形态 + ENABLE_TESTS=ON + BUILD_TESTING=OFF，全部可选依赖 OFF）构建上游 test-libmongoc，本机 OHOS aarch64 原生执行 529 条目（501 libbson 树 = 464 C + 37 JSON spec 文件条目；28 捆绑 src/common 层）——526 pass / 3 skip（文档化原因）/ 0 fail，用例级 1476/1479"
+  consumer_test: "test_package/test_bson.c — 104 checks, 12 scenario classes mirroring upstream test files（消费者视角：安装包直编直链运行）"
+  result: "upstream vehicle 526/529 pass (3 documented skips) + consumer 104/104 pass — see notes.md"
+
+# ============================================================
+# 打包产物
+# ============================================================
+
+packaging:
+  shared_lib: "lib/libbson2.so.2.5.6 (SONAME libbson2.so.2)"
+  static_lib: "lib/libbson2.a (static-only configuration)"
+  headers: "include/bson-2.5.6/bson/*.h (24 public headers + generated config.h/version.h)"
+  cmake_config: "lib/cmake/bson-2.5.6/ (bsonConfig.cmake + bsonConfigVersion.cmake + bson-shared/static-targets.cmake + 00-mongo-platform-targets.cmake)"
+  pkg_config: "lib/pkgconfig/bson2.pc / bson2-static.pc"

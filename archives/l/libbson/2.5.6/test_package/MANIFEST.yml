@@ -1,0 +1,46 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: libbson/2.5.6
+homepage: "https://github.com/mongodb/mongo-c-driver"
+
+# 上游测试命令 (用于 ctest -N / 构建系统分析)
+upstream_check_command: "test-libmongoc --list-tests (full-tree shape, TestSuite native runner)"
+
+# conanfile.py build() 方法中是否已集成上游测试
+# 2026-10-11 rule4 整改：上游测试已在 build() 内真实执行——对同一份未打补丁
+# 源码做第二次 test-only configure（ENABLE_MONGOC=ON 全树形态 + ENABLE_TESTS=ON
+# + BUILD_TESTING=OFF），构建上游 test-libmongoc 车辆（464 C 注册测试 +
+# 1015 JSON 数据驱动用例全部编在该可执行文件内，TestSuite 框架位于
+# src/libmongoc/tests/），本机 OHOS aarch64 原生执行 libbson 全部套件。
+# 实测：529 条目（501 libbson 树 = 464 C + 37 JSON spec 文件条目，另有 28 个
+# 捆绑 src/common 层条目）——526 pass / 3 skip（文档化原因）/ 0 fail，
+# 用例级覆盖 1476/1479。详见 notes.md。
+upstream_test_in_build: true
+upstream_test_command: "conanfile.py build() -> _run_upstream_tests(): cmake --build --target test-libmongoc (ENABLE_MONGOC=ON full-tree vehicle) + TestSuite runner with -l /bson* /endian* /util* /mcommon* /mlib* --skip-tests (529 entries, 526 pass / 3 skip / 0 fail)"
+
+# 上游实际运行的测试（上游注册口径）
+upstream_tests:
+  # C 注册单元/功能测试：22 个 test-*.c 文件，464 个 TestSuite_Add 注册
+  - file: src/libbson/tests/test-*.c (22 files)
+    source: mongo-c-driver-2.5.6/src/libbson/tests/
+    description: "C-registered unit/functional tests (464 TestSuite_Add registrations: test-bson.c 78, test-json.c 103, test-validate.generated.c 112, test-bcon-basic.c 28, test-bcon-extract.c 27, test-iter.c 27, test-decimal128.c 15, test-bson-vector.c 15, test-oid.c 9, test-reader.c 9, test-string.c 9, test-utf8.c 7, test-writer.c 6, test-bson-error.c 4, test-iso8601.c 4, test-endian.c 3, test-value.c 3, test-b64.c 2, test-bson-corpus.c 1, test-bson-version.c 1, test-clock.c 1, corpus-test.c shared)"
+    command: "TestSuite runner inside test-libmongoc (ENABLE_MONGOC=ON full-tree shape)"
+  # JSON 数据驱动 corpus：34 个 bson_corpus/*.json，990 个用例 (valid/decodeErrors/parseErrors)
+  - file: src/libbson/tests/json/bson_corpus/*.json (34 files)
+    source: mongo-c-driver-2.5.6/src/libbson/tests/json/bson_corpus/
+    description: "BSON corpus spec tests (990 cases: decimal128-*.json 739, top.json 63, binary.json 30, code_w_scope.json 16, string.json 14, double.json 13, code.json 13, symbol.json 13, document.json 11, regex.json 11, array.json 8, dbpointer.json 9, dbref.json 9, int32/int64/datetime 6 each, ...)"
+    command: "install_json_test_suite_with_check(BSON_JSON_DIR, bson_corpus) inside test-libmongoc"
+  # JSON 数据驱动 binary vector：3 个 bson_binary_vector/*.json，25 个用例
+  - file: src/libbson/tests/json/bson_binary_vector/*.json (3 files)
+    source: mongo-c-driver-2.5.6/src/libbson/tests/json/bson_binary_vector/
+    description: "BSON binary vector JSON spec tests (25 cases: float32.json 7, int8.json 6, packed_bit.json 10, plus 3 C-registered view-api tests)"
+    command: "install_json_test_suite_with_check(BSON_JSON_DIR, bson_binary_vector) inside test-libmongoc"
+
+# 消费者测试（test_package/）
+consumer_tests:
+  - file: test_package/test_bson.c
+    description: "Consumer test mirroring upstream scenarios against the installed package: version consistency (test-bson-version.c), all 13 BSON types append+iterate (test-bson.c/test-iter.c), nested doc/array (test-bcon-basic.c), BCON_NEW (test-bcon-basic.c), JSON<->BSON conversion + malformed-input rejection (test-json.c/test-bson-error.c), serialization round-trip + truncated-document/invalid-UTF8 validation (test-bson.c/test-reader.c), corpus canonical_bson boolean scenarios incl. decodeError (test-bson-corpus.c), writer/reader round-trip (test-writer.c/test-reader.c), OID round-trip/validity/timestamp (test-oid.c), decimal128 string round-trip (test-decimal128.c), UTF-8 validate/escape (test-utf8.c), 1000-key large document (test-bson.c big-doc), monotonic clock (test-clock.c) — 60+ assertions total"
+    command: "test_bson"
