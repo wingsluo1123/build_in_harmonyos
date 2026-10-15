@@ -1,0 +1,41 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: metal/2.1.4
+homepage: "https://github.com/brunocodutra/metal"
+
+# 上游测试命令 (ctest 注册 4 个 target: test.unit / test.header / test.formatting / test.deployment)
+upstream_check_command: "cmake --build build --target tests"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序 (metal 2.1.4 头文件库的单元/头/格式化/部署测试)
+upstream_tests:
+  - file: test/unit/src/metal.cpp
+    source: metal-2.1.4/test/unit/src/metal.cpp
+    description: "单元测试：数值运算 (add/mul/div/mod/inc/dec/neg/not_/and_/or_/if_) 与列表操作 (at/find/insert/erase/slice/take/drop/rotate/sort/iota)"
+    command: "./test.unit"
+  - file: test/header/CMakeLists.txt
+    source: metal-2.1.4/test/header/CMakeLists.txt
+    description: "头文件自包含性测试：每个公开头均可独立编译"
+    command: "./test.header"
+  - file: test/formatting/CMakeLists.txt
+    source: metal-2.1.4/test/formatting/CMakeLists.txt
+    description: "格式化/风格测试"
+    command: "./test.formatting"
+  - file: test/deployment/CMakeLists.txt
+    source: metal-2.1.4/test/deployment/CMakeLists.txt
+    description: "部署测试：metal.hpp 聚合头随版本发布"
+    command: "./test.deployment"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.cpp
+    description: "消费者测试：包含 metal.hpp，验证 metal::list / metal::size / metal::front / metal::numbers / metal::add 编译期行为"
+    command: "./test_metal"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 6
