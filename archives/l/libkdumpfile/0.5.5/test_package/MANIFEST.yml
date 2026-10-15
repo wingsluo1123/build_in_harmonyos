@@ -1,0 +1,59 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# 填写方法:
+#   1. 解压上游源码包
+#   2. 运行 make -n check (或 ctest -N / meson test --list) 查看测试列表
+#   3. 把实际运行的测试记录到下方
+
+package: libkdumpfile/0.5.5
+homepage: "https://github.com/ptesarik/libkdumpfile"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+# 实测: make check 通过 addrxlat/addrmap 脚本测试 47 个 + src/kdumpfile 单元测试 4 个
+# (test-blob / test-clone-attr / test-cache / test-fcache)，0 FAIL；
+# diskdump/elf/lkcd/xlat 系列"创建 dump 后回读"测试在 kdump_free() 处被 OHOS 环境
+# 信号等待挂起（实测 wchan=do_rt_sigsuspend，user 时间 ~0.1s），详见 notes.md。
+upstream_tests:
+  - file: src/kdumpfile/test-blob.c
+    source: libkdumpfile-0.5.5/src/kdumpfile/test-blob.c
+    description: "blob 属性读写单元测试"
+    command: "./test-blob"
+  - file: src/kdumpfile/test-clone-attr.c
+    source: libkdumpfile-0.5.5/src/kdumpfile/test-clone-attr.c
+    description: "属性字典克隆单元测试"
+    command: "./test-clone-attr"
+  - file: src/kdumpfile/test-cache.c
+    source: libkdumpfile-0.5.5/src/kdumpfile/test-cache.c
+    description: "内部缓存单元测试"
+    command: "./test-cache"
+  - file: src/kdumpfile/test-fcache.c
+    source: libkdumpfile-0.5.5/src/kdumpfile/test-fcache.c
+    description: "文件缓存 (mmap/read) 单元测试"
+    command: "./test-fcache"
+  - file: tests/addrxlat-linear
+    source: libkdumpfile-0.5.5/tests/addrxlat-linear
+    description: "addrxlat 线性地址转换脚本测试"
+    command: "./addrxlat-linear"
+  - file: tests/xlat-linux-x86_64-ktext-pgt
+    source: libkdumpfile-0.5.5/tests/xlat-linux-x86_64-ktext-pgt
+    description: "Linux x86_64 内核页表翻译脚本测试"
+    command: "./xlat-linux-x86_64-ktext-pgt"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "消费者测试：创建/释放 libkdumpfile 与 addrxlat 上下文（R34 实质 API 调用）"
+    command: "./test_libkdumpfile"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 4
