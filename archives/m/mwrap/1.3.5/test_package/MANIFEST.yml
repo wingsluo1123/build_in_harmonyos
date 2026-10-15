@@ -1,0 +1,65 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: mwrap/1.3.5
+homepage: "https://github.com/zgimbutas/mwrap"
+
+# 上游测试命令 (CMake/CTest 路径)
+# 上游构建系统: CMake (cmake_minimum_required 3.16) + 经典 Makefile 双路径；
+# CMakeLists.txt include(CTest)，testing/CMakeLists.txt 注册 2 个 CTest 用例。
+# MATLAB/Octave 运行时用例 (mwrap.octave.test_all 及全部 mwrap_add_mex 目标)
+# 仅在 MWRAP_COMPILE_MEX=ON 且找到 mkoctfile/Matlab 时注册 —— OHOS/CI 无
+# MATLAB/Octave 环境，默认配置下不参与（见 notes.md 环境受限说明）。
+upstream_check_command: "ctest"
+
+# conanfile.py build() 方法中已集成上游测试 (cmake.test() → ctest)
+upstream_test_in_build: true
+upstream_test_command: "ctest"
+
+# 上游实际运行的测试用例 (默认配置，无需 MATLAB/Octave)
+upstream_tests:
+  - file: testing/CMakeLists.txt (mwrap.test_syntax)
+    source: mwrap-1.3.5/testing/test_syntax.mw + test_syntax.ref
+    description: >-
+      语法检查用例：mwrap 对 test_syntax.mw 跑语法/解析，期望非零退出
+      (EXPECT_NONZERO)，stderr 与 test_syntax.ref 基线逐字比对。
+    command: "ctest -R mwrap.test_syntax"
+  - file: testing/CMakeLists.txt (mwrap.test_typecheck)
+    source: mwrap-1.3.5/testing/test_typecheck.mw + test_typecheck.ref
+    description: >-
+      类型检查用例：mwrap -cppcomplex 对 test_typecheck.mw 跑类型检查，
+      期望非零退出 (EXPECT_NONZERO)，stderr 与 test_typecheck.ref 逐字比对。
+    command: "ctest -R mwrap.test_typecheck"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_mwrap.sh
+    description: >-
+      消费者冒烟测试：mwrap 帮助横幅、真实 .mw 输入端到端生成 MEX gateway
+      (.cc) + MATLAB stub (.m)、gateway 含 mexFunction 入口与版本标记、
+      stub 正确经 demomex 分发。5 项断言。
+    command: "bash test_mwrap.sh <bin_dir> <work_dir>"
+  - file: ohos_specific_test.sh
+    description: >-
+      ★鸿蒙新增消费者用例：将上游 testing/ 语义移植到 HarmonyOS 平台。
+      改造点：① 全程使用调用方指定工作目录 + 私有 TMPDIR（OHOS /tmp 只读）；
+      ② 产物校验含 #include <mex.h> 接口契约；③ -cppcomplex 支持代码注入
+      验证；④ 确定性复生成逐字节比对；⑤ 缺失输入必须非零退出（上游
+      EXPECT_NONZERO 语义在 OHOS 平台实证）。6 项断言。
+    command: "bash ohos_specific_test.sh <bin_dir> <work_dir> <log_file>"
+
+# 测试断言总数 (test_mwrap.sh 5 + ohos_specific_test.sh 6)
+assertion_count: 11
+
+# 上游用例与适配后用例的对应关系 (R51 申报)
+upstream_to_adapted:
+  upstream_entry: "ctest (testing/CMakeLists.txt)"
+  adapted_entry: "conanfile.py build() 内 cmake.test() + test_package 消费者用例"
+  upstream_case_count: 2
+  adapted_case_count: 11
+  note: >-
+    上游默认配置 2 个 CTest 用例全部进入 build() 实际执行；MATLAB/Octave
+    运行时用例因平台无解释器不注册（环境受限，非删除）。消费者侧新增
+    11 项断言（其中 6 项为鸿蒙平台端到端实证）。
