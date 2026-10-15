@@ -1,0 +1,41 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: cpp-member-accessor/1.0.0
+homepage: "https://github.com/hliberacki/cpp-member-accessor"
+
+# 上游测试命令 (CTest)
+upstream_check_command: "ctest --output-on-failure"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "ctest --output-on-failure"
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: tests/functionWrapperTestSuite.cpp
+    source: cpp-member-accessor-1.0.0/tests/functionWrapperTestSuite.cpp
+    description: "函数签名包装器类型检查 (4 组断言)"
+    command: "./functionWrapperTestSuite"
+  - file: tests/memberWrapperTestSuite.cpp
+    source: cpp-member-accessor-1.0.0/tests/memberWrapperTestSuite.cpp
+    description: "成员指针包装器类型检查 (4 组断言)"
+    command: "./memberWrapperTestSuite"
+  - file: tests/callFunctionTestSuite.cpp
+    source: cpp-member-accessor-1.0.0/tests/callFunctionTestSuite.cpp
+    description: "通过模板调用私有成员函数"
+    command: "./callFunctionTestSuite"
+  - file: tests/accessMemberTestSuite.cpp
+    source: cpp-member-accessor-1.0.0/tests/accessMemberTestSuite.cpp
+    description: "通过模板访问私有成员变量"
+    command: "./accessMemberTestSuite"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.cpp
+    description: "消费者测试：find_package(accessor) 后实际读取私有成员并调用私有函数"
+    command: "./test_cpp-member-accessor"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 8
