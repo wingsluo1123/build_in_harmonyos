@@ -1,0 +1,39 @@
+=== R02 ci_fork_oom_attribution — memory-allocators 3.5 (pc3-41) ===
+task_id: memory-allocators-3.5-r02-ci-fork-oom-attribution-and-review-p2-p3-rework-pc3-41-20260929T093803Z
+CI 失败: build 64417 (PR #13608, worker OpenHarmonyPCDeveloper-CI-018, 2026-09-29 12:14)
+ci_failure_first_error: ci/conan/build_and_test.sh:116: fork failed: out of memory
+
+== 复现观测 (ci_repro_observation_ledger) ==
+命令 1: GRAPH_DIR_G0=... ; G0_BAD_KV=$(ls -1 "$GRAPH_DIR_G0"/*.kv 2>/dev/null | grep -vE '.../E[0-9][0-9][0-9]\.kv$|_template|principles' || true)
+  cwd: /storage/Users/currentUser/tianyi/build_in_harmonyos/.workflow/memory-allocators-3.5
+  exit_code: 0   输出: G0_BAD_KV=[空]  (无 fork failed)
+命令 2 (同上, zsh 同源): zsh -c '... G0b 同源命令 ...'
+  exit_code: 0   输出: G0b 同源命令本地执行: PASS (无 fork failed)
+命令 3: python3 压力测试 — 50x 纯 fork
+  exit_code: 0   输出: 50x 纯 fork OK=50
+命令 4: python3 — 30x fork+exec(subprocess.run(['true']))
+  输出: 全部 FileNotFoundError（PATH 中无 'true'？实测绝对路径 /system/bin/true 20/20 OK）→ 属 PATH 解析差异, 非 fork 失败
+命令 5: python3 — 30x 纯 fork 对照: 30x 纯 fork OK=30
+环境: uname = HarmonyOS HongMeng Kernel 1.12.0 aarch64; Mem 31.9GB (free ~3.2GB 可用)
+进程数: 57; ulimit 无显式进程数限制; pid_max=65536
+
+== 根因定位 (ci_cause_locator_evidence) ==
+- 失败行 build_and_test.sh:116 位于共享框架脚本 G0b 知识图谱完整性检查段
+  (G0_BAD_KV=$(ls ... | grep -vE ... || true)), 该段在任何当前库包构建之前执行,
+  与 memory-allocators 源码/配方/测试无任何逻辑关联。
+- 本机对同一命令与本轮全部门禁复现均无 fork failed（上方命令 1/2 exit 0）。
+- 根因: CI worker (OpenHarmonyPCDeveloper-CI-018) 上的进程创建(fork)资源耗竭
+  ("fork failed: out of memory" 为 zsh/glibc fork 在资源受限环境的标准报错),
+  属平台/基础设施层资源限制, 非当前库代码缺陷, 也非共享框架脚本缺陷
+  (prohibited_markers: 未修改 ci/**、未 conanfile_modified_for_ci_avoidance)。
+
+== 仓库 CI 交叉核验 (repository_ci_failure_cross_check) ==
+- CI 失败发生在 G0 前置门禁(知识图谱完整性), 位于构建任何包之前, 与 PR 变更内容
+  (archives/m/memory-allocators/3.5/**) 解耦。
+- 本地同源 zsh 复跑相同命令 PASS, 证明该命令在正常资源环境可稳定执行。
+- 结论: CI 失败归因于 CI worker 平台资源限制 (fork OOM), 非当前库缺陷;
+  已按规程记录并在同一任务内继续其余门禁, 不将外部基础设施问题伪报为当前库缺陷。
+
+== 处置 ==
+- 无 ci/** 或共享框架改动; 无 conanfile/source 为规避 CI 而改动;
+- 继续同一 task_id 执行 Review P2/P3 返工与交付态修复。
