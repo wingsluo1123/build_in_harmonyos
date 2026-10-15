@@ -1,0 +1,32 @@
+package: mrbuild/1.17
+homepage: "https://github.com/dkogan/mrbuild"
+
+upstream_check_command: "n/a (v1.17 ships no automated test suite)"
+upstream_test_in_build: false
+upstream_test_command: "The v1.17 tarball contains no test suite; build_examples/GNU_Make/ is a manual example only."
+
+upstream_tests:
+  - file: build_examples/GNU_Make/Makefile
+    source: mrbuild-1.17/build_examples/GNU_Make/Makefile
+    description: "Manual example Makefile demonstrating template usage (not an automated check)."
+    command: "n/a (manual example, no automated upstream test)"
+
+test_package_tests:
+  - file: test.sh
+    description: "Consumer test: verifies the installed payload, then builds a real mini C project (libmrtest + run) with the installed templates using the OHOS cross toolchain, and asserts the .so symlink chain and ELF artifacts."
+    command: "sh test.sh"
+  - file: project/Makefile
+    description: "Mini project Makefile that includes the installed Makefile.common.header/footer."
+    command: "make"
+  - file: project/lib.c
+    description: "C source built into libmrtest.so.0.1 via the installed templates."
+    command: "make (compile + link)"
+  - file: project/run.c
+    description: "C source built into the run executable linked against libmrtest."
+    command: "make (compile + link)"
+
+assertion_count: 11
+
+test_modifications:
+  - "No upstream tests exist to modify or remove (no automated test suite in v1.17)."
+  - "Consumer test exercises the primary purpose of the package: building a project for OHOS with the installed Makefile templates, plus a dynamic usage-contract check of make-pod-from-help when perl is present."
