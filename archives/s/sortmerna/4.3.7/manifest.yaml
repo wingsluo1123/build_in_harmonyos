@@ -1,0 +1,33 @@
+version: "4.3.7"
+software: sortmerna
+status: built
+build_date: "2026-10-15"
+build_system: cmake
+conan_ref: "sortmerna/4.3.7"
+
+source:
+  url: "https://github.com/sortmerna/sortmerna/archive/refs/tags/v4.3.7.tar.gz"
+  sha256: "6b62def30704ea956e1de060b602f9bebc8f2ba68107c59329b332500997b1d2"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DWITH_TESTS=OFF"
+    - "-DROCKSDB_USE_STATIC_LIBS=ON"
+    - "-DZLIB_ROOT=<conan zlib package>"
+    - "-DCONCURRENTQUEUE_HOME=<conan concurrentqueue package>/include/concurrentqueue/moodycamel"
+  dependencies:
+    - rocksdb7/7.9.2
+    - zlib/1.3.1.1
+    - concurrentqueue/1.0.5
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-keep-rocksdb-transitive-deps.patch"
+
+knowledge_gained:
+  - "knowledge_ref: DRAFT-sortmerna-4.3.7-cmakedeps-iface-link-libraries-rewrite — 上游 set_target_properties 改写 CMakeDeps imported target 的 INTERFACE_LINK_LIBRARIES 会抹掉库路径本身，链接期整个依赖库符号未定义"
+  - "knowledge_ref: E447 — 同族 MODULE/CONFIG 桥接问题：上游强制 find_package(ZLIB MODULE REQUIRED)，CMakeDeps config 不命中，需显式 ZLIB_ROOT 钉住 conan zlib 包"
+  - "knowledge_ref: 无（流程观察） — 上游测试套件 scripts/run.py+test.jinja 定义 78 个场景，54 个依赖未随仓分发的外部 DATA_DIR 数据，上游自身 CI 只构建不跑测试"

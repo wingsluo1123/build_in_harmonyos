@@ -1,0 +1,24 @@
+software: sortmerna
+display: "SortMeRNA"
+description: "宏转录组 rRNA 过滤/比对/聚类的局部序列比对工具 (C++17)"
+category: data
+homepage: "https://github.com/sortmerna/sortmerna"
+license: LGPL-3.0-only
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "上游固定 find_package(ZLIB MODULE REQUIRED)，需通过 ZLIB_ROOT 指向 conan zlib 包"
+    - "RocksDB 通过 CMakeDeps 属性重映射为 RocksDB::rocksdb（上游仓无 FindRocksDB.cmake，依赖 CONFIG 模式）"
+    - "上游会改写 RocksDB::rocksdb 的 INTERFACE_LINK_LIBRARIES 为 zlib+Threads，需补丁保留 conan rocksdb7 的完整传递依赖"
+    - "KVDB 落盘 RocksDB，依赖 rocksdb7 的 OHOS env-io_posix 适配"
+  common_dependencies:
+    - rocksdb7
+    - zlib
+    - concurrentqueue
+
+versions:
+  "4.3.7":
+    status: built
+    build_date: "2026-10-15"
+    conan_ref: "sortmerna/4.3.7"

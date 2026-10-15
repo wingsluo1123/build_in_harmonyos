@@ -1,0 +1,23 @@
+--- a/src/sortmerna/CMakeLists.txt
++++ b/src/sortmerna/CMakeLists.txt
+@@ -66,15 +66,11 @@
+ 	message("RocksDB not found")
+ endif(RocksDB_FOUND)
+ 
+-# fix RocksDBTargets.cmake, which makes both static and shared libraries always dependent on libz.so
+-if(NOT WIN32)
+-	if(ZLIB_LIBRARY_RELEASE)
+-		# modify the dependent libraries of the RocksDB::rocksdb target
+-		set_target_properties(RocksDB::rocksdb PROPERTIES
+-			INTERFACE_LINK_LIBRARIES "${ZLIB_LIBRARY_RELEASE};Threads::Threads"
+-		)
+-	endif()
+-endif()
++# OHOS/conan: do NOT override RocksDB::rocksdb INTERFACE_LINK_LIBRARIES.
++# Conan 2 CMakeDeps encodes the library file path itself in the imported
++# target's INTERFACE_LINK_LIBRARIES, so upstream's rewrite to
++# "zlib;Threads::Threads" unlinks librocksdb.a entirely -> link fails with
++# undefined rocksdb::* symbols (and would also drop snappy/lz4/zstd/bzip2).
+ 
+ if(RocksDB_FOUND)
+ get_property(trans_deps TARGET RocksDB::rocksdb PROPERTY INTERFACE_LINK_LIBRARIES)

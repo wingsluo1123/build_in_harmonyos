@@ -1,0 +1,68 @@
+# ═══ Draft knowledge entry — 上游 set_target_properties 改写 CMakeDeps imported target 的 INTERFACE_LINK_LIBRARIES，链接丢失整个依赖库 ═══
+# Timestamp: 2026-10-15
+# Software: sortmerna 4.3.7 — 触发实例（改写 RocksDB::rocksdb）
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     DRAFT-sortmerna-4.3.7-cmakedeps-iface-link-libraries-rewrite
+trigger_tool:           cmake|ld|conan
+phase:                  linking
+error_signature:        ld\.lld: error: undefined symbol: rocksdb::|undefined reference to [`']rocksdb::|undefined symbol: .*::.*\(\).*referenced by.*CMakeFiles
+severity:               3
+category:               cmake, conan, linking, static-library, cross-compile
+match_keywords:         INTERFACE_LINK_LIBRARIES, set_target_properties, CMakeDeps, imported target, RocksDB::rocksdb, undefined symbol, 传递依赖, 库路径丢失, sortmerna, rocksdb7
+title:                  上游改写 CMakeDeps imported target 的 INTERFACE_LINK_LIBRARIES 会抹掉库文件路径本身，链接期该库符号全部未定义
+
+# ═══ Layer 2: 诊断层 ═══
+root_cause:             Conan 2 CMakeDeps 把依赖库文件路径（lib<dep>.a）连同传递依赖一起编码在生成的 imported target 的 INTERFACE_LINK_LIBRARIES 属性里（生成表达式形式）。上游若用 set_target_properties(<Dep>::<dep> PROPERTIES INTERFACE_LINK_LIBRARIES "…;Threads::Threads") 改写该属性（常见动机：修正上游自带 CMake config 里写死的传递依赖），会把 CMakeDeps 编码的库路径本身一并抹掉——不是“少链几个传递依赖”，而是整个库不再参与链接，链接期报该库全部符号 undefined（sortmerna 4.3.7 实测：ld.lld 报 undefined rocksdb::DB::Open / ReadOptions / DBOptions::IncreaseParallelism 等，全部 referenced by 本包 .obj）。
+affected_scope:         任何“上游 CMakeLists 对 find_package 得到的 imported target 做 set_target_properties(... INTERFACE_LINK_LIBRARIES ...)”的 CMake 项目，在 Conan 2 CMakeDeps 消费模式下（依赖以生成的 *Config.cmake 提供）必然命中；与平台无关（Linux/macOS/OHOS 同发），静态/动态均受影响。
+verification_cmd:       grep -Rn "set_target_properties" --include=CMakeLists.txt --include=*.cmake . | grep INTERFACE_LINK_LIBRARIES
+
+# ═══ Layer 3: 方案层 ═══
+rec_priority:           1
+rec_approach:           patch-out-interface-rewrite
+rec_description:        最小补丁删除（或按条件旁路）上游的 set_target_properties(... INTERFACE_LINK_LIBRARIES ...) 改写块，让 CMakeDeps 生成的完整链接接口生效；若上游本意是裁剪传递依赖，应在消费方 conanfile 里用 CMakeDeps 属性（cmake_target_name / components）或上游自有选项表达，而不是改写 target 属性。
+rec_command:            conan create archives/s/sortmerna/4.3.7 -pr:h=ohos-local -pr:b=ohos-local --build=missing
+rec_auto_fix:           false
+rec_impl:               manual-patch-set
+
+fallback_priority:      2
+fallback_approach:      consumer-side-link-line-audit
+fallback_description:   若不宜改上游（如无补丁通道），在 conanfile build() 后用 cmake --build . --verbose 核对最终链接行确实包含 lib<dep>.a；缺失时只能说明改写块仍在生效，仍需回到推荐方案。
+fallback_command:
+fallback_auto_fix:      false
+fallback_impl:
+
+# ★ 禁止策略 ★
+forbid_1_pattern:       set_target_properties\([^)]*INTERFACE_LINK_LIBRARIES
+forbid_1_reason:        在消费 Conan 2 CMakeDeps 包时保留上游对 imported target INTERFACE_LINK_LIBRARIES 的改写：该属性里编码着库文件路径本身，改写等于摘除整个库
+forbid_1_consequence:   链接期该依赖库符号全部 undefined，且报错面（undefined symbol）看似“库没编出来”，极易误判为依赖包本身缺失/未发布
+
+forbid_2_pattern:       INTERFACE_LINK_LIBRARIES.*\$\{[A-Z_]+\};Threads::Threads
+forbid_2_reason:        往改写行里手工补回库路径（如 "${ROCKSDB_LIBRARY};${ZLIB_LIBRARY_RELEASE};Threads::Threads"）：与 CMakeDeps 生成的依赖契约重复维护，依赖包增删传递依赖时静默腐烂
+forbid_2_consequence:   依赖包升级（如 rocksdb7 增减压缩器）后链接再次断裂，且断点在本包补丁里，排查链路长
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             P012
+
+# ═══ 关系图 ═══
+causes:                 []
+caused_by:              []
+similar_to:             E447, E473
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file:               doc/DRAFT-sortmerna-4.3.7-cmakedeps-iface-link-libraries-rewrite.md
+last_updated:           2026-10-15
+source_event:           sortmerna 4.3.7 适配（feat/sortmerna-4.3.7）：无补丁时 conan create 链接失败，ld.lld 报 rocksdb::* 全部 undefined；补 0001 删除改写块后构建通过
+
+# ═══ 知识协作 ═══
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 ═══
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
