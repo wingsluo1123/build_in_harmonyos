@@ -1,0 +1,43 @@
+software: kwrited
+version: "6.7.2"
+status: built
+build_system: cmake
+created_at: 2026-10-12
+build_date: 2026-10-15
+dependencies:
+  required:
+    - qtbase/6.11.1
+    - kcoreaddons/6.26.0.1
+    - ki18n/6.26.0
+    - knotifications/6.26.0
+    - kpty/6.26.0
+  build:
+    - ecm/6.26.0
+  optional: []
+  note: "无需 kdbusaddons：OHOS 侧 kpty 导出 KPty_HAVE_UTEMPTER=FALSE，上游 cmake_dependent_option(BUILD_AS_EXECUTABLE ...) 自动选可执行分支，该分支不 find_package(KF6DBusAddons)"
+patches_applied: []
+test_results:
+  type: passed_with_added_tests
+  upstream: "上游无测试（R51 清点：ctest -N 0 目标；无 autotests/tests/test 目录；CMakeLists 无 add_test/ecm_add_test；CI 配置无测试作业）——证据见 test_package/MANIFEST.yml → inventory_evidence"
+  test_package: "passed: 消费者用例 1/1 —— 实跑打包产物 bin/kwrited（offscreen QPA）：存活 5s、/proc/<pid>/fd/0 -> /dev/pts/6、SIGTERM 优雅退出"
+  package_id: "32de47f40b0f3a681c423576726e5659244b10eb"
+  recipe_revision: "0fe0f2b53ba1932371d29d420de990d0"
+  package_revision: "1e5d8360d3ee72a91348181ca7d9d494"
+  gates:
+    g0: "pass（预扫描命中 E092 CMake 不认识 HarmonyOS，已由 CONAN 工具链 CMAKE_SYSTEM_NAME=OHOS 处理）"
+    g1: "pass（配方字段完整：name/version/source/build/package/package_info/export_sources + test_package/MANIFEST.yml）"
+    g2: "pass（干净 conan create 成功）"
+    g3: "pass（纯可执行包，无 lib/ 与系统同名库冲突）"
+    g4: "pass（校验工具未解出程序包 ID，未列产物清单；产物清单以本机实测为准：bin/kwrited 35456B、包体约 161KB）"
+    l0: "pass（2026-10-15 重跑 W3：依赖闸实测命中 kpty/6.26.0#32850cf489da395267d4cfe789ffce7e，L0_RESULT=pass；.ci-result.json 已写入 exit_code=0、log_sha256=4a43fbce…；证据 reports/w3-local-ci.log）"
+    l1: "pass（消费者用例 1/1 实跑通过：打包产物 bin/kwrited 存活 5s、pty=/dev/pts/6、SIGTERM 优雅退出；L1e 破坏性反向验证确认测试真依赖被测包；Pass rate 100% (1/1)）"
+    l2: "skip: kwrited 为守护进程无 --version/--help，L2 烟雾测试不适用（W3 同判 L2_RESULT=skip）；执行覆盖由 test_package 真执行 + L1e 反向验证承担"
+    l4: "pass（无补丁：L4_RESULT=pass patches clean）"
+    l5: "pass（L5_RESULT=pass: bin/ has content）"
+source_url: https://download.kde.org/stable/plasma/6.7.2/kwrited-6.7.2.tar.xz
+source_sha256: f03e867a1ace77e5d9285957023c5bb9db7fd92e466a7e02d5d419f8d827e6b3
+knowledge_gained:
+  - "形态由上游能力宏决定：cmake_dependent_option(BUILD_AS_EXECUTABLE ... OFF \"KPty_HAVE_UTEMPTER\" ON) —— OHOS 侧 kpty/6.26.0 无 UTEMPTER，宏为 FALSE，自动落可执行分支；该分支不依赖 KF6DBusAddons（无桌面会话平台的正确形态）。"
+  - "no-desktop-session 判定：OHOS PC 无会话 D-Bus 总线与 KDED 装载器，KDED 插件形态（plugins/kf6/kded + ServiceTypes=KDEDModule）能编译但永不加载；判定/策略/复现见 knowledge/operations/no-desktop-session-dbus-kded/。"
+  - "零补丁的边界条件：能力宏必须由依赖包真实导出（本例 KPty_HAVE_UTEMPTER=FALSE 来自 kpty 包配置），不能由本配方强行注入 -D 覆盖——注入等于伪造能力。"
+  - "消费者测试要点：守护进程无 CLI 参数/无 stdout，验证方式为真执行 + 存活判定 + /proc/<pid>/fd/0 的 pty 归属断言，而非 --version 烟雾测试。"
