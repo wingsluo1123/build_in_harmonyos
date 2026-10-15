@@ -1,0 +1,68 @@
+# 版本级 manifest
+# 文件位置: archives/f/fslsfonts/1.0.7/manifest.yaml
+
+version: "1.0.7"
+
+# 软件名
+software: fslsfonts
+
+# built | published | failed | archived —— 本窗只做到本地 W3 通过，发布由 CI 完成
+status: built
+
+build_date: "2026-10-15"
+
+build_system: autotools
+
+source:
+  url: "https://xorg.freedesktop.org/archive/individual/app/fslsfonts-1.0.7.tar.xz"
+  sha256: "67cddb1aa7fccab5d107beef32fa2c143e8a132a2b974a557557b24c6f306b63"
+  tar_format: tar.xz
+
+build:
+  system: autotools
+  configure_options: []
+  dependencies:
+    - libfs/1.0.10
+    - xorgproto/2025.1
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - 0001-configure-hmdfs-pwd-tmpdir.patch
+  - 0002-config.guess.patch
+  - 0003-config.sub.patch
+
+knowledge_gained:
+  - "E011/E114 家族变体：HMDFS 上 configure 的 ac_pwd 判定需在 pwd 失败时回退 $PWD（配方侧同时预置 os.environ[\"PWD\"]），config.status 临时目录 umask 077→022"
+  - "E007/E072 家族：config.guess 需 HarmonyOS 分支（uname -s=HarmonyOS 直接无法猜型）、config.sub 拒绝 ohos 记号，双补丁缺一不可，且不得用 --build/--host 绕过"
+  - "X font 族客户端（fslsfonts）只需 libfs + xorgproto 的 pkg-config 视图（PkgConfigDeps + VirtualBuildEnv），无需 X server / libX11 链接面"
+  - "E182/E188 家族：HMFS 上带 -c 的 install 失败，手册页安装需把 Makefile INSTALL 重定向到 cp/mkdir shim"
+  - "上游无自动化测试时，测试口径为 test_package 自造真断言：6 声明 / 6 执行 / 6 通过 / 0 跳过 / 0 失败；主功能路径（列字体）需 font server，无服务器代码路径全部可断言"
+
+patch_generation:
+  method: per-file-diff
+  generated_at: "2026-10-15T01:20"
+  patches_count: 3
+
+patch_classification:
+  - file: 0001-configure-hmdfs-pwd-tmpdir.patch
+    type: portability
+    platform_only: True
+    guard: 'applied'
+  - file: 0002-config.guess.patch
+    type: portability
+    platform_only: True
+    guard: 'applied'
+  - file: 0003-config.sub.patch
+    type: portability
+    platform_only: True
+    guard: 'applied'
+
+test_summary:
+  upstream_tests_static: 0
+  upstream_tests_executed: 0
+  test_package_declared: 6
+  test_package_passed: 6
+  test_package_skipped: 0
+  test_package_failed: 0
+  evidence: "archives/f/fslsfonts/1.0.7/reports/conan-create.log"
