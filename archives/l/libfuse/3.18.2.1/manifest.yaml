@@ -1,0 +1,36 @@
+version: 3.18.2.1
+software: libfuse
+status: built
+build_date: '2026-10-14'
+build_system: meson
+source:
+  url: https://github.com/libfuse/libfuse/releases/download/fuse-3.18.2/fuse-3.18.2.tar.gz
+  sha256: f01de85717e20adf5f98aff324acd85dd73d61a5ca3834d573dcf0bd6e54a298
+  tar_format: tar.gz
+build:
+  system: meson
+  configure_options:
+  - -Dexamples=false
+  - -Dutils=false
+  - -Dtests=false
+  - -Duseroot=false
+  options:
+  - shared=True
+  - fPIC=True
+  dependencies: []
+  cc: clang
+  cxx: clang++
+patches_applied:
+- 0001-meson-build.patch
+- 0002-lib-meson-build.patch
+- 0003-lib-fuse-loop-mt.patch
+- 0004-lib-fuse.patch
+knowledge_gained:
+- "conan 的兼容性回退只放宽 settings（如 cppstd），**不放宽 options**：3.18.2 已发布的制品只有静态变体（package_id 21b17f8b…，shared=False），消费方要 shared=True 的 0726937e… 时匹配不到，只能从源码重编——而那次源码编译在 CI 上撞上 posix_spawn 资源耗尽。发布该变体的唯一合规途径是新版本号（R37）。"
+- "上游源码与 3.18.2 完全相同（同一个 fuse-3.18.2.tar.gz），本版本只改 default_options.shared"
+- "OHOS: host_machine.system() 返回 harmonyos，meson.build 的 startswith(linux) 判断失效；mount_bsd.c 会被选中；pthread_cancel 系列需 HAVE_PTHREAD_CANCEL 特性探测（4 个补丁，与 3.18.2 同一组）"
+verification:
+  conan_create: passed
+  conan_create_detail: "本地 conan create 端到端 rc=0；产出的 package_id 恰为 0726937e17000c634ad5fc029642008575bda6b0（即 shared=True 变体，也正是 CI #14023 报缺失的那个）"
+  test_package: "1/1 tests passed（CMake 消费测试 test_libfuse 链接并运行成功）"
+  compiler: clang 15.0.4
