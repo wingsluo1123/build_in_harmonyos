@@ -1,0 +1,56 @@
+--- a/rfcdiff
++++ b/rfcdiff
+@@ -1,11 +1,11 @@
+-#!/bin/bash
++#!/data/service/hnp/bin/bash
+ #
+ # Synopsis:
+ #	Show changes between 2 internet-drafts using changebars or html
+ #	side-by-side diff.
+ #	
+ # Usage:
+ #	rfcdiff [options] file1 file2
+ #	
+ #	rfcdiff takes two RFCs or Internet-Drafts in text form as input, and
+ #	produces output which indicates the differences found in one of various
+@@ -102,21 +102,21 @@
+ #		rfcdiff first-file second-file
+ #	
+ #	The latest version is available from
+ #		https://github.com/ietf-tools/rfcdiff
+ #
+ 
+ export version="1.49"
+ export progdate=""
+ export prelines="10"
+ export basename=$(basename $0)
+-export workdir="/tmp/$basename-$$"
++export workdir="${TMPDIR:-/tmp}/$basename-$$"
+ export pagecache1="$workdir/pagecache1"
+ export pagecache2="$workdir/pagecache2"
+ 
+ # ----------------------------------------------------------------------
+ # Utility to find an executable
+ # ----------------------------------------------------------------------
+ lookfor() {
+     for b in "$@"; do
+ 	found=$(which "$b" 2>/dev/null)
+ 	if [ -n "$found" ]; then
+@@ -1144,16 +1144,16 @@
+ if [ $optkeep -eq 0 ]; then
+    if [ -f $pagecache1 ]; then rm $pagecache1; fi
+    if [ -f $pagecache2 ]; then rm $pagecache2; fi
+    rm -fr $workdir/1
+    rm -fr $workdir/2
+    if [ -f $workdir/diff ]; then
+       rm $workdir/diff
+    fi
+    rmdir $workdir
+ else
+-   cd /tmp
++   cd "${workdir%/*}"
+    tar czf $basename-$$.tgz $basename-$$
+    echo "
+    Temporary workfiles have been left in $workdir/, and packed up in $workdir.tgz"
+ fi
+ 
