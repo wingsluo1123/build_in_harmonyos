@@ -1,0 +1,119 @@
+# 版本级 manifest — obs 32.1.2
+# 文件位置: archives/o/obs/32.1.2/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "32.1.2"
+software: "obs"
+status: built
+build_date: "2026-10-14"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/obsproject/obs-studio/archive/refs/tags/32.1.2.tar.gz"
+  mirrors:
+    - "https://gh-proxy.com/https://github.com/obsproject/obs-studio/archive/refs/tags/32.1.2.tar.gz"
+  sha256: "b4a59410cddb46d0e31df1ee13b8ec66f30862d7e980c1a8c4e3b5d16fae6053"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_SYSTEM_NAME=Linux"          # OHOS 目标是 aarch64-linux-ohos，见 patches/0002
+    - "-DCMAKE_SKIP_RPATH=ON"              # OHOS 加载器拒绝 CMake 安装期改写后的 ELF（EACCES）
+    - "-DOBS_VERSION_OVERRIDE=32.1.2"      # tarball 无 .git，否则版本回退为 0.0.1
+    - "-DENABLE_UI=OFF"
+    - "-DENABLE_FRONTEND=OFF"
+    - "-DENABLE_PLUGINS=OFF"
+    - "-DENABLE_SCRIPTING=OFF"
+    - "-DENABLE_UNIT_TESTS=ON"
+    - "-DBUILD_TESTS=OFF"
+    - "-DENABLE_PULSEAUDIO=OFF"
+    - "-DENABLE_WAYLAND=OFF"
+  dependencies:
+    - ffmpeg/7.1.5
+    - simde/0.8.4-rc3
+    - zlib/1.3.1.1
+    - uthash/2.4.0
+    - jansson/2.15.1.1
+    - libuuid/2.42.2
+    - libx11/1.8.13.1
+    - libxcb/1.17.0.1
+    - xorgproto/2025.1
+    - libdrm/2.4.133
+    - gl4es/1.1.6
+    - extra-cmake-modules/6.29.0
+    - cmocka/2.0.2
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-CMakeLists.txt.patch"
+  - "0002-cmake-common-osconfig.cmake.patch"
+  - "0003-libobs-util-threading-posix.c.patch"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /data/storage/el2/base/files/home/.tmp/builds/obs-32.1.2.orig
+  source_work_dir: /data/storage/el2/base/files/home/.tmp/builds/obs-32.1.2.work
+  source_orig_hash: a11fe8460cfe1849
+  source_work_hash: f15eb40298286e59
+  generated_at: '2026-10-14T01:27:22'
+  patches_count: 3
+
+patch_classification:
+  - file: 0001-CMakeLists.txt.patch
+    type: portability
+    platform_only: False
+    guard: none
+    note: >-
+      上游顶层 CMakeLists.txt 从未 add_subdirectory(test)，test/cmocka 的 4 个
+      上游单元测试在既有配置下永远不会被构建；本补丁在 ENABLE_UNIT_TESTS=ON 时
+      补 enable_testing() + add_subdirectory(test)，使上游测试真正可构建可执行。
+  - file: 0002-cmake-common-osconfig.cmake.patch
+    type: platform
+    platform_only: True
+    guard: 'CMAKE_HOST_SYSTEM_NAME == "HarmonyOS"'
+    note: >-
+      OBS 依据 CMAKE_HOST_SYSTEM_NAME 选 OS_* 分支，HarmonyOS 内核报告
+      "HarmonyOS" 不匹配任何分支，导致 include(defaults/compilerconfig/helpers)
+      直接失败；HarmonyOS PC 使用 aarch64-linux-ohos ABI，映射到既有 Linux 模块集。
+  - file: 0003-libobs-util-threading-posix.c.patch
+    type: platform
+    platform_only: True
+    guard: '__OHOS__'
+    note: >-
+      os_set_thread_name() 只有 __APPLE__/__FreeBSD__/__GLIBC__ 分支；OHOS 使用
+      musl 不定义 __GLIBC__，函数退化为空实现并触发 -Werror（unused parameter）。
+      OHOS 导出与 glibc 同签名的 pthread_setname_np，故将 __OHOS__ 并入该分支——
+      有实质逻辑（真实设置线程名），非空壳 stub，test_package 已实测回读验证。
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "OHOS 加载器（musl）拒绝 CMake 安装期做过 RPATH 剥离的 ELF：同一 .so 构建树副本可加载、安装副本 dlopen 报 EACCES Permission denied（程序头与 .note.ohos.ident 逐字节一致）。对策 CMAKE_SKIP_RPATH=ON。→ knowledge/drafts/E549-draft-B7A2.kv"
+  - "OBS 顶层 CMakeLists.txt 第 3 行 include(bootstrap)（含 versionconfig，解析版本号）而 project() 在第 4 行；CMake 只在 project() 时读取 toolchain，故 toolchain 内的 cache 变量对该处不可见——版本号类变量必须用命令行 -D 传入。"
+  - "OBS 顶层从不 add_subdirectory(test)，test/cmocka 的 4 个上游 cmocka 用例是死代码，须自行 enable_testing() + add_subdirectory(test) 才能构建执行。"
+  - "conan 的 CMakeToolchain 默认置 CMAKE_FIND_PACKAGE_PREFER_CONFIG=ON，会绕过 OBS 自带的 cmake/finders（FindFFmpeg/FindUthash/FindLibdrm 等），导致 Uthash::Uthash / Libdrm::Libdrm / XCB::XCB 等目标缺失；需在 toolchain 末尾追加 PREFER_CONFIG=OFF。"
+  - "conan 生成的 ECMConfig.cmake 不设置 ECM_MODULE_PATH，OBS 依赖的 FindX11_XCB.cmake / FindXCB.cmake 来自 extra-cmake-modules 的 share/ECM/find-modules，须显式指定该变量。"
+  - "OHOS 提供 libEGL/libGLESv3/libGLv4 与 EGL/GLES 头，但无 X11/Wayland 桌面栈；GitHub 归档 tarball 中 obs-browser/obs-websocket 子模块为空占位，故 Qt 前端与插件集无法构建，libobs + libobs-opengl + obs-frontend-api 可完整构建。"
+  - "OHOS libc 为 musl 派生：不定义 __GLIBC__；pthread_setname_np/pthread_getname_np 需 _GNU_SOURCE 才声明。"
+  - "CI 预下载对 conandata.yml 的每个镜像逐条 curl --retry 3 --connect-timeout 30 --max-time 300，不可达镜像每个约耗 20 分钟，镜像列表应只保留实测可达项。"
+

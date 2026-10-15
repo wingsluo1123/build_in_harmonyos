@@ -1,0 +1,46 @@
+# conandata.yml — obs 32.1.2
+# Source: OBS Studio upstream release tag 32.1.2 (GitHub archive tarball).
+# sha256 verified against the tarball used for the local OHOS build.
+#
+# URL list follows the repo convention: mirror endpoints first (the build
+# workers cannot reach github.com directly), the official source last. The
+# official URL is the source of record per R39.
+# Only mirrors verified to answer this release are listed: the CI pre-download
+# loop walks the list with `curl --retry 3 --connect-timeout 30 --max-time 300`
+# per entry, so unreachable mirrors (mirror.ghproxy.com / ghproxy.com /
+# gitclone.com / moeyy.cn / kkgithub.com all fail as of 2026-10-14) would cost
+# ~20 minutes of CI time each without ever producing a download.
+
+sources:
+  url:
+    - "https://gh-proxy.com/https://github.com/obsproject/obs-studio/archive/refs/tags/32.1.2.tar.gz"
+    - "https://ghfast.top/https://github.com/obsproject/obs-studio/archive/refs/tags/32.1.2.tar.gz"
+    - "https://github.com/obsproject/obs-studio/archive/refs/tags/32.1.2.tar.gz"
+  sha256: "b4a59410cddb46d0e31df1ee13b8ec66f30862d7e980c1a8c4e3b5d16fae6053"
+
+patches:
+  - patch_file: "patches/0001-CMakeLists.txt.patch"
+    patch_description: >-
+      Wire the upstream CMake CTest suite into the build: enable_testing() plus
+      add_subdirectory(test) gated on ENABLE_UNIT_TESTS. Upstream only adds
+      test/test-input, so test/cmocka (the four cmocka unit tests) was dead code
+      and never built by any configuration.
+    patch_type: "portability"
+  - patch_file: "patches/0002-cmake-common-osconfig.cmake.patch"
+    patch_description: >-
+      Teach OBS's OS bootstrap about HarmonyOS. OBS branches on
+      CMAKE_HOST_SYSTEM_NAME, which the HarmonyOS kernel reports as
+      "HarmonyOS" - matching no upstream branch, so include(defaults)/
+      include(compilerconfig)/include(helpers) (all resolved through
+      cmake/linux) failed immediately. HarmonyOS PC uses the aarch64-linux-ohos
+      ABI, so map it onto the existing Linux module set.
+    patch_type: "platform"
+  - patch_file: "patches/0003-libobs-util-threading-posix.c.patch"
+    patch_description: >-
+      os_set_thread_name() only had __APPLE__/__FreeBSD__/__GLIBC__ branches.
+      OHOS libc is musl-based and does not define __GLIBC__, so the function
+      compiled to an empty body (and broke -Werror with an unused-parameter
+      warning). OHOS exports pthread_setname_np(pthread_t, const char *) with
+      the same signature as glibc, so OR the __OHOS__ case into the glibc
+      branch.
+    patch_type: "platform"

@@ -1,0 +1,73 @@
+# test_package/MANIFEST.yml — obs 32.1.2
+# 上游官方测试声明文件（CI build_and_test.sh L0e 强制要求）。
+# 详见 docs/TEST_QUALITY_SPEC.md
+
+package: obs/32.1.2
+homepage: "https://obsproject.com/"
+
+# 上游测试枚举命令（本次实测使用）
+upstream_check_command: "ctest --test-dir <build> -N"
+
+# conanfile.py build() 中已集成上游测试并实际执行
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build> --output-on-failure"
+
+# 上游测试审计（源码: GitHub release tarball 32.1.2）
+upstream_test_audit:
+  source_tarball: "obs-studio-32.1.2.tar.gz"
+  source_sha256: "b4a59410cddb46d0e31df1ee13b8ec66f30862d7e980c1a8c4e3b5d16fae6053"
+  framework: "cmocka (cmocka_run_group_tests) + CTest add_test 注册"
+  registration: >-
+    test/cmocka/CMakeLists.txt 定义 4 个 cmocka 可执行目标并注册到 CTest，
+    由 test/CMakeLists.txt 的 ENABLE_UNIT_TESTS 开关控制。
+  build_wiring_note: >-
+    上游顶层 CMakeLists.txt 仅 add_subdirectory(test/test-input)，从未
+    add_subdirectory(test)，因此 test/cmocka 的 4 个上游用例在任何既有配置下都不会被
+    构建（等于死代码）。patches/0001 在 ENABLE_UNIT_TESTS=ON 时补上
+    enable_testing() + add_subdirectory(test)，使上游用例真正进入构建并由本配方执行。
+
+# 上游实际运行的全部测试程序（4/4）
+upstream_tests:
+  - file: test_serializer.c
+    source: test/cmocka/test_serializer.c
+    description: "array_output_serializer 写入字节与 serializer 位置断言"
+    command: "./test_serializer"
+  - file: test_darray.c
+    source: test/cmocka/test_darray.c
+    description: "darray_* 动态数组增删/容量断言"
+    command: "./test_darray"
+  - file: test_bitstream.c
+    source: test/cmocka/test_bitstream.c
+    description: "bitstream 读写与字节序断言"
+    command: "./test_bitstream"
+  - file: test_os_path.c
+    source: test/cmocka/test_os_path.c
+    description: "os_get_path_extension() 路径扩展名解析（POSIX/Windows 混合用例）"
+    command: "./test_os_path"
+
+# 本机实测结果（aarch64 HarmonyOS，conan create 内的 ctest 步骤）
+local_run:
+  command: "ctest --test-dir <build> --output-on-failure"
+  total: 4
+  pass: 4
+  fail: 0
+  skip: 0
+  detail: "4/4 通过（100%）；libobs.so.30 与 conan 依赖运行环境齐备，无平台限制导致的跳过"
+
+# test_package 中的消费者测试（鸿蒙特有）
+test_package_tests:
+  - file: src/test_obs.c
+    description: >-
+      鸿蒙特有消费者测试：os_set_thread_name() 的 __OHOS__ 分支（pthread_setname_np
+      设置 + pthread_getname_np 回读 + 超长名截断）、libobs 版本串、obs_data JSON
+      往返、HarmonyOS 沙箱路径扩展名
+    command: "./test_obs"
+
+# 断言数（近似值，用于质量评估）
+assertion_count: 24
+
+scanned_for:
+  - "cmocka_unit_test (cmocka)"
+  - "add_test (ctest)"
+  - "TEST( / TEST_F (gtest)"
+  - "TESTS = (automake)"
