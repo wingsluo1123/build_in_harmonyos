@@ -1,0 +1,74 @@
+# 版本级 manifest — scrollz 2.2.3
+# 文件位置: archives/s/scrollz/2.2.3/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "2.2.3"
+software: "scrollz"
+
+# 编译状态 (published | built | failed | archived)
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-15"
+build_system: "autotools"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 官方上游 tag tarball（R39: 官方源）
+  url: "https://github.com/scrollz/scrollz/archive/refs/tags/ScrollZ-2.2.3.tar.gz"
+  sha256: "cba8cdbf01d64aed6e9ba94781629f24be58ab18929ccef28c775e8678cbad2a"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: autotools
+  # 未向 configure 传额外选项；--prefix 由 AutotoolsToolchain 提供。
+  # 依赖探测所需路径经环境注入：CPPFLAGS=-I<ncurses>/include（buildenv）、
+  # LDFLAGS=-L<ncurses>/lib（extra_ldflags）。
+  configure_options: []
+  dependencies:
+    - ncurses/6.5
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-configure.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "老 autoconf 2.13 生成的 configure 不接受 `VAR=value` 形式的命令行赋值（报 invalid host type）；需要注 入 CPPFLAGS 时应走环境变量/self.buildenv。"
+  - "configure 头文件探测（AC_CHECK_HEADERS/AC_EGREP_CPP）走 $CPP，只读 $CPPFLAGS 不读 $CFLAGS；依赖头文件路径必须进 CPPFLAGS，否则驱动库原型缺失（隐式 int）导致编译失败。"
+  - "OHOS 已发布 ncurses 为静态宽字符版（仅 libncursesw.a），旧式 configure 的 `-lncurses` 探测必须改为 `-lncursesw`。"
+
+# ---- refresh-patch --auto 生成记录（保留）----
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/ohpc-porting/builds/scrollz-2.2.3.orig
+  source_work_dir: /storage/Users/currentUser/tmp/ohpc-porting/builds/scrollz-2.2.3.work
+  source_orig_hash: 3791158167e4bb28
+  source_work_hash: b09e4d61f91e07bc
+  generated_at: '2026-10-15T11:41:12'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
