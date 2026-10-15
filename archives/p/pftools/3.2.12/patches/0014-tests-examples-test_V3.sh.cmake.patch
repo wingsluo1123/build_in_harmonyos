@@ -1,0 +1,61 @@
+--- a/tests/examples/test_V3.sh.cmake
++++ b/tests/examples/test_V3.sh.cmake
+@@ -18,21 +18,21 @@
+ PFW=$<TARGET_FILE:pfw>
+ PTOH=$<TARGET_FILE:ptoh>
+ PTOF=$<TARGET_FILE:ptof>
+ P2FT=$<TARGET_FILE:2ft> # NB: sh does not allow variable name starting with a digit
+ 
+ SORT_PSA=@PERL_SCRIPT_DIR@/sort_fasta.pl # FIXME: use cmake syntax
+ MAKE_IUPAC_CMP=@PERL_SCRIPT_DIR@/make_iupac_cmp.pl # FIXME: use cmake syntax
+ SCRAMBLE=@PERL_SCRIPT_DIR@/scramble_fasta.pl # FIXME: use cmake syntax
+ 
+ CMPDIR=@DATA_DIR@/Matrices
+-TMPDIR=/tmp/test_V3
++TMPDIR=${TMPDIR:-/tmp}/test_V3
+ mkdir -p $TMPDIR
+ 
+ #----------------------------------------------------------------------#
+ # The PFTOOLS is a powerful software to align biological sequences.
+ # Owing to the 'generalized profile syntax', it allows the fine-tuning
+ # of an alignent scoring system, beyond what is feasible by most other
+ # software. Despite the PFTOOLS are crippled by a lot of legacy code,
+ # they are still extremely useful for precision work.
+ #
+ # Nota bene to use this script as a testsuite:
+@@ -223,28 +223,27 @@
+ | $SCRAMBLE -m permutation -M 10 - \
+ > $TMPDIR/permut.fa
+ 
+ # $PFCALIBRATEV3 -F $TMPDIR/permut.fa $TMPDIR/16S.prf.tmp > $TMPDIR/16S.prf
+ # $PFSEARCHV3 -t 1 -n -q $TMPDIR/16S.prf $TMPDIR/small.sample.fastq
+ 
+ #----------------------------------------------------------------------#
+ # Verify handling of characters not in the profile alphabet
+ #----------------------------------------------------------------------#
+ 
+-cat > $TMPDIR/ACGTAACGT.seq << EOI
+->ACGTAACGT weight=10
+-ACGTAACGT
+-EOI
+-cat > $TMPDIR/ACGTWACGT.seq << EOI
+->ACGTWACGT weight=1.0
+-ACGTWACGT
+-EOI
++# OHOS: 这里原本用 here-document（cat > file << EOI）。HarmonyOS 的 /tmp 是只读文件系统，
++# 而 shell 为 here-document 创建临时文件时会落到 /tmp，导致测试随机失败
++# （"can't create temporary file /tmp/shXXXXXX.tmp: Read-only file system"）。
++# 改用 printf 写同样的内容，彻底去掉对 /tmp 的依赖。
++printf '%s\n' '>ACGTAACGT weight=10' 'ACGTAACGT' > $TMPDIR/ACGTAACGT.seq
++# ACGTWACGT 含非 profile 字母字符 W，用于验证字母表外字符处理
++printf '%s\n' '>ACGTWACGT weight=1.0' 'ACGTWACGT' > $TMPDIR/ACGTWACGT.seq
+ $PFMAKE -m -3 -S 0.01 -F 100 $TMPDIR/ACGTAACGT.seq $CMPDIR/dna_50_40.cmp > $TMPDIR/ACGTAACGT.prf
+ 
+ $PFSEARCHV3 -fa -o 6 $TMPDIR/ACGTAACGT.prf $TMPDIR/ACGTAACGT.seq # raw_score=450 PSA=ACGTAACGT
+ $PFSEARCHV3 -fa -o 6 $TMPDIR/ACGTAACGT.prf $TMPDIR/ACGTWACGT.seq # raw_score=383 PSA=ACGTWACGT (not ACGTXACGT)
+ 
+ 
+ #----------------------------------------------------------------------#
+ # extra & bug fix related tests
+ 
+ # pfscanV3 should accept motif files containing patterns, and be able to ignore patterns with --matrix-only option

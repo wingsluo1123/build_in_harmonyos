@@ -1,0 +1,28 @@
+--- a/src/Fortran/pfmake.f
++++ b/src/Fortran/pfmake.f
+@@ -425,21 +425,24 @@
+       If(J1.GT.0) SINS(K1)=-SINS(K1)
+       LPRF=K1
+ 
+ 
+ * initialize generalized profile
+ 
+ * - header
+ 
+       If(CPID.EQ.' ') CPID='SEQUENCE_PROFILE'
+       If(CPAC.EQ.' ') CPAC='ZZ99999'
+-      CALL Fdate(FDAT)
++* OHOS/LLVM Flang: the FDATE extension is not implemented by LLVM Flang;
++*       use the standard DATE_AND_TIME intrinsic to build the time stamp.
++      FDAT=' '
++      Call Date_and_time(Date=FDAT(1:8),Time=FDAT(10:15))
+       If(CPDT.NE.' ') then
+          CPDT=FDAT(1:Lblnk(FDAT)) // ' ! ' // CPDT
+       Else
+          CPDT=FDAT(1:Lblnk(FDAT))
+       End if
+       If(FMSF.EQ.'-') FMSF='stdin'
+       If(CPDE.EQ.' ') CPDE='Generated from MSF file: '''
+      *   // FMSF(1:Lblnk(FMSF))
+      *   // '''.'
+ 

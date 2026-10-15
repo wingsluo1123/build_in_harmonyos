@@ -1,0 +1,163 @@
+software: pftools
+version: 3.2.12
+status: built
+build_system: cmake
+compile_date: 2026-10-13
+
+source:
+  url: "https://codeload.github.com/sib-swiss/pftools3/tar.gz/refs/tags/v3.2.12"
+  sha256: "1de33d6444015942afa690d54a103ad5a3d68f416fad63f247c12fa3f71a550c"
+  tar_format: tar.gz
+  extra_sources:
+    - name: sse2neon.h
+      url: "https://raw.githubusercontent.com/DLTcollab/sse2neon/v1.9.1/sse2neon.h"
+      sha256: "78632498a57bf7e080e84cb8d74c47ce93b204cece77eab79de2908eb8bc92ed"
+
+dependencies:
+  required:
+    - pcre2/10.47
+    - libfile-slurp-perl/9999.32
+  optional: []
+  tool_requires:
+    - flang-ohos/20.1.0
+
+build_config:
+  target: aarch64-unknown-linux-ohos
+  options:
+    - -DUSE_PCRE2=ON
+    - -DUSE_AFFINITY=OFF   # musl 不定义 __USE_GNU（INSTALL 记载的官方构型）
+    - -DUSE_RPATH=OFF      # rpath 交给 conan
+    - -DCMAKE_C_FLAGS=-ffp-contract=off   # AArch64 FMA 收缩会使分数与 x86 参考差 1 ULP
+
+patches_applied:
+  - 0001-CMakeLists.txt.patch
+  - 0002-src-C-sse2-heuristic_sse2.c.patch
+  - 0003-src-C-sse2-sse2_inline_fcts.h.patch
+  - 0004-src-C-sse2-xali1_sse2.c.patch
+  - 0005-src-C-sse41-heuristic_sse41.c.patch
+  - 0006-src-C-sse41-sse41_inline_fcts.h.patch
+  - 0007-src-C-utils-system.c.patch
+  - 0008-src-Fortran-CMakeLists.txt.patch
+  - 0009-src-Fortran-pfmake.f.patch
+  - 0010-src-Fortran-pfw.f.patch
+  - 0011-src-Fortran-psa2msa.f.patch
+  - 0012-src-Fortran-regpr.f.patch
+  - 0013-tests-examples-CMakeLists.txt.patch
+  - 0014-tests-examples-test_V3.sh.cmake.patch
+  - 0015-tests-examples-test_V3_output.sh.cmake.patch
+  - 0016-tests-examples-test_pfsearchV3_pattern-regexp.sh.cmake.patch
+
+patch_details:
+  0001-CMakeLists.txt.patch: 非 x86 架构下引入 src/C/simd/ 可移植 SIMD 垫片；PCRE2 头目录全局可见（非系统前缀）
+  0002-src-C-sse2-heuristic_sse2.c.patch: x86 内联汇编（xorps/maxps/addss）改写为等价 intrinsic
+  0003-src-C-sse2-sse2_inline_fcts.h.patch: _my_insert_epi32_POS1 的 movsd 内联汇编改为 SSE2 intrinsic
+  0004-src-C-sse2-xali1_sse2.c.patch: movss / cvtsi2ss 内联汇编改为 intrinsic
+  0005-src-C-sse41-heuristic_sse41.c.patch: pxor/movdqa/pmaxsd/phaddd/pshufd 内联汇编改写为 intrinsic（含水平求和替换）
+  0006-src-C-sse41-sse41_inline_fcts.h.patch: SSE4.1 守卫增加 SSE2NEON_H 条件（垫片提供 SSE4.1 intrinsic）
+  0007-src-C-utils-system.c.patch: createMask 的 bsrq 改为 __builtin_clzll；cpuid/xgetbv 探测与 Intel/AMD 拓扑函数加 x86 门控 + aarch64 回退分支
+  0008-src-Fortran-CMakeLists.txt.patch: 按 Fortran 编译器 ID 选择 legacy flag（flang 只接受 -std=f2018）
+  0009-src-Fortran-pfmake.f.patch: FDATE（LLVM Flang 未实现）改用标准 DATE_AND_TIME
+  0010-src-Fortran-pfw.f.patch: Status=SCRATCH（/tmp 只读）改为 $TMPDIR 具名工作文件
+  0011-src-Fortran-psa2msa.f.patch: Status=SCRATCH 改为 $TMPDIR 具名工作文件
+  0012-src-Fortran-regpr.f.patch: Status=SCRATCH 改为 $TMPDIR 具名工作文件
+  0013-tests-examples-CMakeLists.txt.patch: Perl 测试的工作目录不再硬编码 /tmp，改用构建目录
+  0014-tests-examples-test_V3.sh.cmake.patch: 测试临时目录改为 ${TMPDIR:-/tmp}；here-document 改为 printf（shell 为 here-doc 建临时文件会落到只读 /tmp，导致随机失败）
+  0015-tests-examples-test_V3_output.sh.cmake.patch: 测试临时目录 /tmp 改为 ${TMPDIR:-/tmp}
+  0016-tests-examples-test_pfsearchV3_pattern-regexp.sh.cmake.patch: 测试临时目录 /tmp 改为 ${TMPDIR:-/tmp}
+
+verification:
+  upstream_test_suite: "ctest (tests/examples/CMakeLists.txt)"
+  upstream_tests_total: 6
+  upstream_tests_passed: 6
+  upstream_tests_failed: 0
+  upstream_tests_skipped: 0
+  byte_exact_reference: "tests/examples/test_V3.out (1959 行, diff 为空)"
+  test_package: "5 项消费者检查全部通过 (pfsearchV3 命中 12 / pfscanV3 / gtop / ps_scan.pl / [鸿蒙特有] psa2msa $TMPDIR SCRATCH 回退)"
+  ohos_specific_tests: 1
+  ohos_specific_test_detail: "pfsearchV3 -o 4 | psa2msa -du：断言产出 MSA 且工作文件落在 TMPDIR（上游 Status=SCRATCH 依赖只读 /tmp，鸿蒙必失败）"
+  artifacts: "bin/ 26 项（8 个 pftoolsV3 C 程序 + 12 个 Fortran 2.3 程序 + 7 个 Perl 脚本）"
+
+knowledge_gained:
+  - "x86 SSE intrinsic 专用库在 aarch64 上的可移植方案：sse2neon 转译层 + CMake 架构判定，避免逐文件重写内核（knowledge_ref: DRAFT-9005）"
+  - "AArch64 默认 FMA 收缩（-ffp-contract）使浮点结果与 x86 参考差 1 ULP；逐字节比对型测试必须 -ffp-contract=off（knowledge_ref: DRAFT-9006）"
+  - "OHOS /tmp 只读：Fortran SCRATCH 文件与 musl tmpfile() 都失效，需改用 TMPDIR 具名文件（knowledge_ref: DRAFT-9007）"
+  - "LLVM Flang 限制：不支持 -std=legacy；未实现 FDATE；只带编译器不带 crt/运行时（需注入 OHOS SDK 资源）（knowledge_ref: DRAFT-9008）"
+  - "OHOS musl 不定义 __USE_GNU，依赖该宏的上游代码需 USE_AFFINITY=OFF 或打补丁（knowledge_ref: DRAFT-9009）"
+  - "shell here-document 会为临时文件写 /tmp（HarmonyOS 只读）→ 测试脚本随机失败，需改用 printf 等无临时文件写法（knowledge_ref: DRAFT-9007）"
+  - "CMake BUILD_TESTING 目录作用域陷阱：ENABLE_TESTING() 在后面的子目录调用 → 前面的子目录 IF(BUILD_TESTING) 为假，整套测试静默不注册（knowledge_ref: DRAFT-9010）"
+  - "conan 脏缓存：Error, the file to download already exists …/conan_package.tgz —— 删除 ~/.conan2/p/<hash> 后重试，勿误报 dependency_missing（knowledge_ref: DRAFT-9011）"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/pftools-3.2.12.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/pftools-3.2.12.work
+  source_orig_hash: 693931e26a81a790
+  source_work_hash: d9eefd0b3a03fd20
+  generated_at: '2026-10-13T20:02:51'
+  patches_count: 16
+
+patch_classification:
+  - file: 0001-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-src-C-sse2-heuristic_sse2.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-src-C-sse2-sse2_inline_fcts.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-src-C-sse2-xali1_sse2.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0005-src-C-sse41-heuristic_sse41.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0006-src-C-sse41-sse41_inline_fcts.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0007-src-C-utils-system.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0008-src-Fortran-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0009-src-Fortran-pfmake.f.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0010-src-Fortran-pfw.f.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0011-src-Fortran-psa2msa.f.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0012-src-Fortran-regpr.f.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0013-tests-examples-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0014-tests-examples-test_V3.sh.cmake.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0015-tests-examples-test_V3_output.sh.cmake.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0016-tests-examples-test_pfsearchV3_pattern-regexp.sh.cmake.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

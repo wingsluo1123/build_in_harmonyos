@@ -1,0 +1,153 @@
+--- a/src/C/utils/system.c
++++ b/src/C/utils/system.c
+@@ -72,39 +72,50 @@
+ 
+ 
+ 
+ extern inline unsigned long __ALWAYS_INLINE createMask(unsigned int numEntries, unsigned int *maskWidth)
+ {
+     unsigned int i;
+     unsigned long k = ((unsigned long) numEntries) * 2L - 1L;
+     unsigned long index;
+     unsigned int AllZero;
+ 
++#if defined(__x86_64__) || defined(__i386__)
+ #ifndef __MIC__    
+     __asm__ __volatile__ (
+       "xorl   %0, %0; \n\t"
+       "bsrq   %2,%1;  \n\t"
+       "cmovzl %3,%0;  \n\t"
+       : "=r"(AllZero), "=r"(index)
+       : "r"(k), "rm"(1)
+     );
+ #else
+     __asm__ __volatile__ (
+       "xorl   %0, %0; \n\t"
+       "bsrq   %2,%1;  \n\t"
+       "jnz 1f ;       \n\t"
+       "movl   %3,%0;  \n\t"
+       "1:"
+       : "=r"(AllZero), "=r"(index)
+       : "r"(k), "rm"(1)
+     ); 
+ #endif
++#else
++    /* Portable bit-scan-reverse replacement of "bsrq" + "cmovzl". */
++    if (k == 0UL) {
++      AllZero = 1U;
++      index   = 0UL;
++    } else {
++      AllZero = 0U;
++      index   = (unsigned long) (63 - __builtin_clzll((unsigned long long) k));
++    }
++#endif
+     if (AllZero) {
+       *maskWidth = 0; 
+       return 0L;
+     }
+     *maskWidth = (unsigned int) index;
+     if (index == 63L) {
+       return -1L;
+     } else {
+       return (1L << index) - 1L;
+     }
+@@ -306,20 +317,21 @@
+   free(CurrentMask);
+   return count;
+   
+   FIN1:
+     free(CurrentMask);
+   FIN:
+     return 0;
+ }
+ #endif
+ 
++#if defined(__x86_64__) || defined(__i386__)
+ static void GetIntelTopology(SystemInfo * const info)
+ {
+ 	unsigned int APIC_HyperthreadingMask, APIC_HyperthreadingMaskWidth;
+ 	unsigned int APIC_SocketSelectMask, APIC_SocketSelectMaskShift;
+ 	unsigned int APIC_CoreSelectMask;
+ 	
+ 	int eax_value, ebx_value, ecx_value, edx_value;
+ 	
+ 	/* Do we support Leaf 11 (0xB) */
+ 	_Bool UseLeafB = false;
+@@ -880,20 +892,21 @@
+   info->nSockets = 1 + nSockets;
+   
+   info->HyperthreadingMaskWidth = APIC_HyperthreadingMaskWidth;
+   info->HyperthreadingMask      = APIC_HyperthreadingMask;
+   info->CoreSelectMask          = APIC_CoreSelectMask;
+   info->HyperthreadingMask      = APIC_HyperthreadingMask;
+   info->SocketSelectMask        = APIC_SocketSelectMask;
+   info->SocketSelectMaskShift   = APIC_SocketSelectMaskShift;
+ #endif
+ }
++#endif
+ 
+ 
+ void getSystemInfo(SystemInfo * const info)
+ {
+   time_t creation_time;
+ 
+   /* clear all data */
+   memset(info, 0, sizeof(SystemInfo));
+   
+   /*
+@@ -905,20 +918,21 @@
+    * ARCHITECTURE INFORMATION -----------------------------------------------
+    */
+   
+   for (size_t i=0; i<13; ++i) info->CPU_Vendor[i] = '\0';
+   
+   /* Available number of logical processor seen by OS */
+   info->nOverallCores = (unsigned int) sysconf(_SC_NPROCESSORS_ONLN);
+   const char NOBrand[] = "Not supported by this cpu"; 
+   strcpy(info->CPU_Name, NOBrand);
+   
++#if defined(__x86_64__) || defined(__i386__)
+   long a,c;
+   __asm__ __volatile__ (
+     /* See if CPUID instruction is supported ... */
+     /* ... Get copies of EFLAGS into eax and ecx */
+     "pushf\n\t"
+     "pop %0\n\t"
+     "mov %0, %1\n\t"
+ 
+     /* ... Toggle the ID bit in one copy and store */
+     /*     to the EFLAGS reg */
+@@ -1118,20 +1132,33 @@
+     /*
+      * TOPOLOGY INFORMATIONS ---------------------------------------------------------
+      */
+     /* Intel Topology*/
+     if (info->CPU_Vendor[0] == 'G' && info->CPU_Vendor[1] == 'e') 
+       GetIntelTopology(info);
+     /* AMD Topology*/
+     else if (info->CPU_Vendor[0] == 'A' && info->CPU_Vendor[1] == 'u')
+       GetAMDTopology(info);
+   }
++#else
++  /*
++   * Portable fallback for targets without CPUID (e.g. AArch64).  The portable SIMD
++   * shim (src/C/simd/, sse2neon.h) implements the SSE2 and SSE4.1 intrinsics on
++   * top of ARM NEON, so advertise both to the SSE2/SSE4.1 dispatch used by
++   * pfsearchV3 / pfscanV3 / pfcalibrateV3.  There is no x86 CPU topology here.
++   */
++  info->Extensions = MM_SSE2 | MM_SSE41;
++  strncpy(info->CPU_Vendor, "ARM", sizeof(info->CPU_Vendor) - 1);
++  info->CPU_Vendor[sizeof(info->CPU_Vendor) - 1] = '\0';
++  strncpy(info->CPU_Name, "ARM NEON (SSE2/SSE4.1 via portable SIMD shim)", sizeof(info->CPU_Name) - 1);
++  info->CPU_Name[sizeof(info->CPU_Name) - 1] = '\0';
++#endif
+ 
+ #ifdef __NUMA__
+   info->NumaAble = (numa_available() < 0) ? false : true;
+   if (info->NumaAble) {
+     info->nNodes       = (unsigned int) numa_num_configured_nodes();
+     info->nCpusPerNode = numa_num_configured_cpus() / info->nNodes;
+   }
+ #endif
+ 
+ #if defined(USE_KNC) && !(defined(__MIC__))

@@ -1,0 +1,56 @@
+--- a/src/Fortran/pfw.f
++++ b/src/Fortran/pfw.f
+@@ -50,20 +50,23 @@
+ 
+       Character*512     RCIO
+       Character*512     ROUT
+       Character*32      RCTM
+       Logical           OPTM
+       Character         B
+ 
+ * functions
+ 
+       Integer           Getc
++
++      Character*256     TMPNAM
++      Integer           LTMP
+ C       Integer           Fputc
+ 
+ * character translation
+ 
+       Character*27      ABCU
+       Character*27      ABCL
+ 
+       Data              ABCU/'ABCDEFGHIJKLMNOPQRSTUVWXYZ-'/
+       Data              ABCL/'abcdefghijklmnopqrstuvwxyz.'/
+ 
+@@ -114,21 +117,28 @@
+ C       If(FMSF.EQ.'-') then
+ C   1      Open(NMSF,Status='SCRATCH')
+ C          Do I1=1,2*IDM1
+ C             If(Getc(B).NE.0) go to   2
+ C             N1=Fputc(NMSF,B)
+ C          End do
+ C   2      Rewind(NMSF)
+ C       End if
+ 
+       If(FMSF.EQ.'-') then
+- 1       Open(NMSF,Status='SCRATCH',Err=901)
++* OHOS: /tmp is read-only on HarmonyOS -> Status='SCRATCH' is unusable.
++*       Buffer stdin in a named work file below $TMPDIR instead.
++      TMPNAM=' '
++      Call Get_environment_variable('TMPDIR',TMPNAM)
++      LTMP=LEN_TRIM(TMPNAM)
++      If (LTMP.GT.0) TMPNAM=TMPNAM(1:LTMP)//'/pftools_pfw.scr'
++      If (LTMP.LE.0) TMPNAM='pftools_pfw.scr'
++ 1    Open(NMSF,File=TMPNAM,Status='UNKNOWN',Err=901)
+  2       Continue
+          Do I1=1,512
+             If(Getc(B).NE.0) go to 3
+             If(Ichar(B).EQ.10) then
+                Write(NMSF,'(512A)',Err=903)(CSEQ(ii1),ii1=1,I1-1)
+                Go to   2
+             Else
+                CSEQ(I1)=B
+             End if
+          End do
