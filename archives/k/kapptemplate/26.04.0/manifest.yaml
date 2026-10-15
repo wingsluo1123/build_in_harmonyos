@@ -1,0 +1,84 @@
+# 版本级 manifest — kapptemplate 26.04.0
+# 包名 kapptemplate = 上游产品 kapptemplate（KDE SDK 应用，release-service 26.04.0）
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "26.04.0"
+software: "kapptemplate"
+
+# 编译状态: built（本地 conan create + conan-verify 通过，未上传远端，remote_authorization=none）
+status: built
+build_date: "2026-10-14"
+build_system: cmake
+
+source:
+  url: "https://invent.kde.org/sdk/kapptemplate/-/archive/v26.04.0/kapptemplate-v26.04.0.tar.gz"
+  sha256: "2f9ecf3954a3c90495be487691bd9d74d24f9e739b90bf802bb7d2761338817d"
+  tar_format: tar.gz
+  git_tag_peeled: "v26.04.0 (upstream KAPPTEMPLATE_VERSION 0.1.26040)"
+  equivalent_release_artifact:
+    url: "https://download.kde.org/stable/release-service/26.04.0/src/kapptemplate-26.04.0.tar.xz"
+    sha256: "c69ff5f040f043666d3f17537c7c5072ac5b09c0bb6a1c459b0bb532bdfe377d"
+    note: "设备实测算术：两棵解压树 diff -rq 完全一致，仅打包方式不同"
+
+build:
+  system: cmake
+  configure_options:
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DBUILD_TESTING=ON"
+    - "-DKF_IGNORE_PLATFORM_CHECK=TRUE"
+    - "-DKF_SKIP_PO_PROCESSING=ON"
+  dependencies:
+    required:
+      - qtbase/6.11.1
+      - qtdeclarative/6.11.1
+      - karchive/6.18.0
+      - kconfig/6.18.0
+      - kconfigwidgets/6.18.0
+      - kcoreaddons/6.18.0
+      - ki18n/6.18.0
+      - kiconthemes/6.18.0.1
+      - kirigami/6.18.0
+      - kirigami-addons/1.13.0
+      - kitemmodels/6.18.0.1
+    build:
+      - ecm/6.26.0
+    transitive_note: >
+      整组 KF6 保持 6.18.0 家族以匹配已发布的 OHOS 二进制，避免任何
+      force 覆盖导致依赖 package_id 失效而被迫从源码重建；
+      kirigami-addons/1.13.0 经传递依赖引入 DBus/SQL 版 qtbase-sql-dbus/6.11.1。
+    removed:
+      - "kdoctools（KF6 DocTools 经 patches/0001-CMakeLists.txt.patch 关闭）"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-CMakeLists.txt.patch（OHOS 跳过 KF6 DocTools：kdoctools/6.19.0 钉 karchive/6.19.0 与 kiconthemes/6.18.0.1 的 karchive/6.18.0 冲突；帮助手册非生成器功能所必需。kfourinline/ksnakeduel 26.04.x 先例）"
+  - "0002-src-application-generator.cpp.patch（OHOS 上 QFile::copy() 恒返回 false，模板落盘改为手动 read+write；否则生成器静默 0 输出）"
+  - "0003-src-templates-C++-CMakeLists.txt.patch（模板归档由 .tar.bz2 改为 .zip：karchive WITH_BZIP2=OFF 无法读 bz2，generator 经 KZip/zlib 读 .zip）"
+
+knowledge_gained:
+  - "已发布 KF6 共享库携带过期绝对 DT_NEEDED（指向构建机 $HOME/.cache/conan2/...）与 build-tree 相对 DT_NEEDED（../../bin/libX.so）；消费者运行需按 accessibility 26.04.3 先例做 link farm + 绝对依赖物化"
+  - "kdoctools/6.19.0 的 generate() 直接引用 self.dependencies[\"zstd\"]（经 karchive/6.19.0 传递）；若把 karchive force 到无 zstd 的 6.26.0 会让其闭包丢失 zstd 而 KeyError"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/ohpc-porting/kapptemplate-20261014-1/patchbuild/orig
+  source_work_dir: /storage/Users/currentUser/tmp/ohpc-porting/kapptemplate-20261014-1/patchbuild/work
+  source_orig_hash: 2ce3df76e4aef85c
+  source_work_hash: 94318da825bf1247
+  generated_at: '2026-10-14T12:37:28'
+  patches_count: 3
+
+patch_classification:
+  - file: 0001-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-src-application-generator.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-src-templates-C++-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

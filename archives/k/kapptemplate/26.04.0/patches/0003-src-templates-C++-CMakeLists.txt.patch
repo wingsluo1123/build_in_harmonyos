@@ -1,0 +1,25 @@
+--- a/src/templates/C++/CMakeLists.txt
++++ b/src/templates/C++/CMakeLists.txt
+@@ -1,6 +1,21 @@
+ set(APPTEMPLATE_DIRS
+     kde-frameworks6-simple
+     kde-frameworks6
+ )
+ 
+-kde_package_app_templates(TEMPLATES ${APPTEMPLATE_DIRS} INSTALL_DIR ${KDE_INSTALL_KAPPTEMPLATESDIR})
++# OHOS: the stock kde_package_app_templates() always writes .tar.bz2 archives,
++# but the KF6Archive shipped for OHOS is built with WITH_BZIP2=OFF, so KTar
++# cannot open them and kapptemplate silently generates nothing. Emit .zip
++# archives instead; the generator already loads .zip through KZip (zlib).
++foreach(_template ${APPTEMPLATE_DIRS})
++    get_filename_component(_baseName ${_template} NAME_WE)
++    set(_zip ${CMAKE_CURRENT_BINARY_DIR}/${_baseName}.zip)
++    file(GLOB_RECURSE _tpl_entries LIST_DIRECTORIES true CONFIGURE_DEPENDS
++        "${CMAKE_CURRENT_SOURCE_DIR}/${_template}/*")
++    add_custom_command(OUTPUT ${_zip}
++        COMMAND ${CMAKE_COMMAND} -E tar cf ${_zip} --format=zip .
++        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${_template}
++        DEPENDS ${_tpl_entries})
++    add_custom_target(${_baseName}_kapptemplate ALL DEPENDS ${_zip})
++    install(FILES ${_zip} DESTINATION ${KDE_INSTALL_KAPPTEMPLATESDIR})
++endforeach()
