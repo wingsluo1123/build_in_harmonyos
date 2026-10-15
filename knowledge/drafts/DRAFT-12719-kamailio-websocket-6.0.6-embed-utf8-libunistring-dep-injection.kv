@@ -1,0 +1,47 @@
+#====================================================================
+# DRAFT-12719-kamailio-websocket-6.0.6-embed-utf8-libunistring-dep-injection
+#   kamailio websocket 模块双依赖（openssl + libunistring）依赖注入：
+#   主依赖走 LOCALBASE、可选依赖（EMBEDDED_UTF8_DECODE=0 上游默认 → libunistring）
+#   经 CPATH/LIBRARY_PATH 注入；平台宏缺失沿用同族先例 extra_defs 注入。
+# 来源: 平台任务 kamailio-websocket-6.0.6-r01-pc3-4-20261009T094353Z（高难度挑战）
+# 路径: Path C（高难度挑战，知识草稿随 PR 同仓交付）
+# 状态: 草稿（待主编审核 promote）
+# 证据口径: 下列断言均可核查 —— 源码行号取自 kamailio 6.0.6 官方源码包；
+#           真机结论取自 HarmonyOS PC（OHOS clang 15.0.4, aarch64）上实跑的
+#           完整 conan create（13 项产物断言全绿，readelf 存在时）。
+#====================================================================
+
+id:                     DRAFT-12719-kamailio-websocket-6.0.6-embed-utf8-libunistring-dep-injection
+trigger_tool:           make|pkg-config|linking
+phase:                  configuration|compilation|linking
+error_signature:        neither gethostbyname2 or getipnodebyname present|cannot find -lunistring|unistr.h: No such file
+severity:               2
+category:               build-system, cross-compile, ohos, toolchain, linking
+match_keywords:         websocket, EMBEDDED_UTF8_DECODE, libunistring, u8_check, unistr.h, LOCALBASE, SSL_BUILDER, CRYPTO_BUILDER, CROSS_COMPILE, make cfg, config.mak, HAVE_GETHOSTBYNAME2, resolve.h, 多依赖模块, 可选依赖开关, 交叉编译探测污染, kamailio, loadmodule
+title:                  websocket 模块双依赖（openssl + libunistring）的依赖注入——主依赖 LOCALBASE + 可选 UTF-8 解码依赖 CPATH/LIBRARY_PATH 注入（kamailio 6.0.6 websocket）
+
+# ═══ Layer 2: 诊断层 ═══
+root_cause:             【现象】多依赖模块沿单依赖先例手法适配时，libunistring 头/库无法寻址（cannot find -lunistring / unistr.h No such file）；同时 OS=harmonyos 不落在构建系统任何 OS 分支，平台能力宏缺失导致 core/resolve.h:290 直接 #error。【机制一：单值 LOCALBASE vs 主依赖】websocket 模块 Makefile 的 SSL 回退分支（-I$(LOCALBASE)/ssl/include -L$(LOCALBASE)/lib -lssl -lcrypto）与 libunistring 分支（-I$(LOCALBASE)/include -L$(LOCALBASE)/lib -lunistring）共用同一 $(LOCALBASE)，只能指向一个包目录。【机制二：可选依赖开关】与 lost 模块不同，websocket 的 libunistring 依赖是可选的开（EMBEDDED_UTF8_DECODE=0 上游默认走 libunistring，=1 走内置 utf8_decode.h），因此主依赖继续 LOCALBASE、可选依赖经 CPATH/LIBRARY_PATH 注入即可，无需 DRAFT-12718 的「LOCALBASE 指向不存在目录」技巧。【机制三：平台宏】与同族先例 tls/xml 相同：OS=harmonyos 不在 Makefile.defs 的 OS 枚举内，linux 分支的 HAVE_* 宏集全部缺失，经 make 命令行 extra_defs 注入（逐宏对照 OHOS SDK sysroot 实证）。
+affected_scope:         kamailio 6.0.6 websocket 模块；以及任何模块 Makefile 含 EMBEDDED_UTF8_DECODE 类可选依赖开关 + 主依赖经 LOCALBASE 兜底的经典 Makefile 构建系统。反例与不适用面见 .md 正文「Scope」。
+verification_cmd:       cd kamailio-6.0.6 && make cfg include_modules=websocket SSL_BUILDER= CRYPTO_BUILDER= LOCALBASE=<openssl pkg> && make modules modules=modules/websocket -j1 SSL_BUILDER= CRYPTO_BUILDER= LOCALBASE=<openssl pkg>（CPATH=<openssl>/include:<unistring>/include LIBRARY_PATH=<openssl>/lib:<unistring>/lib 环境）
+
+# ═══ Layer 3: 方案层 ★ ═══
+rec_priority:           1
+rec_approach:           main-dep-localbase-plus-optional-dep-env-injection-with-platform-defs
+rec_description:        ① 主依赖（openssl）继续走 LOCALBASE 兜底，显式置空 SSL_BUILDER=/CRYPTO_BUILDER=（make 命令行变量优先于 Makefile 内部赋值）钉死 LOCALBASE 回退分支，阻止构建机 pkg-config 在交叉编译期把宿主路径混入产物；② 可选依赖（libunistring）经 CPATH/LIBRARY_PATH 按依赖注入各自的 include/lib —— 无需改上游、无需「不存在目录」技巧；③ 平台宏缺失沿用同族先例：make 命令行 extra_defs 注入 linux 分支等价宏集（-D_GNU_SOURCE -DHAVE_GETHOSTBYNAME2 -DHAVE_SCHED_YIELD -DHAVE_MSG_NOSIGNAL -DHAVE_MSGHDR_MSG_CONTROL -DHAVE_ALLOCA_H -DHAVE_TIMEGM -DHAVE_SCHED_SETSCHEDULER -DHAVE_IP_MREQN），不注入 HAVE_UNION_SEMUN（musl sys/sem.h 不导出 union semun，core lock_ops.h 自带条件定义）；④ 保持 EMBEDDED_UTF8_DECODE=0 上游默认（RFC 6455 UTF-8 校验走 libunistring 成熟实现，外部依赖已发布、注入成本低）。
+rec_command:            CPATH=<openssl>/include:<unistring>/include LIBRARY_PATH=<openssl>/lib:<unistring>/lib make cfg include_modules=websocket LOCALBASE=<openssl> SSL_BUILDER= CRYPTO_BUILDER= extra_defs='<linux 宏集>' && make modules modules=modules/websocket -j1 <同上 make vars>
+rec_auto_fix:           false
+rec_impl:               conan-recipe
+
+fallback_priority:      2
+fallback_approach:      embedded-utf8-decode-option
+fallback_description:   设 EMBEDDED_UTF8_DECODE=1 完全避开 libunistring 外部依赖（模块自带 utf8_decode.h 提供内置 UTF-8 解码），DEFS 追加 -DEMBEDDED_UTF8_DECODE、LIBS 不再 -lunistring。代价：偏离上游默认行为，且需另行验证内置解码器的完整性与 RFC 6455 兼容面（本任务未采用）。
+fallback_command:       make cfg include_modules=websocket ... extra_defs='-DEMBEDDED_UTF8_DECODE <linux 宏集>' && make modules modules=modules/websocket -j1 ...
+fallback_auto_fix:      false
+fallback_impl:          conan-recipe
+
+# ═══ Layer 4: 关系层 ═══
+similar_to:             DRAFT-12718-kamailio-lost-6.0.6-multidep-localbase-and-os-branch|DRAFT-11941-kamailio-module-dep-probe-pinning
+caused_by:              []
+prerequisite_of:        []
+conflicts_with:         []
