@@ -1,0 +1,65 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: pluto/5.24.1
+homepage: "https://libreswan.org"
+
+# 上游测试命令 (make -n check 分析)
+# `make check` -> `regress` 目标，驱动 testing/ 下的 KVM/QEMU 虚拟机回归框架
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+# KVM 回归框架未集成（依赖 KVM/QEMU 双虚拟机 + 完整 Linux 内核 XFRM + root
+# 网络命名空间，OHOS 构建环境不具备，见 upstream_tests_not_run_reasons）；
+# 5 个可运行入口（3 零参数自测 + algparse 2 模式）构建进 conan 包，
+# 并在 test_package/test.sh 中复核执行；其余 12 个（9 local-check +
+# 3 cavp 向量）经本地执行验证通过，未纳入 conan 包
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（清点结果，R51 第一步）
+# - testing/pluto/ 下 1434 个 IKEv1/IKEv2 端到端脚本回归测试（KVM 框架）
+# - programs/cavp/ 下 CAVP 密码学算法验证程序（test_ikev1/test_ikev2/test_sha 等）
+# - lib/libswan/test_buffer.c 等库内测试源
+upstream_tests:
+  - file: "testing/pluto/ (1434 个端到端脚本)"
+    source: "libreswan-5.4.1/testing/pluto/"
+    description: "IKEv1/IKEv2 双虚拟机端到端 IPsec 回归测试（KVM/QEMU 框架）"
+    command: "make check  # 需要 testing/kvm 框架 + 双 VM + 内核 XFRM + root"
+  - file: "programs/cavp/test_ikev2.c (等 CAVP 验证程序)"
+    source: "libreswan-5.4.1/programs/cavp/"
+    description: "NIST CAVP 密码学算法验证（GCM/HMAC/SHA/IKEv1/IKEv2）"
+    command: "3 个 .run 向量（ikev1_dsa/ikev1_psk/ikev2）全部执行通过"
+  - file: "testing/programs/ (15 check 工具)"
+    source: "libreswan-5.4.1/testing/programs/"
+    description: "9 个上游 local-check（asn1/authby/dn/flags/ip/jambuf/seedbits/time/vendorid）+ 3 个零参数自测（enum/hunk/keyid）+ 3 个不可执行（getpeercon_server/kernel/ttodatacheck）"
+    command: "12 个执行通过（零参数自测直接运行 / local-check .run）"
+  - file: "programs/algparse/ (--tp/--ta)"
+    source: "libreswan-5.4.1/programs/algparse/"
+    description: "--tp = proposal 字符串解析（上游 local-check 入口）；--ta = test_ike_alg AES-CBC/CTR/GCM + HMAC-SHA1 KDF 官方向量自测（失败触发 pasassert 致命断言）"
+    command: "algparse --tp && algparse --ta；均执行通过"
+
+# 上游测试未在 conan 构建中运行的具体技术原因（R51 第二步，逐项列明）
+upstream_tests_not_run_reasons:
+  - "1434 KVM 端到端回归（testing/pluto）：testing/kvm 框架要求 KVM/QEMU 双虚拟机、完整 Linux 内核 XFRM 支持、root 权限与网络命名空间；HongMeng 内核无 KVM 模块、无 /dev/kvm、无 qemu、非 root（PR 正文 6 条实证），无法执行"
+  - "getpeercon_server（1）：testing/programs/Makefile:33-35 门控，仅 USE_LABELED_IPSEC=true 时构建（需 libselinux，OHOS 制品仓无此包）；且为 KVM 双 VM 对中的服务端，需 peer VM 才有测试语义"
+  - "kernel/（1）：KVM 客户机模板（仅 kernel.in 模板 + Makefile，无独立可执行文件），运行依赖 KVM 框架引导"
+  - "ttodatacheck（1）：手工诊断工具（argv[1] 传 t_to_data 待解析字符串，供单点调试），上游无自动化测试 harness，不构成独立测试用例"
+  - "202 个单元子检查项：(a) 本适配禁用的 10 个可选依赖（unbound/dnssec/ldns/libcurl/systemd-watchdog/nflog/nftables/iptables/pam/libcap-ng/cat）对应代码路径未编译进本构建，其内部单测无运行条件；(b) 归属上述 3 个未执行 check 工具（getpeercon_server/kernel/ttodatacheck）的子检查"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.sh
+    description: "执行 pluto --version（断言退出码 0 且输出含 Libreswan 版本与能力横幅）；再执行 5 个上游自测入口（_enumcheck/_hunkcheck/_keyidcheck/algparse --tp/algparse --ta，断言 exit=0，即内部向量/断言全过）；conanfile.py test() 另断言二进制存在；最后调用 harmony_consumer_test.sh"
+    command: "pluto --version && _enumcheck && _hunkcheck && _keyidcheck && algparse --tp && algparse --ta && sh harmony_consumer_test.sh"
+  - file: harmony_consumer_test.sh
+    description: "鸿蒙特有消费者用例：pluto 在 HongMeng 内核上真实加载含 conn 的 ipsec.conf（限时前台），断言配置被真正解析（control-socket/监听标记，无标记=FAIL）+ 崩溃码判别（rc 非 0/2/124=FAIL）+ NSS 能力横幅，并采集平台限制实证"
+    command: "sh harmony_consumer_test.sh"
+
+# 测试断言总数 (近似值, 用于质量评估)
+# test.sh: 7 个断言（--version 退出码 0 + 输出含 Libreswan + 3 check 工具 exit=0 + algparse --tp exit=0 + algparse --ta exit=0）
+# conanfile.py test(): 1 个断言（pluto 二进制存在）
+# harmony_consumer_test.sh: 5 个断言（无 syntax error + 崩溃码 + 启动标记 + NSS 横幅 + 完成）
+assertion_count: 13

@@ -1,0 +1,61 @@
+--- a/lib/libswan/whack/send.c
++++ b/lib/libswan/whack/send.c
+@@ -24,7 +24,8 @@
+  * for more details.
+  */
+ 
+-#include <unistd.h>		/* for write() */
++#include <unistd.h>		/* for write(), isatty() */
++#include <termios.h>		/* for tcgetattr/tcsetattr (echo masking) */
+ #include <errno.h>
+ #include <stdlib.h>		/* for exit() */
+ #include <sys/un.h>		/* struct sockaddr_un;! */
+@@ -72,6 +73,39 @@
+ 	return len;
+ }
+ 
++/* getpass(3) is obsolete (POSIX 2008) and is not provided by the OHOS
++ * (HarmonyOS) libc, so the implicit-declaration build error under -Werror
++ * is not fixable with a prototype (the symbol would be missing at link
++ * time). Read the passphrase from stdin as a portable fallback instead.
++ * getpass(3) masked input by disabling terminal echo; replicate that here
++ * with tcgetattr/tcsetattr when stdin is a tty (restore afterwards), so a
++ * passphrase typed at the whack prompt is not left in the scrollback. */
++static char *whack_getpass(const char *prompt)
++{
++	static char buf[256];
++	struct termios oldt;
++	int echo_disabled = 0;
++
++	fflush(stdout);
++	if (isatty(STDIN_FILENO) && tcgetattr(STDIN_FILENO, &oldt) == 0) {
++		struct termios newt = oldt;
++		newt.c_lflag &= ~((tcflag_t) ECHO);
++		if (tcsetattr(STDIN_FILENO, TCSANOW, &newt) == 0)
++			echo_disabled = 1;
++	}
++	fputs(prompt, stdout);
++	if (fgets(buf, sizeof(buf), stdin) == NULL) {
++		if (echo_disabled)
++			tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
++		buf[0] = '\0';
++		return buf;
++	}
++	if (echo_disabled)
++		tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
++	buf[strcspn(buf, "\n")] = '\0';
++	return buf;
++}
++
+ /* Get password from user.  Truncate it to fit in buf. */
+ /* ??? the function getpass(3) is obsolete! */
+ static size_t whack_get_secret(char *buf, size_t bufsize)
+@@ -79,7 +113,7 @@
+ 	fflush(stdout);
+ 	passert(bufsize > 0);	/* room for terminal NUL */
+ 
+-	char *secret = getpass("Enter passphrase: ");
++	char *secret = whack_getpass("Enter passphrase: ");
+ 	/* jam_str would be good but it requires too much library */
+ 	size_t len = strlen(secret) + 1;
+ 	size_t trunc_len = len <= bufsize ? len : bufsize;

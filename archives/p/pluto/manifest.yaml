@@ -1,0 +1,27 @@
+software: pluto
+display: "pluto"
+description: "Libreswan IPsec IKEv1/IKEv2 守护进程（核心 IKE 协议实现）"
+category: network
+homepage: "https://libreswan.org"
+license: GPL-2.0-or-later
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "上游为自定义顶层 Makefile（无 configure/CMake），make 命令行注入适配参数"
+    - "OSDEP=linux 强制（无 harmonyos.mk）；LINUX_VARIANT=generic（无 /etc/os-release，否则 linux-variant 源文件被静默排除导致链接缺符号）"
+    - "加密后端是 NSS（非 OpenSSL）：NSS_CFLAGS/NSS_LDFLAGS 从 conan nss/nspr 包推导"
+    - "OHOS linux/socket.h 缺 glibc struct 守卫 → -D_UAPI_LINUX_SOCKET_H + -include ohos_compat.h 构建期统一修复（不改内核头消费者源码）"
+    - "XFRM 新版 uAPI 属性缺失 → kernel_xfrm.c #ifndef compat 块（R40 运行时边界）"
+    - "getpass(3) 不在 OHOS libc → whack stdin fallback"
+    - "10 个可选依赖 OHOS 制品仓无 → USE_*=false 裁剪（DNSSEC/unbound/libcurl/PAM 等）"
+    - "WERROR_CFLAGS= 降级（OHOS bionic 式头文件告警）；xmlto 无包 → stub 生成空 manpage（纯文档）"
+  common_dependencies:
+    - nss/3.118.1
+    - nspr/4.37
+    - libevent/2.1.13
+
+versions:
+  "5.24.1":
+    status: built
+    build_date: "2026-10-08"
