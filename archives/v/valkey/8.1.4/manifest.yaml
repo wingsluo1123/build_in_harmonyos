@@ -1,0 +1,60 @@
+software: valkey
+version: "8.1.4"
+status: built
+build_date: "2026-09-25"
+build_system: makefile
+conan_ref: "valkey/8.1.4"
+
+source:
+  url: "https://github.com/valkey-io/valkey/archive/refs/tags/8.1.4.tar.gz"
+  sha256: "32350b017fee5e1a85f7e2d8580d581a0825ceae5cb3395075012c0970694dee"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options:
+    - "MALLOC=libc"
+    - "USE_SYSTEMD=no"
+    - "BUILD_TLS=no"
+  dependencies: []
+  dependencies_note: "Runtime dependencies are vendored in deps/; tcl/8.6.16 is a separately adapted build-only test requirement."
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-guard-glibc-process-name-globals.patch"
+  - "0002-add-ohos-pthread-cancel-compat.patch"
+  - "0003-read-server-logs-without-exec-cat.patch"
+  - "0004-route-test-unixsocket-to-writable-tmp.patch"
+  - "0005-adjust-other-tcl-socket-path-assertion.patch"
+  - "0006-skip-process-pause-checks.patch"
+
+expected_artifacts:
+  - "bin/valkey-server"
+  - "bin/valkey-cli"
+  - "bin/valkey-benchmark"
+  - "bin/valkey-sentinel"
+  - "bin/valkey-check-rdb"
+  - "bin/valkey-check-aof"
+
+test_results:
+  type: official
+  upstream_inventory_tcl_files: 224
+  official_entry_points: "runtest / runtest-moduleapi / runtest-sentinel / runtest-cluster"
+  official_entry_points_passed: 4
+  official_entry_points_total: 4
+  # 口径: 源码树全树递归 .tcl 中行首 `test "…"`(双引号式) 与 `test {…}`(花括号式) 两种块合计;
+  # 覆盖 tests/ 下全部 224 个 .tcl（unit/unit/type/integration/unit/cluster/unit/moduleapi/
+  # sentinel/tests/sentinel/tests/includes/cluster/tests/cluster/tests/includes/support）
+  # 复现: grep -rE '^[[:space:]]*test[[:space:]]+["{]' . --include='*.tcl'  输出行数 3588
+  # 复核日期 2026-10-03
+  upstream_static_test_blocks: 3588
+  upstream_static_test_blocks_double_quoted: 1509
+  upstream_static_test_blocks_braced: 2079
+  upstream_ok_records: 4661
+  upstream_capability_skips: 323
+  upstream_failed_records: 0
+  consumer_assertions: 87
+  status: built
+
+knowledge_gained: []

@@ -1,0 +1,32 @@
+--- a/tests/support/server.tcl
++++ b/tests/support/server.tcl
+@@ -572,21 +572,28 @@
+     if {$::tls} {
+         set pport [find_available_port $::baseport $::portcount]
+         dict set config "port" $pport
+         dict set config "tls-port" $port
+         dict set config "tls-cluster" "yes"
+         dict set config "tls-replication" "yes"
+     } else {
+         dict set config port $port
+     }
+ 
+-    set unixsocket [file normalize [format "%s/%s" [dict get $config "dir"] "socket"]]
++    # HarmonyOS PC rejects AF_UNIX bind on the build cache filesystem. The
++    # Conan recipe provides VALKEY_TEST_TMPDIR under the writable app cache.
++    set unixsocket_dir [dict get $config "dir"]
++    if {[info exists ::env(VALKEY_TEST_TMPDIR)] && $::env(VALKEY_TEST_TMPDIR) ne ""} {
++        set unixsocket_dir [file join $::env(VALKEY_TEST_TMPDIR) [file tail $unixsocket_dir]]
++        file mkdir $unixsocket_dir
++    }
++    set unixsocket [file normalize [file join $unixsocket_dir "socket"]]
+     dict set config "unixsocket" $unixsocket
+ 
+     # apply overrides from global space and arguments
+     foreach {directive arguments} [concat $::global_overrides $overrides] {
+         dict set config $directive $arguments
+     }
+ 
+     # remove directives that are marked to be omitted
+     foreach directive $omit {
+         dict unset config $directive

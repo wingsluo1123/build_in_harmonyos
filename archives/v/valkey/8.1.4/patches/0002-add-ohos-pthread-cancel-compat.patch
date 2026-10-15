@@ -1,0 +1,60 @@
+--- a/src/io_threads.c
++++ b/src/io_threads.c
+@@ -5,6 +5,7 @@
+  */
+ 
+ #include "io_threads.h"
++#include "pthread_compat.h"
+ 
+ static __thread int thread_id = 0; /* Thread local var */
+ static pthread_t io_threads[IO_THREADS_MAX_NUM] = {0};
+--- a/src/server.h
++++ b/src/server.h
+@@ -48,6 +48,7 @@
+ #include <errno.h>
+ #include <inttypes.h>
+ #include <pthread.h>
++#include "pthread_compat.h"
+ #include <syslog.h>
+ #include <netinet/in.h>
+ #include <sys/socket.h>
+--- /dev/null
++++ b/src/pthread_compat.h
+@@ -0,0 +1,37 @@
++#ifndef VALKEY_PTHREAD_COMPAT_H
++#define VALKEY_PTHREAD_COMPAT_H
++
++#if defined(__linux__) && !defined(__GLIBC__)
++
++#include <errno.h>
++#include <pthread.h>
++
++/*
++ * This libc does not provide POSIX thread cancellation. Returning ENOSYS
++ * matters: Valkey joins a thread only when pthread_cancel reports success, so
++ * a success-returning no-op could deadlock crash handling and shutdown paths.
++ */
++static inline int valkey_pthread_cancel(pthread_t thread) {
++    (void)thread;
++    return ENOSYS;
++}
++
++static inline int valkey_pthread_setcancelstate(int state, int *oldstate) {
++    (void)state;
++    if (oldstate) *oldstate = PTHREAD_CANCEL_ENABLE;
++    return 0;
++}
++
++static inline int valkey_pthread_setcanceltype(int type, int *oldtype) {
++    (void)type;
++    if (oldtype) *oldtype = PTHREAD_CANCEL_DEFERRED;
++    return 0;
++}
++
++#define pthread_cancel valkey_pthread_cancel
++#define pthread_setcancelstate valkey_pthread_setcancelstate
++#define pthread_setcanceltype valkey_pthread_setcanceltype
++
++#endif /* defined(__linux__) && !defined(__GLIBC__) */
++
++#endif /* VALKEY_PTHREAD_COMPAT_H */
