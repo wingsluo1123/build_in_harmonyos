@@ -1,0 +1,42 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: kwrited/6.7.2
+homepage: "https://invent.kde.org/plasma/kwrited"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+# R51 第一步清点结论：kwrited 6.7.2 上游不含任何测试目标
+upstream_check_command: "无（源码包 15 个条目中无 autotests/ tests/ test/ 目录，CMakeLists.txt 无 add_test()/ecm_add_test()/include(ECMAddTests)，ctest -N 无可列目标）"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: "不适用（上游无测试可跑）"
+
+# 上游实际运行的测试程序：无（清点证据见下方 inventory_evidence）
+upstream_tests: []
+
+# 上游无测试用例 -> 按 R51 / 积分赛口径补鸿蒙独有消费者测试（真实执行产物，非空壳断言）
+test_package_tests:
+  - file: test_app.sh
+    description: "消费者用例：实跑打包产物 bin/kwrited（上游 BUILD_AS_EXECUTABLE 分支）—— offscreen QPA 启动后存活 ≥5s（证明 Qt6/KF6 链接闭包在 OHOS 可加载且 KPtyDevice 已开 pty），/proc/<pid>/fd/0 必须解析为 /dev/pts/N（验证可执行分支 dup2(pty->slaveFd(), 0) 的 pty 归属），最后 SIGTERM 触发优雅退出路径（~KWrited 调 pty->logout()）——该步为尽力而为观测：超时仅 WARN 并强制 kill，不判失败、不计入 assertion_count"
+    command: "sh test_app.sh <pkg>/bin/kwrited 5"
+
+# 测试断言总数 (fail-closed 断言计数, 用于质量评估)
+# 计数口径 = test_app.sh 中真正能让用例失败(exit 1)的检查：
+#   1) 启动后存活 ≥ GRACE 秒（否则 exit 1 并打印日志前 20 行）
+#   2) /proc/<pid>/fd/0 的 readlink 结果必须匹配 /dev/pts/*
+#   3) readlink 不可用时退回 `ls -l` 备用探针；两条路都取不到 pty 归属即 exit 1
+# 另有 1 项「尽力而为」观测，不计入断言数：
+#   - SIGTERM 后 10s 内退出（超时仅 WARN + kill -KILL，不判失败）
+assertion_count: 3
+
+# R51 第一步「上游测试清点」证据（防"没环境/没测试"式搪塞）
+inventory_evidence:
+  source_archive: "kwrited-6.7.2.tar.xz"
+  archive_sha256: "f03e867a1ace77e5d9285957023c5bb9db7fd92e466a7e02d5d419f8d827e6b3"
+  archive_entries: 15
+  test_dirs: "无 autotests/ tests/ test/"
+  ctest_registration: "无 add_test() / ecm_add_test() / include(ECMAddTests)"
+  kde_ci: ".gitlab-ci.yml（.kde-ci.yml）存在，未定义任何测试作业"

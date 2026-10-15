@@ -1,0 +1,28 @@
+software: kwrited
+display: "kwrited"
+description: "KDE Plasma daemon that receives write(1)/wall(1) messages and presents them as desktop notifications (this build writes no utmp/wtmp)"
+category: utility
+homepage: "https://invent.kde.org/plasma/kwrited"
+license: GPL-2.0-or-later
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "上游是双形态程序：默认编成 KDED 会话插件（K_PLUGIN_FACTORY_WITH_JSON + kwrited.json，装进 plugins/kf6/kded），或编成独立可执行程序；形态由 cmake_dependent_option(BUILD_AS_EXECUTABLE \"...\" OFF \"KPty_HAVE_UTEMPTER\" ON) 与 KF6Pty 导出的能力宏联动"
+    - "OHOS 侧 kpty/6.26.0 为无 UTEMPTER 构建（包配置导出 KPty_HAVE_UTEMPTER=FALSE）→ 上游自动走可执行分支：产物 bin/kwrited，配方无需任何源码补丁，也不引入 kdbusaddons"
+    - "OHOS 没有桌面会话：无会话 D-Bus 总线、无 KDED 装载路径 —— 插件形态即使编出来也永远不会被加载（主题：knowledge/operations/no-desktop-session-dbus-kded）"
+    - "上游无任何测试目标（无 autotests/tests 目录、无 add_test/ecm_add_test），按 R51 补鸿蒙独有消费者用例：实跑 bin/kwrited 并断言该进程持有 pty（/proc/<pid>/fd/0 → /dev/pts/N）"
+    - "产物为 GUI 应用但无桌面会话，消费者用例用 offscreen QPA 平台启动，仅验证进程存活与 pty 归属，不做窗口交互"
+  common_dependencies:
+    - qtbase
+    - kcoreaddons
+    - ki18n
+    - knotifications
+    - kpty
+    - ecm
+
+versions:
+  "6.7.2":
+    status: built
+    build_date: "2026-10-15"
+    conan_ref: "kwrited/6.7.2"
