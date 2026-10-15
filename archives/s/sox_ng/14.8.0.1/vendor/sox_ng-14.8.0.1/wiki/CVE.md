@@ -1,0 +1,70 @@
+# Common Vulnerabilities and Exposures reported in sox
+
+sox has 20 CVEs signalled against it, all of which are fixed in sox_ng.
+
+The few [distros](Distros) that package sox.sf.net's git HEAD from 2021-05
+(affectionately known as 42b355) instead of 14.4.2 from 2015 may have others.
+
+    Legend
+    @ Tested and present
+    F Said to be fixed in 14.4.2 but untestable for the lack of a test file
+    U Untestable for the lack of a test file
+    Q Reported by qflb.wu with sample test files
+    H Helmut Grohne's email has a patch for this
+    A On Debian i386, the error is only detected when compiled with AddressSanitizer
+    ? Has a different fix which may or may not work
+    0 Detects the bad condition but exits 0
+    1 Detects a different bad condition and exits 1
+    0! Says nothing for 6.5 seconds, creating an hour of white noise, then exits 0
+    - Detects the bad condition and exits non-zero (OK!)
+
+|  BUG |  14<BR>.4<BR>.2  |  de<BR>bi<BR>an  |  42<BR>b3<BR>55  | Patch |
+| :--- | :--------------: | :--------------: | :--------------: | :---- |
+| [CVE-2004-0557](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2004-0557) Multiple buffer overflows in the st_wavstartread function in wav.c for Sound eXchange (SoX) 12.17.2 through 12.17.4 allow remote attackers to execute arbitrary code via certain WAV file header fields. | - | - | - | - |
+| [CVE-2014-8145](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2014-8145) Multiple heap-based buffer overflows in Sound eXchange (SoX) 14.4.1 and earlier allow remote attackers to have unspecified impact via a crafted WAV file to the (1) start_read or (2) AdpcmReadBlock function. | F | F | F | - |
+| [CVE-2017-11332](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2017-11332) The startread function in wav.c in Sound eXchange (SoX) 14.4.2 allows remote attackers to cause a denial of service (divide-by-zero error and application crash) via a crafted wav file. [Q](https://seclists.org/fulldisclosure/2017/Jul/81) | @ | - | - | [Debian](https://sources.debian.org/patches/sox/14.4.2%2Bgit20190427-4/0006-CVE-2017-11332.patch) |
+| [CVE-2017-11358](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2017-11358) The read_samples function in hcom.c in Sound eXchange (SoX) 14.4.2 allows remote attackers to cause a denial of service (invalid memory read and application crash) via a crafted hcom file. [Q](https://seclists.org/fulldisclosure/2017/Jul/81) | 0 | - | - | [Debian](https://sources.debian.org/patches/sox/14.4.2%2Bgit20190427-4/0004-CVE-2017-11358.patch) |
+| [CVE-2017-11359](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2017-11359) The wavwritehdr function in wav.c in Sound eXchange (SoX) 14.4.2 allows remote attackers to cause a denial of service (divide-by-zero error and application crash) via a crafted snd file, during conversion to a wav file. [Q](https://seclists.org/fulldisclosure/2017/Jul/81) | @ | - | - | [Debian](https://sources.debian.org/patches/sox/14.4.2%2Bgit20190427-4/0007-CVE-2017-11359.patch) |
+| [CVE-2017-15370](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2017-15370) The wavwritehdr function in wav.c in Sound eXchange (SoX) 14.4.2 allows remote attackers to cause a denial of service (divide-by-zero error and application crash) via a crafted snd file, during conversion to a wav file. | @ | 0 | - | [Debian](https://sources.debian.org/patches/sox/14.4.2%2Bgit20190427-4/0005-CVE-2017-15370.patch) |
+| [CVE-2017-15371](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2017-15371) There is a reachable assertion abort in the function sox_append_comment() in formats.c in Sound eXchange (SoX) 14.4.2. A Crafted input will lead to a denial of service attack during conversion of an audio file. | @ | - | - | [Debian](https://sources.debian.org/patches/sox/14.4.2%2Bgit20190427-4/0003-CVE-2017-15371.patch) |
+| [CVE-2017-15372](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2017-15372) There is a stack-based buffer overflow in the lsx_ms_adpcm_block_expand_i function of adpcm.c in Sound eXchange (SoX) 14.4.2. A Crafted input will lead to a denial of service attack during conversion of an audio file. | @ | 0 | - | [Debian](https://sources.debian.org/patches/sox/14.4.2%2Bgit20190427-4/0011-CVE-2017-15372.patch) |
+| [CVE-2017-15642](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2017-15642) In lsx_aiffstartread in aiff.c in Sound eXchange (SoX) 14.4.2, there is a Use-After-Free vulnerability triggered by supplying a malformed AIFF file. | A | - | - | [Debian](https://sources.debian.org/patches/sox/14.4.2%2Bgit20190427-4/0012-CVE-2017-15642.patch) |
+| [CVE-2017-18189](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2017-18189) In the startread function in xa.c in Sound eXchange (SoX) through 14.4.2, a corrupt header specifying zero channels triggers an infinite loop with a resultant NULL pointer dereference, which may allow a remote attacker to cause a denial-of-service. | @ | - | - | [Debian](https://sources.debian.org/patches/sox/14.4.2%2Bgit20190427-3.5/0012-xa-validate-channel-count.patch) |
+| [CVE-2019-8354](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2019-8354) An issue was discovered in SoX 14.4.2. lsx_make_lpf in effect_i_dsp.c has an integer overflow on the result of multiplication fed into malloc. When the buffer is allocated, it is smaller than expected, leading to a heap-based buffer overflow. | @ | @ | @ | [Debian](https://sources.debian.org/patches/sox/14.4.2%2Bgit20190427-4/0014-CVE-2019-8354.patch) |
+| [CVE-2019-8355](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2019-8355) An issue was discovered in SoX 14.4.2. In xmalloc.h, there is an integer overflow on the result of multiplication fed into the lsx_valloc macro that wraps malloc. When the buffer is allocated, it is smaller than expected, leading to a heap-based buffer overflow in channels_start in remix.c. | @ | - | 0 | [Debian](https://sources.debian.org/patches/sox/14.4.2%2Bgit20190427-4/0015-CVE-2019-8355.patch) |
+| [CVE-2019-8356](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2019-8356) An issue was discovered in SoX 14.4.2. One of the arguments to bitrv2 in fft4g.c is not guarded, such that it can lead to write access outside of the statically declared array, aka a stack-based buffer overflow. | @ | 0! | 0! | [Debian](https://sources.debian.org/patches/sox/14.4.2%2Bgit20190427-4/0016-CVE-2019-8356.patch) |
+| [CVE-2019-8357](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2019-8357) An issue was discovered in SoX 14.4.2. lsx_make_lpf in effect_i_dsp.c allows a NULL pointer dereference. | @ | @ | 0 | [Debian](https://sources.debian.org/patches/sox/14.4.2%2Bgit20190427-4/0017-CVE-2019-8357.patch) |
+| [CVE-2019-13590](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2019-13590) An issue was discovered in libsox.a in SoX 14.4.2. In sox-fmt.h (startread function), there is an integer overflow on the result of integer addition (wraparound to 0) fed into the lsx_calloc macro that wraps malloc. When a NULL pointer is returned, it is used without a prior check that it is a valid pointer, leading to a NULL pointer dereference on lsx_readbuf in formats_i.c. | @ | - | - | [Debian](https://sources.debian.org/patches/sox/14.4.2%2Bgit20190427-4/0018-CVE-2019-13590.patch) |
+| [CVE-2019-1010004](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2019-1010004) SoX - Sound eXchange 14.4.2 and earlier is affected by: Out-of-bounds Read. The impact is: Denial of Service. The component is: read_samples function at xa.c:219. The attack vector is: Victim must open specially crafted .xa file. NOTE: this may overlap CVE-2017-18189. | @ | - | - | =CVE-2017-18189 |
+| [CVE-2021-3643](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-3643) A flaw was found in sox 14.4.1. The lsx_adpcm_init function within libsox leads to a global-buffer-overflow. This flaw allows an attacker to input a malicious file, leading to the disclosure of sensitive information. | A0 | 0 | @ | [H](https://www.openwall.com/lists/oss-security/2023/02/03/3/7)=[Debian](https://sources.debian.org/patches/sox/14.4.2%2Bgit20190427-4/0022-CVE-2021-3643.patch) |
+| [CVE-2021-23159](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-23159) A vulnerability was found in SoX, where a heap-buffer-overflow occurs in function lsx_read_w_buf() in formats_i.c file. The vulnerability is exploitable with a crafted file, that could cause an application to crash. | @ | - | @ | |
+| [CVE-2021-23172](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-23172) A vulnerability was found in SoX, where a heap-buffer-overflow occurs in function startread() in hcom.c file. The vulnerability is exploitable with a crafted hcom file, that could cause an application to crash. | @ | - | @ | =CVE-2021-23159 |
+| [CVE-2021-23210](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-23210) A floating point exception (divide-by-zero) issue was discovered in SoX in function read_samples() of voc.c file. An attacker with a crafted file, could cause an application to crash. | 0 | 0 | @ | =CVE-2021-3643 |
+| [CVE-2021-33844](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-33844) A floating point exception (divide-by-zero) issue was discovered in SoX in function startread() of wav.c file. An attacker with a crafted wav file, could cause an application to crash. | - | - | @ | [H](https://www.openwall.com/lists/oss-security/2023/02/03/3/6)~=[Debian](https://sources.debian.org/patches/sox/14.4.2%2Bgit20190427-4/0024-CVE-2021-33844.patch) |
+| [CVE-2021-40426](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-40426) A heap-based buffer overflow vulnerability exists in the sphere.c start_read() functionality of Sound Exchange libsox 14.4.2 and master commit 42b3557e. A specially-crafted file can lead to a heap buffer overflow. An attacker can provide a malicious file to trigger this vulnerability. | - | - | - | [H](https://www.openwall.com/lists/oss-security/2023/02/03/3/8)=[Debian](https://sources.debian.org/patches/sox/14.4.2%2Bgit20190427-4/0025-CVE-2021-40426.patch) |
+| [CVE-2022-31650](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-31650) In SoX 14.4.2, there is a floating-point exception in lsx_aiffstartwrite in aiff.c in libsox.a. | @ | - | @ | [H](https://www.openwall.com/lists/oss-security/2023/02/03/3/9)=[Debian](https://sources.debian.org/patches/sox/14.4.2%2Bgit20190427-4/0026-CVE-2022-31650.patch) |
+| [CVE-2022-31651](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-31651) In SoX 14.4.2, there is an assertion failure in rate_init in rate.c in libsox.a. | @ | - | @ | [H](https://www.openwall.com/lists/oss-security/2023/02/03/3/10)=[Debian](https://sources.debian.org/patches/sox/14.4.2%2Bgit20190427-4/0027-CVE-2022-31651.patch) |
+| [CVE-2023-26590](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-26590) A floating point exception vulnerability was found in sox, in the lsx_aiffstartwrite function at sox/src/aiff.c:622:58. This flaw can lead to a denial of service. | 1 | - | 1 | =CVE-2022-31650 |
+| [CVE-2023-32627](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-32627) A floating point exception vulnerability was found in sox, in the read_samples function at sox/src/voc.c:334:18. This flaw can lead to a denial of service. | 0 | 0 | @ | [Debian(2)](https://sources.debian.org/patches/sox/14.4.2%2Bgit20190427-4/0028-CVE-2023-32627-Filter-null-sampling-rate-in-VOC-code.patch) |
+| [CVE-2023-34318](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-34318) A heap buffer overflow vulnerability was found in sox, in the startread function at sox/src/hcom.c:160:41. This flaw can lead to a denial of service, code execution, or information disclosure. | @ | - | @ | =CVE-2021-23159 |
+| [CVE-2023-34432](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2023-34432) A heap buffer overflow vulnerability was found in sox, in the lsx_readbuf function at sox/src/formats_i.c:98:16. This flaw can lead to a denial of service, code execution, or information disclosure. | @ | - | - | =CVE-2021-23159 |
+| [CVE-2024-10573](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2024-10573) in mpg123: When decoding PCM, the libmpg123 may write past the end of a heap-located buffer. Consequently, heap corruption may happen, and arbitrary code execution is not discarded. | @ | - | @ | Workaround in sox_ng; depends on distro's libmpg123 version |
+
+## Other fixed bugs that may be exploitable
+
+|  BUG |  14<BR>.4<BR>.2  |  de<BR>bi<BR>an  |  42<BR>b3<BR>55  | Patch |
+| :--- | :--------------: | :--------------: | :--------------: | :---- |
+| [Fedora-1226675](https://bugzilla.redhat.com/show_bug.cgi?id=1226675) startwrite(): sox killed by SIGFPE | - | - | - | [Fedora](https://src.fedoraproject.org/rpms/sox/blob/rawhide/f/sox-14.4.2-bug_1226675_fix.patch) |
+| wavpack: check errors when initializing |  |  |  | [Debian](https://sources.debian.org/patches/sox/14.4.2%2Bgit20190427-3.5/0010-wavpack_check_errors.patch) |
+| fix-regression-in-CVE-2017-11358 | @ | @ | @ | [H](https://www.openwall.com/lists/oss-security/2023/02/03/3/3) |
+| fix-hcom-big-endian | @ | ? | ? | [H](https://www.openwall.com/lists/oss-security/2023/02/03/3/4) [Debian](https://sources.debian.org/patches/sox/14.4.2%2Bgit20190427-4/0021-fix-hcom-big-endian.patch) |
+| argc[cv] code smell in parsing of ladspa plugin options | @ | @ | @ |  |
+
+## Sources
+
+* nvd.nist.gov/vuln imports and "enriches" them ([Search for "sox" on NVD](https://nvd.nist.gov/vuln/search/results?query=sox): 18 results)
+* [Helmut Grohne's 2023-02-32 email to oss-security](https://www.openwall.com/lists/oss-security/2023/02/03/3) fixes 8 CVEs and 4 memory leaks
+* [qflb.wu's 2017-07-30 email to fulldisclosure](https://seclists.org/fulldisclosure/2017/Jul/81) lists 3 vulnerabilities in 14.4.2 to attached crafted sound files
+* [CentOS](https://git.centos.org/rpms/sox/blob/c7/f/SOURCES) fix for CVE-2017-18189
+* [cygwin](https://cygwin.com/cgit/cygwin-packages/sox) Patches from fedoraproject
+* [Debian](https://sources.debian.org/patches/sox/14.4.2+git20190427-3.5)

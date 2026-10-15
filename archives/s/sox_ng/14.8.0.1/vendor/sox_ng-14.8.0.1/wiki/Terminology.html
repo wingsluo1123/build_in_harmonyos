@@ -1,0 +1,204 @@
+<html><head><title>Terminology - sox_ng wiki</title></head>
+<body><p align=center>sox_ng wiki - Terminology</p>
+<hr>
+<h1 id="terminology">Terminology</h1>
+
+<p>This was supposed to be a list of terms used in SoX but it's
+turning into an introduction to how SoX works internally.
+The same thing happened to whoever wrote <code>libsox.3</code>.</p>
+
+<h2 id="fileformats">File formats</h2>
+
+<p>A file format is type of audio file, such as <code>wav</code>, <code>aiff</code> or  <code>au</code>,
+which usually corresponds to the same file name extension,
+though one file format can have several file name extensions,
+aush as <code>3gp</code> and <code>3gpp</code> which are the same.</p>
+
+<p>In the source code, these are present in:</p>
+
+<ul>
+<li>the list of <code>names</code> that a format handler can read and/or write</li>
+<li>the characters after the dot in the name of files that SoX is reading
+or writing;</li>
+<li>the file type auto detection table in <code>src/formats.c</code></li>
+</ul>
+
+<p>and used by</p>
+
+<ul>
+<li><code>sox_find_format()</code>, to find a format handler for a file according to
+the target file's name</li>
+</ul>
+
+<h2 id="encodings">Encodings</h2>
+
+<p>Each File Format is a container for audio data which may be encoded
+in different ways. For example, the <code>wav</code> format can contain
+uncompressed PCM data, A-law, mu-law or even MP3 data and a host of others.</p>
+
+<p>There is more on the page <a href="Formats-and-encodings.html">Formats and Encodings</a>.</p>
+
+<h3 id="internals">Internals</h3>
+
+<p>All the encodings that SoX can handle are listed in <code>sox_ng.h</code> in
+the enum <code>sox_encoding_t</code> and each Format Handler says which encodings
+it can write into the File Formats it handles.</p>
+
+<h2 id="formathandlers">Format Handlers</h2>
+
+<p>A format handler is a code module that can read and/or write
+certain file formats.</p>
+
+<p>For the most part, there is a one-to-one correspondence between
+file formats, their filename extension, the name of the format handler
+and even the source file the handler lives in, such as <code>flac</code> and <code>nsp</code>,
+and most of them read and write that format
+but one handler may be able to read several file formats (of which <code>sndfile</code>
+is the example par excellence) and one file format may be handled by several
+different handlers.</p>
+
+<h3 id="staticformathandlers">Static format handlers</h3>
+
+<p>Most of the format handlers, <code>wav</code>, <code>aiff</code> and so on, are compiled
+into <code>libsox</code> and the <code>sox</code> program links to them.</p>
+
+<h3 id="dynamicformathandlers">Dynamic format handlers</h3>
+
+<p>Others can be built-in or compiled as dynamic libraries
+using <code>./configure --with-flac=dyn</code> which creates a
+separately-installed library file called <code>libsox_fmt_flac.{a,la,so,dll}</code>
+and <code>./configure --with-dyn-default</code> builds all the dynamic format handlers
+it can as separate libraries.</p>
+
+<p>The <code>export-symbols-regex</code> line in <code>src/Makefile.am</code> lists functions
+in <code>libsox</code> that are called by the dynamic formats.</p>
+
+<p>Debian packages these separately from the <code>libsox</code> package so that it could
+include free software handlers in the main repository and the patented ones,
+<code>amrnb</code>, <code>amrwb</code> and <code>mp3</code>, in the <code>non-free</code> repositories.
+The idea was also that people dould be able to publish their own
+format handlers that could be added to existing SoX installations,
+but this seems never to have happened, with LADSPA and VST taking the
+high ground in this area.</p>
+
+<h3 id="internals">Internals</h3>
+
+<p>A format handler is created by an <code>LSX_FORMAT_HANDLE(whatever)</code> clause
+in some source code file. That is a macro, defined in <code>src/sox_i.h</code>,
+that expands to a function <code>lsx_whatever_format_fn(void)</code> which returns
+a pointer to a <code>sox_format_handler_t</code>, which is a small struct containing,
+among a few other things:</p>
+
+<ul>
+<li><code>names</code>: the list of file formats that it can read or write;</li>
+</ul>
+
+<p>If it can read a file format it will have some of:</p>
+
+<ul>
+<li>Its <code>startread</code> function is handed a <code>sox_format_t *</code> and is called
+when the input file has already been opened. It does anything required
+before it starts reading samples, often reading the file's header
+to find out the sample rate, the number of channels and the way data
+are encoded in the rest of the file, and allocating memory.
+It returns SOX_SUCCESS if the file looks and reading can proceed
+or SOX_EOF if not.</li>
+<li><code>read</code> is handed a <code>sox_format_t *</code>, a pointer to a buffer of <code>sox_sample_t</code>
+and the length of that buffer (in samples, not sample frames).
+The <code>sox_format_t</code> contains stuff that <code>startread</code> filled in and more,
+which it uses to reads data from the file using the <code>FILE</code> pointer therein
+and writes up to <code>sox_sample_t</code>s into the buffer it was handed.
+It returns the number of samples that it wrote into the buffer,
+always a multiple of the number of channels.</li>
+<li><code>stopread</code> does anything needed when no more reading is required
+such as freeing any memory that was allocated during <code>startread</code>.
+It does not have to close the input file; that is done for it afterwards.</li>
+<li><p><code>seek</code> repositions the reader to a different point in the input file
+for the next call to its <code>read</code> function.</p></li>
+<li><p><code>startwrite</code> is similar to <code>startread</code> when a file is to be written to;</p></li>
+<li><code>write</code> is handed a buffer full of SoX samples in the 32-bit signed format
+that SoX uses internally and</li>
+<li><code>stopwrite</code> is called when all samples have been processed, often rewrites
+the length of the file in its header and frees any memory allocated in
+<code>startwrite</code>.</li>
+</ul>
+
+<p>Any of these can be <code>NULL</code> to say it is not necessary or not supported
+but <code>read</code> must be non-NULL for it to be considered able to read the
+file formats it lists, and <code>write</code> to say it can write those formats.</p>
+
+<p>The <code>read</code>, <code>write</code> and <code>seek</code> functions in the format handler's
+source file can be called anything in real life as those symbols
+are local to the format handler and are only called via the pointers
+in the <code>sox_format_handler_t</code> whose address the <code>lsx_*_format_fn</code> returns.</p>
+
+<p><code>src/skelform.c</code> is a tiny example of a format handler and
+details about what is in a <code>sox_format_t</code> can be found in <code>sox_ng.h</code>
+in the description of the <code>sox_format</code> structure.</p>
+
+<h2 id="effects">Effects</h2>
+
+<p>Effects are what follow the input and output file names on the SoX
+command line, each followed by its own set of parameters.</p>
+
+<p>An effects chain is a sequence of effects, each of whose output feeds
+into the input of the following effect.</p>
+
+<h3 id="internals">Internals</h3>
+
+<p>Like the format handlers, each SoX effect is defined by one tiny function that
+returns a <code>sox_effect_handler_t</code> a pointer to a <code>sox_effect_handler</code> structure
+containing pointers to the functions that make it work:</p>
+
+<ul>
+<li><code>getopts</code> is called once at startup to look at the effect's arguments,
+ allocates memory that lasts the lifetime of the effect and initializes
+ any libraries that it uses;</li>
+<li><code>start</code> is called once per channel before passing data through it;</li>
+<li><code>flow</code> copies samples from input to output, probably modifying them;</li>
+<li><code>drain</code> is called when all audio data has been given to <code>flow</code>,
+in case it has any more samples that it hasn't output yet,</li>
+<li><code>stop</code> is called once per channel, and</li>
+<li><code>kill</code> is called just once to shut down any libraries that it used
+and to free memory that was allocated in <code>getopts</code>.</li>
+</ul>
+
+<p>Each of these is handed a pointer to a <code>sox_effect</code> structure
+in which it can find out which channel it is processing (the <code>flow</code>),
+the total number of channels (in <code>flows</code>) and the characteristics
+of the input and output signals.</p>
+
+<p>Other goodies in the <code>sox_effect_handler</code> are the effect's name,
+its help and the logical OR of a number of flags describing how it operates.
+There is a full list of them in <code>sox_ng.h</code>, but the most interesting ones are:</p>
+
+<ul>
+<li><code>SOX_EFF_CHAN</code>, <code>SOX_EFF_RATE</code> and <code>SOX_EFF_LENGTH</code> to say whether it might
+change the number of channels, the sample rate or the length of the audio
+and</li>
+<li><code>SOX_EFF_MCHAN</code> to say that it processes all the channels together,
+in which case <code>start</code>, <code>flow</code>, <code>drain</code> and <code>stop</code> are called once per
+audio frame with the samples of the channels interleaved
+(left, right, left, right).
+Otherwise, the four functions are called once per channel, each processing
+a mono signal and these multiple invocations can be done in parallel.</li>
+</ul>
+
+<h2 id="effects">Effects</h2>
+
+<p>A SoX effect is a function that returns the address of a sox_effect_t.</p>
+
+<p>That contains function pointers to the effect's functions::</p>
+
+<ul>
+<li>getopts</li>
+<li>start</li>
+<li>stop</li>
+<li>drain</li>
+<li>stop</li>
+<li>kilol</li>
+</ul>
+
+<p>I should get a T-Shirt made with those six words on it to see if anyone
+ever happens to know what they are!</p>
+<hr>Generated by <tt>makehtml.sh</tt> on Mon May 18 04:03:53 PM CEST 2026</body>

@@ -1,0 +1,159 @@
+<html><head><title>Releases - sox_ng wiki</title></head>
+<body><p align=center>sox_ng wiki - Releases</p>
+<hr>
+<h1 id="releases">Releases</h1>
+
+<p><code>sox_ng</code> has a time-based release cycle using Semantic Versioning.
+Each of the versions has a new release every six months.</p>
+
+<h2 id="releaselevels">Release levels</h2>
+
+<h3 id="micro">Micro</h3>
+
+<p>Numbered X.Y.Z+1, micro releases include bug fixes, spelling errors
+and very small enhancements to existing features but no new features.
+Changes, apart from the bug fixes, are both forward- and backward-compatible.</p>
+
+<p>Each six months, all the release series (currently 14.4.X, 14.5.X and 14.6.X)
+get all the bug fixes applied in the main development branch since the last
+micro release (well, the ones that apply to them).</p>
+
+<p>So, there have been 173 commits to the main branch since the last micro release.</p>
+
+<ul>
+<li>Ones that introduce new features can be ignored</li>
+<li>Of the rest, if you're lucky there will be a text [issue #416] at the end of
+the first line of the commit message. From that, you can see what milestone
+the issue has and discard it if it is not micro or release.
+If you look through the closed issues in the Conclusion section
+there may be a seven-digit lowercase hex commit hash stem,
+giving you further correlation between commits and issues
+and hence their milestone.</li>
+<li>Now look at each of the remaining commits and decide which of them
+needs to be applied to which of the maintenance branches:
+<ul>
+<li>bug fixes</li>
+<li>improvements to the documentation and error messages</li>
+<li>speed/space improvements</li>
+</ul></li>
+</ul>
+
+<p>The last micro releases were made on 2025-08-18 and
+the next micro releases are scheduled for 2026-08-18.</p>
+
+<h3 id="minor">Minor</h3>
+
+<p>Numbered X.Y+1.0, minor releases add new features and functionality
+in a backward-compatible manner but "not too many at once".</p>
+
+<p>The next minor release, 14.9.0, is scheduled for 2026-11-18.</p>
+
+<h3 id="major">Major</h3>
+
+<p>Major releases, numbered X+1.0.0 include changes that are
+not backward-compatible and major new feature sets.</p>
+
+<p>A major release is not planned.</p>
+
+<h2 id="foreachrelease">For each release</h2>
+
+<p>On the <a href="http://codeberg.org/sox_ng/sox_ng/releases">Releases</a> page they will be ordered 
+in reverse chronological order of the commit that the tag points to so,
+if you are making several at once and want the most recent minor release first,
+make the "Release 14.whatever" commits in order from the oldest to the newest.</p>
+
+<ul>
+<li>Run <code>make check</code> and, if you're feeling brave:
+<ul>
+<li>Make sure it compiles on the GCC Compile Farm</li>
+<li>Make sure the Vindov builds build</li>
+<li>Run the testsuite with <code>valgrind</code></li>
+<li>Run the Address Sanitizer and <a href="https://github.com/kernelslacker/sox-mangler"><code>sox-mangler</code></a></li>
+</ul></li>
+<li><code>V=14.4.3-rc1     # or whatever</code></li>
+<li><code>git checkout main</code></li>
+<li><code>git status       # There should be nothing to do</code></li>
+<li>If it's a first release candidate
+<ul>
+<li>Edit <code>README.md</code> and <code>wiki/Releases.md</code> to change the next release date</li>
+<li>Change the milestone's description to reflect the next release date</li>
+</ul></li>
+<li><code>git clone https://codeberg.org/sox_ng/sox_ng.wiki wiki</code></li>
+<li><code>(cd wiki &amp;&amp; git push &amp;&amp; sh makehtml.sh)</code></li>
+<li>Copy in and commit the latest version of https://codeberg.org/sox_ng/issues</li>
+<li>Update ChangeLog from the git logs and fix the date</li>
+<li>Change <code>AC_INIT</code> in <code>configure.ac</code> to the new version</li>
+<li>Change <code>src/sox_ng.h</code>'s <code>SOX_LIB_VERSION_CODE</code> to the new version</li>
+<li><code>git commit -m "Release $V" -a</code></li>
+<li><code>git tag -f sox_ng-$V</code></li>
+<li><code>git push origin $(git branch --show-current)</code></li>
+<li><code>git push --tags origin $(git branch --show-current)</code></li>
+<li><code>autoreconf -i</code></li>
+<li><code>./configure</code></li>
+<li><code>make txt pdf dist</code></li>
+<li><code>tar xf sox_ng-$V.tar.gz</code></li>
+<li><code>zip -rq sox_ng-$V.zip sox_ng-$V</code></li>
+<li><code>rm -r sox_ng-$V</code></li>
+<li>Make the Windows executables
+<ul>
+<li><code>rm -f win32.exe win64.exe</code></li>
+<li><code>make win32.exe win64.exe</code></li>
+<li><code>zip -jq sox_ng-$V-win32-exe.zip mxe/usr/i686-w64-*/bin/sox_ng.exe AUTHORS ChangeLog COPYING README{,.md,.win32} sox*.{txt,pdf}</code></li>
+<li><code>zip -jq sox_ng-$V-win64-exe.zip mxe/usr/x86_64-w64-*/bin/sox_ng.exe AUTHORS ChangeLog COPYING README{,.md,.win32} sox*.{txt,pdf}</code></li>
+</ul></li>
+<li><code>echo '```'</code></li>
+<li><code>echo md5sums:</code></li>
+<li><code>md5sum sox_ng-$V.* sox_ng-$V-*.zip</code></li>
+<li><code>echo sha256sums:</code></li>
+<li><code>sha256sum sox_ng-$V.* sox_ng-$V-*.zip</code></li>
+<li><code>echo '```'</code></li>
+<li><code>firefox https://codeberg.org/sox_ng/sox_ng/releases</code></li>
+<li>Poke "New release"
+<ul>
+<li>Tag name: sox_ng-$V</li>
+<li>Release title: Release $V</li>
+<li>Describe this release:
+<ul>
+<li>First micro release</li>
+<li>Copy in ChangeLog</li>
+<li>Add checksums of source tarballs.</li>
+</ul></li>
+<li>Click here to upload and select sox_ng/sox_ng-$V.{tar.gz,zip}</li>
+<li>Use the title and content of release as tag message: No</li>
+<li>Mark as prerelease if it's not a stable release</li>
+<li>Hide automatically generated archives: Yes</li>
+<li>Poke "Publish release". This is the no-going-back point.</li>
+</ul></li>
+<li>Announce the release on sox-ng@groups.io</li>
+<li>For a first release candidate, contact the people who contributed to it</li>
+<li>Wait a week; if no problems are evident, it becomes the release;
+otherwise issue another release candidate for another week's testing,
+and so on</li>
+<li>When a release candidate is OK for a week, it becomes the release</li>
+<li>Announce the final release on <a href="http://freshcode.club">http://freshcode.club</a></li>
+<li>Announce release candidates on sox-ng@groups.io and sox-devel@lists.sourceforge.net</li>
+<li>Announce final releases on sox-ng@groups.io and sox-users@lists.sourceforge.net</li>
+<li>Change configure.ac's release number to $V+git, check in and push
+Historically it has been 14.4.3git where 14.4.3 is the next release
+but this conflicts with <a href="http://semver.org">semantic versioning</a> and
+we don't know whether the release after 14.4.3.1 will be
+14.4.3.2, 14.4.4 or 14.5.0.</li>
+</ul>
+
+<h2 id="furtherreading">Further reading</h2>
+
+<h3 id="releasemanagement">Release management</h3>
+
+<ul>
+<li>Karl Fogel's book <a href="http://producingoss.com"><em>Producing OSS</em></a> chapter 3: <em>Release management</em> and chapter 6: <em>Release Strategy</em></li>
+<li>Michael Michlmayr's PhD theses <a href="http://www.cyrius.com/publications/michlmayr-phd.pdf"><em>Open Source Software Projects: Exploring the Impact of Release Management</em></a> on the merits of time-based released over "when it's ready" releases.</li>
+<li><a href="http://producingoss.com"><em>Producing OSS</em></a> chapter 5: <em>Time Based Releases</em></li>
+</ul>
+
+<h3 id="semanticversioning">Semantic versioning</h3>
+
+<ul>
+<li><a href="https://producingoss.com/en/development-cycle.html#semantic-versioning"><em>Producing OSS</em>'s section on semantic versioning</a></li>
+<li>The <a href="http://semver.org"><em>Semantic Versioning Specification</em></a></li>
+</ul>
+<hr>Generated by <tt>makehtml.sh</tt> on Mon May 18 04:03:50 PM CEST 2026</body>
