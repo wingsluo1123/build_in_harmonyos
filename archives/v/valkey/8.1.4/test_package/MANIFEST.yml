@@ -1,0 +1,30 @@
+package: valkey/8.1.4
+homepage: "https://valkey.io/"
+
+upstream_check_command: "make test test-modules test-sentinel test-cluster"
+upstream_test_in_build: true
+upstream_test_command: "sh ./runtest && sh ./runtest-moduleapi && sh ./runtest-sentinel && sh ./runtest-cluster"
+upstream_tests:
+  - file: tests/test_helper.tcl
+    source: valkey-8.1.4/tests/test_helper.tcl
+    description: "Default Tcl integration harness; drives the whole tests/integration tree"
+    command: "sh ./runtest"
+  - file: runtest-moduleapi
+    source: valkey-8.1.4/runtest-moduleapi
+    description: "Valkey Module API integration suite"
+    command: "sh ./runtest-moduleapi"
+  - file: tests/sentinel/run.tcl
+    source: valkey-8.1.4/tests/sentinel/run.tcl
+    description: "Valkey Sentinel integration suite"
+    command: "sh ./runtest-sentinel"
+  - file: tests/cluster/run.tcl
+    source: valkey-8.1.4/tests/cluster/run.tcl
+    description: "Valkey Cluster integration suite"
+    command: "sh ./runtest-cluster"
+
+test_package_tests:
+  - file: test.sh
+    description: "Exercise packaged commands across data types, expiry, transactions, scripting, persistence with check-rdb/check-aof, replication, Sentinel promotion, benchmark load and invalid-input paths"
+    command: "bash test.sh"
+
+assertion_count: 87  # 由 test.sh 运行时 ASSERTIONS 计数器自打印（W3 日志: 'valkey consumer test passed: 87 assertions'）

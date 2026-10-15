@@ -1,0 +1,23 @@
+sources:
+  url: "https://github.com/valkey-io/valkey/archive/refs/tags/8.1.4.tar.gz"
+  sha256: "32350b017fee5e1a85f7e2d8580d581a0825ceae5cb3395075012c0970694dee"
+
+patches:
+  - patch_file: "patches/0001-guard-glibc-process-name-globals.patch"
+    patch_description: "Guard the glibc-only program_invocation_name/_short_name copy so musl/OHOS does not reference undeclared globals"
+    patch_type: "portability"
+  - patch_file: "patches/0002-add-ohos-pthread-cancel-compat.patch"
+    patch_description: "Provide ENOSYS-reporting pthread cancellation fallbacks for musl/OHOS, which does not implement POSIX thread cancellation (server.h and io_threads.c call sites)"
+    patch_type: "portability"
+  - patch_file: "patches/0003-read-server-logs-without-exec-cat.patch"
+    patch_description: "Read the server logs inside the interpreter instead of spawning cat; Tcl reports EPERM as not owner when the harness polls cat per startup tick on OHOS"
+    patch_type: "portability"
+  - patch_file: "patches/0004-route-test-unixsocket-to-writable-tmp.patch"
+    patch_description: "Place the test suite Unix socket under VALKEY_TEST_TMPDIR when set; the OHOS build-cache filesystem rejects AF_UNIX bind (Operation not permitted) while the app cache dir accepts it. Default layout unchanged when unset"
+    patch_type: "portability"
+  - patch_file: "patches/0005-adjust-other-tcl-socket-path-assertion.patch"
+    patch_description: "Align the other.tcl proc-title cmdline assertion with the relocated test Unix socket path when VALKEY_TEST_TMPDIR is set"
+    patch_type: "portability"
+  - patch_file: "patches/0006-skip-process-pause-checks.patch"
+    patch_description: "Skip the upstream cases that block on observing a SIGSTOP-suspended process when VALKEY_TEST_SKIP_PROCESS_PAUSE is set; OHOS does suspend on SIGSTOP but never reports the stopped state (/proc and toybox ps keep showing S), so the wait-for-pause checks in process_is_paused / wait_process_paused cannot succeed. Measured on device: /proc/<pid>/stat and /proc/<pid>/status stay S while the process is stopped, and resume on SIGCONT"
+    patch_type: "portability"

@@ -1,0 +1,20 @@
+--- a/src/setproctitle.c
++++ b/src/setproctitle.c
+@@ -232,7 +232,7 @@
+ 	if (!(SPT.arg0 = strdup(argv[0])))
+ 		goto syerr;
+ 
+-#if __linux__
++#if defined(__linux__) && defined(__GLIBC__)
+ 	if (!(tmp = strdup(program_invocation_name)))
+ 		goto syerr;
+ 
+@@ -247,6 +247,8 @@
+ 		goto syerr;
+ 
+ 	setprogname(tmp);
++#else
++	(void)tmp;
+ #endif
+ 
+     /* Now make a full deep copy of the environment and argv[] */
