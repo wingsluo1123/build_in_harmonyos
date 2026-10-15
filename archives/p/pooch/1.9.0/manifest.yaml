@@ -1,0 +1,58 @@
+# 版本级 manifest — pooch 1.9.0
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "1.9.0"
+software: pooch
+status: built
+build_date: "2026-10-13"
+build_system: python
+
+source:
+  url: "https://files.pythonhosted.org/packages/83/43/85ef45e8b36c6a48546af7b266592dc32d7f67837a6514d111bced6d7d75/pooch-1.9.0.tar.gz"
+  sha256: "de46729579b9857ffd3e741987a2f6d5e0e03219892c167c6578c0091fb511ed"
+  tar_format: tar.gz
+
+build:
+  system: custom
+  configure_options: []
+  dependencies:
+    # 运行期依赖（pooch 1.9.0 自身声明）——**三者在仓库中均已有归档**，直接 requires：
+    - "platformdirs/4.3.8（已归档）"
+    - "packaging/26.3（已归档）"
+    - "requests/2.22.0（已归档）"
+    # 测试期依赖（仅 build() 内、**不进产物**；来自上游 setup.cfg/setup.py 的 test extras）
+    # ⚠️ pip 源必须**平台私有源 pypi.cnb.cool 优先**（+ --trusted-host）：pyOpenSSL 依赖的
+    #    cffi/cryptography 是原生扩展，清华镜像的 manylinux 轮子其 .so 在 OHOS(musl) 上加载不了
+    #    → pyftpdlib 不导出 TLS_FTPHandler → pytest_localftpserver 无条件 import 失败
+    #    （CI 构建 #89930 实测）；详见 notes.md。
+    #   仓库无归档 → 按要求"缺环境就下"从 PyPI 装到 <build>/test-deps
+    - "pytest-httpserver（PyPI，测试期）"
+    - "pytest-localftpserver（PyPI，测试期）"
+  python: "3.12"
+
+patches_applied: []
+
+upstream_tests:
+  framework: pytest
+  # sdist 的测试位于**包内** `pooch/tests/`（9 个 .py）；**sdist 无顶层 tests/**
+  #   → 第 1 轮本地 CI 因此报 `ERROR: file or directory not found: tests/`（已改为包内路径）
+  test_path: "pooch/tests/"
+  test_command: "python3 -m pytest pooch/tests/ -q -m 'not network'"
+  # 上游以 `@pytest.mark.network` 标记需要真实外网的用例（实测 38 处）；本环境访问外网会
+  #   `requests.exceptions.ConnectTimeout` → 按**上游自己的标记** deselect（上游认可的离线子集）
+  network_subset_policy: "按上游 @pytest.mark.network deselect；未被标记者的失败仍令 build 硬失败"
+  # 实测：62 passed / 13 skipped / 85 deselected（`-m 'not network'`）
+  run_in_build: true
+upstream_test_pass_rate: "**离线子集：62 passed / 13 skipped / 85 deselected**（`-m 'not network'`，build() 内真跑）；被 deselect 的用例为上游自身标记 `@pytest.mark.network`（需真实外网，本环境 ConnectTimeout）——**如实披露，不把 deselect 计入通过**。**并如实披露测试期环境改动（CI 构建 #90269 的修复）**：本平台 ABI 下 pyOpenSSL 不可用（本机轮子标签 `cp312-cp312-ohos_aarch64`，CI 选到的不是它）→ pyftpdlib 不导出 TLS_FTPHandler → pytest_localftpserver 的无条件 import 会在收集阶段打死整个会话；故测试期用 sitecustomize 补一个 **TLS_FTPHandler 占位**（明文 FTP 夹具走 FTPHandler、不触碰占位；**真有 FTPS 用例会立刻报错而非静默通过**），并加 **shim 自检**（把 OpenSSL 置 None 模拟无 pyOpenSSL，要求插件仍可导入，否则响亮失败）与测试期 pip 的**按源重试 1 次**（传输层抖动不该让 build 挂）。"
+adapted_test_pass_rate: "test_package/check_pooch.py **7 项消费者校验**（全部离线、不触网）：①产物齐备 ②关键文件（__init__/core/downloaders/hashes/processors/utils/version）③真实 import ④__version__ == 1.9.0 ⑤真实离线 API：file_hash() 算 sha256 正确 ⑥真实离线 API：create() 构造 Pooch 且 registry 保留 ⑦证据（模块字节 + python 版本）"
+
+knowledge_gained:
+  - category: L1
+    content: "上游测试的**权威离线子集**应取其自身的标记，而不是我们私自挑文件：pooch 用 `@pytest.mark.network` 标注需要真实外网的用例（实测源码内 38 处），本环境直跑会 `requests.exceptions.ConnectTimeout`（还会挂住不返回）；正确做法是 `pytest -m 'not network'` —— 这是**上游认可**的离线子集，实测 62 passed / 13 skipped / 85 deselected，且未被标记者的失败仍然硬失败（不宽恕）。适配任何带网络用例的上游套件时，先 grep 其 marker 定义与用法。"
+    reason: "pooch 适配实测——离线子集应以上游 marker 为准"
+  - category: L1
+    content: "**测试路径要看 sdist 的真实布局**：pooch 的测试在**包内** `pooch/tests/`，sdist **没有顶层 `tests/`** → 习惯性写 `pytest tests/` 会直接 `ERROR: file or directory not found`（本轮第 1 次本地 CI 即如此）；写配方前先用 `find`/`ls` 核对 sdist 的测试落点（包内 vs 顶层），再定 test_path。"
+    reason: "pooch 适配实测——sdist 测试布局差异导致的首轮失败"
+  - category: L1
+    content: "**纯 py3 wheel 且零依赖的运行期依赖优先复用仓库归档**：pooch 的 platformdirs/packaging/requests 在仓库均已有归档 → 直接 `requires`（无需 pip 绕过、无需随包附带）；只有当某个运行期依赖**仓内无归档**时才退回“随包附带 + manifest/notes/PR 三处披露”（如 praw 的 update-checker/websocket-client）。判定顺序：已合入 > 可绕过。"
+    reason: "pooch 适配实测——依赖复用优先级的正向范例"
