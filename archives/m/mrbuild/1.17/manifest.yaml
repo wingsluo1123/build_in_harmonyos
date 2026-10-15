@@ -1,0 +1,37 @@
+software: mrbuild
+version: "1.17"
+status: built
+build_date: "2026-10-13"
+conan_ref: "mrbuild/1.17"
+
+source:
+  url: "https://github.com/dkogan/mrbuild/archive/refs/tags/v1.17.tar.gz"
+  sha256: "d577e2cc4a2bc598ca7dd78235b7f9fea4bbd6099926b78f26ef18dbb4c94ceb"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options: []
+  dependencies:
+    required: []
+    optional: []
+  cc: clang
+  cxx: clang++
+
+commands:
+  - make-pod-from-help
+
+patches_applied:
+  - 0001-port-ld-default-symver-flag-to-llvm-lld-linkers.patch
+
+test_results:
+  upstream_command: "n/a (v1.17 ships no automated test suite)"
+  upstream_scope: "No automated upstream tests exist; build_examples/GNU_Make is a manual example only."
+  test_package: "Consumer test builds a real mini C project (libmrtest + run) with the installed templates via the OHOS cross toolchain and asserts the .so symlink chain, ELF artifacts, and the make-pod-from-help usage contract"
+  local_status: "conan create passed on WSL ext4 with ohos-aarch64-wsl (host=build) on 2026-10-13; test_package 11 unconditional assertions passed plus 2 conditional perl assertions"
+  device_status: "pending CI"
+
+knowledge_gained:
+  - "mrbuild is a pure file-distribution package (Makefile templates + perl helper); nothing is compiled."
+  - "GNU make 4.3 mishandles a second quoted include name (quotes not stripped -> No such file or directory); consumer Makefiles must use unquoted include paths."
+  - "The footer hard-codes the GNU-ld-only --default-symver link flag on non-Darwin; LLVM lld (OHOS NDK) rejects it. The portability patch probes the linker and keeps the flag only when accepted."
