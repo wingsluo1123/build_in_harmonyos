@@ -1,0 +1,16 @@
+--- a/tool/command.h	2026-10-13 23:07:05.285121719 +0800
++++ b/tool/command.h	2026-10-13 23:07:05.397122501 +0800
+@@ -4,6 +4,13 @@
+ 
+ #include "cli.h"
+ 
++/* glibc 特有全局变量 program_invocation_short_name 在 OHOS libc 不存在，
++   varlink CLI (tool/*.c) 的 usage 信息使用；非 glibc 平台提供静态字符串 fallback。 */
++#if !defined(__GLIBC__)
++static const char varlink_progname_short[] = "varlink";
++#define program_invocation_short_name varlink_progname_short
++#endif
++
+ typedef long (*CommandRunFunction)(Cli *cli, int argc, char **argv);
+ typedef long (*CommandCompleteFunction)(Cli *cli, int argc, char **argv, const char *current);
+ 
