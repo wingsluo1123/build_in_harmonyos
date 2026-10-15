@@ -1,0 +1,26 @@
+id: E15163
+trigger_tool: configure|config.status|make
+phase: configuration
+error_signature: config.status.*Permission denied|No targets specified and no makefile found
+severity: 3
+category: autoconf,diagnosis,hmdfs
+match_keywords: config.status,confstat,subs.sed,config.h,missing Makefile,configure return code,first causal failure
+title: 旧 Autoconf 的末尾 make 失败可能掩盖成功返回的配置生成错误
+root_cause: 旧生成脚本在 config.status 内写替换脚本和输出文件失败后仍继续执行 depfiles，外层 configure 命令未阻止后续 make；最终缺 Makefile 的错误是结果，不是编译器或源码错误。
+affected_scope: 携带旧预生成 configure/config.status 的原生 Autotools 发布包，日志先出现文件创建失败、后进入 make 且无 Makefile；不适用于已经生成 Makefile 后的真实编译或链接错误。
+verification_cmd: 按时间检查完整 configure/config.status/make 日志及原始发布脚本；修复首个文件生成错误，再从干净源码执行完整构建、原始上游测试及安装消费者。
+rec_priority: 1
+rec_approach: trace-first-generation-failure-not-last-conan-frame
+rec_description: 将缺 Makefile 的末尾异常向前追踪到 config.status 的首个失败，区分权限、输入模板与平台识别。HMDFS confstat 权限案例复用 E114/E129，仅修改两条创建分支并保留 cleanup；不能用 configure 返回成功证明配置产物完整。
+rec_command: 回读完整日志；定位生成 Makefile/config.h 的首个失败；核对官方 configure 唯一锚点；修复后 conan create 并核对全量原始测试与实际安装包。
+rec_auto_fix: false
+rec_impl: causal-log-analysis-and-native-rebuild
+forbid_1_pattern: ignore missing Makefile|waive config.status permission error|change compiler to fix generation failure
+forbid_1_reason: 末尾 make 的返回码及 Conan build() 行号只说明传播位置，不能替代首个配置生成错误。
+forbid_1_consequence: 将权限问题错归因于编译器，或把 configure 成功误作完整配置成功。
+doc_file: knowledge/drafts/E15163-draft-2501.md
+last_updated: 2026-10-12
+source_event: PR15362 CI86351 先发生 confstat/subs.sed/out/config.h Permission denied，随后 make 无 Makefile；修复候选 r12 原生官方 W3 CI exit0，上游70/70、消费者8/8、12阶段及释放PASS；完整日志SHA256 5d52f7d79d2a872701d33300a33ca77f30736b8a377da04e03d88c59f8d011c9。
+authors: 2501_91199785 (诶，云朵)
+draft: true
+contributor_id: 2501
