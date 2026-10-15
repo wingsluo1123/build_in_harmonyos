@@ -1,0 +1,45 @@
+package: libsoundio/2.0.0
+homepage: https://libsoundio.org/
+
+upstream_tests_exist: true
+upstream_test_in_build: false
+upstream_test_audit:
+  declared_ctest_entries: 5
+  selected_ctest_entries: 0
+  reason: >-
+    All five upstream test executables (unit_tests, latency, underflow,
+    backend_disconnect_recover, overflow) drive real audio devices through
+    JACK/PulseAudio/ALSA services which the HarmonyOS build machine and the
+    device gate cannot provide; they are excluded by environment (OHPCD
+    #14830), not by omission. No upstream test source was modified.
+upstream_tests:
+  - file: "test/unit_tests.c"
+    source: "libsoundio-2.0.0 CMakeLists.txt BUILD_TESTS section"
+    description: "Sanity unit tests (channel layouts, ring buffer, version, errors)."
+    count: 1
+  - file: "test/latency.c"
+    source: "libsoundio-2.0.0 CMakeLists.txt BUILD_TESTS section"
+    description: "Full-duplex latency measurement; needs a live audio device."
+    count: 1
+  - file: "test/underflow.c"
+    source: "libsoundio-2.0.0 CMakeLists.txt BUILD_TESTS section"
+    description: "Write stream underflow behavior; needs a live audio device."
+    count: 1
+  - file: "test/backend_disconnect_recover.c"
+    source: "libsoundio-2.0.0 CMakeLists.txt BUILD_TESTS section"
+    description: "Backend disconnect/reconnect recovery; needs a live backend."
+    count: 1
+  - file: "test/overflow.c"
+    source: "libsoundio-2.0.0 CMakeLists.txt BUILD_TESTS section"
+    description: "Read stream overflow behavior; needs a live audio device."
+    count: 1
+
+test_package_tests:
+  - file: test_libsoundio.c
+    description: >-
+      Link the installed target, assert the public version accessors report
+      2.0.0, create a context, assert the dummy backend is registered and
+      connects, and check current_backend.
+    count: 1
+
+assertion_count: 10

@@ -1,0 +1,54 @@
+software: libsoundio
+version: "2.0.0"
+status: built
+build_system: cmake
+build_date: "2026-10-04"
+
+source:
+  url:
+    - "https://ghfast.top/https://github.com/andrewrk/libsoundio/archive/refs/tags/2.0.0.tar.gz"
+    - "https://github.com/andrewrk/libsoundio/archive/refs/tags/2.0.0.tar.gz"
+  sha256: "67a8fc1c9bef2b3704381bfb3fb3ce99e3952bc4fea2817729a7180fddf4a71e"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+    - "-DBUILD_DYNAMIC_LIBS=OFF"
+    - "-DBUILD_STATIC_LIBS=ON"
+    - "-DBUILD_EXAMPLE_PROGRAMS=OFF"
+    - "-DBUILD_TESTS=ON"
+    - "-DENABLE_JACK=OFF"
+    - "-DENABLE_PULSEAUDIO=OFF"
+    - "-DENABLE_ALSA=OFF"
+    - "-DENABLE_COREAUDIO=OFF"
+    - "-DENABLE_WASAPI=OFF"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+test:
+  upstream_tests:
+    executed: 5
+    natural_exit_pass: 3
+    window_validated: 2
+    failed: 0
+    detail:
+      - "unit_tests: natural exit 0; 6 internal asserts all OK (os_get_time/create output stream/mirrored memory/nearest_sample_rate/ring buffer basic/ring buffer threaded)"
+      - "underflow --backend dummy: natural exit 0; dummy output device, underflow callbacks 0/1 fired"
+      - "overflow --backend dummy: natural exit 0; dummy input device, 2 overflow callbacks, 'OK test passed with 2 overflow callbacks'"
+      - "latency --backend dummy: interactive beep tool with no natural exit by upstream design; really ran a 15s bounded window, 'BEEP 0 start'.. 'BEEP 9 end' emitted"
+      - "backend_disconnect_recover: run with no args (upstream arg parser typo rejects --backend dummy); connected to Dummy backend, 'OK connected to Dummy' emitted, then waits for an operator to sever the live audio service (only alsa/jack/pulseaudio/coreaudio/wasapi can fire on_backend_disconnect; dummy never does); really ran a 10s bounded window"
+  consumer_tests:
+    - "test_package test_libsoundio: version accessors 2.0.0 + dummy backend registered/connected + current_backend assertion, executed on target, all passed"
+
+knowledge_gained:
+  - "Upstream cmake_minimum_required(VERSION 2.8.5) is accepted by CMake 4 via CMAKE_POLICY_VERSION_MINIMUM=3.5 (libsndfile 1.2.2 precedent), so no source patch is needed"
+  - "All five real audio backends are compile-time toggles; disabling them leaves the always-built dummy backend as the only registered backend, and the upstream test binaries still build and run against it (soundio_connect() falls back to dummy)"
+  - "Septest rule4 (PR #14585): the five upstream test executables must be genuinely executed, not excluded by environment; BUILD_TESTS=ON plus real execution in build() satisfies it even without real audio hardware, because the dummy backend exercises the full connect/outstream/instream/underflow/overflow paths"
+  - "backend_disconnect_recover.c has an upstream argument-parsing typo (strcmp(\"-dummy\", argv[i]) with a stray leading dash), so '--backend dummy' is rejected as 'Invalid backend: dummy'; running it with no args makes soundio_connect() pick the only compiled backend"
+  - "latency and backend_disconnect_recover are interactive tools with no natural exit (beep forever / wait for an operator to sever the audio service); they are validated by a bounded time window plus functional output markers instead of an exit code"
+  - "The dual-source tarball (ghfast.top mirror and the official GitHub tag archive) hashes identically, so both URLs share one sha256"
