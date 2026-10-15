@@ -1,0 +1,14 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P3",
+      "rule_id": "code_style",
+      "file": "archives/j/jtreg6/6.2-1/conanfile.py",
+      "line": 197,
+      "description": "（遗留自 r1/r2，本内容未改动）_fetch 的 python-urllib 兜底仍使用 ssl._create_unverified_context() 关闭 TLS 校验（Ant zip / TestNG 源码 tarball / JDK tarball 三处兜底下载共用）；每个下载结果随后均有 sha1/sha256 钉校验，完整性有保证，属纵深防御类软建议（与 jtreg8 W4 对同款代码的 P3 判定一致），作者可合理接受当前实现。",
+      "fix_suggestion": "先尝试默认校验上下文，仅在证书校验失败时回退到 unverified 上下文（保留下载后哈希校验）。"
+    }
+  ],
+  "summary": "r3 复审 verdict=pass（P0=0，P1=0；仅 1×P3 遗留软建议，不阻断）。finish/W3 后新增内容逐项复核：(1) notes.md 收尾为规范单块（`---` + 空行 +『**编译结束**: 2026-10-14 18:08』+『**最终状态**: built』，全文件仅 1 处『编译结束』/1 处『最终状态』，无重复，其余正文相对 r2 未变）；(2) 版本 manifest 的 patch_classification 已恢复 type: portability + 与两个补丁内容相符的 guard（0001 removal-lint / 0002 uname-HarmonyOS），与 conandata.yml/两处 manifest/实际补丁一致，generated_at=18:08:17、orig/work 哈希 dc92ebf4/3084fced 未变，交付内容无 pending/type: auto 残留；(3) 证据链核实通过——w3-local-ci.log 为真实完整构建（Calling build() → quick-test『All (6) selected tests completed successfully』→ test_package 12/12 → L1e 破坏性负例确认依赖被测包 → L0/L1/L2/L4/L5 全 pass、Build Summary 1/1、结尾『conandata.yml 已还原为官方 URL』），.ci-result.json exit_code=0 且其 log_sha256 与 w3-local-ci.log 的实际 SHA256 逐位一致（R52），conan-verify-report.md G0–G4 PASS（G4 仅『无法找到程序包 ID』提示、L2/L4/L5 由 W3 覆盖）；conan-create.log（G2）本次为缓存命中（Already installed）故本身不含 build，其 test_package 12/12 与 W3 日志共同支撑申报；(4) R52：committed reports/audit-result.json 为 r2 输出（verdict pass、2×P3），其事实在 r3 仍成立（SSL 建议保留；conan-verify-report.md 已生成且引用属实、属按设计不随 PR 提交的本地证据，本轮不再列 issue），r3 结果取代该文件，无相矛盾内容。全量 180/184 仍为真机手工实测统计（新 CI 证据不覆盖该项，亦无冲突证据，不构成 issue）。其余快速复核：16 个交付文件与 audit-input 逐字节一致、test.sh 仍为 12 断言（MANIFEST=12）、补丁与 .patch-backup 逐字节相同、conandata 官方 https URL + sha256 d2a4ef1b…（与本地上游 tarball 复算一致）、无占位符/CRLF/BOM/密钥（唯一 __OHOS__ 命中为 r2 审计正文文字提及）。"
+}
