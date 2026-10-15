@@ -1,0 +1,105 @@
+#====================================================================
+# DRAFT-pep517-hatchling-build-isolation-interpreter-probe
+# PEP 517 后端解析 + G2 残缺解释器下的上游测试可运行性判定
+#====================================================================
+
+# Layer 0: Error Surface
+id:                     DRAFT-pep517-hatchling-build-isolation-interpreter-probe
+trigger_tool:           "conan|pip"
+phase:                  "build|testing"
+error_signature: |
+  BackendUnavailable.*No module named 'hatchling'
+  ModuleNotFoundError: No module named 'pytest'
+  unittest discover.*failed to import test module
+
+# Layer 1: Recognition
+severity:               2
+category:               "python, build-system, toolchain"
+match_keywords: |
+  hatchling, build isolation, --no-build-isolation, PEP 517, pyproject.toml,
+  build-backend, pip wheel, pytest, unittest discover, interpreter probe,
+  G2, hnp python3, stdlib 残缺, site-packages, payload
+title:                  纯 Python 包两件事必须分开：PEP 517 后端解析交给 pip 隔离，上游测试用功能探针选解释器
+
+# Layer 2: Diagnosis
+root_cause: |
+  纯 Python 三方包（terminado 等）在适配中有两个独立的技术点常被混为一谈：
+  (1) 构建后端解析：上游 pyproject.toml 声明 build-backend=hatchling.build
+  （或 flit_core/poetry-core）。若给 pip 传 --no-build-isolation，pip 会直接从
+  构建解释器的 site-packages 导入该 backend，而构建机解释器通常没装它，
+  直接报 BackendUnavailable。正确做法是保留 build isolation，让 pip 从索引
+  自动拉取 backend。
+  (2) 上游测试可运行性：上游 tests/ 可能是 pytest 风格（模块级 import pytest、
+  使用 timeout marker），stdlib unittest discover 连收集都做不到。此时不能
+  猜解释器，也不能轻信 sys.executable——构建机可能是残缺解释器（G2：hnp python3
+  无 pytest 且无法安装），而 ~/usr/local/bin/python3 完好。同时上游测试还需要
+  Conan 依赖（tornado/ptyprocess 等）的 payload 在 sys.path 上，而这些 payload
+  只在依赖包的 package_folder 里、不在任何解释器的 site-packages 中。
+affected_scope: |
+  所有 pyproject.toml 驱动、非 setuptools 后端的纯 Python 包；以及上游测试
+  依赖 pytest + Conan 依赖 payload 的 Python 包适配。
+verification_cmd: |
+  grep pyproject.toml 的 build-backend / requires；对候选解释器跑功能探针
+  （import pytest + 依赖 payload + subprocess 可用），探针失败时如实记录
+  NOT RUN 而非谎报通过。
+
+# Layer 3: Solution Space
+rec_priority:           1
+rec_approach:           keep-build-isolation-plus-functional-interpreter-probe
+rec_description: |
+  构建：pip wheel 时不传 --no-build-isolation，让 pip 从社区索引解析 PEP 517
+  backend。上游测试：用功能探针（而非 import 探测）逐个候选解释器验证
+  `import pytest,tornado,ptyprocess` + subprocess fork 可用，并把 Conan 依赖
+  payload 目录加入该探针的 PYTHONPATH；选定后才跑测试，无可用解释器则如实
+  输出 NOT RUN（不计入 PASS）。上游测试命令必须捕获真实退出码：
+  self.run(..., ignore_errors=True) 后再判 r != 0，或用 subprocess.run 检查
+  returncode——否则 `| tail -N` 管道（tail 恒返 0）或 run() 默认非零即抛异常
+  都会让 r != 0 分支成为死代码，上游测试失败被静默吞掉。
+rec_command:            grep -E "build-backend|requires" pyproject.toml；探针候选解释器跑 import+pytest
+rec_auto_fix:           false
+rec_impl:               recipe-pattern
+
+fallback_priority:      2
+fallback_approach:      subprocess-run-returncode
+fallback_description: |
+  若配方不便用 self.run 的 ignore_errors，可用 subprocess.run 执行上游测试并
+  检查 returncode（tornado 先例做法），完全规避 ConanFile.run 的抛异常语义。
+fallback_command:
+fallback_auto_fix:      false
+fallback_impl:
+
+forbid_1_pattern:       "--no-build-isolation.*hatchling"
+forbid_1_reason:        backend 不在构建解释器 site-packages 中，隔离被关后必然 BackendUnavailable。
+forbid_1_consequence:   构建阶段直接失败。
+forbid_2_pattern:       "tail -?[0-9]+|self\\.run\\(.*\\) 后 if r"
+forbid_2_reason:        管道使 r 取到 tail 的退出码（恒 0）；ConanFile.run() 默认 ignore_errors=False，非零退出直接抛 ConanException，使 r != 0 分支不可达。
+forbid_2_consequence:    上游测试失败被静默吞掉，notes 里「如实告警」成为死代码，构成状态申报不实。
+
+# Layer 4: Principles
+principles:             P005
+
+# Relations
+causes:                 []
+caused_by:              []
+similar_to:             []
+conflicts_with:         []
+prerequisite_of:        []
+
+# Metadata
+doc_file:               doc/DRAFT-pep517-hatchling-build-isolation-interpreter-probe.md
+last_updated:           2026-10-13
+source_event: |
+  terminado 0.18.1 适配：上游 build-backend=hatchling.build，误传
+  --no-build-isolation 报 BackendUnavailable；上游 tests/basic_test.py 为
+  pytest 风格（模块级 import pytest + timeout marker），stdlib unittest discover
+  无法收集；构建机 hnp python3（G2 残缺）无 pytest 且装不了，而
+  ~/usr/local/bin/python3 完好。实测后者跑上游测试 7 passed / 2 skipped 真实通过。
+
+# Quality metrics
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-13
+
+draft:                  true
+contributor_id:         MakeBlackSheepGreat
