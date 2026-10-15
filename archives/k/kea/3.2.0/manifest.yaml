@@ -1,0 +1,163 @@
+# 版本级 manifest
+# 文件位置: archives/k/kea/3.2.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "3.2.0"
+software: "kea"
+status: built
+build_date: "2026-10-04"
+build_system: "meson"
+
+source:
+  url: "https://ftp.isc.org/isc/kea/3.2.0/kea-3.2.0.tar.xz"
+  sha256: "14bf695d37b65b9b1bf550fea5d0adaf9806c50e5419ef2a176a4b8e9aade3df"
+  tar_format: tar.xz
+
+build:
+  system: meson
+  configure_options:
+    - "-Dtests=enabled"
+    - "-Dcrypto=openssl"
+    - "-Dmysql=disabled"
+    - "-Dpostgresql=disabled"
+    - "-Dnetconf=disabled"
+    - "-Dkrb5=disabled"
+    - "-DBOOST_SP_NO_PTHREAD_SETCANCELSTATE (extra_cxxflags)"
+    - "tc.binaries ar/ranlib = <compiler dir>/llvm-ar|llvm-ranlib (MesonToolchain)"
+    - "LD_LIBRARY_PATH += host 依赖 libdirs（配置期 cpp.run() 探针）"
+  dependencies:
+    - boost/1.85.0
+    - log4cplus/2.2.0.1
+    - openssl/3.5.8.1
+    - gtest/1.17.0.1   # test_requires
+    - meson/1.11.0     # tool_requires
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-meson.build.patch"
+  - "0002-src-lib-dhcp-iface_mgr_linux.cc.patch"
+  - "0003-meson.build.patch"
+  - "0004-src-lib-process-cfgrpt-meson.build.patch"
+  - "0005-src-lib-dhcp-iface_mgr_linux-getifaddrs-fallback.patch"
+  - "0006-meson-script-tests-interpreter.patch"
+  - "0007-src-lib-asiolink-process_spawn.cc-exec-fallback.patch"
+  - "0008-src-bin-keactrl-kea-admin-no-shebang.patch"
+  - "0009-src-lib-util-tests-pid_file_unittest.cc-premise-probe.patch"
+  - "0010-src-lib-testutils-sandbox.h-tmpdir.patch"
+  - "0011-src-lib-dhcp-tests-iface_mgr_unittest.cc-siocgifhwaddr-fallback.patch"
+  - "0012-src-hooks-dhcp-run_script-tests-run_script_unittests.cc-script-spawn-timeout.patch"
+  - "0013-src-bin-dhcp4-tests-ctrl-unix-socket-probe.patch"
+  - "0014-src-bin-dhcp6-tests-ctrl-unix-socket-probe.patch"
+  - "0015-src-bin-d2-tests-ctrl-unix-socket-probe.patch"
+  - "0016-src-lib-asiolink-tests-unix_domain_socket_unittest.cc-socket-probe.patch"
+  - "0017-src-lib-config-tests-unix-socket-probe.patch"
+  - "0018-src-lib-dhcpsrv-tests-memfile-tmpdir-and-perms-probe.patch"
+  - "0019-src-hooks-dhcp-tests-tmpdir-substitution.patch"
+  - "0020-src-bin-http-config-write-tmpdir.patch"
+
+tests:
+  upstream_suite: "(整棵树 · 实测注册 92 套件（66 gtest + 26 脚本）；源码书写 105 处 test()（1 处 foreach 展开 7 项），19 处条件不注册（mysql 4/pgsql 4/netconf 6/krb5·gss-tsig 2 + 无 sudo 环境 3），无套件过滤)"
+  upstream_test_command: "meson test -v --timeout-multiplier 4 -C <builddir>"
+  upstream_test_macros: 12281       # 全树列首锚定静态计数（^TEST(_F|_P)?，src/**.cc+.h）：TEST_F 10741 + TEST 1538 + TEST_P 2；含 38 处 DISABLED_；mysql/pgsql/netconf 禁用组件测试目录另有 1512 处宏未编译
+  upstream_tests_executed: 10544    # gtest 用例级执行数（10336 通过 + 208 跳过）；26 个脚本套件以套件级计（26/26 通过）
+  upstream_tests_passed: 10336
+  upstream_tests_failed: 0
+  upstream_tests_skipped: 208       # 154 平台前提探针（bind/chmod 前提不成立）+ 54 上游既有需 root（ping-check 48 / dhcp LPF 4 / util root_tests 2）
+  upstream_tests_disabled: 38       # DISABLED_ 前缀定义（29 处在启用套件内 gtest 注册不执行；9 处在禁用组件目录）
+  upstream_test_suites: 92          # 实测注册：66 gtest + 26 脚本
+  upstream_test_exit_code: 0        # 套件级 Ok: 92 / Fail: 0（meson test，无过滤）
+  ohos_specific_tests: 2            # test_package: test_ohos_platform + test_ohos_runtime
+  ohos_test_command: "./test_ohos_platform <package>/bin/kea-dhcp4 && ./test_ohos_runtime <package>/lib"
+  local_ci: "conan-verify 八门禁 G0-G4 全 PASS（L2/L4/L5 因本次无对应 cache 路径跳过）→ Verdict PASS，2026-10-04；test_package 4 程序 129 项检查全过（0 FAIL）"
+
+knowledge_gained:
+  - "无新增问题类：平台差异全部落在已收录知识类（E232 脚本 execve 被拒 / E046 chmod 静默失效 / netlink bind EPERM 回退 / symlink EPERM / 沙箱 AF_UNIX bind 前提 / 测试临时目录 TMPDIR 优先），按路径 A（基础适配）申报、不新增知识草稿"
+
+patch_generation:
+  method: "per-file-difflib（0001-0009，pristine scratch git repo）+ iterative-in-place（0010-0020，3.2.0 源码树迭代生成；GNU patch 往返验证）"
+  base: "pristine kea-3.2.0 tarball tree（本地 scratch git repo，core.autocrlf=false）"
+  validation: "按 conandata 顺序逐枚 apply 于 pristine 树（本地 git apply 全栈 + 真机 conan patch_ng 双验证），应用后 36 个被改文件与目标内容逐字节一致（LF-only）；0010-0020 另在原构建树全应用 + 增量重建 + 原失败套件复验 12/12 通过"
+  patches_count: 20
+
+patch_classification:
+  - file: 0001-meson.build.patch
+    type: auto
+    platform_only: True
+    guard: 'platform-name normalization（常规平台分支不受影响）'
+  - file: 0002-src-lib-dhcp-iface_mgr_linux.cc.patch
+    type: auto
+    platform_only: True
+    guard: '__linux__ && !__GLIBC__'
+  - file: 0003-meson.build.patch
+    type: auto
+    platform_only: True
+    guard: 'invocation-equivalent（脚本经解释器前缀启动，各平台等价；调用点零改动）'
+  - file: 0004-src-lib-process-cfgrpt-meson.build.patch
+    type: auto
+    platform_only: True
+    guard: 'invocation-equivalent（`mk_cfgrpt.sh` 经 /bin/sh 调用，各平台等价）'
+  - file: 0005-src-lib-dhcp-iface_mgr_linux-getifaddrs-fallback.patch
+    type: auto
+    platform_only: True
+    guard: 'runtime capability fallback（netlink 可用则行为不变）'
+  - file: 0006-meson-script-tests-interpreter.patch
+    type: auto
+    platform_only: True
+    guard: 'invocation-equivalent（脚本经解释器启动，各平台等价；仅注册层）'
+  - file: 0007-src-lib-asiolink-process_spawn.cc-exec-fallback.patch
+    type: auto
+    platform_only: True
+    guard: 'runtime capability fallback（execve 成功路径零变化，仅 EACCES/ENOEXEC 触发）'
+  - file: 0008-src-bin-keactrl-kea-admin-no-shebang.patch
+    type: auto
+    platform_only: True
+    guard: 'POSIX XCU 2.9.1.1 shell 回退（`sh 脚本` 显式调用与常规内核均兼容）'
+  - file: 0009-src-lib-util-tests-pid_file_unittest.cc-premise-probe.patch
+    type: auto
+    platform_only: True
+    guard: 'runtime premise probe（chmod 落实时不触发 SKIP，上游检查不变）'
+  - file: 0010-src-lib-testutils-sandbox.h-tmpdir.patch
+    type: auto
+    platform_only: True
+    guard: 'runtime premise（TMPDIR 已设且非空时用之，否则回退 /tmp 原名；含 mkdtemp 失败空指针防护）'
+  - file: 0011-src-lib-dhcp-tests-iface_mgr_unittest.cc-siocgifhwaddr-fallback.patch
+    type: auto
+    platform_only: True
+    guard: 'runtime capability fallback + buffer-length clamp（ioctl 成功路径与上游判定一致，仅 EPERM 触发 AF_PACKET 回退；两条路径只比对缓冲区可承载的字节前缀，长度不足时仍按原判定失败）'
+  - file: 0012-src-hooks-dhcp-run_script-tests-run_script_unittests.cc-script-spawn-timeout.patch
+    type: auto
+    platform_only: True
+    guard: 'timing margin only（3s→10s，无逻辑变化）'
+  - file: 0013-src-bin-dhcp4-tests-ctrl-unix-socket-probe.patch
+    type: auto
+    platform_only: True
+    guard: 'runtime premise probe（同路径同原语 bind 探针；探针可用则原用例全跑，skip 消息写明平台语义）'
+  - file: 0014-src-bin-dhcp6-tests-ctrl-unix-socket-probe.patch
+    type: auto
+    platform_only: True
+    guard: 'runtime premise probe（同路径同原语 bind 探针；探针可用则原用例全跑）'
+  - file: 0015-src-bin-d2-tests-ctrl-unix-socket-probe.patch
+    type: auto
+    platform_only: True
+    guard: 'runtime premise probe（同路径同原语 bind 探针；探针可用则原用例全跑）'
+  - file: 0016-src-lib-asiolink-tests-unix_domain_socket_unittest.cc-socket-probe.patch
+    type: auto
+    platform_only: True
+    guard: 'runtime premise probe（同路径同原语 bind 探针；探针可用则原用例全跑）'
+  - file: 0017-src-lib-config-tests-unix-socket-probe.patch
+    type: auto
+    platform_only: True
+    guard: 'runtime premise probe（同路径同原语 bind 探针；探针可用则原用例全跑）'
+  - file: 0018-src-lib-dhcpsrv-tests-memfile-tmpdir-and-perms-probe.patch
+    type: auto
+    platform_only: True
+    guard: 'runtime premise probe + TMPDIR 优先（chmod 落实与 TMPDIR 未设时均回退原行为）'
+  - file: 0019-src-hooks-dhcp-tests-tmpdir-substitution.patch
+    type: auto
+    platform_only: True
+    guard: 'TMPDIR 优先（未设时回退原路径，常规环境行为不变）'
+  - file: 0020-src-bin-http-config-write-tmpdir.patch
+    type: auto
+    platform_only: True
+    guard: 'TMPDIR 优先（未设时回退原路径，常规环境行为不变）'

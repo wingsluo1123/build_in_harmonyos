@@ -1,0 +1,37 @@
+software: kea
+display: "ISC Kea DHCP suite"
+description: "Full ISC Kea DHCP server suite — kea-dhcp4/kea-dhcp6/kea-dhcp-ddns/kea-lfc daemons and the perfdhcp client, with the complete libkea-* runtime libraries, the built-in hook plug-ins and the public headers"
+category: network
+homepage: "https://www.isc.org/kea/"
+license: MPL-2.0
+build_system: meson
+
+# 跨版本通用的 OHOS 适配知识
+ohos_adaptation:
+  key_points:
+    - "Meson 在 OHOS 上报告 system='harmonyos'，Kea 的平台白名单不含它：需归一化为 linux 才能选中 Linux 源码分支"
+    - "OHOS sysroot 的 linux/socket.h 与 musl sys/socket.h 都定义 struct sockaddr_storage，包含 netlink 头时需 define-guard"
+    - "OHOS musl pthread.h 不声明 pthread_setcancelstate，boost/core 需 BOOST_SP_NO_PTHREAD_SETCANCELSTATE"
+    - "OHOS 内核拒绝 /bin/sh shebang 脚本 execve（EACCES）：配置期脚本须经解释器前缀调用（0003/0004），meson 测试执行器侧须以 SH/PYTHON 包装脚本套件注册（0006），进程 spawn 子进程须在 execve EACCES/ENOEXEC 时以 /bin/sh + 同 argv/env 回退（0007），构建树辅助脚本可去 shebang 依赖 POSIX shell 回退（0008）"
+    - "HMDFS 沙箱文件系统不落实 chmod：以'文件不可写'为前提的测试需前提探针 + SKIP（0009），前提成立处上游检查不变"
+    - "OHOS 应用沙箱禁止 AF_NETLINK socket bind（EPERM）：接口枚举需 getifaddrs() 回退路径（无动态接口事件）"
+    - "meson 对 clang 默认用裸名 llvm-ar 探测归档器，本环境/CI 上失败：需从 tools.build:compiler_executables 推导绝对路径写入 machine file"
+    - "配置期 cpp.run() 探针要求 host 共享依赖在 LD_LIBRARY_PATH 可见（log4cplus shared=True）"
+    - "OHOS 全盘 symlink EPERM：soname 以真实拷贝落盘 + package() 0 字节自愈"
+    - "boost 必须固定 1.85.0（1.90/1.91 制品仓包缺 Kea 实际使用的头文件），且 meson 需 >= 1.10"
+    - "OHOS 沙箱拒绝 AF_UNIX 路径名 socket bind（EPERM）：以本地控制通道为前提的测试需同型 bind 探针 + 逐用例 SKIP（0013-0017），skip 消息写明平台语义；常规内核上探针恒真、用例全跑"
+    - "OHOS PC /tmp 只读：测试沙箱（含 mkdtemp 失败空指针防护）与测试临时文件须 TMPDIR 优先、未设时回退原路径（0010/0018/0019/0020）"
+    - "OHOS 沙箱拒绝 SIOCGIFHWADDR ioctl（EPERM）：测试中的 MAC 校验需回退 getifaddrs() AF_PACKET 记录（0011，ioctl 路径先行）"
+  common_dependencies:
+    - boost
+    - log4cplus
+    - openssl
+
+# 版本索引（所有已归档版本，含状态）
+versions:
+  "3.2.0":
+    status: built
+    build_date: "2026-10-04"
+    conan_ref: "kea/3.2.0"
+    upstream_tests: "整树注册 92 套件（66 gtest + 26 脚本）全部实跑：套件级 Ok: 92 / Fail: 0；gtest 用例级 10544 执行 = 10336 通过 + 208 跳过 + 0 失败（跳过 = 154 平台前提探针 + 54 上游既有需 root）；test_package 4 程序 129 项检查全过（2026-10-04 真机 conan-verify，Verdict PASS）"
+    ohos_specific_tests: 2

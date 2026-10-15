@@ -1,0 +1,139 @@
+--- a/src/hooks/dhcp/lease_cmds/libloadtests/lease_cmds4_unittest.cc
++++ b/src/hooks/dhcp/lease_cmds/libloadtests/lease_cmds4_unittest.cc
+@@ -26,6 +26,7 @@
+ 
+ #include <gtest/gtest.h>
+ 
++#include <cstdlib>
+ #include <errno.h>
+ #include <set>
+ 
+@@ -3914,22 +3915,32 @@
+     // Initialize lease manager (false = v4, false = don't add leases)
+     initLeaseMgr(false, false);
+ 
++    // Prefer the POSIX temporary directory when set: some sandboxed
++    // platforms provide no writable /tmp (HarmonyOS PC mounts /tmp
++    // read-only), while this test needs a writable full path.
++    const char* tmpdir = getenv("TMPDIR");
++    if ((tmpdir == NULL) || (*tmpdir == 0)) {
++        tmpdir = "/tmp";
++    }
++    const std::string data_dir = tmpdir;
++    const std::string file_path = data_dir + "/kea-lease-write-test.txt";
++
+     // Filename must use supported path.
+     std::string cmd =
+         "{\n"
+         "    \"command\": \"lease4-write\",\n"
+         "    \"arguments\": {"
+-        "        \"filename\": \"/tmp/kea-lease-write-test.txt\"\n"
++        "        \"filename\": \"" + file_path + "\"\n"
+         "    }\n"
+         "}";
+ 
+     std::ostringstream os;
+     os << "LEASE_CMDS_PATH_SECURITY_WARNING lease file path specified is NOT SECURE:"
+-       << " invalid path specified: '/tmp', supported path is '"
++       << " invalid path specified: '" << data_dir << "', supported path is '"
+        << CfgMgr::instance().getDataDir() << "'";
+ 
+     testCommand(cmd, CONTROL_RESULT_SUCCESS,
+-                "IPv4 lease database into '/tmp/kea-lease-write-test.txt'.");
++                "IPv4 lease database into '" + file_path + "'.");
+ 
+     EXPECT_EQ(1U, countFile(os.str()));
+ }
+--- a/src/hooks/dhcp/forensic_log/tests/legal_log_mgr_unittests.cc
++++ b/src/hooks/dhcp/forensic_log/tests/legal_log_mgr_unittests.cc
+@@ -22,6 +22,7 @@
+ #include <testutils/log_utils.h>
+ 
+ #include <gtest/gtest.h>
++#include <cstdlib>
+ 
+ #include <boost/date_time/posix_time/posix_time.hpp>
+ 
+@@ -195,7 +196,15 @@
+ 
+ // Verify env variable path override.
+ TEST_F(LegalLogMgrTest, pathEnvVarOverride) {
+-    legal_log_dir_env_var_.setValue("/tmp");
++    // Prefer the POSIX temporary directory when set: some sandboxed
++    // platforms provide no writable /tmp (HarmonyOS PC mounts /tmp
++    // read-only), while this test needs a writable override directory.
++    const char* tmpdir = getenv("TMPDIR");
++    if ((tmpdir == NULL) || (*tmpdir == 0)) {
++        tmpdir = "/tmp";
++    }
++    const std::string data_dir = tmpdir;
++    legal_log_dir_env_var_.setValue(data_dir);
+     resetLogPath();
+     isc::db::DatabaseConnection::ParameterMap map;
+     EXPECT_NO_THROW(LegalLogMgr::parseConfig(ConstElementPtr(), map));
+@@ -209,7 +218,7 @@
+ 
+     // Valid path should be OK.
+     params = Element::createMap();
+-    params->set("path", Element::create("/tmp"));
++    params->set("path", Element::create(data_dir));
+     ASSERT_NO_THROW_LOG(LegalLogMgr::parseFile(params, map));
+ 
+     // Invalid path should NOT be OK.
+--- a/src/hooks/dhcp/host_cache/tests/command_unittests.cc
++++ b/src/hooks/dhcp/host_cache/tests/command_unittests.cc
+@@ -16,6 +16,7 @@
+ #include <testutils/multi_threading_utils.h>
+ #include <testutils/log_utils.h>
+ #include <gtest/gtest.h>
++#include <cstdlib>
+ #include <fstream>
+ #include <functional>
+ #include <iostream>
+@@ -780,7 +781,15 @@
+     // Prepare
+     handlerType write_handler = std::bind(&writeHandler, hcptr_, ph::_1);
+     file::PathChecker::enableEnforcement(false);
+-    string badpath = "/tmp/kea-host-cache-test.txt";
++    // Prefer the POSIX temporary directory when set: some sandboxed
++    // platforms provide no writable /tmp (HarmonyOS PC mounts /tmp
++    // read-only), while this test needs a writable full path.
++    const char* tmpdir = getenv("TMPDIR");
++    if ((tmpdir == NULL) || (*tmpdir == 0)) {
++        tmpdir = "/tmp";
++    }
++    const string data_dir = tmpdir;
++    const string badpath = data_dir + "/kea-host-cache-test.txt";
+     remove_on_exit_.push_back(badpath);
+     string write_cmd =
+         "{ \"command\": \"cache-write\", \"arguments\": \"" + badpath + "\" }";
+@@ -795,7 +804,8 @@
+ 
+     std::ostringstream oss;
+     oss << "HOST_CACHE_PATH_SECURITY_WARNING Cache file path specified"
+-        << " is NOT SECURE: invalid path specified: '/tmp', supported path is '"
++        << " is NOT SECURE: invalid path specified: '" << data_dir
++        << "', supported path is '"
+         << CfgMgr::instance().getDataDir() << "'";
+     EXPECT_EQ(1U, countFile(oss.str()));
+ }
+@@ -1195,9 +1205,17 @@
+ 
+ TEST_F(CommandTest, writeEnvVarOverride) {
+     EnvVarWrapper data_dir_env_var_("KEA_DHCP_DATA_DIR");
+-    data_dir_env_var_.setValue("/tmp");
++    // Prefer the POSIX temporary directory when set: some sandboxed
++    // platforms provide no writable /tmp (HarmonyOS PC mounts /tmp
++    // read-only), while this test needs a writable full path.
++    const char* tmpdir = getenv("TMPDIR");
++    if ((tmpdir == NULL) || (*tmpdir == 0)) {
++        tmpdir = "/tmp";
++    }
++    const string data_dir = tmpdir;
++    data_dir_env_var_.setValue(data_dir);
+     auto valid_path = CfgMgr::instance().getDataDir(true);
+-    EXPECT_EQ(valid_path, "/tmp");
++    EXPECT_EQ(valid_path, data_dir);
+     testWriteCommand();
+ }
+ 
