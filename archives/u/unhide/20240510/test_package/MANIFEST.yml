@@ -1,0 +1,59 @@
+# test_package/MANIFEST.yml — unhide 20240510
+package: unhide/20240510
+homepage: "https://github.com/YJesus/Unhide"
+
+upstream_tests_exist: true
+upstream_test_audit: >-
+  unhide-20240510.tgz (sha256 7173ba2ec2732c943eca785fe01290b3cce09f60ded66df857caba3ec690877b)
+  has 42 members: 13 C sources + 2 headers, COPYING/LICENSE/README/NEWS/TODO,
+  man/ (en+es+fr), two GUI/test python scripts and two shell testsuites:
+  sanity.sh (7 numbered tests) and sanity-tcp.sh (2 numbered tests). Both are
+  interactive root-only harnesses that build fake ./ps / ./ss shims in the
+  CWD and run the in-tree binaries (./unhide-linux sys, ./unhide-linux
+  procall, ./unhide-tcp ...) to confirm the hidden-process/hidden-port
+  detection logic against a deliberately lying ps/ss. They cannot be used as
+  conan test_package on the CI device: unhide's main() refuses to run when
+  getuid() != 0 (CI device euid is 20020084, cdebootstrap 0.7.9 precedent),
+  the harnesses expect the unpacked source tree rather than an installed
+  package, and their ps/ss PATH-shim trick is not portable to the installed
+  bin/ layout. The consumer suite below drives the real installed artefacts
+  instead: ELF hardening facts, real CLI/version/getopt behaviour of all four
+  binaries, and (in root runs, e.g. the local qemu-aarch64 verification
+  build) live scans through sysinfo() and getpriority().
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests:
+  - file: sanity.sh
+    description: "upstream root-only testsuite: 7 numbered tests with fake ./ps shims (hide ps output, fake ps failure, fake extra process, ...)"
+    used: false
+  - file: sanity-tcp.sh
+    description: "upstream root-only TCP/UDP testsuite: 2 numbered tests with fake ./ss (or netstat on BSD) shims"
+    used: false
+
+test_package_tests:
+  - file: test_unhide.py
+    description: "[HarmonyOS] artefact x4: ELF64 AArch64, OHOS NDK note owner 'OHOS', dynamically linked PIE (ET_DYN + PT_INTERP; interp value not asserted — CI driver emits /lib/ld-musl-aarch64.so.1, local shim /lib/ld-linux-aarch64.so.1), DT_NEEDED exactly libc.so (no static libc in OHOS sysroot, sockstat 0.4.2 precedent), GNU_STACK RW (NX) for unhide-linux / unhide_rb / unhide-tcp / unhide-posix"
+    command: "python3 test_unhide.py --bindir <package>/bin --ohos"
+  - file: test_unhide.py
+    description: "[root] unhide-linux: -V exit 0 after banner; -h usage exit 0; no-args usage exit 1; -Z exit 2; checksysinfo live sysinfo() scan exit 0"
+    command: "python3 test_unhide.py --bindir <package>/bin --ohos"
+  - file: test_unhide.py
+    description: "[root] unhide-tcp: -V exit 0 after banner; -h usage exit 0; -Z exit 2"
+    command: "python3 test_unhide.py --bindir <package>/bin --ohos"
+  - file: test_unhide.py
+    description: "[root] unhide-posix: bogus arg usage exit 1; 'sys' live getpriority()/getpgid()/getsid() PID-space scan exit 0"
+    command: "python3 test_unhide.py --bindir <package>/bin --ohos"
+  - file: test_unhide.py
+    description: "[root] unhide_rb: P.O.F. warning block + phase-1 'Scanning for hidden processes...' start (upstream has no arg parsing; long scan terminated after start)"
+    command: "python3 test_unhide.py --bindir <package>/bin --ohos"
+  - file: test_unhide.py
+    description: "[non-root, CI device] unhide-linux/-tcp/_rb: banner + upstream root-refusal ('You must be root to run', exit 1); unhide-posix bogus: banner + 'proc | sys' usage exit 1"
+    command: "python3 test_unhide.py --bindir <package>/bin --ohos"
+
+assertion_count: 19
+# 19 = 4 [HarmonyOS] artefact checks (one per binary) + 11 root-mode checks
+# (unhide-linux x5 incl. live checksysinfo scan, unhide-tcp x3,
+# unhide-posix x2 incl. live 'sys' scan, unhide_rb x1) + 4 non-root checks
+# (CI device: 3 root-refusals + unhide-posix usage).  Only one of the two
+# execution-mode blocks runs per environment (euid-based).

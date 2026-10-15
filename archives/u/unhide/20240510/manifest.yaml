@@ -1,0 +1,95 @@
+# 版本级 manifest 模板
+# 文件位置: archives/u/unhide/20240510/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "20240510"
+
+# 软件名
+software: "unhide"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-12"
+build_system: custom
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（上游 v20240510 官方 release 资产）
+  url: "https://github.com/YJesus/Unhide/releases/download/v20240510/unhide-20240510.tgz"
+
+  # 源码校验和
+  sha256: "7173ba2ec2732c943eca785fe01290b3cce09f60ded66df857caba3ec690877b"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  # 上游无构建系统：build_all.sh 直接调 gcc 产出 4 个二进制
+  system: custom
+
+  # 配置选项列表
+  configure_options: []
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+  # 无第三方依赖（纯 libc + pthread，musl 内建）
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-fix-wait-include.patch"
+  - "0002-add-limits-include.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "<wait.h> 是 glibc/libc6-dev 的转发头（#include <sys/wait.h>），musl/OHOS 无此文件；替换为 <sys/wait.h>（先例: nwipe/0.39 补丁 0002）"
+  - "PATH_MAX 在 musl 由 <limits.h>/<linux/limits.h> 提供；glibc 经 sys/wait.h 等传递包含即可用，musl+clang 需显式 #include <limits.h>（先例: ubench/0.32 CLK_TCK 显式化同类思路）"
+  - "OHOS sysroot 无静态 libc（find -name '*.a' 为空）且无 rcrt1.o，--static/-static-pie 均不可链；产物改动态链接仅 NEEDED libc.so，CI aarch64 真机原生执行、x86 本地 qemu-aarch64 执行（先例: sockstat/0.4.2）"
+  - "PT_INTERP 具体值依驱动而定：真机 /data/service/hnp/bin/clang 产出 /lib/ld-musl-aarch64.so.1，本地 Ubuntu clang-15 shim 对未知 ohos env 回退 /lib/ld-linux-aarch64.so.1；跨环境断言只写 '有 PT_INTERP' 不写具体路径"
+  - "上游无构建系统的多 main 包可按 build_all.sh 的逐二进制编译清单在 build() 里复刻（先例: ubench/0.32）"
+
+patch_generation:
+  method: per-file-difflib-style (orig/work 目录逐文件 diff -u，a/ b/ 前缀)
+  source_orig_dir: /root/ohpcd-work/build/unhide-20240510/patchgen/unhide-20240510.orig
+  source_work_dir: /root/ohpcd-work/build/unhide-20240510/patchgen/unhide-20240510.work3
+  generated_at: '2026-10-12T16:33:07'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-fix-wait-include.patch
+    type: portability
+    platform_only: False
+    guard: 'none (standard POSIX header <sys/wait.h>)'
+  - file: 0002-add-limits-include.patch
+    type: portability
+    platform_only: False
+    guard: 'none (standard POSIX header <limits.h>)'
