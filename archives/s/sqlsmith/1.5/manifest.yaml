@@ -1,0 +1,56 @@
+# 版本级 manifest — sqlsmith 1.5
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "1.5"
+software: "sqlsmith"
+status: built
+build_date: "2026-10-12"
+build_system: cmake
+
+source:
+  url: "https://github.com/anse1/sqlsmith/archive/refs/tags/v1.5.tar.gz"
+  sha256: "828ee3e816b94848627e8132d32ade6339dbcbba5469437dc9a6a8335d4dab23"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "CMakeToolchain generic_system: cmake_system_name=OHOS, cmake_system_processor=aarch64 (OHOS)"
+    - "CMakeToolchain cppstd block forced to C++20 (libpqxx 8.x headers require C++20; shared profile pins cppstd=17)"
+  dependencies:
+    - libpqxx/8.0.1
+    - libpq/18.1
+    - boost1.84-regex/1.84.0
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-cmakelists-deps.patch"
+
+knowledge_gained:
+  - "sqlsmith 是纯命令行工具（单一 sqlsmith 可执行文件），上游 CMakeLists.txt 无 install() 规则，需在 package() 手动把构建产物拷入 package/bin（abcm2ps 先例）。"
+  - "sqlsmith 的 CMakeLists 用 find_package(PostgreSQL)/find_package(PQXX)/find_package(Boost)，OHOS 制品仓都以 Conan 包名提供 target（libpq::libpq / libpqxx::pqxx / boost1.84-regex::boost1.84-regex），须补丁改写依赖发现（libpqxx 8.0.1 同款做法）。"
+  - "log.cc / monetdb.cc / sqlite.cc / sqlsmith.cc 无条件 #include <boost/regex.hpp>（仅 postgres.cc 顶部有 HAVE_BOOST_REGEX 守卫），故 Boost.Regex 是硬依赖，无论上游 std::regex probe 结果，必须始终链接 boost1.84-regex。"
+  - "libpqxx 8.x 头需 C++20；OHOS 共享 profile 固定 cppstd=17，CMakeToolchain cppstd block 会注入 -std=c++17 压制 sqlsmith 的 CMAKE_CXX_STANDARD 20，须覆盖为 20（libpqxx/8.0.1 同款）。"
+  - "postgres.cc 同时使用 libpqxx::connection（C++）与 libpq C API（PQ* 函数），故 libpq 与 libpqxx 都是硬依赖；libpqxx/8.0.1 自身 requires libpq/18.1，sqlsmith 显式 requires libpq/18.1 以保持图内单一 libpq 版本。"
+  - "上游没有任何自动化测试（无 tests/ 目录、无 ctest / make check / TESTS / check_PROGRAMS，仅 GitHub Actions 在 live PostgreSQL 上跑 --max-queries=100 冒烟）；sqlsmith 连接真实数据库才能产出 SQL，回归到可运行环境的测试只有 --version / --help，由 test_package 覆盖。"
+
+validation:
+  upstream_tests:
+    command: "N/A (sqlsmith 1.5 upstream source and build system contain no automated test target — see test_package/MANIFEST.yml upstream_test_audit)"
+    statistical_unit: "upstream test case"
+    total: 0
+    passed: 0
+    failed: 0
+    skipped: 0
+    not_run: 0
+  test_package:
+    command: "conan create 后 test_package/test.sh 运行安装的 sqlsmith --version / --help 冒烟"
+    result: "待真机验证"
+
+test_results:
+  type: harmonyos-device-consumer
+  total: 0
+  passed: 0
+  failed: 0
+  note: "上游测试库存=0；test_package 二进制冒烟计数待真机 evidence 轮回填"

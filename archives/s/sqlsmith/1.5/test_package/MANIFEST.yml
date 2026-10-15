@@ -1,0 +1,51 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: sqlsmith/1.5
+homepage: "https://github.com/anse1/sqlsmith"
+
+# 上游测试命令: sqlsmith 1.5 不存在任何测试目标，
+# 故无独立 check 命令可声明（审计见 upstream_test_audit）。
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游测试套件审计结论（清点 sqlsmith v1.5 官方发布包
+# https://github.com/anse1/sqlsmith/archive/refs/tags/v1.5.tar.gz）:
+upstream_tests_exist: false
+upstream_test_total: 0
+upstream_test_count_method: manual_audit
+upstream_test_audit:
+  - path: "CMakeLists.txt"
+    finding: "无 add_test / enable_testing / CTest；仅有 add_executable(sqlsmith) 与 target_sources/target_link_libraries，未注册任何测试。grep 全文件无 add_test 关键字。"
+  - path: "Makefile.am"
+    finding: "仅定义 bin_PROGRAMS 与 filterdump 目标；无 check_PROGRAMS、无 TESTS、无 check 目标（make -n check 会报 'No rule to make target'）。"
+  - path: "configure.ac"
+    finding: "无 AC_CONFIG_TESTDIR / TESTS 相关宏；无测试框架（check/unity/catch2 等）探测。"
+  - path: "仓库目录树"
+    finding: "无 tests/ 或 test* 目录、无 test_*.cc 源码、无 .github 之外的测试脚本；唯一 CI 为 .github/workflows/regression.yml。"
+  - path: ".github/workflows/regression.yml"
+    finding: "所谓 test 步骤仅为 `pg_virtualenv build/sqlsmith --max-queries=100 --verbose` —— 对 live PostgreSQL 跑随机 SQL 冒烟，无断言、无通过/失败计数；需真实数据库服务器，非可离线运行的自动化测试，故不计入上游测试用例。"
+  - conclusion: "sqlsmith 1.5 官方发布包确实不含任何可运行的自动化测试；软件功能（随机 SQL 生成）需连接真实 RDBMS 才能产出查询，无法在无数据库环境下作为普通测试运行。消费者视角验证由 test_package 对安装产物做实质检查（运行 sqlsmith --version / --help，验证可执行且输出正确）覆盖。"
+
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.sh
+    description: "在 conanrun 环境运行安装的 sqlsmith 可执行文件：① sqlsmith --version 退出码 0 且输出含 SQLsmith；② sqlsmith --help 退出码 0 且列出全部 CLI 选项（含 --version）。共 2 项实质断言，每项打印一条 'TEST PASS:' 标记由 conanfile 统计并通过率占位。"
+    command: "bash test.sh（由 test_package/conanfile.py test() 经 self.run + conanrun 环境实际执行）"
+    assertions: 2
+
+upstream_test_count: 0
+consumer_test_count: 1
+consumer_assertion_count: 2
+assertion_count: 2
+
+device_validation:
+  platform: "HarmonyOS HongMeng Kernel aarch64"
+  compiler: "clang 15.0.4 (libc++ 15)"
+  command: "conan create . -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 --build=missing"
+  result: "待真机 evidence 轮验证（2/2 consumer assertions）"
