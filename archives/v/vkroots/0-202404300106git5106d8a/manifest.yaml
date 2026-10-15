@@ -1,0 +1,62 @@
+# 版本级 manifest
+# vkroots 0-202404300106git5106d8a — header-only Vulkan layer 编写框架
+
+version: "0-202404300106git5106d8a"
+software: "vkroots"
+status: built
+build_date: "2026-10-13"
+build_system: meson
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/Joshua-Ashton/vkroots/archive/5106d8a.tar.gz"
+  sha256: "37b77586e91f7ebee70380dcddd73bf01ae4acef1053e6be41d0485ede022422"
+  tar_format: tar.gz
+  upstream_repo: "https://github.com/Joshua-Ashton/vkroots"
+  # ⚠️ 必须锁定到该 commit，不可改为 main（实测依据见下）
+  pinned_commit: "5106d8a"
+  pin_reason: >-
+    上游 main 已使用 std::format / std::format_string / std::ranges::any_of，
+    而 OHOS 工具链的 libc++ 15 不含 std::format，实测编译失败 5 处 error：
+    "no template named 'format_string' in namespace 'std'" 等。
+    本任务版本 0-202404300106git5106d8a 对应提交 5106d8a，该快照无上述用法。
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: meson
+  # header-only：上游 meson.build 仅 install_headers('vkroots.h') +
+  # declare_dependency(include_directories: '.') + pkgconfig.generate()，
+  # 不产出任何编译产物，故 recipe 不定义 build()（不得伪造编译日志，R34）
+  build_command: "无（header-only，仅安装头文件）"
+  configure_options: []
+  dependencies:
+    - "vulkan-headers/vulkan-sdk-1.4.357.0"
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "vulkan-headers 的 package_type = \"build-scripts\"，Conan 2.29 会据此把该依赖自动置为 visible=False；下游 cpp_info.requires 里写 \"vulkan-headers::vulkan-headers\" 会被 check_component_requires() 判为「非直接依赖」而报错。解法：在 requirements() 中显式 self.requires(..., visible=True)（知识库既有条目 E545 已记录，本包实证复现）"
+  - "vulkan-headers 的 package_info() 只打印 CPATH=...、不通过 cpp_info 导出 include 目录（实测生成的 vulkan-headers_INCLUDE_DIRS_RELEASE 为空）。而 vkroots.h 直接 include <vulkan/vk_layer.h>，消费者必须能解析到该目录 → 需在自身 package_info() 中显式补上 self.dependencies[\"vulkan-headers\"].package_folder/include"
+  - "OHOS SDK sysroot 只提供 vulkan/vulkan.h、vulkan_core.h、vulkan_ohos.h，**不含 vk_layer.h / vk_icd.h** —— 编写 Vulkan layer 的包必须引入上游 Vulkan-Headers，不能只依赖 SDK"
+  - "vkroots 要求 cpp_std=c++20（上游 meson default_options），而 OHOS profile 默认 compiler.cppstd=17；需在 recipe 用 cpp_info.cxxflags=[\"-std=c++20\"] 向下游传递"
+  - "vkroots 采用 Vulkan v2 协商接口：layer 只导出 vkNegotiateLoaderLayerInterfaceVersion，vkGetInstanceProcAddr / vkGetDeviceProcAddr 是经协商结构体交回的函数指针、不是导出符号——断言时不可按传统手写层的符号表预期"
+  - "无 GPU/Vulkan 驱动时仍可做 layer 的运行期验证：dlopen 该 .so 并按 vulkan/vk_layer.h 契约调用 vkNegotiateLoaderLayerInterfaceVersion（填 VkNegotiateLayerInterface：sType=1、loaderLayerInterfaceVersion=2），实测 rc=VK_SUCCESS 且两个过程地址非空"
+
+knowledge_ref:
+  - "E545"

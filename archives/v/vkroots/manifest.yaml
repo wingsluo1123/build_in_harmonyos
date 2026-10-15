@@ -1,0 +1,26 @@
+software: vkroots
+display: "vkroots"
+description: "单头文件 Vulkan Layer 编写框架（由 Vulkan registry 生成 dispatch 表与宏）"
+category: graphics
+homepage: "https://github.com/Joshua-Ashton/vkroots"
+license: "Apache-2.0 OR MIT"
+build_system: meson
+
+ohos_adaptation:
+  key_points:
+    - "header-only：上游 meson.build 仅 install_headers('vkroots.h')，不产出编译产物"
+    - "必须锁定上游 commit 5106d8a —— main 使用 std::format，OHOS libc++ 15 不含该符号，实测编译失败"
+    - "要求 C++20（上游 meson default_options），OHOS profile 默认 17，需用 cpp_info.cxxflags 向下游传递"
+    - "依赖 vulkan-headers，但该包 package_type 为 build-scripts，Conan 会自动置 visible=False，必须显式 self.requires(..., visible=True)（知识库 E545）"
+    - "vulkan-headers 不通过 cpp_info 导出 include 目录（仅打印 CPATH），需在自身 package_info() 显式补上"
+    - "OHOS SDK sysroot 缺 vulkan/vk_layer.h，编写 Vulkan layer 必须引入上游 Vulkan-Headers"
+    - "运行期限制：当前环境无 Vulkan 驱动/ICD，只能做 dlopen + loader 协商级验证"
+  common_dependencies:
+    - "vulkan-headers/vulkan-sdk-1.4.357.0"
+
+versions:
+  "0-202404300106git5106d8a":
+    status: built
+    build_date: "2026-10-13"
+    ref: "vkroots/0-202404300106git5106d8a"
+    pinned_commit: "5106d8a"
