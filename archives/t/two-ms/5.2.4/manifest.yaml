@@ -1,0 +1,50 @@
+# two-ms 5.2.4 适配清单（Checkmarx/2ms，Apache-2.0）
+# 纯 Go 项目（main 包在仓库根目录 main.go），无 cgo、无原生 C/C++ 源码。
+# 上游构建等价命令：
+#   GOOS=linux GOARCH=arm64 CGO_ENABLED=0 \
+#     go build -trimpath -ldflags "-s -w -X github.com/checkmarx/2ms/v5/cmd.Version=5.2.4" -o 2ms .
+# OHOS 无原生 Go 工具链（E250）⇒ 配方自举 Go 1.26.9；SDK 与产物用 binary-sign-tool
+# 自签名（E128）；缓存/链接输出落 ext2（E166）；go test 临时 ELF 经 -exec wrapper 签名（E318）。
+
+version: "5.2.4"
+software: "two-ms"
+status: built
+build_date: "2026-10-13"
+build_system: go
+
+source:
+  url: "https://github.com/Checkmarx/2ms/archive/refs/tags/v5.2.4.tar.gz"
+  sha256: "de1fb907ecf113629233f7e7139d791ad7b91d6c4eae2c523a5c79d4b7fc1825"
+  tar_format: tar.gz
+
+build:
+  system: go
+  configure_options:
+    - "CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags \"-s -w -X github.com/checkmarx/2ms/v5/cmd.Version=5.2.4\" -o <ext2>/out/2ms ."
+    - "go test -count=1 -json -timeout 900s ./...  -exec=<binary-sign-tool wrapper>"
+  dependencies: []
+  cc: go-1.26.9
+  notes: "自举 Go 1.26.9（golang.google.cn / dl.google.com / aliyun 三镜像 + sha256）；GOCACHE/GOMODCACHE/GOPATH/GOTMPDIR/TMPDIR 与链接输出全落 ext2（E166）；源码整树复制到 ext2（E046）；自举 SDK 的 bin/go 换成签名 shim、真 go 落 bin/go.real，使上游 e2e 内部 `go build` 的 2ms 也被签名"
+
+dependencies: []
+
+patches_applied: []
+
+test:
+  upstream_cases: 1139
+  upstream_suite: "go test -count=1 -json -timeout 900s ./...（18 个含 _test.go 的包，其中 17 个含 Test 函数；356 个顶层 Test 函数 + 783 个子用例 = 1139 个用例）"
+  runnable: 1137
+  runnable_note: "1139 个用例全部实际执行：通过 1137，失败 0，跳过 2（均为上游自身 t.Skip：lib/utils TestBindFlags/BindFlags_ReturnsErrorForUnknownConfigurationKeys=『Not sure if we need this feature.』；tests TestIntegration/confluence=『confluence page is currently private』）。benches 包仅 Benchmark（无 Test 函数），go test ./... 只做编译校验"
+  pass_rate: "OHOS aarch64 实测：1139 用例 pass 1137 / fail 0 / skip 2 = 通过率 100%（在可执行用例口径下 1137/1137）"
+  env_network_limited_cases: 6
+  env_network_limited_note: "6 个子用例经 --validate 访问 https://api.github.com/ 校验植入凭据；无外网/DNS 超时时 validationStatus 由 Invalid 变 Unknown、severity 由 Medium 变 High，断言必然失败（上游 CI 有公网）。配方 _enforce_gates 按『输出网络特征 + 显式清单』归类为 environment-network-limited，如实打印且不计入门禁；其余 1133 个用例在任何场景下都必须通过。清单：engine/TestProcessEvaluationWithValidation/Should_update_validationStatus,_CvssScore_and_Severity_of_secrets；pkg/TestScanAndScanDynamicWithCustomRules/{Run_default_+_non_override_rules,Run_only_default_rules_by_ignoring_custom_rules}；pkg/TestScanWithValidation/Successful_Scan_with_Multiple_Items；tests/TestSecretsScans/{run_default_+_non_override_rules_in_json,run_only_default_rules_by_ignoring_custom_rules_in_json}"
+  consumer_test: "test_package/consumer_check.py 真跑 bin/2ms 7 个用例：--version/--help/filesystem 命中(exit 2)/--ignore-on-exit(exit 0)/干净目录(exit 0)/缺失路径(exit 1)/rules"
+  hmos_specific_cases: 1
+  self_checks: 13
+
+knowledge_gained:
+  - "上游 release.yml 的 -X 符号路径写成 github.com/checkmarx/2ms/cmd.Version（缺 /v5），对 v5 module 无效；本配方用正确的 github.com/checkmarx/2ms/v5/cmd.Version 注入版本串（ref: DRAFT-two-ms-5.2.4-go-version-ldflags-symbol-path）"
+  - "go test 会把 $GOROOT/bin 前置到测试进程 PATH，PATH 上放签名 wrapper 无法拦截 e2e 内部的 `go build`；改把自举 SDK 的 bin/go 换为签名 shim（真 go→go.real）才生效（ref: DRAFT-two-ms-5.2.4-go-test-nested-build-sign-shim）"
+  - "检测 ELF magic 必须比较完整 4 字节 \\x7fELF：用 `head -c3` 只能取到 \\x7fEL，比较恒假会导致签名被静默跳过（ref: DRAFT-two-ms-5.2.4-go-test-nested-build-sign-shim）"
+  - "go -toolexec 在 link 后立即签名产出的 ELF 在鸿蒙上仍 execve 失败（EPERM）；对最终文件重新执行 objcopy+sign 才有效，故不采用 toolexec 方案（ref: DRAFT-two-ms-5.2.4-go-test-nested-build-sign-shim）"
+  - "上游 6 个 --validate 用例访问 api.github.com 校验凭据，无外网时 validationStatus 由 Invalid 变 Unknown 必然失败；配方按『网络输出特征 + 显式清单』归类 environment-network-limited 并如实打印（ref: DRAFT-two-ms-5.2.4-upstream-tests-require-external-network）"
