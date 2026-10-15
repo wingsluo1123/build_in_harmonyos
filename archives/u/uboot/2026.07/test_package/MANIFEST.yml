@@ -1,0 +1,91 @@
+package: uboot/2026.07
+homepage: "https://docs.u-boot.org"
+upstream_check_command: "make O=sandbox -j1 sandbox_defconfig && make O=sandbox -j1"
+upstream_test_in_build: true
+upstream_test_command: "pytest test/py（test_ut.py 逐子测试展开；构建内冒烟 ./u-boot -c \"version; ut lib; exit\"，上游不裸跑 ut all——跨用例状态污染）"
+upstream_tests:
+  - "C 侧单元测试 919 子测试（u-boot.sym 链接器列表符号 _u_boot_list_2_ut_<suite>_2_<name> 口径，与上游 test/py/conftest.py:39 同正则；2 个 _norun 条目按 conftest.py:394 收集期排除），上游 CI 经 test/py pytest 的 test_ut.py 逐子测试执行（每子测试独立进程 `ut <suite> <name>`）"
+  - "test/py pytest 套件 tests/ 85 文件 296 个 def test_*（按 sandbox_defconfig 收集 619 例；含 test_vboot.py 30 例等依赖 openssl 签名工具链用例）"
+upstream_test_note: >-
+  U-Boot 上游把全部 C 侧单元测试编译进 sandbox 目标（CONFIG_UNIT_TEST=y），
+  上游 CI 经 test/py/tests/test_ut.py 逐子测试执行：conftest.py 的
+  generate_ut_subtest 从 u-boot.sym 的链接器列表符号
+  `_u_boot_list_2_ut_<suite>_2_<name>`（RE_UT_TEST_LIST）枚举注册用例，
+  每个子测试独立进程 `ut <suite> <name>`——单进程 `ut all` 会因
+  dm_test_post_run 的 uclass 全量拆除产生跨用例状态污染，上游从不裸跑。
+  bootstd 套件另需真实块设备夹具（mmc1/mmc4/flash1/mmc10 + mmc5/mmc7/
+  mmc8 GPT 盘/测试 U 盘），上游 conftest fixture（setup_bootflow_image/
+  setup_fedora_image/setup_efi_image/setup_cros_image/setup_android_image）
+  依赖 mount、`mkfs.vfat -d`、debugfs、sgdisk——OHOS 无 mount 权限、
+  busybox mkfs.vfat 无 -d 参数、无 debugfs、无 sgdisk，本包以纯 dd +
+  busybox mkfs.vfat + mke2fs + 纯 python ext2 构造器 + 纯标准库 GPT
+  构造器在真机重建夹具并经 u-boot 自身回读校验（见 fixtures/mkfixtures.sh）。
+  计数口径：919 = 本包执行口径（u-boot.sym 链接器列表符号枚举，上游
+  conftest 同正则、_norun 排除）；619 = 上游 pytest 对 test/py 的 Linux
+  收集数（含依赖宿主 mount/openssl 等能力的用例，设备不执行 pytest
+  本体）；879 = 16 补丁无 SDL 形态历史口径（SDL 门控面接入后
+  video/cedit/expo 40 项回归 → 879 + 40 = 919）。
+test_package_tests:
+  - file: test_uboot.sh
+    description: >-
+      E2E 入口（四步）：① 产物在位校验（bin/ 5 工具 + u-boot-sandbox +
+      test/ 三资产 + sandbox 运行期资源 bin/arch/sandbox/dts/other.dtb
+      共 10 项，L1e 破坏性反向验证；other.dtb 为 OF_LIVE 组单元测试
+      按 argv[0] 所在目录相对解析的运行时文件，须与二进制同相对布局
+      分发）+ 5 个宿主工具无参冒烟（usage banner）+ 固件在位与 U-Boot
+      横幅串校验（非 aarch64 构建条件告警）+ SDL 门控测试面在位校验
+      （pairs.txt 以 dm 视频套件基础用例 dm_test_video_base 锚定，防
+      HOST_HAS_SDL 探测失败被 syncconfig 静默收敛整片裁掉 SDL 测试面）；
+      ② 主冒烟 `version; ut lib`
+      （stdin=/dev/null；工作目录提供上游源码树 README 副本——lib 套件
+      membuf_readline 以 CWD 相对路径读取该文件，与上游 pytest 以源码根
+      为 CWD 的契约一致）；③ 夹具重建
+      fixtures/mkfixtures.sh（含 u-boot 自身 fatload/part list 回读校验）；
+      ④ 逐子测试全量 fixtures/ut-run-subtests.sh——按上游 pytest 同口径
+      枚举打包期生成的子测试清单（test/pairs.txt），每个子测试独立进程
+      执行，逐例输出 TEST PASS/FAIL/SKIP 判定行（判定依据=上游同款汇总行
+      "failures: 0"，skipped 显式计数），末行 TEST SUMMARY 汇总，任一
+      失败退出码 1。
+    command: "test_uboot.sh"
+  - file: fixtures/mkfixtures.sh
+    description: >-
+      bootstd E2E 块设备夹具重建：mmc1.img（extlinux/initrd/dtb/vmlinuz
+      FAT32+ext2 双分区）、mmc4.img（boot.cmd/boot.bmp/boot.scr/Image
+      经纯 python ext2 构造器）、flash1.img（EFI/BOOT/BOOTSBOX.EFI）、
+      mmc10.img（RAUC A/B 四分区）、mmc5/7/8.img（cros/android GPT 盘，
+      经 gen-gpt-fixtures.py 纯标准库构造；android boot/vendor_boot 镜像
+      从 abootimg-hexdumps.py 的 gzip hexdump 解码）；空树 DT 载荷与
+      dtc 输出逐字节一致（含 16 字节 rsvmap 终止项）；usb 载体 dd 零建 +
+      单载体 stage.img 重放（三 stick 同指一文件，读与设备索引解耦）+
+      逐扇区显式覆盖 payload（杜绝测试中途格式化载体的污染态复用），
+      staging 完成后以 cmp.b 回读三载荷逐字节校验、重指成品 flash1.img
+      复查（任一步不齐即硬失败退出）；块设备号按 hex 书写
+      （blk_get_device_by_str hextoul，设备 10 写 `mmc a`）；mkimage
+      生成段先于文件系统构造段（boot.scr 被 ext2 构造器消费）；镜像每
+      跑 dd 零建重写；静态输入自 HOST_FIXTURES（只读包目录）seed——文本
+      夹具直接 cp，13 个二进制夹具（boot.bmp/inf.gz/sandbox.dtb/
+      cedit.dtb/tools/logos/denx.bmp/tools/logos/denx-comp.bmp/
+      tools/logos/denx-16bpp.bmp.gz/tools/logos/denx-24bpp.bmp.gz/
+      mbr-{mmc1,mmc4,scsi,flash1,mm10}.bin）经 fixture-blobs.py 以
+      base64 文本随包（每件 sha256 钉死），构建时逐字节物化并经解码
+      复验（PR 检查按 gitcode .diff 端点取补丁，二进制载荷不进文本补丁）。
+    command: "fixtures/mkfixtures.sh"
+  - file: fixtures/fixture-blobs.py
+    description: >-
+      二进制夹具文本化载荷：13 个二进制夹具以 base64 文本内联、sha256
+      逐件钉死，物化时解码复验（不符即非零退出、mkfixtures 随之硬失败）；
+      配合平台 PR 检查的 .diff 补丁通道（该端点对二进制文件只输出
+      "Binary files ... differ" 占位、不带 GIT binary patch 数据，直接
+      随包二进制会使 git apply 必然失败）。
+    command: "fixtures/fixture-blobs.py <dest_dir>"
+  - file: fixtures/ut-run-subtests.sh
+    description: >-
+      逐子测试 ut 全量：优先用包内 test/pairs.txt（打包期从 u-boot.sym
+      链接器列表符号生成，与上游 RE_UT_TEST_LIST 同正则），每子测试
+      独立进程 `ut <suite> <name>`，逐例输出 TEST PASS/FAIL/SKIP 行 +
+      末行 TEST SUMMARY 汇总（`failures: 0` 判过、skipped 计数）、全量
+      模式另断言枚举总数 == 919（U_BOOT_EXPECT_SUBTESTS 可覆写，防
+      测试面静默收敛退化）、任一失败即退出码 1；CWD 下备有 README
+      （membuf_readline 数据源，上游 pytest 以源码根为 CWD 的同契约）。
+    command: "fixtures/ut-run-subtests.sh [suite] [first last]"
+assertion_count: 19

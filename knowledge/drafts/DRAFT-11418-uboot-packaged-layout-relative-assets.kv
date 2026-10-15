@@ -1,0 +1,62 @@
+#====================================================================
+# DRAFT-11418-uboot-packaged-layout-relative-assets - build-tree-relative path assumptions (CWD-relative test data / argv[0]-relative runtime assets) break after packaging
+#====================================================================
+
+id:                     DRAFT-11418-uboot-packaged-layout-relative-assets
+trigger_tool:           u-boot|sandbox|conan
+phase:                  testing
+error_signature:        Cannot open file '.*arch/sandbox/dts/other.dtb'|test_load_other_fdt.*got 0xfffffffb|Test 'membuf_readline' failed.*failures: 1
+
+severity:               2
+category:               packaging, sandbox, relative-path, installed-layout, testing
+match_keywords:         conan, test_package, packaging, installed layout, build tree, argv[0], state_get_rel_filename, other.dtb, CWD, README, membuf, os_read_file, EIO, -5, sandbox, ut
+title:                  构建树内相对路径假设在打包安装后断裂：argv[0] 目录相对运行时资源（other.dtb）与 CWD 相对测试数据（README）两类显形
+
+root_cause:             上游测试/工具二进制默认"在构建树内运行"，其资源解析内嵌构建树布局假设，打包安装后不回放则静默断裂（in-tree 多轮全绿不蕴含包可用）。两类实例：(1) argv[0] 目录相对——sandbox 的 state_load_other_fdt() 经 state_get_rel_filename()（arch/sandbox/cpu/state.c:402，strrchr(argv[0], '/') 取可执行文件目录）拼接 <dir(argv0)>/arch/sandbox/dts/other.dtb；构建树内二进制 build/sandbox/u-boot 与资源 build/sandbox/arch/sandbox/dts/other.dtb 天然相对命中，包内二进制 bin/u-boot-sandbox 下该相对结构不存在 → OF_LIVE 组 15 个单元测试（dm_test_livetree_ensure + 14 个 dm_test_ofnode_*_ot）全部 test_load_other_fdt -5（-EIO）失败，逐子测试日志首行 "Cannot open file '<pkg>/bin/arch/sandbox/dts/other.dtb'"，断言链 test/dm/ofnode.c:1487 / test/test-main.c:385。(2) CWD 相对——test/lib/membuf.c 的 membuf_readline 以 os_read_file("README") 相对 CWD 读测试数据：上游 pytest 的 CWD=源码树根（README 天然在场），打包框架（conan test_package）在独立工作目录回放时该文件缺席 → -EIO → failures: 1。两类路径均无环境变量/命令行可覆盖（other.dtb 纯 argv[0] 相对；README 纯 CWD 相对），显形条件唯一：以包形态在独立 CWD/安装前缀下回放全部子测试。
+affected_scope:         一切"从构建树直接运行的上游测试/二进制被重新打包安装后再运行"的适配项目——凡测试数据按 CWD 相对、运行时资源按 argv[0] 目录相对解析者；典型触发面=conan create/test_package 或其它打包框架的消费者测试在独立工作目录/安装前缀下回放。同类先例：sandbox -T 选项（start.c:213）同样按 argv[0] 目录相对解析 arch/sandbox/dts/test.dtb。
+verification_cmd:       对照组（包内缺 other.dtb）：`u-boot-sandbox -d test.dtb -c "ut dm dm_test_ofnode_get_path_ot; exit"` → Cannot open file + :1487 -5；放置后同命令 → failures: 0（dm_test_livetree_ensure 同）。README 面：工作目录放入随包 README 副本后 `u-boot-sandbox -c "version; ut lib; exit"` → failures: 0（此前 failures: 1）。
+
+rec_priority:           1
+rec_approach:           mirror-buildtree-layout-in-package
+rec_description:        在打包层镜像上游相对布局：把 arch/sandbox/dts/other.dtb 落至包内 <bindir>/arch/sandbox/dts/other.dtb（与二进制保持同相对结构，消费方以任意路径调用 bin/u-boot-sandbox 均可解析）；CWD 相对数据文件（README）将上游源码树逐字节副本随包分发，测试脚本切换到其所在目录运行。第 0 步在位断言把该运行时资源纳入硬校验清单（9→10 项），防打包回归静默丢文件。
+rec_command:            # conanfile.py package(): other_dst = os.path.join(bin_dir, "arch", "sandbox", "dts") / os.makedirs(other_dst, exist_ok=True) / shutil.copy2(os.path.join(sb, "arch", "sandbox", "dts", "other.dtb"), os.path.join(other_dst, "other.dtb"))
+rec_auto_fix:           false
+rec_impl:               packaging
+
+fallback_priority:      2
+fallback_approach:      test-time-materialize
+fallback_description:   不便改打包层时，测试脚本可在运行前把资源复制到二进制旁目录（other.dtb）或把数据文件放入 CWD（README）——只保测试通过，消费方真实使用（require 后运行 bin/u-boot-sandbox）仍断裂，属绕行且会掩盖打包缺口。
+fallback_command:       mkdir -p "$(dirname "$U_BOOT_SANDBOX")/arch/sandbox/dts" && cp other.dtb "$(dirname "$U_BOOT_SANDBOX")/arch/sandbox/dts/" && (cd work && cp README . && u-boot-sandbox -c "ut lib; exit")
+fallback_auto_fix:      false
+fallback_impl:          test-script
+
+forbid_1_pattern:       以"构建树内全量测试全绿"判断安装包可用
+forbid_1_reason:        两类相对路径在构建树内在场（CWD=源码根、argv[0] 目录=构建目录），in-tree 跑多少轮都全绿；只有包布局回放才显形（本项 in-tree 879/879 全绿，包内首跑即 15 失败 + 1 失败）。
+forbid_1_consequence:   漏检打包层缺文件，把缺陷带到消费方；判断依据必须来自"以包形态回放"的运行结果。
+
+forbid_2_pattern:       只在测试侧复制资源，不修打包层
+forbid_2_reason:        测试层绕过会让假绿通过；真实消费者（conan require 后直接运行 bin/u-boot-sandbox）的资源解析仍断裂，且 -T 等其它 argv[0] 相对入口同样受影响。
+forbid_2_consequence:   打包缺口被测试补丁掩盖，上线后在消费方炸出；正确分层=资源随包镜像（打包层）+ 在位断言（测试层硬校验防回归）。
+
+forbid_3_pattern:       把 -5/-EIO 当驱动或解析缺陷排查
+forbid_3_reason:        -5 是 os_read_file 打开文件失败（EIO）的返回值；日志首行 "Cannot open file '<绝对路径>'" 已给出实际解析路径，先核对该路径与实测布局的差异，再怀疑代码。
+forbid_3_consequence:   往 OF_LIVE 转换/设备树解析方向排查无果（15 个失败用例的转换逻辑本身无误，唯一缺口是文件不在）；应在 triage 第一步读 "Cannot open file" 的路径并按布局回放。
+
+principles:             minimal-patch, real-evidence-over-assumption, test-surface-preservation
+causes:                 []
+caused_by:              []
+similar_to:             [DRAFT-11418-uboot-fixture-staging-hex-carrier]
+conflicts_with:         []
+prerequisite_of:        []
+
+doc_file:               knowledge/drafts/DRAFT-11418-uboot-packaged-layout-relative-assets.md
+last_updated:           2026-10-03
+source_event:           u-boot 2026.07 HarmonyOS PC 适配（conan test_package 包布局回放暴露：other.dtb 按 argv[0] 目录相对解析缺失 → OF_LIVE 组 15 子测试全灭；membuf_readline 按 CWD 相对读 README 缺失 → smoke 失败 1；以包内镜像相对布局 + README 随包副本修复）
+authors:                LIMInGZE666 <LIMInGZE666@noreply.gitcode.com>
+source_pr:
+source_commit:
+
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.95
+metrics_last_used:      2026-10-03

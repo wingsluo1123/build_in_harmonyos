@@ -1,0 +1,26 @@
+--- a/tools/Kconfig
++++ b/tools/Kconfig
+@@ -66,6 +66,12 @@
+ 	help
+ 	  Enable signature verification of FIT uImages in the tools builds
+ 
++config TOOLS_FIT_CIPHER
++	depends on TOOLS_LIBCRYPTO
++	def_bool y
++	help
++	  Enable ciphering of FIT images in the tools builds
++
+ config TOOLS_FIT_SIGNATURE_MAX_SIZE
+ 	hex
+ 	depends on TOOLS_FIT_SIGNATURE
+--- a/include/image.h
++++ b/include/image.h
+@@ -1785,7 +1785,7 @@
+  * device
+  */
+ #if defined(USE_HOSTCC)
+-# if defined(CONFIG_FIT_CIPHER)
++# if CONFIG_IS_ENABLED(FIT_CIPHER)
+ #  define IMAGE_ENABLE_ENCRYPT	1
+ #  define IMAGE_ENABLE_DECRYPT	1
+ #  include <openssl/evp.h>

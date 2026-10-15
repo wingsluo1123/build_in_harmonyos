@@ -1,0 +1,73 @@
+--- a/drivers/mtd/nand/raw/sand_nand.c
++++ b/drivers/mtd/nand/raw/sand_nand.c
+@@ -483,7 +483,8 @@
+ 		u32 erasesize, oobsize, pagesize, pages;
+ 		u32 err_count, err_step_size;
+ 		off_t expected_size;
+-		char filename[30];
++		const char *tmpdir;
++		char *filename;
+ 		fdt_addr_t cs;
+ 		const u8 *id, *onfi;
+ 		int id_len, onfi_len;
+@@ -577,15 +578,27 @@
+ 		chip->err_steps = pagesize / err_step_size;
+ 
+ 		expected_size = (off_t)pages * chip->chunksize;
+-		snprintf(filename, sizeof(filename),
+-			 "/tmp/u-boot.nand%d.XXXXXX", devnum);
++		/* OHOS: /tmp is read-only; honor TMPDIR from the host
++		 * environment, falling back to /tmp elsewhere */
++		tmpdir = os_getenv("TMPDIR");
++		if (!tmpdir || !*tmpdir)
++			tmpdir = "/tmp";
++		filename = malloc(strlen(tmpdir) + 40);
++		if (!filename) {
++			ret = -ENOMEM;
++			goto err_chip;
++		}
++		snprintf(filename, strlen(tmpdir) + 40,
++			 "%s/u-boot.nand%d.XXXXXX", tmpdir, devnum);
+ 		chip->fd = os_mktemp(filename, expected_size);
+ 		if (chip->fd < 0) {
+ 			dev_dbg(dev, "Could not create temp file %s\n",
+ 				filename);
++			free(filename);
+ 			ret = chip->fd;
+ 			goto err_chip;
+ 		}
++		free(filename);
+ 
+ 		chip->programmed = calloc(sizeof(long),
+ 					  BITS_TO_LONGS(pages));
+--- a/arch/sandbox/cpu/os.c
++++ b/arch/sandbox/cpu/os.c
+@@ -323,6 +323,11 @@
+ 	return fd;
+ }
+ 
++const char *os_getenv(const char *name)
++{
++	return getenv(name);
++}
++
+ /* Restore tty state when we exit */
+ static struct termios orig_term;
+ static bool term_setup;
+--- a/include/os.h
++++ b/include/os.h
+@@ -122,6 +122,14 @@
+ int os_mktemp(char *fname, off_t size);
+ 
+ /**
++ * os_getenv() - Access a host environment variable
++ *
++ * @name: Name of environment variable to look up
++ * Return: Value of the environment variable, or NULL if it is not set
++ */
++const char *os_getenv(const char *name);
++
++/**
+  * os_exit() - access to the OS exit() system call
+  *
+  * This exits with the supplied return code, which should be 0 to indicate

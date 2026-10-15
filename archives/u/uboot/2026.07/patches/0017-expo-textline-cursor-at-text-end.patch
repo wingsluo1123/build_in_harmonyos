@@ -1,0 +1,16 @@
+--- a/boot/scene_textline.c
++++ b/boot/scene_textline.c
+@@ -199,7 +199,12 @@
+ 			ret = vidconsole_select_font(cons, NULL, 0);
+ 		}
+ 
+-		ret = vidconsole_entry_restore(cons, &scn->entry_save);
++		/*
++		 * Start a new entry rather than restoring the state saved at
++		 * open time: the pen is already at the end of the existing
++		 * text, which is where the cursor should be shown
++		 */
++		ret = vidconsole_entry_start(cons);
+ 		if (ret)
+ 			return log_msg_ret("sav", ret);
+ 

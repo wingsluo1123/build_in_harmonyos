@@ -1,0 +1,86 @@
+--- a/lib/efi_loader/Makefile
++++ b/lib/efi_loader/Makefile
+@@ -81,7 +81,7 @@
+ capsule_crt_path=($(subst $(quote),,$(CONFIG_EFI_CAPSULE_CRT_FILE)))
+ capsule_crt_full=$(srctree)/$(subst $(quote),,$(CONFIG_EFI_CAPSULE_CRT_FILE))
+ quiet_cmd_capsule_esl_gen = CAPSULE_ESL_GEN $@
+-cmd_capsule_esl_gen = cert-to-efi-sig-list $(capsule_crt_full) $@
++cmd_capsule_esl_gen = python3 $(srctree)/scripts/cert-to-efi-sig-list.py $(capsule_crt_full) $@
+ $(objtree)/capsule_esl_file: FORCE
+ 	@if [ ! -e "$(capsule_crt_full)" ]; then \
+ 		echo "ERROR: path $(capsule_crt_full) is invalid." >&2; \
+--- /dev/null
++++ b/scripts/cert-to-efi-sig-list.py
+@@ -0,0 +1,72 @@
++#!/usr/bin/env python3
++# SPDX-License-Identifier: GPL-2.0
++# cert-to-efi-sig-list: convert an X509 certificate (PEM) to an EFI
++# Signature List (ESL) file.
++#
++# Faithful port of the efitools tool of the same name, reduced to the
++# operation u-boot invokes: `cert-to-efi-sig-list <crt file> <esl file>`
++# with an all-zero SignatureOwner.  The original tool is a C program
++# built against OpenSSL (PEM_read_bio_X509 + i2d_X509); this port
++# decodes the PEM body directly, which yields the same DER bytes
++# i2d_X509 emits for a well-formed certificate, and wraps them in the
++# UEFI EFI_SIGNATURE_LIST / EFI_SIGNATURE_DATA layout.  Used on build
++# hosts that have python3 but cannot build efitools (no OpenSSL
++# development headers), e.g. the OHOS toolchain environment.
++
++import base64
++import struct
++import sys
++import uuid
++
++# EFI_CERT_X509_GUID: a5c059a1-94e4-4aa7-87b5-ab155c2bf072
++# (UEFI mixed-endian GUID layout: Data1/2/3 little-endian, Data4 big.)
++EFI_CERT_X509_GUID = bytes([
++    0xa1, 0x59, 0xc0, 0xa5, 0xe4, 0x94, 0xa7, 0x4a,
++    0x87, 0xb5, 0xab, 0x15, 0x5c, 0x2b, 0xf0, 0x72,
++])
++
++# Self-check: the byte array above must equal the little-endian encoding of
++# the UEFI GUID: a wrong GUID yields an ESL entry firmware can never match,
++# so capsule authentication fails closed and silently.  Kept as a runtime
++# guard (not `assert`, which python -O disables) and validated against
++# Python's own uuid little-endian encoder.
++_expected = uuid.UUID("a5c059a1-94e4-4aa7-87b5-ab155c2bf072").bytes_le
++if EFI_CERT_X509_GUID != _expected:
++    sys.exit("EFI_CERT_X509_GUID mismatch: %s != %s"
++             % (EFI_CERT_X509_GUID.hex(), _expected.hex()))
++
++# struct EFI_SIGNATURE_LIST: GUID SignatureType; UINT32 SignatureListSize;
++# UINT32 SignatureHeaderSize; UINT32 SignatureSize;
++ESL_HEADER_SIZE = 28
++# struct EFI_SIGNATURE_DATA: GUID SignatureOwner; UINT8 SignatureData[];
++SIGDATA_HEADER_SIZE = 16
++
++
++def pem_to_der(path):
++    with open(path, "rb") as f:
++        data = f.read()
++    begin = b"-----BEGIN CERTIFICATE-----"
++    end = b"-----END CERTIFICATE-----"
++    i = data.find(begin)
++    j = data.find(end)
++    if i < 0 or j < 0 or j <= i:
++        sys.exit("cert-to-efi-sig-list: not a PEM certificate: %s" % path)
++    body = data[i + len(begin):j]
++    return base64.b64decode(body.replace(b"\r", b"").replace(b"\n", b""))
++
++
++def main(argv):
++    if len(argv) != 3:
++        sys.exit("Usage: %s <crt file> <efi sig list file>" % argv[0])
++    der = pem_to_der(argv[1])
++    owner = bytes(16)  # all-zero SignatureOwner, as u-boot invokes it
++    sig_list = struct.pack("<16sIII", EFI_CERT_X509_GUID,
++                           len(der) + ESL_HEADER_SIZE + SIGDATA_HEADER_SIZE,
++                           0,
++                           len(der) + SIGDATA_HEADER_SIZE)
++    with open(argv[2], "wb") as f:
++        f.write(sig_list + owner + der)
++
++
++if __name__ == "__main__":
++    main(sys.argv)

@@ -1,0 +1,19 @@
+--- a/net/dhcpv6.c
++++ b/net/dhcpv6.c
+@@ -32,7 +32,15 @@
+ /* DHCPv6 all server IP6 address */
+ const struct in6_addr dhcp_mcast_ip6 = DHCP6_MULTICAST_ADDR;
+ /* IPv6 multicast ethernet address */
+-const u8 net_dhcp6_mcast_ethaddr[6] = IPV6_ALL_NODE_ETH_ADDR(dhcp_mcast_ip6);
++/* The ethaddr tail bytes come from the IPv6 multicast address. GCC
++ * accepts member access on a const-qualified global as a constant
++ * expression (an extension); clang does not, so build the value from a
++ * compound literal of the same initializer - C99 compound literals at
++ * file scope have static storage duration and are valid constant
++ * expressions.
++ */
++const u8 net_dhcp6_mcast_ethaddr[6] =
++	IPV6_ALL_NODE_ETH_ADDR((struct in6_addr)DHCP6_MULTICAST_ADDR);
+ 
+ static void dhcp6_state_machine(bool timeout, uchar *rx_pkt, unsigned int len);
+ 
