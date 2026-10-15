@@ -1,0 +1,34 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: libklibc/2.0.14
+homepage: "https://www.kernel.org/pub/linux/libs/klibc/"
+
+# 上游测试命令：清除继承的 MAKEFLAGS 并串行构建 Kbuild 测试目标，避免 HMDFS jobserver FIFO。
+upstream_check_command: "MAKEFLAGS= make -j1 test"
+
+# conanfile.py build() 集成并强制执行全部 39 项，不允许 skip/not-built/sign-failed。
+upstream_test_in_build: true
+upstream_test_command: "MAKEFLAGS= make -j1 test（测试编译加 -fno-builtin-malloc -fno-builtin-calloc）; 逐个运行 usr/klibc/tests 下全部 39 个静态测试程序（timeout 15s），testrand48 按其确定性输出向量判定"
+upstream_test_count: 39
+upstream_test_skips: 0
+
+# 上游测试程序（usr/klibc/tests 下 39 个 .c，static + shared 两版本）
+upstream_tests:
+  - file: "usr/klibc/tests/*.c"
+    source: "klibc-2.0.14/usr/klibc/tests/"
+    description: "klibc 上游测试套件：39 个静态测试程序（字符串/stdio/stdlib/time/socket/mmap 等）；testrand48 为返回码 1 的向量打印器，按种子与 rand48 输出值校验，不跳过"
+    command: "MAKEFLAGS= make -j1 test（测试编译加 -fno-builtin-malloc -fno-builtin-calloc）; 逐个运行 usr/klibc/tests 下的静态程序（timeout 15 保护）"
+
+# test_package 自带测试（消费者视角，R34：真实调用 klibc API）
+test_package_tests:
+  - file: test_klibc.c
+    description: "消费者视角：strcpy/strcat/strlen/strcmp/printf 验证 klibc 头文件与静态库可用"
+    command: "./test_probe"
+  - file: test_ohos_map_noreserve.c
+    description: "HarmonyOS 系统 libc / mmap：MAP_NORESERVE 映射 4 GiB + 1 稀疏区域并触页读回"
+    command: "./test_ohos_map_noreserve"
+
+# 测试断言总数（test_package 6 项断言；上游测试为独立程序，不计入断言数）
+assertion_count: 6
