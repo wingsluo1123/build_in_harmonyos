@@ -1,0 +1,104 @@
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/1.0.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.0.0"
+
+# 软件名
+software: "cava"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-08"
+build_system: "autotools"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://codeload.github.com/karlstav/cava/tar.gz/refs/tags/1.0.0"
+
+  # 源码校验和（本机 sha256sum 实测）
+  sha256: "2866cea11d0bd38406924ab2b47d5577f14909a7321ee928b6836391f375af7e"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表（与 conanfile.py 的 DISABLED_INPUTS + CANONICAL_ARGS 同源）
+  configure_options:
+    - "--disable-input-alsa"
+    - "--disable-input-pulse"
+    - "--disable-input-pipewire"
+    - "--disable-input-portaudio"
+    - "--disable-input-sndio"
+    - "--disable-input-oss"
+    - "--disable-input-jack"
+    - "--disable-input-coreaudio"
+    - "--disable-input-coreaudio-tap"
+    - "--disable-output-sdl"
+    - "--build=aarch64-unknown-linux-gnu"
+    - "--host=aarch64-unknown-linux-ohos"
+
+  # 编译依赖列表（格式: name/version）— 与 conanfile.py requirements() 同源（R36）
+  dependencies:
+    - "fftw/3.3.11"
+    - "iniparser/4.2.6"
+    - "ncurses/6.6"
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 测试数字（五维，与 notes.md / test_package/MANIFEST.yml 三处同源）
+# ============================================================
+tests:
+  n_static: 10          # 资产口径：cavacore_test.c 1 + run_all_tests.sh 1 + test_configs 8
+  n_registered: 0       # Makefile.am 无 TESTS/check_PROGRAMS ⇒ make check 跑 0 用例
+  n_executed: 3         # make check + cavacore_test + {fifo_zero_test,non_zero_test}
+  n_not_executed: 7     # 分类见 not_executed_categories
+  n_consumer: 4         # test_package/test_package test.sh 4 条断言
+  not_executed_categories:
+    input_backend_trimmed: 5    # alsa/pulse/pipewire/portaudio/sndio 5 个配置
+    external_source_missing: 1  # shmem_zero_test（上游注明需 squeezelite）
+    top_level_script: 1         # run_all_tests.sh（8 子配置中 6 个同上不可执行）
+  n_assertion_upstream: 42      # cavacore_test 20 频点×上下界 2 = 40 + 配置退出码断言 2
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+# 例如:
+# - "0001-bootstrap-ohos-toolchain.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained: []
+# 例如:
+# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
+# - "内嵌 libuv 需要禁用，使用系统 libuv"

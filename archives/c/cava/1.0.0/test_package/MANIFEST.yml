@@ -1,0 +1,80 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# 口径（手册/04 §10 四类数字 + 经验库 §12.72 资产口径），本文件为事实源，
+# notes.md / PR 正文 / result.json 的测试数字必须与这里同源。
+
+package: cava/1.0.0
+homepage: "https://github.com/karlstav/cava"
+
+# 上游测试命令（automake 注册口径）
+# 实测：Makefile.am 无 TESTS / check_PROGRAMS ⇒ 注册 0 项，`make check` target 存在但跑 0 用例
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "make check && ./cavacore_test && ./cava -p example_files/test_configs/{fifo_zero_test,non_zero_test}"
+
+# ── 上游测试资产（§12.72 资产口径，N_static = 10）────────────────────
+#   测试源文件 1 + 测试脚本 1 + 测试语料/配置 8（automake 注册 0，示例程序 0）
+upstream_tests:
+  - file: cavacore_test.c
+    source: cava-1.0.0/cavacore_test.c
+    description: "cavacore 独立测试程序：仿真模式自产 200Hz/2000Hz 正弦，跑 300 次 cava_execute，左右声道各 10 频点与 blueprint 逐点比对（±2%），不符 exit 1"
+    command: "./cavacore_test"
+  - file: run_all_tests.sh
+    source: cava-1.0.0/run_all_tests.sh
+    description: "遍历 example_files/test_configs/* 逐个跑 ./cava -p（8 个配置）"
+    command: "./run_all_tests.sh"
+  - file: example_files/test_configs/fifo_zero_test
+    source: cava-1.0.0/example_files/test_configs/fifo_zero_test
+    description: "FIFO 输入取 /dev/zero，draw_and_quit=60 帧后 zero_test 断言总条高为 0（cava.c:1721）"
+    command: "./cava -p example_files/test_configs/fifo_zero_test"
+  - file: example_files/test_configs/non_zero_test
+    source: cava-1.0.0/example_files/test_configs/non_zero_test
+    description: "FIFO 输入取 /dev/urandom，non_zero_test 断言总条高非 0（cava.c:1725）"
+    command: "./cava -p example_files/test_configs/non_zero_test"
+  - file: example_files/test_configs/alsa_zero_test
+    source: cava-1.0.0/example_files/test_configs/alsa_zero_test
+    description: "ALSA 回环输入 zero_test（需 snd-aloop 内核模块）— 本设备未执行，见未执行原因"
+    command: "./cava -p example_files/test_configs/alsa_zero_test"
+  - file: example_files/test_configs/pulse_zero_test
+    source: cava-1.0.0/example_files/test_configs/pulse_zero_test
+    description: "PulseAudio 输入 zero_test — 本设备未执行，见未执行原因"
+    command: "./cava -p example_files/test_configs/pulse_zero_test"
+  - file: example_files/test_configs/pipewire_zero_test
+    source: cava-1.0.0/example_files/test_configs/pipewire_zero_test
+    description: "PipeWire 输入 — 本设备未执行，见未执行原因"
+    command: "./cava -p example_files/test_configs/pipewire_zero_test"
+  - file: example_files/test_configs/portaudio_zero_test
+    source: cava-1.0.0/example_files/test_configs/portaudio_zero_test
+    description: "PortAudio 输入 — 本设备未执行，见未执行原因"
+    command: "./cava -p example_files/test_configs/portaudio_zero_test"
+  - file: example_files/test_configs/sndio_zero_test
+    source: cava-1.0.0/example_files/test_configs/sndio_zero_test
+    description: "sndio 输入 — 本设备未执行，见未执行原因"
+    command: "./cava -p example_files/test_configs/sndio_zero_test"
+  - file: example_files/test_configs/shmem_zero_test
+    source: cava-1.0.0/example_files/test_configs/shmem_zero_test
+    description: "共享内存输入（需 squeezelite 提供数据源）— 本设备未执行，见未执行原因"
+    command: "./cava -p example_files/test_configs/shmem_zero_test"
+
+# 未执行项（7）与技术原因
+#   1) 5 项（alsa/pulse/pipewire/portaudio/sndio）：输入后端按本设备实物能力裁剪
+#      （configure 探测不到即 AC_MSG_NOTICE 降级，上游原生支持），运行期亦无可用采集节点。
+#   2) 1 项（shmem）：需 squeezelite 作为共享内存数据源（上游配置文件注释明示），本设备无该服务。
+#   3) 1 项（run_all_tests.sh）：其 8 个子配置中 6 个同上不可执行，且需 snd-aloop/squeezelite 外部数据源。
+upstream_not_executed: 7
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: test.sh
+    description: "消费者测试 — 调用已安装 cava 二进制：版本契约、--help 契约、非法选项非零退出，4 项断言"
+    command: "bash test.sh"
+
+# 测试断言总数（近似值，用于质量评估）
+#   上游已执行：cavacore_test 20 频点 × 上下界 2 = 40 条 blueprint 比对 + 2 条配置退出码断言 = 42
+#   消费者：test.sh 4 条
+assertion_count: 46
