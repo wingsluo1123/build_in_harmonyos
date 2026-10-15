@@ -1,0 +1,34 @@
+software: pgtt
+# 版本级 manifest
+# 文件位置: archives/p/pgtt/4.6/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "4.6"
+status: built
+build_date: "2026-10-13"
+build_system: pgxs
+
+source:
+  url: "https://github.com/darold/pgtt/archive/refs/tags/v4.6.tar.gz"
+  sha256: "9d70ebaa0ef091990dd6ec1446e0e7b894507718249cbf07eaaedf384b66bcbe"
+  tar_format: tar.gz
+  upstream_commit: "c8730243ca993de96122641452a138f284ef0437"
+  upstream_tag: "v4.6"
+  internal_version: "4.6.0"
+
+build:
+  system: pgxs
+  configure_options: []
+  dependencies:
+    - postgresql/18.3
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "pgtt 是 PostgreSQL 服务端扩展（非可执行/库）：PGXS 构建产出 pgtt.so，由运行中的 postgres 进程在 CREATE EXTENSION / session_preload_libraries 时 dlopen"
+  - "postgresql/18.3（ohpcd 预编译包）同时提供 pg_config + PGXS makefile + include/postgresql/server 头文件 + libpq + 服务端二进制，PGXS 扩展无需任何 PostgreSQL 源码 bootstrap"
+  - "PGXS 默认把 pg_config --libdir（构建机 conan 缓存绝对路径）写进 .so 的 RUNPATH；PG 18 的开关是 enable_rpath（不是 rpath=），改传 rpathdir='$$ORIGIN/../lib' 得到可重定位 RUNPATH，模块在 <prefix>/lib/postgresql 加载时经 ..\\/lib 找到 libpq.so.5"
+  - "test_package 必须先把 postgresql 安装整份复制到工作目录再部署 —— conan 缓存中的包目录共享且 HMDFS 拒绝原地覆盖（EPERM），原地部署第二次即失败"
+  - "上游 test/expected/privilege.out 是 4.6 安全加固前的陈旧期望文件：4.6 起 pg_global_temp_tables 不再对 PUBLIC 授予写权限，privilege.sql 仅 GRANT schema 故必然失败；补上安装脚本注释所要求的表级 GRANT 后功能正常"
