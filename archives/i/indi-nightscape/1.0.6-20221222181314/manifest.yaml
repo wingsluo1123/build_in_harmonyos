@@ -1,0 +1,83 @@
+# 版本级 manifest — indi-nightscape 1.0.6-20221222181314
+# 遵循 ARCHIVE-SPEC v2.0
+
+# 版本号
+version: "1.0.6-20221222181314"
+
+# 软件名
+software: "indi-nightscape"
+
+# 编译状态
+# published | built | failed
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-01"
+build_system: cmake
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL (R39: 官方 https 源, indilib/indi-3rdparty 官方仓库,
+  # commit bd010b89b00bf63f396075835a0c5ef95986b3c2, 驱动位于 indi-nightscape/ 子目录)
+  url: "https://github.com/indilib/indi-3rdparty/archive/bd010b89b00bf63f396075835a0c5ef95986b3c2.tar.gz"
+
+  # 源码校验和 (官方整仓 tarball 168MB, 完整下载后 sha256sum 实测;
+  # 修正: 此前误写截断文件哈希 fdc66a9d...)
+  sha256: "6a1ab7ae4d5c343adcc8212cd7795c84311953e59ea3d344c2a1f2e9ca64be8b"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  system: cmake
+
+  # 配置选项列表
+  configure_options:
+    - "-DCMAKE_SYSTEM_NAME=Linux"
+    - "-DCMAKE_SYSTEM_PROCESSOR=aarch64"
+    - "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+    - "-DNIGHTSCAPE_INSTALL_UDEV_RULES=OFF"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - libindi/2.2.2.1
+    - cfitsio/4.6.4
+    - libusb/1.0.27
+    - libftdi/1.5
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "patches/0001-CMakeLists-OHOS-install-cmake.patch"
+  - "patches/0002-nightscape-INDI2-API-migration.patch"
+  - "patches/0003-FindINDI-version-regex.patch"
+  - "patches/0004-FindFTDI1-include-dirs.patch"
+  - "patches/0005-CMakeCommon-cxx17.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "indi-3rdparty 自带 FindINDI.cmake 版本正则无法匹配带引号的 #define INDI_VERSION \"x.y.z\"，需放宽正则"
+  - "libindi 2.x 头文件要求 C++17 (std::any)，CMakeCommon.cmake 需从 14 提升到 17"
+  - "2022 年的驱动源码使用旧 INDI Property API，需按上游 master 迁移到 PropertyNumber/PropertyText 类 API"
+  - "Conan CMakeToolchain 默认 PREFER_CONFIG=ON 会 shadow 自带 Find*.cmake 旧式变量，需强制 OFF"
+  - "OHOS musl libc 无 secure_getenv，统一用 getenv"
+  - "FindFTDI1.cmake 未定义 FTDI1_INCLUDE_DIRS 且路径层级不匹配，需派生父目录"

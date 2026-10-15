@@ -1,0 +1,31 @@
+# conandata.yml — indi-nightscape 1.0.6-20221222181314
+#
+# 官方源: indilib/indi-3rdparty 仓库 (驱动位于 indi-nightscape/ 子目录)
+# commit bd010b89b00bf63f396075835a0c5ef95986b3c2 (2022-12-19, 对应上游版本
+# 1.0.6-20221222181314 时间戳 2022-12-22 的最接近 master 提交)。
+#
+# sha256 修正说明 (主编复核 2026-10-02): 官方整仓 codeload tarball 完整下载
+# (168MB) 后实测 sha256sum = 6a1ab7ae4d5c343adcc8212cd7795c84311953e59ea3d344c2a1f2e9ca64be8b，
+# 与 CI 预下载缓存 (.build-cache/predl_cache/) 中 tarball 哈希一致。
+# 注意：此前误写 fdc66a9d...（截断文件哈希），已修正。
+
+sources:
+  url: "https://github.com/indilib/indi-3rdparty/archive/bd010b89b00bf63f396075835a0c5ef95986b3c2.tar.gz"
+  sha256: "6a1ab7ae4d5c343adcc8212cd7795c84311953e59ea3d344c2a1f2e9ca64be8b"
+
+patches:
+  - patch_file: "patches/0001-CMakeLists-OHOS-install-cmake.patch"
+    patch_description: "CMakeLists: INDI_DATA_DIR 找不到时回退 share/indi；udev rules 安装加 NIGHTSCAPE_INSTALL_UDEV_RULES 开关默认 OFF (OHOS /lib/udev 不可写)"
+    patch_type: "portability"
+  - patch_file: "patches/0002-nightscape-INDI2-API-migration.patch"
+    patch_description: "nightscape.cpp: 迁移到 libindi 2.2.x 新 Property API (TemperatureN->TemperatureNP, BayerT->BayerTP, .s->getState(), IDSetNumber->apply/save, currentCCDTemperature->setValue/getValue)；OHOS musl 无 secure_getenv 统一用 getenv"
+    patch_type: "portability"
+  - patch_file: "patches/0003-FindINDI-version-regex.patch"
+    patch_description: "FindINDI.cmake: 版本正则兼容带引号的 INDI_VERSION \"x.y.z\" (libindi 头文件格式)"
+    patch_type: "portability"
+  - patch_file: "patches/0004-FindFTDI1-include-dirs.patch"
+    patch_description: "FindFTDI1.cmake: 定义 FTDI1_INCLUDE_DIRS 并指向 ftdi.h 父目录 (CMakeLists 引用复数变量，且源码 include <libftdi1/ftdi.h>)"
+    patch_type: "portability"
+  - patch_file: "patches/0005-CMakeCommon-cxx17.patch"
+    patch_description: "CMakeCommon.cmake: C++ 标准 14->17 (libindi 2.x 头文件使用 std::any 等 C++17 特性)"
+    patch_type: "portability"
