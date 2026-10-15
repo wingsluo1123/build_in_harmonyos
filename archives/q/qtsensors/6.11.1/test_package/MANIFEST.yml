@@ -1,0 +1,41 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: qtsensors/6.11.1
+homepage: "https://doc.qt.io/qt-6/qtsensors-index.html"
+
+upstream_check_command: "./tst_qsensor（独立 CMake 工程，见下）"
+upstream_test_in_build: true
+upstream_test_command: "cmake -DQT_ADDITIONAL_PACKAGES_PREFIX_PATH=<qtsensors-pkg> .. && cmake --build . && ./tst_qsensor"
+
+# 上游 tests/auto/qsensor 的 tst_qsensor 在无传感器 HAL 机器上可真实运行：
+# 其 mock 传感器后端经 QT_STATICPLUGIN 静态编入测试本体
+# （test_sensorplugin.cpp 的 Q_IMPORT_PLUGIN(TestSensorPlugin)），测试进程
+# 自带后端、不依赖任何传感器硬件。2026-10-14 实测（qtbase/qtsensors conan
+# 包环境 + offscreen 平台）：Totals: 39 passed, 0 failed, 0 skipped。
+upstream_tests:
+  - file: "tests/auto/qsensor/tst_qsensor.cpp"
+    source: "qtsensors-everywhere-src-6.11.1/tests/auto/qsensor/tst_qsensor.cpp"
+    description: "Qt Sensors 上游自动测试（37 个测试函数 + initTestCase/cleanupTestCase）：类型注册、后端注册/注销、默认传感器、配置解析、生命周期与缓冲区语义；mock 后端经 QT_STATICPLUGIN 静态编入"
+    command: "独立 CMake 工程（镜像上游 qt_internal_add_test：同源码 + QT_STATICPLUGIN + Qt6::Core/Test/Sensors，手动补 private include 根）；QT_QPA_PLATFORM=offscreen 直接运行"
+    result: "39 passed, 0 failed, 0 skipped（rc=0，2026-10-14）"
+
+# 其余两个上游测试目标（tests/auto/qml/{qml_cpp,qml_quick} 的
+# tst_sensors_qmlcpp / tst_sensors_qmlquick）依赖 Qt::Qml 与
+# QtSensorsQuickPrivate（qtdeclarative 模块）。本仓不构建 qtdeclarative，
+# 该依赖在本仓不可获得，两个 QML 目标无法构建，按 §3.3 声明豁免。
+upstream_test_exemption:
+  rule: "missing_dependency"
+  targets:
+    - tst_sensors_qmlcpp
+    - tst_sensors_qmlquick
+  reason: "依赖 Qt::Qml/QtSensorsQuickPrivate（qtdeclarative 模块），本仓无 qtdeclarative 包，QML 目标无法构建；C++ 核心目标 tst_qsensor 已真实执行（39/39 通过）"
+
+test_package_tests:
+  - file: "test_package/test_qtsensors.cpp"
+    description: "消费者视角验证 QtSensors 可用：类型注册表不变式（无 HAL 时空）、type() 契约（返回类名键 \"QAccelerometer\"）、identifier 初始为空、无后端时 start() 优雅降级（false/不崩溃/isActive 保持 false）——全部真实断言，失败以非零退出"
+    command: "conan test"
+
+assertion_count: 6

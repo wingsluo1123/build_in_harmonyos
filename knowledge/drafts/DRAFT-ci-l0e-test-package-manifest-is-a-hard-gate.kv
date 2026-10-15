@@ -1,0 +1,29 @@
+# ═══ Draft knowledge entry — CI L0e：test_package/MANIFEST.yml 是硬门禁 ═══
+# Timestamp: 2026-10-14
+# Software: 任意 conan 包（CI 门禁层）
+# Gate: L0 质量门禁
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id: draft-ci-l0e-test-package-manifest-is-a-hard-gate
+title: CI 在 L0 就因 test_package/MANIFEST.yml 缺失而失败（且 L1/L2/L4/L5 全 skip）；合规 MANIFEST 的两套写法与字段
+trigger_tool: ci/conan/build_and_test.sh|conan create
+phase: ci
+error_signature: L0e: test_package/MANIFEST.yml missing|L0c: No test source files in
+  test_package/|blocked_by_L0
+severity: 3
+category: ci|conan|process
+match_keywords: L0e, MANIFEST.yml, no_test_sources, blocked_by_L0, upstream_test_exemption,
+  platform_limitation, upstream_check_command, assertion_count
+keywords: 质量门禁, 上游测试声明, 豁免字段, Qt 附加模块漏文件, 提交前自查
+approach: 在 test_package/ 下补 MANIFEST.yml：有上游测试但不可运行用
+  upstream_test_exemption(rule=platform_limitation + reason)；上游无测试则只写 reason。
+  字段与 conanfile 实际执行的命令必须一致。
+root_cause: build_and_test.sh 的 L0e 是对 test_package/MANIFEST.yml 的存在性硬检查
+  （要求声明上游测试来源）；文件缺失即整包失败，后续 L1/L2/L4/L5 全部 skip。
+  实测 qtsensors/6.11.1 与 qtconnectivity/6.11.1 两个 PR 均只因缺该文件而挂。
+rec_approach: always-ship-test-package-manifest
+doc: docs/TEST_QUALITY_SPEC.md
+verification: 两个 Qt 模块补 MANIFEST 后 L0e 具备通过条件（commit 87121ed344 /
+  fdea9df441）；对照 archives/q/qt-unixodbc 与 qt-mariadb 的 MANIFEST 字段结构。
+related: 上游测试不可运行的归因写法与 DRAFT-13988 no-gl-environment 条互补；
+  源站失败见 DRAFT-source-host-rate-limit-and-mirror-fallback 条。
