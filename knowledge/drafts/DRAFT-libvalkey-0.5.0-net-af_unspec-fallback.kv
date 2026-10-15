@@ -1,0 +1,71 @@
+# DRAFT-libvalkey-0.5.0-net-af_unspec-fallback.kv
+# 知识草稿（路径 B，R02）— 库双族 getaddrinfo 回退覆盖白名单 errstr 的修复
+# 生成来源: libvalkey 0.5.0 鸿蒙特有测试与上游测试闭环（#66 NXDOMAIN）
+
+id: DRAFT-libvalkey-0.5.0-net-af_unspec-fallback
+title: 客户端库双族 getaddrinfo 回退在平台单族解析系统级失败时覆盖白名单 errstr，改为 AF_UNSPEC 单次回退
+category: linking, runtime, dns, portability, testing
+severity: 2
+trigger_tool: getaddrinfo|client_test
+phase: configuration|runtime|testing
+error_signature: >
+  Error relocating .*: .* symbol not found|
+  Returns error when host cannot be resolved: FAILED|
+  Error loading shared library lib.*\.so\.[0-9]+|
+  gai_strerror.*System error|
+  #66.*FAILED|
+  c->errstr=System error|
+  getaddrinfo.*AF_INET6.*rv=-11
+match_keywords: getaddrinfo, AF_INET, AF_INET6, AF_UNSPEC, EAI_SYSTEM, EAI_NONAME, gai_strerror, NXDOMAIN, whitelist, errstr, dual-family, fallback, musl, resolver, libvalkey, hiredis, DNS
+root_cause: >
+  客户端库（libvalkey/hiredis 系）在 DNS 解析失败后按单族重试另一地址族
+  （AF_INET 失败→AF_INET6）。在鸿蒙 PC 真机上，AF_INET6 的主机名解析路径
+  在系统级失败（musl resolver 返回 EAI_SYSTEM，errno=22 EINVAL，即使 DNS
+  服务器对 AAAA 查询正常返回应答），导致最后一次 getaddrinfo 的
+  gai_strerror 文案（"System error"）覆盖了首次 AF_INET 返回的白名单内
+  EAI_NONAME 文案（"Name does not resolve"）。上游测试逐字比对
+  c->errstr 命中 10 条硬编码白名单，EAI_SYSTEM 文案不在白名单内 → #66
+  FAILED，即便该域名确实不可解析且 IPv4 路径语义正确。
+affected_scope: >
+  所有使用 getaddrinfo 双族回退（先单族、失败后换另一族）的 C/C++ 客户端库
+  （libvalkey、hiredis 及其衍生）在 OHOS/Linux 平台上适配与测试；特别是
+  平台 IPv6 解析路径存在系统级缺陷（无全局 IPv6、musl resolver EAI_SYSTEM）
+  的设备。纯 IPv4 或 AF_UNSPEC 单次查询路径不受影响。
+verification_cmd: >
+  cd <src> && make && ./tests/client_test -h 127.0.0.1 -p 56379 -s <sock>
+  （#66 应 PASSED；修复前后对比：errstr 从 "System error" 变为 "Name does not resolve"）
+rec_priority: 1
+rec_approach: af-unspec-single-fallback
+rec_description: >
+  将解析失败后的单族回退改为 AF_UNSPEC 单次回退：首次 getaddrinfo 失败时
+  hints.ai_family = AF_UNSPEC 再查一次（一次查询同时尝试 A/AAAA，返回
+  语义一致的 EAI_NONAME 白名单文案），而不是换到另一单族——避免把平台
+  某地址族的系统级失败文案带入 errstr。
+rec_command: |
+  /* src/net.c */
+  rv = getaddrinfo(c->tcp.host, _port, &hints, &servinfo);
+  if (rv != 0 && hints.ai_family != AF_UNSPEC) {
+      hints.ai_family = AF_UNSPEC;
+      rv = getaddrinfo(c->tcp.host, _port, &hints, &servinfo);
+  }
+  if (rv != 0) {
+      valkeySetError(c, VALKEY_ERR_OTHER, gai_strerror(rv));
+      return VALKEY_ERR;
+  }
+rec_auto_fix: false
+rec_impl: source-patch
+fallback_priority: 2
+fallback_approach: environment-dns-ipv6
+fallback_description: >
+  若不能改库源码，可尝试环境层：提供可用的全局 IPv6 地址/路由使 AF_INET6
+  解析返回 EAI_NONAME；或配置 DNS 使 NXDOMAIN 在 AAAA 路径同样正常返回。
+  鸿蒙真机 /etc/resolv.conf 只读且无全局 IPv6 时此路径不可行。
+evidence_ref:
+  - "client_test_server_backed.log: #66 PASSED, 112 PASSED/0 FAILED/3 SKIPPED"
+  - "harmonyos_specific_test.log: exit 0, TCP PING PONG + AF_UNIX 受限行为"
+  - "nxdomain_probe.c: getaddrinfo(AF_INET) rv=-2 'Name does not resolve'; valkeyConnect errstr 'System error'"
+  - "probe8: AF_INET6 no-flags/AI_ADDRCONFIG rv=-11 EAI_SYSTEM; AF_UNSPEC rv=-2 EAI_NONAME"
+library: libvalkey
+version: 0.5.0
+source_pr: feat/libvalkey-0.5.0 (PR 13278, R02)
+last_updated: 2026-09-27
