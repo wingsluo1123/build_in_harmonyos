@@ -1,0 +1,97 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（R51：上游测试三步法申报）
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: libheif-rav1e/1.23.0
+homepage: "https://github.com/strukturag/libheif"
+
+# 上游测试命令：
+#   * 父 tarball libheif 1.23.0 的入口是 CTest（需 -DBUILD_TESTING=ON，本包交付面不含上游测试目标）
+#   * 内树构建的 rav1e 0.7.1 的入口是 cargo test（本包在 test_package 中真跑）
+upstream_check_command: "cargo test --release --workspace --tests --no-fail-fast   # rav1e；libheif 侧为 ctest（需 -DBUILD_TESTING=ON，不属交付面）"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: "cargo test --release --target aarch64-unknown-linux-ohos --workspace --tests --no-fail-fast"
+
+# 上游用例清点（rule4）：
+#   A) 父 tarball libheif 1.23.0 全量注册面（本包是其中树内子模块）——
+#      主 N 取「用例/注册类」候选口径的最大值 = Catch2 TEST_CASE = 217；
+#      本次在独立的 testing-preset 测试构建里**真跑**：N′=212（PASS 212 / FAIL 0 / SKIP 0），
+#      NOT_RUN 5，逐项归因见 notes.md 6.2。
+#   B) 内树构建的 rav1e 0.7.1（cargo workspace）—— 宏清点 120，实际运行 452 全绿。
+upstream_test_counts:
+  # A. libheif（父 tarball）注册面
+  libheif_catch2_test_case: 217         # 用例/注册类最大值，即 libheif 侧主 N
+  libheif_ctest_add_test_all_switches_on: 39
+  libheif_ctest_compiled_in_this_config: 38   # 少 1：generic-compression 用例需 zlib，未接
+  libheif_test_source_files_cc: 41
+  libheif_assertions: 4016              # 另一单位，只披露、不并入 N
+  libheif_executed_passed: 212          # N′：ctest 真跑且通过的用例数
+  libheif_executed_failed: 0
+  libheif_executed_skipped: 0
+  libheif_not_run: 5                    # 2 upstream #if 0 + 1 tiffdecode #if 守卫 + 2 zlib gated
+  # B. rav1e（内树构建）
+  rav1e_macro_count: 120                # #[test] 静态清点（src/** 104 + ivf 3 + tests 13）
+  rav1e_executed_passed: 452            # cargo test --workspace --tests 实测
+  rav1e_executed_failed: 0
+  rav1e_executed_ignored: 0
+  basis: >-
+    取数命令见 notes.md 6.2。libheif 主 N=Catch2 TEST_CASE 注册数=217
+    （grep -rho 'TEST_CASE' tests/*.cc | wc -l）；实测以 ctest 逐可执行文件的 Catch2 汇总行
+    为准（HMBS_UPSTREAM_TEST_RESULT）；rav1e 实测以 cargo test 输出为准。
+  in_surface_scope: "libheif/plugins/encoder_rav1e.cc（上游目标 heif-rav1e → libheif-rav1e.so）"
+  in_surface_executed: 0
+  not_run: 217
+  harmony_specific: 15
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: "rav1e src/**/*.rs, ivf/src/lib.rs, tests/*.rs"
+    source: "rav1e-0.7.1（内树构建；source 从 conandata.yml 声明的官方源重新下载）"
+    description: >-
+      rav1e 上游单元 + 集成测试（#[test] 宏静态清点 120，实测 452/452 全绿）。
+      在 test_package 的 test() 阶段真跑（R51 三步法第 2 步，HMBS_UPSTREAM_TEST_RESULT 标记）。
+    command: "cargo test --release --target aarch64-unknown-linux-ohos --workspace --tests --no-fail-fast"
+  - file: "libheif-1.23.0/tests/**（本配置编译出 38 个 ctest 可执行文件）"
+    source: "libheif-1.23.0（父 tarball，sha256 50ea4fbd…fab9a）"
+    description: >-
+      libheif 上游 CTest/Catch2 套件。在独立的 testing-preset 测试构建里编译并**真跑**
+      （BUILD_TESTING=ON + WITH_REDUCED_VISIBILITY=OFF + WITH_UNCOMPRESSED_CODEC=ON +
+      ENABLE_EXPERIMENTAL_FEATURES=ON）：N′ = 212（PASS 212 / FAIL 0 / SKIP 0），NOT_RUN 5。
+      测试所需的编解码后端（dav1d/libde265/x265/openjpeg/openjph/libtiff）以 tool_requires
+      接入（仅进 build 上下文，不进交付包 requires 面）。
+    command: "ctest --output-on-failure"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_package/CMakeLists.txt
+    description: "find_package(libheif REQUIRED) + target_link_libraries libheif::libheif（经 CMakeDeps 生成）"
+    command: "cmake --configure"
+  - file: test_package/test_libheif_rav1e.c
+    description: >-
+      15 项显式检查：宿主版本指纹（1.23.0）、heif_init、LIBHEIF_PLUGIN_PATH 来自本包
+      runenv_info、交付的 libheif-rav1e.so 文件存在且非空、
+      heif_have_encoder_for_format(AV1)==1（证明插件被宿主装载并注册）、
+      编码器归属（heif_encoder_get_name() 含 'rav1e'）、AV1 解码器与 HEVC 编码器反证、
+      图像/上下文/编码器构造生命周期、**真实 AV1 编码一次并断言输出 AVIF 非空**
+      （进入 rav1e 编码器）、heif_deinit 生命周期闭合
+    command: "./test_libheif_rav1e"
+
+# 鸿蒙特有测试 (HarmonyOS-specific)
+harmonyos_specific_tests:
+  - file: test_package/conanfile.py
+    description: >-
+      插件模块经 OHOS 运行时 dlopen 验证（LIBHEIF_PLUGIN_PATH + LD_LIBRARY_PATH 由
+      VirtualRunEnv 提供）；包内 ELF 由 binary-sign-tool 自签（OHOS 拒绝未签名 ELF /
+      安装就地改写会让签名失效）；内树 rav1e 以 OHOS clang 交叉编译（NEON 汇编）。
+    command: "conan create + conan test（自动执行）"
+    assertion_count: 15
+
+# 依赖测试 (dependency functional test)
+# 无运行时 conan 依赖（插件静态链入 librav1e.a；工具链 rust-toolchain/openssl/cbindgen
+# 均为 build 工具，不进入产物链接）
+
+# 测试断言总数（近似值，质量评估用）
+# 消费者 roundtrip 15 + 上游 rav1e 实测 452
+assertion_count: 15

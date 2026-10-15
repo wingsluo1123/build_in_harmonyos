@@ -1,0 +1,27 @@
+software: libheif-rav1e
+display: "libheif rav1e AV1 encoder plugin"
+description: "rav1e (AV1) encoder backend plugin module for libheif, built in-tree from libheif's plugins/encoder_rav1e.cc as the upstream CMake target heif-rav1e; vendors the official rav1e 0.7.1 source (librav1e.a + rav1e.h) built with the OHOS Rust toolchain"
+category: gfx                      # foundation|build-tool|compress|crypto|db|network|system|doc|gfx|data
+homepage: "https://github.com/strukturag/libheif"
+license: LGPL-3.0-or-later
+build_system: cmake
+
+# 跨版本通用的 OHOS 适配知识
+ohos_adaptation:
+  key_points:
+    - "libheif 把编解码后端做成可独立装载的 MODULE 插件：树内目标 heif-<codec> → libheif-<codec>.so，装到 <libdir>/libheif/"
+    - "插件模块不能脱离宿主运行：必须同源同版本、ENABLE_PLUGIN_LOADING=ON 的共享宿主；仓库既有 libheif/1.22.2 是插件装载关闭的 codec-free 核心，装不了插件"
+    - "上游把默认插件目录编译期钉死（heif_version.h 的 LIBHEIF_PLUGIN_DIRECTORY = 构建时 <prefix>/lib/libheif），跨缓存/跨机不可移植 → 必须用 package_info().runenv_info 导出 LIBHEIF_PLUGIN_PATH（上游 plugins_unix.cc 读单数 PATH）"
+    - "上游 FindRAV1E.cmake 是 MODULE 模式（pkg-config + 无 HINTS 的 find_path/find_library），不认 CMakeDeps 的 config → 要用 cache 变量 RAV1E_INCLUDE_DIR/RAV1E_LIBRARY 直接钉住依赖路径"
+    - "rav1e 是 Rust 项目：用 tool_requires(rust-toolchain/1.97.1 + cbindgen/0.28.0 + openssl/3.5.6.1.1) 在包内树构建 librav1e.a + rav1e.h（自签 cargo/rustc 私有拷贝、openssl relink、rsproxy.cn 镜像），手法同 upstream 分支 archives/r/rust-rav1e/0.7.1"
+    - "把 Rust 静态库链进共享 MODULE 插件需 PIC（RUSTFLAGS -C relocation-model=pic）；OHOS sysroot 的 libpthread.a/libdl.a/libm.a 是空 stub，符号都在 libc.so，无需额外 -l"
+    - "OHOS 上 CMAKE_SYSTEM_NAME 必须显式置 Linux：否则宿主不带 SONAME、插件 DT_NEEDED 写进构建期路径，运行期 dlopen 失败；install 就地改写 RUNPATH 会破坏 ELF 签名 → dlopen EACCES，故 CMAKE_BUILD_WITH_INSTALL_RPATH=ON"
+    - "制品仓没有 rav1e/librav1e/rust-rav1e 包（W0 实测），故 rav1e 在包内树构建；同形态已合并先例：libheif-svtenc（内树 SVT-AV1）、libheif-aom（内树 libaom）、handbrake/1.11.2"
+  common_dependencies: []          # 无 Conan 运行时依赖（rav1e 内树构建并静态链入插件）
+
+# 版本索引（所有已归档版本，含状态）
+versions:
+  "1.23.0":
+    status: built                 # O5：仅 release upload 确认后才标 published
+    build_date: "2026-09-27"
+    conan_ref: "libheif-rav1e/1.23.0"
