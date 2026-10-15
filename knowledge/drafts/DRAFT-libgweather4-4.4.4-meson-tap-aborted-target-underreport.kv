@@ -1,0 +1,79 @@
+#====================================================================
+# Draft: libgweather 4.4.4 on OHOS aarch64 -- meson/TAP alone reports
+#        100% for a run meson itself judged Fail (aborted target emits
+#        no `not ok` line)
+#====================================================================
+
+id:                     DRAFT-LIBGWEATHER4-444-MESON-TAP-ABORT-UNDERREPORT
+trigger_tool:           conan|meson
+phase:                  runtime
+error_signature:        killed by signal 6 SIGABRT|Summary of Failures|Ok:\s+[0-9]+|Fail:\s+[0-9]+|testlog\.txt|not ok|g_test_add_func|attributed upstream target failure
+
+severity:               1
+category:               ohos-platform|testing
+match_keywords:         meson test, TAP, testlog.txt, Summary of Failures, SIGABRT, abort, g_test, g_assert, upstream tests, R51, pass rate, attribution, conan build(), libgweather, g_test_add_func, exit status 1
+
+title:                  只读 meson 的 TAP testlog 统计上游用例，会把「被 SIGABRT 中止的 target」报成 100% 通过——中止的用例根本不写 `not ok`；必须与 meson stdout 的 Ok/Fail/Summary of Failures 对账，再用注册点数核算缺口
+
+root_cause: >-
+  TAP 行由**测试程序自己**打印。g_test 里的 `g_assert_*` 失败时 GLib 直接
+  `abort()`（SIGABRT, exit 134），进程当场消失：已经跑过的用例留下了
+  `ok N - /weather/...`，**还没轮到的用例一行都不会写**，包括那个真正失败的
+  （GLib 在断言处 abort，来不及打 `not ok`）。于是 `meson-logs/testlog.txt`
+  里只有 `ok` 没有 `not ok`。
+
+  而 meson 自己的汇总看的是**子进程退出状态**：target 被信号杀死 → 该 target
+  计入 `Fail`，控制台打印 `Summary of Failures:` 与 `Ok: / Fail:`，`meson test`
+  退出码非 0。这两套信息天然不一致：
+
+  实测（2026-10-08 22:44，设备 3QC0124C11000071，libgweather4 4.4.4）
+  - meson stdout：`1/5 libgweather:timezones ERROR 0.17s killed by signal 6 SIGABRT`
+    + `Ok: 4` / `Fail: 1`，退出码 1
+  - 同一次运行的 testlog.txt：只有 11 行 TAP（10 ok + 1 skip），**0 个 not ok**
+  - 只读 testlog 的配方打印：`upstream test summary: 10/10 executed cases passed,
+    0 failed` ← **把 meson 判 Fail 的一跑报成了全过**
+
+  即：只吃 testlog 的统计在「失败以中止形式出现」时必然少报；只吃退出码则没有
+  case 粒度，也没法归因。第三份证据来自**注册点**：上游
+  `grep -c g_test_add_func libgweather/tests/*.c` = 13，TAP 只报 11，
+  差的 2 个（`/weather/named-timezones-deserialized`、`/weather/timezones`）
+  正是被中止的 target 里没轮到执行的那两个。
+
+affected_scope: >-
+  所有用 meson 注册测试、且失败可能以「进程被信号杀死」形式出现的项目
+  （g_test/glib 的 g_assert、gtest 的断言、OOM-kill、段错误、平台断言不成立）；
+  所有在 conan `build()` 里跑上游测试并**要往 PR 描述/MANIFEST 写实测通过数**的
+  流程（本项目的 R51：声明数必须实数实测，少报即 FAIL）；
+  以及任何把「testlog.txt 里没有 not ok」当成「全过」的 CI 统计脚本。
+  与 `DRAFT-libgmobile-0.7.2-meson-not-installed-is-not-skipped-and-exit-code-is-not-coverage`
+  互补：那条讲「退出码 0 不代表跑了多少」，这条讲「testlog 没有 not ok 不代表没失败」——
+  两个方向都得对账。
+
+verification_cmd:       meson test -C builddir --print-errorlogs > builddir/meson-logs/stdout.txt 2>&1; echo "exit=$?"; grep -E "^(Ok|Fail):" builddir/meson-logs/stdout.txt; grep -c "^not ok" builddir/meson-logs/testlog.txt; grep -rc g_test_add_func libgweather/tests/*.c
+
+rec_priority:           1
+rec_approach:           meson-stdout-verdict-plus-tap-case-level-plus-registration-gap
+rec_description: >-
+  (1) 捕获 meson 的 stdout：`meson test ... > <log> 2>&1; rc=$?; cat <log>; exit $rc`
+      ——`Ok:`/`Fail:`/`Summary of Failures:` **只出现在控制台**，不写进 testlog，
+      不捕获就永远拿不到 target 级判据（conan 的 `self.run()` 走 shell，重定向可用，
+      跑完 `cat` 回来保证 CI 日志里仍能看到完整输出）。
+  (2) target 级以 stdout 汇总为唯一判据：解析 `Summary of Failures:` 得到失败 target 名，
+      解析 `Ok:`/`Fail:` 得到计数。**退出码非 0 但解析不到失败 target → 直接 raise**，
+      不允许「拿不到判据就算过」。
+  (3) case 级用 TAP testlog（行首 `ok|not ok <n> [-] <name>`，注意 TAP 允许可选的 `- `）。
+  (4) 用上游注册点（`g_test_add_func` 出现的用例路径）减去 TAP 已报用例 = 「被中止、
+      没进 TAP」的用例，**逐条点名写进日志**，不要让它们从统计里消失。
+  (5) 归因表（平台数据/网络缺口）按 **target 名 + 日志签名**双重校验：签名不在日志里
+      就当移植缺陷抛错，避免归因表把真回归一起放行；归因命中时用
+      `self.output.warning` 把 cause 原文打进构建日志，供审查复核（§8.6 / R51）。
+  (6) 对外口径同时给两个层级（meson target 级 + case 级）和「注册 13 / TAP 11 / 未上报 2」，
+      声明的通过率永远等于实测，不写 100% 也不写「未运行」。
+
+rec_command:            meson test -C "$BF" --print-errorlogs --no-suite=style --timeout-multiplier 4 > "$BF/meson-logs/upstream_test_stdout.txt" 2>&1; rc=$?; cat "$BF/meson-logs/upstream_test_stdout.txt"; exit $rc
+rec_auto_fix:           false
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+# PR 交付后回填（与仓内绝大多数草稿同阶段做法一致）
+source_pr:
+source_commit:

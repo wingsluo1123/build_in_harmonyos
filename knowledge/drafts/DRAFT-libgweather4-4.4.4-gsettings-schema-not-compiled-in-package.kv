@@ -1,0 +1,77 @@
+#====================================================================
+# Draft: libgweather 4.4.4 on OHOS aarch64 -- meson's
+#        glib_compile_schemas: true never produces gschemas.compiled
+#        for a packaged artifact; consumer dies with SIGTRAP on first
+#        GSettings use
+#====================================================================
+
+id:                     DRAFT-LIBGWEATHER4-444-GSETTINGS-SCHEMA-NOT-COMPILED-IN-PACKAGE
+trigger_tool:           conan|meson
+phase:                  runtime
+error_signature:        GLib-GIO-FATAL-ERROR: No GSettings schemas are installed on the system|gschemas\.compiled|glib_compile_schemas|SIGTRAP|abort\(\)|org\.gnome\.[A-Za-z0-9]+\.gschema\.xml
+
+severity:               2
+category:               ohos-platform|packaging
+match_keywords:         gschemas.compiled, glib_compile_schemas, GSettings, GLib-GIO-FATAL-ERROR, SIGTRAP, schema, meson, install_data, conan package(), GNOME, consumer test, glib-compile-schemas, org.gnome.GWeather4
+
+title:                  meson 的 `glib_compile_schemas: true` 只在源码树内生效，打包场景**永远不会**产出 `gschemas.compiled`——消费者首次触发 GSettings 即 `GLib-GIO-FATAL-ERROR` + SIGTRAP；必须在 package() 阶段用 glib 包自带的 `glib-compile-schemas` 补编译并校验产物
+
+root_cause: >-
+  meson 的 `glib_compile_schemas: true` 是**源码树内**的便利开关：它在构建目录里
+  调 `glib-compile-schemas` 生成 `gschemas.compiled`，供同一次构建里的测试/程序
+  通过 `GSETTINGS_SCHEMA_DIR` 指向构建目录使用。
+
+  发布 tarball 的内容只有**源**：`org.gnome.GWeather4.gschema.xml` 与
+  `org.gnome.GWeather4.enums.xml`。上游用 `install_data()` 把它们装进
+  `${datadir}/glib-2.0/schemas/`，`meson.install()` 复制的也只是这两个源文件；
+  **没有任何一步对「安装目录」执行 `glib-compile-schemas`**（meson 不会跨目录
+  追着装）。于是包里 `schemas/` 目录只有 `.gschema.xml`，没有 `gschemas.compiled`。
+
+  GSettings 只认编译产物：`g_settings_new()` / 读取 schema id 的那一刻
+  `gsettings-backend` 初始化失败 →
+  `GLib-GIO-FATAL-ERROR: No GSettings schemas are installed on the system`
+  → `g_error()` → `abort()` → **SIGTRAP/SIGABRT，进程直接死**。
+
+  为什么容易漏：在**源码树内**跑 `meson test` 时一切正常（schema 在构建目录、
+  已编译），只有「从 conan/系统前缀等**包管理形态**消费安装后产物」才复现——
+  而这正是 test_package / 下游应用的真实形态。消费者测试第一次调到库内设置
+  路径就崩，症状与库本身无关，极易误判成「库坏了」或「平台缺 GSettings」。
+
+  实测（libgweather4 4.4.4，设备 3QC0124C11000071）：修之前消费侧首帧
+  `GLib-GIO-FATAL-ERROR: No GSettings schemas are installed`（SIGTRAP）；
+  补编译后同一条路径 `# failures: 0`。
+
+affected_scope: >-
+  任何「源码树里用了 GSettings、又要以包形态交付」的 GNOME/GLib 库
+  （conan/macports/distro 打包、SDK sysroot 里带 schema 的库）；
+  以及所有 test_package 形态的消费者测试——只要被测库或其依赖链里有
+  `g_settings_*` 调用就可能命中。
+  不适用于：源码树内 `meson test`（已由 meson 编译到构建目录），
+  也不适用于发行版打包脚本自己补跑 `glib-compile-schemas` 的场景。
+
+verification_cmd:       find <package>/share/glib-2.0/schemas -name '*.gschema.xml' | head; test -f <package>/share/glib-2.0/schemas/gschemas.compiled && echo SCHEMA_COMPILED_OK || echo SCHEMA_MISSING; glib-compile-schemas <package>/share/glib-2.0/schemas && test -f <package>/share/glib-2.0/schemas/gschemas.compiled && echo OK
+
+rec_priority:           2
+rec_approach:           compile-schemas-in-package-phase-and-fail-if-missing
+rec_description: >-
+  (1) `package()`（或 `package_info()` 之前的最后一步）里定位包内
+      `<pkgdatadir|share>/glib-2.0/schemas/`，若存在 `*.gschema.xml` 则显式调
+      `glib-compile-schemas <该目录>`；工具来自 glib 包自带（本配方
+      `_inject_glib_tools()` 已把 glib 包的 bin 目录加进 PATH），不依赖目标机是否安装。
+  (2) **编译后校验产物存在**：`gschemas.compiled` 缺失就 `raise ConanException`，
+      不要只打印 warning——缺它的包是坏包，会在消费者侧以 SIGTRAP 形式炸。
+  (3) 复核 `package()` 里对 schema 目录的拷贝顺序：必须**先拷源 xml、后编译**，
+      顺序反了等于白编。
+  (4) 消费者测试里加一条真实触发 GSettings 的断言（创建一个使用 schema 的对象
+      并走到库内设置读取），把「SIGTRAP at runtime」变成 CI 上的确定性红灯；
+      注意断言要在**安装后的包**上跑，源码树内跑不出来。
+  (5) 归档时在 notes 写明「meson glib_compile_schemas ≠ 安装产物已编译」这一根因，
+      避免后人再去翻 meson 文档。
+
+rec_command:            glib-compile-schemas "$PKG/share/glib-2.0/schemas" && test -f "$PKG/share/glib-2.0/schemas/gschemas.compiled"
+rec_auto_fix:           true
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+# PR 交付后回填（与仓内绝大多数草稿同阶段做法一致）
+source_pr:
+source_commit:
