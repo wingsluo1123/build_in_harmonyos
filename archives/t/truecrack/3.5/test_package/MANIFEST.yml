@@ -1,0 +1,54 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: truecrack/3.5
+homepage: http://code.google.com/p/truecrack
+
+# 上游测试在 conanfile.py build() 内联执行（见 _run_upstream_tests）：
+# 对 test/ 目录下 6 个官方示例卷执行字典攻击，恢复出 README 记载的密码
+# （标准卷 password "test"，隐藏卷 hidden 区 password "hidden"）。
+upstream_test_in_build: true
+upstream_test_command: "src/truecrack -t <test/xx.tc> -w test/passwords.txt [-k whirlpool|sha512] [-e serpent|twofish] [-H]"
+
+# 上游注册测试总数：test/ 目录随源码包发布的 6 个示例卷
+# （test/README 第 2/3/5 节），每个卷对应一次字典攻击用例。
+# 口径：conanfile.py 中 _UPSTREAM_CASES 显式枚举的用例数（python_def）。
+upstream_test_total: 6
+upstream_test_count_method: "python_def"
+upstream_tests_exist: true
+upstream_tests:
+  - file: test/ripemd160_aes.test.tc
+    source: truecrack_v35/test/ripemd160_aes.test.tc
+    description: "PKCS5 hmac-ripemd160 + AES-XTS 标准卷字典攻击，password=test"
+    command: "src/truecrack -t test/ripemd160_aes.test.tc -w test/passwords.txt"
+  - file: test/whirlpool_aes.test.tc
+    source: truecrack_v35/test/whirlpool_aes.test.tc
+    description: "PKCS5 hmac-whirlpool + AES-XTS 标准卷字典攻击，password=test"
+    command: "src/truecrack -t test/whirlpool_aes.test.tc -w test/passwords.txt -k whirlpool"
+  - file: test/sha512_aes.test.tc
+    source: truecrack_v35/test/sha512_aes.test.tc
+    description: "PKCS5 hmac-sha512 + AES-XTS 标准卷字典攻击，password=test"
+    command: "src/truecrack -t test/sha512_aes.test.tc -w test/passwords.txt -k sha512"
+  - file: test/ripemd160_serpent.test.tc
+    source: truecrack_v35/test/ripemd160_serpent.test.tc
+    description: "PKCS5 hmac-ripemd160 + SERPENT-XTS 标准卷字典攻击，password=test"
+    command: "src/truecrack -t test/ripemd160_serpent.test.tc -w test/passwords.txt -e serpent"
+  - file: test/ripemd160_twofish.test.tc
+    source: truecrack_v35/test/ripemd160_twofish.test.tc
+    description: "PKCS5 hmac-ripemd160 + TWOFISH-XTS 标准卷字典攻击，password=test"
+    command: "src/truecrack -t test/ripemd160_twofish.test.tc -w test/passwords.txt -e twofish"
+  - file: test/hidden_ripemd160_aes.test.hidden.tc
+    source: truecrack_v35/test/hidden_ripemd160_aes.test.hidden.tc
+    description: "隐藏卷字典攻击，隐藏区 password=hidden"
+    command: "src/truecrack -t test/hidden_ripemd160_aes.test.hidden.tc -w test/passwords.txt -H"
+
+# test_package 自带冒烟测试（消费者视角验证）
+test_package_tests:
+  - file: test_package/test.sh
+    description: "truecrack -h 打印用法并正常退出（CLI 冒烟）"
+    command: "truecrack -h"
+
+test_package_test_count: 1
+assertion_count: 1

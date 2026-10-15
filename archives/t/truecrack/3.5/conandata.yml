@@ -1,0 +1,18 @@
+# conandata.yml — truecrack 3.5
+# 官方源: Google Code Archive (code.google.com/p/truecrack)
+# 该归档由官方 Google Code 导出，sha256 为源码包真实校验值。
+
+sources:
+  url: "https://storage.googleapis.com/google-code-archive-downloads/v2/code.google.com/truecrack/truecrack_v35.tar.gz"
+  sha256: "25bf270fa3bc3591c3d795e5a4b0842f6581f76c0b5d17c0aef260246fe726b3"
+
+patches:
+  - patch_file: "patches/0001-fix-common-symbols.patch"
+    patch_description: "CPU 构建模式：修复 2011 年老代码依赖 GCC/Clang 10 之前的 -fcommon 默认行为导致的全局符号 multiple-definition 链接错误（CpuAes.h EXTERN、Core.h 全局变量改为 extern 声明并单处定义）"
+    patch_type: "portability"
+  - patch_file: "patches/0002-fix-utils-return.patch"
+    patch_description: "修复 Main/Utils.c file_readHeader() 打开卷失败时对非 void 函数使用空 `return ;` 导致现代 clang -Wreturn-type 编译错误：改为 `return -1;`（调用方 Core.c 未检查返回值，语义不变）"
+    patch_type: "portability"
+  - patch_file: "patches/0003-fix-cpucore-return.patch"
+    patch_description: "修复 Common/CpuCore.c cpu_Core_charset()（int 返回）在 KDF 不支持分支对非 void 函数使用空 `return;` 导致现代 clang -Wreturn-type 编译错误：改为 `return 0;`（失败语义，与函数末尾 return 0 一致；void 的 cpu_Core_dictionary 分支不受影响）"
+    patch_type: "portability"
