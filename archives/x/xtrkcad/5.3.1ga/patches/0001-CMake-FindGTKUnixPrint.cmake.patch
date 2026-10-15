@@ -1,0 +1,58 @@
+--- a/CMake/FindGTKUnixPrint.cmake
++++ b/CMake/FindGTKUnixPrint.cmake
+@@ -26,20 +26,55 @@
+ # PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+ # OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ # WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+ # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+ find_package(PkgConfig)
+ pkg_check_modules(GTK_UNIX_PRINT gtk+-unix-print-2.0)
+ set(VERSION_OK TRUE)
+ 
++if (NOT GTK_UNIX_PRINT_INCLUDE_DIRS)
++	# Some packagings ship the unix-print headers inside the GTK tree without a
++	# gtk+-unix-print-2.0.pc file.  In that case look for the header next to the
++	# GTK ones and reuse GTK's own libraries, which hold the printing API too.
++	find_path(GTK_UNIX_PRINT_INCLUDE_DIR
++		NAMES gtk/gtkunixprint.h
++		PATHS ${GTK_INCLUDE_DIRS}
++		PATH_SUFFIXES gtk-unix-print-2.0)
++	if (GTK_UNIX_PRINT_INCLUDE_DIR)
++		set(GTK_UNIX_PRINT_INCLUDE_DIRS ${GTK_UNIX_PRINT_INCLUDE_DIR})
++		set(GTK_UNIX_PRINT_LIBRARIES ${GTK_LIBRARIES})
++	endif ()
++endif ()
++
++set(GTK_UNIX_PRINT_HEADER_FOUND FALSE)
++foreach (_gtku_dir ${GTK_UNIX_PRINT_INCLUDE_DIRS})
++	if (EXISTS "${_gtku_dir}/gtk/gtkunixprint.h")
++		set(GTK_UNIX_PRINT_HEADER_FOUND TRUE)
++	endif ()
++endforeach ()
++
++if (NOT GTK_UNIX_PRINT_HEADER_FOUND)
++	# pkg-config can also report a directory that is not there, for instance a
++	# prefix recorded in a .pc file that was never relocated.  Locate the header
++	# itself in that case and reuse GTK's include directories and libraries.
++	find_path(GTK_UNIX_PRINT_INCLUDE_DIR
++		NAMES gtk/gtkunixprint.h
++		PATHS ${GTK_INCLUDE_DIRS} ${CMAKE_INCLUDE_PATH}
++		PATH_SUFFIXES gtk-unix-print-2.0)
++	if (GTK_UNIX_PRINT_INCLUDE_DIR)
++		set(GTK_UNIX_PRINT_INCLUDE_DIRS ${GTK_UNIX_PRINT_INCLUDE_DIR})
++		set(GTK_UNIX_PRINT_LIBRARIES ${GTK_LIBRARIES})
++	endif ()
++endif ()
++
+ if (GTK_UNIX_PRINT_VERSION)
+ 	if (GTK_UNIX_PRINT_FIND_VERSION_EXACT)
+ 		if (NOT("${GTK_UNIX_PRINT_FIND_VERSION}" VERSION_EQUAL "${GTK_UNIX_PRINT_VERSION}"))
+ 			set(VERSION_OK FALSE)
+ 		endif ()
+ 	else ()
+ 		if ("${GTK_UNIX_PRINT_VERSION}" VERSION_LESS "${GTK_UNIX_PRINT_FIND_VERSION}")
+ 			set(VERSION_OK FALSE)
+ 	endif ()
+ 	endif ()

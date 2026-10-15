@@ -1,0 +1,26 @@
+software: xtrkcad
+display: "XTrackCAD model railroad layout CAD"
+description: "XTrackCAD is a CAD program for designing model railroad layouts (GTK2 GUI, C)"
+category: graphics
+homepage: "https://xtrkcad-fork.sourceforge.net/"
+license: GPL-2.0-or-later
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "The project selects its POSIX code paths through the CMake UNIX variable; HarmonyOS is not a system CMake knows, so UNIX is false and the non POSIX branches are configured (configure failed on a missing Libzip::Libzip target). The platform patch marks the system Unix-like instead of relabelling CMAKE_SYSTEM_NAME"
+    - "Toolbar bitmaps are rasterised with Inkscape upstream, which does not exist on OpenHarmony. A small librsvg based rasteriser (svg2png, built by the recipe and shipped in bin/) takes its place and answers the same command line"
+    - "app/bin/bitmaps/CMakeLists.txt is stored with CRLF line endings upstream, which the patch pipeline cannot patch; the adapted copy is carried in ohos/bitmaps/ and copied over the sources while building"
+    - "The unit tests are the upstream ctest/cmocka ones: 5 tests, 26 cases, all passing on aarch64"
+    - "The package is an application; the newly built rasteriser is executed by the package test on a small SVG and its PNG output is verified"
+  common_dependencies:
+    - gtk2
+    - libzip
+    - librsvg
+
+versions:
+  "5.3.1ga":
+    status: built
+    build_date: "2026-10-01"
+    conan_ref: "xtrkcad/5.3.1ga"
+    note: "GTK2 desktop CAD application; GUI runtime needs an X server, so verification is at compile/link level plus the upstream ctest suite (5/5, 26 cmocka cases) and a consumer test of the packaged library"

@@ -1,0 +1,105 @@
+# 版本级 manifest
+# 文件位置: archives/x/xtrkcad/5.3.1ga/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "5.3.1ga"
+software: "xtrkcad"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+build_date: "2026-10-01"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://downloads.sourceforge.net/project/xtrkcad-fork/XTrackCad/Version%205.3.1/xtrkcad-source-5.3.1GA.tar.gz"
+  sha256: "5b02a0352c23f90b0011029c7e2c3f12a6f6779425c4c47c1f75d6b8a0db572c"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+
+  # 无任何平台伪装标志：UNIX 判定由源码补丁修正（见 patches/0003）
+  configure_options: []
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - gtk2/2.24.33
+    - libzip/1.11.4
+    - librsvg/2.62.3.1.1        # 构建期位图生成，替代 inkscape
+    - cmocka/2.0.2              # test_requires：上游单测框架
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-CMake-FindGTKUnixPrint.cmake.patch"
+  - "0002-CMake-FindInkscape.cmake.patch"
+  - "0003-CMakeLists.txt.patch"
+  - "0004-app-bin-unittest-CMakeLists.txt.patch"
+  - "0005-app-bin-unittest-defaultstest.c.patch"
+  - "0006-app-wlib-gtklib-CMakeLists.txt.patch"
+  # 另有 ohos/bitmaps/（CRLF 源文件无法用 LF 补丁交付，见 knowledge_gained）
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "OHOS/HarmonyOS 不是 CMake 已知系统名，UNIX 变量为假会导致工程走非 POSIX 分支；应在源码补丁里按 Unix 类平台处理（set(UNIX 1)），禁止伪装 CMAKE_SYSTEM_NAME（会把平台模块载错，见 E092）"
+  - "工程缺少 inkscape 时，可用制品仓的 librsvg 静态库自建一个接受同一命令行形态（INPUT.svg -h N -o OUT.png）的 SVG 光栅化小工具顶上，使位图头文件仍可在构建期生成"
+  - "Conan CMakeDeps 生成小写导入目标（libzip::libzip / cmocka::cmocka），工程自带 Find 模块定义大写变量，需在顶层 CMakeLists 做双向桥接"
+  - "补丁管线按文本模式读源码会剥掉 CR，CRLF 源文件（app/bin/bitmaps/CMakeLists.txt）无法套用 LF 补丁（dry-run Hunk FAILED）；改为 exports_sources 携带整文件覆盖交付"
+  - "conan 包里没有 .pc wrapper 时，工程的 Find 模块应改为按头文件实际存在性判定（能力探针），不要依赖 pkg-config 缓存前缀"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/xtrkcad-5.3.1ga.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/xtrkcad-5.3.1ga.work
+  source_orig_hash: b6dd7618a4d24cb9
+  source_work_hash: 802169189db35e9e
+  generated_at: '2026-10-01T22:22:48'
+  patches_count: 6
+
+patch_classification:
+  - file: 0001-CMake-FindGTKUnixPrint.cmake.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-CMake-FindInkscape.cmake.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-app-bin-unittest-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0005-app-bin-unittest-defaultstest.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0006-app-wlib-gtklib-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
