@@ -1,0 +1,82 @@
+# 版本级 manifest — libcopp 2.2.0
+
+# 版本号
+version: "2.2.0"
+
+# 软件名
+software: "libcopp"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-15"
+build_system: cmake
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 主源：上游 tag 归档（GitHub codeload）
+  url: "https://codeload.github.com/owent/libcopp/tar.gz/refs/tags/v2.2.0"
+
+  # 源码校验和
+  sha256: "4f7831a88e28ca865fb9f00282c759bc1dddadd180736021ee014bee6d2aaecc"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+  # ★ 子模块（tag 归档里是空目录；该 tag 无 release 资产）
+  #   .gitmodules 把 atframework/cmake-toolset 钉在 commit c911fe34
+  submodule:
+    path: "atframework/cmake-toolset"
+    url: "https://codeload.github.com/atframework/cmake-toolset/tar.gz/c911fe34b494dcb3200408803f25787772e5d8c6"
+    sha256: "ede39873db506c6348b94207736d8a34a7ada7143b85b5ce30def19ac1f3ea37"
+    commit: "c911fe34b494dcb3200408803f25787772e5d8c6"
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表（经 conanfile.py CMakeToolchain 注入）
+  configure_options:
+    - "-DLIBCOPP_FCONTEXT_OS_PLATFORM=arm64"
+    - "-DPROJECT_ENABLE_UNITTEST=ON"
+    - "-DBUILD_TESTING=ON"
+    - "-DPROJECT_ENABLE_SAMPLE=OFF"
+
+  # 编译依赖列表（格式: name/version）
+  # ★ 无外部测试依赖：上游 test/ 用自带 test_manager；其 find_package(GTest)
+  #   是非 REQUIRED 的可选门，且代码检查的宏 UTILS_TEST_MACRO_TEST_ENABLE_GTEST
+  #   从未被赋值 ⇒ gtest 分支是死代码（W4 审计实证：link.txt 无 gtest、nm 计 0）。
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 本版本零源码补丁：唯一必要改动是 CMake 变量（-DLIBCOPP_FCONTEXT_OS_PLATFORM=arm64），
+# 属配置期注入，不改上游任何一行源码。
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "HarmonyOS 上 CMake 把处理器识别为 unknown（CMAKE_HOST_SYSTEM_PROCESSOR=unknown / CMAKE_SYSTEM_NAME=HarmonyOS），libcopp 的 fcontext.detect.cmake 用 MATCHES \"unknown|i386|i686|x86_64|amd64\" 分支按 CMAKE_SIZEOF_VOID_P=8 把 unknown 硬回退成 x86_64 ⇒ aarch64 设备去编 x86_64 上下文切换汇编，首错 jump_x86_64_sysv_elf_gas.S:138: error: invalid operand / jmp *%r8；修法=显式 -DLIBCOPP_FCONTEXT_OS_PLATFORM=arm64（探测输出随即恢复 arm64/aapcs/elf/gas）"
+  - "上游 tag 归档不含 git submodule：atframework/cmake-toolset 在 tarball 里是空目录，且 v2.2.0 该 tag 无 release 资产 ⇒ 必须按 .gitmodules 钉住的 commit c911fe34 单独取一份铺进原路径，否则 CMake configure 阶段报 include could not find requested file: IncludeDirectoryRecurse / EchoWithColor"
+  - "package_info 必须同时报 copp 与 cotask 两个静态库（上游 install 交付 libcopp.a 与 libcotask.a，cotask 依赖 copp 故顺序在前）；只报 copp 时消费者链接 undefined symbol: cotask::v2002::this_task::get_task()（W4 审计 P1 实链对照）"
+  - "上游 install 会带自己的 libcopp-config.cmake（内含 include libcopp-targets.cmake，conan 不生成该文件）⇒ package() 里 rmdir 掉 lib/cmake 与 share，让 CMakeDeps 生成的 config 成为唯一权威，否则消费者 find_package(libcopp) 会命中上游那份并报缺 libcopp-targets.cmake"
