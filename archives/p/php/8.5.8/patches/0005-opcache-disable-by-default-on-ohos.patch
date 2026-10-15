@@ -1,0 +1,17 @@
+--- a/ext/opcache/zend_accelerator_module.c
++++ b/ext/opcache/zend_accelerator_module.c
+@@ -283,7 +283,13 @@ static ZEND_INI_MH(OnUpdateMaxTraceLength)
+ #endif
+
+ ZEND_INI_BEGIN()
+-	STD_PHP_INI_BOOLEAN("opcache.enable"             , "1", PHP_INI_ALL,    OnEnable,     enabled                             , zend_accel_globals, accel_globals)
++	/* OHOS: default disabled. OHOS does not implement POSIX fcntl record locks
++	 * on memfd inodes (F_SETLKW fails with EACCES), and opcache lock creation
++	 * goes memfd_create-first on Linux-family targets. With the upstream
++	 * default (1) every non-CLI SAPI (cgi, fpm) aborts at startup with
++	 * "Cannot create lock - Permission denied". Users can still enable
++	 * opcache explicitly once the kernel gains memfd lock support. */
++	STD_PHP_INI_BOOLEAN("opcache.enable"             , "0", PHP_INI_ALL,    OnEnable,     enabled                             , zend_accel_globals, accel_globals)
+ 	STD_PHP_INI_BOOLEAN("opcache.use_cwd"            , "1", PHP_INI_SYSTEM, OnUpdateBool, accel_directives.use_cwd            , zend_accel_globals, accel_globals)
+ 	STD_PHP_INI_BOOLEAN("opcache.validate_timestamps", "1", PHP_INI_ALL   , OnUpdateBool, accel_directives.validate_timestamps, zend_accel_globals, accel_globals)
+ 	STD_PHP_INI_BOOLEAN("opcache.validate_permission", "0", PHP_INI_SYSTEM, OnUpdateBool, accel_directives.validate_permission, zend_accel_globals, accel_globals)

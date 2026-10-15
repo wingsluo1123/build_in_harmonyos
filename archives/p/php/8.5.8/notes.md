@@ -103,3 +103,31 @@ Test: preg_match("/\d+/", "abc123") → int(1)
 
 **编译结束**: 2026-07-21 22:46
 **最终状态**: built
+
+## OPcache 默认值修复（2026-10-15 深度验证发现）
+
+### 根因
+
+OHOS 内核未实现 memfd inode 上的 POSIX 记录锁：`fcntl(F_SETLKW)` 对
+`memfd_create()` 返回的 fd 报 `EACCES (13)`。opcache 的锁初始化在
+Linux 系目标上优先走 `memfd_create` 路径（见 ext/opcache/zend_shared_alloc.c
+`zend_shared_alloc_create_lock()`），因此：
+
+- CLI SAPI：`opcache.enable_cli` 默认 0，不受影响；
+- CGI/FPM 等非 CLI SAPI：`opcache.enable` 默认 1 → 启动即
+  `Cannot create lock - Permission denied (13)` 崩溃（php-cgi 开箱即坏）。
+
+上游测试侧证：run-tests.php 中 14 个 Zend 测试与 59 个 tests/basic CGI
+测试因该锁失败；将 enable 置 0 后 CGI 侧全部转绿。
+
+### 修复（0005-opcache-disable-by-default-on-ohos.patch）
+
+`zend_accelerator_module.c` 中 `opcache.enable` 默认值 "1"→"0"。
+CLI/CGI/php -S 内置服务器开箱可用；用户显式 `-d opcache.enable=1`
+仍可尝试（待内核支持 memfd 锁后自动解禁）。
+
+### 发行制品侧的等价修复
+
+ophcd distro 的 php-8.5.8 制品在打包阶段对 php/php-cgi 二进制做了
+等价 patch：将 ini entry 的 default_value 指针重定向到已有的 "0"
+字符串（8 字节等长替换，重签），与源码补丁效果一致。
