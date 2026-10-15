@@ -1,0 +1,25 @@
+# conandata.yml — ming (libming) 0.4.8.r68.g04aee523
+#
+# 版本号是 git describe 形态：上游 tag `ming-0_4_8` + 68 个提交 + g<sha>。
+# 已用 GitHub compare API 核对 `compare/ming-0_4_8...04aee5236` 的
+# total_commits == 68，与版本号逐位吻合；源码即提交
+# 04aee52363688426eab74f5d6180c149654a6473（2020-07-23）的官方归档。
+#
+# codeload.github.com 是 GitHub 官方归档主机（github.com/<owner>/<repo>/archive/<ref>
+# 的 301 目标），不是第三方镜像；R39 要求的官方源口径满足。
+# 实测：github.com/.../archive/<sha>.tar.gz 在本机不可达（HTTP 000），
+# codeload.github.com/.../tar.gz/<sha> 可达（HTTP 200），故直接使用后者。
+sources:
+  url: "https://codeload.github.com/libming/libming/tar.gz/04aee52363688426eab74f5d6180c149654a6473"
+  # URL 以提交哈希结尾、不带扩展名，Conan get() 无法推断归档格式（会当作 zip
+  # 解压并报 BadZipFile），必须显式给 filename（同 abbtr/1.0.4 先例）。
+  filename: "ming-04aee52363688426eab74f5d6180c149654a6473.tar.gz"
+  sha256: "a5cae95316889f12b3f8c1bc61c284e6028f1b714d2a5c55c484f2ddb5d54f2c"
+
+patches:
+  - patch_file: "patches/0001-util-main.c.patch"
+    patch_description: "util/main.c 的 cws2fws() 把临时文件路径硬编码为 /tmp/swftoscriptXXXXXX，而 HarmonyOS 的 /tmp 是只读文件系统（mkstemp 报 Errno 30），导致 listswf/swftophp/swftocxx 等工具处理【压缩 SWF（CWS）】时直接失败并输出 Couldn't create tempfile；改为优先取 TMPDIR、缺省回退 /tmp（对其它平台透明）"
+    patch_type: "portability"
+  - patch_file: "patches/0002-util-makeswf_utils.c.patch"
+    patch_description: "OHOS 设备不提供 cpp 可执行文件，导致 ActionScript 用例报 \"sh: cpp: inaccessible or not found\"；把 util/makeswf_utils.c 中硬编码的预处理器命令由 `cpp -xc++ -P -Wall` 改为 `clang -E -xc++ -P -Wall`（本平台编译器自带预处理器，参数语义一致）"
+    patch_type: "portability"
