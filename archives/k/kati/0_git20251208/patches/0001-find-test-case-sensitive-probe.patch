@@ -1,0 +1,37 @@
+diff --git a/src/find_test.cc b/src/find_test.cc
+--- a/src/find_test.cc
++++ b/src/find_test.cc
+@@ -17,6 +17,7 @@
+ #include "find.h"
+ 
+ #include <stdlib.h>
++#include <sys/stat.h>
+ #include <unistd.h>
+ 
+ #include <string>
+@@ -120,6 +121,25 @@
+ }
+ 
+ int FindUnitTests() {
++  // OHOS portability: the fixture below depends on the case distinction
++  // between top/a (file) and top/A (dir) in the same directory. On a
++  // case-insensitive filesystem the fixture cannot exist as intended and
++  // the native-vs-emulated comparison is meaningless. Probe once and skip
++  // with an explicit marker; on case-sensitive filesystems behaviour is
++  // unchanged (the probe dir is removed either way).
++  Run("rm -rf out/citest && mkdir -p out/citest/P");
++  Run("touch out/citest/p");
++  {
++    struct stat st;
++    if (stat("out/citest/p", &st) == 0 && S_ISDIR(st.st_mode)) {
++      fprintf(stderr, "SKIP: find_test fixture requires a case-sensitive "
++                      "filesystem (top/a vs top/A)\n");
++      Run("rm -rf out/citest");
++      return 0;
++    }
++  }
++  Run("rm -rf out/citest");
++
+   Run("rm -rf out/find");
+   Run("mkdir -p out/find");
+   if (chdir("out/find")) {
