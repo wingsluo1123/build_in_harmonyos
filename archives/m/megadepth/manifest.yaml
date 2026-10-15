@@ -1,0 +1,23 @@
+software: megadepth
+display: "megadepth"
+description: "从 BAM/CRAM 与 BigWig 文件计算覆盖度、AUC、剪接位点等汇总统计的命令行工具"
+category: bioinformatics
+homepage: "https://github.com/ChristopherWilks/megadepth"
+license: MIT
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "上游无规范名 CMakeLists.txt（只有 .ci/.static/.statlib/.windows 变体并用 ln -fs 取别名）；配方自带等价 CMakeLists.txt 并用 CMakeDeps 目标消费 Conan 依赖，不改上游源码"
+    - "依赖 htslib/1.24-r0 + libbigwig/0.4.9 + zlib/1.3.1；传递依赖 libdeflate/1.25 以共享库分发（其配方硬编码 BUILD_SHARED_LIB=ON），运行时需 conanrun 注入 LD_LIBRARY_PATH"
+    - "aarch64 无需架构补丁：AVX512/AVX2/SSE2 与 x86intrin.h 均由宏守卫，标量尾循环兜底"
+    - "上游 tests/test.sh 两处最小改动：未加 static 守卫的远程 HTTP 取数改为等价本地 fixture；CRAM 用例去掉 --alts 以走参考无关解码（htslib 无 libcurl，无法在线回取参考序列）"
+  common_dependencies:
+    - htslib
+    - libbigwig
+    - zlib
+
+versions:
+  "1.2.0":
+    status: built
+    build_date: "2026-10-13"

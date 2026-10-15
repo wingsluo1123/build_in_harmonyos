@@ -1,0 +1,30 @@
+# conandata.yml — megadepth 1.2.0 (HarmonyOS PC / OHOS aarch64)
+# 单一事实源：源码 URL + SHA256 + 补丁清单
+# conanfile.py 通过 self.conan_data["sources"] 与 apply_conandata_patches() 读取
+#
+# R39: 源码 URL 必须为官方正式源（GitHub release tag 归档），镜像 fallback 由 CI 注入。
+
+sources:
+  url: "https://github.com/ChristopherWilks/megadepth/archive/refs/tags/1.2.0.tar.gz"
+  sha256: "d6b7674c644952e48f3a0ab4a54c5285ada9b44374b6e580e215ad9c9a96eaec"
+
+patches:
+  # 上游 tests/test.sh 末段含一处未加 static 守卫的远程 HTTP 取数
+  # （http://stingray.cs.jhu.edu/data/temp/test.bam）；本平台 htslib/libbigwig
+  # 均以 --disable-libcurl / NOCURL 构建，远程 URL 不可用。
+  # 该补丁以完全等价的本地 fixture（tests/test_noprefix.bam + --add-chr-prefix human，
+  # 与 static 分支首个用例输入一致）替换该 URL，断言与期望文件保持不变。
+  - patch_file: "patches/0001-tests-remote-bam-to-local-fixture.patch"
+    patch_description: "tests/test.sh: 远程 HTTP test.bam 替换为等价的本地 fixture，使上游测试套件可离线完整运行"
+    patch_type: "portability"
+  # 上游 tests/test.sh 的 CRAM 用例带 --alts；megadepth 的 --alts 会向 htslib
+  # 请求 SAM_SEQ 全量解码，CRAM 全量解码必须能取到参考序列。上游 test.cram 的
+  # 参考是作者机器上的 /data7/hbb_megadepth/test.fa（仓库未附带任何 FASTA），
+  # 上游 CI 依赖 htslib 内置 curl 从 ENA 在线回取；本平台 htslib/1.24-r0 以
+  # --disable-libcurl 发布，无法在线回取。去掉 --alts 后 megadepth 走
+  # CRAM_OPT_REQUIRED_FIELDS（QNAME/FLAG/RNAME/POS/MAPQ/CIGAR/RNEXT/PNEXT）
+  # 参考无关解码路径，实读 96 条记录，且本用例的两条断言（coverage.tsv 逐行
+  # diff、window.tsv 求和 diff）与本补丁前完全一致（已实测）。
+  - patch_file: "patches/0002-tests-cram-reference-free-decode.patch"
+    patch_description: "tests/test.sh: CRAM 用例去掉 --alts，走 htslib 参考无关解码路径（断言与期望文件不变）"
+    patch_type: "portability"

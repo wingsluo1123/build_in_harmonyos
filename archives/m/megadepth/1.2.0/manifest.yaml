@@ -1,0 +1,79 @@
+# 版本级 manifest — archives/m/megadepth/1.2.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "1.2.0"
+
+software: "megadepth"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-13"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 官方正式源（GitHub release tag 归档），R39
+  url: "https://github.com/ChristopherWilks/megadepth/archive/refs/tags/1.2.0.tar.gz"
+  sha256: "d6b7674c644952e48f3a0ab4a54c5285ada9b44374b6e580e215ad9c9a96eaec"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+
+  # 配方自带的 CMakeLists.txt（上游只有 CMakeLists.txt.ci/.static/.statlib/.windows
+  # 四个变体，构建脚本以 ln -fs 取规范名）；用 CMakeDeps 目标消费 Conan 依赖。
+  configure_options: []
+
+  # 编译依赖（ohpcd 制品仓，均已发布）
+  dependencies:
+    - htslib/1.24-r0
+    - libbigwig/0.4.9
+    - zlib/1.3.1
+    # 传递依赖：libdeflate/1.25（htslib --with-libdeflate 引入）、xz/5.6.2
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-tests-remote-bam-to-local-fixture.patch"
+  - "0002-tests-cram-reference-free-decode.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "上游 CMake 构建文件名非规范（CMakeLists.txt.<variant> + ln -fs 取别名）会使构建系统探测落空，进而影响语言预检的判定优先级（manifest>构建系统>源码统计）(ref: E549-draft-411A)"
+  - "htslib 以 --disable-libcurl 发布时，CRAM 解码的远端参考序列回取不可用；megadepth 的 --alts 会强制 SAM_SEQ 全量解码从而必须取参考序列，去掉 --alts 走 CRAM_OPT_REQUIRED_FIELDS 可参考无关解码 (ref: E550-draft-4D8F)"
+  - "libdeflate/1.25 配方 build() 硬编码 -DLIBDEFLATE_BUILD_SHARED_LIB=ON，shared=False 不改变产物，无法得到静态 libdeflate；依赖它的产物必有 libdeflate.so.0 运行时依赖，需用 VirtualRunEnv/conanrun 注入 LD_LIBRARY_PATH (ref: E551-draft-123C)"
+
+# ============================================================
+# 上游测试（R51 三步法）
+# ============================================================
+
+upstream_test:
+  command: "bash tests/test.sh static"
+  in_build: true
+  invocations: 19
+  assertions: 30
+  result: "19/19 用例执行，30/30 断言通过"
+  inventory: "test_package/MANIFEST.yml"
+  log: "reports/conan-create.log（reports/ 被 .gitignore 忽略，仅本机留档）"
