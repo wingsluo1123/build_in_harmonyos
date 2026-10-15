@@ -1,0 +1,78 @@
+--- a/src/lib_tcp.c
++++ b/src/lib_tcp.c
+@@ -38,38 +38,42 @@
+ 		exit(2);
+ 	}
+ 	if (listen(sock, 100) < 0) {
+ 		perror("listen");
+ 		exit(4);
+ 	}
+ 	if (prog > 0) {
+ #ifdef	LIBTCP_VERBOSE
+ 		fprintf(stderr, "Server port %d\n", sockport(sock));
+ #endif
++#ifndef	NO_PORTMAPPER
+ 		(void)pmap_unset((u_long)prog, (u_long)1);
+ 		if (!pmap_set((u_long)prog, (u_long)1, (u_long)IPPROTO_TCP,
+ 		    (unsigned short)sockport(sock))) {
+ 			perror("pmap_set");
+ 			exit(5);
+ 		}
++#endif
+ 	}
+ 	return (sock);
+ }
+ 
+ /*
+  * Unadvertise the socket
+  */
+ int
+ tcp_done(int prog)
+ {
+ 	if (prog > 0) {
++#ifndef	NO_PORTMAPPER
+ 		pmap_unset((u_long)prog, (u_long)1);
++#endif
+ 	}
+ 	return (0);
+ }
+ 
+ /*
+  * Accept a connection and return it
+  */
+ int
+ tcp_accept(int sock, int rdwr)
+ {
+@@ -154,30 +158,32 @@
+ 					 */
+ 		save_prog = prog;
+ 		if (!(h = gethostbyname(host))) {
+ 			perror(host);
+ 			exit(2);
+ 		}
+ 		bzero((void *) &s, sizeof(s));
+ 		s.sin_family = AF_INET;
+ 		bcopy((void*)h->h_addr, (void *)&s.sin_addr, h->h_length);
+ 		if (prog > 0) {
++#ifndef	NO_PORTMAPPER
+ 			save_port = pmap_getport(&s, prog,
+ 			    (u_long)1, IPPROTO_TCP);
+ 			if (!save_port) {
+ 				perror("lib TCP: No port found");
+ 				exit(3);
+ 			}
+ #ifdef	LIBTCP_VERBOSE
+ 			fprintf(stderr, "Server port %d\n", save_port);
+ #endif
+ 			s.sin_port = htons(save_port);
++#endif
+ 		} else {
+ 			s.sin_port = htons(-prog);
+ 		}
+ 	}
+ 	if (connect(sock, (struct sockaddr*)&s, sizeof(s)) < 0) {
+ 		if (errno == ECONNRESET 
+ 		    || errno == ECONNREFUSED
+ 		    || errno == EAGAIN) {
+ 			close(sock);
+ 			if (++tries > 10) return(-1);

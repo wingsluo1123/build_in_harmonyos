@@ -1,0 +1,27 @@
+--- a/scripts/build
++++ b/scripts/build
+@@ -1,22 +1,22 @@
+ #!/bin/sh
+ 
+ CC=${CC-`../scripts/compiler`}
+ MAKE=${MAKE-`../scripts/make`}
+ OS=${OS-`../scripts/os`}
+ TARGET=${TARGET-`../scripts/target`}
+ BINDIR=../bin/"${OS}"
+ CONFIG=../bin/"${OS}"/`../scripts/config`
+ NULL=/dev/null
+ 
+-BASE=/tmp/dummy
+-for t in /usr/tmp /var/tmp /tmp; do
++BASE=${TMPDIR:-/tmp}/dummy
++for t in "${TMPDIR:-/tmp}" /usr/tmp /var/tmp /tmp; do
+ 	if [ -d $t -a -w $t ]
+ 	then	BASE=${t}/dummy
+ 		break
+ 	fi
+ done
+ 
+ trap 'rm -f ${BASE}$$.s ${BASE}$$.c ${BASE}$$.o ${BASE}$$; exit 1' 1 2 15
+ 
+ LDLIBS=-lm
+ 
