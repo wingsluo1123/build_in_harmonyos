@@ -1,0 +1,39 @@
+# 软件级 manifest — libxaw
+# 遵循 ARCHIVE-SPEC v3.0（软件级字段）
+#
+# 上游库名 libXaw（X.Org Athena Widgets）。目录/包名按仓内主流小写约定取 libxaw。
+
+software: libxaw
+display: "libXaw"
+description: "X.Org Athena Widgets 库（libXaw6 + libXaw7），X11 的经典 widget 工具包"
+category: library
+homepage: "https://gitlab.freedesktop.org/xorg/lib/libxaw"
+license: MIT
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "一次 configure 产双库：libXaw6（-DOLDXAW, SONAME libXaw.so.6）与 libXaw7（-DXAW7, SONAME libXaw.so.7），头文件共用 include/X11/Xaw/*.h"
+    - "configure 用 /system/bin/sh 交叉执行（--build=aarch64-unknown-linux-gnu --host=aarch64-linux-ohos），避免 RUN conftest 二进制"
+    - "configure 的 umask 077→022（config.status 的 ./confXXXXXX 0700 临时目录在 HMFS 上不可写，DRAFT-E565）"
+    - "build-local linker-view 重定位依赖的 libtool .la，避免 libxcb.la 等陈旧绝对路径失败并防止污染发布元数据"
+    - "1.0.14 自带 config.sub（2020）不认识 linux-ohos，需补丁（1.0.15+ 上游已自带）"
+    - "免 display 契约测试：XawInitializeWidgetSet/XawInitializeDefaultConverters 不触 X server，widget class 记录是链接期常量"
+  common_dependencies:
+    - libx11
+    - libxext
+    - libxt
+    - libxmu
+    - libxpm
+    - xorgproto
+
+versions:
+  "1.0.14":
+    status: built
+    build_date: "2026-10-13"
+    conan_ref: "libxaw/1.0.14"
+    upstream_version: "1.0.14"
+    notes: |
+      - Debian/Ubuntu 现行版本（2:1.0.14-1）；上游仅 .tar.gz/.tar.bz2
+      - 依赖对齐 libxmu/1.3.1.1 的 libx11/1.8.13 force 轨
+      - 1 个补丁：0001-config.sub.patch（linux-ohos canonical target）
