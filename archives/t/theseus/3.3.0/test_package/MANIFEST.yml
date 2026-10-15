@@ -1,0 +1,23 @@
+# test_package/MANIFEST.yml — 上游测试声明（CI L0e 强制要求）
+package: theseus/3.3.0
+homepage: "http://www.theseus3d.org/"
+
+# 上游无测试套件（无 make check / ctest / meson test）；
+# Debian 用 autopkgtest 冒烟（tests/run-unit-test），即对 shipped examples
+# 跑真实超叠命令。
+upstream_check_command: "n/a (no upstream test suite; Debian autopkgtest: run-unit-test)"
+upstream_test_in_build: false
+upstream_test_command: "theseus 1s40.pdb"
+
+upstream_tests:
+  - file: examples/1s40.pdb
+    source: theseus_3.3.0.orig.tar.gz/examples/1s40.pdb
+    description: "Upstream demo (examples/README): ML superposition of a 10-model NMR family"
+    command: "theseus 1s40.pdb"
+
+test_package_tests:
+  - file: test.sh
+    description: "Run theseus on upstream demo data; assert exit 0 and real computation output (ML <sigma>, Marginal Log Likelihood, pairwise <RMSD>)"
+    command: "bash test.sh"
+
+assertion_count: 3

@@ -1,0 +1,19 @@
+Subject: Fix case-sensitive include of Error.h in NWfill.c
+
+Upstream NWfill.c includes "error.h" (lowercase) while the header file
+is Error.h (uppercase E). It resolves on case-insensitive filesystems
+(macOS, where upstream is developed) but is a hard error on
+case-sensitive ones (Linux, OHOS):
+    NWfill.c:39:10: fatal error: 'error.h' file not found
+
+--- a/NWfill.c
++++ b/NWfill.c
+@@ -36,7 +36,7 @@
+ #include <float.h>
+ #include <time.h>
+ #include "distfit.h"
+-#include "error.h"
++#include "Error.h"
+ #include "DLTutils.h"
+ #include "pdbMalloc.h"
+ #include "pdbIO.h"
