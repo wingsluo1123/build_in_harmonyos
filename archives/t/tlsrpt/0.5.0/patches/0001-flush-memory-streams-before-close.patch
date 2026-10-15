@@ -1,0 +1,56 @@
+--- a/libtlsrpt.c
++++ b/libtlsrpt.c
+@@ -375,6 +375,21 @@
+   return 0;
+ }
+ 
++/* Flush publishes the buffer even on libcs whose memory-stream close
++ * returns EBADF. A failed flush must remain an error; always close the stream
++ * to release its resources, preserving the first failure's errno. */
++static int tlsrpt_close_memstream(FILE *stream) {
++  int flush_result = fflush(stream);
++  int flush_errno = errno;
++  int close_result = fclose(stream);
++  if (flush_result != 0) {
++    errno = flush_errno;
++    return EOF;
++  }
++  if (close_result != 0 && errno == EBADF) return 0;
++  return close_result;
++}
++
+ int tlsrpt_finish_policy(struct tlsrpt_dr_t* dr, tlsrpt_final_result_t final_result) {
+   int res=0;
+   /*
+@@ -383,19 +398,19 @@
+ Calls to errorcode will record the errorcode in the tlsrpt_dr_t structure.
+    */
+   if(dr->memstreamps!=NULL) {
+-    res=fclose(dr->memstreamps);
++    res=tlsrpt_close_memstream(dr->memstreamps);
+     if(res!=0) errorcode(dr, TLSRPT_ERR_FCLOSE_FINISHPOLICY+errno);
+   } else {
+     errorcode(dr,TLSRPT_ERR_TLSRPT_MEMSTREAMPS_NOT_INITIALIZED);
+   }
+   if(dr->memstreammx!=NULL) {
+-    res=fclose(dr->memstreammx);
++    res=tlsrpt_close_memstream(dr->memstreammx);
+     if(res!=0) errorcode(dr, TLSRPT_ERR_FCLOSE_FINISHPOLICY+errno);
+   } else {
+     errorcode(dr,TLSRPT_ERR_TLSRPT_MEMSTREAMMX_NOT_INITIALIZED);
+   }
+   if(dr->memstreamfd!=NULL) {
+-    res=fclose(dr->memstreamfd);
++    res=tlsrpt_close_memstream(dr->memstreamfd);
+     if(res!=0) errorcode(dr, TLSRPT_ERR_FCLOSE_FINISHPOLICY+errno);
+   } else {
+     errorcode(dr,TLSRPT_ERR_TLSRPT_MEMSTREAMFD_NOT_INITIALIZED);
+@@ -538,7 +553,7 @@
+   res=fprintf(dr->memstream, "}");
+   if(res<0) errorcode(dr,TLSRPT_ERR_FPRINTF_FINISHDR+errno);
+ 
+-  res=fclose(dr->memstream);
++  res=tlsrpt_close_memstream(dr->memstream);
+   if(res!=0) errorcode(dr,TLSRPT_ERR_FCLOSE_FINISHDR+errno);
+ 
+   if(dr->status == 0) { // everything looks fine, we can send the datagram

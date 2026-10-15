@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.15)
+project(test_tlsrpt C)
+find_package(tlsrpt CONFIG REQUIRED)
+add_executable(test_tlsrpt test_tlsrpt.c)
+target_link_libraries(test_tlsrpt PRIVATE tlsrpt::tlsrpt)
