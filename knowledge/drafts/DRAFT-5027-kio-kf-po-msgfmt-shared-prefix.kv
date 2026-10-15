@@ -1,0 +1,74 @@
+#====================================================================
+# DRAFT-5027-kio-kf-po-msgfmt-shared-prefix.kv — kio/6.14.0 (KDE Frameworks)
+# KF 构建期 po 编目调用共享前缀里的 msgfmt → OHOS 无系统 libintl.so.8 → pofiles 目标 FATAL_ERROR
+#
+# 与 E135 的关系：error_signature 部分重叠（都含 "Error loading shared library libintl.so.8"），
+# 但根因与处方不同 —— E135 是"未签名 ELF 被加载器拒绝"，本条目是"所需库不在加载搜索路径、
+# 且失败方是构建期工具 msgfmt"。engine 检索时应以 msgfmt/po 上下文区分两者。
+#====================================================================
+
+id:                     DRAFT-5027-kio-kf-po-msgfmt-shared-prefix
+draft:                  true
+contributor_id:         openharmony-pc-adaptor
+title:                  KDE/KF 构建期 po 编目调用共享前缀 msgfmt → OHOS 无系统 libintl.so.8 → pofiles 目标 FATAL_ERROR（配方应设 KF_SKIP_PO_PROCESSING=ON）
+trigger_tool:           cmake|make
+phase:                  compilation
+error_signature:        Error loading shared library libintl\.so\.8.*msgfmt|Error relocating .*libgettext(lib|src)-.*libintl_[a-z]+: symbol not found|failed generating .*/po|pofiles-.*Error [12]
+severity:               2
+category:               ohos, environment, build-tool, cmake, nls
+match_keywords:         msgfmt, gettext, libintl.so.8, libgettextsrc, libgettextlib, KF_SKIP_PO_PROCESSING, ki18n_install, build-pofiles.cmake, GETTEXT_MSGFMT_EXECUTABLE, pofiles, KDE Frameworks, KF6, 共享前缀, /usr/local/bin, DEFAULT_PREFIX, 构建期工具, po 编目, 翻译目录
+
+root_cause:             |
+  KDE/KF 模块的 CMakeLists 调用 ki18n_install(po)（KI18n 提供，见 KF6I18nMacros.cmake），
+  在 ALL 目标里生成 pofiles-<md5>，由 build-pofiles.cmake 对每个 .po 执行
+  ${GETTEXT_MSGFMT_EXECUTABLE}。该变量由 PATH 里的 msgfmt 解析，而 ohos-aarch64 profile 的
+  buildenv 把共享前缀 $HOME/usr/local/bin（DEFAULT_PREFIX）放进了 PATH；构建机当时在那里装过
+  gettext 0.22.5，于是选中 /storage/Users/currentUser/usr/local/bin/msgfmt。
+  该 msgfmt 按 glibc 惯例 NEED libintl.so.8 并依赖同前缀的 libgettextsrc-0.22.5.so，
+  而 OHOS 不提供系统 libintl.so.8：/system/lib64 只有名字相近但无关的 libintl_ani.z.so，
+  全机唯一的 libintl.so.8 位于 Python 发行版内（/data/service/hnp/python.org/python_3.12/lib/），
+  不在构建工具的加载搜索路径上。于是加载器报 Error loading shared library libintl.so.8
+  并让 libgettextsrc/libgettextlib 的 libintl_* 重定位失败 → 每个 msgfmt 调用非零
+  → build-pofiles.cmake:24 的 message(FATAL_ERROR "failed generating .../po") → make Error 2。
+  失败发生在 [2%] 的 po 目标上，源码编译尚未开始，所以错误现象与 KDE 源码兼容性无关。
+  注意与 E135 的区别：E135 的处方是 sign-elf（给未签名 .so 补签名），对本案无效——
+  本案缺的不是签名，而是"被调用工具所需的库根本不在加载路径上"。
+affected_scope:         任何调用 ki18n_install(po) 的 KDE/KF6 包（KI18n 6.x 全部版本，含 6.14.0）
+                        在同款 worker 上构建；同理适用于调用 ecm_install_po_files_as_qm 的项目，
+                        以及任何 PATH 中暴露"按 glibc 假设构建的 gettext"的构建环境。
+                        本仓同批未设开关的 6.14.0 配方（kxmlgui/kservice/kconfigwidgets 等）属同类未暴露风险。
+verification_cmd:       grep -rn 'ki18n_install(po)' <src>/CMakeLists.txt ; grep -n 'GETTEXT_MSGFMT_EXECUTABLE' <ki18n_pkg>/lib/cmake/KF6I18n/KF6I18nMacros.cmake ; llvm-readelf -d $HOME/usr/local/bin/msgfmt | grep -i libintl ; ls /system/lib64/libintl.so.8 ; ls /data/service/hnp/python.org/python_3.12/lib/libintl.so.8*
+
+rec_priority:           1
+rec_approach:           cmake-skip-po-processing
+rec_description:        配方 generate() 中设 KF_SKIP_PO_PROCESSING=ON。已在制品仓的 ki18n/6.14.0 实测支持：KF6I18nMacros.cmake:78 声明 option(KF_SKIP_PO_PROCESSING ... OFF)，:114 处 KI18N_INSTALL() 直接 return()，因此完全不生成 pofiles 目标、不调用 msgfmt。本仓 karchive/kauth/kbookmarks/kcolorscheme/kcompletion/kconfigwidgets 等 KF 配方为同一做法。代价：包内不含 .mo 翻译目录（运行时本地化缺失），库功能与 ABI 不受影响。
+rec_command:            tc.variables["KF_SKIP_PO_PROCESSING"] = "ON"   # conanfile.py generate()
+rec_auto_fix:           false
+rec_impl:               manual
+
+fallback_priority:      2
+fallback_approach:      provide-working-msgfmt
+fallback_description:   确需翻译目录时：让构建用可运行的 msgfmt —— 把原生 gettext（/data/service/hnp/bin，实测 msgfmt 0.26 --version 正常）或 conan gettext 工具的 bin 目录前置到共享前缀之前；必要时给加载器提供一份可用的 libintl.so.8。此为环境相关做法（绑定 worker 绝对路径），不可移植，且不解决"共享前缀里那份 glibc 假设的 gettext"根因。
+fallback_command:       PATH=/data/service/hnp/bin:$PATH conan create ... -pr:h ci/conan/profiles/ohos-aarch64
+fallback_auto_fix:      false
+fallback_impl:          manual
+
+forbid_1_pattern:       sign-elf.*(libintl|gettext)
+forbid_1_reason:        会把本案误判为 E135 的"未签名 ELF 被拒"。本案的 libintl.so.8 并非"存在但未签名"，而是根本不在构建工具的加载搜索路径上（全机唯一副本在 Python 发行版内），签名治不了缺失与符号体系不匹配。
+forbid_1_consequence:   误诊沿 E135 处方走一轮无效修复，po 步骤仍然失败
+forbid_2_pattern:       LD_LIBRARY_PATH=.*(usr/local|DEFAULT_PREFIX)/lib
+forbid_2_reason:        把共享前缀 lib 塞进 LD_LIBRARY_PATH 会遮蔽包内 vendored 库（glib 的 proxy-libintl 前车之鉴，见 DRAFT-glib-2.84.0.1-gettext-libintl-ld-library-path-shadow），也会影响 Python 解释器加载 libintl。
+forbid_2_consequence:   运行期 g_libintl_* 符号缺失、解释器加载 gettext 报错
+
+principles:
+causes:
+caused_by:
+similar_to:             E135, DRAFT-kf-skip-po-processing-gettext-toolchain
+conflicts_with:
+prerequisite_of:
+doc_file:               knowledge/drafts/DRAFT-5027-kio-kf-po-msgfmt-shared-prefix.md
+last_updated:           2026-10-14
+source_event:           kio/6.14.0 的 CI 实证：conan-build-test → conan create → pofiles 目标 msgfmt 崩溃（问题发现于 PR !5027 的 CI 诊断；交付 PR !15358，分支 feat/kio-6.14.0.1，提交 864f0b1f50。文件名中的 5027 = 发现该问题的 PR）
+authors:                openharmony-pc-adaptor <adaptor@openharmony.pc>
+source_pr:              15358
+source_commit:          864f0b1f50033672b8bdaa6e560e2aa1f3ac3088
