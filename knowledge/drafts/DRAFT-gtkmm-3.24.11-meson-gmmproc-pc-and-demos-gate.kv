@@ -1,0 +1,63 @@
+#====================================================================
+# DRAFT-gtkmm-3.24.11-meson-gmmproc-pc-and-demos-gate.kv - gtkmm 3.24.11
+# gtkmm-3.0（3.24 线）meson 构建三连坑：gmmproc .pc 变量缺失 / demos 未按 build-demos 关闭 / 无窗口系统测试
+#====================================================================
+
+id:                     DRAFT-gtkmm-3.24.11-meson-gmmproc-pc-and-demos-gate
+trigger_tool:           conan|conan create|meson|pkg-config|meson setup
+phase:                  configure|compilation|testing
+
+error_signature:        Could not get pkg-config variable and no default provided for <PkgConfigDependency (glibmm-2\.4|giomm-2\.4|pangomm-1\.4|atkmm-1\.6|gio-2\.0)|Library glibmm_generate_extra_defs.*not found|cannot open display
+
+severity:               2
+category:               build-system, meson, pkg-config, conan, compilation, testing
+match_keywords:         gtkmm, gdkmm, gtkmm-3.0, gmmproc, gmmprocdir, gmmprocm4dir, PkgConfigDeps, PkgConfigDependency, get_variable, epoxy, build-demos, build-x11-api, failing suite, no-suite=failing, meson
+title:                  gtkmm 3.24（gtkmm-3.0 线）meson 配方：PkgConfigDeps 重建的 *mm .pc 丢失 gmmprocdir/gmmprocm4dir、demos 守卫失效、object_move 测试无窗口系统
+
+root_cause:             |
+  gtkmm 3.24 官方 tarball 已迁移到 meson（无 configure 脚本），三处与 Conan 环境交互：
+  (1) meson.build:164/166/168 无条件读取 dependency 的 pkg-config 变量 gmmprocdir
+      （glibmm-2.4.pc）与 gmmprocm4dir（pangomm-1.4.pc / atkmm-1.6.pc）。上游安装的
+      这几个 .pc 带这些变量，但 PkgConfigDeps 按 cpp_info 重新生成 .pc，只写
+      prefix/libdir/includedir/Libs/Cflags/Requires → meson 报
+      "Could not get pkg-config variable and no default provided"。
+  (2) meson.build 的 subdir('demos/gtk-demo') 无条件执行，demos/gtk-demo/meson.build
+      用 epoxy_dep.found() 守卫目标，而 epoxy_dep = dependency('epoxy',
+      required: build_demos)；Conan 图中 libepoxy 经 gtk/3.24.43 传递存在，
+      PkgConfigDeps 生成 epoxy.pc → found() 恒真 → -Dbuild-demos=false 失效，
+      demos 的 gnome.compile_resources() 又需要 gio-2.0.pc 的 glib_compile_resources
+      （PkgConfigDeps 同样不生成）→ configure 失败。
+  (3) tools/extra_defs_gen 用 cpp_compiler.find_library('glibmm_generate_extra_defs-2.4')
+      无 dirs 参数，而 glibmm 包只声明 glibmm-2.4/giomm-2.4 组件，不提供该工具库的
+      -L/.pc → find_library 探测失败。
+  (4) 上游 tests/meson.build 注册执行的 object_move_test 调 gtk_init()，OHOS 上
+      GTK+3 为 Broadway-only（无窗口系统，Broadway server 亦无法启动）→ 真实失败
+      "cannot open display"（exit 1）。
+
+affected_scope:         任何用 PkgConfigDeps + meson 构建的 *mm C++ 绑定库（gtkmm/glibmm/pangomm/atkmm 系列），尤其 gtkmm-3.0 线；OHOS 无窗口系统平台必然命中 (4)
+verification_cmd:       conan create <gtkmm recipe> -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 --build=missing; # 期望 G2 PASS 且日志含 "gdk_rgba_test OK"
+
+rec_priority:           2
+rec_approach:           inject-pc-tool-vars + gate-demos-subdir + failing-suite
+rec_description:        (1) 在 generate() 里 PkgConfigDeps 之后注入工具变量：向
+                        glibmm-2.4.pc/giomm-2.4.pc 追加 gmmprocdir=<glibmm 包>/lib/glibmm-2.4/proc，
+                        向 pangomm-1.4.pc 追加 gmmprocm4dir=<pangomm 包>/lib/pangomm-1.4/proc/m4，
+                        向 atkmm-1.6.pc 追加 gmmprocm4dir=<atkmm 包>/lib/atkmm-1.6/proc/m4
+                        （值与上游 .pc 相同；maintainer-mode=false 下仅作变量占位）。
+                        (2) 补丁 meson.build：if build_demos / subdir('demos/gtk-demo') / endif
+                        （同 gtkmm 4.0.0 recipe 0002 补丁）。
+                        (3) build() 中把 glibmm 包 libdir 前置到 LIBRARY_PATH，让
+                        find_library 的 link 探测命中 libglibmm_generate_extra_defs-2.4.so。
+                        (4) 补丁 tests/meson.build 把调 gtk_init() 的测试注册进 failing suite，
+                        build() 用 meson test ... --no-suite=failing 排除执行（测试程序仍构建），
+                        与 glibmm/2.66.9 配方同款。
+                        另：-Dbuild-x11-api=false 同时规避平台无 X11 后端与 meson 读取
+                        pkg-config targets 变量（PkgConfigDeps 不生成该变量）。
+                        参考实现：archives/g/gtkmm/3.24.11/conanfile.py。
+rec_auto_fix:           false
+fallback:               无法注入变量时，改用 maintainer-mode=false + 不调用 gmmproc 的路径；
+                        仍失败则在 build() 前把依赖包 lib/pkgconfig 加入 PKG_CONFIG_PATH，
+                        让 meson 读到上游自带 .pc（注意其 prefix 可能为构建机路径，需重写）
+kb_ref:                 E490
+
+last_updated:           2026-10-15

@@ -1,0 +1,71 @@
+# test_package/MANIFEST.yml — 上游官方测试声明（CI L0e 强制要求）
+package: gtkmm/3.24.11
+homepage: https://gitlab.gnome.org/GNOME/gtkmm
+
+# ADAPTATION_GUIDE Step 3 / TEST_QUALITY_SPEC §3：上游 meson 套件在 build() 中跑。
+# gtkmm 3.24.11 的 tests/meson.build 构建 15 个测试程序，但只有 2 个在 meson 中
+# 注册为 test()（test_programs 表中 execute 列为 true）：
+#   gdk_rgba_test     —— Gdk::RGBA 纯计算，无显示服务器依赖，可原生执行
+#   object_move_test  —— Glib/Gtk::Object move 语义，需 gtk_init()（OHOS 无窗口系统
+#      → patch 0002 将其标记为 failing suite，由 --no-suite=failing 排除执行，实测真实
+#      失败：Gtk-WARNING "cannot open display"，exit 1）
+# 其余 13 个为 GUI 交互程序（builder/dialog/scrolledwindow 等），构建但不执行
+# （OHOS 上 GTK+3 为 Broadway-only，无窗口系统/无交互）。
+# 实际清单以 `meson test -C <build> --list`（meson-info/intro-tests.json）为准。
+upstream_check_command: "meson test -C build --timeout-multiplier=16 --no-rebuild"
+upstream_test_in_build: true
+upstream_test_command: "meson test -v -C build --timeout-multiplier=16 --no-rebuild --no-suite=failing"
+
+upstream_tests:
+  - file: tests/gdk_rgba/main.cc
+    description: "Gdk::RGBA 颜色构造/分量/解析（无显示依赖，meson test 执行）"
+    command: "meson test -C build --timeout-multiplier=16 --no-rebuild --no-suite=failing gdk_rgba_test"
+  - file: tests/object_move/main.cc
+    description: "Gtk::Object move 构造/赋值语义（需 gtk_init；无窗口系统真实失败，patch 0002 标记 failing suite，--no-suite=failing 排除执行，仅构建）"
+    command: "(build only; failing suite)"
+  - file: tests/builder/main.cc
+    description: "Gtk::Builder（GUI 程序，构建但不执行）"
+    command: "(build only)"
+  - file: tests/child_widget/main.cc
+    description: "child widget 生命周期（GUI 程序，构建但不执行）"
+    command: "(build only)"
+  - file: tests/child_widget2/main.cc
+    description: "child widget2（GUI 程序，构建但不执行）"
+    command: "(build only)"
+  - file: tests/child_widget_managed/main.cc
+    description: "managed child widget（GUI 程序，构建但不执行）"
+    command: "(build only)"
+  - file: tests/delete_cpp_child/main.cc
+    description: "delete C++ child（GUI 程序，构建但不执行）"
+    command: "(build only)"
+  - file: tests/dialog/main.cc
+    description: "Gtk::Dialog（GUI 程序，构建但不执行）"
+    command: "(build only)"
+  - file: tests/dialog_deletethis/main.cc
+    description: "dialog delete this（GUI 程序，构建但不执行）"
+    command: "(build only)"
+  - file: tests/main_with_options/main.cc
+    description: "main with options（GUI 程序，构建但不执行）"
+    command: "(build only)"
+  - file: tests/menu_destruction/main.cc
+    description: "menu 析构（GUI 程序，构建但不执行）"
+    command: "(build only)"
+  - file: tests/property_notification/main.cc
+    description: "property notification（GUI 程序，构建但不执行）"
+    command: "(build only)"
+  - file: tests/refcount_dialog/main.cc
+    description: "refcount dialog（GUI 程序，构建但不执行）"
+    command: "(build only)"
+  - file: tests/scrolledwindow/main.cc
+    description: "scrolled window（GUI 程序，构建但不执行）"
+    command: "(build only)"
+  - file: tests/wrap_existing/main.cc
+    description: "Glib::wrap 既有对象（GUI 程序，构建但不执行）"
+    command: "(build only)"
+
+test_package_tests:
+  - file: test.cpp
+    description: "头文件包含 + 链接 gtkmm-3.0/gdkmm-3.0 + 原生运行（版本宏/Gdk::RGBA/Gdk::Rectangle/Gtk::Button GType/sigc++-2.0 信号，11 断言）"
+    command: "./test_probe"
+
+assertion_count: 11

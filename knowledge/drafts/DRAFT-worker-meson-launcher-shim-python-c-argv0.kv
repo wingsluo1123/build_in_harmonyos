@@ -1,0 +1,48 @@
+#====================================================================
+# DRAFT-worker-meson-launcher-shim-python-c-argv0.kv - worker 环境
+# meson 启动器 shim 用 `python -c` 导致 meson_command argv[0]="-c"：所有 meson.* 目标 exec "<builddir>/-c"（Error 127）
+#====================================================================
+
+id:                     DRAFT-worker-meson-launcher-shim-python-c-argv0
+trigger_tool:           conan|conan create|meson|ninja|meson compile
+phase:                  configure|compilation
+
+error_signature:        meson: inaccessible or not found|meson.* Error 127|/bin/sh: .*build.*/-c: inaccessible or not found|Failed to run.*symbolextractor
+
+severity:               2
+category:               environment, meson, toolchain, python, shell
+match_keywords:         meson, shim, launcher, python -c, argv0, meson_command, symbolextractor, ERROR 127, broken-worker-shadow, el2 bundle python, PATH
+title:                  worker 的 meson 启动器失效（shebang 指向已移除的 el2 bundle python）；修复 shim 必须用 python3 -m mesonbuild.mesonmain，不能用 python -c
+
+root_cause:             |
+  两个叠加问题：
+  (1) worker 的 /storage/Users/currentUser/usr/local/bin/meson 被改名为
+      meson.broken-worker-shadow（其 shebang 指向 /data/storage/el1/bundle/libs/
+      arm64/python/bin/python3，该 el2 bundle python 在本会话已不存在），导致
+      conan 调 meson 时报 "meson: inaccessible or not found" / Error 127；
+      另有 ~/.scratch/bin/meson 与 .broken-worker-shadow 同款 shebang，同样失效。
+  (2) 自建 shim 若写成 `python3 -c '...mesonmain.main()...' "$@"`，meson 启动时记录
+      的 meson_command（mesonlib.meson_command）的 argv[0] 会成为 "-c"；meson 在生成
+      shared_library 目标时用 get_build_command() 自我重入执行内部
+      `--internal symbolextractor`，于是 ninja 以构建目录为 cwd 去 exec "<builddir>/-c"
+      → "inaccessible or not found"（Error 127）。表现为：编译链接全部成功，却在
+      Generating symbol file 一步失败，且报错里的可执行文件路径是 "<builddir>/-c"。
+
+affected_scope:         在 el2 bundle python 被移除/不可用的 OHOS worker 上，任何 meson 驱动的 conan 包（glibmm/gtkmm/gtk/pango 等）
+verification_cmd:       meson --version; # 应为正常版本号；随后 conan create 一个 meson 包，日志出现 symbolextractor 不再报 127
+
+rec_priority:           2
+rec_approach:           shim-python-m-mesonmain
+rec_description:        在 PATH 前排目录（本 worker 用 /storage/Users/currentUser/usr/local/bin，
+                        该目录被 ohos-aarch64 profile 的 buildenv 前置）放一个 shim：
+                        export PYTHONPATH=<user site-packages>${PYTHONPATH:+:$PYTHONPATH}
+                        exec /storage/Users/currentUser/usr/local/bin/python3 -m mesonbuild.mesonmain "$@"
+                        关键点：必须用 `-m mesonbuild.mesonmain`（argv[0] 为真实脚本路径，
+                        meson 自我重入可用），禁止 `python -c`（argv[0]="-c"）。
+                        属 worker 环境修复，不入仓库、不改任何配方。
+rec_auto_fix:           false
+fallback:               临时用 `meson` 的绝对路径 + 每次手动 meson setup/compile（绕过 conan 的 meson 调用）；
+                        或把 python3 -m mesonbuild.mesonmain 包成 PATH 内脚本
+kb_ref:                 none
+
+last_updated:           2026-10-15
