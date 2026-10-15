@@ -1,0 +1,103 @@
+{
+  "software": "megactl",
+  "version": "0.4.5",
+  "audit_time": "2026-10-03T17:05:00+08:00",
+  "auditor": "independent subagent (W4, context-isolated), 2 rounds",
+  "round1_verdict": "fail",
+  "verdict": "pass",
+  "p0_count": 0,
+  "p1_count": 0,
+  "p2_count": 0,
+  "p3_count": 4,
+  "issues": [
+    {
+      "id": "P3-1",
+      "severity": "P3",
+      "file": "archives/m/megactl/commands.json",
+      "description": "框架冲突，非本 PR 缺陷：preflight PF9 要求所有 archives 变更路径 ≥5 段（archives/<字母>/<包>/<版本>/<文件>），而软件级 commands.json 只有 4 段。但 PF8（preflight.py:518 `cj = pkg_dir / 'commands.json'`）、CI L0k（build_and_test.sh:691-692 `PKG_SOFTWARE_DIR=$(dirname $(dirname $CONANFILE))`）、pre-commit L0k、iron-rules R38 与 review-memory §15 全部要求软件级。仓库先例：软件级 3543 个 vs 版本级 17 个（遗留）。PF9 是异类，且其分支名一半（feat/megactl-0.4.5 == feat/{pkg}-{ver}）实测通过。本包按多数派与 review-memory 放软件级，CI L0k 实测 pass。",
+      "suggestion": "本 PR 不改。建议把 PF9 的路径深度规则登记为框架缺陷（应豁免 archives/<字母>/<包>/commands.json）。提 PR 时以 --no-preflight 跳过并在正文说明。"
+    },
+    {
+      "id": "P3-2",
+      "severity": "P3",
+      "file": "archives/m/megactl/0.4.5/notes.md",
+      "description": "已知事项如实记录：CI L2 冒烟会对两个 CLI 各报一条 [warn]（上游只有短选项 -V/-h，`--version` 被上游解析为 invalid flag 并 rc=2）。该 warn 非阻塞（build_and_test.sh 的 L2 失败分支只 echo warn，不置 L2_FAILED）；要消除须改上游行为，故保留。已在 notes.md §7 写明，评审可预期。",
+      "suggestion": "无需处理。"
+    },
+    {
+      "id": "P3-3",
+      "severity": "P3",
+      "file": "archives/m/megactl/0.4.5/test_package/test_layout.py",
+      "description": "鸿蒙特有断言 9 项中，test_megactl.py 的 1 项（check_harmony(rc == 0, …)）与同文件第 115 行「megactl -V 退出码 0」断言同一事实，非独立证据。其余 8 项（e_machine / DT_NEEDED / .interp / .note.ohos.ident 各 2 个 CLI）均为独立结构检查，且审计已用注入 x86-64 ELF 的反例证明它们会真失败。",
+      "suggestion": "已复核，不影响 rule12 达标（鸿蒙特有 ≥1）。若追求更强独立性可让该项改断言 ET_DYN + OHOS loader。"
+    },
+    {
+      "id": "P3-4",
+      "severity": "P3",
+      "file": "archives/m/megactl/0.4.5/conanfile.py",
+      "description": "方法顺序为 layout → validate → requirements，与 code-style §3 的 export_sources → requirements → layout 顺序不同。仓库有先例（23 个配方 layout-first vs 190 个 requirements-first），且无门禁强制。",
+      "suggestion": "可按 §3 调换，或按先例豁免。"
+    }
+  ],
+  "round1_findings_resolved": [
+    {
+      "id": "R1-P0",
+      "round1_severity": "P0",
+      "summary": "原文声称「两个上游仓库都没有任何 git tag、GitHub tag 归档全部 404，故无可用归档」。对 namiltd/megactl 不成立（确有 tag v0.4.5 = 8f86e0be，2024-08-14）。",
+      "resolution": "来源改为上游官方 tag 归档 github.com/…/archive/refs/tags/v0.4.5.tar.gz（sha256 不变，182212 B）；删除三处文件里不成立的论证，改写为可复核的交叉验证表（GitHub tag 归档与 Debian pool 包 cmp 判定 byte-identical，md5 585b2e1d… 一致）。审计复验：URL HTTP 200、sha256 与 conandata.yml 逐字相等、残留「无 tag/404」类断言扫描 0 命中。"
+    },
+    {
+      "id": "R1-P1",
+      "round1_severity": "P1",
+      "summary": "MANIFEST.yml 与 notes.md 的分节断言数与各自小计不符（写作 34/26，实为 38/31）。",
+      "resolution": "按脚本实际调用点重算为 test_megactl.py 6+8+14+5+2+3=38、test_layout.py 10+4+6+4+4+3=31；审计逐节复算确认，运行时输出（38/38、31/31、鸿蒙 1+8=9）与文档完全一致。"
+    },
+    {
+      "id": "R1-P2a",
+      "round1_severity": "P2",
+      "summary": "两条恒真断言被计入：test_layout.py 的 check(True, 「是 ELF64」)、test_megactl.py 的 check_harmony(True, …)。",
+      "resolution": "前者改为直接读 20 字节原始头校验 ELF 魔数与 EI_CLASS=2（不经解析器）；后者改为 check_harmony(rc == 0, …)。审计用截断 ELF / 不支持选项两种反例证明两者都会真失败。"
+    },
+    {
+      "id": "R1-P2b",
+      "round1_severity": "P2",
+      "summary": "conanfile.py 的 import json 在函数体内（违反 code-style §16）。",
+      "resolution": "已提到模块级 stdlib 导入组，位于 import os 之后、conan 导入之前。"
+    },
+    {
+      "id": "R1-P3a",
+      "round1_severity": "P3",
+      "summary": "_cc() 取不到 conf 编译器时回落裸 \"clang\"，会在宿主架构上静默产出错误目标的二进制。",
+      "resolution": "改为抛 ConanInvalidConfiguration 并在消息里点名当前 conf 值与两个可用 OHOS profile；审计确认无 or \"clang\" 回落且 raise 分支可达。"
+    },
+    {
+      "id": "R1-P3b",
+      "round1_severity": "P3",
+      "summary": "manifest.yaml 记 toolchain_profile: ohos-aarch64，但本地实测用的是 ohos-aarch64-wsl。",
+      "resolution": "改为同时如实记录两者：CI 用 ci/conan/profiles/ohos-aarch64，本地 W3/W4 复核用 ohos-aarch64-wsl（含各自 CC 路径）。"
+    },
+    {
+      "id": "R1-P3c",
+      "round1_severity": "P3",
+      "summary": "8 个文件缺文件末尾换行（code-style §21）。",
+      "resolution": "全部 9 个提交文件均以换行结尾，审计字节级复验通过。"
+    },
+    {
+      "id": "R1-P2c",
+      "round1_severity": "P2",
+      "summary": "新增的知识草稿 .kv 是散文而非 schema 化条目，且与 knowledge/drafts/ 下多份同源草稿重复。",
+      "resolution": "复核确认该坑在仓库已有 9 份同源草稿（8543 / 8960 / libexecinfo / libnbd / ring-span-lite / status-value-lite / jwt-cpp / radvd / ci-predl-curl 等），本包不再另建草稿避免重复沉淀，已删除自建草稿对；megactl 的具体触发条件与复现证据保留在 notes.md §3.9，并注明属框架级已知陷阱、供主编合并既有条目时取用。"
+    }
+  ],
+  "checks": {
+    "code_style": "pass（shebang + docstring；MegactlConan PascalCase；name/version/homepage/license 齐全；package_type=application；settings 四项齐全；无 TODO/FIXME/请填写；9 个文件均 LF-only、无 BOM、无 CRLF；末尾换行齐备；import 分组正确）",
+    "deceptive_behavior": "pass（14 个反向破坏探针全部 rc=1 而完好的包 rc=0：删 bin/、假 shell 假二进制、清执行位、截断 ELF、换入宿主 x86_64 /bin/true、megasasctl 复制成 megactl、注入 .o/隐藏文件、往 metainfo 注入构建机路径、改指 .TH 宏、删/截断 metainfo、COPYING 换非 GPL 文本。sha256 为真实 64 位十六进制。manifest status=built 与 R29 一致（未 upload）。上游「零测试」说法经真实 tarball 复核：Makefile 恰 7 个目标、无 check/test、无测试目录、workflows 仅 codeql-analysis.yml。11 条 -Wvoid-pointer-to-int-cast 警告数经独立构建复现。构建机路径泄漏 2→0 经独立构建复现，且保留 .interp/.note.ohos.ident/.note.gnu.build-id/.symtab）",
+    "recipe_correctness": "pass（R32 validate 用 in ('Linux','OHOS')；R33 编译器取自 conf 且 self.run 无裸 shell 变量，CI L0h 正则 0 命中；R37 version=上游版本；R38 commands.json 在软件级且 name/type/ref 正确；R39 用官方 github.com archive 形态；R49/PF6 无共享前缀注入；零 requires 且源码确实无外部依赖；CFLAGS+= 被命令行覆盖会致 scg/scsi 头找不到的坑经复现；package() 产出与 manifest 声明的 6 件产物一致）",
+    "artifact_hygiene": "pass（9 个提交文件全为文本、零二进制；无 token、无私人账号、无主机名；notes.md §3.1 主动把用户名脱敏为 <用户名>；.build-cache/、ci-metadata.json、test_package/build-release/ 等本地产物均未入库且已清理；archives/_index.yaml 未动）",
+    "previous_findings_resolved": "pass（8 项全部闭环，见 round1_findings_resolved；其中 P0 的 URL/sha256 由审计独立下载复核，predl 前缀 URL 的根因由审计把 build_and_test.sh 的两段内嵌 python 抠出来对真实 conandata.yml 原样重放验证，并用反向对照复现 md5 前缀 1f893089 的损坏）",
+    "w3_local_ci": "pass（conan create --build='*' 强制重建 rc=0，产出的二进制与暂存包 sha256 逐字节一致，证明暂存包确由本配方产出；同一次运行内 test_package 实测 38/38 与 31/31。门禁复跑：G0/KC/JC/L0/L1/L4/L5 全 pass，JC_ERRORS=0，KC_ERRORS=0，L1e 反向破坏测试 pass，通过率 100% (1/1)，GATE_RC=0。L2=skip 为上游无长选项所致，非阻塞）",
+    "w1_sync": "pass（merge-base(origin/main, HEAD) == origin/main == 2446216757，git rev-list --count HEAD..origin/main = 0，分支直接坐在最新 main 上）",
+    "w2_atomicity": "pass（git diff --name-status origin/main...HEAD 恰 9 条新增，全在 archives/m/megactl/ 下；单一软件目录；零框架文件：SKILL.md / references/ / templates/ / scripts/ / ci/ / index.tsv / SUMMARY.md / .gitignore 均未触碰）"
+  },
+  "conclusion": "审计通过：P0/P1 清零。第 1 轮判 fail 的 8 项（含 1 项 P0 捏造事实：声称上游无 git tag）已全部整改并由本轮从零复核闭环——特别是 P0 的源码来源已换成上游官方 tag 归档并用两条独立途径交叉验证字节一致，另一次发现的「conandata 注释里裸 URL 被门禁预下载当源码包并做子串替换」坑已定位根因、用最小复现件证实、在配方侧规避并写入 notes.md。测试非空壳已由 14 个反向破坏探针与强制重建的字节级一致性双重证明；69 项断言与文档计数完全吻合；单软件原子性与框架文件零触碰成立。遗留 4 条 P3 均为框架冲突或上游行为导致的非阻塞事项，已在正文如实说明。"
+}

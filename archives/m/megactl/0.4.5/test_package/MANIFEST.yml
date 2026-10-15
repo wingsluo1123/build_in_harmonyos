@@ -1,0 +1,87 @@
+# test_package/MANIFEST.yml — megactl 0.4.5 上游官方测试声明
+# CI 脚本 build_and_test.sh L0e 强制要求本文件存在。
+
+package: megactl/0.4.5
+homepage: "https://github.com/namiltd/megactl"
+
+# ── 上游测试：确无（如实申报，清点证据见 notes.md §4）────────────────
+# 上游 Makefile 只有 all / megactl / megasasctl / megatrace / install / clean /
+# depend 七个目标，没有 check 或 test；源码树无任何测试目录；唯一的 GitHub Actions
+# 是 codeql-analysis.yml（静态扫描，非测试）；无 automake 测试变量
+# （无 check_PROGRAMS / TESTS）。
+# megactl 的真实验收前提是 MegaRAID 硬件 + /dev/megadev0（PERC）或
+# /dev/megaraid_sas_ioctl_node（SAS）设备节点，CI 与开发机均无。
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests: []
+
+upstream_summary:
+  registered: 0
+  executed: 0
+  ok: 0
+  fail: 0
+  note: >-
+    上游无自动化测试套件（无 make check / ctest / pytest，无测试目录；
+    Makefile 的七个目标中不含测试目标）。因此不存在「上游用例被删减」的问题，
+    验证全部由 test_package 消费者测试承担。
+
+# ── test_package 自带测试（消费者视角，真实执行交付物）────────────────
+test_package_tests:
+  - file: test_megactl.py
+    description: >-
+      消费者 CLI 行为测试（38 项断言，本地实测 38/38 通过，其中鸿蒙特有 1 项）。
+      真执行交付的 bin/megactl 与 bin/megasasctl，覆盖 megactl 全部与硬件无关的
+      代码路径（分节 6+8+14+5+2+3 = 38）：①版本/verbosity（-V、-v -V，两 CLI
+      各一组，加退出码与「鸿蒙目标上真能执行」共 6 项）②usage/帮助（-? 与 -h 的
+      rc 与 usage 首行，usage 正文含 -V 选项 / PERC 的 /dev/megadev0 与
+      channels / SAS 的 /dev/megaraid_sas_ioctl_node 与 enclosures，共 8 项）
+      ③选项校验错误分支（-Z、-T bogus、-l、-l 0xZZ、-l 9999、-D、-H a0c0，
+      每项 2 个断言：rc=2 + 精确首行文案、错误行后附 usage 正文，共 14 项）
+      ④target specifier 解析（zz、a0x0、a99 越 MAX_CONTROLLERS=32、a0c99、
+      a0c0t99，5 项）⑤组合语义（-est -V、-V a0c0 证明 -V 在打开设备前短路，
+      2 项）⑥设备失败路径（-D 不存在 → rc=1 + stdout 为空 + stderr 命中上游两条拒绝
+      文案之一，两个 CLI；-D 普通文件 → open 成功、真进 ioctl、rc=1 unable to determine
+      megaraid driver version，3 项）。上游 megactl.c:601-629 对「设备打不开」有两条
+      都 return 1 的拒绝路径——「/proc/devices 不可读」与「二次 open 失败」——鸿蒙 PC
+      实测走前者（CI #73496 真机），故断言不把 Linux 专有文案当成跨平台不变量。
+      宿主若既非 aarch64 又无 qemu/binfmt（ENOEXEC），CLI 断言如实标记 SKIP
+      并以非零退出，绝不把「没跑」伪装成「通过」。
+    command: "python3 test_megactl.py <package_folder>/bin"
+  - file: test_layout.py
+    description: >-
+      适配自检（31 项断言，本地实测 31/31 通过，其中鸿蒙特有 8 项）。
+      纯 Python 解析交付 ELF 字节，不依赖 readelf/qemu/执行权限，故任何宿主都能给
+      确定结论（分节 10+4+6+4+4+3 = 31）：①两个 CLI 各 5 项（存在 / 可执行位 /
+      ELF 魔数与 EI_CLASS / e_machine=AArch64(183) / ET_DYN(PIE)，共 10 项）
+      ②DT_NEEDED 只有 musl 的 libc.so、未混入宿主 glibc 的 libc.so.6（4 项）
+      ③.interp 是 OHOS hnp loader（/lib/ld-linux-aarch64.so.1）、非 x86_64
+      loader、无 RPATH/RUNPATH 指向构建机（6 项）④两 CLI 均带 BuildID 且互不相同
+      （确为分别编译的两个目标）＋带 OHOS 工具链独有的 .note.ohos.ident 段
+      （4 项）⑤man 页 .TH 宏分别指向 megactl / megasasctl、AppStream metainfo、
+      licenses/COPYING 正文为 GPL-2.0（4 项）⑥无构建中间产物、无隐藏文件残留
+      （JC5）、包内文本无构建机绝对路径泄漏（3 项）。
+    command: "python3 test_layout.py <package_folder>"
+
+# ── 断言总数 ────────────────────────────────────────────────────────
+assertion_count: 69
+harmony_specific_assertions: 9
+
+# 断言数复算命令（评审可逐字复现）：
+#   python3 test_megactl.py <pkg>/bin | tail -3   → 断言 38 项
+#   python3 test_layout.py  <pkg>     | tail -3   → 适配自检 31 项
+harmony_specific_breakdown:
+  - "test_megactl.py: 交付的 megactl 在鸿蒙目标上真能执行并返回 0（非仅交叉编译通过）"
+  - "test_layout.py: bin/megactl 的 e_machine = AArch64(183)"
+  - "test_layout.py: bin/megasasctl 的 e_machine = AArch64(183)"
+  - "test_layout.py: bin/megactl 的 DT_NEEDED ⊆ ['libc.so']（OHOS musl，非宿主 glibc）"
+  - "test_layout.py: bin/megasasctl 的 DT_NEEDED ⊆ ['libc.so']（OHOS musl，非宿主 glibc）"
+  - "test_layout.py: bin/megactl 的 .interp 指向 OHOS hnp loader"
+  - "test_layout.py: bin/megasasctl 的 .interp 指向 OHOS hnp loader"
+  - "test_layout.py: bin/megactl 带 OHOS 工具链的 .note.ohos.ident 段"
+  - "test_layout.py: bin/megasasctl 带 OHOS 工具链的 .note.ohos.ident 段"
+
+# L1e（R34）反证：两脚本都真读 bin/ 下交付物，CI 移走包产物后必然失败，
+# 因此不可能是 echo/print 空壳测试。
+l1e_negative_proof: true
