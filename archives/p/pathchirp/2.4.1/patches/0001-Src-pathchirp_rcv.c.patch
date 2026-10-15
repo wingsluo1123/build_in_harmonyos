@@ -1,0 +1,45 @@
+--- a/Src/pathchirp_rcv.c
++++ b/Src/pathchirp_rcv.c
+@@ -385,27 +385,36 @@
+       remote_host_broken=1;
+       return;
+     }
+         
+     if (setsockopt (new_so1, IPPROTO_TCP, TCP_NODELAY, (char *)&tcp_no_delay,
+ 		    sizeof(tcp_no_delay)) < 0) {
+ 	 perror ("tcpsend: TCP_NODELAY_options");
+       }
+ 
+ 
+-    if (read(new_so1,paramarray,PARAMARRAY_SIZE)== 0)
+-      {
+-	perror("pathchirp_rcv_tcp: read error");
+-      remote_host_broken=1;
+-      return;
++    /* Read one bounded NUL-terminated frame; TCP reads can be partial. */
++    {
++      size_t used = 0;
++      while (used < sizeof(paramarray)) {
++        ssize_t count = read(new_so1, paramarray + used,
++                             sizeof(paramarray) - used);
++        if (count <= 0) { remote_host_broken=1; return; }
++        used += (size_t) count;
++        if (paramarray[used - 1] == '\0') break;
+       }
+-    
++      if (used == sizeof(paramarray) && paramarray[used - 1] != '\0') {
++        remote_host_broken=1;
++        return;
++      }
++    }
++
+     /* split received parameters into array of strings  */
+ 
+     params=strtok(paramarray,":");
+ 
+     argc_val=0;
+     /* setup argc_val and argv_array  */
+     while(params!=NULL)
+       {
+ 	argv_array[argc_val]=params;/*store location in array*/
+ 	argc_val++;
