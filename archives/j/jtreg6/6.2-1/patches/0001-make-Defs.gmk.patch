@@ -1,0 +1,48 @@
+--- a/make/Defs.gmk
++++ b/make/Defs.gmk
+@@ -143,21 +143,21 @@
+ 
+ # Only use -source -target, to support legacy platforms, when building with JDK 8
+ # Otherwise, use default values for $JDKHOME/bin/javac
+ SUPPORT_OLD_SOURCE_TARGET = $(shell $(JDKJAVAC) -version 2>&1 | grep '[8]' > /dev/null && echo true )
+ ifneq ($(SUPPORT_OLD_SOURCE_TARGET),)
+     OLD_JAVAC_SOURCE_TARGET = -source 1.2 -target 1.1
+     AGENT_JAVAC_SOURCE_TARGET = -source 5 -target 5
+     TOOL_JAVAC_SOURCE_TARGET = -source 8 -target 8
+     REGTEST_TOOL_PATCH_JAVA_BASE_OPTIONS =
+ else
+-    EXTRA_LINT_OPTS = -rawtypes,-unchecked
++    EXTRA_LINT_OPTS = -rawtypes,-unchecked,-removal
+     REGTEST_TOOL_PATCH_JAVA_BASE_OPTIONS = --patch-module java.base=$(JAVADIR)
+ endif 
+ 
+ ifdef JDK5HOME
+     JDK5_BOOTCLASSPATH = -bootclasspath $(JDK5HOME)/jre/lib/rt.jar
+ endif
+ ifdef JDK8HOME
+     JDK8_BOOTCLASSPATH = -bootclasspath $(JDK8HOME)/jre/lib/rt.jar
+ endif
+ 
+@@ -167,21 +167,21 @@
+ 	$(OLD_JAVAC_SOURCE_TARGET) $(JDK5_BOOTCLASSPATH) -Xlint:all,-options,-deprecation,$(EXTRA_LINT_OPTS) -Werror
+ 
+ # for files needed to run agentvm tests (on platforms back to JDK 1.5)
+ REGTEST_AGENT_JAVAC = $(JDKHOME)/bin/javac
+ REGTEST_AGENT_JAVAC_OPTIONS = \
+ 	$(AGENT_JAVAC_SOURCE_TARGET) $(JDK5_BOOTCLASSPATH) -Xlint:all,-options,-deprecation,$(EXTRA_LINT_OPTS) -Werror
+ 
+ # for files needed for jtreg tool
+ REGTEST_TOOL_JAVAC = $(JDKHOME)/bin/javac
+ REGTEST_TOOL_JAVAC_OPTIONS = \
+-	$(TOOL_JAVAC_SOURCE_TARGET) $(JDK8_BOOTCLASSPATH) -Xlint:all,-options,-deprecation -Werror
++	$(TOOL_JAVAC_SOURCE_TARGET) $(JDK8_BOOTCLASSPATH) -Xlint:all,-options,-deprecation,-removal -Werror
+ 
+ #----- JavaTest: https://wiki.openjdk.java.net/display/CodeTools/JT+Harness
+ #
+ # At a minimum, JAVATEST_JAR must be set, either directly or indirectly.
+ # If not set explicitly, it defaults to values derived from JAVATEST_HOME,
+ # JTHARNESS_HOME or SLASH_JAVA.
+ # Set JTHARNESS_LICENSE and JTHARNESS_COPYRIGHT to include license and
+ # copyright files in the product image. If not set explicitly, these 
+ # default to values derived from JAVATEST_HOME, JTHARNESS_HOME or SLASH_JAVA.
+ 

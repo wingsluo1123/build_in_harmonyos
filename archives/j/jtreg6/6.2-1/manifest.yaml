@@ -1,0 +1,72 @@
+version: "6.2-1"
+software: jtreg6
+status: built
+build_date: "2026-10-14"
+build_system: makefile
+
+source:
+  url: "https://github.com/openjdk/jtreg/archive/refs/tags/jtreg-6.2+1.tar.gz"
+  sha256: "d2a4ef1b7d3cf748ea116fcc67c1f60418eb790884b5c3395bd2a6d6bba1d728"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options: []
+  env:
+    JAVA_HOME: "BiShengJDK 17.0.13（缺失时配方内纯 Python 引导安装到 ~/bishengjdk17：conan download + tarfile 进程内解压，sha256 钉校验）"
+    JTREG_VERSION_STRING: "6.2+1"
+    CODE_TOOLS_URL_BASE: "https://github.com/openjdk"
+    MAVEN_REPO_URL_BASE: "https://maven.aliyun.com/repository/central"
+  dependencies:
+    - "bishengjdk 17.0.13"
+    - "apache-ant 1.10.8（配方自取、sha1 钉校验、缓存于 ~/apache-ant-1.10.8）"
+    - "JT Harness jt6.0-b14 / JCov jcov3.0-b07 / AsmTools 7.0-b09（上游 build.sh 从 GitHub 源码构建并校验）"
+    - "JUnit 4.13.2 / TestNG 7.3.0 / Guice 4.2.3 / JCommander 1.78（上游 build.sh 经 Maven 镜像下载并校验）"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-make-Defs.gmk.patch"
+  - "0002-make-Platform.gmk.patch"
+
+knowledge_gained:
+  - "HarmonyOS 的 `uname -s` 返回 HarmonyOS；上游 make/Platform.gmk 未识别时会落入 Windows 分支（PS=';'），javac 在 -Werror 下报 [path] bad path element，需按 Linux 语义加分支（补丁 0002）"
+  - "JDK 9+ 的 javac -Xlint:all 包含 removal 类别；JDK 17（JEP 398）将 java.applet.Applet 标记 forRemoval，jtreg 6.2 在 JDK 17 下 -Werror 构建失败（上游 CI 用 JDK 11），需从 lint 列表排除 removal（补丁 0001）"
+  - "上游 build.sh 依赖 wget -q；设备 toybox wget 不支持，需要 wget→curl shim；raw.githubusercontent.com 不可达，TestNG LICENSE 改从 GitHub 的 testng 源码 tarball 提取（sha1 钉校验）"
+  - "archive.apache.org 从设备下载被限速至 ~20KB/s，Ant 由配方预取缓存到用户目录后经 ANT 环境变量传给 build.sh"
+  - "CI worker（AppSpawn 沙箱、共享 UID）缺 JDK 时 cmd-pkgs install-jdk.sh 的 tar xzf fork 解压子进程会 EAGAIN（tar: fork: Resource temporarily unavailable）——JDK 引导须在配方内纯进程完成：conan download() + tarfile（zlib 进程内）+ rename 竞态发布"
+  - "HMDFS 不支持 mkfifo：GNU make 4.4 的 -j2 jobserver 报 'jobserver mkfifo: Operation not permitted' 后退化调度，构建不受影响"
+
+upstream_tests:
+  full_suite_on_device: "make -k test（HEADLESS=1）：选中 184 个自测目标，180 通过 / 4 失败（97.8%）；失败均为平台/工具语义差异（chmod 只读语义 / JVM 平台属性视图 / toybox grep 缺 BRE \\+），见 reports/test-report.md"
+  build_quick_test: "quick-test（HEADLESS=1）：6/6 通过（tidy-docs、Basic.check、i18n×4），在 conan build() 内执行"
+
+test_results:
+  total: 184
+  passed: 180
+  failed: 4
+  quick_test_total: 6
+  quick_test_passed: 6
+  failed_tests:
+    - "CleanupTests.agentvm.retain: 鸿蒙 chmod 只读语义受限，'不可删除文件'可被删除，残留 scratch 目录数 1 != 5（5 个用例全部 PASS）"
+    - "ProblemList: make 侧平台键（linux-*）与 JVM os.name=HarmonyOS/os.version='HongMeng Kernel 1.12.0' 不一致，OSNAME 系 3 条排除静默失配（期望 passed:1，实测 passed:4；generic 两条正常）"
+    - "SkippedExceptionTest.agentvm / .othervm: 设备 toybox grep 不支持 BRE '\\+'，summary 精确行断言无法匹配（结果断言 passed:1; failed:2 已匹配，实际结果符合期望）"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/work/kasumizawa-miyuu/tmp/builds/jtreg6-6.2-1.orig
+  source_work_dir: /storage/Users/currentUser/work/kasumizawa-miyuu/tmp/builds/jtreg6-6.2-1.work
+  source_orig_hash: dc92ebf4cfe5bcef
+  source_work_hash: 3084fced6a8dce71
+  generated_at: '2026-10-14T18:08:17'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-make-Defs.gmk.patch
+    type: portability
+    platform_only: True
+    guard: 'javac -Xlint:all removal category on JDK 9+ (JDK 17 JEP 398: Applet forRemoval)'
+  - file: 0002-make-Platform.gmk.patch
+    type: portability
+    platform_only: True
+    guard: 'uname -s == HarmonyOS'

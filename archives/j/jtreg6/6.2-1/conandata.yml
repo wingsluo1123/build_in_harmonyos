@@ -1,0 +1,27 @@
+# conandata.yml — jtreg6 6.2-1 (upstream jtreg 6.2+1)
+# 源码 tarball 从 GitHub 官方仓库下载（OpenJDK jtreg tag jtreg-6.2+1）
+# SHA256: d2a4ef1b7d3cf748ea116fcc67c1f60418eb790884b5c3395bd2a6d6bba1d728
+# URL: https://github.com/openjdk/jtreg/archive/refs/tags/jtreg-6.2+1.tar.gz
+#
+# 补丁 0001: 上游 make/Defs.gmk 用 -Xlint:all -Werror 编译。
+# JDK 9+ 的 -Xlint:all 含 removal 类别；JDK 17（JEP 398）把 java.applet.Applet
+# 标记 forRemoval，AppletWrapper.java 产生 [removal] warning 使 -Werror 失败
+# （上游 6.2 CI 用 JDK 11 构建不触发；OHOS 侧仅有 BiShengJDK 17）。
+# 补丁从 lint 列表排除 removal，与现代 JDK 构建习惯一致。
+#
+# 补丁 0002: 上游 make/Platform.gmk 仅识别 SunOS/Linux/Darwin；
+# HarmonyOS 的 `uname -s` 返回 "HarmonyOS"，会落入 Windows 分支，
+# 导致 PS=';'（类路径分隔符变成 Windows 分号），javac 在 -Werror 下
+# 因 [path] bad path element 报错。补丁按 Linux 语义处理 HarmonyOS。
+
+sources:
+  url: "https://github.com/openjdk/jtreg/archive/refs/tags/jtreg-6.2+1.tar.gz"
+  sha256: "d2a4ef1b7d3cf748ea116fcc67c1f60418eb790884b5c3395bd2a6d6bba1d728"
+
+patches:
+  - patch_file: "patches/0001-make-Defs.gmk.patch"
+    patch_description: "Exclude the 'removal' lint category so jtreg 6.2 builds with -Werror on JDK 9+ (JDK 17 marks java.applet.Applet for removal via JEP 398)"
+    patch_type: "portability"
+  - patch_file: "patches/0002-make-Platform.gmk.patch"
+    patch_description: "Treat HarmonyOS as a Linux platform in the makefile platform detection"
+    patch_type: "portability"

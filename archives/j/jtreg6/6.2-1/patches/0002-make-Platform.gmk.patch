@@ -1,0 +1,32 @@
+--- a/make/Platform.gmk
++++ b/make/Platform.gmk
+@@ -53,20 +53,29 @@
+   # Check for unknown arch, try uname -p if uname -m says unknown
+   ifeq ($(OS_ARCH),unknown)
+     OS_ARCH    := $(shell $(UNAME) -p)
+   endif
+   OS_VERSION := $(shell $(UNAME) -r)
+ endif
+ ifeq ($(UNAME_S), Darwin)
+   OS_NAME     = macosx
+   OS_ARCH    := $(shell $(UNAME) -m)
+   OS_VERSION := $(shell defaults read loginwindow SystemVersionStampAsString)
++endif
++ifeq ($(UNAME_S), HarmonyOS)
++  OS_NAME     = linux
++  OS_ARCH    := $(shell $(UNAME) -m)
++  # Check for unknown arch, try uname -p if uname -m says unknown
++  ifeq ($(OS_ARCH),unknown)
++    OS_ARCH    := $(shell $(UNAME) -p)
++  endif
++  OS_VERSION := $(shell $(UNAME) -r)
+ endif
+ ifeq ($(OS_NAME),)
+   OS_NAME = windows
+   # GNU Make or MKS overrides $(PROCESSOR_ARCHITECTURE) to always
+   # return "x86". Use the first word of $(PROCESSOR_IDENTIFIER) instead.
+   ifeq ($(PROCESSOR_IDENTIFIER),)
+     PROC_ARCH:=$(shell $(UNAME) -m)
+   else
+     PROC_ARCH:=$(word 1, $(PROCESSOR_IDENTIFIER))
+   endif
