@@ -1,0 +1,107 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# 填写方法:
+#   1. 解压上游源码包
+#   2. 运行 make -n check (或 ctest -N / meson test --list) 查看测试列表
+#   3. 把实际运行的测试记录到下方
+
+package: oarc-dsc/2.16.1
+homepage: "https://www.dns-oarc.net/tools/dsc"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "make check"
+
+# 上游实际运行的测试程序
+# 清点位置: src/test/Makefile.am 的 TESTS —— 默认 18 项；`--enable-dnstap` 时追加
+#   test5.sh（TESTS += test5.sh）故为 19 项。本包未启用 dnstap，实跑 18 项。
+# 实跑结果: UPSTREAM_DSC_TESTS total=18 pass=14 fail=4（详见 reports/test-report.md）
+# 测试形态: 数据驱动 —— `<name>.conf` + 预录制 pcap 回放，比对 `*_gold` 期望输出；无需 root
+upstream_tests:
+  - file: src/test/test1.sh
+    source: oarc-dsc-2.16.1/src/test/test1.sh
+    description: "1458044657 数据集：含 IPProto / Qtype / transport_vs_qtype 维度与 *_gold 比对"
+    command: "./test1.sh"
+  - file: src/test/test2.sh
+    source: oarc-dsc-2.16.1/src/test/test2.sh
+    description: "数据驱动回放 + *_gold 比对"
+    command: "./test2.sh"
+  - file: src/test/test3.sh
+    source: oarc-dsc-2.16.1/src/test/test3.sh
+    description: "数据驱动回放 + *_gold 比对"
+    command: "./test3.sh"
+  - file: src/test/test4.sh
+    source: oarc-dsc-2.16.1/src/test/test4.sh
+    description: "数据驱动回放 + *_gold 比对"
+    command: "./test4.sh"
+  - file: src/test/test6.sh
+    source: oarc-dsc-2.16.1/src/test/test6.sh
+    description: "数据驱动回放 + *_gold 比对"
+    command: "./test6.sh"
+  - file: src/test/test7.sh
+    source: oarc-dsc-2.16.1/src/test/test7.sh
+    description: "IPv6 数据集回放 + *_gold 比对"
+    command: "./test7.sh"
+  - file: src/test/test8.sh
+    source: oarc-dsc-2.16.1/src/test/test8.sh
+    description: "TCP 传输数据集回放 + *_gold 比对"
+    command: "./test8.sh"
+  - file: src/test/test9.sh
+    source: oarc-dsc-2.16.1/src/test/test9.sh
+    description: "dnstap 输入数据集（本包未启用 --enable-dnstap，实测 FAIL）"
+    command: "./test9.sh"
+  - file: src/test/test10.sh
+    source: oarc-dsc-2.16.1/src/test/test10.sh
+    description: "含用户名/组名解析的数据集（平台无 passwd/group 库，id -nu 解析失败，实测 FAIL）"
+    command: "./test10.sh"
+  - file: src/test/test11.sh
+    source: oarc-dsc-2.16.1/src/test/test11.sh
+    description: "数据驱动回放 + *_gold 比对"
+    command: "./test11.sh"
+  - file: src/test/test12.sh
+    source: oarc-dsc-2.16.1/src/test/test12.sh
+    description: "含已知 TLD 列表（knowntlds）的数据集回放"
+    command: "./test12.sh"
+  - file: src/test/test13.sh
+    source: oarc-dsc-2.16.1/src/test/test13.sh
+    description: "含用户名/组名解析的数据集（平台无 passwd/group 库，实测 FAIL）"
+    command: "./test13.sh"
+  - file: src/test/test_285.sh
+    source: oarc-dsc-2.16.1/src/test/test_285.sh
+    description: "上游 issue 285 回归数据集回放"
+    command: "./test_285.sh"
+  - file: src/test/test_291.sh
+    source: oarc-dsc-2.16.1/src/test/test_291.sh
+    description: "上游 issue 291 回归数据集（EDNS）回放"
+    command: "./test_291.sh"
+  - file: src/test/test_dnstap_unixsock.sh
+    source: oarc-dsc-2.16.1/src/test/test_dnstap_unixsock.sh
+    description: "dnstap unix socket 输入（无 dnstap 支持时自行跳过，实跑 PASS）"
+    command: "./test_dnstap_unixsock.sh"
+  - file: src/test/test_dnstap_tcp.sh
+    source: oarc-dsc-2.16.1/src/test/test_dnstap_tcp.sh
+    description: "dnstap tcp 输入（无 dnstap 支持时自行跳过，实跑 PASS）"
+    command: "./test_dnstap_tcp.sh"
+  - file: src/test/test_encrypted.sh
+    source: oarc-dsc-2.16.1/src/test/test_encrypted.sh
+    description: "加密（DoT/DoH）dnstap 输入数据集（本包未启用 --enable-dnstap，实测 FAIL）"
+    command: "./test_encrypted.sh"
+  - file: src/test/test_pslconv.sh
+    source: oarc-dsc-2.16.1/src/test/test_pslconv.sh
+    description: "dsc-psl-convert 工具验证（public suffix list 转换）"
+    command: "./test_pslconv.sh"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.sh
+    description: "鸿蒙侧消费者用例：用包内 dsc 回放自造 pcap 做真实统计，断言产出 JSON 的 qtype / transport_vs_qtype 数据集与 A 查询计数"
+    command: "bash test.sh"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 7

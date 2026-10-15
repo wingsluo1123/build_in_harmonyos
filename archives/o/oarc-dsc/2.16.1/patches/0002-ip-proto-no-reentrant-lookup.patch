@@ -1,0 +1,50 @@
+--- a/src/ip_proto_index.c
++++ b/src/ip_proto_index.c
+@@ -54,6 +54,21 @@
+ 
+ static int next_iter = 0;
+ 
++#if !defined(__GLIBC__) && !defined(__APPLE__) && !defined(__ANDROID__) && !defined(__FreeBSD__)
++/* Protocol names from the IANA assignments, used when the libc has no reentrant
++ * proto lookup and the platform ships no protocol database (e.g. musl). */
++static const struct {
++    int         proto;
++    const char* name;
++} ip_proto_iana[] = {
++    { 0, "ip" },      { 1, "icmp" },       { 2, "igmp" },       { 4, "ipencap" },
++    { 6, "tcp" },     { 8, "egp" },        { 17, "udp" },       { 41, "ipv6" },
++    { 43, "ipv6-route" }, { 44, "ipv6-frag" }, { 47, "gre" },   { 50, "esp" },
++    { 51, "ah" },     { 58, "ipv6-icmp" }, { 59, "ipv6-nonxt" }, { 60, "ipv6-opts" },
++    { 89, "ospf" },   { 103, "pim" },      { 112, "vrrp" },     { 132, "sctp" },
++};
++#endif
++
+ int ip_proto_iterator(const char** label)
+ {
+     static char label_buf[20];
+@@ -74,8 +89,24 @@
+     memset(&pdata, 0, sizeof(struct protoent_data));
+     getprotobynumber_r(next_iter, &proto, &pdata);
+     p = &proto;
++#elif defined(__GLIBC__) || defined(__APPLE__) || defined(__ANDROID__) || defined(__FreeBSD__)
++    getprotobynumber_r(next_iter, &proto, buf, sizeof(buf), &p);
+ #else
+-    getprotobynumber_r(next_iter, &proto, buf, sizeof(buf), &p);
++    /* libcs without the reentrant proto lookups (e.g. musl): use the classic
++     * interface, and the IANA assignments when there is no protocol database */
++    p = getprotobynumber(next_iter);
++    if (!p) {
++        size_t i;
++        for (i = 0; i < sizeof(ip_proto_iana) / sizeof(ip_proto_iana[0]); i++) {
++            if (ip_proto_iana[i].proto == next_iter) {
++                proto.p_name    = (char*)ip_proto_iana[i].name;
++                proto.p_aliases = 0;
++                proto.p_proto   = next_iter;
++                p               = &proto;
++                break;
++            }
++        }
++    }
+ #endif
+     if (p)
+         *label = p->p_name;

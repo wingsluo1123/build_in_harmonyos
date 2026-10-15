@@ -1,0 +1,29 @@
+# 软件级元数据 — oarc-dsc（ARCHIVE-SPEC v2.0）
+
+name: oarc-dsc
+description: "DNS-OARC DSC（DNS Statistics Collector）：DNS 流量统计采集器，按配置对 pcap 输入做多维统计并输出 XML/JSON 数据集。"
+homepage: "https://www.dns-oarc.net/tools/dsc"
+upstream_repo: "https://codeberg.org/DNS-OARC/dsc"
+upstream_archive: "https://www.dns-oarc.net/files/dsc/dsc-2.16.1.tar.gz"
+
+license: "BSD-3-Clause"
+package_type: application
+build_system: autotools
+
+maintainers:
+  - weijiapan
+
+versions:
+  - version: "2.16.1"
+    status: built
+    build_date: "2026-10-11"
+    build_system: autotools
+    patches:
+      - "0001-dns_message-sys-types.patch"
+      - "0002-ip-proto-no-reentrant-lookup.patch"
+    notes: "autotools 直编（上游含预生成 configure）；补丁 0001 补 <sys/types.h>（u_char，E113/E429），补丁 0002 改协议名解析为『非重入查询 + 内置 IANA 回退表』（平台无 netdb _r 族、无 /etc/protocols）。CLI 包按 ofhttp 惯例 staging 搬运二进制。W3 conan create EXIT=0；上游测试 18 项 14 PASS / 4 FAIL（失败项为平台限制）。含知识库拓展四件套。"
+
+knowledge_refs:
+  knowledge/drafts/oarc-dsc-2.16.1-netdb-reentrant-gap.kv: "本包核心知识条目草稿：OHOS/musl 缺 netdb _r 族 + 设备无 /etc/protocols、/etc/services → 协议名/服务名解析双重退化（含处理策略与判据）"
+  knowledge/drafts/oarc-dsc-2.16.1-netdb-reentrant-gap.md: "同主题的人类可读文档（问题形态、适用范围、既有先例对比、验证判据）"
+  archives/o/oarc-dsc/2.16.1/knowledge-extension/README.md: "知识库拓展四件套说明（检测脚本 / 处理策略 / 文档 / 复现脚本）"

@@ -1,0 +1,88 @@
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/2.16.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "2.16.1"
+
+# 软件名
+software: "oarc-dsc"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-11"
+build_system: "autotools"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://www.dns-oarc.net/files/dsc/dsc-2.16.1.tar.gz"
+
+  # 源码校验和
+  sha256: ""
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表
+  configure_options: []
+  # 例如:
+  # - "-DCMAKE_BUILD_TYPE=Release"
+  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+  # 例如:
+  # - openssl/1.1.1w
+  # - curl/8.19.0
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-dns_message-sys-types.patch"
+  - "0002-ip-proto-no-reentrant-lookup.patch"
+# 例如:
+# - "0001-bootstrap-ohos-toolchain.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "OHOS(musl) sysroot 的 netdb.h 不含 _r 族（getprotobynumber_r 等）→ 链接期 undefined symbol"
+  - "平台无 /etc/protocols、/etc/services：协议名/服务名解析须自带 IANA 回退表，否则维度退化为 p17"
+  - "autotools config.guess/config.sub 不认识 HarmonyOS：需补 ohos 分支（先例 aalib/0001-config.sub-ohos.patch）"
+  - "configure 内 umask 077 使 config.guess 无法创建 dummy.c：沿用 a52dec/0002-configure-umask-022.patch 做法"
+  - "平台无法创建 FIFO（mkfifo EPERM）→ make jobserver 退化为串行，直接 make -j1"
+  - "OHOS sysroot 不含 BSD 风格类型别名 u_char（E113/E429）：显式补 <sys/types.h>"
+# 例如:
+# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
+# - "内嵌 libuv 需要禁用，使用系统 libuv"
