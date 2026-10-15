@@ -1,0 +1,23 @@
+--- a/lib/libexfat.c
++++ b/lib/libexfat.c
+@@ -364,6 +364,20 @@
+ 	ret = uname(&uts);
+ 	if (ret)
+ 		return -1;
++
++	/*
++	 * A release string that does not begin with a digit carries no kernel
++	 * version this comparison can evaluate: the sscanf() below expects the
++	 * number in the leading field.  Kernels that report a descriptive
++	 * release string instead (measured on the HarmonyOS PC device:
++	 * "HongMeng Kernel 1.12.0") must not be rejected as "failed to get
++	 * kernel version" and then, after parsing were fixed, as a pre-2.6
++	 * kernel -- the regular-file path this program supports does not use
++	 * /sys/dev/block at all.  Treat such a release as "version unknown"
++	 * and let the caller proceed.
++	 */
++	if (uts.release[0] < '0' || uts.release[0] > '9')
++		return 0;
+ 
+ 	switch (count_dots(uts.release, 65)) {
+ 	case 0:

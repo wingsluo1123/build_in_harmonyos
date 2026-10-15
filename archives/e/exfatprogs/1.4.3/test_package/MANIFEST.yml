@@ -1,0 +1,35 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI 脚本 build_and_test.sh L0e 强制要求）
+# 依据: exfatprogs-1.4.3 原始 tarball 的 Makefile.am（顶层与 lib/）、
+#       tests/test_fsck.sh 及 lib/tests/suite0000-bitmap.c，
+#       2026-10-15 在 HarmonyOS PC 构建机上对实物源码树清点并实跑。
+
+package: exfatprogs/1.4.3
+homepage: "https://github.com/exfatprogs/exfatprogs"
+
+# 上游测试命令（automake 侧）
+upstream_check_command: "make check"
+
+# conanfile.py build() 中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "make -j1 check && ./lib/tests/suite0000-bitmap && bash ./upstream-tests/test_fsck.sh   # 三段都在 build() 内真实执行"
+
+# 上游实际运行的测试（28 项，两处入口）
+upstream_tests:
+  - file: lib/tests/suite0000-bitmap
+    source: exfatprogs-1.4.3/lib/tests/suite0000-bitmap.c
+    description: "libexfat 位图函数内置单元测试（--enable-tests 编译出的 noinst 程序；上游未把它注册进 automake TESTS）：test_bitmap_size / test_count_used_clusters_0 / test_count_used_clusters_1 / test_bitmap_func / test_bitmap_endian 共 5 个测试函数"
+    command: "./lib/tests/suite0000-bitmap"
+  - file: tests/test_fsck.sh
+    source: exfatprogs-1.4.3/tests/test_fsck.sh
+    description: "上游数据驱动损坏检测套件：19 个 fixture 目录（exfat.img.tar.xz）+ 4 个 tests/upcase_table/*.sh 镜像生成脚本 = 23 个用例；tests/ 不在 SUBDIRS、无 automake TESTS 接线，须由配方显式驱动"
+    command: "bash ./upstream-tests/test_fsck.sh（23/23 通过）"
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: test_exfatprogs.py
+    description: "普通文件镜像上的 mkfs→dump→fsck→exfatlabel 断言链（含全零文件反向对照），8 条断言"
+    command: "conan test（conan create 的 test_package 阶段自动执行）"
+
+# 测试断言总数（用于质量评估）：上游 28（5 单元 + 23 数据驱动）+ 消费者 8
+assertion_count: 36
