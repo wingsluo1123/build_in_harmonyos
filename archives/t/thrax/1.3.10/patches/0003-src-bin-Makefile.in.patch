@@ -1,0 +1,27 @@
+--- a/src/bin/Makefile.in
++++ b/src/bin/Makefile.in
+@@ -331,22 +331,22 @@
+ sbindir = @sbindir@
+ sharedstatedir = @sharedstatedir@
+ srcdir = @srcdir@
+ sysconfdir = @sysconfdir@
+ target_alias = @target_alias@
+ top_build_prefix = @top_build_prefix@
+ top_builddir = @top_builddir@
+ top_srcdir = @top_srcdir@
+ @HAVE_READLINE_FALSE@AM_CPPFLAGS = -I$(srcdir)/../include
+ @HAVE_READLINE_TRUE@AM_CPPFLAGS = -I$(srcdir)/../include -DHAVE_READLINE
+-@HAVE_BIN_TRUE@@HAVE_READLINE_FALSE@LDADD = -L/usr/local/lib/fst ../lib/libthrax.la -lfstscript -lfstfar -lfst -lm -ldl
+-@HAVE_BIN_TRUE@@HAVE_READLINE_TRUE@LDADD = -L/usr/local/lib/fst ../lib/libthrax.la -lfstscript -lfstfar -lfst -lm -ldl -lreadline -lcurses
++@HAVE_BIN_TRUE@@HAVE_READLINE_FALSE@LDADD = -L/usr/local/lib/fst ../lib/libthrax.la -lfstscript -lfstfar -Wl,--whole-archive,-lfst,--no-whole-archive -lm -ldl
++@HAVE_BIN_TRUE@@HAVE_READLINE_TRUE@LDADD = -L/usr/local/lib/fst ../lib/libthrax.la -lfstscript -lfstfar -Wl,--whole-archive,-lfst,--no-whole-archive -lm -ldl -lreadline -lcurses
+ @HAVE_BIN_TRUE@thraxcompiler_SOURCES = compiler.cc
+ @HAVE_BIN_TRUE@thraxrewrite_tester_SOURCES = rewrite-tester.cc rewrite-tester-main.cc
+ @HAVE_BIN_TRUE@thraxrandom_generator_SOURCES = random-generator.cc
+ EXTRA_DIST = thraxmakedep regression_test.cc
+ all: all-am
+ 
+ .SUFFIXES:
+ .SUFFIXES: .cc .lo .o .obj
+ $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
+ 	@for dep in $?; do \

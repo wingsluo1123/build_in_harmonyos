@@ -1,0 +1,108 @@
+#====================================================================
+# E545-draft-4936 — Conan AutotoolsToolchain 丢弃自定义 CPPFLAGS 且不注入依赖 include
+# 来源: PR feat(thrax): 1.3.10 适配 HarmonyOS PC（ohpcd 任务 thrax/1.3.10）
+# 路径: 实测（envprobe 探针 + thrax configure 预演）
+# 状态: 草稿（待主编审核 promote）
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id: E545
+trigger_tool:           conan|configure|clang
+phase:                  configuration
+error_signature:        configure: error: fst/fst\.h header not found|
+                         configure: error: fst/extensions/(far/far|pdt/pdt|mpdt/mpdt)\.h header not found|
+                         fatal error: 'fst/fst\.h' file not found|
+                         ^export CPPFLAGS="\$\{CPPFLAGS:-\}\$\{CPPFLAGS:\+ \}-DNDEBUG"$
+# 前三条=依赖头文件在 AC_CHECK_HEADER 硬校验处失败的表象；
+# 末条=根因的取证指纹：生成文件里 CPPFLAGS 只剩 toolchain 自己写的 -DNDEBUG。
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               2
+category:               autotools, conan, toolchain, headers, build-system
+match_keywords:         CPPFLAGS被覆盖, CPPFLAGS丢失, AutotoolsToolchain,
+                        conanautotoolstoolchain.sh, extra_cflags, extra_cxxflags,
+                        extra_ldflags, AC_CHECK_HEADER 硬校验, 依赖头文件找不到,
+                        include 路径未注入, conftest 链接失败, environment().define
+title:                  Conan AutotoolsToolchain 丢弃自定义 CPPFLAGS 且不注入依赖 include：改用 extra_cflags/extra_cxxflags 显式注入
+prescan_pattern:        AutotoolsToolchain|AC_CHECK_HEADER
+prescan_globs:          conanfile.py, configure.ac, configure.in, configure
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             Conan 2 的 AutotoolsToolchain 在 generate() 中自行拼装环境文件
+                        conanautotoolstoolchain.sh，CPPFLAGS 由它整段重写（只含 -D 宏，
+                        如 -DNDEBUG）；配方里 environment().define("CPPFLAGS", "…-I<dep>")
+                        写进 shell_environment 的自定义内容被覆盖，静默失效（不是报错，
+                        是"没有生效"）。同时 toolchain 不会把依赖包的 includedirs/libdirs
+                        自动注入编译与链接行（AutotoolsDeps 另一路会把依赖写进 LIBS/CPPFLAGS，
+                        但那条路会触发 E467 的 conftest 链接整条共享闭包问题）。
+                        于是依赖头文件不在编译器默认搜索路径里，configure 的
+                        AC_CHECK_HEADER 逐个失败并 AC_MSG_ERROR 中止。
+                        实测取证（envprobe 探针，空配方只放三种指令，看生成文件）：
+                          CFLAGS   落 -O3 -I/PROBE-CFLAGS        ← extra_cflags 生效
+                          CXXFLAGS 落 -stdlib=libc++ -std=c++17 -O3 -I/PROBE-CXXFLAGS ← extra_cxxflags 生效
+                          CPPFLAGS 只剩 -DNDEBUG，-I/PROBE-CPPFLAGS 消失 ← environment().define 被覆盖
+affected_scope:         autotools 构建 + conan 依赖（依赖 include 不在默认搜索路径）的所有包；
+                        上游 configure 对依赖头文件做 AC_CHECK_HEADER 硬校验时必现；
+                        症状会伪装成"依赖没装好/版本不对"，导致在依赖版本上反复调参。
+verification_cmd:       grep -n '^export CPPFLAGS' <build_folder>/conanautotoolstoolchain.sh
+                        # 自定义 -I 不在其中 = 注入被覆盖（根因确认）
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           extra-flags-channel-injection
+rec_description:        在 generate() 里改用 AutotoolsToolchain 的 extra_cflags / extra_cxxflags
+                        注入依赖 include（-I<dep includedir>），用 extra_ldflags 注入
+                        -L<私有静态库目录>；这些字段由 toolchain 以
+                        `${CFLAGS:-}${CFLAGS:+ }…` 形式追加，不与 toolchain 自身标志冲突。
+                        链接侧同理：注入的 -L 落在 LDFLAGS 前段，是链接行上第一个 -L。
+rec_command:            tc = AutotoolsToolchain(self)
+                        tc.extra_cflags.append(f"-I{fst_include}")
+                        tc.extra_cxxflags.append(f"-I{fst_include}")
+                        tc.extra_ldflags.append(f"-L{static_dir}")
+                        tc.generate()
+rec_auto_fix:           false
+
+fallback_priority:      2
+fallback_description:   用 configure 操作数形式传变量（autoconf 支持 ./configure VAR=value），
+                        即 tc.configure_args.append(f'CPPFLAGS=-I{fst_include}')；
+                        本包未实测（主方案已够），仅作 toolchain API 不可用时的降级选项。
+fallback_command:       tc.configure_args.append(f"CPPFLAGS=-I{fst_include}")
+fallback_auto_fix:      false
+
+# ★ 禁止策略 ★
+forbid_1_pattern:       environment\(\)\.define\(\s*["']CPPFLAGS
+forbid_1_reason:        AutotoolsToolchain 场景下它会被 toolchain 生成的 CPPFLAGS 整段覆盖，
+                        写了等于没写（无任何报错，纯静默失效）。
+forbid_1_consequence:   configure 仍在依赖头 AC_CHECK_HEADER 处失败，现象与"没注入"完全一样，
+                        排查者会误判为依赖版本/路径问题而反复调参（典型内部死循环，R43 场景）。
+forbid_2_pattern:       ac_cv_prog_cc_works=yes
+forbid_2_reason:        用预设缓存变量盖住探测结果只是关掉告警，依赖 include/库并未真的接上。
+forbid_2_consequence:  configure 通过但编译期必报头文件/符号缺失，把失败点推后且更难定位。
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             P003
+
+# ═══ 关系图 (Relations) ═══
+causes:                 []
+caused_by:              []
+similar_to:             E467, E524
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file:               knowledge/drafts/E545-draft-4936.md
+last_updated:           2026-10-11
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:                weijiapan <weijiapan@noreply.gitcode.com>
+source_pr:              pending
+source_commit:          pending
+
+# ═══ 质量度量 (Quality Metrics, 方案 D) ═══
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+
+draft: true
+contributor_id: 4936
