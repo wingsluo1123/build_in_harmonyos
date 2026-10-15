@@ -1,0 +1,31 @@
+# conandata.yml — jama 1.0.3 (JAMA: A Java Matrix Package)
+#
+# 上游：NIST + The MathWorks 合作的 JAMA（Java 版），Public Domain。
+#   http://math.nist.gov/javanumerics/jama/
+#   官方发布物只有这一个 tarball（82188 B，2012-11-09 的 1.0.3 稳定版），
+#   解包后为单一根目录 Jama/，含 9 个 *.java（其中 test/、examples/ 非库本体）。
+#
+# ⚠️ 同名易混：本仓另有 C++ 版 JAMA（archives/l/libjama/1.2.5，依赖 libtnt），
+#    与本包 jama/1.0.3 是不同软件、不同版本线，二者不存在依赖关系。
+#
+# 上游零第三方依赖：全部 import 仅 java.* 与 Jama.*（详见 notes.md）。
+
+sources:
+  url: "https://math.nist.gov/javanumerics/jama/Jama-1.0.3.tar.gz"
+  sha256: "a8f4c8f3a4a5d5f8908304638d03aa181b7c71debb2e3c08bb9dc14fcc350a75"
+
+# 构建工具链（非 Conan 依赖）：JDK 缺失时按固定 URL + sha256 下载
+# BiSheng JDK 17.0.13（OHOS aarch64，cmd-pkgs 官方发布，与 vecmath/servlet-api
+# /tunnelx 同款同哈希）。CI worker 已预装时直接复用，不走下载分支。
+build_tools:
+  bisheng_jdk:
+    scheme: "https"
+    host: "gitcode.com"
+    path: "/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/bishengjdk-17.0.13-ohos-aarch64.tar.gz"
+    filename: "bishengjdk-17.0.13-ohos-aarch64.tar.gz"
+    sha256: "ce074909ff5c13e7e7675eb243ee15424f0343610312c526552a1a08d199e28f"
+    version: "17.0.13"
+
+# 无需补丁：JAMA 1.0.3 是纯 Java 源码，产出平台无关字节码，
+# 1.0.3 的 ChangeLog 已含 hqr2 死循环修复与 serialVersionUID 补齐。
+patches: {}

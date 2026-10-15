@@ -1,0 +1,54 @@
+version: "1.0.3"
+software: jama
+status: published
+build_date: "2026-10-14"
+conan_ref: "jama/1.0.3"
+
+source:
+  url: "https://math.nist.gov/javanumerics/jama/Jama-1.0.3.tar.gz"
+  sha256: "a8f4c8f3a4a5d5f8908304638d03aa181b7c71debb2e3c08bb9dc14fcc350a75"
+  tar_format: tar.gz
+
+build:
+  system: custom (javac + jar)
+  configure_options:
+    - "javac -encoding UTF-8 -d classes @library-sources.list"
+    - "jar cf jama-1.0.3.jar -C classes ."
+  dependencies: []
+  cc: "N/A (pure Java)"
+  cxx: "N/A (pure Java)"
+  build_tools:
+    - "BiSheng JDK 17.0.13 (conandata build_tools.bisheng_jdk 固定下载，gitcode cmd-pkgs；worker 已预装则直接复用)"
+
+patches_applied: []
+
+upstream_tests:
+  framework: "custom (Jama.test.TestMatrix，无第三方测试框架)"
+  test_files: 1
+  test_methods: 74
+  sections: 6
+  test_command: "java -cp <classes>:<test-classes> Jama.test.TestMatrix"
+  run_in_build: true
+  result:
+    discovered: 74
+    executed: 74
+    passed: 74
+    failed: 0
+    skipped: 0
+    warnings: 0
+    errors_reported: 0
+  evidence: >-
+    build() 内编译 test/TestMatrix.java 并在独立可写工作目录真实执行，
+    日志 upstream-test-run/upstream-test.log；结果持久化为
+    share/jama/upstream_test_result.json 供 test_package 复发 HMBS 标记。
+
+knowledge_gained:
+  - "源码定位：JAMA 1.0.3（Java 版）唯一官方发行是 NIST tarball（82188 B，2012-11-09，Public Domain），解包为单根 Jama/；上游无任何构建脚本（无 Makefile/pom.xml/build.xml）、无 README/LICENSE（reference: archives/j/jama/1.0.3/conandata.yml）"
+  - "同名易混：本仓另有 C++ 版 JAMA = archives/l/libjama/1.2.5（依赖 libtnt/1.2.6）；jama/1.0.3 与 libjama/1.2.5 是不同软件、不同版本线，不存在依赖关系（reference: archives/l/libjama/1.2.5）"
+  - "零第三方依赖：全部 import 仅 java.io/java.text/java.util/java.util.zip 与 Jama.*；Maven 官方 POM 无 <dependencies>；Debian libjama-java 的 Depends 仅 ${misc:Depends}（reference: archives/j/jama/1.0.3/conanfile.py，notes.md#编译步骤）"
+  - "编译方式：纯 Java 无构建系统，javac -encoding UTF-8 编译 6 个顶层类 + util/Maths.java（排除 test/、examples/，与 Debian debian/build.xml 的 exclude 一致），jar cf 打包 —— 不使用 -source/-target 1.6（JDK 17 已不支持 source 6）（reference: archives/j/jama/1.0.3/notes.md#编译步骤）"
+  - "JDK：conandata build_tools.bisheng_jdk 固定 BiSheng JDK 17.0.13（gitcode cmd-pkgs，sha256 ce074909…，与 vecmath/servlet-api/tunnelx 同款同哈希）；缺失时才下载，构建与 test_package 复用同一 ~/bishengjdk17（reference: archives/v/vecmath/1.5.2/conandata.yml）"
+  - "上游测试：test/TestMatrix.java（957 行、单一 main()、6 段、74 项检查）在 build() 内真实执行，实测 74/74 通过、0 失败、0 跳过、0 警告；结果持久化进包，保证 cache-hit 时 HMBS 标记仍可复发（reference: archives/j/jama/1.0.3/reports/test-report.md）"
+  - "R34：test_package 对打包 JAR 做 31 项真实断言（27 API + 4 鸿蒙消费者用例），不是空壳测试（reference: SKILL.md §R34，archives/j/jama/1.0.3/test_package/TestJama.java）"
+  - "鸿蒙消费者用例（本次新增）：OHOS-1 HarmonyOS aarch64 JVM、OHOS-2 经 Conan 包布局消费（JAMA_JAR/codeSource 一致）、OHOS-3 鸿蒙文件系统真实矩阵读写（不依赖可写 /tmp）、OHOS-4 制品为纯平台无关字节码（reference: archives/j/jama/1.0.3/test_package/MANIFEST.yml）"
+  - "R32: validate() 检查 settings.os in (Linux, OHOS)；R38: 库包（仅 JAR，无 bindirs），不需要 commands.json（reference: SKILL.md §R32，SKILL.md §R38）"
