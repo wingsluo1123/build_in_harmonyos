@@ -1,0 +1,44 @@
+software: termsvg
+version: "0.11.0"
+status: built
+build_date: "2026-10-12"
+build_system: go
+package_type: application
+source:
+  url: "https://github.com/MrMarble/termsvg/archive/refs/tags/v0.11.0.tar.gz"
+  sha256: "035334dce273efe3ff4fcf6eecf0b9facdcb2988403eb9e473659c0c7d0d1c52"
+  tar_format: tar.gz
+build:
+  system: go
+  go_module: github.com/mrmarble/termsvg
+  go_version_required: "1.25.6"
+  go_toolchain_bootstrap: "go1.26.0 linux-arm64 (sha256 bd03b743eb6eb4193ea3c3fd3956546bf0e3ca5b7076c8226334afe6b75704cd)"
+  build_command: "go build -trimpath -ldflags '-s -w -X main.version=v0.11.0 -X main.commit=none -X main.date=unknown' -o <out>/termsvg ./cmd/termsvg"
+  env:
+    CGO_ENABLED: "0"      # 纯静态编译（doggo 先例：默认 CGO 触发 fork/exec 权限错误）
+    GOOS: linux
+    GOARCH: arm64
+    GOTOOLCHAIN: local    # 禁止 go 自行下载另一套工具链（bootstrapped 已签名）
+  dependencies: []
+notes: >
+  Go CLI 工具。OHOS 上两个平台障碍按已发布先例 addchain/0.4.0 与 ain/1.6.0
+  同款解法处理：
+  (1) 制品仓无 Go 工具链、CI 无 go bootstrap —— 配方自行下载 go1.26.0 到
+      非 hmdfs 工作区，并用 binary-sign-tool 为其 bin/go、bin/gofmt 与
+      pkg/tool/linux_arm64/* 下全部 ELF 签名（未签名 ELF 在 OHOS 上 exec
+      报 Permission denied）；
+  (2) Go linker 在 hmdfs 上 mmap 输出失败（E051/E046）—— 链接输出放到
+      /data/storage/el2/... 工作区，完成后再拷回 build_folder。
+  上游 go test 的 *.test 二进制同样需签名，由 go test -exec wrapper 处理。
+  真机实测：go test ./... 6 个包 ok / 0 fail；export 真实 asciicast 产出
+  2.4MB 动效 SVG；消费者测试 6 项断言全 PASS。
+
+commands: commands.json
+commands_note: "R38：产物含可执行文件 bin/termsvg，已声明 hicmd 格式 commands.json"
+
+platform_notes:
+  - "R26 不适用：Go 纯静态二进制，不链接任何系统库，无同名库污染风险"
+  - "R32：settings.os 判 `in (Linux, OHOS)`"
+  - "R33：编译器走 Go 工具链而非 CC/CFLAGS shell 变量"
+  - "R34：test_package 驱动真实二进制 export 真实 asciicast 并校验 SVG 结构/动画/架构"
+  - "R38：commands.json 已声明"
