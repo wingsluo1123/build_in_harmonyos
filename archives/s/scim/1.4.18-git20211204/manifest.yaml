@@ -1,0 +1,40 @@
+software: scim
+version: "1.4.18-git20211204"
+build_system: autotools
+status: published
+build_date: "2026-10-07"
+source:
+  url: "https://github.com/scim-im/scim/archive/e12d6cf6d49d05c226130a3e44400102c82b5163.tar.gz"
+  sha256: "a21e31b0639dbde7089b699dd7fd415f80aebc8defa5ee17688a0e4605fd40e4"
+  tar_format: tar.gz
+build:
+  configure_options: ["--disable-panel-gtk", "--enable-tests", "--build=aarch64-linux", "--host=aarch64-linux"]
+  dependencies: ["libltdl/2.6.0", "gtk/3.24.38"]
+  cc: /data/service/hnp/bin/clang
+  cxx: /data/service/hnp/bin/clang++
+patches_applied:
+  - "patches/0001-configure.ac.patch"
+export_sources:
+  - "m4/pkg.m4"
+  - "m4/intltool.m4"
+knowledge_gained:
+  - "HMDFS 上 autotools config.status 的 AS_TMPDIR umask 077 临时目录不可写，需在 configure.ac 中 m4_define 覆盖 AS_TMPDIR 为 umask 002（E052/E060）"
+  - "上游 git 快照缺 m4/pkg.m4 导致 PKG_PROG_PKG_CONFIG 未展开，随配方 export_sources 提供 pkg.m4（serial 12, pkg-config-0.29.2）"
+  - "上游缺 m4/intltool.m4 导致 IT_PROG_INTLTOOL 未展开，随配方 export_sources 提供 intltool.m4（intltool 0.51.0）"
+  - "conan tool_requires perl 包注入 PERL5LIB(5.42.2 XS)与系统 perl 5.42.0 ABI 不匹配，须将 PERL 指向系统 perl 且 PERL5LIB 仅指向 automake share 目录"
+  - "conan libtool 包 libltdl 数据在 share/libtool-conan/libltdl 仅头文件，完整源在 share/libtool/，需 _stage_libtool_data 复制后以 _lt_pkgdatadir 指向（E443）"
+  - "conan 子进程 HNP cmake 运行时缺 libc++_shared.so，test_package 改用 pkg-config 直编方式规避"
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/scim-1.4.18-git20211204.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/scim-1.4.18-git20211204.work
+  source_orig_hash: af44bbbe30130909
+  source_work_hash: 94a72f53dc19da67
+  generated_at: '2026-10-07T10:33:09'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-configure.ac.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
