@@ -1,0 +1,26 @@
+package: "shaderc"
+homepage: "https://github.com/google/shaderc"
+upstream_check_command: "ctest -N（需 SHADERC_SKIP_TESTS=OFF 并具备 googletest/effcee/re2/abseil）"
+upstream_test_in_build: false
+upstream_test_command: "python3 glslc/test/glslc_test_framework.py <build_dir>/glslc/test"
+upstream_tests:
+  - file: "glslc/test/glslc_test_framework.py"
+    source: "upstream"
+    description: "glslc 集成用例：GLSL/HLSL→SPIR-V 编译、错误路径与告警行为（纯 Python 驱动，依赖 glslc 与 spirv-dis）"
+    command: "python3 glslc/test/glslc_test_framework.py <build_dir>/glslc/test"
+  - file: "glslc/test/expect_unittest.py"
+    source: "upstream"
+    description: "expect 测试框架自测"
+    command: "python3 -m unittest expect_unittest.py"
+  - file: "glslc/test/glslc_test_framework_unittest.py"
+    source: "upstream"
+    description: "glslc 测试框架自测"
+    command: "python3 -m unittest glslc_test_framework_unittest.py"
+test_package_tests:
+  - file: "test_package/test.cpp"
+    description: "以消费者身份链接 libshaderc 静态库，调用 C API 把顶点着色器编译成 SPIR-V，校验编译状态、长度、4 字节对齐与 SPIR-V magic，并带 Vulkan 1.1 + performance 优化选项再编译一次"
+    command: "bash test.sh <build_dir>/test_package/test_shaderc <package_folder>/bin/glslc"
+  - file: "test_package/test.sh"
+    description: "驱动消费者程序，并验证本包交付的 glslc 命令行能编译 GLSL 且产物 SPIR-V magic 正确"
+    command: "bash test.sh <build_dir>/test_package/test_shaderc <package_folder>/bin/glslc"
+assertion_count: 464

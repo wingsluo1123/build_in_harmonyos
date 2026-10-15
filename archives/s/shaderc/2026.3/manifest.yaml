@@ -1,0 +1,44 @@
+software: "shaderc"
+version: "2026.3"
+status: built
+build_date: "2026-10-13"
+build_system: cmake
+source:
+  url: "https://github.com/google/shaderc/archive/refs/tags/v2026.3.tar.gz"
+  sha256: "ee493ccf1b3038b4ef2fe024664c5eb2dc4bcc1f6b05b33e3909de0e19c81024"
+  tar_format: tar.gz
+resources:
+  glslang:
+    url: "https://github.com/KhronosGroup/glslang/archive/168d452a4f460d24b588fed08477a81c44ee27a1.tar.gz"
+    sha256: "c167b2474af06cbab93abae8249efaf88fb79a09f30488e2a24d399e4258ce7a"
+  spirv_tools:
+    url: "https://github.com/KhronosGroup/SPIRV-Tools/archive/b707790a898e44038547df54580022fc1cf89c3d.tar.gz"
+    sha256: "05d8af89737bde57571c48dbd36714c9f520a69623e14de72c3be6b600e277d6"
+  spirv_headers:
+    url: "https://github.com/KhronosGroup/SPIRV-Headers/archive/29981f65241605e08b0ede4cfeb999fe3b723c6a.tar.gz"
+    sha256: "232899f1ad4104fb5bc377b94596c7621575eee62ad9a9e8f929b63a7dd8a7ad"
+build:
+  system: cmake
+  cc: clang
+  cxx: clang++
+  dependencies: []
+  configure_options:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DBUILD_SHARED_LIBS=OFF"
+    - "-DSHADERC_SKIP_TESTS=ON"
+    - "-DSHADERC_SKIP_EXAMPLES=ON"
+    - "-DSHADERC_SKIP_COPYRIGHT_CHECK=ON"
+    - "-DSHADERC_ENABLE_WERROR_COMPILE=OFF"
+    - "-DSPIRV_WERROR=OFF"
+    - "-DCMAKE_POSITION_INDEPENDENT_CODE=ON（受配方 fPIC 选项控制）"
+    - "-DENABLE_GLSLANG_BINARIES=OFF"
+    - "-DSPIRV_SKIP_EXECUTABLES=ON"
+    - "-DSPIRV_SKIP_TESTS=ON"
+patches_applied: []
+knowledge_gained:
+  - "shaderc 源码树不含子模块，glslang/SPIRV-Tools/SPIRV-Headers 提交由上游 DEPS 固定，配方须按同源提交拉取并还原 third_party 布局（含 spirv-tools/external/spirv-headers 同源副本）（reference: conanfile.py#source, notes.md#二）"
+  - "OHOS clang 驱动自带 --gcc-toolchain=<sdk> 参数，shaderc 默认 -Werror 会以 -Wunused-command-line-argument 失败，须关闭 SHADERC_ENABLE_WERROR_COMPILE（reference: conanfile.py#build, E063）"
+  - "构建目录路径含 '.' 时，glslc 对无扩展名输入文件的输出名推导与上游测试框架的期望路径同时被截断，上游 glslc 集成用例会假失败（改用无 '.' 路径即 445/445 通过）（reference: notes.md#四, reports/test-report.md）"
+  - "CMake 4.x 无 Platform/HarmonyOS.cmake 模块，上游 SOVERSION 不生效：libshaderc_shared.so 无版本后缀且无 DT_SONAME，且会被 collect_libs() 收进 cpp_info.libs；本包声明 static-library，须在 package() 剔除该共享库并把 shaderc.pc 链接项改写为静态库（reference: conanfile.py#_drop_soname_less_shared_lib, E383）"
+  - "受限 CI worker 上 CMake 编译器可用性探测的 try-compile 会因 fork/exec EAGAIN 失败（日志为裸 `resource temporarily unavailable`，conan 只抛 `Error 1 while executing` 不带原文），须按签名退避重试并从 CMakeConfigureLog.yaml 回查证据；同一配方在健康 worker（CI-028）可完整通过（reference: conanfile.py#_configure_with_fork_retry, notes.md#对话 #4）"
+  - "Makefiles 生成器执行每条规则要额外 fork /bin/sh，在进程紧张的 worker 上是 try-compile 最先失败的环节，故在能探测到 ninja 时固定 Ninja 生成器并钉死 CMAKE_MAKE_PROGRAM，探测不到则回退 conan 默认生成器（reference: conanfile.py#_ninja_path, E346）"
