@@ -1,0 +1,21 @@
+package: vamp-sdk/2.10.0
+homepage: "https://www.vamp-plugins.org/"
+
+upstream_check_command: "make -j1 all; bash test/run-test-plugin-regression.sh"
+upstream_test_in_build: true
+upstream_test_command: "22 exact output comparisons against test/expected/*.txt"
+upstream_tests:
+  - file: test/run-test-plugin-regression.sh
+    description: "22 plugin-output regression cases, each compared byte-for-byte with an expected result"
+    command: "bash test/run-test-plugin-regression.sh; independent 22-file comparison in conanfile.py"
+
+test_package_tests:
+  - file: test_vamp_consumer.cpp
+    description: "Load the installed example plugin and verify 4 zero crossings and timestamps"
+    command: "./test_vamp_consumer portable"
+  - file: test_vamp_consumer.cpp
+    description: "HarmonyOS user-storage round trip of actual plugin feature output"
+    command: "./test_vamp_consumer ohos-storage"
+
+assertion_count: 17
+# Seventeen explicit failure guards across the two consumer cases; case count is 2.
