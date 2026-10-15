@@ -1,0 +1,67 @@
+# 版本级 manifest — zerolang 0.3.4
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "0.3.4"
+software: "zerolang"
+conan_ref: "zerolang/0.3.4"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-09-29"
+build_system: "makefile"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 官方正式源：vercel-labs/zerolang release v0.3.4
+  url: "https://github.com/vercel-labs/zerolang/archive/refs/tags/v0.3.4.tar.gz"
+
+  # 源码校验和（Homebrew formula 官宣值）
+  sha256: "222c6ca439103441c7c2169351b0aeb841c6f5eca985c07dc53f131173e5c2a7"
+
+  # 压缩格式
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: makefile
+
+  # 配置选项
+  configure_options:
+
+  # 构建命令（CONAN_SRC 为解包后的源码树）
+  build_command: "make -C native/zero-c OUT=<prefix>/bin/zero"
+
+  # 编译环境
+  environment:
+    COMPILER: "clang (OHOS toolchain / cc)"
+    C_STANDARD: c11
+
+  # 构建产物
+  artifacts:
+    - "bin/zero"
+
+# ============================================================
+# 上游测试
+# ============================================================
+
+upstream_tests:
+  total: 5
+  count_method: "native/zero-c/tests/*_smoke.c 独立冒烟程序（scripts/test-native.sh preflight 与 *-smoke.mts 编译运行的 Native smoke 集合）"
+  portability_patch: "OHOS /tmp 只读（erofs E002）：3 个 smoke（process_exec/http_listen/program_graph）硬编码 /tmp 绝对路径，配方在 build() 内将其改写为 SMOKE_TMP 宏（指向可写 build-local 目录）后编译，不改逻辑、仅重定向临时目录，5/5 在只读 /tmp 上通过。"
+  list:
+    - "canonical_text_smoke"
+    - "mir_verify_smoke"
+    - "process_exec_smoke"
+    - "program_graph_smoke"
+    - "http_listen_runner_smoke"

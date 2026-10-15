@@ -1,0 +1,43 @@
+# 软件级 manifest — zerolang (vercel-labs/zerolang)
+# 遵循 ARCHIVE-SPEC v2.0
+
+software: zerolang
+display: "zerolang"
+description: "zerolang：面向 agent 的 graph-native 编程语言编译器（自包含 C 编译器，产出 `zero` CLI 工具）"
+
+# 分类标签
+# foundation|build-tool|compress|crypto|db|network|system|doc|gfx|data|library|utility
+category: build-tool
+
+# 官网 URL
+homepage: "https://github.com/vercel-labs/zerolang"
+
+# 开源许可证（SPDX 标识）
+license: Apache-2.0
+
+# 常用构建系统
+# cmake | autotools | makefile | meson | custom
+build_system: makefile
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "编译器本体是自包含 C 程序（native/zero-c），`make -C native/zero-c OUT=<bin>/zero` 单个 cc 规则即可产出 `zero`"
+    - "native/zero-c/src/embedded_{skills,stdlib_graph,runtime_sources}.inc 三个嵌入资源已在 release 归档内预生成提交，make 判定 up-to-date，无需 node 重新生成 → 纯 cc 编译，无 node/pnpm 运行时依赖"
+    - "aarch64/OHOS 直接支持：上游已内置 zero-elf-aarch64 / aarch64_direct 直接后端，编译器本体纯 C 无平台内联汇编限制"
+    - "OHOS 只读 /tmp：构建与 smoke 子进程一律把 TMPDIR 指到可写 build 目录；3 个 native smoke（process_exec/http_listen/program_graph）硬编码 /tmp 绝对路径，配方编译前改写为 SMOKE_TMP 宏（指向可写目录），不改逻辑仅重定向临时目录"
+    - "上游官方测试套件共 15 个用例 = native/zero-c/tests/*_smoke.c 的 5 个 C 冒烟程序（scripts/test-native.sh preflight 与 *-smoke.mts 编译运行，全部纯 C 可确定性执行）+ tests/zero-cli.test.ts 的 10 个 node:test CLI 契约用例（独立 JS 驱动套件，要求 node 运行时与可运行的 direct-backend 宿主目标 runnableDirectTarget，该目标上游仅定义 darwin-arm64/linux-musl-x64，linux-aarch64/OHOS 无定义，故 10 个用例在锁定无依赖的 OHOS 构建环境以 environment gap 如实披露，不归零）"
+  common_dependencies: []
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "0.3.4":
+    status: built
+    build_date: "2026-09-29"
+    conan_ref: "zerolang/0.3.4"

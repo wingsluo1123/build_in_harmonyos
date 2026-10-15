@@ -1,0 +1,85 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI 强制要求）
+
+package: zerolang/0.3.4
+homepage: "https://github.com/vercel-labs/zerolang"
+
+upstream_tests_exist: true
+upstream_test_audit:
+  source_tarball: "zerolang-0.3.4.tar.gz"
+  build_system: "Makefile (native/zero-c/Makefile, 单个 cc 规则) + tests/zero-cli.test.ts (node:test)"
+  test_definition: >
+    上游官方测试套件分两部分，合计 15 个用例：
+    (A) native/zero-c/tests/*_smoke.c 的 5 个 C 冒烟程序（canonical_text /
+        mir_verify / process_exec / program_graph / http_listen_runner）。
+        scripts/test-native.sh 的 preflight 阶段直接编译运行 process_exec_smoke
+        与 http_listen_runner_smoke，scripts/*-smoke.mts 编译运行 canonical_text /
+        mir_verify / program_graph smoke。配方在 build() 内对这 5 个 smoke 逐一
+        编译并运行，全部纯 C、可确定性执行。
+    (B) tests/zero-cli.test.ts 的 10 个 node:test CLI 契约用例（node:test 驱动，
+        需 node 运行时与可运行的 direct-backend 宿主目标 runnableDirectTarget）。
+    可移植性：OHOS /tmp 只读（erofs E002），process_exec / http_listen / program_graph
+    三个 smoke 硬编码 /tmp 绝对路径（ignore $TMPDIR，只读 /tmp 上 EROFS 必然失败）。
+    配方在编译前将硬编码 /tmp 字面量改写为 SMOKE_TMP 宏（指向可写 build-local 目录），
+    不改测试逻辑、仅重定向临时目录，5/5 在只读 /tmp 上通过。
+  dependency: "none（自包含 C 编译器，仅系统 C 编译器；B 部分的 node:test JS 驱动套件需 node，但不在 C 编译器 zero 的构建/测试链内，锁定的无依赖 OHOS 构建环境不提供）"
+
+upstream_check_command: "cc <native/zero-c/tests>/*_smoke.c && 运行各 smoke（5 native C 冒烟已执行）；tests/zero-cli.test.ts node:test 套件（10，非 OHOS 可执行）"
+upstream_test_in_build: true
+upstream_test_command: "conanfile.py build() 内编译并运行 5 个 native smoke；10 个 node:test CLI 契约用例如实计为 environment gap 未执行"
+
+# 5 个上游原生 C 冒烟程序（来源：native/zero-c/tests/）
+upstream_tests:
+  - file: canonical_text_smoke.c
+    source: native/zero-c/tests/canonical_text_smoke.c
+    description: "canonical text 解析/格式化往返；成功输出 'canonical text smoke ok'"
+    command: "cc native/zero-c/src/*.c (除 main.c) tests/canonical_text_smoke.c && 运行"
+  - file: mir_verify_smoke.c
+    source: native/zero-c/tests/mir_verify_smoke.c
+    description: "MIR 校验器；成功输出 'mir verifier smoke ok'"
+    command: "cc src/mir_verify.c tests/mir_verify_smoke.c && 运行"
+  - file: process_exec_smoke.c
+    source: native/zero-c/tests/process_exec_smoke.c
+    description: "进程执行/输出文件契约（fork+exec）；退出码契约，0 为通过"
+    command: "cc src/process_exec.c src/process_path.c tests/process_exec_smoke.c && 运行"
+  - file: program_graph_smoke.c
+    source: native/zero-c/tests/program_graph_smoke.c
+    description: "program graph 存储/命令；成功输出 'program graph smoke ok'"
+    command: "cc (program_graph 相关 src 集合) tests/program_graph_smoke.c && 运行"
+  - file: http_listen_runner_smoke.c
+    source: native/zero-c/tests/http_listen_runner_smoke.c
+    description: "HTTP listener runner（回环 socket）；退出码契约，0 为通过"
+    command: "cc tests/http_listen_runner_smoke.c && 运行"
+
+# 其余 10 个上游用例为 tests/zero-cli.test.ts 的 node:test CLI 契约用例（已盘点、
+# 未在 OHOS 执行，见下方 gaps 披露）。官方口径合计 15 = 上面 5 个 native C 冒烟
+# + 下面 10 个 node:test CLI 用例：
+#   prints a terse plain version with the build hash
+#   checks directly and rejects removed legacy build flags
+#   builds and runs an executable
+#   checks and builds a manifest project
+#   reports graph, size, objects, and targets
+#   lists and retrieves bundled skills
+#   handles target-specific executable names
+#   rejects unsupported target triples
+#   builds hosted Linux hello through the direct executable backend
+#   emits native diagnostic codes
+
+upstream_test_total: 15
+upstream_test_count_method: "官方口径 = 5 × native/zero-c/tests/*_smoke.c C 冒烟程序（scripts/test-native.sh preflight 与 *-smoke.mts 官方原生测试集合）+ 10 × tests/zero-cli.test.ts 的 node:test CLI 契约用例（tests/zero-cli.test.ts 中 10 个 it() 用例）"
+upstream_test_passed: 5
+upstream_test_failed: 0
+upstream_test_skipped: 0
+upstream_test_not_run: 10
+upstream_test_gaps:
+  - count: 10
+    category: environment
+    detail: "10 个 node:test CLI 契约用例（tests/zero-cli.test.ts）是独立 JS 驱动套件，不在自包含 C 编译器 zero 的测试/构建链内（zero 无需 node）；其可运行 direct-backend 宿主目标 runnableDirectTarget 上游仅定义 darwin-arm64/linux-musl-x64，linux-aarch64/OHOS 无定义，2 个 build&run 用例在此平台必然抛 'no runnable direct target for this host'。锁定的无依赖 OHOS 构建环境无法整体运行该 JS 套件。5 个纯 C 冒烟已在该环境真实编译并 5/5 通过。"
+    evidence: "tests/zero-cli.test.ts 含 10 个 node:test it() 用例；runnableDirectTarget 仅 darwin-arm64/linux-musl-x64（runnableBuildArgs 对 aarch64 抛错）"
+
+test_package_tests:
+  - file: test.sh
+    description: "消费者冒烟：zero --version 含 0.3.4 + hello-world 经 init/import/check/run（--backend llvm，OHOS 端口：llvm 后端产 clang 链接的 PIE/ET_DYN，可被 OHOS 内核 exec；direct 后端静态 ET_EXEC 被 OHOS EACCES 拒）输出 'hello'；共 2 处断言"
+    command: "${SHELL:-/bin/sh} test.sh <package bin/zero 绝对路径>"
+
+assertion_count: 2
