@@ -1,0 +1,99 @@
+# 版本级 manifest
+# 文件位置: archives/l/libxtrxdsp/0.0.1-git20230203.271f5e6/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0（人读索引，CI 不依赖；CI 只读 conanfile.py/conandata.yml/test_package/patches）
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "0.0.1-git20230203.271f5e6"
+
+software: "libxtrxdsp"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-13"
+build_system: cmake
+
+# Conan 引用
+conan_ref: "libxtrxdsp/0.0.1-git20230203.271f5e6"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（上游官方源：myriadrf/libxtrxdsp master HEAD，原 xtrx-sdr/libxtrxdsp）
+  url: "https://github.com/myriadrf/libxtrxdsp/archive/271f5e60e40dd578c0db5f50ceb7fd6b7119c5ef.tar.gz"
+
+  # 源码校验和（官方 GitHub 归档 tarball 实测 sha256）
+  sha256: "4fe5c3e5aff5144dff002ec738e37258c63bb68e9fe2f4bb00175932f3d3d77e"
+
+  # 压缩格式
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+
+  # 配置选项列表（与 conanfile.py generate() 一致）
+  configure_options:
+    - "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"   # 上游 cmake_minimum_required(2.8)，CMake 4.x 需下限
+    - "-DCMAKE_SYSTEM_NAME=Linux"            # E092：CMake 无 HarmonyOS 平台模块，别名以恢复 SONAME/Unix 语义
+    - "-DCMAKE_SYSTEM_PROCESSOR=aarch64"
+    - "-DCMAKE_POSITION_INDEPENDENT_CODE=ON" # 共享库目标显式 PIC（与平台检测分支无关）
+
+  # 编译依赖列表（格式: name/version）
+  # 上游只有 CMake + clang + libm，无任何第三方 Conan 依赖
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 本库在 OHOS 上零源码补丁
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "ref: E187 上游 cmake_minimum_required(VERSION 2.8) 在 CMake >= 4 下直接报 'Compatibility with CMake < 3.5 has been removed'；必须设 CMAKE_POLICY_VERSION_MINIMUM=3.5，且要用 cache_variables（普通 variables 不进 CMakeCache，压不住）。同族先例 libxtrxll/0.0.1-git20201202.1b6eddf、airspyhf/1.6.8、airspy/1.0.10"
+  - "ref: E092 CMake 无 HarmonyOS 平台模块：os=OHOS 经 Conan 映射出的 CMAKE_SYSTEM_NAME=HarmonyOS 不被 CMake 识别（configure 输出 'System is unknown to cmake, create: Platform/HarmonyOS'），Platform/*.cmake 不加载 → CMAKE_SHARED_LIBRARY_SONAME_C_FLAG 为空 → 产物无 DT_SONAME，上游 set_target_properties(... VERSION/SOVERSION ...) 被忽略（无 .so.0 链），CI L5a 门禁拒绝。配方在 os=OHOS 时把 CMAKE_SYSTEM_NAME 别名到 Linux，readelf -d 实测 SONAME = libxtrxdsp.so.0"
+  - "aarch64/OHOS 上上游 x86 SIMD 译元不会被编译：上游 CMakeLists 用 `${CMAKE_C_COMPILER} -dumpmachine` 推导 ARCH 并仅在 ARCH MATCHES \"^x86.*\" 时追加 xtrxdsp_x86_{sse2,avx,avx_fma}.c；aarch64-linux-ohos 得 ARCH=arm。同时 xtrxdsp_config.h 的 XTRXDSP_HAS__SSE2__/__AVX__/__FMA__ 被 `#if defined(__x86_64__) || defined(__i386__)` 守卫，aarch64 上未定义，运行时打印 'Using generic for xtrxdsp_*'，全部走 xtrxdsp_no.c 的通用实现。结论：无需裁剪源文件、无需打补丁、无 x86 intrinsics 触达"
+  - "上游戏默认 add_library(xtrxdsp SHARED ...)：本库在 /lib* 下无同名库（非 R26 情形），保留动态库由 Conan 管理依赖链；package_info 仅声明实际使用的 system_libs=[m]（rt/dl/pthread 在 OHOS 下属基础 C 运行时）"
+  - "R51 上游测试清点：tests/ 下共 2 个测试程序（N=2），全树 grep -rn 'enable_testing|add_test(' 命中 0（ctest 注册数 = 0），故两个程序都由配方直接驱动运行，通过率 2/2。① test_xtrxdsp_sc32i_iq16.c：确定性自校验单元测试（F_VALS=1000，每条样本 2 次 CHECK_I = 2000 项断言，无硬件依赖），但上游结尾写死 `return 0;`，退出码恒 0 → 必须以输出中的 'Total errors: 0' 作为判定（build() 捕获其输出并断言）；② test_filter.c：上游 FIR 滤波流水线（内部调用 xtrxdsp_filter_init + xtrxdsp_filter_work），无断言，文档化终止方式是流结束时的短读路径（`return 2`，1=初始化失败、3=短写）→ build() 用 2×8192 个 float32 的确定性输入驱动 -i/-o 全流水线，断言退出码=2 且输出字节数 = 2×8192×4（即 out_samples = num_insamples >> decim）。要点：无 ctest 注册时『跑 make check』无从谈起，必须直接驱动测试程序，并对**各自真正的通过信号**做断言（退出码 ≠ 通过信号时改断言输出）"
+  - "Conan 2 的 conan.tools.files.copy() 没有 delete 参数；清理包内 *.la/*.dylib 必须用 conan.tools.files.rm(self, pattern, folder)（同族 libxtrxll 已踩过）"
+  - "许可证口径：271f5e60 提交标题即 'Relicensing the code to Apache 2.0 license.'，仓库内 LICENSE 全文为 Apache License 2.0（201 行）——与 libxtrxll 恰好相反（后者 LICENSE 为 LGPL-2.1 而 GitHub 元数据标 Apache-2.0）。本库部分源文件头仍保留迁移前的 LGPL-2.1 文本，以上游仓库 LICENSE 文件为权威口径，conanfile license = Apache-2.0"
+
+# ============================================================
+# 测试
+# ============================================================
+
+tests:
+  # 上游测试程序数（tests/ 下 2 个程序，**全部在本配方 build() 中实际运行**）
+  upstream_count: 2
+  upstream_programs_present: 2     # test_xtrxdsp_sc32i_iq16 + test_filter（两者均在 build() 中运行）
+  upstream_assertions: 2000        # test_xtrxdsp_sc32i_iq16：F_VALS(1000) × 2 次 CHECK_I
+  upstream_run_in_build: true      # test_xtrxdsp_sc32i_iq16 断言 "Total errors: 0"；
+                                   # test_filter 断言退出码=2（文档化流结束路径）+ 输出样本数契约
+  upstream_pass_rate: "2/2 (100%)"
+  test_package_count: 2            # test_consumer.c + test_ohos_dsp.c
+  assertion_count: 73              # 47 + 26
+  verified_on: "HarmonyOS PC aarch64 真机（clang 15.0.4），conan create -pr:h=ohos -pr:b=ohos --build=missing"
+
+patch_generation:
+  method: none
+  reason: "OHOS 适配全部由 CMake cache/普通变量完成，无需修改上游源码（R1 参数最少化 / R8 源码修改四不准则 / 补丁文件中默认禁止平台宏）"
+  patches_count: 0

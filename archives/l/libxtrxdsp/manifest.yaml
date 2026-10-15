@@ -1,0 +1,32 @@
+# 软件级 manifest
+# 文件位置: archives/l/libxtrxdsp/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0（软件级元数据 + 版本索引，人读，CI 不依赖）
+
+software: libxtrxdsp
+display: "libxtrxdsp"
+description: "XTRX SDR DSP support library — sample format conversion (iq8/iq12/iq16 <-> sc32/ic16) and FIR channel filters"
+category: math
+homepage: "https://github.com/myriadrf/libxtrxdsp"
+license: Apache-2.0
+build_system: cmake
+
+# ============================================================
+# 跨版本通用的 OHOS 适配知识
+# ============================================================
+ohos_adaptation:
+  key_points:
+    - "上游 cmake_minimum_required(VERSION 2.8) 在 CMake >= 4 下报 'Compatibility with CMake < 3.5 has been removed'；需 CMAKE_POLICY_VERSION_MINIMUM=3.5，且必须是 cache 变量"
+    - "E092：CMake 无 HarmonyOS 平台模块，os=OHOS 映射出的 CMAKE_SYSTEM_NAME=HarmonyOS 不会被识别，导致 CMAKE_SHARED_LIBRARY_SONAME_C_FLAG 为空、.so 无 DT_SONAME（CI L5a 拒绝）；OHOS 上把 CMAKE_SYSTEM_NAME 别名到 Linux"
+    - "aarch64 上上游不编译 x86 SIMD 译元（ARCH MATCHES \"^x86.*\" 不成立），xtrxdsp_config.h 的 XTRXDSP_HAS__SSE2__/__AVX__/__FMA__ 亦由 x86 宏守卫，运行时走 xtrxdsp_*_no 通用实现——无需裁剪或打补丁"
+    - "上游 tests/ 内 test_xtrxdsp_sc32i_iq16.c 是确定性自校验单元测试（2000 项 CHECK_I），可在无硬件环境运行；test_filter.c 为 getopt 交互式流式工具，无断言"
+    - "非系统同名库（/lib* 下无 libxtrxdsp.so*），保留动态库由 Conan 管理依赖链（R26 不适用）"
+  common_dependencies: []
+
+# ============================================================
+# 版本索引
+# ============================================================
+versions:
+  "0.0.1-git20230203.271f5e6":
+    status: built
+    build_date: "2026-10-13"
+    conan_ref: "libxtrxdsp/0.0.1-git20230203.271f5e6"

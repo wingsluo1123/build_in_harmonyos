@@ -1,0 +1,78 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md 与 references/iron-rules.md R51（上游测试三步法）
+
+package: libxtrxdsp/0.0.1-git20230203.271f5e6
+homepage: "https://github.com/myriadrf/libxtrxdsp"
+
+# ── R51 第一步：上游测试清点（证据：tarball 内源码树） ──
+#
+# 清点命令（在源码根目录执行）:
+#   ls tests/                                -> CMakeLists.txt  test_filter.c  test_xtrxdsp_sc32i_iq16.c
+#   grep -rn "enable_testing\|add_test(" .   -> 0 hits（全树无 ctest 注册）
+#   sed -n '1,20p' tests/CMakeLists.txt      -> 仅 add_executable + target_link_libraries + install
+#
+# 结论：上游 tests/ 下有 **2 个测试程序**（N = 2），ctest 注册用例数 = 0，
+#       两个程序均由上游无条件的 add_subdirectory(tests) 编译，**两个都在本配方
+#       build() 中实际运行**（无 ctest 可用，故直接驱动）：
+#
+#   * test_xtrxdsp_sc32i_iq16.c —— **确定性自校验单元测试**：
+#       - F_VALS = 1000，循环内每条样本做 2 次 CHECK_I 比较（共 2000 项断言）；
+#       - 覆盖 xtrxdsp_sc32i_iq16（aarch64 上经 xtrxdsp_config.h 的 x86 宏守
+#         卫解析为 xtrxdsp_sc32i_iq16_no）的 scale 与 int16 截断语义；
+#       - 无硬件、无设备节点、无网络依赖，任何主机上结果恒定；
+#       - 上游结尾 `return 0;` 恒返回 0（错误只累加到 g_errors 并打印
+#         "Total errors: N"），退出码不足以判定，故 build() 捕获其输出并断言
+#         "Total errors: 0"。
+#
+#   * test_filter.c —— **上游 FIR 滤波流水线**，同样在 build() 中实际运行：
+#       - getopt 驱动：-i 输入文件 / -o 输出文件 / -m 0 浮点模式 / -b 块大小 /
+#         -d 抽取 / -I 插值；默认 stdin→stdout；
+#       - 内部调用 xtrxdsp_filter_init(g_filter_float_taps_64_2x, FILTER_TAPS_64,
+#         decim, inter, blocksize, &state) 与 xtrxdsp_filter_work(state, in, out, bs)；
+#       - 无断言，其**文档化终止方式**是流结束时的短读路径（`return 2` 紧跟
+#         "read %u"；1 = 滤波器初始化失败，3 = 短写）；
+#       - 故 build() 用确定性 float32 输入文件驱动它跑完整流水线，并断言
+#         ①退出码 = 2（走到文档化流结束路径，而非 1/3 的错误路径）；
+#         ②输出样本数符合契约 out_samples = num_insamples >> decim（decim=0 时
+#           等于输入样本数）。
+#
+# 验证平台：HarmonyOS PC (aarch64)，clang 15.0.4，无 XTRX 硬件（真机环境事实；
+#           本库的 DSP 运算本身与 XTRX 硬件无关，两个测试程序均无需硬件）。
+upstream_check_command: "ctest -N"
+upstream_tests_found: 2
+upstream_test_programs_present: 2
+upstream_test_registration: "none (no enable_testing()/add_test() in the tree)"
+
+# conanfile.py build() 方法中是否已集成上游测试运行（两个程序均运行并各自断言）
+upstream_test_in_build: true
+upstream_test_command: "tests/test_xtrxdsp_sc32i_iq16; tests/test_filter -i <in> -o <out> -m 0 -b 8192 -d 0 -I 0"
+
+# 上游实际运行的测试（N = 2，全部在 build() 中执行；通过率 2/2 = 100%）
+upstream_tests:
+  - file: tests/test_xtrxdsp_sc32i_iq16.c
+    source: libxtrxdsp-271f5e6/tests/test_xtrxdsp_sc32i_iq16.c
+    description: 'xtrxdsp_sc32i_iq16 定点/浮点转换单元测试：2000 项 CHECK_I 断言；conanfile.py build() 捕获其输出并断言 "Total errors: 0"'
+    command: "./tests/test_xtrxdsp_sc32i_iq16"
+  - file: tests/test_filter.c
+    source: libxtrxdsp-271f5e6/tests/test_filter.c
+    description: '上游 FIR 滤波流水线：build() 用 2×8192 个 float32 的确定性输入驱动 -i/-o 全流水线，断言退出码 = 2（文档化流结束路径；1=初始化失败、3=短写）且输出字节数 = 2×8192×4（out_samples = num_insamples >> decim）'
+    command: "./tests/test_filter -i <in> -o <out> -m 0 -b 8192 -d 0 -I 0"
+
+# ── R51 第二步/第三步：本包在真机/CI 上实际运行并通过的测试（test_package） ──
+# 两个程序均真实链接 libxtrxdsp 并调用其公共 API（R34：非空壳）。
+test_package_tests:
+  - file: test_consumer.c
+    description: "消费者集成测试：sc32i_iq16 / sc32_iq16 / ic16i_iq16 交织转换与趋零截断、iq16_sc32 的 64 位块路径与尾部路径及 scale、iq16_sc32i / iq16_ic16i 解交织、FIR 通道滤波器（4 项 -EINVAL 参数校验、返回值 num_insamples>>decim、1 抽头全通滤波的 128 浮点延迟直通与跨块连续性、int16 抽头变体、free 清空指针）"
+    command: "./test_consumer"
+  - file: test_ohos_dsp.c
+    description: "鸿蒙特有测试：打包产物符号集（公共入口 + xtrxdsp_*_no 通用实现经 RTLD_DEFAULT 可解析）、x86 SIMD 入口（sse2/avx）必须不存在、公共分发函数与 _no 实现结果逐字节一致、64 位块加载路径的小端通道序（OHOS/aarch64）、posix_memalign(64) 滤波器状态 16 轮 init/free 循环稳定"
+    command: "./test_ohos_dsp"
+
+# 测试断言总数
+#   上游：test_xtrxdsp_sc32i_iq16 的 2000 项 CHECK_I（断言 Total errors: 0）
+#         + test_filter 的退出码/样本数契约断言（2 项）
+#   test_package：test_consumer.c 47 项 + test_ohos_dsp.c 26 项 = 73 项
+#         （实测输出 checks: 47 / checks: 26，failures 均为 0）
+assertion_count: 73
