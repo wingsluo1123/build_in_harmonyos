@@ -1,0 +1,381 @@
+--- a/Cargo.toml	2026-10-04 17:25:24.033188750 +0800
++++ b/Cargo.toml	2026-10-04 19:05:28.701177969 +0800
+@@ -14,8 +14,6 @@
+ tracing-subscriber = "0.3.15"
+ gettext-rs = { version = "0.7.0", features = ["gettext-system"] }
+ gtk = { package = "gtk4", version = "0.7", features = ["gnome_45"] }
+-gdk-wayland = { package = "gdk4-wayland", version = "0.7" }
+-gdk-x11 = { package = "gdk4-x11", version = "0.7" }
+ adw = { package = "libadwaita", version = "0.5", features = ["v1_4"] }
+ gst_video = { package = "gstreamer-video", version = "0.21" }
+ gst_pbutils = { package = "gstreamer-pbutils", version = "0.21", features = [
+@@ -23,9 +21,6 @@
+ ] }
+ gst = { package = "gstreamer", version = "0.21" }
+ gst-plugin-gif = "0.11"
+-gst-plugin-gtk4 = "0.11"
+ futures-channel = "0.3.19"
+ futures-util = { version = "0.3", default-features = false }
+ gsettings-macro = "0.1.15"
+-pulse = { package = "libpulse-binding", version = "2.26.0" }
+-pulse_glib = { package = "libpulse-glib-binding", version = "2.25.1" }
+--- a/src/area_selector/mod.rs	2026-10-04 17:25:24.057180781 +0800
++++ b/src/area_selector/mod.rs	2026-10-04 19:25:08.301179062 +0800
+@@ -19,6 +19,16 @@
+ const PREVIEW_FRAMERATE: u32 = 60;
+ const ASSUMED_HEADER_BAR_HEIGHT: f64 = 47.0;
+ 
++/// Placeholder preview texture for the fakesink-based OHOS preview pipeline.
++const PLACEHOLDER_PREVIEW_WIDTH: i32 = 1280;
++const PLACEHOLDER_PREVIEW_HEIGHT: i32 = 720;
++static PLACEHOLDER_PREVIEW_BYTES: std::sync::LazyLock<glib::Bytes> = std::sync::LazyLock::new(|| {
++    glib::Bytes::from_owned(vec![
++        0u8;
++        (PLACEHOLDER_PREVIEW_WIDTH * PLACEHOLDER_PREVIEW_HEIGHT * 4) as usize
++    ])
++});
++
+ #[derive(Debug)]
+ pub struct Data {
+     /// Selection relative to paintable_rect
+@@ -179,14 +189,30 @@
+         // Setup pipeline
+         let pipeline = gst::Pipeline::new();
+         let videosrc_bin = pipeline::pipewiresrc_bin(fd, streams, PREVIEW_FRAMERATE, None)?;
+-        let sink = gst::ElementFactory::make("gtk4paintablesink").build()?;
++        // HarmonyOS PC adaptation: upstream uses gtk4paintablesink to render the
++        // live preview into a gdk::Paintable. That element comes from
++        // gst-plugin-gtk4, which hard-depends on gstreamer-gl and a real
++        // window-system backend (wayland/x11) — neither exists on the
++        // Broadway-only gtk4/4.22.4 build published for OHOS. Degrade the
++        // preview sink to fakesink (frames are dropped) and provide a plain
++        // MemoryTexture paintable so the selection viewport still receives
++        // concrete intrinsic dimensions (paintable_rect is unwrap()-ed by
++        // update_selection_ui, so it must not be None).
++        let sink = gst::ElementFactory::make("fakesink").build()?;
+         pipeline.add_many([videosrc_bin.upcast_ref(), &sink])?;
+         videosrc_bin.link(&sink)?;
+         imp.pipeline.set(pipeline.clone()).unwrap();
+ 
+-        // Setup paintable
+-        let paintable = sink.property::<gdk::Paintable>("paintable");
+-        imp.view_port.set_paintable(Some(paintable));
++        // Setup paintable (placeholder texture; real frames need a GL sink)
++        let placeholder: gdk::Paintable = gdk::MemoryTexture::new(
++            PLACEHOLDER_PREVIEW_WIDTH,
++            PLACEHOLDER_PREVIEW_HEIGHT,
++            gdk::MemoryFormat::B8g8r8a8,
++            &PLACEHOLDER_PREVIEW_BYTES,
++            (PLACEHOLDER_PREVIEW_WIDTH * 4) as usize,
++        )
++        .upcast();
++        imp.view_port.set_paintable(Some(placeholder));
+ 
+         pipeline.set_state(gst::State::Playing)?;
+ 
+--- a/src/audio_device.rs	2026-10-04 17:25:24.057180781 +0800
++++ b/src/audio_device.rs	2026-10-04 19:13:20.041188594 +0800
+@@ -36,11 +36,14 @@
+     {
+         Ok(res) => Ok(res),
+         Err(err) => {
++            // HarmonyOS PC adaptation: upstream falls back to a direct libpulse
++            // connection here (libpulse-binding / libpulse-glib-binding crates).
++            // The published pulseaudio/17.0 package ships libpulse.so but no
++            // libpulse-mainloop-glib, so the glib-mainloop binding cannot link.
++            // The gstreamer DeviceMonitor path stays the only discovery path.
+             tracing::warn!("Failed to find default name using gstreamer: {:?}", err);
+-            tracing::debug!("Manually using libpulse instead");
+ 
+-            let pa_context = pa::Context::connect().await?;
+-            pa_context.find_default_device_name(class).await
++            Err(err)
+         }
+     }
+ }
+@@ -121,121 +124,3 @@
+ 
+     Err(anyhow!("Failed to find a default device"))
+ }
+-
+-mod pa {
+-    use anyhow::{bail, Context as ErrContext, Result};
+-    use futures_channel::{mpsc, oneshot};
+-    use futures_util::StreamExt;
+-    use gettextrs::gettext;
+-    use gtk::glib;
+-    use pulse::{
+-        context::{Context as ContextInner, FlagSet, State},
+-        proplist::{properties, Proplist},
+-    };
+-
+-    use std::time::Duration;
+-
+-    use super::Class;
+-    use crate::{config::APP_ID, help::ResultExt};
+-
+-    const DEFAULT_TIMEOUT: Duration = Duration::from_secs(2);
+-
+-    pub struct Context {
+-        inner: ContextInner,
+-
+-        // `ContextInner` does not hold a reference causing it
+-        // to be freed and cause error after `Context::connect`.
+-        #[allow(dead_code)]
+-        main_loop: pulse_glib::Mainloop,
+-    }
+-
+-    impl Context {
+-        pub async fn connect() -> Result<Self> {
+-            let main_loop =
+-                pulse_glib::Mainloop::new(None).context("Failed to create pulse Mainloop")?;
+-
+-            let mut proplist = Proplist::new().unwrap();
+-            proplist
+-                .set_str(properties::APPLICATION_ID, APP_ID)
+-                .unwrap();
+-            proplist
+-                .set_str(properties::APPLICATION_NAME, "Kooha")
+-                .unwrap();
+-
+-            let mut inner = ContextInner::new_with_proplist(&main_loop, APP_ID, &proplist)
+-                .context("Failed to create pulse Context")?;
+-
+-            inner.connect(None, FlagSet::NOFLAGS, None).with_help(
+-                || gettext("Make sure that you have PulseAudio installed in your system."),
+-                || gettext("Failed to connect to PulseAudio daemon"),
+-            )?;
+-
+-            let (mut tx, mut rx) = mpsc::channel(1);
+-
+-            inner.set_state_callback(Some(Box::new(move || {
+-                let _ = tx.start_send(());
+-            })));
+-
+-            tracing::debug!("Waiting for context server connection");
+-
+-            while rx.next().await.is_some() {
+-                match inner.get_state() {
+-                    State::Ready => break,
+-                    State::Failed => bail!("Connection failed or disconnected"),
+-                    State::Terminated => bail!("Connection context terminated"),
+-                    _ => {}
+-                }
+-            }
+-
+-            tracing::debug!("Connected context to server");
+-
+-            inner.set_state_callback(None);
+-
+-            Ok(Self { inner, main_loop })
+-        }
+-
+-        pub async fn find_default_device_name(&self, class: Class) -> Result<String> {
+-            let (tx, rx) = oneshot::channel();
+-            let mut tx = Some(tx);
+-
+-            let mut operation = self.inner.introspect().get_server_info(move |server_info| {
+-                let Some(tx) = tx.take() else {
+-                    tracing::error!("Called get_server_info twice!");
+-                    return;
+-                };
+-
+-                match class {
+-                    Class::Source => {
+-                        let _ = tx.send(
+-                            server_info
+-                                .default_source_name
+-                                .as_ref()
+-                                .map(|s| s.to_string()),
+-                        );
+-                    }
+-                    Class::Sink => {
+-                        let _ = tx.send(
+-                            server_info
+-                                .default_sink_name
+-                                .as_ref()
+-                                .map(|s| format!("{}.monitor", s)),
+-                        );
+-                    }
+-                }
+-            });
+-
+-            let Ok(name) = glib::future_with_timeout(DEFAULT_TIMEOUT, rx).await else {
+-                operation.cancel();
+-                bail!("get_server_info operation timeout reached");
+-            };
+-
+-            name.unwrap().context("Found no default device")
+-        }
+-    }
+-
+-    impl Drop for Context {
+-        fn drop(&mut self) {
+-            self.inner.disconnect();
+-        }
+-    }
+-}
+--- a/src/main.rs	2026-10-04 17:25:24.061181875 +0800
++++ b/src/main.rs	2026-10-04 20:21:01.415082187 +0800
+@@ -48,23 +48,40 @@
+ 
+ use self::{
+     application::Application,
+-    config::{GETTEXT_PACKAGE, LOCALEDIR, RESOURCES_FILE},
++    config::{GETTEXT_PACKAGE, LOCALEDIR, RESOURCES_FILE, VERSION},
+ };
+ 
+ fn main() -> glib::ExitCode {
+     tracing_subscriber::fmt::init();
+ 
++    // HarmonyOS PC adaptation (headless verification path; zenity 4.2.2
++    // E252 precedent): --version prints and exits BEFORE gtk display,
++    // gstreamer and resource initialization, none of which can run
++    // headless on the Broadway-only gtk4 build.
++    if std::env::args().any(|arg| arg == "--version") {
++        println!("Kooha {}", VERSION);
++        return glib::ExitCode::from(0);
++    }
++
+     gettextrs::setlocale(LocaleCategory::LcAll, "");
+-    gettextrs::bindtextdomain(GETTEXT_PACKAGE, LOCALEDIR).expect("Unable to bind the text domain.");
++    // HarmonyOS PC adaptation: LOCALEDIR/RESOURCES_FILE default to the
++    // build-time prefix; allow relocating via environment (packaged layout
++    // differs from the meson prefix convention).
++    let localedir = std::env::var("KOOHA_LOCALEDIR").unwrap_or_else(|_| LOCALEDIR.to_string());
++    gettextrs::bindtextdomain(GETTEXT_PACKAGE, &localedir).expect("Unable to bind the text domain.");
+     gettextrs::textdomain(GETTEXT_PACKAGE).expect("Unable to switch to the text domain.");
+ 
+     glib::set_application_name(&gettext("Kooha"));
+ 
+     gst::init().expect("Unable to start gstreamer.");
+     gstgif::plugin_register_static().expect("Failed to register gif plugin.");
+-    gstgtk4::plugin_register_static().expect("Failed to register gtk4 plugin.");
+-
+-    let res = gio::Resource::load(RESOURCES_FILE).expect("Could not load gresource file.");
++    // HarmonyOS PC adaptation: gst-plugin-gtk4 (gtk4paintablesink) requires
++    // gstreamer-gl + EGL/wayland, unavailable on the Broadway-only gtk4 build.
++    // The preview pipeline degrades to fakesink (see area_selector/mod.rs).
++
++    let resources_file =
++        std::env::var("KOOHA_RESOURCE_FILE").unwrap_or_else(|_| RESOURCES_FILE.to_string());
++    let res = gio::Resource::load(&resources_file).expect("Could not load gresource file.");
+     gio::resources_register(&res);
+ 
+     let app = Application::new();
+--- a/src/screencast_session/window_identifier.rs	2026-10-04 17:25:24.061181875 +0800
++++ b/src/screencast_session/window_identifier.rs	2026-10-04 19:13:19.869183281 +0800
+@@ -1,32 +1,28 @@
+ // Based on ashpd (MIT)
+ // Source: https://github.com/bilelmoussaoui/ashpd/blob/49aca6ff0f20c68fc2ddb09763ed9937b002ded6/src/window_identifier/gtk4.rs
++//
++// HarmonyOS PC adaptation: the published gtk4/4.22.4 build ships the
++// Broadway backend only (no wayland/x11), so neither WaylandToplevel nor
++// X11Surface exist to downcast to. The identifier degrades to the empty
++// variant — the same path upstream takes for an "Unhandled surface
++// backend type" (which is exactly what Broadway is).
++
++use std::fmt;
+ 
+-use futures_channel::oneshot;
+ use gtk::{
+-    glib::{self, WeakRef},
++    glib::{self, ToVariant},
+     prelude::*,
+ };
+ 
+-use std::{cell::RefCell, fmt};
+-
+-const WINDOW_HANDLE_KEY: &str = "kooha-wayland-window-handle";
+-
++#[derive(Debug, Default)]
+ pub enum WindowIdentifier {
+-    Wayland {
+-        top_level: WeakRef<gdk_wayland::WaylandToplevel>,
+-        handle: Option<String>,
+-    },
+-    X11(gdk_x11::XWindow),
++    #[default]
+     None,
+ }
+ 
+ impl fmt::Display for WindowIdentifier {
+     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+         match self {
+-            WindowIdentifier::Wayland { handle, .. } => {
+-                write!(f, "wayland:{}", handle.as_deref().unwrap_or_default())
+-            }
+-            WindowIdentifier::X11(xid) => write!(f, "x11:{:#x}", xid),
+             WindowIdentifier::None => f.write_str(""),
+         }
+     }
+@@ -39,66 +35,8 @@
+ }
+ 
+ impl WindowIdentifier {
+-    pub async fn new(native: &impl IsA<gtk::Native>) -> Self {
+-        let surface = native.surface();
+-
+-        if let Some(top_level) = surface.downcast_ref::<gdk_wayland::WaylandToplevel>() {
+-            let handle = unsafe {
+-                if let Some(mut handle) = top_level.data(WINDOW_HANDLE_KEY) {
+-                    let (handle, ref_count): &mut (Option<String>, u8) = handle.as_mut();
+-                    *ref_count += 1;
+-                    handle.clone()
+-                } else {
+-                    let (sender, receiver) = oneshot::channel();
+-                    let sender = RefCell::new(Some(sender));
+-
+-                    let result = top_level.export_handle(move |_, handle| {
+-                        if let Some(m) = sender.take() {
+-                            let _ = m.send(handle.to_string());
+-                        }
+-                    });
+-
+-                    if !result {
+-                        return Self::None;
+-                    }
+-
+-                    let handle = receiver.await.ok();
+-                    top_level.set_data(WINDOW_HANDLE_KEY, (handle.clone(), 1));
+-                    handle
+-                }
+-            };
+-
+-            Self::Wayland {
+-                top_level: top_level.downgrade(),
+-                handle,
+-            }
+-        } else if let Some(surface) = surface.downcast_ref::<gdk_x11::X11Surface>() {
+-            Self::X11(surface.xid())
+-        } else {
+-            tracing::warn!(
+-                "Unhandled surface backend type: {:?}",
+-                surface.display().backend()
+-            );
+-            Self::None
+-        }
+-    }
+-}
+-
+-impl Drop for WindowIdentifier {
+-    fn drop(&mut self) {
+-        if let WindowIdentifier::Wayland { top_level, .. } = self {
+-            if let Some(top_level) = top_level.upgrade() {
+-                unsafe {
+-                    let (_handle, ref_count): &mut (Option<String>, u8) =
+-                        top_level.data(WINDOW_HANDLE_KEY).unwrap().as_mut();
+-                    if *ref_count > 1 {
+-                        *ref_count -= 1;
+-                        return;
+-                    }
+-                    top_level.unexport_handle();
+-                    let _ = top_level.steal_data::<(Option<String>, u8)>(WINDOW_HANDLE_KEY);
+-                }
+-            }
+-        }
++    pub async fn new(_native: &impl IsA<gtk::Native>) -> Self {
++        tracing::debug!("WindowIdentifier: no wayland/x11 surface on this backend");
++        Self::None
+     }
+ }
