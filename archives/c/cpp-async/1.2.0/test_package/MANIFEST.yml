@@ -1,0 +1,50 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: cpp-async/1.2.0
+homepage: "https://github.com/microsoft/cpp-async"
+
+# 上游测试命令 (header-only 库，无 make check；由 conan 配方 source() 应用补丁后，
+# 用 clang++ -std=c++20 编译 test/ 下全部 7 个 Catch2 测试 TU)
+upstream_check_command: "clang++ -std=c++20 -Iinclude -I<catch2> test/program.cpp test/*_tests.cpp"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（v1.2.0 官方测试，Catch2 2.13）
+upstream_tests:
+  - file: test/awaitable_get_tests.cpp
+    source: cpp-async-1.2.0/test/awaitable_get_tests.cpp
+    description: "awaitable_get 基础/成员/非成员 co_await 取回测试"
+    command: "./upstream_tests"
+  - file: test/awaitable_then_tests.cpp
+    source: cpp-async-1.2.0/test/awaitable_then_tests.cpp
+    description: "awaitable_then 串联与值/异常传递测试"
+    command: "./upstream_tests"
+  - file: test/task_canceled_tests.cpp
+    source: cpp-async-1.2.0/test/task_canceled_tests.cpp
+    description: "task_canceled 异常类型测试"
+    command: "./upstream_tests"
+  - file: test/task_completion_source_tests.cpp
+    source: cpp-async-1.2.0/test/task_completion_source_tests.cpp
+    description: "task_completion_source 完成/值/异常/取消测试"
+    command: "./upstream_tests"
+  - file: test/task_tests.cpp
+    source: cpp-async-1.2.0/test/task_tests.cpp
+    description: "task<> 协程生命周期/可等待/移动语义测试"
+    command: "./upstream_tests"
+  - file: test/to_future_tests.cpp
+    source: cpp-async-1.2.0/test/to_future_tests.cpp
+    description: "to_future 转换与成员/非成员 co_await 测试"
+    command: "./upstream_tests"
+
+# test_package 中自带的测试 (消费者视角验证，R34 真实调用 task/event_signal API)
+test_package_tests:
+  - file: test.cpp
+    description: "消费者测试：task<int> 取回 42 + event_signal 跨线程唤醒"
+    command: "./test_cpp-async"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 176
