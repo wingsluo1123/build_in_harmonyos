@@ -1,0 +1,50 @@
+# conandata.yml — pbbam 2.4.0
+# Upstream tag is v2.4.0; tarball root dir is pbbam-2.4.0 (strip_root=True).
+#
+# Download reliability (2026-09-26 preflight: github.com connect timeout):
+# GitHub URLs use the repo-standard mirror fallback (ci/conan/build_and_test.sh
+# get_mirrors: gh-proxy.com first, official URL last). Conan 2.x get()/download()
+# try list entries in order. sha256 values are the official upstream checksums,
+# unchanged — mirrors must serve the identical archives.
+
+sources:
+  url:
+    - "https://gh-proxy.com/https://github.com/PacificBiosciences/pbbam/archive/refs/tags/v2.4.0.tar.gz"
+    - "https://github.com/PacificBiosciences/pbbam/archive/refs/tags/v2.4.0.tar.gz"
+  sha256: "a386a5231b06b0ea660d81abe8081041c200d1817710b89bc9888b485a7aab26"
+
+# pbcopper has no OHOS conan package yet. Upstream pairs pbbam 2.4.0 with
+# pbcopper 2.3.* (bioconda pbbam/meta.yaml, same pbbam sha256 as above);
+# its subprojects/pbcopper.wrap tracks unpinned develop, unusable under
+# Conan's nofallback default. Pin v2.3.0 tarball (bioconda-verified sha256)
+# and vendor it into subprojects/ in source().
+pbcopper:
+  url:
+    - "https://gh-proxy.com/https://github.com/PacificBiosciences/pbcopper/archive/v2.3.0.tar.gz"
+    - "https://github.com/PacificBiosciences/pbcopper/archive/v2.3.0.tar.gz"
+  sha256: "5a183e4a4c860b7e4616b7dda6a3e04fc447d91aa8d75cfbe9b66bebc909c631"
+
+# gtest 1.13.0 comes from the upstream-pinned gtest.wrap (wrap-file with
+# fixed hashes). Seeded into subprojects/packagecache in source() following
+# the upstream CI pattern (scripts/ci/setup.sh copies gtest* into
+# subprojects/packagecache to avoid relying on connectivity at configure).
+gtest:
+  url:
+    - "https://gh-proxy.com/https://github.com/google/googletest/archive/refs/tags/v1.13.0.tar.gz"
+    - "https://github.com/google/googletest/archive/refs/tags/v1.13.0.tar.gz"
+  sha256: "ad7fdba11ea011c1d925b3289cf4af2c66a352e18d4c7264392fead75e919363"
+gtest_patch:
+  url:
+    - "https://gh-proxy.com/https://github.com/mesonbuild/wrapdb/releases/download/gtest_1.13.0-1/gtest_1.13.0-1_patch.zip"
+    - "https://github.com/mesonbuild/wrapdb/releases/download/gtest_1.13.0-1/gtest_1.13.0-1_patch.zip"
+    - "https://wrapdb.mesonbuild.com/v2/gtest_1.13.0-1/get_patch"
+  sha256: "6d82a02c3a45071cea989983bf6becde801cbbfd29196ba30dada0215393b082"
+
+patches:
+  "2.4.0":
+    - patch_file: "patches/0001-samtools-optional.patch"
+      patch_description: "Make samtools optional for samtools-gated cram tests (pbbamify + ccs-kinetics-bystrandify); skip registration when samtools is absent on OHOS (no samtools conan package yet)"
+      patch_type: "portability"
+    - patch_file: "patches/0002-libdeflate-golden-offsets.patch"
+      patch_description: "Refresh BGZF golden offsets in test_PacBioIndex for the in-repo libdeflate stack (htslib --with-libdeflate emits valid but byte-different blocks vs zlib); no assertion added/removed/weakened, following Debian results_with_latest_samtools precedent of adapting golden outputs to the toolchain"
+      patch_type: "portability"

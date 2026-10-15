@@ -1,0 +1,43 @@
+# test_package/MANIFEST.yml — upstream and consumer test declaration
+package: pbbam/2.4.0
+homepage: https://github.com/PacificBiosciences/pbbam
+
+upstream_check_command: "meson test --list"
+upstream_test_in_build: true
+upstream_test_command: "meson test -v --print-errorlogs"
+
+# Upstream audit (v2.4.0, tag v2.4.0):
+# - tests/meson.build registers exactly 3 meson tests: formatting check,
+#   gtest unittests (single pbbam_test binary), zero-byte input check.
+# - tests/src/meson.build lists 72 gtest .cpp files linked into that one binary.
+# - Official registration unit is `meson test` entries, hence total 3+5=8 (build-tools=true).
+upstream_tests_exist: true
+upstream_test_total: 8
+upstream_test_count_method: auto
+upstream_test_audit: "tests/meson.build x3 + tools/meson.build x5 (bam2sam/pbindexdump/pbmerge/pbbamify/ccs-kinetics); 72 TEST files in pbbam_test; pbbamify_CramTests and ccs-kinetics-bystrandify_CramTests register only when samtools is on PATH (both pipe through `samtools view`; patched required:false+found() guard; OHOS has no samtools conan package, btllib precedent) and are excluded_cases when absent (not counted in discovered); pbbam formatting check needs tools/HarmonyOS/clang-format but upstream only ships Linux/Darwin binaries so its OK is vacuous on OHOS (xargs 127) and it is likewise an excluded_case; test_PacBioIndex BGZF golden offsets refreshed for the in-repo htslib --with-libdeflate stack (0002, assertions untouched, Debian golden-refresh precedent)"
+
+upstream_tests:
+  - file: tests/meson.build
+    source: pbbam-2.4.0/tests/meson.build
+    description: "pbbam formatting check (tools/check-formatting --all)"
+    command: "meson test 'pbbam formatting check'"
+  - file: tests/src/test_Version.cpp
+    source: pbbam-2.4.0/tests/src/test_Version.cpp
+    description: "pbbam gtest unittests (72 TEST files in pbbam_test binary)"
+    command: "meson test 'pbbam gtest unittests'"
+  - file: tests/zero_byte_check/main.cpp
+    source: pbbam-2.4.0/tests/zero_byte_check/main.cpp
+    description: "pbbam zero-byte input check (cram)"
+    command: "meson test 'pbbam zero-byte input check'"
+
+  - file: tools/meson.build
+    source: pbbam-2.4.0/tools/meson.build
+    description: "tool cram tests x5 (bam2sam/pbindexdump/pbmerge/pbbamify/ccs-kinetics, build-tools=true)"
+    command: "meson test"
+
+test_package_tests:
+  - file: test_pbbam.cpp
+    description: "LibraryVersionString + FastaSequence round-trip and equality (3 checks)"
+    command: "./test_pbbam"
+
+assertion_count: 8
