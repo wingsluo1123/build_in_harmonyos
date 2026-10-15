@@ -1,0 +1,34 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: ms-numpress/61acddbc
+homepage: "https://github.com/ms-numpress/ms-numpress"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+# ms-numpress 无顶层构建系统（C++ 主体直接 g++ 编译运行，
+# 见 src/main/cpp/MSNumpressTest.cpp 顶部注释: g++ MSNumpress.cpp MSNumpressTest.cpp -o test）
+upstream_check_command: "g++ MSNumpress.cpp MSNumpressTest.cpp -o test && ./test"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: src/main/cpp/MSNumpressTest.cpp
+    source: ms-numpress-61acddbc/src/main/cpp/MSNumpressTest.cpp
+    description: "上游 C++ 算法测试：encodeLinear/decodeLinear、encodePic/decodePic、encodeSlof/decodeSlof 往返与容差校验"
+    command: "./test"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.cpp
+    description: "消费者测试：真实调用 ms-numpress encodeLinear/decodeLinear、encodePic/decodePic 并验证往返一致性与最大误差"
+    command: "./test_ms-numpress"
+
+# 测试断言总数 (近似值, 用于质量评估)
+# 上游 MSNumpressTest.cpp 实测全部通过（本地 clang++ 运行 all tests succeeded），
+# test_package 含 6 项往返断言
+assertion_count: 6
