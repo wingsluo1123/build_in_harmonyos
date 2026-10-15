@@ -1,0 +1,44 @@
+--- a/CMakeLists.txt	2026-10-11 03:19:46.310879900 +0800
++++ b/CMakeLists.txt	2026-10-11 03:51:11.811306600 +0800
+@@ -89,6 +89,14 @@
+ # custom cmake modules
+ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake/")
+ 
++# OHOS/portability: build.sh must be invoked through a shell
++# interpreter -- direct execution of script files is rejected on
++# platforms without binfmt_script support.
++find_program(MYMPD_SHELL_EXECUTABLE NAMES bash sh)
++if(NOT MYMPD_SHELL_EXECUTABLE)
++  message(FATAL_ERROR "Could not find a bash/sh interpreter to run build.sh")
++endif()
++
+ # required dependencies
+ find_library(MATH_LIB m REQUIRED)
+ find_package(Threads REQUIRED)
+@@ -215,7 +223,7 @@
+   message("Embedding assets in binary")
+   set(MYMPD_DOC_ROOT "${MYMPD_WORK_DIR}/empty")
+   set(MYMPD_LUALIBS_PATH "")
+-  execute_process(COMMAND "${PROJECT_SOURCE_DIR}/build.sh" createassets RESULT_VARIABLE RC_CREATE_ASSETS)
++  execute_process(COMMAND "${MYMPD_SHELL_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/build.sh" createassets RESULT_VARIABLE RC_CREATE_ASSETS)
+   # remove object files with embedded assets
+   file(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/src/CMakeFiles/mympd.dir/webserver/mg_user_data.c.o")
+   file(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/src/CMakeFiles/mympd.dir/mympd_api/scripts.c.o")
+@@ -224,7 +232,7 @@
+   message("Serving assets from filesystem")
+   set(MYMPD_DOC_ROOT "${PROJECT_SOURCE_DIR}/htdocs")
+   set(MYMPD_LUALIBS_PATH "${CMAKE_CURRENT_BINARY_DIR}/contrib/lualibs")
+-  execute_process(COMMAND "${PROJECT_SOURCE_DIR}/build.sh" copyassets RESULT_VARIABLE RC_CREATE_ASSETS)
++  execute_process(COMMAND "${MYMPD_SHELL_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/build.sh" copyassets RESULT_VARIABLE RC_CREATE_ASSETS)
+ endif()
+ 
+ if(RC_CREATE_ASSETS GREATER 0)
+@@ -285,7 +293,7 @@
+ 
+ # create html documentation
+ if(MYMPD_DOC_HTML)
+-  execute_process(COMMAND "${PROJECT_SOURCE_DIR}/build.sh" doc "${PROJECT_BINARY_DIR}/htmldoc" RESULT_VARIABLE RC_CREATE_DOC)
++  execute_process(COMMAND "${MYMPD_SHELL_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/build.sh" doc "${PROJECT_BINARY_DIR}/htmldoc" RESULT_VARIABLE RC_CREATE_DOC)
+ endif()
+ if(RC_CREATE_DOC GREATER 0)
+   message(FATAL_ERROR "Creating documentation failed")

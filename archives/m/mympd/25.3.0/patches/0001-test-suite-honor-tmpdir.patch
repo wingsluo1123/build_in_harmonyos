@@ -1,0 +1,322 @@
+--- a/test/utility.h.in	2026-10-11 03:19:46.267369100 +0800
++++ b/test/utility.h.in	2026-10-11 03:19:47.212598800 +0800
+@@ -22,6 +22,13 @@
+ 
+ extern sds workdir;
+ 
++/* The unit tests create their scratch directory below TMPDIR when the
++   environment sets it (the Conan recipe does); /tmp is a read-only mount
++   on HarmonyOS PC.  With TMPDIR unset this resolves to the upstream
++   hardcoded /tmp/mympd-test path, so other platforms are unaffected. */
++const char *test_tmpdir(void);
++sds test_tmpfile(const char *suffix);
++
+ struct t_input_result {
+     const char *input;
+     const char *result;
+--- a/test/utility.c	2026-10-11 03:19:46.267369100 +0800
++++ b/test/utility.c	2026-10-11 03:19:47.213609900 +0800
+@@ -11,29 +11,74 @@
+ #include "src/lib/list/shuffle.h"
+ #include "src/lib/random.h"
+ 
++#include <errno.h>
++#include <ftw.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <sys/stat.h>
+ 
++const char *test_tmpdir(void) {
++    static sds tmpdir = NULL;
++
++    if (tmpdir == NULL) {
++        const char *env = getenv("TMPDIR");
++        if (env != NULL && env[0] != '\0') {
++            tmpdir = sdscatfmt(sdsempty(), "%s/mympd-test", env);
++        }
++        else {
++            tmpdir = sdsnew("/tmp/mympd-test");
++        }
++    }
++
++    return tmpdir;
++}
++
++sds test_tmpfile(const char *suffix) {
++    return sdscatfmt(sdsempty(), "%s%s", test_tmpdir(), suffix);
++}
++
+ void init_testenv(void) {
+-    mkdir("/tmp/mympd-test", 0770);
+-    mkdir("/tmp/mympd-test/http", 0770);
+-    mkdir("/tmp/mympd-test/state", 0770);
+-    mkdir("/tmp/mympd-test/state/default", 0770);
+-    mkdir("/tmp/mympd-test/webradios", 0770);
++    const char *tmpdir = test_tmpdir();
++    sds path = sdsempty();
++
++    mkdir(tmpdir, 0770);
++    path = sdscatfmt(path, "%s/http", tmpdir);
++    mkdir(path, 0770);
++    sdsclear(path);
++    path = sdscatfmt(path, "%s/state", tmpdir);
++    mkdir(path, 0770);
++    sdsclear(path);
++    path = sdscatfmt(path, "%s/state/default", tmpdir);
++    mkdir(path, 0770);
++    sdsclear(path);
++    path = sdscatfmt(path, "%s/webradios", tmpdir);
++    mkdir(path, 0770);
++    sdsfree(path);
+     unsetenv("TESTVAR");
+ }
+ 
++// nftw callback: remove every entry, depth first
++static int clean_testenv_cb(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf) {
++    (void)sb;
++    (void)typeflag;
++    (void)ftwbuf;
++    return remove(fpath);
++}
++
+ void clean_testenv(void) {
+-    if (system("rm -rf /tmp/mympd-test") != 0) {
+-        printf("Failure cleaning /tmp/mympd-test\n");
++    // The scratch directory follows TMPDIR; removing the tree in-process
++    // avoids depending on an external rm and shell
++    if (nftw(test_tmpdir(), clean_testenv_cb, 64, FTW_DEPTH | FTW_PHYS) == -1 &&
++        errno != ENOENT)
++    {
++        printf("Failure cleaning %s\n", test_tmpdir());
+     }
+     unsetenv("TESTVAR");
+ }
+ 
+ bool create_testfile(void) {
+-    sds file = sdsnew("/tmp/mympd-test/state/test");
++    sds file = test_tmpfile("/state/test");
+     const char *data = TESTFILE_CONTENT"\n";
+     size_t len = strlen(data);
+     bool rc = write_data_to_file(file, data, len);
+--- a/test/main.c	2026-10-11 03:19:46.246410700 +0800
++++ b/test/main.c	2026-10-11 03:19:47.213609900 +0800
+@@ -9,6 +9,7 @@
+ #include "dist/utest/utest.h"
+ #include "src/lib/log.h"
+ #include "src/lib/sds/sds_extras.h"
++#include "utility.h"
+ 
+ #include <sys/stat.h>
+ #include <unistd.h>
+@@ -22,7 +23,7 @@
+     thread_logline = sdsempty();
+     set_loglevel(7);
+     log_type = LOG_TO_STDOUT;
+-    workdir = sdsnew("/tmp/mympd-test");
++    workdir = sdsnew(test_tmpdir());
+ 
+     //utest main
+     int rc = utest_main(argc, argv);
+--- a/test/tests/test_cert.c	2026-10-11 03:19:46.254407700 +0800
++++ b/test/tests/test_cert.c	2026-10-11 03:19:47.213609900 +0800
+@@ -20,14 +20,22 @@
+     sds ssl_san = sdsempty();
+     certificates_check(workdir, ssl_san);
+     sdsfree(ssl_san);
+-    bool rc = unlink("/tmp/mympd-test/ssl/ca.key");
++    sds path = test_tmpfile("/ssl/ca.key");
++    bool rc = unlink(path);
+     ASSERT_EQ(0, rc);
+-    rc = unlink("/tmp/mympd-test/ssl/ca.pem");
++    sdsfree(path);
++    path = test_tmpfile("/ssl/ca.pem");
++    rc = unlink(path);
+     ASSERT_EQ(0, rc);
+-    rc = unlink("/tmp/mympd-test/ssl/server.key");
++    sdsfree(path);
++    path = test_tmpfile("/ssl/server.key");
++    rc = unlink(path);
+     ASSERT_EQ(0, rc);
+-    rc = unlink("/tmp/mympd-test/ssl/server.pem");
++    sdsfree(path);
++    path = test_tmpfile("/ssl/server.pem");
++    rc = unlink(path);
+     ASSERT_EQ(0, rc);
++    sdsfree(path);
+ 
+     clean_testenv();
+ }
+--- a/test/tests/test_state_files.c	2026-10-11 03:19:46.265363700 +0800
++++ b/test/tests/test_state_files.c	2026-10-11 03:19:47.213609900 +0800
+@@ -17,7 +17,9 @@
+ 
+ sds get_file_content(void) {
+     int nread = 0;
+-    sds line = sds_getfile(sdsempty(), "/tmp/mympd-test/state/test", 1000, true, true, &nread);
++    sds path = test_tmpfile("/state/test");
++    sds line = sds_getfile(sdsempty(), path, 1000, true, true, &nread);
++    sdsfree(path);
+     return line;
+ }
+ 
+--- a/test/tests/test_http_client_cache.c	2026-10-11 03:19:46.256408900 +0800
++++ b/test/tests/test_http_client_cache.c	2026-10-11 03:19:47.213609900 +0800
+@@ -20,7 +20,7 @@
+ 
+     struct t_config config;
+     config.cache_http_keep_days = 31;
+-    config.cachedir = sdsnew("/tmp/mympd-test");
++    config.cachedir = sdsnew(test_tmpdir());
+     const char *uri = "https://github.com/jcorporation";
+ 
+     struct mg_client_response_t rw;
+--- a/test/tests/test_list.c	2026-10-11 03:19:46.258407800 +0800
++++ b/test/tests/test_list.c	2026-10-11 03:19:47.214597700 +0800
+@@ -304,7 +304,7 @@
+ 
+     struct t_list test_list;
+     populate_list(&test_list);
+-    sds filepath = sdsnew("/tmp/mympd-test/state/test_list");
++    sds filepath = test_tmpfile("/state/test_list");
+     bool rc = list_write_to_disk(filepath, &test_list, write_disk_cb);
+     ASSERT_TRUE(rc);
+     unlink(filepath);
+--- a/test/tests/test_filehandler.c	2026-10-11 03:19:46.255414000 +0800
++++ b/test/tests/test_filehandler.c	2026-10-11 03:19:47.214597700 +0800
+@@ -14,10 +14,12 @@
+ UTEST(filehandler, test_cleanup_rm_directory) {
+     init_testenv();
+ 
+-    int rc = testdir("/tmp/mympd-test/tmp2", "/tmp/mympd-test/tmp2", true, false);
++    sds path = test_tmpfile("/tmp2");
++    int rc = testdir(path, path, true, false);
+     ASSERT_EQ(rc, DIR_CREATED);
+-    bool rc2 = clean_rm_directory("/tmp/mympd-test/tmp2");
++    bool rc2 = clean_rm_directory(path);
+     ASSERT_TRUE(rc2);
++    sdsfree(path);
+ 
+     clean_testenv();
+ }
+@@ -28,15 +30,19 @@
+     int rc = testdir("workdir", workdir, false, false);
+     ASSERT_EQ(rc, DIR_EXISTS);
+ 
+-    rc = testdir("/tmp/mympd-test/tmp2", "/tmp/mympd-test/tmp2", false, false);
++    sds path = test_tmpfile("/tmp2");
++    rc = testdir(path, path, false, false);
+     ASSERT_EQ(rc, DIR_NOT_EXISTS);
+ 
+-    rc = testdir("/tmp/mympd-test/tmp2", "/tmp/mympd-test/tmp2", true, false);
++    rc = testdir(path, path, true, false);
+     ASSERT_EQ(rc, DIR_CREATED);
+-    rmdir("/tmp/mympd-test/tmp2");
++    rmdir(path);
+ 
+-    rc = testdir("/tmp/mympd-test/tmp2/tmp2", "/tmp/mympd-test/tmp2/tmp2", true, false);
++    sds path2 = test_tmpfile("/tmp2/tmp2");
++    rc = testdir(path2, path2, true, false);
+     ASSERT_EQ(rc, DIR_CREATE_FAILED);
++    sdsfree(path2);
++    sdsfree(path);
+ 
+     clean_testenv();
+ }
+@@ -55,12 +61,12 @@
+ 
+     create_testfile();
+ 
+-    sds file  = sdsnew("/tmp/mympd-test/state/test");
++    sds file = test_tmpfile("/state/test");
+     bool rc = testfile_read(file);
+     ASSERT_TRUE(rc);
+-    sdsclear(file);
++    sdsfree(file);
+ 
+-    file = sdscat(file, "/tmp/mympd-test/state/test-notexist");
++    file = test_tmpfile("/state/test-notexist");
+     rc = testfile_read(file);
+     ASSERT_FALSE(rc);
+     sdsfree(file);
+@@ -73,7 +79,8 @@
+ 
+     create_testfile();
+ 
+-    FILE *fp = fopen("/tmp/mympd-test/state/test", "r");
++    sds path = test_tmpfile("/state/test");
++    FILE *fp = fopen(path, "r");
+     int nread = 0;
+     sds line = sds_getfile_from_fp(sdsempty(), fp, 1000, false, &nread);
+     fclose(fp);
+@@ -81,7 +88,7 @@
+     ASSERT_STREQ(TESTFILE_CONTENT, line);
+ 
+     //remove newline
+-    fp = fopen("/tmp/mympd-test/state/test", "r");
++    fp = fopen(path, "r");
+     nread = 0;
+     line = sds_getfile_from_fp(line, fp, 1000, true, &nread);
+     fclose(fp);
+@@ -89,13 +96,14 @@
+     ASSERT_STREQ(TESTFILE_CONTENT_NW, line);
+ 
+     // too big
+-    fp = fopen("/tmp/mympd-test/state/test", "r");
++    fp = fopen(path, "r");
+     nread = 0;
+     line = sds_getfile_from_fp(line, fp, 5, true, &nread);
+     fclose(fp);
+     ASSERT_EQ(nread, -2);
+ 
+     sdsfree(line);
++    sdsfree(path);
+     clean_testenv();
+ }
+ 
+@@ -104,16 +112,18 @@
+ 
+     create_testfile();
+ 
++    sds path = test_tmpfile("/state/test");
+     int nread = 0;
+-    sds line = sds_getfile(sdsempty(), "/tmp/mympd-test/state/test", 1000, false, true, &nread);
++    sds line = sds_getfile(sdsempty(), path, 1000, false, true, &nread);
+     ASSERT_GE(nread, 0);
+     ASSERT_STREQ(line, "asdfjlkasdfjklsafd\nasfdsdfawaerwer");
+ 
+     // too big
+     nread = 0;
+-    line = sds_getfile(line, "/tmp/mympd-test/state/test", 5, true, true, &nread);
++    line = sds_getfile(line, path, 5, true, true, &nread);
+     ASSERT_EQ(nread, -2);
+     sdsfree(line);
++    sdsfree(path);
+ 
+     clean_testenv();
+ }
+@@ -123,7 +133,8 @@
+ 
+     create_testfile();
+ 
+-    FILE *fp = fopen("/tmp/mympd-test/state/test", "re");
++    sds path = test_tmpfile("/state/test");
++    FILE *fp = fopen(path, "re");
+     int nread = 0;
+     sds line = sds_getline(sdsempty(), fp, 1000, &nread);
+     fclose(fp);
+@@ -131,12 +142,13 @@
+     ASSERT_STREQ(line, "asdfjlkasdfjklsafd");
+ 
+     // read 5 chars
+-    fp = fopen("/tmp/mympd-test/state/test", "re");
++    fp = fopen(path, "re");
+     nread = 0;
+     line = sds_getline(line, fp, 5, &nread);
+     fclose(fp);
+     ASSERT_EQ(nread, 5);
+     sdsfree(line);
++    sdsfree(path);
+ 
+     clean_testenv();
+ }

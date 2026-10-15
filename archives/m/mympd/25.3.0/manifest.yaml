@@ -1,0 +1,93 @@
+# 版本级 manifest — mympd 25.3.0
+# 文件位置: archives/m/mympd/25.3.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "25.3.0"
+software: "mympd"
+status: built
+build_system: cmake
+
+source:
+  url:
+    - "https://gh-proxy.com/https://github.com/jcorporation/myMPD/archive/refs/tags/v25.3.0.tar.gz"
+    - "https://ghproxy.net/https://github.com/jcorporation/myMPD/archive/refs/tags/v25.3.0.tar.gz"
+    - "https://github.com/jcorporation/myMPD/archive/refs/tags/v25.3.0.tar.gz"
+  sha256: "d21170635f5caf7650860bcab23560ec0691acd0102a89a281bbb72ab31a7d01"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "cmake_layout（默认生成器 Unix Makefiles）；CMAKE_INSTALL_PREFIX=<package_folder>（上游用绝对 CMAKE_INSTALL_FULL_* 目标并固化工作/缓存/文档根路径）"
+    - "MYMPD_BUILD_TESTING=ON（构建 unit_test，build() 内全量 ctest）"
+    - "内嵌 libmpdclient 2.26.0：不设 MYMPD_EMBEDDED_LIBMPDCLIENT（保持上游默认 OFF）→ find_package 未命中，走上游自带 not-found 回退（该分支同时 set 变量 + add_compile_definitions 定义 C 宏）；⚠ 上游直通 ON 分支漏定义宏：unit_test/mympd-script 按共享模式找 <mpd/client.h> 编译失败（真机四轮实测），版本行也缺 (embedded) 标记"
+    - "MYMPD_STARTUP_SCRIPT=OFF（否则初始化脚本落绝对系统路径）"
+    - "MYMPD_DOC_HTML 保持上游默认 OFF（html 文档链需 sphinx/venv/网络）"
+    - "MYMPD_SHELL_EXECUTABLE=<bash 或 sh>（patch 0003；配方按 CONFIG_SHELL → PATH → 环境 bash 路径优先注入 cache）"
+    - "CMakeDeps：module 模式 + 上游精确大小写 cmake_file_name（PCRE2、OpenSSL+OPENSSL、UTF8PROC、LIBID3TAG、FLAC、Lua+LUA）"
+    - "MATH_LIB 预填空串缓存（musl 数学符号并入 libc、无独立 libm 可发现；跳过上游 find_library(MATH_LIB m REQUIRED) 的失败查找，不额外链接，E376 口径）"
+    - "OHOS 侧 CMAKE_C_FLAGS += -Werror=unused-command-line-argument：使上游逐旗标探测（无 -Werror）与真实 -Werror 语义对齐——-mshstk/-fstack-clash-protection 两枚（aarch64 clang-15 上探针仅告警）在探针阶段如实失败被排除；conan-create 日志探针失败共 4 枚，另两枚 -fcf-protection=full（target 硬错）与 -ftrivial-auto-var-init=zero（clang 15 需专门 opt-in 旗标）与注入无关、历来即被上游探针如实排除；其余旗标不受影响"
+    - "OHOS 侧 CMAKE_C_FLAGS += -Wno-static-in-inline：上游 -D_FORTIFY_SOURCE=2 下 OHOS libc 的 FORTIFY memcpy 为 static-inline 包装，clang 的 -Wstatic-in-inline 在 mpack.h 的 C99 inline 助手中触发并经上游 -Werror 致命；该诊断为 libc-fortify 头文件产物、非源码可修，真机探针矩阵实证（仅 FORTIFY_SOURCE=2 存在时触发；-Wno- 抑制不被其后通用 -Werror 覆写）"
+    - "TMPDIR=<build>/_test_tmp（OHOS /tmp 只读；patch 0001 测试临时路径跟随）"
+    - "gzip：<build>/_toolshim/gzip（pigz 2.8 派生副本，前置到构建环境 PATH；build.sh check_cmd gzip）"
+  dependencies:
+    - pcre2/10.48
+    - openssl/3.5.8.1
+    - utf8proc/2.11.3.2
+    - libid3tag/0.16.3（经注册表配方传递 zlib）
+    - flac/1.5.0（经注册表配方传递 libogg）
+    - lua/5.4.8.1
+    - "tool_requires: jq/1.7.1、perl/5.42.2.3、lua/5.4.8.1（luac）、pigz/2.8"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-test-suite-honor-tmpdir.patch"
+  - "0003-cmake-run-build-sh-via-interpreter.patch"
+  - "0004-test-files-copy-instead-symlink.patch"
+  - "0005-cacertstore-add-harmonyos-ca-path.patch"
+  - "0006-test-http-client-reachable-mirror.patch"
+  - "0007-getopt-long-options-sentinel.patch"
+  - "0008-ohos-mkdir-group-accessible.patch"
+
+patch_classification:
+  - file: 0001-test-suite-honor-tmpdir.patch
+    type: portability
+    platform_only: True
+    guard: '测试侧临时路径统一经 TMPDIR 感知助手（test_tmpdir()/test_tmpfile()，TMPDIR 未设置时回落上游 /tmp/mympd-test，他平台行为等价）；测试目录清理由 system("rm -rf") 改为进程内 nftw() 递归删除。涉及 test/utility.h.in、test/utility.c、test/main.c 与 test/tests/ 下 test_cert.c、test_state_files.c、test_http_client_cache.c、test_list.c、test_filehandler.c 共 8 文件。同一补丁另含 sds 句柄重赋值内存安全修复（sdscatfmt()/sdscat() 增长后返回的新句柄重赋值回变量、弃用值改 sdsfree()；平台加固 jemalloc 将旧句柄复用释放判为致命断言 SIGTRAP——平台触发、修复全平台语义正确）；无用例增删、无期望值改动'
+  - file: 0003-cmake-run-build-sh-via-interpreter.patch
+    type: portability
+    platform_only: True
+    guard: '统一路径（解释器存在时行为等价，无平台条件编译）：根 CMakeLists.txt 三处 execute_process 直接执行 build.sh，无 binfmt_script 的平台不能直接执行脚本文件 → configure 期 find_program(MYMPD_SHELL_EXECUTABLE NAMES bash sh) 定位解释器后以 <解释器> build.sh 调用；未定位到解释器时 FATAL_ERROR 显式报错（配方另可行注入精确路径）'
+  - file: 0004-test-files-copy-instead-symlink.patch
+    type: portability
+    platform_only: True
+    guard: '统一路径（内容一致、用例零改动）：test/CMakeLists.txt 的 unit_test PRE_BUILD 用 cmake -E create_symlink 把 test/testfiles 链接到构建目录，平台对 symlink 全盘 EPERM → 改为 cmake -E rm -r -f + copy_directory 真实复制（cmake -E rm 需构建期 cmake ≥3.17，OHOS 侧满足）'
+  - file: 0005-cacertstore-add-harmonyos-ca-path.patch
+    type: portability
+    platform_only: True
+    guard: '统一路径（探针列表追加项，他平台路径不存在即无效果）：find_ca_cert_store() 仅探测 openSUSE/Fedora/Debian 三种系统 CA 布局，HarmonyOS PC 系统栈位于 /etc/ssl/certs/cacert.pem、三者皆未命中 → TLS 证书校验无系统根证书可加载；向探测表追加 HarmonyOS 路径（cacertstore.c +1 行）'
+  - file: 0006-test-http-client-reachable-mirror.patch
+    type: portability
+    platform_only: True
+    guard: '统一路径（同文件的镜像前缀 URL，有直连的网络行为等价）：test_http_client 抓取 raw.githubusercontent.com 的 README.md，验证网络可达 gh-proxy.com、不可达其直连（解析成功、TCP 连接失败）→ 改为经 gh-proxy.com 前缀镜像取字节同一文件（test/tests/test_http_client.c 单 URL 改动，真实执行同一 HTTP 获取与 TLS 路径）'
+  - file: 0007-getopt-long-options-sentinel.patch
+    type: bugfix
+    platform_only: False
+    guard: '上游正确性修复（全平台语义正确、无平台条件编译）：handle_options.c 的 long_options[] 缺 getopt(3) 契约要求的全零终止项——精确匹配/短选项在扫描早期即被服务而掩盖缺陷，未匹配长选项与无歧义缩写需扫全表 → 越界读表外 .name 指针（真机确定性 SIGSEGV：--foo/--dum 均退出 139、--dump/-Z 正常，崩溃于错误消息打印之前、进程零输出）。修复＝补一行 {NULL, 0, 0, 0}；选项表本身不变'
+  - file: 0008-ohos-mkdir-group-accessible.patch
+    type: portability
+    platform_only: True
+    guard: '平台条件编译（MYMPD_OHOS 门控，配方仅在 OHOS 构建注入该宏；窗口仅包裹 mkdir 调用、文件走 mkstemp(0600) 不受影响）：main 的 umask(0077) 使 0770 mkdir 落为 2700，HarmonyOS PC 存储以目录组权限位判定其下一切访问且忽略事后 chmod() → 目录对包括属主在内一切进程 EACCES（真机最小复现 + 全树预建 0770 组目录后真二进制 -c RC=0 端到端实证）；其余平台行为与上游一致'
+
+knowledge_gained:
+  - 'CMakeDeps 变量契约规则（conan 2.29 源码 + 本地实证）：config 文件模式的变量前缀固定跟随小写包名，无法满足上游精确大小写消费（PCRE2_LIBRARIES/OPENSSL_VERSION/LUA_FOUND 等）；cmake_find_mode=module 时生成 Find<file_name>.cmake，模板对 file_name 与 cmake_additional_variables_prefixes 每个前缀完整输出 FOUND/VERSION/VERSION_STRING/INCLUDE_DIR(S)/LIBRARIES（module 模式额外有 find_package_handle_standard_args 与 <file_name>_FOUND/_VERSION）。file_name 与上游变量前缀大小写不一致的依赖（openssl→OPENSSL_VERSION、lua→LUA_FOUND/LUA_VERSION_STRING）需追加全大写 additional prefix。conan toolchain 默认置 CMAKE_FIND_PACKAGE_PREFER_CONFIG=ON，本方案在该开关两种取值下解析一致'
+  - '构建脚本 check_cmd gzip 类硬需求的最小面适配：注册表无 gzip 包时，pigz 为官方 drop-in（argv[0]=gzip 即 gzip 兼容行为）；构建期把 pigz 二进制派生为 gzip 命名副本，并经 Environment.save_script 注册进 conanbuild 聚合环境脚本（run(env="conanbuild") 为 cmake.configure()/build() 默认，脚本内 ${PATH} 为运行期展开，与 tool_requires 的 PATH 注入正确复合）'
+  - '无 binfmt_script 平台的 CMake 工程适配：execute_process 直接执行仓库内脚本会失败，需 find_program 定位解释器；解释器定位与配方注入双保险（cache_variables 预设 MYMPD_SHELL_EXECUTABLE 后 find_program 自动跳过搜索）'
+  - 'symlink 全盘 EPERM 的平台（OHOS）：cmake -E create_symlink 的 PRE_BUILD 步骤须替换为 rm -r -f + copy_directory 真实复制（cmake -E rm 需构建期 cmake ≥ 3.17）'
+  - 'musl 平台上游 find_library(MATH_LIB m REQUIRED) 失败（数学符号并入 libc、无独立 libm 可发现）：预填空串缓存变量使 find_library 跳过查找、不额外链接（E376 target-evidence-bound-empty-library-cache；ballerburg/blupimania 先例）——真机实测首轮 G2 即在 CMakeLists.txt find_library(MATH_LIB m) 处失败，按此口径修复'
+  - '逐旗标编译探针缺 -Werror 语义的假阳性：上游 check_c_compiler_flag 逐个探测硬化旗标并加入通过者，但探针不带 -Werror，x86 专用旗标 -mshstk/-fstack-clash-protection 在 aarch64 clang-15 上探针通过、真实编译与上游 -Werror 合流后 "argument unused during compilation" 致命（真机二轮实测死在 dist/libmpdclient 全部 .obj）。处方=令 CMAKE_C_FLAGS 携带 -Werror=unused-command-line-argument（仅该诊断组），探针如实失败→旗标被排除；同族诊断先例 E580（draft：-Qunused-arguments 对冲），同效先例 liboprf `_patch_stack_clash`（剥旗标）'
+  - '_D_FORTIFY_SOURCE 下 libc FORTIFY 包装 × clang -Wstatic-in-inline 假阳性：上游 — 未开 sanitizer 时 — 加 -D_FORTIFY_SOURCE=2；OHOS libc 的 FORTIFY memcpy 为 static-inline 包装（string.h pass_object_size 版本），clang 的 -Wstatic-in-inline 在 mpack.h 的 C99 inline（外链）助手中触发、经上游 -Werror 致命（真机三轮实测死在 dist/mpack/mpack.c）。该诊断非源码可修（C99 约束题面对 libc 头文件产物）；处方=OHOS 侧 CMAKE_C_FLAGS 加 -Wno-static-in-inline（真机矩阵实证：无 FORTIFY 不触发；-Wno- 的忽略态不被其后通用 -Werror 覆写）。先例=rpmalloc/1.4.5 自用旗标表即含 -Wno-static-in-inline'
+  - '上游内嵌 libmpdclient 的 ON 直通分支缺定义宏：CMakeLists.txt 中 if(MYMPD_EMBEDDED_LIBMPDCLIENT STREQUAL "ON") 分支只有 message，add_compile_definitions("MYMPD_EMBEDDED_LIBMPDCLIENT=ON") 只写在两个回退分支（版本过旧 / not-found）。以 -DMYMPD_EMBEDDED_LIBMPDCLIENT=ON（cache）配置时 CMake 侧变量为 ON（src 目标挂 dist include、unit_test 链接 mpdclient、dist 子目录启用、mympd 链接 mpdclient），但 C 侧宏缺失：src/lib/mpdclient.h 走 #include <mpd/client.h> 的 else 分支（上游假定系统头路径存在——正常 Linux 有 /usr/include/mpd），handle_options/main 版本行缺 "(embedded)" 标记。真机四轮实测：mympd 主目标借自身 dist include 目录编译通过，unit_test 与 cli_tools/mympd-script 双双 fatal error（9 处）。修法=不设该变量、走上游 not-found 回退：内嵌 dist/libmpdclient（2.26.0）与 C 宏一次到位（上游主流内嵌路径）'
+  - 'getopt_long 长选项表终止契约（补丁 0007）：long_options[] 必须以全零项结尾；精确匹配与短选项可在扫描早期被服务而掩盖缺陷，未匹配长选项与无歧义缩写必须扫全表 → 缺哨兵即越界读（真机确定性 SIGSEGV、139；崩溃早于任何错误输出——重定向文件仅含 shell 的 "Signal 11" 行、进程零输出=崩于扫描期，判定锚点）。myMPD 25.3.0 上游真实缺陷；修复=补哨兵一行，全平台正确性修复'
+  - 'HarmonyOS PC 用户存储目录语义（补丁 0008，真机探针矩阵定案）：目录访问以其组权限位判定——umask(0077)+mkdir(0770) 落 2700 后对属主亦 EACCES；事后 chmod() 被忽略不落盘（shell chmod 与 python3 os.chmod 直调均 no-op）；创建时请求 mode 被尊重（umask≤0002 或 umask(0)+mkdir(0770) → 2771 组 rwx 可用、其内建子目录/文件正常）。修复面=创建时保组 rwx：全树唯一 mkdir 点=filehandler.c testdir()、唯一 umask 点=main.c:208，单点窗口修复即可；端到端实证=全树预建后真二进制 -c RC=0、证书与逐项配置全生成、优雅退出'

@@ -1,0 +1,17 @@
+--- a/test/CMakeLists.txt	2026-10-11 03:19:46.246410700 +0800
++++ b/test/CMakeLists.txt	2026-10-11 03:51:11.811306600 +0800
+@@ -182,8 +182,13 @@
+   target_link_libraries(unit_test ${FLAC_LIBRARIES})
+ endif()
+ 
++# OHOS/portability: symlink creation is denied on the platform (EPERM
++# across the filesystem), so materialize the test files as a real
++# directory copy instead of a symlink (cmake -E rm needs cmake >= 3.17
++# at build time only).
+ add_custom_command(TARGET unit_test PRE_BUILD
+-  COMMAND ${CMAKE_COMMAND} -E create_symlink
++  COMMAND ${CMAKE_COMMAND} -E rm -r -f ${PROJECT_BINARY_DIR}/testfiles
++  COMMAND ${CMAKE_COMMAND} -E copy_directory
+   ${CMAKE_SOURCE_DIR}/test/testfiles ${PROJECT_BINARY_DIR}/testfiles)
+ 
+ # define tests
