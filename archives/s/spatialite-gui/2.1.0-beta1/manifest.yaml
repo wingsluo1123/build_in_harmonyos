@@ -1,0 +1,120 @@
+# 版本级 manifest
+# 文件位置: archives/s/spatialite-gui/2.1.0-beta1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "2.1.0-beta1"
+
+software: "spatialite-gui"
+
+# 编译状态
+# published | built | failed | archived
+# drafted = 配方就绪但未真机验证（切勿标 published）
+status: drafted
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-01"
+build_system: "autotools"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://www.gaia-gis.it/gaia-sins/spatialite-gui-sources/spatialite_gui-2.1.0-beta1.tar.gz"
+  # 2026-10-01 用 shasum -a 256 对 init-build 取到的 tarball 独立复算确认
+  sha256: "ba48d96df18cebc3ff23f69797207ae1582cce62f4596b69bae300ca3c23db33"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: autotools
+
+  configure_options:
+    - "--with-wxconfig=<wxwidgets-gtk3 包内 bin/wx-config>"
+    - "--with-geosconfig=<自建 ELF geos-config 替身>"
+    - "--with-pgconfig=<自建 ELF pg_config 替身>"
+    - "--disable-xlsxwriter"   # 本仓无 libxlsxwriter 配方；XLSX 路径全被 #ifdef 包住
+    - "--disable-lz4"          # configure 探测 liblz4，而 lz4 配方发布 lz4.pc，名字对不上
+    - "--disable-freexl"
+    - "--disable-minizip"
+    - "--disable-zstd"
+    - "--disable-openjpeg"
+    - "--disable-webp"
+    - "--enable-libxml2"       # virtualpg 的 .pc 与 WFS/KML 解析都需要，且已是传递依赖
+
+  dependencies:
+    - wxwidgets-gtk3/3.2.10
+    - libspatialite/5.1.0.2   # 非 5.1.0.2.1：librasterlite2 pin 5.1.0.2，同 ref 双 exact pin 解析冲突
+    - librasterlite2/1.1.0-beta1
+    - virtualpg/2.0.1.1
+    - curl/8.15.0
+    - sqlite3/3.49.1          # 非 3.53.4：libspatialite/librasterlite2/virtualpg/proj 均 pin 3.49.1
+    - liblzma/5.8.1
+    - proj/9.3.1.1
+    - geos/3.13.1
+    - libpq/18.1              # 非 18.6.1：virtualpg pin 18.1
+    - zlib/1.3.1.1
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 两个源码补丁（与 conandata.yml patches: 段一致；build() 经 apply_conandata_patches
+# 顺序应用，cigate-4 日志 291-292 行 Apply patch 实证）
+patches_applied:
+  - "0001-Classdef.h.patch：Classdef.h:53 的 #include <freexl.h> 包进 #ifndef OMIT_FREEXL——上游疏漏，--disable-freexl 下该公共头 include 无条件编译死于 freexl.h not found（+2/-0）"
+  - "0002-minizip-conditional.patch：Zip Shp/Zip Dbf 代码面（三文件 17 hunk 纯插入 20 行）包进 #ifdef ENABLE_MINIZIP——上游 configure AC_DEFINE 的宏在源码零使用，本仓 libspatialite --disable-minizip 包 so 零 gaiazip 符号，不包裹则链接失败"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained: []
+# 本包的知识条目不写在 knowledge_gained 里（该字段的清单式条目会被
+# check-knowledge-gap 的 unreferenced 闸逐条要求 knowledge_ref，而本仓
+# 已合入的 drafted 包统一用 `knowledge_gained: []`，正文放 notes.md）。
+# 本次沉淀的三条草稿（kv+md 一一对应）：
+#   DRAFT-autotools-conftest-needs-elf-codesign
+#       —— autotools 运行型探针在 OHOS 上需逐个重签名；helper 程序
+#          （geos-config/pg_config）须自建 ELF 替身且 flag 形状不对称；
+#          只看 PKG_CHECK_MODULES 会漏判 AC_CHECK_HEADERS/AC_SEARCH_LIBS 裸调用
+#   DRAFT-ohos-device-mtu-blackhole-fake-ip-tls-eof
+#       —— 设备 Clashbox VPN（vpn-tun MTU 1400）静默丢弃 >1372B 且不发
+#          ICMP need-frag，致全站 TLS unexpected EOF；conan download 的布尔
+#          返回会把「连不上」误报成「依赖未发布」
+#   DRAFT-preflight-pf9-conflicts-with-software-commands-json
+#       —— PF9 的路径深度要求与 R38/PF8 的软件级 commands.json 互斥，
+#          已合入同类 PR 14/14 同样被 flag
+knowledge_refs:
+  - "DRAFT-autotools-conftest-needs-elf-codesign"
+  - "DRAFT-ohos-device-mtu-blackhole-fake-ip-tls-eof"
+  - "DRAFT-preflight-pf9-conflicts-with-software-commands-json"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/ohpc-porting/sgui-fix5-20261012-1/orig
+  source_work_dir: /storage/Users/currentUser/tmp/ohpc-porting/sgui-fix5-20261012-1/work
+  source_orig_hash: 1ad804aca0da65b0
+  source_work_hash: 87d21ca7d4b481e8
+  generated_at: '2026-10-12T19:16:10'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-Classdef.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-minizip-conditional.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

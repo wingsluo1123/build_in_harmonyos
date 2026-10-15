@@ -1,0 +1,14 @@
+# conandata.yml — spatialite-gui 2.1.0-beta1
+# 官方源（唯一来源，无镜像前缀 — PF7/R39）
+
+sources:
+  url: "https://www.gaia-gis.it/gaia-sins/spatialite-gui-sources/spatialite_gui-2.1.0-beta1.tar.gz"
+  sha256: "ba48d96df18cebc3ff23f69797207ae1582cce62f4596b69bae300ca3c23db33"
+patches:
+  "2.1.0-beta1":
+    - patch_file: "patches/0001-Classdef.h.patch"
+      patch_description: "fix#6: Classdef.h:53 的 #include <freexl.h> 包进 #ifndef OMIT_FREEXL——上游疏漏：configure --disable-freexl 已定义 OMIT_FREEXL（config.h:186）且全部 freexl 使用点（Dialogs.cpp/Main.cpp）均有此包裹，唯独这个公共头文件的 include 无条件，导致 --disable-freexl 下所有 .o 编译死于 freexl.h not found。注释风格对齐上游既有块（Main.cpp:3485 等）。降级边界不变：维持 --disable-freexl，不引入 freexl 依赖"
+      patch_type: "bugfix"
+    - patch_file: "patches/0002-minizip-conditional.patch"
+      patch_description: "fix#10: 把 Zip Shp/Zip Dbf 代码面（Classdef.h 的 4 个对话框类与 DoLoadZipShp/DoLoadZipDbf 声明、Dialogs.cpp 的 4 个类实现、Main.cpp 的 2 个方法体与 OnLoadShp/OnLoadDbf 的 .zip 扩展名分支）包进 #ifdef ENABLE_MINIZIP，17 hunk 三文件纯插入 20 行。——上游疏漏：configure.ac:211-217 的 --enable-minizip（default yes）AC_DEFINE 了 ENABLE_MINIZIP，但该宏在 2.1.0-beta1 源码中零使用，Zip 导入面完全无条件编译并调用 libspatialite 的 gaiazip API（gaiaOpenZipDbf/gaiaZipfileShpN/gaiaZipfileDbfN/gaiaZipfileNumSHP/gaiaZipfileNumDBF/load_zip_shapefile/load_zip_dbf）；本仓 libspatialite 配方族 --disable-minizip，本图 libspatialite/5.1.0.2 包 so 零 zip 符号（llvm-nm -D 实证），--disable-minizip 下链接必然失败。宏取自上游自有开关：本配方维持 --disable-minizip（既有关闭项）时未定义，zip 面整体剔除；将来 enable-minizip 且依赖带 gaiazip 时自然恢复。降级边界不变：不引入 minizip/libspatialite 重建"
+      patch_type: "bugfix"
