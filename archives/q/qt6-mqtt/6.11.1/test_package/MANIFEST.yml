@@ -1,0 +1,52 @@
+package: qt6-mqtt/6.11.1
+homepage: https://doc.qt.io/qt-6/qtmqtt-index.html
+upstream_check_command: "ctest --output-on-failure"
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build> -R '^(module_includes|tst_(qmqttcontrolpacket|qmqtttopicfilter|qmqtttopicname)_Tcp_4)$' --output-on-failure -j1"
+upstream_tests:
+  - file: tests/auto/cmake/CMakeLists.txt
+    description: "module_includes: Qt MQTT module consumer include/link integration test"
+    command: "ctest -R '^module_includes$' --output-on-failure"
+  - file: tests/auto/qmqtttopicname/CMakeLists.txt
+    description: "Run tst_qmqtttopicname_Tcp_4 (broker-free unit test)"
+    command: "ctest -R '^tst_qmqtttopicname_Tcp_4$' --output-on-failure"
+  - file: tests/auto/qmqtttopicfilter/CMakeLists.txt
+    description: "Run tst_qmqtttopicfilter_Tcp_4 (broker-free unit test)"
+    command: "ctest -R '^tst_qmqtttopicfilter_Tcp_4$' --output-on-failure"
+  - file: tests/auto/qmqttcontrolpacket/CMakeLists.txt
+    description: "Run tst_qmqttcontrolpacket_Tcp_4 (broker-free unit test)"
+    command: "ctest -R '^tst_qmqttcontrolpacket_Tcp_4$' --output-on-failure"
+conditional_upstream_tests:
+  - file: tests/auto/conformance/CMakeLists.txt
+    description: "tst_conformance_Tcp_4 requires an external MQTT broker via MQTT_TEST_BROKER/MQTT_TEST_BROKER_LOCATION (upstream does not bundle one; missing broker calls qFatal)"
+    condition: "MQTT_TEST_BROKER"
+    command: "ctest -R '^tst_conformance_Tcp_4$' --output-on-failure"
+  - file: tests/auto/qmqttclient/CMakeLists.txt
+    description: "tst_qmqttclient_Tcp_4 requires an external MQTT broker (MQTT_TEST_BROKER)"
+    condition: "MQTT_TEST_BROKER"
+    command: "ctest -R '^tst_qmqttclient_Tcp_4$' --output-on-failure"
+  - file: tests/auto/qmqttconnectionproperties/CMakeLists.txt
+    description: "tst_qmqttconnectionproperties_Tcp_4 requires an external MQTT broker (MQTT_TEST_BROKER)"
+    condition: "MQTT_TEST_BROKER"
+    command: "ctest -R '^tst_qmqttconnectionproperties_Tcp_4$' --output-on-failure"
+  - file: tests/auto/qmqttlastwillproperties/CMakeLists.txt
+    description: "tst_qmqttlastwillproperties_Tcp_4 requires an external MQTT broker (MQTT_TEST_BROKER)"
+    condition: "MQTT_TEST_BROKER"
+    command: "ctest -R '^tst_qmqttlastwillproperties_Tcp_4$' --output-on-failure"
+  - file: tests/auto/qmqttpublishproperties/CMakeLists.txt
+    description: "tst_qmqttpublishproperties_Tcp_4 requires an external MQTT broker (MQTT_TEST_BROKER)"
+    condition: "MQTT_TEST_BROKER"
+    command: "ctest -R '^tst_qmqttpublishproperties_Tcp_4$' --output-on-failure"
+  - file: tests/auto/qmqttsubscription/CMakeLists.txt
+    description: "tst_qmqttsubscription_Tcp_4 requires an external MQTT broker (MQTT_TEST_BROKER)"
+    condition: "MQTT_TEST_BROKER"
+    command: "ctest -R '^tst_qmqttsubscription_Tcp_4$' --output-on-failure"
+  - file: tests/auto/qmqttsubscriptionproperties/CMakeLists.txt
+    description: "tst_qmqttsubscriptionproperties_Tcp_4 requires an external MQTT broker (MQTT_TEST_BROKER)"
+    condition: "MQTT_TEST_BROKER"
+    command: "ctest -R '^tst_qmqttsubscriptionproperties_Tcp_4$' --output-on-failure"
+test_package_tests:
+  - file: test_package.cpp
+    description: "HarmonyOS consumer feasibility: QMqttClient lifecycle, MQTT 5.0 connection/will properties, topic name validation and wildcard filter matching"
+    command: "./test_package"
+assertion_count: 16
