@@ -1,0 +1,43 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件 (libxeddsa 2.0.1)
+
+package: libxeddsa/2.0.1
+homepage: "https://github.com/Syndace/libxeddsa"
+
+# 上游测试命令 (用于 ctest -N 分析)
+upstream_check_command: "ctest -N"
+
+# conanfile.py build() 中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: "ctest"
+
+# 上游实际运行的测试程序 (4 个独立用户用例, 见 notes.md 台账)
+upstream_tests:
+  - file: test/test_signing.c
+    source: libxeddsa-2.0.1/test/test_signing.c
+    description: "private key/seed-based signing (64 messages x 64 key pairs)"
+    command: "./xeddsa_test_static"
+  - file: test/test_conversion_uniqueness.c
+    source: libxeddsa-2.0.1/test/test_conversion_uniqueness.c
+    description: "public key conversion uniqueness (8192 keys)"
+    command: "./xeddsa_test_static"
+  - file: test/test_pub_derivation.c
+    source: libxeddsa-2.0.1/test/test_pub_derivation.c
+    description: "public key from private key/seed derivation (8192 key pairs)"
+    command: "./xeddsa_test_static"
+  - file: ref10/kernelrandombytes/test.c
+    source: libxeddsa-2.0.1/ref10/kernelrandombytes/test.c
+    description: "kernelrandombytes frequency distribution test (10000 rounds)"
+    command: "./kernelrandombytes_test_static"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "消费者测试: xeddsa_init + seed_to_ed25519_pub + ed25519_seed_sign + ed25519_verify (含篡改消息负例)"
+    command: "./test_libxeddsa"
+  - file: ohos_specific_test.c
+    description: "OHOS 专项: 随机源探测 / 公钥转换往返 / x25519 共享密钥 / ed25519 签名验签"
+    command: "./ohos_specific_test"
+
+# 测试断言总数 (近似值, 消费者 4 + OHOS 专项 5)
+assertion_count: 9

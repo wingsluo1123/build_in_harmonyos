@@ -1,0 +1,100 @@
+# 版本级 manifest — libxeddsa 2.0.1
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "2.0.1"
+
+# 软件名
+software: "libxeddsa"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-09-28"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（官方 GitHub 源, tag v2.0.1）
+  url: "https://github.com/Syndace/libxeddsa/archive/refs/tags/v2.0.1.tar.gz"
+
+  # 源码校验和（与 conandata.yml 一致）
+  sha256: "0bcca892dda9caaf725c82ae34f3ee7638395319b3bae380c22d9851c046bb8f"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表
+  configure_options:
+    - "XEDDSA_BUILD_DYNAMIC=OFF"
+    - "sodium_USE_STATIC_LIBS=ON"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - "libsodium/1.0.22"
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-CMakeLists.txt.patch"
+  - "0002-FindSodium.cmake.patch"
+  - "0003-ref10-CMakeLists.txt.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "HarmonyOS 下 CMake if(UNIX) 门禁为假，平台检查需加 CMAKE_SYSTEM_NAME STREQUAL HarmonyOS（复用 2.0.0 既有草稿 DRAFT-libxeddsa-2.0.0-*）"
+  - "FindSodium.cmake X_LAST 缓存重置会清掉 Conan toolchain 注入路径，注入路径存在时跳过重置（复用 2.0.0 既有草稿）"
+  - "静态 libsodium 下 xeddsa_dynamic 与 ref10/fastrandombytes 的 randombytes 重复符号，XEDDSA_BUILD_DYNAMIC 门控关闭（与 2.0.0 BUILD_SHARED_LIBS 门控同模式）"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/libxeddsa-2.0.1.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/libxeddsa-2.0.1.work
+  source_orig_hash: 79965d77a5170492
+  source_work_hash: 17658a2a8c887094
+  generated_at: '2026-09-28T16:40:01'
+  patches_count: 3
+
+patch_classification:
+  - file: 0001-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-FindSodium.cmake.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-ref10-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

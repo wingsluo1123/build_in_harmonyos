@@ -1,0 +1,75 @@
+--- a/FindSodium.cmake
++++ b/FindSodium.cmake
+@@ -31,21 +31,25 @@
+ 
+ if (CMAKE_C_COMPILER_ID STREQUAL "GNU"
+     OR CMAKE_C_COMPILER_ID STREQUAL "Clang")
+     set(_GCC_COMPATIBLE 1)
+ endif()
+ 
+ # static library option
+ if (NOT DEFINED sodium_USE_STATIC_LIBS)
+     option(sodium_USE_STATIC_LIBS "enable to statically link against sodium" OFF)
+ endif()
+-if(NOT (sodium_USE_STATIC_LIBS EQUAL sodium_USE_STATIC_LIBS_LAST))
++# OHOS/portability: when the build system (Conan toolchain) injects explicit
++# libsodium paths, keep them and skip the cache-reset logic that would drop
++# them on the first configure (sodium_USE_STATIC_LIBS_LAST undefined).
++if(NOT (sodium_USE_STATIC_LIBS EQUAL sodium_USE_STATIC_LIBS_LAST)
++   AND NOT (DEFINED sodium_LIBRARY_RELEASE AND NOT sodium_LIBRARY_RELEASE MATCHES ".*-NOTFOUND$"))
+     unset(sodium_LIBRARY CACHE)
+     unset(sodium_LIBRARY_DEBUG CACHE)
+     unset(sodium_LIBRARY_RELEASE CACHE)
+     unset(sodium_DLL_DEBUG CACHE)
+     unset(sodium_DLL_RELEASE CACHE)
+     set(sodium_USE_STATIC_LIBS_LAST ${sodium_USE_STATIC_LIBS} CACHE INTERNAL "internal change tracking variable")
+ endif()
+ 
+ 
+ ########################################################################
+@@ -63,21 +67,21 @@
+         message(FATAL_ERROR "The environment variable sodium_LIBRARY must point to the libsodium static library of the Emscripten build.")
+     endif()
+ 
+     set(sodium_INCLUDE_DIR "$ENV{sodium_INCLUDE_DIR}")
+     set(sodium_LIBRARY_DEBUG "$ENV{sodium_LIBRARY}")
+     set(sodium_LIBRARY_RELEASE "$ENV{sodium_LIBRARY}")
+ 
+ 
+ ########################################################################
+ # UNIX
+-elseif (UNIX)
++elseif (UNIX OR CMAKE_SYSTEM_NAME STREQUAL "HarmonyOS")
+     # import pkg-config
+     find_package(PkgConfig QUIET)
+     if (PKG_CONFIG_FOUND)
+         pkg_check_modules(sodium_PKG QUIET libsodium)
+     endif()
+ 
+     if(sodium_USE_STATIC_LIBS)
+         foreach(_libname ${sodium_PKG_STATIC_LIBRARIES})
+             if (NOT _libname MATCHES "^lib.*\\.a$") # ignore strings already ending with .a
+                 list(INSERT sodium_PKG_STATIC_LIBRARIES 0 "lib${_libname}.a")
+@@ -287,21 +291,21 @@
+     IMPORTED_LINK_INTERFACE_LANGUAGES "C"
+ )
+ 
+ if (sodium_USE_STATIC_LIBS)
+     set_target_properties(sodium PROPERTIES
+         INTERFACE_COMPILE_DEFINITIONS "SODIUM_STATIC"
+         IMPORTED_LOCATION "${sodium_LIBRARY_RELEASE}"
+         IMPORTED_LOCATION_DEBUG "${sodium_LIBRARY_DEBUG}"
+     )
+ else()
+-    if (UNIX)
++    if (UNIX OR CMAKE_SYSTEM_NAME STREQUAL "HarmonyOS")
+         set_target_properties(sodium PROPERTIES
+             IMPORTED_LOCATION "${sodium_LIBRARY_RELEASE}"
+             IMPORTED_LOCATION_DEBUG "${sodium_LIBRARY_DEBUG}"
+         )
+     elseif (WIN32)
+         set_target_properties(sodium PROPERTIES
+             IMPORTED_IMPLIB "${sodium_LIBRARY_RELEASE}"
+             IMPORTED_IMPLIB_DEBUG "${sodium_LIBRARY_DEBUG}"
+         )
+         if (NOT (sodium_DLL_DEBUG MATCHES ".*-NOTFOUND"))

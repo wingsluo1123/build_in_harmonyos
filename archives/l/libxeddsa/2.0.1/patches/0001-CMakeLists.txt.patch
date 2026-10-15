@@ -1,0 +1,85 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,14 +1,20 @@
+ cmake_minimum_required(VERSION 3.10)
+ project(libxeddsa VERSION 2.0.1 LANGUAGES C)
+ 
+ include(CTest)
++
++# OHOS adaptation: when libsodium is linked statically (the only variant
++# published in the OHOS artifact registry), the shared library target fails
++# with a duplicate `randombytes` symbol (ref10/fastrandombytes vs libsodium).
++# Allow disabling the dynamic targets while keeping the static ones.
++option(XEDDSA_BUILD_DYNAMIC "Build the shared library (xeddsa_dynamic)" ON)
+ 
+ add_subdirectory(ref10)
+ 
+ if (WIN32)
+     # On Windows, don't even try to organize the outputs logically
+     set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
+     set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
+     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
+ 
+     foreach (OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES})
+@@ -100,21 +106,21 @@
+     fastrandombytes_objects
+     crypto_rng_objects
+     crypto_stream_objects
+     crypto_core_objects
+     kernelrandombytes_objects
+     sodium
+ )
+ 
+ install(TARGETS xeddsa_static)
+ 
+-if (NOT DEFINED EMSCRIPTEN)
++if (NOT DEFINED EMSCRIPTEN AND XEDDSA_BUILD_DYNAMIC)
+     add_library(xeddsa_dynamic SHARED $<TARGET_OBJECTS:xeddsa_objects>)
+     set_target_properties(xeddsa_dynamic PROPERTIES OUTPUT_NAME xeddsa)
+     set_target_properties(xeddsa_dynamic PROPERTIES
+        VERSION ${CMAKE_PROJECT_VERSION}
+        SOVERSION ${CMAKE_PROJECT_VERSION_MAJOR}
+     )
+ 
+     target_link_libraries(xeddsa_dynamic PUBLIC
+         xeddsa_objects
+         crypto_sign_objects
+@@ -152,21 +158,21 @@
+ add_library(xeddsa_test_objects OBJECT ${xeddsa_test_sources})
+ 
+ target_compile_definitions(xeddsa_test_objects PRIVATE SODIUM_DLL_EXPORT)
+ target_compile_definitions(xeddsa_test_objects PRIVATE BUILD)
+ target_include_directories(xeddsa_test_objects PRIVATE test)
+ 
+ add_executable(xeddsa_test_static $<TARGET_OBJECTS:xeddsa_test_objects>)
+ target_include_directories(xeddsa_test_static PRIVATE test)
+ target_link_libraries(xeddsa_test_static xeddsa_static sodium)
+ 
+-if (NOT DEFINED EMSCRIPTEN)
++if (NOT DEFINED EMSCRIPTEN AND XEDDSA_BUILD_DYNAMIC)
+     add_executable(xeddsa_test_dynamic $<TARGET_OBJECTS:xeddsa_test_objects>)
+     target_include_directories(xeddsa_test_dynamic PRIVATE test)
+     target_link_libraries(xeddsa_test_dynamic xeddsa_dynamic sodium)
+ endif ()
+ 
+ ################
+ # DEPENDENCIES #
+ ################
+ 
+ target_include_directories(xeddsa_objects PUBLIC
+@@ -181,14 +187,14 @@
+     ref10/kernelrandombytes
+ )
+ 
+ #########
+ # TESTS #
+ #########
+ 
+ if (BUILD_TESTING)
+     add_test(NAME xeddsa_test_static COMMAND xeddsa_test_static)
+ 
+-    if (NOT DEFINED EMSCRIPTEN)
++    if (NOT DEFINED EMSCRIPTEN AND XEDDSA_BUILD_DYNAMIC)
+         add_test(NAME xeddsa_test_dynamic COMMAND xeddsa_test_dynamic)
+     endif ()
+ endif ()
