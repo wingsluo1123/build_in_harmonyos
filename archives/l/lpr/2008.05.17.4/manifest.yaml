@@ -1,0 +1,98 @@
+# ============================================================
+# 版本级 manifest
+# 文件位置: archives/l/lpr/2008.05.17.4/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+# ============================================================
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号（任务串原样；与 tarball 实名 lpr_2008.05.17.4.tar.xz 一致，无归一化问题）
+version: "2008.05.17.4"
+
+# 软件名
+software: "lpr"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-05"
+build_system: "makefile"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL。Debian 是该版本的唯一一手渠道（上游 OpenBSD CVS 归档已下线，
+  # GitHub 无对应 tag/发布件），且这就是任务串版本号对应的 **native** tarball
+  # （lpr_2008.05.17.4.dsc: Format 3.0 native / Version 1:2008.05.17.4），
+  # tarball 内自带 debian/ 目录，因此没有单独的 .debian.tar.* 组件。
+  url: "https://deb.debian.org/debian/pool/main/l/lpr/lpr_2008.05.17.4.tar.xz"
+
+  # 源码校验和：与同目录 lpr_2008.05.17.4.dsc 的 Checksums-Sha256 段一致，
+  # 本地重算同值（81804 字节）
+  sha256: "2f65cb4097b5386ffbce6051785576b7dfb40ac5951e69ca86ed2ad6b564a608"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: makefile
+
+  # 配置选项列表。上游没有 configure，全部通过 CFLAGS / make 命令行变量传入。
+  # 逐条理由见 notes.md 与 conanfile.py 的模块 docstring。
+  configure_options:
+    # GNU make 下子目录 Makefile 的 ${.CURDIR} 展开为空，用绝对 common_source
+    # 路径取代（Debian 用相对 -I../common_source，见 debian/rules）
+    - "-I<source>/common_source"
+    # musl 把 setresuid/setresgid/getifaddrs/freeifaddrs 关在 _GNU_SOURCE 后面；
+    # glibc 默认特性集已全部可见，此项只补 musl 缺口
+    - "-D_GNU_SOURCE"
+    # 照抄 debian/rules 的 DEB_CPPFLAGS_MAINT_APPEND，打开 common.c:391 的
+    # link-local IPv6 scope_id 处理
+    - "-D__KAME__"
+    # 强制包含 compat/lpr_ohos_compat.h：<sys/types.h>（补 u_int）+
+    # <sys/ttydefaults.h>（补 TTYDEF_*/CTRL）+ rresvport_af/innetgr 原型
+    - "-include compat/lpr_ohos_compat.h"
+    - "-O2"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: null
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表。**空**：上游源码零改动，4 处 musl 差异全部在配方层解决
+# （编译旗标 + compat/ 下两个新文件 + 链接期注入），详见 notes.md
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "musl 的 <dirent.h> 不经过 <sys/types.h>（直接 include <bits/alltypes.h>），"
+  - "所以只靠 lp.h 里那行 #include <dirent.h> 的 BSD 老代码会 'unknown type name u_int'；"
+  - "glibc 侧的同名代码因为 dirent.h 拉到了 sys/types.h 才没事 —— 这是 musl 适配的常见第一处坎"
+  - "musl 的 <termios.h> 不 include <sys/ttydefaults.h>（glibc termios.h:104 会 include），"
+  - "而 OHOS sysroot 里该头文件是存在的（Linux 那套值），显式 -include 即可复现 glibc 的可见性"
+  - "rresvport_af() 与 innetgr() 是 glibc 从 2.2.5 起导出的 4.4BSD 遗留接口（<netdb.h> 声明），"
+  - "musl 两者都没有；BSD 老代码用到它们时表现为链接期 undefined symbol，只能自带实现"
+  - "上游 Makefile.in 的链接规则 `$(CC) -o ${PROG} ${OBJ}` 既不吃 LDLIBS 也不吃 LDFLAGS，"
+  - "需要额外目标文件时只能包一层编译器驱动脚本（编译步骤透传、仅链接且目标程序在白名单时追加）"

@@ -28,5 +28,18 @@ fabric
 # acpi_call: Linux kernel module (acpi_call.ko). Upstream has NO automated test suite (Makefile has only default/install/load/unload targets, no test target; verification is a manual README example: insmod then write /proc/acpi/call). Kernel-state loading needs a real device with kernel headers + root, impossible in the OHOS cross-compile CI. Skip L1 upstream-test check.
 acpi_call
 
+# lpr: NO automated test suite upstream. The build is plain hand-written
+# Makefiles with no configure: the top-level Makefile has only all/clean,
+# common_source/Makefile.in only .o.c/${PROG}/clean, and the 8 per-program
+# Makefiles declare no targets of their own -- `make check` exits 2 with
+# "No rule to make target 'check'". No TESTS/check_PROGRAMS/add_test
+# anywhere in the tree, no tests/ directory. The only test-ish code is
+# lpr/lptest.c, a 2003 POSIX client conformance suite that needs a real
+# printer backend plus /etc/printcap entries, which the OHOS cross-compile
+# CI cannot provide. L1 upstream-test check skipped; real coverage comes
+# from the consumer assertions in archives/l/lpr/2008.05.17.4/test_package/
+# test_lpr.py (NOT presented as upstream tests).
+lpr
+
 # yell 1.1: Upstream has NO automated test suite (tarball ships only Makefile/yell.c/yell.h/README; the Makefile has only default/install/deinstall targets, no check/test target, and "make -n check" fails with "No rule to make target"). Upstream behaviour is asserted by the OHOS-side test_package (6 end-to-end checks on the installed bin/yell). Skip L1 upstream-test check.
 yell
