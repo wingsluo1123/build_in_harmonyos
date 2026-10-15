@@ -1,0 +1,21 @@
+version: "0.3.7"
+software: "pox"
+status: built
+build_date: "2026-09-29"
+build_system: "custom"
+source:
+  url: "https://files.pythonhosted.org/packages/44/58/4385741dea1d74fe9dfed7ff42975266634ef8000f2c8e96717079c916b1/pox-0.3.7.tar.gz"
+  sha256: "0652f6f2103fe6d4ba638beb6fa8d3e8a68fd44bcb63315c614118515bcc3afb"
+  tar_format: tar.gz
+build:
+  system: custom
+  configure_options: []
+  dependencies: []
+  cc: clang
+  cxx: clang++
+patches_applied:
+  - "0001-test-walk-listable-dir.patch"
+knowledge_gained:
+  - "纯 Python 分发（sdist + setup.py）适配：package_type=build-scripts（Conan 2 无 python 类型；library 会要求 shared 产物），pip wheel --no-deps 后解包 wheel 进 lib/python3.12/site-packages"
+  - "上游 pytest 在 iOS/OHOS 类沙箱的限制：test_shutils 的 walk(rootdir()) 中 rootdir()='/' 不可列（EACCES），断言 len(folders)>0 必然失败——改为 walk(os.getcwd())，断言语义不变"
+  - "沙箱中 os.getlogin() 不可用且 $USER 为数字，但上游断言只与 homedir() 自身比较，无需改动"

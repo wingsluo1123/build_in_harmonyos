@@ -1,0 +1,24 @@
+--- a/pox/shutils.py
++++ b/pox/shutils.py
+@@ -75,11 +75,17 @@
+         string name of the user.
+     '''
+     try:
+-        return os.getlogin()
+-    except:
++        uname = os.getlogin()
++    except Exception:
++        uname = None
++    # musl/OHOS: getlogin() returns an empty string instead of raising,
++    # so the environment fallback must also cover the empty case --
++    # otherwise username() reports no user at all on this platform.
++    if not uname:
+         uname = os.path.expandvars('$USER')
+-        if '$' in uname: uname = env('USERNAME', all=False)
+-        return uname
++        if '$' in uname or not uname:
++            uname = env('USERNAME', all=False)
++    return uname
+ 
+ def sep(type=''):
+     '''get the separator string for the given type of separator

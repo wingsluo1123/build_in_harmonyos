@@ -1,0 +1,33 @@
+# ═══ Draft knowledge entry — CI worker 缺测试驱动器（pytest）的三级降级 ═══
+# Timestamp: 2026-10-14
+# Software: pox 0.3.7（纯 Python；模式适用于任何"build() 里跑上游 pytest"的包）
+# Gate: R51 上游测试应测尽测 / conan create
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id: draft-13649-upstream-pytest-runner-degradation
+title: 本地有 pytest、CI worker 没有时整包失败（No module named pytest）；三级降级保住真实执行，
+  以及 conan2 self.run 不返回退出码必须用 subprocess 探测的陷阱
+trigger_tool: pytest|conan|python3
+phase: build
+error_signature: No module named pytest|ConanException: Error 1 while executing|Error in
+  build\(\) method
+severity: 3
+category: ci|python|testing|process
+match_keywords: pytest, No module named, subprocess.run, returncode, ignore_errors,
+  self.run 返回值, pip install --target, PYTHONPATH, stdlib runner, 纯 assert
+keywords: 测试驱动缺失, 三级降级, 环境自适应, worker 精简 python, 构建本地安装
+approach: ① subprocess.run([python3,"-c","import pytest"]) 取 returncode 做真实探测；
+  ② 无则 pip install --index-url <PyPI 镜像> --target <build>/pytest-libs pytest
+  （构建本地，不碰 worker site-packages），PYTHONPATH 前插；③ 镜像也挂且上游测试为
+  纯 assert 函数（无 import pytest/fixture/parametrize，须逐行核实）时用 stdlib
+  runner 直接执行同一批断言（AssertionError 非零退出，语义 1:1）。
+root_cause: CI worker 的 /data/service/hnp/bin/python3 是精简构建不带 pytest，而开发机
+  带有——本地验证永远复现不了；conan2 的 self.run(..., ignore_errors=True) 返回 None
+  而非退出码，用它探测永远 False。
+rec_approach: three-tier-test-runner-degradation
+doc: archives/p/pox/0.3.7/conanfile.py
+verification: 开发机 tier-1：conan create 全流程 rc=0、POX-CONSUMER-OK；tier-3 单测：
+  打好两个平台补丁的源码树输出 UPSTREAM-TESTS-OK（2/2 断言函数）；CI 日志确认 worker
+  能从清华 PyPI 镜像下载（tier-2 同域可达）。
+related: pre-download curl 缺失与本条无关（conan 自带下载器兜底）；CI 修复建议的 429
+  hint 是关键词误匹配；换源判据见 DRAFT-source-host-rate-limit-and-mirror-fallback 条。

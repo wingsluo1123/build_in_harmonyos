@@ -1,0 +1,14 @@
+--- a/pox/tests/test_shutils.py
++++ b/pox/tests/test_shutils.py
+@@ -52,7 +52,10 @@
+ 
+    #print('testing walk...')
+    #print(walk('/usr/local','*',recurse=False,folders=True,files=False))
+-    folders = walk(rootdir(),'*',recurse=False,folders=True,files=False)
++   #OHOS: rootdir() is '/' which the sandbox refuses to list (EACCES), so
++   #walk() over it legitimately returns nothing; walk the source tree
++   #root instead - the assertion still exercises walk()'s folders mode.
++    folders = walk(os.getcwd(),'*',recurse=False,folders=True,files=False)
+     assert len(folders) > 0
+ ### assert all(not os.path.isfile(folder) for folder in folders)
+     home = walk(homedir()+sep()+os.pardir, username(), False, True)[0]
