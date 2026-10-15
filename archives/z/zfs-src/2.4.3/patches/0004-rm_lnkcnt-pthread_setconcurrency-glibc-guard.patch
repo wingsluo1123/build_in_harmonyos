@@ -1,0 +1,13 @@
+--- a/tests/zfs-tests/cmd/rm_lnkcnt_zero_file.c	2026-06-12 00:59:05.000000000 +0800
++++ b/tests/zfs-tests/cmd/rm_lnkcnt_zero_file.c	2026-10-04 19:02:22.489177969 +0800
+@@ -137,7 +137,10 @@
+ 		exit(-1);
+ 	}
+ 
++#if defined(__GLIBC__)
+ 	(void) pthread_setconcurrency(4);	/* 3 threads + main */
++#endif
++	/* musl libc (OHOS) has no pthread_setconcurrency; it is advisory only */
+ 	(void) pthread_create(&tid, NULL, mover, NULL);
+ 	(void) pthread_create(&tid, NULL, cleaner, NULL);
+ 	(void) pthread_create(&tid, NULL, writer, (void *) &fd);
