@@ -1,0 +1,18 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: udpkg/1.21
+homepage: "https://salsa.debian.org/installer-team/udpkg"
+
+# 上游无测试套件（源码树无 test/ 目录，无 make check 目标——
+# configure.ac 无 test 目标、仅 3 个 .c + 1 个 .h——实测核对 tarball 全树）
+upstream_test_in_build: false
+upstream_tests: []
+
+test_package_tests:
+  - file: test_udpkg.py
+    description: "运行打包二进制——A. 基础冒烟：ELF 头确认、--print-architecture 输出 arm64、--print-os 输出 linux、无参数输出用法；B. 完整消费者用例：构造标准 .deb 归档，真实执行 udpkg -f(dpkg_fields) 端到端抽取 control 字段、udpkg -c(dpkg_contents) 端到端列出 data 文件（mock ar/cat/tar 注入 PATH，走真实 popen 解析路径）"
+    command: "python3 test_udpkg.py <package>"
+
+assertion_count: 4
