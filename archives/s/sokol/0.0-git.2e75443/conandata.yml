@@ -1,0 +1,32 @@
+# conandata.yml — sokol 0.0-git.2e75443
+# Upstream is master-only (no release tags). Version follows the
+# master-only rule 0.0-git.{hash7}: snapshot master @
+#   2e75443dbd4940b5aa8d76a8e479f8e4b270b9a3
+# (7-hex prefix 2e75443 = version tag).
+#
+# URL 列表：ghfast.top 镜像在前 + 官方 GitHub 兜底（libgweather 4.6.0
+# conandata 先例格式）。CI worker 站点白名单对 github.com 直连超时；
+# ghfast 镜像实测可达。两 URL 内容逐字节一致（本机 diff -r 全树比对
+# master tarball vs 2e75443 tarball：0 差异行），sha256 相同。
+# sha256: measured locally on this machine from the actual download of
+# the ghfast URL (and cross-checked against the per-commit archive):
+#   d8560ddd11fb3223f3aaf6513aaa2d9be66ee7896fa1263ad51c5bd60ec52cf3
+#   （per-commit tarball 哈希；与 master tarball 哈希不同——git archive
+#    pax header 含 commit id，字节级不同但树内容一致，本机 diff -r 全树 0 差异）
+#
+# NOTE (R39): 上游无 release tag，正式源即 GitHub per-commit 归档。
+# 曾锚 refs/heads/master 浮动归档，上游 master 新提交后 tarball 漂移致
+# sha256 校验失败（CI 85052 实锤）——改钉 2e75443 per-commit 归档，
+# 同 commit 归档确定性恒定，根治漂移。
+
+sources:
+  url:
+    - "https://ghfast.top/https://github.com/floooh/sokol/archive/2e75443dbd4940b5aa8d76a8e479f8e4b270b9a3.tar.gz"
+    - "https://github.com/floooh/sokol/archive/2e75443dbd4940b5aa8d76a8e479f8e4b270b9a3.tar.gz"
+  sha256: "d8560ddd11fb3223f3aaf6513aaa2d9be66ee7896fa1263ad51c5bd60ec52cf3"
+
+patches:
+  "0.0-git.2e75443":
+    - patch_file: "patches/s0001-sokol_cmdbuf-cxx-voidptr-cast.patch"
+      patch_description: "Cast void* to uint8_t* in _scb_init_cmdbuf (upstream C-only implicit conversion is a hard error when the sokol_cmdbuf.h implementation section is compiled as C++)"
+      patch_type: "portability"
