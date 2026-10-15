@@ -1,0 +1,36 @@
+version: "1.2"
+software: tqftpserv
+status: built
+build_date: "2026-10-15"
+build_system: meson
+
+source:
+  url: "https://github.com/linux-msm/tqftpserv/archive/refs/tags/v1.2.tar.gz"
+  sha256: "a3850c34e48f23b7bc360d70f1e91700de2f8c60af003eda93e14182f8cf6af1"
+  tar_format: tar.gz
+
+build:
+  system: meson
+  configure_options:
+    - "-Dsystemd-unit-prefix="
+  dependencies:
+    - qrtr/1.2
+    - zstd/1.5.7
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - 0001-ohos-systemd-init.patch
+
+knowledge_gained:
+  - "tqftpserv is a Meson-based C application — package_type=application"
+  - "meson.build has a bug: systemd_system_unit_dir variable is only conditionally defined; patch in source() initializes it to empty"
+  - "OHOS ar/ranlib must be derived from compiler_executables since HNP toolchain not on PATH"
+  - "AF_QIPCRTR support provided by qrtr/1.2 (already in artifact repo)"
+  - "Upstream has no test suite (confirmed via R51 scan)"
+
+patch_classification:
+  - file: 0001-meson.build.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
