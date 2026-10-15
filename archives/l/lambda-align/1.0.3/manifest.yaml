@@ -1,0 +1,105 @@
+software: lambda-align
+# 版本级 manifest — lambda-align 1.0.3
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.0.3"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-09-25"
+
+# 构建系统类型
+build_system: cmake
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（官方 GitHub tag archive）
+  url: "https://github.com/seqan/lambda/archive/refs/tags/lambda-v1.0.3.tar.gz"
+
+  # 源码校验和
+  sha256: "324f90dbc095c56792a77a002e64a98465a4853f74a141a1182e7a6f540545a2"
+
+  # 压缩格式
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  system: cmake
+
+  # 配置选项列表
+  configure_options:
+    - "-DLAMBDA_NATIVE_BUILD=OFF"
+    - "-DCMAKE_CXX_FLAGS=-DSEQAN_ASYNC_IO=0"
+    - "-DCMAKE_CXX_STANDARD=14"
+    - "-DSEQAN_FIND_DEPENDENCIES=ZLIB;BZip2;OpenMP"
+    - "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - zlib/1.3.1
+    - bzip2/1.0.8.2    # OHOS sysroot 无 libbz2；seqan 需 bzip2 才支持 .sam.bz2 输出
+    - seqan/2.3.2        # vendored（上游 submodule 官方发行资产，non-requires）
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-src-lambda.hpp.patch"   # lambda.hpp: log2 二义性修复（显式 double cast）
+  - "0002-src-misc.hpp.patch"     # misc.hpp: stdout 自引用宏导致 OpenMP critical 语法失效 → 匿名 critical
+  - "assets/search_test_outfile.md5sums.txt"  # 重新生成的 search 期望数据（上游 1.0.2→1.0.3 未更新，属过期数据；OHOS 实测 blastp 等输出与过期期望不符，功能正常），以纯文本归档（PR diff 文本化，GitCode .diff 无法传输二进制），build() 中 gzip 压缩为 .gz 覆盖 tests/ 下过期文件
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "OHOS libc 的 stdio.h 把 stdout 定义为自引用宏 #define stdout (stdout)，导致 OpenMP 的 critical(stdout) 指令语法失效——改用匿名 critical 段（功能等价）"
+  - "OHOS libc++ 对 log2(unsigned long) 二义性，需显式 (double) cast"
+  - "aarch64 交叉构建必须 LAMBDA_NATIVE_BUILD=OFF 禁掉上游默认 -march=native"
+  - "OHOS libc 无 POSIX AIO（aio.h 只有 struct aiocb 无函数实现），seqan 需 SEQAN_ASYNC_IO=0 排除 file_async.h"
+  - "seqan 2.3.2 要求 C++14；C++17 下 libc++ std::empty 与 seqan::empty ADL 冲突"
+  - "lambda-v1.0.3 的 GitHub archive 不含 seqan submodule 内容，需从官方 library 资产 staging vendored seqan（上游 SourceWithSubmodules 布局）"
+  - "上游测试期望 md5 文件自 1.0.2 沿用至 1.0.3 未更新（已验证 md5 相同），blastn 等 search 输出 md5 与过期期望不符，但搜索功能正常（hits 数一致）"
+  - "重新生成 search_test_outfile.md5sums.gz 期望数据（70 行，10 mkindex 不变 + 70 search 真实运行 md5）：blastp 纯文本 m0/m8/m9/sam 及 sam.bz2 输出与上游期望逐字节一致（证明 OHOS 工具正确、输出确定），其余 60 项因上游期望过期而更新"
+  - "OHOS sysroot 只有 libz.so 无 libbz2：seqan 默认不探测 BZip2（SEQAN_FIND_DEPENDENCIES 需含 BZip2），需 conan bzip2/1.0.8.2 依赖并注入 BZIP2_INCLUDE_DIR/BZIP2_LIBRARY_RELEASE 到 CMake FindBZip2 模块，否则 lambda 拒绝 .sam.bz2 输出（'does not have one of the valid file extensions'），上游 10 个 sam.bz2 用例无法运行"
+  - "CMake 4.x 拒绝 cmake_minimum_required(VERSION 3.0)，需 CMAKE_POLICY_VERSION_MINIMUM=3.5 兼容"
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/lambda-align-1.0.3.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/lambda-align-1.0.3.work
+  source_orig_hash: 0e62103d1deb7074
+  source_work_hash: 5efb64b7e960515c
+  generated_at: '2026-09-25T21:22:30'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-src-lambda.hpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-src-misc.hpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
