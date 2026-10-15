@@ -1,0 +1,35 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -19,7 +19,6 @@
+ 
+ set(CMAKE_CXX_STANDARD 17)
+ 
+-find_package(PkgConfig REQUIRED)
+ find_package(nlohmann_json REQUIRED)
+ 
+ # 向量数据库只支持 x86_64|aarch64，其他架构不支持，sw_64
+@@ -31,10 +30,11 @@
+     include_directories(${PROJECT_SOURCE_DIR}/include/kysdk-vector-engine-client
+             ${PROJECT_SOURCE_DIR}/src/impl)
+ 
+-    pkg_check_modules(GRPC REQUIRED IMPORTED_TARGET grpc)
++    find_package(gRPC CONFIG REQUIRED)
+     find_package(Protobuf REQUIRED)
+     find_package(absl REQUIRED)
+     find_package(KylinAiProto REQUIRED)
++    find_package(zlib CONFIG REQUIRED)
+ 
+     kylin_ai_generate_grpc_proto_source(RETURNED_GRPC_SOURCE_FILES vector-db schema common msg feder rg milvus)
+     message("grpc source files: ${RETURNED_GRPC_SOURCE_FILES}")
+@@ -47,8 +47,9 @@
+             ${RETURNED_GRPC_SERVICE_FILES})
+ 
+     target_link_libraries(kysdk-vector-engine-client
+-            PUBLIC grpc++
+-            PUBLIC protobuf
++            PUBLIC gRPC::grpc++
++            PUBLIC protobuf::libprotobuf
++            PUBLIC zlib::zlib
+             PUBLIC absl::synchronization
+             PUBLIC nlohmann_json::nlohmann_json)
+ else()

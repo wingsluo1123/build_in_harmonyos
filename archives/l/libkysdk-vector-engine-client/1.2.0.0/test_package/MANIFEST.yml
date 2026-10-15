@@ -1,0 +1,32 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI build_and_test.sh L0e 强制要求）
+
+package: libkysdk-vector-engine-client/1.2.0.0
+homepage: "https://gitee.com/openkylin/libkysdk-vector-engine-client"
+
+# 上游测试入口（实测不存在）
+upstream_check_command: "echo 'upstream ships no test suite'"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游测试规模（实测 upstream/1.2.0.0 归档，44310 字节 / 52 文件）：
+#   - 无 test/、tests/、autotests/ 目录
+#   - CMakeLists.txt：无 enable_testing/add_test/CTest/BUILD_TESTING
+#   - demo/ 是手工示例程序（且 ENABLE_DEMO 默认 OFF），非自动化测试
+upstream_tests: []
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: test_vector_client.cpp
+    description: "消费者冒烟：Database::Create() 工厂实例化（DSO 加载 + 全 grpc/protobuf 闭包符号解析）+ Connect() 指向死端口必须返回非 OK Status 且非 NOT_SUPPORTED（桩分支回归断言，真实 gRPC channel 建立路径）+ 错误消息非空 + Disconnect() 幂等回收返回 OK"
+    command: "./test_vector_client"
+    assertions: 5
+  - file: conanfile.py (test())
+    description: "OHOS 适配点断言：包负载完整性（include/lib/pkgconfig/licenses 均在 prefix 内，.pc 未落绝对 /pkgconfig）+ readelf 断言 DT_SONAME == libkysdk-vector-engine-client.so.1（相对名，L5a 同源）+ 设备上 protoc/grpc_cpp_plugin 生成的 milvus 桩符号确实编入 DSO（--dyn-syms milvus 符号计数 > 0）"
+    command: "readelf -d / --dyn-syms + python payload checks"
+    assertions: 4
+
+# 测试断言总数（用于质量评估）
+assertion_count: 9

@@ -1,0 +1,59 @@
+software: libkysdk-vector-engine-client
+
+# 版本号
+version: "1.2.0.0"
+
+# 编译状态
+status: built
+
+# 编译日期
+build_date: "2026-10-02"
+
+# 构建系统
+build_system: cmake
+
+# 源码信息
+source:
+  url: "https://gitee.com/openkylin/libkysdk-vector-engine-client/releases/download/debian/1.2.0.0-1/libkysdk-vector-engine-client_1.2.0.0.orig.tar.gz"
+  sha256: "fc5d7d1866496e0a4ab9307ce8c9c9c82dede1f37d79edb190a128fb9c42e2c6"
+  tar_format: tar.gz
+
+# 构建配置
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_CXX_STANDARD=17"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DgRPC_DIR=<grpc pkg>/lib/cmake/grpc"
+    - "-DProtobuf_DIR=<protobuf pkg>/lib/cmake/protobuf"
+    - "-Dutf8_range_DIR=<protobuf pkg>/lib/cmake/utf8_range"
+    - "-Dabsl_DIR=<abseil-cpp pkg>/lib/cmake/absl"
+    - "-DOPENSSL_ROOT_DIR=<openssl pkg>"
+    - "-DKylinAiProto_DIR=<libkylin-ai-system-private pkg>/share/KylinAiProto/cmake"
+    - "-DKYLAI_GRPC_PROTOCOL_DIR=<libkylin-ai-system-private pkg>/share/kylin-ai/protocols/grpc"
+    - "-Dprotobuf_MODULE_COMPATIBLE=ON"
+    - "-DPROTOBUF_PROTOC_EXECUTABLE=<protobuf pkg>/bin/protoc"
+    - "-DGRPC_CPP_PLUGIN=<grpc pkg>/bin/grpc_cpp_plugin"
+    - "-DCMAKE_SHARED_LIBRARY_SONAME_CXX_FLAG=-Wl,-soname,"
+    - "user_toolchain: set(CMAKE_SYSTEM_PROCESSOR aarch64)  # OHOS 交叉工具链探成 unknown 时上游会静默走 sw_64 桩分支"
+  dependencies:
+    - grpc/1.84.0
+    - protobuf/33.6
+    - libkylin-ai-system-private/1.2.0.0
+    - nlohmann_json/3.12.0
+    - zlib/1.3.1
+  cc: clang
+  cxx: clang++
+
+# 补丁信息
+patches_applied:
+  - "0001-cmake-config-targets-zlib.patch"
+
+# 知识沉淀
+knowledge_gained:
+  - "上游 grpc 依赖是 pkg-config 存在性检查（PkgConfig::GRPC 从未被引用）；registry grpc.pc Requires 大量未安装 absl_* 模块，必须改走 find_package(gRPC CONFIG REQUIRED) + gRPC::grpc++（kylin-ai-document-service 同型补丁）"
+  - "libgrpc.a 引用 zlib 符号而 grpc 安装 config 不传递 zlib：DSO 链接闭包需显式 zlib::zlib；且 zlib/1.3.1 非 PIC 静态归档进 DSO 需 -Wl,--exclude-libs,ALL"
+  - "KylinAiProtoGenerate.cmake 读全大写 ${PROTOBUF_PROTOC_EXECUTABLE}，而 registry protobuf 的 module-compat 层只导出 CamelCase Protobuf_PROTOC_EXECUTABLE——两个拼写都要注入；GRPC_CPP_PLUGIN 预置同名 cache 变量可让宏内 find_program 直接命中"
+  - "上游 install() 用未定义的 ${CMAKE_INSTALL_LIBDIR}，.pc 会落绝对 /pkgconfig（设备越权写）；配方层注入 CMAKE_INSTALL_LIBDIR=lib 即可，无需改源码"
+  - "CMake 无 Platform/HarmonyOS.cmake，VERSION/SOVERSION 目标也不会产生 DT_SONAME，需注入 CMAKE_SHARED_LIBRARY_SONAME_{C,CXX}_FLAG（CI L5a 门禁）"
+  - "上游零测试（无 test/ 目录、无 CTest）：验证走消费者 test_package（死端口优雅错误路径 + 设备 protoc/grpc_cpp_plugin 代码生成符号 + SONAME/payload 断言）"
