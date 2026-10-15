@@ -1,0 +1,72 @@
+# two-ms/5.2.4 test_package 清单
+# 上游测试在 conanfile.py 的 build() 阶段真跑（go test -count=1 -json -timeout 900s ./...），
+# 本 test_package 负责消费者视角：真跑 bin/2ms（7 个用例）+ 鸿蒙特有用例 H1 + 13 项交付形态自检。
+
+package: two-ms/5.2.4
+homepage: "https://github.com/Checkmarx/2ms"
+
+# 上游测试命令（值即 build() 里真实执行的命令；OHOS 上追加 -exec=<go-test-exec.sh>
+# 对 go 内部生成的测试 ELF 就地签名，E318/E128）
+upstream_check_command: "go test -count=1 -json -timeout 900s ./..."
+upstream_test_in_build: true
+upstream_test_command: "go test -count=1 -json -timeout 900s ./...  -exec=<binary-sign-tool wrapper>"
+
+# 上游实测结果（OHOS aarch64，CGO_ENABLED=0，go1.26.9）：
+#   包数（含 _test.go 并被 go test 编译）: 18；含 Test 函数的包: 17
+#   顶层 Test 用例: 356，通过 356，失败 0，跳过 0
+#   子用例（t.Run）: 783，通过 781，失败 0，跳过 2
+#   合计用例: 1139，通过 1137，失败 0，跳过 2（两处跳过均为上游自身 t.Skip）
+#   环境网络依赖用例（environment-network-limited，不计入门禁）: 6
+#     这 6 个子用例经 --validate 访问 https://api.github.com/ 校验植入凭据；
+#     无外网/DNS 超时时 validationStatus 由 Invalid 变 Unknown、severity 由 Medium 变 High，
+#     断言必然失败（上游 CI ubuntu-latest 有公网故通过）。
+#     归属: engine/TestProcessEvaluationWithValidation/Should_update_validationStatus,_CvssScore_and_Severity_of_secrets
+#           pkg/TestScanAndScanDynamicWithCustomRules/{Run_default_+_non_override_rules,Run_only_default_rules_by_ignoring_custom_rules}
+#           pkg/TestScanWithValidation/Successful_Scan_with_Multiple_Items
+#           tests/TestSecretsScans/{run_default_+_non_override_rules_in_json,run_only_default_rules_by_ignoring_custom_rules_in_json}
+#     配方 _enforce_gates 按其网络输出特征 + 显式清单分类，如实打印且不阻断；其余 1133 个用例硬门禁。
+upstream_tests:
+  - file: e2e_test.go
+    source: two-ms-5.2.4/tests/e2e_test.go
+    description: "端到端 CLI：TestIntegration/TestSecretsScans/TestFlagsIntegration/TestMissingFlagsIntegration（4 个顶层 Test，内部自行 go build 出 2ms 再扫描本地文件；confluence 子用例被上游 t.Skip）"
+    command: "go test -count=1 ./tests/"
+  - file: engine/rules/ruledefine/*_test.go
+    source: two-ms-5.2.4/engine/rules/ruledefine/
+    description: "内置规则定义逐条校验（213 个 _test.go，212 个顶层 Test：GitHub/GitLab/Slack/AWS/Stripe… 每条规则的匹配与正则）"
+    command: "go test -count=1 ./engine/rules/ruledefine/"
+  - file: plugins/*_test.go
+    source: two-ms-5.2.4/plugins/
+    description: "扫描源插件（filesystem/git/confluence/discord/paligo/slack）与 mock（74 个顶层 Test）"
+    command: "go test -count=1 ./plugins/"
+  - file: engine/**/*_test.go
+    source: two-ms-5.2.4/engine/
+    description: "检测引擎：engine 18 + chunk 6 + detect 1 + extra 1 + linecontent 1 + rules 6 + score 2 + semaphore 2（37 个顶层 Test）"
+    command: "go test -count=1 ./engine/..."
+  - file: cmd/*_test.go
+    source: two-ms-5.2.4/cmd/
+    description: "CLI 装配：配置/枚举 flag/退出处理/插件 mock（12 个顶层 Test）"
+    command: "go test -count=1 ./cmd/"
+  - file: pkg/*_test.go
+    source: two-ms-5.2.4/pkg/
+    description: "对外 API：规则加载与扫描（7 个顶层 Test）"
+    command: "go test -count=1 ./pkg/"
+  - file: lib/**/*_test.go
+    source: two-ms-5.2.4/lib/
+    description: "reporting 5 + secrets 1 + utils 3（9 个顶层 Test，含跳过 1 处上游 t.Skip）"
+    command: "go test -count=1 ./lib/..."
+  - file: internal/workerpool/pool_test.go
+    source: two-ms-5.2.4/internal/workerpool/
+    description: "worker pool 并发（1 个顶层 Test）"
+    command: "go test -count=1 ./internal/workerpool/"
+  - file: benches/process_items_test.go
+    source: two-ms-5.2.4/benches/
+    description: "⚠ 无 Test 函数（仅 TestMain + BenchmarkProcessItems）；`go test ./...` 仅编译校验，上游 CI 亦不执行 benchmark，故不计入用例统计"
+    command: "go test -count=1 ./benches/"
+
+test_package_tests:
+  - file: consumer_check.py
+    description: "消费者用例 C1-C7：真跑 bin/2ms 的 --version/--help/filesystem 扫描命中(exit 2)/--ignore-on-exit(exit 0)/干净目录(exit 0)/缺失路径(exit 1)/rules，断言真实 stdout/stderr/退出码与 --report-path JSON 报告；鸿蒙特有用例 H1：.codesign 段 + aarch64 静态 ELF + 本机真实执行；并做 M1-M13 交付形态自检"
+    command: "python3 consumer_check.py <package_folder> --expect-machine aarch64 --expect-version 5.2.4 --require-signature"
+
+# 测试断言总数 = 上游 Go 断言（1139 个用例）+ test_package 消费者/鸿蒙/形态断言
+assertion_count: 1180

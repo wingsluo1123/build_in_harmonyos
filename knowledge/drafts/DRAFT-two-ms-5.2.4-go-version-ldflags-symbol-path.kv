@@ -1,0 +1,70 @@
+#====================================================================
+# DRAFT-two-ms-5.2.4-go-version-ldflags-symbol-path.kv
+# Go 项目版本串注入：-X 的符号路径必须与 module path 完全一致
+# （路径缺 /vN 时静默无效，--version 显示默认值）
+#====================================================================
+
+id:                     DRAFT-two-ms-5.2.4-go-version-ldflags-symbol-path
+trigger_tool:           go|go build|conan
+phase:                  compilation
+error_signature:        .*version\s+0\.0\.0|
+                         --version.*0\.0\.0|
+                         version output shows default value
+
+severity:               2
+category:               go, build-system, packaging, versioning
+match_keywords:         ldflags, -X, go build, version, 0.0.0, symbol path,
+                         module path, /v5, semver major, VERSION
+title:                  Go 版本串注入：`go build -ldflags "-X <importpath>.<Var>=<ver>"` 的 importpath 必须与 module path 完全一致，否则静默失效
+
+root_cause:             `-X` 只能改写**已存在**的字符串变量，且符号必须是完整的
+                         import path。若上游自身写错（如 module 为
+                         github.com/checkmarx/2ms/v5，release.yml 却用
+                         github.com/checkmarx/2ms/cmd.Version，缺 /v5），go 不报错、
+                         静默忽略 → 二进制输出版本为源码默认值（如 0.0.0）
+affected_scope:         所有通过 ldflags 注入版本/构建信息、且 module path 带
+                         /vN 主版本后缀的 Go 项目（实例: two-ms 5.2.4）
+verification_cmd:       go build -ldflags "-s -w -X <modulepath>/cmd.Version=<ver>" -o <bin> .
+                         && <bin> --version    # 期望输出包含 <ver>，非 0.0.0
+
+rec_priority:           1
+rec_approach:           correct-importpath-ldflags
+rec_description:        在 conanfile.py 内以 module path（读 go.mod 首行 `module`）
+                         拼接符号路径注入版本；不要照抄上游 release.yml 的路径。
+                         交付前用 `--version` 断言真实版本串。
+rec_command:            go build -trimpath -ldflags "-s -w -X github.com/checkmarx/2ms/v5/cmd.Version=5.2.4" -o 2ms .
+rec_auto_fix:           false
+rec_impl:               manual
+
+fallback_priority:      2
+fallback_approach:      patch-version-constant
+fallback_description:   若符号路径无法确定，回退为在源码中修改版本常量（须记录
+                         为 patch 并在 notes.md 说明），但优先用 -X 避免改源码
+fallback_command:       sed -i 's/Version = "0.0.0"/Version = "5.2.4"/' cmd/main.go
+fallback_auto_fix:      false
+fallback_impl:          manual
+
+forbid_1_pattern:       照抄上游 release.yml 的 -X 路径而不校验 module path
+forbid_1_reason:        路径不匹配时 go 静默忽略，产物版本串错误且难以察觉
+forbid_1_consequence:   交付包 --version 输出 0.0.0
+
+principles:             P017
+
+causes:
+caused_by:
+similar_to:             E250(Go 工具链自举)
+conflicts_with:
+prerequisite_of:
+
+doc_file:               knowledge/drafts/DRAFT-two-ms-5.2.4-go-version-ldflags-symbol-path.md
+last_updated: 2026-10-13
+source_event:           two-ms-5.2.4 构建后 --version 显示 0.0.0（上游 release.yml 路径缺 /v5）
+
+authors:                OpenDesk
+source_pr:
+source_commit:
+
+metrics_success_count: 1
+metrics_fail_count: 0
+metrics_confidence: 0.8
+metrics_last_used: 2026-10-13

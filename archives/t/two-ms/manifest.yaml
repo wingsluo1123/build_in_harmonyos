@@ -1,0 +1,28 @@
+{
+  "name": "two-ms",
+  "display": "two-ms (2ms)",
+  "description": "密钥/凭据泄露扫描 CLI（Checkmarx/2ms，交付命令 2ms）",
+  "category": "security",
+  "homepage": "https://github.com/Checkmarx/2ms",
+  "license": "Apache-2.0",
+  "build_system": "go",
+
+  "ohos_adaptation": {
+    "key_points": [
+      "纯 Go 项目，无 cgo / 无原生 C/C++ 源码；上游全平台 CGO_ENABLED=0 静态构建",
+      "OHOS 无原生 Go 工具链（E250）：配方在 build() 内自举下载 Go 1.26.9 官方 SDK",
+      "自举 SDK 的 bin/go 换成签名 shim（真 go→go.real），使上游 e2e 内部 `go build` 的 2ms 也被签名（E128）",
+      "go test 临时测试 ELF 经 -exec wrapper 签名（E318）",
+      "HMDFS/SELinux 限制 Go link（E166）：源码树/缓存/链接输出全落 ext2 分区",
+      "命令行工具：软件级 commands.json 声明（R38, binary=true）"
+    ],
+    "common_dependencies": []
+  },
+
+  "versions": {
+    "5.2.4": {
+      "status": "built",
+      "build_date": "2026-10-13"
+    }
+  }
+}
