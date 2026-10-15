@@ -1,0 +1,35 @@
+--- a/python/libtoolize.py
++++ b/python/libtoolize.py
+@@ -97,27 +97,27 @@
+                 if not self.dry_run:
+                     os.symlink(link_dest, dst_name)
+                 outputs.append(dst_name)
+ 
+             elif os.path.isdir(src_name):
+                 outputs.extend(
+                     self.copy_tree(src_name, dst_name, preserve_mode,
+                                    preserve_times, preserve_symlinks))
+ 
+             elif n.endswith('.la'):
+-                spawn(self.cmd_libtool_install + [ src_name, dst_name ],
+-                      dry_run=self.dry_run)
++                if not self.dry_run:
++                    spawn(self.cmd_libtool_install + [ src_name, dst_name ])
+ 
+             else:
+-                copy_file(src_name, dst_name, preserve_mode,
+-                          preserve_times, not self.force,
+-                          dry_run=self.dry_run)
++                if not self.dry_run:
++                    copy_file(src_name, dst_name, preserve_mode,
++                              preserve_times, not self.force)
+                 outputs.append(dst_name)
+ 
+         return outputs
+ 
+ def sysconfig_replace_ext(varname, newext):
+     """Replace the extension in a system config variable.
+     """
+     from distutils.sysconfig import _config_vars
+     val = _config_vars.get(varname, '')
+     suffpos = val.rfind('.')

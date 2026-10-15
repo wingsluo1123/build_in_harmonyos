@@ -1,0 +1,100 @@
+--- a/src/threads.h
++++ b/src/threads.h
+@@ -35,21 +35,29 @@
+ #if USE_PTHREAD
+ 
+ #include <pthread.h>
+ 
+ typedef pthread_mutex_t mutex_t;
+ typedef pthread_mutexattr_t mutexattr_t;
+ 
+ static inline int
+ mutex_init(mutex_t *mutex, const mutexattr_t *attr)
+ {
+-	return pthread_mutex_init(mutex, attr);
++	/* r04 platform adaptation: recursive mutex so the unlock-then-retake
++	 * pattern in open.c (uts_name_from_init_uts_ns / update_linux_utsname)
++	 * does not self-deadlock on musl rwlock wakeup semantics. */
++	pthread_mutexattr_t a;
++	pthread_mutexattr_init(&a);
++	pthread_mutexattr_settype(&a, PTHREAD_MUTEX_RECURSIVE);
++	int r = pthread_mutex_init(mutex, &a);
++	pthread_mutexattr_destroy(&a);
++	return r;
+ }
+ 
+ static inline int
+ mutex_destroy(mutex_t *mutex)
+ {
+ 	return pthread_mutex_destroy(mutex);
+ }
+ 
+ static inline int
+ mutex_lock(mutex_t *mutex)
+@@ -62,51 +70,59 @@
+ {
+ 	return pthread_mutex_trylock(mutex);
+ }
+ 
+ static inline int
+ mutex_unlock(mutex_t *mutex)
+ {
+ 	return pthread_mutex_unlock(mutex);
+ }
+ 
+-typedef pthread_rwlock_t rwlock_t;
+-typedef pthread_rwlockattr_t rwlockattr_t;
++/* r04 platform adaptation: demote rwlock to recursive mutex. USE_PTHREAD
++ * stays on; mutual exclusion is preserved while musl rwlock reader/writer
++ * wakeup ordering (E029/E248 family) can no longer stall the library. */
++typedef pthread_mutex_t rwlock_t;
++typedef pthread_mutexattr_t rwlockattr_t;
+ 
+ static inline int
+ rwlock_init(rwlock_t *rwlock, const rwlockattr_t *attr)
+ {
+-	return pthread_rwlock_init(rwlock, attr);
++	pthread_mutexattr_t a;
++	pthread_mutexattr_init(&a);
++	pthread_mutexattr_settype(&a, PTHREAD_MUTEX_RECURSIVE);
++	int r = pthread_mutex_init(rwlock, &a);
++	pthread_mutexattr_destroy(&a);
++	return r;
+ }
+ 
+ static inline int
+ rwlock_destroy(rwlock_t *rwlock)
+ {
+-	return pthread_rwlock_destroy(rwlock);
++	return pthread_mutex_destroy(rwlock);
+ }
+ 
+ static inline int
+ rwlock_rdlock(rwlock_t *rwlock)
+ {
+-	return pthread_rwlock_rdlock(rwlock);
++	return pthread_mutex_lock(rwlock);
+ }
+ 
+ static inline int
+ rwlock_wrlock(rwlock_t *rwlock)
+ {
+-	return pthread_rwlock_wrlock(rwlock);
++	return pthread_mutex_lock(rwlock);
+ }
+ 
+ static inline int
+ rwlock_unlock(rwlock_t *rwlock)
+ {
+-	return pthread_rwlock_unlock(rwlock);
++	return pthread_mutex_unlock(rwlock);
+ }
+ 
+ #else  /* USE_PTHREAD */
+ 
+ typedef struct { } mutex_t;
+ typedef struct { } mutexattr_t;
+ 
+ static inline int
+ mutex_init(mutex_t *mutex, const mutexattr_t *attr)
+ {
