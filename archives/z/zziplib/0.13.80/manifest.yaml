@@ -1,0 +1,54 @@
+version: "0.13.80"
+status: built
+build_date: "2026-10-08"
+compile_date: "2026-10-14"
+
+source:
+  url: "https://github.com/gdraheim/zziplib/archive/refs/tags/v0.13.80.tar.gz"
+  sha256: "21f40d111c0f7a398cfee3b0a30b20c5d92124b08ea4290055fbfe7bdd53a22c"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "BUILD_SHARED_LIBS=OFF"
+    - "BUILD_TESTS=OFF"
+    - "ZZIPMMAPPED=OFF"
+    - "ZZIPFSEEKO=OFF"
+    - "ZZIPWRAP=OFF"
+    - "ZZIPSDL=OFF"
+    - "ZZIPBINS=OFF"
+    - "ZZIPTEST=OFF"
+    - "ZZIPDOCS=OFF"
+  dependencies:
+    - zlib
+  cc: clang
+
+patches_applied:
+  - "0001-zzip-CMakeLists.txt.patch"
+
+test_results:
+  type: official
+  total: 230
+  passed: 221
+  failed: 0
+  errors_environment: 2
+  skipped_upstream_data: 7
+  notes: >-
+    2026-10-14 本机（HarmonyOS PC aarch64 真机）真跑上游 zziptests.py 套件
+    （AST 口径 233 = 230 可执行 test_* + 3 辅助方法 testname/testzip/testdir）。
+    221 ok / 0 FAIL / 2 ERROR / 7 SKIP。2 ERROR：test_65570 外部 oracle
+    Info-ZIP unzip 6.00 无 ZIP64 能力（zziplib 自身 ZIP64 的 test_65571 通过）；
+    test_81000 SFX 需执行"构建后被改写"二进制被 OHOS 内核完整性校验拒绝
+    （EPERM，根因实验：未改写副本 rc=0，翻转 1 字节即 EPERM）。7 SKIP：
+    6 个上游 CVE PoC 文件永久 404 + 1 个上游默认未编入 _ZZIP_ENABLE_WRITE。
+    另 test_package 1/1 通过（conan create 全绿 RC=0）。
+
+knowledge_gained:
+  - "上游 0.13.80 已将各 CMakeLists 的 cmake_minimum_required 升至 3.10，0.13.78 所需的 3.5 升级补丁不再需要"
+  - "上游仍保留 RELEASE_POSTFIX '-0' 逻辑，静态库输出名需裁剪为干净的 libzzip.a"
+  - "zziplib 的 CMake 构建路径不执行 config.guess/config.sub（仅 automake 遗留 Makefile.in/old.configure 引用），OHOS triplet 由 CMakeToolchain 提供——4 个 10646 行的 GNU 脚本补丁可整体裁掉（rule6 大 diff 根治）"
+  - "OHOS 平台需禁用 ZZIPWRAP/ZZIPSDL/ZZIPBINS/ZZIPTEST/ZZIPDOCS 避免缺少依赖导致构建失败"
+  - "CMake target 名称为 zziplib::zziplib（非 zziplib::zzip）"
+  - "上游 zziptests.py 的 test 模板硬编码 '../{exe}' 相对前缀，bindir 必须传相对路径（绝对路径会拼成畸形路径全批误报 127）"
+  - "OHOS 内核拒绝执行'构建后被改写字节'的 ELF（即使同目录同权限），SFX 自解压类测试需定性豁免"
