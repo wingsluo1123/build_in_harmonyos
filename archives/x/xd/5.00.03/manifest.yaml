@@ -1,0 +1,56 @@
+# 版本级 manifest
+# 文件位置: archives/x/xd/5.00.03/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "5.00.03"
+
+software: "xd"
+
+status: built
+
+build_date: "2026-10-12"
+
+build_system: custom
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://ftp.debian.org/debian/pool/main/x/xd/xd_5.00.03.orig.tar.gz"
+  sha256: "0b8eb4559bb5bb723edcaabc879e5969f98ffa728543a9a1891db0fc8178b3b8"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: custom          # 上游 icmake（./build program -> icmbuild program），配方以 Python 复刻其语义
+  configure_options: []
+  dependencies:
+    - "bobcat/6.14.00"
+  cc: clang
+  cxx: clang++
+  cppstd: 20              # 上游未固定；bobcat 6.14.00 公共头要求 >= C++20
+  translation_units: 68
+  products:
+    - "bin/xd"
+    - "share/xd/xdrc"
+
+patches_applied:
+  - "patches/0001-inline-version-macros-for-case-insensitive-fs.patch"
+  - "patches/0002-fix-splitbase-iterator-invalidation.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "libstdc++ 宽松/libc++ 严格的又一类：Command::splitBase() 在 push_back 同一 vector 的同时用早先取得的 front() 迭代器（短字符串缓冲随重分配搬移）→ libc++/OHOS 上读到乱码并 SIGTRAP，补丁 0002 先拷贝再拆分（CI #15428 第四轮 verbose: Initial characters of directories: z z <乱码>）"
+  - "worker fork 压力：Python 复刻构建驱动若用 ThreadPool(CPU)+shell=True，瞬时进程数 ~2N，受限 worker 会抛 BlockingIOError(EAGAIN)；处置=并发上限 min(CPU,4) + argv 免 shell + 瞬时 errno 有限重试（CI #15428 第三轮实测）"
+  - "xd 是 fbb-git（Frank B. Brokken）的 eXtra smart Directory changer：把参数按 '/'、'-' 或逐字符切成嵌套目录名的首字母（0=当前目录、/=根、1..9=父目录、.=家目录），展开出候选目录；唯一候选直接 stdout 输出目录绝对路径（退出码 0），无候选退出码 3，-h/-v 退出码 4"
+  - "上游构建工具是与 bobcat 同源的 icmake（./build program -> icmbuild program，配置见 icmconf/INSTALL.im/CLASSES）；本仓无 icmake 配方，配方以 Python 复刻 program 模式：编译顶层 MAIN 及顶层其余 *.cc + CLASSES 各模块目录 *.cc（68 TU），链接 -lbobcat"
+  - "bobcat 6.14.00 公共头要求 C++20，profile 的 compiler.cppstd=17 必须抬到 20，否则 xd 自身编译即失败（bobcat/6.14.00 配方的 _cppstd_flag 同策略）"
+  - "上游 tarball 根级同时含 VERSION（文件）与 version/（目录）：HarmonyOS 设备/CI 的 HMDFS 大小写不敏感，解包即失败（IsADirectoryError: [Errno 21] Is a directory: './VERSION'，CI #89206 实测）；处理为 source() 加 excludes=['*VERSION'] 并在补丁 0001 中把三个宏内联回 version/version.h"
+  - "上游 tag 5.00.03 无任何自动化测试资产（无 test/tests/check/spec/CI 配置、无 assert/EXPECT 内容），消费者验证全部由本仓 test_package 提供（状态 D）"

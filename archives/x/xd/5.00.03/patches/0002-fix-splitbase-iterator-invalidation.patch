@@ -1,0 +1,25 @@
+--- a/command/splitbase.cc
++++ b/command/splitbase.cc
+@@ -7,13 +7,15 @@
+     if (size() != 1)
+         return;
+ 
+-    for_each(                   // copy all spec. elements into Command's 
+-        front().begin() + 1, front().end(),                 // base object
+-        [&](char ch)
+-        {
+-            push_back(string(1, ch));
+-        }
+-    );
++        // 先把 base 拷出来：下面的 push_back 可能使 vector 重新分配，而 front()
++        // 是 std::string，其短字符串缓冲就在对象内部，重分配会把它搬走——原先按
++        // front() 取的迭代器随之失效，读到脏字符。libstdc++ 上常侥幸通过，
++        // libc++/OHOS 上实测出错（CI #15428 第四轮：`Initial characters of
++        // directories: z z <乱码>` 后 SIGTRAP）。
++    string const base{ front() };
++
++    for (size_t idx = 1; idx != base.size(); ++idx)
++        push_back(string(1, base[idx]));
+ 
+     front().resize(1);          // keep the 1st character
+ }

@@ -1,0 +1,34 @@
+# conandata.yml — xd 5.00.03
+# 上游: https://gitlab.com/fbb-git/xd (tag 5.00.03, 作者 Frank B. Brokken)
+# 镜像采用 Debian 权威 orig 包（sourcetar 布局，与上游 tag 内容一致），
+# SHA256 与 xd_5.00.03-1.dsc 的 Checksums-Sha256 逐字一致：
+#   xd_5.00.03.orig.tar.gz 63287 字节
+#   0b8eb4559bb5bb723edcaabc879e5969f98ffa728543a9a1891db0fc8178b3b8
+#
+# 取源口径（E718 四源法 + PF7 源 URL 闸）：
+#   * PF7 黑名单命中证据：https://deb.debian.org/... -> _pf7_classify =
+#     "Debian 下游重打包源"，不可写入 conandata；因此主源改用 Debian 主张
+#     host ftp.debian.org（_pf7_classify = None）。
+#   * 三源同 sha 交叉核验（63287 字节，sort -u 后 distinct = 1）：
+#       https://ftp.debian.org/debian/pool/main/x/xd/xd_5.00.03.orig.tar.gz
+#       https://archive.ubuntu.com/ubuntu/pool/universe/x/xd/xd_5.00.03.orig.tar.gz
+#       https://deb.debian.org/debian/pool/main/x/xd/xd_5.00.03.orig.tar.gz   (仅作反例，不进配方)
+#     三者 sha256 均为 0b8eb4559bb5bb723edcaabc879e5969f98ffa728543a9a1891db0fc8178b3b8，
+#     且与 xd_5.00.03-1.dsc 的 Checksums-Sha256 一致。
+
+sources:
+  "5.00.03":
+    url: "https://ftp.debian.org/debian/pool/main/x/xd/xd_5.00.03.orig.tar.gz"
+    sha256: "0b8eb4559bb5bb723edcaabc879e5969f98ffa728543a9a1891db0fc8178b3b8"
+
+# HMDFS 大小写不敏感：tarball 根级 VERSION（文件）与 version/（目录）同名冲突，
+# source() 用 excludes=["*VERSION"] 排除该文件（见 conanfile.py），其提供的三个宏
+# 由下面的补丁内联回 version/version.h；这是本版本唯一的源码补丁。
+patches:
+  "5.00.03":
+    - patch_file: "patches/0001-inline-version-macros-for-case-insensitive-fs.patch"
+      patch_description: "内联上游 VERSION 文件的 AUTHOR/VERSION/YEARS 宏（HMDFS 大小写不敏感无法同时解包 VERSION 文件与 version/ 目录）"
+      patch_type: "portability"
+    - patch_file: "patches/0002-fix-splitbase-iterator-invalidation.patch"
+      patch_description: "Command::splitBase() 在 push_back 同一 vector 的同时使用早先取得的 front() 迭代器：libstdc++ 侥幸可用，libc++/OHOS 上短字符串缓冲随重分配搬移导致读到脏字符并 SIGTRAP（CI #15428 实测）。改为先拷贝 base 再拆分"
+      patch_type: "bugfix"
