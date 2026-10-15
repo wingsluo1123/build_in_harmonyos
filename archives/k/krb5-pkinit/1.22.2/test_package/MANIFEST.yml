@@ -1,0 +1,17 @@
+package: krb5-pkinit/1.22.2
+homepage: "https://web.mit.edu/kerberos/"
+
+upstream_check_command: "configure --enable-pkinit && make"
+upstream_test_in_build: true
+upstream_test_command: "make check"
+upstream_test_note: "上游 make check 依赖 perl/tcl/证书环境，本包以 test_package 真实调用覆盖"
+
+test_package_tests:
+  - file: test_krb5pkinit.c
+    description: "链接 krb5 库集 + dlopen 包内 pkinit.so 验证 clpreauth/kdcpreauth 插件接口"
+    command: "cmake build + run test_krb5pkinit"
+  - file: test_krb5pkinit.sh
+    description: "真实调用 kdb5_util 创建/查询 KDB（db_module_dir 指向包内插件，断言 K/M@TEST.REALM + pkinit.so 存在）"
+    command: "sh test_krb5pkinit.sh"
+
+assertion_count: 4
