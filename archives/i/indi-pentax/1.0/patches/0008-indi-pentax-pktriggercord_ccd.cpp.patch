@@ -1,0 +1,469 @@
+--- a/indi-pentax/pktriggercord_ccd.cpp
++++ b/indi-pentax/pktriggercord_ccd.cpp
+@@ -13,42 +13,46 @@
+  Lesser General Public License for more details.
+ 
+  You should have received a copy of the GNU Lesser General Public
+  License along with this library; if not, write to the Free Software
+  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+  */
+ 
+ 
+ #include "pktriggercord_ccd.h"
+ #include "pslr.h"
++#include <cmath>
++#include <cerrno>
+ 
+ #define MINISO 100
+ #define MAXISO 102400
+-
+-#define TMPFILEBASE (char *)"/tmp/indipentax.tmp"
+ 
+ PkTriggerCordCCD::PkTriggerCordCCD(const char * name)
+ {
+     snprintf(this->name, 32, "%s", name);
+     char displayname[32];
+     snprintf(displayname, 32, "PENTAX %s (MSC)", name);
+     setDeviceName(displayname);
+ 
+     InExposure = false;
+     InDownload = false;
+ 
+     setVersion(INDI_PENTAX_VERSION_MAJOR, INDI_PENTAX_VERSION_MINOR);
+     LOG_INFO("The Pentax camera driver for MSC mode uses PkTriggerCord, courtesy of Andras Salamon.  See https://pktriggercord.melda.info");
+ }
+ 
+ PkTriggerCordCCD::~PkTriggerCordCCD()
+ {
++    if (shutter_result.valid()) shutter_result.wait();
++    if (fd >= 0) close(fd);
++    if (device) { pslr_disconnect(device); pslr_shutdown(device); }
++    if (!captureDirectory.empty()) rmdir(captureDirectory.c_str());
+ }
+ 
+ const char *PkTriggerCordCCD::getDefaultName()
+ {
+     return "Pentax DSLR";
+ }
+ 
+ bool PkTriggerCordCCD::initProperties()
+ {
+     // Init parent properties first
+@@ -71,21 +75,21 @@
+     IUFillSwitch(&transferFormatS[0], "FORMAT_FITS", "FITS", ISS_ON);
+     IUFillSwitch(&transferFormatS[1], "FORMAT_NATIVE", "Native", ISS_OFF);
+     IUFillSwitchVector(&transferFormatSP, transferFormatS, 2, getDeviceName(), "CCD_TRANSFER_FORMAT", "Output", OPTIONS_TAB, IP_RW, ISR_1OFMANY, 0, IPS_IDLE);
+ 
+     IUFillSwitch(&preserveOriginalS[1], "PRESERVE_ON", "Also Copy Native Image", ISS_OFF);
+     IUFillSwitch(&preserveOriginalS[0], "PRESERVE_OFF", "Keep FITS Only", ISS_ON);
+     IUFillSwitchVector(&preserveOriginalSP, preserveOriginalS, 2, getDeviceName(), "PRESERVE_ORIGINAL", "Copy Option", OPTIONS_TAB, IP_RW, ISR_1OFMANY, 0, IPS_IDLE);
+ 
+     PrimaryCCD.setMinMaxStep("CCD_EXPOSURE", "CCD_EXPOSURE_VALUE", 0, 7200, 1, false);
+ 
+-    IUSaveText(&BayerT[2], "RGGB");
++    BayerTP[2].setText("RGGB");
+ 
+     PrimaryCCD.getCCDInfo()->p = IP_RW;
+ 
+     uint32_t cap = CCD_HAS_BAYER;
+     SetCCDCapability(cap);
+ 
+     addConfigurationControl();
+     addDebugControl();
+     return true;
+ }
+@@ -141,21 +145,21 @@
+     string exposurecomp1_2[] = { "-3.0", "-2.5", "-2.0", "-1.5", "-1.0", "-0.5", "0", "0.5", "1.0", "1.5", "2.0", "3.0"};
+ 
+     string whitebalance[] = {"Auto", "Daylight", "Shade", "Cloudy", "Fluorescent_D", "Fluorescent_N", "Fluorescent_W", "Fluorescent_L", "Tungsten", "Flash", "Manual", "Manual2", "Manual3", "Kelvin1", "Kelvin2", "Kelvin3", "CTE", "MultiAuto"};
+     string imagequality[] = {"1","2","3","4"};
+     string imageformat[] = {"JPEG","PEF","DNG"};
+ 
+     buildCaptureSettingSwitch(&mIsoSP,iso,NARRAY(iso),"ISO","CCD_ISO",to_string(status.current_iso));
+     char current[5];
+     sprintf(current,"%.1f",(float)status.current_aperture.nom/status.current_aperture.denom);
+     buildCaptureSettingSwitch(&mApertureSP,aperture,NARRAY(aperture),"Aperture","CCD_APERTURE",string(current));
+-    buildCaptureSettingSwitch(&mWhiteBalanceSP,whitebalance,NARRAY(whitebalance),"White Balance","CCD_WB",string(get_pslr_white_balance_mode_str((pslr_white_balance_mode_t)status.white_balance_mode)));
++    buildCaptureSettingSwitch(&mWhiteBalanceSP,whitebalance,NARRAY(whitebalance),"White Balance","CCD_WB",string(pslr_get_white_balance_mode_str((pslr_white_balance_mode_t)status.white_balance_mode)));
+     buildCaptureSettingSwitch(&mIQualitySP,imagequality,pslr_get_model_max_jpeg_stars(device),"Quality","CAPTURE_QUALITY",to_string(status.jpeg_quality));
+     sprintf(current,"%.1f",(float)status.ec.nom/status.ec.denom);
+     if (status.custom_ev_steps == PSLR_CUSTOM_EV_STEPS_1_2)
+         buildCaptureSettingSwitch(&mExpCompSP,exposurecomp1_2,NARRAY(exposurecomp1_2),"Exp Comp","CCD_EC",string(current));
+     else
+         buildCaptureSettingSwitch(&mExpCompSP,exposurecomp1_3,NARRAY(exposurecomp1_3),"Exp Comp","CCD_EC",string(current));
+ 
+     string f = "JPEG";
+     if (uff == USER_FILE_FORMAT_DNG) {
+         f = "DNG";
+@@ -166,26 +170,26 @@
+ 
+     refreshBatteryStatus();
+ 
+     char exposuremode[10];
+     char usermode[10];
+     char firmware[16];
+ 
+     sprintf(exposuremode,"%d",status.exposure_mode);
+     sprintf(usermode,"%d",status.user_mode_flag);
+ 
+-    pslr_read_dspinfo( (pslr_handle_t *)device, firmware );
++    pslr_get_dspinfo( (pslr_handle_t *)device, firmware );
+ 
+     IUSaveText(&DeviceInfoT[1],firmware);
+     IUSaveText(&DeviceInfoT[3],exposuremode);
+     IUSaveText(&DeviceInfoT[4],usermode);
+-    IUSaveText(&DeviceInfoT[5],get_pslr_scene_mode_str((pslr_scene_mode_t)status.scene_mode));
++    IUSaveText(&DeviceInfoT[5],pslr_get_scene_mode_str((pslr_scene_mode_t)status.scene_mode));
+ 
+     IDSetText(&DeviceInfoTP,nullptr);
+ }
+ 
+ void PkTriggerCordCCD::deleteCaptureSwitches() {
+     if (mIsoSP.nsp > 0) deleteProperty(mIsoSP.name);
+     if (mApertureSP.nsp > 0) deleteProperty(mApertureSP.name);
+     if (mExpCompSP.nsp > 0) deleteProperty(mExpCompSP.name);
+     if (mWhiteBalanceSP.nsp > 0) deleteProperty(mWhiteBalanceSP.name);
+     if (mIQualitySP.nsp > 0) deleteProperty(mIQualitySP.name);
+@@ -210,46 +214,51 @@
+ }
+ 
+ bool PkTriggerCordCCD::Connect()
+ {
+     char *d = nullptr;
+     device = pslr_init(name,d);
+     if (! device) {
+         LOG_ERROR("Cannot connect to Pentax camera.");
+         return false;
+     }
+-    int r;
+-    if (r=pslr_connect(device)) {
++    int r = pslr_connect(device);
++    if (r != 0) {
+         if ( r != -1 ) {
+             LOG_ERROR("Cannot connect to Pentax camera.");
+         } else {
+             LOG_ERROR("Unknown Pentax camera found.");
+         }
++        pslr_shutdown(device);
++        device = nullptr;
+         return false;
+     }
+     InExposure = false;
+     InDownload = false;
+     LOG_INFO("Connected to Pentax camera in MSC mode.");
+     return true;
+ }
+ 
+ bool PkTriggerCordCCD::Disconnect()
+ {
++    if (shutter_result.valid()) shutter_result.wait();
++    if (!device) return true;
+     pslr_disconnect(device);
+     pslr_shutdown(device);
++    device = nullptr;
+     return true;
+ }
+ 
+ bool PkTriggerCordCCD::setupParams()
+ {
+     if (!getCaptureSettingsState()) return false;
+-    uff = get_user_file_format(&status);
++    uff = pslr_get_user_file_format(&status);
+     return true;
+ }
+ 
+ bool PkTriggerCordCCD::shutterPress(pslr_rational_t shutter_speed)
+ {
+     if ( status.exposure_mode ==  PSLR_GUI_EXPOSURE_MODE_B ) {
+         if (pslr_get_model_old_bulb_mode(device)) {
+             struct timeval prev_time;
+             gettimeofday(&prev_time, NULL);
+             bulb_old(device, shutter_speed, prev_time);
+@@ -272,29 +281,27 @@
+ 
+ 
+ bool PkTriggerCordCCD::StartExposure(float duration)
+ {
+     if (InExposure)
+     {
+         LOG_ERROR("Camera is already exposing.");
+         return false;
+     }
+     else {
+-        if (!duration) {
++        if (!std::isfinite(duration) || duration <= 0) {
+             LOG_INFO("Shutter speed must be greater than 0.");
+             return false;
+         }
+ 
+         //just need to check if we changed exposure modes and are still connected before proceeding here
+         if (!getCaptureSettingsState()) return false;
+-
+-        InExposure = true;
+ 
+         //update shutter speed
+         if ( status.exposure_mode !=  PSLR_GUI_EXPOSURE_MODE_B ) {
+             if (duration>30) {
+                 duration = 30;
+                 LOG_INFO("Exposures longer than 30 seconds not supported in current mode.  Setting exposure time to 30 seconds.  Change camera to bulb mode for longer expsoures.");
+             }
+             else {
+                 LOGF_INFO("Only pre-defined shutter speeds are supported in current mode.  The camera will select the pre-defined shutter speed that most closely matches %f.",duration);
+             }
+@@ -317,25 +324,39 @@
+             if (duration != (float)status.current_shutter_speed.nom/status.current_shutter_speed.denom) {
+                 pslr_set_shutter(device, shutter_speed);
+             }
+         }
+ 
+         if (autoFocusS[0].s == ISS_ON) pslr_focus(device);
+ 
+         //start capture
+         gettimeofday(&ExpStart, nullptr);
+         LOGF_INFO("Taking a %g seconds frame...", ExposureRequest);
++        const char *tmp = std::getenv("TMPDIR");
++        if (!tmp || !*tmp) tmp = "/tmp";
++        if (captureDirectory.empty())
++        {
++            std::string pattern = std::string(tmp) + "/indi-pentax-XXXXXX";
++            std::vector<char> path(pattern.begin(), pattern.end());
++            path.push_back('\0');
++            if (!mkdtemp(path.data())) { LOG_ERROR("Failed to create capture directory."); return false; }
++            captureDirectory = path.data();
++            capturePrefix = captureDirectory + "/capture";
++        }
++        user_file_format_t *format = pslr_get_user_file_format_t(uff);
++        if (!format) return false;
++        fd = open_file(const_cast<char *>(capturePrefix.c_str()), 1, *format);
++        if (fd < 0) { LOG_ERROR("Failed to open capture file."); return false; }
++        quality = status.jpeg_quality;
++        need_bulb_new_cleanup = false;
++        InExposure = true;
+         shutter_result = std::async(std::launch::async, &PkTriggerCordCCD::shutterPress,this,shutter_speed);
+-
+-        user_file_format_t ufft = *get_file_format_t(uff);
+-        char * output_file = TMPFILEBASE;
+-        fd = open_file(output_file, 1, ufft);
+ 
+         return true;
+     }
+ }
+ 
+ bool PkTriggerCordCCD::AbortExposure()
+ {
+ 
+     return true;
+ }
+@@ -462,49 +483,50 @@
+                 PrimaryCCD.setExposureLeft(timeleft);
+             }
+         }
+ 
+         std::chrono::milliseconds span (100);
+         if ( shutter_result.wait_for(span)!=std::future_status::timeout) {
+             bool result = shutter_result.get();
+             InDownload = false;
+             InExposure = false;
+             pslr_delete_buffer(device, 0);
+-            if (fd != 1) {
++            if (fd >= 0) {
+                 close(fd);
++                fd = -1;
+             }
+             if (need_bulb_new_cleanup) {
+                 bulb_new_cleanup(device);
+             }
+-            grabImage();
+-            ExposureComplete(&PrimaryCCD);
++            if (result && grabImage())
++                ExposureComplete(&PrimaryCCD);
++            else
++            {
++                LOG_ERROR("Capture or image decoding failed.");
++                PrimaryCCD.setExposureFailed();
++            }
+         } else if (InDownload && isDebug()) {
+             IDLog("Still waiting for download...");
+         }
+     }
+ 
+     if (timerID == -1)
+         SetTimer(POLLMS);
+     return;
+ }
+ 
+ bool PkTriggerCordCCD::grabImage()
+ {
+     //set correct tmpfile location
+-    char tmpfile[256];
+-    if (uff==USER_FILE_FORMAT_JPEG) {
+-        snprintf(tmpfile, 256, "%s-0001.jpg", TMPFILEBASE);
+-    } else if (uff==USER_FILE_FORMAT_DNG) {
+-        snprintf(tmpfile, 256, "%s-0001.dng", TMPFILEBASE);
+-    } else {
+-        snprintf(tmpfile, 256, "%s-0001.pef", TMPFILEBASE);
+-    }
++    const std::string capturedFile = capturePrefix + "-0001." +
++        (uff == USER_FILE_FORMAT_JPEG ? "jpg" : uff == USER_FILE_FORMAT_DNG ? "dng" : "pef");
++    const char *tmpfile = capturedFile.c_str();
+ 
+     // fits handling code
+     if (transferFormatS[0].s == ISS_ON)
+     {
+         PrimaryCCD.setImageExtension("fits");
+         uint8_t * memptr = PrimaryCCD.getFrameBuffer();
+         size_t memsize = 0;
+         int naxis = 2, w = 0, h = 0, bpp = 8;
+ 
+         if (uff==USER_FILE_FORMAT_JPEG)
+@@ -529,22 +551,22 @@
+             if (read_libraw(tmpfile, &memptr, &memsize, &naxis, &w, &h, &bpp, bayer_pattern))
+             {
+                 LOG_ERROR("Exposure failed to parse raw image.");
+                 unlink(tmpfile);
+                 return false;
+             }
+ 
+             LOGF_DEBUG("read_libraw: memsize (%d) naxis (%d) w (%d) h (%d) bpp (%d) bayer pattern (%s)",
+                        memsize, naxis, w, h, bpp, bayer_pattern);
+ 
+-            IUSaveText(&BayerT[2], bayer_pattern);
+-            IDSetText(&BayerTP, nullptr);
++            BayerTP[2].setText(bayer_pattern);
++            BayerTP.apply();
+             SetCCDCapability(GetCCDCapability() | CCD_HAS_BAYER);
+         }
+ 
+         if (PrimaryCCD.getSubW() != 0 && (w > PrimaryCCD.getSubW() || h > PrimaryCCD.getSubH()))
+             LOGF_WARN("Camera image size (%dx%d) is different than requested size (%d,%d). Purging configuration and updating frame size to match camera size.", w, h, PrimaryCCD.getSubW(), PrimaryCCD.getSubH());
+ 
+         PrimaryCCD.setFrame(0, 0, w, h);
+         PrimaryCCD.setFrameBuffer(memptr);
+         PrimaryCCD.setFrameBufferSize(memsize, false);
+         PrimaryCCD.setResolution(w, h);
+@@ -572,28 +594,31 @@
+         else {
+             std::remove(tmpfile);
+         }
+ 
+     }
+     // native handling code
+     else
+     {
+         PrimaryCCD.setImageExtension(getFormatFileExtension(uff));
+ 
+-        FILE* f = fopen(tmpfile, "r");
+-        fseek(f, 0, SEEK_END);
+-        size_t size = ftell(f);
++        FILE* f = fopen(tmpfile, "rb");
++        if (!f) return false;
++        if (fseek(f, 0, SEEK_END)) { fclose(f); return false; }
++        long length = ftell(f);
++        if (length <= 0) { fclose(f); return false; }
++        size_t size = static_cast<size_t>(length);
+         rewind(f);
+ 
+         PrimaryCCD.setFrameBufferSize(size);
+         char * memptr = (char *)PrimaryCCD.getFrameBuffer();
+-        fread(memptr, sizeof(char), size, f);
++        if (fread(memptr, sizeof(char), size, f) != size) { fclose(f); return false; }
+         PrimaryCCD.setFrameBuffer((unsigned char *)memptr);
+         fclose(f);
+         std::remove(tmpfile);
+     }
+ 
+     return true;
+ }
+ 
+ 
+ ISwitch * PkTriggerCordCCD::create_switch(const char * basestr, string options[], size_t numOptions, int setidx)
+@@ -647,26 +672,26 @@
+         LOG_WARN("Unfortunately, changing the ISO does not appear to work currently on some (all?) models in MSC mode.  You may need to change manually.");
+     }
+     else if (!strcmp(name, mApertureSP.name)) {
+         updateCaptureSettingSwitch(&mApertureSP,states,names,n);
+         pslr_rational_t ap = {(int)(atof(IUFindOnSwitch(&mApertureSP)->label)*10), 10};
+         pslr_set_aperture(device, ap);
+     }
+     else if (!strcmp(name, mExpCompSP.name)) {
+         updateCaptureSettingSwitch(&mExpCompSP,states,names,n);
+         pslr_rational_t ec = {(int)(atof(IUFindOnSwitch(&mExpCompSP)->label)*10), 10};
+-        pslr_set_ec( device, ec );
++        pslr_set_expose_compensation( device, ec );
+         LOG_WARN("Unfortunately, changing the exposure compensation does not work currently on some (all?) models in MSC mode.  You may need to change manually.");
+     }
+     else if (!strcmp(name, mWhiteBalanceSP.name)) {
+         updateCaptureSettingSwitch(&mWhiteBalanceSP,states,names,n);
+-        pslr_white_balance_mode_t white_balance_mode = get_pslr_white_balance_mode(IUFindOnSwitch(&mWhiteBalanceSP)->label);
++        pslr_white_balance_mode_t white_balance_mode = pslr_get_white_balance_mode(IUFindOnSwitch(&mWhiteBalanceSP)->label);
+         if ( white_balance_mode == -1 ) {
+             LOG_WARN("Could not set desired white balance: Invalid setting for current camera mode.");
+         }
+         else {
+             pslr_set_white_balance( device, white_balance_mode );
+         }
+     }
+     else if (!strcmp(name, mIQualitySP.name)) {
+         updateCaptureSettingSwitch(&mIQualitySP,states,names,n);
+         pslr_set_jpeg_stars(device, atoi(IUFindOnSwitch(&mIQualitySP)->label));
+@@ -699,55 +724,53 @@
+ bool PkTriggerCordCCD::saveConfigItems(FILE * fp) {
+ 
+     for (auto sw : std::vector<ISwitchVectorProperty*>{&mIsoSP,&mApertureSP,&mExpCompSP,&mWhiteBalanceSP,&mIQualitySP,&mFormatSP}) {
+         if (sw->nsp>0) IUSaveConfigSwitch(fp, sw);
+     }
+ 
+     // Save regular CCD properties
+     return INDI::CCD::saveConfigItems(fp);
+ }
+ 
+-void PkTriggerCordCCD::addFITSKeywords(fitsfile * fptr, INDI::CCDChip * targetChip)
+-{
+-    INDI::CCD::addFITSKeywords(fptr, targetChip);
+-
+-    int status = 0;
++void PkTriggerCordCCD::addFITSKeywords(INDI::CCDChip * targetChip, std::vector<INDI::FITSRecord> &fitsKeywords)
++{
++    INDI::CCD::addFITSKeywords(targetChip, fitsKeywords);
+ 
+     if (mIsoSP.nsp > 0)
+     {
+         ISwitch * onISO = IUFindOnSwitch(&mIsoSP);
+         if (onISO)
+         {
+             int isoSpeed = atoi(onISO->label);
+             if (isoSpeed > 0)
+-                fits_update_key_s(fptr, TUINT, "ISOSPEED", &isoSpeed, "ISO Speed", &status);
++                fitsKeywords.emplace_back("ISOSPEED", isoSpeed, "ISO Speed");
+         }
+     }
+ }
+ 
+ // returns true if still connected
+ bool PkTriggerCordCCD::getCaptureSettingsState() {
+     pslr_get_status(device, &status);
+     //assume that if we don't see battery info in status, the camera is disconnected
+     if (!status.battery_1 && !status.battery_2 && !status.battery_3 && !status.battery_4) {
+         if (Disconnect()) {
+             setConnected(false, IPS_IDLE);
+             updateProperties();
+         }
+         LOG_ERROR("Error: the camera appears to no longer be connected.");
+         return false;
+     }
+     else return true;
+ }
+ 
+ string PkTriggerCordCCD::getUploadFilePrefix() {
+-    return UploadSettingsT[UPLOAD_DIR].text + string("/") + UploadSettingsT[UPLOAD_PREFIX].text;
++    return string(UploadSettingsTP[UPLOAD_DIR].getText()) + "/" + UploadSettingsTP[UPLOAD_PREFIX].getText();
+ }
+ 
+ const char * PkTriggerCordCCD::getFormatFileExtension(user_file_format format) {
+     if (format==USER_FILE_FORMAT_JPEG) {
+         return "jpg";
+     }
+     else if (format==USER_FILE_FORMAT_DNG) {
+         return "raw";
+     }
+     else {
