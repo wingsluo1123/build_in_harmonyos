@@ -1,0 +1,34 @@
+# manifest.yaml — yatas 1.6.1 (HarmonyOS PC)
+version: "1.6.1"
+software: "yatas"
+status: "built"
+arch:
+  - "armv8"
+  - "x86_64"
+build_system:
+  - "conan2"
+  - "go1.26.5"
+toolchain:
+  go: "1.26.5"
+  cgo: false
+source:
+  upstream: "https://github.com/padok-team/yatas"
+  tag: "v1.6.1"
+  url: "https://github.com/padok-team/yatas/archive/refs/tags/v1.6.1.tar.gz"
+  sha256: "d4ecca0180fe9c5447cc13ce9a2b2bdab4a5b977060f5e89b87e9f4ca71d5857"
+  license: "Apache-2.0"
+build:
+  entry: "go build -trimpath -ldflags=\"-s -w\" ."
+  output_binary: "yatas"
+patches_applied: []
+upstream_tests:
+  total: 48
+  count_method: go_test_functions
+  command: "go test ./... -cover"
+knowledge_gained:
+  - "yatas is a pure-Go CLI (module github.com/padok-team/yatas, main.go at repo root); CGO disabled, GOOS=linux, static binary for OHOS/arm64 and x86_64."
+  - "go.mod declares go 1.20 (only requires >= 1.20), so any modern Go SDK works; 1.26.5 is used to match the worker toolchain."
+  - "Go linker mmap fails on HMDFS/tmpfs: link output must be placed on an ext2-like writable workspace (/data/storage/el2/base/haps/entry/files)."
+  - "On OHOS every executed ELF (the yatas binary and Go SDK tool binaries) must carry a .codesign section; sign with binary-sign-tool."
+  - "Upstream 1.6.1 ships 11 *_test.go files with 48 pure-local top-level Go unit tests (no network/t.Skip/t.Parallel); the official Makefile target is `go test ./... -cover`."
+  - "On OHOS the `go test ./...` DRIVER collapses to a bare 'FAIL' (implicit go vet + parallel multi-binary exec under OHOS ELF signing/fallocate). Robust faithful run = `go test -c` each test binary onto the ext2 workspace, self-sign with the proven binary-sign-tool path, then exec each directly with cwd=<package dir>; this yields exactly the same 48 top-level `--- PASS:` lines."
