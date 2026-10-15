@@ -1,0 +1,32 @@
+# 软件级 manifest — mscompress
+# 遵循 ARCHIVE-SPEC v2.0
+
+software: mscompress
+display: "mscompress"
+description: "Microsoft compress.exe/expand.exe 兼容的 LZ77 压缩/解压工具（mscompress + msexpand）"
+category: utility
+homepage: "https://github.com/stapelberg/mscompress"
+license: GPL-2.0
+build_system: autotools
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "纯 C autotools 双二进制工具（mscompress/msexpand），零外部依赖（仅 libc）"
+    - "上游 tag tarball 不带预生成 configure（仅 configure.ac/Makefile.am），conanfile 需先 autoreconf -fiv（tool_requires automake/1.18 + libtool/2.5.4）"
+    - "config.guess 无法识别 HarmonyOS，conanfile 显式传 --build/--host=aarch64-unknown-linux-ohos"
+    - "E114：生成的 configure 中 config.status 临时目录 umask 077 在 HMDFS 下不可写，需剔除"
+    - "上游 test.sh 为压缩/解压往返一致性验证，可直接作为 HarmonyOS 专项测试"
+  common_dependencies: []
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "0.4":
+    status: built
+    build_date: "2026-09-28"
