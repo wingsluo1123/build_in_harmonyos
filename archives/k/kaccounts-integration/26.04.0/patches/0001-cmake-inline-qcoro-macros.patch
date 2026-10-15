@@ -1,0 +1,24 @@
+--- a/CMakeLists.txt	2026-10-13 17:26:43.498434688 +0800
++++ b/CMakeLists.txt	2026-10-13 17:26:43.598434063 +0800
+@@ -66,6 +66,21 @@
+ 
+ find_package(QCoro${QT_MAJOR_VERSION} REQUIRED COMPONENTS Core)
+ 
++if(NOT COMMAND qcoro_enable_coroutines)
++    # The published qcoro Conan package reaches consumers through CMakeDeps
++    # generated configs, which do not ship upstream's QCoroMacros.cmake
++    # (installed under lib/cmake/QCoro6Coro/). Define the macro inline so
++    # OHOS cross-builds get the same behaviour (Clang <16: -fcoroutines-ts).
++    macro(qcoro_enable_coroutines)
++        if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
++            if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS "16")
++                set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fcoroutines-ts")
++            endif()
++        elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
++            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fcoroutines")
++        endif()
++    endmacro()
++endif()
+ qcoro_enable_coroutines()
+ 
+ add_definitions(-DTRANSLATION_DOMAIN=\"kaccounts-integration\")
