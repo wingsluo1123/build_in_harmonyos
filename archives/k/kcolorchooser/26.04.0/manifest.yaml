@@ -1,0 +1,51 @@
+# 版本级 manifest — kcolorchooser 26.04.0
+# 位置: archives/k/kcolorchooser/26.04.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "26.04.0"
+software: kcolorchooser
+status: built
+build_date: "2026-10-15"
+build_system: cmake
+
+source:
+  url: "https://download.kde.org/stable/release-service/26.04.0/src/kcolorchooser-26.04.0.tar.xz"
+  sha256: "8595c4294a087b516d55443ea009b8fdcb2e9fd798f550acc6a6c11fdcca1f24"
+  tar_format: tar.xz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DBUILD_TESTING=OFF"
+    - "-DKF_IGNORE_PLATFORM_CHECK=TRUE"
+    - "-DKF_SKIP_PO_PROCESSING=ON"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+  dependencies:
+    - qtbase/6.11.1
+    - kconfig/6.18.0
+    - kconfigwidgets/6.18.0
+    - kcoreaddons/6.18.0
+    - kguiaddons/6.18.0
+    - ki18n/6.18.0
+    - kiconthemes/6.18.0
+    - kitemviews/6.18.0
+    - kwidgetsaddons/6.18.0
+    - kxmlgui/6.18.0
+    - ecm/6.26.0
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+test_results:
+  upstream: "上游 kcolorchooser 26.04.0 无任何测试（0 用例）——证据：tarball 无 autotests/、无 tests/ 目录；CMakeLists.txt 仅 add_executable(kcolorchooser) + target_sources(kcolorchooser PRIVATE kcolorchooser.cpp)，未注册任何测试（无 add_test/enable_testing/BUILD_TESTING/ecm_add_test）；.kde-ci.yml 仅构建依赖元数据 + require-passing-tests-on，未声明测试目标；.gitlab-ci.yml 引入 9 个 KDE 共享模板（linux-qt6 / linux-qt6-next / freebsd-qt6 / windows-qt6 / flatpak / snap-snapcraft-lxd + clang-format/xml-lint/yaml-lint），这些模板做构建/打包/lint，仅在项目注册测试时才跑 ctest——本项目未注册。故无上游 ctest 可执行，test_package/MANIFEST.yml 申报 upstream_tests: []"
+  test_package: "passed 4 用例 / 5 断言 + 1 鸿蒙特有非断言用例 —— 用例1a 产物存在可执行；用例1b --version 报告 26.04.0；用例2 --help 识别 kcolorchooser；用例3a --author 输出 KAboutData 作者；用例3b --license 输出二进制 KAboutData 声明的许可证文本（上游 cpp 传 BSD_2_Clause，与其 COPYING/appdata.xml 的 MIT 不一致）；用例4 [鸿蒙特有，非断言] 真实启动 bin/kcolorchooser，由 OHOS 动态链接器解析完整 DT_NEEDED closure（进程退出码 143=被 SIGTERM 终止，无链接器错误）。证据：reports/conan-create.log 'ALL CONSUMER CASES PASSED (4 用例 / 5 断言 + 1 鸿蒙特有非断言用例)'"
+  ohos_run: "passed: conan create（含 test_package 消费者用例）在 HarmonyOS PC 设备（OHOS aarch64 profile）原生执行"
+  r40_note: "R40 深适配声明：绘图/交互界面（QColorDialog 窗口、鼠标/键盘输入、剪贴板取色、--color 初始色、--print 输出）在无头 offscreen 平台无法自动断言，仅经 DT_NEEDED closure + 元数据路径验证；交互路径需真机人工确认（本 PR 不声称已完成交互验收）。许可证：上游 COPYING 与 appdata.xml 为 MIT（Conan license=MIT）。"
+
+knowledge_gained:
+  - "Conan Environment.append() 对普通变量用空格连接（非 os.pathsep）：QT_QPA_PLATFORM_PLUGIN_PATH 需用 define() 显式注入 os.pathsep 连接的值，否则 Qt 把整串当成一个无效插件目录，报 Could not find the Qt platform plugin \"offscreen\"（OHOS 上伴随 Signal 6 core dumped） [knowledge_ref: knowledge/drafts/kcolorchooser-26.04.0-conan-env-append-space-joined-qt-plugin-path.kv]"
+  - "已发布 KF6 6.18.0 库的 path-form DT_NEEDED 有两类：相对 \"../../bin/libX.so\"（libKF6IconWidgets/libKF6ConfigGui/libKF6I18nLocaleData 实测命中）与构建机绝对路径；OHOS 按符号链接路径解析相对条目，消费者测试需归一化为 SONAME + 重签名 [knowledge_ref: knowledge/drafts/DRAFT-14403-registry-so-no-soname-dynstr-normalize-resign.kv, knowledge/drafts/DRAFT-E5xx-registry-so-baked-absolute-needed-symlink.kv]"
+  - "kcolorchooser 26.04.0 无补丁即可在 OHOS 构建：KF6 CoreAddons/I18n/XmlGui 均在 ohpcd 6.18.0 闭包内，KF_IGNORE_PLATFORM_CHECK + KF_SKIP_PO_PROCESSING 两个开关即可 [knowledge_ref: knowledge/drafts/DRAFT-kf-metainfo-platform-whitelist-ignore-flag.kv, knowledge/drafts/DRAFT-kf-skip-po-processing-gettext-toolchain.kv]"
+  - "ECM_MODULE_PATH 与 conan_cmakedeps_paths.cmake 必须手工补齐：CMakeDeps 不对 cmake_find_mode=none 的 qtbase/KF6 包加入 CMAKE_PREFIX_PATH，其生成的 ECMConfig.cmake 也不传播 ECM_MODULE_PATH [knowledge_ref: knowledge/drafts/DRAFT-13796-qqc2-breeze-style-6.7.5-kf6-ecm-cmakedeps-bridge.kv]"

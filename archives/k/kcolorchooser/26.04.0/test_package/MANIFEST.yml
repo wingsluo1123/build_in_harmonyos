@@ -1,0 +1,37 @@
+package: kcolorchooser/26.04.0
+homepage: https://invent.kde.org/graphics/kcolorchooser
+
+# 上游测试清点（R51 第一步）：kcolorchooser 26.04.0 **无任何测试**。
+# 证据：
+#   - 26.04.0 tarball 中不存在 autotests/ 或 tests/ 目录；
+#   - CMakeLists.txt 未注册任何测试：无 add_test()/enable_testing()/
+#     BUILD_TESTING/ecm_add_test() 用法，唯一目标是
+#     add_executable(kcolorchooser) + target_sources(kcolorchooser PRIVATE
+#     kcolorchooser.cpp)；
+#   - 上游 CI 配置未为本项目定义测试套件：.gitlab-ci.yml 引入 9 个 KDE 共享
+#     模板（linux-qt6 / linux-qt6-next / freebsd-qt6 / windows-qt6 / flatpak /
+#     snap-snapcraft-lxd + clang-format / xml-lint / yaml-lint），这些模板做
+#     构建/打包/lint，且仅在项目注册了测试时才跑 ctest —— 本项目未注册；
+#     .kde-ci.yml 仅含构建依赖元数据与 require-passing-tests-on，未声明测试目标。
+upstream_test_in_build: false
+upstream_check_command: "(none — 上游未注册任何测试目标，无 ctest 可执行；清点证据见上)"
+upstream_test_command: "(none — 上游 0 用例，见上方清点证据)"
+upstream_tests: []
+
+test_package_tests:
+  - file: test.sh
+    description: >-
+      消费者用例 4 用例 / 5 断言 + 1 鸿蒙特有非断言用例：
+      (1) 产物存在可执行 + --version 报告 26.04.0；
+      (2) --help 命令行接口可用（Qt6/KF6 运行时链接）；
+      (3) --author 输出 KAboutData 作者；--license 输出二进制内 KAboutData
+      声明的许可证文本（上游 kcolorchooser.cpp 传 BSD_2_Clause，与 COPYING/
+      appdata.xml 的 MIT 不一致，本用例断言的是运行时元数据路径）；
+      (4) [鸿蒙特有，非断言] 共享库 closure 加载：真实启动包内
+      bin/kcolorchooser，由 OHOS 动态链接器解析完整 DT_NEEDED closure
+      （已发布 KF6 库的 "../../bin/libX.so" 相对条目与构建机绝对路径条目
+      未经归一化时在 OHOS 上加载失败，在 glibc 下恒过）。
+    command: "sh test.sh <kcolorchooser-bin>"
+
+# 5 条内容断言（用例 1a/1b/2/3a/3b）；用例 4 为鸿蒙特有非断言用例，不计入。
+assertion_count: 5
