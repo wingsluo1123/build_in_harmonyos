@@ -1,0 +1,23 @@
+# conandata.yml — kactivitymanagerd 6.7.2
+# First-time adaptation of the KDE Plasma activity-manager daemon.
+
+sources:
+  url: "https://download.kde.org/stable/plasma/6.7.2/kactivitymanagerd-6.7.2.tar.xz"
+  sha256: "98d99436f07ee4fae8873d187ce4a9f41ca9fdc7d9adcc9423ec158996b42c73"
+
+patches:
+  - patch_file: "patches/0001-CMakeLists.txt.patch"
+    patch_description: "Rename the ecm_setup_version generated header to kactivitymanagerd_version.h: on case-insensitive OHOS filesystems #include <version.h> resolves to the project's own src/service/Version.h instead of the generated header"
+    patch_type: "ohos_adaptation"
+  - patch_file: "patches/0002-src-service-Application.cpp.patch"
+    patch_description: "Application.cpp: include the renamed kactivitymanagerd_version.h and the renamed FeaturesIface.h (case-insensitive filesystem collision with libc++ <features.h>)"
+    patch_type: "ohos_adaptation"
+  - patch_file: "patches/0003-src-service-CMakeLists.txt.patch"
+    patch_description: "Explicitly find_package(KF6Service) (KAMD plugins link KF6::Service; the aggregated KF6KIO config does not pull the target) and reference the renamed FeaturesIface.h in the D-Bus adaptor rule"
+    patch_type: "ohos_adaptation"
+  - patch_file: "patches/0004-src-service-plugins-sqlite-CMakeLists.txt.patch"
+    patch_description: "Generate the KDirNotify D-Bus interface locally: the published kio package is built without the D-Bus feature and does not ship kdirnotify.h"
+    patch_type: "ohos_adaptation"
+  - patch_file: "patches/0005-src-service-plugins-sqlite-ResourceLinking.cpp.patch"
+    patch_description: "ResourceLinking.cpp: use the locally generated KDirNotify stub and send the session-bus signals directly (the generated stub lacks kio's hand-written static emit* helpers)"
+    patch_type: "ohos_adaptation"

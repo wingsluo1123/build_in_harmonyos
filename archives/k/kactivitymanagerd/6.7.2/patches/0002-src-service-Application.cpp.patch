@@ -1,0 +1,49 @@
+--- a/src/service/Application.cpp
++++ b/src/service/Application.cpp
+@@ -1,20 +1,22 @@
+ /*
+  *   SPDX-FileCopyrightText: 2010-2016 Ivan Cukic <ivan.cukic@kde.org>
+  *
+  *   SPDX-License-Identifier: GPL-2.0-only OR GPL-3.0-only OR LicenseRef-KDE-Accepted-GPL
+  */
+ 
+ // Self
+ #include "Application.h"
+ #include <kactivities-features.h>
+-#include <version.h>
++// OHOS adaptation: <version.h> resolves (case-insensitively) to the
++// project's own src/service/Version.h; use a case-unique generated header name.
++#include <kactivitymanagerd_version.h>
+ 
+ // Qt
+ #include <QDBusConnection>
+ #include <QDBusConnectionInterface>
+ #include <QDBusServiceWatcher>
+ #include <QThread>
+ 
+ // KDE
+ #include <KAboutData>
+ #include <KCrash>
+@@ -27,21 +29,21 @@
+ 
+ // System
+ #include <functional>
+ #include <memory>
+ #include <signal.h>
+ #include <stdlib.h>
+ 
+ // Local
+ #include "Activities.h"
+ #include "DebugApplication.h"
+-#include "Features.h"
++#include "FeaturesIface.h"
+ #include "Plugin.h"
+ #include "Resources.h"
+ #include "common/dbus/common.h"
+ 
+ namespace
+ {
+ QList<QThread *> s_moduleThreads;
+ }
+ 
+ // Runs a QObject inside a QThread
