@@ -1,0 +1,62 @@
+# 版本级 manifest — xiccd 0.4.1
+# 遵循 ARCHIVE-SPEC v2.0（交叉校验元数据，CI 不依赖；以 conandata.yml 为准）
+
+version: "0.4.1"
+name: xiccd
+software: xiccd
+status: built
+build_date: "2026-10-15"
+build_system: autotools
+conan_ref: "xiccd/0.4.1"
+
+source:
+  url: "https://github.com/agalakhov/xiccd/archive/refs/tags/v0.4.1.tar.gz"
+  sha256: "bd4077fa45bdb74e3e5e029b4361648459bbb67ecb0d762bc9df9f9cf26ea567"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "autoreconf -fi 自举（tag archive 不含预生成 configure；automake/libtool 来自 tool_requires，E178）"
+    - "PKG_CONFIG_PATH 作用域注入：generators 目录（PkgConfigDeps 产物）+ 各依赖 lib/pkgconfig（真机 tc.environment() 自动注入不生效）"
+    - "ACLOCAL_PATH 指向 pkg-config 的 share/aclocal（pkg.m4 供 PKG_CHECK_MODULES）"
+    - "生成的 configure 改写 umask 077→022（E114）与 ac_pwd/pwd 判定（HMFS/HMDFS 无 getcwd）"
+    - "make -j1（设备原生构建，单线程避免 FD/内存压力）"
+  dependencies:
+    - libx11/6.4.0
+    - libxrandr/1.5.5.1
+    - libxext/6.4.0
+    - glib2/2.88.0
+    - colord/1.4.8.1
+  tool_requirements:
+    - automake/1.18
+    - libtool/2.5.4
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-configure.ac.patch"
+
+knowledge_gained:
+  - "E444（本包核心）：ohpcd 的 glib2/2.88.0 只发静态库（无 .so），而 colord/1.4.8.1 的 libcolordprivate.so.2 内嵌并导出全部 g_*/g_object_*/g_io_*（nm -D 实测 4123 个）。若再把静态 glib 链进 exe，进程内即有两份 GObject 类型系统；libtool 默认 -export-dynamic 让 exe 那份参与符号插入，而依赖库构造器早于 exe 构造器 → libcolordprivate 构造器调到未初始化的 glib，加载期 gtype.c:2555 断言 abort"
+  - "E444 修法：generate() 里把 generators 目录下 glib-2.0.pc 的 Libs/Libs.private 置空，静态 glib 不进链接，g_* 全部以 UND 引用解析到 libcolordprivate.so.2 导出的唯一副本（同栈先例 gssdp/1.6.6、gupnp/1.6.8 的「去源头」方案）。修后 nm -D 导出 g_* 由 4123 → 0"
+  - "E444 已证伪的对照修法：-Wl,--exclude-libs,ALL 只隐藏动态符号表，.so 内部对静态库符号的引用链接期已绑定未初始化本地副本（gssdp/1.6.6 实测仍崩）；共享 glib shim 排在 libcolord 之前会爆双份类型注册冲突 cannot register existing type 'gchar'；.preinit_array 钩子仍晚于依赖库构造器"
+  - "E178：真机自带 automake 1.19 损坏（am/ 数据文件里 @datadir@ 占位符未展开，autoreconf 报 cannot open < @datadir@/automake-1.19/am/header-vars.am），经 tool_requires automake/1.18 + libtool/2.5.4 用 build profile 解析出可用 autoreconf"
+  - "GitHub tag archive 无 .git：上游 AC_INIT 版本取自 m4_esyscmd_s(git describe ...)，展开为空串导致 xiccd -V 不打印版本 → 补丁 0001 固化；同一补丁给 AM_INIT_AUTOMAKE 补 foreign 严格度（上游无 AUTHORS/NEWS，不新建空文件）"
+  - "X11 栈必须走 6.4.0 线：libxrandr/1.5.5.1 force 钉 libx11/6.4.0；旧 1.8.13 线的 libX11.la 引用未发布的 libxcb.la，下游任何源码构建都撞 libtool 'not a valid libtool archive'"
+  - "R51：上游 0 个测试用例（无 tests/ 目录、configure.ac/Makefile.am 无 TESTS/check_PROGRAMS 注册，make check 为 no-op）；适配侧补 3 条 headless 断言实跑 bin/xiccd（-V / --help / 未知选项），3/3 通过"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/xiccd-0.4.1.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/xiccd-0.4.1.work
+  source_orig_hash: f71a86013f4bb59b
+  source_work_hash: 78aa1a5382b0f41b
+  generated_at: '2026-10-15T16:42:35'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-configure.ac.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
