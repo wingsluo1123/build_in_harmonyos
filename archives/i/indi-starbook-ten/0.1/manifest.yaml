@@ -1,0 +1,64 @@
+# 版本级 manifest — indi-starbook-ten 0.1
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "0.1"
+software: indi-starbook-ten
+status: built
+build_date: "2026-10-01"
+build_system: cmake
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/i/indi-starbook-ten/indi-starbook-ten_0.1.orig.tar.gz"
+  sha256: "f8f5ca6990afd32d0b7c18338aa297847bebfd328645d25b1ffc92b5d05db6f7"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - CMAKE_SYSTEM_NAME=Linux
+    - CMAKE_SYSTEM_PROCESSOR=aarch64
+    - CMAKE_POLICY_VERSION_MINIMUM=3.5
+  dependencies:
+    - libindi/2.2.2.1
+    - libnova/0.16
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - category: L1
+    content: "indi-starbook-ten 是 Vixen StarBook Ten 望远镜 mount 控制器的 INDI 驱动可执行程序（非库），通过 HTTP 协议（StarBook 命令集）控制 mount；核心为 starbook_ten.cpp/h 协议客户端 + 内置 cpp-httplib 单头文件"
+    reason: "实测 CMakeLists：find_package(INDI/NOVA REQUIRED)，add_executable(indi_starbook_ten)"
+  - category: L1
+    content: "libindi 发布版不装 INDIConfig.cmake 且全部头文件在 include/libindi/ 子目录 → 注入 INDI_INCLUDE_DIR 必须指到该子目录（find_path 短路不追加 PATH_SUFFIXES，指包根 include/ 报 INDI version header not found）；库解析注入 INDI_ROOT=<包根> 即可，注入 INDI_LIBRARIES 会被 FindINDI 模块覆盖重算（与 indi-rtklib 同根因同修法）"
+    reason: "真机第 1 轮 FAIL@G2（FindINDI.cmake:212）实测定位，第 2 轮验证修复生效；libindi package_info 用 cmake_file_name=libindi，与驱动 find_package(INDI) 不匹配"
+  - category: L1
+    content: "indi-3rdparty 2021/2022 快照驱动对 libindi 2.x 必踩四雷：FindINDI 版本正则、CMakeCommon 锁 CXX_STANDARD 14 遮蔽 toolchain cppstd=17、驱动源码用已移除的 libindi 1.x API（本包为 SlewRateS/LocationN/TimeT/initGuiderProperties 等，整文件回移上游 master 的 indi_starbook_ten.cpp）、INDI_INCLUDE_DIR 层级——同族任务 id 12487-12506 均适用"
+    reason: "本包 patches 0001-0003 与 indi-rtklib 同根因实测"
+  - category: L1
+    content: "StarBook 响应为 <!--KEY=VAL--> HTML 注释格式，客户端 std::regex 解析；httplib 同头文件自带 Server → 可用 localhost mock（bind_to_any_port 免固定端口）做无硬件真实 API 测试"
+    reason: "test_package 实测（x86_64 gcc 本地运行 + 真机三轮验证）：getFirmwareVersion/getStatus/getPierSide/stop 四组 API 全链路断言通过"
+  - category: L1
+    content: "executable-only 包的 test_package 必须对 bin/<驱动> 做存在性硬断言：L1e 破坏性负测只移走 bin/lib/include（不碰 src/），若测试只编译包内 src/ 且 --help 探测用 ignore_errors=True 吞退出码，sabotage 后照过会被误判'假测试'(R34)；执行探测保留 best-effort（本机对链 libindi 共享库二进制 exec EPERM/126 属环境限制）但须捕获并报告返回码"
+    reason: "真机第 2 轮 finish 卡 L1e 实测定位，第 3 轮 sabotage 重跑触发硬断言失败、闸正确判定'测试真实依赖包产物'放行——修复验证生效；conan 2.x self.run(ignore_errors=True) 返回退出码（源码确认）"
+
+notes: |
+  indi-starbook-ten 是 INDI 天文框架的 Vixen StarBook Ten mount 驱动，
+  纯 C++，依赖 libindi/libnova（全部已在制品仓），无 GUI/媒体/内核依赖。
+
+  适配要点：
+  - CMake 构建，强制 CMAKE_SYSTEM_NAME=Linux（E092，CMake 不识别 HarmonyOS）。
+  - 上游 cmake_minimum_required(VERSION 3.0) → 注入 cache 变量
+    CMAKE_POLICY_VERSION_MINIMUM=3.5（CMake 4.x 移除 <3.5 兼容）。
+  - 用驱动自带 FindINDI/FindNova 模块：INDI_INCLUDE_DIR 指 include/libindi
+    子目录、库解析靠 INDI_ROOT（注入 INDI_LIBRARIES 会被模块覆盖）。
+  - patches 0001-0003 修 libindi 2.x 迁移四雷（正则/cxx17/整文件 API 回移）。
+  - 产出为可执行程序 indi_starbook_ten（R38：软件级 commands.json 声明）。
+
+  test_package（R34）：
+  - Layer 1：vendor 编译 starbook_ten.cpp（+httplib.h），httplib::Server
+    localhost mock StarBook mount，真实调用 getFirmwareVersion/getStatus/
+    getPierSide/stop 四组公开 API，断言解析结果。
+  - Layer 2：bin/indi_starbook_ten 存在性硬断言（L1e 依赖锚点）+ --help
+    best-effort 探测（执行受限环境 EPERM 仅 warn，如实报告退出码）。

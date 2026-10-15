@@ -1,0 +1,13 @@
+sources:
+  url: "https://deb.debian.org/debian/pool/main/i/indi-starbook-ten/indi-starbook-ten_0.1.orig.tar.gz"
+  sha256: "f8f5ca6990afd32d0b7c18338aa297847bebfd328645d25b1ffc92b5d05db6f7"
+patches:
+  - patch_file: "patches/0001-FindINDI-version-regex.patch"
+    patch_description: "FindINDI.cmake 版本正则回移上游 indi-3rdparty master 修复：兼容 INDI 2.x indiversion.h 的 INDI_VERSION \"2.2.2\" 引号形式（否则 find_package(INDI) 报 FATAL_ERROR failed to detect INDI version）；与已合并 libfli/2.0-20221221182632 的 0001 补丁逐字一致"
+    patch_type: "portability"
+  - patch_file: "patches/0002-CMakeCommon-cxx17.patch"
+    patch_description: "CMakeCommon.cmake 将 CMAKE_CXX_STANDARD 由 14 提至 17：libindi 2.x 头文件使用 std::any（C++17），该目录级普通变量会遮蔽 conan toolchain 注入的 cppstd=17 cache 变量，必须就地修正"
+    patch_type: "portability"
+  - patch_file: "patches/0003-starbook-ten-libindi2.patch"
+    patch_description: "回移上游 indi-3rdparty master 的 libindi 2.x Property-API 迁移：indi_starbook_ten.cpp 整文件同步（2021 源码使用的 SlewRateS/LocationN/TimeT/operator&/initGuiderProperties 等 1.x API 在 libindi 2.2.2 中已移除），另含 starbook_ten.cpp 的 fabs() 负坐标修复；上游头文件 indi_starbook_ten.h 与 0.1 快照逐字一致，无需改动"
+    patch_type: "backport"
