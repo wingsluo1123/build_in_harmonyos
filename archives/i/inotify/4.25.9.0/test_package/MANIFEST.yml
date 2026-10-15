@@ -1,0 +1,48 @@
+# test_package/MANIFEST.yml — inotify 4.25.9.0
+# Upstream official test declaration (CI L0e requires this file).
+
+package: inotify/4.25.9.0
+homepage: "https://github.com/inotify-tools/inotify-tools"
+
+upstream_tests_exist: true
+upstream_test_audit:
+  - path: "build_and_test.sh (official test entry)"
+    finding: "official tests = unit_test (libinotifytools/src/test) + integration_test (cd t && make)"
+  - path: "libinotifytools/src/Makefile.am (TESTS = test)"
+    finding: "automake registers exactly 1 unit binary built from test.cpp (assertion-level summary printed at runtime, registration unit is the binary)"
+  - path: "t/ directory (14 *.t files)"
+    finding: "sharness suite: fsnotifywait-subtree.t + 13 inotifywait-*.t; t/Makefile runs each .t via SHELL_PATH with aggregate-results.sh; registration unit is one .t file"
+  - path: "t/sharness.sh + t/fanotify-common.sh"
+    finding: "harness helpers, not test cases; fanotify subcases are guarded by fanotify_supported() and skip cleanly where the kernel lacks fanotify"
+  - path: "top-level Makefile.am (SUBDIRS = libinotifytools src man)"
+    finding: "t/ is not in SUBDIRS, so the registration total is the union of both harnesses: 1 + 14 = 15"
+
+upstream_check_command: "libinotifytools/src/test + make -C t test (sharness *.t suite)"
+upstream_test_in_build: true
+upstream_test_command: "build unit binary from libinotifytools/src/test.cpp and run it; run each t/*.t via sh"
+
+# Registration-level total per official build_and_test.sh: 1 automake unit
+# binary + 14 sharness .t files = 15. Not the assertion-level expansion.
+upstream_test_total: 15
+upstream_test_count_method: autotools_tests
+
+upstream_tests:
+  - suite: "automake unit"
+    cases: 1
+    source: "libinotifytools/src/test.cpp (TESTS = test)"
+    command: "./inotify_unit_test"
+  - suite: "sharness integration"
+    cases: 14
+    source: "t/*.t (13 inotifywait-*.t + fsnotifywait-subtree.t)"
+    command: "sh *.t in t/"
+
+# Consumer tests (same conan create run).
+test_package_tests:
+  - file: test_inotify.cpp
+    description: "C++ API consumer: str/event mapping, initialize, watch_file, next_event modify, wd/filename round-trip (6 CHECK-OK)"
+    command: "./test_inotify"
+  - file: conanfile.py (functional drive)
+    description: "packaged inotifywait observes a create event in a scratch dir (exit-code case)"
+    command: "inotifywait -e create"
+
+assertion_count: 7
