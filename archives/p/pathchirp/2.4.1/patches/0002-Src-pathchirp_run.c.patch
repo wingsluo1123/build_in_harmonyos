@@ -1,0 +1,39 @@
+--- a/Src/pathchirp_run.c
++++ b/Src/pathchirp_run.c
+@@ -636,25 +636,31 @@
+    while(num_args<=argc)
+      {
+        /* point to next arguement */
+        argv_ptr++;
+        strcat(data_snd,":");
+        strcat(data_snd,*argv_ptr);
+        num_args++;
+      }
+ 
+ 
+-	if (write(sotcp,data_snd,100) < 0)
+-		{
+-		 perror("pathchirp_rcv_tcp: write");
+-		 exit(1);
+-		}
++        /* Send the complete NUL-terminated parameter frame, including long
++         * installed argv[0] paths. TCP writes can be partial. */
++        {
++          size_t total = strlen(data_snd) + 1;
++          size_t sent = 0;
++          while (sent < total) {
++            ssize_t count = write(sotcp, data_snd + sent, total - sent);
++            if (count <= 0) { perror("pathchirp_run: write"); exit(1); }
++            sent += (size_t) count;
++          }
++        }
+ 
+ 	while(read(sotcp,data,MAXMESG)> 0)
+ 		{
+ 		  nc=(int)ntohl(remote_pkt->chirp);
+ 		  timestamp=(double)ntohl(remote_pkt->timestamp_sec)+(double)ntohl(remote_pkt->timestamp_usec)/100000.0;
+ 
+ 		  avail_bw=(double)ntohl(remote_pkt->avail_bw);
+ 		  avail_bw=avail_bw/1000.0;
+ 
+ 		  if (timestamp<0.01)
