@@ -1,0 +1,35 @@
+# test_package/MANIFEST.yml — 上游官方测试声明（CI L0e 强制要求）
+package: ezc3d/1.5.5
+homepage: https://github.com/pyomeca/ezc3d
+
+# 上游测试情况：test/CMakeLists.txt 用 GoogleTest 构建单个测试可执行文件
+# ezc3d_test（test_ezc3d.cpp / test_math.cpp / test_modules.cpp，共 53 个 TEST）。
+# 上游 test/CMakeLists.txt 通过 git submodule 拉 gtest（external/gtest），
+# 通过 file(DOWNLOAD) 拉官方 C3D 测试数据；本配方改为 tool_requires("gtest")
+# + conandata.yml test_data 预取，并在 build() 中真实执行该套件。
+upstream_test_in_build: true
+upstream_tests:
+  - name: ezc3d_test
+    source: test/test_ezc3d.cpp
+    cases: 38
+  - name: ezc3d_test
+    source: test/test_math.cpp
+    cases: 10
+  - name: ezc3d_test
+    source: test/test_modules.cpp
+    cases: 5
+
+# test_package 自带测试（消费者视角：真实调用库的公开 API 走 C3D 写/读回环）
+# e2e：构造 c3d（3 point / 3 analog / 10 frame）→ parametrizedWrite 写盘 →
+#      全新建对象读回 → 逐点/逐采样/逐标签比对 → 二次回环 → 错误路径（缺文件抛异常）。
+# runtime: 本机直接执行；OHOS 交叉构建经 qemu + 真机 musl 运行根执行。
+test_package_tests:
+  - file: consumer_e2e.cpp
+    description: "消费者端到端 C3D 写/读回环：构造→写盘→读回→逐点比对→二次回环→错误路径"
+    command: "./ezc3d_consumer_test"
+    runtime: native-and-qemu
+
+assertion_count: 22
+
+# 实测（2026-10-10，qemu aarch64 下真实执行 consumer_e2e）：
+#   "== checks: 22, failed: 0 ==" / "RESULT: PASS"
