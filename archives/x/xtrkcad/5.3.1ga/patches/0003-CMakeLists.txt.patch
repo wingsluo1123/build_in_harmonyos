@@ -1,0 +1,75 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,14 +1,22 @@
+ # Main CMake file for XTrackCAD
+ 
+ cmake_minimum_required(VERSION 3.20.0)
+ project(XTrkCAD)
++
++# OpenHarmony / HarmonyOS PC is not a system that CMake knows about, so the
++# UNIX variable the rest of the build uses to select the POSIX code paths is
++# not set for it.  OHOS is Linux based, so mark it as such here rather than
++# mislabelling CMAKE_SYSTEM_NAME, which would load the wrong platform modules.
++if(CMAKE_SYSTEM_NAME STREQUAL "HarmonyOS" OR CMAKE_SYSTEM_NAME STREQUAL "OHOS")
++    set(UNIX 1)
++endif()
+ 
+ cmake_policy(SET CMP0076 NEW)
+ cmake_policy(SET CMP0079 NEW)
+ 
+ # where to look first for cmake modules, before ${CMAKE_ROOT}/Modules/ is checked
+ # additional CMake modules can be found here
+ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
+ 
+ # Include CMake defaults
+ include(CMakeDefaults)
+@@ -20,31 +28,49 @@
+ 
+ enable_testing()
+ 
+ # Find all dependencies
+ # 
+ # Additional libraries
+ 
+ find_package(Libzip)
+ find_package(Zlib)
+ 
++# The build normally uses the find modules in CMake/, which define the upper
++# case variables below.  Dependencies supplied by a package manager ship a
++# <name>-config.cmake instead, and CMake prefers that when both exist, so adopt
++# the imported targets it declares for the variables the rest of the build uses.
++if(TARGET libzip::libzip AND NOT LIBZIP_LIBRARY)
++	set(LIBZIP_LIBRARY libzip::libzip)
++endif()
++if(TARGET ZLIB::ZLIB AND NOT ZLIB_LIBRARY)
++	set(ZLIB_LIBRARY ZLIB::ZLIB)
++endif()
++
+ # Optionally enable SVG export
+ find_package(MiniXML)
+ if(MiniXML_FOUND)
+     set(XTRKCAD_CREATE_SVG 1)
+ 	message( STATUS "MiniXML found: SVG export is enabled")
+ else()
+ 	message( STATUS "MiniXML not found: no SVG export")
+ endif()
+ 
+ # Find unit testing framework
+ find_package(CMocka)
++# cmocka-config.cmake declares the imported target and lower case variables;
++# the unit tests use the upper case names that FindCMocka.cmake defines.
++if(TARGET cmocka::cmocka AND NOT CMOCKA_FOUND)
++	set(CMOCKA_FOUND TRUE)
++	set(CMOCKA_INCLUDE_DIR ${cmocka_INCLUDE_DIR})
++	set(CMOCKA_LIBRARIES cmocka::cmocka)
++endif()
+ if(CMOCKA_FOUND)
+ 	include_directories(${CMOCKA_INCLUDE_DIR})
+  	set(LIBS ${LIBS} ${CMOCKA_LIBRARIES})
+  	option(XTRKCAD_TESTING "Build unittests" ON)
+ endif()
+ 
+ # Tools
+ # Find document conversion tool
+ find_package(Pandoc)
+ 

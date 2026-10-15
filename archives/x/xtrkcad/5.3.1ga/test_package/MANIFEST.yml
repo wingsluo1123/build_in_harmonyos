@@ -1,0 +1,52 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+# 填写依据: ctest -N / ctest --output-on-failure 实测（见 reports/test-report.md）
+
+package: xtrkcad/5.3.1ga
+homepage: "https://xtrkcad-fork.sourceforge.net/"
+
+# 上游测试命令
+upstream_check_command: "ctest --output-on-failure"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "ctest --output-on-failure"
+
+# 上游实际运行的测试程序（本平台可达 5 个 / 24 个可运行 case；上游活跃 26 个含 2 个 MSW 专用）
+upstream_tests:
+  - file: app/bin/unittest/dxfformattest.c
+    source: xtrkcad-5.3.1GA/app/bin/unittest/dxfformattest.c
+    description: "DXF 输出格式（6 个 cmocka case，另编入 ../dxfformat.c）"
+    command: "./app/bin/unittest/dxfformattest"
+  - file: app/bin/unittest/pathstest.c
+    source: xtrkcad-5.3.1GA/app/bin/unittest/pathstest.c
+    description: "路径处理辅助函数（2 个 case）"
+    command: "./app/bin/unittest/pathstest"
+  - file: app/bin/unittest/defaultstest.c
+    source: xtrkcad-5.3.1GA/app/bin/unittest/defaultstest.c
+    description: "默认值读写（2 个 case）"
+    command: "./app/bin/unittest/defaultstest"
+  - file: app/bin/unittest/shortentest.c
+    source: xtrkcad-5.3.1GA/app/bin/unittest/shortentest.c
+    description: "字符串缩短（8 个 case，另编入 ../shortentext.c）"
+    command: "./app/bin/unittest/shortentest"
+  - file: app/dynstring/unittest/DynStringTest.c
+    source: xtrkcad-5.3.1GA/app/dynstring/unittest/DynStringTest.c
+    description: "dynstring 库（6 个 case）"
+    command: "./app/dynstring/unittest/dynstringtest"
+  # 说明: app/wlib/mswlib/unittest/utf8test.c（2 个 case）为 MSW 专用路径，
+  #       在 OHOS/Linux 侧不参与构建；catalogtest（8 个 case）被上游注释禁用。
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "消费者用例：链接包内 libdynstring.a，实跑 dynstring API（8 项断言）"
+    command: "./test_xtrkcad"
+  - file: conanfile.py
+    description: "实跑包内 svg2png 光栅化器，校验其 PNG 输出"
+    command: "svg2png check.svg -h 24 -o check.png"
+
+# 测试断言总数 (本平台可运行的上游 cmocka case 数；上游活跃 26 含 2 个 MSW 专用)
+assertion_count: 24

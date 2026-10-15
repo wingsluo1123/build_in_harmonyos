@@ -1,0 +1,29 @@
+--- a/CMake/FindInkscape.cmake
++++ b/CMake/FindInkscape.cmake
+@@ -11,21 +11,25 @@
+ # Module is from https://github.com/arx/ArxLibertatis
+ 
+ find_program(
+ 	Inkscape_EXECUTABLE
+ 	NAMES inkscape
+     HINTS "C:/Program Files/Inkscape/bin" 
+ 	DOC "Inkscape command-line SVG rasterizer"
+ )
+ 
+ execute_process(COMMAND ${Inkscape_EXECUTABLE} "--version" OUTPUT_VARIABLE _Inkscape_VERSION ERROR_QUIET)
+-STRING(REGEX MATCH "[1-9]\.[0-9\+\.[0-9]+" _Inkscape_VERSION ${_Inkscape_VERSION})
++# Guard: when inkscape is absent the version string is empty and STRING(REGEX MATCH ...)
++# would be called with too few arguments (CMake 4 treats that as a fatal error).
++if(_Inkscape_VERSION)
++	STRING(REGEX MATCH "[1-9]\.[0-9\+\.[0-9]+" _Inkscape_VERSION ${_Inkscape_VERSION})
++endif()
+ 
+ set(Inkscape_VERSION ${_Inkscape_VERSION} CACHE STRING "Inkscape Version")
+ 
+ execute_process(COMMAND ${Inkscape_EXECUTABLE} "--help" OUTPUT_VARIABLE _Inkscape_HELP ERROR_QUIET)
+ 
+ if(_Inkscape_HELP MATCHES "--without-gui")
+ 	set(Inkscape_GUI "--without-gui" CACHE STRING "Inkscape option to disable the GUI if needed")
+ endif()
+ 
+ if(NOT DEFINED Inkscape_EXPORT)

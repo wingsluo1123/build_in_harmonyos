@@ -1,0 +1,48 @@
+--- a/app/bin/unittest/CMakeLists.txt
++++ b/app/bin/unittest/CMakeLists.txt
+@@ -1,12 +1,20 @@
+ # build unit tests for the xtrkcad library
+ #
++
++# The test sources include headers of the code under test and of the shared
++# helpers, which live in the parent directory and in the wlib library.
++include_directories(
++	${CMAKE_CURRENT_SOURCE_DIR}/..
++	${CMAKE_CURRENT_SOURCE_DIR}/../../wlib/include
++	${CMAKE_CURRENT_BINARY_DIR}/../../wlib/include
++)
+ 
+ # dxf formatting
+ 
+ add_executable(dxfformattest
+ 				dxfformattest.c
+ 				../dxfformat.c
+ 			  )
+ 
+ target_link_libraries(dxfformattest
+                       dynstring
+@@ -31,20 +39,24 @@
+ 
+ add_executable( defaultstest
+ 				defaultstest.c
+ 				)
+ 
+ target_link_libraries(defaultstest
+                       xtrkcad-wlib
+ 					  ${LIBS})
+ 
+ add_test(DefaultsTest defaultstest)
++
++# The test file carries its own stubs of the wlib helpers it exercises, so it
++# must not also link the library that holds the real implementations of them.
++set_target_properties(defaultstest PROPERTIES LINK_LIBRARIES "dynstring;${LIBS}")
+ 
+ #
+ 
+ add_executable(shortentest
+ 			  shortentest.c
+ 			  ../shortentext.c
+ 			 )
+ 
+ target_link_libraries(shortentest
+ 					${LIBS})
