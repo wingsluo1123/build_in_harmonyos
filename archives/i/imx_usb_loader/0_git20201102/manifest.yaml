@@ -1,0 +1,94 @@
+version: "0_git20201102"
+status: built
+build_date: "2026-10-09"
+conan_ref: "imx_usb_loader/0_git20201102"
+
+source:
+  url: "https://github.com/boundarydevices/imx_usb_loader/archive/30b43d69770cd69e84c045dc9dcabb1f3e9d975a.tar.gz"
+  sha256: "4357907c9669874d3ccbf00395bf0b1733c26e6daea85d721f1c0cd897f4162c"
+  tar_format: tar.gz
+  tar_entries: 55
+  pinned_commit: "30b43d69770cd69e84c045dc9dcabb1f3e9d975a"
+  upstream_commit_date: "2020-05-17"
+  version_label_provenance: >-
+    任务版本号 0_git20201102 是 Alpine aports（community/imx_loader/APKBUILD）的
+    pkgver；该 APKBUILD 里的 _commit="30b43d69770cd69e84c045dc9dcabb1f3e9d975a"
+    就是它钉死的上游快照。同一 commit 被三方独立印证：Alpine aports（pkgver +
+    _commit）、Buildroot（package/imx-usb-loader/imx-usb-loader.mk 的
+    IMX_USB_LOADER_VERSION）、Debian（唯一的 orig tarball
+    imx-usb-loader_0~git20200517.30b43d69.orig.tar.gz）。**上游 master 只有这一个
+    分支、无 tag，且 2020-05-18 到 2020-11-02 之间没有任何提交**，所以 20201102
+    是 Alpine 的快照/打包标签，不是提交日期 —— 本包两种信息都如实记录，未编造。
+
+build:
+  system: make        # 手写 Makefile：无 configure / 无 CMake / 无 automake
+  in_source: true     # Makefile 规则全是 CWD 相对路径；tests/ 驱动器也假定树内布局
+  make_variables:
+    - "prefix=/ bindir=/bin sysconfdir=/etc  (conan 包布局)"
+    - "rel_sysconfdir=../etc  (钉死编译期 REL_SYSCONFDIR；不依赖构建机有 GNU coreutils realpath)"
+    - "USBCFLAGS=<libusb include>*  (含 <dep>/include，因为源码写 #include <libusb-1.0/libusb.h>)"
+    - "USBLDFLAGS=<libusb lib -L> -lusb-1.0 -lpthread  (来自 conan 依赖声明，不经 pkg-config)"
+  dependencies:
+    - libusb/1.0.27
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+# ── 适配范围（如实声明）────────────────────────────────────────────────
+adaptation_scope:
+  delivered:
+    - "bin/imx_usb   —— USB (libusb) 串行下载协议加载器"
+    - "bin/imx_uart  —— UART 加载器（不依赖 libusb，DT_NEEDED 只有 libc）"
+    - "etc/imx-loader.d/*.conf —— 上游 install -m644 *.conf 的 14 个板级/工作配置"
+    - "licenses/COPYING (LGPL-2.1 原文)"
+  capability_reductions:
+    - "上游 imx_usb.conf 引用了 3 个仓库内并不存在的板级配置（mx23_usb_work.conf / mx28_usb_work.conf / linux_gadget.conf）⇒ 这三条映射在运行期必然打不开；这是上游历史缺口，本包原样交付，未编造文件补上（消费者用例把它作为显式断言）"
+    - "Windows 目标（msvc/ 与 Makefile.mingw）不交付：本赛道只做 Linux/OHOS"
+  runtime_notes:
+    - "两个产物都没有 RPATH/RUNPATH（与现代 ld 行为一致），运行时需 LD_LIBRARY_PATH 能找到 libusb-1.0.so.0；conan 消费端由 VirtualRunEnv/conanrun 提供"
+    - "配置查找顺序：SYSCONFDIR(/etc/imx-loader.d) 优先，其次 REL_SYSCONFDIR(../etc/imx-loader.d，相对 argv[0] 所在目录)；两者都编译进 .rodata，交付形态自检 M7 逐条核对"
+    - "真正刷机需要目标板进入 serial download 模式并接上 USB/UART 与板级 .imx 镜像；本包交付的是用户态工具"
+
+test_results:
+  type: upstream + consumer + layout
+  upstream:
+    - name: "tests/Makefile（上游自带黄金语料套件）"
+      files: 3
+      cases: 3
+      executed: 3
+      passed: 3
+      failed: 0
+      skipped: 0
+      hard_gate: true
+      command: "make -f ohos-check.mk check   # check 只转调 $(MAKE) -C tests tests"
+      detail: >-
+        每个用例都是 $(IMX_USB) -v -S 0x15a2:0x0061 <img> > <img>.test 再
+        diff -u <img>.output <img>.test，与上游提交的 43KB/43KB/773KB 黄金轨迹
+        逐字节比对；-S 是模拟模式（do_simulation_dev），不需要 USB 硬件。
+        本机实测 3/3 通过。
+  cli_golden:
+    cases: 4
+    detail: >-
+      build() 内用 build 树里的 imx_usb/imx_uart 真跑：-V 横幅（imx_usb.c:608 /
+      imx_uart.c:330 + imx_loader.h:22）、imx_usb -h 的 3 条 print_usage() 字面量、
+      -c <不存在目录> 负例、以及 tests/test.imx.output 首行的解析后配置映射。
+  consumer:
+    file: "test_package/test_consumer.py"
+    checks: 12
+    detail: >-
+      真跑交付的 bin/imx_usb、bin/imx_uart（OHOS 上包目录内动态链接 ELF 若被加载器
+      拒绝则显式打印平台限制，不静默跳过）+ 独立 Python 解析器核对
+      etc/imx-loader.d/imx_usb.conf 的 22 条 VID:PID 映射、上游 tests/ 使用的
+      0x15a2:0x0061 -> mx6_usb_work.conf、三个上游历史缺口配置、
+      以及 14 个 *.conf 与钉死 tarball 派生的 sha256 表逐条一致。
+  layout_self_check:
+    file: "test_package/test_layout.py"
+    checks: 15
+
+knowledge_gained:
+  - "Alpine aports 的 pkgver `0_git<YYYYMMDD>` 只是快照/打包标签，不等于上游提交日期：imx_loader 的 0_git20201102 钉死的其实是 2020-05-17 的 30b43d69770c（APKBUILD 里的 _commit 才是权威，且与 Buildroot/Debian orig tarball 三方一致）⇒ 遇到 Debian/Alpine 快照式版本号，必须回到发行版的打包脚本里取 _commit，不能按日期去上游找提交"
+  - "imx_usb_loader 的 `-S/--sim=VID:PID` 是**模拟**模式（imx_usb.c 的 long_options: {sim, required_argument, 'S'} -> do_simulation_dev），所以上游 tests/ 的三个黄金语料用例完全离线可跑 ⇒ 这是「上游自带黄金数据 + 免硬件」的硬门禁范本"
+  - "conan 的 libusb-1.0.pc 把 includedir 指到 <prefix>/include/libusb-1.0，而 2010~2020 年代的老源码普遍写 #include <libusb-1.0/libusb.h> ⇒ 必须额外补 -I<prefix>/include；本包直接绕过 pkg-config，把 USBCFLAGS/USBLDFLAGS 作为 make 变量注入，OHOS worker 上连 pkg-config 都不需要"
+  - "手写 Makefile 包的测试目标可能叫 tests 而不是 check（顶层 tests: -> $(MAKE) -C tests/ tests）⇒ CI 的 L1c grep make.*check 匹配不到；配方生成一行 ohos-check.mk（check 只转调上游 tests 目标）既保持执行的是上游原封不动的用例，又让日志出现规范字面量"
+  - "上游 make install 用 $(shell realpath -m --relative-to=$(bindir) $(sysconfdir)) 计算编译期 REL_SYSCONFDIR ⇒ 依赖构建机有 GNU coreutils，且结果随 /bin 是否符号链接而变；直接以 make 变量钉死 ../etc 才是确定性的做法"

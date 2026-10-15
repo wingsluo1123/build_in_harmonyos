@@ -1,0 +1,76 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI 脚本 build_and_test.sh L0e 强制要求存在）
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: imx_usb_loader/0_git20201102
+homepage: "https://github.com/boundarydevices/imx_usb_loader"
+
+# 上游测试命令。上游没有 automake/CMake，测试目标叫 `tests`：
+#   顶层 Makefile: tests: imx_usb ; $(MAKE) -C tests/ tests
+#   tests/Makefile: 每个用例 = $(IMX_USB) -v -S 0x15a2:0x0061 <img> > <img>.test
+#                                        + diff -u <img>.output <img>.test
+# `-S` 是**模拟**模式（--sim=VID:PID -> do_simulation_dev），不需要 USB 硬件。
+upstream_check_command: "make -C tests tests"
+
+# conanfile.py build() 中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "make -f ohos-check.mk check   # check 目标只转调 $(MAKE) -C tests tests"
+
+# 上游实际运行的测试（逐套件口径）
+upstream_tests:
+  - file: tests/Makefile
+    source: imx_usb_loader-30b43d69770cd69e84c045dc9dcabb1f3e9d975a/tests/
+    description: >-
+      上游自带黄金语料套件：3 个用例（test.imx / test-dcd.imx / test-plugin.imx），
+      每个都用交付的 imx_usb 在 -S 模拟模式下跑一遍，再与上游提交的
+      *.output 黄金轨迹（43KB / 43KB / 773KB）逐字节 diff。输入语料为
+      tests/{image.bin,plugin.bin,{bare,dcd,plugin}.cfg,*.imx}。不需要 USB 硬件。
+    command: "make -f ohos-check.mk check"
+    executed: true
+    cases: 3
+    passed: 3
+    hard_gate: true
+
+# test_package 中自带的测试（消费者视角 + 交付形态）
+test_package_tests:
+  - file: test_consumer.py
+    description: >-
+      消费者用例：真跑交付的 bin/imx_usb、bin/imx_uart（-V 横幅来自
+      imx_usb.c:608 + imx_loader.h:22；-h 的 usage 字面量来自 print_usage()；
+      外加一条 -c <不存在目录> 的负例），并用独立 Python 解析器核对
+      etc/imx-loader.d/imx_usb.conf 的 22 条 VID:PID 映射、上游 tests/ 用的
+      0x15a2:0x0061 -> mx6_usb_work.conf、以及三个上游历史缺口配置。
+      OHOS 上包目录内的动态链接 ELF 若被加载器拒绝，**显式打印平台限制**
+      （等价用例已在 build() 用 build 树里的同一份产物跑过），绝不静默跳过。
+    command: "python3 test_consumer.py --package-folder <pkg> --os <os> --arch <arch>"
+    checks: 12
+  - file: test_layout.py
+    description: >-
+      交付形态自检（M）：两个可执行体在位/可执行、ELF 类型与架构、DT_NEEDED 契约
+      （imx_usb 依赖 libusb-1.0.so.0、imx_uart 不依赖）、无 RPATH/RUNPATH、
+      OHOS .codesign、编译期 SYSCONFDIR/REL_SYSCONFDIR 契约、内嵌版本串、
+      etc/imx-loader.d 的 14 个配置及其**由钉死 tarball 派生的 sha256**、
+      无 .o/.a/.la/.test 残留、无隐藏文件（JC5）、无源码/测试语料泄漏、
+      版本五处一致、LGPL-2.1 原文。
+    command: "python3 test_layout.py --package-folder ... --os ... --arch ... --version ..."
+    checks: 15
+  - file: test_ohos_native.py
+    description: >-
+      鸿蒙特有测试（OHOS-native，O1..O10 共 10 条）：**只在 os=OHOS 时执行**，
+      判据全是鸿蒙平台特有的约束，Linux 上无意义（非 OHOS 构建由脚本显式打印跳过原因，
+      绝不静默通过；本地可用 `--os OHOS` 强制跑全部判据复核逻辑）。
+      O1 OHOS 平台身份（/data/service/hnp 存在）；O2 OHOS 上只有
+      /data/service/hnp/bin/bash ⇒ 断言交付的两个 ELF 都不引用 /bin/bash；
+      O3 设备 /tmp 只读 ⇒ 断言交付物不依赖 /tmp 写路径（并打印 worker 实测可写性）；
+      O4 OHOS 加载器签名契约 ⇒ 两个 ELF 都必须带 .codesign/.note.ohos；
+      O5 OHOS 不在 CMake 平台表 ⇒ 断言无 RPATH/RUNPATH；
+      O6 依赖闭包 ⇒ DT_NEEDED 只允许系统库与 libusb-1.0.so.0 且不得是路径；
+      O7/O8 **在鸿蒙 worker 上真跑 bin/imx_usb 与 bin/imx_uart**：能跑则断言版本横幅
+      `imx_usb 0.2pre`（两个入口共用 imx_loader.h:22 的版本串），被加载器拒绝则断言
+      拒绝形态属于已归档的平台策略（不依赖 /bin/bash、不依赖可写 /tmp、已签名）；
+      O9 配置数据库随包交付（上游格式 + tests/ 依赖的 0x15a2:0x0061 映射）；
+      O10 ELF64 + e_machine 与目标架构一致。
+    command: "python3 test_ohos_native.py --package-folder <pkg> --os <os> --arch <arch>"
+    checks: 10
+
+assertion_count: 37
