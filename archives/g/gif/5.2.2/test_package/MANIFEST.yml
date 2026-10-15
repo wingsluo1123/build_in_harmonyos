@@ -1,0 +1,73 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+
+package: gif/5.2.2
+homepage: "https://sourceforge.net/projects/giflib/"
+
+# 上游测试命令 (make check 等价物: tests/makefile 的默认目标 test)
+upstream_check_command: "make -C tests"
+
+# conanfile.py build() 方法中已集成上游回归套件 (make -C tests)
+upstream_test_in_build: true
+upstream_test_command: "make -C tests"
+
+# 上游实际运行的测试目标 (tests/makefile, 12 个 regress 目标)
+# 除 gifbg/gifcolor/gifhisto 外全部工具有测试; 每个目标以 diff/cmp 断言输出
+upstream_tests:
+  - file: tests/makefile
+    source: giflib-5.2.2/tests/makefile
+    description: "render-regress: gif2rgb RGB 渲染与基准 .rgb 逐像素 cmp (9 张图片)"
+    command: "make -C tests render-regress"
+  - file: tests/makefile
+    source: giflib-5.2.2/tests/makefile
+    description: "gif2rgb-regress: gif2rgb->gifbuild 幂等性 diff"
+    command: "make -C tests gif2rgb-regress"
+  - file: tests/makefile
+    source: giflib-5.2.2/tests/makefile
+    description: "gifbuild-regress: gifbuild -d 与基准 .ico diff"
+    command: "make -C tests gifbuild-regress"
+  - file: tests/makefile
+    source: giflib-5.2.2/tests/makefile
+    description: "gifclrmp-regress: gifclrmp 色彩映射行为"
+    command: "make -C tests gifclrmp-regress"
+  - file: tests/makefile
+    source: giflib-5.2.2/tests/makefile
+    description: "gifecho-regress: gifecho 拷贝行为"
+    command: "make -C tests gifecho-regress"
+  - file: tests/makefile
+    source: giflib-5.2.2/tests/makefile
+    description: "giffilter-regress: giffilter->gif2rgb 与基准 rgb cmp (9 张图片)"
+    command: "make -C tests giffilter-regress"
+  - file: tests/makefile
+    source: giflib-5.2.2/tests/makefile
+    description: "giffix-regress: 截断 GIF 修复后 gifbuild -d diff (可移植补丁替换 head --bytes=-20)"
+    command: "make -C tests giffix-regress"
+  - file: tests/makefile
+    source: giflib-5.2.2/tests/makefile
+    description: "gifinto-regress: 短文件/非法输入 gifinto 行为"
+    command: "make -C tests gifinto-regress"
+  - file: tests/makefile
+    source: giflib-5.2.2/tests/makefile
+    description: "gifsponge-regress: gifsponge 拷贝 9 张图片与原始文件 cmp"
+    command: "make -C tests gifsponge-regress"
+  - file: tests/makefile
+    source: giflib-5.2.2/tests/makefile
+    description: "giftext-regress: giftext 文本转储 9 张图片"
+    command: "make -C tests giftext-regress"
+  - file: tests/makefile
+    source: giflib-5.2.2/tests/makefile
+    description: "giftool-regress: giftool 拷贝/去隔行/隔行"
+    command: "make -C tests giftool-regress"
+  - file: tests/makefile
+    source: giflib-5.2.2/tests/makefile
+    description: "gifwedge-regress: gifwedge 楔形图生成"
+    command: "make -C tests gifwedge-regress"
+
+# test_package 中自带的测试 (消费者视角验证: 公开 API 编码->解码往返)
+test_package_tests:
+  - file: test.c
+    description: "消费者测试: EGifOpenFileName/EGifPutScreenDesc/EGifPutImageDesc/EGifPutLine/EGifCloseFile 编码 3x2 GIF，DGifOpenFileName/DGifSlurp 解码并逐像素验证往返"
+    command: "./test_gif"
+
+# 测试断言总数 (近似值: 12 个上游 regress 目标 + 消费者往返 6 像素断言)
+assertion_count: 13
