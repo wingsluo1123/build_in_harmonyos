@@ -1,0 +1,126 @@
+--- a/dyncall/dyncall_call_arm64.S
++++ b/dyncall/dyncall_call_arm64.S
+@@ -19,20 +19,21 @@
+    ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+    ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ 
+ */
+ 
+ 
+ 
+ #include "../portasm/portasm-arm64.S"
++#include "dyncall_macros.h"
+ BEGIN_ASM
+ 
+ /* ============================================================================
+    DynCall Call Kernel for ARM 64-bit ARM Architecture 
+    ----------------------------------------------------------------------------
+    C Interface:
+      dcCall_arm64 (DCpointer target, DCpointer data, DCsize size, DCfloat* regdata);
+ 
+    This Call Kernel was tested on Debian/qemu-debootstrap arm64 jessie and on win64.
+ */
+@@ -44,29 +45,46 @@
+ // Supported ABIs:
+ // - 'ARM 64-bit AArch64 PCS' (@dadler: work in progress)
+ // 
+ // Useful Links:
+ // - http://lxr.free-electrons.com/source/arch/arm64/kernel/stacktrace.c
+ 
+ GLOBAL_C(dcCall_arm64)
+ ENTRY_C(dcCall_arm64)
+ ALIGN(2)
+ 
++#if defined(DC__Feature_Aggr_ARM64)
++	mov x4, xzr
++	mov x5, xzr
++	b LABELUSE(call_common)
++
++GLOBAL_C(dcCall_arm64_aggr)
++ENTRY_C(dcCall_arm64_aggr)
++ALIGN(2)
++// x4: indirect result address (x8); x5: x0/x1/d0-d3 capture buffer.
++LABELDEF(call_common)
++#endif
++
+ // input:
+ //   x0: target   (address of target)
+ //   x1: data     (address of stack copy data)
+ //   x2: size     (number of 'pair' 16-byte units)
+ //   x3: regdata  (address of register data)
+ 
+ // prolog:
+ 	
++#if defined(DC__Feature_Aggr_ARM64)
++	stp x29, x30, [sp, #-32]!
++	stp x5, x4, [sp, #16]
++#else
+ 	stp  x29, x30, [sp, #-16]!	// allocate frame
++#endif
+ 	mov  x29,  sp
+ 
+ // load 64-bit floating-point registers
+         
+ 	ldr  d0,  [x3,#0 ]
+ 	ldr  d1,  [x3,#8 ]
+ 	ldr  d2,  [x3,#16]
+ 	ldr  d3,  [x3,#24]
+ 	ldr  d4,  [x3,#32]
+ 	ldr  d5,  [x3,#40]
+@@ -91,39 +109,53 @@
+ 	add  x4, x4, 16	        // advance 16 bytes
+ 
+ 	b   LABELUSE(next)
+ 
+ LABELDEF(done)
+ 	
+ // rescue temp int registers
+ 
+ 	mov  x9 , x0			// x9: target
+ 	add  x10, x3, 64                // x3: integer reg buffer
++#if defined(DC__Feature_Aggr_ARM64)
++	ldr x8, [x29, #24]
++#endif
+ 
+ // load 64-bit integer registers ( 8 x 64-bit )
+ 	
+ 	// load register set
+ 
+ 	ldr  x0, [x10, #0]
+ 	ldr  x1, [x10, #8]
+ 	ldr  x2, [x10, #16]
+ 	ldr  x3, [x10, #24]
+ 	ldr  x4, [x10, #32]
+ 	ldr  x5, [x10, #40]
+ 	ldr  x6, [x10, #48]
+ 	ldr  x7, [x10, #56]
+ 	
+ // call target:
+ 	
+ 	blr  x9
++#if defined(DC__Feature_Aggr_ARM64)
++	ldr x9, [x29, #16]
++	cbz x9, LABELUSE(no_capture)
++	stp x0, x1, [x9, #0]
++	stp d0, d1, [x9, #16]
++	stp d2, d3, [x9, #32]
++LABELDEF(no_capture)
++#endif
+ 
+ // epilog:
+ 
+ 	mov  sp,  x29
++#if defined(DC__Feature_Aggr_ARM64)
++	ldp x29, x30, [sp], #32
++#else
+ 	ldp  x29, x30, [sp], 16
++#endif
+ 
+ 	ret
+ 
+ 
+ END_PROC
+ END_ASM
+-

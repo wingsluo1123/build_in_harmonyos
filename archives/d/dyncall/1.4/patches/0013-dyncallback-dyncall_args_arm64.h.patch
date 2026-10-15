@@ -1,0 +1,42 @@
+--- /dev/null
++++ b/dyncallback/dyncall_args_arm64.h
+@@ -0,0 +1,39 @@
++/* Internal AAPCS64 callback frame. Offsets are also used by assembly.
++ * Permission to use, copy, modify and distribute for any purpose is granted.
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
++ */
++#ifndef DYNCALL_ARGS_ARM64_H
++#define DYNCALL_ARGS_ARM64_H
++#include "dyncall_args.h"
++#include "dyncall_aggregate.h"
++#include <stdint.h>
++#include <stddef.h>
++
++typedef union {
++  struct { double value; } d;
++  struct { float value; } f;
++} DCFPU_t;
++
++struct DCArgs {
++  uint64_t I[8];                  /* 0 */
++  DCFPU_t F[8];                  /* 64 */
++  uint64_t* sp;                  /* 128 */
++  int i, f;                      /* 136, 140 */
++#if defined(DC__Feature_Aggr_ARM64)
++  DCaggr *const *aggrs;           /* 144 */
++  const DCaggr* ret_aggr;         /* 152 */
++  void* ret_ptr;                 /* 160: caller's x8 */
++  uint64_t ret_regs[6];          /* 168: x0/x1, d0-d3 */
++  int has_aggr_return;           /* 216 */
++  int reserved;                 /* 220 */
++#else
++  int s, reserved;
++#endif
++};
++
++#if defined(DC__Feature_Aggr_ARM64)
++typedef char dc_args_arm64_layout[
++  sizeof(DCArgs) == 224 && offsetof(DCArgs, ret_regs) == 168 &&
++  offsetof(DCArgs, aggrs) == 144 && offsetof(DCArgs, ret_ptr) == 160 ? 1 : -1];
++#endif
++#endif

@@ -1,0 +1,54 @@
+--- a/dyncall/dyncall_aggregate.c
++++ b/dyncall/dyncall_aggregate.c
+@@ -29,33 +29,39 @@
+ #include "dyncall_aggregate.h"
+ #include "dyncall_alloc.h"
+ #include <stdio.h>
+ #include <assert.h>
+ #include <stdarg.h>
+ 
+ 
+ 
+ #if defined(DC__Arch_AMD64) && defined(DC_UNIX)
+ #  include "dyncall_aggregate_x64.c"
++#elif defined(DC__Feature_Aggr_ARM64)
++#  include "dyncall_aggregate_arm64.c"
+ #else
+ static void dcFinishAggr(DCaggr *ag)
+ {
+ }
+ #endif
+ 
+ 
+ DCaggr* dcNewAggr(DCsize maxFieldCount, DCsize size)
+ {
+ 	DCaggr* ag = (DCaggr*)dcAllocMem(sizeof(DCaggr) + maxFieldCount * sizeof(DCfield));
+ 	ag->n_fields = 0;
+ 	ag->size = size;
+ 	ag->alignment = 0;
++#if defined(DC__Feature_Aggr_ARM64)
++	ag->arm64_hfa_type = 0;
++	ag->arm64_hfa_count = 0;
++#endif
+ 	return ag;
+ }
+ 
+ 
+ void dcAggrField(DCaggr* ag, DCsigchar type, DCint offset, DCsize array_len, ...)
+ {
+ 	DCfield *f = ag->fields + (ag->n_fields++);
+ 	f->type = type;
+ 	f->offset = offset;
+ 	f->array_len = array_len;
+@@ -103,11 +109,10 @@
+ void dcCloseAggr(DCaggr* ag)
+ {
+ 	dcFinishAggr(ag);
+ }
+ 
+ 
+ void dcFreeAggr(DCaggr* ag)
+ {
+ 	dcFreeMem(ag);
+ }
+-

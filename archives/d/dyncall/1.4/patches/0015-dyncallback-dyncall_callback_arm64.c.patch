@@ -1,0 +1,80 @@
+--- a/dyncallback/dyncall_callback_arm64.c
++++ b/dyncallback/dyncall_callback_arm64.c
+@@ -20,49 +20,76 @@
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+    ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ 
+ */
+ 
+ 
+ #include "dyncall_callback.h"
+ #include "dyncall_alloc_wx.h"
+ #include "dyncall_thunk.h"
++#include "dyncall_aggregate.h"
++#include <stddef.h>
++#include <errno.h>
+ 
+ 
+ /* Callback symbol. */
+ extern void dcCallbackThunkEntry();
+ 
+ struct DCCallback               /*  off  size */
+ {                               /* ----|----- */
+   DCThunk            thunk;     /*   0     32 */
+   DCCallbackHandler* handler;   /*  32      8 */
+   void*              userdata;  /*  40      8 */
++#if defined(DC__Feature_Aggr_ARM64)
++  DCaggr *const *    aggrs;      /*  48      8 */
++  const DCaggr*     ret_aggr;    /*  56      8 */
++  DCint             has_aggr_return; /* 64   4 */
++  DCint             reserved;    /*  68      4 */
++#endif
+ };                              /* total   48 */ 
+                                 /* aligned 48 */ 
+ 
+ void dcbInitCallback2(DCCallback* pcb, const DCsigchar* signature, DCCallbackHandler* handler, void* userdata, DCaggr *const * aggrs)
+ {
+   pcb->handler = handler;
+   pcb->userdata = userdata;
++#if defined(DC__Feature_Aggr_ARM64)
++  const DCsigchar* ch = signature;
++  DCsize n = 0;
++  pcb->aggrs = aggrs;
++  pcb->ret_aggr = NULL;
++  pcb->has_aggr_return = 0;
++  pcb->reserved = 0;
++  while(*ch) n += *(ch++) == DC_SIGCHAR_AGGREGATE;
++  if(ch != signature && ch[-1] == DC_SIGCHAR_AGGREGATE) {
++    pcb->has_aggr_return = 1;
++    pcb->ret_aggr = aggrs[n-1];
++  }
++#endif
+ }
+ 
+ 
+ DCCallback* dcbNewCallback2(const DCsigchar* signature, DCCallbackHandler* handler, void* userdata, DCaggr *const * aggrs)
+ {
+   DCCallback* pcb;
++#if defined(DC__Feature_Aggr_ARM64)
++  const DCsigchar* ch;
++  if(!signature || !handler) { errno = EINVAL; return NULL; }
++  for(ch = signature; *ch; ++ch)
++    if(*ch == DC_SIGCHAR_AGGREGATE && !aggrs) { errno = EINVAL; return NULL; }
++#endif
+   int err = dcAllocWX(sizeof(DCCallback), (void**)&pcb);
+   if(err)
+     return NULL;
+ 
+   dcbInitCallback2(pcb, signature, handler, userdata, aggrs);
+   dcbInitThunk(&pcb->thunk, dcCallbackThunkEntry);
+ 
+   err = dcInitExecWX(pcb, sizeof(DCCallback));
+   if(err) {
+     dcFreeWX(pcb, sizeof(DCCallback));
+     return NULL;
+   }
+ 
+   return pcb;
+ }
+-
