@@ -1,62 +1,53 @@
-# PR 信息
-
 - **三方库名称**：dbg-macro
 - **上游版本**：0.5.1
 - **上游仓库地址**：https://github.com/sharkdp/dbg-macro
-- **适配路径**：路径 A（基础适配）
-- **开源许可证**：MIT
+- **适配路径**：路径 A（基础适配，同版本重验证）
 - **使用知识库**：无（header-only，零依赖，CMake 原生兼容）
 
-# 测试用例对比
+## 测试用例对比
 
-## 上游库测试用例统计
+### 上游库测试用例统计
 
 | 测试类型 | 上游用例数 | 说明 |
-| --- | --- | --- |
-| 单元测试 | 4 | tests/ 目录 4 个测试（basic.cpp、demo.cpp、example.cpp、main.cpp） |
-| 集成测试 | 0 | — |
-| 其他测试 | 0 | — |
-| **合计** | **4** | |
+|----------|-----------|------|
+| 单元测试 | 18 | 来源：`tests/basic.cpp`，9 个 Catch2 `TEST_CASE` 分别以正常宏和 `DBG_MACRO_DISABLE` 两种配置编译 |
+| 其他测试 | 1 | 来源：`tests/demo.cpp`，上游注册为 `dbg_macro-demo` CTest 运行检查 |
+| **合计** | **19** | CTest 条目总数（0.5.1.1 归档同口径，同一上游 tarball） |
 
-## 适配后测试用例统计
+### 适配后测试用例统计
 
 | 测试类型 | 适配后用例数 | 与上游对比 | 说明 |
-| --- | --- | --- | --- |
-| 消费者测试 | 1 | +1 | 链接 dbg_macro::dbg_macro，dbg() 宏返回值 + 表达式验证 |
-| **合计** | **1** | **+1** | |
+|----------|-------------|-----------|------|
+| 单元测试 | 19 | 不变 | macOS 实跑 19/19；OHOS CI #86325 已编译上游套件，执行清点时 Python 直接启动 `ctest` 报 `FileNotFoundError`，上游实际执行 0/19 |
+| 消费者测试 | 1 | 新增 | 消费者程序通过安装后的 `dbg_macro::dbg_macro` 验证 6 项公开 API 行为；OHOS CI #86325 已运行 6/6 |
+| **合计** | **20** | **+1** | 声明上游 19 条目与消费者 1 个程序；平台实跑结果分别列示 |
 
-# 上游测试用例修改说明
+## 上游测试用例修改说明
 
 ### 是否存在对上游测试用例的修改？
 
 - [x] **否**，未修改上游任何测试用例
 
-# 补全测试用例说明
+## 补全测试用例说明
 
 ### 上游是否存在无测试用例，适配后补全的情况？
 
-- [x] **否**，上游已有测试（tests/ 4 个 .cpp）
+- [x] **是**，消费者测试本次补强
 
-# 验证结果
+> - **补全的测试范围**：`test_package/test.cpp` 6 项检查（dbg() 返回值/多参数、pretty_print(vector)、dbg::hex、dbg::bin），口径与 0.5.1.1 一致
+> - **补全原因**：覆盖头文件公开的格式化 API
+> - **新增测试文件清单**：
+>   1. `archives/d/dbg-macro/0.5.1/test_package/test.cpp` — 6 项检查（macOS arm64 clang C++11/C++17 双档实测通过）
 
-- 编译状态：**通过**（本地 CI 模拟 L0/L1/L4/L5 全部通过）
-- 上游测试用例通过率：**4/4（100%）**——已实际运行全部上游测试（basic 87 assertions + example + demo 全通过，0 失败）。Catch2 子模块缺失已克服：下载 Catch2 v2.13.10 单头文件（catch.hpp）补充 include 路径后编译运行
-- 新增测试用例通过率：1/1（100%，test_package dbg() 宏验证通过）
+## 验证结果
 
-### 适配过程关键点
+- 编译状态：本轮 macOS 原生构建通过；[OHOS CI #86325](https://ohpcd.atomgit.com/ci?id=86325) 上游与消费者编译成功，但 `test_package` 在清点上游时失败。版本级 `conanfile.py`/`conandata.yml` 保持逐字节不变。
+- 上游测试用例通过率：修复后本轮 macOS CTest 19/19（100%）；OHOS CI #86325 实际执行 0/19（清点命令无法启动，因此无上游通过率）。
+- 新增测试用例通过率：本轮 macOS arm64 clang C++11/C++17 均 6/6（100%）；OHOS CI #86325 消费者已执行 6/6（100%）。
+- 修复回归：先复现原 `FileNotFoundError`，再真实使用 Conan 2.33 命令入口执行完整上游套件；另验证清点命令失败、无总数、少于 19 项、测试执行失败均使测试失败。该回归模拟了 Python 直接执行的故障边界，不能替代 OHOS 真机复验。
 
-| 项 | 说明 |
-| --- | --- |
-| 源码下载 | ✅ 官方 GitHub tag（v0.5.1，sha256 fffea75f...） |
-| 构建 | ✅ CMake（INTERFACE 库，仅配置验证头文件） |
-| CMake 兼容 | ✅ CMAKE_POLICY_VERSION_MINIMUM=3.5（上游声明 3.1，CMake 4.x 拒绝 <3.5） |
-| 依赖 | ✅ 零（纯 C++ header） |
-| 上游测试 | ✅ 实际运行通过（Catch2 v2.13.10 单头文件补充后编译运行：basic 87 assertions + example + demo 全过） |
+## 补充说明
 
-# 补充说明
-
-- **构建方式**：CMake 标准安装（头文件 dbg.h + dbg_macro-config.cmake）
-- **补丁**：无（header-only 零依赖，仅 CMake 配置变量兼容）
-- **产物**：头文件（include/dbg.h）
-- **依赖**：无外部 Conan 依赖（header-only，纯 C++ 模板）
-- **上游测试说明**：tests/ 4 个 .cpp 依赖 Catch2 子模块（tests/Catch2，GitHub tarball 不含子模块源码），无法在 OHOS 编译运行；以 test_package dbg() 宏验证作为消费者验证
+- CI 故障修复：`ctest -N` 改用 `self.run(stdout=StringIO(), env="conanbuild")`，CTest 实跑也使用同一构建环境，删除 Python 侧 `shutil.which` 预检。命令启动失败或非零退出仍直接失败，清点必须严格等于 19 项，不新增跳过路径。
+- rule4 的 OHOS 19/19 运行要求尚未闭环：当前目标机证据仍是 #86325 清点失败；修复版本需新一轮 OHOS CI 确认。rule7 已有该轮 CI 记录。
+- 上游 tarball 缺 Catch2 submodule 的历史原因与钉版恢复方案见 0.5.1.1 归档；两版本归档互补
