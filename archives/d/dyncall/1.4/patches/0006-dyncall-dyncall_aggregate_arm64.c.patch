@@ -1,0 +1,68 @@
+--- /dev/null
++++ b/dyncall/dyncall_aggregate_arm64.c
+@@ -0,0 +1,65 @@
++/* AAPCS64 homogeneous float/double aggregate classification.
++ * Permission to use, copy, modify and distribute for any purpose is granted.
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
++ */
++#include <string.h>
++
++/* Work from actual offsets, not a sum of fields: union members can overlap,
++ * arrays and nested aggregates can share a base type, padding is not an HFA.
++ * The public descriptor has no vector/half-float type or explicit overalignment.
++ */
++static int arm64_hfa_members(const DCaggr* ag, DCsize base, DCsigchar* type,
++                             unsigned char coverage[32], unsigned depth)
++{
++  DCsize i, j, k;
++  if(depth > 64 || base > 32 || ag->size > 32 - base)
++    return 0;
++  for(i = 0; i < ag->n_fields; ++i) {
++    const DCfield* f = &ag->fields[i];
++    if(!f->array_len || !f->size)
++      continue;
++    if(f->offset > ag->size || f->array_len > (ag->size - f->offset) / f->size)
++      return 0;
++    if(f->type == DC_SIGCHAR_AGGREGATE) {
++      if(!f->sub_aggr)
++        return 0;
++      for(j = 0; j < f->array_len; ++j)
++        if(!arm64_hfa_members(f->sub_aggr, base + f->offset + j*f->size,
++                              type, coverage, depth + 1))
++          return 0;
++    } else {
++      DCsize width;
++      if(f->type != DC_SIGCHAR_FLOAT && f->type != DC_SIGCHAR_DOUBLE)
++        return 0;
++      if(*type && *type != f->type)
++        return 0;
++      *type = f->type;
++      width = f->type == DC_SIGCHAR_FLOAT ? sizeof(DCfloat) : sizeof(DCdouble);
++      if(f->size != width || (base + f->offset) % width)
++        return 0;
++      for(k = 0; k < f->size*f->array_len; ++k)
++        coverage[base + f->offset + k] = 1;
++    }
++  }
++  return 1;
++}
++
++static void dcFinishAggr(DCaggr* ag)
++{
++  unsigned char coverage[32] = { 0 };
++  DCsigchar type = 0;
++  DCsize i, width;
++  ag->arm64_hfa_type = 0;
++  ag->arm64_hfa_count = 0;
++  if(!ag->size || ag->size > sizeof(coverage) ||
++     !arm64_hfa_members(ag, 0, &type, coverage, 0) || !type)
++    return;
++  width = type == DC_SIGCHAR_FLOAT ? sizeof(DCfloat) : sizeof(DCdouble);
++  if(ag->size % width || ag->size / width > 4)
++    return;
++  for(i = 0; i < ag->size; ++i)
++    if(!coverage[i])
++      return;
++  ag->arm64_hfa_type = type;
++  ag->arm64_hfa_count = (DCuchar)(ag->size / width);
++}

@@ -1,0 +1,123 @@
+--- a/dyncallback/dyncall_args_arm64.c
++++ b/dyncallback/dyncall_args_arm64.c
+@@ -15,43 +15,24 @@
+ 
+    THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+    WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+    MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+    ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+    ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ 
+ */
+-#include "dyncall_args.h"
++#include "dyncall_args_arm64.h"
++#include <string.h>
+ 
+ #include <stdint.h>
+-
+-typedef union {
+-  struct { double value; } d;
+-  struct { float  value; } f;
+-} DCFPU_t;
+-
+-struct DCArgs
+-{
+-  /* buffers and stack-pointer: */
+-
+-  uint64_t  I[8];
+-  DCFPU_t   F[8];
+-  uint64_t* sp;
+-  
+-  /* counters: */
+-  int i;
+-  int f;
+-  int s;
+-  int reserved;
+-};
+ 
+ DClonglong dcbArgLongLong (DCArgs* p) 
+ {
+   if (p->i < 8) {
+     return p->I[p->i++];
+   } else {
+     return *(p->sp)++;
+   }
+ }
+ DCdouble  dcbArgDouble (DCArgs* p) {
+@@ -68,13 +49,72 @@
+ DCchar    dcbArgChar   (DCArgs* p) { return (DCchar)  dcbArgLongLong(p); }
+ DCbool    dcbArgBool   (DCArgs* p) { return dcbArgLongLong(p) & 0x1; }
+ DCpointer dcbArgPointer(DCArgs* p) { return (DCpointer) dcbArgLongLong(p); }
+ 
+ DCuint      dcbArgUInt     (DCArgs* p) { return (DCuint)      dcbArgInt(p);      }
+ DCuchar     dcbArgUChar    (DCArgs* p) { return (DCuchar)     dcbArgChar(p);     }
+ DCushort    dcbArgUShort   (DCArgs* p) { return (DCushort)    dcbArgShort(p);    }
+ DCulong     dcbArgULong    (DCArgs* p) { return (DCulong)     dcbArgLong(p);     }
+ DCulonglong dcbArgULongLong(DCArgs* p) { return (DCulonglong) dcbArgLongLong(p); }
+ 
+-DCpointer   dcbArgAggr     (DCArgs* p, DCpointer target)                   { /* @@@AGGR not impl */ return NULL; }
+-void        dcbReturnAggr  (DCArgs *args, DCValue *result, DCpointer ret)  { /* @@@AGGR not impl */ }
++#if defined(DC__Feature_Aggr_ARM64)
++DCpointer dcbArgAggr(DCArgs* p, DCpointer target)
++{
++  const DCaggr* ag = *(p->aggrs++);
++  DCsize i, width, words;
++  const void* src;
++  if(!ag) return dcbArgPointer(p); /* non-trivial C++ object, user's copy */
++  if(!ag->size) return target;
++  if(ag->arm64_hfa_count) {
++    width = ag->arm64_hfa_type == DC_SIGCHAR_FLOAT ? 4 : 8;
++    if(p->f + ag->arm64_hfa_count <= 8) {
++      for(i = 0; i < ag->arm64_hfa_count; ++i)
++        memcpy((unsigned char*)target+i*width, &p->F[p->f++], width);
++      return target;
++    }
++    p->f = 8;
++  } else if(ag->size > 16) {
++    src = dcbArgPointer(p);
++    memcpy(target, src, ag->size);
++    return target;
++  } else {
++    words = (ag->size+7)/8;
++    if(ag->alignment >= 16) p->i = (p->i+1) & ~1;
++    if(p->i + words <= 8) {
++      for(i = 0; i < words; ++i) {
++        DCsize n = ag->size-i*8;
++        if(n > 8) n = 8;
++        memcpy((unsigned char*)target+i*8, &p->I[p->i++], n);
++      }
++      return target;
++    }
++    p->i = 8;
++  }
++  if(ag->alignment > 8)
++    p->sp = (uint64_t*)(((uintptr_t)p->sp+15) & ~(uintptr_t)15);
++  memcpy(target, p->sp, ag->size);
++  p->sp += (ag->size+7)/8;
++  return target;
++}
+ 
++void dcbReturnAggr(DCArgs* args, DCValue* result, DCpointer ret)
++{
++  const DCaggr* ag = *(args->aggrs++);
++  DCsize i, width;
++  if(!ag || (!ag->arm64_hfa_count && ag->size > 16)) {
++    if(ag) memcpy(args->ret_ptr, ret, ag->size);
++    result->p = args->ret_ptr;
++    return;
++  }
++  memset(args->ret_regs, 0, sizeof(args->ret_regs));
++  if(ag->arm64_hfa_count) {
++    width = ag->arm64_hfa_type == DC_SIGCHAR_FLOAT ? 4 : 8;
++    for(i = 0; i < ag->arm64_hfa_count; ++i)
++      memcpy(&args->ret_regs[2+i], (const unsigned char*)ret+i*width, width);
++  } else if(ag->size) {
++    memcpy(args->ret_regs, ret, ag->size);
++  }
++}
++#else
++DCpointer dcbArgAggr(DCArgs* p, DCpointer target) { return NULL; }
++void dcbReturnAggr(DCArgs* args, DCValue* result, DCpointer ret) { }
++#endif

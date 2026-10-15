@@ -1,0 +1,38 @@
+--- a/dyncallback/CMakeLists.txt
++++ b/dyncallback/CMakeLists.txt
+@@ -27,31 +27,32 @@
+     set(ASM_SRC ${CMAKE_SOURCE_DIR}/dyncallback/dyncall_callback_arm64_masm.asm)
+     compile_asm(TARGET dyncallback_s ASM_FILES ${ASM_SRC} OUTPUT_OBJECTS ASM_SRC)
+   else()
+     set(ASM_SRC dyncall_callback_x64_masm.asm)
+   endif()
+ else()
+   set(ASM_SRC dyncall_callback_arch.S)
+   set_source_files_properties(${ASM_SRC} PROPERTIES LANGUAGE "C")
+ endif()
+ 
+-add_library(dyncallback_s STATIC ${ASM_SRC}
++add_library(dyncallback_s ${ASM_SRC}
+   dyncall_thunk.c
+   dyncall_alloc_wx.c
+   dyncall_args.c
+   dyncall_callback.c
+ )
+ 
+-install(TARGETS dyncallback_s ARCHIVE DESTINATION lib )
++target_link_libraries(dyncallback_s PUBLIC dyncall_s)
++install(TARGETS dyncallback_s ARCHIVE DESTINATION lib LIBRARY DESTINATION lib RUNTIME DESTINATION bin)
+ 
+ install(FILES
+   dyncall_thunk.h
+   dyncall_thunk_x86.h
+   dyncall_thunk_ppc32.h
+   dyncall_thunk_x64.h
+   dyncall_thunk_arm32.h
++  dyncall_thunk_arm64.h
+   dyncall_alloc_wx.h
+   dyncall_args.h
+   dyncall_callback.h
+   DESTINATION include
+ )
+-

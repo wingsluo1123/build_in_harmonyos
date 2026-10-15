@@ -1,0 +1,105 @@
+--- a/dyncallback/dyncall_callback_arm64.S
++++ b/dyncallback/dyncall_callback_arm64.S
+@@ -17,34 +17,85 @@
+    WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+    MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+    ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+    ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ 
+ */
+ 
+ #include "../portasm/portasm-arm64.S"
++#include "../dyncall/dyncall_macros.h"
+ BEGIN_ASM
+ 
+ // struct DCCallback
+ //   type       off   size
+ //   ---------|------|------
+ //   DCThunk  |   0  |  32
+ //   handler  |  32  |   8
+ //   userdata |  40  |   8
+ 
+ TEXTAREA
+ 
+ GLOBAL_C(dcCallbackThunkEntry)
+ ENTRY_C(dcCallbackThunkEntry)
+ ALIGN(4)
++
++#if defined(DC__Feature_Aggr_ARM64)
++// Frame 16 + DCArgs 224 + DCValue 16 = 256, always 16-byte aligned.
++	mov x10, sp
++	stp x29, x30, [sp, #-256]!
++	mov x29, sp
++	add x11, x29, #16
++	stp x0, x1, [x11, #0]
++	stp x2, x3, [x11, #16]
++	stp x4, x5, [x11, #32]
++	stp x6, x7, [x11, #48]
++	stp d0, d1, [x11, #64]
++	stp d2, d3, [x11, #80]
++	stp d4, d5, [x11, #96]
++	stp d6, d7, [x11, #112]
++	stp x10, xzr, [x11, #128]
++	ldp x12, x13, [x9, #48]
++	stp x12, x13, [x11, #144]
++	str x8, [x11, #160]
++	stp xzr, xzr, [x11, #168]
++	stp xzr, xzr, [x11, #184]
++	stp xzr, xzr, [x11, #200]
++	ldr w12, [x9, #64]
++	str w12, [x11, #216]
++	mov x0, x9
++	mov x1, x11
++	add x2, x29, #240
++	ldr x3, [x9, #40]
++	ldr x12, [x9, #32]
++	blr x12
++	and w0, w0, #255
++	cmp w0, 'A'
++	b.eq LABELUSE(retaggr)
++	cmp w0, 'f'
++	b.eq LABELUSE(retfloat)
++	cmp w0, 'd'
++	b.eq LABELUSE(retfloat)
++	ldr x0, [x29, #240]
++	b LABELUSE(return_done)
++LABELDEF(retfloat)
++	ldr d0, [x29, #240]
++	b LABELUSE(return_done)
++LABELDEF(retaggr)
++	ldp x0, x1, [x29, #184]
++	ldp d0, d1, [x29, #200]
++	ldp d2, d3, [x29, #216]
++LABELDEF(return_done)
++	ldp x29, x30, [sp], #256
++	ret
++#else
+ 
+ // input:
+ //  x9: DCCallback* pcb
+ //  x0..x7 ?? GP regs
+ //  d0..d7 ?? FP/SIMD regs
+ //  sp...  ?? arguments on stack
+ //
+ // locals:
+ //   type       off   size
+ //   ---------|------|------
+@@ -107,14 +158,15 @@
+ 	
+ LABELDEF(reti)
+ 	ldr x0, [x29, #184]
+ 	b LABELUSE(ret)
+ LABELDEF(retf)
+ 	ldr d0, [x29, #184]
+ LABELDEF(ret)
+ 	ldp x29, x30, [sp], #208
+ 	ret
+ 
++#endif
++
+ 
+ END_PROC
+ END_ASM
+-

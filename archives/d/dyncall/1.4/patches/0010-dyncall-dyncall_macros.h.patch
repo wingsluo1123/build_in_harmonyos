@@ -1,0 +1,23 @@
+--- a/dyncall/dyncall_macros.h
++++ b/dyncall/dyncall_macros.h
+@@ -331,13 +331,19 @@
+ #if (defined(DC__Arch_Intel_x86) || (defined(DC__Arch_AMD64) && defined(DC_UNIX)) || defined(DC__Arch_PPC32) || defined(DC__Arch_PPC64)) && \
+     !defined(DC__OS_MacOSX) && !defined(DC__OS_Plan9) && !defined(DC__OS_NDS) && !defined(DC__OS_PSP) && !defined(DC__OS_Minix) && !defined(DC__OS_SunOS) && !defined(DC__OS_BeOS)
+ # define DC__Feature_Syscall
+ #endif
+ 
+ /* aggregate (struct, union) by value */
+ #if defined(DC__Arch_AMD64)
+ # define DC__Feature_AggrByVal
+ #endif
+ 
++/* Base little-endian ELF AAPCS64. Darwin/Windows have distinct PCS variants. */
++#if defined(DC__Arch_ARM64) && defined(DC_UNIX) && defined(__ELF__) && \
++    !defined(DC__OS_Darwin) && !defined(__AARCH64EB__)
++# define DC__Feature_Aggr_ARM64
++# define DC__Feature_AggrByVal
++#endif
++
+ 
+ #endif /* DYNCALL_MACROS_H */
+-

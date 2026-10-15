@@ -1,0 +1,16 @@
+--- a/test/resolve_self/CMakeLists.txt
++++ b/test/resolve_self/CMakeLists.txt
+@@ -1,4 +1,13 @@
+ add_executable(resolve_self main.c)
+ target_link_libraries(resolve_self dynload_s)
+ set_target_properties(resolve_self PROPERTIES ENABLE_EXPORTS on)
+ 
++# Some POSIX targets have no stock CMake Platform module and hence no
++# executable export flags even though their linker supports this option.
++if(NOT WIN32 AND NOT APPLE)
++  include(CheckCCompilerFlag)
++  check_c_compiler_flag("-Wl,--export-dynamic" DYNLOAD_HAVE_EXPORT_DYNAMIC)
++  if(DYNLOAD_HAVE_EXPORT_DYNAMIC)
++    set_property(TARGET resolve_self APPEND_STRING PROPERTY LINK_FLAGS " -Wl,--export-dynamic")
++  endif()
++endif()

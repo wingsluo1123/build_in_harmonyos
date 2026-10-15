@@ -1,0 +1,249 @@
+--- a/dyncall/dyncall_callvm_arm64.c
++++ b/dyncall/dyncall_callvm_arm64.c
+@@ -20,36 +20,80 @@
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+    ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ 
+ */
+ 
+ 
+ #include "dyncall_callvm_arm64.h"
+ #include "dyncall_alloc.h"
+ #include "dyncall_macros.h"
++#include <string.h>
++#if defined(DC__Feature_Aggr_ARM64)
++#include "dyncall_aggregate.h"
++
++typedef struct DCArm64Copy {
++  struct DCArm64Copy* next;
++  unsigned char data[];
++} DCArm64Copy;
++
++static void free_copies(DCCallVM_arm64* p)
++{
++  while(p->copies) {
++    DCArm64Copy* copy = p->copies;
++    p->copies = copy->next;
++    dcFreeMem(copy);
++  }
++}
++
++static void stack_copy(DCCallVM_arm64* p, const void* data, DCsize size, DCsize alignment)
++{
++  DCsize at, padded;
++  alignment = alignment > 8 ? 16 : 8;
++  if(size > (DCsize)-1 - 7 || p->mVecHead.mSize > (DCsize)-1 - (alignment-1)) {
++    p->mInterface.mError = DC_ERROR_STACK_OVERFLOW;
++    return;
++  }
++  at = (p->mVecHead.mSize + alignment-1) & ~(alignment-1);
++  padded = (size + 7) & ~(DCsize)7;
++  if(at > p->mVecHead.mTotal || padded > p->mVecHead.mTotal-at) {
++    p->mInterface.mError = DC_ERROR_STACK_OVERFLOW;
++    return;
++  }
++  memset(dcVecAt(&p->mVecHead, p->mVecHead.mSize), 0, at+padded-p->mVecHead.mSize);
++  memcpy(dcVecAt(&p->mVecHead, at), data, size);
++  p->mVecHead.mSize = at+padded;
++}
++#endif
+ 
+ 
+ void dcCall_arm64(DCpointer target, DCpointer data, DCsize size, DCpointer regdata);
+ 
+ 
+ static void reset(DCCallVM* in_p)
+ {
+   DCCallVM_arm64* p = (DCCallVM_arm64*)in_p;
++#if defined(DC__Feature_Aggr_ARM64)
++  free_copies(p);
++  p->mInterface.mError = DC_ERROR_NONE;
++#endif
+   p->i = 0;
+   p->f = 0;
+   dcVecReset(&p->mVecHead);
+ }
+ 
+ 
+ static void deinit(DCCallVM* in_self)
+ {
++#if defined(DC__Feature_Aggr_ARM64)
++  free_copies((DCCallVM_arm64*)in_self);
++#endif
+   dcFreeMem(in_self);
+ }
+ 
+ 
+ 
+ static void a_i64(DCCallVM* in_self, DClonglong x)
+ {
+   DCCallVM_arm64* p = (DCCallVM_arm64*)in_self;
+   if (p->i < 8) {
+     p->I[p->i] = x;
+@@ -93,50 +137,141 @@
+ void call(DCCallVM* in_p, DCpointer target)
+ {
+   DCCallVM_arm64* p = (DCCallVM_arm64*)in_p;
+ 
+   /*
+   ** copy 'size' argument is given in number of 16-byte 'pair' blocks.
+   */
+ 
+   dcCall_arm64(target, dcVecData(&p->mVecHead), ( dcVecSize(&p->mVecHead) + 15 ) & -16, &p->u.S[0]);
+ }
++
++#if defined(DC__Feature_Aggr_ARM64)
++/* The last two parameters are x8's indirect result pointer and a 48-byte
++ * capture of x0/x1/d0-d3. They never consume the user argument registers. */
++void dcCall_arm64_aggr(DCpointer target, DCpointer data, DCsize size,
++                       DCpointer regdata, DCpointer indirect, DCpointer capture);
++
++static void a_aggr(DCCallVM* in_self, const DCaggr* ag, const void* data)
++{
++  DCCallVM_arm64* p = (DCCallVM_arm64*)in_self;
++  DCsize i, width, words;
++  if(!ag) { a_pointer(in_self, (DCpointer)data); return; }
++  if(!ag->size) return; /* C empty aggregate extension uses no registers. */
++  if(ag->arm64_hfa_count) {
++    width = ag->arm64_hfa_type == DC_SIGCHAR_FLOAT ? 4 : 8;
++    if(p->f + ag->arm64_hfa_count <= 8) {
++      for(i = 0; i < ag->arm64_hfa_count; ++i) {
++        memset(&p->u.D[p->f], 0, 8);
++        memcpy(&p->u.D[p->f++], (const unsigned char*)data + i*width, width);
++      }
++    } else {
++      p->f = 8; /* C.3: do not spill into GP registers or split the HFA. */
++      stack_copy(p, data, ag->size, ag->alignment);
++    }
++    return;
++  }
++  if(ag->size > 16) {
++    DCArm64Copy* copy;
++    if(ag->size > (DCsize)-1 - sizeof(DCArm64Copy)) {
++      p->mInterface.mError = DC_ERROR_OUT_OF_MEMORY;
++      return;
++    }
++    copy = (DCArm64Copy*)dcAllocMem(sizeof(DCArm64Copy)+ag->size);
++    if(!copy) { p->mInterface.mError = DC_ERROR_OUT_OF_MEMORY; return; }
++    memcpy(copy->data, data, ag->size);
++    copy->next = p->copies;
++    p->copies = copy;
++    a_pointer(in_self, copy->data);
++    return;
++  }
++  words = (ag->size+7)/8;
++  if(ag->alignment >= 16) p->i = (p->i+1) & ~1u;
++  if(p->i + words <= 8) {
++    for(i = 0; i < words; ++i) {
++      DCsize n = ag->size-i*8;
++      if(n > 8) n = 8;
++      p->I[p->i] = 0;
++      memcpy(&p->I[p->i++], (const unsigned char*)data+i*8, n);
++    }
++  } else {
++    p->i = 8; /* C.13: composite arguments are not split at x7. */
++    stack_copy(p, data, ag->size, ag->alignment);
++  }
++}
++
++static void begin_aggr(DCCallVM* self, const DCaggr* ag)
++{
++  /* AAPCS64 reserves x8 for the result, independent of x0-x7. Its value
++   * is supplied at call time, so there is no argument-slot reservation. */
++  (void)self; (void)ag;
++}
++
++static void call_aggr(DCCallVM* in_self, DCpointer target, const DCaggr* ag, DCpointer ret)
++{
++  DCCallVM_arm64* p = (DCCallVM_arm64*)in_self;
++  unsigned long long registers[6] = { 0 };
++  DCsize i, width;
++  DCpointer indirect = (!ag || (!ag->arm64_hfa_count && ag->size > 16)) ? ret : NULL;
++  if(p->mInterface.mError != DC_ERROR_NONE) return;
++  dcCall_arm64_aggr(target, dcVecData(&p->mVecHead),
++                    (dcVecSize(&p->mVecHead)+15) & ~(DCsize)15,
++                    &p->u.S[0], indirect, registers);
++  if(!ag || indirect || !ag->size) return;
++  if(ag->arm64_hfa_count) {
++    width = ag->arm64_hfa_type == DC_SIGCHAR_FLOAT ? 4 : 8;
++    for(i = 0; i < ag->arm64_hfa_count; ++i)
++      memcpy((unsigned char*)ret+i*width, &registers[2+i], width);
++  } else {
++    memcpy(ret, registers, ag->size);
++  }
++}
++#endif
+ 
+ static void mode(DCCallVM* in_self, DCint mode);
+ 
+ DCCallVM_vt vt_arm64 =
+ {
+   &deinit
+ , &reset
+ , &mode
+ , &a_bool
+ , &a_char
+ , &a_short
+ , &a_int
+ , &a_long
+ , &a_i64
+ , &a_float
+ , &a_double
+ , &a_pointer
++#if defined(DC__Feature_Aggr_ARM64)
++, &a_aggr
++#else
+ , NULL /* argAggr */
++#endif
+ , (DCvoidvmfunc*)       &call
+ , (DCboolvmfunc*)       &call
+ , (DCcharvmfunc*)       &call
+ , (DCshortvmfunc*)      &call
+ , (DCintvmfunc*)        &call
+ , (DClongvmfunc*)       &call
+ , (DClonglongvmfunc*)   &call
+ , (DCfloatvmfunc*)      &call
+ , (DCdoublevmfunc*)     &call
+ , (DCpointervmfunc*)    &call
++#if defined(DC__Feature_Aggr_ARM64)
++, &call_aggr
++, &begin_aggr
++#else
+ , NULL /* callAggr */
+ , NULL /* beginAggr */
++#endif
+ };
+ 
+ #ifdef DC__OS_Win64
+ /* for variadic, everything is pushed like ints as no FP regs are used, so
+    allocate arguments to an imaginary stack, where the first 64 bytes of
+    the stack are loaded into x0-x7, and any remaining arguments on the stack */
+ 
+ static void var_float (DCCallVM* in_p, DCfloat  x) { DClonglong tmp = 0; *(DCfloat*)&tmp = x; a_i64(in_p, tmp); }
+ static void var_double(DCCallVM* in_p, DCdouble x) { a_i64(in_p, *(DClonglong *)&x); }
+ 
+@@ -191,19 +326,22 @@
+       self->mInterface.mError = DC_ERROR_UNSUPPORTED_MODE;
+       return;
+   }
+   dc_callvm_base_init(&self->mInterface, vt);
+ }
+ 
+ /* Public API. */
+ DCCallVM* dcNewCallVM(DCsize size)
+ {
+   DCCallVM_arm64* p = (DCCallVM_arm64*)dcAllocMem(sizeof(DCCallVM_arm64)+size);
++  if(!p) return NULL;
++#if defined(DC__Feature_Aggr_ARM64)
++  p->copies = NULL;
++#endif
+ 
+   mode((DCCallVM*)p, DC_CALL_C_DEFAULT);
+ 
+   dcVecInit(&p->mVecHead, size);
+   reset((DCCallVM*)p);
+ 
+   return (DCCallVM*)p;
+ }
+-

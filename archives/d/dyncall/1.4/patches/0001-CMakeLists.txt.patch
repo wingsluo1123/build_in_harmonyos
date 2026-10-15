@@ -1,0 +1,30 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -138,21 +138,25 @@
+   set(CMAKE_ASM_COMPILER "${CMAKE_C_COMPILER}")
+   set(CMAKE_ASM_COMPILER_ARG1 "${CPPFLAGS} -c")
+   enable_language(ASM)
+   endif()
+ endif()
+ 
+ add_subdirectory(dynload)
+ add_subdirectory(dyncall)
+ add_subdirectory(dyncallback)
+ add_subdirectory(doc/manual EXCLUDE_FROM_ALL)
+-add_subdirectory(test EXCLUDE_FROM_ALL)
++option(DC_BUILD_TESTS "Build all upstream test executables" OFF)
++if(DC_BUILD_TESTS)
++  add_subdirectory(test)
++else()
++  add_subdirectory(test EXCLUDE_FROM_ALL)
++endif()
+ 
+ # install cmake Find scripts (disabled per default)
+ 
+ option(INSTALL_CMAKE_MODULES "install cmake modules to locate dyncall" "NO")
+ 
+ if(INSTALL_CMAKE_MODULES)
+ file(GLOB INSTALL_CMAKE_MODULES_FILES buildsys/cmake/Modules/Find*.cmake)
+ install(FILES ${INSTALL_CMAKE_MODULES_FILES} DESTINATION ${CMAKE_ROOT}/Modules)
+ endif(INSTALL_CMAKE_MODULES)
+-

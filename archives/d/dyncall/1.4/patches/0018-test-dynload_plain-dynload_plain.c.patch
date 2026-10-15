@@ -1,0 +1,86 @@
+--- a/test/dynload_plain/dynload_plain.c
++++ b/test/dynload_plain/dynload_plain.c
+@@ -16,31 +16,36 @@
+    WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+    MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+    ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+    ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ 
+ */
+ 
+ 
++#ifndef _GNU_SOURCE
++#define _GNU_SOURCE
++#endif
++
+ #include "../../dynload/dynload.h"
+ #include "../common/platformInit.h"
+ #include "../common/platformInit.c" /* Impl. for functions only used in this translation unit */
+ 
+ #include <string.h>
+ #include <sys/stat.h>
+ #if defined(DC_WINDOWS)
+ #  include <io.h>
+ #  define F_OK 0
+ #else
+ #  include <unistd.h>
++#  include <dlfcn.h>
+ #endif
+ 
+ #if defined(DC_WINDOWS)
+ char* dirname(char* path)
+ {
+   static const char dot[] = ".";
+   char* p = strrchr(path, '\\');
+   if(p)
+     *p = '\0';
+   else
+@@ -85,22 +90,33 @@
+     "/usr/lib/libc.dylib",
+     "/boot/system/lib/libroot.so",       /* Haiku */
+     "\\ReactOS\\system32\\msvcrt.dll",   /* ReactOS */
+     "C:\\ReactOS\\system32\\msvcrt.dll",
+     "\\Windows\\system32\\msvcrt.dll",   /* Windows */
+     "C:\\Windows\\system32\\msvcrt.dll"
+   };
+ 
+   dcTest_initPlatform();
+ 
++  /* Bind the already-loaded C runtime instead of guessing another alias.
++     On musl-based systems libc may be the ELF interpreter itself. */
++#if !defined(DC_WINDOWS)
++  {
++    Dl_info provider;
++    if(dladdr((void*)&printf, &provider) && provider.dli_fname &&
++       access(provider.dli_fname, F_OK) != -1)
++      path = provider.dli_fname;
++  }
++#endif
++
+   /* use first matching path of hacky hardcoded list, above */
+-  for(i=0; i<(sizeof(clibs)/sizeof(const char*)); ++i) {
++  for(i=0; !path && i<(sizeof(clibs)/sizeof(const char*)); ++i) {
+     if(access(clibs[i], F_OK) != -1) {
+       path = clibs[i];
+       break;
+     }
+ #if defined(DC__OS_Darwin)
+     /* macos >= 11.0.1 (Big Sur) dylibs might not be on disk but in a sys cache, so dlopen works but not fs checks */
+     else if((pLib = dlLoadLibrary(clibs[i]))) {
+       cmp_inode = 0; /* not dealing with files but dylib sys cache */
+       dlFreeLibrary(pLib);
+       path = clibs[i];
+@@ -281,11 +297,10 @@
+   }
+ 
+   /* Check final score of right ones to see if all worked */
+   r = (r == 16 + cmp_inode);
+   printf("result: dynload_plain: %d\n", r);
+ 
+   dcTest_deInitPlatform();
+ 
+   return !r;
+ }
+-
