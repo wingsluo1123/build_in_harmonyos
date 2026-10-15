@@ -1,0 +1,46 @@
+# SACLIB 2.2.8 source provenance.
+#
+# Upstream (www.usna.edu) publishes no source release on a code hosting
+# platform.  The release tarball is the exact file redistributed by both the
+# SageMath upstream mirror and the Debian source archive; Debian and Fedora
+# build their saclib packages from it.
+#
+# 3060308 bytes
+# sha256 E8E3ACB253C64394F35C8E17942F764CAE34DF731F3FE3D749B6A2AE1FB8203B
+#
+# Equivalence was proven by downloading the file from three independent
+# official hosters and comparing the full sha256 — all three are
+# E8E3ACB2...203B, same size, same version:
+#   https://files.sagemath.org/spkg/upstream/saclib/saclib2.2.8.tar.gz
+#   https://mirrors.mit.edu/sage/spkg/upstream/saclib/saclib2.2.8.tar.gz
+#   https://deb.debian.org/debian/pool/main/s/saclib/saclib_2.2.8.orig.tar.gz
+# No version substitution or repacking is involved: this is one byte-identical
+# upstream tarball served by three mirrors.
+#
+# The Debian host is the one actually used, because it is the mirror the CI
+# workers are known to reach: it appears in 563 recipes on main (it is also the
+# documented fallback there for hosts such as ftp.gnu.org that the workers
+# cannot reach), whereas mirrors.mit.edu appears in 4.  The first CI run for
+# this package failed in `checkout-pr` (the worker could not download the PR
+# diff at all), so the source host was re-checked against that constraint.
+sources:
+  "2.2.8":
+    url: "https://deb.debian.org/debian/pool/main/s/saclib/saclib_2.2.8.orig.tar.gz"
+    sha256: "E8E3ACB253C64394F35C8E17942F764CAE34DF731F3FE3D749B6A2AE1FB8203B"
+patches:
+  "2.2.8":
+    - patch_file: "patches/0001-sysdep-ohos-aarch64-port.patch"
+      patch_description: >-
+        Add an OHOS/aarch64 system-dependent port (sysdep/ohosAarch64) and teach
+        sconf/mksysdep.pl to select it, so that the generated sysdep.h does not
+        pull in the glibc-only <ieee754.h> and GC() does not spill x86 registers.
+      patch_type: "portability"
+      patch_source: "https://github.com/chriswestbrown/saclib"
+    - patch_file: "patches/0002-weak-sacmain-hook.patch"
+      patch_description: >-
+        Mark SACLIB's optional sacMain() hook as a weak reference, so that a
+        consumer that defines main() itself can never clash with the archive
+        member that holds SACLIB's default main().  Also adds the __weak
+        attribute macro to include/sacsys.h.
+      patch_type: "portability"
+      patch_source: "Debian saclib packaging (debian/patches/saclib-attr.patch, __weak part)"

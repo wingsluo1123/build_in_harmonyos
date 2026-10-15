@@ -1,0 +1,78 @@
+#====================================================================
+# OHOS/AArch64：保守式收集器的寄存器根发现不成立（哑参数落栈只适配 x86_64）
+#====================================================================
+
+id:                     DRAFT-ohos-aarch64-conservative-gc-register-roots
+trigger_tool:           clang|gcc|make|runtime|test
+phase:                  build|runtime
+error_signature:        SIGSEGV|Segmentation fault|Signal 11|core dumped|
+                        loss of live object after collection|
+                        passes at -O0 and fails from -O1 on|
+                        使用已回收对象|收集后数据损坏
+severity:               2
+category:               ohos|aarch64|aapcs64|abI|calling-convention|garbage-collector|
+                        register-roots|red-zone|optimization|runtime|porting
+match_keywords:         保守式收集器, conservative GC, stack scanning, 栈扫描,
+                        register roots, 寄存器根, callee-saved, x19-x28,
+                        AAPCS64, 调用约定, dummy argument spill, 哑参数落栈,
+                        push_regs, GC_push_regs, setjmp 强制溢出, red zone,
+                        16 字节 red zone, 栈下界, EACSTACK, BACSTACK,
+                        GCSI, GC(), SACLIB, saclib, -O0 掩盖缺陷,
+                        只在 -O0 通过
+title:                  AArch64 上「哑参数落栈」无法捕获保守式收集器的寄存器根——
+                        -O0 全过、-O1 起必崩，须用 setjmp() 强制溢出并以扫描者自身
+                        局部变量地址作为栈扫描下界
+
+root_cause: >
+  自研保守式（stack-scanning）收集器普遍采用同一套根发现办法：把所有可能存活的对象
+  都在栈或全局变量里找一遍。为了让「活跃在寄存器里的对象」也出现在栈上，上游 x86_64
+  的写法是声明 N 个哑整数局部变量，并一次性传给一个 dummy 函数——System V AMD64 有
+  16 个参数寄存器，这次调用会把它们全部落到栈上，扫描即可见。
+
+  该构造的成立前提是 x86_64 的调用约定，在 AArch64/AAPCS64 上不成立：
+
+  1) AAPCS64 下，被调用函数只保证 x19-x28 等被调用者保存寄存器不被破坏，因此**调用者
+     完全可以把自己仍然活跃的值留在这些寄存器里跨过本次调用**。栈扫描看不到它们，
+     于是这些活跃对象被当成垃圾回收；下一次使用就是段错误或数据损坏。
+  2) AAPCS64 还给叶子函数 16 字节 red zone（sp 之下可自由使用），编译器会把溢出槽放在
+     那里。若扫描的下界取的是「扫描辅助函数自己的帧地址」，则调用者在进入扫描前刚溢出
+     到 red zone 的指针也落在扫描区间之外。
+
+  实测（HarmonyOS PC / aarch64 / clang 15.0.4，SACLIB 2.2.8 的 GC()）：
+    - 哑参数写法：-O0 6/6 通过，-O1、-O2、-Os 各 0/6（共 0/18），全部 SIGSEGV；
+    - 去掉测试里的显式收集调用后，同一批构建在 -O0/-O1/-O2 全部通过
+      ⇒ 失败 100% 来自收集器，与算术、列表、链接无关；
+    - 放大单元空间使收集根本不发生（+N20000 / +N5000000）仍然崩溃
+      ⇒ 不是「回收太频繁」，而是根发现本身错误；
+    - 改为 setjmp() 强制溢出后，同一矩阵 24/24 全通过（-O0/-O1/-O2/-Os 各 6 次）。
+
+  为什么这个缺陷特别危险：-O0 会把所有局部变量放在栈上，恰好掩盖寄存器根问题，
+  于是「本机能过」会给出完全错误的结论；而下游（如 QEPCAD B）通常开优化构建。
+
+fix_template: >
+  ①把「让寄存器落栈」改成编译器无法省略的形式：在扫描前调用 setjmp()（或 sigsetjmp）。
+    ABI 要求 setjmp() 返回后被调用者保存寄存器保持不变，编译器必须把它实际用到的每个
+    x19-x28 先写进栈帧——恰好就是仍可能持有活跃对象的那组寄存器。这是经典保守式收集器
+    （Boehm GC 的 GC_push_regs 一类）用来抓寄存器根的手法，可移植且无内联汇编。
+    示例（SACLIB sysdep 端口，见 saclib/2.2.8 的 sysdep/ohosAarch64/GC.c）：
+        jmp_buf regs;
+        volatile Word frame_reserve[8];   /* 保证帧真实存在 */
+        (void)setjmp(regs);               /* 强制溢出全部被调用者保存寄存器 */
+        GCSI(sizeof(Word), (char *)&top_of_stack);
+    注意 setjmp 的返回值故意不使用、也不 longjmp 回去；只借用它的寄存器保存语义。
+  ②扫描下界取「执行扫描的那个函数自己的局部变量地址」，而不是它调用的辅助函数的帧地址，
+    以覆盖调用者 red zone 内的溢出槽。
+  ③把 -O1/-O2 纳入验证矩阵：只跑 -O0 的验证不能证明寄存器根正确。
+    可直接用本目录的 reproduce.sh（-O0/-O1/-O2/-Os 各跑 N 次）。
+  ④排查入口：detect_conservative_gc.py <源码目录>，会标出「哑参数落栈且无 setjmp」
+    的 RISK 文件与行号。
+
+scope_note: >
+  适用于所有「自行实现保守式/栈扫描垃圾回收」的库移植到 aarch64（不限于 SACLIB）：
+  自带 GC 的解释器、Lisp/Scheme/ML 运行时、数学内核、CAD/符号计算库等。
+  不适用于使用 malloc/free、引用计数或精确 GC 的库。
+  判定要点不是「有没有 GC」，而是「根发现是否依赖把活跃值落到栈上」：
+  只要源码里出现「N 个哑局部变量交给 dummy 函数」或等价构造，且目标平台不是
+  System V AMD64，就应当按 RISK 处理并在 -O1/-O2 下实测。
+  验证必须在目标架构上做：x86_64 宿主上同一份代码能跑通不能作为证据
+  （本次适配中，同一份 GC.c 在 x86_64 宿主上编译运行是通过的）。

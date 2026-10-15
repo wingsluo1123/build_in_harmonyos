@@ -1,0 +1,78 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI 脚本 build_and_test.sh L0e 强制要求存在）
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: saclib/2.2.8
+homepage: "https://www.usna.edu/Users/cs/wcbrown/saclib/"
+
+# 上游测试命令
+# SACLIB 源码树内没有 make check / tests / 测试脚本，也没有单独发布的测试包：
+# bin/ 下只有代码生成器（mkproto/mkmake/mklib/...），既无测试目标也无断言。
+# upstream_check_command: (none — SACLIB ships no test suite)
+upstream_check_command: "(none; the release ships no test target)"
+
+# conanfile.py build() 中是否集成了上游测试
+# build() 只执行上游生成器（mksysdep.pl / mkmake / mklib）编译出 lib/saclibo.a，
+# 上游没有可运行的测试可集成，因此不虚报 upstream_test_in_build。
+upstream_test_in_build: false
+
+# 上游测试清点（实际为空）
+# 清点范围：全部 Makefile/makefile/*.mk 是否有 check|test 目标、是否存在
+# tests/ 或 test/ 目录、是否有 CTest/add_test/AC_INIT/pytest 痕迹、
+# src/ 下除 main.c 外是否有其他 main()。四项全为空。
+upstream_tests: []
+
+# test_package 中自带的测试（消费者视角）
+test_package_tests:
+  - file: consumer_flow.c
+    test_kind: consumer_workflow
+    description: >-
+      【完整消费者用例/端到端】一个程序消费已安装的 SACLIB 完成一整件事：从 stdin 读取
+      问题（n、两个分数），用多精度乘法算精确阶乘；用 RNRED/RNSUM/RNDIF/RNPROD/RNQ 做
+      精确有理数四则并化简；用纯整数运算（IQR 十进展开）把有理数展开为精确十进制并自动
+      检测循环节；最后验证闭合恒等式 x-y == (b1*c2-b2*c1)/(c1*c2)。输出用于比对外部
+      独立计算的值（11! = 39916800；100/3+7/13=1321/39、-:1279/39、*:700/39、/:1300/21；
+      1/7=0.142857 循环节长 6、1/2=0.5 有限）。
+    command: "printf '# nfact b1 c1 b2 c2\\n11 100 3 7 13\\n' | ./consumer_flow -"
+  - file: test.c
+    test_kind: assertion_suite
+    description: >-
+      多精度整数恒等式：(2^100+3^60)(2^100-3^60) == (2^100)^2-(3^60)^2，
+      用 IEQ 对完整大整数比较；两个因子与乘积都超出单个机器字。
+    command: "./saclib_test"
+  - file: test.c
+    test_kind: assertion_suite
+    description: >-
+      模 1000003 独立定量校验：MDHOM(1000003, lhs) == 956067，与恒等式
+      互相印证，杜绝“能链接但算错”的库通过。
+    command: "./saclib_test"
+  - file: test.c
+    test_kind: assertion_suite
+    description: >-
+      垃圾回收：在运算之间显式调用 GC()，再校验 ISUM/IDIF 结果不变。
+      SACLIB 的收集器沿栈扫描 GC roots，只有端口的 GC() 正确捕获寄存器根与
+      red zone 内的活跃对象才可能通过，因此这条断言直接覆盖
+      sysdep/ohosAarch64/GC.c（详见 notes.md §6.2）。
+    command: "./saclib_test"
+  - file: test.c
+    test_kind: assertion_suite
+    description: >-
+      堆与列表：LIST1/LIST2/LENGTH/FIRST/SECOND 校验 SPACE/SPACEB1 寻址、
+      NIL==BETA 约定与 AVAIL 单元分配路径。
+    command: "./saclib_test"
+  - file: sample.c
+    test_kind: upstream_sample
+    description: >-
+      上游唯一可运行产物 doc/user_guide/sample.c 的逐字节副本（上游无测试套件）。
+      以 20 位 × 20 位整数驱动，断言乘积精确等于
+      1219326311370217952237463801111263526900（test.sh 中 1 条）；同时验证
+      sacMain() 钩子链与循环计数（test.sh 中 1 条）—— patches/0002 的弱符号处理。
+    command: "printf '12345678901234567890\\n98765432109876543210\\n5\\n' | ./sample_test"
+  - file: test.sh
+    test_kind: driver
+    description: "驱动完整消费者用例、断言套件与上游样例三个二进制并传播退出码（非空壳测试）"
+    command: "sh test.sh"
+
+# 断言总数：test.c 的 15 条 + 上游样例 2 条；另有 1 个完整消费者用例（consumer_flow.c）
+assertion_count: 17
+consumer_workflow_count: 1
