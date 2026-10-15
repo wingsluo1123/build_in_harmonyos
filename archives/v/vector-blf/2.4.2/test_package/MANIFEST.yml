@@ -1,0 +1,584 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: vector-blf/2.4.2
+homepage: "https://github.com/Technica-Engineering/vector_blf"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+# 上游 src/Vector/BLF/tests/unittests/CMakeLists.txt 通过 add_boost_test() 为每个
+# Boost.Test 二进制注册一个 ctest 用例；OPTION_BUILD_TESTS=ON 时 `ctest -N` 列出 126 项。
+upstream_check_command: "cmake -DOPTION_BUILD_TESTS=ON .. && ctest -N   # 126 registered tests"
+
+# conanfile.py build() 方法中是否已集成上游测试
+# 未集成：126 个测试二进制链接已编译的 Boost.Test 库
+# (boost_unit_test_framework/system/filesystem)，OHOS Boost 包只提供头文件与
+# filesystem/regex/program_options/iostreams 静态库，干净环境中不可用；
+# 该套件已在真机以 header-only Boost.Test 入口独立跑通，见 r51_run_evidence。
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（126 个 Boost.Test 二进制，与 ctest 注册项一一对应）
+# description 由逐文件解析 test_*.cpp 中的 .blf/.asc 字面量 + 校验该固定装置是否随
+# 源码发布生成，避免把上游 #if 0 的失效引用写成实际读取。
+upstream_tests:
+  - file: src/Vector/BLF/tests/unittests/test_AllLogfiles.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case AllLogfiles: iterates the events_from_binlog / events_from_converter fixture directories and writes/reads test_GlobalMarker.blf"
+    command: "./test_AllLogfiles"
+  - file: src/Vector/BLF/tests/unittests/test_A429BusStatistic.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case A429BusStatistic: uses the checked-in fixture events_from_binlog/test_A429BusStatistic.blf"
+    command: "./test_A429BusStatistic"
+  - file: src/Vector/BLF/tests/unittests/test_A429Error.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case A429Error: uses the checked-in fixture events_from_binlog/test_A429Error.blf"
+    command: "./test_A429Error"
+  - file: src/Vector/BLF/tests/unittests/test_A429Message.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case A429Message: uses the checked-in fixture events_from_binlog/test_A429Message.blf"
+    command: "./test_A429Message"
+  - file: src/Vector/BLF/tests/unittests/test_A429Status.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case A429Status: uses the checked-in fixture events_from_binlog/test_A429Status.blf"
+    command: "./test_A429Status"
+  - file: src/Vector/BLF/tests/unittests/test_AfdxBusStatistic.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case AfdxBusStatistic: uses the checked-in fixture events_from_binlog/test_AfdxBusStatistic.blf"
+    command: "./test_AfdxBusStatistic"
+  - file: src/Vector/BLF/tests/unittests/test_AfdxErrorEvent.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case AfdxErrorEvent: uses the checked-in fixture events_from_binlog/test_AfdxErrorEvent.blf"
+    command: "./test_AfdxErrorEvent"
+  - file: src/Vector/BLF/tests/unittests/test_AfdxFrame.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case AfdxFrame: uses the checked-in fixture events_from_binlog/test_AfdxFrame.blf"
+    command: "./test_AfdxFrame"
+  - file: src/Vector/BLF/tests/unittests/test_AfdxStatistic.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case AfdxStatistic: uses the checked-in fixture events_from_binlog/test_AfdxStatistic.blf"
+    command: "./test_AfdxStatistic"
+  - file: src/Vector/BLF/tests/unittests/test_AfdxStatus.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case AfdxStatus: uses the checked-in fixture events_from_binlog/test_AfdxStatus.blf"
+    command: "./test_AfdxStatus"
+  - file: src/Vector/BLF/tests/unittests/test_AppText.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case AppText: uses the checked-in fixture events_from_binlog/test_AppText.blf"
+    command: "./test_AppText"
+  - file: src/Vector/BLF/tests/unittests/test_AppTrigger.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case AppTrigger: uses the checked-in fixture events_from_binlog/test_AppTrigger.blf"
+    command: "./test_AppTrigger"
+  - file: src/Vector/BLF/tests/unittests/test_CanDriverError.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case CanDriverError: uses the checked-in fixture events_from_binlog/test_CanDriverError.blf"
+    command: "./test_CanDriverError"
+  - file: src/Vector/BLF/tests/unittests/test_CanDriverErrorExt.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case CanDriverErrorExt: uses the checked-in fixture events_from_binlog/test_CanDriverErrorExt.blf"
+    command: "./test_CanDriverErrorExt"
+  - file: src/Vector/BLF/tests/unittests/test_CanDriverHwSync.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case CanDriverHwSync: uses the checked-in fixture events_from_binlog/test_CanDriverHwSync.blf"
+    command: "./test_CanDriverHwSync"
+  - file: src/Vector/BLF/tests/unittests/test_CanDriverStatistic.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case CanDriverStatistic: uses the checked-in fixture events_from_binlog/test_CanDriverStatistic.blf"
+    command: "./test_CanDriverStatistic"
+  - file: src/Vector/BLF/tests/unittests/test_CanErrorFrame.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case CanErrorFrame: uses the checked-in fixture events_from_binlog/test_CanErrorFrame.blf"
+    command: "./test_CanErrorFrame"
+  - file: src/Vector/BLF/tests/unittests/test_CanErrorFrameExt.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case CanErrorFrameExt: uses the checked-in fixture events_from_binlog/test_CanErrorFrameExt.blf"
+    command: "./test_CanErrorFrameExt"
+  - file: src/Vector/BLF/tests/unittests/test_CanFdErrorFrame64.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case CanFdErrorFrame64: uses the checked-in fixture events_from_binlog/test_CanFdErrorFrame64.blf"
+    command: "./test_CanFdErrorFrame64"
+  - file: src/Vector/BLF/tests/unittests/test_CanFdMessage64.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case CanFdMessage64: uses the checked-in fixture events_from_binlog/test_CanFdMessage64.blf"
+    command: "./test_CanFdMessage64"
+  - file: src/Vector/BLF/tests/unittests/test_CanFdMessage.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case CanFdMessage: uses the checked-in fixture events_from_binlog/test_CanFdMessage.blf"
+    command: "./test_CanFdMessage"
+  - file: src/Vector/BLF/tests/unittests/test_CanMessage.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case CanMessage: uses the checked-in fixture events_from_binlog/test_CanMessage.blf"
+    command: "./test_CanMessage"
+  - file: src/Vector/BLF/tests/unittests/test_CanMessage2.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case CanMessage2: uses the checked-in fixture events_from_binlog/test_CanMessage2.blf"
+    command: "./test_CanMessage2"
+  - file: src/Vector/BLF/tests/unittests/test_CanOverloadFrame.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case CanOverloadFrame: uses the checked-in fixture events_from_binlog/test_CanOverloadFrame.blf"
+    command: "./test_CanOverloadFrame"
+  - file: src/Vector/BLF/tests/unittests/test_CompactSerialEvent.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case CompactSerialEvent: no .blf/.asc fixture referenced; the object/exception path is exercised in code"
+    command: "./test_CompactSerialEvent"
+  - file: src/Vector/BLF/tests/unittests/test_CompressedFile.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case CompressedFile: uses the checked-in fixture(s) /events_from_binlog/test_CanMessage.blf"
+    command: "./test_CompressedFile"
+  - file: src/Vector/BLF/tests/unittests/test_DataLostBegin.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case DataLostBegin: the /events_from_binlog/test_DataLostBegin.blf reference sits inside an upstream #if 0 block, so no fixture is needed; the object path is exercised in code"
+    command: "./test_DataLostBegin"
+  - file: src/Vector/BLF/tests/unittests/test_DataLostEnd.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case DataLostEnd: the /events_from_binlog/test_DataLostEnd.blf reference sits inside an upstream #if 0 block, so no fixture is needed; the object path is exercised in code"
+    command: "./test_DataLostEnd"
+  - file: src/Vector/BLF/tests/unittests/test_DiagRequestInterpretation.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case DiagRequestInterpretation: uses the checked-in fixture events_from_binlog/test_DiagRequestInterpretation.blf"
+    command: "./test_DiagRequestInterpretation"
+  - file: src/Vector/BLF/tests/unittests/test_DriverOverrun.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case DriverOverrun: uses the checked-in fixture events_from_binlog/test_DriverOverrun.blf"
+    command: "./test_DriverOverrun"
+  - file: src/Vector/BLF/tests/unittests/test_EnvironmentVariable.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case EnvironmentVariable: uses the checked-in fixture events_from_binlog/test_EnvironmentVariable.blf"
+    command: "./test_EnvironmentVariable"
+  - file: src/Vector/BLF/tests/unittests/test_EthernetErrorEx.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case EthernetErrorEx: uses the checked-in fixture events_from_binlog/test_EthernetErrorEx.blf"
+    command: "./test_EthernetErrorEx"
+  - file: src/Vector/BLF/tests/unittests/test_EthernetErrorForwarded.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case EthernetErrorForwarded: uses the checked-in fixture events_from_binlog/test_EthernetErrorForwarded.blf"
+    command: "./test_EthernetErrorForwarded"
+  - file: src/Vector/BLF/tests/unittests/test_EthernetFrameEx.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case EthernetFrameEx: uses the checked-in fixture events_from_binlog/test_EthernetFrameEx.blf"
+    command: "./test_EthernetFrameEx"
+  - file: src/Vector/BLF/tests/unittests/test_EthernetFrameForwarded.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case EthernetFrameForwarded: uses the checked-in fixture events_from_binlog/test_EthernetFrameForwarded.blf"
+    command: "./test_EthernetFrameForwarded"
+  - file: src/Vector/BLF/tests/unittests/test_EthernetFrame.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case EthernetFrame: uses the checked-in fixture events_from_binlog/test_EthernetFrame.blf"
+    command: "./test_EthernetFrame"
+  - file: src/Vector/BLF/tests/unittests/test_EthernetRxError.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case EthernetRxError: uses the checked-in fixture events_from_binlog/test_EthernetRxError.blf"
+    command: "./test_EthernetRxError"
+  - file: src/Vector/BLF/tests/unittests/test_EthernetStatistic.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case EthernetStatistic: uses the checked-in fixture events_from_binlog/test_EthernetStatistic.blf"
+    command: "./test_EthernetStatistic"
+  - file: src/Vector/BLF/tests/unittests/test_EthernetStatus.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case EthernetStatus: uses the checked-in fixture events_from_binlog/test_EthernetStatus.blf"
+    command: "./test_EthernetStatus"
+  - file: src/Vector/BLF/tests/unittests/test_EventComment.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case EventComment: uses the checked-in fixture events_from_binlog/test_EventComment.blf"
+    command: "./test_EventComment"
+  - file: src/Vector/BLF/tests/unittests/test_Exceptions.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case Exceptions: no .blf/.asc fixture referenced; the object/exception path is exercised in code"
+    command: "./test_Exceptions"
+  - file: src/Vector/BLF/tests/unittests/test_File.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case File: uses the checked-in fixture(s) /events_from_binlog/test_CanMessage.blf, /errors/FileWithoutLogContainers.blf (+4 more)"
+    command: "./test_File"
+  - file: src/Vector/BLF/tests/unittests/test_FileStatistics.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case FileStatistics: no .blf/.asc fixture referenced; the object/exception path is exercised in code"
+    command: "./test_FileStatistics"
+  - file: src/Vector/BLF/tests/unittests/test_FlexRayData.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case FlexRayData: uses the checked-in fixture events_from_binlog/test_FlexRayData.blf"
+    command: "./test_FlexRayData"
+  - file: src/Vector/BLF/tests/unittests/test_FlexRayStatusEvent.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case FlexRayStatusEvent: uses the checked-in fixture events_from_binlog/test_FlexRayStatusEvent.blf"
+    command: "./test_FlexRayStatusEvent"
+  - file: src/Vector/BLF/tests/unittests/test_FlexRaySync.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case FlexRaySync: uses the checked-in fixture events_from_binlog/test_FlexRaySync.blf"
+    command: "./test_FlexRaySync"
+  - file: src/Vector/BLF/tests/unittests/test_FlexRayV6Message.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case FlexRayV6Message: uses the checked-in fixture events_from_binlog/test_FlexRayV6Message.blf"
+    command: "./test_FlexRayV6Message"
+  - file: src/Vector/BLF/tests/unittests/test_FlexRayV6StartCycleEvent.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case FlexRayV6StartCycleEvent: uses the checked-in fixture events_from_binlog/test_FlexRayV6StartCycleEvent.blf"
+    command: "./test_FlexRayV6StartCycleEvent"
+  - file: src/Vector/BLF/tests/unittests/test_FlexRayVFrError.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case FlexRayVFrError: uses the checked-in fixture events_from_binlog/test_FlexRayVFrError.blf"
+    command: "./test_FlexRayVFrError"
+  - file: src/Vector/BLF/tests/unittests/test_FlexRayVFrReceiveMsgEx.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case FlexRayVFrReceiveMsgEx: uses the checked-in fixture events_from_binlog/test_FlexRayVFrReceiveMsgEx.blf"
+    command: "./test_FlexRayVFrReceiveMsgEx"
+  - file: src/Vector/BLF/tests/unittests/test_FlexRayVFrReceiveMsg.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case FlexRayVFrReceiveMsg: uses the checked-in fixture events_from_binlog/test_FlexRayVFrReceiveMsg.blf"
+    command: "./test_FlexRayVFrReceiveMsg"
+  - file: src/Vector/BLF/tests/unittests/test_FlexRayVFrStartCycle.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case FlexRayVFrStartCycle: uses the checked-in fixture events_from_binlog/test_FlexRayVFrStartCycle.blf"
+    command: "./test_FlexRayVFrStartCycle"
+  - file: src/Vector/BLF/tests/unittests/test_FlexRayVFrStatus.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case FlexRayVFrStatus: uses the checked-in fixture events_from_binlog/test_FlexRayVFrStatus.blf"
+    command: "./test_FlexRayVFrStatus"
+  - file: src/Vector/BLF/tests/unittests/test_FunctionBus.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case FunctionBus: the /events_from_binlog/test_FunctionBus.blf reference sits inside an upstream #if 0 block, so no fixture is needed; the object path is exercised in code"
+    command: "./test_FunctionBus"
+  - file: src/Vector/BLF/tests/unittests/test_GeneralSerialEvent.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case GeneralSerialEvent: no .blf/.asc fixture referenced; the object/exception path is exercised in code"
+    command: "./test_GeneralSerialEvent"
+  - file: src/Vector/BLF/tests/unittests/test_GlobalMarker.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case GlobalMarker: uses the checked-in fixture events_from_binlog/test_GlobalMarker.blf"
+    command: "./test_GlobalMarker"
+  - file: src/Vector/BLF/tests/unittests/test_GpsEvent.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case GpsEvent: uses the checked-in fixture events_from_binlog/test_GpsEvent.blf"
+    command: "./test_GpsEvent"
+  - file: src/Vector/BLF/tests/unittests/test_J1708Message.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case J1708Message: uses the checked-in fixture events_from_binlog/test_J1708Message.blf"
+    command: "./test_J1708Message"
+  - file: src/Vector/BLF/tests/unittests/test_KLineStatusEvent.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case KLineStatusEvent: uses the checked-in fixture events_from_binlog/test_KLineStatusEvent.blf"
+    command: "./test_KLineStatusEvent"
+  - file: src/Vector/BLF/tests/unittests/test_LinBaudrateEvent.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LinBaudrateEvent: uses the checked-in fixture events_from_binlog/test_LinBaudrateEvent.blf"
+    command: "./test_LinBaudrateEvent"
+  - file: src/Vector/BLF/tests/unittests/test_LinChecksumInfo.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LinChecksumInfo: uses the checked-in fixture events_from_binlog/test_LinChecksumInfo.blf"
+    command: "./test_LinChecksumInfo"
+  - file: src/Vector/BLF/tests/unittests/test_LinCrcError2.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LinCrcError2: uses the checked-in fixture events_from_binlog/test_LinCrcError2.blf"
+    command: "./test_LinCrcError2"
+  - file: src/Vector/BLF/tests/unittests/test_LinCrcError.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LinCrcError: uses the checked-in fixture events_from_binlog/test_LinCrcError.blf"
+    command: "./test_LinCrcError"
+  - file: src/Vector/BLF/tests/unittests/test_LinDisturbanceEvent.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LinDisturbanceEvent: uses the checked-in fixture events_from_binlog/test_LinDisturbanceEvent.blf"
+    command: "./test_LinDisturbanceEvent"
+  - file: src/Vector/BLF/tests/unittests/test_LinDlcInfo.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LinDlcInfo: uses the checked-in fixture events_from_binlog/test_LinDlcInfo.blf"
+    command: "./test_LinDlcInfo"
+  - file: src/Vector/BLF/tests/unittests/test_LinLongDomSignalEvent2.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LinLongDomSignalEvent2: uses the checked-in fixture events_from_binlog/test_LinLongDomSignalEvent2.blf"
+    command: "./test_LinLongDomSignalEvent2"
+  - file: src/Vector/BLF/tests/unittests/test_LinLongDomSignalEvent.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LinLongDomSignalEvent: uses the checked-in fixture events_from_binlog/test_LinLongDomSignalEvent.blf"
+    command: "./test_LinLongDomSignalEvent"
+  - file: src/Vector/BLF/tests/unittests/test_LinMessage2.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LinMessage2: uses the checked-in fixture events_from_binlog/test_LinMessage2.blf"
+    command: "./test_LinMessage2"
+  - file: src/Vector/BLF/tests/unittests/test_LinMessage.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LinMessage: uses the checked-in fixture events_from_binlog/test_LinMessage.blf"
+    command: "./test_LinMessage"
+  - file: src/Vector/BLF/tests/unittests/test_LinReceiveError2.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LinReceiveError2: uses the checked-in fixture events_from_binlog/test_LinReceiveError2.blf"
+    command: "./test_LinReceiveError2"
+  - file: src/Vector/BLF/tests/unittests/test_LinReceiveError.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LinReceiveError: uses the checked-in fixture events_from_binlog/test_LinReceiveError.blf"
+    command: "./test_LinReceiveError"
+  - file: src/Vector/BLF/tests/unittests/test_LinSchedulerModeChange.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LinSchedulerModeChange: uses the checked-in fixture events_from_binlog/test_LinSchedulerModeChange.blf"
+    command: "./test_LinSchedulerModeChange"
+  - file: src/Vector/BLF/tests/unittests/test_LinSendError2.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LinSendError2: uses the checked-in fixture events_from_binlog/test_LinSendError2.blf"
+    command: "./test_LinSendError2"
+  - file: src/Vector/BLF/tests/unittests/test_LinSendError.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LinSendError: uses the checked-in fixture events_from_binlog/test_LinSendError.blf"
+    command: "./test_LinSendError"
+  - file: src/Vector/BLF/tests/unittests/test_LinShortOrSlowResponse2.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LinShortOrSlowResponse2: uses the checked-in fixture events_from_binlog/test_LinShortOrSlowResponse2.blf"
+    command: "./test_LinShortOrSlowResponse2"
+  - file: src/Vector/BLF/tests/unittests/test_LinShortOrSlowResponse.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LinShortOrSlowResponse: uses the checked-in fixture events_from_binlog/test_LinShortOrSlowResponse.blf"
+    command: "./test_LinShortOrSlowResponse"
+  - file: src/Vector/BLF/tests/unittests/test_LinSlaveTimeout.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LinSlaveTimeout: uses the checked-in fixture events_from_binlog/test_LinSlaveTimeout.blf"
+    command: "./test_LinSlaveTimeout"
+  - file: src/Vector/BLF/tests/unittests/test_LinSleepModeEvent.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LinSleepModeEvent: uses the checked-in fixture events_from_binlog/test_LinSleepModeEvent.blf"
+    command: "./test_LinSleepModeEvent"
+  - file: src/Vector/BLF/tests/unittests/test_LinSpikeEvent2.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LinSpikeEvent2: uses the checked-in fixture events_from_binlog/test_LinSpikeEvent2.blf"
+    command: "./test_LinSpikeEvent2"
+  - file: src/Vector/BLF/tests/unittests/test_LinSpikeEvent.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LinSpikeEvent: uses the checked-in fixture events_from_binlog/test_LinSpikeEvent.blf"
+    command: "./test_LinSpikeEvent"
+  - file: src/Vector/BLF/tests/unittests/test_LinStatisticEvent.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LinStatisticEvent: uses the checked-in fixture events_from_binlog/test_LinStatisticEvent.blf"
+    command: "./test_LinStatisticEvent"
+  - file: src/Vector/BLF/tests/unittests/test_LinSyncError2.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LinSyncError2: uses the checked-in fixture events_from_binlog/test_LinSyncError2.blf"
+    command: "./test_LinSyncError2"
+  - file: src/Vector/BLF/tests/unittests/test_LinSyncError.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LinSyncError: uses the checked-in fixture events_from_binlog/test_LinSyncError.blf"
+    command: "./test_LinSyncError"
+  - file: src/Vector/BLF/tests/unittests/test_LinUnexpectedWakeup.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LinUnexpectedWakeup: uses the checked-in fixture events_from_binlog/test_LinUnexpectedWakeup.blf"
+    command: "./test_LinUnexpectedWakeup"
+  - file: src/Vector/BLF/tests/unittests/test_LinWakeupEvent2.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LinWakeupEvent2: uses the checked-in fixture events_from_binlog/test_LinWakeupEvent2.blf"
+    command: "./test_LinWakeupEvent2"
+  - file: src/Vector/BLF/tests/unittests/test_LinWakeupEvent.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LinWakeupEvent: uses the checked-in fixture events_from_binlog/test_LinWakeupEvent.blf"
+    command: "./test_LinWakeupEvent"
+  - file: src/Vector/BLF/tests/unittests/test_LogContainer.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case LogContainer: no .blf/.asc fixture referenced; the object/exception path is exercised in code"
+    command: "./test_LogContainer"
+  - file: src/Vector/BLF/tests/unittests/test_Most150AllocTab.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case Most150AllocTab: uses the checked-in fixture events_from_binlog/test_Most150AllocTab.blf"
+    command: "./test_Most150AllocTab"
+  - file: src/Vector/BLF/tests/unittests/test_Most150MessageFragment.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case Most150MessageFragment: uses the checked-in fixture events_from_binlog/test_Most150MessageFragment.blf"
+    command: "./test_Most150MessageFragment"
+  - file: src/Vector/BLF/tests/unittests/test_Most150Message.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case Most150Message: uses the checked-in fixture events_from_binlog/test_Most150Message.blf"
+    command: "./test_Most150Message"
+  - file: src/Vector/BLF/tests/unittests/test_Most150PktFragment.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case Most150PktFragment: uses the checked-in fixture events_from_binlog/test_Most150PktFragment.blf"
+    command: "./test_Most150PktFragment"
+  - file: src/Vector/BLF/tests/unittests/test_Most150Pkt.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case Most150Pkt: uses the checked-in fixture events_from_binlog/test_Most150Pkt.blf"
+    command: "./test_Most150Pkt"
+  - file: src/Vector/BLF/tests/unittests/test_Most50Message.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case Most50Message: uses the checked-in fixture events_from_binlog/test_Most50Message.blf"
+    command: "./test_Most50Message"
+  - file: src/Vector/BLF/tests/unittests/test_Most50Pkt.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case Most50Pkt: uses the checked-in fixture events_from_binlog/test_Most50Pkt.blf"
+    command: "./test_Most50Pkt"
+  - file: src/Vector/BLF/tests/unittests/test_MostAllocTab.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case MostAllocTab: uses the checked-in fixture events_from_binlog/test_MostAllocTab.blf"
+    command: "./test_MostAllocTab"
+  - file: src/Vector/BLF/tests/unittests/test_MostCtrl.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case MostCtrl: uses the checked-in fixture events_from_binlog/test_MostCtrl.blf"
+    command: "./test_MostCtrl"
+  - file: src/Vector/BLF/tests/unittests/test_MostDataLost.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case MostDataLost: uses the checked-in fixture events_from_binlog/test_MostDataLost.blf"
+    command: "./test_MostDataLost"
+  - file: src/Vector/BLF/tests/unittests/test_MostEcl.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case MostEcl: uses the checked-in fixture events_from_binlog/test_MostEcl.blf"
+    command: "./test_MostEcl"
+  - file: src/Vector/BLF/tests/unittests/test_MostEthernetPktFragment.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case MostEthernetPktFragment: uses the checked-in fixture events_from_binlog/test_MostEthernetPktFragment.blf"
+    command: "./test_MostEthernetPktFragment"
+  - file: src/Vector/BLF/tests/unittests/test_MostEthernetPkt.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case MostEthernetPkt: uses the checked-in fixture events_from_binlog/test_MostEthernetPkt.blf"
+    command: "./test_MostEthernetPkt"
+  - file: src/Vector/BLF/tests/unittests/test_MostGenReg.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case MostGenReg: uses the checked-in fixture events_from_binlog/test_MostGenReg.blf"
+    command: "./test_MostGenReg"
+  - file: src/Vector/BLF/tests/unittests/test_MostHwMode.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case MostHwMode: uses the checked-in fixture events_from_binlog/test_MostHwMode.blf"
+    command: "./test_MostHwMode"
+  - file: src/Vector/BLF/tests/unittests/test_MostLightLock.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case MostLightLock: uses the checked-in fixture events_from_binlog/test_MostLightLock.blf"
+    command: "./test_MostLightLock"
+  - file: src/Vector/BLF/tests/unittests/test_MostNetState.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case MostNetState: uses the checked-in fixture events_from_binlog/test_MostNetState.blf"
+    command: "./test_MostNetState"
+  - file: src/Vector/BLF/tests/unittests/test_MostPkt2.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case MostPkt2: uses the checked-in fixture events_from_binlog/test_MostPkt2.blf"
+    command: "./test_MostPkt2"
+  - file: src/Vector/BLF/tests/unittests/test_MostPkt.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case MostPkt: uses the checked-in fixture events_from_binlog/test_MostPkt.blf"
+    command: "./test_MostPkt"
+  - file: src/Vector/BLF/tests/unittests/test_MostReg.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case MostReg: uses the checked-in fixture events_from_binlog/test_MostReg.blf"
+    command: "./test_MostReg"
+  - file: src/Vector/BLF/tests/unittests/test_MostSpy.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case MostSpy: uses the checked-in fixture events_from_binlog/test_MostSpy.blf"
+    command: "./test_MostSpy"
+  - file: src/Vector/BLF/tests/unittests/test_MostStatisticEx.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case MostStatisticEx: uses the checked-in fixture events_from_binlog/test_MostStatisticEx.blf"
+    command: "./test_MostStatisticEx"
+  - file: src/Vector/BLF/tests/unittests/test_MostStatistic.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case MostStatistic: uses the checked-in fixture events_from_binlog/test_MostStatistic.blf"
+    command: "./test_MostStatistic"
+  - file: src/Vector/BLF/tests/unittests/test_MostStress.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case MostStress: uses the checked-in fixture events_from_binlog/test_MostStress.blf"
+    command: "./test_MostStress"
+  - file: src/Vector/BLF/tests/unittests/test_MostSystemEvent.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case MostSystemEvent: uses the checked-in fixture events_from_binlog/test_MostSystemEvent.blf"
+    command: "./test_MostSystemEvent"
+  - file: src/Vector/BLF/tests/unittests/test_MostTrigger.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case MostTrigger: uses the checked-in fixture events_from_binlog/test_MostTrigger.blf"
+    command: "./test_MostTrigger"
+  - file: src/Vector/BLF/tests/unittests/test_MostTxLight.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case MostTxLight: uses the checked-in fixture events_from_binlog/test_MostTxLight.blf"
+    command: "./test_MostTxLight"
+  - file: src/Vector/BLF/tests/unittests/test_ObjectHeaderBase.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case ObjectHeaderBase: no .blf/.asc fixture referenced; the object/exception path is exercised in code"
+    command: "./test_ObjectHeaderBase"
+  - file: src/Vector/BLF/tests/unittests/test_ObjectQueue.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case ObjectQueue: no .blf/.asc fixture referenced; the object/exception path is exercised in code"
+    command: "./test_ObjectQueue"
+  - file: src/Vector/BLF/tests/unittests/test_RealtimeClock.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case RealtimeClock: uses the checked-in fixture events_from_binlog/test_RealtimeClock.blf"
+    command: "./test_RealtimeClock"
+  - file: src/Vector/BLF/tests/unittests/test_SerialEvent.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case SerialEvent: uses the checked-in fixture events_from_binlog/test_SerialEvent.blf"
+    command: "./test_SerialEvent"
+  - file: src/Vector/BLF/tests/unittests/test_SingleByteSerialEvent.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case SingleByteSerialEvent: no .blf/.asc fixture referenced; the object/exception path is exercised in code"
+    command: "./test_SingleByteSerialEvent"
+  - file: src/Vector/BLF/tests/unittests/test_SystemVariable.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case SystemVariable: uses the checked-in fixture events_from_binlog/test_SystemVariable.blf"
+    command: "./test_SystemVariable"
+  - file: src/Vector/BLF/tests/unittests/test_TestStructure.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case TestStructure: uses the checked-in fixture events_from_binlog/test_TestStructure.blf"
+    command: "./test_TestStructure"
+  - file: src/Vector/BLF/tests/unittests/test_TriggerCondition.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case TriggerCondition: the /events_from_binlog/test_TriggerCondition.blf reference sits inside an upstream #if 0 block, so no fixture is needed; the object path is exercised in code"
+    command: "./test_TriggerCondition"
+  - file: src/Vector/BLF/tests/unittests/test_UncompressedFile.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case UncompressedFile: no .blf/.asc fixture referenced; the object/exception path is exercised in code"
+    command: "./test_UncompressedFile"
+  - file: src/Vector/BLF/tests/unittests/test_WaterMarkEvent.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case WaterMarkEvent: the /events_from_binlog/test_WaterMarkEvent.blf reference sits inside an upstream #if 0 block, so no fixture is needed; the object path is exercised in code"
+    command: "./test_WaterMarkEvent"
+  - file: src/Vector/BLF/tests/unittests/test_WlanFrame.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case WlanFrame: uses the checked-in fixture events_from_binlog/test_WlanFrame.blf"
+    command: "./test_WlanFrame"
+  - file: src/Vector/BLF/tests/unittests/test_WlanStatistic.cpp
+    source: v2.4.2.tar.gz
+    description: "Upstream Boost.Test case WlanStatistic: uses the checked-in fixture events_from_binlog/test_WlanStatistic.blf"
+    command: "./test_WlanStatistic"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_vector_blf.cpp
+    description: >-
+      L1 API 往返用例：写 4000 条 CAN 报文（>128 KiB，触发多个 zlib 压缩 LOG_CONTAINER）
+      后读回，逐字段校验 channel/flags/dlc/id/data 与 objectSize==calculateObjectSize()，
+      并校验缺失文件经 is_open() 报告。
+    command: "./test_vector_blf"
+    result: "Passed — 28007 checks, 0 failures"
+  - file: test_ohos_e2e.cpp
+    description: >-
+      【鸿蒙特有 · 端到端消费者用例】构造输入：6000 条确定性 CAN 报文（无随机数）；
+      真实执行：经安装后的库写入 $TMPDIR（OHOS /tmp 只读，E002）→ 3 个数据容器
+      (131072+131072+25856=288000 B) + 关闭时 1 个空容器 = 4 个 zlib 压缩 LOG_CONTAINER
+      → 全量流式读回两遍；产出结果：确定性报告；校验内容：与独立实现 ref_blf_parser
+      （不链接 vector-blf）逐字段比对并强制校验容器/压缩口径。
+    command: "./test_ohos_e2e <report> <blf>"
+    result: "Passed — 6000/6000 报文, 14 checks, 0 failures, digest=4964f8fbec9dd913"
+  - file: ref_blf_parser.cpp
+    description: >-
+      【鸿蒙特有 · 独立参考实现】不链接 vector-blf、不包含其头文件，自行解析 BLF
+      文件头(144B)、LOG_CONTAINER 框架(objectSize%4 填充)、zlib 载荷与 CAN_MESSAGE 字段。
+    command: "./ref_blf_parser <blf> <ref-report>"
+    result: "Passed — 6000 objects, 4 containers(方法全为 2=zlib), trailing=0, digest 与库侧一致"
+  - file: test_compare.cpp
+    description: >-
+      【鸿蒙特有 · 交叉校验 + 强制不变量】逐字段比对两侧报告（lib:/ref: 为各实现私有项），
+      并强制 6 条不变量：容器数≥2 / 压缩方法全为 2(zlib) / 对象流无尾随字节 /
+      独立推算的未压缩大小与文件头一致 / 独立读出的文件大小一致 / 读回报文数==写入数。
+    command: "./test_compare <lib-report> <ref-report>"
+    result: "Passed — 23 shared fields compared, 6 invariants enforced, 0 mismatches"
+  - file: ohos_dlopen_probe.cpp
+    description: >-
+      【鸿蒙特有 · OHOS ELF 可加载性】探针**不链接** vector-blf、也不包含其头文件，
+      因此加载器是在该进程内首次映射产物（若在已链接本库的二进制里 dlopen 则会被
+      动态链接提前完成而失去验证意义）。
+    command: "./ohos_dlopen_probe <pkg>/lib/libVector_BLF.so"
+    result: "Passed — dlopen 成功并解析到导出符号"
+
+# 鸿蒙特有测试用例数（完整消费者用例；供 review rule12 核验）
+harmonyos_specific_tests: 1
+
+# 测试断言/检查总数（L1 28007 + 端到端 14 + 交叉校验 23+6=29）
+assertion_count: 28050
+
+# R51 上游测试三步法：本次在真机 (HarmonyOS PC, aarch64) 实际运行结果
+r51_run_evidence:
+  environment: "HarmonyOS PC aarch64 (native), OHOS SDK clang 15.0.4 (/data/service/hnp/bin/clang, target aarch64-unknown-linux-ohos); libVector_BLF.so 由本配方构建产物安装树提供"
+  harness: "上游 126 个 test_*.cpp 逐文件直接编译（仅测试脚手架改动：包含 <boost/test/included/unit_test.hpp> 头文件版入口、去掉 BOOST_TEST_DYN_LINK）+ 追加 -DBOOST_SP_NO_PTHREAD_SETCANCELSTATE；被测库不改动"
+  registered: 126
+  executed: 126
+  passed: "126/126"
+  failed: 0
+  report: "reports/upstream-tests.md"
