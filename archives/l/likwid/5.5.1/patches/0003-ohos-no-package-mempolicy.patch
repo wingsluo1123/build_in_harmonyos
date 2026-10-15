@@ -1,0 +1,31 @@
+--- a/src/topology_hwloc.c
++++ b/src/topology_hwloc.c
+@@ -262,6 +262,11 @@
+         LIKWID_HWLOC_NAME(topology_load)(hwloc_topology);
+     }
+     obj = LIKWID_HWLOC_NAME(get_obj_by_type)(hwloc_topology, HWLOC_OBJ_SOCKET, 0);
++    if (!obj)
++    {
++        /* OHOS sysfs exposes no package/socket object; fall back to a PU */
++        obj = LIKWID_HWLOC_NAME(get_obj_by_type)(hwloc_topology, HWLOC_OBJ_PU, 0);
++    }
+ 
+     cpuid_info.model = 0;
+     cpuid_info.family = 0;
+--- a/src/numa_proc.c
++++ b/src/numa_proc.c
+@@ -348,9 +348,12 @@
+     if (numaInitialized > 0 || numa_info.numberOfNodes > 0)
+         return 0;
+ 
+-    if (get_mempolicy(NULL, NULL, 0, 0, 0) < 0 && errno == ENOSYS)
++    /* A missing NUMA node directory means the kernel exposes no NUMA/mempolicy
++     * support; allocate a virtual node instead.  This is a runtime check: the
++     * previous get_mempolicy() probe is terminated by seccomp with SIGSYS
++     * (not ENOSYS) on some kernels, so it must not be called unconditionally. */
++    if (access("/sys/devices/system/node", R_OK | X_OK) != 0)
+     {
+-        /* Allocate a virtual node instead and bail out */
+         return virtual_numa_init();
+     }
+     /* First determine maximum number of nodes */

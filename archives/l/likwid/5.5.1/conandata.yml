@@ -1,0 +1,14 @@
+sources:
+  url: "https://github.com/RRZE-HPC/likwid/archive/refs/tags/v5.5.1.tar.gz"
+  sha256: "25c7830e63b20396fcfc3b16ae79c39b4220a86d376ceb7cd6949b5ff991db78"
+
+patches:
+  - patch_file: "patches/0001-ohos-clang-portability.patch"
+    patch_description: "OHOS/bionic clang portability: cwisstable needs C11 static_assert (map to _Static_assert under -std=c99); add a pthread_[sg]etaffinity_np shim over sched_[sg]etaffinity (bionic omits the glibc helpers); replace glibc's private __cpu_mask cpu_count() with a CPU_ISSET loop; provide a cache-line size for likwid-bench (bionic has no _SC_LEVEL1_DCACHE_LINESIZE)."
+    patch_type: "portability"
+  - patch_file: "patches/0002-ohos-hwloc-sysfs.patch"
+    patch_description: "Bundled hwloc 2.9.3: disable the glibc pthread_[sg]etaffinity_np and program_invocation_name/__progname assumptions (bionic has none), and accept the *_list sibling filenames that OHOS sysfs exposes instead of core_siblings (without it hwloc aborts CPU discovery and reports a single PU)."
+    patch_type: "portability"
+  - patch_file: "patches/0003-ohos-no-package-mempolicy.patch"
+    patch_description: "OHOS adaptation of likwid's proc backends: hwloc exposes no Package/Socket object on OHOS (fall back to a PU for CPU identity), and the get_mempolicy() syscall is killed by seccomp with SIGSYS instead of returning ENOSYS (skip the probe and use a virtual NUMA node)."
+    patch_type: "portability"
