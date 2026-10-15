@@ -1,0 +1,96 @@
+#====================================================================
+# DRAFT-7871-kmer-generated-make-compilers-tool-definitions.kv
+# 自研非递归 Makefile 工程把"平台编译选项 + 公共工具定义"一起生成到一个配置片段
+#   （kmer/meryl 家族的 Make.compilers，由 configure.sh 生成）
+# 手写/替换这个生成物 → .d 依赖生成规则的命令行首 token 变空 → 源文件被当命令执行
+#   /bin/sh: /path/foo.C: can't execute: Permission denied
+# 触发事件: kmer 0-20150903-r2013 HarmonyOS PC 适配
+#           （archives/k/kmer/0-20150903-r2013，2013 年 trunk 快照）
+#====================================================================
+
+id:                     DRAFT-7871-kmer-generated-make-compilers-tool-definitions
+trigger_tool:           make|sh|conan
+phase:                  configuration|compilation
+error_signature:        can't execute: Permission denied|
+                        ^ 该行出现在 "making <src>.C.d" 之后，且命令行首 token 是被当命令执行的源文件路径|
+                        No targets specified and no makefile found（配套现象：生成物缺失 / cwd 失效，见 E114/E386）
+severity:               2
+category:               build-system|makefile|portability|toolchain
+match_keywords:         Make.compilers, configure.sh, CXXDEP, CCDEP, .O, CLD, ARFLAGS,
+                        non-recursive make, generic makefile, %.d:%, dependency generation,
+                        can't execute: Permission denied, source file as command,
+                        generated config fragment, hand-written makefile config, kmer, meryl
+
+title:                  自研 Makefile 工程的"生成式配置片段"（kmer/Make.compilers）里同时装着平台编译选项与公共工具定义（CXXDEP/CCDEP/.O/CLD）；手写或替换该生成物会丢定义，使 .d 依赖规则把源文件当命令执行，必须让上游 configure.sh 自己生成、只往它加平台分支
+
+root_cause: >
+  kmer（Celera/JCVI 的 k-mer 工具箱）用的是自研非递归 make：顶层 Makefile + Make.rules + 各目录 Make.include，
+  真正的平台相关配置只存在于 configure.sh 的 case 分支里，脚本把它写成 Make.compilers，Makefile 再 include 它。
+  关键陷阱是这个生成物**混装两类内容**：
+    (1) 平台块：CC/CXX/CFLAGS_COMPILE/CXXFLAGS_COMPILE/CLDFLAGS/CLIBS/SHLIB_FLAGS/ARFLAGS/INSTALL/；
+    (2) 脚本尾部追加的公共工具定义：.EXE/.SO/.A/.O、CLD、CXXLD、CCDEP、CXXDEP、PYTHON*、WITHOUT。
+  只补 (1) 而手写整个 Make.compilers（或把它提交进仓库）就会丢 (2)。丢了 CXXDEP/CCDEP 之后，
+  Make.rules 里的依赖生成规则
+        ${ALL_CXX_DEPS}:%.d:%
+            @ dir=…; ${CXXDEP} ${CXXDEPFLAGS} ${CXXFLAGS} $< | sed … > $@
+  展开成 "  <src>.C | sed … > <src>.C.d" —— 首 token 就是源文件路径，/bin/sh 试图"执行"它，
+  于是报 /bin/sh: /path/foo.C: can't execute: Permission denied。报错位置（依赖生成）与根因（少了几个变量定义）
+  相距极远，极易被误判为 HMDFS 权限问题或源码损坏。次要陷阱：Makefile 通常带有
+  "Make.compilers 不存在就调用 configure.sh" 的兜底，手写生成物会让上游配置步骤被静默跳过，平台差异全部消失。
+
+affected_scope: >
+  所有"顶层 Makefile + Make.rules/Make.include + configure.sh 生成配置片段"式的自研构建系统
+  （kmer/meryl 这一族、JCVI 的 Celera Assembler 系列）；识别特征是 Makefile 里出现
+  ${MAKEFILE/}Make.compilers 之类的生成物引用，或 "缺配置就 shell 调 configure.sh" 的兜底语句。
+
+verification_cmd: >
+  # 1) 确认配置片段是"生成物"：找 Makefile 里的生成物引用与兜底调用
+  grep -n "Make.compilers" Makefile
+  # 2) 正确生成后应能看到公共工具定义（缺这几个变量就会命中本条）
+  bash ./configure.sh OHOS-arm64 && grep -nE "^(CXXDEP|CCDEP|\.O|CLD|CXXLD)" Make.compilers
+  # 3) 全量构建（验收看产物，不看 make 退出码）
+  make -j1 && make -j1 install
+
+rec_priority:           1
+rec_approach:           patch-upstream-configure-never-write-the-generated-fragment
+rec_description: >
+  两条一起做：
+    (1) 平台分支只加在 configure.sh 的 case 里（kmer 新增 OHOS-arm64 块：去掉 Linux 块的 x86 -m64，
+        保留 -fPIC -D_REENTRANT -O3 -D_THREAD_SAFE -pthread -fmessage-length=0 -Wall -Wno-char-subscripts，
+        再加 -fcommon -fno-strict-aliasing），配方显式执行 `./configure.sh <target>`，
+        让脚本自己把公共工具定义追加进生成物；HarmonyOS 不在脚本的 uname 分支里，所以必须**显式传目标名**，
+        不能指望它自动识别（同 E640/E007 一族思想）。
+    (2) 绝不在 conanfile.py 里手写/替换生成物，也不把它提交进仓库：生成物的内容是"平台选项 + 工具定义"的混合体，
+        替换必然丢定义；而且会让上游的"缺配置就 configure"兜底失效。
+  验收口径：`make` 退出码 + 安装目录里真实存在的产物（kmer 为 OHOS-arm64/{bin,include,lib}）。
+rec_command: >
+  CC=<clang> CXX=<clang++> bash ./configure.sh OHOS-arm64 && make -j1 && make -j1 install
+rec_auto_fix:           false
+rec_impl:               patch
+
+fallback_priority:      2
+fallback_approach:      post-process-the-generated-fragment
+fallback_description:   >
+  若上游脚本确实无法修改（生成逻辑被加密/二进制），就先让 configure.sh 生成一次生成物，
+  再用补丁/脚本只**追加或覆盖**平台开关（例如 sed 去掉 -m64、追加 -fcommon），
+  永远不要从零手写这个文件。
+fallback_command:       bash ./configure.sh Linux-amd64 && sed -i "s/-m64//; s/-O3/-O3 -fcommon -fno-strict-aliasing/" Make.compilers
+fallback_auto_fix:      false
+fallback_impl:          manual
+
+forbid_1_pattern:       手写或整体替换 Make.compilers（或把生成物提交进仓库）
+forbid_1_reason:        生成物是"平台编译选项 + 公共工具定义"的混合体，手写必然丢掉 CXXDEP/CCDEP/.O/CLD 等；
+                        且会绕过上游 configure 步骤
+forbid_1_consequence:   依赖生成/链接规则静默退化，报错点（源文件被当命令执行）与根因相距极远，
+                        并可能与 HMDFS 权限问题混淆，白白排查数轮
+
+similar_to:             DRAFT-E640（uname 分支型 Makefile 的平台选择：那条是 ifeq 分支落空导致目标静默变空，
+                        本条是"选项集中在生成物里"，修法是加平台分支而不是命令行覆盖）
+conflicts_with:         []
+prerequisite_of:        []
+principles:             P004
+doc_file:               knowledge/drafts/DRAFT-7871-kmer-generated-make-compilers-tool-definitions.md
+last_updated:           2026-10-11
+                        /bin/sh: /…/*.C: can't execute: Permission denied；改为由 configure.sh 生成后验收通过）
+authors:                Lee-BX
+draft:                  true
