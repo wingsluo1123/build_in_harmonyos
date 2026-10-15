@@ -1,0 +1,35 @@
+# 软件级 manifest
+# 文件位置: archives/m/mnxdom/manifest.yaml
+
+software: mnxdom
+display: "mnxdom"
+description: "MNX 音乐交换格式（JSON）的文档对象模型，C++17 类框架"
+category: library
+homepage: "https://github.com/mnx-works/mnxdom"
+license: MIT
+build_system: cmake
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "上游 CMakeLists 用 FetchContent 联网拉取 nlohmann_json / json-schema-validator / googletest；打开 USE_SYSTEM_* 开关即可改用制品仓预编译依赖，构建期零联网"
+    - "json-schema-validator 不能用制品仓的 2.1.0：MNX schema 的根 $id 会被子 schema 继承，2.1.0 会抛 'already inserted'，上游 62 个用例全挂；上游为此把该依赖钉在 commit 40af3ec3，本配方按该 commit 随包下发源码并静态编译进包"
+    - "内嵌依赖 jsv 的共享/静态开关在其 CMakeLists 里写错了变量名（option 为 JSON_VALIDATOR_SHARED_LIBS，实现读 nlohmann_json_schema_validator_SHARED_LIBS），两个都要显式置 False 才能得到静态库"
+    - "mnxdom 对 googletest 的目标名有白名单要求（GTest::gtest_main / GTest::gtest），CMakeDeps 只给 gtest::gtest，需用 GTest_DIR 指向依赖包内的上游配置目录"
+    - "上游固定 googletest 1.15.2，制品仓只有 gtest/1.17.0；GTestConfigVersion.cmake 为 SameMajorVersion 策略，1.17.0 满足 1.15.2 约束，无需补丁"
+    - "MNX JSON schema 以 mnx-schema.xxd 内嵌进库，schemaValidate() 运行时不读外部文件，安装包无需附带 schema/示例资源"
+    - "上游 CMake 工程版本号仍写着 2.1（未随 tag 更新），生成的 mnxdom.pc 中 Version 会显示 2.1；Conan 包版本以 tag 为准"
+  common_dependencies:
+    - nlohmann_json
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "3.0.1":
+    status: built
+    build_date: "2026-10-13"

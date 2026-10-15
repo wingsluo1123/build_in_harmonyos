@@ -1,0 +1,57 @@
+# 版本级 manifest
+# 文件位置: archives/m/mnxdom/3.0.1/manifest.yaml
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "3.0.1"
+software: "mnxdom"
+status: built
+build_date: "2026-10-13"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/mnx-works/mnxdom/archive/refs/tags/v3.0.1.tar.gz"
+  sha256: "1fc1799c76651a58f8bd88b69b098f263ebb9646604a544745b231373508ccb8"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DUSE_SYSTEM_NLOHMANN_JSON=ON"
+    - "-DUSE_SYSTEM_GOOGLETEST=ON"
+    - "-DUSE_SYSTEM_JSON_SCHEMA_VALIDATOR=OFF"
+    - "-DFETCHCONTENT_SOURCE_DIR_JSON_SCHEMA_VALIDATOR=<内嵌 json-schema-validator 源码目录>"
+    - "-Dmnxdom_BUILD_TESTING=ON"
+  dependencies:
+    - nlohmann_json/3.12.0
+    - gtest/1.17.0
+    - json-schema-validator@40af3ec3（内嵌源码，随配方下发并静态编译进本包）
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "上游 CMakeLists 用 FetchContent 联网拉取 nlohmann_json/json-schema-validator/googletest，打开其 USE_SYSTEM_* 开关即可全部改为制品仓依赖"
+  - "mnxdom 对依赖目标名做白名单判断（GTest::gtest_main、nlohmann_json_schema_validator），CMakeDeps 生成的 gtest::gtest / nlohmann_json_schema_validator::nlohmann_json_schema_validator 都不匹配，需用 <Pkg>_DIR 指向依赖包内自带的官方 CMake 配置"
+  - "googletest 上游固定 1.15.2，ohpcd 只有 gtest/1.17.0；GTestConfigVersion.cmake 为 SameMajorVersion 策略，1.17.0 满足 1.15.2 约束，无需补丁"
+  - "MNX JSON schema 以 mnx-schema.xxd 内嵌进库，schemaValidate() 运行时不依赖外部 schema 文件，安装包无需附带 schema/示例资源"

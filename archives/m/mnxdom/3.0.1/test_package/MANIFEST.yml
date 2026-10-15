@@ -1,0 +1,82 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: mnxdom/3.0.1
+homepage: "https://github.com/mnx-works/mnxdom"
+
+# 上游测试命令 (gtest + ctest，由 gtest_discover_tests 注册)
+upstream_check_command: "ctest"
+
+# conanfile.py build() 方法中是否已集成上游测试 (cmake.test() → ctest)
+upstream_test_in_build: true
+upstream_test_command: "ctest --output-on-failure"
+
+# 上游实际编译运行的测试程序 (tests/CMakeLists.txt 的 mnxdom_tests 目标)
+upstream_tests:
+  - file: tests/test_main.cpp
+    source: mnxdom-3.0.1/tests/test_main.cpp
+    description: "测试 main + 数据目录自检（gtest 入口）"
+    command: "./mnxdom_tests"
+  - file: tests/test_document.cpp
+    source: mnxdom-3.0.1/tests/test_document.cpp
+    description: "文档模型：从零构建 / mnx 元数据 / parts / layouts"
+    command: "./mnxdom_tests --gtest_filter=Document.*"
+  - file: tests/test_global.cpp
+    source: mnxdom-3.0.1/tests/test_global.cpp
+    description: "global 节点的解析与修改"
+    command: "./mnxdom_tests --gtest_filter=Global.*"
+  - file: tests/test_layouts.cpp
+    source: mnxdom-3.0.1/tests/test_layouts.cpp
+    description: "layout 结构解析与修改"
+    command: "./mnxdom_tests --gtest_filter=Layouts.*"
+  - file: tests/test_scores.cpp
+    source: mnxdom-3.0.1/tests/test_scores.cpp
+    description: "score / page / system / layoutChange 构建"
+    command: "./mnxdom_tests --gtest_filter=Scores.*"
+  - file: tests/test_sequences.cpp
+    source: mnxdom-3.0.1/tests/test_sequences.cpp
+    description: "sequence / content / event 构建"
+    command: "./mnxdom_tests --gtest_filter=Sequences.*"
+  - file: tests/test_beams.cpp
+    source: mnxdom-3.0.1/tests/test_beams.cpp
+    description: "beams 与 grace notes"
+    command: "./mnxdom_tests --gtest_filter=Beams.*"
+  - file: tests/test_ottavas.cpp
+    source: mnxdom-3.0.1/tests/test_ottavas.cpp
+    description: "ottavas 及 entity map 关联"
+    command: "./mnxdom_tests --gtest_filter=Ottavas.*"
+  - file: tests/validation/test_document.cpp
+    source: mnxdom-3.0.1/tests/validation/test_document.cpp
+    description: "schema 校验：文档级"
+    command: "./mnxdom_tests --gtest_filter=Validation*Document*"
+  - file: tests/validation/test_examples.cpp
+    source: mnxdom-3.0.1/tests/validation/test_examples.cpp
+    description: "遍历 w3c-mnx 官方示例，逐份做 schema + 语义校验"
+    command: "./mnxdom_tests --gtest_filter=Examples.*"
+  - file: tests/validation/test_global.cpp
+    source: mnxdom-3.0.1/tests/validation/test_global.cpp
+    description: "schema 校验：global 级"
+    command: "./mnxdom_tests --gtest_filter=Validation*Global*"
+  - file: tests/validation/test_layouts.cpp
+    source: mnxdom-3.0.1/tests/validation/test_layouts.cpp
+    description: "schema 校验：layout 级"
+    command: "./mnxdom_tests --gtest_filter=Validation*Layout*"
+  - file: tests/validation/test_parts.cpp
+    source: mnxdom-3.0.1/tests/validation/test_parts.cpp
+    description: "schema 校验：part 级"
+    command: "./mnxdom_tests --gtest_filter=Validation*Part*"
+  - file: tests/validation/test_scores.cpp
+    source: mnxdom-3.0.1/tests/validation/test_scores.cpp
+    description: "schema 校验：score 级"
+    command: "./mnxdom_tests --gtest_filter=Validation*Score*"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_mnxdom.cpp
+    description: "消费者测试：构建文档 / schemaValidate / save + 重新加载"
+    command: "./test_mnxdom"
+
+# 测试断言总数 (test_mnxdom.cpp 中的 check() 调用数)
+assertion_count: 15
