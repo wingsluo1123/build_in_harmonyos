@@ -1,0 +1,39 @@
+# 版本级 manifest
+# 文件位置: archives/v/vish/0.0.20130812/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "0.0.20130812"
+
+software: "vish"
+
+status: built
+
+build_date: "2026-10-13"
+
+# 构建系统: manual（真机池无 autoconf 且归档缺 config.guess/config.sub，
+# 直接 CXX 编译 vish.cpp + 静态链接 librevisa 的 libvisa.a，等价于
+# configure 的 AC_CHECK_LIB(visa)/AC_CHECK_HEADER(visa.h) 选择，见 notes.md）
+build_system: "manual"
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/v/vish/vish_0.0.20130812.orig.tar.gz"
+  sha256: "1c121057397a328ded3b18a8536ff49ab0f8c5a254325fb3f26b5deda4db7ac0"
+  tar_format: tar.gz
+
+build:
+  system: manual
+  configure_options: []
+  dependencies:
+    - "librevisa/0.0.20130812"
+  build_dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "官方源 librevisa.org/download 已 404（2026-10-13 实测），改用 Debian pool orig 权威镜像（sha256 本地实测一致）；PF7/R39 例外已在 PR 说明登记"
+  - "vish 归档虽带生成式 configure，但无 config.guess/config.sub，且真机池无 autoconf 套件：直接以 CXX 编译 vish.cpp + 链接 librevisa 包的 libvisa.a，等价于 configure 的 AC_CHECK_LIB(visa)/AC_CHECK_HEADER(visa.h) 选择"
+  - "直接编译不生成 config.h，--version 分支依赖 PACKAGE/VERSION 宏，需 -D'PACKAGE=\"vish\"' -D'VERSION=\"0.0.20130812\"' 替代"
+  - "vish.cpp 用 std::string/getline 未显式 include <string>，libc++ 经 <iostream> 传递包含，无需补丁"
+  - "上游无测试目录（11 文件无 tests/，Makefile.am 无 check target），N=0；鸿蒙特有 test_package 2 断言（--version 退出0含版本串、--scan 退出0走真实 VISA 资源管理器路径）"
