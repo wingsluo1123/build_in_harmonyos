@@ -1,0 +1,33 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -8,10 +8,30 @@
+    	src/LinearAllocator.cpp
+     	src/StackAllocator.cpp
+     	src/PoolAllocator.cpp
+    	src/FreeListAllocator.cpp
+    	src/Benchmark.cpp 
+ 	src/main.cpp)
+ 
+ add_executable(main ${SOURCES})
+ target_include_directories(main PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/includes)
+ target_compile_features(main PRIVATE cxx_std_11)
++
++# --- OHOS adaptation: build a static library target + install rules ---
++set(LIB_SOURCES
++    src/Allocator.cpp
++    src/CAllocator.cpp
++    src/LinearAllocator.cpp
++    src/StackAllocator.cpp
++    src/PoolAllocator.cpp
++    src/FreeListAllocator.cpp)
++
++add_library(memory-allocators ${LIB_SOURCES})
++target_include_directories(memory-allocators PUBLIC
++    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/includes>
++    $<INSTALL_INTERFACE:include>)
++target_compile_features(memory-allocators PUBLIC cxx_std_11)
++
++install(TARGETS memory-allocators
++    ARCHIVE DESTINATION lib
++    LIBRARY DESTINATION lib)
++install(DIRECTORY includes/ DESTINATION include)

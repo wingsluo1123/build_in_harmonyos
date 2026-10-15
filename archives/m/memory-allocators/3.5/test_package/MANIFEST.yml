@@ -1,0 +1,37 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+#
+# 上游测试清点 (R51):
+#   上游仓库 https://github.com/mtrebi/memory-allocators master (ad599a37) 无 tests/
+#   目录、无 ctest 注册、无 pytest。CMakeLists 仅构建 main（benchmark 演示程序）。
+#   已实际运行 ./main 验证可执行且正常退出（exit 0）。
+
+package: memory-allocators/3.5
+homepage: "https://github.com/mtrebi/memory-allocators"
+
+# 上游测试命令 (make -n check / ctest -N / meson test --list 分析结果: 无注册测试)
+upstream_check_command: "ctest -N"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序 (benchmark 主程序，运行全部 allocator 分配/释放路径)
+upstream_tests:
+  - file: src/main.cpp
+    source: memory-allocators-master/src/main.cpp
+    description: "benchmark 主程序 — 对 C/Linear/Stack/Pool/FreeList 分配器执行分配/释放基准并正常退出(exit 0)"
+    command: "./main"
+
+# test_package 中自带的测试 (消费者视角验证, 实质调用库 API: 分配/对齐/释放)
+# R02 变更: 弃用 assert()（Release/NDEBUG 下被编译期移除, Review P2），改为
+# NDEBUG 免疫的自定义 CHECK 宏（实际执行校验并累计失败数, Review P3 失败链路已修复）。
+# 交付态实测: 21 checks / 0 failures / exit 0（Release 含 -DNDEBUG 编译运行）。
+test_package_tests:
+  - file: test.cpp
+    description: "消费者测试 — 调用 Linear/Stack/Pool/FreeList/CAllocator API 验证分配、对齐、释放行为（CHECK 宏 NDEBUG 免疫）"
+    command: "./test_memory-allocators"
+
+# 测试断言总数 (R02 修正: 由 14 处 assert 修正为 21 个实际执行校验点)
+assertion_count: 21
