@@ -1,0 +1,34 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: jericho-html/3.4
+homepage: "http://jericho.htmlparser.net"
+
+# 上游测试通过 javac 编译 + JUnitCore 运行（上游原生构建为 Ant test.bat，配方内复刻等效流程）
+# 上游测试框架：JUnit 4.8.2
+upstream_check_command: "javac + java org.junit.runner.JUnitCore TestSuite"
+upstream_test_in_build: true
+upstream_test_command: "java -cp test-classes:classes:junit-4.8.2.jar org.junit.runner.JUnitCore TestSuite"
+
+# 上游 JUnit 测试用例（在 build() 中运行）
+# 统计来源：upstream-tests/ 目录（上游 SourceForge 项目包 test/src/ 完整内容）
+# 14 个测试类（TestSuite 聚合 13 个 + StAXTest 整类上游注释禁用），50 个可运行 @Test 方法
+# StreamedSourceHugeFileTest 的 2 个 @Test 上游自带 `if (true) return;` 禁用逻辑（需 D 盘数据文件），照常计入运行
+upstream_tests:
+  - file: upstream-tests/
+    source: jericho-html-3.4.zip (SourceForge) /test/src/
+    description: "上游 JUnit 4 测试套件（14 个测试类，50 个可运行 @Test 方法）"
+    command: "java -cp test-classes:classes:junit-4.8.2.jar org.junit.runner.JUnitCore TestSuite"
+
+# test_package 中自带的测试 (消费者视角验证，在鸿蒙真机运行)
+test_package_tests:
+  - file: test.sh
+    description: "编译并运行 Java 测试程序，调用 jericho-html Source/Element/TextExtractor API 解析 HTML (R34 实质性验证)"
+    command: "bash test.sh"
+
+# 测试断言总数
+# 上游：50 个 @Test 方法（在 build() 中通过 JUnitCore 运行 TestSuite）
+# test_package：9 个断言（1 JAR + 1 编译 + 6 API 断言 + 1 PASS）
+assertion_count: 59
