@@ -1,0 +1,28 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI L0e 强制要求存在）
+package: kamailio-websocket/6.0.6
+homepage: "https://www.kamailio.org"
+
+# 上游测试命令
+# 清点结论（R51 三步法，证据见 notes.md）：
+#   - kamailio 6.0.6 源码包顶层为 CMakeLists.txt/ COPYING/ ChangeLog/ INSTALL/ Makefile/
+#     README/ cmake/ doc/ etc/ misc/ pkg/ src/ utils/，不含 test/ 目录
+#     （utils/kamctl/dbtextdb/tests/ 是 kamctl 工具的 Python 测试数据，与 websocket 模块无关）
+#   - src/modules/websocket/ 内仅源码 + doc/，无测试源文件
+#   - src/modules/websocket/CMakeLists.txt 无 add_test/enable_testing；顶层与 src/Makefile
+#     均无 check 目标（上游 CI 走 pkg/kamailio 的 Smoketest，非源码内自动化套件）
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（上游无 websocket 模块自动化测试套件）
+upstream_tests: []
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: check_websocket.py
+    description: "产物结构校验：ELF aarch64/ET_DYN、OpenSSL 静态链入（SHA1/EVP_sha1/OPENSSL_init_crypto/OPENSSL_cleanup 符号 + NEEDED 无 libssl/libcrypto）、libunistring 静态链入（u8_check）、mod_register 模块入口、licenses/COPYING、无 RPATH/RUNPATH 泄漏"
+    command: "python3 check_websocket.py"
+
+# 测试断言总数（check_websocket.py 中的 check() 调用数：readelf 存在时 13 项，readelf 缺失时 11 项）
+assertion_count: 13
