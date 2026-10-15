@@ -1,0 +1,51 @@
+software: pangomm
+# 版本级 manifest
+# 文件位置: archives/p/pangomm/2.42.2/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "2.42.2"
+status: built
+build_system: meson
+build_date: "2026-10-13"
+
+# Conan 引用
+conan_ref: "pangomm/2.42.2@ohpcd/stable"
+
+source:
+  url: "https://download.gnome.org/sources/pangomm/2.42/pangomm-2.42.2.tar.xz"
+  sha256: "1b24c92624ae1275ccb57758175d35f7c39ad3342d8c0b4ba60f0d9849d2d08a"
+  tar_format: tar.xz
+
+build:
+  system: meson
+  cc: clang
+  cxx: clang++
+  configure_options:
+    - "default_library=shared"
+    - "maintainer-mode=false"
+    - "build-documentation=false"
+    - "wrap_mode=nodownload"
+  dependencies:
+    - "glibmm/2.66.9 (glibmm-2.4 旧 ABI 线, sigc++-2.0)"
+    - "cairomm/1.14.5.1 (cairomm-1.0 旧 ABI 线, sigc++-2.0)"
+    - "pango/1.50.14.1.1 (提供 pangocairo >= 1.41.0)"
+    - "libsigc/2.12.1 (override: glibmm 钉 2.10.8 vs cairomm 钉 2.12.1 的 Conan 2 版本冲突归一)"
+
+patches_applied:
+  - "patches/0001-pango-1.44-markup-header-split.patch（pango>=1.44 把 pango_parse_markup 拆进 <pango/pango-markup.h>，gmmproc-2.64 生成的 2.42 头链只含细粒度 pango-attributes.h，attrlist.cc markup 构造函数编译失败；显式 include 拆分头修复。上游 2.46 线生成头改用伞形 <pango/pango.h> 天然免疫）"
+
+knowledge_gained:
+  - "pangomm 2.42.2 是 pangomm-1.4 旧 ABI 线的 2.42 老线补位（gtkmm 老版本线前置）：pkg-config 名 pangomm-1.4，依赖 glibmm-2.4(2.66.x) + cairomm-1.0(1.14.x) + pangocairo(>=1.41.0)；与 2.46.5 同 ABI 线且 SONAME 相同（libtool_soversion=[1,30,0] → libpangomm-1.4.so.1.0.30），适配技法可完整平移"
+  - "GNOME mm 绑定老版本线（2.42）与近版本线（2.46）在 meson.build 上的差异：老线用 get_pkgconfig_variable()（0.56 起废弃）与 python3.path()（0.55 起废弃），实测 meson 1.12 仍保留这两个 API（仅 deprecation 警告），无需打补丁即可构建——升级 meson 大版本时需复核此兼容窗口"
+  - "cairomm 选线依据是上游 meson.build 的 pkg-config 名而非版本号：pangomm 2.42/2.46 线要求 cairomm-1.0（1.14.x），cairomm 1.16+ 生成 cairomm-1.16.pc 会被 dependency('cairomm-1.0') 拒绝；任务卡若给新线版本号须以 pkg-config 名为准纠正"
+  - "pangomm 2.42.2 tarball 同样自带 untracked/ 预生成绑定（26 .cc + 25 .h + private/25 _p.h）+ build_scripts/（generate-binding.py 等），maintainer-mode=false 构建不需要 mm-common/gmmproc"
+  - "OHOS 挂载点禁 symlink（EPERM）：meson install 的 libpangomm-1.4.so / .so.1 链接可能静默缺失，package() 内以 copyfile 物化 SONAME 链（幂等，不改变 Linux CI 的真符号链接行为）"
+  - "原生 OHOS 上 meson install 改写 rpath，.so 必须用 binary-sign-tool 重新 codesign 才能被 dlopen（E135）；未签名 .so 在 OHOS 上 dlopen 报 Permission denied"
+
+knowledge_refs:
+  - "knowledge/drafts/DRAFT-15141-pangomm-2.42-pango-1.44-markup-header-split.kv"
+  - "knowledge/drafts/DRAFT-15141-pangomm-2.42-pango-1.44-markup-header-split.md"
+
+upstream_test_pass_rate: "N/A——上游 2.42.2 无自动化测试入口（meson 未注册 test()，tests/Makefile.am 的 SUBDIRS 为空，无 meson.build 入口；用例总数 0）"
+adapted_test_pass_rate: "100%——消费者 L1 4/4 断言 PASS；鸿蒙特有测试 14/14 断言 PASS（HarmonyOS PC aarch64 原生实机执行，conan create 干净重建 exit=0）"
+test_command: "conan create archives/p/pangomm/2.42.2 -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 --build=missing"
