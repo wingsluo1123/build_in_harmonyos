@@ -1,0 +1,40 @@
+version: "2.2"
+software: "perdition"
+status: built
+build_date: "2026-10-14"
+build_system: "autotools"
+
+source:
+  url: "https://horms.net/projects/perdition/download/2.2/perdition-2.2.tar.gz"
+  sha256: "17e8a4cbe2638b0dcb7f8169e40c1944a747f3b30848ff81380a1cacfe206bdd"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=/"
+    - "--build=x86_64-unknown-linux-gnu"
+    - "--disable-mysql"
+    - "--disable-odbc"
+    - "--disable-pg"
+    - "--disable-cdb"
+    - "--disable-bdb"
+    - "--disable-nis"
+    - "--disable-ldap"
+    - "--disable-pam"
+    - "--without-libidn"
+  dependencies:
+    - "gdbm/1.24"
+    - "openssl/3.5.6.1"
+    - "popt/1.16 (vendored, private prefix; conancenter rebuild fails at config.sub under HMBS chmod=0)"
+    - "vanessa_logger/0.0.10 (vendored, private prefix)"
+    - "vanessa_adt/0.0.9 (vendored, private prefix)"
+    - "vanessa_socket/0.0.12 (vendored, private prefix)"
+  cc: clang
+
+patches_applied: []
+
+knowledge_gained:
+  - "perdition 2.2 hard-requires vanessa_logger/adt/socket (PKG_CHECK_MODULES + AC_CHECK_LIB); none are in the registry, so the recipe vendors the trio from the 2.2 download dir into build_folder/prefix (R49)"
+  - "Upstream evidence: perdition 2.2 itself has no suite (no TESTS/AM_TESTS, no tests/ dir, make check no-op); countable evidence = vendored vanessa_adt 0.0.9 test/Makefile.am noinst_PROGRAMS (4: dynamic_array/list/hash/config_file), all executed on true machine with exit-code oracle (status passed with audit)"
+  - "install-exec-hook uses ln -f/ln -sf for protocol aliases; rewritten to cp -p in build() for HMDFS"
