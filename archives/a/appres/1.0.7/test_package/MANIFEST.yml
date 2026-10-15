@@ -1,0 +1,34 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# 上游测试清点（§12.72 四口径，2026-10-07 于 appres-1.0.7 源码树实测）：
+#   ① test*/ 框架源码: 0（find -type d -name 'test*' → 0；test 源文件 → 0）
+#   ② */res 语料     : 0（find -type d -name 'res' → 0）
+#   ③ **/*RUNTEST*   : 0
+#   ④ src/demo|examples 示例 .c: 0（源码树唯一 .c 即主程序 appres.c）
+#   另：Makefile.am 无 TESTS/check_PROGRAMS，configure.ac 无测试相关宏
+#   ⇒ 上游确无测试资产；`make check` 实测空转（rc=0，"Nothing to be done"）
+
+package: appres/1.0.7
+homepage: "https://gitlab.freedesktop.org/xorg/app/appres"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序 —— 无（四口径清点证据见文件头注释）
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证, 调用已安装二进制)
+test_package_tests:
+  - file: test.sh
+    description: "消费者测试 — 调用已安装 appres 二进制，断言 -version 与 -V 输出、-help 退出码与 usage 文本（4 条断言）"
+    command: "bash test.sh"
+
+# 测试断言总数 (test_package 实测断言数)
+assertion_count: 4
