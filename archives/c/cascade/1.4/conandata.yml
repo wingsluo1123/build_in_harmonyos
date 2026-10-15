@@ -1,0 +1,18 @@
+# conandata.yml — cascade 1.4
+#
+# 上游 SourceForge 项目 rfcascade 的官方发布包（cascade-1.4，2001-09）。
+# 无补丁：上游是 sh + awk 脚本，经 autoconf 2.13 生成的 configure/Makefile 做字符串替换安装。
+sources:
+  "1.4":
+    url: "https://downloads.sourceforge.net/project/rfcascade/cascade/cascade-1.4/cascade-1.4.tar.gz"
+    sha256: "0bcf3e806632c1bab9b7f08fc2f15dedd37d4ede2b898f7b7e826a6fcf28ed9c"
+
+# 唯一补丁：删除 cascade.sh 里仅 gawk 才执行的 strftime 时间戳块。
+# 该块虽被 `if(ARGV[0]=="gawk")` 保护，但没有 strftime 的 awk（OHOS 构建机/设备上的 awk）
+# 在解析阶段就报 `Undefined function 'strftime'` + `1 syntax error(s)`，整个程序一行都跑不起来。
+# 属通用可移植性修复，不含平台宏。
+patches:
+  "1.4":
+    - patch_file: "patches/0001-cascade-drop-gawk-strftime.patch"
+      patch_type: "portability"
+      patch_description: "cascade.sh: 删除仅 gawk 执行的 strftime 时间戳块，避免无 strftime 的 awk 在解析阶段报 Undefined function"
