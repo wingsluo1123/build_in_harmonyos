@@ -1,0 +1,26 @@
+# 软件级 manifest — fbset
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: fbset
+display: "fbset (frame buffer settings)"
+description: "查询与调整 Linux 帧缓冲设备显示模式的命令行工具（FBIOGET_VSCREENINFO 等 FB ioctl 族）"
+category: system
+homepage: "http://g33rt.be/migrated/Linux/fbdev/"
+license: GPL-2.0-only
+
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "fb.h 随源码内置，无需内核头文件 ⇒ 无编译墙；唯一阻塞是 fbset.h 的 <asm/types.h> 被 #ifdef __GLIBC__ 包裹（musl/OHOS 不定义），补丁 0001 改为无条件包含"
+    - "上游 Makefile 写死 CC = gcc -Wall -O2 -I.，本平台仅 clang ⇒ 按 R33 从 tools.build:compiler_executables 取编译器并在 make 命令行覆盖 CC/CFLAGS/LDFLAGS"
+    - "modes.l/modes.y 未预生成 ⇒ tool_requires flex/2.6.4 + bison/3.8.2（CI worker 不保证自带）"
+    - "上游 make install 写 /sbin、/usr/man 并 mknod /dev/fb* ⇒ 改由 package() 手工安装 bin/fbset 与 share/fbset/fb.modes.*，OHOS 下自签 ELF"
+    - "补丁 0002：--help 属信息型请求，退出码改为 0（上游经 Die()/exit(1)）；其余诊断路径保持 1，供 L2 smoke 与消费者断言使用"
+    - "运行期墙（可披露）：OHOS PC 无可访问的帧缓冲设备，fbset -s 报 open /dev/fb0: No such file or directory；工具编译/安装/消费者验证不受影响"
+  common_dependencies: []
+
+versions:
+  "2.1":
+    status: built
+    build_date: 2026-10-15

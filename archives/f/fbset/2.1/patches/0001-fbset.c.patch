@@ -1,0 +1,67 @@
+--- a/fbset.c
++++ b/fbset.c
+@@ -230,29 +230,36 @@
+ static void DisplayFBInfo(struct fb_fix_screeninfo *fix);
+ static int FillScanRates(struct VideoMode *vmode);
+ static void Usage(void) __attribute__ ((noreturn));
+ int main(int argc, char *argv[]);
+ 
+ 
+     /*
+      *  Print an Error Message and Exit
+      */
+ 
++/*
++ * Exit status used by Die().  Informational requests (--help) set it to 0
++ * before printing, so a plain `fbset --help` reports success; every other
++ * diagnostic keeps the historical status 1.
++ */
++static int Die_status = 1;
++
+ void Die(const char *fmt, ...)
+ {
+     va_list ap;
+ 
+     fflush(stdout);
+     va_start(ap, fmt);
+     vfprintf(stderr, fmt, ap);
+     va_end(ap);
+-    exit(1);
++    exit(Die_status);
+ }
+ 
+ 
+     /*
+      *  Open the Frame Buffer Device
+      */
+ 
+ int OpenFrameBuffer(const char *name)
+ {
+     int fh;
+@@ -902,22 +909,25 @@
+     int fh = -1, i;
+ 
+     ProgramName = argv[0];
+ 
+     /*
+      *  Parse the Options
+      */
+ 
+     while (--argc > 0) {
+ 	argv++;
+-	if (!strcmp(argv[0], "-h") || !strcmp(argv[0], "--help"))
++	if (!strcmp(argv[0], "-h") || !strcmp(argv[0], "--help")) {
++	    /* asking for help is not an error: exit with status 0 */
++	    Die_status = 0;
+ 	    Usage();
++	}
+ 	else if (!strcmp(argv[0], "-v") || !strcmp(argv[0], "--verbose"))
+ 	    Opt_verbose = 1;
+ 	else if (!strcmp(argv[0], "-V") || !strcmp(argv[0], "--version"))
+ 	    Opt_version = 1;
+ 	else if (!strcmp(argv[0], "--test"))
+ 	    Opt_test = 1;
+ 	else if (!strcmp(argv[0], "-s") || !strcmp(argv[0], "--show"))
+ 	    Opt_show = 1;
+ 	else if (!strcmp(argv[0], "-i") || !strcmp(argv[0], "--info")) {
+ 	    Opt_show = 1;

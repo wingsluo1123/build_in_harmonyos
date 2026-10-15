@@ -1,0 +1,59 @@
+# 版本级 manifest — fbset 2.1
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "2.1"
+software: "fbset"
+
+# built = 配方完成、消费者测试本地验证通过，尚未由 CI upload 制品仓
+status: built
+
+build_date: "2026-10-15"
+build_system: "makefile"
+
+source:
+  url: "http://g33rt.be/migrated/Linux/fbdev/fbset-2.1.tar.gz"
+  sha256: "40ff4ab0247b75138a0887ed40f81c1a6184f340b77126c16d074b1075b41c20"
+  tar_format: tar.gz
+
+dependencies:
+  required: []
+  optional: []
+
+build_tools:
+  - flex/2.6.4
+  - bison/3.8.2
+
+patches_applied:
+  - patches/0001-fbset.c.patch
+  - patches/0002-fbset.h.patch
+
+test_results:
+  type: manual
+  total: 6
+  passed: 6
+  failed: 0
+
+knowledge_ref: []
+knowledge_gained:
+  - "上游把 <asm/types.h> 放在 #ifdef __GLIBC__ 内 ⇒ musl/OHOS 下 __u32 未定义、编译报错（一行级可移植性修复，非不可修复的编译墙）"
+  - "裸 Makefile 写死 CC=gcc 且 install 目标写绝对路径 + mknod /dev/fb* ⇒ 覆盖 make 变量 + package() 手工安装"
+  - "无 framebuffer 设备的平台：fbset -s 报 open /dev/fb0: No such file or directory（运行期墙，可披露）"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/builds/fbset-2.1.orig
+  source_work_dir: /storage/Users/currentUser/builds/fbset-2.1.work
+  source_orig_hash: 927dd0ab0ac1bbb1
+  source_work_hash: e948e51cbd88c81e
+  generated_at: '2026-10-15T01:33:47'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-fbset.c.patch
+    type: portability
+    platform_only: False
+    guard: 'none'
+  - file: 0002-fbset.h.patch
+    type: portability
+    platform_only: False
+    guard: 'none'
