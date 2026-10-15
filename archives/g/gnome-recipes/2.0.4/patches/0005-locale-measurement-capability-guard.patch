@@ -1,0 +1,64 @@
+--- a/meson.build
++++ b/meson.build
+@@ -119,6 +119,17 @@
+ # Must be unquoted for dbus service file
+ conf.set('BINDIR', bindir)
+ 
++# 能力探测：_NL_MEASUREMENT_MEASUREMENT 是 glibc 专有的 langinfo 列表项（枚举
++# 成员，非宏，无法直接 #ifdef），部分 libc（如 OHOS）不提供 → 编译探测守卫。
++cc = meson.get_compiler('c')
++if cc.links('''#include <langinfo.h>
++int main (void)
++{
++  return (int) _NL_MEASUREMENT_MEASUREMENT;
++}''')
++  conf.set('HAVE__NL_MEASUREMENT_MEASUREMENT', true)
++endif
++
+ configure_file(output : 'config.h', configuration : conf)
+ 
+ subdir('src')
+--- a/src/gr-convert-units.c
++++ b/src/gr-convert-units.c
+@@ -44,7 +44,8 @@
+         unit = g_settings_get_enum (settings, "temperature-unit");
+ 
+         if (unit == GR_TEMPERATURE_UNIT_LOCALE) {
+-        #ifdef LC_MEASUREMENT
++        /* 守卫来自 meson 能力探测 HAVE__NL_MEASUREMENT_MEASUREMENT：仅当本 libc 提供 glibc 专有的 _NL_MEASUREMENT_MEASUREMENT 列表项时启用本分支 */
++        #ifdef HAVE__NL_MEASUREMENT_MEASUREMENT
+                 const char *fmt;
+ 
+                 fmt = nl_langinfo (_NL_MEASUREMENT_MEASUREMENT);
+@@ -68,7 +69,8 @@
+     unit = g_settings_get_enum (settings, "volume-unit");
+ 
+     if (unit == GR_PREFERRED_UNIT_LOCALE) {
+-#ifdef LC_MEASUREMENT
++/* 守卫来自 meson 能力探测 HAVE__NL_MEASUREMENT_MEASUREMENT：仅当本 libc 提供 glibc 专有的 _NL_MEASUREMENT_MEASUREMENT 列表项时启用本分支 */
++#ifdef HAVE__NL_MEASUREMENT_MEASUREMENT
+                 const char *fmt;
+ 
+             fmt = nl_langinfo (_NL_MEASUREMENT_MEASUREMENT);
+@@ -91,7 +93,8 @@
+         unit = g_settings_get_enum (settings, "weight-unit");
+ 
+         if (unit == GR_PREFERRED_UNIT_LOCALE) {
+-#ifdef LC_MEASUREMENT
++/* 守卫来自 meson 能力探测 HAVE__NL_MEASUREMENT_MEASUREMENT：仅当本 libc 提供 glibc 专有的 _NL_MEASUREMENT_MEASUREMENT 列表项时启用本分支 */
++#ifdef HAVE__NL_MEASUREMENT_MEASUREMENT
+                  const char *fmt;
+ 
+                 fmt = nl_langinfo (_NL_MEASUREMENT_MEASUREMENT);
+--- a/src/gr-recipe-formatter.c
++++ b/src/gr-recipe-formatter.c
+@@ -49,7 +49,8 @@
+         unit = g_settings_get_enum (settings, "temperature-unit");
+ 
+         if (unit == GR_TEMPERATURE_UNIT_LOCALE) {
+-#ifdef LC_MEASUREMENT
++/* 守卫来自 meson 能力探测 HAVE__NL_MEASUREMENT_MEASUREMENT：仅当本 libc 提供 glibc 专有的 _NL_MEASUREMENT_MEASUREMENT 列表项时启用本分支 */
++#ifdef HAVE__NL_MEASUREMENT_MEASUREMENT
+                 const char *fmt;
+ 
+                 fmt = nl_langinfo (_NL_MEASUREMENT_MEASUREMENT);

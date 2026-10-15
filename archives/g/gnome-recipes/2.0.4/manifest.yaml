@@ -1,0 +1,55 @@
+version: "2.0.4"
+software: gnome-recipes
+status: built
+build_date: "2026-10-14"
+build_system: meson
+
+source:
+  url: "https://download.gnome.org/sources/gnome-recipes/2.0/gnome-recipes-2.0.4.tar.xz"
+  sha256: "b30e96985f66fe138a17189c77af44d34d0b4c859b304ebdb52033bc2cd3ffed"
+  tar_format: tar.xz
+  source_note: "上游官方 2.0.4 发布 tarball（GNOME 官方源，SHA-256 与官方一致）"
+
+build:
+  system: meson
+  configure_options:
+    - "-Dwrap_mode=nodownload"
+  dependencies:
+    - "glib/2.84.0.1.1"
+    - "gtk/3.24.43"
+    - "libsoup/2.74.3-r1"
+    - "libgoa/3.58.1"
+    - "json-glib/1.10.6.1"
+    - "gnome-autoar/0.4.5"
+    - "libarchive/3.8.7"
+    - "gspell/1.14.4"
+    - "libcanberra/0.30"
+    - "pcre2/10.45"
+    - "libffi/3.4.4"
+    - "graphite2/1.3.14"
+    - "xz/5.6.2"
+    - "zlib/1.3.1.1"
+  compiler: "OHOS clang (armv8-a, OHOS SDK)"
+
+patches_applied:
+  - "patches/0001-shopping-list-export-via-libsoup.patch"
+  - "patches/0002-appdata-no-its-merge.patch"
+  - "patches/0003-post-install-no-system-tools.patch"
+  - "patches/0004-disable-help-build.patch"
+  - "patches/0005-locale-measurement-capability-guard.patch"
+  - "patches/0006-disable-post-install-script.patch"
+
+test_passed: 20
+test_failed: 0
+
+knowledge_gained:
+  - "librest（rest-0.7）在 OHOS 制品仓缺失；购物清单 Todoist 导出的 5 处 RestProxyCall 全部是固定 URL 的 x-www-form-urlencoded POST，直接以 libsoup 2.4 重建后可整文件移除 rest 依赖（上游 meson.build 仅需删一行）。"
+  - "glib/2.88.3 与 GTK3 栈（pin 2.84.0.x）精确版本互斥：2.88.3 世代制品仓尚无 GTK3 栈二进制，向上统一会作废 13 个已发二进制、触发整栈源码构建；向下 override 到 glib/2.84.0.1.1 + zlib/1.3.1.1 可保留全栈二进制，仅 libgoa 一个节点重编。Conan 2 允许根 override 覆盖依赖的硬 pin（实测 Overrides 表无冲突无告警）。"
+  - "glib 配方缺 gio-unix-2.0 / gmodule-export-2.0 组件 .pc；由最接近的组件 .pc 合成别名即可（gio-unix 头文件随 gio 组件打包）。"
+  - "glib 两代配方的 cpp_info 组件命名不一致（2.84.x 带 -2.0 后缀 vs 2.88.3 裸名）；按 2.88 世代引用写法的消费者（libgoa）在向下统一后会被 PkgConfigDeps 中止，generate() 在生成前对依赖图做双向归一即可（活引用改写对生成器可见）。"
+  - "OHOS 上 sh/env 作 shebang 解释器不可 exec，而解释器绝对路径可行；glib python 工具（glib-genmarshal/glib-mkenums/gdbus-codegen）应包装为『解释器绝对路径 shebang + runpy 执行原包脚本』——原脚本 __file__ 保持在包内 bin/，其 bin→share/glib-2.0 引导分支才能找到 gdbus-codegen 的 codegen 模块（裸拷贝进构建目录会丢模块搜索根；平台内 atk 2.38.0.1.1 同款方案）。ELF 工具（glib-compile-resources/glib-compile-schemas）staged 后 patchelf+签名方可运行。"
+  - "msgfmt --xml 在 OHOS 缺 itstool ITS 规则；appdata 直接安装未翻译文件（evince 同款先例）。"
+  - "上游用 #ifdef LC_MEASUREMENT 守卫 glibc 专有列表项 _NL_MEASUREMENT_MEASUREMENT；OHOS libc 有类别宏而无该项 → 守卫通过但符号不存在。该标识是枚举成员而非宏，无法直接 #ifdef → 以 meson cc.links 编译探测（HAVE__NL_MEASUREMENT_MEASUREMENT）守卫；glibc 上探测为真、行为与上游一致，缺该扩展的 libc 上落回 metric 默认。"
+  - "OHOS 禁脚本直执行，meson add_install_script 的 install script 也不例外（真机 FAILED: install script ... could not be run → Error 127，与脚本内容无关）；安装期脚本工作应移入配方 package()（如用 staged 工具编译 GSettings schema）并从构建系统摘除调用。"
+  - "OHOS 文件系统拒绝 symlink(2)：meson install 的共享库只落版本化实体文件，缺 libX.so / libX.so.<major> 链接名，消费者 -lX 链接即 unable to find library（制品仓包因解包物化无此病）。消费者配方可在 generate() 扫描 host 依赖包 libdir，以实体拷贝物化缺失 soname 名（幂等，有 symlink 的宿主零动作）。"
+  - "OHOS 系统 libarchive.so.13 是减配构建（基础归档 API 齐全、gzip/bzip2/xz 等压缩过滤器入口全缺）；图内链接的共享依赖若未出现在消费侧 run 环境，进程启动即 relocate 失败（Error relocating ... symbol not found，rc=127）。根因两层：①run 环境未携带该依赖 libdir，加载器落回系统同名库；②该依赖是传递依赖时被 conan Skipped binaries 排除出运行闭包（package_folder=None → 配方 package_info() 守卫型 runenv 发布静默失效）。修法（conan 2.29.1 实测唯一有效杠杆）：消费者图根侧显式 requires（test_package requirements() 直接声明同版依赖）把包拉回运行闭包（Skip→Cache），此后配方 package_info() 的 runenv 发布（libdir 前置进 LD_LIBRARY_PATH，路径消费端解析、无绝对路径烙进产物）+ test() 侧枚举 host 依赖 libdir 注入两通道同时落实。另注：conan 缓存目录名是『名前缀+hash』（libarchive → p/libara<hash>），『*archive*』通配检索永远打不中。"

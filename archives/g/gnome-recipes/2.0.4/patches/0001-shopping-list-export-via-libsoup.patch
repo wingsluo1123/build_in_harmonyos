@@ -1,0 +1,825 @@
+--- a/meson.build
++++ b/meson.build
+@@ -87,7 +87,6 @@ deps = [ dependency('gtk+-3.0', version : '>=3.22'),
+          dependency('gmodule-export-2.0'),
+          dependency('libsoup-2.4'),
+          dependency('goa-1.0'),
+-         dependency('rest-0.7'),
+          dependency('json-glib-1.0'),
+          autoar_dep,
+          gspell_dep,
+--- a/src/gr-shopping-list-exporter.c
++++ b/src/gr-shopping-list-exporter.c
+@@ -25,7 +25,7 @@
+ #include <glib/gstdio.h>
+ #include <gtk/gtk.h>
+ #include <goa/goa.h>
+-#include <rest/oauth2-proxy.h>
++#include <libsoup/soup.h>
+ #include <json-glib/json-glib.h>
+ 
+ #include "gr-shopping-list-exporter.h"
+@@ -40,6 +40,49 @@
+ static gboolean get_todoist_account (GrShoppingListExporter *exporter);
+ static gboolean get_project_id (GrShoppingListExporter *exporter);
+ 
++/* The Todoist sync requests below used to be issued through librest
++ * (RestProxy / RestProxyCall). librest is not available on this platform;
++ * every RestProxyCall here was an application/x-www-form-urlencoded POST
++ * to a fixed URL, so the same requests are built and dispatched directly
++ * with libsoup. */
++static SoupSession *
++get_soup_session (void)
++{
++        static SoupSession *session = NULL;
++
++        if (session == NULL)
++                session = soup_session_new ();
++
++        return session;
++}
++
++static void
++form_add_param (GString     *form,
++                const gchar *key,
++                const gchar *value)
++{
++        if (form->len > 0)
++                g_string_append_c (form, '&');
++
++        g_string_append (form, key);
++        g_string_append_c (form, '=');
++        g_string_append_uri_escaped (form, value, NULL, TRUE);
++}
++
++static SoupMessage *
++form_post_message (const gchar *url,
++                   GString     *form)
++{
++        SoupMessage *msg;
++
++        msg = soup_message_new ("POST", url);
++        soup_message_set_request (msg, "application/x-www-form-urlencoded",
++                                  SOUP_MEMORY_TAKE, form->str, form->len);
++        g_string_free (form, FALSE);
++
++        return msg;
++}
++
+ struct _GrShoppingListExporter
+ {
+         GObject parent_instance;
+@@ -107,155 +150,120 @@ gr_shopping_list_exporter_new (GtkWindow *parent)
+ }
+ 
+ static void
+-remove_items_callback (RestProxyCall *call,
+-		       GError *error,
+-		       GObject *obj,
+-		       GrShoppingListExporter *exporter)
++remove_items_callback (SoupSession *session,
++                       SoupMessage *msg,
++                       gpointer     user_data)
+ {
+-
+-	guint status_code;
+-
+-	status_code = rest_proxy_call_get_status_code (call);
+-
+-	if (status_code != 200) {
+-		g_warning ("Couldn't complete items in todoist");
+-	}
+-
++        if (msg->status_code != 200) {
++                g_warning ("Couldn't complete items in todoist");
++        }
+ }
+ 
+ static void
+ remove_items (GrShoppingListExporter *exporter, GList *items)
+ {
+-	RestProxy *proxy;
+-	RestProxyCall *call;
+-	GError *error;
+-	g_autofree gchar *uuid = g_uuid_string_random ();
+-
+-	GList *l;
+-	GString *commands;
+-	commands = g_string_new ("");
+-	if (exporter->delete_items)
+-		g_string_append_printf (commands , "[{\"type\": \"item_delete\", \"uuid\": \"%s\", \"args\": {\"ids\": [", uuid);
+-	else
+-		g_string_append_printf (commands , "[{\"type\": \"item_complete\", \"uuid\": \"%s\", \"args\": {\"ids\": [", uuid);
+-	
+-	for (l = items; l != NULL; l = l->next) {
+-		JsonObject *object;
+-		double id;
+-		glong item_id;
+-
+-		object = json_node_get_object (l->data);
+-		id = json_object_get_double_member (object, "id");
+-		item_id = (glong) id;
+-		g_string_append_printf (commands, "%ld,", item_id);
+-	}
+-	commands = g_string_truncate (commands, commands->len-1);
+-	g_string_append_printf (commands, "]}}]");
+-
+-	error = NULL;
+-
+-	proxy = rest_proxy_new (TODOIST_URL, FALSE);
+-	call = rest_proxy_new_call (proxy);
+-	rest_proxy_call_set_method (call, "POST");
+-	rest_proxy_call_add_header (call, "content-type", "application/x-www-form-urlencoded");
+-	rest_proxy_call_add_param (call, "token", exporter->access_token);
++        SoupMessage *msg;
++        GString *form;
++        GList *l;
++        GString *commands;
++        g_autofree gchar *uuid = g_uuid_string_random ();
++
++        commands = g_string_new ("");
++        if (exporter->delete_items)
++                g_string_append_printf (commands, "[{\"type\": \"item_delete\", \"uuid\": \"%s\", \"args\": {\"ids\": [", uuid);
++        else
++                g_string_append_printf (commands, "[{\"type\": \"item_complete\", \"uuid\": \"%s\", \"args\": {\"ids\": [", uuid);
++
++        for (l = items; l != NULL; l = l->next) {
++                JsonObject *object;
++                double id;
++                glong item_id;
++
++                object = json_node_get_object (l->data);
++                id = json_object_get_double_member (object, "id");
++                item_id = (glong) id;
++                g_string_append_printf (commands, "%ld,", item_id);
++        }
++        commands = g_string_truncate (commands, commands->len - 1);
++        g_string_append_printf (commands, "]}}]");
+ 
+-	if (!exporter->sync_token)
+-		rest_proxy_call_add_param (call, "sync_token", "\'*\'");
+-	else
+-		rest_proxy_call_add_param (call, "sync_token", exporter->sync_token);
++        form = g_string_new ("");
++        form_add_param (form, "token", exporter->access_token);
++        form_add_param (form, "sync_token",
++                        exporter->sync_token ? exporter->sync_token : "'*'");
++        form_add_param (form, "commands", commands->str);
+ 
+-	rest_proxy_call_add_param (call, "commands", commands->str);
++        msg = form_post_message (TODOIST_URL, form);
++        soup_session_queue_message (get_soup_session (), msg,
++                                    remove_items_callback, exporter);
+ 
+-	if (!rest_proxy_call_async (call, (RestProxyCallAsyncCallback) remove_items_callback,
+-				    NULL, exporter, &error))
+-	{
+-	    g_warning ("Couldn't execute RestProxyCall");
+-	    goto out;
+-	}
+-	out:
+-	  g_object_unref (proxy);
+-	  g_object_unref (call);
++        g_string_free (commands, TRUE);
+ }
+ 
+ static void
+-get_project_data_callback (RestProxyCall *call,
+-			   GError *error,
+-			   GObject *obj,
+-			   GrShoppingListExporter *exporter)
++get_project_data_callback (SoupSession *session,
++                           SoupMessage *msg,
++                           gpointer     user_data)
+ {
+-	JsonObject *object = NULL;
+-	JsonParser *parser = NULL;
+-	GError *parse_error;
+-	const gchar *payload;
+-	guint status_code;
+-	gsize payload_length;
+-
+-	JsonArray *json_items;
+-	GList *items;
+-
+-	status_code = rest_proxy_call_get_status_code (call);
+-
+-	if (status_code != 200) {
+-		g_warning ("status code %d", status_code);
+-		goto out;
+-	}
++        GrShoppingListExporter *exporter = user_data;
++        JsonObject *object = NULL;
++        JsonParser *parser = NULL;
++        GError *parse_error = NULL;
++        const gchar *payload;
++        gsize payload_length;
++        JsonArray *json_items;
++        GList *items;
++
++        if (msg->status_code != 200) {
++                g_warning ("status code %d", msg->status_code);
++                return;
++        }
+ 
+-	parser = json_parser_new ();
+-	payload = rest_proxy_call_get_payload (call);
+-	payload_length = rest_proxy_call_get_payload_length (call);
+-	if (!json_parser_load_from_data (parser, payload, payload_length, &parse_error)) {
+-		g_clear_error (&parse_error);
+-		g_warning ("Couldn't load payload");
+-		goto out;
+-	}
++        parser = json_parser_new ();
++        payload = msg->response_body->data;
++        payload_length = msg->response_body->length;
++        if (!json_parser_load_from_data (parser, payload, payload_length, &parse_error)) {
++                g_clear_error (&parse_error);
++                g_warning ("Couldn't load payload");
++                goto out;
++        }
+ 
+-	object = json_node_dup_object (json_parser_get_root (parser));
++        object = json_node_dup_object (json_parser_get_root (parser));
+ 
+-	if (!object) {
+-		g_warning ("No Data found");
+-		goto out;
+-	}
++        if (!object) {
++                g_warning ("No Data found");
++                goto out;
++        }
+ 
+-	json_items = json_object_get_array_member (object, "items");
+-	items = json_array_get_elements (json_items);
+-	if (items)
+-	{
+-		remove_items (exporter, items);
+-	}
+-	out:
+-	  if (parser)
+-		g_object_unref (parser);
+-	  if (object)
+-		json_object_unref (object);
++        json_items = json_object_get_array_member (object, "items");
++        items = json_array_get_elements (json_items);
++        if (items)
++        {
++                remove_items (exporter, items);
++        }
++        out:
++          if (parser)
++                g_object_unref (parser);
++          if (object)
++                json_object_unref (object);
+ }
+ 
+ static void
+ get_project_data (GrShoppingListExporter *exporter)
+ {
+-	RestProxy *proxy;
+-	RestProxyCall *call;
+-	GError *error;
+-	const gchar *id;
+-	id = g_strdup_printf ("%ld", exporter->project_id);
+-
+-	proxy = rest_proxy_new ("https://todoist.com/api/v7/projects/get_data", FALSE);
+-	call = rest_proxy_new_call (proxy);
+-	rest_proxy_call_set_method (call, "POST");
+-	rest_proxy_call_add_header (call, "content-type", "application/x-www-form-urlencoded");
+-	rest_proxy_call_add_param (call, "token", exporter->access_token);
+-	rest_proxy_call_add_param (call, "project_id", id);
+-
+-	if (!rest_proxy_call_async (call, (RestProxyCallAsyncCallback) get_project_data_callback,
+-				    NULL, exporter, &error))
+-	{
+-		g_warning ("Couldn't execute RestProxyCall");
+-		goto out;
+-	}
++        SoupMessage *msg;
++        GString *form;
++        g_autofree gchar *id = NULL;
+ 
+-	out:
+-	  g_object_unref (proxy);
+-	  g_object_unref (call);
++        id = g_strdup_printf ("%ld", exporter->project_id);
++
++        form = g_string_new ("");
++        form_add_param (form, "token", exporter->access_token);
++        form_add_param (form, "project_id", id);
++
++        msg = form_post_message ("https://todoist.com/api/v7/projects/get_data", form);
++        soup_session_queue_message (get_soup_session (), msg,
++                                    get_project_data_callback, exporter);
+ }
+ 
+ static void
+@@ -286,108 +294,95 @@ close_dialog (GrShoppingListExporter *exporter)
+ }
+ 
+ static void
+-export_shopping_list_callback (RestProxyCall *call,
+-			       GError *error,
+-			       GObject *obj,
+-			       GrShoppingListExporter *exporter)
++export_shopping_list_callback (SoupSession *session,
++                               SoupMessage *msg,
++                               gpointer     user_data)
+ {
+-	JsonObject *object;
+-	JsonParser *parser;
+-	GError *parse_error;
+-	const gchar *payload;
+-	guint status_code;
+-	gsize payload_length;
+-	const gchar *sync_token;
+-
+-	parse_error = NULL;
+-	status_code = rest_proxy_call_get_status_code (call);
+-	parser = json_parser_new ();
+-
+-	if (status_code != 200) {
+-		g_warning ("Couldn't export shopping list");
+-		goto out;
+-	}
++        GrShoppingListExporter *exporter = user_data;
++        JsonObject *object;
++        JsonParser *parser;
++        GError *parse_error = NULL;
++        const gchar *payload;
++        gsize payload_length;
++        const gchar *sync_token;
+ 
+-	payload = rest_proxy_call_get_payload (call);
+-	payload_length = rest_proxy_call_get_payload_length (call);
++        parser = json_parser_new ();
+ 
+-	if (!json_parser_load_from_data (parser, payload, payload_length, &parse_error)) {
+-		g_clear_error (&parse_error);
+-		goto out;
+-	}
++        if (msg->status_code != 200) {
++                g_warning ("Couldn't export shopping list");
++                goto out;
++        }
+ 
+-	object = json_node_dup_object (json_parser_get_root (parser));
++        payload = msg->response_body->data;
++        payload_length = msg->response_body->length;
+ 
+-	if (!object) {
+-		g_warning ("Export returned empty json");
+-		goto out;
+-	}
+-	sync_token = json_object_get_string_member (object, "sync_token");
+-	exporter->sync_token = sync_token;
++        if (!json_parser_load_from_data (parser, payload, payload_length, &parse_error)) {
++                g_clear_error (&parse_error);
++                goto out;
++        }
+ 
+-	out:
+-	  g_object_unref (parser);
+-	  if (exporter->dialog)
+-		close_dialog (exporter);
+-	  gr_window_confirm_shopping_exported (GR_WINDOW (exporter->window));
++        object = json_node_dup_object (json_parser_get_root (parser));
++
++        if (!object) {
++                g_warning ("Export returned empty json");
++                goto out;
++        }
++        /* Keep the object referenced: exporter->sync_token points into it
++         * and is read by the follow-up sync requests. */
++        sync_token = json_object_get_string_member (object, "sync_token");
++        exporter->sync_token = sync_token;
++
++        out:
++          g_object_unref (parser);
++          if (exporter->dialog)
++                close_dialog (exporter);
++          gr_window_confirm_shopping_exported (GR_WINDOW (exporter->window));
+ }
+ 
+ static void
+ export_shopping_list_to_todoist (GrShoppingListExporter *exporter)
+ {
+-	RestProxy *proxy;
+-	RestProxyCall *call;
+-	GError *error;
+-
+-	GList *list;
+-	GString *commands;
+-	commands = g_string_new ("");
+-	error = NULL;
+-	GString *commands_arg;
+-
+-	if (exporter->ingredients) {
+-		for (list = exporter->ingredients; list != NULL; list = list->next) {
+-			GString *s;
+-
+-			ShoppingListItem *item = list->data;
+-			s = g_string_new ("");
+-			g_string_append_printf (s, "%s %s", item->amount, item->name);
+-			g_autofree gchar *uuid = g_uuid_string_random ();
+-			g_autofree gchar *temp_id = g_uuid_string_random ();
+-
+-			g_string_append_printf (commands, "{\"type\": \"item_add\", \"temp_id\":\"%s\", \"uuid\":\"%s\", "
+-			                             "\"args\":{\"content\":\"%s\",\"project_id\":%ld}},",
+-			                             temp_id, uuid, s->str, exporter->project_id);
+-		}
+-	}
+-
+-	commands = g_string_truncate (commands, commands->len-1);
+-	commands_arg = g_string_new ("[");
+-	g_string_append_printf (commands_arg, "%s]", commands->str);
+-
+-	proxy = rest_proxy_new (TODOIST_URL, FALSE);
+-	call = rest_proxy_new_call (proxy);
+-	rest_proxy_call_set_method (call, "POST");
+-	rest_proxy_call_add_header (call, "content-type", "application/x-www-form-urlencoded");
+-	rest_proxy_call_add_param (call, "token", exporter->access_token);
++        SoupMessage *msg;
++        GString *form;
++
++        GList *list;
++        GString *commands;
++        GString *commands_arg;
++
++        commands = g_string_new ("");
++        if (exporter->ingredients) {
++                for (list = exporter->ingredients; list != NULL; list = list->next) {
++                        GString *s;
++
++                        ShoppingListItem *item = list->data;
++                        s = g_string_new ("");
++                        g_string_append_printf (s, "%s %s", item->amount, item->name);
++                        g_autofree gchar *uuid = g_uuid_string_random ();
++                        g_autofree gchar *temp_id = g_uuid_string_random ();
++
++                        g_string_append_printf (commands, "{\"type\": \"item_add\", \"temp_id\":\"%s\", \"uuid\":\"%s\", "
++                                                     "\"args\":{\"content\":\"%s\",\"project_id\":%ld}},",
++                                                     temp_id, uuid, s->str, exporter->project_id);
++                        g_string_free (s, TRUE);
++                }
++        }
+ 
+-	if (!exporter->sync_token)
+-		rest_proxy_call_add_param (call, "sync_token", "\'*\'");
+-	else
+-		rest_proxy_call_add_param (call, "sync_token", exporter->sync_token);
++        commands = g_string_truncate (commands, commands->len - 1);
++        commands_arg = g_string_new ("[");
++        g_string_append_printf (commands_arg, "%s]", commands->str);
+ 
+-	rest_proxy_call_add_param (call, "commands", commands_arg->str);
++        form = g_string_new ("");
++        form_add_param (form, "token", exporter->access_token);
++        form_add_param (form, "sync_token",
++                        exporter->sync_token ? exporter->sync_token : "'*'");
++        form_add_param (form, "commands", commands_arg->str);
+ 
+-	if (!rest_proxy_call_async (call, (RestProxyCallAsyncCallback) export_shopping_list_callback,
+-				    NULL, exporter, &error))
+-	{
+-	    g_warning ("Couldn't execute RestProxyCall");
+-	    goto out;
+-	}
+-	out:
+-	  g_object_unref (proxy);
+-	  g_object_unref (call);
++        msg = form_post_message (TODOIST_URL, form);
++        soup_session_queue_message (get_soup_session (), msg,
++                                    export_shopping_list_callback, exporter);
+ 
++        g_string_free (commands, TRUE);
++        g_string_free (commands_arg, TRUE);
+ }
+ 
+ static void
+@@ -467,185 +462,173 @@ static void
+ add_project_id (GrShoppingListExporter *exporter)
+ {
+ 
+-	RestProxy *proxy;
+-	RestProxyCall *call;
+-	g_autofree gchar *uuid;
+-	g_autofree gchar *temp_id;
+-	guint status_code;
+-	GError *error;
+-	gchar *list_title = _("Shopping List from Recipes");
++        SoupMessage *msg;
++        GString *form;
++        g_autofree gchar *uuid;
++        g_autofree gchar *temp_id;
++        guint status_code;
++        gchar *list_title = _("Shopping List from Recipes");
+ 
+-	JsonObject *object;
+-	JsonParser *parser;
+-	GError *parse_error;
+-	const gchar *payload;
+-	JsonArray *projects;
++        JsonObject *object;
++        JsonParser *parser = NULL;
++        GError *parse_error = NULL;
++        const gchar *payload;
++        JsonArray *projects;
+ 
+-	gsize payload_length;
+-	const gchar *sync_token;
+-	g_autoptr (GList) lists = NULL;
+-	GList *l;
+-	GString *project_add_commands;
+-
+-	project_add_commands = g_string_new ("");
+-	uuid = g_uuid_string_random ();
+-	temp_id = g_uuid_string_random ();
+-	proxy = rest_proxy_new (TODOIST_URL, FALSE);
+-	call = rest_proxy_new_call (proxy);
+-	rest_proxy_call_set_method (call, "POST");
+-	rest_proxy_call_add_header (call, "content-type", "application/x-www-form-urlencoded");
+-	rest_proxy_call_add_param (call, "token", exporter->access_token);
+-	rest_proxy_call_add_param (call, "resource_types", "[\"projects\"]" );
+-
+-	if (!exporter->sync_token)
+-		rest_proxy_call_add_param (call, "sync_token", "\'*\'");
+-	else
+-		rest_proxy_call_add_param (call, "sync_token", exporter->sync_token);
+-	g_string_append_printf (project_add_commands, "[{\"type\": \"project_add\", \"temp_id\":\"%s\", \"uuid\":\"%s\", "
+-				"\"args\":{\"name\":\"%s\"}}]", temp_id, uuid , list_title);
+-
+-	rest_proxy_call_add_param (call, "commands", project_add_commands->str);
+-
+-	if (!rest_proxy_call_sync (call, &error)) {
+-		g_clear_error (&error);
+-		goto out;
+-	}
++        gsize payload_length;
++        const gchar *sync_token;
++        g_autoptr (GList) lists = NULL;
++        GList *l;
++        GString *project_add_commands;
+ 
+-	status_code = rest_proxy_call_get_status_code (call);
++        project_add_commands = g_string_new ("");
++        uuid = g_uuid_string_random ();
++        temp_id = g_uuid_string_random ();
+ 
+-	if (status_code != 200) {
+-		g_warning ("status code %d", status_code);
+-		goto out;
+-	}
++        form = g_string_new ("");
++        form_add_param (form, "token", exporter->access_token);
++        form_add_param (form, "resource_types", "[\"projects\"]");
++        form_add_param (form, "sync_token",
++                        exporter->sync_token ? exporter->sync_token : "'*'");
+ 
+-	parser = json_parser_new ();
+-	payload = rest_proxy_call_get_payload (call);
+-	payload_length = rest_proxy_call_get_payload_length (call);
+-	if (!json_parser_load_from_data (parser, payload, payload_length, &parse_error)) {
+-		g_clear_error (&parse_error);
+-		g_warning ("Couldn't load payload");
+-		goto out;
+-	}
++        g_string_append_printf (project_add_commands, "[{\"type\": \"project_add\", \"temp_id\":\"%s\", \"uuid\":\"%s\", "
++                                "\"args\":{\"name\":\"%s\"}}]", temp_id, uuid , list_title);
+ 
+-	object = json_node_dup_object (json_parser_get_root (parser));
++        form_add_param (form, "commands", project_add_commands->str);
++        g_string_free (project_add_commands, TRUE);
+ 
+-	if (!object) {
+-		g_warning ("No Data found");
+-		goto out;
+-	}
++        msg = form_post_message (TODOIST_URL, form);
++        soup_session_send_message (get_soup_session (), msg);
+ 
+-	projects = json_object_get_array_member (object, "projects");
+-	lists = json_array_get_elements (projects);
+-	sync_token = json_object_get_string_member (object, "sync_token");
+-	exporter->sync_token = sync_token;
++        status_code = msg->status_code;
+ 
+-	for (l = lists; l != NULL; l = l->next) {
+-		JsonObject *object;
+-		const gchar *name;
+-		double id;
++        if (status_code != 200) {
++                g_warning ("status code %d", status_code);
++                goto out;
++        }
+ 
+-		object = json_node_get_object (l->data);
+-		name = json_object_get_string_member (object, "name");
++        parser = json_parser_new ();
++        payload = msg->response_body->data;
++        payload_length = msg->response_body->length;
++        if (!json_parser_load_from_data (parser, payload, payload_length, &parse_error)) {
++                g_clear_error (&parse_error);
++                g_warning ("Couldn't load payload");
++                goto out;
++        }
+ 
+-		if (strcmp (name, list_title) == 0) {
+-			id = json_object_get_double_member (object, "id");
+-			exporter->project_id = (glong) id;
+-		}
+-	}
+-	out:
+-	  g_object_unref (proxy);
+-	  g_object_unref (call);
++        object = json_node_dup_object (json_parser_get_root (parser));
++
++        if (!object) {
++                g_warning ("No Data found");
++                goto out;
++        }
++
++        projects = json_object_get_array_member (object, "projects");
++        lists = json_array_get_elements (projects);
++        /* Keep the object referenced: exporter->sync_token points into it
++         * and is read by the follow-up sync requests. */
++        sync_token = json_object_get_string_member (object, "sync_token");
++        exporter->sync_token = sync_token;
++
++        for (l = lists; l != NULL; l = l->next) {
++                JsonObject *object;
++                const gchar *name;
++                double id;
++
++                object = json_node_get_object (l->data);
++                name = json_object_get_string_member (object, "name");
++
++                if (strcmp (name, list_title) == 0) {
++                        id = json_object_get_double_member (object, "id");
++                        exporter->project_id = (glong) id;
++                }
++        }
++        out:
++          g_object_unref (msg);
++          if (parser)
++                g_object_unref (parser);
+ }
+ 
+ static gboolean
+ get_project_id (GrShoppingListExporter *exporter)
+ {
+-	RestProxy *proxy;
+-	RestProxyCall *call;
+-	GError *error;
+-	gchar *list_title = _("Shopping List from Recipes");
+-
+-	JsonObject *object;
+-	g_autoptr (JsonParser) parser = NULL;
+-	GError *parse_error;
+-	const gchar *payload;
+-	guint status_code;
+-	gsize payload_length;
+-	const gchar *sync_token;
+-	g_autoptr (GList) lists = NULL;
+-	GList *l;
+-	JsonArray *projects;
+-
+-
+-	proxy = rest_proxy_new (TODOIST_URL, FALSE);
+-	call = rest_proxy_new_call (proxy);
+-	rest_proxy_call_set_method (call, "POST");
+-	rest_proxy_call_add_header (call, "content-type", "application/x-www-form-urlencoded");
+-	rest_proxy_call_add_param (call, "token", exporter->access_token);
+-
+-	if (!exporter->sync_token)
+-		rest_proxy_call_add_param (call, "sync_token", "\'*\'");
+-	else
+-		rest_proxy_call_add_param (call, "sync_token", exporter->sync_token);
++        SoupMessage *msg;
++        GString *form;
++        gchar *list_title = _("Shopping List from Recipes");
++
++        JsonObject *object;
++        g_autoptr (JsonParser) parser = NULL;
++        GError *parse_error = NULL;
++        const gchar *payload;
++        guint status_code;
++        gsize payload_length;
++        const gchar *sync_token;
++        g_autoptr (GList) lists = NULL;
++        GList *l;
++        JsonArray *projects;
+ 
+-	rest_proxy_call_add_param (call, "resource_types", "[\"projects\"]");
+ 
+-	if (!rest_proxy_call_sync (call, &error)) {
+-		g_clear_error (&error);
+-		goto out;
+-	}
++        form = g_string_new ("");
++        form_add_param (form, "token", exporter->access_token);
++        form_add_param (form, "sync_token",
++                        exporter->sync_token ? exporter->sync_token : "'*'");
++        form_add_param (form, "resource_types", "[\"projects\"]");
+ 
+-	parse_error = NULL;
+-	parser = json_parser_new ();
+-	status_code = rest_proxy_call_get_status_code (call);
++        msg = form_post_message (TODOIST_URL, form);
++        soup_session_send_message (get_soup_session (), msg);
+ 
+-	if (status_code != 200) {
+-		g_warning ("Couldn't export shopping list");
+-		goto out;
+-	}
++        parse_error = NULL;
++        parser = json_parser_new ();
++        status_code = msg->status_code;
+ 
+-	payload = rest_proxy_call_get_payload (call);
+-	payload_length = rest_proxy_call_get_payload_length (call);
++        if (status_code != 200) {
++                g_warning ("Couldn't export shopping list");
++                goto out;
++        }
+ 
+-	if (!json_parser_load_from_data (parser, payload, payload_length, &parse_error)) {
+-		g_clear_error (&parse_error);
+-		goto out;
+-	}
++        payload = msg->response_body->data;
++        payload_length = msg->response_body->length;
+ 
+-	object = json_node_dup_object (json_parser_get_root (parser));
+-	if (!object) {
+-		g_warning ("No Data found");
+-		goto out;
+-	}
++        if (!json_parser_load_from_data (parser, payload, payload_length, &parse_error)) {
++                g_clear_error (&parse_error);
++                goto out;
++        }
+ 
+-	projects = json_object_get_array_member (object, "projects");
+-	lists = json_array_get_elements (projects);
++        object = json_node_dup_object (json_parser_get_root (parser));
++        if (!object) {
++                g_warning ("No Data found");
++                goto out;
++        }
+ 
+-	for (l = lists; l != NULL; l = l->next) {
+-		JsonObject *object;
+-		const gchar *name;
+-		double id;
++        projects = json_object_get_array_member (object, "projects");
++        lists = json_array_get_elements (projects);
+ 
+-		object = json_node_get_object (l->data);
+-		name = json_object_get_string_member (object, "name");
++        for (l = lists; l != NULL; l = l->next) {
++                JsonObject *object;
++                const gchar *name;
++                double id;
+ 
+-		if (strcmp (name, list_title) == 0) {
+-			id = json_object_get_double_member (object, "id");
+-			exporter->project_id = (glong) id;
+-			break;
+-		}
+-	}
++                object = json_node_get_object (l->data);
++                name = json_object_get_string_member (object, "name");
+ 
+-	sync_token = json_object_get_string_member (object, "sync_token");
+-	exporter->sync_token = sync_token;
++                if (strcmp (name, list_title) == 0) {
++                        id = json_object_get_double_member (object, "id");
++                        exporter->project_id = (glong) id;
++                        break;
++                }
++        }
+ 
+-	out:
+-	  g_object_unref (proxy);
+-	  g_object_unref (call);
+-	  if (exporter->project_id)
+-		return TRUE;
+-	  else
+-		return FALSE;
++        /* Keep the object referenced: exporter->sync_token points into it
++         * and is read by the follow-up sync requests. */
++        sync_token = json_object_get_string_member (object, "sync_token");
++        exporter->sync_token = sync_token;
++
++        out:
++          g_object_unref (msg);
++          if (exporter->project_id)
++                return TRUE;
++          else
++                return FALSE;
+ }
+ 
+ static void

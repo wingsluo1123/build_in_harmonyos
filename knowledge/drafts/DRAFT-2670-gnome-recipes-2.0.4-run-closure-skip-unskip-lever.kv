@@ -1,0 +1,23 @@
+id: DRAFT-2670-gnome-recipes-2.0.4-run-closure-skip-unskip-lever
+# 与已有条目关系: E669（lnav 0.13.2）覆盖主干（显式 requires → Skip 转 Cache →
+#   test() 枚举注入）；本条增量 = conan 2.29.1 实测：仅配方 package_info 访问
+#   依赖 package_folder 不足以 un-skip（兜底通道只在已入闭包时落实），且被 skip
+#   时 package_folder=None 使守卫型写法静默失效；给出两通道并用落地代码。
+title: conan 2 运行闭包跳过传递共享库：Skip 判定与 un-skip 的唯一实测杠杆（test_package 显式 requires；配方 package_info 访问不足）
+category: ohos, conan, runtime, runenv, closure, musl, loader
+build_system: meson
+phase: test_package|runtime
+match_keywords: Skipped binaries, Error relocating, symbol not found, rc=127, package_folder None, runenv_info, LD_LIBRARY_PATH, VirtualRunEnv, transitive_libs, test_package requires, libarchive.so.13, app consumer, run closure
+error_signature: "Error relocating .*: .*: symbol not found|Skipped binaries.*libarchive"
+error_excerpt: "应用消费者 test_package 真跑二进制：Error relocating .../bin/gnome-recipes: archive_write_add_filter_gzip: symbol not found → ConanException: Error 127。图中 libarchive/3.8.7 在 Requirements 却仍在 Skipped binaries；conanrunenv-release-armv8.sh 无其 libdir（grep -c libara = 0）。"
+affected_scope: 任何 conan 2 消费者图：应用/工具配方（或 test_package）的二进制 DT_NEEDED 指向传递依赖的共享库，而该依赖对消费者不贡献 libs/runenv → 被 Skipped binaries → 不进依赖表、VirtualRunEnv 不生成其 libdir。设备系统库存在同名减配版时，加载器静默回落并在启动时 relocate 失败（退出码 127）。
+root_cause: "conan 2.29.1 实测：(1) 被 skip 的包 package_folder 为 None——配方 package_info() 里 `if dep.package_folder:` 守卫型 runenv 发布静默失效（不报错不警告）；(2) 仅在被依赖方 package_info 里访问 package_folder 不足以把 Skip 转 Cache：gnome-recipes 测试图中 package_info 确实执行（无条件 PATH 前置落在 conanrunenv export PATH 行、被测包目录出现 2 次、profile os=OHOS），libarchive 仍留在 Skipped binaries、conanrunenv 无其目录；(3) 唯一实测杠杆 = 图根侧消费者显式 requires（test_package.requirements 直接 self.requires('libarchive/3.8.7')，与配方同版去重无冲突）→ Skip 转 Cache、package_folder 可用、装进依赖表。修法顺序：先入闭包，再注入环境。"
+rec_approach: 在 test_package 的 requirements() 显式声明运行期 .so 直依赖（与配方同版本），并在 test() 侧枚举 self.dependencies.host 逐包目录（lib/lib64）注入 LD_LIBRARY_PATH——不能只读 cpp_info（组件化包 root libdirs 可能为空）。经脚本第三参数传入，脚本内前置。配方侧 package_info() 的 runenv 发布保留为真实消费者通道（入闭包后生效），但不能替代 un-skip。
+solution: "gnome-recipes 2.0.4 落地：test_package/conanfile.py requirements() += self.requires('libarchive/3.8.7')；test() 枚举依赖 host 包目录按 lib/lib64 生成冒号连接串，作为第 3 参数传给 test_gnome_recipes.sh（脚本内 LD_LIBRARY_PATH=\"$3:$LD_LIBRARY_PATH\" 前置）。结果：libarchive/3.8.7 - Cache、Already installed! (17 of 34)；conanrunenv 出现其 libdir；RUN 行 LD 注入含 .../p/libara07f23a76465c/p/lib；gnome-recipes package smoke test: OK（rc=0）。反例（仅配方侧直依赖+守卫型 runenv 发布）：仍 Skipped、rc=127。"
+fallback: 若无法改 test_package（黑盒消费），只能如实记录该图缺闭包；不要用指向设备系统库或 patchelf 改写 DT_NEEDED 的方式消错误（E669 禁止项同族）。
+prescan_pattern: "Skipped binaries|Error relocating|symbol not found.*rc=127"
+verify_builds: "gnome-recipes 2.0.4（task 2670，2026-10-14，conan 2.29.1）：反例 rc=127 → 正例 rc=0、smoke OK、libarchive Skip 转 Cache 且装包。真机 conan-verify 八门禁结果见主配方 notes.md。"
+doc_file: knowledge/drafts/DRAFT-2670-gnome-recipes-2.0.4-run-closure-skip-unskip-lever.md
+draft: true
+severity: 2
+last_updated: 2026-10-14
