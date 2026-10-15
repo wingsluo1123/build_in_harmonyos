@@ -1,0 +1,29 @@
+#====================================================================
+# Draft: 纯 Makefile（无 configure）项目跑 14 步驱动时 Step5「安装无产物」：
+#        上游默认 prefix 与驱动 staging_prefix 不一致 + install(1) 不在 PATH
+#====================================================================
+
+id:                     DRAFT-DTE-191-RAW-MAKEFILE-DRIVER-DESTDIR-PREFIX
+trigger_tool:           ohc|make|sh
+phase:                  installation|packaging
+error_signature:        安装无产物.*staging|No rule to make target 'install-binPROGRAMS'|make: install: No such file or directory|Error 127|staging_prefix
+
+severity:               2
+category:               build-system|packaging|ohos-platform
+match_keywords:         raw makefile, GNUmakefile, 无 configure, prefix, DESTDIR, staging, 安装无产物, install(1), Error 127, _find_tool, DEFAULT_PREFIX, 14 步驱动, Step5, make install
+
+title:                  纯 Makefile（无 configure）项目在 14 步驱动 Step5 必报「安装无产物」：上游 prefix ?= /usr/local 与驱动 staging_prefix=$DESTDIR/$DEFAULT_PREFIX 不一致，且 install(1) 不在 PATH —— 环境变量 prefix 注入 + PATH 垫 install shim + 配方 package() 手工 copy 三步修
+
+root_cause:             驱动的 Step5 是为 autotools 设计的：configure --prefix=$DEFAULT_PREFIX（展开成 /storage/Users/currentUser/usr/local 这样的绝对路径）把运行期前缀烧进二进制，安装时 DESTDIR+prefix 恰好落在 staging_prefix = test_prefix/<DEFAULT_PREFIX 去掉前导/>。而纯 Makefile 项目没有 configure，`make install` 用上游自带的 `prefix ?= /usr/local` ⇒ 产物落在 $DESTDIR/usr/local/bin，驱动检查的却是 $DESTDIR/<HOME>/usr/local/bin，于是 bin=0 lib=0 → 「❌ 安装无产物」→ RuntimeError。第二层：GNUmakefile 的 `$(INSTALL) -d …` 需要 install(1)，但本平台 PATH 不含 /bin（toybox 的 install 只在 /bin/install），驱动 _find_tool 依次查 ~/usr/local/bin/install、test_prefix/bin/install、`which install` 全落空后返回裸名 "install" ⇒ `make: install: No such file or directory` + `GNUmakefile:NN: install Error 127`；两层叠加时第一层 fallback（install-binPROGRAMS）也会先打出 `No rule to make target` 的干扰信息。
+affected_scope:         所有上游只带 GNUmakefile/Makefile、没有 configure 脚本、且 install 目标按 $(prefix) 展开路径的包（dte 1.9.1 实证；bearssl/fbida/suckless 系等同族）；以及所有在本平台跑 `ohc-run.py build` 的 raw-makefile 任务。CI 侧的 conan create 不受影响（配方自己决定 package()），但配方若照抄 `make install` 会在 CI worker 上踩同一颗 install(1) 雷。
+verification_cmd:       sh 经验文档/tools/build-slot.sh --kind short --mem 2500 -- make -C ~/builds/dte-1.9.1.work install DESTDIR=$HOME/test-install-dte-1.9.1 INSTALL=$(which install) prefix=$HOME/usr/local && ls $HOME/test-install-dte-1.9.1$HOME/usr/local/bin/dte
+rec_priority:           1
+rec_approach:           env-prefix-injection-plus-install-shim-plus-manual-package-copy
+rec_description:        (1) 起驱动前 `export prefix=$DEFAULT_PREFIX`：GNU make 对来自环境的变量视为「已定义」，上游的 `prefix ?= /usr/local` 不再覆盖 ⇒ DESTDIR+prefix 与驱动 staging_prefix 对齐，Step5 立刻 bin=1；(2) PATH 最前置一个任务级 shim 目录并 `ln -s /bin/install <shim>/install`，让 _find_tool 的 `which install` 命中（⛔ 不要动 ~/usr/local/bin —— 那是基础设施区）；(3) 配方 package() 不要依赖 install(1)：CI worker 与本机同样没有它，直接 copy 构建产物到 bin/ 与 share/man/ 并 chmod 0755（本 PR 的 conanfile 即此写法），这样 L2 冒烟与 L1e 破坏性反向验证都能过；(4) 同时显式传 CC（裸 make 的 CC 解析成 make 内建 cc，本机无 cc —— 该坑已有 M18/E 族条目，此处只做引用）。
+rec_command:            export prefix=$DEFAULT_PREFIX; export PATH=$HOME/tmp/uc2/<task>/bin:$PATH; python3 scripts/ohc-run.py build <pkg> <ver>
+rec_auto_fix:           false
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+# PR 交付后回填
+source_pr:
+source_commit:
