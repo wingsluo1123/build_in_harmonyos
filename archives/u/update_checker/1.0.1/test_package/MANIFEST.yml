@@ -1,0 +1,43 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: update_checker/1.0.1
+homepage: "https://github.com/bboe/update_checker"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "python3 -m pytest tests/ -q（测试取自 conandata.test_assets 的仓库归档；被测源码取该归档 src，见下）"
+
+upstream_tests:
+  - name: "tests/test_update_checker.py（取自 tag v1.0.1 仓库归档；官方 sdist 不含测试）"
+    count: "43 passed"
+    description: >-
+      **官方 sdist 不含测试**（只打 `src/update_checker`），测试只在上游仓库的
+      `tests/test_update_checker.py`（用 mock 替换网络 → 纯离线可跑）→ 配方在
+      `conandata.yml` 的 `test_assets` 里钉死 tag v1.0.1 的仓库归档（sha256 固定，**不进产物**）。
+      测试期依赖：`aiohttp`（**仓库已有归档** `archives/a/aiohttp/3.14.3` → `self.test_requires`；
+      上游测试 import aiohttp）+ `pytest`、`pytest-asyncio`（仓库无归档 → pip 装到
+      `<build>/test-deps`，**不进产物**）。
+      ⚠️ **被测源码取自仓库归档 v1.0.1 的 `src/`（与 sdist 同版本同源码）**：官方 sdist 的成员
+      时间戳被归一化到 **epoch（mtime = 0）**，而上游
+      `test_import__without_package_metadata` 用 `zipfile.write()` 按**源文件 mtime** 造 zip →
+      `ValueError: ZIP does not support timestamps before 1980`（git 检出下该用例通过）。
+      实测两口径：sdist 源码 42 passed / 1 failed（该时间戳用例）；仓库归档同版本源码 **43 passed**。
+      **包产物本身仍由 sdist 源码树打包**；本差异已在 manifest.yaml 与 notes.md 如实披露。
+
+test_package_tests:
+  - file: check_update_checker.py
+    description: >-
+      R34 消费者校验（全部离线、不触网）：①产物齐备（`update_checker/`）②模块文件齐备
+      （`__init__.py`/`core.py`/`py.typed`）③真实 `import update_checker`（零运行期依赖）
+      ④公开符号面（上游 `__all__` 的 12 个导出全部可访问）⑤真实离线 API：`parse_version()`
+      归一化（'1.2.3' → ('00000001','00000002','00000003','*final')；'1.0.0b1' 同形）
+      ⑥真实离线 API：`pretty_date()`（now-2d → '2 days ago'、now-1h → '1 hour ago'）
+      ⑦真实离线 API：`standard_release('1.0.0') is True` + `UpdateChecker(bypass_cache=True)` 构造
+      ⑧`__version__`（上游 core.py 兜底为 'unknown'；本适配只装模块不建 dist-info，如实报告不臆造）
+      ⑨证据（模块总字节 + python 版本）。注：其联网能力（`query_pypi`/`update_check`）需真实
+      外网与缓存目录，消费者校验只做离线可实证部分。
+    command: "python3 check_update_checker.py <package-folder>"
+
+assertion_count: 9
