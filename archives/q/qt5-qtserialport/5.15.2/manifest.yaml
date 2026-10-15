@@ -1,0 +1,90 @@
+# 版本级 manifest
+# 文件位置: archives/q/qt5-qtserialport/5.15.2/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "5.15.2"
+
+# 软件名
+software: "qt5-qtserialport"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-06"
+build_system: qmake
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（官方单条 URL，R39）
+  url: "https://download.qt.io/archive/qt/5.15/5.15.2/submodules/qtserialport-everywhere-src-5.15.2.tar.xz"
+
+  # 源码校验和（官方源+清华镜像双源实测一致）
+  sha256: "59c559d748417306bc1b2cf2315c1e63eed011ace38ad92946af71f23e2ef79d"
+
+  # 压缩格式
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  system: qmake
+
+  # 配置选项列表
+  configure_options:
+  - "-spec linux-clang"
+  - "QMAKE_STRIP="
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+  - "qt5-qtbase/5.15.2.2"
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+- "qmake 构建 Qt5 模块沿用 qtserialport-opensource-src/5.15.15 模式：_fix_qtbase_paths 重写 qtbase 包内 qt.conf 与 mkspecs/{modules,modules-inst}/*.pri 的悬空构建机路径"
+- "QMAKEMODULES 指向构建树 mkspecs/modules，让 tests/auto 的 qmake 能解析刚构建的 serialport 模块"
+- "QMAKE_STRIP=\"\": OHOS loader 拒绝被 strip 的 ELF"
+- "package() 阶段对产物 ELF 执行 binary-sign-tool 自签名（对齐 qt5-qtbase/5.15.2.2 制品 .codesign 段与 qtserialport/6.11.1 先例）"
+- "test_package OHOS 下强制 CMAKE_SYSTEM_NAME=Linux + CMAKE_SYSTEM_PROCESSOR=aarch64 双覆盖（OHOS 适配版 conan 默认生成 HarmonyOS/unknown）"
+- "上游测试 tst_qserialport/tst_qserialportinfo 需 QTEST_SERIALPORT_SENDER/RECEIVER 物理串口对，无硬件时 initTestCase QSKIP（QtTest 退出码 0），真实失败可阻断构建"
+
+# ============================================================
+# 测试结果
+# ============================================================
+
+test_results:
+  upstream:
+    total: 2
+    command: "./tests/auto/qserialport/tst_qserialport && ./tests/auto/qserialportinfo/tst_qserialportinfo"
+    status: built
+  added:
+    total: 5
+    status: built
+
+dependency_for: []
