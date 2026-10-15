@@ -1,0 +1,56 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（R51 三步法：清点 → 实跑 → 如实回填）
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: libretro/20260530.083400.g8926b0c6c347
+homepage: "https://github.com/libretro/yabause"
+
+# 上游测试入口（R51 清点结论）：
+#   - libretro 端口自身（yabause/src/libretro/Makefile）：无 check/test 目标
+#     （目标仅 all/clean/generate-files/generate-files-clean）
+#   - vendored libretro-common（yabause/src/libretro/libretro-common/Makefile.test）：
+#     5 个单元测试程序，需 libcheck（Check 框架）——本次已从制品仓消费
+#     libcheck/0.15.2（OHOS aarch64 预编译二进制）实跑
+#   - yabauseut/：CMAKE_SYSTEM_NAME=SegaSaturn + ExternalProject 拉取 iapetus，
+#     Saturn devkit 测试架，OHOS 环境不可构建/运行
+#   - src/runner/：lodepng 子模块不在 tarball 内（CMakeLists.txt:7-8 守卫 return()）
+#   - src/tools/{cdtest,pertest}：硬件诊断工具，需物理 CD/外设，不适用
+upstream_check_command: "make -f libretro-common/Makefile.test all（在 yabause/src/libretro/libretro-common 目录，需 libcheck）"
+upstream_test_in_build: false
+upstream_test_command: "clang <libretro-common/Makefile.test 全上游 flags（含 -fsanitize=address,undefined -ftest-coverage）> <TEST_*_SRC> -lcheck -o <TEST_*> && ./<TEST_*>"
+
+# 上游实跑结果（2026-10-12，OHOS aarch64 真机，clang 15.0.4，libcheck/0.15.2 制品仓二进制）
+# 合计：5 个测试程序 / 127 项 checks / 126 通过 / 1 失败 / 0 错误 / 0 跳过
+# 已知失败 1 项（test_word_wrap）：vendored 快照测试期望值早于上游换行行为变更，
+#   平台无关——上游 master 期望值与 OHOS 实跑输出逐字一致（详见 notes.md 证据链）
+# 另：test_crc32_file / test_sha1 初始因 OHOS /tmp 只读（tmpnam 硬编码 /tmp，E002）
+#   失败，临时文件重定向到可写目录后 100% 通过（验证期环境调整，已如实申报）
+upstream_tests:
+  - name: test_stdstring
+    command: "clang -Iinclude -I<libcheck>/include -L<libcheck>/lib -lcheck -Werror -Wdeclaration-after-statement -fsanitize=address -fsanitize=undefined -ftest-coverage -fprofile-arcs -ggdb test/string/test_stdstring.c string/stdstring.c encodings/encoding_utf.c compat/compat_strl.c -o test/string/test_stdstring && TEMP=<writable> ./test/string/test_stdstring"
+    expected: "16 checks: 15 pass, 1 fail (test_word_wrap — upstream stale expectation, platform-independent; see notes.md)"
+  - name: test_utils
+    command: "clang ... test/utils/test_utils.c utils/md5.c encodings/encoding_crc32.c streams/file_stream.c vfs/vfs_implementation.c file/file_path.c compat/compat_strl.c time/rtime.c string/stdstring.c encodings/encoding_utf.c -o test/utils/test_utils && TEMP=<writable> TMPDIR=<writable> ./test/utils/test_utils"
+    expected: "3 checks: 3 pass (after /tmp->writable redirect for tmpnam)"
+  - name: test_hash
+    command: "clang ... test/hash/test_hash.c hash/lrc_hash.c streams/file_stream.c vfs/vfs_implementation.c file/file_path.c compat/compat_strl.c time/rtime.c string/stdstring.c encodings/encoding_utf.c -o test/hash/test_hash && TEMP=<writable> TMPDIR=<writable> ./test/hash/test_hash"
+    expected: "3 checks: 3 pass (after /tmp->writable redirect for tmpnam)"
+  - name: test_linked_list
+    command: "clang ... test/lists/test_linked_list.c lists/linked_list.c -o test/lists/test_linked_list && TEMP=<writable> ./test/lists/test_linked_list"
+    expected: "89 checks: 89 pass"
+  - name: test_generic_queue
+    command: "clang ... test/queues/test_generic_queue.c queues/generic_queue.c -o test/queues/test_generic_queue && TEMP=<writable> ./test/queues/test_generic_queue"
+    expected: "16 checks: 16 pass"
+
+# test_package 自带的消费者视角测试（dlopen 核心并调用 retro_* 公开 ABI）
+test_package_tests:
+  - file: test.c
+    description: "消费者冒烟：dlopen yabause_libretro.so，调用 retro_api_version/retro_get_system_info 验证核心 ABI（library_name=Yabause，valid_extensions 含 cue/iso/chd）"
+    command: "./test_libretro <pkg>/lib/yabause_libretro.so"
+  - file: test_ohos.c
+    description: "鸿蒙专项（非断言，if+return 分支风格）：①ABI 闭包——dlsym 全部 25 个必需 retro_* 入口点；②前端接线——set_environment(最小 environ 回调)/set_video_refresh/set_audio_sample(_batch)/set_input_poll/set_input_state/set_controller_port_device；③OHOS 运行时生命周期 retro_init -> retro_get_system_info -> retro_deinit。注：未加载光盘时刻意不调 retro_get_system_av_info（上游 retro_get_region->Cs2GetIP 解引用全局 Cs2Area，仅 YabauseInit 分配，平台无关 NULL 解引用，且在前端契约之外）"
+    command: "./test_libretro-ohos <pkg>/lib/yabause_libretro.so"
+
+# 断言/检查总数：上游 127（5 个测试程序 checks 合计）+ test_package 34
+# （test.c 6 项装载/ABI 校验 + test_ohos.c 28 项符号闭包/生命周期校验）= 161
+assertion_count: 161
