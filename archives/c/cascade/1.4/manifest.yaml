@@ -1,0 +1,36 @@
+# 版本级 manifest
+# 文件位置: archives/c/cascade/1.4/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "1.4"
+software: "cascade"
+
+# published | built | failed | archived
+status: built
+
+build_date: "2026-10-04"
+build_system: "none"
+
+source:
+  url: "https://downloads.sourceforge.net/project/rfcascade/cascade/cascade-1.4/cascade-1.4.tar.gz"
+  sha256: "0bcf3e806632c1bab9b7f08fc2f15dedd37d4ede2b898f7b7e826a6fcf28ed9c"
+  tar_format: tar.gz
+
+build:
+  # sh + awk 脚本，无编译阶段；configure（autoconf 2.13）+ make cascade 仅做 sed 替换
+  system: none
+  configure_options:
+    - "AWK=awk"
+    - "--prefix=<package_folder>"
+    - "--mandir=<package_folder>/share/man"
+  dependencies: []
+  cc: ""
+  cxx: ""
+
+patches_applied:
+  - "0001-cascade-drop-gawk-strftime.patch"
+
+knowledge_gained:
+  - "上游 Makefile 的 all 目标依赖 nroff 预排版 cat1 手册页，OHOS CI 工具链无 nroff；只构建 cascade 目标并手工安装 man1 源页"
+  - "autoconf 2.13 的 AC_PROG_AWK 把构建机探测到的 awk 名（mawk/gawk/nawk/awk）写进脚本；交付脚本需显式 AWK=awk 固定解析名"
+  - "cascade.sh 里 gawk 专有的 strftime 块虽有 ARGV[0]==\"gawk\" 运行期保护，但无 strftime 的 awk 在解析阶段就报 Undefined function 'strftime' + 1 syntax error(s)，整个程序跑不起来；须从源码删除该块（OHOS CI 上 test_package 11 过 13 败）"

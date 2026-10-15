@@ -1,0 +1,63 @@
+#====================================================================
+# E654-draft-06CB — 内嵌 awk 程序里 gawk 专有函数（strftime）即使有运行期保护，也会让无该函数的 awk 在解析阶段整体失败
+#====================================================================
+
+id:                     E654
+trigger_tool:           awk|sh|conan
+phase:                  testing
+error_signature:        awk: .*Undefined function '?strftime'?|function strftime never defined|awk: [0-9]+ syntax error\(s\)|calling undefined function strftime
+
+severity:               2
+category:               portability|shell|toolchain|testing
+match_keywords:         awk, gawk, mawk, nawk, strftime, systime, gensub, Undefined function, never defined, syntax error, parse error, ARGV[0], gawk extension, embedded awk, shell script package, OHOS
+
+title:                  sh+awk 脚本包里的 gawk 专有函数调用（strftime/systime/gensub…）即便被 `if(ARGV[0]=="gawk")` 保护，在没有该函数的 awk 上解析阶段就整体报错，脚本一行都跑不起来
+
+root_cause:             awk 在执行任何语句之前先整体解析程序，函数调用在解析阶段就要解析到已定义函数或内建函数；运行期条件（`if(ARGV[0]=="gawk")`）保护不了解析。cascade 1.4 的内嵌 awk 程序末尾有 `if(ARGV[0]=="gawk"){ now = strftime(...) }`：本机 mawk 1.3.4 20250131 内置 strftime，所以本地 conan create 24/24 通过；OHOS CI 构建机上的 awk 没有 strftime，每次运行 `cascade file` 都输出 `awk: file (cmdline) line 0: Undefined function 'strftime'` 和 `awk: 1 syntax error(s)`，报告一行都出不来（CI 上 test_package 11 过 13 败）。`--version`/`--help` 在 sh 层处理、不经过 awk，所以仍然通过，容易让人误判为“包基本可用”。
+
+affected_scope:         所有内嵌或随包带 awk 程序的 sh/awk 脚本包（cascade、各类 awk 报表脚本、configure 之外的老 Unix 工具），只要程序文本里出现 gawk 扩展函数（strftime、systime、mktime、gensub、gsub 的 gawk 扩展、asort、PROCINFO 等）——无论是否有运行期保护。目标机的 awk 实现（mawk 旧版、onetrue-awk、busybox awk、toybox 环境）可能没有这些函数。
+
+prescan_pattern:         strftime\(|systime\(|gensub\(|mktime\(
+verification_cmd:       grep -nE 'strftime|systime|mktime|gensub|asorti?|PROCINFO|BEGINFILE|@include' <脚本>；再用目标环境的 awk 运行最小用例并检查 stderr 为空：`cascade examples/ex1.cas 2>err.txt; test ! -s err.txt`。本机若 awk 是 gawk/新版 mawk 则不会复现，须以远程 CI（OHOS 构建机）结果为准。
+
+rec_priority:           1
+rec_approach:           drop-gawk-only-awk-block-by-patch
+rec_description:        用 conandata 补丁把 gawk 专有函数调用的整块代码删掉（cascade 里是仅在 gawk 下多打一行时间戳，无功能损失），补丁是通用可移植性修复，不含 __OHOS__ 平台宏。test_package 对每次运行都断言 stderr 为空，这样同类解析错误不会被“退出码 0 / 部分输出”掩盖。
+rec_command:            patch(cascade.sh): 删除 `if(ARGV[0] == "gawk"){ now = strftime(...); printf(...) }` 整块
+rec_auto_fix:           false
+rec_impl:               patch-based
+
+fallback_priority:      2
+fallback_approach:      awk-user-defined-function-shim
+fallback_description:   如果该函数确有功能价值：在 awk 程序里自己定义同名替代函数（`function strftime(f){ return "" }` 之类）。注意 gawk 下用户重定义内建函数名是语法错误，所以必须同时去掉运行期分支或按 awk 实现拆成两份程序，复杂度高于直接删除。
+fallback_command:       patch(cascade.sh): 去掉 gawk 分支并按需提供自定义时间函数
+fallback_auto_fix:      false
+fallback_impl:          patch-based
+
+forbid_1_pattern:       tool_requires\(["']gawk|apt(-get)? install .*gawk|brew install gawk
+forbid_1_reason:        为一行时间戳给配方引入 gawk 依赖会扩大依赖面；且包安装后运行期用的是目标机的 awk，不是构建时的 gawk。
+forbid_1_consequence:   依赖未发布导致 PF4 拦截，或构建通过但目标机仍运行失败。
+forbid_2_pattern:       ARGV\[0\] *== *"gawk"
+forbid_2_reason:        认为“运行期判断 awk 实现”就能规避 gawk 专有函数是错的：解析阶段已经失败。
+forbid_2_consequence:   只在无该函数的 awk 上整体失败，本地用 gawk/新 mawk 验证时完全看不出。
+
+principles:             P010, P020
+causes:                 []
+caused_by:              []
+similar_to:             []
+conflicts_with:         []
+prerequisite_of:        []
+
+doc_file:               knowledge/drafts/E654-draft-06CB.md
+last_updated:           2026-10-14
+source_event:           cascade 1.4 HarmonyOS PC 适配（PR !14708 第一轮 CI：test_package 11 过 13 败）
+authors:                nyaco3 <aqjCItYW1QmEJQuF.gcw_XDpqZ8sO@noreply.gitcode.com>
+source_commit:          (commit 时回填)
+
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+
+draft: true
+contributor_id: 06CB

@@ -1,0 +1,37 @@
+package: cascade/1.4
+homepage: "https://sourceforge.net/projects/rfcascade/"
+
+# R51 步骤 1 — 上游测试清点
+# 上游 cascade-1.4.tar.gz 共 18 个文件：没有 tests/ 目录，没有 `make check`/`make test` 目标
+# （Makefile.in 只有 default/all/clean/distclean/install/uninstall/distfile），没有 ctest/pytest 注册，
+# 没有 CI 配置。唯一的回归基准是 examples/ex1.cas + examples/ex1.out（输入与期望输出各一份），
+# 由 test_package 的 test_cascade.sh 第 2 节原样比对。
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests:
+  - file: examples/ex1.cas
+    source: cascade-1.4/examples/ex1.cas
+    description: "上游示例输入，期望输出为 examples/ex1.out（README.examples：cascade ex1.cas）"
+    command: "cascade ex1.cas | diff - ex1.out"
+upstream_test_inventory:
+  release_files: 18
+  test_directories: 0
+  registered_test_cases: 0
+  reference_examples: 1
+  evidence: "tar tzf cascade-1.4.tar.gz：BUGS HISTORY INSTALL README Makefile.in cascade.1 cascade.sh cascade-mode.el configure configure.in install-sh mkinstalldirs doc/ examples/（ex1.cas ex1.gif ex1.out README.examples）；Makefile.in 无 check/test 目标"
+
+# R51 步骤 3 — 鸿蒙特有消费者测试（rule12）
+# test_package 通过 Conan 消费已安装的 cascade：用 OHOS profile 下装出的 bin/cascade（sh 脚本，
+# 构建时由 configure+sed 写入 awk 名与版本号）处理消费者自己构造的三份级联输入，
+# 并与系统 awk 独立计算的 Friis 公式结果对比。覆盖本次适配改动点：固定 AWK=awk 的解析、
+# 跳过依赖 nroff 的 install.man 后的安装布局（share/man/man1 源页、doc、examples、lisp）、
+# 目标机 awk 方言下的完整报告输出（OHOS 构建机的 awk 没有 strftime，补丁前整个程序在解析阶段即失败，
+# 此类问题会表现为 ex1 运行失败且 stderr 非空）。
+test_package_tests:
+  - file: test_cascade.sh
+    description: "消费者流程：运行安装产物，CLI 入口/退出码、上游 ex1 逐行比对、两组 Friis 级联数值校验（总噪声系数/总增益/输出载波电平）、'@' 注释与 defaults 关键字、安装布局"
+    command: "sh test_cascade.sh <package>/bin/cascade <package-folder> <work-dir>"
+
+# 25 条断言（check 调用 25 次，见 test_cascade.sh）
+assertion_count: 25
