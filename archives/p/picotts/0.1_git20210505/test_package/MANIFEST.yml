@@ -1,0 +1,63 @@
+package: "picotts/0.1_git20210505"
+homepage: "https://github.com/naggety/picotts"
+
+# ── R51 上游测试三步法 ────────────────────────────────────────────────
+# 1) 清点：上游 0 个注册用例（证据见 upstream_zero_evidence）
+# 2) 运行：无上游用例可运行；生效的是本包的消费者测试（见 test_package_tests）
+# 3) 回填：本文件的 test_case_count / assertion_count 与 PR 表格一致
+upstream_check_command: "make -j1 check"
+upstream_test_in_build: true
+upstream_tests: []
+upstream_zero_evidence: >-
+  pico/Makefile.am 只声明 lib_LTLIBRARIES=libttspico.la、bin_PROGRAMS=pico2wave 与
+  picolang_DATA，全文无 TESTS / check_PROGRAMS / check-local / XFAIL_TESTS，因此
+  automake 生成的 check 目标零注册用例；全树亦无 *test*.c、tests/*.sh 或 ctest/pytest
+  注册文件，pico/tests/ 仅有 8 个手工语料文本
+  （tests_regressions_es-ES.txt 与 xsampa_pico_man_*.txt），不构成可执行测试套件。
+  make check 因此以 rc=0 空跑（无任何用例），本包在 build() 中仍保留该调用。
+
+test_package_tests:
+  - id: "picotts-wav-consumer"
+    kind: "harmony-pc-consumer"
+    source: "picotts_wav_consumer.c"
+    command: "picotts_wav_consumer <package>/share/pico/lang <out.wav>"
+    description: >-
+      **鸿蒙 PC 消费者端到端用例（完整流程）**：文本 → libttspico 合成 →
+      落盘 16 kHz/单声道/16-bit PCM WAV → 重新读取该文件并解析 RIFF/WAVE 容器
+      （RIFF/WAVE/fmt/data 标识、audio_format=PCM、1 声道、16000 Hz、16 bit、
+      data 大小与写入 PCM 字节一致、RIFF 大小字段自洽）。产出真实制品文件，
+      任一步（合成/写盘/容器封装）失效都会失败；非纯断言用例。
+      OHOS 特有前置由 test_package/conanfile.py 完成：新编译的消费者 ELF 先经
+      binary-sign-tool 自签名，输出落在可写的 /data/storage/el2/base/cache 沙箱。
+  - id: "picotts-engine-contract"
+    kind: "library-api"
+    source: "picotts_engine_contract.c"
+    command: "picotts_engine_contract <package>/share/pico/lang"
+    description: >-
+      真实链接 libttspico 并调用其公共 API 完成一次端到端 TTS 合成：
+      pico_initialize / pico_loadResource / pico_getResourceName /
+      pico_createVoiceDefinition / pico_addResourceToVoiceDefinition /
+      pico_newEngine / pico_putTextUtf8 / pico_getData / pico_disposeEngine /
+      pico_releaseVoiceDefinition / pico_unloadResource / pico_terminate；
+      断言包内 en-US 语音资源可读、合成输出 PCM 非空且为 16-bit PCM、
+      数据格式全程稳定、字节数为偶。
+  - id: "picotts-cli-contract"
+    kind: "cli-behaviour"
+    source: "cli_test.sh"
+    command: "bash cli_test.sh <package_folder>"
+    description: >-
+      对已安装的 bin/pico2wave 做真实行为测试：readelf NEEDED 校验其确实链接
+      本包 libttspico.so.0，并用 nm 校验二进制内含 popt 符号（制品仓 popt/1.19
+      为静态包，popt 静态链入故 NEEDED 不含 libpopt）；--help 打印用法（含
+      -w/--wave、-l/--lang 与默认 en-US）；缺 --wave、未知语言、非法选项三条
+      错误路径的退出码与文案。
+
+test_counting:
+  upstream_independent_total: 0
+  integration_independent_total: 3
+  harmony_pc_consumer_tests: 1
+  shared_static_counted_once: true
+  internal_assertions_counted_as_cases: false
+
+test_case_count: 3
+assertion_count: 72

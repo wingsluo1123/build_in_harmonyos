@@ -1,0 +1,86 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "R34",
+      "file": "archives/p/picotts/0.1_git20210505/test_package/picotts_engine_contract.c",
+      "line": 120,
+      "description": "R34 核查通过：test 真实 include <picoapi.h> 并实质调用 pico_initialize/pico_loadResource/pico_getResourceName/pico_createVoiceDefinition/pico_addResourceToVoiceDefinition/pico_newEngine/pico_putTextUtf8/pico_getData/pico_disposeEngine/pico_releaseVoiceDefinition/pico_unloadResource/pico_terminate，断言 PCM 非空、为 PICO_DATA_PCM_16BIT、字节数为偶；cli_test.sh 真实执行已安装 bin/pico2wave 并校验链接。无空壳/假测试。",
+      "fix_suggestion": "无需修改；审计澄清项。"
+    },
+    {
+      "severity": "P2",
+      "rule_id": "code_style#5",
+      "file": "archives/p/picotts/0.1_git20210505/conanfile.py",
+      "line": 62,
+      "description": "url 占位符（原 url = \"\"  # CI fills this）为 code-style 第 5 条禁止的模板残留。已按审计意见修复为仓地址。",
+      "fix_suggestion": "已修复。"
+    },
+    {
+      "severity": "P2",
+      "rule_id": "R51",
+      "file": "archives/p/picotts/README.md",
+      "line": 59,
+      "description": "README/MANIFEST 曾称 readelf 校验 NEEDED 含 libttspico 与 libpopt，与实现漂移（popt 为静态包，NEEDED 不含 libpopt，cli_test.sh 改用 nm 校验符号）。已按审计意见对齐措辞。",
+      "fix_suggestion": "已修复。"
+    },
+    {
+      "severity": "P2",
+      "rule_id": "code_style#7",
+      "file": "archives/p/picotts/0.1_git20210505/test_package/cli_test.sh",
+      "line": 12,
+      "description": "脚本仅 set -u。因逐条计数断言需容忍预期非零退出码，已在注释中显式说明理由。",
+      "fix_suggestion": "已补注释说明。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R8",
+      "file": "archives/p/picotts/0.1_git20210505/patches/0001-pico-config.guess.patch",
+      "line": 163,
+      "description": "R8/PF5 例外认定（认可）：新增行 #elif defined(__OHOS__) LIBC=ohos 位于 GNU config.guess 内嵌 LIBC 探针程序内，与既有 __ANDROID__ 分支同形，仅用于识别 libc，属明文允许的『识别 libc 的探针程序』例外。提 PR 时须带说明并以 --no-preflight 显式跳过（留痕）。",
+      "fix_suggestion": "保持现状；PR 描述保留该例外说明。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "L4",
+      "file": "archives/p/picotts/0.1_git20210505/patches/0002-pico-config.sub.patch",
+      "line": 1,
+      "description": "L4 安全扫描 warn（非阻断）：两份整文件替换型补丁载荷为 GNU config.guess/config.sub 副本，含 rm/eval 等 shell 惯用构造，属已声明（patch_type=portability）的探测脚本，无注入或绕过。",
+      "fix_suggestion": "无需修改；按非阻断 warn 记录。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style#5",
+      "file": "archives/p/picotts/0.1_git20210505/manifest.yaml",
+      "line": 13,
+      "description": "版本级 manifest.yaml 原残留 {software}/{BUILD_SYSTEM} 占位符、sha256 空值与模板头。已按审计意见回填为真实内容。",
+      "fix_suggestion": "已修复。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R49",
+      "file": "archives/p/picotts/0.1_git20210505/manifest.yaml",
+      "line": 84,
+      "description": "patch_generation.source_orig_dir/source_work_dir 含主机绝对路径（refresh-patch 存量生成模式，非本 PR 独有，不影响构建）。备注：conanfile.py 无硬编码系统前缀、无裸用 ${CC}/${CFLAGS}、未注入共享前缀（R32/R33/R49 未命中）。",
+      "fix_suggestion": "后续迭代可脱敏。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R31",
+      "file": "knowledge/drafts/E429-draft-6EA4.md",
+      "line": 1,
+      "description": "草稿 md 为未填充模板（草稿本身允许未完成，KC1/KC2 仅扫 knowledge/graph/ 且已通过），.kv 已填 id/title/root_cause。",
+      "fix_suggestion": "后续可把 .kv 内容同步到 .md。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "suggestion",
+      "file": "archives/p/picotts/0.1_git20210505/test_package/MANIFEST.yml",
+      "line": 45,
+      "description": "核对通过项（R28/L0c/L0e）：test_package 六件套齐全，assertion_count=43≠0（=引擎契约 26 + CLI 17，与 W3 日志一致），test_case_count=2。L2 smoke 被 skip 属环境性非阻断。",
+      "fix_suggestion": "无需修改。"
+    }
+  ],
+  "summary": "picotts/0.1_git20210505：P0=0、P1=0，verdict=pass（P2×4、P3×6，均非阻断）。R34 通过（真实调用 pico_* API 且 W3 L1e 破坏性反向验证通过，无空壳测试）；R28/L0c/L0e 通过（test_package 齐全、MANIFEST 非空、assertion_count=43）；R39 通过（conandata.yml 源 URL 为官方 commit 归档，无镜像/网盘/file:// 残留，sha256 真实）；R37/R38 通过（commands.json 与目录 slug/版本全链一致）；R32/R33/R49 通过（无硬编码系统前缀、无裸用 ${CC}/${CFLAGS}、未注入共享前缀）；R51 通过（MANIFEST.upstream_zero_evidence 上游 0 用例与 notes.md、conandata.yml 三处口径一致，无占位符）。R8/PF5：补丁中唯一 __OHOS__ 位于 config.guess 的 LIBC 探针程序内，属明文允许例外，审计认可（提 PR 需带说明并 --no-preflight）。16 个变更文件全部与本包适配相关（含 2 个知识草稿），未夹带构建缓存、下载包、二进制或凭据。P2 意见已按建议修复。"
+}

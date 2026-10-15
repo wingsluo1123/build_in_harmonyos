@@ -1,0 +1,42 @@
+# conandata.yml — picotts 0.1_git20210505
+#
+# 上游 picotts 仓库（naggety/picotts，即 ihuguet/picotts 的 fork）不打 tag，
+# 版本号 0.1_git20210505 沿袭 Alpine community/picotts 的命名与固定提交：
+#   pkgver=0.1_git20210505
+#   _commit=21089d223e177ba3cb7e385db8613a093dff74b5
+# 该提交与 Alpine APKBUILD 固定提交逐字一致，保证源码可复现
+# （不可用移动的 master 快照）。
+#
+# R39: URL 必须为官方正式源。CI/W3 的镜像改写只在构建期临时进行（脚本退出
+# 时还原），**提交进仓库的必须是官方 https 源**；本文件严禁出现本地文件协议
+# 地址或本机绝对路径（否则 CI 会报 "no URLs found in conandata.yml" 并在
+# source() 阶段 FileNotFoundError）。
+sources:
+  url: "https://github.com/naggety/picotts/archive/21089d223e177ba3cb7e385db8613a093dff74b5.tar.gz"
+  sha256: "f9556495fd56b96160cdae873ca2dbb0f0a578259c74f4ca939effa3fa1cb101"
+
+# E007（知识图谱命中）: 上游源树不含 config.guess/config.sub。
+#   pico/autogen.sh 先 `rm -f ... config.guess config.sub`，再由
+#   automake --add-missing --copy 复制 automake/1.18 随附的 GNU 版本；
+#   这两份副本（config.guess timestamp=2024-07-27）不认识
+#   uname -s = HarmonyOS，configure 在首阶段即中断：
+#       configure: error: cannot guess build type; you must specify one
+#   E007 要求补齐 config.guess/config.sub 的平台分支，并禁止用
+#   --build/--host 绕过（会令 configure 误判交叉编译、跳过 AC_RUN_IFELSE
+#   一类的运行时探测，进而按 Linux/glibc 硬编码平台能力）。
+#   下面的补丁是相对 automake/1.18 随附副本的**差异补丁**（合计 42 行），在
+#   自举之后（两个文件已存在时）施加；先前"整文件替换"形态会把 GNU 脚本全文
+#   4192 行塞进 diff，导致平台 AI 评审因变更过大而整体跳过。
+patches:
+  - patch_file: "patches/0001-config.guess-ohos.patch"
+    patch_description: >-
+      E007: 为 GNU config.guess 补齐 HarmonyOS 识别——LIBC 探针增加
+      `#elif defined(__OHOS__) LIBC=ohos`（与既有 __ANDROID__ 分支同形），
+      并新增 `*:HarmonyOS:*:*` 的机器/OS 判定分支，使本机三元组正确解析为
+      aarch64-unknown-linux-ohos
+    patch_type: "portability"
+  - patch_file: "patches/0002-config.sub-ohos.patch"
+    patch_description: >-
+      E007: 为 GNU config.sub 补齐 ohos-linux 三元组（basic_os=linux-ohos）
+      以及 OS/内核白名单条目，否则 configure 报 "OS ohos not recognized"
+    patch_type: "portability"

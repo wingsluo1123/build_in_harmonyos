@@ -1,0 +1,58 @@
+# 版本级 manifest — picotts 0.1_git20210505
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "0.1_git20210505"
+software: picotts
+status: built
+build_date: "2026-10-14"
+build_system: autotools
+conan_ref: "picotts/0.1_git20210505"
+
+source:
+  url: "https://github.com/naggety/picotts/archive/21089d223e177ba3cb7e385db8613a093dff74b5.tar.gz"
+  sha256: "f9556495fd56b96160cdae873ca2dbb0f0a578259c74f4ca939effa3fa1cb101"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  # in-source 自举（上游不发布 configure，仅 pico/configure.in + autogen.sh）
+  configure_options:
+    - "--prefix=/"
+    - "--enable-shared"
+    - "--disable-static"
+  dependencies:
+    - popt/1.19
+  build_requirements:
+    - autoconf/2.72
+    - automake/1.18
+    - libtool/2.5.4
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-pico-config.guess.patch"
+  - "0002-pico-config.sub.patch"
+
+knowledge_gained:
+  - "上游 autogen.sh 含 rm -f config.guess config.sub：E007 补丁必须在自举之后施加，之前预置会被删除（实测 OVERWRITTEN-BY-AUTOMAKE）"
+  - "conan perl/5.42.2 在真机 ABI 不兼容（Perl_my_cxt_init: symbol not found），且 conanbuild 会在 self.run 时重新注入 PERL/PERL5LIB —— 覆盖必须内联在命令内（DRAFT-6049 模式）"
+  - "refresh-patch 会在 --- /dev/null 与 --- a/<path> 两种补丁头形态间改写整文件替换型补丁；后者在目标缺失时被 patch 判为 source/target file does not exist"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/picotts-0.1_git20210505.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/picotts-0.1_git20210505.work
+  source_orig_hash: 9c47627debaa299d
+  source_work_hash: 003e8656bd0b848a
+  generated_at: '2026-10-14T17:01:44'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-pico-config.guess.patch
+    type: portability
+    platform_only: True
+    guard: 'none'
+  - file: 0002-pico-config.sub.patch
+    type: portability
+    platform_only: True
+    guard: 'none'
