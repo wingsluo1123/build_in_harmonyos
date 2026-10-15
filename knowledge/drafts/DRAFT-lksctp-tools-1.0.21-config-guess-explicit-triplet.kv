@@ -1,0 +1,70 @@
+# ═══ Draft knowledge entry — lksctp-tools 1.0.21 config.guess 显式 triplet 适配点 ═══
+# Timestamp: 2026-09-29
+# Software: lksctp-tools 1.0.21
+# Gate: PR r02（修正 PR 归属并重新远端交付）
+# Status: DRAFT — needs human/AI review to promote to E-entry
+#
+# 适配点归属声明：
+#   r01 正文/回报曾把 "config.guess 不识别 HarmonyOS → 显式 --build/--host" 记为
+#   E007/E011 等价命中（路径 A）。经本轮复核，该适配点实际依赖 E007 与 E011
+#   forbid_1_pattern 明确禁止的参数（--build=/--host=），因此**不得声称等价命中
+#   E007/E011**，改判路径 B，并以本草稿沉淀该适配点的真实证据与适用性对照。
+
+id:                     DRAFT-lksctp-tools-1.0.21-config-guess-explicit-triplet
+trigger_tool:           configure|config.status|autoreconf
+phase:                  configuration
+error_signature:        cannot guess build type|unable to guess system type|
+                         OS ohos not recognized|config\.guess.*unable
+
+severity:               2
+category:               autotools, configure, ohos
+match_keywords:         config.guess, build type, HarmonyOS, explicit triplet,
+                         --build, --host, autoconf, autoreconf, automake,
+                         libtool, aarch64-unknown-linux-musl
+title:                  lksctp-tools 1.0.21 使用显式 --build/--host triplet 绕过
+                         config.guess（与 E007/E011 forbid_1_pattern 冲突的真实证据）
+
+root_cause:             GNU config.guess 脚本不包含 HarmonyOS/__OHOS__ 检测分支，
+                         uname -s=HarmonyOS 无法匹配任何已知系统模式，configure
+                         第一阶段即报 cannot guess build type。上游 GitHub archive
+                         tarball 不含 configure，需 autoreconf 自举；自举产物
+                         config.guess 同样不认识 HarmonyOS。本适配点在 generate()
+                         显式追加 --build=aarch64-unknown-linux-musl 与
+                         --host=aarch64-unknown-linux-musl 使 configure 通过。
+                         该做法与 E007（rec=patch-autotools-ohos.pl，输出标准三元组
+                         aarch64-unknown-linux-ohos）及 E011（forbid_1_pattern:
+                         --build=|--host=|--target=）明确冲突，属"依赖被禁止参数"。
+
+affected_scope:         autotools 项目在 HarmonyOS 上 configure 平台识别失败时，
+                         误用显式 triplet 绕过的适配点（同 argp-standalone /
+                         abiword 系列做法在本库的落地证据与适用性边界）
+
+verification_cmd:       grep -n -- '--build=\|--host=' conanfile.py;
+                         grep -c __OHOS__ build-aux/config.guess 2>/dev/null;
+                         ls -la /proc/net/sctp
+
+rec_priority:           1
+rec_approach:           explicit-triplet-with-audit
+rec_description:        如实记录显式 --build/--host=aarch64-unknown-linux-musl
+                         的实际命令、自举环境（automake/libtool tool_requires
+                         版本）与验证证据，不声称 E007/E011 等价命中；由审核
+                         决定是否改走 E007 的 config.guess 补丁路径。
+rec_command:            tc.configure_args.append("--build=aarch64-unknown-linux-musl");
+                         tc.configure_args.append("--host=aarch64-unknown-linux-musl");
+                         （conanfile.py generate()，工具版本：tool_requires
+                         automake/1.18 + libtool/2.5.4，autoreconf 自举）
+rec_auto_fix:           false
+rec_impl:               conan-recipe-argument
+
+forbid_1_pattern:       --build=|--host=|--target=
+forbid_1_reason:         知识库 E007/E011 禁止用交叉编译参数绕过 configure：会让
+                         AC_RUN_IFELSE 全部跳过，检测结果默认化，且与
+                         patch-autotools-ohos.pl（E007 推荐路径）冲突
+forbid_1_consequence:   configure 看似通过但 config.h 检测结果可能全部为默认值，
+                         编译阶段出现级联错误；声称 E007/E011 等价命中属不实
+
+principles:             P004, P006
+
+doc_file:               knowledge/drafts/DRAFT-lksctp-tools-1.0.21-config-guess-explicit-triplet.md
+last_updated:           2026-09-29
+source_event:           archives/l/lksctp-tools/1.0.21（PR r02 修正交付）
