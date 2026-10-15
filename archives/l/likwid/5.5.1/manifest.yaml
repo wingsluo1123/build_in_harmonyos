@@ -1,0 +1,31 @@
+version: "5.5.1"
+software: "likwid"
+status: built
+build_date: "2026-10-13"
+build_system: makefile
+source:
+  url: "https://github.com/RRZE-HPC/likwid/archive/refs/tags/v5.5.1.tar.gz"
+  sha256: "25c7830e63b20396fcfc3b16ae79c39b4220a86d376ceb7cd6949b5ff991db78"
+  tar_format: tar.gz
+build:
+  system: makefile
+  compiler_profile: CLANGARMv8
+  access_mode: perf_event
+  bundled_dependencies: [hwloc-2.9.3, lua-5.4]
+  dependencies: []
+patches_applied:
+  - patches/0001-ohos-clang-portability.patch
+  - patches/0002-ohos-hwloc-sysfs.patch
+  - patches/0003-ohos-no-package-mempolicy.patch
+runtime_notes:
+  - "OHOS denies perf_event_open (EACCES) and exposes no /dev/cpu/*/msr, so hardware counter measurement cannot run; topology, NUMA, affinity, timer and pinning work."
+  - "likwid-topology reports the real machine (20 HWThreads, 6 sockets, 1 NUMA domain, HUAWEI KirinX90); likwid-pin pins processes via sched_setaffinity."
+knowledge_gained:
+  - "bionic has no glibc pthread_[sg]etaffinity_np; map them onto sched_[sg]etaffinity(0,...) when only the calling thread is pinned."
+  - "cwisstable (C11) needs static_assert while likwid compiles with -std=c99."
+  - "bionic has no glibc-private __cpu_mask cpu_set_t layout."
+  - "OHOS sysfs exposes core_siblings_list/thread_siblings_list but not core_siblings, so bundled hwloc 2.9.3 aborts CPU discovery."
+  - "hwloc builds no Package/Socket object on OHOS."
+  - "OHOS seccomp kills get_mempolicy() with SIGSYS (not ENOSYS)."
+  - "OHOS has no cpp driver and no coreutils install."
+knowledge_ref: []

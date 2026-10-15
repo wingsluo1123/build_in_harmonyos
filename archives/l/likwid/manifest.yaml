@@ -1,0 +1,22 @@
+software: likwid
+display: "LIKWID"
+description: "HPC performance analysis tool suite: hardware performance counters, CPU topology, NUMA and thread pinning (liblikwid + Lua command line tools)"
+category: utility
+homepage: "https://github.com/RRZE-HPC/likwid"
+license: GPL-3.0-or-later
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "Plain Makefile; COMPILER=CLANGARMv8, ACCESSMODE=perf_event (no msr access daemon); bundled hwloc 2.9.3 + Lua 5.4"
+    - "bionic has no glibc pthread_[sg]etaffinity_np, __cpu_mask or program_invocation_name; a small compat header maps the affinity helpers onto sched_[sg]etaffinity"
+    - "OHOS sysfs exposes *_list sibling files (not core_siblings), which makes bundled hwloc abort CPU discovery; hwloc is patched to accept them"
+    - "OHOS seccomp kills the get_mempolicy() syscall with SIGSYS instead of ENOSYS; the NUMA probe is skipped"
+    - "OHOS has no cpp driver (likwid-bench's perl generator) and no coreutils install; the recipe supplies both as build shims"
+  common_dependencies: []
+
+versions:
+  - version: "5.5.1"
+    status: built
+    build_date: "2026-10-13"
+    conan_ref: "likwid/5.5.1"

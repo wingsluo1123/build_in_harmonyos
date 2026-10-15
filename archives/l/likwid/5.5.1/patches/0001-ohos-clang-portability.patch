@@ -1,0 +1,67 @@
+--- a/make/include_CLANGARMv8.mk
++++ b/make/include_CLANGARMv8.mk
+@@ -10,7 +10,7 @@
+ 
+ ANSI_CFLAGS   =
+ 
+-CFLAGS   = -march=armv8-a -mtune=cortex-a57 -O2 -std=c99 -Wno-format -fPIC
++CFLAGS   = -Dstatic_assert=_Static_assert -include pthread_affinity_compat.h -march=armv8-a -mtune=cortex-a57 -O2 -std=c99 -Wno-format -fPIC
+ FCFLAGS  = -module ./
+ PASFLAGS = ARMv8
+ ASFLAGS  =
+--- a/src/topology.c
++++ b/src/topology.c
+@@ -672,27 +672,14 @@
+ int
+ cpu_count(cpu_set_t* set)
+ {
+-    uint32_t i;
++    int i;
+     int s = 0;
+-    const __cpu_mask *p = set->__bits;
+-    const __cpu_mask *end = &set->__bits[sizeof(cpu_set_t) / sizeof (__cpu_mask)];
+-
+-    while (p < end)
++    for (i = 0; i < CPU_SETSIZE; i++)
+     {
+-        __cpu_mask l = *p++;
+-
+-        if (l == 0)
++        if (CPU_ISSET(i, set))
+         {
+-            continue;
++            s++;
+         }
+-
+-        for (i=0; i< (sizeof(__cpu_mask)*8); i++)
+-        {
+-            if (l&(1UL<<i))
+-            {
+-                s++;
+-            }
+-        }
+     }
+     return s;
+ }
+--- a/bench/likwid-bench.c
++++ b/bench/likwid-bench.c
+@@ -196,7 +196,18 @@
+ #ifdef _ARCH_PPC
+     int clsize = 128;
+ #else
+-    int clsize = sysconf (_SC_LEVEL1_DCACHE_LINESIZE);
++    int clsize = 0;
++    {
++        FILE *clf = fopen("/sys/devices/system/cpu/cpu0/cache/index0/coherency_line_size", "r");
++        if (clf)
++        {
++            if (fscanf(clf, "%d", &clsize) != 1)
++                clsize = 0;
++            fclose(clf);
++        }
++    }
++    if (clsize <= 0)
++        clsize = 64; /* sysconf(_SC_LEVEL1_DCACHE_LINESIZE) is not portable */
+ #endif
+     char compilers[512] = "gcc,icc,pgcc";
+     char defcompilepath[512] = "/tmp";
