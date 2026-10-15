@@ -1,0 +1,29 @@
+--- a/pawk.py
++++ b/pawk.py
+@@ -140,23 +140,23 @@
+     @classmethod
+     def from_options(cls, options, modules):
+         self = cls()
+         self['t'] = ''
+         self['m'] = ()
+         if options.imports:
+             for imp in options.imports.split(','):
+                 m = __import__(imp.strip(), fromlist=['.'])
+                 self.update((k, v) for k, v in inspect.getmembers(m) if k[0] != '_')
+ 
+-        self.delim = codecs.decode(options.delim, STRING_ESCAPE) if options.delim else None
+-        self.odelim = codecs.decode(options.delim_out, STRING_ESCAPE)
+-        self.line_separator = codecs.decode(options.line_separator, STRING_ESCAPE)
++        self.delim = codecs.decode(options.delim.encode('raw_unicode_escape'), STRING_ESCAPE) if options.delim else None
++        self.odelim = codecs.decode(options.delim_out.encode('raw_unicode_escape'), STRING_ESCAPE)
++        self.line_separator = codecs.decode(options.line_separator.encode('raw_unicode_escape'), STRING_ESCAPE)
+ 
+         for m in modules:
+             try:
+                 key = m.split('.')[0]
+                 self[key] = __import__(m)
+             except:
+                 pass
+         return self
+ 
+ 
