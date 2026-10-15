@@ -1,0 +1,58 @@
+--- a/kitchen3/kitchen/i18n/__init__.py
++++ b/kitchen3/kitchen/i18n/__init__.py
+@@ -100,6 +100,19 @@
+ import os
+ import sys
+ import warnings
++def _ohc_locale_output_encoding():
++    """Return the encoding requested via LC_ALL when libc falls back to UTF-8.
++
++    HarmonyOS does not ship the pt_BR.iso88591 locale, so ``setlocale`` keeps
++    UTF-8 and ``locale.getpreferredencoding`` would report UTF-8 even though
++    the caller explicitly requested Latin-1.  Deriving the requested encoding
++    from LC_ALL preserves kitchen's gettext output on such platforms.
++    """
++    locale_name = os.environ.get("LC_ALL") or os.environ.get("LC_CTYPE", "")
++    normalized = locale_name.lower().replace("-", "").replace("_", "")
++    if "iso88591" in normalized or "latin1" in normalized:
++        return "latin1"
++    return locale.getpreferredencoding()
+ 
+ # We use the _default_localedir definition in get_translation_object
+ try:
+@@ -368,7 +381,7 @@
+ 
+         # Next decide what encoding to use for the strings we return
+         output_encoding = (self._output_charset or
+-                locale.getpreferredencoding())
++                _ohc_locale_output_encoding())
+ 
+         return self._reencode_if_necessary(message, output_encoding)
+ 
+@@ -390,7 +403,7 @@
+ 
+         # Next decide what encoding to use for the strings we return
+         output_encoding = (self._output_charset or
+-                locale.getpreferredencoding())
++                _ohc_locale_output_encoding())
+ 
+         return self._reencode_if_necessary(message, output_encoding)
+ 
+@@ -581,7 +594,7 @@
+ 
+         # Next decide what encoding to use for the strings we return
+         output_encoding = (self._output_charset or
+-                locale.getpreferredencoding())
++                _ohc_locale_output_encoding())
+ 
+         return self._reencode_if_necessary(tmsg, output_encoding)
+ 
+@@ -607,7 +620,7 @@
+ 
+         # Next decide what encoding to use for the strings we return
+         output_encoding = (self._output_charset or
+-                locale.getpreferredencoding())
++                _ohc_locale_output_encoding())
+ 
+         return self._reencode_if_necessary(tmsg, output_encoding)
+ 

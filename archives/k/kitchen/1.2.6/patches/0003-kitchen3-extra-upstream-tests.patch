@@ -1,0 +1,288 @@
+--- /dev/null
++++ b/kitchen3/tests/_ohc_extra_upstream_tests.py
+@@ -0,0 +1,285 @@
++# -*- coding: utf-8 -*-
++"""Execute the upstream kitchen3 tests that ``unittest discover`` drops silently.
++
++Upstream drove this suite with nose.  ``unittest``'s discovery only collects
++``TestCase`` subclasses and module-level ``test_*`` functions, so every test
++that nose took from another shape never ran here:
++
++  * ``test_collections.test_strict_dict_get_set``           -- module-level function
++  * ``test__all__.Test__all__``                             -- plain ``object`` subclass
++  * ``test_deprecation_py3.TestPendingDeprecationModules``  -- plain ``object`` subclass
++  * ``test_i18n.TestDummyTranslations``                     -- plain ``object`` subclass
++  * ``test_i18n.TestNewGNUTranslationsNoMatch``             -- inherits the above
++  * ``test_i18n.TestFallbackNewGNUTranslationsNoMatch``     -- inherits the above
++  * ``test_versioning.TestVersionTuple``                    -- plain ``object`` subclass
++
++``unittest`` reports "Ran 126" while kitchen3 defines 127 tests, and the
++TestCase-owned subset is only 101 definitions: the 26 definitions above never
++executed.  This runner drives them under Python 3.12, fails on a generator that
++yields nothing, fails on any unexpected error, and finally re-derives the set of
++nose-only entities from the sources and fails if any of them was not driven --
++so neither a silent downgrade nor a shrinking generator can recur.
++
++Case labels stay stable across interpreter versions: modules whose yielded
++arguments include non-strings are labelled by index.
++"""
++import importlib.util
++import os
++import sys
++import traceback
++import unittest
++import warnings
++
++# Two upstream fixtures predate Python 3.10+ interpreter behaviour.  They are
++# pinned here by the exact module under test so that ANY other failure still
++# fails the build -- this is a narrow xfail, not a blanket advisory.
++KNOWN_DRIFT = {
++    # Upstream deletes the interpreter-injected ``__builtins__`` from a star
++    # import but predates ``__warningregistry__``, which CPython also injects
++    # into module globals (both packages emit PendingDeprecationWarning).
++    "test__all__.test_everything_in__all__exists('pycompat24','kitchen')": "cpython-injected-__warningregistry__",
++    "test__all__.test_everything_in__all__exists('pycompat25','kitchen')": "cpython-injected-__warningregistry__",
++    # CPython >= 3.10 added b32hexencode/b32hexdecode to the stdlib base64
++    # module; upstream hardcodes the pre-3.10 __all__ while its own comment
++    # says newer stdlib names are meant to "shine through".
++    "test__all__.test__all__is_complete('base64','kitchen.pycompat24')": "cpython-3.10-added-base64-names",
++}
++
++# Entity prefix -> method labels actually driven, used by the coverage gate.
++DRIVEN = {}
++RAN = 0
++XFAIL = []
++FAILURES = []
++
++# nose expands the generators below, so the exact number of cases is fixed by
++# the pinned sources: 74 (test__all__ / collections / deprecation_py3) + 3 x 127
++# (TestDummyTranslations and its two subclasses) + 9 (TestVersionTuple).
++# The gate fails if fewer run, so a silently shrinking generator cannot pass.
++MIN_CASES = 464
++
++
++def _label(name, args):
++    if args and all(isinstance(a, str) for a in args):
++        return "%s(%s)" % (name, ",".join("'%s'" % a for a in args))
++    return name
++
++
++def _ok(name):
++    global RAN
++    RAN += 1
++    print("ok    %s" % name)
++
++
++def _fail(name, detail):
++    global RAN
++    RAN += 1
++    if name in KNOWN_DRIFT:
++        XFAIL.append(name)
++        print("xfail %s  (%s)" % (name, KNOWN_DRIFT[name]))
++        return
++    FAILURES.append((name, detail))
++    print("FAIL  %s" % name)
++    for line in detail.rstrip().splitlines():
++        print("      %s" % line)
++
++
++def _run_case(name, fn, *args):
++    label = _label(name, args)
++    DRIVEN.setdefault(name, []).append(label)
++    try:
++        fn(*args)
++    except Exception:
++        _fail(label, traceback.format_exc())
++    else:
++        _ok(label)
++
++
++def _drive(prefix, method_name, instance, indexed=False):
++    """Drive one method: plain test, or nose-style generator of (fn, *args)."""
++    DRIVEN.setdefault(prefix, []).append(method_name)
++    try:
++        produced = getattr(instance, method_name)()
++        produced = list(produced) if produced is not None else None
++    except Exception:
++        _fail(prefix, traceback.format_exc())
++        return
++    if produced is None:
++        _ok(prefix)
++        return
++    if not produced:
++        _fail(prefix, "generator yielded no cases -- upstream cases silently dropped\n")
++        return
++    for index, item in enumerate(produced):
++        args = item[1:]
++        if indexed:
++            case = "%s#%d" % (prefix, index)
++        elif args and all(isinstance(a, str) for a in args):
++            case = prefix
++        else:
++            case = "%s#%d" % (prefix, index)
++        _run_case(case, item[0], *args)
++
++
++def _drive_class(prefix, cls, indexed=False):
++    """Drive a plain-object test class the way nose did: setUp per method."""
++    DRIVEN.setdefault(prefix, [])
++    methods = sorted(m for m in dir(cls) if m.startswith("test_"))
++    for method in methods:
++        instance = cls()
++        if hasattr(instance, "setUp"):
++            instance.setUp()
++        try:
++            _drive("%s.%s" % (prefix, method), method, instance, indexed=indexed)
++        finally:
++            if hasattr(instance, "tearDown"):
++                instance.tearDown()
++    return methods
++
++
++def _load_module(name, path):
++    spec = importlib.util.spec_from_file_location(name, path)
++    module = importlib.util.module_from_spec(spec)
++    sys.modules[name] = module
++    spec.loader.exec_module(module)
++    return module
++
++
++def _nose_only_entities(tests_dir, modules):
++    """Re-derive what nose would collect but unittest cannot see.
++
++    Returns (module_funcs, class_names) keyed by ``module.entity``; used as a
++    coverage gate so that a dropped import or a renamed file cannot silently
++    reduce the executed set.
++    """
++    funcs = set()
++    classes = set()
++    for module_name, module in modules.items():
++        for attr in dir(module):
++            obj = getattr(module, attr)
++            if isinstance(obj, type):
++                if not attr.startswith("Test") or issubclass(obj, unittest.TestCase):
++                    continue
++                if any(m.startswith("test_") for m in dir(obj)):
++                    classes.add("%s.%s" % (module_name, attr))
++            elif callable(obj) and attr.startswith("test_"):
++                if getattr(obj, "__module__", None) == module.__name__:
++                    funcs.add("%s.%s" % (module_name, attr))
++    return funcs, classes
++
++
++def main():
++    here = os.path.dirname(os.path.abspath(__file__))
++    tests_dir = here if os.path.basename(here) == "tests" else os.path.join(here, "tests")
++    kitchen3_dir = os.path.dirname(tests_dir)
++    for entry in (kitchen3_dir, tests_dir):
++        if entry not in sys.path:
++            sys.path.insert(0, entry)
++    os.chdir(kitchen3_dir)
++
++    # 1) module-level test function (nose collects it, unittest does not)
++    collections_tests = _load_module(
++        "extra_test_collections", os.path.join(tests_dir, "test_collections.py")
++    )
++    _run_case(
++        "test_collections.test_strict_dict_get_set",
++        collections_tests.test_strict_dict_get_set,
++    )
++
++    # 2) plain-object class holding three nose generator tests
++    all_tests = _load_module("extra_test__all__", os.path.join(tests_dir, "test__all__.py"))
++    DRIVEN.setdefault("test__all__.Test__all__", [])
++    instance = all_tests.Test__all__()
++    if hasattr(instance, "setUp"):
++        instance.setUp()
++    try:
++        for method in ("test_has__all__", "test_everything_in__all__exists",
++                       "test__all__is_complete"):
++            _drive("test__all__.%s" % method, method, instance)
++    finally:
++        if hasattr(instance, "tearDown"):
++            instance.tearDown()
++
++    # 3) plain-object class: deprecation checks.
++    # Python 3.12 removed Loader.load_module(), which upstream's
++    # check_modules() relies on, so the reload is done with importlib.util
++    # while keeping the warning assertion itself untouched.
++    dep_tests = _load_module(
++        "extra_test_deprecation_py3", os.path.join(tests_dir, "test_deprecation_py3.py")
++    )
++    DRIVEN.setdefault("test_deprecation_py3.TestPendingDeprecationModules", [])
++    instance = dep_tests.TestPendingDeprecationModules()
++    if hasattr(instance, "setUp"):
++        instance.setUp()
++    with warnings.catch_warnings(record=True) as caught:
++        warnings.simplefilter("always")
++        for module_name, module_fqn, _module_path in instance.module_data:
++            name = "test_deprecation_py3.check_modules(%s)" % module_fqn
++            try:
++                spec = importlib.util.find_spec(module_fqn)
++                module = importlib.util.module_from_spec(spec)
++                spec.loader.exec_module(module)
++            except Exception:
++                _fail(name, traceback.format_exc())
++                continue
++            raised = any(
++                isinstance(w.message, PendingDeprecationWarning)
++                and ("%s is deprecated" % module_name) in str(w.message)
++                for w in caught
++            )
++            if raised:
++                _ok(name)
++            else:
++                _fail(name, "no PendingDeprecationWarning mentioning "
++                            "'%s is deprecated'\n" % module_name)
++            caught[:] = []
++    _drive("test_deprecation_py3.test_defaultdict", "test_defaultdict", instance)
++
++    # 4) i18n dummy-translation generators.  TestDummyTranslations is a plain
++    # object that nose collected directly; its two subclasses only swap the
++    # catalogue (no-match variants) while inheriting all 19 definitions.
++    i18n_tests = _load_module("extra_test_i18n", os.path.join(tests_dir, "test_i18n.py"))
++    for cls_name in ("TestDummyTranslations", "TestNewGNUTranslationsNoMatch",
++                     "TestFallbackNewGNUTranslationsNoMatch"):
++        _drive_class("test_i18n.%s" % cls_name, getattr(i18n_tests, cls_name), indexed=True)
++
++    # 5) versioning generator (nose generator over a table of version strings)
++    versioning_tests = _load_module(
++        "extra_test_versioning", os.path.join(tests_dir, "test_versioning.py")
++    )
++    _drive_class("test_versioning.TestVersionTuple", versioning_tests.TestVersionTuple,
++                 indexed=True)
++
++    # 6) Coverage gate: every nose-only entity in the sources must have been
++    # driven above, whatever shape it has.
++    modules = {
++        "test_collections": collections_tests,
++        "test__all__": all_tests,
++        "test_deprecation_py3": dep_tests,
++        "test_i18n": i18n_tests,
++        "test_versioning": versioning_tests,
++    }
++    missing_funcs, missing_classes = _nose_only_entities(tests_dir, modules)
++    undriven = sorted(
++        [f for f in missing_funcs if f not in DRIVEN]
++        + [c for c in missing_classes if c not in DRIVEN]
++    )
++    for entity in undriven:
++        _fail("coverage", "nose-only entity not driven: %s\n" % entity)
++
++    print("")
++    print("extra upstream cases: ran=%d unexpected_failures=%d known_drift=%d"
++          % (RAN, len(FAILURES), len(XFAIL)))
++    if RAN < MIN_CASES:
++        print("FATAL: expected at least %d upstream cases, only %d ran -- "
++              "cases are being silently dropped" % (MIN_CASES, RAN))
++        return 1
++    if FAILURES:
++        for name, _detail in FAILURES:
++            print("  UNEXPECTED: %s" % name)
++        return 1
++    print("extra upstream cases: OK (all recovered cases executed)")
++    return 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
