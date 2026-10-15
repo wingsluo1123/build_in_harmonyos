@@ -1,0 +1,51 @@
+# 版本级 manifest — gtkmm 3.24.11
+# 遵循 ARCHIVE-SPEC v3.0
+# 官方源 tarball gtkmm-3.24.11.tar.xz（gnome meson dist 产物，自带 untracked/）
+# gtkmm 3.24.11 = gtkmm-3.0 ABI 线（pkg-config gtkmm-3.0 / gdkmm-3.0）。
+
+version: "3.24.11"
+software: gtkmm
+status: built
+build_system: meson
+build_date: "2026-10-15"
+
+source:
+  url: "https://download.gnome.org/sources/gtkmm/3.24/gtkmm-3.24.11.tar.xz"
+  sha256: "19e383c82d5dd89db275e00b82864e90414d4c3fb3d100b2f996bcc2338a4cc7"
+  tar_format: tar.xz
+
+build:
+  system: meson
+  cc: clang
+  cxx: clang++
+  configure_options:
+    - "default_library=shared"
+    - "maintainer-mode=false"
+    - "build-documentation=false"
+    - "build-demos=false"
+    - "build-x11-api=false"
+    - "build-tests=true"
+    - "wrap_mode=nodownload"
+  dependencies:
+    - "libsigc/2.10.8 (override: 对齐 glibmm 的 pin；使 CI 只重建 cairomm+pangomm 约 80 个目标，避免 glibmm 291 目标重建触发 worker posix_spawn 进程耗尽)"
+    - "glibmm/2.66.9 (glibmm-2.4 + giomm-2.4；用已发布 binary，绑定 libsigc/2.10.Z)"
+    - "gtk/3.24.43 (gtk+-3.0 + gtk+-unix-print-3.0，Broadway-only)"
+    - "atkmm/2.28.4 (atkmm-1.6)"
+    - "cairomm/1.14.5.1 (cairomm-1.0)"
+    - "pangomm/2.46.5 (pangomm-1.4)"
+    - "gdk-pixbuf/2.44.6.1 (gdk-pixbuf-2.0)"
+
+patches_applied:
+  - "0001-gate-demos-on-build-demos.patch"
+  - "0002-failing-suite-for-display-dependent-tests.patch"
+
+knowledge_gained:
+  - "gtkmm 3.24 官方 tarball 已改用 meson（无 configure 脚本），init-build 会误判 autotools"
+  - "PkgConfigDeps 重新生成的 glibmm-2.4/giomm-2.4/pangomm-1.4/atkmm-1.6 .pc 丢失 gmmprocdir/gmmprocm4dir，gtkmm meson.build 无条件读取 → meson configure 失败；须注入指向依赖包 lib/<pkg>/proc(/m4) 的变量"
+  - "demos/gtk-demo 仅以 epoxy_dep.found() 守卫，而 libepoxy 在图中有传递提供 → -Dbuild-demos=false 仍会配置 demos；须 patch meson.build 以 build_demos 守卫 subdir"
+  - "object_move_test 调 gtk_init()，OHOS 无窗口系统真实失败（cannot open display）→ failing suite + --no-suite=failing（与 glibmm 2.66.9 / gtkmm 4.0.0 一致）"
+  - "gtkmm-3.0 ABI 线必须配 glibmm-2.4/cairomm-1.0/pangomm-1.4/atkmm-1.6（2.68/1.16/2.48/2.36 为 gtkmm-4.0 线，pkg-config 名不匹配）"
+  - "gtkmm 3.24 meson 硬性依赖 gtk+-unix-print-3.0.pc，PkgConfigDeps 不生成该 .pc，须从 gtk 包拷入 generators 并重写 prefix"
+  - "libsigc 版本裁决影响 CI 稳定性：选 2.12.1 会触发 glibmm 291 目标源码重建，CI worker 实测反复 `ninja: fatal: posix_spawn: Resource temporarily unavailable`（进程数耗尽）；选 2.10.8 只重建 cairomm+pangomm（约 80 目标）"
+  - "tools/extra_defs_gen 用 cpp_compiler.find_library('glibmm_generate_extra_defs-2.4')，无 dirs，需 LIBRARY_PATH 前置 glibmm libdir"
+  - "build-x11-api=false 既符合 OHOS Broadway-only 后端，又避免读取 PkgConfigDeps 生成 .pc 中不存在的 targets 变量"

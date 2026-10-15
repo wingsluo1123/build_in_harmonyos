@@ -1,0 +1,45 @@
+# conandata.yml — gtkmm 3.24.11
+# 源码 URL（GNOME 官方 release tarball）+ SHA256。
+#
+# ⚠️ 必须用 download.gnome.org 的 release tarball（meson dist 产物）：
+#    release tarball 自带 untracked/（gdkmm/gtkmm 预生成绑定代码 263 个 .cc），
+#    maintainer-mode=false 即可构建（无需 mm-common/gmmproc 生成；gmmproc 仍经
+#    glibmm-2.4.pc 的 gmmprocdir 变量定位，见 conanfile.py）。
+#
+# sha256 与 GNOME 官方 gtkmm-3.24.11.sha256sum 一致（下载实测一致）：
+#   19e383c82d5dd89db275e00b82864e90414d4c3fb3d100b2f996bcc2338a4cc7  gtkmm-3.24.11.tar.xz
+#
+# 适配基线：GTK+3（gtk/3.24.43）在 OHOS 上为 Broadway-only（无 X11/Wayland），
+# gtkmm 作为其 C++ 绑定库沿用同一图形配置：build-x11-api=false（不构建
+# Gdk::X11 API）、build-demos=false（gtk-demo 是唯一 libepoxy 消费者）。
+# gtkmm 3.24.11 = gtkmm-3.0 ABI 线（pkg-config gtkmm-3.0 / gdkmm-3.0），
+# 对应 glibmm-2.4 / cairomm-1.0 / pangomm-1.4 / atkmm-1.6 / sigc++-2.0。
+
+sources:
+  url:
+    - "https://download.gnome.org/sources/gtkmm/3.24/gtkmm-3.24.11.tar.xz"
+    - "https://mirrors.ustc.edu.cn/gnome/sources/gtkmm/3.24/gtkmm-3.24.11.tar.xz"
+    - "https://mirrors.tuna.tsinghua.edu.cn/gnome/sources/gtkmm/3.24/gtkmm-3.24.11.tar.xz"
+    - "https://mirror.nju.edu.cn/gnome/sources/gtkmm/3.24/gtkmm-3.24.11.tar.xz"
+  sha256: "19e383c82d5dd89db275e00b82864e90414d4c3fb3d100b2f996bcc2338a4cc7"
+
+patches:
+  - patch_file: "patches/0001-gate-demos-on-build-demos.patch"
+    patch_description: >
+      meson.build: gate subdir('demos/gtk-demo') on the build-demos option.
+      demos/gtk-demo/meson.build guards its targets on epoxy_dep.found(), and
+      epoxy_dep = dependency('epoxy', required: build_demos); in a Conan graph
+      libepoxy is present transitively (gtk/3.24.43 -> libepoxy/1.5.10) so
+      PkgConfigDeps generates epoxy.pc and found() stays true even with
+      -Dbuild-demos=false, after which the demo resources need
+      glib_compile_resources from gio-2.0.pc and meson configure fails.
+      Same fix as gtkmm 4.0.0 recipe patch 0002-gate-demos-on-build-demos.patch.
+    patch_type: "portability"
+  - patch_file: "patches/0002-failing-suite-for-display-dependent-tests.patch"
+    patch_description: >
+      tests/meson.build: register the gtk_init()-dependent test
+      (object_move_test) in a failing suite so build() can exclude it with
+      --no-suite=failing.  OHOS has no window system, the test really fails
+      with "cannot open display" (exit 1).  Same handling as glibmm 2.66.9 and
+      the gtkmm 4.0.0 recipe.  gdk_rgba_test needs no window and keeps running.
+    patch_type: "portability"

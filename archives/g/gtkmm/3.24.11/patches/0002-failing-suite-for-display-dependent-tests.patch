@@ -1,0 +1,21 @@
+--- a/tests/meson.build
++++ b/tests/meson.build
+@@ -45,7 +45,17 @@
+   )
+ 
+   if ex[4] and run_tests
+-    test(ex_name, exe_file)
++    # Tests that call gtk_init() cannot run without a window system on
++    # this platform (Broadway cannot start its server either), so they fail
++    # with "cannot open display" for real.  Mark them as a 'failing' suite
++    # and exclude it from build() with --no-suite=failing, same handling as
++    # glibmm 2.66.9 and the gtkmm 4.0.0 recipe; gdk_rgba_test does not need a
++    # window and keeps running for real.
++    if ex_name in ['object_move_test']
++      test(ex_name, exe_file, suite: ['failing'])
++    else
++      test(ex_name, exe_file)
++    endif
+   endif
+ endforeach
+ 
