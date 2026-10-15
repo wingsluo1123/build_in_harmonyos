@@ -1,0 +1,33 @@
+# 版本级 manifest — vxi 0.0.20121221（VXI-11 RPC 协议库，首次适配）
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "0.0.20121221"
+software: vxi
+status: built
+build_date: "2026-10-14"
+build_system: autotools
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/v/vxi/vxi_0.0.20121221.orig.tar.gz"
+  sha256: "12b04dbc8f8538dfebb062c16fbaa8fdf11a3ca110e8ffabdeba60363e3af8d8"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+  - "--enable-static"
+  - "--disable-shared"
+  dependencies:
+  - libtirpc/1.3.7
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+- "Debian vxi 源码包仅 14 个文件：vxi.x/vxi_intr.x 为 RPC 规范源，构建期 rpcgen 生成全部 C/H（Debian Build-Depends rpcsvc-proto）；OHOS 真机无系统 rpcgen，配方在 build() 优先复用系统 rpcgen、缺失时从 rpcsvc-proto 1.4.4 官方 release 原生编译私有构建期工具（不打包，.x 仍为唯一规范源）"
+- "Debian rules 构建要点：CFLAGS -fPIC + CPPFLAGS -I/usr/include/tirpc；conan 侧用 libtirpc/1.3.7 头目录等价注入"
+- "vxi.x 为 Public Domain（VXIbus 联盟规范附录 C），configure.ac/Makefile.am/debian/* 为 GPL-2+；配方 license 取 GPL-2.0-or-later"
+- "上游无任何测试套件：14 文件中无 tests/、无 TESTS/check_PROGRAMS，Makefile.am 仅定义 lib_LIBRARIES；按 no_tests 口径由 test_package 承担验证"
+
+patch_classification: []
