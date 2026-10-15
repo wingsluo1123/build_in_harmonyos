@@ -1,0 +1,95 @@
+# 版本级 manifest — rolo 021
+# 文件位置: archives/r/rolo/021/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "021"
+software: "rolo"
+
+# 编译状态: published | built | failed
+# 首轮仅完成未提交工作树，真机预检未跑，标记 built 需真机通过后才可升级。
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-13"
+build_system: "autotools"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 官方 GitHub v021 tag 归档（commit 61587842d051779cd90b76f10f123ce5a6ab583a）
+  url: "https://github.com/libvc/rolo/archive/refs/tags/v021.tar.gz"
+  sha256: "eaf69f0dbf4215b57eb4ed4fe271d1672821cf010f965c72369b7d30ba77f946"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: autotools
+  # 构建期工具：原生优先 + 仅两个 ohpcd 解析边（automake/1.18，CCI 仅有
+  # 1.19/1.16.5；libtool/2.5.4，bashdb 已合入先例，CCI 仅有 2.4.7）。
+  # yacc/lex 无 Conan 边（纯原生；bison/3.8.2 与 flex 全版本必命中 CCI m4）。
+
+  # in-source 构建（test/run-tests 相对自身定位 ../configure.ac、
+  # contacts.vcf、../src/rolo）；--prefix=/ + DESTDIR 归一
+  configure_options:
+    - "--prefix=/"
+    - "--build=aarch64-unknown-linux-gnu"
+    - "--host=aarch64-unknown-linux-gnu"
+
+  # 编译依赖（libvc 无仓内配方，已在配方内官方源码私有静态 vendoring，见 notes.md）
+  dependencies:
+    - "ncurses/6.6"
+    # glib: no longer required (upstream uses only g_utf8_strlen x3 in
+    # src/entry.c; rewritten in-place to rolo_utf8_strlen, see notes #11;
+    # every glib revision in-repo lacks a binary for this profile and
+    # forces meson+libffi source builds that die at configure[139])
+    # unac 1.8.0 vendored privately (recipe never published a binary and its
+    # tool_requires libtool/2.5.4 is absent from this repo, dragging CCI
+    # automake -> autoconf -> m4 into the graph; see notes.md problem #8)
+    # libvc v013 vendored privately (no recipe in repo; see notes.md)
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 首轮无补丁（tag 源码 + autoreconf 直编；真机预检若暴露平台问题再补）。
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "rolo对glib仅用g_utf8_strlen x3（entry.c菜单列宽补偿），仓内各glib版本在当前profile下均无二进制、任何requires都强制meson+libffi源码构建链并死于configure[139]；解法是build()原地改写configure.ac+entry.c消除glib边（等价本地实现，exact-match计数校验），重依赖仅剩零传递依赖的ncurses/6.6"
+  - "unac/1.8.0（manifest built、无已发布二进制）恒从源码构建，其 tool_requires libtool/2.5.4 在本仓不存在、automake/1.18 经 CCI autoconf 恒拖入 CCI m4（configure[139] Error 127）；解法是整库私有 vendoring（libvc 先例），而非 override/RREV（跨双层 build-of-build 无法统一）"
+  - "rolo v021 上游只发布 GitHub tag 归档（无 configure 生成物）；2026-10-14 第九策略确认本 runner 无 perl、无 autoconf 包且 ohpcd automake/1.18 不提供 autoreconf，任何 autoreconf 路线不可达，故消除而非修复：libvc 直接编译（vendored byacc/flex 生成 + cc + ar），unac 直接编译（orig 包无 configure 且 runner 无 autoreconf：单文件 cc+ar、构建期探测 config.h、消费者符号链接门禁），rolo 直接编译（手写 config.h 仅 PACKAGE_* 宏 + cc + link，直跑 sh test/run-tests）；零 tool_requires"
+  - "config.guess 不识别 HarmonyOS，必须显式 --build/--host=aarch64-unknown-linux-gnu（alpine 先例）"
+  - "test/run-tests 用 $0 相对路径定位 ../configure.ac、contacts.vcf、../src/rolo，外树构建必坏；必须 in-source 构建（folders.build=.）"
+  - "configure.ac 硬依赖 libvc/ncursesw/menuw（AC_CHECK_LIB 致命）、glib-2.0/unac（PKG_CHECK_MODULES 致命）；shunit2 仅缺时 WARNING 并跳过测试"
+  - "libvc v013（vCard 解析库，https://github.com/libvc/libvc）无仓内配方，已按官方 tag 源码在配方内静态 vendoring（私有 prefix，不发布）；ncurses/6.6 提供 ncursesw+menuw（--enable-widec）"
+
+# ============================================================
+# 上游测试审计（R51：有测试必须接入真机完整执行）
+# ============================================================
+# 结论：上游 v021 有 4 个 shunit2 单元测试，由 build() 直跑
+# sh test/run-tests 实跑，解析 make_check.log 的 shunit2 汇总行生成证据
+#（详见 test_package/MANIFEST.yml）。
+
+upstream_tests_exist: true
+upstream_test_total: 4
+upstream_test_count_method: auto
+upstream_test_audit: "test/run-tests 定义 4 个 shunit2 函数（版本断言/启动帮助/搜索删除/移动编辑），由 build() 经 sh 直接执行（不再经 test/Makefile 的 check 目标，因无 autoreconf 可生成 Makefile；ROLO 默认为 ../src/rolo 即直接链接产物，shunit2 经 PATH 解析），test/contacts.vcf 为真实 fixture。计数口径 auto（单一 shunit2 框架）。"
+reason: "上游 4 用例由 build() 直跑 sh test/run-tests 在真机实跑并解析落证（share/doc/rolo/upstream-check.json），test_package 原样重发标记；通过数待真机 evidence 轮回填。"
+test_package_test_count: 5
+assertion_count: 5
