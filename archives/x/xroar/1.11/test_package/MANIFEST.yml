@@ -1,0 +1,24 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+package: xroar/1.11
+homepage: "https://www.6809.org.uk/xroar/"
+
+# 上游测试注册口径：XRoar 1.11 无自动化测试套件。
+# 清点证据: 源码树无 tests/ 目录，src/Makefile.am 无 TESTS/check_PROGRAMS，
+# `make -n check` -> "No rule to make target 'check'"。
+upstream_check_command: "make -n check   # -> make: *** No rule to make target 'check'"
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序：无
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_xroar.py
+    description: "消费者冒烟测试：bin/xroar 存在且可执行；--version 打印 'XRoar 1.11' 退出 0；--help 打印选项退出 0；无 ROM 裸运行要么非零码报 ROM 错误（GUI 构建），要么进入 headless null-UI 空转（有界超时观察，均证明模拟器核心已链接）。"
+    command: "python3 test_xroar.py <package>/bin"
+
+# 测试断言总数 (近似值) 用于质量评估
+assertion_count: 5
