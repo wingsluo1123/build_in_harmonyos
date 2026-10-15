@@ -1,0 +1,83 @@
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/1.2.6/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.2.6"
+
+# 软件名
+software: "kitchen"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-02"
+build_system: setuptools
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://files.pythonhosted.org/packages/source/k/kitchen/kitchen-1.2.6.tar.gz"
+
+  # 源码校验和
+  sha256: "b84cf582f1bd1556b60ebc7370b9d331eb9247b6b070ce89dfe959cba2c0b03c"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: custom
+
+  # 配置选项列表
+  configure_options: []
+  # 例如:
+  # - "-DCMAKE_BUILD_TYPE=Release"
+  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+  # 例如:
+  # - openssl/1.1.1w
+  # - curl/8.19.0
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-i18n-locale-output-encoding.patch"
+  - "0002-text-display-combining-table.patch"
+  - "0003-kitchen3-extra-upstream-tests.patch"
+  - "0004-kitchen3-nose-tool-shim.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "新建文件的补丁必须带 /dev/null 源标签，否则 Conan 的 patch_ng 报 source/target file does not exist；GNU patch -p1 会因 -0,0 hunk 头而假通过。本地需用 patch_ng.fromfile(...).apply(strip=0) 复验。ref: knowledge/drafts/E586-draft-2757.kv"
+  - "nose 专属测试形态（生成器形 test_* 方法、plain object 测试类）会被 unittest discovery 静默丢弃，报告只写 Ran N 即少报；需垫片 + 补跑执行器 + 用例数下限闸门。ref: knowledge/drafts/E587-draft-5F23.kv"
+  - "W3 用 zsh 执行 CI 脚本，here-doc 临时文件只认 TMPPREFIX（非 TMPDIR），/tmp 只读时会伪装成 L0i conanfile.py AST 解析失败。ref: knowledge/drafts/E588-draft-7B93.kv"
+  - "CI worker 的构建解释器有 pip 无 setuptools（Python 3.12 起解释器不再附带），--no-build-isolation 下 PEP 517 后端不可导入（BackendUnavailable: Cannot import 'setuptools.build_meta'），而本地 W3 跑在带 setuptools 的解释器上故全绿；修复为按解释器能力择路——可 import setuptools 则保留该参数，缺失则让 pip 自建隔离构建环境（不污染 worker 共享解释器）。本地同构复现：python3 -m venv（3.12 venv 不带 setuptools）。ref: knowledge/drafts/E589-draft-826F.kv"

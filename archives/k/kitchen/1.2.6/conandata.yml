@@ -1,0 +1,18 @@
+sources:
+  "1.2.6":
+    url: "https://files.pythonhosted.org/packages/source/k/kitchen/kitchen-1.2.6.tar.gz"
+    sha256: "b84cf582f1bd1556b60ebc7370b9d331eb9247b6b070ce89dfe959cba2c0b03c"
+patches:
+  "1.2.6":
+    - patch_file: "patches/0001-i18n-locale-output-encoding.patch"
+      patch_description: "Honour the LC_ALL-requested encoding when libc has no pt_BR.iso88591 locale (HarmonyOS ships no such locale, so getpreferredencoding() stays UTF-8 and the Latin-1 gettext tests fail)"
+      patch_type: "portability"
+    - patch_file: "patches/0002-text-display-combining-table.patch"
+      patch_description: "Rebuild the bundled Unicode combining table from the running interpreter's own database (upstream's own _generate_combining_table) so combining marks added after Unicode 12 no longer report width 1"
+      patch_type: "portability"
+    - patch_file: "patches/0003-kitchen3-extra-upstream-tests.patch"
+      patch_description: "Add the runner for the 26 nose-only test definitions that unittest discovery drops (one module-level function, the plain-object classes test__all__.Test__all__, test_deprecation_py3.TestPendingDeprecationModules, test_i18n.TestDummyTranslations and its two no-match subclasses, and test_versioning.TestVersionTuple), with a coverage gate that fails if any of them is left undriven"
+      patch_type: "portability"
+    - patch_file: "patches/0004-kitchen3-nose-tool-shim.patch"
+      patch_description: "Add a minimal nose.tools / nose.plugins.skip shim so the upstream test sources run unmodified on Python 3.12"
+      patch_type: "portability"

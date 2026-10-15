@@ -1,0 +1,77 @@
+#====================================================================
+# E589 — CI worker 有 pip 无 setuptools：--no-build-isolation 下 PEP 517 后端不可导入
+# 对应的人类文档: doc/E589.md
+# 格式规则:
+#   - key: value（冒号后一个空格，value 到行尾）
+#   - 多行值: 下一行以空格开头 = 续行
+#   - 列表值: 逗号分隔
+#   - 正则值: | 分隔多个模式
+#   - 以 # 开头的行为注释
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E589
+trigger_tool: pip|python
+phase: compilation
+error_signature: BackendUnavailable: Cannot import 'setuptools.build_meta'|No module named 'setuptools'|pip wheel .*--no-build-isolation|prepare_metadata_for_build_wheel
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity: 2
+category: python, environment, build-system, packaging, conan
+match_keywords: setuptools, BackendUnavailable, setuptools.build_meta, no-build-isolation, pip wheel, PEP 517, build backend, prepare_metadata, python 3.12, CI worker, sys.executable, local green CI red
+title: The CI worker's interpreter ships pip but not setuptools (Python 3.12 no longer bundles it), so pip wheel --no-build-isolation cannot import the PEP 517 backend and dies with BackendUnavailable, while the same recipe passes locally on an interpreter that has setuptools
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause: Under --no-build-isolation pip must import the build backend from the ambient interpreter, so a missing setuptools turns the wheel build into "BackendUnavailable: Cannot import 'setuptools.build_meta'" (surfaced through pip._vendor.pyproject_hooks). Python 3.12 stopped shipping setuptools with the interpreter, and the worker's build interpreter (/data/service/hnp/bin/python3, plain pip only) has none, while conan on the developer machine runs on a different interpreter (.../python.org/python_3.12/bin/python3.12) that does. A recipe that hardcodes --no-build-isolation therefore passes W3 and fails the moment CI reaches build().
+affected_scope: Every recipe whose build() drives pip or a PEP 517 backend (pure Python packages building a wheel) and pins --no-build-isolation or otherwise assumes setuptools is importable. Bit kitchen 1.2.6 on PR CI build #84754, first run that reached build() after the worker's source-download problem was fixed.
+verification_cmd: python3 -c "import importlib.util,sys; sys.exit(0 if importlib.util.find_spec('setuptools') else 1)"; echo rc=$?
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority: 1
+rec_approach: probe-setuptools-and-fall-back-to-an-isolated-build-env
+rec_description: Probe the build interpreter before invoking pip (importlib.util.find_spec('setuptools')) and use --no-build-isolation only when setuptools is importable; otherwise drop the flag so pip provisions its own isolated build environment and installs the backend into a throwaway venv. This keeps the offline local path byte-identical and does not mutate the shared worker interpreter, unlike pip install setuptools. Reproduce CI locally with python3 -m venv (a 3.12 venv has pip but no setuptools).
+rec_command: python3 -c "import importlib.util,sys; sys.exit(0 if importlib.util.find_spec('setuptools') else 1)"  # rc=0 -> keep --no-build-isolation; rc=1 -> drop it
+rec_auto_fix: false
+rec_impl:
+
+# 回退方案 (当推荐方案不可用时尝试)
+fallback_priority:      2
+fallback_approach: install-the-build-backend-explicitly
+fallback_description: If the index is unreachable and the isolated environment cannot be provisioned, install the backend explicitly (python -m pip install setuptools wheel) before the no-isolation build. This needs index access and writes into whatever interpreter pip points at, so on a shared CI worker it must be a last resort.
+fallback_command: python3 -m pip install setuptools wheel && python3 -m pip wheel . --no-deps --no-build-isolation -w <dist>
+fallback_auto_fix:      false
+fallback_impl:
+
+# ★ 禁止策略 ★
+forbid_1_pattern: keep --no-build-isolation unconditionally in a recipe that runs pip wheel|assume setuptools is importable because W3 passed locally|pip install setuptools into the shared worker interpreter as the default fix
+forbid_1_reason: W3 runs on a different interpreter than CI, so a locally green build proves nothing about the backend's availability, and mutating the shared worker interpreter leaks state across unrelated builds (R49).
+forbid_1_consequence: CI fails at build() with BackendUnavailable after a full source download, wasting a CI cycle; the recipe keeps looking correct locally and the same flag is copied into sibling Python recipes.
+
+# ═══ Layer 4: 原则引用 ═══
+principles: environment-first-diagnosis, real-evidence-over-assumption, minimal-parameter-change
+
+# ═══ 关系图 (Relations) ═══
+causes:                 []
+caused_by:              []
+similar_to:             []
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file:               doc/E589.md
+last_updated: 2026-10-12
+source_event:           PR #13191 CI build #84754 (kitchen/1.2.6 conan-build-test failed)
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors: AtomCode AI <noreply@atomgit.com>
+source_pr: 13191
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics, 方案 D) ═══
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+
+draft: true
+contributor_id: 826F

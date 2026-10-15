@@ -1,0 +1,67 @@
+--- /dev/null
++++ b/kitchen3/tests/nose/tools.py
+@@ -0,0 +1,57 @@
++# -*- coding: utf-8 -*-
++"""Minimal replacement for ``nose.tools`` on interpreters without nose.
++
++nose 1.3.7 is Python 2 only (it uses the ``print`` statement in core.py), so it
++cannot be imported under Python 3.12.  kitchen3/tests only uses the six
++helpers below plus ``nose.plugins.skip.SkipTest``, so the surface is small
++enough to reimplement exactly, keeping the upstream test sources unmodified.
++"""
++import unittest
++
++__all__ = [
++    "ok_",
++    "eq_",
++    "assert_raises",
++    "assert_true",
++    "assert_false",
++    "assert_not_equal",
++]
++
++
++def ok_(expr, msg=None):
++    if not expr:
++        raise AssertionError(msg or "Expected truthy value, got %r" % (expr,))
++
++
++def eq_(a, b, msg=None):
++    if a != b:
++        raise AssertionError(msg or "%r != %r" % (a, b))
++
++
++def assert_raises(exception, callable_, *args, **kwargs):
++    try:
++        callable_(*args, **kwargs)
++    except exception:
++        return
++    except Exception as exc:
++        raise AssertionError(
++            "Expected %s, got %s: %s" % (exception.__name__, type(exc).__name__, exc)
++        )
++    raise AssertionError(
++        "Expected %s but no exception was raised" % exception.__name__
++    )
++
++
++def assert_true(expr, msg=None):
++    if expr is not True:
++        raise AssertionError(msg or "Expected True, got %r" % (expr,))
++
++
++def assert_false(expr, msg=None):
++    if expr is not False:
++        raise AssertionError(msg or "Expected False, got %r" % (expr,))
++
++
++def assert_not_equal(a, b, msg=None):
++    if a == b:
++        raise AssertionError(msg or "%r == %r" % (a, b))
+--- /dev/null
++++ b/kitchen3/tests/nose/plugins/skip.py
+@@ -0,0 +1,4 @@
++# -*- coding: utf-8 -*-
++"""Minimal replacement for ``nose.plugins.skip``."""
++
++from unittest import SkipTest  # noqa: F401  (re-exported for nose parity)
