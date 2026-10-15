@@ -1,0 +1,92 @@
+# 版本级 manifest — modemmanager 1.24.2
+# 遵循 ARCHIVE-SPEC v2.0
+
+# 版本号
+version: "1.24.2"
+
+# 软件名
+software: modemmanager
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-05"
+build_system: meson
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（gitlab.freedesktop.org 官方源；freedesktop.org 发布 tarball
+  # 被反爬 bot-check 页拦截不可用，gitlab 官方 archive 实测可达，
+  # sha256 两次独立下载实测一致）
+  url: "https://gitlab.freedesktop.org/mobile-broadband/ModemManager/-/archive/1.24.2/ModemManager-1.24.2.tar.gz"
+  upstream_url: "https://gitlab.freedesktop.org/mobile-broadband/ModemManager/-/archive/1.24.2/ModemManager-1.24.2.tar.gz"
+
+  # 源码校验和（实测下载 sha256）
+  sha256: "fbc75adcc0d7b0565f256e7ff4e8872b0a37c4413ff576665f7470932d9c1b68"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: meson
+
+  # 配置选项列表
+  configure_options:
+    - "-Ddaemon=false"
+    - "-Dudev=false"
+    - "-Dudevdir=<pkg>/lib/udev"
+    - "-Dsystemdsystemunitdir=no"
+    - "-Dsystemd_suspend_resume=false"
+    - "-Dsystemd_journal=false"
+    - "-Dpolkit=no"
+    - "-Dmbim=false"
+    - "-Dqmi=false"
+    - "-Dqrtr=false"
+    - "-Dintrospection=false"
+    - "-Dvapi=false"
+    - "-Dgtk_doc=false"
+    - "-Dman=false"
+    - "-Dbash_completion=false"
+    - "-Dtests=false"
+    - "-Dexamples=false"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - glib/2.84.0.1
+    - dbus/1.14.10
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "patches/0001-meson-daemon-option.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "ModemManager 1.24.2 上游 meson.build 无条件 subdir('src')/subdir('cli')（daemon+mmcli），且 src/daemon 依赖 udev/libgudev、可选 libmbim/libqmi/libqrtr、systemd journal/suspend、polkit——运行期硬依赖 D-Bus 系统总线环境；配方侧用 0001 补丁加中性 -Ddaemon 布尔门控，-Ddaemon=false 时只构建 libmm-glib 客户端库+头文件+生成类型（mm-gdbus-*/mm-enums-types/mm-flags-types/mm-errors-types）"
+  - "libmm-glib 构建期工具链：gdbus-codegen（gnome.gdbus_codegen 读 gio-2.0.pc 的 gdbus_codegen 变量）、mm-mkenums（python3 移植版，find_program 源码内脚本）、xsltproc（ModemManager-names.h 生成）、msgfmt（po/i18n.gettext preset glib）——gdbus-codegen 需 python wrapper 让 meson 经 .pc 变量找到可执行入口"
+  - "顶层 meson.build 硬读 dbus-1.pc 的 interfaces_dir/system_bus_services_dir/sysconfdir 变量决定 introspection XML 与 bus activation 文件安装位置（libmm-glib 本身不链 libdbus-1，dbus 为 configure-time only）；dbus/1.14.10 配方 pkg-config 名生成 dbus.pc 需 dbus-1.pc 别名+变量补全（accountsservice 同模式）"
+  - "-Dudev=false 时上游 meson.build assert 要求显式给 -Dudevdir（即使 daemon 已裁剪仍无条件 install_data udev rules 到 udev_rulesdir）——配方给包内 lib/udev 显式值绕过"
+  - "产物形态：lib/libmm-glib.so（soname libmm-glib.so.0）+ include/ModemManager.h（主枚举/错误头，与 daemon 共享）+ include/libmm-glib/*.h + 生成头（mm-enums-types.h/mm-flags-types.h/mm-errors-types.h/mm-gdbus-*.h 安装进 include/libmm-glib）；.pc 名 mm-glib（libmm-glib/meson.build pkg.generate name='mm-glib'）"
