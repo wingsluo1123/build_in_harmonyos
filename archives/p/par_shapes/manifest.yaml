@@ -1,0 +1,26 @@
+# 软件级 manifest — par_shapes
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: par_shapes
+display: "par_shapes"
+description: "单文件 C 三角网格生成与变换库（prideout/par 单文件库集合中的 par_shapes.h）；头文件即库，实现段由消费者编译"
+category: graphics
+homepage: "https://github.com/prideout/par"
+license: MIT
+build_system: custom
+
+ohos_adaptation:
+  key_points:
+    - "header-only：par_shapes.h 的实现段由 PAR_SHAPES_IMPLEMENTATION 守卫、由消费者编译；包内仅安装 include/par_shapes.h，无库产物（package_type=header-library）"
+    - "上游 test/test_shapes.c（16 用例）在 build() 内按上游 test_shapes 目标的编译方式（-std=c11 -Wall，include .. 与 .，链接 m）复刻并实跑；其导出用例向相对路径 build/*.obj 写 15 个文件，运行目录须预建 build/（导出函数不判 fopen 空）"
+    - "OHOS 上运行 ELF 测试二进制经 bash -c 包装执行（/system/bin/sh 可能无法直接 exec），上游套件与 test_package 两处一致"
+    - "溯源：任务卡 URL（anael-seghezzi/par_shapes）已 404；canonical 上游为 prideout/par monorepo（无 tag），conandata 以 commit 68e1215a055ccbeae378dd5969e09d0c79963a4a 钉定"
+    - "源 URL 为官方 GitHub archive 端点：CI 侧镜像回退由构建脚本对 github.com URL 自动注入；真机 E017 前缀注入按 conan-verify 守卫跳过（conandata 注释显式提及 ghfast.top），真机直连下载已实测成功"
+  common_dependencies: []
+
+versions:
+  "master":
+    status: built
+    build_date: "2026-10-15"
+    conan_ref: "par_shapes/master"
+    note: "首次适配：header-only 打包 + build() 内实跑上游 16 用例（test_shapes.c）+ test_package 消费者端到端执行器（12 用例 / 66 校验点）；真机八门禁 Verdict PASS"

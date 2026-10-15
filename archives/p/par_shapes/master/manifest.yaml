@@ -1,0 +1,39 @@
+# 版本级 manifest — par_shapes master
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "master"
+software: par_shapes
+status: built
+build_date: "2026-10-15"
+build_system: custom
+
+source:
+  url: "https://github.com/prideout/par/archive/68e1215a055ccbeae378dd5969e09d0c79963a4a.tar.gz"
+  sha256: "59fa3e89e1683365beef1126890528b14079b8d8b4556460238cae3acd9f587c"
+  tar_format: tar.gz
+
+build:
+  system: custom
+  configure_options: []
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - category: L1
+    content: "par_shapes 是 prideout/par 单文件库集合中的 mesh 库：par_shapes.h 为「头文件即库」形态，实现段由 PAR_SHAPES_IMPLEMENTATION 守卫、由消费者编译；包内只安装 include/par_shapes.h（package(): Packaged 1 '.h' file），package_type=header-library。卡面 URL（anael-seghezzi/par_shapes）已 404，canonical 上游为 prideout/par monorepo，无 tag，故 conandata 以 commit 68e1215a055ccbeae378dd5969e09d0c79963a4a 钉定。"
+    reason: "header-only 适配模式 + 卡面 URL 失效溯源"
+  - category: L1
+    content: "上游测试套件在 build() 内复刻 test_shapes 目标的编译方式（test_shapes.c + console-colors.c，-std=c11 -Wall，include '..' 与 '.'，链接 m）并直接执行：16/16 用例通过、退出码 0。其导出用例向相对路径 build/*.obj 写 15 个文件（14 形状导出 + lsystem.obj），且 par_shapes_export 对 fopen 失败不判空——工作目录必须先有 build/ 子目录，否则段错误。"
+    reason: "R51 上游测试集成;导出用例对 CWD 的相对路径依赖为本库特有"
+  - category: L1
+    content: "真机验证：八门禁 Verdict PASS（G0-G4 + L2/L4/L5），conan create 成功（包 ID 6b129b068851896169fae42d399fa922d239ce8a，来源下载 12.8MB sha256 与 conandata 一致），test_package 以 CMakeDeps 解析 par_shapes::par_shapes 编译并通过 12 用例/66 校验点。日志中无 E017 注入记录——conandata 注释显式保留 ghfast.top 字样使注入守卫跳过，真机直连 github.com 下载成功（syslog-ng 4.8.1 先例）。"
+    reason: "E017/ghfast 死域规避的已证实写法；header-only 包在 OHOS 真机的完整验证链"
+  - category: L1
+    content: "OHOS 运行 ELF 测试二进制需经 bash -c 包装（/system/bin/sh 可能无法直接 exec），上游套件与 test_package 两处均按此执行；上游自身代码在设备 clang 15 下产生 1 条 -Wall 警告（par_shapes.h rand()/RAND_MAX 的 int→float 隐式转换），属上游代码质量、不影响构建，不做补丁。"
+    reason: "同类包通用执行包装（picohttpparser 先例）+ 上游警告如实记录"
+  - category: L1
+    content: "header-only 包若实现段调用 libm（par_shapes.h 的 sqrtf/sinf/cosf/tanf 等），必须在 package_info() 声明 system_libs=[\"m\"]：CMakeDeps 只发射 cpp_info 已声明的条目，缺声明时消费者按 find_package + target_link_libraries(par_shapes::par_shapes) 即报未定义数学符号。本次由 R1 离线检视发现（test_package 此前手工追加 m 掩盖了该缺口），整改为「配方声明 system_libs + 消费者去掉手工 m」——测试构建成功即同时验证声明经 CMakeDeps 的传递链路。"
+    reason: "R1 离线检视整改（P2）；header-only 包 system_libs 声明与 CMakeDeps 传播面"
