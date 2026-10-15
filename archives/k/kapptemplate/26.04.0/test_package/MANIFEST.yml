@@ -1,0 +1,37 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件 — kapptemplate 26.04.0
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在。
+
+package: kapptemplate/26.04.0
+homepage: "https://invent.kde.org/sdk/kapptemplate"
+
+# 上游测试入口: tests/CMakeLists.txt（顶层 CMakeLists 在 BUILD_TESTING 时
+# find_package(Qt6 COMPONENTS Test) + include(ECMAddTests) + add_subdirectory(tests)），
+# 经 ecm_add_test() 注册 2 个 QtTest 可执行目标：
+#   - namevalidatortest        (Qt6::Core + Qt6::Test)
+#   - macrosubstitutiontest    (KF6::CoreAddons + Qt6::Core + Qt6::Test)
+upstream_check_command: "ctest -N"
+
+# conanfile.py 的 build() 方法中已集成上游测试（真实运行，失败即构建失败）
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build> --output-on-failure --no-tests=error (QT_QPA_PLATFORM=offscreen)"
+
+# 上游实际运行的测试程序（QtTest，纯 QtCore/QRegularExpression + KMacroExpander，
+# 无 GUI / 无网络 / 无外部服务，offscreen 平台下稳定）。
+upstream_tests:
+  - name: namevalidatortest
+    description: "项目名校验正则 QRegularExpression(\"^[a-zA-Z0-9_.\\\\-]*$\") 断言（1 项 QVERIFY）"
+  - name: macrosubstitutiontest
+    description: "KMacroExpander 模板宏替换断言（5 项 QCOMPARE：APPNAME/APPNAMEUC/APPNAMELC/AUTHOR/EMAIL）"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: conanfile.py
+    description: "消费者测试：offscreen QPA 下真实执行 bin/kapptemplate —— (1) --version 打印 KAboutData 版本 0.1.26040（设备实测）；(2) --list-templates 列出已安装模板 kde-frameworks6 / kde-frameworks6-simple；(3) 以 6 个位置参数驱动模板生成器，在 $TMPDIR 下生成 kde-frameworks6 项目，断言项目目录/文件名（%{APPNAMELC} 展开）与根 CMakeLists.txt 内容宏展开（project(mytestapp VERSION 1.2.3)）"
+    command: "kapptemplate MyTestApp <tmp> 'Test Author' test@example.org 1.2.3 kde-frameworks6"
+  - file: test_app.sh
+    description: "等价的独立复现脚本（设备手动复现消费者 CLI 生成流程）"
+    command: "./test_app.sh <pkg>/bin/kapptemplate"
+
+# 测试断言总数：上游 6（1+5）+ 消费者 11（version 1 + list 3 + 生成 7）≈ 17
+assertion_count: 17

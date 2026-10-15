@@ -1,0 +1,66 @@
+--- a/src/application/generator.cpp
++++ b/src/application/generator.cpp
+@@ -22,20 +22,40 @@
+ #include <KZip>
+ 
+ #include <QDir>
+ #include <QFileInfo>
+ #include <QMimeDatabase>
+ #include <QRegularExpression>
+ #include <QStandardPaths>
+ #include <QTemporaryDir>
+ 
+ using namespace Qt::StringLiterals;
++
++// OHOS: QFile::copy() returns false on the HMDFS filesystem used on this
++// platform even for plain file names (the underlying kernel copy path fails),
++// which made the template generator silently produce nothing. Copy the
++// extracted file by reading and writing it explicitly instead.
++static bool copyTemplateFile(const QString &src, const QString &dst)
++{
++    QFile in(src);
++    if (!in.open(QIODevice::ReadOnly)) {
++        return false;
++    }
++    const QByteArray data = in.readAll();
++    QFile out(dst);
++    if (!out.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
++        return false;
++    }
++    const bool written = out.write(data) == data.size();
++    out.close();
++    return written;
++}
+ 
+ Generator::Generator(QObject *parent)
+     : QObject(parent)
+     , m_name(Prefs::appName())
+     , m_location(Prefs::url())
+     , m_authorName(Prefs::name())
+     , m_authorEmail(Prefs::email())
+     , m_version(Prefs::appVersion())
+ {
+ }
+@@ -160,21 +180,21 @@
+             file->copyTo(tdir.path());
+             QString destName = KMacroExpander::expandMacros(dest + '/' + file->name(), m_variables);
+             if (QFile::exists(destName)) {
+                 Q_EMIT errorOccurred(
+                     i18n("Could not copy template file to %1, because the file is "
+                          "already exists. The project has not been generated and "
+                          "all temporary files will be removed.",
+                          destName));
+                 failed = true;
+                 break;
+-            } else if (QFile(QDir::cleanPath(tdir.path() + '/' + file->name())).copy(destName)) {
++            } else if (copyTemplateFile(QDir::cleanPath(tdir.path() + '/' + file->name()), destName)) {
+                 m_newFiles.append(destName);
+                 auto mimeType = mimeDb.mimeTypeForFile(destName);
+                 auto processMacros = mimeType.inherits(QStringLiteral("text/plain"));
+                 qCDebug(KAPPTEMPLATE) << (processMacros ? "processing file" : "not processing file") << destName << "with mimetype" << mimeType.name()
+                                       << "inheriting" << mimeType.allAncestors();
+                 if (processMacros && !extractFileMacros(destName)) {
+                     Q_EMIT errorOccurred(
+                         i18n("Failed to integrate your project information into "
+                              "the file %1. The project has not been generated and "
+                              "all temporary files will be removed.",
