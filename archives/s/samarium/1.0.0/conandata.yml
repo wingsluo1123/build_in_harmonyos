@@ -1,0 +1,22 @@
+sources:
+  "1.0.0":
+    url: "https://github.com/strangeQuark1041/samarium/archive/refs/tags/v1.0.0.tar.gz"
+    sha256: "943de75803f492f78c5d55fe43be298fbb66156cc22946a3c6cc6b0634efc2e2"
+
+patches:
+  "1.0.0":
+    - patch_file: "patches/0001-cmake-remove-host-only-march-flag.patch"
+      patch_description: "上游 cmake/compiler_options.cmake 给所有目标加 -march=x86-64；交叉编译到 aarch64（OHOS）时 clang 直接报 unknown target CPU，必须移除"
+      patch_type: "portability"
+    - patch_file: "patches/0002-cmake-consume-installed-cmake-packages.patch"
+      patch_description: "上游用 conan 1 的 conanbuildinfo / 配置期 conan install；改为消费 conan 2 CMakeDeps 生成的 CMake 包配置（fmt/range-v3），并保留共享库默认符号可见性"
+      patch_type: "portability"
+    - patch_file: "patches/0003-disable-sfml-dependent-app-gui-modules.patch"
+      patch_description: "app/ 与 gui/ 硬依赖 SFML Window/Graphics，本制品仓的 sfml/2.6.1.1 只交付 System/Network；裁掉这三个编译单元与对应的公共头/umbrella 行"
+      patch_type: "portability"
+    - patch_file: "patches/0004-test-run-registered-boost-ut-suites.patch"
+      patch_description: "上游 test/tests/main.cpp 是空 main()，Boost.UT 的两个 suite 注册后从不执行（ctest 假通过）；补上 cfg<>.run() 让 49 条断言真跑"
+      patch_type: "test"
+    - patch_file: "patches/0005-grid-fix-out-of-range-member-access.patch"
+      patch_description: "graphics/Grid.hpp 的 at(size_t) 访问了不存在的成员 m_size（应为 data.size()）；GCC 13+ 的 -Wtemplate-body 直接判错，修正为合法成员访问（语义等价）"
+      patch_type: "bugfix"

@@ -1,0 +1,46 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（samarium 1.0.0）
+# 上游是 CMake + Boost.UT：test/CMakeLists.txt 注册唯一 CTest 目标 samarium_tests，
+# recipe 的 build() 里真跑 `ctest --test-dir <build_folder> -V --output-on-failure`。
+
+package: samarium/1.0.0
+homepage: "https://github.com/strangeQuark1041/samarium"
+
+# 上游测试命令（与 conanfile.py build() 中执行的字面量一致；CI 日志里可见 ctest）
+upstream_check_command: "ctest --test-dir <build_folder> -V --output-on-failure"
+
+# conanfile.py build() 中已集成上游测试（失败即让构建失败）
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build_folder> -V --output-on-failure"
+
+# 上游实际执行的测试程序：Boost.UT 单可执行文件 test/samarium_tests
+# 实测输出 "All tests passed (49 asserts in 4 tests)"，CTest 1/1 Passed
+upstream_tests:
+  - file: test/CMakeLists.txt
+    source: samarium-1.0.0/test/CMakeLists.txt
+    description: "CTest 注册：add_test(NAME SamariumTests COMMAND samarium_tests)；测试源为 tests/Vector2.cpp + tests/concepts.cpp + tests/main.cpp"
+    command: "ctest --test-dir <build_folder> -V"
+  - file: test/tests/Vector2.cpp
+    source: samarium-1.0.0/test/tests/Vector2.cpp
+    description: "Boost.UT suite _Vector2：math.Vector2.literals / math.Vector2 / math.Vector2.geometry（含 6 个 should 子用例），31 条 expect 断言（字面量、length/length_sq/angle/slope、线段交点与 clamped 交点、Circle/BoundingBox 面积）"
+    command: "test/samarium_tests（由 ctest 调起）"
+  - file: test/tests/concepts.cpp
+    source: samarium-1.0.0/test/tests/concepts.cpp
+    description: "Boost.UT suite concepts：core.concepts（Integral/Number 对 u8..u64、i8..i64、f32/f64 的约束判定），18 条 expect 断言"
+    command: "test/samarium_tests（由 ctest 调起）"
+  - file: test/tests/main.cpp
+    source: samarium-1.0.0/test/tests/main.cpp
+    description: "上游测试入口（补丁 0004：上游原为空 main()，suite 只注册不执行 ⇒ ctest 空跑假通过；补 boost::ut::cfg<>.run() 后 49 条断言真跑）"
+    command: "test/samarium_tests"
+
+# test_package 中自带的测试（消费者视角 + 交付形态）
+test_package_tests:
+  - file: test_package.cpp
+    description: "消费者用例：只 include 交付头、只链接 libsamarium.so，39 项检查全部用外部可核对真值判定（显式欧拉离散闭式解/解析力学：自由落体 y=y0+v0t−½gt²、抛体射程 v²sin2θ/g 与最大高度、弹性碰撞等质量交换速度、胡克定律 F=kx、平面几何与 πr²、Trail 滑动窗口不变量、PCG 均匀分布性质）"
+    command: "./test_samarium"
+  - file: test_layout.py
+    description: "交付形态自检（M）：ELF 架构/ET_DYN/DT_SONAME/无 RPATH/DT_NEEDED、.codesign 段（OHOS）、头文件包含闭包、未交付模块已裁净、许可原文、无测试与构建中间产物、无隐藏文件、CMake/pkconfig 契约可重定位、消费者 DT_NEEDED 含 libsamarium"
+    command: "python3 test_layout.py --package-folder=<pkg> --generators-dir=<gen> --consumer=<bin>"
+
+# 断言总数：上游 49 条 + 消费者 39 项 + 交付形态自检 30 项（OHOS 侧 30 项全部执行）
+assertion_count: 118
