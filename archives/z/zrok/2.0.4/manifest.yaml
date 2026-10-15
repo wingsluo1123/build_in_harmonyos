@@ -1,0 +1,46 @@
+# 版本级 manifest — zrok 2.0.4
+# 状态依据 conan-verify 结果（G2 conan create 通过，未发布到制品仓 → built）
+
+version: "2.0.4"
+software: zrok
+status: built
+build_date: "2026-10-03"
+build_system: custom
+test_passed: 160
+test_failed: 0
+test_skipped: 4
+test_total: 164
+test_results_passed: 160
+test_results_failed: 0
+
+source:
+  url: "https://github.com/openziti/zrok/archive/refs/tags/v2.0.4.tar.gz"
+  sha256: "07c98d5f9be96885ec98b40446d4d8867f19f4b59f3ae4de0b41cdac8db6c392"
+  tar_format: tar.gz
+
+build:
+  system: custom
+  configure_options:
+    - "CGO_ENABLED=1"
+    - "GOOS=linux"
+    - "GOARCH=arm64"
+    - "GOTOOLCHAIN=local"
+    - "GOFLAGS=-mod=mod"
+    - "GOPROXY=https://goproxy.cn,direct"
+    - "GOSUMDB=sum.golang.google.cn"
+    - "CC=aarch64-unknown-linux-ohos-clang"
+    - "TAGS=no_zrok_ui"
+    - "LDFLAGS=-s -w -X github.com/openziti/zrok/v2/build.Version=v2.0.4 -X github.com/openziti/zrok/v2/build.Hash=2.0.4"
+  dependencies:
+    - "go/1.26.0"
+  cc: aarch64-unknown-linux-ohos-clang
+  cxx: ""
+
+patches_applied: []
+
+knowledge_gained:
+  - "Go 项目 go build ./cmd/zrok2 直编；绕开顶层 Makefile（npm ui + agent/agentUi 构建 + go install）"
+  - "mattn/go-sqlite3 是 cgo-only 包，CGO_ENABLED=0 时包为空导致 controller/createFrontend.go 的 sqlite3.Error 未定义——zrok 必须 CGO_ENABLED=1 配 OHOS SDK clang（与 kubeaudit CGO_ENABLED=0 的最大 delta）"
+  - "UI go:embed dist 用上游自带 -tags no_zrok_ui（embed_stub.go）绕开，无需造 UI placeholder；endpointUi/index.gohtml、controller/emailUi、proxyUi、sql/*.sql 等 embed 文件均在源码内"
+  - "HMDFS 上 go 链接输出放 go-workspace/link-out 单遍成型后拷贝，测试 ELF 按 E318 编译-签名-回源码目录运行"
+  - "上游测试 12 个包 35 个 _test.go；sdk/golang/sdk 的 4 个集成测试在无 ZROK2_API_ENDPOINT/ZROK2_ADMIN_TOKEN 时按上游语义自跳过"
