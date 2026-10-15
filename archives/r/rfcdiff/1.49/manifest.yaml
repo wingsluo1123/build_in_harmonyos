@@ -1,0 +1,66 @@
+software: rfcdiff
+version: "1.49"
+upstream_version: "1.49"
+status: built
+build_date: "2026-10-04"
+build_system: custom
+conan_ref: "rfcdiff/1.49"
+
+source:
+  url: "https://github.com/ietf-tools/rfcdiff/archive/refs/tags/1.49.tar.gz"
+  sha256: "a4401868137cc3e7711fcd8be3cd088a75955f8dba72ec472b91880c773a93a7"
+  tar_format: tar.gz
+  upstream_tag: "1.49"
+
+build:
+  system: custom
+  configure_options: []
+  dependencies: []
+  cc: clang
+  outputs:
+    - "bin/rfcdiff"
+    - "share/doc/rfcdiff/README.md"
+    - "licenses/LICENSE"
+
+patches_applied:
+  - "0001-rfcdiff.patch"
+
+knowledge_gained:
+  - "鸿蒙没有 /bin/bash（E165）：依赖 bash 特性的脚本（$(< file)、echo -en、[ == ]）不能改成 /system/bin/sh，shebang 应指向 /data/service/hnp/bin/bash"
+  - "鸿蒙 /tmp 只读（E002）：脚本把工作目录硬编码成 /tmp/<name>-$$ 时，改成 ${TMPDIR:-/tmp}/<name>-$$；『保留现场』分支里的 cd /tmp 要同步改为 cd 到工作目录的父目录，否则 tar 打包找不到目录"
+  - "lang-preflight 对纯 Shell 项目判 other（无构建系统、无可统计源文件），必须用 --lang other 如实申报，不能伪报 cpp"
+  - "init-build 对无构建系统的脚本包把 build_system 误渲染为 autotools，conan-init 随之生成 autotools 配方与 CMake test_package 骨架，需要整体改写为脚本包（参照 headeronly 变体 C）"
+
+conan:
+  reference: "rfcdiff/1.49"
+  package_type: application
+  architecture_independent: true
+  user_channel: "ohpcd/stable"
+
+test_scope:
+  upstream_functional_cases: 0
+  upstream_functional_passed: 0
+  upstream_test_evidence: >-
+    The 1.49 tag tarball holds only LICENSE, README.md and the rfcdiff script;
+    no tests/ directory and no build system.
+  test_package_assertions: 15
+  generic_assertions: 10
+  harmonyos_assertions: 5
+  harmonyos_test_files:
+    - "test_package/test_rfcdiff_ohos.sh"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /root/tmp/builds/rfcdiff-1.49.orig
+  source_work_dir: /root/tmp/builds/rfcdiff-1.49.work
+  source_orig_hash: a3e82770e67a38ae
+  source_work_hash: c313117f8b325c22
+  generated_at: '2026-10-04T04:02:23'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-rfcdiff.patch
+    type: portability
+    platform_only: false
+    guard: none
+    note: "无平台宏/条件编译：shebang 为静态路径改写；工作目录改动为 ${TMPDIR:-/tmp} 参数展开，在任何 POSIX 系统上语义与上游一致"

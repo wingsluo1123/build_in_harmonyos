@@ -1,0 +1,60 @@
+# test_package/MANIFEST.yml
+# Upstream test declaration for rfcdiff 1.49 (required by CI L0e).
+package: "rfcdiff/1.49"
+homepage: "https://github.com/ietf-tools/rfcdiff"
+upstream_repo: "https://github.com/ietf-tools/rfcdiff"
+
+# ── R51 upstream test inventory ──────────────────────────────────────────────
+# The 1.49 tag tarball contains exactly three files and no test code:
+#   $ tar tzf rfcdiff-1.49.tar.gz
+#   rfcdiff-1.49/  rfcdiff-1.49/LICENSE  rfcdiff-1.49/README.md  rfcdiff-1.49/rfcdiff
+# There is no tests/ directory, no Makefile/CMakeLists/meson.build, no ctest or
+# pytest registration and no CI test workflow in the released tree, so the
+# upstream count is N = 0 and nothing can be run. Real functional tests are
+# supplied by this test_package instead.
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_test_count: 0
+upstream_test_passed: 0
+upstream_tests: []
+upstream_test_evidence: >-
+  `tar tzf rfcdiff-1.49.tar.gz` lists only LICENSE, README.md and the rfcdiff
+  script; the tree has no tests/ directory and no build system.
+
+# ── test_package cases (consumer view: the packaged tool is run on drafts) ──
+test_package_tests:
+  - file: "test_rfcdiff.sh"
+    kind: functional
+    description: >-
+      Runs the packaged rfcdiff on two synthetic Internet-Drafts with page
+      headers/footers: --version, --diff (exact output + hunk header),
+      --chbars (exactly 3 marked lines), --html (word-level insert/delete
+      spans, no footer leak), --nostrip, default output file name, same-file
+      detection, usage error exit code.
+    command: "bash test_rfcdiff.sh <package>/bin/rfcdiff <workdir>"
+  - file: "test_rfcdiff_ohos.sh"
+    kind: harmonyos
+    description: >-
+      HarmonyOS-specific consumer cases for the 3 patched lines: (1) shebang is
+      /data/service/hnp/bin/bash (E165); (2) the tool diffs two drafts through
+      that interpreter (direct exec first, explicit interpreter if HMDFS drops
+      the exec bit; SKIP if the interpreter is absent); (3) --keep puts the work
+      directory and its tarball under $TMPDIR; (4) a normal run with a custom
+      $TMPDIR succeeds and leaves nothing behind; (5) an unusable $TMPDIR fails
+      with "Failed to create temporary directory" instead of falling back to
+      /tmp (E002). Cases 1, 3 and 5 fail against the unpatched script (verified).
+    command: "bash test_rfcdiff_ohos.sh <package>/bin/rfcdiff <workdir>"
+
+generic_test_count: 10
+harmonyos_test_count: 5
+test_package_assertion_count: 15
+assertion_count: 15
+counting_policy: >-
+  Each ok()/no() call counts as one assertion; sk() (precondition absent) is
+  reported as SKIP, never as a pass. Adaptation host result: 15/15 inside
+  `conan create` against the packaged script (HarmonyOS case 2 took the direct
+  shebang-exec path; against the bare work copy, which has no exec bit, it takes
+  the explicit-interpreter path). Negative control: against the pristine upstream
+  script the generic suite passes 10/10 and the HarmonyOS suite fails cases 1,
+  3 and 5.
