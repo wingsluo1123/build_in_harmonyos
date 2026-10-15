@@ -1,0 +1,35 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: indi-shelyak/1.0-20221222171819
+homepage: "https://github.com/indilib/indi-3rdparty"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+# 上游 CMakeLists.txt 未注册任何测试目标（纯 add_executable 两个驱动，
+# 无 add_test / enable_testing），make check 无实际测试可跑。
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+# 上游 indi-shelyak 无独立测试程序（仅两个驱动可执行文件本身）。
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证)
+# 消费者探针 test_shelyak.py：ELF64/AArch64 身份 + DT_NEEDED 链接
+# libindidriver/libindiAlignmentDriver + indi_shelyak.xml 注册文件校验。
+# 驱动二进制为 OHOS aarch64 动态链接产物，构建宿主无法执行（E537/R49：
+# HMDFS 无法对 OHOS 共享库 mmap PROT_EXEC，与 libindi/libfli 同款限制），
+# 故以制品解析方式实质验证（非空壳测试）。
+test_package_tests:
+  - file: test_shelyak.py
+    description: "消费者探针：验证已装驱动的 ELF 身份/动态链接/注册文件"
+    command: "python3 test_shelyak.py"
+
+# 测试断言总数 (近似值, 用于质量评估)
+# 2 个驱动 × 6 项检查 + 注册文件 5 项检查 = 17 项
+assertion_count: 17
