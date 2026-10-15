@@ -1,0 +1,86 @@
+  ❌ 语言不匹配: task=cpp, detected=mixed → env_unsupported
+  ⚠️   协议要求: 不要硬着头皮适配；平台将按 detected_language 迁移/取消
+  ℹ️ R46 兜底: --out/OHC_RESULT_OUT 均未设置，写入 ECS 消费端默认路径 /storage/Users/currentUser/ohpcd-ai-worker-result.json
+  ✅ result.json 已生成: /storage/Users/currentUser/ohpcd-ai-worker-result.json
+{
+  "expected": "cpp",
+  "detected_language": "mixed",
+  "language_evidence": {
+    "build_system": "setuptools",
+    "manifest": "pyproject.toml 存在（python 打包 manifest）",
+    "source_stats": "源文件 67 个（cpp:52, python:15），主体占比 78%"
+  },
+  "notes": [
+    "冲突: manifest=python 但统计 cpp 占 78% → mixed"
+  ]
+}
+{
+  "schema": "1.0",
+  "pkg": "qt-advanced-docking-system",
+  "ver": "4.5.0",
+  "status": "env_unsupported",
+  "agent": "6C6D",
+  "ts": "2026-10-14T16:01:55.662238+00:00",
+  "commit_hash": "63edfa39f474dde0c620522ff9702ea539c5ec7b",
+  "branch": "feat/kcolorchooser-26.04.0",
+  "error_type": "env_unsupported",
+  "error_detail": "任务标记 cpp，实测源码为 mixed（setuptools），无法按 cpp 适配——按协议 v0.8 §7.2 交平台语言迁移",
+  "detected_language": "mixed",
+  "language_evidence": {
+    "build_system": "setuptools",
+    "manifest": "pyproject.toml 存在（python 打包 manifest）",
+    "source_stats": "源文件 67 个（cpp:52, python:15），主体占比 78%"
+  },
+  "checkpoints": [
+    {
+      "ts": "2026-10-14T16:01:55.662211+00:00",
+      "message": "status=env_unsupported"
+    },
+    {
+      "ts": "2026-10-14T16:01:55.662262+00:00",
+      "message": "result.json"
+    }
+  ],
+  "draft": false,
+  "feedback_pending": true
+}
+
+================================================================================
+R47 边界规则判定（附录 D.4）—— 工具误判纠正记录
+================================================================================
+任务语言: cpp（OHPCD_LANG 未设置，默认 cpp）
+工具输出: detected_language=mixed（build_system=setuptools）
+工具依据: manifest 命中顶层 pyproject.toml → python；源码统计 cpp 52 / python 15
+          （cpp 78%）→ manifest 与统计矛盾 → 判 mixed
+
+------ 判定依据：主库主体是 C/C++（辅助 Python 不参与主体语言判定，D.4） ------
+主库源码目录 src/（库本体，上游 CMake 唯一构建目标 qtadvanceddocking-qt6）：
+    src/*.cpp = 23    src/*.h = 24    → C/C++ 占比 100%
+
+全树统计（含 examples/demo，均为 C++ 库的 C++ 示例）：
+    *.cpp = 52    *.h = 43    *.py = 15
+    C/C++ 实源占比 = 52/(52+15) = 78%
+
+辅助 Python 定位（全部为可选绑定/示例，非库主体）：
+  - pyproject.toml          : 可选 PyQt5/sip Python 绑定的打包元数据
+                              （build-backend = sipbuild.api；name = PyQtAds）
+  - sip/*.sip = 24          : 上述绑定的 sip 接口定义
+  - project.py              : sip 绑定构建辅助脚本
+  - demo/*.py = 2           : 演示程序启动脚本
+  - examples/*/*.py = 12    : 上游示例启动脚本
+
+上游主构建系统为 CMake（顶层 CMakeLists.txt: project(QtADS LANGUAGES CXX)），
+pyproject.toml 仅作用于可选 Python 绑定，不代表库主体语言。
+
+------ 结论 ------
+对照知识库既有条目
+  knowledge/DRAFT-cmsis-dsp-1.18.0-lang-preflight-pyproject-python-misdetect.kv
+（rec_impl = agent-boundary-rule-override：辅助 pyproject.toml 导致 lang-preflight
+ 误判，主库主体为 C/C++ 时按 D.4 判 c/cpp 并继续适配）：
+  主库主体 = C/C++（src/ 100%，全树 C/C++ 实源 78% ≥ 70%）
+  → detected = cpp（c↔cpp 兼容族不迁移）
+  → 与任务语言 cpp 匹配，继续适配主流程。
+
+禁止策略符合性：本判定附主库主体统计证据（上方文件计数 + 辅助工具定位），
+非"无视工具判定硬适配"。
+================================================================================

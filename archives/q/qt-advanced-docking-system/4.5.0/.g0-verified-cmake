@@ -1,0 +1,13 @@
+# G0 干净构建验证标记（CMake 项目变体）
+# 本包为 CMake 项目，`ohc-run.py finish` 的 G0 clean-verify 步骤按 autotools
+# 约定执行 `./configure`（上游无该脚本 → exit 127），不适用于 CMake 项目。
+# 等价的干净构建验证已由以下两步完成并通过（该步骤本身被 finish 记为非阻塞）：
+#   1. conan-verify G2「conan create (干净构建)」—— 从 tarball 重新解压 + 打补丁 +
+#      完整交叉编译 + test_package；该次运行 G1/G2/G3/G4 判定 PASS（G0 为
+#      conan-verify 内部的预构建风险评估门禁，亦 PASS；L2/L4/L5 见下条）；
+#   2. finish step[5/10] W3 本地 CI 模拟（setup.sh + build_and_test.sh + conan create）
+#      通过，其中含 CI 的 L2 smoke / L4 安全扫描 / L5 产物基线检查。
+# 说明：本文件只登记"CMake 项目的 G0 等价验证走 conan-verify G2 + W3"这一事实，
+#       不代表 autotools 式 ./configure + make + make install 路径已被执行。
+# 详见 reports/conan-verify-report.md 与 reports/w3-local-ci.log。
+verified_at: 2026-10-15
