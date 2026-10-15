@@ -1,0 +1,27 @@
+# conandata.yml — scanbd 1.5.1
+# 官方源码: https://sourceforge.net/projects/scanbd/ (SourceForge release 直链)
+# sha256 于 2026-10-03 由官方 release tarball 实测
+
+sources:
+  # downloads.sourceforge.net (redirect host) times out from CI workers
+  # (network-restricted). master.dl.sourceforge.net is SourceForge's own
+  # official mirror host for the same release file (viasf=1 forces the
+  # direct download); sha256 verified byte-identical.
+  url: "https://master.dl.sourceforge.net/project/scanbd/releases/scanbd-1.5.1.tgz?viasf=1"
+  sha256: "b69ca5a474b81516d19c38082d949363c243df9ab9742315aaae499723267e5f"
+
+patches:
+  - patch_file: "patches/0001-config.sub-ohos.patch"
+    patch_description: "Teach the bundled Autoconf config.sub to accept linux-ohos triplets"
+    patch_type: "portability"
+  - patch_file: "patches/0002-configure-tmpdir-mkdir.patch"
+    patch_description: "configure: create the config.status temp directory with mkdir instead of mktemp：HMDFS 上 mktemp 0700 目录投影为不可写 drwx--S--- (E114/E046 平台限制)"
+    patch_type: "portability"
+    patch_source: "E114"
+  - patch_file: "patches/0003-no-pthread-cancel.patch"
+    patch_description: "dbus.c/sane.c: replace pthread_cancel()/pthread_testcancel()/pthread_setcancelstate() with cooperative stop flags (OHOS libc provides neither the declarations nor the symbols)"
+    patch_type: "portability"
+    patch_source: "OHOS platform limitation"
+  - patch_file: "patches/0004-vpath-makefile-conf.patch"
+    patch_description: "Makefile.in/Makefile.am: read Makefile.conf.in/Makefile.include.in through $(srcdir), so the noinst_DATA files can be generated in an out-of-tree build (upstream only supported in-tree builds)"
+    patch_type: "portability"

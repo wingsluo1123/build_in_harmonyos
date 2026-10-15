@@ -1,0 +1,86 @@
+# 版本级 manifest
+# 文件位置: archives/{letter}/{name}/1.5.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.5.1"
+
+# 软件名
+software: "scanbd"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-03"
+build_system: "autotools"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://downloads.sourceforge.net/project/scanbd/releases/scanbd-1.5.1.tgz"
+
+  # 源码校验和
+  sha256: "b69ca5a474b81516d19c38082d949363c243df9ab9742315aaae499723267e5f"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表
+  configure_options:
+    - "--build=aarch64-linux-gnu"
+    - "--host=aarch64-linux-ohos"
+    - "--with-systemdsystemunitdir=no"
+    - "--disable-udev"
+    - "--disable-hal"
+    - "ac_cv_func_malloc_0_nonnull=yes"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - libconfuse/3.3
+    - sane-backends/1.2.1
+    - dbus/1.14.10
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-config.sub-ohos.patch"
+  - "0002-configure-tmpdir-mkdir.patch"
+  - "0003-no-pthread-cancel.patch"
+  - "0004-vpath-makefile-conf.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "AC_FUNC_MALLOC 的运行时探针在交叉编译下必然失败，Autoconf 会把 malloc 重定向到 gnulib 的 rpl_malloc()，而 OHOS libc 不提供该符号：configure 需显式传入 ac_cv_func_malloc_0_nonnull=yes"
+  - "依赖包内的 .la 文件记录着其构建机的绝对路径（libdir='//lib'、dependency_libs='//lib/libpng16.la'），libtool 会照此解析并报 not a valid libtool archive：把依赖 .la 复制到 staging 目录改写 libdir/dependency_libs，并用 pkg-config Libs 前置 -L<stage> 让链接优先命中（Conan 缓存只读，不改依赖包）"
+  - "OHOS libc 缺 pthread_cancel/pthread_testcancel/pthread_setcancelstate：dbus.c/sane.c 的线程取消改为协作式停止标志；sane.c 自带 #define CANCEL_TEST，取消测试块是活代码，需一并移除该宏"
+  - "上游 Makefile.am 的 noinst_DATA 规则用 $@.in 而非 $(srcdir)/$@.in，只在源码树内构建可行：out-of-tree（Conan 构建目录）下 Makefile.conf.in / Makefile.include.in 找不到，需补 $(srcdir)"

@@ -1,0 +1,130 @@
+diff --git a/src/scanbd/dbus.c b/src/scanbd/dbus.c
+--- a/src/scanbd/dbus.c
++++ b/src/scanbd/dbus.c
+@@ -26,6 +26,9 @@
+ 
+ static DBusConnection* conn = NULL;
+ static pthread_t dbus_tid = 0;
++// OHOS does not provide pthread_cancel(): the dbus thread is stopped
++// cooperatively with this flag (checked once per dispatch timeout).
++static volatile bool dbus_thread_stop_requested = false;
+ 
+ #ifdef PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP
+ // this is non-portable
+@@ -679,7 +682,8 @@
+     }
+     slog(SLOG_DEBUG, "timeout: %d ms", timeout);
+ 
+-    while(dbus_connection_read_write_dispatch(conn, timeout)) {
++    while(!dbus_thread_stop_requested &&
++          dbus_connection_read_write_dispatch(conn, timeout)) {
+         slog(SLOG_DEBUG, "Iteration on dbus call");
+         usleep(timeout * 1000);
+     }
+@@ -809,6 +813,7 @@
+         slog(SLOG_DEBUG, "dbus thread already running");
+         dbus_stop_dbus_thread();
+     }
++    dbus_thread_stop_requested = false;
+     if (pthread_create(&dbus_tid, NULL, dbus_thread, NULL) < 0){
+         slog(SLOG_ERROR, "Can't create dbus thread: %s", strerror(errno));
+         return;
+@@ -821,14 +826,10 @@
+     if (dbus_tid == 0) {
+         return;
+     }
+-    if (pthread_cancel(dbus_tid) < 0) {
+-        if (errno == ESRCH) {
+-            slog(SLOG_WARN, "dbus thread was already cancelled");
+-        }
+-        else {
+-            slog(SLOG_WARN, "unknown error from pthread_cancel: %s", strerror(errno));
+-        }
+-    }
++    // OHOS does not provide pthread_cancel(): ask the thread to leave its
++    // dispatch loop instead. The thread observes the flag on its next
++    // iteration (at most one dispatch timeout), so the join below terminates.
++    dbus_thread_stop_requested = true;
+     slog(SLOG_DEBUG, "join dbus thread");
+     if (pthread_join(dbus_tid, NULL) < 0) {
+         slog(SLOG_ERROR, "pthread_join: %s", strerror(errno));
+diff --git a/src/scanbd/sane.c b/src/scanbd/sane.c
+--- a/src/scanbd/sane.c
++++ b/src/scanbd/sane.c
+@@ -23,7 +23,10 @@
+ #include "scanbd.h"
+ #include "scanbd_dbus.h"
+ 
+-#define CANCEL_TEST
++// OHOS does not provide thread cancellation: pthread_cancel()/pthread_setcancelstate()/
++// pthread_testcancel() are absent from its libc, so the cancellation test scaffolding
++// is disabled. Threads are stopped cooperatively instead (see stop_requested below).
++//#define CANCEL_TEST
+ 
+ // all programm-global sane functions use this mutex to avoid races
+ #ifdef PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP
+@@ -113,6 +116,9 @@
+     // for this device
+     int num_of_options_with_functions;// the number of elements in the
+     // above list
++    // OHOS does not provide pthread_cancel(): cooperative stop flag,
++    // checked by the polling loop below
++    volatile bool stop_requested;
+ };
+ typedef struct sane_thread sane_thread_t;
+ 
+@@ -751,15 +757,15 @@
+     slog(SLOG_DEBUG, "timeout: %d ms", timeout);
+     
+     slog(SLOG_DEBUG, "Start the polling for device %s", st->dev->name);
+-    while(true) {
++    while(!st->stop_requested) {
+         slog(SLOG_DEBUG, "polling thread for %s, before cancellation point", st->dev->name);
+ #ifdef CANCEL_TEST
+         if (pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) < 0) {
+             slog(SLOG_ERROR, "pthread_setcancelstate: %s", strerror(errno));
+         }
+ #endif
+-        // special cancellation point
+-        pthread_testcancel();
++        // OHOS does not provide thread cancellation: the loop condition
++        // above is the cooperative cancellation point
+ 
+ #ifdef CANCEL_TEST
+     if (pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL) < 0) {
+@@ -860,16 +866,9 @@
+             // free the previous allocated value
+             sane_option_value_free(&st->opts[si].value);
+ 
+-            // pass the responsibility to free the value to the main
+-            // thread, if this thread gets canceled
+-            if (pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL) < 0) {
+-                slog(SLOG_ERROR, "pthread_setcancelstate: %s", strerror(errno));
+-            }
++            // pass the responsibility to free the value to the main thread
+             st->opts[si].value = value;
+             pthread_cleanup_pop(0);
+-            if (pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) < 0) {
+-                slog(SLOG_ERROR, "pthread_setcancelstate: %s", strerror(errno));
+-            }
+ 
+             // was there a value change?
+             if (st->triggered && (st->triggered_option >= 0)) {
+@@ -1361,14 +1360,9 @@
+         }
+ 
+         slog(SLOG_DEBUG, "stopping poll thread for device %s", (*(sane_device_list + i))->name);
+-        if (pthread_cancel(sane_poll_threads[i].tid) < 0) {
+-            if (errno == ESRCH) {
+-                slog(SLOG_ERROR, "poll thread for device %s was already cancelled");
+-            }
+-            else {
+-                slog(SLOG_ERROR, "unknown error from pthread_cancel: %s", strerror(errno));
+-            }
+-        }
++        // OHOS does not provide pthread_cancel(): the thread leaves its
++        // polling loop cooperatively after its current cycle
++        sane_poll_threads[i].stop_requested = true;
+     }
+     // waiting for all threads to vanish
+     for(int i = 0; i < num_devices; i += 1) {
