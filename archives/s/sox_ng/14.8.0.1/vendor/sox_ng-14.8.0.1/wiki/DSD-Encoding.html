@@ -1,0 +1,213 @@
+<html><head><title>DSD-Encoding - sox_ng wiki</title></head>
+<body><p align=center>sox_ng wiki - DSD-Encoding</p>
+<hr>
+<h1 id="dsdencodingprimer">DSD Encoding Primer</h1>
+
+<p>by <a href="https://github.com/barstoolbluz"><code>github/barstoolbluz</code></a></p>
+
+<h2 id="introduction">Introduction</h2>
+
+<p>Direct Stream Digital (DSD) is a digital audio encoding method utilizing 
+1-bit sigma-delta modulation. DSD64, the original standard used in SACD,
+samples at 2.8224 MHz. Higher sample rates like DSD128, DSD256 and DSD512
+provide significant advantages by reducing ultrasonic noise and enabling
+gentler noise shaping.</p>
+
+<h2 id="noiseshapingandmodulators">Noise Shaping and Modulators</h2>
+
+<h3 id="keyconcepts:">Key Concepts:</h3>
+
+<ul>
+<li><strong>Sigma-Delta Modulation (SDM)</strong>: Converts PCM audio data into 1-bit data
+with high sampling rates.</li>
+<li><strong>Noise Shaping</strong>: Moves quantization noise to ultrasonic frequencies,
+reducing audible noise.</li>
+</ul>
+
+<h3 id="modulatoroptions:">Modulator Options:</h3>
+
+<p>Multiple methods available in SoX-DSD:</p>
+
+<ul>
+<li><strong>CLANS (Closed Loop Analysis of Noise Shapers)</strong>: Optimizes noise shaping
+for lower distortion and stable operation.</li>
+<li><strong>SDM (Standard Delta-Sigma Modulation)</strong>: Conventional approach leveraging
+Delta-Sigma Toolbox functions.</li>
+<li><strong>CRFB (Cascade of Resonators with distributed FeedBack)</strong>:
+Alternative modulator design with different noise-shaping characteristics.</li>
+</ul>
+
+<p>Higher-order modulators (e.g., 7th or 8th order) significantly reduce
+audible noise (\~6dB/octave increase), but risk instability and overload,
+particularly at higher amplitudes and lower DSD rates.</p>
+
+<h3 id="recommendedsettings:">Recommended Settings:</h3>
+
+<ul>
+<li><strong>DSD64</strong>: CLANS-8 (recommended for stability) or SDM-8 (lower noise but less stable)</li>
+<li><strong>DSD128</strong>: CLANS-7</li>
+<li><strong>DSD256</strong>: CLANS-6</li>
+<li><strong>DSD512</strong>: CLANS-5</li>
+</ul>
+
+<p>Higher DSD rates allow using lower-order modulators due to inherent
+noise reduction at elevated sampling frequencies.</p>
+
+<h3 id="stabilityobservations:">Stability Observations:</h3>
+
+<ul>
+<li>High-order modulators, especially SDM-8, can become unstable with continuous,
+high-amplitude test signals.</li>
+<li>DSD128 is notably more challenging to encode compared to other DSD rates.</li>
+<li>Testing stability across different modulator settings and signals
+is strongly advised.</li>
+</ul>
+
+<h2 id="encodingcommands">Encoding Commands</h2>
+
+<h3 id="basicencodingcommanddsd64example:">Basic Encoding Command (DSD64 example):</h3>
+
+<pre><code>  sox RightMark32-96.wav RightMark32-96-DSD64.dsf rate -v 2822400 sdm -f sdm-8
+</code></pre>
+
+<ul>
+<li><code>rate -v</code> ensures very high-quality sample rate conversion.</li>
+<li><code>sdm -f sdm-8</code> specifies the 8th-order standard noise shaper.</li>
+<li>Alternative filters: <code>clans-8</code>, <code>crfb-8</code>, <code>clans-4</code>, <code>sdm-4</code>, etc.</li>
+</ul>
+
+<h3 id="advancedencodingcommandwithtrellisoptimization:">Advanced Encoding Command with Trellis Optimization:</h3>
+
+<p>Trellis optimization in SoX-DSD improves encoding accuracy and minimizes
+distortion by exploring alternative bitstream paths. It is computationally
+heavy and significantly increases encoding time, often taking hours for
+short audio segments, especially at higher rates such as DSD512:</p>
+
+<pre><code>  sox "+3.1dBDSD 1kHz Sine (32-192kHz).wav" \
+      "+3.1dBDSD 1kHz Sine (DSD64, clans-8).dsf" \
+      rate -v 2822400 sdm -f clans-8 -t 32 -n 32
+</code></pre>
+
+<h4 id="trellisparameterexplanation:">Trellis Parameter Explanation:</h4>
+
+<table border=1 cellspacing=0>
+<col />
+<col />
+<thead>
+<tr>
+	<th>Parameter</th>
+	<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+	<td><code>-t 32</code></td>
+	<td><strong>Trellis lookahead depth</strong>: Determines how many samples ahead the encoder considers for optimal quantization. Higher values (up to 64) significantly improve optimization but at substantial computational cost.</td>
+</tr>
+<tr>
+	<td><code>-n 32</code></td>
+	<td><strong>Number of trellis nodes</strong>: Controls the complexity by evaluating more quantization paths. Higher values (16–32+) greatly enhance quality but drastically increase computational requirements.</td>
+</tr>
+<tr>
+	<td><code>-l 64</code></td>
+	<td><strong>Trellis latency</strong>: Overrides internal latency (delay in samples). Usually set automatically, but can be manually increased for slightly better optimization results at the cost of additional processing delay.</td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>Practical Interpretation:</strong></p>
+
+<ul>
+<li>Settings <code>-t 32 -n 32</code> represent extremely high-quality trellis optimization, ideal for mastering or critical archival purposes, with substantial CPU and memory use.</li>
+<li>Moderate settings like <code>-t 8 -n 8</code> may offer acceptable quality with significantly less computational overhead.</li>
+</ul>
+
+<p><strong>Typical Usage Examples:</strong></p>
+
+<pre><code>  # Moderate-quality (default-like) trellis settings:
+  sox input.wav output.dsf rate -v 2822400 sdm -f clans-8 -t 8 -n 8
+
+  # Higher-quality mastering-level settings:
+  sox input.wav output.dsf rate -v 2822400 sdm -f clans-8 -t 32 -n 32
+
+  # Very high quality with explicit latency control:
+  sox input.wav output.dsf rate -v 2822400 sdm -f clans-8 -t 32 -n 32 -l 64
+</code></pre>
+
+<p><em>Note</em>: Trellis is always optional.</p>
+
+<h2 id="sacdanddsdsignallevelstandards">SACD and DSD Signal Level Standards</h2>
+
+<ul>
+<li><strong>0dBDSD</strong>: Defined as 50% theoretical maximum amplitude,
+equivalent to -6dBFS PCM.</li>
+<li><strong>Peak Modulation</strong>: Official SACD limit is 71.43% amplitude
+(+3.1dBDSD or -2.9dBFS PCM).</li>
+<li>Encoding beyond this modulation level risks modulator overload and distortion.</li>
+</ul>
+
+<h3 id="practicalpcmconversionrecommendation:">Practical PCM Conversion Recommendation:</h3>
+
+<ul>
+<li>Base encoding level should target around 0dBDSD (-6dBFS PCM).</li>
+<li>Occasional peaks up to +3.1dBDSD (-2.9dBFS PCM) are acceptable briefly.</li>
+<li>Apply approximately +2.5dB gain when converting DSD to PCM to avoid clipping.</li>
+</ul>
+
+<h2 id="noiseanddynamicrangeanalysis">Noise and Dynamic Range Analysis</h2>
+
+<ul>
+<li>SACD (DSD64) typically achieves a dynamic range around 120dB
+(5th-order noise shaping).</li>
+<li>Higher-order (8th-order) shaping achieves around 140dB dynamic range,
+comparable to 24-bit PCM.</li>
+<li>High-speed DSD (128, 256, 512) reduces the need for aggressive noise shaping.</li>
+</ul>
+
+<h2 id="comparativeperformanceinsights">Comparative Performance Insights</h2>
+
+<p>Comparative measurements indicate:</p>
+
+<ul>
+<li>SDM-8 (SoX-DSD) closely matches PCM playback performance in THD and
+noise floor.</li>
+<li>CLANS provides greater stability at slightly elevated audible noise levels.</li>
+<li>JRiver's DSD conversion closely resembles SoX-DSD's SDM-8 in performance,
+though slightly higher noise just below 20kHz.</li>
+</ul>
+
+<h2 id="practicalguidelinesforaudiophiles">Practical Guidelines for Audiophiles</h2>
+
+<ul>
+<li><strong>DSD128 and above</strong>: Recommended for audiophiles to shift noise
+further into ultrasonic frequencies.</li>
+<li>At DSD64, a low-pass filter around 50kHz is advisable to manage
+aggressive ultrasonic noise shaping.</li>
+</ul>
+
+<h2 id="modulatorselectionandsubjectiveaudioquality">Modulator Selection and Subjective Audio Quality</h2>
+
+<ul>
+<li>Higher-order modulators require significant negative feedback,
+potentially impacting subjective audio perception.</li>
+<li>Lower-order modulators (CLANS-4 or SDM-4) can offer a more "analog-like"
+subjective experience, though with increased audible noise.</li>
+</ul>
+
+<h2 id="sacdproductionreferenceguidelinesscarletbook">SACD Production Reference Guidelines (Scarlet Book)</h2>
+
+<ul>
+<li>Official SACD production guidelines specify a 50kHz Butterworth 30 dB/oct low-pass filter for audio measurement.</li>
+<li>Recommended maximum modulation level is +3.1dBDSD, clearly cautioning against exceeding this threshold due to distortion risks.</li>
+</ul>
+
+<h2 id="finalobservationsandrecommendations">Final Observations and Recommendations</h2>
+
+<p>DSD encoding involves trade-offs between stability, computational resources,
+noise-shaping intensity, and subjective audio quality.
+Meticulous experimentation and selection of modulator settings,
+particularly at lower DSD rates, are crucial for achieving optimal fidelity.
+Understanding Trellis optimization, SACD production guidelines and
+the nuances of subjective listening preferences further refines
+practical DSD encoding practices.</p>
+<hr>Generated by <tt>makehtml.sh</tt> on Mon May 18 04:03:17 PM CEST 2026</body>

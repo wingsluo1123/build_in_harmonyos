@@ -1,0 +1,25 @@
+sources:
+  # 官方 release tarball（含预生成 configure/config.guess/config.sub/Makefile.in）
+  # R39: 官方源 = 项目官方 Codeberg 仓库的 release 资产
+  url: "https://codeberg.org/sox_ng/sox_ng/releases/download/sox_ng-14.8.0.1/sox_ng-14.8.0.1.tar.gz"
+  sha256: "7698a1b2699499b0b38fa95a15bb56c68928d97b144bce03b7ecb76fe9c46698"
+
+patches:
+  - patch_file: "patches/0001-Makefile.in.patch"
+    patch_description: "Makefile.in: empty DOCPDF - vendored tree is text-only (platform PR .diff endpoint drops binary payloads, prebuilt doc PDFs stripped, CI #90955/#90964); keeps make install independent of pdfroff"
+    patch_type: "portability"
+  - patch_file: "patches/0002-config.guess.patch"
+    patch_description: "config.guess: recognize HarmonyOS / linux-ohos triplet (E007); temp dir umask 077->007 (HMDFS uid mapping: 0700 dirs unwritable by creating process)"
+    patch_type: "portability"
+  - patch_file: "patches/0003-config.sub.patch"
+    patch_description: "config.sub: accept linux-ohos / ohos-linux triplets (E072)"
+    patch_type: "portability"
+  - patch_file: "patches/0004-configure.patch"
+    patch_description: "configure: temp dir umask 077->007 in config.status template (HMDFS uid mapping: umask-077 temp dir fails EACCES when writing subs1.awk)"
+    patch_type: "portability"
+  - patch_file: "patches/0005-src-libsox_i.c.patch"
+    patch_description: "lsx_tmpfile: use full TMPDIR via mkstemp (musl tmpfile 7-char truncation causes EACCES)"
+    patch_type: "portability"
+  - patch_file: "patches/0006-test-check.sh.patch"
+    patch_description: "check.sh: use ${TMPDIR:-/tmp} instead of hardcoded /tmp (OHOS /tmp read-only, E002)"
+    patch_type: "portability"
