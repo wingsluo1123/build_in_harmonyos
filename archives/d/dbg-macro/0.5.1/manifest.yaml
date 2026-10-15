@@ -1,0 +1,56 @@
+software: dbg-macro
+version: "0.5.1"
+upstream_version: "0.5.1"
+status: published
+build_date: "2026-08-15"
+build_system: cmake
+
+source:
+  url: "https://github.com/sharkdp/dbg-macro/archive/refs/tags/v0.5.1.tar.gz"
+  sha256: "fffea75f067c69995853dc790626887788e2c4c9eb0a5a0014a4501d2b6b9909"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DDBG_MACRO_ENABLE_TESTS=OFF"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+  # 上游 tests/Catch2 为 git submodule，发布 tarball 不含该目录，0.5.1 配方
+  # 因此禁用上游测试（恢复上游测试的配方见 0.5.1.1，按 R37 递增版本号）
+  upstream_test_in_build: false
+  upstream_test_command: ""
+
+patches_applied: []
+
+test_package:
+  test_binary: test_dbg_macro
+  assertion_count: 6
+  checks:
+    - "dbg() 宏返回表达式原值"
+    - "dbg(1 + 2 * 3) 返回表达式计算结果 7"
+    - "多参数 dbg(1, 2, 1+2) 返回最后一个参数值"
+    - "dbg::pretty_print(vector<int>{1,2,3}) 渲染为 {1, 2, 3}"
+    - "dbg::hex(uint16_t 0xAB12) 渲染为 0xAB12"
+    - "dbg::bin(uint8_t 11) 渲染为 0b00001011"
+
+knowledge_gained:
+  - "header-only 包，安装产物为 include/dbg.h + dbg_macro::dbg_macro CMake target"
+  - "上游 tarball 缺 tests/Catch2 submodule，0.5.1 配方禁用上游测试；如需恢复须按 R37 递增版本（见 0.5.1.1）"
+  - "CMakeLists 声明 cmake_minimum_required(3.1)，CMake 4.x 需传入 CMAKE_POLICY_VERSION_MINIMUM=3.5"
+
+# 2026-10-12 消费者验证口径
+# 成功路径实际执行 6 项检查；运行日志动态打印执行数量，不能以编译成功代替运行成功。
+revalidation:
+  date: "2026-10-12"
+  ci_id: 86325
+  ci_result: failed
+  ci_consumer_checks_passed: 6
+  ci_upstream_tests_executed: 0
+  ci_failure: "Python subprocess ctest -N: FileNotFoundError"
+  repair: "CTest 清点与执行统一使用 self.run 和 conanbuild 环境"
+  local_platform: "macOS arm64"
+  local_upstream_tests_passed: 19
+  local_consumer_checks_passed: 6
+  target_repair_verified: false
