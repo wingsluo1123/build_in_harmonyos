@@ -1,0 +1,71 @@
+version: "7.5.2-1"
+software: jtreg7
+status: built
+build_date: "2026-10-14"
+build_system: makefile
+
+source:
+  url: "https://github.com/openjdk/jtreg/archive/refs/tags/jtreg-7.5.2+1.tar.gz"
+  sha256: "ce0c9971f951dffa4b3b85044ffe76a97d5ad9e0f5d6d0e218ceee2ce60df341"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options: []
+  env:
+    JAVA_HOME: "BiShengJDK 17.0.13（缺失时配方内纯 Python 引导安装到 ~/bishengjdk17：conan download + tarfile 进程内解压，sha256 钉校验）"
+    JTREG_VERSION_STRING: "7.5.2+1"
+    CODE_TOOLS_URL_BASE: "https://github.com/openjdk"
+    MAVEN_REPO_URL_BASE: "https://maven.aliyun.com/repository/central"
+  dependencies:
+    - "bishengjdk 17.0.13"
+    - "apache-ant 1.10.8（配方自取、sha1 钉校验、缓存于 ~/apache-ant-1.10.8）"
+    - "JT Harness jt6.0-b24 / AsmTools 7.0-b09（上游 build.sh 从 GitHub 源码构建）"
+    - "JUnit platform console standalone 1.11.0 / TestNG 7.3.0 / Guice 5.1.0 / JCommander 1.82（上游 build.sh 经 Maven 镜像下载并校验）"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-make-Platform.gmk.patch"
+
+knowledge_gained:
+  - "HarmonyOS 的 `uname -s` 返回 HarmonyOS；上游 make/Platform.gmk 未识别时会落入 Windows 分支（PS=';'），javac 在 -Werror 下报 [path] bad path element——真机微探针实证：补丁前 OS_NAME=windows/PS=';'，补丁后 OS_NAME=linux/PS=':'（唯一补丁）"
+  - "版本代差实证（同族 6.2 vs 7.5.2）：jtreg 6.2 需在 Defs.gmk 排除 removal lint（JDK 17 的 -Xlint:all 被 Applet forRemoval 触发 -Werror 失败）；7.5.2 的 Defs.gmk 使用 --release 8/11 目标版本，旧 API 视图屏蔽 removal 警告，无需该补丁"
+  - "BiShengJDK 在鸿蒙上 os.name=HarmonyOS、os.version='HongMeng Kernel 1.12.0'（含空格）——jtreg/JavaTest 的 ProblemList OSNAME-REV 排除选择器因此失配（自测 ProblemList 多跑 1 例：passed:2; excluded:4，期望 passed:1）"
+  - "设备 toybox grep 不支持 BRE 的 \\+ 量词（GNU grep 支持），导致上游自测 SkippedExceptionTest 的 summary 精确行断言失败（测试结果本身正确：passed:1; failed:2; skipped:1）"
+  - "鸿蒙文件权限/SELinux 下 chmod 只读语义受限：上游 CleanupTests.agentvm.retain 预置的'不可删除文件'实际可删，jtreg 正常清理复用 scratch 目录（5 个用例全 PASS，仅 scratch 目录计数断言 1 != 5 失败）"
+  - "上游 build.sh 依赖 wget -q；设备 toybox wget 不支持，需要 wget→curl shim；raw.githubusercontent.com 不可达，TestNG LICENSE 改从 GitHub 的 testng 源码 tarball 提取（sha1 钉校验）"
+  - "archive.apache.org 从设备下载被限速至 ~20KB/s，Ant 由配方预取缓存到 ~/apache-ant-1.10.8 后经 ANT 环境变量传给 build.sh；git.openjdk.org 重定向链不稳定，CODE_TOOLS_URL_BASE 直用 https://github.com/openjdk"
+  - "本地 conan-verify G2 对 github.com 源 URL 注入的 ghfast.top 镜像已失效；本地验证可用 codeload.github.com 直连（GitHub 官方归档同字节源、sha256 相同）临时替换，提交版保持官方 URL"
+
+upstream_tests:
+  full_suite_on_device: "make -k test（HEADLESS=1）：选中 257 个自测目标，253 通过 / 4 失败 / 0 挂起（失败均为平台/工具语义差异，见 test_results.failed_tests）"
+  build_quick_test: "make quick-test（HEADLESS=1）：All (10) selected tests completed successfully（checkJavaOSVersion + BUILDTESTDIR + INITIAL_TESTS 8 个目标）"
+
+test_results:
+  total: 257
+  passed: 253
+  failed: 4
+  hung: 0
+  quick_test_total: 10
+  quick_test_passed: 10
+  failed_tests:
+    - "CleanupTests.agentvm.retain: 鸿蒙 chmod/只读语义受限，'不可删除文件'可被删除，jtreg 复用 scratch 目录（实测 1 个 != 期望 5 个；5 个用例本身全部 PASS，jt.log: Test results: passed: 5）"
+    - "ProblemList: JVM os.version 含空格（'HongMeng Kernel 1.12.0'），OSNAME-REV 排除条目失配，实测 passed:2; excluded:4（期望 passed:1）"
+    - "SkippedExceptionTest.agentvm: 设备 toybox grep 不支持 BRE '\\+'，summary 断言无法匹配（测试结果与期望一致：passed:1; failed:2; skipped:1）"
+    - "SkippedExceptionTest.othervm: 同上"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/work/kasumizawa-miyuu/tmp/builds/jtreg7-7.5.2-1.orig
+  source_work_dir: /storage/Users/currentUser/work/kasumizawa-miyuu/tmp/builds/jtreg7-7.5.2-1.work
+  source_orig_hash: 7bc98bdb339fb1a0
+  source_work_hash: ee2ffe3700e4c7cb
+  generated_at: '2026-10-14T17:19:48'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-make-Platform.gmk.patch
+    type: portability
+    platform_only: True
+    guard: 'uname -s == HarmonyOS'
