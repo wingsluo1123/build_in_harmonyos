@@ -1,0 +1,49 @@
+Mark SACLIB's optional sacMain() hook as a weak reference.
+
+src/main.c defines the strong symbol main(), whose whole purpose is to call the
+optional hook sacMain() so that a program can provide "int sacMain(int,char**)"
+
+- either its own main() or SACLIB's.  No other translation unit in the library
+  references main() or sacMain(), so the archive member is normally not pulled
+  in; but as soon as a consumer does reference main() (for example a program
+  that links the archive with --whole-archive, or that uses SACLIB's own main()
+  while defining sacMain() itself), the strong definition of main() clashes
+  with the consumer's main() and the strong undefined sacMain() breaks programs
+  that do not have the hook.
+
+Declaring the hook weak fixes both directions and is the same treatment the
+Debian/Fedora saclib package applies.
+diff --git a/include/sacsys.h b/include/sacsys.h
+index 0000000..3944ba9 100644
+--- a/include/sacsys.h
++++ b/include/sacsys.h
+@@ -52,6 +52,16 @@
+ # endif
+ #endif
+ 
++/* Indicate that a symbol is a weak reference.  SACLIB calls the optional
++ * sacMain() hook from its default main(); the hook is declared weak so that a
++ * program which does not provide it still links. */
++#ifndef __weak
++# ifdef __GNUC__
++#  define __weak __attribute__ ((weak))
++# else
++#  define __weak
++# endif
++#endif
+ 
+ 
+ #endif
+diff --git a/src/main.c b/src/main.c
+index 0000000..eb49aa7 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -9,7 +9,7 @@
+ ======================================================================*/
+ #include "saclib.h"
+ 
+-extern int sacMain  P__((int ac, char **av));
++extern int sacMain  P__((int ac, char **av)) __weak;
+ 
+ 
+ void main(argc, argv)

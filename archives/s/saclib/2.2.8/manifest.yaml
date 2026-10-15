@@ -1,0 +1,167 @@
+version: "2.2.8"
+# 版本级 manifest — 遵循 ARCHIVE-SPEC v3.0
+# 文件位置: archives/s/saclib/2.2.8/manifest.yaml
+
+# 编译状态: published | built | failed | archived
+# built：真机 conan create 通过（exit 0，test_package 17/17），平台 CI 亦校验通过
+#        （build #91794，验的是修复提交 9c316f08e2）；尚未 upload
+status: built
+
+build_date: "2026-10-15"
+conan_ref: "saclib/2.2.8"
+
+# ============================================================
+# 源码信息（与 conandata.yml 保持一致）
+# ============================================================
+
+source:
+  # 上游 www.usna.edu 不通过任何代码托管平台发布源码包。该 tar 包是 SageMath
+  # 上游镜像与 Debian 源码归档共同再分发的同一文件，Debian/Fedora 的 saclib
+  # 包也用它构建。
+  url: "https://deb.debian.org/debian/pool/main/s/saclib/saclib_2.2.8.orig.tar.gz"
+  sha256: "E8E3ACB253C64394F35C8E17942F764CAE34DF731F3FE3D749B6A2AE1FB8203B"
+  tar_format: tar.gz
+  size_bytes: 3060308
+  provenance:
+    - "三个独立官方来源下载并比对完整 sha256，全部为 E8E3ACB2...203B、同一大小、同一版本：files.sagemath.org、mirrors.mit.edu、deb.debian.org"
+    - "不涉及版本替换或重新打包：同一份上游 tarball 由三个镜像提供"
+    - "实际使用 deb.debian.org：它是 CI Worker 已知可达的镜像（main 上 563 个配方在用，也是 ftp.gnu.org 等不可达主机的既有兜底），mirrors.mit.edu 仅 4 例。本轮首个 CI 运行在 checkout-pr 阶段因 Worker 下载 PR diff 失败而中止，故按同一约束复核了源码主机"
+    - "解包顶层目录 saclib2.2.8/，含 src/(1068 个 .c)、include/、bin/(生成器)、sysdep/(平台端口)"
+    - "include/sacproto.h 与用上游 bin/mkproto 重新生成的结果逐字节一致（sha256 A637432FB97094C8036050B11D46ED5BAADD6B501C0D00B725BCF68A07E578CA）"
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: custom
+  # SACLIB 自带生成器，无 configure / CMake / Meson：
+  #   bin/mksysdep.pl ohosAarch64   选择并安装平台端口（bin/sconf 只是它的 bash 包装）
+  #   sysdep/ohosAarch64/install    拷贝 GC.c -> src/、sysdep.h -> include/
+  #   bin/mkmake                    生成 lib/objo/makefile
+  #   bin/mklib opt                 编译 + 归档为 lib/saclibo.a
+  configure_options:
+    - "perl bin/mksysdep.pl ohosAarch64"
+    - "cd sysdep/ohosAarch64 && sh ./install"
+    - "bin/mkmake"
+    - "bin/mklib opt CC=clang AR=llvm-ar RANLIB=llvm-ranlib MAKE=make SUBMAKEFLAGS=-j1"
+  dependencies: []
+  cc: clang
+  cxx: null
+
+patches_applied:
+  - "0001-sysdep-ohos-aarch64-port.patch"
+  - "0002-weak-sacmain-hook.patch"
+
+# ============================================================
+# W0 依赖检查（详情见 notes.md §2）
+# ============================================================
+
+w0_dependency_check:
+  ohpcd:
+    dependencies: "none — SACLIB 是纯 C 库，只使用 libc + libm，没有任何外部库依赖"
+  local:
+    conan_download: "未能执行：本机对 ohpcd 不可达（system acceleration policy not enabled）"
+    graph_info: "未能执行：同上，远端结论必须在真机复核"
+  decision: >-
+    继续本包，无拆库需求。SACLIB 是依赖链最底层（qepcad/1.74 -> saclib/2.2.8），
+    本包发布后 qepcad 才能进入编译验证。
+  follow_up:
+    - "真机复核：conan download saclib/2.2.8 -r=ohpcd --only-recipe（预期 not found：首次发布）"
+    - "本包发布后回到 qepcad/1.74 做真机 conan create"
+
+# ============================================================
+# 下游契约（qepcad/1.74 直接依赖这些路径）
+# ============================================================
+
+consumer_contract:
+  consumer: "qepcad/1.74"
+  must_provide:
+    - "include/ 提供 saclib.h 及全部头文件（qepcad 用 -I${saclib}/include）"
+    - "lib/saclibo.a 必须存在（qepcad 的 source/Makefile 与 cad2d/Makefile 直接链接该路径）"
+    - "必须是静态库：qepcad 在 qesource/source/saclib/ 下重定义了 CREAD/GCSI 等同名符号"
+  provided:
+    - "include/ 安装全部 .h（含 sysdep.h）"
+    - "lib/saclibo.a（上游命名）与 lib/libsaclib.a（同一归档的常规命名）"
+    - "cpp_info.libs=[\"saclib\"]、cpp_info.system_libs=[\"m\"]、package_type=static-library"
+
+# ============================================================
+# 真机验证
+# ============================================================
+
+device_verification:
+  device: "HarmonyOS aarch64, clang 15.0.4, Conan 2.29.1 (OHOS), Python 3.12.9, GNU Make 4.4.1"
+  isolation: "独立 CONAN_HOME + 独立 repo 克隆（origin/main b6fd9ca0ac），由 ohos-test-runner.sh --try-lock --mode heavy 执行"
+  run_id: "saclib-saclib-saclib-2.2.8-conan-create-20261014-180718-49053"
+  result: "conan create exit 0"
+  artifacts:
+    - "lib/saclibo.a 1987208 字节，1069 个成员（含 GC.o）"
+    - "lib/libsaclib.a（同一归档的常规命名）"
+    - "include/{saclib,sacsys,sactypes,hfloats,sacmacros,sacproto,sysdep}.h"
+    - "package_id settings: os=OHOS os.version=6.0 arch=armv8 compiler=clang compiler.version=15 build_type=Release"
+  test_package: >-
+    17/17 断言通过（test.c 15 条 + 上游样例 2 条）＋ 1 个完整消费者用例
+    （consumer_flow.c：精确阶乘 / 精确有理数四则 / 精确十进制展开与循环节检测 /
+    闭合恒等式），三个二进制在真机 conan create 的 test 阶段全部通过
+
+# ============================================================
+# 平台 CI 验证
+# ============================================================
+
+ci_verification:
+  pull_request: "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos/merge_requests/15789"
+  verdict: "CI 校验通过"
+  build: "#91794 (task), log build-105497, worker OpenHarmonyPCDeveloper-CI-031"
+  verified_commit: "9c316f08e2"
+  verified_commit_evidence: >-
+    通过构建的 cleanup 日志里配方修订号为 saclib/2.2.8#036680d0282f6835b84659e5059eeaa4；
+    在本地用同一 Conan 2.29.x 从两个候选提交导出配方后，9c316f08e2 得到同一修订号
+    （12ad49d5ea 得到 #3fe5976b…，即上一轮失败版本），据此确认通过的是修复提交。
+  gates:
+    - "L0 门禁（结构完整性）：通过"
+    - "L1 门禁（测试执行验证）：通过"
+    - "Conan test_package：通过"
+  steps: "worker_preparation / worker-prep / git-clone / checkout-pr / conan-setup / conan-build-test / cleanup 全部 ✅（conan-build-test 6m58s）"
+  earlier_rounds:
+    - "#91591 (CI-001)：checkout-pr 阶段中止 —— Worker 取不到 PR diff，属平台网络问题，未进入构建"
+    - "#91676 (CI-034)：conan-build-test 真失败 —— 端口安装经 mksysdep.pl 被静默跳过，缺 src/GC.c；已在本 PR 内修正（见 notes.md §6.5）"
+  ai_review: "atomgit-bot 自动代码审查 3 次，均为「✅ 未发现问题」；无人工审查意见"
+
+# ============================================================
+# 未走 CI 脚本的原因（与包本身无关，已核实）
+# ============================================================
+
+ci_script_note: >-
+  ci/conan/build_and_test.sh 的 JC 门禁需要 PR diff 基线；设备上的 checkout 没有基线，
+  于是 JC6 判定全部 9019 个包变更，JC1/JC5 另外报出 8 个 origin/main 自带且被 git 跟踪的
+  隐藏状态文件（archives/*/*/.staging-verified 等，已用 git ls-files --error-unmatch 确认）。
+  真机改用等价的 conan create 直接执行；L0j（版本未占用）、L0k（库包无需 commands.json）、
+  L0m（目录结构）已单点复核通过。正式 PR 由平台 CI 提供 diff 基线。
+
+# ============================================================
+# 剩余事项
+# ============================================================
+
+remaining:
+  - "conan download saclib/2.2.8 -r=ohpcd --only-recipe（真机 W0 复核，预期 not found：首次发布）"
+  - "提交 PR，由平台 CI 走标准单包门禁（L0-L5）"
+  - "本包合入并发布到 ohpcd 后，回到 qepcad/1.74 做真机 conan create"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "SACLIB 无 configure/CMake，平台适配全部集中在 sysdep/<port>：sysdep.h + GC.c，由 bin/mksysdep.pl 选择安装"
+  - "sysdep/linuxX86_64/sysdep.h 定义 _X86_LINUX_，会让 include/hfloats.h 引入 glibc 专有的 <ieee754.h>；OHOS 的 musl 系 libc 没有该头文件，必须另开端口"
+  - "AArch64 版 GC() 不能用上游 x86_64 的『哑参数落栈』写法：AAPCS64 允许调用者把活跃 Word 留在被调用者保存寄存器 x19-x28 跨过调用，栈扫描看不见。真机实测该写法 -O0 6/6 通过、-O1/-O2/-Os 0/18 全部段错误；改用 setjmp() 强制溢出后 24/24 通过"
+  - "AAPCS64 给叶子函数 16 字节 red zone，编译器会把溢出槽放在 sp 之下；GC() 必须以自身局部变量地址（而非 GCSI 自己的帧）作为扫描下界，否则刚调用过 printf 的调用者其 red zone 内的活跃对象会被漏扫"
+  - "bin/mkmake 生成的 makefile 硬编码 AFLAGS = -I${saclib}/include -P；AArch64 as 不认 GNU as 的 -P，需把 AFLAGS 参数化并由 mklib 传 -ansi（2.2.8 的 src 已无 .s，Debian 打包亦去掉该选项）"
+  - "生成的 makefile 还硬编码 AR = ar / RANLIB = ranlib，而 OHOS clang 工具链没有 ranlib（只有 llvm-ranlib）；mklib 原本只转发 CC，需让它同时转发 AR/RANLIB 并在配方侧用绝对路径注入"
+  - "bin/sconf 是 bash + Perl 包装，只有 bin/mksysdep.pl 真正需要 Perl；设备上没有 perl，其内部 system(\"bash -c ...\") 在 PATH 无 bash 时会静默不安装端口，导致后续 GC 未定义 —— 必须显式执行等价拷贝并断言文件已落地"
+  - "设备没有 /bin/bash（bash 在 $HOME/usr/local/bin），SACLIB 构建脚本的 #!/bin/bash shebang 直接执行会 bad interpreter；且不能用 bash -c \"<绝对路径>\"（会重新走 shebang 查找），必须用 bash <绝对路径>"
+  - "Conan run(env=...) 接的是环境文件名而不是 KEY=VALUE 映射：传 dict 报 'should be a list'，传 KEY=VALUE 列表会被当成不存在的 env 脚本；工具变量应写成命令行前置赋值"
+  - "bin/mkproto 生成 sacproto.h 时跳过 main.c，因此 sacMain 的前向声明只在 main.c 内；2.2.8 的 include/sacproto.h 与重新生成结果逐字节一致，可安全跳过该步"
+  - "上游 tarball 内部换行不一致（部分文本文件 CRLF、部分 LF），生成补丁必须按字节替换以保留原换行，否则整个文件被算作改动"
+  - "Conan 2 的 apply_conandata_patches() 用 patch_ng 的 strip=0（patch_ng 的 decode_clean 自带 a//b/ 前缀剥离）；补丁块必须带 index/new file mode 行才会被判为 GIT 类型并正确剥前缀"
+  - "ci/conan/build_and_test.sh 的 JC 门禁依赖 PR diff 基线，在没有基线的设备 checkout 上会把整棵 archives/ 判为变更，不能作为单包验证入口；单包真机验证应直接用 conan create"
