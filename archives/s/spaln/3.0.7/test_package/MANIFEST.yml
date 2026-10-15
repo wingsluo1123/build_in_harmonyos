@@ -1,0 +1,52 @@
+# spaln 3.0.7 test manifest
+package: spaln/3.0.7
+homepage: "https://github.com/ogotoh/spaln"
+
+upstream_check_command: "make test"
+upstream_test_in_build: false
+upstream_tests:
+  source_tree: "none - the ver.3.0.7 release archive ships no test suite"
+  test_programs: 0
+  passed: 0
+  expected_failures: 0
+  unexpected_failures: 0
+  harness_result: not_available
+  result: "N/A: upstream ships no automated tests"
+  notes:
+    - "src/Makefile.in declares a `test` target whose whole recipe is `./test.sh`,
+       but no test.sh exists anywhere in the ver.3.0.7 release archive
+       (`find . -name 'test.sh'` -> 0 hits, and `ls src` has no test.sh), so the
+       target cannot be executed by anyone, upstream CI included."
+    - "The upstream tree contains no unit-test framework, no test/ directory and
+       no CI configuration; verification upstream is by running the CLI by hand
+       (README.md 'Example' section)."
+    - "ci/config/no_official_test.txt is NOT modified by this PR on purpose: that
+       file lives outside archives/s/spaln/3.0.7/ and this PR is package-atomic
+       (W2 / L0n). Registering spaln there is a follow-up for the maintainers if
+       the L1 whitelist is required."
+    - "L1c therefore reports 'no upstream make check/ctest in log'; the executable
+       behaviour is covered by test_package instead (10 assertions)."
+
+test_package_tests:
+  assertion_count: 10
+  result: "PASS: 10/10 on aarch64/OHOS; execution is deferred on the x86_64 cross-build host"
+  command: "test_spaln <packaged-spaln>   # compiled by CMake with the OHOS aarch64 toolchain"
+  tests:
+    - "1. `spaln` with no arguments prints `*** SPALN... version 3.0.7 ...`"
+    - "2. the banner selects the aarch64 NEON SIMD path (`_ARM_NEON`, not the scalar fallback)"
+    - "3. the same invocation prints the `Usage:` screen"
+    - "4. `sortgrcd` with no arguments prints `sortgrcd version 2.2.2`"
+    - "5. `makdbs` with no arguments prints `makdbs Version 2.0.0`"
+    - "6. all 10 packaged executables are present in <pkg>/bin"
+    - "7. the packaged parameter table directory holds >= 250 entries"
+    - "8. table/AlnParam is readable through the binaries' baked-in table path"
+    - "9. `makmdm <tmpdir>` regenerates mdm_cmp with the packaged PAM composition (20 doubles, |delta| <= 1e-9)"
+    - "10. `makmdm <tmpdir>` regenerates mdm_mtx with the same geometry (byte size) as the packaged table"
+  ohos_specific:
+    - "the consumer program is compiled for aarch64/OHOS, so a successful run also proves the packaged binaries load under the OHOS loader"
+    - "the fixtures use $TMPDIR (OHOS /tmp is not generally writable) with mkdtemp(3)"
+    - "parameter tables are reached through the path baked in by src/configure; $ALN_TAB is exported by package_info() as a relocatable override"
+  deferral:
+    reason: "the conan create that produces the package runs on an x86_64 cross-build host, so the aarch64 binary cannot be executed there"
+    behaviour: "test() prints an explicit deferral message and returns; it does NOT silently pass a weaker assertion"
+    ran_on: "aarch64 OHOS worker (conan create in CI)"
