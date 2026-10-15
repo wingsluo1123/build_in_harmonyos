@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.16)
+project(dbus_consumer C)
+find_package(DBus1 CONFIG REQUIRED)
+add_executable(consumer consumer.c)
+target_link_libraries(consumer PRIVATE DBus1::DBus1)
+set_target_properties(consumer PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")

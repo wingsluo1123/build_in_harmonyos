@@ -1,0 +1,22 @@
+package: dbus/1.16.2.1
+homepage: https://www.freedesktop.org/wiki/Software/dbus/
+upstream_check_command: "python3 -m mesonbuild.mesonmain test --no-rebuild --num-processes 1 --print-errorlogs"
+upstream_test_in_build: true
+upstream_test_command: "native_upstream.execute_original_upstream(self)"
+upstream_configured_groups: 49
+upstream_tests:
+  - file: ../native_upstream.py
+    source: dbus-1.16.2/meson.build
+    description: "All original embedded and modular Meson groups; any original skip or failure is blocking"
+    command: "meson test -C intrusive-upstream --no-rebuild --num-processes 1 --print-errorlogs"
+test_package_tests:
+  - file: consumer.c
+    description: "Four real API checks: syntax, roundtrip, message metadata, server lifecycle"
+    command: "./bin/consumer"
+  - file: harmony_tests/numeric_external.py
+    description: "Harmony signed daemon, real EXTERNAL credentials, registration and actual UNIX UID"
+    command: "python3 harmony_tests/numeric_external.py consumer dbus-daemon harmony-private"
+assertion_count: 4
+consumer_test_count: 4
+HARMONY_TEST_COUNT: 1
+execution_status: NOT_RUN_FORMAL_CANDIDATE
