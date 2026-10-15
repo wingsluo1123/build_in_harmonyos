@@ -1,0 +1,102 @@
+software: sfront
+version: "0.99"
+status: built
+build_date: "2026-10-03"
+build_system: makefile
+conan_ref: "sfront/0.99"
+
+source:
+  url: "https://john-lazzaro.github.io/sa/sfront0.99.tar.gz"
+  sha256: "97296d8308ad7fabc8944a44592bbb996293ee66975b3c07c4022a548ef68862"
+  tar_format: tar.gz
+  provenance: >
+    Official upstream release tarball from the project homepage recorded in Debian's
+    control file. Cross-checked against Debian's signed source package
+    sfront_0.99-5.dsc (orig tarball sha256
+    d354fbd44fda59013a8111d489ca4155a4eba3c902e081440c8efbc568dc61c4): diff -r of
+    src/ and lib/ is empty, so both releases carry byte-identical sources and SAOL
+    library. They differ elsewhere: Debian's orig tarball is the 2.2 MB "lite"
+    distribution (16 example orchestras, 12 SASL scores), the official tarball is
+    the full 10 MB release (26 / 20) and rewrites the author's
+    www.cs.berkeley.edu/~lazzaro links to john-lazzaro.github.io in the HTML manual.
+
+build:
+  system: makefile
+  build_command: >
+    touch src/parser.tab.c src/parser.tab.h &&
+    make -C src/lib -j1 CC=<OHOS clang> SLOWSCHED= LINKLIB=-lm
+    CFLAGS="-O2 -Wall -Werror=implicit-function-declaration -static"
+  configure_options: []
+  dependencies: []
+  cc: clang
+
+test_results:
+  target: "OpenHarmony aarch64（本地 x86_64 构建机经 qemu-aarch64 执行交付产物与生成程序）"
+  upstream_framework: "无：源码包无 tests/ 目录，src/Makefile 与 src/lib/Makefile 均无 check/test 目标"
+  upstream_discovered: 31
+  upstream_passed: 30
+  upstream_failed: 0
+  upstream_not_executed: 1
+  upstream_not_executed_reason: >
+    examples/rtime/linbuzz 是 26 个示例里唯一 #include <Slib/*.hs> 的一个，必须走
+    `-cpp`；而 `-cpp` 在上游 sfmain.c:cppsystemcall 里把预处理器硬编码为外部程序
+    `gcc`，并追加编译期常量 SAOLLIBDIR（tree.h:667 = "/usr/share/sfront"）。OHOS
+    工具链没有 gcc，也没有该安装路径，故该示例在 OHOS 上不可翻译。这是上游对外部
+    工具与固定安装前缀的依赖，不是本次适配裁剪。
+  test_package_passed: 68
+  test_package_failed: 0
+  test_package_assertions: 68
+  harmonyos_specific_tests: 3
+  execution: >
+    conan create rc=0；68/68 断言通过。含 25 个上游示例乐谱翻译、min/bach 的 MP4-SA
+    位流编码与解码、-symtab、CLI 面（-help/-license/无参/非法选项）、畸形输入诊断，
+    以及 3 组鸿蒙特有端到端用例：min 渲染 176841 帧 44.1 kHz 单声道 PCM、torvalds
+    读入真实 8 kHz 人声 WAV 后渲染 41464 帧立体声 PCM（覆盖全部输入）、min 走
+    upstream mp4test 流程时位流解码出的程序与 -orc 直译出的程序渲染出逐字节相同的
+    音频。
+
+test_passed: 2
+test_failed: 0
+
+patches_applied: []
+
+knowledge_gained:
+  - >
+    sfront 的构建入口是 src/lib/Makefile 而不是 src/Makefile：它的 all 目标先跑
+    libmaker 代码生成器重建五个 *lib.[ch] 运行时源文件，再 `cd .. ; make` 回落到
+    src/Makefile 链接出 bin/sfront。命令行变量覆盖靠 MAKEFLAGS 传递到子 make，
+    而子 make 在 HMDFS 上拿不到 jobserver（E074/E525），因此必须整体 -j1。
+  - >
+    src/Makefile 里有 `parser.tab.c: parsehelp.c parser.y tree.h` 规则，recipe 是
+    `-bison -d parser.y`（前导 `-` 让 make 忽略失败）。官方 tarball 已自带 bison 2.3
+    生成的 parser.tab.c/parser.tab.h，但 conan get() 不保留 mtime，解压顺序决定它
+    会不会被判定为过期——构建结果因此会随「有没有 bison」漂移。配方显式 touch 这两个
+    文件，让预生成解析器成为唯一权威，构建不再隐式依赖 bison。
+  - >
+    上游 Makefile 默认 CC=gcc、MODEL=-m32、ECHECK=-ansi -Wall、SLOWSCHED=
+    -fno-schedule-insns。-m32 在 AArch64 上不可行必须整体覆盖 CFLAGS；-ansi 不是必
+    要的（实测 clang 默认方言与 -ansi 产出的 sfront 二进制 BuildID 完全相同），去掉
+    它可以顺带避免 tal 1.9 记录的 __STRICT_ANSI__ 隐藏 POSIX 声明的老坑；-fno-schedule-insns
+    是 GCC 专有调度开关，clang 只会打印 "optimization flag ... is not supported" 警告，
+    直接清空 SLOWSCHED。
+  - >
+    `-cpp` 模式在 OHOS 上不可用：sfmain.c:cppsystemcall 把预处理器硬编码成 `gcc`
+    -nostdinc -x c++ -E，并追加 tree.h:667 的 SAOLLIBDIR "/usr/share/sfront"。这让
+    唯一依赖 Slib 头文件的示例 examples/rtime/linbuzz 在 OHOS 上无法翻译；其余 25 个
+    示例与 -cin/-gcc 模式都不受影响。
+  - >
+    MP4-SA 位流往返（upstream mp4test）在文本层面不可逐字节比较：-bit 解出来的程序
+    会把 SAOL 标识符重命名为 a7_* 之类的自动名，浮点字面量也从 1.95F 变成
+    1.950000e+00F（值相同、写法不同），连 -symtab 也保留不了原名。有意义的等价性判据
+    在音频样本层：min 的 -orc 与 -bit 两条路径渲染出的 WAV 逐字节相同；bach 因为
+    乐器求和顺序变化，2976792 个采样里有 2868555 个（96.4%）不同，最大偏差 13755，
+    因此 bach 只做「解回等价程序」的结构断言，不做采样级比对。
+  - >
+    OHOS SDK 没有 rcrt1.o，-static-pie 不可用（ld.lld 报 cannot open rcrt1.o）；-static
+    可用，交付静态可执行文件后，本地 x86 构建机经 qemu-aarch64 无需 QEMU_LD_PREFIX
+    即可直接运行，CI 的 AArch64 worker 也原生可跑。
+  - >
+    同一软件可以有两种上游发布物：官方站点 sfront0.99.tar.gz（10 MB，26 个示例 / 20 个
+    SASL）与 Debian orig tarball（2.2 MB，lite 版，16 个示例 / 12 个 SASL）。两者
+    src/ 与 lib/ 逐字节相同（diff -r 为空），官方源另外还带完整示例语料并把 HTML 手册
+    里的作者主页链接改成了 john-lazzaro.github.io，故选官方源。
