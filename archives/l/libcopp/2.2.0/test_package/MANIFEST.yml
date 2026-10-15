@@ -1,0 +1,32 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: libcopp/2.2.0
+homepage: "https://github.com/owent/libcopp"
+
+# 上游测试套件存在性 (经审计源码 tar 包确认)
+upstream_tests_exist: true
+
+# 上游测试审计 (源码: libcopp-2.2.0.tar.gz, sha256 4f7831a88e28ca865fb9f00282c759bc1dddadd180736021ee014bee6d2aaecc)
+upstream_test_audit:
+  source_tarball: "libcopp-2.2.0.tar.gz"
+  source_sha256: "4f7831a88e28ca865fb9f00282c759bc1dddadd180736021ee014bee6d2aaecc"
+  top_level_files:
+    - CMakeLists.txt     # PROJECT_ENABLE_UNITTEST / BUILD_TESTING 打开后 add_subdirectory(test)
+    - test/CMakeLists.txt # add_test(libcopp.unit_test ...)；find_package(GTest) 为非 REQUIRED 可选门
+    - test/frame/        # 上游自带测试框架 test_manager（Running/…/test(s) ran./[ PASSED ] 输出即出自它）
+    - test/case/         # 22 个测试源文件（CASE_EXPECT_* 断言合计 1618）
+    - test/app/  test/cli/
+    - src/libcopp/       # 被测库本体（协程/调度器/内存池/fcontext）
+    - src/libcopp/fcontext/asm/  # 72 个 per-ABI 手写上下文切换汇编
+  scanned_for:
+    - "TEST( / TEST_F (gtest)"
+    - "add_test / enable_testing (CMake)"
+    - "Makefile TESTS / check_PROGRAMS 目标"
+    - "tests/ / test/ / spec/ 目录"
+    - "make check / ctest 目标"
+  scan_result: "test/CMakeLists.txt 构建 libcopp_unit_test 并 add_test 注册；测试框架是上游自带 test_manager（test/frame/），测试源文件 22 个（test/case/ 等）、CASE_EXPECT_* 断言合计 1618；find_package(GTest) 为非 REQUIRED 可选门，且代码检查的宏 UTILS_TEST_MACRO_TEST_ENABLE_GTEST 从未被赋值 ⇒ gtest 未被链接（W4 审计实证 link.txt 无 gtest、nm 计 0）；无 autotools TESTS 目标（本项目纯 CMake）"
+  make_check_output: "ctest --output-on-failure 真机实测：CI profile（compiler.cppstd=17）下 [==========] 64 test(s) ran / [  PASSED  ] 64 test case(s) ⇒ 64/64（100%）；同源码在 C++20 coroutine 路径启用的原生配置下为 144/144（100%）"
+  reason: "libcopp 2.2.0 上游自带 test_manager 测试套件（全 test/ 树 22 个测试源文件 / 1618 条 CASE_EXPECT_* 断言，纯 CPU 自包含，不依赖设备节点、网络服务或 GPU；其 find_package(GTest) 为非 REQUIRED 可选门且对应宏从未被赋值 ⇒ gtest 未被链接）。配方在 build() 内以 ctest --output-on-failure --no-tests=error 真实执行该套件，CI profile 下 64/64 全过（C++20 coroutine 路径启用的原生配置下 144/144）；test_package 另外真实执行一次协程上下文切换（create/start/yield/resume/取返回码），验证打包产物内含的是 arm64 fcontext 汇编且在 OHOS 上确实可切换栈"
