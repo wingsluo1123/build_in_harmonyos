@@ -1,0 +1,40 @@
+# test_package/MANIFEST.yml
+# upstream test declaration (CI L0e).
+
+package: iitii/0.0-git20191030.85209e0
+homepage: "https://github.com/mlin/iitii"
+
+upstream_check_command: "ctest -N -R unit_tests"
+
+# The header-only recipe build() does not build the upstream test/ harness;
+# the upstream suite is built in an OHOS-adapted form inside test_package
+# and really executed via ctest (see upstream_test_iitii.cc header note).
+upstream_test_in_build: false
+upstream_test_command: "ctest -R unit_tests --output-on-failure"
+
+# Official upstream registration (test/CMakeLists.txt add_test entries).
+upstream_tests:
+  - file: test/test_iitii.cc
+    source: iitii-85209e07a3ee403fb6557387a7f897cd76be4406/test/test_iitii.cc
+    description: "Catch2 test_iitii (6 TEST_CASEs); adapted as upstream_test_iitii.cc (mm_builder backing files, no htslib/CTPL/jemalloc, fuzz scaled to N<60000/Q=200, Catch2 via Conan dep), same case names and assertions"
+    command: "ctest -R unit_tests"
+
+# Official total: ctest_entries (1 add_test; NOT the 6 inner Catch2 cases).
+upstream_test_total: 1
+upstream_test_count_method: "ctest_entries"
+upstream_tests_exist: true
+upstream_test_audit: "test/CMakeLists.txt has 1 add_test(unit_tests); test_iitii.cc has 6 Catch2 TEST_CASEs plus 2 non-test benchmarks; util.h needs htslib/CTPL and the test command preloads Linux jemalloc; test_iitii.cc also uses the old in-memory builder(begin,end) API which does not exist in the 85209e0 header (mm_builder only), so it must run via the adapted upstream_test_iitii.cc on OHOS"
+
+test_package_tests:
+  - file: test_iitii.cpp
+    description: "Consumer test: 4 deterministic cases incl. dark-node cost assertions plus fixed-seed light fuzz vs naive scan"
+    command: "./test_iitii"
+  - file: upstream_test_iitii.cc
+    description: "OHOS-adapted upstream suite: 6 same-name Catch2 TEST_CASEs via ctest -R unit_tests"
+    command: "ctest -R unit_tests --output-on-failure"
+
+test_dependencies:
+  - ref: catch2/2.13.10
+    purpose: "Upstream test framework; replaces ExternalProject Catch v2.9.1.zip with the repo Conan package (OHOS-verified header-only)"
+
+assertion_count: 10

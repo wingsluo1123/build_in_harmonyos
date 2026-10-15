@@ -1,0 +1,49 @@
+--- a/src/iitii.h
++++ b/src/iitii.h
+@@ -199,6 +199,9 @@ class iit_base
+         if (nodes.size()) {
+             // sort the nodes by interval beg (then end)
+-            ips4o::parallel::sort(nodes.begin(), nodes.end());
++            // OHOS portability: ips4o::parallel::sort needs the OpenMP runtime
++            // (libomp), which is unavailable on HarmonyOS; the serial sort
++            // yields the identical node order the index is built from.
++            ips4o::sort(nodes.begin(), nodes.end());
+             // Memoize the path from the rightmost leaf up to the root. This will trace the border
+             // between the real and imaginary nodes (if any), which we'll refer to in indexing
+             // below. Some of these border nodes may be imaginary.
+@@ -290,14 +290,20 @@ class iit_mm_builder_base
+     //mmappable_vector<Node> nodes_;
+
+     int get_thread_count(void) {
++#ifdef _OPENMP
+         int thread_count = 1;
+ #pragma omp parallel
+         {
+ #pragma omp master
+             thread_count = omp_get_num_threads();
+         }
+         return thread_count;
++#else
++        // OHOS portability: HarmonyOS provides no OpenMP runtime (libomp),
++        // so the builder runs single-threaded with one spill writer.
++        return 1;
++#endif
+     }
+
+     std::ofstream writer;
+     std::vector<std::ofstream> writers;
+@@ -366,9 +366,14 @@ class iit_mm_builder_base
+         return wf.str();
+     }
+
+     std::ofstream& get_writer(void) {
++#ifdef _OPENMP
+         return writers[omp_get_thread_num()];
++#else
++        // OHOS portability: single writer when built without OpenMP.
++        return writers[0];
++#endif
+     }
+
+     void sync_and_close_parallel_writers(void) {
+         // check to see if we ran single-threaded

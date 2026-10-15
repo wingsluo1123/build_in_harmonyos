@@ -1,0 +1,73 @@
+# 版本级 manifest — iitii 0.0-git20191030.85209e0
+# 文件位置: archives/i/iitii/0.0-git20191030.85209e0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "0.0-git20191030.85209e0"
+software: "iitii"
+
+# 编译状态: published | built | failed | archived
+# 首轮工作树尚未经过真机验证，标记 built，待 rule4 通过后由 HMBS 更新。
+status: "built"
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-14"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 官方 GitHub commit 归档（R39 官方源，无 tag，按 git snapshot 惯例版本化）
+  url: "https://github.com/mlin/iitii/archive/85209e07a3ee403fb6557387a7f897cd76be4406.tar.gz"
+
+  # 上游 commit（Debian 快照 0.0+git20191030.85209e0 对应提交）
+  tag: "85209e07a3ee403fb6557387a7f897cd76be4406"
+  release_commit: "85209e07a3ee403fb6557387a7f897cd76be4406"
+
+  # 源码校验和（实测下载值，105015 bytes）
+  sha256: "40a2baf1f325375e070ec29392ed7e156318658c4b79f4f6b5f328d2cbeab671"
+
+  # 压缩格式
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # header-only：上游 CMakeLists 构建 CLI 工具，本配方仅打包 src/iitii.h
+  system: cmake
+
+  # 配置选项列表（header-only，无构建配置）
+  configure_options: []
+
+  # 编译依赖列表（格式: name/version）
+  # ips4o 提供 ips4o.hpp（parallel sort）；mmap_allocator 提供 mmappable_vector.h
+  dependencies:
+    - "ips4o/0.0-git22069381cc"
+    - "mmap_allocator/3.1"
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "iitii 是 header-only C++14 库，核心头文件为 src/iitii.h，包含 ips4o.hpp 与 mmappable_vector.h（ref: notes.md）"
+  - "上游无 release tag，Debian 快照 0.0+git20191030.85209e0 对应 mlin/iitii 提交 85209e07（PR #4 head），配方按 0.0-git<date>.<short> 惯例版本化（ref: notes.md）"
+  - "库头文件本身不需要 Taywee args 与 OpenMP 工具链；args 仅 src/main.cpp CLI 工具使用，不入 header-library 配方依赖（ref: notes.md）"
+  - "上游 test/CMakeLists 注册 1 个 ctest（unit_tests），内含 6 个 Catch2 TEST_CASE，其中 gnomAD 用例无数据时 WARN 跳过（ref: notes.md 上游测试清点）"
