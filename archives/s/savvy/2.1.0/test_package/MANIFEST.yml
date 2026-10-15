@@ -1,0 +1,51 @@
+# test_package/MANIFEST.yml — savvy 2.1.0
+# 上游官方测试声明文件（CI L0e 强制要求）
+# 填写依据：解压官方 v2.1.0 tag 源码 → CMakeLists.txt 顶层
+# `if(BUILD_TESTS)` 注册 5 个 ctest 用例（src/test/main.cpp）。
+
+package: savvy/2.1.0
+homepage: "https://github.com/statgen/savvy"
+
+# 上游测试命令
+upstream_check_command: "ctest -N"
+
+# conanfile.py build() 中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "ctest --output-on-failure"
+
+# 上游实际运行的测试（BUILD_TESTS=ON → savvy-test 单二进制，5 个 ctest 用例）
+upstream_tests:
+  - file: src/test/main.cpp
+    source: savvy-2.1.0.tar.gz/src/test/main.cpp
+    description: >
+      上游 ctest 注册 5 个用例，均为 savvy-test 二进制不同子命令：
+      convert_file_test (convert-file) / subset_test (subset) /
+      random_access_test (random-access) / stride_reduce_test (stride-reduce) /
+      missing_headers_test (missing-headers)。fixture 为源码树根目录
+      test_file.vcf 与 test_file_missing_headers.vcf（编译期绝对路径注入），
+      SAV 中间文件 test_file_hard.sav/test_file_dose.sav 写 cwd。全部校验用
+      C assert()，配方给 savvy-test 加 -UNDEBUG 使断言在 Release 下真实验证。
+      5 个用例共用同一二进制且共享 cwd 产物，配方在 build() 起始
+      conf.define("tools.build:jobs", 1) 显式串行，规避并行写/读竞态
+      （CI build #88326 的 subset/random_access "Unsupported file format" 失败）。
+    command: "ctest --output-on-failure"
+
+# test_package 中自带的测试（消费者视角验证，R34：真实调用库 API）
+test_package_tests:
+  - file: test_savvy.cpp
+    description: >
+      消费者 29 条断言：varint_encode/varint_decode 对 8 个代表值（0/1/127/
+      128/300/65535/2^32/2^63-1）的无损往返 + 解码定位到末字节（完整消费编码，
+      上游 varint_decode 返回最后一个已消费字节而非 one-past-end）+ 字节宽校验，
+      one_bit_prefixed_varint 往返，detail::has_extension 文件扩展名识别
+      （savvy/savvy.hpp；4 条：.vcf 匹配、.vcf.gz 不匹配 .vcf 但匹配 .gz、
+      .txt 不匹配 .vcf）。
+      另运行安装的 `sav --version` 冒烟（L2）。
+    command: "./test_savvy && sav --version"
+
+# 测试数量口径（与 notes.md、PR 描述保持一致）
+# 上游总数按官方 ctest 注册数（ctest_entries）；消费者断言数 29。
+upstream_test_total: 5
+upstream_test_count_method: ctest_entries
+test_package_assertion_count: 29
+assertion_count: 29
