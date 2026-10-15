@@ -1,0 +1,32 @@
+--- a/test/test_plyvel.py
++++ b/test/test_plyvel.py
+@@ -50,20 +50,29 @@
+ #
+ 
+ def test_version():
+     v = plyvel.__leveldb_version__
+     assert v.startswith('1.')
+ 
+ 
+ def test_open_read_only_dir(db_dir):
+     # Opening a DB in a read-only dir should not work
+     os.chmod(db_dir, stat.S_IRUSR | stat.S_IXUSR)
++    # Some filesystems normalize permissions rather than honoring chmod.
++    # Check the test's prerequisite without changing its IOError assertion.
++    try:
++        probe = tempfile.TemporaryFile(dir=db_dir)
++    except PermissionError:
++        pass
++    else:
++        probe.close()
++        pytest.skip('filesystem permits writes after chmod to read-only')
+     with pytest.raises(plyvel.IOError):
+         plyvel.DB(db_dir)
+ 
+ 
+ def test_open_no_create(db_dir):
+     with pytest.raises(plyvel.Error):
+         plyvel.DB(db_dir, create_if_missing=False)
+ 
+ 
+ def test_open_fresh(db_dir):
