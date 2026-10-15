@@ -1,0 +1,32 @@
+package: kafs-client/0.5
+homepage: "https://www.infradead.org/~dhowells/kafs/"
+
+# 上游测试审计（no_tests 情形，必须同时声明 exist=false + 非空 audit）：
+#  - 源码包 kafs-client_0.5.orig.tar.gz（sha256 561b6416f8f7234ddc1e66d8e479d96625c1655463365ea0f954e469ba8aa051）
+#    共 45 个文件（.gitignore/LICENCE.GPL/Makefile/README/SUBMITTING_PATCHES/conf/man/redhat/src），无 tests/ 或
+#    test/ 目录（tar -tf 全量核对，见 notes.md）。
+#  - 顶层 Makefile 目标仅 all/install/clean/distclean/tarball/rpm/rpmlint；
+#    src/Makefile 目标仅 all/lib/progs/install/clean/distclean；
+#    全仓 grep 无 check/test/ctest 目标、无 TESTS 变量、无 enable_testing/add_test。
+#  - man/ 仅文档（AF_RXRPC.7/aklog-kafs.1/kafs-check-config.8 等），非测试。
+upstream_tests_exist: false
+upstream_test_audit: "解包 kafs-client_0.5.orig.tar.gz（sha256 561b6416f8f7234ddc1e66d8e479d96625c1655463365ea0f954e469ba8aa051，45 文件）确认无 tests/、test/ 目录；顶层 Makefile 与 src/Makefile 均无 check/test 目标（仅 all/install/clean/distclean/tarball/rpm）；无 ctest/pytest/gtest 注册（TEST(/TEST_F、def test_、enable_testing/add_test、check_PROGRAMS/TESTS 全零命中）；man/conf 均为文档与配置"
+
+upstream_test_total: 0
+upstream_test_count_method: "none"
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests: []
+
+test_package_tests:
+  - file: test_kafs_client.c
+    description: "离线调用 libkafs_client 真实 API：profile 解析/字符串查找与计数、bool 与常量 helper、source/status 字符串、server-list 分配释放（6 用例）"
+    command: "./test_kafs_client kafs_test.conf"
+  - file: kafs_test.conf
+    description: "离线静态 cell 配置（use_dns=no，127.0.0.1），供 C 测试与 kafs-check-config 烟囱使用"
+    command: "kafs-check-config -c kafs_test.conf -P -N dns"
+
+assertion_count: 7

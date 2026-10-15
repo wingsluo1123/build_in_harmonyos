@@ -1,0 +1,33 @@
+# kafs-client 0.5 manifest
+# 文件位置: archives/k/kafs-client/0.5/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "0.5"
+software: "kafs-client"
+status: built
+build_date: "2026-10-14"
+build_system: makefile
+
+source:
+  url: "https://archive.ubuntu.com/ubuntu/pool/universe/k/kafs-client/kafs-client_0.5.orig.tar.gz"
+  sha256: "561b6416f8f7234ddc1e66d8e479d96625c1655463365ea0f954e469ba8aa051"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options:
+    - "BUILDFOR= (neutralise upstream -m32/-m64 probe, x86-only)"
+    - "LIBDIR/INCLUDEDIR/BINDIR/SBINDIR/LIBEXECDIR explicit (ldd/file probes fail on OHOS)"
+    - "make -C src install only (top-level install would write /etc + systemd units)"
+  dependencies:
+    - "krb5/1.22.1"
+    - "libkeyutils/1.6.3"
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "kafs-client 0.5 为纯 Makefile 项目，无 configure、无 check/test 目标，属 no_tests 情形"
+  - "顶层 Makefile 以 file/ldd 探测 word size 与 LIBDIR，在 OHOS 上必须以 BUILDFOR= 与显式目录覆盖"
+  - "aklog-kafs 需 krb5/krb5.h，kafs-dns/aklog-kafs 需 keyutils.h，分别由 krb5 与 libkeyutils 提供"
