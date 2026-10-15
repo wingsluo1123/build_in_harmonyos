@@ -1,0 +1,45 @@
+# test_package/MANIFEST.yml — dte/1.9.1 上游测试声明（CI L0e）
+package: dte/1.9.1
+homepage: "https://craigbarnes.gitlab.io/dte/"
+
+# dte 使用 GNU Make（GNUmakefile + mk/*.mk）：`make check` 构建并运行 build/test/test
+upstream_check_command: "make check"
+upstream_test_in_build: true
+upstream_test_command: "make check"
+
+upstream_tests:
+  - file: test/main.c
+    source: dte-1.9.1/test/main.c
+    description: "单元测试入口：headless 初始化 + 注册全部测试套件"
+    command: "./build/test/test"
+  - file: test/command.c
+    source: dte-1.9.1/test/command.c
+    description: "命令语言与按键绑定解析断言"
+    command: "./build/test/test"
+  - file: test/syntax.c
+    source: dte-1.9.1/test/syntax.c
+    description: "语法高亮状态机断言"
+    command: "./build/test/test"
+  - file: test/terminal.c
+    source: dte-1.9.1/test/terminal.c
+    description: "终端输入解码与窗口尺寸处理断言"
+    command: "./build/test/test"
+  - file: test/encoding.c
+    source: dte-1.9.1/test/encoding.c
+    description: "编码转换（iconv 路径）断言"
+    command: "./build/test/test"
+  - file: test/util.c
+    source: dte-1.9.1/test/util.c
+    description: "字符串/路径/缓冲区工具函数断言"
+    command: "./build/test/test"
+
+test_package_tests:
+  - file: test.sh
+    description: "消费者冒烟：dte -V/-h/-B/-b rc，随后进入 termios 原始模式 pty 探针"
+    command: "bash test.sh"
+  - file: pty_probe.py
+    description: "在 pty 中启动真实 dte，断言 ICANON/ECHO 关闭（termios 原始模式）、TIOCGWINSZ 24x80 与首帧画面输出"
+    command: "python3 pty_probe.py"
+
+# 测试断言总数（test/*.c 中 EXPECT_* 宏调用静态计数，近似值）
+assertion_count: 862

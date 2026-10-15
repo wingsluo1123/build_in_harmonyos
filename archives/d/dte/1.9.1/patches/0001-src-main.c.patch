@@ -1,0 +1,40 @@
+--- a/src/main.c
++++ b/src/main.c
+@@ -188,20 +188,37 @@
+     const char *rc = NULL;
+     const char *command = NULL;
+     const char *lint_syntax = NULL;
+     bool read_rc = true;
+     bool use_showkey = false;
+     bool load_and_save_history = true;
+     int ch;
+ 
+     init_editor_state();
+ 
++    /* GNU-style long option aliases (platform portability patch):
++     * probes such as `pkg --version` / `pkg --help` are standard on
++     * POSIX CLI tools, but upstream only implements the short -V/-h
++     * forms, so getopt() rejects the long forms with "unrecognized
++     * option: -" and exits non-zero.  Only the single-argument form
++     * is handled, so normal option parsing is unchanged. */
++    if (argc == 2 && streq(argv[1], "--version")) {
++        printf("dte %s\n", editor.version);
++        puts("(C) 2017-2019 Craig Barnes");
++        puts("(C) 2010-2015 Timo Hirvonen");
++        return 0;
++    }
++    if (argc == 2 && streq(argv[1], "--help")) {
++        printf(usage, argv[0]);
++        return 0;
++    }
++
+     while ((ch = getopt(argc, argv, optstring)) != -1) {
+         switch (ch) {
+         case 'c':
+             command = optarg;
+             break;
+         case 't':
+             tag = optarg;
+             break;
+         case 'r':
+             rc = optarg;
