@@ -1,0 +1,38 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI L0e 强制要求存在）
+package: kamailio-xhttp_prom/6.0.6
+homepage: "https://www.kamailio.org"
+
+# 上游测试清点（R51 三步法，证据见 notes.md 与本次清点记录）：
+#   - kamailio 6.0.6 源码包顶层无 test/ 目录
+#     （utils/kamctl/dbtextdb/tests/ 是 kamctl 工具的 Python 测试数据，与模块无关）
+#   - src/modules/xhttp_prom/ 内仅源码 + doc/ + README，无任何测试源文件
+#   - src/modules/xhttp_prom/Makefile 中 test 关键字出现次数 = 0；
+#     模块 CMakeLists.txt 无 add_test/enable_testing；顶层与 src/Makefile 无 check 目标
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（上游无 xhttp_prom 模块自动化测试套件）
+upstream_tests: []
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: consumer/consumer.c
+    description: >-
+      消费者用例（运行期真实加载，R34 实质验证）：按 kamailio 模块加载器序列
+      dlopen 模块 → dlsym exports → 解析导出表（模块名 xhttp_prom / 22 项配置命令
+      / 10 个模块参数及绑定地址）→ dlsym mod_register 并实际调用 → 核对 10 个
+      prom_* Prometheus 指标 API 与 6 个 OHOS libc 平台符号（含 dladdr 归属确认），
+      共 17 项断言
+    command: 'consumer <package_folder>/lib/kamailio/modules/xhttp_prom.so'
+  - file: check_artifact.py
+    description: >-
+      产物合规 + 鸿蒙平台适配核对：随包文件三件（模块/许可证/文档）、ELF64+aarch64+
+      ET_DYN、NEEDED 仅 libc.so、无 RPATH/RUNPATH、导出 exports/mod_register/10 个
+      prom_* 符号、无 glibc 专属未定义符号、53 个未定义符号全部归类为
+      kamailio 核心符号(35)+OHOS libc(18) 且后者逐个在 OHOS libc 中可解析，共 16 项断言
+    command: "python3 check_artifact.py"
+
+# 测试断言总数（consumer 17 + check_artifact 16）
+assertion_count: 33
