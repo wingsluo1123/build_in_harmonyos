@@ -1,0 +1,57 @@
+# test_package/MANIFEST.yml
+#
+# wmauda 0.9 — OHOS 适配验证清单
+package: wmauda/0.9
+homepage: "https://www.netswarm.net/"
+
+# 上游测试入口
+#
+# 上游发布包是"手写 Makefile + 单文件 wmauda.c"结构：Makefile 只声明
+# all / clean / install 三个目标，没有 check 目标（不是 automake 为无测试
+# 项目生成的空壳 check，而是该目标根本不存在）、没有 tests/ 目录、也没有
+# configure.ac/meson 等测试框架。实测上游自动化测试数 = 0
+# （"上游确实没有"，不是"未执行"）。
+upstream_check_command: null
+upstream_test_in_build: false
+upstream_tests: []
+upstream_test_result:
+  total: 0
+  passed: 0
+  failed: 0
+  status: no_tests
+  reason: >
+    wmauda 是单文件 C 项目（wmauda.c + 手写 Makefile）。Makefile 无 check
+    目标、无 tests/ 目录、无 configure/meson 测试框架，上游无任何自动化
+    测试。因此上游通过率为 0/0（无用例），不虚报。
+
+# test_package 自带的消费者视角测试（安装后二进制 + 真实动态库链）
+test_package_tests:
+  - file: "test.sh"
+    description: >-
+      Drives the installed wmauda dockapp on display-independent paths.
+      wmauda 的 main() 在 getopt_long() 之前调用 gtk_init()（src/wmauda.c:833），
+      因此 -v/-h 同样会死在 gtk_init() 内——无 X server 时不存在可用的参数
+      路径。脚本据此断言：AArch64/ELF64 的 OHOS 形状；无 RPATH/RUNPATH
+      （包可重定位）；已安装运行时数据（share/pixmaps/wmauda.xpm +
+      dock-master.xpm）与 man page（share/man/man1/wmauda.1）；真实
+      DT_NEEDED 链（libgtk-x11-2.0.so.0、libgdk-x11-2.0.so.0、
+      libaudclient.so.2、libglib-2.0.so.0、libX11.so.6）；
+      audacious_remote_* 与 dbus_g_* 未定义符号（证明 Audacious D-Bus 客户端
+      stub 真正被链接使用，而非仅有一个悬空 NEEDED 条目）；DT_NEEDED 闭包在
+      OHOS 上可完整解析（musl 运行时基线由加载器提供，另行断言）；以及二进制
+      链接 OHOS musl 运行时（libc.so）。此外执行一个鸿蒙特有消费者用例：
+      以宿主内核为门（门本身不是断言），端到端启动已安装二进制——预期的干净
+      拒绝 "cannot open display"（exit 1）证明运行时共享库链（含
+      libaudclient.so.2）已解析、GTK+2 初始化在鸿蒙上被真实到达。
+    command: "bash test.sh"
+test_package_result:
+  total: 18
+  passed: 18
+  failed: 0
+
+# 用例口径（与 test.sh 自身 RESULT 行一致）：
+#   17 条消费者侧断言 + 1 个已执行的鸿蒙消费者用例 = 18
+#   test.sh 输出 [consumer] RESULT: 18 passed, 0 failed
+assertion_count: 17
+executed_harmonyos_usecase: 1
+harmonyos_consumer_usecase: "executed in test.sh (gated on host kernel; not counted in assertion_count)"
