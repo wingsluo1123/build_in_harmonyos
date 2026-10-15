@@ -1,0 +1,35 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI L0e 强制要求）
+package: lmbench/3.0-a9
+homepage: "https://sourceforge.net/projects/lmbench/"
+
+# 上游无断言式测试框架：源码树无 tests/ 目录，Makefile 无 test/check 目标，
+# 无 ctest/pytest 注册（清点命令与结果见 3.0-a9/notes.md「上游测试清点」）。
+# 上游的“测试面”= 基准程序本身：每个 lat_*/bw_* 程序运行即产出测量值。
+upstream_check_command: "make（无 test 目标；基准程序执行即上游测试面）"
+
+# 构建阶段只编译（make all + opt）；基准程序真机执行证据在 reports/，
+# 消费者回归在 test_package/。
+upstream_test_in_build: false
+
+upstream_tests:
+  - file: "src/（lat_*.c / bw_*.c 基准程序，共 49 个可执行文件）"
+    source: "lmbench-3.0-a9"
+    description: "上游无单元/集成测试用例（N=0）；基准程序以“能否正常运行并输出测量值”为验证口径，本适配真机运行 6 项基准 + 标定三件套（逐项见 reports/test-report.md）"
+    command: "./lat_syscall null; ./lat_pipe; ./bw_pipe; ./lat_ctx -s 0 2; ./lat_proc fork"
+
+# 平台原因不可用项（非适配裁剪）
+platform_skipped_tests:
+  - names: [lat_rpc]
+    reason: "lat_rpc 整个程序依赖 Sun RPC（rpc/rpc.h、CLIENT/SVCXPRT/xdr_* 与 portmapper）；musl/OHOS 不提供 Sun RPC。适配后该命令保留为明确报错的诊断入口（非 0 退出），其余 TCP/UDP/Unix 延迟与带宽基准不受影响"
+  - names: [lat_unix_connect -s]
+    reason: "该基准的服务端使用文件系统命名 AF_UNIX socket（上游硬编码 /tmp/af_unix）；OHOS 平台禁止在文件系统创建 AF_UNIX socket（实测所有可写目录 bind 均 EPERM，抽象 socket 可用），属平台能力限制，上游行为未改动"
+
+# test_package 中自带的消费者测试（鸿蒙特有 // 消费者视角）
+test_package_tests:
+  - file: test_lmbench.sh
+    description: "包布局（49 基准 + 10 头文件 + libmbench.a）；上游官方标定三件套 enough/timing_o/loop_o；6 项基准真机实跑（退出码 + 标签 + 正数值）；lat_rpc 平台能力报错断言；未知子命令负向对照；consumer 链接 libmbench.a 的 tvsub() 实跑"
+    command: "sh test_lmbench.sh <package-dir> <work-dir> <cc>"
+
+# 测试断言总数 (用于质量评估)
+assertion_count: 26

@@ -1,0 +1,25 @@
+# 软件级 manifest — lmbench
+software: lmbench
+display: "lmbench"
+description: "系统微基准套件：系统调用/上下文切换/管道/进程创建/信号/内存与缓存延迟，管道/TCP/UDP/Unix/文件/内存带宽（49 个独立基准程序）"
+category: utility
+homepage: "https://sourceforge.net/projects/lmbench/"
+license: GPL-2.0
+
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "构建走上游 scripts/build：make OS=aarch64-ohos CC=<clang>（R33 编译器取 Conan conf），5 个 portability 补丁"
+    - "musl/OHOS 无 Sun RPC（rpc/rpc.h）：按上游 HAVE_pmap_clnt_h 探测与既有 NO_PORTMAPPER 宏补齐保护；lat_rpc 改为明确报错的诊断入口，其余 TCP/UDP/Unix 基准不受影响"
+    - "scripts/build 特性探测临时目录改为优先 $TMPDIR（OHOS /tmp 只读导致探测全部静默失败）"
+    - "OS 标签不可依赖 config.guess（scripts/gnu-os 在 OHOS 不可运行），显式传 aarch64-ohos"
+    - "标定采用上游官方机制：包内 enough/timing_o/loop_o 生成 ENOUGH/TIMING_O/LOOP_O 后再运行基准（scripts/config-run 同口径；高负载机器上自适应标定会因测量噪声发散）"
+    - "包布局=上游 install 目标：bin/（49 基准）+ include/（10 头文件）+ lib/libmbench.a"
+  common_dependencies: []
+
+versions:
+  "3.0-a9":
+    status: built
+    build_date: "2026-10-14"
+    conan_ref: "lmbench/3.0-a9"

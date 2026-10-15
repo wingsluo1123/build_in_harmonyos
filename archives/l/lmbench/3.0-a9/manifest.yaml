@@ -1,0 +1,95 @@
+# 版本级 manifest — lmbench 3.0-a9
+# 文件位置: archives/l/lmbench/3.0-a9/manifest.yaml
+
+# 版本号（平台任务版本，与上游发布同名；首次适配无修复后缀）
+version: "3.0-a9"
+
+# Conan 引用
+conan_ref: "lmbench/3.0-a9"
+
+# 软件名
+software: "lmbench"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-14"
+build_system: "makefile"
+
+# 源码信息
+source:
+  # 源码下载 URL（R39 官方源：SourceForge 项目官方下载域）
+  url: "https://downloads.sourceforge.net/project/lmbench/development/lmbench-3.0-a9/lmbench-3.0-a9.tgz"
+  # 源码校验和
+  sha256: "cbd5777d15f44eab7666dcac418054c3c09df99826961a397d9acf43d8a2a551"
+  # 压缩格式
+  tar_format: tar.gz
+
+# 构建配置
+build:
+  # 构建系统类型
+  system: makefile
+
+  # 配置选项列表
+  configure_options: []
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+
+  # 编译器（R33：make CC=<clang> 取 Conan conf；AR=llvm-ar 覆盖上游默认 ar）
+  cc: clang
+  cxx: clang++
+
+# 补丁信息
+patches_applied:
+  - "0001-scripts-build.patch"
+  - "0002-src-bench.h.patch"
+  - "0003-src-lat_rpc.c.patch"
+  - "0004-src-lib_tcp.c.patch"
+  - "0005-src-lib_udp.c.patch"
+
+# 知识沉淀（每条注明记录位置，供 W5 完整性检查）
+knowledge_gained:
+  - knowledge_ref: "notes.md#遇到的问题与解决方案"
+    text: "scripts/build 特性探测基址固定 /tmp/dummy 且候选目录仅 /usr/tmp /var/tmp /tmp：OHOS /tmp 只读（E002）导致所有 C 特性探测静默失败；改为优先 $TMPDIR 后 -DRUSAGE/-DHAVE_DRAND48 等宏正确生成（通用模式：源码树内自带编译器探测脚本的包，探测临时目录必须可配置）"
+  - knowledge_ref: "notes.md#遇到的问题与解决方案"
+    text: "musl/OHOS 无 Sun RPC：rpc/rpc.h 不存在。bench.h 无条件 include 该头（上游 1996 年代码假定 UNIX 必有 RPC）；用上游自身 HAVE_pmap_clnt_h 探测保护后，lib_tcp/lib_udp 的 pmap_* 调用还需按既有 NO_PORTMAPPER 宏补齐保护，lat_rpc 改为诊断入口"
+  - knowledge_ref: "notes.md#遇到的问题与解决方案"
+    text: "rpc/types.h 在旧 UNIX 上顺带提供 TRUE/FALSE；去掉该 include 后 lat_usleep.c 编译失败，需在 bench.h 补定义（移除系统头时须核对其历史副产物符号）"
+  - knowledge_ref: "notes.md#遇到的问题与解决方案"
+    text: "lmbench 自适应标定（find_N ±2% 窗口）对测量噪声敏感：共享设备高负载（并发 conan create -j8，load 26/20 核）时 min-of-10 散布 2 倍以上，N 发散至 10^8，表现为‘无输出长跑’。官方规避机制 = scripts/config-run 先跑 enough/timing_o/loop_o 并把 ENOUGH/TIMING_O/LOOP_O 写入 CONFIG 再运行套件；CI 冒烟应采用同一机制"
+  - knowledge_ref: "README.md#OHOS 适配要点"
+    text: "lmbench 的 OS 标签不可依赖 uname/config.guess：scripts/os 回退的 scripts/gnu-os（config.guess）在 OHOS 无法运行，必须显式 make OS=aarch64-ohos"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/work/kasumizawa-miyuu/tmp/builds/lmbench-3.0-a9.orig
+  source_work_dir: /storage/Users/currentUser/work/kasumizawa-miyuu/tmp/builds/lmbench-3.0-a9.work
+  source_orig_hash: 44f754706db15fd3
+  source_work_hash: e6c896e1b25e68c1
+  generated_at: '2026-10-14T17:47:50'
+  patches_count: 5
+
+patch_classification:
+  - file: 0001-scripts-build.patch
+    type: portability
+    platform_only: False
+    guard: 'none'
+  - file: 0002-src-bench.h.patch
+    type: portability
+    platform_only: False
+    guard: 'none'
+  - file: 0003-src-lat_rpc.c.patch
+    type: portability
+    platform_only: False
+    guard: 'none'
+  - file: 0004-src-lib_tcp.c.patch
+    type: portability
+    platform_only: False
+    guard: 'none'
+  - file: 0005-src-lib_udp.c.patch
+    type: portability
+    platform_only: False
+    guard: 'none'

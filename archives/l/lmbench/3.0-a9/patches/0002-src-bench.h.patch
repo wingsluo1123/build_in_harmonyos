@@ -1,0 +1,45 @@
+--- a/src/bench.h
++++ b/src/bench.h
+@@ -28,27 +28,42 @@
+ #include        <sys/mman.h>
+ #endif
+ #include        <sys/stat.h>
+ #ifndef WIN32
+ #include        <sys/wait.h>
+ #include	<time.h>
+ #include        <sys/time.h>
+ #include        <sys/socket.h>
+ #include        <sys/un.h>
+ #include        <sys/resource.h>
++#ifdef HAVE_pmap_clnt_h
+ #define PORTMAP
+ #include	<rpc/rpc.h>
+ #endif
++#endif
+ #ifdef HAVE_pmap_clnt_h
+ #include	<rpc/pmap_clnt.h>
+ #endif
++#ifdef HAVE_pmap_clnt_h
+ #include	<rpc/types.h>
++#else
++/*
++ * rpc/types.h (Sun RPC) is unavailable on this platform (musl/OHOS); it
++ * also provided TRUE/FALSE, which lat_usleep.c relies on.
++ */
++#ifndef TRUE
++#define TRUE 1
++#endif
++#ifndef FALSE
++#define FALSE 0
++#endif
++#endif
+ #ifdef HAVE_pmap_clnt_h
+ #include	<rpc/pmap_clnt.h>
+ #endif
+ 
+ #include 	<stdarg.h>
+ #ifndef HAVE_uint
+ typedef unsigned int uint;
+ #endif
+ 
+ #ifndef S_IREAD

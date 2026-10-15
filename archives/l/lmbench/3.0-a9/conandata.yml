@@ -1,0 +1,49 @@
+# conandata.yml — lmbench 3.0-a9
+# 上游: lmbench（Larry McVoy / Carl Staelin），SourceForge 官方项目归档
+# 源码 URL: downloads.sourceforge.net 是 SourceForge 官方下载域（本项目 3.0-a9
+#           为官方发布的 tarball，顶层目录 lmbench-3.0-a9/；仓库内 427 个
+#           sourceforge 先例同用此形式，R39 官方源）。
+# 版本口径: 平台任务版本 3.0-a9 与上游发布同名（无适配修复后缀，首次适配）。
+
+sources:
+  url: "https://downloads.sourceforge.net/project/lmbench/development/lmbench-3.0-a9/lmbench-3.0-a9.tgz"
+  sha256: "cbd5777d15f44eab7666dcac418054c3c09df99826961a397d9acf43d8a2a551"
+  # data 源未携带扩展名信息（.tgz），Conan get() 依据 URL 末段判定解压格式；
+  # 显式 filename 保证按 tar.gz 处理（仓库内先例同法）。
+  filename: "lmbench-3.0-a9.tar.gz"
+
+patches:
+  - patch_file: "patches/0001-scripts-build.patch"
+    patch_description: >-
+      scripts/build 的特性探测把临时文件写到 /tmp/dummy，且可写目录候选仅
+      /usr/tmp、/var/tmp、/tmp；OHOS 上 /tmp 只读（E002）、另两者不存在，
+      所有探测静默失败（bcopy/valloc/getrusage/drand48 等特性宏全部缺失）。
+      改为优先使用 $TMPDIR（Conan 构建环境可用；CI /tmp 可写时行为不变）。
+    patch_type: "portability"
+  - patch_file: "patches/0002-src-bench.h.patch"
+    patch_description: >-
+      bench.h 无条件 include <rpc/rpc.h>（Sun RPC）与 <rpc/types.h>；musl/OHOS
+      不提供 rpc 头文件。按上游自身的 HAVE_pmap_clnt_h 特性探测保护这两个
+      include（该探测在无头文件时本就未定义），并在未定义时补充 TRUE/FALSE
+      定义（原由 rpc/types.h 提供，lat_usleep.c 依赖）。
+    patch_type: "portability"
+  - patch_file: "patches/0003-src-lat_rpc.c.patch"
+    patch_description: >-
+      lat_rpc.c 整个程序依赖 Sun RPC 客户端/服务端 API（CLIENT/SVCXPRT/xdr_*）。
+      musl/OHOS 无 rpc/rpc.h，无法编译该实现；在 HAVE_pmap_clnt_h 未定义时改为
+      提供一个明确报错（"Sun RPC is not available on this platform"，退出码 1）
+      的诊断入口，其余基准不受影响。
+    patch_type: "portability"
+  - patch_file: "patches/0004-src-lib_tcp.c.patch"
+    patch_description: >-
+      lib_tcp.c 的 tcp_server/tcp_done/tcp_connect 调用 pmap_* 端口映射 API；
+      bench.h 定义的 NO_PORTMAPPER 路径（上游为无 portmapper 环境保留）在代码中
+      未完全落地。用 NO_PORTMAPPER 保护这三处 pmap 调用，使无 Sun RPC 的 libc
+      也能链接（负端口号的 TCP 直连路径不受影响，lat_tcp/bw_tcp 正常使用）。
+    patch_type: "portability"
+  - patch_file: "patches/0005-src-lib_udp.c.patch"
+    patch_description: >-
+      lib_udp.c 的 udp_done 无条件调用 pmap_unset（上游 NO_PORTMAPPER 路径下
+      的遗漏）。同样用 NO_PORTMAPPER 保护，避免无 Sun RPC 时链接失败
+      （lat_udp/bw_udp 使用的负端口号直连路径不受影响）。
+    patch_type: "portability"

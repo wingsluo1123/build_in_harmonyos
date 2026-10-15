@@ -1,0 +1,28 @@
+--- a/src/lib_udp.c
++++ b/src/lib_udp.c
+@@ -44,21 +44,25 @@
+ #endif
+ 	return (sock);
+ }
+ 
+ /*
+  * Unadvertise the socket
+  */
+ void
+ udp_done(u_long prog)
+ {
++#ifndef	NO_PORTMAPPER
+ 	(void)pmap_unset(prog, (u_long)1);
++#else
++	(void)prog;
++#endif
+ }
+ 
+ /*
+  * "Connect" to the UCP socket advertised as "prog" on "host" and
+  * return the connected socket.
+  */
+ int
+ udp_connect(char *host, u_long prog, int rdwr)
+ {
+ 	struct hostent *h;

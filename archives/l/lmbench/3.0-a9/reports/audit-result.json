@@ -1,0 +1,30 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "code_style §7",
+      "file": "archives/l/lmbench/3.0-a9/test_package/test_lmbench.sh",
+      "line": 23,
+      "description": "shell 脚本安全模式不完整：文件头仅 `set -u`，未按代码规范 §7（所有脚本以 `set -euo pipefail` 开头）开启 -e/pipefail。考虑到该脚本为 TAP 式收集器、需要在单项断言失败后继续执行，省略 -e 可能是刻意设计，但文件中没有任何说明该例外的注释。",
+      "fix_suggestion": "若保留 TAP 语义，在文件头加注释说明“有意不启用 set -e（逐项收集失败）”；否则改用 `set -eu`（/bin/sh 下 pipefail 不具可移植性，可省略或注明）。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style §12",
+      "file": "archives/l/lmbench/3.0-a9/conandata.yml",
+      "line": 17,
+      "description": "patch_description 五条均为多行长文本说明，未采用代码规范 §12 规定的空格分隔短格式（如 `\"0001 scripts build\"`，对应 0001-scripts-build.patch）。内容本身真实且信息量大，仅格式与规范模板不一致（0002-0005 同样，见第 24/31/38/45 行）。",
+      "fix_suggestion": "与仓库既有惯例核对：若规范要求短格式，改为 `\"0001 scripts build\"` 等；若长描述被接受，建议在 CONTRIBUTING/规范中明确该例外。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "suggestion",
+      "file": "archives/l/lmbench/3.0-a9/conanfile.py",
+      "line": 126,
+      "description": "CC 已正确取自 Conan conf（R33），但归档器 `AR=llvm-ar` 为硬编码。对 OHOS SDK 工具链这是正确取值且已在 README/notes 中声明，但若用同一配方构建其他工具链（validate 允许 Linux）会不一致。",
+      "fix_suggestion": "保持 OHOS 默认 llvm-ar 的前提下，优先从 conf/toolchain 读取归档器（如有），无配置时再回退 llvm-ar；或在注释中说明该固定值与 OHOS SDK 绑定的理由。"
+    }
+  ],
+  "summary": "审计结论：pass（P0=0，P1=0；P2=1，P3=2，均非阻断）。类别一（欺骗检测 R34/R9/R8/R19/R40）：无一命中——test_package 真实执行包内二进制并断言真实输出（49 可执行/10 头文件/libmbench.a、6 项基准、lat_rpc 平台能力负向断言、未知子命令负向对照），consumer_timing.c 真实链接 libmbench.a 并调用 tvsub()（定义于 src/lib_timing.c:1092，lib_timing.o 已含于上游 LIBOBJS）；无跳过/伪造通过；全部补丁与 conanfile 无 __OHOS__ 宏注入（guard 为上游既有 HAVE_pmap_clnt_h / NO_PORTMAPPER 与 $TMPDIR 环境变量）；PR 无预编译二进制；sha256 经从官方 URL 下载实测完全一致（cbd5777d…a551），status=built 与“未 upload”一致；R51 申报经上游 tarball 独立清点核实（无 tests/ 目录、仅 testmake 目标、ctest/pytest/unittest 0 命中，N=0 属实），test-report.md / MANIFEST.yml / 26 项断言互相一致，标定三件套回退机制不伪数值（断言仍校验真实运行的正数输出）。类别二（配方质量）：R32/R33/R37/R38/R39 通过，R26 不适用；R39 官方 SourceForge 源已实测可下载且哈希匹配。类别三（文件规范）：归档结构完整，5 个补丁编号/格式/patch_type=portability 规范且附工具生成证据（patch_generation），无 PR 禁止文件，reports/ 仅 test-report.md。类别四（PR 合规）：W2 原子性通过，17 个文件全部位于 archives/l/lmbench/**，未越权改动框架文件。全部 17 个文件 LF 行尾、无 CRLF、无 TODO/FIXME/XXX 占位符、无 http://、file://、无密钥/绝对 Windows 路径。"
+}
