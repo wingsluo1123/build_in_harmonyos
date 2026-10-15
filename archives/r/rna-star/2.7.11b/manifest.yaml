@@ -1,0 +1,47 @@
+# 版本级 manifest — rna-star 2.7.11b
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "2.7.11b"
+software: rna-star
+status: built
+build_date: "2026-10-12"
+build_system: makefile
+
+source:
+  url: "https://github.com/alexdobin/STAR/archive/refs/tags/2.7.11b.tar.gz"
+  sha256: "3f65305e4112bd154c7e22b333dcdaafc681f4a895048fa30fa7ae56cac408e7"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options:
+    - "make -j1 all CXXFLAGS='-O3 -std=c++17 -stdlib=libc++ -fopenmp -static-openmp' CXXFLAGS_SIMD= (命令行钉死，覆盖上游 ?=-pipe -Wall -Wextra)"
+    - "CXX=clang++ / CC=clang（自 conan conf，R33）；编前 Python 预生成 parametersDefault.xxd（toybox xxd 契约缺失）"
+  dependencies:
+    - zlib/1.3.1.1
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-remove-register-keyword-cxx17.patch"
+
+knowledge_gained:
+  - "上游 Makefile 纯 make 无 install 目标：package() 直接打包产物 STAR；自带 htslib 子目录 lib-static 静态链进 STAR，并链接 -lz（需 zlib 依赖）"
+  - "上游默认 -std=c++11；OHOS libc++-ohos 头要求 C++17 最低（E130）。.o 规则用裸 $(CXXFLAGS)，命令行传 -std=c++17 即覆盖；C++17 移除 register 存储类，SuffixArrayFuns.cpp 7 处 register 变量需 patch 移除"
+  - "STAR 的 CXXFLAGS_common 无条件携带 -fopenmp；CLI 必须直接执行，故链接 -fopenmp -static-openmp 让 libomp 静态并入，规避 clang 默认 RUNPATH 写宿主 resource dir 导致 libomp.so 加载失败（spaced 同款坑）"
+  - "CXXFLAGS_SIMD ?= -mavx2 是 x86 专属，aarch64 上传它会报 unknown target；opal 用 simde_avx2.h（SIMDe）在 aarch64 软件兜底，故命令行传 CXXFLAGS_SIMD= 清空该标志即可"
+  - "OHOS /usr/bin/xxd 是 toybox，xxd -i 只产裸 hex 缺声明+_len 变量（metaeuk 同款坑）：STAR.cpp/Parameters.cpp 都 include parametersDefault.xxd 并引用 parametersDefault/parametersDefault_len，故 build() 预生成 vim-xxd 契约头文件（先于 make 落盘，make 视其最新不再触发玩具 xxd）"
+  - "可执行 ELF 需 binary-sign-tool 自签（E077/E082），否则 OHOS 内核拒绝执行；package() 逐 bin 自签 + 工具缺失容错"
+  - "STAR 无正式上游测试套件（无 make check/ctest/gtest/测试目录，CI 仅 make STAR）；消费测试真实驱动 STAR --version（exit 0，输出 2.7.11b）与 --help（usage 输出 STAR version=2.7.11b）"
+
+# ── Upstream test audit (hmbs evidence requirement) ───────────────────────
+upstream_tests_exist: false
+upstream_test_total: 0
+upstream_test_count_method: "manual_audit"
+upstream_test_audit: |
+  rna-star 2.7.11b 为单个命令行工具（RNA-seq 剪接比对），纯 make 构建。
+  上游无正式测试套件：source/Makefile 无 check/test 目标；.travis.yml 仅
+  `make STAR`；extras/tests/scripts 与 extras/scripts 只有分析用 awk/matlab
+  辅助脚本，非可运行的测试程序；全仓无 ctest/gtest/make check/meson test
+  等任何测试框架。由 test_package 对打包的 STAR 二进制执行真实功能冒烟
+  （STAR --version 输出 2.7.11b + STAR --help 输出 STAR version=2.7.11b）。

@@ -1,0 +1,23 @@
+software: rna-star
+display: "STAR"
+description: "RNA-seq 剪接比对工具（Spliced Transcripts Alignment to a Reference），将测序 reads 比对到参考基因组"
+category: bioinformatics
+homepage: "https://github.com/alexdobin/STAR"
+license: GPL-3.0-or-later
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "纯 make 构建（source/ 下 GNU Makefile），无 configure/install；package() 直接打包 STAR 可执行文件"
+    - "命令行钉死编译/链接 flag：CXXFLAGS='-O3 -std=c++17 -stdlib=libc++ -fopenmp -static-openmp'、CXXFLAGS_SIMD= 清空 x86 专属 -mavx2"
+    - "build() 预生成 parametersDefault.xxd（vim-xxd 契约，规避 OHOS toybox xxd）"
+    - "C++17 移除 register：补丁 0001 移除 SuffixArrayFuns.cpp 的 register 存储类"
+    - "链接 -static-openmp 让 libomp 静态并入，规避 CLI 启动 libomp.so 加载失败"
+    - "内嵌 htslib 静态构建需 zlib（conan 依赖 zlib/1.3.1.1）；可执行 ELF 需 binary-sign-tool 自签"
+  common_dependencies:
+    - zlib
+
+versions:
+  "2.7.11b":
+    status: built
+    build_date: "2026-10-12"

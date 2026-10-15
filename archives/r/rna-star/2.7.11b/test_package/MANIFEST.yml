@@ -1,0 +1,42 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI build_and_test.sh L0e 强制要求存在）
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: rna-star/2.7.11b
+homepage: "https://github.com/alexdobin/STAR"
+
+# ---------------------------------------------------------------------------
+# 上游测试审计（hmbs 硬门禁）：rna-star 2.7.11b 上游无正式测试套件
+# ---------------------------------------------------------------------------
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "source/Makefile"
+    reason: "仅定义 all/STAR/STARstatic/STARlong/gdb/POSIXSHARED/clean 等构建目标，无 check/test 目标；.PHONY 列表无任何测试目标。"
+  - source: ".travis.yml"
+    reason: "上游 CI 仅运行 `make STAR`（编译产出可执行文件），无测试步骤。"
+  - source: "extras/tests/scripts"
+    reason: "仅含 3 个 awk 辅助脚本（checkCellReadsStats*.awk），是分析输出格式的辅助工具，非可编译/可运行的测试程序。"
+  - source: "extras/scripts"
+    reason: "分析用 awk/matlab 脚本（extractSJfromGTF.sh / sjFromSAMcollapseUandM.awk 等），非测试套件。"
+  - source: "全仓 grep"
+    reason: "无 ctest / gtest / make check / build 目录下的 TEST 宏 / test 子目录 / meson test 等任何测试框架声明；不满足 upstream_test_total 可解析口径。"
+  - conclusion: "上游无正式测试套件，upstream_test_total=0、upstream_test_count_method=manual_audit。由 test_package 对打包的 STAR 二进制做真实功能冒烟（STAR --version 输出 2.7.11b + STAR --help 输出 STAR version=2.7.11b，均真实执行编译产物）。"
+
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_check_command: ""
+upstream_test_total: 0
+upstream_test_count_method: "manual_audit"
+
+upstream_tests: []
+
+# test_package 自带的测试（消费者视角，直接驱动 ELF 二进制）
+# 1. STAR --version → Parameters::inputParameters 命中 --version 打印 "2.7.11b" 并 exit 0
+# 2. STAR --help   → STAR.cpp usage() 打印 "STAR version=2.7.11b" 并 exit 0
+test_package_tests:
+  - file: test_rna_star.sh
+    description: "消费者冒烟测试：运行包内 bin/STAR --version（断言输出含 2.7.11b 且 exit 0）与 bin/STAR --help（断言 usage 输出含 STAR version=2.7.11b），二者均真实执行编译产物"
+    command: "bash test_rna_star.sh"
+
+test_package_test_count: 2
+assertion_count: 2
