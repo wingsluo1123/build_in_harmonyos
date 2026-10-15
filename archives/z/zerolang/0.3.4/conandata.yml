@@ -1,0 +1,43 @@
+# conandata.yml — zerolang 0.3.4
+# R39: 官方正式源。zerolang 是 vercel-labs/zerolang 发行的一个 graph-native
+# 编程语言编译器（自包含 C 编译器，native/zero-c）。官方 release 归档为
+# GitHub 上的 v0.3.4 tag tarball，sha256 为 Homebrew formula 官宣的校验值。
+#
+# 构建说明：`make -C native/zero-c OUT=<bin>/zero` 即可产出 `zero` 编译器
+# 可执行文件。native/zero-c/src/embedded_{skills,stdlib_graph,runtime_sources}.inc
+# 三个嵌入资源文件已在 release 归档内预生成并提交，因此 make 不会触发
+# node 脚本重新生成（file timestamps 一致，make 判定为 up-to-date），只需要
+# 系统 C 编译器（OHOS toolchain 的 clang/cc）即可完成纯净编译，无 node/pnpm
+# 运行时依赖。
+#
+# 镜像说明：GitHub 源码下载直连会超时（connect timeout）时，采用与 CI
+# build_and_test.sh 的 get_mirrors() 一致的 GitHub 镜像映射：gh-proxy.com
+# 镜像优先、官方 github.com 原始地址留作最后回退。Conan 2 的 get()/download()
+# 对 url 列表按序逐个尝试，任一成功即用同一归档；sha256 保持不变。
+sources:
+  url:
+    - "https://gh-proxy.com/https://github.com/vercel-labs/zerolang/archive/refs/tags/v0.3.4.tar.gz"
+    - "https://github.com/vercel-labs/zerolang/archive/refs/tags/v0.3.4.tar.gz"
+  filename: "zerolang-0.3.4.tar.gz"
+  sha256: "222c6ca439103441c7c2169351b0aeb841c6f5eca985c07dc53f131173e5c2a7"
+
+# 无需源码补丁（编译器本体）：
+#   - make 直接可用（embedded .inc 已提交，无需 node 重新生成）
+#   - aarch64 上游已含 zero-elf-aarch64 / zero-elf64 直接后端（emit_elf_aarch64.c
+#     / aarch64_direct.c），且编译器本体是纯 C，无平台内联汇编依赖
+#
+# 测试可移植性补丁（build() 内 _patch_smoke_tmp_paths 应用，非 conan patch 工具）：
+#   OHOS 的 /tmp 是只读挂载（erofs，E002）。native/zero-c/tests 下 3 个 C 冒烟
+#   程序硬编码 /tmp 绝对路径写临时制品（process_exec / http_listen / program_graph），
+#   在只读 /tmp 上必然 EROFS 失败、且与 $TMPDIR 无关。配方在编译前把这 3 个测试
+#   源码里的硬编码 /tmp 字面量改写为 SMOKE_TMP 字符串宏（指向可写 build-local 目录），
+#   使 5 个 native smoke 在只读 /tmp 上全部 5/5 通过；不改测试逻辑，仅重定向临时目录
+#   （参见 E002 / DRAFT-code-level-tmpfile-readonly-tmp 文档化做法）。
+# 运行期可执行链接补丁（build() 内 _patch_no_pie 应用，make 之前，非 conan patch 工具）：
+#   zerolang 的 `zero run`（LLVM-native 与 direct-ELF）链接路径在 Linux 分支强制
+#   `-no-pie`（非 PIE/ET_EXEC）。HarmonyOS(Linux 内核) 实行 PIE-mandatory（类 Android），
+#   execve 非 PIE 二进制返回 EACCES；而 smoke/zero 用同一 /data/service/hnp/bin/clang
+#   以默认 PIE（ET_DYN）链接可正常运行。配方把两处硬编码 `" -no-pie"` 改写为 `" -pie"`
+#   （llvm_toolchain.c z_llvm_link_executable 与 main.c link_direct_object_executable），
+#   使 zero run 产物为 PIE、可被 OHOS execv 执行；不改测试逻辑。
+patches: []
