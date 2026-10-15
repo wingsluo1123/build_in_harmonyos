@@ -1,0 +1,15 @@
+--- a/iceoryx_posh/test/CMakeLists.txt
++++ b/iceoryx_posh/test/CMakeLists.txt
+@@ -37,6 +37,12 @@
+ 
+ 
+ file(GLOB_RECURSE MODULETESTS_SRC "${CMAKE_CURRENT_SOURCE_DIR}/moduletests/*.cpp")
++if(NOT TOML_CONFIG)
++    # OHOS/conan adaptation: the TOML gateway config parser is not built when
++    # TOML_CONFIG=OFF (cpptoml is unavailable), so drop its unit test from the
++    # GLOB result - the test file itself is left untouched.
++    list(FILTER MODULETESTS_SRC EXCLUDE REGEX "test_(popo_toml_gateway_config_parser|roudi_config_toml_file_provider)\\.cpp$")
++endif()
+ file(GLOB_RECURSE INTEGRATIONTESTS_SRC "${CMAKE_CURRENT_SOURCE_DIR}/integrationtests/*.cpp")
+ file(GLOB_RECURSE COMPONENTTESTS_SRC "${CMAKE_CURRENT_SOURCE_DIR}/componenttests/*.cpp")
+ file(GLOB_RECURSE MOCKS_SRC "${CMAKE_CURRENT_SOURCE_DIR}/mocks/*.cpp")

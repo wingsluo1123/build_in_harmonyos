@@ -1,0 +1,15 @@
+--- a/iceoryx_meta/tests.cmake
++++ b/iceoryx_meta/tests.cmake
+@@ -16,7 +16,11 @@
+ cmake_minimum_required(VERSION 3.16)
+ 
+ if (BUILD_TEST)
+-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/googletest ${CMAKE_BINARY_DIR}/dependencies/googletest/prebuild)
++    # OHOS/conan adaptation: build against the googletest provided by the declared
++    # conan dependency instead of downloading and building one at configure time
++    # (upstream's helper unconditionally runs an ExternalProject, which needs
++    # network access; the CI worker has none).
++    find_package(GTest CONFIG REQUIRED)
+ 
+     ### create component list
+     set(COMPONENTS "hoofs" "posh")

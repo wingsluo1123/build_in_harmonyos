@@ -1,0 +1,24 @@
+sources:
+  url: "https://github.com/eclipse-iceoryx/iceoryx/archive/refs/tags/v2.0.8.tar.gz"
+  sha256: "375b8e635185cd39821b676847bfe4c67f2ef70af9b598c00bd9e8d8e8659bd9"
+
+patches:
+  "2.0.8":
+    - patch_file: "patches/0001-tests-use-conan-googletest.patch"
+      patch_description: "Build the test suites against the googletest provided by the conan dependency instead of downloading googletest at configure time (upstream's helper runs an ExternalProject, which needs network access)"
+      patch_type: "test"
+    - patch_file: "patches/0002-tests-tolerate-toml-config-off.patch"
+      patch_description: "Provide an interface stand-in for the iceoryx_posh_config target when TOML_CONFIG=OFF so the upstream test binaries can be built (the installed/exported library set is unchanged)"
+      patch_type: "test"
+    - patch_file: "patches/0003-tests-skip-toml-gateway-test.patch"
+      patch_description: "Drop the two TOML unit tests (gateway config parser, RouDi TOML file provider) from the GLOB when TOML_CONFIG=OFF - their sources belong to the TOML-gated library and cannot compile/link without cpptoml; the test files themselves are unmodified"
+      patch_type: "test"
+    - patch_file: "patches/0004-ohos-mqueue-stubs.patch"
+      patch_description: "POSIX message queue capability fallback. Some C libraries ship a <mqueue.h> that defines the message queue types (mqd_t, struct mq_attr) but declares no mq_* function and has no message queue runtime; the generic 'unix' platform layer iceoryx selects for such a target calls those functions directly, so the build stops at 'use of undeclared identifier mq_open'. iceoryx_meta/CMakeLists.txt now probes (compile-only, no link) whether mq_open is declared and, when it is not, compiles the ENOSYS stubs of the platform layer instead (upstream's mac/win platform layers do the same). No platform name is hardcoded: on every libc with POSIX message queues the patch is a no-op"
+      patch_type: "portability"
+    - patch_file: "patches/0005-time-mock-noexcept-libc-match.patch"
+      patch_description: "The time mock (iceoryx_hoofs/testing/mocks/time_mock.{hpp,cpp}, part of the test infrastructure) redeclares clock_getres/clock_gettime/clock_settime with 'noexcept' under '#if defined(__linux__)', which only matches the declaration of a libc that marks those functions __THROW. On a musl-based Linux target (OHOS) <time.h> declares them without that specification, so in C++17 the redeclaration is ill-formed: 'error: exception specification in declaration does not match previous declaration' (6 errors, CI #85699). The guard becomes '#if defined(__linux__) && defined(__GLIBC__)', which is exactly the condition under which the noexcept specification is correct; on glibc nothing changes, and no platform name is hardcoded"
+      patch_type: "portability"
+    - patch_file: "patches/0006-stress-test-affinity-glibc-guard.patch"
+      patch_description: "The SoFi stress test (iceoryx_hoofs/test/stresstests/test_stress_sofi.cpp, part of the test infrastructure) pins the two helper threads with pthread_setaffinity_np() under '#ifdef __linux__', i.e. it assumes every Linux-like libc carries that GNU extension. A musl-based Linux target (OHOS) defines __linux__ but declares only sched_setaffinity(), so the build stops at 'use of undeclared identifier pthread_setaffinity_np' (CI #91284). The guard becomes '#if defined(__linux__) && defined(__GLIBC__)', the exact condition under which the GNU extension exists; the file's own non-Linux fallback branch (no-op, returns true) is then used instead. On glibc nothing changes, no test case, assertion or expectation is touched, and no platform name is hardcoded"
+      patch_type: "portability"
