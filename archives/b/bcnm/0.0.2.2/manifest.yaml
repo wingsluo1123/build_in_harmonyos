@@ -1,0 +1,30 @@
+version: "0.0.2.2"
+software: "bcnm"
+status: built
+build_date: "2026-10-15"
+build_system: custom
+
+source:
+  url: "https://github.com/skarnet/bcnm/archive/refs/tags/v0.0.2.2.tar.gz"
+  sha256: "527dd8487490417c9f62a216434bb907d08633a05a8a0d0d9ae4e4130992319c"
+  tar_format: tar.gz
+
+build:
+  system: custom
+  configure_options:
+    - "--disable-shared"
+    - "--with-sysdeps={skalibs_prefix}/lib/skalibs/sysdeps"
+    - "--with-include={skalibs_prefix}/include"
+    - "--with-lib={skalibs_prefix}/lib"
+  dependencies:
+    - skalibs/2.15.1.0
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "patches/bcnm-fix-netlink.patch"
+
+knowledge_gained:
+  - "bcnm 使用 skarnet 自有 configure 系统，不是标准 autotools"
+  - "OHOS 平台 linux/socket.h 与 sys/socket.h 的 sockaddr_storage 重定义"
+  - "skarnet make install 在沙箱中被 safe-delete hook 拦截，需手动 copy 产物"
