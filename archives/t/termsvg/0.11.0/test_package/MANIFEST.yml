@@ -1,0 +1,44 @@
+package: termsvg/0.11.0
+homepage: "https://github.com/MrMarble/termsvg"
+
+upstream_check_command: "go test ./... 2>&1 | tail -20"
+upstream_test_in_build: true
+upstream_test_command: "go test -count=1 ./..."
+
+upstream_tests:
+  - file: pkg/ir/ir_test.go
+    source: termsvg-0.11.0/pkg/ir/ir_test.go
+    description: "中间表示（IR）解析/构建测试"
+    command: "go test ./pkg/ir/ -v"
+  - file: pkg/raster/raster_test.go
+    source: termsvg-0.11.0/pkg/raster/raster_test.go
+    description: "光栅化（raster）渲染测试"
+    command: "go test ./pkg/raster/ -v"
+  - file: pkg/renderer/svg/renderer_test.go
+    source: termsvg-0.11.0/pkg/renderer/svg/renderer_test.go
+    description: "SVG 渲染器测试"
+    command: "go test ./pkg/renderer/svg/ -v"
+  - file: pkg/renderer/gif/renderer_test.go
+    source: termsvg-0.11.0/pkg/renderer/gif/renderer_test.go
+    description: "GIF 渲染器测试"
+    command: "go test ./pkg/renderer/gif/ -v"
+  - file: pkg/renderer/webm/renderer_test.go
+    source: termsvg-0.11.0/pkg/renderer/webm/renderer_test.go
+    description: "WebM 渲染器测试"
+    command: "go test ./pkg/renderer/webm/ -v"
+  - file: pkg/color/catalog_test.go
+    source: termsvg-0.11.0/pkg/color/catalog_test.go
+    description: "颜色目录测试"
+    command: "go test ./pkg/color/ -v"
+
+test_package_tests:
+  - file: test_package/test_termsvg.py
+    description: "R34 实质验证：真实二进制 --version/--help、真实 asciicast -> 真实 SVG 导出（含 SVG 根元素/命名空间/动画标记断言）、--minify 路径、aarch64 ELF 架构校验"
+    command: "python3 test_termsvg.py（由 test_package/conanfile.py test() 经 self.run 实际执行）"
+
+assertion_count: 11
+notes: >
+  termsvg 为 Go CLI（module github.com/mrmarble/termsvg，go 1.25.6）。
+  OHOS 上 Go SDK 不在制品仓，配方自举 go1.26.0 并为其 ELF 签名
+  （addchain/0.4.0 已发布先例同样模式）；链接输出放非 hmdfs 工作区规避 E051。
+  上游 go test 的测试二进制同样需要签名，由 go test -exec wrapper 处理。
