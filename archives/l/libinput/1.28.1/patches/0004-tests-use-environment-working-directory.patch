@@ -1,0 +1,27 @@
+--- a/meson.build
++++ b/meson.build
+@@ -703,21 +703,23 @@
+ 				  install : false)
+ test('tools-builddir-lookup',
+      test_builddir_lookup,
+      args : ['--builddir-is-set'],
+      suite : ['all'])
+ test('tools-builddir-lookup-installed',
+      find_program('test/helper-copy-and-exec-from-tmp.sh'),
+      args : [test_builddir_lookup.full_path(), '--builddir-is-null'],
+      env : ['LD_LIBRARY_PATH=@0@'.format(meson.current_build_dir())],
+      suite : ['all'],
+-     workdir : '/tmp')
++     workdir : run_command(find_program('sh'), '-c',
++                           'printf %s "${TMPDIR:-/tmp}"',
++                           check : true).stdout().strip())
+ 
+ ############ tests ############
+ 
+ test('symbols-leak-test',
+      find_program('test/symbols-leak-test'),
+      args : [ dir_src / 'libinput.sym', dir_src],
+      suite : ['all'])
+ 
+ # build-test only
+ executable('test-build-pedantic',

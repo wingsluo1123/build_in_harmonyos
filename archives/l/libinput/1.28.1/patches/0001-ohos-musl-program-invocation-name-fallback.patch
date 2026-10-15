@@ -1,0 +1,28 @@
+diff --git a/meson.build b/meson.build
+index 0c02b0d..bd086ab 100644
+--- a/meson.build
++++ b/meson.build
+@@ -126,6 +126,10 @@ endif
+ if not cc.has_header_symbol('errno.h', 'program_invocation_short_name', prefix : prefix)
+ 	if cc.has_header_symbol('stdlib.h', 'getprogname')
+ 		config_h.set('program_invocation_short_name', 'getprogname()')
++	else
++		# musl (e.g. OpenHarmony PC) has neither; the only users are the
++		# tools' usage() output, so a literal name is fine
++		config_h.set('program_invocation_short_name', '"libinput"')
+ 	endif
+ endif
+ 
+diff --git a/src/util-strings.c b/src/util-strings.c
+index 8732cc5..2f98c13 100644
+--- a/src/util-strings.c
++++ b/src/util-strings.c
+@@ -280,7 +280,7 @@ trunkname(const char *filename)
+ 	if (base == NULL)
+ 		return safe_strdup("");
+ 
+-	suffix = rindex(base, '.');
++	suffix = strrchr(base, '.');
+ 	if (suffix == NULL)
+ 		return safe_strdup(base);
+ 	else

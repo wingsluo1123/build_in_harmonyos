@@ -1,0 +1,116 @@
+--- a/tools/libinput-debug-gui.c
++++ b/tools/libinput-debug-gui.c
+@@ -1080,65 +1080,67 @@
+ 	gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(w->area),
+ 				       draw_gtk4,
+ 				       w,
+ 				       NULL);
+ 
+ 	gtk_widget_set_cursor_from_name(w->win, "none");
+ 
+ 	window_lock_pointer(w);
+ }
+ #else
+-static void
++static gboolean
+ map_event_cb(GtkWidget *widget, GdkEvent *event, gpointer data)
+ {
+ 	struct window *w = data;
+ 	GdkDisplay *display;
+ 	GdkWindow *window;
+ 
+ 	window_place_ui_elements(widget, w);
+ 
+ 	g_signal_connect(G_OBJECT(w->area), "draw", G_CALLBACK(draw), w);
+ 
+ 	window = gdk_event_get_window(event);
+ 	display = gdk_window_get_display(window);
+ 
+ 	gdk_window_set_cursor(gtk_widget_get_window(w->win),
+ 			      gdk_cursor_new_for_display(display,
+ 							 GDK_BLANK_CURSOR));
+ 
+ 	window_lock_pointer(w);
++	return FALSE;
+ }
+ #endif
+ 
+ static void
+ window_quit(struct window *w)
+ {
+ 	g_main_loop_quit(w->event_loop);
+ }
+ 
+ #if HAVE_GTK4
+ static gboolean
+ window_delete_event_cb(GtkWindow *window, gpointer data)
+ {
+ 	struct window *w = data;
+ 
+ 	window_quit(w);
+ 
+ 	return TRUE;
+ }
+ #else
+-static void
++static gboolean
+ window_delete_event_cb(GtkWidget *widget, GdkEvent *event, gpointer data)
+ {
+ 	struct window *w = data;
+ 
+ 	window_quit(w);
++	return TRUE;
+ }
+ #endif
+ 
+ static void
+ window_init(struct window *w)
+ {
+ 	list_init(&w->evdev_devices);
+ 
+ #if HAVE_GTK4
+ 	w->win = gtk_window_new();
+@@ -1151,38 +1153,39 @@
+ 		gtk_window_minimize(GTK_WINDOW(w->win));
+ #else
+ 		gtk_window_iconify(GTK_WINDOW(w->win));
+ #endif
+ 	}
+ 
+ 	gtk_window_set_title(GTK_WINDOW(w->win), "libinput debugging tool");
+ 	gtk_window_set_default_size(GTK_WINDOW(w->win), 1024, 768);
+ 	gtk_window_maximize(GTK_WINDOW(w->win));
+ 	gtk_window_set_resizable(GTK_WINDOW(w->win), TRUE);
++
++	w->area = gtk_drawing_area_new();
++
++#if HAVE_GTK4
+ 	gtk_widget_realize(w->win);
+-
+-	w->area = gtk_drawing_area_new();
+-
+-#if HAVE_GTK4
+ 	g_signal_connect(G_OBJECT(w->area), "resize", G_CALLBACK(map_event_cb), w);
+ 	g_signal_connect(G_OBJECT(w->win), "close-request", G_CALLBACK(window_delete_event_cb), w);
+ 
+ 	gtk_window_set_child(GTK_WINDOW(w->win), w->area);
+ 	gtk_widget_set_visible(w->win, TRUE);
+ #else
+ 	g_signal_connect(G_OBJECT(w->win), "map-event", G_CALLBACK(map_event_cb), w);
+ 	g_signal_connect(G_OBJECT(w->win), "delete-event", G_CALLBACK(window_delete_event_cb), w);
+ 
+ 	gtk_widget_set_events(w->win, 0);
+ 	gtk_widget_set_events(w->area, 0);
+ 
+ 	gtk_container_add(GTK_CONTAINER(w->win), w->area);
++	gtk_widget_realize(w->win);
+ 	gtk_widget_show_all(w->win);
+ #endif
+ 
+ 	w->pad.ring.position = -1;
+ 	w->pad.strip.position = -1;
+ 	w->pad.dial.position = -1;
+ }
+ 
+ static void
+ window_cleanup(struct window *w)

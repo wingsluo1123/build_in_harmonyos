@@ -1,0 +1,31 @@
+--- a/tools/test_tool_option_parsing.py
++++ b/tools/test_tool_option_parsing.py
+@@ -114,21 +114,27 @@
+ 
+ class LibinputDebugGui(LibinputTool):
+     def __init__(self, subtool="debug-gui"):
+         assert subtool == "debug-gui"
+         super().__init__(subtool)
+ 
+         debug_gui_enabled = "@MESON_ENABLED_DEBUG_GUI@" == "True"
+         if not debug_gui_enabled:
+             pytest.skip()
+ 
+-        if not os.getenv("DISPLAY") and not os.getenv("WAYLAND_DISPLAY"):
++        # GTK3's genuine Broadway backend uses its own display selector.
++        # The existing actual gtk_init_check/RC77 guard remains below.
++        broadway = (
++            os.getenv("BROADWAY_DISPLAY")
++            and "broadway" in os.getenv("GDK_BACKEND", "").split(",")
++        )
++        if not os.getenv("DISPLAY") and not os.getenv("WAYLAND_DISPLAY") and not broadway:
+             pytest.skip()
+ 
+         # 77 means gtk_init() failed, which is probably because you can't
+         # connect to the display server.
+         rc, _, _ = self.run_command(["--help"])
+         if rc == 77:
+             pytest.skip()
+ 
+ 
+ def get_tool(subtool=None):
