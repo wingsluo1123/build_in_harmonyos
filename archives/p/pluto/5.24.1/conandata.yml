@@ -1,0 +1,18 @@
+# conandata.yml — pluto 5.24.1 (libreswan 5.4.1, OHOS adaptation)
+sources:
+  url: "https://github.com/libreswan/libreswan/releases/download/v5.4.1/libreswan-5.4.1.tar.gz"
+  sha256: "7b0f90c9a83b3ad96b430d85495074eb626599024c973789c1b0b6cff032ee10"
+
+patches:
+  - patch_file: "patches/0001-lib-libswan-whack-send.c.patch"
+    patch_description: "getpass(3) is obsolete (POSIX 2008) and absent from the
+      OHOS libc; read the passphrase from stdin as a portable fallback."
+  - patch_file: "patches/0002-programs-pluto-kernel_xfrm.c.patch"
+    patch_description: "Define the XFRM uAPI attributes libreswan 5.4 uses that
+      the (older) OHOS kernel header lacks (IPTFS / SA direction / offload).
+      No-op on a kernel that already provides them; best-effort at runtime
+      (R40: compiles != functional)."
+# Note: the OHOS header-compat shim (ohos_compat.h) is NOT a patch — it is a
+# build-only header created by the recipe's build() (see conanfile.py
+# _OHOS_COMPAT_HEADER) and force-included via -include, so it is not shipped in
+# patches/ nor declared here.

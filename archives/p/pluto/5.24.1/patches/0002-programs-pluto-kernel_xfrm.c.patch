@@ -1,0 +1,63 @@
+--- a/programs/pluto/kernel_xfrm.c
++++ b/programs/pluto/kernel_xfrm.c
+@@ -69,6 +69,60 @@
+ 
+ #include "linux/xfrm.h"		/* local (if configured) or system copy */
+ 
++/*
++ * Compat for kernel headers whose uapi/linux/xfrm.h predates the XFRM uAPI
++ * libreswan 5.4 uses (e.g. OHOS/HarmonyOS). libreswan ships a complete copy
++ * under external/linux-xfrm-headers/, but forcing it on the include path
++ * collides with the OHOS <sys/socket.h> (sockaddr_storage redefinition — the
++ * clash the GRRR note above describes). Instead, define only the missing
++ * values here, using the upstream Linux uAPI numbers taken verbatim from
++ * external/linux-xfrm-headers/linux/xfrm.h (enum xfrm_attr_type_t:
++ * XFRMA_SA_DIR=33, XFRMA_IPTFS_DROP_TIME=36, XFRMA_IPTFS_REORDER_WINDOW=37,
++ * XFRMA_IPTFS_DONT_FRAG=38, XFRMA_IPTFS_INIT_DELAY=39,
++ * XFRMA_IPTFS_MAX_QSIZE=40, XFRMA_IPTFS_PKT_SIZE=41; enum xfrm_sa_dir:
++ * XFRM_SA_DIR_IN=1, XFRM_SA_DIR_OUT=2; XFRM_MODE_IPTFS=5,
++ * XFRM_OFFLOAD_PACKET=4). Note there is no standalone XFRMA_IPTFS attribute
++ * upstream — the IPTFS_* entries are top-level attributes. Each definition is
++ * a no-op on a kernel that already provides the symbol, and the values match
++ * upstream so macro shadowing of a modern enum is harmless. These are newer
++ * XFRM features (IPTFS / SA direction / offload / dir-support) the host
++ * kernel may not implement at runtime, so supporting them is best-effort
++ * (R40: compiles != functional).
++ */
++#ifndef XFRMA_IPTFS_PKT_SIZE
++# define XFRMA_IPTFS_PKT_SIZE 41
++#endif
++#ifndef XFRMA_IPTFS_INIT_DELAY
++# define XFRMA_IPTFS_INIT_DELAY 39
++#endif
++#ifndef XFRMA_IPTFS_MAX_QSIZE
++# define XFRMA_IPTFS_MAX_QSIZE 40
++#endif
++#ifndef XFRMA_IPTFS_DONT_FRAG
++# define XFRMA_IPTFS_DONT_FRAG 38
++#endif
++#ifndef XFRMA_IPTFS_DROP_TIME
++# define XFRMA_IPTFS_DROP_TIME 36
++#endif
++#ifndef XFRMA_IPTFS_REORDER_WINDOW
++# define XFRMA_IPTFS_REORDER_WINDOW 37
++#endif
++#ifndef XFRMA_SA_DIR
++# define XFRMA_SA_DIR 33
++#endif
++#ifndef XFRM_SA_DIR_IN
++# define XFRM_SA_DIR_IN 1
++#endif
++#ifndef XFRM_SA_DIR_OUT
++# define XFRM_SA_DIR_OUT 2
++#endif
++#ifndef XFRM_MODE_IPTFS
++# define XFRM_MODE_IPTFS 5
++#endif
++#ifndef XFRM_OFFLOAD_PACKET
++# define XFRM_OFFLOAD_PACKET 4
++#endif
++
+ #include <linux/ethtool.h>
+ #include <linux/sockios.h>
+ 

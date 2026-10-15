@@ -1,0 +1,101 @@
+# 版本级 manifest — pluto 5.24.1
+# 文件位置: archives/p/pluto/5.24.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "5.24.1"
+software: "pluto"
+
+# 编译状态: published | built | failed | archived
+# built = 本地 conan 验证通过、未 upload（conan-verify 通过后置 built）
+status: built
+build_date: "2026-10-08"
+build_system: makefile
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码为 libreswan 5.4.1 官方 release（pluto 为其 IKE 守护进程组件）
+  url: "https://github.com/libreswan/libreswan/releases/download/v5.4.1/libreswan-5.4.1.tar.gz"
+  sha256: "7b0f90c9a83b3ad96b430d85495074eb626599024c973789c1b0b6cff032ee10"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 自定义顶层 Makefile（无 configure/CMake），适配参数经 make 命令行注入
+  system: makefile
+  configure_options:
+    - "OSDEP=linux"
+    - "LINUX_VARIANT=generic"
+    - "USE_UNBOUND=false"
+    - "USE_DNSSEC=false"
+    - "USE_LDNS=false"
+    - "USE_LIBCURL=false"
+    - "USE_SYSTEMD_WATCHDOG=false"
+    - "USE_NFLOG=false"
+    - "USE_NFTABLES=false"
+    - "USE_IPTABLES=false"
+    - "USE_AUTHPAM=false"
+    - "USE_LIBCAP_NG=false"
+    - "USE_CAT=false"
+    - "WERROR_CFLAGS="
+    - "CFLAGS=-O2 -D_UAPI_LINUX_SOCKET_H -include ohos_compat.h"
+    - "NSS_CFLAGS/NSS_LDFLAGS 从 conan nss/nspr/libevent 包推导"
+  dependencies:
+    - nss/3.118.1
+    - nspr/4.37
+    - libevent/2.1.13
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-lib-libswan-whack-send.c.patch"
+  - "0002-programs-pluto-kernel_xfrm.c.patch"
+  # ohos_compat.h 不走补丁：它是构建期 shim，由 recipe build() 用 save() 创建
+  # 并 -include 引入（见 conanfile.py _OHOS_COMPAT_HEADER）。
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "OSDEP=linux 强制：无 mk/defaults/harmonyos.mk，OSDEP=harmonyos 无法解析"
+  - "LINUX_VARIANT=generic 必需：无 /etc/os-release → 变量为空 → ifneq 门控的 linux-variant 源文件被排除 → 链接缺符号（kernel_iface/defaultroute）"
+  - "加密后端是 NSS 而非 OpenSSL：libreswan 5.4 make 系统无 OpenSSL/internal-crypto 选项，pluto 硬链接 -lnss3 并用 NSS_KDF"
+  - "OHOS linux/socket.h 是 bionic 式自动生成头，缺 glibc 的 sockaddr_storage struct 守卫 → 与 sys/socket.h 重定义冲突；构建期 -D 文件守卫 + -include 兼容头统一修复"
+  - "libreswan 自带 external/linux-xfrm-headers 完整 XFRM 头，但强挂 include 路径会与 OHOS sys/socket.h 冲突（GRRR 注释所述），故改用 #ifndef compat 块补属性"
+  - "getpass(3) POSIX 2008 已废弃且不在 OHOS libc → stdin fallback（whack 交互路径低频）"
+  - "PAM 门控变量是 USE_AUTHPAM（非 USE_PAM_AUTH，后者只是 -D 宏）"
+  - "WERROR_CFLAGS 是 ?= 可命令行覆盖；OHOS 头文件在 -Werror 下报告警（CMSG_NXTHDR 符号比较）"
+  - "manpage 生成是 local-all 的一部分且先于/独立于 pluto 链接；xmlto 无 OHOS 包 → stub（man 格式按 refnames.sh 逐 refname 出文件，单 XML 可含多 manpage）"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/pluto-5.24.1.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/pluto-5.24.1.work
+  source_orig_hash: 8ae276cd4e2c02e1
+  source_work_hash: e69bf3a19e322b21
+  generated_at: '2026-10-08T22:05:37'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-lib-libswan-whack-send.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-programs-pluto-kernel_xfrm.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
