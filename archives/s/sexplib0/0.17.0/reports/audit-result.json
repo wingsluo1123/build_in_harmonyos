@@ -1,0 +1,38 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "R16",
+      "file": "archives/s/sexplib0/0.17.0/conanfile.py",
+      "line": 166,
+      "description": "Still present (file unchanged since r2): package_info() uses the removed Conan 1.x API self.env_info.OCAMLPATH.append(...). Under Conan 2.x env_info is a MockInfoProperty that silently discards writes, so OCAMLPATH is never propagated to consumers; test_package/test.sh:12 exports OCAMLPATH itself, so the executed test results are unaffected.",
+      "fix_suggestion": "Use the Conan 2 environment API, e.g. self.buildenv_info.prepend_path(\"OCAMLPATH\", os.path.join(self.package_folder, \"lib\", \"ocaml\")) and/or self.runenv_info."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style#3",
+      "file": "archives/s/sexplib0/0.17.0/conanfile.py",
+      "line": 67,
+      "description": "Still present (unchanged since r2): export_sources() is declared after requirements() (line 56) and layout() (line 63), while code_style section 3 requires export_sources -> requirements -> layout -> source -> generate -> build -> package -> package_info. Cosmetic ordering only, no functional impact.",
+      "fix_suggestion": "Move export_sources() above requirements()."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style#7",
+      "file": "archives/s/sexplib0/0.17.0/test_package/test.sh",
+      "line": 3,
+      "description": "Still present (unchanged since r2): test.sh starts with `set -eu` instead of the required `set -euo pipefail` (code_style section 7 / review rule 25); no pipelines exist today, so this is a style gap only. Step/success output also uses `=== ... ===` and 'artifacts: OK' instead of the `[step]`/`[ok]`/`[fail]` format (code_style section 9).",
+      "fix_suggestion": "Use `set -euo pipefail` and the [step]/[ok]/[fail] output markers."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "docs-truthfulness",
+      "file": "archives/s/sexplib0/0.17.0/reports/test-report.md",
+      "line": 37,
+      "description": "Partly fixed: line 5 now states the result inline ('通过 ... 7/7 ... 40/40 ... 20/20') and no longer defers, but the closing gate section still points at the uncommittable state file: '- L0/L1/L1e/L2/L5：见本地 CI 日志与 .ci-result.json' (line 37). code_style section 24 forbids committing .ci-result.json, so this pointer cannot be followed by a repository reader.",
+      "fix_suggestion": "Replace the .ci-result.json reference with the concrete local CI outcome (already stated at line 5) or just '见本地 CI 日志'."
+    }
+  ],
+  "summary": "PASS (P0=0, P1=0, P2=1, P3=3). This is the round-2 audit of the 2026-10-14 rule-4 fix for sexplib0 0.17.0 (r3 artifact set); it supersedes the round-1 record currently committed as reports/audit-result.json, which should be replaced by this result. The verbatim-cases claim is re-verified on the updated material: the regenerated patch 0002 (only two header comment lines changed vs r2) applies cleanly to the pristine upstream v0.17.0 tree and reproduces the shipped ported file byte-for-byte; the updated file still contains all 7 upstream cases in identical order, all 39 input strings and all 40 expectation bodies byte-identical to upstream (exact match before any whitespace normalization), and the runner's 40-check exit-1-on-mismatch gate and 'ALL UPSTREAM TESTS PASSED (7 cases, 40 checks)' marker are unchanged; the r2 source-semantics checks and the hash-verified official tarball (sha256 5b0910b5...) still stand. All five claimed document fixes are confirmed: the header no longer references nonexistent '[%=case]' markers (0 occurrences), manifest patch_classification is now portability with reasons for both patches, notes.md has a single trailer and a CI exit-0 / 7/7 + 20/20 line, test-report.md line 5 carries the inline result, and the MANIFEST.yml OHOS e2e description now matches test_ohos_e2e.ml (byte-for-byte readback, deterministic re-serialization, substring field-presence checks, no parsing); the 7/7 (40 checks) + 20/20 story is consistent across conanfile.py, notes.md, test-report.md and test_package/MANIFEST.yml. No deception (R34/R9/R8/R19/R40 clean), no file://, no prebuilt binaries or manual packaging, W2 atomicity holds (all 14 changed files under archives/s/sexplib0/). Remaining non-blocking items are the unchanged P2 Conan-1.x env_info no-op and three P3s (export_sources ordering, test.sh set -eu/markers, residual .ci-result.json pointer at test-report.md:37); the only element not independently reproducible is the actual OHOS-worker runtime result (external CI), and no repository evidence contradicts it. Cosmetic note: the 7th upstream case is anonymous (let%expect_test _) and is named 'big string' in the runner; case correspondence remains 1:1 in order and content with no semantic effect."
+}
