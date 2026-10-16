@@ -1,0 +1,21 @@
+package: libbs2b/3.1.0
+homepage: "http://bs2b.sourceforge.net/"
+
+upstream_check_command: "grep -nE '^check|check_PROGRAMS|TESTS' Makefile.am"
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_test_note: >-
+  上游无测试目标（Makefile.am 无 TESTS/check_PROGRAMS，`make check` 无内容），
+  故无上游测试可迁移；平台能力由本包 test_package 的消费者功能测试覆盖。
+upstream_tests: []
+
+test_package_tests:
+  - file: test.c
+    description: >-
+      离线消费者测试（5 条断言）：级别编码回读（`BS2B_HIGH_CLEVEL` 及 fcut/feed = 700/30）；
+      采样率回读；真实串扰处理（左 1.0 / 右 0.0 → 右声道 > 0 且左声道 < 1.0，空实现会失败）；
+      运行时版本自报（libbs2b 3.1.0 → 0x30100）
+    command: "./test_libbs2b"
+
+logical_test_count: 1
+assertion_count: 5
