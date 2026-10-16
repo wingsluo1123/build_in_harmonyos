@@ -1,0 +1,44 @@
+id:                     E1624
+trigger_tool:           runtime
+phase:                  runtime
+error_signature:        madvise|MADV_FREE|EINVAL|errno=22|linuxMadvFreeForkBugCheck|serverAssert|Assertion failed
+
+severity:               3
+category:               compat, kernel, portability, syscall, runtime
+match_keywords:         madvise, MADV_FREE, MADV_DONTNEED, EINVAL, errno 22, fork bug check, serverAssert, 断言终止, 启动即退出, 内核 capability probe
+title:                  内核不支持 madvise(MADV_FREE) 返回 EINVAL，上游把它当作不可失败前置条件直接断言终止进程
+
+root_cause:             madvise(MADV_FREE) 依赖内核实现该建议；不支持的内核返回 -1 且 errno=EINVAL。部分上游把它写成"不可失败"的探测前置条件——探测失败即断言或直接终止进程(如 keydb 的 linuxMadvFreeForkBugCheck 用 serverAssert)，于是进程在启动期被杀。而被探测的 arm64 fork bug 只存在于"实现了 MADV_FREE"的内核上，不支持的核天然不受影响，把 EINVAL 当致命错误在语义上就是错的。
+affected_scope:         所有在内核能力探测中把 madvise 失败等同致命的程序，在未实现 MADV_FREE 的内核(含部分 OpenHarmony/HarmonyOS PC 构建内核)上启动即退出。症状为启动早期 assert/abort，日志含 madvise、EINVAL 或 errno 22。
+verification_cmd:       最小复现探针：mmap 一段内存 → mprotect 可写 → 分别调用 madvise(MADV_FREE) 与 madvise(MADV_DONTNEED)，比较两者返回值与 errno。若 MADV_FREE 返回 -1 且 errno=EINVAL 而 MADV_DONTNEED 返回 0，即确认本模式。
+
+rec_priority:           1
+rec_approach:           degrade-probe-to-not-affected
+rec_description:        把 madvise 失败当作"探测无法执行"→ 返回"不受该 bug 影响"，并记录一条警告，而不是断言或终止进程；因为被探测的 bug 仅存在于实现了 MADV_FREE 的内核上。
+rec_auto_fix:           false
+rec_impl:               manual-patch
+
+fallback_priority:      2
+fallback_approach:      runtime-configurable-probe-skip
+fallback_description:   若不便改动探测函数语义，则提供配置项/环境变量跳过该启动期探测（明确记录为"探测已跳过"，避免静默降级）。
+fallback_auto_fix:      false
+fallback_impl:          manual-patch
+
+forbid_1_pattern:       madvise\s*\([^)]*MADV_FREE[^)]*\)\s*[;)]?\s*.*serverAssert|serverAssert\s*\([^)]*madvise
+forbid_1_reason:        把内核"不支持该建议"这一正常返回当作不可失败的前提，探测失败即终止进程
+forbid_1_consequence:   在未实现 MADV_FREE 的内核上程序启动即崩溃，且用户无法通过配置绕过
+
+principles:
+doc_file:               doc/E627.md
+last_updated:           2026-10-08
+source_event:           keydb 6.3.4 在 HarmonyOS PC aarch64 上启动即被 linuxMadvFreeForkBugCheck 的断言终止；最小探针实测 madvise(MADV_FREE)=-1 errno=22，而 MADV_DONTNEED=0
+
+authors:
+source_pr:
+source_commit:
+
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+authors:               D86C

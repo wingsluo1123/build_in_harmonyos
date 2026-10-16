@@ -1,0 +1,41 @@
+#====================================================================
+# E600 — HMDFS setgid prevents mktemp from creating writable confstat dirs
+#====================================================================
+
+# Layer 0: Error Surface
+id:                     E1629
+trigger_tool:           configure
+phase:                  configuration
+error_signature: |
+  Permission denied.*confstat
+  confstat.*Permission denied
+  cannot create.*temporary directory
+
+# Layer 1: Recognition
+severity:               2
+category:               hmdfs, portability, build-system
+prescan_pattern:        umask 077.*mktemp|mktemp.*confstat
+root_cause:             |
+  The conan build dir (b/) on HMDFS is setgid (group=file_manager).
+  The vendor configure script uses `umask 077 && mktemp -d -q ./confstatXXXXXX`.
+  On HMDFS, this creates confstat dirs with mode 0270 owned by group=file_manager
+  (uid 20001006), not the build user (uid 20020101).  Even though the build
+  user is in the file_manager group, the setgid bit forces the result to be
+  owned by file_manager, and 0270 grants no write permission to the group.
+  HMDFS enforces owner-based permission checking strictly, so the build user
+  cannot write to its own temp dirs.  chmod does not help because HMDFS
+  enforces the permission model at the filesystem level.
+
+# Layer 2: Fix Strategy
+rec_approach:           build-in-user-owned-dir
+# Layer 3: Validation
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-17
+authors:               unknown
+doc_file:               doc/E1629.md
+match_keywords:         ohos, make
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        build-in-user-owned-dir

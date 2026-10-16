@@ -1,0 +1,51 @@
+id:                     E1609
+trigger_tool: conan|test|zip|cvs|rcs
+phase: testing
+error_signature: "missing file .*/stream|MISSING FILE .*/c.md5|MISSING FILE .*/dump|upstream regression corpus unavailable"
+severity:               2
+category:               archive-recovery, fixture-provenance, upstream-test
+match_keywords: CVS, RCS, head deltatext, upstream regression, external fixtures, mpeg2dec-streams, IGNORE-MD5, strict denominator, c.md5, dump
+title: Recover a complete external regression corpus from the upstream CVS snapshot, not a partial mirror
+root_cause: >
+  The upstream source archive lists 73 stream cases in test/tests but does not
+  ship their stream/c.md5/dump files. The historical external tarball is no
+  longer reachable, while a later media mirror contains only a subset and
+  different reference c.md5 values. Upstream test/regression prints missing
+  fixture messages without necessarily returning failure, so its exit status
+  alone can falsely certify an incomplete suite.
+affected_scope: >
+  Legacy projects whose official test data lived in an external CVS/SVN module
+  and whose later mirrors preserve incomplete or mixed-version references.
+verification_cmd: >
+  Compare all upstream test IDs against the CVS archive's RCS members, verify
+  the snapshot SHA-256 and ZIP CRC, restore each head deltatext, then demand
+  exact stream/c.md5/dump inventory before executing every case.
+rec_priority: 1
+rec_approach: sha-pinned-cvs-rcs-fulltext-and-strict-inventory
+rec_description: >
+  Obtain a project-owned CVS snapshot, pin its SHA-256, enumerate the upstream
+  test manifest, and read the head revision's first RCS deltatext as fulltext
+  for every required fixture. Preserve same-snapshot references and upstream
+  IGNORE-MD5 markers. Fail if any expected file is missing, changed, or a test
+  exits nonzero; count case PASS only after the upstream reference checks.
+  A complete small official sample may additionally be embedded byte-for-byte
+  with provenance and SHA-256 for an installed-package decode/output/readback
+  consumer. Preserve the full upstream denominator, pin the reference CPU
+  path for cross-architecture pixel comparison, and distinguish display width
+  from the aligned converted-frame stride.
+rec_command: >
+  python3 testdata/extract-cvs-73.py --zip libmpeg2.zip --tests test/tests
+  --output cvs-suite && python3 testdata/run-upstream-73.py
+  --decoder src/mpeg2dec --data-root cvs-suite
+  --manifest cvs-suite/manifest.tsv --upstream-tests test/tests
+rec_auto_fix: false
+rec_impl: manual-corpus-provenance-and-conan-build-test
+forbid_1_pattern: "partial mirror.*full upstream PASS|test/regression exit 0.*73/73"
+forbid_1_reason: >
+  A subset or the upstream shell exit code without input closure does not
+  prove that all declared cases were executed with their matching references.
+authors: codex
+source_pr: pending
+source_commit: pending
+last_updated:               2026-10-17
+doc_file:               doc/E1609.md

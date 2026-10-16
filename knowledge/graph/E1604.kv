@@ -1,0 +1,61 @@
+#====================================================================
+# Draft: musl 派生 sysroot（OpenHarmony/HarmonyOS）下 libc 与内核 UAPI 的
+#        同名结构重定义 —— 只在"同时包含两侧头文件"的 TU 爆发
+#        类级交付：检测脚本 + 修复模板 + 样例库 + 知识文档（path B）
+#====================================================================
+
+# ═══ Layer 0: 错误面 ═══
+id:                     E1604
+trigger_tool:           clang|make|meson
+phase:                  compilation
+error_signature:        redefinition of 'struct sockaddr_storage'|redefinition of 'struct sockaddr'|redefinition of 'struct msghdr'|redefinition of 'struct ifreq'|redefinition of 'struct in_addr'|struct .* previously defined here|note: previous definition of .struct
+
+# ═══ Layer 1: 识别层 ═══
+severity:               3
+category:               detection, portability, libc, musl, headers
+prescan_pattern:        #\s*include\s*<(linux/socket\.h|linux/rtnetlink\.h|linux/if\.h|linux/in\.h)>
+prescan_globs:          *.c, *.h, *.cc, *.cpp, *.cxx, *.hpp
+match_keywords:         redefinition of struct, sockaddr_storage, msghdr, ifreq, in_addr, linux/socket.h, linux/rtnetlink.h, net/if.h, sys/socket.h, musl, bionic, UAPI, sysroot, __GLIBC__
+title:                  musl 派生 sysroot 上"libc 结构 × 内核 UAPI 再定义"同名冲突：仅同时包含两侧头文件的 TU 报重定义，须用 libc 鉴别探针（而非平台宏）在引入 UAPI 头期间临时改名
+
+# ═══ Layer 2: 诊断层 ═══
+root_cause:             glibc 的 <linux/socket.h> 用 #ifndef __GLIBC__ 屏蔽 UAPI 侧结构定义，musl 派生的 OHOS sysroot 中的 UAPI 头照抄 bionic（无条件 #include <sys/socket.h> 且无该互斥），于是 <net/if.h>（经 <sys/socket.h> 提供 sockaddr_storage 等）与 <linux/socket.h>（经 <linux/rtnetlink.h>）在同一个 TU 内双双生效，C 不允许结构体重定义 → 编译失败；glibc 环境同类代码永不触发，故上游代码"在 Linux 上没问题"。
+affected_scope:         任何包含内核 UAPI 头（linux/socket.h、linux/rtnetlink.h、linux/if.h、linux/in.h …）且同时可见 libc 同名结构的库，主要是网络/接口/路由类（Kea 全族、DHCP/dnsmasq 类工具、netlink 封装库）。表现为"工程内个别 TU 报头文件重定义、其余 TU 全绿"。
+verification_cmd:       python3 knowledge/tools/libc-symbol-clash/detect-libc-symbol-clash.py includes --src <src> [--sysroot "$OHOS_SYSROOT"] --min-severity HIGH
+
+# ═══ Layer 3: 方案层 ═══
+rec_priority:           1
+rec_approach:           rename-uapi-symbol-in-libc-probe-window
+rec_description:        在引入 UAPI 头文件的窗口内，用 libc 鉴别探针（#if defined(__linux__) && !defined(__GLIBC__)）把冲突符号宏改名，出窗口后 #undef 还原；glibc 路径行为逐字不变，且不使用平台宏 __OHOS__。
+rec_command:            # {\n# if defined(__linux__) && !defined(__GLIBC__)\n#   define sockaddr_storage __linux_uapi_sockaddr_storage\n#   define RESTORE_SOCKADDR_STORAGE 1\n# endif\n#include <linux/rtnetlink.h>\n#ifdef RESTORE_SOCKADDR_STORAGE\n# undef sockaddr_storage\n# undef RESTORE_SOCKADDR_STORAGE\n#endif\n# }
+rec_auto_fix:           false
+
+fallback_priority:      2
+fallback_approach:      avoid-uapi-header-or-forward-declare
+fallback_description:   若该符号仅用于本 TU 的少量字段，改为不包含冲突的 UAPI 头（用需要的系统调用/ioctl 常量自行声明）；仅在无法规避时使用，可维护性低于方案 1。
+fallback_command:       python3 knowledge/tools/libc-symbol-clash/detect-libc-symbol-clash.py includes --src <src> --min-severity HIGH --ignore CLASH-001
+fallback_auto_fix:      false
+
+forbid_1_pattern:       __OHOS__
+forbid_1_reason:        平台宏表达的是"哪个平台"而不是"哪一侧 libc"，在非鸿蒙构建上语义缺失；且平台名会随产品演进变化，guard 会静默失效。
+forbid_1_consequence:   CI 门禁 PF5 / R8 拦截（补丁新增行含平台宏即拦）；历史上 680 个补丁因此被标记待清理。
+
+# ═══ Layer 4: 原则引用 ═══
+principles:               
+# ═══ 关系图 ═══
+# ═══ 元数据 ═══
+doc_file:               knowledge/drafts/libc-uapi-symbol-clash.md
+last_updated:           2026-09-28
+source_event:           kea-hook-host-cmds 3.0.3 适配（archive patch 0002，全族 7 包复用同一补丁）
+
+# ═══ 知识协作 ═══
+authors:                @hejin111 <hejin111@noreply.gitcode.com>
+source_pr:              13620
+source_commit:          6b55062d5e
+
+# ═══ 质量度量 ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-09-28
+rec_impl:               manual

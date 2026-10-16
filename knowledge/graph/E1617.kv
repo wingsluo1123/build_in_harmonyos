@@ -1,0 +1,31 @@
+id:                     E1617
+trigger_tool: conan|runtime|consumer-test
+phase: installed-package-validation
+error_signature: consumer enters main and version check passes, then crashes at constructor requiring a global event loop
+severity:               2
+category:               conan, runtime, dependency-initialization
+match_keywords: default event loop, dependency context, constructor segfault, aml_get_default, consumer test, upstream example
+title: Initialize required dependency context before constructing an installed library object
+root_cause: A consumer can link and load a packaged library correctly while omitting a dependency's process-local default context. When the public constructor immediately dereferences that context, the test crashes even though packaging and dynamic loading have succeeded.
+affected_scope: Event-driven C libraries whose constructors use a global or thread-local default scheduler, event loop, allocator, or context supplied by a separately packaged dependency.
+verification_cmd: Compare the library constructor with upstream examples, initialize and register the required default context in the consumer, run the installed-package test, then unregister and release the context after object destruction.
+rec_priority: 1
+rec_approach: dependency-context-first-consumer
+rec_description: Bind the context dependency explicitly in test_package, create and set its default before constructing the tested object, then destroy the object before clearing and releasing the context. Keep this test separate from the upstream test count.
+rec_command: Inspect constructor and official example call order; run a fresh target Conan create with the corrected consumer and verify upstream and consumer totals independently.
+rec_auto_fix: false
+rec_impl: consumer-fixture-and-dependency-graph
+forbid_1_pattern: constructor crash.*packaging failure
+forbid_1_reason: A successful main entry and library version read prove loading already succeeded; a crash at the context dereference is a consumer setup error.
+forbid_1_consequence: Re-signing or relinking the package repeatedly does not initialize the missing runtime context.
+principles:               
+doc_file: knowledge/drafts/E779-draft-2501.md
+last_updated: 2026-10-10
+source_event: neatvnc historical consumer context repair; CI80105 Meson unknown linker llvm-ar; neatvnc-w3-20261010T103400Z Conan RC0 upstream2/2 consumer1/1 log SHA256 c9e3b6acba62fb1a95633b1a402a6245a561c9604aec83cd5d3237a6c7fc724b
+authors: 2501_91199785
+source_pr:
+source_commit:
+metrics_success_count: 1
+metrics_fail_count: 1
+metrics_confidence: 0.5
+metrics_last_used: 2026-10-05

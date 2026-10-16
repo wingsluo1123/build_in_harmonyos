@@ -44,12 +44,20 @@ def g(*args, cwd=None):
 # ─────────────────────────── pr-map ───────────────────────────
 
 def _load_adds(refresh=False):
-    """全量导出草稿添加记录（缓存, origin/main 签名控制新鲜度）。
+    """导出草稿添加记录（缓存, origin/main 签名控制新鲜度）。
 
-    返回 (adds, first_add, order):
-      adds: [(h, src, an, ae, subj, files)] 按时间倒序
-      first_add: {draft_name: (h, src, an, ae, subj)}
-      order: 按添加时间正序的草稿名列表（≈PR 时间序, batch 排序用）
+    两次导出：
+      main 内记录: git log origin/main --diff-filter=A（主判据——main 里的草稿
+                   必然已随某 PR 合入, 取 main 内最早添加 commit 反查 !N）
+      all 记录:    git log --all（仅用于孤儿检测: main 无记录但工作区存在
+                   = 本地未提交草稿）
+    ⚠️ 不能用 --all 的全局最早 commit 判合入: 草稿常被添加两次（最早在
+    未合入的 feature 分支, 后随另一 PR 的 rebase/cherry-pick 进入 main），
+    取全局最早会 ancestry 落空 → 误判"未合入"（批次 5-12 暂缓误判根因）。
+
+    返回 (adds_main, first_add_main, order):
+      adds_main/first_add_main: main 历史内的添加记录
+      order: main 内添加时间正序的草稿名列表（batch 排序用）
     """
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     adds_cache = STATE_DIR / 'adds-raw.txt'
@@ -59,7 +67,7 @@ def _load_adds(refresh=False):
         head = adds_cache.read_text(encoding='utf-8', errors='replace').split('\n', 1)[0]
         need = head.strip() != f'#sig {sig}'
     if need:
-        raw = g('log', '--all', '--source', '--diff-filter=A', '--name-only',
+        raw = g('log', 'origin/main', '--diff-filter=A', '--name-only',
                 '--format=%x00%H|%S|%an|%ae|%s', '--', 'knowledge/drafts/')
         adds_cache.write_text(f'#sig {sig}\n{raw}', encoding='utf-8')
     else:
@@ -82,7 +90,7 @@ def _load_adds(refresh=False):
         for f in files:
             n = Path(f).stem
             if n not in first_add:
-                order.append(n)                    # 时间正序（倒序遍历中首见=最晚, 逆放）
+                order.append(n)
             first_add[n] = (h, src, an, ae, subj)
     order.reverse()                                # 现为时间正序
     return adds, first_add, order
@@ -262,11 +270,18 @@ def cmd_pr_map(refresh=False, limit=0, batch_file=None):
                             'merged': True,
                             'last_activity': '', 'note': ''}
         else:
-            rb = src.replace('refs/remotes/origin/', '').replace('refs/heads/', '').strip()
-            act = g('log', '-1', '--format=%ci', f'origin/{rb}') if rb and rb != 'main' else ''
-            result[name] = {'pr': '', 'branch': rb, 'title': subj,
-                            'author': an, 'email': ae, 'merged': False,
-                            'last_activity': act[:10], 'note': '来源PR未合入main'}
+            out_lines = [l for l in g('log', '--ancestry-path', '--merges', '--oneline', f'{h}..origin/main').splitlines() if l.strip()]
+            if out_lines:
+                # main 内有 merge 但非 feat/ PR merge（bot 直推/普通合并）→ 已在 main
+                result[name] = {'pr': '', 'branch': '', 'title': subj,
+                                'author': an, 'email': ae, 'merged': True,
+                                'last_activity': '', 'note': '已随直推/非feat合并进入main(无PR号)'}
+            else:
+                rb = src.replace('refs/remotes/origin/', '').replace('refs/heads/', '').strip()
+                act = g('log', '-1', '--format=%ci', f'origin/{rb}') if rb and rb != 'main' else ''
+                result[name] = {'pr': '', 'branch': rb, 'title': subj,
+                                'author': an, 'email': ae, 'merged': False,
+                                'last_activity': act[:10], 'note': '来源PR未合入main'}
         n_new += 1
 
     PR_MAP_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding='utf-8')

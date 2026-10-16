@@ -1,0 +1,29 @@
+id:                     E1688
+trigger_tool:           conan|cmake|clang
+phase:                  compilation|linking|testing
+error_signature:        full API consumer fails while lite API consumer passes|public graphics API needs transitive dependency headers
+severity:               2
+category:               portability, headers, conan, test
+match_keywords:         transitive_headers,cpp_info.requires,full API,lite API,device layer,public headers
+title:                  Exercise full installed API to verify Conan transitive header and link metadata
+root_cause:             A lite entry point uses fewer public types and dependencies; a consumer that tests only it can pass while the full installed API lacks propagated dependency headers or link edges.
+affected_scope:         Conan libraries with lite/full API variants, optional device layers, or public headers exposing dependency types.
+verification_cmd:       Compile and run an installed-package consumer that calls the full API and a representative device layer, with only the tested reference as its direct requirement; verify generated include and link closure.
+rec_priority:           1
+rec_approach:           propagate-full-api-closure-and-test-full-entry-point
+rec_description:        Declare public-header propagation on the relevant Conan requirement, enumerate direct dependency edges in cpp_info.requires, and use a real full-API consumer rather than the lite smoke path.
+rec_command:            conan create <recipe> -pr:h=<ohos-profile> -pr:b=<ohos-profile>; verify full API consumer call and exit code
+rec_auto_fix:           false
+rec_impl:               recipe-metadata-and-consumer
+forbid_1_pattern:       lite-only-consumer
+forbid_1_reason:        A lite-only test cannot prove public full-API types, device layer initialization, or transitive compile/link metadata.
+forbid_1_consequence:   A package can pass CI yet fail real downstream full-API consumers.
+principles:               
+doc_file:               knowledge/drafts/E14861-draft-2501.md
+last_updated:           2026-10-10
+source_event:           libwmf/0.2.15 full wmf_api_create and SVG consumer; OHOS W3 libwmf-w3-20261004T074946Z upstream Automake 1/1 (51 converter invocations) and installed consumer 1/1; raw log SHA-256 80cf006f0d80b09b439ee8b2646b37b646dfb77af94686792d56220857444d16.
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-04
+authors:               2501

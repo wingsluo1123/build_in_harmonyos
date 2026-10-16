@@ -1,0 +1,45 @@
+id:                     E1621
+severity:               2
+category:               ohos, meson, conan, pkg-config, linkage
+trigger_tool: conan|meson
+phase: configure|build|consumer
+error_signature: Meson cross build cannot resolve generated dependency modules|generated .pc files expose bare -lintl|archive tool missing|consumer link fails with unresolved intl or GLib symbols|native OHOS worker rejects test_package with tools.build:sysroot is required|consumer links but target test_package cannot load the tested shared-library SONAME under conanrun|inline LD_LIBRARY_PATH assignment is not exported by the target shell|Windows self.run reports '. is not recognized' before Meson starts|extensionless GLib generator scripts are not executable on a Windows host|CI consumer test returns 127 with missing shared-library SONAME despite a logged LD_LIBRARY_PATH
+match_keywords: Windows-hosted OHOS cross build, native OHOS worker, Meson machine files, generated pkg-config modules, archive tools, public transitive dependencies, consumer link closure, conditional sysroot, Conan environment wrapper, extensionless host generator
+root_cause: A Windows-hosted OHOS Meson build has two separate boundaries: host-side tools used while configuring and generating code, and target-side libraries exported to consumers. Supplying only a cross compiler or only .pc files leaves Meson without pkg-config/archive tools, while declaring intl as a system name or a bare -lintl loses the task-owned provider path and breaks the consumer closure. Conan may generate only POSIX .sh environment files for an OHOS host profile; the default self.run() wrapper then sends '. ".../conanbuild.sh"' to Windows cmd.exe, failing before the command starts. GLib generator entries can also be extensionless Python scripts, which Windows Meson cannot execute directly. Native OHOS workers may provide a compiler-default sysroot without exposing tools.build:sysroot; requiring that conf unconditionally rejects a valid native profile. Separately, a test_package that calls self.run(..., env="conanrun") without generating VirtualRunEnv receives no package runtime path; even when the direct package exports runenv_info, transitive shared-library libdirs are not guaranteed to be present in the generated shell environment. On some target shells, an inline assignment with shell parameter expansion is logged but is not exported as a loader environment, so the runtime closure must be exported explicitly before exec. A native OHOS worker can also run clang while its lld helper cannot load an SDK-side libxml2; the consumer compile subprocess must prepend the compiler-adjacent SDK lib/lib64 directories to its host-tool LD_LIBRARY_PATH without applying that path to the target consumer runtime.
+rec_approach: Bind host tools in generated Meson machine files, fail closed when pkg-config/pkgconf is absent, configure the target prefix as '/', and expose GLib plus the actual intl provider as Conan transitive requirements. On Windows/OHOS, generate task-owned .cmd wrappers only for extensionless host scripts and run Meson commands with env=None so Conan does not apply a POSIX .sh wrapper to cmd.exe; retain the normal environment wrapper on POSIX workers. Require tools.build:sysroot only when cross_building(self) is true; otherwise let the native OHOS compiler use its default sysroot. If a sysroot is present, pass it explicitly. Ensure generated pkg-config data carries provider library directories and static-compilation defines. For runnable shared-library consumers, generate VirtualRunEnv, derive an absolute de-duplicated runtime closure from the tested package and non-build/non-test Conan dependency libdirs, stage the shared objects beside the consumer under a task-private runtime directory, bind one DT_RPATH containing both $ORIGIN/runtime and the absolute staging path, verify each staged entry is a non-empty readable regular file, and still use an explicit `export LD_LIBRARY_PATH=... && executable` command before execution. The origin-relative entry is required because a worker may execute the consumer in a loader namespace where its absolute Conan cache path is not visible; the ordinary directory name avoids a loader boundary observed with the hidden directory.
+rec_description: |
+  For Windows-hosted OHOS recipes that use MesonToolchain and PkgConfigDeps, inject
+  pkg-config/pkgconf plus llvm-ar/llvm-ranlib into the generated machine files and
+  keep host tool paths separate from target sysroot paths. Do not use a system_libs
+  projection for a Conan-provided intl implementation. The package_info component
+  must expose the real provider with transitive headers/libs, and the test_package
+  must query the generated pkg-config module and compile a source file that calls
+  the package API.
+rec_command: |
+  # after PkgConfigDeps(self).generate():
+  #   validate pkg-config/pkgconf, inject pkg-config, ar and ranlib into both
+  #   Meson native/cross machine files, and use --prefix=/ for OHOS setup.
+  # in requirements/package_info:
+  #   self.requires("glib/...", transitive_headers=True, transitive_libs=True)
+  #   self.requires("proxy-libintl/...", transitive_headers=True, transitive_libs=True)
+  #   expose the provider component instead of system_libs=["intl"]
+  # in test_package:
+  #   generate VirtualRunEnv, derive tested-package-first absolute libdirs from
+  #   non-build/non-test dependencies, copy the shared-library closure beside
+  #   the consumer under .runtime, bind one DT_RPATH to that directory, and
+  #   run with conanrun plus an explicit exported LD_LIBRARY_PATH assignment;
+  #   run pkg-config --cflags --libs json-glib-1.0 and compile a real API consumer;
+  #   require tools.build:sysroot only for cross_building(self), and append it
+  #   only when configured so native OHOS workers use the compiler default.
+rec_auto_fix: false
+affected_scope: Windows-hosted Conan recipes for OHOS libraries built by Meson when generated pkg-config modules and target-provided transitive libraries are consumed by a real downstream program.
+verification_cmd: meson test -C <build> --print-errorlogs --num-processes 2 && conan create <recipe> -pr:h=<ohos-profile> -pr:b=<host-profile> --build=missing
+authors:
+  - 2301_80739235
+source_pr: 10484
+source_commit: 22d0ded7b6053d3a3aaab1626db2ab0cb10a6866
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-17
+authors:               
+doc_file:               doc/E1621.md
