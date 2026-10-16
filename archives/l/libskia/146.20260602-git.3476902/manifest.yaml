@@ -1,0 +1,68 @@
+software: libskia
+display: "Skia"
+version: "146.20260602-git.3476902"
+upstream_name: skia
+upstream_version: "m146 @ 34769028da93df54a2e33ebe8985413924053bc1"
+status: built          # W3 PASSED on OHOS device (conan create + test_package smoke ok, 2026-10-14)
+build_system: gn       # GN meta-build (graph pre-generated on host) + ninja on device
+compile_date: 2026-10-14
+target_platform: aarch64-linux-ohos
+issue: TBD
+
+source:
+  # P1: vendored complete source tarball (official archive + 9 DEPS externals + arm64 gn
+  #     + PRE-GENERATED ninja graph out/ so the device never needs to exec gn).
+  #   Persisted as GitCode Release attachment (tag libskia-146.20260602-git.3476902).
+  url: "https://gitcode.com/gcw_6YxinkyD/build_in_harmonyos/releases/download/libskia-146.20260602-git.3476902/skia-146.20260602-git.3476902-complete.tar.gz"
+  sha256: "a01ea3a20a56bffb226338f89b20e5ff4bdbee6013bd46d4215b4a81600c391e"
+  tar_format: tar.gz
+  version_mapping: "146.20260602-git.3476902 = upstream chrome/m146 branch, commit 34769028da93df54a2e33ebe8985413924053bc1 (2026-06-02)."
+  upstream_archive: "https://github.com/google/skia/archive/34769028da93df54a2e33ebe8985413924053bc1.tar.gz (sha256 09605d1152521a358bae574278f311fa93453494b3962ab4d642a94ef3fc17d5, 60.6MB, no third_party)"
+
+build:
+  system: custom       # GN graph pre-generated on host (windows gn, device cc/cxx paths baked in) + ninja on device
+  configure_options:
+    - 'is_official_build=true'
+    - 'target_os="linux" / target_cpu="arm64" (OHOS clang cross)'
+    - 'cc/cxx = device /storage/Users/currentUser/usr/local/bin/clang{,++} (baked into the graph)'
+    - 'skia_enable_discrete_gpu=false / skia_enable_graphite=false (m146 split of skia_enable_gpu)'
+    - 'skia_use_vulkan/gl/egl/dawn/angle/metal/webgpu=false'
+    - 'skia_use_system_*=false (bundled expat/freetype/libjpeg-turbo/libpng/libwebp/zlib/wuffs)'
+    - 'skia_use_fontconfig=false / skia_use_x11=false / skia_use_harfbuzz=false (no system/bundled deps on device)'
+    - 'skia_enable_tools=false / skia_enable_pdf=false / skia_use_icu=false / skia_enable_skottie=false / skia_enable_svg=true / skia_enable_rust=false'
+  dependencies: []     # Skia bundles third_party via DEPS; no Conan requires
+  cc: clang
+  cxx: clang++
+  prebuild_steps:
+    - "P1: source tarball contains vendored third_party (9 externals at DEPS revisions) + arm64 bin/gn + out/ (pre-generated ninja graph)"
+    - "recipe build(): if out/build.ninja exists -> skip gn gen, run ninja -C out -j{2..4} skia directly (device gn not executable on hmdfs)"
+    - "graph rewrite before packaging: cmd.exe stamps -> ': >', D$:/harmonyos absolute paths -> ../ relative, FT_CONFIG_*_H angle macros quoted for sh"
+  extra_notes:
+    - "Device ninja/clang/ar/ld.lld are prestaged in usr/local/bin (exec OK); any non-prestaged ELF (e.g. our gn copy) is denied exec by hmdfs/SELinux policy"
+
+patches_applied: []
+
+validation:
+  local:
+    - "Python AST syntax check passed for conanfile.py and test_package/conanfile.py"
+    - "YAML parsing passed for conandata.yml, manifest.yaml, test_package/MANIFEST.yml"
+    - "gn gen out on Windows (win gn): 111 targets / 57 files, no error (after externals prune)"
+    - "DEPS externals per-repo rev-parse == DEPS target for the 9 kept repos"
+    - "graph hygiene: recursive scan over out/**/*.ninja = 0 hits of D$:/, cmd.exe, D:/harmonyos; SK_FONTMGR_FCI_AVAILABLE = 0"
+    - "conan source . (file:// local): download + sha256 + unpack OK"
+  remote:
+    - "complete tarball uploaded to /storage/Users/currentUser/, device sha256sum == a01ea3a2... (2026-10-14)"
+    - "W3 conan create on OHOS target: [1213/1213] link libskia.a, package created (377 headers + libskia.a 21,080,060 B, ar archive)"
+    - "test_package (2 consumer use cases, 2026-10-15): test_libskia -> 'libskia smoke: pixel(2,2)=RGBA(255,0,0,255)' + 'libskia smoke ok'; test_libskia2 -> 'libskia smoke2: png encode 102 bytes, magic ok' + 'libskia smoke2 ok' (SkPngEncoder via bundled libpng)"
+    - "recipe package(): added modules/skcms/{skcms.h,src/skcms_public.h} under package ROOT (SkColorSpace.h include chain for encode paths); verified by conan test 2/2"
+
+knowledge_gained:
+  - "Skia uses GN+ninja; GitHub archive excludes third_party, requiring tools/git-sync-deps."
+  - "googlesource / chrome-infra-packages unreachable from device -> P1 vendored complete tarball with file:// source."
+  - "Only 9 of 46 DEPS externals are referenced by the minimal software-raster GN build graph (verified from out/*.ninja)."
+  - "m146 GN args: skia_enable_gpu split into skia_enable_discrete_gpu + skia_enable_graphite; skia_use_system_harfbuzz and skia_use_d3d removed."
+  - "OHOS hmdfs/SELinux: only prestaged ELF binaries (usr/local/bin, owner file_manager) are executable; user-copied ELF gets Permission denied -> never run gn on the device; pre-generate the ninja graph on the host instead."
+  - "gn gen on Windows embeds host paths (D$:/... escapes) and cmd.exe stamps into the graph; a rewrite pass (relative paths, ': >' stamp, quoted <...> FT_CONFIG macros) is required before running ninja on OHOS."
+  - "freetype in skia needs -DFT_CONFIG_MODULES_H=<freetype-android/...>; unquoted angle brackets make ninja invoke /bin/sh which treats < > as redirection -> quote the macro values in the graph."
+  - "Windows .git read-only files make shutil.rmtree silently fail; chmod + onerror retry needed for pruning."
+  - "SkPngEncoder.h pulls include/core/SkColorSpace.h -> modules/skcms/skcms.h (forwarder to src/skcms_public.h); package must ship modules/skcms/ under the package ROOT (includedirs=['.']) or consumer encode paths fail to compile."

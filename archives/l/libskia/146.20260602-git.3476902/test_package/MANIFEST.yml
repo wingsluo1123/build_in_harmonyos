@@ -1,0 +1,32 @@
+# test_package/MANIFEST.yml — libskia upstream test declaration.
+# CI (build_and_test.sh L0e) requires this file.
+
+package: libskia/146.20260602-git.3476902
+homepage: "https://skia.org"
+
+# Upstream has a large unit-test suite under tests/ runnable as:
+#   ninja -C out/<dir> tests        # the `tests` test binary
+#   out/<dir>/tests --match=...    # gtest-style runner
+# We deliberately do NOT build/run it in the first OHOS pass (needs a GPU /
+# fonts / skia_resource data); the Conan L1 test below is the smoke gate.
+upstream_check_command: "ninja -C out/Release tests && out/Release/tests --gtest_list_tests"
+
+# The recipe build() only builds the `skia` library target; upstream tests are
+# not compiled in this pass.
+upstream_test_in_build: false
+upstream_test_command: "ninja -C out/Release tests"
+
+upstream_tests:
+  - file: tests/
+    source: skia/tests/
+    description: "Upstream GoogleTest unit suite (not built in first pass; deferred to a later iteration after the core lib links)"
+    command: "./out/Release/tests"
+
+# Consumer-side smoke test compiled & run by conan create (L1).
+test_package_tests:
+  - file: test_skia.cpp
+    description: "Raster surface: fill white, draw red rect, assert an inside pixel is red (SkSurfaces/SkCanvas/SkPaint)"
+    command: "./test_libskia"
+
+# One core functional assertion (pixel color), plus surface creation guards.
+assertion_count: 1
