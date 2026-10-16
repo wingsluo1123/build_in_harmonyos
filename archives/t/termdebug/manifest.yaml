@@ -1,0 +1,44 @@
+# 软件级 manifest — termdebug
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: termdebug
+display: "termdebug"
+description: "终端程序输入/输出录制与回放工具集（tdrecord / tdreplay / tdview / tdrerecord / tdcompare）"
+category: utility
+homepage: "https://os.ghalkes.nl/termdebug.html"
+license: GPL-3.0-only
+build_system: custom-configure
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "构建系统是 Tilde Terminal Toolkit 的自研 configure（config.pkg 框架）：tarball 只有生成好的 configure + Makefile.in，无 configure.ac/Makefile.am"
+    - "configure/Makefile.in/config.pkg 三者用相对路径互相引用 → 必须在源码根目录就地构建（recipe 用 cwd=self.source_folder；magicrescue/1.1.10 同款处理）"
+    - "sed_rules_c 的 replace_default CFLAGS 会把 Makefile.in 里的整行 CFLAGS=-O2 -Isrc 换掉 → 配方必须自己补回 -O2 -Isrc"
+    - "Conan 的 VirtualBuildEnv 在 build context 只带 build_requires 的 buildenv_info，不把 host 依赖的 cpp_info 变成 CC/CFLAGS/LDFLAGS → 配方自行 aggregated_components() 后显式导出"
+    - "configure 只认 tinfo/ncurses 与 cairo/pangocairo 四个 pkg-config 包名，而 ncurses/6.6 声明 pkg_config_name=ncursesw、pango/1.58.2 声明 pango → 配方在 generators 目录补 ncurses.pc / pangocairo.pc 转发 stub"
+    - "任一可选依赖探测失败，configure 只打一行 'Warning: compiling without ...' 并继续（静默砍功能）→ 配方构建后硬断言 5 个可选 .o 全部产出，缺一即失败"
+    - "musl OHOS 的 openpty/forkpty/login_tty 在 libc 内，configure 探测 -lutil 失败会自动回退到 posix_openpt / /dev/ptmx，无需干预"
+    - "ncurses/6.6 是 static-only，链接顺序 formw/menuw/panelw/ncursesw（消费者在前、核心在后）由该配方 cpp_info.libs 保证；cairo/pango 是 shared"
+    - "真机 HMDFS 拒绝执行未签名 ELF（cronutils 首轮 PermissionError errno 13）→ package() 对 bin/termdebug 做 llvm-objcopy --remove-section .codesign + binary-sign-tool -selfSign 1"
+    - "5 个命令是同一 ELF 的 argv[0] symlink（src/common.c main() 按 basename 分派），签名一次即可"
+    - "真机无系统 pkg-config（HMBS 只注入 cmake/make/ninja/python3）→ tool_requires pkgconf/3.0.5 并做 --version 握手后落同名 shim"
+    - "上游 tarball 混进一个 2013 年的 x86-64 预编译残留 src/tdcompare（不参与 Makefile）→ 配方构建前删除，避免被误认成产物"
+  common_dependencies:
+    - ncurses
+    - libunistring
+    - cairo
+    - pango
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "2.2":
+    status: built
+    build_date: "2026-10-05"
+    published_as: termdebug/2.2
