@@ -1,0 +1,37 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# 上游测试清点（§12.72 四口径，2026-10-08 于 bdftopcf-1.1 源码树就地实测）：
+#   ① test*/ 框架源码: 0 —— find . -type d 全树只有 `.` 与 `./man` 两个目录，
+#      find . -iname '*test*' → 0
+#   ② */res 语料     : 0 —— find . -type d -name 'res' / 'tests' / 'test' → 0
+#   ③ **/*RUNTEST*   : 0 —— find . -iname '*runtest*' → 0
+#   ④ src/demo|examples 示例 .c: 0 —— find . -path '*demo*' -o -path '*example*' → 0
+#   另：Makefile.am / man/Makefile.am 无 TESTS、无 check_PROGRAMS；configure.ac 无测试宏
+#   ⇒ 上游确无测试资产；`make check` 实测空转：
+#       man/: "Nothing to be done for 'check'"；顶层无 check-TESTS 目标；rc=0
+#   源码树 48 个文件（15 .c / 13 .h），全部为主程序与 man 页。
+
+package: bdftopcf/1.1
+homepage: "https://gitlab.freedesktop.org/xorg/app/bdftopcf"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序 —— 无（四口径清点证据见文件头注释）
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证, 调用已安装二进制)
+test_package_tests:
+  - file: test.sh
+    description: "消费者测试 — 调用已安装 bdftopcf 二进制，把自带 font.bdf（2 glyph）编译成 PCF，断言 -o 主用法、PCF magic 01 66 63 70、产物非空、stdin→stdout 流式路径、-p8 选项、损坏输入与文件缺失两条错误路径（7 条断言）"
+    command: "bash test.sh"
+
+# 测试断言总数 (test_package 实测断言数)
+assertion_count: 7

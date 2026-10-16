@@ -1,0 +1,25 @@
+# conandata.yml — bdftopcf 1.1
+# 货源（权威，勿改）：X.Org releases 个体目录（官方直链）
+# 本机实测：curl -fsSL 下载 150815 字节、sha256 逐字如下（2026-10-08）
+# ⛔ 不得用 Debian 池址（PF7 拉黑 deb.debian.org）
+# 注：该直链 301 → http://www.x.org/archive/... → https://xorg.freedesktop.org/archive/...
+#     （中间那跳 http 是上游自己的重定向，conandata 里保留 https 官方标量，PF7 只查本文件）
+
+sources:
+  url: "https://www.x.org/releases/individual/app/bdftopcf-1.1.tar.bz2"
+  sha256: "4b4df05fc53f1e98993638d6f7e178d95b31745c4568cee407e167491fd311a2"
+
+# 三件均为对 autotools 分发 shell 脚本的移植性修复，无平台预处理器宏（R8/PF5）；
+# 由 finish 的 refresh-patch --auto（编辑追踪器精准模式）从 .orig/.work 差异生成（R7）。
+# conanfile.py 的 build() 先 apply_conandata_patches() 应用下列 3 件，
+# 再跑幂等的 _patch_autotools_scripts() 兜底（补丁已生效时为 no-op，两处 guard 均为"已存在即跳过"）。
+patches:
+  - patch_file: "patches/0001-config.guess.patch"
+    patch_description: "Teach config.guess (2017-08-08) to recognize uname -s = HarmonyOS and echo aarch64-unknown-linux-ohos; also relax its umask 077 scratch dir to 022 so HMDFS can write it (E007/E072, E110)"
+    patch_type: "portability"
+  - patch_file: "patches/0002-config.sub.patch"
+    patch_description: "Add linux-ohos* to config.sub's KERNEL-OS list (so basic_machine collapses to aarch64-unknown) and -linux-ohos* to the basic-system-types list (so the later -linux*) alias branch cannot rewrite it to -linux-gnu-ohos) (E072)"
+    patch_type: "portability"
+  - patch_file: "patches/0003-configure.patch"
+    patch_description: "Create config.status's scratch dir with umask 022 and mkdir instead of umask 077 and mktemp -d, which produces a 700 dir HMDFS refuses to write (E110/E112)"
+    patch_type: "portability"
