@@ -1,0 +1,30 @@
+#====================================================================
+# DRAFT-git256-ohos-conan-toolchain-deps-flags
+# OHOS conan AutotoolsToolchain 不聚合依赖 -I/-L：configure 探测静默失败
+# 来源: git 2.56.0 适配 (2026-10-15)
+#====================================================================
+
+id:                     DRAFT-git256-03
+trigger_tool:            conan create|configure|autotools
+phase:                  configuration
+error_signature:        NO_OPENSSL=YesPlease|NO_CURL=YesPlease|checking for SHA1_Init.*no|AC_CHECK_LIB 探测失败
+match_keywords:          OHOS conan, AutotoolsToolchain, CPPFLAGS, LDFLAGS, 聚合, 依赖 flags, NO_OPENSSL, NO_CURL, AC_CHECK_LIB, conanbuild.sh
+category:               conan, build-system, ohos-conan
+severity:               2
+status:                 draft
+agent_id:               opendesk-git256
+root_cause: >
+  OHOS 适配版 conan (2.29.1) 的 AutotoolsToolchain 生成的构建环境
+  不把依赖包的 -I/-L 聚合进 CPPFLAGS/LDFLAGS（conanbuild.sh 里仅
+  CC/NDEBUG 等），configure 的 AC_CHECK_LIB/AC_CHECK_HEADER 在无
+  路径提示下静默失败，生成 NO_OPENSSL/NO_CURL 等禁用配置——编译
+  链接都能过（禁用路径），功能缺失直到运行期才暴露。
+rec_approach: >
+  配方 generate() 里遍历 self.dependencies[name].cpp_info.
+  aggregated_components() 手动收集 includedirs/libdirs，经
+  configure_args 的 CPPFLAGS=/LDFLAGS= 传入；静态闭包还需 LIBS=
+  完整链（-lcurl -lssl -lcrypto -lz -lexpat）供探测期链接；
+  curl 另需 CURL_CONFIG=<包内 curl-config 绝对路径>（PATH 里找不到）。
+auto_fix:                false
+fix_command:             # 参见 archives/g/git/2.56.0/conanfile.py generate() 的 inc_flags/lib_flags 聚合实现
+last_updated:            2026-10-15

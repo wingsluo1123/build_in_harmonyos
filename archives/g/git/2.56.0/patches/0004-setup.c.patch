@@ -1,0 +1,34 @@
+--- a/setup.c
++++ b/setup.c
+@@ -1427,20 +1427,31 @@
+  * Exemptions for known-safe repositories can be added via `safe.directory`
+  * config settings; for non-bare repositories, their worktree needs to be
+  * added, for bare ones their git directory.
+  */
+ static int ensure_valid_ownership(const char *gitfile,
+ 				  const char *worktree, const char *gitdir,
+ 				  struct strbuf *report)
+ {
+ 	struct safe_directory_data data = { 0 };
+ 
++#ifdef TRUST_ALL_REPOSITORIES
++	/*
++	 * Build-time opt-out for platforms whose filesystems force-map
++	 * file ownership to a uid that never matches the process uid
++	 * (e.g. HMDFS), making the ownership check meaningless.
++	 * GIT_TEST_ASSUME_DIFFERENT_OWNER still forces the checked path
++	 * so the safe.directory logic stays testable.
++	 */
++	if (!git_env_bool("GIT_TEST_ASSUME_DIFFERENT_OWNER", 0))
++		return 1;
++#endif
+ 	if (!git_env_bool("GIT_TEST_ASSUME_DIFFERENT_OWNER", 0) &&
+ 	    (!gitfile || is_path_owned_by_current_user(gitfile, report)) &&
+ 	    (!worktree || is_path_owned_by_current_user(worktree, report)) &&
+ 	    (!gitdir || is_path_owned_by_current_user(gitdir, report)))
+ 		return 1;
+ 
+ 	/*
+ 	 * normalize the data.path for comparison with normalized paths
+ 	 * that come from the configuration file.  The path is unsafe
+ 	 * if it cannot be normalized.

@@ -1,0 +1,40 @@
+--- a/run-command.c
++++ b/run-command.c
+@@ -521,33 +521,37 @@
+ 	 * triggering -Wunreachable-code false positive.
+ 	 */
+ 	if (NOT_CONSTANT(sigfillset(&all)))
+ 		die_errno("sigfillset");
+ #ifdef NO_PTHREADS
+ 	if (sigprocmask(SIG_SETMASK, &all, &as->old))
+ 		die_errno("sigprocmask");
+ #else
+ 	CHECK_BUG(pthread_sigmask(SIG_SETMASK, &all, &as->old),
+ 		"blocking all signals");
++#ifndef NO_PTHREAD_CANCEL
+ 	CHECK_BUG(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &as->cs),
+ 		"disabling cancellation");
++#endif
+ #endif
+ }
+ 
+ static void atfork_parent(struct atfork_state *as)
+ {
+ #ifdef NO_PTHREADS
+ 	if (sigprocmask(SIG_SETMASK, &as->old, NULL))
+ 		die_errno("sigprocmask");
+ #else
++#ifndef NO_PTHREAD_CANCEL
+ 	CHECK_BUG(pthread_setcancelstate(as->cs, NULL),
+ 		"re-enabling cancellation");
++#endif
+ 	CHECK_BUG(pthread_sigmask(SIG_SETMASK, &as->old, NULL),
+ 		"restoring signal mask");
+ #endif
+ }
+ 
+ #endif /* GIT_WINDOWS_NATIVE */
+ 
+ static inline void set_cloexec(int fd)
+ {
+ 	int flags = fcntl(fd, F_GETFD);
