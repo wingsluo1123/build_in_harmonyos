@@ -1,0 +1,25 @@
+# Upstream test and consumer-test audit for x-loader 1.5.1-git20110715-fca7cd2.
+package: x-loader/1.5.1-git20110715-fca7cd2
+homepage: "https://github.com/joelagnel/x-loader"
+
+# Upstream ships no automated test suite: the tree has no tests/ directory and the
+# Makefile has no check/test target. The only verification entry points that exist
+# are the build itself, the signGP signing round trip, and the `oneboot` target.
+upstream_check_command: "make omap3530beagle_config && make all"
+upstream_test_in_build: false
+upstream_test_command: "N/A - no upstream test target (build + signGP round trip verified instead)"
+
+upstream_tests: []
+
+test_package_tests:
+  - file: test_x_loader.py
+    description: "Consumer checks: packaged artifacts present/executable; signGP --version/--help; MLO equals x-load.bin.ift; TI header size/load address; re-signing the packaged raw image reproduces the MLO byte for byte"
+    command: "python3 test_x_loader.py <package-folder>"
+    executed_by: "test_package/conanfile.py test() using self.run"
+  - file: test_ohos_x_loader.py
+    description: "HarmonyOS-specific checks: HarmonyOS kernel, AArch64 device, AArch64+musl signGP, 32-bit ARM x-load.elf entry point, MLO header + reset vector, on-device signing reproduces the packaged MLO"
+    command: "python3 test_ohos_x_loader.py <package-folder>"
+    executed_by: "test_package/conanfile.py test() on settings.os=OHOS"
+
+# Unique consumer checks: 13 portable + 12 HarmonyOS = 25.
+assertion_count: 25
