@@ -1,0 +1,67 @@
+# 版本级 manifest — xanalyser 1.32
+version: "1.32"
+software: xanalyser
+status: built
+build_date: "2026-10-14"
+conan_ref: "xanalyser/1.32"
+build_system: autotools
+
+source:
+  url: "http://arvin.schnell-web.net/xanalyser/xanalyser-1.32.tar.bz2"
+  sha256: "8ca3f65bcaad92b1421912311da47e4aa1741a4bb1f422eaf85d75e5996f7946"
+  tar_format: tar.bz2
+  upstream_version: "1.32"
+  version_mapping: "VERSION 文件内容 1.32；help 文本打印 \"Version 1.32\"。"
+  url_note: >-
+    作者官方站点只提供 http 分发；该域名 443 端口使用托管商证书 *.kasserver.com，
+    与域名不匹配，无法自动化下载，故源为官方 http 直链（R39 官方托管例外，详见 notes.md）。
+
+build:
+  system: autotools
+  in_source: true
+  configure_options:
+    - "--prefix=/"
+    - "--x-includes=<libx11 package_folder>/include"
+    - "--x-libraries=<libx11 package_folder>/lib"
+  make_target: "all"
+  make_flags:
+    - "-j1"
+    - "VERSION=1.32"
+  extra_cxxflags:
+    - "-Wno-c++11-narrowing"
+  platform_fixes:
+    - "configure umask 077 -> 022 (E011, HMDFS)"
+    - "autotools 辅助脚本恢复可执行位 (HMDFS 丢可执行位)"
+    - "configure 之后把源码根 VERSION 移出 include 根（HMDFS 大小写不敏感 → #include <version> 遮蔽）"
+    - "install-data-hook 的 app-defaults 归位到 <pkg>/share/X11/app-defaults"
+  dependencies:
+    - "libx11/1.8.13"
+    - "libxt/1.3.1"
+    - "libxext/6.4.0.1"
+    - "xorgproto/2025.1"
+    - "motif/2.3.8"
+    - "libxmu/1.3.1.1"
+    - "libxpm/3.5.17"
+    - "libsm/1.2.6"
+    - "libice/1.1.2"
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+validation:
+  local:
+    - "python3 -m py_compile 通过 conanfile.py / test_package/conanfile.py"
+    - "sh -n 通过 test_package/test_xanalyser.sh"
+    - "手工 OHOS/aarch64 构建：configure/make/make install 全部 exit 0（日志见 notes.md 与 reports/）"
+    - "conan create（ci/conan/profiles/ohos-aarch64，host+build 同 profile）— 见 reports/test-report.md"
+    - "test_package/test_xanalyser.sh 8 项检查全部 PASS"
+  notes:
+    - "libxpm/3.5.17 在 libx11/1.8.13 轨上没有已发布二进制，由 --build=missing 从源码构建（已验证成功）。"
+
+knowledge_gained:
+  - "xanalyser 的 GUI 完全建立在 Xt + Motif 之上，需要本仓库适配的 motif/2.3.8（libXm.so.4）。"
+  - "libxpm 与 motif 分属两条 libx11 轨（6.4.0 vs 1.8.13），混用只能靠 force 1.8.13 + 源码补建 libxpm。"
+  - "源码根普通文件 VERSION 在大小写不敏感 FS 上会遮蔽 C++17 标准头 <version>（同 DRAFT-srcroot-plain-file-shadows-std-header）。"
+  - "2008 年 C++ 代码在 cppstd=17 下命中列表初始化窄化 hard error，用 -Wno-c++11-narrowing 处置（零补丁）。"
+  - "OHOS 无 X server：headless 只能验证 ELF 平台属性 + 依赖加载闭包 + 上游 Xt 报错路径。"

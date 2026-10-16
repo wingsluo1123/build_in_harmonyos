@@ -1,0 +1,38 @@
+# test_package/MANIFEST.yml — xanalyser 1.32
+# 上游官方测试声明文件（CI L0e 强制要求）。证据见 ../notes.md「R51 上游测试清点」。
+
+package: xanalyser/1.32
+homepage: "http://arvin.schnell-web.net/xanalyser/"
+
+# ── R51 上游测试清点（真实命令与原始输出见 notes.md）──────────────────────
+# XAnalyser 1.32（2008 年最后的发布）不提供测试套件：
+#   * `find . -iname '*test*'`        -> 0 个文件（源码树里没有 tests/ 或 test 程序）
+#   * 三个 Makefile.in 中无 TESTS / check_PROGRAMS 声明
+#   * automake 递归生成的 `check: check-recursive`（各子目录 `check-am: all-am`）
+#     存在，但注册 0 个用例，`make check` 原样执行后无事可做
+#   * 没有 `test:` 目标（`make test` -> "No rule to make target 'test'"）
+upstream_check_command: "make check"     # 存在但 0 用例（清点证据见 notes.md）
+upstream_test_in_build: true             # build() 内确实原样执行了 `make check`
+upstream_test_command: "make check"
+
+# 上游可运行的测试目标：没有任何一个（check 目标由 automake 递归生成，0 用例）
+upstream_tests: []
+
+# test_package 自带的消费者测试（R34 实质调用被测物：直接执行打包后的二进制）
+test_package_tests:
+  - file: test_xanalyser.sh
+    description: >-
+      执行打包后的 bin/xanalyser：A1 可执行；A2 man page 安装；A3 Motif
+      app-defaults 资源文件（含 XAnalyser.SampleRate）；B1 ELF 解释器为
+      OHOS musl aarch64 加载器 ld-musl-aarch64.so.1；B2 ELF Machine=AArch64；
+      B3 DT_NEEDED 含 libXm.so.4/libXt/libXext/libXmu/libXpm/libX11/libSM/libICE
+      完整 Motif/X11 链；B4 动态加载器成功解析整条依赖闭包（无
+      "Error loading shared library"）；B5 无 X server 时走上游真实 Xt 路径
+      （"Can't open display"，退出码非 0，无挂起）。
+    command: "sh test_xanalyser.sh <package_folder> /data/service/hnp/bin/llvm-readelf"
+  - file: conanfile.py
+    description: "消费者测试入口：test() 以 env=conanrun 执行 test_xanalyser.sh（LD_LIBRARY_PATH 指向打包的 Motif/X11 依赖库）"
+    command: "conan create 的 test() 阶段运行"
+
+# 测试检查项总数：8（A1/A2/A3 + B1/B2/B3/B4/B5）
+assertion_count: 8
