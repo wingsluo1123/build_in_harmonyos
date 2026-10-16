@@ -1,0 +1,32 @@
+# ═══ Draft knowledge entry — libx11 的 x11.pc prefix=/ 不可重定位 + C++11 用户自定义字面量 + 交叉 host triplet ═══
+# Timestamp: 2026-09-27
+# Software: wmcdplay 1.1（X11 dockapp / 需交叉编译的 autotools 包）
+# Gate: conan create build() — configure / 编译阶段
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E553
+title: X11 dockapp 上 OHOS 三连：libx11 的 x11.pc prefix=/ 不可重定位（须靠 AutotoolsDeps cpp_info 注入真实路径）、C++11 把 "... "MACRO 词法成用户自定义字面量、--host=aarch64-linux-ohos 是进入交叉模式的开关
+trigger_tool: pkg-config|clang++|configure
+phase: configuration|compilation
+error_signature: 'X11/Xlib\.h.*file not found|-I//include|invalid suffix on literal|checking whether we are cross compiling\.\.\. no'
+severity:               2
+category:               ohos, autotools, cross-compile, cxx, x11
+match_keywords: x11.pc, prefix=/, relocatable, AutotoolsDeps, cpp_info,
+  user-defined literal, invalid suffix on literal, VERSION, --host,
+  aarch64-linux-ohos, cross compiling, works-check
+root_cause: 三个独立的平台/标准差异被同一条构建链放大：不可重定位 pc 文件、C++11 词法
+  规则收紧、交叉编译模式未启用。
+affected_scope: 依赖 libx11 的 X11 客户端/dockapp 在 OHOS 的 conan 配方；含 "..."MACRO
+  写法的 C++ 源；任何需交叉的 autotools 包
+verification_cmd: pkg-config --variable=prefix x11; llvm-readelf -h <bin> | grep Machine; grep -n 'cross compiling' config.log
+rec_priority: 1
+rec_approach: cpp-info-injection-plus-space-out-macros-plus-host-triplet
+rec_description: generate() 用 AutotoolsDeps 提供真实 include/lib；补丁为字符串字面量与
+  宏之间加空格；OHOS 下 AutotoolsToolchain 追加 --host=aarch64-linux-ohos。
+rec_command: self._toolchain.configure_args.append("--host=aarch64-linux-ohos")
+source_pr: wmcdplay 1.1 适配
+rec_auto_fix:               false
+rec_impl:               manual
+last_updated:               2026-10-16
+authors:               unknown
+doc_file:               doc/E553.md

@@ -1,0 +1,19 @@
+id:                     E599
+category:               platform, ohos, linking, go, cgo
+phase: build|package
+match_keywords: codesign, placeholder, EPERM, Operation not permitted, binary-sign-tool, llvm-objcopy, remove-section, lld, Go CGO, freshly linked, exec, permission denied, Seccomp, .note.ohos.ident, _has_ohos_signature, force re-sign
+error_signature: "exec of freshly linked Go/CGO binary fails with 'Operation not permitted' (EPERM, rc=126) even though readelf shows a .codesign section and .note.ohos.ident present; signing helper skipped the file because a substring check for '.codesign' matched the linker-emitted placeholder"
+root_cause: "OHOS-target lld emits a PLACEHOLDER .codesign section (plus .note.ohos.ident) into every freshly linked ELF for the OHOS target. The placeholder carries the section-name bytes (so naive substring checks like reading the file and testing b'.codesign' in data report 'already signed') but is NOT a valid signature — the kernel loader / Seccomp policy rejects exec with EPERM. Recipes that guard their signing step with a has-signature early-exit therefore silently skip real signing for freshly linked artifacts. Static Go toolchain binaries (pure Go, linked without the OHOS lld target flags) come WITHOUT any .codesign section and do need the regular first-time signing path."
+rec_approach: "force-re-sign freshly linked artifacts"
+prescan_pattern: "_has_ohos_signature|codesign"
+severity:               2
+last_updated: 2026-10-08
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E599.md
+trigger_tool:           clang
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        "force-re-sign freshly linked artifacts"

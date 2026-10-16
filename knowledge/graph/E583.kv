@@ -1,0 +1,56 @@
+#====================================================================
+# DRAFT-11418-uboot-ohos-symlink-free-extract
+# — OHOS HMDFS 全域禁 symlink：任何含链接的发行 tar 包用
+#   tarfile.extractall（conan files.get() 默认路径）解包即 EPERM 硬失败；
+#   容错解包器先落常规文件、symlink 直建失败物化为目标内容副本
+#   （文件/目录树，链式递归），构建只读消费语义等价
+# 触发事件: u-boot 2026.07 适配（真机 conan source() 首轮即炸）
+# 路径: Path B（知识库扩展）
+#====================================================================
+
+id:                     E583
+trigger_tool:           tarfile|conan|extractall|symlink|source
+phase:                  conan_source
+error_signature:        Permission denied.*symlink|EPERM.*link|extractall.*Error|Cannot create symlink
+severity:               2
+category:               conan, packaging, filesystem, permissions
+match_keywords:         symlink EPERM, HMDFS, extractall, tarfile, 容错解包, materialize, 发行包链接, linkname, hardlink
+title:                  OHOS HMDFS 全域禁 symlink 压垮 tarfile.extractall 解包：容错解包器（常规文件先落盘 + 链接 EPERM 物化为内容副本，链式/目录链接递归）
+
+root_cause:           OHOS HMDFS（应用存储文件系统）全域禁 symlink：
+  os.symlink() 对任何目标/位置都 EPERM（与路径深度、属主、mode 无关，
+  实测新建文件同样被拒）。conan files.get() 内部走 tarfile.extractall()，
+  Python tarfile 对链接成员直接 os.symlink/os.link，无 try/except
+  容错——第一个链接成员即抛 PermissionError 终止解包。u-boot 2026.07
+  发行包含 ~25 个 symlink：COPYING→Licenses/gpl-2.0.txt、多个 dts
+  别名、xilinx board 目录链、tools/binman→main.py 等；目录链接
+  （board/ 整目录别名）extractall 也需整树物化。
+
+affected_scope:         OHOS HMDFS 上一切 conan 配方 source()（files.get()/tarfile.extractall 路径）解包含 symlink 的发行 tar 包——Linux 构建机无感、OHOS 必炸。容错解包器与具体上游无关，可原样移植到任何 tar 发行配方；u-boot 2026.07 发行包（约 25 个链接成员）为首个实例。
+
+verification_cmd: >
+  conan create . -pr:h=ohos-aarch64.profile -pr:b=ohos-aarch64.profile
+  # source() 阶段：修复前 EPERM 中断；修复后全部链接物化、构建推进
+
+rec_priority:           1
+rec_approach:           ohos-symlink-free-extract
+rec_description: >
+  OHOS conan 配方凡 source() 涉及 tar 发行包：download() + 容错解包
+  （常规文件先落盘、symlink 直建失败物化为目标内容副本，目录/链式
+  链接递归物化，恢复 mode 位），弃用 files.get()。
+rec_command:            conan source . -pr:h=ohos-aarch64.profile -pr:b=ohos-aarch64.profile
+rec_auto_fix:           false
+rec_impl:               conanfile.py source()/download/_extract_tolerant/_materialize_link
+
+doc_file:               knowledge/drafts/DRAFT-11418-uboot-ohos-symlink-free-extract.md
+last_updated:           2026-09-29
+source_event:           u-boot 2026.07 适配（真机 conan source() 首轮 EPERM）
+authors:                LIMInGZE666 <LIMInGZE666@noreply.gitcode.com>
+source_pr:              11418
+source_commit:          62f3b5f060
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-09-29
+

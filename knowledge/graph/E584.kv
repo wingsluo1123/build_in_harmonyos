@@ -1,0 +1,59 @@
+#====================================================================
+# DRAFT-11418-uboot-ohos-sysroot-header-shadow
+# — host 工具以尖括号包含 <version.h>，而 UBOOTINCLUDE 被
+#   tools/Makefile 降级为 -idirafter（系统头目录之后才搜索）；
+#   OHOS SDK sysroot 自带 /usr/include/version.h 遮蔽 u-boot 的
+#   shim 头 → PLAIN_VERSION 未定义编译失败。让常规 tools 目标
+#   依赖上游已有的 tools/version.h 拷贝规则，使 objtree 拷贝
+#   进入 -I 路径先于系统目录命中
+# 触发事件: u-boot 2026.07 适配（真机 mkenvimage PLAIN_VERSION）
+# 路径: Path B（知识库扩展）
+#====================================================================
+
+id:                     E584
+trigger_tool:           clang|make|gcc
+phase:                  conan_build
+error_signature:        PLAIN_VERSION.*undeclared|version.h.*shadow|first use in this function
+severity:               2
+category:               build-system, toolchain, include-path
+match_keywords:         version.h, -idirafter, UBOOTINCLUDE, sysroot, 遮蔽, shim header, PLAIN_VERSION, include path, 尖括号包含
+title:                  OHOS SDK sysroot 自带 version.h 遮蔽项目 shim 头（-idirafter 降级 + 尖括号包含）：让常规 tools 目标依赖上游已有拷贝规则，objtree 拷贝进入 -I 路径先于系统目录
+
+root_cause:           u-boot host 工具编译的 include 解析顺序：
+  -I 路径（objtree 生成头）→ clang resource 目录 → SDK sysroot 系统头
+  （/usr/include/aarch64-linux-ohos、/usr/include）→ -idirafter 的
+  UBOOTINCLUDE。mkenvimage.c 尖括号 <version.h> 在 objtree 下没有同名
+  文件（常规 tools 目标不生成），落入 -idirafter 前的系统目录命中
+  SDK 的 /usr/include/version.h；u-boot 自己的 shim
+  include/version.h 在 -idirafter 段，永远搜不到。上游只有
+  envtools/tools-only 两个目标显式依赖 tools/version.h 拷贝规则
+  （Makefile:2510），常规 tools 目标缺这个依赖。
+
+affected_scope:         任何「host 工具构建 + 项目 shim 头与 OHOS SDK sysroot 系统头同名」的适配：SDK sysroot 的头集合大于常规发行版，同名遮蔽概率高；项目头位于 -idirafter 段时必被 /usr/include 同名头遮蔽。排查特征：报「某宏未定义」且 clang -H/-### 显示命中 sysroot 同名头。u-boot 2026.07 的 <version.h>（mkenvimage PLAIN_VERSION）为实例。
+
+verification_cmd: >
+  make O=<obj> HOSTCC=clang CC=clang NO_PYTHON=1 -j1
+  # 修复前：mkenvimage PLAIN_VERSION 未定义；修复后：COPY tools/version.h 出现、编译通过
+
+rec_priority:           2
+rec_approach:           ohos-sysroot-header-shadow-fix
+rec_description: >
+  OHOS host 工具构建中项目 shim 头被 SDK sysroot 同名头遮蔽时：优先
+  复用上游已有的 objtree 拷贝规则让项目头进入 -I 前段；次选引号包含
+  或 -iquote；排查用 gcc -H 或 clang -### 确认实际命中的头文件。
+rec_command:            clang -### -c tools/mkenvimage.c 2>&1 | grep version.h
+rec_auto_fix:           false
+rec_impl:               patches/0004-tools-version-h-for-host-tools.patch
+
+doc_file:               knowledge/drafts/DRAFT-11418-uboot-ohos-sysroot-header-shadow.md
+last_updated:           2026-09-29
+source_event:           u-boot 2026.07 适配（真机 mkenvimage PLAIN_VERSION）
+authors:                LIMInGZE666 <LIMInGZE666@noreply.gitcode.com>
+source_pr:              11418
+source_commit:          62f3b5f060
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-09-29
+

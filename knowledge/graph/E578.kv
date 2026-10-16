@@ -1,0 +1,45 @@
+#====================================================================
+# Draft: upstream static initializers index members of const-qualified
+#        globals - a GCC extension; clang rejects per C99 6.6
+#        (u-boot 2026.07 net/dhcpv6.c)
+#====================================================================
+
+id:                     E578
+trigger_tool:           clang|make|Kbuild|gcc|static initializer|dhcpv6|constant expression
+phase:                  compile
+error_signature:        initializer element is not a compile-time constant|expanded from macro.*u6_addr8\[1[2-5]\]|IPV6_ALL_NODE_ETH_ADDR
+
+severity:               2
+category:               gcc-extension-dependence
+match_keywords:         compile-time constant, constant expression, const global, compound literal, gcc extension, clang, initializer, C99 6.6, u-boot, dhcpv6, net6.h, static storage duration, OHOS
+
+title:                  u-boot net/dhcpv6.c initializes a const array from member access on another const-qualified global (IPV6_ALL_NODE_ETH_ADDR(dhcp_mcast_ip6) -> _ip6_addr.in6_u.u6_addr8[12..15]) - GCC accepts const globals as constant expressions (extension), clang strictly follows C99 6.6 and rejects: 'initializer element is not a compile-time constant'
+
+root_cause:             include/net6.h:97 defines IPV6_ALL_NODE_ETH_ADDR(_ip6_addr) = {0x33, 0x33, _ip6_addr.in6_u.u6_addr8[12..15]} - the macro indexes array members OF ITS ARGUMENT. net/dhcpv6.c:35 passes a declared const-qualified global: `const u8 net_dhcp6_mcast_ethaddr[6] = IPV6_ALL_NODE_ETH_ADDR(dhcp_mcast_ip6);`. In standard C (C99 6.6), an lvalue of a non-literal object is not a constant expression even if const-qualified; GCC accepts const file-scope objects with constant initializers in constant-expression positions as a long-standing extension (same family as static-const array sizes), so upstream CI (gcc-hosted sandbox builds) never sees it. clang implements the standard strictly and rejects with 'initializer element is not a compile-time constant' (verified on OHOS device clang 15.0.4, build.log line 1492; minimal repro t8.c: lvalue form errors, compound-literal form passes).
+
+affected_scope:         Any clang-built u-boot target that compiles net/dhcpv6.c (sandbox_defconfig, qemu_arm64_defconfig with CONFIG_NET/CONFIG_NET6); generally any upstream C relying on const-global-as-constant folding in static initializers, array sizes, or case labels.
+
+verification_cmd:       minimal repro with device clang: `clang -fsyntax-only t8.c` where t8.c contains both the lvalue form (must error) and the compound-literal form (must pass); full build via conan create uboot/2026.07 -pr:h=ohos-aarch64.profile
+
+rec_priority:           1
+rec_approach:           compound-literal-instead-of-lvalue
+rec_description:        Rewrite the initializer to feed the macro the original braced initializer as a C99 compound literal: `IPV6_ALL_NODE_ETH_ADDR((struct in6_addr)DHCP6_MULTICAST_ADDR)`. File-scope compound literals have static storage duration (C99 6.5.2.5p5), and member access with a constant index on a static-duration object is a valid constant expression - clang and gcc both accept it. The byte values are identical because DHCP6_MULTICAST_ADDR is the very initializer of dhcp_mcast_ip6; the const global itself stays untouched for its value users (dhcpv6.c:207/257).
+rec_command:            apply the patch and rebuild: conan create uboot/2026.07 -pr:h=ohos-aarch64.profile -pr:b=ohos-aarch64.profile
+rec_auto_fix:           false
+rec_impl:               patches/0010-dhcpv6-ethaddr-compound-literal.patch (net/dhcpv6.c)
+
+fallback_priority:      2
+fallback_approach:      hardcode-literal-bytes
+fallback_description:   Expand the macro result by hand: const u8 net_dhcp6_mcast_ethaddr[6] = {0x33, 0x33, 0x00, 0x01, 0x00, 0x02}. Byte-correct but decouples the ethaddr from the multicast address macro - silently wrong if DHCP6_MULTICAST_ADDR ever changes; the compound literal keeps the derivation.
+fallback_command:       manual edit of net/dhcpv6.c
+fallback_auto_fix:      false
+fallback_impl:
+
+forbid_1_pattern:       -Wno-gnu-folding-constant| -fpermissive|disable the error via flags|make the global non-const to silence|__extension__
+forbid_1_reason:        clang has no equivalent of gcc's const-folding extension to enable; making the global non-const changes linkage/ABI semantics and other TUs; flag-level suppression hides a real standard violation and breaks on any strict build (-pedantic-errors).
+forbid_1_consequence:   Either the error persists (no such clang flag) or the code silently diverges from standard semantics - both worse than the one-line compound-literal fix.
+
+principles:             P005
+last_updated:               2026-10-16
+authors:               unknown
+doc_file:               doc/E578.md

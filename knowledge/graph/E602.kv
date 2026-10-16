@@ -1,0 +1,28 @@
+# ═══ Draft knowledge entry — EE4J 系发行 tarball「聚合器 parent 带 SNAPSHOT 版本 + 模块挂外部 parent」只构建模块目录 ═══
+# Timestamp: 2026-09-27
+# Software: jakarta-authentication-api 3.0.0（jakartaee/* EE4J 家族 release tarball 通用）
+# Gate: conan create build() mvn 执行
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E602
+title: EE4J 系 release tarball 根 pom 聚合器带 SNAPSHOT 版本且模块挂外部 parent（ee4j:project）时，配方只构建模块目录（cd <module> && mvn package），不构建聚合器根、不 mvn install
+trigger_tool: mvn
+phase: build
+error_signature: "Non-resolvable parent POM|Could not find artifact .*:pom:.*-SNAPSHOT|The project .* has 1 error"
+severity:               2
+category:               java, packaging, ee4j, maven
+match_keywords: SNAPSHOT, aggregator, parent, ee4j, project, jakartaee, authentication-parent,
+  mail-parent, activation, api module
+root_cause: EE4J 发布流程用 tag 打包时只更新了模块版本，根聚合器 parent 版本保持
+  SNAPSHOT；且模块 pom 的 parent 指向外部 ee4j:project 而非聚合器（继承关系与模块
+  聚合关系分离）。若按常规「根目录构建」思路执行，SNAPSHOT 解析与生命周期错位。
+rec_approach: module-dir-build + no-root-install + module-target-artifact
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-16
+authors:               unknown
+doc_file:               doc/E602.md
+affected_scope:         EE4J 系 release tarball 根 pom 聚合器带 SNAPSHOT 版本且模块挂外部 parent（e
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        module-dir-build + no-root-install + module-target-artifact

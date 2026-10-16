@@ -1,0 +1,70 @@
+# ====================================================================
+# DRAFT-11759-vrpn-07.36 — CMake UNIX 变量 FALSE 致 if(UNIX) 门控子目录静默跳过、链接期缺库
+# ====================================================================
+
+id:                     E589
+trigger_tool:           cmake|ld
+phase:                  build
+title:                  HarmonyOS 无 CMake 平台模块致 UNIX 变量 FALSE，if(UNIX) 门控子目录被静默跳过，链接期才爆 cannot find -l（与 E532 三分支 FATAL 是不同症状面）
+error_signature:        cannot find -l|
+                        undefined reference to `vrpn_|
+                        undefined reference.*atmel
+severity:               2
+category:               platform, cmake, gating, link
+match_keywords:         if(UNIX), UNIX, NOT WIN32, cmake, Platform
+
+root_cause: HarmonyOS 主机上 uname -s=HarmonyOS，CMake（含 4.1.2）没有
+  Platform/HarmonyOS.cmake 平台模块，平台检测分支全部落空。除 E092 已录的
+  configure 期症状（System is unknown to cmake）外，还有更隐蔽的第二症状：
+  CMake 内建平台变量 UNIX 被置为 FALSE（探针实测 message 打印 UNIX= 为空）。
+  上游若用 if(UNIX) 门控「仅在 Unix 构建」的子目录（如 vrpn 的 atmellib），
+  该子目录会被静默跳过——configure 不报错、构建照常推进，直到链接期
+  server 侧（以 NOT WIN32 或无条件方式引用该目标）才爆 cannot find -l<lib>。
+  与 E092 的关系：同根因（平台模块缺失）的不同症状路径与不同解法——
+  E092 症状在 configure 期、解法是 CMAKE_SYSTEM_NAME=Linux + toolchain；
+  本条症状在链接期、解法是把门控宏 if(UNIX) 改为 if(NOT WIN32)
+  （语义等价「非 Windows 即构建」，无 OHOS 平台宏，PF5 合规）。
+  与 E532 的区别（查重留痕）：E532 是 if(WIN32)/elseif(UNIX)/else() 三分支
+  的 else 兜底 FATAL_ERROR "Unsupported platform"，configure 期响亮失败，
+  解法给 elseif(UNIX) 追加 CMAKE_SYSTEM_NAME STREQUAL HarmonyOS 判据；
+  本条是单 if(UNIX) 无 else 的静默形态，configure 零告警、延迟到链接期爆发，
+  排查要从链接错误反查被跳过的子目录，解法 NOT WIN32 连平台名都不用写。
+
+affected_scope: 所有在 CMakeLists.txt / *.cmake 里用 if(UNIX)（或 if(UNIX AND ...)）门控
+  子目录或源文件清单、而这些目标又被其它目标以 NOT WIN32 或无条件方式引用的
+  跨平台软件；HarmonyOS 上 configure 静默通过但链接期爆缺库的先查这条。
+
+verification_cmd: |
+  # 实证 UNIX 变量取值（任选其一）
+  cmake --system-information 2>&1 | grep -E "CMAKE_SYSTEM|CMAKE_HOST_SYSTEM"
+  # 在 CMakeLists.txt 临时插入一行后再 configure：
+  #   message(STATUS "UNIX=${UNIX} WIN32=${WIN32}")
+  # 修后验证被跳过的子目录产物真的回来了：
+  nm <build-dir>/libvrpn_atmel.a | head -3
+
+rec_approach:           cmake-gate-macro-align
+rec_description: 把上游 if(UNIX) 门控改为 if(NOT WIN32)，保持「除 Windows 外全构建」的
+  原语义；一行补丁、不引入任何平台宏，L4 patches clean 直接通过。
+  不要走 E092 的 CMAKE_SYSTEM_NAME=Linux 覆盖去「骗」UNIX=TRUE——那会把
+  Linux 专属分支全部打开，副作用远大于一行门控对齐（E532 的 forbid_1 同此口径）。
+rec_command: |
+  # 仅限语义为「非 Windows 即构建」的 if(UNIX) 门控，复合条件见 safety_boundary
+  sed -i 's/if(UNIX)/if(NOT WIN32)/' CMakeLists.txt
+  conan create . -name vrpn -version 07.36 <profile 参数>
+  nm <build-dir>/libvrpn_atmel.a | head -3
+rec_auto_fix:           false
+
+fallback_approach:      explicit-add-subdirectory
+fallback_description: 若上游门控是复合条件（if(UNIX AND NOT X)）改宏会牵连语义，可在配方补丁里
+  显式 add_subdirectory(<被跳过目录>) 并对齐其 target 依赖关系。
+fallback_command: 'grep -n "if(UNIX" CMakeLists.txt; grep -rn "atmel" --include=*.txt --include=*.cmake .'
+
+similar_to:
+caused_by:
+authors:                [主理-60]
+source_pr: ""
+source_commit: ""
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-16
+doc_file:               doc/E589.md

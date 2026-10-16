@@ -1,0 +1,44 @@
+# ═══ Draft knowledge entry — package() 的 isdir 容错守卫把「交付缺件」静默成「成功」 ═══
+# Timestamp: 2026-09-27
+# Software: gputils 1.5.2 → 1.5.2.1（适用于所有「多目录 + isdir/glob 容错拷贝」的 package()）
+# Gate: conan create package() / 消费者侧 AC_PATH_PROG 缺工具
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E612
+title: Conan package() 用 `if os.path.isdir()` 容错拷贝多目录产物时，上游跨版本改布局会让「缺件」静默通过——发布制品少装工具而 conan create 退出码 0、CI 全绿；须加显式完整性断言 fail loudly
+trigger_tool: conan / package() / shutil.copytree
+phase: packaging
+error_signature: (无构建期报错) 消费者侧 checking for <tool>... no|configure: error: <tool> not found；制品自身 os.path.isdir 列表项不存在
+severity:               2
+category:               ohos, conan, packaging, silent-failure
+match_keywords: package(), os.path.isdir, shutil.copytree, 候选目录列表, 静默跳过,
+  silently skip, 制品不完整, incomplete package, 少装, 漏装, 工具集, tool set,
+  AC_PATH_PROG, 上游改布局, SUBDIRS 重组, gplib, gputils
+root_cause: package() 用「候选目录列表 + if os.path.isdir(...)」容错拷贝，守卫本意
+  是"可选目录容错"，但在交付清单语境下把"本质缺件"与"合法可选缺失"混为一谈。
+  gputils 1.5.x 把 gplib/gpdasm/gpstrip/gpvo/gpvc 统一改到 gputils/ 子目录构建
+  （gpasm/、gplink/ 各只产自己的程序），而清单仍写旧布局的 gplib/、gpvc/、
+  gpdasm/ —— 这些目录不存在，isdir 守卫静默跳过，于是发布制品缺 gplib 且无任何
+  报错。缺陷在配方侧，非上游缺件（对比 DRAFT-bzip3 / DRAFT-6051）。
+rec_approach: packaging-completeness-assertion
+  # 同一 gputils 1.5.2.1 配方里的其它适配点——均已查证有既有条目覆盖，只引用不新开
+  E011: config.status 临时目录在 hmdfs 上 Permission denied（umask 型）；本配方的
+    mktemp -d "./confXXXXXX" 变体见 DRAFT-6507-cln-mktemp-0700-hmdfs（就地改 configure
+    为第三种手法）
+  E443: aclocal 不可执行（hmdfs 强制 0o770、chmod 无效）→ 本配方直接跳过 autoreconf
+  E007: config.guess 猜不出 OHOS → 显式传 --build/--host
+  DRAFT-conan-aggregated-env-whitelist: 构建期 TMPDIR 被 conanbuild env 指向 hmdfs
+    （~/.cache/tmp），不能读 $TMPDIR → 本配方硬编码可写目录，是该条实例
+  DRAFT-libint2-2.7.2-compile-time-datadir-macro-for-runtime-data + DRAFT-magic-db-load-path-fallback:
+    上游 $(datadir) 编译期回退路径在包内不存在 → package_info 导出 GPUTILS_HEADER_PATH/
+    GPUTILS_LKR_PATH（形态相近，作既有条目补充案例，不新开）
+  DRAFT-6507-cln-mktemp-0700-hmdfs: configure 临时目录 mktemp -d 强制 0700 变体
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-16
+authors:               unknown
+doc_file:               doc/E612.md
+affected_scope:         Conan package() 用 `if os.path.isdir()` 容错拷贝多目录产物时，上游跨版本改布局会让
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        packaging-completeness-assertion

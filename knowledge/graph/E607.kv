@@ -1,0 +1,31 @@
+# ═══ Draft knowledge entry — JDK 9+/17 javac `-Xlint:all` 新增 removal 类别击穿旧项目 `-Werror` 构建 ═══
+# Timestamp: 2026-10-14
+# Software: jtreg6 6.2+1（所有 JDK 11 时代及更早的 Java 代码基线在新 JDK 上构建通用）
+# Gate: conan build() -> make/javac（-Xlint:all -Werror）
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E607
+title: JDK 17 的 javac `-Xlint:all` 含 removal 类别（JEP 398 将 Applet 标记 forRemoval）——
+  旧 Java 基线 `-Werror` 构建直接失败；修法为 lint 列表追加 `-removal`（或钉 JDK 11 / --release 旧 API）
+trigger_tool: javac
+phase: build
+error_signature: "warning: \\[removal\\].*has been deprecated and marked for removal|error: warnings found and -Werror specified"
+severity:               2
+category:               portability, build-system, java, jdk
+match_keywords: removal, -Xlint:all, -Werror, Applet, JEP 398, forRemoval, javac,
+  JDK 17, bishengjdk, java.applet
+root_cause: JDK 9 新增 removal lint 类别并纳入 -Xlint:all；JDK 17（JEP 398）将
+  java.applet.Applet 标记 forRemoval。上游旧项目（此例 jtreg 6.2）CI 用 JDK 11
+  构建不触发；OHOS 侧仅有 BiShengJDK 17，构建在 -Werror 下被新增 warning 击穿。
+  属一类问题：任何含 -Xlint:all -Werror 的旧 Java 基线在新 JDK 上可能被任意新增
+  forRemoval API 触发，按 error_signature 定位后统一按此修复。
+rec_approach: javac-lint-exclude-removal + conandata-portability-patch
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-16
+authors:               unknown
+doc_file:               doc/E607.md
+affected_scope:         JDK 17 的 javac `-Xlint:all` 含 removal 类别（JEP 398 将 Applet 标记
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        javac-lint-exclude-removal + conandata-portability-patch

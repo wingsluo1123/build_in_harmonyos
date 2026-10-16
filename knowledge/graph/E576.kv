@@ -1,0 +1,62 @@
+#====================================================================
+# DRAFT-11418-uboot-expo-cursor-at-text-end - baked test constant = behaviour-semantics anchor: refactor regressions hide in silently-dropped test surfaces; read the introducing commit's intent, restore the documented semantics, never rebake constants
+#====================================================================
+
+id:                     E576
+trigger_tool:           u-boot|expo|sandbox
+phase:                  test
+error_signature:        cedit.c:413 Expected 0x14a3 (5283), got 0x1496 (5270)|cedit_render_lineedit failure on SDL-enabled surface|bz2 destLen 5270 != baked 5283
+
+severity:               2
+category:               baked-constants, expo, test-surface, upstream-regression, video-console
+match_keywords:         u-boot, expo, scene_textline, cedit_render_lineedit, cedit.c:413, vidconsole_entry_restore, vidconsole_entry_start, set_cursor_visible, xcur_frac, entry_save, 5283, 5270, baked-frame-constant, bz2 destLen, silent-test-surface, refactor-regression, observer-effect
+title:                  上游烘焙常量=行为语义锚：被静默收敛的测试面里藏着源码重构回归——以测试引入提交的意图判词定性（源码回归 vs 测试过期），约束"测试文件零修改"下恢复源码行为语义并全量回归其余烘焙常量
+
+root_cause:             v2026.07 expo 文本行（scene_textline）打开态渲染的光标位置回归：scene_textline_render_deps 打开分支先 vidconsole_entry_restore(cons, &scn->entry_save)，把控制台状态回卷到 scene_textline_open 时刻的存档——彼时 set_cursor_pos 已把笔位钉在字段起点（x=250），vidconsole_set_cursor_visible 经 xcur 分支把光标画在字段起点（帧长 5270）；而测试烘焙帧（cedit_render_lineedit 的 bz2 压缩长度 5283，像素级=光标在既存文本 my-machine 末尾）对应的语义是"光标在文本末尾"——test/boot/cedit.c 的引入提交 c43791c4 提交信息明言 The cursor should start at the end（常量在各发行标签间未变：即烘焙之后未 rebake，源码侧行为被后续 scene 重构改变）。该分歧长期不可见：该测试面 depends on VIDEO_SANDBOX_SDL，宿主无 SDL2 时被 Kconfig 按 depends 静默收敛（构建成功零告警；上游 CI 形态亦不执行该面）——源码回归藏在 CI 不跑的测试面里。修复=该处改调 vidconsole_entry_start（清位置历史、不回卷笔位），光标回归刚绘完文本的实时笔位（x=329=末尾），帧逐字节=5283。关键定位方法：帧压缩长度非单射，标量差无法反推像素几何——dump 原始帧（os_write_file 绕 u-boot 控制台写文件，避免 print 观测者效应污染被断言帧）逐像素比对 + 游标 x 环境变量扫描复现 5283 定值。
+affected_scope:         u-boot expo/video-console 与本例同构的一切"依赖宿主库门控、宿主缺件即静默收敛"的上游测试面；一切"构建通过=测试面在位"的交付假设。关联：暴露该分歧的测试面接入见 DRAFT-11418-uboot-sandbox-sdl2-registry-dep。
+verification_cmd:       真机（SDL 门控面在位）：`u-boot-sandbox -d test.dtb -c 'ut bootstd cedit_render_lineedit; exit'` → failures: 0，四帧 destLen 5336/5363/5283/5170 全中；回归：`-c 'ut bootstd cedit_render; exit'` → 12 帧逐字节不变、空场帧 4851 不变。
+
+rec_priority:           1
+rec_approach:           source-side-semantics-restore
+rec_description:        把 render_deps 打开渲染分支的 `vidconsole_entry_restore(cons, &scn->entry_save)` 改为 `vidconsole_entry_start(cons)`（一行）：清位置历史后 set_cursor_visible 的 index<pos_ptr 分支不成立、光标取 live xcur（刚绘完文本的笔位=末尾）。逐键编辑路径 scene_textline_send_key 的 restore/process/save 配对与 open 时写入的 entry_save 保持原样（其语义独立且正确，勿连带改）。上游测试文件零修改——"源码回归 vs 测试过期"的定性取测试引入提交的提交信息（意图判词），修复方向=恢复被文档化的行为语义而非重烘常量。
+rec_command:            # scene_textline_render_deps() 打开分支：- ret = vidconsole_entry_restore(cons, &scn->entry_save); + ret = vidconsole_entry_start(cons);
+rec_auto_fix:           false
+rec_impl:               patch
+
+fallback_priority:      2
+fallback_approach:      rebake-test-constant
+fallback_description:   仅当确证烘焙值本身为陈旧期望（引入提交意图与现行为相悖）且测试文件可改时，才考虑重烘常量/更新期望；本交付约束"上游测试文件零修改"，该路线等价于给测试面开绿灯（回归被焊死成期望），仅在上游接受并 rebake 后成立——本项意图判词（提交信息 + 常量跨发行版不变）明确支持源码侧，故不走此路。
+fallback_command:       # 无（交付中禁止改测试文件；若上报上游，附帧 dump + 逐像素证据）
+fallback_auto_fix:      false
+fallback_impl:          patch
+
+forbid_1_pattern:       以标量差（5270 vs 5283）直接反推像素差异/猜测修复位置
+forbid_1_reason:        bz2 压缩长度非单射——不同帧可同长、近邻值无像素几何含义；单凭标量差猜"缺了什么像素"不可证。
+forbid_1_consequence:   猜测式修复即使命中也是巧合、无回归保证；正确路径=dump 原始帧逐像素比对（须 os_write_file 绕控制台防观测者效应）+ 参数扫描（游标 x 覆写）定位并复现值。
+
+forbid_2_pattern:       在"测试面没跑"的形态下宣布适配完成/以构建成功证明测试面在位
+forbid_2_reason:        依赖门控面可被 Kconfig 按 depends 静默收敛而构建零告警；上游 CI 同形态也不执行——源码回归正藏在这些面里，不跑=看不见。
+forbid_2_consequence:   本项实踩：SDL 面接入后一次性暴露 16 项失败（15 夹具缺失 + 1 光标回归），全部是"面未跑时不可见"的存量分歧。
+
+forbid_3_pattern:       遇"源码行为 vs 烘焙常量"分歧直接改测试常量/跳过用例/标 known-fail
+forbid_3_reason:        烘焙常量带语义（该帧=光标画在文本末尾的完整像素断言），改常量=把回归焊死成新期望；且交付约束测试文件零修改。
+forbid_3_consequence:   分歧须先读测试引入提交的意图判词定性（源码回归 vs 测试过期）再行动：定性为源码回归→改源码并全量回归其余烘焙常量；定性为测试过期→上报上游而非本地静默改。
+
+principles:             P005
+causes:
+caused_by:
+similar_to:
+conflicts_with:
+prerequisite_of:
+
+doc_file:               knowledge/drafts/DRAFT-11418-uboot-expo-cursor-at-text-end.md
+last_updated:           2026-10-10
+source_event:           u-boot 2026.07 HarmonyOS PC 适配（SDL 门控测试面经制品仓 sdl2 接入后，16 项存量失败的最后一项：cedit_render_lineedit 期望帧 5283 实得 5270；根因=render_deps 打开分支 entry_restore 把光标回卷到字段起点，违反测试引入提交 c43791c4 文档化的'光标在文本末尾'语义；修复=entry_start 一行，四帧全中且其余 12+1 帧逐字节不变）
+authors:                LIMInGZE666 <LIMInGZE666@noreply.gitcode.com>
+source_pr:
+source_commit:
+
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.95
+metrics_last_used:      2026-10-10

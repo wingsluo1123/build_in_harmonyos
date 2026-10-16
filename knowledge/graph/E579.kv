@@ -1,0 +1,60 @@
+#====================================================================
+# DRAFT-11418-uboot-kbuild-probe-vs-linker-mismatch
+# — Kbuild 探测函数（ld-option/cc-option）只对「探测时」组件做
+#   兼容性测试：u-boot 顶层 Makefile 以 ld-option 对 $(LD)=GNU ld
+#   探测 --no-warn-rwx-segments（bfd 2.39+ 警告抑制旗标）通过后进入
+#   KBUILD_LDFLAGS；当配方经 LTO_FINAL_LDFLAGS=-fuse-ld=lld 把实际
+#   链接器换成 lld（OHOS 上 clang LTO 缺 LLVMgold 的既定路由）后，
+#   探测结论失效——lld 无该旗标且硬报 unknown argument。
+#   修法：按实际链接器守卫探测（仅 lld 路由时跳过）。
+# 触发事件: u-boot 2026.07 适配（真机 LTO u-boot 链接 ld.lld 报错）
+# 路径: Path B（知识库扩展）
+#====================================================================
+
+id:                     E579
+trigger_tool:           make|clang|ld.lld|ld-option
+phase:                  conan_build
+error_signature:        ld.lld: error: unknown argument|linker command failed
+severity:               2
+category:               build-system, toolchain, linking, kbuild
+match_keywords:         ld-option, cc-option, lld, -fuse-ld, unknown argument, KBUILD_LDFLAGS, 探测, 链接器错配, LLVMgold
+title:                  Kbuild ld-option 探测用链接器与实际链接器错配：GNU ld 接受的旗标被 lld 硬拒（unknown argument），按实际链接器守卫探测
+
+root_cause:           u-boot Makefile:1036 的 KBUILD_LDFLAGS += $(call
+  ld-option,--no-warn-rwx-segments) 用 $(LD)=GNU ld 探测（bfd 接受），
+  实际链接经 clang -fuse-ld=lld 由 lld 执行（配方层
+  LTO_FINAL_LDFLAGS=-fuse-ld=lld 命令行覆盖位，Makefile 内 := 置空
+  后 += -flto 附加到命令行值）。GNU ld 与 lld 旗标集不重叠：该旗标
+  是 bfd 2.39+ 专用，lld 无等价项且对未知旗标硬错（非忽略）。
+  scripts/Makefile.lib-u-boot:76 的同名探测（KBUILD_EFILDFLAGS）
+  不受影响：EFI 链接直接用 $(LD)，不经过 lld，真机该段已构建成功。
+
+affected_scope:         任何「探测组件 ≠ 实际组件」的 Kbuild 系构建（-fuse-ld=lld / LD=ld.lld / 交叉工具链切换等）：ld-option/cc-option/cc-ldoption 的既有探测结论对替换后组件全部待复核；错误签名固定 ld.lld: error: unknown argument '--xxx'。与 u-boot 无关的通用约束，u-boot 2026.07 的 --no-warn-rwx-segments 为首个实例。
+
+verification_cmd: >
+  make O=<obj> HOSTCC=clang CC=clang NO_PYTHON=1 CONFIG_SHELL=bash \
+    LTO_FINAL_LDFLAGS=-fuse-ld=lld sandbox_defconfig
+  # 修复前：LTO u-boot 链接 ld.lld unknown argument；修复后：链接通过
+
+rec_priority:           1
+rec_approach:           kbuild-probe-guard-by-actual-linker
+rec_description: >
+  OHOS/lld 环境下 Kbuild 探测结论须按实际链接器复核：ld-option 探
+  GNU ld 通过而链接走 lld 时旗标被硬拒（unknown argument）。守卫
+  探测：仅 lld 路由时跳过，其余环境原样。
+rec_command:            grep -rn 'ld-option' Makefile scripts/
+rec_auto_fix:           false
+rec_impl:               patches/0012-ldflags-no-warn-rwx-guard-for-lld.patch
+
+doc_file:               knowledge/drafts/DRAFT-11418-uboot-kbuild-probe-vs-linker-mismatch.md
+last_updated:           2026-09-30
+source_event:           u-boot 2026.07 适配（真机 LTO u-boot 链接 ld.lld unknown argument）
+authors:                LIMInGZE666 <LIMInGZE666@noreply.gitcode.com>
+source_pr:              11418
+source_commit:          62f3b5f060
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-09-30
+
