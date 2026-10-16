@@ -1,0 +1,42 @@
+# test_package/MANIFEST.yml
+# 上游测试声明（CI 门禁 L0e 要求本文件存在且非空）
+
+package: rpcgen/2.6.4
+homepage: "https://linux-nfs.org/"
+
+# 上游测试命令
+upstream_check_command: "make -C tools/rpcgen check"
+
+# conanfile.py build() 中是否已集成上游测试
+# 字段口径：false = 上游**没有可运行的测试套件**（不是"有套件但我们没跑"）。
+# build() 仍执行 `make -C tools/rpcgen check`，使"上游无测试"这一事实留在构建
+# 日志中（实测输出 `make: Nothing to be done for 'check'.`，exit 0），但不计入
+# "已集成测试"——否则会与 upstream_tests: [] 的 0 计数自相矛盾。
+upstream_test_in_build: false
+upstream_test_command: "make -C tools/rpcgen check"
+
+# 上游实际可用的测试入口：无。
+# 清点证据（nfs-utils-2.6.4 源码树）：
+#   - tools/rpcgen/Makefile.am: 无 TESTS、无 check_PROGRAMS
+#   - tools/rpcgen/ 目录: 无 test/check 命名的文件
+#   - 整树 grep -rn '^\s*(TESTS|check_PROGRAMS)\s*=' --include=Makefile.am 仅命中
+#     tests/Makefile.am（rpc.statd 的 statdb_dump + t0001-statd-basic-mon-unmon.sh）
+#     与 tests/nsm_client/Makefile.am（nsm_client），均针对 nfs-utils 守护进程，
+#     不覆盖 rpcgen
+# 因此上游自动化用例数为 0，不提供 upstream 计数。
+upstream_tests: []
+
+# test_package 中自带的测试（消费者端到端，规则 12）
+test_package_tests:
+  - file: calc_consumer.c
+    description: >-
+      RPCGEN-CONSUMER-E2E：用安装后的 bin/rpcgen 对真实接口定义 calc.x 依次生成
+      calc.h（-h）、calc_xdr.c（-c）、calc_clnt.c（-l）、calc_svc.c（-m），再把这些
+      生成物编译链接进消费者程序：程序 fork 出服务端子进程（127.0.0.1 临时端口、
+      svc_vc_create + 本地注册），父进程用生成客户端存根发起两次真实 TCP RPC 调用
+      （CALC_ADD 结构体入参/回参、CALC_SQUARE 标量入参/回参），断言业务结果
+      13/42/81。输入为 test_package/calc.x，输出为上述四个生成文件与程序自检结果。
+    command: "./calc_consumer"
+
+# 测试断言总数（calc_consumer.c 内 check_int 业务断言：sum / product / square）
+assertion_count: 3
