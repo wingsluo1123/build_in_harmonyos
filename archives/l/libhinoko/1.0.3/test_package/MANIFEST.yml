@@ -1,0 +1,64 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: libhinoko/1.0.3
+homepage: "https://git.kernel.org/pub/scm/libs/ieee1394/libhinoko.git/"
+
+# 上游测试命令（meson test，Python GI 脚本）
+upstream_check_command: "meson test -C builddir"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（tests/meson.build 注册 9 项，全部为纯 GIR
+# introspection 断言，依赖 Hinoko-1.0 typelib；本适配 gir=False 不产出
+# typelib，且 pygobject GI 运行时在 OHOS 上经实测不可用（_gi.so 重定位
+# PyType_Ready symbol not found），详见 notes.md「上游测试清点」与崩溃点证据）
+upstream_tests:
+  - file: tests/hinoko-enum
+    source: libhinoko-1.0.3/tests/hinoko-enum
+    description: "6 组枚举值断言（GIR typelib）"
+    command: "meson test hinoko-enum"
+  - file: tests/fw-iso-ctx
+    source: libhinoko-1.0.3/tests/fw-iso-ctx
+    description: "FwIsoCtx 接口内省（GIR typelib）"
+    command: "meson test fw-iso-ctx"
+  - file: tests/fw-iso-ir-single
+    source: libhinoko-1.0.3/tests/fw-iso-ir-single
+    description: "FwIsoIrSingle 内省（GIR typelib）"
+    command: "meson test fw-iso-ir-single"
+  - file: tests/fw-iso-ir-multiple
+    source: libhinoko-1.0.3/tests/fw-iso-ir-multiple
+    description: "FwIsoIrMultiple 内省（GIR typelib）"
+    command: "meson test fw-iso-ir-multiple"
+  - file: tests/fw-iso-it
+    source: libhinoko-1.0.3/tests/fw-iso-it
+    description: "FwIsoIt 内省（GIR typelib）"
+    command: "meson test fw-iso-it"
+  - file: tests/fw-iso-resource
+    source: libhinoko-1.0.3/tests/fw-iso-resource
+    description: "FwIsoResource 接口内省（GIR typelib）"
+    command: "meson test fw-iso-resource"
+  - file: tests/fw-iso-resource-auto
+    source: libhinoko-1.0.3/tests/fw-iso-resource-auto
+    description: "FwIsoResourceAuto 内省（GIR typelib）"
+    command: "meson test fw-iso-resource-auto"
+  - file: tests/fw-iso-resource-once
+    source: libhinoko-1.0.3/tests/fw-iso-resource-once
+    description: "FwIsoResourceOnce 内省（GIR typelib）"
+    command: "meson test fw-iso-resource-once"
+  - file: tests/hinoko-functions
+    source: libhinoko-1.0.3/tests/hinoko-functions
+    description: "纯函数/错误 quark 内省（GIR typelib）"
+    command: "meson test hinoko-functions"
+
+# test_package 中自带的测试（消费者视角验证，R34 实质消费）
+test_package_tests:
+  - file: test_hinoko.c
+    description: "HinokoFwIsoCtx 类型注册 + calculate_bandwidth 纯函数 + 枚举断言探针（编译链接运行，OHOS 特有）"
+    command: "test_hinoko_probe"
+
+# 测试断言总数（近似值，用于质量评估）
+assertion_count: 3
