@@ -1,0 +1,26 @@
+# 软件级 manifest — rpcgen
+software: rpcgen
+display: "rpcgen"
+description: "RPC 协议编译器：把 .x 接口定义生成 C 头文件、客户端/服务端存根与 XDR 例程（Sun/TIRPC rpcgen，取自 nfs-utils 源码树 tools/rpcgen/）"
+category: build-tool
+homepage: "https://linux-nfs.org/"
+license: BSD-3-Clause
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "无独立上游发布轨：包版本 = nfs-utils 版本，源码为官方 tarball，只构建 tools/rpcgen 子目录（需顶层 configure，故继承其无条件门禁 libtirpc/uuid/libevent/sqlite3）"
+    - "rpcgen 运行期需要外部 C 预处理器；OHOS 只提供 clang-cpp，没有 `cpp` 命令，需自建 `cpp` 入口或用 -Y <dir>（clang 还需 -x c 才会以预处理模式读取 .x）"
+    - "rpc_main.c 使用 LFS64 的 struct stat64/stat64()，OHOS libc 仅在定义 _LARGEFILE64_SOURCE 时提供这些别名"
+    - "rindex() 在 OHOS libc 中从不声明（<strings.h> 亦无），已改用 POSIX strrchr()"
+    - "编译通过后无需额外平台适配代码：rpcgen 是纯代码生成器，产物为普通 aarch64 可执行文件"
+  common_dependencies:
+    - libtirpc
+    - uuid
+    - libevent
+    - sqlite3
+
+versions:
+  "2.6.4":
+    status: built
+    build_date: 2026-10-16

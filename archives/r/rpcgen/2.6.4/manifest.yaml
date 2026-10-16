@@ -1,0 +1,69 @@
+# 版本级 manifest — rpcgen 2.6.4
+version: "2.6.4"
+software: "rpcgen"
+status: built
+build_date: "2026-10-16"
+build_system: autotools
+
+source:
+  url: "https://cdn.kernel.org/pub/linux/utils/nfs-utils/2.6.4/nfs-utils-2.6.4.tar.xz"
+  sha256: "01b3b0fb9c7d0bbabf5114c736542030748c788ec2fd9734744201e9b0a1119d"
+  tar_format: tar.xz
+
+build:
+  system: autotools
+  # configure 参数由 conanfile.py 的 CONFIGURE_ARGS 常量给出，另有运行时才确定的
+  # --prefix=<package_folder>；build() 只构建 tools/rpcgen 一个子目录。
+  # 实际参数见 conanfile.py 与 notes.md：
+  #   --with-rpcgen=internal --disable-gss --disable-nfsv41 --disable-uuid
+  #   --disable-nfsrahead
+  # 本列表留空（clean-verify 的解析器按行取字符串：写 `[]` 会被当成字面量参数，
+  # 不写值会把下一行的 `dependencies:` 当参数）。
+  configure_options: ""
+  dependencies:
+    - libtirpc/1.3.7
+    - uuid/2.40.1
+    - libevent/2.1.13
+    - sqlite3/3.49.1
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-config.guess.patch"
+  - "0002-config.sub.patch"
+  - "0003-configure.patch"
+  - "0004-tools-rpcgen-rpc_main.c.patch"
+
+knowledge_gained:
+  - "rpcgen 无独立发布轨：维护中的副本是 nfs-utils 源码树 tools/rpcgen/，包版本 = nfs-utils 版本，源码取官方 tarball；子目录式打包必须跑顶层 configure，因而继承其无条件门禁（uuid/libevent/sqlite3/rpc.h）"
+  - "OHOS 的 C 预处理器只以 clang-cpp 提供，没有 `cpp` 命令；rpcgen 运行期恒需外部预处理器（/lib/cpp → PATH 中 cpp → -Y <dir>），且 clang 对 .x 扩展名必须显式 -x c 才会进入预处理模式"
+  - "rpcgen 源码使用 LFS64 的 struct stat64/stat64()；OHOS libc 仅在 _LARGEFILE64_SOURCE（POSIX 特性宏）下提供这些别名，glibc 默认提供，因此上游没有守卫——用编译期特性宏即可，不必打补丁"
+  - "OHOS libc 只声明 index()，从不声明 BSD 遗留的 rindex()（<strings.h> 亦无）；-Werror=implicit-function-declaration 下必须改用 POSIX strrchr()"
+  - "libtirpc 的旧式 clnttcp_create() 要经 netconfig 解析 netid，OHOS 无 /etc/netconfig 且路径为编译期常量（NETCONFIG 环境变量不生效），报 RPC: Unknown protocol；改用 clnt_vc_create()/svc_vc_create() 直接传 fd+地址可完全绕开"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/rpcgen-2.6.4.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/rpcgen-2.6.4.work
+  source_orig_hash: 59571113f1f5a1bc
+  source_work_hash: c51bd5ee441faece
+  generated_at: '2026-10-16T03:05:58'
+  patches_count: 4
+
+patch_classification:
+  - file: 0001-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-config.sub.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-tools-rpcgen-rpc_main.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

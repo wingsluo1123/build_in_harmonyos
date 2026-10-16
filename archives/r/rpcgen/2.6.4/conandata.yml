@@ -1,0 +1,31 @@
+# conandata.yml — rpcgen 2.6.4
+#
+# 源码 = nfs-utils 官方发布 tarball（kernel.org）。rpcgen 无独立发布轨，维护中的
+# 副本是 nfs-utils 源码树的 tools/rpcgen/（Sun TIRPC rpcgen.new 的清理版）；
+# Alpine 等发行版的 rpcgen 包同样由该目录构建。工具链自带预生成的 configure /
+# Makefile.in，构建不需要 autoconf/automake。
+#
+# 说明：此处只保留官方源的单一 url。CI（ci/conan/build_and_test.sh 的 mirror fallback）
+# 会在构建时把该 url 临时改写为「镜像 + 官方源」的列表；那是构建期行为，不应进入提交内容。
+
+sources:
+  url:
+    - "https://mirrors.ustc.edu.cn/kernel.org/pub/linux/utils/nfs-utils/2.6.4/nfs-utils-2.6.4.tar.xz"
+    - "https://mirrors.tuna.tsinghua.edu.cn/pub/linux/utils/nfs-utils/2.6.4/nfs-utils-2.6.4.tar.xz"
+    - "https://mirror.nju.edu.cn/pub/linux/utils/nfs-utils/2.6.4/nfs-utils-2.6.4.tar.xz"
+    - "https://cdn.kernel.org/pub/linux/utils/nfs-utils/2.6.4/nfs-utils-2.6.4.tar.xz"
+  sha256: "01b3b0fb9c7d0bbabf5114c736542030748c788ec2fd9734744201e9b0a1119d"
+
+patches:
+  - patch_file: "patches/0001-config.guess.patch"
+    patch_description: "Add the HarmonyOS case branch so config.guess reports aarch64-unknown-linux-ohos instead of failing with 'unable to guess system type' (E007); avoids --build/--host, which would make configure treat the native build as a cross build"
+    patch_type: "portability"
+  - patch_file: "patches/0002-config.sub.patch"
+    patch_description: "Accept the aarch64-unknown-linux-ohos triplet in config.sub: ohos-linux basic-machine branch, ohos* in the OS list and linux-ohos* in the kernel/OS validation list (E122)"
+    patch_type: "portability"
+  - patch_file: "patches/0003-configure.patch"
+    patch_description: "configure: (1) downgrade the tree-wide getrpcbynumber(_r) hard gate to a warning -- the OHOS libc and libtirpc provide neither and its only user (support/nfs/svc_socket.c, libnfs.la) is outside this package's scope; (2) create the config.status temp directory with a $$-based name under umask 000, because HMDFS makes a mktemp-created 0700 directory unwritable (E110/E112/E118)"
+    patch_type: "portability"
+  - patch_file: "patches/0004-tools-rpcgen-rpc_main.c.patch"
+    patch_description: "tools/rpcgen/rpc_main.c: replace the BSD-legacy rindex() with its POSIX equivalent strrchr(). rindex() is declared only by <strings.h> on glibc; the OHOS libc declares index() but never rindex(), so with -Werror=implicit-function-declaration the file cannot compile. Same semantics, single call site."
+    patch_type: "portability"
