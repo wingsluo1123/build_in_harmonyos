@@ -1,0 +1,53 @@
+# conandata.yml — libappindicator 12.10.1（手工完成，含源码身份考证）
+#
+# ── 源码身份说明（R39/PF7 相关）───────────────────────────────────────
+# libappindicator 12.10.1 上游（Canonical，https://launchpad.net/libappindicator）
+# **没有发布过 12.10.1 的 release tarball**：Launchpad 12.10 系列官方下载页
+# 只有 12.10.0（libappindicator-12.10.0.tar.gz）。12.10.1 是 12.10 分支的
+# 维护快照（lp:libappindicator trunk），业界发行版统一以
+# 「12.10.1+20.10.20200706.1」这一快照版本号发行：
+#   - Ubuntu 源码包 libappindicator 12.10.1+20.10.20200706.1（orig tarball，
+#     即上游快照的原样打包，未做 Debian 化裁剪/重构）
+#   - NixOS/nixpkgs 同名版本（fetchgit 同一提交 fe25e53bc7e39…）
+#   - Fedora libappindicator-12.10.1
+# 本配方采用 Ubuntu 官方源码归档（launchpad.net 官方，非第三方镜像重打包），
+# 并同时列出 Ubuntu pool 镜像作为回退；sha256 三方一致（本地逐字节核验）。
+# 注：tarball 内 configure.ac 的 AC_INIT 版本串仍为 12.10.0（上游裁分支时
+# 未改版本号），发行版一致以包版本号 12.10.1 为准。
+#
+# ── vendored 依赖：libdbusmenu 16.04.0 ──────────────────────────────
+# 上游 configure.ac 硬依赖 dbusmenu-gtk3-0.4（app-indicator.c 直接调用
+# dbusmenu_* API）。制品仓实测未发布 libdbusmenu（`conan list "*dbusmenu*/*"
+# -r ohpcd` 为空）；按「一库一 PR / 禁止捎带」（PF1/R36）不能在本 PR 新增
+# 独立包，故按 R49「依赖注入 build_folder 私有 prefix」随本包构建并交付
+# （见 notes.md「随包交付 libdbusmenu」一节）。来源为 Canonical 官方
+# libdbusmenu 16.04.0 release tarball。
+sources:
+  libappindicator:
+    url:
+      - "https://launchpad.net/ubuntu/+archive/primary/+files/libappindicator_12.10.1+20.10.20200706.1.orig.tar.gz"
+      - "https://mirrors.tuna.tsinghua.edu.cn/ubuntu/pool/universe/liba/libappindicator/libappindicator_12.10.1+20.10.20200706.1.orig.tar.gz"
+      - "https://mirrors.aliyun.com/ubuntu/pool/universe/liba/libappindicator/libappindicator_12.10.1+20.10.20200706.1.orig.tar.gz"
+    sha256: "94e7096a49c400628ecddcafe313d63bf917d95a90ab994930909de724604e0a"
+  libdbusmenu:
+    url:
+      - "https://launchpad.net/libdbusmenu/16.04/16.04.0/+download/libdbusmenu-16.04.0.tar.gz"
+    sha256: "b9cc4a2acd74509435892823607d966d424bd9ad5d0b00938f27240a1bfa878a"
+
+patches:
+  - patch_file: "patches/0001-configure.ac-drop-missing-gnome-macros.patch"
+    strip: 1
+    patch_description: "configure.ac：移除 GTK_DOC_CHECK / AM_PROG_VALAC（gtk-doc.m4、vala.m4 在 OHOS 构建镜像不存在，autoreconf 直接失败），并从 AC_CONFIG_FILES 去掉 docs/ 生成项；不触碰 src/ 与 tests/"
+    patch_type: "portability"
+  - patch_file: "patches/0002-Makefile.am-drop-docs-subdir.patch"
+    strip: 1
+    patch_description: "顶层 Makefile.am：SUBDIRS 去掉 docs（gtk-doc 不可用）；不触碰 tests/"
+    patch_type: "portability"
+  - patch_file: "patches/0003-configure.ac-testdeps-optional.patch"
+    strip: 1
+    patch_description: "configure.ac：TESTDEPS（dbus-glib-1）探测改为非致命——制品仓 dbus-glib/0.114 锁 glib/2.88.0 与 gtk 链 glib/2.84.0.1 冲突，实测对 glib 2.84 源码重建 dbus-glib 失败（-lgio-2.0/-lffi 找不到）；tests/ 中 6 个 dbus-glib 程序因此不编译（它们同时需要 Xvfb + dbus-test-runner，OHOS 不可运行）。不修改任何测试用例源码"
+    patch_type: "portability"
+  - patch_file: "patches/0004-libdbusmenu-configure-relax-intltool-probe.patch"
+    strip: 1
+    patch_description: "随包构建的 libdbusmenu 16.04.0（R49 私有 prefix）的预生成 configure：OHOS 构建镜像不含 intltool/gettext/perl，配置期四处硬失败改为宽松——① intltool 版本探测直接置 0.51.0；② 缺 intltool 脚本时 INTLTOOL_UPDATE/MERGE/EXTRACT 置 `:`；③ GNU gettext 探测失败时 XGETTEXT/MSGMERGE/MSGFMT/GMSGFMT 置 `:`；④ 缺 perl 时 INTLTOOL_PERL 置 `:` + XML::Parser 探测跳过；另外在 enable_tests=no 时补 HAVE_VALGRIND 条件定义（否则报 conditional \"HAVE_VALGRIND\" was never defined）。配合 --disable-nls。只改随包依赖的构建脚本，不触碰 libappindicator 上游、不触碰任何测试用例源码"
+    patch_type: "portability"

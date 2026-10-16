@@ -1,0 +1,20 @@
+--- a/configure.ac
++++ b/configure.ac
+@@ -74,7 +74,16 @@
+ )
+ AM_CONDITIONAL(USE_GTK3, [test "x$with_gtk" = x3])
+ 
+-PKG_CHECK_MODULES(TESTDEPS, dbus-glib-1)
++# dbus-glib-1 (TESTDEPS) is only used by the 6 tests/ programs that speak the
++# legacy dbus-glib API. On HarmonyOS it cannot be linked: the published
++# dbus-glib/0.114 package pins glib/2.88.0 while the gtk3 stack used by this
++# library pins glib/2.84.0.1; rebuilding dbus-glib against glib 2.84 was
++# measured to fail (ld.lld: unable to find library -lgio-2.0/-lffi, log in
++# notes.md). Make the probe non-fatal so the library and the other upstream
++# tests still build; the 6 dbus-glib programs are skipped by building
++# explicit make targets (see build() and MANIFEST.yml).
++PKG_CHECK_MODULES(TESTDEPS, dbus-glib-1, [],
++                  [AC_MSG_WARN([dbus-glib-1 unavailable: 6 upstream dbus-glib test programs will not be built])])
+ 
+ ###########################
+ # GObject Introspection
