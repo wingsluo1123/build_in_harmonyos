@@ -1,0 +1,29 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: prison/6.28.0
+homepage: "https://invent.kde.org/frameworks/prison"
+
+# 上游测试命令 (CTest 驱动)
+upstream_check_command: "ctest --output-on-failure"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir . --output-on-failure --no-tests=error"
+
+# 上游实际运行的测试程序 (autotests 目录, BUILD_TESTING=ON 时注册)
+upstream_tests:
+  - file: "autotests"
+    source: "prison-6.28.0/autotests"
+    description: "Prison 上游 autotests（Barcode 格式创建/图像渲染）"
+    command: "ctest"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_package/test.cpp
+    description: "消费者测试: 通过 KF6::Prison 创建 QRCode 条码并渲染 QImage，断言图像非空"
+    command: "./test_prison"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 2

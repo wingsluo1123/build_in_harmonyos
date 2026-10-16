@@ -1,0 +1,47 @@
+software: prison
+version: "6.28.0"
+status: built
+build_date: "2026-10-15"
+build_system: cmake
+conan_ref: "prison/6.28.0"
+
+source:
+  url: "https://download.kde.org/stable/frameworks/6.28/prison-6.28.0.tar.xz"
+  sha256: "ad24dd64b5150ec9ebc4df9734b4c2a58c27a588eafeb4239cdcef01629fe696"
+  tar_format: tar.xz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DBUILD_TESTING=ON"
+    - "-DWITH_QUICK=OFF"
+    - "-DWITH_MULTIMEDIA=ON"
+    - "-DKF_IGNORE_PLATFORM_CHECK=TRUE"
+    - "-DKF_SKIP_PO_PROCESSING=ON"
+    - "-DCMAKE_CXX_STANDARD=20"
+  dependencies:
+    required:
+      - qtbase/6.11.1
+      - qrencode/4.1.1
+    build:
+      - ecm/6.28.0
+    optional:
+      - qtdeclarative/6.11.1
+      - qtmultimedia/6.11.1
+      - libdmtx
+      - zxing-cpp
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-fix-ranges-none-of.patch: OHOS SDK libc++（clang 15 配套）未实现 std::ranges::none_of，改用传统 std::none_of"
+
+knowledge_gained:
+  - ref: E092
+    text: "Prison 为 KDE Frameworks 6 库，CMake 构建，不识别 HarmonyOS 平台需 KF_IGNORE_PLATFORM_CHECK"
+  - ref: E540
+    text: "HNP cmake 二进制依赖 SDK aarch64-linux-ohos/libc++_shared.so，配方 generate() 中 _sdk_runtime_env() 前置 SDK lib 目录并 save_script 覆盖 build/package/test 全阶段"
+  - ref: DRAFT-E5xx
+    text: "OHOS SDK libc++（clang 15）未实现 std::ranges::none_of 等 ranges 算法，需将上游 ranges 调用替换为传统迭代器算法并打补丁（同 DRAFT-E5xx-ohos-libcpp-missing-ranges-algorithms）"
+  - ref: E096
+    text: "共享 profile 的 compiler.cppstd=17 会令 conan_toolchain.cmake 以普通变量强制 -std=c++17（优先级高于缓存变量），需在配方 generate() 覆写 self.settings.compiler.cppstd 显式指定 C++ 标准"
