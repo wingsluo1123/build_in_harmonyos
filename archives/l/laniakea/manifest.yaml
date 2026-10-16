@@ -1,0 +1,31 @@
+# 软件级 manifest — laniakea
+# 遵循 ARCHIVE-SPEC v2.0
+
+software: laniakea
+display: "Laniakea"
+description: "Suite of tools to manage a Debian-based Linux distribution."
+category: development
+homepage: "https://laniakea-hq.readthedocs.io/"
+license: LGPL-3.0-or-later
+
+# 纯 Python Debian 衍生发行版管理套件（R47 用户决策覆盖 python_class_task，
+# 参考同生态 laniakea-spark/0.1.1 已合入 main 的 PR #3636 与 pyjson5/0.15.0；
+# 以 python/3.12.9 解释器为运行时依赖交付，Meson 元构建不移植）
+build_system: python
+
+ohos_adaptation:
+  key_points:
+    - "纯 Python 套件：不跑上游 Meson（meson.build 强依赖 systemd/apt-ftparchive/bubblewrap 等 Debian 专属工具），全部 src/ 顶层包复制到 lib/python3.12/site-packages/，requires python/3.12.9"
+    - "bin/ 生成 5 个 CLI 启动器包装（lk-admin/lk-archive/lk-keytool/rubicon/synchrotron，上游 install_data rename 入口）；data/ → share/laniakea/ 并镜像 lib/python3.12/data/（匹配上游 get_data_file 非 /usr 开发目录启发式，使 LocalConfig() 可发现 base-config.toml）"
+    - "核心 import laniakea 触发 laniakea.db → apt_pkg（Debian 专属 C 绑定）：OHOS 测试环境以仅满足 import 期符号的 apt_pkg 桩支撑（不伪造真实解析），deb822 数据层由 python-debian（纯 Python）覆盖"
+    - "守护进程（lighthouse/scheduler/mailgun/mirk/spears/planter/web*）与数据库后端（PostgreSQL）需 Debian/系统服务环境，模块随包安装但无 OHOS 可运行入口（不在 commands.json 内）"
+  common_dependencies:
+    - python
+    - "sqlalchemy / tomlkit / python-debian / requests / cryptography / marshmallow / pyzmq / PyNaCl / PyYAML / Pebble / click / rich / firehose（消费环境提供）"
+
+versions:
+  "0.1.1":
+    status: built
+    build_date: "2026-10-14"
+    archive_path: "0.1.1"
+    requires_manual_verification: false

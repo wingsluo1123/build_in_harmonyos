@@ -1,0 +1,78 @@
+# 版本级 manifest — laniakea 0.1.1（Python 类适配，R47 用户决策覆盖）
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "0.1.1"
+software: laniakea
+
+# 编译状态（finish 最终更新；本地验证通过未 upload 即 built（R29），CI upload 后升级 published）
+# published | built | failed
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-14"
+build_system: python
+
+# 测试结果（上游 39 例主编实测 24/39 61.5%；新增鸿蒙特有 test_package 47 断言 100%）
+# 上游 3 失败 / 12 环境阻塞原因逐项见 notes.md R51 第三步（不编造通过率）
+test_passed: 24
+test_failed: 15
+test_total: 39
+
+# ============================================================
+# 源码信息
+# ============================================================
+source:
+  # 源码下载 URL（官方 GitHub tag v0.1.1，R39；镜像 fallback 由 CI 自动添加）
+  url: "https://github.com/lkhq/laniakea/archive/refs/tags/v0.1.1.tar.gz"
+  # 源码校验和（任务书给定，W3/CI conan create 实拉时复核）
+  sha256: "2da3e89f8822f0885b2766fcaa2555345a91655440e22a367eb304b5290753f5"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+build:
+  # 构建系统类型（Python 类：纯 Python 手动复制打包，不跑 Meson/pip；
+  # 参考 laniakea-spark/0.1.1 与 pyjson5/0.15.0）
+  system: python
+
+  configure_options:
+    - "不跑上游 Meson（meson.build 强依赖 systemd/apt-ftparchive/bubblewrap 等 Debian 专属工具，OHOS 无）"
+    - "全部顶层 Python 包复制到 lib/python3.12/site-packages/"
+    - "bin/ 生成 5 个 CLI 启动器包装（lk-admin/lk-archive/lk-keytool/rubicon/synchrotron）"
+    - "data/ → share/laniakea/，并镜像到 lib/python3.12/data/（get_data_file 开发目录启发式）"
+    - "COPYING → licenses/"
+
+  # 编译依赖列表（格式: name/version；ohpcd 制品仓均已发布）
+  dependencies:
+    - python/3.12.9
+
+  # 编译器（纯 Python 无编译；解释器为 python3.12）
+  cc: "n/a（纯 Python 无编译，解释器 python3.12）"
+  cxx: "n/a（纯 Python 无编译）"
+
+# ============================================================
+# 补丁信息
+# ============================================================
+patches_applied: []
+# 无需补丁：纯 Python 官方源码按原样打包，未修改任何上游文件
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+knowledge_gained:
+  - "纯 Python Debian 发行版管理套件（Meson 构建但强依赖 Debian 专属工具链）以无构建/打包族配方交付：全部 src/ 顶层包 → lib/python3.12/site-packages + bin/ 5 个 CLI 启动器包装 + data 双份（share/laniakea 标准位 + lib/python3.12/data 匹配上游 get_data_file 非 /usr 开发目录启发式，使 LocalConfig()/LintianConfig() 可发现默认配置）+ 软件级 commands.json（R38）"
+  - "laniakea 核心 `import laniakea` 即触发 laniakea.db → db/archive.py 顶层 `import apt_pkg`（Debian 专属 C 绑定）：OHOS 测试环境须提供仅满足 import 期符号的 apt_pkg 桩（Hashes/TagFile/TagSection/version_compare），不伪造真实解析能力"
+  - "CLI --version 前置链：**lk-archive** 的 run() 在 click 解析前调用 ensure_laniakea_master_user → LocalConfig()，因此包内必须自带 base-config.toml（lib/python3.12/data/ 镜像）才能让 --version 在无 /etc/laniakea 环境下跑通；lk-admin 的 --version 在 click 回调先 exit（早于 LocalConfig，admincli/cli.py:29-33）；rubicon/synchrotron/lk-keytool 在 user 检查前先 check_print_version，无此要求"
+  - "上游 39 个 pytest 用例主编全部实测（可运行环境 + 最小 apt_pkg 桩，不改测试逻辑）：24 通过 / 3 失败（test_parse_changes 与 test_reporeader_local 为环境 GPG 无 status 输出行为差异，test_flatpak_init_repo 为 OHOS 无 flatpak 工具链）/ 12 环境阻塞（conftest postgresql_container fixture 依赖 podman + postgres:16 容器，OHOS 无），通过率 24/39（61.5%）；未修改任何上游测试（patches_applied=[]）；详见 notes.md R51 第三步与 .scratch/laniakea-subtask/upstream-tests/main-agent-empirical.md"
+
+# ============================================================
+# R47 覆盖决策（用户决策，记入 notes.md）
+# ============================================================
+r47_override: >-
+  lang-preflight 实测任务标记 cpp 但源码为 python（纯 Python + Meson 元构建，
+  0 个 C/C++ 源文件），按 R47 本应 env_unsupported 终态。用户明确指示走
+  完整适配 + PR 流程，且本仓库同生态 laniakea-spark/0.1.1 已按 Python
+  application 适配合入 main（PR #3636），bambam/1.4.1 有 r47_override 先例。
+  按用户决策覆盖 R47 走 Python application 成功路径适配；覆盖决策与依据
+  详见 notes.md 与 .scratch/laniakea-subtask/。
