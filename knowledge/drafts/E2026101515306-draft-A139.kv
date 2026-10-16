@@ -1,0 +1,25 @@
+id: E2026101515306
+title: 解释器旧模式策略断言与当前并发后端功能覆盖
+trigger_tool: perl|make-test|Net::Daemon
+phase: testing
+error_signature: Only verifiable on Perl < 5.10|Only verifiable on MSWin32
+severity: 2
+category: perl, concurrency, test-applicability
+match_keywords: Net::Daemon, ithreads, fork, interpreter-version, Winsock, saved-set-user-ID
+root_cause: 原测试同时注册旧解释器和其它系统的模式选择策略，真实当前后端运行与这些分支适用条件并非同一结论。
+affected_scope: Perl服务器框架按版本及平台切换fork与ithreads的测试验收；不能用操作系统名称单独判定线程依赖或永久降权能力。
+verification_cmd: 原make test TEST_VERBOSE=1，逐程序与TAP身份核对原源码，再分别验证并发socket往返和非root非法UID变更检测。
+rec_priority: 1
+rec_approach: separate-mode-policy-predicates-from-live-backend
+rec_description: 保留原注册及3项原skip，只按同版本明确谓词区分旧Perl/Windows断言；当前fork和ithreads完整执行，root降权单独披露。
+rec_command: make test TEST_VERBOSE=1
+rec_auto_fix: false
+rec_impl: original mode.t, forkm.t, ithreadm.t and privdrop.t with exact installed runtime binding
+doc_file: knowledge/drafts/E2026101515306-draft-A139.md
+last_updated: 2026-10-15
+source_event: Net-Daemon0.52 r328 two formal creates each18 programs/93 TAP90PASS3SKIP;forkm10 andithreadm10 each1000 rounds;C3H1;W3log d3152970b2c39309d4251d0c2b30106eeea607437d0f8a6bd67b84460fe482aa
+authors: 2301_80739235
+source_pr:
+source_commit:
+draft: true
+contributor_id: A139
