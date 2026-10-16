@@ -1,0 +1,46 @@
+# 版本级 manifest — typst 0.15.1
+
+version: "0.15.1"
+software: "typst"
+
+# 编译状态
+# built：本地 OHOS aarch64 交叉编译 + 上游测试（3680/3684 集成用例通过）+ test_package 通过；未上传发布。
+status: built
+build_date: "2026-10-12"
+build_system: "cargo"
+
+source:
+  url: "https://github.com/typst/typst/archive/refs/tags/v0.15.1.tar.gz"
+  sha256: "c07909e01a2a6941e52c9b616e48c209c755eed416d62bcf5583c37a4aca01a3"
+  tar_format: tar.gz
+
+build:
+  system: custom          # Rust cargo workspace（无 autotools/cmake/meson）
+  configure_options: []
+  dependencies:
+    - "openssl/3.5.8.1"
+  build_tools:
+    - "rust-toolchain/1.97.1"
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "Rust 配方在竞赛 CI 的可行路径：tool_requires rust-toolchain/1.97.1（rust-lang 官方 dist 预编译 aarch64-unknown-linux-ohos 工具链），规避系统无 cargo 与 rustup 无法识别 HarmonyOS 宿主（E105/E154）"
+  - "OHOS 拒绝 execve/dlopen 未签名 ELF：工具链 cargo/rustc、rustc dlopen 的 librustc_driver、proc-macro 测试 DT_NEEDED 的 libstd-*.so 均须复制 + binary-sign-tool -selfSign 1 后才可用"
+  - "cargo 运行期依赖 libssl/libcrypto（OHOS loader 忽略 DT_RUNPATH），系统 OpenSSL 3.0 缺 SSL_get0_group_name（cargo 1.97 需 3.5+），改用 Harmonybrew OHOS openssl bottle 进 LD_LIBRARY_PATH"
+  - "typst-cli 默认特性闭包经 typst-kit/system-downloader 无条件依赖 openssl-sys → 静态链接 conan openssl/3.5.8.1，产物自包含"
+  - "rust-toolchain/1.97.1 基础设施包不含 rustdoc → doctest 不可运行；上游测试须以 --tests 运行（单元 + 集成）"
+  - "构建宿主不可直连 github.com；crates.io 走 rsproxy.cn sparse 镜像，git 依赖（typst-dev-assets）经 GitHub 镜像以 git insteadOf 解析"
+  - "集成测试 4 项（彩色 emoji / 可变字体 / RTL 整形）在 aarch64-unknown-linux-ohos 上输出哈希与上游参考确定性不一致（release 与 debug 逐字节相同）"
+
+upstream_tests:
+  suite: "typst-tests 集成套件（tests/suite/*.typ）+ 各 crate 单元测试"
+  command: "cargo test --release --target aarch64-unknown-linux-ohos --workspace --tests --no-fail-fast"
+  total: 3886
+  passed: 3882
+  failed: 4
+  skipped: 0
+  doctests: "未运行（rust-toolchain/1.97.1 不含 rustdoc）"
+  log: ".task-typst/logs/upstream_cargo_test.log"   # 任务留档（非仓库文件）
