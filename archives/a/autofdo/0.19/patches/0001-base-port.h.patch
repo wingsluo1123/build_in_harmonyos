@@ -1,0 +1,29 @@
+--- a/base/port.h
++++ b/base/port.h
+@@ -119,21 +119,25 @@
+ #define bswap_32(x) _byteswap_ulong(x)
+ #define bswap_64(x) _byteswap_uint64(x)
+ 
+ #elif defined(OS_MACOSX)
+ // Mac OS X / Darwin features
+ #include <libkern/OSByteOrder.h>
+ #define bswap_16(x) OSSwapInt16(x)
+ #define bswap_32(x) OSSwapInt32(x)
+ #define bswap_64(x) OSSwapInt64(x)
+ 
+-#elif defined(__GLIBC__) || defined(__CYGWIN__)
++#elif defined(__GLIBC__) || defined(__CYGWIN__) || defined(__OHOS__)
++// OHOS/musl 同样以 <byteswap.h> 提供 bswap_16/32/64 宏；若不并入本分支，
++// 会落入下面的 #else 自行定义 static inline bswap_16 函数，与已 include 的
++// <byteswap.h> 宏冲突（宏展开成 __bswap_16 与内联函数重定义，编译报
++// "redefinition of '__bswap_16'"）。
+ #include <byteswap.h>  // IWYU pragma: export
+ 
+ #else
+ 
+ static inline uint16 bswap_16(uint16 x) {
+   return static_cast<uint16>(((x & 0xFF) << 8) | ((x & 0xFF00) >> 8));
+ }
+ #define bswap_16(x) bswap_16(x)
+ static inline uint32 bswap_32(uint32 x) {
+   return (((x & 0xFF) << 24) |

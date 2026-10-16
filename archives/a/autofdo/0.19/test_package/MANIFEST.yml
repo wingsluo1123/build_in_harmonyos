@@ -1,0 +1,27 @@
+package: autofdo/0.19
+homepage: "https://github.com/google/autofdo"
+
+# 上游测试清点（R51）：
+#   autofdo 0.19 的 autotools 工程（Makefile.am / configure.ac）**没有**
+#   TESTS / check_PROGRAMS / check-local 目标，`make check` 无实际用例运行
+#   （清点命令：grep -nE 'check_PROGRAMS|TESTS|check-local' Makefile.am configure.ac → 无输出）。
+#   因此上游无自动化测试可跑；本包门禁依赖 test_package 的真实 CLI 调用。
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_tests: []
+
+test_package_tests:
+  - file: test_autofdo.sh
+    description: >-
+      逐工具（7 个 CLI：create_gcov/dump_gcov/sample_merger/profile_merger/
+      profile_diff/profile_update/create_llvm_prof）各运行 --help 与 --version，
+      共 7×2=14 次真实调用、28 项断言：
+        · --help  : 断言 exit=1（bundled gflags 文档化行为，见
+          gflags/gflags_reporting.cc HandleCommandLineHelpFlags）且 stdout 含
+          该工具自身 gflags flag（gflags 帮助里以**单破折号**列出：
+          -binary/-input/-output_file/-compare_function 等）/程序名；
+        · --version: 断言 exit=0 且 stdout 含工具程序名。
+      非空壳：真实 exec 被测二进制并解析其 gflags 命令行。
+    command: "bash test_autofdo.sh (由 test_package/conanfile.py::test() 经 conanrun 环境调用)"
+
+assertion_count: 28

@@ -1,0 +1,70 @@
+# conandata.yml — autofdo 0.19 (AutoFDO profile tools)
+#
+# 官方上游：https://github.com/google/autofdo
+# tag 0.19 -> commit 492384d08687b8b5bdbd2c49aa3436ac69380de3 (lightweight tag)
+#
+# ⚠️ 上游 tag 的 GitHub release tarball **不包含子模块内容**（只保留空的
+#    third_party/* 目录 + .gitmodules）。autofdo 0.19 依赖两个子模块：
+#       third_party/protobuf           @ a72da27f5a46844e1a70725bb4362c2e51d7195d (protobuf 3.5.2)
+#       third_party/perf_data_converter @ d9ef70b46e63ebaec6d2d296aa178e332c6e5f58
+#    子模块 pin 由 `git ls-tree 0.19 third_party/` 读出（shallow clone 只读核验）。
+#    按知识库 E150（manual-download：Release tarball 不含子模块，需单独下载拷贝），
+#    单独下载 perf_data_converter 源码放置到 third_party/perf_data_converter。
+#    third_party/protobuf 用 Conan 制品 protobuf/3.17.3（含 protoc + libprotobuf），
+#    见 conanfile.py 说明——本机无 automake/libtool，无法在树内 autoreconf 生成
+#    bundled protobuf 的 configure。
+sources:
+  autofdo:
+    url: "https://github.com/google/autofdo/archive/refs/tags/0.19.tar.gz"
+    sha256: "2ab3a16a8966b6e9a877fddb15ee39e627646fcf8d0df17c19de013da36c27d0"
+  perf_data_converter:
+    url: "https://github.com/google/perf_data_converter/archive/d9ef70b46e63ebaec6d2d296aa178e332c6e5f58.tar.gz"
+    sha256: "99f20f50bb07d9cb5ff4d16899583d71abfac8b28ec7cb9e2900776f9c41a953"
+
+patches:
+  - patch_file: "patches/0001-base-port.h.patch"
+    patch_description: >-
+      OHOS/musl 以 <byteswap.h> 的宏提供 bswap_16/32/64，但 base/port.h 只在
+      __GLIBC__/__CYGWIN__ 分支 include <byteswap.h>；OHOS 落入 #else 分支自行
+      定义 static inline bswap_16 函数，与该宏冲突（宏展开为 __bswap_16 ->
+      "redefinition of '__bswap_16'"）。把 __OHOS__ 并入 include <byteswap.h> 分支。
+    patch_type: "portability"
+  - patch_file: "patches/0002-llvm_profile_writer.cc.patch"
+    patch_description: >-
+      LLVM 15 的 SampleProf API 变化：SampleProfileMap 以 SampleContext 为键
+      （不再是 StringMap<FunctionSamples>），FunctionSamplesMap 以 std::string
+      为键（非 StringRef）。用 LLVM_VERSION_MAJOR >= 15 守卫，改键构造与 .str()。
+    patch_type: "portability"
+  - patch_file: "patches/0003-llvm_profile_writer.h.patch"
+    patch_description: >-
+      同上（头文件侧）：引入 AutoFDOProfileMap 别名（LLVM >= 15 为
+      llvm::sampleprof::SampleProfileMap，否则为 StringMap<FunctionSamples>），
+      ConvertProfiles()/GetProfiles()/profiles_ 统一使用该别名。
+    patch_type: "portability"
+  - patch_file: "patches/0004-m4-ax_llvm.m4.patch"
+    patch_description: >-
+      OHOS SDK 的 LLVM 只提供单一共享库 libLLVM-<major>.so（无分组件共享对象）；
+      m4/ax_llvm.m4 的 shared 分支原用 llvm-config --libs <component> 报告的
+      -lLLVM<Part>，这些库不存在导致链接失败。改为链接整库 libLLVM-<major>.so。
+    patch_type: "portability"
+  - patch_file: "patches/0005-profile_creator.cc.patch"
+    patch_description: >-
+      OHOS/musl 的 <string.h> 不提供 GNU basename（仅 <libgen.h> 有 POSIX 版且
+      参数可写）；用 #ifdef __OHOS__ 等价实现取路径最后一段。
+    patch_type: "portability"
+  - patch_file: "patches/0006-sample_reader.cc.patch"
+    patch_description: >-
+      同上：sample_reader.cc 的 MatchBinary 使用 basename，按 __OHOS__ 走等价实现。
+    patch_type: "portability"
+  - patch_file: "patches/0007-symbolize-elf_reader.cc.patch"
+    patch_description: >-
+      OHOS/musl 不定义 __WORDSIZE（glibc 专有宏），symbolize/elf_reader.cc 的
+      #if __WORDSIZE == 32/64 全部为假、触发 #error "Invalid word size"；
+      __OHOS__ 下直接取 Elf64（OHOS PC 为 aarch64）。
+    patch_type: "portability"
+  - patch_file: "patches/0008-third_party-perf_data_converter-src-quipper-dso.cc.patch"
+    patch_description: >-
+      perf_data_converter 子模块的 quipper/dso.cc 按 glibc/elfutils 语义使用 libelf：
+      Riepe libelf（0.8.13.1）无 ELF_C_READ_MMAP（其 ELF_C_READ 即 mmap 读取），
+      且其 gelf.h 未声明已实现的 gelf_getnote。仅在 __OHOS__ 下补等价别名与函数声明。
+    patch_type: "portability"
