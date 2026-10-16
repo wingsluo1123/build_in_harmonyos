@@ -1,0 +1,24 @@
+title: ltrace 缺少 aarch64 支持，需创建符号链接到 arm
+category:               build-system, architecture, aarch64
+severity:               2
+error_signature: No rule to make target.*sysdeps/linux-gnu/aarch64|sysdeps.*aarch64.*No such file
+root_cause: ltrace 0.7.3 (2013年发布) 早于 aarch64 普及，只包含 arm (32-bit) 的 sysdeps 目录，没有 aarch64 支持。构建系统无法找到 aarch64 相关文件。
+match_keywords: ltrace, aarch64, sysdeps, arm symlink, architecture support
+rec_approach: |
+  在源码根目录创建符号链接：
+  ln -sf arm sysdeps/linux-gnu/aarch64
+  
+  ⚠️ 必须在应用补丁之前创建，因为后续补丁修改 arm/ 目录下的文件
+rec_description: 创建 aarch64 → arm 符号链接，复用 ARM32 的实现
+rec_command: ln -sf arm sysdeps/linux-gnu/aarch64
+affected_scope: ltrace 0.7.x 系列（0.7.3 及更早版本）
+verification_cmd: ls -l sysdeps/linux-gnu/aarch64
+last_updated: 2026-09-03
+id:                     E1187
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E1187.md
+trigger_tool:           make
+phase:                  build
