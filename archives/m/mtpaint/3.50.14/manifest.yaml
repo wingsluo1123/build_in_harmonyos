@@ -1,0 +1,41 @@
+version: "3.50.14"
+software: "mtpaint"
+status: built
+build_date: "2026-10-14"
+build_system: "makefile"
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/m/mtpaint/mtpaint_3.50.14.orig.tar.gz"
+  tar_format: tar.gz
+  sha256: "1062ec6c9fddb5a402b0c22e958f28814cc128428d03e8fa9d71c9982b985256"
+
+build:
+  system: makefile
+  configure_options:
+    - "gtk3"
+    - "release"
+    - "jpeg"
+    - "tiff"
+    - "lcms2"
+    - "nojp2"
+    - "nowebp"
+    - "--prefix=/"
+  dependencies:
+    - "gtk/3.24.43"
+    - "zlib/1.3.1.1"
+    - "libpng/1.6.58"
+    - "libjpeg-turbo/3.2.0"
+    - "libtiff/4.7.2"
+    - "freetype/2.14.3"
+    - "lcms2/2.19"
+    - "pixman/0.46.4"
+  cc: clang
+
+patches_applied: []
+
+knowledge_gained:
+  - "mtPaint uses a bespoke mini-configure (no GNU Autotools files); do not pass --build/--host (R15)"
+  - "Upstream 3.50.14 ships no test suite: no tests/ dir and no check/test target, handled per no_tests precedent"
+  - "mtpaint --version/--help exit before gtk_init, so headless consumer smoke tests are deterministic"
+  - "mtpaint --cmd scripting mode skips gtk_init and is suitable for headless follow-up tests"
+  - "pixman/0.46.4 override=True unifies transitive pins (conancenter cairo pulls 0.43.4 vs ohpcd cairo-gobject/cairo pin 0.46.4); gtk/3.24.38 override precedent"
