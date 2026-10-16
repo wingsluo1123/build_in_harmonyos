@@ -1,0 +1,29 @@
+# 软件级 manifest（跨版本共享；遵循 ARCHIVE-SPEC v2.0）
+software: tdbcodbc
+display: "TDBC ODBC driver (tdbc::odbc)"
+description: "TDBC 的 ODBC 驱动桥：把 Tcl Database Connectivity 接到任意 ODBC 驱动管理器与驱动上；运行期 dlopen unixODBC 的 libodbc.so.2/libodbcinst.so.2，链接期不依赖 unixODBC"
+category: db
+homepage: "https://core.tcl-lang.org/tdbcodbc/"
+license: TCL
+
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "TEA 构建：configure/config.status 的 umask 077 临时目录在 HMDFS 上不可写（E011 同源）→ 022"
+    - "TEA tcl.m4 无 HarmonyOS 分支 → 传 tcl_cv_sys_version=Linux-6.6 启用共享库链接"
+    - "显式 --exec_prefix，避免 pkglibdir 落进 tcl 依赖包 cache（TEA_PREFIX 继承 TCL_EXEC_PREFIX）"
+    - "已发布 tdbc 包的 tdbcConfig.sh 内是打包时 prefix(/usr/local) 与构建机 cache 绝对路径 → 用 CPPFLAGS/LDFLAGS 补真实包目录（命令行 VAR= 覆盖会被 configure 内部 source 冲掉）"
+    - "运行期 dlopen 驱动管理器：unixodbc 未声明 buildenv_info，需在 generate() 里把其 libdir 注入 build 作用域 LD_LIBRARY_PATH，否则 build() 内 make test 找不到 libodbc.so.2"
+    - "make -j1（OHOS 无 mkfifo jobserver）；测试 make test 在 build() 内真实执行并校验汇总（can_run 为真时）"
+
+  common_dependencies:
+    - tcl
+    - tdbc
+    - unixodbc
+
+versions:
+  "1.1.14":
+    status: built
+    build_date: "2026-10-14"
+    conan_ref: "tdbcodbc/1.1.14"

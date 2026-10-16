@@ -1,0 +1,67 @@
+# 版本级 manifest — tdbcodbc 1.1.14（遵循 ARCHIVE-SPEC v2.0）
+# 交叉校验元数据；CI 的实际构建输入是 conanfile.py + conandata.yml
+
+version: "1.1.14"
+software: "tdbcodbc"
+status: built
+build_date: "2026-10-14"
+build_system: "autotools"
+conan_ref: "tdbcodbc/1.1.14"
+
+source:
+  url: "https://prdownloads.sourceforge.net/tcl/tdbcodbc1.1.14.tar.gz"
+  sha256: "cac1fdc99a859cf444e1b40bc3a683228a93370007af1331270d8ac4108e79fa"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=/usr/local --exec_prefix=/usr/local"
+    - "--with-tcl=<tcl pkg>/lib"
+    - "--with-tdbc=<tdbc pkg>/lib/tdbc1.1.14"
+    - "--enable-shared=yes"
+    - "tcl_cv_sys_version=Linux-6.6"
+    - "CPPFLAGS=-I<tdbc pkg>/include（修正 tdbcConfig.sh 内失效的 /usr/local/include）"
+    - "LDFLAGS=-L<tdbc pkg>/lib/tdbc1.1.14（修正 tdbcConfig.sh 内失效的 stub 库路径）"
+    - "本机交叉验证追加（仅 can_run=False 时）：--host=aarch64-unknown-linux-ohos AR=llvm-ar RANLIB=llvm-ranlib ac_cv_sizeof_long=8 ac_cv_sizeof_long_long=8"
+  dependencies:
+    - tcl/8.6.16
+    - tdbc/1.1.14
+    - unixodbc/2.3.12
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-configure.patch"
+
+knowledge_gained:
+  - "TEA(autotools) 扩展的 config.status 用 umask 077 建临时目录；OHOS HMDFS 下不可写 → Permission denied，需改 022（与 tdbc/1.1.14、tcl/8.6.16 的 E011 同源）"
+  - "TEA 的 tcl.m4 无 HarmonyOS 分支，uname -s(HarmonyOS...) 使 SHLIB_LD/SHLIB_SUFFIX 为空 → 传 tcl_cv_sys_version=Linux-6.6 走官方 Linux 分支"
+  - "TEA_PREFIX 未显式给 --exec_prefix 时会继承 tclConfig.sh 的 TCL_EXEC_PREFIX，pkglibdir 会落进 tcl 依赖包目录 → 显式 --prefix/--exec_prefix 隔离安装树"
+  - "【新】已发布 TEA 扩展包里的 *Config.sh 记录的是它自己打包时的 prefix(/usr/local) 与构建机 conan cache 绝对路径；TEA_LOAD_CONFIG 在 configure 内部 source 它，命令行 VAR= 覆盖会被 source 冲掉 → 只能用 CPPFLAGS/LDFLAGS 补真实包目录（tcl.m4 把 CPPFLAGS 并入 CFLAGS，MAKE_SHARED_LIB 含 LDFLAGS）"
+  - "【新】tdbcodbc 用 fakesql.h + odbcStubInit.c 在运行期 dlopen 驱动管理器，链接期不依赖 unixODBC（产物 DT_NEEDED 只有 libc.so），但运行期必须有 libodbc.so.2/libodbcinst.so.2 → unixodbc 仍需声明为 requires"
+  - "【新】unixodbc 未声明 buildenv_info，conanbuild 环境里没有它的 libdir → build() 内跑测试前需在 generate() 用 Environment().prepend_path 注入 LD_LIBRARY_PATH"
+  - "【新·CI #91604 实测】Tcl 把 TCLLIBPATH 当 Tcl 列表（空格分隔）解析，而 Conan 的 prepend_path 用 os.pathsep(:) 拼接且 get_str() 对 path 型变量忽略自定义 separator；依赖图里有 >=2 个 Tcl 扩展包时 Tcl 会把 a/lib:b/lib 当成一个不存在的目录 → pkgIndex.tcl 扫不到 → can't find package。修复：test_package 里按空格显式重设 TCLLIBPATH"
+  - "【新·CI #91604 实测】TEA_MAKE_LIB 的 PACKAGE_LIB_PREFIX8 在 TEA_PLATFORM=unix 时为 lib：OHOS 原生构建产物是 libtdbcodbc1.1.14.so，本机带 --host 的交叉构建是 tdbcodbc1.1.14.so；pkgIndex.tcl 与产物名由同一次 configure 生成，两侧各自自洽"
+  - "【新】ohc 工具链对 -pr:h/-pr:b 传同一 profile，host==build 使 cross_building() 恒 False；判断产物能否在本机执行应改用 can_run()（ohos-local profile 的 tools.build.cross_building:can_run=False 是权威信号）"
+
+test_result:
+  upstream: "OHOS worker 实测（CI #91604）：L1_UPSTREAM_RESULT backends=3 total=4 passed=3 skipped=1 failed=0 cases=3，与清点预测逐字一致"
+  upstream_declared: "tests/tdbcodbc.test 共 194 个 tcltest 用例声明；其中 190 个位于 tests/tdbcodbc.test:158 的 connect 门禁之后，无 ODBC 驱动时不会被声明执行"
+  test_package: "tclsh8.6 test_tdbcodbc.tcl → 12 项独立检查（其中鸿蒙特有 4 项）；CI #91604 因 TCLLIBPATH 分隔符报 can't find package，已修复待第二轮"
+  counting_convention: "上游=tcltest 声明用例数(194)；新增=独立检查项数(12)"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /var/folders/mz/4dql6xh91bv6q32jnsgc1q7c0000gn/T/builds/tdbcodbc-1.1.14.orig
+  source_work_dir: /var/folders/mz/4dql6xh91bv6q32jnsgc1q7c0000gn/T/builds/tdbcodbc-1.1.14.work
+  source_orig_hash: 6cfbb05af3294306
+  source_work_hash: 4e3fe14dd9d38784
+  generated_at: '2026-10-14T21:00:17'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
