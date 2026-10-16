@@ -1,0 +1,30 @@
+software: xcwd
+display: "X current working directory"
+description: "X11 工具：打印当前焦点窗口的工作目录，便于在新终端/文件管理器里打开同一目录"
+category: x11
+homepage: "https://github.com/schischi/xcwd"
+license: BSD-3-Clause
+build_system: makefile
+package_type: application
+
+# 跨版本通用的 OHOS 适配知识
+ohos_adaptation:
+  key_points:
+    - "上游手写 Makefile 用 `UNAME:=$(shell uname)` 选平台分支；OHOS `uname -s` 返回 HarmonyOS → Makefile:20 直接 `$(error Operating System not supported.)`。适配方式是命令行传上游自带变量 `UNAME=Linux`，选中上游自身 Linux 分支（/proc + glob），不改源码、不加平台宏补丁"
+    - "GNU make 命令行 CFLAGS 会覆盖 makefile 内的 `+=`：上游在 Linux 分支里的 `CFLAGS += -DLINUX` 会被静默丢弃，必须重述上游自带标志并显式追加 -DLINUX，否则得到「能编能链但功能分支为空」的假成功"
+    - "OHOS 系统无 libX11（/lib、/usr/lib、/system/lib* 均无同名库）：X11 CLI 的 libX11.so.6 只能来自 Conan 依赖，产物不写 RUNPATH（OHOS 加载器拒绝指向 Conan 缓存目录的 RUNPATH），运行期由 conanrun 提供搜索路径"
+    - "上游 install 目标不支持 DESTDIR（`install -m 0755 ${EXE} $(prefix)/bin`）→ Makefile 类配方在 package() 直接 copy 产物到 package/bin（R20：DESTDIR staging 已废弃）"
+    - "产物是命令行程序 → 软件级 commands.json 必须存在（R38/L0k）"
+    - "上游无测试套件（源码树 5 文件、Makefile 无 check 目标）→ 按 TEST_QUALITY_SPEC「上游无测试」分支，由 test_package 提供覆盖并在 MANIFEST 申报"
+    - "X11 客户端在 OHOS PC 上无法端到端验证：设备与制品仓均无 Xorg/Xvfb/Xwayland，无 /tmp/.X11-unix；消费者测试按可观测契约（无显示退出码、平台分支字面量、动态段不变量、负向依赖验证）设计并如实声明未覆盖范围"
+  common_dependencies:
+    - "libx11/6.4.0"
+    - "xorgproto/2025.1"
+
+# 版本索引
+versions:
+  "0-2.gbpe2c777c":
+    status: built
+    build_date: "2026-10-15"
+    conan_ref: "xcwd/0-2.gbpe2c777c"
+    upstream_source: "https://github.com/schischi/xcwd/archive/e2c777cbf3a226522a4871f97916f0cb0bee3688.tar.gz"
