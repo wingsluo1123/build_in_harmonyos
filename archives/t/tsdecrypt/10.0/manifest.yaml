@@ -1,0 +1,83 @@
+version: "10.0"
+software: "tsdecrypt"
+status: built
+build_date: "2026-10-15"
+build_system: makefile
+
+source:
+  url: "https://github.com/gfto/tsdecrypt/archive/refs/tags/v10.0.tar.gz"
+  sha256: "5c69bec60046fa808fe92f2ce2236b69aa8b59af66aa0a3b86618488659e450e"
+  tar_format: tar.gz
+  submodules:
+    libfuncs: "2d8b0cb1051ce0196ee387ab6ae731c2f841c67b"
+    libtsfuncs: "5b303b7933b66b806f4bc953aa5f88cdd3286433"
+
+build:
+  system: makefile
+  configure_options:
+    - "DECRYPT_LIB=libdvbcsa"
+  dependencies:
+    - "openssl/3.0.21"
+    - "libdvbcsa/1.1.0"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-Makefile.patch"
+  - "0002-camd-newcamd.c.patch"
+  - "0003-filter.c.patch"
+  - "0004-libfuncs-asyncdns.c.patch"
+  - "0005-libtsfuncs-crc.c.patch"
+  - "0006-libtsfuncs-tdt.c.patch"
+  - "0007-libtsfuncs-time.c.patch"
+  - "0008-process.c.patch"
+  - "0009-tsdecrypt.c.patch"
+
+knowledge_gained:
+  - "RTP payload starts after the fixed header, all CSRC entries, and any extension; padding is removed from the tail (ref: knowledge/drafts/E429-draft-1BEB.md)."
+  - "MPEG-TS payload validation must use the complete UDP datagram before processing 188-byte packets (ref: knowledge/drafts/E429-draft-1BEB.md)."
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_hash: 2198f2e2bc816814
+  source_work_hash: 8c292bb8a60fe351
+  generated_at: '2026-10-15T13:53:45'
+  patches_count: 9
+
+patch_classification:
+  - file: 0001-Makefile.patch
+    type: build
+    platform_only: false
+    guard: 'none'
+  - file: 0002-camd-newcamd.c.patch
+    type: portability
+    platform_only: false
+    guard: 'none'
+  - file: 0003-filter.c.patch
+    type: portability
+    platform_only: false
+    guard: 'none'
+  - file: 0004-libfuncs-asyncdns.c.patch
+    type: portability
+    platform_only: true
+    guard: 'TSDECRYPT_NO_PTHREAD_CANCEL'
+  - file: 0005-libtsfuncs-crc.c.patch
+    type: portability
+    platform_only: false
+    guard: 'none'
+  - file: 0006-libtsfuncs-tdt.c.patch
+    type: correctness
+    platform_only: false
+    guard: 'none'
+  - file: 0007-libtsfuncs-time.c.patch
+    type: correctness
+    platform_only: false
+    guard: 'none'
+  - file: 0008-process.c.patch
+    type: portability
+    platform_only: false
+    guard: 'none'
+  - file: 0009-tsdecrypt.c.patch
+    type: correctness
+    platform_only: false
+    guard: 'none'

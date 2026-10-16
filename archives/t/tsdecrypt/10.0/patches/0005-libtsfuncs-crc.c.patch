@@ -1,0 +1,25 @@
+--- a/libtsfuncs/crc.c
++++ b/libtsfuncs/crc.c
+@@ -39,21 +39,21 @@
+ 	if (!crc_table_initialized) {
+ 		ts_crc32_init();
+ 	}
+ 	for (j=0; j<data_size; j++) {
+ 		i = ((crc >> 24) ^ *data++) & 0xff;
+ 		crc = (crc << 8) ^ crc32_table[i];
+ 	}
+ 	return crc;
+ }
+ 
+-u_int32_t ts_crc32_section(struct ts_section_header *section_header) {
++uint32_t ts_crc32_section(struct ts_section_header *section_header) {
+ 	return ts_crc32(section_header->section_data, section_header->section_data_len);
+ }
+ 
+ int ts_crc32_section_check(struct ts_section_header *section_header, char *table) {
+ 	uint32_t check_crc = ts_crc32(section_header->section_data, section_header->section_data_len);
+ 
+ 	if (check_crc != 0) {
+ 		ts_LOGf("!!! Wrong %s table CRC! It should be 0 but it is 0x%08x (CRC in data is 0x%08x)\n",
+ 			table,
+ 			check_crc,

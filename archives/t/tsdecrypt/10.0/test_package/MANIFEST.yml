@@ -1,0 +1,27 @@
+package: tsdecrypt/10.0
+homepage: "https://github.com/gfto/tsdecrypt"
+
+upstream_check_command: "make -C FFdecsa FFdecsa_test && make -C libtsfuncs tstest"
+upstream_test_in_build: true
+upstream_test_command: "FFdecsa/FFdecsa_test && TZ=UTC libtsfuncs/tstest"
+
+upstream_tests:
+  - file: FFdecsa/FFdecsa_test.c
+    source: tsdecrypt-10.0/FFdecsa/FFdecsa_test.c
+    description: "FFdecsa fixed-vector, random and throughput runner"
+    command: "./FFdecsa/FFdecsa_test"
+  - file: libtsfuncs/tstest.c
+    source: libtsfuncs/tstest.c
+    description: "libtsfuncs generator round-trip runner"
+    command: "TZ=UTC ./libtsfuncs/tstest"
+
+test_package_tests:
+  - file: conanfile.py
+    description: "Validate the installed AArch64 ELF signature, relocatability, dependency edge and exact version output"
+    command: "conan test test_package tsdecrypt/10.0"
+  - file: test_rtp_input.py
+    description: "Run 17 black-box RTP/MPEG-TS cases through the installed public CLI"
+    command: "python3 test_rtp_input.py <installed-tsdecrypt>"
+
+# 17 protocol-scenario verdicts + 3 independent ELF gates + 1 exact version check.
+assertion_count: 21

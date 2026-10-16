@@ -1,0 +1,25 @@
+--- a/libfuncs/asyncdns.c
++++ b/libfuncs/asyncdns.c
+@@ -13,21 +13,21 @@
+ #include <unistd.h>
+ #include <pthread.h>
+ #include <errno.h>
+ #include <arpa/inet.h>
+ #include <sys/socket.h>
+ #include <netinet/in.h>
+ 
+ #include "log.h"
+ 
+ /* FreeBSD have problems with pathread_cancel so do not use async resolver */
+-#ifdef __FreeBSD__
++#if defined(__FreeBSD__) || defined(TSDECRYPT_NO_PTHREAD_CANCEL)
+ 
+ int async_resolve_host(char *host, int port, struct sockaddr_in *sockaddr, int msec_timeout, int *active) {
+ 	msec_timeout = msec_timeout;
+ 	active = active;
+ 	struct hostent *hostinfo = gethostbyname(host);
+ 	if (hostinfo == NULL) {
+ 		int local_h_errno = h_errno;
+ 		LOGf("gethostbyname(%s) returned %s", host, hstrerror(local_h_errno));
+ 		return 1; // error
+ 	}

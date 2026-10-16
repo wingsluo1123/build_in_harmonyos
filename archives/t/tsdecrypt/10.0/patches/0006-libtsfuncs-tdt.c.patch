@@ -1,0 +1,27 @@
+--- a/libtsfuncs/tdt.c
++++ b/libtsfuncs/tdt.c
+@@ -166,22 +166,22 @@
+ 		ts_LOGf("Error copying tdt!\n");
+ 		ts_tdt_free(&newtdt);
+ 		return NULL;
+ 	}
+ }
+ 
+ void ts_tdt_check_generator(struct ts_tdt *tdt) {
+ 	struct ts_tdt *tdt1 = ts_tdt_alloc();
+ 	int i;
+ 
+-	char *prefix1 = "TDT (tspacket->struct)";
+-	char *prefix2 = "TDT (struct->tspacket)";
++	char prefix1[] = "TDT (tspacket->struct)";
++	char prefix2[] = "TDT (struct->tspacket)";
+ 	if (tdt->section_header->table_id == 0x73) {
+ 		prefix1[1] = 'O';
+ 		prefix2[1] = 'O';
+ 	}
+ 
+ 	for (i=0;i<tdt->section_header->num_packets;i++) {
+ 		tdt1 = ts_tdt_push_packet(tdt1, tdt->section_header->packet_data + (i * TS_PACKET_SIZE));
+ 	}
+ 
+ 	ts_compare_data(prefix1, // "TDT (tspacket->struct)",
