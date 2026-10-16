@@ -1,0 +1,17 @@
+sources:
+  url: "https://github.com/lh3/trimadap/archive/ec5a764e1834363ae0c4b52f52bdb114ff7af265.tar.gz"
+  sha256: "40f1c0d0266d7c06f37392e6c73af7ef78a140ef74c740bf0e86bbf1e3654d05"
+
+patches:
+  - patch_file: "patches/0001-ksw.c.patch"
+    patch_description: >-
+      ksw.c: compile the SSE2 implementation only when __SSE2__ is defined and
+      provide an equivalent scalar implementation otherwise. Upstream includes
+      <emmintrin.h> unconditionally, which is x86-only, so the file cannot be
+      built on aarch64 (OHOS) without this. The x86/x64 code path is unchanged.
+    patch_type: "portability"
+  - patch_file: "patches/0002-kthread.c.patch"
+    patch_description: >-
+      kthread.c: include <stdint.h> for the int64_t uses below. glibc exposes
+      the type transitively through <pthread.h>/<limits.h>, other libcs do not.
+    patch_type: "portability"

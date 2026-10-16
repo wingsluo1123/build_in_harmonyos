@@ -1,0 +1,78 @@
+# 版本级 manifest — trimadap 0.1-4
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "0.1-4"
+software: trimadap
+
+status: built
+build_date: "2026-10-15"
+build_system: makefile
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 上游 lh3/trimadap 固定提交（FreeBSD ports biology/trimadap 的
+  # DISTVERSION=0.1-4 对应提交 ec5a764，见 notes.md 来源核验）
+  url: "https://github.com/lh3/trimadap/archive/ec5a764e1834363ae0c4b52f52bdb114ff7af265.tar.gz"
+  sha256: "40f1c0d0266d7c06f37392e6c73af7ef78a140ef74c740bf0e86bbf1e3654d05"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: makefile
+
+  configure_options: []
+
+  dependencies:
+    - "zlib/1.3.1"
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-ksw.c.patch"
+  - "0002-kthread.c.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "lh3 的 ksw.c（fermi-lite/trimadap 同源）只实现 SSE2 且无条件 include <emmintrin.h>（x86 专属头），aarch64 必须补标量回退（ref: DRAFT-trimadap-0.1-4-ksw-sse2-scalar-fallback 草稿）"
+  - "ksw.c 标量回退须按 SSE2 的运算顺序逐步饱和（_mm_adds_epu8/_mm_subs_epu8/_mm_adds_epi16/_mm_subs_epu16 一一对应），合并成单个 clamp 表达式会在 h+S>255 时不等价（ref: DRAFT-trimadap-0.1-4-ksw-sse2-scalar-fallback 草稿）"
+  - "lh3 的 kthread.c 依赖 glibc 经 <pthread.h> 间接暴露 int64_t，非 glibc libc 需显式 include <stdint.h>（ref: DRAFT-trimadap-0.1-4-ksw-sse2-scalar-fallback 草稿）"
+  - "跨架构验收可用上游打包生态的既有期望值当 oracle：Homebrew 断言 test.fa 上第 4 个默认接头命中数为 1，aarch64 标量路径实测一致（ref: DRAFT-trimadap-0.1-4-ksw-sse2-scalar-fallback 草稿）"
+  # 版本级构建细节（L3，未挂图谱条目）：Makefile 无 CPPFLAGS/LDFLAGS 钩子，
+  # 依赖 zlib 的 include/lib 路径须经 CC/CFLAGS 传入（同 seqtk 配方）
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/trimadap-0.1-4.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/trimadap-0.1-4.work
+  source_orig_hash: edbc7a2133c009fd
+  source_work_hash: f2cc370f6008c6a2
+  generated_at: '2026-10-15T13:23:44'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-ksw.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-kthread.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
