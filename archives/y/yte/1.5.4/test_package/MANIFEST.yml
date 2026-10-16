@@ -1,0 +1,32 @@
+# test_package/MANIFEST.yml — yte 1.5.4
+# 上游官方测试声明文件（CI 脚本 build_and_test.sh L0e 强制要求）
+
+package: yte/1.5.4
+homepage: "https://github.com/yte-template-engine/yte"
+
+# 上游测试命令
+upstream_check_command: "python3 -m pytest tests.py --co -q"
+
+# conanfile.py build() 方法中是否已集成上游测试
+# 上游测试集 = tests.py 单文件、42 个 pytest 测试函数，依赖 pytest/pyyaml。
+# conan create 构建期已跑 pytest --co 收集（报告真实测试数）；完整执行
+# 需要消费端安装 dpath/plac/pyyaml（Python 级依赖，见 notes.md），此处
+# 以 test_package 真实 API 调用作为消费者验证。
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试（tests.py，共 42 个测试函数）
+upstream_tests:
+  - file: tests.py
+    source: yte-1.5.4/tests.py
+    description: "yte 全量 pytest 测试集：模板展开/循环/条件/shell 表达式/错误处理（42 个测试函数）"
+    command: "python3 -m pytest tests.py -q"
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: test_package/conanfile.py (test())
+    description: "导入打包后的 yte 模块并调用 yte.process_yaml 真实处理 YAML 模板（?for 循环 + ?f-string 键，精确匹配展开结果）"
+    command: "<site>/test_yte.py"
+
+# 测试断言总数（精确值：2 个 assert，覆盖展开匹配与纯 YAML 透传）
+assertion_count: 2

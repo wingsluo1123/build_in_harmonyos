@@ -1,0 +1,32 @@
+---
+name: ohos-conan-python-vendor-env-hygiene
+description: OHOS conan 构建环境对 Python 包适配的污染链：LD_LIBRARY_PATH 破坏扩展模块加载、hnp python3 pip 解析不到 cp312-ohos 轮子、py3.12 移除 asyncore 后旧版纯 Python 依赖不可用。覆盖 pip --target vendoring 的环境卫生规范。
+error_signature: "ModuleNotFoundError: No module named '_posixsubprocess'|ModuleNotFoundError: No module named 'math'|ModuleNotFoundError: No module named 'asyncore'|No matching distribution found for|env: exec .*python3: No such file or directory"
+root_cause:             conan OHOS profile 的 [buildenv] LD_LIBRARY_PATH 指向 hnp SDK llvm lib（ohos-sdk.../native/llvm/lib），在 conan build()/test() 的 self.run 环境里运行 python3 时，CPython 扩展模块（_posixsubprocess、math 等 builtin/extension）加载被该 lib 目录劫持，报 ModuleNotFoundError（同一解释器在干净 shell 里完全正常）。其次，PATH 上的 hnp python3.12（/data/service/hnp/python.org/...）自带旧 pip，无法解析 pypi.cnb.cool 镜像的 cp312-ohos_aarch64 专用轮子（报 versions: none）。第三，纯 Python 依赖存在 py3.12 兼容性问题（如 plac 1.3.5 import asyncore，py3.12 已移除该模块），需在满足上游版本约束 (^x.y.z) 的前提下选兼容版本。
+rec_approach:           pinned-python-plus-env-strip-plus-vendoring
+rec_detail: |
+  纯 Python 包（package_type="python-require"）适配 OHOS 时：
+  (a) 配方内所有 python/pip 调用钉定 conan 运行时解释器 sys.executable
+      （CI worker 上为 /data/app/bin/python3；本机调试时经 conan profile 或
+      环境注入完好解释器），禁止硬编码 /storage/... 绝对路径——worker 上
+      不存在该文件，build() 直接 exec 失败（R33；先例 zipp/decorator/
+      dtfabric/smmap/gitdb 均用 sys.executable），也禁止裸 python3；
+  (b) pip 命令用 `env -u LD_LIBRARY_PATH -u PYTHONHOME -u PYTHONPATH` 前缀剥离
+      conan buildenv 污染，test_package 的 self.run 同样处理；
+  (c) 依赖未发布到制品仓时（R36 例外），按 DRAFT-10175 先例
+      `python3 -m pip install --no-input --no-deps --index-url <pypi.cnb.cool 镜像>
+      --target <source>/_pydeps <pkgs>` 在 build() vendoring，package() 一并拷入
+      site-packages，并在 notes.md/test-report.md 披露；
+  (d) 选依赖版本先在真实 python3.12 上 import 验证（asyncore/asynchat 等已移除
+      模块会让旧版纯 Python 依赖直接 import 失败），版本必须仍满足上游 poetry/
+      requirements 约束。
+verified_instances:     yte 1.5.4（plac 1.3.5→1.4.3、pyyaml 6.0.2 cp312-ohos 轮子、LD_LIBRARY_PATH 剥离后 conan create + test_package 全绿，2026-10-14；CI 硬编码路径失败后改 sys.executable 修复，提交 0732f453，2026-10-15）
+affected_scope:         所有纯 Python 包（python-require）及在 conan build()/test() 里调用 python3 的配方；含 C 扩展的 Python 包在 OHOS worker 上同样受 LD_LIBRARY_PATH 污染影响
+match_keywords: ["ModuleNotFoundError", "_posixsubprocess", "asyncore", "cp312", "ohos_aarch64", "pip", "vendoring", "LD_LIBRARY_PATH", "python-require", "site-packages"]
+error_excerpt: "ModuleNotFoundError: No module named '_posixsubprocess'\nFile .../subprocess.py, line 106, in <module>\n    from _posixsubprocess import fork_exec as _fork_exec"
+severity:               P1
+category:               platform
+source_pr:              ""
+source_commit:          ""
+last_updated:           2026-10-15
+---
