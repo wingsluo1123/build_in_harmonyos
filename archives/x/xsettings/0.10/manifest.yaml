@@ -1,0 +1,31 @@
+# 版本级 manifest — xsettings 0.10
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "0.10"
+software: "xsettings"
+
+status: built
+
+build_date: "2026-10-12"
+build_system: cmake
+
+source:
+  url: "https://downloads.yoctoproject.org/releases/matchbox/optional-dependencies/Xsettings-client-0.10.tar.gz"
+  sha256: "f274a4bc969ae192994a856b7f786c6fce96bae77f96c1c2b71dd97599e06e43"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  dependencies:
+    - "libx11/1.8.13.1"
+  cc: clang
+
+patches_applied: []
+
+knowledge_gained:
+  - "xsettings 0.10 = libxsettings-client 0.10 (matchbox-project), Xsettings 协议客户端 C 库, 仅依赖 libX11"
+  - "上游源码仅 4 文件: xsettings-client.c/xsettings-common.c + 2 头文件"
+  - "API: xsettings_client_new/destroy/get_setting/process_event; xsettings_byte_order/list_insert/list_lookup/list_delete/setting_copy/setting_equal"
+  - "CMake 从 autotools 重写 (configure.ac AC_PATH_X + Makefile.am libXsettings-client.la); 库名/SONAME/头文件布局保持不变"
+  - "libx11/1.8.13.1 为 shared:True (2.84.0.1 形态, 无 .a); 依赖需确保 transitive_libs=True 传递 .so"
+  - "上游无自动化测试: Makefile.am 无 check/TESTS、无 test/ 目录、INSTALL 文档未提及测试"
