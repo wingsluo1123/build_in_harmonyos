@@ -1,0 +1,26 @@
+software: xhk
+display: "xHK"
+description: "Xlib 半键盘（HalfKeyboard）解释器：以空格键为修饰键镜像键盘对侧按键，实现单手打字"
+category: system
+homepage: "https://github.com/kbingham/xhk"
+license: GPL-2.0-or-later
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "上游为 GNU autotools；tag archive xhk-v1.2 不含预生成 configure，须 autoreconf -fi 自举（tool_requires automake/1.18 + libtool/2.5.4）"
+    - "configure.ac 三个 PKG_CHECK_MODULES（x11>=1.6 / xi>=1.6 / xtst>=1）：pkg.m4 经 ACLOCAL_PATH 提供，.pc 由 PkgConfigDeps 生成"
+    - "制品仓 X11 家族按 .so 主版本命名；libxtst/1.2.5 pin libxi/6.1.0，与 libxi/1.8.3 分属两条线，统一取 6.x 线避免同图版本冲突"
+    - "OHOS 下 bin/xhk 需 binary-sign-tool 自签名（E549），未签名 ELF 不可执行"
+    - "规则 7 平台限制：OHOS 无 X server，XInput2 抓键 / XTest 注入需真实 X 环境（真机验证）；headless 只验证 -v/-h/-t"
+  common_dependencies:
+    - "libx11/6.4.0"
+    - "libxi/6.1.0"
+    - "libxtst/1.2.5"
+    - "xorgproto/2025.1"
+
+versions:
+  "1.2":
+    status: built
+    build_date: "2026-10-15"
+    conan_ref: "xhk/1.2"
