@@ -1,0 +1,142 @@
+# 版本级 manifest — xdriinfo 1.0.8
+
+software: xdriinfo
+display: "xdriinfo"
+version: "1.0.8"
+upstream_name: xdriinfo
+upstream_version: "1.0.8"
+status: built
+build_system: autotools
+build_date: "2026-10-16"
+compile_date: 2026-10-16
+target_platform: aarch64-unknown-linux-ohos
+conan_ref: "xdriinfo/1.0.8"
+
+source:
+  url: "https://xorg.freedesktop.org/pub/individual/app/xdriinfo-1.0.8.tar.xz"
+  sha256: "00463056435b82261c227ad0de1873fd4536101607fbc57540e28e4a0a9b71f7"
+  tar_format: tar.xz
+  version_mapping: >-
+    Conan xdriinfo/1.0.8 matches upstream xdriinfo 1.0.8 one-to-one; the
+    artifact is bin/xdriinfo (application, no shared library).
+
+build:
+  system: autotools
+  configure_options:
+    - "native build=host; no --build/--host/--target (iron rule #0)"
+    - "PKG_CONFIG_PATH=<conan dependency lib/pkgconfig + share/pkgconfig dirs> (resolves PKG_CHECK_MODULES(XDRIINFO, x11 glproto))"
+    - "XDRIINFO_LIBS / GL link flags come from AutotoolsDeps (mesa libdir + -lGL); configure's AC_SEARCH_LIBS([glXGetProcAddressARB], [GL]) resolves against mesa's libGL.so"
+  dependencies:
+    - "libx11/6.4.0"
+    - "glproto/1.4.17"
+    - "mesa/24.3.4.1.1.1 (libGL.so.1 + GL/glx.h + gl.pc)"
+    - "llvm/20.1.0 (run; mesa libGL -> libgallium -> DT_NEEDED libLLVM.so.20.1)"
+  cc: clang
+  cxx: ""
+
+patches_applied:
+  - file: "patches/0001-config.guess.patch"
+    type: portability
+    platform_only: true
+    targets: ["config.guess"]
+    description: >-
+      The bundled config.guess (timestamp 2024-07-27) does not recognise
+      HarmonyOS: `uname -s` returns HarmonyOS, config.guess exits 1 with
+      "unable to guess system type", and ./configure then aborts with
+      "cannot guess build type; you must specify one". The patch adds a
+      `*:HarmonyOS:*:*` branch that emits ${MACHINE}-unknown-linux-ohos so the
+      build works without --build/--host/--target (iron rule #0). config.sub
+      already accepts linux-ohos (verified), so no config.sub change is needed.
+      The patch adds no __OHOS__ preprocessor token (shell script change).
+  - file: "patches/0002-configure.patch"
+    type: portability
+    platform_only: true
+    targets: ["configure"]
+    description: >-
+      Relax the autoconf secure temporary directory mode from umask 077 to
+      umask 007 (two occurrences). HMDFS maps ownership so the creating
+      process is not the directory owner, hence a 0700 directory is evaluated
+      against the group permission bits and writing confXXXXXX/subs1.awk
+      fails with EACCES, aborting configure with "config.status: error: could
+      not setup config files machinery". umask 007 keeps group rwx and leaves
+      glibc/tmp behaviour unchanged on hosts with matching uids (E114 /
+      DRAFT-10863). The `umask 077` in Makefile.in:782 sits in the distdir
+      rule, which is not on the build path, and is intentionally left alone.
+
+validation:
+  ci_local:
+    - "CI-isomorphic ci/conan/build_and_test.sh (CI_REPO_ROOT=<worktree>, CONAN_PROFILE=<repo profile>, JUNK_PR_DIFF=<this PR file list>) exited 0: JC pass, L0 pass, L1 pass, L1e destructive negative test pass (moving bin/ away makes the test fail), L5 pass, summary 1/1 pass rate 100%"
+    - "L2 smoke reported skip (non-blocking): the framework L2 runs `timeout 15 <bin> --version` without the dependency libdirs, so the binary cannot load libGL.so.1/libgallium/libLLVM and does not start; the same binary returns 'xdriinfo 1.0.8' with rc=0 once the dependency libdirs are on LD_LIBRARY_PATH (test_package tests 1-3)"
+    - "L4 patch scan reported warn (non-blocking): the regex (strcpy|sprintf|gets|strcat)\\b matched the CONTEXT lines of 0001-config.guess.patch via the word 'tar-gets' in the NetBSD comment; no added line contains a dangerous C function, and 0002-configure.patch (the one touching mktemp) was not flagged"
+  local:
+    - "python3 -m py_compile conanfile.py and test_package/conanfile.py passed"
+    - "yaml parse passed for conandata.yml, manifest.yaml, test_package/MANIFEST.yml; json parse passed for commands.json"
+    - "official source sha256 locally verified: xdriinfo-1.0.8.tar.xz = 00463056435b82261c227ad0de1873fd4536101607fbc57540e28e4a0a9b71f7 (123872 bytes) fetched from the official X.Org host"
+    - "reachability probe: /pub/individual/app/, /archive/individual/app/ and /releases/individual/app/ all HTTP 200 with the expected size; the /pub/ path segment is not rewritten by the framework pre-download mirror rule, hence it is listed first"
+    - "conan list -r=ohpcd for libx11/glproto/mesa/llvm/xorgproto all matched; conan install --build=never with the ohos-aarch64 profile resolved mesa/24.3.4.1.1.1, glproto/1.4.17 and llvm/20.1.0 binaries"
+    - "mesa libGL.so.1 (SONAME libGL.so.1) exports glXGetProcAddressARB, glXGetScreenDriver, glXGetDriverConfig and glXGetClientString (llvm-nm on the published binary)"
+    - "gl4es/1.1.6 also provides libGL.so.1 + GL/glx.h but glXGetProcAddressARB returns NULL for glXGetScreenDriver/glXGetDriverConfig (measured), so the display-independent command line paths would be unreachable; mesa was chosen on that basis"
+    - "config.sub accepts aarch64-unknown-linux-ohos (rc=0); patched config.guess outputs aarch64-unknown-linux-ohos (rc=0)"
+    - "upstream test census: no tests/ directory, no *_test source, Makefile.am has no TESTS/check_PROGRAMS, meson.build has no test(), xdriinfo.c has no assert()"
+    - "ohc-run.py conan-verify xdriinfo 1.0.8 exited 0: G0/G1/G2/G3/G4 all PASS (G4 could not locate a package id, same as the sibling xev report, so L2/L4/L5 show 'no cache path' skipped there)"
+    - "conan create log: test_package executed 5/5 real assertions (--version/-version/-help/unrecognized option/no-display nscreens) with HMBS_TEST_PACKAGE_RESULT passedCount=5"
+  remote:
+    - "pending platform CI pipeline run (see the CI result on the PR)"
+  pending:
+    - "PR validation / REL upload"
+
+upstream_tests:
+  exists: false
+  framework: none
+  command: ""
+  run_in_build: false
+  automake_tests: 0
+  result: >-
+    no upstream test suite; the packaged binary is exercised by
+    test_package/test_xdriinfo.sh (5/5 real assertions)
+
+knowledge_gained:
+  - >-
+    A DRI/GLX query tool cannot be satisfied by libglvnd as this registry
+    publishes it: libglvnd/1.7.0 builds with x11+glx disabled, so it has no
+    libGL.so, no libGLX.so, no gl.pc and no GL/glx.h, and configure's
+    AC_SEARCH_LIBS([glXGetProcAddressARB], [GL]) fails. mesa is the provider
+    that actually exports the DRI entry points; verify a GL "provider" by
+    inspecting the published binary's exported symbols, not by name.
+  - >-
+    mesa's binary package records its LLVM libdir in a mesa_llvm_lib_dir marker
+    that points at the builder's conan home (.cache/conan2/...), so a consumer
+    whose conan home differs cannot resolve libgallium's DT_NEEDED
+    libLLVM.so.20.1 through mesa's own runenv hint, and the OHOS SDK only ships
+    libLLVM-15. Declaring llvm/20.1.0 as a runtime requirement of the consumer
+    is the working arrangement.
+  - >-
+    config.guess on HarmonyOS exits 1 (uname -s = HarmonyOS), which turns into
+    configure's "cannot guess build type; you must specify one". Adding a
+    `*:HarmonyOS:*:*` branch keeps the build free of --build/--host/--target
+    (iron rule #0); a shell-script patch carries no __OHOS__ token so it does
+    not collide with the PF5 gate.
+  - >-
+    xdriinfo resolves glXGetScreenDriver/glXGetDriverConfig before parsing
+    argv, so any consumer test that wants to exercise `--version`/`-help` needs
+    a GL provider whose glXGetProcAddressARB returns those two entry points
+    without a display; mesa's does, gl4es's does not (measured with a probe).
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/ohpc-porting/builds/xdriinfo-1.0.8.orig
+  source_work_dir: /storage/Users/currentUser/tmp/ohpc-porting/builds/xdriinfo-1.0.8.work
+  source_orig_hash: fe063562dbac0620
+  source_work_hash: 7f894aeb3a871b87
+  generated_at: '2026-10-16T13:25:38'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-config.guess.patch
+    type: portability
+    platform_only: true
+    guard: none
+  - file: 0002-configure.patch
+    type: portability
+    platform_only: true
+    guard: none

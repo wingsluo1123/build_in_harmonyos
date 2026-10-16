@@ -1,0 +1,62 @@
+# test_package/MANIFEST.yml
+# Upstream test declaration for xdriinfo 1.0.8 (R51 census + evidence).
+# See: docs/TEST_QUALITY_SPEC.md
+
+package: xdriinfo/1.0.8
+homepage: "https://gitlab.freedesktop.org/xorg/app/xdriinfo"
+
+# Upstream source census: the xdriinfo 1.0.8 release ships NO automated test
+# suite. The automake `check` target exists (Makefile.in: "check: check-recursive"
+# -> "check-am: all-am"), but the Makefile.am declares no TESTS, no
+# check_PROGRAMS and no check-local, so it registers zero test programs and
+# running it is a no-op.
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "Makefile.am"
+    reason: >-
+      Only "SUBDIRS = man", "bin_PROGRAMS = xdriinfo", "xdriinfo_SOURCES = xdriinfo.c"
+      and man-page/dist hooks. No TESTS, no check_PROGRAMS, no check-local and no
+      check target of its own (grep -c 'TESTS\\|check_PROGRAMS\\|check-local' = 0).
+  - source: "configure.ac"
+    reason: >-
+      Only AC_INIT/AM_INIT_AUTOMAKE/XORG_DEFAULT_OPTIONS, PKG_CHECK_MODULES(XDRIINFO,
+      x11 glproto), AC_SEARCH_LIBS(glXGetProcAddressARB, [GL]) and AC_CONFIG_FILES.
+      No test framework macros (no AC_CONFIG_TESTDIR / AM_PATH_* test hooks).
+  - source: "meson.build"
+    reason: >-
+      Only executable('xdriinfo', ...) plus a custom_target for the man page.
+      No test() call (grep -c 'test(' = 0).
+  - source: "source tree"
+    reason: >-
+      23 files in the release tarball; there is no tests/ or test/ directory and
+      no *_test / test_* source file (find -name '*test*' -> empty).
+  - source: "xdriinfo.c"
+    reason: >-
+      grep -c 'assert(' = 0; the single translation unit contains no assertion
+      based self-check.
+  - conclusion: >-
+      Upstream provides no automated test suite, so R51 step 2 has nothing to
+      run; R51 step 3 ("no tests") is backed by the census above. Real execution
+      of the packaged binary is done by test_package/test_xdriinfo.sh.
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests: []
+
+test_package_tests:
+  - file: test_xdriinfo.sh
+    description: >-
+      Really executes the packaged xdriinfo binary on 5 display-independent
+      paths (R34). xdriinfo.c resolves glXGetScreenDriver/glXGetDriverConfig via
+      glXGetProcAddressARB *before* argv parsing; with mesa's libGL both resolve
+      to non-NULL without an X server, so: `--version` and `-version` must report
+      "xdriinfo 1.0.8" with exit 0 (PACKAGE_STRING from config.h); `-help` must
+      print the usage banner with exit 0; an unrecognized option (`-Zz`) must
+      print a diagnostic and exit non-zero; `nscreens` must reach XOpenDisplay
+      and fail with "Couldn't open display" (DISPLAY is cleared so the result is
+      deterministic on a headless device).
+    command: "$SHELL test_xdriinfo.sh <package>/bin/xdriinfo <runtime LD_LIBRARY_PATH>"
+
+assertion_count: 5

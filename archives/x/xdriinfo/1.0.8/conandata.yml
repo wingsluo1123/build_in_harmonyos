@@ -1,0 +1,44 @@
+# conandata.yml — xdriinfo 1.0.8
+#
+# Source: the official X.Org release of xdriinfo 1.0.8 (the X.Org "app"
+# module), published on the official X.Org download host. Both entries below
+# are official upstream release artifacts on the same official host; no
+# third-party proxy, mirror prefix or local path is used (R39 leaf).
+#
+# Ordering rationale (measured, see notes.md): the framework pre-download step
+# rewrites URLs matching the "/archive/|<...>/releases/" path segments to
+# mirrors first, and its success test is only "size > 100 bytes", so a mirror
+# error page can be accepted and the file rewritten in place. The "/pub/"
+# path segment is not matched by that rewrite rule, so it is listed first and
+# is fetched directly from the official host; the "/archive/" entry is kept
+# as a fallback. conan's tools.files.download() tries the list in order and
+# verifies sha256 per entry, so the first entry wins whenever it is reachable.
+#
+# NOTE: keep this file free of protocol-qualified URL strings inside comments —
+# the pre-download regex also scrapes commented lines.
+
+sources:
+  url:
+    - "https://xorg.freedesktop.org/pub/individual/app/xdriinfo-1.0.8.tar.xz"
+    - "https://xorg.freedesktop.org/archive/individual/app/xdriinfo-1.0.8.tar.xz"
+  sha256: "00463056435b82261c227ad0de1873fd4536101607fbc57540e28e4a0a9b71f7"
+
+patches:
+  - patch_file: "patches/0001-config.guess.patch"
+    patch_description: >-
+      Teach the bundled config.guess to recognise HarmonyOS and emit the
+      aarch64-unknown-linux-ohos triplet, so ./configure works without
+      --build/--host/--target (iron rule #0). config.sub already accepts the
+      triplet.
+    patch_type: "portability"
+    sha256: "530d182e9355935074ceff4ea504c34ae36f3cd6b369884a29e0524c782d8f74"
+  - patch_file: "patches/0002-configure.patch"
+    patch_description: >-
+      Relax the secure temporary directory mode from umask 077 to umask 007 in
+      configure. HMDFS maps file ownership so that the creating process is not
+      the owner, hence a 0700 directory falls through to the group permission
+      branch and writing confXXXXXX/subs1.awk fails with EACCES, aborting
+      configure with "config.status: error: could not setup config files
+      machinery". umask 007 keeps group rwx (E114 / DRAFT-10863).
+    patch_type: "portability"
+    sha256: "7c3dc1ea0ea9fdb96447aaf540c5dcdf821b5dd05dc8fcb35ec23462831e648a"
