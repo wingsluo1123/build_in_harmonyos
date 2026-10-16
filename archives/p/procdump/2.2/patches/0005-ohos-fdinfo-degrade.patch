@@ -1,0 +1,44 @@
+From: lxx0329 <lxx0329@noreply.atomgit.com>
+Subject: [PATCH 0005] ohos: degrade fdinfo-open failure to unknown count (-fc disabled)
+
+The -fc trigger counts file descriptors by opendir("/proc/<pid>/fdinfo").
+On OHOS (non-root, restricted procfs) that directory is not readable by an
+unprivileged monitor, so upstream logs an error and GetProcessStat() returns
+false, aborting monitoring entirely -- even for -c/-m triggers that never
+need the fd count. Treat the failed open as an unknown count (-1) instead:
+-fc never fires on an unknown count (num_fd >= threshold is false), and all
+other triggers keep working. Root hosts and readable procfs behave unchanged.
+
+Note: fddir is declared auto_free_dir, so cleanup_dir() closes it exactly once
+on every return path; closing it explicitly here as well made closedir() run
+twice on the same DIR (double close of the fd + double free of the DIR buffer),
+which crashes the first CpuMonitoringThread poll inside libc.
+---
+--- a/src/Process.c
++++ b/src/Process.c
+@@ -36,15 +36,19 @@
+         {
+             proc->num_filedescriptors++;
+         }
++        proc->num_filedescriptors-=2;               // Account for "." and ".."
+     }
+     else
+     {
+-        Log(error, "Failed to open %s. Exiting...", procFilePath);
+-        return false;
+-
+-    }
+-
+-    proc->num_filedescriptors-=2;                   // Account for "." and ".."
++        // OHOS non-root procfs restriction (and any system that hides
++        // /proc/<pid>/fdinfo from unprivileged readers): the fd count is
++        // only consumed by the -fc trigger (Monitor.c), so do not abort the
++        // whole monitor over it. Mark the count unknown (-1); -fc then never
++        // fires (num_fd >= threshold is false), while -c/-m/-cl/-ml/ondemand
++        // triggers keep working from /proc/<pid>/stat and friends.
++        Trace("WARNING: Failed to open %s; fd count unknown (-fc disabled)", procFilePath);
++        proc->num_filedescriptors = -1;
++    }
+ 
+ 
+     // Read /proc/[pid]/stat
