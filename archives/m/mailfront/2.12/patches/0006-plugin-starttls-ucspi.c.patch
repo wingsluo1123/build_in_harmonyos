@@ -1,0 +1,35 @@
+--- a/plugin-starttls-ucspi.c
++++ b/plugin-starttls-ucspi.c
+@@ -71,25 +71,32 @@
+   return 1;
+ }
+ 
+ static int enabled(void)
+ {
+   return tls_available;
+ }
+ 
+ static int cmd_STARTTLS(void)
+ {
++  const response* resp;
++
+   if (!respond(&resp_start))
+     return 0;
+ 
+   if (!starttls())
+     return 0;
++
++  if (!response_ok(resp = handle_security_reset())) {
++    respond(resp);
++    return 0;
++  }
+ 
+   tls_available = 0;
+   session_setnum("tls_state", 1);
+ 
+   /* Remove UCSPITLS from environment to indicate it no longer available. */
+   unsetenv("UCSPITLS");
+   return 1;
+ }
+ 
+ static const struct command commands[] = {

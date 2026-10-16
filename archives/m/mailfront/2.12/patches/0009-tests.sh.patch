@@ -1,0 +1,255 @@
+--- a/tests.sh
++++ b/tests.sh
+@@ -1,36 +1,46 @@
+ #!/bin/sh
+-src=`pwd`
++src=${MAILFRONT_TEST_SOURCE:-`pwd`}
+ tmp=$src/tests-tmp
+ rm -rf $tmp
+ mkdir -p $tmp
+-PATH="$src:/bin:/usr/bin:/usr/local/bin"
++PATH="$src:$PATH:/bin:/usr/bin:/usr/local/bin"
+ tests_failed=0
+ tests_count=0
+-_UID=`id -u`
+-_GID=`id -g`
++_UID=${MAILFRONT_TEST_UID:-`id -u`}
++_GID=${MAILFRONT_TEST_GID:-`id -g`}
+ 
+ usage() {
+   echo "usage: sh $0 [-v]"
+ }
+ 
+ vecho() { :; }
+ while getopts v flag
+ do
+   case $flag in
+     v)      vecho() { echo "$*"; } ;;
+ 	*)      usage; exit 1 ;;
+   esac
+ done
+ smtpfront() {
+-  $src/mailfront smtp "$@" 2>&1 \
+-  | sed -e '/^220 local.host mailfront ESMTP/d; s/\[[0123456789]*\]:/[#]:/'
++  if test -n "$RBL_BLACKLISTS"
++  then
++    $src/mailfront smtp "$@" 2>&1 \
++    | sed -e '/^220 local.host mailfront ESMTP/d; s/\[[0123456789]*\]:/[#]:/' \
++          -e 's@http://www.spamhaus.org/sbl/query/[[:graph:]]*@RBL-LISTED@g' \
++          -e 's@http://www.spamhaus.org/query/bl?ip=[[:graph:]]*@RBL-LISTED@g' \
++          -e 's@Listed by [SX]BL, see https://[[:graph:]]*@RBL-LISTED@g' \
++          -e 's/bytes in: 71 bytes out: [0123456789]*/bytes in: 71 bytes out: RBL-DYNAMIC/'
++  else
++    $src/mailfront smtp "$@" 2>&1 \
++    | sed -e '/^220 local.host mailfront ESMTP/d; s/\[[0123456789]*\]:/[#]:/'
++  fi
+ }
+ sfecho() {
+   $src/mailfront smtp echo "$@" 2>/dev/null \
+   | grep -v '^220 local.host mailfront ESMTP'
+ }
+ pfauth() {
+   $src/pop3front-auth "$@" echo Yes. 2>/dev/null \
+   | tail -n +2
+ }
+ ifauth() {
+@@ -652,87 +662,87 @@
+ dump_queuedir
+ 
+ cleanup_queuedir
+ 
+ unset RBL_BLACKLISTS RBL_DEBUG RBL_QUEUEDIR TCPLOCALIP QUEUEDIR
+ rm -rf $tmp/queuedir $tmp/queuedir
+ }
+ vecho "Running test tests/plugin-rbl '127.0.0.2' 'false'"
+ run_compare_test tests/plugin-rbl '127.0.0.2' 'false' <<END_OF_TEST_RESULTS
+ mailfront[#]: rbl: sbl-xbl.spamhaus.org:
+-mailfront[#]: http://www.spamhaus.org/sbl/query/SBL233
+-mailfront[#]: http://www.spamhaus.org/query/bl?ip=127.0.0.2
++mailfront[#]: RBL-LISTED
++mailfront[#]: RBL-LISTED
+ 250 local.host^M
+ mailfront[#]: MAIL FROM:<somewhere>
+-mailfront[#]: 451 Blocked: http://www.spamhaus.org/sbl/query/SBL233
+-451 Blocked: http://www.spamhaus.org/sbl/query/SBL233^M
++mailfront[#]: 451 Blocked: RBL-LISTED
++451 Blocked: RBL-LISTED^M
+ mailfront[#]: RCPT TO:<elsewhere>
+ mailfront[#]: 503 5.5.1 You must send MAIL FROM: first
+ 503 5.5.1 You must send MAIL FROM: first^M
+ mailfront[#]: 503 5.5.1 You must send MAIL FROM: first
+ 503 5.5.1 You must send MAIL FROM: first^M
+ mailfront[#]: Subject: test
+ mailfront[#]: 500 5.5.1 Not implemented.
+ 500 5.5.1 Not implemented.^M
+ mailfront[#]: . 
+ mailfront[#]: 500 5.5.1 Not implemented.
+ 500 5.5.1 Not implemented.^M
+-mailfront[#]: bytes in: 71 bytes out: 243
++mailfront[#]: bytes in: 71 bytes out: RBL-DYNAMIC
+ queuedir tmp: 0 new: 0
+ END_OF_TEST_RESULTS
+ 
+ vecho "Running test tests/plugin-rbl '127.0.0.2' 'true'"
+ run_compare_test tests/plugin-rbl '127.0.0.2' 'true' <<END_OF_TEST_RESULTS
+ mailfront[#]: rbl: sbl-xbl.spamhaus.org:
+-mailfront[#]: http://www.spamhaus.org/sbl/query/SBL233
+-mailfront[#]: http://www.spamhaus.org/query/bl?ip=127.0.0.2
++mailfront[#]: RBL-LISTED
++mailfront[#]: RBL-LISTED
+ 250 local.host^M
+ mailfront[#]: MAIL FROM:<somewhere>
+ 250 Sender='somewhere'.^M
+ mailfront[#]: RCPT TO:<elsewhere>
+ 250 Recipient='elsewhere'.^M
+ 354 End your message with a period on a line by itself.^M
+ mailfront[#]: Subject: test
+-mailfront[#]: 451 Blocked: http://www.spamhaus.org/sbl/query/SBL233
+-451 Blocked: http://www.spamhaus.org/sbl/query/SBL233^M
+-mailfront[#]: bytes in: 71 bytes out: 213
++mailfront[#]: 451 Blocked: RBL-LISTED
++451 Blocked: RBL-LISTED^M
++mailfront[#]: bytes in: 71 bytes out: RBL-DYNAMIC
+ queuedir tmp: 0 new: 1
+ ===== queued file =====
+ somewhere^@elsewhere^@^@Subject: test
+ =====
+ END_OF_TEST_RESULTS
+ 
+ vecho "Running test tests/plugin-rbl '127.0.0.99' 'false'"
+ run_compare_test tests/plugin-rbl '127.0.0.99' 'false' <<END_OF_TEST_RESULTS
+ 250 local.host^M
+ mailfront[#]: MAIL FROM:<somewhere>
+ 250 Sender='somewhere'.^M
+ mailfront[#]: RCPT TO:<elsewhere>
+ 250 Recipient='elsewhere'.^M
+ 354 End your message with a period on a line by itself.^M
+ mailfront[#]: Subject: test
+ 250 Received 14 bytes.^M
+-mailfront[#]: bytes in: 71 bytes out: 182
++mailfront[#]: bytes in: 71 bytes out: RBL-DYNAMIC
+ queuedir tmp: 0 new: 0
+ END_OF_TEST_RESULTS
+ 
+ vecho "Running test tests/plugin-rbl '127.0.0.99' 'true'"
+ run_compare_test tests/plugin-rbl '127.0.0.99' 'true' <<END_OF_TEST_RESULTS
+ 250 local.host^M
+ mailfront[#]: MAIL FROM:<somewhere>
+ 250 Sender='somewhere'.^M
+ mailfront[#]: RCPT TO:<elsewhere>
+ 250 Recipient='elsewhere'.^M
+ 354 End your message with a period on a line by itself.^M
+ mailfront[#]: Subject: test
+ 250 Received 14 bytes.^M
+-mailfront[#]: bytes in: 71 bytes out: 182
++mailfront[#]: bytes in: 71 bytes out: RBL-DYNAMIC
+ queuedir tmp: 0 new: 0
+ END_OF_TEST_RESULTS
+ 
+ 
+ ##### Test tests/rules-empty #####
+ 
+ runtest() {
+ PLUGINS=mailrules:accept
+ 
+ cat >$tmp/rules <<EOF
+@@ -1809,22 +1819,21 @@
+ local localhost="$3"
+ local localip="$4"
+ local helo="$5"
+ 
+ PLUGINS=add-received:accept
+ TESTLOCALHOST="$localhost"
+ TESTLOCALIP="$localip"
+ TESTREMOTEHOST="$remotehost"
+ TESTREMOTEIP="$remoteip"
+ 
+-$src/mailfront smtp echo 2>&1 >/dev/null <<EOF | \
+-	sed -n -e 's/^.* Received: //p'
++smtpfront echo <<EOF | sed -n -e 's/^.* Received: //p'
+ $helo
+ MAIL FROM:<>
+ RCPT TO:<test@example.com>
+ DATA
+ .
+ EOF
+ }
+ vecho "Running test tests/received '' '' '' '' ''"
+ run_compare_test tests/received '' '' '' '' '' <<END_OF_TEST_RESULTS
+ from unknown  by unknown
+@@ -2038,42 +2047,43 @@
+ END_OF_TEST_RESULTS
+ 
+ 
+ ##### Test tests/plugin-force-file #####
+ 
+ runtest() {
+ local tmpdir="$1"
+ local plugins="$2"
+ 
+ PLUGINS=${plugins}:add-received:accept
+-TMPDIR=$tmpdir 
+-export TMPDIR
+-
+-sfecho <<EOF
++cat >$tmp/force-file.input <<EOF
+ MAIL FROM:<>
+ RCPT TO:<test@example.com>
+ DATA
+ .
+ EOF
++TMPDIR=$tmpdir 
++export TMPDIR
++
++sfecho <$tmp/force-file.input
+ 
+ unset TMPDIR
+ }
+-vecho "Running test tests/plugin-force-file '/tmp' ''"
+-run_compare_test tests/plugin-force-file '/tmp' '' <<END_OF_TEST_RESULTS
++vecho "Running test tests/plugin-force-file '$tmp' ''"
++run_compare_test tests/plugin-force-file "$tmp" '' <<END_OF_TEST_RESULTS
+ 250 Sender=''.^M
+ 250 Recipient='test@example.com'.^M
+ 354 End your message with a period on a line by itself.^M
+ 250 Received 128 bytes.^M
+ END_OF_TEST_RESULTS
+ 
+-vecho "Running test tests/plugin-force-file '/tmp' 'force-file'"
+-run_compare_test tests/plugin-force-file '/tmp' 'force-file' <<END_OF_TEST_RESULTS
++vecho "Running test tests/plugin-force-file '$tmp' 'force-file'"
++run_compare_test tests/plugin-force-file "$tmp" 'force-file' <<END_OF_TEST_RESULTS
+ 250 Sender=''.^M
+ 250 Recipient='test@example.com'.^M
+ 354 End your message with a period on a line by itself.^M
+ 250 Received 128 bytes.^M
+ END_OF_TEST_RESULTS
+ 
+ vecho "Running test tests/plugin-force-file '/@notmp@' ''"
+ run_compare_test tests/plugin-force-file '/@notmp@' '' <<END_OF_TEST_RESULTS
+ 250 Sender=''.^M
+ 250 Recipient='test@example.com'.^M
+@@ -3051,22 +3061,21 @@
+ runtest() {
+ PLUGINS=add-received:accept
+ PROTO=TCP6
+ TCP6LOCALHOST="localhost"
+ TCP6LOCALIP="localip"
+ TCP6REMOTEHOST="remotehost"
+ TCP6REMOTEIP="remoteip"
+ 
+ export TCP6LOCALHOST TCP6LOCALIP TCP6REMOTEHOST TCP6REMOTEIP
+ 
+-$src/mailfront smtp echo 2>&1 >/dev/null <<EOF | \
+-	sed -n -e 's/^.* Received: //p'
++smtpfront echo <<EOF | sed -n -e 's/^.* Received: //p'
+ $helo
+ MAIL FROM:<>
+ RCPT TO:<test@example.com>
+ DATA
+ .
+ EOF
+ 
+ PROTO=TEST
+ unset TCP6LOCALHOST TCP6LOCALIP TCP6REMOTEHOST TCP6REMOTEIP
+ }
