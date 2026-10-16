@@ -1,0 +1,37 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: xwpe/1.6.6
+homepage: "https://codeberg.org/mendezr/xwpe"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "解析构建目录 Makefile 的 check_PROGRAMS → make → **逐个直接执行**（不经 automake 的 check-TESTS 驱动）"
+
+upstream_tests:
+  - name: "上游自带 C 单元测试（顶层 Makefile.am:187 check_PROGRAMS，共 18 个）"
+    count: 18
+    description: >-
+      **上游自带 18 个单元测试**（不是"没有测试"）。本地实测：**通过 11 / 跳过 7（上游自身 exit 77）**，
+      0 个真失败。跳过的 7 个所需外部工具在本机装不上，且有可复现证据：`dl.google.com` 与 GitHub
+      releases 不可达（HTTP=000）、`static.rust-lang.org` 21 KB/s（rustup-init 18.9MB、工具链 1.5–2GB）、
+      `repo1.maven.org` ~2 KB/s。**按平台级系统性阻塞如实记录，不冒充通过**。
+    command: "conanfile.py 内 _run_upstream_tests()：make <每个 check_PROGRAMS> 后逐个执行"
+
+test_package_tests:
+  - file: check_xwpe.py
+    description: >-
+      R34 消费者校验 **6 项**（全部离线）：①产物齐备（bin/we + bin/wpe）②ELF 头自检 ③动态依赖自检
+      （**json-c 动态**：NEEDED 必须含 libjson-c.so.*，否则 fail；**ncurses 在 conan 包里只有 .a、属静态链入**，
+      故 NEEDED 不含它——按"包内有无 .so"决定期望；仅工具缺失才记 skip，且单独计数、不计入通过）
+      ④`we --version` 真跑尝试（全屏程序无 tty，如实记录 rc=-11）
+      ⑤许可证随包 ⑥证据（sha256 + python 版本）。
+    command: "python3 check_xwpe.py <package-folder>"
+
+assertion_count: 6
+modified_upstream_tests: >-
+  **是**——仅做**可移植性修正**：11 个 tests/*.c 里写死的 `/tmp/...` 改成相对路径 `./...`
+  （本构建沙箱 /tmp 只读，否则 test_checkheader 直接 abort rc=-6）。**判定逻辑、断言、用例数量一字未改**。
+added_tests_note: >-
+  本库**上游自带 18 个测试**，故未新增功能级测试；另加消费者校验 6 条。两者分开计数。
