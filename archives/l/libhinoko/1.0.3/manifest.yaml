@@ -1,0 +1,121 @@
+software: libhinoko
+# 版本级 manifest
+# 文件位置: archives/l/libhinoko/1.0.3/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+# 状态：配方已交付，等待主任务 conan create 验证（见 notes.md「待验证项」）。
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "1.0.3"
+status: pending
+build_date: "2026-09-30"
+build_system: meson
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # R39 官方源：kernel.org 官方镜像体系（mirrors.kernel.org）；
+  # 镜像黑名单拦截时可用 https://www.kernel.org/pub/linux/libs/ieee1394/libhinoko-1.0.3.tar.xz
+  url: "https://mirrors.kernel.org/pub/linux/libs/ieee1394/libhinoko-1.0.3.tar.xz"
+  sha256: "f826dd438333655adac225941d36b8d4dfdcf4db6de2867244e9d9b94ed3724b"
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: meson
+  configure_options:
+    - "--wrap-mode=nofallback"
+    - "-Ddoc=disabled"
+    - "-Dgir=false"          # 配方自增 option：内联改写禁用 gnome.generate_gir
+  dependencies:
+    - "glib/2.84.0.2"        # gobject-2.0 >= 2.44 满足
+    - "libhinawa/4.0.2"      # 顶层 meson.build: dependency('hinawa', >=4.0.0)
+  build_dependencies:
+    - "meson/1.11.0"
+    # glib-genmarshal / glib-mkenums 来自 glib 包 bin/
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 测试结果
+# ============================================================
+
+test_results:
+  upstream:
+    # 上游 tests/ 目录共 9 项 Python GI 脚本测试（tests/meson.build foreach 注册）
+    files: 9
+    registered: 9
+    ran: 0
+    ok: 0
+    expected_fail: 0
+    skipped: 0
+    fail: 0
+    errors: 0
+    command: "meson test（9 项 Python GI 脚本需 gir/typelib + GI 运行时，本适配 gir=False 未生成 typelib，无法运行）"
+    verified: "2026-09-30"
+    # 未运行原因逐项归因见 notes.md「上游测试清点（R51 三步法）」
+  upstream_not_run:
+    suites: ["hinoko-enum", "fw-iso-ctx", "fw-iso-ir-single", "fw-iso-ir-multiple", "fw-iso-it", "fw-iso-resource", "fw-iso-resource-auto", "fw-iso-resource-once", "hinoko-functions"]
+    count: 9
+    reason: >-
+      全部 9 项均为 Python GI 脚本：import gi 并加载 Hinoko-1.0 typelib
+      （tests/meson.build 显式设 GI_TYPELIB_PATH=<builddir>/src 与
+      depends: hinoko_gir）。本适配以 gir=False 构建（取舍见 notes.md），
+      不产出 Hinoko-1.0.typelib，9 项均无法运行。核对脚本源码：9 项均为
+      纯 GIR introspection 断言（test_object/test_enums/test_functions，
+      经 gi.__info__ 遍历属性/虚方法/信号/枚举/函数），脚本内无 open()
+      /dev/fw* 调用，不依赖真实 1394 硬件。
+    evidence: >-
+      tests/meson.build: envs.append('GI_TYPELIB_PATH', builddirs) +
+      depends: hinoko_gir；tests/* 各脚本仅 gi 内省断言。崩溃点实证
+      （2026-10-02）：临时接通 GIR 运行时（pygobject/3.58.0+glib2/2.88.0+
+      gobject-introspection/1.80.1+python/3.12.9 自制品仓安装）后，
+      import gi 在本机 OHOS 环境必然崩溃：
+      "ImportError: Error relocating .../gi/_gi.cpython-312-aarch64-linux-ohos.so:
+      PyType_Ready: symbol not found"（conan python 与系统 python3 下复测
+      4 次同一崩溃）——OHOS musl 动态链接器在 pygobject _gi.so 重定位阶段
+      找不到 CPython PyType_Ready 符号，GI 运行时本平台不可用，属已验证
+      平台限制，非网络问题。
+  test_package:
+    assertions: 3
+    passed: 0
+    fail: 0
+    verified: "2026-09-30"
+    note: "test_package 探针已交付（test_hinoko.c 3 项断言），待主任务 conan create 实跑"
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+# 无 patches/ 补丁：OHOS sysroot（/storage/Users/currentUser/usr/local/sysroot/
+# usr/include/linux/）已含 firewire-cdev.h 与 firewire-constants.h，且逐一核对
+# libhinoko 1.0.3 使用的全部 fw_cdev 结构/ioctl/常量（fw_cdev_get_info、
+# fw_cdev_create_iso_context、FW_CDEV_IOC_SET_ISO_CHANNELS、
+# FW_CDEV_ISO_CONTEXT_*、SCODE_* 等）均存在，无需 backport 头。
+# GIR 禁用为 build() 内联改写（非文件补丁）。最终以主任务 conan create 编译结果复核。
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "libhinawa 安装的 lib/pkgconfig/hinawa.pc prefix=/ 不可直接消费：下游 recipe 须在 generate() 自写正确 prefix 的 hinawa.pc（Requires: gobject-2.0），meson dependency('hinawa') 经 pkg_config_path=generators_folder 命中"
+  - "glib 组件 .pc 缺失（gobject-2.0 等）用 generators_folder wrapper .pc 补齐，参考 libhinawa/gobject-introspection 配方"
+  - "gnome.genmarshal/gnome.mkenums 工具（glib-genmarshal/glib-mkenums）由 glib 包 bin/ 提供，generate() 用 Environment prepend PATH + glib-2.0.pc 追加 glib_genmarshal/glib_mkenums 变量双保险"
+  - "libhinoko 上游 9 项测试均为纯 GIR introspection 断言（无 /dev/fw* 设备依赖），与 libhinawa 的 fw-* 设备测试不同"
+
+# ============================================================
+# 平台限制
+# ============================================================
+
+platform_limitations:
+  - "运行时需 LD_LIBRARY_PATH 包含 libhinawa + glib libdir（libhinawa.so.4、libgobject-2.0/libglib-2.0 共享库）"
+  - "库操作 /dev/fw* 设备（FW_CDEV_IOC_* ioctl），功能级验证需真实 1394 硬件；test_package 探针只走类型/枚举/纯函数 API"
