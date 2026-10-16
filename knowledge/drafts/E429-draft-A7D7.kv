@@ -1,0 +1,106 @@
+#====================================================================
+# E429-draft-A7D7.kv — 手写 Makefile 的 uname 平台闸在 HarmonyOS 上 $(error) 终止
+# 来源: xcwd 0-2.gbpe2c777c 适配（PR: 本任务 PR，见 source_pr）
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E429
+trigger_tool:           make
+phase:                  configuration
+error_signature:        Makefile:[0-9]+: \*\*\* Operating System not supported|Operating System not supported\.\.  Stop\.|\$\(error Operating System not supported|UNAME:=\$\(shell uname\)
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               2
+category:               build-system, make, platform, detection, portability
+prescan_pattern:        UNAME\s*:?=\s*\$\(shell\s+uname\)|\$\(shell\s+uname\s+-s\)
+match_keywords:         Operating System not supported, Makefile, uname, UNAME, $(shell uname),
+                        $(error, 平台闸, 平台判定, 平台分支, HarmonyOS, uname -s, 手写 Makefile,
+                        raw Makefile, command-line variable, 命令行变量, CFLAGS override, -DLINUX
+title:                  手写 Makefile 的 uname 平台闸不识别 HarmonyOS：用 UNAME=<平台> 构建变量选中上游 Linux 分支（零补丁），并注意命令行 CFLAGS 会静默丢弃分支宏
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             手写 Makefile 在解析期用 UNAME:=$(shell uname) 取得系统名，再与作者写死的
+                        系统名（Linux/FreeBSD/Darwin…）做 ifeq 比较；HarmonyOS 的 uname -s 返回
+                        HarmonyOS（实测 uname -a = "HarmonyOS localhost HongMeng Kernel 1.12.0
+                        ... aarch64 Toybox"），既不命中任何分支 → 落入 else 的 $(error ...)，
+                        make 在解析阶段即终止，未编译任何源码。而 HarmonyOS 的用户态是 Linux
+                        兼容面（/proc、glob、readlink、bionic libc 均在），源码里 #ifdef LINUX
+                        分支通常才是行为正确的分支——平台闸缺的只是"这个名字"，不是新平台实现。
+affected_scope:         仅"纯手写 Makefile + 解析期 $(shell uname) 判平台"的项目（典型：suckless
+                        风格单文件工具、平台专用 CLI）。带 configure（config.guess）或
+                        CMake（Platform/*.cmake）的项目不会命中此模式，见 E007/E092。
+                        适用于任何 uname 未列举的新平台，不限于 C/C++。
+verification_cmd:       1) sed -n '1,40p' Makefile | grep -nE "uname|\\$\\(error"  定位平台闸与行号;
+                        2) uname -s  确认本机系统名（OHOS → HarmonyOS）;
+                        3) 原样 make CC=clang  复现 "Makefile:NN: *** Operating System not supported..  Stop.";
+                        4) 加 UNAME=Linux 后能否继续编译即验证根因;
+                        5) grep -nE "CFLAGS ?\\+=" Makefile  列出各分支追加的宏（如 -DLINUX），
+                           判断命令行 CFLAGS 是否会把这些宏一起丢掉（衔接 E14411）
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           make-platform-variable-override
+rec_description:        在 recipe 的 build() 中用命令行 make 变量覆盖上游的平台判定变量
+                        （UNAME=Linux，或项目实际使用的变量名），选中上游自带的 Linux 类分支：
+                        不改源码、不打平台宏补丁。若该分支通过 "CFLAGS += -D<MACRO>" 追加平台宏，
+                        又必须在本次命令行传 CFLAGS（为了注入 Conan 的 -I/-L），则必须把上游在该
+                        分支追加的宏与其他上游标志一并重述到命令行 CFLAGS 中（命令行变量覆盖
+                        makefile 内 += ，见 E14411）。
+rec_command:            make -j1 UNAME=Linux CC=<conan tools.build:compiler_executables:c> \
+                          CFLAGS="<上游默认标志> -D<分支宏> <conan -I...>" \
+                          LDFLAGS="<conan -L...> -l<上游库>"
+rec_auto_fix:           false
+rec_impl:               conan-recipe-makefile
+
+fallback_priority:      2
+fallback_approach:      patch-platform-gate-branch
+fallback_description:   若平台名不是 make 变量（硬编码在源码/脚本里），或该分支同时决定链接库
+                        （如 FreeBSD 分支的 -lutil），可加最小补丁在 ifeq 链中追加平台分支，
+                        复用上游 Linux 分支的 CFLAGS/LDFLAGS。补丁须走 refresh-patch --auto 生成，
+                        且保持上游风格、不删除其它平台分支（R8/R3）。
+fallback_command:       patches/0001-makefile-recognize-ohos.patch:
+                          else ifeq ($(UNAME), HarmonyOS) → CFLAGS += -DLINUX
+fallback_auto_fix:      false
+fallback_impl:          conan-recipe-patch
+
+forbid_1_pattern:       sed -i.*(uname|Operating System not supported)|echo.*>>.*Makefile
+forbid_1_reason:        sed/echo 直接改源码或生成物绕过平台闸，改动不可复现、不在 conandata.yml
+                        声明、无法生成补丁审计（R2/R6/R3）。
+forbid_1_consequence:   下个版本重新踩坑；补丁缺失导致归档知识永久丢失；PR 被审计判 P0。
+forbid_2_pattern:       make .*CFLAGS=(?!.*-DLINUX)|make .*UNAME=Linux(?!.*-D[A-Z_]+)
+forbid_2_reason:        只覆盖 UNAME 而在命令行传 CFLAGS 却不带分支宏：makefile 内 "CFLAGS += -DLINUX"
+                        被命令行覆盖静默丢弃，而 LINUX/BSD 两条 #ifdef 分支往往定义了同名函数，
+                        编译器不会报错。与 E14411 同机制（丢掉的是 OPTS/宏）。
+forbid_2_consequence:   产出"能编能链但平台功能分支为空"的二进制，消费者测试可能仍通过而功能已丢失
+                        （对 CLI 而言是静默功能缺失，比编译失败更危险）。
+
+# ═══ Layer 4: 原则引用 ═══
+principles:
+
+# ═══ 关系图 (Relations) ═══
+causes:                 []
+caused_by:              []
+similar_to:             E14411, E007
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file:               doc/E429.md
+last_updated:           2026-10-15
+source_event:           xcwd 0-2.gbpe2c777c 适配：OHOS uname -s = HarmonyOS 触发上游
+                        Makefile:20 $(error Operating System not supported.)，以 UNAME=Linux +
+                        重述 CFLAGS(-DLINUX) 零补丁解决
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics, 方案 D) ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-15
+
+draft: true
+contributor_id: A7D7

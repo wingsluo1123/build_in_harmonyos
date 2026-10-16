@@ -1,0 +1,113 @@
+# test_package — xcwd 0-2.gbpe2c777c 消费者端到端用例集
+#
+# 本配方产物是**可执行程序**（bin/xcwd），不是库。因此消费者测试必须真正执行包内
+# 二进制并断言其可观测行为（R34），而不是只打印字符串。
+#
+# 统计口径：PR 描述「适配后测试用例统计」表的行按**用例数**填报，即下表的 5 个
+# HC-N；每个用例内部的 ok/FAIL 行只是该用例的检查项（共 13 项）。
+
+files:
+  - test_package/conanfile.py
+  - test_package/test_xcwd.py
+  - test_package/MANIFEST.yml
+
+requirements:
+  - xcwd/0-2.gbpe2c777c
+
+# 标准字段（对齐 templates/test_package/MANIFEST.yml.tmpl）
+package: xcwd/0-2.gbpe2c777c
+homepage: "https://github.com/schischi/xcwd"
+upstream_check_command: "N/A（上游 Makefile 无 check 目标，清点证据见下）"
+upstream_test_in_build: false
+upstream_test_command: "N/A（上游无测试套件，无可运行入口）"
+upstream_tests: []
+
+test_package_tests:
+  - file: test_package/test_xcwd.py
+    description: "消费者端到端：真实执行包内 bin/xcwd，核对无显示退出契约、LINUX 分支已编入、ELF 动态段不变量与运行期依赖负向验证"
+    command: "python3 test_package/test_xcwd.py <packaged bin/xcwd> <work-dir>"
+
+assertion_count: 13
+
+# 上游测试套件：**无**。
+#   证据（R51 清点，源码树 = 上游 commit e2c777c 归档，共 5 个文件）：
+#     - `find . -type d -name "*test*" | wc -l` → 0
+#     - `grep -inE "check|test" Makefile` → 无匹配（Makefile:10 只有
+#       `.PHONY: all clean distclean install`，无 check 目标）
+#     - 源码树文件清单：.gitignore / LICENSE / Makefile / README.md / xcwd.c
+#         （无 tests/、无 check/、无 ctest/pytest/meson 注册）
+#     - 构建系统为手写 Makefile，无 make check 可用入口
+#   故本包属 TEST_QUALITY_SPEC 的「上游无测试」分支：适配后由 test_package
+#   提供覆盖，此处显式申报，避免被判定为漏装上游测试。
+upstream_tests_exist: false
+upstream_test_count: 0
+upstream_test_framework: "无（上游手写 Makefile 无 check 目标，源码树无测试文件）"
+upstream_test_census_evidence:
+  - "源码树文件数 = 5（.gitignore LICENSE Makefile README.md xcwd.c）"
+  - "find . -type d -name '*test*' → 0"
+  - "grep -inE 'check|test' Makefile → 无匹配"
+
+use_cases:
+  - id: HC-1
+    title: "包内产物契约 / packaged artifact contract"
+    kind: consumer_e2e
+    description: >
+      断言落在**包内** bin/xcwd 上：文件存在、可执行位已置、ELF64 小端、
+      e_machine=EM_AARCH64、e_type=ET_DYN（PIE）。均以纯标准库解析 ELF 头，
+      不依赖 CI worker 未必提供的 readelf/strings。
+    status: pass
+
+  - id: HC-2
+    title: "无 X 显示下真实执行（上游契约）/ headless execution contract"
+    kind: consumer_e2e
+    description: >
+      在 conanrun 环境中真实执行包内 xcwd（DISPLAY 未设置）：上游
+      xcwd.c:69-71 在 XOpenDisplay() 失败时 `exit(EXIT_FAILURE)`，故断言退出码
+      恰为 1 且 stdout/stderr 均为空。该断言在无 X 服务器的 CI 环境真实可跑，
+      证明程序确实被加载并执行到 X 客户端初始化路径。
+    status: pass
+
+  - id: HC-3
+    title: "对应平台分支确已编入 / LINUX branch really compiled in"
+    kind: harmony_specific
+    description: >
+      断言产物二进制中包含**仅存在于上游 `#ifdef LINUX` 分支**的字面量：
+      `/proc/%ld/cwd`（xcwd.c:235）、`/proc/[0-9]*`（xcwd.c:161）、`/stat`
+      （xcwd.c:172）。OHOS 适配通过 `UNAME=Linux` 选中上游自身 Linux 分支，
+      本用例证明该分支确实被编译进产物，而不是编出空壳或落到 BSD 分支。
+    status: pass
+
+  - id: HC-4
+    title: "ELF 动态段打包不变量 / ELF dynamic invariants"
+    kind: consumer_e2e
+    description: >
+      自解析包内 ELF 的 PT_DYNAMIC：DT_NEEDED 必须含 libX11.so.6（OHOS 系统
+      无同名库，故只能来自 Conan 依赖）；任一 DT_NEEDED 不得含 "/"（构建机
+      私有缓存路径泄漏 = 制品不可跨机消费）；不得存在 DT_RPATH/DT_RUNPATH
+      （OHOS 加载器拒绝指向 Conan 缓存目录的 RUNPATH，本仓库 X11 包统一由
+      conanrun 提供搜索路径）。
+    status: pass
+
+  - id: HC-5
+    title: "运行期依赖真实性（负向验证）/ runtime dependency is genuine"
+    kind: consumer_e2e
+    description: >
+      剥离 LD_LIBRARY_PATH / LD_PRELOAD 后再次执行同一包内二进制，断言其**无法
+      启动**（加载器找不到 libX11.so.6）。与 HC-2 对照即证明程序所加载的
+      libX11 确实来自本 Conan 依赖，而非系统或环境偶然提供的副本。
+    status: pass
+
+summary:
+  total_use_cases: 5
+  passed_use_cases: 5
+  pass_rate: 1.0
+  assertion_count: 13
+
+# 防空壳的结构性保障（R34 / L1e）
+anti_hollow:
+  - "test_package/conanfile.py 的 test() 用 self.run 真正执行包内二进制"
+  - "can_run() 为假时直接抛 AssertionError（不允许静默跳过消费者测试）"
+  - "HC-2 真实运行程序并断言退出码与输出，非空壳打印"
+  - "HC-3 断言上游 LINUX 分支字面量确在产物内，证明平台适配落到真实代码路径"
+  - "HC-5 负向验证：去掉 Conan 运行库路径后程序必须起不来（依赖真实）"
+  - "L1e 负向预期：mv 走包内 bin/ 后 HC-1 找不到可执行文件直接失败"
