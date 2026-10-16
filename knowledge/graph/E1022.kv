@@ -1,0 +1,49 @@
+#====================================================================
+# E617 — autotools 代码生成器无已发布 conan 包：gperf 走 missing 包装器 + perl 走 tool_requires
+#====================================================================
+
+# Layer 0: Error Surface
+id:                     E1022
+trigger_tool:           make
+phase:                  build
+error_signature: |
+  missing: gperf
+  gperf: command not found
+  No rule to make target 'tokenhash.h'
+  use of undeclared identifier .*in_word_set
+  BUILT_SOURCES.*tokenhash
+
+# Layer 1: Recognition
+severity:               2
+category:               ohos, autotools, toolchain, conan, codegen
+prescan_pattern:        AM_MISSING_PROG.*(GPERF|PERL)|BUILT_SOURCES\s*=.*(tokenhash|gperf)
+root_cause:             |
+  autotools 包把生成源码（词法表、语法表）挂在 BUILT_SOURCES 上，由 gperf/perl 之类的
+  代码生成器在构建期生成。两类失败模式：
+  (1) gperf：archives/g/gperf/3.1 有配方但**制品仓没有 binary**
+      （conan install --requires=gperf/3.1 --build=never 实测
+      "Package 'gperf/3.1' not resolved: Unable to find ... in remotes"），
+      因此 tool_requires("gperf/...") 不可用（R36 要求依赖先发布）。
+  (2) perl：制品仓通常**有**已发布 binary（perl/5.42.2.3 实测 rc=0），可直接 tool_requires。
+  关键机制：configure.ac 用 AM_MISSING_PROG([GPERF],[gperf]) 时，若 configure 期 PATH 里
+  没有 gperf，GPERF 被设成 `${SHELL} <build>/missing gperf`；automake 的 missing 包装器
+  **在构建期重新从 PATH 解析 gperf**，找到就真实执行、找不到才报 127。
+  因此「configure 日志里 GPERF='... missing gperf'」**不等于**构建一定失败——
+  判据要看构建日志里 missing 是否真的调起了 gperf、以及生成物是否有内容。
+  另一风险：生成命令常写成 `$(GPERF) ... | sed ... > out.h`，**管道吞掉 missing 的退出码**，
+  所以「生成器缺失」不会让 make 失败，而是留下空文件——好在消费该头文件的 TU 紧接着
+  就会编译失败（未声明标识符），是响亮失败而非假绿。
+
+# Layer 2: Fix Strategy
+rec_approach:           pin-perl-via-tool-requires-and-verify-generator-actually-ran
+# Layer 3: Validation
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-17
+authors:               unknown
+doc_file:               doc/E1022.md
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        pin-perl-via-tool-requires-and-verify-generator-actually-ran
+match_keywords:         ohos, configure

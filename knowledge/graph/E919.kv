@@ -1,0 +1,55 @@
+#====================================================================
+# Draft: 上游"无输出即通过"型回归脚本 (sng_regress) 退出码恒为 0 ——
+#        在 build()/test() 里只靠 self.run() 不抛错判通过会把真实失败写成通过
+# 来源事件: sng 1.1.1 HarmonyOS 适配（Makefile + libpng 的 PNG<->文本转换器）
+#====================================================================
+
+id:                     E919
+trigger_tool:           test
+phase:                  testing
+error_signature:        sng_regress|No output is good news|decompilation of the test PNG failed|recompilation of the (decompiled|canonicalized) form failed|generation of the canonicalized form failed
+
+severity:               2
+category:               build-system, testing, ci-gate
+match_keywords:         sng, sng_regress, No output is good news, make check, regression, exit code, silent on success, check() echo, self.run, stdout, libpng warning, hIST out of place, test_package, upstream test
+
+title:                  上游回归脚本"无输出即通过"、失败只 echo 一行且脚本退出码恒为 0（sng_regress）：配方里 self.run() 不抛错不等于通过，必须捕获 stdout 断言为空；libpng 的 warning 走 stderr，不能并进判据
+
+root_cause:             sng 的 `make check` 调用 sng_regress，脚本里的 check() 只在上一条命令失败时 `echo "<file>: ... failed"`，不 exit，脚本末尾也没有汇总退出码，Makefile 靠 `echo "No output is good news."` 约定"无输出=通过"。实测给它一个损坏的 bad.png：4 行 failed 全部打印，`bash sng_regress bad.png` 退出码仍是 0。因此在 Conan 配方里 `self.run("bash ./sng_regress test.sng snglogo.png")` 即使回归全红也不会抛 ConanException，W3/CI 照绿，上游测试"通过率"成了纸面数字。另有一个反向陷阱：正常输入也会让 libpng 往 **stderr** 打 `libpng warning: hIST: out of place`（test.sng 故意含 hIST/tRNS 边界用例），若 2>&1 合并后再断言"输出为空"会把健康运行误判为失败。判据必须是 **stdout 为空**，stderr 只作诊断。
+
+affected_scope:         所有"无输出即通过"约定的上游回归脚本（Eric S. Raymond 系的 sng/cvs-fast-export/reposurgeon 的 shell 回归、各类 `make check` 里 `@cmd; echo "No output is good news"` 形态、diff 驱动的 shell 测试）；表现为配方里 self.run(test_script) 恒绿。同类还有把失败写成 `echo` 而不 `exit 1` 的手写 harness。
+
+verification_cmd:       echo notpng > bad.png; TMPDIR=$PWD bash ./sng_regress bad.png >out.txt 2>err.txt; echo "exit=$? stdout_lines=$(wc -l <out.txt)"   # 期望 exit=0 且 stdout_lines=4（证明退出码不可信）；再对 test.sng snglogo.png 跑一遍，期望 stdout_lines=0（stderr 里的 libpng warning 不计）
+
+rec_priority:           1
+rec_approach:           capture-stdout-assert-empty
+rec_description:        build()/test() 里用 `self.run(cmd, stdout=StringIO())` 捕获脚本 stdout，`if out.getvalue().strip(): raise ConanException(...)`；不要把 stderr 并入判据（libpng warning 属正常）。脚本需要临时目录时用 $TMPDIR（sng_regress 硬编码 /tmp 且用 diff -c，OHOS 上 /tmp 只读、toybox diff 无 -c，按最小补丁改为 ${TMPDIR:-/tmp} 与 diff -u）。验证时务必先跑一遍反例（损坏输入）确认判据真的会红，再信任它的绿。
+rec_command:            out = StringIO(); self.run('TMPDIR="<dir>" bash ./sng_regress test.sng snglogo.png', stdout=out); assert not out.getvalue().strip()
+rec_auto_fix:           false
+rec_impl:               manual
+
+fallback_priority:      2
+fallback_approach:      consumer-flow-in-test-package
+fallback_description:   无法在 build 机执行目标二进制（x86 runner + aarch64 产物）时，上游回归如实 skip（打 WARN，不写成通过），改由 test_package 的完整消费者流程（被测二进制产出文件 → 消费者程序用 libpng 解码校验 → 往返）承担功能证据，并在 CI（aarch64 原生）实跑。
+fallback_command:       qemu-aarch64 ./sng < sample.sng > out.png && qemu-aarch64 ./check_png out.png
+fallback_auto_fix:      false
+fallback_impl:          manual
+
+forbid_1_pattern:       self\.run\(.*sng_regress.*\)\s*$|2>&1.*sng_regress|assert.*returncode == 0.*regress
+forbid_1_reason:        sng_regress 退出码恒为 0，只看退出码等于没测；反过来把 stderr 合并后断言空会被 libpng warning 误伤
+forbid_1_consequence:   回归全红仍显示 W3/CI 绿，PR 正文里的上游测试通过率是假数据（R51 失真）；或健康构建被误判失败后有人"修"掉判据
+
+principles:
+
+doc_file:               doc/E700.md
+last_updated:           2026-10-07
+source_event:           sng 1.1.1 适配：反例 bad.png 使 sng_regress 打印 4 行 failed 而 exit=0
+authors:                zyj070505 <z2996336133@163.com>
+source_pr:
+source_commit:
+
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+

@@ -1,0 +1,72 @@
+#====================================================================
+# E615 — CMake+Conan 适配的四类确定性陷阱：宿主依赖静默回退、生成器吞掉
+#        $LD_LIBRARY_PATH、传递依赖头文件不传播、上游安装清单漏头文件
+#====================================================================
+
+# Layer 0: Error Surface
+id:                     E1023
+trigger_tool:           cmake, conan, make, ninja
+phase:                  configure, build, test
+error_signature: |
+  unable to find library -l[<]?expat
+  Error relocating .*/[A-Za-z0-9_.-]+: [A-Za-z_][A-Za-z0-9_]*: symbol not found
+  Error loading shared library .*: No such file or directory
+  fatal error: 'libxml/.*\.h' file not found
+  fatal error: 'comps_types\.h' file not found
+  Unable to create temporary file for communication; may not have permissions
+
+# Layer 1: Recognition
+severity:               3
+category:               ohos, cmake, conan, packaging, fake-green
+prescan_pattern:        CMAKE_FIND_PACKAGE_PREFER_CONFIG|LD_LIBRARY_PATH="\$[{A-Za-z_]*|find_package\((ZLIB|LibXml2|EXPAT)|install\(FILES \$\{.*_HEADERS\}
+root_cause:             |
+  在 OHOS 设备上按 Conan 2 适配「上游 CMake 工程 + C 库 + 语言绑定」时,以下四类问题
+  全部表现为**假绿或方向错误的报错**,已在 libcomps 0.1.24 上逐条实测:
+
+  (1) 宿主依赖静默回退 —— Conan 的 CMakeToolchain 会写
+      `set(CMAKE_FIND_PACKAGE_PREFER_CONFIG ON)`。若配方不调用 CMakeDeps,且上游读的是
+      Find 模块的旧式变量(大写: LIBXML2_LIBRARY/LIBXML2_LIBRARIES/EXPAT_LIBRARY/
+      ZLIB_LIBRARIES/ZLIB_INCLUDE_DIRS),find_package/find_library 会命中设备 PATH 上
+      ~/.harmonybrew 的 *-config.cmake。实测 CMakeCache 出现
+      LIBXML2_LIBRARY=~/.harmonybrew/Cellar/libxml2/.../libxml2.so、
+      ZLIB_DIR=~/.harmonybrew/lib/cmake/ZLIB,链接行出现
+      ~/.harmonybrew/lib/libz.so.1.3.1.zlib-ng。
+      **设备上编译通过、干净 worker 上必红**,且构建日志无任何异常字样。
+
+  (2) 构建生成器吞掉 $LD_LIBRARY_PATH —— 上游把 shell 片段直接写进
+      add_custom_target 的 COMMAND:`export LD_LIBRARY_PATH="${OUT}/:$LD_LIBRARY_PATH"`。
+      Makefile 生成器把 `$L` 当 make 变量引用、Ninja 生成器把 `$LD_LIBRARY_PATH` 当
+      ninja 变量引用,**两种生成器都展开为空**,继承来的搜索路径被清成 `<build>/src/:`,
+      测试二进制随即 `Error relocating ...: symbol not found`。
+      实测 build.make 与 build.ninja 里的命令都只剩 `${OUT}/:`。
+
+  (3) 传递依赖头文件不传播 —— Conan 2 的 `transitive_headers` 默认为 None(等于不传播)。
+      若被测库的**公开头文件**包含依赖的头(如 libcomps 的 comps_utils.h 含
+      <libxml/encoding.h>、comps_parse.h 含 <expat.h>),消费者的 CMakeDeps config 里
+      对应依赖的 *_INCLUDE_DIRS_RELEASE 为空,编译消费者即失败。
+      判据:比较 `conan install` 在「直接 requires」与「经中间包传递」两种图下生成的
+      <dep>-<cfg>-data.cmake 的 INCLUDE_DIRS 行。
+
+  (4) 上游安装清单漏头文件 —— `install(FILES ${libcomps_HEADERS})` 是显式清单,
+      而已安装的 comps_log.h 会 `#include "comps_types.h"`。对安装集合做包含闭包计算:
+      清单(去掉被注释的 #comps_list.h)25 个头、包含闭包 26 个,差集 = ['comps_types.h'](补丁后安装 26 个)。
+      上游 RPM 用 `%{_includedir}/<name>/*.h` 通配安装,掩盖了该缺陷;
+      按 CMake 显式清单打包必然暴露,且**任何消费者都无法编译**。
+
+  附带判据(同类):check 0.15.2 的 IPC 临时文件受 TEMP/TMPDIR 控制(不是硬编码 /tmp),
+  在 /tmp 只读的 OHOS 上把 TMPDIR/TMP/TEMP 指到构建目录内可写目录即可全量运行;
+  报错形态 `check_msg.c:NNN: Unable to create temporary file for communication`
+  极易被误读成权限/环境损坏。
+
+# Layer 2: Fix Strategy
+rec_approach:           pin-all-consumed-vars-and-verify-link-line
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-17
+authors:               unknown
+doc_file:               doc/E1023.md
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        pin-all-consumed-vars-and-verify-link-line
+match_keywords:         ohos, cmake
