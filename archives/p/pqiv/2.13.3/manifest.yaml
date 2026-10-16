@@ -1,0 +1,36 @@
+# 版本级 manifest — pqiv 2.13.3
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "2.13.3"
+software: "pqiv"
+
+# 本地 conan-verify 通过后置 built；未上传制品仓，故非 published。
+status: built
+build_date: "2026-10-15"
+build_system: makefile
+
+source:
+  url: "https://github.com/phillipberndt/pqiv/archive/refs/tags/2.13.3.tar.gz"
+  sha256: "f0ffaa33e93299b38058c507da2945976a4b350c92cf1c4b3649586444395dfd"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  # 上游自带 configure 为自写 bash 脚本（非 autotools），仅生成 config.make。
+  # 原生 build=host，不传 --host/--build/--target（铁律 #0）。
+  configure_options:
+    - "--prefix=/"
+    - "--gtk-version=3"
+    - "--backends=gdkpixbuf"
+  dependencies:
+    - gtk/3.24.43
+    - gdk-pixbuf/2.44.6.1
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "pqiv 的自写 configure 只识别它自身定义的选项；PKG_CONFIG_PATH/CC 必须以环境变量前缀注入，不能作为 configure 参数（会被判 Unknown option 退出 1）"
+  - "该 configure 含 bash 语法（${VAR//...}、${VAR: -1}），须用 bash 驱动，不能用 OHOS 的 mksh"
+  - "gtk/3.24.43（ohpcd）为 broadway 后端（x11/wayland 关闭），因此 pqiv 的 GTK3 x11 探测分支不触发，无需 X11 系统库"
