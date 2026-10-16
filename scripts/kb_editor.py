@@ -320,14 +320,40 @@ SEV_MAP = {'P0': '3', 'P1': '2', 'P2': '1', 'P3': '1', 'HIGH': '3', 'MEDIUM': '2
 
 
 def parse_kv(path):
+    """解析 kv 文件。支持 YAML 多行块（| 与 >）：块内容并入字段值。"""
     d = {}
     try:
-        for line in Path(path).read_text(encoding='utf-8', errors='replace').splitlines():
-            mm = FIELD_RE.match(line)
-            if mm:
-                d[mm.group(1)] = mm.group(2).strip().strip('"')
+        lines = Path(path).read_text(encoding='utf-8', errors='replace').splitlines()
     except OSError:
-        pass
+        return d
+    i = 0
+    while i < len(lines):
+        mm = FIELD_RE.match(lines[i])
+        if not mm:
+            i += 1
+            continue
+        key, val = mm.group(1), mm.group(2).strip()
+        if val in ('|', '>', '|-', '>-', '|+', '>+'):
+            block = []
+            j = i + 1
+            while j < len(lines):
+                nxt = lines[j]
+                if nxt.strip() == '':
+                    block.append('')
+                    j += 1
+                    continue
+                if not FIELD_RE.match(nxt) and (nxt.startswith(' ') or nxt.startswith('\t')):
+                    block.append(nxt.strip())
+                    j += 1
+                else:
+                    break
+            while block and block[-1] == '':
+                block.pop()
+            d[key] = ' '.join(block).strip().strip('"')
+            i = j
+        else:
+            d[key] = val.strip('"')
+            i += 1
     return d
 
 
@@ -624,6 +650,15 @@ MR_URL = 'https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos/merge_re
 def cmd_report(decisions, batch_no, date, out_path):
     m = json.loads(PR_MAP_PATH.read_text(encoding='utf-8')) if PR_MAP_PATH.exists() else {}
 
+    # 从 promote 日志提取 草稿→E编号 映射（含被合并吸收的）
+    pmap = {}
+    log = STATE_DIR / 'promote.log'
+    if log.exists():
+        for mm in re.finditer(r'🎉 (\S+) → (E\d+) 提升完成', log.read_text(encoding='utf-8', errors='replace')):
+            pmap[mm.group(1)] = mm.group(2)
+        for mm in re.finditer(r'已移除合并草稿: (\S+)', log.read_text(encoding='utf-8', errors='replace')):
+            pmap.setdefault(mm.group(1), '（并入相邻条目）')
+
     def pr_cell(name):
         v = m.get(name) or {}
         title = v.get('title', '').replace('|', '\\|')
@@ -651,17 +686,31 @@ def cmd_report(decisions, batch_no, date, out_path):
     L.append('|-----------|-----------|-------------|-------------|------|------|------|')
     for p in acc:
         v = m.get(p[0]) or {}
-        L.append(f"| {p[0]} |  |  | {pr_cell(p[0])} | {v.get('author','')} | {v.get('email','')} | ✅ |")
+        eid = pmap.get(p[0], '')
+        mark = '✅(merged)' if eid == '（并入相邻条目）' else '✅'
+        L.append(f"| {p[0]} | {eid} |  | {pr_cell(p[0])} | {v.get('author','')} | {v.get('email','')} | {mark} |")
     L.append('')
-    L.append(f'## 拒绝清单（{len(rej)} 条）')
-    L.append('')
-    L.append('| 草稿原名称 | 原始 PR 编号及标题 | 拒绝原因 |')
-    L.append('|-----------|-------------|---------|')
-    REASON_CN = {'empty_core_fields': '空壳草稿：核心三字段缺失或占位',
-                 'no_md_pair': '无配套 .md 文档'}
-    for p in rej:
-        reason = REASON_CN.get(p[2], p[2])
-        L.append(f'| {p[0]} | {pr_cell(p[0])} | {reason} |')
+    if rej:
+        L.append('')
+        L.append(f'## 拒绝清单（{len(rej)} 条）')
+        L.append('')
+        L.append('| 草稿原名称 | 原始 PR 编号及标题 | 拒绝原因 |')
+        L.append('|-----------|-------------|---------|')
+        REASON_CN = {'empty_core_fields': '空壳草稿：核心三字段缺失或占位',
+                     'no_md_pair': '无配套 .md 文档'}
+        for p in rej:
+            reason = REASON_CN.get(p[2], p[2])
+            L.append(f'| {p[0]} | {pr_cell(p[0])} | {reason} |')
+    df = [p for p in dec if p[1] == 'DEFER']
+    if df:
+        L.append('')
+        L.append(f'## 暂缓清单（{len(df)} 条，来源 PR 未合入 main）')
+        L.append('')
+        L.append('| 草稿原名称 | 所在 feature 分支 | 分支最后活动 |')
+        L.append('|-----------|-----------------|-------------|')
+        for p in df:
+            v = m.get(p[0]) or {}
+            L.append(f"| {p[0]} | {v.get('branch','')} | {v.get('last_activity','')} |")
     if rev:
         L.append('')
         L.append(f'## 待复核清单（{len(rev)} 条，人工裁定）')

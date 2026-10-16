@@ -1,0 +1,34 @@
+#====================================================================
+# Draft: SourceForge 的 `/…/download` 跳转 URL 没有扩展名，conan 的 get()
+#        无法据此判断压缩格式，默认按 zip 解压 → BadZipFile，明明下载成功
+#        却报 "File is not a zip file"。官方直链 downloads.sourceforge.net
+#        保留 .tar.gz/.tgz 扩展名，sha256 相同，是正解。
+#====================================================================
+
+id:                     E650
+trigger_tool:           conan
+phase:                  source
+error_signature:        BadZipFile.*File is not a zip file|Error in source\(\) method.*get\(|Uncompressing .* to \.
+
+severity:               2
+category:               conan, networking, source
+match_keywords:         sourceforge, downloads.sourceforge.net, /download, redirect, conandata.yml, get, BadZipFile, unzip, tar.gz, source(), URL extension
+
+title:                  conandata.yml 用 SourceForge `/…/download` 跳转 URL 会让 conan get() 按 zip 解压报 BadZipFile：改用官方直链 downloads.sourceforge.net（保留 .tgz 后缀，sha256 不变）
+
+root_cause:             Conan 2 的 tools.files.get()/download() 从 URL 的 basename 推断压缩格式（.tar.gz/.tgz/.zip/…）。SourceForge 的文件页给的是 `https://sourceforge.net/projects/<proj>/files/<path>/<file>.tgz/download`——basename 是 `download`，没有扩展名，conan 落不到 tar 分支，按 zip 处理，解压时报 `BadZipFile: File is not a zip file`。日志里前一行往往已经打印 "Sources correctly downloaded"，很容易被误判成下载损坏/网络问题而反复重试或换镜像。仓库内既有先例（graphicsmagick manifest）用 `/download` 形态，所以这不是个例。
+affected_scope:         所有把源码源站指向 SourceForge 文件页 `/…/download` URL 的 conandata.yml（本仓 SourceForge 项目数量很大：potrace/graphicsmagick/osra/gocr/…）；只要 URL 末段不是带压缩扩展名的文件名就会命中。
+verification_cmd:       python3 -c "import urllib.request as u;print(u.urlopen('https://downloads.sourceforge.net/project/osra/gocr-patched/gocr-0.50pre-patched-2.tgz').status)"; conan create <recipe> -pr:h=ci/conan/profiles/ohos-aarch64
+rec_priority:           3
+rec_approach:           use-direct-sourceforge-download-host-with-extension
+rec_description:        (1) 症状识别：source() 里 `get()` 报 BadZipFile 但日志显示 "Sources correctly downloaded … Uncompressing <file> to ."，说明是**格式判定**而不是下载失败，别去重试/换镜像。(2) 修法：把 URL 换成 SourceForge 官方直链域名 `https://downloads.sourceforge.net/project/<proj>/<subpath>/<file>.<ext>`（保留真实文件名与扩展名）；这是 SF 的官方下载主机（非第三方代理），sha256 与原 URL 完全一致，替换后 `sha256` 字段无需改。(3) 仍然只允许官方源（R39/PF7 里被点名的是 gh-proxy/ghfast/cnb.cool 这类代理域，downloads.sourceforge.net 属于官方托管）。(4) 若确实拿不到带扩展名的直链，可在 source() 里显式 `download(..., filename)` + `unzip/untar`，不要依赖 get() 的推断。
+rec_command:            conan create archives/<l>/<pkg>/<ver> -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 --build=missing
+rec_auto_fix:           false
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+source_pr:
+source_commit:
+rec_impl:               manual
+last_updated:               2026-10-16
+authors:               unknown
+doc_file:               doc/E650.md

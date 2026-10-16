@@ -1066,7 +1066,7 @@ def cmd_promote(
     drafts_dir = project / "knowledge" / "drafts"
     doc_dir = project / "knowledge" / "doc"
 
-    if not draft_id.startswith("DRAFT"):
+    if not draft_id.startswith("DRAFT") and not (drafts_dir / f"{draft_id}.kv").exists():
         draft_id = f"DRAFT-{draft_id}"
     draft_path = drafts_dir / f"{draft_id}.kv"
     if not draft_path.exists():
@@ -1115,7 +1115,7 @@ def cmd_promote(
     merged_contributors = []
     if not no_merge:
         target_kws = set(k.strip() for k in fields.get('match_keywords', '').split(',') if k.strip())
-        for other in sorted(drafts_dir.glob("DRAFT-*.kv")):
+        for other in sorted(drafts_dir.glob("*.kv")):
             if other.name == draft_path.name:
                 continue
             other_fields = _parse_fields(other.read_text(encoding='utf-8'))
