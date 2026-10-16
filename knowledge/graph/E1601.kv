@@ -1,0 +1,73 @@
+#====================================================================
+# Draft: libusbauth-configparser 1.0.5 —— 上游是「单体仓（monorepo）」，被适配
+#        组件只是其中一个子目录，且**该组件没有独立 tag**：既不能按
+#        /archive/refs/tags/<vX.Y.Z>.tar.gz 取源，也不能把整仓当包子树。
+#        解法：① 版本号取自子目录 configure.ac 的 AC_INIT；② 用 commit 钉定
+#        官方 codeload tar.gz；③ source() 里 strip_root 后把子目录内容上提为
+#        源根；④ 补丁路径按上提后的源根写（src/…，不是 monorepo 的完整子路径）；
+#        ⑤ 该快照无 configure，build() 用 autoreconf -fi 自举。
+# 来源: libusbauth-configparser 1.0.5 适配（2026-10-08，monorepo=kochstefan/
+#       usbauth-all，组件子目录=libusbauth-configparser/）。
+#====================================================================
+
+id:                     E1601
+trigger_tool:           conan|autotools
+phase:                  source|configuration
+error_signature:        autoreconf: 'configure\.ac' or 'configure\.in' is required|configure\.ac: No such file or directory|cannot find input file|archive/refs/tags/.*(404|Not Found)|configure: No such file or directory
+
+severity:               2
+category:               build-system, conan, packaging, source, structure
+match_keywords:         monorepo, multi-component upstream, no per-component tag, subdirectory package, codeload pinned commit, strip_root then lift subdir, source_folder flatten, patch path relative to lifted root, AC_INIT version, autoreconf -fi git snapshot, usbauth-all, libusbauth-configparser, umbrella tarball sibling, version has no upstream tag
+
+title:                  上游为单体仓（monorepo）且被适配组件无独立 tag：不能按 tags/<ver>.tar.gz 取源、也不能把整仓当包子树——须用 commit 钉定 codeload 归档，在 source() 里把包子目录上提为源根（补丁路径随之上提），并为无 configure 的 git 快照 autoreconf -fi 自举
+
+root_cause:             单体仓（一个 git 仓库，多个组件各占一个子目录，各自带 configure.ac / CMakeLists.txt / Makefile.am）常见于「一组强相关工具」型上游。当制品仓/发行版按「组件」粒度建包时，两个前提同时不成立：① **组件没有独立 tag** —— 仓库 tag 是整仓代次（或干脆不打 tag），故 /archive/refs/tags/<vX.Y.Z>.tar.gz 取不到组件版本对应的源（多点半 404 或取到的是别的代次）；② **不能把整仓当包子树** —— get() 取到的是 usbauth-all-<sha>/，组件树在其下的 libusbauth-configparser/ 子目录里，若直接在源根跑 autoreconf/configure/CMake 会因根目录没有 configure.ac/CMakeLists.txt 而报 'configure.ac is required' / 'No such file or directory'。此外该快照常是**纯 git 归档**（不含生成物），没有现成 configure，必须自举。注意与 component-split-from-umbrella-tarball 的区别：那型是「一份 tarball 用目录级构建入口（Kbuild）拆组件」，本型是「一个 git 仓库里每个组件都是自洽的子项目，各带自己的构建脚本」。
+affected_scope:         任何 monorepo 型上游里只有子目录、没有独立 tag 的组件：usbauth-all（libusbauth-configparser / usbauth / yast2 模块）、多数「*-all」「*-tools」聚合仓、GNOME/KDE 的 individual-component 子项目（当只有整仓 tag 时）、以及发行版按组件拆包的场合。判据：上游仓库里每个候选组件子目录都有独立 configure.ac/Makefile.am 或 CMakeLists.txt，而仓库 tag 只有一个或没有。
+verification_cmd:       git ls-remote --tags <upstream> | tail                # 看有没有组件级 tag（常为空）
+                        curl -sI <upstream>/archive/refs/tags/<ver>.tar.gz | head -1   # 常 404
+                        tar tzf <codeload-commit>.tar.gz | head              # 顶层是 <repo>-<sha>/，组件是它的子目录
+                        grep -n 'AC_INIT' <subdir>/configure.ac              # 组件版本只在这里
+                        ls <subdir>/configure 2>&1                            # 无 configure → 需自举
+
+rec_priority:           1
+rec_approach:           pin-commit-and-lift-subdir-to-source-root
+rec_description:        "① 版本号取自组件子目录的构建脚本（autotools 取 AC_INIT 第二参；CMake 取 project(VERSION)；否则取 CHANGELOG/version 文件），并核验它确实对应你想交付的代次。② 源地址用官方 **codeload** 的 commit 化端点 https://codeload.github.com/<owner>/<repo>/tar.gz/<commit-sha>，sha256 本地核验后写进 conandata.yml（不要用 refs/tags，组件可能没有 tag）。③ source() 里 `get(..., strip_root=True)` 拿到 <repo>-<sha>/ 的内容后，把 `<组件子目录>/` 内的条目 `shutil.move` 到 source_folder 根并 rmdir 空目录——autotools/CMake 只有在一棵自洽的树（根目录就有 configure.ac/CMakeLists.txt）里才正确工作。④ 补丁在**上提之后**应用（apply_conandata_patches 以 source_folder 为 base），故 patch 里的路径是 `src/xxx.c`、`CMakeLists.txt`，而不是 monorepo 的完整子路径 `libxxx/src/xxx.c`——否则 patch -p1 落不到文件。⑤ 若该快照无 configure，用 `autoreconf -fi` 自举（automake/libtool 经 tool_requires 拉入；autoconf 家族与 flex/bison 常在设备 /data/service/hnp/bin），并配 VirtualBuildEnv 把 tool_requires 的 bin 注入 conanbuild PATH。"
+rec_command: |-
+  # conandata.yml
+  sources:
+    url: "https://codeload.github.com/kochstefan/usbauth-all/tar.gz/d40b9790f776e698bd84b42ea5555c29ed3fbfee"
+    sha256: "7dc6aa9323ea6de56f0add4c06a72b1efebdc4d49461604c2d6f17e79ddc2ce8"
+
+  # conanfile.py
+  def source(self):
+      get(self, **self.conan_data["sources"]["1.0.5"], strip_root=True)
+      sub = os.path.join(self.source_folder, "libusbauth-configparser")   # 组件子目录
+      for name in os.listdir(sub):
+          shutil.move(os.path.join(sub, name), os.path.join(self.source_folder, name))
+      os.rmdir(sub)
+      apply_conandata_patches(self)      # patch 路径相对上提后的源根：src/usbauth-configparser.c
+rec_auto_fix:           false
+
+fallback_priority:      2
+fallback_approach:      keep-monorepo-root-and-point-build-script-at-subdir
+fallback_description:   "若上提会与其它组件共享根级文件（如共用 m4/ 宏、共用 config.h.in、顶层 Makefile.am 串联多个组件）而不能安全 flatten，则保留 monorepo 根，改用 Autotools(build_script_folder='<subdir>')（或 CMake -S <subdir>）让构建在子目录里发生；补丁路径随之写完整的子路径 `<subdir>/src/xxx.c`。代价：VPATH/相对 include 需复核，且 conan 的 basic_layout 下 build_folder 与 source_folder 的对应关系要重新对齐；仅在 flatten 破坏树内相对引用时才采用。"
+fallback_command:       autotools.configure(build_script_folder="libusbauth-configparser", args=[...])
+fallback_auto_fix:      false
+
+forbid_1_pattern:       (tags/v?\d+\.\d+|archive/refs/tags|releases/download).*libusbauth-configparser|requires\(.*libusbauth-configparser.*\)\s*#.*(stub|vendor|fake)
+forbid_1_reason:        monorepo 组件没有独立 tag，凭想象拼 tags/<ver> URL 会 404（或取到错误代次）；也禁止用伪造/内联冒充真实依赖
+forbid_1_consequence:   download 404 → source() 直接失败；或静默取到别的组件/代次，产物与声明的版本不符
+forbid_2_pattern:       Conanfile.*source\(self\):\s*[\s\S]{0,200}apply_conandata_patches[\s\S]{0,400}(strip_root|get)   # 上提前打补丁
+forbid_2_reason:        补丁在上提前应用，patch -p1 会按 monorepo 完整子路径找不到文件（path 落到 libxxx/src/… 而文件已上提到 src/…）
+forbid_2_consequence:   patch 静默失败或 "can't find file to patch"，配方继续用未打补丁的源码，OHOS 差异（如只读 /etc 覆盖）丢失
+forbid_3_pattern:       codeload\.github\.com/[^"]+/tar\.gz/[0-9a-f]{7,}(?![0-9a-f])|sha256:\s*"[^"]{63}"|sha256:\s*"[^"]{65}"
+forbid_3_reason:        commit 钉定必须写全 40 位 sha，sha256 必须 64 位十六进制；截断或错长会让 get() 校验失败/取到浮动分支
+forbid_3_consequence:   sha256 mismatch 直接 fail，或短 commit 解析到非预期树
+
+principles:               
+doc_file: drafts/libusbauth-configparser-1.0.5-monorepo-subdir-pinned-commit-flatten.md
+last_updated: 2026-10-08
+source_pr:              14972
+source_commit:          d372f1721a
+rec_impl:               manual
+authors:               libusbauth-configparser-1.0.5

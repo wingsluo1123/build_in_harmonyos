@@ -1,0 +1,59 @@
+#====================================================================
+# E632 — C++ 构造函数未初始化成员在 libc++ 下读出垃圾值
+#====================================================================
+
+id:                     E1623
+trigger_tool:           make|clang++|runtime
+phase:                  compilation|runtime
+error_signature:        [0-9]{15,}\.[0-9]{3}|huge garbage value|uninitialized member|hasConfidence.*garbage|
+                         aligninfo.*[0-9]{18,}
+severity:               2
+category:               portability, memory, cpp
+match_keywords:         uninitialized member, constructor, libc++, libstdc++, garbage value,
+                         huge number output, aligninfo, confidence, asclite, SCTK
+title:                  C++ 构造函数未初始化成员在 libc++ 下读出巨大垃圾值
+root_cause:             C++ 类的构造函数未初始化全部成员（如只初始化了 m_bUseConfidence 而未初始化
+                         m_Confidence 等标量成员），在 libc++（OHOS clang 默认）下读取未初始化
+                         栈/堆内存时得到巨大垃圾值（如 2.75e23），而 libstdc++（Linux base 生成
+                         环境）下可能恰好为 0/空，导致 OHOS 输出与上游 base 不一致
+affected_scope:         C++ 项目在 OHOS/libc++ 下运行且构造函数未初始化全部成员时，程序输出
+                         可能出现巨大垃圾值（浮点位模式残留，如 0x66696472="fidr" ASCII 残留）
+verification_cmd:       grep -n "275541069870429653434368\|74107705259255264157978591232" \
+                         test2-sastt.test/sastt-case2.sys.rttm.filt.aligninfo.csv
+rec_priority:           1
+rec_approach:           initialize-all-members
+rec_description:        在构造函数中显式初始化所有成员变量（浮点置 0.0、布尔置 false、整型置 0），
+                         消除未初始化读取；通过 test_package/自研断言对比输出无巨大垃圾值
+rec_command:            track-edit add ${SOFTWARE} ${VERSION} ${SOURCE_FILE} && \
+                         refresh-patch --auto ${SOFTWARE} ${VERSION}
+rec_auto_fix:           false
+rec_impl:               manual-source-fix
+
+fallback_priority:      2
+fallback_approach:      zero-init-class
+fallback_description:   若成员较多难以逐一初始化，可将构造函数改为使用成员初始化列表或
+                         对对象整体 memset 后仅设置必要字段
+fallback_command:
+fallback_auto_fix:      false
+fallback_impl:
+
+forbid_1_pattern:       忽略.*垃圾值|跳过.*测试|只.*help
+forbid_1_reason:        垃圾值是未初始化内存读取的直接证据，忽略会导致 Release 产物在
+                         真实数据下输出错误评分
+forbid_1_consequence:   包构建通过但运行输出含随机巨大数值，下游解析失败
+principles:
+doc_file:               doc/E632.md
+last_updated: 2026-10-03
+source_event:           sctk/2.4.12 asclite aligninfo confidence 字段出现 2.75e23 垃圾值（libc++ 未初始化读取）
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:                HouYuxuan <f24011422@st.sandau.edu.cn>
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics, 方案 D) ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used: 2026-10-03
+

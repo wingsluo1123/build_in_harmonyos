@@ -1,0 +1,65 @@
+#====================================================================
+# E14723 — 纯 Python 运行时依赖缺 run=True → BINARY_SKIP（消费者 import 失败）
+# 来源: tinyprog 1.0.23 适配（Python 应用，pyserial/six 为 python-require 依赖）
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E1702
+trigger_tool: conan
+phase: packaging
+# 两种表现：① build 期 conan 图日志出现 Skip；② 运行期消费者 import 失败
+error_signature: BINARY_SKIP|Skipped binaries|binary.*[Ss]kip|ModuleNotFoundError: No module named '(serial|usb|six|intelhex)'|No module named .* (from conan dependency)
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               3
+category:               python, dependency, packaging
+match_keywords: python-require, run=True, BINARY_SKIP, PYTHONPATH, VirtualRunEnv, conanrun, ModuleNotFoundError, runenv_info, pip, 纯 Python 依赖, package_folder
+title: 纯 Python 依赖未声明 run=True，被 conan 标 BINARY_SKIP，消费者运行期 import 失败
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause: Conan 2 对 python-require 依赖默认 run=False → Requirement.files 为 False → graph_binaries._skip_binaries() 将该节点标 BINARY_SKIP，节点无 package_folder、无 runenv PYTHONPATH；消费者 conan install 后 import 该依赖直接 ModuleNotFoundError
+affected_scope: 所有以 Conan 配方打包的纯 Python 库/应用；依赖为 python-require 且未显式 run=True 时；传递依赖同样受影响（run 不沿链传播）
+verification_cmd: conan create <recipe> -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 2>&1 | grep -E "BINARY_SKIP|Skipped"
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority: 1
+rec_approach: pin-run-true-on-every-python-runtime-dependency
+rec_description: 对每个纯 Python 运行时依赖显式声明 run=True（self.requires("pkg/ver", run=True)），使其 Requirement.files 为 True，节点保留 package_folder 与 runenv PYTHONPATH
+rec_command: self.requires("pyserial/3.5", run=True)
+rec_auto_fix: false
+rec_impl:
+
+fallback_priority: 2
+fallback_approach: redeclare-dependency-site-in-package-info
+fallback_description: 若上游配方不可改，在本包 package_info() 中把依赖的 site-packages 目录显式 append 进 runenv_info/buildenv_info 的 PYTHONPATH（治标：依赖节点仍被 Skip，但消费者路径可用）
+fallback_command: self.runenv_info.append_path("PYTHONPATH", <dep_site>)
+fallback_auto_fix: false
+fallback_impl:
+
+forbid_1_pattern: self\.requires\(["'][^"']+["']\)\s*$.*#.*python
+forbid_1_reason: 纯 Python 依赖写成裸 self.requires()（run 默认 False）是 BINARY_SKIP 的直接成因
+forbid_1_consequence: 消费者 conanrun 环境缺该依赖路径，运行期 ModuleNotFoundError；CI L1/test_package 才会暴露，浪费整轮 CI
+# forbid_2_pattern:
+# forbid_2_reason:
+# forbid_2_consequence:
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             P007, P013
+# ═══ 关系图 (Relations) ═══
+# ═══ 元数据 ═══
+doc_file:               doc/E14723.md
+last_updated: 2026-10-09
+source_event:           tinyprog/1.0.23 适配：pyserial/3.5 + six/1.17.0 作为 python-require 运行时依赖
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics, 方案 D) ═══
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+rec_impl:               manual
+authors:               E7F5
