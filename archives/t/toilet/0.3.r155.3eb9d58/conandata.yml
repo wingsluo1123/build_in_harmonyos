@@ -1,0 +1,40 @@
+# conandata.yml — toilet 0.3.r155.3eb9d58
+#
+# 版本号逐项核实（非推断）：
+#   * 上游为 cacalabs/toilet（Sam Hocevar 的 "The Other Implementation of figLET"）。
+#     该仓库**没有任何 tag**（GitHub API /repos/cacalabs/toilet/tags -> []，
+#     /git/refs/tags -> 404），故不存在 git describe 形态的版本串；
+#     configure.ac 的 AC_INIT([toilet],[0.3]) 给出上游版本 0.3（首次适配不加后缀，R37）。
+#   * 3eb9d58 = 提交 3eb9d58037afb0a1baec6dca82caa045fb2217c0，是 master 的最新提交
+#     （2016-09-27 11:54:13Z，Merge pull request #6 "build: use more modern autotools
+#     features"），也是本版本使用的精确上游源码点。
+#   * r155 = 该仓库 master 的提交总数：GitHub commits API `per_page=1` 响应的
+#     Link rel="last" 为 page=155（本机实测逐项核对），即该提交是仓库历史上的
+#     第 155 个提交（r155），与提交哈希互相印证。
+#
+# 源码 URL：codeload.github.com 是 GitHub 官方归档主机
+# （github.com/<owner>/<repo>/archive/<ref> 的 301 目标），URL 指向本版本对应的
+# 精确提交，满足 R39 官方源口径（同 archives/m/ming/0.4.8.r68.g04aee523 先例）。
+sources:
+  url: "https://codeload.github.com/cacalabs/toilet/tar.gz/3eb9d58037afb0a1baec6dca82caa045fb2217c0"
+  # URL 以提交哈希结尾且不带扩展名，Conan 的 get() 无法从 URL 推断归档格式
+  # （会按 zip 解压并报 BadZipFile），必须显式给 filename
+  # （同 ming/0.4.8.r68.g04aee523 先例）。
+  filename: "toilet-3eb9d58037afb0a1baec6dca82caa045fb2217c0.tar.gz"
+  sha256: "a16b3a6217852d4ec5e9fa94c5600b900710d652910ac041bf1c5c61524a03d4"
+
+patches:
+  # 唯一补丁：为编译期字体目录加一个 make 覆盖点（默认值保持上游不变）。
+  # toilet 把字体目录烤进二进制（src/Makefile.am: -DFONTDIR="$(datadir)/figlet"），
+  # 而 conan 按自身惯例用 `--prefix=/` + `make install DESTDIR=<包目录>` 安装，
+  # 于是 $(datadir) 展开为 `/share`、二进制里写死 `//share/figlet`，运行期
+  # 找不到包内字体（实测：`toilet -f pagga` 报 "error: could not load font pagga"）。
+  # 上游没有提供任何覆盖点（既无 configure 选项也无环境变量，见 src/main.c 的
+  # `cx->dir = FONTDIR;`），故按 figlet/2.2.5 的既有做法把字体目录指向包内真实位置：
+  # 该补丁只把 `toilet_CPPFLAGS` 里写死的 $(datadir)/figlet 换成可覆盖的
+  # `FONTDIR ?= $(datadir)/figlet`（默认行为与上游完全一致，未改任何逻辑），
+  # 由配方在 make 命令行传 `FONTDIR=<包目录>/share/figlet`。
+  - patch_file: "patches/0001-src-Makefile.am.patch"
+    patch_description: "src/Makefile.am: make the compiled-in FONTDIR overridable on the make command line (FONTDIR ?= $(datadir)/figlet) so packagers can point the built-in font directory at the location where the fonts are actually installed; default behaviour is unchanged"
+    patch_type: "portability"
+

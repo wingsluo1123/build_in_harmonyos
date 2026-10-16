@@ -1,0 +1,62 @@
+# 版本级 manifest — toilet 0.3.r155.3eb9d58
+# 遵循 ARCHIVE-SPEC v2.0（conandata.yml 是 CI 实际输入，本文件用于人工交叉校验）
+
+version: "0.3.r155.3eb9d58"
+software: toilet
+
+# 设备实机构建已通过 conan create（上游完整测试 + 消费者端到端用例）；制品发布由平台 release 流水线在合入后执行
+status: built
+
+build_date: "2026-10-16"
+build_system: autotools
+conan_ref: "toilet/0.3.r155.3eb9d58"
+
+source:
+  url: "https://codeload.github.com/cacalabs/toilet/tar.gz/3eb9d58037afb0a1baec6dca82caa045fb2217c0"
+  sha256: "a16b3a6217852d4ec5e9fa94c5600b900710d652910ac041bf1c5c61524a03d4"
+  tar_format: tar.gz
+  # 版本串含义（逐项核实）：上游仓库无任何 tag；3eb9d58 = master 最新提交
+  # （2016-09-27，Merge PR #6）；r155 = 该仓库 master 提交总数（GitHub commits API
+  # per_page=1 的 Link rel="last" 实测为 page=155）。
+  upstream_commit: "3eb9d58037afb0a1baec6dca82caa045fb2217c0"
+  upstream_version: "0.3（configure.ac 的 AC_INIT([toilet],[0.3])）"
+
+build:
+  system: autotools
+  configure_options:
+    - "--build=aarch64-unknown-linux-gnu --host=aarch64-unknown-linux-gnu（显式三元组：本机 config.guess 不识别 HarmonyOS 内核且 HMDFS 下 mkdtemp 写 dummy.c 被拒；build==host 保持本机原生编译并跳过 config.guess）"
+    - "autotools.configure()（prefix/bindir/datarootdir 由 conan AutotoolsToolchain 注入包目录）"
+    - "build() 先执行上游 bootstrap（aclocal/autoconf/autoheader/automake）自举 configure 与 Makefile.in"
+    - "生成 configure 内 umask 077 → 022 改写（HMDFS：2700 临时目录不可写、chmod 为 no-op）"
+    - "源码内构建：basic_layout(src_folder='.') + folders.build='.'（上游 test/check-* 按源码树相对路径取值）"
+    - "PKG_CHECK_MODULES(CACA, caca >= 0.99.beta18)：PkgConfigDeps 生成 caca.pc，PKG_CONFIG_PATH 指向本配方 generators_folder"
+  dependencies:
+    - libcaca/0.99.beta20.1
+    - automake/1.18（tool_requires，构建期自举；传递 ncurses/6.4、zlib/1.3.1 由 libcaca 配方静态链入）
+  cc: clang
+  cxx: clang++
+
+# 本版本仅 1 个补丁：为编译期字体目录加 make 覆盖点（默认值不变，非平台宏守卫）
+patches_applied:
+  - "0001-src-Makefile.am.patch"
+
+knowledge_gained:
+  - "HMDFS 按组位判定目录访问权（本机 uid 20020082 非文件属主，靠 file_manager 组通行）：config.status 的 (umask 077 && mktemp -d ./confXXXXXX) 生成 2700 目录后写入必 EACCES，且 chmod 无效果；修法是改写生成 configure 里两处 umask 077 → 022（对应 E175 家族）"
+  - "本机 config.guess(2024-07-27) 在 HMDFS 上 mkdtemp 后写 dummy.c 被拒 → 无法猜测 build 三元组；必须显式传 --build/--host 才能 configure（conan 仅在 build profile != host profile 时才自动注入三元组）"
+  - "autotools 库的官方测试若按源码树相对路径取值（../src、../fonts），必须源码内构建（basic_layout(src_folder='.') + folders.build='.'）；conan basic_layout 默认的 build-release/ 子目录会让这类测试假失败"
+  - "automake/1.18（制品仓）以 perl 脚本分发，其 Automake::Config 模块靠包的 buildenv_info 注入 PERL5LIB/ACLOCAL_PATH，只在 conanbuild 环境内生效；直接调用包内 bin/aclocal 会报 Can't locate Automake/Config.pm"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/toilet-0.3.r155.3eb9d58.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/toilet-0.3.r155.3eb9d58.work
+  source_orig_hash: 22c6b51d8eb18605
+  source_work_hash: d1107053975c3410
+  generated_at: '2026-10-16T01:38:24'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-src-Makefile.am.patch
+    type: portability
+    platform_only: False
+    guard: 'none'

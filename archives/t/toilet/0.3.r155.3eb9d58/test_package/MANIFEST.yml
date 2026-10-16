@@ -1,0 +1,48 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI 门禁 L0e 强制要求）
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: toilet/0.3.r155.3eb9d58
+homepage: "https://github.com/cacalabs/toilet"
+
+# 上游测试命令（清点来源：test/Makefile.am 的 `TESTS = check-source check-fonts`，
+# 由 automake 的 parallel-tests 驱动；`make check` 在 conanfile.build() 内执行）
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "make check"
+
+# 上游实际运行的测试程序（= test/Makefile.am 的 TESTS 列表，共 2 个）
+upstream_tests:
+  - file: check-source
+    source: toilet-3eb9d58037afb0a1baec6dca82caa045fb2217c0/test/check-source
+    description: "源码卫生检查：遍历 src/、tools/ 下全部源文件，断言不存在制表符与行尾空格（实数 11 files / 1147 lines / 0 errors）"
+    command: "./check-source"
+  - file: check-fonts
+    source: toilet-3eb9d58037afb0a1baec6dca82caa045fb2217c0/test/check-fonts
+    description: "字体资产检查：用构建出的 toilet 逐个加载 fonts/ 的全部 .tlf 字体并渲染 'Hello World'，断言 0 个加载错误（实数 24 fonts / 0 load errors）"
+    command: "./check-fonts"
+
+# test_package 中自带的消费者端到端测试（消费者视角验证，逐个带 ID）
+test_package_tests:
+  - file: test_e2e.sh
+    description: "HM-E2E-01 文本渲染端到端：真实输入文件经安装后的 toilet 渲染，输出与黄金文件逐字节一致"
+    command: "bash test_e2e.sh"
+  - file: test_e2e.sh
+    description: "HM-E2E-02 字体资产端到端：安装包 share/figlet 下 24 个 .tlf 字体逐个加载并渲染成功（0 加载错误）"
+    command: "bash test_e2e.sh"
+  - file: test_e2e.sh
+    description: "HM-E2E-03 HTML 导出端到端：--html 导出完整 XHTML 文档，结构齐全且含 3 行字形"
+    command: "bash test_e2e.sh"
+
+# 测试断言总数（**近似值**，用于质量评估）——计数粒度与构成逐项列明：
+#   粒度约定：每个「检查点」（一次命令调用或一条显式守卫判定）计 1，不把一个命令
+#   调用内部的多个布尔子条件拆开计（故 HM-E2E-02 的每字体 1 次加载/渲染调用计 1）。
+#   上游 check-source : 11 个源文件 × 2 类检查（制表符 / 行尾空格） = 22
+#   上游 check-fonts  : 24 个字体 × 1 次加载/渲染调用               = 24
+#   HM-E2E-01         : rc==0 守卫 + 与黄金文件逐字节一致          = 2
+#   HM-E2E-02         : 24 次字体加载/渲染调用 + 字体总数/失败数守卫 = 25
+#   HM-E2E-03         : rc==0 守卫 + DOCTYPE + 结尾标签 + &#9608; + 3 行 span 守卫 = 5
+#   合计 = 22 + 24 + 2 + 25 + 5 = 78
+assertion_count: 78
