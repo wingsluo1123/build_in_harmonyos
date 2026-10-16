@@ -1,0 +1,20 @@
+# conandata.yml — git 2.56.0
+# Source: kernel.org official mirror (USTC)
+
+sources:
+  url: "https://mirrors.ustc.edu.cn/kernel.org/software/scm/git/git-2.56.0.tar.gz"
+  sha256: "826817fd3671b8565586d6d49f688298de8354ab11db829c02720e5c74b9b39f"
+
+patches:
+  - patch_file: "patches/0001-configure.patch"
+    patch_description: "HMDFS 新目录强制 setgid，umask 077 产生 drwx--S--- 连属主不可写，config.status 无法生成（知识 E129），configure 内临时目录 umask 放宽为 022"
+    patch_type: "portability"
+  - patch_file: "patches/0002-http.c.patch"
+    patch_description: "平台默认 CA 集成：未配置 http.sslCAInfo 时使用系统证书库 /system/etc/ssl/certs/cacert.pem（配合 CPPFLAGS 的 GIT_HTTP_DEFAULT_CAINFO 宏），用户显式配置优先"
+    patch_type: "portability"
+  - patch_file: "patches/0003-run-command.c.patch"
+    patch_description: "OHOS musl 裁剪 POSIX 线程取消 API，pthread_setcancelstate 链接期 undefined（知识 E085），用 NO_PTHREAD_CANCEL 宏守卫"
+    patch_type: "portability"
+  - patch_file: "patches/0004-setup.c.patch"
+    patch_description: "HMDFS 强制映射文件属主 uid 与进程 uid 永不一致，ownership 检查恒失败；编译期 TRUST_ALL_REPOSITORIES 短路（保留 GIT_TEST_ASSUME_DIFFERENT_OWNER 测试路径）"
+    patch_type: "portability"

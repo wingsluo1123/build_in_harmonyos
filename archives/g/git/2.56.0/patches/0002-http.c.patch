@@ -1,0 +1,32 @@
+--- a/http.c
++++ b/http.c
+@@ -1197,20 +1197,29 @@
+ 	if (has_cert_password())
+ 		curl_easy_setopt(result, CURLOPT_KEYPASSWD, cert_auth.password);
+ 	if (ssl_key)
+ 		curl_easy_setopt(result, CURLOPT_SSLKEY, ssl_key);
+ 	if (ssl_key_type)
+ 		curl_easy_setopt(result, CURLOPT_SSLKEYTYPE, ssl_key_type);
+ 	if (ssl_capath)
+ 		curl_easy_setopt(result, CURLOPT_CAPATH, ssl_capath);
+ 	if (ssl_pinnedkey)
+ 		curl_easy_setopt(result, CURLOPT_PINNEDPUBLICKEY, ssl_pinnedkey);
++#ifdef GIT_HTTP_DEFAULT_CAINFO
++	/*
++	 * Platform default CA store (OpenHarmony: /system/etc/ssl/certs/).
++	 * Applies only when the user has not set http.sslCAInfo, so explicit
++	 * configuration always wins.
++	 */
++	if (!ssl_cainfo)
++		ssl_cainfo = GIT_HTTP_DEFAULT_CAINFO;
++#endif
+ 	if (http_ssl_backend && !strcmp("schannel", http_ssl_backend) &&
+ 	    !http_schannel_use_ssl_cainfo) {
+ 		curl_easy_setopt(result, CURLOPT_CAINFO, NULL);
+ 		curl_easy_setopt(result, CURLOPT_PROXY_CAINFO, NULL);
+ 	} else if (ssl_cainfo != NULL || http_proxy_ssl_ca_info != NULL) {
+ 		if (ssl_cainfo)
+ 			curl_easy_setopt(result, CURLOPT_CAINFO, ssl_cainfo);
+ 		if (http_proxy_ssl_ca_info)
+ 			curl_easy_setopt(result, CURLOPT_PROXY_CAINFO, http_proxy_ssl_ca_info);
+ 	}
