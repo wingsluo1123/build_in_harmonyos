@@ -1,0 +1,32 @@
+# 软件级 manifest
+# 文件位置: archives/r/rdma/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+software: rdma
+display: "rdma (rdma-core)"
+description: "RDMA core userspace libraries and daemons (libibverbs, librdmacm, libibumad, libibmad, libibnetdisc)"
+category: system
+homepage: "https://github.com/linux-rdma/rdma-core"
+license: GPL-2.0 OR BSD-2-Clause
+
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "禁用 libnl with ENABLE_RESOLVE_NEIGH=0"
+    - "禁用 Python 绑定 with NO_PYVERBS=1（CI 无 Cython/numpy）"
+    - "禁用 man 页 with NO_MAN_PAGES=1"
+    - "禁用 GNU 符号版本 with NO_COMPAT_SYMS=1（musl/OHOS）"
+    - "禁用 valgrind with ENABLE_VALGRIND=0"
+    - "注入 -D__MUSL__=1，避免 linux/socket.h 与 sys/socket.h 的 sockaddr_storage 重定义（E119）"
+    - "注入 -D_GNU_SOURCE，OHOS string.h 仅在其下暴露 strdupa()"
+    - "以 compat/ohos-compat.h 兼容层补齐 getpass/rindex/__progname/线程取消符号面（E093/E493/E203/E513）"
+    - "覆盖 CMAKE_INSTALL_LIBEXECDIR=libexec，避免与 bin/srp_daemon 冲突"
+    - "注入 CMAKE_SHARED_LIBRARY_SONAME_{C,CXX}_FLAG=-Wl,-soname,：os=OHOS 被映射为 CMAKE_SYSTEM_NAME=HarmonyOS，CMake 无该平台模块导致 SONAME 标志为空，产物缺 DT_SONAME 且依赖方 DT_NEEDED 退化为相对路径（E092 / DRAFT-libharu-2.3.0-missing-dt-soname）"
+    - "覆盖 SYSUSERS_DIR=lib/sysusers.d，避免 cmake --install 写入绝对路径 /usr/lib/sysusers.d 失败"
+  common_dependencies: []
+
+versions:
+  "64.0":
+    status: published
+    build_date: 2026-10-15
