@@ -1,0 +1,94 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: mtpaint/3.50.14
+homepage: "https://github.com/wjaguar/mtPaint"
+
+# 上游测试套件存在性 (经审计上游源码确认, 详见下方 upstream_test_audit)
+upstream_tests_exist: false
+
+# rule4 门禁: 上游测试总数声明 (本包构建面可执行的上游测试数为 0;
+# 单一手写 Makefile 框架可解析, 故用 auto)
+upstream_test_total: 0
+upstream_test_count_method: auto
+
+# 上游测试审计 (源码: Debian mtpaint_3.50.14.orig.tar.gz, 即上游
+# wjaguar/mtPaint 3.50.14 release 2026-03-05 / commit 8304376,
+# sha256 1062ec6c9fddb5a402b0c22e958f28814cc128428d03e8fa9d71c9982b985256;
+# 审计依据为 GitHub master 树文件清单 + configure/Makefile 内容,
+# 与 .orig 内容一致: 上游仅发布 configure + Makefile + src/po/doc,
+# 无测试目录与测试目标)
+upstream_test_audit:
+  source_tarball: "mtpaint_3.50.14.orig.tar.gz (https://deb.debian.org/debian/pool/main/m/mtpaint/mtpaint_3.50.14.orig.tar.gz)"
+  source_sha256: "1062ec6c9fddb5a402b0c22e958f28814cc128428d03e8fa9d71c9982b985256"
+  source_origin: "upstream wjaguar/mtPaint 3.50.14 (2026-03-05, commit 8304376e8861a8a603371b0f188db30f9cafdc17)"
+  top_level_files:
+    - file: "configure"
+      role: "手写 mini-configure shell 脚本, 仅做 GTK/编解码库探测并生成 _conf.txt, 无测试目标注册"
+      test_targets: "none (无 enable_testing/add_test, 无 check/test 注册)"
+      is_test: false
+    - file: "Makefile"
+      role: "顶层递归入口, 仅 all/install/uninstall/clean, 逐个 $(MAKE) -C $(subdirs)"
+      test_targets: "none (无 check / test / check-local)"
+      is_test: false
+    - file: "src/Makefile"
+      role: "唯一构建入口: 24 个 .c -> mtpaint 二进制 + install (cp 到 DESTDIR), 仅 all/clean/install/uninstall"
+      test_targets: "none (无 check / test 目标)"
+      is_test: false
+    - file: "src/*.c + src/*.h (约 60 个实现源, 含 main.c/png.c/memory.c)"
+      role: "绘图程序实现, main.c 仅处理 --version/--help/--cmd/-s/-v 等 CLI, 无 TEST()/TEST_F()/def test_ 包裹"
+      test_targets: "none (无独立测试入口, 无断言回归基线)"
+      is_test: false
+    - file: "po/ + doc/ (intl/man, 本配方不启用)"
+      role: "翻译与手册, 非测试套件"
+      test_targets: "none"
+      is_test: false
+  scanned_for:
+    - "TEST( / TEST_F (gtest)"
+    - "def test_ (pytest)"
+    - "Makefile 中的 check: / test: / check-local: / TESTS / check_PROGRAMS"
+    - "tests/ / test/ / t/ / spec/ 目录"
+    - "*_test.c / test_*.c / *check*.c 测试源"
+    - "configure.in enable_testing / add_test"
+    - "ctest / meson test / pytest 入口"
+  scan_result: "0 matches — 顶层 Makefile 与 src/Makefile 均无 check/test 目标; 全树无 tests/test 目录, 无测试源文件, 无测试框架注册; `make check` 报 No rule to make target 'check'"
+  make_check_output: "make: *** No rule to make target 'check'.  Stop. (手写 Makefile 工程, 非 automake, 无隐式 check 规则); build() 不调用 make check (upstream_test_in_build: false), 证据由 test_package 阶段 no_tests 标记给出"
+  reason: "mtpaint 3.50.14 上游为手写 Makefile 的 GUI 绘图程序, 发布包不含任何测试套件: 无 tests/test 目录, 无 check/test 目标, 无测试源文件与测试框架注册"
+
+# 上游测试命令 (无测试套件, check 命令不适用;
+# upstream_tests_exist:false 的库一律 upstream_check_command:"")
+upstream_check_command: ""
+
+# conanfile.py build() 方法中是否已集成上游测试
+# false: 上游 genuinely 无测试套件, build() 不集成 make check;
+# 上游测试证据由 test_package/test.sh 在 test 阶段产生
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序 (upstream_tests_exist: false, 见上方审计)
+# 上游无测试, 输出 HMBS_UPSTREAM_TEST_RESULT status:"no_tests" discovered:0 executed:0
+upstream_tests: []
+
+test_package_tests:
+  - file: test.sh
+    description: "mtpaint --version 烟雾测试 (gtk_init 前退出, 非空输出含 mtpaint, 确定性 headless)"
+    command: "mtpaint --version"
+  - file: test.sh
+    description: "mtpaint --help 烟雾测试 (gtk_init 前退出, 非空输出含 usage)"
+    command: "mtpaint --help"
+  - file: test.sh
+    description: "产物二进制体积校验 (非空且大于 100KB, 拒绝截断安装)"
+    command: "wc -c mtpaint"
+  - file: test.sh
+    description: "mtpaint --version 精确版本断言 (复跑含 3.50.14, 证明确定性非静默跳过)"
+    command: "mtpaint --version"
+  - file: test.sh
+    description: "readelf 校验产物 ELF 类型 (EXEC/DYN)"
+    command: "readelf -h mtpaint"
+  - file: test.sh
+    description: "readelf 校验动态链接含 GUI/图像库 NEEDED (gtk/gdk/glib/libpng/libjpeg/libtiff)"
+    command: "readelf -d mtpaint"
+
+assertion_count: 6
