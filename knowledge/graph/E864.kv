@@ -1,0 +1,48 @@
+#====================================================================
+# E901-draft-A8C4.kv — Bash 工具上游 `set -e` + `x=$(fn)` 静默 rc=1：先判定是上游行为
+#   而非鸿蒙 bash/toybox 差异，不打补丁，测试断言退出码与副作用而非输出文本
+#   实例：semtag 0.2.0（archives/s/semtag/0.2.0）
+#====================================================================
+
+id:                     E864
+trigger_tool:           test|runtime|bash
+phase:                  testing|runtime
+error_signature:        rc=1 out=''|exited with (status|code) 1 and (no|empty) output|silently exits? (with )?(status )?1|set -e.*command substitution.*(exit|abort)
+severity:               1
+category:               portability, posix, testing, shell
+match_keywords:         set -e, set -euo pipefail, command substitution, $(...), silent exit, rc=1, empty output, check_git_status, errexit, 脚本类工具, test_package, semtag
+title:                  Bash 工具上游 set -e + x=$(fn) 静默 rc=1：先用 x86 参照 + 最小复现判定为上游行为，不打补丁，测试断言退出码与副作用
+
+root_cause:             脚本类工具包适配时，某命令在鸿蒙环境「无输出、rc=1」很容易被误归因于鸿蒙 bash/toybox 差异。semtag 0.2.0 的真实根因在上游：脚本 `set -euo pipefail`，`analyze`/`create_tag`/`get_current_version` 路径里写成 `status=$(check_git_status)`，而 check_git_status 在工作区有改动时 `echo "unstaged"; return 1`。errexit 下「赋值语句的退出状态 = 命令替换的退出状态」，非零即令整个脚本立刻退出，后面的 `if [[ "$status" != "clean" ]]; then error ...` 永远走不到——表现为静默 rc=1、没有 ERROR 提示。与平台无关：同一脚本在 Debian bash 5.2.37 上同样复现。
+affected_scope:         所有 `#!/usr/bin/env bash` + `set -e`（或 `set -euo pipefail`）风格的脚本类 Conan 包，且脚本里存在 `var=$(func)`、func 以非零表示「状态/结果」而非「错误」的写法（semtag；同类：以 return 1 表示 dirty/not-found 的 git 辅助脚本、version/status 探测函数）。
+verification_cmd:       bash -c 'set -euo pipefail; f(){ echo dirty; return 1; }; s=$(f); echo "unreachable: $s"'; echo "rc=$?"   # 期望 rc=1 且不输出 unreachable；对照 `s=$(f) || true` 则输出 unreachable: dirty、rc=0。在 x86 构建机与鸿蒙上结果必须一致，一致即为上游行为
+
+rec_priority:           1
+rec_approach:           classify-upstream-behaviour-no-patch
+rec_description:        ①先在 x86 参照机（原生 bash）上用最小复现确认症状与鸿蒙一致，一致即判为上游行为，不写补丁（保持 patches/ 只含真正的平台适配，例如 shebang）；②在 notes.md 「遇到的问题」表里登记根因与最小复现命令；③test_package 对该路径只断言「退出码非 0 + 没有产生副作用（例如没有创建 tag）」，不断言输出文本，避免把上游缺陷固化成期望值，也避免上游修复后用例失效；④README 的平台约束节如实写明该上游缺陷。
+rec_command:            bash -c 'set -euo pipefail; f(){ echo dirty; return 1; }; s=$(f); echo unreachable'; echo "rc=$?"
+rec_auto_fix:           false
+rec_impl:               notes-and-test-design
+
+fallback_priority:      2
+fallback_approach:      patch-with-or-true
+fallback_description:   只有当该缺陷让安装后的工具在鸿蒙上完全不可用（而非某个边缘子命令）时才补丁：把 `status=$(check_git_status)` 改为 `status=$(check_git_status) || true`（或 `|| rc=$?`）。补丁须写进 conandata.yml 并在 notes 说明「上游缺陷修复，非平台适配」，不得带 __OHOS__ 宏。
+fallback_command:       sed -i 's/status=\$(check_git_status)$/status=$(check_git_status) || true/' semtag
+fallback_auto_fix:      false
+fallback_impl:          conandata-patch
+
+forbid_1_pattern:       patches/.*(__OHOS__)|断言.*(out|output)=''.*rc=1|assert .* == ''
+forbid_1_reason:        把上游的静默退出当成鸿蒙 bash 缺陷去加平台宏补丁，或在测试里把「空输出 + rc=1」固化为期望值，都会把上游缺陷伪装成平台适配/期望行为；上游一旦修复，用例反而失败。
+forbid_1_consequence:   补丁被审计判为 R8 平台宏滥用；测试在上游修复后失效，且 rule12 审核会认为用例在断言缺陷而非行为。
+
+principles:
+doc_file:               knowledge/drafts/E901-draft-A8C4.md
+last_updated:           2026-10-03
+source_event:           semtag 0.2.0 适配：为脏工作区路径设计 test_package 断言时，`semtag getcurrent` 脏树 rc=1 且无输出；最小复现确认为上游 set -e + status=$(check_git_status)，Debian bash 5.2.37 同样复现
+authors:                nyaco3 <aqjCItYW1QmEJQuF.gcw_XDpqZ8sO@noreply.gitcode.com>
+source_pr:
+source_commit:
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:

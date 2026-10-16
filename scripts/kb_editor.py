@@ -357,8 +357,17 @@ def parse_kv(path):
     return d
 
 
+CJK_RE = re.compile(r'[\u4e00-\u9fff]')
+
+
 def is_emptyish(v):
-    return not v or len(v.strip()) < 8 or bool(PLACEHOLDER.search(v))
+    if not v:
+        return True
+    # CJK 字符信息密度高, 阈值 3; ASCII 阈值 8
+    minlen = 3 if CJK_RE.search(v) else 8
+    if len(v.strip()) < minlen:
+        return True
+    return bool(PLACEHOLDER.search(v))
 
 
 def jaccard(a, b):
@@ -471,7 +480,8 @@ def cmd_promote(decisions):
     log = STATE_DIR / 'promote.log'
     log.parent.mkdir(parents=True, exist_ok=True)
     ok = fail = 0
-    with log.open('w', encoding='utf-8') as fp:
+    with log.open('a', encoding='utf-8') as fp:      # 追加模式: 多次调用不丢映射
+        fp.write(f'\n# promote run {__import__("datetime").datetime.now().isoformat()}\n')
         for line in Path(decisions).read_text(encoding='utf-8').splitlines()[1:]:
             p = line.split('\t')
             if p[1] != 'ACCEPT':

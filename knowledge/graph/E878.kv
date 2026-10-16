@@ -1,0 +1,92 @@
+#====================================================================
+# E756 (draft) — 测试框架版本替换导致 ±inf 断言假失败
+# 来源任务: xnnpack 0.0-git20241108.4ea82e5 适配（平台 rawId 12165）
+# 格式规则: key: value；多行值以空格开头的续行；正则用 | 分隔；# 为注释
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E878
+trigger_tool:           test|ctest|conan create|make
+phase:                  testing
+error_signature:        The difference between .* is nan, which exceeds|
+                        \[  FAILED  \] .*\.(batch_eq|batch_div|batch_lt|batch_gt|inplace|special_values)|
+                        [0-9]+% tests passed, [1-9][0-9]* tests failed out of|
+                        y\[i\] evaluates to -inf,|
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               2
+category:               compat, build-system, testing
+prescan_pattern:        '(googletest|gtest).{0,60}(archive/refs/tags/v1\.1[0-4]|v1\.1[0-4]\.[0-9]|1\.1[0-4]\.[0-9])'
+prescan_globs:          conanfile.py, conandata.yml, *.yml, *.yaml, *.cmake, CMakeLists.txt
+match_keywords:         ASSERT_NEAR, EXPECT_NEAR, DoubleNearPredFormat, googletest, gtest,
+                        nan which exceeds, same-signed infinity, 同号无穷, 断言假失败,
+                        测试框架版本, 测试全红, ctest
+title:                  替换/降级测试框架版本导致 ±inf 断言假失败：googletest 1.14.0 的 ASSERT_NEAR 没有同号无穷短路分支，把两侧都等于 -inf 的比较算成 NaN
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             googletest 1.14.0 的 DoubleNearPredFormat 先算 diff = fabs(val1 - val2)，
+                        两侧同为 -inf 时 diff = NaN，而 `diff <= abs_error` 对 NaN 恒为假 ⇒ 直接判失败。
+                        被测库的微内核测试在饱和输入上**合法地**产出同号 ±inf（如 fp16 leaky-relu
+                        把 -52096 * slope 溢出成 -inf），参考实现同样得到 -inf，两者其实完全相等。
+                        上游钉的 googletest 1.15.2 在 gtest.cc 里有短路分支
+                        `if (std::isinf(val1) && std::isinf(val2) && (std::signbit(val1) == std::signbit(val2)
+                        || (abs_error > 0.0 && std::isinf(abs_error)))) return AssertionSuccess();`
+                        —— 所以同一份测试在上游 CI 全绿，只有在**把测试框架换成旧版本**时才假红。
+affected_scope:         任何 vendor / 自行钉版本测试框架的配方（conan 包里 googletest 尤其常见：
+                        各包为了避开配置期下载会把上游钉的 revision 换成"仓库里现成的"版本）。
+                        XNNPACK 0.0-git20241108.4ea82e5 实测：594 条断言假失败、5 个 ctest 二进制
+                        （f16-vlrelu / f16-vsqr / f32-f16-vcvt / unary-elementwise-nc / f32-vgelu）
+                        在 62118 条用例里报 116 条失败、`ctest` rc=8。
+verification_cmd:       sh $HOME/tmp/xnnpack-0.0-git20241108.4ea82e5/repro-e756.sh
+                        （脚本做三件事：查 vendor 的 gtest.cc 是否有 isinf(val1) 同号无穷短路分支；
+                        单跑 f16-vlrelu-test --gtest_filter='*neonfp16arith_u8.negative_slope*'；
+                        打印 ctest 汇总行与配方自报的 HMBS_UPSTREAM_TEST_RESULT 四分项）
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:          pin-upstream-pinned-test-framework-revision
+rec_description:       把 vendor 的测试框架换回**上游自己钉的同一 revision**，不要用"仓库里别处现成"的版本；
+                       先核对该 revision 的 CMake 兼容性（cmake_minimum_required ≥ 3.5 即可在 CMake 4.x 下 configure），
+                       再核对其 gtest.cc 是否有同号无穷短路分支。
+rec_command:           grep -rn "googletest/archive" <upstream-src>/cmake/DownloadGoogleTest.cmake
+                        （取其 URL_HASH 的 revision）；把 conandata.yml 的 url/sha256 换成该 revision（保留官方源 + 镜像项）；
+                        再 grep -n "isinf(val1)" <vendored-gtest>/googletest/src/gtest.cc 确认有短路分支
+rec_auto_fix:          false
+rec_impl:              manual
+
+fallback_priority:      2
+fallback_approach:     patch-framework-near-format
+fallback_description:  上游 revision 确实不可得时（例如其 CMakeLists 真的过不了本机 CMake），才考虑给
+                       旧版 gtest.cc 打一个最小补丁补上同号无穷短路；这会让"测试框架"变成被改过的第三方件，
+                       必须在配方/PR 里逐字披露，并同步核对 1.15.2 的原始分支语义。
+fallback_command:       按 1.15.2 gtest.cc:1676-1680 的分支，插在 const double diff = fabs(val1 - val2); 之前
+fallback_auto_fix:     false
+fallback_impl:         source-patch
+
+forbid_1_pattern:      (googletest|gtest).{0,60}(v1\.1[0-4]|1\.1[0-4]\.[0-9])
+forbid_1_reason:       1.14.0 及更早的 DoubleNearPredFormat 没有同号无穷短路分支，
+                       而"仓库里 cpuinfo/ruy 用的是 1.14.0"这类**先例**会被当作理由照搬。
+forbid_1_consequence:  上游测试大面积假红（本次 594 条断言/116 用例），
+                       进而被误判为"平台不兼容"，触发改配方、裁剪测试甚至跳过测试等错误处置。
+
+# ═══ Layer 4: 原则引用 ═══
+principles:
+
+# ═══ 关系图 (Relations) ═══
+# ═══ 元数据 ═══
+doc_file:               knowledge/drafts/E756-draft-962E.md
+last_updated:           2026-10-07
+source_event:           xnnpack 0.0-git20241108.4ea82e5 适配（rawId 12165）：conan create 内嵌 ctest 阶段
+                        5 个二进制变红、116 条用例失败，其中 594 条断言是 "difference ... is nan"
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:                Awstme <awstme@qq.com>
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics, 方案 D) ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-07
+
