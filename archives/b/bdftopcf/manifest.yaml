@@ -1,0 +1,43 @@
+# 软件级 manifest — bdftopcf
+# 文件位置: archives/b/bdftopcf/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+software: bdftopcf
+display: "bdftopcf"
+description: "X.Org BDF→PCF 字体编译工具（为 X server / font server 生成可移植的编译字体）"
+category: utility
+homepage: "https://gitlab.freedesktop.org/xorg/app/bdftopcf"
+license: MIT
+build_system: autotools
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "config.guess / config.sub 不识 uname -s = HarmonyOS ⇒ 补 *:HarmonyOS:*:* 分支（输出 aarch64-unknown-linux-ohos）与 linux-ohos* 白名单（E007/E072）"
+    - "⚠ 同族两版 config.guess 不可互抄：X.Org 各 tarball 年代不同 —— 新版有 GUESS= 变量（分支赋值），2017 老版每分支是 `echo <tuple>; exit ;;`（bdftopcf 1.1 属后者，照抄新版写法会静默落到 unable to guess）"
+    - "⚠ config.sub 的 ohos 要补**两处**且各用独立 guard：KERNEL-OS 列表 `linux-ohos*`（否则 basic_machine 被切成 aarch64-unknown-linux → machine not recognized）与 basic system types 列表 `-linux-ohos*`（否则被后面 `-linux*)` 别名改写成 -linux-gnu-ohos）。裸子串做 guard 会让先写入的子串把后一处误判为已存在（appres 实撞）"
+    - "configure 的 `umask 077 && mktemp -d` 建 700 目录，HMDFS 拒写 ⇒ 放宽 022 + mkdir（E110/E112），改 configure 源头让 config.status 继承，且必须真正写回磁盘"
+    - "bdftopcf 是**纯头文件消费者**：configure.ac 无任何 AC_CHECK_LIB/PKG_CHECK_MODULES、Makefile.am 链接行只有 CWARNFLAGS ⇒ 只 requires xorgproto（提供 8 个 X11 头），不拉 libx11"
+    - "本工具**无 --version/--help**，任意未知参数走 invalid option + usage、rc=1；验证必须用真实 BDF→PCF 转换，不能断言版本号输出"
+    - "纯本地文件编译器：不连 X server，DISPLAY 未设不影响任何断言"
+  common_dependencies:
+    - xorgproto
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "1.1":
+    status: built
+    build_date: "2026-10-08"
+    source_url: "https://www.x.org/releases/individual/app/bdftopcf-1.1.tar.bz2"
+    sha256: "4b4df05fc53f1e98993638d6f7e178d95b31745c4568cee407e167491fd311a2"
+    dependencies:
+      - xorgproto/2025.1
+    tests:
+      upstream: 0
+      after_adapt: 7

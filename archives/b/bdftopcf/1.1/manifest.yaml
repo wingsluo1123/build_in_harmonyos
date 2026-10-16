@@ -1,0 +1,132 @@
+# 版本级 manifest — bdftopcf 1.1
+# 文件位置: archives/b/bdftopcf/1.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.1"
+
+# 软件名
+software: "bdftopcf"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-08"
+build_system: "autotools"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（X.Org releases 个体目录，官方直链；PF7 通过）
+  url: "https://www.x.org/releases/individual/app/bdftopcf-1.1.tar.bz2"
+
+  # 源码校验和（本机 curl -fsSL + sha256sum 实测，150815 字节）
+  sha256: "4b4df05fc53f1e98993638d6f7e178d95b31745c4568cee407e167491fd311a2"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.bz2
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表 —— 上游 configure.ac 无项目专属开关，只需 --prefix（R1 参数最少化）
+  configure_options: []
+
+  # 编译依赖列表（格式: name/version）
+  # 唯一依赖：header-only，conan 预编译二进制实测可下载（--build=never 通过）
+  dependencies:
+    - "xorgproto/2025.1"
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 测试口径（三处同源：本件 / notes.md / test_package/MANIFEST.yml）
+# ============================================================
+tests:
+  # 上游测试资产 —— §12.72 四口径 2026-10-08 源码树就地实测（48 文件）
+  #   test*/ 框架源码 0 · */res 语料 0 · **/*RUNTEST* 0 · src/demo|examples *.c 0
+  #   Makefile.am / man/Makefile.am 无 TESTS、无 check_PROGRAMS；configure.ac 无测试宏
+  #   make check 实测：man/: "Nothing to be done for 'check'"，rc=0（空转）
+  upstream: 0
+  # 适配后合计 = 上游 0 + 消费者 7（消费者测试另列并计入适配后总数，§10.1）
+  # 口径：适配后按**可执行断言口径**（手册/04 §11.2 口径限定）；消费者 = 1 个消费者程序
+  # test_package/test.sh，含 **7 条可执行断言**（程序数 1、断言数 7 两个读数都在此注明）
+  after_adapt: 7
+  evidence: "reports/test-report.md"
+  # 五维数值字段（手册/04 §10.1）
+  N_static: 0                # 上游静态声明：无 TESTS / check_PROGRAMS
+  N_registered: 0            # 构建系统注册：grep '^TESTS|check-TESTS|check_PROGRAMS' → 0 行
+  N_executed: 0              # 实际执行：make check 空转 rc=0，无注册项可跑
+  not_executed_categories: 0 # 未执行分类数：无跳过/无预期失败/无条件注册
+  N_consumer: 7              # 新增消费者测试：test_package/test.sh，7 条断言，实测 7/7 PASS
+  N_consumer_programs: 1     # 消费者程序数（test.sh 一个），供"程序数"口径核对
+  N_assertion: 7             # 断言数（N_consumer 同值，括注）
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 三处修复全部落在 autotools 分发 shell 脚本（config.guess / config.sub / configure），
+# 由 refresh-patch --auto 的**编辑追踪器精准模式**从 .orig/.work 差异生成（R7）；
+# conanfile.py 的 build() 先 apply_conandata_patches() 应用下列 3 件，
+# 再跑幂等的 _patch_autotools_scripts() 兜底（"已存在即跳过"，补丁已生效即 no-op）。
+# 五处同源：conandata.yml 的 patches: 3 件 · 本清单 3 件 · patch_generation.patches_count: 3
+# · patch_classification 3 件 · 磁盘 patches/ 实物 3 件。
+# 全文无 __OHOS__ 字面量（R8/PF5 不引入平台宏）。
+patches_applied:
+  - "0001-config.guess.patch"
+  - "0002-config.sub.patch"
+  - "0003-configure.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识（每条须带 ref: —— 指向本次实际查用的知识条目）
+knowledge_gained:
+  - "config.guess 不识 uname -s=HarmonyOS ⇒ 补 *:HarmonyOS:*:* 分支输出 aarch64-unknown-linux-ohos (ref: E007)"
+  - "⚠ 同族两版 config.guess 不可互抄：2017 老版分支是 echo+exit，新版才是 GUESS= 变量 (ref: E007 变体)"
+  - "config.sub 要补两处：KERNEL-OS 列表 linux-ohos*（收敛 basic_machine）+ basic system types 列表 -linux-ohos*（拦住 -linux*) 别名改写）(ref: E072)"
+  - "configure 的 umask 077 && mktemp 建 700 目录，HMDFS 拒写 ⇒ 放宽 022 + mkdir (ref: E110, E112)"
+  - "bdftopcf 是纯头文件消费者：8 个 X11 头全在 conan xorgproto 包内、链接面为空 ⇒ 只 requires xorgproto，不拉 libx11 (ref: R36, R35)"
+  - "registry 无条目时 build 一条龙死在 init_build_failed ⇒ 按 §12.60① 配方就位后直走 conan-verify (ref: §12.60①)"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/builds/bdftopcf-1.1.orig
+  source_work_dir: /storage/Users/currentUser/builds/bdftopcf-1.1.work
+  source_orig_hash: a0412e6c3ba2fb96
+  source_work_hash: 8a2059bb5819b3c3
+  generated_at: '2026-10-08T00:55:25'
+  patches_count: 3
+
+patch_classification:
+  - file: 0001-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-config.sub.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
