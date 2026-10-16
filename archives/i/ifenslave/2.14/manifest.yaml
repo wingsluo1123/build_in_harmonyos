@@ -1,0 +1,29 @@
+version: "2.14"
+software: "ifenslave"
+status: built
+build_date: "2026-10-15"
+build_system: custom
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/i/ifenslave/ifenslave_2.14.tar.xz"
+  sha256: "684e7c80da5346ed15f61ace0743c66fdb4442b445dec872a5317be5afe883c9"
+  tar_format: tar.xz
+
+build:
+  system: custom
+  configure_options: []
+  dependencies: []
+  cc: clang
+  cxx: clang++
+  outputs:
+    - "bin/ifenslave.if-pre-up"
+    - "bin/ifenslave.if-up"
+    - "bin/ifenslave.if-post-down"
+    - "share/doc/ifenslave/examples/two_ethernet"
+
+patches_applied: []
+
+knowledge_gained:
+  - "Debian-native 2.14 tarball ships only debian/ hooks (22 entries); the historical ifenslave.c binary was retired in 2.10, replaced by 3 ifupdown shell hooks"
+  - "Pure shell package: no configure/make; recipe validates hooks and stages them under bin/ for Conan redistribution"
+  - "Upstream ships zero automated tests; consumer test asserts hook presence, shebang, shell syntax and bonding sysfs contract statically"

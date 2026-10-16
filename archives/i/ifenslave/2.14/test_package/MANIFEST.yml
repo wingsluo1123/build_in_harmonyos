@@ -1,0 +1,51 @@
+package: ifenslave/2.14
+homepage: "https://salsa.debian.org/debian/ifenslave"
+upstream_repo: "https://salsa.debian.org/debian/ifenslave.git"
+
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "ifenslave_2.14.tar.xz file listing (22 entries, probed in-task)"
+    reason: "Every entry lives under ifenslave-2.14/debian/; no tests/ or test/ directory exists."
+  - source: "debian/rules + debhelper control files"
+    reason: "rules is a bare dh passthrough with no override_dh_auto_test and no check target; control declares Architecture: all with no test framework dependency."
+  - source: "debian/README.source + debian/NEWS (2.10 entry)"
+    reason: "The historical ifenslave.c binary was retired in 2.10 and replaced by ifupdown shell hooks; 2.14 ships 3 hooks, 1 systemd link and 4 interface examples, none of which registers an automated test."
+  - conclusion: "Upstream 2.14 provides no automated tests whatsoever, so the adapted build executes 0 upstream cases. The adaptation adds a real consumer test driving the installed hooks statically; it is reported separately and never presented as upstream coverage."
+
+upstream_test_total: 0
+upstream_test_count_method: manual_audit
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+test_package_tests:
+  - file: test_ifenslave.sh
+    description: "Three hooks present as regular files under package bin/"
+    command: "sh test_ifenslave.sh <package bin dir>"
+  - file: test_ifenslave.sh
+    description: "First line of all three hooks is #!/bin/sh"
+    command: "sh test_ifenslave.sh <package bin dir>"
+  - file: test_ifenslave.sh
+    description: "sh -n syntax check passes for all three hooks"
+    command: "sh test_ifenslave.sh <package bin dir>"
+  - file: test_ifenslave.sh
+    description: "pre-up hook keeps master setup contract (add_master, enslave_slaves, ip link add)"
+    command: "sh test_ifenslave.sh <package bin dir>"
+  - file: test_ifenslave.sh
+    description: "post-down hook keeps teardown contract (bonding/slaves sysfs, ip link del)"
+    command: "sh test_ifenslave.sh <package bin dir>"
+  - file: test_ifenslave.sh
+    description: "Docs and examples staged (README.Debian + examples/two_ethernet with bond-slaves)"
+    command: "sh test_ifenslave.sh <package bin dir>"
+
+test_scenario_count: 6
+assertion_count: 6
+assertion_count_basis:
+  hooks_present: 1
+  shebang: 1
+  shell_syntax: 1
+  pre_up_contract: 1
+  post_down_contract: 1
+  docs_examples: 1
+counting_policy: "One PASS increment per numbered scenario; inner check_contains calls only fail the scenario without extra increments. No stdout string-counting or arithmetic fix-ups."
