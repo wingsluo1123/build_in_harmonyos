@@ -1,0 +1,111 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: qtconnectivity/6.11.1
+homepage: "https://doc.qt.io/qt-6/qtconnectivity-index.html"
+
+upstream_check_command: "独立 CMake 工程（tests/auto 全部 22 个 tst 目标，见下）"
+upstream_test_in_build: true
+upstream_test_command: "cmake（Qt6::Bluetooth/Nfc + 私有头根 + EGL/GLESv2=SDK sysroot）&& cmake --build && 逐目标 ./tst_* -o result.txt,txt；QT_QPA_PLATFORM=offscreen"
+
+# 上游 tests/auto 的 22 个 tst 目标已于 2026-10-14 在本机全部真实执行
+# （qtbase/qtconnectivity conan 包环境 + offscreen 平台；蓝牙走包内置
+# dummy 后端，NFC 走上游 nfccommons 仿真器）。总账：
+#   passed=340  failed=8  skipped=48
+# 48 个 skipped 为上游自身 QSKIP（无适配器/无设备时按设计跳过，如
+# qbluetoothlocaldevice 的配对类用例 22 个）。
+# 8 个 failed 的分类（原始 -o txt 落盘可复核）：
+#   - 7 个为 NFC 仿真器 targetDetected 路径未触发
+#     （tst_qnearfieldmanager 2、tst_qnearfieldtagtype1 3、
+#      tst_qnearfieldtagtype2 2：'!targetDetectedSpy.isEmpty()' 超时，
+#      单用例 30s 特征）——上游 nfccommons 仿真器的目标检测线程在
+#      本平台未按期投递信号；
+#   - 1 个为 tst_QBluetoothServiceInfo::tst_writeByteArray：断言
+#     QDebug 十六进制转储输出（上游注释自述该断言检查 BlueZ 后端的
+#     debug dump 实现），dummy 后端无此转储输出（Actual ""）。
+upstream_tests:
+  - file: "tests/auto/qbluetoothaddress"
+    description: "QBluetoothAddress 数据类"
+    result: "16 passed, 0 failed"
+  - file: "tests/auto/qbluetoothdevicediscoveryagent"
+    description: "设备发现代理（3 个 QSKIP 为需真实适配器的发现用例）"
+    result: "4 passed, 0 failed, 3 skipped"
+  - file: "tests/auto/qbluetoothdeviceinfo"
+    description: "QBluetoothDeviceInfo 数据类"
+    result: "54 passed, 0 failed"
+  - file: "tests/auto/qbluetoothhostinfo"
+    description: "QBluetoothHostInfo"
+    result: "27 passed, 0 failed"
+  - file: "tests/auto/qbluetoothlocaldevice"
+    description: "本地适配器/配对（22 个 QSKIP 为需真实设备的用例）"
+    result: "4 passed, 0 failed, 22 skipped"
+  - file: "tests/auto/qbluetoothserver"
+    description: "QBluetoothServer 生命周期（dummy 后端）"
+    result: "5 passed, 0 failed"
+  - file: "tests/auto/qbluetoothservicediscoveryagent"
+    description: "服务发现代理（3 个 QSKIP 需真实适配器）"
+    result: "4 passed, 0 failed, 3 skipped"
+  - file: "tests/auto/qbluetoothserviceinfo"
+    description: "QBluetoothServiceInfo 数据类与服务记录"
+    result: "4 passed, 1 failed, 2 skipped（tst_writeByteArray 依赖 BlueZ 后端 debug dump 实现，dummy 后端输出为空）"
+  - file: "tests/auto/qbluetoothsocket"
+    description: "QBluetoothSocket 状态机"
+    result: "8 passed, 0 failed, 2 skipped"
+  - file: "tests/auto/qbluetoothuuid"
+    description: "QBluetoothUuid 全量 UUID 映射"
+    result: "20 passed, 0 failed"
+  - file: "tests/auto/qlowenergycharacteristic"
+    description: "BLE characteristic 数据类"
+    result: "3 passed, 0 failed, 1 skipped"
+  - file: "tests/auto/qlowenergycontroller"
+    description: "BLE 控制器状态机（7 个 QSKIP 需真实控制器）"
+    result: "5 passed, 0 failed, 7 skipped"
+  - file: "tests/auto/qlowenergycontroller-gattserver"
+    description: "GATT 服务器角色（6 个 QSKIP 需真实链路）"
+    result: "7 passed, 0 failed, 6 skipped"
+  - file: "tests/auto/qlowenergydescriptor"
+    description: "BLE descriptor 数据类"
+    result: "3 passed, 0 failed, 1 skipped"
+  - file: "tests/auto/qlowenergyservice"
+    description: "BLE service 数据类"
+    result: "3 passed, 0 failed"
+  - file: "tests/auto/qndeffilter"
+    description: "QNdefFilter 记录匹配"
+    result: "81 passed, 0 failed"
+  - file: "tests/auto/qndefmessage"
+    description: "QNdefMessage 消息语义"
+    result: "41 passed, 0 failed"
+  - file: "tests/auto/qndefnfcsmartposterrecord"
+    description: "Smart Poster NDEF 记录"
+    result: "12 passed, 0 failed"
+  - file: "tests/auto/qndefrecord"
+    description: "QNdefRecord 记录类型系统"
+    result: "27 passed, 0 failed"
+  - file: "tests/auto/qnearfieldmanager"
+    description: "QNearFieldManager + nfccommons 仿真器"
+    result: "8 passed, 2 failed（targetDetected 仿真信号未触发）"
+  - file: "tests/auto/qnearfieldtagtype1"
+    description: "Type 1 标签（nfccommons 仿真器）"
+    result: "2 passed, 3 failed（targetDetected 仿真信号未触发）"
+  - file: "tests/auto/qnearfieldtagtype2"
+    description: "Type 2 标签（nfccommons 仿真器）"
+    result: "2 passed, 2 failed, 1 skipped（同上）"
+
+# 构建方式说明（可复核）：
+# 22 个 tst 目标经独立 CMake 工程构建——与上游 qt_internal_add_test 同
+# SOURCES/DEFINES；Qt::*Private 为 header-only（符号在公共 .so），私有头根
+# 手动补齐；QNFC 三个仿真器目标额外编译树内私有实现
+# （src/nfc/qnearfieldtarget{,_p}.cpp、qnearfieldmanager.cpp——安装库按
+# ELF 可见性隐藏了私有类的 moc/虚分派符号，nm 实证在案），AUTOMOC 自包含。
+upstream_test_exemption:
+  rule: "none"
+  reason: "22/22 目标均已真实构建并执行，无豁免项；8 个 failed 为真实执行结果（NFC 仿真器 targetDetected 路径 7 个 + BlueZ 专属 debug dump 断言 1 个），48 个 skipped 为上游设计内跳过"
+
+test_package_tests:
+  - file: "test_package/test_qtconnectivity.cpp"
+    description: "消费者视角验证：QBluetoothAddress/QBluetoothUuid/QBluetoothDeviceInfo 数据类往返、NFC NDEF 记录往返、无适配器时 QBluetoothLocalDevice::isValid() 优雅报告（输出 QTCONNECTIVITY-CONSUMER-OK）"
+    command: "conan test"
+
+assertion_count: 6
