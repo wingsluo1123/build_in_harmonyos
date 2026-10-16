@@ -1,0 +1,42 @@
+# 版本级 manifest — ppft 1.7.8
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "1.7.8"
+software: ppft
+status: built
+build_date: "2026-10-13"
+build_system: python
+
+source:
+  url: "https://files.pythonhosted.org/packages/8b/d2/281aa3466e948283d51b83238fb456f65e14f8ade5f8627822578cd2708f/ppft-1.7.8.tar.gz"
+  sha256: "5f696d4f397ae9b0af39b1faffb31957c51dfbc5a3815856472d4f4e872937ee"
+  tar_format: tar.gz
+
+build:
+  system: custom
+  configure_options: []
+  dependencies:
+    # **零运行期依赖**：PyPI 元数据 requires_dist 为空
+    #   （`dill>=0.4.1` 仅为可选 extra "dill"，不属于运行期必需）
+    - "（无）"
+    # 测试期依赖：**无**——实测上游套件脚本只 import math/sys/time/hashlib 与 ppft 自身
+    # （早前预估需要 dill/pytest，已被实测证伪，pip 安装一并去掉，构建全程离线）
+  python: "3.12"
+
+patches_applied: []
+
+upstream_tests:
+  framework: "上游自带 runner（ppft/tests/__main__.py；**非 pytest**，脚本名也不是 test_*）"
+  test_path: "ppft/tests（_discover_test_dir() 按「目录内存上游 runner __main__.py」探测）"
+  test_command: "python3 ppft/tests/__main__.py（上游 tox.ini 的官方命令）"
+  test_count: 7
+  test_scripts: "auto_diff.py, callback.py, dynamic_ncpus.py, quicksort.py, reverse_md5.py, sum_primes.py, sum_primes_functor.py"
+  run_in_build: true
+  verified: true
+upstream_test_pass_rate: "**7/7 个脚本全部通过（rc=0）**（本地 conan create 实测）：上游官方跑法 `python ppft/tests/__main__.py`（其 tox.ini 的 commands 即此），runner 把 ppft/tests/ 下除 `__*` 外的 7 个脚本逐个当子进程执行，任一失败即 exit 1 —— 配方按 rc 硬判（rc≠0 或找不到套件一律 `ConanInvalidConfiguration`，绝不把“没跑”写成通过）；**零测试期依赖**（实测脚本只 import 标准库与 ppft）。早前“按 test_* 探测 + pytest 跑”是错的：该目录下根本没有 test_*.py。**并如实披露测试期环境改动（CI 构建 #89931 的修复）**：ppft 的 `Server._Server__detect_ncpus()` 按 `os.sysconf('SC_NPROCESSORS_ONLN')`（系统总核数、与 CPU 亲和性无关，已实测）一次 spawn 出同数 worker → CI 沙箱 `BlockingIOError: [Errno 11] Resource temporarily unavailable`；故测试期用 sitecustomize shim 把探测值压到 **2**（**只改并行度，用例数与断言完全不变**），并加 **shim 自检**（探测值 > 2 即 `ConanInvalidConfiguration`，防首版那种“类名写错 → 静默跳过”的失效）与 **仅对资源类错误的有界重试 1 次**（断言失败不重试）。"
+adapted_test_pass_rate: "test_package/check_ppft.py **6 项消费者校验**（全部离线、只用可实证断言）：①产物齐备 ②模块文件齐备（≥3 个 .py 且含 __init__.py）③真实 import ppft（零运行期依赖）④公开符号面（按实测 dir() 报告）⑤__version__ 若存在需为 1.7.8（不存在则如实说明）⑥证据（模块字节 + python 版本）"
+
+knowledge_gained:
+  - category: L1
+    content: "**零运行期依赖的纯 Python 包**（PyPI `requires_dist` 为空，仅可选 extra 有依赖）适配最省事：不声明任何 Conan `requires`、无 pip 绕过、无随包附带，`package()` 直接拷贝模块目录即可；但仍须在消费者校验里**只用可实证断言**（用 `dir()` 报告实际符号面、`__version__` 缺失时如实说明而非硬断言），避免臆造上游 API 名字造成假失败。"
+    reason: "ppft 适配实测——零运行期依赖包的最小适配面与可实证断言纪律"
