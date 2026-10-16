@@ -1,0 +1,69 @@
+#====================================================================
+# Draft knowledge entry — npm 分发的纯 bash 脚本包被 lang-preflight 判为 nodejs
+# 来源: xcv 1.0.1 适配（archives/x/xcv/1.0.1）
+# 配对人类文档: knowledge/drafts/E8741-draft-X7C1.md
+# 待办: 评审通过后由主编 promote 为 E###.kv
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E870
+trigger_tool:           ohc-run.py lang-preflight
+phase:                  preflight
+error_signature:        detected_language.*nodejs.*无源文件可统计|build_system.*npm.*package\.json 含 main/scripts/engines/bin|语言不匹配: task=cpp, detected=nodejs
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               2
+category:               limitation, detection, build-system
+match_keywords:         lang-preflight, lang_detect, package.json, bin, npm, nodejs, 无源文件可统计, 无扩展名脚本, extensionless, bash 脚本, env_unsupported, R47, 误判
+title:                  通过 npm 分发的单文件 bash 脚本（无扩展名，package.json 含 bin）被 lang-preflight 判 nodejs 且源码统计为空，默认口径会误写 env_unsupported 终态
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             lang_detect._manifest_scan 见到 package.json 含 "bin" 键即判 manifest=nodejs/npm；源码统计 _EXT_LANG 只按扩展名归类
+                        （.sh/.bash→bash），而这类脚本以 bin 名直接命名（xcv，无扩展名，仅靠 #!/bin/bash shebang 识别），
+                        因此统计为空（"无源文件可统计"）、没有任何信号能纠正 manifest 的判断。仓库实际只有一个 bash 脚本 + README + package.json，
+                        不含任何 JS 源码。默认任务语言 cpp 与 nodejs 不匹配 → 自动写 env_unsupported 终态。
+affected_scope:         以 npm 作为分发渠道、但内容是单文件 bash/sh 脚本的 CLI 工具（package.json 含 bin，脚本无扩展名）；
+                        所有走 ohc-run.py lang-preflight 的 Shell 库适配任务
+verification_cmd:       python3 -c "import sys; sys.path.insert(0,'scripts'); from ohc.lang_detect import detect_language; print(detect_language('<src>'))"; head -1 <src>/<bin 脚本>
+
+# ═══ Layer 3: 方案层 (Solution Space) ═══
+rec_priority:           1
+rec_approach:           declare-detector-language-and-document
+rec_description:        赛事接受 Shell 适配，不是止损条件。先用只读 detect_language 判定并确认仓库只有 bash 脚本（head -1 看 shebang、无 JS 源码），
+                        再用 --lang <检测器判定值> 显式声明跑 lang-preflight 放行（如实申报，不伪报 cpp），把只读输出与 Shell 依据写入 notes.md，
+                        并在 SKILL_FEEDBACK 记录检测器缺陷。若默认口径已误写 env_unsupported，最终回执用 result --force 覆盖并在 --summary 说明。
+rec_command:            python3 $SKILL_ROOT/scripts/ohc-run.py lang-preflight <软件> <版本> --src $BUILD_SRC_DIR --lang nodejs
+rec_auto_fix:           false
+rec_impl:               manual
+
+fallback_priority:      2
+fallback_approach:      readonly-detect-only
+fallback_description:   不跑会写终态的预检，只保留只读 detect_language 输出与 Shell 依据留档
+fallback_command:
+fallback_auto_fix:      false
+fallback_impl:
+
+forbid_1_pattern:       --lang cpp|OHPCD_LANG=cpp|env_unsupported.*Shell
+forbid_1_reason:        伪报 cpp 违反“如实申报”；以“语言不是 C/C++”为由上报 env_unsupported 违反赛事对 Shell 适配的接受口径
+forbid_1_consequence:   前者回执被判语言申报造假，后者把可交付的 Shell 库白白止损
+
+# ═══ Layer 4: 原则引用 ═══
+principles:
+
+# ═══ 关系图 (Relations) ═══
+# ═══ 元数据 ═══
+doc_file:               doc/E8741.md
+last_updated: 2026-10-07
+source_event:           archives/x/xcv/1.0.1/notes.md
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:                lkjing2021345 <1908499668@qq.com>
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics, 方案 D) ═══
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+
