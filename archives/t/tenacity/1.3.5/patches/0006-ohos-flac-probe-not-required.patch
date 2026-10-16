@@ -1,0 +1,16 @@
+--- a/cmake-modules/FindFLAC++.cmake
++++ b/cmake-modules/FindFLAC++.cmake
+@@ -42,7 +42,12 @@
+ 
+ #]=======================================================================]
+ 
+-find_package(FLAC REQUIRED)
++# OHOS patch: 顶层 CMakeLists.txt 对 FLAC 的探测本身是**可选**的
++# （find_package(FLAC++)，随后 cmake_dependent_option(FLAC ... OFF)），
++# 但本模块内的 REQUIRED 把它升级成了硬失败，导致 OHOS 上（未打包 FLAC）
++# configure 直接中止。改为 QUIET：缺失时 FLAC_FOUND=FALSE，特性优雅降级为
++# "FLAC codec support disabled"，与其它可选编解码器行为一致。
++find_package(FLAC QUIET)
+ 
+ find_package(PkgConfig QUIET)
+ if(PkgConfig_FOUND)

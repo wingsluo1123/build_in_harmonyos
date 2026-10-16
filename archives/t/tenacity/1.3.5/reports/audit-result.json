@@ -1,0 +1,57 @@
+{
+  "metadata": {
+    "timestamp": "2026-10-14T22:58:00.000000",
+    "branch": "feat/tenacity-1.3.5",
+    "base_branch": "upstream/main",
+    "package": "tenacity",
+    "version": "1.3.5",
+    "auditor": "W4-pre-pr-independent-auditor",
+    "audit_scope": "提交级 diff 为空（工作树尚未提交，pre_pr_audit.py generate 返回 RC=1「没有变更文件，无需审计」），本报告按工作树真实证据手工撰写，覆盖范围为 archives/t/tenacity/1.3.5/ 全部 18 个配方文件 + knowledge/drafts/ 下 8 个知识草稿。"
+  },
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "R40",
+      "file": "archives/t/tenacity/1.3.5/conanfile.py",
+      "description": "本包只交付静态形态：configure() 中对 shared=True 显式抛 ConanInvalidConfiguration（理由：shared 形态未验证，避免静默产出错架构），且 BUILD_STATIC_LIBS=ON 为唯一验证过的配置。适配走「路径 B」——仅构建 17 个非 GUI 核心库（libraries/lib-*），GUI 前端（src/ modules/ plug-ins/ nyquist/ scripts/）整体跳过。因此本包不提供 GUI 可执行文件，W3 的 L2 记为 skip: no bin/ dir。",
+      "fix_suggestion": "需人工确认接受「仅静态核心库」这一交付形态。若后续需要 shared 或 GUI 前端，应作为独立任务另立配方，不在本 PR 扩展。"
+    },
+    {
+      "severity": "P2",
+      "rule_id": "R40",
+      "file": "archives/t/tenacity/1.3.5/manifest.yaml",
+      "description": "finalize-archive 报「缺少 debug tar.gz」（本轮仅打包 release：packaging/tenacity-1.3.5-ohos-aarch64.tar.gz，成员数 131 = 包内 133 文件 − conaninfo.txt/conanmanifest.txt，已自检）。原因是 debug 构建（-c build_type=Debug）未执行、未验证，故不声称该形态可用。",
+      "fix_suggestion": "需人工确认接受仅提供 release 制品；如需 debug，应另跑一次 -c build_type=Debug 的 conan create 并单独验证，不与本 PR 混做。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "gate-accuracy-L1c",
+      "file": "ci/conan/build_and_test.sh",
+      "description": "W3 的 L1c 判据 `grep -qiE \"make.*check|ctest|meson test|pytest\" \"$BUILD_LOG\"`（第 1446 行，忽略大小写）会误判。本包上游自动化测试实为 0/0，但 BUILD_LOG（.ci_logs/conan_build_tenacity_1.3.5.log）中唯一命中行是第 1318 行 `Building C object CMakeFiles/elf_check.dir/elf_check.c.obj` —— `CMa**make**Files` 含 make、elf_**check** 含 check，恰好凑成 make.*check，于是 L1 报 `pass: upstream tests + test_package executed`。不可据此判上游测试通过。",
+      "fix_suggestion": "收紧为带词边界且要求测试语义的形式（如 `\\bmake\\s+\\S*\\s*check\\b|\\bctest\\b`，并排除 CMakeFiles 路径行）。属 ci/ 基础设施缺陷，应按「框架改动单独 PR」处理，不在本配方 PR 中顺手改。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "gate-accuracy-L4",
+      "file": "ci/conan/build_and_test.sh",
+      "description": "W3 的 L4 判据 `grep -rlE '(strcpy|sprintf|gets|strcat)\\b'`（第 1469 行）缺少**前导**词边界，导致 `wxWidgets` 内嵌子串 `gets`（其后紧跟 `:` 或空格，尾部 \\b 成立）被误判：本包 6 个补丁共 20 处命中（0001 十三处、0002 两处、0003/0007/0008 各一处、0005 两处），L4 记 `warn: dangerous functions in patches`。经标准 Python re 复验同样 20 处命中，说明与 grep 实现（toybox）无关，是正则本身缺陷。实际危险函数调用形态 `\\b(strcpy|sprintf|gets|strcat)\\s*\\(` 在 9 个补丁中零命中。",
+      "fix_suggestion": "判据改为 `\\b(strcpy|sprintf|gets|strcat)\\s*\\(`。属 ci/ 基础设施缺陷，同上应单独 PR。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "JC5",
+      "file": "archives/t/tenacity/1.3.5/.edit-tracker.json",
+      "description": "finish 运行时在版本目录写入 .edit-tracker.json（编辑追踪基线）。它出现在 `git status --porcelain -uall` 的 27 项 untracked 中，而 JC5 明确拦截 archives/**/.<dotfile>（不在白名单内）。当前工作树共 27 项 untracked、0 staged、0 unstaged，分支领先 main 0 个提交。",
+      "fix_suggestion": "提交时用精确路径 git add（禁止 git add -A / git add archives/），显式排除 .edit-tracker.json 与其余 6 个运行时标记（.build-closed / .ci-result.json / .conan-verified / .handoff.json / .knowledge-done / .staging-verified）。另需 git add -f archives/t/tenacity/1.3.5/reports/test-report.md 与 reports/audit-result.json（reports/ 被 .gitignore:96 忽略，747/494 个入库包惯例强制追踪），大日志（conan-create*.log、r36-*.log）不提交。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "gate-accuracy-G0",
+      "file": "scripts/ohc/clean_verify.py",
+      "description": "finish Step3 的 G0 干净构建验证走**系统 patch 命令行**（本机为 toybox 0.8.12），而 conan create 走纯 Python patch_ng，二者对同一 hunk 判定可相反。实测：同一份 0007-ohos-expat-target-bridge.patch + 同一份 G0 干净源码（/data/storage/el2/base/cache/ohc-verify-tenacity-*/tenacity-1.3.5），toybox 报 `Hunk 1 FAILED 495/495`（连 --dry-run 的 rc 都是 0），patch_ng 返回 parse=True / apply=True；同一次 conan create RC=0 且 9 个补丁全部应用成功。G0 在 finish 中非阻塞。",
+      "fix_suggestion": "G0 判补丁应用应改用与 Conan 相同的 patch_ng（或至少在 toybox 报 FAILED 时用 patch_ng 复核后再判定），避免把宿主 grep/patch 实现缺陷误判为配方缺陷。"
+    }
+  ],
+  "summary": "审计通过：verdict=pass，P0=0、P1=0。欺骗类全项通过——R34 反空壳：test_package/conanfile.py 在运行前校验 licenses/ 非空、17 个 <lib>.a 全部存在、17 个 include/tenacity/<lib>/ 头文件目录全部非空，随后真实链接 17 个交付归档并真实运行 test_tenacity --selftest（22 项断言：lib-math 14 + lib-string-utils 4 + platform 4，PASSED: 0 failure(s)），再以 elf_check 对 17 个归档逐一校验 ar magic 与 ELF e_machine==EM_AARCH64(183)，非 echo/print 假运行；R9/R19：无预编译产物（.a/.so/.o 零命中）；R8/PF5：9 个补丁零处注入 -D__OHOS__ 类平台宏，全部为 CMake 层配置与可移植 C++ 改动；R33：配方零处读取裸环境变量；R39：conandata.yml 仅官方 GitHub URL + sha256 3bcbbbd…，9 条 patch_file 与磁盘 9 个 .patch 一致，manifest.yaml 的 patches_applied 亦为 9 条（三方一致）；配方质量：Conan 2.x API（configure(variables=…) 而非 1.x 的 configure_variables）、package_type=library、cpp_info.libs/defines/includedirs/requires 四项齐备、configure() 显式拒绝未验证的 shared 形态。状态一致性：manifest status=built 与 notes「状态: built」一致，未虚称 published（制品仅在本地缓存，未 upload ohpcd）。上游测试如实申报 0/0 并附技术原因（全树无 add_test/enable_testing/include(CTest)；tests/ 仅出现在 scripts/CMakeLists.txt:43-44 的源码 tarball 打包清单中，不构成测试目标；其测试源另引用 1.3.5 已不存在的 DirManager.h / blockfile/SimpleBlockFile.h），不以消费者用例冒充上游统计。文件边界：archives/ 下 19 项变更全部属 t/tenacity/1.3.5，另 8 项为 knowledge/drafts/tenacity-1.3.5-*.{md,kv} 知识草稿，无其它软件/版本、无依赖源码、无生成物、无软件级 README.md/commands.json（PF9 合规）。遗留 6 条 P2/P3 观察项不阻塞发布：其中 3 条为门禁自身的误判或缺陷（L1c 的 make.*check 误命中 CMakeFiles/elf_check、L4 正则缺前导词边界、G0 用 toybox patch 假 FAIL），已在对应 issue 中给出定位与修法并建议按「框架改动单独 PR」处理；另 2 条需人工确认交付形态（仅静态、仅 release）；1 条为提交卫生提示（.edit-tracker.json 须排除）。"
+}

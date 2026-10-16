@@ -1,0 +1,37 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -662,13 +662,31 @@
+ # define EXPERIMENTAL flags
+ include("src/Experimental.cmake")
+ 
+-find_package(wxWidgets 3.1 REQUIRED COMPONENTS base core html net)
+-include(${wxWidgets_USE_FILE})
++# OHOS patch: ohpcd 已合入的 wxWidgets（3.2.10/3.3.x）以 wxUSE_GUI=OFF 构建，仅提供 wxBase
++# 组件（3.2.x: libwx_baseu-*.a/libwxregexu-*.a；3.3.x 另有 _net/_xml/wxzlib/wxexpat），无 GUI 组件（setup.h 中
++# wxUSE_GUI 0 / wxUSE_HTML 0）。上游 find_package 的 REQUIRED 语义使缺失即致命、无法降级；
++# 而本补丁集跳过的 GUI 前端（src/ modules/ plug-ins/ nyquist/）才是这些组件的唯一消费者，
++# 保留的 libraries/lib-* 核心库全部只依赖 wxBase（wxString/wxFileName 等）。
++# 手法与本仓库 aegisub 3.4.2（wx_dep 改 wx-baseu-3.2 + 禁用 GUI 前端）同构。
++find_package(wxWidgets REQUIRED)
++# config 模式（Conan CMakeDeps 生成的 <name>-config.cmake / <Name>Config.cmake）不产出 wxWidgets_USE_FILE，
++# 原 include(${wxWidgets_USE_FILE}) 会以空参数报
++# "include called with wrong number of arguments"；仅非空时才 include。
++if(wxWidgets_USE_FILE)
++  include(${wxWidgets_USE_FILE})
++endif()
+ # The FindwxWidgets.cmake module does not create an IMPORT target, so hack one together.
+ # This makes it easy to add the compile definitions to the lib-strings and lib-strings-utils targets.
+ if(NOT TARGET wxWidgets::wxWidgets)
+   add_library(wxWidgets::wxWidgets INTERFACE IMPORTED)
+-  target_link_libraries(wxWidgets::wxWidgets INTERFACE ${wxWidgets_LIBRARIES})
++  # OHOS: Conan CMakeDeps 的 config 目标名随 cmake_target_name 而异——3.2.10 为小写
++  # wxwidgets::wxwidgets；3.3.x 为驼峰 wxWidgets::wxWidgets（与上游同名，最外层 if 直接
++  # 跳过本 block）。优先桥接小写 config 目标以继承真实静态库/头文件/编译定义，否则回退 MODULE。
++  if(TARGET wxwidgets::wxwidgets)
++    target_link_libraries(wxWidgets::wxWidgets INTERFACE wxwidgets::wxwidgets)
++  else()
++    target_link_libraries(wxWidgets::wxWidgets INTERFACE ${wxWidgets_LIBRARIES})
++  endif()
+   target_compile_definitions(wxWidgets::wxWidgets INTERFACE ${wxWidgets_DEFINITIONS} ${wxWidgets_DEFINITIONS_DEBUG})
+ endif()
+ 

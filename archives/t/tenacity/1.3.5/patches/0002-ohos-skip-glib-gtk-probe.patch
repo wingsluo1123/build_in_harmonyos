@@ -1,0 +1,19 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -642,9 +642,14 @@
+     message(STATUS "VST2 plugin host support disabled.")
+ endif()
+ 
++# OHOS patch: GLIB/GTK 仅服务 GUI 前端（src/ 的 GTK 集成），保留的 libraries/lib-*
++# 对 glib/gtk 零直接使用（已逐库核验）。注意源码中出现的 __WXGTK__ 是 wxWidgets 的
++# GTK 端口宏，而 OHOS 制品为 base-unicode-static（无 GTK 端口），相关 #if 分支不会被
++# 编译。跳过 GUI 前端时一并去掉这两个 REQUIRED 探测，同时消除依赖图中的版本冲突
++# （glib -> fontconfig -> expat/2.8.2.1 与 wxwidgets -> expat/2.8.2 互斥）。
+ if(NOT CMAKE_SYSTEM_NAME MATCHES "Darwin|Windows")
+-    find_package(GLIB REQUIRED)
+-    find_package(GTK 3.0 REQUIRED)
++    # find_package(GLIB REQUIRED)
++    # find_package(GTK 3.0 REQUIRED)
+ 
+ endif()
+ 

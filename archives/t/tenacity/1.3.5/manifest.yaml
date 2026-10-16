@@ -1,0 +1,99 @@
+# 版本级 manifest — tenacity 1.3.5
+# 遵循 ARCHIVE-SPEC v2.0
+
+# 版本号
+version: "1.3.5"
+
+# 软件名
+software: tenacity
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-14"
+build_system: cmake
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（tenacityteam/tenacity 官方 GitHub release tag）
+  url: "https://github.com/tenacityteam/tenacity/archive/refs/tags/v1.3.5.tar.gz"
+
+  # 源码校验和（conandata.yml 实测）
+  sha256: "3bcbbbddf3d7ed9036d5c131c4dd3cc6b037c0888c6b6099c7c149c9dbfcdcb8"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表
+  configure_options:
+    - "-DBUILD_STATIC_LIBS=ON"
+    - "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+    - "-DCMAKE_DISABLE_FIND_PACKAGE_Python3=ON"
+    - "-DVCPKG=OFF"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - wxwidgets/3.3.3.2
+    - portaudio/19.7.0
+    - libsoxr/0.1.3
+    - expat/2.8.2
+    - zlib/1.3.1.1
+    - lame/3.100
+    - libsndfile/1.2.2
+    - sqlite3/3.49.1
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "patches/0001-ohos-wxwidgets-base-only.patch"
+  - "patches/0002-ohos-skip-glib-gtk-probe.patch"
+  - "patches/0003-ohos-libraries-only.patch"
+  - "patches/0004-ohos-libraries-install.patch"
+  - "patches/0005-ohos-drop-wx-display-include.patch"
+  - "patches/0006-ohos-flac-probe-not-required.patch"
+  - "patches/0007-ohos-expat-target-bridge.patch"
+  - "patches/0008-ohos-internat-pathformat-fallback.patch"
+  - "patches/0009-ohos-filenames-magic-h-relative.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "路径 B（非 GUI 核心库适配）：仅构建 libraries/lib-* 的 17 个非 GUI 核心库（251 源文件），跳过 src/ GUI 前端（346 文件直接用 wxWindow 等 GUI 类）、modules/、plug-ins/、nyquist/；与 archives/a/aegisub/3.4.2「libaegisub 核心库 + 禁用 GUI 前端」同构。已逐库核验 17 个 lib-* 对 GUI-only wx 头零引用、与 src/ 零反向依赖。（ref: archives/a/aegisub/3.4.2/notes.md）"
+  - "R36 依赖阻塞（初版 wxwidgets/3.2.10）：其已发布制品（ohpcd 与本地同修订 b145b32324b9d8283025188312c9964b）缺全部平台源——libwx_baseu-3.2.a 的 93 个成员中 unix/msw/osx 零命中，真实链接消费者报 52 个未定义 wx 平台符号（wxDir::* / wxAppTraits::* / wxStandardPaths::* / wxMutex / wxThread / wxGetEnv / wxUILocaleImpl::*）。根因：上游 build/cmake/lib/base/CMakeLists.txt 用 elseif(UNIX) 选平台源，交叉编译 CMAKE_SYSTEM_NAME=HarmonyOS 时 UNIX 为假；同仓 wxwidgets/3.2.6 配方有正解 tc.cache_variables[UNIX]=ON，3.2.10 回归丢失。改用 wxwidgets/3.3.3.2（ohpcd 有完整二进制）解决。（ref: knowledge/drafts/tenacity-1.3.5-wxwidgets-missing-unix-base-sources.md）"
+  - "wxwidgets 3.2.x 与 3.3.x 的 CMake 目标名不同（实测探针）：3.2.10 的 cmake_target_name 为小写 wxwidgets::wxwidgets（生成 wxwidgets-config.cmake），3.3.3.2 为驼峰 wxWidgets::wxWidgets（生成 wxWidgetsConfig.cmake）。find_package(wxWidgets REQUIRED) 两版本均可解析；3.3.3.2 下 wxWidgets::wxWidgets 由 Conan CMakeDeps 直接提供，因此上游 if(NOT TARGET wxWidgets::wxWidgets) 的桥接块自动跳过。（ref: knowledge/drafts/tenacity-1.3.5-wxwidgets-missing-unix-base-sources.md）"
+  - "cpp_info.libs 与上游归档命名：tenacity 的 TenacityFunctions.cmake 对库目标设 PREFIX \"\"，而目标名本身已含 lib- 前缀 → 归档实际名为 lib-<name>.a。而 Conan CMakeDeps 用 find_library(NAMES <cpp_info.libs 条目>)，CMake 会强制拼 lib 前缀 → 写成 lib-project-rate 实际查 liblib-project-rate.a。正解：cpp_info.libs 条目写成去掉 lib 前缀但保留连字符的形式（-project-rate），归档保持上游原名不重命名。（ref: knowledge/drafts/tenacity-1.3.5-cpp-info-libs-lib-prefix.md）"
+  - "package_type=library 使消费者丢失传递依赖头文件：Conan 对编译型库的依赖边默认 transitive_headers=False，消费者不继承本包依赖的 include 目录。本包公开头文件直接 #include 了 wx（42 处）与 portaudio（1 处），故 wxwidgets/portaudio 两条边必须显式 transitive_headers=True，否则消费者编译报 fatal error: 'wx/string.h' file not found。同构先例 knowledge/drafts/DRAFT-cpp-rotor-0.35-boost-trimmed-recipe-missing-components。（ref: knowledge/drafts/tenacity-1.3.5-package-type-library-transitive-headers.md）"
+  - "Conan 完整性校验 The direct dependency 'x' is not used by any '(cpp_info/components).requires'：只要 cpp_info.requires 里出现 pkg::comp 形式，该包所有 visible 的直接依赖都必须列出。处理：仅服务 GUI 前端（本包不构建）的 lame/libsndfile/sqlite3 标 visible=False（同构先例 archives/a/accountsservice/26.27.3）；zlib 因同时是 wxwidgets 的可见依赖必须保持可见并列入 requires，否则触发 required both with visible=True and visible=False 风险告警。（ref: knowledge/drafts/tenacity-1.3.5-cpp-info-requires-completeness-visible-false.md）"
+  - "上游测试入口如实申报：tenacity 1.3.5 全仓 add_test / enable_testing / include(CTest) 零命中（无 CTest）；tests/ 目录不构成构建或测试目标——唯一提及它的 scripts/CMakeLists.txt:43-44 是传给 add_custom_target 的源码 tarball 打包清单（配合 set( TLD \"tenacity-minsrc-…\" ) 与 tar.xz）；且 tests/SequenceTest.cpp 与 tests/SimpleBlockFileTest.cpp 引用 1.3.5 中已不存在的 DirManager.h / blockfile/SimpleBlockFile.h，无法编译。故上游自动化测试 0/0，功能验证由 test_package 的 HarmonyOS 消费者用例承担（真实链接 + 真实 API 调用 + --selftest 无头断言 + no-display fail-closed）。（ref: archives/t/tenacity/1.3.5/test_package/MANIFEST.yml）"
+
+knowledge_ref:
+  - "knowledge/drafts/tenacity-1.3.5-wxwidgets-missing-unix-base-sources.md"
+  - "knowledge/drafts/tenacity-1.3.5-cpp-info-libs-lib-prefix.md"
+  - "knowledge/drafts/tenacity-1.3.5-package-type-library-transitive-headers.md"
+  - "knowledge/drafts/tenacity-1.3.5-cpp-info-requires-completeness-visible-false.md"
+  - "archives/t/tenacity/1.3.5/test_package/MANIFEST.yml"
