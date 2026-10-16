@@ -1,0 +1,53 @@
+--- a/src/variablesModel.cpp
++++ b/src/variablesModel.cpp
+@@ -34,15 +34,19 @@ VariablesModel::~VariablesModel()
+ 
+ Variable *VariablesModel::create()
+ {
+-    // reset values of variable from prev use
+-    CTVariable ctVariable = CTVariable(QStringLiteral(""), QStringLiteral(""), mCtCron->userLogin());
++    // reset values of variable from prev use; with a null cron there is no
++    // login to attach the variable to, keep it unowned (still editable).
++    CTVariable ctVariable = CTVariable(QStringLiteral(""), QStringLiteral(""),
++                                       mCtCron ? mCtCron->userLogin() : QString());
+     mTmpVariable->updateVariable(ctVariable);
+     return mTmpVariable;
+ }
+ 
+ void VariablesModel::applyCreate()
+ {
+-    Variable *variable = new Variable(new CTVariable(QStringLiteral(""), QStringLiteral(""), mCtCron->userLogin()), this);
++    Variable *variable = new Variable(new CTVariable(QStringLiteral(""), QStringLiteral(""),
++                                                     mCtCron ? mCtCron->userLogin() : QString()),
++                                      this);
+     variable->updateVariable(mTmpVariable->variable());
+ 
+     this->add(variable);
+@@ -207,6 +211,10 @@ void VariablesModel::cut()
+ 
+ void VariablesModel::paste()
+ {
++    if (!mCtCron) {
++        return;
++    }
++
+     QString clipboard = QApplication::clipboard()->text();
+     if (clipboard.isEmpty()) {
+         return;
+@@ -295,9 +303,13 @@ void VariablesModel::refresh(CTCron *ctCron)
+ 
+     this->clear();
+ 
+-    for (CTVariable *ctVariable : mCtCron->variables()) {
+-        Variable *variable = new Variable(ctVariable, this);
+-        this->add(variable);
++    // HarmonyOS PC (OHOS): tolerate a missing current-user crontab (null cron,
++    // see CTHost / KCMCron::init()) instead of dereferencing the null pointer.
++    if (mCtCron) {
++        for (CTVariable *ctVariable : mCtCron->variables()) {
++            Variable *variable = new Variable(ctVariable, this);
++            this->add(variable);
++        }
+     }
+ 
+     Q_EMIT needUserColumnChanged();

@@ -1,0 +1,18 @@
+--- a/src/crontablib/cthost.cpp
++++ b/src/crontablib/cthost.cpp
+@@ -66,6 +66,15 @@ CTHost::CTHost(const QString &cronBinary, CTInitializationError &ctInitializatio
+         setpwent(); // restart again for others
+ 
+         passwd *currentUserPassword = getpwuid(uid);
++        // HarmonyOS PC (OHOS): processes can legitimately run under app-domain
++        // uids that have no /etc/passwd entry, in which case getpwuid()
++        // returns nullptr. Degrade to an initialization error instead of
++        // dereferencing the null entry (which would abort the host process
++        // while loading the KCM).
++        if (!currentUserPassword) {
++            ctInitializationError.setErrorMessage(i18n("No password entry found for uid '%1'", getuid()));
++            return;
++        }
+ 
+         const QString errorMessage = createCTCron(currentUserPassword);
+         if (!errorMessage.isEmpty()) {

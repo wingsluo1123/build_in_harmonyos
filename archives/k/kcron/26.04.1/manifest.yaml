@@ -1,0 +1,114 @@
+# 版本级 manifest
+# 文件位置: archives/k/kcron/26.04.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "26.04.1"
+software: "kcron"
+status: built
+build_date: "2026-10-16"
+build_system: "cmake"
+conan_ref: "kcron/26.04.1"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://download.kde.org/stable/release-service/26.04.1/src/kcron-26.04.1.tar.xz"
+  sha256: "ee83f2a70a7a58882a75a9e989205917ee8d872b01c572a140ecc4094b3df45f"
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+
+  configure_options:
+    - "-DBUILD_TESTING=ON（上游 taskvalidatortest 在 build() 内真实执行）"
+    - "-DKF_IGNORE_PLATFORM_CHECK=TRUE（OHOS 不在 KDE 平台白名单）"
+    - "-DKF_SKIP_PO_PROCESSING=ON（平台无 msgfmt/lconvert）"
+    - "-DCMAKE_DISABLE_FIND_PACKAGE_KF6DocTools=TRUE（未发布，非必需）"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DCMAKE_MODULE_LINKER_FLAGS_INIT=-Wl,-z,max-page-size=0x1000（OHOS 加载器要求 4-LOAD 段布局）"
+    - "-DCMAKE_EXE_LINKER_FLAGS_INIT=-Wl,-z,max-page-size=0x1000 -Wl,--disable-new-dtags（工具链若落依赖 RPATH 则取 DT_RPATH 形式）"
+    - "-DCMAKE_BUILD_RPATH/-DCMAKE_INSTALL_RPATH=<依赖 lib 目录集>（跨平台意图；本 OHOS 工具链实测不落 RPATH，运行时解析经 package_info() 导出 LD_LIBRARY_PATH）"
+    - "-DQT_ADDITIONAL_PACKAGES_PREFIX_PATH=<qtdeclarative;qtsvg;qtshadertools;qtmultimedia 前缀>（Qt6 跨包组件查找）"
+
+  dependencies:
+    - "qtbase/6.11.1.1"
+    - "qtbase-sql-dbus/6.11.1"
+    - "qtdeclarative/6.11.1"
+    - "qtsvg/6.11.1"
+    - "qtshadertools/6.11.1"
+    - "qtmultimedia/6.11.1"
+    - "kauth/6.26.0"
+    - "kcmutils/6.26.0"
+    - "kio/6.26.0"
+    - "kxmlgui/6.26.0"
+    - "kitemviews/6.26.0"
+    - "kservice/6.26.0（传递）"
+    - "kconfigwidgets/6.18.0"
+    - "kirigami/6.18.0"
+    - "kirigami-addons/1.13.0"
+    - "kconfig/6.26.0"
+    - "kcoreaddons/6.26.0"
+    - "kguiaddons/6.26.0"
+    - "ki18n/6.26.0"
+    - "kwidgetsaddons/6.26.0"
+    - "kcolorscheme/6.26.0"
+    - "kcodecs/6.26.0"
+    - "kiconthemes/6.26.0"
+    - "kcrash/6.26.0"
+    - "karchive/6.26.0（传递，KIO 闭包）"
+    - "expat/2.8.2.1"
+    - "openssl/3.5.6.1"
+    - "zstd/1.5.7"
+    - "libxml2/2.15.3"
+    - "ecm/6.26.0 (tool_requires)"
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - patches/0001-CMakeLists.txt.patch
+  - patches/0002-src-CMakeLists.txt.patch
+  - patches/0003-src-cronPrinter.cpp.patch
+  - patches/0004-src-crontablib-cthost.cpp.patch
+  - patches/0005-src-tasksModel.cpp.patch
+  - patches/0006-src-variablesModel.cpp.patch
+  - patches/0007-autotests-portable-absolute-path.patch
+
+# ============================================================
+# 测试信息
+# ============================================================
+
+upstream_tests:
+  framework: "ctest"
+  test_targets: 1
+  test_command: "ctest --test-dir <build> --output-on-failure --no-tests=error（taskvalidatortest，9 具名用例，清单见 test_package/MANIFEST.yml）"
+  run_in_build: true
+upstream_test_pass_rate: "9/9（真机零裁剪；补丁 0007 将 2 个绝对路径用例改写为 QCoreApplication::applicationFilePath() 断言，消除平台不可移植断言）"
+adapted_test_pass_rate: "25/25（消费者 7 组断言，真机，reports/test-package-ctest.log 逐用例 PASS）+ 八门禁 PASS（reports/conan-verify-report.md，2026-10-16）"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "QML KCM 消费者的加载链是 lib/plugins/plasma/kcms/systemsettings/kcm_cron.so → QPluginLoader → KPluginFactory 实例化；KCM 的 QML 资源走 org.kde.private.kcms.cron 模块（QML2_IMPORT_PATH 指到包 qml/），消费者测试用真实 QQmlEngine 驱动即可覆盖 TaskValidator 全部分支（空命令拒绝/真实可执行通过/缺失路径 File not found）"
+  - "已发布 qtbase 以 FEATURE_printsupport=OFF 构建（无 Qt6PrintSupport 模块）：cron 打印必须整链替换为 QPdfWriter（QtGui）+ QFileDialog::getSaveFileName（Qt Widgets），并显式请求 Widgets 组件（algobox/conducteo/ksystemlog 26.04.0 先例）"
+  - "本平台 uid 20020084 无 /etc/passwd 条目：CTHost 构造里 getpwuid() 返回空指针，上游直接终止宿主进程——降级为 CTInitializationError 后 KCM 可加载、模型空但可用；同类环境无 crontab 后端，TasksModel/VariablesModel 的 create/applyCreate/paste/refresh 须容忍空 currentCron（0005/0006）"
+  - "OHOS lld 默认 max-page-size=0x10000 会把 .dynsym/.dynstr 拆进高地址 RW 段，OHOS musl 加载器拒绝 mmap 该布局——CMAKE_MODULE/SHARED/EXE_LINKER_FLAGS_INIT 统一 -Wl,-z,max-page-size=0x1000 恢复 4-LOAD 布局（audiocd/kcolorchooser 先例）；可执行文件另加 --disable-new-dtags（工具链若落依赖 RPATH 则取 DT_RPATH 形式）——实测本 OHOS 工具链不落 RPATH：构建树 link.txt 无 -rpath、随包 ELF 0 条 RPATH/RUNPATH 标签，运行时解析全部经导出 LD_LIBRARY_PATH"
+  - "共享设备存在两个 conan home（现行 .conan2 + 早期 .cache/conan2 残留）：在 .conan2 中发布的 KF6 库携带烧死在 .cache/conan2 的绝对 DT_NEEDED（51 条/37 文件），加载器会跟随该绝对路径装进过期副本，而过期副本内又有按构建树相对路径（../../bin/libKF6*.so）的条目无法修复——消费者测试侧须把闭包内库的绝对 DT_NEEDED 原位重写为裸库名（patchelf --replace-needed + 去 .codesign + 重签），使查找全部走导出的 LD_LIBRARY_PATH（实测产物无 RPATH 标签；test_package 内实现，幂等）"
+  - "真机 HMDFS 全盘拒绝 symlink 创建（EACCES/EPERM）：任何'dot 链'修复方案都不可用，必须原位改写；本包版本化 soname 场景不存在（仅 MODULE 目标），无需 E330 的 -DCMAKE_PLATFORM_NO_VERSIONED_SONAME（该旗标在最终全量重建中被有意省略并直接通过）"
+  - "test_package 与主配方一样需要 QT_ADDITIONAL_PACKAGES_PREFIX_PATH：否则 find_package(Qt6 COMPONENTS Qml) 先命中 qtbase 的 Qt6Config.cmake 并因缺组件失败（期望路径 .../qtbase*/p/lib/cmake/Qt6Qml/Qt6QmlConfig.cmake 不存在）"

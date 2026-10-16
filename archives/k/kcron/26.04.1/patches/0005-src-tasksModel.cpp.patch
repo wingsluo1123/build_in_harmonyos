@@ -1,0 +1,55 @@
+--- a/src/tasksModel.cpp
++++ b/src/tasksModel.cpp
+@@ -72,15 +72,21 @@ void TasksModel::run()
+ 
+ Task *TasksModel::create()
+ {
+-    // reset values of task from prev use
+-    CTTask ctTask = CTTask(QStringLiteral(""), QStringLiteral(""), mCtCron->userLogin(), mCtCron->isSystemCron());
++    // reset values of task from prev use; with a null cron there is no login
++    // to attach the task to, keep it unowned (still editable/validatable).
++    CTTask ctTask = CTTask(QStringLiteral(""), QStringLiteral(""),
++                           mCtCron ? mCtCron->userLogin() : QString(),
++                           mCtCron && mCtCron->isSystemCron());
+     mTmpTask->updateTask(ctTask);
+     return mTmpTask;
+ }
+ 
+ void TasksModel::applyCreate()
+ {
+-    Task *task = new Task(new CTTask(QStringLiteral(""), QStringLiteral(""), mCtCron->userLogin(), mCtCron->isSystemCron()), this);
++    Task *task = new Task(new CTTask(QStringLiteral(""), QStringLiteral(""),
++                                     mCtCron ? mCtCron->userLogin() : QString(),
++                                     mCtCron && mCtCron->isSystemCron()),
++                          this);
+     task->updateTask(mTmpTask->task());
+ 
+     this->add(task);
+@@ -242,6 +248,10 @@ void TasksModel::cut()
+ 
+ void TasksModel::paste()
+ {
++    if (!mCtCron) {
++        return;
++    }
++
+     QString clipboard = QApplication::clipboard()->text();
+     if (clipboard.isEmpty()) {
+         return;
+@@ -330,9 +340,13 @@ void TasksModel::refresh(CTCron *ctCron)
+ 
+     this->clear();
+ 
+-    for (CTTask *ctTask : mCtCron->tasks()) {
+-        Task *task = new Task(ctTask, this);
+-        this->add(task);
++    // HarmonyOS PC (OHOS): tolerate a missing current-user crontab (null cron,
++    // see CTHost / KCMCron::init()) instead of dereferencing the null pointer.
++    if (mCtCron) {
++        for (CTTask *ctTask : mCtCron->tasks()) {
++            Task *task = new Task(ctTask, this);
++            this->add(task);
++        }
+     }
+ 
+     Q_EMIT needUserColumnChanged();

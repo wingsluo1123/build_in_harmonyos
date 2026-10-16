@@ -1,0 +1,44 @@
+# 软件级 manifest — kcron
+# 文件位置: archives/k/kcron/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: kcron
+display: "kcron"
+description: "KDE 任务计划程序（Task Scheduler）——Plasma 系统设置中的 QML KCM（kcm_cron.so）加 KAuth 提权助手（kcron_helper），用于查看/编辑用户与系统 crontab，基于 Qt6/KF6（KCMUtils/Auth/Kirigami）"
+category: utility
+homepage: "https://invent.kde.org/utilities/kcron"
+license: "GPL-2.0-or-later"
+build_system: cmake
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "已发布 qtbase 以 FEATURE_printsupport=OFF 构建：Qt PrintSupport 消费者必须整链替换（cron 打印 → QPdfWriter + QFileDialog PDF 导出），显式请求 Gui/Widgets 组件"
+    - "平台允许无 /etc/passwd 条目的 uid：getpwuid() 空结果不得解引用（CTHost 降级为 CTInitializationError）；无 crontab 后端时模型须容忍空 currentCron"
+    - "Qt6 组件分散于多个 conan 包（qtbase/qtdeclarative/qtsvg/qtshadertools/qtmultimedia）：主配方与 test_package 都必须注入 QT_ADDITIONAL_PACKAGES_PREFIX_PATH，否则 find_package(Qt6 COMPONENTS Qml...) 先命中 qtbase 的 Qt6Config 而失败"
+    - "OHOS lld 需 -Wl,-z,max-page-size=0x1000（4-LOAD 段布局，musl 加载器要求）；可执行文件另加 --disable-new-dtags 使 RPATH 以 DT_RPATH 生效"
+    - "共享设备存在两个 conan home（.conan2 + .cache/conan2 残留）：依赖制品绝对 DT_NEEDED 会跟随旧 home 加载图外副本，必须原位改写为基名（patchelf --replace-needed + 去 .codesign + 重签；HMDFS 全盘禁 symlink）"
+    - "MODULE 类插件（QML KCM）无版本化 soname 符号链问题，无需 E330 的 CMAKE_PLATFORM_NO_VERSIONED_SONAME（仅 SHARED 带 SOVERSION 场景需要）"
+    - "QML KCM 消费者验证链：QPluginLoader → KPluginFactory::instantiatePlugin<QObject> → 真实 QQmlEngine 加载 org.kde.private.kcms.<name> 模块，可覆盖模型的非交互面"
+  common_dependencies:
+    - qtbase-sql-dbus
+    - qtdeclarative
+    - kcmutils
+    - kauth
+    - kconfigwidgets
+    - kirigami-addons
+    - ecm (tool_requires)
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "26.04.1":
+    status: built
+    build_date: "2026-10-16"
+    conan_ref: "kcron/26.04.1"
+    note: "首次适配：7 补丁（PrintSupport 链替换 / getpwuid 空安全 / 空 cron 容忍 / 上游测试可移植化）；上游 1 目标 9 用例在 build() 内实跑；消费者 7 组 25 断言真机全过；八门禁 Verdict PASS"

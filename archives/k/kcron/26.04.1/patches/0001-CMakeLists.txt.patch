@@ -1,0 +1,20 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -28,9 +28,16 @@ kde_clang_format(${ALL_CLANG_FORMAT_SOURCE_FILES})
+
+ find_package (Qt6 ${QT_MIN_VERSION} CONFIG REQUIRED COMPONENTS
+     Core
+-    PrintSupport
++    Gui
+     Quick
++    Widgets
+ )
++# HarmonyOS PC (OHOS): the published qtbase builds Qt with
++# FEATURE_printsupport=OFF and ships no Qt6PrintSupport module (algobox 1.1.1 /
++# conducteo 5.0.2 / ksystemlog 26.04.0 precedent), so PrintSupport is removed
++# from the required components. The cron print action is re-targeted to a
++# QPdfWriter (QtGui) PDF export flow in CronPrinter (patch 0003); Gui and
++# Widgets (QFileDialog) are requested explicitly for it.
+ 
+ find_package(KF6 REQUIRED COMPONENTS
+     ConfigWidgets

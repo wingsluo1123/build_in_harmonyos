@@ -1,0 +1,98 @@
+#====================================================================
+# DRAFT-kcron-26.04.1-qml-kcm-consumer-verification
+# QML KCM (KCMUtils consumer) packages: non-interactive consumer
+# verification chain and the honest out-of-scope declaration
+#====================================================================
+
+id:                     DRAFT-kcron-26.04.1-qml-kcm-consumer-verification
+trigger_tool:           conan|test_package|cmake|qt|qml
+phase:                  l1|consumer-validation
+error_signature:        kcm_.*\.so|kcmdesktopfilegenerator|org\.kde\.private\.kcms\.|QPluginLoader.*plugin|No password entry found for uid|KPluginFactory
+severity:               2
+category:               test-package|consumer-contract|kde|kcm|qml|harmonyos
+match_keywords:         KCM, KCMUtils, QML KCM, kcm_*.so, kcmdesktopfilegenerator, .desktop, KAuth, kcron_helper, activation files, QPluginLoader, KPluginFactory, instantiatePlugin, QQmlEngine, QML2_IMPORT_PATH, org.kde.private.kcms, System Settings, Plasma session
+title:                  QML KCM 包没有 CLI：消费者验证必须走 QPluginLoader → KPluginFactory → 真实 QQmlEngine（应用私有 QML 模块）三层真实加载，交互面如实申报为平台外
+
+root_cause:             KCM（KConfigModule）以插件形态交付：一个 MODULE 目标 kcm_*.so
+                        加 kcmdesktopfilegenerator 生成的 .desktop，KAuth 型 KCM 另带
+                        提权助手可执行文件与激活文件。没有 CLI，--version/文件存在性
+                        都不构成消费者契约。可非交互验证的真实契约分三层：①产物定位
+                        （插件 .so/.desktop/助手/激活文件都在 install 树）；②插件加载
+                        （QPluginLoader 读元数据 = className；KPluginFactory::
+                        instantiatePlugin<QObject> 走 KCMUtils 同款路径实例化——
+                        KCM 的 QObject 接口沿继承链匹配，不要求精确类型）；③QML 资源
+                        面（真实 QQmlEngine 把包的 qml/ 目录放进 QML2_IMPORT_PATH，
+                        import org.kde.private.kcms.<name> 驱动应用自己的 QML 组件，
+                        可真实跑出业务逻辑如输入校验）。反面：把"能 import/能实例化"
+                        当全部验证，会漏掉 QML 组件内逻辑（本包 TaskValidator 的
+                        空命令/绝对路径分支），也会把只在完整 Plasma 会话可到达的
+                        交互槽（Apply/Add/Remove、save()）伪装成"已验证"。
+affected_scope:         所有 KDE Gear / Plasma 的 QML KCM 包（kcmutils 消费者，
+                        典型名如 kcm_cron/kcm_screen/kcm_energy 等）在无桌面会话的
+                        目标平台（OHOS PC 真机/CI worker）做 test_package 时；
+                        同样适用于 KAuth 型 KCM 的助手文件验证面划分。
+
+verification_cmd:       conan create archives/k/kcron/26.04.1 \
+                          -pr:h=ci/conan/profiles/ohos-aarch64 \
+                          -pr:b=ci/conan/profiles/ohos-aarch64 \
+                          --build=missing --user=ohpcd --channel=stable
+                        # 消费者用例：ctest --test-dir <test_package build> --output-on-failure
+                        # 逐用例证据：reports/test-package-ctest.log（25 PASS + 9 INFO）
+
+rec_priority:           1
+rec_approach:           three-layer-real-load-consumer-cases
+rec_description:        test_package 消费者用例按三层组织：①产物定位（kcm_*.so、
+                        kcm_*.desktop、KAuth helper、激活文件逐一存在性断言，激活文件可
+                        降级为 INFO——backend 依赖）；②QPluginLoader::metaData() 断言
+                        className 与 IID，KPluginFactory::instantiatePlugin<QObject>
+                        实例化成功（传 parent 用 KCMUtils 同款调用形状）；③真实
+                        QQmlEngine + QQuickWindow offscreen，QML2_IMPORT_PATH 指向
+                        包的 qml/（及依赖包的 qml/），import 应用私有模块后驱动其组件
+                        （如把校验组件接上真实文件系统路径跑三分支：空命令拒绝/真实
+                        可执行通过/缺失路径报错）。环境归一化：QT_QPA_PLATFORM=
+                        offscreen、独立 HOME/XDG_RUNTIME_DIR、QT_PLUGIN_PATH 与
+                        QML2_IMPORT_PATH 显式 os.pathsep 拼接（Environment.append()
+                        空格拼接会让 Qt 把整串当路径，kcolorchooser 先例）。平台特有
+                        降级路径要有自适应断言：无 /etc/passwd 条目 uid 下 KCM 构造
+                        带 CTInitializationError 仍可加载、模型空但可用（getpwuid
+                        空值族的 KCM 化断言）。交互面（需要 System Settings 会话的
+                        add/modify/remove/save 槽）在 test_package 与配方 docstring
+                        双向如实申报"仅交互可达、未验证"，不以任何桩冒充。消费者
+                        断言数按 PASS 口径计（本包 7 组 25 断言），INFO 行只作回显
+                        不计入分母。
+rec_command:            ctest --test-dir test_package/build --output-on-failure --no-tests=error
+rec_auto_fix:           false
+rec_impl:               conan-test-package
+
+fallback_priority:      2
+fallback_approach:      build-time-loader-only-when-qml-engine-unavailable
+fallback_description:   若目标环境确实无法起 QQmlEngine（无 offscreen 平台插件等），
+                        保留①②层断言并把 QML 层标注 SKIP 写明原因（qml 目录存在性
+                        与 .qml 文件清单最小核对），不得以"qml 文件存在"冒充行为验证；
+                        在 CI 侧用有完整 Qt 运行环境的 worker 补跑③层。
+fallback_command:       QT_QPA_PLATFORM=offscreen ctest --test-dir <build> -R test_kcron
+                        QT_DEBUG_PLUGINS=1  # 平台插件缺失时的诊断开关
+fallback_auto_fix:      false
+
+forbid_1_pattern:       用 System Settings/plasma 会话截图或"人工点点看"替代可复跑的消费者用例；把交互槽验证写成"已通过"
+forbid_1_reason:        目标平台通常没有 Plasma 会话（OHOS PC 无 System Settings），
+                        这类"验证"不可复跑、不可被 CI 审计，等于未验证。
+forbid_1_consequence:   交互面缺陷（本包 save()/add() 无空 cron 守卫）被伪装成已测，
+                        合入后到真实会话才暴露。
+
+forbid_2_pattern:       只断言 .so/.desktop 文件存在即判定 KCM"可用"（或只 dlopen 不实例化）
+forbid_2_reason:        插件契约在元数据与工厂实例化，加载成功≠KCM 能构造；
+                        KCM 构造函数里的平台假设（getpwuid、cron 后端）恰是失败高发区。
+forbid_2_consequence:   宿主进程在模块构造期崩溃类缺陷漏到用户侧（本包 CTInitializationError 场景）。
+
+doc_file:               knowledge/drafts/DRAFT-kcron-26.04.1-qml-kcm-consumer-verification.md
+last_updated:           2026-10-16
+source_event:           kcron/26.04.1 HarmonyOS PC 适配（lmz 线；八门禁真机 PASS）
+source_package:         archives/k/kcron/26.04.1
+evidence:               test_package/test_kcron.cpp（7 组用例）、test_package/MANIFEST.yml、
+                        reports/test-package-ctest.log（25 PASS + 9 INFO 逐用例）、
+                        reports/conan-create.log:1057-1062（消费者 ctest 100%）
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     0.85
+draft:                  true
