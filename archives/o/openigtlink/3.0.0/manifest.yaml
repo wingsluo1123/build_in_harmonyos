@@ -1,0 +1,102 @@
+# 版本级 manifest
+# 文件位置: archives/o/openigtlink/3.0.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "3.0.0"
+software: "openigtlink"
+
+# 编译状态: published | built | failed | archived
+status: built
+
+build_date: "2026-10-14"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 官方正式源（github.com releases/archive），非镜像/非个人 fork（R39）
+  url: "https://github.com/openigtlink/OpenIGTLink/archive/refs/tags/v3.0.tar.gz"
+  sha256: "8eaf7b9895172152c1e1014e5d06a2a1c7588c00a03c0623be570a87a3a74b9e"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型: cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  configure_options: []
+  # 上游 CMake 选项：BUILD_TESTING=ON（集成上游 63 项 CTest）、
+  # USE_GTEST=OFF（启用上游内置非-gtest 回退，免除 configure 期联网下载 googletest 1.7.0）、
+  # CMAKE_POLICY_VERSION_MINIMUM=3.5（上游 cmake_minimum_required(2.4) 与 CMake 4.1.2 的兼容放行）
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-OpenIGTLinkConfig.cmake.in.patch"
+  - "0002-Source-CMakeLists.txt.patch"
+  - "0003-Testing-igtlTestConfig.h.in.patch"
+  - "0004-UseOpenIGTLink.cmake.in.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  # 单行项 + 内嵌 （ref: …） 供 W5 完整性检查识别
+  - "openigtlink 3.0.0 上游 tag 为 v3.0，但 CMakeLists 自报 3.0.0（MAJOR 3 / MINOR 0 / PATCH 0），故版本号取 3.0.0（ref: knowledge/operations/build-systems.md）"
+  - "上游 cmake_minimum_required(VERSION 2.4) 在 CMake 4.x 下被拒，需 -DCMAKE_POLICY_VERSION_MINIMUM=3.5 放行（ref: archives/a/airspy/1.0.10）"
+  - "上游 Testing 默认 USE_GTEST=ON 会在 configure 期下载 googletest/googlemock 1.7.0；igtlTestConfig.h.in 提供非-gtest 回退，USE_GTEST=OFF 可在不减用例的前提下免除联网（ref: docs/TEST_QUALITY_SPEC.md）"
+  - "核心库零第三方依赖，仅 POSIX pthread/libm/socket 族，OHOS sysroot 原生提供（ref: knowledge/operations/ohos-adaptation-patterns.md）"
+  - "sys/sysctl.h 与 sys/prctl.h/wait.h 的引用点分别被 __APPLE__ 与 OpenIGTLink_USE_SPROC 守卫，OHOS 路径不触发（ref: knowledge/operations/ohos-adaptation-patterns.md）"
+  - "上游 Source/CMakeLists.txt:75 只在 MSVC/Xcode generator 下填充 OpenIGTLink_INCLUDE_FILES，POSIX 上 INSTALL(FILES ...) 装 0 个头文件，包对下游完全不可消费；必须无条件收集（补丁 0002）（ref: knowledge/operations/ohos-adaptation-patterns.md）"
+  - "上游公开头文件内部按平铺名互相包含（#include \"igtl_header.h\"），且 OpenIGTLink_INCLUDE_RELATIVE_DIRS 从未被设置，故安装布局必须是平铺的 include/，不能把 igtlutil/ 拆成子目录（ref: knowledge/operations/build-systems.md）"
+  - "上游 OpenIGTLinkConfig.cmake.in 与 UseOpenIGTLink.cmake.in 用 include() 引入 export() 产物，CMake>=3.0 起被 CMP0024 判为硬错误；CMAKE_POLICY_DEFAULT_CMP0024=OLD 在 CMake 4.x 已失效，只能改用 if(NOT TARGET OpenIGTLink) 守卫（补丁 0001/0003）（ref: knowledge/operations/build-systems.md）"
+  - "上游 Testing/ 里的 igtlSocketTest/igtlClientSocketTest/igtlServerSocketTest 被 CMakeLists 注释掉，上游套件实际不覆盖 socket 路径；消费者测试改从公开 API 侧补一条 127.0.0.1 回环往返（ref: docs/TEST_QUALITY_SPEC.md）"
+  - "上游把 igtlPositionMessageTest 注册了两次（63 条 ADD_TEST → 62 个唯一 CTest 用例），统计上游用例数时需去重（ref: knowledge/operations/build-systems.md）"
+  - "igtl::Socket::Send() 成功返回 1（不是字节数），Receive() 才返回字节数；断言字节数会导致消费者测试假失败（ref: knowledge/operations/ohos-testing.md）"
+  - "上游 Testing/igtlTestConfig.h.in 的非-gtest EXPECT_THAT 回退用 GNU 关键字 typeof；Conan profile 的 compiler.cppstd=17 会让工具链发 -std=c++17（严格 ISO），typeof 立即失效、整棵上游 CTest 树编译失败；__typeof__ 是同一运算符的保留名拼写，各模式均可用，而 decltype(a[0]) 会退化成引用类型使 std::vector 非法（补丁 0003）（ref: knowledge/operations/ohos-adaptation-patterns.md）"
+  - "未设 compiler.cppstd 时 clang 默认 gnu++17，typeof 恰好可用 —— 手工构建因此「通过」，只有按 profile 走严格标准才会暴露该问题，故编译期兼容性必须用 conan create（Conan 工具链真实 flags）判定（ref: knowledge/operations/ohos-adaptation-patterns.md）"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /data/storage/el2/base/cache/builds/openigtlink-3.0.0.orig
+  source_work_dir: /data/storage/el2/base/cache/builds/openigtlink-3.0.0.work
+  source_orig_hash: 71fefe97bb5a3ea2
+  source_work_hash: c8e4a48516721083
+  generated_at: '2026-10-14T19:23:47'
+  patches_count: 4
+
+patch_classification:
+  - file: 0001-OpenIGTLinkConfig.cmake.in.patch
+    type: portability
+    platform_only: False
+    guard: 'none'
+  - file: 0002-Source-CMakeLists.txt.patch
+    type: portability
+    platform_only: False
+    guard: 'none'
+  - file: 0003-Testing-igtlTestConfig.h.in.patch
+    type: portability
+    platform_only: False
+    guard: 'none'
+  - file: 0004-UseOpenIGTLink.cmake.in.patch
+    type: portability
+    platform_only: False
+    guard: 'none'
