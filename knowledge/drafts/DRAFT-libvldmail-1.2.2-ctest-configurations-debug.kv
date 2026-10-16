@@ -1,0 +1,43 @@
+# ═══ Draft knowledge entry — CMake add_test 带 CONFIGURATIONS 时 ctest 默认找不到测试 ═══
+# Timestamp: 2026-09-27
+# Software: libvldmail 1.2.2（任何「CMake add_test(NAME ... CONFIGURATIONS "Debug")」工程同型）
+# Gate: Adapt 上游测试运行（ctest 默认 → "No tests were found!!!"；-C Debug → 1/1 Passed）
+# Status: DRAFT — needs human/AI review to promote to E-entry
+
+draft:                 "DRAFT-libvldmail-1.2.2-ctest-configurations-debug"
+status:                "pending-editor-review"
+id:                    "DRAFT-libvldmail-1.2.2-ctest-configurations-debug"
+trigger_tool:          "cmake|ctest"
+phase:                 "testing"
+error_signature:       "No tests were found!!!|ctest.*0 tests failed out of 0|add_test\\([^)]*CONFIGURATIONS"
+
+severity:              2
+category:              "cmake,testing,ctest"
+prescan_pattern:       "add_test\\s*\\(|CONFIGURATIONS\\s+\"Debug\"|enable_testing\\s*\\("
+match_keywords:        "CONFIGURATIONS, Debug, add_test, ctest -C, No tests were found, ctest empty suite, single-config generator, CMake 测试注册"
+title:                 "CMake add_test 注册了 CONFIGURATIONS \"Debug\" 时，单配置生成器下默认 ctest 报 'No tests were found!!!'，必须 ctest -C Debug 运行真实测试"
+
+root_cause: >-
+  上游 CMakeLists.txt 用 add_test(NAME xxx COMMAND xxx CONFIGURATIONS "Debug" ...) 注册测试，
+  测试只在 Debug 配置下启用。单配置生成器（Unix Makefiles/Ninja）默认构建配置为 Release，
+  ctest 不带 -C 时按当前配置过滤，CONFIGURATIONS "Debug" 的用例被过滤掉 → 输出
+  "No tests were found!!!" 且退出码 0。若适配流程据此认为"上游无测试/测试为空"，会把
+  真实存在的上游测试误判为 0 入口，或把 ctest 的 0 结果当作通过统计，造成台账失实。
+  必须用 `ctest -C Debug`（或构建时用 Debug 配置）才能命中该用例；直接运行
+  测试二进制（vldmailtest）也可绕过 CTest 过滤得到真实结果。
+
+affected_scope: >-
+  一切用 add_test(NAME ... CONFIGURATIONS "Debug"/"Release") 注册上游测试的 CMake 工程；
+  影响面=上游测试台账与 W3 本地 CI 模拟中的测试统计，不在库本身编译。
+
+verification_cmd: >-
+  # 段1：复现（libvldmail 1.2.2，-DLIBVLDMAIL_TESTS=ON）
+  #   cmake -S . -B build-tests -DLIBVLDMAIL_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
+  #   cmake --build build-tests -j1
+  #   ctest --test-dir build-tests --output-on-failure
+  #     → "No tests were found!!!"（exit 0，用例被 CONFIGURATIONS Debug 过滤）
+  # 段2：正确运行
+  #   ctest --test-dir build-tests -C Debug --output-on-failure
+  #     → 1/1 Test #1: vldmailtest Passed
+  #   cd <src> && ./build-tests/vldmailtest
+  #     → ok ×11, 1..11（直接运行二进制绕过过滤）
