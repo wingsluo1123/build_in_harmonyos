@@ -1,0 +1,108 @@
+#====================================================================
+# _template.kv — 知识图谱条目模板
+# 用法: 复制此文件为 E560.kv，填写各字段
+# 对应的人类文档: doc/E560.md
+#
+# 格式规则:
+#   - key: value（冒号后一个空格，value 到行尾）
+#   - 多行值: 下一行以空格开头 = 续行
+#   - 列表值: 逗号分隔
+#   - 正则值: | 分隔多个模式
+#   - 以 # 开头的行为注释
+#   - 空行忽略
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+# trigger_tool: 出错的工具 (configure/cmake/meson/make/gcc/clang/ld/python/pip/install/test/runtime)
+# phase:         出错阶段 (configuration/compilation/linking/installation/testing/runtime)
+# error_signature: 正则表达式(|分隔), 用于精确匹配日志文本
+id:                     E1128
+trigger_tool: conan
+phase: source
+error_signature: Can't untar a tgz containing files in the root with strip_root enabled|The zip file contains more than 1 folder in the root|The zip file contains a file in the root
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+# severity:      3=🔴blocking  2=🟡medium  1=🟢minor  0=✅resolved
+# category:      分类标签（受控词表 64 词，逗号分隔，最多 5 个；add/promote 自动归一化）
+# prescan_pattern: （可选）预编译源码扫描正则——写入后 PreScanner 运行时自动派生
+#                   PSCAN-KB-{id} 规则，无需改 pre-scan-rules.yaml（知识增长即扫描能力增长）
+# prescan_globs:   （可选）扫描范围 glob 列表，默认 '*.c, *.h, *.cc, *.cpp, *.sh, Makefile*, *.mk'
+# 词表: platform, compat, limitation, detection, hmdfs, ohos, selinux, kernel, portability, libc, musl, posix, syscall, headers, threading, socket, network, build-system, cmake, autotools ...（全表见 scripts/ohc/kb_taxonomy.py）
+# match_keywords: 纯文本关键词(逗号分隔), 用于粗筛(固定字符串匹配F)
+# title:         简短标题(一句话描述错误模式)
+severity:               2
+category:               portability, build-system, conan, packaging
+match_keywords: strip_root, get(), untargz, files in the root, orig.tar.xz, +dfsg, Debian orig, no top-level directory, TMalign, conan source(), conandata sources
+title: Debian +dfsg / 重打包 orig 压缩包根目录直接放文件（无顶层目录）：get(strip_root=True) 抛 ConanException，须去掉 strip_root；无构建系统的多文件源码包还会被 conan-init 误判成 autotools library 骨架
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+# root_cause:       一句话根因描述(逗号可分行)
+# affected_scope:   影响范围
+# verification_cmd: 验证诊断是否正确的命令
+root_cause: conan.tools.files.untargz/unzip 的 strip_root 要求压缩包只有一个顶层目录：通过 commonprefix 取公共目录，根目录下直接是文件（如 TMalign.cpp / TMalign.f / TMscore.cpp / TMscore.f）时无公共目录，tgz 抛 "Can't untar a tgz containing files in the root with strip_root enabled"，zip 抛 "contains more than 1 folder in the root" 或 "contains a file in the root"。Debian 的 +dfsg / 重打包 orig 压缩包常把少量源文件直接放在根；模板与大多数配方默认写 strip_root=True，照抄即在 source() 阶段失败。另外这类无任何构建系统文件的源码包，init-build/conan-init 回退判成 autotools 并生成 package_type=library + cpp_info.libs 的骨架，需要手工改为直接编译（self.run 调用 conf 取得的编译器）+ package_type=application + bindirs。
+affected_scope: 所有源码压缩包根目录无顶层目录的包（Debian +dfsg/重打包 orig、单文件或少量文件的科研/生信小工具、只含 .c/.cpp/.f 的包）；conan-init 对无构建系统包的骨架误判同样影响这类包。
+verification_cmd: python3 -c "from conan.tools.files.files import untargz; untargz('tm-align_20190822+dfsg.orig.tar.xz', '.', strip_root=True)"   # 期望抛 ConanException: Can't untar a tgz containing files in the root with strip_root enabled
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+# 推荐方案 (priority 越小越优先, 从 1 开始)
+rec_priority: 1
+rec_approach: drop-strip-root-for-flat-archive
+rec_description: 先 tar tf 看压缩包根结构：根目录直接是文件时，conanfile.py 的 source() 里 get(self, **self.conan_data["sources"][self.version]) 不要传 strip_root（默认 False，文件直接落在 source_folder）；有单一顶层目录时才用 strip_root=True。无构建系统的包不要沿用 conan-init 的 autotools/library 骨架：在 build() 里用 self.conf.get("tools.build:compiler_executables", default={}, check_type=dict).get("cpp","clang++") 取编译器直接编译，package_type=application，package_info 设 libdirs=[] includedirs=[] bindirs=["bin"]。
+rec_command: get(self, **self.conan_data["sources"][self.version])   # 不带 strip_root
+rec_auto_fix: false
+rec_impl:               impl-name                   # 内置实现名 (见 DESIGN §5)
+
+# 回退方案 (当推荐方案不可用时尝试)
+fallback_priority:      2
+fallback_approach:
+fallback_description:
+fallback_command:
+fallback_auto_fix:      false
+fallback_impl:
+
+# ★ 禁止策略 (与推荐方案同等重要) ★
+# forbid_N_pattern:     正则(|分隔), 匹配则拒绝/警告
+# forbid_N_reason:      为什么禁止
+# forbid_N_consequence: 违反后的后果
+forbid_1_pattern: strip_root=True.*(\+dfsg|no top-level)|tar.*--strip-components=1.*手工重打包|自行重新打包.*上传
+forbid_1_reason: 压缩包结构是上游/Debian 发布物的一部分，改写或自行重打包会改变 sha256 并偏离官方源（R39/PF7），且掩盖真实结构
+forbid_1_consequence: source() 阶段 ConanException 使 conan create 失败；自行重打包会触发源 URL/校验闸门拦截
+# forbid_2_pattern:
+# forbid_2_reason:
+# forbid_2_consequence:
+
+# ═══ Layer 4: 原则引用 ═══
+# principles:    适用的原则 ID 列表(逗号分隔), 在 graph/principles.kv 中定义
+principles:
+
+# ═══ 关系图 (Relations) ═══
+# causes:          本模式是这些模式的根因 (修好本模式可能同时解决它们)
+# caused_by:       本模式的根因是这些模式 (应先修它们)
+# similar_to:      特征相似可能混淆的模式
+# conflicts_with:  解决方案互相冲突的模式
+# prerequisite_of: 本模式是修复这些模式的前置条件
+# ═══ 元数据 ═══
+doc_file: doc/E560.md
+last_updated: 2026-10-08
+source_event: tm-align/20190822 适配：Debian +dfsg orig 压缩包根目录直接含 TMalign.cpp/.f 与 TMscore.cpp/.f
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+# authors: 作者列表 (格式: Name <email>, Name2 <email2>)
+#          草稿生成时自动从 git config 填入；主编合入时保留原作者
+#          合并到已有条目时追加为第二/第三作者
+# source_pr:            添加该条目的 PR 编号
+# source_commit:        添加时的 commit SHA (短)
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics, 方案 D) ═══
+# metrics_success_count: 该修复方案成功次数
+# metrics_fail_count:    该修复方案失败次数
+# metrics_confidence:    置信度 = success / (success + fail)
+# metrics_last_used:     最后使用时间
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+authors:               D148

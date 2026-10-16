@@ -602,8 +602,8 @@ def _fix_one(path):
     have = set()
     for l in out:
         mm = FIELD_RE.match(l)
-        if mm:
-            have.add(mm.group(1))
+        if mm and mm.group(2).strip():
+            have.add(mm.group(1))          # 值非空才视为已有（空值字段仍需补）
     trig, phase = _trig_phase(kv.get('category', ''), kv.get('error_signature', ''))
     rec = kv.get('rec_approach', '')
     add = []
