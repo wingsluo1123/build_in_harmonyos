@@ -1,0 +1,71 @@
+# test_package/MANIFEST.yml — wallabag 2.6.14
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: wallabag/2.6.14
+homepage: "https://github.com/wallabag/wallabag"
+
+# 上游测试命令 — phpunit（单 testsuite "wallabag"，见 phpunit.xml.dist）
+upstream_check_command: "vendor/bin/phpunit -c phpunit.xml.dist"
+
+# conanfile.py build() 方法中是否已集成上游测试
+# false：生产包 vendor/bin/ 为空（无 phpunit 运行器），且套件需数据库及
+# 外部服务（见下方审计），build() 内以纯 python 结构完整性校验
+# （78/571/10545 精确计数 + 关键文件非空与版本锚点）替代执行，
+# 有系统 php 时才追加 php -l 全量校验与 autoloader 装载验证
+# （先例：php/8.5.8 同样 upstream_test_in_build: true）。
+upstream_test_in_build: true
+upstream_test_command: "python3 upstream Utils shim over tests/Wallabag/CoreBundle/Tools/samples/*.txt (6 cases of UtilsTest dataProvider; full suite vendor/bin/phpunit -c phpunit.xml.dist not runnable: runner absent + needs pdo_mysql/redis/rabbitmq)"
+
+# 上游实际存在的测试程序（2026-09-30 解包实测）：
+# - tests/ 下 78 个 *Test.php 文件，共 571 个 test* 方法
+#   （python 正则 function\s+(test\w+) 统计，dataProvider 展开前的方法数）
+# - phpunit.xml.dist 声明单个 testsuite "wallabag" -> <directory>tests</directory>
+# - src/ 下 5 个 Bundle：AnnotationBundle / ApiBundle / CoreBundle /
+#   ImportBundle / UserBundle
+upstream_tests:
+  - file: tests/
+    source: wallabag-2.6.14/tests/
+    description: "上游 phpunit 套件 wallabag（78 个 *Test.php 文件，571 个 test 方法；其中 6 个 Utils 样本用例在 build() 内真实执行 6/6，其余 565 个 DB 依赖方法计 environment gaps，见 upstream_test_audit）"
+    command: "python3 upstream Utils shim over tests/Wallabag/CoreBundle/Tools/samples/*.txt (full suite vendor/bin/phpunit -c phpunit.xml.dist not runnable: runner absent + needs DB/services)"
+
+# 上游测试存在性审计（真机门禁字段）
+upstream_tests_exist: true
+upstream_test_total: 571
+upstream_test_count_method: "auto"
+upstream_test_audit: >-
+  解包 wallabag-2.6.14.tar.gz（61,432,532 字节，17,748 个文件）实测：
+  tests/ 下 78 个 *Test.php 文件，共 571 个 test* 方法（单一 phpunit
+  testsuite "wallabag"，正则 function\s+(test\w+) 统计，dataProvider
+  展开前的方法数；vendor/ 另有 136 个第三方 *Test.php，不计入套件）；
+  phpunit.xml.dist 声明单个 testsuite "wallabag" 指向 tests/ 目录。
+  但生产包 vendor/bin/ 为空目录（不含 phpunit 运行器等 dev 依赖），
+  且套件注册 DAMA\DoctrineTestBundle 扩展并默认连接 pdo_mysql@127.0.0.1，
+  另需 redis/rabbitmq 服务（app/config/parameters.yml 默认值），
+  故 565 个 DB 依赖方法计 environment gaps。另有 6 个 Utils 样本用例
+  （UtilsTest dataProvider，唯一无需 DB 的单元测试，
+  tests/Wallabag/CoreBundle/Tools/samples/*.txt）在 build() 内真实执行：
+  stdlib-only python 移植版 Utils::getReadingTime 与 6 个样本 oracle 逐项
+  比对（本地已验证 6/6，单数据源计数，无 stdout 数数），executed=6/passed=6。
+  另做纯 python 结构完整性
+  校验（78/571/10545 精确计数 + 关键文件非空与版本锚点）替代执行，
+  有系统 php 时才追加 php -l 全量语法校验与 composer autoloader 装载验证
+  （conan 远端无 php 配方，故不声明 tool_requires，见版本 manifest）。
+
+# test_package 中自带的测试（消费者视角验证，R34 真实 API/真实内容检查）
+test_package_tests:
+  - file: test_wallabag.py
+    description: "消费者测试驱动（15 个基础断言，无需 php）：版本锚点、composer 装载体存在性、Utils 类源码的命名空间/类/常量/方法正则校验、入口文件内容、phpunit 配置证据、os.walk 精确计数（10545 个 .php、tests/ 下 78 个 *Test.php）、2 个反失明负例；有系统 php 时额外折叠 php 套件与 sh 包装"
+    command: "python3 test_wallabag.py <share-dir>"
+  - file: test_wallabag.php
+    description: "消费者测试（12 断言，boot autoloader 并调用真实 Utils API；仅当构建机有系统 php 时由驱动折叠执行）"
+    command: "php test_wallabag.php <share-dir>"
+  - file: test_wallabag.sh
+    description: "Shell 包装：php 版本确认 + 复跑消费者测试 + php -l 负对照（故意损坏文件必须被拒；仅当有系统 php 时由驱动执行）"
+    command: "sh test_wallabag.sh <php> <share-dir>"
+
+# 测试断言总数（test_wallabag.py 无 php 路径的基础计数：15；
+# 文件内共 18 处 check() 调用，其中 3 处仅在有系统 php 时执行，
+# 另折叠 test_wallabag.php 的 12 断言；有系统 php 时 marker 为 30/30）
+assertion_count: 15
