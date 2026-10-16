@@ -1,0 +1,44 @@
+package: kcharselect/26.04.0
+homepage: https://invent.kde.org/utilities/kcharselect
+
+# 上游测试清点（R51 第一步）：kcharselect 26.04.0 **无任何测试**。
+# 证据：
+#   - 26.04.0 tarball 中不存在 autotests/ 或 tests/ 目录（顶层仅有
+#     doc/、pics/、po/、LICENSES/ 四个目录）；
+#   - CMakeLists.txt 未注册任何测试：无 add_test()/enable_testing()/
+#     ecm_add_test() 用法、无 BUILD_TESTING 守卫，唯一目标是
+#     add_executable(kcharselect) + target_sources(kcharselect PRIVATE
+#     kcharselectdia.cc kcharselectdia.h main.cc kcharselect.qrc)；
+#     tarball 中仅有的两处 BUILD_TESTING 分别位于 CMakePresets.json 与
+#     snapcraft.yaml，二者都只是传 -DBUILD_TESTING=OFF；
+#   - doc/CMakeLists.txt 仅 kdoctools_create_handbook（文档目标，非测试）；
+#   - 上游 CI 配置未为本项目定义测试套件：.gitlab-ci.yml 引入 9 个 KDE 共享
+#     模板（linux-qt6 / linux-qt6-next / freebsd-qt6 / windows-qt6 /
+#     craft-windows-x86-64-qt6 / flatpak / snap-snapcraft-lxd + xml-lint /
+#     yaml-lint），这些模板做构建/打包/lint，且仅在项目注册了测试时才跑
+#     ctest —— 本项目未注册；.kde-ci.yml 仅含构建依赖元数据与
+#     require-passing-tests-on，未声明测试目标。
+upstream_test_in_build: false
+upstream_check_command: "(none — 上游未注册任何测试目标，无 ctest 可执行；清点证据见上)"
+upstream_test_command: "(none — 上游 0 用例，见上方清点证据)"
+upstream_tests: []
+
+test_package_tests:
+  - file: test.sh
+    description: >-
+      消费者用例 4 用例 / 5 断言 + 1 鸿蒙特有非断言用例：
+      (1) 产物存在可执行 + --version 报告 26.04.0；
+      (2) --help 命令行接口可用（Qt6/KF6 运行时链接）；
+      (3) --author 输出 KAboutData 作者（Christoph Feck）；--license 输出
+      二进制内 KAboutData 声明的 GPL 许可证文本（上游 main.cc 传
+      KAboutLicense::GPL，与 COPYING / LICENSES/GPL-2.0-or-later.txt /
+      appdata.xml 的 GPL-2.0+ 一致）；
+      (4) [鸿蒙特有，非断言] 共享库 closure 加载：真实启动包内
+      bin/kcharselect，由 OHOS 动态链接器解析完整 DT_NEEDED closure
+      （KBookmarks/KCrash/KXmlGui/KColorScheme 闭包；已发布 KF6 库的
+      "../../bin/libX.so" 相对条目与构建机绝对路径条目未经归一化时在 OHOS
+      上加载失败，在 glibc 下恒过）。
+    command: "sh test.sh <kcharselect-bin>"
+
+# 5 条内容断言（用例 1a/1b/2/3a/3b）；用例 4 为鸿蒙特有非断言用例，不计入。
+assertion_count: 5

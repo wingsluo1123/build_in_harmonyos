@@ -1,0 +1,38 @@
+software: kcharselect
+display: "KCharSelect"
+description: "KDE character selection utility (KCharSelect widget in a KXmlGuiWindow)"
+category: utility
+homepage: "https://invent.kde.org/utilities/kcharselect"
+license: GPL-2.0-or-later
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "Qt6 Widgets + KF6 组件应用（Bookmarks/CoreAddons/Crash/I18n/WidgetsAddons/XmlGui/ConfigWidgets/IconThemes），无需上游源码补丁"
+    - "KF_IGNORE_PLATFORM_CHECK=TRUE（OHOS 不在 KDE 平台列表）；KF_SKIP_PO_PROCESSING=ON（ki18n_install(po) 需 gettext msgfmt/lconvert，.qm 非必需）"
+    - "KF6DocTools 为上游可选依赖（find_package 无 REQUIRED），不提供时 doc/ 手册子目录与 kdoctools_install(po) 被配置掉，仅 feature summary 记『OPTIONAL packages have not been found』"
+    - "ECM_MODULE_PATH 手工设置（CMakeDeps 的 ECMConfig.cmake 不传播）+ conan_cmakedeps_paths.cmake（qtbase/KF6 为 cmake_find_mode=none，需手工 CMAKE_PREFIX_PATH）"
+    - "-Wl,-z,max-page-size=0x1000；package() 内把 bin/kcharselect 的 path-form DT_NEEDED 就地净化为 basename 并重签名（已发布 KF6 产物无 DT_SONAME）。实测产物 .dynamic 无 DT_RPATH/DT_RUNPATH（CMake 只改写已存在的 RPATH），运行期依赖解析由 package_info() 导出的 runenv_info（LD_LIBRARY_PATH）承担"
+    - "test_package 把 HOME/XDG_* 指向源码树外：应用 main() 的 KIconTheme/KStyleManager 会写 $HOME/.local/state/kcharselectstaterc，否则污染归档树"
+  common_dependencies:
+    - qtbase
+    - kbookmarks
+    - kcodecs
+    - kcolorscheme
+    - kconfig
+    - kconfigwidgets
+    - kcoreaddons
+    - kcrash
+    - kguiaddons
+    - ki18n
+    - kiconthemes
+    - kitemviews
+    - kwidgetsaddons
+    - kxmlgui
+
+versions:
+  "26.04.0":
+    status: built
+    build_date: "2026-10-15"
+    upstream_tests: 0
+    build_system: cmake
