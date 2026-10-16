@@ -1,0 +1,44 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: netpbm/10.73.42
+homepage: "https://netpbm.sourceforge.net/"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+# 上游测试需完整构建树 + 可执行产物（本机未签名 ELF 受限），故作为独立步骤实测，
+# 不嵌入 conan build()；实测过程与结果见 notes.md「上游测试用例实测（R51 三步法）」。
+upstream_test_in_build: false
+# RESULTDIR 上游默认 /tmp；OHOS 上 /tmp 受限（E002），实测改用可写目录：
+upstream_test_command: "make check RESULTDIR=$HOME/tmp/netpbm-test"
+
+# 上游实际运行的测试程序（test/ 目录 115 个 .test，由 test/Execute-Tests 驱动，
+# 逐项比对 test/*.ok 期望输出；Test-Order 决定执行顺序）
+upstream_tests:
+  - file: test/Execute-Tests
+    source: netpbm-10.73.42/test/Execute-Tests
+    description: "上游测试驱动：按 Test-Order 顺序执行 test/ 下 115 个 *.test，输出与 *.ok 逐字节比对；退出码 80 记为 NOT TESTABLE"
+    command: "CHECK_TYPE=package PBM_TEST_PATH=$PREFIX/bin bash test/Execute-Tests  # $PREFIX: 制品安装前缀"
+  - file: test/Test-Order
+    source: netpbm-10.73.42/test/Test-Order
+    description: "测试执行顺序清单（含每项用例的适用平台/依赖标注）"
+    command: "grep -v '^#' test/Test-Order | grep '.test'"
+  - file: test/pnm-roundtrip.test
+    source: netpbm-10.73.42/test/pnm-roundtrip.test
+    description: "代表性用例（格式往返）：115 个 *.test 覆盖 pnm/png/tiff/jpeg/ps/bmp/pcx/sgi/... 等格式读写往返与工具行为"
+    command: "./test/pnm-roundtrip.test"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "消费者测试：真实调用 libnetpbm API（pm_init/pnm_writepaminit/pnm_writepamrow/pnm_readpaminit/pnm_readpamrow 等）写入并回读 PPM(P6)，逐像素断言"
+    command: "./test_netpbm"
+
+# 测试断言总数 (近似值, 用于质量评估)
+# 口径：上游测试用例数 = test/*.test 文件数（每个用例内部含多条命令与输出比对断言）；
+# 消费者用例 test.c 内另有逐像素校验断言。
+assertion_count: 115
