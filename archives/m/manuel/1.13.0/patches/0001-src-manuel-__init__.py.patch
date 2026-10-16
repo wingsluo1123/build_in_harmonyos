@@ -1,0 +1,52 @@
+--- a/src/manuel/__init__.py
++++ b/src/manuel/__init__.py
+@@ -100,21 +100,21 @@
+ def sort_handlers(handlers):
+     def key(f):
+         # "j" was chosen because it sorts between "early" and "late"
+         return getattr(f, 'manuel_timing', 'j')
+ 
+     return sorted(handlers, key=key)
+ 
+ 
+ def find_end_of_line(s):
+     end = 0
+-    while len(s) < end and s[end] != '\n':
++    while end < len(s) and s[end] != '\n':
+         end += 1
+     return end
+ 
+ 
+ class RegionContainer(object):
+ 
+     location = '<memory>'
+     id = None
+ 
+     def __init__(self):
+@@ -190,23 +190,23 @@
+                 if end is None:
+                     end_match = None
+ 
+                     text = start_match.group()
+                 else:
+                     end_match = end.search(region.source, start_match.end())
+ 
+                     # couldn't find a match for the end re, try again
+                     if end_match is None:
+                         continue
+-                    end_position = end_match.end() + find_end_of_line(
+-                        region.source[end_match.end() :]
+-                    )
++                    end_position = end_match.end()
++                    if end_position == 0 or region.source[end_position - 1] != '\n':
++                        end_position += find_end_of_line(region.source[end_position:])
+                     text = region.source[start_match.start() : end_position]
+ 
+                 if text[-1] != '\n':
+                     text += '\n'
+ 
+                 new_region = Region(first_lineno, text, start_match, end_match)
+                 self.shadow_regions.append(new_region)
+                 results.append(new_region)
+ 
+         return results
