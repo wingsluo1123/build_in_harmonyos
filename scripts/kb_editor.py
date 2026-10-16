@@ -315,7 +315,7 @@ def cmd_batch(size=100, start_offset=0):
 
 # ─────────────────────────── audit ───────────────────────────
 
-PLACEHOLDER = re.compile(r'(\(请填写\)|<TODO>|TODO[:：]|待补|^["\']*\s*["\']?$|N/?A(?![a-zA-Z]))', re.I)
+PLACEHOLDER = re.compile(r'(\(请填写\)|<TODO>|TODO[:：]|待补|^["\']*\s*["\']?$|\bN/A\b)', re.I)
 SEV_MAP = {'P0': '3', 'P1': '2', 'P2': '1', 'P3': '1', 'HIGH': '3', 'MEDIUM': '2', 'LOW': '1'}
 
 
