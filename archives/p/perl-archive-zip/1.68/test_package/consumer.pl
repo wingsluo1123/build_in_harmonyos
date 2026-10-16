@@ -1,0 +1,10 @@
+use strict;
+use warnings;
+use File::Temp qw(tempdir);
+use Cwd qw(getcwd);
+use Archive::Zip qw(:ERROR_CODES :CONSTANTS);
+my $old=getcwd();my $root=tempdir('archive-zip-consumer-XXXXXX',TMPDIR=>1,CLEANUP=>1);chdir $root or die $!;
+my $zip=Archive::Zip->new();my $m=$zip->addString("a\0b\n"=>'binary.dat');die "member" unless $m;$m->desiredCompressionMethod(COMPRESSION_DEFLATED);die "write" unless $zip->writeToFileNamed('data.zip')==AZ_OK;
+my $r=Archive::Zip->new();die "read" unless $r->read('data.zip')==AZ_OK;die "binary roundtrip" unless $r->memberNamed('binary.dat')->contents eq "a\0b\n";print "CONSUMER_CASE_PASS=binary-deflated-roundtrip\n";
+die "extract" unless $r->extractMember('binary.dat','restored.dat')==AZ_OK;open my $f,'<','restored.dat' or die $!;binmode $f;local $/;my $data=<$f>;close $f;die "real file" unless $data eq "a\0b\n";print "CONSUMER_CASE_PASS=real-file-extraction\n";
+die "remove old member" unless $r->removeMember('binary.dat');die "replace" unless $r->addString('replacement'=>'binary.dat');die "write updated" unless $r->writeToFileNamed('updated.zip')==AZ_OK;my $u=Archive::Zip->new();die "read updated" unless $u->read('updated.zip')==AZ_OK;die "updated member" unless $u->memberNamed('binary.dat')->contents eq 'replacement';print "CONSUMER_CASE_PASS=updated-member-serialization\n";chdir $old or die $!;print "CONSUMER_LIBRARY_TEST_PASS=3/3\n";

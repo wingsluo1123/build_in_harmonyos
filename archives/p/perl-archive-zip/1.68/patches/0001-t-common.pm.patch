@@ -1,0 +1,48 @@
+--- a/t/common.pm
++++ b/t/common.pm
+@@ -94,21 +94,21 @@
+ sub execProc
+ {
+     # "2>&1" DOES run portably at least on DOSish and on MACish
+     # operating systems
+     return (scalar(`$_[0] 2>&1`), $?);
+ }
+ 
+ sub execPerl
+ {
+     my $libs = join('" -I"', @INC);
+-    my $perl = $Config{'perlpath'};
++    my $perl = $^X;
+     return execProc("\"$perl\" \"-I$libs\" -w \"" . join('" "', @_) . "\"");
+ }
+ 
+ my ($cwdVol, $cwdPath) = File::Spec->splitpath(File::Spec->rel2abs('.'), 1);
+ my @cwdDirs            = File::Spec->splitdir($cwdPath);
+ 
+ my @dataDirs = ('t', 'data');
+ 
+ sub dataPath
+ {
+@@ -194,21 +194,21 @@
+ };
+ if (! defined($uztWorks)) {
+     $uztWorks = 0;
+     $uztOutErr .= "Caught exception $@";
+ }
+ elsif (! $uztWorks) {
+     $uztOutErr .= "Exit value $uztExitVal\n";
+ }
+ 
+ # Check whether we can write through a (non-seekable) pipe
+-my $pipeCommand = '| "' . $Config{'perlpath'} . '" -pe "BEGIN{binmode(STDIN);binmode(STDOUT)}" >';
++my $pipeCommand = '| "' . $^X . '" -pe "BEGIN{binmode(STDIN);binmode(STDOUT)}" >';
+ my $pipeError = "";
+ my $pipeWorks = eval {
+     my $testString = pack('C256', 0 .. 255);
+     my $fh = FileHandle->new("$pipeCommand " . OUTPUTZIP) or die $!;
+     binmode($fh) or die $!;
+     $fh->write($testString, length($testString)) or die $!;
+     $fh->close() or die $!;
+     (-f OUTPUTZIP) or die $!;
+     (-s OUTPUTZIP) == length($testString) or die "length mismatch";
+     readFile(OUTPUTZIP) eq $testString  or die "data mismatch";
