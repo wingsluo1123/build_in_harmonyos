@@ -1,0 +1,20 @@
+--- a/mjs.c	2026-09-28 23:28:51.170133593 +0800
++++ b/mjs.c	2026-09-28 23:32:06.310131874 +0800
+@@ -9435,7 +9435,7 @@
+     case TOK_XOR:     return (double) ((int64_t) da ^ (int64_t) db);
+     case TOK_LSHIFT:  return (double) ((int64_t) da << (int64_t) db);
+     case TOK_RSHIFT:  return (double) ((int64_t) da >> (int64_t) db);
+-    case TOK_URSHIFT: return (double) ((uint32_t) da >> (uint32_t) db);
++    case TOK_URSHIFT: return (double) ((uint32_t) (int64_t) da >> (uint32_t) (int64_t) db);
+   }
+   /* clang-format on */
+   *resnan = true;
+@@ -14202,7 +14202,7 @@
+    * NOTE(dfrank): without double cast, all numbers >= 0x80000000 are always
+    * converted to exactly 0x80000000.
+    */
+-  return (int) (unsigned int) get_double(v);
++  return (int) (uint32_t) (int64_t) get_double(v);
+ }
+ 
+ int32_t mjs_get_int32(struct mjs *mjs, mjs_val_t v) {
