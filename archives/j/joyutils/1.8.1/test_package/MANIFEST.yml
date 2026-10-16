@@ -1,0 +1,42 @@
+# test_package/MANIFEST.yml for joyutils 1.8.1
+# Upstream ships no automated tests; the consumer test below validates the
+# packaged joystick binaries instead.
+
+package: joyutils/1.8.1
+homepage: "https://sourceforge.net/projects/linuxconsole"
+
+# ---- Upstream test audit ---------------------------------------------------
+# Audited the linuxconsoletools-1.8.1 source tree and build files:
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "linuxconsoletools-1.8.1 top-level tree"
+    reason: "Only COPYING/Makefile/NEWS/README plus utils/ and docs/ exist; there is no tests/, test/ or *_test.* harness directory."
+  - source: "linuxconsoletools-1.8.1/Makefile"
+    reason: "Defines only all/compile/clean/distclean/install/dist targets delegating to utils/ and docs/; no check or test target."
+  - source: "linuxconsoletools-1.8.1/utils/Makefile"
+    reason: "Defines only compile/clean/distclean/install targets for inputattach/joystick/force-feedback programs; no check_program, TESTS, or test target."
+  - source: "linuxconsoletools-1.8.1/docs/Makefile"
+    reason: "Installs man pages only; no test target."
+  - source: "Alpine Linux linuxconsoletools-1.8.1 build log"
+    reason: "Reports 'APKBUILD does not run any tests' and 'does not have a testsuite'; make check has nothing to run."
+  - conclusion: "Upstream 1.8.1 provides no automated tests; test_package validates the installed jstest/jscal binaries as runtime consumer checks."
+
+# rule4 required fields: total is 0 because upstream truly has no tests.
+upstream_test_total: 0
+upstream_test_count_method: autotools_tests
+upstream_test_passed: 0
+upstream_test_failed: 0
+upstream_test_skipped: 0
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# ---- Consumer tests (test_package) -----------------------------------------
+test_package_tests:
+  - file: test_joyutils.sh
+    description: "Run installed jstest/jscal through 4 hardware-free assertions: jstest --help usage, jscal -h usage, bare jscal usage, missing-device negative control. Emits machine-readable RESULT trailer parsed by conanfile.py."
+    command: "sh test_joyutils.sh (JSTEST_BIN/JSCAL_BIN=<package>/bin)"
+
+assertion_count: 4
