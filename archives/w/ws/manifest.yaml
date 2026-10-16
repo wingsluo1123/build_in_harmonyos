@@ -1,0 +1,62 @@
+# 软件级 manifest
+# 文件位置: archives/w/ws/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 软件名称（小写，与目录名一致）
+software: ws
+
+# 显示名
+display: "ws (IXWebSocket)"
+
+# 一句话描述
+description: "WebSocket/HTTP 客户端-服务端库与 ws 命令行工具（Alpine Linux 同名包命名约定）"
+
+# 分类标签
+# foundation|build-tool|compress|crypto|db|network|system|doc|gfx|data|library|utility
+category: network
+
+# 官网 URL
+homepage: "https://github.com/machinezone/IXWebSocket"
+
+# 开源许可证（SPDX 标识）
+license: BSD-3-Clause
+
+# ============================================================
+# 构建信息
+# ============================================================
+
+# 常用构建系统（可被版本级覆盖）
+build_system: cmake
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  # 关键适配要点
+  key_points:
+    - "上游以 FetchContent 拉取 spdlog，须改为 find_package(spdlog/fmt CONFIG REQUIRED) 并在配方把 fmt 声明为直接依赖（skip_shared_packages）"
+    - "FindOpenSSL/FindZLIB 模块变量在 conan CMakeDeps 下为空，须按 imported target（openssl::openssl/zlib::zlib）分支"
+    - "打包的 bin/ws 与（shared 选项下）libixwebsocket.so 需在 package() 里 binary-sign-tool 代码签名，否则 XPM 拒绝 exec/dlopen"
+    - "上游 ws CLI --version 退出码恒为 1（main 的 ret 初始化），冒烟断言输出内容而非退出码"
+
+  # 跨版本通用依赖
+  common_dependencies:
+    - zlib
+    - openssl
+    - spdlog
+    - fmt
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "11.4.6":
+    status: published
+    build_date: 2026-10-13
+    published_as: ws
