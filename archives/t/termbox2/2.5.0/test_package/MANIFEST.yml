@@ -1,0 +1,109 @@
+# test_package/MANIFEST.yml - termbox2 2.5.0 upstream + consumer test declaration
+package: termbox2/2.5.0
+homepage: "https://github.com/termbox/termbox2"
+
+# Upstream test situation (audited at tag v2.5.0, tarball sha256
+# 1d7a9811...): the repo ships a tests/ suite with 16 test_*/test.php cases
+# (test_basic, test_64bit, test_color_8bit, test_color_true, test_egc,
+# test_error, test_invalid_term, test_invalid_utf8, test_invalidate,
+# test_large_input, test_mod, test_non_printable, test_non_spacing_mark,
+# test_output_mode, test_print, test_resize) driven by tests/run.sh. That
+# harness is PHP-FFI + X11: each case renders a termbox2 program in an xterm
+# under Xvfb, injects input with xvkbd and diffs an ANSI screen capture
+# (expected.ansi) -- tests/Dockerfile installs php8.4-cli xvfb xterm xvkbd.
+#
+# The PHP-FFI/X11 toolchain does not exist on headless OHOS/aarch64, so every
+# case's real logic (a sequence of termbox2 C API calls against the library)
+# is ported verbatim to a native C program (test_package/test_<name>.c) that
+# drives the same termbox2 C API over a PTY (tb_init_fd) and is compiled and
+# compiled and executed on the target. All 16 ported cases run in test_package
+# and are counted here as the upstream suite; per-case pass/fail is emitted in
+# the HMBS_UPSTREAM_TEST_RESULT marker from the real preflight run.
+upstream_tests_exist: true
+upstream_test_audit: "Audited termbox2 v2.5.0 (tag v2.5.0). tests/ contains 16 test_*/test.php cases plus test_ffi.php/test_prepend.php helpers and run.sh; Makefile provides `make test` (Docker) and `make test_local` (./tests/run.sh). The PHP-FFI + X11 (Xvfb/xterm/xvkbd) screen-capture harness is not available on OHOS/aarch64, so each of the 16 cases is ported to a native C program in test_package (test_<name>.c) that calls the same real termbox2 API over a PTY and is executed on the target. 16 = number of tests/test_* case directories in v2.5.0 (manual enumeration)."
+upstream_test_total: 16
+upstream_test_count_method: manual_audit
+upstream_test_in_build: true
+upstream_test_command: "./test_basic ./test_64bit ./test_color_8bit ./test_color_true ./test_egc ./test_error ./test_invalid_term ./test_invalid_utf8 ./test_invalidate ./test_large_input ./test_mod ./test_non_printable ./test_non_spacing_mark ./test_output_mode ./test_print ./test_resize"
+
+# The 16 upstream cases, ported from tests/test_*/test.php and executed here.
+upstream_tests:
+  - file: test_basic.c
+    source: termbox2-2.5.0/tests/test_basic/test.php
+    description: "init/version/width/height, tb_printf; inject Ctrl-A ('\\x01') and assert TB_EVENT_KEY ch==0x01"
+    command: "./test_basic"
+  - file: test_64bit.c
+    source: termbox2-2.5.0/tests/test_64bit/test.php
+    description: "tb_attr_width()==64 (TB_LIB_OPTS), print STRIKEOUT/INVISIBLE/UNDERLINE_2 attrs"
+    command: "./test_64bit"
+  - file: test_color_8bit.c
+    source: termbox2-2.5.0/tests/test_color_8bit/test.php
+    description: "output mode switching NORMAL/256/216/GRAYSCALE with tb_print + tb_present"
+    command: "./test_color_8bit"
+  - file: test_color_true.c
+    source: termbox2-2.5.0/tests/test_color_true/test.php
+    description: "tb_has_truecolor() (attr width 64), TRUECOLOR mode, truecolor fg/bg + bold/underline/italic prints"
+    command: "./test_color_true"
+  - file: test_egc.c
+    source: termbox2-2.5.0/tests/test_egc/test.php
+    description: "tb_has_egc() (TB_OPT_EGC), UTF-8 decoding, tb_set_cell_ex/tb_extend_cell grapheme clusters"
+    command: "./test_egc"
+  - file: test_error.c
+    source: termbox2-2.5.0/tests/test_error/test.php
+    description: "out-of-bounds tb_set_cell returns TB_ERR_OUT_OF_BOUNDS and tb_strerror is non-empty"
+    command: "./test_error"
+  - file: test_invalid_term.c
+    source: termbox2-2.5.0/tests/test_invalid_term/test.php
+    description: "init with TERM=invalid-term must not crash; shutdown clears state"
+    command: "./test_invalid_term"
+  - file: test_invalid_utf8.c
+    source: termbox2-2.5.0/tests/test_invalid_utf8/test.php
+    description: "tb_print_ex with embedded NUL after partial UTF-8; tb_set_cell invalid codepoint"
+    command: "./test_invalid_utf8"
+  - file: test_invalidate.c
+    source: termbox2-2.5.0/tests/test_invalidate/test.php
+    description: "mode switch to GRAYSCALE + tb_invalidate re-renders correctly"
+    command: "./test_invalidate"
+  - file: test_large_input.c
+    source: termbox2-2.5.0/tests/test_large_input/test.php
+    description: "tb_init_fd, ALT input mode, buffer-filling up-arrow bytes drained via tb_peek_event"
+    command: "./test_large_input"
+  - file: test_mod.c
+    source: termbox2-2.5.0/tests/test_mod/test.php
+    description: "modifier escape sequences 1;2A..1;8A report SHIFT/ALT/CTRL modifier bits"
+    command: "./test_mod"
+  - file: test_non_printable.c
+    source: termbox2-2.5.0/tests/test_non_printable/test.php
+    description: "control / non-printable code points (NULL..0x7f) written via tb_set_cell"
+    command: "./test_non_printable"
+  - file: test_non_spacing_mark.c
+    source: termbox2-2.5.0/tests/test_non_spacing_mark/test.php
+    description: "tb_has_egc(), combining marks compose as EGC via tb_print"
+    command: "./test_non_spacing_mark"
+  - file: test_output_mode.c
+    source: termbox2-2.5.0/tests/test_output_mode/test.php
+    description: "output mode switch keeps rendering valid (cyan then gray)"
+    command: "./test_output_mode"
+  - file: test_print.c
+    source: termbox2-2.5.0/tests/test_print/test.php
+    description: "multiline/escape/tab prints; out-of-bounds tb_print returns TB_ERR_OUT_OF_BOUNDS"
+    command: "./test_print"
+  - file: test_resize.c
+    source: termbox2-2.5.0/tests/test_resize/test.php
+    description: "raise(SIGWINCH) yields a TB_EVENT_RESIZE event with new dimensions"
+    command: "./test_resize"
+
+# test_package consumer tests (link the installed termbox2, call real APIs;
+# HarmonyOS-specific).
+test_package_tests:
+  - file: "test_api.c"
+    description: "21 assertions for version, UTF-8 lengths and roundtrips, event/key/color/attr constants and pre-init state"
+    command: "./test_api"
+  - file: "test_ohos_pty.c"
+    description: "19 HarmonyOS-only assertions for aarch64, PTY setup, tb_init_fd, window size, modes, clear/cell buffer and tb_present"
+    command: "./test_ohos_pty"
+
+# Approximate assertion count across both suites: consumer 40 (21+19) +
+# upstream-ported 136 static CHECKs (test_mod adds 7 dynamic modifier checks at
+# runtime). Real per-case pass/fail comes from the preflight HMBS markers.
+assertion_count: 176
