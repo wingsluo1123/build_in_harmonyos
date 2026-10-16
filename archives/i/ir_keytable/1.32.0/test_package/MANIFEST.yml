@@ -1,0 +1,25 @@
+# test_package/MANIFEST.yml
+# Test declaration for Conan L1 consumer smoke test.
+
+package: ir_keytable/1.32.0
+homepage: "https://linuxtv.org/wiki/index.php/V4l-utils"
+
+# 上游测试如实申报（R51 三步法 · 清点证据）：
+# ① 清点：v4l-utils 的 meson 构建未为 keytable 注册任何 meson test——
+#    keytable/meson.build 无 test() 调用、无 utils/keytable/tests/ 目录、
+#    1.32.0 argp 选项中无 --test-keymap（autotools 历史 check 目标未迁移至 meson）。
+# ② 可运行性：上游 meson 无 keytable 测试可运行（upstream_test_in_build=false）。
+# ③ 补全：test_package 以 consumer 侧脚本跑 ir-keytable --version/--help 实质执行二进制。
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests_total: 0
+upstream_tests_passed: 0
+upstream_tests_skipped_reason: "meson 构建未为 keytable 注册测试（keytable/meson.build 无 test() 调用，无 tests/ 子目录）；autotools 历史 check 目标（rc_keymap 数据校验）未迁移至 meson，且 1.32.0 argp 选项中不存在 --test-keymap"
+
+# test_package consumer-side tests
+test_package_tests:
+  - file: test_ir_keytable.sh
+    description: "Run ir-keytable --version / --help and verify deterministic output (argp 标准选项，无需 IR 设备)；R34 实质执行被测包二进制"
+
+assertion_count: 3
