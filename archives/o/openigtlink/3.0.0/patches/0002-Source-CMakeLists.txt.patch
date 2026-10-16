@@ -1,0 +1,78 @@
+--- a/Source/CMakeLists.txt
++++ b/Source/CMakeLists.txt
+@@ -65,21 +65,28 @@
+   igtlServerSocket.cxx
+   igtlSessionManager.cxx
+   igtlSimpleFastMutexLock.cxx
+   igtlSocket.cxx
+   igtlStatusMessage.cxx
+   igtlTimeStamp.cxx
+   igtlTransformMessage.cxx
+   )
+ 
+ SET(OpenIGTLink_INCLUDE_FILES)
+-IF( MSVC OR ${CMAKE_GENERATOR} MATCHES "Xcode" )
++# Upstream only collected the public header list for the MSVC and Xcode
++# generators, so on POSIX systems (Linux, OpenHarmony/HarmonyOS) the installed
++# package carried no library headers at all and could not be consumed:
++# INSTALL(FILES ${OpenIGTLink_INCLUDE_FILES}) below then installed nothing.
++# The headers are plain C/C++ declarations, they are the same on every
++# generator, and the in-tree build already exposes Source/ and Source/igtlutil/
++# as include dirs, so collect them unconditionally.
++IF(TRUE)
+   LIST(APPEND OpenIGTLink_INCLUDE_FILES
+     igtlutil/igtl_header.h
+     igtlutil/igtl_image.h
+     igtlutil/igtl_position.h
+     igtlutil/igtl_transform.h
+     igtlutil/igtl_types.h
+     igtlutil/igtl_util.h
+     igtlutil/igtl_capability.h
+     igtlutil/igtl_win32header.h
+     igtlMessageHandler.h
+@@ -143,21 +150,21 @@
+     igtlTrackingDataMessage.cxx
+     igtlPolyDataMessage.cxx
+     igtlQuaternionTrackingDataMessage.cxx
+     igtlTrajectoryMessage.cxx
+     igtlStringMessage.cxx
+     igtlUnit.cxx
+     igtlSensorMessage.cxx
+     igtlBindMessage.cxx
+     igtlNDArrayMessage.cxx
+     )
+-  IF( MSVC OR ${CMAKE_GENERATOR} MATCHES "Xcode" )
++  IF(TRUE)
+     LIST(APPEND OpenIGTLink_INCLUDE_FILES
+       igtlutil/igtl_colortable.h
+       igtlutil/igtl_imgmeta.h
+       igtlutil/igtl_lbmeta.h
+       igtlutil/igtl_point.h
+       igtlutil/igtl_tdata.h
+       igtlutil/igtl_qtdata.h
+       igtlutil/igtl_trajectory.h
+       igtlutil/igtl_unit.h
+       igtlutil/igtl_sensor.h
+@@ -184,21 +191,21 @@
+ ENDIF()
+ 
+ # Add support for OpenIGTLink version 3
+ IF( ${OpenIGTLink_PROTOCOL_VERSION} GREATER "2" )
+   LIST(APPEND OpenIGTLink_SOURCES
+     igtlCommandMessage.cxx
+     igtlQueryMessage.cxx
+     igtlutil/igtl_command.c
+     igtlutil/igtl_query.c
+     )
+-  IF( MSVC OR ${CMAKE_GENERATOR} MATCHES "Xcode" )
++  IF(TRUE)
+     LIST(APPEND OpenIGTLink_INCLUDE_FILES
+       igtlCommandMessage.h
+       igtlQueryMessage.h
+       igtlutil/igtl_command.h
+       igtlutil/igtl_query.h
+       )
+   ENDIF()
+ ENDIF()
+ 
+ ADD_LIBRARY(OpenIGTLink ${OpenIGTLink_SOURCES} ${OpenIGTLink_INCLUDE_FILES})

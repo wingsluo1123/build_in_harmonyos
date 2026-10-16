@@ -1,0 +1,64 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+schema_version: "1.0"
+package: openigtlink/3.0.0
+library: openigtlink
+version: "3.0.0"
+homepage: "https://openigtlink.org/"
+
+# 上游测试命令：CMake 项目，build() 中以 cmake.test() 驱动 ctest。
+# 实测执行位置 /data/storage/el2/base/cache/igtl_w0/b-ohos（OHOS SDK 26.0.0.18,
+# aarch64-linux-ohos, clang 15, Release）。
+upstream_check_command: "ctest --output-on-failure -j 1"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "ctest --output-on-failure -j 1"
+
+# 实测结果：63 条 ADD_TEST 语句 / 62 个唯一 CTest 用例，全部通过。
+upstream_test_count: 62
+upstream_count_unit: "unique CTest cases (63 ADD_TEST statements; upstream registers igtlPositionMessageTest twice)"
+
+upstream_tests:
+  - file: Testing/CMakeLists.txt
+    source: OpenIGTLink-3.0/Testing/CMakeLists.txt
+    description: "44 unique gtest cases: the 3 message layers of the protocol (header v1 format, v2 format), message factory, multi-threader, condition variable and timestamp; USE_GTEST=OFF inlines igtlTestConfig.h so no googletest download is required"
+    command: "ctest --output-on-failure -j 1 (cases igtlMultiThreaderTest1..igtlCommandMessageTestFormatVersion2)"
+  - file: Testing/igtlutil/CMakeLists.txt
+    source: OpenIGTLink-3.0/Testing/igtlutil/CMakeLists.txt
+    description: "18 pure C tests for the igtlutil serialisation layer (image, header, transform, status, util, position, capability, colortable, imgmeta, lbmeta, point, tdata, trajectory, sensor, string, bind, ndarray, polydata)"
+    command: "ctest --output-on-failure -j 1 (cases igtl_image_test_01..igtl_polydata_test_01)"
+  - file: Testing/igtlSocketTest.cxx
+    source: OpenIGTLink-3.0/Testing/igtlSocketTest.cxx
+    description: "Present upstream but NOT registered: igtlSocketTest / igtlClientSocketTest / igtlServerSocketTest are commented out in Testing/CMakeLists.txt, so the upstream suite exercises no socket path. The OHOS adaptation covers that gap from the consumer side instead (loopback validation below)"
+    command: "n/a - not registered by upstream"
+
+# test_package 中自带的测试 (消费者视角验证, docs/TEST_QUALITY_SPEC.md 层 2)
+test_package_tests:
+  - file: test_openigtlink.cpp
+    description: "Consumer test built only against the installed package (OpenIGTLink::OpenIGTLink): protocol constants, igtlutil byte-order/CRC, TRANSFORM serialise-deserialise round trip, end-to-end client/server round trip over a loopback TCP socket, and the HarmonyOS contract (uname identity + task-private TMPDIR round trip including re-decoding the message read back from disk)"
+    command: "./test_openigtlink"
+
+# 实测断言数（真实运行输出：CONSUMER_1_OF_1_PASS assertions=51 pack_size=106 protocol=3 header=2）
+assertion_count: 51
+
+# 适配期间新增的鸿蒙专属测试用例（消费者可用性验证）
+adaptation_tests:
+  source: test_openigtlink.cpp
+  cases: 1
+  assertions_ohos: 51
+  features:
+    - "uname() reports HarmonyOS on the OHOS target"
+    - "TMPDIR is set, absolute and writable inside the task-private scratch dir"
+    - "The serialised OpenIGTLink message survives a TMPDIR write/read round trip and still decodes to the identical matrix"
+    - "A full TRANSFORM message traverses a loopback TCP socket created with igtl::ServerSocket/igtl::ClientSocket and is decoded on the receiving side"
+
+notes: >-
+  Upstream ships no automatic test runner other than the CMake CTest tree, so
+  ctest is the upstream entry point and is invoked from build(). The socket
+  tests that upstream left commented out are not re-enabled upstream; the
+  consumer test covers the same capability from the public API instead. The
+  adaptation adds four portability patches, see archive conandata.yml.
