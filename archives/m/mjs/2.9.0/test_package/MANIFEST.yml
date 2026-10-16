@@ -1,0 +1,25 @@
+# Upstream and consumer test declaration for CI quality gates.
+
+package: mjs/2.9.0
+homepage: "https://github.com/cesanta/mjs"
+
+upstream_check_command: "mjs tests/test_*.js"
+upstream_test_in_build: true
+upstream_test_command: "clang -I. -I.. tests/unit_test.c mjs.c common/cs_dirent.c common/cs_time.c common/test_util.c -ldl -lm"
+
+upstream_tests:
+  - file: tests/unit_test.c
+    source: mjs-2.9.0/mjs/tests/unit_test.c
+    description: "Official unit suite covering parser, arithmetic, objects, arrays, functions, FFI, dataview, math library, and exec"
+    command: "unit_test (42 tests, 3436 checks; local harness reconstructed for missing upstream common/test_main.h)"
+  - file: tests/test_*.js
+    source: mjs-2.9.0/mjs/tests/test_*.js
+    description: "Official JavaScript scripts executed by the mjs CLI"
+    command: "build/mjs tests/test_1.js .. test_13.js (13/13 passed)"
+
+test_package_tests:
+  - file: test_mjs.c
+    description: "Consumer integration test for creating an mjs instance, executing JavaScript, and reading numbers/booleans/strings through the packaged library"
+    command: "./test_mjs"
+
+assertion_count: 3436
