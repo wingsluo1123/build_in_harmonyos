@@ -1,0 +1,117 @@
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/1.0-20230126190232/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.0-20230126190232"
+
+# 软件名
+software: "indi-eqmod"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-01"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://deb.debian.org/debian/pool/main/i/indi-eqmod/indi-eqmod_1.0+20230126190232.orig.tar.gz"
+
+  # 源码校验和
+  sha256: "8f34499875e983ba17573f3cb1ba43f6df7813d7f045b4ae96e3528f8e75a4f2"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表
+  configure_options: []
+  # 例如:
+  # - "-DCMAKE_BUILD_TYPE=Release"
+  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+  - libindi/2.2.2.1
+  - libnova/0.16
+  - zlib/1.3.1.1
+  - gsl/2.8
+  # 例如:
+  # - openssl/1.1.1w
+  # - curl/8.19.0
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+- "0001-cmake_modules-CMakeCommon.cmake.patch"
+- "0002-cmake_modules-FindINDI.cmake.patch"
+- "0003-eqmodbase.cpp.patch"
+- "0004-scope-limits-scope-limits.cpp.patch"
+- "assets/gsl_stub.c"  # rule4 静态 GTest 链接资产：满足 libindiAlignmentDriver.a (BuiltInMathPlugin) 的 GSL 链接期符号；8 个上游用例不触达其变换路径（见文件头注释）
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+- "OHOS 用户分区（/storage）上的 .so 无法被 dlopen（musl 'Error loading shared library ... Permission denied'，E537/R49），系统分区 /data /system 不可写；任何动态链接版 test 二进制都无法在本机/CI 执行——静态链接（全部依赖 .a）是唯一可真实运行上游测试的路径（libindi/argp-standalone test_package 已验证同款模式）"
+- "上游 indi-eqmod 的 eqmod.cpp 含全局 static std::unique_ptr<EQMod>（驱动入口文件），静态链接时会 pre-main 构造 EQMod → 与 INDI::Logger 等静态初始化顺序冲突（static-init-order fiasco）导致 SIGSEGV；测试链接必须排除 eqmod.cpp.o"
+- "libindidriver.a 内含 indidrivermain.c.o（驱动 main 与 waitPingReply）；测试链接冲突可通过 llvm-objcopy --redefine-sym main=... 改名规避，waitPingReply 等符号保留"
+- "libindi 上游 libs/alignment/CMakeLists.txt 对 AlignmentDriver 硬编码 add_library(SHARED)，libindi 包 INDI_BUILD_STATIC=ON 也只出 libindidriver.a；静态 GTest 需按 conandata libindi_src 下载 libindi 源码编译 11 个 alignment 源文件生成 libindiAlignmentDriver.a（头文件用 libindi 包 include/）"
+- "INDI buildSkeleton 的 sk.xml 路径优先读环境变量 INDISKEL/INDIPREFIX（$INDIPREFIX/share/indi/*.xml）；静态测试运行时用 INDIPREFIX 指向 staging 目录即可，无需修改 libindi 包"
+- "GSL 仅被 BuiltInMathPlugin（默认注册插件）引用；8 个上游测试用例只构造 EQMod 不执行数学变换，gsl_* 符号仅供链接期满足——提供签名对齐的 stub（assets/gsl_stub.c）即可，避免在 CI 额外构建 GSL 静态库"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/indi-eqmod-1.0-20230126190232.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/indi-eqmod-1.0-20230126190232.work
+  source_orig_hash: a872b32483258e3f
+  source_work_hash: b1bdf122a7cc867e
+  generated_at: '2026-10-01T22:57:48'
+  patches_count: 4
+
+patch_classification:
+  - file: 0001-cmake_modules-CMakeCommon.cmake.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-cmake_modules-FindINDI.cmake.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-eqmodbase.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-scope-limits-scope-limits.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
