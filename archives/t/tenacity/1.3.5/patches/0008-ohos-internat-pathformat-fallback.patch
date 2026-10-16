@@ -1,0 +1,16 @@
+--- a/libraries/lib-strings/Internat.cpp
++++ b/libraries/lib-strings/Internat.cpp
+@@ -89,7 +89,13 @@
+ #if defined(__WXMAC__)
+    wxPathFormat format = wxPATH_MAC;
+ #elif defined(__WXGTK__)
+    wxPathFormat format = wxPATH_UNIX;
+ #elif defined(__WXMSW__)
+    wxPathFormat format = wxPATH_WIN;
++#else
++   // OHOS patch: 这三个分支都以 wxWidgets 的 GUI 端口宏为前提；OHOS 使用 wxUSE_GUI=OFF
++   // 的 wxBase 制品，__WXMAC__/__WXGTK__/__WXMSW__ 均未定义，format 因而完全未声明
++   // （编译期 "error: use of undeclared identifier 'format'"）。OHOS 属 POSIX 类系统，
++   // 与 libraries/lib-files/FileNames.cpp 中既有的 #else 兜底写法保持一致，取 Unix 路径规则。
++   wxPathFormat format = wxPATH_UNIX;
+ #endif

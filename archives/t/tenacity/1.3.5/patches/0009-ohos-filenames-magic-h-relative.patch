@@ -1,0 +1,14 @@
+--- a/libraries/lib-files/FileNames.cpp
++++ b/libraries/lib-files/FileNames.cpp
+@@ -728,5 +728,10 @@
+ #elif defined(__linux__)
+ #include <sys/statfs.h>
+-#include "/usr/include/linux/magic.h"
++// OHOS patch: 上游以绝对路径引入该头文件，只有在宿主 sysroot 恰为 /usr/include 时
++// 才成立。交叉编译时 sysroot 位于 SDK 内部另一路径，报
++// "fatal error: '/usr/include/linux/magic.h' file not found"。
++// 改为标准尖括号引入，交由 -isysroot 解析；OHOS sysroot 的 linux/magic.h 同样
++// 定义本文件所用的 MSDOS_SUPER_MAGIC（0x4d44）。
++#include <linux/magic.h>
+ bool FileNames::IsOnFATFileSystem(const FilePath &path)
+ {

@@ -1,0 +1,40 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -695,8 +695,10 @@
+   target_compile_definitions(wxWidgets::wxWidgets INTERFACE ${wxWidgets_DEFINITIONS} ${wxWidgets_DEFINITIONS_DEBUG})
+ endif()
+ 
+-add_subdirectory(lib-src/libnyquist EXCLUDE_FROM_ALL)
+-set(USE_NYQUIST ON)
++# OHOS patch: lib-src/libnyquist 仅被 nyquist/ 与 src/ 的 Nyquist 效果链使用；
++# libraries/lib-* 对其零依赖（已逐库核验无 nyquist/Nyquist 引用），随 GUI 前端一并跳过。
++# add_subdirectory(lib-src/libnyquist EXCLUDE_FROM_ALL)
++# set(USE_NYQUIST ON)
+ 
+ # Manual Packaging
+ 
+@@ -707,15 +709,16 @@
+    set(PACKAGE_MANUAL OFF)
+ endif()
+ 
+-add_subdirectory( "help" )
+-add_subdirectory( "images" )
++# OHOS patch: 仅构建 libraries/lib-* 非 GUI 核心库。
++# 跳过的子目录及其原因：
++#   src/       GUI 前端——346 个源文件直接使用 wxWindow/wxDialog 等 GUI 类，
++#              中央头 src/TenacityHeaders.h:20 直接 #include <wx/wx.h>（GUI 伞形头）
++#   modules/   GUI 模块装载层，依赖 src/
++#   plug-ins/ 效果/分析/生成插件，多数经 src/ 的 GUI 效果链注册
++#   nyquist/   Nyquist 脚本效果，依赖 src/ + libnyquist
++#   help/ images/ locale/ scripts/  打包/翻译/辅助资源，同样经 src/ 的目标图
++# 保留的 libraries/ 与 src/ 零反向依赖（已核验：无 ../src/ 引用、无 #include ".../src/"）。
+ add_subdirectory( "libraries" )
+-add_subdirectory( "locale" )
+-add_subdirectory( "src" )
+-add_subdirectory( "modules" )
+-add_subdirectory( "nyquist" )
+-add_subdirectory( "plug-ins" )
+-add_subdirectory( "scripts" )
+ 
+ # Generate config file
+ if( CMAKE_SYSTEM_NAME MATCHES "Windows" )

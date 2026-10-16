@@ -1,0 +1,28 @@
+--- a/libraries/CMakeLists.txt
++++ b/libraries/CMakeLists.txt
+@@ -26,5 +26,25 @@
+    add_subdirectory( "${LIBRARY}" )
+ endforeach()
+ 
++# OHOS patch: 上游 libraries/ 未定义任何 install() 规则——GUI 前端的安装规则位于
++# src/CMakeLists.txt，已随 GUI 前端一并跳过。为保留的 17 个 lib-* 核心库补齐安装规则。
++#   ① 静态库装到 lib/（BUILD_STATIC_LIBS=ON 时 tenacity_module_fn 产出 STATIC 目标）
++#   ② 头文件按 libraries/<lib>/ 的相对结构装到 include/tenacity/<lib>/，
++#      与 tenacity_module_fn() 为每个目标设置的 PUBLIC ${TARGET_ROOT} 包含目录一一对应，
++#      消费者因此可以沿用上游的扁平 basename 风格 #include "Prefs.h" 引用跨库头文件。
++#      install(DIRECTORY .../) 的尾斜杠表示拷贝目录内容而非目录本身，FILES_MATCHING
++#      只拣 *.h/*.hpp，子目录结构（如 lib-ffmpeg-support/impl/avutil/57/）原样保留。
++foreach( LIBRARY ${LIBRARIES} )
++   install( TARGETS ${LIBRARY}
++      ARCHIVE DESTINATION lib
++      LIBRARY DESTINATION lib
++      RUNTIME DESTINATION bin )
++   install( DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/${LIBRARY}/"
++      DESTINATION "include/tenacity/${LIBRARY}"
++      FILES_MATCHING
++         PATTERN "*.h"
++         PATTERN "*.hpp" )
++endforeach()
++
+ set( GRAPH_EDGES "${GRAPH_EDGES}" PARENT_SCOPE )
+ set( TENACITY_LIBRARIES "${TENACITY_LIBRARIES}" PARENT_SCOPE )

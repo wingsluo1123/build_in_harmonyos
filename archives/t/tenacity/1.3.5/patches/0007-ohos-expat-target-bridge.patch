@@ -1,0 +1,23 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -495,9 +495,20 @@
+ endif()
+ 
+ find_package(ZLIB REQUIRED)
+ find_package(EXPAT REQUIRED)
++# OHOS patch: Conan CMakeDeps 为 expat 声明的目标名是小写 expat::expat（recipe 的
++# cmake_target_name），而保留的核心库 libraries/lib-xml/CMakeLists.txt 链接的是
++# EXPAT::EXPAT（CMake 内建 FindEXPAT 模块的命名）。conan_toolchain.cmake 设置
++# CMAKE_FIND_PACKAGE_PREFER_CONFIG=ON 后，find_package(EXPAT) 走 config 模式，
++# 内建模块不再执行，EXPAT::EXPAT 因而缺失并在 generate 阶段报
++# "Target lib-xml links to: EXPAT::EXPAT but the target was not found"。
++# 桥接一个大小写兼容的目标，与 patches/0001 处理 wxWidgets::wxWidgets 同构。
++if(NOT TARGET EXPAT::EXPAT AND TARGET expat::expat)
++  add_library(EXPAT::EXPAT INTERFACE IMPORTED)
++  target_link_libraries(EXPAT::EXPAT INTERFACE expat::expat)
++endif()
+ find_package(mp3lame REQUIRED)
+ find_package(SndFile REQUIRED)
+ find_package(Soxr REQUIRED)
+ find_package(SQLite3 REQUIRED)
+ find_package(PortAudio REQUIRED)
