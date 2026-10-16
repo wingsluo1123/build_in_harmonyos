@@ -1,0 +1,39 @@
+# conandata.yml — ublock 1.70.0 (uBlock Origin)
+#
+# 源码渠道（R39 官方正式源）：上游 GitHub 官方 tag 归档。CI/W3 运行期会对
+# https://github.com 做镜像回退（无需、也不得在 conandata 内写镜像域名，
+# 否则 submit 的 PF7 源URL闸直接拦截）。
+sources:
+  url: "https://github.com/gorhill/uBlock/archive/refs/tags/1.70.0.tar.gz"
+  sha256: "2f5423376833e5ae441a4e52a2ff9476fa7ff15b0d819c235c5b90505937a1ba"
+
+# uAssets 是 uBlock Origin 扩展默认过滤列表数据仓库（官方）。
+# 上游 tools/pull-assets.sh 以 `git clone --depth 1` 拉取 HEAD（不可复现）；
+# 此处改用官方 archive 快照并钉死 commit，由 conanfile.source() 解压到
+# dist/build/uAssets/{main,prod}，供 `make chromium` / `make npm` 使用。
+assets:
+  main:
+    url: "https://github.com/uBlockOrigin/uAssets/archive/158c3c962dc1ea27b7d2d1a1c7de119a1f467f59.tar.gz"
+    sha256: "dbf9e6285c1be2b5524ffef79f80e9a26b64fa866f0d22512bae26e5d9a1d227"
+  prod:
+    url: "https://github.com/uBlockOrigin/uAssets/archive/71dbf1e0a268dc06893b35f9737d4789d91962bc.tar.gz"
+    sha256: "a369e7733a1ceeae56a1a7df5ea5c9ed3206f88f24f7e5f805fd5ba3a27f3c17"
+
+# 上游 platform/npm/tests/request-data.js（`test.js --full-battery` 全量电池）
+# 需要外部 dev 依赖 scaling-palm-tree（GitHub 专属，npm registry 上同名包为
+# 0.0.1-security 占位、无 requests.json）。此处钉死上游 commit 归档以保证可复现。
+test_assets:
+  scaling_palm_tree:
+    url: "https://github.com/mjethani/scaling-palm-tree/archive/15cf1ab37e038771e1ff8005edc46d95f176739f.tar.gz"
+    sha256: "0b5f80b5492d0d3d605037433d530c695013f5e3fea5bc226db0068890217637"
+
+patches:
+  "1.70.0":
+    - patch_file: "patches/0001-tools-explicit-bash.patch"
+      patch_description: >-
+        OHOS/CI：上游 tools/make-*.sh 的 shebang 为 `#!/usr/bin/env bash`，经 make 直接
+        exec 时在 OHOS/CI 沙箱下失败（`make: tools/make-chromium.sh: Resource temporarily
+        unavailable` → Error 127；知识库 E165：OHOS 无传统 /bin，shebang 解释器不可直接
+        执行）。将 tools/make-npm.sh 内部两处 `./tools/*.sh` 调用改为显式 `bash`，
+        配合配方以显式 bash 调用顶层脚本，彻底绕开 shebang 执行。
+      patch_type: "portability"

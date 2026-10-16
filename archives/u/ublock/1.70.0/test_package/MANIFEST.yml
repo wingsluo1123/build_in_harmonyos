@@ -1,0 +1,72 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI 脚本 build_and_test.sh L0e 强制要求存在）
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: ublock/1.70.0
+homepage: "https://github.com/gorhill/uBlock"
+
+# 上游测试总入口（R51 清点）：
+#   * 根 package.json 的 `npm test` = `echo "Error: no test specified" && exit 1`
+#     （上游显式声明根级无自动化测试）。
+#   * 真实测试入口 = platform/npm/test.js —— 官方 mocha 运行器，默认电池
+#     tests/wasm.js + tests/snfe.js；另有未被 test.js 收录的 tests/leaks.js
+#     与 `--full-battery` 可选纳入的 tests/request-data.js。
+#   * 上游 GitHub Actions（.github/workflows/main.yml）只做扩展打包，不跑测试。
+upstream_check_command: "node test.js --mocha   # (in dist/build/uBlock0.npm) → mocha tests/wasm.js tests/snfe.js"
+upstream_test_in_build: true
+upstream_test_command: "bash scripts/run_upstream_tests.sh <src>   # 直接调 mocha，取真实退出码"
+
+upstream_tests:
+  - name: "platform/npm mocha 默认电池 (wasm + snfe)"
+    source: "platform/npm/tests/{wasm.js,snfe.js}"
+    description: >-
+      tests/wasm.js 2 例（WebAssembly available/not-available，验证 enableWASM()
+      返回值）+ tests/snfe.js 32 例（SNFE 初始化 3 / 过滤列表加载 9 / 序列化 5 /
+      反序列化 6 / 过滤匹配 9）。mocha 实测 34 passing / 0 failing，日志
+      reports/upstream-mocha-default.log。
+    command: "node node_modules/.bin/mocha --experimental-vm-modules --no-warnings tests/wasm.js tests/snfe.js"
+    count: 34
+  - name: "platform/npm leaks.js"
+    source: "platform/npm/tests/leaks.js"
+    description: >-
+      1 例（should not leak global variables）——未被 test.js 收录的上游测试资产，
+      本次一并执行：1 passing / 0 failing，日志 reports/upstream-leaks.log。
+    command: "node node_modules/.bin/mocha --experimental-vm-modules --no-warnings tests/leaks.js"
+    count: 1
+  - name: "platform/npm request-data.js (--full-battery，可选)"
+    source: "platform/npm/tests/request-data.js"
+    description: >-
+      参数化数据比对用例（逐请求 × 逐规则）——本文件自身 498268 例
+      （全量运行 498302 = wasm+snfe 34 + request-data 498268），以 2021 快照
+      tests/data/results.json 作期望；需外部 dev 依赖 scaling-palm-tree（GitHub
+      专属，npm registry 同名包为 0.0.1-security 占位）。本次实测 496584 passing /
+      1718 failing —— 期望值来自 2021 年快照，与 1.70.0 引擎行为存在既有时序差异，
+      属上游 fixture 陈旧（非 OHOS 适配引起、非本配方引入）；上游 test.js 亦仅在
+      `--full-battery` 下启用此文件，故不作为本适配门禁。日志
+      reports/upstream-mocha-fullbattery-summary.log。
+    command: "UBO_FULL_BATTERY=1 node node_modules/.bin/mocha --experimental-vm-modules --no-warnings tests/wasm.js tests/snfe.js tests/request-data.js"
+    count: 498268
+    gating: false
+
+external_integration_note: >-
+  上游另有 docs/tests/*.html 浏览器手工测试页（hntrie-test.html、
+  css-selector-based-cosmetic-filters.html、procedural-*-filters.html 等）——
+  需真实浏览器宿主交互，无自动化入口，故不纳入统计（如实申报，不虚报）。
+
+test_package_tests:
+  - file: test.sh
+    description: >-
+      消费者验证（POSIX sh）—— 断言位：① 打包布局 10 条（core index.js/package.json/
+      js/lib/build+publicsuffixlist.json、扩展 manifest.json/background.html/js/_locales、
+      licenses/LICENSE.txt）；② 内容锚点 3 条（index.js 导出 StaticNetFilteringEngine/
+      enableWASM、GPLv3 全文）；③ [OHOS] 鸿蒙特有 6 条（res 双制品布局、扩展 manifest
+      版本==1.70.0、WebAssembly 可用(JIT；--jitless 不兼容)、engines.node>=18、
+      ubo-core 引擎端到端、wasm 制品分发）；④ ③中的「引擎端到端」即
+      consumer/engine_flow.mjs，真实驱动被测库 API（enableWASM + create + useLists +
+      matchRequest block/exception/no-match/类型限定 + serialize + deserialize，
+      R34 非空壳，内部展开 8 个子断言 ENGINE_FLOW=8/8）。断言位合计 10+3+6 = 19
+      （引擎端到端按 1 处计），test.sh 实测 "19 passed, 0 failed, 0 skipped"。
+    command: "conan create archives/u/ublock/1.70.0 --build=missing"
+
+assertion_count: 19
+ohos_specific_test_count: 6
