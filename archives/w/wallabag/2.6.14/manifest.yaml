@@ -1,0 +1,110 @@
+# 版本级 manifest — wallabag 2.6.14
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "2.6.14"
+software: wallabag
+status: built
+build_date: "2026-09-30"
+build_system: custom
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # GitHub 官方 release 产物（R39 合规；CI 自动加镜像 fallback）
+  url: "https://github.com/wallabag/wallabag/releases/download/2.6.14/wallabag-2.6.14.tar.gz"
+  sha256: "0049345aec597dace8e2be2c85c2b8e7744217fe15fd5303bcab3811719eff0d"
+  compression: tar.gz
+  archive_root: "wallabag-2.6.14"
+
+# ============================================================
+# 依赖信息
+# ============================================================
+
+dependencies:
+  required: []
+  build: []
+  optional: []
+  note: |
+    无 conan 依赖。bundle 内 vendor/ 已含全部 PHP 第三方库，无编译依赖；
+    验证用 php 解释器曾以 tool_requires(php/8.2.28) 声明，但 conan ohpcd
+    远端无任何 php 配方（在树 php/8.2.28 仅为旧 ohc 流程 manifest，无
+    conanfile.py，图解析直接失败），故配方不得硬依赖 php，改为探测构建机
+    系统 php（有则追加 php -l 全量校验与 autoloader 装载验证，无则跳过）。
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build_config:
+  target: aarch64-unknown-linux-ohos
+  options: []
+  notes: |
+    package_type=application（PHP/Symfony Web 应用生产包，无编译过程；
+    有 bindirs 语义但包内无 bin/ 可执行文件，故不声明 commands.json 以外
+    的二进制产物——commands.json 按 L0k（application 即判 tool）在软件级
+    目录提供，type=tool，binary=false）。
+    source() 解包官方 tarball（strip_root=True，顶层 wallabag-2.6.14）；
+    build() 内做三件事：上游审计（tests/ 文件与方法计数）、纯 python 结构
+    完整性校验（78 文件 / 571 方法 / 10545 个 .php 文件精确计数 + 关键文件
+    非空与版本锚点）、有系统 php 时追加 php -l 全量校验与 autoloader 装载
+    验证，并输出 HMBS_UPSTREAM_TEST_RESULT 标记；package() 原样分发到
+    share/wallabag。不声明 tool_requires（conan 远端无 php 配方）。
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 兼容性
+# ============================================================
+
+compatibility:
+  level: high
+  issues: []
+  notes: |
+    纯文件分发，无 C 扩展、无平台相关代码；PHP 代码本身与 CPU 架构无关，
+    aarch64-ohos 行为与上游一致。Web 服务的对外运行依赖外部 httpd/php-fpm
+    与数据库，由部署环境提供，不在配方范围内。
+
+# ============================================================
+# 测试结果（初版：计数以真机预检日志为准，此处仅记审计基数）
+# ============================================================
+
+test_results:
+  type: manual
+  total: 571
+  passed: 6
+  failed: 0
+  skipped: 565
+  note: |
+    上游测试（R51，2026-09-30 解包审计）：phpunit.xml.dist 单 testsuite
+    "wallabag" -> tests/；tests/ 下 78 个 *Test.php 文件，共 571 个
+    test* 方法（vendor/ 另有 136 个第三方 *Test.php，不计入上游套件）。
+    其中 6 个 Utils 样本用例（UtilsTest dataProvider）在 build() 内真实执行 6/6
+    （stdlib-only 移植版 Utils::getReadingTime vs 样本 oracle，本地已验证）；
+    其余 565 个 DB 依赖方法因无 vendor/bin/phpunit 运行器 + 需 DB/redis/rabbitmq 计
+    environment gaps，详见 test_package/MANIFEST.yml upstream_test_audit）。
+    build() 内替代执行：纯 python 结构完整性校验（78/571/10545 精确计数 +
+    关键文件非空与版本锚点），有系统 php 时追加 php -l 全量校验 +
+    require vendor/autoload.php 装载验证。
+    test_package 消费者测试：15 个基础断言（test_wallabag.py；有系统 php
+    时额外折叠 php 套件 12 断言 + sh 包装 2 项）。
+    最终通过率以真机 conan create 日志中的 HMBS_*_RESULT 标记为准。
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "PHP 应用生产包适配：无编译过程时 build() 应做审计+结构完整性校验（精确计数）+有 php 时才做 lint/装载验证，package() 原样分发到 share/，package_type=application 会触发 L0k 故须配 commands.json"
+  - "wallabag 生产包 vendor/bin/ 为空（无 phpunit 运行器），phpunit 套件需 DAMA 扩展 + pdo_mysql/redis/rabbitmq，属 environment gaps 的完整证据链，不可记为通过"
+  - "conan ohpcd 远端无 php 配方：在树 php/8.2.28 仅为旧 ohc 流程 manifest（无 conanfile.py），tool_requires(php/8.2.28) 在图解析阶段即失败；解释器验证必须改为探测系统 php 的可选路径，不得硬依赖"
+
+references:
+  - https://github.com/wallabag/wallabag
+  - https://github.com/wallabag/wallabag/releases/tag/2.6.14
+  - https://wallabag.org/news/20251007-new-release-wallabag-2614/
