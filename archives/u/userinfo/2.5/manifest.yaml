@@ -1,0 +1,30 @@
+version: "2.5"
+software: "userinfo"
+status: built
+build_date: "2026-10-15"
+build_system: "autotools"
+
+source:
+  url: "https://mirrors.aliyun.com/debian/pool/main/u/userinfo/userinfo_2.5.orig.tar.bz2"
+  sha256: "c21e6da328a01a58934ecf0319f4395418ef0b0362231e464fc25f825c16b753"
+  tar_format: tar.bz2
+
+build:
+  system: autotools
+  configure_options:
+    - "--build=aarch64-unknown-linux-gnu"
+    - "--host=aarch64-unknown-linux-gnu"
+    - "--target=aarch64-unknown-linux-gnu"
+    - "--program-prefix="
+    - "--prefix=<package_folder>"
+  dependencies: []
+  cc: clang
+
+patches_applied:
+  - "0001-ohos-hmdfs-config-status-scratch-umask.patch"
+
+knowledge_gained:
+  - "autoconf 的 config.status 用 (umask 077 && mktemp -d ./confXXXXXX) 建临时目录，HMDFS 对不可被 group/other 遍历（缺 x 位）的目录拒绝在其中创建文件 → 需把 configure 里的 umask 077 改成 022"
+  - "AC_CANONICAL_TARGET 会因 --target 给安装程序名加 <triplet>- 前缀；加 --program-prefix= 可恢复为 ui"
+  - "老 config.guess/config.sub 不认 HarmonyOS，显式传 --build/--host/--target=aarch64-unknown-linux-gnu 绕开"
+  - "预生成 configure + Makefile.in 的项目在 mtime 被打乱时会触发 aclocal/automake 重生成 → touch 生成文件使其比源新"
