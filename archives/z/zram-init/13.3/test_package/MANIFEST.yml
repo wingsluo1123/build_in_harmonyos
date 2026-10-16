@@ -1,0 +1,45 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: zram-init/13.3
+homepage: "https://github.com/vaeth/zram-init"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+# R51 清点证据（实测于 zram-init-13.3 源码树）：
+#   1. `make -n check` → "make: *** No rule to make target 'check'.  Stop."
+#      （Makefile 仅有 all/po/install/uninstall/clean/mrproper/distclean/
+#       maintainer-clean 目标，无任何 check/test 目标）
+#   2. 源码树 0 个 test* 文件、0 个 .c 源文件（纯 shell 软件包，
+#      仅 sbin/zram-init.in + man/modprobe.d/zsh/i18n/systemd/openrc 数据）
+#   3. 仓库无 CI 测试配置（无 .github/workflows 测试作业、无 tox/pytest/shellcheck 配置）
+# 结论：上游无测试套件，无法运行上游测试；按 R51 由本 test_package 自行补齐消费者视角测试。
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.sh
+    description: "包布局与内容断言：bin 脚本可执行位、上游 shebang 保留、@MODIR@/@EXENAME@ 占位符已替换、man 页存在、zsh 补全 compdef 头、modprobe.d 模块参数"
+    command: "sh test.sh <package_folder>"
+  - file: conanfile.py (test())
+    description: "功能性冒烟：`sh -n` 语法检查 + `sh zram-init -h` 输出 Usage 且 exit 0（getopts -h/-H → Usage 0）"
+    command: "sh zram-init -h"
+  - file: harmony_e2e.sh
+    description: "鸿蒙特有消费者端到端用例（真实执行交付脚本，非纯断言）：\n
+      case1 释放流程 `zram-init 0`：参数解析→数值校验→设备探测→释放决策→exit 0（无诊断输出，鸿蒙默认无 zram 模块运行面下的上游契约行为）；\n
+case2 建立流程 `zram-init 64 DIR`：完整走 getopts→默认值→DIR 校验→设备探测→modprobe 尝试→5×1s hot_add 探测，在鸿蒙内核边界优雅降级——输出上游精确致命消息 'cannot create /dev/zram0: /sys/class/zram-control missing' 并 exit 1，零副作用。两用例在 /dev/zram0 或 zram-control 存在的非干净宿主上自动 SKIP（如实记录，不虚构通过）"
+    command: "sh harmony_e2e.sh <packaged_script>"
+
+# 测试断言总数 (近似值, 用于质量评估)
+# test.sh 10 条布局/内容断言 + test() 3 条命令级断言（sh -n / grep Usage / exit 0）
+# + harmony_e2e.sh 2 个鸿蒙特有消费者端到端用例（case1 release：exit 0 + 静默；
+#   case2 setup：exit 1 + 精确降级消息 + 无副作用，各含 3 项检查）
+assertion_count: 19
