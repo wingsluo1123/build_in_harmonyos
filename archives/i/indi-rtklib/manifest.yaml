@@ -1,0 +1,28 @@
+# 软件级 manifest — indi-rtklib
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: indi-rtklib
+display: "INDI RTKLIB Driver"
+description: "INDI 天文框架的 RTKLIB 精密定位驱动（C/C++ 可执行程序，依赖 libindi/libnova）"
+category: library
+homepage: "https://github.com/indilib/indi-3rdparty"
+license: GPL-2.0-or-later
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "E092：CMake 不识别 HarmonyOS → 强制 CMAKE_SYSTEM_NAME=Linux（同 libindi 配方）"
+    - "OHOS libc++：C++ 驱动目标需链接 c++/c++abi（见 package_info system_libs）"
+    - "libindi 未安装 INDIConfig.cmake → 用驱动自带 FindINDI.cmake/FindNova.cmake，配方注入 INDI_INCLUDE_DIR/INDI_LIBRARIES/NOVA_*"
+    - "产出为可执行驱动（非库）→ test_package 用 vendor 的 rtkrcv_parser.c 做真实 API 测试（R34）"
+  common_dependencies:
+    - libindi
+    - libnova
+    - zlib
+
+versions:
+  "1.0-20221222172722":
+    status: built
+    build_date: "2026-09-29"
+    conan_ref: "indi-rtklib/1.0-20221222172722"
+    note: "INDI RTKLIB 驱动（CMake，依赖全已在制品仓）"

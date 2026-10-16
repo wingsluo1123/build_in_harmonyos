@@ -1,0 +1,63 @@
+# 版本级 manifest — indi-rtklib 1.0-20221222172722
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "1.0-20221222172722"
+software: indi-rtklib
+status: built
+build_date: "2026-09-29"
+build_system: cmake
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/i/indi-rtklib/indi-rtklib_1.0+20221222172722.orig.tar.gz"
+  sha256: "49028a1c35789aeb3e5074ba71836c2aa2bd98797e8a1ee1b007c3de66c23d9c"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - CMAKE_SYSTEM_NAME=Linux
+    - CMAKE_SYSTEM_PROCESSOR=aarch64
+    - CMAKE_POLICY_VERSION_MINIMUM=3.5
+  dependencies:
+    - libindi/2.2.2.1
+    - libnova/0.16
+    - zlib/1.3.1.1
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - category: L1
+    content: "indi-rtklib 是 INDI 驱动可执行程序（非库），不打包 RTKLIB 算法源码；核心是继承 INDI::GPS 的 rtklib_driver.cpp + 独立 C 解析器 rtkrcv_parser.c"
+    reason: "实测 CMakeLists：find_package(INDI/NOVA REQUIRED)，add_executable(indi_rtklib)"
+  - category: L1
+    content: "libindi 发布版不装 INDIConfig.cmake 且全部头文件在 include/libindi/ 子目录 → 注入 INDI_INCLUDE_DIR 必须指到该子目录（find_path 短路不追加 PATH_SUFFIXES，指包根 include/ 报 INDI version header not found）；库解析注入 INDI_ROOT=<包根> 即可，注入 INDI_LIBRARIES 会被 FindINDI 模块覆盖重算"
+    reason: "真机第 3 轮 FAIL@G2（FindINDI.cmake:212）实测定位；libindi package_info 用 cmake_file_name=libindi，与驱动 find_package(INDI) 不匹配"
+  - category: L1
+    content: "indi-3rdparty 2021/2022 快照驱动对 libindi 2.x 必踩四雷：FindINDI 版本正则匹配不了带引号的 INDI_VERSION \"2.2.2\"、CMakeCommon.cmake 目录级锁死 CXX_STANDARD 14 遮蔽 toolchain cppstd=17（libindi 2.x 头用 std::any）、驱动源码用已移除的 libindi 1.x API（LocationN/TimeT/stime 等）、INDI_INCLUDE_DIR 层级指错——修法均为回移上游 master + 配方注入修正（本包 patches 0001-0003）"
+    reason: "rtklib 与 starbook-ten 两包同根因实测；同族任务 id 12487-12506 均适用"
+  - category: L1
+    content: "上游 rtkrcv_parser.c 的 char status[6] + sscanf(\"(%6c)\") 恰好写满 6 字节、按 C 标准不写终止符，后续 strcmp 依赖第 7 字节为 '\\0' 属未定义行为——真机 musl 实测第 7 字节为栈垃圾致任何状态都不命中、*fix 残留上次调用值；修复为回移上游 master 的 strncmp(status, RTKRCV_FIX_X, strlen(...))（patch 0004），顺带使 FIX/FLOAT 短名可识别"
+    reason: "真机第 4 轮 test_package 运行期 FAIL（single: fix=1 expect 6）+ 探针三场景定位；编译期检查不可能暴露此 UB"
+  - category: L1
+    content: "executable-only 包的 test_package 必须对 bin/<驱动> 做存在性硬断言：L1e 破坏性负测只移走 bin/lib/include（不碰 src/），若测试只编译包内 src/ 且 --help 探测用 ignore_errors=True 吞退出码，sabotage 后照过会被误判'假测试'(R34)；执行探测保留 best-effort（本机对链 libindi 共享库二进制 exec EPERM/126 属环境限制）但须捕获并报告返回码"
+    reason: "starbook-ten 第 2 轮 finish 卡 L1e 实测 + 第 3 轮验证修复生效；conan 2.x self.run(ignore_errors=True) 返回退出码（源码确认）"
+
+notes: |
+  indi-rtklib 是 INDI 天文框架的 RTKLIB 精密定位驱动，纯 C/C++，
+  依赖 libindi/libnova/zlib（全部已在制品仓），无 GUI/媒体/内核依赖。
+
+  适配要点：
+  - CMake 构建，强制 CMAKE_SYSTEM_NAME=Linux（E092，CMake 不识别 HarmonyOS）；
+    注入 cache 变量 CMAKE_POLICY_VERSION_MINIMUM=3.5（CMake 4.x 移除 <3.5 兼容）。
+  - 用驱动自带 FindINDI/FindNova 模块：INDI_INCLUDE_DIR 指 include/libindi 子目录、
+    库解析靠 INDI_ROOT（注入 INDI_LIBRARIES 会被模块覆盖）、ZLIB_ROOT 对齐。
+  - patches 0001-0003 修 libindi 2.x 迁移四雷，0004 回移上游 strncmp UB 修复。
+  - 产出为可执行程序 indi_rtklib（R38：软件级 commands.json 声明）。
+
+  test_package（R34）：
+  - Layer 1：vendor 编译 rtkrcv_parser.c，真实调用公开 C API scansolution()，
+    断言 no_fix/SINGLE/FIX/FLOAT 四个状态（patch 0004 后全部确定性识别）。
+  - Layer 2：bin/indi_rtklib 存在性硬断言（L1e 依赖锚点）+ --help best-effort
+    探测（执行受限环境 EPERM 仅 warn，如实报告退出码）。
