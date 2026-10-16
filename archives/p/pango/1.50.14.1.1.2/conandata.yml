@@ -1,0 +1,15 @@
+sources:
+  # 【换源 2026-10-16】CI 实测：主源 src.fedoraproject.org 在 Worker 上 Read timed out（三次重试均超时，
+  # 属 Worker 网络可达性问题）→ 主源改回**官方 download.gnome.org**，与 CI 已验收通过的 gdk-pixbuf
+  # 完全同构（CI 的 Mirror fallback 会把它改写成 gnome 镜像；同机制下 gdk-pixbuf 由 mirror.nju.edu.cn 命中）
+  # 【换源 2026-10-14】CI 自诊断：源码下载超时（Worker 网络受限）。原镜像 ftp2.osuosl.org 未验证可达
+  # → 主源改用 Fedora lookaside 的 pristine 上游 tarball（Worker 已验证可达：libcaca CI 通过）。
+  # 文件字节一致：sha256 1d67f205…（与下方记录相同），sha512 与 Fedora 记录逐字核验一致，4,273,776 B。
+  url: "https://download.gnome.org/sources/pango/1.50/pango-1.50.14.tar.xz"
+  sha256: "1d67f205bfc318c27a29cfdfb6828568df566795df0cb51d2189cde7f2d581e8"
+  mirror_url: "https://mirror.nju.edu.cn/gnome/sources/pango/1.50/pango-1.50.14.tar.xz"   # 实测 200；CI 侧同镜像已成功服务 gdk-pixbuf
+
+patches:
+  - patch_file: "patches/0001-ohos-failing-suite-font-tests.patch"
+    patch_description: "OHOS: mark 8 fontconfig-dependent tests as Meson failing suite（无 fonts.conf：test-font/fonts/layout/bidi/iter/ellipsize/harfbuzz/misc）；conanfile 以 --no-suite=failing 排除，其它失败仍中断构建"
+    patch_type: "portability"
