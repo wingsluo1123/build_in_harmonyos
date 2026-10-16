@@ -1,0 +1,28 @@
+# ═══ Draft knowledge entry — 纯 Java/JAR API 发行物 Conan 打包范式（Maven 源码编译 + JVM 运行环境）═══
+# Timestamp: 2026-09-27
+# Software: jakarta-inject-api 2.0.1（所有 jar-library / 纯 Java API 类包通用）
+# Gate: conan create build() / test_package 真机运行
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E605
+title: 上游纯 Java/JAR API 发行物适配范式：Maven 源码编译（禁原 jar 打包）+ 上游无 mvnw 时配方自取 Maven（sha256 校验）+ bishengjdk 17 运行时依赖 + libexec 目录导出 + test_package javac/java 反射断言
+trigger_tool: mvn / javac / java
+phase: build|package|testing
+error_signature: "./mvnw: No such file or directory|Could not resolve dependencies|JAVA_HOME not set"
+severity:               2
+category:               platform, java, packaging, maven
+match_keywords: jar, java, maven, mvnw, bishengjdk, libexec, cpp_info.libdirs, JVM,
+  jakarta, api
+root_cause: jar-library 类任务存在两个易错点：直接打包官网预编译 jar 违反 L1c
+  （必须源码编译）；上游 repo 无 mvnw 时 Maven 依赖不满足，且 OHOS 设备无系统级 JDK，
+  需要 bishengjdk 17 运行环境（构建期与 test_package 期都要处理 JAVA_HOME）。
+rec_approach: maven-src-compile + self-fetch-maven-sha256 + bishengjdk-autodetect-install + libexec-export
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-16
+authors:               unknown
+doc_file:               doc/E605.md
+affected_scope:         上游纯 Java/JAR API 发行物适配范式：Maven 源码编译（禁原 jar 打包）+ 上游无 mvnw 时配方
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        maven-src-compile + self-fetch-maven-sha256 + bishengjdk-autodetect-install + libexec-export

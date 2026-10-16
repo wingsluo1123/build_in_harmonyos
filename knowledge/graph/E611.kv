@@ -1,0 +1,21 @@
+title: "PkgConfigDeps .pc 单一 -Iincludedir 对版本化多级 include 布局的 Cflags 补丁 + musl 无 locale 库的 g_test setlocale 断言中止豁免"
+category:               ohos, meson, pkg-config, packaging, testing
+match_keywords: >
+  PkgConfigDeps, glib-2.0.pc, Cflags, includedir 子目录, libsoup-3.0, soup.h file not found,
+  setlocale, musl, locale 数据库, g_test, 断言中止, 环境限制, 上游测试直跑,
+  geocode-glib, GNOME, meson 交叉
+error_signature: "fatal error: 'libsoup/soup\\.h' file not found|'setlocale \\(LC_ALL, \"[a-z_A-Z]+\\.UTF-?8\"\\)' should not be NULL|Cflags: -I\"\\$\\{includedir\\}\""
+root_cause: "两个独立缺口：(1) conan PkgConfigDeps 生成的 .pc 只写 Cflags: -I\"${includedir}\"，但 GNOME 系库上游布局把头文件放在版本化多级子目录（include/libsoup-3.0/libsoup/soup.h，消费者 #include <libsoup/soup.h>），单 -I 解析不到子目录导致 fatal error file not found；(2) OHOS musl 无 locale 数据库，上游测试调 setlocale(LC_ALL, \"en_GB.UTF-8\") 等返回 NULL，g_test 断言 'setlocale should not be NULL' 直接中止测试进程（不是行为差异而是数据缺失，无法通过代码修补绕开）。"
+rec_approach: "(1) build() 前定位生成的 libsoup-3.0.pc，把 Cflags 替换为 -I\"${includedir}/libsoup-3.0\" -I\"${includedir}\" 双路径（幂等判断：不含子目录串才替换）；(2) locale 依赖测试项按环境限制豁免如实申报（断言原文+行号在案），其余上游测试二进制以 OHOS 原生 ELF 直跑（LD_LIBRARY_PATH 注入依赖 libdir，libshumate 先例）保证真跑覆盖率。"
+severity:               2
+id:                     E611
+doc_file: doc/DRAFT-12915.md
+authors:               unknown, Builder (ZCode subagent), Coordinator, SunShine_06
+trigger_tool:           meson
+phase:                  build
+affected_scope:         "PkgConfigDeps .pc 单一 -Iincludedir 对版本化多级 include 布局的 Cflags
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        "(1) build() 前定位生成的 libsoup-3
+rec_priority:           1
+rec_auto_fix:          false
+rec_impl:               manual

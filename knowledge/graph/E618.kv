@@ -1,0 +1,52 @@
+#====================================================================
+# DRAFT-13400-libinput-1.28.1-musl-program-invocation-name-third-fallback - meson probe chain needs musl fallback
+#====================================================================
+
+id:                     E618
+trigger_tool:           meson|clang|ninja
+phase:                  build
+error_signature:        "use of undeclared identifier 'program_invocation_short_name'|program_invocation_short_name.*undeclared|program_invocation_short_name 未定义"
+
+severity:               2
+category:               musl, meson, config-h, glibc-extension
+match_keywords:         program_invocation_short_name, getprogname, __progname, musl, config_h.set, has_header_symbol, meson.build, errno.h
+title:                  program_invocation_short_name 探测链需第三级 musl fallback
+
+root_cause:             program_invocation_short_name 是 glibc 扩展(errno.h 在 _GNU_SOURCE 下声明),BSD 标准对应物是 getprogname();上游 meson 探测链只有 glibc→getprogname 两级,musl(OHOS PC)两级皆不命中时 config.h 不定义该宏,使用点(tools 的 usage() 输出)编译报未声明标识符。
+affected_scope:         musl 上构建、代码使用 program_invocation_short_name 且上游探测链缺兜底分支的包(libinput/consolation/eudev 系列仓内多次复现)。
+verification_cmd:       补丁对干净 orig 树 git apply --check;构建后 grep config.h 应含 program_invocation_short_name 定义;CI conan create 构建成功。
+
+rec_priority:           1
+rec_approach:           meson-third-literal-fallback
+rec_description:        在 meson 层给探测链加第三级字面量兜底(config_h.set('program_invocation_short_name', '"<pkgname>"')),一处收敛、不引入逐文件 extern;仅 usage() 输出使用时无功能损失。
+rec_command:            meson.build: if not cc.has_header_symbol('errno.h', 'program_invocation_short_name', ...) \n  if cc.has_header_symbol('stdlib.h', 'getprogname') ... \n  else config_h.set('program_invocation_short_name', '"libinput"') endif endif
+rec_auto_fix:           false
+rec_impl:               upstream-patch-plus-conandata
+
+fallback_priority:      1
+fallback_approach:      per-file-progname-alias
+fallback_description:   在使用文件内 extern char *__progname; #define program_invocation_short_name __progname(1.26.2 补丁方案);语义等价且保留运行时程序名,适合使用点分散、构建系统无法收敛的包。
+fallback_command:       (patch) tools/*.c: extern char *__progname; #define program_invocation_short_name __progname
+fallback_auto_fix:      false
+fallback_impl:          package-patch
+
+forbid_1_pattern:       #define\s+program_invocation_short_name\s+__progname(?=[^\n]*\n[^\n]*#include)
+forbid_1_reason:        别名宏必须在 include 之后定义且不与 glibc 头冲突;在头文件前盲定义会在 glibc 上产生重定义冲突。
+forbid_1_consequence:   glibc 构建报宏重定义/类型冲突。
+
+principles:               
+causes:
+caused_by:
+similar_to:
+conflicts_with:
+prerequisite_of:
+
+doc_file:               knowledge/drafts/DRAFT-13400-libinput-1.28.1-musl-program-invocation-name-third-fallback.md
+last_updated:           2026-09-28
+source_event:           libinput/1.28.1 适配(积分赛依赖任务)
+authors:                2301_80739235
+source_pr:              13400
+source_commit:
+
+metrics_success_count:  0
+metrics_fail_count:     0

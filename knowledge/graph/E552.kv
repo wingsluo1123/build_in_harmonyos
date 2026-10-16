@@ -1,0 +1,30 @@
+# ═══ Draft knowledge entry — automake 的 AM_CFLAGS 不覆盖 C++ 源文件 ═══
+# Timestamp: 2026-09-27
+# Software: wmcdplay 1.1（所有含 C++ 源的 autotools X11/图形包）
+# Gate: conan create build() — 编译阶段
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E552
+title: automake 只把 AM_CFLAGS 传给 C 编译，C++ 源收不到 pkg-config 的 -I；须补 AM_CXXFLAGS
+trigger_tool: clang++|g++|make
+phase: compilation
+error_signature: fatal error: '.*' file not found|X11/X\.h.*file not found|X11/Xlib\.h.*file not found
+severity:               2
+category:               build-system, autotools, cxx
+match_keywords: AM_CFLAGS, AM_CXXFLAGS, pkg-config, CFLAGS, CXXFLAGS, automake,
+  X11, Xpm, Xext, include path, cc, cxx
+root_cause: automake 对 C 与 C++ 使用不同的内建编译变量族；上游把"依赖注入变量"错误地
+  挂在仅覆盖 C 的变量上。
+affected_scope: 含 C/C++ 混合或纯 C++ 源、且用 AM_CFLAGS 注入 pkg-config 结果的 autotools 包
+verification_cmd: grep -n "AM_CFLAGS\|AM_CXXFLAGS" Makefile.am; make V=1 2>&1 | grep -m1 "clang++\|g++"
+rec_priority: 1
+rec_approach: add-am-cxxflags
+rec_description: Makefile.am 增加 AM_CXXFLAGS，值与 AM_CFLAGS 一致；随后自举并确认 C++
+  编译命令行出现 -I<dep>/include。
+rec_command: AM_CXXFLAGS = $(x11_CFLAGS) $(xpm_CFLAGS) $(xext_CFLAGS)   # Makefile.am
+source_pr: wmcdplay 1.1 适配
+rec_auto_fix:               false
+rec_impl:               manual
+last_updated:               2026-10-16
+authors:               unknown
+doc_file:               doc/E552.md

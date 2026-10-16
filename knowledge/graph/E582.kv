@@ -1,0 +1,67 @@
+#====================================================================
+# DRAFT-11418-uboot-ohos-no-script-execve
+# — OHOS 内核禁脚本 execve（binfmt_script 缺失级平台策略）：
+#   `sh file` 可读可跑、直接 exec 与 `sh -c file` 一律 EACCES rc=126，
+#   与文件属主/目录/mode 无关、新建文件同样被拒、ELF exec 正常。
+#   Kbuild/Kconfig 中直接 exec 的辅助脚本改经 sh/$(CONFIG_SHELL)
+#   解释执行（解析期 $(shell,) 与配方执行期两条路径全覆盖）
+# 触发事件: u-boot 2026.07 适配（真机 conf 构建链 EACCES）
+# 路径: Path B（知识库扩展）
+#====================================================================
+
+id:                     E582
+trigger_tool:           make|kconfig|conf|sh|exec
+phase:                  conan_build
+error_signature:        Permission denied.*EACCES|rc=126|exec.*not permitted
+severity:               2
+category:               kernel, build-system, permissions, execve
+match_keywords:         script execve, binfmt_script, EACCES, rc=126, sh -c, CONFIG_SHELL, 辅助脚本, $(shell,), Kconfig, sdl2-config, ELF 包装器, shim, 命令式调用
+title:                  OHOS 内核禁脚本 execve（binfmt_script 缺失）：Kbuild/Kconfig 直接 exec 的辅助脚本一律 EACCES rc=126，改经 sh/$(CONFIG_SHELL) 解释执行（不可改写调用点用同名 ELF 包装器）
+
+root_cause:           OHOS 内核对 execve 的脚本路径（binfmt_script 处理器）
+  未注册或被 LSM 拒绝：内核看到 shebang 头后不回落解释器，直接
+  EACCES。Linux/macOS 无感。u-boot Kbuild 四个直接 exec 点实测全炸：
+  - scripts/Kconfig.include:34 的 gcc-version 宏 → conf 解析 Kconfig
+    时 $(shell,) 直接 exec gcc-version.sh；
+  - Kconfig:90/98 的 $(shell ... scripts/gcc-version.sh / clang-version.sh)；
+  - Makefile:1361 起 cmd_ofcheck 在 `all` 配方里直接 exec
+    scripts/check-of.sh；
+  - scripts/Makefile.build:249 的 cmd_check_local_export → 每个 .o
+    编译后直接 exec check-local-export（该脚本是 bash 脚本：shopt，
+    设备 /bin/sh 无 shopt、/bin/bash 不存在、bash 在
+    /data/service/hnp/bin/bash）。
+  另外 2 处（endian-swap/mkuboot）因无大端/SPL 配置不触发。gen_ll
+  初判不触发是误判（判断开关终态以 .config 为准）：sandbox 的
+  Kconfig `imply LTO`（arch/Kconfig:236）在 defconfig 无字面量的
+  情况下把 CONFIG_LTO 拉成 y → keep-syms-lto.c 规则链接前直接 exec
+  gen_ll_addressable_symbols.sh → 真机 make[1] Error 126（patch 0011
+  修复，同款 $(CONFIG_SHELL) 前缀）。
+
+affected_scope:         任何 make/autotools/cmake/Kconfig 构建在 OHOS 上的适配：凡配方或配置解析直接 exec 辅助脚本（shebang 脚本直跑 / sh -c scriptfile）的路径一律 EACCES rc=126，须改经 sh/$(CONFIG_SHELL)/CONFIG_SHELL 解释执行；调用点为不可改写上游文字且为命令式调用（PATH 查找 / popen）的，用同名 ELF 包装器消解。判别口诀：直接 exec 与 sh -c 均 EACCES rc=126、sh file 正常 → 脚本 execve 禁令而非权限问题。u-boot 2026.07 实例=0002 四处 + 0011 + sdl2-config 包装器。
+
+verification_cmd: >
+  make O=<obj> HOSTCC=clang CC=clang NO_PYTHON=1 CONFIG_SHELL=bash sandbox_defconfig
+  # 修复前：gcc-version.sh EACCES rc=126；修复后：defconfig 正常写出
+
+rec_priority:           1
+rec_approach:           ohos-script-exec-via-shell
+rec_description: >
+  OHOS 上构建系统凡直接 exec 辅助脚本（$(shell,) 解析期、make 配方
+  执行期、configure 探测）一律改经显式 sh/$(CONFIG_SHELL) 解释执行；
+  错误签名 EACCES rc=126 且 `sh file` 正常即本坑，勿误判为权限。
+rec_command:            sh scripts/gcc-version.sh; make sandbox_defconfig
+rec_auto_fix:           false
+rec_impl:               patches/0002-kbuild-script-exec-via-shell.patch
+
+doc_file:               knowledge/drafts/DRAFT-11418-uboot-ohos-no-script-execve.md
+last_updated:           2026-10-10
+source_event:           u-boot 2026.07 适配（真机 conf 构建链 EACCES + LTO keep-syms 第 5 炸点 + sdl2-config 命令式调用包装器）
+authors:                LIMInGZE666 <LIMInGZE666@noreply.gitcode.com>
+source_pr:              11418
+source_commit:          62f3b5f060
+
+metrics_success_count:  3
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-10
+

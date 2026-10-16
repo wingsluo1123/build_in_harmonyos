@@ -1,0 +1,75 @@
+#====================================================================
+# DRAFT-11418-uboot-ohos-host-kconfig-remap
+# — host 代码里 CONFIG_IS_ENABLED(X) 经 USE_HOSTCC 符号重映射解析为
+#   CONFIG_TOOLS_X：两处裸 #ifdef CONFIG_FIT_SIGNATURE 未走重映射导致
+#   TOOLS_LIBCRYPTO=n + FIT_SIGNATURE=y（上游文档化无 OpenSSL 组合）
+#   无法编译/链接；且 Kconfig 的 select 无视用户显式关闭——单独
+#   -d TOOLS_LIBCRYPTO 被 default y 的 TOOLS_KWBIMAGE（select 源）
+#   经 syncconfig 强制拉回 y。双修：裸引用改 CONFIG_IS_ENABLED +
+#   gate 改 TOOLS 符号 + 同时 -d select 源，不跑 olddefconfig
+# 触发事件: u-boot 2026.07 适配（真机无 OpenSSL 构建）
+# 路径: Path B（知识库扩展）
+#====================================================================
+
+id:                     E581
+trigger_tool:           clang|kconfig|conf|mkimage|openssl
+phase:                  conan_build
+error_signature:        openssl/evp.h.*file not found|undefined reference.*fit_config_verify|TOOLS_.*select
+severity:               2
+category:               build-system, toolchain, host-tools, kconfig
+match_keywords:         USE_HOSTCC, CONFIG_IS_ENABLED, TOOLS_ prefix, -idirafter 无关, select 强制回写, default y 陷阱, olddefconfig, syncconfig, TOOLS_LIBCRYPTO, 无 OpenSSL
+title:                  host/目标双编译的 Kconfig 符号重映射 + select 强制回写双陷阱：裸 #ifdef 未走 USE_HOSTCC 重映射 + 单独 -d 被 default-y select 源经 syncconfig 拉回
+
+root_cause:           1) 重映射机制：include/linux/kconfig.h 在 USE_HOSTCC
+  下把 _CONFIG_PREFIX 定义为 TOOLS_，CONFIG_IS_ENABLED(X) → 检查
+  CONFIG_TOOLS_X。tools/Kconfig 里 TOOLS_FIT_SIGNATURE depends on
+  TOOLS_LIBCRYPTO、def_bool y。上游两处漏网：tools/image-host.c:1397
+  裸 #ifdef CONFIG_FIT_SIGNATURE（host 编译时该目标符号不定义，但
+  守卫内的 fit_check_sign() 引用 TOOLS_LIBCRYPTO 门控对象——注意
+  此处的坑是「裸 #ifdef 目标符号在 host 编译中恒假，函数被误留/
+  误删」，实测为该文件内唯一未走重映射的守卫，链接期缺
+  fit_config_verify）；tools/Makefile:67 的 fit_check_sign 启用条件
+  用目标符号 CONFIG_FIT_SIGNATURE，而签名对象按 TOOLS_LIBCRYPTO
+  门控 → 启用但对象缺失，链接失败。
+  1b) 第三处漏网 include/image.h:1788 裸 #if defined(CONFIG_FIT_CIPHER)
+  （USE_HOSTCC 块内、目标符号）：host 工具编译包含共享
+  generated/autoconf.h，目标 FIT_CIPHER=y 时宏必然定义 → openssl 头
+  直接包含（无 OpenSSL 设备 aisimage.o 实测炸）。
+  2) select 语义：Kconfig 的 select 对「有 prompt 的符号」强制拉 y
+  （用户显式 n 也会被覆盖，新版 kconfig 仅告警）。TOOLS_KWBIMAGE
+  是 default y 的有 prompt 符号，select TOOLS_LIBCRYPTO。全树仅此
+  一处 select 源（mvebu SPL 的 select TOOLS_KWBIMAGE 对
+  sandbox/qemu_arm64 不触发）。
+  3) default-y 陷阱：TOOLS_LIBCRYPTO 本身 default y，-d 后若跑
+  olddefconfig 会按默认值重新置 y（真机 .config 实证）。
+
+affected_scope:         Kbuild 系 host/目标双编译项目在 OHOS（或任何无 OpenSSL/gnutls 开发头设备）上的「关宿主密码学工具」构建：① 全部裸 #ifdef CONFIG_* 守卫须按 host 编译语义复核（USE_HOSTCC 重映射）；② 关 default-y 符号须先定位全树 select 源并一并关闭、禁跑 olddefconfig 回写。与 u-boot 无关的通用约束，u-boot 2026.07 实例=0005/0006/0007 三补丁 + -d TOOLS_KWBIMAGE/-d TOOLS_MKEFICAPSULE。
+
+verification_cmd: >
+  bash scripts/config --file <obj>/.config -d TOOLS_KWBIMAGE -d TOOLS_LIBCRYPTO
+  grep -E "CONFIG_TOOLS_(KWBIMAGE|LIBCRYPTO|FIT_SIGNATURE)" <obj>/.config
+  # 修复前：=y（select 强制回写）；修复后：not set / 消失
+
+rec_priority:           1
+rec_approach:           ohos-host-kconfig-remap
+rec_description: >
+  Kbuild host/目标双编译项目在无 OpenSSL 设备上：裸 #ifdef 目标符号
+  守卫改 CONFIG_IS_ENABLED（重映射）或 TOOLS 符号；关 default-y
+  符号前 grep 全树 select 源一并 -d；禁止 olddefconfig 回写，靠
+  syncconfig 收敛。
+rec_command:            grep -rn "select TOOLS_LIBCRYPTO" --include=Kconfig\* .
+rec_auto_fix:           false
+rec_impl:               patches/0005-image-host-fit-check-sign-tools-gate.patch + patches/0006-fit-check-sign-gated-by-tools-fit-signature.patch + conanfile.py _disable_openssl + patches/0007-fit-cipher-host-gate-via-tools-symbol.patch
+
+doc_file:               knowledge/drafts/DRAFT-11418-uboot-ohos-host-kconfig-remap.md
+last_updated:           2026-09-29
+source_event:           u-boot 2026.07 适配（真机无 OpenSSL 构建三连坑）
+authors:                LIMInGZE666 <LIMInGZE666@noreply.gitcode.com>
+source_pr:              11418
+source_commit:          62f3b5f060
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-09-29
+

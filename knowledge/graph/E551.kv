@@ -1,0 +1,35 @@
+# ═══ Draft knowledge entry — OHOS 上 autotools 自举：无 automake 镜像 + autoreconf 冲突 + $ACLOCAL 惯用法 ═══
+# Timestamp: 2026-09-27
+# Software: wmcdplay 1.1（所有上游 tarball 只带 configure.ac/Makefile.am 的 autotools 包）
+# Gate: conan create build() — _bootstrap_autotools
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E551
+title: 上游只发 configure.ac/Makefile.am 时在 OHOS 的自举三要点：tool_requires(automake/1.18)、分步 aclocal→autoconf→automake（禁 autoreconf）、经 $ACLOCAL/$AUTOMAKE 调用包装脚本
+trigger_tool: aclocal|automake|autoreconf|configure
+phase: configuration
+error_signature: aclocal: *(Permission denied|not found|command not found)|automake: *(Permission denied|not found)|autoconf: error: undefined macro AM_|autoreconf: autoconf\.m4f|configure: error: cannot find install-sh
+severity:               2
+category:               ohos, autotools, conan
+match_keywords: automake/1.18, tool_requires, aclocal, automake, autoreconf,
+  autoconf.m4f, ACLOCAL, AUTOMAKE, buildenv_info, conanbuild, --add-missing,
+  install-sh, missing, depcomp, abiword
+root_cause: 上游 tarball 未发布生成物 + OHOS 镜像缺 automake + autoreconf 的 m4 链在
+  OHOS 解析错位 + automake 包装脚本对自身路径敏感，四者叠加；用裸命令名或 autoreconf
+  都会在自举阶段失败（编译尚未开始）。
+affected_scope: 所有上游只带 configure.ac/Makefile.am 的 autotools 包在 OHOS 的 conan 配方
+verification_cmd: command -v automake || echo "no system automake (需 tool_requires)"; ls "$(conan profile show 2>/dev/null >/dev/null; echo)"; "${ACLOCAL:-aclocal}" --version
+rec_priority: 1
+rec_approach: tool-requires-automake-plus-stepwise-bootstrap
+rec_description: build_requirements() 声明 automake/1.18；generate() 里 VirtualBuildEnv
+  落地 conanbuild 环境；build() 分步调用 ${ACLOCAL}/${AUTOMAKE}，不走 autoreconf；
+  自举后校验 configure/Makefile.in 已生成再 configure。
+rec_command: self.tool_requires("automake/1.18")  # build_requirements()
+  # build(): self._run_build('"${ACLOCAL:-aclocal}" --force')
+  #          self._run_build("autoconf -o configure configure.ac")
+  #          self._run_build('"${AUTOMAKE:-automake}" --add-missing --copy')
+source_pr: wmcdplay 1.1 适配
+authors:               unknown, ffieldd22_-, parasail-2.6.2 任务执行体（容器层 Agent）
+doc_file:               doc/E551.md
+rec_auto_fix:          false
+rec_impl:               manual

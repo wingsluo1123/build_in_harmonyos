@@ -57,7 +57,32 @@ SKILL_ROOT="$(dirname "$(find "${ATOMCODE_HOME:-$HOME/.atomcode}" -name "SKILL.m
 本 skill 默认以**协作者模式**运行，基于 Git + GitCode PR 协作。详见 `CONTRIBUTING.md`。| 模式 | 触发方式 | 职责 |
 |------|---------|------|
 | 协作者（默认） | 直接使用 | 编译软件、提取知识、生成 conanfile.py、创建分支并提交 PR |
-| 主编 | `OHC_ROLE=editor` | 审核 PR、合并知识、重建索引 |
+| 主编 | `OHC_ROLE=editor` | 审核 PR、合并知识、重建索引、**批量审核知识草稿入库**（§0.5 + `knowledge/operations/editor-review-workflow.md`，工具 `scripts/kb_editor.py`） |
+
+### §0.5 主编知识草稿审核工作流（⭐ `OHC_ROLE=editor` 生效）
+
+草稿池（`knowledge/drafts/`）按批次审核入库，**每批 100 条 = 一个分支 = 一个 PR = 一份报告**。完整规程见 `knowledge/operations/editor-review-workflow.md`。
+
+**三条铁律**：
+1. **批次按 PR 时间序**：草稿按添加时间正序（≈PR 编号升序方向）进入批次；未合入 PR 的草稿（merged=false）**暂缓**，不接纳不拒绝，等 PR 落地后随之再审
+2. **PR 归属反查前置**：审核前先 `kb_editor.py pr-map --batch-file` 反查批次草稿来源（PR 号/标题/作者/邮箱/合入状态）。⚠️ 草稿名数字段 ≠ PR 编号，禁止据此反查
+3. **四维审核**：事实（来源 PR 已合入 + 软件归档抽查）/ 质量（核心三字段）/ 有效性（kv↔md 配对）/ 重复性（draft-review + jaccard 双通道）；工具判 merge-into 且 score<0.7 → 人工比对后裁定（误判实测存在）
+
+**工具链**（`scripts/kb_editor.py`，主编专用）：
+
+```bash
+python3 scripts/kb_editor.py batch --size 100            # P1 批次构建（时间序+DEFER预过滤）
+python3 scripts/kb_editor.py pr-map --batch-file <F>     # P0 批次内来源PR精查（增量缓存）
+python3 scripts/kb_editor.py audit --batch-file <F>      # P2 四维审核 → 决策表 TSV
+# 人工复核 REVIEW/边缘条目（P2 人工环节，工具给证据）
+python3 scripts/kb_editor.py promote --decisions <F>     # P3 批量 promote ACCEPT
+python3 scripts/kb_editor.py fix                         # P3 promote后置字段修复（C4/C4.5/C5/C6/C7/C11）
+python3 scripts/ohc-run.py graph validate --fix          # P4 校验至 0 error
+python3 scripts/kb_editor.py report --decisions <F> --batch N --date D --out <报告路径>
+python3 scripts/kb_editor.py publish --branch editor/kb-promote-batch-N --push
+```
+
+**promote 已知缺陷由 `fix` 兜底**：severity 文本/数字不一致（index 解析丢行）、必填字段缺失、非标字段带入、relations 自由文本引用、字段内联拼接。收尾必须 `graph validate` 至 `kv=md=index` 且 0 error。
 
 ### §0.2 积分赛事 PR 模板（⭐ 积分赛专用）
 
@@ -425,6 +450,7 @@ configure 失败？
 | CI 脚本契约 | ci/conan/build_and_test.sh（内联注释） | ci/ 脚本修改时 |
 | **Pre-PR 审计 (W4)** | **.gitcode/code-style.md + .gitcode/review-memory.md** | **提 PR 前 (W4)** |
 | **PR 管理** | **scripts/gitcode_pr.py** | **创建/跟踪/回复 PR 时** |
+| **主编草稿审核 (editor)** | **knowledge/operations/editor-review-workflow.md + scripts/kb_editor.py** | **`OHC_ROLE=editor` 审核草稿入库时** |
 
 ---
 
@@ -973,6 +999,7 @@ python3 $SKILL_ROOT/scripts/ohc-run.py dispatch script zlib bzip2 openssl wget
 | `scripts/migrate_kv_to_yaml.py` | KV→YAML 渐进迁移 |
 | `scripts/pre_pr_audit.py` | ⭐ W4: Pre-PR 审计工具 (generate/report/check 子命令，由 submit 内部调用) |
 | `scripts/gitcode_pr.py` | ⭐ GitCode PR 管理 (创建PR/获取评论/CI状态/回复评论/monitor-review AI检视监控) |
+| `scripts/kb_editor.py` | ⭐ 主编知识草稿审核 (pr-map/batch/audit/promote/fix/report/publish/pr-info，§0.5) |
 
 ### Pre-commit Hook（⭐ 建议安装）
 
@@ -1044,3 +1071,5 @@ cp ci/conan/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-co
 *SKILL.md v12.20 — 2026-09-03 — 7,870 PR 全量评论/检视审计落地（25,616 CI 失败 + 21,151 行级检视 + 11,736 真人评论，语料与报告 ~/tmp/pr_crawl 留档）。preflight 扩至 PF1-PF9+R52：①PF5 扩面堵 R8 绕道（conanfile 新增行 -D__OHOS__/replace 注入，64+27 例）；②PF7 源URL闸（R39 前置：镜像黑名单 14 域/http/file://泄漏/绝对路径/Debian 重打包/gitcode·gitee 搬运，R39 1,061 条违规 90%+ 静态可拦）；③PF8 配方静态闸（R38 commands.json schema/存在性 + L0p settings 四项 + L0m slug/version 一致，705+193 条）；④PF9 分支/路径闸（L0n ~550 + No-packages 490 条）；⑤PF3 扩面（test_package 测试源文件 + MANIFEST 齐全非空，L0c/L0e ~860 条）；⑥R52 审计一致性交叉校验（审计 pass vs 硬闸命中 → 审计失真一票否决，#2204/#4237/#4321）。规则新增：R51 上游测试三步法（真人评审第一拒绝原因"硬性不通过"495 次，SKILL 此前零覆盖）；R52 审计证据一致性。主编重编号：R49 冲突修复——iron-rules R49（依赖注入 prefix）保留，SKILL.md 重复的"回执完整性"重编号 R50 并补入 iron-rules 详解；铁律 49→52（SKILL/iron-rules/CONTRIBUTING 三处对齐）。数据验证：门禁路线时间演进实证（preflight 前置门禁落地后 CI 门禁类失败 529→65 条/PR段）；预计新闸+扩面可在建 PR 前拦截 ~60% bot 检视意见量与 ~2,500 条/轮门禁失败。审计模板门禁分级表同步 PF7-PF9/R51。测试：test_v1220 新套件（新闸行为级 14 断言），run_all 全回归。v12.19→v12.20*
 *SKILL.md v12.21 — 2026-09-03 — 全仓构建系统普查落地（3,477 配方：CMake 27%/Autotools 24%/Make 21%/无构建族 26%/Meson 4.8%）。①新模板 conanfile-headeronly.py.tmpl（无构建/打包族三变体：header-only 库/数据资源/脚本工具，普查 26% 配方此前零模板），conan_recipe/init_archive 注册 headeronly；②recipe-search 分类器扩 headeronly/copy（catalog 重建救回 464 配方，构建系统 0.30 相似度权重恢复命中）；③build-systems.md 补四节：Meson 详解（166 配方此前仅一行表格：交叉三元组 host_machine=linux+musl sysroot、wrap-mode=nodownload）、无构建/打包族（§12，R34/R51 同样适用）、QMake-Qt5 存量要点（14 例全存量，新任务不再产生）、Python C 扩展 setup.py build_ext（6 例存量+python-gssapi 系新任务：交叉 CC/LDSHARED 覆盖、plat-name、conan 依赖并入 CFLAGS）。长尾不建模板（QMake/Go/Rust/JVM 已被 R47 挡在门外或纯存量），防模板库通胀。*
 *SKILL.md v12.22 — 2026-09-03 — 知识库 metrics 闭环接线（构建成败自动回写，置信度数据从 4% 覆盖起步积累）。背景：kb_metrics.record_result 唯一调用点在 driver._error_recovery 的 auto-retry 窄路径，且直写共享 knowledge/graph/E*.kv——每个包 PR 携带知识文件 diff、并发 PR 在同一条目必然冲突（v12.6.1 sidecar 设计修正所指问题在 driver 旧代码中残留）。三层落地：①engine sidecar v2 结构升级（.metrics-local.json：{entries:{eid:{last,s,f}},pending:[eid]}，兼容 v1 顶层 {eid:date} 读取；_touch_metrics 命中即入 pending；tmp+os.replace 原子写）；②driver 记账改造——_error_recovery 两处 record_result 直写 .kv 改为 engine._record_outcome（sidecar 即时记账+移出 pending，auto-retry 成败语义不变）；三个终局结算出口：run() 全绿 settle(True)、_emit_handoff 失败 sys.exit 前 settle(False)、build_cli RuntimeError 兜底 settle(False)，幂等（pending 空早退）——G0 预扫描命中/worker 手动修复后 RESUME 绿/auto-retry 未覆盖的命中路径全部纳入闭环；③kb_report._parse_kv_metrics 适配 v2（last/s/f + hits_success/hits_fail 列，v1 字符串与 .kv 遗留 metrics_* 字段兜底）。效果：修复成功/失败结果不再进 PR diff（PR 污染归零）；540 正式条目的 confidence 数据可随构建自然积累，为 kb_metrics 低置信度剪枝提供数据基础。tests/test_v1222.py 21 断言（sidecar v2 写入/v1 迁移/记账/结算幂等/driver 无 kb_metrics 引用防回退/kb_report v1-v2 兼容）；test_v1220（PF 闸）与 test_v1221（构建普查）为 worker 环境套件（硬编码 worker git 路径），本机环境性跳过。
+
+*SKILL.md v12.23 — 2026-10-16 — 主编知识草稿审核工作流工具化落地（批次 1 实战 3778 条草稿池驱动）。①新增 §0.5 主编工作流：三条铁律（批次按 PR 时间序/未合入即暂缓/PR 归属反查前置——草稿名数字段≠PR 编号，实例 DRAFT-10035-wmcdplay 实际来自 !13252 而非 !10035）+ kb_editor.py 工具链七命令；②新工具 scripts/kb_editor.py：pr-map（批次内来源 PR 精查，ancestry 单次 20s 超时防 HMDFS IO 抖动，--source ref 替代 branch --contains 消除 12s/次瓶颈，增量缓存 .ohc/kb-editor/）/batch（时间序+DEFER 预过滤）/audit（四维+DEFER 过滤，merge-into score<0.7 改人工裁定——批次 1 推翻 3 条误判的教训）/promote/fix（C4/C4.5/C5/C6/C7/C11 后置修复+index severity 数字化）/report（暂缓清单动态生成分支信息）/publish；③流程文档 knowledge/operations/editor-review-workflow.md v1.0：五阶段 P0-P4、报告规范、promote 已知缺陷清单（_kv_to_tsv_row 写 P1 文本 vs parse_index_tsv 要数字、合并检测字段内联拼接 E608 实例）；④§0.1 主编行扩充、§2 检索表与 §9 工具表加 kb_editor 条目；⑤批次 1 实绩：100 条→73 接纳/20 拒绝/7 暂缓（未合入撤回机制验证），图谱 547→620（kv=md=index 对齐 0 error），暂缓调查：7 条来自未合入 feature 分支（ytt 停滞 3.5 月/其余活跃 PR 流程中）。v12.22→v12.23*

@@ -144,6 +144,8 @@ python3 $SKILL_ROOT/scripts/ohc-run.py review <软件名> <版本>
 
 PR 合并后主编自动执行：草稿→正式目录、重建 index.tsv、重建 SUMMARY.md。
 
+**知识草稿批量入库审核（积压草稿治理）**：主编定期按批次（100 条/批）审核 `knowledge/drafts/` 积压草稿并入库。流程与工具见 `knowledge/operations/editor-review-workflow.md` 与 `SKILL.md` §0.5（`scripts/kb_editor.py`）。要点：批次按 PR 时间序、来源 PR 未合入 main 的草稿暂缓、每批一分支一 PR 一报告。
+
 ---
 
 ## 归档结构

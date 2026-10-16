@@ -1,0 +1,45 @@
+#====================================================================
+# Draft: OHOS musl hardcodes 32-bit wchar_t while clang -fshort-wchar
+#        defines 16-bit - system-header TUs die with typedef
+#        redefinition (u-boot 2026.07 arch/sandbox/cpu)
+#====================================================================
+
+id:                     E580
+trigger_tool:           make|clang|Kbuild|musl|wchar|stddef.h|alltypes.h|sandbox
+phase:                  compile
+error_signature:        typedef redefinition with different types \('unsigned int' vs 'unsigned short'\)|bits/alltypes.h|__WCHAR_TYPE__|__DEFINED_wchar_t|__NEED_wchar_t
+
+severity:               2
+category:               musl, clang-incompat
+match_keywords:         fshort-wchar, -fshort-wchar, wchar_t, alltypes.h, __WCHAR_TYPE__, musl, clang, u-boot, sandbox, syshdrs, CFLAGS_USE_SYSHDRS, OHOS, typedef redefinition
+
+title:                  OHOS musl <bits/alltypes.h> hardcodes 'typedef unsigned wchar_t' (32-bit on aarch64) while clang under -fshort-wchar typedefs __WCHAR_TYPE__ as unsigned short - any TU that mixes system headers with -fshort-wchar fails with wchar_t typedef redefinition
+
+root_cause:             Two independent wchar_t definitions collide. (1) musl sysroot usr/include/aarch64-linux-ohos/bits/alltypes.h line 15 declares `typedef unsigned wchar_t;` guarded by __NEED_wchar_t/__DEFINED_wchar_t - fixed 32-bit, hardcoded, no compiler introspection. (2) clang's resource-dir stddef.h line 74 declares `typedef __WCHAR_TYPE__ wchar_t;` guarded by __need_wchar_t/_WCHAR_T - and __WCHAR_TYPE__ is `unsigned short` under -fshort-wchar. When one TU includes both (any system header that pulls alltypes.h while the compile line carries -fshort-wchar), the guards differ so both typedefs fire: "typedef redefinition with different types ('unsigned int' vs 'unsigned short')". glibc never trips this because it derives wchar_t from __WCHAR_TYPE__ (no hardcode), so upstream Linux CI is blind to it. Canonical instance - u-boot 2026.07: top Makefile:546 adds -fshort-wchar to KBUILD_CFLAGS unconditionally (deliberate, for u-boot's own wide-string handling), and arch/sandbox/cpu/Makefile's CFLAGS_USE_SYSHDRS mechanism builds four host-style files (initjmp.c/os.c/eth-raw-os.c/sdl.c) with a special syshdrs_rule that drops -nostdinc and converts -I to -idirafter (libc headers win) but KEEPS -fshort-wchar. initjmp.c includes <stdlib.h> which lands in the musl sysroot, alltypes.h fires, resource-dir stddef.h fires - compile fails. Upstream already fixed this exact failure for sdl.o only (comment: "sdl.c also needs -fshort-wchar removed (musl)") via a per-target cmd override `$(CC) $(filter-out -nostdinc -fshort-wchar, $(patsubst -I%,-idirafter%,$(c_flags))) -fno-lto -c -o $@ $<`; the other three files were left with the generated rule.
+
+affected_scope:         Any TU compiled with -fshort-wchar that also includes musl system headers (mixed-header TUs: kernel/sandbox/firmware host builds that open the sysroot). Verified instance - u-boot 2026.07 sandbox target on OHOS aarch64: initjmp.o, then os.o and eth-raw-os.o fail the same way (error chain initjmp.c:24 -> sysroot stdlib.h:19 -> bits/alltypes.h:15, three levels deep because -idirafter places u-boot include/ AFTER the sysroot).
+
+verification_cmd:       conan create uboot/2026.07 -pr:h=ohos-aarch64.profile -pr:b=ohos-aarch64.profile (OHOS device) and confirm arch/sandbox/cpu/initjmp.o compiles; rebuild on glibc Linux to confirm no behavior change
+
+rec_priority:           1
+rec_approach:           extend-upstream-per-target-filter-out
+rec_description:        Reuse the upstream precedent verbatim: extend the sdl.o-style per-target rule override to the remaining syshdrs files by removing -fshort-wchar (and keeping -nostdinc out) for those targets only. In u-boot's arch/sandbox/cpu/Makefile, after the existing cmd_cc_sdl.o override: `$(foreach f,initjmp.o os.o eth-raw-os.o, $(eval cmd_cc_$(f) = $(CC) $(filter-out -nostdinc -fshort-wchar, $(patsubst -I%,-idirafter%,$(c_flags))) -c -o $$@ $$<))`. The four files use zero wide-char APIs (grep-verified), so dropping the flag hands wchar_t to the C library with no ABI effect; glibc platforms behave identically because the flag only removes the 16-bit typedef that glibc never saw anyway. This is a flag-level fix - header shims are provably unreachable here (see forbid_1).
+rec_command:            apply the Makefile override patch and rebuild: conan create uboot/2026.07 -pr:h=ohos-aarch64.profile -pr:b=ohos-aarch64.profile
+rec_auto_fix:           false
+rec_impl:               patches/0008-sandbox-syshdrs-wchar-musl.patch (arch/sandbox/cpu/Makefile)
+
+fallback_priority:      2
+fallback_approach:      drop-global-kbuild-flag
+fallback_description:   Remove -fshort-wchar from KBUILD_CFLAGS (top Makefile) and re-add it per-directory only where u-boot's wide-char ABI needs it. Global, invasive, touches firmware-side wide-char behavior - strictly worse than the per-target override.
+fallback_command:       make -C <src> O=<obj> HOSTCC=clang CC=clang sandbox_defconfig && edit KBUILD_CFLAGS
+fallback_auto_fix:      false
+fallback_impl:
+
+forbid_1_pattern:       shim include/stddef.h|own stddef.h in -I path|override __WCHAR_TYPE__ via -D|force _WCHAR_T or __DEFINED_wchar_t macros
+forbid_1_reason:        Both flag sets make a shim unreachable: normal target TUs carry `-nostdinc -isystem <clang-resource-dir> -Iinclude` with the resource dir FIRST, so <stddef.h> always resolves to the compiler's own header before any project shim; the syshdrs files use -idirafter which puts project include/ AFTER the sysroot. -D overrides of compiler-reserved typedef macros are fragile across compiler versions and fight the toolchain. Verified dead-end on device (u-boot 0008 v1 attempt: shim applied but never consulted).
+forbid_1_consequence:   Error persists at identical line numbers; -D macro overrides may silently change wide-char layout in unrelated TUs, a worse failure than the original compile error.
+
+principles:             P005
+last_updated:               2026-10-16
+authors:               unknown
+doc_file:               doc/E580.md

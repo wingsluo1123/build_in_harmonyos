@@ -1,0 +1,62 @@
+#====================================================================
+# DRAFT-11418-uboot-pr-text-blob-binary-assets - PR diff channel is text-only: platform .diff endpoint drops binary payloads, git apply fails deterministically
+#====================================================================
+
+id:                     E586
+trigger_tool:           git|gitcode|platform-ci
+phase:                  submission
+error_signature:        missing binary patch data|Binary files .* and /dev/null differ|patch does not apply|源码下载超时|类别: 网络问题
+
+severity:               2
+category:               platform, packaging, binary-assets, patch-channel
+match_keywords:         gitcode, .diff, .patch, GIT binary patch, git apply, binary fixture, base64, sha256, PR checkout, worker checkout, 源码下载超时, missing binary patch data
+title:                  平台补丁通道是文本通道：PR 差分（gitcode .diff 端点）对二进制文件只输出占位行，含二进制资产的 MR 必触发 git apply 失败
+
+root_cause:             平台构建取 PR 内容时下载 https://gitcode.com/<org>/<repo>/pull/<n>.diff 并以 git apply（回退 --3way / patch -p1）应用到基准树；gitcode 的 .diff 端点对二进制文件只输出 "Binary files ... differ" 占位行、不携带 GIT binary patch 数据段（对照：同 PR 的 .patch 端点含完整二进制载荷且可直接 apply），git apply 对「补丁未携带载荷的二进制文件」必然硬错误（error: missing binary patch data for '<path>'），--3way/patch 回退同样无法还原字节 → 确定性 checkout 失败；机器人分类器把该失败误诊为「类别: 网络问题 / 源码下载超时」，掩盖真因。
+affected_scope:         一切经 PR 差分提交、差分中含二进制文件（新增或修改）的平台 MR；对本平台=任何含二进制资产（夹具/位图/固件桩/测试载荷）的适配包。修复=资产文本化（base64+sha256 钉死+构建时物化复验），与具体包无关。
+verification_cmd:       本地 round-trip：python3 fixture-blobs.py <dest> 解码产物 sha256 与原始文件全等（钉死值内置任何环境可复验）；端点对照：同一 PR 的 pull/<n>.diff 中 GIT binary patch 计数 0 而 .patch 计数 19；全链：二进制文本化后真机 test_package 复跑全绿 + 设备侧物化 sha256 与本地全等。
+
+rec_priority:           1
+rec_approach:           binary-assets-as-text-blobs
+rec_description:        把二进制资产改为 base64 文本随包：生成 blobs 脚本（每件 sha256 钉死），构建脚本 seed 段解码入工作目录并复验（不符即非零退出硬失败），二进制原文件从仓库移除（diff 中不再出现二进制 hunk）；消费点路径保持不变。
+rec_command:            # 生成：base64 内联 + sha256 钉死 -> fixture-blobs.py; # 构建：python3 $H/fixture-blobs.py $F || exit 1
+rec_auto_fix:           false
+rec_impl:               script
+
+fallback_priority:      2
+fallback_approach:      patch-endpoint-transport
+fallback_description:   改用 /pull/<n>.patch（带二进制载荷）取补丁或平台侧切换端点——依赖外部行为、不可控，仅作旁证与上游建议，不替代资产文本化。
+fallback_command:       curl -sSfk https://gitcode.com/<org>/<repo>/pull/<n>.patch | git apply --whitespace=nowarn
+fallback_auto_fix:      false
+fallback_impl:          manual
+
+forbid_1_pattern:       按机器人评论「类别: 网络问题/源码下载超时」对同一 head 反复重试 /rebuild
+forbid_1_reason:        该分类是摘要推断：补丁载荷缺失是确定性缺陷，重试永不成功（本项实踩：重试多次全数复败）。
+forbid_1_consequence:   浪费构建队列与时间，且正确的修复信号（构建日志末尾 missing binary patch data）被误诊掩盖。
+
+forbid_2_pattern:       看到 .patch 端点能正常 apply 就认为 MR 可提交
+forbid_2_reason:        平台实际使用 .diff 端点；两个端点对二进制的输出不同（.diff 无载荷占位、.patch 带载荷），能过 .patch 不蕴含能过 .diff。
+forbid_2_consequence:   提交后平台 checkout 必然失败，且错误被机器人误诊，排查绕远路。
+
+forbid_3_pattern:       只验证 blobs 脚本解码 sha256 全等即宣告修复完成
+forbid_3_reason:        输入形态改变后残余风险在消费链（路径/时序/既有 cp 循环移除后的缺件）；单元级相等不覆盖全链。
+forbid_3_consequence:   可能留下「解码对但某个消费点仍读旧路径/未物化」的静默缺件；必须全链（夹具重建 + 全量测试）复跑。
+
+principles:             P005
+causes:
+caused_by:
+similar_to:
+conflicts_with:
+prerequisite_of:
+
+doc_file:               knowledge/drafts/DRAFT-11418-uboot-pr-text-blob-binary-assets.md
+last_updated:           2026-10-09
+source_event:           u-boot 2026.07 HarmonyOS PC 适配（MR 首轮 CI：二进制夹具使平台工作机 checkout 必然失败——首轮 8 件，SDL 接入后终版 13 件；修复=base64 文本随包 + sha256 钉死 + 构建时物化复验）
+authors:                LIMInGZE666 <LIMInGZE666@noreply.gitcode.com>
+source_pr:
+source_commit:
+
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.95
+metrics_last_used:      2026-10-09

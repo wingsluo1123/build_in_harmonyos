@@ -1,0 +1,35 @@
+# ═══ Draft knowledge entry — 本机 WorkBuddy 沙箱按解释器启动路径施加 execve 允许清单 ═══
+# Timestamp: 2026-09-27
+# Software: 环境级（影响所有在 HarmonyOS PC WorkBuddy 里跑 conan create 的任务）
+# Gate: conan create build() — 子进程 spawn
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E554
+title: conan create 报 "aclocal: Permission denied"(rc=126) 的真因：以 $HOME/usr/local/bin/python3（HMDFS 解释器）启动的进程，其子进程 execve 系统根以外的任何路径（含 ELF）一律 EACCES；改用应用包内 python 启动 conan 即可
+trigger_tool: conan|subprocess|posix_spawn
+phase: configuration
+error_signature: Permission denied.*bin/aclocal|Error 126 while executing|bad interpreter.*safe-bin|SAFE_DELETE_BULK_GUARD_ERROR
+severity:               2
+category:               ohos, conan, environment, sandbox
+match_keywords: Permission denied, EACCES, execve, posix_spawn, conan create,
+  aclocal, automake, automake/1.18, sandbox, HMDFS, BASH_ENV, PYTHONPATH,
+  safe-bin, sitecustomize, bundle python
+root_cause: 沙箱按进程启动解释器路径划分 exec 域：HMDFS 上的解释器（$HOME/usr/local/bin/
+  python3，恰是 conan launcher 的 shebang）其子孙进程 execve 只允许系统根（如
+  /data/service/hnp）下的路径；此前误判为"非 ELF 脚本被拒"或"沙箱不可绕过"，均为表象。
+affected_scope: 在 HarmonyOS PC WorkBuddy 内本地跑 conan create / conan-verify 的所有任务；
+  CI 干净环境不受影响
+verification_cmd: python3 -c "import subprocess;subprocess.run(['/data/storage/el2/base/cache/conan-home/p/*/p/bin/aclocal','--version'])"
+rec_priority: 1
+rec_approach: run-conan-through-bundle-python
+rec_description: 用应用包内 python（/data/storage/el1/bundle/libs/arm64/python/bin/python3）
+  经 conans.conan:run 入口启动 conan，并清理 BASH_ENV/PYTHONPATH/safe-bin/导出函数。
+rec_command: unset BASH_ENV; PYTHONPATH=$HOME/usr/local/lib/python3.12/site-packages
+  exec /data/storage/el1/bundle/libs/arm64/python/bin/python3 -c
+  'import sys; sys.argv[0]="conan"; from conans.conan import run; sys.exit(run())' "$@"
+source_pr: wmcdplay 1.1 适配（本地验证链）
+rec_impl:               manual
+last_updated:               2026-10-16
+authors:               unknown
+doc_file:               doc/E554.md
+rec_auto_fix:          false

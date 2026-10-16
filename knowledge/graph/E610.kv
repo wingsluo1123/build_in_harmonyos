@@ -1,0 +1,20 @@
+id:                     E610
+title: OHOS /system/bin/sh（Korn 系）算术展开内嵌命令替换翻倍命令名（$(( $(date +%s) + n )) → datedate）：等待/超时类 shell 逻辑立即误判超时
+category:               ohos, portability, testing, shell
+phase: testing
+match_keywords: /system/bin/sh, ksh93, mksh, tracked alias, arithmetic expansion, arithmetic command substitution, $(( )), $(date +%s), deadline, timeout, wait_for_file, wait_for_process_to_stop, datedate, bad uid, memfile, kea-dhcp4
+error_signature: "datedate.*not found|echoecho.*not found|bad uid|.*was not created in time"
+affected_scope: 一切在 OHOS 上执行、脚本内含形如 $(( $(cmd) + n )) 嵌套命令替换的 shell 测试套件/交付脚本（等待/超时/deadline 计算最常见；不限于 Kea；纯算术与算术外比较不受影响）。kea 3.0.3 全树 7 处 $(( 仅 2 处嵌套命中：修复前 memfile.init 确定性失败，补丁 0009 后 3/3 通过。
+root_cause: "The OHOS /system/bin/sh (Korn-family, tracked-alias semantics) duplicates the command word when a `$(...)` command substitution appears inside `$((...))` arithmetic expansion. The command is emitted twice ('date' -> 'datedate'), the (failed) substitution evaluates as empty, and arithmetic continues as if the value were 0. The bug only fires for the nested form `$(( $(cmd) ... ))`; plain `test x -lt \"$(date +%s)\"` and hoisted `now=$(date +%s); $((now + n))` are unaffected. Pattern is common in upstream wait/timeout helpers."
+rec_approach: "Hoist the command substitution OUT of the arithmetic expansion into a variable first: `now=$(date +%s)` then `deadline=$((now + timeout))`. When porting packages that run upstream shell suites (or ship shell scripts), grep for the nested pattern `\\$\\(\\s*\\$\\(` and rewrite every hit; do not rely on `env -i`, `unalias`, or bypassing PATH - the mis-tokenization happens before command lookup and cannot be aliased away."
+prescan_pattern: "\\$\\(\\([^)]*\\$\\("
+doc_file: knowledge/drafts/DRAFT-12776-kea-admin-3.0.3-ohos-ksh93-arith-cmdsubst-doubling.md
+severity:               2
+last_updated: 2026-10-04
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+trigger_tool:           ctest
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        "Hoist the command substitution OUT of the arithmetic expansion into a variable first: `now=$(date +

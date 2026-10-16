@@ -1,0 +1,19 @@
+id:                     E598
+category:               build-system, go, conan, pkg-config, cgo
+phase: build
+match_keywords: cgo pkg-config, gousb, libusb-1.0, prefix=/usr/local, PKG_CONFIG_PATH, PKG_CONFIG_LIBDIR, CGO_CFLAGS, CGO_LDFLAGS, pc file, autotools DESTDIR, conan package_info, pkgconfig dir, #cgo directive
+error_signature: "cgo: 'pkg-config --cflags --libs libusb-1.0' resolves include/lib paths against /usr/local (system prefix baked into the registry package's lib/pkgconfig/libusb-1.0.pc) instead of the Conan dependency package folder; build picks up host headers or fails with 'libusb.h: No such file or directory'"
+root_cause: "The ohpcd registry libusb/1.0.27 recipe installs via autotools 'make install DESTDIR=<package_folder> prefix='; libtool's pkgconfig file records prefix=/usr/local (the empty --prefix with DESTDIR does not rewrite libdir/includedir in the generated .pc). Any CGO build (#cgo pkg-config: libusb-1.0) that trusts pkg-config therefore gets -I/usr/local/include/libusb-1.0 and -L/usr/local/lib — host paths that do not exist on the OHOS device/CI worker. The conan package_info does ship cpp_info.includedirs/libdirs correctly, but the #cgo directive in the Go dependency (gousb) goes through pkg-config, not through conan generators."
+rec_approach: "rewrite the .pc prefix next to the build + inject CGO flags explicitly"
+prescan_pattern: "#cgo pkg-config|libusb-1.0.pc|prefix=/usr/local"
+severity:               2
+last_updated: 2026-10-08
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E598.md
+trigger_tool:           conan
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        "rewrite the 

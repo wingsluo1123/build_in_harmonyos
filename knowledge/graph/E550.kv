@@ -1,0 +1,37 @@
+# ═══ Draft knowledge entry — Qt Wayland 上游测试在 OHOS 深路径 conan 缓存目录的三重环境陷阱 ═══
+# Timestamp: 2026-09-17
+# Software: qtwayland 6.11.1（所有需要在 conan build 目录内运行 Wayland/Unix socket 测试的包）
+# Gate: conan create build() ctest / QtTest 执行
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E550
+title: Qt Wayland 上游测试（QTEST_MAIN/QCOMPOSITOR_TEST_MAIN）在 OHOS 深路径 conan 缓存目录三重失败：108 字节 socket 路径超限 + /tmp 只读 shm buffer + QPA 平台双分离，修复后 52/52 全量用例真跑通过
+trigger_tool: ctest / QtTest / QGuiApplication
+phase: testing
+error_signature: socket path ".*" plus null terminator exceeds 108 bytes|open /tmp/wayland-shm-XXXXXX failed: Read-only file system|Failed to create wl_display \(Connection refused\)|qt\.qpa\.plugin: Could not load the Qt platform plugin "wayland"
+severity:               2
+category:               platform, testing, qt6
+match_keywords: exceeds 108 bytes, wayland-shm, XDG_RUNTIME_DIR, sun_path, QT_QPA_PLATFORM,
+  QCOMPOSITOR_TEST_MAIN, QTEST_MAIN, offscreen, qt_temp, XKB_CONFIG_ROOT, wayland_server,
+  qtwaylandscanner, WaylandScannerTools
+root_cause: Qt 上游测试在 OHOS 独立构建环境的三重平台冲突：①POSIX Unix domain socket 的
+  sun_path 上限 108 字节，conan 缓存构建目录（~/.conan2/p/b/<hash>/b/build/Release）路径深度
+  必然超限——libwayland 报 "socket path ... plus null terminator exceeds 108 bytes"，QFATAL
+  abort；且 QtTest 的 ctest wrapper 自行用 TMPDIR 生成 qt_temp 目录存放 per-test
+  XDG_RUNTIME_DIR，TMPDIR 指向深路径时同样超限。②OHOS 的 /tmp 挂载只读文件系统（EROFS），
+  上游 mock client 的 ShmBuffer 用硬编码 /tmp/wayland-shm-XXXXXX 调 mkstemp，所有 buffer 型
+  用例（inputRegion/mapSurface/frameCallback 等十余个）失败。③Qt Wayland 的两类测试 main
+  宏对 QPA 平台要求相反：client 测试必须 wayland 平台（连 mock compositor），compositor 测试
+  的 QGuiApplication 必须离屏（无外部显示可连）。另有关键可行性发现：qtbase/6.11.1.2 conan
+  包自带 libexec/qtwaylandscanner 与 Qt6WaylandScannerTools CMake 包——wayland_server
+  特性在 standalone 构建即可启用（此前误判为仅 qtbase 超级构建提供）。
+rec_approach: short-tmpdir-socket + tmpdir-shm-patch + dual-qpa-ctest + xkb-config-root
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-16
+authors:               unknown
+doc_file:               doc/E550.md
+affected_scope:         Qt Wayland 上游测试（QTEST_MAIN/QCOMPOSITOR_TEST_MAIN）在 OHOS 深路径 
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        short-tmpdir-socket + tmpdir-shm-patch + dual-qpa-ctest + xkb-config-root
