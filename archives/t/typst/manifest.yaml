@@ -1,0 +1,30 @@
+software: typst
+display: "Typst"
+description: "A new markup-based typesetting system that is powerful and easy to learn"
+category: doc
+homepage: "https://typst.app"
+license: Apache-2.0
+build_system: cargo
+type: tool
+
+ohos_adaptation:
+  key_points:
+    - "纯 Rust / Cargo workspace 项目，被适配产物为 typst CLI 可执行文件（crates/typst-cli，[[bin]] name=typst）"
+    - "OHOS 交叉编译目标 aarch64-unknown-linux-ohos，链接器与 C 编译器由 OHOS SDK clang 提供（aarch64-unknown-linux-ohos-clang）"
+    - "Rust 工具链由制品仓基础设施包 rust-toolchain/1.97.1 以 tool_requires 提供（rust-lang 官方 dist 预编译，宿主与目标均为 aarch64-unknown-linux-ohos）"
+    - "工具链包内 cargo/rustc 无 code signature，OHOS 拒绝 execve；配方复制 cargo/rustc + librustc_driver 到 build_folder 用 binary-sign-tool -selfSign 1 自签名，其余只读负载软链"
+    - "cargo 运行期依赖 libssl/libcrypto（OHOS loader 忽略 DT_RUNPATH）→ 使用 Harmonybrew OHOS 预编译 bottle 提供 LD_LIBRARY_PATH；系统 OpenSSL 3.0 缺 SSL_get0_group_name（cargo 1.97 需要 3.5+）"
+    - "typst-cli 默认特性闭包经 typst-kit/system-downloader 无条件启用 openssl（openssl-sys）→ 链接 conan openssl/3.5.8.1 静态库，产物自包含"
+    - "crates.io 走 rsproxy.cn sparse 镜像；git 依赖 typst-dev-assets 经 GitHub 镜像解析（GH 直连不可达）"
+    - "SSL_CERT_FILE=/etc/ssl/certs/cacert.pem 供 cargo HTTPS；OHOS 设备无默认 CA store"
+  packaging:
+    structure: "plain"
+    bin_typst: "ELF64 aarch64 OHOS musl 二进制（已用 binary-sign-tool 自签名，含 .codesign / .note.ohos.ident）"
+  common_dependencies:
+    - openssl/3.5.8.1 (静态)
+
+versions:
+  "0.15.1":
+    status: built
+    build_date: "2026-10-12"
+    notes: "Rust 排版系统 CLI，交叉编译 aarch64-unknown-linux-ohos，OpenSSL 静态链接，产物含 OHOS code signature"
