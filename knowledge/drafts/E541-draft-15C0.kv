@@ -1,0 +1,121 @@
+#====================================================================
+# _template.kv — 知识图谱条目模板
+# 用法: 复制此文件为 E541.kv，填写各字段
+# 对应的人类文档: doc/E541.md
+#
+# 格式规则:
+#   - key: value（冒号后一个空格，value 到行尾）
+#   - 多行值: 下一行以空格开头 = 续行
+#   - 列表值: 逗号分隔
+#   - 正则值: | 分隔多个模式
+#   - 以 # 开头的行为注释
+#   - 空行忽略
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+# trigger_tool: 出错的工具 (configure/cmake/meson/make/gcc/clang/ld/python/pip/install/test/runtime)
+# phase:         出错阶段 (configuration/compilation/linking/installation/testing/runtime)
+# error_signature:        实测源码为 python|detected_language.{0,6}python|pyproject.toml 存在（python 打包 manifest）|no C/C++ extension|Building wheel for .+ \(py3-none-any\)|language_evidence.*setuptools 正则表达式(|分隔), 用于精确匹配日志文本
+id:                     E541
+trigger_tool:           lang-preflight|pip|python|conan
+phase:                  configuration
+error_signature:         实测源码为 python|detected_language.{0,6}python|pyproject.toml 存在（python 打包 manifest）|no C/C++ extension|Building wheel for .+ (py3-none-any)|language_evidence.*setuptools
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+# severity:      3=🔴blocking  2=🟡medium  1=🟢minor  0=✅resolved
+# category:      分类标签（受控词表 64 词，逗号分隔，最多 5 个；add/promote 自动归一化）
+# prescan_pattern: （可选）预编译源码扫描正则——写入后 PreScanner 运行时自动派生
+#                   PSCAN-KB-{id} 规则，无需改 pre-scan-rules.yaml（知识增长即扫描能力增长）
+# prescan_globs:   （可选）扫描范围 glob 列表，默认 '*.c, *.h, *.cc, *.cpp, *.sh, Makefile*, *.mk'
+# 词表: platform, compat, limitation, detection, hmdfs, ohos, selinux, kernel, portability, libc, musl, posix, syscall, headers, threading, socket, network, build-system, cmake, autotools ...（全表见 scripts/ohc/kb_taxonomy.py）
+# match_keywords: 纯文本关键词(逗号分隔), 用于粗筛(固定字符串匹配F)
+# title:         简短标题(一句话描述错误模式)
+severity:               3
+category:               build-system, detection, portability, limitation
+match_keywords:         pyproject.toml, setuptools, pure python, py3-none-any, detected_language, lang-preflight, env_unsupported, 误派发, 纯 Python, 语言不匹配
+title:                  纯 Python 三方库被误派发到 C/C++ Conan 适配管线（pyproject.toml/setuptools 源码，无 C 扩展）
+prescan_pattern:        (^\[build-system\]|^requires\s*=\s*\[?"?setuptools|^from setuptools|^import setuptools)
+prescan_globs:          'pyproject.toml, setup.py, setup.cfg'
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+# root_cause:             派发/选型阶段仅凭库名认领，未做源码语言预检，纯 Python 库（构建系统 setuptools/poetry，产物 py3-none-any wheel）进入 C/C++ conan 管线
+affected_scope:         所有纯 Python 三方库（如蓝牙解析器族 inkbird-ble、bthome 等 homeassistant 生态包）在鸿蒙PC conan 适配任务中的浪费派发
+verification_cmd:       python3 ohc-run.py lang-preflight <name> <ver> --src <src_dir>  # exit 2/0 + detected_language=python       一句话根因描述(逗号可分行)
+# affected_scope:   影响范围
+# verification_cmd: 验证诊断是否正确的命令
+root_cause:              派发/选型阶段仅凭库名认领，未做源码语言预检，纯 Python 库（构建系统 setuptools/poetry，产物 py3-none-any wheel）进入 C/C++ conan 管线
+affected_scope:          所有纯 Python 三方库（蓝牙解析器族 inkbird-ble、bthome 等 homeassistant 生态包）在鸿蒙PC conan 适配任务中的浪费派发
+verification_cmd:        python3 ohc-run.py lang-preflight <name> <ver> --src <src_dir>  # exit 非0 + detected_language=python
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+# 推荐方案 (priority 越小越优先, 从 1 开始)
+rec_priority:           1
+rec_approach:           lang-preflight-terminal
+rec_description:        checkout 后立即执行 lang-preflight 语言预检（R47），判定为 python 时直接终态 env_unsupported + detected_language=python + 三项 language_evidence 上报，禁止硬着头皮适配
+rec_command:            python3 ${SKILL_ROOT}/scripts/ohc-run.py lang-preflight ${NAME} ${VER} --src ${SRC_DIR}
+rec_auto_fix:           false
+rec_impl:               lang_preflight
+
+# 回退方案 (当推荐方案不可用时尝试)
+fallback_priority:      2
+fallback_approach:      prescan-early-detect
+fallback_description:  派发前静态探测：源码含 pyproject.toml 且声明 setuptools/poetry 构建、或 PyPI wheel 为 py3-none-any，即判定纯 Python，选型阶段直接跳过
+fallback_command:       curl -s https://pypi.org/pypi/${NAME}/json | grep -o 'py3-none-any'
+fallback_auto_fix:      false
+fallback_auto_fix:      false
+fallback_impl:
+
+# ★ 禁止策略 (与推荐方案同等重要) ★
+# forbid_N_pattern:     正则(|分隔), 匹配则拒绝/警告
+# forbid_N_reason:      为什么禁止
+# forbid_N_consequence: 违反后的后果
+forbid_1_pattern:       pip install|setup.py build_ext|python setup.py install
+forbid_1_reason:        对纯 Python 库禁止在 C/C++ conan 配方内手工 pip 打包顶替（伪造产物、CI 无法复现）
+forbid_1_consequence:   配方自包含性破坏（G2 失败）、CI 门禁 L0 拦截、产物不可追溯
+# forbid_2_pattern:
+# forbid_2_reason:
+# forbid_2_consequence:
+
+# ═══ Layer 4: 原则引用 ═══
+# principles:             P001    适用的原则 ID 列表(逗号分隔), 在 graph/principles.kv 中定义
+principles:              P001
+
+# ═══ 关系图 (Relations) ═══
+# causes:          本模式是这些模式的根因 (修好本模式可能同时解决它们)
+# caused_by:       本模式的根因是这些模式 (应先修它们)
+# similar_to:      特征相似可能混淆的模式
+# conflicts_with:  解决方案互相冲突的模式
+# prerequisite_of: 本模式是修复这些模式的前置条件
+causes:                 []
+caused_by:              []
+similar_to:             []
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file:               doc/E541.md
+last_updated: 2026-10-14
+source_event:           task inkbird-ble 1.7.0 语言预检实测命中（上游 Bluetooth-Devices/inkbird-ble，language=Python，setuptools，Python 源文件 2/2 主体 100%）# 触发此条目创建的编译事件(如有)
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+# authors: 作者列表 (格式: Name <email>, Name2 <email2>)
+#          草稿生成时自动从 git config 填入；主编合入时保留原作者
+#          合并到已有条目时追加为第二/第三作者
+# source_pr:            添加该条目的 PR 编号
+# source_commit:        添加时的 commit SHA (短)
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics, 方案 D) ═══
+# metrics_success_count: 该修复方案成功次数
+# metrics_fail_count:    该修复方案失败次数
+# metrics_confidence:    置信度 = success / (success + fail)
+# metrics_last_used:     最后使用时间
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+
+draft: true
+contributor_id: 15C0
