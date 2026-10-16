@@ -1,0 +1,23 @@
+version: "3.3"
+software: "qpage"
+status: built
+build_date: "2026-10-15"
+build_system: "custom"
+
+source:
+  url: "https://ftp.jaist.ac.jp/pub/pkgsrc/distfiles/qpage-3.3.tar.Z"
+  sha256: "0bbecd2908380c5d28b8beeee0d0238854162128db5ef4ea603614d52ee7d24c"
+  tar_format: tar.Z
+
+build:
+  system: custom
+  configure_options:
+    - "--prefix=<package_folder>"
+  dependencies: []
+  cc: clang
+
+patches_applied: []
+
+knowledge_gained:
+  - "compress(1) 的 .Z（LZW）容器 Conan 的 unzip/get 不支持，tarfile 也不支持；需在 source() 里用纯 Python 解 LZW（compress 格式在码宽切换/CLEAR 时会按 8 位边界对齐，缺这一步会解码错位）"
+  - "qpage 客户端固定连 SNPP 端口 444（或 /etc/services 的 snpp），OHOS 非特权进程不能 bind <1024；消费者测试用 LD_PRELOAD 拦截 connect() 把 444 改写到高位端口，从而在本地跑 mock SNPP 服务器做真实协议往返，无需改上游"
