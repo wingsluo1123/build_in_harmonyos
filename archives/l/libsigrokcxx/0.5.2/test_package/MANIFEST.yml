@@ -1,0 +1,30 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI L0e 要求存在）
+# 详见 docs/TEST_QUALITY_SPEC.md 与 templates/test_package/MANIFEST.yml.tmpl
+
+package: libsigrokcxx/0.5.2
+homepage: "https://sigrok.org/"
+
+# 上游测试命令。
+# bindings/cxx/ 目录没有 Makefile.am、没有 configure 测试入口、也没有任何
+# 测试源文件，因此 libsigrokcxx 本身没有可运行的上游测试套件。
+# libsigrok 源码树中的 tests/*.c（Check 框架）属于 C 库 libsigrok/0.5.2，
+# 其 W3 日志的断言行（Checks: 76）在 libsigrok/0.5.2 的归档中统计，不计入本包。
+upstream_check_command: "(none — bindings/cxx has no Makefile.am and no test sources)"
+
+upstream_test_in_build: false
+upstream_test_command: "(none)"
+
+upstream_tests: []
+
+# test_package 自带的消费者测试（CI 通过 conan create 自动执行）
+test_package_tests:
+  - file: consumer.cpp
+    description: >-
+      已安装 C++ 绑定的消费者探针：枚举 API（LogLevel/PacketType/Quantity）
+      解析与链接、EnumValue::values() 读取共享库内导出的枚举注册表、
+      OHOS 共享库 closure 加载（dlopen RTLD_NOW）与 .codesign 校验
+    command: "./consumer"
+
+# 断言总数：本探针不含 assert()/值断言，只观测 API 调用与加载结果
+assertion_count: 0

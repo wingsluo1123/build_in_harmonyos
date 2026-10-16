@@ -1,0 +1,61 @@
+software: libsigrokcxx
+version: "0.5.2"
+status: built
+build_date: "2026-10-15"
+build_system: custom
+source:
+  url: "https://sigrok.org/download/source/libsigrok/libsigrok-0.5.2.tar.gz"
+  sha256: "4d341f90b6220d3e8cb251dacf726c41165285612248f2c52d15df4590a1ce3c"
+  tar_format: tar.gz
+  note: "libsigrokcxx 是 libsigrok 源码树中的 bindings/cxx/ 子目录，无独立 tarball"
+build:
+  system: custom
+  target: OHOS-aarch64
+  cc: clang
+  cxx: clang++
+  method: "gen_enums.py + 直接调用 clang++ 编译链接（绕过 autotools/libtool/doxygen）"
+  compiler: clang-15
+  linker: lld
+  dependencies:
+    - libsigrok/0.5.2
+    - glibmm/2.66.7.1
+    - libsigc/2.10.8
+    - glib/2.84.0.1
+    - libzip/1.11.4
+    - pcre2/10.45
+    - zlib/1.3.1.1
+  configure_options:
+    - "-shared -fPIC -std=c++11 -fvisibility=hidden -O2 -DNDEBUG"
+    - "-DHAVE_STOI_STOD=1"
+    - "-Wl,-soname,libsigrokcxx.so.0"
+patches_applied: []
+artifacts:
+  soname: "libsigrokcxx.so.0"
+  signed: true
+  files:
+    - "lib/libsigrokcxx.so.0.5.2 (+ libsigrokcxx.so.0 / libsigrokcxx.so symlinks)"
+    - "include/libsigrokcxx/libsigrokcxx.hpp"
+    - "include/libsigrokcxx/enums.hpp (由 gen_enums.py 生成)"
+    - "licenses/COPYING"
+test_results:
+  upstream_has_tests: false
+  upstream_note: >-
+    bindings/cxx/ 无 Makefile.am、无测试源，libsigrokcxx 本身没有上游测试套件；
+    libsigrok 源码树的 tests/*.c（Check 框架，其 W3 日志计数 76）归属 C 库 libsigrok/0.5.2
+  ohos_rule12_required: true
+  ohos_non_assertion_tests:
+    - "共享库 closure 加载：dlopen(\"libsigrokcxx.so.0\", RTLD_NOW) 观测 DT_NEEDED 闭包解析结果"
+    - ".codesign 段存在性检查：binary-sign-tool 签名后的发行 ELF"
+  consumer: "1/1"
+knowledge_gained:
+  - "libsigrokcxx 无独立 tarball，源码取自 libsigrok 的 bindings/cxx/ 子目录（ref: conandata.yml / 上游 libsigrok-0.5.2.tar.gz 目录结构）"
+  - "上游用 doxygen 由 C 头文件生成 enums.hpp；CI 无 doxygen，改为 gen_enums.py 直接解析 libsigrok.h 枚举定义（ref: patches/gen_enums.py）"
+  - "classes.cpp 通过 #include <enums.cpp> 内联枚举实现，编译时需把生成目录加入 -I（ref: 本包 build() 的 -I 参数）"
+  - "glib 版本冲突：libsigrok/0.5.2 钉 glib/2.88.0（static），glibmm/2.66.7.1 钉 glib/2.84.z（shared）；同一图必须 override 归一。必须归一到 shared 侧：static glib 进两个 shared mm 库会造成 GLib 双重初始化，glibmm 测试当场 abort（ref: E538 / DRAFT-24650）"
+  - "OHOS 共享库必须带 .codesign 段（binary-sign-tool 自签），仓库中 libsigrok/libsigc/libglibmm 均已签名，未签名 ELF 无法在设备加载（ref: libsigrok/0.5.2 配方 _sign_elf）"
+  - "头文件布局三件套：<pkg>/include/<component> 与 <pkg>/lib/<component>/include（glibconfig.h / glibmmconfig.h / sigc++config.h），两条都要进 -I（ref: 发行包 include 布局）"
+  - "本机即 OHOS aarch64，aarch64 二进制可直接执行，消费者测试可真实运行而非仅编译链接（ref: E471 的原生执行前提）"
+limitations:
+  - "glib 归一到 2.84.0.1（shared）后，libsigrok/0.5.2 的制品仓 binary 在干净环境可能因 package_id 变化失配而需源码重建；其上游 Check（该包 W3 日志断言行 `Checks: 76, Failures: 0, Errors: 0`）由该包配方自身强制校验，本包不重复执行、也不计入本包用例数"
+  - "libsigrokcxx 仅覆盖非 USB 场景：底层 libsigrok 以 --without-libusb 构建"
+  - "目标机无 sigrok 硬件驱动后端，本包只保证 bindings 层可加载/可链接，不声明采集功能可用"
