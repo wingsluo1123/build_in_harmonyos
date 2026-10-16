@@ -1,0 +1,73 @@
+# ═══ Draft knowledge entry（通用型：一类问题，非单库 case-by-case）═══
+# 问题类：OHOS 用户态未提供独立 install(1) 命令，导致任何调用 install(1) 的
+#         构建/安装脚本失败（make install、install.sh、自定义安装脚本）
+# 来源实例：chkboot 1.3（纯 shell 包，纯 make install）——但结论与方案与软件无关
+# Gate: 真机 make install Error 127 → shim 后 rc=0；conan create rc=0；test_package 10/10（8P/0F/2S）
+# Status: DRAFT
+
+id:                     E817
+title: OHOS 缺独立 install(1)：用 busybox 多调用二进制的 install applet 建 PATH shim，零源码改动通过安装步骤
+severity:               2
+category:               platform, build-system, toolchain, install
+trigger_tool: make|install|shell
+phase: installation
+
+# ── 识别层 ──
+error_signature: "make: install: No such file or directory|make\\[\\d+\\]: install: No such file or directory|\\*\\*\\* \\[Makefile:\\d+: install\\] Error 127|install: command not found|/usr/bin/install: not found"
+match_keywords: install, No such file or directory, Error 127, command not found, make install, busybox, applet, multicall, PATH shim, coreutils, toybox, 安装步骤失败
+# ── 诊断层 ──
+root_cause: |
+  OHOS 用户态没有把 GNU coreutils 的 install(1) 暴露为独立命令：`command -v install`
+  为空，/bin、/usr/bin、/data/service/hnp/bin 下也没有 install 可执行文件；但平台自带的
+  busybox（本机 v1.37.0，`/data/service/hnp/bin/busybox`）是**多调用二进制**，其 applet
+  表里**包含 install**（`busybox --list | grep -x install` 命中；`busybox install --help`
+  输出 `Usage: install [-cdDsp] [-o USER] [-g GRP] [-m MODE] [-t DIR] SOURCE... DEST`）。
+  由于没有建立同名入口，任何按 POSIX/GNU 惯例直接调用 `install` 的脚本都会在“命令解析”
+  阶段失败（shell 报 command not found；make 报 No such file or directory + Error 127）。
+  这不是权限问题，也不是 E188 记录的“toybox install 选项不兼容”——本机 PATH 中根本没有 install。
+
+affected_scope: |
+  所有依赖 install(1) 的构建/安装路径：上游 Makefile 的 `install:` 目标、autotools 生成的
+  `install` 规则（GNU coreutils install 语义）、安装脚本里的 `install -D -m755 …`。
+  CI worker 与本机同为 OHOS，行为一致；常规 Linux（coreutils 存在）不受影响。
+
+verification_cmd: |
+  command -v install || echo "install missing"                 # 期望：install missing
+  /data/service/hnp/bin/busybox --list | grep -x install        # 期望：install（applet 存在）
+  busybox install --help | head -2                              # 期望：Usage: install [-cdDsp] ...
+
+# ── 使用说明（HOW-TO，按序执行）──
+# ── 输入输出定义 ──
+# ── 示例 ──
+# ── 方案层 ──
+rec_priority: 1
+rec_approach: busybox-install-shim
+rec_description: |
+  构建期建一个只含 `install` 符号链接（指向平台 busybox）的 shim 目录并前置 PATH，
+  再执行上游原命令。零上游源码改动、不引入 Makefile 补丁，上游安装布局仍是唯一事实源。
+rec_command: |
+  command -v install || { BB=$(command -v busybox || echo /data/service/hnp/bin/busybox);
+    mkdir -p .shim && ln -s "$BB" .shim/install && export PATH="$PWD/.shim:$PATH"; }
+  make install DESTDIR=<staging>
+rec_auto_fix: false
+rec_impl: path-shim
+
+fallback_priority: 2
+fallback_approach: manual-install
+fallback_description: 参考 E174：用 cp + chmod 复刻 Makefile 布局；或打 Makefile 补丁把 install 换成 mkdir -p/cp/chmod
+fallback_command: |
+  mkdir -p "$STAGING/usr/bin" && cp -f tool "$STAGING/usr/bin/" && chmod 0755 "$STAGING/usr/bin/tool"
+fallback_auto_fix: false
+fallback_impl: manual-copy
+
+forbid_1_pattern: apt-get install.*coreutils|yum install.*coreutils|opkg install.*coreutils
+forbid_1_reason: OHOS 不是标准 Linux 发行版，无 apt/yum/opkg 包管理器
+forbid_1_consequence: 命令直接失败，并把不存在的环境依赖写进构建脚本，CI 不可复现
+forbid_2_pattern: \|\| true\s*;?\s*$ # 仅针对安装步骤吞错
+forbid_2_reason: 安装失败被吞掉会产生“空包但构建成功”的假绿
+forbid_2_consequence: 包内缺产物，后续 consumer 编译/运行才暴露，排查成本高
+
+principles:               
+doc_file: drafts/chkboot-1.3-ohos-install-shim-for-make-install.md
+last_updated: 2026-09-26
+authors:               chkboot-1.3
