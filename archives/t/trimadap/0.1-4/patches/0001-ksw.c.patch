@@ -1,0 +1,283 @@
+--- a/ksw.c
++++ b/ksw.c
+@@ -19,38 +19,46 @@
+    NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+    BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+    ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+ */
+ 
+ #include <stdlib.h>
+ #include <stdint.h>
+ #include <string.h>
+-#include <emmintrin.h>
++#if defined(__SSE2__)
++#include <emmintrin.h> // x86/x64 only; aarch64 uses the scalar path at the end
++#endif
+ #include "ksw.h"
+ 
+ #ifdef __GNUC__
+ #define LIKELY(x) __builtin_expect((x),1)
+ #define UNLIKELY(x) __builtin_expect((x),0)
+ #else
+ #define LIKELY(x) (x)
+ #define UNLIKELY(x) (x)
+ #endif
+ 
+ const kswr_t g_defr = { 0, -1, -1, -1, -1, -1, -1 };
+ 
+ struct _kswq_t {
+ 	int qlen, slen;
+ 	uint8_t shift, mdiff, max, size;
++#if defined(__SSE2__)
+ 	__m128i *qp, *H0, *H1, *E, *Hmax;
++#else
++	void *qp, *H0, *H1, *E, *Hmax;
++#endif
+ };
++
++#if defined(__SSE2__)
+ 
+ /**
+  * Initialize the query data structure
+  *
+  * @param size   Number of bytes used to store a score; valid valures are 1 or 2
+  * @param qlen   Length of the query sequence
+  * @param query  Query sequence
+  * @param m      Size of the alphabet
+  * @param mat    Scoring matrix in a one-dimension array
+  *
+@@ -314,20 +322,232 @@
+ 				int e = (int32_t)b[i];
+ 				if ((e < low || e > high) && (int)(b[i]>>32) > r.score2)
+ 					r.score2 = b[i]>>32, r.te2 = e;
+ 			}
+ 		}
+ 	}
+ 	free(b);
+ 	return r;
+ }
+ 
++#else /* !__SSE2__: portable scalar fallback (aarch64 and other non-x86 hosts) */
++
++/* The x86/x64 implementation above keeps the query profile in a striped lane
++ * layout and propagates the F (insertion) term with the SWPS3 lazy-F block.
++ * Neither is available off x86, so the same recurrences are evaluated cell by
++ * cell here, with a linear profile layout and F propagated directly:
++ *   H(i,j)   = max{H(i-1,j-1)+S(i,j), E(i,j), F(i,j)}
++ *   E(i+1,j) = max{H(i,j)-gapo, E(i,j)-gape}
++ *   F(i,j+1) = max{H(i,j)-gapo, F(i,j)-gape}
++ * The KSW_ADDS_* and KSW_SUBS_* helpers below mirror _mm_adds_epu8,
++ * _mm_subs_epu8, _mm_adds_epi16 and _mm_subs_epu16, so scores saturate
++ * exactly as they do on the SIMD path. */
++
++#define KSW_ADDS_U8(a, b) ((a) + (b) > 255? 255 : (a) + (b))
++#define KSW_SUBS_U8(a, b) ((a) > (b)? (a) - (b) : 0)
++#define KSW_ADDS_I16(a, b) ((a) + (b) > 32767? 32767 : ((a) + (b) < -32768? -32768 : (a) + (b)))
++#define KSW_SUBS_U16(a, b) ((a) > (b)? (a) - (b) : 0)
++
++/**
++ * Initialize the query data structure
++ *
++ * @param size   Number of bytes used to store a score; valid valures are 1 or 2
++ * @param qlen   Length of the query sequence
++ * @param query  Query sequence
++ * @param m      Size of the alphabet
++ * @param mat    Scoring matrix in a one-dimention array
++ *
++ * @return       Query data structure
++ */
++kswq_t *ksw_qinit(int size, int qlen, const uint8_t *query, int m, const int8_t *mat)
++{
++	kswq_t *q;
++	int a, k, tmp;
++
++	size = size > 1? 2 : 1;
++	q = (kswq_t*)calloc(1, sizeof(kswq_t) + 256 + qlen * (m + 4) * (size == 1? 1 : 2)); // a single block of memory
++	q->qp = (void*)(((size_t)q + sizeof(kswq_t) + 15) >> 4 << 4); // align memory
++	q->H0 = (uint8_t*)q->qp + qlen * m * (size == 1? 1 : 2);
++	q->H1 = (uint8_t*)q->H0 + qlen * (size == 1? 1 : 2);
++	q->E  = (uint8_t*)q->H1 + qlen * (size == 1? 1 : 2);
++	q->Hmax = (uint8_t*)q->E + qlen * (size == 1? 1 : 2);
++	q->slen = qlen; q->qlen = qlen; q->size = size;
++	// compute shift
++	tmp = m * m;
++	for (a = 0, q->shift = 127, q->mdiff = 0; a < tmp; ++a) { // find the minimum and maximum score
++		if (mat[a] < (int8_t)q->shift) q->shift = mat[a];
++		if (mat[a] > (int8_t)q->mdiff) q->mdiff = mat[a];
++	}
++	q->max = q->mdiff;
++	q->shift = 256 - q->shift; // NB: q->shift is uint8_t
++	q->mdiff += q->shift; // this is the difference between the min and max scores
++	// unlike the SSE2 path, the profile is stored linearly: row a holds the
++	// score of every query position against residue a
++	if (size == 1) {
++		uint8_t *t = (uint8_t*)q->qp;
++		for (a = 0; a < m; ++a) {
++			const int8_t *ma = mat + a * m;
++			for (k = 0; k < qlen; ++k)
++				*t++ = (uint8_t)(ma[query[k]] + q->shift);
++		}
++	} else {
++		int16_t *t = (int16_t*)q->qp;
++		for (a = 0; a < m; ++a) {
++			const int8_t *ma = mat + a * m;
++			for (k = 0; k < qlen; ++k)
++				*t++ = ma[query[k]];
++		}
++	}
++	return q;
++}
++
++kswr_t ksw_u8(kswq_t *q, int tlen, const uint8_t *target, int _gapo, int _gape, int xtra) // the first gap costs -(_o+_e)
++{
++	int i, j, qlen = q->qlen, m_b = 0, n_b = 0, te = -1, gmax = 0, minsc, endsc;
++	uint64_t *b = 0;
++	uint8_t *H0 = (uint8_t*)q->H0, *H1 = (uint8_t*)q->H1, *E = (uint8_t*)q->E, *Hmax = (uint8_t*)q->Hmax;
++	uint8_t *qp = (uint8_t*)q->qp, shift = q->shift;
++	int gapoe = _gapo + _gape, gape = _gape;
++	kswr_t r = g_defr;
++
++	// initialization
++	minsc = (xtra&KSW_XSUBO)? xtra&0xffff : 0x10000;
++	endsc = (xtra&KSW_XSTOP)? xtra&0xffff : 0x10000;
++	for (i = 0; i < qlen; ++i) E[i] = H0[i] = Hmax[i] = 0;
++	// the core loop
++	for (i = 0; i < tlen; ++i) {
++		uint8_t *S = qp + target[i] * qlen; // S is the score vector of target[i]
++		int imax = 0, f = 0;
++		for (j = 0; j < qlen; ++j) {
++			/* SW cells are computed in the following order:
++			 *   H(i,j)   = max{H(i-1,j-1)+S(i,j), E(i,j), F(i,j)}
++			 *   E(i+1,j) = max{H(i,j)-q, E(i,j)-r}
++			 *   F(i,j+1) = max{H(i,j)-q, F(i,j)-r}
++			 */
++			int e, h = j == 0? 0 : (int)H0[j-1];
++			h = KSW_ADDS_U8(h, (int)S[j]);
++			h = KSW_SUBS_U8(h, shift); // h=H(i-1,j-1)+S(i,j)
++			if (h < (int)E[j]) h = E[j];
++			if (h < f) h = f; // h=H(i,j)
++			H1[j] = (uint8_t)h;
++			if (h > imax) imax = h;
++			e = KSW_SUBS_U8(E[j], gape); // e=E(i,j)-r
++			h = KSW_SUBS_U8(h, gapoe); // h=H(i,j)-q
++			E[j] = (uint8_t)(e > h? e : h); // E(i+1,j)
++			f = KSW_SUBS_U8(f, gape); // f=F(i,j)-r
++			if (f < h) f = h; // F(i,j+1)
++		}
++		if (imax >= minsc) { // write the b array; this condition adds branching unfornately
++			if (n_b == 0 || (int32_t)b[n_b-1] + 1 != i) { // then append
++				if (n_b == m_b) {
++					m_b = m_b? m_b<<1 : 8;
++					b = (uint64_t*)realloc(b, 8 * m_b);
++				}
++				b[n_b++] = (uint64_t)imax<<32 | i;
++			} else if ((int)(b[n_b-1]>>32) < imax) b[n_b-1] = (uint64_t)imax<<32 | i; // modify the last
++		}
++		if (imax > gmax) {
++			gmax = imax; te = i; // te is the end position on the target
++			memcpy(Hmax, H1, qlen); // keep the H1 vector
++			if (gmax + q->shift >= 255 || gmax >= endsc) break;
++		}
++		{ uint8_t *t = H0; H0 = H1; H1 = t; } // swap H0 and H1
++	}
++	r.score = gmax + q->shift < 255? gmax : 255;
++	r.te = te;
++	if (r.score != 255) { // get a->qe, the end of query match; find the 2nd best score
++		int max = -1, low, high;
++		uint8_t *t = Hmax;
++		for (i = 0; i < qlen; ++i, ++t)
++			if ((int)*t > max) max = *t, r.qe = i;
++		if (b) {
++			i = (r.score + q->max - 1) / q->max;
++			low = te - i; high = te + i;
++			for (i = 0; i < n_b; ++i) {
++				int e = (int32_t)b[i];
++				if ((e < low || e > high) && (int)(b[i]>>32) > r.score2)
++					r.score2 = (int)(b[i]>>32), r.te2 = e;
++			}
++		}
++	}
++	free(b);
++	return r;
++}
++
++kswr_t ksw_i16(kswq_t *q, int tlen, const uint8_t *target, int _gapo, int _gape, int xtra) // the first gap costs -(_o+_e)
++{
++	int i, j, qlen = q->qlen, m_b = 0, n_b = 0, te = -1, gmax = 0, minsc, endsc;
++	uint64_t *b = 0;
++	int16_t *H0 = (int16_t*)q->H0, *H1 = (int16_t*)q->H1, *E = (int16_t*)q->E, *Hmax = (int16_t*)q->Hmax;
++	int16_t *qp = (int16_t*)q->qp;
++	int gapoe = _gapo + _gape, gape = _gape;
++	kswr_t r = g_defr;
++
++	// initialization
++	minsc = (xtra&KSW_XSUBO)? xtra&0xffff : 0x10000;
++	endsc = (xtra&KSW_XSTOP)? xtra&0xffff : 0x10000;
++	for (i = 0; i < qlen; ++i) E[i] = H0[i] = Hmax[i] = 0;
++	// the core loop
++	for (i = 0; i < tlen; ++i) {
++		int16_t *S = qp + target[i] * qlen; // S is the score vector of target[i]
++		int imax = 0, f = 0;
++		for (j = 0; j < qlen; ++j) {
++			int e, h = j == 0? 0 : (int)H0[j-1];
++			h = KSW_ADDS_I16(h, (int)S[j]);
++			if (h < (int)E[j]) h = E[j];
++			if (h < f) h = f; // h=H(i,j)
++			H1[j] = (int16_t)h;
++			if (h > imax) imax = h;
++			e = KSW_SUBS_U16(E[j], gape);
++			h = KSW_SUBS_U16(h, gapoe);
++			E[j] = (int16_t)(e > h? e : h); // E(i+1,j)
++			f = KSW_SUBS_U16(f, gape);
++			if (f < h) f = h; // F(i,j+1)
++		}
++		if (imax >= minsc) {
++			if (n_b == 0 || (int32_t)b[n_b-1] + 1 != i) {
++				if (n_b == m_b) {
++					m_b = m_b? m_b<<1 : 8;
++					b = (uint64_t*)realloc(b, 8 * m_b);
++				}
++				b[n_b++] = (uint64_t)imax<<32 | i;
++			} else if ((int)(b[n_b-1]>>32) < imax) b[n_b-1] = (uint64_t)imax<<32 | i; // modify the last
++		}
++		if (imax > gmax) {
++			gmax = imax; te = i;
++			memcpy(Hmax, H1, qlen * sizeof(int16_t));
++			if (gmax >= endsc) break;
++		}
++		{ int16_t *t = H0; H0 = H1; H1 = t; } // swap H0 and H1
++	}
++	r.score = gmax; r.te = te;
++	{
++		int max = -1, low, high;
++		int16_t *t = Hmax;
++		for (i = 0, r.qe = -1; i < qlen; ++i, ++t)
++			if ((int)*t > max) max = *t, r.qe = i;
++		if (b) {
++			i = (r.score + q->max - 1) / q->max;
++			low = te - i; high = te + i;
++			for (i = 0; i < n_b; ++i) {
++				int e = (int32_t)b[i];
++				if ((e < low || e > high) && (int)(b[i]>>32) > r.score2)
++					r.score2 = (int)(b[i]>>32), r.te2 = e;
++			}
++		}
++	}
++	free(b);
++	return r;
++}
++
++#endif /* __SSE2__ */
++
+ static void revseq(int l, uint8_t *s)
+ {
+ 	int i, t;
+ 	for (i = 0; i < l>>1; ++i)
+ 		t = s[i], s[i] = s[l - 1 - i], s[l - 1 - i] = t;
+ }
+ 
+ kswr_t ksw_align(int qlen, const uint8_t *query, int tlen, uint8_t *target, int m, const int8_t *mat, int gapo, int gape, int xtra, kswq_t **qry)
+ {
+ 	int size;

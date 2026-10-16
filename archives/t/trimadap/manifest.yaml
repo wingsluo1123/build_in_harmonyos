@@ -1,0 +1,21 @@
+software: trimadap
+display: "trimadap"
+description: "Fast but inaccurate adapter trimmer for Illumina reads"
+category: bioinformatics
+homepage: "https://github.com/lh3/trimadap"
+license: "MIT"
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "上游 ksw.c 只实现 SSE2 且无条件 include <emmintrin.h>（x86 专属），aarch64 需补丁"
+    - "补丁把 SSE2 整块用 #if defined(__SSE2__) 条件化，并为非 x86 提供等价标量内核，x86 行为不变"
+    - "Makefile 默认 CC=gcc，且无 CPPFLAGS/LDFLAGS 钩子，zlib 的 include/lib 路径经 CC/CFLAGS 传入"
+    - "上游无测试套件（Makefile 只有 all/clean），test_package 以真实执行 trimadap-mt 做功能验证"
+  common_dependencies:
+    - zlib/1.3.1
+
+versions:
+  "0.1-4":
+    status: built
+    build_date: "2026-10-15"

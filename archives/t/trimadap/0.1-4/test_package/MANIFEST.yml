@@ -1,0 +1,56 @@
+# test_package/MANIFEST.yml
+# 上游测试声明（CI 门禁 L0e 要求本文件存在）
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: trimadap/0.1-4
+homepage: "https://github.com/lh3/trimadap"
+
+# 上游构建系统只有 all / trimadap-mt / clean 三个目标，没有 check 目标
+upstream_check_command: "make -n check"
+# 上游无测试套件，conanfile.py 的 build() 中无上游测试可跑
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游测试清点证据（R51）：仓库根目录无 tests/ 目录、无 configure/CMakeLists.txt，
+# 无任何测试框架注册；`make -n check` 报 "No rule to make target 'check'"。
+# 上游唯一的测试数据是 test.fa（6 条 read，覆盖 3'/5' 端接头）。
+upstream_tests:
+  - file: test.fa
+    source: trimadap-ec5a764/test.fa
+    description: >-
+      上游自带样本数据（非测试框架）。打包生态把它当冒烟数据使用：Homebrew 的
+      `brew test trimadap` 断言第 4 个默认接头 ATCTCGTATGCCGTCTTCTGCTTG 的命中数为 1。
+      本包的 test_trimadap.sh 复用了同一份数据（data 文件同名 test.fa）。
+    command: "trimadap-mt test.fa"
+
+# test_package 自带的测试（消费者视角，真实执行被测二进制）
+test_package_tests:
+  - file: test_consumer.c
+    description: >-
+      完整消费者端到端用例（沿用仓库既有 test_consumer.c 惯例）：把 trimadap 当作
+      下机 gzip FASTQ 的流式接头过滤器接入管线——gzip 输入（经 OHOS zlib 写出）
+      → trimadap -p 4 多线程流式修剪 → 下游消费者独立解析产出 FASTQ（记录数/长度/
+      序列保真/掩码连续且贴合端/分类掩码长度），再走 -t 8 剪切流水线核对产出等于
+      已知插入片段。覆盖 OHOS 平台相关路径：OHOS zlib（gzFile）、OHOS pthread
+      多线程（kthread.c），以及 aarch64 上本适配新增的标量比对内核。
+    command: "./test_consumer <trimadap-mt> <workdir>"
+  - file: test_trimadap.sh
+    description: >-
+      真实执行打包出的 trimadap-mt：版本输出、上游 test.fa 的结构不变量与上游
+      Homebrew oracle（接头命中数=1）、read 1/6 精确后缀掩码、构造型用例
+      （对照/错配/短片段/5' 端）、-t 剪切模式、-3 自定义接头、多线程一致性
+    command: "sh test_trimadap.sh <trimadap-mt> <test_package dir>"
+
+# 鸿蒙特有 / 消费者用例（规则 12：至少一个完整消费者用例，非纯断言）
+consumer_tests:
+  file: test_consumer.c
+  count: 1
+  ohos_paths:
+    - "OHOS zlib：gzip（gzFile）输入读写"
+    - "OHOS pthread / kthread.c：-p 4 多线程流式处理"
+    - "aarch64 标量比对内核（x86 才是 SSE2 路径）"
+  assertions: 13
+
+# 断言/校验总数 = test_trimadap.sh 13 条断言（12 次 assert_* 调用 + 1 次结构不变量内联校验）
+#                + test_consumer.c 13 条端到端校验
+assertion_count: 26
