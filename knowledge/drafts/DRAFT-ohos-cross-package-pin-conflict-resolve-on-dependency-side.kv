@@ -1,0 +1,27 @@
+# Maintainer-review candidate; no automatic Path B grade or points claim.
+id:                     DRAFT-ohos-cross-package-pin-conflict-resolve-on-dependency-side
+draft:                  true
+trigger_tool:           conan|graph
+phase:                  build
+severity:               2
+category:               ohos-cross-package-version-lines
+error_signature:        Version conflict: Conflict between [a-z0-9._+-]+/[0-9][^ ]* and [a-z0-9._+-]+/[0-9][^ ]* in the graph
+match_keywords:         版本冲突, Version conflict, force=True, override, 精确钉版, pango/harfbuzz, gdk-pixbuf/libjpeg-turbo, 依赖侧递增, test_package 钉版同步, R36, 已发布依赖源码重建
+title:                  跨包精确钉版冲突的依赖侧解法：为冲突方递增一个“只改钉版”的版本，而不是用 override 逼已发布依赖源码重建
+root_cause:             两条已发布依赖对**同一传递依赖**钉了不同的精确版本时，消费者图直接报 Version conflict，例如本轮：
+                        `libass/0.17.5 → harfbuzz/14.2.0` 与 `pango/1.50.14.1.1 → harfbuzz/14.2.0.1.1.1`；
+                        `libmng/2.0.3 → libjpeg-turbo/3.0.4` 与 `gdk-pixbuf/2.44.6.1.1 → libjpeg-turbo/3.2.0`。
+                        消费者侧最直觉的做法是 `override=True` 强行统一，但那会迫使 **libass/libmng 等已发布依赖在 CI 里从源码重建**
+                        （触碰 R36“依赖已发布”原则，并放大 CI 时间与失败面）；`force=True` 只在本配方参与解析时生效，
+                        对消费者图无效（samba/4.21.0 的 `zlib/1.3.1 force=True` 即因此在本仓消费者图里变成硬冲突）。
+affected_scope:         消费者需要同时纳入两条互相冲突的已发布依赖链（本轮：gtk2 GUI 链 + libass 字幕链 / libmng MNG 链）
+verification_cmd:       conan graph info <probe>.py -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 2>&1 | grep -E "Version conflict"
+rec_priority:           1
+rec_approach:           increment-conflicting-package-with-pin-only-change
+rec_description:        ①先查两边钉版是否存在**已发布的第三版本**可同时满足（零重建最优）；
+                        ②否则为冲突方递增一个**只改钉版**的版本——version 递增、requires 改到对齐值，源/补丁/configure 选项/产物布局**保持不变**；
+                        ③让上层包（如 gtk2）也递增并要求这些新版本，形成一条可共存的链；
+                        ④**`test_package` 内若有显式钉版必须同步**，否则测试包自身会在图解析阶段失败（本轮 pango 实测踩到）；
+                        ⑤每件独立成一个 PR（W2 原子性），并在 PR 正文写明“不做 override，避免已发布依赖源码重建”的理由与两侧钉版证据。
+rec_command:            'conan create archives/p/pango/1.50.14.1.1.2 -pr:h=ci/conan/profiles/ohos-aarch64 --build=missing && conan create archives/g/gdk-pixbuf/2.44.6.1.1.1 … && conan create archives/g/gtk2/2.24.33.1 …'
+evidence_ref:           archives/p/pango/1.50.14.1.1.2/reports/pr-body.md; archives/g/gdk-pixbuf/2.44.6.1.1.1/reports/pr-body.md; archives/g/gtk2/2.24.33.1/reports/pr-body.md
