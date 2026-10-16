@@ -1,0 +1,42 @@
+--- a/scripts/signGP.c
++++ b/scripts/signGP.c
+@@ -246,20 +246,39 @@
+ int main(int argc, char *argv[])
+ {
+ 	int	i;
+ 	char	ifname[FILENAME_MAX], ofname[FILENAME_MAX], ch;
+ 	FILE	*ifile, *ofile;
+ 	unsigned long	loadaddr, len;
+ 	struct stat	sinfo;
+ 	int ch_add = 0;
+ 
+ 
++	/* Long options: report the tool version / usage and exit successfully.
++	 * Upstream only understands positional arguments, so a bare --version or
++	 * --help would be treated as an input file name and fail.  */
++	if ((argc == 2) && (strcmp(argv[1], "--version") == 0)) {
++		printf("signGP 1.5.1\n");
++		return 0;
++	}
++
++	if ((argc == 2) && ((strcmp(argv[1], "--help") == 0) ||
++			    (strcmp(argv[1], "-h") == 0))) {
++		printf("Usage: signGP [<input> [<load-addr> [<config-header>]]]\n"
++		       "Prepend the TI signed-image header to a raw x-loader image.\n"
++		       "  <input>          raw image (default: x-load.bin)\n"
++		       "  <load-addr>      load address, hex (default: 0x40200800)\n"
++		       "  <config-header>  non-zero to emit the 512-byte CH header\n"
++		       "Writes <input>.ift next to the input file.\n");
++		return 0;
++	}
++
+ 	/* Default to x-load.bin and 0x40200800. */
+ 	strcpy(ifname, "x-load.bin");
+ 	loadaddr = 0x40200800;
+ 
+ 	if ((argc == 2) || (argc == 3) || (argc == 4))
+ 		strcpy(ifname, argv[1]);
+ 
+ 	if ((argc == 3) || (argc == 4))
+ 		loadaddr = strtoul(argv[2], NULL, 16);
+ 
