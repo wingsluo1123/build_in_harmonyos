@@ -1,0 +1,36 @@
+--- a/src/pam/Makefile.am
++++ b/src/pam/Makefile.am
+@@ -52,27 +52,32 @@
+   AUTH_METHODS_LIBS += auth-method-x509/libpoldi-auth-x509.a
+ endif
+ 
+ SUBDIRS = auth-support $(AUTH_METHODS)
+ 
+ noinst_LIBRARIES = libpam_poldi.a
+ 
+ libpam_poldi_a_SOURCES = \
+  pam_poldi.c auth-methods.h
+ 
++# pam_poldi.so is dlopen(3)ed by the PAM stack.  Where the dynamic loader does
++# not expose the symbols of the host's already loaded libpam to the module, the
++# module needs its own DT_NEEDED entry for libpam; without it the PAM stack
++# rejects the module with PAM_MODULE_UNKNOWN.  Where the host provides them
++# anyway, the extra dependency is a no-op.
+ pam_poldi.so: libpam_poldi.a $(AUTH_METHODS_LIBS) auth-support/libpam-poldi-auth-support.a \
+ 		../scd/libscd_shared.a ../util/libpoldi-util_shared.a
+ 	$(CC) $(LDFLAGS) -shared -o pam_poldi.so -Wl,-u,pam_sm_authenticate \
+ 		libpam_poldi.a \
+ 		$(AUTH_METHODS_LIBS) auth-support/libpam-poldi-auth-support.a \
+ 		../scd/libscd_shared.a ../util/libpoldi-util_shared.a ../assuan/libassuan.a \
+-		$(LIBGCRYPT_LIBS) $(KSBA_LIBS)
++		$(LIBGCRYPT_LIBS) $(KSBA_LIBS) -lpam
+ 
+ all-local: pam_poldi.so
+ 
+ install-exec-local:
+ 	$(INSTALL) -d $(DESTDIR)$(PAM_MODULE_DIRECTORY)
+ 	$(INSTALL) pam_poldi.so $(DESTDIR)$(PAM_MODULE_DIRECTORY)
+ 
+ uninstall-local:
+ 	rm -f $(DESTDIR)$(PAM_MODULE_DIRECTORY)/pam_poldi.so
+ 

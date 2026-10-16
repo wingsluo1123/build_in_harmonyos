@@ -1,0 +1,59 @@
+version: "0.4.2-git20201120.5d67235"
+software: "poldi"
+status: built
+build_date: "2026-10-14"
+build_system: "autotools"
+
+source:
+  url: "https://codeload.github.com/gpg/poldi/tar.gz/5d672355f3d27dc1f7e4729be5f098cd2bc9d448"
+  sha256: "3459ea5287aad02625cfce94be3fd7f15d0695e1e562b7a69648af8d632e7ae9"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--disable-nls"
+    - "MAKEINFO=true"
+    - "--with-libgpg-error-prefix=<libgpg-error package>"
+    - "--with-libgcrypt-prefix=<libgcrypt package>"
+    - "--with-ksba-prefix=<libksba package>"
+  dependencies:
+    - libgpg-error/1.55
+    - libgcrypt/1.12.2
+    - libksba/1.8.1
+    - linux-pam/1.7.2
+  build_requirements:
+    - automake/1.18
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-src-pam-Makefile.am.patch"
+  - "0002-src-poldi.h.patch"
+
+knowledge_gained:
+  - "OHOS 的 dlopen 模块只在自己的依赖闭包里解析符号：模块不自带 DT_NEEDED libpam 时，libpam 用 dlopen 加载它会报 'Error relocating ... pam_get_item: symbol not found'，PAM 栈据此返回 PAM_MODULE_UNKNOWN(28) → PAM 模块必须显式 -lpam（knowledge_ref: DRAFT-24651-ohos-dlopen-module-host-symbol-scope.kv；相关 knowledge_ref: E345, E442）"
+  - "上游只给 configure.ac 的 git 快照：tool_requires(automake/1.18) + aclocal/autoheader/automake --add-missing --copy/autoconf 自举即可（automake 包经 PERL5LIB/ACLOCAL_PATH 提供可重定位脚本）（knowledge_ref: E248；相关 knowledge_ref: DRAFT-10035-wmcdplay-1.1-autotools-bootstrap-ohos）"
+  - "automake 1.18 的 config.sub 已接受 aarch64-linux-ohos，只有 config.guess 需要补 HarmonyOS 分支（knowledge_ref: E007；相关 knowledge_ref: E072）"
+  - "OHOS SDK 的 <libintl.h> 是空壳头（只有版本宏、无 dgettext 声明）：关闭 NLS 时源码不能无条件使用 dgettext（knowledge_ref: E508；相关 knowledge_ref: E015）"
+  - "autoconf 2.72 的 config.status 用 umask 077 建 confXXXXXX 临时目录，HMDFS 上该目录连创建者都不可写（knowledge_ref: E114）"
+  - "本机 /etc 是 /system/etc 的只读符号链接：Poldi 的编译期配置路径 /etc/poldi/poldi.conf 无法在生产环境落盘，模块的配置需由部署方预先放置（knowledge_ref: E002；见 notes.md 已知限制）"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/poldi-0.4.2-git20201120.5d67235.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/poldi-0.4.2-git20201120.5d67235.work
+  source_orig_hash: bf88f85a1f1652d7
+  source_work_hash: e638f2c2d34e2be3
+  generated_at: '2026-10-14T14:02:49'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-src-pam-Makefile.am.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-src-poldi.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
