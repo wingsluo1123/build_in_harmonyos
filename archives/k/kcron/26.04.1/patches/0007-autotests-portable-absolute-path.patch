@@ -1,0 +1,30 @@
+--- a/autotests/taskvalidatortest.cpp
++++ b/autotests/taskvalidatortest.cpp
+@@ -5,3 +5,4 @@
+ 
++#include <QCoreApplication>
+ #include <QDir>
+ #include <QFileInfo>
+@@ -55,6 +56,10 @@ void TaskValidatorTest::testEmptyCommand()
+ void TaskValidatorTest::testAbsolutePathExecutable()
+ {
+-    QVERIFY(validate(QLatin1String("/usr/bin/true")));
++    // /usr/bin/true is not guaranteed to exist on every platform (on OHOS
++    // application uids cannot even search /usr/bin); the test executable
++    // itself is an absolute path that always exists and is executable,
++    // so it preserves this case's intent portably.
++    QVERIFY(validate(QCoreApplication::applicationFilePath()));
+ }
+ 
+ void TaskValidatorTest::testAbsolutePathNotFound()
+@@ -83,7 +88,9 @@ void TaskValidatorTest::testAbsolutePathNotFound()
+ void TaskValidatorTest::testAbsolutePathWithArguments()
+ {
+     // Quoted paths work with arguments
+-    QVERIFY(validate(QLatin1String("\"/usr/bin/printf\" hello world")));
++    // Use the test executable itself as the portable absolute path (see
++    // testAbsolutePathExecutable above).
++    QVERIFY(validate(QStringLiteral("\"%1\" hello world").arg(QCoreApplication::applicationFilePath())));
+ }
+ 
+ void TaskValidatorTest::testCommandInPath()

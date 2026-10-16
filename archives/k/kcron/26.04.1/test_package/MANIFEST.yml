@@ -1,0 +1,59 @@
+package: kcron/26.04.1
+homepage: https://invent.kde.org/utilities/kcron
+
+# 上游测试清点（R51 第一步）：kcron 26.04.1 有 1 个测试目标 / 9 个具名用例。
+# 证据（26.04.1 tarball）：
+#   - autotests/CMakeLists.txt 构建唯一目标 taskvalidatortest（13 个源文件，
+#     含 ../src/taskvalidator.cpp、../src/task.cpp 与 ../src/crontablib/*），
+#     链接 Qt6::Test Qt6::Gui Qt6::Qml KF6::I18n；
+#   - autotests/CMakeLists.txt 注册唯一 CTest 条目：
+#     add_test(NAME taskvalidatortest COMMAND taskvalidatortest)；
+#   - autotests/taskvalidatortest.cpp（QTEST_MAIN）声明 9 个测试槽：
+#     testEmptyCommand, testAbsolutePathExecutable, testAbsolutePathNotFound,
+#     testAbsolutePathNotExecutable, testAbsolutePathWithArguments,
+#     testCommandInPath, testCommandInPathWithArguments, testCommandNotInPath,
+#     testSpecialValidCommand；
+#   - 顶层 CMakeLists.txt include(CTest) + add_subdirectory(autotests) 无条件
+#     生效，故 BUILD_TESTING=ON 时该套件属于每次构建。
+upstream_test_in_build: true
+upstream_check_command: >-
+  ctest --test-dir <build> -N  （构建后自动发现 1 个测试：
+  taskvalidatortest，见 conanfile.py build() 的 _run_upstream_tests）
+upstream_test_command: >-
+  ctest --test-dir <build> --output-on-failure --no-tests=error
+upstream_tests:
+  - taskvalidatortest.testEmptyCommand
+  - taskvalidatortest.testAbsolutePathExecutable
+  - taskvalidatortest.testAbsolutePathNotFound
+  - taskvalidatortest.testAbsolutePathNotExecutable
+  - taskvalidatortest.testAbsolutePathWithArguments
+  - taskvalidatortest.testCommandInPath
+  - taskvalidatortest.testCommandInPathWithArguments
+  - taskvalidatortest.testCommandNotInPath
+  - taskvalidatortest.testSpecialValidCommand
+
+test_package_tests:
+  - file: test_kcron.cpp
+    name: test_kcron
+    description: >-
+      消费者用例 7 组 / 25 断言（HarmonyOS PC 设备实测口径；对等主机上
+      免 /etc/passwd 自适应用例不计入分母）：
+      CASE 1 包内产物定位（kcm_cron.so / kcron_helper / kcm_cron.desktop
+      三断言 + KAuth 激活文件 INFO）；
+      CASE 2 QPluginLoader 加载 kcm_cron.so 并读取元数据（2 断言）；
+      CASE 3 KPluginFactory::instantiatePlugin<QObject> 以 KCMUtils 相同
+      路径实例化 KCM（3 断言；无 passwd 主机追加断言捕获的
+      「No password entry found for uid」CTInitializationError — patch 0004）；
+      CASE 4 tasksModel/variablesModel 属性可达且为空模型（6 断言，
+      含无 passwd 主机的空模型断言 — patch 0005/0006）；
+      CASE 5 真实 QQmlEngine 驱动 org.kde.private.kcms.cron 校验流程：
+      @reboot + 空命令拒绝（Choose a program to run）、真实可执行文件通过、
+      缺失绝对路径拒绝（File not found）（6 断言）；
+      CASE 6 空 cron 下列表粘贴守卫不崩溃（1 断言，patch 0005/0006）；
+      CASE 7 load()/defaults()/refreshPages() 与 isPersonalUse 往返
+      （4 断言）。print()/save()/applyCreate() 属交互路径，不调用
+      （配方 docstring 中如实申报）。
+    command: "ctest --test-dir <build> --output-on-failure --no-tests=error"
+
+# 设备实测断言数（含 2 条无 passwd 自适应断言 ×2 组，见上方 CASE 3/4）。
+assertion_count: 25

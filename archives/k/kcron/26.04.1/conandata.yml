@@ -1,0 +1,78 @@
+# conandata.yml — kcron 26.04.1
+# Flat sources layout, mirroring the kirigami-addons 1.13.0 recipe (the
+# recipe carries the version); patches keyed by version for
+# apply_conandata_patches().
+
+sources:
+  # Official URL first, then mainland mirrors (E017: the platform rewrites
+  # github.com URLs to ghfast.top, KDE URLs are not affected). Verified
+  # 2026-10-16 from the Xi'an workstation: mirror.nju.edu.cn and
+  # mirrors.aliyun.com served the identical tarball (sha256 ee83f2a7...,
+  # 902656 bytes); download.kde.org, mirrors.bfsu.edu.cn and
+  # mirrors.ustc.edu.cn were unreachable from that network at that time
+  # (curl rc=7), so they stay in the list for the build/dev device to try
+  # in order.
+  url:
+    - "https://download.kde.org/stable/release-service/26.04.1/src/kcron-26.04.1.tar.xz"
+    - "https://mirrors.bfsu.edu.cn/kde/stable/release-service/26.04.1/src/kcron-26.04.1.tar.xz"
+    - "https://mirrors.ustc.edu.cn/kde/stable/release-service/26.04.1/src/kcron-26.04.1.tar.xz"
+    - "https://mirror.nju.edu.cn/kde/stable/release-service/26.04.1/src/kcron-26.04.1.tar.xz"
+    - "https://mirrors.aliyun.com/kde/stable/release-service/26.04.1/src/kcron-26.04.1.tar.xz"
+  sha256: "ee83f2a70a7a58882a75a9e989205917ee8d872b01c572a140ecc4094b3df45f"
+patches:
+  "26.04.1":
+    - patch_file: "patches/0001-CMakeLists.txt.patch"
+      patch_description: >-
+        Drop PrintSupport from the required Qt6 components and request Gui and
+        Widgets explicitly: the published qtbase is built with
+        FEATURE_printsupport=OFF and ships no Qt6PrintSupport module; the cron
+        print action is re-targeted to a QPdfWriter (QtGui) PDF export flow
+        (patch 0003) whose file dialog needs Qt Widgets.
+      patch_type: "portability"
+    - patch_file: "patches/0002-src-CMakeLists.txt.patch"
+      patch_description: >-
+        Link the kcm_cron target against Qt6::Widgets (for the QFileDialog of
+        the PDF export flow) instead of the unavailable Qt6::PrintSupport.
+      patch_type: "portability"
+    - patch_file: "patches/0003-src-cronPrinter.cpp.patch"
+      patch_description: >-
+        Re-target CrontabPrinter to QPdfWriter and
+        QFileDialog::getSaveFileName: QPrinter/QPrintDialog (Qt PrintSupport)
+        are unavailable without the PrintSupport module. PDF export replaces
+        the print dialog (algobox 1.1.1 / conducteo 5.0.2 / ksystemlog 26.04.0
+        precedent).
+      patch_type: "portability"
+    - patch_file: "patches/0004-src-crontablib-cthost.cpp.patch"
+      patch_description: >-
+        Do not dereference a null getpwuid() result in the CTHost
+        constructor: processes can legitimately run under uids without an
+        /etc/passwd entry, where getpwuid() returns nullptr and upstream
+        aborted the host process while the KCM was constructed. Degrade to a
+        CTInitializationError instead.
+      patch_type: "portability"
+    - patch_file: "patches/0005-src-tasksModel.cpp.patch"
+      patch_description: >-
+        Tolerate a null current-user CTCron (no crontab backend available)
+        in TasksModel::create()/applyCreate()/paste()/refresh() instead of
+        dereferencing it; the model stays usable (empty, add-able,
+        validatable).
+      patch_type: "portability"
+    - patch_file: "patches/0006-src-variablesModel.cpp.patch"
+      patch_description: >-
+        Same null-cron tolerance for VariablesModel::create()/applyCreate()/
+        paste()/refresh(), keeping the variable editor usable with a null
+        cron.
+      patch_type: "portability"
+    - patch_file: "patches/0007-autotests-portable-absolute-path.patch"
+      patch_description: >-
+        Make taskvalidatortest's two absolute-path cases portable: on OHOS the
+        build uid cannot search /usr/bin at all (stat is denied) and there is
+        no /usr/bin/true or /usr/bin/printf, so the hardcoded Linux constants
+        made testAbsolutePathExecutable and testAbsolutePathWithArguments fail
+        on device (9 of 11 cases passed, these two asserted on paths that do
+        not resolve). Both cases now validate
+        QCoreApplication::applicationFilePath() - an absolute path that exists
+        and is executable in every build environment - preserving each case's
+        intent (bare absolute path / quoted path with arguments) on both the
+        OHOS device and the Linux CI workers.
+      patch_type: "portability"

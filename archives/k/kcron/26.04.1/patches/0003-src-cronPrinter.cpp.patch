@@ -1,0 +1,53 @@
+--- a/src/cronPrinter.cpp
++++ b/src/cronPrinter.cpp
+@@ -15,8 +15,8 @@
+ #include "kcm_cron_debug.h"
+ 
+ #include <KLazyLocalizedString>
+-#include <QPrintDialog>
+-#include <QPrinter>
++#include <QFileDialog>
++#include <QPdfWriter>
+ #include <QTextEdit>
+ 
+ namespace HTML
+@@ -79,22 +79,25 @@ void CronPrinter::print(CTCron *cron)
+     QString tasksTable = getTasksTable(cron);
+     QString variablesTable = getVariablesTable(cron);
+ 
+-    QPrinter *printer = new QPrinter(QPrinter::HighResolution);
+-    printer->setFullPage(true);
+-    printer->setOutputFormat(QPrinter::PdfFormat);
+-
+-    QPrintDialog *dlg = new QPrintDialog(printer);
+-    dlg->setOptions(QAbstractPrintDialog::PrintToFile);
+-
+-    if (dlg->exec() == QDialog::Accepted) {
+-        QTextEdit textEdit;
+-        textEdit.setHtml(HTML::html.arg(HTML::documentHead
+-                                        + HTML::documentBody.arg(title + HTML::tasks.toString() + tasksTable + HTML::variables.toString() + variablesTable)));
+-        textEdit.print(printer);
++    // HarmonyOS PC (OHOS): the published qtbase builds Qt with
++    // FEATURE_printsupport=OFF, so QPrinter/QPrintDialog (Qt PrintSupport)
++    // are unavailable. Re-target the print action to a QPdfWriter (QtGui)
++    // PDF export flow (algobox 1.1.1 / conducteo 5.0.2 / ksystemlog 26.04.0
++    // precedent), keeping the feature usable in PDF form.
++    QString const fileName = QFileDialog::getSaveFileName(nullptr, i18n("Export Crontab to PDF"), QStringLiteral("kcron.pdf"), QStringLiteral("application/pdf (*.pdf)"));
++    if (fileName.isEmpty()) {
++        return;
+     }
+ 
+-    delete dlg;
+-    delete printer;
++    QPdfWriter writer(fileName);
++    writer.setCreator(QStringLiteral("kcron"));
++    writer.setTitle(i18n("Crontab export"));
++    writer.setResolution(1200);
++
++    QTextEdit textEdit;
++    textEdit.setHtml(HTML::html.arg(HTML::documentHead
++                                    + HTML::documentBody.arg(title + HTML::tasks.toString() + tasksTable + HTML::variables.toString() + variablesTable)));
++    textEdit.print(&writer);
+ }
+ 
+ QString CronPrinter::getTasksTable(CTCron *cron)
