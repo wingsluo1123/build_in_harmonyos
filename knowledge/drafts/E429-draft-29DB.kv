@@ -1,0 +1,44 @@
+id:                     E429
+trigger_tool: autotools|conan|make
+phase: testing
+rec_priority: 2
+error_signature: No rule to make target 'check'|getcwd: cannot access parent directories|makeinfo: command not found|symbol not found|FAIL: mkdtemp|exit 77
+
+severity: 2
+category: testing, build-system, environment
+match_keywords: out-of-source 跑上游测试, 构建目录 make check, automake check-TESTS 驱动, shell-init getcwd Not supported, check_PROGRAMS 多行解析, 空行导致只解析第一行, EXEEXT, srcdir 环境变量, LD_LIBRARY_PATH 测试, TMPDIR 只读, exit 77 SKIP, makeinfo MAKEINFO=true
+title: 在 conan 的 out-of-source 布局下接入上游 autotools 测试：5 处坑 + SKIP/makeinfo 语义
+
+root_cause: conan 是 out-of-source 构建，而上游 autotools 的测试体系（`check_PROGRAMS`/`TESTS`）默认假设
+  in-source，直接 `make check` 与"逐个直跑"都会踩坑：①源码目录里**没有 Makefile** → `No rule to make target
+  'check'`，测试程序必须在**构建目录**编译；②automake 的 `check-TESTS` 驱动在受限文件系统上会
+  `shell-init: error retrieving current directory: getcwd: cannot access parent directories: Not supported`
+  → 必须绕开驱动、改逐个直跑；③解析 `check_PROGRAMS` 时名单**跨多行**（续行以 `\` 结尾、以 TAB 开头）
+  且 `m.end()` 之后第一项是**空串** → 不先滤空行就只解析到第一行（18 个只拿到 2 个），名字还会带未展开的
+  `$(EXEEXT)`；④**运行条件不会自动具备**：automake 会导出 `srcdir/abs_srcdir/top_srcdir`（上游靠它们定位
+  数据文件），不补 `LD_LIBRARY_PATH` 会跑到环境里不完整的同名库（实测 `json_tokener_get_error: symbol not
+  found`，rc=127），临时目录写死 `/tmp` 时只读的 /tmp 会直接让用例 abort；⑤**`exit 77` 是 automake 约定的
+  SKIP**（上游缺外部工具时主动跳过），当成失败统计就会误判；另：缺 texinfo 时 `make`/`make check`/
+  `make install` 都会因 info 文档规则中断（`missing: makeinfo: command not found` → Error 127）。
+affected_scope: 所有"上游自带 autotools 测试套件"的 C/C++ 库在 conan（或任何 out-of-source 构建）下接入测试时
+verification_cmd: `grep -n 'check_PROGRAMS' <build>/Makefile`；`make -C <build> <test-name>` 后逐个执行；`env | grep -E 'srcdir|builddir'`（在 make check 里对照）
+
+principles:
+causes:                 []
+caused_by:              []
+similar_to:             []
+conflicts_with:         []
+prerequisite_of:        []
+
+doc_file:               doc/E429.md
+last_updated: 2026-10-15
+
+authors:
+source_pr:
+source_commit:
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+draft: true
+contributor_id: 29DB

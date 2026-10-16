@@ -1,0 +1,80 @@
+# 版本级 manifest — xwpe 1.6.6
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "1.6.6"
+software: xwpe
+status: built
+build_date: "2026-10-15"
+build_system: autotools
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/x/xwpe/xwpe_1.6.6.orig.tar.xz"
+  sha256: "e9bf25f145021efd560e36bc52dbf28bf117def88e2ac0f0154b04d52840f139"
+  filename: "xwpe_1.6.6.orig.tar.xz"
+  note: >-
+    上游在 codeberg（`codeberg.org/mendezr/xwpe`）；源取 **Debian 源包 orig**（版本与平台清单一致），
+    sha256 为本地实测值。
+
+build:
+  system: autotools
+  configure_options:
+    - "--build=aarch64-unknown-linux-musl"
+    - "--host=aarch64-unknown-linux-musl"
+    - "--without-x"
+    - "--without-gpm"
+  dependencies:
+    - "ncurses/6.6（上游必需 ncursesw：PKG_CHECK_MODULES([NCURSESW],[ncursesw])；仓库包内含 ncursesw.pc ✓）"
+    - "json-c/0.18（上游必需：DAP 调试客户端的线格式）"
+  build_requirements:
+    - "automake/1.18"
+    - "libtool/2.5.4"
+  note: >-
+    可选层（X11/Xft/cairo/pango/libvterm）全部关闭：它们不在该库的依赖清单里，开启会引入清单外依赖。
+    产物 = bin/we（956992 字节，musl 动态 ELF64/AArch64）+ bin/wpe（上游自建的符号链接）。
+
+patches_applied:
+  - "测试临时目录可移植性修正：把 tests/*.c 里**写死**的 /tmp/... 改成相对路径 ./（本构建沙箱 /tmp 是\
+     只读 erofs，否则 test_checkheader 等直接 abort rc=-6）。**判定逻辑一字未改**——详见 notes.md。"
+
+upstream_tests:
+  framework: "autotools check（顶层 Makefile.am:187 check_PROGRAMS / :287 TESTS）"
+  test_path: "tests/*.c（18 个单元测试程序，随源码树）"
+  test_command: "本配方逐个直跑：解析构建目录 Makefile 的 check_PROGRAMS → make → 逐个执行"
+  test_count: 18
+  run_in_build: true
+  verified: true
+upstream_test_pass_rate: >-
+  **上游 18 个单元测试，11 个真通过、7 个按上游自身设计跳过（exit 77）**，0 个真失败，本地实测
+  `通过 11 / 跳过 7 / 共 18`。跳过的 7 个所需外部工具在本机**装不上**（有可复现证据，见下）：
+  `dlv+go`、`gdb+rustc`、`lldb-dap+rustc`、`scala-cli`、`metals+scala-cli`、`gopls+go`、
+  `rust-analyzer+cargo`。
+  **环境阻塞证据（实测）**：①`dl.google.com`（Go 工具链）与 GitHub `releases/download`（dlv/gopls/
+  rust-analyzer/scala-cli 预编译包）**均不可达**（HTTP=000）；②`static.rust-lang.org` 可达但实测
+  **21 KB/s**，`rustup-init` 本体 **18,888,208 字节**（≈15 分钟）、Rust 工具链解包 1.5–2 GB →
+  需数小时；③`repo1.maven.org` 实测 **~2 KB/s**（8MB 采样 1.26s 只拿到 2.6KB）。
+  → 属"平台级系统性阻塞"，按仓库既有要求**带证据如实记录**，不冒充通过。
+adapted_test_pass_rate: >-
+  test_package/check_xwpe.py **6 项消费者校验（全部离线）**，本地实测 `checks=6 fails=0 skips=0 / RESULT: PASS`：
+  ①产物齐备（bin/we 956992 字节 + bin/wpe）②ELF 头自检（真 ELF64、machine=0xB7 AArch64）
+  ③动态依赖自检（**json-c 动态**：NEEDED 必须含 libjson-c.so.*，否则 fail；**ncurses 静态链入**：conan 包
+  只有 libncursesw.a、无 .so，故 NEEDED 不含它）④`we --version` 已尝试（rc=-11：全屏程序无 tty，如实记录）
+  ⑤许可证随包（COPYING）⑥证据（sha256 + python 版本）。
+
+knowledge_gained:
+  - category: L1
+    content: >-
+      **在 conan 的 out-of-source 布局里跑上游 autotools 测试，要自己补齐 automake 的运行时条件**：
+      ①测试程序要**在构建目录**里编译（源码目录没有 Makefile）；②解析 `check_PROGRAMS` 时**名单会跨多行**
+      （续行以 `\` 结尾且以 TAB 开头），且**必须先滤掉空行**（`m.end()` 后第一项就是空串，否则只解析到
+      第一行）；③名字里可能带未展开变量（`test_xxx$(EXEEXT)`）要剥掉；④运行时环境要自己给：
+      `srcdir/abs_srcdir/top_srcdir`（上游用它们定位数据文件）、`LD_LIBRARY_PATH`（否则跑到系统里不完整
+      的同名库，实测 `json_tokener_get_error: symbol not found` rc=127）、`TMPDIR`（本沙箱 /tmp 只读）。
+    reason: "xwpe 1.6.6 适配实测——上游自带 18 个 C 单元测试在 conan 下直跑"
+  - category: L1
+    content: >-
+      **`exit 77` 是 automake 约定的 SKIP，不是失败**；把上游测试"逐个直跑"时要按 0=通过 / 77=跳过 /
+      其它=失败 分别统计，并把跳过原因打印出来（便于判断缺什么、能不能补装）。另：`autotools` 的
+      `make`/`make check`/`make install` 在缺 texinfo 的环境里都会因 **info 文档规则**中断
+      （`build-aux/missing: makeinfo: command not found` → Error 127），三处都要传 `MAKEINFO=true`
+      让文档步骤空转（不改上游 Makefile.am）。
+    reason: "xwpe 1.6.6 适配实测——SKIP 语义与 makeinfo 缺失"
