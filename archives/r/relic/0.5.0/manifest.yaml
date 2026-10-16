@@ -1,0 +1,80 @@
+# 版本级 manifest
+# 文件位置: archives/r/relic/0.5.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.5.0"
+
+# 软件名
+software: "relic"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-15"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（上游官方 tag 归档；URL 无 .tar.gz 后缀 ⇒ 配方给 filename）
+  url: "https://codeload.github.com/relic-toolkit/relic/tar.gz/refs/tags/relic-toolkit-0.5.0"
+
+  # 源码校验和（实测 645936 字节，sha256sum 逐字节核对通过）
+  sha256: "e6b34be22a5534382b7d7f9bf1bcb6b9691bb037e14f71b33dac076629c60f71"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表（配方 generate() 注入的 cache 变量，全部在配方层、未改上游源码）
+  configure_options:
+    - "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+    - "-DOPSYS=LINUX"
+    - "-DTESTS=1"
+    - "-DBENCH=0"
+    - "-DDOCUM=OFF"
+    - "-DSHLIB=OFF"
+    - "-DSTLIB=ON"
+
+  # 编译依赖列表（格式: name/version）
+  # 上游 relic 无任何第三方依赖，故为空
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表（本包零补丁：适配点全部落在配方 cache 变量层）
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "CMake 4.x 拒绝 cmake_minimum_required(<3.5)：命令行注入 CMAKE_POLICY_VERSION_MINIMUM=3.5（必须走 cache 变量，写进 tc.variables 落在首行之后不生效） ref: knowledge/drafts/DRAFT-E321-cmake4-policy-version-minimum.kv"
+  - "HarmonyOS 下 CMAKE_SYSTEM_NAME=HarmonyOS 使上游 if(CMAKE_SYSTEM_NAME STREQUAL Linux) 落空：OPSYS 空 / TIMER 退化 ANSI / -D_GNU_SOURCE 丢失 / -lrt 丢失；注入上游自身派生 cache 变量 OPSYS=LINUX 一处恢复三处（A/B 实测 _GNU_SOURCE 0/36→36/36） ref: knowledge/drafts/DRAFT-relic-0.5.0-harmonyos-linux-branch-opsys-injection.kv"
+  - "ARITH=arm-asm-254 的 .s 是 AArch32 指令（MOV pc, lr / LDMIA sp!, {r4-r12, r14}），aarch64 编译 error: invalid operand ⇒ 用默认 ARITH=easy 可移植 C 后端 reference: 设备实测"
