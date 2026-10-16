@@ -1,0 +1,55 @@
+# 版本级 manifest — wob 0.16
+# 遵循 knowledge/ARCHIVE-SPEC v3.0：交叉校验元数据（CI 不读取，以
+# conandata.yml / conanfile.py 为准）；与 wdisplays/1.1.3 同构（同为 meson）。
+version: "0.16"
+software: "wob"
+status: built
+build_date: "2026-10-15"
+conan_ref: "wob/0.16"
+build_system: "meson"
+
+source:
+  url: "https://github.com/francma/wob/archive/refs/tags/0.16.tar.gz"
+  sha256: "8a5850beec72b5b19be631a6eb21315a20082bf9135447080f9e9045f143938b"
+  tar_format: tar.gz
+
+build:
+  system: meson
+  configure_options:
+    - "werror=false"
+    - "seccomp=disabled"
+    - "tests=enabled"
+    - "man-pages=disabled"
+    - "systemd-unit-files=disabled"
+  dependencies:
+    - "wayland/1.22.0"
+    - "wayland-protocols/1.36"
+    - "inih/r62"
+    - "cmocka/2.0.2"
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+test_report:
+  upstream:
+    status: "pass"
+    command: "meson test color --print-errorlogs"
+    suites_total: 1
+    suites_passed: 1
+    cases_total: 5
+    cases_passed: 5
+    notes: "meson 注册单一测试程序 color（test/color_test.c，5 个 cmocka 用例，纯字符串解析断言，无需 compositor）；配方 build() 内真实运行，1/1 OK"
+  test_package:
+    file: "test_package/src/test_wob_ohos.sh"
+    assertions_total: 6
+    assertions_passed: 6
+    assertions_failed: 0
+    notes: "bin/wob 存在性 1 断言 + OHOS 专属 A1-A5（AArch64 ELF Machine / musl interpreter / seccomp=disabled 生效 / wob --version 真实执行 / wob --help 真实执行）"
+
+knowledge_gained:
+  - "制品仓 wayland 包 bin/wayland-scanner 在 HMFS 直接执行 EPERM，且 DT_NEEDED 记录构建机 conan 缓存绝对路径——配方 generate() 内 staging 五步：拷贝 → patchelf --replace-needed（绝对路径→soname）→ remove .codesign + selfSign 重签 → wrapper 注入 LD_LIBRARY_PATH → PATH 置顶供 meson find_program 命中（knowledge_ref: E077, E537, E186；DRAFT-ohos-build-tool-staging-resign-wrapper）"
+  - "meson.build 以 get_variable('pkgdatadir') 定位 wayland-protocols 协议 XML，PkgConfigDeps 生成的 .pc 不含该变量——配方注入 pkgdatadir=<pkg>/share/wayland-protocols（wdisplays/1.1.3 同款，knowledge_ref: E527）"
+  - "seccomp 显式 disabled：仅运行期 self-sandbox（src/pledge_seccomp.c），上游 musl CI 同款先例，不影响构建与上游测试；systemd-unit-files/man-pages 显式 disabled（OHOS 无 systemd 用户单元，scdoc 为 native 文档工具）"
+  - "上游 meson.build 默认 werror=true（gcc CI 磨合产物），clang 15 下配置覆盖 werror=false，避免工具链差异告警升级为错误——配置覆盖，零 patch"
+  - "链接闭包显式化：c_link_args 注入各依赖 libdir 的 -Wl,-rpath-link，不依赖 lld 隐式 DT_NEEDED 闭包查找，保证跨 worker 确定性（libgee 实证，见 build-chain-pitfalls 共享库链接闭包节）"
