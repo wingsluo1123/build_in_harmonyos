@@ -1,0 +1,52 @@
+package: termdebug/2.2
+homepage: "https://os.ghalkes.nl/termdebug.html"
+
+upstream_check_command: "N/A: Makefile only has all/clean/dist-clean/install targets; no check/test target and the tarball ships no tests/ directory"
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+test_package_tests:
+  - file: test_termdebug.py
+    description: >-
+      Consumer test for the installed CLI package. Static leg (runs in both
+      cross builds and on device): bin/termdebug present and executable, the
+      five argv[0] symlinks tdrecord/tdreplay/tdrerecord/tdview/tdcompare all
+      resolve to termdebug, ELF64 little-endian EM_AARCH64 header, six man
+      pages, three doc files, representative symbols for all five optional
+      features (curses terminfo, libunistring width/categories, cairo image
+      surface and PNG output, pangocairo text layout, pthread picture series),
+      and no stray x86-64 ELF left over from the upstream tarball. Runtime leg
+      (only when the target is executable): six --help usages proving the
+      argv[0] dispatch, three tdreplay --help capability probes
+      (--visual-compare / --picture= / --picture-series=, each compiled in only
+      under the matching HAVE_CURSES+HAVE_UNISTRING / HAVE_CAIRO /
+      HAVE_CAIRO+HAVE_PTHREAD guard), five -V version strings, and the refusal
+      message when the ELF is invoked under its own name instead of a command
+      name.
+    command: "python3 test_termdebug.py <package> [--runtime]"
+
+assertion_count: 25
+runtime_assertion_count: 15
+
+notes:
+  - >-
+    Upstream termdebug has no automated test suite at all. L1 is therefore
+    whitelisted in ci/config/no_official_test.txt with the reason recorded
+    there. These consumer assertions are NOT presented as upstream tests.
+  - >-
+    The runtime leg is gated on can_run(), not on "try running it". This host
+    registers binfmt_misc + qemu-aarch64, so an aarch64 ELF does start, but the
+    loader that actually runs is an old /lib/ld-musl-aarch64.so.1 without the
+    __vsnprintf_chk / __memcpy_chk / __strlen_chk _FORTIFY symbols that the
+    published cairo/1.18.4.2 imports (the DevEco SDK libc.so does export all
+    three, and so does the real OHOS loader). That produces exit 127 plus
+    "Error relocating ... symbol not found", which is a local emulation
+    limitation rather than a package defect. The static leg runs unconditionally
+    and its seven symbol assertions cover the same five optional features, so
+    the local pass is never vacuous.
+  - >-
+    The package is statically linked against ncurses/libunistring and
+    dynamically against cairo/pango, so the feature-symbol assertions read the
+    raw ELF bytes (symbol names are literal in .symtab/.dynstr) instead of
+    depending on nm/llvm-nm, which the OHOS worker may not provide.

@@ -1,0 +1,131 @@
+# 版本级 manifest — termdebug 2.2
+
+version: "2.2"
+software: "termdebug"
+
+# built：本地 OHOS aarch64 交叉编译通过（configure 5 项可选能力全部启用），
+# test_package 消费者断言通过；未上传发布。
+status: built
+
+build_date: "2026-10-05"
+build_system: "custom-configure"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 上游作者官方站点归档（HTTP 200 实测；Content-Length 148192，
+  # Last-Modified 2013-06-23，与上游 News 的 "2.2 released 23-Jun-2013" 吻合）。
+  # 不用 Debian 的 +dfsg.orig.tar.gz —— 那是剔文档后的重打包，sha256 不同。
+  url: "https://os.ghalkes.nl/dist/termdebug-2.2.tar.bz2"
+  sha256: "06bd95bb6eeb1581bc4fbadc0111500f1d016ca0ba34c21ddf39b78857de5969"
+  tar_format: tar.bz2
+  upstream_repository: "无官方 git 仓库（Debian salsa 的 termdebug.git 只含 debian/ 打包目录）"
+  upstream_release_page: "https://os.ghalkes.nl/termdebug.html"
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: custom            # Tilde Terminal Toolkit 自研 configure（config.pkg）
+  configure_options:
+    - "./configure --prefix=/"
+  dependencies:
+    - "ncurses/6.6"
+    - "libunistring/1.0"
+    - "cairo/1.18.4.2"
+    - "pango/1.58.2"
+  build_tools:
+    - "pkgconf/3.0.5"       # tool_requires：真机无系统 pkg-config
+  cc: clang
+  cxx: clang++
+  rust_target: ~
+  in_source_build: true     # configure/Makefile.in/config.pkg 相对路径互引，必须就地构建
+  pkgconfig_stubs:
+    - "ncurses.pc -> Requires: ncursesw"
+    - "pangocairo.pc -> Requires: pango"
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 上游源码零改动：适配全部发生在构建环境层 + package() 的 ELF 自签名。
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "termdebug 2.2 的 build system 是自研 configure 而非 autotools：tarball 里只有 configure + Makefile.in + config.pkg，没有 configure.ac。configure 用 sed 把探测结论（CONFIGFLAGS/CONFIGLIBS/OPTOBJECTS）写进 Makefile"
+  - "自研 configure 用相对路径引用 Makefile.in 与 config.pkg，只能在源码根目录就地运行 —— Conan 的 build/source 目录分离会直接失败，配方改 cwd=self.source_folder（与 magicrescue/1.1.10 同款）"
+  - "configure 的能力探测失败**不报错**：只打 'Warning: compiling without curses/cairo' 然后继续构建一个功能残缺的包。必须在配方里硬断言 OPTOBJECTS 里 5 个可选 .o 都在，否则会把降级包当成功交付"
+  - "Conan 2 的 VirtualBuildEnv 在 build scope 只 compose profile buildenv + build_requires 的 buildenv_info/runenv_info，以及 host_requires 的 buildenv_info；**不会**把 host 依赖 cpp_info 的 -I/-L/-D 变成 CC/CFLAGS/LDFLAGS。自研 configure 不读 CFLAGS 的场景必须自行 aggregated_components() 后显式导出"
+  - "上游 configure 的包名假设与依赖配方声明的 pkg_config_name 不一致：它找 tinfo/ncurses（ncurses/6.6 声明 ncursesw）和 pangocairo（pango/1.58.2 声明 pango）。解法是在 generators 目录写只含 Requires 的转发 .pc —— pango/1.58.2 给 cairo-ft/cairo-fc 补转发 .pc 是同款先例"
+  - "sed_rules_c 的 replace_default CFLAGS 会把 Makefile.in 的整行 CFLAGS=-O2 -Isrc 替换掉，导出依赖 flags 时必须自己补回 -O2 -Isrc，否则丢优化级别与 src/ 相对包含路径"
+  - "src/common.c 的 main() 按 basename(argv[0]) 分派 tdrecord/tdreplay/tdrerecord/tdview/tdcompare：5 个命令是同一 ELF 的 argv[0] symlink，package() 只需签名一次，且可直接断言 readlink==termdebug"
+  - "tdreplay/tdcompare 的 --help 文本按 HAVE_CURSES/HAVE_UNISTRING/HAVE_CAIRO/HAVE_PTHREAD 条件编译（-v/--visual-compare、-p/--picture=、-P/--picture-series=），因此 --help 就是最便宜、最可靠的能力探针，可直接进 test_package 断言"
+  - "上游 tarball 混进一个 2013-06-23 的 x86-64 预编译文件 src/tdcompare（208047 字节，不在 OBJECTS/OPTOBJECTS 里，纯残留）—— 配方构建前删除，避免被质量门禁误认成构建产物"
+  - "musl OHOS 把 openpty/forkpty/login_tty 收进 libc，configure 探测 -lutil 失败后自动回退 posix_openpt//dev/ptmx，不需要为 -lutil 做任何适配"
+  - "ncurses/6.6 是 static-only 包（libncursesw.a），静态链接顺序 formw/menuw/panelw/ncursesw 由该配方 cpp_info.libs 的'消费者在前、核心在后'保证；cairo/1.18.4.2 与 pango/1.58.2 是 shared，直接 -l 即可"
+  - "真机 HMDFS 拒绝执行未签名 ELF（cronutils 首轮 PermissionError errno 13），termdebug 作为 CLI 包同样必须在 package() 阶段 binary-sign-tool -selfSign 1"
+  - "Conan 的 conf 键名会校验存在性：tools.build:pkg_config 不存在（conan config list 里只有 tools.gnu:pkg_config），self.conf.get 会直接抛 ConanException，即使给了 default 也不行"
+  - "Conan 的 get() 不接受 tar_format 关键字（只有 url/sha256/filename/pattern/mstrip/verify/subdir/strip_root 等）；格式写给人读的 manifest.yaml，不能**透传**"
+  - "get(**self.conan_data['sources']) 的字典只应放 get() 认识的键"
+  - "在 default_options 里写 self.options[\"某依赖/*\"] 时，若该依赖配方连 config_options 都没有（没有 options），Conan 初始化 options 阶段会抛 TypeError: 'function' object has no attribute 'items'。ncurses/6.6 就是这种没有 options 的配方"
+  - "VirtualBuildEnv 对象本身没有 append()，要取它的 .environment()（Environment）再 append，最后 .vars(self).save_script(...)"
+  - "test_package 不能靠'试着跑一下'判断目标可执行：本机 WSL 注册了 qemu-aarch64 binfmt，能拉起 aarch64 ELF，但真正的 loader 是旧 musl，缺 cairo 需要的 __*_chk 符号，表现为 exit 127 + 'Error relocating'。必须用 can_run(self) 门控运行段，静态段无条件跑"
+
+upstream_tests:
+  exists: false
+  test_count: 0
+  command: "N/A: Makefile 只有 all/clean/dist-clean/install 四个 target，没有任何测试目标；tarball 也不含 tests/ 目录"
+  notes: "上游既无 make check 也无 test/ 目录，因此按 ci/config/no_official_test.txt 白名单豁免 L1；不得用 test_package 冒充上游测试。真实覆盖由 test_package 的消费者断言承担。"
+
+test_package:
+  assertion_count: 25
+  runtime_assertion_count: 15
+  description: >-
+    消费者测试两段。静态段 25 条，任何环境都跑：包内容、5 个 argv[0] symlink、
+    ELF64/LE/AArch64 头、6 个 man page、3 个 doc 文件、七个代表符号
+    （setupterm / uc_width / uc_is_general_category_withtable /
+    cairo_image_surface_create / cairo_surface_write_to_png /
+    pango_cairo_create_layout / pthread_create，即五个可选能力都链进去了）、
+    以及包里无 x86-64 ELF 残留。运行段 15 条，仅 can_run() 为真时执行：
+    6 个 --help（证明 argv[0] 分派）、3 条 tdreplay --help 能力探针、
+    5 个 -V、1 条直接运行 termdebug 的分派拒绝消息。
+
+quality_gates:
+  W0_dependencies: "ncurses/6.6、libunistring/1.0、cairo/1.18.4.2、pango/1.58.2 在 ohpcd 均可用（conan search -r=ohpcd 命中 recipe，且 conan list -r=ohpcd 各有 1 个 os=OHOS armv8 Release 二进制包）。"
+  W1_source: "C 项目 + 自研 configure + raw Makefile.in；公开命令为 tdrecord/tdreplay/tdview/tdrerecord/tdcompare（同一 ELF 的 argv[0] symlink）。"
+  W4_local: >-
+    通过。2026-10-05 本地 WSL aarch64/OHOS 交叉编译
+    （-pr:h=ohos-aarch64-wsl-xbuild -pr:b=default，CC=/opt/lpk-fixed/clang）
+    conan create 全绿：package
+    termdebug/2.2#4a804247066b8a5506cdf5b0cc1441ce:3e494929116f4f2ea3227c867f10c63d6b54504e，
+    configure 探测 ncurses/libunistring/cairo/pangocairo/iconv/pthreads 全 yes，
+    配方自检 "all 5 optional features enabled"，test_package 25 passed / 0 failed /
+    1 skipped（运行段），bin/termdebug 546728 字节
+    sha256=cd7774d7d2afcb315512149884775910ba1003d8ab3ec20f4b9114a7f74dc406。
+    运行段在本机跳过的原因见 notes.md §3.10（qemu + 旧 musl loader 缺
+    _FORTIFY 符号，属本地模拟环境缺陷，非包缺陷）。
+  W5_shadow_ci: "未跑 —— 本轮是预编译阶段（任务尚未认领，平台不允许开 PR）。分支 feat/termdebug-2.2 已推送，待认领后开 PR 由 CI 接手。"
+  R26_static_system_lib: >-
+    ncurses/6.6 与系统库同名，按 R26 须静态。实测解析结果即为 static-only
+    （conan list: ncurses/6.6#3dcfd3b6...:21b17f8b... options {fPIC: True,
+    shared: False}），静态链接顺序 formw/menuw/panelw/ncursesw 由该配方
+    cpp_info.libs 保证。没有在配方里写 default_options {"ncurses/*":
+    {"shared": False}}：ncurses/6.6 配方连 config_options 都没有，pattern 写法会在
+    Conan 初始化 options 阶段抛 TypeError。cairo/pango 不适用：非系统库，且
+    pango/1.58.2 要求 cairo shared=True。
+  R40_scope_note: >-
+    cairo/pangocairo 仅用于离屏出图（cairo_image_surface_create +
+    pango_cairo_create_layout + cairo_surface_write_to_png），不涉及 EGL/GLES/Vulkan/
+    X11/Wayland 窗口系统与 GPU。能力缺失时上游 configure 会砍掉 src/write_image.o，
+    配方硬断言该 .o 存在、test_package 断言三个符号在最终 ELF 里，不是空壳渲染。
+  R38_commands_json: "已补 archives/t/termdebug/commands.json（type=tool，binary=true）。"
+  L1_no_official_test: "已在 ci/config/no_official_test.txt 加 termdebug 及理由（上游零测试目标）。"
+
+blockers: []
