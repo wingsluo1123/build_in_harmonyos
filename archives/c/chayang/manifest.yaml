@@ -1,0 +1,27 @@
+software: chayang
+display: "chayang"
+description: "逐渐降低屏幕亮度（grace period），配合 swaylock 等锁屏工具使用"
+category: desktop
+homepage: "https://git.sr.ht/~emersion/chayang"
+license: MIT
+build_system: meson
+
+ohos_adaptation:
+  key_points:
+    - "单文件 C11 wlroots 客户端：zwlr-layer-shell + wp_viewporter + wp_single_pixel_buffer_manager_v1 全屏调光"
+    - "依赖 wayland/1.24.0（wayland-client 库与头）与 wayland-protocols/1.36（viewporter / xdg-shell / single-pixel-buffer-v1 XML）"
+    - "**ELF 签名（E077）**：安装期 ELF 改写使签名失效：meson 安装时会把 ELF 内 RUNPATH 的构建机绝对路径就地替换为占位符（实测安装前后差 155 字节，位于 .dynstr/.dynamic；strip=False、.symtab/.debug_* 仍在）——任何 ELF 改写（install 期该改写 / strip / objcopy / patchelf）都会使链接器写入的 .codesign 失效；鸿蒙内核拒绝执行无有效 .codesign 的 ELF（E077，报错不含 codesign 字样）；package() 末尾用 binary-sign-tool sign -selfSign 1 重新签名后才能执行"
+    - "wayland 包自带的 wayland-scanner 有两个独立缺陷（.codesign 被安装期 ELF 改写作废 + DT_NEEDED 内嵌不存在的构建机绝对路径 libexpat.so 且缺 libxml2.so.16）→ 从 wayland 1.24.0 源码静态编译 scanner（仅依赖 libc）替代（DRAFT-ohos-static-tool-bypass-dlopen-limit）"
+    - "wayland-client.pc 的 Requires.private: libffi 会被 pkg-config --cflags 解析，libffi 作为纯传递依赖被 conan 标为 Skipped binary 不安装 → 提升为直接 requires（hyprpicker/lavalauncher 先例）"
+    - "制品仓 wayland/wayland-protocols 的 .pc prefix 为 / 或构建机缓存路径 → 复制改写 prefix/libdir/includedir 置顶 PKG_CONFIG_PATH"
+    - "设备无系统 meson，按仓库惯例 tool_requires meson/1.11.0"
+    - "上游无测试目标（meson.build 无 test()，meson test 输出 No tests defined.）；消费者测试 9 条断言全部真实执行通过"
+  common_dependencies:
+    - wayland/1.24.0
+    - wayland-protocols/1.36
+    - libffi/3.4.4
+
+versions:
+  - version: "0.1.0"
+    status: built
+    build_date: "2026-10-16"

@@ -1,0 +1,66 @@
+# 版本级 manifest（与 conandata.yml 交叉校验；不一致时以 conandata.yml 为准）
+
+version: "0.1.0"
+software: "chayang"
+
+# built：本地 conan-verify + CI 同构门禁通过，尚未经平台 upload
+status: built
+build_date: "2026-10-16"
+build_system: "meson"
+conan_ref: "chayang/0.1.0"
+
+source:
+  url: "https://git.sr.ht/~emersion/chayang/archive/v0.1.0.tar.gz"
+  sha256: "61aa0e2955e8b5cf321ef14a5fd72f0e953da51a390d456e929b74fc5efcb74a"
+  tar_format: tar.gz
+
+# 构建期额外源码：wayland 1.24.0，仅用于编译静态 wayland-scanner
+scanner_source:
+  url: "https://gitlab.freedesktop.org/wayland/wayland/-/releases/1.24.0/downloads/wayland-1.24.0.tar.xz"
+  sha256: "82892487a01ad67b334eca83b54317a7c86a03a89cfadacfef5211f11a5d0536"
+
+build:
+  system: meson
+  configure_options:
+    - "-Ddefault_library=static"   # R26：终端工具，不产出共享库
+  dependencies:
+    - wayland/1.24.0
+    - wayland-protocols/1.36
+    - libffi/3.4.4
+  tool_requires:
+    - meson/1.11.0
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+upstream_tests:
+  count: 0
+  command: "meson test"
+  evidence: 'meson test -> "No tests defined."（meson.build 无 test()）'
+
+consumer_tests:
+  file: test_package/src/test_chayang.sh
+  assertions: 9
+  pass: 9
+  fail: 0
+  skip: 0
+  note: "断言 7-9 真实执行已安装的 bin/chayang（-h / -d 非法值 / 无 display），断言真实输出与退出码"
+
+elf_signing:
+  required: true
+  reason: "鸿蒙只执行带有效 .codesign 的 ELF（E077）；meson 安装期就地改写 ELF（RUNPATH→占位符）使该段失效，故 package() 末尾用 binary-sign-tool sign -selfSign 1 重新签名"
+  knowledge_ref: "E077"
+
+knowledge_gained:
+  - "meson 安装期会就地改写 ELF（把 RUNPATH 构建机绝对路径替换为占位符），使 .codesign 段失效 -> 应用类配方必须在 package() 末尾重新签名，否则安装后的二进制在设备上 execve 被拒（EPERM，且报错不含 codesign 字样）"
+  - "制品仓 wayland 包自带 wayland-scanner 有两个独立缺陷（.codesign 被安装期 ELF 改写作废 + DT_NEEDED 内嵌不存在的构建机绝对路径 libexpat.so 且缺 libxml2.so.16）-> 从 wayland 源码静态编译只依赖 libc 的 scanner 替代（DRAFT-ohos-static-tool-bypass-dlopen-limit）"
+  - "pkg-config --cflags 会解析 Requires.private：作为纯传递依赖被 conan 标为 Skipped binary 的包不会安装 .pc，需提升为直接 requires（wayland-client.pc -> libffi）"
+  - "制品仓 .pc 的 prefix 为 / 或构建机缓存路径，需复制改写后置顶 PKG_CONFIG_PATH（hyprpicker/lavalauncher 同款）"
+  - "CI L0i 依赖提取只看 AST 常量字符串参数，\"wayland/\" + CONST 拼接会被静默漏检，依赖引用须写字面量"
+
+knowledge_ref:
+  - "E077"
+  - "E472"
+  - "DRAFT-ohos-static-tool-bypass-dlopen-limit"
+  - "E090"
