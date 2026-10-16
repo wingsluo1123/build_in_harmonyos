@@ -1,0 +1,32 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: wob/0.16
+homepage: "https://github.com/francma/wob"
+
+# 上游测试命令：meson test color（在 wob 配方 build() 内真实运行）
+upstream_check_command: "meson test"
+upstream_test_in_build: true
+upstream_test_command: "meson test color"
+
+# 上游实际运行的测试程序（meson test 注册项；5 个 cmocka 用例，
+# 纯字符串解析断言，无需合成器/显示——OHOS 沙箱无 compositor 不影响）
+upstream_tests:
+  - file: test/color_test.c
+    description: "wob 颜色字符串解析单元测试（cmocka）：大小写不敏感 / alpha 通道可选 / 非法长度 / 非法字符 / 合法值边界"
+    command: "meson test color"
+
+# test_package 中自带的测试（消费者视角验证；OHOS 专属，非上游用例）
+test_package_tests:
+  - file: src/test_wob_ohos.sh
+    description: "OHOS 专属消费者验证（5 断言）：A1 AArch64 ELF Machine；A2 musl interpreter（ld-musl-aarch64，OHOS PC libc 差异）；A3 seccomp=disabled 配置分支实际生效（DT_NEEDED 无 libseccomp）；A4 真实执行 wob --version（签名/动态链接闭包，HMFS 未签名 EPERM 在此暴露）；A5 真实执行 wob --help（usage 输出）"
+    command: "bash test_wob_ohos.sh <pkg_dir> <wayland_libdir>"
+  - file: conanfile.py
+    description: "验证 bin/wob 存在（1 断言）并以 conanrun 环境驱动上述脚本"
+    command: "conan test"
+
+# 测试断言总数：上游 meson test color 5 用例 + test_package OHOS 专属
+# 5 断言 + bin/wob 存在性 1 断言 = 11
+assertion_count: 11

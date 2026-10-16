@@ -1,0 +1,179 @@
+#====================================================================
+# DRAFT-ohos-build-tool-staging-resign-wrapper
+#   制品仓 ELF 构建期工具在 HMFS 上不可直接执行：
+#   staging 拷贝 → DT_NEEDED 改写 → 重签名 → wrapper 后交 find_program
+# 来源: feat(wob): 0.16 适配 HarmonyOS PC（path B 知识库扩展）
+# 路径: Path B（知识库扩展，L2 跨库工程模式）
+# 状态: 草稿（待审核 promote）
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     DRAFT-ohos-build-tool-staging-resign-wrapper
+trigger_tool:           meson|conan|HMFS|pkg-config
+phase:                  generate|build|configure
+error_signature:        Program wayland-scanner found: NO|
+                        operation not permitted|
+                        Permission denied.*ELF|
+                        NEEDED.*Shared library: \[/|
+                        error while loading shared libraries
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               2
+category:               conan2, meson, toolchain, elf-signing, ohos, native-tools
+match_keywords:         wayland-scanner, glib-compile-resources, find_program,
+                        conan-native-tools, staging, patchelf, replace-needed,
+                        DT_NEEDED, binary-sign-tool, selfSign, codesign,
+                        LD_LIBRARY_PATH, wrapper, 未签名 ELF, EPERM
+title:                  制品仓依赖包自带的原生 ELF 构建期工具（协议/IDL 代码生成器等）在 OHOS 上不可直接执行：配方 generate() 内 staging——copy → patchelf --replace-needed（绝对 DT_NEEDED→soname）→ remove .codesign + 重签名 → wrapper 注入 LD_LIBRARY_PATH → 目录置于 PATH 最前供 meson find_program 命中
+prescan_pattern:        find_program\('[a-z-]+'|dependency\('[a-z-]+', native: true\)|\.cache/conan2|NEEDED.*\[/
+prescan_globs:          **/meson.build, **/conanfile.py
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             OHOS(HMFS) 内核只加载含有效 .codesign 签名段的 ELF
+                        （机理已收录 graph E077：llvm-readelf -S | grep codesign
+                        自包含探针）；制品仓 conan 包 bin/ 里的原生工具是
+                        **构建机上的构建产物**，存在双重不可执行性：
+                        ① 未签名（或签名随构建机环境失效）→ HMFS 直接执行
+                        EPERM（历史实测记录：archives/w/wdisplays/1.1.3/
+                        conanfile.py docstring「bin/wayland-scanner 直接执行
+                        报 EPERM（HMFS 未签名 ELF 不可执行）」）；
+                        ② DT_NEEDED 记录构建机缓存**绝对路径**（如
+                        /storage/Users/currentUser/.cache/conan2/p/expat…/lib/
+                        libexpat.so），loader 不查 LD_LIBRARY_PATH，
+                        本机布局不同即找不到依赖（本 run 实证：
+                        wob run conan_build_wob_0.16.log:202 staged scanner
+                        的 DT_NEEDED 确含 .cache/conan2 绝对路径）。
+                        上游 meson.build 以 find_program('wayland-scanner')/
+                        dependency(..., native: true) 消费这类工具，
+                        直接把包内 bin/ 路径交出去必然失败；须在配方
+                        generate() 内把工具「搬运+修复+签名+包装」为
+                        meson 可命中、可执行的构建期命令。
+
+affected_scope:         任何在 OHOS 上以 native 构建工具消费制品仓 ELF 工具
+                        的配方：meson find_program()/dependency(native:true)、
+                        自定义 generate 步骤、gnome 模块（glib-compile-*）、
+                        Wayland/GLib/GTK 栈代码生成器（wayland-scanner、
+                        gdk-pixbuf-pixdata 等）。仓内同模式实践 ≥4 处：
+                        wdisplays/1.1.3、glade/3.40.0、gtk/3.24.43、
+                        gdk-pixbuf/2.44.6（另有 goocanvas/gspell/gtk-vnc/
+                        gtksourceview3/gxr 同目录惯例），本 wob/0.16 为
+                        独立复验实例（首过绿）。
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           stage-patchelf-resign-wrapper
+rec_description:        配方 generate() 内五步（顺序不可倒）：
+                        ① **copy**：把依赖包 bin/<tool> 拷入构建目录
+                        （如 conan-native-tools/<tool>.elf）——后续改写不得
+                        污染制品仓原件；
+                        ② **改写 DT_NEEDED**：llvm-readelf -d 列出绝对路径
+                        NEEDED（正则 NEEDED.*\[/<），逐条
+                        patchelf --replace-needed <绝对路径> <basename>；
+                        ③ **重签名**：签名顺序不可倒（E077 forbid_1）——
+                        llvm-objcopy --remove-section .codesign 后
+                        binary-sign-tool sign -inFile … -outFile … -selfSign 1
+                        （patchelf 改写会使原签名失效，必须"改写→重签"；
+                        本 run 实证 conan_build_wob_0.16.log:204-206 两步
+                        顺序执行且 "add codesign section success"）；
+                        ④ **wrapper**：写同名 /bin/sh 脚本，exec 真实 ELF 前
+                        export LD_LIBRARY_PATH=<各依赖包 libdir>（构建期
+                        子进程 env 由父 shell 显式传递，语义见 .md 与 E186
+                        辨析段；本 run 实证 :250-257 staged scanner 在该
+                        env 下完成 8 个协议生成任务）；
+                        ⑤ **PATH 置顶**：工具目录放构建环境 PATH 最前
+                        （meson find_program 按 PATH 顺序命中 wrapper；
+                        本 run 实证 :230 「Program wayland-scanner found:
+                        YES (…/conan-native-tools/wayland-scanner)」）。
+                        产物留在构建目录、不随包发布——绕开 E537 对
+                        shipped artifact 的 patchelf 禁区（E537 治理的是
+                        随包分发的产物，本条治理的是构建期临时工具）。
+rec_command:            # staging 后自检（构建目录内）
+                        llvm-readelf -d <build>/conan-native-tools/wayland-scanner.elf \
+                          | grep NEEDED          # 期望：无 / 开头绝对路径
+                        <build>/conan-native-tools/wayland-scanner --help  # 期望：正常输出
+rec_auto_fix:           false
+rec_impl:               generate-hook-staging
+
+fallback_priority:      2
+fallback_approach:      static-rebuild-native-tool
+fallback_description:   静态重编译工具本体替代制品仓 ELF（见
+                        knowledge/drafts/DRAFT-ohos-static-tool-bypass-dlopen-limit，
+                        lavalauncher 已采用）：绕开签名与 DT_NEEDED 两类
+                        问题，但要求工具源码可得且付出额外构建时间；
+                        staging 是其低成本对偶方案，二者构成方案空间
+                        互补——工具源码不可得或重编成本过高时用 staging，
+                        staging 仍不可行（如工具依赖无法在构建机满足）再
+                        考虑静态重编译。
+fallback_command:       # 无独立命令：由配方以源码包静态构建同名工具并置 PATH
+fallback_auto_fix:      false
+fallback_impl:          recipe-native-build
+
+# ★ 禁止策略 ★
+forbid_1_pattern:       直接执行制品仓.*bin/.*(未签名|原样)|find_program.*包内 bin/ 路径直交
+forbid_1_reason:        HMFS 只加载含有效 .codesign 的 ELF；制品仓包内
+                        工具是构建机产物，直接执行 EPERM（E077 机理 +
+                        wdisplays docstring 实测记录）
+forbid_1_consequence:   meson configure/build 报 operation not permitted，
+                        易被误判为文件权限问题而反复 chmod（无效）
+forbid_2_pattern:       patchelf.*改写后不重签|replace-needed 后直接执行
+forbid_2_reason:        patchelf/objcopy 修改即破坏 .codesign 签名；E537
+                        fallback 实证改写后未重签的文件执行 Permission
+                        denied——必须"改写→remove .codesign→重签"顺序
+                        （E077 forbid_1 同源）
+forbid_2_consequence:   staged 工具执行 Permission denied，改写步骤白做
+forbid_3_pattern:       patchelf 改写产物.*随包发布|staged 工具.*install 到包
+forbid_3_reason:        E537 forbid_1 禁止把 patchelf 改写产物当 shipped
+                        artifact（分发面 SONAME/签名治理是另一套规则）；
+                        staging 产物属构建期临时物，留在构建目录即可
+forbid_3_consequence:   分发产物治理失守：包内出现绝对路径 DT_NEEDED 残留
+                        或无效签名的 ELF（E537 记录的 HMDFS 拒绝场景）
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             P-SIGN-001
+
+# ═══ 关系图 (Relations) ═══
+similar_to:             E077（签名机理与"改写→重签"顺序，本条是其构建期
+                        工具场景的工程化封装）；
+                        E537（制品绝对 DT_NEEDED 泄漏与链接期治理，本条
+                        治构建期临时工具，绕开其 shipped-artifact 禁区）；
+                        E186（消费端工具 RUNPATH 运行期修复——与本条
+                        wrapper 的场景差异见 doc_file 辨析段）；
+                        DRAFT-ohos-static-tool-bypass-dlopen-limit（静态
+                        重编译方案，本条的低成本对偶，方案空间互补）；
+                        DRAFT-12412-zsa-wally-ohos-lld-placeholder-codesign
+                        （新链接产物的 force re-sign，非既有工具 staging）
+caused_by:
+conflicts_with:
+prerequisite_of:
+
+# ═══ 元数据 ═══
+verification_cmd:       llvm-readelf -d <wayland-pkg>/bin/wayland-scanner | grep -E 'NEEDED.*\[/'
+                        # 探针1：绝对 DT_NEEDED 残留（有输出=不可直接执行）
+                        <wayland-pkg>/bin/wayland-scanner --help
+                        # 探针2：HMFS 直接执行观察 EPERM
+                        # staging 五步后：
+                        llvm-readelf -d <build>/conan-native-tools/wayland-scanner.elf | grep -E 'NEEDED.*\[/'
+                        # 探针3：期望无输出（soname 化完成）
+                        <build>/conan-native-tools/wayland-scanner --help
+                        # 探针4：期望正常输出（可脱离本 run 日志复现）
+doc_file:               knowledge/drafts/DRAFT-ohos-build-tool-staging-resign-wrapper.md
+last_updated:           2026-10-15
+source_event:           wob-0.16 适配（path B）：wob meson.build 以
+                        find_program('wayland-scanner') 生成 4 组协议
+                        private-code/client-header；制品仓 wayland 包
+                        bin/wayland-scanner 不可直接执行（E077 机理 +
+                        wdisplays docstring 实测），配方 generate() 内
+                        staging 五步后端到端走通（conan_build_wob_0.16.log
+                        :202/:204-206/:230/:250-257，权威 CI 首过绿）。
+                        阻塞面失败日志来源分布：E077 + wdisplays 配方
+                        docstring（历史 run），本 run 为正面必要性证据
+                        （DT_NEEDED 绝对路径残留实测 + staging 链路全通）。
+authors:                sea_crab
+source_pr:
+source_commit:          dca30c0803efcb8e705e7841aec289a80fe6836e
+
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     0.8
+metrics_last_used:      2026-10-15
