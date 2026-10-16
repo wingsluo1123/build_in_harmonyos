@@ -1,0 +1,154 @@
+Portability fixes for HarmonyOS PC (OHOS/aarch64, cmake 4.1, clang 15).
+
+1. kpty.cpp relied on transitive Qt includes for QFile/QFileInfo, which
+   this Qt5 configuration does not provide; include them directly.
+2. QString::sprintf and the unqualified endl are gone from that build;
+   use QString::asprintf and Qt::endl.
+3. KPty::login()/logout() are compiled out entirely when the platform has
+   neither the utmpx API (HAVE_UTMPX) nor login()/logout() (HAVE_LOGIN),
+   which is the only situation in which upstream would fall back to the
+   legacy updwtmp()/getutline() bookkeeping. HarmonyOS is such a platform
+   and its stub utmp.h declares neither symbol. Enclosed with #if/#else so
+   the code is excluded at compile time; platforms with a real utmp keep
+   upstream behaviour unchanged.
+4. KPtyDevicePrivate::_k_canRead() reserved the read buffer from an
+   ioctl(TIOCINQ) queue length on the pty master. HarmonyOS denies that ioctl
+   (and FIONREAD, same request number) with EACCES on the master while the
+   slave answers it, so the guarded read never ran, the zero byte count was
+   taken for EOF, and the read notifier was switched off for good - all five
+   upstream KPtyProcessTest cases then failed on a pty that never delivered a
+   byte. Fall back to reading a chunk when the ioctl fails; the master is
+   O_NONBLOCK, so the read returns what is queued, and the unreserve() call
+   releases the surplus. Where the ioctl works nothing changes, including the
+   closed-slave case that legitimately reads zero bytes and reports readEof.
+
+5. The same function has to report end-of-file when the slave side closes.
+   Linux spells that as EIO from read() on the master, and upstream never sees
+   it because its ioctl reports a zero-length queue, so the zero-length read
+   returns 0 and the EOF branch runs. With the ioctl unavailable the read is a
+   real one and returns -1/EIO instead, which the error branch would swallow -
+   the readEof signal would never fire and test_pty_signals would lose its
+   trailing marker. EIO is therefore mapped to the same end-of-file; any other
+   errno still goes to the error branch.
+
+--- a/src/kpty.cpp
++++ b/src/kpty.cpp
+@@ -31,6 +31,8 @@
+ 
+ #include <cerrno>
+ #include <fcntl.h>
++#include <QFile>
++#include <QFileInfo>
+ #include <grp.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+@@ -252,8 +254,8 @@
+     // Linux device names, FIXME: Trouble on other systems?
+     for (const char *s3 = "pqrstuvwxyzabcde"; *s3; s3++) {
+         for (const char *s4 = "0123456789abcdef"; *s4; s4++) {
+-            ptyName = QString().sprintf("/dev/pty%c%c", *s3, *s4).toLatin1();
+-            d->ttyName = QString().sprintf("/dev/tty%c%c", *s3, *s4).toLatin1();
++            ptyName = QString::asprintf("/dev/pty%c%c", *s3, *s4).toLatin1();
++            d->ttyName = QString::asprintf("/dev/tty%c%c", *s3, *s4).toLatin1();
+ 
+             d->masterFd = QT_OPEN(ptyName.data(), QT_OPEN_RDWR);
+             if (d->masterFd >= 0) {
+@@ -289,7 +291,7 @@
+     constexpr auto perms = QFile::ReadGroup | QFile::ExeGroup | QFile::ReadOther | QFile::WriteOther | QFile::ExeOther;
+     if ((info.ownerId() != getuid() || (info.permissions() & perms)) //
+         && !d->chownpty(true)) {
+-        qCWarning(KPTY_LOG) << "chownpty failed for device " << ptyName << "::" << d->ttyName << "\nThis means the communication can be eavesdropped." << endl;
++        qCWarning(KPTY_LOG) << "chownpty failed for device " << ptyName << "::" << d->ttyName << "\nThis means the communication can be eavesdropped." << Qt::endl;
+     }
+ 
+ grantedpt:
+@@ -446,6 +448,19 @@
+ 
+ void KPty::login(const char *user, const char *remotehost)
+ {
++#if !HAVE_UTMPX && !HAVE_LOGIN
++    // HarmonyOS provides neither the utmpx API (HAVE_UTMPX) nor
++    // login()/logout() (HAVE_LOGIN), so the only reachable branch would be
++    // the legacy utmp bookkeeping, which needs updwtmp() and getutline().
++    // Its utmp.h is a stub - _PATH_WTMP is "/dev/null/wtmp" - declaring
++    // pututline/getutent but neither of those two, and there is no usable
++    // wtmp to write to. Nothing to record, so the whole body is excluded.
++    // Platforms with utmpx (glibc, where HAVE_UTMPX is 1) or with
++    // login()/logout() are completely unaffected.
++    (void)user;
++    (void)remotehost;
++    return;
++#else
+ #ifdef UTEMPTER_PATH
+     Q_D(KPty);
+ 
+@@ -531,10 +546,15 @@
+ #endif
+ #endif
+ #endif
++#endif
+ }
+ 
+ void KPty::logout()
+ {
++#if !HAVE_UTMPX && !HAVE_LOGIN
++    // See KPty::login() above: no usable utmp/wtmp on this platform.
++    return;
++#else
+ #ifdef UTEMPTER_PATH
+     Q_D(KPty);
+ 
+@@ -610,6 +630,7 @@
+ #endif
+ #endif
+ #endif
++#endif
+ }
+ 
+ bool KPty::tcGetAttr(struct ::termios *ttmode) const
+--- a/src/kptydevice.cpp
++++ b/src/kptydevice.cpp
+@@ -270,15 +270,39 @@
+     qint64 readBytes = 0;
+ 
+     int available;
+-    if (!::ioctl(q->masterFd(), PTY_BYTES_AVAILABLE, (char *)&available)) {
++    // HarmonyOS denies the queue-length ioctls on the pty MASTER: TIOCINQ and
++    // FIONREAD both fail with EACCES there, while the slave side answers both.
++    // The original `if (!ioctl(...))` guard therefore never ran the read, and
++    // the zero byte count was then taken for end-of-file below - which also
++    // switched the read notifier off for good. Every payload was lost after a
++    // single spurious readEof and waitForReadyRead() returned immediately,
++    // because doWait() loops on readNotifier->isEnabled().
++    //
++    // The ioctl only decides how much buffer to reserve. The master is
++    // O_NONBLOCK (finishOpen), so a plain read of a chunk returns whatever is
++    // actually queued, and the unreserve() below releases the unused rest.
++    // Where the ioctl works nothing changes - including the closed-slave case,
++    // where it reports a zero-length queue and the zero-length read returns 0.
++    if (::ioctl(q->masterFd(), PTY_BYTES_AVAILABLE, (char *)&available)) {
++        available = CHUNKSIZE;
++    }
++    {
+         char *ptr = readBuffer.reserve(available);
+         NO_INTR(readBytes, read(q->masterFd(), ptr, available));
+         if (readBytes < 0) {
+             readBuffer.unreserve(available);
+-            q->setErrorString(i18n("Error reading from PTY"));
+-            return false;
++            // A closed slave shows up as EIO on the master, and that is the
++            // platform's spelling of end-of-file: upstream reaches the EOF
++            // path through the ioctl instead, which reports a zero-length
++            // queue. Anything else is a real read error.
++            if (errno != EIO) {
++                q->setErrorString(i18n("Error reading from PTY"));
++                return false;
++            }
++            readBytes = 0;
++        } else {
++            readBuffer.unreserve(available - readBytes); // *should* be a no-op
+         }
+-        readBuffer.unreserve(available - readBytes); // *should* be a no-op
+     }
+ 
+     if (!readBytes) {

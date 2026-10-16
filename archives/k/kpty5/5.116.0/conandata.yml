@@ -1,0 +1,32 @@
+# conandata.yml - kpty5 5.116.0 (KDE Frameworks 5 / Qt5)
+# Official KDE Frameworks release train source. KF5 5.116 is the final KF5
+# release and is served by download.kde.org from the KDE Attic archive.
+sources:
+  "5.116.0":
+    url: "https://download.kde.org/stable/frameworks/5.116/kpty-5.116.0.tar.xz"
+    sha256: "ad4f6322544f65c7c900003d86ffeaac350fd2e2739b4777997ece49d8f04630"
+
+patches:
+  "5.116.0":
+    - patch_file: "patches/0001-ohos-portability.patch"
+      patch_description: >-
+        Portability for HarmonyOS: include <QFile>/<QFileInfo> explicitly
+        instead of relying on transitive Qt includes; replace the removed
+        QString::sprintf with QString::asprintf and the bare endl with
+        Qt::endl; and compile out KPty::login()/logout() on platforms that have
+        neither the utmpx API (HAVE_UTMPX) nor login()/logout() (HAVE_LOGIN),
+        which is the only case where upstream falls back to the legacy
+        updwtmp()/getutline() bookkeeping that the OHOS stub utmp.h does not
+        provide. The bodies are enclosed with #if/#else so they are excluded at
+        compile time; platforms with a real utmp are unaffected.
+        Finally, KPtyDevicePrivate::_k_canRead() sizes its read from an
+        ioctl(TIOCINQ) on the pty master; HarmonyOS denies that ioctl (and
+        FIONREAD, the same request number) with EACCES on the master while the
+        slave answers it, so the guarded read never ran, the zero byte count was
+        taken for EOF and the read notifier was switched off - all five upstream
+        KPtyProcessTest cases then failed on a pty that never delivered a byte.
+        The patch falls back to reading a chunk when the ioctl fails; the master
+        is O_NONBLOCK, so the read returns what is queued and the surplus
+        reservation is released. Where the ioctl works nothing changes,
+        including the closed-slave case that legitimately reads zero bytes.
+      patch_type: portability

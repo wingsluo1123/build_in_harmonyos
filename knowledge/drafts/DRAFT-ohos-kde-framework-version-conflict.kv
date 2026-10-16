@@ -1,0 +1,60 @@
+# ═══ OHOS: KDE Frameworks 依赖图版本冲突，已发布配方不直接改而是升版本重新发布 ═══
+# Timestamp: 2026-10-01
+# Software: kcoreaddons5/5.116.0.1, kpty5/5.116.0, kservice5/5.116.0, kactivities5/5.116.0 (KDE Frameworks 5)
+# Gate: G2/conan graph resolve（依赖解析）
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id: DRAFT-ohos-kde-framework-version-conflict
+severity: 3
+category: dependency|conan|graph
+trigger_tool: conan
+phase: configure
+approach: 先 `conan list "<pkg>/*" -r <remote>` 查已发布版本；能在现有版本里解决就在各兄弟配方上对该依赖写 `self.requires("<pkg>/<ver>", force=True)` 让整图收敛到唯一版本；确需改配方内容时按 R37 升版本重新发布，不在已发布版本上原地修改。基础库自身的缺陷另立独立任务，不混入叶子配方。
+
+keywords: conan version conflict, force=True, dependency graph, KDE Frameworks, KF5, qt5-qtbase, R37 version bump, 已发布版本, 升版本, requirement conflict
+
+error_signature: Version conflict: Conflict between .* and .* in the graph|Version ranges and conflicts must be resolved|Missing binary.*要求不同版本
+match_keywords: version conflict,conflict between,force=true,requirement conflict,qt5-qtbase,dependency graph
+
+root_cause: |
+  Conan 2 的图中每个包名只允许一个版本。KF5 这一族配方逐层叠加共享同一个基础库：
+      qt5-qtbase/5.15.2.2
+        ├── kcoreaddons5/5.116.0.1
+        │     ├── kpty5/5.116.0
+        │     └── kservice5/5.116.0  (+ kconfig5, kdbusaddons5, ki18n5)
+        └── kconfig5/5.116.0
+              └── kactivities5/5.116.0 (+ kwindowsystem5, qt5-qtdeclarative, qt5-qtsql)
+  只要任一配方声明了不同版本（例如 kcoreaddons5 写 5.15.2、ki18n5 写 5.15.2.2），
+  整图解析即失败。上层到底层是共享的，任何一个叶子改版本都会波及所有同图消费者。
+
+error_hint: |
+  冲突只在整图里出现，单库 `conan install` 可能恰好只解析到自己那一支而成功——不要据此判定无冲突。
+  用 `conan graph info --requires=<top> 2>&1 | grep -i conflict` 复现，并用
+  `conan graph info ... | grep <pkg>` 确认该包在全图只剩一行版本。
+
+wrong_turns: |
+  1. 直接修改已发布配方的版本要求（同一 version 在不同时间产生不同制品，账目与复现失效）。
+  2. 在下游配方里临时引入或内联基础库，把依赖问题藏进叶子配方，其它消费者仍会命中。
+  3. 只看单库安装成功就判定无冲突。
+  4. 为绕开冲突而降低该配方的依赖要求（等于改变被测对象）。
+
+affected_scope: |
+  所有 KF5/KF6 叠加适配（kcoreaddons5 → kpty5/kservice5 → kactivities5 一族），
+  以及任何共享基础库（qtbase、ecm、ki18n5）的框架栈。
+  本仓库 kcoreaddons5 同时存在 5.116.0 与 5.116.0.1，正是 R37 升版本规则作用的结果。
+
+detection: |
+  conan graph info --requires=kservice5/5.116.0 2>&1 | grep -i conflict
+  conan list "qt5-qtbase/*" -r ohpcd          # 确认已发布版本，决定能否用现成版本解决
+  conan graph info --requires=kservice5/5.116.0 | grep qt5-qtbase   # 应只剩一行版本
+
+verification: |
+  图中不再出现 Version conflict；冲突包在全图只剩一个版本；
+  升版本后对该新版本重新跑完整真机验证，不沿用旧版本结果。
+
+recovery_condition: |
+  出现以下任一情况即应重新调查：上游发布新基础库版本使现有钉法失效；
+  新增兄弟配方未采用同一钉法而重新引入冲突；有人在已发布版本上直接改了 conanfile；
+  图中再次出现同一包名的两个版本。
+
+rec_priority: high
