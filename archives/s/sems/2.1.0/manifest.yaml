@@ -1,0 +1,62 @@
+# 版本级 manifest
+# 文件位置: archives/s/sems/2.1.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "2.1.0"
+software: sems
+status: built
+build_date: "2026-10-15"
+build_system: cmake
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 官方 GitHub tag 归档（HTTP 200）
+  url: "https://github.com/sems-server/sems/archive/refs/tags/2.1.0.tar.gz"
+  sha256: "f16c28917f1b92e9ec963ca28abd4612282f610276a67fa4e6346d07cffb8756"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DSEMS_USE_PYTHON=OFF"
+    - "-DSEMS_USE_ILBC=OFF"
+    - "-DSEMS_USE_MONITORING=OFF"
+    - "-DEXCLUDE_APP_MODULES=\"monitoring xmlrpc2di\""
+    - "-DSEMS_EXEC_PREFIX=. -DSEMS_CFG_PREFIX=. -DSEMS_AUDIO_PREFIX=lib -DSEMS_DOC_PREFIX=share/doc"
+    - "-DLIBEVENT2_INCLUDE_DIR=<libevent pkg>/include -DLIBEVENT2_LIBRARIES=<libevent pkg>/lib/libevent.a;<libevent pkg>/lib/libevent_pthreads.a"
+  dependencies:
+    - libevent/2.1.12
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-pthread-cancel-capability-probe.patch"
+  - "0002-inject-libevent-vars.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "OHOS musl 无 pthread_cancel：上游 core/AmThread.cpp 无条件调用该符号导致编译失败；用 check_symbol_exists 编译期能力探测替代平台宏（R8 合规），无符号时退化为 on_stop() 协作式停止"
+  - "SEMS 2.1.0 上游 core/CMakeLists.txt 以裸名 event/event_pthreads 链接（不引用 CMake 目标），CMakeDeps 生成的 target 不会被使用；须用变量注入（LIBEVENT2_INCLUDE_DIR/LIBEVENT2_LIB_DIR/LIBEVENT2_LIBRARIES）并 patch 掉裸名"
+  - "apps/xmlrpc2di 捆绑的 xmlrpc++ XmlRpcSource.h 无条件 include <openssl/crypto.h>，与 SEMS_USE_OPENSSL 开关无关；OHOS sysroot 无 openssl，须整体排除该可选模块"
+  - "apps/monitoring 探测 cargo/rustc：有则构建 host 架构 Rust 二进制混入 OHOS 包，无则安装 Python 包装脚本；对 aarch64 包均无意义，用 EXCLUDE_APP_MODULES 排除"
+  - "上游 install 规则用 ${SEMS_*_PREFIX} 绝对路径（/usr/local、/var/local/run），直接 cmake --install 会写宿主 /usr/local；须改为相对前缀（. / lib / share/doc）使产物落在 conan 包目录内"
+  - "上游测试为 core/tests 单体 fct.h 程序 sems_tests（11 suite / 204 断言），配方构建并随包分发 sbin/sems_tests，test_package 真实执行"

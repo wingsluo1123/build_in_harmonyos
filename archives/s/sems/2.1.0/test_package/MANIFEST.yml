@@ -1,0 +1,145 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI L0e 强制存在）
+# 口径：R51 三步法 —— ①清点 ②真实执行 ③如实回填（本文件即第 ③ 步产物）
+package: sems/2.1.0
+homepage: "https://github.com/sems-server/sems"
+
+# ── ① 清点（R51 第一步） ──────────────────────────────────────────
+# 上游 2.1.0 已全量迁移 CMake；测试位于 core/tests/：
+#   · sems_tests.cpp —— fct.h 测试入口，FCT_BGN() 内以 FCTMF_SUITE_CALL() 注册 11 个 suite
+#   · test_*.cpp × 11 —— 各 suite 源文件（每个配同名 .h）
+#   · fct.h —— 上游自带 fct 测试框架（单头文件实现）
+# 上游 CMake 将该目录编译为**单体可执行程序** sems_tests（ctest 注册 1 项），
+# 11 个 suite 共 204 个断言级子测试。各 suite 用例数（源文件 FCT_TEST_BGN 静态计数）：
+#   rfc3261_musts=88, rfc3261_parser=25, uriparser=15, amconfig=14, jsonarg=13,
+#   parser=13, auth=11, headers=10, extensions=8, replaces=5, sdp=2  →  合计 204
+upstream_check_command: "ctest（core/tests 注册 1 项：单体 sems_tests，内部 204 个断言级子测试）"
+
+# ── ② 真实执行（R51 第二步）已集成进配方 ─────────────────────────
+# 配方 build() 全量构建（含 sems_tests 目标），package() 将 sems_tests 收进 sbin/，
+# test_package/conanfile.py 的 test() 第一步真实运行它 —— conan create（本地 W3 与 CI 同源）
+# 每次都会真实执行上游 204 项用例；test() 第二步再以 test_sems.sh 真实运行打包的
+# sbin/sems -v 并断言版本横幅。
+upstream_test_in_build: true
+upstream_test_command: "cmake --build <build_folder> --target sems_tests && <package_folder>/sbin/sems_tests"
+upstream_tests_exist: true
+
+# ── ② 真实执行记录 ───────────────────────────────────────────────
+upstream_test_audit:
+  run_env: >-
+    本地：WSL(x86_64) + qemu-aarch64 -L /opt/ohos-guest（OHOS guest rootfs，预载
+    libbacktraceshim/libarc4shim/libfdchkshim/libchkfcnshim 等 guest libc 缺失符号 shim）
+    直接运行交叉编译产物 sbin/sems_tests；CI：原生 HarmonyOS PC worker 经 conan create →
+    test_package 运行同一二进制（无需 shim）
+  run_date: "2026-10-15"
+  discovered: 11
+  executed: 11
+  passed: 11
+  failed: 0
+  skipped: 0
+  excluded: 0
+  assertions_total: 204
+  assertions_passed: 204
+  assertion_count_source: "各 suite 源文件 FCT_TEST_BGN 静态计数（合计 204），与运行末行 204/204 一致"
+  conclusion: >-
+    上游 core/tests/ 的 11 个 fct.h suite（204 个断言级子测试）已真实执行：配方构建 sems_tests
+    并随包分发（sbin/sems_tests）；本地以 qemu-aarch64 + OHOS guest rootfs 运行交叉编译产物，
+    实测 `PASSED (204/204 tests in 0.197590s)`、退出码 0、零失败；同一二进制在 CI 由 test_package
+    的 test() 第一步运行（原生 HarmonyOS PC）。无 skipped、无 excluded。
+
+# ── 上游测试清单（11 个 suite，逐项登记；顺序同 sems_tests.cpp 注册顺序） ──
+upstream_tests:
+  - file: test_sdp.cpp
+    source: sems-2.1.0/core/tests/test_sdp.cpp
+    description: "SDP 会话描述解析/生成（AmSdp：session/media/connection 行）"
+    subtests: 2
+    executed: true
+    result: PASS
+    execution_env: "conan create → test_package → sbin/sems_tests（OHOS aarch64）"
+  - file: test_auth.cpp
+    source: sems-2.1.0/core/tests/test_auth.cpp
+    description: "SIP 摘要认证（UACAuth：nonce/response 计算与校验）"
+    subtests: 11
+    executed: true
+    result: PASS
+    execution_env: "同上"
+  - file: test_headers.cpp
+    source: sems-2.1.0/core/tests/test_headers.cpp
+    description: "SIP 头域解析与生成（AmSipHeaders）"
+    subtests: 10
+    executed: true
+    result: PASS
+    execution_env: "同上"
+  - file: test_uriparser.cpp
+    source: sems-2.1.0/core/tests/test_uriparser.cpp
+    description: "SIP URI 解析（core/sip/parse_uri）"
+    subtests: 15
+    executed: true
+    result: PASS
+    execution_env: "同上"
+  - file: test_jsonarg.cpp
+    source: sems-2.1.0/core/tests/test_jsonarg.cpp
+    description: "JSON 参数容器解析/序列化（AmArg ↔ JSON）"
+    subtests: 13
+    executed: true
+    result: PASS
+    execution_env: "同上"
+  - file: test_replaces.cpp
+    source: sems-2.1.0/core/tests/test_replaces.cpp
+    description: "SIP Replaces 头映射（apps/sbc/ReplacesMapper 相关逻辑）"
+    subtests: 5
+    executed: true
+    result: PASS
+    execution_env: "同上"
+  - file: test_parser.cpp
+    source: sems-2.1.0/core/tests/test_parser.cpp
+    description: "SIP 消息整体解析（core/sip 解析器）"
+    subtests: 13
+    executed: true
+    result: PASS
+    execution_env: "同上"
+  - file: test_rfc3261_parser.cpp
+    source: sems-2.1.0/core/tests/test_rfc3261_parser.cpp
+    description: "RFC3261 语法解析一致性"
+    subtests: 25
+    executed: true
+    result: PASS
+    execution_env: "同上"
+  - file: test_rfc3261_musts.cpp
+    source: sems-2.1.0/core/tests/test_rfc3261_musts.cpp
+    description: "RFC3261 MUST 条款覆盖（本目录最大 suite）"
+    subtests: 88
+    executed: true
+    result: PASS
+    execution_env: "同上"
+  - file: test_extensions.cpp
+    source: sems-2.1.0/core/tests/test_extensions.cpp
+    description: "SIP 扩展头域处理（core/sip/parse_extensions）"
+    subtests: 8
+    executed: true
+    result: PASS
+    execution_env: "同上"
+  - file: test_amconfig.cpp
+    source: sems-2.1.0/core/tests/test_amconfig.cpp
+    description: "配置解析（AmConfig：LocalSIPIP2If 映射等，含 fixture 复位）"
+    subtests: 14
+    executed: true
+    result: PASS
+    execution_env: "同上"
+
+# ── test_package 自带测试（消费者视角，赛规 N≥1） ────────────────
+test_package_tests:
+  - file: test_sems.sh
+    description: "运行打包的 sbin/sems -v，断言退出码 0、输出包含 2.1.0 且横幅为 'Sip Express Media Server'"
+    command: "SEMS_BIN=<package_folder>/sbin/sems sh test_sems.sh"
+    assertions: 3
+  - file: conanfile.py
+    description: "test() 两步：①真实运行包内 sbin/sems_tests（上游 11 suite / 204 断言）②真实运行 sbin/sems 冒烟脚本 test_sems.sh；另校验 plug-in 目录非空"
+    command: "<pkg>/sbin/sems_tests && SEMS_BIN=<pkg>/sbin/sems sh test_sems.sh"
+    assertions: 207
+
+# 断言统计
+assertion_count: 3
+e2e_assertion_count: 3
+upstream_suite_count: 11
+upstream_assertion_count: 204
