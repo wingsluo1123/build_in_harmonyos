@@ -1,0 +1,38 @@
+id:                     E1193
+trigger_tool:           cmake|conan
+phase:                  configuration
+error_signature:        Unknown CMake command "find_dependency"|Unknown CMake command.*find_dependency
+severity:               2
+category:               build-system, cmake, packaging, testing
+match_keywords:         CMakeFindDependencyMacro, find_dependency, package config, find_package CONFIG, Conan test_package, exported CMake target
+title:                  导出的 CMake 包配置调用 find_dependency 前须包含宏定义模块
+root_cause:             上游生成的 KDSoapWSDiscoveryClientConfig.cmake.in 直接调用 find_dependency，但没有 include(CMakeFindDependencyMacro)；当消费者只通过 find_package 加载此配置且调用方没有提前定义该宏时，CMake 将 find_dependency 当作未知命令并中止配置。
+affected_scope:         安装后导出 Config.cmake 中调用 find_dependency、却没有显式包含 CMakeFindDependencyMacro 的 CMake 库项目。
+verification_cmd:       grep -n 'find_dependency\\|CMakeFindDependencyMacro' KDSoapWSDiscoveryClientConfig.cmake.in; cmake -S test_package -B test_package/build
+rec_priority:           1
+rec_approach:           include-cmake-find-dependency-macro
+rec_description:        在导出包配置模板中于第一个 find_dependency() 前加入 include(CMakeFindDependencyMacro)，再从独立 Conan consumer 调用 find_package(... CONFIG REQUIRED) 验证。
+rec_command:            sed -i '/@PACKAGE_INIT@/a include(CMakeFindDependencyMacro)' KDSoapWSDiscoveryClientConfig.cmake.in
+rec_auto_fix:           false
+rec_impl:               manual-edit
+fallback_priority:      2
+fallback_approach:      consumer-preinclude
+fallback_description:   仅作诊断时，可让消费者在 find_package 前包含 CMakeFindDependencyMacro；正式库包应修复其导出配置，避免把宏加载顺序责任转嫁给所有调用者。
+fallback_command:       cmake -DCMAKE_PROJECT_INCLUDE=CMakeFindDependencyMacro.cmake -S consumer -B build
+fallback_auto_fix:      false
+fallback_impl:          manual-edit
+forbid_1_pattern:       skip.*test_package|return.*before.*find_package
+forbid_1_reason:        跳过安装包消费者配置会漏掉导出 Config.cmake 中的宏顺序错误。
+forbid_1_consequence:   Conan 包的本地构建可能通过，但下游第一次 find_package 时立即失败。
+principles:               
+doc_file:               knowledge/drafts/E546-draft-KDSC.md
+last_updated:           2026-10-11
+source_event:           kdsoap-ws-discovery-client 0.4.0 Conan L1 失败：导出 Config.cmake 调用 find_dependency 时报告 Unknown CMake command
+authors:
+source_pr:
+source_commit:
+metrics_success_count:  1
+metrics_fail_count:     1
+metrics_confidence:     0.5
+metrics_last_used:      2026-10-11
+authors:               KDSC

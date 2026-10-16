@@ -1,0 +1,24 @@
+id:                     E1208
+title: Automake 自定义 check 与 check-am 的重复构建依赖引发共享 Tpo 文件竞争
+trigger_tool: make|automake|conan
+phase: testing
+severity:               2
+category:               threading, build-system, autotools, test-harness
+match_keywords: check_PROGRAMS, check-am, .Tpo, dependency-file, parallel make check, duplicated prerequisites
+error_signature: mv:.*\.Tpo.*No such file or directory|failed to rename.*\.Tpo
+root_cause: 上游自定义 check 目标与 Automake check-am 同时依赖同一个 check_PROGRAMS；平行 check 可能重复启动相同测试对象编译，争用相同 .deps/*.Tpo 临时依赖文件。正常库构建成功不证明测试驱动的依赖图安全。 Autoconf creates config.status scratch directories in two branches with owner-only masks. On HMDFS, changing file modes later or repairing PR transport cannot establish creation-time access. Replace both creation branches with exclusive mkdir under the recipe-private TMPDIR, use umask 022 at creation, restore configure timestamps, and prefix TMPDIR after Conan environment activation. Preserve cleanup and every original test.
+affected_scope: Autotools 工程的自定义 check 与生成 check-am 重叠，且 make 日志确实出现同一测试对象重复编译的场景。
+rec_priority: 1
+rec_approach: serialize-only-overlapping-check-target
+rec_description: 保留全部上游测试与测试源；库构建保持有界并行，显式把重叠的 make check 调用限制为 -j1。长期上游修复应消除重复目标依赖，而不是删除测试。 Autoconf creates config.status scratch directories in two branches with owner-only masks. On HMDFS, changing file modes later or repairing PR transport cannot establish creation-time access. Replace both creation branches with exclusive mkdir under the recipe-private TMPDIR, use umask 022 at creation, restore configure timestamps, and prefix TMPDIR after Conan environment activation. Preserve cleanup and every original test.
+rec_command: autotools.make(target="check", args=["-j1"])
+rec_auto_fix: false
+rec_impl: recipe-test-job-limit
+verification_cmd: conan create . --build=<root-package>/*; 核对所有测试组真实 Passed N out of N 终态与消费者退出码
+forbid_1_pattern: disable.*tests|skip.*check|ignore.*make.*error
+forbid_1_reason: 降低测试分母或忽略错误不能证明竞争已修复。
+principles:             P002, P003
+doc_file: E545-draft-UB11.md
+last_updated: 2026-10-14
+source_event: 2026-10-14 current CI repair; libunibreak-ci-repair-w3-20261013-r101, official CI log SHA256 d0a87427f041e339e92b9b369683ea87c75842311a5440387a2ffcb704765b06; Current worker logs provide the independent second-failure boundary after the earlier checkout/fixture repair: successful source retrieval and dependency installation are not proof that configure generated usable config files. Use both-branch source reconciliation, timestamp-preserving production-helper tests and complete native recipe/tests; do not treat a missing-curl predownload warning as the cause when source() already succeeded. This extends the existing evidence/transport topic with a causal validation boundary, not a new generic umask claim.
+authors:               unknown

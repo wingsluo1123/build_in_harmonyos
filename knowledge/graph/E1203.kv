@@ -1,0 +1,21 @@
+E: DRAFT
+title:  "gupnp-av 的 XSD 运行时寻址：GUPNP_AV_DATADIR 必须指向包内 share/gupnp-av（DATADIR 宏是编译期 prefix）"
+category:               meson, runtime, environment, library, xml
+match_keywords: GUPNP_AV_DATADIR, didl-lite-v2.xsd, failed to load xsd, Schemas parser error, Failed to locate the main schema resource, gupnp-av share/gupnp-av, DIDL-Lite schema, fragment-util get_data_dir
+root_cause: gupnp-av 的 DIDL-Lite 校验器（fragment-util.c get_data_dir）按 GUPNP_AV_DATADIR 环境变量 > 编译期 DATADIR 宏（prefix+datadir+'gupnp-av'，conan 下 prefix=/ → "/share/gupnp-av"）的顺序寻址 XSD。conan 包安装路径不在 "/"，消费者运行时不设 GUPNP_AV_DATADIR 的话 libxml2 加载 XSD 失败：新 writer 会打 "I/O warning" + "Schemas parser error"（部分路径直接 abort/SIGTRAP）。上游 tests/gtest/meson.build 正是用 GUPNP_AV_DATADIR 指向源码 data/ 目录来跑测试的——这是上游设计的运行时寻址机制，不是适配 bug。
+error_signature: I/O warning : failed to load "/share/gupnp-av/didl-lite-v2\.xsd"|Schemas parser error : Failed to locate the main schema resource
+affected_scope: gupnp-av 全版本（0.12+）的消费场景：任何触发 DIDL-Lite schema 加载的 API（writer/parser/media-collection）。同模式适用于一切带数据文件资源（.xsd/.dtd/.share 系）且用编译期 DATADIR 宏寻址的库。
+verification_cmd: ls <pkg>/share/gupnp-av/didl-lite-v2.xsd && GUPNP_AV_DATADIR=<pkg>/share/gupnp-av ./test_gupnp_av
+rec_approach: 参考 archives/g/gupnp-av/0.14.5 的 package_info()（PR #7999 CI 全绿验证）。注意 conanrun 环境只在 test_package/消费者用 conanrunenv 时生效；裸跑二进制需手动设置。推广：带编译期数据目录宏的库（.xsd/.dtd/locale 数据）在 conan 打包后都需检查运行时寻址是否断裂，用 runenv_info.define_path 注入包内绝对路径。
+rec_priority: P2
+prescan_pattern: GUPNP_AV_DATADIR|didl-lite-v2.xsd
+last_updated: 2026-09-04
+id:                     E1203
+severity:               2
+rec_auto_fix:               false
+rec_impl:               manual
+authors:               unknown
+doc_file:               doc/E1203.md
+trigger_tool:           meson
+phase:                  build
+rec_description:        参考 archives/g/gupnp-av/0

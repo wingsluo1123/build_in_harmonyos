@@ -1,0 +1,26 @@
+id:                     E1209
+title: Automake 测试子目录漏用依赖 CFLAGS 时分离编译头闭包和 Libtool 搜索路径
+trigger_tool: make|clang|conan|libtool
+phase: testing
+severity:               2
+category:               headers, autotools, linking, dependency
+match_keywords: AM_CXXFLAGS, BOOST_CFLAGS, ICU_CFLAGS, check_PROGRAMS, private headers, .la-free, extra_cxxflags
+error_signature: fatal error:.*boost/cstdint.hpp.*file not found
+root_cause: 根库 AM_CXXFLAGS 消费 BOOST_CFLAGS/ICU_CFLAGS 不代表独立测试子目录也消费它们；测试包含私有头时会缺依赖头。恢复所有全局依赖 -L 又会绕过已有私有 .la-free 隔离，让 Libtool 重新读陈旧 .la，必须分离编译和链接闭包。 A checkout-pr message saying main conflict can actually originate from missing binary patch data and an unsupported patch fallback option. Identify the first low-level Git apply error; encode and hash-restore the unchanged consumer sample rather than rebasing or deleting its test. Autoconf creates config.status scratch directories in two branches with owner-only masks. On HMDFS, changing file modes later or repairing PR transport cannot establish creation-time access. Replace both creation branches with exclusive mkdir under the recipe-private TMPDIR, use umask 022 at creation, restore configure timestamps, and prefix TMPDIR after Conan environment activation. Preserve cleanup and every original test.
+affected_scope: Automake 独立测试子目录漏用依赖 CFLAGS，同时链接已隔离 provider .la 的工程；不适用于提供者缺文件或单纯消费者公共头 traits 缺失。
+rec_priority: 1
+rec_approach: compile-only-header-closure-preserving-scoped-linking
+rec_description: 对比库与测试 Makefile.am，确认当前发布包有头；用 Conan Toolchain extra_cxxflags 仅添加依赖 include 目录，不恢复全局 -L；保持逐依赖 scoped LIBS 的私有 .la-free 路径。安装公共头 traits 是另一层契约，单独验证。 A checkout-pr message saying main conflict can actually originate from missing binary patch data and an unsupported patch fallback option. Identify the first low-level Git apply error; encode and hash-restore the unchanged consumer sample rather than rebasing or deleting its test. Autoconf creates config.status scratch directories in two branches with owner-only masks. On HMDFS, changing file modes later or repairing PR transport cannot establish creation-time access. Replace both creation branches with exclusive mkdir under the recipe-private TMPDIR, use umask 022 at creation, restore configure timestamps, and prefix TMPDIR after Conan environment activation. Preserve cleanup and every original test.
+rec_command: tc.extra_cxxflags.append('-I' + shlex.quote(dependency_include)); preserve scoped FOO_LIBS; make check
+rec_auto_fix: false
+rec_impl: conan-autotools-compile-only-flags
+verification_cmd: 干净 conan create；测试编译命令有正确 -I，链接不恢复 provider 全局 -L；全量9+2 CppUnit，再以独立消费者验证安装公共接口和解析导出。
+forbid_1_pattern: test_package.*include_directories.*dependency-cache
+forbid_1_reason: 消费者硬编码路径不能修复上游测试私有头闭包，也掩盖公共包契约。
+forbid_2_pattern: global.*-L.*provider|delete.*conan.*\.la
+forbid_2_reason: 全局链接路径会绕过私有隔离；删除共享缓存影响其他任务。
+principles:             P010, P012, P013
+doc_file: E545-draft-QX11.md
+last_updated: 2026-10-14
+source_event: 2026-10-14 current CI repair; libqxp-ci-repair-w3-20261013-r1, official CI log SHA256 903166c1aa1c609b26b297f4ad11625925ab1d1e6869f56f9943a2d1dc339513; Separate patch-format loss from a true merge conflict and from the existing complete CppUnit inventory topic. The eleven original upstream cases and the same parser consumer remain; the decoded original fixture is never counted as an additional test. 2026-10-14 current CI repair; libqxp-ci-repair-w3-20261013-r101, official CI log SHA256 1cce135bf987be9821bfc280da8f1770c88ea7801d61a153a0bb87e55decaf3f; Current worker logs provide the independent second-failure boundary after the earlier checkout/fixture repair: successful source retrieval and dependency installation are not proof that configure generated usable config files. Use both-branch source reconciliation, timestamp-preserving production-helper tests and complete native recipe/tests; do not treat a missing-curl predownload warning as the cause when source() already succeeded. This extends the existing evidence/transport topic with a causal validation boundary, not a new generic umask claim.
+authors:               unknown
