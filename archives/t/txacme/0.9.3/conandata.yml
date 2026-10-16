@@ -1,0 +1,26 @@
+# conandata.yml — txacme 0.9.3
+# 官方源：PyPI sdist（上游仓库 mithrandi/txacme，Home-page 见 conanfile.py）
+# sha256 与 PyPI simple 索引声明一致（已实测校验）
+
+sources:
+  url: "https://files.pythonhosted.org/packages/31/62/a5e327c674b7374cae31de82df12bd110e30c74662129e948de7cd55dc7c/txacme-0.9.3.tar.gz"
+  sha256: "bce2d0dfa8fa2cf3f2eb10526c89a8b4f77a021d9e182704e7776fff7bd8bceb"
+
+patches:
+  # Python 3.12 / 现代依赖兼容补丁（详见 notes.md「源码修改」）：
+  #  0001 — twisted.python.compat._PY3 已移除 → 本地常量（integration/test_client.py）
+  #  0002 — collections.Mapping → collections.abc.Mapping（challenges/_tls.py）
+  #  0003 — service_identity._common → service_identity.hazmat（test/matchers.py）
+  #  0004 — twisted.python.compat._PY3 已移除 → 本地常量（test/test_client.py）
+  - patch_file: "patches/0001-src-integration-test_client.py.patch"
+    patch_description: "Python 3.12 compat: twisted.python.compat._PY3 removed"
+    patch_type: "portability"
+  - patch_file: "patches/0002-src-txacme-challenges-_tls.py.patch"
+    patch_description: "Python 3.12 compat: collections.Mapping -> collections.abc.Mapping"
+    patch_type: "portability"
+  - patch_file: "patches/0003-src-txacme-test-matchers.py.patch"
+    patch_description: "service_identity >= 24: _common -> hazmat"
+    patch_type: "portability"
+  - patch_file: "patches/0004-src-txacme-test-test_client.py.patch"
+    patch_description: "Python 3.12 compat: twisted.python.compat._PY3 removed"
+    patch_type: "portability"
