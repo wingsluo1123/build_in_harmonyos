@@ -1,0 +1,69 @@
+#====================================================================
+# E587 草稿 — termcap 时代程序自定义 LINES/COLS/UP 等 curses 同名全局，
+# 链接 R26 强制的静态 libncursesw.a 时 ld.lld duplicate symbol
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E1048
+trigger_tool:           ld
+phase:                  linking
+error_signature:        duplicate symbol: LINES|duplicate symbol: COLS|lib_setup.o:(.bss|lib_termcap.o:(.bss|(lib_setup.o):(.bss|multiple definition of `LINES'|multiple definition of `COLS'
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               3
+category:               ohos, portability, linking, static-library
+match_keywords:         duplicate symbol, libncursesw.a, libncurses.a, lib_setup.o, lib_termcap.o, lib_gen.o, LINES, COLS, UP, tgetent, termcap, static ncurses, symbol interposition
+title:                  termcap 时代程序自定义 LINES/COLS/UP/refresh 等与 curses 同名的全局符号：链接 R26 强制的静态 libncursesw.a 时 ld.lld 报 duplicate symbol（动态库场景被可执行文件符号抢占而静默通过）
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             老式 termcap 程序（vi 克隆、行编辑器、终端游戏）在自己的 globals.c 里定义 int LINES, COLS; char *UP; 以及 refresh()/scroll() 等函数/变量，名字与 curses/terminfo 的公开符号相同。
+  Linux 发行版动态链接 libtinfo/libncurses.so 时，可执行文件里的定义抢占共享库同名符号（ELF interposition），从不报错；
+  本仓 ncurses/6.6 按 R26 只发布静态 libncursesw.a，且 tinfo 合在同一个单体归档里（无独立 libtinfo）：程序一调用 tgetent，链接器就抽出定义 tgetent/UP 的 lib_termcap.o 与定义 LINES/COLS 的 lib_setup.o；
+  lib_termcap.o 还经 trim_sgr0.o→visbuf.o→lib_addstr.o→lib_addch.o→…→lib_refresh.o→…→lib_slk.o→lib_slkrefr.o 一路把 curses 屏幕层拉进来，最终抽出定义 refresh/scroll 等宏函数版本的 lib_gen.o（lld --why-extract 实测链），于是同一符号在程序 .o 与归档成员里各有一个强定义，ld.lld 报 duplicate symbol。
+  clang 11+ 默认 -fno-common，程序里的暂定定义也是强符号，不会让位。
+affected_scope:         任何自带 termcap 全局（LINES/COLS/UP/BC/PC/ospeed）或与 curses 宏函数同名的函数（refresh/scroll/clear/erase/overwrite…）、并链接本仓静态 ncurses/6.x 的 C 程序；实测 levee 4.0（6 个冲突：LINES COLS UP refresh scroll overwrite 中 5 个在链接时报错）
+verification_cmd:       llvm-nm --defined-only <程序>.o | awk 'NF==3{print $3}' | sort -u > own.txt; llvm-nm --defined-only libncursesw.a | awk 'NF==3 && $2 ~ /[TDBRC]/ {print $3}' | sort -u | comm -12 - own.txt   # 非空即会冲突
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           rename-own-globals-via-central-header-macros
+rec_description:        在程序自己的中心头文件（所有 .c 最先包含、且早于 <termcap.h>/<curses.h> 的那个）里用宏把冲突名改为私有前缀：#define LINES levee_LINES 等。只改链接名，行为不变；termcap.h 里的 extern char *UP 随之同名改写，声明与定义保持一致；字符串字面量（如 :set scroll 选项名）不受影响
+rec_command:            在中心头文件 #include "config.h" 之后加入 #define LINES prog_LINES / #define COLS prog_COLS / #define UP prog_UP / #define refresh prog_refresh ...（冲突清单用 verification_cmd 求交集得到）→ track-edit + refresh-patch --auto 生成补丁
+rec_auto_fix:           false
+rec_impl:               archives/l/levee/4.0/patches/0001-levee.h.patch
+
+fallback_priority:      2
+fallback_approach:      include-order-fixed-rename-per-file
+fallback_description:   程序没有统一的中心头文件时，逐个在定义/引用冲突符号的 .c 文件顶部加同一组宏（必须在包含 curses/termcap 头之前），并用 llvm-nm 复核冲突集合为空
+fallback_command:
+fallback_auto_fix:      false
+fallback_impl:
+
+forbid_1_pattern:       -Wl,--allow-multiple-definition|-z muldefs
+forbid_1_reason:        取哪个定义由归档顺序决定，程序的 LINES/COLS 与 ncurses 内部的同名变量被随机合并，屏幕尺寸/光标能力读写错位且无任何告警
+forbid_1_consequence:   链接通过但运行期行为随链接顺序漂移，审计视为掩盖错误
+forbid_2_pattern:       ncurses.*shared.*True|-lncursesw.*\.so|--with-shared
+forbid_2_reason:        改链动态 ncurses 可以让符号抢占重新静默生效，但违反 R26（系统同名库禁止产 .so，会污染 /lib）
+forbid_2_consequence:   R26/G3 门禁失败，且设备上与系统库冲突
+forbid_3_pattern:       -fcommon
+forbid_3_reason:        只能让暂定定义变为 COMMON 让位给归档定义，函数（refresh/scroll）依旧冲突；变量被 ncurses 定义吞并后与程序语义耦合
+forbid_3_consequence:   仍报错或语义错乱
+
+# ═══ Layer 4: 原则引用 ═══
+principles:
+
+# ═══ 关系图 (Relations) ═══
+# ═══ 元数据 ═══
+doc_file:               knowledge/drafts/E587-draft-A841.md
+last_updated:           2026-09-27
+source_event:           levee 4.0 OHOS 适配（2026-09-27）：链接 ncurses/6.6 静态 libncursesw.a 报 duplicate symbol refresh/scroll/LINES/COLS/UP；engine 误命中 E163（OHOS 内核头 __packed 全局），加 levee.h 改名宏后链接通过，test_package 9/9
+authors:                lkjing2021345 <1908499668@qq.com>
+source_pr:
+source_commit:
+
+# ═══ 质量度量 ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-09-27
+
