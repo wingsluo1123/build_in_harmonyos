@@ -1,0 +1,30 @@
+# mrgingham 1.26 source metadata (ARCHIVE-SPEC v3.0 / R39: official upstream only)
+sources:
+  url: "https://github.com/dkogan/mrgingham/archive/refs/tags/v1.26.tar.gz"
+  sha256: "3989191b764345b70d2574b56d68bb4151faa4e4804832bfde76dfc4232a2c53"
+
+# mrgingham's Makefile is driven by the upstream "mrbuild" Makefile framework
+# (https://github.com/dkogan/mrbuild).  mrgingham does not vendor it, and it is
+# not published as a Conan package, so the recipe downloads the exact release
+# that mrgingham's choose_mrbuild.mk pins (V := 1.13) and drops it at
+# <source>/mrbuild/ — choose_mrbuild.mk prefers a local ./mrbuild/ checkout
+# over the system copy (/usr/include/mrbuild).  This keeps the build hermetic
+# and offline-reproducible (no network at build time).
+#
+# sha256 below is computed from the official GitHub release tarball; it also
+# matches the sha512 that choose_mrbuild.mk records for the same file.
+mrbuild:
+  url: "https://github.com/dkogan/mrbuild/archive/refs/tags/v1.13.tar.gz"
+  sha256: "ac9c9c4f725a7ea2dcb12c786ef548d1003c8cf745e452806d38689e3ad13f1e"
+
+patches:
+  - patch_file: "patches/0001-ohos-lld-no-default-symver.patch"
+    patch_description: >-
+      The HarmonyOS PC SDK links with LLVM lld, which does not implement GNU
+      ld's --default-symver that mrbuild's vendored Makefile.common.footer
+      appends to the full shared-object link.  This patch edits the vendored
+      footer directly to drop that flag (deterministic; no runtime linker
+      probe), keeping the rest of the footer intact; same approach as the
+      mrcal/libdogleg precedents.
+    patch_type: "portability"
+

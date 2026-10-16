@@ -1,0 +1,55 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明（CI L0e 与 conan-verify G1 强制要求）
+package: mrgingham/1.26
+homepage: "https://github.com/dkogan/mrgingham"
+
+# 上游测试面（R51 清点）：上游只有一套测试 —— `make test`
+# （Makefile: `test: test/test--mrgingham-rotate-corners`）。
+# 它是一个 zsh 脚本，对 mrgingham-rotate-corners 工具做 9 项检查：
+#   passthrough / rot180 / rot180-multiple / rot90 / rot270 /
+#   failure-gridn-too-low--all-data / failure-gridn-too-high--all-data /
+#   failure-gridn-too-low--one-file / failure-gridn-too-high--one-file
+# （后两项经 `vnl-filter filename=="a1"` 过滤输入）
+upstream_check_command: "make test（设备侧，测试期 vnlog Perl CLI 环境，2026-10-15 实跑）"
+upstream_test_in_build: false
+upstream_test_command: "make test"
+
+# ── 实跑结果（2026-10-15，设备真机，R51）───────────────────────────────
+# `make test` 与直接 `/usr/bin/zsh test/test--mrgingham-rotate-corners` 两次运行
+# 均 exit 0，9 项全部 `Test OK`。TOTAL=9 / PASS=9 / FAIL=0 / SKIP=0 / NOT_RUN=0。
+# 第 6-9 项（期望非零退出）已单独复核为真实失败（`expected N points but
+# received 9`，rc=1），非假通过。
+#
+# 构建内（conan build()）仍不跑 make test：它需要的 vnlog Perl CLI 是**运行期**
+# 工具链（非构建依赖），OHOS 上由测试期环境提供（见 notes.md「测试期工具链」）；
+# 构建内运行会引入不在交付物里的运行期依赖。
+upstream_tests:
+  - "passthrough (--gridn 3) — PASS"
+  - "rot180 (--gridn 3 --180 a) — PASS"
+  - "rot180-multiple (--gridn 3 --180 a --180 b) — PASS"
+  - "rot90 (--gridn 3 --90 a --180 b) — PASS"
+  - "rot270 (--gridn 3 --270 a) — PASS"
+  - "failure-gridn-too-low--all-data (--gridn 2, expect ERROR) — PASS (rc=1, real error)"
+  - "failure-gridn-too-high--all-data (--gridn 5, expect ERROR) — PASS (rc=1, real error)"
+  - "failure-gridn-too-low--one-file (vnl-filter filename==\"a1\", --gridn 2) — PASS (rc=1)"
+  - "failure-gridn-too-high--one-file (vnl-filter filename==\"a1\", --gridn 5) — PASS (rc=1)"
+# 实跑合计：9 PASS / 0 FAIL（TOTAL=9）
+
+# test_package 中自带的消费者测试（构建内真实运行，承担本 PR 的功能验证）
+test_package_tests:
+  - file: test_package/test_mrgingham.cpp
+    description: >-
+      消费者功能测试（库级，R34 真实调用）：编译并链接 mrgingham.hh 的公开
+      API，调用 mrgingham::find_grid_from_points() 在一个合成的 4x4 点阵
+      （FIND_GRID_SCALE=1000 整数坐标）上找网格，断言返回 true、点数 = 16，
+      且每个返回点与一个互不重复的输入点在 50（缩放单位）内重合 —— 即检测
+      网格是输入的置换。任一断言失败即非零退出。
+    command: "./test_mrgingham"
+  - file: test_package/conanfile.py
+    description: >-
+      命令行冒烟：运行已安装的 bin/mrgingham --help，断言输出含 "Usage:" 与
+      "gridn"（真实执行被测二进制并断言其输出）。
+    command: "mrgingham --help"
+
+# 测试断言总数（近似值，用于质量评估）：库级 3 项（返回真/点数/置换）+ CLI 1 项
+assertion_count: 4

@@ -1,0 +1,55 @@
+software: mrgingham
+version: "1.26"
+upstream_version: "1.26"
+status: built
+build_date: "2026-10-15"
+conan_ref: "mrgingham/1.26"
+build_system: makefile
+
+source:
+  url: "https://github.com/dkogan/mrgingham/archive/refs/tags/v1.26.tar.gz"
+  sha256: "3989191b764345b70d2574b56d68bb4151faa4e4804832bfde76dfc4232a2c53"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  cxx_standard: 17
+  dependencies:
+    - opencv/4.12.0
+    - boost/1.89.0
+  build_tools:
+    - conan
+    - clang
+    - clang++
+    - make
+    - pkg-config
+    # mrgingham's Makefile is driven by the mrbuild Makefile framework, which is
+    # not packaged for Conan; the recipe vendors mrbuild v1.13 into <source>/mrbuild
+    # (see conandata.yml:mrbuild).
+    - mrbuild/1.13 (vendored from upstream)
+  output:
+    - "libmrgingham.so.2.1（+ SONAME 软链 libmrgingham.so.2 / libmrgingham.so）"
+    - "公共头文件位于 include/mrgingham/（mrgingham.hh、point.hh）"
+    - "命令行工具位于 bin/（mrgingham、mrgingham-rotate-corners、mrgingham-observe-pixel-uncertainty）"
+    - "pkg-config 文件（mrgingham.pc，Requires: opencv4）"
+  make_targets:
+    - "libmrgingham.so.2.1 mrgingham mrgingham-from-image test-dump-chessboard-corners test-dump-blobs test-find-grid-from-points"
+  version_injection: "VERSION=1.26（上游 Makefile 把 VERSION 交给 mrbuild 的默认值 $(ABI_VERSION).$(TAIL_VERSION)=2.1；ABI/TAIL 命名 .so，未被改动）"
+
+patches_applied:
+  - "0001-ohos-lld-no-default-symver.patch"
+
+not_built:
+  - "CPython 扩展 mrgingham$(PY_EXT_SUFFIX)：需要 NumPy 头文件（numpy/arrayobject.h），OHOS 无 NumPy 移植"
+  - "README.org：上游规则需要 mawk，OHOS 只有 awk/gawk"
+
+knowledge_gained:
+  - "mrgingham 的 Makefile 由上游 mrbuild 框架驱动（choose_mrbuild.mk：优先 ./mrbuild/，其次 /usr/include/mrbuild），而 mrbuild 没有 Conan 包；把 mrbuild 的官方 tarball 在 source() 里解到 <源码>/mrbuild 即可让 choose_mrbuild.mk 命中，无需联网、无需改上游 Makefile。"
+  - "mrbuild 的 Makefile.common.footer 给完整共享库目标加 GNU ld 专有的 -Wl,--default-symver；OHOS SDK 用 LLVM lld，不认该参数（ld.lld: error: unknown argument '--default-symver'）。修法是直接改 vendored 的 mrbuild/Makefile.common.footer、注释掉非 Darwin 分支那一行（与 archives/m/mrcal、archives/l/libdogleg 对同一 footer 的修法一致）。**不要**用 `$(shell $(CC_LINKER) -Wl,--version)` 在 Makefile 解析期探测链接器：该探针会重放链接器，在平台 CI worker 上可能因 lld 自身缺 libxml2.so.16 而拿不到含 lld 的输出，于是静默跳过覆盖，使 --default-symver 重新落到 ld.lld（平台 CI #93287 命中、#93329 未命中，同一 HEAD 同一环境）。"
+  - "OHOS 的 clang 会调起 SDK 的 lld（RUNPATH=$ORIGIN/../lib，需要 <sdk>/llvm/lib 下的 libxml2.so.16）。conan 的 conanrun 环境把传递依赖（含 libxml2/2.15.3）的 lib 目录前置到 LD_LIBRARY_PATH，会遮蔽 SDK 那份，lld 启动即失败（Error loading shared library libxml2.so.16 ... symbol not found；设备上以不兼容 libxml2 置于 LD_LIBRARY_PATH 首位逐字复现）。修法：从 tools.build:compiler_executables 的编译器路径推出 <sdk>/llvm/lib，在链接命令前加 LD_LIBRARY_PATH=\"<sdk>/llvm/lib:$LD_LIBRARY_PATH\"（在 conanrun 之后求值，故仍优先）；同 archives/a/abr2gbr、archives/b/bubblewrap。"
+  - "mrbuild 禁止任何 *FLAGS 以命令行变量传入（footer 的 origin 检查会 error），但允许环境变量；因此 CXXFLAGS/CPPFLAGS/LDFLAGS 必须走环境，而 CC/CXX 可走命令行。"
+  - "mrgingham 的 Makefile 用 `pkg-config --cflags/--libs opencv4` 取 OpenCV；conan 的 PkgConfigDeps 只在 generators 目录生成 .pc，必须显式把 PKG_CONFIG_PATH/PKG_CONFIG_LIBDIR 指过去（opencv 配方同理）。"
+  - "find_grid.cc 用 Boost.Polygon 的 Voronoi（header-only）；boost/1.85.0 会钉 zlib/1.3.1，与 opencv 拉的 zlib/1.3.1.1 冲突（Version conflict），改用无 zlib 依赖的 boost/1.89.0。"
+  - "上游测试 `make test`（test/test--mrgingham-rotate-corners，9 项）需要 vnlog 的 Perl CLI（vnl-filter/vnl-sort）——被测工具 mrgingham-rotate-corners 本身无条件调用它们；OHOS 的 vnlog/1.42 制品只交付 C 库，本机 perl 亦缺 List::MoreUtils。**本轮以测试期工具链（vnlog Perl CLI + 纯 Perl List::MoreUtils/Exporter::Tiny + mawk/sort/bash-zsh shim，均不入交付物）把 9 项上游测试真跑通：PASS=9/FAIL=0**（详见 test_package/MANIFEST.yml 与 notes.md）。"
+
+issues: []
