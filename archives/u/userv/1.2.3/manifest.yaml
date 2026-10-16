@@ -1,0 +1,151 @@
+software: userv
+version: "1.2.3"
+status: built
+status_note: >
+  已在真机完成 conan create + 影子 CI 单包门禁（L0/L1/L4/L5 pass，L2 skip+warn 且有据），
+  Build Summary 1/1 成功；尚未 upload 到制品仓，故不是 published。
+  客户端 userv 的运行期需要 setuid-root 部署，见 compatibility。
+category: system
+compile_date: "2026-10-14"
+build_system: makefile
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/u/userv/userv_1.2.3.tar.gz"
+  sha256: "259431d0033efa109d21ceec818e119c10342cb23e16185c6bd76c035ec646db"
+  tar_format: tar.gz
+  upstream_homepage: "https://www.chiark.greenend.org.uk/~ian/userv/"
+  source_note: >
+    上游官网只挂 "current version"（实测仍为 1.2.0），1.2.3 的官方 tarball 只在
+    chiark 匿名 FTP 上；改用 Debian 源码池同版本原始源码包（native 包，
+    Format 1.0，即上游 tarball），sha256 与已签名 .dsc 的 Checksums-Sha256 一致。
+
+build:
+  system: makefile
+  configure_options:
+    - "--prefix=/"
+  install_overrides:
+    - "DESTDIR=<package_folder>"
+    - "INSTALL_FLAGS=            # 覆盖上游 -o root -g 0（CI 非 root）"
+    - "sbindir=/bin             # uservd 也进 Conan 标准 bin/（CI L2/L5 扫描 bin/）"
+    - "etcdir=/res              # /etc/userv 骨架收进 res/，不写系统 /etc"
+  cc: clang
+  cxx: clang++
+
+dependencies:
+  required: []
+  build:
+    - coreutils/9.10        # 构建期 md5sum（生成 pcsum.h）；ohpcd 已发布，二进制内含 md5sum
+
+patches_applied:
+  - file: 0001-configure-mktemp-umask.patch
+    purpose: >
+      configure/config.status 的临时目录创建 `(umask 077 && mktemp -d "./confXXXXXX")` 在真机
+      HMDFS 上会生成 drwx--S--- 目录且内容不可访问（MAC 标签），导致
+      `config.status: ./confXXXXXX/subs1.awk: Permission denied`；改为 umask 022。
+    lines_changed: 2
+    evidence: "真机影子 CI 第二轮实测复现 + archives/v/vcprompt/1.3.0 同设备结论一致"
+
+artifacts_expected:
+  - bin/userv    (客户端；上游以 setuid root 安装为 /usr/bin/userv)
+  - bin/uservd   (守护进程；上游安装为 /usr/sbin/uservd)
+  - res/userv/system.default
+  - res/userv/system.override
+  - licenses/COPYING
+
+verification:
+  local_done:
+    - "源码 URL + sha256 与 Debian 已签名 .dsc 逐字节一致（202235 字节）"
+    - "解包确认版本 1.2.3（debian/changelog 首条）与单一顶层目录 work/（strip_root=True 成立）"
+    - "conan graph info（OHOS profile）解析通过；tool_requires coreutils/9.10 命中 ohpcd 已发布二进制"
+    - "真配方 conan create 本机跑通 source()（Conan 自行校验 sha256）与 generate()；build() 停在 ./configure（Windows 无 OHOS 工具链，预期）"
+    - "核对生成的 conanbuildenv-userv.sh：CC/CXX 来自 profile conf、CFLAGS=-O2、PATH 含 coreutils/bin（md5sum）"
+    - "本机 create 期间发现并修复 2 个配方缺陷：非法 conf tools.build:ldflags（应为 exelinkflags）、save_script('conanbuild') 与 Conan 聚合入口撞名"
+    - "探针实测 Conan 对 tool_requires 的隐式 PATH 合成会被 profile [buildenv] PATH 覆盖掉，故配方显式 prepend coreutils/bin"
+    - "CI L0 门禁等价自检（L0a-L0e/L0h/L0k/目录结构）全部通过"
+    - "test_package 断言逻辑本机自测（mock 上游 CLI 行为）：正向契约全通过；反向（版本号错、bin/ 为空）会失败并退出非 0，证明断言真的依赖被测产物"
+    - "conandata.yml / manifest.yaml / test_package/MANIFEST.yml / commands.json / 两个 conanfile.py / 补丁 语法与编码（UTF-8 无 BOM、LF）校验通过"
+    - "补丁用 git apply -p1 在原始源码树上试打通过；本机 conan create 确认 Conan 导出并应用补丁，build 树里的 configure 已是 umask 022（两处）"
+  device_done:
+    - "影子 CI 第四轮全绿：L0 pass / L1 pass / L2 skip+warn(有据) / L4 pass / L5 pass，Build Summary 1/1，runner exit=0"
+    - "RUN_DIR（第 4 轮）：$HOME/ohos-test-runs/userv-codex-userv-shadow-1.2.3-20261014-002501-47630；shadow run：$HOME/ohos-users/userv-codex/userv-1.2.3/ohpc-ci-shadow/runs/821c5f6003f6-20261013T162502Z-47690"
+    - "被测提交 821c5f6003（基线 origin/main 06bbd38cd1）；与本分支提交的 archives/u/userv 子树 blob 哈希逐文件一致（子树哈希 bcad09547236bfaaac6de3d693ad0d9924b91496）"
+    - "L0i/L0j/L0k/L0m 明细：coreutils 依赖在册、首次发布无版本冲突、commands.json(type=tool) 有效、目录结构有效"
+    - "L1e 破坏性反向验证通过：移走 bin/ 后测试失败，证明断言真依赖产物"
+    - "test_package 真机 9 断言 0 失败 1 SKIP；uservd 真机执行通过（exit=3 + usage 行）；userv 为 AArch64 ELF 且内嵌 1.2.3std/usage/GPL 文本"
+    - "configure/make/链接/make install/package 全部通过；产物 bin/userv(55744B)、bin/uservd(108992B)、res/userv/*、licenses/COPYING"
+  device_pending:
+    - "真实 setuid-root 部署后的客户端运行期行为（需要 root + /etc/userv + 常驻 uservd + /var/run/userv），属整机集成范畴，见 compatibility"
+    - "制品仓 upload（CI upload 阶段）"
+
+content_hash:
+  note: "以下为内容寻址标识（git blob 哈希），与真机影子 CI 验证过的提交逐一致，永久可校验"
+  device_validated_commits:
+    - "391d676b9aeb97dacbd22365c5f9f1c2ab069396  # 第 5 轮，最终内容（L0/L1/L4/L5 pass，exit 0）"
+    - "821c5f6003f68a6b779c968efae0afe58cd234d3  # 第 4 轮，配方同内容（L0/L1/L4/L5 pass，exit 0）"
+  base_commit: "06bbd38cd1012014ff4c3aece5afec7f5b4b1dd4  # origin/main（设备 job 仓库基线）"
+  recipe_blobs:
+    - "b86020db149b5f14c1bc66416d58381e9d41d685  archives/u/userv/1.2.3/conandata.yml"
+    - "01965c47fc8c7ee428af0b5631b294612c7360cd  archives/u/userv/1.2.3/conanfile.py"
+    - "a622be10aa3e3f4c861b8b671632fd54fc666ea3  archives/u/userv/1.2.3/patches/0001-configure-mktemp-umask.patch"
+    - "754e3846623e3741a31c3f889903ba2b311ab5a8  archives/u/userv/1.2.3/test_package/MANIFEST.yml"
+    - "f10003e34a5161942c91be779b08a8098e8f0a1e  archives/u/userv/1.2.3/test_package/conanfile.py"
+    - "0d1ba3275d89e9000ab6a9a3993360bca1308a84  archives/u/userv/1.2.3/test_package/test.sh"
+    - "80c919728bc30c8262b3f534d27c574d1e92eb4d  archives/u/userv/commands.json"
+  run_dirs:
+    - "$HOME/ohos-test-runs/userv-codex-userv-shadow-1.2.3-20261014-003145-51931   # 第 5 轮"
+    - "$HOME/ohos-test-runs/userv-codex-userv-shadow-1.2.3-20261014-002501-47630   # 第 4 轮"
+
+knowledge_gained:
+  - "userv 的 client.c/overlord.c 把 NDEBUG 视为安全错误：编译期 #error、运行期 abort；Conan AutotoolsToolchain 在 Release 下会注入 -DNDEBUG，因此本包必须绕开它"
+  - "Makefile.in 的 INSTALL_FLAGS 硬编码 -o root -g 0，非 root CI 必须命令行覆盖 INSTALL_FLAGS="
+  - "userv 的 CPPFLAGS 在 Makefile.in 中被重新赋值，会静默丢弃环境里的 CPPFLAGS —— 依赖外部 CPPFLAGS 传递宏定义在这里不可靠"
+  - "构建期需要 md5sum（pcsum.h 协议校验和），configure 只探测 md5sum/md5/gmd5sum"
+  - "Conan 没有 tools.build:ldflags 这个 conf，可执行文件链接选项要用 tools.build:exelinkflags"
+  - "Environment.save_script 不能取名 conanbuild/conanrun：那是 Conan 聚合脚本名，会被覆盖并产生自引用脚本，导致自定义环境变量全部丢失；应改用独立名字（本包用 conanbuildenv-userv）"
+  - "VirtualBuildEnv 对 tool_requires 的隐式 PATH 合成，在 profile [buildenv] 已定义 PATH 时会被 compose 逻辑丢弃（探针实测），需要显式 prepend_path"
+  - "上游 1.2.3 没有 make check 断言集；tarball 内 tests/ 是 Debian autopkgtest（needs-root/breaks-testbed），Conan 沙箱不可运行"
+  - "上游官网 'current version' 的 userv.tar.gz 实测仍是 1.2.0，取 1.2.3 必须用 Debian 源码池版本化 tarball"
+  - "真机 HMDFS：autoconf `(umask 077 && mktemp -d \"./confXXXXXX\")` 生成的目录是 drwx--S--- 且内容连 ls 都 Permission denied（MAC 标签），config.status 随后执行 ./confXXXXXX/subs1.awk 必失败；改 umask 077→022 即可（vcprompt 在同设备已证）"
+  - "影子 CI 设备上没有 /data/service/hnp/bin/bash（该目录只有 git），clang/bash 都在 $HOME/usr/local/bin；配方里硬编码 hnp 路径会 Error 127 —— CONFIG_SHELL 只存在于 profile [buildenv] 的子进程环境里，必须用 shell 参数展开在运行时求值"
+  - "影子 CI 必须经 $HOME/bin/ohos-test-runner.sh 启动：它设置 TMPDIR/TMPPREFIX（设备 /tmp 只读）并加 device-global 锁；直接 sh run-ohos-shadow-ci-local.sh 会因 heredoc 临时文件写 /tmp 失败"
+  - "OHOS 会把用户域进程的特权系统调用直接拦成 SIGSYS（shell 报 exit=159 + core dumped）：最小 C 探针显示 getpid/getuid/getgid/getgroups 正常，而 setreuid(0,uid) 立即被杀 —— userv 客户端因此在真机上一启动就死，与 setuid 位、参数、打包方式都无关"
+  - "userv 客户端按设计要求 setuid root 安装（client.c:248 priv_suspend 无条件 setreuid(0,uid)）；Conan 包内二进制不是 setuid root，所以 --version/--help 在 Linux 上也是 EPERM 报错退出 —— 这类包的 test_package 必须区分「产物正确」与「运行期需要特权」，不能把跑不起来当通过"
+
+compatibility:
+  level: partial
+  issues:
+    - >
+      userv 客户端在普通用户域无法运行：security_init()（client.c:808-821）在解析参数前调用
+      priv_suspend()，后者无条件执行 setreuid(0,uid)（client.c:248）。Conan 包内不是 setuid root
+      （CI 用户无法 chown root），因此任何调用（含 --version/--help）都会在打印前失败。
+    - >
+      OHOS 上该特权系统调用被安全策略直接拦成 SIGSYS：真机实测 `userv --version` → exit=159
+      （128+31）+ core dumped、无输出；已用最小 C 探针复现（setreuid 是触发点）。
+    - >
+      完整功能（跨用户受限服务调用）还需要 setuid-root 安装到系统路径 + /etc/userv 配置 +
+      常驻 uservd（VARDIR=/var/run/userv），属系统集成方工作，CI 沙箱不可验证。
+  notes: >
+    编译、链接、安装、打包已在真机全部通过；uservd 可执行（参数校验路径）；userv 的构建身份
+    （版本串/用法串/许可证串/AArch64 ELF）可静态校验。客户端运行期行为与整机 setuid 部署未验证，
+    本包不声明"服务可用"。
+
+test_results:
+  type: device_shadow_ci
+  toolchain: "OHOS shadow CI: clang-15 + $HOME/usr/local/sysroot + lld + --code-sign（ohos-local profile）"
+  upstream:
+    total: 4
+    run_in_ci: 0
+    detail: >
+      上游用例数 N=4（tests/t-basic、t-config、t-userconfig、t-persist，均为 Debian autopkgtest）。
+      沙箱内运行 0/4：debian/tests/control 逐条要求 needs-root / isolation-container / breaks-testbed，
+      并依赖 chiark-really、系统级 setuid 安装与常驻 uservd + /etc/userv 配置（环境限制，非"上游无用例"）。
+      上游 make check 本身无校验集（只打印 "There is no validation suite for this package."，退出码 0）。
+  test_package: "10 项：9 通过 + 1 SKIP（客户端运行期契约需 setuid-root，原因见 compatibility）"
+  evidence: "notes.md §五/§十/§十一 真机记录；RUN_DIR 见 verification.device_done"
+
+references:
+  - https://www.chiark.greenend.org.uk/~ian/userv/
+  - https://deb.debian.org/debian/pool/main/u/userv/
+  - archives/z/zlib/1.3.1/conanfile.py          # 源码树内构建（folders.build = "."）参考
+  - archives/d/disktype/9.0/test_package/       # CLI test_package（bash test.sh）参考
+  - archives/d/duo-unix/1.11.3/conanfile.py     # sbin → bin 处理参考

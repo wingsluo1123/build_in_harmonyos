@@ -1,0 +1,42 @@
+# conandata.yml — userv 1.2.3
+#
+# 源码来源说明（R39：必须是官方源或权威镜像；本轮已做等价性核验）：
+#
+#   * 上游官网 https://www.chiark.greenend.org.uk/~ian/userv/ 只提供
+#     "current version" 的 userv.tar.gz；本轮实际下载解包后确认它仍是 1.2.0
+#     （work/debian/changelog 首条为 `userv (1.2.0)`），拿不到 1.2.3。
+#   * 上游历史版本只挂在匿名 FTP（ftp.chiark.greenend.org.uk/users/ian/userv/），
+#     本机网络不可达（连接超时）。
+#   * 因此改用 Debian 源码池中的同版本原始源码包。userv 是 Debian native 包
+#     （.dsc 里 Format: 1.0），userv_1.2.3.tar.gz 就是上游 tarball 本身，
+#     不含任何 Debian 补丁，只额外带 upstream 自己的 debian/ 打包目录。
+#
+#   等价性证据：
+#     1. sha256 与 Debian 已签名 .dsc（userv_1.2.3.dsc，Ian Jackson 签名）中
+#        Checksums-Sha256 的值逐字节一致：
+#          259431d0033efa109d21ceec818e119c10342cb23e16185c6bd76c035ec646db
+#        文件大小 202235 字节也与 .dsc 的 Files 字段一致。
+#     2. 解包后 work/debian/changelog 首条为 `userv (1.2.3) unstable`，
+#        与目标版本一致。
+#     3. 顶层只有单一目录 work/，strip_root=True 语义成立。
+#
+# 补丁说明：本包只有一个 portability 补丁，其余平台差异都在配方层处理
+# （-DNDEBUG 规避、INSTALL_FLAGS、sbindir、etcdir、md5sum），详见 conanfile.py 文件头与 notes.md。
+#
+# `configure` 里 `tmp=\`(umask 077 && mktemp -d "./confXXXXXX")\`` 这段（第 4458-4468 行）
+# 同时是 configure 自己和它生成的 config.status 的临时目录逻辑（autoconf 把同段文本
+# 原样写进 config.status）。在真机 HMDFS 上，`umask 077 && mktemp -d` 会生成
+# drwx--S--- 目录且目录内容连 ls 都报 Permission denied（MAC 标签问题，项目经验库
+# E011/E114 类），导致 `config.status: ./confXXXXXX/subs1.awk: Permission denied`。
+# 真机实测（2026-10-13 影子 CI 第二轮）与 archives/v/vcprompt/1.3.0 在同一台设备上的
+# 结论一致：把 umask 077 改成 022 即可正常生成 config.status。
+# 这里用规范 unified diff（只改这两处 umask，不动 configure.in 与其他逻辑）。
+
+sources:
+  url: "https://deb.debian.org/debian/pool/main/u/userv/userv_1.2.3.tar.gz"
+  sha256: "259431d0033efa109d21ceec818e119c10342cb23e16185c6bd76c035ec646db"
+
+patches:
+  - patch_file: "patches/0001-configure-mktemp-umask.patch"
+    patch_description: "configure/config.status 的临时目录 umask 077 -> 022，规避 HMDFS 上 drwx--S--- 目录导致 subs1.awk Permission denied"
+    patch_type: "portability"
