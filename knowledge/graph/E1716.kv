@@ -1,0 +1,81 @@
+#====================================================================
+# DRAFT-ghc-filesystem-1.5.14-ohos-filesystem-privilege-semantics.kv
+# 草稿（Path B 知识库扩展候选）— 正式 E 编号由主编后续分配
+# 同 stem 草稿: DRAFT-ghc-filesystem-1.5.14-ohos-filesystem-privilege-semantics.md
+# 依据: ghc-filesystem 1.5.14 r03/r04 实测 evidence
+#====================================================================
+
+id:                     E1716
+trigger_tool:           filesystem-test-suite|Catch2|test_package|conan create
+phase:                  testing|runtime
+error_signature:        create_hard_link.*Operation not permitted|
+                         copy.*create_hard_links.*not permitted|
+                         mkfifo.*Operation not permitted|
+                         fs\.permissions.*chmod.*not effective|
+                         permissions.*owner_write.*not removed|
+                         file permission.*assertion.*fail
+
+severity:               1
+category:               platform, testing, filesystem, capability, evidence-closure
+match_keywords:         hard link, FIFO, mkfifo, chmod, permissions, owner_write,
+                         Operation not permitted, HMDFS, SELinux, platform capability
+                         boundary, upstream test, filesystem_test, ghc-filesystem,
+                         evidence ledger, recovery condition, copy_options,
+                         create_hard_links, recursive copy
+
+root_cause:             OHOS 真机文件系统与 Linux 桌面假设存在三类系统性差异，
+                         均发生在 syscall/文件系统层，与用户态库实现无关：
+                         (1) HMDFS(nodev, 分布式) 不支持 hard link，link() 返回 Operation not permitted；
+                         (2) SELinux 策略禁止创建 FIFO/命名管道，mkfifo() 返回 Operation not permitted；
+                         (3) SELinux/HMDFS 忽略或部分屏蔽 POSIX chmod()/权限位，
+                             chmod() 返回 0 但权限不变，或 other-read/owner-write 位被额外清除。
+                         ghc-filesystem 为 header-only 纯用户态库，上述调用之上的逻辑无缺陷，
+                         上游测试断言这些能力成立，在 OHOS 缺失时失败，但根因全属平台能力边界。
+
+affected_scope:         OHOS 真机运行文件系统 API 上游测试套件的 C/C++ 库
+                         (ghc::filesystem / std::filesystem 实现 / POSIX filesystem 测试 /
+                         依赖文件权限断言的集成测试)
+
+verification_cmd:       |
+  # 最小能力探针（区分平台能力边界 vs 库缺陷）
+  printf x > hl_probe_a && ln hl_probe_a hl_probe_b; echo "hardlink_exit=$?"
+  mkfifo fifo_probe; echo "mkfifo_exit=$?"
+  printf x > chmod_probe && chmod ugo-w chmod_probe && stat -c %A chmod_probe
+  # 探针证明不可用的能力集合 ⊆ 失败断言的能力集合 => 平台能力边界
+
+rec_priority:           1
+rec_approach:           probe-attribution-evidence-closure
+rec_description:        逐入口失败分类 -> 平台能力探针 -> 交叉对照归因 ->
+                         保留逐入口证据台账(命令/cwd/退出码/首错/绝对日志/日志SHA-256) ->
+                         恢复条件(标准 Linux 宿主重跑预期全绿)。
+                         禁止修改上游测试断言；禁止 build-tests=false/宽泛跳过伪造通过；
+                         禁止把受限用例伪写成通过。
+rec_command:            |
+  /data/service/hnp/bin/clang++ -std=c++17 -I include -I test test/filesystem_test.cpp -o filesystem_test && ./filesystem_test
+
+forbid_1_pattern:       修改上游测试断言 / 宽泛排除伪造通过
+forbid_1_reason:        平台能力边界被当作库缺陷修补会污染代码并掩盖真实缺陷
+forbid_1_consequence:   伪报通过、误导后续库复用判断
+
+principles:             P013, P020
+causes:
+conflicts_with:
+prerequisite_of:
+
+doc_file:               knowledge/drafts/DRAFT-ghc-filesystem-1.5.14-ohos-filesystem-privilege-semantics.md
+last_updated:           2026-08-31
+source_event:           archives/g/ghc-filesystem/1.5.14 (r03/r04 evidence)
+
+# 证据映射（r03/r04）
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:                junshi_liu
+source_pr:              PR #7338 (r04, open)
+source_commit:          8b948593ab, f188b28f3f
+
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count: 0
+metrics_fail_count: 0
+metrics_confidence: 0.0
+metrics_last_used:
+rec_auto_fix:               false
+rec_impl:               manual

@@ -1,0 +1,29 @@
+#====================================================================
+# Draft: OHOS musl long double 数学函数族为 double 精度别名
+# 适配实例: boost1.84-math/1.84.0 (PR !8441)
+# 验证: nm -D 实证 coshl/cosh 同地址 0x11d80；test_tr1.c TEST_LD 95 断言
+#       误差量级全部 ~1e-16（double 特征）vs 容差 ~1e-30（quad）
+#====================================================================
+
+id:                     E1851
+trigger_tool:          clang|test|runtime
+phase:                 testing
+error_signature:       check_close_l.*rc=-?[0-9]+|long double.*tolerance|LDBL_EPSILON.*fail|test_valuesl.*FAIL|with error [0-9.]+e-1[0-9].*max allowed [0-9.]+e-3[0-9]
+
+severity:               2
+category:               platform, compat, limitation, libc, musl
+match_keywords:        long double, LDBL_MANT_DIG, coshl, powl, sinhl, expl, quad precision, TEST_LD, boost math, tr1l, c99l, double alias, long double 精度
+title:                 OHOS musl 的 long double 数学函数族是 double 精度别名，quad 容差断言物理不可达
+
+root_cause:            OHOS musl libc 导出的 *l 后缀数学函数（coshl/powl/sinhl/expl/logl/atanhl 等）与对应 double 版本是同一地址的别名 stub（nm -D 验证 coshl 与 cosh 同为 0x11d80），只返回 double 精度；而 aarch64 clang 的 long double 类型是 IEEE quad（LDBL_MANT_DIG=113，LDBL_EPSILON=1.93e-34）。任何以 long double 精度容差（LDBL_EPSILON×N）校验 libc 数学函数返回值的测试都会失败——误差固定在 ~1e-16（double 精度特征），非适配缺陷而是平台实现限制。
+affected_scope:        所有调用 libc *l 函数族并做 quad 精度断言的库测试（boost.math TEST_LD 模式、numpy/scipy/gsl/mpfr 类数值库的 long double 测试段）
+rec_approach:          ① 诊断确认：打印 sizeof(long double)=16、LDBL_MANT_DIG=113（编译器侧是 quad）；nm -D $OHOS_SDK/sysroot/.../libc.so 对比 cosh/coshl 地址（libc 侧是别名）→ 两者不一致即为命中。② 处置：库照常编译交付（符号/ABI 完整，double/float 精度范围可用）；长双精度测试失败项如实记录为平台限制（notes.md + PR 豁免说明），不视为适配缺陷。③ 下游指引：需要真 quad 精度时绕开 libc *l 函数族，改用模板 header-only 实现直接实例化 long double（如 boost::math::special_functions，内部软件实现不经 libc）。④ 免重蹈：新库适配时若上游有 long double 测试段，提前用本方法判定并写好豁免说明。
+
+doc_file:              doc/E999.md
+last_updated:          2026-09-05
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               j669539
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        ① 诊断确认：打印 sizeof(long double)=16、LDBL_MANT_DIG=113（编译器侧是 quad）

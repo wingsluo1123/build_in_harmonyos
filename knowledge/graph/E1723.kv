@@ -1,0 +1,24 @@
+# ═══ Draft knowledge entry — 上游无限压力测试的受控完成 ═══
+# Timestamp: 2026-08-31
+# Software: readerwriterqueue 1.0.6
+# Gate: upstream-test/stabtest (受控完成验收规则)
+# Status: DRAFT — 本地知识草稿（Path B 候选），未提交、未发布、未关联任何远端
+# 注意：本条目是可复用测试证据与编排规则，不声称创建任何源码补丁/框架改动/远端 PR/Issue/正式知识条目
+id:                     E1723
+severity:               2
+category:               orchestration, upstream-test
+trigger_tool: stabtest|stress|test
+phase: upstream-test
+error_signature: readerwriterqueue tests/stabtest/stabtest.cpp 使用无参数无限主循环（for (unsigned int i = 0; true; ++i)），并直接指示操作者用 Ctrl-C 结束（输出 Press CTRL+C to quit）；它没有测试数、随机种子或运行时长等任何官方参数；因此该入口不可能自然产生退出码 0；把墙钟超时（如 timeout 返回 124）当成成功是无效验收，会掩盖潜在真实错误
+root_cause: 这是上游测试设计，不是 OpenHarmony 适配问题、不是 Conan 配方问题、也不是 readerwriterqueue 运行时缺陷；R03 已核实 stabtest.cpp 无官方参数（argv 未使用、无测试数/种子/时长），自然 exit 0 不可用；任何把它当成普通有界测试的验收方式都会因永不自然结束而误判
+match_keywords: stabtest, infinite, loop, controlled, completion, timeout, SIGINT, Press CTRL+C
+affected_scope: 所有上游压力/稳定性测试使用无限循环且无终止参数的三方库验收流程
+rec_priority: 1
+rec_approach: 双阈值+SIGINT 原始子进程+原始信号退出态+错误扫描+原子性记录
+rec_auto_fix: false
+rec_impl: orchestration
+doc_file: knowledge/drafts/DRAFT-readerwriterqueue-1.0.6-infinite-stress-controlled-completion.md
+last_updated:               2026-10-17
+authors:               unknown
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        双阈值+SIGINT 原始子进程+原始信号退出态+错误扫描+原子性记录

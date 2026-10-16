@@ -1,0 +1,19 @@
+id:                     E1751
+error_signature: test failure: backtrace test functions optimized away despite __attribute__((noclone))
+match_keywords: noclone,sibling-calls,omit-frame-pointer,backtrace,test,tail-call-optimization
+category:               compiler, testing, optimization
+severity:               2
+root_cause: Clang on OHOS aarch64 ignores GCC-specific __attribute__((noclone)), causing test functions (e.g., callback_one, callback_two in libbacktrace test suite) to be optimized via tail call elimination or frame pointer omission. This breaks backtrace stack frame tests that expect distinct function entries.
+rec_approach: Add -fno-optimize-sibling-calls and -fno-omit-frame-pointer to CFLAGS for test compilation targets only (not the library itself). In Makefile-based builds, use TEST_CFLAGS or target-specific CFLAGS; in CMake, set COMPILE_FLAGS on test targets.
+verification_cmd:
+last_updated: 2026-09-02
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E1751.md
+trigger_tool:           ctest
+phase:                  test
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        Add -fno-optimize-sibling-calls and -fno-omit-frame-pointer to CFLAGS for test compilation targets o
