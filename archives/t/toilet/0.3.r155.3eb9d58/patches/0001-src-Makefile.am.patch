@@ -1,0 +1,27 @@
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -1,15 +1,23 @@
+ 
+ bin_PROGRAMS = toilet
+ 
+ toilet_SOURCES = main.c toilet.h \
+                  render.c render.h \
+                  filter.c filter.h \
+                  export.c export.h \
+                  term.c figlet.c
+ 
+-toilet_CPPFLAGS = -DFONTDIR=\"$(datadir)/figlet\"
++
++# The compiled-in font directory defaults to $(datadir)/figlet.  Packagers
++# install the fonts somewhere else than the configure prefix (e.g. a Conan
++# package tree) and need to point the built-in default at that location, so
++# allow overriding FONTDIR from the make command line:
++#   make FONTDIR=/path/to/share/figlet
++FONTDIR ?= $(datadir)/figlet
++
++toilet_CPPFLAGS = -DFONTDIR=\"$(FONTDIR)\"
+ toilet_CFLAGS = @CACA_CFLAGS@
+ toilet_LDADD = @CACA_LIBS@
+ 
+ echo-sources: ; echo $(SOURCES)
+ 

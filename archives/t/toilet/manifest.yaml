@@ -1,0 +1,27 @@
+software: toilet
+display: "toilet"
+description: "toilet — 把普通文本渲染成大号彩色 ASCII/ANSI 艺术字的命令行工具（FIGlet 字体的另一种实现）"
+category: tool
+homepage: "https://github.com/cacalabs/toilet"
+license: WTFPL
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "源码归档是 git-archive 快照，不含生成的 configure/Makefile.in：build() 先跑上游自带 bootstrap（aclocal/autoconf/autoheader/automake）"
+    - "设备 /data/service/hnp/bin 只有 autoconf 家族，没有 automake/aclocal：以 tool_requires automake/1.18 拉入（其 package_info 自带 PERL5LIB/ACLOCAL_PATH 注入，只在 conanbuild 环境内生效）"
+    - "本机 config.guess(2024-07-27) 不识别 HarmonyOS 内核、且在 HMDFS 上 mkdtemp 后写 dummy.c 被拒：configure 必须显式给 --build/--host 三元组以跳过 config.guess"
+    - "config.status 的 (umask 077 && mktemp -d ./confXXXXXX) 在 HMDFS 上生成 2700 目录，当前 uid 靠组位通行、chmod 无效 → 写入报 EACCES；配方把生成 configure 里的 umask 077 改写为 022"
+    - "上游两个官方测试（test/check-source、test/check-fonts）按源码树相对路径取值，只在 srcdir == builddir 时成立：配方用 basic_layout(src_folder='.') + folders.build='.' 做源码内构建，上游测试脚本零改动、原样运行"
+    - "conan 以 --prefix=/ + DESTDIR 安装使编译期 FONTDIR 指向 /share/figlet（运行期找不到包内字体）：patches/0001 为 src/Makefile.am 提供 FONTDIR make 覆盖点（默认值不变、无平台宏），配方传 FONTDIR=<包目录>/share/figlet"
+    - "libcaca 依赖用 PkgConfigDeps 生成 caca.pc（包自带 caca.pc 的 prefix=/ 出包即失效），PKG_CONFIG_PATH 指向本配方 generators_folder"
+  common_dependencies:
+    - libcaca
+    - ncurses
+    - zlib
+
+versions:
+  "0.3.r155.3eb9d58":
+    status: built
+    build_date: "2026-10-16"
+    conan_ref: "toilet/0.3.r155.3eb9d58"
