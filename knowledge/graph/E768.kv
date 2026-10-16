@@ -1,0 +1,37 @@
+id:                     E768
+title: "OHOS 上 KPtyProcess 的 pty 子进程路径失败（上游 kptyprocesstest 四槽 FAIL! 后 SIGSEGV）"
+category:               libc
+error_signature: "kptyprocesstest|FAIL!  : KPtyProcessTest::test_pty_basic|waitForReadyRead.*FALSE|KPtyProcess.*SEGFAULT"
+root_cause: >
+  KDE Frameworks 6 的 kpty/6.26.0 上游自动测试 autotests/kptyprocesstest.cpp 共 5 个
+  QTest 槽：initTestCase 通过，test_pty_basic / test_pty_signals / test_ctty /
+  test_shared_pty 四槽实际求值并 FAIL!（waitForReadyRead FALSE、信号值不符、输出为空），
+  随后在 test_shared_pty 内 SIGSEGV 退出（合计 1 目标 / 0 通过）。
+  已排除的原因：①不是「缺 pty 头/符号」——config-pty.h 实测 HAVE_OPENPTY=1、
+  HAVE_PTSNAME=1；②不是「环境不能跑 pty 子进程」——本机 pty.fork() + os.read()
+  实测能读到子进程输出（READ=hello-pty），同包 test_package 亦成功取得 /dev/pts/3。
+  剩余待查方向：KPty::setCTty()（setsid + ioctl(TIOCSCTTY)）在 OHOS 的语义、
+  QProcess childProcessModifier 与 pty 从设备 fd 的交接、以及子进程 stdout 在
+  未被正确设为控制终端时的缓冲行为。
+rec_approach: >
+  复现命令（OHOS aarch64 profile，干净缓存）：
+  conan create archives/k/kpty/6.26.0 --build=missing -pr:h/-pr:b ohos-aarch64，
+  日志中 ctest 段即上述 4 槽 FAIL! + SIGSEGV；
+  等价手工复现：ctest --test-dir <build_folder> --output-on-failure。
+  处理策略：当前配方 build() 内实跑 ctest 并原样打印失败输出，非 0 时追加明确
+  warning（不得当作通过）；断言级覆盖由 test_package/ 的消费者用例承担。
+  定位后应把 ctest 恢复为硬门禁，并在补丁中按中性符号探测写法（禁平台宏，R8）
+  处理 setCTty 相关的能力差异。
+severity:               2
+last_updated: "2026-10-11"
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E768.md
+trigger_tool:           ctest
+phase:                  test
+affected_scope:         "OHOS 上 KPtyProcess 的 pty 子进程路径失败（上游 kptyprocesstest 四槽 FAIL
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        >
+match_keywords:         kptyprocesstest, FAIL!, KPtyProcessTest, test_pty_basic, waitForReadyRead, FALSE

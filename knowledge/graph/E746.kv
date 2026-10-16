@@ -1,0 +1,76 @@
+# ═══ Draft knowledge entry — C++20 std::pmr/memory_resource unavailable on OHOS
+# libc++ 15004: downgrade-to-C++17-release workflow + autotools bootstrap cross wiring
+# Software: libhttpserver 0.19.0 (assigned upstream tag 2.0.0)
+# Gate: conan-verify G2 (conan create, ohos-aarch64) + upstream tests 149/152 + W3 local green
+# Status: DRAFT
+
+id:                     E746
+severity:               3
+category:               platform, build-system, toolchain, cpp-standards
+trigger_tool: clang++|configure|conan
+phase: build
+
+error_signature: fatal error: 'memory_resource' file not found|ld\.lld: error: unable to find library -lstd\+\+|Unable to connect daemon to port
+match_keywords: memory_resource, pmr, C++20, libc++, clang 15, memory_resource file not found, lstdc++, autoreconf, ac_cv_lib, cross compile, AC_CHECK_LIB, MHD_start_daemon, umask 077
+
+root_cause: |
+  (1) The OHOS toolchain ships libc++ 15004 (clang 15). The standard <memory_resource>
+  header (C++17 pmr) is NOT present — only experimental/memory_resource exists under
+  llvm/include/c++/v1/. Upstream releases whose core implementation uses std::pmr
+  (arena allocators) cannot compile: 'memory_resource' file not found. This is a
+  toolchain capability boundary, not a package defect; patching out pmr means
+  rewriting the upstream core data structures (violates minimal-patch).
+  (2) Old-generation autotools releases (libhttpserver 0.19.0) hardcode
+  AM_LDFLAGS="-lstdc++" in configure.ac; OHOS uses libc++, so the link fails with
+  "ld.lld: error: unable to find library -lstdc++". Upstream already handles this
+  per-OS (freebsd branch clears AM_LDFLAGS) — the fix is a new linux-ohos* case
+  branch, not a platform macro.
+  (3) Release tarballs that ship no ./configure force build() to run autoreconf -fi;
+  automake/libtool must come in as tool_requires (resolved by the BUILD profile).
+  (4) Cross AC_CHECK_HEADER/AC_CHECK_LIB probes execute host test programs —
+  impossible under cross; they must be preseeded via ac_cv_* env vars plus
+  CPPFLAGS/LDFLAGS pointing at the conan dependency package.
+
+rec_approach: cpp20-pmr-downgrade-to-cpp17-release + ohos-host-os-link-branch + autoreconf-tool-requires + acv-preseed
+rec_description: |
+  (1) When an assigned upstream tag requires C++20 std::pmr: verify the toolchain
+  boundary first (echo '#include <memory_resource>' | clang++ -std=c++20 -x c++ -
+  -fsyntax-only -> fatal error), then check the previous release line for a C++17
+  no-pmr version and adapt that, documenting the env_unsupported evidence chain for
+  the assigned tag in notes.md (do NOT hack pmr out — it is the core design).
+  (2) For -lstdc++ hardcoding: add a linux-ohos* case branch next to the existing
+  freebsd branch that clears AM_LDFLAGS (pure build-system branch, no platform
+  macro — R8 compliant). Patch configure.ac BEFORE autoreconf so the branch also
+  lands in the generated configure.
+  (3) For no-configure tarballs: build_requirements tool_requires automake/1.18 +
+  libtool/2.5.4; run autoreconf -fi in source() or build() with the conanbuild env;
+  both -pr:h and -pr:b must be passed to conan create.
+  (4) Cross AC_CHECK preseeds: export ac_cv_header_<h>=yes and
+  ac_cv_lib_<lib>_<func>=yes in os.environ before autotools.configure(), with
+  CPPFLAGS=-I<dep>/include LDFLAGS=-L<dep>/lib in AutotoolsToolchain configure_args.
+  (5) After autoreconf, the generated configure embeds umask 077 (E011 HMDFS);
+  rewrite to umask 022 — idempotent-harmless on CI Linux workers.
+  (6) SSL upstream tests fail with "Unable to connect daemon to port" when the
+  libmicrohttpd dependency package was built --disable-https: that is a dependency
+  capability boundary (document as per-test exemption, not a package defect).
+
+  - "echo '#include <memory_resource>' | clang++ -std=c++20 -x c++ - -fsyntax-only  # toolchain boundary probe"
+  - "conan create archives/l/libhttpserver/0.19.0 -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 --build=missing"
+
+verification_cmd:
+  conan create on ohos-aarch64 (clang 15) succeeds for 0.19.0: autoreconf bootstrap
+  + patched linux-ohos link branch + ac_cv preseeds; lib/libhttpserver.so packaged;
+  test_package 6/6 (real embedded HTTP server start/GET/stop roundtrip); upstream
+  littletest suite executed locally: 152 tests / 811 checks, 808 pass, 3 SSL-only
+  failures exempted (libmicrohttpd package built without HTTPS).
+
+  - archives/a/abiword-plugin-clarisworks/3.0.8/conanfile.py (autoreconf + tool_requires + E114 umask precedent)
+  - knowledge/graph/E011.kv (HMDFS umask 077 config.status)
+  - archives/l/libmicrohttpd/1.0.1 (dependency; built --disable-https)
+last_updated: 2026-09-20
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E746.md
+affected_scope:         general
