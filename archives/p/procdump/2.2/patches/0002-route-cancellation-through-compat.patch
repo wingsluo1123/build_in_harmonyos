@@ -1,0 +1,101 @@
+diff --git a/profiler/src/ProcDumpProfiler.cpp b/profiler/src/ProcDumpProfiler.cpp
+index f0d9844..42b3249 100644
+--- a/profiler/src/ProcDumpProfiler.cpp
++++ b/profiler/src/ProcDumpProfiler.cpp
+@@ -1,6 +1,7 @@
+ // Copyright (c) .NET Foundation and contributors. All rights reserved.
+ // Licensed under the MIT license. See LICENSE file in the project root for full license information.
+ 
++#include "PthreadCompat.h"
+ #include "ProcDumpProfiler.h"
+ #include "corhlpr.h"
+ #include "CComPtr.h"
+@@ -1050,7 +1051,8 @@ HRESULT STDMETHODCALLTYPE CorProfiler::ExceptionThrown(ObjectID thrownObjectId)
+ void CorProfiler::CleanupProfiler()
+ {
+     LOG(TRACE) << "CorProfiler::CleanupProfiler: Enter";
+-    pthread_cancel(healthThread);
++    ProcdumpInstallThreadExitHandler();
++    ProcdumpCancelThread(healthThread);
+     pthread_join(healthThread, NULL);
+     LOG(TRACE) << "CorProfiler::CleanupProfiler: Exit";
+ }
+diff --git a/src/CoreDumpWriter.c b/src/CoreDumpWriter.c
+index 77a753f..52faf03 100644
+--- a/src/CoreDumpWriter.c
++++ b/src/CoreDumpWriter.c
+@@ -110,11 +110,7 @@ int WriteCoreDump(struct CoreDumpWriter *self)
+         Trace("WriteCoreDump: failed WaitForQuitOrEvent.");
+         exit(-1);
+     }
+-    if(pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL) != 0){
+-        Log(error, INTERNAL_ERROR);
+-        Trace("WriteCoreDump: failed pthread_setcanceltype.");
+-        exit(-1);
+-    }
++    ProcdumpDeferThreadExit();
+     switch (rc) {
+         case WAIT_OBJECT_0: // QUIT!  Time for cleanup, no dump
+             break;
+@@ -140,11 +136,7 @@ int WriteCoreDump(struct CoreDumpWriter *self)
+             Trace("WriteCoreDump: Error in default case");
+             break;
+     }
+-    if(pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL) != 0){
+-        Log(error, INTERNAL_ERROR);
+-        Trace("WriteCoreDump: failed pthread_setcanceltype.");
+-        exit(-1);
+-    }
++    ProcdumpResumeThreadExit();
+ 
+     return rc;
+ }
+diff --git a/src/Monitor.c b/src/Monitor.c
+index 3d46ed4..3570019 100644
+--- a/src/Monitor.c
++++ b/src/Monitor.c
+@@ -85,7 +85,7 @@ void *SignalThread(void *input)
+                             ptrace(PTRACE_DETACH, item->config->ProcessId, 0, 0);
+                             pthread_mutex_unlock(&item->config->ptrace_mutex);
+ 
+-                            if ((rc = pthread_cancel(item->config->Threads[i].thread)) != 0) {
++                            if ((rc = ProcdumpCancelThread(item->config->Threads[i].thread)) != 0) {
+                                 Log(error, "An error occurred while cancelling SignalMonitorThread.\n");
+                                 exit(-1);
+                             }
+@@ -777,7 +777,7 @@ int WaitForSignalThreadToTerminate(struct ProcDumpConfiguration *self)
+ 
+     // Cancel the signal handling thread.
+     // We dont care about the return since the signal thread might already be gone.
+-    pthread_cancel(sig_thread_id);
++    ProcdumpCancelThread(sig_thread_id);
+ 
+     // Wait for signal handling thread to complete
+     if ((rc = pthread_join(sig_thread_id, NULL)) != 0) {
+@@ -1248,7 +1248,7 @@ void *DotNetMonitoringThread(void *thread_args /* struct ProcDumpConfiguration*
+     Trace("DotNetMonitoringThread: Enter [id=%d]", gettid());
+     struct ProcDumpConfiguration *config = (struct ProcDumpConfiguration *)thread_args;
+     auto_free char* fullDumpPath = NULL;
+-    auto_cancel_thread pthread_t waitForProfilerCompletion = -1;
++    auto_cancel_thread pthread_t waitForProfilerCompletion = PROCDUMP_INVALID_THREAD;
+     auto_free char* clientData = NULL;
+ 
+     int rc = 0;
+@@ -1335,7 +1335,7 @@ void *DotNetMonitoringThread(void *thread_args /* struct ProcDumpConfiguration*
+         if(InjectProfiler(config->ProcessId, clientData)!=0)
+         {
+             Trace("DotNetMonitoringThread: Failed to inject the profiler.");
+-            pthread_cancel(waitForProfilerCompletion);
++            ProcdumpCancelThread(waitForProfilerCompletion);
+         }
+ 
+         pthread_join(waitForProfilerCompletion, NULL);
+@@ -1534,7 +1534,7 @@ void *WaitForProfilerCompletion(void *thread_args /* struct ProcDumpConfiguratio
+     unsigned int t, s2;
+     struct sockaddr_un local, remote;
+     int len;
+-    pthread_t processMonitor = -1;
++    pthread_t processMonitor = PROCDUMP_INVALID_THREAD;
+     auto_free char* tmpFolder = NULL;
+     auto_free_fd int s=-1;
+ 

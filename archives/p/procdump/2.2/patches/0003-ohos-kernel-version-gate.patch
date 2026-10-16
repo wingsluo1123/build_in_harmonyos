@@ -1,0 +1,30 @@
+diff --git a/src/GenHelpers.c b/src/GenHelpers.c
+index 341d6eb..d27ed8c 100644
+--- a/src/GenHelpers.c
++++ b/src/GenHelpers.c
+@@ -110,6 +110,25 @@ bool CheckKernelVersion()
+         int version, patch = 0;
+         if(sscanf(kernelInfo.release,"%d.%d",&version,&patch) != 2)
+         {
++            /* Portability (OHOS / HarmonyOS): uname(2) there reports sysname
++             * "HarmonyOS" and a release string that is not the Linux
++             * "major[.minor[.patch]]" form, so the sscanf above fails. This check
++             * exists to refuse kernels older than MIN_KERNEL_VERSION.MIN_KERNEL_PATCH
++             * (3.5); an unparseable release is not evidence of an ancient kernel --
++             * and bailing out here made the tool unusable on HarmonyOS, because
++             * InitProcDump() turns this false into exit(-1) before usage is printed.
++             * The platform is recognised by its sysname (a runtime string, no
++             * platform macros), so every other system keeps the original strict
++             * behaviour. */
++            if(strstr(kernelInfo.sysname, "HarmonyOS") != NULL ||
++               strstr(kernelInfo.sysname, "OpenHarmony") != NULL ||
++               strstr(kernelInfo.sysname, "OHOS") != NULL)
++            {
++                Log(warn, "uname release '%s' on %s is not a Linux version string; "
++                          "assuming kernel >= %d.%d",
++                    kernelInfo.release, kernelInfo.sysname, MIN_KERNEL_VERSION, MIN_KERNEL_PATCH);
++                return true;
++            }
+             Log(error, "Cannot validate kernel version");
+             Trace("%s",strerror(errno));
+             return false;

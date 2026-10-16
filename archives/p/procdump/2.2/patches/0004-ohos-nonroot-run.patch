@@ -1,0 +1,34 @@
+diff --git a/src/Procdump.c b/src/Procdump.c
+--- a/src/Procdump.c
++++ b/src/Procdump.c
+@@ -40,21 +40,17 @@
+     // print privelege warning
+     if(geteuid() != 0)
+     {
+-        Log(warn, "Procdump not running with elevated credentials. If your uid does not match the uid of the target process procdump will not be able to capture memory dumps");
+-        PrintUsage();
++        Log(warn, "Procdump not running with elevated credentials. If your uid does not match the uid of the target process procdump will not be able to capture memory dumps. Continuing anyway: ptrace of same-uid targets works without root.");
+     }
+-    else
++    if (GetOptions(&g_config, argc, argv) != 0)
+     {
+-        if (GetOptions(&g_config, argc, argv) != 0)
+-        {
+-            Trace("main: failed to parse command line arguments");
+-            exit(-1);
+-        }
++        Trace("main: failed to parse command line arguments");
++        exit(-1);
++    }
+ 
+-        // Register exit handler
+-        atexit(OnExit);
++    // Register exit handler
++    atexit(OnExit);
+ 
+-        // monitor for all specified processes
+-        MonitorProcesses(&g_config);
+-    }
++    // monitor for all specified processes
++    MonitorProcesses(&g_config);
+ }

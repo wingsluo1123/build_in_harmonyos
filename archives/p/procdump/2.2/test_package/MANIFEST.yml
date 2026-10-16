@@ -1,0 +1,89 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（R51 上游测试三步法申报）
+# CI 脚本强制要求此文件存在
+
+package: procdump/2.2
+homepage: "https://github.com/microsoft/ProcDump-for-Linux"
+
+# 上游测试入口（Makefile 的 `test` 目标）
+upstream_check_command: "make test  ->  tests/integration/run.sh"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游测试清点（源码实测，tag 2.2 归档逐文件核验）
+# 40 个场景 = 21 个非 dotnet（其中 7 个 shouldDump=false、14 个 shouldDump=true）+ 19 个 dotnet_*。
+# 数字来源：对 tests/integration/scenarios/*.sh 逐文件统计 shouldDump=
+# （2026-10-16 复核：40 个 .sh，与仓库内 test_package/upstream_tests/scenarios/ 逐字节一致）。
+upstream_tests_count: 40
+upstream_tests:
+  - file: tests/integration/run.sh
+    description: "集成测试总入口：强制 root（否则 sudo 重入），并要求 /usr/bin/stress-ng 与 /usr/bin/dotnet 存在，缺失即 exit 1。这 3 个硬性门槛不适用于 OHOS（无 root/sudo、无 stress-ng、无 .NET），执行层以等价方式逐场景执行（见下）"
+    command: "make test"
+  - file: tests/integration/scenarios/*.sh
+    description: "40 个场景脚本（实测清单）：21 个非 dotnet（high_cpu/high_mem/high_fd/high_tc/low_cpu/low_mem 及其 notdump/by_name/custom_core_file_name/nonexisting_output_directory/trigger_cpu_memory 变体 + ondemand）+ 19 个 dotnet_*（需目标进程为 CoreCLR 并开放 diagnostics 管道）"
+    command: "tests/integration/run.sh <scenario>"
+  - file: tests/integration/runProcDumpAndValidate.sh
+    description: "场景公共执行/校验器：启动负载（stress-ng 或 TESTPROGNAME）→ procdump 监视 30s → 按 shouldDump 校验转储目录。执行层提供 OHOS 适配版（stress-ng 段等价替换为 ProcDumpTestApplication burn/sleep/fc/tc + memload），上游原版保留于 upstream_tests/runProcDumpAndValidate.upstream.sh（与上游字节一致）供审计对照"
+    command: "sourced by scenarios/*.sh"
+  - file: tests/integration/helpers.sh
+    description: "等待辅助（waitforurl/waitforprocdump/waitforprocdumpsocket），dotnet 场景使用；非 dotnet 场景不调用"
+    command: "(helper, not a test itself)"
+  - file: tests/integration/ProcDumpTestApplication.c
+    description: "被监视的负载生成程序（burn/sleep/fc/tc 模式）；执行层用 OHOS 编译器在 test_package 内重建（配方 build() 亦编译它但不打包）"
+    command: "(load generator, not a test itself)"
+  - file: tests/integration/signal/signaltest.c
+    description: "-sig 场景使用的信号发送辅助程序，由 tests/integration/signal/makefile 单独构建"
+    command: "make -C tests/integration/signal"
+  - file: tests/integration/TestWebApi/
+    description: "dotnet_* 场景的被监视 .NET Web API 工程（C#，需 dotnet SDK 才能构建）"
+    command: "dotnet build"
+
+# 上游测试未在 OHOS 上运行的原因（逐项技术原因 + 证据，非「没环境」）
+upstream_tests_not_run:
+  - reason: "19 个 dotnet_* 场景需要目标进程为 CoreCLR 并开放 diagnostics 管道（procdump 通过 unix socket 与 CLR 通信），OHOS 无 .NET 运行时与 dotnet SDK；执行层显式跳过并计数（dotnet_blocked=19）"
+    blocking: true
+  - reason: "14 个 shouldDump=true 场景需要「产出转储文件」的后端。上游 src/CoreDumpWriter.c 把转储**全部委托给外部 gcore**（snprintf(command, ..., \"gcore -o %s %d 2>&1\", ...) 后 popen2 执行，失败即 Log(error, \"Dump exit status = %d\")），OHOS 基础镜像无 gcore/gdb；执行层先探 gcore 与端到端转储能力，探不通即有据跳过并单列计数（skipped_no_dump_backend=14），**不计入 passed**"
+    blocking: true
+  - reason: "run.sh 的 root 门槛（rootcheck/sudo）与 /usr/bin/stress-ng、/usr/bin/dotnet 缺失即 exit 1 不适用于 OHOS：产品侧 0004 patch 放宽 root 门槛（非 root 照常监控，同 uid ptrace），执行层以等价负载替代 stress-ng、对 dotnet 场景如实阻塞"
+    blocking: false
+
+# 上游测试 OHOS 真实执行记录（rule4：真实执行，非 0/40）
+upstream_test_execution_on_ohos:
+  # 按平台能力分为三类，逐类如实处置（2026-10-16 起由能力探测驱动，探测结论与原始证据进构建日志）
+  scenario_classes:
+    - class: "A 可执行（shouldDump=false，不需要转储后端）"
+      count: 7
+      disposition: "真实执行；执行到的全部通过，计入 passed"
+    - class: "B 需转储后端（shouldDump=true，依赖外部 gcore）"
+      count: 14
+      disposition: "无 gcore 的 worker 上有据跳过，逐条打印原因与证据，单列 skipped_no_dump_backend，**不计入 passed、不申报为通过**"
+    - class: "C 需 .NET/CoreCLR 诊断管道"
+      count: 19
+      disposition: "如实阻塞并计数 dotnet_blocked=19（非失败）"
+  executed: "7（A 类；B 类在有可用 gcore 的机器上才执行，届时为 21）"
+  passed: "等于 A 类已执行数（7）；跳过项一律不计入 passed"
+  failed: 0
+  skipped_no_dump_backend: 14
+  dotnet_blocked: 19
+  capability_probes: "跑场景前先探测并把原始证据打进日志：① capprobe（euid / /proc/<pid>/cmdline argv[0] / /proc/<pid>/comm / PTRACE_SEIZE / PTRACE_ATTACH / /proc/<pid>/mem）；② gcore 是否存在；③ 被监视进程身份（比对 /proc/<pid>/cmdline argv[0] 基名与目标程序名，用于识破 qemu-user/binfmt 之类架构翻译层）；④ 端到端转储探针（真实负载 + procdump -n 1 -c 80）"
+  dump_backend_probe: "探针输出落在构建日志与 results/_dump-probe.log；结果行含 dump_backend / gcore / target_identity 字段，CI 日志可自证结论"
+  target_identity_guard: "若探测判定本机存在架构翻译层（argv[0] 是解释器而非目标程序），需转储的场景不执行、不申报为通过 —— 因为此时 procdump 的「转储成功」实际发生在解释器进程上，结果不可归因于被监视进程（实测产物文件名即解释器名 aarch64_binfmt_P_cpu_*）"
+  result_line: "HMBS_UPSTREAM_OHOS_RESULT={total,executed,passed,failed,skipped_no_dump_backend,dotnet_blocked,dump_backend,gcore,target_identity}"
+  entry: "test_package/upstream_tests/run_upstream_ohos.sh"
+  note: "非 dotnet 场景在 OHOS 构建机（aarch64）上真实执行（执行到的都真跑，跳过的一律如实标注）：每个场景 = 真实负载进程 + 打包 procdump 监视（-c/-cl/-m/-ml/-fc/-tc/复合/ondemand 触发）+ 转储文件存在性校验，即 rule12 的端到端消费者用例"
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: test.sh
+    description: "静态层 6 断言（安装布局 / ELF magic / man page / 内嵌 CLR profiler blob 特征 / 无 glibc FORTIFY __*_chk 引用）+ 运行层 5 断言（procdump -? 输出 usage 与 options、退出码非 127/信号）；[11] 已随 0004 patch 更新（-? 恒定 255）"
+    command: "bash test.sh --execute | --static-only (via test_package conanfile.py test())"
+  - file: upstream_tests/run_upstream_ohos.sh
+    description: "上游测试 OHOS 真实执行层：编译负载生成器（ProcDumpTestApplication + memload）与 capprobe 能力探针 → 打印能力矩阵与 gcore/身份探测结论 → 按三类逐场景处置（A 类真跑；B 类缺后端时有据跳过且不计入 passed；C 类显式 SKIP 计数）→ 汇总 HMBS_UPSTREAM_OHOS_RESULT"
+    command: "bash upstream_tests/run_upstream_ohos.sh <procdump_bin> <cc> [bash] (via test_package conanfile.py test())"
+  - file: upstream_tests/capprobe.c
+    description: "平台能力探测程序（不是测试用例，不产出自称的 PASS/FAIL）：打印 euid、/proc/<pid>/cmdline argv[0]、/proc/<pid>/comm、PTRACE_SEIZE、PTRACE_ATTACH、/proc/<pid>/mem 的原始探测结果与 errno，供执行层据实决定执行/跳过"
+    command: "compiled with $CC and run by run_upstream_ohos.sh"
+
+assertion_count: 11

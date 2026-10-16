@@ -1,0 +1,30 @@
+# conandata.yml - procdump 2.2
+# Source: the official GitHub tag archive of microsoft/ProcDump-for-Linux 2.2
+# (upstream ships no release-asset tarball for 2.2; the tag archive is the
+# canonical distribution form and is what the tag page links to).
+# Verified 2026-10-05: HTTP 200, 6144581 bytes,
+#   sha256 a8ac2e4db3f357c897adb8c11c2279853ebea0c766eb4cdc158e77ca11b77690
+# The codeload form (https://codeload.github.com/microsoft/ProcDump-for-Linux/
+# tar.gz/refs/tags/2.2) that github.com/.../archive/refs/tags/2.2.tar.gz
+# redirects to yields a byte-identical archive with the same sha256.
+
+sources:
+  url: "https://github.com/microsoft/ProcDump-for-Linux/archive/refs/tags/2.2.tar.gz"
+  sha256: "a8ac2e4db3f357c897adb8c11c2279853ebea0c766eb4cdc158e77ca11b77690"
+
+patches:
+  - patch_file: "patches/0001-thread-cancel-compat-header.patch"
+    patch_description: "Add include/PthreadCompat.h (link-probed pthread_cancel shim + type-correct PROCDUMP_INVALID_THREAD sentinel) and pull it in through Includes.h/GenHelpers.h"
+    patch_type: "portability"
+  - patch_file: "patches/0002-route-cancellation-through-compat.patch"
+    patch_description: "Route the five pthread_cancel/pthread_setcanceltype call sites (Monitor.c x4, CoreDumpWriter.c x2, ProcDumpProfiler.cpp x1) through the compat helpers so the build links on a libc without POSIX thread cancellation"
+    patch_type: "portability"
+  - patch_file: "patches/0003-ohos-kernel-version-gate.patch"
+    patch_description: "Relax the uname()-based kernel>=3.5 gate on OHOS/HarmonyOS: uname(2) there reports sysname HarmonyOS with a non-Linux release string, so sscanf failed and InitProcDump() exit(-1) before the tool could even print usage (CI build #85837: rc=255, only the banner was printed). The gate still applies strictly on every other system."
+    patch_type: "portability"
+  - patch_file: "patches/0004-ohos-nonroot-run.patch"
+    patch_description: "Drop the root-only gate in src/Procdump.c main(): upstream's main() prints the privilege warning + usage and returns without monitoring anything when geteuid()!=0. OHOS build workers are unprivileged (no root, no sudo), so the tool could never actually monitor or dump there. ptrace(PTRACE_ATTACH) of same-uid targets works without root, so the gate is removed (warning retained) and GetOptions/MonitorProcesses run at any euid; behaviour on a real root host is unchanged. This is what lets the test_package upstream execution layer run the 21 non-dotnet integration scenarios for real on OHOS (rule4)."
+    patch_type: "portability"
+  - patch_file: "patches/0005-ohos-fdinfo-degrade.patch"
+    patch_description: "Degrade the /proc/<pid>/fdinfo open failure in src/Process.c GetProcessStat() to an unknown fd count (-1) instead of aborting monitoring. On OHOS the procfs hides /proc/<pid>/fdinfo from the unprivileged worker, so upstream's Log+return false killed every -log monitor before any trigger could fire (CI build #89511: all 21 executed scenarios failed with 'Failed to open /proc/<pid>/fdinfo. Exiting...'). The fd count is only consumed by the -fc trigger, and -fc never fires on an unknown count (num_fd >= threshold is false), so -c/-m/-cl/-ml and ondemand triggers keep working from /proc/<pid>/stat. Root hosts and readable procfs behave unchanged."
+    patch_type: "portability"

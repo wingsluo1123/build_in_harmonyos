@@ -1,0 +1,49 @@
+# 版本级 manifest — procdump/2.2
+# 遵循 ARCHIVE-SPEC v3.0（conanfile.py 为 CI 唯一输入，本文件为交叉校验元数据）
+
+package: procdump
+version: "2.2"
+homepage: "https://github.com/microsoft/ProcDump-for-Linux"
+license: MIT
+status: built
+build_system: makefile
+build_date: "2026-10-05"
+
+source:
+  url: "https://github.com/microsoft/ProcDump-for-Linux/archive/refs/tags/2.2.tar.gz"
+  sha256: "a8ac2e4db3f357c897adb8c11c2279853ebea0c766eb4cdc158e77ca11b77690"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options: []
+  dependencies: []
+  cc: clang
+  cxx: clang++
+  feature_probes:
+    - "pthread_cancel link probe -> -DPROCDUMP_NO_PTHREAD_CANCEL (OHOS musl libc has none)"
+
+patches_applied:
+  - "0001-thread-cancel-compat-header.patch"
+  - "0002-route-cancellation-through-compat.patch"
+
+knowledge_gained:
+  - "OHOS musl libc 完全不实现 POSIX 线程取消：pthread_cancel/pthread_setcanceltype 在 <pthread.h> 里没有声明，libc.a 有 pthread_cancel.o 但 libc.so 不导出该符号（真卡住的是链接而非声明），必须用「编译+链接」探针判定，不能只 grep 头文件"
+  - "OHOS musl 的 pthread_t 是 `struct __pthread *`（C 模式），上游 `pthread_t x = -1` 与 `static inline void cancel_pthread(unsigned long*)` 两处都因此类型不匹配；用 `((pthread_t)-1)` 哨兵 + `pthread_t*` 形参同时兼容整数型与指针型 pthread_t"
+  - "缺失 pthread_cancel 时的正确退路是「sigaction + pthread_kill + 处理器内 pthread_exit」：处理器必须 sa_flags=0（不能带 SA_RESTART），保留信号选 SIGUSR1（proc_dump 只为 sigwait 屏蔽 SIGINT/SIGTERM，无需改屏蔽逻辑），且绝不返回「成功」的假取消"
+  - "PTHREAD_CANCEL_DEFERRED 在无取消 API 时可用 pthread_sigmask 只屏蔽调用线程的保留信号等价表达：作用域一致，且请求会挂起到恢复后投递"
+  - "上游 `-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2` 在 musl 上是隐蔽的运行期地雷：产物链接成功，但加载时报 11 个 __*_chk relocation 失败；lld 在这条链路上没拦住，必须靠 test_package 断言防回归"
+  - "上游 Makefile 的 `$(OBJDIR): clean` / `$(BINDIR): clean` 让每次 make 都先 rm -rf obj bin，因此无法「预置产物再 make」，只能整体自己驱动构建"
+  - "`ld -r -b binary` 是 GNU ld 专有语法（lld 还要 -m aarch64linux），改用生成的 .S + `.incbin` + clang 编译即可产生完全相同的 _binary_<path>_{start,end} 符号对且只依赖 C 编译器"
+  - "conan 的 can_run() 不认识 os=OHOS 这个枚举名，会在 x86_64 主机上误报 True 导致 test 假失败；aarch64 工具包必须再叠一层 platform.machine() 判定并显式声明延后"
+  - "OHOS sysroot 自带 zconf.h/zlib.h，而 ProcDump 源码虽然 include <zconf.h> 却从未引用任何 zlib 符号 —— 这是上游历史遗留 include，不应写成 Conan 依赖"
+  - "-fanalyzer 是 GCC 专有开关（clang 报 unknown argument），上游 CCFLAGS 里带它且带 -Werror，直接沿用会让 OHOS 构建必红"
+
+upstream_tests:
+  command: "make test  ->  tests/integration/run.sh"
+  test_count: 40
+  notes: "上游 40 个场景脚本（tests/integration/scenarios/*.sh）+ tests/integration/run.sh；run.sh 强制 root（否则 sudo 重入）且硬性要求 /usr/bin/stress-ng，dotnet_* 场景还需要已安装 .NET 运行时与 CLR 诊断管道；上游无单元测试框架"
+
+test_package:
+  assertion_count: 12
+  description: "静态层 8 断言（安装布局 / ELF magic / man page / 内嵌 CLR profiler blob 的三处特征字符串 / 无 glibc FORTIFY 引用）+ 运行层 4 断言（procdump -h 输出 usage 与 options、退出码非信号终止；本地 x86_64 主机按 can_run()+platform.machine() 显式延后）"

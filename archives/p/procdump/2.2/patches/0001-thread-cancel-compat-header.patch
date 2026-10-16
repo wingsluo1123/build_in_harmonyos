@@ -1,0 +1,183 @@
+diff --git a/include/GenHelpers.h b/include/GenHelpers.h
+index 82f2091..cc4fcf4 100644
+--- a/include/GenHelpers.h
++++ b/include/GenHelpers.h
+@@ -10,6 +10,7 @@
+ #ifndef GENHELPERS_H
+ #define GENHELPERS_H
+ 
++#include "PthreadCompat.h"
+ #include <linux/version.h>
+ #include <unistd.h>
+ #include <string.h>
+@@ -82,11 +83,11 @@ static inline void cleanup_file(FILE** val)
+ //-------------------------------------------------------------------------------------
+ // Auto cancel pthread
+ //-------------------------------------------------------------------------------------
+-static inline void cancel_pthread(unsigned long* val)
++static inline void cancel_pthread(pthread_t* val)
+ {
+-    if(*val!=-1)
++    if(*val!=PROCDUMP_INVALID_THREAD)
+     {
+-        pthread_cancel(*val);
++        ProcdumpCancelThread(*val);
+     }
+ }
+ 
+diff --git a/include/Includes.h b/include/Includes.h
+index b4e29b7..26ab332 100644
+--- a/include/Includes.h
++++ b/include/Includes.h
+@@ -1,3 +1,4 @@
++#include "PthreadCompat.h"
+ #include "ProfilerCommon.h"
+ #include "CoreDumpWriter.h"
+ #include "Events.h"
+@@ -9,4 +10,4 @@
+ #include "ProcDumpConfiguration.h"
+ #include "Process.h"
+ #include "DotnetHelpers.h"
+-#include "ProfilerHelpers.h"
++#include "ProfilerHelpers.h"
+\ No newline at end of file
+diff --git a/include/PthreadCompat.h b/include/PthreadCompat.h
+new file mode 100644
+index 0000000..a43f7ef
+--- /dev/null
++++ b/include/PthreadCompat.h
+@@ -0,0 +1,133 @@
++// Copyright (c) Microsoft Corporation. All rights reserved.
++// Licensed under the MIT License
++
++//-------------------------------------------------------------------------------------
++//
++// PthreadCompat.h - target-libc thread cancellation compatibility
++//
++// Upstream assumes glibc's POSIX thread-cancellation API (pthread_cancel +
++// pthread_t as an unsigned long, with (pthread_t)-1 as the "no thread" sentinel).
++// The musl-based OpenHarmony libc implements neither:
++//   * pthread_cancel/pthread_setcancelstate/pthread_setcanceltype are neither declared
++//     in <pthread.h> nor exported by libc.so, so every call fails to link, and
++//   * pthread_t is `struct __pthread *`, so the `(pthread_t)-1` sentinel and the
++//     `unsigned long*` cleanup helper no longer type-check.
++//
++// HAVE_PTHREAD_CANCEL is decided by the build system with a real link probe
++// (see the recipe's build()), not by a platform macro, so the same source tree
++// still builds the upstream way on glibc targets.
++//
++// When cancellation is unavailable we fall back to a narrowly scoped
++// async-signal thread exit: a reserved signal (PROCDUMP_THREAD_EXIT_SIG) is
++// installed with sigaction() and its handler calls pthread_exit(0), so a thread
++// blocked in a cancellation point (waitpid/accept/sigwait/sleep) unwinds and
++// the caller can still pthread_join() it. proc_dump never blocks this signal
++// (it only blocks SIGINT/SIGTERM for its sigwait thread).
++//
++//-------------------------------------------------------------------------------------
++#ifndef PROCDUMP_PTHREAD_COMPAT_H
++#define PROCDUMP_PTHREAD_COMPAT_H
++
++#include <pthread.h>
++#include <signal.h>
++#include <string.h>
++
++#if defined(__cplusplus)
++extern "C" {
++#endif
++
++// Reserved signal used to unwind a worker thread when pthread_cancel is missing.
++#define PROCDUMP_THREAD_EXIT_SIG SIGUSR1
++
++// Type-correct "no thread" sentinel: valid for both an integer and a pointer
++// pthread_t.
++#define PROCDUMP_INVALID_THREAD ((pthread_t)-1)
++
++#if defined(PROCDUMP_NO_PTHREAD_CANCEL)
++
++// Deferring is expressed by masking the reserved signal for the *calling* thread
++// (pthread_sigmask, not sigprocmask), which is exactly the per-thread scope of
++// PTHREAD_CANCEL_DEFERRED / PTHREAD_CANCEL_ASYNCHRONOUS. A cancellation request
++// that arrives while deferred stays pending and is delivered as soon as the
++// thread resumes cancellation.
++static inline void ProcdumpDeferThreadExit(void)
++{
++    sigset_t set;
++    sigemptyset(&set);
++    sigaddset(&set, PROCDUMP_THREAD_EXIT_SIG);
++    pthread_sigmask(SIG_BLOCK, &set, NULL);
++}
++
++static inline void ProcdumpResumeThreadExit(void)
++{
++    sigset_t set;
++    sigemptyset(&set);
++    sigaddset(&set, PROCDUMP_THREAD_EXIT_SIG);
++    pthread_sigmask(SIG_UNBLOCK, &set, NULL);
++}
++
++static volatile sig_atomic_t procdump_thread_exit_installed = 0;
++
++static void procdump_thread_exit_handler(int sig)
++{
++    (void)sig;
++    pthread_exit(NULL);
++}
++
++static inline void ProcdumpInstallThreadExitHandler(void)
++{
++    struct sigaction sa;
++    if (procdump_thread_exit_installed)
++    {
++        return;
++    }
++    memset(&sa, 0, sizeof(sa));
++    sa.sa_handler = procdump_thread_exit_handler;
++    sigemptyset(&sa.sa_mask);
++    sa.sa_flags = 0;                  // no SA_RESTART: blocked syscalls must return EINTR
++    sigaction(PROCDUMP_THREAD_EXIT_SIG, &sa, NULL);
++    __sync_synchronize();
++    procdump_thread_exit_installed = 1;
++}
++
++// Returns 0 on success, matching the pthread_cancel() convention used upstream.
++static inline int ProcdumpCancelThread(pthread_t thread)
++{
++    if (thread == PROCDUMP_INVALID_THREAD)
++    {
++        return 0;
++    }
++    ProcdumpInstallThreadExitHandler();
++    return pthread_kill(thread, PROCDUMP_THREAD_EXIT_SIG);
++}
++
++#else   // target libc implements POSIX thread cancellation
++
++static inline void ProcdumpInstallThreadExitHandler(void)
++{
++}
++
++static inline int ProcdumpCancelThread(pthread_t thread)
++{
++    return pthread_cancel(thread);
++}
++
++// Upstream's PTHREAD_CANCEL_DEFERRED around the core-dump critical section maps
++// straight onto the POSIX cancellation type.
++static inline void ProcdumpDeferThreadExit(void)
++{
++    pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
++}
++
++static inline void ProcdumpResumeThreadExit(void)
++{
++    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
++}
++
++#endif
++
++#if defined(__cplusplus)
++}
++#endif
++
++#endif
+\ No newline at end of file

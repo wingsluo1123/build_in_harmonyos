@@ -1,0 +1,29 @@
+software: procdump
+display: "ProcDump for Linux"
+description: "Sysinternals ProcDump 的 Linux/macOS 实现：按 CPU/内存/线程/文件句柄/信号/.NET GC 与异常等触发条件为目标进程抓取 core dump"
+category: system
+license: MIT
+homepage: "https://github.com/microsoft/ProcDump-for-Linux"
+repository: "https://github.com/microsoft/ProcDump-for-Linux"
+keywords:
+  - procdump
+  - sysinternals
+  - coredump
+  - debugger
+  - dump
+  - monitoring
+
+ohos_adaptation:
+  key_points:
+    - "目标 libc（musl）不实现 POSIX 线程取消，配方用编译+链接探针判定后启用 PthreadCompat.h 的 sigaction+pthread_kill 退路"
+    - "pthread_t 在 musl 下是指针，上游的 `= -1` 哨兵与 unsigned long* 清理函数都要按 pthread_t 改写"
+    - "内嵌 CLR profiler 的 `ld -r -b binary` 改为生成 .S + .incbin，只依赖 clang"
+    - "抓 dump 需要 ptrace 与相同 uid，真机上通常要 root；core dump 落盘还受 OHOS 策略与 SELinux 约束"
+  common_dependencies: []
+
+versions:
+  "2.2":
+    status: built
+    build_date: "2026-10-05"
+    conan_ref: "procdump/2.2"
+    patches: 2
