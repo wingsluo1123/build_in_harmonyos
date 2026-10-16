@@ -1,0 +1,56 @@
+# ═══ Draft knowledge entry — vendored py2-era protobuf pb2 modules on Python 3. five-patch migration recipe + protobuf version decision tree
+# Software: keepkey-agent 0.9.0 (keepkeylib 0.7.3 / libagent 0.9.0 vendored closure)
+# Gate: conan create (ohos-aarch64, OHOS Python 3.12.9) + build functional checks 7/7 + test_package 4/4
+# Status: DRAFT
+
+id:                     E628
+title: vendored py2 时代 protobuf pb2 模块在 Python 3 的五处断裂迁移配方（unicode 调用形态/serialized_pb/_ParseOptions bytes 字面量/裸 import/六参数元类）+ protobuf 版本决策树（3.15.4 唯一可用带）
+severity:               2
+category:               compat, python, runtime
+trigger_tool: python|conan|create
+phase: runtime
+
+error_signature: name 'unicode' is not defined|TypeError: decoding str is not supported|memoryview: a bytes-like object is required, not 'str'|Extensions "wire_in" and "wire_in" both try to extend|module 'collections' has no attribute 'MutableMapping'|TypeError: Ping\(\) takes no arguments|NotImplementedError on SerializeToString
+match_keywords: pb2, protobuf, py2, py3, unicode, serialized_pb, metaclass, RegisterExtension, descriptor pool, MutableMapping, collections, GeneratedProtocolMessageType, vendored, keepkey, trezor
+
+root_cause: |
+  Python packages from the 2016-2017 era (keepkey/trezor/bitcoin toolchain generation)
+  ship protoc-generated *_pb2.py modules written for Python 2, which break on Python 3
+  in five distinct ways, all of which must be fixed before the vendored closure imports:
+  (1) `unicode("x", "utf-8")` default-value literals — py3 has no `unicode` builtin; a
+      naive `unicode = str` shim is NOT enough because str("x", "utf-8") raises
+      TypeError("decoding str is not supported") — the call form itself must be replaced
+      with the plain literal "x".
+  (2) `serialized_pb='...'` module-level FileDescriptor payload — py2 str literals carry
+      bytes semantics; py3 requires an explicit b-prefix or protobuf raises
+      "memoryview: a bytes-like object is required, not 'str'" at descriptor parsing.
+  (3) `_ParseOptions(descriptor_pb2.XxxOptions(), '...')` second argument — same bytes
+      literal issue, one call per message/enum/field option (115+ occurrences in keepkey).
+  (4) Bare `import types_pb2` inside a package (py2 allowed package-internal absolute
+      imports) — on py3 the bare name and the package-qualified name
+      (`keepkeylib.types_pb2`) resolve to TWO separate module instances; each executes
+      `RegisterExtension(wire_in)` against the GLOBAL descriptor pool and the second one
+      dies with AssertionError: Extensions "wire_in" and "wire_in" both try to extend
+      message type "google.protobuf.EnumValueOptions" with field number 60002.
+  (5) `class Ping(_message.Message): __metaclass__ = ...` — py2 class-attribute
+      metaclass declaration is silently ignored on py3, so message classes are never
+      protocol-ized by GeneratedProtocolMessageType: instantiation accepts nothing
+      (TypeError: Ping() takes no arguments) and SerializeToString raises bare
+      NotImplementedError.
+  Separately, the protobuf RUNTIME version must be chosen deliberately for old pb2 code:
+  7.x removed the legacy descriptor-construction API (AttributeError on _AddSerializedProto
+  and friends); 3.0.0 runtime uses collections.MutableMapping (removed in Python 3.10+);
+  3.15.4 is the last py2.py3-none-any pure wheel line that still supports legacy
+  descriptor construction AND runs on Python 3.12.
+
+rec_approach: vendored-pb2-five-patch-plus-protobuf-3154
+
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-16
+authors:               unknown
+doc_file:               doc/E628.md
+affected_scope:         vendored py2 时代 protobuf pb2 模块在 Python 3 的五处断裂迁移配方（unicode 
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        vendored-pb2-five-patch-plus-protobuf-3154

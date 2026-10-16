@@ -1,0 +1,39 @@
+# ═══ Draft knowledge entry — hnp/bin symlink 集体失效：PATH 前置 .org 真实目录绕过 ═══
+# Gate: netselect 0.4 真机 shadow CI r1→r4 实证（r1 KC fail → env.sh 修复 → r3/r4 全绿）
+# Status: DRAFT — same-stem .md/.kv pair
+
+id:                     E701
+title: /data/service/hnp/bin 符号链接集体失效（目标不可解析）导致全设备 CI KC 失败——PATH 前置 .org 原位真实二进制目录绕过
+category: ohos, toolchain, environment, shadow-ci
+match_keywords: permission denied: bash, knowledge check failed, /data/service/hnp/bin, l?????????, bash inaccessible, exit 126 copied binary, readelf missing, all jobs fail same day
+
+error_signature: ci/conan/build_and_test.sh.*: permission denied: bash|KC: knowledge check failed — blocking build|sh: bash: inaccessible or not found|ls: /data/service/hnp/bin/.*: Permission denied
+root_cause: >-
+  /data/service/hnp/bin 下所有工具均为指向 /data/service/hnp/<项目>.org/<版本>/bin/...
+  的符号链接；挂载/HMDFS 事件后链接目标集体不可解析（ls 显示 l?????????）。
+  PATH 解析仍能找到路径名，但执行与 stat 均被拒。与 opencsg/E529/E540 的
+  "hnp/bin 不在 PATH" 是不同故障：那些是 PATH 注入问题，本条是链接本身失效。
+affected_scope: >-
+  任何依赖 hnp 工具链的隔离 job（bash/readelf/make/clang 全部经该目录暴露）。
+  判别特征：同日设备上所有库的 job 同时 KC 失败/exit 127。
+rec_approach: prepend-real-org-dir-into-job-env-path
+rec_description: >-
+  在隔离 job 的 env.sh（job 目录文件，非 git 基础设施）PATH 行前置真实二进制
+  所在的 .org 版本目录，例如
+  export PATH=/data/service/hnp/bash.org/bash_5.3/bin:...原PATH...
+  原位二进制保留有效 ELF 签名，可直接执行。
+fallback_approach: resign-copied-binary
+fallback_description: >-
+  若必须用副本（如 shim 目录）：复制到可写分区后需 binary-sign-tool selfSign
+  重签；但签名工具自身通常也在失效的 hnp/bin 里，实际不可行。实测 HMDFS 与
+  /data/storage/el2/base/haps/entry/files/ 的副本均 exit 126（E077 签名丢失）。
+severity:               2
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-16
+authors:               unknown
+doc_file:               doc/E701.md
+trigger_tool:           conan
+phase:                  packaging
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）

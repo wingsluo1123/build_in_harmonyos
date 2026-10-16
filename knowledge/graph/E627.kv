@@ -1,0 +1,64 @@
+#====================================================================
+# DRAFT-12370-zfs-src-2.4.3-userland-kernel-boundary
+#   OpenZFS 2.4.3 用户态栈在 OHOS 的内核/用户态边界适配
+# 来源: PR feat/zfs-src-2.4.3（任务卡 #12370，路径 C 高难度挑战）
+# 路径: Path C（高难度挑战——内核接口边界攻坚）
+# 状态: 草稿（待审核 promote）
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E627
+trigger_tool:           configure|make|clang|ld.lld
+phase:                  build+link+runtime
+error_signature:        with-config=user.*ZFS_AC_CONFIG_USER|
+                        umask 077.*config.status.*could not setup config files|
+                        sed does not support in-place|
+                        program_invocation_short_name.*undeclared|
+                        pthread_cancel.*undefined symbol|
+                        addmntent.*undefined symbol|
+                        SEEK_DATA.*undeclared|
+                        R_AARCH64_ADR_PREL_PG_HI21.*z_errmsg|
+                        implicit.*dgettext.*int-conversion|
+                        zpool.cache.*cannot open
+辨别要点: OpenZFS 家族 + OHOS/musl 语境的组合指纹；单条签名各自已有独立 E 节点，
+  本条收录的是"内核文件系统混合体在无内核模块平台的完整边界处理方法论"。
+
+# ═══ Layer 1: 根因 (Root Cause) ═══
+root_cause: >-
+  OpenZFS 是内核文件系统+用户态工具链混合体，其 Linux 内核依赖（SPL 层/内核模块/
+  udev/libtirpc）在 OHOS（无 ZFS 内核支持、musl libc、toybox 用户环境）上形成
+  三层边界问题：构建期（configure 探测 glibc/toybox 语义）、链接期（musl 符号面
+  与 glibc 私有扩展差异）、运行期（内核 ioctl 不可用）。
+rec_approach: >-
+  three-layer-boundary + user-config-path + weak-symbol-shim + honest-failure-signature
+
+# ═══ Layer 2: 解法 (Solution) ═══
+# ═══ Layer 3: 验证 (Verification) ═══
+verification_cmd:       ztest -T 30 -s 64M -v 1 -f <writable-dir>  # 期望 RC=0
+
+# ═══ Layer 4: 知识面 (Knowledge) ═══
+prerequisite_of:
+conflicts_with:
+
+# ═══ 元数据 ═══
+last_updated:           2026-10-04
+source_event:           任务卡 #12370 zfs-src 2.4.3 适配（路径 C 高难度挑战件）；
+                        可行性先研→实测→配方落地全链
+authors:                 calbee21
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     0.95
+metrics_last_used:      2026-10-04
+severity:               2
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+doc_file:               doc/E627.md
+affected_scope:         general
+rec_description:        >-
+category:               build-system, ohos
+match_keywords:         with-config, user, ZFS_AC_CONFIG_USER

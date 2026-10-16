@@ -1,0 +1,19 @@
+error_signature: "CMakeLists.txt has no install\\(\\) rules|cmake\\.install\\(\\) produced no lib|package_folder missing lib.*include"
+match_keywords: ["pxlib", "CMake", "install rules", "package() manual copy", "configure_file", "h.in shadowing"]
+trigger_tool: "conan create"
+phase: "package"
+root_cause: "Upstream CMakeLists.txt only defines add_library + target_include_directories with no install(TARGETS/FILES) rules; conan cmake.install() therefore produces no lib/ or include/ artifacts, and consumer find_package fails. Secondary: *.h.in templates copied alongside generated *.h shadow the real headers for consumers."
+rec_approach: "In package(): after cmake.install(), use conan.tools.files.copy to manually collect lib<name>.a/.so into package_folder/lib and all public headers (both configure_file-generated and source-folder headers) into package_folder/include. Do NOT ship *.h.in templates. For upstream version-macro/SHARED hardcoding, use real patch files registered in conandata.yml (patches: list) and applied in build() via export_sources()+apply_conandata_patches() (G1 recipe-completeness gate); patch headers use a/ b/ relative paths."
+rec_command: "conan create archives/p/pxlib/0.6.9 -pr:h ohos-aarch64 -pr:b ohos-aarch64"
+category:               cmake, no-install
+verification_cmd: "find <package_folder>/lib -name 'libpxlib.*' | wc -l  # expect >= 1; find <package_folder>/include -name '*.h' | wc -l  # expect >= 3"
+id:                     E675
+severity:               2
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-16
+authors:               unknown
+doc_file:               doc/E675.md
+affected_scope:         general
+rec_description:        "In package(): after cmake
