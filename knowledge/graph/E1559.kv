@@ -1,0 +1,73 @@
+#====================================================================
+# E14726 — OHOS 解释器 sys.platform 不稳定（ohos/linux 随构建而变）：依赖它的第三方
+#          纯 Python 包在部分构建上直接 ImportError，外部依赖无配方时须随包下发 shim
+# 来源: tinyprog 1.0.23 适配（本地/HNP 报 linux 全绿，worker 自带解释器报 ohos
+#       → pyserial 3.5 平台分派抛 ImportError → PR #15147 CI 第 2 轮红）
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E1559
+trigger_tool: python
+phase: runtime
+error_signature: Sorry: no implementation for your platform|don't know how to enumerate ttys on this system|sys\.platform = 'ohos'|list_ports_posix
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               2
+category:               platform, detection, ohos, python, packaging
+match_keywords: sys.platform, ohos, harmonyos, pyserial, list_ports, list_ports_posix, comports, sitecustomize, 平台分派, 解释器, 外部依赖, 本地绿 CI 红
+title: OHOS 解释器 sys.platform 不稳定——依赖它的第三方纯 Python 包在部分构建上 ImportError（外部依赖须随包 shim）
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause: OHOS 上 os.uname().sysname 与 platform.system() 稳定报 HarmonyOS，但 sys.platform 随解释器构建而变（HNP 解释器报 linux，worker 自带解释器报 ohos，另有构建报 harmonyos/ohos-*）。依赖 sys.platform 做平台分派的第三方纯 Python 代码会因此踩空：pyserial 3.5 的 serial/tools/list_ports_posix.py 按 `plat = sys.platform.lower()` 前缀匹配已知平台，'ohos' 不在其列 → 直接 `raise ImportError("Sorry: no implementation for your platform ('{}')")`；而 tinyprog 在 import 期就 `from serial.tools.list_ports import comports`，于是 import 即失败。本地（linux）全绿、CI（ohos）构建期冒烟必红，属"环境语义不可迁移"（W0b）
+affected_scope: 所有适配物依赖第三方纯 Python 包、且该包用 sys.platform 做平台分派的场景；尤其当该依赖是**外部 conan 依赖**（本仓无其配方，W2 单包 PR 无法顺带改其源码/加 ohos 分支）时
+verification_cmd: python3 -c "import sys; print(sys.platform)"; python3 -c "import serial.tools.list_ports as m; print(m.comports.__module__)"（在目标解释器上实测；本地 linux 通过不代表 OHOS 通过）
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority: 1
+rec_approach: ship-sitecustomize-platform-shim
+rec_description: 随包下发 sitecustomize.py（CPython 启动时按 PYTHONPATH 自动导入），仅在 sys.platform 为 ohos/harmonyos 时把正确实现注册到第三方分派器要查的模块名下——本例把 pyserial 的 serial.tools.list_ports_linux 注册为 serial.tools.list_ports_posix，使 `from serial.tools.list_ports import comports` 在 OHOS 上可用。shim 用 `sys.modules.setdefault` 注册、try/except ImportError 兜底，且对非 OHOS 平台零动作（透明）——可参考本仓 cruft 随包下发 sitecustomize.py 的处理
+rec_command: |
+  # sitecustomize.py（随包下发，build() 拷入 stage 后随 package() 进包）
+  #   import sys
+  #   if sys.platform.startswith(("ohos", "harmonyos")):
+  #       try:
+  #           from serial.tools import list_ports_linux as _lpl
+  #       except ImportError:
+  #           pass
+  #       else:
+  #           sys.modules.setdefault("serial.tools.list_ports_posix", _lpl)
+rec_auto_fix: false
+rec_impl:
+
+fallback_priority: 2
+fallback_approach: patch-or-fork-dependency
+fallback_description: 若该依赖在本仓有配方（或可另开 PR 单独适配），优先在其配方内为其源码追加 `sys.platform.startswith(("linux","ohos","harmonyos"))` 平台分支（本仓 bpytop/psutil 的处理方式），从根上修而不是在下游 shim；外部依赖无配方时不得在本包内顺带适配（W2/PF1 原子性），只能走 shim
+fallback_command: grep -rn "sys.platform" <dep-src>  # 定位平台分派点后追加 ohos 分支
+fallback_auto_fix: false
+fallback_impl:
+
+forbid_1_pattern: sys\.platform\s*=\s*['\"]linux['\"]|sys\.platform\s*==\s*['\"]linux['\"]
+forbid_1_reason: 在包内把全局 sys.platform 改写成 'linux' 会污染整个进程（其它真正按 ohos 分流/显式判断的代码被误导），副作用远超"修好 pyserial"这一目标
+forbid_1_consequence: 消费者环境里 OHOS 相关分支被静默关闭，出现难以定位的行为漂移；应改为只注册具体后端模块（sys.modules），不动全局 sys.platform
+
+# ═══ Layer 4: 原则引用 ═══
+principles:
+
+# ═══ 关系图 (Relations) ═══
+# ═══ 元数据 ═══
+doc_file:               doc/E14726.md
+last_updated: 2026-10-13
+source_event:           tinyprog/1.0.23 适配：PR #15147 CI 第 2 轮 build #89823 conan-build-test 步骤失败（conanfile.py _smoke → tinyprog --help rc=1 → pyserial ImportError）
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics, 方案 D) ═══
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+rec_impl:               manual
+authors:               C1A7

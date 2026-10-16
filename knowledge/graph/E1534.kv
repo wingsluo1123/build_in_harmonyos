@@ -1,0 +1,26 @@
+id:                     E1534
+trigger_tool: conan|perl|make|shell
+phase: testing|installation|runtime-validation
+error_signature: no_test_sources|Foreign module|Incomplete original full TAP aggregation
+severity:               2
+category: conan, interpreted-consumer, test-evidence
+title: 对解释型消费者的结构识别补充
+match_keywords: interpreted consumer, declared interpreter, actual installed module, original source hash, TAP plans, exec status, source extension
+root_cause: 固定后缀检查不能识别所有解释型后端，包安装根与解释器系统路径也不能单独证明实际加载来源；必须分别绑定真实前端执行、实际包模块与原TAP完整身份。
+affected_scope: 解释型模块的Conan消费者和固定后缀结构检查，不限某个包或版本。
+verification_cmd: 使用实际解释器执行未改原测试与真实安装消费者，比较原源哈希、TAP程序/计划/结果、实际模块路径和独立原生回执。
+rec_priority: 1
+rec_approach: real-interpreter-frontend-and-installed-source-binding
+rec_description: 对解释型消费者的结构识别补充：保持原语言文件和源码身份，受支持的前端必须用已声明的实际解释器执行原消费者并保留退出码；同时核验实际安装模块、原程序清单和完整TAP，不能以包装文件存在代替真实依赖或测试。
+rec_command: <platform-shell> <real-exec-wrapper> <declared-package-interpreter> <original-consumer>
+rec_auto_fix: false
+rec_impl: actual exec frontend, declared runtime environment and original TAP identity
+forbid_1_pattern: empty.*test source|version-only.*consumer|rename.*pl.*sh
+forbid_1_reason: 前端扩展名、版本文字或错误语言改名不证明真实后端和实际安装包被执行。
+forbid_1_consequence: 结构检查与真实功能脱节，或吞掉后端失败并虚增测试覆盖。
+doc_file: knowledge/drafts/E2026101415198-draft-A139.md
+last_updated: 2026-10-14
+source_event: perl-test-leaktrace-0.17-official-20261014-r004 两次各14原程序/132TAP，C2/H1，15/30/unique1/own0/release/post；原日志SHA256 79bb645bd75d17044887381013094d43c8a939252839b6003d4d2182105146dd，独立观察SHA256 db1dd281ede580f89c859f971c56490cadcf4b4522c7e644ec62fdef06cc7712，平台CI及发布仍待验收。
+authors: 2301_80739235
+source_pr:
+source_commit:

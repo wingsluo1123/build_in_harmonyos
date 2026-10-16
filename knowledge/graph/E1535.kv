@@ -1,0 +1,31 @@
+id:                     E1535
+title: conan 2.29.1 backup-sources 离线喂源码必须同时提供 sha256 与 sha256.json 元数据，缺一即 NotFoundException
+trigger_tool: conan
+phase: conan-create
+severity:               2
+category:               network, conan, backup-sources, offline-build, source-mirror
+match_keywords: backup-sources, download_urls, NotFoundException, Checking backup, download_cache, conandata, sources not found in remote backup, No connection adapters, sha256.json
+error_signature: Checking backup: <base>|Sources for <url> not found in remote backup <base>
+root_cause: conan 2.29.1 的 backup-sources 查找（caching_file_downloader._do_download）对每个源码包要求 <base>/<sha256> 与 <base>/<sha256>.json 两个文件同时存在，缺 .json 元数据即使正文可下载（HTTP 200）也判 NotFoundException；且该版本不支持 file:// scheme（"No connection adapters"），纯路径报 'No scheme supplied'——旧版离线喂源码方案（file:// 基址 + 仅 sha256 命名文件）在新版 conan 上整体失效。
+affected_scope: 任何依赖 conandata.yml 源码下载、需要离线源/镜像基址（core.sources:download_urls + download_cache）的本机或 CI 环境；与具体三方库无关，属 conan 源缓存机制的共性阻塞。
+verification_cmd: curl -s -o /dev/null -w "%{http_code}" http://<base>/<sha256> 返回 200 仍可能 NotFoundException；须同时 curl <base>/<sha256>.json 也为 200 才能通过。
+rec_priority: 1
+rec_approach: dual-file-backup-metadata
+rec_description: 在镜像/本地源目录同时放置 <sha256>（源码包本体）与 <sha256>.json（元数据 {"references": {"<name>/<ver>": ["<原始URL>", "<镜像URL>"]}, "timestamp": <epoch>}）；json 的 urls 需包含实际会被请求的每个 URL 形态（含镜像注入后的完整 URL），否则 URL 交集校验失败触发重下载循环。基址用 http(s)（本机起 python http.server 亦可），勿用 file:// 或纯路径。
+rec_command: printf '{"references": {"pkg/ver": ["https://官方URL", "https://镜像URL"]}, "timestamp": 1760352000}' > <缓存目录>/<sha256>.json
+rec_auto_fix: false
+rec_impl: manual
+forbid_1_pattern: core\.sources:download_urls=\[?["']file:
+forbid_1_reason: conan 2.29.1 requests 不支持 file:// 连接适配器，配置后所有源码下载必失败。
+forbid_1_consequence: conan create 在 source() 阶段 ConanException: No connection adapters，浪费整轮构建。
+principles:
+doc_file: knowledge/drafts/E2026101301-draft-2301_80739235.md
+last_updated: 2026-10-13
+authors: 2301_80739235 <2047361658@qq.com>
+source_pr: ""
+source_commit: ""
+source_event: jamulus 3.9.1 W3 conan-verify source() 三连失败（http 200 仍 NotFound / file:// 无适配器 / 补 .json 后 PASS）。
+metrics_success_count: 1
+metrics_fail_count: 0
+metrics_confidence: 0.5
+metrics_last_used: 2026-10-13
