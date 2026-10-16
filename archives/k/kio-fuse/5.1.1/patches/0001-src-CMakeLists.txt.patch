@@ -1,0 +1,13 @@
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -20,5 +20,9 @@
+ add_executable(kio-fuse ${KIOFUSE_SOURCES})
+ target_include_directories(kio-fuse PRIVATE ${FUSE3_INCLUDE_DIRS})
+ target_compile_definitions(kio-fuse PRIVATE FUSE_USE_VERSION=31 ${FUSE3_CFLAGS_OTHER})
+-target_link_libraries(kio-fuse PRIVATE Qt::Core KF${QT_MAJOR_VERSION}::KIOCore ${FUSE3_LIBRARIES} ${FUSE3_LDFLAGS})
++# OHOS adaptation: kio 6.26.0 is built with USE_DBUS=OFF, so
++# its KF6KIO config does not export a transitive Qt6DBus link
++# (patch 0002 pulls the component in; Qt6::DBus comes from
++# qtbase-sql-dbus/6.11.1).
++target_link_libraries(kio-fuse PRIVATE Qt::Core Qt::DBus KF${QT_MAJOR_VERSION}::KIOCore ${FUSE3_LIBRARIES} ${FUSE3_LDFLAGS})
+ install(TARGETS kio-fuse DESTINATION ${KDE_INSTALL_FULL_LIBEXECDIR})

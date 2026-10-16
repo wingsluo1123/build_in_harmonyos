@@ -1,0 +1,46 @@
+software: kio-fuse
+version: "5.1.1"
+status: built
+build_system: cmake
+created_at: 2026-10-16
+build_date: 2026-10-16
+dependencies:
+  required:
+    - qtbase-sql-dbus/6.11.1
+    - kio/6.26.0
+    - kcoreaddons/6.26.0
+    - libxml2/2.15.3
+    - libfuse/3.18.2
+  build:
+    - ecm/6.26.0
+  transitive:
+    - qtbase/6.11.1
+    - dbus/1.14.10
+    - expat/2.8.2
+    - karchive/6.26.0
+    - kconfig/6.26.0
+    - ki18n/6.26.0
+    - kcrash/6.26.0
+    - kservice/6.26.0
+patches_applied:
+  - 0001-src-CMakeLists.txt.patch
+  - 0002-CMakeLists.txt.patch
+test_results:
+  type: upstream_ctest + test_package
+  upstream: "2 ctest 目标（fileopstest-cache / fileopstest-filejob，同一 tests/fileopstest.cpp 经 -DTEST_CACHE_BASED_IO 编两份，各 21 个 QTest 槽位）以 BUILD_TESTING=ON 编译（Qt6Test/Qt6DBus 链接与 qt_add_dbus_interface 代码生成在构建期全量覆盖）；执行被排除（ctest -E '^(fileopstest-cache|fileopstest-filejob)$'，日志打印排除清单），原因=设备实测沙箱限制：open(\"/dev/fuse\") → EACCES、mount(2) → SIGSYS/seccomp，且无 dbus-run-session。真机行为验证由 test_package 覆盖。"
+  test_package: "passed（TEST_RC=0）：--version 实跑输出 'KIO FUSE version 5.1.1 | FUSE library version 3.18.2 | using FUSE kernel interface version 7.45'；daemon -f 以 rc=1 优雅死于 '/dev/fuse: Permission denied'（沙箱拒挂=预期）；readelf 断言 DT_NEEDED 全裸名 ['libQt6DBus.so.6','libKF6KIOCore.so.6','libKF6CoreAddons.so','libQt6Network.so.6','libQt6Core.so.6','libc++_shared.so','libc.so']（无绝对路径/无 libfuse3/含 Qt6DBus）；D-Bus 服务文件与 systemd 单元 Exec 均指向 libexec/kio-fuse；vendored libdbus-1.so* 随包；共 24 项检查点断言。"
+  package_id: "fa98c7be7612712c7b287292dd89ae8df602ed0c"
+  l0: "pass (test_package/ 结构 + MANIFEST.yml)"
+  l1: "pass (test_package 实跑；上游套件编译覆盖，执行排除原因如实声明)"
+  l2: "skip (设备常态: 无 cache 路径; reports/conan-verify-report.md)"
+  l4: "skip (设备常态: 无 cache 路径; reports/conan-verify-report.md)"
+  l5: "skip (设备常态: 无 cache 路径; reports/conan-verify-report.md)"
+source_url: https://download.kde.org/stable/kio-fuse/kio-fuse-5.1.1.tar.xz
+source_sha256: adf6aa7ce055c0987e716a93ac01f3c0a97c1280421443cd6b21e0e71d763d14
+knowledge_gained:
+  - "平台 kcoreaddons/6.26.0 的 libKF6CoreAddons.so 无 DT_SONAME：CMake 导入目标全路径链接使 lld 把构建机 Conan 缓存绝对路径写进 DT_NEEDED（不可移植、L5b 违规）。三方案实测：IMPORTED_NO_SONAME TRUE 属性无效（lld 仍写绝对路径）；-L genex + -l 追加链接项产生裸名条目但不去重（双条不留）；patchelf --replace-needed 后处理唯一收敛（--print-needed 列绝对条目 → 改写为裸名，运行期由 LD_LIBRARY_PATH 解析）。create #9/#10 日志实证 '1 absolute entry rewritten'。"
+  - "ECM KDEInstallDirs 的 KDE_INSTALL_LIBEXECDIR 在设备 CMAKE_SYSTEM_NAME 下 UNX 判定失败 → libexec 守护进程被装进 bin/（create #7 实证：test_package 断言 libexec/kio-fuse 缺失失败）。generate() 显式钉 KDE_INSTALL_LIBEXECDIR=libexec；org.kde.KIOFuse.service 与 systemd 单元嵌入的都是该路径。"
+  - "cmake.install 对已装 ELF 的 RUNPATH 重写会使工具链 .codesign 段失效 → OHOS 内核拒绝 exec()（create #9 实证：test_package subprocess.run 抛 PermissionError EPERM；构建树二进制可跑、安装后的不可跑，差别仅在 install 的 RUNPATH 重写）。package() 收尾 llvm-objcopy --remove-section .codesign + binary-sign-tool sign -selfSign 1 重签全树（kscreenlocker/kscreen 6.7.2 先例；本次 Signed 4 OHOS package ELF file(s)）。"
+  - "Qt::DBus 版本化别名只在创建它的目录作用域可见：kio/6.26.0 以 USE_DBUS=OFF 构建不导出 Qt6DBus 传递链接，tests/ 自建的 Qt::DBus 别名对 src/ 不可见 → 顶层 find_package(Qt6 COMPONENTS Core DBus) + src 链 Qt::DBus 两行补丁解决；模块本体须用 qtbase-sql-dbus/6.11.1（qtbase/6.11.1 FEATURE_dbus=OFF）。"
+  - "kio/6.26.0 包内 libKF6KIOCore.so.6 携带构建机烘焙的 .cache/conan2 绝对 DT_NEEDED（kserv88f93b00a81ef/kcras5edccfbfae498 等）：装载器对含 '/' 的条目直接按路径 open，路径不存在即链断。Conan 缓存文件夹名跨机器确定（conan download 复现出同名文件夹），CI farm 同机构建链自洽；设备本地以同名包目录复制到 .cache/conan2/p/ 即修复。"
+  - "HMDFS 沙箱全面拒绝 symlink()：共享库版本链（如内置 dbus 的 libdbus-1.so → .so.3 → .so.3.32.4）必须用普通文件复制物化（packaging 与运行解析均等价）；libfuse 直接走静态包绕开该限制。"

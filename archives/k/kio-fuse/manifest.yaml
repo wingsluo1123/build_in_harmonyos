@@ -1,0 +1,30 @@
+software: kio-fuse
+display: "kio-fuse"
+description: "KIO FUSE 守护进程（把 KIO URL 挂载为真实内核 FUSE 文件系统：libexec 守护 + org.kde.KIOFuse D-Bus 激活服务 + systemd 用户单元）"
+category: utility
+homepage: "https://invent.kde.org/system/kio-fuse"
+license: "GPL-3.0-or-later"
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "上游客栈 Qt6::DBus 接线：kio/6.26.0 以 USE_DBUS=OFF 构建、Qt::DBus 别名的目录作用域对 src/ 不可见 → 补丁 0002 顶层 find_package 增 DBus 组件、0001 给守护进程链 Qt::DBus（模块来自 qtbase-sql-dbus/6.11.1）"
+    - "libfuse/3.18.2 静态链接（HMDFS 拒绝 symlink()，共享 libfuse3 的 meson 符号链必然失败）+ 手写 fuse3.pc 供 pkg-config 解析 <fuse_lowlevel.h>"
+    - "随包内置 dbus 1.14.10 共享库：OHOS qtbase 的 Qt6DBus 以 dlopen 加载 libdbus-1.so.3，制品仓仅有静态 libdbus-1.a；版本符号链以普通文件复制物化（沙箱拒绝 symlink）"
+    - "KDE_INSTALL_LIBEXECDIR=libexec 钉死：ECM 的 UNIX 判定在设备 CMAKE_SYSTEM_NAME 下失败，守护进程会被装进 bin/（服务文件与 systemd 单元嵌的是 libexec 路径）"
+    - "DT_NEEDED 绝对路径治理：平台 kcoreaddons/6.26.0 无 DT_SONAME，导入目标全路径链接把 Conan 缓存绝对路径写进 DT_NEEDED → 链接后用 patchelf 改写为裸库名（实测 IMPORTED_NO_SONAME 无效）"
+    - "安装后 ELF 重签名：cmake.install 重写 RUNPATH 失效工具链 .codesign 段 → 内核拒绝 exec（EPERM）；llvm-objcopy 去段 + binary-sign-tool 重签（kscreenlocker/kscreen 6.7.2 先例）"
+    - "上游 fileopstests 编译但不执行：OHOS 沙箱拒绝内核 FUSE 挂载（/dev/fuse EACCES、mount(2) SIGSYS）且无 dbus-run-session；运行期行为由 test_package 真机覆盖"
+  common_dependencies:
+    - "qtbase-sql-dbus/6.11.1"
+    - "kio/6.26.0"
+    - "kcoreaddons/6.26.0"
+    - "libxml2/2.15.3"
+    - "libfuse/3.18.2"
+
+versions:
+  "5.1.1":
+    status: built
+    build_date: "2026-10-16"
+    source_url: "https://download.kde.org/stable/kio-fuse/kio-fuse-5.1.1.tar.xz"
+    packaging: "5.1.1/"
