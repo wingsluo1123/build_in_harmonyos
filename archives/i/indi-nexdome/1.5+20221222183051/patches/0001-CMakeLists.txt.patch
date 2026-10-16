@@ -1,0 +1,56 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,37 +1,49 @@
+-cmake_minimum_required(VERSION 3.0)
++cmake_minimum_required(VERSION 3.16)
+ PROJECT(indi_nexdome CXX C)
++
++# Link against the static INDI archives: the libindi shared objects cannot be
++# loaded at runtime on this OHOS target, while the archives are usable.
++set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+ 
+ LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules/")
+ LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../cmake_modules/")
+ 
+ include(GNUInstallDirs)
+ 
+ set(INDI_NEXDOME_VERSION_MAJOR 1)
+ set(INDI_NEXDOME_VERSION_MINOR 6)
+ 
+-find_package(INDI REQUIRED)
++find_package(INDI COMPONENTS driver REQUIRED)
+ find_package(ZLIB REQUIRED)
+ find_package(Nova REQUIRED)
+ 
+ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.cmake ${CMAKE_CURRENT_BINARY_DIR}/config.h )
+ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/indi_nexdome.xml.cmake ${CMAKE_CURRENT_BINARY_DIR}/indi_nexdome.xml )
+ 
+ include_directories( ${CMAKE_CURRENT_BINARY_DIR})
+ include_directories( ${CMAKE_CURRENT_SOURCE_DIR})
+ include_directories( ${INDI_INCLUDE_DIR})
+ include_directories( ${NOVA_INCLUDE_DIR})
+ 
+ include(CMakeCommon)
+ 
+ ########### NexDome ###########
+ set(indi_nexdome_SRCS
+    ${CMAKE_CURRENT_SOURCE_DIR}/nex_dome.cpp
+    )
+ 
+-add_executable(indi_nexdome ${indi_nexdome_SRCS})
++# Build the driver into a static archive and link it *after* the INDI static
++# libraries (the linker emits .init_array entries in link order, and INDI's own
++# initializers must run before the driver's global device object is built).
++add_library(indi_nexdome_driver STATIC ${indi_nexdome_SRCS})
+ 
+-target_link_libraries(indi_nexdome ${INDI_LIBRARIES} ${NOVA_LIBRARIES})
++set(INDI_NEXDOME_STUB ${CMAKE_CURRENT_BINARY_DIR}/indi_nexdome_stub.c)
++file(WRITE ${INDI_NEXDOME_STUB} "/* intentionally empty translation unit */\n")
++
++add_executable(indi_nexdome ${INDI_NEXDOME_STUB})
++
++target_link_libraries(indi_nexdome -Wl,--start-group ${INDI_LIBRARIES} ${NOVA_LIBRARIES} ${INDI_NEXDOME_DEPS} -Wl,--end-group -Wl,--whole-archive indi_nexdome_driver -Wl,--no-whole-archive)
+ 
+ install(TARGETS indi_nexdome RUNTIME DESTINATION bin )
+ 
+ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/indi_nexdome.xml DESTINATION ${INDI_DATA_DIR})
