@@ -1,0 +1,19 @@
+id:                     E1968
+error_signature: undefined symbol: flatbuffers::ClassicLocale::instance_|parser_test.cpp.*invalid number: "0x|TEST FAILED.*error_.c_str
+match_keywords: add_definitions,FLATBUFFERS_LOCALE_INDEPENDENT,ClassicLocale,strtod_l,hex-float,undefined-symbol,header-default-macro,_XOPEN_VERSION,locale_t
+category:               ohos, linking, conan
+severity:               2
+root_cause: 上游 CMake 以目录级 add_definitions 注入探测得到的编译宏（FLATBUFFERS_LOCALE_INDEPENDENT，check_cxx_symbol_exists 探测 strtof_l），目录级定义不随 cmake install 导出；库内按探测值（本工具链为 0）编译，消费者头文件经 base.h 的 #ifndef 平台默认分支（OHOS _XOPEN_VERSION>=700 取 1）引用仅在宏>0 时编译的静态数据成员 ClassicLocale::instance_ → 消费者链接失败。反向强制宏=1 又触发 OHOS libc 平台缺陷：strtod_l 传入 ClassicLocale 创建的 locale_t 对象时 hex-float 字面量在 0x 处停止解析（返回 0），而裸 strtod 与 newlocale 新建对象均正常解析。
+rec_approach: 配方 generate() 用 tc.variables 显式定值宏为与上游探测一致的落点（本例 OFF），package_info() 用 cpp_info.defines 导出同一宏值，库与消费者强制同走 plain strtod 路径；跨仓库审计点：头文件 #ifndef 平台默认 + 源文件 #if 条件编译符号 + CMake add_definitions 注入的组合必须核查宏是否随安装导出且两侧一致。验证手段：同源文件双宏值编译 × ClassicLocale/新建 locale/裸 strtod 三对照微观探针。
+verification_cmd:
+last_updated: 2026-09-09
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E1968.md
+trigger_tool:           conan
+phase:                  packaging
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        配方 generate() 用 tc

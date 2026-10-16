@@ -1,0 +1,40 @@
+#====================================================================
+# DRAFT-ohos-toybox-ln-long-option
+# OHOS toybox ln 不识别 GNU 长选项，构建系统安装脚本建符号链接失败
+# 触发事件: kmod/34 HarmonyOS PC 适配 (PR #8333)
+#====================================================================
+
+id:                     E1912
+trigger_tool:           meson|make|install|conan|runtime
+phase:                  installation
+error_signature:        Unknown option 'symbolic'|Unknown option 'relative'|ln --symbolic|ln --relative|ln: Unknown option
+
+severity:               2
+category:               portability, build-system, toolchain, install, symlink
+match_keywords:         toybox, ln, symlink, --symbolic, --relative, meson install, install script, os.symlink, multi-call binary
+title:                  OHOS toybox ln rejects GNU long options (--symbolic/--force/--relative); tolerate in install scripts and create symlinks via python
+
+root_cause:             OHOS 用户空间命令由 toybox 提供，ln 只支持短选项（-s/-f），不识别 GNU coreutils 长选项 --symbolic/--force/--relative；meson/CMake 等构建系统生成的安装脚本常用 GNU 长选项（如 meson.add_install_script 输出 ln --symbolic --force --relative），执行即报 "Unknown option" 并退出非零，导致 conan package()/install 失败。
+
+rec_approach:           portability-patch
+rec_description:         两层修复：① 补丁给构建系统安装脚本的 ln 调用加 || true 容错（失败不终止 meson install）；② 配方 package() 用 python os.symlink（相对目标，如 ../bin/kmod）显式创建符号链接，等价于 ln --relative，保证多路调用工具链接不丢失。
+rec_command:            meson.build: ln_s = 'ln --symbolic --force --relative "$DESTDIR@0@/kmod" "$DESTDIR@1@" || true'; conanfile.py package(): for tool in ("depmod","insmod","lsmod","modinfo","modprobe","rmmod"): os.symlink("../bin/kmod", os.path.join(package_folder,"sbin",tool))
+rec_auto_fix:           false
+rec_impl:               conan-recipe
+
+forbid_1_pattern:        \|\| true 且未重建符号链接
+forbid_1_reason:         只加 || true 容错会静默吞掉 ln 失败，包内多路调用符号链接缺失而构建仍"成功"
+forbid_1_consequence:    产物缺失 depmod/modinfo/insmod 等工具，下游调用 command not found，运行时/CI L0k(R38) 才暴露，等于假成功
+
+doc_file:                 knowledge/drafts/DRAFT-ohos-toybox-ln-long-option.md
+last_updated:             2026-09-05
+source_event:             kmod/34 HarmonyOS PC adaptation, PR #8333
+source_pr:                8333
+verification_cmd:         conan create . --user=ohpcd --channel=stable -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 --build=missing
+metrics_success_count:    1
+metrics_fail_count:       0
+metrics_confidence:       0.9
+metrics_last_used:        2026-09-05
+rec_priority:               1
+authors:               A7F3
+affected_scope:         OHOS toybox ln rejects GNU long options (--symbolic/--force/

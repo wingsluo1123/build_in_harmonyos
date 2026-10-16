@@ -1,0 +1,19 @@
+id:                     E1984
+error_signature: (无编译错误) 在无 GPU/EGL/GLFW 上下文的 CI 上无法运行函数指针表 loader（glad/GLEW/EGL loader）的运行用例，导致 run 类上游用例全部未执行
+match_keywords: glad,loader,function pointer table,gladLoadGL,GLADloadfunc,stub get-proc-address,headless,no GPU,EGL,GLFW,khrplatform,GLADapiproc
+category:               platform, testing, graphics, link
+severity:               2
+root_cause: 函数指针表 loader（glad 等）的运行用例依赖真实 GL/GLES/EGL 上下文：upstream run 用例链接 -lglfw/-lgdi32 并创建显示上下文，CI 无 GPU/显示服务器即硬阻塞。但 loader 的初始化路径本身（gladLoadGL → glad_gl_find_core_gl 版本解析 → 函数表填充 → 扩展探测）不依赖真实上下文，可以用 stub get-proc-address 驱动真实执行。
+rec_approach: test_package 提供 stub proc-address 回调（签名必须为 GLADloadfunc=GLADapiproc(*)(const char*)，GLADapiproc=void(*)(void)，返回值不是 void*）：对 glGetString 返回"4.6.0"版本串（驱动 glad_gl_find_core_gl 的 sscanf 版本解析），对 glClear 返回真实无害函数地址（验证表填充），其余返回 NULL；随后断言 gladLoadGL 返回值非 0、GLAD_GL_VERSION_4_6==1、表项非 NULL。这样在无 GPU 上下文 CI 上真实执行 loader 初始化代码路径且不跳转到假地址。
+verification_cmd:
+last_updated: 2026-09-10
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E1984.md
+trigger_tool:           ctest
+phase:                  test
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        test_package 提供 stub proc-address 回调（签名必须为 GLADloadfunc=GLADapiproc(*)(const char*)，GLADapiproc=void

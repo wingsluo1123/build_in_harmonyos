@@ -1,0 +1,33 @@
+# ═══ Draft knowledge entry — OHOS SDK 26 libc++ 缺 ostream<<basic_string 显式实例化 ═══
+# Timestamp: 2026-09-09
+# Software: classads 1.0.10（所有 -O2 链接且调用 cout << std::string 的 C++ 库/程序）
+# Gate: conan create build()（上游测试程序链接）/ test_package 链接
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E1941
+title: OHOS SDK 26 libc++ 不导出 ostream<<basic_string 显式实例化，-O2 TU 链接 undefined symbol _ZNSt4__n1lsIc...
+trigger_tool: clang++ / ld.lld
+phase: linking
+error_signature: undefined symbol: std::__n1::basic_ostream.*operator<<.*basic_string|_ZNSt4__n1lsIcNS_11char_traitsIcEENS_9allocatorIcEEEERNS_13basic_ostream
+severity:               3
+category:               platform, toolchain, libcxx
+match_keywords: undefined symbol, __n1, basic_ostream, basic_string, libc++_shared,
+  operator<<, ld.lld, explicit instantiation, extern template
+root_cause: OHOS SDK 26 的 libc++ 头对 basic_string<char> 的 operator<<(ostream&)
+  声明了 extern template（-O2 TU 因此不生成隐式实例化、发 U 引用），但 SDK 提供的
+  libc++_shared.so、libc++_static.a（以及设备 /system/lib64/libc++.so）经 llvm-nm
+  实测均不含该符号——头与库不匹配。-O0 时隐式实例化生成 W 弱定义可自足，故仅
+  -O2/-O1 以上暴露。
+rec_approach: libcxx-asm-alias-instantiation
+verification_cmd:
+  test_package 链接运行通过（conan-verify G2 PASS，2026-09-09）；llvm-nm 取证：
+  三处库文件对该符号 0 命中、exprTree.o 为 U、t2.o(-O0) 为 W。
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-17
+authors:               unknown
+doc_file:               doc/E1941.md
+affected_scope:         OHOS SDK 26 libc++ 不导出 ostream<<basic_string 显式实例化，-O2 TU 链接
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        libcxx-asm-alias-instantiation
