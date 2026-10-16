@@ -1,0 +1,30 @@
+# 软件级 manifest — xanalyser
+software: xanalyser
+display: "XAnalyser"
+description: "X11/Motif real-time audio frequency spectrum analyser (FFT spectrum + scope, ALSA/OSS/WAV/CDR input)"
+category: audio
+homepage: "http://arvin.schnell-web.net/xanalyser/"
+license: GPL-2.0-or-later
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "GUI 基于 X Toolkit (Xt) + Motif：依赖本仓库适配的 motif/2.3.8（libXm.so.4 + Xm/*.h）。"
+    - "上游链接串 -lXext -lXm -lXt -lSM -lICE -lXmu -lXpm -lX11 要求 8 个 X11 库全部为直接依赖（libxmu/libxpm 不在 motif 的依赖图内）。"
+    - "两条 X11 轨不兼容：libxpm/3.5.17 的二进制建在 libx11/6.4.0 轨，motif/libxt/libxmu 固定在 libx11/1.8.13 轨。沿 xmhtml/1.1.10 化解方式 force libx11/1.8.13 + libxext/6.4.0.1，libxpm 由 CI --build=missing 从源码补建。"
+    - "源码根存在纯文本 VERSION 文件且顶层目录在 -I 路径上：HMDFS 大小写不敏感，C++17 的 #include <version> 命中它 → 全部 TU 报 expected unqualified-id。configure 之后把 VERSION 移出 include 根（改名 VERSION.txt），版本号改由 make 变量传入。"
+    - "E011：configure 的 umask 077 在 HMDFS 上导致临时目录不可写 → 改 022。"
+    - "2008 年的 C++ 代码在 cppstd=17 下命中列表初始化窄化 hard error → -Wno-c++11-narrowing（仓内既有先例：8 个配方的 conanfile.py 使用同款零补丁处置）。"
+    - "OHOS 无 X server：GUI 不可交互，headless 走上游真实 Xt 报错路径（Can't open display，exit 1）；测试覆盖 ELF/musl/AArch64 与依赖加载闭包。"
+  common_dependencies:
+    - motif
+    - libxmu
+    - libxpm
+    - xorgproto
+
+versions:
+  "1.32":
+    status: built
+    build_date: "2026-10-14"
+    conan_ref: "xanalyser/1.32"
+    note: "首次 OHOS 适配。in-source autotools 构建，零源码补丁；全部平台处置在 conanfile.py 内。"
