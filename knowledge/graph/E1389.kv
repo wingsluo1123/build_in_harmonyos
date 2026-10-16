@@ -1,0 +1,108 @@
+#====================================================================
+# _template.kv — 知识图谱条目模板
+# 用法: 复制此文件为 E429.kv，填写各字段
+# 对应的人类文档: doc/E429.md
+#
+# 格式规则:
+#   - key: value（冒号后一个空格，value 到行尾）
+#   - 多行值: 下一行以空格开头 = 续行
+#   - 列表值: 逗号分隔
+#   - 正则值: | 分隔多个模式
+#   - 以 # 开头的行为注释
+#   - 空行忽略
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+# trigger_tool: 出错的工具 (configure/cmake/meson/make/gcc/clang/ld/python/pip/install/test/runtime)
+# phase:         出错阶段 (configuration/compilation/linking/installation/testing/runtime)
+# error_signature: 正则表达式(|分隔), 用于精确匹配日志文本
+id:                     E1389
+trigger_tool: conan|create|shunit2|sh|subprocess
+phase: testing
+error_signature: 未取得 .* 运行结果（可能未真跑）|Ran \\x1b\[|FileNotFoundError: 'sh'|shunit2|<!nocheck>
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+# severity:      3=🔴blocking  2=🟡medium  1=🟢minor  0=✅resolved
+# category:      分类标签（受控词表 64 词，逗号分隔，最多 5 个；add/promote 自动归一化）
+# prescan_pattern: （可选）预编译源码扫描正则——写入后 PreScanner 运行时自动派生
+#                   PSCAN-KB-{id} 规则，无需改 pre-scan-rules.yaml（知识增长即扫描能力增长）
+# prescan_globs:   （可选）扫描范围 glob 列表，默认 '*.c, *.h, *.cc, *.cpp, *.sh, Makefile*, *.mk'
+# 词表: platform, compat, limitation, detection, hmdfs, ohos, selinux, kernel, portability, libc, musl, posix, syscall, headers, threading, socket, network, build-system, cmake, autotools ...（全表见 scripts/ohc/kb_taxonomy.py）
+# match_keywords: 纯文本关键词(逗号分隔), 用于粗筛(固定字符串匹配F)
+# title:         简短标题(一句话描述错误模式)
+severity:               2
+category:               testing, environment, tooling
+match_keywords: shunit2, 测试框架, 测试专用依赖, nocheck, ANSI 颜色码, 重定向吞输出, subprocess 捕获, PATH 无 /bin, 绝对路径 shell, 真跑判定
+title: ①`Build-Depends` 里带 `<!nocheck>` 的条目（本例 shunit2）是**测试框架、不是运行期/构建期必需依赖**——制品仓没有它**不应据此放弃该库**，而应在 build() 内从上游取真实 tarball（钉 sha256）仅用于跑测试、不进产物；②解析测试框架输出时有三处字符级坑：**shell 重定向会吞输出**（要用 `subprocess` 直接捕获）、**框架会输出 ANSI 颜色码**（解析前必须剥离）、**test_package 环境的 PATH 可能不含 `/bin`**（`sh` 要按绝对路径候选解析）
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+# root_cause:       一句话根因描述(逗号可分行)
+# affected_scope:   影响范围
+# verification_cmd: 验证诊断是否正确的命令
+root_cause: ①包管理器语义：`<!nocheck>` 表示"仅在没有测试时才可省略"，属测试期依赖；把它当成硬依赖会导致 白放弃可适配的库。②输出解析：实测三个"看起来没问题但解析失败"的场景—— * 用 `bash -c "… > log 2>&1"` 时输出跑到了 conan 控制台、日志文件为空 → 误判"未真跑"； * shunit2 给数字/OK 着色，repr 是 `Ran \x1b[1;36m6\x1b[0m tests.` → `Ran (\d+) tests?` 永远匹配不到； * 消费者校验进程的 PATH 可能不含 `/bin` → `subprocess.run(["sh", …])` 直接 `FileNotFoundError: 'sh'`。
+affected_scope: 所有需要在 build/test 阶段真跑"上游自带测试套件"的适配；尤其是 shell/perl/python 这类"测试框架本身是纯解释型脚本、仓库里没有对应包"的场景
+verification_cmd: ①`grep -n '<!nocheck>' debian/control`（确认是测试专用）②跑测试时打印捕获输出的 `repr()`（可立刻看出 ANSI 码/空白异常）③`grep -n 'sh' <test>/*` 与 `command -v sh`（确认 shell 是否可解析）
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+# 推荐方案 (priority 越小越优先, 从 1 开始)
+rec_priority: 1
+rec_approach: fetch-test-only-framework-with-pinned-hash-and-capture-output-ansi-stripped
+rec_description: ①**判定依赖性质**：`Build-Depends` 里带 `<!nocheck>` 的条目是测试专用 → 制品仓缺失不构成放弃理由，按"缺环境就下"从上游/Debian pool 取真实 tarball 并钉 sha256（写到 conandata 的独立小节，注明"仅测试用、不进产物"）；②**捕获输出用 `subprocess.run(..., stdout=PIPE, stderr=STDOUT)`**，不要依赖 shell 重定向（否则日志可能为空而误判）；③**解析前剥 ANSI**：`re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", raw)`，再 `" ".join(text.split())` 归一化空白，然后再匹配 `Ran (\d+) tests?` / `OK` / `FAILED`；④**shell 用绝对路径候选**：`shutil.which("sh")` → `/bin/sh` → `/usr/bin/sh` → `/system/bin/sh`，都找不到才按具名环境信号 SKIP；⑤失败时把捕获输出的**末尾若干行 + repr** 打进错误信息，避免"看起来一样却解析不到"的盲目排查。
+rec_command: python3 -c "import subprocess,re;p=subprocess.run(['/bin/sh','tests/functions_test'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT);t=re.sub(r'\x1b\[[0-9;]*[A-Za-z]','',p.stdout.decode('utf-8','replace'));print(re.search(r'Ran (\d+) tests?',' '.join(t.split())))"
+rec_auto_fix: false
+rec_impl: manual
+
+# 回退方案 (当推荐方案不可用时尝试)
+fallback_priority: 2
+fallback_approach: mark-test-framework-absence-as-named-skip
+fallback_description: 若测试框架确实无法获取（上游与各镜像都不可达），可按"具名环境信号"记 SKIP 并在 manifest/notes/PR 里如实披露（写明尝试过的来源与错误），**不得把未跑记成通过**；但这应当是最后手段，优先按上面的方式取到框架。
+fallback_command:
+fallback_auto_fix: false
+fallback_impl: manual forbid_1_pattern:
+
+# ★ 禁止策略 (与推荐方案同等重要) ★
+# forbid_N_pattern:     正则(|分隔), 匹配则拒绝/警告
+# forbid_N_reason:      为什么禁止
+# forbid_N_consequence: 违反后的后果
+forbid_1_pattern:
+forbid_1_reason:
+forbid_1_consequence:
+# forbid_2_pattern:
+# forbid_2_reason:
+# forbid_2_consequence:
+
+# ═══ Layer 4: 原则引用 ═══
+# principles:    适用的原则 ID 列表(逗号分隔), 在 graph/principles.kv 中定义
+principles:
+
+# ═══ 关系图 (Relations) ═══
+# causes:          本模式是这些模式的根因 (修好本模式可能同时解决它们)
+# caused_by:       本模式的根因是这些模式 (应先修它们)
+# similar_to:      特征相似可能混淆的模式
+# conflicts_with:  解决方案互相冲突的模式
+# prerequisite_of: 本模式是修复这些模式的前置条件
+# ═══ 元数据 ═══
+doc_file:               doc/E429.md
+last_updated: 2026-10-08
+source_event:           # 触发此条目创建的编译事件(如有)
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+# authors: 作者列表 (格式: Name <email>, Name2 <email2>)
+#          草稿生成时自动从 git config 填入；主编合入时保留原作者
+#          合并到已有条目时追加为第二/第三作者
+# source_pr:            添加该条目的 PR 编号
+# source_commit:        添加时的 commit SHA (短)
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics, 方案 D) ═══
+# metrics_success_count: 该修复方案成功次数
+# metrics_fail_count:    该修复方案失败次数
+# metrics_confidence:    置信度 = success / (success + fail)
+# metrics_last_used:     最后使用时间
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+authors:               D089

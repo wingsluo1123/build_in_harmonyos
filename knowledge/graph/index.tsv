@@ -1048,6 +1048,99 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 E001	3	toolchain	configure	configuration	cc not found, C compiler, clang, PATH, compiler, cannot create executables	0	true	set-env-var		doc/E001.md
 E002	3	environment	configure|make|install	configuration|installation	/tmp, temporary, read-only, erofs, TMPDIR, Permission denied, tmp	0	true	set-env-var	P014	doc/E002.md
 E003	2	linking	make|ld|clang	linking	pthread, undefined reference, -lpthread, -pthread, threading, libpthread, pthread_create, pthread_mutex	0	true	add-cflags		doc/E003.md
@@ -1539,15 +1632,107 @@ E1352	3	platform, ohos, libc, testing, gap	make|make check|configure|autotools	t
 E1353	2	conan, testing	conan|make	testing	test_package, application package, stdin mode assumption, echo pipe, picoc, grep -q assert	0	false	先读上游入口 usage 再定测试命令；提交真实输入文件(smoke.c)到 test_package/（满足 L0e），test() 用 'bin input | grep -q 断言串'；OHPCD conan 2.29.1 fork 的 ConanFile.run 无 output/capture_output 关键字。		doc/E430.md
 E1354	2	platform, ohos, kernel	cmake|test|runtime	testing|runtime	ppoll, pselect, ENOMEM, OHOS kernel, ninja, NINJA_FORCE_PSELECT, Out of memory	0	false	force-pselect-build-option		doc/E430.md
 E1355	2	detection, build-system, python, conan, packaging	python|pip|test|lit	testing	import 探针, 隐式命名空间包, namespace package, PEP 420, 目录名遮蔽 shadowing, test_package/filecheck, shutil.which, PATH 探针, pip install 被跳过, 静默跳过, lit 127	1	true	cli-probe-with-shutil-which		doc/E430.md
+E1356	2	make, conan, packaging	configure|cmake|meson|make|gcc|clang|ld|python|pip|install|test|runtime	configuration|compilation|linking|installation|testing|runtime	conan copy, keep_path, nested, bin/bin, lib/lib, symlink, package_folder, unable to find library	0	false	package() 拷贝自带 bin//lib/ 前缀的产物时用 copy(..., keep_path=False)；软链显式重建（os.symlink）保证 -l 可链接		knowledge/drafts/E430-draft-A7AC.md
+E1357	2	build-cache	configure|cmake|meson|make|gcc|clang|ld|python|pip|install|test|runtime	configuration|compilation|linking|installation|testing|runtime	conan cache,stale,conan remove,.so 行为,哈希碰撞,多会话	0	false	运行行为偏离源码（源码 md5/反汇编一致但实测值对不上）时，第一嫌疑=缓存陈旧 .so：conan remove "<name>/*" -c 清本包全部旧条目后 clean-room 重建，核验包目录 .so 的 mtime/sha256。多任务并行机器上正式构建前必清本包旧条目。conan 不会重新校验已存在 source 目录的 sha256（只校验下载时刻）		doc/E430.md
+E1358	1	detection, build-system	python|conan|CI	configuration	lang-preflight, detected_language, SConstruct, SConscript, 主体语言, source stats, android subtree, tar exclude, mixed	1	false	source-scope-reextract		doc/E430.md
+E1359	2	compat, libc, aarch64, legacy-c	clang|make	compilation|runtime	implicit declaration, implicitly declaring library function, malloc truncated, SIGSEGV startup, aarch64 pointer truncation, atof, sin, K&R, stdlib.h, LCC, 64-bit	1	false	unconditional-std-headers-and-pointer-prototypes		doc/E430.md
 E136	2	platform, configure, permissions	config.status, configure	configuration	TMPDIR,umask,mktemp,Permission denied,临时目录,config.status,HarmonyOS权限	0	false	patch-script		doc/E136.md
+E1360	3	portability, build-system, conan	configure|cmake|meson|make|gcc|clang|ld|python|pip|install|test|runtime	configuration|compilation|linking|installation|testing|runtime	include 即编译失败, non-dependent, eager check, 声明未定义, undefined symbol, header-only 从未编译, 死代码	0	false	probe-include-and-link-then-patch-or-avoid		doc/E430.md
+E1361	3	build-system	conan	configure	autotoolstoolchain,cppflags,ldflags,ac_check_lib,conan 2.29,dependencies,-lX11	0	false	explicit-flags-in-generate		E430.md
+E1362	2	platform, installation	configure|cmake|meson|make|gcc|clang|ld|python|pip|install|test|runtime	configuration|compilation|linking|installation|testing|runtime	make install,Error 69,is not private,for 循环,rc=0,HMDFS,0660,chmod 无效,HAVE_PRIVATE_FILES,staged install	0	false	per-dir-install-and-skip-host-secrets		knowledge/drafts/E430-draft-4405.md
+E1363	2	ohos, portability, build-system, autotools	conan	build	libtool, -static, -all-static, ld-musl-aarch64.so.1, INTERP, readelf -l, make check, cross compile, QEMU, binfmt, extra_ldflags	0	false	extra-ldflags		doc/E430.md
+E1364	2	conan, api	conan	configuration	ConanFile.run, env, conanbuild, conanrun, should be a list, os.PathLike not tuple, extra_env	1	false	不要用 self.run(env=) 传自定义环境变量；改用 GnuToolchain(self).extra_env.define(K, V) + tc.generate()。	P001, P002	E430-draft-3CE2.md
+E1365	2	platform, c++20, cplusplus, libcxx-stdlib	clang|cmake|make	compilation	std::ranges, __cpp_lib_ranges, no member named, ranges::sort, ranges::find, reverse_view, erase-remove, libcxx-ohos, _LIBCPP_VERSION 15004	0	false	rewrite-ranges-to-classic-stl		doc/E430.md
+E1366	1	portability, testing, audio	make|gcc|clang|runtime	testing|runtime	WAV, wFormatTag, IEEE_FLOAT, BlockAlign, 32-bit float, RIFF, audio, unsupported format	0	false	correct-wav-float-header		doc/E430.md
+E1367	2	compat, portability, runtime	runtime	runtime	GLES, geometry shader, gl_FragDepth, Maleoon 916, D16, D24, D32F	0	false	preserve-requested-32-bit-depth-with-d32f		knowledge/drafts/E429-draft-VTK9.md
+E1368	2	portability, build-system	make	configuration	perl, strict.pm, @INC, PERL5LIB, conan perl, //lib/perl5	0	false	env-variable		doc/E429.md
+E1369	2	compat, python, runtime	python	runtime	mmllib, musicxml, convert_mml_file, N60, extra	0	false	dispatch-on-payload-before-export		drafts/E429-draft-M414.md
 E137	3	build-system, linking, perl	ld|clang|perl	linking|compilation	fstack-protector-strong, ldflags, lddlflags, ld.lld, unknown argument, ExtUtils::CBuilder, have_compiler, Module::Build, Perl, cbuilder, config override	0	false	source-patch		doc/E137.md
+E1370	2	autotools, conan, packaging	libtoolize|autoreconf	configuration	libtoolize, libltdl, share/libtool-conan, not found, autoreconf failed with exit status 1, LT_CONFIG_LTDL_DIR, ohpcd libtool	0	false	materialize-libltdl-from-libtool-package		doc/E429.md
+E1371	2	build-system, meson, linking, conan	meson	configuration	meson, configure probe, run probe, NoRun, meson.build, Unknown variable, LD_LIBRARY_PATH, mesonlib, cpp.run, feature probe, conan cache, shared dependency, log4cplus, meson log	2	false	inject-dep-libdirs-ld-library-path		knowledge/drafts/E429-draft-FC1A.md
+E1372	2	platform, compat, limitation, ohos, portability	runtime	runtime	libusb_init, libusb_get_device_list, sysfs_get_device_list, errno=13, EACCES, /dev/bus/usb, SIGSEGV, 139, FEL, HongMeng kernel	1	false	check-libusb-init-return		doc/E429.md
+E1373	2	ohos, cmake, toolchain, archive	configure|cmake|meson|make|gcc|clang|ld|python|pip|install|test|runtime	compilation|linking	llvm-ranlib, CMAKE_RANLIB, CMAKE_AR, llvm-ar, static archive, cmake_link_script	0	false	cmake-configure-explicit-ranlib		doc/E429.md
+E1374	3	toolchain, java, environment	java|javac|mvn|conan|create	compilation	Error occurred during initialization of VM, Failed to mark memory page as executable, grsecurity, PaX, W^X, RWX, mmap, mprotect, PROT_EXEC, bishengjdk, HNP, /data/service/hnp/bin/java, JAVA_HOME, Maven BUILD FAILURE	0	false	probe-platform-then-switch-to-cmd-pkgs-jdk		doc/E429.md
+E1375	3	build-system, autotools, environment	conan|create|configure|make|autotools	building	builddir, config.status, confstat, config.h.dist, support/configure, out-of-source, --with-zlib, OPTIMIZE, -std=gnu17, C23, conan.tools.gnu, basic_layout	0	false	source-tree-local-builddir-plus-config-h-plus-writable-mount-plus-optimize-flag		doc/E429.md
+E1376	2	compat, headers, build-system, make, environment	make	compilation	CFLAGS,js0n.h,file not found,vendored include,Makefile,environment CFLAGS,LDFLAGS	1	false	始终用 make 命令行变量显式传入完整 CFLAGS/LDFLAGS（命令行优先级高于环境）并补齐 -I<vendored include> 与 -lm;编译器取自 conan conf tools.build:compiler_executables 而非 shell ${CC}（R33）	P001, P011	doc/E429.md
+E1377	2	ohos, portability, memory, aarch64, single-header	clang|conan create|make	compilation	zpl, single-header, stb-style, emmintrin, xmmintrin, SIMD, ZPL_CPU_X86, stdio.h, FILE, tmpfile, ZPL_THREADING, posix_memalign, aligned_alloc, EINVAL, base64	0	true	(1) SIMD 头以 ZPL_CPU_X86 守卫，否则包含 <sched.h>；(2) 主头非 Windows 分支无条件包含 <stdio.h>；(3) ARM Linux 与 x86 一致使用 aligned_alloc		doc/E429.md
+E1378	2	portability, build-system, cmake	cmake	configuration	UHDM_USE_HOST_CAPNP,CAPNP_EXECUTABLE,CAPNPC_CXX_EXECUTABLE,third_party,tool_requires,capnproto	0	false	host 选项跳过上游子模块（UHDM_USE_HOST_CAPNP=ON、UHDM_BUILD_TESTS=OFF）；tool_requires capnproto/1.3.0（制品仓 static+fPIC 现成二进制，免源码编译）；generate() 用 tc.cache_variables 注入 capnproto 包 bin/capnp 与 bin/capnpc-c++ 绝对路径（参考 archives/u/uhdm/1.86/conanfile.py）		doc/E429.md
+E1379	2	build-system, autotools, conan, pkg-config	configure	configuration	PkgConfigDeps, 聚合 pc, gio-2.0.pc, gobject-2.0.pc, PKG_CHECK_MODULES, pkg.m4, 预设变量, BITLBEE_CFLAGS, GLIB_LIBS, 环境变量旁路	0	false	pkg-m4-preset-variable-bypass		doc/E429.md
 E138	3	compat, ohos, portability, libc, posix	gcc|clang|make|cmake	compilation	CLOCK_REALTIME, CLOCK_MONOTONIC, clock_gettime, timespec, time.h, POSIX timer	1	false	disable-posix-timer		doc/E138.md
+E1380	2	conan, recipe-structure	configure|cmake|meson|make|gcc|clang|ld|python|pip|install|test|runtime	packaging	export_sources,apply_conandata_patches,conan-verify,G1,Recipe completeness,patches,conandata.yml,no-op	0	false	在 conanfile.py 中补 from conan.tools.files import apply_conandata_patches, export_conandata_patches；定义 def export_sources(self): export_conandata_patches(self)；在 build() 首行调用 apply_conandata_patches(self)；conandata.yml 显式声明 patches: []		doc/E429.md
+E1381	3	autotools, linking, conan, libtool	configure|cmake|meson|make|gcc|clang|ld|python|pip|install|test|runtime	configuration|compilation|linking|installation|testing|runtime	DT_NEEDED,old_deplibs,archive_cmds,ltconfig,libtool,Error relocating,no-allow-shlib-undefined,whole-archive,as-needed,NEEDED 缺失	0	false	在 package() 阶段绕过 libtool 重建共享库：用同时构建出的静态归档以 -Wl,--whole-archive 加 -Wl,--no-as-needed 直接链接出 .so，把 DT_NEEDED 修复在产物本身，而不是把 --allow-shlib-undefined 之类的负担推给下游（cpp_info.sharedlinkflags 亦不可靠，CMakeDeps 不传导）。重建后按 HMDFS 规则先 os.remove 再 os.symlink 恢复 soname 链接；输入缺失必须 raise，不可静默 return，否则修复会悄然失效。		doc/E429.md
+E1382	3	cmake, conan, packaging	cmake|conan|create|install|find_path	packaging	find_path, INDI_DATA_DIR, INDI_ROOT, PATH_SUFFIXES, install(FILES, DESTINATION, CMAKE_INSTALL_PREFIX, 写进依赖包, 产物缺失, CMakeCache, Nova_DIR, 相对路径, find_package 变量	0	false	preset-directory-variable-to-relative-path-in-toolchain		doc/E429.md
+E1383	3	platform, libc, musl, runtime, testing	conan|make|clang|ctest|sh|runtime	testing|runtime	rc=-5, SIGTRAP, invalid free, invalid pointer, uninitialised struct, uninitialized pointer member, malloc without memset, MallocScribble, MALLOC_PERTURB_, ASan, strict allocator	2	false	zero-init-struct-right-after-malloc		doc/E429.md
+E1384	2	platform, portability, build-system	pip|cmake	configuration	orderedmultidict,pip,PYTHONPATH,generate.py,代码生成,--no-deps,build_folder	0	false	build() 内 python3 -m pip install --no-deps --target <build_folder>/pydeps orderedmultidict==1.0.2 six==1.17.0（社区源 pypi.cnb.cool 由 setup.sh 预配置；先例 adb-enhanced/2.8.0）；generate() VirtualBuildEnv.define PYTHONPATH；TMPDIR 指向 build_folder/tmp（E002/E544-E3AD，见 knowledge/drafts/E544-draft-E3AD.kv）		doc/E429.md
+E1385	2	runtime	configure|cmake|meson|make|gcc|clang|ld|python|pip|install|test|runtime	configuration|compilation|linking|installation|testing|runtime	g_object_unref,GBoxed,adw_spring_params,g_object_run_dispose,SIGSEGV	0	false	释放前先查头文件类型宏：G_DEFINE_BOXED_TYPE→用 boxed 专用 unref（如 adw_spring_params_unref）；G_DEFINE_TYPE→用 g_object_unref。SIGSEGV 落在 g_object_run_dispose 时勿先假设 gobject 库损坏——先用最小 GObject 对照组分离平台问题 vs 对象类型误用		doc/E429.md
+E1386	2	platform, headers, autotools	clang|configure	compilation	utmpx.h, setutxent, getutxent, HAVE_UTMPX_H, ac_cv_header_utmpx_h, utmp.h, w.c, procps	0	false	configure-cache-variable		doc/E429.md
+E1387	2	platform, compat, build-system	make	configuration	kamailio, make cfg, cfg-defs, extra_defs, Makefile.defs, harmonyos, LOCALBASE, pkg-config, CROSS_COMPILE, lock_ops, USE_PTHREAD_MUTEX, HAVE_EPOLL, HAVE_RESOLV_RES, _res, musl	2	false	build-cli-macro-inject		doc/E429.md
+E1388	2	platform, limitation, ohos, conan, testing	conan|test_package|cmake|runtime|make	testing	test_package, GUI 应用, JACK, X11, 无显示, headless, dummy 后端, libc++_shared, /system/lib64, LD_LIBRARY_PATH, ELF 静态验证, 纯 C 检查器, self.run, can_run, 无库 API, reverb, zita-rev1, kokkinizita	2	false	headless-application-static-checker		doc/E429.md
+E1389	2	testing, environment, tooling	conan|create|shunit2|sh|subprocess	testing	shunit2, 测试框架, 测试专用依赖, nocheck, ANSI 颜色码, 重定向吞输出, subprocess 捕获, PATH 无 /bin, 绝对路径 shell, 真跑判定	0	false	fetch-test-only-framework-with-pinned-hash-and-capture-output-ansi-stripped		doc/E429.md
 E139	2	dependency	configure|ld	configuration|linking	GMP, gmp, shared library, static library, libgmp.so, -lgmp, precompiled package	0	false	compile-gmp-shared		doc/E139.md
+E1390	2	python, packaging, testing, shell	python|conan	testing	script-mode child, sys.path[0], python -m, cwd-only import, dill.tests, inherited PYTHONPATH, installed origin, source-independent test	1	false	installed-origin-plus-child-environment-proof		knowledge/drafts/E429-draft-D041.md
+E1391	2	headers, conan, testing	conan|cmake|clang++|make|test_package	configuration|testing	short-name macro, unqualified expansion, using namespace, lest silent success, -p pass flag, test_package consumer	1	false	consumer-namespace-import-plus-pass-flag-evidence		doc/E429.md
+E1392	3	packaging, debian, template	conan|create|package|sed|install	packaging	mkinitramfs, 占位符, @VERSION@, @BUSYBOX_PACKAGES@, override_dh_install, sed 替换, 模板化脚本, DESTDIR, 产物断言	0	false	replicate-the-distro-substitution-and-assert-it		doc/E429.md
+E1393	2	platform, compat, runtime, testing, third-party-package	test	runtime	sane, libsane, /lib/sane, sane-backends, dll.conf, SANE_CONFIG_DIR, scanimage, No scanners were identified, LD_PRELOAD, backend search path	0	false	测试期规避：SANE 后端本身即完整 libsane 实现（导出 sane_init/sane_open/sane_read），在 test_package 运行环境中 LD_PRELOAD=<sane-backends>/lib/sane/libsane-test.so.1 直接驱动官方 test 虚拟后端，并设 SANE_CONFIG_DIR 指向从包内 etc/sane.d 复制的 test.conf（libksane 26.04.0 实践：端到端取图 314x393 通过）。根治：为 sane-backends 单独提依赖项修复 PR，把后端搜索路径改为包内 lib/sane 或引入可覆盖配置。		doc/E429.md
+E1394	2	build-system, conan, packaging	mvn|conan|create	compilation	mvn -pl, -am, --projects, --also-make, maven-dependency-plugin, Downloading from central, 源码编译口径, reactor, unpack, 现成 jar, jakarta.activation-2.0.0.jar	0	false	build-full-reactor-and-verify-artifact-origin		doc/E429.md
+E1395	2	ohos, meson, configure, conan, dependency	meson|conan	configure	meson configure, runs: NO (127), Unknown variable, Error loading shared library, LD_LIBRARY_PATH, shared=True, log4cplus, compile-and-run probe, cpp.run(), meson-native-file, dependency not found	2	false	inject-host-dependency-runtime-path-in-generate	P014	doc/E429.md
+E1396	2	portability, libc, musl, runtime	runtime|test|numdiff	runtime|testing	ssplit, calloc, malloc, uninitialized, SIGSEGV, segmentation fault, core dumped, delimiter, -D, musl, numdiff, vector	1	false	fix-uninitialized-pointer-vector-malloc-to-calloc		doc/E429.md
+E1397	2	java, testing, quality	java|javac|test|python	testing	java, 端到端, consumer check, classpath, NoClassDefFoundError, Class.forName, reflection, 静态方法, 纯函数, 容器, servlet, 真实入口, 断言返回值	0	false	pick-container-free-static-entrypoint-for-e2e		doc/E429.md
+E1398	2	linking, conan, cxx	ld|clang|conan|runtime	linking|runtime	libmemcached.pc, system_libs, __gxx_personality_v0, _ZSt9terminatev, c++ runtime, symbol not found	0	false	不要使用依赖包内自带的 .pc 取链接参数；改用 conan PkgConfigDeps 生成的 .pc（自动带上 package_info 声明的 system_libs）。验证：llvm-nm -u <产物> 无 C++ 运行时残留；llvm-readelf -d 确认 DT_NEEDED 含 libc++_shared.so。		doc/E429.md
+E1399	2	portability, build-system, toolchain	make|clang	compilation	Imakefile, xmkmf, imake, ComplexProgramTarget, DEPXLIB, XPMLIB, XLIB, make install DESTDIR, BINDIR, 老 X11 项目, dockapp, 无 imake 工具链, Imake.tmpl, X11R6, 直接编译, clang++	2	false	bypass-xmkmf-direct-compile	P011	doc/E429.md
 E140	2	platform, detection, cmake	cmake	configuration	CMAKE_SYSTEM_NAME, HarmonyOS, OS_LINUX, platform detection, __OHOS__	0	false	add-harmonyos-cmake-detection		doc/E140.md
+E1400	2	platform, compat, limitation, ohos	test|runtime	testing|runtime	typelib, GIRepository, girepository, introspection, g-irepository-error-quark	2	false	test-skipped-with-evidence		doc/E429.md
+E1401	2	hmdfs, portability, runtime, filesystem, shell	runtime|test|shell	runtime|testing	case-insensitive, 大小写不敏感, HMDFS, /storage, case-only rename, 仅大小写改名, conflict, are the same file, rename no-op, same inode, -ef, 两步改名, temporary name, slugify, OSTYPE, darwin	2	false	same-inode-alias-two-step-rename	P013, P016	knowledge/drafts/E429-draft-B041.md
+E1402	2	build-system, conan, script	conan	configuration	G1,export_sources,apply_conandata_patches,conan-init,autotools,completion script,脚本包,headeronly,test.c	1	false	改用 templates/conanfile-headeronly.py.tmpl 变体 C：删 Autotools/generate 与 shared option，build() 仅核验脚本存在与非空但保留 apply_conandata_patches(self)，def export_sources() 调 export_conandata_patches(self)，package() copy 到 share/bash-completion/completions/，package_info() libs/bindirs/libdirs/includedirs 置空 + resdirs=[share]，package_id() self.info.clear()；test_package 用 .sh 断言 + self.run(bash …)		drafts/E429-draft-AEA2.md          # 草稿期配套文档；promote 后由工具改写为 doc/E429.md
+E1403	3	portability, libc, patch, difference	clang|ld.lld|make|conan|create	building	musl, glibc, __GLIBC__, setpgrp, getpass, portability 补丁, undefined symbol, 编译错误, 老代码, OHOS libc	0	false	glibc-guarded-portability-patch-with-equivalent-posix-fallback		doc/E429.md
+E1404	2	build-system, make, packaging, custom-recipe	make|conan|ar	build|package	make test, No rule to make target install, custom conanfile, llvm-ar, libbytes, raw makefile, single-file C library, no configure, no make install	0	false	custom-conanfile-single-file-lib		doc/E429.md
+E1405	2	conan, environment, tooling	conan|install|build	configuration|compilation	conan, download(), ReadTimeoutError, curl, sha256, retry, mirror, repo1.maven.org, local seed dir, 网络不稳, 编译期 jar	0	false	fetch-with-curl-and-verify-own-sha256-plus-optional-local-seed		doc/E429.md
+E1406	2	ohos, dependency, version, qt	cmake	configuration	Version conflict, qt5-qtbase, KF5CoreAddons, force=True, cmake_find_mode=none, KF5JobWidgets	1	false	unify-qt-base-and-inject-config-paths		knowledge/drafts/E429-draft-AC34.md
+E1407	2	portability, clang, cpp, legacy-code, libcxx	clang|clang++|make|conan	build|compilation	legacy C++, old C++ code, libc++, clang 15, explicit operator bool, operator void*, ostream rdbuf, copyFile, unknown type name uint, BSD sys/types.h, -Wdeprecated-copy-with-user-provided-copy, portability patch, C++98 source under C++17	0	false	minimal-source-portability-patch		knowledge/drafts/E429-draft.md
+E1408	2	platform, compat, ohos, cmake, conan	cmake|conan	configuration|dependency-resolution	Qt6PrintSupport, qtbase/6.11.1.3, override=True, qttools, HarmonyOS aarch64, Conan	1	false	select-published-provider-and-override-transitive-pin		knowledge/drafts/E429-draft-A434.md
+E1409	3	conan, packaging	python	configuration	strip_root, IndexError, flat zip, 扁平压缩包, commonprefix	2	false	verify-archive-layout-then-strip-root-false		doc/E429.md
 E141	2	packaging	clean_verify	verification	configure_options, YAML list, regex, [], no closing quote, shell argument, manifest.yaml	1	false	use-empty-string		doc/E141.md
+E1410	2	portability	clang|make	compilation	always true,tautological-constant-out-of-range-compare,getopt,char,int,aarch64,hang	0	false	承接 getopt/getopt_long 返回值的变量必须是 int（clang 判据 -Wtautological-constant-out-of-range-compare）；回归测试加 timeout，打补丁前后 rc 124(悬死)→1。		doc/E429.md
+E1411	3	build-system, java	mvn|conan|create|maven-bundle-plugin|felix	compilation	maven-bundle-plugin, ConcurrentModificationException, org.apache.felix, osgi-manifest, bnd, ZipFile, 4.2.1, 5.1.9, maven-javadoc-plugin, doclint, heading-sequence, JDK 17.0.13, BUILD FAILURE	0	false	patch-pom-to-pin-newer-maven-bundle-plugin		doc/E429.md
+E1412	2	build-system, conan	ohc-run.py init-build|conan create	extract|packaging	no-build-system,无构建系统,嵌入式协议栈,example 提升,源码集合,直接编译栈源码,CO_driver_target	0	false	1) 误提升时手动重建 .orig/.work（rm -rf; tar xzf --strip-components=1; cp -a; 重写 .tarball-sha256 并核对）; 2) conanfile build() 用 self.conf.get("tools.build:compiler_executables", default={}) dict 形式取编译器（R33），源码全部绝对路径并 cwd=src 编译，llvm-ar 归档; 3) package() 保留子目录头文件布局（CANopen.h include "301/CO_driver.h"）; 4) test_package 用上游 blank 驱动作为消费者硬件抽象层，调用 CO_new/CO_CANinit/CO_LSSinit/CO_CANopenInit/CO_CANopenInitPDO/CO_process/CO_delete 验证真实运行; 5) 提交前清理 conan-verify 残留 .ghfast-bak/.orig 并恢复官方 URL		doc/E429.md
+E1413	3	ohos, packaging, runtime, api, memory	napi|ArkTS|image	runtime	NAPI, ArkTS, ArkUI, image.createPixelMap, external ArrayBuffer, readPixelsToBuffer, release, use-after-free, SIGSEGV, SEGV_MAPERR, cppcrash, PixelMapNapi, HAP	2	false	copied-arraybuffer-and-release-after-all-awaits		doc/E429.md
+E1414	2	platform, limitation, ohos, portability, runtime	runtime|window|gtk	runtime	GTK, Broadway, broadwayd, cannot open display, no display backend, ArkUI native host, overlay, click-through, input shape, window rect, uinput, snapshot_display, curtain	2	false	arkui-native-host-with-ported-behavior-core	P013	doc/E429.md
+E1415	2	ohos, toolchain, linking, environment, ocaml	ocamlopt|dune|clang|as|ld	compilation|linking|testing	ocamlopt, ocaml, GNU as, binutils, as, native_c_compiler, -cc, OCAMLPARAM, ccwrap, -shared, -Wl,-E, lld, undefined symbol: main, Scrt1.o, camlasm, /data/service/hnp	2	false	device-local-ocaml-link-toolchain-closure		knowledge/drafts/E429-draft-9C4A-menhir-ocaml-native-link-closure.md
+E1416	2	compat, libc, musl	cc|clang	compilation	sizeof(FILE), opaque FILE, musl, stdio interpreter buffer layout, PICOC_SYSTEM_FILE_SIZE	0	false	libc 能力守卫：__GLIBC__ 分支保留 sizeof(FILE)，其余用固定上限(512)。案例 picoc 2.1 patches/0001-cstdlib-stdio.c.patch		doc/E429.md
+E1417	2	build-system, autotools, conan, packaging, install	configure|make|conan|test	installation|testing	AutotoolsToolchain,prefix,DESTDIR,package_folder,make install,mkinstalldirs	2	false	AutotoolsToolchain(self) 保持默认 prefix=/，由 Autotools.install() 自动追加 DESTDIR=<package_folder>，产物落在 <package_folder>/bin；不要自造 build_folder 私有 prefix		knowledge/drafts/E429-draft-996F.md
+E1418	2	conan	configure|cmake|meson|make|gcc|clang|ld|python|pip|install|test|runtime	configuration|compilation|linking|installation|testing|runtime	not found in remote backup,No connection adapters,No scheme supplied,download_urls,download_cache,backup source,离线喂源	0	false	本地 http.server 喂源：目录内成对放 <内容sha256> 与 <内容sha256>.json（references 指回官方 URL），core.sources:download_urls=["http://127.0.0.1:<port>/"]；或同构成对预置 download_cache；TEMP 配置用后必须还原 global.conf。检测脚本与样例见 knowledge/operations/conan-offline-source-feed/（样例库 japa 0.9.4 三连失败复现→修复后 create RC=0）		doc/E429.md
+E1419	2	platform, build-system, conan	conan|meson	configuration	version conflict, libx11, libxi, libxtst, libxext, libxfixes, conan graph, 6.4.0, 1.8.13, X11, soname, dependency group	1	false	align-x11-family-to-soname-version-group		doc/E429.md
 E142	3	platform, runtime	ld|runtime	runtime	g_libintl_dgettext, libintl_glib, gettext, NLS, gnulib, dgettext, ENABLE_NLS	1	false	link-libintl_glib		doc/E142.md
+E1420	2	ohos, toolchain, go, conan, permissions	binary-sign-tool|llvm-readelf|llvm-objcopy|go|conan	build|package|test_package	codesign, .codesign, binary-sign-tool, llvm-readelf, selfSign, Permission denied, rc 126, Go SDK bootstrap, go/bin/go, execve, has_codesign, .note.ohos, Go binary, chmod	0	false	readelf-section-check-and-conditional-sign		knowledge/doc/E429.md
+E1421	2	platform, compat, portability, build-system	make|clang|gcc	compilation	msse4, sse4, CXXFLAGS, x86 flag, aarch64, arm64, NEON, unused-command-line-argument, SIMD	1	false	override-build-flags	P001, P014	doc/E429.md
+E1422	2	platform, portability, clang, testing, numerics	clang|clang++|cmake|ctest	testing	ffp-contract, FMA, fused multiply-add, Not able to correctly generate, Assertion failed ApproxEqual, aarch64 floating point	0	false	ffp-contract-off		doc/E429.md
+E1423	3	build-system, cmake, conan	cmake|conan|create|clang|compile	compilation	file not found, indirect include, include_directories, target_link_libraries, XXX_LIBRARIES, XXX_INCLUDE_DIRS, extra_cflags, extra_cxxflags, CMakeToolchain, 老式 CMake, indi, libastro.h, libnova	0	false	inject-dependency-include-dir-via-cmake-toolchain-flags		doc/E429.md
+E1424	2	compat, ohos, libc, bsd-make, cdefs-macro	conan|clang|make	build	__FBSDID, __dead2, errc, sysctlbyname, sys/sysctl.h, BSD make, machine uninitialized	1	true	①sysctl/sysctlbyname 用 #ifdef __FreeBSD__ 守卫（只守卫调用本体，保留 getenv 赋值）；②编译参数注入 -D'__FBSDID(x)=' 与 -D'__dead2=__attribute__((__noreturn__))'；③errc() 等价替换为 errno=EAGAIN + err()		doc/E429.md
+E1425	2	build-system, conan, environment	conan|create|curl|codeload|github	source	404, Not Found, release tag, -RELEASE, v prefix, refs/tags, codeload, 仓库名与制品坐标不一致, jaf-api, jakarta.activation-api, 14 字节	0	false	probe-tag-shapes-and-verify-archive-bytes		doc/E429.md
+E1426	2	ohos, build-system, make, packaging, hardening	make	compilation	Makefile, g++, gcc, hardcoded compiler, GPP, CXX, Error 127, -static, -static-pie, PIE, ET_EXEC, RELRO, hardening	0	false	makefile-toolchain-injection-and-static-pie	P002	drafts/E429-draft-8644.md
+E1427	2	ohos, portability, build-system	make	configuration	.ifdef, missing separator, BSD make, bmake, -DWITH_, WITH_ICONV	0	false	改写条件语法为 ifdef/else/endif；-DWITH_X 改为命令行变量 WITH_X=1；install 用 mkdir -p + cp -f + chmod 替代缺失的 install(1)；补 prefix ?= /usr/local 与 DESTDIR		doc/E429.md
+E1428	3	toolchain, packaging, feasibility	npm|conan|cargo|rustup|wasm	investigation	预构建产物, prebuilt, wasm-bindgen, postinstall 编译, rustup 拒绝 HarmonyOS, 比赛版本不存在, 最新可获取版本, 可行性判据	0	false	check-published-artifacts-before-language-and-pin-but-disclose-missing-versions		doc/E429.md
+E1429	3	compat, ohos, pkg-config, packaging, coin-or	configure	configuration	osi-clp, osi.pc, pkg-config alias, AC_COIN_CHECK_PACKAGE, CglLandP, COIN_HAS_OSICLP, coin-or, clp, CbcSolver	0	false	generate-pkg-config-compat-alias		doc/E429.md
 E143	2	platform, runtime	runtime|python	runtime	bscalc, ctypes, dlopen, Permission denied, Python shebang, /usr/bin/python3, PYTHONPATH, bytesize module	0	false	fix-shebang-plus-env		doc/E143.md
+E1430	2	build-system, java, packaging	javac|maven|conan|build	compilation	java, javac, runtime deps, compile-time deps, optional integration, servlet, osgi, jts, lucene, slf4j, jar 内容, 零运行期依赖, 编译期依赖, 上游 pom, provided	0	false	enumerate-third-party-imports-then-add-compile-only-jars		doc/E429.md
+E1431	1	compat, portability, build-system	python|pip|pytest|conan	testing	test_requires, test 上下文, dependencies.test, conan 包目录截断名, site-packages, sdist 时间戳, SOURCE_DATE_EPOCH, mtime 0, zipfile, before 1980, aiohttp, py.typed	0	false	approach-identifier          # 见 DESIGN §5 impl 列表		doc/E429.md
+E1432	1	build-convention	configure|cmake|meson|make|gcc|clang|ld|python|pip|install|test|runtime	configuration|compilation|linking|installation|testing|runtime	libc++_shared.so, LD_LIBRARY_PATH, VVENC_TOPLEVEL_OUTPUT_DIRS, release-shared, CMAKE_SOURCE_DIR, vvencTests.cmake, add_test, 39 tests, ctest 基线	0	false	Conan recipe 中显式设 VVENC_TOPLEVEL_OUTPUT_DIRS=OFF 并启用 VVENC_ENABLE_INSTALL/VVENC_INSTALL_FULLFEATURE_APP；不要为 libc++_shared.so 额外注入 LD_LIBRARY_PATH；统计上游测试数以 shared 构建的 39 项为基线。		doc/E429.md
+E1433	3	platform	conan	build/test_package	hmdfs,selinux,adhoc_bin,conan,execve,permission denied,shared library	0	false	trusted-python-shim		E429.md
+E1434	2	ohos, kernel, testing, false-fail, fdinfo	make|make check|test-runner|kernel	testing|runtime	fdinfo, flags:02u, O_RDWR, direction bit, pipe endpoint, pty endpoint, socket endpoint, fdinfo flags, /proc/pid/fdinfo, kernel data source, make check, lsof	0	false	kernel-data-gap-report		doc/E429.md
+E1435	2	posix, network, testing	runtime|test	runtime|testing	read returns zero, EOF, stream to datagram, zero length payload, unsigned underflow, packet count	1	false	tri-state-read-loop-with-exact-datagram-cardinality		drafts/E429-draft-7015.md
+E1436	2	build-system	configure|cmake|meson|make|gcc|clang|ld|python|pip|install|test|runtime	configuration|compilation|linking|installation|testing|runtime	mkfifo,EPERM,jobserver,-j1,FIFO	0	false	构建一律 make -j1 串行；conanfile.py build() 中固定 -j1；不要尝试 MAKEFLAGS/-jN 绕过（会复现 EPERM）；CI 同设备类型同约束		doc/E429.md
+E1437	2	platform, portability, libc, musl, headers	clang|clang++|make|conan	compilation	feenableexcept, fedisableexcept, fenv.h, FpeEnable, __GLIBC__, musl, undeclared identifier	0	false	glibc-capability-guard		doc/E429.md
+E1438	2	ohos, runtime, testing, environment, security	runtime|test|qemu	testing|runtime	ncurses, terminfo, TERMINFO, TERMINFO_DIRS, cannot initialize terminal type, uid 0, root, _nc_env_access, use_terminfo_vars, issetugid, cf_cv_multiuser, USE_ROOT_ENVIRON, --enable-root-environ, /etc/passwd, qemu-aarch64, static relink, setpriv, nobody, x86 runner	1	false	run-local-tui-verification-as-non-root		doc/E429.md
+E1439	2	ohos, portability, testing	test|clang|ld	testing	TEST_FILTER, RUN_TEST, strstr, substring filter, duplicate count, assertion count, 用例数, 重复计数, 虚高	1	false	desc-length-substring-subtraction		doc/E429.md
 E144	3	cmake	cmake	configuration	cmake module missing, BuildVersion.cmake, ParseVersion.cmake, MongoPlatform.cmake, MongoSettings.cmake, mongo-c-driver, libbson, .work re-initialization	1	false	manual-build-mode-b		doc/E144.md
+E1440	2	compat, headers, build-system, make	make|cc|clang	compilation	CFLAGS, conditional assignment, Makefile default, include path lost, env CFLAGS overrides makefile, -Isrc, angled include, recipe build flags, make CFLAGS override	1	false	replay-upstream-default-cflags	P014	doc/E429.md
+E1441	3	platform, cmake, toolchain, clang, conan	conan|cmake|clang	configuration	not able to compile a simple test program, compiler is unknown, broken, conan create, stdin, tty, silent failure	0	false	stdin-dev		doc/E429.md
+E1442	3	portability, testing, gp-script, pari	gp	test	not a function in function call, file_exists, wildcards, is_file, galoisgetpol, SUMMARY pass=0 fail=0, GP comment backslash	0	false	一、GP 注释行禁止以反斜杠结尾，命令示例写成整行；二、需要枚举被测目录时由外部脚本（Python）枚举并生成 straight-line 断言 GP 文件，gp 只做真实读取与比较；三、任何批处理测试必须断言用例数等于预期数，不得只看退出码——0 用例 + rc=0 是本类假绿的特征信号。		doc/E429.md
+E1443	2	portability, python, dependency, packaging	python|pip	runtime|installation	python-require, requires, unpublished, guard patch, pip --target, runenv_info PYTHONPATH, R36	2	false	dependency-tiered-dispatch		doc/E429.md
+E1444	2	build-system, java	javac|maven|conan	compilation	java, javac, dependency version, pom alignment, osgi, registerService, API signature change, 4.2.0, 6.0.0, no suitable method found, 编译期依赖版本	0	false	pin-compile-jars-to-the-exact-upstream-pom-versions		doc/E429.md
+E1445	2	detection, portability, python, conan, packaging	lit|pytest|python|test	testing	lit, ShTest, TestingConfig, pass_vars 白名单, HOME 不转发, PYTHONPATH 不转发, --timeout=5, psutil, readline history, riscemu debug.py, lit.local.cfg, 平台 shim, xdsl_src, filecheck 套件假失败	1	false	lit-local-cfg-platform-shim		doc/E429.md
+E1446	2	platform, compat, limitation, build-system, autotools	configure	configuration	cat, Permission denied, heredoc, CONFIG_SHELL, conftest, C compiler cannot create executables, autotools	0	false	conanfile generate() 中把 CONFIG_SHELL/SHELL 固定为 /bin/sh 并自行执行 configure(需自行读 conanbuild.conf 的 configure_args)		doc/E429.md
+E1447	2	portability, build-system, cmake, conan	conan|cmake	configuration|linking	BUILD_SHARED_LIBS, CMakeToolchain, SharedLibBock, vendored, submodule, conan, OHOS, static, shared library	2	false	shadow-cache-variable-in-top-cmakelists	P010, P012	knowledge/drafts/E429-draft-5415.md
 E145	3	meson, runtime, subdir-order	meson	configuration	meson, Unknown variable, have_arm_intrinsics_or_asm, subdir, silk, celt, opus	1	true	source-patch		doc/E145.md
 E146	2	dependency	configure|make	configuration|compilation	dependency, missing, precompiled, external, Alpine, cmd-pkgs	1	true	use_precompiled_package		doc/E146.md
 E147	2	platform, compat, libc	cc|clang|configure|make	compilation|configuration	CPU_SETSIZE, cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_COUNT, CPU_ZERO, CPU_SET, CPU affinity, undeclared, musl, __linux__, __OHOS__	1	true	source-patch		doc/E147.md
