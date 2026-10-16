@@ -1,0 +1,93 @@
+diff --git a/libatomic/Makefile.am b/libatomic/Makefile.am
+index 49689d451..22aaf5a11 100644
+--- a/libatomic/Makefile.am
++++ b/libatomic/Makefile.am
+@@ -69,7 +69,7 @@ libatomic_darwin_rpath += -Wl,-rpath,@loader_path
+ endif
+ 
+ libatomic_la_LDFLAGS = $(libatomic_version_info) $(libatomic_version_script) \
+-	-Wc,-fno-link-libatomic $(lt_host_flags) $(libatomic_darwin_rpath)
++	$(lt_host_flags) $(libatomic_darwin_rpath)
+ 
+ SIZES = @SIZES@
+ 
+diff --git a/libatomic/Makefile.in b/libatomic/Makefile.in
+index 887ae41e4..449490a0e 100644
+--- a/libatomic/Makefile.in
++++ b/libatomic/Makefile.in
+@@ -434,7 +434,7 @@ libatomic_version_info = -version-info $(libtool_VERSION)
+ @ENABLE_DARWIN_AT_RPATH_TRUE@	-Wc,-nodefaultrpaths \
+ @ENABLE_DARWIN_AT_RPATH_TRUE@	-Wl,-rpath,@loader_path
+ libatomic_la_LDFLAGS = $(libatomic_version_info) $(libatomic_version_script) \
+-	-Wc,-fno-link-libatomic $(lt_host_flags) $(libatomic_darwin_rpath)
++	$(lt_host_flags) $(libatomic_darwin_rpath)
+ 
+ @PARTIAL_VXWORKS_FALSE@libatomic_la_SOURCES = gload.c gstore.c gcas.c \
+ @PARTIAL_VXWORKS_FALSE@	gexch.c glfree.c lock.c init.c fenv.c \
+diff --git a/libatomic/configure b/libatomic/configure
+index 2ab04c889..f42a1abb0 100755
+--- a/libatomic/configure
++++ b/libatomic/configure
+@@ -3437,9 +3437,8 @@ fi
+ # in both places for now and restore CFLAGS at the end of config.
+ __libatomic_save_CFLAGS__="$CFLAGS"
+ 
+-# Append -fno-link-libatomic to avoid automatically linking libatomic,
+-# while building libatomic itself.
+-XCFLAGS="$XCFLAGS -fno-link-libatomic"
++# Clang does not automatically link libatomic while building this library.
++XCFLAGS="$XCFLAGS"
+ CFLAGS="$__libatomic_save_CFLAGS__ $XCFLAGS"
+ 
+ 
+@@ -12381,9 +12380,8 @@ cat >>confdefs.h <<_ACEOF
+ _ACEOF
+ 
+ 
+-# Disable fallbacks to __sync routines from libgcc.  Otherwise we'll
+-# make silly decisions about what the cpu can do.
+-CFLAGS="$__libatomic_save_CFLAGS__ -fno-sync-libcalls $XCFLAGS"
++# Clang has no -fno-sync-libcalls; probe the target builtins directly.
++CFLAGS="$__libatomic_save_CFLAGS__ $XCFLAGS"
+ 
+ # Check header files.
+ { $as_echo "$as_me:${as_lineno-$LINENO}: checking for ANSI C header files" >&5
+diff --git a/libatomic/configure.ac b/libatomic/configure.ac
+index 4dc99e0f8..fbfdbf495 100644
+--- a/libatomic/configure.ac
++++ b/libatomic/configure.ac
+@@ -144,9 +144,8 @@ fi
+ # in both places for now and restore CFLAGS at the end of config.
+ __libatomic_save_CFLAGS__="$CFLAGS"
+ 
+-# Append -fno-link-libatomic to avoid automatically linking libatomic,
+-# while building libatomic itself.
+-XCFLAGS="$XCFLAGS -fno-link-libatomic"
++# Clang does not automatically link libatomic while building this library.
++XCFLAGS="$XCFLAGS"
+ CFLAGS="$__libatomic_save_CFLAGS__ $XCFLAGS"
+ 
+ m4_rename([_AC_ARG_VAR_PRECIOUS],[real_PRECIOUS])
+@@ -200,9 +199,8 @@ AM_CONDITIONAL(PARTIAL_VXWORKS, test "x$partial_libatomic" = "xvxworks")
+ AC_DEFINE_UNQUOTED(IFUNC_RESOLVER_ARGS, $IFUNC_RESOLVER_ARGS,
+ 	[Define ifunc resolver function argument.])
+ 
+-# Disable fallbacks to __sync routines from libgcc.  Otherwise we'll
+-# make silly decisions about what the cpu can do.
+-CFLAGS="$__libatomic_save_CFLAGS__ -fno-sync-libcalls $XCFLAGS"
++# Clang has no -fno-sync-libcalls; probe the target builtins directly.
++CFLAGS="$__libatomic_save_CFLAGS__ $XCFLAGS"
+ 
+ # Check header files.
+ AC_STDC_HEADERS
+diff --git a/libatomic/configure.tgt b/libatomic/configure.tgt
+index 026856e7f..e1a9396f1 100644
+--- a/libatomic/configure.tgt
++++ b/libatomic/configure.tgt
+@@ -229,3 +229,6 @@ case "${target}" in
+ 	IFUNC_RESOLVER_ARGS="void"
+ 	;;
+ esac
++
++# The OHOS recipe uses baseline AArch64 atomics (no IFUNC resolver).
++try_ifunc=no
