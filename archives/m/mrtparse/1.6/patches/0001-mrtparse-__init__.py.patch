@@ -1,0 +1,30 @@
+--- a/mrtparse/__init__.py
++++ b/mrtparse/__init__.py
+@@ -657,21 +657,26 @@
+             or self.mrt.type == MRT_T['BGP4MP_ET']:
+             if self.mrt.subtype == BGP4MP_ST['BGP4MP_ENTRY'] \
+                 or self.mrt.subtype == BGP4MP_ST['BGP4MP_SNAPSHOT']:
+                 self.p += self.mrt.len
+                 raise MrtFormatError(
+                     'Unsupported %s subtype %d(%s)'
+                     % (MRT_T[self.mrt.type], self.mrt.subtype,
+                        BGP4MP_ST[self.mrt.subtype]))
+             else:
+                 if self.mrt.type == MRT_T['BGP4MP_ET']:
+-                    self.mrt.micro_ts = self.val_num(4)
++                    if len(data) < 4:
++                        raise MrtFormatError(
++                            'Invalid BGP4MP_ET timestamp length %d < 4 byte'
++                            % len(data))
++                    self.mrt.micro_ts = struct.unpack('>I', data[:4])[0]
++                    data = data[4:]
+                 self.mrt.bgp = Bgp4Mp(data)
+                 self.mrt.bgp.unpack(self.mrt.subtype)
+         elif self.mrt.type == MRT_T['TABLE_DUMP']:
+             self.mrt.td = TableDump(data)
+             self.mrt.td.unpack(self.mrt.subtype)
+         else:
+             self.p += self.mrt.len
+             raise MrtFormatError(
+                 'Unsupported MRT type %d(%s)'
+                 % (self.mrt.type, MRT_T[self.mrt.type]))
