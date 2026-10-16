@@ -1,0 +1,21 @@
+--- a/include/phast/external_libs.h	2026-10-14 19:08:43.218511094 +0800
++++ b/include/phast/external_libs.h	2026-10-14 19:09:04.334517656 +0800
+@@ -38,9 +38,15 @@
+ #define LAPACK_DOUBLE __CLPK_doublereal
+ #else
+ 
+-#ifndef SKIP_LAPACK 
+-#include <f2c.h>  
+-#include <clapack.h> 
++#ifndef SKIP_LAPACK
++/* Adaptation: link against reference LAPACK (netlib, flang-built) instead
++   of CLAPACK. f2c.h/clapack.h are CLAPACK-specific headers and are not
++   provided; declare the f2c-compatible element types directly.  Reference
++   LAPACK default INTEGER is 32-bit (int) and DOUBLE PRECISION is double;
++   Fortran symbols carry a trailing underscore, matching phast's direct
++   dgeev_/dgetrf_/dgetri_/dgesv_/dgebal_/dgebak_ calls. */
++typedef int integer;
++typedef double doublereal;
+ #define LAPACK_INT integer
+ #define LAPACK_DOUBLE doublereal
+ #endif  /*ifndef SKIP_LAPACK */

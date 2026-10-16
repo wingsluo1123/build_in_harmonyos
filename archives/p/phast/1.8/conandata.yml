@@ -1,0 +1,18 @@
+sources:
+  "1.8":
+    url: "https://github.com/CshlSiepelLab/phast/archive/refs/tags/v1.8.tar.gz"
+    sha256: "cf940869102cff48bdfbfab6b23c6515eae743959649903174c7e24f21d26b50"
+patches:
+  "1.8":
+    - patch_file: "patches/0001-external-libs-reference-lapack-types.patch"
+      patch_description: "以参考 LAPACK（netlib/flang，i32 INTEGER，尾下划线符号）替代 CLAPACK：直接定义 f2c 兼容元素类型，不再依赖 CLAPACK 专有的 f2c.h/clapack.h 头文件"
+      patch_type: "portability"
+    - patch_file: "patches/0002-make-include-no-clapack-autodetect.patch"
+      patch_description: "移除对 /usr/local/software/clapack 的无条件 CLAPACKPATH 自动探测，并从 LAPACK bypass 分支移除 -DSKIP_LAPACK（链接参数由 make 命令行显式提供，LAPACK 不可被禁用）"
+      patch_type: "portability"
+    - patch_file: "patches/0003-src-makefile-skip-manpages.patch"
+      patch_description: "跳过 help2man man 手册生成（man 页不属于 conan 包产物，且避免构建期执行 freshly-built 二进制）"
+      patch_type: "packaging"
+    - patch_file: "patches/0004-munge-help-sh-shebang.patch"
+      patch_description: "munge-help.sh shebang 从 /bin/bash 改为 /bin/sh（OHOS 无 /bin/bash，脚本为 POSIX shell 语法）"
+      patch_type: "portability"
