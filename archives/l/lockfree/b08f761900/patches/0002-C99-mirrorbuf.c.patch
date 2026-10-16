@@ -1,0 +1,54 @@
+--- a/C99/mirrorbuf.c
++++ b/C99/mirrorbuf.c
+@@ -61,36 +61,50 @@
+    /* setup map */
+    map->mapf = mapf;
+    map->pbuf = pBuf;
+    map->bsiz = bsiz;
+ 
+    return ((void *)pBuf);
+ }
+ 
+ #else
+ #include <stdlib.h>
++#include <stdio.h>
++#include <string.h>
+ #include <sys/mman.h>
+ #include <unistd.h>
+ 
+ #include "mirrorbuf.h"
+ 
+ /** OSX needs some help here */
+ #ifndef MAP_ANONYMOUS
+ #  define MAP_ANONYMOUS MAP_ANON
+ #endif
+ 
++/** OHOS: /tmp is a read-only erofs mount; honor TMPDIR when set (E002). */
++static void mirrorbuf_tmpl(char *buf, size_t buflen)
++{
++   const char *tmpdir = getenv("TMPDIR");
++   if (tmpdir == NULL || tmpdir[0] == '\0') {
++      tmpdir = "/tmp";
++   }
++   snprintf(buf, buflen, "%s/SPSC-XXXXXX", tmpdir);
++}
++
+ void * mirrorbuf_create(mirrorbuf_t * map, size_t bsiz)
+ {
+-   char path[] = "/tmp/SPSC-XXXXXX";
++   char path[256];
+    int fd, status;
+    unsigned char * addr;
+    unsigned char * data;
++
++   mirrorbuf_tmpl(path, sizeof(path));
+ 
+    map->pbuf = NULL;
+ 
+    fd = mkstemp(path);
+    if (fd < 0)
+    {
+       return (NULL);
+    }
+ 
+    status = unlink(path);

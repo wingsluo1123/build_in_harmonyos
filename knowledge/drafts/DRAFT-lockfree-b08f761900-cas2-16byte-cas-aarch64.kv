@@ -1,0 +1,84 @@
+#====================================================================
+# Draft: lockfree b08f761900 (huangfcn/lockfree) - C99 lffifo.h/lfstack
+#        CAS2 16-byte double-word CAS uses x86-only 'lock cmpxchg16b'
+#        inline asm which clang rejects on aarch64 ('invalid output
+#        constraint "=a"'), and the portable __atomic __int128 16-byte
+#        CAS additionally REQUIRES 16-byte alignment of the head struct
+#        (SIGBUS when only 8-byte aligned). Verified OHOS armv8.
+#====================================================================
+
+id:                     DRAFT-LOCKFREE-B08F761900-CAS2-16BYTE-CAS-AARCH64
+trigger_tool:           clang|gcc|test_package|conan create|cmake
+phase:                  compile|runtime
+error_signature:        invalid output constraint '=a' in asm|cmpxchg16b|include/lffifo.h|invalid output constraint|Signal 7|SIGBUS|Bus error|__int128|compare_exchange
+
+severity:               2
+category:               arch-portability|inline-asm|concurrency|lock-free|memory-alignment
+match_keywords:         cmpxchg16b, 16-byte CAS, double-word CAS, DCAS, ABA counter, lf_pointer, lock-free queue, lock-free stack, inline asm, __asm__ __volatile__, invalid output constraint, x86 asm on aarch64, __int128, __atomic_compare_exchange_n, ldxp, stxp, casp, 16-byte alignment, SIGBUS, alignas, aligned(16)
+
+title:                  无锁库的 16 字节双字 CAS（x86 'lock cmpxchg16b' 内联汇编）在 aarch64 编译失败 + 可移植 __int128 原子 CAS 必须 16 字节对齐：lockfree b08f761900 C99 lffifo/lfstack 的双修复补丁（OHOS armv8 验证通过）
+
+root_cause:             huangfcn/lockfree 的 C99 变体在 lffifo.h 中用内联汇编实现
+                        16 字节双字 CAS（CAS2：指针 + ABA 计数器，__asm__ "lock
+                        cmpxchg16b" + x86 寄存器约束 "=a"/"a"/"b"/"c"/"D"/"d"）。
+                        aarch64 无 cmpxchg16b 指令，clang 直接报
+                        "invalid output constraint '=a' in asm"。改用可移植
+                        __atomic_compare_exchange_n 作用在 __int128* 上（armv8
+                        下降级为 ldxp/stxp 或 casp，lock-free，无需 libatomic），
+                        但 __int128 16 字节原子访问要求目标地址 16 字节对齐：
+                        原 struct lf_pointer {node, aba_} 仅为 8 字节对齐，
+                        堆栈/堆上地址若 8 对齐而未 16 对齐，运行态直接 SIGBUS
+                        （Signal 7）。两处缺一不可：替换 asm + 强制结构 16 字节
+                        对齐，否则要么编不过、要么跑崩。
+affected_scope:         所有在 C/C++ 头文件或源码中用 x86 内联汇编实现 16 字节
+                        双字 CAS（cmpxchg16b / _InterlockedCompareExchange128
+                        也可类同）的无锁数据结构库（lock-free queue/stack/
+                        环形缓冲 + ABA 计数器），移植到 aarch64（OHOS/
+                        HarmonyOS PC 原生 arm64、Linux ARM 等）时必踩；C++11
+                        变体用 std::atomic 无此问题（自动处理对齐与内建）。
+verification_cmd:       修复前（复现）:
+                        test_package 编译含 lffifo.h 的 consumer:
+                          conan create . -pr:h=ci/conan/profiles/ohos-aarch64
+                        → 编译期 error: invalid output constraint '=a' in asm
+                        修复 asm 但未对齐时:
+                          运行 test_lockfree → Signal 7 (SIGBUS) @ magicq 之后
+                          lffifo_init 内 CAS2（结构 8 对齐但不 16 对齐）
+                        修复后（本 draft 证据）:
+                          conan create + test_package 通过，12/12 断言 PASS，
+                          G1-G4/L2/L4/L5 全过，W3 本地 CI 模拟 PASS
+rec_priority:           1
+rec_approach:           portable-int128-atomic-plus-16-byte-align
+rec_description:        ① 用可移植 __atomic_compare_exchange_n 替换 x86 内联汇编：
+                        把 (node, aba_) 两段 64 位打包为 __int128 后对目标指针做
+                        16 字节原子比较交换（memory_order seq_cst）；armv8 clang
+                        原生生成 ldxp/stxp（或 casp），lock-free、不需链接
+                        libatomic；② 给被 CAS 的结构（如 struct lf_pointer）加
+                        16 字节对齐属性（GCC/Clang: __attribute__((aligned(16)))
+                        / C++11: alignas(16)），保证嵌入它的 head/tail/freelist
+                        字段地址 16 对齐，消除 SIGBUS；③ 用 conan-verify G2
+                        （干净 conan create + test_package 真实 API 断言 +
+                        ctest）做端到端验证，覆盖编译期与运行期两侧。
+rec_command:            conan create . -pr:h=ci/conan/profiles/ohos-aarch64 --build=missing  # conan create 内 test_package 自动构建并运行
+rec_auto_fix:           false
+
+# ═══ 七轴查重（本地快照比对 E016/E145/E355/E356/E659 后判定）═══
+exact_duplicate:        false
+causal_duplicate:       false
+trigger_overlap:        false
+solution_overlap:       false
+combination_novelty:    true
+boundary_novelty:       true
+test_migration_novelty: true
+
+# ═══ 关系字段 ═══
+similar_to:             E016, DRAFT-E659-quickfix-1.15.1-atomiccount-x86-xadd-aarch64
+caused_by:              upstream-inline-asm-x86-only-plus-8-byte-alignment
+prerequisite_of:        none
+conflicts_with:         none
+
+# ═══ 路径决定 ═══
+path_decision:          path_b_new_draft
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+source_pr:              #pending (lockfree-b08f761900 本轮 PR，创建后回填)
+source_commit:          b08f76190043f638a52f464eeeab1bcc8345d26d → 本轮适配 commit
