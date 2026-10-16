@@ -1,0 +1,50 @@
+# test_package/MANIFEST.yml — xhk 1.2
+# 上游官方测试声明文件
+# CI 脚本 (ci/conan/build_and_test.sh L0e) 强制要求此文件存在
+# 详见: knowledge/ARCHIVE-SPEC.md、docs/TEST_QUALITY_SPEC.md
+
+package: xhk/1.2
+homepage: "https://github.com/kbingham/xhk"
+
+# 上游源码审计：xhk 1.2 tag archive 不含任何自动化测试。
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "源码树 (xhk-v1.2 GitHub tag archive)"
+    reason: "无 tests/、test/ 目录；源码仅 src/xhk.c、src/xhk-layout.h（单一主程序）与 doc/xhk.1。"
+  - source: "Makefile.am / src/Makefile.am"
+    reason: "根 Makefile.am 仅 SUBDIRS=src 与 dist_doc_DATA=README；src/Makefile.am 仅 bin_PROGRAMS=xhk，无 check/test 目标、无 TESTS 变量。"
+  - source: "configure.ac"
+    reason: "仅 AC_PROG_CC_C99、AM_PROG_CC_C_O 与 x11/xi/xtst 三个 PKG_CHECK_MODULES，无测试宏。"
+  - source: ".travis.yml"
+    reason: "./autogen.sh && ./configure && make；CI 仅验证编译，不运行测试。"
+  - conclusion: "上游 1.2 未提供自动化测试；由 test_package 执行消费者视角的验证：确定性 CLI/ELF 断言（test_xhk.sh）+ 鸿蒙消费者端到端用例（test_xhk_consumer.sh，HC-1/HC-2）。"
+
+# 上游测试命令 (用于 make -n check 分析)
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_xhk.sh
+    description: "真实执行打包的 bin/xhk：-v 打印 'xhk, version 1.2'（exit 0）、-h 打印 usage（exit 0）、-z 非法选项 exit 1 并打印 usage；并用 llvm-readelf 断言 AArch64 / OHOS musl 解释器 / NEEDED libX11.so.6,libXi.so.6,libXtst.so.6（.codesign 段在签名工具可用时存在）。不断言主路径 xlib_halfkey()：OHOS 无 X server，且上游 aarch64 存在 unsigned-char getopt 与 construct() NULL 解引用两处缺陷（见 notes.md）"
+    command: "bash test_xhk.sh"
+    assertion_count: 9
+  - file: test_xhk_consumer.sh
+    description: "鸿蒙消费者端到端用例（rule12 消费者用例，具名 2 个）：HC-1「半键盘镜像工作流端到端」把打包的 bin/xhk 当最终用户工具用，在一台真实运行的 X server 上执行 `xhk -dd -t` 跑通 xhk 的核心业务工作流（ProcessKeycode 的 Start/Pressed/Modified 三态 + mirror_key 镜像映射 + XTest 真注入 X server），断言业务输出：XOpenDisplay/XI Version 2.0 真连上 server、镜像段落真的跑到、状态机真的进入 Modified、Down/Up 65 (space) 真经 XTest 注入、Exiting Test Loop with 0 errors、全程无 keycode/状态比对失败、rc=0；HC-2「独立消费者旁路观测」由另一个独立 X 客户端（xev）在同一 server 上观测被测工具注入的按键事件，断言事件真由 server 投递给别的客户端（keycode 65 / keysym 0x20 space），证明注入不是进程内自说自话。X server 供给：自起可控 Xvfb（PATH → /opt/ohos-guest/bin → /data/service/hnp/bin）优先，其次环境已有且可达的 $DISPLAY；都不可用则显式 SKIP（不计入通过、不阻塞构建，平台限制见 notes.md）"
+    command: "bash test_xhk_consumer.sh"
+    harmonyos_specific: true
+    consumer_cases:
+      - "HC-1 半键盘镜像工作流端到端（真实 X server）"
+      - "HC-2 独立消费者旁路观测（注入按键由 server 投递给独立客户端）"
+    assertion_count: 12
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 21
+
+# 鸿蒙特有测试（消费者用例）计数：CI/评审脚本可读
+harmonyos_specific_test_count: 2
+harmony_consumer_cases: 2

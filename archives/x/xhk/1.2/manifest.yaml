@@ -1,0 +1,42 @@
+# 版本级 manifest — xhk 1.2
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "1.2"
+status: built
+build_date: "2026-10-15"
+conan_ref: "xhk/1.2"
+
+source:
+  url: "https://github.com/kbingham/xhk/archive/refs/tags/xhk-v1.2.tar.gz"
+  sha256: "2fd99c8b81262d4af7b827259be5e0b2a143f67e9f65f78a286dc56960824b7c"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "PKG_CONFIG_PATH 作用域注入：generators 目录（PkgConfigDeps 生成的 x11.pc/xi.pc/xtst.pc）+ 各依赖 lib/pkgconfig"
+    - "--build=aarch64-unknown-linux-gnu --host=aarch64-unknown-linux-gnu (OHOS，绕过 config.guess 无法识别 HarmonyOS)"
+    - "autoreconf -fi 自举（tag archive 不含预生成 configure）"
+  dependencies:
+    - libx11/6.4.0
+    - libxi/6.1.0
+    - libxtst/1.2.5
+    - xorgproto/2025.1
+  build_requirements:
+    - automake/1.18
+    - libtool/2.5.4
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "上游 tag archive 不含预生成 configure（autoreconf 产物不进版本库），须 autoreconf -fi 自举（tool_requires automake/1.18 + libtool/2.5.4，E178）"
+  - "configure.ac 三个 PKG_CHECK_MODULES（x11>=1.6 / xi>=1.6 / xtst>=1）：需要 pkg.m4（ACLOCAL_PATH 动态定位）+ x11.pc/xi.pc/xtst.pc（conan 依赖 + PkgConfigDeps 生成）"
+  - "制品仓 X11 家族按 .so 主版本命名；libxtst/1.2.5 pin libxi/6.1.0，与 libxi/1.8.3 属不同版本线，统一取 6.x 线避免同图版本冲突"
+  - "真机 conan 2.x 的 PkgConfigDeps/tc.environment() 注入 PKG_CONFIG_PATH 不生效，须在 build() 内作用域注入（try/finally 恢复）"
+  - "E549: OHOS 下 bin/xhk 必须自签名（binary-sign-tool）；本地 WSL 环境无该工具时跳过并告警，用 qemu + OHOS guest rootfs 做运行验证"
+  - "上游 aarch64 缺陷 1（未打补丁）: `char opt` 在 aarch64 无符号，(char)-1 != -1 恒真 → getopt 循环永不结束，-d/无参一律 usage+exit(1)；需上游改为 `int opt;`"
+  - "上游 aarch64 缺陷 2（未打补丁）: construct() 无 X 时 return NULL，调用点却解引用 screen->display → 无 X server 时 SIGSEGV（qemu 实测 rc=139）"
+  - "本地 /opt/ohos-guest 为 stock musl，缺 __fd_chk/arc4random_buf，需 libfdchkshim.so/libarc4shim.so 经 LD_PRELOAD 注入才能运行制品仓 X11 二进制（真机 libc 自带，配方本体不依赖）"
+  - "platform-limit（规则 7）: OHOS 无 X server，XInput2 抓键 / XTest 注入路径无法在 headless 环境运行，headless 只验证 -v/-h/-z 与 ELF 属性"
