@@ -1,0 +1,31 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: minicsv/ec11134f7f
+homepage: "https://github.com/jedisct1/minicsv"
+
+# 上游测试命令：上游仅提供 minicsv-test.c（无 Makefile/ctest/configure）。
+# 实际运行：clang minicsv-test.c libminicsv.a 后执行产物。
+upstream_check_command: "clang -O2 -I. minicsv-test.c minicsv.o -o minicsv-test && ./minicsv-test"
+
+# conanfile.py build() 方法中未集成上游测试（无构建系统的单文件库），
+# 上游测试在适配阶段独立运行过（rc=0），见 notes.md。
+upstream_test_in_build: false
+upstream_test_command: "clang -O2 -I. minicsv-test.c libminicsv.a -o minicsv-test && ./minicsv-test"
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: minicsv-test.c
+    source: https://github.com/jedisct1/minicsv/archive/ec11134f7f0b01b7981d5568bc4a9c85b00a21e8.tar.gz/minicsv-test.c
+    description: "上游官方 smoke test：解析多行/转义/空列 CSV 并打印各列"
+    command: "./minicsv-test"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "消费者视角验证：调用 minicsv_parse_line 与 minicsv_trim_cols 断言列数与内容"
+    command: "./test_minicsv"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 8
