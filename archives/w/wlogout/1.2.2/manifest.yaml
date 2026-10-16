@@ -1,0 +1,61 @@
+software: wlogout
+# 版本级 manifest
+# 文件位置: archives/w/wlogout/1.2.2/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "1.2.2"
+
+# 编译状态
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-14"
+
+# 构建系统类型 (顶层字段)
+build_system: meson
+
+source:
+  url: "https://github.com/ArtsyMacaw/wlogout/archive/refs/tags/1.2.2.tar.gz"
+  sha256: "4c9204bfa19c73f51176c94c67711f54f3e393301c0809c61ae379054060fa46"
+  tar_format: tar.gz
+
+build:
+  toolchain: "OHOS clang 15 (aarch64-linux-ohos) / Meson"
+  command: "meson setup + meson compile（man-pages=disabled, werror=false）"
+  parallel: 2
+  flags: ""
+  # patch 0001：meson 依赖 gtk+-wayland-3.0 → 通用 gtk+-3.0（gtk/3.24.43
+  # 为 broadway-only 构建，无 wayland 后端与对应 .pc）；gtk-layer-shell
+  # 上游 optional，不在制品仓，LAYERSHELL 代码经上游 #ifdef 守卫编出。
+  # scdoc 不在制品仓——man-pages=disabled。
+
+test:
+  framework: shell
+  command: "test_package/test.sh"
+  # 上游无测试套件（N=0，审计见 test_package/MANIFEST.yml）
+  total_cases: 4
+  passed_cases: 4
+  failed_cases: 0
+  skipped_cases: 0
+  notes: >-
+    上游 wlogout 1.2.2 无测试套件（无 tests/ 目录、无 meson test 目标，
+    逐文件审计见 test_package/MANIFEST.yml）。功能验证由消费者冒烟补全：
+    --version/-v（版本标识 1.2.2）、--help/-h（usage 文本）共 4 用例真
+    执行真断言。
+
+artifacts:
+  - name: wlogout
+    type: binary
+    path: bin/wlogout
+
+dependencies:
+  runtime:
+    - name: gtk
+      version: "3.24.43"
+      reason: "GTK3 工具链（broadway-only 构建；patch 0001 切通用 gtk+-3.0 依赖）"
+  build: []
+
+environment:
+  os: OHOS
+  arch: arm64
+  build_env: "OpenHarmony PC (aarch64), conan 2.29.1 OHOS-adapted"
