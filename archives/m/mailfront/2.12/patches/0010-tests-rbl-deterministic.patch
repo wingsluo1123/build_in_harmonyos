@@ -1,0 +1,66 @@
+--- a/tests.sh
++++ b/tests.sh
+@@ -117,6 +117,45 @@
+   tests_count=$(($tests_count+1))
+ }
+
++write_rbl_unlisted_expected() {
++  cat >"$tmp/expected-rbl-unlisted" <<'END_OF_RBL_UNLISTED'
++250 local.host^M
++mailfront[#]: MAIL FROM:<somewhere>
++250 Sender='somewhere'.^M
++mailfront[#]: RCPT TO:<elsewhere>
++250 Recipient='elsewhere'.^M
++354 End your message with a period on a line by itself.^M
++mailfront[#]: Subject: test
++250 Received 14 bytes.^M
++mailfront[#]: bytes in: 71 bytes out: RBL-DYNAMIC
++queuedir tmp: 0 new: 0
++END_OF_RBL_UNLISTED
++}
++
++run_compare_rbl_dynamic_test() {
++  local name=$1
++  shift
++  sed -e "s:@SOURCE@:$src:g" -e "s:@TMPDIR@:$tmp:g" \
++      -e "s:@UID@:$_UID:" -e "s:@GID@:$_GID:" >"$tmp/expected"
++  write_rbl_unlisted_expected
++  ( runtest "$@" 2>&1 ) 2>&1 >"$tmp/actual-raw"
++  cat -v "$tmp/actual-raw" >"$tmp/actual"
++  if cmp "$tmp/expected" "$tmp/actual" >/dev/null 2>&1
++  then
++    :
++  elif cmp "$tmp/expected-rbl-unlisted" "$tmp/actual" >/dev/null 2>&1
++  then
++    vecho "RBL lookup returned the canonical unlisted result"
++  else
++    echo "Test $name $* failed:"
++    ( cd "$tmp"; echo "--- listed result ---"; diff -U 9999 expected actual | tail -n +3; \
++      echo "--- unlisted result ---"; diff -U 9999 expected-rbl-unlisted actual | tail -n +3; echo; )
++    tests_failed=$(($tests_failed+1))
++  fi
++  rm -f "$tmp/expected" "$tmp/expected-rbl-unlisted" "$tmp/actual" "$tmp/actual-raw"
++  tests_count=$(($tests_count+1))
++}
++
+ ##### Test tests/rules-negate #####
+
+ runtest() {
+@@ -667,7 +706,7 @@
+ rm -rf $tmp/queuedir $tmp/queuedir
+ }
+ vecho "Running test tests/plugin-rbl '127.0.0.2' 'false'"
+-run_compare_test tests/plugin-rbl '127.0.0.2' 'false' <<END_OF_TEST_RESULTS
++run_compare_rbl_dynamic_test tests/plugin-rbl '127.0.0.2' 'false' <<END_OF_TEST_RESULTS
+ mailfront[#]: rbl: sbl-xbl.spamhaus.org:
+ mailfront[#]: RBL-LISTED
+ mailfront[#]: RBL-LISTED
+@@ -691,7 +730,7 @@
+ END_OF_TEST_RESULTS
+
+ vecho "Running test tests/plugin-rbl '127.0.0.2' 'true'"
+-run_compare_test tests/plugin-rbl '127.0.0.2' 'true' <<END_OF_TEST_RESULTS
++run_compare_rbl_dynamic_test tests/plugin-rbl '127.0.0.2' 'true' <<END_OF_TEST_RESULTS
+ mailfront[#]: rbl: sbl-xbl.spamhaus.org:
+ mailfront[#]: RBL-LISTED
+ mailfront[#]: RBL-LISTED

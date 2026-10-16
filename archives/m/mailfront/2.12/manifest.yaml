@@ -1,0 +1,38 @@
+version: "2.12"
+software: "mailfront"
+status: built
+build_date: "2026-10-15"
+build_system: makefile
+conan_ref: "mailfront/2.12"
+
+source:
+  url: "https://untroubled.org/mailfront/archive/mailfront-2.12.tar.gz"
+  sha256: "a3e3eb2e180a3dfab95f98c3ec65e4add9fb8c14a66987eebdcf02c5f80dca6d"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options:
+    - "Conan-generated conf-cc, conf-ccso and conf-ld"
+    - "make -j1 all lua"
+  dependencies:
+    - "bglibs/2.04"
+    - "cvm/0.97"
+    - "lua/5.1.5"
+  cc: clang
+  cxx: null
+
+patches_applied:
+  - "0001-Makefile.patch"
+  - "0002-builtins.c.patch"
+  - "0003-mailfront.c.patch"
+  - "0004-mailfront.h.patch"
+  - "0005-modules.c.patch"
+  - "0006-plugin-starttls-ucspi.c.patch"
+  - "0007-protocol-smtp.c.patch"
+  - "0008-queuedir.c.patch"
+  - "0009-tests.sh.patch"
+  - "0010-tests-rbl-deterministic.patch"
+
+knowledge_gained:
+  - "STARTTLS 原地传输升级必须在握手成功与下一条命令之间撤销握手前事务、协议身份、认证副本和授权状态；普通邮件事务 reset 不足以表达该安全边界。"  # knowledge_ref: E550 draft

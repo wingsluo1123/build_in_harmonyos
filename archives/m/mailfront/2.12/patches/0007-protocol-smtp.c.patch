@@ -1,0 +1,43 @@
+--- a/protocol-smtp.c
++++ b/protocol-smtp.c
+@@ -29,20 +29,27 @@
+ static RESPONSE(ok, 250, "2.3.0 OK");
+ static RESPONSE(unimp, 500, "5.5.1 Not implemented.");
+ static RESPONSE(badaddr, 501, "5.5.2 Syntax error in address parameter.");
+ static RESPONSE(needsparam, 501, "5.5.2 Syntax error, command requires a parameter.");
+ static RESPONSE(noparam, 501, "5.5.2 Syntax error, no parameters allowed.");
+ static RESPONSE(toomanyunimp, 503, "5.5.0 Too many unimplemented commands.\n5.5.0 Closing connection.");
+ static RESPONSE(goodbye, 221, "2.0.0 Good bye.");
+ 
+ static int saw_mail = 0;
+ static int saw_rcpt = 0;
++
++static void security_reset(void)
++{
++  saw_mail = 0;
++  saw_rcpt = 0;
++  protocol.name = "SMTP";
++}
+ 
+ static const response* parse_addr_arg(void)
+ {
+   unsigned i;
+   char term;
+   int quoted;
+   
+   if (!str_truncate(&addr, 0)) return &resp_oom;
+   if (!str_truncate(&params, 0)) return &resp_oom;
+ 
+@@ -371,11 +378,12 @@
+     && obuf_write(&outbuf, msg, len)
+     && obuf_puts(&outbuf, CRLF);
+ }
+ 
+ struct protocol protocol = {
+   .version = PROTOCOL_VERSION,
+   .name = "SMTP",
+   .respond_line = smtp_respond_line,
+   .init = init,
+   .mainloop = mainloop,
++  .security_reset = security_reset,
+ };

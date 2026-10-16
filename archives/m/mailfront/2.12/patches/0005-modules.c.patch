@@ -1,0 +1,69 @@
+--- a/modules.c
++++ b/modules.c
+@@ -1,21 +1,43 @@
+ #include <dlfcn.h>
++#include <limits.h>
+ #include <stdlib.h>
+ #include <string.h>
++#include <unistd.h>
+ #include <bglibs/msg.h>
+ #include "mailfront-internal.h"
+ #include "conf_modules.c"
+ 
+ static response resp_load = { 451, 0 };
+ static RESPONSE(backend_version,451,"4.3.0 Backend ABI version mismatch");
+ static RESPONSE(plugin_version,451,"4.3.0 Plugin ABI version mismatch");
+ static RESPONSE(protocol_version,451,"4.3.0 Protocol ABI version mismatch");
++
++static const char* executable_module_path(void)
++{
++  static char path[PATH_MAX];
++  static const char suffix[] = "/../lib/mailfront";
++  char* slash;
++  ssize_t len;
++
++  len = readlink("/proc/self/exe", path, sizeof path - sizeof suffix);
++  if (len <= 0)
++    return conf_modules;
++  path[len] = 0;
++  if ((slash = strrchr(path, '/')) == 0)
++    return conf_modules;
++  *slash = 0;
++  if (strlen(path) + sizeof suffix > sizeof path)
++    return conf_modules;
++  strcat(path, suffix);
++  return path;
++}
+ 
+ static void append_plugin(struct plugin* plugin)
+ {
+   plugin->next = 0;
+   if (session.plugin_tail == 0)
+     session.plugin_list = plugin;
+   else
+     session.plugin_tail->next = plugin;
+   session.plugin_tail = plugin;
+ }
+@@ -160,21 +182,21 @@
+   return old;
+ }
+ 
+ const response* load_modules(const char* protocol_name,
+ 			     const char* backend_name,
+ 			     const char** plugins)
+ {
+   const char* env;
+   const response* r;
+   if ((session.module_path = getenv("MODULE_PATH")) == 0)
+-    session.module_path = conf_modules;
++    session.module_path = executable_module_path();
+   if ((session.protocol = load_object("protocol", protocol_name)) == 0)
+     return &resp_load;
+   if (session.protocol->version != PROTOCOL_VERSION)
+     return &resp_protocol_version;
+   if ((r = load_backend(&session.backend, backend_name)) != 0)
+     return r;
+   session.flags |= session.backend->flags;
+   while (*plugins != 0)
+     if ((r = load_plugins(*plugins++)) != 0)
+       return r;

@@ -1,0 +1,58 @@
+--- a/builtins.c
++++ b/builtins.c
+@@ -1,19 +1,19 @@
+ #include <stdlib.h>
+ #include "mailfront-internal.h"
+ 
+ static RESPONSE(accept,250,0);
+ static RESPONSE(ok, 250, 0);
+ static RESPONSE(mustauth, 530, "5.7.1 You must authenticate first.");
+ static response resp;
+ 
+-static const response* accept(str* s, str* params)
++static const response* builtin_accept(str* s, str* params)
+ {
+   return &resp_accept;
+   (void)s;
+   (void)params;
+ }
+ 
+ static const response* reject(str* s, str* params)
+ {
+   const char* sr;
+   if ((sr = session_getenv("SMTPREJECT")) != 0
+@@ -53,30 +53,30 @@
+       && session_getenv("RELAYCLIENT") == 0)
+     return &resp_mustauth;
+   return 0;
+   (void)s;
+   (void)params;
+ }
+ 
+ struct plugin builtin_plugins[] = {
+   {
+     .name = "accept",
+-    .sender = accept,
+-    .recipient = accept,
++    .sender = builtin_accept,
++    .recipient = builtin_accept,
+   },
+   {
+     .name = "accept-recipient",
+-    .recipient = accept,
++    .recipient = builtin_accept,
+   },
+   {
+     .name = "accept-sender",
+-    .sender = accept,
++    .sender = builtin_accept,
+   },
+   {
+     .name = "force-file",
+     .flags = FLAG_NEED_FILE,
+   },
+   {
+     .name = "reject",
+     .sender = reject,
+   },
+   {
