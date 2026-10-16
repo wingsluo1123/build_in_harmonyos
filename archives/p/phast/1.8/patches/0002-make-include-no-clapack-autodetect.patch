@@ -1,0 +1,38 @@
+--- a/src/make-include.mk	2026-10-14 19:08:43.150510313 +0800
++++ b/src/make-include.mk	2026-10-14 19:19:48.186508125 +0800
+@@ -102,15 +102,10 @@
+   # platform-specific suffix used for CLAPACK libraries; use the same
+   #value as in CLAPACK's "make.inc" file
+ ifneq ($(TARGETOS), Windows)
+-  ifndef CLAPACKPATH
+-    CHECKFILE = $(shell if [ -d /usr/local/software/clapack ]; then echo "true"; fi) 
+-    ifeq ($(CHECKFILE),true )
+-      CLAPACKPATH = /usr/local/software/clapack
+-    endif 
+-  endif 
+-    ifndef CLAPACKPATH
+-      CLAPACKPATH = /usr/local/software/clapack
+-    endif 
++    # Adaptation: no auto-detection of a system CLAPACK.  Consumers provide
++    # their own LAPACK implementation; LIBS/LIBPATH are overridden on the
++    # make command line (reference lapack + blas + flang runtime).  Leaving
++    # CLAPACKPATH undefined keeps lib/Makefile on its no-CLAPACK branch.
+     #Automatically detects PLAT type by looking in CLAPACKPATH for blas*.a and extracts the * part
+     PLAT = $(shell find ${CLAPACKPATH}/ -name '*.a' -exec expr match {} '.*blas\(.*\).a' \; | tr -d "\n")
+   else
+@@ -154,11 +149,13 @@
+ # bypass
+ else
+ ifneq ($(TARGETOS), Windows)
+-  CFLAGS += -DSKIP_LAPACK
++  # Adaptation: LAPACK comes from the command-line LIBS/LIBPATH (reference
++  # lapack/blas); do NOT define SKIP_LAPACK (it would disable LAPACK calls
++  # at runtime via external_libs.h).
+   LIBS = -lphast -lc -lm
+ else
+   CFLAGS += -DSKIP_LAPACK -DPCRE_STATIC
+-  LIBS = -lphast -lm  
++  LIBS = -lphast -lm
+ endif
+ endif
+ endif
