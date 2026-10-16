@@ -1,0 +1,22 @@
+package: vacation/3.3.3-nmu1
+homepage: "https://packages.debian.org/source/sid/vacation"
+
+# Upstream source inventory: 12 files in the Debian-native release archive.
+# There is no tests/ directory, test source, make check/test target, or
+# documented manual test command. The upstream test count is therefore zero.
+upstream_check_command: "none (the release contains no test suite or test target)"
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+test_package_tests:
+  - file: test_vacation.py
+    description: "Twelve installed-command scenarios covering logical-header policy, CRLF, recipient/subject/Return-Path unfolding, DB throttling, sendmail-compatible execution, outbound loop marker, and fail-closed bounds"
+    command: "python3 test_vacation.py <installed-vacation>"
+  - file: capture_sendmail.py
+    description: "Sendmail-compatible subprocess endpoint used by the HarmonyOS end-to-end consumer flow; captures the real fork/pipe/exec output and arguments"
+    command: "invoked by installed vacation through VACATION_SENDMAIL"
+
+assertion_count: 12
+harmony_specific_tests:
+  - "Installed vacation executes on OHOS AArch64 with the published db1-compat shared library and performs an end-to-end mail-input -> logical-header policy -> Berkeley DB -> fork/pipe/exec -> captured-reply flow"
