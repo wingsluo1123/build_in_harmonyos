@@ -1,0 +1,82 @@
+# 版本级 manifest
+# 文件位置: archives/y/yte/1.5.4/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.5.4"
+
+# 软件名
+software: yte
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-14"
+
+# 构建系统
+# cmake | autotools | makefile | meson | custom
+build_system: custom
+
+# ============================================================
+# 源码信息
+# ============================================================
+source:
+  url: "https://github.com/yte-template-engine/yte/archive/refs/tags/v1.5.4.tar.gz"
+  sha256: "2a3f75c15a9b507d76a0338bb0aa711a209f34cc850a8bba03bbe0d2b17e8a3b"
+
+# ============================================================
+# 构建信息
+# ============================================================
+build:
+  # 具体构建方式
+  system: custom  # python-require：build() 内 pytest 收集上游测试数 + pip vendoring
+  configure_options:
+    - "package_type=python-require（纯 Python 包，无 C/C++ 编译）"
+    - "pip --target vendoring: plac==1.4.3 dpath==2.2.0 pyyaml==6.0.2（pypi.cnb.cool 镜像）"
+
+# ============================================================
+# 依赖
+# ============================================================
+dependencies: []  # Python 级依赖随包 vendoring（plac/dpath 未发布制品仓，R36 例外处置）
+
+# ============================================================
+# 补丁
+# ============================================================
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+knowledge_gained:
+  - "纯 Python 包 OHOS 适配环境卫生三件套：python3 钉绝对路径 + env -u LD_LIBRARY_PATH 剥离 conan buildenv 污染（否则 _posixsubprocess/math ImportError）+ pip --target vendoring 未发布依赖（DRAFT-ohos-conan-python-vendor-env-hygiene）"
+  - "py3.12 移除 asyncore：plac 1.3.5 不可用，需在满足上游 poetry 约束 ^1.3.4 前提下选 1.4.x"
+  - "镜像 cp312-ohos_aarch64 专用轮子只有本机完好 python3 的 pip 能解析（hnp python3 的 pip 报 versions: none）"
+
+# ============================================================
+# 编译日志
+# ============================================================
+build_log: reports/w3-local-ci.log
+
+# ============================================================
+# 备注
+# ============================================================
+notes: |
+  yte 为纯 Python YAML 模板引擎（poetry 构建，包类型 python-require）。
+  适配要点：Python 运行期依赖（plac/dpath/pyyaml）未发布制品仓，按
+  DRAFT-10175 pip --target 先例在 build() 内 vendoring 进 site-packages；
+  conan buildenv 的 LD_LIBRARY_PATH（hnp SDK llvm lib）会污染 Python
+  扩展模块加载，pip 与 test_package 均以 env -u 剥离后执行。
+  上游 42 个 pytest 测试函数（tests.py 单文件）；conan create 期跑
+  pytest --co 报告真实测试数，完整执行需消费端 pytest（见 MANIFEST.yml）。
+  最终状态：published（本机 W3 全绿；test_package 消费者断言 2/2 通过）。
+
+---
+
+**编译结束**: 2026-10-14 04:20
+**最终状态**: published
