@@ -1,0 +1,25 @@
+# conandata.yml — libbs2b 3.1.0
+# 【换源记录 2026-10-13】上游发布位在 sourceforge：
+#   https://sourceforge.net/projects/bs2b/files/libbs2b/3.1.0/libbs2b-3.1.0.tar.gz/download
+# 本沙箱内 sourceforge **及其全部镜像**均不可达（实测 Connection refused / 0 字节响应）。
+# 改用 **Fedora lookaside 缓存中的 pristine 上游 tarball**（字节等同上游发布物）：
+#   Fedora 记录的 md5 = 00d32ffa6461dde6a632c846da3e0a13（本包已逐字核验一致）
+#   sha256 = b97164dd98fda4b05722fd68ffed2427b980dfb8316bbbbcfc0cde3ae5238cd5
+# 该 tarball 内含预生成的 configure（无需 autoreconf），与仓内既有补丁集完全兼容（4 段补丁实测均可打）。
+sources:
+  url: "https://src.fedoraproject.org/repo/pkgs/libbs2b/libbs2b-3.1.0.tar.lzma/00d32ffa6461dde6a632c846da3e0a13/libbs2b-3.1.0.tar.lzma"
+  sha256: "b97164dd98fda4b05722fd68ffed2427b980dfb8316bbbbcfc0cde3ae5238cd5"
+
+patches:
+  - patch_file: "patches/0001-build-aux-config.guess.patch"
+    patch_description: "config.guess 识别 HarmonyOS/OHOS（输出 aarch64-unknown-linux-ohos）"
+    patch_type: "portability"
+  - patch_file: "patches/0002-build-aux-config.sub.patch"
+    patch_description: "config.sub 接受 ohos OS 与 linux-ohos 内核-OS 组合"
+    patch_type: "portability"
+  - patch_file: "patches/0003-configure.ac.patch"
+    patch_description: "configure.ac 平台适配（上游 2009 年脚本，OHOS 相关判据）"
+    patch_type: "portability"
+  - patch_file: "patches/0004-src-Makefile.am.patch"
+    patch_description: "src/Makefile.am 构建规则适配（不依赖 autoreconf 再生）"
+    patch_type: "portability"
