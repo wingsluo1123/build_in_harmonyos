@@ -1,0 +1,16 @@
+sources:
+  url: "https://deb.debian.org/debian/pool/main/i/indi-rtklib/indi-rtklib_1.0+20221222172722.orig.tar.gz"
+  sha256: "49028a1c35789aeb3e5074ba71836c2aa2bd98797e8a1ee1b007c3de66c23d9c"
+patches:
+  - patch_file: "patches/0001-FindINDI-version-regex.patch"
+    patch_description: "FindINDI.cmake 版本正则回移上游 indi-3rdparty master 修复：兼容 INDI 2.x indiversion.h 的 INDI_VERSION \"2.2.2\" 引号形式（否则 find_package(INDI) 报 FATAL_ERROR failed to detect INDI version）；与已合并 libfli/2.0-20221221182632 的 0001 补丁逐字一致"
+    patch_type: "portability"
+  - patch_file: "patches/0002-CMakeCommon-cxx17.patch"
+    patch_description: "CMakeCommon.cmake 将 CMAKE_CXX_STANDARD 由 14 提至 17：libindi 2.x 头文件使用 std::any（C++17），该目录级普通变量会遮蔽 conan toolchain 注入的 cppstd=17 cache 变量，必须就地修正"
+    patch_type: "portability"
+  - patch_file: "patches/0003-rtklib-driver-libindi2.patch"
+    patch_description: "回移上游 indi-3rdparty master 的 libindi 2.x GPS-API 迁移：rtklib_driver.{cpp,h} 同步（2022 源码的 LocationN/TimeT/IUSaveText(&TimeT[..]) 在 libindi 2.2.2 中已改名为 LocationNP/TimeTP），并删除驱动自带的 setSystemTime()（其 stime() 回退分支在 OHOS libc 不存在；libindi 2.2.2.1 基类实现已由 libindi 配方修为 clock_settime）"
+    patch_type: "backport"
+  - patch_file: "patches/0004-rtkrcv-parser-strncmp.patch"
+    patch_description: "回移上游 indi-3rdparty master 的 rtkrcv_parser.c strcmp→strncmp 修复：快照 char status[6] + sscanf(\"(%6c)\") 恰好写满 6 字节、按 C 标准不写终止符，后续 strcmp 依赖第 7 字节恰为 '\\0' 属未定义行为（真机 musl 实测第 7 字节为栈垃圾，SINGLE 永不命中、fix 残留上次调用值）；master 已改为 strncmp(status, RTKRCV_FIX_X, strlen(RTKRCV_FIX_X)) 消除对终止符的依赖，顺带使 FIX/FLOAT/SBAS/PPP 短名可正常识别"
+    patch_type: "backport"

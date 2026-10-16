@@ -1,0 +1,39 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for indi-rtklib.
+
+package: indi-rtklib/1.0-20221222172722
+homepage: https://github.com/indilib/indi-3rdparty
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests:
+  - file: "(none)"
+    source: indi-rtklib-1.0+20221222172722
+    description: >
+      Upstream ships no test suite. The package is a 3-source-file INDI
+      driver (rtklib_driver.cpp + rtkrcv_parser.c). The only exercisable
+      public API without a connected GPS device is the standalone C parser
+      scansolution(), which we vendor-compile in the consumer probe below.
+    command: "(none upstream)"
+
+test_package_tests:
+  - file: test_package/test.c
+    description: >
+      Consumer probe compiles the vendored rtkrcv_parser.c and calls the
+      public C API scansolution(). Asserts four fix statuses: "------" ->
+      status_no_fix, "SINGLE" -> status_single, and the short names
+      "FIX"/"FLOAT" -> status_fix/status_float. (The unpatched snapshot
+      parser compared an unterminated char[6] with strcmp — UB; patch 0004
+      backports upstream master's strncmp fix, after which all status names
+      resolve deterministically.)
+    command: "cc test.c rtkrcv_parser.c -lm && run"
+  - file: test_package/conanfile.py
+    description: >
+      Driver binary presence hard assert (R34/L1e: test must fail without
+      package artifacts) + best-effort --help probe; exec-restricted
+      environments (EPERM) only warn, presence is what is asserted.
+    command: "test -f bin/indi_rtklib && indi_rtklib --help"
+
+assertion_count: 4
