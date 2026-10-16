@@ -1,0 +1,98 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+#
+# 统计口径（务必与 PR 正文一致）:
+#   上游 C 测试可执行文件   8 个  -> 全部构建并逐个运行，4 通过 / 4 环境阻塞
+#   上游 Python 测试        51 个模块 / 384 个 test_ 方法 -> 0 实例化（见下）
+#   test_package 测试       3 个二进制（L1 + 鸿蒙专项 + 消费者用例）
+#   合计已执行测试项        11 个二进制 / 断言声明 55 条（上游 25 + test_package 30）
+#                           本次实际执行 51 条（上游 25 + test_package 26），0 失败
+
+package: rdma/64.0
+homepage: "https://github.com/linux-rdma/rdma-core"
+
+# 上游测试组织方式: rdma-core 用 CMake 构建，测试分三类
+#   1) C 测试可执行文件: 由 CMake 函数 rdma_test_executable() 生成（8 个）
+#   2) Python 测试:      tests/test_*.py，由 pyverbs 驱动（需 Cython+numpy+HW）
+#   3) ctest 注册:       上游不调用 enable_testing()，ctest -N 为 0
+upstream_check_command: "C: 8 x rdma_test_executable() (util/tests, libibumad/tests, libibnetdisc/tests, infiniband-diags); make check -> ctest -N = 0 registered; Python: python tests/run_tests.py (pyverbs)"
+
+# conanfile.py build() 中是否集成了上游测试（保持 false: 上游测试会因无硬件而中断构建）
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游 8 个 C 测试可执行文件 —— 全部构建成功并逐个执行（no RDMA hardware / no ib_umad
+# kernel module on HarmonyOS PC，因此 4 个依赖真实设备的用例按上游自身的错误路径退出）
+upstream_tests:
+  - file: util/tests/bitmap_test.c
+    source: rdma-core-64.0/util/tests/bitmap_test.c
+    description: "util 位图单元测试（纯 CPU，无硬件依赖）"
+    command: "./bin/bitmap_test"
+    result: "PASS (exit 0, 25 条 OK 断言)"
+  - file: libibumad/tests/umad_compile_test.c
+    source: rdma-core-64.0/libibumad/tests/umad_compile_test.c
+    description: "umad 编译/链接测试（无硬件依赖）"
+    command: "./bin/umad_compile_test"
+    result: "PASS (exit 0)"
+  - file: libibumad/tests/umad_reg2_compat.c
+    source: rdma-core-64.0/libibumad/tests/umad_reg2_compat.c
+    description: "umad register API 测试（无 ib_umad 模块时仅 ibwarn 并正常退出）"
+    command: "./bin/umad_reg2"
+    result: "PASS (exit 0, ibwarn: ib_umad module not loaded)"
+  - file: libibumad/tests/umad_register2.c
+    source: rdma-core-64.0/libibumad/tests/umad_register2.c
+    description: "umad register2 API 测试（无 ib_umad 模块时仅 ibwarn 并正常退出）"
+    command: "./bin/umad_register2"
+    result: "PASS (exit 0, ibwarn: ib_umad module not loaded)"
+  - file: infiniband-diags/ibsendtrap.c
+    source: rdma-core-64.0/infiniband-diags/ibsendtrap.c
+    description: "IB trap 发送工具；需 UMAD 端口。上游在端口打开失败时 exit(-1)"
+    command: "./bin/ibsendtrap"
+    result: "BLOCKED (exit 255, 'failed to open (null) port 0' - 无 ib_umad 内核模块)"
+  - file: libibumad/tests/umad_sa_mcm_rereg_test.c
+    source: rdma-core-64.0/libibumad/tests/umad_sa_mcm_rereg_test.c
+    description: "umad SA mcm rereg 测试，依赖真实 RDMA 设备"
+    command: "./bin/umad_sa_mcm_rereg_test"
+    result: "BLOCKED (exit 255, 'umad_get_port failed for first IB CA port 0')"
+  - file: libibnetdisc/tests/testleaks.c
+    source: rdma-core-64.0/libibnetdisc/tests/testleaks.c
+    description: "ibnetdisc 内存泄漏测试，依赖真实 IB 子网发现"
+    command: "./bin/testleaks"
+    result: "BLOCKED (exit 1, 'can't open MAD port' / discover failed)"
+  - file: infiniband-diags/mcm_rereg_test.c
+    source: rdma-core-64.0/infiniband-diags/mcm_rereg_test.c
+    description: "mcm rereg 测试，依赖真实 RDMA 设备"
+    command: "./bin/mcm_rereg_test"
+    result: "BLOCKED (exit 139, 端口打开失败后上游错误路径 SIGSEGV)"
+
+# Python 测试（pyverbs 框架）
+# 51 个 tests/test_*.py 模块，共 384 个 def test_ 方法。
+# 0 实例化原因（两条独立约束，缺一不可）:
+#   1) NO_PYVERBS=1 —— CI/OHOS 环境无 Cython + numpy，pyverbs C 扩展无法构建
+#      （与本研究仓库 56.1 / 61.0 的历史适配保持一致）
+#   2) 全部 pyverbs 用例都需要真实 RDMA 硬件（HarmonyOS PC 无 HCA / 无 ib_umad
+#      内核模块，/sys/class/infiniband 与 /dev/infiniband 均不存在）
+python_tests_declared: 51
+python_tests_instantiated: 0
+python_tests_reason: "NO_PYVERBS=1（CI 无 Cython/numpy）+ OHOS 无 RDMA 硬件（/dev/infiniband 不存在）"
+
+# test_package 中自带的测试（消费者视角 + 鸿蒙平台专项）
+# ⚠️ 三个二进制全部列入，不得少报
+test_package_tests:
+  - file: test.c
+    description: "L1 消费者测试: 通过公开头文件调用 libibverbs(ibv_get_device_list/free/name) + librdmacm(rdma_get_devices/rdma_free_devices)，含重复枚举与释放路径"
+    command: "./test_rdma"
+    assertions: 9          # 声明 9 条；无 HCA 时 2 条位于逐设备循环内不可达 -> 执行 7 条
+  - file: test_ohos_specific.c
+    description: "鸿蒙平台专项测试（本次新增，上游无此测试）: T1 __MUSL__ 下 sockaddr_storage 与 <linux/netlink.h>/<sys/socket.h> 共存；T2 __progname 非空且不含路径分隔符；T3 strrchr/rindex 语义；T4 pthread_kill(SIGUSR1)+pthread_join 线程回收（E513 机制）并报告 OHOS pthread_cancel 缺失；T5 无硬件时设备枚举幂等且无错误"
+    command: "./test_ohos_specific"
+    assertions: 21         # 声明 21 条；T3 分支取其一 + T5 逐设备断言不可达 -> 执行 19 条
+  - file: test_consumer.c
+    description: "业务消费者用例: 仅用公开头文件与公开 API 枚举设备并打印 name/guid，验证第三方可编译/链接/运行"
+    command: "./test_consumer"
+    assertions: 0          # rc 判定（失败即 return 非零）: 5 处有效性检查，不打印断言标记
+
+# 断言总数 = 上游 bitmap_test 25 + test_package 声明 30 (test.c 9 + test_ohos_specific.c 21)
+# 本次实际执行 51 条（上游 25 + test_package 26），0 失败
+assertion_count: 55

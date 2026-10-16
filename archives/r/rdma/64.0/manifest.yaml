@@ -1,0 +1,83 @@
+# 版本级 manifest
+# 文件位置: archives/r/rdma/64.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "64.0"
+software: "rdma"
+status: published
+build_date: "2026-10-15"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/linux-rdma/rdma-core/releases/download/v64.0/rdma-core-64.0.tar.gz"
+  sha256: "d170d0265e1e5030c574c8613a1fecc047413282b94c2bc4cf2e99477d82ee93"
+  tar_format: tar.gz
+  # 上游 CMakeLists.txt: set(PACKAGE_NAME "RDMA") / set(PACKAGE_VERSION "64.0")
+  upstream_project: "rdma-core"
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DENABLE_RESOLVE_NEIGH=0"
+    - "-DNO_PYVERBS=1"
+    - "-DNO_MAN_PAGES=1"
+    - "-DENABLE_STATIC=1"
+    - "-DNO_COMPAT_SYMS=1"
+    - "-DENABLE_VALGRIND=0"
+    - "-DENABLE_WERROR=0"
+    - "-DCMAKE_INSTALL_LIBEXECDIR=libexec"
+    - "-DSYSUSERS_DIR=lib/sysusers.d"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-librdmacm-examples-rping.c.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "OHOS 平台上 CMakeToolchain 会把 os=OHOS 映射为 CMAKE_SYSTEM_NAME=HarmonyOS，而 CMake 没有 Modules/Platform/HarmonyOS.cmake，回落到通用平台模块；定义 SONAME 标志的 CMAKE_SHARED_LIBRARY_SONAME_C_FLAG（在 Platform/Linux.cmake 中）因此为空，所有共享库都不带 DT_SONAME（E092 根因，命中知识库 DRAFT-libharu-2.3.0-missing-dt-soname）；配方须显式恢复 -Wl,-soname, 标志"
+  - "缺 SONAME 的连带后果：依赖方 DT_NEEDED 退化为构建树相对路径 lib/libibverbs.so，加载器按字面路径解析，离开构建目录即加载失败；补上 SONAME 后 DT_NEEDED 变为可重定位的 libibverbs.so.1"
+  - "rdma-core 的 SYSUSERS_DIR 默认硬编码绝对路径 /usr/lib/sysusers.d，cmake --install 在 Conan prefix 下报 'file cannot create directory'；配方须覆盖为相对路径 lib/sysusers.d"
+  - "OHOS musl 未实现 POSIX 线程取消：链接期 sysroot 不导出 pthread_cancel/setcancelstate/setcanceltype/testcancel（运行期 libc.so 中 pthread_cancel 返回 ENOSYS，setcancelstate 不写回 oldstate），须以弱符号兼容层补齐符号面（E513）"
+  - "OHOS musl 不导出 getpass()：可用 weak 引用 + termios 无回显回退实现（E093）"
+  - "OHOS 链接期 sysroot 导入库不导出 rindex()（运行期 libc.so 中存在）：兼容层 strrchr() 语义等价，且对可执行文件须用弱声明避免链接失败"
+  - "OHOS musl 无 program_invocation_short_name：改用 __progname（E493/E203）"
+  - "OHOS string.h 仅在 _GNU_SOURCE 下暴露 strdupa，rdma-core 自带探测只在 glibc/uclibc 路径注入 _GNU_SOURCE，须由配方显式补齐"
+  - "OHOS sys/socket.h 仅在定义了 __MUSL__ 时跳过 sockaddr_storage 定义，与 linux/socket.h 冲突，须 -D__MUSL__=1（E119）"
+  - "Conan CMakeToolchain 默认 CMAKE_INSTALL_LIBEXECDIR=bin，与 bin/srp_daemon 可执行文件冲突，须覆盖为 libexec"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /data/storage/el2/base/files/home/.tmp/builds/rdma-64.0.orig
+  source_work_dir: /data/storage/el2/base/files/home/.tmp/builds/rdma-64.0.work
+  source_orig_hash: bf848f31014b5a48
+  source_work_hash: 599835677e9b31e2
+  generated_at: '2026-10-15T21:00:53'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-librdmacm-examples-rping.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
