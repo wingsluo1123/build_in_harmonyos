@@ -1,0 +1,39 @@
+# test_package/MANIFEST.yml
+# qpage 3.3 - upstream test declaration.
+
+package: qpage/3.3
+homepage: "http://www.qpage.org/"
+
+upstream_tests_exist: false
+upstream_test_audit: >-
+  QuickPage 3.3 (Thomas Dwyer III, 1999) ships a hand-written Makefile whose
+  targets are all/config-check/client/install/lint/clean/tar/tags/... and a set
+  of documentation/example files.  There is no test suite (no `make check`, no
+  ctest, no tests/ directory, no .sh/.py test harness).
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+test_package_tests:
+  - file: test_qpage.sh
+    description: >-
+      Runs the installed qpage client: CLI diagnostics (version, usage, missing
+      recipient/message, invalid time/level, connect failure) plus three live
+      SNPP transactions against a local mock server (basic page, level/coverage/
+      hold modifiers, and e-mail parsing with -m).
+    command: "sh test_qpage.sh"
+  - file: mock_snpp.c
+    description: "Minimal RFC-1861 SNPP server used by the round-trip checks"
+  - file: redir.c
+    description: "LD_PRELOAD connect() shim redirecting TCP 444 to a high port"
+
+test_files:
+  - path: "test_package/test_qpage.sh"
+    test_type: "R34"
+    assertion_count: 29
+
+test_package_test_count: 3
+consumer_assertion_count: 29
+upstream_test_cases: 0
+assertion_count: 29
