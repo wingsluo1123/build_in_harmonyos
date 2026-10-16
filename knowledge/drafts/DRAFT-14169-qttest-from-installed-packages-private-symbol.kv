@@ -1,0 +1,46 @@
+# ═══ Draft knowledge entry — 安装包环境上游 QtTest 多目标批量执行 + 私有符号隐藏补链 ═══
+# Timestamp: 2026-10-14
+# Software: qtconnectivity/6.11.1（模式适用多目标上游套件对着 conan 安装包执行的场合）
+# Gate: 积分赛 pc-pr-review rule4（上游用例真实执行）
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id: draft-14169-qttest-from-installed-packages-private-symbol
+title: 上游 QtTest 22 目标批量真实执行法（脚本生成统一 CMake 工程镜像
+  qt_internal_add_test + 安装包环境 + EGL/GLESv2 缓存变量）；安装库按 ELF 可见性隐藏
+  私有类 moc/虚分派符号时的补链（私有实现 cpp 编入测试本体，AUTOMOC 自包含，勿手挂 moc）
+trigger_tool: cmake|qt_internal_add_test|llvm-nm|QTest
+phase: upstream-test-execution
+error_signature: undefined symbol: Q.*Private::(qt_metacall|qt_metacast|
+  staticMetaObject)|duplicate symbol: Q.*Private::|Failed to find required Qt
+  component "Gui"|Could NOT find EGL|too many errors emitted
+severity: 3
+category: qt|test|conan|linker|elf-visibility
+match_keywords: 批量执行, qt_internal_add_test 解析, 生成器, EGL_LIBRARY, GLESv2_LIBRARY,
+  SDK sysroot, 私有符号隐藏, globalize-symbol 无效, qnearfieldtarget_p.cpp, AUTOMOC
+  自包含, 手挂 moc 重复, nfccommons 仿真器, targetDetected 超时, QSKIP 分类
+keywords: per-target Totals 统计, dummy 后端, 失败≠没测, rule4, 无空格路径,
+  qlowenergycontroller-gattserver/test 目标
+approach: ① Python 生成器括号平衡扫描解析各目录 qt_internal_add_test 块，生成单份
+  CMakeLists 含全部 add_executable；Qt::X(Private) 一律映射 Qt6::X；include 直取 conan
+  源码缓存路径；私有头根统一注入（模块级+版本化父目录两级）；② 依赖含 Gui 时 configure
+  喂 -DEGL/-DGLESv2 缓存变量（SDK sysroot 的头与库，qtbase 开 EGL 构建 → Qt6GuiConfig
+  会 find_package）；③ 逐目标 timeout 60 ./tst_* -o results/<t>.txt,txt（LD_LIBRARY_PATH
+  = 两包 lib + QT_QPA_PLATFORM=offscreen），汇总从 txt 的 ^Totals: 行统计；④ 链接
+  undefined symbol XPrivate 时：nm -C 取证（.symtab 有 = 可见性隐藏），把私有实现
+  *.cpp + *_p.cpp 编入测试本体（等价树内静态链接语义），勿手挂 moc（实现 cpp 尾部自带
+  moc include 且 AUTOMOC 自动生成私有 metacode，手挂必 duplicate symbol）；⑤ 8 failed
+  逐分类落账 MANIFEST（7 个 NFC 仿真器 targetDetected 超时 + 1 个 BlueZ debug dump
+  断言），48 skipped 为上游 QSKIP。
+root_cause: 上游树内测试链 build-tree 对象（私有符号可用），conan 安装库按 ELF 可见性
+  把私有类的 moc 符号与虚分派器隐藏（.dynsym 无、.symtab local t/d）——安装包环境独立
+  构建测试即缺符号；objcopy --globalize-symbol 只改 .symtab 改不了 .dynsym，单 moc 补不
+  齐虚分派实现体（在 *_p.cpp）；实现 cpp 自带尾部 moc include + AUTOMOC 使"编入实现源码"
+  自包含，额外手挂 moc 即重复定义。
+rec_approach: generated-cmake-batch-execution-plus-private-impl-link
+doc: archives/q/qtconnectivity/6.11.1/test_package/MANIFEST.yml
+verification: 22/22 目标真实构建并执行，passed=340 failed=8 skipped=48（2026-10-14，
+  offscreen）；NFC 三目标补链后全部产物成型并出执行结果；commit fc4d7d21c3（MANIFEST
+  per-target 实测表，rule: none）。
+related: 单目标 QT_STATICPLUGIN mock 后端形态与豁免证伪原则见
+  DRAFT-14168-qttest-static-plugin-real-execution 条；ELF 签名门禁见
+  DRAFT-13618-pip-build-isolation-signature-gate-and-libpython-closure 条。

@@ -1,0 +1,35 @@
+# manifest.yaml — qtconnectivity 6.11.1
+
+version: "6.11.1"
+software: qtconnectivity
+status: built
+build_date: "2026-10-01"
+build_system: cmake
+
+source:
+  url: "https://mirrors.ustc.edu.cn/qtproject/official_releases/qt/6.11/6.11.1/submodules/qtconnectivity-everywhere-src-6.11.1.tar.xz"
+  sha256: "2105289ea414b46ed5fa53ba8782230045b9e47cc8156b5940c9e31e3980e591"
+  tar_format: tar.xz
+
+build:
+  system: cmake
+  configure_options:
+    - "QT_QMAKE_TARGET_MKSPEC=harmonyos-clang"
+    - "CMAKE_PREFIX_PATH=<qtbase 包>"
+    - "FEATURE_bluez=OFF"
+    - "FEATURE_pcsclite=OFF"
+    - "FEATURE_neard=OFF"
+    - "QT_BUILD_TESTS=ON"
+    - "QT_BUILD_TESTS_BY_DEFAULT=OFF"
+    - "QT_BUILD_EXAMPLES=OFF"
+  dependencies:
+    - qtbase/6.11.1
+  cc: clang
+  cxx: clang++
+
+knowledge_gained:
+  - "Qt Connectivity 提供 QtBluetooth 与 QtNfc 两个模块（外加 global 模块 QtConnectivity），可只依赖 qtbase/6.11.1 构建"
+  - "bluetooth 特性的 CONDITION 仅为 TARGET Qt::Network（不依赖 BlueZ）；bluez/bluez_le 是可选后端特性，OHOS 无 BlueZ 时关闭即可，Qt 会用树内 dummy 后端补齐 API 库"
+  - "nfc 后端为 pcsclite 或 neard（后者需 dbus），OHOS 两者皆无；关闭后仍可构建 QtNfc 的数据类型 API（QNdefRecord/QNdefMessage）"
+  - "上游测试全部是设备/后端驱动（设备发现、配对、NFC 目标），OHOS 无硬件后端不可运行；功能覆盖由 test_package 承担（bluetooth 地址/UUID/设备信息数据类 + NFC NDEF 记录往返 + 无适配器的优雅报告）"
+  - "与 qtsensors/qtserialport 同构：CMAKE_PREFIX_PATH 指向 qtbase、CMAKE_MODULE_PATH 指向其 lib/cmake/Qt6/platforms（否则 HarmonyOS 被当未知平台，SOVERSION/SONAME 规则缺失导致插件 DT_NEEDED 退化成相对路径），安装产物统一 ELF 自签名"
