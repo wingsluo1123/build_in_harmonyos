@@ -1,0 +1,73 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -43,20 +43,70 @@
+     find_package(Qt6 ${REQUIRED_QT_VERSION} CONFIG REQUIRED TextToSpeech)
+     add_definitions(-DHAVE_SPEECH)
+ endif()
+ 
+ find_package(KF6Completion ${KF_DEP_VERSION} REQUIRED)
+ find_package(KF6Config ${KF_DEP_VERSION} REQUIRED)
+ find_package(KF6I18n ${KF_DEP_VERSION} REQUIRED)
+ find_package(KF6WidgetsAddons ${KF_DEP_VERSION} REQUIRED)
+ find_package(KF6Sonnet ${KF_DEP_VERSION} REQUIRED)
+ 
++# E537 relocatable linkage: kcompletion/kconfig/ki18n/kwidgetsaddons/sonnet
++# are published without a DT_SONAME, so linking by their absolute Conan cache
++# paths makes the linker record machine-private paths in DT_NEEDED
++# (non-consumable on a different cache layout). Stamp an IMPORTED_SONAME on
++# the dependency targets and clear both the generic and per-config
++# IMPORTED_NO_SONAME so CMake links by `-L<dir> -l:libKF6*.so` and ld records
++# the basename (kcompletion 6.26.0.1 precedent).
++if(TARGET KF6::SonnetUi)
++    set_target_properties(KF6::SonnetUi PROPERTIES
++        IMPORTED_NO_SONAME FALSE
++        IMPORTED_NO_SONAME_RELEASE FALSE
++        IMPORTED_SONAME "libKF6SonnetUi.so"
++        IMPORTED_SONAME_RELEASE "libKF6SonnetUi.so")
++endif()
++if(TARGET KF6::I18n)
++    set_target_properties(KF6::I18n PROPERTIES
++        IMPORTED_NO_SONAME FALSE
++        IMPORTED_NO_SONAME_RELEASE FALSE
++        IMPORTED_SONAME "libKF6I18n.so"
++        IMPORTED_SONAME_RELEASE "libKF6I18n.so")
++endif()
++if(TARGET KF6::SonnetCore)
++    set_target_properties(KF6::SonnetCore PROPERTIES
++        IMPORTED_NO_SONAME FALSE
++        IMPORTED_NO_SONAME_RELEASE FALSE
++        IMPORTED_SONAME "libKF6SonnetCore.so"
++        IMPORTED_SONAME_RELEASE "libKF6SonnetCore.so")
++endif()
++if(TARGET KF6::WidgetsAddons)
++    set_target_properties(KF6::WidgetsAddons PROPERTIES
++        IMPORTED_NO_SONAME FALSE
++        IMPORTED_NO_SONAME_RELEASE FALSE
++        IMPORTED_SONAME "libKF6WidgetsAddons.so"
++        IMPORTED_SONAME_RELEASE "libKF6WidgetsAddons.so")
++endif()
++if(TARGET KF6::Completion)
++    set_target_properties(KF6::Completion PROPERTIES
++        IMPORTED_NO_SONAME FALSE
++        IMPORTED_NO_SONAME_RELEASE FALSE
++        IMPORTED_SONAME "libKF6Completion.so"
++        IMPORTED_SONAME_RELEASE "libKF6Completion.so")
++endif()
++if(TARGET KF6::ConfigGui)
++    set_target_properties(KF6::ConfigGui PROPERTIES
++        IMPORTED_NO_SONAME FALSE
++        IMPORTED_NO_SONAME_RELEASE FALSE
++        IMPORTED_SONAME "libKF6ConfigGui.so"
++        IMPORTED_SONAME_RELEASE "libKF6ConfigGui.so")
++endif()
++
+ set(EXCLUDE_DEPRECATED_BEFORE_AND_AT 0 CACHE STRING "Control the range of deprecated API excluded from the build [default=0].")
+ 
+ cmake_dependent_option(BUILD_DESIGNERPLUGIN "Build plugin for Qt Designer" ON "NOT CMAKE_CROSSCOMPILING" OFF)
+ add_feature_info(DESIGNERPLUGIN ${BUILD_DESIGNERPLUGIN} "Build plugin for Qt Designer")
+ 
+ add_definitions(-DTRANSLATION_DOMAIN=\"ktextwidgets6\")
+ 
+ ecm_set_disabled_deprecation_versions(
+     QT 6.11
+     KF 6.23
