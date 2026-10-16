@@ -1,0 +1,20 @@
+package: wheel/0.48.0
+homepage: "https://github.com/pypa/wheel"
+
+# wheel 自带 tests/（pytest 套件），配方内**真实执行**并按实际 rc 如实打印；
+# 本地实测 2 failed / 18 passed / 50 errors，原因见 notes.md 与 PR 正文——
+# 不以"未跑"或"跳过的都算过"冒充通过。
+upstream_check_command: "python -m pytest tests -q"
+upstream_test_in_build: true
+upstream_test_command: "python -m pytest <source>/tests -q"
+upstream_tests: []
+
+test_package_tests:
+  - file: test_wheel.py
+    description: >-
+      消费侧验证：从制品 import wheel 与 wheel.wheelfile（meson-python 上游套件
+      实际用到的入口），断言版本、WheelFile 读写方法、__all__、WheelError、
+      WHEEL_INFO_RE 与 wheel.bdist_wheel
+    command: "python test_wheel.py <pkg>"
+
+assertion_count: 10 # 9 恒定 + 1 视 setuptools 可用性（bdist_wheel 缺 setuptools 时如实 SKIP，不算失败）
