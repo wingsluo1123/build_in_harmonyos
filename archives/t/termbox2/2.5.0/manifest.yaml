@@ -1,0 +1,25 @@
+version: "2.5.0"
+software: "termbox2"
+status: "built"
+build_date: "2026-09-26"
+build_system: "makefile"
+
+source:
+  url: "https://github.com/termbox/termbox2/archive/refs/tags/v2.5.0.tar.gz"
+  sha256: "1d7a9811060e3673be417019007acbf4e2575734b6f95baaf6e8aed27f06c65a"
+  tar_format: "tar.gz"
+
+build:
+  system: "makefile"
+  configure_options: []
+  dependencies: []
+  cc: "clang"
+  cxx: "clang++"
+
+patches_applied: []
+
+knowledge_gained:
+  - description: "上游为单文件头库（termbox2.h，MIT），纯 GNU Make 构建，可直接用 Conan 工具链的 CC/AR 生成 libtermbox2.a 或 libtermbox2.so.2.0.0"
+  - description: "共享库 SONAME 为 libtermbox2.so.2，Makefile 用 ln -sf 生成 .so 别名；HMDFS 不支持软链接覆盖，配方打包时把(签名后的) ELF 复制为 SONAME/链接名别名"
+  - description: "OHOS 加载共享库需用 binary-sign-tool 自签，与 termbox 1.1.4 相同的 objcopy 移除 .codesign + sign 流程"
+  - description: "上游 tests/ 为 16 个 test_*/test.php 用例，由 PHP-FFI + X11(Xvfb/xterm/xvkbd) 屏幕捕获比对 harness 驱动；该工具链在无头 OHOS/aarch64 不可用，故把 16 个用例逐一移植为原生 C 程序（test_package/test_<name>.c）经 PTY(tb_init_fd) 调用同一真实 termbox2 API 并在真机全部执行，作为上游测试套件接入 test_package"
