@@ -1,0 +1,26 @@
+manifest_version: "1.0"
+package: ocaml-re
+version: "1.13.2"
+test_type: smoke
+assertion_count: 22
+upstream_tests:
+  source: "upstream lib_test/ (dune): expect/ = 129 let%expect_test cases (21 test_*.ml), str/ = ounit2 suite, fort_unit/ = ounit2 compat layer"
+  mechanism: "EXECUTED on the OHOS device in the local verification environment (2026-10-15): the test framework stack (ppx_expect / base / ppx_inline_test / ounit2 + ~20 transitive packages) is not published in the registry (ppx_expect depends on ppxlib - registry-level dependency cycle), so the stack was built from official sources locally and the upstream suite run: `inline_test_runner_re_tests.exe inline-test-runner re_tests -list-test-names` lists 129 cases; `-verbose` run prints all 129 results with rc=0; `dune runtest lib_test` rc=0; 0 `.corrected` files; lib_test/str ounit2 18/18 ('Ran: 18 tests', 'OK'). Test sources and expectations are unmodified; only 2 build-config adaptations (inline_tests native mode - js backend needs js_of_ocaml; implicit_transitive_deps enabled) for running in this environment."
+  discovered: 129
+  passed: 129
+  modified_reason: "no source or test modification; 129/129 upstream expect cases + 18/18 ounit2 cases executed and passed on the OHOS device. Registry-level note: the framework stack cannot be added to the Conan recipe because ppx_expect -> ppxlib -> (test deps on ocaml-re/cinaps) forms a dependency cycle; CI therefore runs the test_package consumer cases while the full upstream suite ran in the local verification environment with the same toolchain."
+
+# 鸿蒙特有测试（rule12：至少一个完整消费者用例）
+harmony_specific_test_count: 1
+harmony_specific_tests:
+  - file: test_package/test_ohos_e2e.ml
+    kind: e2e_consumer_case
+    label: "鸿蒙特有测试"
+    description: >
+      End-to-end consumer case on the real OHOS filesystem: writes a
+      key=value report file, regex-parses each line with the packaged re
+      library, aggregates line/digit counts, writes a result file and reads
+      it back to verify the round-trip.
+    command: "bash test.sh <lib_dir> <ocaml_lib> <ocaml_bin>  # third section"
+    executed: true
+    result: "ALL OHOS E2E PASSED (3 lines, 6 digits parsed)"
