@@ -1,0 +1,69 @@
+--- a/C99/lffifo.h
++++ b/C99/lffifo.h
+@@ -55,34 +55,27 @@
+ 
+ #define _DEFAULT_SOURCE  // usleep
+ #include <unistd.h>
+ #undef  _DEFAULT_SOURCE
+ 
+ #else
+ #include <unistd.h>
+ #endif   
+     static inline char CAS2(volatile int64_t* addr, volatile int64_t* oldval, volatile int64_t* newval)
+     {
+-        void* v1 = (void*)(oldval[0]);
+-        int64_t v2 = (int64_t)(oldval[1]);
+-        void* n1 = (void*)(newval[0]);
+-        int64_t n2 = (int64_t)(newval[1]);
+-
+-        register bool ret;
+-        __asm__ __volatile__(
+-            "# CAS2 \n\t"
+-            "lock cmpxchg16b (%1) \n\t"
+-            "sete %0               \n\t"
+-            :"=a" (ret)
+-            : "D" (addr), "d" (v2), "a" (v1), "b" (n1), "c" (n2)
+-        );
+-        return ret;
++        /* 16-byte compare-and-swap (pointer + ABA counter).
++         * OHOS arm64 has no x86 cmpxchg16b; use portable __atomic on __int128,
++         * which lowers to ldxp/stxp (or casp) on aarch64 and is lock-free. */
++        __int128* p = (__int128*)(void*)addr;
++        __int128 ov = ((__int128)(uint64_t)oldval[0]) | ((__int128)(uint64_t)oldval[1] << 64);
++        __int128 nv = ((__int128)(uint64_t)newval[0]) | ((__int128)(uint64_t)newval[1] << 64);
++        return __atomic_compare_exchange_n(p, &ov, nv, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+     }
+ 
+ // #define CAS2(ptr, oldptr, newptr) __sync_bool_compare_and_swap_16((long long *)(ptr), *(long long *)(oldptr), *(long long *)(newptr))
+ #define CAS(ptr, oldval, newval ) __sync_bool_compare_and_swap(ptr, oldval, newval)
+ #define FAA(ptr                 ) __sync_fetch_and_add((ptr), 1) 
+ #define FAS(ptr                 ) __sync_fetch_and_sub((ptr), 1) 
+ 
+ #define _aligned_malloc(n, align) aligned_alloc((align), (n))
+ #define _aligned_free(x)          free(x)
+ 
+@@ -100,21 +93,23 @@
+ 
+     struct lf_node
+     {
+         lf_node_t * node;
+         uint64_t    aba_;
+ 
+         uint64_t    valu;
+         uint64_t    padd;
+     };
+ 
+-    struct lf_pointer
++    // 16-byte CAS2 requires 16-byte alignment on aarch64 (__int128 atomic).
++    // x86 cmpxchg16b likewise demands 16-byte alignment; this matches upstream.
++    struct __attribute__((aligned(16))) lf_pointer
+     {
+         lf_pointer_t * node;
+         uint64_t       aba_;
+     };
+     //////////////////////////////////////////////////////////////
+ 
+     //////////////////////////////////////////////////////////////
+     /* lock-free stack                                          */
+     //////////////////////////////////////////////////////////////
+     typedef lf_node_t    lfstack_node_t;

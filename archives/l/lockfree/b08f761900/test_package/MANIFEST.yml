@@ -1,0 +1,34 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: lockfree/b08f761900
+homepage: "https://github.com/huangfcn/lockfree"
+
+# 上游无 tests/ 目录、无 ctest/pytest 注册（纯数据结构头文件库）。
+# 可运行物为两个变体的基准程序 ffbench（性能测试，非断言型测试）。
+upstream_check_command: "make -C C99 ffbench && make -C C++11 ffbench"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: C99/main.c
+    source: lockfree-b08f761900/C99/main.c
+    description: "C99 变体基准（SPSC/MPMC ring buffer / stack / queue，TESTMODE 0-3）"
+    command: "./C99/ffbench"
+  - file: C++11/main.cpp
+    source: lockfree-b08f761900/C++11/main.cpp
+    description: "C++11 变体基准（同上，std::atomic 实现）"
+    command: "./C++11/ffbench"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "消费者测试：magicq/rbq/lffifo 真实 push/pop 断言"
+    command: "./test_lockfree"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 12
