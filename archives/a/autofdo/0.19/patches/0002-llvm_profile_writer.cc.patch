@@ -1,0 +1,72 @@
+--- a/llvm_profile_writer.cc
++++ b/llvm_profile_writer.cc
+@@ -53,30 +53,36 @@
+   auto Writer = std::move(WriterOrErr.get());
+   if (std::error_code EC = Writer->write(profiles)) {
+     LOG(ERROR) << "Error writing profile output to '" << output_filename
+                << "': " << EC.message();
+     return false;
+   }
+ 
+   return true;
+ }
+ 
+-const llvm::StringMap<llvm::sampleprof::FunctionSamples>
+-    &LLVMProfileBuilder::ConvertProfiles(const SymbolMap &symbol_map) {
++const AutoFDOProfileMap &LLVMProfileBuilder::ConvertProfiles(
++    const SymbolMap &symbol_map) {
+   Start(symbol_map);
+   return GetProfiles();
+ }
+ 
+ void LLVMProfileBuilder::VisitTopSymbol(const string &name,
+                                         const Symbol *node) {
+   llvm::StringRef name_ref = GetNameRef(name);
++#if LLVM_VERSION_MAJOR >= 15
++  // LLVM 15: SampleProfileMap 以 SampleContext 为键。
++  llvm::sampleprof::FunctionSamples &profile =
++      profiles_[llvm::sampleprof::SampleContext(name_ref)];
++#else
+   llvm::sampleprof::FunctionSamples &profile = profiles_[name_ref];
++#endif
+   if (std::error_code EC =
+           llvm::MergeResult(result_, profile.addHeadSamples(node->head_count)))
+     LOG(FATAL) << "Error updating head samples for '" << name
+                << "': " << EC.message();
+ 
+   if (std::error_code EC = llvm::MergeResult(
+           result_, profile.addTotalSamples(node->total_count)))
+     LOG(FATAL) << "Error updating total samples for '" << name
+                << "': " << EC.message();
+ 
+@@ -88,23 +94,30 @@
+ void LLVMProfileBuilder::VisitCallsite(const Callsite &callsite) {
+   DCHECK_GE(inline_stack_.size(), 1);
+   uint32 offset = callsite.first;
+   uint32 line = offset >> 16;
+   uint32 discriminator = offset & 0xffff;
+   while (inline_stack_.size() > level_) {
+     inline_stack_.pop_back();
+   }
+   auto &caller_profile = *(inline_stack_.back());
+   auto CalleeName = GetNameRef(Symbol::Name(callsite.second));
++#if LLVM_VERSION_MAJOR >= 15
++  // LLVM 15: FunctionSamplesMap 以 std::string 为键（非 StringRef）。
++  auto &callee_profile =
++      caller_profile.functionSamplesAt(llvm::sampleprof::LineLocation(
++          line, discriminator))[CalleeName.str()];
++#else
+   auto &callee_profile =
+       caller_profile.functionSamplesAt(llvm::sampleprof::LineLocation(
+           line, discriminator))[CalleeName];
++#endif
+   callee_profile.setName(CalleeName);
+   inline_stack_.push_back(&callee_profile);
+ }
+ 
+ void LLVMProfileBuilder::Visit(const Symbol *node) {
+   DCHECK_GE(inline_stack_.size(), 1);
+   auto &profile = *(inline_stack_.back());
+ 
+   if (level_ > 1) {
+     // If this is a nested inline call, update its total count.

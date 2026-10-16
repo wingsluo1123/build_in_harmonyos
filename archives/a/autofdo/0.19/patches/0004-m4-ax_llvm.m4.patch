@@ -1,0 +1,29 @@
+--- a/m4/ax_llvm.m4
++++ b/m4/ax_llvm.m4
+@@ -62,21 +62,25 @@
+       shared_mode=$($ac_llvm_config_path --shared-mode)
+       rpath=""
+       if test "x$shared_mode" = "xstatic"; then
+         LLVM_LDFLAGS="$($ac_llvm_config_path --ldflags)"
+         LLVM_LIBS="$($ac_llvm_config_path --libs $1) \
+                       -ldl -lpthread -ltinfo"
+       elif test "x$shared_mode" = "xshared"; then
+         rpath="$($ac_llvm_config_path --libdir)"
+         LLVM_LDFLAGS="-Wl,-rpath $rpath \
+                       $($ac_llvm_config_path --ldflags)"
+-        LLVM_LIBS="$($ac_llvm_config_path --libs $1)"
++        dnl OHOS SDK 的 LLVM 以单一共享库 libLLVM-<major>.so 提供，没有
++        dnl 分组件共享对象；llvm-config --libs <component> 报告的 -lLLVM<Part>
++        dnl 全部链接不到（ld.lld: unable to find library -lLLVMProfileData）。
++        dnl 故改为链接整库 libLLVM-<major>.so。
++        LLVM_LIBS="-lLLVM-$($ac_llvm_config_path --version | sed 's/\..*//')"
+       fi
+ 
+       AC_REQUIRE([AC_PROG_CXX])
+       CXXFLAGS_SAVED="$CXXFLAGS"
+       CXXFLAGS="$CXXFLAGS $LLVM_CXXFLAGS"
+       export CXXFLAGS
+ 
+       LDFLAGS_SAVED="$LDFLAGS"
+       LDFLAGS="$LDFLAGS $LLVM_LDFLAGS"
+       export LDFLAGS

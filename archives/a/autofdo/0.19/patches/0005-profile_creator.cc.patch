@@ -1,0 +1,32 @@
+--- a/profile_creator.cc
++++ b/profile_creator.cc
+@@ -110,21 +110,29 @@
+     if (!ReadSample(input_profile_name, profiler)) return false;
+     if (!ComputeProfile(&symbol_map)) return false;
+   }
+   bool ret = writer->WriteToFile(output_profile_name);
+   return ret;
+ }
+ 
+ bool ProfileCreator::ReadSample(const string &input_profile_name,
+                                 const string &profiler) {
+   if (profiler == "perf") {
++#if defined(__OHOS__)
++    // OHOS/musl 的 <string.h> 不提供 GNU basename（仅 <libgen.h> 有 POSIX 版，
++    // 且参数可写）。此处只需取路径最后一段，用等价实现避免引入可变缓冲。
++    const string::size_type base_slash = binary_.find_last_of('/');
++    string file_base_name = (base_slash == string::npos)
++                                ? binary_ : binary_.substr(base_slash + 1);
++#else
+     string file_base_name = basename(binary_.c_str());
++#endif
+     size_t unstripped_at = file_base_name.find(".unstripped");
+     if (unstripped_at != string::npos) {
+       file_base_name.erase(unstripped_at);
+     }
+     CHECK(!file_base_name.empty()) << "Cannot find basename for: " << binary_;
+ 
+     ElfReader reader(binary_);
+ 
+     sample_reader_ = new PerfDataSampleReader(
+         input_profile_name, std::move(file_base_name));

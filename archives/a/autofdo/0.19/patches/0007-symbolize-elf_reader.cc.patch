@@ -1,0 +1,29 @@
+--- a/symbolize/elf_reader.cc
++++ b/symbolize/elf_reader.cc
+@@ -689,21 +689,25 @@
+   if (fd_ != -1)
+     close(fd_);
+   if (impl32_ != NULL)
+     delete impl32_;
+   if (impl64_ != NULL)
+     delete impl64_;
+ }
+ 
+ 
+ // The only word-size specific part of this file is IsNativeElfFile().
+-#if __WORDSIZE == 32
++#if defined(__OHOS__)
++// OHOS/musl 不定义 __WORDSIZE（glibc 专有宏），会落到下面 #else 触发
++// #error "Invalid word size"；OHOS PC 为 aarch64（64 位字长）。
++#define NATIVE_ELF_ARCH Elf64
++#elif __WORDSIZE == 32
+ #define NATIVE_ELF_ARCH Elf32
+ #elif __WORDSIZE == 64
+ #define NATIVE_ELF_ARCH Elf64
+ #else
+ #error "Invalid word size"
+ #endif
+ 
+ template <typename ElfArch>
+ static bool IsElfFile(const int fd, const string &path) {
+   if (fd < 0)

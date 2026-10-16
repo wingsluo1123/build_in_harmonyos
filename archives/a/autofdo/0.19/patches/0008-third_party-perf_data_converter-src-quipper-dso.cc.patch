@@ -1,0 +1,35 @@
+--- a/third_party/perf_data_converter/src/quipper/dso.cc
++++ b/third_party/perf_data_converter/src/quipper/dso.cc
+@@ -12,20 +12,32 @@
+ #include <sys/stat.h>
+ #include <sys/sysmacros.h>
+ #include <unistd.h>
+ 
+ #include <algorithm>
+ #include <vector>
+ 
+ #include "base/logging.h"
+ #include "compat/string.h"
+ #include "file_reader.h"
++
++#if defined(__OHOS__)
++// OHOS 适配：本仓移植版 libelf/0.8.13.1（Riepe libelf）与 glibc/elfutils 的差异：
++//  1) Riepe libelf 无 ELF_C_READ_MMAP（其 ELF_C_READ 即 mmap 读取），补一个等价别名；
++//  2) 0.8.13.1 已实现 gelf_getnote（libelf.a 导出该符号）但 gelf.h 未声明，补声明。
++// 两者都只在 __OHOS__ 下生效，不影响其他平台。
++# ifndef ELF_C_READ_MMAP
++#  define ELF_C_READ_MMAP ELF_C_READ
++# endif
++extern "C" size_t gelf_getnote(Elf_Data *data, size_t offset, GElf_Nhdr *nhdr,
++                               size_t *name_off, size_t *desc_off);
++#endif
+ 
+ namespace quipper {
+ 
+ namespace {
+ 
+ // Find a section with a name matching one in |names|. Prefer sections matching
+ // names earlier in the vector.
+ Elf_Scn *FindElfSection(Elf *elf, const std::vector<string> &names) {
+   size_t shstrndx;  // section index of the section names string table.
+   if (elf_getshdrstrndx(elf, &shstrndx) != 0) {
