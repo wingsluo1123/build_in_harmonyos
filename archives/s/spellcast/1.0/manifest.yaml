@@ -1,0 +1,48 @@
+name: spellcast
+software: spellcast
+version: "1.0"
+type: application
+build_system: conan
+description: >
+  Classic hand-waving multi-player X11 game of spellcasting.
+  Two or more wizards duel using spells invoked by hand gestures.
+homepage: https://www.eblong.com/zarf/spellcast.html
+repository: https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos
+license: LicenseRef-Custom
+topics: [game, x11]
+upstream:
+  name: spellcast
+  version: "1.0"
+  url: http://archive.ubuntu.com/ubuntu/pool/multiverse/s/spellcast/spellcast_1.0.orig.tar.gz
+  sha256: 3a96bd29fad2c4c8de85efc45ecacde5c5ae387da171420dac9400ba5360015d
+  author: Andrew Plotkin
+  license: Custom (free redistribution, non-commercial)
+build:
+  system: make
+  dependencies:
+    - libx11/1.8.13.1
+    - xorgproto/2025.1
+  os_support:
+    - Linux
+    - OHOS
+  instructions: |
+    make -j1 spellcast
+adaptation:
+  notes: >
+    X11 game with simple 1994 Makefile (K&R C, 1993). No patches required;
+    Makefile include/lib paths adapted via conan libx11/xorgproto dependencies.
+  changes:
+    - Replace -I/usr/local/include with libx11 + xorgproto conan include paths
+    - Replace -L/usr/local/lib with libx11 conan lib path
+    - Add -std=gnu89 for K&R C compatibility
+    - Explicit CC=clang (conanbuild env doesn't propagate)
+    - Suppress warnings: deprecated-non-prototype, int-conversion, return-type, incompatible-pointer-types
+  test_package:
+    description: >
+      Verify binary ELF structure (aarch64 PIE), libX11 NEEDED, musl linker,
+      man page, spelllist.ps, plus one HarmonyOS-specific non-assertion
+      runtime closure-load case. 10 checks.
+  knowledge_gained: []
+category: game
+maintainer: HarmonyOS PC OpenHarmony
+status: built

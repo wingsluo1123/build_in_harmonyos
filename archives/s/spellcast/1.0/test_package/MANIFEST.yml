@@ -1,0 +1,21 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: spellcast/1.0
+homepage: "https://www.eblong.com/zarf/spellcast.html"
+
+# 上游是 X11 GUI 游戏，无自动化测试
+upstream_test_command: null
+upstream_test_in_build: false
+upstream_tests: []
+
+# test_package 自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.sh
+    description: "Tests 1-9: ELF metadata/content checks (aarch64, PIE, libX11 NEEDED, musl linker, man page, spelllist.ps). Test 10: HarmonyOS-specific NON-ASSERTION runtime feasibility — actually executes the binary and only fails on dynamic-loader errors, proving the full shared-library closure (libX11.so.6 + libc.so) loads and relocates natively on OHOS."
+    command: "bash test.sh <package_folder>"
+    harmonyos_specific:
+      - "test 10 (non-assertion runtime closure load, wmgtemp precedent pattern)"
+
+assertion_count: 10
