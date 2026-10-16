@@ -1,0 +1,67 @@
+#====================================================================
+# Draft: kcharselect 26.04.0 -- Qt/KF 应用在 test_package 里跑起来会把运行时
+#        状态写进 $HOME/.local/state/，而 test_type="explicit" 的 test_package
+#        构建目录就是归档的 test_package/ → 归档树被污染（jc/junk 门禁风险）
+#====================================================================
+
+id:                     DRAFT-KCHARSELECT-26040-TEST-PACKAGE-HOME-XDG-STATE-FILE-ARCHIVE-POLLUTION
+trigger_tool:           test|conan
+phase:                  testing
+error_signature:        test_package/\.local/state/.*staterc|
+                        \.local/state/[a-z]*staterc|
+                        KIconTheme::initTheme|
+                        KStyleManager::initStyle
+
+severity:               2
+category:               testing, environment, conan, packaging
+
+match_keywords:         test_package, HOME, XDG_STATE_HOME, XDG_RUNTIME_DIR, .local/state,
+                        staterc, QSettings, KIconTheme, KStyleManager, KColorSchemeManager,
+                        test_type explicit, conan create, archives 污染, junk check
+
+title:                  conan test_package（test_type="explicit"）的构建目录就是归档 test_package/：KF/Qt 应用把 HOME 指向它会写 .local/state/*staterc，污染归档树——必须把 HOME/XDG_* 指向源码树外
+
+root_cause:             conan 对 `test_type = "explicit"` 且未定义 layout 的 test_package，
+                        把 **test_package 源码目录本身**当作构建目录，并在每次 `conan create`
+                        时在其中生成 conanrun.sh / bin/ / metadata/ 等（多数已被 .gitignore 覆盖）。
+                        如果 test() 里用 `env.define("HOME", self.build_folder)`（kblocks/kjumpingcube
+                        一族的常见写法）来给 GUI 应用一个干净 HOME，那么应用初始化时写的用户级
+                        状态就落到归档目录里。kcharselect 的 main() 在 QApplication 之前调用
+                        `KIconTheme::initTheme()` + `KStyleManager::initStyle()`，二者经 QSettings
+                        写 `<HOME>/.local/state/kcharselectstaterc` —— 该路径**不在** .gitignore
+                        的 test_package 白名单里，会被 `git add` 带进 PR（junk/JC 门禁风险，
+                        且属无意义产物污染）。
+                        同类应用：任何用 KIconTheme/KStyleManager/KSharedConfig/KColorSchemeManager
+                        初始化、或在测试中触发 QSettings 写入的 KF6 应用。
+
+affected_scope:        所有在 conan test_package 中真实启动 Qt/KF GUI 程序（尤其 OHOS 无头
+                        offscreen 冒烟）的配方；只要把 HOME 指向 self.build_folder，
+                        就会把用户级状态写进归档树。
+
+verification_cmd:       cd archives/k/kcharselect/26.04.0/test_package && ls -a | grep -F .local
+                        # 修复后应无输出；修复前可见 .local/state/kcharselectstaterc
+                        git check-ignore -v archives/*/*/*/test_package/.local/state/*staterc
+                        # 若 rc!=0（未被 ignore），该文件会被 git add 带进 PR
+
+rec_priority:           1
+rec_approach:           isolate-home-xdg-outside-source-tree
+rec_description:        test_package 里把 HOME 与全部 XDG_* 指向**源码树外**的固定目录
+                        （如 `$TMPDIR/<pkg>-test-runtime`），不要指向 self.build_folder；
+                        这样应用的用户级状态落在临时目录，归档树保持干净、可重复。
+rec_command:            runtime_home = os.path.join(os.environ.get("TMPDIR", tempfile.gettempdir()),
+                                                   "kcharselect-test-runtime")
+                        os.makedirs(runtime_home, exist_ok=True)
+                        env.define("HOME", runtime_home)
+                        env.define("XDG_RUNTIME_DIR", runtime_home)
+                        env.define("XDG_STATE_HOME", os.path.join(runtime_home, "state"))
+                        env.define("XDG_CONFIG_HOME", os.path.join(runtime_home, "config"))
+                        env.define("XDG_DATA_HOME", os.path.join(runtime_home, "data"))
+                        env.define("XDG_CACHE_HOME", os.path.join(runtime_home, "cache"))
+rec_auto_fix:           false
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+source_pr:
+source_commit:
+contributor_id:         DRAFT
+verified_on:            OHOS 6.0 aarch64 (HarmonyOS PC, native build, clang 15, conan 2.29.1)
+verified_by:            kcharselect/26.04.0 conan create（修复后归档树无 .local，用例全通过）
