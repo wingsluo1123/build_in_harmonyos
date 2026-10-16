@@ -1,0 +1,85 @@
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -48,30 +48,76 @@
+ set(ktextwidgets_INCLUDES
+   ${CMAKE_CURRENT_SOURCE_DIR}/dialogs
+   ${CMAKE_CURRENT_SOURCE_DIR}/findreplace
+   ${CMAKE_CURRENT_SOURCE_DIR}/widgets
+ )
+ target_include_directories(KF6TextWidgets PUBLIC "$<BUILD_INTERFACE:${ktextwidgets_INCLUDES}>"
+ )
+ 
+ target_include_directories(KF6TextWidgets INTERFACE "$<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR_KF}/KTextWidgets>")
+ 
++# E537 relocatable linkage: kcompletion/kconfig/ki18n/kwidgetsaddons/sonnet
++# are published without a DT_SONAME, so linking by their absolute Conan cache
++# paths would make the linker record machine-private paths in DT_NEEDED
++# (non-consumable on a different cache layout). Link every KF6 dependency by
++# bare -l basenames (SonnetUi/I18n PUBLIC, the rest PRIVATE) so ld records
++# libKF6SonnetUi.so and friends; E537 knowledge suggests
++# target_link_directories(PUBLIC) + bare -l so consumers and the in-tree
++# autotests can resolve the -l flags (kio/ksanecore precedent). The link-time
++# search dirs are build-machine local only; DT_NEEDED stays basename and
++# relocatable.
++target_link_directories(KF6TextWidgets PUBLIC ${KTEXTWIDGETS_DEP_LIB_DIRS})
++
++foreach(_dep_target KF6::SonnetUi KF6::I18n KF6::SonnetCore
++                    KF6::WidgetsAddons KF6::Completion KF6::ConfigGui)
++    if(TARGET ${_dep_target})
++        get_target_property(_dep_inc ${_dep_target} INTERFACE_INCLUDE_DIRECTORIES)
++        if(_dep_inc)
++            target_include_directories(KF6TextWidgets SYSTEM PRIVATE ${_dep_inc})
++        endif()
++        unset(_dep_inc)
++    endif()
++endforeach()
++
++# SonnetUi/I18n include dirs propagate as INTERFACE because public headers
++# (ktextedit.h) pull sonnet headers; the remaining KF6 deps keep their includes
++# as SYSTEM PRIVATE (build-only, not exported).
++foreach(_pub_target KF6::SonnetUi KF6::I18n)
++    if(TARGET ${_pub_target})
++        get_target_property(_pub_inc ${_pub_target} INTERFACE_INCLUDE_DIRECTORIES)
++        if(_pub_inc)
++            target_include_directories(KF6TextWidgets INTERFACE ${_pub_inc})
++        endif()
++        unset(_pub_inc)
++    endif()
++endforeach()
++
++foreach(_dep_target KF6::SonnetCore KF6::WidgetsAddons KF6::Completion KF6::ConfigGui)
++    if(TARGET ${_dep_target})
++        get_target_property(_dep_inc ${_dep_target} INTERFACE_INCLUDE_DIRECTORIES)
++        if(_dep_inc)
++            target_include_directories(KF6TextWidgets SYSTEM PRIVATE ${_dep_inc})
++        endif()
++        unset(_dep_inc)
++    endif()
++endforeach()
++
+ target_link_libraries(KF6TextWidgets
+ PUBLIC
+   Qt6::Widgets
+-  KF6::SonnetUi
+-  KF6::I18n
++  -lKF6SonnetUi
++  -lKF6I18n
+ PRIVATE
+-  KF6::SonnetCore
+-  KF6::WidgetsAddons
+-  KF6::Completion
+-  KF6::ConfigGui
++  -lKF6SonnetCore
++  -lKF6WidgetsAddons
++  -lKF6Completion
++  -lKF6ConfigGui
+ )
+ 
+ if (Qt6TextToSpeech_FOUND)
+     target_link_libraries(KF6TextWidgets
+       PRIVATE
+         Qt6::TextToSpeech)
+ endif()
+ 
+ ecm_generate_headers(KTextWidgets_HEADERS
+   HEADER_NAMES
