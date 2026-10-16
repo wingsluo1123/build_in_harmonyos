@@ -1,0 +1,48 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: mapsforge/0.20.0
+homepage: "https://github.com/mapsforge/mapsforge"
+
+# 上游源码审计：mapsforge 0.20.0 是 Gradle 多模块 Java 项目，仓库内自带
+# JUnit4 测试（各模块 src/test/java），由 `./gradlew test` / `gradle build` 执行。
+upstream_tests_exist: true
+upstream_test_audit:
+  - source: "settings.gradle (13 modules)"
+    reason: "地图库多模块工程；桌面/JVM 模块 10 个（core/map/map-reader/map-awt/map-writer/themes/poi/poi-awt/poi-writer/samples-awt）自带 src/test/java JUnit4 用例；Android 模块 3 个（map-android/poi-android/samples-android）需 Android SDK，OHOS PC 环境不可构建，已在补丁中排除。"
+  - source: "各模块 build.gradle"
+    reason: "测试依赖 = junit:junit:4.12（全模块），map 模块另需 commons-io:2.5 / jetty:6.1.26 / slf4j-log4j12:1.7.28；测试注册由 Gradle 的 test 任务自动发现 JUnit4 类。"
+  - source: "上游 CI (.github/workflows/android.yml)"
+    reason: "上游 CI 使用 `./gradlew build`（含 test）。适配环境以 `gradle clean build` 等价执行。"
+  - conclusion: "上游存在自动化测试。计数口径（源码静态清点 N）：`@Test` 全量 244（有效 235 + 上游自身注释禁用 9）+ src/androidTest 仪器测试文件 9 = 253；其中 OHOS PC 可执行 = 有效 JUnit4 用例 235，适配环境实测 235/235 通过（0 失败 / 0 错误 / 0 跳过）。9 处注释禁用项上游本就不注册、9 个 androidTest 因需 Android SDK 未执行。逐条清单见 reports/testcases.tsv。"
+
+upstream_check_command: "gradle clean build"
+upstream_test_in_build: true
+upstream_test_command: "gradle clean build"
+upstream_tests:
+  - suite: "mapsforge-core (JUnit4)"
+    tests: 114
+  - suite: "mapsforge-map (JUnit4)"
+    tests: 42
+  - suite: "mapsforge-map-reader (JUnit4)"
+    tests: 8
+  - suite: "mapsforge-map-awt (JUnit4)"
+    tests: 46
+  - suite: "mapsforge-map-writer (JUnit4)"
+    tests: 16
+  - suite: "mapsforge-poi (JUnit4)"
+    tests: 8
+  - suite: "mapsforge-samples-awt (JUnit4)"
+    tests: 1
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: TestMapsforge.java
+    description: "编译并运行 Java 程序，调用 org.mapsforge.core 的 LatLong / BoundingBox / LatLongUtils API 做 15 项断言（含 1 项鸿蒙特有断言 test_ohos_bisheng_jdk），满足 R34 实质性验证"
+    command: "bash test.sh"
+
+# test_package 的断言总数（15 项，其中鸿蒙特有 ≥1）
+assertion_count: 15
+ohos_specific_assertion_count: 1

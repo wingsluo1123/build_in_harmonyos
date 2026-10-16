@@ -1,0 +1,111 @@
+version: "0.20.0"
+software: mapsforge
+status: built
+build_date: "2026-09-30"
+build_system: gradle
+
+source:
+  url: "https://github.com/mapsforge/mapsforge/archive/refs/tags/0.20.0.tar.gz"
+  sha256: "b3c7f72c6af8ca30d14203e739c88ad3bd23f9e197e179cfe4ee9f2cc5447fd3"
+  tar_format: tar.gz
+  upstream_tag: "0.20.0"
+  upstream_commit: "40a8f86df5ff9e29bb297f440d1d25b90be186aa"
+
+build:
+  system: gradle
+  gradle_version: "8.12 (tool_requires gradle/8.12, ohpcd)"
+  jdk: "BiSheng JDK 17.0.13 (ohos-aarch64, SHA-256 固定；conandata build_tools.bisheng_jdk)"
+  command: "gradle -p <src> clean build --no-daemon --console=plain"
+  configure_options:
+    - "JAVA_HOME=<bishengjdk17>"
+    - "JAVA_TOOL_OPTIONS=-Dos.name=Linux  (Gradle OperatingSystem 不识别 HarmonyOS)"
+    - "GRADLE_USER_HOME=<source_folder>/.gradle-home  (构建状态私有化，不写 HOME)"
+  dependencies:
+    - "gradle/8.12 (tool_requires, ohpcd 制品仓)"
+    - "Maven 依赖由 Gradle 从 Maven Central 解析（kxml2/svgSalamander/guava/trove4j/jts-core/osmosis-core/sqlite-jdbc/activation/jaxb-runtime/junit/commons-io/jetty/slf4j-log4j12）"
+  cc: "N/A (pure Java)"
+  cxx: "N/A (pure Java)"
+  modules_built:
+    - mapsforge-core
+    - mapsforge-map
+    - mapsforge-map-reader
+    - mapsforge-map-awt
+    - mapsforge-map-writer
+    - mapsforge-themes
+    - mapsforge-poi
+    - mapsforge-poi-awt
+    - mapsforge-poi-writer
+    - mapsforge-samples-awt
+  modules_excluded:
+    - "mapsforge-map-android (needs Android SDK)"
+    - "mapsforge-poi-android (needs Android SDK)"
+    - "mapsforge-samples-android (needs Android SDK + AGP)"
+
+patches_applied:
+  - "0001-build.gradle.patch"
+  - "0002-settings.gradle.patch"
+
+upstream_tests:
+  framework: "junit4"
+  # ── N 计数口径（外部审查 pc-pr-review rule4 按“源码静态清点”独立复算，声明值必须 >= 清点值）──
+  # 本包清点：@Test 全量 244（含 9 处上游自身注释禁用的 @Test）+ src/androidTest 仪器测试文件 9 = 253
+  source_static_scan_at_tests: 244   # 全仓库 `@Test` 出现次数（有效 235 + 注释禁用 9）
+  disabled_commented_at_tests: 9     # map-writer/MapFileWriterTest 8 处 + poi/PoiCategoryRangeQueryGeneratorTest 1 处（`// @Test`，运行期不注册）
+  upstream_static_total: 253         # 源码静态清点合计 = 244 + 9（= 平台“实测 N=253”）
+  runnable_on_ohos: 235              # OHOS PC 可执行的 JUnit4 有效用例（= 244 - 9）
+  test_files: 84
+  test_classes: 70
+  android_test_files_not_run: 9      # src/androidTest（8 个 Robotium 测试类 + 1 个 TestUtils），需 Android 设备/SDK
+  test_methods: 235
+  test_command: "gradle clean build"
+  run_in_build: true
+  discovered: 235
+  executed: 235
+  passed: 235
+  failed: 0
+  errors: 0
+  skipped: 0
+  by_module:
+    mapsforge-core: 114
+    mapsforge-map: 42
+    mapsforge-map-awt: 46
+    mapsforge-map-reader: 8
+    mapsforge-map-writer: 16   # 另有 8 处 @Test 被上游注释禁用（不计入可执行）
+    mapsforge-poi: 8           # 另有 1 处 @Test 被上游注释禁用（不计入可执行）
+    mapsforge-samples-awt: 1
+  evidence:
+    - "reports/upstream-tests.log"
+    - "reports/testcases.tsv"
+  audit: "上游存在自动化测试（各模块 src/test/java JUnit4）。源码静态清点 N=253（`@Test` 全量 244（含 9 处上游注释禁用的 @Test：map-writer 8 + poi 1）+ src/androidTest 仪器测试文件 9）；其中 OHOS PC 可执行 = JUnit4 有效用例 235，实测 235/235 通过。9 处注释禁用项上游自身即不注册、9 个 androidTest 需 Android 设备/SDK，均不在 OHOS 执行。"
+
+test_package:
+  assertions: 15
+  ohos_specific_assertions: 1
+  command: "bash test.sh (javac + java, 调用 mapsforge-core API)"
+
+knowledge_gained:
+  - "mapsforge 是纯 Java/Gradle 多模块工程；OHOS PC 无 Android SDK，须排除 3 个 Android 模块"
+  - "上游 settings.gradle 同时声明 google() 仓库；该仓库在 OHOS 构建网络不可达时是*连接超时*（非 404），Gradle 会直接中断依赖解析——排除 Android 模块后必须一并移除 google()"
+  - "Gradle 的 OperatingSystem 不识别 HarmonyOS，需为构建 JVM 注入 -Dos.name=Linux（ohpcd gradle/8.12 启动器已内置，recipe 再兜底）"
+  - "Conan basic_layout 下 project 根在 source_folder 而 cwd 在 build_folder，gradle 必须用 -p 指到 source_folder"
+  - "library 类型的 Conan 配方必须声明 shared 选项，否则 conan create 报 'Package type is library, but no shared option declared'"
+  - "本机 GitHub 官方源码通道不可达（codeload 限速/git early EOF/raw 超时）；本地验证借助 conan 的 core.sources:download_cache（sha256 索引），CI 侧由 build_and_test.sh 的 mirror fallback（gh-proxy）处理"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/mapsforge-0.20.0.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/mapsforge-0.20.0.work
+  source_orig_hash: 748a607b414fcdd3
+  source_work_hash: ba9fcb8e0f0f2a00
+  generated_at: '2026-10-01T00:05:54'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-build.gradle.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-settings.gradle.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

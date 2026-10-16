@@ -1,0 +1,27 @@
+# conandata.yml — mapsforge 0.20.0
+# 上游：mapsforge/mapsforge（GitHub，LGPL-3.0-or-later），标签 0.20.0
+#   轻量 tag -> commit 40a8f86df5ff9e29bb297f440d1d25b90be186aa（release 2023-08-15）
+#   GitHub 自动归档 tar.gz 的 SHA256（官方内容；CI 侧 mirror fallback 会追加 gh-proxy 镜像）
+sources:
+  url: "https://github.com/mapsforge/mapsforge/archive/refs/tags/0.20.0.tar.gz"
+  sha256: "b3c7f72c6af8ca30d14203e739c88ad3bd23f9e197e179cfe4ee9f2cc5447fd3"
+
+# JVM 工具链：BiSheng JDK 17.0.13（ohos-aarch64），与 archives/v/vecmath 先例同款
+# Gradle 由 recipe 的 tool_requires("gradle/8.12") 提供（ohpcd 制品仓已发布）
+build_tools:
+  bisheng_jdk:
+    scheme: "https"
+    host: "gitcode.com"
+    path: "/OpenHarmonyPCDeveloper/cmd-pkgs/releases/download/pkgs/bishengjdk-17.0.13-ohos-aarch64.tar.gz"
+    filename: "bishengjdk-17.0.13-ohos-aarch64.tar.gz"
+    sha256: "ce074909ff5c13e7e7675eb243ee15424f0343610312c526552a1a08d199e28f"
+    version: "17.0.13"
+
+# 平台适配补丁（无平台宏、无空壳 stub；仅构建系统层面裁剪 Android/Google 仓库）
+patches:
+  - patch_file: "patches/0001-build.gradle.patch"
+    patch_description: "移除 Android Gradle Plugin 插件块，并将 group version 固定为 0.20.0（OHOS PC 无 Android SDK）"
+    patch_type: "portability"
+  - patch_file: "patches/0002-settings.gradle.patch"
+    patch_description: "从 Gradle 多模块构建中排除 3 个 Android 模块，并移除仅 Android 需要的 google() 仓库"
+    patch_type: "portability"
