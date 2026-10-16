@@ -1,0 +1,109 @@
+# 版本级 manifest — ublock 1.70.0
+# 文件位置: archives/u/ublock/1.70.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "1.70.0"
+software: "ublock"
+
+# published | built | failed | archived
+status: built
+
+build_date: "2026-10-12"
+build_system: make
+# ↑ 上游为 Makefile + bash + node/npm（纯 JS 项目，C/C++ 源文件 0）。
+#   make chromium → 浏览器扩展；make npm → @gorhill/ubo-core 静态过滤引擎库。
+
+source:
+  url: "https://github.com/gorhill/uBlock/archive/refs/tags/1.70.0.tar.gz"
+  sha256: "2f5423376833e5ae441a4e52a2ff9476fa7ff15b0d819c235c5b90505937a1ba"
+  tar_format: tar.gz
+  upstream_repo: "https://github.com/gorhill/uBlock"
+  upstream_tag: "1.70.0"
+  upstream_git_head: "3703f5efb82dde5aaaaf590a3a37550fcd34160d"
+assets:
+  # 上游扩展默认过滤列表数据（官方 uAssets 仓库，钉死 commit 快照）
+  main:
+    url: "https://github.com/uBlockOrigin/uAssets/archive/158c3c962dc1ea27b7d2d1a1c7de119a1f467f59.tar.gz"
+    sha256: "dbf9e6285c1be2b5524ffef79f80e9a26b64fa866f0d22512bae26e5d9a1d227"
+  prod:
+    url: "https://github.com/uBlockOrigin/uAssets/archive/71dbf1e0a268dc06893b35f9737d4789d91962bc.tar.gz"
+    sha256: "a369e7733a1ceeae56a1a7df5ea5c9ed3206f88f24f7e5f805fd5ba3a27f3c17"
+
+build:
+  system: make
+  configure_options: []
+  targets:
+    - "bash tools/make-chromium.sh   # 显式 bash（不经 make 直接 exec，规避 shebang 执行失败）"
+    - "bash tools/make-npm.sh        # 显式 bash；内部两处 ./tools/*.sh 由 patches/0001 改为显式 bash"
+  dependencies: []
+  test_only_dev_dependencies:
+    - "mocha (npm registry)"
+    - "esm-world (npm registry)"
+    - "scaling-palm-tree @15cf1ab (可选全量电池；GitHub 专属)"
+  cc: "N/A (纯 JS)"
+  cxx: "N/A (纯 JS)"
+
+# 语言核验（R47 口径）：上游全仓 1028 文件，*.c/.h/.cpp/.hpp/.m/.mm 命中 0，
+# 主体为 JavaScript（268 个 .js）+ 已提交的 WebAssembly 制品。lang-preflight 判定
+# detected=javascript ≠ task=cpp；按仓库既有 JS/npm 范式（uglify/roblox-ts/
+# leaflet-markercluster）继续适配，判定证据如实记录于 notes.md。
+lang_preflight:
+  detected_language: javascript
+  task_language: cpp
+  build_system: make
+  manifest_evidence: "Makefile + package.json(engines node>=22/npm>=11)；无 CMake/autotools/meson/Cargo/go"
+  source_stats: "源码 1028 文件，C/C++ 源文件 0；.js 268、.json 164、.html 42、.wasm 4"
+  protocol_verdict: env_unsupported
+  decision: "人工复核后按既有 JS/npm 范式继续适配（同族先例已并入 main）"
+
+patches_applied:
+  - "patches/0001-tools-explicit-bash.patch"   # OHOS/CI：显式 bash 调用 tools 子脚本，规避 shebang 执行失败（E165）
+
+artifacts:
+  resources:
+    - "res/ublock/chromium"     # uBlock Origin 浏览器扩展（含 uAssets 默认过滤列表）
+    - "res/ublock/ubo-core"     # @gorhill/ubo-core 静态网络过滤引擎 Node 库
+  binaries: []
+
+test_result:
+  round: 1
+  # ── 上游测试（platform/npm，mocha）真实执行 ──
+  # 默认电池（官方 test.js --mocha 口径）= tests/wasm.js(2) + tests/snfe.js(32)
+  upstream_tests_default_total: 34
+  upstream_tests_default_passed: 34
+  upstream_tests_default_failed: 0
+  upstream_tests_default_log: "reports/upstream-mocha-default.log"
+  # tests/leaks.js（未被 test.js 收录）
+  upstream_tests_leaks_total: 1
+  upstream_tests_leaks_passed: 1
+  upstream_tests_leaks_failed: 0
+  upstream_tests_leaks_log: "reports/upstream-leaks.log"
+  # 门禁口径合计
+  upstream_tests_gated_total: 35
+  upstream_tests_gated_passed: 35
+  upstream_tests_gated_failed: 0
+  upstream_tests_gated_skipped: 0
+  upstream_test_command: "bash scripts/run_upstream_tests.sh <src>  (直接调 mocha 取真实退出码)"
+  # 可选全量电池（--full-battery，含 tests/request-data.js）—— 实测但非门禁
+  upstream_tests_fullbattery_total: 498302
+  upstream_tests_fullbattery_passed: 496584
+  upstream_tests_fullbattery_failed: 1718
+  upstream_tests_fullbattery_log: "reports/upstream-mocha-fullbattery-summary.log"
+  upstream_tests_fullbattery_note: >-
+    期望值来自随仓 2021 快照 tests/data/results.json，与 1.70.0 引擎存在既有时序差异
+    （1718 例均为 "should allow ... 1 !== 0"），属上游 fixture 陈旧；上游 CI 不执行、
+    test.js 仅在 --full-battery 下启用，故不作门禁。
+  # ── 消费者层（test_package） ──
+  consumer_assertions_total: 19
+  consumer_assertions_passed: 19
+  consumer_assertions_failed: 0
+  consumer_assertions_skipped: 0
+  consumer_engine_flow: "8/8 (enableWASM + create + useLists + matchRequest + serialize/deserialize)"
+  consumer_log: "reports/conan-create.log"
+  ohos_specific_test_count: 6
+
+knowledge_gained:
+  - ref: "E429-draft-A5AD（--jitless 禁用 WebAssembly；npm test.js 退出码不传播；SNFE 单实例）"
+  - ref: "E430-draft-4943（make 直接 exec #!/usr/bin/env bash 脚本失败 → 显式 bash + patch）"
+  - ref: "E431-draft-86A1（hnp node.org 自带 bin/npm 为残缺 stub → 用真实 npm-cli.js / npm shim）"
+  - ref: "E432-draft-75DA（OHOS CI worker fork EAGAIN（瞬时）→ 测试子进程有界重试）"
