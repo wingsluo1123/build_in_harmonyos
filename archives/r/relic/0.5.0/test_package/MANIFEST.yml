@@ -1,0 +1,108 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# 上游 relic 0.5.0 的测试体系（在目标 tag 源码上静态清点，非日志反填）：
+#   * 注册入口 = test/CMakeLists.txt 里的 `ADD_MODULE(<模块>)`（18 次调用），
+#     展开为 `add_test(test_<模块> …)` ⇒ **N_registered = 18** 个 ctest 目标。
+#   * 原子用例注册宏 = test/test_*.c 里的 `TEST_BEGIN("…")` 与
+#     `TEST_ONCE("…")`（含 10 处跨行写的 TEST_BEGIN）：
+#       TEST_BEGIN 1058 + TEST_ONCE 31 = **N_static = 1089**，
+#     与同目录 `TEST_END` 计数 1089 逐个配平 —— 这是本包「上游用例数」的口径。
+#   * 执行：配方 build() 内 `ctest --output-on-failure`（TESTS=1，每条用例跑一遍），
+#     18/18 目标全部通过 ⇒ **N_executed = 18 目标 / 1089 原子用例，未执行 0**。
+#   * bench/ 是基准程序（BENCH=0 未构建），不计入测试用例。
+#   * 未修改任何上游测试文件（上游测试用例修改 = 否）。
+
+package: relic/0.5.0
+homepage: "https://github.com/relic-toolkit/relic"
+
+upstream_check_command: "ctest -N   # 列出 18 个注册目标（test/CMakeLists.txt 的 ADD_MODULE 展开）"
+upstream_test_in_build: true
+upstream_test_command: "ctest --output-on-failure --timeout 1800   # 在配方 build() 内真实执行，失败抛错并附 ctest 日志尾部"
+
+upstream_tests:
+  - file: test/test_err.c
+    source: relic-relic-toolkit-0.5.0/test/test_err.c
+    description: "错误处理模块（2 个 TEST_ONCE 用例）"
+    command: "./test_err"
+  - file: test/test_core.c
+    source: relic-relic-toolkit-0.5.0/test/test_core.c
+    description: "库上下文与初始化（4 个 TEST_ONCE 用例）"
+    command: "./test_core"
+  - file: test/test_bn.c
+    source: relic-relic-toolkit-0.5.0/test/test_bn.c
+    description: "多精度整数算术（115 个用例）"
+    command: "./test_bn"
+  - file: test/test_dv.c
+    source: relic-relic-toolkit-0.5.0/test/test_dv.c
+    description: "临时双精度数字向量（5 个用例）"
+    command: "./test_dv"
+  - file: test/test_fp.c
+    source: relic-relic-toolkit-0.5.0/test/test_fp.c
+    description: "素域算术（67 个用例）"
+    command: "./test_fp"
+  - file: test/test_fpx.c
+    source: relic-relic-toolkit-0.5.0/test/test_fpx.c
+    description: "素域扩域算术（423 个用例）"
+    command: "./test_fpx"
+  - file: test/test_fb.c
+    source: relic-relic-toolkit-0.5.0/test/test_fb.c
+    description: "二元域算术（65 个用例）"
+    command: "./test_fb"
+  - file: test/test_fbx.c
+    source: relic-relic-toolkit-0.5.0/test/test_fbx.c
+    description: "二元域扩域算术（16 个用例）"
+    command: "./test_fbx"
+  - file: test/test_ep.c
+    source: relic-relic-toolkit-0.5.0/test/test_ep.c
+    description: "素域椭圆曲线（47 个用例）"
+    command: "./test_ep"
+  - file: test/test_epx.c
+    source: relic-relic-toolkit-0.5.0/test/test_epx.c
+    description: "素域椭圆曲线扩域（48 个用例）"
+    command: "./test_epx"
+  - file: test/test_eb.c
+    source: relic-relic-toolkit-0.5.0/test/test_eb.c
+    description: "二元域椭圆曲线（51 个用例）"
+    command: "./test_eb"
+  - file: test/test_ed.c
+    source: relic-relic-toolkit-0.5.0/test/test_ed.c
+    description: "Edwards 曲线（47 个用例）"
+    command: "./test_ed"
+  - file: test/test_ec.c
+    source: relic-relic-toolkit-0.5.0/test/test_ec.c
+    description: "椭圆曲线密码学（24 个用例）"
+    command: "./test_ec"
+  - file: test/test_pc.c
+    source: relic-relic-toolkit-0.5.0/test/test_pc.c
+    description: "配对密码学（63 个用例）"
+    command: "./test_pc"
+  - file: test/test_pp.c
+    source: relic-relic-toolkit-0.5.0/test/test_pp.c
+    description: "素域配对（67 个用例）"
+    command: "./test_pp"
+  - file: test/test_md.c
+    source: relic-relic-toolkit-0.5.0/test/test_md.c
+    description: "消息摘要/哈希（6 个 TEST_ONCE 用例）"
+    command: "./test_md"
+  - file: test/test_cp.c
+    source: relic-relic-toolkit-0.5.0/test/test_cp.c
+    description: "密码协议（34 个用例）"
+    command: "./test_cp"
+  - file: test/test_rand.c
+    source: relic-relic-toolkit-0.5.0/test/test_rand.c
+    description: "随机数生成器（5 个 TEST_ONCE 用例）"
+    command: "./test_rand"
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: test_package/src/main.c
+    description: "以库使用者身份从安装后的包编译链接 relic，调用 core_init / bn_read_str / bn_add / bn_sub / bn_cmp / bn_sqr / bn_div / bn_mul / bn_is_zero 公开 API，3 条大整数恒等式断言决定退出码"
+    command: "./test_relic_consumer"
+
+# 测试断言总数（近似值，用于质量评估）
+#   1877 = test/test_*.c 的 TEST_ASSERT( 数（上游原子断言）
+#      3 = test_package/src/main.c 的消费者断言
+assertion_count: 1880
