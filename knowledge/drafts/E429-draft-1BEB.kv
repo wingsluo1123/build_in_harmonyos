@@ -1,0 +1,44 @@
+id:                     E429
+trigger_tool:           runtime|test
+phase:                  runtime|testing
+error_signature:        Invalid RTP/MPEG-TS datagram dropped|two_csrc: expected prefix .* got|zero_word_extension: expected prefix .* got
+severity:               3
+category:               network,socket,runtime,testing,portability
+match_keywords:         RTP, MPEG-TS, CSRC, extension header, padding, payload type 33, marker bit, 188-byte packet, sync byte, UDP datagram, fixed 12-byte header
+title:                  RTP 固定首部长度不等于负载起点：须在完整数据报上联合解析 CSRC、扩展与 padding 后再验证 MPEG-TS 边界
+root_cause:             RTP v2 只有前 12 字节固定；CC 决定其后的 CSRC 数量，X 决定扩展头及 32 位字数，P 决定数据报尾部 padding。接收端若固定剥离 12 字节，或只修正 CC 后立即按 188 字节验证，会把合法首部字节当成 MPEG-TS payload，产生错位输出或把合法数据报当成无效包丢弃。
+affected_scope:         直接从 UDP socket 接收完整 RTP 数据报、再把 payload 交给 MPEG-TS 或其他固定大小分组协议的客户端/服务器；不适用于上层 RTP 库已经返回去首部 payload 的调用点，也不适用于明确禁止 CC/X/P 的私有固定头协议。
+verification_cmd:       在目标端用真实安装 CLI 对固定头、marker、CSRC、扩展、padding、组合头和截断/越界负例执行同一黑盒矩阵；上游臂应在 CSRC 失败，只修 CC 的反例臂应在扩展失败，完整解析臂应 17/17 通过。
+rec_priority:           P1
+rec_approach:           complete-datagram-rtp-boundary-parser
+rec_description:        先一次读取完整 UDP 数据报；依次校验版本与屏蔽 marker 后的 payload type，计算 12+4*CC，若 X 置位再读取扩展字数并做溢出/截断检查，若 P 置位从数据报尾读取并校验 padding；最后对剩余 payload 做上限、188 对齐和每包 sync 检查。任何一步失败均丢弃整个数据报，不把半解析数据交给下游。
+rec_command:            python3 test_package/test_rtp_input.py <installed-tsdecrypt>
+rec_auto_fix:           false
+fallback_priority:      2
+fallback_approach:      use-a-proven-rtp-library
+fallback_description:   若项目已有可用 RTP 库，可让该库提供边界已验证的 payload 和序号；调用方仍须验证 payload type 与上层分组边界。
+fallback_auto_fix:      false
+forbid_1_pattern:       memmove\([^,]+,[^,]+\+\s*12|RTP_HDR_SZ\s+12.*read.*FRAME_SIZE\s*\+\s*RTP_HDR_SZ
+forbid_1_reason:        禁止把固定 12 字节直接当作所有 RTP 数据报的负载起点。
+forbid_1_consequence:   合法 CSRC、扩展或 padding 数据报会错位、截断或被错误拒绝。
+forbid_2_pattern:       packet\[1\]\s*!=\s*33
+forbid_2_reason:        RTP marker 与 payload type 共用第二字节；必须屏蔽最高位后比较 PT=33。
+forbid_2_consequence:   marker 置位的合法 MPEG-TS RTP 包会被误拒绝。
+causes:                 []
+caused_by:              []
+similar_to:             []
+conflicts_with:         []
+prerequisite_of:        []
+doc_file:               knowledge/drafts/E429-draft-1BEB.md
+last_updated:           2026-10-15
+source_event:           tsdecrypt 10.0 在 HarmonyOS PC 真机对合法 CSRC/扩展 RTP 数据报的三臂黑盒复现；Arm A/B 退出 1，Arm C 17/17 退出 0。
+authors:                gcw_vbU49vcA <gcw_vbU49vcA@noreply.gitcode.com>
+source_pr:
+source_commit:
+verify_builds:          tsdecrypt/10.0 真机 conan create：上游 runner 2/2，安装后 RTP/MPEG-TS 黑盒场景 17/17；三臂 A=1、B=1、C=0。
+metrics_success_count:  1
+metrics_fail_count:     2
+metrics_confidence:     0.9
+metrics_last_used:      2026-10-15
+draft:                  true
+contributor_id:         1BEB

@@ -1,0 +1,72 @@
+--- a/tsdecrypt.c
++++ b/tsdecrypt.c
+@@ -943 +943,27 @@
+-#define RTP_HDR_SZ  12
++#define RTP_HDR_SZ     12
++#define RTP_PACKET_MAX 65535
++#define RTP_MP2T_PT    33
++
++static uint8_t ts_packet[RTP_PACKET_MAX];
++
++static int rtp_payload(uint8_t *packet, ssize_t *packet_len, uint16_t *sequence) {
++	size_t i, header_len, payload_len;
++	uint8_t csrc_count;
++
++	if (*packet_len < RTP_HDR_SZ)
++		return 0;
++	if ((packet[0] >> 6) != 2 || (packet[1] & 0x7f) != RTP_MP2T_PT)
++		return 0;
++
++	csrc_count = packet[0] & 0x0f;
++	header_len = RTP_HDR_SZ + (size_t)csrc_count * 4;
++	if (header_len > (size_t)*packet_len)
++		return 0;
++
++	payload_len = (size_t)*packet_len - header_len;
++	if (payload_len == 0 || payload_len > FRAME_SIZE || payload_len % 188 != 0)
++		return 0;
++	for (i = 0; i < payload_len; i += 188) {
++		if (packet[header_len + i] != 0x47)
++			return 0;
++	}
+@@ -945,2 +971,5 @@
+-static uint8_t ts_packet[FRAME_SIZE + RTP_HDR_SZ];
+-static uint8_t rtp_hdr[2][RTP_HDR_SZ];
++	*sequence = (packet[2] << 8) | packet[3];
++	memmove(packet, packet + header_len, payload_len);
++	*packet_len = payload_len;
++	return 1;
++}
+@@ -953 +982,2 @@
+-	int rtp_hdr_pos = 0, num_packets = 0;
++	int have_rtp_sequence = 0;
++	uint16_t rtp_sequence = 0;
+@@ -963,3 +992,0 @@
+-	memset(rtp_hdr[0], 0, RTP_HDR_SZ);
+-	memset(rtp_hdr[1], 0, RTP_HDR_SZ);
+-
+@@ -1028,13 +1055,11 @@
+-				readen = fdread_ex(ts.input.fd, (char *)ts_packet, FRAME_SIZE + RTP_HDR_SZ, 250, 4, 1);
+-				if (readen > RTP_HDR_SZ) {
+-					memcpy(rtp_hdr[rtp_hdr_pos], ts_packet, RTP_HDR_SZ);
+-					memmove(ts_packet, ts_packet + RTP_HDR_SZ, FRAME_SIZE);
+-					readen -= RTP_HDR_SZ;
+-					uint16_t ssrc  = (rtp_hdr[rtp_hdr_pos][2] << 8) | rtp_hdr[rtp_hdr_pos][3];
+-					uint16_t pssrc = (rtp_hdr[!rtp_hdr_pos][2] << 8) | rtp_hdr[!rtp_hdr_pos][3];
+-					rtp_hdr_pos = !rtp_hdr_pos;
+-					if (pssrc + 1 != ssrc && (ssrc != 0 && pssrc != 0xffff) && num_packets > 2)
+-						if (ts.ts_discont)
+-							ts_LOGf("--- | RTP discontinuity last_ssrc %5d, curr_ssrc %5d, lost %d packet\n",
+-								pssrc, ssrc, ((ssrc - pssrc)-1) & 0xffff);
+-					num_packets++;
++				uint16_t sequence;
++				readen = fdread_ex(ts.input.fd, (char *)ts_packet, sizeof(ts_packet), 250, 4, 0);
++				if (readen > 0 && !rtp_payload(ts_packet, &readen, &sequence)) {
++					ts_LOGf("--- | Invalid RTP/MPEG-TS datagram dropped.\n");
++					readen = 0;
++				} else if (readen > 0) {
++					if (have_rtp_sequence && (uint16_t)(rtp_sequence + 1) != sequence && ts.ts_discont)
++						ts_LOGf("--- | RTP discontinuity last_seq %5d, curr_seq %5d, lost %d packet\n",
++							rtp_sequence, sequence, ((sequence - rtp_sequence)-1) & 0xffff);
++					rtp_sequence = sequence;
++					have_rtp_sequence = 1;
