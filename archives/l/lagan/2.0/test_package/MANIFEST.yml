@@ -1,0 +1,38 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: lagan/2.0
+homepage: "http://lagan.stanford.edu/lagan_web"
+
+# 上游测试命令
+# LAGAN 2.0 的顶层 Makefile 与 src/Makefile 都没有 test/check 目标
+# （src/Makefile 只有 all 与各二进制目标），tarball 内也不含任何自动化测试
+# 套件或用例，因此没有可声明的上游测试入口。
+upstream_check_command: "make -n check  # 上游 Makefile 无 check 目标"
+
+# conanfile.py build() 中未集成上游测试（上游没有测试）
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序：无。
+# tarball 只带 src/、utils/、Readmes/ 与 sample.fasta + sample.params 演示数据，
+# 那是手工演示输入，不是可断言的自动化用例，故此处为空表。
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_lagan.py
+    description: "消费者视角功能测试。阶段一（总是执行，含交叉构建）：校验安装后的 <pkg>/bin 下 6 个主二进制、utils/ 下 17 个编译工具、7 个 perl 包装脚本与 3 个打分矩阵齐备，且 23 个 ELF 带可执行位 —— 共 56 项断言。阶段二（仅目标可运行时）：真实启动打包的 aarch64 ELF，校验 chaos 与 mlagan 打印上游 README 记录的 usage banner —— 另 2 项。"
+    command: "python3 test_lagan.py --bin-dir <package_folder>/bin [--run]"
+  - file: conanfile.py
+    description: "test() 通过 self.run() 调用 test_lagan.py；交叉构建时 can_run()==False，只执行阶段一，跳过阶段二，不伪造运行结果。"
+    command: "conan test_package"
+
+# 断言总数（阶段一）：6 主二进制 + 17 utils + 7 perl + 3 打分矩阵 = 33；
+#                      6 主二进制 + 17 utils 的可执行位 = 23；合计 56。
+# 阶段二额外 +2（chaos / mlagan usage banner，仅目标可运行时执行）。
+# 实测（binfmt qemu-aarch64 + OHOS guest sysroot）：58/58 通过。
+assertion_count: 56
+assertion_count_with_run: 58
+upstream_test_cases: 0

@@ -1,0 +1,28 @@
+# 软件级 manifest — lagan
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: lagan
+display: "LAGAN"
+description: "DNA 序列局部/全局/多序列比对工具集（lagan, mlagan, shuffle-lagan, chaos, glocal + utils）"
+category: utility
+homepage: "http://lagan.stanford.edu/lagan_web"
+license: GPL-2.0-or-later
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "普通 Makefile 工程（非 autotools/CMake）：顶层 make 递归到 src/，glocal/ 需单独再 make 一次"
+    - "src/Makefile 硬编码 CC=gcc / CPP=g++，且 all 目标会递归进 glocal/ 再硬编码一次 g++；交叉编译须显式列出二进制目标并在 make 命令行覆盖 CC/CPP/CLINKER"
+    - "2006 年代码 × 现代 clang/glibc 的 4 类必现错误：getline 与 glibc 2.10+ 撞名、C99 裸 inline 不产外部符号导致链接期 undefined symbol、'using namespace std;' 使全局变量 end 与 std::end 二义、预标准 <fstream.h> 已移除 —— 见 2.0/patches/"
+    - "src/thrtrie.h 的 tentative definition 'int indeces[256];' 被两个 TU 包含，现代 clang 默认 -fno-common 会重复符号 → C 编译参数加 -fcommon"
+    - "运行期用 $LAGAN_DIR 定位数据文件；配方 package_info() 已在 runenv_info 里导出 LAGAN_DIR=<pkg>/bin 并把 bin/ 加入 PATH"
+    - "无第三方依赖，仅链接 -lm（任务池注解提到的 Boost 在源码树中不存在）"
+  common_dependencies: []
+
+versions:
+  "2.0":
+    status: built
+    build_date: "2026-10-14"
+    conan_ref: "lagan/2.0"
+    format: conan
+    note: "6 主二进制 + 17 utils + perl 包装 + 打分矩阵；4 个可移植性补丁 + -fcommon；本地 arm64/OHOS 交叉编译 conan create rc=0，binfmt qemu 实测 chaos/mlagan 输出 usage"
