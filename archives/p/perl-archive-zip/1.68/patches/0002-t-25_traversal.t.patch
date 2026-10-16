@@ -1,0 +1,25 @@
+--- a/t/25_traversal.t
++++ b/t/25_traversal.t
+@@ -27,21 +27,21 @@
+ 
+ my ($existed, $ret, $zip, $allowed_file, $forbidden_file);
+ 
+ # Change working directory to a temporary directory because some tested
+ # functions operate there and we need prepared symlinks there.
+ ok(chdir testPath(), "Working directory changed");
+ 
+ # Symlink tests make sense only if a file system supports them.
+ my $symlinks_not_supported;
+ {
+-    my $link = testPath('trylink');
++    my $link = File::Spec->catfile('trylink');
+     $symlinks_not_supported = !eval { symlink('.', $link) };
+     unlink($link);
+ }
+ 
+ # Case 1:
+ #   link-dir -> /tmp
+ #   link-dir/gotcha-linkdir
+ # should not write into /tmp/gotcha-linkdir file.
+ SKIP: {
+     skip 'Symbolic links are not supported', 12 if $symlinks_not_supported;
