@@ -1,0 +1,44 @@
+#====================================================================
+# E617 — 依赖只有动态 binary 时：静态库消费者/CLI 产物加 -Wl,-rpath 才能直接执行
+#====================================================================
+
+# Layer 0: Error Surface
+id:                     E1021
+trigger_tool:           runtime / CI L2 smoke
+phase:                  runtime
+error_signature: |
+  error while loading shared libraries: liblcms2\.so\.2
+  cannot open shared object file
+  -version.*failed.*non-blocking
+
+# Layer 1: Recognition
+severity:               2
+category:               ohos, autotools, linking, conan, shared-library
+prescan_pattern:        requires\(\s*["']lcms2/|PKG_CHECK_MODULES\(\[LCMS2\]|Missing prebuilt package.*lcms2
+root_cause:             |
+  某些依赖包在制品仓**只发布了动态 binary**（配方 default_options 里 shared=True，
+  例如 archives/l/lcms2/2.19）。此时：
+  (1) 静态库本体（如 libfreehand-0.1.a 里的 FHParser.o）会引用该动态库符号；
+  (2) 任何链接该静态库的最终产物（转换工具 CLI、test_package 里的消费者二进制）都会
+      带 DT_NEEDED=<lib>.so.N；
+  (3) OHOS 系统目录里往往只有**soname 不同**的自研构建（实测 /system/lib64 只有
+      liblcms_shared.z.so，没有 liblcms2.so.2），所以进程启动即报
+      "error while loading shared libraries"；
+  (4) 症状出现在**运行期**（CI L2 的 `<bin> --version` 冒烟、test_package 的
+      self.run），容易被误读成"产物坏了/链接错了"。
+  不能靠 `-o <dep>/*:shared=False` 绕开：实测 `conan install --requires=lcms2/2.19
+  -o lcms2/*:shared=False --build=never` → "Missing prebuilt package"（制品仓没编静态）。
+
+# Layer 2: Fix Strategy
+rec_approach:           inject-rpath-into-ldflags
+# Layer 3: Validation
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-17
+authors:               unknown
+doc_file:               doc/E1021.md
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        inject-rpath-into-ldflags
+match_keywords:         ohos, configure

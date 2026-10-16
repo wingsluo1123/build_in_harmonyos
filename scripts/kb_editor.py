@@ -610,6 +610,10 @@ def _fix_one(path):
     if 'doc_file' not in have: add.append(f'doc_file:               doc/{eid}.md')
     if 'trigger_tool' not in have: add.append(f'trigger_tool:           {trig}')
     if 'phase' not in have: add.append(f'phase:                  {phase}')
+    if 'category' not in have: add.append('category:               ' + ('build-system, ohos' if trig in ('make', 'configure', 'cmake', 'meson') else 'ohos, packaging'))
+    if 'match_keywords' not in have:
+        kws = [w for w in re.split(r'[|\\\[\](){}.*+?^$\s,;:="]+', kv.get('error_signature', '')) if len(w) > 3][:6]
+        add.append('match_keywords:         ' + (', '.join(kws) if kws else 'ohos, ' + trig))
     if 'affected_scope' not in have: add.append('affected_scope:         ' + (kv.get('title', 'general')[:60] or 'general'))
     if 'verification_cmd' not in have: add.append('verification_cmd:       # 以 source_pr CI 门禁为准（PR %s）' % kv.get('source_pr', 'n/a'))
     if 'rec_description' not in have:
