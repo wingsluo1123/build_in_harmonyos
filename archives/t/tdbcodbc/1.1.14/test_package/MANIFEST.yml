@@ -1,0 +1,78 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI 脚本 build_and_test.sh L0e 强制要求）
+package: tdbcodbc/1.1.14
+homepage: "https://core.tcl-lang.org/tdbcodbc/"
+
+# ── 计数口径（唯一，贯穿 MANIFEST / notes.md / 测试日志 / PR 两张表）─────────
+# 上游：按 tests/tdbcodbc.test 中 tcltest `test` 声明数计（194）。
+# 适配后新增：按 test_tdbcodbc.tcl 中的独立检查项计（12），其中鸿蒙特有 4 项。
+# 上游"实际执行数"与"声明数"分开报告，原因见下方 upstream_test_gating。
+counting_convention: "上游=tcltest 声明用例数(194)；新增=独立检查项数(12)"
+
+# 上游测试入口：TEA 生成的 Makefile `test` 目标 = test-jet + test-sqlserver +
+# test-sqlite，三者各自以不同 TDBCODBC_TEST_TYPE 跑一遍 tests/all.tcl
+upstream_check_command: "make test"
+
+# conanfile.py build() 中已真实执行上游测试并校验汇总（can_run 为真时）
+upstream_test_in_build: true
+upstream_test_command: "make test TESTFLAGS=\"-verbose pass\"（tests/all.tcl 驱动，日志 upstream_test.log）"
+
+# 上游实际包含的测试文件
+upstream_tests:
+  - file: tests/tdbcodbc.test
+    source: tdbcodbc1.1.14/tests/tdbcodbc.test
+    description: "tdbc::odbc 全量 tcltest 套件：tdbc::odbc-1.1 ~ -31.2，共 194 个用例声明"
+    command: "make test"
+    declared_cases: 194
+  - file: tests/all.tcl
+    source: tdbcodbc1.1.14/tests/all.tcl
+    description: "tcltest 2.2 驱动器（runAllTests），本身不含用例"
+    command: "make test"
+    declared_cases: 0
+  - file: tests/test.mdb
+    source: tdbcodbc1.1.14/tests/test.mdb
+    description: "jet 后端用的空 MS Access 数据库模板（非可执行测试）"
+    command: "make test-jet"
+    declared_cases: 0
+
+# 上游用例在 OHOS 上的实际执行门禁（真实技术原因，非"没环境"）
+upstream_test_gating:
+  executed_total: 4
+  executed_passed: 3
+  executed_skipped: 1
+  executed_failed: 0
+  not_reached: 190
+  reasons:
+    - "test-jet / test-sqlserver：tests/tdbcodbc.test 第 32-40 行硬编码 `if {$::env(TDBCODBC_TEST_TYPE) in {jet sqlserver}} { if {$::tcl_platform(platform) ne {windows}} { ... cleanupTests; return } }` —— 两个后端由上游自身限定为 Windows-only，在任何非 Windows 平台（含 Linux）都是 0 用例。"
+    - "test-sqlite：Unix 默认后端，第 83 行连接串硬编码 `DRIVER=SQLite3;Database=<file>`，需要一个注册进 unixODBC 的 SQLite ODBC 驱动。制品仓无该驱动（conan download sqliteodbc/0.999、sqliteodbc/0.100、libsqliteodbc/0.999、mdbtools/1.0.1 均返回 'system acceleration policy not enabled' = 配方不存在）；unixODBC 自身只提供驱动管理器（libodbc/libodbcinst/libodbccr），不含任何驱动。"
+    - "无驱动 → tests/tdbcodbc.test:139 的 `tcltest::testConstraint connect` 为假 → 第 158-163 行 `if {![tcltest::testConstraint connect]} { puts \"tests requiring a db connection skipped.\"; cleanupTests; return }` 提前返回，其后 190 个用例连声明都不会执行。可达的只有 1.1/1.2/1.3（通过）与 1.4（connect 约束跳过）。"
+  evidence: "conan download 探测输出见 notes.md「上游测试」一节；门禁行号来自 tdbcodbc1.1.14/tests/tdbcodbc.test 原文"
+
+# test_package 中自带的消费者测试（Tcl 包形态：shell 入口 + tclsh 加载 + 真实 ODBC 调用）
+test_package_tests:
+  - file: test_tdbcodbc.sh
+    description: "消费者测试入口（shell 包装；CI L0c 要求的测试源文件扩展名），内部以 tclsh8.6 执行断言"
+    command: "sh test_tdbcodbc.sh"
+  - file: test_tdbcodbc.tcl
+    description: "断言实现：package require tdbc::odbc 1.1.14 + TclOO 超类链 + .so dlopen + SQL 类型表（号→名，24 项）+ 真实 ODBC 调用（drivers/datasources/datasource 命令/连接失败 SQLSTATE）+ 4 项鸿蒙特有断言（共 12 项独立检查）"
+    notes:
+      - "sqltypes 方向为「SQL 类型号 → 名称」（library/tdbcodbc.tcl: dict create 1 char ... 12 varchar ... -5 bigint ... -11 guid，共 24 项）；CI #91604 因按名称反查报 key \"varchar\" not known in dictionary 而失败，已改为正向查并加 dict size == 24 断言（对上游原文实测通过）"
+      - "odbc-drivers / odbc-datasources 的判定口径：成功且返回偶数长度字典，或失败但 errorCode 以 TDBC 开头（TransferSQLError 所设）——两者都证明 OdbcInitStubs 已 dlopen 驱动管理器并解析出 SQL* 符号；只有库未加载才给非 TDBC 的普通 Tcl 错误，那才判失败（已用三种情形实测该 expr 非恒真）"
+      - "ohos-odbc-manager-mapped / ohos-odbcinst-mapped 用 /proc/self/maps 中是否出现 libodbc.so.2 / libodbcinst.so.2 判定，正则不依赖行尾格式；libodbc 正则对 libodbcinst.so.2 行无误判（实测）"
+    command: "tclsh8.6 test_tdbcodbc.tcl"
+
+# 鸿蒙特有测试（rule12：N >= 1）—— 均为 test_tdbcodbc.tcl 中的独立检查项
+harmonyos_specific_tests:
+  count: 4
+  items:
+    - name: ohos-platform
+      adaptation_point: "TEA tcl.m4 无 HarmonyOS 分支，本包靠 tcl_cv_sys_version=Linux-6.6 走 Linux 路径；锁住'确实在 HarmonyOS 上运行'这一前提"
+    - name: ohos-elf-aarch64
+      adaptation_point: "缺 HarmonyOS 分支时 SHLIB_LD/SHLIB_SUFFIX 为空、根本产不出共享库；验证共享库分支生效且产物为 ELF64/AArch64(machine=183)"
+    - name: ohos-odbc-manager-mapped
+      adaptation_point: "odbcStubInit.c 候选名表无 __OHOS__ 分支，OHOS 走 Linux 的 'libodbc' + info sharedlibextension(.so) + ABI 后缀 .2 组合；用 /proc/self/maps 验证 libodbc.so.2 确实被 dlopen 映射进进程（非文件存在性检查）"
+    - name: ohos-odbcinst-mapped
+      adaptation_point: "第二个可选库 libodbcinst.so.2 的 dlopen + Tcl_FindSymbol(SQLConfigDataSource*/SQLInstallerError) 在 OHOS 上成功；与 ::tdbc::odbc::datasource 命令的创建条件互为印证"
+
+# 上游测试用例数（tcltest 声明）
+assertion_count: 194
