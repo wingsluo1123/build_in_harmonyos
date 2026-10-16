@@ -1,0 +1,86 @@
+# DRAFT — 非阻塞 TLS ready 转换后应用发送队列未被重新调度
+
+id:                     E1455
+trigger_tool:           runtime|test|poll|openssl
+phase:                  runtime|testing
+error_signature:        TLS handshake.*(?:success|complete).*(?:first|Version).*(?:timeout|not received)|
+                        server-first.*(?:frame|message).*(?:timeout|deadlock)|
+                        SSLready.*(?:txMsgQueue|send queue).*(?:stalled|not flushed)
+
+severity:               2
+category:               socket, network, runtime, testing, security
+match_keywords:         nonblocking TLS, SSL_accept, SSL_do_handshake, SSL_ERROR_WANT_READ,
+                        SSL_ERROR_WANT_WRITE, SSLready, server-first frame, application send queue,
+                        POLLIN, POLLOUT, state transition, queue flush, deadlock, busy poll
+title:                  非阻塞 TLS 握手完成只更新 ready 状态而未重新调度握手前应用发送队列，
+                        导致握手成功但服务端首帧永久滞留
+
+root_cause:             事件驱动服务器允许在 TLS 未 ready 时排队应用帧，但 poll/epoll
+                        写事件只观察已经序列化的发送缓冲和 TLS WANT_WRITE 状态，不观察
+                        应用消息队列。握手在读事件回调中完成时，代码只把 ready 从 false
+                        改成 true，既不排空队列也不重新计算写调度，因此没有后续事件能把
+                        队首消息移入发送缓冲。TLS 握手本身成功，遵循 server-first 协议的
+                        客户端却一直等首帧。把“应用队列非空”无条件映射为握手前 POLLOUT
+                        不是修复：socket 通常持续可写，会在尚无 ClientHello 时形成忙轮询，
+                        且写回调若仍不处理未 ready 队列，首帧照样滞留。
+affected_scope:         使用 OpenSSL 或同类非阻塞 TLS、允许握手前排队应用消息、且事件
+                        掩码与应用队列分层管理的 TCP 守护进程；特别是 Mumble、SMTP、
+                        IMAP、WebSocket 或自定义协议中由服务端先发 banner/version/greeting
+                        的状态机。同步阻塞握手、握手前禁止排队或 ready 回调已经显式唤醒
+                        发送调度的实现不适用。
+verification_cmd:       rg -n 'SSL_accept|SSL_do_handshake|SSLready|txMsgQueue|POLLOUT' src;
+                        python3 archives/u/umurmur/0.3.1/reports/repro/build-three-arms.py --help;
+                        python3 archives/u/umurmur/0.3.1/reports/repro/probe-three-arms.py --help;
+                        python3 archives/u/umurmur/0.3.1/test_package/test_umurmur.py "$PACKAGE_FOLDER"
+
+rec_priority:           1
+rec_approach:           flush-application-queue-at-tls-ready-transition
+rec_description:        将“握手完成”视为调度状态转换而不只是布尔赋值。在确认 TLS ready
+                        的同一个回调中调用一个具备前置条件的队列排空函数：仅当 ready、
+                        当前序列化发送缓冲为空且应用队列非空时，弹出一条消息并走正常
+                        TLS write 路径；正常写完成后复用同一函数继续推进队列。保留
+                        SSL_ERROR_WANT_READ/WANT_WRITE 对事件掩码的既有映射，不让未完成
+                        握手的应用队列单独触发持续 POLLOUT。回归必须同时断言“握手后未发
+                        客户端应用数据即可收到服务端首帧”和“只建 TCP 不发 ClientHello
+                        时 CPU ticks 不增长”。
+rec_command:            add flush_queued() guarded by tls_ready && tx_buffer_empty && !queue_empty;
+                        call it immediately after the false-to-true TLS-ready transition and after
+                        each completed write; run the server-first and idle-CPU regressions
+rec_auto_fix:           false
+rec_impl:               source-state-machine-patch
+
+fallback_priority:      2
+fallback_approach:      schedule-one-shot-writable-work-after-handshake
+fallback_description:   若 TLS 层与应用层严格分离，握手完成回调可投递一次 one-shot
+                        writable/task 事件，由应用发送器重新检查队列；该事件必须只在
+                        ready 转换后投递并可去重，不能把队列非空永久映射为 POLLOUT。
+fallback_command:       on_tls_ready: schedule_once(application_writer)
+fallback_auto_fix:      false
+fallback_impl:          event-loop-callback
+
+forbid_1_pattern:       (?:txMsgQueue|send_queue).*(?:POLLOUT|EPOLLOUT).*(?:!SSLready|handshake)|
+                        (?:POLLOUT|EPOLLOUT).*(?:txMsgQueue|send_queue).*(?:before|pre).*handshake
+forbid_1_reason:        握手前只因应用队列非空持续订阅写事件会在可写 socket 上忙轮询，
+                        也不能保证写回调具备从未 ready 队列取消息的合法条件。
+forbid_1_consequence:   空闲连接消耗 CPU，首帧仍可能超时，并扩大慢速连接 DoS 面。
+forbid_2_pattern:       TLS handshake.*success.*(?:test passed|healthy)$
+forbid_2_reason:        握手成功只证明 TLS 状态机完成，不证明应用发送队列在 ready 转换后
+                        被重新调度。
+forbid_2_consequence:   构建和 TLS 冒烟均为绿色，但 server-first 客户端实际死锁。
+
+principles:             P005
+doc_file:               knowledge/drafts/E429-draft-4084.md
+last_updated:           2026-10-12
+source_event:           umurmur/0.3.1 HarmonyOS PC 适配；同一真机三臂实验分别证明
+                        上游握手成功但 Version 超时、队列直接触发 POLLOUT 仍超时且
+                        1 秒消耗 105 CPU ticks、ready 转换点排空后首帧到达且为 0 tick；
+                        精确反例补丁和可执行复现脚本位于
+                        archives/u/umurmur/0.3.1/reports/repro/，证据报告位于
+                        archives/u/umurmur/0.3.1/reports/path-b-evidence.md
+authors:                gcw_vbU49vcA <gcw_vbU49vcA@noreply.gitcode.com>
+source_pr:
+source_commit:
+metrics_success_count:  1
+metrics_fail_count:     2
+metrics_confidence:     0.9
+metrics_last_used:      2026-10-12
