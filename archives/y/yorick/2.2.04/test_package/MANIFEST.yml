@@ -1,0 +1,66 @@
+# test_package/MANIFEST.yml — 上游官方测试声明（yorick 2.2.04, OHOS/aarch64, NO_XLIB）
+package: yorick/2.2.04
+homepage: "https://github.com/LLNL/yorick"
+
+# 上游全套入口：`make check` -> `cd yorick; make check` ->
+# `./yorick -batch check.i`，check.i 再 include i/testfull.i 跑全套。
+# 本机为 NO_XLIB（无 X11）无头构建：testfull.i 里的交互图形用例无法运行，
+# 故 build() 用同一批上游脚本、去掉交互图形项后执行（见 conanfile.py / notes.md）。
+upstream_check_command: "make check"
+upstream_test_in_build: true
+upstream_test_command: "./yorick -batch ../ohos-headless-check.i  (testp.i; testm; testlp, 200)"
+
+# 上游测试逐项（单位 = i/testfull.i 中的一次顶层调用）
+#   TOTAL = PASS + FAIL + SKIP + NOT_RUN = 9 = 3 + 0 + 0 + 6
+upstream_tests:
+  - file: i/testp.i
+    source: yorick-2.2.04/i/testp.i
+    description: "解析器测试 + 字符串 + oxy 编译器 + 二进制/ASCII/netCDF I/O + 3 项计时子测（'0 goofs'）"
+    command: "./yorick -batch <driver.i>"
+    status: PASS
+  - file: i/testm.i
+    source: yorick-2.2.04/i/testm.i
+    description: "数学库测试（testm）"
+    command: "testm"
+    status: PASS
+  - file: i/testlp.i
+    source: yorick-2.2.04/i/testlp.i
+    description: "LINPACK 基准（testlp, 200）"
+    command: "testlp, 200"
+    status: PASS
+  - file: i/testg.i
+    source: yorick-2.2.04/i/testg.i
+    description: "lissajous / testg 图形基准 — 需交互图形或 hcp 图形设备"
+    command: "lissajous,0; lissajous,1; testg"
+    status: NOT_RUN
+    reason: "NO_XLIB 无 X11 后端，无交互图形设备；window/palette 需要 display 或 hcp 引擎"
+  - file: i/demo2.i
+    source: yorick-2.2.04/i/demo2.i
+    description: "demo2 图形/网格演示（window + palette）"
+    command: "demo2"
+    status: NOT_RUN
+    reason: "同上：交互图形设备缺失（palette 需要图形设备）"
+  - file: i/testg.i
+    source: yorick-2.2.04/i/testg.i
+    description: "grtest 综合图形测试（24 帧，quick）"
+    command: "grtest, quick=1"
+    status: NOT_RUN
+    reason: "同上：交互图形设备缺失"
+  - file: i/testg.i
+    source: yorick-2.2.04/i/testg.i
+    description: "txtest 文本/排版测试（9 帧，quick）"
+    command: "txtest, quick=1"
+    status: NOT_RUN
+    reason: "同上：交互图形设备缺失"
+
+# test_package 自带消费者测试（调用已安装的 yorick 二进制）
+test_package_tests:
+  - file: test.i
+    description: "消费者脚本 — 标量算术/数组规约/列主序矩阵索引/FFT 往返，批处理断言真实输出"
+    command: "yorick -batch test.i"
+  - file: test.sh
+    description: "包装脚本 — 断言退出码 0 且输出含 YORICK_CONSUMER_OK"
+    command: "bash test.sh"
+
+# 消费者测试断言数（test.i 内 11 条 if 断言）
+assertion_count: 11
