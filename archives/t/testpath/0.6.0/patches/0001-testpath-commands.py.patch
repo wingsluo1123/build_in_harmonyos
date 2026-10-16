@@ -1,0 +1,45 @@
+--- a/testpath/commands.py
++++ b/testpath/commands.py
+@@ -1,13 +1,14 @@
+ import contextlib
+ import json
+ import os
++import shlex
+ import shutil
+ import sys
+ import tempfile
+ 
+ __all__ = ['MockCommand', 'assert_calls']
+ 
+ pkgdir = os.path.dirname(__file__)
+ 
+ recording_dir = None
+ 
+@@ -71,20 +72,27 @@
+     def __init__(self, name, content=None, python=''):
+         self.name = name
+         self.recording_file = _make_recording_file(prefix=name)
+         self.command_dir = tempfile.mkdtemp()
+ 
+         if content is None:
+             content = _record_run.format(
+                 python=sys.executable, recording_file=self.recording_file,
+                 extra_code=python,
+             )
++            if os.name == 'posix' and os.uname().sysname == 'HarmonyOS':
++                # Preserve the interpreter, script argv and recording body.
++                # Enter through the system shell, then replace it with Python.
++                preamble = ('#!/system/bin/sh\n' + '""":"\nexec '
++                            + shlex.quote(sys.executable) + ' "$0" "$@"\n'
++                            + '":"""\n')
++                content = preamble + content.split('\n', 1)[1]
+         elif python:
+             raise ValueError(
+                 "Specify script content or extra code (python='...'), not both"
+             )
+         self.content = content
+ 
+     @classmethod
+     def fixed_output(cls, name, stdout='', stderr='', exit_status=0):
+         """Make a mock command, producing fixed output when it is run::
+ 
