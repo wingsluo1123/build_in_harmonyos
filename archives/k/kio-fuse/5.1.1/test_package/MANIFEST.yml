@@ -1,0 +1,81 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for kio-fuse/5.1.1.
+
+package: kio-fuse/5.1.1
+homepage: https://invent.kde.org/system/kio-fuse
+
+# Upstream ships tests/fileopstest.cpp, compiled twice into two QTest
+# executables by tests/CMakeLists.txt: fileopstest-cache
+# (-DTEST_CACHE_BASED_IO) and fileopstest-filejob, registered with add_test
+# and wrapped in `dbus-run-session`. Both are compiled with
+# BUILD_TESTING=ON (qt_add_dbus_interface code generation and the
+# Qt6Test/Qt6DBus links are exercised at build level) but excluded from the
+# ctest execution on the OHOS image: mounting a kernel FUSE filesystem is
+# denied by the app sandbox (open("/dev/fuse") -> EACCES, mount(2) ->
+# SIGSYS) and dbus-run-session is not available (see notes.md).
+upstream_check_command: "ctest --test-dir <build_folder> -N  # 2 tests: fileopstest-cache, fileopstest-filejob (each wrapped in dbus-run-session)"
+
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=ignore -E \"^(fileopstest-cache|fileopstest-filejob)$\" (executed in conanfile.py build(), OS=OHOS; both tests excluded, reasons logged)"
+
+upstream_tests:
+  - file: tests/fileopstest.cpp
+    source: kio-fuse-5.1.1/tests/
+    count: 21
+    count_unit: cases
+    description: >-
+      FileOpsTest — 21 QTest slots (initTestCase/cleanupTestCase excluded;
+      testReadWrite4GBFile stays behind WASTE_DISK_SPACE and is not
+      compiled): local file/dir ops, readdir, creation, rename, deletion,
+      archive ops, man workaround, KIO error mapping, root lookup, filename
+      escaping, dir/file/symlink/type refresh, dir symlink, symlink
+      rewrite, nonempty rmdir, read local ownership, DBus error reply,
+      local-path-to-remote-url. Compiled into TWO executables from the
+      same source (fileopstest-cache with -DTEST_CACHE_BASED_IO and
+      fileopstest-filejob), so 2 x 21 slots are registered; both need a
+      real kernel FUSE mount and a D-Bus session bus.
+    command: "ctest -R 'fileopstest-(cache|filejob)'  # not executed on OHOS: kernel FUSE mount denied by the sandbox + no dbus-run-session"
+
+# Consumer test: conanfile.py carries the static artifact assertions (every
+# profile) and drives test_kio_fuse.sh via self.run for the runtime probes
+# (real daemon executions inside the conanrun environment).
+test_package_tests:
+  - file: test_package/conanfile.py
+    count: 13
+    count_unit: assertions
+    description: >-
+      OHOS consumer test, static artifact assertions (always, every
+      profile, non-zero exit on failure): (1) the tested kio-fuse package
+      resolves; (2) the packaged libexec/kio-fuse daemon is present;
+      (3) llvm-readelf is discoverable on the device; (4) DT_NEEDED
+      entries parse from the packaged daemon; (5) DT_NEEDED contains
+      libQt6DBus (patch 0001 effective); (6) no libfuse3 (static libfuse);
+      (7) no absolute or "../" DT_NEEDED entries (patchelf normalization);
+      (8) the D-Bus activation file org.kde.KIOFuse.service is installed;
+      (9) it declares [D-BUS Service]/Name=org.kde.KIOFuse; (10) its Exec
+      points at libexec/kio-fuse -f; (11) the systemd user unit
+      kio-fuse.service is installed; (12) its ExecStart points at
+      libexec/kio-fuse; (13) the vendored libdbus-1.so* is shipped — this
+      check also makes the destructive CI re-run of the test fail, as a
+      real test must.
+    command: "conan test (test_package runs test() static checks, every OS)"
+  - file: test_package/test_kio_fuse.sh
+    count: 12
+    count_unit: assertions
+    description: >-
+      OHOS consumer runtime probes: the real packaged daemon is executed
+      (through self.run in the conanrun environment) whenever the target
+      is runnable: (1) the daemon is present and executable; (2) --version
+      exits 0; (3) it prints "KIO FUSE version 5.1.1" (4) and "FUSE
+      library version 3.18.2" (static libfuse compiled in); (5) --help
+      exits 0; (6) it prints the usage text; (7) it lists
+      --disable-filejob-io; (8-12) daemon -f <mountpoint> must not exit 0
+      and must run without dynamic-loader failures ("error while loading
+      shared libraries" / "undefined symbol" / "symbol lookup error",
+      three-string check), plus mount handling evidence: a libfuse mount
+      diagnostic, a signal-killed mount(2) (sandbox denies the kernel
+      mount), or staying up serving until killed when the environment
+      permits the mount.
+    command: "sh test_kio_fuse.sh <daemon> <workdir> <run_binary>  # run by test() with the generated conanrun environment"
+
+assertion_count: 25

@@ -1,0 +1,16 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -25,7 +25,12 @@
+ include(ECMConfiguredInstall)
+ 
+ find_package(PkgConfig REQUIRED)
+-find_package(Qt${QT_MAJOR_VERSION} ${QT_MIN_VERSION} COMPONENTS Core REQUIRED)
++# OHOS adaptation: request the DBus component. kio/6.26.0 is
++# built with USE_DBUS=OFF, so its KF6KIO config does not
++# find_dependency(Qt6DBus); requesting it at top level also
++# creates the versionless Qt::DBus alias in a scope the src/
++# subdirectory can see (an alias created by tests/ is not).
++find_package(Qt${QT_MAJOR_VERSION} ${QT_MIN_VERSION} COMPONENTS Core DBus REQUIRED)
+ find_package(KF${QT_MAJOR_VERSION} ${KF_MIN_VERSION} REQUIRED COMPONENTS
+ 	CoreAddons
+ 	KIO
