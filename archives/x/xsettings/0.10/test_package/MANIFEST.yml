@@ -1,0 +1,30 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: xsettings/0.10
+homepage: "https://matchbox-project.org/sources/optional-dependencies/"
+
+# 上游源码审计（hmbs 硬门禁）：xsettings-client 0.10 发布包确认无任何自动化测试
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "Makefile.am"
+    reason: "仅声明 lib_LTLIBRARIES = libXsettings-client.la + libxsinclude_HEADERS; 无 check/TESTS/check_PROGRAMS 目标, make check 无任何用例。"
+  - source: "configure.ac"
+    reason: "仅 AC_PATH_X/AC_PATH_XTRA 探测 X11, AC_PROG_LIBTOOL; 无测试相关宏或 AC_CONFIG_TESTDIR。"
+  - source: "源码树"
+    reason: "发布包无 tests/、test/ 目录; 仅 xsettings-client.c/xsettings-common.c 两个产品源文件 + 两个头文件, 无 *_test 源文件。"
+  - source: "COPYING/INSTALL"
+    reason: "INSTALL 文档仅描述 ./configure && make && make install, 未提及测试; COPYING 为 MIT/X11 许可。"
+  - conclusion: "上游未提供自动化测试套件; test_package 以消费者 API 调用 + dlopen 共享库加载验证。"
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests: []
+
+test_package_tests:
+  - file: test_xsettings.c
+    description: "消费者 API 调用: xsettings_client_new/destroy 创建销毁 XSettingsClient; xsettings_byte_order 字节序检测; 鸿蒙特有非断言测试: dlopen 加载共享库后 dlsym 解析核心 API 符号, 验证消费者可行性 (rule12)。"
+    command: "test_xsettings_consumer"
