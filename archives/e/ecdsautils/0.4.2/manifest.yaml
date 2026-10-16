@@ -1,0 +1,76 @@
+# 版本级 manifest
+# 文件位置: archives/e/ecdsautils/0.4.2/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.4.2"
+
+# 软件名
+software: "ecdsautils"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-08"
+build_system: cmake
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（官方 tag 归档，自算 sha256 实测 45944 字节）
+  url: "https://codeload.github.com/freifunk-gluon/ecdsautils/tar.gz/refs/tags/v0.4.2"
+
+  # 源码校验和
+  sha256: "8880e5a506555a06d7a866de8a76c28bb4c7472abbf0d3fb396100d16c447174"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表
+  configure_options:
+    - "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+    - "-DBUILD_SHARED_LIBS=OFF"
+    - "-DCMAKE_SKIP_INSTALL_RPATH=ON"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - libuecc/7.0
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "上游 cmake_minimum_required(2.8.3) 需注入 CMAKE_POLICY_VERSION_MINIMUM=3.5（平台 CMake 4.1.2）"
+  - "上游 Findlibuecc.cmake 走 pkg-config/find_path，conan 包内 .pc 的 prefix 是构建机绝对路径，必须预置 LIBUECC_INCLUDE_DIR/LIBUECC_LIBRARIES 缓存项"
+  - "上游 N_static=0（tarball 无任何测试源与 enable_testing/add_test/ctest 命中），仅消费者测试"
