@@ -1,0 +1,29 @@
+#====================================================================
+# Draft: Git repo with case-duplicated tracked paths (libXext/libxext)
+#        on case-insensitive HMDFS -- stash/checkout/rebase all loop;
+#        escape via git worktree
+#====================================================================
+
+id:                     DRAFT-GIT-CASE-DUP-TRACKED-PATHS
+trigger_tool:           git|stash|rebase|pull
+phase:                  collaboration
+error_signature:        error: cannot pull with rebase: You have unstaged changes|The following paths.*collide|case.*insensitive.*collide|stash.*still.*modified
+
+severity:               3
+category:               ohos-platform|hmdfs|git
+match_keywords:         libXext, libxext, case insensitive, 大小写, stash 不干净, rebase unstaged, worktree, 双路径, collide
+
+title:                  协作仓在同一物理目录同时 tracked 两套大小写路径（如 libXext/ 4 文件 + libxext/ 34 文件）时，HMDFS 上 stash/checkout/rebase 全部死循环——唯一可靠出口是 git worktree 独立目录
+
+root_cause:             HMDFS 大小写不敏感且物理目录项只保留一种大小写形态（实测为小写 libxext）。git index 中两套 tracked 路径（大小写各一套，来自不同时期的提交）都 stat 命中同一物理目录：stash 把内容写回后另一套路径立即重新变脏；git checkout HEAD -- 恢复后同样；rm + checkout 重建目录后仍以物理目录项大小写呈现。结果：任何要求"干净工作树"的 git 操作（pull --rebase / rebase / stash 后续操作）永久失败，形成 stash → 报脏 → pop → 仍脏 的死循环。两步 mv 刷新目录大小写（mv libXext tmp && mv tmp libXext）只对"单路径幽灵"有效，对 index 内真实双 tracked 路径无效。
+affected_scope:         build_in_harmonyos 协作仓已知一处：archives/l/libXext（大写 4 tracked 文件）+ archives/l/libxext（小写 34 tracked 文件）。任何 HMDFS 上多人协作、曾以不同大小写提交过同一目录的仓库都可能复发。症状：git status 永远显示 2 个文件 M（大小写交替出现），pull/rebase 永远报 unstaged changes。
+verification_cmd:       git ls-files | grep -i "^archives/l/libxext" | awk -F/ '{print $3}' | sort -u | wc -l   # >1 即双路径分裂
+rec_priority:           3
+rec_approach:           worktree-bypass-then-normalize-with-merge-commit
+rec_description:        (1) 推送被挡时的逃生通道：git worktree add <tmp> origin/main -b <branch> → cherry-pick 目标提交 → push origin HEAD:main → worktree remove。worktree 是全新目录，物理大小写干净，不受分裂污染；(2) 他人工作现场保护：分裂目录内未提交的实质修改先 cp 备份到 ~/tmp，操作完成后拷回（stash 机制对分裂目录无效，不要反复尝试）；(3) 根治（需一次专门 PR）：在 Linux（大小写敏感 FS）上做合并提交，统一为一套路径——删除一套 tracked 路径（git rm --cached 小写那套），内容以权威版本为准，一次性修复。HMDFS 本地无法完成根治（物理目录项只能呈现一种形态）。
+rec_command:            git worktree add ~/tmp/wt origin/main -b fix-branch && cd ~/tmp/wt && git cherry-pick <sha> && git push origin HEAD:main && cd - && git worktree remove ~/tmp/wt --force
+rec_auto_fix:           false
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+source_pr:
+source_commit:

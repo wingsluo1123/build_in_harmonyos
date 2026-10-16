@@ -1,0 +1,28 @@
+#====================================================================
+# Draft: HMDFS refuses in-place overwrite of already-signed ELF files
+#        (EPERM) -- must write temp + atomic replace
+#====================================================================
+
+id:                     DRAFT-SIGNED-ELF-OVERWRITE-EPERM
+trigger_tool:           python3|binary-edit|sign-tool
+phase:                  packaging
+error_signature:        Operation not permitted|EPERM|errno 1.*wb|PermissionError.*\[Errno 1\].*php|Permission denied.*write.*signed
+
+severity:               2
+category:               ohos-platform|hmdfs
+match_keywords:         Operation not permitted, EPERM, PermissionError, signed ELF, codesign, overwrite, open wb, binary patch, 原子替换, rm + mv
+
+title:                  HMDFS 对已携带 .codesign 段的 ELF 拒绝原位覆盖写（open(p,"wb") 报 EPERM）：修改已签二进制必须写临时文件 + rm 原件 + mv 替换
+
+root_cause:             HMDFS 对含 .codesign 段的 ELF 实施完整性保护：任何试图对已签文件做原位截断重写的操作（open(path, "wb") / python 写入 / sed -i）直接返回 EPERM（Operation not permitted, errno 1），无论文件权限位是否允许。这是文件系统级行为，chmod 无法绕过。注意区分：首次签名的 inFile→outFile 不同文件路径不受影响；llvm-objcopy 去 .codesign 段后再写同一路径同样会被拒（此时文件仍是已签状态）。
+affected_scope:         一切需要修改已签名二进制的场景：二进制内路径清理（等长字符串替换）、ini 默认值 patch、调试信息 strip 后处理、测试期 instrumentation。签名流水线自身（binary-sign-tool 原件直签新文件）不受影响。
+verification_cmd:       python3 -c "p='<signed-elf>'; open(p,'wb').write(open(p,'rb').read())" && echo OK || echo EPERM
+rec_priority:           2
+rec_approach:           temp-write-then-atomic-replace
+rec_description:        (1) 永远不要对已签 ELF 做原位重写：先写同目录新文件（p + ".new" 或 ".ws"），os.remove(原路径) 后 os.rename(临时, 原路径)（rm+mv 原子替换，HMDFS 支持 rename）；(2) shell 场景用 cp 副本 + 处理副本 + rm 原件 + mv 回；(3) 替换后必须重签（写入即破坏原 .codesign）：llvm-objcopy --remove-section .codesign → binary-sign-tool selfSign → readelf -S 验 codesign=1 + 运行验证；(4) python 的 open(p, "wb") 会先截断——截断即触发 EPERM，连写入机会都没有。
+rec_command:            cp f f.ws && llvm-objcopy --remove-section .codesign f.ws && binary-sign-tool sign -inFile f.ws -outFile f.ws -selfSign 1 && rm f && mv f.ws f
+rec_auto_fix:           false
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+source_pr:
+source_commit:
