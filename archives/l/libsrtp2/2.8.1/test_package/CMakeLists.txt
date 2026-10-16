@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.15)
+project(libsrtp2_consumer LANGUAGES C)
+find_package(libSRTP CONFIG REQUIRED)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+add_executable(consumer consumer.c)
+target_link_libraries(consumer PRIVATE libSRTP::srtp2)
+set_property(TARGET consumer PROPERTY C_STANDARD 11)
