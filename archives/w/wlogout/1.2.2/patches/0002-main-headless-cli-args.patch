@@ -1,0 +1,22 @@
+diff --git a/main.c b/main.c
+index 1031af6..0402fc4 100644
+--- a/main.c
++++ b/main.c
+@@ -702,11 +702,16 @@ int main(int argc, char *argv[])
+     buttons = malloc(sizeof(button) * default_size);
+ 
+     g_set_prgname("wlogout");
+-    gtk_init(&argc, &argv);
++    /* OHOS: parse CLI args before gtk_init so --version/--help work
++     * headless — gtk_init exits with "cannot open display" when no
++     * backend is available, before the arg parser ever runs. Normal
++     * GUI startup is unchanged (gtk_init still runs after a non-exit
++     * process_args). */
+     if (process_args(argc, argv))
+     {
+         return 0;
+     }
++    gtk_init(&argc, &argv);
+ 
+     if (get_layout_path())
+     {

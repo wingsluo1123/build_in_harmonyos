@@ -1,0 +1,19 @@
+diff --git a/meson.build b/meson.build
+index 7af6fb9..bfc6383 100644
+--- a/meson.build
++++ b/meson.build
+@@ -70,7 +70,13 @@ if get_option('zsh-completions')
+   install_data('completions/_wlogout', install_dir: zshdir)
+ endif
+ 
+-gtk = dependency('gtk+-wayland-3.0')
++# OHOS: the gtk/3.24.43 conan package is a broadway-only build (no
++# wayland backend) and ships gtk+-3.0.pc / gtk+-broadway-3.0.pc — the
++# wayland-specific pc does not exist. wlogout's GUI layer runs against
++# whichever GDK backend the toolkit provides; the wayland-specific
++# layer-shell path is separately guarded by LAYERSHELL below (and stays
++# off: gtk-layer-shell is not packaged for OHOS).
++gtk = dependency('gtk+-3.0')
+ layershell = dependency('gtk-layer-shell-0', required : false)
+ 
+ if layershell.found()
