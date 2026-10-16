@@ -1,0 +1,52 @@
+# ═══ Draft knowledge entry — 老版 googletest（≤1.6）CapturedStream 硬编码 /tmp，死亡测试在 OHOS 上整体 abort(134) ═══
+# Timestamp: 2026-09-11
+# Software: cssc 1.4.1（任何捆绑 googletest 1.x 老版本源码、含死亡测试 EXPECT_EXIT/ASSERT_DEATH 的 C/C++ 包）
+# Gate: make check / unit-tests 阶段
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E1983
+title: googletest 1.6 CapturedStream 硬编码 /tmp/captured_stream.XXXXXX，OHOS /tmp 只读导致死亡测试父进程 GTEST_CHECK abort（exit 134），整个测试二进制被判 FAIL
+trigger_tool: make / gtest
+phase: testing
+error_signature: Signal 6 \(core dumped\)|FAIL test_\w+ \(exit status: 134\)|Death tests use fork\(\), which is unsafe
+severity:               3
+category:               platform, hmdfs, test-framework
+match_keywords: googletest, gtest, death test, EXPECT_EXIT, ASSERT_DEATH, KilledBySignal,
+  CapturedStream, captured_stream.XXXXXX, mkstemp /tmp, GTEST_CHECK, exit status 134,
+  Signal 6, Death tests use fork
+root_cause: googletest 1.6 的 CapturedStream（src/gtest-port.cc）硬编码
+  char name_template[] = "/tmp/captured_stream.XXXXXX"，仅 GTEST_OS_LINUX_ANDROID
+  特判 /sdcard；OHOS 平台 /tmp 为只读 root 目录，mkstemp 失败（EACCES），随后
+  GTEST_CHECK_ 触发 abort()。由于 CaptureStderr() 在父进程 fork 之前执行，
+  表现为整个测试二进制 exit 134 而非单个用例失败，极易误判为 fork/线程安全问题
+  （"Death tests use fork(), which is unsafe" 警告是烟雾弹）
+affected_scope: 所有捆绑 googletest 1.x（≤1.7，无 __OHOS__/TMPDIR 处理）且测试含
+  EXPECT_EXIT/ASSERT_DEATH 死亡用例、或 CaptureStderr/CaptureStdout 被触发的
+  C/C++ 项目，在 /tmp 只读的 OHOS 设备上 make check。捆绑式（vendored googletest）
+  是 2010 年代老项目的普遍形态；新版 googletest（≥1.8）已用 testing::internal
+  的临时目录探测，不在此列
+verification_cmd: grep -n '"/tmp/captured_stream.XXXXXX"' <src>/googletest/src/gtest-port.cc;
+  ./test_binary 2>&1 | grep -c "Signal 6"; # >0 即父进程被 abort
+rec_priority: 1
+rec_approach: gtest-port-unconditional-tmpdir
+rec_description: 在捆绑 googletest/src/gtest-port.cc 的 CapturedStream name_template
+  处，把硬编码 "/tmp/captured_stream.XXXXXX" 改为无条件 POSIX 逻辑：4096 字节
+  buf + getenv("TMPDIR")（空回退 "/tmp"）snprintf 拼模板——不引入平台条件编译宏
+  （R8 合规；getenv 回退在所有平台与原行为等价，Linux 上 TMPDIR 通常未设时仍用
+  /tmp）。补丁只动测试框架副本，随包补丁集提交；同包内项目自有 tmpfile() 调用
+  点另配无条件 mkstemp($TMPDIR) 回退（tmpfile() 走 musl P_tmpdir=/tmp，同样失败），
+  fdopen 失败时 close(tfd) 防泄漏
+rec_command: patch 后 make -C unit-tests && ./test_sccsdate  # 死亡测试 [ OK ]
+rec_auto_fix: false
+rec_impl: patch-source（vendored test-framework 副本修改，随 conanfile patches 走）
+fallback_priority: 2
+fallback_approach: writable-tmp-bind-mount
+fallback_description: 无法改源码时（如二进制发行版测试），给测试进程提供可写 /tmp
+  （容器/bind-mount 场景）；OHOS 真机无 root 无法 mount，故对设备测试不可行，
+  仅限 CI 容器侧
+fallback_command: mount --bind <writable-dir> /tmp && ./test_binary
+fallback_auto_fix: false
+prescan_pattern: captured_stream\.XXXXXX|Death tests use fork|EXPECT_EXIT|ASSERT_DEATH
+last_updated:               2026-10-17
+authors:               unknown
+doc_file:               doc/E1983.md

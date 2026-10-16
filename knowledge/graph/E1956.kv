@@ -1,0 +1,55 @@
+#====================================================================
+# DRAFT-6050-libnxml-0.18.5-upstream-test-dead-domain — 上游测试硬编码已被注册局下线的域名：以本地 HTTP 等价数据源替代，测试逻辑零改动
+# 触发事件: libnxml 0.18.5 适配（make check 的 easy 用例失败）
+# 路径: Path B（知识库扩展）
+#====================================================================
+
+id:                     E1956
+trigger_tool:           make|curl|test|dns
+phase:                  testing
+error_signature:        Download error|nxmle_new_data_from_url.*NULL|New data from url.*error|
+                         rcode=3|NXDOMAIN|serverHold
+
+severity:               2
+category:               ohos, network, testing, upstream
+match_keywords:         上游测试, 硬编码 URL, 域名下线, serverHold,
+                         NXDOMAIN, rcode=3, autistici.org, easy,
+                         本地 HTTP, http.server, 127.0.0.1, 等价数据源,
+                         测试逻辑零改动, HMBS_UPSTREAM_TEST_RESULT
+title:                  上游测试硬编码已被注册局下线（serverHold）的域名时，以本地 HTTP 等价数据源替代数据源，测试逻辑零改动
+
+root_cause:             上游测试硬编码的固定域名被注册局 serverHold 强制下线（权威 NXDOMAIN rcode=3，不可恢复），外部数据源永久失效，而被测的 HTTP 下载 + XML 解析逻辑本身与域名无关
+  1) 测试硬编码固定域名 URL 作为数据源，域名生命周期不受上游/适配方控制；
+  2) serverHold 是注册局级强制下线（权威 NXDOMAIN），与 DNS 污染/被墙
+     （rcode 非 3、换网络可解析）机制不同，不可恢复；
+  3) 被测逻辑（HTTP 下载 + XML 解析）本身与具体域名无关，仅数据源失效。
+
+verification_cmd: >
+  cd archives/l/libnxml/0.18.5 && conan create . -pr:h=~/.conan2/profiles/ohos-aarch64-local -pr:b=~/.conan2/profiles/ohos-aarch64-local --build=libnxml/* && grep 'PASS: 3' conan-build.log
+
+rec_priority:           1
+rec_approach:           local-http-equivalent-source（本地 HTTP 等价数据源替代，测试逻辑零改动）
+rec_description: >
+  配方内四步处置：1) 定性——本地 curl 对照 + 权威 DNS 查询 rcode=3
+  确认域名下线；2) 等价替代——replace_in_file 把测试源里的 URL 换成
+  http://127.0.0.1:<port>/<原路径>；3) 同构数据——python http.server +
+  threading 起 daemon 线程，提供与原 URL 同构内容，随 conan create
+  进程退出不留残留；4) 证据留痕——HMBS_UPSTREAM_TEST_RESULT 机器
+  证据行如实记录处置方式，不冒充原样通过。
+rec_command:            cd archives/l/libnxml/0.18.5 && conan create . -pr:h=~/.conan2/profiles/ohos-aarch64-local -pr:b=~/.conan2/profiles/ohos-aarch64-local --build=libnxml/* && grep 'PASS: 3' conan-build.log
+rec_auto_fix:           false
+rec_impl:               conan-recipe-local-http-fixture
+
+doc_file:               knowledge/drafts/DRAFT-6050-libnxml-0.18.5-upstream-test-dead-domain.md
+last_updated:           2026-09-08
+source_event:           libnxml 0.18.5 适配，make check easy 用例因上游硬编码域名被注册局下线而失败
+authors:                 atomcode-executor
+source_pr:
+source_commit:
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     0.9
+metrics_last_used:      2026-09-08
+
+affected_scope:         上游测试硬编码已被注册局下线（serverHold）的域名时，以本地 HTTP 等价数据源替代数据源，测试逻辑零改动

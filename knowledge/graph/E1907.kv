@@ -1,0 +1,66 @@
+#====================================================================
+# DRAFT-libmad-0.15.1b-aarch64-fixed-point-width-wordsize
+# 触发事件: libmad 0.15.1b HarmonyOS PC 适配（R01）
+#          mad.h 默认 FPM_INTEL + SIZEOF_LONG=4 与 aarch64 64 位 long 不符
+#====================================================================
+
+id:                     E1907
+trigger_tool:           configure|clang|make|runtime
+phase:                  configuration|compilation|runtime
+error_signature: 'FPM_INTEL|SIZEOF_LONG 4|SIZEOF_LONG 8|fixed-point|fixed point|
+                    decoder.*noise|samples.*wrong|audio.*garbage|integer overflow'
+
+severity:               3
+category:               ohos, portability, aarch64, dsp, fixed-point
+match_keywords:         FPM_INTEL, FPM_DEFAULT, SIZEOF_LONG, mad.h, libmad,
+                         fixed-point, aarch64, arm64, 64-bit long, wordsize,
+                         DSP, audio decoder, HarmonyOS, OHOS, clang
+
+title: 'aarch64 fixed-point width mismatch: hardcoded 32-bit long macros must be updated'
+
+root_cause: >
+  libmad 0.15.1b 的 mad.h 由 configure 生成，x86/32 位时代默认 `# define FPM_INTEL`
+  （32 位定点路径）且 `# define SIZEOF_LONG 4`。在 aarch64（OHOS PC armv8）上
+  C 的 long 是 64 位，FPM_INTEL 假设 32 位 long 的定点乘法/精度路径失效，
+  解码输出噪声/错误。需切到 FPM_DEFAULT（64 位安全定点路径）并修正 SIZEOF_LONG=8。
+
+affected_scope: >
+  任何在 mad.h 或等价生成头中硬编码 32 位 long / FPM_INTEL 定点宏的 DSP、音频解码、
+  定点数学库，移植到 64 位 aarch64（OHOS armv8 / 其它 ARM64）时均会命中。
+  libmad 是典型代表；同类还有采用 32 位定点汇编路径的媒体库。
+
+verification_cmd: |
+  grep -n 'FPM_\|SIZEOF_LONG' mad.h
+  # 期望: # define FPM_DEFAULT  与  # define SIZEOF_LONG 8
+
+rec_approach:           patch-generated-header-wordsize
+rec_priority:           1
+rec_auto_fix:          true
+
+# 留档 exact_duplicate: "false"
+# 留档 causal_duplicate: "false"
+# 留档 trigger_overlap: "false"
+# 留档 solution_overlap: "false"
+# 留档 combination_novelty: "true"
+# 留档 boundary_novelty: "true"
+# 留档 test_migration_novelty: "true"
+# 留档 similar_to: "E117(cmake config SIZEOF_LONG 模板), DRAFT-gcem-1.16.0-ohos-libm-long-double-boundary"
+# 留档 caused_by: "none"
+# 留档 prerequisite_of: "none"
+# 留档 conflicts_with: "none"
+
+# 知识协作 (Authorship & Provenance)
+authors:                pc6-5 (OH executor)
+source_pr:
+source_commit:
+
+# 质量度量 (Quality Metrics)
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-09-07
+
+doc_file:               DRAFT-libmad-0.15.1b-aarch64-fixed-point-width-wordsize.md
+rec_impl:               manual
+last_updated:               2026-10-17
+rec_description:        patch-generated-header-wordsize
