@@ -1,0 +1,74 @@
+# ============================================================
+# 版本级 manifest — libappindicator 12.10.1（遵循 ARCHIVE-SPEC v3.0）
+# ============================================================
+version: "12.10.1"
+software: "libappindicator"
+conan_ref: "libappindicator/12.10.1"
+status: published
+build_date: "2026-09-30"
+build_system: autotools
+
+# ============================================================
+# 源码信息
+# ============================================================
+source:
+  # 上游 12.10.1 无 release tarball（Launchpad 仅 12.10.0）；采用发行版统一
+  # 使用的上游快照包版本（Ubuntu orig tarball，非 Debian 重打包）。
+  # 详见 12.10.1/conandata.yml 的源码身份说明。
+  url: "https://launchpad.net/ubuntu/+archive/primary/+files/libappindicator_12.10.1+20.10.20200706.1.orig.tar.gz"
+  sha256: "94e7096a49c400628ecddcafe313d63bf917d95a90ab994930909de724604e0a"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+build:
+  system: autotools
+  configure_options:
+    - "--with-gtk=3"
+    - "--enable-tests"
+  dependencies:
+    - "glib/2.84.0.1"            # force 统一（dbus-glib 链的 2.88.0 已移除）
+    - "gtk/3.24.43"
+    - "harfbuzz/14.2.0.1.1.1"    # 头闭包补全：pango/pango-coverage.h -> <hb.h>
+    # 随包构建（R49 私有 prefix，制品仓未发布该依赖）：
+    - "libdbusmenu/16.04.0 (vendored, build_folder/prefix)"
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+patches_applied:
+  - "0001-configure.ac-drop-missing-gnome-macros.patch"
+  - "0002-Makefile.am-drop-docs-subdir.patch"
+  - "0003-configure.ac-testdeps-optional.patch"
+  - "0004-libdbusmenu-configure-relax-intltool-probe.patch"
+
+# ============================================================
+# 验证结果（本地 qemu + OHOS musl 运行根实测，2026-09-29 23:36 CST）
+# ============================================================
+verification:
+  conan_create: "exit 0（conan create . -pr:h=ohos-aarch64-run -pr:b=default --build=missing）"
+  consumer_e2e: "checks=27 failures=0 display=yes；复跑 5/5 次 exit=0"
+  upstream_tests: "tests/test-libappindicator.c（未修改）g_test 9 用例 TAP 1..9 全 ok，exit=0；复跑 3/3 次"
+  upstream_tests_unrunnable: "automake TESTS 4 个脚本（Xvfb/X11 + dbus-test-runner + 硬编码 /usr/share 路径）；6/8 check_PROGRAMS 需 dbus-glib-1（与 glib/2.84.0.1 冲突，实测源码重建失败）"
+  elf_gates: "3 个 .so SONAME 相对、DT_NEEDED 无绝对/../ 路径、DT_RUNPATH 已清除（L5a/L5b）"
+  device_e2e: "润和 DAYU200-RK3568 · OpenHarmony 6.0.0.47：消费者端到端 checks=19 failures=0、exit=0（真机无 broadwayd，菜单往返 6 项按设计 SKIP；证据 _device_evidence.json job=lai_e2e_fix3）"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+knowledge_gained:
+  - "autoreconf 从构建机复制 config.guess/config.sub，版本随构建机变化，linux-ohos 支持只能构建期注入（E007）；2022+ 版 config.sub 有两张白名单（基本系统类型 + kernel-os 配对），只补前者仍报 Kernel 'linux' not known to work with OS 'ohos'。**白名单文本结构本身也随版本变**（CI #92718 实测：conan automake/1.18 的 2024-05-27 版已改为每行一项、旧单行 pattern 不存在使严格替换直接炸，且该版上游已内置 ohos 无需注入）——注入前先按结构分支，收尾用真执行 config.sub（rc=0 + 无 Invalid + 输出含 linux-ohos）做 fail-closed 行为校验，比子串回读可靠"
+  - "m4 宏参数列表（AC_CONFIG_FILES([...])）内不能写 # 注释：会被当成输出文件项，报 `#' is already registered with AC_CONFIG_FILES；折行 SUBDIRS 删末项时还要收掉上一行的续行反斜杠（否则 comment following trailing backslash / SUBDIRS must be set with '=' before using '+='）"
+  - "制品仓依赖包发布的 *.la 记录了发布机构建前缀（个别 libdir='/'），libtool 会拼出 //lib/libfreetype.la 死路径并中断链接：构建前把依赖 .la 的 libdir 重定位、dependency_libs 清空（同 xauth/libxp 做法）"
+  - "libtool 会把安装前缀写进发布件 DT_RUNPATH（构建机死路径）：发布前用 patchelf --remove-rpath 清除，且必须在 ELF 签名之前（签名是内容哈希）"
+  - "GtkMenu 是 GInitiallyUnowned：app_indicator_set_menu() 内部 g_object_ref_sink() 已把浮动引用转为指示器强引用，消费方/用例不应再 g_object_unref()，否则菜单被析构而指示器留悬垂指针（实测偶发 SIGSEGV）"
+  - "GTK broadway：broadwayd 默认只听 unix socket（/run/user/<uid>/broadway<N+1>.socket），客户端必须同时给 GDK_BACKEND=broadway + DISPLAY=:N + BROADWAY_DISPLAY=:N；给 localhost:PORT 会走 TCP 而 broadwayd 未 --address 绑定时必然连不上"
+  - "制品仓 pango/1.50.14.1.1 未对 harfbuzz 声明 transitive_headers，而 gtk.h → gdk.h → pango/pango-coverage.h 直接 #include <hb.h>：消费方需显式 requires harfbuzz 补全头闭包"
+  - "dbus-glib/0.114 锁 glib/2.88.0 与 gtk/3.24.43 链 pin 的 glib/2.84.0.1 冲突，且按该配方对 glib 2.84 源码重建失败（-lgio-2.0/-lffi 找不到）：上游仅测试用到的 TESTDEPS 可在补丁中改为非致命"
+  - "CI worker 是 HarmonyOS PC，原生构建（cross_building=False）时 AutotoolsToolchain 不注入 --build/--host，configure 只能跑 config.guess，而 OHOS 的 uname -s = HarmonyOS 不被 2015 版 config.guess 认识 → `configure: error: cannot guess build type`（CI #65065 实测）：随包的老 autotools 工程必须显式给 GNU 三元组；主包在原生场景同样要补（交叉场景 toolchain 会自己注入）"
+  - "autoconf 生成的 configure/config.status 里有写死的 (umask 077 && mktemp -d ./confXXXXXX) 子 shell，在私有临时目录里写 subs1.awk 后二次读取，OHOS 文件系统（HMFS/HMDFS）会拒绝该读取 → `config.status: error: could not setup config files machinery` / `Permission denied`（CI #65144、#65460 实测）。**外层 `umask 000 && configure` 无效**（那两处 umask 在脚本自己的子 shell 内）——必须改写脚本文本；改写 configure 即同时生效于它生成的 config.status（逐行比对 configure:2453/2458 ↔ config.status:546/551）"
+  - "CI worker 上 PATH 里的 glib-mkenums 是 HNP 的 perl 版脚本，shebang 写死 #!/usr/bin/perl，而 HarmonyOS PC 的 perl 在 /data/service/hnp/bin/perl → `bad interpreter` / make Error 126（CI #65468/#65495 实测，本地因依赖包内是 python3 版而不复现）。**只往 PATH 前塞 shim 无效**：configure 用 AC_PATH_PROG 取 PATH 首个匹配并把绝对路径固化进 Makefile；正解是用 AC_ARG_VAR 接口注入 GLIB_MKENUMS=<绝对路径>（同 xauth 用 XAUTH_CFLAGS/LIBS 绕过 pkg-config 的思路）"
+  - "CI worker（HarmonyOS PC 原生构建）基础 PATH 只有 /data/app/bin:/system/bin:/system/sbin:/vendor/bin，不含 aclocal → 需要 autoreconf 自举的包报 `aclocal: inaccessible or not found` / `autoreconf: error: aclocal failed with exit status: 127`（CI #65510 实测，E178）；本地交叉构建机自带 autotools 故不复现。正解是**按需** tool_requires automake+libtool+autoconf（三者制品仓均有 OHOS armv8 binary）；不能无条件引入——autoconf 拉入的 m4 在 OHOS 交叉下编译失败（printf-frexpl 的 `fldcw` 内联汇编）"

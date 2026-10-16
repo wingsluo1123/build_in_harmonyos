@@ -1,0 +1,46 @@
+--- a/configure.ac
++++ b/configure.ac
+@@ -33,7 +33,10 @@
+ # GTK Doc
+ ###########################
+ 
+-GTK_DOC_CHECK([1.14],[--flavour no-tmpl])
++# GTK_DOC_CHECK() removed: gtk-doc.m4 is not provided by any OHOS
++# package and gtk-doc-tools is absent from the build image, so
++# autoreconf aborts on the undefined macro. The API reference is not
++# part of the shipped library artifact (docs/ dropped in Makefile.am).
+ 
+ 
+ ###########################
+@@ -96,7 +99,9 @@
+ # Vala Compiler support
+ ###########################
+ 
+-AM_PROG_VALAC([0.14.0])
++# AM_PROG_VALAC() removed: vala.m4 is absent from the build image and
++# makes autoreconf fail. VALAC stays unset, hence HAVE_VALAC is false
++# and bindings/vala is not built (see bindings/Makefile.am).
+ AM_CONDITIONAL(HAVE_VALAC, [test "x$VALAC" != "x"])
+ 
+ ###########################
+@@ -205,6 +210,9 @@
+ # Files
+ ###########################
+ 
++# docs/ 生成项已从下方列表中移除：gtk-doc.m4/gtk-doc-tools 在 OHOS 构建
++# 镜像中不存在（0001 同时移除了 GTK_DOC_CHECK），API 参考文档不属于
++# 本配方交付物；宏参数内不能写注释，故说明放在此处。
+ AC_CONFIG_FILES([
+ Makefile
+ src/Makefile
+@@ -215,10 +223,6 @@
+ bindings/vala/examples/Makefile
+ tests/Makefile
+ example/Makefile
+-docs/Makefile
+-docs/reference/Makefile
+-docs/reference/version.xml
+-docs/reference/libappindicator-docs.sgml
+ ])
+ 
+ if test "x$has_mono" = "xtrue" ; then

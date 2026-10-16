@@ -1,0 +1,89 @@
+--- a/libdbusmenu-src/configure
++++ b/libdbusmenu-src/configure
+@@ -3083,8 +3083,14 @@
+ esac
+ 
+ INTLTOOL_REQUIRED_VERSION_AS_INT=`echo 0.35.0 | awk -F. '{ print $ 1 * 1000 + $ 2 * 100 + $ 3; }'`
+-INTLTOOL_APPLIED_VERSION=`intltool-update --version | head -1 | cut -d" " -f3`
+-INTLTOOL_APPLIED_VERSION_AS_INT=`echo $INTLTOOL_APPLIED_VERSION | awk -F. '{ print $ 1 * 1000 + $ 2 * 100 + $ 3; }'`
++# intltool/gettext/perl are maintainer-only i18n helpers that the HarmonyOS
++# build image does not ship, and no NLS catalog is delivered (configure runs
++# with --disable-nls, so po/ builds nothing). The pre-generated configure only
++# needs them for these probes; they are turned into no-ops instead of hard
++# requirements. NOTE: configure is edited rather than configure.ac because the
++# tarball ships a pre-generated configure.
++INTLTOOL_APPLIED_VERSION=0.51.0
++INTLTOOL_APPLIED_VERSION_AS_INT=51000
+ if test -n "0.35.0"; then
+     { $as_echo "$as_me:${as_lineno-$LINENO}: checking for intltool >= 0.35.0" >&5
+ $as_echo_n "checking for intltool >= 0.35.0... " >&6; }
+@@ -3215,7 +3221,9 @@
+ 
+ 
+ if test -z "$INTLTOOL_UPDATE" -o -z "$INTLTOOL_MERGE" -o -z "$INTLTOOL_EXTRACT"; then
+-    as_fn_error $? "The intltool scripts were not found. Please install intltool." "$LINENO" 5
++    INTLTOOL_UPDATE=:
++    INTLTOOL_MERGE=:
++    INTLTOOL_EXTRACT=:
+ fi
+ 
+ if test -z "$AM_DEFAULT_VERBOSITY"; then
+@@ -3520,13 +3528,16 @@
+ 
+ 
+ if test -z "$XGETTEXT" -o -z "$MSGMERGE" -o -z "$MSGFMT"; then
+-    as_fn_error $? "GNU gettext tools not found; required for intltool" "$LINENO" 5
+-fi
+-xgversion="`$XGETTEXT --version|grep '(GNU ' 2> /dev/null`"
+-mmversion="`$MSGMERGE --version|grep '(GNU ' 2> /dev/null`"
+-mfversion="`$MSGFMT --version|grep '(GNU ' 2> /dev/null`"
++    XGETTEXT=:
++    MSGMERGE=:
++    MSGFMT=:
++    GMSGFMT=:
++fi
++xgversion="`$XGETTEXT --version 2> /dev/null`"
++mmversion="`$MSGMERGE --version 2> /dev/null`"
++mfversion="`$MSGFMT --version 2> /dev/null`"
+ if test -z "$xgversion" -o -z "$mmversion" -o -z "$mfversion"; then
+-    as_fn_error $? "GNU gettext tools not found; required for intltool" "$LINENO" 5
++    xgversion=noop    # see the intltool note above
+ fi
+ 
+ # Extract the first word of "perl", so it can be a program name with args.
+@@ -3570,7 +3581,7 @@
+ 
+ 
+ if test -z "$INTLTOOL_PERL"; then
+-   as_fn_error $? "perl not found" "$LINENO" 5
++   INTLTOOL_PERL=:    # see the intltool note above
+ fi
+ { $as_echo "$as_me:${as_lineno-$LINENO}: checking for perl >= 5.8.1" >&5
+ $as_echo_n "checking for perl >= 5.8.1... " >&6; }
+@@ -3585,7 +3596,7 @@
+ if test "x" != "xno-xml"; then
+    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for XML::Parser" >&5
+ $as_echo_n "checking for XML::Parser... " >&6; }
+-   if `$INTLTOOL_PERL -e "require XML::Parser" 2>/dev/null`; then
++   if test 1 -eq 1; then    # see the intltool note above
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: ok" >&5
+ $as_echo "ok" >&6; }
+    else
+@@ -14628,6 +14639,17 @@
+ fi
+ 
+ 
++if test "x$enable_tests" = "xno"; then
++  # configure.ac emits AM_CONDITIONAL([HAVE_VALGRIND]) only inside the
++  # "tests enabled" branch, while @HAVE_VALGRIND_TRUE@/@HAVE_VALGRIND_FALSE@
++  # are substituted unconditionally: configure would abort at the end with
++  # 'conditional "HAVE_VALGRIND" was never defined' when built with
++  # --disable-tests (the mode used here). Define it for that case.
++  have_valgrind=no
++  HAVE_VALGRIND_TRUE='#'
++  HAVE_VALGRIND_FALSE=
++fi
++
+ if test "x$enable_tests" != "xno"; then :
+ 
+ 
