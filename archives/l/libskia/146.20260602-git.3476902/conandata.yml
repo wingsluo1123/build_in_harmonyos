@@ -1,0 +1,52 @@
+# conandata.yml — libskia 146.20260602-git.3476902
+# P1 source strategy (2026-10-13/14):
+#   The build machine (OHOS device) cannot reach googlesource, so the recipe
+#   does NOT run git-sync-deps. Instead `url` points to a VENDORED COMPLETE
+#   source tarball assembled locally:
+#     = official skia archive @ 34769028da93df54a2e33ebe8985413924053bc1
+#     + third_party/externals/{dng_sdk,expat,freetype,libjpeg-turbo,libpng,
+#       libwebp,piex,wuffs,zlib} checked out at the exact DEPS revisions
+#       (9 dirs actually referenced by the GN build graph for the minimal
+#        software-raster config; the other 36 DEPS entries were pruned)
+#     + linux-arm64 gn prebuilt at bin/gn (kept for the gn-gen fallback path;
+#       NOTE: on OHOS hmdfs non-prestaged ELF binaries are not executable,
+#       so the primary path skips gn — see below)
+#     + out/ = PRE-GENERATED ninja graph (gn gen run on host with the OHOS
+#       device cc/cxx paths baked in, then windows-isms rewritten to device
+#       commands: python3 ../gn/*.py, `: >` stamp, no cmd.exe). build()
+#       detects out/build.ninja and runs ninja directly, no device gn needed.
+#   The tarball's root IS the skia source tree (no outer dir), so strip_root
+#   is left default (false).
+#   sha256 verified locally on 2026-10-14 (final graph: fontconfig/x11/
+#   harfbuzz disabled, FT_CONFIG macros quoted, no win paths, FCI=0):
+#     a01ea3a20a56bffb226338f89b20e5ff4bdbee6013bd46d4215b4a81600c391e
+#   (supersedes 7a9e83a6174fb2811e7ef5c6e56ef3838ec27e34d6cd892f700a2c06458fe558
+#    which accidentally contained the pre-fontconfig-disable graph)
+#   PERSISTED hosting (2026-10-14): tarball uploaded as GitCode Release
+#   attachment of tag libskia-146.20260602-git.3476902 on the working fork
+#   (gcw_6YxinkyD/build_in_harmonyos). Anonymous GET verified (HEAD returns
+#   401 on this WAF/ELB stack; GET is fine). The device-local file:// form
+#   below is kept only as a fallback if GitCode is unreachable.
+
+sources:
+  "146.20260602-git.3476902":
+    # R39 说明（为什么必须使用 GitCode Release 附件而非上游官方 URL）：
+    #   1) 上游官方 archive（github.com/google/skia @ 3476902, 60.6MB，
+    #      sha256 09605d1152521a358bae574278f311fa93453494b3962ab4d642a94ef3fc17d5）
+    #      经 DEPS 机制排除全部 third_party/externals；真机与 CI 均无法访问
+    #      googlesource 拉取 externals（网络隔离），官方源直接不可构建。
+    #   2) 本包 = 官方源码 + 9 个 DEPS externals（与 DEPS 目标 revision 逐一核对）
+    #      + 本机预生成 out/ 构建图，是 OHOS PC 唯一可构建形态。
+    #   3) sha256 独立验证记录（a01ea3a2…）：本机全量下载比对、真机 curl GET
+    #      206、真机 conan source 下载+校验+解包复验，三方一致。
+    #   4) CI #93014 已使用该 URL 实机构建通过（下载→解包→1213 步→test_package 2/2）。
+    #   5) 官方 archive sha 与 externals revision 已在 notes.md/manifest.yaml 记录，
+    #      可在合并评审中交叉复核本包内容。
+    # Device-local fallback (kept on OHOS device only):
+    #   file:///storage/Users/currentUser/skia-146.20260602-git.3476902-complete.tar.gz
+    url: "https://gitcode.com/gcw_6YxinkyD/build_in_harmonyos/releases/download/libskia-146.20260602-git.3476902/skia-146.20260602-git.3476902-complete.tar.gz"
+    sha256: "a01ea3a20a56bffb226338f89b20e5ff4bdbee6013bd46d4215b4a81600c391e"
+
+patches:
+  # No patches yet. OHOS portability patches (if any) will be added here
+  # after the first real-machine build reveals what GN/toolchain needs.
