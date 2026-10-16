@@ -1,0 +1,73 @@
+#====================================================================
+# DRAFT-19001 — 宿主程序脚本插件包/数据包形态三方库（非 C/C++ 交付物）
+# 选型阶段即判 env_unsupported，禁止进入 conan 适配主流程
+#====================================================================
+id:                     DRAFT-19001
+trigger_tool:           configure|cmake|meson|install|test|runtime
+phase:                  configuration
+error_signature:        no compilable source|no Makefile|no CMakeLists.txt|\
+                        mod_[a-z_-]+\.lua|\.plugin$|\.service$|\.desktop$|\
+                        "^#!/usr/bin/(env )?(lua|prosodyctl)"
+severity:               2
+category:               limitation, detection, conan, packaging
+prescan_pattern:        (mod_[a-z0-9_-]+\.(lua|pl|py)|resources/(prosody|asterisk|freepbx)-plugins|usr/share/|usr/lib/[a-z]+/plugins/)
+prescan_globs:          '*.c, *.h, *.cc, *.cpp, Makefile*, *.mk, CMakeLists.txt, *.lua, *.py, *.rb, *.pl, debian/*'
+match_keywords:         lua plugins, prosody, asterisk, jitsi-meet-prosody, mod_*.lua, \
+                        plugin package, data package, debian package, no C/C++ source, \
+                        lang-preflight, env_unsupported, lang_hold, scripting language, \
+                        host application, interpreter, LuaRocks, metapackage, monorepo
+title:                  宿主程序脚本插件包/纯数据包形态三方库无 C/C++ 交付物，选型即 env_unsupported（lang_hold），禁止硬适配
+
+# ═══ Layer 2: 诊断层 ═══
+root_cause:             交付物是宿主应用程序（Prosody/Asterisk/Jitsi 等服务端）的运行时脚本插件或静态数据文件（Lua/Python/Perl 模块、conf、service 单元），不含任何可编译 C/C++ 翻译单元与库产物；conan C/C++ 流水线无对应包模型，CI 也无对应解释器/宿主运行时，编译通过概念不成立
+affected_scope:         所有以 Debian 元包/单体仓库子目录形式发布的宿主插件集合与数据包（如 jitsi-meet-prosody、asterisk 相关 mod_*.conf、FreeSWITCH 模块、GNOME shell 扩展等）
+verification_cmd:       find <src> -name "*.lua" -o -name "*.py" -o -name "*.pl" | wc -l; \
+                        find <src> -name "*.c" -o -name "*.cpp" -o -name "*.h" | wc -l; \
+                        ls <src>/debian/*.install 2>/dev/null
+
+# ═══ Layer 3: 方案层 ═══
+rec_priority:           1
+rec_approach:           lang-preflight-early-disposition
+rec_description:        选型/立项阶段（下载源码后立即）运行 lang-preflight + 插件包特征探测，判定为非 C/C++ 交付物即用 result 命令上报 env_unsupported（带 detected_language 与 language_evidence 三字段），释放任务——平台转 lang_hold 挂起等生态，不算失败
+rec_command:            python3 $SKILL_ROOT/scripts/ohc-run.py lang-preflight <name> <ver> --src $BUILD_SRC_DIR && \
+                        python3 $SKILL_ROOT/scripts/ohc-run.py result <name> <ver> --status env_unsupported \
+                        --detected-language <lua|java|python|...> \
+                        --ev-build-system "<证据>" --ev-manifest "<证据>" --ev-source-stats "<证据>"
+rec_auto_fix:           true
+rec_impl:               lang-preflight-early-disposition
+
+fallback_priority:      2
+fallback_approach:      manual-evidence-report
+fallback_description:   lang-preflight 误判（如 monorepo 主语言与交付子目录不一致）时，以交付物子目录为判定范围补齐人工证据（源文件统计 + debian/*.install 安装清单），仍走 result env_unsupported；禁止为了让 CI 走通而伪造 C/C++ 测试或 stub
+fallback_command:
+fallback_auto_fix:      false
+fallback_impl:
+
+# ═══ 禁止策略 ═══
+forbid_1_pattern:       (__OHOS__.*lua|stub.*plugin|empty.*test_package)
+forbid_1_reason:        脚本插件包无编译期可验证产物，硬造 C/C++ stub 测试属于伪适配
+forbid_1_consequence:   PF3/L1e 空壳测试拦截 + 评审"硬性不通过"，浪费 CI 轮次
+
+forbid_2_pattern:       (conan create.*(jitsi-meet-prosody|mod_[a-z-]+\.lua))
+forbid_2_reason:        R47 语言预检 exit 2 后禁止硬着头皮进入 conan 主流程
+forbid_2_consequence:   无编译步骤可执行，W3/CI 必然失败，预算白耗
+
+# ═══ 原则/关系 ═══
+principles:             P004
+causes:                 []
+caused_by:              []
+similar_to:             []
+conflicts_with:         []
+prerequisite_of:        []
+
+doc_file:               doc/DRAFT-19001.md
+last_updated:           2026-10-15
+source_event:           jitsi-meet-prosody 1.0.9139 适配任务：源码为 jitsi/jitsi-meet 单体仓库 tag jitsi-meet_9139 的 resources/prosody-plugins/ 67 个 Lua 插件 + 7 个 patch，无任何 C/C++ 翻译单元；lang-preflight 判定非 cpp → env_unsupported 终态
+authors:                li_shuo <ls.fr@qq.com>
+source_pr:
+source_commit:
+
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
