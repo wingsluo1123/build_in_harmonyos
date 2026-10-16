@@ -1,0 +1,659 @@
+--- a/eqmodbase.cpp
++++ b/eqmodbase.cpp
+@@ -97,20 +97,21 @@
+      tv_usec is certainly positive. */
+     result->tv_sec  = x->tv_sec - y->tv_sec;
+     result->tv_usec = x->tv_usec - y->tv_usec;
+ 
+     /* Return 1 if result is negative. */
+     return x->tv_sec < y->tv_sec;
+ }
+ #endif
+ 
+ EQMod::EQMod()
++    : INDI::GuiderInterface(this)
+ {
+     //ctor
+     setVersion(EQMOD_VERSION_MAJOR, EQMOD_VERSION_MINOR);
+     // Do not define dynamic properties on startup, and do not delete them from memory
+     setDynamicPropertiesBehavior(false, false);
+     currentRA            = 0;
+     currentDEC           = 90;
+     gotoparams.completed = true;
+     last_motion_ns       = -1;
+     last_motion_ew       = -1;
+@@ -184,26 +185,26 @@
+     INDI::Telescope::setSimulation(enable);
+ }
+ 
+ const char *EQMod::getDefaultName()
+ {
+     return "EQMod Mount";
+ }
+ 
+ double EQMod::getLongitude()
+ {
+-    return (IUFindNumber(&LocationNP, "LONG")->value);
++    return (IUFindNumber(LocationNP.operator->(), "LONG")->value);
+ }
+ 
+ double EQMod::getLatitude()
+ {
+-    return (IUFindNumber(&LocationNP, "LAT")->value);
++    return (IUFindNumber(LocationNP.operator->(), "LAT")->value);
+ }
+ 
+ double EQMod::getJulianDate()
+ {
+     /*
+     struct timeval currenttime, difftime;
+     double usecs;
+     gettimeofday(&currenttime, nullptr);
+     if (timeval_subtract(&difftime, &currenttime, &lasttimeupdate) == -1)
+     return juliandate;
+@@ -259,33 +260,33 @@
+     return lst;
+ }
+ 
+ bool EQMod::initProperties()
+ {
+     /* Make sure to init parent properties first */
+     INDI::Telescope::initProperties();
+ 
+     loadProperties();
+ 
+-    for (int i = 0; i < SlewRateSP.nsp - 1; i++)
+-    {
+-        SlewRateSP.sp[i].s = ISS_OFF;
+-        sprintf(SlewRateSP.sp[i].label, "%.fx", slewspeeds[i]);
+-        SlewRateSP.sp[i].aux = (void *)&slewspeeds[i];
++    for (int i = 0; i < SlewRateSP->nsp - 1; i++)
++    {
++        SlewRateSP->sp[i].s = ISS_OFF;
++        sprintf(SlewRateSP->sp[i].label, "%.fx", slewspeeds[i]);
++        SlewRateSP->sp[i].aux = (void *)&slewspeeds[i];
+     }
+ 
+     // Since last item is NOT maximum (but custom), let's set item before custom to SLEWMAX
+-    SlewRateSP.sp[SlewRateSP.nsp - 2].s = ISS_ON;
+-    strncpy(SlewRateSP.sp[SlewRateSP.nsp - 2].name, "SLEW_MAX", MAXINDINAME);
++    SlewRateSP->sp[SlewRateSP->nsp - 2].s = ISS_ON;
++    strncpy(SlewRateSP->sp[SlewRateSP->nsp - 2].name, "SLEW_MAX", MAXINDINAME);
+     // Last is custom
+-    strncpy(SlewRateSP.sp[SlewRateSP.nsp - 1].name, "SLEWCUSTOM", MAXINDINAME);
+-    strncpy(SlewRateSP.sp[SlewRateSP.nsp - 1].label, "Custom", MAXINDILABEL);
++    strncpy(SlewRateSP->sp[SlewRateSP->nsp - 1].name, "SLEWCUSTOM", MAXINDINAME);
++    strncpy(SlewRateSP->sp[SlewRateSP->nsp - 1].label, "Custom", MAXINDILABEL);
+ 
+     AddTrackMode("TRACK_SIDEREAL", "Sidereal", true);
+     AddTrackMode("TRACK_SOLAR", "Solar");
+     AddTrackMode("TRACK_LUNAR", "Lunar");
+     AddTrackMode("TRACK_CUSTOM", "Custom");
+ 
+     SetParkDataType(PARK_RA_DEC_ENCODER);
+ 
+     setDriverInterface(getDriverInterface() | GUIDER_INTERFACE);
+ #ifdef WITH_ALIGN
+@@ -302,22 +303,22 @@
+     addAuxControls();
+     return true;
+ }
+ 
+ void EQMod::ISGetProperties(const char *dev)
+ {
+     INDI::Telescope::ISGetProperties(dev);
+ 
+     if (isConnected())
+     {
+-        defineProperty(&GuideNSNP);
+-        defineProperty(&GuideWENP);
++        defineProperty(GuideNSNP);
++        defineProperty(GuideWENP);
+         defineProperty(SlewSpeedsNP);
+         defineProperty(GuideRateNP);
+         defineProperty(PulseLimitsNP);
+         defineProperty(MountInformationTP);
+         defineProperty(SteppersNP);
+         defineProperty(CurrentSteppersNP);
+         defineProperty(PeriodsNP);
+         defineProperty(JulianNP);
+         defineProperty(TimeLSTNP);
+         defineProperty(RAStatusLP);
+@@ -438,41 +439,41 @@
+     IUFillSwitch(&AlignMethodS[1], "ALIGN_METHOD_SUBSYSTEM", "Alignment Subsystem", ISS_OFF);
+     IUFillSwitchVector(&AlignMethodSP, AlignMethodS, NARRAY(AlignMethodS), getDeviceName(), "ALIGN_METHOD",
+                        "Align Method", OPTIONS_TAB, IP_RW, ISR_1OFMANY, 0, IPS_IDLE);
+ #endif
+ #if defined WITH_ALIGN || defined WITH_ALIGN_GEEHALEL
+     AlignSyncModeSP = getSwitch("ALIGNSYNCMODE");
+ #endif
+ 
+     simulator->initProperties();
+ 
+-    INDI::GuiderInterface::initGuiderProperties(this->getDeviceName(), MOTION_TAB);
++    INDI::GuiderInterface::initProperties(MOTION_TAB);
+ 
+ #ifdef WITH_SCOPE_LIMITS
+     if (horizon)
+     {
+         if (!horizon->initProperties())
+             return false;
+     }
+ #endif
+ 
+     return true;
+ }
+ 
+ bool EQMod::updateProperties()
+ {
+     INDI::Telescope::updateProperties();
+ 
+     if (isConnected())
+     {
+-        defineProperty(&GuideNSNP);
+-        defineProperty(&GuideWENP);
++        defineProperty(GuideNSNP);
++        defineProperty(GuideWENP);
+         defineProperty(SlewSpeedsNP);
+         defineProperty(GuideRateNP);
+         defineProperty(PulseLimitsNP);
+         defineProperty(MountInformationTP);
+         defineProperty(SteppersNP);
+         defineProperty(CurrentSteppersNP);
+         defineProperty(PeriodsNP);
+         defineProperty(JulianNP);
+         defineProperty(TimeLSTNP);
+         defineProperty(RAStatusLP);
+@@ -575,44 +576,44 @@
+             zeroRAEncoder  = mount->GetRAEncoderZero();
+             totalRAEncoder = mount->GetRAEncoderTotal();
+             homeRAEncoder  = mount->GetRAEncoderHome();
+             zeroDEEncoder  = mount->GetDEEncoderZero();
+             totalDEEncoder = mount->GetDEEncoderTotal();
+             homeDEEncoder  = mount->GetDEEncoderHome();
+ 
+             parkRAEncoder = GetAxis1Park();
+             parkDEEncoder = GetAxis2Park();
+ 
+-            INumber *latitude = IUFindNumber(&LocationNP, "LAT");
+-            INumber *longitude = IUFindNumber(&LocationNP, "LONG");
+-            INumber *elevation = IUFindNumber(&LocationNP, "ELEV");
++            INumber *latitude = IUFindNumber(LocationNP.operator->(), "LAT");
++            INumber *longitude = IUFindNumber(LocationNP.operator->(), "LONG");
++            INumber *elevation = IUFindNumber(LocationNP.operator->(), "ELEV");
+             if (latitude && longitude && elevation)
+                 updateLocation(latitude->value, longitude->value, elevation->value);
+             //            else
+             //                updateLocation(0.0, 0.0, 0.0);
+ 
+             //            if ((latitude) && (latitude->value < 0.0))
+             //                SetSouthernHemisphere(true);
+             //            else
+             //                SetSouthernHemisphere(false);
+ 
+             sendTimeFromSystem();
+         }
+         catch (EQModError &e)
+         {
+             return (e.DefaultHandleException(this));
+         }
+     }
+     else
+     {
+-        deleteProperty(GuideNSNP.name);
+-        deleteProperty(GuideWENP.name);
++        deleteProperty(GuideNSNP->name);
++        deleteProperty(GuideWENP->name);
+         deleteProperty(GuideRateNP->name);
+         deleteProperty(PulseLimitsNP->name);
+         deleteProperty(MountInformationTP->name);
+         deleteProperty(SteppersNP->name);
+         deleteProperty(CurrentSteppersNP->name);
+         deleteProperty(PeriodsNP->name);
+         deleteProperty(JulianNP->name);
+         deleteProperty(TimeLSTNP->name);
+         deleteProperty(RAStatusLP->name);
+         deleteProperty(DEStatusLP->name);
+@@ -771,22 +772,22 @@
+             rc = true;
+         }
+         else
+         {
+             rc = ReadScopeStatus();
+         }
+ 
+         if (rc == false)
+         {
+             // read was not good
+-            EqNP.s = IPS_ALERT;
+-            IDSetNumber(&EqNP, nullptr);
++            EqNP->s = IPS_ALERT;
++            IDSetNumber(EqNP.operator->(), nullptr);
+         }
+ 
+         SetTimer(getCurrentPollingPeriod());
+     }
+ }
+ 
+ bool EQMod::ReadScopeStatus()
+ {
+     // Time
+     double juliandate = 0;
+@@ -985,42 +986,42 @@
+                     LOGF_INFO(
+                         "Iterative goto (%d): slew mount to RA increment = %d, DE increment = %d",
+                         gotoparams.iterative_count, static_cast<int>(gotoparams.ratargetencoder - gotoparams.racurrentencoder),
+                         static_cast<int>(gotoparams.detargetencoder - gotoparams.decurrentencoder));
+                     mount->SlewTo(static_cast<int>(gotoparams.ratargetencoder - gotoparams.racurrentencoder),
+                                   static_cast<int>(gotoparams.detargetencoder - gotoparams.decurrentencoder));
+                 }
+                 else
+                 {
+                     ISwitch *sw;
+-                    sw = IUFindSwitch(&CoordSP, "TRACK");
++                    sw = IUFindSwitch(CoordSP.operator->(), "TRACK");
+                     if ((gotoparams.iterative_count > GOTO_ITERATIVE_LIMIT) &&
+                             (((3600 * fabs(gotoparams.ratarget - currentRA)) > RAGOTORESOLUTION) ||
+                              ((3600 * fabs(gotoparams.detarget - currentDEC)) > DEGOTORESOLUTION)))
+                     {
+                         LOGF_INFO(
+                             "Iterative Goto Limit reached (%d iterations): RA diff = %4.2f arcsecs DE diff = %4.2f "
+                             "arcsecs",
+                             gotoparams.iterative_count, 3600 * fabs(gotoparams.ratarget - currentRA),
+                             3600 * fabs(gotoparams.detarget - currentDEC));
+                     }
+ 
+                     // For AstroEQ (needs an explicit :G command at the end of gotos)
+                     mount->ResetMotions();
+ 
+                     if ((RememberTrackState == SCOPE_TRACKING) || ((sw != nullptr) && (sw->s == ISS_ON)))
+                     {
+                         char *name;
+ 
+                         if (RememberTrackState == SCOPE_TRACKING)
+                         {
+-                            sw   = IUFindOnSwitch(&TrackModeSP);
++                            sw   = IUFindOnSwitch(TrackModeSP.operator->());
+                             name = sw->name;
+                             mount->StartRATracking(GetRATrackRate());
+                             mount->StartDETracking(GetDETrackRate());
+                         }
+                         else
+                         {
+                             sw    = IUFindOnSwitch(TrackDefaultSP);
+                             name  = sw->name;
+                             mount->StartRATracking(GetDefaultRATrackRate());
+                             mount->StartDETracking(GetDefaultDETrackRate());
+@@ -1636,68 +1637,68 @@
+     }
+     g->outsidelimits   = outsidelimits;
+     g->ratargetencoder = targetraencoder;
+     g->detargetencoder = targetdecencoder;
+ }
+ 
+ double EQMod::GetRATrackRate()
+ {
+     double rate = 0.0;
+     ISwitch *sw;
+-    sw = IUFindOnSwitch(&TrackModeSP);
++    sw = IUFindOnSwitch(TrackModeSP.operator->());
+     if (!sw)
+         return 0.0;
+     if (!strcmp(sw->name, "TRACK_SIDEREAL"))
+     {
+         rate = TRACKRATE_SIDEREAL;
+     }
+     else if (!strcmp(sw->name, "TRACK_LUNAR"))
+     {
+         rate = TRACKRATE_LUNAR;
+     }
+     else if (!strcmp(sw->name, "TRACK_SOLAR"))
+     {
+         rate = TRACKRATE_SOLAR;
+     }
+     else if (!strcmp(sw->name, "TRACK_CUSTOM"))
+     {
+-        rate = IUFindNumber(&TrackRateNP, "TRACK_RATE_RA")->value;
++        rate = IUFindNumber(TrackRateNP.operator->(), "TRACK_RATE_RA")->value;
+     }
+     else
+         return 0.0;
+     if (RAInverted)
+         rate = -rate;
+     return rate;
+ }
+ 
+ double EQMod::GetDETrackRate()
+ {
+     double rate = 0.0;
+     ISwitch *sw;
+-    sw = IUFindOnSwitch(&TrackModeSP);
++    sw = IUFindOnSwitch(TrackModeSP.operator->());
+     if (!sw)
+         return 0.0;
+     if (!strcmp(sw->name, "TRACK_SIDEREAL"))
+     {
+         rate = 0.0;
+     }
+     else if (!strcmp(sw->name, "TRACK_LUNAR"))
+     {
+         rate = 0.0;
+     }
+     else if (!strcmp(sw->name, "TRACK_SOLAR"))
+     {
+         rate = 0.0;
+     }
+     else if (!strcmp(sw->name, "TRACK_CUSTOM"))
+     {
+-        rate = IUFindNumber(&TrackRateNP, "TRACK_RATE_DE")->value;
++        rate = IUFindNumber(TrackRateNP.operator->(), "TRACK_RATE_DE")->value;
+     }
+     else
+         return 0.0;
+     if (DEInverted)
+         rate = -rate;
+     return rate;
+ }
+ 
+ double EQMod::GetDefaultRATrackRate()
+ {
+@@ -1713,21 +1714,21 @@
+     else if (!strcmp(sw->name, "TRACK_LUNAR"))
+     {
+         rate = TRACKRATE_LUNAR;
+     }
+     else if (!strcmp(sw->name, "TRACK_SOLAR"))
+     {
+         rate = TRACKRATE_SOLAR;
+     }
+     else if (!strcmp(sw->name, "TRACK_CUSTOM"))
+     {
+-        rate = IUFindNumber(&TrackRateNP, "TRACK_RATE_RA")->value;
++        rate = IUFindNumber(TrackRateNP.operator->(), "TRACK_RATE_RA")->value;
+     }
+     else
+         return 0.0;
+     if (RAInverted)
+         rate = -rate;
+     return rate;
+ }
+ 
+ double EQMod::GetDefaultDETrackRate()
+ {
+@@ -1743,21 +1744,21 @@
+     else if (!strcmp(sw->name, "TRACK_LUNAR"))
+     {
+         rate = 0.0;
+     }
+     else if (!strcmp(sw->name, "TRACK_SOLAR"))
+     {
+         rate = 0.0;
+     }
+     else if (!strcmp(sw->name, "TRACK_CUSTOM"))
+     {
+-        rate = IUFindNumber(&TrackRateNP, "TRACK_RATE_DE")->value;
++        rate = IUFindNumber(TrackRateNP.operator->(), "TRACK_RATE_DE")->value;
+     }
+     else
+         return 0.0;
+     if (DEInverted)
+         rate = -rate;
+     return rate;
+ }
+ 
+ bool EQMod::gotoInProgress()
+ {
+@@ -1771,40 +1772,40 @@
+     INDI::IEquatorialCoordinates gotoradec;
+     INDI::IHorizontalCoordinates gotoaltaz;
+     double gotoaz;
+     double gotoalt;
+ #endif
+ 
+     if ((TrackState == SCOPE_SLEWING) || (TrackState == SCOPE_PARKING) || (TrackState == SCOPE_PARKED))
+     {
+         LOG_WARN("Can not perform goto while goto/park in progress, or scope parked.");
+         //        EqNP.s = IPS_IDLE;
+-        //        IDSetNumber(&EqNP, nullptr);
++        //        IDSetNumber(EqNP.operator->(), nullptr);
+         //        return true;
+         return false;
+     }
+ 
+     juliandate = getJulianDate();
+ 
+ #ifdef WITH_SCOPE_LIMITS
+     gotoradec.rightascension  = r;
+     gotoradec.declination = d;
+     INDI::EquatorialToHorizontal(&gotoradec, &m_Location, juliandate, &gotoaltaz);
+     gotoaz  = gotoaltaz.azimuth;
+     gotoalt = gotoaltaz.altitude;
+     if (horizon)
+     {
+         if (!horizon->inGotoLimits(gotoaz, gotoalt))
+         {
+             LOG_WARN("Goto outside Horizon Limits.");
+             //            EqNP.s = IPS_IDLE;
+-            //            IDSetNumber(&EqNP, nullptr);
++            //            IDSetNumber(EqNP.operator->(), nullptr);
+             //            return true;
+             return false;
+         }
+     }
+ #endif
+ 
+     LOGF_INFO("Starting Goto RA=%g DE=%g (current RA=%g DE=%g)", r, d, currentRA, currentDEC);
+     targetRA  = r;
+     targetDEC = d;
+     char RAStr[64], DecStr[64];
+@@ -1964,22 +1965,22 @@
+     return true;
+ }
+ 
+ bool EQMod::Park()
+ {
+     if (!isParked())
+     {
+         if (TrackState == SCOPE_SLEWING)
+         {
+             LOG_INFO("Can not park while slewing...");
+-            ParkSP.s = IPS_ALERT;
+-            IDSetSwitch(&ParkSP, nullptr);
++            ParkSP->s = IPS_ALERT;
++            IDSetSwitch(ParkSP.operator->(), nullptr);
+             return false;
+         }
+ 
+         try
+         {
+             // stop motor
+             mount->StopRA();
+             mount->StopDE();
+             currentRAEncoder = mount->GetRAEncoder();
+             currentDEEncoder = mount->GetDEEncoder();
+@@ -1992,21 +1993,21 @@
+                           static_cast<int32_t>(parkDEEncoder - currentDEEncoder));
+         }
+         catch (EQModError e)
+         {
+             return (e.DefaultHandleException(this));
+         }
+         //TrackModeSP->s = IPS_IDLE;
+         //IDSetSwitch(TrackModeSP, nullptr);
+         TrackState = SCOPE_PARKING;
+         //        ParkSP.s   = IPS_BUSY;
+-        //        IDSetSwitch(&ParkSP, nullptr);
++        //        IDSetSwitch(ParkSP.operator->(), nullptr);
+         LOG_INFO("Mount park in progress...");
+ 
+         return true;
+     }
+ 
+     return false;
+ }
+ 
+ bool EQMod::UnPark()
+ {
+@@ -2024,22 +2025,22 @@
+ 
+     // get current mount position asap
+     tmpsyncdata.telescopeRAEncoder  = mount->GetRAEncoder();
+     tmpsyncdata.telescopeDECEncoder = mount->GetDEEncoder();
+ 
+     juliandate = getJulianDate();
+     lst        = getLst(juliandate, getLongitude());
+ 
+     if (TrackState != SCOPE_TRACKING)
+     {
+-        //        EqNP.s = IPS_ALERT;
+-        //        IDSetNumber(&EqNP, nullptr);
++        //        EqNP->s = IPS_ALERT;
++        //        IDSetNumber(EqNP.operator->(), nullptr);
+         LOG_WARN("Syncs are allowed only when Tracking");
+         return false;
+     }
+     /* remember the two last syncs to compute Polar alignment */
+ 
+     tmpsyncdata.lst       = lst;
+     tmpsyncdata.jd        = juliandate;
+     tmpsyncdata.targetRA  = ra;
+     tmpsyncdata.targetDEC = dec;
+ 
+@@ -2471,34 +2472,34 @@
+             }
+             IUUpdateNumber(SlewSpeedsNP, values, names, n);
+             SlewSpeedsNP->s = IPS_OK;
+             IDSetNumber(SlewSpeedsNP, nullptr);
+             LOGF_INFO("Setting Slew rates - RA=%.2fx DE=%.2fx",
+                       IUFindNumber(SlewSpeedsNP, "RASLEW")->value, IUFindNumber(SlewSpeedsNP, "DESLEW")->value);
+             return true;
+         }
+ 
+         // Guider interface
+-        if (!strcmp(name, GuideNSNP.name) || !strcmp(name, GuideWENP.name))
++        if (!strcmp(name, GuideNSNP->name) || !strcmp(name, GuideWENP->name))
+         {
+             // Unless we're in track mode, we don't obey guide commands.
+             if (TrackState != SCOPE_TRACKING)
+             {
+-                GuideNSNP.s = IPS_IDLE;
+-                IDSetNumber(&GuideNSNP, nullptr);
+-                GuideWENP.s = IPS_IDLE;
+-                IDSetNumber(&GuideWENP, nullptr);
++                GuideNSNP->s = IPS_IDLE;
++                IDSetNumber(GuideNSNP.operator->(), nullptr);
++                GuideWENP->s = IPS_IDLE;
++                IDSetNumber(GuideWENP.operator->(), nullptr);
+                 LOG_WARN("Can not guide if not tracking.");
+                 return true;
+             }
+ 
+-            processGuiderProperties(name, values, names, n);
++            processNumber(getDeviceName(), name, values, names, n);
+ 
+             return true;
+         }
+         if (strcmp(name, GuideRateNP->name) == 0)
+         {
+             IUUpdateNumber(GuideRateNP, values, names, n);
+             GuideRateNP->s = IPS_OK;
+             IDSetNumber(GuideRateNP, nullptr);
+             LOGF_INFO("Setting Custom Tracking Rates - RA=%1.1f arcsec/s DE=%1.1f arcsec/s",
+                       IUFindNumber(GuideRateNP, "GUIDE_RATE_WE")->value,
+@@ -3138,33 +3139,33 @@
+ 
+     LOGF_INFO("Setting UTC Time to %s, Offset %g", utc_time, utc_offset);
+ 
+     return true;
+ }
+ 
+ double EQMod::GetRASlew()
+ {
+     ISwitch *sw;
+     double rate = 1.0;
+-    sw          = IUFindOnSwitch(&SlewRateSP);
++    sw          = IUFindOnSwitch(SlewRateSP.operator->());
+     if (!strcmp(sw->name, "SLEWCUSTOM"))
+         rate = IUFindNumber(SlewSpeedsNP, "RASLEW")->value;
+     else
+         rate = *((double *)sw->aux);
+     return rate;
+ }
+ 
+ double EQMod::GetDESlew()
+ {
+     ISwitch *sw;
+     double rate = 1.0;
+-    sw          = IUFindOnSwitch(&SlewRateSP);
++    sw          = IUFindOnSwitch(SlewRateSP.operator->());
+     if (!strcmp(sw->name, "SLEWCUSTOM"))
+         rate = IUFindNumber(SlewSpeedsNP, "DESLEW")->value;
+     else
+         rate = *((double *)sw->aux);
+     return rate;
+ }
+ 
+ bool EQMod::MoveNS(INDI_DIR_NS dir, TelescopeMotionCommand command)
+ {
+     const char *dirStr = (dir == DIRECTION_NORTH) ? "North" : "South";
+@@ -3279,24 +3280,24 @@
+         mount->StopDE();
+     }
+     catch (EQModError e)
+     {
+         if (!(e.DefaultHandleException(this)))
+         {
+             LOG_WARN("Abort: error while stopping DE motor");
+         }
+     }
+ 
+-    GuideNSNP.s = IPS_IDLE;
+-    IDSetNumber(&GuideNSNP, nullptr);
+-    GuideWENP.s = IPS_IDLE;
+-    IDSetNumber(&GuideWENP, nullptr);
++    GuideNSNP->s = IPS_IDLE;
++    IDSetNumber(GuideNSNP.operator->(), nullptr);
++    GuideWENP->s = IPS_IDLE;
++    IDSetNumber(GuideWENP.operator->(), nullptr);
+ #if 0
+     TrackModeSP->s = IPS_IDLE;
+     IUResetSwitch(TrackModeSP);
+     IDSetSwitch(TrackModeSP, nullptr);
+ #endif
+     AutohomeState = AUTO_HOME_IDLE;
+     AutoHomeSP->s = IPS_IDLE;
+     IUResetSwitch(AutoHomeSP);
+     IDSetSwitch(AutoHomeSP, nullptr);
+     TrackState = SCOPE_IDLE;
+@@ -3675,29 +3676,29 @@
+ 
+     return true;
+ }
+ 
+ bool EQMod::SetTrackEnabled(bool enabled)
+ {
+     try
+     {
+         if (enabled)
+         {
+-            LOGF_INFO("Start Tracking (%s).", IUFindOnSwitch(&TrackModeSP)->label);
++            LOGF_INFO("Start Tracking (%s).", IUFindOnSwitch(TrackModeSP.operator->())->label);
+             TrackState     = SCOPE_TRACKING;
+             RememberTrackState = TrackState;
+             mount->StartRATracking(GetRATrackRate());
+             mount->StartDETracking(GetDETrackRate());
+         }
+         else if (enabled == false)
+         {
+-            LOGF_WARN("Stopping Tracking (%s).", IUFindOnSwitch(&TrackModeSP)->label);
++            LOGF_WARN("Stopping Tracking (%s).", IUFindOnSwitch(TrackModeSP.operator->())->label);
+             TrackState     = SCOPE_IDLE;
+             RememberTrackState = TrackState;
+             mount->StopRA();
+             mount->StopDE();
+         }
+     }
+     catch (EQModError e)
+     {
+         return (e.DefaultHandleException(this));
+     }
