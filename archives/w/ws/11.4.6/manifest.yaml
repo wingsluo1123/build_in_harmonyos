@@ -1,0 +1,109 @@
+# 版本级 manifest
+# 文件位置: archives/w/ws/11.4.6/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "11.4.6"
+
+# 软件名
+software: "ws"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-13"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（上游官方 tag）
+  url: "https://github.com/machinezone/IXWebSocket/archive/refs/tags/v11.4.6.tar.gz"
+
+  # 源码校验和
+  sha256: "c024334f8e45980836c67008979a884d6dcc5ef067dd2eb1fa7241f4c17ddc32"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表
+  configure_options:
+    - "-DUSE_TLS=ON"
+    - "-DUSE_ZLIB=ON"
+    - "-DUSE_WS=ON"
+    - "-DUSE_TEST=OFF"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - zlib/1.3.1
+    - openssl/3.5.8.1
+    - spdlog/1.11.0
+    - fmt/8.1.1
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-CMakeLists.txt.patch"
+  - "0002-test-CMakeLists.txt.patch"
+  - "0003-ws-CMakeLists.txt.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "conan skip_shared_packages：shared 包（spdlog）的传递依赖（fmt）cpp_info 被清空，fmt 必须声明为直接依赖 (ref: E429-draft)"
+  - "上游 FindOpenSSL/FindZLIB 模块变量在 conan CMakeDeps 下为空，需按 imported target（openssl::openssl/zlib::zlib）分支处理；公共头引用 <openssl/*.h> 时补 BUILD_INTERFACE include 传播 (ref: E430-draft)"
+  - "鸿蒙 XPM 要求打包的 ELF 可执行/动态库代码签名：package() 里 llvm-objcopy 清 .codesign 后 binary-sign-tool -selfSign 重签 (ref: E431-draft)"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/ws-11.4.6.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/ws-11.4.6.work
+  source_orig_hash: 077442e766d9b307
+  source_work_hash: 632efd698e6d40f4
+  generated_at: '2026-10-13T17:54:39'
+  patches_count: 3
+
+patch_classification:
+  - file: 0001-CMakeLists.txt.patch
+    type: portability
+    platform_only: False
+    guard: none
+    note: "cmake_minimum_required 3.4.1->3.5；spdlog FetchContent->find_package(+fmt)；OpenSSL/zlib conan imported target 分支 + BUILD_INTERFACE 头传播。纯构建系统与依赖接线，无平台宏（R8 合规）"
+  - file: 0002-test-CMakeLists.txt.patch
+    type: portability
+    platform_only: False
+    guard: none
+    note: "测试目标链接 conan spdlog::spdlog/fmt::fmt"
+  - file: 0003-ws-CMakeLists.txt.patch
+    type: portability
+    platform_only: False
+    guard: none
+    note: "ws CLI 链接 conan spdlog::spdlog/fmt::fmt"

@@ -1,0 +1,44 @@
+--- a/test/CMakeLists.txt
++++ b/test/CMakeLists.txt
+@@ -60,21 +60,21 @@
+     test_runner.cpp
+     IXTest.cpp
+     ../third_party/msgpack11/msgpack11.cpp
+ )
+ target_compile_definitions(ixwebsocket_test PRIVATE ${TEST_PROGRAMS_DEFINITIONS})
+ target_include_directories(ixwebsocket_test PRIVATE
+   ${PROJECT_SOURCE_DIR}/Catch2/single_include
+   ../third_party
+ )
+ target_link_libraries(ixwebsocket_test ixwebsocket)
+-target_link_libraries(ixwebsocket_test spdlog)
++target_link_libraries(ixwebsocket_test spdlog::spdlog fmt::fmt)
+ 
+ foreach(TEST_TARGET_NAME ${TEST_TARGET_NAMES})
+   add_executable(${TEST_TARGET_NAME}
+     ${TEST_TARGET_NAME}.cpp
+   )
+ 
+   target_include_directories(${TEST_TARGET_NAME} PRIVATE
+     ${PROJECT_SOURCE_DIR}/Catch2/single_include
+     ../third_party
+     ../third_party/msgpack11
+@@ -83,17 +83,17 @@
+   target_compile_definitions(${TEST_TARGET_NAME} PRIVATE SPDLOG_COMPILED_LIB=1)
+ 
+   if (APPLE AND USE_TLS)
+     target_link_libraries(${TEST_TARGET_NAME} "-framework foundation" "-framework security")
+   endif()
+ 
+   # library with the most dependencies come first
+   target_link_libraries(${TEST_TARGET_NAME} ixwebsocket_test)
+   target_link_libraries(${TEST_TARGET_NAME} ixwebsocket)
+ 
+-  target_link_libraries(${TEST_TARGET_NAME} spdlog)
++  target_link_libraries(${TEST_TARGET_NAME} spdlog::spdlog fmt::fmt)
+ 
+   add_test(NAME ${TEST_TARGET_NAME}
+            COMMAND ${TEST_TARGET_NAME}
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+ 
+ endforeach()

@@ -1,0 +1,64 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# 上游测试清点方式：cmake -DUSE_TEST=ON 配置后 `ctest -N`
+# 上游测试完整运行结果见 archives/w/ws/11.4.6/notes.md 的 R51 申报表
+# （上游 test/ 目录含 TEST_CASE 文件全量 23 个；其中 16 项注册为 ctest
+#   目标，本机真机运行 14 过 2 败——唯一失败项 IXSocketTest 与
+#   IXHttpServerTest 部分用例依赖 google.com 外网连接，构建环境网络不可达）。
+
+package: ws/11.4.6
+homepage: "https://github.com/machinezone/IXWebSocket"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "ctest -N"
+
+# 清点说明：上游 test/ 目录含 TEST_CASE 的测试文件全量 23 个。注册面：
+# `test/CMakeLists.txt` 基础 13 项 + `if (UNIX)` 门控 2 项
+# （IXHttpServerTest/IXWebSocketChatTest）+ `if (USE_ZLIB)` 门控 1 项
+# （IXWebSocketPerMessageDeflateCompressorTest）= 16 项。探索构建为原生
+# 手工环境（未设 CMAKE_SYSTEM_NAME，CMake 视 HarmonyOS 为未知平台 →
+# UNIX 空），后 2 项默认不注册故 ctest -N 为 14；已用 -DUNIX=1 补测
+# （详见 notes.md R51 补测表：IXWebSocketChatTest 通过，IXHttpServerTest
+# 唯一失败用例重定向到 google.com 外网不可达）。打包构建工具链下
+# CMAKE_SYSTEM_NAME=OHOS（Platform/OHOS.cmake → set(UNIX 1)）注册全部
+# 16 项——与上游 Linux/macOS 注册集完全一致。其余 7 项为上游自身禁用、
+# 任何平台均不注册，与本适配无关：5 项 CMake 注释禁用
+# （Ping/PingTimeout/Leak/HttpClient/Broadcast）+ 2 项完全未接线
+# （SentryClient/StreamSql）。
+
+# conanfile.py build() 方法中是否已集成上游测试
+# 上游测试（Catch2 套件）不进包构建：W3 conan create 只构建库+CLI，
+# 上游测试在适配阶段于真机运行并记录（notes.md R51 表）。
+upstream_test_in_build: false
+upstream_test_command: "cmake -DUSE_TEST=ON .. && cmake --build . --target IXUrlParserTest && ./test/IXUrlParserTest"
+
+# 上游实际运行的测试程序（节选代表项，注册 16 项全表见 notes.md R51 表）
+upstream_tests:
+  - file: test/IXUrlParserTest.cpp
+    source: ws-11.4.6/test/IXUrlParserTest.cpp
+    description: "URL 解析单元测试（上游 Catch2 套件代表项）"
+    command: "./test/IXUrlParserTest"
+  - file: test/IXWebSocketServerTest.cpp
+    source: ws-11.4.6/test/IXWebSocketServerTest.cpp
+    description: "WebSocket 服务器客户端回环测试（真机通过，5.0s）"
+    command: "./test/IXWebSocketServerTest"
+  - file: test/IXWebSocketPerMessageDeflateCompressorTest.cpp
+    source: ws-11.4.6/test/IXWebSocketPerMessageDeflateCompressorTest.cpp
+    description: "permessage-deflate 压缩测试（真机通过）"
+    command: "./test/IXWebSocketPerMessageDeflateCompressorTest"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_ws.cpp
+    description: "消费者功能测试：启动 127.0.0.1 echo 服务器 + 客户端连接，发送文本消息并校验回环载荷一致（R34 实质 API 测试）"
+    command: "./test_ws"
+  - file: bin/ws
+    description: "打包产物 CLI 冒烟：ws --version 输出 ixwebsocket/11.4.6 + OpenSSL/zlib 后端"
+    command: "ws --version"
+
+# 测试断言总数 (近似值, 用于质量评估)
+# test_ws: 连接/收到回声/载荷一致 3 处 + 上游套件断言约 40+（Catch2）
+assertion_count: 3

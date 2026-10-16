@@ -1,0 +1,63 @@
+#====================================================================
+# E429 — conan skip_shared_packages: shared 包的传递依赖 cpp_info 为空
+# 场景: ws 11.4.6 (IXWebSocket) 适配 — fmt 经 shared spdlog 传递为空
+#====================================================================
+
+id:                     E429
+trigger_tool:           conan|cmake
+phase:                  configuration|linking
+error_signature:       Could not find a package configuration file provided by "fmt"|'fmt/core.h' file not found|fmt_INCLUDE_DIRS_RELEASE|Undefined symbols.*fmt::
+
+# ═══ Layer 1: 识别层 ═══
+severity:               2
+category:               build-system, conan, cmake, ohos
+match_keywords:         skip_shared_packages, cpp_info, shared package, transitive dependency, fmt, spdlog, CMakeDeps, find_package
+title:                  conan skip_shared_packages 之下，shared 包（如 spdlog）的传递依赖（如 fmt）cpp_info 为空，需声明为直接依赖
+
+# ═══ Layer 2: 诊断层 ═══
+root_cause:             本制品仓 CI profile 启用 skip_shared_packages：当依赖图中存在 shared 包（spdlog/1.11.0 为 shared）时，conan 跳过其传递依赖的 cpp_info 聚合，于是 fmt/8.1.1 虽在依赖图中且已安装，但 CMakeDeps 拿到的 fmt 配置为空（fmt_INCLUDE_DIRS_RELEASE/fmt_LIBS_RELEASE 空），编译期报 'fmt/core.h' file not found、链接期报 Undefined symbols: fmt::。
+affected_scope:         所有依赖"shared 包 + 其外部传递依赖"的配方（典型：spdlog→fmt；Qt→其运行时插件依赖）。
+verification_cmd:       conan graph info --requires=ws/11.4.6@ohpcd/stable -pr:h ci/conan/profiles/ohos-aarch64 | grep -A2 fmt
+
+# ═══ Layer 3: 方案层 ★ ═══
+rec_priority:           1
+rec_approach:           declare-direct-requirement
+rec_description:        把传递依赖提升为配方直接 requires（self.requires("fmt/8.1.1")），其 cpp_info 即完整生成；并在上游 CMake 用 find_package(fmt CONFIG REQUIRED) + target_link_libraries(... fmt::fmt) 显式消费。
+rec_command:            self.requires("fmt/8.1.1")  # + patch: find_package(fmt CONFIG REQUIRED); target_link_libraries(ws spdlog::spdlog fmt::fmt)
+rec_auto_fix:           false
+
+fallback_priority:      2
+fallback_approach:      consumer-side-paths
+fallback_description:   无法改配方时消费者手动聚合 fmt include/lib 路径（脆弱，不推荐）。
+fallback_auto_fix:      false
+
+forbid_1_pattern:        FetchContent_Declare\(fmt|FetchContent_MakeAvailable\(fmt
+forbid_1_reason:         用 FetchContent 内嵌源码绕过包管理会破坏离线构建与依赖锁定（上游 spdlog 正是 FetchContent 引入，本条目即其替代）。
+forbid_1_consequence:    CI 无外网或镜像缺失时构建失败，且产物与制品仓依赖树不一致。
+
+# ═══ Layer 4: 原则引用 ═══
+principles:
+
+# ═══ 关系图 ═══
+causes:                 []
+caused_by:              []
+similar_to:             [E298]
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file:               doc/E429.md
+last_updated:           2026-10-13
+source_event:           ws 11.4.6 (IXWebSocket) 适配：spdlog 由 FetchContent 改 find_package 后，ws CLI 与 14 个测试目标编译报 'fmt/core.h' file not found；最小化验证（临时测试配方）确认直接 require fmt 后 cpp_info 完整、传递 require 为空
+
+authors:
+source_pr:
+source_commit:
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-13
+
+draft: true
+contributor_id: 6A11
