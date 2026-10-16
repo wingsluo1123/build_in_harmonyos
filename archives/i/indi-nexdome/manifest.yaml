@@ -1,0 +1,37 @@
+# 软件级 manifest — indi-nexdome
+# 遵循 ARCHIVE-SPEC v2.0
+
+software: indi-nexdome
+display: "indi-nexdome"
+description: "NexDome 个人天文台圆顶的 INDI 驱动（驱动进程由 indiserver 拉起的 INDI 设备服务器）"
+category: astronomy
+homepage: "https://indilib.org"
+license: LGPL-2.0-or-later
+build_system: cmake
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "indi-nexdome 是 indi-3rdparty monorepo 内的单个 INDI 驱动；产物是可执行文件 indi_nexdome（由 indiserver 拉起）+ 设备描述文件 indi_nexdome.xml"
+    - "INDI API 迁移：源码写于 INDI 1.9.x 时代，libindi 2.x 移除了 DomeParamN/DomeAbsPosN/DomeShutterS/ShutterParkPolicyS 等数组式旧名，须改用 INDI::Property API（isNameMatch/update/setState/apply/getValue）"
+    - "libindi 2.x 头文件使用 std::any，编译标准须为 C++17（CMakeCommon.cmake 原固定 C++14）"
+    - "老式 FindINDI.cmake 版本探针需兼容当前 libindi 带引号的 #define INDI_VERSION \"x.y.z\""
+    - "OHOS 无法加载 libindi 的共享对象（libindidriver.so.2 / libindiAlignmentDriver.so.2），须静态链接 INDI 归档；静态链接时驱动目标必须排在 INDI 静态库之后，否则全局设备对象的 .init_array 先于 INDI 静态初始化运行会段错误"
+    - "CMake install 改写 RPATH 会破坏 OHOS ELF 的 .codesign，需禁用 build/install RPATH，运行时依赖经 LD_LIBRARY_PATH 解析"
+  common_dependencies:
+    - libindi
+    - libnova
+    - zlib
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "1.5+20221222183051":
+    status: published
+    build_date: "2026-10-13"
+    source_url: "https://deb.debian.org/debian/pool/main/i/indi-nexdome/indi-nexdome_1.5+20221222183051.orig.tar.gz"

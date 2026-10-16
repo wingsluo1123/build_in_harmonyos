@@ -1,0 +1,31 @@
+#====================================================================
+# Draft: 静态链接带静态初始化器的依赖库时，可执行文件自身目标文件的 .init_array
+#        先于依赖库执行 —— 全局对象在依赖库静态初始化完成前构造 → 启动即 SIGSEGV
+#====================================================================
+
+draft: DRAFT-indi-nexdome-1.5-static-indi-link-order-init-array-segv
+status: pending-editor-review
+id: DRAFT-indi-nexdome-1.5-static-init-order
+doc_file: DRAFT-indi-nexdome-1.5-static-indi-link-order-init-array-segv.md
+title: 静态链接一个自身带静态初始化器的库时，可执行文件自己的目标文件总排在静态库之前，其 .init_array 先运行，使程序里依赖该库静态初始化的全局对象在库初始化完成前构造而启动即 SIGSEGV（exit 139、无任何输出）；把程序源码编成 STATIC 库并用 --whole-archive 放在依赖库之后链接即可修复
+category: linking, cmake, conan, static-library, init_array, runtime, sigsegv
+match_keywords: SIGSEGV, Signal 11, exit 139, core dumped, 启动即崩溃, no output, .init_array, constructor, static initializer, 静态初始化, 链接顺序, link order, --whole-archive, static archive, 静态链接, global object, 全局对象, INDI::Dome, DefaultDevice, framework singleton before init, shared object unloadable forced static
+error_signature: 启动即 SIGSEGV / exit 139，程序无任何输出；gdb 无法 attach(ptrace) 时仍可用「删去全局对象即正常、加回即崩」二分定位；\.init_array 在可执行文件目标文件与依赖静态库中均非空
+root_cause: 链接器按输入文件顺序把各目标文件的 .init_array 拼接进最终映像。可执行文件自身的目标文件（如 nex_dome.cpp.o）永远排在它所链接的静态库（如 libindidriver.a）之前，于是程序里依赖框架静态初始化的全局对象（框架 defaultdevice.cpp.o / indilogger.cpp.o / sharedblob_parse.cpp.o 等带 .init_array）会在框架自己的初始化器之前被构造，读到尚未初始化的全局状态而崩溃。共享库场景不触发（加载器先跑共享库初始化），仅「可执行文件自身含全局对象 + 依赖库带静态初始化器 + 静态链接」三者同时成立才触发。最小复现：派生类构造体首行打点未执行，崩溃发生在基类构造器（成员初始化阶段）。
+affected_scope: 任何「可执行文件自身含全局对象 + 静态链接带静态初始化器的库」的场景；在本平台等价于「消费者因框架共享库无法 dlopen 被迫静态链接」（INDI/libindi 即一例）。与 E457（静态/共享混用导致运行时重复拷贝）、E444（GObject .init_array 显式 init 入口）相关但不同：本条目是链接器拼接顺序，而非重复初始化或缺失初始化。
+verification_cmd: 最小复现：clang++ -o t6.o -c t6.cpp；clang++ -o t6 -Wl,--start-group <libs> -Wl,--end-group t6.o  → SIGSEGV(139)；clang++ -o t6b -Wl,--start-group <libs> -Wl,--end-group t6.o 换序后正常。正式驱动：conan create（修复前 exit 139 无输出；修复后 RC=0，test.sh 7/7 + test_ohos.sh 12/12）
+rec_priority: 1
+rec_approach: own-source-as-archive-linked-after-dependency-with-whole-archive
+rec_description: 把可执行文件自身的源码编成一个 STATIC 库；链接时用 -Wl,--whole-archive <own-lib> -Wl,--no-whole-archive 把它放在依赖框架静态库之后（可放进同一个 --start-group/--end-group）。这样框架的 .init_array 先执行，程序的全局对象在框架初始化完成后才构造。CMake 中用一个 file(WRITE ...) 生成的空 stub 源文件作为 add_executable 的源，避免 CMake 拒绝无源目标。
+rec_command: add_library(indi_nexdome_driver STATIC ${indi_nexdome_SRCS}); file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/stub.c "/* empty */"); add_executable(indi_nexdome ${CMAKE_CURRENT_BINARY_DIR}/stub.c); target_link_libraries(indi_nexdome -Wl,--start-group ${INDI_LIBRARIES} ${INDI_NEXDOME_DEPS} -Wl,--end-group -Wl,--whole-archive indi_nexdome_driver -Wl,--no-whole-archive)
+rec_auto_fix: false
+rec_impl: CMakeLists.txt 目标结构改造（源码→STATIC 库 + whole-archive 后置）
+fallback_priority: 2
+fallback_approach: lazy-initialize-global-object
+fallback_description: 若框架要求全局对象在静态初始化期注册（如设置 mainDevice 之类全局），无法延迟构造时，次选是把全局对象改为函数内静态、由框架初始化后的入口显式触发；但多数框架不提供该回调，故 primary 方案更通用。
+fallback_command: static X& instance() { static X x; return x; }  // 需框架提供"初始化完成后"回调
+fallback_auto_fix: false
+forbid_1_pattern: 给全局对象加 __attribute__((constructor(65535))) 试图调顺序
+forbid_1_reason: 默认优先级已是 65535，同优先级仍按链接顺序，无法改变结果
+forbid_2_pattern: 把该崩溃当 codesign 失效处理（去 .codesign / 改权限）
+forbid_2_reason: codesign 失效表现为 Operation not permitted，与本条目的干净 SIGSEGV 不同

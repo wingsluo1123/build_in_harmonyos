@@ -1,0 +1,52 @@
+# test_package/MANIFEST.yml — indi-nexdome 1.5+20221222183051
+# CI L0e 要求此文件存在；R51 上游测试三步法：清点 -> 运行 -> 如实回填
+
+package: indi-nexdome/1.5+20221222183051
+homepage: "https://github.com/indilib/indi-3rdparty"
+
+# ── 上游测试清点结论（R51 第一步）─────────────────────────────
+# indi-nexdome 是 indi-3rdparty monorepo 里的单个驱动子项目，源码树内
+# 不存在任何测试目录或测试注册：
+#   * 顶层只有 CMakeLists.txt / ChangeLog / TODO / config.h.cmake /
+#     indi-nexdome.spec / indi_nexdome.xml.cmake / nex_dome.{cpp,h} /
+#     nex_dome_constants.h / cmake_modules/；
+#   * find -iname '*test*' 命中 0 个路径；
+#   * CMakeLists.txt 未注册任何 add_test / enable_testing，无 ctest；
+#   * ChangeLog 仅有 "[1.0.0] - 2017-09-12 Initial Release"。
+# 上游真实可执行的入口 = 驱动进程本身：`indi_nexdome -h` 打印 INDI 框架用法，
+# 以及以 INDI XML 协议（indiserver 与驱动之间的 stdin/stdout 报文）进行设备
+# 属性握手/连接。本适配在 test.sh / test_ohos.sh 中真实驱动了该入口。
+upstream_check_command: "find . -iname '*test*' （0 命中）；CMakeLists.txt 无 add_test/enable_testing"
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游源码包内不存在任何测试程序
+upstream_tests: []
+
+# ── test_package 自带测试（消费者视角，全部真实执行包内二进制）──
+test_package_tests:
+  - file: test.sh
+    description: "功能测试（7 条断言）：-h 用法退出码、无参数用法、未知选项回退用法、<getProperties/> INDI 协议握手声明 NexDome 设备、DRIVER_INFO= NexDome/indi_nexdome/1.6、CONNECTION 向量含 CONNECT/DISCONNECT、CONNECT 请求被应答为 CONNECTION state=Alert（无硬件）"
+    command: "bash test.sh <pkg>/bin/indi_nexdome"
+    assertions: 7
+  - file: test_ohos.sh
+    description: "鸿蒙特有测试（12 条断言）：平台身份 HarmonyOS/aarch64、ELF64/LP64、AArch64、PIE、musl 解释器 /lib/ld-musl-aarch64.so.1、无 glibc 专有 NEEDED、INDI 框架改为静态链接（NEEDED 中无 libindi*.so，本平台无法加载其共享库）、INDI 框架代码确实内嵌（driver main + ISGetProperties）、.note.ohos.ident 段、share/indi/indi_nexdome.xml 设备描述文件、在 OHOS 设备上真实运行并应答 INDI getProperties"
+    command: "bash test_ohos.sh <pkg>"
+    assertions: 12
+
+# 测试断言总数 = 功能 7 + 鸿蒙特有 12
+assertion_count: 19
+
+# 其中鸿蒙平台特有测试用例数
+ohos_specific_assertions: 12
+
+# 补充说明（R51 第三步：如实回填，不冒充上游覆盖）
+notes: >
+  上游 indi-nexdome 不含任何自动化测试，故"上游测试统计"为 0/0；
+  test_package 的 7 条功能断言与 12 条鸿蒙特有断言均为本适配新增，不冒充上游
+  覆盖。驱动的 NexDome 硬件交互（USB/串口控制器）无法在 CI 构造，但驱动的
+  进程入口、INDI 协议握手、设备身份与属性向量定义在本平台被真实执行验证。
+  适配的核心技术点（把驱动从 INDI 1.x 数组式属性 API 迁移到 INDI 2.x
+  INDI::Property API；以及在本平台无法加载 libindi 共享库、且静态链接 INDI
+  时必须把驱动目标排在 INDI 静态库之后以修正 .init_array 顺序）均记录于
+  归档 notes.md。

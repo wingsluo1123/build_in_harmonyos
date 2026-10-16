@@ -1,0 +1,66 @@
+# 版本级 manifest — indi-nexdome 1.5+20221222183051
+# 上游: indilib/indi-3rdparty 的 indi-nexdome 子项目（快照 = Debian 源包
+#       indi-nexdome 1.5+20221222183051，其 pristine upstream tarball 即该快照）
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "1.5+20221222183051"
+software: indi-nexdome
+status: published
+build_date: "2026-10-13"
+build_system: cmake
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/i/indi-nexdome/indi-nexdome_1.5+20221222183051.orig.tar.gz"
+  sha256: "85bf08929fb031a4ed58439b95c85b24ac2fe159973b9bc59ca9207208d78e37"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_SYSTEM_NAME=Linux"
+    - "-DCMAKE_SYSTEM_PROCESSOR=aarch64"
+    - "-DINDI_DATA_DIR=share/indi"
+  dependencies:
+    - libindi/2.2.2.1
+    - libnova/0.16
+    - zlib/1.3.1.1
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+# 生成后回填
+
+knowledge_gained:
+  - "INDI 3rdparty 驱动从 INDI 1.x 的数组式属性 API 迁移到 INDI 2.x 的 INDI::Property 对象 API：DomeParamNP/DomeAbsPosNP/DomeShutterSP/ShutterParkPolicySP 的 old 名称（DomeParamN/DomeAbsPosN/DomeShutterS/ShutterParkPolicyS）在 libindi 2.x 已被移除"
+  - "libindi 2.x 头文件使用 std::any，驱动必须按 C++17 编译（旧的 CMakeCommon.cmake 固定 C++14 会编译失败）"
+  - "老式 FindINDI.cmake 的版本探针只认无引号的 INDI_VERSION x.y.z，读不懂当前 libindi 带引号的 #define INDI_VERSION \"x.y.z\""
+  - "OHOS 上 libindi 的共享对象（libindidriver.so.2 / libindiAlignmentDriver.so.2）无法被加载，消费者必须静态链接 INDI 归档"
+  - "静态链接 INDI 时驱动目标必须排在 INDI 静态库之后：链接器按链接顺序生成 .init_array，驱动全局设备对象若先于 INDI 自身的静态初始化运行会段错误（命令行 --whole-archive 后置驱动归档可修复）"
+  - "CMake install 步骤改写 RPATH 会使 OHOS 的 ELF .codesign 失效，执行时报误导性的 Operation not permitted，需同时设置 CMAKE_SKIP_BUILD_RPATH/CMAKE_SKIP_INSTALL_RPATH"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/indi-nexdome-1.5+20221222183051.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/indi-nexdome-1.5+20221222183051.work
+  source_orig_hash: 33fb96d734f71d7f
+  source_work_hash: 1a6323bff67c9173
+  generated_at: '2026-10-13T15:51:32'
+  patches_count: 4
+
+patch_classification:
+  - file: 0001-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-cmake_modules-CMakeCommon.cmake.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-cmake_modules-FindINDI.cmake.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-nex_dome.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
