@@ -1,0 +1,31 @@
+software: kwidgetsaddons
+version: "6.28.0"
+status: built
+build_system: cmake
+created_at: 2026-10-16
+build_date: "2026-10-16"
+dependencies:
+  required:
+    - qtbase/6.11.1
+  build:
+    - ecm/6.28.0
+  optional:
+    - qttools
+    - shiboken6
+    - pyside6
+patches_applied:
+  - patches/0001-CMakeLists.txt.patch
+test_results:
+  type: passed_with_exclusions
+  upstream: "passed: 24/24 executed upstream CTest autotests; excluded ktooltipwidgettest and kwidgetsaddons-kcolumnresizertest for OHOS headless/offscreen limits (6.18.0 precedent)"
+  test_package: "passed: KPageWidgetModel consumer compile/link/runtime smoke (1/1)"
+  full_reference: "kwidgetsaddons/6.28.0#e6c46cfaee1b80d95e5b65f255048e14:57ffd8c720a5bfee7e8827990cd6550a49181c1b"
+source_url: https://download.kde.org/stable/frameworks/6.28/kwidgetsaddons-6.28.0.tar.xz
+source_sha256: 6bb6a22e40bc8cfaeda08276b771488294ad417e7802b27bdc455202afdabd7d
+knowledge_gained:
+  - "kwidgetsaddons 6.28.0 raises the ECM minimum to 6.28.0 (find_package(ECM 6.28.0 NO_MODULE)); ohpcd publishes ecm/6.28.0 since 2026-10-14, so the build dependency moves to ecm/6.28.0 directly with no lowering patch (cf. kquickcharts 6.28.0, which patched the ECM requirement down to 6.26.0 while ecm 6.28 was still absent from the registry)."
+  - "The 6.26.0 -> 6.28.0 CMakeLists.txt delta is exactly two lines (KF_VERSION and the ECM minimum); the po/qm patch (0001) applies with zero context refresh (patch_ng strip=0, 1 file / 1 hunk)."
+  - "src/CMakeLists.txt 6.28 moves kmimetypeeditor.cpp/.h behind if(NOT IOS) and adds 6.0 to ecm_setup_version DEPRECATION_VERSIONS; both are no-ops for OHOS (IOS is false, ECM 6.28 handles the extended version list)."
+  - "BUILD_PYTHON_BINDINGS still defaults to ON in 6.28.0 (auto-off only for ANDROID/APPLE/WIN32/HAIKU or static builds); the OHOS recipe keeps passing BUILD_PYTHON_BINDINGS=OFF to avoid Shiboken6/PySide6 discovery."
+  - "autotests/CMakeLists.txt is byte-identical between 6.26.0 and 6.28.0: 26 CTest entries with the same two OHOS headless exclusions (ktooltipwidgettest offscreen hang, kwidgetsaddons-kcolumnresizertest offscreen geometry)."
+  - "First device build of 6.28.0 failed at the link step with 'CMake Error: failed to create symbolic link libKF6WidgetsAddons.so.6: Permission denied': the HMDFS user volume rejects symlink() with EPERM, so CMake's versioned .so chain cannot be created on device. Fixed with CMAKE_PLATFORM_NO_VERSIONED_SONAME=ON (toolchain + cache variables, plus the explicit -soname flags) so the library is emitted under its plain name with a real DT_SONAME (DRAFT-cmake-harmonyos-system-name-soname; kcolorpicker/expat precedent); ctest runtime resolution relies on the recipe's explicit LD_LIBRARY_PATH injection."
