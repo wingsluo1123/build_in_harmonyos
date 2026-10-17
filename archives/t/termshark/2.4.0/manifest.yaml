@@ -1,0 +1,55 @@
+software: termshark
+version: "2.4.0"
+status: built
+build_date: "2026-10-12"
+build_system: go
+package_type: application
+source:
+  url: "https://github.com/gcla/termshark/archive/refs/tags/v2.4.0.tar.gz"
+  sha256: "949c71866fcd2f9ed71a754ea9e3d1bdc23dee85969dcdc78180f1d18ca8b087"
+  tar_format: tar.gz
+build:
+  system: go
+  go_module: github.com/gcla/termshark/v2
+  go_version_required: "1.13"
+  go_toolchain_bootstrap: "go1.26.0 linux-arm64 (sha256 bd03b743eb6eb4193ea3c3fd3956546bf0e3ca5b7076c8226334afe6b75704cd)"
+  build_command: "go build -trimpath -o <out>/termshark ./cmd/termshark"
+  env:
+    CGO_ENABLED: "0"      # 纯静态编译（tshark 依赖以其共享库形式由 tshark 包提供，本二进制自身静态）
+    GOOS: linux
+    GOARCH: arm64
+    GOTOOLCHAIN: local
+  dependencies:
+    required:
+      - tshark/4.6.7       # 运行期命令依赖（termshark exec tshark 做协议解析）— via ohpcd
+notes: >
+  Go CLI（tshark 的终端 UI）。OHOS 适配沿用已发布的 termsvg/0.11.0 /
+  termshot/0.6.1 Go 模式：自举 go1.26.0 并用 binary-sign-tool 为 SDK 全部
+  ELF 签名（未签名 ELF 在 OHOS 上 exec 报 Permission denied）；链接输出放非
+  hmdfs 工作区规避 E051；go test 的 *.test 二进制由 -exec wrapper 签名。
+  依赖的 ~35 个较老 Go 模块经 GOPROXY 解析，实测全部可用。
+  运行期依赖 tshark/4.6.7（ohpcd 已发布，application 型，暴露 bindirs/libdirs），
+  以 self.requires 声明后 Conan 自动为消费者注入 PATH 与 LD_LIBRARY_PATH
+  （实测：conanrun 环境下 tshark --version 输出真实 TShark 4.6.7 banner）。
+  重要经验：向测试进程导入整个 conanrun 的 LD_LIBRARY_PATH 会毒化无关进程
+  （libpython3.12.so 报 libintl_gettext: symbol not found），故 test_package
+  改为把 tshark 的 bin/lib 以普通变量导出，仅在构造子进程环境时注入。
+  真机实测：go test ./... 12 包 ok / 1 包失败（TestCF1，上游对新版 tshark
+  陈旧，详见 notes.md）；消费者测试 6 项断言全 PASS（含 tshark 真解 pcap）。
+
+commands: commands.json
+commands_note: "R38：产物含可执行文件 bin/termshark，已声明 hicmd 格式 commands.json（含 runtime_deps 说明）"
+
+platform_notes:
+  - "R26 不适用：Go 纯静态二进制，不链接任何系统库，无同名库污染风险"
+  - "R32：settings.os 判 `in (Linux, OHOS)`"
+  - "R33：编译器走 Go 工具链而非 CC/CFLAGS shell 变量"
+  - "R34：test_package 驱动真实二进制（--help/--version/tshark 解真实 pcap）"
+  - "R38：commands.json 已声明"
+  - "R36：tshark/4.6.7 已发布（conan download 验证通过）"
+
+knowledge_refs:
+  - "Go 工具链自举 + ELF 签名（addchain/0.4.0 先例）"
+  - "runenv LD_LIBRARY_PATH 毒化无关进程：只向子进程注入隔离环境"
+  - "共享库型命令依赖：需注入完整 lib 闭包（glib/libgcrypt/libxml2/zstd/brotli）"
+  - "上游用例对新版外部工具陈旧：如实记录 12 ok/1 fail，不伪造"
