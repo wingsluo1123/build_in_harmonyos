@@ -1,0 +1,24 @@
+# 软件级 manifest — installation-report
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: installation-report
+display: "Debian installation-report"
+description: "Debian 安装报告工具集（report-hw / usb-list / httpd / bug 报告助手 / save-logs 钩子），纯 POSIX shell 脚本包"
+category: application
+homepage: "https://salsa.debian.org/installer-team/installation-report"
+license: GPL-2.0-or-later
+build_system: none
+
+ohos_adaptation:
+  key_points:
+    - "Debian native 包（无独立上游仓库）：源码 = 顶层脚本 + debian/；构建入口只有 debian/rules（dh 系）→ 不跑 dh，按 debian/*.install + *.manpages + *.links 的映射直接安装（与同族 init-system-helpers 同做法）"
+    - "无 Conan requires：Build-Depends 仅 debhelper-compat、Depends 仅 ${misc:Depends}；脚本只用 /bin/sh，lspci/lsusb/dmidecode 是脚本内可选调用（report-hw 自降级）"
+    - "产物分散：bin/（report-hw、httpd、usb-list）、lib/pre-pkgsel.d 与 lib/finish-install.d（安装器钩子）、share/installation-report 与 share/save-logs（同一 debconf 模板文件两处引用）、share/bug/（bug 报告脚本）、share/man/man1、share/doc"
+    - "上游无测试（无 Makefile/t/debian/tests）→ 通过率记 N/A；build() 做 sh -n 语法检查，验证主要由 test_package 承担"
+  common_dependencies: []
+
+versions:
+  "2.98":
+    status: built
+    build_date: "2026-10-08"
+    conan_ref: "installation-report/2.98"
