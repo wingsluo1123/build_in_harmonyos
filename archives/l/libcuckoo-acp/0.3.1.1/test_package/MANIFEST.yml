@@ -1,0 +1,66 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: libcuckoo-acp/0.3.1.1
+homepage: "https://github.com/efficient/libcuckoo"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "ctest"
+
+# conanfile.py build() 方法中是否已集成上游测试
+# 是：build() 通过 cmake.test() 运行 ctest，执行 unit_tests + stress_checked + stress_unchecked
+upstream_test_in_build: true
+upstream_test_command: "ctest"
+
+# 上游实际运行的测试程序
+# libcuckoo v0.3.1 bundles Catch v1.5.9 (NOT v3). OHOS libc++ enforces the
+# C++11 URBG requirement (unsigned result_type) which Catch v1.5.9's
+# RandomNumberGenerator violates -> fixed by patches/0002-catch-urng-result-type.patch.
+# test_c_interface read/write used tmpfile() which fails on OHOS read-only /tmp
+# -> fixed by patches/0003-c-interface-tmpfile-ohos.patch.
+# After both portability patches, ALL 80 unit TEST_CASEs pass and both stress
+# tests pass with upstream default parameters on HarmonyOS PC arm64.
+upstream_tests:
+  - file: tests/unit-tests/unit_tests
+    source: libcuckoo-0.3.1/tests/unit-tests/
+    description: "Catch v1.5.9 based unit tests (80 TEST_CASEs, all pass after patches 0002/0003)"
+    command: "./unit_tests"
+  - file: tests/stress-tests/stress_checked
+    source: libcuckoo-0.3.1/tests/stress-tests/stress_checked.cc
+    description: "Stress test (checked) for concurrent operations, upstream default params (10s)"
+    command: "./stress_checked"
+  - file: tests/stress-tests/stress_unchecked
+    source: libcuckoo-0.3.1/tests/stress-tests/stress_unchecked.cc
+    description: "Stress test (unchecked) for concurrent operations, upstream default params (10s)"
+    command: "./stress_unchecked"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.cc
+    description: "Consumer test: insert, find, erase, update operations on cuckoohash_map"
+    command: "./test_libcuckoo"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 10
+
+# 上游测试在 OHOS 的运行结果 (积分赛事申报)
+upstream_test_blockers:
+  - "tests/unit-tests: 上游捆绑 Catch 实为 v1.5.9 (非 v3)。OHOS libc++ 强制 URBG result_type 为无符号类型, Catch v1.5.9 RandomNumberGenerator 用 std::ptrdiff_t(有符号) 导致 concept check 失败 -> 已通过 0002 补丁修复 (ptrdiff_t->size_t)"
+  - "tests/unit-tests/test_c_interface read/write: OHOS /tmp 只读 (E002) 且 musl tmpfile() 硬编码 /tmp -> tmpfile() 返回 NULL -> fwrite 到 NULL FILE* 触发 SIGABRT -> 已通过 0003 补丁改为 TMPDIR 下 mkstemp"
+  - "tests/stress-tests: 依赖 pcg 随机数 + 并发线程, 已确认可在 OHOS 以默认参数运行 (power=25, threads=4, time=10s), 通过"
+upstream_pass_rate: "80/80 (100%) - 单元测试 80 个 TEST_CASE 全部通过 (203962 assertions); stress_checked/stress_unchecked 默认参数通过"
+upstream_pass_rate_detail:
+  test_bucket_container: 14
+  test_constructor: 15
+  test_locked_table: 20
+  test_iterator: 6
+  test_noncopyable_types: 7
+  test_resize: 5
+  test_maximum_hashpower: 3
+  test_minimum_load_factor: 3
+  test_hash_properties: 3
+  test_c_interface: 2
+  test_heterogeneous_compare: 1
+  test_user_exceptions: 1

@@ -1,0 +1,37 @@
+--- a/tests/unit-tests/test_c_interface.cc
++++ b/tests/unit-tests/test_c_interface.cc
+@@ -1,6 +1,9 @@
+ #include <catch.hpp>
+ #include <cerrno>
+ #include <cstdio>
++#include <cstdlib>
++#include <string>
++#include <unistd.h>
+ 
+ extern "C" {
+ #include "int_int_table.h"
+@@ -145,7 +148,15 @@
+   }
+ 
+   SECTION("read/write") {
+-    FILE *fp = tmpfile();
++    // OHOS: /tmp is read-only (E002) and musl tmpfile() hardcodes /tmp,
++    // so tmpfile() would fail. Use mkstemp in a writable directory instead.
++    const char *tmpdir = getenv("TMPDIR");
++    if (tmpdir == NULL || *tmpdir == '\0') tmpdir = ".";
++    std::string tmpl = std::string(tmpdir) + "/libcuckoo-c-XXXXXX";
++    int fd = mkstemp(&tmpl[0]);
++    REQUIRE(fd >= 0);
++    FILE *fp = fdopen(fd, "w+b");
++    REQUIRE(fp != NULL);
+     int_int_table_locked_table *ltbl = int_int_table_lock_table(tbl);
+     REQUIRE(int_int_table_locked_table_write(ltbl, fp));
+     rewind(fp);
+@@ -159,6 +170,7 @@
+     int_int_table_free(tbl2);
+     int_int_table_locked_table_free(ltbl);
+     fclose(fp);
++    unlink(tmpl.c_str());
+   }
+ 
+   int_int_table_free(tbl);
