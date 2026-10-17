@@ -1,0 +1,67 @@
+--- a/unixinput.c
++++ b/unixinput.c
+@@ -286,11 +286,14 @@ static void input_file(unsigned int sample_rate, unsigned int overlap,
+ 	int pipedes[2];
+ 	int pid = 0, soxstat;
+ 	int fd;
+-	int i;
+-	short buffer[8192];
++	ssize_t nread;
++	unsigned char buffer[sizeof(short) * 8192 + sizeof(short) - 1];
+ 	float fbuf[16384];
+ 	unsigned int fbuf_cnt = 0;
+-	short *sp;
++	size_t carry = 0;
++	size_t complete;
++	size_t offset;
++	short sample;
+ 
+ 	/*
+ 	 * if the input type is not raw, sox is started to convert the
+@@ -340,23 +343,33 @@ static void input_file(unsigned int sample_rate, unsigned int overlap,
+ 	 * demodulate
+ 	 */
+ 	for (;;) {
+-		i = read(fd, sp = buffer, sizeof(buffer));
+-		if (i < 0 && errno != EAGAIN) {
++		nread = read(fd, buffer + carry, sizeof(buffer) - carry);
++		if (nread < 0 && (errno == EINTR || errno == EAGAIN))
++			continue;
++		if (nread < 0) {
+ 			perror("read");
+ 			exit(4);
+ 		}
+-		if (!i)
+-			break;
+-		if (i > 0) {
+-			for (; i >= sizeof(buffer[0]); i -= sizeof(buffer[0]), sp++)
+-				fbuf[fbuf_cnt++] = (*sp) * (1.0/32768.0);
+-			if (i)
+-				fprintf(stderr, "warning: noninteger number of samples read\n");
+-			if (fbuf_cnt > overlap) {
+-				process_buffer(fbuf, fbuf_cnt-overlap);
+-				memmove(fbuf, fbuf+fbuf_cnt-overlap, overlap*sizeof(fbuf[0]));
+-				fbuf_cnt = overlap;
++		if (!nread) {
++			if (carry) {
++				fprintf(stderr, "error: truncated 16-bit sample at end of input\n");
++				exit(4);
+ 			}
++			break;
++		}
++		complete = carry + (size_t)nread;
++		complete -= complete % sizeof(sample);
++		for (offset = 0; offset < complete; offset += sizeof(sample)) {
++			memcpy(&sample, buffer + offset, sizeof(sample));
++			fbuf[fbuf_cnt++] = sample * (1.0/32768.0);
++		}
++		carry += (size_t)nread - complete;
++		if (carry)
++			memmove(buffer, buffer + complete, carry);
++		if (fbuf_cnt > overlap) {
++			process_buffer(fbuf, fbuf_cnt-overlap);
++			memmove(fbuf, fbuf+fbuf_cnt-overlap, overlap*sizeof(fbuf[0]));
++			fbuf_cnt = overlap;
+ 		}
+ 	}
+ 	close(fd);

@@ -1,0 +1,32 @@
+version: "1.0"
+software: "multimon"
+status: built
+build_date: "2026-10-16"
+build_system: makefile
+conan_ref: "multimon/1.0"
+
+source:
+  url: "https://downloads.sourceforge.net/project/multimon/multimon/1.0/multimon-1.0-src.tar.gz"
+  sha256: "bb4957f10ffbe0bdefb91170beeba22edba7cac265855fe47960d5f7033b5255"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options:
+    - "CC=HarmonyOS clang"
+    - "BINDIR=bin-ohos"
+    - "-std=gnu11"
+  dependencies:
+    - "libx11/1.8.13"
+    - "xorgproto/2025.1"
+  cc: clang
+  cxx: null
+
+patches_applied:
+  - "0000-use-modern-c-declarations.patch"
+  - "0001-use-portable-inline-linkage.patch"
+  - "0002-build-generator-with-host-compiler.patch"
+  - "0003-preserve-partial-pcm-samples.patch"
+
+knowledge_gained:
+  - "固定宽度 PCM 字节流的 read() 边界不是样本边界；解码器必须跨读取保存不足一个样本的残余字节，并区分干净 EOF 与截断样本 EOF。"  # knowledge_ref: E202610160200 draft
