@@ -1,0 +1,45 @@
+--- a/src/relayd.c
++++ b/src/relayd.c
+@@ -31,20 +31,42 @@
+ #include <stdio.h> // fputs()
+ #include <sys/types.h>
+ #include <string.h> // strcasecmp()
+ #include <errno.h>
+ #include <unistd.h> // close()
+ #include <fcntl.h>
+ #include <sys/wait.h> // wait()
+ #include <signal.h> // sigemptyset()
+ #include <syslog.h>
+ #include <pthread.h>
++/* Some Linux libcs (e.g. the one shipped with HarmonyOS) omit the POSIX
++ * thread cancellation functions. Provide harmless fallbacks so that this
++ * file still links there. */
++#ifndef __GLIBC__
++static inline int pthread_cancel (pthread_t thread)
++{
++	(void)thread;
++	return 0;
++}
++
++static inline int pthread_setcancelstate (int state, int *oldstate)
++{
++	if (oldstate != NULL)
++		*oldstate = (state == PTHREAD_CANCEL_DISABLE)
++			? PTHREAD_CANCEL_ENABLE : PTHREAD_CANCEL_DISABLE;
++	return 0;
++}
++
++static inline void pthread_testcancel (void)
++{
++}
++#endif
+ 
+ #include <sys/socket.h>
+ #include <netinet/in.h>
+ #include <netinet/ip6.h>
+ #include <netinet/icmp6.h>
+ #include <arpa/inet.h> // inet_ntop()
+ #include <netdb.h> // NI_MAXHOST
+ #ifdef HAVE_SYS_CAPABILITY_H
+ # include <sys/capability.h>
+ #endif

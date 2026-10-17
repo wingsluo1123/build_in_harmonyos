@@ -1,0 +1,34 @@
+--- a/libtun6/tun6.c
++++ b/libtun6/tun6.c
+@@ -46,20 +46,31 @@
+ 
+ #include <net/if.h> // struct ifreq, if_nametoindex(), if_indextoname()
+ 
+ #if defined (__linux__)
+ /*
+  * Linux tunneling driver
+  */
+ const char os_driver[] = "Linux";
+ # define USE_LINUX 1
+ 
++/*
++ * The libc <netinet/if_ether.h> header defines struct ethhdr itself, while
++ * the kernel UAPI <linux/if_ether.h> defines the same struct under the
++ * __UAPI_DEF_ETHHDR switch. glibc's libc-compat header sets that switch to
++ * 0 once the libc header is in use; not every libc does the same, so apply
++ * the guard here to keep a single definition.
++ */
++# ifndef __UAPI_DEF_ETHHDR
++#  define __UAPI_DEF_ETHHDR 0
++# endif
++
+ # include <linux/if_tun.h> // TUNSETIFF - Linux tunnel driver
+ /*
+  * <linux/ipv6.h> conflicts with <netinet/in.h> and <arpa/inet.h>,
+  * so we've got to declare this structure by hand.
+  */
+ struct in6_ifreq {
+ 	struct in6_addr ifr6_addr;
+ 	uint32_t ifr6_prefixlen;
+ 	int ifr6_ifindex;
+ };

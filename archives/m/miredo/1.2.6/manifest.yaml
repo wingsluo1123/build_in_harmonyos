@@ -1,0 +1,90 @@
+software: miredo
+version: "1.2.6"
+homepage: "https://www.remlab.net/miredo/"
+license: "GPL-2.0-or-later"
+build_system: autotools
+status: published
+build_date: "2026-10-14"
+
+source:
+  url: "https://www.remlab.net/files/miredo/miredo-1.2.6.tar.xz"
+  sha256: "fa26d2f4a405415833669e2e2e22677b225d8f83600844645d5683535ea43149"
+  tar_format: tar.xz
+
+build:
+  system: autotools
+  configure_options:
+    - "--enable-static"
+    - "--enable-shared"
+  dependencies:
+    - judy/1.0.5
+    - libcap/2.78
+  cc: clang
+  cxx: clang++
+
+dependencies:
+  required:
+    - judy/1.0.5
+    - libcap/2.78
+  optional: []
+
+patches_applied:
+  - patches/0001-libteredo-peerlist.c.patch
+  - patches/0002-libtun6-tun6.c.patch
+  - patches/0003-src-relayd.c.patch
+  - patches/0004-admin-config.guess.patch
+  - patches/0005-admin-config.sub.patch
+  - patches/0006-libteredo-debug.h.patch
+
+test_results:
+  type: official
+  upstream_command: "make check"
+  total: 12
+  passed: 11
+  failed: 0
+  timeout: 0
+  skipped: 1
+  note: "make check 注册 12 项：compat 2 项 + libteredo 8 项 + libtun6 1 项 + src 1 项。libtun6-diagnose 需要 TUN 设备与特权，上游自身即判 SKIP（非本次适配引入）；其余 11 项 PASS。消费者用例 5 条断言全绿。"
+  test_package_assertions: 5
+
+knowledge_gained:
+  - "E007 边界：2012 版 config.guess 没有新版才有的 GUESS 变量出口机制，patch-autotools-ohos.pl 插入的分支只赋值不输出，脚本仍报 unable to guess system type；须改为 echo ... ; exit ;;（老版 config.sub 同样缺 android-linux 锚点，需手工补三处 ohos 支持） [knowledge_ref: E007, E429]"
+  - "E114 边界：umask 077 的临时目录问题不止出现在生成的 configure/config.status，config.guess 运行期也会用 umask 077 && mktemp -d $TMPDIR/cgXXXXXX 建目录并写 dummy.c，须一并去除 [knowledge_ref: E110, E114, E430]"
+  - "E127 落地：OHOS libc 连 pthread_cancel/pthread_setcancelstate/pthread_testcancel 符号都不导出，仅提供空操作回退会让 pthread_cancel+pthread_join 成对调用永久阻塞；必须同时把线程改成协作式停止（stop 标志 + 分片等待） [knowledge_ref: E127, E431]"
+  - "E119 落地：内核 UAPI linux/if_ether.h 与 libc netinet/if_ether.h 都定义 struct ethhdr，非 glibc libc 下重复定义编译失败；按 libc 特性宏 __UAPI_DEF_ETHHDR 守卫（同 xdp-tools 先例） [knowledge_ref: E119]"
+  - "E432 处置：补丁工具对新增文件固定写 --- a/... 头部（Conan 需 /dev/null）且会覆盖 AI 判定行，预生成 configure 又被判为 GENERATED 无法进补丁；新增代码优先内联进既有文件，GENERATED 的 E114 改写在配方 build() 内做 [knowledge_ref: E432, E490]"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/miredo-1.2.6.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/miredo-1.2.6.work
+  source_orig_hash: c07290a3aa65267a
+  source_work_hash: a4507dda51ca5f52
+  generated_at: '2026-10-16T13:46:09'
+  patches_count: 6
+
+patch_classification:
+  - file: 0001-libteredo-peerlist.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-libtun6-tun6.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-src-relayd.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-admin-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0005-admin-config.sub.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0006-libteredo-debug.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
