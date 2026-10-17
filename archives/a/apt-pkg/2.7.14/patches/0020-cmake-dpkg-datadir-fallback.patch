@@ -1,0 +1,40 @@
+apt 2.7.14 CMake: default DPKG_DATADIR when the perl Dpkg probe fails
+
+CMakeLists.txt derives DPKG_DATADIR with
+
+  perl -MDpkg -e "print $Dpkg::DATADIR;"
+
+and feeds it to `#cmakedefine DPKG_DATADIR "${DPKG_DATADIR}"` in
+CMake/config.h.in.  The conan tool_requires perl (perl/5.42.2) ships no
+Dpkg.pm module, so the probe fails and DPKG_DATADIR ends up empty; an empty
+value makes cmakedefine leave the macro undefined, and apt-pkg/init.cc then
+fails to compile:
+
+  apt-pkg/init.cc:62:64: error: use of undeclared identifier 'DPKG_DATADIR'
+  apt-pkg/init.cc:63:68: error: use of undeclared identifier 'DPKG_DATADIR'
+  apt-pkg/init.cc:64:60: error: use of undeclared identifier 'DPKG_DATADIR'
+
+Fix: when the probe returns empty, default DPKG_DATADIR to the Debian
+datadir "/usr/share/dpkg".  On OHOS/musl the value is a compile-time string
+only -- the builtin dpkg architecture tables (patch 0009) override the
+actual data loading, and no /usr/share/dpkg exists at runtime.
+
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -221,6 +221,16 @@
+ if (NOT DEFINED DPKG_DATADIR)
+   execute_process(COMMAND ${PERL_EXECUTABLE} -MDpkg -e "print $Dpkg::DATADIR;"
+                   OUTPUT_VARIABLE DPKG_DATADIR_CMD OUTPUT_STRIP_TRAILING_WHITESPACE)
++  # The conan tool_requires perl ships no Dpkg.pm module, so the probe above
++  # fails and DPKG_DATADIR_CMD is empty.  With an empty value
++  # `#cmakedefine DPKG_DATADIR` leaves the macro undefined and apt-pkg/init.cc
++  # fails to compile ("use of undeclared identifier 'DPKG_DATADIR'").  Default
++  # to the Debian datadir; on OHOS the builtin dpkg table (0009 patch) makes
++  # this a compile-time string only.
++  if (DPKG_DATADIR_CMD STREQUAL "")
++    set(DPKG_DATADIR_CMD "/usr/share/dpkg")
++    message(STATUS "dpkg data dir not resolvable; defaulting to /usr/share/dpkg")
++  endif()
+   message(STATUS "Found dpkg data dir: ${DPKG_DATADIR_CMD}")
+   set(DPKG_DATADIR "${DPKG_DATADIR_CMD}" CACHE PATH "dpkg data directory")
+ endif()

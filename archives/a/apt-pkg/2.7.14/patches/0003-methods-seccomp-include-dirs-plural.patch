@@ -1,0 +1,27 @@
+apt 2.7.14 cmake: use SECCOMP_INCLUDE_DIRS (plural) in methods dir
+
+The apt-internal FindSECCOMP.cmake module exports the variable
+SECCOMP_INCLUDE_DIRS (plural), but methods/CMakeLists.txt referenced the
+singular form ${SECCOMP_INCLUDE_DIR}, which is never defined, so
+include_directories(...) in the methods directory received an empty list
+and every compile in methods/ failed with:
+
+  methods/aptmethod.h:31:10: fatal error: 'seccomp.h' file not found
+
+On a distro Linux build /usr/include happens to hold seccomp.h, so the
+empty include list is harmless and the bug is invisible.  On a cross
+build (OHOS) the conan prefix include dir is only reachable through
+SECCOMP_INCLUDE_DIRS and the build fails.
+
+Fix by using the plural variable, matching what FindSECCOMP.cmake
+actually exports.
+--- a/methods/CMakeLists.txt
++++ b/methods/CMakeLists.txt
+@@ -1,5 +1,5 @@
+ # Create the executable targets
+-include_directories($<$<BOOL:${SECCOMP_FOUND}>:${SECCOMP_INCLUDE_DIR}>)
++include_directories($<$<BOOL:${SECCOMP_FOUND}>:${SECCOMP_INCLUDE_DIRS}>)
+ link_libraries(apt-pkg $<$<BOOL:${SECCOMP_FOUND}>:${SECCOMP_LIBRARIES}>)
+ 
+ add_library(connectlib OBJECT connect.cc rfc2553emu.cc)
+

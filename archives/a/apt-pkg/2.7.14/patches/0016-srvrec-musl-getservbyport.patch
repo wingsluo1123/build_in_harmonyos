@@ -1,0 +1,29 @@
+apt 2.7.14 apt-pkg: use getservbyport() on musl/OHOS (no glibc _r variant)
+
+srvrec.cc uses glibc's reentrant getservbyport_r().  OHOS ships musl,
+which does not provide the _r variant -- the link fails with:
+
+  undefined symbol: getservbyport_r
+
+SRV lookups are infrequent; fall back to the POSIX non-reentrant
+getservbyport() under musl (thread-safe in musl) and keep the glibc path
+unchanged.  Verified on the OHOS build: links and resolves srv records.
+
+--- a/apt-pkg/contrib/srvrec.cc
++++ b/apt-pkg/contrib/srvrec.cc
+@@ -49,7 +49,15 @@
+    struct servent *s_ent = nullptr;
+    std::vector<char> buf(1024);
+ 
++#if defined(__GLIBC__)
+    res = getservbyport_r(htons(port), "tcp", &s_ent_buf, buf.data(), buf.size(), &s_ent);
++#else
++   // OHOS/musl 没有 glibc 的 getservbyport_r 重入版；SRV 查询不频繁，用
++   // POSIX 非重入版 getservbyport 代替（musl 线程安全）。
++   (void)s_ent_buf; (void)buf;
++   s_ent = getservbyport(htons(port), "tcp");
++   res = (s_ent == nullptr) ? -1 : 0;
++#endif
+    if (res != 0 || s_ent == nullptr)
+       return false;
+ 

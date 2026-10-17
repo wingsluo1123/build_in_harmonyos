@@ -1,0 +1,28 @@
+apt 2.7.14 CMake: propagate LFS_FOUND to parent scope for conan toolchain
+
+The OHOS conan CMakeToolchain sets CMAKE_FIND_PACKAGE_PREFER_CONFIG=ON,
+so find_package(LFS) first probes config-mode and pre-sets a NORMAL
+variable LFS_FOUND=0 before this module loads.  The module only sets
+LFS_FOUND as CACHE INTERNAL, and a normal variable of the same name
+SHADOWS the cache value -- find_package_handle_standard_args() then
+reports "missing: LFS_FOUND" even though large-file support works.
+
+Fix: propagate LFS_FOUND as a normal variable into the caller scope via
+PARENT_SCOPE so it wins over the stale 0.  Verified on the OHOS build:
+without this, configure fails with "Could not find LFS".
+
+--- a/CMake/FindLFS.cmake
++++ b/CMake/FindLFS.cmake
+@@ -139,6 +139,12 @@
+     set(LFS_COMPILE_OPTIONS ${_lfs_cflags} CACHE STRING "Extra definitions for large file support")
+     set(LFS_LIBRARIES ${_lfs_libs} ${_lfs_ldflags} CACHE STRING "Extra definitions for large file support")
+     set(LFS_FOUND ${LFS_FOUND} CACHE INTERNAL "Found LFS")
++    # OHOS toolchain compat: conan CMakeToolchain sets CMAKE_FIND_PACKAGE_PREFER_CONFIG=ON,
++    # so find_package(LFS) pre-sets a normal variable LFS_FOUND=0 before loading this module
++    # (config-mode-first probe failure). A normal 0 shadows the CACHE INTERNAL value set above,
++    # making find_package_handle_standard_args() report "missing: LFS_FOUND" even when LFS works.
++    # Propagate the result as a normal variable into the caller scope so it wins over the 0.
++    set(LFS_FOUND ${LFS_FOUND} PARENT_SCOPE)
+ endfunction()
+ 
+ if (NOT LFS_FOUND)

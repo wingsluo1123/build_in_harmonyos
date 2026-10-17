@@ -1,0 +1,34 @@
+apt 2.7.14 apt-pkg: build static library (R26 / static-only OHOS layout)
+
+Upstream builds apt-pkg as a SHARED library
+(add_library(apt-pkg SHARED ...)).  The OHOS conan toolchain links
+against musl and the conan-provided dependency chain; shipping libapt-pkg
+as a static archive avoids .so SONAME / version-script issues and matches
+the R26 requirement that system-name libraries stay static.  The recipe
+sets BUILD_SHARED_LIBS=OFF, but these add_library calls are explicit
+SHARED and ignore that variable -- the target must be changed to STATIC
+directly.  The install rule also needs the ARCHIVE (not LIBRARY) form.
+
+Verified: with this change libapt-pkg.a / libapt-private.a are produced
+and consumers link them statically (test_package links fine).
+
+--- a/apt-pkg/CMakeLists.txt
++++ b/apt-pkg/CMakeLists.txt
+@@ -40,7 +40,7 @@
+ file(GLOB_RECURSE headers "*.h")
+ 
+ # Create a library using the C++ files
+-add_library(apt-pkg SHARED ${library})
++add_library(apt-pkg STATIC ${library})
+ add_dependencies(apt-pkg apt-pkg-versionscript)
+ # Link the library and set the SONAME
+ target_include_directories(apt-pkg
+@@ -76,7 +76,7 @@
+ add_version_script(apt-pkg)
+ 
+ # Install the library and the header files
+-install(TARGETS apt-pkg LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
++install(TARGETS apt-pkg ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+ install(FILES ${headers} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/apt-pkg)
+ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/apt-pkg.pc DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
+ flatify(${PROJECT_BINARY_DIR}/include/apt-pkg/ "${headers}")

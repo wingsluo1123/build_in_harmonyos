@@ -1,0 +1,52 @@
+apt 2.7.14 apt-pkg: force-link the debSystem instance in static builds
+
+pkgInitSystem() picks the packaging system by scoring every entry in
+pkgSystem::GlobalList, which is populated by the constructors of the
+per-system global instances (debSystem debSys lives in debsystem.cc).
+With a static library the linker pulls object files per referenced
+symbol; nothing in libapt-pkg.a, apt-private.a or the test binary
+references debsystem.cc.obj, so debSys's constructor never runs and
+GlobalList stays empty.  Verified with a debug harness:
+
+  GlobalListLen=0
+  pkgInitSystem=0 Sys=0
+  E: Unable to determine a suitable packaging system type
+
+Upstream builds libapt-pkg as a shared library where every object is
+present and the constructor always runs, which is why this never
+surfaced on Debian.
+
+Fix: in pkgInitSystem() take the address of the global debSys (odr-use)
+under __OHOS__ so the object file is always pulled into the link and the
+constructor registers the system.  In a shared-library build the same
+reference is trivially satisfied and has no effect.
+--- a/apt-pkg/init.cc
++++ b/apt-pkg/init.cc
+@@ -15,6 +15,9 @@
+ #include <apt-pkg/init.h>
+ #include <apt-pkg/macros.h>
+ #include <apt-pkg/pkgsystem.h>
++#ifdef __OHOS__
++#include <apt-pkg/debsystem.h>
++#endif
+ #include <apt-pkg/strutl.h>
+ 
+ #include <cstdlib>
+@@ -276,6 +279,16 @@
+ bool pkgInitSystem(Configuration &Cnf,pkgSystem *&Sys)
+ {
+    Sys = 0;
++#ifdef __OHOS__
++   // 静态库(musl/OHOS)按对象粒度裁剪链接：没有代码引用 debsystem.cc.obj 时，
++   // 全局对象 debSys 的构造器不会执行，pkgSystem::GlobalList 为空，评分循环
++   // 选不出任何系统，pkgInitSystem() 报
++   // "Unable to determine a suitable packaging system type"（libapt_test 实测
++   // GlobalListLen=0）。显式取 debSys 地址强制链接该对象，让构造器完成自注册。
++   // Debian 构建为共享库、所有对象都在 .so 里，此引用同样成立、无副作用。
++   extern debSystem debSys;
++   (void)&debSys;
++#endif
+    std::string Label = Cnf.Find("Apt::System","");
+    if (Label.empty() == false)
+    {
+

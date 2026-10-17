@@ -1,0 +1,37 @@
+apt 2.7.14 CMake: keep full pkg-config include list in FindGCRYPT.cmake
+
+apt's CMake/FindGCRYPT.cmake collapses the pkg-config include dirs with
+
+  find_path(GCRYPT_INCLUDE_DIRS NAMES gcrypt.h
+            PATHS ${GCRYPT_PKGCONF_INCLUDE_DIRS})
+
+so GCRYPT_INCLUDE_DIRS ends up as the single directory that holds gcrypt.h.
+But gcrypt.h does `#include <gpg-error.h>` (transitive dependency
+libgpg-error), and pkg-config correctly resolves both prefixes into
+GCRYPT_PKGCONF_INCLUDE_DIRS.  find_path drops the gpg-error prefix, so any
+translation unit that pulls in gcrypt.h fails on a cross build (OHOS) where
+the two headers live in separate package prefixes:
+
+  .../libgcrypt.../include/gcrypt.h:31:10: fatal error: 'gpg-error.h' file not found
+
+Fix: when pkg-config resolved GCRYPT_PKGCONF_INCLUDE_DIRS, keep the full
+list as GCRYPT_INCLUDE_DIRS instead of the collapsed find_path result.
+No effect on distro builds where both headers share /usr/include.
+
+--- a/CMake/FindGCRYPT.cmake
++++ b/CMake/FindGCRYPT.cmake
+@@ -13,6 +13,14 @@
+   PATHS ${GCRYPT_PKGCONF_INCLUDE_DIRS}
+ )
+ 
++# gcrypt.h does `#include <gpg-error.h>` (transitive dependency libgpg-error),
++# and pkg-config resolves both prefixes into GCRYPT_PKGCONF_INCLUDE_DIRS.
++# find_path above collapses the list to the single directory holding gcrypt.h,
++# losing the gpg-error prefix -- fatal on cross builds (OHOS) where the two
++# headers live in separate package prefixes.  Keep the full pkg-config list.
++if(GCRYPT_PKGCONF_INCLUDE_DIRS)
++    set(GCRYPT_INCLUDE_DIRS ${GCRYPT_PKGCONF_INCLUDE_DIRS})
++endif()
+ 
+ find_library(GCRYPT_LIBRARIES
+   NAMES gcrypt

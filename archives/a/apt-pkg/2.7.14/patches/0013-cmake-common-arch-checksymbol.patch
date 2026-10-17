@@ -1,0 +1,24 @@
+apt 2.7.14 CMake: include(CheckSymbolExists) for check_symbol_exists()
+
+The top-level CMakeLists.txt calls check_symbol_exists(statfs ...) /
+check_symbol_exists(statvfs ...) / CHECK_STRUCT_HAS_MEMBER without
+including the CheckSymbolExists module.  On a Debian build the command
+is pulled in transitively (or silently no-ops); on OHOS with a minimal
+conan toolchain CMake fails with:
+
+  CMake Error: Could not find CMAKE_ROOT
+  ... Unknown CMake command "check_symbol_exists".
+
+Fix by explicitly including CheckSymbolExists alongside the other
+Check* modules already loaded.
+
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -42,6 +42,7 @@
+ include(CheckIncludeFiles)
+ include(CheckFunctionExists)
+ include(CheckStructHasMember)
++include(CheckSymbolExists)
+ include(GNUInstallDirs)
+ include(TestBigEndian)
+ find_package(Threads REQUIRED)

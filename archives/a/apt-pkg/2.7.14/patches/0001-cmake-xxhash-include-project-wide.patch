@@ -1,0 +1,37 @@
+apt 2.7.14 cmake: make XXHASH include dir project-wide
+
+apt-pkg/pkgcachegen.h is a public header (installed under
+include/apt-pkg/) and does `#include <xxhash.h>`.  The
+XXHASH_INCLUDE_DIRS were only added to the apt-pkg target as PRIVATE
+include dirs (apt-pkg/CMakeLists.txt), so consumers of the library
+headers (e.g. apt-private/private-source.cc includes
+apt-pkg/deblistparser.h -> apt-pkg/pkgcachegen.h) do not get the xxhash
+include path.  On a distro Linux build /usr/include happens to hold
+xxhash.h, so the bug is invisible; on a cross build (OHOS) the conan
+prefix include dir is not in the compiler's default search path and the
+build fails with:
+
+  apt-private/private-source.cc:32: In file included from
+  .../build-ohos/include/apt-pkg/deblistparser.h:15:
+  .../include/apt-pkg/pkgcachegen.h:33:10: fatal error: 'xxhash.h' file not found
+
+Fix by propagating XXHASH_INCLUDE_DIRS at top level so every target that
+compiles apt-pkg public headers sees the include dir, mirroring what the
+system /usr/include layout gives on Linux.
+
+This is a portability fix for cross compilation; it has no effect on
+Linux builds where XXHASH_INCLUDE_DIRS is empty or already in the
+default search path.
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -142,6 +142,9 @@
+ 
+ find_package(GCRYPT REQUIRED)
+ find_package(XXHASH REQUIRED)
++if (XXHASH_FOUND)
++  include_directories(${XXHASH_INCLUDE_DIRS})
++endif()
+ 
+ # Mount()ing and stat()ing and friends
+ check_symbol_exists(statfs sys/vfs.h HAVE_VFS_H)
+

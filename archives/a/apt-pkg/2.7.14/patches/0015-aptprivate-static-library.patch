@@ -1,0 +1,26 @@
+apt 2.7.14 apt-private: build static library (R26 / static-only OHOS layout)
+
+Same rationale as 0014: upstream builds apt-private SHARED; on the OHOS
+conan build it must be STATIC.  The install rule for a static archive is
+ARCHIVE (without NAMELINK_SKIP, which only applies to .so symlinks).
+
+--- a/apt-private/CMakeLists.txt
++++ b/apt-private/CMakeLists.txt
+@@ -9,7 +9,7 @@
+ file(GLOB_RECURSE headers "*.h")
+ 
+ # Create a library using the C++ files
+-add_library(apt-private SHARED ${library})
++add_library(apt-private STATIC ${library})
+ 
+ # Link the library and set the SONAME
+ target_link_libraries(apt-private PUBLIC apt-pkg)
+@@ -20,7 +20,6 @@
+ 
+ # Install the library and the headers
+ install(TARGETS apt-private
+-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+-        NAMELINK_SKIP)
++        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+ 
+ flatify(${PROJECT_BINARY_DIR}/include/apt-private/ "${headers}")

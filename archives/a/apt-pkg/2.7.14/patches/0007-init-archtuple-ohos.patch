@@ -1,0 +1,35 @@
+apt 2.7.14 apt-pkg: tolerate missing dpkg tuple/cputable tables on OHOS
+
+pkgInitArchTupleMap() loads dpkg's cputable/tupletable/triplettable from
+DPKG_DATADIR to build the architecture<->tuple mapping used for
+multi-arch.  On OHOS/musl there is no dpkg data directory and no
+cputable, so the open fails and the whole library initialization fails
+with an I/O error before any client can start.
+
+Verified on the OHOS build host:
+
+  $ ls /usr/share/dpkg/cputable
+  ls: /usr/share/dpkg/cputable: No such file or directory
+
+Fix: when the cputable cannot be opened, degrade to an empty
+ArchToTupleMap and return success (architecture matching falls back to
+plain name comparison against APT::Architecture).  On Debian systems the
+tables exist and this branch is inert.
+--- a/apt-pkg/init.cc
++++ b/apt-pkg/init.cc
+@@ -63,6 +63,14 @@
+    // Load a list of CPUs
+    std::vector<std::string> cpus;
+    std::ifstream cputable(cpupath);
++   if (cputable.is_open() == false)
++   {
++      // OHOS/musl 环境通常没有 dpkg 数据目录（DPKG_DATADIR），架构->tuple
++      // 映射表（cputable/tupletable）不存在。退化处理：保留空 ArchToTupleMap，
++      // 架构匹配退化为按名字的直接匹配（APT::Architecture），而不是让整个
++      // 库初始化失败。
++      return true;
++   }
+    for (std::string cpuline; std::getline(cputable, cpuline); )
+    {
+       if (cpuline[0] == '#' || cpuline[0] == '\0')
+
