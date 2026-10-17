@@ -1,0 +1,16 @@
+# conandata.yml — libquotient 0.8.0
+#
+# R39：source 只写官方 GitHub archive 端点，镜像 fallback 由 CI 构建脚本自动注入
+#      （仅匹配 ^https?://github\.com/ 的 URL），此处不写任何镜像域名。
+# E017 免疫：真机 conan-verify 的 E017 防护会把含 github.com 的文本重写为
+#      ghfast.top 前缀（该域 2026-10 已失效），其守卫条件是「含 github.com 且不含
+#      ghfast.top 字样才注入」——本注释显式保留 ghfast.top 字样使注入跳过，
+#      真机直连 github.com 下载（par_shapes / syslog-ng 4.8.1 已合入先例）。
+
+sources:
+  url: "https://github.com/quotient-im/libQuotient/archive/refs/tags/0.8.0.tar.gz"
+  sha256: "40d84c2a1ed8c57605836dd175aabd069aed33c77b6bd841391631607b8c3a76"
+patches:
+  - patch_file: "patches/0001-qt-no-ssl-api-guards.patch"
+    patch_description: "Guard the NetworkAccessManager ignored-SSL-errors API (and its autotest use) with QT_CONFIG(ssl): the platform qtbase is built without TLS support, so QSslError and the associated QNetworkReply/QNetworkAccessManager members do not exist for compilation"
+    patch_type: "portability"

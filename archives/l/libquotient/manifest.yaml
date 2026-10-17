@@ -1,0 +1,30 @@
+# 软件级 manifest — libquotient
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: libquotient
+display: "libQuotient"
+description: "面向矩阵（Matrix）协议客户端的 C++17/Qt 库（Quotient）：连接与同步、房间/成员模型、事件体系、上传下载；端到端加密为可选特性"
+category: network
+homepage: "https://github.com/quotient-im/libQuotient"
+license: LGPL-2.1-or-later
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "OHOS /storage 全域拒绝 symlink 创建（EPERM）：VERSION/SOVERSION 版本链（.so → .so.0.8 → .so.0.8.0）由构建图的 cmake_symlink_library 步骤（Ninja 的 rules.ninja 或 Unix Makefiles 的 build.make，随 profile 选定生成器）在 OHOS 分支统一改写为逐路径实体拷贝（lfortran 0.64.0 先例）；加载器按文件名解析，与链接形态无差异"
+    - "库带 DT_SONAME=libQuotientQt6.so.0.8（SOVERSION 名即消费侧加载名，真机 ELF 实测）：实体拷贝版的 .so.0.8 是运行期解析的硬前提；库自身依赖 DT_NEEDED 全裸 basename（无机器私有路径，可重定位）；配合 CMAKE_BUILD_RPATH=$ORIGIN + -Wl,--disable-new-dtags，运行期在同目录内解析全部依赖"
+    - "补丁 0001（QT_CONFIG(ssl) 能力守卫）：平台 qtbase-sql-dbus/6.11.1 为无 OpenSSL 构型，QSslError 类型与 ignoreSslErrors(QList<QSslError>)/sslErrors 在头文件即被裁剪，上游无条件使用构成编译墙；守卫后无 TLS 构型该 API 整体不存在、TLS 构型预处理结果与上游逐字一致（能力探测型，非平台宏）"
+    - "Qt 双风味库：以 BUILD_WITH_QT6=ON 构建 Qt6 风味（QUOTIENT_LIB_NAME=QuotientQt6）；上游 install(EXPORT) 无 NAMESPACE，消费侧目标为裸名 QuotientQt6；CMake 包配置链 find_dependency(Qt6Gui/Qt6Network/Qt6Keychain) 由 qtbase-sql-dbus 与 qtkeychain 提供"
+    - "端到端加密（E2EE）保持上游默认 OFF（平台无 libolm）；quotest 集成套件需真实 homeserver、上游未注册 ctest，仅在不安装的前提下作编译冒烟；上游离线 ctest 用例（非 E2EE 构建 N=2）在 conan create 内全量实跑"
+    - "package() 对全部安装 ELF 重签名（llvm-objcopy 去 .codesign + binary-sign-tool 自签名）：CMake 安装期会重写 RUNPATH，使构建期签名失效"
+    - "E132 先例：build/package 环境前置 OHOS SDK 的 llvm/lib 目录（/data/service/hnp/ohos-sdk.org/.../native/llvm/lib），供 lld 解析 libxml2.so.16"
+  common_dependencies:
+    - qtbase-sql-dbus
+    - qtkeychain
+
+versions:
+  "0.8.0":
+    status: built
+    build_date: "2026-10-16"
+    conan_ref: "libquotient/0.8.0"
+    note: "首次适配：Qt6 共享库构建（BUILD_WITH_QT6=ON、E2EE=OFF）+ 补丁 0001（QT_CONFIG(ssl) 守卫）；OHOS 禁 symlink 以构建图规则改写（Ninja/Makefiles 双生成器）实体拷贝落地 SOVERSION 链；上游离线 ctest 2/2 + 消费者 6 用例 16/16 + ELF 制品 21/21；真机八门禁 Verdict PASS（2026-10-16）"

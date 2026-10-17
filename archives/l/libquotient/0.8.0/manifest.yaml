@@ -1,0 +1,39 @@
+version: "0.8.0"
+software: libquotient
+status: built
+build_date: 2026-10-16
+build_system: cmake
+conan_ref: libquotient/0.8.0
+source:
+  url: https://github.com/quotient-im/libQuotient/archive/refs/tags/0.8.0.tar.gz
+  sha256: 40d84c2a1ed8c57605836dd175aabd069aed33c77b6bd841391631607b8c3a76
+  tar_format: tar.gz
+build:
+  system: cmake
+  configure_options:
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DBUILD_WITH_QT6=ON"
+    - "-DBUILD_TESTING=ON"
+    - "-DQuotient_ENABLE_E2EE=OFF"
+    - "-DQuotient_INSTALL_TESTS=OFF"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+  dependencies:
+    - qtbase-sql-dbus/6.11.1
+    - qtkeychain/0.14.2
+patches_applied:
+  - "0001-qt-no-ssl-api-guards.patch"
+upstream_tests:
+  framework: ctest
+  test_targets: 2
+  test_command: 'ctest --output-on-failure -R "^(callcandidateseventtest|utiltests)$"'
+  run_in_build: true
+upstream_test_pass_rate: "2/2（callcandidateseventtest、utiltests，真机实测）"
+adapted_test_pass_rate: "行为 16/16（6 用例 16 校验点 0 失败）+ 制品 21/21（14 固定结构 + 7 DT_NEEDED；真机实测）"
+knowledge_gained:
+  - "OHOS /storage 全域禁 symlink（EPERM）会击杀带 VERSION/SOVERSION 的 CMake 库：构建图（Ninja 的 rules.ninja 或 Unix Makefiles 的 CMakeFiles/*.dir/build.make，随 profile 选定生成器）中的 cmake_symlink_library 步骤建链必败且失败边无条件重跑；配方级处置=仅 OHOS 分支在 configure 后、build 前把两代生成器的该命令统一改写为逐路径 python3 copyfile 实体拷贝（lfortran 0.64.0 先例），加载器按 DT_NEEDED 文件名字符串解析，行为等价；CMake 安装脚本只拷贝这些名字、自身不建链，安装树不受影响。"
+  - "libQuotient 0.8.0 的 Qt6 形态由 BUILD_WITH_QT6=ON 整体切换：产物 libQuotientQt6.so、CMake 包 QuotientQt6、install EXPORT 无 NAMESPACE → 消费侧 find_package(QuotientQt6) 后链接裸目标 QuotientQt6。"
+  - "QuotientQt6Config.cmake 链式 find_dependency(Qt6Gui/Qt6Network/Qt6Keychain)：消费图必须同时提供 qtbase-sql-dbus 与 qtkeychain 的 lib/cmake 目录于 CMAKE_PREFIX_PATH。"
+  - "平台 qtbase-sql-dbus/6.11.1 内含 Qt6Test（其自测 tst_qcolor/tst_qwidget 等 7 目标实测链接）与 Qt6Concurrent（asyncfuture 先例同源构型），满足 libQuotient 的 find_package(Qt6 REQUIRED Core Network Gui Test) 首关与 quotest 的 Concurrent 链接，无需裁剪。"
+  - "上游 E2EE 默认 OFF 且平台无 libolm：保持 OFF 即免 Olm/OpenSSL/QtSql 依赖与六个 E2EE 专属 ctest；ctest 口径 N=2（callcandidateseventtest、utiltests），quotest 需活 homeserver 且上游未注册 ctest，仅编译作冒烟。"
+  - "库实测带 DT_SONAME=libQuotientQt6.so.0.8（SOVERSION 0.8；真机 ELF 校验断言项+输出为证）：消费侧记录并解析的加载名即该 SOVERSION 名，故 /storage 禁 symlink 约束下版本链中的 .so.0.8 必须以实体拷贝在位，否则运行期解析失败；运行期解析靠 LD_LIBRARY_PATH 与 BUILD_RPATH=$ORIGIN + --disable-new-dtags 的同目录副本。"
+  - "平台 qtbase-sql-dbus/6.11.1 为无 OpenSSL 构型（QT_CONFIG(ssl)=off）：QSslError 类型整体不存在（qsslerror.h 被 QT_NO_SSL 包裹），QNetworkReply::ignoreSslErrors(QList<QSslError>) 重载与 QNetworkAccessManager::sslErrors 信号在头文件即被裁剪；依赖这些 API 的上游源码须以 QT_CONFIG(ssl) 能力守卫适配（能力探测型，非平台宏），无 TLS 构型编译通过、TLS 构型预处理结果不变。"

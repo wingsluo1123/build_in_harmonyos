@@ -1,0 +1,47 @@
+# test_package/MANIFEST.yml
+# libquotient 0.8.0 上游测试声明与消费者验证清单
+package: libquotient/0.8.0
+homepage: "https://github.com/quotient-im/libQuotient"
+
+# 上游测试清点口径：configure 后 ctest -N。
+# autotests/CMakeLists.txt 在非 E2EE 构建下注册 2 个用例：
+#   callcandidateseventtest、utiltests（均为离线用例）；
+# 另 6 个用例（testolmaccount/testgroupsession/testolmsession/
+# testolmutility/testfilecrypto/testkeyverification）仅在
+# Quotient_ENABLE_E2EE=ON 时注册——本配方 E2EE=OFF，故上游口径 N=2。
+# quotest 集成套件需真实 homeserver，上游未注册到 ctest。
+upstream_check_command: "ctest -N（BUILD_TESTING=ON、BUILD_WITH_QT6=ON、E2EE=OFF 构建树）"
+upstream_test_in_build: true
+upstream_test_command: 'ctest --output-on-failure -R "^(callcandidateseventtest|utiltests)$"（conanfile.py build() 内、构建目录执行）'
+
+upstream_tests:
+  - file: autotests/callcandidateseventtest.cpp
+    source: libQuotient-0.8.0/autotests/callcandidateseventtest.cpp
+    description: "CallCandidatesEvent 事件 JSON 装载与内容访问（QTest，离线）"
+    command: "ctest -R ^callcandidateseventtest$"
+  - file: autotests/utiltests.cpp
+    source: libQuotient-0.8.0/autotests/utiltests.cpp
+    description: "Omittable<> 类型推导的编译期 static_assert 全集（QTest 壳、运行期无槽；用例实质为编译期校验，编译通过即通过）"
+    command: "ctest -R ^utiltests$"
+  - file: quotest/quotest.cpp
+    source: libQuotient-0.8.0/quotest/quotest.cpp
+    description: "上游手动集成套件（需真实 Matrix homeserver；上游未注册 ctest）：BUILD_TESTING 下仅编译作构建冒烟，本配方不运行"
+    command: "（不运行——./quotest 需要活的 homeserver 与账号）"
+
+test_package_tests:
+  - file: test_libquotient.cpp
+    description: "消费者 API 测试：Connection homeserver 往返、RoomMessageEvent JSON 解析/构造/fullJson()/loadEvent() 分派（runCase 逐例 TEST PASS/FAIL + TEST SUMMARY，任一失败 exit 1）"
+    command: "./test_libquotient"
+  - file: test_libquotient_elf.py
+    description: "制品校验：libQuotientQt6.so.0.8.0 为 AArch64 ELF64 且含 .codesign、库自身 DT_NEEDED 全裸名、DT_SONAME 断言为 libQuotientQt6.so.0.8、libQuotientQt6.so 与 .so.0.8 加载名可解析（OHOS 禁 symlink，SOVERSION 链以实体拷贝落地）"
+    command: "python3 test_libquotient_elf.py <package_folder>"
+
+# 鸿蒙特有测试 = ELF 制品校验（行为用例为跨平台消费者测试，另计）。
+# 口径：14 条固定结构校验 + 每个 DT_NEEDED 条目 1 条裸名校验。
+ohos_specific_tests: "21（14 固定结构校验 + 7 DT_NEEDED 裸名，真机实测）"
+ohos_specific_description: >
+  OHOS /storage 禁 symlink 约束下的版本链/加载名完整性（实体拷贝落地）、
+  package() 重签名后的 .codesign 段在位、DT_SONAME 与 SOVERSION 加载名
+  同一性、库自身依赖 DT_NEEDED 全裸名的可重定位性。
+# 校验计数：行为 16（6 用例实跑 16/16）+ 制品 21（14 固定结构 + 7 DT_NEEDED） = 37
+assertion_count: 37
