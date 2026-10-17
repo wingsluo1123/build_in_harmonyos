@@ -1,0 +1,49 @@
+# test_package/MANIFEST.yml — xastir 2.2.4
+# 上游官方测试声明文件 (CI L0e 强制要求). 详见 docs/TEST_QUALITY_SPEC.md 与 notes.md.
+package: xastir/2.2.4
+homepage: "https://github.com/Xastir/Xastir"
+
+# ── R51 上游测试清点（证据见 notes.md "R51 上游测试清点"） ──
+# xastir 2.2.4 自带一个真正的 autotest 套件（tests/testsuite.at 及其生成的
+# testsuite）+ 七个 check_PROGRAMS（tests/Makefile.am，从真实 src/*.c 编出）：
+#   test_interface_helpers, test_db, test_object_utils,
+#   test_output_my_aprs_data, test_util, test_objects
+#   * `grep -nE "^check_PROGRAMS" tests/Makefile.am` -> 6 个 + 条件项 test_nominatim（HAVE_NOMINATIM）= 7 个程序
+#   * `make check` 编译六个测试二进制并运行 autotest testsuite
+#   * 实测：`All 242 tests were successful.`（CHECK_EXIT=0，无跳过），原始输出
+#     逐字捕获进构建日志（[upstream-test] 行）
+upstream_check_command: "make check"
+upstream_test_in_build: true
+upstream_test_command: "make check"
+
+# 上游可运行的测试目标（全部真实执行，未删除、未伪造）
+upstream_tests:
+  - target: "check"
+    file: "tests/Makefile.am (check_PROGRAMS block)"
+    command: "make check (check_PROGRAMS + autotest testsuite)"
+    description: >
+      build() 内以 `( unset DISPLAY; cd build && timeout 900 make check ) 2>&1`
+      原样执行并捕获原始输出到 upstream-test.log 后逐字打印（R51）；
+      七个测试二进制在 OHOS worker 上真实运行（242/242 autotest 通过，含 nominatim 组），
+      运行期 DT_NEEDED 由配方的 E050 链接视图 + LD_LIBRARY_PATH 满足。
+
+# test_package 中自带的消费者测试（R34 实质调用被测二进制）
+test_package_tests:
+  - file: test_xastir.sh
+    description: >
+      执行打包产物：(a) callpass 功能测试——4 个呼号（W1AW/WA0EIR/N0CALL/
+      X1ABC-9）的 APRS passcode 输出与独立 Python 复算的 0x73e2 哈希逐个
+      相等，并验证无参调用打印上游 usage 横幅（证明打包的纯 C ELF 在目标
+      上真实执行且行为正确）；(b) 无显示器的 xastir 负测试——DISPLAY 取消
+      下 60s 不得挂起、不得静默成功；输出不得含任何动态加载器诊断
+      （OHOS libc 预先重定位，进入 X 层即证明整个 DT_NEEDED 闭包装载
+      完成）；失败形态接受上游 "Can't open display" 文本，或死于信号
+      ——后者是本机 libXt/1.3.1 无显示器错误路径的已知平台缺陷（见
+      notes.md），最小 8 行 XtOpenDisplay 程序可独立复现；
+      (c) readelf -d 断言 ELF DT_NEEDED 直接依赖集合
+      libXm.so.4/libXt.so.6/libX11.so.6/libXext.so.6/libXpm.so.4/libSM.so.6/
+      libICE.so.6/libcurl.so/libproj.so.25/libtiff.so.6/libgeotiff.so.5，
+      并反向断言不含 worker 前缀的 libcurl.so.4 / libpcre2-8.so.0
+      （证明链接的是 conan 图内 curl/8.15.0 与静态 pcre2/10.48）；
+      (d) 打包运行数据树存在（share/xastir/{config,symbols,help}）。
+      L1e 反向验证：移走 bin/ 后 (a)(b)(c) 全部失败——非桩测试。

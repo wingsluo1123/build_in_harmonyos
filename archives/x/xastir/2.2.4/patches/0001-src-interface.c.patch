@@ -1,0 +1,69 @@
+--- a/src/interface.c
++++ b/src/interface.c
+@@ -77,6 +77,21 @@
+ #include "xa_config.h"
+ //#include "maps.h"
+ #include "interface.h"
++
++/*
++ * POSIX thread cancellation is optional.  configure probes for it
++ * (AC_CHECK_FUNCS) because some C libraries omit it -- the musl-derived
++ * OHOS libc among them.  Where it is missing we do not fabricate a
++ * successful cancellation: every worker thread created here detaches
++ * itself (pthread_detach(pthread_self())) and is never joined, and each
++ * loop polls the port state/descriptor, so the threads end through their
++ * normal exit conditions.  pthread_testcancel() only acts when a
++ * cancellation is pending, so a no-op is the honest equivalent when none
++ * can exist.
++ */
++#ifndef HAVE_PTHREAD_TESTCANCEL
++#  define pthread_testcancel()    ((void)0)
++#endif
+ #include "util.h"
+ #include "mutex_utils.h"
+ #include "wx.h"
+@@ -3566,12 +3581,14 @@
+       {
+         fprintf(stderr,"Killing thread\n");
+       }
++#ifdef HAVE_PTHREAD_CANCEL
+       if (pthread_cancel(connect_thread))
+       {
+         // The only error code we can get here is ESRCH, which means
+         // that the thread number wasn't found.  The thread is already
+         // dead, so let's not print out an error code.
+       }
++#endif
+ 
+       if (sec_now() >= wait_time)    // Timed out
+       {
+@@ -5878,7 +5895,7 @@
+ 
+   if (ok)
+   {
+-    int retvalue;
++    int retvalue = 0;
+ 
+     if (debug_level & 2)
+     {
+@@ -5901,6 +5918,7 @@
+       fprintf(stderr,"connect_lock, Port = %d\n", port);
+     }
+ 
++#ifdef HAVE_PTHREAD_CANCEL
+     if (port_data[port].read_thread != 0)   // If we have a thread defined
+     {
+       retvalue = pthread_cancel(port_data[port].read_thread);
+@@ -5916,6 +5934,12 @@
+       // warning if this failed, but it got commented out a very
+       // long time ago (around 2003).
+     }
++#else
++    // This C library provides no thread cancellation.  The read/write
++    // threads detach themselves and poll the port state/descriptor, so
++    // they end through their normal loop conditions once it is closed.
++    (void)retvalue;
++#endif
+ 
+     if (end_critical_section(&connect_lock, "interface.c:del_device(3)" ) > 0)
+     {

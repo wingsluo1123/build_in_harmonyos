@@ -1,0 +1,32 @@
+{
+  "verdict": "pass",
+  "timestamp": "2026-10-16T05:51:55+00:00",
+  "auditor": "inline-independent",
+  "issues": [
+    {
+      "severity": "P3",
+      "rule_id": "R39/PF7",
+      "file": "archives/x/xastir/2.2.4/conandata.yml",
+      "line": 8,
+      "description": "conandata.yml 的 sources.url 曾把 gh-proxy 第三方代理放在列表首位（CI 预下载步骤注入后未清理）。已修复：仅保留官方 GitHub 源，镜像 fallback 交由 CI 追加。",
+      "fix_suggestion": "已修复（本 PR 最新提交）"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R19",
+      "file": "archives/x/xastir/2.2.4/reports/conan-create.log",
+      "line": 1,
+      "description": "PR 曾提交 reports/conan-create.log 与 reports/w3-local-ci.log，属评审规则第 19 条禁止入库的 *.log。已修复：解除跟踪，证据改为 notes.md「验证证据摘要」中的可复现命令+关键输出。",
+      "fix_suggestion": "已修复（本 PR 最新提交）"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R52",
+      "file": "archives/x/xastir/2.2.4/reports/audit-result.json",
+      "line": 1,
+      "description": "本审计此前引用的取证字符串（230 项、旧 package_id、4 组断言）与产物不一致。已修复：按当前产物重新生成（242 项、package_id d79516ea05581c78aa747ca533c5ce80990c21f5、6 组消费者断言）。",
+      "fix_suggestion": "已修复（本文件即为重新生成版本）"
+    }
+  ],
+  "summary": "xastir 2.2.4 独立审计结论：pass，无 P0/P1。取证（全部可在本归档复现，原始日志按规则 19 不入库，摘要见 notes.md「验证证据摘要」）：(1) 无空壳测试——test_package/test_xastir.sh 的 6 组断言均为对抗性真实断言：callpass 的 4 个呼号输出与脚本内独立 Python 复算的 APRS passcode 逐一比对、无参调用校验上游 usage 横幅、headless xastir 先判 FAIL 任何动态加载器诊断（Error relocating/symbol not found/cannot open shared object/Error loading shared library）再拒绝 rc=124 挂起与 rc=0 假成功、DT_NEEDED 正向断言 11 个平台 soname 且反向断言不得出现 worker 前缀的 libcurl.so.4/libpcre2-8.so.0、运行数据树三项存在性；移走 bin/ 会使断言组失败（非桩测试）。(2) 无伪造状态——上游测试实跑 `All 242 tests were successful.`（CHECK_EXIT=0，无 skipped 行；编号 231–242 为 Nominatim 组），7 个 check_PROGRAMS 全部构建（含 test_nominatim）；package_id d79516ea05581c78aa747ca533c5ce80990c21f5 由本配方实际构建产生；消费者测试日志为 6 行 PASS + ALL PASS。(3) 无伪造 sha256——独立重算 Release-2.2.4.tar.gz 得 cc521b8590bacc8d1f1f99a6596660c46174f7c809d6ecbbbf4b8dfa57a68419，与 conandata.yml 一致。(4) P1 配方正确性——name/version/目录/conandata 版本键/patch_file 路径一致；四个补丁 hunk 指向真实文件（src/interface.c、src/main.c、src/x_spider.c、configure.ac）；绝对路径 /data/service/hnp/bin 为 CI 既有惯例且带 shutil.which 回退；cpp_info.requires 覆盖全部直接依赖（含新增 cjson/1.7.19）。(5) 合规——补丁内无 `__OHOS__` 平台身份宏（PF5/R8），判据为 AC_CHECK_FUNCS 能力探测与 defined(__GLIBC__)；conandata.yml 仅官方 URL（R39/PF7）；PR 不含 *.log/__pycache__/预编译二进制（R19）。(6) CI 同源脚本本地全绿：JC=pass(Junk Files: 0)、L0/L1/L4/L5=pass、Pass rate 100.0%。已知平台条件（非欺骗）：headless xastir 死于 libXt/1.3.1 无显示错误路径的 SIGSEGV（notes.md 记录最小 8 行复现），消费者断言因此采用「零加载器诊断 + 非零退出」矩阵。"
+}
