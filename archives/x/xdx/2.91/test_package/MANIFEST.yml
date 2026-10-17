@@ -1,0 +1,49 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: xdx/2.91
+homepage: "https://github.com/N0NB/xdx"
+
+# 上游测试命令
+# xdx 2.91 上游无官方测试套件：configure.ac 无 AC_CONFIG_HEADER(tests) 之外的
+# 测试目标，Makefile.am 无 `check` 目标，源码树无 tests/ 目录（已逐一目检
+# xdx-2.91.tar.gz，sha256=4dcba623ba062cb028e67d40a85b9f8eea23259af34ff4752ccc60ca9a2dce7e）。
+upstream_check_command: ""
+
+# conanfile.py build() 中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际存在的测试
+upstream_tests: []
+
+# test_package 中自带的测试（消费者视角验证，R34 反空壳）
+# xdx 是 GTK+3 GUI 应用：main() 在 parse_opts() 之前调用 gtk_init()，
+# 无显示环境下任何调用（含 -h/-V）都止步于 gtk_init。因此消费者验证分两层：
+# 1) 结构层（always）：包装 bin/xdx 存在、非空、e_machine==EM_AARCH64 ——
+#    同时保证门禁 L1e 破坏 bin/ 后本测试必然失败（R34 要求）；
+# 2) 运行层（always）：经 conanrun 环境（包 bin/ 进 PATH、依赖 lib/ 进
+#    LD_LIBRARY_PATH）有界启动交付产物：强制动态链接器解析全部 DT_NEEDED
+#    （libgtk-3.so.0/libglib-2.0.so.0/libc++_shared.so 等），缺依赖会在
+#    main() 前报 loader 错误并被断言拒绝；headless 下 gtk_init 失败 rc=1
+#    属合法路径，有显示则进 GTK 主循环、harness 5s 有界后 TERM 收尾
+#    （rc=143 合法）。
+# 执行模型（先例 archives/t/tasksh/1.2.0）：按产物 ELF 头判别 native/
+# emulated —— CI 真机（aarch64）直接执行；x86_64 开发机走
+# qemu-aarch64 -L /opt/ohos-guest + guest 侧 shim 预载（补 glibc-fortify
+# __*_chk 与 arc4random），不用 cross_building()（OHOS profile 同文件给
+# -pr:h/-pr:b，Conan 会误报 host==build）。
+test_package_tests:
+  - file: test_xdx.sh
+    description: >-
+      有界启动交付产物并断言动态依赖全解析 + 启动路径干净
+      （结构层断言在 conanfile.py _structural_check 内）
+    command: "sh test_xdx.sh"
+
+# 测试断言总数
+# 结构层 3 条：bin/xdx 存在 + 非空 + e_machine==EM_AARCH64
+# 运行层 2 条：有界启动退出码合法（0/1 headless 或 0/1/143 主循环）
+#            + 输出无动态 loader 错误
+assertion_count: 5
