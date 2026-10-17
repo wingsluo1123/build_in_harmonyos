@@ -1,0 +1,40 @@
+software: kded5
+build_system: cmake
+
+# 版本级 manifest
+# 文件位置: archives/k/kded5/5.116.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "5.116.0"
+status: built
+build_date: "2026-10-17"
+
+source:
+  url: "https://download.kde.org/stable/frameworks/5.116/kded-5.116.0.tar.xz"
+  sha256: "5cb67255f866ad765a88a091ad864e4fa83c7bd8b59fa96717817f448e6fa03d"
+  tar_format: tar.xz
+
+build:
+  system: cmake
+  notes:
+    - "CMake + Ninja 交叉编译；kded5 为可执行守护进程（无库产物）。"
+
+dependencies:
+  build:
+    - ecm/6.20.0
+  runtime:
+    - qt5-qtbase/5.15.2.2
+    - kconfig5/5.116.0
+    - kcoreaddons5/5.116.0
+    - kcrash5/5.116.0
+    - kdbusaddons5/5.116.0
+    - kservice5/5.116.0
+
+platform_differences:
+  - "KF_IGNORE_PLATFORM_CHECK=TRUE 绕过 KDE 平台检测（OHOS 不在 KDE 平台列表）。"
+  - "ECM_MODULE_PATH 手动设置（CMakeDeps 生成的 ECMConfig.cmake 不传播该变量）。"
+  - "conan_cmakedeps_paths.cmake 手写：所有 KF5 依赖均以 cmake_find_mode=none 发布，CMakeDeps 不会把其 lib/cmake 加入 CMAKE_PREFIX_PATH，故逐依赖前置。"
+  - "OHOS CMake 平台模块未定义 SONAME flag，设置 CMAKE_SHARED_LIBRARY_SONAME_*=-Wl,-soname, 以产生真实 DT_SONAME。"
+  - "KF5DocTools 保持可选（find_package(KF5DocTools) 非 REQUIRED），未引入以最小化依赖集并跳过 po/doc 安装。"
+
+patches_count: 0
