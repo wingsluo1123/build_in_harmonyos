@@ -1,0 +1,42 @@
+# test_package/MANIFEST.yml
+# Official upstream-test and consumer-test declaration for puf 1.0.0.
+
+package: puf/1.0.0
+homepage: "https://sourceforge.net/projects/puf/"
+
+# Upstream source audit: official SourceForge release archive
+# puf-1.0.0.tar.gz (153 540 bytes, SHA256
+# 3f1602057dc47debeb54effc2db9eadcffae266834389bdbf5ab14fc611eeaf0).
+# puf ships NO upstream test suite.
+upstream_tests_exist: false
+upstream_test_total: 0
+upstream_test_count_method: "manual_audit"
+upstream_test_audit:
+  source_tarball: "puf-1.0.0.tar.gz"
+  source_sha256: "3f1602057dc47debeb54effc2db9eadcffae266834389bdbf5ab14fc611eeaf0"
+  source_origin: "https://downloads.sourceforge.net/project/puf/puf/1.0.0/puf-1.0.0.tar.gz"
+  source_tree: "AUTHORS, ChangeLog, ChangeLog.ag, COPYING, INSTALL, Makefile.am, Makefile.in, NEWS, README, TODO, aclocal.m4, config.guess, config.h.in, config.sub, configure, configure.in, depcomp, install-sh, makemake, missing, puf.1, puf.spec, puf.spec.in, src/Makefile.am, src/Makefile.in, src/{puf.c,puf.h,url.c,recurse.c,http_conn.c,http_rsp.c,http_req.c,hostlist.c,getopts.c,fetch.c,util_date.c}"
+  scan_commands:
+    - "tar tzf puf-1.0.0.tar.gz (24 entries; full listing above)"
+    - "find . -iname '*test*' (no hits: no test/, no *test* files)"
+    - "grep src/Makefile.am: only 'bin_PROGRAMS = puf' and puf_SOURCES; no TESTS/check_PROGRAMS"
+    - "make -n check (generated Makefile.in): check-am: all-am -> no test program runs"
+    - "grep for gtest/criterion/CTest/meson test (no hits)"
+  scan_result: "No test/ or tests/ directory, no TESTS/check_PROGRAMS in src/Makefile.am, no make-check test target with real assertions (check-am: all-am rebuilds the binary), no gtest/CTest harness. The SourceForge release archive ships no test suite."
+  reason: "puf 1.0.0 ships no upstream test framework: no test directory, no make check test target, no gtest/ctest bindings; src/Makefile.am only defines bin_PROGRAMS = puf."
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests: []
+
+test_package_tests:
+  - file: test.sh
+    description: "真实调用 puf 二进制：① puf -h 打印完整用法(选项解析路径,exit 0)；② 裸 puf 打印短用法并 exit 2(参数处理)；③ 用本地 python http.server 起的 hermetic HTTP 回环服务抓取 payload 并校验文件内容(核心并行下载功能)；共 3 项断言"
+    command: "/bin/sh test.sh <bindir> <python>"
+  - file: conanfile.py
+    description: "以 conanrun 环境解析 puf bindir 与 python(HMBS_PYTHON3) 后执行 test.sh"
+    command: "conan test (test_package)"
+
+assertion_count: 3

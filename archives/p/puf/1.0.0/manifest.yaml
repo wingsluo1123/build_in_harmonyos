@@ -1,0 +1,47 @@
+# 版本级 manifest
+# 文件位置: archives/p/puf/1.0.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "1.0.0"
+
+software: puf
+
+# published | built | failed | archived
+# R29: 真机 conan create/verify 通过前标 built，不伪造 published
+status: built
+
+build_date: "2026-10-10"
+build_system: autotools
+
+source:
+  url: "https://downloads.sourceforge.net/project/puf/puf/1.0.0/puf-1.0.0.tar.gz"
+  sha256: "3f1602057dc47debeb54effc2db9eadcffae266834389bdbf5ab14fc611eeaf0"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=/"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-config.sub-ohos.patch"
+  - "0002-configure-confstat-tmpdir.patch"
+  - "0003-configure-sanity-check.patch"
+
+knowledge_gained:
+  - "puf 是纯 Autotools C 命令行工具（configure+make），仅产出 bin/puf 可执行文件，无库 API、无上游测试套件"
+  - "configure.in 仅 AC_CHECK_LIB(xnet/socket/nsl) 与 snprintf 检查，无需外部依赖，bionic libc 直接满足"
+  - "源码包内置生成的 configure 脚本，无需 autoreconf；--prefix=/ 让 make install(DESTDIR=package_folder) 落到 bin/ 直下"
+  - "OHOS shell：不覆写 SHELL/CONFIG_SHELL，放行 profile 的 /data/service/hnp/bin/bash（AutotoolsToolchain 默认保留 buildenv 值）；曾强制 /bin/sh shim 致 configure 在真机 fork/exec 子进程失败"
+  - "test_package 通过真实本地 HTTP 回环抓取验证 puf 的核心并行下载能力"
+  - "puf 生成的 config.status 硬编码在构建树内建 ./confstatXXXXXX 临时目录；HMFS 新建目录权限元数据滞后 + chmod 不受支持(HMBS_CAP_CHMOD=0) 使随后写 in/out/config.h 全 EACCES、Makefile 生成失败。修复：补丁把临时目录改为 ${TMPDIR:-.}/confstatXXXXXX，配方 build() 前 _pin_tmpdir() 用探针把 TMPDIR 钉到可写非 HMFS 根（同 reflex 思路，但 reflex 只 pin TMPDIR 因 reflex 的 config.status 本就用 $TMPDIR）"
+  - "共享 OHOS 构建主机在 fork 压力尖峰下会短暂拒绝 fork()（EAGAIN，shell 报 'fork: retry: Resource temporarily unavailable'），使 make 以 'Error 254' 中止，属主机瞬时资源竞争而非源码缺陷。缓解：configure 加 --disable-dependency-tracking 减少单 TU 的 fork 次数；make/make install 走 _run_make_with_fork_retry()，仅在日志命中 fork 压力指纹时退避重跑（增量续跑），真实编译错误立即上抛"
+  - "fork EAGAIN 在本机的真实触发面是 vfork/posix_spawn 快速路径，而非裸 fork()：CI #94346 中 10 个翻译单元（bash 派生）全部编译成功，只有链接失败，且 Python link-retry 包装的 60 次 subprocess.run([clang]) 全部抛 [Errno 11]（clang 零字节输出）。CPython 的 subprocess 在 glibc>=2.24/OHOS 上 _USE_POSIX_SPAWN=True，走 vfork；clang 派生 ld.lld 亦走 posix_spawn，二者都不重试 EAGAIN，而 bash 对裸 fork() 内部重试。修复：包装改用 os.fork()+os.execv() 原始系统调用派生链接（与 bash 成功路径同源），并把软 RLIMIT_NPROC/RLIMIT_NOFILE 抬到硬上限（fork EAGAIN 的直接触发条件是进程数将超 RLIMIT_NPROC），重试节奏改为 200 次×递增 0.2s（≤2s）高频轮询；瞬态 errno 与瞬态文本才重试，真实链接错误原样立即上抛"
+  - "fork 压力下 bash 与 clang 的重试不对称：bash 内部自动重试 EAGAIN 的 fork()（故编译全部成功），但 clang 用 posix_spawn() 派生 ld.lld 且不重试 EAGAIN，一次尖峰即令链接失败。仅靠外层 make 重试每次只给 clang 一次 spawn 机会（间隔数秒），粒度太粗——实测 6 次 attempt/约 3.5 分钟仍 6/6 全败。修复：把 make 的 CCLD 命令行覆盖为 'exec <python> <build>/hmbs-link-retry.py $(CC)'，在单条链接命令内快速重试 clang。包装必须是 Python 而非 shell：shell 在 fork 失败时不返回非零状态而是直接以 exit 254 中止整个脚本，重试循环无法进入第二次（重试机制被它所要对冲的故障摧毁，实测日志无任何 'link attempt N' 行）；Python 把 fork 失败作为可捕获 OSError，解释器存活并真正循环重试。只对 posix_spawn failed/Resource temporarily unavailable/fork: retry 等瞬态指纹或 EAGAIN/ENOMEM 等瞬态 errno 重试，真实链接错误原样上抛；exec 让 make 的 shell 用解释器替换自身不多一次 fork，单引号保护使 make 自行展开 $(CC) 并经 MAKEFLAGS 传到 src/ 递归 make"
+
+upstream_tests_exist: false
+upstream_test_audit: "Audited puf-1.0.0.tar.gz (24 entries: Makefile.am/Makefile.in, configure.in/configure, src/{Makefile.am,Makefile.in,puf.c,puf.h,url.c,recurse.c,http_conn.c,http_rsp.c,http_req.c,hostlist.c,getopts.c,fetch.c,util_date.c}, puf.1, puf.spec, COPYING, README, TODO, INSTALL, NEWS, ChangeLog, AUTHORS). No test/ or tests/ directory, no TESTS/check_PROGRAMS in src/Makefile.am (only bin_PROGRAMS = puf), no check/check-TESTS target with real tests (check-am: all-am rebuilds nothing new), no gtest/criterion/CTest harness. SourceForge release tarball ships no test suite."
+reason: "puf 1.0.0 ships no upstream test framework: no test directory, no make check test target, no gtest/ctest bindings; src/Makefile.am only defines bin_PROGRAMS = puf."
