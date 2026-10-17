@@ -1,0 +1,44 @@
+package: lxi-tools/2.8
+homepage: "https://github.com/lxi-tools/lxi-tools"
+
+upstream_check_command: "meson test --list"
+upstream_test_in_build: true
+upstream_test_command: "meson test (build() 内 Meson(self).test())"
+upstream_tests_skip_reason: >-
+  Upstream registers three metadata validators conditionally. The Linux and
+  OHOS build environments register every validator whose executable is
+  available. The recipe supplies the published desktop-file-utils/0.28 tool,
+  so the desktop and GLib schema validators run on OHOS. The remaining
+  appstream-util program belongs to appstream-glib, for which the registry has
+  no OHOS package; that one test remains in the denominator and is reported as
+  not run rather than counted as passing. appstreamcli is not substituted
+  because it is a different upstream interface.
+upstream_tests:
+  - name: "Validate desktop file"
+    type: metadata
+    condition: "desktop-file-validate available"
+  - name: "Validate appstream file"
+    type: metadata
+    condition: "appstream-util available"
+  - name: "Validate schema file"
+    type: metadata
+    condition: "glib-compile-schemas available"
+
+test_package_tests:
+  - file: test_lxi_tools.py
+    description: "Execute the installed CLI and verify the archive version"
+  - file: test_lxi_tools.py
+    description: "Execute the default GUI help path and require both programs, AArch64 ELF signing, clean dynamic paths and no Conan path leak"
+  - file: test_lxi_tools.py
+    description: "Use the public RAW/SCPI CLI against a persistent fake instrument with split text and binary block frames"
+  - file: test_lxi_tools.py
+    description: "Preserve a NUL-containing binary payload byte-for-byte and finish before the server closes"
+  - file: test_lxi_tools.py
+    description: "Reject malformed, indefinite, oversized, truncated and timed-out responses"
+  - file: test_lxi_tools.py
+    description: "Verify HarmonyOS target identity and signed-ELF execution"
+
+scenario_count: 14
+external_assertion_count: 31
+ohos_target_specific_scenarios: 4
+max_rss_mb: 256
