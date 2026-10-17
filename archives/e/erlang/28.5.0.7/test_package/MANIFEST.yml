@@ -1,0 +1,43 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+package: erlang/28.5.0.7
+homepage: "https://www.erlang.org/"
+
+# 上游测试入口：OTP 官方 release_tests（common_test 套件集合）
+#   ./otp_build tests           -> release/tests/<app>_test/
+#   cd release/tests/test_server -> ts:install() 后 ts:run(<app>, [batch])
+upstream_check_command: "./otp_build tests && cd release/tests/test_server && erl -noshell -eval 'ts:install(), ts:run(compiler, [batch]), ts:run(kernel, [batch]), ts:run(stdlib, [batch]), halt().'"
+
+# conanfile.py build() 方法中未跑上游测试（OTP 全量套件数小时级，
+# 不适合放在 conan 构建窗口内），上游测试在构建后由 ts 自宿主执行。
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试套件（common_test *_SUITE，位于源码树 lib/*/test 与 erts/test）
+upstream_tests:
+  - file: lib/compiler/test/*_SUITE.erl
+    source: otp_src_28.5.0.7/lib/compiler/test
+    description: "Erlang 自举编译器（Erlang 写成的编译器跑在本包构建的 BEAM 上）测试套件"
+    command: "ts:run(compiler, [batch])"
+  - file: lib/kernel/test/*_SUITE.erl
+    source: otp_src_28.5.0.7/lib/kernel/test
+    description: "kernel 应用（文件/进程/网络/定时器/代码加载）测试套件"
+    command: "ts:run(kernel, [batch])"
+  - file: lib/stdlib/test/*_SUITE.erl
+    source: otp_src_28.5.0.7/lib/stdlib/test
+    description: "stdlib 标准库（lists/maps/ets/unicode/io 等）测试套件"
+    command: "ts:run(stdlib, [batch])"
+  - file: erts/test/*_SUITE.erl
+    source: otp_src_28.5.0.7/erts/test
+    description: "erlc/erlexec/ethread 等 erts 层测试套件"
+    command: "ts:run(erts, [batch])"
+
+# test_package 中自带的测试 (消费者视角验证，驱动打包后的 erl/erlc/escript)
+test_package_tests:
+  - file: test.sh
+    description: "消费者冒烟: erl/erlc/escript + zlib/crypto NIF + gen_udp + 文件 IO + 定时器 共 15 条断言"
+    command: "bash test.sh"
+
+# 测试断言总数 (test_package 断言数)
+assertion_count: 15

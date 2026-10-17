@@ -1,0 +1,44 @@
+# ═══ Draft knowledge entry — "自研构建体系"型上游在 OHOS 的 Conan 交叉适配模式 ═══
+# Timestamp: 2026-10-13
+# Software: erlang 28.5.0.7（手写顶层 configure + 递归 make + otp_build 体系）
+# Gate: conan create build()/package()
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id: DRAFT-erlang-28.5.0.7-private-build-system-cross-adaptation
+title: 上游自带手写 configure + 递归 make（非单一 autotools/CMake 工程）时在 OHOS 的 Conan 适配模式与 2.29.1 API 三坑
+trigger_tool: configure|make|otp_build|apply_conandata_patches|Environment
+phase: configuration
+error_signature: TypeError: apply_conandata_patches\(\) got an unexpected keyword argument 'base_path'|AssertionError: env argument to ConanFile.run\(\) should be a list|AttributeError: 'Environment' object has no attribute 'apply'|neither TARGET nor OVERRIDE_TARGET can be determined
+severity: 2
+category: ohos|conan|cross-build|build-system
+match_keywords: 手写configure, otp_build, 递归make, AutotoolsToolchain, toolchain 不适用,
+  apply_conandata_patches, base_path, Environment, EnvVars, self.run env, TARGET,
+  OVERRIDE_TARGET, target.mk, staging prefix, make install, --jobserver-style=pipe
+keywords: erlang/28.5.0.7, otp_build, configure, make, conan 2.29.1, apply_conandata_patches,
+  Environment.vars().apply(), self.run(env=...), CONFIG_SHELL, TARGET, release_tests
+approach: 判定"上游构建体系不属于标准 autotools/CMake"的三个信号：①根目录是手写
+  configure（不是 autoconf 生成物，或虽有 configure 但驱动多份子 configure）；②真正的
+  工作由递归 make/自研驱动脚本完成（otp_build、Makefile 里 $(MAKE) 多层）；③安装不依赖
+  DESTDIR。此时不要套 AutotoolsToolchain（它注入的 flags 与上游 configure 的假设冲突），
+  直接：self.run("./configure --build=<ohos-triplet> --host=<ohos-triplet> ...") →
+  self.run("make -jN --jobserver-style=pipe") → self.run("make install")，安装到
+  build_folder/_install 暂存目录再 copy 进 package_folder。环境变量用
+  Environment + env.vars(self, scope="build").apply() 上下文注入（CC/CXX/CPPFLAGS/LDFLAGS/
+  CONFIG_SHELL/SHELL/LC_ALL）。若上游还有"发布测试/构建测试"驱动（otp_build tests、
+  make release_tests）会二次调用 config.guess 推导 TARGET：OHOS 下需显式 TARGET= 或打
+  config.guess 补丁。
+root_cause: 自研构建体系把"宿主环境"假设写死在脚本里（bash、GNU 工具链、/tmp、chmod、
+  mkfifo），Conan 的通用工具链反而与这些假设打架；同时 Conan 2.29.1 的若干 API 与文档/新版本
+  不一致，照旧经验写会连撞三处。
+affected_scope: 所有自带非标准构建驱动的上游（OTP/ocaml/ghc 类自举、vendor 里带自家 configure 的包）
+verification_cmd: conan create archives/e/erlang/28.5.0.7 -pr:h=ci/conan/profiles/ohos-aarch64
+  -pr:b=ci/conan/profiles/ohos-aarch64 --build=missing  # rc=0；test_package 15/15
+rec_priority: 1
+rec_approach: manual-configure-make-with-environment-context
+rec_description: 绕开 AutotoolsToolchain，手写 configure/make/make install 三连 +
+  Environment.vars(...).apply() 注入变量 + staging 前缀安装；patches 走
+  apply_conandata_patches(self)（不带 base_path）；make 并行强制
+  --jobserver-style=pipe；对上游二次 config.guess 探测显式传 TARGET。
+rec_command: with self._configure_env().vars(self, scope="build").apply(): self.run("./configure --prefix=<stage> --build=aarch64-unknown-linux-ohos --host=aarch64-unknown-linux-ohos"); self.run("make -jN --jobserver-style=pipe"); self.run("make install")
+related: DRAFT-erlang-28.5.0.7-beam-ohos-musl-diagnosis-tree, CONFIG-GUESS-BUILD-TYPE-OHOS
+source_pr: erlang 28.5.0.7 适配（路径C）

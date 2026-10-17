@@ -1,0 +1,22 @@
+--- a/erts/emulator/drivers/common/inet_drv.c
++++ b/erts/emulator/drivers/common/inet_drv.c
+@@ -14395,9 +14395,19 @@
+ 	   where the first three are unsigned integers and the last
+ 	   is an arbitrary string. We only care about the first two. */
+ 	if (sscanf(utsname.release, "%u.%u", &version, &patchlevel) != 2) {
++#if defined(__OHOS__)
++	    /* HarmonyOS reports a vendor kernel release string such as
++	       "HongMeng Kernel 1.12.0", which does not have the
++	       <version>.<patchlevel>.<sublevel> form. It is a modern Linux
++	       derivative where SO_BSDCOMPAT is obsolete, so select it rather
++	       than emitting a spurious warning. */
++	    so_bsdcompat_is_obsolete = 1;
++	    return 0;
++#else
+ 	    fprintf(stderr, "uname: unexpected release '%s'\r\n",
+ 		    utsname.release);
+ 	    return 1;
++#endif
+ 	}
+ 	/* SO_BSDCOMPAT is deprecated and triggers warnings in 2.5
+ 	   kernels. It is a no-op in 2.4 but not in 2.2 kernels. */
