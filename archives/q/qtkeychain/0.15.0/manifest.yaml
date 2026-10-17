@@ -1,0 +1,39 @@
+software: qtkeychain
+version: "0.15.0"
+status: built
+build_date: "2026-10-17"
+build_system: cmake
+created_at: 2026-10-17
+dependencies:
+  required:
+    - qtbase-sql-dbus/6.11.1
+  build:
+    - ecm/6.26.0
+  optional:
+    - libsecret
+patches_applied:
+  - 0001-autotest-basic.cpp.patch
+test_results:
+  type: conan_create_ohos_aarch64
+  upstream: "passed: 1/1 CTest entries (basic, autotest/basic.cpp via ECMAddTests) — 100% tests passed"
+  test_package: "passed: CMake consumer found Qt6Keychain, linked, and verified QKeychain fallback store/read/delete (PASS: Qt6Keychain fallback store/read/delete)"
+source_url: https://github.com/frankosterfeld/qtkeychain/archive/refs/tags/0.15.0.tar.gz
+source_sha256: f4254dc8f0933b06d90672d683eab08ef770acd8336e44dfa030ce041dc2ca22
+knowledge_gained:
+  - "qtkeychain exports Qt6KeychainConfig.cmake and the qt6keychain CMake target used by ruqola (Qt6Keychain / QKeychain password storage)."
+  - "The current HarmonyOS PC baseline provides Qt6 Core and DBus through qtbase-sql-dbus/6.11.1."
+  - "0.15.0 registers the upstream autotest (autotest/basic.cpp via ECMAddTests) when BUILD_TESTING=ON and builds the testclient application when BUILD_TEST_APPLICATION=ON."
+  - "0.15.0 removed the LIBSECRET_SUPPORT=OFF default-safe path: the option exists only inside the UNIX branch and defaults ON, so it must be explicitly disabled to avoid a mandatory pkg_check_modules(libsecret-1) lookup."
+  - "On a headless OHOS host with neither gnome-keyring nor kWalletd, the keyring backend detection only reaches fallbackOnError for the KWallet backends; the autotest therefore enables QKeychain insecure fallback and the session is identified as KDE so the plaintext QSettings store is exercised."
+patch_generation:
+  method: per-file-difflib
+  source_orig_hash: ac9ee046d8b6886c
+  source_work_hash: 29d8b7bed2c29624
+  generated_at: '2026-10-17T14:30:24'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-autotest-basic.cpp.patch
+    type: portability
+    platform_only: True
+    guard: 'none'
