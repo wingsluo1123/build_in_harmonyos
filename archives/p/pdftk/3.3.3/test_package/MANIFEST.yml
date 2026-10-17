@@ -1,0 +1,66 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: pdftk/3.3.3
+homepage: "https://gitlab.com/pdftk-java/pdftk"
+
+# 上游存在官方测试套件（JUnit4，ant `test` 目标，batchtest **/*Test.java）。
+# 本包的 conan build() 内真实运行该套件（ant test-resolve + ant test），
+# 结果由框架输出的 per-class "Tests run:" 汇总行解析为 HMBS_UPSTREAM_TEST_RESULT。
+upstream_tests_exist: true
+upstream_check_command: "ant test（官方 test 目标：test-resolve 取 JUnit 依赖 + test-run 跑 batchtest + coverage-report）"
+upstream_test_in_build: true
+upstream_test_command: "sh $ANT_HOME/bin/ant -lib <antlib> -lib ./lib test"
+upstream_test_total: 70
+upstream_test_count_method: auto
+
+# 上游测试用例（@Test 方法级盘点，v3.3.3 源码实测计数；总数 70）
+upstream_tests:
+  - file: "test/com/gitlab/pdftk_java/AnnotationsTest.java"
+    description: "PDF 注解读写（2 个 @Test）"
+    command: "ant test"
+  - file: "test/com/gitlab/pdftk_java/AttachFilesTest.java"
+    description: "文件附件挂载/导出（5 个 @Test）"
+    command: "ant test"
+  - file: "test/com/gitlab/pdftk_java/BurstTest.java"
+    description: "burst 按页拆分（2 个 @Test）"
+    command: "ant test"
+  - file: "test/com/gitlab/pdftk_java/CatTest.java"
+    description: "cat 页面拼接（含 8 个经 pdftocairo 比对 SVG 的用例）"
+    command: "ant test"
+  - file: "test/com/gitlab/pdftk_java/CommandParserTest.java"
+    description: "命令行解析器（8 个 @Test）"
+    command: "ant test"
+  - file: "test/com/gitlab/pdftk_java/CryptoTest.java"
+    description: "加密/解密（含 2 个经 pdftocairo 比对的用例）"
+    command: "ant test"
+  - file: "test/com/gitlab/pdftk_java/DataFieldsTest.java"
+    description: "表单域数据（3 个 @Test）"
+    command: "ant test"
+  - file: "test/com/gitlab/pdftk_java/DataTest.java"
+    description: "dump_data 元数据输出（14 个 @Test）"
+    command: "ant test"
+  - file: "test/com/gitlab/pdftk_java/FormTest.java"
+    description: "表单填充（9 个 @Test）"
+    command: "ant test"
+  - file: "test/com/gitlab/pdftk_java/MultipleTest.java"
+    description: "多输入组合（2 个 @Test）"
+    command: "ant test"
+  - file: "test/com/gitlab/pdftk_java/ReaderTest.java"
+    description: "PDF 读取（1 个 @Test）"
+    command: "ant test"
+  - file: "test/com/gitlab/pdftk_java/StampTest.java"
+    description: "水印/图章（含 2 个经 pdftocairo 比对的用例）"
+    command: "ant test"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.sh
+    description: "三段式消费者验证：1) 结构校验 2 项（bin/pdftk.jar 存在、lib/ 运行时 jar 齐备：bcprov-jdk18on-1.71.jar + commons-lang3-3.12.0.jar）；2) 真实运行打包产物 bin/pdftk --version 并断言报告 3.3.3（1 项）；3) 编译并运行 Java 消费者程序 TestPdftk.java——9 项断言（pdftk/内嵌 iText Document 类存在、PDFTK_VER=3.3.3、main_noexit 入口存在、--version 返回 0、直写最小 1 页有效 PDF（不经已移除的 PdfWriter.getInstance）、cat 返回 0、cat 产物为有效 PDF、dump_data 返回 0 且报告 NumberOfPages: 1）；javac 编译成功行为过程输出，不计断言 (R34 实质性验证)"
+    command: "sh test.sh"
+
+# 测试断言总数
+# 上游：70 个 @Test（官方 ant test 套件；12 个 SVG 比对用例需外部 pdftocairo，见 notes.md）
+# test_package：结构校验 2 项 + CLI 运行断言 1 项 + 消费者断言 9 项 = 12
+assertion_count: 12

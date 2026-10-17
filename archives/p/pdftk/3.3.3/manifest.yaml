@@ -1,0 +1,41 @@
+# 版本级 manifest — pdftk 3.3.3
+version: "3.3.3"
+software: pdftk
+status: built
+build_date: "2026-10-17"
+conan_ref: "pdftk/3.3.3"
+
+source:
+  url: "https://gitlab.com/pdftk-java/pdftk/-/archive/v3.3.3/pdftk-v3.3.3.tar.gz"
+  sha256: "9c947de54658539e3a136e39f9c38ece1cf2893d143abb7f5bf3a2e3e005b286"
+  note: "GitLab 官方归档（tag v3.3.3）；归档大小 2380289 字节，与发行页 jar/x86_64 资产同源"
+
+build:
+  system: ant
+  command: "ant main（clean + ivy resolve + compile + jar）；ant test-resolve + ant test（上游 JUnit4 套件，build() 内真实运行）"
+  dependencies:
+    - bishengjdk 17.0.13（配方经 cmd-pkgs 自取；HNP 自带 JVM 在部分环境无法启动）
+    - apache-ant 1.10.15（配方自 archive.apache.org 自取，sha256 钉校验 71334d7e…80506）
+    - Apache Ivy 2.5.2（配方自 repo1.maven.org 自取，sha256 钉校验 98428d54…eed04；供 build.xml ivy:retrieve）
+    - JaCoCo Ant tasks 0.8.4（配方自 repo1.maven.org 自取，sha256 钉校验 d158d4d1…f80e6；供 build.xml jacoco:coverage/report）
+    - Maven Central 构建/测试依赖（ivy 按 ivy.xml 拉取：bcprov-jdk18on 1.71、commons-lang3 3.12.0、junit 4.12、system-rules 1.19.0、jacoco-ant 0.8.4）
+
+patches_applied: []
+
+upstream_tests:
+  framework: "ant test（上游 build.xml 官方 test 目标：JUnit batchtest **/*Test.java，plain 输出 per-class Tests run 汇总）"
+  test_sources: "test/com/gitlab/pdftk_java/ 下 12 个 *Test.java（BlackBox.java 为辅助类，非测试类）"
+  test_classes: "AnnotationsTest/AttachFilesTest/BurstTest/CatTest/CommandParserTest/CryptoTest/DataFieldsTest/DataTest/FormTest/MultipleTest/ReaderTest/StampTest"
+  test_methods: 70
+  test_command: "sh $ANT_HOME/bin/ant -lib <antlib> -lib ./lib test（conan build() 内真实运行，日志 uptest.log）"
+  run_in_build: true
+  evidence: "build() 解析 uptest.log 的 Tests run 汇总行生成 HMBS_UPSTREAM_TEST_RESULT；真实计数以真机预检日志为准（首轮待回填）"
+upstream_test_pass_rate: "待真机预检回填（首轮未跑；已知 12 个 SVG 比对用例需外部 pdftk-cairo 工具，见 notes.md，如真机缺失将如实记为环境缺口）"
+adapted_test_pass_rate: "待真机预检回填（test_package：结构 2 项 + CLI 运行 1 项 + 消费者 9 项 = 12，HMBS_TEST_PACKAGE_RESULT 以真机实测为准）"
+
+knowledge_gained:
+  - "pdftk 3.x 是纯 Java 项目（pdftk-java），sourceCompatibility 1.8，JDK 17 javac 可直接编译，无需补丁"
+  - "上游同时提供 Ant+Ivy / Gradle / Maven 三套构建；CI 权威入口是 Ant（.gitlab-ci.yml test 作业：ant test-resolve + ant test），配方与之同源"
+  - "build.xml 的 ivy:retrieve 与 jacoco:coverage 需要 ant -lib 额外提供 ivy.jar 与 jacocoant.jar（上游 CI 靠 apt 的 ant-ivy 包）；配方从 Maven Central 按版本钉 sha256 自取，缓存于 ~/.cache-hmbs-pdftk-antlib/"
+  - "12 个 SVG 比对用例（CatTest 8 + CryptoTest 2 + StampTest 2）经 BlackBox.assertPdfEqualsAsSVG 调用外部 pdftocairo（poppler）；其余 58 个用例无外部进程依赖"
+  - "thin jar 打包：build/jar/pdftk.jar + lib/ 运行时 jar（bcprov + commons-lang3），bin/pdftk launcher 经 java -cp 启动；调用一律 sh <script>，规避 HMDFS 新写文件执行位限制"

@@ -1,0 +1,25 @@
+# 软件级 manifest — pdftk
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: pdftk
+display: "pdftk-java PDF Toolkit"
+description: "pdftk-java PDF 工具箱：cat 拼接、burst 拆页、stamp 水印、fill_form 表单填充、dump_data 元数据等 CLI 操作，纯 Java 实现"
+category: utility
+homepage: "https://gitlab.com/pdftk-java/pdftk"
+license: GPL-2.0-or-later
+build_system: custom
+
+ohos_adaptation:
+  key_points:
+    - "纯 Java CLI 工具，无 native 编译；GitLab 官方归档 + Ant 构建（与上游 CI 同源的 main/test 目标）"
+    - "依赖自取：bishengjdk 17.0.13（cmd-pkgs；HNP 自带 JVM 在部分环境无法启动）+ apache-ant 1.10.15（archive.apache.org，sha256 钉校验，sh 调用规避 HMDFS 执行位问题）"
+    - "Ant 上游缺失的 ivy/jacoco 任务 jar 由配方从 Maven Central 按版本钉 sha256 自取（ivy:retrieve / jacoco:coverage 必需）"
+    - "上游 JUnit4 套件 70 个用例在 conan build() 内真实运行，结果由框架 Tests run 汇总行解析为 HMBS_UPSTREAM_TEST_RESULT；12 个 SVG 比对用例需外部 pdftocairo，缺失时如实记环境缺口"
+    - "产物为 libexec/pdftk/ 可运行布局（bin/pdftk.jar + bin/pdftk launcher + lib/ 运行时 jar），test_package 做 --version 实跑 + iText 建 PDF + cat/dump_data 端到端验证"
+  common_dependencies: []
+
+versions:
+  "3.3.3":
+    status: built
+    build_date: "2026-10-17"
+    conan_ref: "pdftk/3.3.3"
