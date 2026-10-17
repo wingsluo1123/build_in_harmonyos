@@ -1,0 +1,52 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# bdf2sfd 1.1.9 上游测试实测（2026-10-07，源码 tag 1.1.9 就地清点 + 本机实跑）：
+#   CMakeLists.txt:65-70 = enable_testing() + 5 个 add_test；
+#   ctest -N 与 ctest 实跑均 5 项，本机 5/5 全过（0.30s）。
+#   tests/ 目录无测试框架源码，只有 4 个 BDF 字体语料（spleen-*.bdf），是其中
+#   4 项转换测试的输入；另 1 项是无参调用。无独立 RUNTEST 脚本、无 examples/ 目录。
+
+package: bdf2sfd/1.1.9
+homepage: "https://github.com/fcambus/bdf2sfd"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "ctest -N"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "cmake --build <build_dir> --target test -- -j20"
+
+# 上游实际运行的测试程序（ctest 注册 5 项，本机实测 5/5 全过）
+upstream_tests:
+  - file: CMakeLists.txt
+    source: bdf2sfd-1.1.9/CMakeLists.txt
+    description: "ctest #1 无参调用（打印用法，实测 rc=0 不崩溃）"
+    command: "ctest -R '^bdf2sfd$'"
+  - file: tests/spleen-8x16.bdf
+    source: bdf2sfd-1.1.9/tests/spleen-8x16.bdf
+    description: "ctest #2 BDF→SFD 转换（8x16 语料，96 glyphs）"
+    command: "ctest -R '^8x16$'"
+  - file: tests/spleen-12x24.bdf
+    source: bdf2sfd-1.1.9/tests/spleen-12x24.bdf
+    description: "ctest #3 BDF→SFD 转换（12x24 语料）"
+    command: "ctest -R '^12x24$'"
+  - file: tests/spleen-16x32.bdf
+    source: bdf2sfd-1.1.9/tests/spleen-16x32.bdf
+    description: "ctest #4 BDF→SFD 转换（16x32 语料）"
+    command: "ctest -R '^16x32$'"
+  - file: tests/spleen-32x64.bdf
+    source: bdf2sfd-1.1.9/tests/spleen-32x64.bdf
+    description: "ctest #5 BDF→SFD 转换（32x64 语料）"
+    command: "ctest -R '^32x64$'"
+
+# test_package 中自带的测试 (消费者视角验证, 调用已安装二进制)
+test_package_tests:
+  - file: test.sh
+    description: "消费者测试 — 调用已安装 bdf2sfd 执行 -v/-h/-f/-p 与 BDF→SFD 转换，5 项断言"
+    command: "bash test.sh"
+
+# 上游测试断言总数（ctest 注册 5 项；本机实测 5/5 通过，见 notes.md 验证结果）
+assertion_count: 5
