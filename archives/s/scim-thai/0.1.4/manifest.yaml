@@ -1,0 +1,53 @@
+# 版本级 manifest — scim-thai 0.1.4
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "0.1.4"
+software: scim-thai
+status: published
+build_date: "2026-10-16"
+build_system: autotools
+
+source:
+  url: "https://github.com/tlwg/scim-thai/archive/v0.1.4.tar.gz"
+  sha256: "3801f53baf9310ecc783049fe928e88152b39645a746f2a7bc78ebefd0ec791b"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--enable-shared"
+    - "--disable-static"
+    - "--build=aarch64-linux"
+    - "--host=aarch64-linux"
+  dependencies:
+    - "scim/1.4.18-git20211204"
+    - "libthai/0.1.29"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "patches/0001-configure.ac.patch"
+
+knowledge_gained:
+  - "HMDFS 上 Autotools config.status 的 AS_TMPDIR umask 077 临时目录不可写，需在 configure.ac 中 m4_define 覆盖 AS_TMPDIR 为 umask 002（E052/E060 复用）"
+  - "上游 git 快照缺 m4/pkg.m4 导致 PKG_CHECK_MODULES 未展开，随配方 export_sources 提供 pkg.m4（E089 复用）"
+  - "gettext AM_GNU_GETTEXT 要求 ./config.rpath 与 gettext 宏链；conan gettext 包的 autopoint 脚本 prefix=/ 写死（重定位缺失），gettext_datadir 误解析为 //share/gettext，报 archive.dir.tar.xz 缺失 → po/Makefile.in.in 未生成 → configure 失败；修复：生成 prefix=<gettext包目录> 的 autopoint 副本并置于 PATH 前，其余 gettext 宏链与 config.rpath 由该 autopoint 自动生成（scim intltoolize 同族手法）"
+  - "conan tool_requires perl 包 PERL5LIB 与系统 perl ABI 不匹配，须将 PERL 指向系统 perl 且 PERL5LIB 仅指向 automake share 目录（E155 复用）"
+  - "scim 依赖包 libscim-1.0.la 内嵌无效绝对依赖 //lib/libltdl.la，libtool 链接报 invalid archive，须在 build 前修正依赖包 .la（依赖包遗留缺陷，下游规避）"
+  - "HMDFS ginstall 复制大 .so 会截断损坏（error deallocating Permission denied），package() 须用 conan copy 重复制完整产物"
+  - "scim-thai 为 SCIM IMEngine dlopen 模块，必须 --enable-shared --disable-static，模板默认 static 导致仅产出 thai.a 无法 dlopen"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/scim-thai-0.1.4.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/scim-thai-0.1.4.work
+  source_orig_hash: ec785945ea78c709
+  source_work_hash: 6236b9afbfcb0a72
+  generated_at: '2026-10-17T14:28:30'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-configure.ac.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

@@ -1,0 +1,35 @@
+--- a/configure.ac
++++ b/configure.ac
+@@ -1,16 +1,32 @@
+ #                                               -*- Autoconf -*-
+ # Process this file with autoconf to produce a configure script.
+ 
+ AC_PREREQ(2.59)
+ AC_INIT(scim-thai, 0.1.4, theppitak@gmail.com)
+ AC_CONFIG_SRCDIR([src/scim_thai_imengine.h])
++dnl HMDFS does not permit writes within the 0700 temporary directories that
++dnl Autoconf's default AS_TMPDIR creates for config.status.  Override the m4
++dnl source macro before AC_OUTPUT expands it, then regenerate configure.
++m4_define([AS_TMPDIR],
++[# Create a temporary directory suitable for HMDFS config.status output.
++m4_if([$2], [], [: "${TMPDIR:=/tmp}"])
++{
++  tmp=`(umask 002 && mktemp -d "m4_default([$2],
++    [$TMPDIR])/$1XXXXXX") 2>/dev/null` &&
++  test -d "$tmp"
++} || {
++  tmp=m4_default([$2], [$TMPDIR])/$1$$-$RANDOM
++  (umask 002 && mkdir "$tmp")
++} || AS_ERROR([cannot create a temporary directory in m4_default([$2],
++      [$TMPDIR])])])
++
+ AC_CONFIG_HEADER([config.h])
+ AC_CONFIG_MACRO_DIR([m4])
+ 
+ AM_INIT_AUTOMAKE([dist-xz no-dist-gzip])
+ 
+ # gettext
+ AM_GNU_GETTEXT_VERSION([0.18.1])
+ AM_GNU_GETTEXT([external])
+ GETTEXT_PACKAGE=scim-thai
+ AC_SUBST(GETTEXT_PACKAGE)
