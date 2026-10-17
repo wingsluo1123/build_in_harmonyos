@@ -1,0 +1,27 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for kservice/6.28.0.
+# assertion_count = check() calls in test.cpp (13) + assert statements in conanfile.py (10).
+
+package: kservice/6.28.0
+homepage: https://invent.kde.org/frameworks/kservice
+
+upstream_check_command: "ctest --output-on-failure"
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error"
+
+upstream_tests:
+  - file: autotests/
+    source: kservice-6.28.0/autotests/
+    description: "KService upstream CTest/autotests suite (ksycocatest, ksycoca_xdgdirstest, ksycocathreadtest, kservicetest, kapplicationtradertest, kmimeassociationstest); the POSIX file-permission/timestamp-sensitive and symlink-creating cases are guarded behind KSERVICE_OHOS_SKIP_UNSUPPORTED_FS_TESTS on OHOS."
+    command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error"
+    condition: "run in the Conan build with BUILD_TESTING=ON"
+
+test_package_tests:
+  - file: test_package/test.cpp
+    description: "Case A constructs a temporary KService and verifies name/exec/icon; Case B performs end-to-end desktop-file discovery: a fixture is installed into the isolated XDG applications directory (plus a second fixture staged under XDG_DATA_DIRS), KSycoca::setupTestMenu() stages the canonical minimal applications.menu, KService lookups drive the real KSycoca pipeline with a cold cache, the fixture is verified through both the desktop-name and the entry-path indexes, and the materialised sycoca cache file must exist."
+    command: "conan create (test_package builds and runs test_kservice)"
+  - file: test_package/conanfile.py
+    description: "Package integrity: libKF6Service.so must carry the bare DT_SONAME without a versioned symlink chain and with no absolute/relative DT_NEEDED entries; kbuildsycoca6 must have clean DT_NEEDED entries (the recipe normalizes the SONAME-less ki18n/6.26.0 path entry to a bare basename in package()), answer --version and complete a real --testmode cache build; the consumer test binary is held to the resolved tier (absolute entries inherited from SONAME-less published packages must exist, relative entries stay fatal)."
+    command: "conan create (test_package test())"
+
+assertion_count: 23
