@@ -1,0 +1,23 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for sonnet/6.28.0.
+
+package: sonnet/6.28.0
+homepage: https://invent.kde.org/frameworks/sonnet
+
+upstream_check_command: "ctest --output-on-failure"
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error"
+
+upstream_tests:
+  - file: autotests/
+    source: sonnet-6.28.0/autotests/
+    description: "Sonnet upstream CTest/autotests suite: 5 core tests (sonnet-test_filter/test_core/test_suggest/test_settings/test_autodetect over KF6::SonnetCore) and 2 widgets tests (sonnet-test_decorator/test_highlighter over KF6::SonnetUi), built with SONNET_USE_WIDGETS=ON and SONNET_USE_QML=ON"
+    command: "ctest --output-on-failure"
+    condition: "run in the Conan build with BUILD_TESTING=ON (QT_QPA_PLATFORM=offscreen for the widgets tests)"
+
+test_package_tests:
+  - file: test_package/test_sonnet.cpp
+    description: "Consumer cases over KF6::SonnetCore/KF6::SonnetUi, the org.kde.sonnet QML module and the packaged parsetrigrams6 CLI: Speller lifecycle in the no-backend configuration (invalid without a dictionary; the query APIs follow the documented no-dictionary contract), Settings round-trips for the backend-independent keys plus the no-op semantics of the dictionary/client-bound keys (setDefaultLanguage/setDefaultClient are rejected when no backend can serve them), GuessLanguage graceful no-dictionary behavior (its script->language map is pruned to dictionary-served languages, so identify() reports no candidate under SONNET_NO_BACKENDS), Highlighter over a QTextEdit (offscreen QPA), QML module import + type instantiation inside a QQmlEngine, and a parsetrigrams6 run over a freshly rewritten word corpus (stale corpus files are removed and the write is verified before the run)."
+    command: "conan create (test_package builds and runs test_sonnet)"
+
+assertion_count: 23
