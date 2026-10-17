@@ -1,0 +1,45 @@
+# 版本级 manifest — pasystray 0.8.2
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "0.8.2"
+software: "pasystray"
+
+# built：conan-verify Verdict PASS（G0–G4 通过；L2/L4/L5 因 “无 cache 路径” 跳过），
+# 未上传/未发布。交付二进制在本机无法完成 CLI 契约执行（OHOS 加载器拒绝未签名的
+# pulseaudio 共享库 + 无显示后端），消费者测试按用户选项(2)与 pavucontrol-qt/2.4.0
+# 先例如实声明并容忍该 OHOS 运行期限制，详见 notes.md 与 reports/。
+status: built
+build_date: "2026-10-16"
+build_system: autotools
+
+source:
+  url: "https://github.com/christophgysin/pasystray/archive/refs/tags/0.8.2.tar.gz"
+  sha256: "9c6fc5859a203f0a6dd8ce2038fea85b7bac44b1baff5c4cf73643229fafa641"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--with-gtk=3"
+    - "--disable-avahi"
+    - "--disable-notify"
+    - "--disable-x11"
+    - "--disable-appindicator"
+  dependencies:
+    - gtk/3.24.43
+    - glib/2.84.0.1
+    - pulseaudio/17.0.1
+    - automake/1.18
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "pasystray 硬需 libpulse-mainloop-glib，制品仓只有 pulseaudio/17.0.1 提供；它钉 glib/2.88.0 与全部 gtk3 的 glib/2.84.0.1 冲突"
+  - "recipe 级 self.requires(\"glib/2.84.0.1\", override=True) 能让图正常解析并把 pulseaudio 逼成源码重建（package_id 变化 → --build=missing 触发）；override 随配方进 CI，profile 级 [replace_requires] 不会"
+  - "PkgConfigDeps 对带 components 的包按 <dep>-<component> 命名 .pc，上游按 libpulse/libpulse-mainloop-glib 探测时必须补同名别名 .pc"
+  - "glib 的 gi18n.h 把 gettext 映射到 g_libintl_*，符号在 glib 包的 libintl.so 里，链接需额外 -L<glib>/lib -lintl（glib 的 .pc 不含 -lintl）"
+  - "OHOS 加载器拒绝未签名共享库：同一文件签名前后 dlopen 结果分别为 Permission denied 与成功；pulseaudio/17.0.1 制品未签名，因此任何链接 libpulse 的交付物在本机无法启动"
+  - "pulseaudio/17.0.1 配方的 build() 直接调用裸 meson 且未声明 tool_requires(meson)，本机 PATH 无 meson（缓存有 meson/1.11.0），重建该依赖需自备 meson"
+  - "消费者测试可照 pavucontrol-qt/2.4.0 先例：generate() 前置依赖 lib 到 LD_LIBRARY_PATH + test() try/except 仅对已声明的 OHOS 限制特征（Error loading shared library / symbol not found / Error 126-127 / Cannot open display）打印声明并容忍，其余仍 raise；结构性断言（ELF/DT_NEEDED）保持硬断言以守住 R34 与 CI L1e"
