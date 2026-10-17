@@ -1,0 +1,142 @@
+--- a/src/w.c
++++ b/src/w.c
+@@ -38,21 +38,21 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <sys/ioctl.h>
+ #include <sys/mman.h>
+ #include <sys/stat.h>
+ #include <sys/types.h>
+ #include <termios.h>
+ #include <time.h>
+ #include <unistd.h>
+-#ifdef HAVE_UTMPX_H
++#ifdef HAVE_UTMPX_FUNCS
+ #include <utmpx.h>
+ #ifndef HAVE_UT_HOSTSIZE_IN_UTMPX
+ #include <utmp.h>
+ #endif
+ #else
+ #	include <utmp.h>
+ #endif
+ #include <arpa/inet.h>
+ #ifdef WITH_SYSTEMD
+ #      include <systemd/sd-login.h>
+@@ -67,21 +67,21 @@
+ #include "fileutils.h"
+ #include "nls.h"
+ 
+ #include "misc.h"
+ #include "pids.h"
+ #include "stat.h"
+ 
+ static int ignoreuser = 0;	/* for '-u' */
+ static int oldstyle = 0;	/* for '-o' */
+ 
+-#ifdef HAVE_UTMPX_H
++#ifdef HAVE_UTMPX_FUNCS
+ typedef struct utmpx utmp_t;
+ #else
+ typedef struct utmp utmp_t;
+ #endif
+ 
+ #ifdef __GLIBC__
+ #if !defined(UT_HOSTSIZE) || defined(__UT_HOSTSIZE)
+ #	define UT_HOSTSIZE __UT_HOSTSIZE
+ #	define UT_LINESIZE __UT_LINESIZE
+ #	define UT_NAMESIZE __UT_NAMESIZE
+@@ -679,21 +679,21 @@
+     if (longform) {
+ #if (defined(WITH_SYSTEMD) || defined(WITH_ELOGIND)) && defined(HAVE_SD_SESSION_GET_LEADER)
+         if (session) {
+             uint64_t ltime;
+ 
+             sd_session_get_start_time(session, &ltime);
+             print_logintime(ltime/((uint64_t) 1000000ULL), stdout);
+         } else {
+ #endif
+ 
+-#ifdef HAVE_UTMPX_H
++#ifdef HAVE_UTMPX_FUNCS
+             print_logintime(u->ut_tv.tv_sec, stdout);
+ #else
+             print_logintime(u->ut_time, stdout);
+ #endif
+ #if (defined(WITH_SYSTEMD) || defined(WITH_ELOGIND)) && defined(HAVE_SD_SESSION_GET_LEADER)
+         }
+ #endif
+     }
+     /* idle */
+     if (u && *u->ut_line == ':')
+@@ -818,21 +818,21 @@
+     if (sd_pid_get_session(last_pid, &session) >= 0) {
+         if ( sd_session_get_username(session, &username) >= 0) {
+             strncpy(uname, username, UT_NAMESIZE);
+             uname[UT_NAMESIZE] = '\0';
+             free(username);
+         }
+     } else {
+         // We get the utmp entry for this tty device
+         utmp_t search;
+         strncpy(search.ut_line, ttyname, UT_NAMESIZE-1);
+-#ifdef HAVE_UTMPX_H
++#ifdef HAVE_UTMPX_FUNCS
+ 	setutxent();
+         u = getutxline(&search);
+ 	endutxent();
+ #else
+ 	utmpname(UTMP_FILE);
+ 	setutent();
+         u = getutline(&search);
+ 	endutent();
+ #endif
+     }
+@@ -1172,44 +1172,44 @@
+ 					from, userlen, fromlen, ip_addresses, pids,
+ 					pids_cache);
+ 
+ 			free(class);
+ 			free(name);
+ 			free(sessions_list[i]);
+ 		}
+ 		free(sessions_list);
+ 	} else {
+ #endif
+-#ifdef HAVE_UTMPX_H
++#ifdef HAVE_UTMPX_FUNCS
+ 	setutxent();
+ #else
+ 	utmpname(UTMP_FILE);
+ 	setutent();
+ #endif
+ 	for (;;) {
+-#ifdef HAVE_UTMPX_H
++#ifdef HAVE_UTMPX_FUNCS
+ 		u = getutxent();
+ #else
+ 		u = getutent();
+ #endif
+ 		if (!u)
+ 			break;
+ 		if (u->ut_type != USER_PROCESS || ('\0' == u->ut_user[0]))
+ 			continue;
+ 		if (!match_user ||
+                     (0 == strncmp(u->ut_user, match_user, UT_NAMESIZE)))
+ 			showinfo(
+ 				 NULL, u->ut_user,
+ 				 u, longform, maxcmd, from, userlen,
+ 				 fromlen, ip_addresses, pids, pids_cache);
+ 	}
+-#ifdef HAVE_UTMPX_H
++#ifdef HAVE_UTMPX_FUNCS
+ 	endutxent();
+ #else
+ 	endutent();
+ #endif
+ #if (defined(WITH_SYSTEMD) || defined(WITH_ELOGIND)) && defined(HAVE_SD_SESSION_GET_LEADER)
+ 	}
+ #endif
+         }
+ 
+         procps_pids_unref(&info);

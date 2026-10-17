@@ -1,0 +1,92 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: procps-ng/4.0.6
+homepage: "https://gitlab.com/procps-ng/procps"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+# procps-ng 的上游套件由 `make check` 驱动（library/tests 与 src/tests 下的
+# libtool 测试程序，configure 后生成），tarball 形态即为原生用法。
+upstream_check_command: "make check"
+# conanfile.py build() 在 make 之后执行 `make check`（真机与 CI 都会跑）：
+# 已知的 test_version 失败被记为平台事实，不判构建失败
+upstream_test_in_build: true
+upstream_test_command: "make check"
+
+# 上游实际运行的测试程序（configure 生成的 libtool 测试），真机 `make check` 实测：
+# TOTAL 8 / PASS 7 / FAIL 1 / SKIP 0 / ERROR 0
+upstream_tests:
+  - "library/tests/test_escape"
+  - "library/tests/test_namespace"
+  - "library/tests/test_pids"
+  - "library/tests/test_sysinfo"
+  - "library/tests/test_uptime"
+  - "library/tests/test_version"
+  - "src/tests/test_fileutils"
+  - "src/tests/test_strtod_nol"
+
+# 上游用例总数 N（清点口径全部列出，取「用例·注册类」最大值作主 N —— 防少报）：
+#   automake TESTS 注册项 .................................. 8   （即上方 upstream_tests，真机实跑）
+#   dejagnu DEJATOOL 注册工具 .............................. 14  （testsuite/Makefile.am:19-46）
+#   dejagnu 用例文件 *.exp ................................. 23
+#   dejagnu 用例资产（testsuite/*.test/ 下 *.exp + *.sh）... 24  ← 主 N（平台评审扫描口径）
+#   测试程序源文件 */tests/*.c ............................. 12  （library/tests 7 + src/tests 5）
+#   testsuite 全部测试资产 ................................. 30
+# 口径差异（如实披露）：本包构建用的 SourceForge 发布 tarball 的 testsuite/ 比 git tag v4.0.6
+# 少 4 个用例文件（pwait.test、skill.test、ps_zombie.exp、sysctl_write.exp；tarball 20 vs tag 24），
+# 本申报按 tag 全量面取 24，不取 20。
+upstream_total_n: 24
+upstream_run_n: 8
+
+# 账本（恒等式 TOTAL = PASS + FAIL + SKIP + NOT_RUN）
+#   automake TESTS ....... TOTAL 8  = PASS 7 + FAIL 1 + SKIP 0 + NOT_RUN 0   ← 真机 make check 实跑
+#   dejagnu 验收套件 ..... TOTAL 24 = PASS 0 + FAIL 0 + SKIP 0 + NOT_RUN 24
+upstream_test_result:
+  total: 8
+  passed: 7
+  failed: 1
+  skipped: 0
+  not_run: 0
+  failed_detail:
+    - test: "library/tests/test_version"
+      check: "procps_linux_version()"
+      reason: "/proc/sys/kernel/osrelease 为 'HongMeng Kernel 1.12.0'，sscanf(\"%u.%u.%u\") 零转换 → 函数按文档契约返回负错误码 -ERANGE（测试断言 >0）；平台内核版本串不含 Linux 版本号，/proc/version 亦不可读（EACCES），故未修改上游源码"
+
+# 未运行的上游套件（24 项，不计入上面的 total: 8，也不写作 PASS）——机械归因，非「没环境」：
+# ① 上游 configure.ac:359 用 AM_CONDITIONAL(LINUX, test "x$host_os" = xlinux-gnu) 门控
+#    testsuite/Makefile.am:15-47 的全部 DEJATOOL 注册块；本平台目标三元组为
+#    aarch64-unknown-linux-ohos（0001 补丁的 config.guess HarmonyOS 分支产出），host_os =
+#    linux-ohos ≠ linux-gnu → LINUX 为假 → 套件在 OHOS 上不被注册。注意与「缺框架」的区别：
+#    此处 make check 并不打印 "WARNING: could not find 'runtest'"，而是 DEJATOOL 展开为空、
+#    循环 0 次（不产生 testsuite/*.sum）。
+#    证据：构建树 config.status 记 S["LINUX_TRUE"]="#"；make -C testsuite check 实跑输出 l='     '。
+# ② 补齐框架后复验仍不可跑：装入仓库内已适配 OHOS 的 dejagnu/1.6.3.1 + expect/5.45.4 +
+#    tcl/8.6.14（ohpcd 制品仓有 OHOS 二进制；runtest --version 实测 = DejaGnu 1.6.3 /
+#    Expect 5.45.4 / Tcl 8.6），越过注册门控手工跑 free 工具：被测程序输出正确，但 expect
+#    每次 spawn 都注入 "sh: /bin/stty: inaccessible or not found"（系统镜像无 /bin/stty，
+#    exp_tty.c 的 EXP_STTY 规避只覆盖一个调用点且实测不生效），击穿用例首行锚定正则
+#    → free 单个工具即 14 FAIL / 1 unresolved。属 framework × 系统镜像边界。
+# 决策：不改上游 .exp、不往镜像塞 /bin/stty、不把 dejagnu/expect/tcl 加进 tool_requires
+# （LINUX 门控下加了也不会执行，徒增构建期依赖）。
+# 另有 4 个 check_PROGRAMS 只编译、不注册进 TESTS 故不运行：src/tests/{test_strutils,
+# test_process,test_shm} 与 library/tests/test_Itemtables —— 源码里 12 个测试程序与 total 8
+# 不矛盾：8 是 TESTS（运行数），12 是 check_PROGRAMS（编译数）。
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: src/test_libproc2.c
+    description: "C 侧消费者测试（CMake + CMakeDeps 链接 procps-ng::procps-ng）：libproc2 的
+      procps_loadavg/procps_uptime/procps_users 与 /proc 及直接 getutent() 走查互校，
+      procps_pids_new/get/unref 遍历 /proc 全进程并确认能报出自身 pid"
+    command: "conan create ...（test_package 的 test() 直接执行构建出的 test_libproc2 并断言退出码 0）"
+  - file: conanfile.py
+    description: "Python 侧消费者测试（conan create test 阶段自动执行）：安装包内的
+      free/uptime/ps/vmstat/top -b/w/sysctl/pidof/pgrep/pkill 十个命令行工具实测
+      （free 读 /proc/meminfo、ps 报出本测试自身 pid、pgrep+pidof+pkill 对准本测试
+      自己拉起的 sleeper 进程）"
+    command: "conan create ... && conan test（test_package 实质执行被测二进制）"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 26

@@ -1,0 +1,40 @@
+--- a/library/sort.c
++++ b/library/sort.c
+@@ -16,20 +16,37 @@
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+  * Lesser General Public License for more details.
+  *
+  * You should have received a copy of the GNU Lesser General Public
+  * License along with this library; if not, write to the Free Software
+  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+  */
+ 
+ #include <stdlib.h>
+ #include <string.h>
++
++#ifdef HAVE_CONFIG_H
++#	include "config.h"
++#endif
++
++/*
++ * HarmonyOS PC's libc provides neither a declaration nor the symbol for
++ * strverscmp(), which library/pids.c and library/diskstats.c use to order
++ * version like strings (ps --sort, top, vmstat).  configure probes the
++ * function and leaves HAVE_STRVERSCMP undefined there, so the library carries
++ * the fallback upstream keeps for such a platform in local/strverscmp.c
++ * (normally built into the top binary under Cygwin, see Makefile.am).
++ * Platforms whose libc has the function keep using the libc one.
++ */
++#ifndef HAVE_STRVERSCMP
++#	include "../local/strverscmp.c"
++#endif
+ 
+ /*
+  * mergesort with callback and user parameter (like qsort_r)
+  *   base:   pointer to the first element
+  *   nmemb:  number of elements
+  *   compar: comparator function (returns <0, 0, >0)
+  *   arg:    extra user parameter passed to comparator
+  *
+  * but, we return 1 on success or 0 on malloc failure! |
+  * plus we issue only a single malloc each invocation! |
