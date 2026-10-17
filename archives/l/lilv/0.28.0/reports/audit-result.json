@@ -1,0 +1,59 @@
+{
+  "verdict": "pass",
+  "findings": [
+    {
+      "severity": "P2",
+      "file": "0.28.0/conanfile.py (package())",
+      "issue": "destdir 逐级下探是启发式回退：若 5 层内始终未找到 include/lib，copy 不会执行且不抛错，产出空包仅静默通过（s 停留为不存在的初始路径，isdir(s) 为 False 直接跳过）。失败静默风险真实存在。",
+      "fix": "在 package() 末尾对 include/lib 的最终定位结果做硬校验：若 os.path.isdir(s) 为 False 则 raise ConanException('meson destdir layout not resolved: <path>')。",
+      "fix_applied": "已修复：package() 下探失败 raise ConanException 硬失败（禁止静默空包）"
+    },
+    {
+      "severity": "P2",
+      "file": "0.28.0/conanfile.py (package_info())",
+      "issue": "cpp_info 未声明对 sratom/sord/serd/lv2 的 cpp_info.requires 转发（注释以'下游直接声明完整依赖集'豁免）。pkg-config 通道（.pc Requires）可传递解析，但走 CMakeDeps 等 cpp_info 通道的下游静态链接时只会得到 -llilv-0，缺 serd/sord/sratom 符号导致链接失败；仅注释约定无机制保证。",
+      "fix": "补充 self.cpp_info.requires（依赖 ref 不带版本）。",
+      "fix_applied": "已修复：package_info() 补 cpp_info.requires = [\"sratom::sratom\", \"sord::sord\", \"lv2::lv2\"]（必须 dep::dep 形态——裸包名会被 conan 当作本包内部 component 校验，本配方无 components 时 package_info() 直接报错，CI #93033 实证；本地 conan create 复验 rc=0，pkg-config/CMakeDeps 双通道符号可达）"
+    },
+    {
+      "severity": "P3",
+      "file": "0.28.0/conanfile.py (build())",
+      "issue": "cross file 硬编码 system='linux'/aarch64（注释已声明与 validate() 的 armv8 白名单联动）；f'PATH=\"{os.path.dirname(cc)}:$PATH\"' 是对 PATH 的字符串拼接侵入（R33 本体已合规：编译器确从 tools.build:compiler_executables conf 获取）。",
+      "fix": "PATH 注入改为仅在 os.path.dirname(cc) 非空时追加。",
+      "fix_applied": "已修复：PATH 前置仅当 cc 带目录时追加（cc_dir 非空判断）"
+    },
+    {
+      "severity": "P3",
+      "file": "0.28.0/test_package/test_lilv_discovery.c:54",
+      "issue": "LilvPlugins* plugins = lilv_world_get_all_plugins(world); 丢弃 const 限定符（编译日志实证 -Wincompatible-pointer-types-discards-qualifiers 告警 1 条）。",
+      "fix": "改为 const LilvPlugins* plugins = ...;",
+      "fix_applied": "已修复：const LilvPlugins* 接收（消除 discard-qualifiers 告警）"
+    },
+    {
+      "severity": "P3",
+      "file": "0.28.0/test_package/",
+      "issue": "conanbuild.sh / conanrun.sh / *_env-*.sh 等生成物被提交进 test_package 目录（conan-create.log 证实为 generate() 产物），属生成文件入库；patches/ 为空目录。",
+      "fix": "从提交中剔除生成 env 脚本与空 patches/ 目录。",
+      "fix_applied": "核实为误报：git ls-files 证实 test_package 仅 5 个交付文件（conanfile.py/test_lilv_discovery.c/MANIFEST.yml/fixture 两 ttl），无 env 脚本入库；amend 时已剔除过一轮生成物（8 个 .pc/pc-flags/test 二进制）"
+    },
+    {
+      "severity": "P3",
+      "file": "0.28.0/test_package/test_lilv_discovery.c",
+      "issue": "致命前置条件仅用 CHECK 记失败而不中断（world/plugins/uri 三处）：一旦为 NULL，后续调用即解引用崩溃，CI 只看到 SIGSEGV、拿不到可定位的 FAIL 行（复审 P3）。",
+      "fix": "新增 REQUIRE 宏：不满足时打印 FAIL、flush stderr 后立即 return 1。",
+      "fix_applied": "已修复：world/plugins/uri 三处由 CHECK 改 REQUIRE 早退；非致命项（LV2_PATH 未设置、插件未发现）保留 CHECK 语义不变"
+    }
+  ],
+  "p0_count": 0,
+  "p1_count": 0,
+  "audit_notes": {
+    "R34_PF3": "通过：test() 真实消费被测包——LV2_PATH 指向内嵌 fixture bundle，lilv_world_new/load_all/get_all_plugins/get_by_uri 真实执行 liblilv-0 及 serd/sord Turtle 解析链，introspection 逐字段断言（name/3 端口/in-out-gain 符号），非纯断言 stub；conan-create.log L133-140 证实实测输出与 test-report.md 第五节一致。",
+    "PF5_PF6": "通过：全仓 11 文件 grep 无 __OHOS__ 平台宏、无 /usr/local / SYS_PREFIX 注入。",
+    "PF7": "通过：源 URL https://download.drobilla.net/lilv-0.28.0.tar.xz 为 drobilla 官方发布站，sha256 8dcb70ad... 与 manifest.yaml 一致。",
+    "PF8": "通过：slug l/lilv、settings 四项齐全、0.28.0 在 conanfile/conandata/manifest/MANIFEST 四处一致、纯库包无 commands.json。",
+    "R33": "通过：conanfile 与 test_package 均从 tools.build:compiler_executables['c'] 取编译器（'cc' 仅兜底），conan-create.log 证实实际使用 /data/service/hnp/bin/clang。",
+    "R51": "通过：test-report.md 三步法完整——21 个 meson unit_tests 用例逐名清点（bad_port_index..world）、21/21 实跑 PASS 记录、消费者测试实测输出逐行回填，与 conan-create.log 一致；manifest.yaml/MANIFEST.yml 交叉印证（含 upstream_test_in_build=false 的如实披露与 blockers 说明）。",
+    "R35_R36": "通过：sratom/0.6.22 前置 PR #15450、sord/0.16.22、lv2/1.18.11-git 均制品仓 Cache 命中（conan-create.log 依赖图全绿）；不钉 serd 的决策在 conanfile.py 与 notes.md 双处记录（sord 传递钉 serd/0.32.9），依赖图解析实证 serd/0.32.9 无冲突。",
+    "py_syntax": "通过：conanfile.py 语法正确、注释密度高且为决策记录型注释、export_sources/apply_conandata_patches 显式空实现有 G1 门禁理由说明。"
+  }
+}
