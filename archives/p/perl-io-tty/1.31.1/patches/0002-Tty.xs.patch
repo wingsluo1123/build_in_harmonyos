@@ -1,0 +1,83 @@
+--- a/Tty.xs
++++ b/Tty.xs
+@@ -819,20 +819,80 @@
+ 	    name[sizeof(name)-1] = 0;
+ 	    EXTEND(SP,3);
+ 	    PUSHs(sv_2mortal(newSViv(ptyfd)));	
+ 	    PUSHs(sv_2mortal(newSViv(ttyfd)));	
+ 	    PUSHs(sv_2mortal(newSVpv(name, strlen(name))));	
+         } else {
+ 	    /* empty list */
+ 	}
+ 
+ 
++
++MODULE = IO::Tty PACKAGE = IO::Tty
++
++SV *
++_ohos_pty_stream(fd)
++    int fd
++    PREINIT:
++        struct stat actual;
++        int saved_errno;
++        int copied_fd;
++        FILE *file;
++        PerlIO *stream;
++        GV *gv;
++        IO *io;
++    CODE:
++        RETVAL = &PL_sv_undef;
++#if defined(__OHOS__)
++        errno = 0;
++        if (fd >= 3 && fstat(fd, &actual) < 0) {
++            saved_errno = errno;
++            if (saved_errno == EACCES && isatty(fd) == 1 &&
++                    fcntl(fd, F_GETFD) >= 0) {
++                copied_fd = fcntl(fd, F_DUPFD, 3);
++                if (copied_fd < 0)
++                    croak("IO::Tty real PTY dup: %s", Strerror(errno));
++                if (fcntl(copied_fd, F_SETFD, FD_CLOEXEC) < 0) {
++                    saved_errno = errno;
++                    close(copied_fd);
++                    croak("IO::Tty real PTY close-on-exec: %s",
++                          Strerror(saved_errno));
++                }
++                file = fdopen(copied_fd, "r+");
++                if (!file) {
++                    saved_errno = errno;
++                    close(copied_fd);
++                    croak("IO::Tty real PTY fdopen: %s", Strerror(saved_errno));
++                }
++                stream = PerlIO_importFILE(file, "r+");
++                if (!stream) {
++                    saved_errno = errno;
++                    fclose(file);
++                    croak("IO::Tty real PTY FILE import: %s",
++                          Strerror(saved_errno));
++                }
++                gv = newGVgen("IO::Tty::NativeStream");
++                io = GvIOn(gv);
++                IoIFP(io) = stream;
++                IoOFP(io) = stream;
++                IoTYPE(io) = '+';
++                RETVAL = newRV_noinc((SV *)gv);
++                sv_bless(RETVAL, gv_stashpv("IO::Handle", GV_ADD));
++                /* The imported stream owns copied_fd. The original master
++                 * is consumed exactly once only after ownership transfer. */
++                close(fd);
++            }
++        }
++#endif
++    OUTPUT:
++        RETVAL
++
+ MODULE = IO::Tty	PACKAGE = IO::Tty
+ 
+ int
+ _open_tty(ttyname, noctty = 1)
+ 	char *ttyname
+ 	int noctty
+     CODE:
+ 	RETVAL = open(ttyname, noctty ? (O_RDWR | O_NOCTTY) : O_RDWR);
+ 	if (RETVAL >= 0) {
+ #if defined(I_PUSH)

@@ -1,0 +1,35 @@
+use strict;
+use warnings;
+use IO::Pty;
+use IO::Tty;
+use IO::Select;
+use POSIX;
+use Cwd qw(abs_path);
+use File::Spec;
+my $module_root=abs_path($ENV{IO_TTY_MODULE_ROOT}) // die "No installed module root";
+my $xs_root=abs_path($ENV{IO_TTY_XS_ROOT}) // die "No installed XS root";
+my @passed;
+for my $m ('IO/Pty.pm','IO/Tty.pm','IO/Tty/Constant.pm') {
+  my $p=abs_path($INC{$m}) // die "Missing actual installed $m";
+  die "Foreign module $m" unless index($p,"$module_root/")==0 || index($p,"$xs_root/")==0;
+}
+my $packed=IO::Tty::pack_winsize(29,97,480,640);
+my @unpacked=IO::Tty::unpack_winsize($packed);
+die "Actual native winsize packing" unless "@unpacked" eq '29 97 480 640';
+push @passed,'actual-installed-xs-winsize-pack-unpack';
+my $pty=IO::Pty->new // die "Actual PTY allocation: $!";
+my $slave=$pty->slave // die "Actual slave allocation: $!";
+die "Native terminal slave required" unless POSIX::isatty($slave);
+$slave->set_raw() or die "Actual raw terminal setup: $!";
+my $data="OHOS\0\x{ff}\x{80}\r\nTTY";
+die "Actual complete PTY write" unless syswrite($slave,$data)==length($data);
+my $select=IO::Select->new($pty);
+die "Native PTY readable within bound" unless $select->can_read(5);
+my $received='';my $n=sysread($pty,$received,256);
+die "Actual raw PTY byte roundtrip" unless defined($n) && $received eq $data;
+push @passed,'actual-installed-pty-raw-binary-roundtrip';
+$slave->set_winsize(31,99,0,0) or die "Set terminal winsize";
+my @actual=$slave->get_winsize();
+die "Actual terminal winsize ioctl" unless $actual[0]==31 && $actual[1]==99;
+push @passed,'actual-slave-winsize-ioctl';
+print "CONSUMER_TEST_COUNT=3\nCONSUMER_TEST_PASS=3/3\n";
