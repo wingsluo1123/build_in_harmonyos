@@ -1,0 +1,54 @@
+# 版本级 manifest — papi 7.2.0
+version: "7.2.0"
+software: "papi"
+
+# 首轮工作树：尚未经过真机预检，按规则不得标 published/built；
+# 状态待 HMBS 真机 rule4 门禁通过后由后端统一更新。
+status: failed
+build_date: "2026-10-14"
+build_system: "autotools"
+
+source:
+  url: "https://github.com/icl-utk-edu/papi/releases/download/papi-7-2-0-t/papi-7.2.0.tar.gz"
+  sha256: "a9bff89ccf39915d729e08ae0a0c6a71ce0ebbe98411e9a2eb3c83c8db0af39c"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=/"
+    - "--disable-fortran"
+    - "--with-shared-lib=no --with-static-lib=yes（shared=False 默认）"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+upstream_tests:
+  command: "src/ctests smoke subset（version/code2name/eventname/describe/hwinfo/cmpinfo）"
+  test_count: 190
+  notes: "总数 190 = 116 ctests + 36 validation_tests + 22 ftests + 16 utils（manual_audit；17 个 .c 减 print_header helper；116+36+22+16=190）；build() 执行 6 项纯查询 smoke，其余 184 以 gaps 上报，见 conanfile.py 与 test_package/MANIFEST.yml。"
+
+test_package:
+  assertion_count: 7
+  description: "调用 libpapi 真实 API：init、get_opt(LIB_VERSION)=7.2.x、num_components>0、eventset 创建/销毁、shutdown（void）；另运行 papi_version 工具。"
+
+test_result:
+  total: 190
+  passed: 0
+  failed: 0
+  ignored: 0
+  method: "首轮工作树，待真机预检 evidence 回填"
+  framework: "custom"
+  command: "src/ctests smoke subset"
+  upstream_sources:
+    - "src/ctests/*.c x116"
+    - "src/validation_tests/*.c x36"
+    - "src/ftests/*.F x22"
+    - "src/utils/*.c x16（17 减 print_header helper）"
+
+knowledge_gained:
+  - "PAPI 构建入口为 src/configure（自定义脚本，不在归档根目录），conanfile 需显式 cwd=src 驱动"
+  - "PAPI 7.2.0 新增 rocp_sdk/topdown 组件，ARM Cortex A57/A72/A76 preset 与 Neoverse V2 支持"
+  - "上游测试为自研 harness（run_tests.sh），无 ctest/gtest 注册表，清点口径用 manual_audit"

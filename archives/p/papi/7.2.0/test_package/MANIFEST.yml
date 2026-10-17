@@ -1,0 +1,71 @@
+# test_package/MANIFEST.yml — papi 7.2.0 上游测试声明
+package: papi/7.2.0
+homepage: "https://icl.utk.edu/papi/"
+
+# ── 上游测试清点（manual_audit：PAPI 使用自研 Makefile harness，
+# 无 ctest/gtest/autotools 注册表，见 src/run_tests.sh） ─────────────
+upstream_tests_exist: true
+upstream_test_total: 190
+upstream_test_count_method: manual_audit  # 自研 harness（run_tests.sh + 各目录 Makefile），无单一可解析注册表；总数 = 源码清点 116 ctests + 36 validation_tests + 22 ftests + 16 utils（17 个 .c 减 print_header helper；116+36+22+16=190，与审查员实测 N=190 一致）
+upstream_test_audit:
+  - "tarball papi-7.2.0.tar.gz（4420651 字节，md5 fc7f90ef8686d15261831fd35dfdbb1b 与官方 release notes 一致）"
+  - "src/ctests/*.c = 116（含 burn.c、attach_target.c 两个 support 程序；run_tests_exclude.txt 另排除长耗时/MPI 项）"
+  - "src/validation_tests/*.c = 36（含 *_testcode.c、cache_helper.c、display_error.c 等 helper 对象，非全部独立可执行）"
+  - "src/ftests/*.F = 22（Fortran，本配方 --disable-fortran，不构建）"
+  - "src/utils/*.c = 17（减 print_header helper 按文件口径计 16；papi_avail/component_avail/native_avail/version 等查询工具，见 src/utils/Makefile ALL；116+36+22+16=190）"
+  - "src/components/*/tests/*.c = 86（绑定 CUDA/ROCM/infiniband 等不存在的硬件，harness 按 active components 自动过滤，本轮不计入总数）"
+  - "构建系统：src/configure（autoconf 风格自定义脚本）+ make；无 CMakeLists.txt；测试入口为 src/run_tests.sh（BUILD=1 先构建 testlib/validation_tests/ctests/ftests）"
+
+# build() 中已集成上游 smoke 子集（6 项纯查询测试），见 conanfile.py
+upstream_test_in_build: true
+upstream_test_command: "src/ctests smoke subset: version code2name eventname describe hwinfo cmpinfo（make -C testlib/validation_tests/ctests 后逐个执行，返回码判定，HMBS_UPSTREAM_TEST_RESULT 由 build() 发出）"
+
+upstream_tests:
+  - file: src/ctests/version.c
+    source: "papi-7.2.0/src/ctests/version.c"
+    description: "PAPI 版本查询冒烟测试"
+    command: "./version"
+  - file: src/ctests/code2name.c
+    source: "papi-7.2.0/src/ctests/code2name.c"
+    description: "事件码与事件名互查冒烟测试"
+    command: "./code2name"
+  - file: src/ctests/eventname.c
+    source: "papi-7.2.0/src/ctests/eventname.c"
+    description: "事件名查询冒烟测试"
+    command: "./eventname"
+  - file: src/ctests/describe.c
+    source: "papi-7.2.0/src/ctests/describe.c"
+    description: "事件描述查询冒烟测试"
+    command: "./describe"
+  - file: src/ctests/hwinfo.c
+    source: "papi-7.2.0/src/ctests/hwinfo.c"
+    description: "硬件信息查询冒烟测试"
+    command: "./hwinfo"
+  - file: src/ctests/cmpinfo.c
+    source: "papi-7.2.0/src/ctests/cmpinfo.c"
+    description: "组件信息查询冒烟测试"
+    command: "./cmpinfo"
+  - file: "src/ctests/*.c（其余 110 项）"
+    source: "papi-7.2.0/src/ctests/"
+    description: "需真实硬件计数器的计数/采样/多路复用/attach/fork 系列，本轮未执行，见 HMBS_UPSTREAM_TEST_RESULT gaps（ohos_feature）"
+    command: "sh run_tests.sh（有计数器硬件时）"
+  - file: "src/validation_tests/*.c（36 项）"
+    source: "papi-7.2.0/src/validation_tests/"
+    description: "计数器精度验证（flops/cycles/cache），依赖 perf_event 硬件计数，本轮未执行"
+    command: "sh run_tests.sh（有计数器硬件时）"
+  - file: "src/ftests/*（22 项）"
+    source: "papi-7.2.0/src/ftests/"
+    description: "Fortran 测试；OHOS 无 Fortran 工具链，--disable-fortran 未构建"
+    command: "无（environment 缺口）"
+  - file: "src/utils/*（16 项，按文件口径）"
+    source: "papi-7.2.0/src/utils/"
+    description: "papi_* 查询工具（avail/component_avail/native_avail/version 等）；同走 PAPI_library_init，本轮除 triage 外未逐个执行"
+    command: "papi_component_avail 等（有计数器硬件时补测）"
+
+test_package_tests:
+  - file: test_papi.c
+    description: "消费者视角：PAPI_library_init、PAPI_get_opt(LIB_VERSION)=7.2.x、PAPI_num_components>0、eventset 创建/销毁往返、PAPI_shutdown（void，仅执行），共 5 项"
+    command: "test_papi"
+
+# 断言数：init 1 + version 2（get_opt 有效 + 主/次版本 7.2） + components 1 + eventset 3 + shutdown 0（void，仅执行） = 7
+assertion_count: 7
