@@ -1,0 +1,122 @@
+#====================================================================
+# DRAFT-7473-indi-driver-hidapi-and-guider-interface-migration
+# 两个在 INDI 驱动适配里反复出现、且与"属性 API 迁移"（DRAFT-7467）不同的问题：
+#   A. INDI 2.x 的 GuiderInterface 改为三段式（构造传 DefaultDevice* +
+#      initProperties(group) + processNumber(dev,name,values,names,n)）
+#   B. 驱动用裸名 <hidapi.h> 且直接调 hid_* 时，必须显式 require hidapi、
+#      注入头目录并把 hidapi/libusb 的 libdir/libs 放进链接行
+# 触发事件: indi-sx 1.16-20221222162728 适配（archives/i/indi-sx）
+#====================================================================
+
+id:                     DRAFT-7473-indi-driver-hidapi-and-guider-interface-migration
+trigger_tool:           cmake|clang|indi|hidapi
+phase:                  build|link
+error_signature:        constructor for '\w+' must explicitly initialize the base class 'INDI::GuiderInterface'|
+                        use of undeclared identifier 'initGuiderProperties'|
+                        use of undeclared identifier 'processGuiderProperties'|
+                        '\w+\.h':\d+:\d+: fatal error: 'hidapi\.h' file not found|
+                        undefined symbol: hid_(open|write|read|close|init|exit)|
+                        'operator&' is a protected member of 'INDI::PropertyBasic<_ISwitch>'
+severity:               2
+category:               indi, astronomy, guider-interface, api-migration, hidapi, usb,
+                        dependency-explicitization, link-line, portability
+match_keywords:         INDI, indi-3rdparty, libindi, GuiderInterface, initGuiderProperties,
+        processGuiderProperties, processNumber, GuideNSNP, GuideWENP, GUIDE_CONTROL_TAB,
+        hidapi, hid_open, hid_write, hid_read, hid_close, libusb-1.0/libusb.h,
+        FindUSB1, USB1_INCLUDE_DIRS, MovementModeSP, defineProperty,
+        "file not found" hidapi.h, 链接行, 显式依赖, 私有前缀
+
+title:                  INDI 2.x 把 GuiderInterface 改成三段式（构造传 DefaultDevice*、
+                        initProperties(group)、processNumber），且用裸 <hidapi.h> 的驱动
+                        必须显式 require hidapi 并补齐头/库/链接行
+
+root_cause: >
+  A. GuiderInterface（导星接口）
+     1.x: 驱动在 initProperties() 里调 initGuiderProperties(dev, tab)，在 ISNewNumber() 里调
+          processGuiderProperties(name, values, names, n)；GuideNSN/GuideWEN 是 C 结构体成员。
+     2.x: 接口变成「有构造函数 + initProperties(groupName) + processNumber(dev,…)」的小类，
+          成员 GuideNSNP/GuideWENP 是 INDI::PropertyNumber 对象：
+            - 派生类构造函数**必须**显式初始化基类（否则 "must explicitly initialize the base
+              class 'INDI::GuiderInterface'"）→ `SXAO::SXAO() : INDI::GuiderInterface(this)`；
+            - initGuiderProperties(dev,tab) → `INDI::GuiderInterface::initProperties(tab)`；
+            - processGuiderProperties(...) → `processNumber(dev, name, values, names, n)`；
+            - defineProperty(&GuideNSNP)/deleteProperty(GuideNSNP.name)/strcmp(name, GuideNSNP.name)
+              → defineProperty(GuideNSNP)/deleteProperty(GuideNSNP)/GuideNSNP.getName()。
+  B. hidapi
+     驱动经常 `#include <hidapi.h>`（裸名）并直接调用 hid_open/hid_write/hid_read，但上游
+     CMakeLists 只把 USB1_LIBRARIES 放进链接行——在 Linux 发行版里 hidapi 的头与库由系统包
+     隐式提供（甚至 hidapi 是 libusb 之上的薄层），因此上游"看起来能编"。在制品仓 + 私有前缀
+     环境下：头文件找不到（include/libusb-1.0 与 include/hidapi 的布局差异）、链接期缺 hid_* 符号。
+
+affected_scope: >
+  A. 任何实现导星（GuiderInterface）的 INDI 驱动（本例 indi-sx 的 AO 驱动；同族的
+     indi-gphoto/indi-pentax/indi-aok 等只要用到导星都会遇到）。
+  B. 任何用 hidapi 与设备通信的 INDI 驱动/库（滤光轮、电源、云台等；本例 indi-sx 的滤光轮），
+     以及更一般地"上游只链接一个库、实际还需另一个库"的隐式依赖场景。
+
+verification_cmd: >
+  # 头/库是否齐（配置期就该发现）
+  grep -n "hidapi\|libusb" <driver>/*.h
+  find <hidapi-pkg>/include -name hidapi.h ; find <libusb-pkg>/include -name libusb.h
+  # 链接后确认动态依赖真的记录了（而不是靠加载器碰运气）
+  llvm-readelf -d <pkg>/bin/indi_<drv> | grep NEEDED
+  # 消费者侧复算
+  python3 test_package/check_driver.py <pkg>/bin <xml> <libindi>/lib <libusb>/lib
+
+rec_priority:           1
+rec_approach:           three-part-guider-api-and-explicit-hidapi-dependency
+rec_description: >
+  A. GuiderInterface 三段式（改源码）：
+     ```cpp
+     SXAO::SXAO() : INDI::GuiderInterface(this) { setVersion(...); }
+     bool SXAO::initProperties() { DefaultDevice::initProperties();
+                                   INDI::GuiderInterface::initProperties(GUIDE_CONTROL_TAB); ... }
+     bool SXAO::ISNewNumber(...) { ...
+       else if (!strcmp(name, GuideNSNP.getName()) || !strcmp(name, GuideWENP.getName()))
+       { processNumber(dev, name, values, names, n); return true; } }
+     ```
+     并在 updateProperties() 里 defineProperty(GuideNSNP)/defineProperty(GuideWENP)，
+     断开时 deleteProperty(GuideNSNP)/deleteProperty(GuideWENP)。
+  B. hidapi 显式化（改配方）：
+     ```python
+     self.requires("hidapi/0.15.0")
+     inc = self.dependencies["hidapi"].cpp_info.includedirs[0]
+     if not os.path.isfile(os.path.join(inc, "hidapi.h")):
+         inc = os.path.join(inc, "hidapi")          # 兼容 include/hidapi/ 布局
+     tc.extra_cflags.append("-I%s" % inc); tc.extra_cxxflags.append("-I%s" % inc)
+     for dep in ("hidapi", "libusb"):               # 数据驱动，不硬编码库名
+         info = self.dependencies[dep].cpp_info
+         for d in (info.libdirs or []): tc.extra_exelinkflags.append("-L%s" % d)
+         for l in (info.libs or []):    tc.extra_exelinkflags.append("-l%s" % l)
+     ```
+     同理，`<libusb-1.0/libusb.h>` 这种版本前缀 include 需要把 libusb 的 include **根**注入
+     （basename 为 libusb-1.0 时取 dirname），因为树内 FindUSB1.cmake 只给出 leaf 目录
+     且上游从不把 USB1_INCLUDE_DIRS 加进 include 路径。
+rec_command: >
+  cmake --build <build-dir> -j2 && conan create archives/i/<pkg>/<ver> -pr:h/-pr:b=ci/conan/profiles/ohos-aarch64
+rec_auto_fix:           false
+rec_impl:               patch|recipe
+
+fallback_priority:      2
+fallback_approach:      link-hidapi-statically-only-and-skip-wheel
+fallback_description: >
+  若制品仓确实没有 hidapi（本例有：hidapi/0.15.0），可把依赖 hidapi 的驱动从构建里摘掉
+  （只交付 CCD/AO 驱动），并在 notes/PR 里如实披露"该子驱动因缺 hidapi 未构建"。
+  代价：功能不完整，且 reviewer 会按"未提供测试用例/功能缺失"扣分，不建议。
+fallback_command:       # 例：去掉 add_executable(indi_sx_wheel ...) 对应目标
+fallback_auto_fix:      false
+fallback_impl:          patch
+
+forbid_1_pattern:       看到 "file not found: hidapi.h" 就把该子驱动注释掉当作"适配完成"
+forbid_1_reason:        hidapi 是制品仓里已有的普通依赖（0.15.0），显式化即可，不需要牺牲功能
+forbid_1_consequence:   交付功能不完整的包，后续消费者/复审发现器件不可用，需返工
+
+similar_to:             DRAFT-7467-indi-3rdparty-driver-indi2-property-api-migration（同族：属性 API 迁移）、
+                        DRAFT-10718-conan-package-type-drives-autotools-shared-static-flags（上游构建契约变化）
+conflicts_with:         []
+prerequisite_of:        []
+principles:             P004
+doc_file:               knowledge/drafts/DRAFT-7473-indi-driver-hidapi-and-guider-interface-migration.md
+last_updated:           2026-10-15
+authors:                Lee-BX
+draft:                  true

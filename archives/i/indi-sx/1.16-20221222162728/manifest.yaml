@@ -1,0 +1,53 @@
+# 版本级 manifest — indi-sx 1.16-20221222162728
+version: "1.16-20221222162728"
+software: "indi-sx"
+status: built
+build_date: "2026-10-15"
+build_system: cmake
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/i/indi-sx/indi-sx_1.16+20221222162728.orig.tar.gz"
+  sha256: "3adf4821e1a2c89918120163be360a0f3812fc7b459a6e164843310f0b90ed7e"
+  tar_format: tar.gz
+  note: >-
+    Debian Astronomy Team 的 orig tarball（= indi-3rdparty 仓 indi-sx/ 子目录 1.16 快照，
+    时间戳 2022-12-22 16:27:28）；URL 中的 '+' 写字面量（%2B 会触发 CI pre-download 的
+    file:// 路径不一致）
+
+build:
+  system: cmake
+  configure_options:
+    - "CMAKE_SYSTEM_NAME=Linux (E092: CMake 无 HarmonyOS 平台映射)"
+    - "CMAKE_SYSTEM_PROCESSOR=aarch64"
+    - "CMAKE_FIND_PACKAGE_PREFER_CONFIG=OFF (让树内 FindINDI/FindCFITSIO/FindUSB1 生效)"
+    - "INDI_ROOT=<libindi 包目录>"
+    - "-I<libusb include 根> -I<hidapi include>（sxccdusb.h 用 <libusb-1.0/libusb.h>、sxwheel.h 用裸 <hidapi.h>）"
+    - "-DCMAKE_POLICY_VERSION_MINIMUM=3.5（patch 0003 同时把声明抬到 3.16）"
+  dependencies:
+    - "libindi/2.2.2.1"
+    - "cfitsio/4.6.4"
+    - "libusb/1.0.27"
+    - "hidapi/0.15.0"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "patches/0001-FindINDI.cmake.patch (portability: 版本号正则兼容 INDI 2.x 引号形式)"
+  - "patches/0002-CMakeCommon-cxx17.patch (portability: CMAKE_CXX_STANDARD 14 -> 17)"
+  - "patches/0003-CMakeLists-ohos.patch (portability: cmake_minimum_required 3.0->3.16；RULES_INSTALL_DIR 由 /lib/udev/rules.d/ 改为本包私有 lib/udev/rules.d；INDI_DATA_DIR 归本包 share/indi)"
+  - "patches/0004-sx-indi2-api.patch (portability: 三个驱动由 INDI 1.x 属性 API 迁移到 INDI 2.x，含 GuiderInterface 三段式改造)"
+
+upstream_tests:
+  framework: none
+  test_sources: 0
+  test_command: ""
+  run_in_build: false
+  evidence: >-
+    indi-sx 1.16 快照无 enable_testing()/add_test()；树内 sxccdtest.cpp 是交互式 USB 诊断
+    工具（sx_ccd_test，随包安装），不是自动化测试；整棵 indi-3rdparty 仓亦无该驱动用例
+upstream_test_pass_rate: "N/A（上游无测试用例，如实披露）"
+adapted_test_pass_rate: "test_package/check_driver.py 9 项校验（3 驱动 × (ELF/XML 交叉引用 + DT_NEEDED 闭包) + 宿主启动）——实测 6 通过 + 3 有证据的宿主 SKIP，fails=0，RESULT: PASS"
+
+knowledge_gained:
+  - "INDI 2.x 迁移的第三个变体：GuiderInterface 从『initGuiderProperties(dev,tab) + processGuiderProperties(...)』改为『构造函数 GuiderInterface(this) + initProperties(group) + processNumber(dev,name,values,names,n)』，GuideNSNP/GuideWENP 是基类对象（defineProperty(P)/deleteProperty(P)/getName()），已并入 DRAFT-7467"
+  - "hidapi 相关的 INDI 驱动要显式 require hidapi 并注入其头目录（sxwheel.h 用裸 <hidapi.h>），且把 hidapi/libusb 的 libdir/libs 放进链接行"

@@ -1,0 +1,157 @@
+diff --git a/sxao.cpp b/sxao.cpp
+index 9324778..6f6cce5 100644
+--- a/sxao.cpp
++++ b/sxao.cpp
+@@ -36,7 +36,7 @@
+ 
+ static std::unique_ptr<SXAO> sxao(new SXAO);
+ 
+-SXAO::SXAO()
++SXAO::SXAO() : INDI::GuiderInterface(this)
+ {
+     setVersion(VERSION_MAJOR, VERSION_MINOR);
+ }
+@@ -83,7 +83,7 @@ int SXAO::aoCommand(const char *request, char *response, int nbytes)
+ bool SXAO::initProperties()
+ {
+     DefaultDevice::initProperties();
+-    initGuiderProperties(getDeviceName(), GUIDE_CONTROL_TAB);
++    INDI::GuiderInterface::initProperties(GUIDE_CONTROL_TAB);
+ 
+     IUFillNumber(&AONS[0], "AO_N", "North (steps)", "%g", 0, 80, 1, 0);
+     IUFillNumber(&AONS[1], "AO_S", "South (steps)", "%g", 0, 80, 1, 0);
+@@ -156,8 +156,8 @@ bool SXAO::updateProperties()
+ 
+     if (isConnected())
+     {
+-        defineProperty(&GuideNSNP);
+-        defineProperty(&GuideWENP);
++        defineProperty(GuideNSNP);
++        defineProperty(GuideWENP);
+         defineProperty(&AONSNP);
+         defineProperty(&AOWENP);
+         defineProperty(&CenterP);
+@@ -166,8 +166,8 @@ bool SXAO::updateProperties()
+     }
+     else
+     {
+-        deleteProperty(GuideNSNP.name);
+-        deleteProperty(GuideWENP.name);
++        deleteProperty(GuideNSNP);
++        deleteProperty(GuideWENP);
+         deleteProperty(AONSNP.name);
+         deleteProperty(AOWENP.name);
+         deleteProperty(CenterP.name);
+@@ -217,9 +217,9 @@ bool SXAO::ISNewNumber(const char *dev, const char *name, double values[], char
+         CheckLimit(false);
+         return true;
+     }
+-    else if (!strcmp(name, GuideNSNP.name) || !strcmp(name, GuideWENP.name))
++    else if (!strcmp(name, GuideNSNP.getName()) || !strcmp(name, GuideWENP.getName()))
+     {
+-        processGuiderProperties(name, values, names, n);
++        processNumber(dev, name, values, names, n);
+         return true;
+     }
+ 
+diff --git a/sxccd.cpp b/sxccd.cpp
+index eb892e6..5cf1f4d 100644
+--- a/sxccd.cpp
++++ b/sxccd.cpp
+@@ -154,7 +154,7 @@ bool SXCCD::initProperties()
+     //    IUFillSwitch(&BayerS[1], "BAYER_FALSE", "False", ISS_ON);
+     //    IUFillSwitchVector(&BayerSP, BayerS, 2, getDeviceName(), "CCD_BAYER_FILTER", "Bayer Filter", IMAGE_SETTINGS_TAB, IP_RW, ISR_1OFMANY,
+     //                       60, IPS_IDLE);
+-    IUSaveText(&BayerT[2], "RGGB");
++    BayerTP[2].setText("RGGB");
+ 
+     //  we can expose less than 0.01 seconds at a time
+     //  and we need to for an allsky in daytime
+@@ -367,15 +367,15 @@ void SXCCD::TimerHit()
+             unsigned short temperature;
+             sxSetCooler(handle, (unsigned char)(CoolerS[0].s == ISS_ON),
+                         (unsigned short)(TemperatureRequest * 10 + 2730), &status, &temperature);
+-            TemperatureN[0].value = (temperature - 2730) / 10.0;
+-            if (TemperatureReported != TemperatureN[0].value)
++            TemperatureNP[0].setValue((temperature - 2730) / 10.0);
++            if (TemperatureReported != TemperatureNP[0].getValue())
+             {
+-                TemperatureReported = TemperatureN[0].value;
++                TemperatureReported = TemperatureNP[0].getValue();
+                 //                if (std::fabs(TemperatureRequest - TemperatureReported) < 1)
+                 //                    TemperatureNP.s = IPS_OK;
+                 //                else
+                 //TemperatureNP.s = IPS_BUSY;
+-                IDSetNumber(&TemperatureNP, nullptr);
++                TemperatureNP.apply();
+             }
+         }
+     }
+@@ -395,7 +395,8 @@ int SXCCD::SetTemperature(double temperature)
+     unsigned short sx_temperature;
+     sxSetCooler(handle, (unsigned char)(CoolerS[0].s == ISS_ON), (unsigned short)(TemperatureRequest * 10 + 2730),
+                 &status, &sx_temperature);
+-    TemperatureReported = TemperatureN[0].value = (sx_temperature - 2730) / 10.0;
++    TemperatureReported = (sx_temperature - 2730) / 10.0;
++    TemperatureNP[0].setValue(TemperatureReported);
+     if (std::fabs(TemperatureRequest - TemperatureReported) < 1)
+         result = 1;
+     else
+@@ -780,9 +781,10 @@ bool SXCCD::ISNewSwitch(const char *dev, const char *name, ISState *states, char
+         unsigned short temperature;
+         sxSetCooler(handle, (unsigned char)(CoolerS[0].s == ISS_ON), (unsigned short)(TemperatureRequest * 10 + 2730),
+                     &status, &temperature);
+-        TemperatureReported = TemperatureN[0].value = (temperature - 2730) / 10.0;
+-        TemperatureNP.s                             = IPS_OK;
+-        IDSetNumber(&TemperatureNP, nullptr);
++        TemperatureReported = (temperature - 2730) / 10.0;
++        TemperatureNP[0].setValue(TemperatureReported);
++        TemperatureNP.setState(IPS_OK);
++        TemperatureNP.apply();
+         result = true;
+     }
+     //    else if (strcmp(name, BayerSP.name) == 0)
+diff --git a/sxwheel.cpp b/sxwheel.cpp
+index 4506042..f67ee00 100644
+--- a/sxwheel.cpp
++++ b/sxwheel.cpp
+@@ -38,8 +38,8 @@ std::unique_ptr<SXWHEEL> sxwheel(new SXWHEEL());
+ 
+ SXWHEEL::SXWHEEL()
+ {
+-    FilterSlotN[0].min = 1;
+-    FilterSlotN[0].max = -1;
++    FilterSlotNP[0].setMin(1);
++    FilterSlotNP[0].setMax(-1);
+     CurrentFilter      = 1;
+     handle             = 0;
+     //setDeviceName(getDefaultName());
+@@ -102,7 +102,7 @@ bool SXWHEEL::initProperties()
+     MovementModeSP[UNIDIRECTIONAL].fill("UNIDIRECTIONAL", "Unidirectional", ISS_OFF);
+     MovementModeSP[BIDIRECTIONAL].fill("BIDIRECTIONAL", "Bidirectional", ISS_ON);
+     MovementModeSP.fill(getDeviceName(), "MOVEMENT", "Movement", OPTIONS_TAB, IP_RW, ISR_1OFMANY, 0, IPS_OK);
+-    defineProperty(&MovementModeSP);
++    defineProperty(MovementModeSP);
+ 
+     return true;
+ }
+@@ -114,7 +114,7 @@ int SXWHEEL::SendWheelMessage(int a, int b)
+         LOGF_DEBUG("simulation: command %d %d", a, b);
+         if (a >= 0x80)
+             CurrentFilter = a - 0x80;
+-        FilterSlotN[0].max = 5;
++        FilterSlotNP[0].setMax(5);
+         return 0;
+     }
+     if (!handle)
+@@ -138,8 +138,8 @@ int SXWHEEL::SendWheelMessage(int a, int b)
+         LOG_DEBUG("Failed to read from wheel.");
+         return -1;
+     }
+-    CurrentFilter      = buf[0];
+-    FilterSlotN[0].max = buf[1];
++    CurrentFilter = buf[0];
++    FilterSlotNP[0].setMax(buf[1]);
+     return 0;
+ }
+ 
