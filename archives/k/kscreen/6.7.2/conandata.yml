@@ -1,0 +1,16 @@
+# conandata.yml — kscreen 6.7.2
+sources:
+  url: "https://download.kde.org/stable/plasma/6.7.2/kscreen-6.7.2.tar.xz"
+  sha256: "a67fbbb8c2fa2a875f29d056d72453d340143219b08062a932c7b1f1501add48"
+
+patches:
+  "6.7.2":
+    - patch_file: "patches/0001-ohos-optional-plasma-integration.patch"
+      patch_description: "Gate the Plasma desktop integration (KCM, OSD, plasmoid) behind KSCREEN_PLASMA_INTEGRATION and the HDR calibrator behind KSCREEN_BUILD_HDRCALIBRATOR (both default ON; OHOS builds them OFF: no Plasma/PlasmaQuick/LayerShellQt/QML modules and no KF6::KCMUtils/Svg/Crash on the platform); make the KF6 component list explicit (CoreAddons/DBusAddons/I18n/WindowSystem) so component availability does not depend on transitive find_dependency chains"
+      patch_type: "portability"
+    - patch_file: "patches/0002-ohos-relocatable-kf6-link.patch"
+      patch_description: "E537: link the SONAME-less imported KF6 targets by -l:<basename> flags with their lib directories (kscreen_link_kf6_relocatable; INTERFACE_FLAGS propagates them through the kscreen_common object library) so DT_NEEDED carries relocatable bare names instead of absolute Conan cache paths; drop the vestigial KF6::XmlGui link from the kded plugin"
+      patch_type: "portability"
+    - patch_file: "patches/0003-ohos-kf6-min-version-floor-6.18.0.patch"
+      patch_description: "Lower KF6_MIN_VERSION from 6.26.0 to 6.18.0: kdbusaddons ships no 6.26-series release, and the 6.29 revision reconciles only with the qtbase/6.11.1 line (its upstream Qt6GuiPrivate requirement cannot be satisfied in this graph); the 6.18 series resolves against qtbase-sql-dbus/6.11.1 with a published binary (kglobalacceld 6.7.2 precedent). The remaining components (kcoreaddons/ki18n/kwindowsystem at 6.26.0, ECM at 6.26.0) satisfy the lower floor"
+      patch_type: "portability"

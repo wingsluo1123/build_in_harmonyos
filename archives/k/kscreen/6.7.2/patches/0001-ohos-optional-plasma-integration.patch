@@ -1,0 +1,160 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index e539e65..afd7ed6 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -13,6 +13,15 @@
+ 
+ set(CMAKE_CXX_STANDARD 20)
+ set(CMAKE_CXX_STANDARD_REQUIRED ON)
++
++# Plasma desktop integration (KCM, OSD, plasmoid) and the HDR calibrator
++# pull in optional upstream components: Plasma/PlasmaQuick, LayerShellQt,
++# the plasma5support/kitemmodels QML modules and the KF6::I18nQml module.
++# Both groups stay ON so the stock desktop build is unchanged; ports whose
++# platform does not ship them build with -DKSCREEN_PLASMA_INTEGRATION=OFF
++# / -DKSCREEN_BUILD_HDRCALIBRATOR=OFF.
++option(KSCREEN_PLASMA_INTEGRATION "Build the Plasma desktop integration (KCM, OSD, plasmoid)" ON)
++option(KSCREEN_BUILD_HDRCALIBRATOR "Build the HDR calibrator" ON)
+ 
+ find_package(ECM ${KF6_MIN_VERSION} REQUIRED NO_MODULE)
+ set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
+@@ -35,20 +44,46 @@
+ 
+ include_directories("${CMAKE_CURRENT_BINARY_DIR}")
+ 
+-find_package(Qt6 ${QT_MIN_VERSION} REQUIRED COMPONENTS Gui Test QuickControls2)
+-if (Qt6Gui_VERSION VERSION_GREATER_EQUAL "6.10.0")
++# Qt::Widgets is linked by the kded plugin; in the stock build the target
++# only materializes as a side effect of the KCMUtils dependency chain that
++# the plasma integration loads, so list the component explicitly.
++find_package(Qt6 ${QT_MIN_VERSION} REQUIRED COMPONENTS Gui Test QuickControls2 Widgets)
++# The private Gui headers are only consumed by the HDR calibrator.
++if (KSCREEN_BUILD_HDRCALIBRATOR AND Qt6Gui_VERSION VERSION_GREATER_EQUAL "6.10.0")
+     find_package(Qt6GuiPrivate ${QT_MIN_VERSION} REQUIRED NO_MODULE)
+ endif()
+ 
++# The components the built targets reference are listed explicitly:
++# CoreAddons (kcoreaddons_add_plugin / KAboutData) and WindowSystem
++# (kscreen-console); some platform Framework builds bake the transitive
++# find_dependency chains off, so component availability only comes from
++# explicit COMPONENTS entries. Config (the KCM and the HDR calibrator read
++# KConfig groups), KCMUtils (KCM) and Svg (the OSD QML consumes KF6::Svg)
++# belong to the Plasma desktop integration, Crash is only used by the HDR
++# calibrator; both groups stay behind the same options that gate their
++# code.
+ find_package(KF6 ${KF6_MIN_VERSION} REQUIRED COMPONENTS
+-    Config
++    CoreAddons
+     DBusAddons
+     I18n
+-    KCMUtils
+-    Svg
+-    XmlGui
+-    Crash
++    WindowSystem
+ )
++if (KSCREEN_PLASMA_INTEGRATION OR KSCREEN_BUILD_HDRCALIBRATOR)
++    find_package(KF6 ${KF6_MIN_VERSION} REQUIRED COMPONENTS
++        Config
++    )
++endif()
++if (KSCREEN_PLASMA_INTEGRATION)
++    find_package(KF6 ${KF6_MIN_VERSION} REQUIRED COMPONENTS
++        KCMUtils
++        Svg
++    )
++endif()
++if (KSCREEN_BUILD_HDRCALIBRATOR)
++    find_package(KF6 ${KF6_MIN_VERSION} REQUIRED COMPONENTS
++        Crash
++    )
++endif()
+ find_package(KF6ImageFormats ${KF6_MIN_VERSION} CONFIG)
+ set_package_properties(KF6ImageFormats PROPERTIES
+     DESCRIPTION "Provides support for more image formats in Qt"
+@@ -57,24 +92,32 @@
+ )
+ 
+ find_package(KF6Screen ${PROJECT_DEP_VERSION} REQUIRED)
+-find_package(Plasma ${PROJECT_DEP_VERSION} REQUIRED)
+-find_package(PlasmaQuick ${PROJECT_DEP_VERSION} REQUIRED)
++if (KSCREEN_PLASMA_INTEGRATION)
++    find_package(Plasma ${PROJECT_DEP_VERSION} REQUIRED)
++    find_package(PlasmaQuick ${PROJECT_DEP_VERSION} REQUIRED)
++endif()
+ 
+-find_package(LayerShellQt)
+-set_package_properties(LayerShellQt PROPERTIES
+-    DESCRIPTION "Layer shell Qt bindings"
+-    URL "https://invent.kde.org/plasma/layer-shell-qt"
+-    PURPOSE "Required for the screen selection osd"
+-    TYPE REQUIRED
+-)
++if (KSCREEN_PLASMA_INTEGRATION)
++    find_package(LayerShellQt)
++    set_package_properties(LayerShellQt PROPERTIES
++        DESCRIPTION "Layer shell Qt bindings"
++        URL "https://invent.kde.org/plasma/layer-shell-qt"
++        PURPOSE "Required for the screen selection osd"
++        TYPE REQUIRED
++    )
++endif()
+ 
+-find_package(Qt6WaylandClient COMPONENTS Private)
+-find_package(WaylandProtocols 1.41)
+-set_package_properties(WaylandProtocols PROPERTIES
+-    TYPE REQUIRED
+-    PURPOSE "Collection of Wayland protocols that add functionality not available in the Wayland core protocol"
+-    URL "https://gitlab.freedesktop.org/wayland/wayland-protocols/"
+-)
++# Qt::WaylandClient and the color-management protocol XML are only
++# consumed by the HDR calibrator.
++if (KSCREEN_PLASMA_INTEGRATION OR KSCREEN_BUILD_HDRCALIBRATOR)
++    find_package(Qt6WaylandClient COMPONENTS Private)
++    find_package(WaylandProtocols 1.41)
++    set_package_properties(WaylandProtocols PROPERTIES
++        TYPE REQUIRED
++        PURPOSE "Collection of Wayland protocols that add functionality not available in the Wayland core protocol"
++        URL "https://gitlab.freedesktop.org/wayland/wayland-protocols/"
++    )
++endif()
+ 
+ option(WITH_X11 "Enable X11 support" ON)
+ 
+@@ -90,8 +133,10 @@
+     find_package(XCB REQUIRED COMPONENTS XCB ATOM)
+ endif()
+ 
+-ecm_find_qmlmodule(org.kde.kitemmodels REQUIRED)
+-ecm_find_qmlmodule(org.kde.plasma.plasma5support REQUIRED)
++if (KSCREEN_PLASMA_INTEGRATION)
++    ecm_find_qmlmodule(org.kde.kitemmodels REQUIRED)
++    ecm_find_qmlmodule(org.kde.plasma.plasma5support REQUIRED)
++endif()
+ 
+ configure_file(config-X11.h.cmake ${CMAKE_CURRENT_BINARY_DIR}/config-X11.h)
+ 
+@@ -100,13 +145,19 @@
+ )
+ 
+ add_subdirectory(common)
+-add_subdirectory(kcm)
++if (KSCREEN_PLASMA_INTEGRATION)
++    add_subdirectory(kcm)
++endif()
+ add_subdirectory(kded)
+-add_subdirectory(osd)
+-add_subdirectory(plasmoid)
++if (KSCREEN_PLASMA_INTEGRATION)
++    add_subdirectory(osd)
++    add_subdirectory(plasmoid)
++endif()
+ add_subdirectory(tests)
+ add_subdirectory(console)
+-add_subdirectory(hdrcalibrator)
++if (KSCREEN_BUILD_HDRCALIBRATOR)
++    add_subdirectory(hdrcalibrator)
++endif()
+ 
+ # add clang-format target for all our real source files
+ file(GLOB_RECURSE ALL_CLANG_FORMAT_SOURCE_FILES *.cpp *.h)

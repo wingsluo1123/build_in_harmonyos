@@ -1,0 +1,169 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index afd7ed6..c00d5e7 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -144,6 +144,95 @@
+     KF 6.12.0
+ )
+ 
++# Relocatable linkage of the SONAME-less KF6 dependency libraries. The
++# published KF6 packages ship their shared objects without a DT_SONAME,
++# so CMake links the imported targets by their absolute package path; lld
++# records that path in DT_NEEDED, which is non-relocatable (E537). lld
++# records the name as given on the command line, so this helper links the
++# listed dependencies by exact-file-name -l: flags (bare basenames) with
++# the dependency directories attached to the target, and re-adds the
++# usage requirements (include directories / compile definitions plus
++# their transitive closure) that the imported targets provided.
++# INTERFACE_FLAGS: for object/static libraries, propagate the -l: flags
++# and directories through the link interface so the final shared object
++# sees them (kpackage/6.26.0.1 / kscreenlocker 6.7.2 precedent).
++# PLAIN: the target's link line already uses the plain signature
++# (ECMAddTests for osdactions, console/CMakeLists.txt for kscreen-console)
++# and plain/keyword cannot be mixed on one target.
++# Only the components the sources actually consume may be listed: every
++# entry lands in DT_NEEDED.
++function(kscreen_link_kf6_relocatable target)
++    cmake_parse_arguments(KSR "INTERFACE_FLAGS;PLAIN" "" "DEPS" ${ARGN})
++    set(_ksr_dirs "")
++    set(_ksr_libs "")
++    foreach(_ksr_dep IN LISTS KSR_DEPS)
++        if(NOT TARGET ${_ksr_dep})
++            continue()
++        endif()
++        # The KDE-installed targets files set the per-config
++        # IMPORTED_LOCATION_RELEASE only; get_target_property returns the
++        # "<var>-NOTFOUND" sentinel string for an unset property, so the
++        # lookups must be sentinel-guarded.
++        set(_ksr_loc "")
++        get_target_property(_ksr_loc ${_ksr_dep} IMPORTED_LOCATION_RELEASE)
++        if(NOT _ksr_loc OR _ksr_loc MATCHES "-NOTFOUND$")
++            get_target_property(_ksr_loc ${_ksr_dep} IMPORTED_LOCATION)
++        endif()
++        if(_ksr_loc AND NOT _ksr_loc MATCHES "-NOTFOUND$")
++            get_filename_component(_ksr_base "${_ksr_loc}" NAME)
++            get_filename_component(_ksr_dir "${_ksr_loc}" DIRECTORY)
++            list(APPEND _ksr_libs "-l:${_ksr_base}")
++            list(APPEND _ksr_dirs "${_ksr_dir}")
++        endif()
++    endforeach()
++    if(_ksr_libs)
++        list(REMOVE_DUPLICATES _ksr_libs)
++        list(REMOVE_DUPLICATES _ksr_dirs)
++        if(KSR_PLAIN)
++            # ECMAddTests (osdactions) and console/CMakeLists.txt already
++            # link their targets with the plain signature; CMake forbids
++            # mixing plain and keyword target_link_libraries on one target.
++            target_link_libraries(${target} ${_ksr_libs})
++            target_link_directories(${target} PRIVATE ${_ksr_dirs})
++        elseif(KSR_INTERFACE_FLAGS)
++            target_link_libraries(${target} PUBLIC ${_ksr_libs})
++            target_link_directories(${target} INTERFACE ${_ksr_dirs})
++        else()
++            target_link_libraries(${target} PRIVATE ${_ksr_libs})
++            target_link_directories(${target} PRIVATE ${_ksr_dirs})
++        endif()
++    endif()
++    # The usage requirements of the KF6 deps no longer arrive through the
++    # link line; walk the transitive closure of the direct deps and copy
++    # them (KCoreConfigSkeleton/KPluginMetaData come from KF6 components,
++    # QWidgetAction from the Qt6::Widgets target reachable through
++    # KF6::XmlGui, ...).
++    set(_ksr_walk ${KSR_DEPS})
++    set(_ksr_seen "")
++    while(_ksr_walk)
++        list(GET _ksr_walk 0 _ksr_cur)
++        list(REMOVE_AT _ksr_walk 0)
++        list(FIND _ksr_seen "${_ksr_cur}" _ksr_idx)
++        if(_ksr_idx EQUAL -1 AND TARGET ${_ksr_cur})
++            list(APPEND _ksr_seen "${_ksr_cur}")
++            get_target_property(_ksr_inc ${_ksr_cur} INTERFACE_INCLUDE_DIRECTORIES)
++            if(_ksr_inc)
++                target_include_directories(${target} SYSTEM PRIVATE ${_ksr_inc})
++            endif()
++            get_target_property(_ksr_defs ${_ksr_cur} INTERFACE_COMPILE_DEFINITIONS)
++            if(_ksr_defs)
++                target_compile_definitions(${target} PRIVATE ${_ksr_defs})
++            endif()
++            get_target_property(_ksr_ll ${_ksr_cur} INTERFACE_LINK_LIBRARIES)
++            foreach(_ksr_item IN LISTS _ksr_ll)
++                if(TARGET ${_ksr_item})
++                    list(APPEND _ksr_walk "${_ksr_item}")
++                endif()
++            endforeach()
++        endif()
++    endwhile()
++endfunction()
++
+ add_subdirectory(common)
+ if (KSCREEN_PLASMA_INTEGRATION)
+     add_subdirectory(kcm)
+diff --git a/common/CMakeLists.txt b/common/CMakeLists.txt
+index 998e516..430d7f5 100644
+--- a/common/CMakeLists.txt
++++ b/common/CMakeLists.txt
+@@ -2,6 +2,7 @@
+ qt_extract_metatypes(kscreen_common)
+ ecm_qt_declare_logging_category(kscreen_common HEADER kscreen_daemon_debug.h IDENTIFIER KSCREEN_KDED CATEGORY_NAME kscreen.kded DESCRIPTION "kscreen kded (kscreen)" EXPORT KSCREEN)
+ set_property(TARGET kscreen_common PROPERTY POSITION_INDEPENDENT_CODE ON)
+-target_link_libraries(kscreen_common PRIVATE Qt::Core KF6::Screen KF6::CoreAddons KF6::I18n)
++target_link_libraries(kscreen_common PRIVATE Qt::Core)
++kscreen_link_kf6_relocatable(kscreen_common INTERFACE_FLAGS DEPS KF6::Screen KF6::CoreAddons KF6::I18n)
+ target_include_directories(kscreen_common PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>")
+ 
+diff --git a/console/CMakeLists.txt b/console/CMakeLists.txt
+index 90d920a..64e4640 100644
+--- a/console/CMakeLists.txt
++++ b/console/CMakeLists.txt
+@@ -5,10 +5,8 @@
+ target_link_libraries(kscreen-console
+     Qt::DBus
+     Qt::Gui
+-    KF6::CoreAddons
+-    KF6::I18n
+-    KF6::Screen
+-    KF6::WindowSystem
+ )
++kscreen_link_kf6_relocatable(kscreen-console PLAIN DEPS
++    KF6::CoreAddons KF6::I18n KF6::Screen KF6::WindowSystem)
+ 
+ install(TARGETS kscreen-console ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
+diff --git a/kded/CMakeLists.txt b/kded/CMakeLists.txt
+index 1f8698a..bbbd33d 100644
+--- a/kded/CMakeLists.txt
++++ b/kded/CMakeLists.txt
+@@ -18,17 +18,16 @@
+ 
+ target_sources(kscreen PRIVATE ${dbus_SRCS})
+ 
++# KF6::XmlGui is dropped from the upstream link list: no source in the
++# plugin references a KXmlGui class (vestigial link).
+ target_link_libraries(kscreen PRIVATE
+                               kscreen_common
+                               Qt::Widgets
+                               Qt::DBus
+                               Qt::Quick
+-                              KF6::CoreAddons
+-                              KF6::Screen
+-                              KF6::DBusAddons
+-                              KF6::I18n
+-                              KF6::XmlGui
+ )
++kscreen_link_kf6_relocatable(kscreen DEPS
++    KF6::CoreAddons KF6::Screen KF6::DBusAddons KF6::I18n)
+ 
+ if(WITH_X11)
+     target_link_libraries(kscreen PRIVATE X11::X11 X11::Xi X11::XCB XCB::ATOM)
+diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+index 8cd29d7..c771549 100644
+--- a/tests/CMakeLists.txt
++++ b/tests/CMakeLists.txt
+@@ -1,4 +1,7 @@
+-ecm_add_tests(osdactions.cpp LINK_LIBRARIES Qt6::Test Qt6::DBus KF6::Screen kscreen_common)
++# Qt6::Gui is linked explicitly: with the -l: relink below, KF6::Screen no
++# longer brings its transitive Qt dependency (the test uses QGuiApplication).
++ecm_add_tests(osdactions.cpp LINK_LIBRARIES Qt6::Test Qt6::DBus Qt6::Gui kscreen_common)
++kscreen_link_kf6_relocatable(osdactions PLAIN DEPS KF6::Screen)
+ target_compile_definitions(osdactions PRIVATE "-DTEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/\"")
+ 
+ # kcmshell6 < 6.27.0 doesn't know the --smoke-test param, so skip this test for
