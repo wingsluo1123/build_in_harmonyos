@@ -1,0 +1,35 @@
+software: kidletime5
+build_system: cmake
+
+# 版本级 manifest
+# 文件位置: archives/k/kidletime5/5.116.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "5.116.0"
+status: built
+build_date: "2026-10-16"
+
+source:
+  url: "https://download.kde.org/stable/frameworks/5.116/kidletime-5.116.0.tar.xz"
+  sha256: "706f44ef35dc9182021847c9c9348d0cab2812bd4ba0d9050a71783c6fb74997"
+  tar_format: tar.xz
+
+build:
+  system: cmake
+  notes:
+    - "CMake + Ninja 交叉编译，BUILD_SHARED_LIBS=ON。"
+
+dependencies:
+  build:
+    - ecm/6.20.0
+  runtime:
+    - qt5-qtbase/5.15.2.2
+
+platform_differences:
+  - "KF_IGNORE_PLATFORM_CHECK=TRUE 绕过 KDE 平台检测（OHOS 不在 KDE 平台列表）。"
+  - "X11 / Wayland poller 插件在 OHOS 缺失（find_package(X11) 失败；qt5-qtbase 未含 Qt5WaylandClient），故不构建任何 OS poller 插件，仅打包平台无关核心库。"
+  - "ECM_MODULE_PATH 手动设置（CMakeDeps 生成的 ECMConfig.cmake 不传播该变量）。"
+  - "conan_cmakedeps_paths.cmake 手写：qtbase 以 cmake_find_mode=none 发布，CMakeDeps 不会把其 lib/cmake 加入 CMAKE_PREFIX_PATH。"
+  - "OHOS CMake 平台模块未定义 SONAME flag，设置 CMAKE_SHARED_LIBRARY_SONAME_*=-Wl,-soname, 以产生真实 DT_SONAME（避免 E537 path-form DT_NEEDED）。"
+
+patches_count: 0
