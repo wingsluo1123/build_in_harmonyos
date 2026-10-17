@@ -1,0 +1,23 @@
+software: ircd-ircu
+display: "Undernet IRC Daemon (ircu2)"
+description: "IRC 服务端守护进程，支持 IPv4/IPv6、epoll/poll/select 事件引擎、oper 体系与频道属性"
+category: net
+homepage: "https://github.com/UndernetIRC/ircu2"
+license: GPL-2.0
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "config.guess（上游为 2005-12-23 版）新增 HarmonyOS/OpenHarmony 分支，输出 aarch64-unknown-linux-ohos（E007）"
+    - "config.sub（上游为 2005 版）补 aarch64 CPU 识别与 linux-ohos KERNEL-OS/OS 归一化，--host=aarch64-linux-ohos 从 Invalid configuration 变为可用（E007）"
+    - "发行 tarball 不含生成后的 lex.yy.c / y.tab.c / y.tab.h，flex 与 bison 作为 tool_requires 补齐（CI 无系统级）"
+    - "source() 清理 tarball 里打包者机器上预生成的 Makefile/config.status/config.h，避免 mtime 相同导致 make 误判为最新"
+    - "layout() 把构建目录指回源码目录：顶层 Makefile.in 无 VPATH，VPATH 构建找不到 configure"
+    - "--with-dpath 钉在包目录内：ircu install 目标对 ${DPATH} 不加 DESTDIR 前缀就 mkdir+chmod 700，默认 /lib 会改到系统 /lib"
+    - "--with-symlink=no 避开 bin/ircd.<时间戳>+软链接方案与 /tmp/ircd.tag 临时文件"
+  common_dependencies: []
+
+versions:
+  "2.10.12.19":
+    status: built
+    build_date: "2026-10-04"

@@ -1,0 +1,110 @@
+Portability: musl (the libc HarmonyOS is built on) does not provide
+getpass(3) at all -- no declaration in <unistd.h> and no symbol in
+libc -- so ircd/umkpasswd.c does not compile there: clang 15 rejects
+the implicit declaration ('incompatible integer to pointer conversion
+assigning to char * from int').  umkpasswd only needs a no-echo read of
+one line, so implement it locally and call that instead.
+
+--- a/ircd/umkpasswd.c
++++ b/ircd/umkpasswd.c
+@@ -26,6 +26,7 @@
+ #include <errno.h>
+ #include <stdlib.h>
+ #include <string.h>
++#include <termios.h>
+ #include <time.h>
+ /* #include <assert.h> -- Now using assert in ircd_log.h */
+ 
+@@ -424,6 +425,83 @@
+ return argv[optind];
+ }
+ 
++/* --- getpass() portability ---------------------------------------------- *
++ * musl, the libc HarmonyOS is built on, does not implement getpass(3) at
++ * all: it declares nothing in <unistd.h> and exports no symbol, so this
++ * translation unit would not even compile (clang 15 rejects the implicit
++ * declaration).  umkpasswd only needs a no-echo read of a single line, so
++ * do it here.  The returned buffer is static, hence writable, which the
++ * caller relies on when it wipes the password after use.
++ */
++static char ircu_getpass_buf[128];
++
++/** Read one line with terminal echo disabled, getpass(3) style.
++ * Reads one character at a time so the prompt behaves the same on every libc
++ * and nothing is buffered past the terminating newline.  A password piped in on
++ * stdin is honoured as-is; only an interactive stdin makes this open /dev/tty
++ * and switch echo off, so that a batch invocation can never block on a
++ * terminal nobody is watching.
++ * @param prompt Text to display before reading.
++ * @return Pointer to the static buffer holding the line.  Never NULL, exactly
++ * like getpass(3): the caller dereferences it unconditionally, and this build
++ * compiles assertions out (-DNDEBUG).
++ */
++static char* ircu_getpass(const char* prompt)
++{
++ struct termios term;
++ struct termios saved;
++ FILE*         in;
++ FILE*         out;
++ FILE*         tty;
++ int           have_term;
++ size_t        len;
++ int           c;
++
++ in = stdin;
++ out = stderr;
++ if (isatty(fileno(stdin)))
++ {
++  tty = fopen("/dev/tty", "r+");
++  if (NULL != tty)
++  {
++   in = tty;
++   out = tty;
++  }
++ }
++
++ fputs(prompt, out);
++ fflush(out);
++
++ have_term = 0;
++ if (0 == tcgetattr(fileno(in), &term))
++ {
++  saved = term;
++  term.c_lflag &= ~((tcflag_t)ECHO);
++  if (0 == tcsetattr(fileno(in), TCSAFLUSH, &term))
++   have_term = 1;
++ }
++
++ len = 0;
++ while (EOF != (c = getc(in)))
++ {
++  if ('\n' == c)
++   break;
++  if (len + 1 < sizeof(ircu_getpass_buf))
++   ircu_getpass_buf[len++] = (char)c;
++ }
++ ircu_getpass_buf[len] = '\0';
++
++ if (have_term)
++  tcsetattr(fileno(in), TCSAFLUSH, &saved);
++ fputs("\n", out);
++ fflush(out);
++
++ if (in != stdin)
++  fclose(in);
++
++ return ircu_getpass_buf;
++}
++
+ int main(int argc, char **argv)
+ {
+ char* pw, *crypted_pw;
+@@ -449,7 +527,7 @@
+ 
+  if (NULL == pw)
+  {
+-  pw = getpass("Password: ");
++  pw = ircu_getpass("Password: ");
+  }
+  crypted_pw = crypt_pass(pw, umkpasswd_conf->mech);
+ 

@@ -1,0 +1,32 @@
+Portability (HMDFS): autoconf 2.64 creates its scratch directory for
+config.status with "umask 077", which leaves confXXXXXX/ usable only by
+its owner.  On the HMDFS-backed build folder of a HarmonyOS worker the
+scratch directory is created with an access label that the very next
+statement cannot use, so config.status dies before it can lay down the
+generated AWK substitution scripts:
+
+    configure: creating ./config.status
+    ./config.status: line 610: ./confhoCbLA/subs1.awk: Permission denied
+    config.status: error: could not setup config files machinery
+
+077 buys nothing here -- the scratch directory only ever holds the
+substitute/define AWK programs for this single configure run and is
+rm -rf'd by the exit trap -- so use 022 like the rest of the build tree.
+
+--- a/configure	2026-10-10 02:50:59.093187124 +0800
++++ b/configure	2026-10-10 02:50:59.120983546 +0800
+@@ -7719,12 +7719,12 @@
+ # Create a (secure) tmp directory for tmp files.
+ 
+ {
+-  tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null` &&
++  tmp=`(umask 022 && mktemp -d "./confXXXXXX") 2>/dev/null` &&
+   test -n "$tmp" && test -d "$tmp"
+ }  ||
+ {
+   tmp=./conf$$-$RANDOM
+-  (umask 077 && mkdir "$tmp")
++  (umask 022 && mkdir "$tmp")
+ } || as_fn_error "cannot create a temporary directory in ." "$LINENO" 5
+ 
+ # Set up the scripts for CONFIG_FILES section.
