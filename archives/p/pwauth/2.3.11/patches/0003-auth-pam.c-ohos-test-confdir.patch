@@ -1,0 +1,46 @@
+--- a/auth_pam.c
++++ b/auth_pam.c
+@@ -46,6 +46,19 @@
+ #else
+ #include <security/pam_appl.h>
+ #endif
++
++/* Linux-PAM (including the OHOS linux-pam package) provides
++ * pam_start_confdir(), which lets a test point the service lookup at a private
++ * directory instead of the system PAM configuration directory.  The override is
++ * honoured only for non-elevated processes (see check_auth), so a setuid
++ * installation always keeps using the system PAM stack.
++ *
++ * The guard stays on __linux__ on purpose: OHOS builds with the
++ * aarch64-linux-ohos target, so __linux__ is already defined there and no
++ * platform-specific macro is added to upstream code. */
++#ifdef __linux__
++#define PWAUTH_HAVE_PAM_START_CONFDIR 1
++#endif
+ #endif
+ 
+ #ifdef PAM
+@@ -175,7 +188,23 @@
+     user_info.passwd= passwd;
+ #endif /* PAM_SOLARIS_26 */
+ 
++#ifdef PWAUTH_HAVE_PAM_START_CONFDIR
++    {
++	/* Optional hook for end-to-end tests: PWAUTH_PAM_CONFDIR redirects the
++	 * PAM service lookup to a private directory, but only when pwauth is not
++	 * running with elevated privileges - a setuid installation therefore
++	 * always uses the system configuration, and an unprivileged caller
++	 * cannot point it at a permissive service of its own. */
++	const char *confdir= getenv("PWAUTH_PAM_CONFDIR");
++
++	if (confdir != NULL && *confdir != '\0' && getuid() == geteuid())
++	    retval= pam_start_confdir("pwauth", login, &conv, confdir, &pamh);
++	else
++	    retval= pam_start("pwauth", login, &conv, &pamh);
++    }
++#else
+     retval= pam_start("pwauth", login, &conv, &pamh);
++#endif
+ 
+     if (retval == PAM_SUCCESS)
+ 	retval= pam_authenticate(pamh, PAM_SILENT);
