@@ -1,0 +1,43 @@
+version: "1.9.3"
+software: "mdtest"
+status: built
+build_date: "2026-10-16"
+build_system: makefile
+conan_ref: "mdtest/1.9.3"
+
+source:
+  url: "https://downloads.sourceforge.net/project/mdtest/mdtest%20latest/mdtest-1.9.3/mdtest-1.9.3.tgz"
+  sha256: "b7e76252031232cf0bba91475f48d0c77dd2e0a56a2e871f1d48e6f247109d8a"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options: []
+  dependencies:
+    - "mpich/5.0.1.2"
+  cc: clang
+  cxx: null
+
+patches_applied:
+  - "0001-Makefile.patch"
+  - "0002-mdtest.c.patch"
+
+knowledge_gained:
+  - "并行基准在屏障协调阶段必须先对各 rank 的完成时间取最大值，再以总操作数除以关键路径时间；直接对 rank 局部速率取最大值或平均值会系统性高估吞吐。"  # knowledge_ref: E591 draft
+
+patch_generation:
+  method: per-file-difflib-context-normalized
+  source_orig_hash: 49bf5bb514ed85dd
+  source_work_hash: 11b63ec1e9367933
+  generated_at: "2026-10-16T03:57:29Z"
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-Makefile.patch
+    type: portability
+    platform_only: true
+    guard: "uname=HarmonyOS selects CC.HarmonyOS"
+  - file: 0002-mdtest.c.patch
+    type: correctness
+    platform_only: false
+    guard: "barrier-mode phase accounting"
