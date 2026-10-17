@@ -1,0 +1,34 @@
+id:                     E429
+trigger_tool: conan|autotools|configure
+phase: configuration
+rec_priority: 2
+error_signature: fatal error: 'argp\.h' file not found|undefined reference to `argp_parse'|cannot guess build type|can't create \./conf[A-Za-z0-9]+/|not building austinp: missing libunwind
+
+severity: 2
+category: build-system, dependencies, compat
+match_keywords: 依赖先扣仓库已有, zero-dependency 误判, autotools 依赖 include, extra_cflags, LIBS=-largp, LDFLAGS 顺序, 静态库链接顺序, config.guess 三元组, --build=aarch64-unknown-linux-musl, configure umask 077, autoreconf 顺序, HMDFS, argp.h, libunwind-ptrace
+title: 判"有依赖"要先把仓库已有依赖扣掉；autotools 依赖的 include/库必须显式注入（含 LIBS 顺序与 umask 顺序）
+
+root_cause: 两个高频坑：①**把"有依赖"当成淘汰理由，却没扣掉仓库里已归档的依赖**——本例 austin 需要 argp 与 libunwind，而仓库 `archives/a/argp-standalone/1.5.0` 与 `archives/l/libunwind/1.6.2` 都已归档且制品仓有二进制，直接 `requires` 引用即可；用"零依赖"筛库会把这类**本来可直接适配**的候选整批误杀（本轮实测：Debian 侧 840 个候选里，扣掉仓库已有依赖后仍有 **41 个**依赖全满足、其中 **17 个**是 C/C++ 构建，而"零依赖"口径下只剩 2 个）。②**autotools 工程的依赖信息不会自动进编译行**——只生成 `AutotoolsToolchain` 时，austin 的编译行里没有 argp 的 include（`src/argparse.c:186: fatal error: 'argp.h' file not found`）；链接期 `-largp` 若塞进 `LDFLAGS` 会排到目标文件**之前**，静态库符号抓不到（静默失败）。另有两个 OHOS 必备项：`config.guess` 认不出本机（须显式 `--build/--host=aarch64-unknown-linux-musl`），以及 `configure` 里 `umask 077` 建临时目录在 HMDFS 上会 `Permission denied`（**且必须在 autoreconf 之后改**，否则被重新生成的 configure 覆盖）。
+affected_scope: 所有需要"判依赖"来筛库/定范围的适配流程；所有用 autotools 构建、且依赖仓库里已归档第三方库的 C/C++ 项目
+verification_cmd: 筛库时先 `git ls-tree -r --name-only main -- archives | grep manifest.yaml` 取全量已归档包名做差集；构建期 `grep -nE 'argp\.h|undefined reference' 构建日志`；`ctest`/`make check` 之外，用 `./configure --build=aarch64-unknown-linux-musl --host=aarch64-unknown-linux-musl` 与 `grep -n 'umask 077' configure`（在 autoreconf 之后）自检
+
+principles:
+causes:                 []
+caused_by:              []
+similar_to:             []
+conflicts_with:         []
+prerequisite_of:        []
+
+doc_file:               doc/E429.md
+last_updated: 2026-10-15
+
+authors:
+source_pr:
+source_commit:
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+draft: true
+contributor_id: 2E57

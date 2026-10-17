@@ -1,0 +1,37 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: austin/3.7.0
+homepage: "https://github.com/P403n1x87/austin"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: >-
+  上游 `test/run.sh`（pytest）**在本机与 CI 均不可用**（脚本内写死 `/tmp/austin-test` venv 与作者私有
+  libunwind 路径，且需 austin-python/ptrace）→ build() 里跑的是**配方补的测试**：
+  `austin --help`（硬判）+ 一次真实采样（尽力而为、如实记录）。
+
+upstream_tests:
+  - name: "上游 55 个用例（cunit 17 + functional 33 + integrity 3 + support 2）：本平台不可执行，原因是上游 harness 硬编码平台门"
+    count: 55
+    description: >-
+      **上游测试数按"本环境可运行数"记 0，并给出不可运行的硬证据**：`test/run.sh` 里
+      `source /tmp/austin-test/bin/activate`（/tmp 本机只读）与
+      `LD_LIBRARY_PATH=/Users/gabriele/Projects/libunwind/src/.libs/`（作者macOS私有路径）；
+      `test/requirements.txt` 需 `austin-python~=1.6`/`flaky`/`pytest-xdist`/`psycopg`/`psutil`。
+      **不宣称"上游测试全过"**。
+
+test_package_tests:
+  - file: check_austin.py
+    description: >-
+      R34 消费者校验 **7 项**（全部离线）：①产物齐备（`bin/austin` 可执行）②ELF 头自检（真 ELF64、
+      machine=0xB7 AArch64）③`bin/austinp` 是否随包（缺 libunwind-ptrace 时上游会跳过 —— 如实记录）
+      ④真实运行 `austin --help` rc=0 ⑤真实采样一次（本环境缺 austinp/ptrace → 如实记录，不计为通过）
+      ⑥许可证随包 ⑦证据（sha256 + python 版本）。
+    command: "python3 check_austin.py <package-folder>"
+
+assertion_count: 7
+added_tests_note: >-
+  本库**上游测试在本环境不可运行**（证据见上）；配方内补的测试 = ①`--help` 硬判 + ②一次真实采样
+  （尽力而为、如实记录），消费者校验 7 条。**三者分开计数**，不混成一句"测试全过"。
