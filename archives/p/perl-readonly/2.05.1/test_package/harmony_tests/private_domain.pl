@@ -1,0 +1,16 @@
+use strict;
+use warnings;
+use POSIX qw(uname);
+use Readonly ();
+use JSON::PP;
+my @os = uname(); die 'HarmonyOS aarch64 required' unless $os[0] eq 'HarmonyOS' && $os[4] eq 'aarch64';
+my $root = $ENV{TMPDIR} // die 'private TMPDIR required';
+my @st = stat($root);die 'private process domain ownership/mode mismatch' unless @st && $st[4] == $< && ($st[2] & 0777) == 0700;
+Readonly::Scalar my $path => $root.'/readonly-native-domain.bin';
+my $payload = "readonly-native-domain\0\x{4e2d}\x{6587}\n";
+open my $write,'>:encoding(UTF-8)',$path or die $!;print $write $payload;close $write or die $!;
+eval { $path = '/storage/Users/currentUser/not-the-private-domain' };my $error=$@;die 'readonly private-domain pointer changed' unless $error =~ /read-only/;
+open my $read,'<:encoding(UTF-8)',$path or die $!;local $/;my $actual=<$read>;close $read;die 'private-domain payload changed' unless $actual eq $payload;
+my @file=stat($path);die 'wrong private file owner' unless $file[4] == $<;unlink($path) or die $!;
+open my $out,'>','harmony-records.json' or die $!;print $out JSON::PP->new->canonical->encode({system=>$os[0],machine=>$os[4],process_uid=>0+$<,temporary_owner=>0+$st[4],temporary_mode=>sprintf('%04o',$st[2]&0777),file_owner=>0+$file[4],readonly_private_domain_reference=>JSON::PP::true,real_utf8_binary_roundtrip=>JSON::PP::true});close $out or die $!;
+print "HARMONY_TEST_COUNT=1\nHARMONY_TEST_PASS=1/1\n";
