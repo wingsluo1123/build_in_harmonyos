@@ -1,0 +1,14 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P3",
+      "rule_id": "cache-immutability / hygiene",
+      "file": "archives/c/cinaps/0.15.1/conanfile.py",
+      "line": 109,
+      "description": "build() calls _fix_launcher_shebangs (called at line 82, defined lines 92-114), which rewrites the '#!' line of launcher scripts inside the ocaml dependency's package folder in the Conan cache by injecting an absolute cache path: line 107 `candidate = os.path.join(ocaml_bin, os.path.basename(parts[0]))` and line 109 `data = (\"#!\" + candidate).encode() + data[nl:]`. This mutates another package's cached artifacts at build time (breaks Conan cache immutability / later `conan cache verify` and embeds machine-specific absolute paths). It is disclosed in the docstring (lines 15-18, 'Defensive launcher-shebang fix for the ocaml package scripts') and idempotent (line 105 skips when the interpreter path already exists), so this is advisory only.",
+      "fix_suggestion": "Prefer fixing the launcher shebangs in the ocaml/4.14.1.1.2 package itself or wrapping the launchers from the consuming side instead of mutating a dependency's cache folder; if kept as-is, note explicitly that cache verification of ocaml/4.14.1.1.2 will flag the modified files."
+    }
+  ],
+  "summary": "P0=0，P1=0，P2=0，P3=1 → verdict=pass。上一轮全部 2×P2 与 7×P3 中除一条外均已修复并逐项复核：(1) package_info() 已改用 Conan 2 环境 API，self.buildenv_info/self.runenv_info append_path PATH/OCAMLPATH（conanfile.py:176-183），全文无 self.env_info；(2) notes.md:25-26 现表述为仅安装 findlib META + cinaps.runtime 子库、主 cinaps 库为 private 不安装，与 conanfile.py:142-149 强制清单及 test-report 一致；(3) 产物断言 banner 与报告均为 4/4（test.sh:27、test-report.md:13），测试循环确为 4 项（test.sh:19-21）；(4) MANIFEST command 现为 4 参 'bash test.sh <bin_dir> <lib_dir> <ocaml_lib> <ocaml_bin>'，与 test.sh:5-8 及 test_package/conanfile.py 调用一致；(5) MANIFEST description（19-26 行）已准确描述 staged 生成驱动 + 编译链接打包 cinaps.runtime + in-sync exit 0 + 负例非零退出并再生 <file>.cinaps-corrected，逐句与 test.sh:34-57 相符；(6) 方法顺序恢复 export_sources(48)→requirements(51)→layout(59)→source(63)→generate(66)→build(69)→package(116)→package_info(169)；(7) test.sh:3 为 set -euo pipefail 且 line 15 cleanup 带说明注释；(8) 占位符已回填（test-report.md:5、notes.md:55-64），全档无“后回填”，W3 本地 CI 待 ocaml-re/1.13.2 发布后执行（R36）已如实记录，属预期不计问题。欺骗与源完整性复检无回归：无伪造结果/哈希/预编译产物，test.sh 仍真实驱动打包后的 cinaps 二进制（4 产物断言、--help、cinaps -staged 生成、ocamlopt 链接打包 cinaps.runtime.cmxa+unix、in-sync exit 0、负例非零退出且 .cinaps-corrected 含再生 'toto'；in_sync.ml/out_of_sync.ml 仅第 4 行 toto→tata 一处不同）；R51 上游测试说明在 conanfile.py/notes.md/MANIFEST.yml/test-report.md 四档一致；conandata.yml 仅官方单一 https URL 且 sha256 为合法 64 位十六进制并与 manifest.yaml 一致；hygiene 扫描无 __OHOS__、file://、ghproxy 镜像、用户路径/密钥、垃圾或预编译文件。唯一残留为一条 P3 咨询项：build() 防御性 shebang 改写仍会写入 ocaml 依赖包的缓存目录（已披露、幂等、仅本地缓存）。"
+}

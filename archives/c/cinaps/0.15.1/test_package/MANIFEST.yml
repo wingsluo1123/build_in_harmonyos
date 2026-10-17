@@ -1,0 +1,29 @@
+manifest_version: "1.0"
+package: cinaps
+version: "0.15.1"
+test_type: smoke
+assertion_count: 14
+upstream_tests:
+  source: "upstream test/ (dune): test_staged.ml + run rule using %{bin:cinaps} -staged, and test_staged_gen (needs ppx_jane)"
+  mechanism: "NOT RUNNABLE in this registry: the test executable is preprocessed with `(pps ppx_jane)`, i.e. the downstream ppxlib ecosystem (circular at dependency stage). The upstream test_staged.ml file itself is embedded verbatim in the test_package check/staged cases, and the run rule's cinaps -staged invocation is reproduced exactly."
+  discovered: 1
+  passed: 0
+  modified_reason: "no source modification; the upstream runtest requires ppx_jane (unpublished, downstream ppxlib dependency). The packaged binary is exercised end-to-end (check mode, staged mode, negative control)."
+
+# 鸿蒙特有测试（rule12：至少一个完整消费者用例）
+harmony_specific_test_count: 1
+harmony_specific_tests:
+  - file: test_package/test.sh
+    kind: e2e_consumer_case
+    label: "鸿蒙特有测试"
+    description: >
+      End-to-end consumer case on the real OHOS worker: the packaged cinaps
+      binary generates the evaluation drivers in staged mode from the
+      upstream test_staged.ml content (verbatim) and from a corrupted
+      variant; the drivers are compiled against the packaged cinaps.runtime
+      sub-library and executed — the in-sync driver exits 0, while the
+      corrupted variant must exit non-zero and regenerate the corrected
+      value in <file>.cinaps-corrected.
+    command: "bash test.sh <bin_dir> <lib_dir> <ocaml_lib> <ocaml_bin>"
+    executed: true
+    result: "ALL PASS (help + check + staged + negative control)"
