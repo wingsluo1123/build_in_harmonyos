@@ -1,0 +1,25 @@
+# conandata.yml — wpmeta 0.2.0
+#
+# 官方源（R39）：上游仓库 AOSC-Dev/wpmeta，tag `wpmeta-v0.2.0`
+# （Arch Linux extra/wpmeta 0.2.0-2 同源，其 PKGBUILD 亦指向此 tag）。
+# 镜像回退由 CI（ci/conan/build_and_test.sh get_mirrors）自动追加，
+# 此处只写官方 URL。
+sources:
+  url: "https://github.com/AOSC-Dev/wpmeta/archive/refs/tags/wpmeta-v0.2.0.tar.gz"
+  sha256: "a7b736ce218ddadeb19271cee6ce336a69daf686b7282103605456baef35fe38"
+
+# cargo 运行期共享库：cargo 1.97 动态链接 libssl.so/libcrypto.so/libz.so，且
+# 需要 OpenSSL 3.5+ 的 SSL_get0_group_name（系统 /usr/lib 的 3.0 缺该符号）。
+# 使用 Harmonybrew OHOS 预编译 bottle（below/argc/alass/weggli 先例）。
+# 2026-10-13 实测：weggli 当时使用的 openssl 3.6.4 / zlib 2.3.3_1 bottle 已在
+# bottle 仓下架（404），改用 formula API（formula.jws.json）当前发布的
+# openssl@3 3.6.5_1 / zlib-ng-compat 2.3.3_2 bottle.1，sha256 与 API 一致并已
+# 本地下载实测核验。
+cargo_runtime:
+  - url: "https://harmonybrew.atomgit.com/bottles/openssl%403-3.6.5_1.arm64_ohos.bottle.1.tar.gz"
+    sha256: "ae1d5bf9252d65d86053e68d7c91fc9d0066016bce50662ce4a32a0b0e954ef2"
+  - url: "https://harmonybrew.atomgit.com/bottles/zlib-ng-compat-2.3.3_2.arm64_ohos.bottle.1.tar.gz"
+    sha256: "7092bfe7af8908f4a7c72493881291fe2416f27fc6502c34e22346a4dbfc4c51"
+
+# 无源码补丁：Cargo.lock（libc 0.2.178 等依赖均 ≥ OHOS 支持版本线），构建输入
+# 逐字节等于上游 tarball；如后续需要确定性锁图迁移（E358 口径）再行登记。

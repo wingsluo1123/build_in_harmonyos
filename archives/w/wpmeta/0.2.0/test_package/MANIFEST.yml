@@ -1,0 +1,111 @@
+# test_package/MANIFEST.yml — wpmeta 0.2.0 上游测试声明
+# CI 脚本 (ci/conan/build_and_test.sh L0e) 强制要求此文件存在。
+
+package: wpmeta/0.2.0
+homepage: "https://github.com/AOSC-Dev/wpmeta"
+
+# 上游测试命令（cargo test，虚拟 workspace：两个成员 localized + wpmeta 全部接入）
+upstream_check_command: "cargo test --release --locked --target aarch64-unknown-linux-ohos --lib --bins --tests -- --test-threads=1"
+upstream_test_command: "cargo test --release --locked --target aarch64-unknown-linux-ohos --lib --bins --tests -- --test-threads=1"
+
+# 上游测试在主配方 build() 阶段执行（pristine 源码在本配方内，无任何源码补丁），
+# 计数持久化到 package/res/upstream_test_result.json，test_package 据此复发
+# HMBS_UPSTREAM_TEST_RESULT（ali/0.8.0 先例：缓存命中时 build() 被跳过）。
+upstream_test_in_build: true
+
+# 上游测试存在性审计（hmbs 硬门禁要求）
+upstream_tests_exist: true
+upstream_test_audit: |
+  审计结论：上游 wpmeta 0.2.0（tag wpmeta-v0.2.0）存在完整单元测试套件，
+  5 个入口共 10 个 #[test] 用例全部在 HarmonyOS PC（aarch64-unknown-linux-ohos）
+  真机完整执行，无漏测、无跳过、无失败。
+  1. localized/src/lib.rs（#[cfg(test)] mod tests）3 个：test_access /
+     test_get_locale / test_serde（serde_test Token 序列化往返）。
+  2. wpmeta/src/input.rs（#[cfg(test)] pub mod test）2 个：
+     test_de_single_file / test_de_multiple_file（metadata.toml schema 单路径
+     与多路径反序列化；路径仅作字符串断言，不打开文件）。
+  3. wpmeta/src/generate/gnome.rs 2 个：
+     test_manifest_includes_normal_and_dark_filenames /
+     test_generates_wallpaper_list_for_multiple_normals（GNOME XML 逐字节比对
+     + 多分辨率 gnome-list.xml）。
+  4. wpmeta/src/generate/kde.rs 1 个：test_writes_kde_metadata_json
+     （KDE KPlugin metadata.json 逐字段比对）。
+  5. wpmeta/src/generate/mod.rs 2 个：
+     test_wallpaper_file_from_file_reads_metadata /
+     test_wallpaper_file_copy_file_copies_into_target_structure（真实读取
+     CARGO_MANIFEST_DIR/test/example.jpg 夹具并验证拷贝语义）。
+  计数方式：取自 cargo 框架真实 "test result:" 行（逐目标累加，非静态统计），
+  --target 固定 aarch64-unknown-linux-ohos、--locked 与上游 Cargo.lock 一致、
+  --test-threads=1 消除 HMDFS 写回竞态（weggli #6 同类）。
+  doc-tests：localized/src/lib.rs 文档含 1 个 ```rust doctest 示例，但
+  rust-toolchain/1.97.1 载荷不含 rustdoc（cargo 无法 spawn rustdoc，ENOENT；
+  alass/martin/argc/weggli 同仓库判定为平台限制），故用 --lib --bins --tests
+  排除该阶段；该 doctest 语义（Localized get_default/insert/Index 回退）已被
+  上述 3 个 localized 单测等价覆盖（test_access 即同一 Index 语义），无独有
+  断言损失。夹具 wpmeta/test/example.jpg（7680x4320 JPEG）由 mod.rs 两个用例
+  真实消费，随上游 tarball 一并进入构建，无网络依赖，全部用例可离线执行。
+
+# 上游测试分组（与源码一一对应）
+upstream_tests:
+  - source: "localized/src/lib.rs"
+    count: 3
+    description: "Localized 容器语义单测（Index/get_default/serde 往返）"
+  - source: "wpmeta/src/input.rs"
+    count: 2
+    description: "metadata.toml 输入 schema 单测（单/多路径反序列化）"
+  - source: "wpmeta/src/generate/gnome.rs"
+    count: 2
+    description: "GNOME gnome-background-properties XML 生成单测"
+  - source: "wpmeta/src/generate/kde.rs"
+    count: 1
+    description: "KDE KPlugin metadata.json 生成单测"
+  - source: "wpmeta/src/generate/mod.rs"
+    count: 2
+    description: "WallpaperFile 元数据读取/拷贝单测（真实消费 test/example.jpg 夹具）"
+
+# 非测试入口（不计入用例统计）
+upstream_non_test_entries:
+  - source: "localized/src/lib.rs (doc example)"
+    description: "1 个 ```rust doctest 示例——rustdoc 不在 rust-toolchain 载荷内（ENOENT，alass/martin/argc/weggli 同判平台限制），排除该阶段；其语义被 3 个 localized 单测等价覆盖"
+  - source: "wpmeta/test/example.jpg"
+    description: "测试夹具（7680x4320 JPEG），被 generate/mod.rs 两个用例真实消费，非独立测试入口"
+  - source: "release.toml / rust-toolchain.toml"
+    description: "cargo-release 配置与 rustup channel 声明，非测试入口"
+
+upstream_total: 10
+upstream_passed: 10
+upstream_failed: 0
+upstream_skipped: 0
+
+# test_package 自身用例（不可替代上游统计，两者分别计数）
+test_package_tests:
+  - file: "test.sh"
+    count: 10
+    description: "10 个断言点 = 5 项消费者 CLI 用例（--version / --help / 缺参报错 / 端到端 normal+dark 运行及其输出断言块 / 坏源目录）+ 3 项鸿蒙特有用例（H1 OHOS 目标 AArch64 ELF / H2 musl program interpreter / H3 端到端预览生成运行及其 JPEG 产物断言块）"
+    command: "test.sh"
+  - file: "fixtures/make_wallpaper.py"
+    count: 0
+    description: "壁纸夹具生成器（不贡献断言点，被 test.sh 调用）：程序化生成 64x64 PNG normal/dark 两变体，恒定 zlib 等级 9 + 每扫描线滤波字节 0 → 产物逐字节确定；两变体像素互异，供 C4 的 cmp 拷贝映射断言判别调包"
+    command: "python3 fixtures/make_wallpaper.py <normal|dark> <out.png>"
+assertion_count: 10
+harmonyos_specific_cases: 3
+
+# ── 夹具策略：二进制测试输入一律测试期生成，不随 PR 提交 ────────────────────
+# 本仓库 CI 的 checkout-pr 步骤不 checkout PR 分支，而是 clone 默认分支后
+# `curl <PR>.diff | git apply`。GitCode 的 PR diff 端点对**新增二进制文件**只
+# 只给出一行占位标记，不携带二进制数据段（base85），git apply 随即报：
+#     error: missing binary patch data for '.../fixtures/ohos_wallpaper.png'
+#     error: binary patch does not apply to '.../ohos_wallpaper.png'
+# 检出阶段即失败，L0/L1/test_package 全部不执行（平台评论区会误判为「源码下载
+# 超时 / PR 与 main 冲突」，与 main 是否真实冲突无关，重试必然复现）。
+# 知识条目：E650（先例 dbview PR #9495 / libsoil PR #12488；同根因 E256/E379）。
+# 因此两个 64x64 PNG 壁纸夹具**不随 PR 提交**，改由 fixtures/make_wallpaper.py
+# 在 test.sh 运行时按需生成：纯 Python 标准库（struct/zlib），无外部依赖与网络，
+# 生成结果确定（固定滤波字节与压缩等级），C4 的 `cmp` 字节级映射断言依然成立。
+# 一行判据：curl -sL <PR>.diff 中出现占位 differ 行、git apply 报 missing binary patch data
+fixtures_generated_at_test_time:
+  - file: "fixtures/make_wallpaper.py"
+    produces: "normal.png / dark.png（各 64x64、8 位真彩、filter=0、zlib level 9）"
+    reason: "E650：PR diff 不含新增二进制数据段，checkout-pr 的 git apply 必失败"
+  - file: "（无）"
+    note: "fixtures/ 目录内不含任何二进制文件；test.sh 生成到 mktemp 私有目录并在退出时清理"
