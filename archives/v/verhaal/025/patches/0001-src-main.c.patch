@@ -1,0 +1,38 @@
+--- a/src/main.c
++++ b/src/main.c
+@@ -67,20 +67,35 @@
+ 	return ret;
+ }
+ 
+ static int git_init(void)
+ {
+ 	int ret;
+ 
+ 	git_libgit2_init();
+ 
+ 	ret = git_repository_open(&git_repo, git_repo_location);
++	if (ret) {
++		/*
++		 * libgit2 >= 1.7 refuses to open a repository whose on-disk
++		 * owner does not match the current euid (the same guard as
++		 * git's "dubious ownership").  Filesystems that normalize the
++		 * ownership of every file - the shared-ownership HMDFS used on
++		 * HarmonyOS, for example - can never satisfy that check, which
++		 * would make verhaal unusable there.  Retry once with the
++		 * validation disabled: this only ever turns a hard failure into
++		 * a working run, and CVEKERNELTREE is set explicitly by the
++		 * user rather than discovered from untrusted directories.
++		 */
++		git_libgit2_opts(GIT_OPT_SET_OWNER_VALIDATION, 0);
++		ret = git_repository_open(&git_repo, git_repo_location);
++	}
+ 	if (ret) {
+ 		fprintf(stderr, "Error opening git repo at %s", git_repo_location);
+ 		return ret;
+ 	}
+ 
+ 	return 0;
+ }
+ 
+ git_repository *git_repo_get(void)
+ {

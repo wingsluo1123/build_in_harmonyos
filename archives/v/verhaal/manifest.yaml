@@ -1,0 +1,33 @@
+software: verhaal
+display: "verhaal"
+description: "Linux stable 分支提交解析与查询工具：把内核 stable 树的提交与 Fixes: 关系建进 SQLite，用于反查某提交被回填到哪些发行版"
+category: dev-tool
+homepage: "https://git.sr.ht/~gregkh/verhaal"
+license: GPL-2.0-only
+build_system: meson
+
+ohos_adaptation:
+  key_points:
+    - "libgit2 >= 1.7 的仓库属主校验在 HMDFS 共享属主文件系统上对本机任何仓库恒失败，补丁 0001 在打开失败时关闭校验重试一次（可移植，无平台宏）"
+    - "meson 依赖名 libpcre2-8：Conan pcre2 包只产出合并 pcre2.pc，配方按包实际路径补 libpcre2-8.pc 别名"
+    - "产物为命令行工具，软件级声明 commands.json（R38）"
+  common_dependencies:
+    - libgit2/1.9.0
+    - sqlite3/3.53.4
+    - pcre2/10.45
+
+versions:
+  "025":
+    status: built
+    build_date: "2026-10-15"
+    test_results:
+      total: 11
+      passed: 11
+      failed: 0
+      timeout: 0
+      note: >-
+        上游 025 无已注册测试套件（N=0，清点证据见 025/test_package/MANIFEST.yml；
+        另有未注册的开发脚本自测 scripts/git-resolve.sh --selftest，需含指定提交的
+        内核 git 树、本环境不可运行，已如实登记为 upstream_tests_unrunnable）。
+        功能验证 = 消费者用例 4 项（conan create 内执行）+ 鸿蒙 PC 真机专项 7 项
+        （含补丁 0001 的 HMDFS 共享属主回归），全部通过。
