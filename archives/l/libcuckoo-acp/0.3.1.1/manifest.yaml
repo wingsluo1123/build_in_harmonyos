@@ -1,0 +1,39 @@
+version: "0.3.1.1"
+status: built
+software: libcuckoo
+build_date: "2026-10-03"
+build_system: cmake
+
+source:
+  url: "https://github.com/efficient/libcuckoo/archive/refs/tags/v0.3.1.tar.gz"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_POLICY_VERSION_MINIMUM=3.5 (via patches/0001-cmake-min-version.patch)"
+    - "-DBUILD_UNIT_TESTS=ON (upstream unit tests run in build())"
+    - "-DBUILD_STRESS_TESTS=ON (upstream stress tests run in build())"
+    - "-DBUILD_UNIVERSAL_BENCHMARK=OFF"
+    - "-DBUILD_EXAMPLES=OFF"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-cmake-min-version.patch"
+  - "0002-catch-urng-result-type.patch"
+  - "0003-c-interface-tmpfile-ohos.patch"
+
+upstream_tests:
+  unit_tests: "80/80 TEST_CASE, 203962 assertions, 100% pass (Catch v1.5.9)"
+  stress_checked: "pass (upstream defaults: power=25, threads=4, time=10s)"
+  stress_unchecked: "pass (upstream defaults: power=25, threads=4, time=10s)"
+
+knowledge_gained:
+  - "libcuckoo是Header-only库，仅需安装头文件 (package_type=header-library)"
+  - "CMake 4.x 兼容性修复必须用补丁改 CMakeLists.txt 的 cmake_minimum_required（3.1.0→3.5.0...3.31）：CMakeToolchain 里 set(CMAKE_POLICY_VERSION_MINIMUM) 的 CACHE 变量在 cmake_minimum_required 解析前不生效（toolchain 在 project() 才加载），必须打补丁"
+  - "OHOS libc++ 强制 C++11 [rand.req.urng] 的 URBG result_type 必须无符号；老测试框架（如 Catch v1.5.9 RandomNumberGenerator 用 ptrdiff_t）会触发 __libcpp_random_is_valid_urng static_assert，改 size_t 即可"
+  - "OHOS /tmp 只读 (E002) 且 musl tmpfile() 硬编码 /tmp：依赖 tmpfile() 的上游测试失败，改用 TMPDIR 下 mkstemp()"
+  - "上游捆绑 Catch 为 v1.5.9（非 v3），0.3.1 旧申报的 0/80 不准确；两个平台兼容小补丁后 unit_tests 80/80 + stress 全通过"
+  - "R37: 0.3.1 已发布过，配方修改后版本递增为 0.3.1.1"
