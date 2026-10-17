@@ -1,0 +1,25 @@
+--- a/src/tup/parser.c
++++ b/src/tup/parser.c
+@@ -174,21 +174,21 @@
+ 	if(n->parsing) {
+ 		fprintf(stderr, "tup error: Circular dependency found among Tupfiles. Last directory: ");
+ 		print_tup_entry(stderr, n->tent);
+ 		fprintf(stderr, "\n");
+ 		return CIRCULAR_DEPENDENCY_ERROR;
+ 	}
+ 	n->parsing = 1;
+ 
+ 	tf.variant = tup_entry_variant(n->tent);
+ 	tf.ps = &ps;
+-	tf.f = tmpfile();
++	tf.f = tup_tmpfile();
+ 	if(!tf.f) {
+ 		perror("tmpfile");
+ 		return -1;
+ 	}
+ 	tf.luaerror = TUPLUA_NOERROR;
+ 	tf.use_server = use_server;
+ 
+ 	/* We may need to convert normal dirs back to generated dirs,
+ 	 * so add this one to check.
+ 	 */

@@ -1,0 +1,188 @@
+--- a/build.sh
++++ b/build.sh
+@@ -1,19 +1,98 @@
+ #! /bin/sh -e
++
++# OpenHarmony worker spawn pressure. The CI worker runs at ~670 live processes
++# with only a handful of free process slots, so what decides whether a step
++# succeeds is how many processes it needs *at the same time*: a plain compile
++# needs three (this shell -> clang -> clang -cc1) and those always pass, while
++# the final link used to need five (this shell -> command substitution ->
++# link.sh -> clang -> linker) and died with
++# `posix_spawn failed: Resource temporarily unavailable`. See notes.md #9.
++#
++# Hence the two rules for everything wrapped in retry_spawn():
++#   1. hold no extra process of our own while the fragile spawn happens, and
++#   2. keep the chain no longer than the compile steps that already work.
++# Rule 1 is why the diagnostics are replayed with shell builtins instead of
++# `out=$(...)`: a command substitution keeps a subshell alive for as long as
++# the command runs, i.e. exactly one process slot too many at the moment that
++# matters. Rule 2 is why link.sh is inlined at its one call site below.
++# TUP_SPAWN_ATTEMPTS/TUP_SPAWN_WAIT/TUP_SPAWN_WAIT_MAX tune the retry loop.
++spawn_attempts=${TUP_SPAWN_ATTEMPTS:-15}
++spawn_wait=${TUP_SPAWN_WAIT:-20}
++spawn_wait_max=${TUP_SPAWN_WAIT_MAX:-60}
++spawn_log=${TUP_SPAWN_LOG:-spawn.log}
++
++retry_spawn() {
++	tries=0
++	wait=$spawn_wait
++	while :; do
++		tries=$((tries + 1))
++		# 必须放在条件上下文里：本脚本以 `sh -e` 运行（配方 `{shell} -e ./build.sh`，
++		# shebang 也是 `#! /bin/sh -e`），裸写 `"$@"` 一旦失败就会在 set -e 下直接
++		# 结束脚本，下面的回放与重试全都不可达（构建日志里也就看不到失败特征）。
++		if "$@" >"$spawn_log" 2>&1; then
++			rc=0
++		else
++			rc=$?
++		fi
++		# Replay and classify in one pass: `read`, `printf` and `case` are
++		# all builtins, so this part costs no process slot at all.
++		exhausted=0
++		while IFS= read -r line || [ -n "$line" ]; do
++			printf '%s\n' "$line"
++			case "$line" in
++			*"Resource temporarily unavailable"*|*"can't fork"*|*"cannot fork"*)
++				exhausted=1
++				;;
++			esac
++		done < "$spawn_log"
++		if [ "$rc" -eq 0 ]; then
++			return 0
++		fi
++		if [ "$exhausted" -ne 1 ]; then
++			return "$rc"
++		fi
++		if [ "$tries" -ge "$spawn_attempts" ]; then
++			echo "spawn-resource exhaustion persisted through $tries attempts" 1>&2
++			return "$rc"
++		fi
++		# A single-process probe records, for the next round of triage,
++		# whether the whole host is out of slots or whether this step alone
++		# asks for more than the compile steps do.
++		probe="cannot fork"
++		if /bin/sh -c : 2>/dev/null; then
++			probe="can fork"
++		fi
++		echo "  spawn-resource exhaustion; retrying in ${wait}s (attempt $tries of $spawn_attempts, probe: $probe)" 1>&2
++		sleep "$wait"
++		wait=$((wait * 2))
++		if [ "$wait" -gt "$spawn_wait_max" ]; then
++			wait=$spawn_wait_max
++		fi
++	done
++}
+ 
+ label=${TUP_LABEL:-bootstrap}
+ os=`uname -s`
+ default_server=fuse
+ monitor=null.c
+ case "$os" in
+ 	Linux)
+ 		default_server=fuse3
++		monitor=inotify.c
++	;;
++	HarmonyOS)
++		# OpenHarmony/HarmonyOS reports uname -s as "HarmonyOS" while the
++		# runtime is musl + Linux ABI (clang defines __linux__). There is no
++		# usable /dev/fuse in the sandbox, so the ldpreload server is the
++		# only working dependency-tracking backend.
++		default_server=ldpreload
+ 		monitor=inotify.c
+ 	;;
+ esac
+ 
+ server=${TUP_SERVER:-$default_server}
+ plat_cflags="-Os"
+ plat_ldflags=""
+ plat_files=""
+ if [ "$server" = "fuse" ]; then
+ 	plat_cflags="`pkg-config fuse --cflags`"
+@@ -29,20 +108,24 @@
+ 	echo "Error: invalid TUP_SERVER \"$server\"" 1>&2
+ 	exit 1
+ fi
+ LDFLAGS="$LDFLAGS -lm"
+ : ${CC:=gcc}
+ case "$os" in
+ 	Linux)
+ 	plat_files="$plat_files ../src/compat/dummy.c"
+ 	plat_files="$plat_files ../src/compat/utimensat_linux.c"
+ 	;;
++	HarmonyOS)
++	plat_files="$plat_files ../src/compat/dummy.c"
++	plat_files="$plat_files ../src/compat/utimensat_linux.c"
++	;;
+ 	SunOS)
+ 	plat_files="$plat_files ../src/compat/dir_mutex.c"
+ 	plat_files="$plat_files ../src/compat/mkdirat.c"
+ 	plat_files="$plat_files ../src/compat/readlinkat.c"
+ 	plat_ldflags="$plat_ldflags -lsocket"
+ 	plat_cflags="$plat_cflags -D_REENTRANT"
+ 	;;
+ 	Darwin)
+ 	plat_files="$plat_files ../src/compat/dummy.c"
+ 	plat_files="$plat_files ../src/compat/clearenv.c "
+@@ -68,49 +151,57 @@
+ echo "  cd build"
+ cd build
+ 
+ for i in ../src/lua/*.c; do
+ 	echo "  bootstrap CC $CFLAGS $i"
+ 	$CC $CFLAGS -DLUA_USE_POSIX -c $i
+ done
+ 
+ rm luac.o
+ echo "  link lua"
+-$CC *.o -o lua $LDFLAGS
++retry_spawn $CC *.o -o lua $LDFLAGS
+ rm lua.o
+ 
+ cp ../src/luabuiltin/builtin.lua builtin.lua
+ mkdir luabuiltin
+-./lua ../src/luabuiltin/xxd.lua builtin.lua luabuiltin/luabuiltin.h
++retry_spawn ./lua ../src/luabuiltin/xxd.lua builtin.lua luabuiltin/luabuiltin.h
+ 
+ CFLAGS="$CFLAGS -DTUP_SERVER=\"$server\""
+ CFLAGS="$CFLAGS -DPCRE2_CODE_UNIT_WIDTH=8"
+ CFLAGS="$CFLAGS -DHAVE_CONFIG_H"
+ 
+ for i in ../src/tup/*.c ../src/tup/tup/main.c ../src/tup/monitor/$monitor ../src/tup/flock/fcntl.c ../src/inih/ini.c ../src/pcre/*.c $plat_files; do
+ 	echo "  bootstrap CC $CFLAGS $i"
+ 	# Put -I. first so we find our new luabuiltin.h file, not one built
+ 	# by a previous invocation of 'tup'.
+ 	$CC $CFLAGS -c $i -I. -I../src -I../src/pcre -I../src/inih $plat_cflags
+ done
+ 
+ echo "  bootstrap CC $CFLAGS ../src/sqlite3/sqlite3.c"
+ $CC $CFLAGS -c ../src/sqlite3/sqlite3.c -DSQLITE_TEMP_STORE=2 -DSQLITE_THREADSAFE=0 -DSQLITE_OMIT_LOAD_EXTENSION $plat_cflags
+ 
+ echo "  bootstrap LD tup $LDFLAGS"
+ objs="$(echo *.o)"
+-../src/tup/link.sh "$CC" "$CFLAGS -I../src" "-lpthread $plat_ldflags $LDFLAGS" "tup" "tup-version.o" "$objs" "$label"
++# link.sh 是插在本脚本与 clang 之间的第二层 shell；在进程槽位几乎耗尽的
++# worker 上，这一层就是「链接放不下 / 放得下」的分界（notes.md #9）。
++# 故就地展开它的两步：版本串取 $label（link.sh 里 `$version` 为空时的
++# git/path 回退只有以空版本调用才会触发，此处调用点永远非空），
++# 版本对象由真实源文件编译而来，替代 `(echo;echo) | $CC -x c -c -`
++# （那个管道自己要再占一个子 shell）。
++printf '#include "tup/version.h"\nconst char tup_version[] = "%s";\n' "$label" > tup-version.c
++retry_spawn $CC -c tup-version.c -o tup-version.o $CFLAGS -I../src
++retry_spawn $CC $objs tup-version.o -o tup -lpthread $plat_ldflags $LDFLAGS
+ 
+ if [ "$server" = "ldpreload" ]; then
+ 	mkdir ldpreload
+ 	cd ldpreload
+ 	CFLAGS="$CFLAGS -fpic"
+ 	for i in ../../src/ldpreload/*.c ../../src/tup/flock/fcntl.c ../../src/tup/ccache.c; do
+ 		echo "  bootstrap CC $CFLAGS $i"
+ 		$CC $CFLAGS -c $i -I../../src $plat_cflags -o `basename $i`.64.o -pthread
+ 	done
+ 	echo "  bootstrap LD tup-ldpreload.so"
+-	$CC *.o -o ../tup-ldpreload.so -fpic -shared -ldl $plat_ldflags $LDFLAGS -pthread
++	retry_spawn $CC *.o -o ../tup-ldpreload.so -fpic -shared -ldl $plat_ldflags $LDFLAGS -pthread
+ 	cd ..
+ fi
+ 
+ cd ..

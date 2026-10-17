@@ -1,0 +1,22 @@
+software: tup
+display: "tup"
+description: "A file-based build system — tracks file read/write dependencies in a graph and rebuilds only what is affected"
+category: build-tool
+homepage: "https://github.com/gittup/tup"
+license: GPL-2.0-or-later
+build_system: custom            # 上游自带 build.sh（非 cmake/autotools/make）
+
+ohos_adaptation:
+  key_points:
+    - "必须使用 ldpreload 后端：本平台无可用 /dev/fuse（且 /dev 不可写），fuse/fuse2/fuse3 均不可选；build.sh 需显式新增 HarmonyOS 分支（uname -s 返回 'HarmonyOS' 而非 'Linux'）"
+    - "OHOS 运行时为 musl + Linux ABI：musl 把 open64/fopen64/stat64 定义为宏，glibc 专有的 __xstat*/__*_chk 包装器必须用 __GLIBC__ 守卫隔离"
+    - "/tmp 是 erofs 只读挂载：libc 的 tmpfile()（glibc/musl 都硬编码 P_tmpdir=/tmp）完全不可用，需改走 $TMPDIR → .tup/tmp → /tmp 回退链，并把 TMPDIR 白名单传给子进程"
+    - "toybox 用户态：touch 对新建文件只 open(O_CREAT)、对已存在文件只 utimensat，上游 shim 全都不记为写事件，需在 shim 侧补齐语义（不改系统用户态）"
+    - "产物 tup 与 tup-ldpreload.so 必须同目录安装（depfile.c 按可执行文件路径推导 .so 路径）"
+  common_dependencies: []
+
+versions:
+  "0.8":
+    status: published
+    build_date: "2026-10-08"
+    conan_ref: "tup/0.8"

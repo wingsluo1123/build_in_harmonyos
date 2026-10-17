@@ -1,0 +1,33 @@
+# conandata.yml — tup 0.8
+sources:
+  url: "https://github.com/gittup/tup/archive/refs/tags/v0.8.tar.gz"
+  sha256: "45ca35c4c1d140f3faaab7fabf9d68fd9c21074af2af9a720cff4b27cab47d07"
+
+patches:
+  # 以下补丁由 refresh-patch --auto 按文件粒度生成（per-file-difflib），
+  # 内容与最初的四组语义补丁等价：build.sh / ldpreload.c 各一组，
+  # tmpfile 改造拆为 file.c(实现) + fileio.h(声明) + parser.c/updater.c(调用点)。
+  - patch_file: "patches/0001-build.sh.patch"
+    patch_description: "build.sh: add HarmonyOS branch (ldpreload server + Linux compat files) and retry_spawn() around the link steps / ./lua (OHOS worker spawn-resource exhaustion)"
+    patch_type: "portability"
+  - patch_file: "patches/0002-src-ldpreload-ldpreload.c.patch"
+    patch_description: "ldpreload shim: musl guards, lazy dep fd, utimensat/O_CREAT write events, skip dirs"
+    patch_type: "portability"
+  - patch_file: "patches/0003-src-tup-db.c.patch"
+    patch_description: "db.c: bump PARSER_VERSION 16 -> 17 (required by the environ whitelist change)"
+    patch_type: "portability"
+  - patch_file: "patches/0004-src-tup-environ.c.patch"
+    patch_description: "environ: forward TMPDIR to sub-processes like PATH/HOME (compilers need a writable scratch dir)"
+    patch_type: "portability"
+  - patch_file: "patches/0005-src-tup-file.c.patch"
+    patch_description: "add tup_tmpfile(): honour $TMPDIR, fall back to .tup/tmp (HarmonyOS /tmp is read-only erofs)"
+    patch_type: "portability"
+  - patch_file: "patches/0006-src-tup-fileio.h.patch"
+    patch_description: "fileio.h: declare the tup_tmpfile() prototype"
+    patch_type: "portability"
+  - patch_file: "patches/0007-src-tup-parser.c.patch"
+    patch_description: "parser: use tup_tmpfile() instead of libc tmpfile() for the Tupfile scratch file"
+    patch_type: "portability"
+  - patch_file: "patches/0008-src-tup-updater.c.patch"
+    patch_description: "updater: use tup_tmpfile() instead of libc tmpfile() for the command error log"
+    patch_type: "portability"
