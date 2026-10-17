@@ -1,0 +1,35 @@
+software: signond
+display: "signond (Single Sign On daemon)"
+description: "accounts-sso 在线账号认证守护进程（D-Bus 服务）及认证插件宿主、插件/扩展 SDK"
+category: system
+homepage: "https://gitlab.com/accounts-sso/signond"
+license: "LGPL-2.1-or-later"
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "上游仅 qmake 工程（signon.pro + *.pri），ohpcd qtbase 无 OHOS mkspec；本包经 exports_sources 自带 CMakeLists.txt 复刻全部 qmake 目标（daemon/pluginprocess/plugins/SDK 库），零上游源码补丁。"
+    - "守护进程 QT += sql（凭据库走 QSqlDatabase/SQLite）；ohpcd 的 qtbase 以 FEATURE_sql=OFF 构建，Qt6 提供方改用已发布的 qtbase-sql-dbus/6.11.1（含 Qt6Sql 与 plugins/sqldrivers/libqsqlite.so）。"
+    - "qtbase-sql-dbus 根 cpp_info 为 cmake_find_mode=none，CMakeDeps 不产出 Qt6 config；配方 generate() 把 <pkg>/lib/cmake/Qt6 写入 Qt6_DIR 缓存变量。"
+    - "libsignon-plugins 是 AuthPluginInterface 的 moc 产物载体（qmake 对 signon-plugins.pro 的 HEADERS 跑 moc）；CMake 侧把 SDK 头列为 target sources 以复现，否则插件加载时报 qt_metacast 符号缺失。"
+    - "插件须命名为 lib<type>plugin.so（宿主按 SIGNON_PLUGIN_PREFIX+type+SUFFIX 查找），CMake 侧显式 PREFIX lib。"
+    - "SIGNOND_PLUGINS_DIR/SIGNOND_EXTENSIONS_DIR 编译期默认 /usr/lib/signon（稳定系统路径），运行期可用 SSO_PLUGINS_DIR/SSO_EXTENSIONS_DIR 覆盖；ELF 的 DT_NEEDED/RUNPATH 无 conan 缓存路径。"
+    - "运行期需 D-Bus 会话总线（无总线时守护进程按上游 qFatal 退出 134）；本环境无 dbus-daemon 且可写挂载点 bind(2) Unix socket EPERM，端到端验证改用不依赖总线的 signonpluginprocess + blob IPC 链路；D-Bus 服务注册与 AuthService/Identity/AuthSession 接口无法在此环境验证。"
+    - "共享库 SONAME：上游 qmake 不设 VERSION（上游 .so 无 DT_SONAME），且本平台对 CMake 是未知系统（CMAKE_SHARED_LIBRARY_SONAME_CXX_FLAG 为空）导致 CMake 的 VERSION/SOVERSION 也不产生 -soname；适配用显式 LINKER:-soname 补齐相对 SONAME，满足 L5a 门禁。"
+    - "插件 SDK 自洽处理：SDK 头引用的客户端类型头（sessiondata.h/signonerror.h/libsignoncommon.h/SessionData）一并装入 include/signon-plugins/SignOn（同一源码树同一版本），避免 recipe 依赖 libsignon-qt 而把 plain qtbase 这个第二 Qt6 提供方拉进依赖图。"
+    - "CONFIG+=enable-backup/enable-p2p/cryptsetup 与 HAVE_LIBPROXY 上游默认关闭，本次未启用；lib/signond/interfaces 为 git submodule，commit 归档中为空故未安装接口 XML。"
+  common_dependencies:
+    - "qtbase-sql-dbus/6.11.1"
+
+versions:
+  "8.61-git20231015.c8ad982":
+    status: built
+    build_date: "2026-10-16"
+    build_system: cmake
+    conan_ref: "signond/8.61-git20231015.c8ad982"
+    dependencies:
+      - qtbase-sql-dbus/6.11.1
+    upstream_test_cases: 9
+    upstream_tests: "tests/passwordplugintest（9 passed / 0 failed / 0 skipped，配方 build() 实跑）；tests/signond-tests + tests/libsignon-qt-tests + tests/extensions 需会话总线未实跑"
+    test_package_assertions: 38
+    assertion_count: 47
