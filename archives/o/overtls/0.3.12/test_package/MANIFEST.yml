@@ -1,0 +1,75 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: overtls/0.3.12
+homepage: "https://github.com/ShadowsocksR-Live/overtls"
+
+# 上游测试命令（Rust/Cargo 项目：无 tests/ 目录，测试是 src/ 内联 #[test]）
+upstream_check_command: "cargo test --release --lib"
+
+# 上游测试在 build() 阶段执行（与 hf-mount/rainfrog 同：test_package 不重复
+# 联网下载上游 tarball，标记从 conan create 日志采集，两套统计相互独立）
+upstream_test_in_build: true
+upstream_test_command: "cargo test --release --lib"
+
+# ── 上游测试存在性审计（hmbs 硬门禁要求 + R51 三步法·清点）────────────
+upstream_tests_exist: true
+upstream_test_audit: |
+  清点对象与命令（两条口径分别取数，不混用；N 按 §3.5「候选数法最大值」定，
+  差额逐项归因）：
+
+  (1) 被适配 tag v0.3.12（源码 = conandata.yml 下载并校验 sha256 的归档）
+      $ grep -rn --include='*.rs' -E '#\[test\]|#\[[a-z_]+::test\]' src | wc -l
+      → 1
+        src/config.rs:577:#[test]  fn test_config()
+      $ grep -rn --include='*.rs' 'cfg(test)' src | wc -l   → 0
+      $ ls -d tests benches examples                        → 均不存在
+      $ grep -rn --include='*.rs' '```' src | wc -l         → 0（无 doc-test 代码块）
+
+  (2) 上游当前 HEAD 3829e3c0c3b1a53a79c06d4693b6369964882879（2026-10-05）
+      $ grep -rn --include='*.rs' -E '#\[test\]|#\[[a-z_]+::test\]' src | wc -l
+      → 4
+        src/config.rs:543:#[test]  fn test_client_listen_url_deserialization()
+        src/config.rs:573:#[test]  fn test_config()
+        src/server.rs:826:#[test]  fn ignores_read_access_to_tls_files()
+        src/server.rs:835:#[test]  fn accepts_modifications_to_tls_files()
+      （HEAD 侧另有 tests/ 目录 = 0、doc-test 代码块 = 0）
+
+  N = max(1, 4) = 4（候选数法最大值，声明值取此数以满足「声明 N 的下界 =
+  上游当前 HEAD 的注册项数」）。差额 3 项逐项归因：src/config.rs:543 与
+  src/server.rs:826/835 三个 #[test] 均在 tag v0.3.12 之后由上游新增
+  （HEAD 提交 3829e3c 及其前序），**v0.3.12 源码树中不存在这三个注册项**，
+  故本版本 N'=1（可运行分母），非「运行失败」也非「跳过」。
+
+  运行方式（在配方 build() 内、对 source() 已校验的源码离线执行）：
+    cargo test --release --lib
+  计数以框架输出 "test result:" 行为准（passed/failed/ignored 全部取自框架
+  输出，非静态统计），由 conanfile.py `_parse_test_counts` 解析并以
+  HMBS_UPSTREAM_TEST_RESULT marker 落进 conan create 日志。
+
+  doc-test 说明：本工具链（rust-toolchain/1.97.1，bin/ 内无 rustdoc）无法执行
+  doc-test，而 v0.3.12 的 src/ 内 0 个 ``` 代码块、0 个可执行 doctest，
+  `--lib` 目标下不存在被跳过的真实用例。
+
+  附：上游唯一测试 test_config 的 check_correctness(false) 会对
+  www.gov.cn:443 做一次真实 TCP 连接（src/tcp_stream.rs::std_create，
+  超时 10s）——属上游测试自身的外网依赖，真机实测可达
+  （2026-10-06 实测 connect 0.05s 成功），故按原样执行、不改写。
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: src/config.rs
+    source: overtls-0.3.12/src/config.rs
+    description: "v0.3.12 唯一注册测试 test_config（SSR URL 生成/解析往返 + 配置一致性断言）"
+    command: "cargo test --release --lib"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_overtls.sh
+    description: "消费者端到端测试 — CLI 契约 3 + 配置校验负向 1 + 服务发现 4 + 数据面 4 + 打包产物 2"
+    command: "sh test_overtls.sh <pkg_dir>"
+
+# 测试断言总数 (14 = A1-A3 + B1 + C1-C4 + D1-D4 + E1-E2)
+assertion_count: 14

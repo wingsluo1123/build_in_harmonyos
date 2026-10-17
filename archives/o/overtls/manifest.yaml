@@ -1,0 +1,39 @@
+# 软件级 manifest — overtls
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: overtls
+display: "overtls"
+description: "极简 WebSocket over TLS 隧道代理 — 客户端侧 SOCKS5 入口，经 ws/wss 隧道把流量送到服务端转发目标，用于穿透/代理场景"
+category: network
+homepage: "https://github.com/ShadowsocksR-Live/overtls"
+license: MIT
+build_system: cargo
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "Rust/Cargo 单 crate 项目：`cargo build --release` 直接编译，无 configure 步骤；上游 tarball 不含 Cargo.lock，不能用 --locked"
+    - "工具链用仓库内 conan 包 rust-toolchain/1.97.1（tool_requires）；该包二进制无 OHOS code signature，配方须构建期用 binary-sign-tool 自签名，并以 RUSTFLAGS=--sysroot=<包目录> 固定 sysroot"
+    - "harmonybrew 的 rust-1.97.1 bottle 已 404（实测 HTTP 404），不要走 bottle 路线；cargo 自身仍需 openssl@3/zlib-ng-compat/ca-certificates 三个 bottle（实测 HTTP 200）"
+    - "TLS 面 = rustls + ring（纯 Rust），不引 openssl-sys → 不需要系统 OpenSSL 头/库参与编译"
+    - "必须打补丁把 reqwest 的 rustls feature 换成 rustls-no-provider：reqwest 0.13.x 的 `rustls` 硬编码启用 aws-lc-rs，而 aws-lc-sys 0.45.0 在 OHOS/aarch64 上不产出 perlasm 汇编对象、链接期 200+ 个 aws_lc_0_45_0_* 符号未定义；上游 overtls 自身只用 ring（src/lib.rs 安装 ring 默认 provider）"
+    - "crate 下载必须走 rsproxy.cn sparse 镜像（设备与 CI worker 无 crates.io CA bundle），并在 .cargo/config.toml 放宽 retry/timeout/low-speed-limit"
+    - "链接器：RUSTFLAGS=-C linker=/data/service/hnp/bin/clang（OHOS 无 cc 符号链接）；CARGO_BUILD_JOBS=1 规避设备上的 ETXTBSY 类间歇失败"
+    - "OHOS /tmp 只读：TMPDIR/TMP/TEMP 指向构建目录下可写目录"
+    - "上游唯一注册测试 test_config 会对 www.gov.cn:443 做一次真实 TCP 连接（外网依赖），真机实测可达"
+    - "产物是二进制应用（bin/overtls-bin），软件级必须有 commands.json（L0k）"
+  common_dependencies:
+    - rust-toolchain
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "0.3.12":
+    status: built
+    build_date: "2026-10-06"
+    conan_ref: "overtls/0.3.12"

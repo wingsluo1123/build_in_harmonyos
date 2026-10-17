@@ -1,0 +1,61 @@
+# 版本级 manifest — overtls 0.3.12
+# 文件位置: archives/o/overtls/0.3.12/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: overtls
+version: "0.3.12"
+
+# 构建系统类型（verify-build 依赖此字段）
+build_system: cargo
+
+# 编译状态（O5：只有合并后 release upload 已确认才 published，此前一律 built）
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-06"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/ShadowsocksR-Live/overtls/archive/refs/tags/v0.3.12.tar.gz"
+  sha256: "d0ed3ae88721e8ae2a525059a81ce29991af29de920bf580cb0999d0a7ac288b"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cargo
+
+  configure_options:
+    - "--release"
+
+  # tool_requires（Rust 工具链包；宿主与目标均为 aarch64-unknown-linux-ohos）
+  dependencies:
+    - rust-toolchain/1.97.1
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-Cargo.toml-reqwest-rustls-no-provider.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  # 唯一沉淀为图谱草稿的新坑（引擎 Phase B 未命中，见草稿内 --trace 证据）
+  - "reqwest 0.13.x 的 `rustls` feature 硬编码 aws-lc-rs；aws-lc-sys 0.45.0 在 OHOS/aarch64 上不产出 perlasm 汇编对象，链接期报 200+ 个 `undefined symbol: aws_lc_0_45_0_*` → 改用 `rustls-no-provider`（上游本就用 ring）ref: knowledge/drafts/E754-draft-49EF.kv"
+  - "rust-toolchain/1.97.1 的 cargo/rustc 不带 OHOS code signature，直接 exec 报 Permission denied；须构建期用 binary-sign-tool 自签名并以 RUSTFLAGS=--sysroot=<包目录> 固定 sysroot（搬离包目录会 E0463）ref: archives/o/overtls/0.3.12/conanfile.py"
+  - "cargo 自身动态链接 libssl.so/libcrypto.so/libz.so（NEEDED），须由 Harmonybrew bottle 供给并注入 LD_LIBRARY_PATH（rust-1.97.1 bottle 实测 404）ref: archives/o/overtls/0.3.12/conandata.yml"
+  - "crate 下载必须走 rsproxy.cn sparse 镜像并放宽 retry/timeout/low-speed-limit（设备与 CI worker 无 crates.io CA bundle）ref: archives/o/overtls/0.3.12/conanfile.py"
+  - "上游服务端对隧道目标有 SSRF 防护：`tcp_stream_from_s5_address()` 无条件跳过 private/loopback/link-local 目标且无配置开关 → 消费者数据面测试不能用 127.0.0.1 作目标，改用同样落到本机但不在私网集合内的 0.0.0.0 ref: archives/o/overtls/0.3.12/test_package/test_overtls.sh"
+  - "上游 tag 归档不含 Cargo.lock（上游 .gitignore 忽略）→ 不能用 `cargo --locked`，依赖解析由 rsproxy 构建时完成，跨时间重建可复现性弱于带 lock 的 Rust 包 ref: archives/o/overtls/0.3.12/notes.md"
