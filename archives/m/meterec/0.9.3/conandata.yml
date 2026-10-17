@@ -1,0 +1,25 @@
+# conandata.yml — meterec 0.9.3
+#
+# Source: the official upstream 0.9.3 release tarball. SourceForge's file
+# server now issues a 403/HTML interstitial for token-less direct downloads
+# (its signed `ts=` tokens are short-lived and cannot be committed), so the
+# URL below is the distribution-maintained copy of the SAME official
+# tarball from the Debian pool. Cross-verification (2026-10-16):
+#   - SourceForge original (signed-token download):
+#     sha256 14ed1af1ec74aaa8de9885d9ddbc22cb7d55e3c58f1498d7ed6f53cfb2b48474
+#   - Debian pool meterec_0.9.3.orig.tar.gz:  sha256 identical
+#   - Ubuntu pool meterec_0.9.3.orig.tar.gz:  sha256 identical
+#   - md5 521b2a7b452f890442f22e23b12e8ed0 matches the digest published in
+#     the Ubuntu (jammy) and Debian package metadata for 0.9.3.
+
+sources:
+  url: "https://deb.debian.org/debian/pool/main/m/meterec/meterec_0.9.3.orig.tar.gz"
+  sha256: "14ed1af1ec74aaa8de9885d9ddbc22cb7d55e3c58f1498d7ed6f53cfb2b48474"
+
+patches:
+  - patch_file: "patches/0001-configure-ncursesw.patch"
+    patch_description: "Point configure's NCURSES pkg-config probe at ncursesw >= 5.9: the repository ncurses package publishes the wide library only (ncursesw.pc); ncursesw is the superset ABI meterec uses (sources include <curses.h>, which the package also ships)"
+    patch_type: "portability"
+  - patch_file: "patches/0002-configure-umask-022.patch"
+    patch_description: "Use umask 022 for the mktemp confstat dir (setgid hmdfs makes umask 077 dirs unwritable; same knowledge point as madplay 0002)"
+    patch_type: "portability"

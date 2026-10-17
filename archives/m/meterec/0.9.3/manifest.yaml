@@ -1,0 +1,43 @@
+package: meterec
+version: "0.9.3"
+homepage: "https://sourceforge.net/projects/meterec/"
+license: GPL-2.0-or-later
+status: built
+build_system: autotools
+build_date: "2026-10-16"
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/m/meterec/meterec_0.9.3.orig.tar.gz"
+  sha256: "14ed1af1ec74aaa8de9885d9ddbc22cb7d55e3c58f1498d7ed6f53cfb2b48474"
+  tar_format: tar.gz
+
+dependencies:
+  - jack/1.9.22
+  - libsndfile/1.2.2
+  - libconfig/1.8.2
+  - ncurses/6.6
+
+patches_applied:
+  - "0001-configure-ncursesw.patch"
+  - "0002-configure-umask-022.patch"
+
+upstream_tests:
+  available: true
+  notes: >-
+    The release tarball ships a standalone `test` binary (test.c) that
+    deterministically exercises the event queue (add_event /
+    find_first_event / rm_event / find_rm_events) and prints its state
+    after every mutation. It requires no JACK server and no terminal.
+    It is installed alongside meterec and executed by the Conan
+    test_package. There is no automake `check`/`test` target.
+
+test_package:
+  assertion_count: 7
+  description: >-
+    Runs the real installed binaries on-device: the upstream queue
+    self-test (exit 0, 12 state-dump separators, 20 queue lines,
+    deterministic first line), `meterec -h` version/usage banners
+    (upstream usage() exits 1), the no-JACK-server failure path
+    (non-zero exit, "Failed to start ... jack client"), and
+    `meterec-init-conf` with and without a session name (usage text
+    with exit 1; creates <session>.mrec with ports=() and version=1).
