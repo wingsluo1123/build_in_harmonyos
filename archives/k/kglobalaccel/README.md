@@ -16,6 +16,7 @@ focused window, plus the `KDED`-side registration interface over D-Bus.
 |---------|--------|-------|
 | 5.116.0 | built  | KF5 branch (Qt5): qt5-qtbase/5.15.2.2 (Qt5::DBus + Qt5::Widgets) + qt5-qtdeclarative/5.15.2 (tests) + ecm/6.26.0 (tool); BUILD_RUNTIME=OFF excludes the X11/XCB-only kglobalacceld daemon and its KF5Config/CoreAddons/Crash/DBusAddons/WindowSystem dependency block |
 | 6.26.0  | built  | First HarmonyOS PC adaptation: qtbase-sql-dbus 6.11.1 (Qt6::DBus) + qt6linguisttools 6.11.1 (poqm) + qtdeclarative 6.11.1 (tests) + ecm 6.26.0 |
+| 6.28.0  | built  | KF6 6.28 train: same dependency set with ecm/6.28.0; OHOS shared-library rules are SONAME-only (unversioned .so with basename DT_SONAME, no versioned symlink chain — HMDFS rejects symlink(2)); upstream 6.27+ setInverseShortcutActions API covered by the consumer executor |
 
 ## OHOS adaptation notes
 
@@ -33,4 +34,12 @@ focused window, plus the `KDED`-side registration interface over D-Bus.
   `QT_ADDITIONAL_PACKAGES_PREFIX_PATH`.
 - `qtdeclarative/6.11.1` supplies `Qt6::Qml` for the upstream tests target.
 - No source patches are applied — the recipe layer alone is enough.
+- The 6.28.0 recipe writes a `CMAKE_USER_MAKE_RULES_OVERRIDE_C/CXX` rules
+  file with only `CMAKE_SHARED_LIBRARY_SONAME_C/CXX_FLAG` (`-Wl,-soname,`)
+  and sets `CMAKE_PLATFORM_NO_VERSIONED_SONAME=TRUE`: the package ships an
+  unversioned `libKF6GlobalAccel.so` with a basename `DT_SONAME` and
+  `install()` is a byte-identical copy. HMDFS rejects `symlink(2)`, so the
+  versioned chain cannot materialize; with `CMAKE_SHARED_LIBRARY_RUNTIME_*`
+  defined, `install()` would rewrite the ELF and strip the RUNPATH, after
+  which the device loader rejects `dlopen` with EACCES.
 - Library package: no bin/ artifacts, no commands.json needed (R38).

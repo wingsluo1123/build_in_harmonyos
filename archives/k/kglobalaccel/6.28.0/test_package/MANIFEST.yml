@@ -1,0 +1,49 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for kglobalaccel/6.28.0.
+
+package: kglobalaccel/6.28.0
+homepage: https://invent.kde.org/frameworks/kglobalaccel
+
+# Upstream ships tests/CMakeLists.txt with a single executable target
+# (kglobalacceltest) and NO add_test()/ctest registration:
+#   $ ctest --test-dir <build_folder> -N  ->  Total Tests: 0
+# The executable is a GUI/QML smoke program (QApplication +
+# QQmlApplicationEngine + app.exec()); it has no programmatic checks and never
+# returns, so it cannot be used as an automated test case.
+upstream_check_command: "ctest --test-dir <build_folder> -N"
+
+upstream_test_in_build: false
+upstream_test_command: "ctest --test-dir <build_folder> -N  # 0 registered cases"
+
+# Counting convention (same as the PR-review side): upstream test targets = 1
+# -> tests/ kglobalacceltest executable only, never CTest-registered.
+upstream_test_target_count: 1
+upstream_ctest_registered_count: 0
+upstream_tests:
+  - file: tests/CMakeLists.txt
+    source: kglobalaccel-6.28.0/tests/CMakeLists.txt
+    description: >-
+      Only an executable target is declared (kglobalacceltest, linked against
+      KF6::GlobalAccel + Qt6::Qml + Qt6::Test). No add_test() call exists, so
+      ctest registers 0 cases; the executable is a GUI/QML smoke program
+      without programmatic checks, validated by an offscreen QPA launch
+      (rc=124 = event loop reached, timeout stop, no crash).
+    command: "ctest --test-dir <build_folder> -N"
+    condition: "compiled with BUILD_TESTING=ON; launched headless for the smoke check"
+
+test_package_tests:
+  - file: test_package/test.cpp
+    description: >-
+      Consumer end-to-end executor, 3 cases: (1) singleton + shortcut
+      lifecycle on a real QAction (setShortcut registration, hasShortcut
+      consistency, removeAllShortcuts cleanup), (2) query API consistency
+      (shortcut() count, isGlobalShortcutAvailable() idempotence), (3)
+      setInverseShortcutActions() (6.27+ API) argument gating: unregistered
+      pair rejected, component-mismatched pair rejected, fully registered
+      same-component pair callable without disturbing local registration
+      state. Per case TEST PASS/TEST FAIL, final TEST SUMMARY, non-zero exit
+      on any failure. All checks observe API-consistency state (not D-Bus
+      side effects) so the executor is deterministic headless and on desktop.
+    command: "conan create (test_package builds and runs test_kglobalaccel)"
+
+assertion_count: 10

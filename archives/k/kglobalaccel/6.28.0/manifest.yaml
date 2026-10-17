@@ -1,0 +1,39 @@
+software: kglobalaccel
+version: "6.28.0"
+status: built
+build_system: cmake
+created_at: 2026-10-17
+build_date: 2026-10-17
+dependencies:
+  required:
+    - qtbase-sql-dbus/6.11.1
+    - qt6linguisttools/6.11.1
+    - qtdeclarative/6.11.1
+  build:
+    - ecm/6.28.0
+  transitive:
+    - qtbase/6.11.1
+    - qtshadertools/6.11.1
+    - qttools/6.11.1.1
+    - dbus/1.14.10
+    - expat/2.8.2
+patches_applied: []
+test_results:
+  type: no_automated_upstream_cases
+  upstream: "ctest --test-dir <conan build dir> -N -> Total Tests: 0 (upstream tests/CMakeLists.txt declares no add_test); the single target kglobalacceltest builds and launches offscreen (QT_QPA_PLATFORM=offscreen, conan-generated runtime env): QQmlApplicationEngine reaches component load and fails only on the org.kde.kquickcontrols module being not installed (provided by kdeclarative, which circularly depends on kglobalaccel), then stays in its event loop; killed by timeout after 15s -> EXIT=124 (event loop reached, no crash)"
+  test_package: "passed: 3 consumer cases / 10 checks (TEST SUMMARY: 3 passed, 0 failed): singleton + shortcut lifecycle, query-API consistency, setInverseShortcutActions (6.27+) argument gating; non-zero exit on any failure"
+  package_id: "abf064d3b52a706f3e5651d0de7f2b3a1c8c7d03"
+  recipe_revision: "a2704e9ec5d4c15c260ef63857fb5456"
+  package_revision: "2f45de46d13a7371bf1df49197568c70"
+  l0: "pass (upstream test target builds; test_package 3/3 consumer cases)"
+  l1: "pass (clean conan create RC=0)"
+  l2: "skip: no bin/ dir (library package)"
+  l4: "skip (verify tool: no cache path; no checksec target for a library package)"
+  l5: "pass (SONAME gate: single unversioned libKF6GlobalAccel.so, DT_SONAME=basename, no RPATH/RUNPATH, install byte-identical to the build artifact per cmp)"
+source_url: https://download.kde.org/stable/frameworks/6.28/kglobalaccel-6.28.0.tar.xz
+source_sha256: b40c195ba7e6674898a64f4e3e25e0235dd79682f39395409469274acb580ac0
+knowledge_gained:
+  - "kglobalaccel 6.28.0 keeps the 6.26.0 recipe shape (tier 1: ECM-only KF dependency, KF_IGNORE_PLATFORM_CHECK + WITH_X11=OFF + qtbase-sql-dbus for Qt6::DBus + QT_ADDITIONAL_PACKAGES_PREFIX_PATH for LinguistTools). The 6.26->6.28 delta is 6 upstream files: version/deprecation lines, the setInverseShortcutActions API (6.27+), the kglobalacceld named-bus preference, and the two D-Bus XMLs; no new dependencies, no build-system changes."
+  - "OHOS shared-library rules must be SONAME-only: a CMAKE_USER_MAKE_RULES_OVERRIDE_C/CXX rules file defining just CMAKE_SHARED_LIBRARY_SONAME_C_FLAG/-CXX_FLAG (-Wl,-soname,) plus CMAKE_PLATFORM_NO_VERSIONED_SONAME=TRUE yields an unversioned libKF6GlobalAccel.so with basename DT_SONAME, no RPATH/RUNPATH and no symlink chain (HMDFS rejects symlink(2)); install() is a byte-identical copy of the build artifact, so the device loader accepts dlopen (with CMAKE_SHARED_LIBRARY_RUNTIME_* defined, install() rewrites the ELF and strips RUNPATH -> EACCES)."
+  - "setInverseShortcutActions() gates locally before any D-Bus traffic: it returns false unless both actions are registered (setShortcut/setDefaultShortcut) and share one componentName; those two branches are deterministic headless and form the 6.27+ API consumer case."
+  - "Upstream registers no CTest cases for kglobalaccel (any version): the only test artifact is the non-checking GUI/QML kglobalacceltest executable whose QML scene needs org.kde.kquickcontrols (from kdeclarative, which reverse-depends on kglobalaccel - cycle), so the R51 declaration stays '0 automated cases + launch-alive smoke' (offscreen run reaches the event loop, killed by the harness timeout at 15 s -> rc=124)."
