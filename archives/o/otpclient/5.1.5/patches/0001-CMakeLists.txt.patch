@@ -1,0 +1,28 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,14 +1,25 @@
+ cmake_minimum_required(VERSION 3.25)
+ project(OTPClient VERSION "5.1.5" LANGUAGES "C")
+ include(GNUInstallDirs)
+ include(CTest)
++
++# explicit_bzero() 是 glibc / BSD 扩展，OHOS（musl）未声明 → 上游 -Werror=implicit-function-declaration
++# 会直接中断编译。这里做编译期能力探测，缺失时以强制包含方式提供内联回退实现。
++include(CheckCSourceCompiles)
++check_c_source_compiles("
++#include <string.h>
++int main(void) { char b[8]; explicit_bzero(b, sizeof(b)); return 0; }
++" HAVE_EXPLICIT_BZERO)
++if(NOT HAVE_EXPLICIT_BZERO)
++    add_compile_options(-include ${CMAKE_CURRENT_SOURCE_DIR}/compat/explicit-bzero.h)
++endif()
+ 
+ configure_file("src/common/version.h.in" "version.h")
+ 
+ set(GETTEXT_PACKAGE ${PROJECT_NAME})
+ 
+ set(CMAKE_C_STANDARD 11)
+ set(CMAKE_C_STANDARD_REQUIRED ON)
+ set(CMAKE_C_EXTENSIONS OFF)
+ 
+ option(IS_FLATPAK "Use flatpak app's config folder to store the database" OFF)

@@ -1,0 +1,97 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# 清点方式（R51 第一步）：
+#   $ ls tests/*.c | wc -l                 → 16 个测试源文件
+#   $ grep -n "add_test\|add_executable" tests/CMakeLists.txt
+#                                          → 16 个 add_test（13 无条件 + 3 个 if(BUILD_GUI) 门控）
+#   测试框架：GLib g_test（tests/*.c 头部 #include <glib.h>）
+
+package: otpclient/5.1.5
+homepage: "https://github.com/paolostivanin/OTPClient"
+
+# 上游测试命令（CMake + CTest；README 未单列，由 CMakeLists.txt:230 if(BUILD_TESTING) 启用）
+upstream_check_command: "ctest --output-on-failure"
+
+# conanfile.py 的 build() 已集成上游测试：tests 选项默认 True → cmake.test() 实际执行 ctest
+upstream_test_in_build: true
+upstream_test_command: "ctest --output-on-failure"
+
+# 上游实际运行的测试程序（16 项，全部来自 tests/CMakeLists.txt 的 add_test）
+upstream_tests:
+  - file: tests/test_parse_uri.c
+    source: otpclient-5.1.5/tests/test_parse_uri.c
+    description: "otpauth:// URI 解析（issuer/label/算法/位数/周期字段）"
+    command: "./test_parse_uri"
+  - file: tests/test_otp_validation.c
+    source: otpclient-5.1.5/tests/test_otp_validation.c
+    description: "OTP 参数合法性校验"
+    command: "./test_otp_validation"
+  - file: tests/test_db_transaction.c
+    source: otpclient-5.1.5/tests/test_db_transaction.c
+    description: "加密数据库事务提交/回滚"
+    command: "./test_db_transaction"
+  - file: tests/test_malformed_db.c
+    source: otpclient-5.1.5/tests/test_malformed_db.c
+    description: "畸形数据库文件容错"
+    command: "./test_malformed_db"
+  - file: tests/test_malformed_aegis.c
+    source: otpclient-5.1.5/tests/test_malformed_aegis.c
+    description: "畸形 Aegis 导入文件容错"
+    command: "./test_malformed_aegis"
+  - file: tests/test_otp_generation.c
+    source: otpclient-5.1.5/tests/test_otp_generation.c
+    description: "TOTP/HOTP 生成（RFC 6238/4226 测试向量）"
+    command: "./test_otp_generation"
+  - file: tests/test_db_roundtrip.c
+    source: otpclient-5.1.5/tests/test_db_roundtrip.c
+    description: "数据库写入-读出往返一致性"
+    command: "./test_db_roundtrip"
+  - file: tests/test_cli_hotp.c
+    source: otpclient-5.1.5/tests/test_cli_hotp.c
+    description: "CLI HOTP 计数器递增行为"
+    command: "./test_cli_hotp"
+  - file: tests/test_parse_uri_extra.c
+    source: otpclient-5.1.5/tests/test_parse_uri_extra.c
+    description: "URI 解析边界与异常输入"
+    command: "./test_parse_uri_extra"
+  - file: tests/test_malformed_importers.c
+    source: otpclient-5.1.5/tests/test_malformed_importers.c
+    description: "各导入器（Aegis/andOTP/FreeOTP）畸形输入"
+    command: "./test_malformed_importers"
+  - file: tests/test_common_utils.c
+    source: otpclient-5.1.5/tests/test_common_utils.c
+    description: "公共工具函数（字符串/路径/编解码）"
+    command: "./test_common_utils"
+  - file: tests/test_field_bounds_roundtrip.c
+    source: otpclient-5.1.5/tests/test_field_bounds_roundtrip.c
+    description: "字段边界值往返"
+    command: "./test_field_bounds_roundtrip"
+  - file: tests/test_memlock_sizing.c
+    source: otpclient-5.1.5/tests/test_memlock_sizing.c
+    description: "mlock 安全内存尺寸计算"
+    command: "./test_memlock_sizing"
+  - file: tests/test_otp_entry.c
+    source: otpclient-5.1.5/tests/test_otp_entry.c
+    description: "[BUILD_GUI 门控] OTP 条目模型行为"
+    command: "./test_otp_entry"
+  - file: tests/test_google_migration.c
+    source: otpclient-5.1.5/tests/test_google_migration.c
+    description: "[BUILD_GUI 门控] Google Authenticator 迁移导入"
+    command: "./test_google_migration"
+  - file: tests/test_qrcode_parser.c
+    source: otpclient-5.1.5/tests/test_qrcode_parser.c
+    description: "[BUILD_GUI 门控] 二维码（zbar + protobuf-c）解析"
+    command: "./test_qrcode_parser"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.sh
+    description: "消费者测试：包内 3 个可执行 + GSettings schema 编译产物 + 桌面文件齐全，ELF 为 AArch64，并真实执行 otpclient-cli --version/--help"
+    command: "sh test.sh <pkg_folder> <pkg_folder>/bin/otpclient-cli"
+
+# 测试断言总数 (近似值, 用于质量评估)
+# 实测：grep -h "g_assert\|assert\|CHECK\|TEST_ASSERT" tests/*.c | wc -l = 394
+assertion_count: 394
