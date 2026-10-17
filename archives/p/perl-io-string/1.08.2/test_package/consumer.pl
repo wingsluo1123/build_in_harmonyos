@@ -1,0 +1,12 @@
+use strict;
+use warnings;
+use IO::String;
+use Test::More tests => 3;
+my $text = 'abcdef';
+my $handle = IO::String->new($text);
+is($handle->getline(), 'abcdef', 'actual packaged IO::String read');
+$handle->setpos(2);
+is($handle->getpos(), 2, 'actual packaged file-position state');
+$handle->print('XY');
+is($text, 'abXYef', 'actual packaged in-memory write');
+print "CONSUMER_TEST_PASS=3/3\n";
