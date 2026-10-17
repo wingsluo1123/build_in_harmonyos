@@ -1,0 +1,93 @@
+<?xml version="1.0"?>
+<!--
+  Consumer end-to-end fixture for konclude on HarmonyOS PC.
+
+  A small but genuinely non-trivial OWL 2 DL ontology: every fact the consumer
+  test asserts is ENTAILED (not asserted), so the assertions can only hold if
+  Konclude's tableau reasoner actually runs on the target device.
+
+  TBox
+    Man          = Person and Male                       (definition)
+    Woman        = Person and Female                     (definition)
+    Father       = Man and hasChild some Person           (definition)
+    Parent       subClassOf Person
+    Male         disjointWith Female
+
+  Entailed facts the test asserts from the classification output
+    Father       subClassOf Man            (definition of Father)
+    Father       subClassOf Person         (transitivity through Man -> Person)
+    Contradiction equivalentTo owl:Nothing (Male and Female is unsatisfiable
+                                            because the two are disjoint)
+  and from the CLI answer mode
+    Father        is satisfiable
+    Contradiction is NOT satisfiable
+-->
+<Ontology xmlns="http://www.w3.org/2002/07/owl#"
+     xml:base="http://example.org/konclude-ohos/family"
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:xml="http://www.w3.org/XML/1998/namespace"
+     xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+     ontologyIRI="http://example.org/konclude-ohos/family">
+    <Prefix name="" IRI="http://example.org/konclude-ohos/family#"/>
+    <Prefix name="owl" IRI="http://www.w3.org/2002/07/owl#"/>
+
+    <Declaration><Class IRI="#Person"/></Declaration>
+    <Declaration><Class IRI="#Male"/></Declaration>
+    <Declaration><Class IRI="#Female"/></Declaration>
+    <Declaration><Class IRI="#Man"/></Declaration>
+    <Declaration><Class IRI="#Woman"/></Declaration>
+    <Declaration><Class IRI="#Parent"/></Declaration>
+    <Declaration><Class IRI="#Father"/></Declaration>
+    <Declaration><Class IRI="#Contradiction"/></Declaration>
+    <Declaration><ObjectProperty IRI="#hasChild"/></Declaration>
+
+    <DisjointClasses>
+        <Class IRI="#Male"/>
+        <Class IRI="#Female"/>
+    </DisjointClasses>
+
+    <SubClassOf>
+        <Class IRI="#Man"/>
+        <Class IRI="#Person"/>
+    </SubClassOf>
+
+    <EquivalentClasses>
+        <Class IRI="#Man"/>
+        <ObjectIntersectionOf>
+            <Class IRI="#Person"/>
+            <Class IRI="#Male"/>
+        </ObjectIntersectionOf>
+    </EquivalentClasses>
+
+    <EquivalentClasses>
+        <Class IRI="#Woman"/>
+        <ObjectIntersectionOf>
+            <Class IRI="#Person"/>
+            <Class IRI="#Female"/>
+        </ObjectIntersectionOf>
+    </EquivalentClasses>
+
+    <SubClassOf>
+        <Class IRI="#Parent"/>
+        <Class IRI="#Person"/>
+    </SubClassOf>
+
+    <EquivalentClasses>
+        <Class IRI="#Father"/>
+        <ObjectIntersectionOf>
+            <Class IRI="#Man"/>
+            <ObjectSomeValuesFrom>
+                <ObjectProperty IRI="#hasChild"/>
+                <Class IRI="#Person"/>
+            </ObjectSomeValuesFrom>
+        </ObjectIntersectionOf>
+    </EquivalentClasses>
+
+    <EquivalentClasses>
+        <Class IRI="#Contradiction"/>
+        <ObjectIntersectionOf>
+            <Class IRI="#Male"/>
+            <Class IRI="#Female"/>
+        </ObjectIntersectionOf>
+    </EquivalentClasses>
+</Ontology>

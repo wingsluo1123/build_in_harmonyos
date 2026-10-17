@@ -1,0 +1,25 @@
+--- a/Source/Reasoner/Kernel/Algorithm/CCalculationTableauCompletionTaskHandleAlgorithm.cpp
++++ b/Source/Reasoner/Kernel/Algorithm/CCalculationTableauCompletionTaskHandleAlgorithm.cpp
+@@ -16096,21 +16096,21 @@
+ 							if (conSet) {
+ 								CConceptDescriptor* conDesIt = conSet->getAddingSortedConceptDescriptionLinker();
+ 								while (conDesIt) {
+ 									CConcept* atmostConcept = conDesIt->getData();
+ 									bool conNegated = conDesIt->isNegated();
+ 									cint64 opCode = atmostConcept->getOperatorCode();
+ 									if (!conNegated && (opCode == CCATMOST) || conNegated && (opCode == CCATLEAST)) {
+ 										cint64 param = atmostConcept->getParameter();
+ 										cint64 atmostCardinality = param - 1*conNegated;
+ 
+-										if (atmostCardinality < cardinality && (hasIdenticalConceptOperands(atmostConcept->getOperandList(),conceptOpLinkerIt) || !atmostConcept->getOperandList())) {
++										if (atmostCardinality < cardinality && (!atmostConcept->getOperandList() || hasIdenticalConceptOperands(atmostConcept->getOperandList(),conceptOpLinkerIt))) {
+ 											CRole* atmostRole = atmostConcept->getRole();
+ 
+ 
+ 											CSortedNegLinker<CRole*>* superRoleIt = role->getIndirectSuperRoleList();
+ 											while (superRoleIt) {
+ 												if (!superRoleIt->isNegated()) {
+ 													if (superRoleIt->getData() == atmostRole) {
+ 														CClashedDependencyDescriptor* clashConDesLinker = nullptr;
+ 														clashConDesLinker = createClashedConceptDescriptor(clashConDesLinker,processIndi,conDes,depTrackPoint,calcAlgContext);
+ 														clashConDesLinker = createClashedConceptDescriptor(clashConDesLinker,processIndi,conDesIt,conDesIt->getDependencyTrackPoint(),calcAlgContext);

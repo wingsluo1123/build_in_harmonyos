@@ -1,0 +1,24 @@
+software: konclude
+display: "Konclude"
+description: "Parallel tableau-based OWL 2 DL (SROIQV(D)) reasoner: classification, consistency, satisfiability, realisation and OWLlink"
+category: system
+homepage: "https://github.com/konclude/Konclude"
+license: LGPL-3.0
+build_system: custom            # 上游为 qmake（.pro/.pri），非 cmake/autotools/meson/makefile
+
+ohos_adaptation:
+  key_points:
+    - "上游仅提供 qmake 构建（Konclude.pri 列出 2580 个 .cpp + 2653 个头文件）；沿用上游 qmake 路线，不另造构建系统"
+    - "qt5-qtbase 包内 bin/qt.conf 与 mkspecs/{modules,modules-inst}/*.pri 指向其构建目录，必须重写为包目录，否则 qmake 报 Unknown module(s) in QT"
+    - "上游 Konclude.pro 链接树内自有 x86_64 预编译 Redland 栈与 jemalloc，aarch64 不可用；改用上游官方变体 KoncludeWithoutRedland.pro"
+    - "RDF 非 XML 序列化（Turtle）与 Rasqal 复杂 SPARQL 路径不可用；OWL/XML 本体上的 SPARQL 实测可用"
+    - "上游快照自身的空值守卫求值顺序缺陷使 roberts-family-full-D 的 classification/realization SIGSEGV，需 1 个平台无关 bugfix 补丁"
+    - "本机构建=宿主机=OHOS/aarch64 原生构建（非交叉编译），qmake/make 直接在目标机运行"
+  common_dependencies:
+    - qt5-qtbase/5.15.2.2
+
+versions:
+  "0.7.0-1138-git20220514-dfsg":
+    status: built
+    build_date: "2026-10-16"
+    conan_ref: "konclude/0.7.0-1138-git20220514-dfsg"
