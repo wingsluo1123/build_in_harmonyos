@@ -1,0 +1,54 @@
+#====================================================================
+# DRAFT-sct-1.0.0-make-commandline-var-suppresses-append - make 命令行变量覆盖 Makefile 的 += 追加，链接库参数被丢弃
+#====================================================================
+
+id:                     DRAFT-sct-1.0.0-make-commandline-var-suppresses-append
+trigger_tool:           make|conan
+phase:                  build|link
+error_signature:        undefined reference to [`']?(XOpenDisplay|XRRGetScreenResourcesCurrent|XRRSetCrtcGamma|XRRGetCrtcGammaSize)\b
+
+severity:               2
+category:               make|conan|cross-compile|link
+match_keywords:         raw Makefile, CFLAGS +=, LDFLAGS +=, make command line variable, command-line assignment, override, undefined reference, XOpenDisplay, XRRSetCrtcGamma, AutotoolsToolchain, AutotoolsDeps, conanbuild, INCS, LIBS, sct
+
+title:                  以 make 命令行变量传 CFLAGS/LDFLAGS 会覆盖上游 Makefile 的 `+=` 追加，导致 -lX11/-lXrandr 等链接参数整体丢失
+
+root_cause:             GNU make 中命令行变量赋值的优先级高于 Makefile 内的普通赋值（包括 `+=`，只有 `override` 指令能压过）。当配方写成 `make CFLAGS="$CFLAGS $CPPFLAGS -std=c99 -Wall" LDFLAGS="$LDFLAGS"` 时，上游 Makefile 的 `CFLAGS += -std=c99 -Wall ${INCS}` 与 `LDFLAGS += -lX11 -lXrandr ${LIBS}` 两行被完全忽略；交叉构建里 conan 只提供 -I/-L 路径，`-lX11/-lXrandr` 本应由 Makefile 自己追加，于是链接行缺少这两个库，报 XOpenDisplay/XRRSetCrtcGamma 等未定义符号。sct 1.0.0 的 Makefile 正是 `LDFLAGS += -lX11 -lXrandr ${LIBS}` 结构。
+
+affected_scope:         Conan 配方包装上游 raw Makefile（无 configure/cmake）的交叉构建；Makefile 用 `CFLAGS +=` / `LDFLAGS +=` / `LDLIBS +=` 追加必需的头文件或库参数，而配方需要向同一变量注入 conan 的 toolchain 参数。sct 1.0.0（纯 Makefile + X11/XRandR）实测：命令行方式编译成功、链接报 X11 符号未定义；改为环境变量方式后 conan create 与 test_package 全通过。
+
+verification_cmd:       conan create . -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 --build=missing --user=ohpcd --channel=stable；readelf -d package/bin/sct | grep NEEDED 应含 libX11.so.6 与 libXrandr.so.2；test_package 18/18 PASS
+
+rec_priority:           1
+rec_approach:          export-flags-through-environment-not-make-argv
+rec_description:       把 CFLAGS/LDFLAGS 作为 make 的环境变量传入（shell 前缀赋值 `CFLAGS=... make ...`，配合 conan `self.run(..., env="conanbuild")`），不要在 make 命令行上写变量赋值；需要替换 Makefile 的宿主机默认路径时，只把对应变量置空（如 `INCS= LIBS=`），保留含 `+=` 的 CFLAGS/LDFLAGS 行生效。
+rec_command:           self.run(f'cd "{self.source_folder}" && CFLAGS="$CFLAGS $CPPFLAGS -std=c99 -Wall" LDFLAGS="$LDFLAGS" make -j1 INCS= LIBS=', env="conanbuild")
+rec_auto_fix:           false
+rec_impl:               conan-raw-makefile-environment-flags
+
+fallback_priority:      2
+fallback_approach:      patch-makefile-to-append-with-override-or-pass-only-project-vars
+fallback_description:   若必须用命令行传参，需给 Makefile 的追加行加 `override`（打补丁），或只通过命令行传入与 Makefile 无关的项目自定义变量（如 INCS/LIBS），绝不覆盖 CFLAGS/LDFLAGS/LDLIBS。
+
+forbid_1_pattern:       make[^\n]*\b(CFLAGS|LDFLAGS|LDLIBS)=
+forbid_1_reason:        命令行赋值禁用 Makefile 内 `+=` 追加，依赖库/头文件参数被静默丢弃。
+forbid_1_consequence:   编译或链接缺少 -I/-l，报头文件找不到或 undefined reference（如 XOpenDisplay/XRRSetCrtcGamma）。
+forbid_2_pattern:       (CFLAGS|LDFLAGS)\s*=\s*["']?\$\(?CFLAGS
+forbid_2_reason:        以“保留原值”为理由写 `CFLAGS="$CFLAGS ..."` 仍在命令行上，仍是覆盖语义。
+forbid_2_consequence:   看似追加、实际覆盖，问题与直接赋值相同且更隐蔽。
+
+principles:             P001, P002
+causes:                 []
+caused_by:              []
+similar_to:             [E392, E636, E568]
+conflicts_with:         []
+prerequisite_of:        []
+
+doc_file:               knowledge/drafts/DRAFT-sct-1.0.0-make-commandline-var-suppresses-append.md
+last_updated:           2026-10-17
+source_event:           sct 1.0.0 HarmonyOS PC 适配（raw Makefile + X11/XRandR，链接参数丢失修复）
+authors:                pc-agent
+source_commit:          (commit 时回填)
+
+metrics_success_count:  1
+metrics_fail_count:     0
