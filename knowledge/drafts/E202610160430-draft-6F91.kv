@@ -1,0 +1,75 @@
+# DRAFT — 外部计算进程事务必须使用单调总截止时间
+
+id:                     E202610160430
+trigger_tool:           runtime|test
+phase:                  runtime|testing
+error_signature:        External function response exceeded the transaction deadline|helper keeps process alive without DONE|per-wait timeout is refreshed
+
+severity:               2
+category:               ipc, subprocess, timeout, protocol, qt, runtime, testing
+match_keywords:         QProcess, waitForReadyRead, waitForStarted, waitForBytesWritten,
+                        monotonic deadline, total timeout, slow drip, DONE marker,
+                        continuous readable response, subprocess generation, partial response
+title:                  长生命周期外部计算进程的请求必须共享单调总截止时间
+prescan_pattern:        waitForStarted\(|waitForBytesWritten\(|waitForReadyRead\(|QProcess
+prescan_globs:          *.cc, *.cpp, *.cxx, *.hh, *.hpp
+
+root_cause:             把进程启动、请求写入和多轮响应读取分别交给默认或固定的逐次超时，
+                        会让每次收到少量输出都重新获得完整等待窗口。助手进程可以持续输出
+                        不构成完整帧的字节而永不发送结束标记，使同步 API 永久不返回。
+                        超时后若保留旧进程和半包，旧响应还可能被下一次请求消费。
+affected_scope:         复用外部解释器、数值程序、插件宿主或编译服务，并通过结束标记、
+                        长度帧或完整 JSON 判断一笔同步事务结束的客户端。一次性子进程且
+                        由单个有界 wait 覆盖完整生命周期的实现不适用。
+verification_cmd:       conan create archives/q/qsoas/3.3 -pr:h=ci/conan/profiles/ohos-aarch64
+                        -pr:b=ci/conan/profiles/ohos-aarch64 --build=qsoas/*
+
+rec_priority:           1
+rec_approach:           monotonic-transaction-deadline-and-process-discard
+rec_description:        在事务入口启动单调计时器，把 remaining=deadline-now 传给启动、
+                        写入排空和每次响应等待；remaining<=0 立即失败。任何失败均终止并
+                        回收当前子进程、丢弃半包，使下一请求只能使用新进程。测试用持续
+                        碎片输出及持续输出完整行但永不发送完成标记的真实助手，要求每轮消费
+                        数据前检查预算、安装后客户端在总预算内非零退出且助手已消失；正常
+                        完整响应仍成功。
+rec_command:            use one monotonic deadline across start, write, frame assembly and completion, then kill and reap on failure
+rec_auto_fix:           false
+rec_impl:               production-process-transaction-patch
+
+fallback_priority:      2
+fallback_approach:      one-process-per-request-with-bounded-lifetime
+fallback_description:   若不需要复用助手进程，可为每笔请求创建独立子进程并以同一总预算
+                        覆盖其完整生命周期；超时仍须终止和回收，不能只让调用者停止等待。
+fallback_command:       spawn a fresh helper per request and enforce one bounded lifetime
+fallback_auto_fix:      false
+fallback_impl:          process-lifecycle-wrapper
+
+forbid_1_pattern:       while.*waitForReadyRead\([0-9]+\)|while.*poll.*timeout|while.*select.*timeout
+forbid_1_reason:        循环内固定相对超时会被任何周期性碎片输出反复续期。
+forbid_1_consequence:   缺少完成标记的助手可无限占用同步调用和 Worker。
+forbid_2_pattern:       timeout.*return|wait.*false.*return
+forbid_2_reason:        只返回超时而不终止、回收并丢弃旧半包，会留下跨事务状态。
+forbid_2_consequence:   旧进程泄漏，旧响应可能满足下一请求或污染下一帧。
+
+principles:             P005
+causes:                 []
+caused_by:              []
+similar_to:             E429-draft-58E6
+conflicts_with:         []
+prerequisite_of:        []
+
+doc_file:               knowledge/drafts/E202610160430-draft-6F91.md
+last_updated:           2026-10-16
+source_event:           qsoas/3.3 的 ExternalFunction 已有明确 DONE 帧界，但逐次调用 QProcess
+                        等待接口；真实外部函数助手
+                        返回合法 JSON 前缀后每 50 ms 输出一个空格但不发送 DONE，原实现和逐次
+                        200 ms 超时的伪修复均不能在 3 秒内返回。单调 500 ms 总截止时间实现非零
+                        返回、回收助手；持续完整行输出也不能绕过截止点；完整 JSON 加 DONE 的
+                        事务返回正确数值。
+authors:                gcw_vbU49vcA <gcw_vbU49vcA@noreply.gitcode.com>
+metrics_success_count:  1
+metrics_fail_count:     2
+metrics_confidence:     0.9
+metrics_last_used:      2026-10-16
+draft:                  true
+contributor_id:         6F91

@@ -1,0 +1,58 @@
+software: qsoas
+version: "3.3"
+status: built
+build_date: "2026-10-16"
+build_system: qmake
+
+source:
+  url: "https://github.com/fourmond/QSoas/archive/refs/tags/3.3.tar.gz"
+  sha256: "d04584108b7cf889ff95b2423306486d15a94176d61799022c2a70741f1cd644"
+  tar_format: tar.gz
+
+build:
+  system: qmake
+  configure_options:
+    - "CONFIG+=release"
+    - "CONFIG+=prebuilt_build_info"
+    - "CONFIG+=no_qthelp"
+    - "CONFIG+=no_qtsvg"
+    - "CONFIG+=no_libzip"
+    - "CONFIG+=no_qt_rpath"
+  dependencies:
+    - qt5/5.15.19
+    - mruby/3.3.0
+    - gsl/2.8
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - 0001-QSoas.pro.patch
+  - 0002-qsoas.qrc.patch
+  - 0003-src-externalfunction.cc.patch
+  - 0004-src-filebrowser.hh.patch
+  - 0005-src-general-commands.cc.patch
+  - 0006-src-headers.hh.patch
+  - 0007-src-helpbrowser-noqthelp.cc.patch
+  - 0008-src-helpbrowser.hh.patch
+  - 0009-src-mainwin.cc.patch
+  - 0010-src-solver.cc.patch
+
+test_results:
+  type: conan_create_ohos_aarch64
+  consumer: "安装后 qsoas 实际执行版本查询、外部函数成功事务、慢滴流与持续可读响应的总截止时间、异常退出和子进程回收"
+  artifact: "AArch64 ELF；恰有一个 .codesign；无 RPATH/RUNPATH；无私有构建路径"
+  upstream_inventory: "19 个目录套件；1616 个运行时断言点"
+  upstream_executed: "1616"
+  upstream_passed: "1610"
+  upstream_imprecisions: "50（上游单独分类，不计失败）"
+  upstream_exceptions: "6（未交付的 ZIP 可选能力）"
+  upstream_not_completed: "0"
+  consumer_scenarios: 5
+  consumer_assertions: 15
+  consumer_passed: 15
+
+knowledge_gained:
+  - "外部计算进程的同步事务必须用单一单调截止时间覆盖启动、请求写入和响应完成，并在失败时回收进程、丢弃半包；逐次固定超时会被碎片输出无限续期。(ref: E202610160430-draft-6F91)"
+
+knowledge_ref:
+  - "knowledge/drafts/E202610160430-draft-6F91.md"

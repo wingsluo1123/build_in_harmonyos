@@ -1,0 +1,40 @@
+#!/system/bin/sh
+
+if [ -n "$QSOAS_TEST_HELPER_PID_FILE" ]; then
+  printf '%s\n' "$$" > "$QSOAS_TEST_HELPER_PID_FILE"
+fi
+
+IFS= read -r request || exit 2
+case "$request" in *'"xvalues"'*) ;; *) exit 4 ;; esac
+case "$request" in *'"parameters"'*) ;; *) exit 4 ;; esac
+
+case "$QSOAS_TEST_HELPER_MODE" in
+  valid)
+    printf '%s\n' '{"values":[8.0]}' '// -> DONE'
+    ;;
+  drip)
+    printf '%s\n' '{"values":[3.0]}'
+    while :; do
+      printf ' '
+      sleep 0.05
+    done
+    ;;
+  flood)
+    printf '%s\n' '{"values":[3.0]}'
+    while :; do
+      count=0
+      while [ "$count" -lt 100 ]; do
+        printf '%s\n' 'continuous complete response line without done marker'
+        count=$((count + 1))
+      done
+      sleep 0.001
+    done
+    ;;
+  exit)
+    printf '%s\n' '{"values":['
+    exit 0
+    ;;
+  *)
+    exit 3
+    ;;
+esac

@@ -1,0 +1,80 @@
+--- a/src/helpbrowser-noqthelp.cc
++++ b/src/helpbrowser-noqthelp.cc
+@@ -1 +1,77 @@
++/*
++  helpbrowser-noqthelp.cc: fallback for builds without the optional QtHelp
++  module.
+ 
++  This program is free software; you can redistribute it and/or modify
++  it under the terms of the GNU General Public License as published by
++  the Free Software Foundation; either version 2 of the License, or
++  (at your option) any later version.
++*/
++
++#include <headers.hh>
++#include <helpbrowser.hh>
++#include <terminal.hh>
++
++HelpBrowser::HelpBrowser()
++{
++  QVBoxLayout * layout = new QVBoxLayout(this);
++  layout->addWidget(new QLabel(
++    "The embedded help browser is not available in this build", this));
++}
++
++void HelpBrowser::browseLocation(const QString &)
++{
++  Terminal::out << "The embedded help browser is not available in this build"
++                << endl;
++}
++
++void HelpBrowser::browseCommand(const Command *)
++{
++  browseLocation(QString());
++}
++
++QString HelpBrowser::collectionFile()
++{
++  return QString();
++}
++
++void HelpBrowser::dumpHelp()
++{
++  browseLocation(QString());
++}
++
++TipsDisplay::TipsDisplay()
++  : QWidget(NULL)
++{
++  setWindowTitle("QSoas tips");
++  QVBoxLayout * layout = new QVBoxLayout(this);
++  layout->addWidget(new QLabel(
++    "Generated QSoas help content is not installed in this build", this));
++}
++
++TipsDisplay::~TipsDisplay() = default;
++
++TipsDisplay * TipsDisplay::getDisplay(bool activate)
++{
++  static TipsDisplay * display = NULL;
++  if(! display)
++    display = new TipsDisplay;
++  if(activate)
++    display->show();
++  return display;
++}
++
++void TipsDisplay::showStartupTips()
++{
++  getDisplay(false);
++}
++
++void TipsDisplay::showRandomTip()
++{
++  getDisplay(true);
++}
++
++void TipsDisplay::showRandomKeyword(const QString &)
++{
++  getDisplay(true);
++}

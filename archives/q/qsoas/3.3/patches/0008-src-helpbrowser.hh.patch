@@ -1,0 +1,40 @@
+--- a/src/helpbrowser.hh
++++ b/src/helpbrowser.hh
+@@ -23,6 +23,7 @@
+ 
+ class Command;
+ 
++#ifndef QSOAS_NO_QTHELP
+ /// A browser to display the help texts
+ class HelpBrowser : public QWidget {
+   Q_OBJECT;
+@@ -149,5 +150,29 @@
+   void linkClicked(const QUrl & url);
+ 
+ };
++#else
++/// Reduced help interface for builds without the optional QtHelp module.
++class HelpBrowser : public QWidget {
++  Q_OBJECT;
++public:
++  HelpBrowser();
++  static void browseLocation(const QString & location);
++  static void browseCommand(const Command * command);
++  static QString collectionFile();
++  static void dumpHelp();
++};
++
++class TipsDisplay : public QWidget {
++  Q_OBJECT;
++public:
++  TipsDisplay();
++  ~TipsDisplay();
++  static TipsDisplay * getDisplay(bool activate = false);
++  static void showStartupTips();
++public slots:
++  void showRandomTip();
++  void showRandomKeyword(const QString & keyword);
++};
++#endif
+ 
+ #endif

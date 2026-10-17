@@ -1,0 +1,96 @@
+--- a/QSoas.pro
++++ b/QSoas.pro
+@@ -3,7 +3,8 @@
+ 
+ TEMPLATE = app
+ 
+-CONFIG += debug warn_on thread exception
++CONFIG += warn_on thread exception
++!release:CONFIG += debug
+ 
+ contains(QT_MAJOR_VERSION, 4) {
+   error("QSoas no longer supports Qt4")
+@@ -25,11 +26,23 @@
+ # We sometimes need the network
+ QT += network
+ 
+-# We need SVG support for icons
++# We need SVG support for icons when the optional QtSvg module is available.
++no_qtsvg {
++  DEFINES += QSOAS_NO_QTSVG
++}
++else {
+ QT += svg
++}
+ 
+-# And now the shiny help system
++# And now the shiny help system. The source release does not ship generated
++# help collections, so distributors without QtHelp can retain the rest of the
++# application with CONFIG+=no_qthelp.
++no_qthelp {
++  DEFINES += QSOAS_NO_QTHELP
++}
++else {
+ QT += help
++}
+ 
+ # We want to build a console application on win32 as we don't have a
+ # proper winmain for windows only applications.
+@@ -167,14 +180,16 @@
+ # message("Ruby: using $$RUBY, found library: $$RUBY_LIB_ARG and includes at $$RUBY_INCLUDE_DIRS")
+ 
+ # Here, we prepare the build information, using the only script
+-# language we're guaranteed to have:
++# language we're guaranteed to have. Packagers can provide src/build.hh
++# themselves and enable prebuilt_build_info for reproducible builds that do
++# not embed the builder hostname and wall-clock time.
+ 
+-system($$RUBY build-info.rb)
++!prebuilt_build_info:system($$RUBY build-info.rb)
+ HEADERS += src/build.hh
+ 
+-build-info.commands = $$RUBY build-info.rb
++!prebuilt_build_info:build-info.commands = $$RUBY build-info.rb
+ 
+-QMAKE_EXTRA_TARGETS += build-info
++!prebuilt_build_info:QMAKE_EXTRA_TARGETS += build-info
+ 
+ 
+ # INCLUDEPATH += $$RUBY_INCLUDE_DIRS
+@@ -596,7 +611,8 @@
+ 
+ # Help browser:
+ HEADERS += src/helpbrowser.hh
+-SOURCES += src/helpbrowser.cc
++no_qthelp:SOURCES += src/helpbrowser-noqthelp.cc
++else:SOURCES += src/helpbrowser.cc
+ 
+ 
+ # A small wrapper around scrolled widgets
+@@ -647,8 +663,16 @@
+ ######################################################################
+ # Detection and handling of libzip
+ 
+-!win32 {
+-  exists(/usr/include/zip.h)|exists(/opt/local/include/zip.h) {
++!win32:!no_libzip {
++  !isEmpty(LIBZIP_DIR) {
++    DEFINES += HAS_LIBZIP
++    INCLUDEPATH += $$LIBZIP_DIR/include
++    LIBS += -L$$LIBZIP_DIR/lib -lzip
++    message("Found support for ZIP archives in $$LIBZIP_DIR")
++    HEADERS += src/zipfile.hh
++    SOURCES += src/zipfile.cc
++  }
++  else:exists(/usr/include/zip.h)|exists(/opt/local/include/zip.h) {
+     DEFINES += HAS_LIBZIP
+     LIBS += -lzip
+     message("Found support for ZIP archives read/write")
+@@ -659,6 +683,7 @@
+     message("Did not find libzip")
+   }
+ }
++no_libzip:message("ZIP archive support disabled by build configuration")
+ 
+ 
+ 

@@ -1,0 +1,154 @@
+--- a/src/externalfunction.cc
++++ b/src/externalfunction.cc
+@@ -19,6 +19,7 @@
+ #include <headers.hh>
+ #include <externalfunction.hh>
+ #include <exceptions.hh>
++#include <QElapsedTimer>
+ 
+ 
+ 
+@@ -48,7 +49,6 @@
+ ///
+ /// The object sent contains two elements: "parameters" and "xvalues"
+ ///
+-/// @todo Implement timeout.
+ class JSONBasedFunction : public ExternalFunction {
+ protected:
+ 
+@@ -58,6 +58,36 @@
+   /// unexpectedly.
+   virtual void spawn() = 0;
+ 
++  int transactionTimeout() const {
++    bool ok = false;
++    int timeout = qEnvironmentVariableIntValue(
++      "QSOAS_EXTERNAL_FUNCTION_TIMEOUT_MS", &ok);
++    if(! ok || timeout < 100 || timeout > 300000)
++      timeout = 30000;
++    return timeout;
++  };
++
++  int remainingTime(const QElapsedTimer & timer, int timeout) const {
++    qint64 remaining = timeout - timer.elapsed();
++    return remaining > 0 ? static_cast<int>(remaining) : 0;
++  };
++
++  void discardProcess() {
++    if(! process)
++      return;
++    if(process->state() != QProcess::NotRunning) {
++      process->kill();
++      process->waitForFinished(1000);
++    }
++    delete process;
++    process = NULL;
++  };
++
++  void failTransaction(const QString & message) {
++    discardProcess();
++    throw RuntimeError(message);
++  };
++
+   /// Reads a line from the subprocess
+   QByteArray readLine() {
+     QByteArray rv;
+@@ -84,12 +114,16 @@
+     if(process) {
+       process->closeWriteChannel();
+       // Wait 10 ms before closing
+-      process->waitForFinished(10);
+-      delete process;
++      if(! process->waitForFinished(10))
++        process->kill();
++      discardProcess();
+     }
+   };
+ 
+   Vector compute(const Vector & xv, const double * params) override {
++    const int timeout = transactionTimeout();
++    QElapsedTimer timer;
++    timer.start();
+     if(! process)
+       spawn();
+     if(! process)
+@@ -105,9 +139,16 @@
+       vals2 << params[i];
+     obj["parameters"] = vals2;
+     QJsonDocument doc(obj);
+-    process->waitForStarted();
+-    process->write(doc.toJson(QJsonDocument::Compact) + "\n");
+-    process->waitForBytesWritten();
++    int remaining = remainingTime(timer, timeout);
++    if(remaining == 0 || ! process->waitForStarted(remaining))
++      failTransaction("External function failed to start before the transaction deadline");
++    if(process->write(doc.toJson(QJsonDocument::Compact) + "\n") < 0)
++      failTransaction("External function request could not be queued");
++    while(process->bytesToWrite() > 0) {
++      remaining = remainingTime(timer, timeout);
++      if(remaining == 0 || ! process->waitForBytesWritten(remaining))
++        failTransaction("External function request exceeded the transaction deadline while writing");
++    }
+ 
+     // Now read the response
+ 
+@@ -116,32 +157,45 @@
+       // if(process->atEnd())
+       //   throw RuntimeError("Premature end of subprocess %1 %2").
+       //     arg(process->program()).arg(process->arguments().join(" "));
++      remaining = remainingTime(timer, timeout);
++      if(remaining == 0)
++        failTransaction("External function response exceeded the transaction deadline");
+       QByteArray ln = readLine();
+       if(ln.startsWith("// -> DONE"))
+         break;
+       if(ln.size() == 0) {
+         if(process->state() == QProcess::NotRunning)
+-            throw RuntimeError("Premature end of subprocess %1 %2").
+-              arg(process->program()).arg(process->arguments().join(" "));
+-        process->waitForReadyRead();
++          failTransaction("External function process ended before completing its response");
++        remaining = remainingTime(timer, timeout);
++        if(remaining == 0)
++          failTransaction("External function response exceeded the transaction deadline");
++        if(! process->waitForReadyRead(remaining)) {
++          if(process->state() == QProcess::NotRunning)
++            failTransaction("External function process ended before completing its response");
++          failTransaction("External function response exceeded the transaction deadline");
++        }
+       }
+-      else 
++      else {
++        const int maximumResponseSize = 16 * 1024 * 1024;
++        if(resp.size() > maximumResponseSize - ln.size())
++          failTransaction("External function response exceeded the maximum size");
+         resp += ln;
++      }
+     }
+     QJsonParseError err;
+     doc = QJsonDocument::fromJson(resp, &err);
+     if(doc.isNull()) {
+-      throw RuntimeError("Failed to parse the JSON response:");
++      failTransaction("Failed to parse the external function JSON response");
+     }
+ 
+     if(! doc.isObject())
+-      throw RuntimeError("The JSON data should be an object");
++      failTransaction("The external function JSON response should be an object");
+     obj = doc.object();
+     if(obj.contains("error"))
+-      throw RuntimeError("Error executing function: %1").
+-        arg(obj["error"].toString());
++      failTransaction(QString("Error executing function: %1").
++                      arg(obj["error"].toString()));
+     if(! obj.contains("values"))
+-      throw RuntimeError("Subprocess failed to return values");
++      failTransaction("External function process failed to return values");
+     vals = obj["values"].toArray();
+     
+ 
+@@ -338,4 +385,3 @@
+     }
+     ::exit(0);
+   }, -3, "display QSoas version");
+-
