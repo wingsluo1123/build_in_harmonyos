@@ -1,0 +1,65 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI 脚本 build_and_test.sh L0e 强制要求）
+# 详见 docs/TEST_QUALITY_SPEC.md
+
+package: pasystray/0.8.2
+homepage: "https://github.com/christophgysin/pasystray"
+
+# 上游测试清点证据：
+#  - 源码树无 tests/、test/、t/ 目录；无 TESTS / check_PROGRAMS / ctest。
+#  - Makefile.am 的 `test:` 目标只有 `@echo "no tests yet"`（上游自认无测试）。
+#  - .github/workflows/build.yml 的 "make test" 步骤即调用该空目标。
+#  - 上游唯一的自动化校验是 build.yml 的 autotools + configure + make 构建矩阵。
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "pasystray-0.8.2/Makefile.am"
+    reason: "`test:` 目标内容为 `@echo \"no tests yet\"`；无 TESTS/check_PROGRAMS 定义。"
+  - source: "pasystray-0.8.2/configure.ac"
+    reason: "无 AC_CONFIG_TESTDIR / AX_CHECK_* 测试宏。"
+  - source: "pasystray-0.8.2/.github/workflows/build.yml"
+    reason: "构建矩阵仅 aclocal/autoconf/autoheader/automake + ./configure + make + make test（空测试）。"
+  - conclusion: "上游无自动化测试套件；因此本适配不重复执行上游测试，只有消费者测试。"
+
+upstream_check_command: "aclocal && autoconf && autoheader && automake --add-missing && ./configure && make && make test"
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# 消费者测试分两部分（R34）：
+#  A. 结构性/链接性：不执行被测二进制 → 必须始终真正通过、产物被移走时必须真正失败
+#     （CI 的 L1e 破坏性反向验证依赖此点）。由 test_pasystray.sh 实现并由 test() 调用。
+#  B. 上游 CLI 契约：真实执行被测二进制并断言真实输出；命中已声明的 OHOS 运行期限制
+#     （未签名 pulseaudio 共享库被加载器拒绝 / 无显示后端）时打印
+#     "Execution skipped due to OHOS platform limitation: ..." 并容忍（先例：
+#     已合入的 pavucontrol-qt/2.4.0）；其余错误仍 raise。
+test_package_tests:
+  - file: test_pasystray.sh
+    description: "[结构性] 产物存在且可执行（bin/pasystray）。"
+    command: "test -x <package>/bin/pasystray"
+  - file: test_pasystray.sh
+    description: "[结构性] 产物是合法 ELF（magic 7f454c46）。"
+    command: "head -c4 <package>/bin/pasystray | od -An -tx1"
+  - file: test_pasystray.sh
+    description: "[链接真实性] llvm-readelf -d 的 DT_NEEDED 含 libpulse.so.0。"
+    command: "llvm-readelf -d <package>/bin/pasystray"
+  - file: test_pasystray.sh
+    description: "[链接真实性] llvm-readelf -d 的 DT_NEEDED 含 libpulse-mainloop-glib.so.0（任务 9324 的争点）。"
+    command: "llvm-readelf -d <package>/bin/pasystray"
+  - file: conanfile.py
+    description: "[CLI 契约] --version 退出码 0 且精确打印 0.8.2（src/options.c version 分支）；OHOS 运行期限制下如实声明并容忍。"
+    command: "pasystray --version"
+  - file: conanfile.py
+    description: "[CLI 契约] --notify=help 退出码 0 且打印 'Notification options:' 帮助；OHOS 运行期限制下如实声明并容忍。"
+    command: "pasystray --notify=help"
+
+# 硬断言（必须真过）：产物存在、可执行、合法 ELF、DT_NEEDED ×2 = 5 项
+# 现实可执行断言（真实执行 + 限制容错）：--version、--notify=help = 2 项
+test_scenario_count: 6
+assertion_count: 7
+assertion_count_basis:
+  package_presence: 3
+  dt_needed: 2
+  cli_contract: 2
+runtime_limitations_tolerated:
+  - "OHOS 加载器拒绝未签名共享库：libpulse.so.0 / libpulse-mainloop-glib.so.0 / libpulsecommon-17.0.so 未签名（.codesign 计数 0）→ rc=127 Error loading shared library ..."
+  - "无显示后端：gtk_init_with_args() 在无 X11/Wayland 时失败，parse_options() 不执行 → rc=1 Cannot open display"

@@ -1,0 +1,35 @@
+# 软件级 manifest — pasystray
+# 遵循 ARCHIVE-SPEC v3.0 §2.1
+
+software: pasystray
+display: "pasystray"
+description: "PulseAudio 系统托盘控制器（GTK+3）：从托盘图标控制系统音量、默认设备与音频流"
+category: system
+homepage: "https://github.com/christophgysin/pasystray"
+license: LGPL-2.1-or-later
+build_system: autotools
+
+# 跨版本通用的 OHOS 适配知识
+ohos_adaptation:
+  key_points:
+    - "上游硬依赖 libpulse-mainloop-glib（pa_glib_mainloop_new），制品仓仅 pulseaudio/17.0.1 提供"
+    - "pulseaudio/17.0.1 钉 glib/2.88.0，全部 gtk3 钉 glib/2.84.0.1 → 需 recipe 级 override 才能解析（平台任务 9324）；该 override 会改变已发布依赖 pulseaudio 的构建语义（越界，用户选项 2 指定）"
+    - "OHOS 加载器拒绝未签名（无 .codesign）共享库；pulseaudio/17.0.1 的 libpulse*/libpulse-mainloop-glib* 未签名"
+    - "OHOS PC 无 X11/Wayland（gtk 为 broadway 后端），GtkStatusIcon 托盘功能当前不可用，可验证面为库链接与 CLI 契约（后者受无显示限制）"
+    - "消费者测试照 pavucontrol-qt/2.4.0 先例容忍 OHOS 运行期限制：结构性断言（ELF/DT_NEEDED）保持硬断言，CLI 契约真实执行但命中已声明限制特征时打印声明并容忍"
+    - "上游 tag archive 不含 configure/Makefile.in，需 autoreconf -fi（本机缺 aclocal/automake，由 automake/1.18 tool_require 提供）"
+    - "E007：config.guess 需补 HarmonyOS/__OHOS__ 与 aarch64-unknown-linux-ohos 三元组"
+    - "E011/E114：HMDFS 上 configure 的 umask 077 临时目录不可写，需降为 umask 022"
+  common_dependencies:
+    - gtk
+    - glib
+    - pulseaudio
+    - automake
+
+# 版本索引
+versions:
+  "0.8.2":
+    status: built
+    build_date: "2026-10-16"
+    conan_ref: "pasystray/0.8.2"
+    note: "依赖冲突（glib 2.88 vs 2.84）经 recipe 级 override 解析（越界：改变已发布依赖 pulseaudio/17.0.1 的构建语义，用户选项 2 指定），构建与 conan-verify 通过。交付二进制在本机受 OHOS 运行期限制（加载器拒绝未签名的 pulseaudio 共享库；无显示后端），消费者测试按 pavucontrol-qt/2.4.0 先例如实声明并容忍；完整 GUI 功能当前不可用"
