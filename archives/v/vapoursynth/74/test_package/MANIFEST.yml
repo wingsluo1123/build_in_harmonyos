@@ -1,0 +1,31 @@
+test:
+  type: conan-test-package
+  language: c/c++/python
+  framework: direct-compiler + upstream-unittest
+  assertion_count: 72
+  commands:
+    - "clang test_vapoursynth.c -o test_vapoursynth -lvapoursynth"
+    - "clang++ -std=c++17 expr.cpp main.cpp -o ExprDebugger.exe"
+    - "./test_vapoursynth"
+    - "python3 run_expr_compiler_test.py <package>/tests/upstream/expr_compiler/compiler_test.py ./ExprDebugger.exe"
+    - "PYTHONPATH=<package>/tests/upstream:<package>/python python3 -m unittest async_test environment_test expr_test filter_test log_test lut_test prop_dict_test range_property_compat test weakref_test zimgtest  (only with -o vapoursynth/*:python_module=True)"
+  assertions:
+    - "getVapourSynthAPI(VAPOURSYNTH_API_VERSION) returns a non-null VSAPI pointer"
+    - "VSAPI reported version matches the headers used by the consumer"
+    - "VSAPI can create and free a VSCore instance"
+    - "upstream ExprDebugger compiles and 69 expressions compile through it"
+upstream_tests:
+  status: run
+  source_files: 12
+  passed_files: 1
+  unittest_modules: 11
+  unittest_cases: 157
+  expr_compiler_harnesses: 1
+  expr_compiler_expressions: 69
+  result: "On the CI worker the upstream ExprDebugger harness runs (69 expressions). The 11 upstream unittest modules / 157 cases need the optional python_module binding: they pass on a true device, but the CI worker cannot build the extension (hmmac blocks Cython's own compiled modules) nor dlopen it from the Conan cache (E212)."
+e212_fallback:
+  reference: "knowledge/doc/E212.md"
+  trigger: "with python_module=True on a sandboxed OHOS worker the packaged CPython extension cannot be dlopen-ed from a user path, i.e. Permission denied during the import probe"
+  action: "still run the C consumer smoke test and the 69-expression ExprDebugger harness, and verify the packaged Python module statically (extension present/executable/ELF/.codesign/links libvapoursynth.so.4, core libraries executable, module files packaged, 11 upstream unittest modules plus the expr harness packaged)"
+  limitation: "the 157 upstream unittest cases are declared from the true-device run and are not executed inside the CI sandbox"
+

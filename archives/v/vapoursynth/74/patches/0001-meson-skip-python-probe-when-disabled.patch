@@ -1,0 +1,50 @@
+--- a/meson.build
++++ b/meson.build
+@@ -1,2 +1,2 @@
+-project('VapourSynth', 'c', 'cpp', 'cython',
++project('VapourSynth', 'c', 'cpp',
+     default_options: ['buildtype=release', 'b_lto=true', 'b_ndebug=if-release', 'c_std=c99', 'cpp_std=c++17'],
+@@ -17,6 +17,8 @@ build_wheel = get_option('build_wheel')
+ if not build_wheel
+     enable_vspipe = false
+-    enable_python_module = false
+ endif
+-
++if enable_python_module
++    add_languages('cython', required: true)
++endif
++
+ cxx = meson.get_compiler('cpp')
+@@ -50,8 +52,17 @@ lang = ['c', 'cpp']
+ pkg = import('pkgconfig')
+-
+-py = import('python').find_installation(pure: false)
+-py_dep = py.dependency(version: is_win ? '>=3.14' : '>=3.12')  # Py_NO_LINK_LIB was introduced in 3.14
+-
+-install_dir = build_wheel ? py.get_install_dir() / 'vapoursynth' : []
+-
++install_dir = []
++python_embed_link_args = []
++if enable_vsscript or enable_python_module or enable_vspipe or build_wheel
++    py = import('python').find_installation(pure: false)
++    py_dep = py.dependency(version: is_win ? '>=3.14' : '>=3.12')  # Py_NO_LINK_LIB was introduced in 3.14
++    install_dir = (enable_python_module or build_wheel) ? py.get_install_dir() / 'vapoursynth' : []
++    python_embed_link = run_command(
++        py,
++        '-c',
++        'import os, sys, sysconfig; names=[x for x in [sysconfig.get_config_var(k) for k in ("LDLIBRARY", "INSTSONAME")] if x]; names += ["libpython%d.%d.so" % sys.version_info[:2], "libpython%d.%d.so.1.0" % sys.version_info[:2]]; dirs=[x for x in [sysconfig.get_config_var(k) for k in ("LIBDIR", "LIBPL")] + [os.path.join(sys.prefix, "lib"), os.path.join(sys.base_prefix, "lib"), os.path.join(os.path.dirname(sys.executable), "..", "lib"), "/data/service/hnp/lib", "/data/service/hnp/lib64"] if x]; seen=set(); paths=[os.path.realpath(os.path.join(d, n)) for d in dirs for n in names]; paths=[p for p in paths if not (p in seen or seen.add(p))]; print(next((p for p in paths if os.path.exists(p)), ""))',
++        check: true,
++    ).stdout().strip()
++    python_embed_link_args = python_embed_link == '' ? [] : [python_embed_link]
++endif
++
+ vs_current_release = run_command(
+@@ -251,7 +267,8 @@ if enable_core
+             files('src/common/wave.cpp', 'src/cython/vapoursynth.pyx'),
+             dependencies: [py_dep, vapoursynth_dep],
+             install: true,
+             install_rpath: '$ORIGIN',
++            link_args: python_embed_link_args,
+             limited_api: '3.12',
+             override_options: 'cython_language=cpp',
+             subdir: 'vapoursynth',
