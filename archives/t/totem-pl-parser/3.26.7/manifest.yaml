@@ -1,0 +1,59 @@
+# 版本级 manifest
+# 文件位置: archives/{letter}/{name}/3.26.7/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "3.26.7"
+software: "totem-pl-parser"
+status: built
+build_date: "2026-10-16"
+build_system: "meson"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://download.gnome.org/sources/totem-pl-parser/3.26/totem-pl-parser-3.26.7.tar.xz"
+  sha256: "60d517c1acabe54ae337f64451264fc76730696eaae26b5480fb37166689b5f3"
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: meson
+  configure_options:
+    - "-Ddefault_library=shared"
+    - "-Dintrospection=false"
+    - "-Denable-gtk-doc=false"
+    - "-Denable-uchardet=yes"
+    - "-Denable-libarchive=no"
+    - "-Denable-libgcrypt=no"
+  dependencies:
+    - glib/2.84.0.1
+    - libxml2/2.15.3
+    - uchardet/0.0.7
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "构建期 GLib 工具不能在配方里重新编译：CI worker 的 SDK lld 缺 libxml2.so.16，glib-mkenums/glib-genmarshal 需改用零编译的 sh wrapper 调用注册表 glib 包内已构建的工具，wrapper 目录纳入 build 环境 PATH。"
+  - "meson native 文件中的工具路径必须写绝对路径：OHOS libc 的 posix_spawn 不做 PATH 查找，裸工具名会直接失败。"
+  - "OHOS 共享库产物不带 SONAME，需在 package() 里为 libtotem-pl-parser / libtotem-pl-parser-mini 补回 .so.<soversion> 与 .so 别名（上游 lt_version 21:6:3）。"
+  - "注册表 libarchive 包未把 libdir 暴露给消费者运行环境，链接后加载期找不到 libarchive.so.13；该特性仅供 totem-disc.c 做 ISO 探测（无上游测试覆盖），故默认关闭 enable-libarchive=no。"
+  - "无 freedesktop MIME 数据库时 glib 把 .m3u 判为 text/plain，totem-pl-parser 返回 TOTEM_PL_PARSER_RESULT_UNHANDLED 且不发 entry-parsed 信号：上游 parser/podcast 会因此假失败，配方与消费者测试均按 mime/mime.cache 是否存在分支执行/断言。"
