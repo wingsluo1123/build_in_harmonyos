@@ -1,0 +1,86 @@
+# 版本级 manifest — uqm 0.8.0
+# 文件位置: archives/u/uqm/0.8.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "0.8.0"
+name: "uqm"
+software: "uqm"
+display: "The Ur-Quan Masters"
+conan_ref: "uqm/0.8.0"
+
+status: built
+compile_date: "2026-10-16"
+build_date: "2026-10-16"
+build_system: custom
+
+source:
+  url: "https://downloads.sourceforge.net/project/sc2/UQM/0.8/uqm-0.8.0-src.tgz"
+  sha256: "24f2f7db9cf7faf53b95f9e2580e6f596205a98ed0c335cfe834c64785ad4f5a"
+  tar_format: tar.gz
+
+build:
+  # 上游自研 build/unix/build.sh（交互式菜单 configure），故非 autotools/cmake/meson
+  system: custom
+  configure_options:
+    # 上游 configure 无 CLI 参数；下列取值为配方合成的 config.state 菜单项
+    - "CHOICE_graphics=sdl2"
+    - "CHOICE_sound=mixsdl"
+    - "CHOICE_mikmod=internal"
+    - "CHOICE_ovcodec=standard"
+    - "CHOICE_netplay=full"
+    - "CHOICE_ioformat=stdio_zip"
+    - "CHOICE_threadlib=sdl"
+  dependencies:
+    - sdl2/2.32.10
+    - libpng/1.6.58.3
+    - libvorbis/1.3.7
+    - zlib/1.3.2
+  cc: clang
+  cxx: clang++
+
+dependencies:
+  required:
+    - sdl2/2.32.10
+    - libpng/1.6.58.3
+    - libvorbis/1.3.7
+    - zlib/1.3.2
+  optional: []
+
+patches_applied:
+  - "0001-build-unix-config_functions.patch"
+  - "0002-src-libs-network-netmanager-netmanager_bsd.c.patch"
+
+test_results:
+  type: manual
+  total: 4
+  passed: 4
+  failed: 0
+  note: "上游 0.8.0 无任何测试用例（无 tests/、无 check/ctest/meson 目标）；4 项为 test_package 消费者断言"
+
+knowledge_gained:
+  - "UQM 自研 build.sh 的 configure 是交互菜单；无人值守用 config.state + reprocess_config（ref: E754）"
+  - "UQM 的 CFLAGS/LDFLAGS 从环境继承，可注入 Conan 依赖的 -I/-L（libpng 探测写死 -lpng 且不带 -L）（ref: E754）"
+  - "UQM 探测 SDL2 走 sdl2-config、Vorbis/zlib 走 pkg-config、libpng 走 -lpng 编译探测，三种机制需分别接入（ref: E754）"
+  - "OHOS /tmp 只读 + 脚本硬编码 /tmp 字面量：设置 TMPDIR 无效，须补丁改 ${TMPDIR:-/tmp}（ref: E754）"
+  - "musl 下 fd_set/FD_SETSIZE/select 需显式 #include <sys/select.h>（netmanager_bsd.c）（ref: E757）"
+
+knowledge_ref: [E754, E757]
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/uqm-0.8.0.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/uqm-0.8.0.work
+  source_orig_hash: f726ca2b3cc00068
+  source_work_hash: 367f355f3334bd7b
+  generated_at: '2026-10-16T19:53:51'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-build-unix-config_functions.patch
+    type: portability
+    platform_only: false
+    guard: 'none'
+  - file: 0002-src-libs-network-netmanager-netmanager_bsd.c.patch
+    type: portability
+    platform_only: false
+    guard: 'none'
