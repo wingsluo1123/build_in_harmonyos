@@ -1,0 +1,21 @@
+# conandata.yml — kbookmarks 6.28.0
+# Based on the 6.18.0 recipe (same OHOS adaptation set plus the 6.28 family
+# SONAME/platform fixes).
+
+sources:
+  # 官方源 + 权威镜像（R39）。download.kde.org 会 302 到区域镜像
+  # （如 mirrors.bfsu.edu.cn），该目标在部分网络（含真机在网环境）下 TLS
+  # 证书校验失败、无法下载；此处显式给出权威镜像作为回退。
+  # 四个 URL 的内容相同（sha256 已逐一核对）。
+  url:
+    - "https://download.kde.org/stable/frameworks/6.28/kbookmarks-6.28.0.tar.xz"
+    - "https://ftp.funet.fi/pub/mirrors/ftp.kde.org/pub/kde/stable/frameworks/6.28/kbookmarks-6.28.0.tar.xz"
+    - "https://mirror.freedif.org/KDE/ftp/stable/frameworks/6.28/kbookmarks-6.28.0.tar.xz"
+    - "https://mirrorservice.org/sites/download.kde.org/stable/frameworks/6.28/kbookmarks-6.28.0.tar.xz"
+  sha256: "d7f4048860ef00bc5d135e284dc6b1307d03199c2c13020994b17e38e3741f5c"
+
+patches:
+  "6.28.0":
+    - patch_file: "patches/0001-CMakeLists.txt.patch"
+      patch_description: "Lower KF_DEP_VERSION 6.28.0 -> 6.26.0: ohpcd publishes KF6Config/KF6CoreAddons only up to 6.26.0.1 (packaged as 6.26.0) while KF6WidgetsAddons is at 6.28.0; 6.26.0 is the common floor that satisfies all three find_package() calls (kcontacts 6.28.0 precedent)"
+      patch_type: "portability"
