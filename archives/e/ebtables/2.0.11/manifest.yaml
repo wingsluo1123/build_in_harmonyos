@@ -1,0 +1,96 @@
+version: "2.0.11"
+status: built
+build_date: "2026-10-09"
+conan_ref: "ebtables/2.0.11"
+
+source:
+  url: "https://ftp.netfilter.org/pub/ebtables/ebtables-2.0.11.tar.gz"
+  sha256: "b71f654784a726329f88b412ef7b96b4e5d786ed2bd28193ed7b4c0d677dfd2a"
+  tar_format: tar.gz
+  tar_entries: 98
+  sha256_note: >-
+    上游 tfp.netfilter.org 同目录下的 `ebtables-2.0.11.tar.gz.sha256sum` 文件
+    字节级给出的就是这个值（本仓使用 .tar.gz；上游另有 .tgz 打包件，未使用）。
+    本地 `sha256sum ebtables-2.0.11.tar.gz` 与 `tar tzf | wc -l` = 98 双校验一致。
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=/ --bindir=/bin --sbindir=/bin --libdir=/lib --includedir=/include  (conan 包布局；sbindir 归一到 bin/)"
+    - "--sysconfdir=/etc  (编译期 _PATH_ETHERTYPES 由 autoconf 的 //etc 归一为 /etc/ethertypes；DESTDIR 安装仍落在 <pkg>/etc/ethertypes)"
+    - "--enable-shared --disable-static  (上游 configure.ac 的 AC_DISABLE_STATIC ⇒ 只有共享 libebtc)"
+    - "OHOS: --build/--host=<cpu>-unknown-linux-ohos  (绕开 config.guess：鸿蒙 uname -s 输出 HarmonyOS，随包的 config.guess 2016-10-02 无该分支)"
+    - "OHOS: patches/0001-config.sub-linux-ohos.patch  (给随包 config.sub 2016-11-04 的两处 OS 列表加上 linux-ohos；否则 configure 校验自己的 --build= 参数时 abort——平台 CI #79884 实测)"
+    - "无需 autoreconf：tarball 已随包提供 configure / Makefile.in / aclocal.m4"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+  timestamp_fix: >-
+    build() 里把 configure.ac / Makefile.am / m4/*.m4 设为 now-300s、生成物按
+    aclocal.m4(now-240) → configure(now-180) → Makefile.in/config.h.in(now-120)
+    分层设置，避免 make 去调用 worker 上不存在的 aclocal/autoconf（Error 127）。
+    只改 mtime，不改上游任何字节。
+
+patches_applied:
+  - "patches/0001-config.sub-linux-ohos.patch"   # config.sub 学会 linux-ohos（#79884 实测：configure --build=aarch64-unknown-linux-ohos 被 config.sub 拒）
+  - "patches/0002-configure-hmdfs-tmpdir-permissions.patch"   # configure 的 config.status 临时目录 umask 077 -> 022（#82335 实测：HMDFS 上 0700 目录 owner 不可用 -> subs1.awk Permission denied；与已合入的 libnftnl/1.3.1、iptables/1.8.13 同款）
+
+
+# ── 适配范围（如实声明）────────────────────────────────────────────────
+adaptation_scope:
+  delivered:
+    - "lib/libebtc.so.0.0.0 (+ .so.0 / .so 相对符号链接；DT_SONAME=libebtc.so.0)  —— ebtables 规则集操作库"
+    - "bin/ebtables-legacy, bin/ebtables-legacy-restore, bin/ebtablesd, bin/ebtablesu  —— 上游 sbin_PROGRAMS"
+    - "bin/ebtables-legacy-save  —— 上游 sbin_SCRIPTS（由 ebtables-save.in 经 sed 替换 @sbindir@ 生成）"
+    - "etc/ethertypes  —— 上游 sysconf_DATA（IANA 以太类型数据库）"
+    - "share/man/man8/ebtables-legacy.8  —— 上游 man8_MANS"
+    - "include/  —— 上游 include/ 树 23 个头文件（ebtables_u.h、ethernetdb.h、linux/netfilter_bridge/**.h、linux/netfilter/xt_AUDIT.h、linux/types.h）"
+    - "licenses/COPYING  —— GPL-2.0 原文"
+  capability_notes:
+    - "上游 Makefile.am 没有 include_HEADERS ⇒ `make install` 不装任何头文件；配方在 package() 里逐字节复制上游 include/ 树，使 libebtc 真正可被消费者使用（头文件内容一字未改）"
+    - "bin/ebtables-legacy-save 是上游的 perl 脚本（#!/usr/bin/perl -w），且内部把 $ebtables 指向 ${sbindir}/ebtables = /bin/ebtables；上游 2.0.11 只安装 ebtables-legacy，因此必须存在 bin/ebtables 才能工作。配方不臆造该链接（保持与 upstream install 一致），如实记录；需要该脚本时由部署侧自行提供 /bin/ebtables -> ebtables-legacy"
+    - "libebtc 只有在内核加载 ebtable_* 模块时才能读写规则集；本包交付的是用户态二进制与库（-L/-A/--atomic-* 需要 CAP_NET_RAW 与内核 ebtables 模块）"
+    - "上游缺陷（本包消费者用例实测）：libebtc 的 parse_ip6_mask() 对前缀长度是 8 的倍数的 IPv6 掩码会越界写 1 字节（memset(p + bits/8 + 1, 0, (128-bits)/8)），在 _FORTIFY_SOURCE 下直接 abort。配方**不修改上游源码**，消费者用例改用 /60 走该解析路径并逐字断言掩码字节，把缺陷写进 notes.md 与 PR 正文"
+    - "上游 man 页的小瑕疵：Makefile.am 的 sed 少了结尾 @，`@PACKAGE_VERSION@` 被替换成 `2.0.11@`（man 页里可见）。不改上游，如实记录"
+  runtime_notes:
+    - "_PATH_ETHERTYPES 编译期为 /etc/ethertypes（含 -p IPv4 这类名字解析）；部署时需把包内 etc/ethertypes 放到该路径"
+    - "--concurrent 使用 LOCKFILE=/var/lib/ebtables/lock（上游 AC_ARG_VAR 默认值）"
+    - "ebtablesd 与 ebtablesu 通过 /tmp/ebtables-v2.0.11/ebtablesd_pipe 命名管道通信（上游 Makefile.am 编译期写死）"
+
+test_results:
+  type: upstream + build-phase-golden + consumer + layout
+  upstream:
+    - name: "（上游无测试套件）"
+      files: 0
+      cases: 0
+      executed: 0
+      passed: 0
+      hard_gate: false
+      command: "make -j1 check（automake 空目标，build() 内执行以证明 N=0）"
+      note: "Makefile.am 无 TESTS/check_PROGRAMS，tarball 无 test 目录；build() 打印 TESTS=absent check_PROGRAMS=0 test-dirs=none"
+  build_phase_golden:
+    name: "用户态黄金用例 G1..G9（期望值由上游源码派生）"
+    cases: 35
+    passed: 35
+    hard_gate: true
+    command: "conan create（build() 内用 build 树的 .libs/ebtables-legacy 真跑）"
+  build_phase_kernel:
+    name: "内核相关用例（CAP_NET_RAW 探测）"
+    cases: 4
+    executed: 0
+    hard_gate: false
+    excluded_reason: "本机 euid=1000 无 CAP_NET_RAW（socket(AF_INET, SOCK_RAW, IPPROTO_RAW) → PermissionError），4 条逐条打印 SKIP 与理由；能力具备时真跑并断言 listing 形状"
+  consumer:
+    file: "test_package/test_ebtables.c"
+    checks: 42
+    description: "真链接 libebtc；判据为内核 ABI（标准判决名/桥接 hook）、libc inet_pton 交叉验证的 IPv4/IPv6 解析与 CIDR 算术、上游 extensions/*.c 派生出的扩展注册表、IANA ethertype 值"
+  layout_self_check:
+    file: "test_package/test_layout.py"
+    checks: 18
+
+knowledge_gained:
+  - "ebtables 2.0.11 是 2011 年的 autotools 包：configure/Makefile.in/aclocal.m4 都已随 tarball 提供，但解包后 mtime 全同 ⇒ make 认为生成物过期、去调用 worker 上不存在的 aclocal/autoconf（Error 127）。按依赖链分层 os.utime（源 now-300 → aclocal.m4 → configure → Makefile.in/config.h.in）即可，无需补丁"
+  - "上游 ebtables 完全没有测试套件（无 TESTS/check_PROGRAMS/test 目录）⇒ 硬门禁只能自建；本包的做法是「期望值全部由上游源码派生」：版本行由 AC_INIT+PROGDATE+PRINT_VERSION 宏拼出；扩展注册表由 extensions/*.c 的 ebt_register_*+.name（宏经 include/**/*.h 解析）派生；每个扩展的 -h 文本逐字比对它自己 help 函数的字面量；三张表的合法链由 ebtable_*.c 的 VALID_HOOKS / hn[NF_BR_*] + libebtc.c 的 ebt_hooknames[] 派生"
+  - "上游缺陷：libebtc parse_ip6_mask() 对 8 的倍数前缀越界写 1 字节（/64 起在 _FORTIFY_SOURCE 下 abort，退出码 134）；/60 等非 8 倍数前缀正常。属上游 bug，配方不修，只在消费者用例里规避并记录"
+  - "libebtc 的扩展注册表靠 __attribute__((constructor))（ebtables_u.h 的 `#define _INIT __attribute__((constructor)) _init`）在加载 .so 时自动完成，消费者不需要调用任何 init；ebt_early_init_once() 只做 kernel-module 表合并，且未在公共头里声明"
+  - "ebtablesu 是唯一不链接 libebtc 的 sbin_PROGRAM（上游 Makefile.am 未给它 LDADD，它只通过命名管道与 ebtablesd 通信）⇒ 交付形态自检里 DT_NEEDED 契约要按程序区分"
