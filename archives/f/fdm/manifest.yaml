@@ -1,0 +1,28 @@
+# 软件级 manifest — fdm
+software: fdm
+display: "fdm"
+description: "fdm — 终端邮件过滤与读取器：从 POP3/IMAP/NNTP/maildir/mbox/stdin 取信，按 filter 规则树匹配后投递（maildir/mbox/pipe/SMTP/LMTP/IMAP 等）"
+category: network
+homepage: "https://github.com/nicm/fdm"
+license: ISC
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "上游 tag 归档只有 configure.ac、没有生成的 configure：配方在 build() 内 `mkdir -p etc && autoreconf -fi` 自举。构建工具面按 OHOS SDK 实况声明——只 tool_requires automake/1.18（提供 aclocal+automake）、libtool/2.5.4（libtoolize）、bison/3.8.2（parse.y → parse.c 需要 yacc）；**故意不声明 autoconf/m4**：conan 的 autoconf 会拉入 OHOS 构建的 perl/5.42.2，其 XS 模块与 SDK autoreconf 使用的 perl 5.42.0 不兼容（`Perl_my_cxt_init: symbol not found`），而 SDK 已自带 autoconf 2.72 与 m4。"
+    - "musl/OHOS 的 regex.h 没有 GNU/BSD 扩展 REG_STARTEND，上游 re.c 编译期即报 `use of undeclared identifier 'REG_STARTEND'`。按上游 MANUAL 的官方建议改用 PCRE2 后端（configure `--enable-pcre2`，编译 pcre.c 替代 re.c），零源码补丁、零平台宏。"
+    - "config.status 在 HMDFS 上以 `(umask 077 && mktemp -d ...)` 建临时目录，目录属主被映射、当前进程写不进 ⇒ 配方在 autoreconf 之后把 configure 里的 `umask 077` 改为 `umask 022`（E011）。"
+    - "config.guess 认不出 HongMeng/HarmonyOS 内核（uname release = \"HongMeng Kernel …\"）⇒ configure 显式传 `--build=aarch64-unknown-linux-gnu --host=aarch64-unknown-linux-ohos`。"
+    - "运行期限制：fdm 启动时 `getpwuid(getuid())` 必须命中 /etc/passwd，否则打印 `unknown user: <uid>` 后退出；OHOS 应用 uid 不在 /etc/passwd 中，因此消费者测试断言到「动态库加载与启动期初始化正常」为止，并把该平台限制如实写进 notes 与 PR 说明。"
+
+  common_dependencies:
+    - "tdb"
+    - "zlib"
+    - "openssl"
+    - "pcre2"
+
+versions:
+  "2.2":
+    status: built
+    build_date: "2026-10-15"
+    conan_ref: "fdm/2.2"
