@@ -1,0 +1,14 @@
+--- a/version.sh
++++ b/version.sh
+@@ -1,9 +1,10 @@
+ #!/bin/sh
+
+ if [ "$1" = "get-vcs" ]; then
+-  git -C "$MESON_SOURCE_ROOT" describe --always --dirty | sed 's/^v//'
++  version=$(git -C "$MESON_SOURCE_ROOT" describe --always --dirty 2>/dev/null) || version=2.8
++  printf '%s\n' "$version" | sed 's/^v//'
+ elif [ "$1" = "set-dist" ]; then
+   $MESONREWRITE --sourcedir="$MESON_PROJECT_DIST_ROOT" kwargs set project / version "$2"
+ else
+   exit 1
+ fi

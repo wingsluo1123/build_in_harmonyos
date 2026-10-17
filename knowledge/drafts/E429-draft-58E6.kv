@@ -1,0 +1,85 @@
+# DRAFT — 持久字节流一次正数短读被误判为完整应用消息
+
+id:                     E429
+trigger_tool:           runtime|test|socket
+phase:                  runtime|testing
+error_signature:        (?:SCPI|RAW|TCP).*(?:response|reply).*(?:truncated|partial|incomplete)|
+                        (?:receive|recv|read).*(?:positive|short).*(?:complete|success)|
+                        (?:persistent|keep-alive).*(?:wait.*close|EOF).*(?:timeout|hang)
+
+severity:               2
+category:               network, socket, runtime, testing, api
+match_keywords:         persistent TCP, RAW SCPI, short read, message framing, application boundary,
+                        definite-length block, IEEE 488.2, termination character, newline terminator,
+                        monotonic deadline, partial response, wait for EOF, keep-alive timeout
+title:                  持久字节流一次正数短读不是完整应用消息，客户端必须按终止符或
+                        声明长度跨读取周期组帧
+
+root_cause:             字节接收 API 只保证返回当前已取得的正数字节数，不保证一次调用
+                        覆盖完整应用消息。调用方却在第一次正数返回后立即打印并成功退出，
+                        把 TCP 分段或暂时无更多数据误作消息结束；若改为等待 EOF，又会在
+                        正常保持连接的协议上超时。完成条件必须来自上层协议的终止符、
+                        definite-length 声明或其他明确帧界，并由一个单调总截止时间约束。
+affected_scope:         在持久 TCP、串口或其他字节流上实现请求/响应协议，底层 recv/read
+                        允许短读，而应用层拥有终止符或长度字段的客户端；包括 SCPI RAW、
+                        line protocol、自定义长度前缀协议。不适用于自带消息语义的 RPC、
+                        datagram、框架已完整组帧的 API，或明确以连接关闭作为消息边界的协议。
+verification_cmd:       python3 archives/l/lxi-tools/2.8/test_package/test_lxi_tools.py "$PACKAGE_FOLDER";
+                        inspect split text, split #<n><length><payload>, persistent-connection,
+                        malformed-length, early-EOF and total-deadline results in
+                        archives/l/lxi-tools/2.8/reports/path-b-evidence.md
+
+rec_priority:           1
+rec_approach:           protocol-boundary-stream-framing
+rec_description:        将应用消息完成条件与单次 read/recv 返回解耦。文本响应持续累积至
+                        配置终止符；长度前缀响应分阶段解析头和声明长度，先做位数、运算安全、
+                        容量与上限检查，再等待完整 payload。每次底层读取只使用同一
+                        CLOCK_MONOTONIC 截止时间的剩余预算；完整帧到达即返回，不等待持久
+                        连接关闭。回归同时分片终止符、头字段和 payload，并验证输出字节与
+                        退出码。
+rec_command:            implement an incremental framing state machine for terminator or declared
+                        length; pass one monotonic deadline across all receive calls; test against
+                        a server that splits the frame and remains connected after completion
+rec_auto_fix:           false
+rec_impl:               source-protocol-framing-patch
+
+fallback_priority:      2
+fallback_approach:      caller-configured-terminator-and-maximum-length
+fallback_description:   若库无法理解具体协议，让调用者显式提供终止符、最大帧长和总超时，
+                        由通用增量读取器累积至终止符；没有可靠边界的模式应明确拒绝，不能
+                        猜测短读或 EOF。
+fallback_command:       configure terminator, maximum response size and total deadline in the caller
+fallback_auto_fix:      false
+fallback_impl:          bounded-stream-reader
+
+forbid_1_pattern:       (?:recv|read|receive).*(?:>\s*0|positive|short).*(?:complete|done|success)|
+                        (?:complete|done).*(?:first|single).*(?:recv|read|receive)
+forbid_1_reason:        正数返回只表示当前获得了一批字节；TCP 分段和调度延迟可在应用帧中间
+                        产生正常短读。
+forbid_1_consequence:   客户端以成功状态输出截断响应，后续解析得到静默错误数据。
+forbid_2_pattern:       (?:while|loop).*(?:recv|read).*(?:EOF|close)|(?:message|response).*(?:EOF|peer close)
+forbid_2_reason:        持久连接不会在每个响应后关闭，transport EOF 不是应用消息边界。
+forbid_2_consequence:   完整响应已经到达仍等待至超时，并可能丢弃已经接收的数据。
+
+principles:             P005
+causes:                 []
+caused_by:              []
+similar_to:             E545-draft-1D7D
+conflicts_with:         []
+prerequisite_of:        []
+
+doc_file:               knowledge/drafts/E429-draft-58E6.md
+last_updated:           2026-10-14
+source_event:           lxi-tools/2.8 HarmonyOS PC 适配；同一真机三臂分别证明上游一次读取
+                        rc=0 但仅输出 ACME,，等待连接关闭的伪修复在完整响应后超时，按
+                        换行或 definite-length 声明组帧则在持久连接关闭前输出完整
+                        ACME,MODEL；证据见 archives/l/lxi-tools/2.8/reports/path-b-evidence.md
+authors:                gcw_vbU49vcA <gcw_vbU49vcA@noreply.gitcode.com>
+source_pr:
+source_commit:
+metrics_success_count:  1
+metrics_fail_count:     2
+metrics_confidence:     0.9
+metrics_last_used:      2026-10-14
+draft:                  true
+contributor_id:         58E6
