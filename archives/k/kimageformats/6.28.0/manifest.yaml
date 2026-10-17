@@ -1,0 +1,40 @@
+software: kimageformats
+version: "6.28.0"
+status: built
+build_system: cmake
+created_at: 2026-10-17
+build_date: 2026-10-17
+dependencies:
+  required:
+    - qtbase/6.11.1
+    - openexr/3.3.4
+    - libraw/0.22.1
+    - openjpeg/2.5.4
+    - libavif/1.4.2.2
+  build:
+    - ecm/6.28.0
+  transitive:
+    - imath/3.2.2
+    - libdav1d/1.5.4
+    - libdeflate/1.22
+    - libjpeg/10
+    - zlib/1.3.1.1
+patches_applied: []
+test_results:
+  type: upstream_ctest + test_package
+  upstream: "上游 autotests 满配潜在 41 项 CTest（含依赖门槛与平台面用例；eps 用例上游已注释）。本配置插件面注册 30 项=13 项无条件 read + dds/avif/jp2/xcf/exr/raw 附加 read 6 项 + 9 项 write + pic/ani 2 项，真机 BUILD_TESTING=ON 编译全量并执行 29 项全过（ctest '100% tests passed, 0 tests failed out of 29'）；1 项环境性排除：write-avif——制品仓 libavif/1.4.2.2 为纯解码构建无 AV1 编码器，实测失败原文 'FAIL : libraries configuration is missing necessary encoder(s) for avif!' 已录 notes.md。read-psd 与 read-exr 不排除：上游 6.28 把缺 TIF 对照图（birthday.pdd 等）与 seek 型 handler 的顺序设备读取降级为 SKIP 条目，实测 Totals '90 passed, 40 skipped, 0 failed'（read-psd）与 '7 passed, 3 skipped, 0 failed'（read-exr）；write-exr 四组全过。"
+  test_package: "passed（TEST SUMMARY: 8 passed, 0 failed，任一无过即非零退出）：① 插件广告（supportedImageFormats 21 键面；heif/jxl/jxr 缺席核验）② HDR 解码（内联 Radiance 夹具）③ TGA 像素精确解码 ④ QOI 像素精确解码 ⑤ DDS DXT1 块解码 ⑥ EXR 写读往返 ⑦ JP2 写读往返 ⑧ 包布局（plugins/imageformats 21 个 kimg_*.so；kimg_heif/jxl/jxr/kra/ora/eps 缺席核验），共 39 项校验点。"
+  package_id: "46b1c24b34791981c426a70872cd32235e91d0fc"  # 来源：真机 conan create 输出（notes.md「真机验证」§5）
+  l0: "pass (test_package/ 结构 + MANIFEST.yml)"
+  l1: "pass (上游 ctest 真机 29/29 全过 + test_package 实跑 8/8)"
+  l2: "skip (设备常态: 无 cache 路径; reports/conan-verify-report.md)"
+  l4: "skip (设备常态: 无 cache 路径; reports/conan-verify-report.md)"
+  l5: "skip (设备常态: 无 cache 路径; reports/conan-verify-report.md)"
+source_url: https://download.kde.org/stable/frameworks/6.28/kimageformats-6.28.0.tar.xz
+source_sha256: 91808c6de080ab5b506721c1f78ad5772bcb1f70bba7262c275ccd98de8b6b38
+knowledge_gained:
+  - "CMakeDeps 不显式实例化 = 零依赖 config：generators 目录只有 toolchain 时 configure 直接死于依赖 config 查找失败。kif5 5.116 未受害是因其依赖包自带 config + 手动 prefix 注入；消费 CMakeDeps 产物（OpenEXR/libavif/Imath 链）的配方必须显式 CMakeDeps(self).generate()。"
+  - "OpenJPEG 大写变量契约：上游 jp2 插件与 2000-write 测试门消费 OPENJPEG_INCLUDE_DIRS/OPENJPEG_LIBRARIES 与 OPENJPEG_{MAJOR,MINOR,BUILD}_VERSION 大写三元组，CMakeDeps 生成的 config 只定义 mixed-case；把 openjpeg 包目录前置 CMAKE_PREFIX_PATH 让其自带 OpenJPEGConfig.cmake 先胜 + toolchain 大写变量兜底。"
+  - "Imath 平头 include：exr.cpp 引 <ImathBox.h>（平文件），制品仓 imath/3.2.2 盘上只有 include/Imath/*，CMakeDeps 的 Imath::Imath 只暴露根目录；imath 包目录前置（其自带 config 同时导出 include/ 与 include/Imath）修复。"
+  - "libavif 字面 target：上游链接字面 target 'avif'，CMakeDeps 只提供 libavif::libavif；generators/kif-shims/ 双文件 shim（转发真 config + 建 avif 别名 + 版本文件同时接受两次版本请求）前置搜索序修复。"
+  - "openexr/3.3.4 构建机绝对路径 DT_NEEDED（kif5/kio-fuse 同款先例）：libOpenEXR-3_3.so.32 的 libImath.so 条目烘焙了 /storage/Users/currentUser/.cache/conan2/p/imath97b7356a3fe4a/p/lib/libImath.so；含 '/' 的条目被装载器直接按路径 open，设备本地以同名包目录（包短名跨机器确定）复制到该路径即修复；CI 侧自身 conan home 就是 .cache/conan2、依赖包天然落在该路径，构建链自洽、配方内无需任何依赖改写。"
