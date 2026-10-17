@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.15)
+project(mygpo_consumer LANGUAGES CXX)
+find_package(Mygpo-qt5 REQUIRED CONFIG)
+add_executable(test_mygpo test_mygpo.cpp)
+target_link_libraries(test_mygpo PRIVATE mygpo-qt5)
