@@ -1,0 +1,39 @@
+# ═══ Draft knowledge entry — EA 家族公开头链式依赖 + plain-name 链接 + 分配器契约 ═══
+# Timestamp: 2026-09-15
+# Software: eastdc 0.0.0-fbcc34e
+# Gate: G2/conan create (compile), consumer link
+# Status: DRAFT — 待审核提升为 E-entry
+#
+# 四范围查重（详见 archives/e/eastdc/0.0.0-fbcc34e/reports/knowledge-candidate-ledger.md）:
+#   exact_duplicate=false, causal_duplicate=false, trigger_overlap=true(头/依赖可见性类),
+#   solution_overlap=true(generate() -I 注入), combination_novelty=true, boundary_novelty=true,
+#   test_migration_novelty=false
+# similar_to: DRAFT-ohos-public-header-transitive-dep, DRAFT-conan2-cmakedeps-transitive-include-strip,
+#             DRAFT-conan-cmaketools-transitive-includedirs, E278
+# prerequisite_of: EA 家族后续库（EASTL/EAMain/EATest/EAThread 自身）OHOS 适配
+
+id:                     E2204
+severity:               2
+category:               platform, build-system, linking
+trigger_tool: cmake|conan|clang
+phase: configuration|compilation|linking
+error_signature: eathread/.*\.h' file not found|EABase/eabase\.h' file not found|EAAssert/eaassert\.h'
+  file not found|include could not find requested file: CommonCppFlags|undefined symbol: operator
+  new\[\]\(unsigned long, char const\*, int, unsigned int, char const\*, int\)
+match_keywords: eathread, eabase, eaassert, eastdc, EA 家族, plain-name, CommonCppFlags, operator new
+
+root_cause: EA 家族库间按头文件链式互 include 设计（public 头无条件 include 兄弟库头，
+  与功能宏取值无关），且上游 CMake 用 plain-name 声明依赖、不生成/传播 CMake target，
+  纯净源码树（无测试子模块）编译与消费者链接时出现头文件/符号不可见问题
+
+rec_approach: 见 approach 字段四要点；依赖发布链按 R36（eabase 已发布 → eaassert/eathread 待发布）
+
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-17
+authors:               unknown
+doc_file:               doc/E2204.md
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        见 approach 字段四要点

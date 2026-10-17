@@ -1,0 +1,56 @@
+#====================================================================
+# DRAFT-libexecinfo-20180201-conandata-comment-url-predl-pollution —
+# conandata.yml 注释中的裸 GitHub 仓库 URL 被 W3 pre-download 正则捕获，
+# 下载成仓库主页 HTML 并前缀污染官方 tarball URL → NotADirectoryError
+# 触发事件: libexecinfo 20180201 适配，finish W3 本地 CI 首次执行失败
+# 路径: Path B（知识库扩展）
+#====================================================================
+
+id:                     E2173
+trigger_tool:           build_and_test.sh|conan create
+phase:                  download|source|conan_build
+error_signature:        NotADirectoryError.*predl_cache.*archive/refs/tags|conan create failed.*pre-download
+
+severity:               2
+category:               conan, packaging, source-download, yaml
+match_keywords:         conandata.yml, pre-download, predl_cache, comment URL,
+                        裸 URL, 仓库主页 HTML, file://, 前缀污染, NotADirectoryError,
+                        url_pattern, build_and_test.sh
+title:                  Do not put a bare repo URL in conandata.yml comments — the W3 pre-download regex captures it, downloads the repo HTML page, and prefix-pollutes the official tarball URL
+
+root_cause: >
+  1) pre-download 的 url_pattern 正则对注释行放开匹配（只要行内出现
+     https?:// 即捕获，不看是否 url: 字段）；
+  2) 下载器对任意 >100 字节响应（含 HTML 页面）都视为"下载成功"并
+     记录 downloaded[url]=dest，无 tarball 格式校验；
+  3) 改写用 content.replace(url, file://local) 做纯字符串前缀替换，
+     裸 URL 是 tarball URL 的前缀时必然污染官方 URL。
+
+verification_cmd: >
+  grep -nE 'https?://' archives/l/libexecinfo/20180201/conandata.yml
+  # 期望：注释中无裸 URL；url: 仅一条官方 tarball URL
+  file .build-cache/predl_cache/*  # 期望：全部为 gzip compressed data
+
+rec_priority:           1
+rec_approach:           no-bare-repo-url-in-conandata-comments（注释不写裸仓库 URL）
+rec_description: >
+  conandata.yml 注释中避免出现裸 https:// 仓库 URL；改写官方 tarball
+  URL 时用完整 URL；W3 报 NotADirectoryError 且路径含 predl_cache/<hash>_<repo>
+  时按 recovery 处置。
+rec_command:            grep -nE '^\s*#.*https?://' archives/l/libexecinfo/20180201/conandata.yml
+rec_auto_fix:           false
+rec_impl:               conandata-comment-no-bare-url
+
+doc_file:               knowledge/drafts/DRAFT-libexecinfo-20180201-conandata-comment-url-predl-pollution.md
+last_updated:           2026-09-17
+source_event:           libexecinfo 20180201 适配，finish W3 pre-download 污染
+authors:                atomcode-executor (pc1-42)
+source_pr:
+source_commit:
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     0.9
+metrics_last_used:      2026-09-17
+
+affected_scope:         Do not put a bare repo URL in conandata.yml comments — the W

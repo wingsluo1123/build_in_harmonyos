@@ -1,0 +1,42 @@
+# ═══ Draft knowledge entry — 现代 2023-08-22 config.guess/config.sub 的 OHOS 适配 ═══
+# Timestamp: 2026-09-18
+# Software: libicns 0.9.0（所有源码无生成式 autotools 文件、build() 内 bootstrap 后
+#           打生成文件补丁的 autotools 包）
+# Gate: conan create build() / configure
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E2269
+title: 现代（2023-08-22）config.guess/config.sub 对 HarmonyOS 的适配锚点与 E007/E072 不同：
+  config.guess 需插 `*:HarmonyOS:*:*` case（before aarch64:Linux），config.sub 只需
+  kernel-OS 验证列表加 `linux-ohos*` + OS accept 列表加 `ohos*`（maybe_os 的 `linux-*`
+  通配已覆盖）；且 config.guess 自身 3 处 umask 077 须改 022（E011 的 config.guess 变体）
+trigger_tool: configure / config.guess / config.sub
+phase: configuration
+error_signature: config\.guess.*unable to guess system type|config\.guess.*can't create .*dummy\.c.*Permission denied|Invalid configuration.*ohos.*not recognized|OS 'ohos' not recognized
+severity:               3
+category:               platform, hmdfs, ohos, autotools
+match_keywords: config.guess, config.sub, 2023-08-22, modern, HarmonyOS, aarch64:Linux,
+  linux-ohos, ohos, kernel-OS, OS accept list, umask 077, umask 022, dummy.c,
+  mktemp, Permission denied, HMDFS, setgid, bootstrap, autoreconf
+root_cause: 现代 config.guess（2023-08-22，含 LIBC 探测块）仍无 `*:HarmonyOS:*:*`
+  分支，`uname -s`=HarmonyOS 落入 C 探测程序，输出空 → "unable to guess system type"。
+  现代 config.sub 的 maybe_os 已用 `linux-*` 通配覆盖 linux-ohos，但 kernel-OS 验证
+  列表与 OS accept 列表不含 ohos，三元组被拒。且 config.guess 的临时目录创建
+  `(umask 077 && mktemp -d "$TMPDIR/cgXXXXXX")` 在 HMDFS setgid 父目录下得到
+  drwx--S--- 2700，有效用户（uid 错位，E011 家族）无法写入 dummy.c → Permission denied。
+rec_approach: post-bootstrap-generate-file-patch (contract-checked)
+verification_cmd:
+  输出 aarch64-unknown-linux-ohos，`sh config.sub aarch64-unknown-linux-ohos` 与
+  `aarch64-linux-ohos` 均 RC=0；②conan create（ohos-aarch64 profile，bootstrap
+  aclocal→autoconf→autoheader→libtoolize→automake 后打补丁）configure/make 全绿；
+  ③conan-verify G2+G3+G4+L2/L4/L5 全绿，消费者 test_libicns + test_ohos_libicns
+  实跑通过（2026-09-18，reports/conan-create.log）。
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-17
+authors:               unknown
+doc_file:               doc/E2269.md
+affected_scope:         现代（2023-08-22）config.guess/config.sub 对 HarmonyOS 的适配锚点与 E00
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        post-bootstrap-generate-file-patch (contract-checked)

@@ -1,0 +1,55 @@
+#====================================================================
+# DRAFT-libexecinfo-20180201-makefile-absolute-symlink-conan-packaging —
+# 纯 Makefile 库：上游 install 用 ln -s 绝对路径 + conan 2.29 无
+# symlink 创建 API → 打包期需 os.symlink 相对链接
+# 触发事件: libexecinfo 20180201 适配，conan create G2 首次失败
+# 路径: Path B（知识库扩展）
+#====================================================================
+
+id:                     E2172
+trigger_tool:           conan create|make install
+phase:                  packaging|conan_build
+error_signature:        module 'conan\.tools\.files\.symlinks\.symlinks' has no attribute 'symlink'|
+                         ln -s /usr/lib/.*\((DESTDIR)\$\(LIBDIR\)
+
+severity:               2
+category:               make, conan, packaging, symlink, shared-library
+match_keywords:         os.symlink, relative symlink, conan.tools.files.symlinks,
+                        absolute path, ln -s, /usr/lib, soname, make install,
+                        package(), AttributeError, symlink API
+title:                  For plain-Makefile libraries whose install target hardcodes an absolute-path symlink, create a relative symlink with os.symlink in package() (conan 2.29 has no symlink creation helper)
+
+root_cause: >
+  1) 上游 Makefile 以 /usr 为安装根编写 install 目标，ln -s 目标写绝对路径，
+     在 Conan 的 DESTDIR 打包模型下变成指向宿主目录的死链接；
+  2) 配方作者容易假设 conan.tools.files 有通用的 symlink 创建函数，
+     但 2.29 该模块定位是"扫描/转换/移除"而非创建。
+
+verification_cmd: >
+  conan create archives/l/libexecinfo/20180201 -pr:h=ci/conan/profiles/ohos-aarch64 \
+    -pr:b=ci/conan/profiles/ohos-aarch64 --build=missing
+  # 期望：G2/G3/G4 PASS；包内 lib/libexecinfo.so 为相对链接
+
+rec_priority:           2
+rec_approach:           os-symlink-relative-in-package（package() 用 os.symlink 建相对链接）
+rec_description: >
+  纯 Makefile 库打包时：不用上游 make install 的绝对路径 ln -s；
+  package() 里 copy 产物后用 os.symlink 创建相对 soname 链接，
+  已存在项先 unlink；conan 2.29 无 symlinks.symlink 创建 API。
+rec_command:            grep -n 'symlink' archives/l/libexecinfo/20180201/conanfile.py
+rec_auto_fix:           false
+rec_impl:               conan-package-os-symlink-relative
+
+doc_file:               knowledge/drafts/DRAFT-libexecinfo-20180201-makefile-absolute-symlink-conan-packaging.md
+last_updated:           2026-09-17
+source_event:           libexecinfo 20180201 适配，conan create G2 symlink API 失败
+authors:                atomcode-executor (pc1-42)
+source_pr:
+source_commit:
+
+metrics_success_count:  1
+metrics_fail_count:     1
+metrics_confidence:     0.85
+metrics_last_used:      2026-09-17
+
+affected_scope:         For plain-Makefile libraries whose install target hardcodes 

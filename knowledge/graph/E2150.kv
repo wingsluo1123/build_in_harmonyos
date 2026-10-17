@@ -1,0 +1,55 @@
+# ═══ Draft knowledge entry — OHOS libc 缺 glibc 可重入随机函数族 drand48_data/srand48_r/mrand48_r ═══
+# Timestamp: 2026-09-16
+# Software: libsgutils (sg3_utils) 1.46 — src/sg_dd.c、testing/sgh_dd.cpp、testing/sg_mrq_dd.cpp
+# Gate: make / testing 目录编译（configure 成功、main 构建失败于 sg_dd.o）
+# Status: DRAFT — needs human/AI review to promote to E-entry
+#
+# To promote:
+#   1. Review the error excerpt below
+#   2. Rename to E0XX.kv and move to knowledge/graph/
+#   3. Add a row to knowledge/graph/index.tsv
+#   4. Write knowledge/doc/E0XX.md
+
+id:                     E2150
+trigger_tool:           clang|make|configure
+phase:                  build|link
+error_signature:        struct drand48_data.*never completed|field has incomplete type 'struct drand48_data'|
+                         tentative definition has type 'struct drand48_data' that is never completed|
+                         implicit function declarations.*mrand48_r|implicit function declarations.*srand48_r|
+                         mrand48_r.*undeclared|srand48_r.*undeclared
+
+severity:               2
+category:               ohos, portability, libc, musl, threading
+match_keywords:         drand48_data, srand48_r, mrand48_r, drand48, mrand48, srand48,
+                         reentrant random, glibc extension, musl, OHOS libc, xorshift,
+                         thread-safe random, random fill
+
+root_cause:             OHOS libc（musl 系）不提供 glibc 可重入随机函数族
+                         drand48_data 类型与 srand48_r()/mrand48_r()。POSIX 基础族
+                         (srand48/mrand48/drand48) 可用，但 _r 变体与 opaque 状态
+                         结构体不存在，导致使用它们的上游源码编译失败。
+
+rec_approach:           replace-drand48-r-two-tier
+rec_description:        两级替换：
+                         1) 单线程路径（如 sg_dd.c 主线程随机填充）直接改用非可重入
+                            srand48(seed) + rn = mrand48()；
+                         2) 多线程路径（如 sgh_dd/sg_mrq_dd 的 per-worker Rq_elem 随机
+                            填充）必须保持 per-rep 独立状态：struct drand48_data 字段
+                            换成 uint64_t rng_state，seed 赋值
+                            rep->rng_state = (uint64_t)seed，取值用 xorshift64
+                            (rng_state ^= rng_state<<13; ^= >>7; ^= <<17;
+                             rn = rng_state & 0xffffffffU) —— 绝不可在多线程中共用
+                            全局 srand48/mrand48 状态。
+verification_cmd:
+                        全库 make 通过；sgs_dd 文件模式运行 rc=0；testing/ 17 个用例
+                        全部构建成功（2026-09-16, task libsgutils-1.46-r01-pc1-40）。
+prerequisite_of:
+conflicts_with:
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-17
+authors:               unknown
+doc_file:               doc/E2150.md
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）

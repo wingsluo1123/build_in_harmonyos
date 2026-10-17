@@ -1,0 +1,33 @@
+# ═══ Draft knowledge entry — polyseed AArch64 plain-char 符号性导致 UTF-8 惰性路径静默失效 ═══
+# Timestamp: 2026-09-19
+# Software: polyseed 1.0.0（一切依赖 `*p < 0` 判定非 ASCII / 依赖字节序比较的 x86 假定代码在 aarch64 上复用）
+# Gate: conan create build() 运行上游测试
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E2291
+title: polyseed 上游 UTF-8 惰性归一化用 `*p < 0` 判定非 ASCII，AArch64 ELF ABI 默认 char 无符号使该分支静默失效，多语言 encode/decode 往返断言失败（SIGABRT exit 134）；-fsigned-char 重编后 51/51 全过
+trigger_tool: cmake / clang (aarch64) / 上游 assert 套件
+phase: compiling|testing
+error_signature: Assertion failed: res == POLYSEED_OK.*test_roundtrip|Signal 6 \(core dumped\)|CHAR_MIN=0
+severity:               2
+category:               platform, portability, char-signedness
+match_keywords: aarch64, unsigned char, CHAR_MIN, __CHAR_UNSIGNED__, fsigned-char,
+  utf8, nfkd, non-ASCII detection, mnemonic, polyseed, bsearch, wordlist
+root_cause: AArch64 ELF ABI 默认 plain char 为无符号（x86-64 相反）。polyseed 的
+  utf8_nfkd_lazy()（src/dependency.h）与 lang.c 的 noaccent 比较器都以 `*p < 0` 识别
+  非 ASCII 字节；无符号时该条件恒假，非 ASCII 输入被逐字节原样拷贝、归一化依赖根本不会被
+  调用，含 U+3000 分隔符的日语短语无法按词切分，解码返回错误 → 上游 test_roundtrip1
+  断言失败 SIGABRT。G1/lang_check 的自检测试因同样惰性路径而漏报（单词本身 NFKD 不变形）。
+rec_approach: cmake-toolchain-extra-cflags-fsigned-char
+verification_cmd:
+  test_roundtrip1 tests.c:505 断言失败 exit 134；仅追加 -fsigned-char 重编后 51/51 用例
+  （78 行 PASSED）全过 exit 0；conan create（profile ohos-aarch64-device）G0-G4 全绿，
+  test_package 10 语言往返消费者测试通过（2026-09-19）。
+authors:               unknown, 8543
+doc_file:               doc/E2291.md
+affected_scope:         polyseed 上游 UTF-8 惰性归一化用 `*p < 0` 判定非 ASCII，AArch64 ELF ABI 
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        cmake-toolchain-extra-cflags-fsigned-char
+rec_priority:           1
+rec_auto_fix:          false
+rec_impl:               manual
