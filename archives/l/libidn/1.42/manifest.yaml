@@ -1,0 +1,25 @@
+software: libidn
+version: "1.42"
+status: built
+build_date: "2026-10-03"
+build_system: autotools
+homepage: "https://www.gnu.org/software/libidn/"
+license: LGPL-2.1+
+description: "Internationalized Domain Names implementation"
+configure_options: "--disable-doc --enable-static --disable-shared"
+patches:
+  - file: "0001-config-sub-ohos.patch"
+    type: ohos-compat
+notes: |
+  OHOS adaptation:
+  - E011: configure umask 077 -> 022 applied in recipe build() before configure
+    (HMDFS breaks config.status temp dirs with 0700 perms).
+  - E012-style config.h backfill: ac_cv_* results from config.log re-applied into
+    config.h after configure (config.status substitution unreliable on OHOS/HMDFS).
+  - PROMOTED_MODE_T=mode_t, HAVE_(DECL_)STRERROR_R, STDC_HEADERS forced.
+  - Static build (R26): --enable-static --disable-shared.
+  - config.guess/config.sub untouched: --build/--host=aarch64-unknown-linux-ohos
+    passed explicitly (E007 bypass).
+upstream_tests:
+  census: "tests/Makefile.am ctests: 18 unit test programs (+tst_tld if TLD)"
+  executed_in_ci: false
