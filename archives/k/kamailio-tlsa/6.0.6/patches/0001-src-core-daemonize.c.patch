@@ -1,0 +1,35 @@
+--- a/src/core/daemonize.c
++++ b/src/core/daemonize.c
+@@ -410,24 +410,28 @@
+ 	};
+ 	/* close stderr only if log_stderr=0 */
+ 	if((!log_stderr) && (freopen("/dev/null", "w", stderr) == 0)) {
+ 		LM_ERR("unable to replace stderr with /dev/null: %s\n",
+ 				strerror(errno));
+ 		/* continue, leave it open */
+ 	};
+ 
+ 	/* close all but the daemon_status_fd output as the main process
+ 	  must still write into it to tell the parent to exit with 0 */
+-	closelog();
+-	for(r = 3; r < MAX_FD; r++) {
+-		if(r != daemon_status_fd[1])
+-			close(r);
++	/* Foreground supervisors and the C runtime may own descriptors.
++	 * Only detach inherited descriptors when actually daemonizing. */
++	if(!dont_daemonize) {
++		closelog();
++		for(r = 3; r < MAX_FD; r++) {
++			if(r != daemon_status_fd[1])
++				close(r);
++		}
+ 	}
+ 
+ 	if(log_stderr == 0)
+ 		openlog(name, LOG_PID | LOG_CONS,
+ 				cfg_get(core, core_cfg, log_facility));
+ 	/* LOG_CONS, LOG_PERRROR ? */
+ 
+ 	return 0;
+ 
+ error:
