@@ -1,0 +1,75 @@
+# 版本级 manifest
+# 文件位置: archives/r/rmcast/2.0.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "2.0.0"
+software: rmcast
+status: built
+build_system: direct-compile (autotools upstream; device autotools stack unavailable, see notes W5)
+conan_ref: "rmcast/2.0.0"
+status_notes: >-
+  真机 shadow CI（r7，2026-10-13）一次通过：conan create exit 0、
+  test_package 4/4 断言 PASS、L1e 破坏性反向验证确认真依赖（破坏后 exit 1）、
+  打包布局齐全（include/lib/bin/licenses/doc）。CI 网站构建 #92899 时 L0 通过、
+  源码下载失败（官方站全网 503）→ 源码切换为 Debian tgif 1:4.2.5 orig 归档
+  捆绑树（CI 可达的 Debian/清华双源），详见 source.sha256_provenance。
+
+source:
+  url:
+    - "https://deb.debian.org/debian/pool/main/t/tgif/tgif_4.2.5.orig.tar.gz"
+    - "https://mirrors.tuna.tsinghua.edu.cn/debian/pool/main/t/tgif/tgif_4.2.5.orig.tar.gz"
+  sha256: "2f24e9fecafae6e671739bd80691a06c9d032bdd1973ca164823e72ab1c567ba"
+  sha256_provenance: >-
+    上游官方归档（land.ufrj.br）全网 503，改用 Debian tgif 1:4.2.5 orig 归档中
+    完整捆绑的 rmcast 2.0.0 项目树（tgif-QPL-4.2.5/rmcast/，配方在该子目录内
+    构建）。身份交叉验证：捆绑树顶层文档与 Homebrew 官方 bottle（GHCR blob，
+    sha256 ecbaa8a6…）逐一字节数相同，configure.in 声明 AC_INIT(rmcast,2.0.0)。
+    官方 rmcast-2.0.0.tar.gz 的 URL/SHA-256 留档：sha256
+    79ccbdbe4a299fd122521574eaf9b3e2d524dd5e074d9bc3eb521f1d934a59b1
+    （Homebrew formula commit a404a99），上游恢复后可切回。
+  tar_format: tar.gz
+
+build:
+  system: direct-compile
+  source_subdir: "rmcast（Debian orig 归档内的捆绑项目树，配方在该子目录构建）"
+  cflags: "上游 src/Makefile.am librmcast_la_CFLAGS 逐字迁移（RANDOM_TIMERS/REFRESH/SINGLE_NACK/SUPPORT_FOR_NEW_MEMBERS/_REENTRANT/fno-strict-aliasing/STR_VERSION）"
+  autoreconf: "不可行（设备仅 autoconf，无 automake/libtool.m4；2007 config.guess/sub 无 aarch64）——见 notes W1/W2"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-configure-in-modern-autotools.patch"
+  - "0002-rmchat-pthread-cancel-musl.patch"
+
+knowledge_gained:
+  - "rmcast 上游仅可经 land.ufrj.br（对外 503）或 web.archive.org 快照获取，无公开 git 仓库/镜像；本机与设备对该两站均被网络阻断。最终解法：Debian tgif 1:4.2.5 orig 归档完整捆绑 rmcast 2.0.0 项目树（deb.debian.org + 清华镜像双源，CI 可达），身份经 Homebrew bottle 字节数对照交叉验证。"
+  - "rmcast 归档 config.guess/config.sub 为 2007 年版，完全无 aarch64；autoreconf --force --install 是硬前置（Homebrew 同款），且 configure.in 含 6 个被现代 autotools 移除的宏，需补丁 0001 后 autoreconf 才能通过。"
+  - "OHOS 设备 autotools 再生栈不可满足（仅 autoconf；automake shebang 死链；无 libtool.m4）→ 配方采用确定性直编：源码零 HAVE_* feature 宏，上游 Makefile.am CFLAGS 逐字迁移，AutotoolsToolchain.vars() 取 CC/CFLAGS/AR；8/8 源码编译 + 全链链接通过。"
+  - "-DSTR_VERSION 宏的引号会被 shell 剥掉（rmcast.c 的字符串拼接报 expected ')'），须用 shell 单引号整体包裹该 -D 参数。"
+  - "上游 rmchat.c 调用 pthread_cancel（musl 无此符号）链接失败——补丁 0002 删除显式 cancel（进程退出即回收线程，行为等价）。"
+  - "包安装 CLI 工具（bin/rmchat、mcastproxy）→ 软件级目录必须有 commands.json（R38），否则 CI L0k 门禁 commands_json_r38 直接失败。"
+
+validation:
+  local_windows:
+    sha256_check: "cross-checked"
+    method: >-
+      源码采用 Debian orig 归档（自带可独立审计的 SHA-256），捆绑树与 Homebrew
+      bottle 文件字节数逐一相同。DevEco OHOS clang 交叉编译：8/8 库 .c 编译、
+      librmcast.a 归档、test_package/test.c 与 rmchat/mcastproxy 链接为
+      AArch64 ELF 通过（补丁 0001/0002 在新布局 git apply --check 通过）。
+    ohos_cross_compile: passed
+    conan_create: passed
+    reason: >-
+      真机 shadow CI 已完成（见 ohos 段）；网站 CI #92899 因官方源不可达失败，
+      源码切换 Debian 双源后由 CI 复跑验证。
+  ohos:
+    conan_create: passed
+    method: >-
+      真机 shadow CI（r7，2026-10-13）：隔离 job 目录 + CONAN_HOME 隔离 +
+      ohos-aarch64 profile，单包排队错峰（等待 xroar r9 结束）。配方为
+      确定性直编（源码零 HAVE_* 宏），8/8 库源码编译、librmcast.a 归档、
+      rmchat/mcastproxy 链接、打包齐全。
+    gates: "L0=pass(静态预检 + CI #92899 L0k 通过) L1=pass(incl L1e negative: 破坏产物后 exit 1) L2=skip(交互式工具无 --version/--help，E503 族) L4=pass L5=pass(打包清单实证)"
+    test_package: "4/4 assertions PASS（真机实跑）"
+    exit_code: 0

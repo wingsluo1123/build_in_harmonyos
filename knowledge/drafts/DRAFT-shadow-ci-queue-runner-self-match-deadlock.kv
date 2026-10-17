@@ -1,0 +1,45 @@
+# Draft knowledge entry — 单包排队 runner 进程探测自匹配死锁
+# Software: generic (shadow CI queue runners; observed on procmail 3.24 runner)
+# Gate: 设备实测确认死锁并营救；修复写法已固化
+# Status: DRAFT — same-stem .md/.kv pair
+
+id: shadow-ci-queue-runner-self-match-deadlock
+severity: 2
+category: ci|scheduling|shell|deadlock
+trigger_tool: sh|ps|grep|pgrep
+phase: shadow-ci
+
+keywords: 单包排队, shadow CI, ps grep 自匹配, 死锁, 空闲判定, mkdir 原子锁, pgrep -f, 父进程 cmdline, runner, 错峰执行, queued build procs busy
+error_signature: "runner.log 持续 'queued: N build procs busy'（N 恒定）数十分钟以上，且 ps 中无任何真实构建子进程"
+match_keywords: queue runner, idle detection, self match, deadlock, ps -ef grep, mkdir lock, pgrep -f, 错峰, 排队
+
+root_cause: |
+  排队循环用 `ps -ef | grep -E 'conan|clang|make' | wc -l` 判定设备空闲，
+  但 runner 自身及其父 `sh -c` 包装进程的 cmdline 就包含这些关键字
+  （典型：`sh -c rm -rf .../conan-home/p ...; sh run-<pkg>-shadow.sh`）。
+  grep -v grep 只排除 grep 进程本身，排除不了字符串里恰好含关键字的父 wrapper，
+  于是 n 永远 >= 1，runner 永远等不到"空闲"，也永远不开始构建；
+  对外表现为设备长期"忙"，阻塞后续所有排队任务。
+
+rec_approach: |
+  1) 判据：runner.log 的 'queued: N build procs busy' 恒定且持续异常久 +
+     ps 中命中的只有 runner 自己/父 wrapper、无任何真实构建子进程
+     ⇒ 自匹配死锁（而非真忙）。
+  2) 修复（健壮性递增）：
+     A. grep -v " $$ " 与 grep -v " $PPID " 自排除；
+     B. 匹配真实工作进程形态（如 'python3 .* conan (create|test)'、
+        '[c]lang '、'[m]ake '），避免裸关键字；方括号技巧只防 grep 自身；
+     C. 首选：放弃进程探测，用 mkdir "$LOCK" 的原子性做互斥锁 +
+        trap rmdir 清理，天然支持先到先得排队。
+  3) 营救：确认死锁后可在 runner.log 留言说明并 kill runner 与其父
+     （尚未开始构建，无工作损失），释放设备。
+
+verification: |
+  设备实测：procmail 3.24 runner 死锁 8+ 小时（queued: 1 恒定、无子进程）；
+  按本条判据确认为自匹配，kill 后设备立即空闲；rmcast 2.0.0 任务随即
+  拿到设备并 conan create + test_package 一次通过。
+
+boundary: |
+  适用：一切轮询进程列表判定空闲的排队/错峰脚本（真机 shadow CI、批量构建
+  调度），含 pgrep -f 等价形态。不适用：基于文件锁/任务队列系统的调度；
+  runner 只做单次执行、空闲判定由外部系统完成的场景。

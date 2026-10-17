@@ -1,0 +1,38 @@
+# conandata.yml — rmcast 2.0.0
+# 源码获取说明：上游官方归档（land.ufrj.br）对外 503 且无公开镜像（Homebrew
+# 已 disable，repo_removed）。本包使用 Debian tgif 1:4.2.5 源码包中完整捆绑的
+# rmcast 2.0.0 项目树作为权威源（tgif-QPL-4.2.5/rmcast/ 子目录，配方 build()
+# 在该子目录内构建）：
+# - Debian orig 归档自带 SHA-256 可独立审计（Debian 官方源 + 清华镜像双源）；
+# - 捆绑树顶层文档与 Homebrew 官方 bottle（GHCR blob，sha256 ecbaa8a6…）逐一
+#   字节数相同，configure.in 声明 AC_INIT(rmcast,2.0.0)；
+# - 官方 URL 与官方 SHA-256 留档：rmcast-2.0.0.tar.gz
+#   sha256 79ccbdbe4a299fd122521574eaf9b3e2d524dd5e074d9bc3eb521f1d934a59b1
+#   （Homebrew formula commit a404a99），供上游恢复后切换回官方源。
+# URL 以 .tar.gz 结尾，Conan 选用 gzip 解压器（规避无扩展名 codeload 的
+# BadZipFile 误选，见知识条目 E392）。
+
+sources:
+  url:
+    - "https://deb.debian.org/debian/pool/main/t/tgif/tgif_4.2.5.orig.tar.gz"
+    - "https://mirrors.tuna.tsinghua.edu.cn/debian/pool/main/t/tgif/tgif_4.2.5.orig.tar.gz"
+  sha256: "2f24e9fecafae6e671739bd80691a06c9d032bdd1973ca164823e72ab1c567ba"
+
+patches:
+  - patch_file: "patches/0001-configure-in-modern-autotools.patch"
+    base_path: "rmcast"
+    patch_description: >-
+      configure.in 使用已被现代 autotools 移除的宏：AM_CONFIG_HEADER（Automake 1.13 移除）、
+      AC_TYPE_SIGNAL / AC_FUNC_SETVBUF_REVERSED / AC_FUNC_CLOSEDIR_VOID / AC_FUNC_SELECT_ARGTYPES /
+      AC_HEADER_TIME / AC_STRUCT_TM（Autoconf 2.70 移除或废弃）。autoreconf --force --install
+      （因 2007 年 config.guess/sub 无 aarch64 而必需）会因这些宏失败。对应 feature 宏在源码中
+      零引用（仅 HAVE_CONFIG_H），删除探测为行为中性。
+    patch_type: "portability"
+  - patch_file: "patches/0002-rmchat-pthread-cancel-musl.patch"
+    base_path: "rmcast"
+    patch_description: >-
+      rmchat.c 的退出路径调用 pthread_cancel，这是 glibc 扩展、OHOS musl 不提供
+      （undefined symbol: pthread_cancel 链接失败，已在本机交叉编译复现）。
+      main() 返回即终止整个进程（含接收线程），删除显式 cancel 并保留 (void)tid
+      为可观测行为等价的最小修复。
+    patch_type: "portability"

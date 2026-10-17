@@ -1,0 +1,18 @@
+diff --git a/rmchat/rmchat.c b/rmchat/rmchat.c
+index f870254..7198296 100644
+--- a/rmchat/rmchat.c
++++ b/rmchat/rmchat.c
+@@ -263,8 +263,11 @@ int main( int argc, char **argv )
+     RM_getOption( DEST_IP, (void *)aux );
+     RM_getOption( DEST_PORT, (void *)&port );
+ 
+-    /* Stop the Receive thread */
+-    pthread_cancel( tid );
++    /* Stop the Receive thread. pthread_cancel is a glibc extension that musl
++     * (OpenHarmony) does not provide; returning from main() terminates the
++     * whole process including the receive thread, so dropping the explicit
++     * cancel keeps identical observable behaviour on OHOS. */
++    (void)tid;
+ 
+     /* Leave the Multicast Group */
+     fprintf( stdout, "Leaving Multicast Group %s:%d \n", aux, port );
