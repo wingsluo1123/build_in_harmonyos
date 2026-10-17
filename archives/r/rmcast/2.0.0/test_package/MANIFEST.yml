@@ -1,0 +1,25 @@
+package: rmcast/2.0.0
+homepage: "https://www.land.ufrj.br/tools/rmcast/rmcast.html"
+
+upstream_check_command: "make check"
+upstream_test_in_build: false
+upstream_test_command: "make check (if defined)"
+
+upstream_tests: []
+upstream_tests_note: >-
+  上游 RML 2.0.0 归档不含测试套件（README/doc 只描述 rmchat 演示程序；
+  rmchat 需要真实 IP Multicast 网络才能产生可判定输出）。上游可运行测试数 = 0，
+  已如实记录，不虚报。消费验证由 test_package 承担。
+
+test_package_tests:
+  - file: test.c
+    description: >-
+      链接已安装的 librmcast：RM_getVersion 返回非空版本串；
+      RM_setOption/RM_getOption 对 TTL/MAX_NAK/MICROSLEEP 三个标量选项做回环校验。
+    command: "./rmcast_test"
+
+test_package_skip_note: >-
+  RM_initialize/RM_joinGroup/RM_sendto/RM_recv 需要可用的 IP Multicast 网络，
+  CI/真机单包环境不保证组播路由，属环境限制跳过（非静默删除）。
+
+assertion_count: 4
