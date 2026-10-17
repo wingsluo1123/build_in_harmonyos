@@ -1,0 +1,52 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件 (CI 强制要求此文件存在)
+# 详见: docs/TEST_QUALITY_SPEC.md
+package: precice/3.4.1
+homepage: "https://github.com/precice/precice"
+
+# 上游测试命令 (ctest 发现 + 执行)
+upstream_check_command: "ctest -N && ctest --output-on-failure"
+
+# conanfile.py build() 方法中已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "ctest --output-on-failure"
+
+upstream_tests_exist: true
+# 静态审计 (口径 ctest_entries, 默认选项全集):
+# src/**/test* 775 个 BOOST_AUTO_TEST_CASE (src/tests.cmake 清单)
+# + tests/ 438 个 (tests/tests.cmake 清单) = 1213 个叶子用例, 经单个
+# testprecice 二进制由 cmake/discover_tests.py (--list_units) 按用例发现为
+# precice.* ctest 条目; tests/ 的 PRECICE_TEST_SETUP 是用例 fixture 配置宏,
+# 非独立用例, 不重复计数。
+# + solverdummy ctest 条目 9 个 (cmake/CTestConfig.cmake: 3 构建 + 6 运行,
+# Fortran ON 全集; Fortran OFF 后剩 5 个, 差 4)。
+# + precice.tools.* 与 config 测试条目 27 个 (PRECICE_BUILD_TOOLS=ON 全集;
+# Tools OFF 后排除, 其中 tools.* 20 个 + config 7 个)。
+# 全集 1213+9+27=1249 (人工审查实测 N=1249, 不得少报)。
+# 本配方官方 opt-out (MPI/PETSc/Python/Ginkgo/Kokkos OFF, Fortran OFF,
+# Tools OFF) 下子集为 1218; MPI 关闭使 #ifndef PRECICE_NO_MPI 保护的集成
+# 用例在编译期消失、多 rank 条目在发现期跳过, 最终 discovered 以真机
+# ctest -N 为准 (预检 519), 差额按 ohos_feature 解释。
+upstream_test_total: 1249
+upstream_test_count_method: ctest_entries
+upstream_test_audit: "Tarball precice-3.4.1 (1871 entries) audited, ctest_entries with default options (Tools ON, Fortran ON): 775 BOOST_AUTO_TEST_CASE under src/*/test* (src/tests.cmake list) + 438 under tests/ (tests/tests.cmake list) = 1213 leaf Boost.Test cases run via the single testprecice binary and discovered per-case by cmake/discover_tests.py (--list_units) as precice.* ctest entries; +9 solverdummy entries in cmake/CTestConfig.cmake (3 build + 6 run; 5 with Fortran OFF, delta 4); +27 precice.tools.* (20) + config (7) entries with PRECICE_BUILD_TOOLS=ON. Full set 1213+9+27=1249, matching reviewer-measured N=1249. This recipe uses official opt-outs (PRECICE_FEATURE_MPI_COMMUNICATION=OFF with PETSC_MAPPING forced OFF, PYTHON/GINKGO/KOKKOS OFF, Fortran OFF, Tools OFF) so the OHOS subset is 1218; MPI-gated cases compile out (PRECICE_NO_MPI guards) or are skipped at discovery (multi-rank), final discovered comes from device ctest -N (preflight 519)."
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: src/testing/main.cpp
+    source: precice-3.4.1/src/testing/main.cpp
+    description: "Boost.Test 主入口, 1213 个叶子用例编译为单个 testprecice 二进制"
+    command: "ctest --output-on-failure"
+  - file: examples/solverdummies/cpp/solverdummy.cpp
+    source: precice-3.4.1/examples/solverdummies/cpp/solverdummy.cpp
+    description: "C++ solverdummy 构建 + 耦合运行冒烟测试 (precice.solverdummy.*)"
+    command: "ctest -R precice.solverdummy"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_precice.cpp
+    description: "真实调用 precice API: getVersionInformation 版本/配置断言 + tooling 配置参考生成 (4 检查)"
+    command: "test_precice"
+
+# 测试断言总数 (test_package 4 检查 + 上游 1213 Boost 用例, solverdummy 为 harness 条目)
+assertion_count: 1217
