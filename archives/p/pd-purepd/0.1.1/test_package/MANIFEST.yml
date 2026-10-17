@@ -1,0 +1,44 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for CI L0/L1 quality gates.
+
+package: pd-purepd/0.1.1
+homepage: "https://puredata.info/"
+
+# purepd ships no C/C++ sources (the upstream Makefile SOURCES list is empty)
+# and the template Makefile defines no check/test target, so there is no
+# upstream test suite that could run in build().  The -help.pd patches that ship
+# with every object are usage documentation, not automated assertions.
+upstream_check_command: "(none: the upstream Makefile has no check/test target)"
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# The consumer test verifies the packaged data and runs the abstractions in Pd:
+#   * layer 1 (60 assertions, no interpreter needed): the packaged libdir holds
+#     exactly the upstream file set, every .pd file parses as a Pd patch with
+#     balanced subpatches and in-range #X connect indices, the meta file
+#     declares NAME purepd / VERSION 0.1.1, and every object class referenced by
+#     an abstraction is a Pd vanilla class or another shipped purepd abstraction
+#     (no external Pd library dependency).
+#   * layer 2 (22 assertions, needs puredata/0.56.5): purepd_instantiate.pd
+#     creates one instance of all 26 abstractions, purepd_smoke.pd drives the
+#     deterministic control objects through known inputs and the captured Pd
+#     output must report the expected values with no object-creation error.
+#   * layer 3 (included in layer 2): the same smoke patch is run again without
+#     the package on Pd's search path and must fail to resolve the abstractions,
+#     proving the runtime assertions cannot pass vacuously.
+test_package_tests:
+  - file: verify_purepd.py
+    description: "Packaged abstraction set: file inventory, Pd patch structure, connect indices, vanilla-only class resolution"
+    command: "python3 verify_purepd.py --purepd-dir <pkg>/lib/pd-externals/purepd"
+  - file: purepd_instantiate.pd
+    description: "Runtime: create one instance of all 26 abstractions with pd -batch -nostdpath -path <pkg>"
+    command: "pd -batch -nogui -noaudio -noprefs -nostdpath -path <pkg>/lib/pd-externals/purepd -open purepd_instantiate.pd -send \"; pd quit\""
+  - file: purepd_smoke.pd
+    description: "Runtime: 14 expected results from inv/log10/cosh/sinh/tanh/^/delta/fifo/once/oneshot/alternate/uzi"
+    command: "pd -batch -nogui -noaudio -noprefs -nostdpath -path <pkg>/lib/pd-externals/purepd -open purepd_smoke.pd -send \"; pd quit\""
+  - file: purepd_smoke.pd
+    description: "Runtime negative control: the same patch without -path must report missing abstractions and produce no results"
+    command: "pd -batch -nogui -noaudio -noprefs -nostdpath -open purepd_smoke.pd -send \"; pd quit\""
+
+assertion_count: 82

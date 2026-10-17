@@ -1,0 +1,137 @@
+#====================================================================
+# DRAFT-pd-purepd-0.1.1-abstraction-headless-load
+# 纯 abstraction 型 Pd 库（无 C 源码、无编译步骤）的打包布局与无头验证：
+# -batch -nostdpath -path <pkg>/lib/pd-externals/<lib> + 命令行 -send "; pd quit"
+# 路径 B 草稿（知识库扩展），与 DRAFT-pd-external-headless-host-load-verification
+# 同族但对象不同：那条讲「C 插件被宿主 dlopen 后的加载」，本条讲「没有 C 源码、
+# 只有 .pd 的 abstraction 库」
+# 来源: pd-purepd 0.1.1 OHOS 适配（A 类前置 + 本机 82 断言实测）
+# 状态: 草稿（待主编审核 promote 为正式 E 条目）
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     DRAFT-pd-purepd-0.1.1-abstraction-headless-load
+trigger_tool:           conan|pd|test
+phase:                  packaging|testing
+error_signature: |
+  No rule to make target 'check'|Nothing to be done for 'all'
+  couldn't create|pd did not terminate within
+  expected results .* absent while -path omitted
+
+# ═══ Layer 1: 识别面 (Recognition) ═══
+severity:               2
+category:               ohos, testing, runtime, puredata, portability
+match_keywords: |
+  Pd abstraction, purepd, 纯 abstraction, no compile step, empty SOURCES,
+  lib/pd-externals, -batch, -nostdpath, -path, -send "; pd quit",
+  loadbang, puredata test-only dependency, L5 lib content, data-only package,
+  Pure Data 库
+title:                  纯 abstraction 型 Pd 库（无 C 源码）在 OHOS 上的打包与无头验证：
+                          payload 落 lib/pd-externals/<lib>、puredata 仅作测试依赖、
+                          pd -batch -nostdpath -path <pkg> -open patch -send "; pd quit"
+
+# ═══ Layer 2: 诊断面 (Diagnosis) ═══
+root_cause: |
+  这类上游（例：purepd 0.1.1，Pd library template 的 Makefile 里 SOURCES 为空、
+  没有 check/test 目标）没有任何可编译源码：按 Makefile 模板给 build() 写
+  `make` + `make check` 只会得到 `Nothing to be done for 'all'` 与
+  `No rule to make target 'check'`，还会平白引入宿主 make 依赖；而 CI 的 L1 只看
+  conan create 日志时，这类包等于「零测试痕迹」。验证只能由 test_package 承担，
+  且必须真的用 Pd 加载——但 Pd 是常驻事件循环：裸跑 `pd patch.pd` 在无头 CI 上
+  永远不返回；而 Pd 的标准搜索路径（extra/、当前目录）又会把「同名对象」从宿主
+  侧解析出来，使测试看不出被测包是否真的被用上。
+  已发布制品仓里 puredata/0.56.5 有匹配 CI profile 的 OHOS 二进制（os=OHOS 6.0 /
+  armv8 / clang 15 / libc++ / cppstd 17 / Release），因此测试侧可以零编译拿到真实宿主。
+affected_scope: |
+  所有「只有 .pd、没有 C 源码」的 Pure Data 库（pd-purepd 以及同族的 abstraction
+  集合），以及任何「数据 + 宿主解释器」形态的包：payload 本身不能自证可用，
+  必须由宿主加载。
+  与 DRAFT-pd-external-headless-host-load-verification 的分工：那条针对 C 插件
+  （.pd_linux 被宿主 dlopen、需要 shim/符号断言），本条针对纯 abstraction
+  （无 .pd_linux、靠 -path 解析、只需真 pd 加载即可）。
+verification_cmd: |
+  PD=<puredata pkg>/bin/pd; LIB=<pkg>/lib/pd-externals/purepd
+  python3 verify_purepd.py --purepd-dir "$LIB" --patches test_package --pd "$PD"
+  # 内部执行（输出在 stderr，退出码 0）：
+  "$PD" -batch -nogui -noaudio -noprefs -nostdpath -path "$LIB" \
+        -open purepd_smoke.pd -send "; pd quit"
+  # 期望 82 断言 0 失败（60 数据层 + 22 运行层，含 1 条负对照）
+
+# ═══ Layer 3: 方案空间 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           abstraction-package-headless-load-closed-search-path
+rec_description: |
+  四步：
+  (a) 打包沿用上游自己的安装布局：`objectsdir = $(prefix)/lib/pd-externals`、
+      `LIBRARY_NAME = <lib>` ⇒ Conan 侧用 copy() 落到
+      `<pkg>/lib/pd-externals/<lib>/`（与仓内 pd-chaos/pd-maxlib 等 23 个 pd-* 包
+      一致），L5 因此看到真实 lib/ 产物；不要为了「复刻上游 install」去调
+      `make libdir_install`（引入宿主 make/install 依赖，见 forbid_2）。
+  (b) 配方不写 build()：没有编译目标、也没有上游测试目标；上游 0 个测试如实记
+      `upstream_test_in_build: false` + `0/0 (N/A)`，断言数记 test_package 的实测值。
+  (c) 真 pd 无头加载：puredata 只作为 **test_package** 的测试依赖（不要写进库配方，
+      否则把整个 Pd 应用强加给数据包消费者，且 puredata 的 validate() 只允许
+      Linux/OHOS）；取 `<dep>.package_folder` 下的绝对路径，不要写裸名 pd。
+      运行参数：`-batch`（一次关掉 GUI/实时/音频/MIDI）、`-noprefs`、
+      `-nostdpath` + `-path <pkg libdir>`（把搜索路径收紧到被测包，
+      abstraction 只可能来自包里）、`-open <patch>`、`-send "; pd quit"`。
+      退出方式：`-send` 是命令行消息，由 sys_main 在**所有 -open 补丁加载完成之后**
+      求值（loadbang 在 glob_evalfile 内同步跑完），所以它与补丁内 `; pd quit;`
+      的「quit 与 loadbang print 竞争」不是一回事（后者见同族草稿的 forbid_2，
+      本方案不触发该模式）；外层再包一层 60s 子进程超时兜底。
+  (d) 断言分层：数据层（文件清单/Pd patch 结构/#X connect 索引范围/引用的类只能是
+      Pd vanilla 或本包自带）不依赖宿主，可跨平台跑；运行层必须有真 pd；
+      再加一条不带 -path 的负对照（见 DRAFT-pd-purepd-0.1.1-host-builtin-name-shadowing）。
+rec_command: |
+  subprocess.run([PD_BIN, "-batch", "-nogui", "-noaudio", "-noprefs", "-nostdpath",
+                  "-path", LIBDIR, "-open", PATCH, "-send", "; pd quit"], timeout=60)
+rec_auto_fix:           false
+rec_impl:               conan-test-package (verify_purepd.py + *.pd)
+
+fallback_priority:      2
+fallback_approach:      data-layer-only-with-declared-gap
+fallback_description: |
+  交叉编译/宿主不可执行时，仍跑数据层（结构/类解析/文件清单），并在日志与
+  MANIFEST.yml 明确写出「本次未做运行时验证」，禁止把数据层当运行证据。
+fallback_command:
+fallback_auto_fix:      false
+fallback_impl:
+
+# ★ 禁止策略（均以实测为依据）★
+forbid_1_pattern:       pd\s+[^-].*\.pd|(^|\s)pd\s+-open\s+\S+\.pd\s*$
+forbid_1_reason:        不带 -batch 运行 pd 会进入 GUI/音频主循环，无头任务永不返回；
+                        带 -open 却不给任何终止手段（-send 或外层 timeout）同样会挂死。
+forbid_1_consequence:   单包 CI 任务被 45/180 分钟超时杀掉，日志里没有可用证据。
+forbid_2_pattern:       make\s+(libdir_install|install).*DESTDIR
+forbid_2_reason:        用宿主 make/install 复刻上游布局会引入未声明的宿主工具依赖
+                        （R33 同类风险；pd-chaos 侧还实测到 install 目标会重链、
+                        回落宿主 cc 报 Relocations in generic ELF (EM: 183)）。
+forbid_2_consequence:   无 make/install 的 worker 上打包失败，或产物落到包目录之外。
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             R34, R51
+
+# ═══ 关系图 (Relations) ═══
+causes:                 数据包无编译/无上游测试目标 ⇒ 证据只能来自宿主加载
+caused_by:              上游 SOURCES 为空 + Pd 常驻事件循环 + 标准搜索路径泄漏
+similar_to:             DRAFT-pd-external-headless-host-load-verification, E241, E255
+conflicts_with:         []
+prerequisite_of:        DRAFT-pd-purepd-0.1.1-host-builtin-name-shadowing
+
+# ═══ 元数据 (Metadata) ═══
+doc_file:               knowledge/drafts/DRAFT-pd-purepd-0.1.1-abstraction-headless-load.md
+last_updated:           2026-10-17
+source_event: |
+  pd-purepd 0.1.1 适配：上游 26 个 abstraction、SOURCES 为空、无 check 目标；
+  本机用同 tag 构建的 Pd 0.56-5 实测 82 断言 0 失败（含不带 -path 的负对照）。
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:                Theresa
+source_pr:              (本分支 feat/pd-purepd-0.1.1)
+source_commit:          708bf9a010
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     0.9
+metrics_last_used:      2026-10-17
+draft:                  true
+contributor_id:         PDPUREPD

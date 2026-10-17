@@ -1,0 +1,81 @@
+# AI metadata for pd-purepd 0.1.1 (task type A: pre-adaptation on the local host).
+#
+# status vocabulary of this repository is published | built | failed; this
+# package is deliberately *not* marked built yet, because the target-device /
+# shadow CI run has not happened: only a host-side `conan create` and a local
+# Pd 0.56-5 functional run are done (see local_verification below).
+name: "pd-purepd"
+software: "pd-purepd"
+version: "0.1.1"
+status: prepared
+build_date: "2026-10-17"
+build_system: "none (pure Pd data package, upstream Makefile has no compilable sources)"
+task_type: "B (knowledge-base expansion: recipe + consumer test + two knowledge drafts)"
+
+source:
+  # Official upstream file area; the two Debian entries are byte-identical
+  # download fallbacks (sha256 compared before writing the recipe).
+  url:
+    - "https://downloads.sourceforge.net/project/pure-data/libraries/purepd/purepd-0.1.1.tar.gz"
+    - "https://mirrors.tuna.tsinghua.edu.cn/debian/pool/main/p/pd-purepd/pd-purepd_0.1.1.orig.tar.gz"
+    - "https://deb.debian.org/debian/pool/main/p/pd-purepd/pd-purepd_0.1.1.orig.tar.gz"
+  sha256: "a670c612019d2b5715deabd66f914d86db56c92d898b98fb573b0bda94bb9389"
+  tar_format: tar.gz
+  upstream_contact: "IOhannes m. zmoelnig (see debian/copyright of pd-purepd 0.1.1)"
+
+build:
+  system: none
+  compile_step: false
+  configure_options: []
+  dependencies: []
+  # Pure Data files only: 26 abstractions + 26 help patches + libdir meta file.
+  artifacts:
+    - "lib/pd-externals/purepd/*.pd"
+    - "lib/pd-externals/purepd/README.txt"
+    - "lib/pd-externals/purepd/LICENSE.txt"
+
+patches_applied: []
+
+w0_dependency_check:
+  method: "conan list <name>/* -r=ohpcd  +  conan download <ref> -r=ohpcd --only-recipe"
+  conan_build_dependencies: []
+  runtime_host:
+    package: "puredata"
+    versions_in_registry: ["0.54.1", "0.56.5"]
+    binary_for_ohos_profile: "puredata/0.56.5 (os=OHOS os.version=6.0 arch=armv8 clang 15 libc++ cppstd 17 Release)"
+    role: "test-only requirement of test_package; the library itself has no Conan dependency"
+  related_packages_in_registry: ["libpd/0.16.1"]
+
+test_results:
+  type: "consumer (no upstream test suite exists for this library)"
+  upstream: "0 of 0 automated tests: the upstream Makefile defines no check/test target; the shipped -help.pd patches are usage documentation"
+  test_package: "verify_purepd.py: 82 assertions = 60 data assertions + 22 runtime assertions"
+  layers:
+    - "data: file inventory, Pd patch structure, #X connect index range, vanilla-only class resolution, meta NAME/VERSION"
+    - "runtime: 26 abstractions instantiated in pd -batch; 14 expected control-object results (inv/log10/cosh/sinh/tanh/^/delta/fifo/once/oneshot/alternate/uzi)"
+    - "negative control: same smoke patch without the package on Pd's search path must report missing abstractions and produce no results"
+  local_host_verification:
+    date: "2026-10-17"
+    host: "Windows x86_64 (host-only, not the OHOS target)"
+    conan_create: "EXIT=0; 'purepd checks: 60 assertions, 0 failed'; source fetched from the official SourceForge URL"
+    pd_functional: "EXIT=0; 'purepd checks: 82 assertions, 0 failed'; run with a locally built Pd 0.56-5 interpreter (upstream tag 0.56-5, same source as puredata/0.56.5)"
+  device_or_shadow_ci:
+    date: null
+    command: "CI_PACKAGES=\"archives/p/pd-purepd/0.1.1\" zsh ci/conan/build_and_test.sh"
+    result: "not run yet"
+
+knowledge:
+  path: "B (knowledge-base expansion)"
+  drafts:
+    - "knowledge/drafts/DRAFT-pd-purepd-0.1.1-abstraction-headless-load.kv/.md"
+    - "knowledge/drafts/DRAFT-pd-purepd-0.1.1-host-builtin-name-shadowing.kv/.md"
+  related_existing:
+    - "DRAFT-pd-external-headless-host-load-verification (pd-maxlib/pd-mjlib): C plugins; this package uses the command-line -send \"; pd quit\" terminator after all -open patches loaded, not the patch-internal quit that entry forbids"
+    - "E241 / E255: data-only and resource-data package patterns"
+    - "23 existing pd-* packages (pd-chaos, pd-maxlib, pd-mjlib, pd-zexy, ...): lib/pd-externals layout, absolute host binary path, deterministic assertions"
+
+notes:
+  - "W0: no Conan dependency is required to build or consume pd-purepd; puredata/0.56.5 is published for the OHOS profile and is used as a test-only requirement."
+  - "The library is pure Pd data (upstream Makefile SOURCES is empty), so there is no build() step and no upstream make check; test_package carries the whole verification."
+  - "26 abstractions; 24 of them resolve only through this package, the other two (clip, moses) are shadowed by Pd vanilla classes of the same name."
+  - "device/shadow CI run is the next step; see notes.md for the exact commands and the open risks (pd first-run, download fallback)."
