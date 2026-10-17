@@ -1,0 +1,86 @@
+# 版本级 manifest — pgqd 3.5
+# 文件位置: archives/p/pgqd/3.5/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "3.5"
+software: "pgqd"
+
+# published | built | failed | archived
+status: published
+build_date: "2026-10-15"
+build_system: "autotools"
+
+source:
+  # 官方 release 资产（`make dist` 产物）：内含预生成 configure/config.sub/
+  # config.guess 与 libusual 子模块内容。git tag 归档两者皆无，OHOS 无 automake
+  # 无法执行 autogen.sh，故必须用 release 资产。
+  url: "https://github.com/pgq/pgqd/releases/download/v3.5/pgqd-3.5.tar.gz"
+  sha256: "a666e5e735f093ef09823ef0df1ba562b52e8fc9081ba1c8b3c3d662658f4916"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  # R1 参数最少化：configure 只需 --prefix（由驱动/conan 注入），无额外选项
+  configure_options: []
+  dependencies:
+    - libevent/2.1.13
+    - libpq/18.6.1
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-Makefile.patch"
+  - "0002-config.guess.patch"
+  - "0003-config.sub.patch"
+  - "0004-configure.patch"
+
+knowledge_gained:
+  - "pgqd 用 antimake（手写 Makefile 链，非 automake），Makefile 以相对路径 include lib/mk/antimake.mk，只支持源码内构建；conan basic_layout 默认 build_folder=build-<type>，会报 No rule to make target 'lib/mk/antimake.mk'，须 basic_layout(self, build_folder='.')"
+  - "configure 用 pg_config --includedir/--libdir 定位 libpq，且 AC_PATH_PROGS 硬性要求 PATH 上有 pg_config；libpq/18.6.1 随包提供 bin/pg_config，配方把它加入 PATH 即可"
+  - "上游测试套件 6 个用例，其中 4 个（version/show_ini/stop/reload）不依赖 PgQ 扩展，可在真机 + 真实 PostgreSQL 上运行通过"
+
+# ── 测试口径（与 test_package/MANIFEST.yml、notes.md、PR 正文保持一致）──
+test_results:
+  # 上游 tests/test.sh 的 testlist 共 6 个用例
+  total: 6
+  passed: 4
+  failed: 0
+  timeout: 0
+  not_run: 2
+  executed: 4
+  pass_rate: "4/4 (已运行部分 100%)"
+  command: "test_package/test_pgqd.sh 第 7 步 → ./tests/test.sh test_version test_show_ini test_stop test_reload（test_package 由 conan create 自动执行）"
+  environment: "真机 aarch64 HarmonyOS + PostgreSQL 16.10（conan postgresql/16.10，由 test_package 现场 initdb 拉起）"
+  note: "test_ticker / test_maint 需 `create extension pgq`（skytools PgQ 扩展）建立队列并驱动 tick/维护轮转；OHOS 无 pgq 扩展包（制品仓与 cmd-pkgs 均无），扩展控制文件缺失，故这 2 个用例无法运行。已运行的 4 个用例 4/4 通过。4 个用例由 test_package 在同一 PostgreSQL 集群上执行（一次 CI 运行只起 1 个集群，避免 worker 进程足迹过高）。"
+  harmonyos_e2e:
+    description: "真机端到端消费者用例（test_package/test_pgqd.sh）：现场 initdb 拉起真实 PostgreSQL 集群，安装后的 pgqd 以守护进程连库运行，并在同一集群上执行上游 4 个可运行用例"
+    steps: 7
+    result: pass
+    evidence: "pgqd -V 版本横幅 → 样例配置打印 → 守护进程启动(pidfile+logfile) → 扫描 pg_database 无 libpq 错误 → SIGHUP 重载 → SIGINT 干净停止 → 上游 tests/test.sh 4 用例全过"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/pgqd-3.5.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/pgqd-3.5.work
+  source_orig_hash: 23a9927254f9e357
+  source_work_hash: cf5ba2f0a63068a0
+  generated_at: '2026-10-16T00:59:41'
+  patches_count: 4
+
+patch_classification:
+  - file: 0001-Makefile.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-config.sub.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
