@@ -1,0 +1,19 @@
+# conandata.yml — imagination 3.6
+# 源码：Debian orig tarball（上游 SourceForge 3.6 发行版同源），
+# 已实测可下载（约 180K）。tarball 自带 configure + Makefile.in，
+# 无需 autoreconf。
+sources:
+  url: "https://deb.debian.org/debian/pool/main/i/imagination/imagination_3.6.orig.tar.gz"
+  sha256: "85dfa14acfe78a8a721c86c0056ce6bd1b517e9b7e6ab9fb3a5864b7d37a2d8d"
+
+patches:
+  "3.6":
+    - patch_file: "patches/0001-configure-ohos-build-fixes.patch"
+      patch_description: "configure/configure.ac 三处 OHOS 构建修正：CFLAGS 覆写改为追加（保留 conan 交叉编译标志）、XML::Parser perl 探测跳过（仅用到 intltool-merge desktop 纯文本模式，intltool/0.51.0 配方先例）、config.status 临时目录 umask 077→022（hmdfs setgid 卷上 0700 目录不可写）"
+      patch_type: "portability"
+    - patch_file: "patches/0002-build-drop-doc-subdir.patch"
+      patch_description: "Makefile.am/Makefile.in 从 SUBDIRS 剔除 doc/：DocBook XSL 样式表在构建期经网络拉取 docbook.sourceforge.net，CI 沙箱不可用且非交付物"
+      patch_type: "portability"
+    - patch_file: "patches/0003-support.h-ngettext-fallback.patch"
+      patch_description: "support.h 的非 NLS 回退宏块补上缺失的 ngettext 宏：上游 configure.ac 无 AC_CONFIG_HEADERS，ENABLE_NLS 永不定义，回退块里 gettext/_/N_/Q_ 都有唯独漏了 ngettext，clang 15 下 img_set_statusbar_message() 的 ngettext 调用退化为隐式声明（int 返回值传 const gchar* 参数报 -Wint-conversion 硬错）"
+      patch_type: "portability"

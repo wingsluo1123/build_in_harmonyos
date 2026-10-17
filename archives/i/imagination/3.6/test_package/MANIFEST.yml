@@ -1,0 +1,50 @@
+package: "imagination/3.6"
+homepage: "https://sourceforge.net/projects/imagination/"
+
+upstream_check_command: "make -j1 check"
+upstream_test_in_build: false
+upstream_tests: []
+upstream_zero_evidence: >-
+  The release Makefile.am files declare no TESTS, check_PROGRAMS or
+  check-recursive targets; the only reference is an installcheck-local
+  hook (tests/run_tests.sh) whose tests/ directory does not exist in the
+  3.6 tarball, so `make check` has nothing to run.
+
+test_package_tests:
+  - id: "packaged-binary-contract"
+    source: "imagination_consumer_test.c (check_binary)"
+    command: "imagination_consumer_test <plugin-dir> <binary>"
+    description: >-
+      Assert the packaged bin/imagination is a genuine executable 64-bit
+      aarch64 ELF (not a host build artifact).
+  - id: "transition-plugin-inventory"
+    source: "imagination_consumer_test.c (check_plugins, dlopen part)"
+    command: "imagination_consumer_test <plugin-dir> <binary>"
+    description: >-
+      All 15 upstream GModule transition plugins are packaged under
+      lib/imagination/ and each dlopens cleanly on the OHOS loader.
+  - id: "plugin-api-contract"
+    source: "imagination_consumer_test.c (check_plugins, contract part)"
+    command: "imagination_consumer_test <plugin-dir> <binary>"
+    description: >-
+      img_get_plugin_info() resolves in every plugin and honours its
+      contract: non-empty group name plus a NULL-terminated
+      name/symbol/id triplet array whose advertised render symbols all
+      resolve via dlsym.
+  - id: "headless-entrypoint-smoke"
+    source: "imagination_consumer_test.c (check_headless_run)"
+    command: "imagination_consumer_test <plugin-dir> <binary>"
+    description: >-
+      The binary resolves its whole GTK+3 shared-library closure and its
+      execution reaches — and stops at — GTK display initialisation
+      ("Cannot open display"), the furthest assertion point for a GUI
+      application on a headless device (l3afpad precedent).
+
+test_counting:
+  upstream_independent_total: 0
+  integration_independent_total: 4
+  shared_static_counted_once: true
+  internal_assertions_counted_as_cases: false
+
+test_case_count: 4
+assertion_count: 34
