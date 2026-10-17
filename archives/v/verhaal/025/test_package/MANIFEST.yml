@@ -1,0 +1,52 @@
+# test_package MANIFEST — verhaal 025
+software: verhaal
+version: "025"
+test_type: consumer
+
+# ── 上游测试清点（R51）──────────────────────────────────────────────
+# verhaal 025 上游**无已注册测试套件**（meson/ctest 无测试目标），清点证据：
+#   * meson.build 中无 test() 目标（meson test --list 为空）
+#   * 上游源树无 tests/、test/ 目录；`find <src> -iname '*test*'` 零命中
+#   * README.md 未声明测试入口；justfile 仅有 _help/spdx/lint/make/build_db
+#     等目标，无 test 目标
+# 故上游**可运行**测试数为 0（N/N′=0/0，非未执行）。
+# 另有未注册的开发脚本自测（见 upstream_tests_unrunnable），如实列出但不计入 N。
+upstream_check_command: "meson test --list   # 上游无测试目标，输出为空"
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+upstream_tests_unrunnable:
+  - file: scripts/git-resolve.sh
+    entry: "--selftest（脚本内 run_selftest()）"
+    cases: 10
+    registered: false
+    reason: >-
+      未在 meson/ctest 注册；期望值是具体内核提交哈希（00250b5、ffef737 等），
+      必须在包含这些提交的内核 git 树内运行。本环境实测 8 例 FAILED + 2 例空过
+      （用例 6/7 期望「无输出 + 非 0 退出」，无 git 树时恰好满足，有效验证 0/10；
+      原始输出见 025/reports/git-resolve-selftest.log），故不计入 N，如实记录
+      而非假装执行。
+
+# ── 消费者用例（test_package，R34 实质消费被测包）──────────────────
+test_package_tests:
+  - file: test.sh
+    description: >-
+      T1 verhaal --version 报告 025；T2 以仿真内核 stable 树（master + 附注 tag
+      v6.0/v6.0.1/v6.0.2 + 两条 Fixes: 提交）驱动 bin/verhaal 完成建库，
+      校验 verhaal.db 生成且流程走完；T3 查询库内 commit→release 与 Fixes 映射，
+      验证"某提交被回填到哪个发行版"这一公开业务结果正确。
+    command: "sh test.sh"
+
+# ── 鸿蒙专项用例（真机，test_ohos/）────────────────────────────────
+test_ohos:
+  - file: test_ohos/run_ohos_test.sh
+    description: >-
+      在鸿蒙 PC（aarch64, OHOS）上执行已安装 verhaal 二进制：aarch64 ELF 校验、
+      宿主路径泄漏检查、版本核验，以及最关键的 HMDFS 共享属主场景下打开真实
+      git 仓库建库（libgit2 属主校验适配 0001 的回归验证）。
+    command: "sh test_ohos/run_ohos_test.sh <verhaal-binary>"
+
+# ── 测试统计（口径见 025/manifest.yaml:test_results，仓库惯例位置）────
+# 上游测试 N=0（清点证据见上）；消费者用例 4 项 + 鸿蒙真机专项 7 项 = 11 项全通过。
+upstream_tests_expected: "0/0（上游无测试套件，非未执行）"
+assertion_count: 11

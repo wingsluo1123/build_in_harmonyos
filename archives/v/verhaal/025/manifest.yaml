@@ -1,0 +1,121 @@
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/025/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "025"
+
+# 软件名
+software: "verhaal"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-15"
+build_system: "meson"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://git.sr.ht/~gregkh/verhaal/archive/v025.tar.gz"
+
+  # 源码校验和
+  sha256: "269584a581631a984ed26cc13181a3cd8bfa520813768a0f646d2ba1107a8d23"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: meson
+
+  # 配置选项列表
+  configure_options:
+    - "-Dwrap_mode=nodownload"
+  # 例如:
+  # - "-DCMAKE_BUILD_TYPE=Release"
+  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - libgit2/1.9.0
+    - sqlite3/3.53.4
+    - pcre2/10.45
+  # 例如:
+  # - openssl/1.1.1w
+  # - curl/8.19.0
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-src-main.c.patch"
+# 例如:
+# - "0001-bootstrap-ohos-toolchain.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "libgit2 >= 1.7 的仓库属主校验（GIT_OPT_SET_OWNER_VALIDATION）在 HMDFS 共享属主文件系统上对本机任何仓库恒失败，消费者需在打开失败时关闭校验重试（知识草稿 DRAFT-libgit2-1.9.0-owner-validation-hmdfs；命令层同根因族见 E101/E497）"
+  - "meson 工程依赖 libpcre2-8 时：Conan pcre2 包经 PkgConfigDeps 只产出合并的 pcre2.pc，包内自带 libpcre2-8.pc 前缀写死为 '/' 不可重定位，需按包实际路径补别名"
+  - "verhaal 以本地 master 分支头 + 附注 tag 判定发行版本；轻量 tag 会导致 git describe 失败（error -3）"
+# 例如:
+# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
+# - "内嵌 libuv 需要禁用，使用系统 libuv"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/verhaal-025.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/verhaal-025.work
+  source_orig_hash: 4c9f3452f039021c
+  source_work_hash: 0e147974e27df972
+  generated_at: '2026-10-16T02:24:30'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-src-main.c.patch
+    type: portability
+    platform_only: False
+    guard: 'none'
+
+# ============================================================
+# 测试结果（口径与软件级 manifest、test_package/MANIFEST.yml、
+#           notes.md、reports/test-report.md、PR 正文六处一致）
+# ============================================================
+test_results:
+  total: 11
+  passed: 11
+  failed: 0
+  timeout: 0
+  upstream_tests:
+    expected: "0/0"
+    note: "上游 025 无已注册测试套件（N=0）：meson.build 无 test() 目标、源树无 tests/ 目录与 *test* 文件、justfile 无 test 目标。另有未注册的开发脚本自测 scripts/git-resolve.sh --selftest（10 例，需含指定提交的内核 git 树；本环境实测 8 例 FAILED + 2 例空过、有效验证 0/10），如实记录但不计入 N。非未执行。"
+  note: >-
+    功能验证 = 消费者用例 4 项（T1 版本 / T2 建库 / T2b 流程走完 / T3 回填查询语义，
+    conan create 内执行）+ 鸿蒙 PC 真机专项 7 项（T1 ELF / T2 路径泄漏 / T3 版本 /
+    T4+T4b HMDFS 共享属主建库（补丁 0001 回归） / T5 回填查询语义 / T6 环境变量契约），
+    全部通过。执行记录见 reports/ohos-test.log 与 reports/w3-local-ci.log。
