@@ -1,0 +1,58 @@
+# 版本级 manifest — solid 6.28.0
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "6.28.0"
+software: solid
+status: built
+build_date: "2026-10-17"
+build_system: cmake
+conan_ref: "solid/6.28.0"
+
+source:
+  url: "https://download.kde.org/stable/frameworks/6.28/solid-6.28.0.tar.xz"
+  sha256: "47fa84db565372584c6ecb03f71a6085f706a1c031ea4f2ffc35808f09a19b3d"
+  tar_format: tar.xz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DBUILD_TESTING=ON"
+    - "-DBUILD_DESIGNERPLUGIN=OFF"
+    - "-DKF_IGNORE_PLATFORM_CHECK=TRUE"
+    - "-DKF_SKIP_PO_PROCESSING=ON"
+    - "-DUSE_DBUS=OFF"
+    - "-DUDEV_DISABLED=ON"
+    - "-DBUILD_DEVICE_BACKEND_fstab=OFF"
+    - "-DCMAKE_DISABLE_FIND_PACKAGE_IMobileDevice=ON"
+    - "-DCMAKE_DISABLE_FIND_PACKAGE_PList=ON"
+    - "-DCMAKE_PLATFORM_NO_VERSIONED_SONAME=TRUE"
+    - "-DCMAKE_SHARED_LIBRARY_SONAME_C_FLAG=-Wl,-soname,"
+    - "-DCMAKE_SHARED_LIBRARY_SONAME_CXX_FLAG=-Wl,-soname,"
+  dependencies:
+    - qtbase/6.11.1
+    - ecm/6.28.0
+    - bison/3.8.2
+    - flex/2.6.4.2
+    - m4/1.4.19
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - category: L1
+    content: "solid 6.28.0 源码使用 C++20 特性：src/solid/devices/frontend/device.cpp:226 调用 std::map::contains。conan profile 默认 cppstd=17，且 conan_toolchain.cmake 在 project() 之前就设置 CMAKE_CXX_STANDARD=17，使 ECM KDECompilerSettings 的『未设置即自动判定 C++20』（if NOT CMAKE_CXX_STANDARD）失效 → 配方必须在 configure() 覆盖 `settings.compiler.cppstd = 20`；不能依赖上游自动判定。"
+    reason: "模式经验（KF6 6.28 家族在旧版本号基线工具链上的通用前置项）"
+  - category: L1
+    content: "HarmonyOS 没有 CMake 平台模块（configure 时 CMake 提示 System is unknown to cmake, create: Platform/HarmonyOS），Platform/Linux.cmake 设置的 CMAKE_SHARED_LIBRARY_SONAME_*_FLAG 为空 → 链接器收不到 -Wl,-soname：libKF6Solid.so 无 DT_SONAME，消费者 solid-hardware6 的 DT_NEEDED 退化为 ../../../bin/ 相对路径。配方在 toolchain 层补 CMAKE_PLATFORM_NO_VERSIONED_SONAME=TRUE + 两个 SONAME 标志，产出未版本化单文件（HMDFS 无软链亦可交付；DRAFT-libharu-2.3.0-missing-dt-soname 先例）。"
+    reason: "平台真理（任何 OHOS 共享库适配通用）"
+  - category: L2
+    content: "CMAKE_SYSTEM_NAME=HarmonyOS 不匹配上游 CMakeLists 的 Linux 判定，落进『BSDs and other Unix like systems』兜底分支，该分支会加入 fstab 后端；fstabwatcher.h 无条件 #include <libmount.h>（OHOS 无该头文件）→ 用上游自带的后端开关 BUILD_DEVICE_BACKEND_fstab=OFF（SolidBackendsMacros.cmake），无需改上游源码（E267）。"
+    reason: "模式经验（上游按 UNIX 兜底分支自动加后端时的开关用法）"
+  - category: L1
+    content: "OHOS 上只构建 fakehw 后端（udev/udisks2/upower 需 libudev/DBus，fstab 需 libmount.h），Solid::Device::allDevices() 仅在 SOLID_FAKEHW 指向 fakecomputer.xml 时才返回设备 → solidmttest::testDeviceMatching（'!deviceList.isEmpty()'）必须在该变量下运行；Linux CI 由真实 udev/udisks 后端提供设备，无需此变量。真机反向验证：漏设该变量时该用例确定性失败、其余 59 用例全过。"
+    reason: "平台真理（OHOS 设备上跑 solid 系测试的必备环境变量）"
+  - category: L2
+    content: "设备上 download.kde.org 对 frameworks tarball 两次 wget 均 404（同时刻 PC 可达）→ conandata 采用双 URL 列表兜底：download.kde.org + mirrors.nju.edu.cn（路径为 /kde/stable/frameworks/<ver>/；TUNA/USTC 缺 /kde/frameworks/6.28 路径）。get() 支持 url 列表按序尝试。"
+    reason: "平台网络事实（KF6 系列包设备侧取源兜底配置）"
