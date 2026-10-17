@@ -1,0 +1,40 @@
+# debian-cloud-images 0.0.9 — 上游测试状态 + 适配后测试声明
+#
+# ── 上游测试清点（真实命令见 ../../reports/upstream-test-gap-statement.md） ──
+# Debian native 源包（3.0 (native)）只含 package/debian/ 共 8 个文件，无任何编译源码：
+#   - 无 tests/ 目录、无 test/ 目录
+#   - 无 debian/tests/（autopkgtest），debian/control 无 Testsuite 字段
+#   - 无 CMakeLists.txt / meson.build / configure(.ac) / Makefile（无 ctest/meson test/make check）
+#   - 无 tox.ini / pytest.ini / noxfile.py / setup.py / pyproject.toml（无 pytest/tox 套件）
+#   - debian/rules 仅 `dh $@`（无任何测试 target）；唯一可执行逻辑是 debian/bin/make-substvars
+# 结论：上游**无自动化测试入口**，N=0。清点命令与原始输出见 reports/upstream-test-gap-statement.md。
+upstream_tests:
+  total: 0
+  passed: 0
+  failed: 0
+  skipped: 0
+  type: "none"
+  evidence: "reports/upstream-test-gap-statement.md（ls/find/grep 逐项清点 + extract_upstream_tests.sh 输出）"
+
+# ── 适配后新增自检断言（test_package/test_cloud_images.py） ──
+# 数量权威=运行实测（test_package 打印 "16/16 assertions passed"），
+# 与 manifest.yaml:test_results.added_total、reports/test-report.md 三处一致。
+added_tests:
+  framework: "python script (test_package/test_cloud_images.py)"
+  total: 16
+  passed: 16
+  failed: 0
+  type: "data-integrity"
+  ohos_specific: 2   # [OHOS] arm64 适用条目数==57；arm64 覆盖 linux-image-arm64/grub-efi-arm64/cloud-init
+
+# ── 完整消费者用例（鸿蒙特有：按 Debian 打包语义消费交付产物） ──
+# consumer_cloud_images.py 走完整消费链路：debian/control 的
+# `${debian-cloud-images-packages:Depends}` 占位符 → debian/source.substvars 的
+# `debian-cloud-images-packages:Depends=` 字段 → 展开成带 [arch] 限定的条目 →
+# 过滤出 OHOS PC（arm64）适用子集。blend/包名全部从交付数据自推导，不硬编码。
+consumer_case:
+  file: "test_package/consumer_cloud_images.py"
+  kind: "end-to-end consumer (control placeholder -> substvars Depends -> arm64/OHOS subset)"
+  total_entries: 66
+  unique_packages: 62
+  arm64_ohos_entries: 57
