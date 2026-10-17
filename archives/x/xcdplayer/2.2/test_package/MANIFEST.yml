@@ -1,0 +1,40 @@
+# test_package/MANIFEST.yml
+# xcdplayer 2.2 - upstream test declaration.
+
+package: xcdplayer/2.2
+homepage: "https://www.x.org/"
+
+upstream_tests_exist: false
+upstream_test_audit: >-
+  xcdplayer 2.2 (X11R5 contrib, 1993) ships an Imakefile whose targets are
+  all/cdplayer/cdinfo/cdgrab/clean/install/... (NormalProgramTarget only).
+  There is no test suite (no `make test`/`make check`, no ctest, no tests/
+  directory, no .sh/.py test harness). The cdgrab utility is Sun-only raw-SCSI
+  and upstream never ported it to Linux (not even in 2.3a), so it is excluded
+  from this port.
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+test_package_tests:
+  - file: test_xcdplayer.sh
+    description: >-
+      Runs the installed xcdplayer binary: ELF/arch check, then a real
+      execution without DISPLAY that must reach the XtOpenDisplay failure
+      path ("can't open display", exit 1) — a full dynamic-link/run smoke
+      test; plus packaged-artifact checks (cdinfo tool, man page,
+      app-defaults). Runtime X11 shared libraries come from conan deps
+      (LD_LIBRARY_PATH via VirtualRunEnv + absolute-path LD_PRELOAD fallback,
+      xeyes precedent).
+    command: "sh test_xcdplayer.sh"
+
+test_files:
+  - path: "test_package/test_xcdplayer.sh"
+    test_type: "R34"
+    assertion_count: 5
+
+test_package_test_count: 1
+consumer_assertion_count: 5
+upstream_test_cases: 0
+assertion_count: 5

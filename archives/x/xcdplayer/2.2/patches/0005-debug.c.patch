@@ -1,0 +1,48 @@
+--- a/debug.c
++++ b/debug.c
+@@ -8,38 +8,38 @@
+  * supporting documentation, and that the name of the University of
+  * California not be used in advertising or publicity pertaining to
+  * distribution of the software without specific, written prior
+  * permission.  the University of California makes no representations
+  * about the suitability of this software for any purpose.  It is provided
+  * "as is" without express or implied warranty.
+  */
+ 
+ # include <X11/Intrinsic.h>
+ 
+-# include <varargs.h>
++# include <stdarg.h>
+ # include <stdio.h>
+ 
+ # include "debug.h"
+ 
+ /* VARARGS */
+ void
+-debug_printf(va_alist)
+-	va_dcl
++debug_printf(int level, char *fmt, ...)
+ {
+ 	va_list		args;
+-	char		*fmt;
+ 
+-	va_start(args);
++	va_start(args, fmt);
+ 
+ 	/*
+ 	 * first arg is whether or not to print.
+ 	 */
+-	if ((va_arg(args, int) == 0) || (debug == False))
++	if ((level == 0) || (debug == False))
++	{
++		va_end(args);
+ 		return;
++	}
+ 
+-	fmt = va_arg(args, char *);
+ 	vfprintf(stdout, fmt, args);
+ 
+ 	fflush(stdout);
+ 
+ 	va_end(args);
+ }

@@ -1,0 +1,132 @@
+# 版本级 manifest — xcdplayer 2.2
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "2.2"
+software: "xcdplayer"
+
+# 编译状态: published | built | failed | archived
+# PR 阶段尚未由 release 流水线 upload 到制品仓，真实状态为 built
+status: published
+
+build_date: "2026-10-16"
+build_system: custom
+
+# 源码信息
+source:
+  url: "https://ftp.gwdg.de/pub/x11/x.org/R5contrib/xcdplayer-2.2.tar.Z"
+  sha256: "2c8b8c7d8510c68e4691d01d69c128399ca34934325f4abcd3c456c9f35389e1"
+  tar_format: tar.Z
+
+# 构建配置
+build:
+  system: custom
+  configure_options: []
+  dependencies:
+    - libxaw/1.0.14
+    - libxpm/3.5.17
+  cc: clang
+  notes: >-
+    Imakefile 不参与构建；conanfile.build() 生成 POSIX Makefile（Makefile.ohos
+    模板内嵌配方），链接 conan 提供的 Xaw/Xmu/Xt/Xpm/Xext/X11/SM/ICE/X11-xcb/
+    xcb/Xau/Xdmcp。
+
+# 补丁
+patches_applied:
+  - patches/xcdplayer-2.2-ohos.patch
+
+# 适配要点
+adaptation:
+  - "新增 Linux CD-ROM 后端 cdrom_linux.c/.h（linux/cdrom.h ioctl），改编自同
+     作者上游后续版本 xcdplayer 2.3a 的 cdrom_linux.c，接口回移至 2.2 语义
+     （char *disc_title、无 get_volume 差异处的核心改动）"
+  - "XtResource 静态表中的 (Cardinal)&global 偏移不被现代编译器接受为静态
+     初始化常量，改为 top_setup() 内运行时构建（base=NULL 行为不变）"
+  - "debug_printf 由 <varargs.h>/va_alist 改写为 <stdarg.h>"
+  - "vendored gray.bm（xbitmaps 1.1.3 的 2x2 gray 位图原样拷贝；xbitmaps 未
+     发布到制品仓，避免新增依赖）"
+  - "main.c 块作用域 static 函数声明提升到文件作用域（C23/clang 不允许）"
+  - "cdinfo.c 移植到 linux/cdrom.h + /dev/cdrom；cdgrab.c（Sun raw-SCSI，
+     上游 2.3a 也未移植）不参与构建"
+  - "internals.c: ff 扫描前 cdrom_pause()、cdrom_atend 换曲前 cdrom_stop()、
+     出仓回调前 cdrom_close_tray()（与 2.3a 上游演进一致）；logo_setup.c 音量
+     控制走 get_volume/VAL2PCT 百分比路径（sgi||linux 分支）"
+
+# 产物
+artifacts:
+  - bin/xcdplayer
+  - bin/cdinfo
+  - share/man/man1/xcdplayer.1
+  - share/X11/app-defaults/XCdplayer
+
+knowledge_gained:
+  - "1993 年 X11R5 contrib 软件的 (Cardinal)&global XtResource 静态初始化依赖
+     K&R 时代编译器的地址常量折叠，clang 直接报 'initializer element is not a
+     compile-time constant'；把资源表移到函数内运行时初始化即可保持 base=NULL
+     +绝对地址偏移的原语义，不必重构为 XtOffsetOf"
+  - "compress(1) 的 .Z 容器需纯 Python unlzw 解码（qpage 3.3 同款先例）；
+     ftp.gwdg.de/pub/x11/x.org 是 ftp.x.org 的可靠 HTTPS 镜像，含 R5contrib"
+  - "FreeBSD ports 的 distinfo 可作为老软件源码包的权威 sha256 指纹来源
+     （cgit 上仍有 audio/xcdplayer 的 distinfo）"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/builds/xcdplayer-2.2.orig
+  source_work_dir: /storage/Users/currentUser/builds/xcdplayer-2.2.work
+  source_orig_hash: a7a0994ffed91f27
+  source_work_hash: d61b39bb2b22e205
+  generated_at: '2026-10-16T15:06:24'
+  patches_count: 13
+
+patch_classification:
+  - file: 0001-button_setup.c.patch
+    type: port
+    platform_only: True
+    guard: 'none'
+  - file: 0002-cdinfo.c.patch
+    type: port
+    platform_only: True
+    guard: 'none'
+  - file: 0003-cdrom_callb.c.patch
+    type: port
+    platform_only: True
+    guard: '__linux__'
+  - file: 0004-cdrom_linux.c.patch
+    type: feature
+    platform_only: True
+    guard: 'none'
+  - file: 0005-debug.c.patch
+    type: portability
+    platform_only: False
+    guard: 'none'
+  - file: 0006-internals.c.patch
+    type: port
+    platform_only: True
+    guard: '__linux__'
+  - file: 0007-logo_setup.c.patch
+    type: port
+    platform_only: True
+    guard: '__linux__'
+  - file: 0008-main.c.patch
+    type: portability
+    platform_only: False
+    guard: 'none'
+  - file: 0009-program.c.patch
+    type: portability
+    platform_only: False
+    guard: 'none'
+  - file: 0010-shuffle.c.patch
+    type: portability
+    platform_only: False
+    guard: 'none'
+  - file: 0011-top_setup.c.patch
+    type: portability
+    platform_only: False
+    guard: 'none'
+  - file: 0012-cdrom_linux.h.patch
+    type: feature
+    platform_only: True
+    guard: 'none'
+  - file: 0013-gray.bm.patch
+    type: feature
+    platform_only: True
+    guard: 'none'
