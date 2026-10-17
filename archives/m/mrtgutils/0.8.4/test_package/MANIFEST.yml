@@ -1,0 +1,46 @@
+package: mrtgutils/0.8.4
+homepage: "https://salsa.debian.org/debian/mrtgutils"
+
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "mrtgutils-upstream-0.8.4.tar.gz source tree"
+    reason: "The upstream tag contains only the five program sources, uptime.c/util.c, headers, POD manuals, Makefile.am, configure.ac, and m4/. It has no tests/ directory and no test driver."
+  - source: "Makefile.am"
+    reason: "The file registers the four hardware-independent programs and their man pages, plus mrtg-sensors when libsensors is available; it defines no check, test, or verify target. All five programs are built here, mrtg-sensors against lm-sensors/3.6.0."
+  - source: "configure.ac"
+    reason: "The Autoconf input checks headers, functions, and optional libsensors only. It does not generate a test suite."
+  - conclusion: "The upstream 0.8.4 source has zero automated tests. The consumer smoke checks below validate the packaged commands without claiming upstream coverage."
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+upstream_test_total: 0
+
+test_package_tests:
+  - file: test_mrtgutils.sh
+    description: "All five packaged executables exist and are executable"
+    command: "test -x mrtg-load mrtg-uptime mrtg-ip-acct mrtg-apache mrtg-sensors"
+  - file: test_mrtgutils.sh
+    description: "mrtg-uptime reads the target /proc data and emits two numeric values"
+    command: "mrtg-uptime -t sys -u s"
+  - file: test_mrtgutils.sh
+    description: "mrtg-load -l 1 emits two numeric values; this exercises the repaired caller-owned load-average pointers"
+    command: "mrtg-load -l 1"
+  - file: test_mrtgutils.sh
+    description: "mrtg-load -l 5 emits two numeric values through the repaired caller-owned load-average pointers"
+    command: "mrtg-load -l 5"
+  - file: test_mrtgutils.sh
+    description: "mrtg-load -l 7 is rejected with the documented unknown-period diagnostic"
+    command: "mrtg-load -l 7"
+  - file: test_mrtgutils.sh
+    description: "mrtg-ip-acct emits two numeric interface counters; this exercises the portable %llu scanf/printf format"
+    command: "mrtg-ip-acct lo"
+  - file: test_mrtgutils.sh
+    description: "mrtg-apache rejects an invocation without a hostname and prints its usage text"
+    command: "mrtg-apache"
+  - file: test_mrtgutils.sh
+    description: "mrtg-sensors rejects an invocation without chip/label arguments and prints its usage text; this exercises the libsensors-linked program without requiring sensor hardware"
+    command: "mrtg-sensors"
+
+assertion_count: 8
