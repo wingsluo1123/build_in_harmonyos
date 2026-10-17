@@ -38,7 +38,7 @@ if [ ! -d "${GRAPH_DIR}" ]; then
 fi
 
 # 只统计标准正式条目 E###.kv（纯数字编号），排除 draft/非标准命名的文件
-KV_COUNT=$(ls -1 "${GRAPH_DIR}"/E[0-9][0-9][0-9].kv 2>/dev/null | wc -l)
+KV_COUNT=$(ls -1 "${GRAPH_DIR}" 2>/dev/null | grep -cE '^E[0-9]{3,}\.kv$')
 echo "  .kv 文件数: ${KV_COUNT}"
 
 # ═══════════════════════════════════════════════════════════════
@@ -86,8 +86,17 @@ HITS=$(grep -rl 'keyword1.*keyword2.*keyword3' "${GRAPH_DIR}"/E[0-9]*.kv 2>/dev/
 HITS=$(grep -rl '^category:.*category-name' "${GRAPH_DIR}"/E[0-9]*.kv 2>/dev/null | xargs -r -n1 basename | tr '\n' ' ')
 [ -n "$HITS" ] && KC2_FAIL="${KC2_FAIL} category_placeholder(${HITS})"
 
-# root_cause with TODO/FIXME/待补充
-HITS=$(grep -rl 'TODO\|FIXME\|待补充' "${GRAPH_DIR}"/E[0-9]*.kv 2>/dev/null | xargs -r -n1 basename | tr '\n' ' ')
+# TODO/FIXME/待补充仍拦截；仅排除 forbid_N_pattern 的正则值及其缩进续行。
+# 每个文件重置状态，顶层字段结束前一个正则块，不能让豁免泄漏到正文。
+HITS=$(awk '
+    FNR == 1 { in_pattern = 0 }
+    /^[^ \t#]/ {
+        in_pattern = ($0 ~ /^forbid_[0-9]+_pattern[ \t]*:/)
+        if (in_pattern) next
+    }
+    in_pattern && /^[ \t]+[^ \t#]/ { next }
+    /TODO|FIXME|待补充/ && !seen[FILENAME]++ { print FILENAME }
+' "${GRAPH_DIR}"/E[0-9]*.kv 2>/dev/null | xargs -r -n1 basename | tr '\n' ' ')
 [ -n "$HITS" ] && KC2_FAIL="${KC2_FAIL} todo_in_content(${HITS})"
 
 if [ -n "$KC2_FAIL" ]; then

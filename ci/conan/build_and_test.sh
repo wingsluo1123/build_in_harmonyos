@@ -112,11 +112,13 @@ if [ -d "${GRAPH_DIR_G0}" ]; then
     fi
 
     # G0b: knowledge/graph/ 下不应有非标准命名的 .kv 文件
-    #     （只允许 E###.kv + _template.kv + principles.kv）
-    G0_BAD_KV=$(ls -1 "${GRAPH_DIR_G0}"/*.kv(N) 2>/dev/null | grep -vE '/E[0-9][0-9][0-9]\.kv$|/_template\.kv$|/principles\.kv$' || true)
+    #     （只允许 E + 3 位以上纯数字编号，如 E001.kv / E1000.kv；
+    #       三位编号 E999 用尽后归档流程继续使用四位编号，故这里不设上限）
+    #     另允许 _template.kv + principles.kv
+    G0_BAD_KV=$(ls -1 "${GRAPH_DIR_G0}"/*.kv(N) 2>/dev/null | grep -vE '/E[0-9]{3,}\.kv$|/_template\.kv$|/principles\.kv$' || true)
     if [ -n "$G0_BAD_KV" ]; then
         G0_BAD_COUNT=$(echo "$G0_BAD_KV" | wc -l)
-        echo "[fail] G0b: knowledge/graph/ 下有 ${G0_BAD_COUNT} 个非标准命名的 .kv 文件（仅允许 E###.kv）:"
+        echo "[fail] G0b: knowledge/graph/ 下有 ${G0_BAD_COUNT} 个非标准命名的 .kv 文件（仅允许 E###.kv / E####.kv）:"
         echo "$G0_BAD_KV" | head -5 | sed "s|^|       |"
         G0_ERRORS=$((G0_ERRORS + 1))
     fi
@@ -130,7 +132,8 @@ if [ -d "${GRAPH_DIR_G0}" ]; then
     fi
 
     # G0d: index.tsv 行数必须与标准 .kv 文件数一致
-    G0_KV_COUNT=$(ls -1 "${GRAPH_DIR_G0}"/E[0-9][0-9][0-9].kv 2>/dev/null | wc -l)
+    #      计数口径与 G0b 保持一致：E + 3 位以上纯数字编号
+    G0_KV_COUNT=$(ls -1 "${GRAPH_DIR_G0}" 2>/dev/null | grep -cE '^E[0-9]{3,}\.kv$')
     if [ -f "${GRAPH_DIR_G0}/index.tsv" ]; then
         G0_IDX_COUNT=$(grep -c '^E[0-9]' "${GRAPH_DIR_G0}/index.tsv" 2>/dev/null || echo 0)
         if [ "${G0_IDX_COUNT}" -ne "${G0_KV_COUNT}" ]; then
