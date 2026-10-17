@@ -1,0 +1,56 @@
+# 版本级 manifest - kunitconversion5/5.116.0
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "5.116.0"
+software: kunitconversion5
+status: built
+build_date: "2026-10-06"
+build_system: cmake
+
+source:
+  url: "https://download.kde.org/stable/frameworks/5.116/kunitconversion-5.116.0.tar.xz"
+  sha256: "ef689b29a27e57b6e5b41107d6fbb0252aba6788f6f96e079da0bddbc43a1c94"
+
+dependencies:
+  - qt5-qtbase/5.15.2.2
+  - ki18n5/5.116.0
+  - ecm/6.26.0 (tool_requires)
+
+patches:
+  - patches/0001-ohos-skip-currency-network-autotests.patch (portability: QSKIP the three ECB currency-table network download autotests on OHOS)
+
+upstream_tests:
+  suite: "autotests/ (CTest)"
+  executed: "ctest in build() (BUILD_TESTING=ON)"
+  registered: 4
+  passed: 4
+  pass_rate: "100%"
+  functions_total: 17
+  functions_passed: 14
+  functions_skipped: 3
+  exclusions: >
+    3 个函数被 QSKIP 原地守卫（ConverterTest::testCurrency /
+    ConverterTest::testCurrencyConversionTableUpdate /
+    CategoryTest::testCurrencyTableUpdate）：断言实时下载 ECB
+    https://www.ecb.europa.eu 汇率表；qt5-qtbase/5.15.2.2 线 Qt5Network 为
+    -no-openssl 构建（无 TLS 后端，strings 实测无 QSsl 符号）且 CI 沙箱无外网
+    路由，下载无法成功（环境限制）。QSKIP 补丁先例：kmbox 25.12.3 / kservice
+    6.x。其余 14 个函数（长度/温度/质量换算、值往返、类目查询、无效路径、
+    货币表离线解析）全部真实通过。
+
+test_package:
+  assertions: 14
+  passed: 14
+  pass_rate: "100%"
+  detail: >
+    14 断言全过：(1-3) Converter::convert 跨 Length/Temperature/Mass 真实乘数
+    换算；(4-5) Value toSymbolString/convertTo 往返；(6-10) 类目查询五查；
+    (11) 类目计数；(12-14) R53 ELF 三查（libKF5UnitConversion.so 可解析、
+    DT_SONAME 存在、DT_RUNPATH 存在）。
+
+full_reference: "kunitconversion5/5.116.0@ohpcd/stable"
+knowledge_gained:
+  - "kunitconversion5 只需 Qt5 Core+Network 与 KF5I18n：qt5-qtbase/5.15.2.2 原生 Qt5Config 聚合（cmake_find_mode=none + paths 文件接线）即可喂饱 find_package(Qt5 CONFIG REQUIRED Core Network) 与 autotests 的 Qt5Test，无需手工聚合 shim。"
+  - "package() 阶段 cmake.install() 裸跑 /data/service/hnp/bin/cmake 会因 libc++ relocation 失败（Error 127）：cmake 二进制依赖 LD_LIBRARY_PATH 中的兼容 libc++，必须与 build() 同样用 _runtime_env().vars(self).apply() 包装。"
+  - "currencytableinittest 真实通过的组合：QStandardPaths::setTestModeEnabled(true) 钉死 GenericDataLocation 到 $HOME/.qttest/share，QFile::copy 不建父目录——配方预建 $HOME/.qttest/share/libkunitconversion/ 缓存目录后，Converter 离线解析 qrc 内嵌 currency.xml 快照并通过 EUR->USD 汇率断言。"
+  - "Qt 5.15 的 QSKIP 签名是 QSKIP(statement, ...)（第二参数可变参，Qt6 才引入 SkipSingle/SkipAll 枚举）——Qt5 补丁必须用单参数形式，传 SkipSingle 会编译失败。"

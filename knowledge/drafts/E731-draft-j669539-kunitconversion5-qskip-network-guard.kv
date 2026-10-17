@@ -1,0 +1,57 @@
+draft: E731-draft-j669539-kunitconversion5-qskip-network-guard
+status: pending-editor-review
+id: E731
+title: "Qt 上游货币/汇率表下载测试的 QSKIP 网络边界守卫：TLS 后端缺失+沙箱无外网判定链与 Qt5/Qt6 QSKIP 签名差异"
+category: testing, ohos, network, qt
+match_keywords: >
+  QSKIP, ECB currency table, testCurrency, testCurrencyTableUpdate,
+  Qt5Network, -no-openssl, QSslSocket, TLS backend, CI sandbox no network,
+  www.ecb.europa.eu, currency.xml, Qt 5.15 QSKIP signature, SkipSingle,
+  SkipAll, kmbox, kservice
+error_signature: >
+  QSslSocket: cannot resolve|qt\.network\.ssl|TLS initialization failed|Network session is not started|Host .+ not found|currency-table network download
+root_cause: >
+  上游测试断言"实时下载 ECB https://www.ecb.europa.eu 汇率表"这一前提在 OHOS CI 环境
+  双重不可满足：(1) qt5-qtbase/5.15.2.2 供应链线的 Qt5Network 为 -no-openssl 构建，
+  无 TLS 后端——strings 实测 libQt5Network.so 无任何 QSsl 符号，https 请求在客户端
+  即失败；(2) CI 沙箱无外网路由（worker 站点白名单网络），即使有 TLS 也无法到达 ECB。
+  此类测试验证的是网络边界而非换算逻辑，正确处置是 QSKIP 原地守卫（保留测试函数与
+  断言代码，跳过执行），而非删除测试或改断言。签名陷阱：Qt 5.15 的 QSKIP 是
+  QSKIP(statement, ...) 变参宏，SkipSingle/SkipAll 枚举 Qt 6 才引入——Qt5 补丁传
+  QSKIP("...", SkipSingle) 会直接编译失败。
+solution: |
+  判定链（先证伪网络前提，再守卫）：
+  1. `strings <qt5-qtbase包>/lib/libQt5Network.so | grep -c QSsl` → 0 即无 TLS 后端；
+  2. CI 沙箱无外网路由（worker 站点白名单网络，https://www.ecb.europa.eu 不可达）；
+  3. 任一命中即网络前提不可满足 → patch 原地 QSKIP（不删函数、不动其余断言）：
+
+  ```cpp
+  void ConverterTest::testCurrency()
+  {
+      // OHOS: Qt5Network from the qt5-qtbase/5.15.2.2 supply is built with
+      // -no-openssl (no TLS backend) and the CI sandbox has no outbound
+      // network route, so the ECB currency-table download cannot run.
+      QSKIP("currency-table network download needs TLS/network, unavailable on OHOS");
+
+      Converter c;
+      // ...original assertions preserved below...
+  }
+  ```
+  Qt5 用单参数形式（先例：kmbox 25.12.3 / kservice 6.x / kunitconversion5 5.116.0）。
+fallback: >
+  数据路径必须被真实验证时改走离线快照法（kunitconversion5 currencytableinittest
+  实证）：QStandardPaths::setTestModeEnabled(true) 钉死 GenericDataLocation 到
+  $HOME/.qttest/share → 配方预建 libkunitconversion/ 缓存目录（QFile::copy 不创建
+  父目录）→ Converter 离线解析 qrc 内嵌 currency.xml 快照（2021-08-24，USD rate
+  1.1740）并通过 EUR→USD 汇率断言。
+verify_builds: >
+  PR !14840（kunitconversion5 5.116.0，干净重跑 conan remove 后 conan create：
+  CTest 4/4，函数级 14 PASS + 3 QSKIP + 0 FAIL）；先例 kmbox 25.12.3 / kservice 6.x。
+reference_impl: >
+  PR !14840 patches/0001-ohos-skip-currency-network-autotests.patch
+  （archives/k/kunitconversion5/5.116.0/patches/）。
+doc_file: doc/E731.md
+source: >
+  kunitconversion5 5.116.0 OHOS PC 适配（j669539，PR !14840）：
+  ConverterTest::testCurrency / ConverterTest::testCurrencyConversionTableUpdate /
+  CategoryTest::testCurrencyTableUpdate 三函数守卫。

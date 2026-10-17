@@ -1,0 +1,38 @@
+--- a/autotests/convertertest.cpp
++++ b/autotests/convertertest.cpp
+@@ -97,6 +97,11 @@
+ 
+ void ConverterTest::testCurrency()
+ {
++    // OHOS: Qt5Network from the qt5-qtbase/5.15.2.2 supply is built with
++    // -no-openssl (no TLS backend) and the CI sandbox has no outbound
++    // network route, so the ECB currency-table download cannot run.
++    QSKIP("currency-table network download needs TLS/network, unavailable on OHOS");
++
+     Converter c;
+     // 2 threads is enough for tsan to notice races, let's not hammer the website with more concurrent requests
+     const int numThreads = 2;
+@@ -117,6 +122,9 @@
+ 
+ void ConverterTest::testCurrencyConversionTableUpdate()
+ {
++    // OHOS: same TLS/network boundary as testCurrency() above.
++    QSKIP("currency-table network download needs TLS/network, unavailable on OHOS");
++
+     const QString cache = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QStringLiteral("/libkunitconversion/currency.xml");
+ 
+     // Missing conversion table must lead to update of table
+--- a/autotests/categorytest.cpp
++++ b/autotests/categorytest.cpp
+@@ -59,6 +59,11 @@
+ 
+ void CategoryTest::testCurrencyTableUpdate()
+ {
++    // OHOS: Qt5Network from the qt5-qtbase/5.15.2.2 supply is built with
++    // -no-openssl (no TLS backend) and the CI sandbox has no outbound
++    // network route, so the ECB currency-table download cannot run.
++    QSKIP("currency-table network download needs TLS/network, unavailable on OHOS");
++
+     // Remove currency cache to force a download
+     const QString cache = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QStringLiteral("/libkunitconversion/currency.xml");
+     QFile::remove(cache);
