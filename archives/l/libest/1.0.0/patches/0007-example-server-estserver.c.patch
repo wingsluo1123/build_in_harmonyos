@@ -1,0 +1,167 @@
+--- a/example/server/estserver.c
++++ b/example/server/estserver.c
+@@ -106,26 +106,35 @@
+ 	0x57,0xEE,0x36,0xCB,0x06,0xEA,0xF5,0x3D,0x95,0x49,0xCB,0xA7,
+ 	0xDD,0x81,0xDF,0x80,0x09,0x4A,0x97,0x4D,0xA8,0x22,0x72,0xA1,
+ 	0x7F,0xC4,0x70,0x56,0x70,0xE8,0x20,0x10,0x18,0x8F,0x2E,0x60,
+ 	0x07,0xE7,0x68,0x1A,0x82,0x5D,0x32,0xA2,
+ 	};
+     DH *dh;
+ 
+     if ((dh=DH_new()) == NULL) {
+ 	return(NULL);
+     }
+-    dh->p=BN_bin2bn(dh1024_p,sizeof(dh1024_p),NULL);
+-    dh->g=BN_bin2bn(dh1024_g,sizeof(dh1024_g),NULL);
+-    if ((dh->p == NULL) || (dh->g == NULL)) { 
+-	DH_free(dh); return(NULL); 
+-    }
+-    dh->length = 160;
++    {
++	BIGNUM *p = BN_bin2bn(dh1024_p, sizeof(dh1024_p), NULL);
++	BIGNUM *g = BN_bin2bn(dh1024_g, sizeof(dh1024_g), NULL);
++	if ((p == NULL) || (g == NULL)) {
++	    BN_free(p);
++	    BN_free(g);
++	    DH_free(dh);
++	    return(NULL);
++	}
++	if (DH_set0_pqg(dh, p, NULL, g) != 1) {
++	    DH_free(dh);
++	    return(NULL);
++	}
++    }
++    DH_set_length(dh, 160);
+     return(dh);
+ }
+ 
+ static void print_version (FILE *fp)
+ {
+     fprintf(fp, "Using %s\n", SSLeay_version(SSLEAY_VERSION));
+ }
+ 
+ static void show_usage_and_exit (void)
+ {
+@@ -220,21 +229,21 @@
+ 	rv = 1;
+ 	goto DONE;
+     }
+ 
+     /*
+      * Get the public key from the request, this will be our index into
+      * the lookup table.  Frankly, I'm not sure how a real CA
+      * would do this lookup.  But this should be good enough for
+      * testing the retry-after logic.
+      */
+-    pkey = X509_PUBKEY_get(req->req_info->pubkey);
++    pkey = X509_REQ_get_pubkey(req);
+     if (!pkey) {
+ 	rv = 1;
+ 	goto DONE;
+     }
+     out = BIO_new(BIO_s_mem());
+     PEM_write_bio_PUBKEY(out, pkey);
+     BIO_get_mem_ptr(out, &bptr);
+ 
+     /*
+      * see if we can find a match for this public key
+@@ -561,21 +570,21 @@
+ 
+ /*
+  * This is the main entry point into the example EST server.
+  * This routine parses the command line options, reads in the
+  * cert chains, creates an EST context, initializes the HTTP
+  * layer (mongoose), and starts a simple TCP server to accept
+  * incoming EST requests.
+  */
+ int main (int argc, char **argv)
+ {
+-    char c;
++    int c;
+     int i;
+     int size;
+     X509 *x;
+     EVP_PKEY *priv_key;
+     BIO *certin, *keyin;
+     DH *dh;
+     EST_ERROR rv;
+     int sleep_delay = 0;
+     int retry_period = 300;
+     
+@@ -628,21 +637,21 @@
+         case 'k':
+ 	    strncpy(keyfile, optarg, EST_MAX_FILE_LEN);
+             break;
+         case 'r':
+ 	    strncpy(realm, optarg, MAX_REALM);
+             break;
+ 	case 'f':
+ 	   /* turn FIPS on if user requested it
+ 	    * and exit if failure.
+ 	   */
+-	    set_fips_return = FIPS_mode_set(1);
++	    set_fips_return = EVP_default_properties_enable_fips(NULL, 1);
+ 	    if (set_fips_return != 1) { 
+ 	      set_fips_error = ERR_get_error();
+ 	      printf("\nERROR WHILE SETTING FIPS MODE ON exiting ....\n"); 
+ 	      exit(1);
+ 	    } else {
+ 	      printf("\nRunning EST Sample Server with FIPS MODE = ON !\n");
+ 	    };
+ 	    break;
+         default:
+             show_usage_and_exit();
+@@ -681,46 +690,50 @@
+      * Read in the trusted CA certificates for the local TLS context
+      */
+     if (getenv("EST_TRUSTED_CERTS")) {
+         trustcerts_len = read_binary_file(getenv("EST_TRUSTED_CERTS"), &trustcerts);
+         if (trustcerts_len <= 0) {
+             printf("\nEST_TRUSTED_CERTS file could not be read\n");
+             exit(1);
+         }
+     }
+ 
+-    est_apps_startup();
++    /* est_apps_startup() macro wraps OpenSSL 1.x init (CRYPTO_malloc_init,
++     * ENGINE_load_builtin_engines, SSL_library_init, ERR_load_crypto_strings)
++     * which OpenSSL 3.x removed; OpenSSL 3.x auto-initializes, so init here
++     * via the supported entry point instead. */
++    OPENSSL_init_ssl(0, NULL);
+ 
+     /*
+      * Read in the local server certificate 
+      */
+-    certin = BIO_new(BIO_s_file_internal());
++    certin = BIO_new(BIO_s_file());
+     if (BIO_read_filename(certin, certfile) <= 0) {
+ 	printf("\nUnable to read server certificate file %s\n", certfile);
+ 	exit(1);
+     }
+     /*
+      * This reads the file, which is expected to be PEM encoded.  If you're using 
+      * DER encoded certs, you would invoke d2i_X509_bio() instead.
+      */
+     x = PEM_read_bio_X509(certin, NULL, NULL, NULL);
+     if (x == NULL) {
+ 	printf("\nError while reading PEM encoded server certificate file %s\n", certfile);
+ 	exit(1);
+     }
+     BIO_free(certin);
+ 
+ 
+     /* 
+      * Read in the server's private key
+      */
+-    keyin = BIO_new(BIO_s_file_internal());
++    keyin = BIO_new(BIO_s_file());
+     if (BIO_read_filename(keyin, keyfile) <= 0) {
+ 	printf("\nUnable to read server private key file %s\n", keyfile);
+ 	exit(1);
+     }
+     /*
+      * This reads in the private key file, which is expected to be a PEM
+      * encoded private key.  If using DER encoding, you would invoke
+      * d2i_PrivateKey_bio() instead. 
+      */
+     priv_key = PEM_read_bio_PrivateKey(keyin, NULL, NULL, NULL);

@@ -1,0 +1,30 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: libest/1.0.0
+homepage: "https://github.com/cisco/libest"
+
+# 上游测试命令: libest 使用 autotools 但未注册 automake TESTS/check 目标;
+# 上游测试位于 test/UT (CUnit 框架, runtest.c + US748/US893-US903/US1005 共 13 个用例),
+# 需要 cunit + libcurl 开发库, 本环境制品仓/系统均无 cunit, 无法编译运行 runtest。
+upstream_check_command: "make check"
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序 (test/UT 清点, R51)
+upstream_tests:
+  - file: runtest.c
+    source: libest-1.0.0/test/UT/runtest.c
+    description: "CUnit 驱动的单元测试主程序(13 用例: US748,US893-US903,US1005); 依赖 cunit+curl, 本环境无 cunit 不可构建"
+    command: "./runtest"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "消费者测试: 调用 est_get_version/est_get_api_level/est_init_logger 实质 API"
+    command: "./test_libest"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 3

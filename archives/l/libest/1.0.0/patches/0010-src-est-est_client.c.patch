@@ -1,0 +1,338 @@
+--- a/src/est/est_client.c
++++ b/src/est/est_client.c
+@@ -70,31 +70,35 @@
+ 
+ 
+ /*
+  * Sign an X509 certificate request using the digest and the key passed.
+  * Returns OpenSSL error code from X509_REQ_sign_ctx();
+  */
+ static int est_client_X509_REQ_sign (X509_REQ *x, EVP_PKEY *pkey, const EVP_MD *md)
+ {
+     int rv;
+     EVP_PKEY_CTX *pkctx = NULL;
+-    EVP_MD_CTX mctx;
+-
+-    EVP_MD_CTX_init(&mctx);
+-
+-    if (!EVP_DigestSignInit(&mctx, &pkctx, md, NULL, pkey)) {
++    EVP_MD_CTX *mctx = NULL;
++
++    mctx = EVP_MD_CTX_new();
++    if (mctx == NULL) {
+         return 0;
+     }
+ 
+-    rv = X509_REQ_sign_ctx(x, &mctx);
+-
+-    EVP_MD_CTX_cleanup(&mctx);
++    if (!EVP_DigestSignInit(mctx, &pkctx, md, NULL, pkey)) {
++        EVP_MD_CTX_free(mctx);
++        return 0;
++    }
++
++    rv = X509_REQ_sign_ctx(x, mctx);
++
++    EVP_MD_CTX_free(mctx);
+ 
+     return (rv);
+ }
+ /*
+  * populate_x509_request will build an x509 request buffer.  It does this by
+  * calls into OpenSSL to insert the fields of the x509 header.
+  *
+  * Parameters:
+  *	req:	pointer to the buffer that is to hold the x509 reauest header
+  *	pkey:   public key to be placed into the x509 request
+@@ -549,21 +553,26 @@
+ 
+     for (i=0; i<sk_X509_num(stack); i++) {
+         current_cert = sk_X509_value(stack, i);
+ 
+         /*
+          * Is it self signed?  If so, add it in the trusted store, otherwise,
+          * add it to the untrusted store.
+          */
+         rv = X509_check_issued(current_cert, current_cert);
+ 	if (rv == X509_V_OK) {
+-            EST_LOG_INFO("Adding cert to trusted store (%s)", current_cert->name);
++            char subject_buf[256];
++            if (X509_NAME_oneline(X509_get_subject_name(current_cert),
++                                  subject_buf, sizeof(subject_buf)) == NULL) {
++                subject_buf[0] = '\0';
++            }
++            EST_LOG_INFO("Adding cert to trusted store (%s)", subject_buf);
+             X509_STORE_add_cert(trusted_cacerts_store, current_cert);
+         }
+     }
+ 
+     /*
+      * set up a X509 Store Context
+      */
+     store_ctx = X509_STORE_CTX_new();
+     if (store_ctx == NULL) {
+         EST_LOG_ERR("Unable to allocate a new store context");
+@@ -583,29 +592,41 @@
+             ossl_dump_ssl_errors();
+ 
+             free(cacerts_decoded);
+             PKCS7_free(pkcs7);
+             X509_STORE_free(trusted_cacerts_store);
+             X509_STORE_CTX_free(store_ctx);
+             
+             return ( EST_ERR_MALLOC);
+         }
+         current_cert = sk_X509_value(stack, i);
+-        EST_LOG_INFO("Adding cert to store (%s)", current_cert->name);
+-	X509_STORE_CTX_set_cert(store_ctx, current_cert);
++        {
++            char subject_buf[256];
++            if (X509_NAME_oneline(X509_get_subject_name(current_cert),
++                                  subject_buf, sizeof(subject_buf)) == NULL) {
++                subject_buf[0] = '\0';
++            }
++            EST_LOG_INFO("Adding cert to store (%s)", subject_buf);
++            X509_STORE_CTX_set_cert(store_ctx, current_cert);
++        }
+         
+         rv = X509_verify_cert(store_ctx);
+         if (!rv) {
+             /*
+              * this cert failed verification.  Log this and continue on
+              */
+-            EST_LOG_WARN("Certificate failed verification (%s)", current_cert->name);
++            char subject_buf[256];
++            if (X509_NAME_oneline(X509_get_subject_name(current_cert),
++                                  subject_buf, sizeof(subject_buf)) == NULL) {
++                subject_buf[0] = '\0';
++            }
++            EST_LOG_WARN("Certificate failed verification (%s)", subject_buf);
+             failed = 1;
+         }
+     }
+ 
+     /*
+      * Finally, remove any CRLs that might be attached.
+      */
+     est_rc = est_client_remove_crls(ctx, cacerts, cacerts_len, pkcs7);
+ 
+     free(cacerts_decoded);
+@@ -1353,51 +1374,57 @@
+ 
+ /*
+  * This function does a sanity check on the X509
+  * prior to attempting to convert the X509 to
+  * a CSR for a reenroll operation.
+  *
+  * Returns an EST_ERROR code
+  */
+ static EST_ERROR est_client_check_x509 (X509 *cert) 
+ {
++    const ASN1_BIT_STRING *sig = NULL;
++    X509_get0_signature(&sig, NULL, cert);
++
+     /*
+      * Make sure the cert is signed
+      */
+-    if(!cert->signature) {
++    if(!sig) {
+ 	EST_LOG_ERR("The certificate provided does not contain a signature.");
+ 	return (EST_ERR_BAD_X509);
+     }
+ 
+     /*
+      * Make sure the signature length is not invalid 
+      */
+-    if (cert->signature->length <= 0) {
++    if (sig->length <= 0) {
+ 	EST_LOG_ERR("The certificate provided contains an invalid signature length.");
+ 	return (EST_ERR_BAD_X509);
+     }
+     return (EST_ERR_NONE);
+ }
+ 
+ /*
+  * This function does a sanity check on the CSR
+  * prior to attempting to use the CSR for a
+  * simple enroll operation.
+  *
+  * Returns an EST_ERROR code
+  */
+ static EST_ERROR est_client_check_csr (X509_REQ *csr) 
+ {
++    const ASN1_BIT_STRING *sig = NULL;
++    X509_REQ_get0_signature(csr, &sig, NULL);
++
+     /*
+      * Attempt to get the signature on the CSR
+      */
+-    if(csr->signature && csr->signature->length > 0) {
++    if(sig && sig->length > 0) {
+ 	EST_LOG_ERR("The CSR provided was already signed.  libest will only accept an unsigned CSR since libest performs the signing operation on the CSR.");
+ 	return (EST_ERR_CSR_ALREADY_SIGNED);
+     }
+     return (EST_ERR_NONE);
+ }
+ 
+ /*
+  * This function is used to clear any ChallengePassword
+  * attributes in an X509 CSR.  This is used because when
+  * HTTP authentication is used during the enrollment
+@@ -1423,27 +1450,31 @@
+ 	 * Look for the PoP value in the CSR 
+ 	 */
+ 	pos = X509_REQ_get_attr_by_NID(csr, NID_pkcs9_challengePassword, -1);
+ 	if (pos >= 0) {
+ 	    /* 
+ 	     * If found, delete it
+ 	     */
+ 	    attr = X509_REQ_delete_attr(csr, pos);
+ 	    if (attr) {
+ 		/*
+-		 * There are no docs in OpenSSL that show how
+-		 * to use X509_REQ_delete_attr.  Going to assume
+-		 * we need to free the attribute ourselves.  There
+-		 * do not appear to be any good examples on how
+-		 * to use this API.
++		 * OpenSSL 3.x: X509_REQ_delete_attr() detaches the attribute
++		 * from the X509_REQ and the returned pointer must NOT be
++		 * freed by the caller (the ASN.1 encoding cache of the
++		 * X509_REQ still references it).  Freeing it here is the
++		 * source of the bad free seen under ASAN (US899.c:445
++		 * X509_REQ_free -> ASN1_item_free -> ossl_asn1_enc_free).
++		 * In OpenSSL 3.x the attribute is released together with
++		 * the X509_REQ itself; dropping the manual free keeps the
++		 * lifetime in line with the X509_REQ's own ownership.
+ 		 */
+-		X509_ATTRIBUTE_free(attr);
++		EST_LOG_INFO("Removed challengePassword attribute from CSR");
+ 	    }
+ 	}
+     }
+ }
+ 
+ 
+ /*
+  * This function does the work of converting the X509_REQ* to
+  * the base64 encoded DER format as specified in the EST RFC.
+  * Once converted to the proper format, this routine will
+@@ -2534,21 +2565,21 @@
+     rv = est_client_enroll_pkcs10(ctx, ssl, csr, pkcs7_len, priv_key, 0);
+     est_client_disconnect(ctx, &ssl);
+     if (rv == EST_ERR_AUTH_FAIL &&
+         (ctx->auth_mode == AUTH_DIGEST ||
+          ctx->auth_mode == AUTH_BASIC)) {
+ 
+         /*
+          * HTTPS digest mode requires the use of MD5.  Make sure we're not
+          * in FIPS mode and can use MD5
+          */
+-        if (ctx->auth_mode == AUTH_DIGEST && (FIPS_mode())){
++        if (ctx->auth_mode == AUTH_DIGEST && (EVP_default_properties_is_fips_enabled(NULL))){
+ 	    EST_LOG_ERR("HTTP digest auth not allowed while in FIPS mode");
+ 	    rv = EST_ERR_BAD_MODE;
+             goto err;
+         }
+         
+         /* Try one more time if we're doing Digest auth */
+         EST_LOG_INFO("HTTP Auth failed, trying again with digest/basic parameters");
+         rv = est_client_connect(ctx, &ssl);
+         if (rv != EST_ERR_NONE) {
+             EST_LOG_ERR("Connection failed on second attempt with basic/digest parameters");
+@@ -2622,21 +2653,21 @@
+     rv = est_client_enroll_cn(ctx, ssl, cn, pkcs7_len, new_public_key);
+     est_client_disconnect(ctx, &ssl);
+     if (rv == EST_ERR_AUTH_FAIL &&
+         (ctx->auth_mode == AUTH_DIGEST ||
+          ctx->auth_mode == AUTH_BASIC)) {
+ 
+         /*
+          * HTTPS digest mode requires the use of MD5.  Make sure we're not
+          * in FIPS mode and can use MD5
+          */
+-        if (ctx->auth_mode == AUTH_DIGEST && (FIPS_mode())){
++        if (ctx->auth_mode == AUTH_DIGEST && (EVP_default_properties_is_fips_enabled(NULL))){
+ 	    EST_LOG_ERR("HTTP digest auth not allowed while in FIPS mode");
+ 	    rv = EST_ERR_BAD_MODE;
+             goto err;
+         }
+         
+         /* Try one more time if we're doing Digest auth */
+         EST_LOG_INFO("HTTP Auth failed, trying again with digest/basic parameters");
+         rv = est_client_connect(ctx, &ssl);
+         if (rv != EST_ERR_NONE) {
+             EST_LOG_ERR("Connection failed on second attempt with basic/digest parameters");
+@@ -2892,24 +2923,46 @@
+     }
+ 
+     /*
+      * Copy the X509 extensions from the old certificate
+      * to the CSR.  The CA may or may not retain these, as
+      * this behavior depends on policy.  When using the 
+      * OpenSSL test CA, set the copy_extensions setting 
+      * in the config file to copyall to retain the
+      * extensions in the CSR when issuing a new cert.
+      */
+-    if (cert->cert_info && cert->cert_info->extensions) {
+-	ossl_rv = X509_REQ_add_extensions(req, cert->cert_info->extensions);
+-	if (!ossl_rv) {
+-	    EST_LOG_WARN("Failed to copy X509 extensions to the CSR. Your new certificate may not contain the extensions present in the old certificate.");
++    if (X509_get_ext_count(cert) > 0) {
++	STACK_OF(X509_EXTENSION) *exts = sk_X509_EXTENSION_new_null();
++	int ext_i, ext_n = X509_get_ext_count(cert);
++	if (exts != NULL) {
++	    for (ext_i = 0; ext_i < ext_n; ext_i++) {
++		X509_EXTENSION *ext = X509_get_ext(cert, ext_i);
++		if (ext != NULL) {
++		    /*
++		     * X509_get_ext() returns a pointer into the certificate's
++		     * internal extension stack.  Push a duplicate so the stack
++		     * owned by this function (and freed below) never aliases
++		     * the certificate's own extensions; freeing the alias
++		     * would corrupt cert and lead to a double free when the
++		     * caller later releases the certificate.
++		     */
++		    X509_EXTENSION *dup = X509_EXTENSION_dup(ext);
++		    if (dup != NULL) {
++			sk_X509_EXTENSION_push(exts, dup);
++		    }
++		}
++	    }
++	    ossl_rv = X509_REQ_add_extensions(req, exts);
++	    sk_X509_EXTENSION_pop_free(exts, X509_EXTENSION_free);
++	    if (!ossl_rv) {
++		EST_LOG_WARN("Failed to copy X509 extensions to the CSR. Your new certificate may not contain the extensions present in the old certificate.");
++	    }
+ 	}
+     }
+ 
+     /*
+      * Establish TLS session with the EST server
+      */
+     rv = est_client_connect(ctx, &ssl);
+     if (rv != EST_ERR_NONE) {
+         goto err;
+     }
+@@ -2920,21 +2973,21 @@
+     rv = est_client_enroll_pkcs10(ctx, ssl, req, pkcs7_len, priv_key, 1);
+     est_client_disconnect(ctx, &ssl);
+     if (rv == EST_ERR_AUTH_FAIL &&
+         (ctx->auth_mode == AUTH_DIGEST ||
+          ctx->auth_mode == AUTH_BASIC)) {
+ 
+         /*
+          * HTTPS digest mode requires the use of MD5.  Make sure we're not
+          * in FIPS mode and can use MD5
+          */
+-        if (ctx->auth_mode == AUTH_DIGEST && (FIPS_mode())){
++        if (ctx->auth_mode == AUTH_DIGEST && (EVP_default_properties_is_fips_enabled(NULL))){
+ 	    EST_LOG_ERR("HTTP digest auth not allowed while in FIPS mode");
+ 	    rv = EST_ERR_BAD_MODE;
+             goto err;
+         }
+         
+         /* Try one more time if we're doing Digest auth */
+         EST_LOG_INFO("HTTP Auth failed, trying again with digest/basic parameters");
+         rv = est_client_connect(ctx, &ssl);
+         if (rv != EST_ERR_NONE) {
+             EST_LOG_ERR("Connection failed on second attempt with basic/digest parameters");

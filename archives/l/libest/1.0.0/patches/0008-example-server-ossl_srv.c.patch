@@ -1,0 +1,250 @@
+--- a/example/server/ossl_srv.c
++++ b/example/server/ossl_srv.c
+@@ -279,38 +279,20 @@
+ 			{
+ 			BIO_printf(err, "Error opening %s %s\n",
+ 				cert_descrip, file);
+ 			ERR_print_errors(err);
+ 			goto end;
+ 			}
+ 		}
+ 
+ 	if 	(format == FORMAT_ASN1)
+ 		x=d2i_X509_bio(cert,NULL);
+-	else if (format == FORMAT_NETSCAPE)
+-		{
+-		NETSCAPE_X509 *nx;
+-		nx=ASN1_item_d2i_bio(ASN1_ITEM_rptr(NETSCAPE_X509),cert,NULL);
+-		if (nx == NULL)
+-				goto end;
+-
+-		if ((strncmp(NETSCAPE_CERT_HDR,(char *)nx->header->data,
+-			nx->header->length) != 0))
+-			{
+-			NETSCAPE_X509_free(nx);
+-			BIO_printf(err,"Error reading header on certificate\n");
+-			goto end;
+-			}
+-		x=nx->cert;
+-		nx->cert = NULL;
+-		NETSCAPE_X509_free(nx);
+-		}
+ 	else if (format == FORMAT_PEM)
+ 		x=PEM_read_bio_X509_AUX(cert,NULL,
+ 			(pem_password_cb *)password_callback, NULL);
+ 	else if (format == FORMAT_PKCS12)
+ 		{
+ 		if (!load_pkcs12(err, cert,cert_descrip, NULL, NULL,
+ 					NULL, &x, NULL))
+ 			goto end;
+ 		}
+ 	else	{
+@@ -1546,26 +1528,29 @@
+ 			return 0;
+ 			}
+ 		}
+ 	return 1;
+ }
+ 
+ static int do_X509_sign(BIO *err, X509 *x, EVP_PKEY *pkey, const EVP_MD *md,
+ 			STACK_OF(OPENSSL_STRING) *sigopts)
+ {
+ 	int rv;
+-	EVP_MD_CTX mctx;
+-	EVP_MD_CTX_init(&mctx);
+-	rv = do_sign_init(err, &mctx, pkey, md, sigopts);
++	EVP_MD_CTX *mctx = NULL;
++	mctx = EVP_MD_CTX_new();
++	if (mctx == NULL) {
++		return 0;
++	}
++	rv = do_sign_init(err, mctx, pkey, md, sigopts);
+ 	if (rv > 0)
+-		rv = X509_sign_ctx(x, &mctx);
+-	EVP_MD_CTX_cleanup(&mctx);
++		rv = X509_sign_ctx(x, mctx);
++	EVP_MD_CTX_free(mctx);
+ 	return rv > 0 ? 1 : 0;
+ }
+ 
+ 
+ 
+ static int do_body(X509 **xret, EVP_PKEY *pkey, X509 *x509, const EVP_MD *dgst,
+ 	     STACK_OF(OPENSSL_STRING) *sigopts, STACK_OF(CONF_VALUE) *policy,
+              CA_DB *db, BIGNUM *serial, char *subj,
+ 	     unsigned long chtype, int multirdn,
+ 	     int email_dn, char *startdate, char *enddate, long days, int batch,
+@@ -1603,38 +1588,37 @@
+ 	if (subj)
+ 		{
+ 		X509_NAME *n = parse_name(subj, chtype, multirdn);
+ 
+ 		if (!n)
+ 			{
+ 			ERR_print_errors(bio_err);
+ 			goto err;
+ 			}
+ 		X509_REQ_set_subject_name(req,n);
+-		req->req_info->enc.modified = 1;
+ 		X509_NAME_free(n);
+ 		}
+ 
+ 	if (default_op)
+ 		BIO_printf(bio_err,"The Subject's Distinguished Name is as follows\n");
+ 
+ 	name=X509_REQ_get_subject_name(req);
+ 	for (i=0; i<X509_NAME_entry_count(name); i++)
+ 		{
+ 		ne= X509_NAME_get_entry(name,i);
+ 		str=X509_NAME_ENTRY_get_data(ne);
+ 		obj=X509_NAME_ENTRY_get_object(ne);
+ 
+ 		if (msie_hack)
+ 			{
+ 			/* assume all type should be strings */
+-			nid=OBJ_obj2nid(ne->object);
++			nid=OBJ_obj2nid(obj);
+ 
+ 			if (str->type == V_ASN1_UNIVERSALSTRING)
+ 				ASN1_UNIVERSALSTRING_to_string(str);
+ 
+ 			if ((str->type == V_ASN1_IA5STRING) &&
+ 				(nid != NID_pkcs9_emailAddress))
+ 				str->type=V_ASN1_T61STRING;
+ 
+ 			if ((nid == NID_pkcs9_emailAddress) &&
+ 				(str->type == V_ASN1_PRINTABLESTRING))
+@@ -1673,21 +1657,21 @@
+ 	if ((subject=X509_NAME_new()) == NULL)
+ 		{
+ 		BIO_printf(bio_err,"Memory allocation failure\n");
+ 		goto err;
+ 		}
+ 
+ 	/* take a copy of the issuer name before we mess with it. */
+ 	if (selfsign)
+ 		CAname=X509_NAME_dup(name);
+ 	else
+-		CAname=X509_NAME_dup(x509->cert_info->subject);
++		CAname=X509_NAME_dup(X509_get_subject_name(x509));
+ 	if (CAname == NULL) goto err;
+ 	str=str2=NULL;
+ 
+ 	for (i=0; i<sk_CONF_VALUE_num(policy); i++)
+ 		{
+ 		cv=sk_CONF_VALUE_value(policy,i); /* get the object id */
+ 		if ((j=OBJ_txt2nid(cv->name)) == NID_undef)
+ 			{
+ 			BIO_printf(bio_err,"%s:unknown object type in 'policy' configuration\n",cv->name);
+ 			goto err;
+@@ -1878,26 +1862,25 @@
+ 		BIO_printf(bio_err,"Subject Name  :%s\n",p);
+ 		ok= -1; /* This is now a 'bad' error. */
+ 		goto err;
+ 		}
+ 
+ 	/* We are now totally happy, lets make and sign the certificate */
+ 	if (verbose)
+ 		BIO_printf(bio_err,"Everything appears to be ok, creating and signing the certificate\n");
+ 
+ 	if ((ret=X509_new()) == NULL) goto err;
+-	ci=ret->cert_info;
+ 
+ 	/* Make it an X509 v3 certificate. */
+ 	if (!X509_set_version(ret,2)) goto err;
+ 
+-	if (BN_to_ASN1_INTEGER(serial,ci->serialNumber) == NULL)
++	if (BN_to_ASN1_INTEGER(serial, X509_get_serialNumber(ret)) == NULL)
+ 		goto err;
+ 	if (selfsign)
+ 		{
+ 		if (!X509_set_issuer_name(ret,subject))
+ 			goto err;
+ 		}
+ 	else
+ 		{
+ 		if (!X509_set_issuer_name(ret,X509_get_subject_name(x509)))
+ 			goto err;
+@@ -1915,34 +1898,20 @@
+ 
+ 	pktmp=X509_REQ_get_pubkey(req);
+ 	i = X509_set_pubkey(ret,pktmp);
+ 	EVP_PKEY_free(pktmp);
+ 	if (!i) goto err;
+ 
+ 	/* Lets add the extensions, if there are any */
+ 	if (ext_sect)
+ 		{
+ 		X509V3_CTX ctx;
+-		if (ci->version == NULL)
+-			if ((ci->version=ASN1_INTEGER_new()) == NULL)
+-				goto err;
+-		ASN1_INTEGER_set(ci->version,2); /* version 3 certificate */
+-
+-		/* Free the current entries if any, there should not
+-		 * be any I believe */
+-		if (ci->extensions != NULL)
+-			sk_X509_EXTENSION_pop_free(ci->extensions,
+-						   X509_EXTENSION_free);
+-
+-		ci->extensions = NULL;
+-
+-		/* Initialize the context structure */
+ 		if (selfsign)
+ 			X509V3_set_ctx(&ctx, ret, ret, req, NULL, 0);
+ 		else
+ 			X509V3_set_ctx(&ctx, x509, ret, req, NULL, 0);
+ 
+ 		if (extconf)
+ 			{
+ 			if (verbose)
+ 				BIO_printf(bio_err, "Extra configuration file found\n");
+  
+@@ -2689,21 +2658,21 @@
+ 	}
+ 
+ 	if (req) {
+ 		if ((email_dn == 1) && ((tmp_email_dn=NCONF_get_string(conf,
+ 			section,ENV_DEFAULT_EMAIL_DN)) != NULL )) {
+ 			if(strcmp(tmp_email_dn,"no") == 0)
+ 				email_dn=0;
+ 		}
+ 		if (verbose)
+ 			BIO_printf(bio_err,"message digest is %s\n",
+-				OBJ_nid2ln(dgst->type));
++				OBJ_nid2ln(EVP_MD_get_type(dgst)));
+ 		if ((policy == NULL) && ((policy=NCONF_get_string(conf,
+ 			section,ENV_POLICY)) == NULL)) {
+ 			lookup_fail(section,ENV_POLICY);
+ 			goto err;
+ 		}
+ 		if (verbose)
+ 			BIO_printf(bio_err,"policy is %s\n",policy);
+ 
+ 		if ((serialfile=NCONF_get_string(conf,section,ENV_SERIAL))
+ 			== NULL) {
+@@ -2821,22 +2790,22 @@
+ 		}
+ 	
+ 		if (verbose)
+ 			BIO_printf(bio_err,"writing new certificates\n");
+ 		for (i=0; i<sk_X509_num(cert_sk); i++) {
+ 			int k;
+ 			char *n;
+ 
+ 			x=sk_X509_value(cert_sk,i);
+ 
+-			j=x->cert_info->serialNumber->length;
+-			p=(const char *)x->cert_info->serialNumber->data;
++			j=X509_get_serialNumber(x)->length;
++			p=(const char *)X509_get_serialNumber(x)->data;
+ 			
+ 
+ 			BUF_strlcat(buf[2],"/",sizeof(buf[2]));
+ 
+ 			n=(char *)&(buf[2][strlen(buf[2])]);
+ 			if (j > 0) {
+ 				for (k=0; k<j; k++) {
+ 					if (n >= &(buf[2][sizeof(buf[2])]))
+ 						break;
+ 					BIO_snprintf(n,

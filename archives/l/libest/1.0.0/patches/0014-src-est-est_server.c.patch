@@ -1,0 +1,78 @@
+--- a/src/est/est_server.c
++++ b/src/est/est_server.c
+@@ -335,21 +335,21 @@
+  * This function is used to determine if the EST client, which could be
+  * an RA, is using a certificate that contains the id-kp-cmcRA usage
+  * extension.  When this usage bit is present, the PoP check is disabled
+  * to allow the RA use case. 
+  *
+  * This logic was taken from x509v3_cache_extensions() in v3_purp.c (OpenSSL).
+  *
+  * Returns 1 if the cert contains id-kp-cmcRA extended key usage extension.
+  * Otherwise it returns 0.
+  */
+-static int est_check_cmcRA (X509 *cert) 
++int est_check_cmcRA (X509 *cert) 
+ {
+     int cmcRA_found = 0;
+     EXTENDED_KEY_USAGE *extusage;
+     int i;
+     ASN1_OBJECT *obj;
+ 
+     /*
+      * Get the extended key usage extension.  If found
+      * loop through the values and look for the ik-kp-cmcRA
+      * value in this extension.
+@@ -469,26 +469,26 @@
+         /*
+          * Get a reference to the attribute now that we know where it's located
+ 	 * RFC 7030 requires that we check the PoP when it's present
+          */
+         attr = X509_REQ_get_attr(req, i);
+ 
+         /*
+          * If we found the attribute, get the actual value of the challengePassword
+          */
+         if (attr) {
+-            if (attr->single) {
+-                t = attr->value.single;
++            if (X509_ATTRIBUTE_count(attr) == 1) {
++                t = X509_ATTRIBUTE_get0_type(attr, 0);
+                 bs = t->value.bit_string;
+             } else {
+                 j = 0;
+-                at = sk_ASN1_TYPE_value(attr->value.set, j);
++                at = X509_ATTRIBUTE_get0_type(attr, j);
+                 bs = at->value.asn1_string;
+             }
+         } else {
+             EST_LOG_WARN("PoP challengePassword attribute not found in client cert request");
+             return (EST_ERR_AUTH_FAIL_TLSUID);
+         }
+ 
+         /*
+          * Now that we have the challengePassword from the client cert request,
+          * compare it to the TLS UID we calculated on the server side.
+@@ -1219,21 +1219,21 @@
+ EST_ERROR est_server_set_auth_mode (EST_CTX *ctx, EST_HTTP_AUTH_MODE amode)
+ {
+     if (!ctx) {
+ 	EST_LOG_ERR("Null context");
+         return (EST_ERR_NO_CTX);
+     }
+ 
+     switch (amode) {
+     case AUTH_BASIC:
+     case AUTH_DIGEST:
+-	if (FIPS_mode()) {
++	if (EVP_default_properties_is_fips_enabled(NULL)) {
+ 	    /*
+ 	     * Since HTTP digest auth uses MD5, make sure we're
+ 	     * not in FIPS mode.
+ 	     */
+ 	    EST_LOG_ERR("HTTP digest auth not allowed while in FIPS mode");
+ 	    return (EST_ERR_BAD_MODE);
+ 	}
+ 	ctx->auth_mode = amode;
+ 	return (EST_ERR_NONE);
+ 	break;

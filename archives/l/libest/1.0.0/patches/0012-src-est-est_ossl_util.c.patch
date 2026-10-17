@@ -1,0 +1,66 @@
+--- a/src/est/est_ossl_util.c
++++ b/src/est/est_ossl_util.c
+@@ -171,21 +171,26 @@
+         EST_LOG_ERR("Unable to read PEM encoded certs from BIO");
+         BIO_free(in);
+         return 0;
+     }
+     BIO_free(in);
+ 
+     /* scan over it and pull out the CRL's */
+     while (sk_X509_INFO_num(sk)) {
+         xi = sk_X509_INFO_shift(sk);
+         if (xi->x509 != NULL) {
+-            EST_LOG_INFO("Adding cert to store (%s)", xi->x509->name);
++            char subject_buf[256];
++            if (X509_NAME_oneline(X509_get_subject_name(xi->x509),
++                                  subject_buf, sizeof(subject_buf)) == NULL) {
++                subject_buf[0] = '\0';
++            }
++            EST_LOG_INFO("Adding cert to store (%s)", subject_buf);
+             X509_STORE_add_cert(store, xi->x509);
+ 	    cert_cnt++;
+         }
+         if (xi->crl != NULL) {
+             EST_LOG_INFO("Adding CRL to store");
+             X509_STORE_add_crl(store, xi->crl);
+         }
+         X509_INFO_free(xi);
+     }
+ 
+@@ -235,21 +240,34 @@
+     BUF_MEM	*bptr = NULL;
+ 
+     e = BIO_new(BIO_s_mem());
+     if (!e) {
+ 	EST_LOG_ERR("BIO_new failed");
+ 	return;
+     }
+     ERR_print_errors(e);
+     (void)BIO_flush(e);
+     BIO_get_mem_ptr(e, &bptr);
+-    EST_LOG_WARN("OSSL error: %s", bptr->data); 
++    if (bptr != NULL && bptr->data != NULL && bptr->length > 0) {
++	/*
++	 * BUF_MEM data is not guaranteed to be NUL-terminated; copy to a
++	 * NUL-terminated buffer before passing it to the %s logger so the
++	 * vfprintf() never reads past the allocated region.
++	 */
++	char *errbuf = malloc(bptr->length + 1);
++	if (errbuf != NULL) {
++	    memcpy(errbuf, bptr->data, bptr->length);
++	    errbuf[bptr->length] = '\0';
++	    EST_LOG_WARN("OSSL error: %s", errbuf);
++	    free(errbuf);
++	}
++    }
+     BIO_free_all(e);
+ }
+ 
+ 
+ /*! @brief est_convert_p7b64_to_pem() converts the base64 encoded
+     PKCS7 response from the EST server into PEM format.   
+  
+     @param certs_p7 Points to a buffer containing the base64 encoded pkcs7 data.
+     @param certs_len Indicates the size of the *certs_p7 buffer.
+     @param pem Double pointer that will receive the PEM encoded data. 
