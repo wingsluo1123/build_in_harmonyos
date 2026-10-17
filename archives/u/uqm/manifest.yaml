@@ -1,0 +1,39 @@
+# 软件级 manifest — uqm (The Ur-Quan Masters)
+# 文件位置: archives/u/uqm/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0 §4.1
+
+software: uqm
+display: "The Ur-Quan Masters"
+description: "Star Control II 开源复刻版（星际探索 + 实时太空对战，SDL2）"
+category: gfx
+homepage: "http://sc2.sourceforge.net/"
+repository: "https://sourceforge.net/projects/sc2/"
+license: GPL-2.0-or-later
+build_system: custom
+keywords:
+  - uqm
+  - ur-quan-masters
+  - star-control
+  - game
+  - sdl2
+
+# 跨版本通用的 OHOS 适配知识
+ohos_adaptation:
+  key_points:
+    - "上游自研 build.sh 的 configure 是交互式文本菜单，无 CLI 参数；无人值守须合成 config.state 后走 reprocess_config（上游 INSTALL 认可）"
+    - "上游把编译器驱动名写死为 gcc（config_proginfo_build: PROG_gcc_FILE）；配方生成 build_folder 私有 gcc→clang 转发 shim（R49）"
+    - "上游构建脚本硬编码 /tmp 作为探针临时目录，OHOS /tmp 只读；仅设置 TMPDIR 无效，须补丁改为 ${TMPDIR:-/tmp}（ref: E754）"
+    - "musl 下 fd_set/FD_SETSIZE/select 不随 sys/types.h 传递可见，须显式 #include <sys/select.h>（ref: E757）"
+    - "依赖探测机制不统一：SDL2 走 sdl2-config、Vorbis/zlib 走 pkg-config、libpng 直接 -lpng 且不带 -L；需分别接入 bindirs/PKG_CONFIG_PATH/CFLAGS-LDFLAGS"
+  common_dependencies:
+    - sdl2/2.32.10
+    - libpng/1.6.58.3
+    - libvorbis/1.3.7
+    - zlib/1.3.2
+
+versions:
+  0.8.0:
+    status: built
+    build_date: "2026-10-16"
+    conan_ref: "uqm/0.8.0"
+    patches: 2
