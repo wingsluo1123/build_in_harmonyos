@@ -1,0 +1,96 @@
+# test_package/MANIFEST.yml — sf-pwgen 1.5
+# 上游官方测试声明（CI build_and_test.sh L0e 强制要求）。
+# 详见 docs/TEST_QUALITY_SPEC.md
+#
+# 计数口径（唯一口径，贯穿 MANIFEST / notes.md / 测试日志 / PR 两张表）：
+#   按「独立检查项数量」计数 —— 每个检查项可单独判定成败、单独打印 ok/FAIL。
+#   适配后合计 14 项 = 功能补全 9 项（F1-F9，test.sh）+ 鸿蒙特有 5 项
+#  （A1-A3 产物 ABI + H1-H2 运行期平台行为；其中 H1-H2 同在 test.sh 内执行，
+#   test.sh 自身共 11 个运行时用例，其 HMBS 标记按 11 计，见 test.sh）。
+
+package: sf-pwgen/1.5
+homepage: "https://github.com/anders/pwgen"
+
+# ── 上游测试套件存在性（经审计官方 tar 包确认）──────────────────────
+upstream_tests_exist: false
+upstream_test_total: 0
+upstream_test_count_method: manual_audit
+
+upstream_test_audit:
+  source_tarball: "pwgen-1.5.tar.gz (https://github.com/anders/pwgen/archive/refs/tags/1.5.tar.gz)"
+  source_sha256: "e1f1d575638f216c82c2d1e9b52181d1d43fd05e7169db1d6f9f5d8a2247b475"
+  upstream_tag_commit: "1212ca43967f49a8ef4deed9164a6558a321bcdc (tag 1.5)"
+  build_system: "手写 Makefile（clang -fobjc-arc -framework Foundation/CoreFoundation/SecurityFoundation，仅 Apple 平台可构建；无 configure / 无 CMake / 无 meson）"
+  scanned_for:
+    - "tests/ 或 test/ 目录"
+    - "Makefile 中的 check / test 目标"
+    - "gtest / criterion / check / CUnit 等 C 测试框架绑定"
+    - "*_test.c / test_*.c 命名的测试源文件"
+    - "sf-pwgen-test/ 下的 XCTest 内容"
+  scan_result: "tarball 共 17 个文件：.gitignore、.travis.yml、Makefile、README.md、SFPasswordAssistant.h、VERSIONS.md、sf-pwgen.m、sf-pwgen-test/Info.plist、sf-pwgen-test/sf_pwgen_test.m、sf-pwgen.xcodeproj/*（6 个工程文件）。无 tests/ 或 test/ 目录；Makefile 目标仅 all/format/clean，无 check 或 test 目标；无第三方测试框架依赖；sf-pwgen-test/sf_pwgen_test.m 为空占位 XCTest（testExample 无断言、testPerformanceExample 测空 block，2019-04-13 为修复 Travis 加的占位工程），无有效断言。"
+  reason: "sf-pwgen 1.5 上游无有效测试框架与测试目标（占位 XCTest 无断言、Makefile 无 check/test 目标），按 no_tests 处理；适配后由 test_package 补全 14 个独立检查项。"
+
+# 上游测试命令（无有效测试套件，故不适用）
+upstream_check_command: ""
+
+# conanfile.py build() 中未集成上游测试（上游无有效测试可集成）
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests: []
+
+# ── test_package 自带的功能测试（上游无有效测试，适配后补全）──────
+# 执行位置: test_package/test.sh（can_run() 为真时在 HarmonyOS 上实跑）
+test_package_tests:
+  - file: test.sh
+    description: >-
+      功能补全 9 项（F1-F9），覆盖可移植后端复刻的 1.5 全部文档化 CLI 契约：
+      F1 无参默认运行（5 行非空）；F2 -v 输出 sf-pwgen 1.5；F3 -h 输出用法；
+      F4 letters 12 位字母表；F5 alphanumeric 16 位；F6 numbers 10 位数字；
+      F7 random 12 位可打印；F8 memorable 词拼接（[a-z-]）；F9 未知算法报错。
+      字符集与行数均为确定性断言（grep -E 全行匹配 + wc -l 行数文件比对，
+      不用命令替换计数）。
+    command: "sh test.sh <bindir>"
+    assertion_count: 9
+
+# ── 鸿蒙特有测试（rule12: N >= 1，本包 N = 5）──────────────────────
+harmonyos_specific_tests:
+  - file: ohos_abi_check.py
+    description: >-
+      鸿蒙特有 A1: 产物为 ELF64 小端且 e_machine == EM_AARCH64(183)，
+      即 HarmonyOS PC arm64 目标（交叉编译三元组 aarch64-linux-ohos 生效）。
+    command: "python3 ohos_abi_check.py --binary <pkg>/bin/sf-pwgen"
+    assertion_count: 1
+  - file: ohos_abi_check.py
+    description: >-
+      鸿蒙特有 A2: .interp == /lib/ld-musl-aarch64.so.1，即鸿蒙 musl 动态
+      加载器；glibc 产物会是 /lib/ld-linux-aarch64.so.1，故该断言可区分
+      工具链/sysroot 是否真的指向 OHOS。
+    command: "python3 ohos_abi_check.py --binary <pkg>/bin/sf-pwgen"
+    assertion_count: 1
+  - file: ohos_abi_check.py
+    description: >-
+      鸿蒙特有 A3: DT_NEEDED 含 libc.so 且无 libcrypto/libssl。
+      本包零 requires（无 framework 残留可表达于 ELF），该断言把零依赖
+      承诺固化成可执行检查。
+    command: "python3 ohos_abi_check.py --binary <pkg>/bin/sf-pwgen"
+    assertion_count: 1
+  - file: test.sh
+    description: >-
+      鸿蒙特有 H1（熵源）: /dev/urandom 必须由鸿蒙内核正确播种，
+      否则口令可预测。连续两次 -a random -l 16 的输出必须不同（cmp 判定）。
+    command: "sh test.sh <bindir>"
+    assertion_count: 1
+  - file: test.sh
+    description: >-
+      鸿蒙特有 H2（1.5 偏短警告语义）: 上游 1.5 要求偏短必警告。
+      可移植后端 8 词上限下 -a memorable -l 128 必然偏短，断言 rc=0、
+      恰好 1 行且 stderr 含 shorter than the requested length。
+    command: "sh test.sh <bindir>"
+    assertion_count: 1
+
+# 测试断言总数（独立检查项：功能补全 9 + 鸿蒙特有 5）
+assertion_count: 14
+test_package_test_count: 9
+harmonyos_specific_test_count: 5
+count_method: "independent_check_items"

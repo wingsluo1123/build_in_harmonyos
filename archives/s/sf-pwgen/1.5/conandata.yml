@@ -1,0 +1,18 @@
+# conandata.yml — sf-pwgen 1.5
+# 上游官方源（R39/PF7）：anders/pwgen tag 1.5（macOS 密码生成器）
+#   https://github.com/anders/pwgen/archive/refs/tags/1.5.tar.gz
+# sha256 = e1f1d575638f216c82c2d1e9b52181d1d43fd05e7169db1d6f9f5d8a2247b475
+#   （tag 1.5 / commit 1212ca43967f49a8ef4deed9164a6558a321bcdc，直链实测）
+# 适配补丁共 1 个：0001 新增 sf-pwgen-portable.c（纯 C99 可移植后端，
+#   复刻 1.5 CLI 契约，熵源 /dev/urandom，无第三方依赖，无平台宏）。
+# 注意（R39/PF7）：此处只写官方源，不得手写镜像前缀。
+#   ci/conan/build_and_test.sh 会在运行时自动加镜像回退。
+
+sources:
+  url: "https://github.com/anders/pwgen/archive/refs/tags/1.5.tar.gz"
+  sha256: "e1f1d575638f216c82c2d1e9b52181d1d43fd05e7169db1d6f9f5d8a2247b475"
+
+patches:
+  - patch_file: "patches/0001-ohos-portable-backend.patch"
+    patch_description: "Add sf-pwgen-portable.c: pure-C99 portable backend implementing the sf-pwgen 1.5 CLI contract (memorable/random/letters/alphanumeric/numbers, count/length/language/version/help, 8..128 clamp, shorter-than-requested warning) on /dev/urandom. Upstream sf-pwgen.m needs macOS Foundation/SecurityFoundation and cannot compile on OHOS; the macOS sources are left untouched and simply not used for the OHOS artifact."
+    patch_type: "portability"

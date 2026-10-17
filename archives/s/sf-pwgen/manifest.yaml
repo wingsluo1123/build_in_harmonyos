@@ -1,0 +1,24 @@
+# 软件级 manifest — sf-pwgen
+software: sf-pwgen
+display: "sf-pwgen"
+description: "口令生成器（macOS sf-pwgen 1.5 CLI 的 HarmonyOS 可移植实现）"
+category: crypto
+homepage: "https://github.com/anders/pwgen"
+license: BSD-3-Clause
+
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "上游 1.5 为 macOS 专属 Objective-C（含 Foundation/SecurityFoundation 私有口令助手 API），在 OHOS 上无法编译链接；补丁新增纯 C99 后端 sf-pwgen-portable.c，复刻全部 CLI 契约"
+    - "熵源为 /dev/urandom（拒绝采样去偏）+ 无 urandom 沙箱回退；零第三方依赖，R36 零 requires"
+    - "配方 build() 仅编译可移植单文件（Conan conf 取编译器，R33；单 cc 调用，R9），macOS 原文件保留但不参与 OHOS 产物"
+    - "产出 bin/sf-pwgen（application 包，R38 工具声明 commands.json）"
+    - "上游仅有空占位 XCTest（testExample/testPerformanceExample 无断言），按无有效测试审计；test_package 补全功能与鸿蒙特有检查"
+  common_dependencies: []
+
+versions:
+  "1.5":
+    status: built
+    build_date: "2026-10-16"
+    conan_ref: "sf-pwgen/1.5"
