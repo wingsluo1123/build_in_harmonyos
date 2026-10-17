@@ -1,0 +1,187 @@
+--- a/test/util/st_proxy.c
++++ b/test/util/st_proxy.c
+@@ -28,20 +28,22 @@
+ #include "ossl_srv.h"
+ #include "test_utils.h"
+ #include <sys/types.h>
+ #include <sys/socket.h>
+ #include <sys/select.h>
+ #include <netinet/in.h>
+ 
+ 
+ static int tcp_port;
+ volatile int stop_proxy_flag = 0;
++static pthread_t proxy_thread_id;
++static int proxy_thread_started = 0;
+ unsigned char *proxy_cacerts_raw = NULL;
+ int proxy_cacerts_len = 0;
+ EST_CTX *epctx;
+ unsigned char *proxy_trustcerts = NULL;
+ int proxy_trustcerts_len = 0;
+ 
+ extern void dumpbin(char *buf, size_t len);
+ 
+ /*
+  * We hard-code the DH parameters here.  THIS SHOULD NOT
+@@ -79,26 +81,31 @@
+ 	0x57,0xEE,0x36,0xCB,0x06,0xEA,0xF5,0x3D,0x95,0x49,0xCB,0xA7,
+ 	0xDD,0x81,0xDF,0x80,0x09,0x4A,0x97,0x4D,0xA8,0x22,0x72,0xA1,
+ 	0x7F,0xC4,0x70,0x56,0x70,0xE8,0x20,0x10,0x18,0x8F,0x2E,0x60,
+ 	0x07,0xE7,0x68,0x1A,0x82,0x5D,0x32,0xA2,
+ 	};
+     DH *dh;
+ 
+     if ((dh=DH_new()) == NULL) {
+ 	return(NULL);
+     }
+-    dh->p=BN_bin2bn(dh1024_p,sizeof(dh1024_p),NULL);
+-    dh->g=BN_bin2bn(dh1024_g,sizeof(dh1024_g),NULL);
+-    if ((dh->p == NULL) || (dh->g == NULL)) { 
+-	DH_free(dh); return(NULL); 
+-    }
+-    dh->length = 160;
++    {
++	BIGNUM *p = BN_bin2bn(dh1024_p, sizeof(dh1024_p), NULL);
++	BIGNUM *g = BN_bin2bn(dh1024_g, sizeof(dh1024_g), NULL);
++	if ((p == NULL) || (g == NULL) ||
++	    (DH_set0_pqg(dh, p, NULL, g) != 1)) {
++	    BN_free(p);
++	    DH_free(dh);
++	    return(NULL);
++	}
++    }
++    DH_set_length(dh, 160);
+     return(dh);
+ }
+ 
+ 
+ /****************************************************************************************
+  * The following funcitons are the callbacks used by libest.a to bind
+  * the EST stack to the HTTP/SSL layer and the CA server.
+  ***************************************************************************************/
+ static char digest_user[3][32] = 
+     {
+@@ -209,38 +216,52 @@
+     while (stop_proxy_flag == 0) {
+         len = sizeof(addr);
+         new = accept(sock, (struct sockaddr*)&addr, &len);
+         if (new < 0) {
+ 	    /*
+ 	     * this is a bit cheesy, but much easier to implement than using select()
+ 	     */
+             usleep(100);
+         } else {
+             if (stop_proxy_flag == 0) {
++		/*
++		 * est_server_handle_request() may block on a slow/half-open
++		 * client (SSL_accept waiting for ClientHello).  Make the
++		 * accepted socket non-blocking so the TLS/HTTP processing
++		 * returns promptly (WANT_READ path) and the accept loop can
++		 * observe stop_proxy_flag instead of being stuck.
++		 */
++		int nfl = fcntl(new, F_GETFL, 0);
++		if (nfl != -1) {
++		    fcntl(new, F_SETFL, nfl | O_NONBLOCK);
++		}
+ 		est_server_handle_request(epctx, new);
+ 		close(new);
+             }
+         }
+     }
+     close(sock);
+     cleanup();
+     return NULL;
+ }
+ 
+ 
+ /*
+  * Call this function to stop the single-threaded simple EST proxy server
+  */
+ void st_proxy_stop ()
+ {
+     stop_proxy_flag = 1;
+-    sleep(2);
++    if (proxy_thread_started) {
++	pthread_join(proxy_thread_id, NULL);
++	proxy_thread_started = 0;
++    }
+ }
+ 
+ /*
+  * Call this to start a simple EST proxy server.  This server will not
+  * be thread safe.  It can only handle a single EST request on
+  * the listening socket at any given time.  This server will run
+  * until st_proxy_stop() is invoked.
+  *
+  * Parameters:
+  *  listen_port:    Port number to listen on
+@@ -304,41 +325,41 @@
+         if (proxy_trustcerts_len <= 0) {
+             printf("\nTrusted certs file %s could not be read\n", 
+ 		    trusted_certs_file);
+             return (-1);
+         }
+     }
+ 
+     /*
+      * Read in the local server certificate 
+      */
+-    certin = BIO_new(BIO_s_file_internal());
++    certin = BIO_new(BIO_s_file());
+     if (BIO_read_filename(certin, certfile) <= 0) {
+ 	printf("\nUnable to read server certificate file %s\n", certfile);
+ 	return (-1);
+     }
+     /*
+      * This reads the file, which is expected to be PEM encoded.  If you're using 
+      * DER encoded certs, you would invoke d2i_X509_bio() instead.
+      */
+     x = PEM_read_bio_X509(certin, NULL, NULL, NULL);
+     if (x == NULL) {
+ 	printf("\nError while reading PEM encoded server certificate file %s\n", certfile);
+ 	return (-1);
+     }
+     BIO_free(certin);
+ 
+ 
+     /* 
+      * Read in the server's private key
+      */
+-    keyin = BIO_new(BIO_s_file_internal());
++    keyin = BIO_new(BIO_s_file());
+     if (BIO_read_filename(keyin, keyfile) <= 0) {
+ 	printf("\nUnable to read server private key file %s\n", keyfile);
+ 	return (-1);
+     }
+     /*
+      * This reads in the private key file, which is expected to be a PEM
+      * encoded private key.  If using DER encoding, you would invoke
+      * d2i_PrivateKey_bio() instead. 
+      */
+     priv_key = PEM_read_bio_PrivateKey(keyin, NULL, NULL, NULL);
+@@ -401,21 +422,24 @@
+     printf("\nLaunching EST proxy server...\n");
+ 
+     rv = est_proxy_start(epctx);
+     if (rv != EST_ERR_NONE) {
+         printf("\nFailed to init mg\n");
+         return (-1);
+     }
+ 
+     // Start master (listening) thread
+     tcp_port = listen_port;
+-    pthread_create(&thread, NULL, master_thread, NULL);
++    if (pthread_create(&thread, NULL, master_thread, NULL) == 0) {
++	proxy_thread_id = thread;
++	proxy_thread_started = 1;
++    }
+ 
+     /* Clean up */
+     EVP_PKEY_free(priv_key);
+     X509_free(x);
+     sleep(2);
+     return 0;
+ }
+ 
+ void st_proxy_enable_pop ()
+ {

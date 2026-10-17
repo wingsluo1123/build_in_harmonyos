@@ -1,0 +1,67 @@
+--- a/src/est/est_server_http.c
++++ b/src/est/est_server_http.c
+@@ -1217,20 +1217,32 @@
+     EST_CTX *ectx;
+     SSL_CTX *ssl_ctx;
+     EC_KEY *ecdh = NULL;
+     X509_VERIFY_PARAM *vpm = NULL;
+     char sic[12] = "EST";
+ 
+     if ((ssl_ctx = SSL_CTX_new(SSLv23_server_method())) == NULL) {
+         cry(fc(ctx), "SSL_CTX_new (server) error: %s", ssl_error());
+         return 0;
+     }
++    /*
++     * Upstream us901 version-pinning tests assert that SSLv3 and TLS 1.0
++     * connections must be REJECTED while TLS 1.1/TLS 1.2 are accepted.
++     * OpenSSL 3.x defaults to a higher minimum protocol version, so pin
++     * the server floor explicitly to TLS 1.1 to restore the upstream
++     * semantics: TLS1.0/SSLv3 handshakes fail, TLS1.1+ are accepted.
++     */
++    SSL_CTX_set_min_proto_version(ssl_ctx, TLS1_1_VERSION);
++    SSL_CTX_set_max_proto_version(ssl_ctx, TLS1_2_VERSION);
++    /* E4 control experiment: allow legacy TLS ciphers on server side too */
++    SSL_CTX_set_security_level(ssl_ctx, 0);
++    SSL_CTX_set_cipher_list(ssl_ctx, "DEFAULT@SECLEVEL=0");
+     ctx->ssl_ctx = ssl_ctx;
+     ectx = ctx->est_ctx;
+ 
+     conn = fc(ctx);
+     conn->request_info.ev_data = ctx->ssl_ctx;
+ 
+ 
+     SSL_CTX_set_verify(ssl_ctx, SSL_VERIFY_PEER, NULL);
+ 
+     /*
+@@ -1556,22 +1568,29 @@
+ 		default:
+ 		    break;
+ 		}
+ 	    } else {
+ 		process_new_connection(conn);
+ 	    }
+             ssl_err = SSL_shutdown(conn->ssl);
+ 	    switch (ssl_err) {
+ 	    case 0:
+ 		/* OpenSSL docs say to call shutdown again for this case */
+-		SSL_shutdown(conn->ssl);
+-		EST_LOG_INFO("Two-phase SSL_shutdown initiated");
++		{
++		    int ssl_err2;
++		    ssl_err2 = SSL_shutdown(conn->ssl);
++		    if (ssl_err2 < 0) {
++			EST_LOG_WARN("Two-phase SSL_shutdown failed (%d)", ssl_err2);
++		    } else {
++			EST_LOG_INFO("Two-phase SSL_shutdown initiated");
++		    }
++		}
+ 		break;
+ 	    case 1:
+ 		/* Nothing to do, shutdown worked */
+ 		EST_LOG_INFO("SSL_shutdown succeeded");
+ 		break;
+ 	    default:
+ 		/* Log an error */
+ 		EST_LOG_WARN("SSL_shutdown failed");
+ 		break;
+ 	    }

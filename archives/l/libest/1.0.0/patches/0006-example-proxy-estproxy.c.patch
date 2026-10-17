@@ -1,0 +1,68 @@
+--- a/example/proxy/estproxy.c
++++ b/example/proxy/estproxy.c
+@@ -235,21 +235,21 @@
+         case 'p':
+             est_server_port = atoi(optarg);
+             break;
+         case 'l':
+             listen_port = atoi(optarg);
+             break;
+         case 'f':
+            /*
+             * Turn FIPS on if user requested it and exit if failure
+             */
+-            set_fips_return = FIPS_mode_set(1);
++            set_fips_return = EVP_default_properties_enable_fips(NULL, 1);
+             if (set_fips_return != 1) {
+               set_fips_error = ERR_get_error();
+               printf("\nERROR WHILE SETTING FIPS MODE ON exiting ....\n");
+               exit(1);
+             } else {
+               printf("\nRunning EST Sample Proxy with FIPS MODE = ON !\n");
+             };
+             break;
+         default:
+             show_usage_and_exit();
+@@ -297,40 +297,40 @@
+             printf("\nEST_TRUSTED_CERTS file could not be read\n");
+             exit(1);
+         }
+     }
+ 
+     est_apps_startup();
+ 
+     /*
+      * Read in the local server certificate 
+      */
+-    certin = BIO_new(BIO_s_file_internal());
++    certin = BIO_new(BIO_s_file());
+     if (BIO_read_filename(certin, certfile) <= 0) {
+ 	printf("\nUnable to read server certificate file %s\n", certfile);
+ 	exit(1);
+     }
+     /*
+      * This reads the file, which is expected to be PEM encoded.  If you're using 
+      * DER encoded certs, you would invoke d2i_X509_bio() instead.
+      */
+     x = PEM_read_bio_X509(certin, NULL, NULL, NULL);
+     if (x == NULL) {
+ 	printf("\nError while reading PEM encoded server certificate file %s\n", certfile);
+ 	exit(1);
+     }
+     BIO_free(certin);
+ 
+     /* 
+      * Read in the server's private key
+      */
+-    keyin = BIO_new(BIO_s_file_internal());
++    keyin = BIO_new(BIO_s_file());
+     if (BIO_read_filename(keyin, keyfile) <= 0) {
+ 	printf("\nUnable to read server private key file %s\n", keyfile);
+ 	exit(1);
+     }
+     /*
+      * This reads in the private key file, which is expected to be a PEM
+      * encoded private key.  If using DER encoding, you would invoke
+      * d2i_PrivateKey_bio() instead. 
+      */
+     priv_key = PEM_read_bio_PrivateKey(keyin, NULL, NULL, NULL);

@@ -1,0 +1,42 @@
+--- a/src/est/est_proxy.c
++++ b/src/est/est_proxy.c
+@@ -465,22 +465,37 @@
+      */
+     if (est_server_check_csr(csr)) {
+ 	EST_LOG_ERR("PKCS10 CSR sent by the client failed sanity check");
+ 	X509_REQ_free(csr);
+ 	return (EST_ERR_BAD_PKCS10);
+     }
+ 
+     /*
+      * Do the PoP check (Proof of Possession).  The challenge password
+      * in the pkcs10 request should match the TLS unique ID.
+-     */
+-    rv = est_tls_uid_auth(ctx, ssl, csr);
++     * The PoP check is not performed when the client is an RA
++     * (certificate carries id-kp-cmcRA), matching est_server.c.
++     */
++    {
++	X509 *peer_cert = SSL_get_peer_certificate(ssl);
++	int client_is_ra = 0;
++	if (peer_cert) {
++	    client_is_ra = est_check_cmcRA(peer_cert);
++	    X509_free(peer_cert);
++	}
++	EST_LOG_INFO("id-kp-cmcRA present: %d", client_is_ra);
++	if (!client_is_ra) {
++	    rv = est_tls_uid_auth(ctx, ssl, csr);
++	} else {
++	    rv = EST_ERR_NONE;
++	}
++    }
+     X509_REQ_free(csr);
+ 
+     if (rv != EST_ERR_NONE) {
+         return (EST_ERR_AUTH_FAIL_TLSUID);
+     }
+ 
+     /*
+      * body now points to the pkcs10 data, pass
+      * this to the enrollment routine.  Need to hi-jack
+      * a BUF_MEM.  Attach the body to a new BUF_MEM

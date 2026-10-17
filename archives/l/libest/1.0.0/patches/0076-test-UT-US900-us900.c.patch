@@ -1,0 +1,53 @@
+--- a/test/UT/US900/us900.c
++++ b/test/UT/US900/us900.c
+@@ -211,21 +211,26 @@
+            __FUNCTION__, openssl_cert_error,
+            X509_verify_cert_error_string(openssl_cert_error));
+ 
+     printf("Failing Cert:\n");
+     X509_print_fp(stdout,cur_cert);
+     /*
+      * Next call prints out the signature which can be used as the fingerprint
+      * This fingerprint can be checked against the anticipated value to determine
+      * whether or not the server's cert should be approved.
+      */
+-    X509_signature_print(bio_err, cur_cert->sig_alg, cur_cert->signature);
++    {
++	const X509_ALGOR *sig_alg = NULL;
++	const ASN1_BIT_STRING *signature = NULL;
++	X509_get0_signature(&signature, &sig_alg, cur_cert);
++	X509_signature_print(bio_err, sig_alg, signature);
++    }
+ 
+     if (openssl_cert_error == X509_V_ERR_UNABLE_TO_GET_CRL) {
+         approve = 1;
+     }
+ 
+     BIO_free(bio_err);
+ 
+     return approve;
+ }
+ 
+@@ -395,21 +400,21 @@
+ 
+     retrieved_cacerts = malloc(retrieved_cacerts_len);
+     
+     rc = est_client_copy_cacerts(ctx, retrieved_cacerts);
+     
+     /*
+      * output the retrieved ca certs and compare to what they should be
+      */    
+     if (retrieved_cacerts) {
+ 
+-        printf("\nRetrieved CA Certs buffer:\n %s\n", retrieved_cacerts);
++        printf("\nRetrieved CA Certs buffer:\n %.*s\n", retrieved_cacerts_len, retrieved_cacerts);
+         printf("Retrieved CA certs buffer length: %d\n", retrieved_cacerts_len);    
+     }
+     free(retrieved_cacerts);
+ 
+     /* clear callback */
+     if (est_set_csr_cb(ectx, NULL)) {
+         printf("\nUnable to set EST CSR Attributes callback.  Aborting!!!\n");
+         exit(1);
+     }
+ 

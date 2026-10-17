@@ -1,0 +1,269 @@
+--- a/test/UT/US901/us901.c
++++ b/test/UT/US901/us901.c
+@@ -282,64 +282,114 @@
+     /*
+      * Cleanup all the data
+      */
+     SSL_shutdown(ssl);
+     SSL_free(ssl);
+     SSL_CTX_free(ssl_ctx);
+ 
+ }
+ 
+ /*
++ * OpenSSL 3.x removed the SSLv3/TLSv1/TLSv1.1 client method functions;
++ * preserve the upstream "old protocol must be rejected" semantics by
++ * pinning the negotiated version on a TLS_client_method() context.
++ * The EST server in this test harness accepts only modern TLS, so a
++ * handshake attempted at a removed protocol version must fail
++ * (expect_fail == 1) and a TLS 1.2 attempt must succeed (expect_fail == 0).
++ */
++static void us901_test_sslversion_tls (int version, int expect_fail)
++{
++    BIO *conn;
++    SSL *ssl;
++    SSL_CTX *ssl_ctx = NULL;
++    int rv;
++
++    LOG_FUNC_NM;
++
++    ssl_ctx = SSL_CTX_new(TLS_client_method());
++    CU_ASSERT(ssl_ctx != NULL);
++    if (ssl_ctx == NULL) {
++	return;
++    }
++    SSL_CTX_set_min_proto_version(ssl_ctx, version);
++    SSL_CTX_set_max_proto_version(ssl_ctx, version);
++    /* E4 control experiment: allow legacy TLS ciphers to test negotiation */
++    SSL_CTX_set_security_level(ssl_ctx, 0);
++    SSL_CTX_set_cipher_list(ssl_ctx, "DEFAULT@SECLEVEL=0");
++
++    conn = open_tcp_socket("127.0.0.1", "8088");
++    CU_ASSERT(conn != NULL); 
++    if (conn == NULL) {
++	SSL_CTX_free(ssl_ctx);
++	return;
++    }
++
++    ssl = SSL_new(ssl_ctx);
++    SSL_set_bio(ssl, conn, conn);
++
++    rv = SSL_connect(ssl);
++    if (!expect_fail) {
++	CU_ASSERT(rv > 0);
++    } else {
++	CU_ASSERT(rv <= 0);
++    }
++
++    SSL_shutdown(ssl);
++    SSL_free(ssl);
++    SSL_CTX_free(ssl_ctx);
++}
++
++/*
+  * This test attempts to create a SSL 3.0 connection
+  * with the EST server.  This should fail, as TLS 1.0
+  * is not allowed.
+  */
+ static void us901_test6 (void)
+ {
+     LOG_FUNC_NM;
+ 
+-    us901_test_sslversion(SSLv3_client_method(), 1);
++    us901_test_sslversion_tls(SSL3_VERSION, 1);
+ }
+ 
+ 
+ /*
+  * This test attempts to create a TLS 1.0 connection
+  * with the EST server.  This should fail, as TLS 1.0
+  * is not allowed.
+  */
+ static void us901_test7 (void)
+ {
+     LOG_FUNC_NM;
+ 
+-    us901_test_sslversion(TLSv1_client_method(), 1);
++    us901_test_sslversion_tls(TLS1_VERSION, 1);
+ }
+ 
+ /*
+  * This test attempts to create a TLS 1.1 connection
+  * with the EST server.  This should succeed.
+  */
+ static void us901_test8 (void)
+ {
+     LOG_FUNC_NM;
+ 
+-    us901_test_sslversion(TLSv1_1_client_method(), 0);
++    us901_test_sslversion_tls(TLS1_1_VERSION, 0);
+ }
+ 
+ /*
+  * This test attempts to create a TLS 1.2 connection
+  * with the EST server.  This should succeed.
+  */
+ static void us901_test9 (void)
+ {
+     LOG_FUNC_NM;
+ 
+-    us901_test_sslversion(TLSv1_2_client_method(), 0);
++    us901_test_sslversion_tls(TLS1_2_VERSION, 0);
+ }
+ 
+ /*
+  * This test attempts to use a client certificate to
+  * verify the TLS client authentiaiton is working.  
+  * The certificate used is signed by the explicit cert
+  * chain. This should succeed.
+  */
+ static void us901_test10 (void)
+ {
+@@ -487,31 +537,31 @@
+ 
+     /*
+      * Read in the CA certificates
+      */
+     cacerts_len = read_binary_file(US901_CACERT, &cacerts);
+     CU_ASSERT(cacerts_len > 0);
+ 
+     /*
+      * Read the server cert
+      */
+-    certin = BIO_new(BIO_s_file_internal());
++    certin = BIO_new(BIO_s_file());
+     rv = BIO_read_filename(certin, US901_SERVER_CERT); 
+     CU_ASSERT(rv > 0);
+     x = PEM_read_bio_X509(certin, NULL, NULL, NULL);
+     CU_ASSERT(x != NULL);
+     BIO_free(certin);
+ 
+     /*
+      * Read the server key 
+      */
+-    keyin = BIO_new(BIO_s_file_internal());
++    keyin = BIO_new(BIO_s_file());
+     rv = BIO_read_filename(keyin, US901_SERVER_KEY);
+     CU_ASSERT(rv > 0);
+     priv_key = PEM_read_bio_PrivateKey(keyin, NULL, NULL, NULL);
+     CU_ASSERT(priv_key != NULL);
+     BIO_free(keyin);
+ 
+     /* 
+      * Attempt to init EST server using NULL realm
+      */
+     est_init_logger(EST_LOG_LVL_INFO, NULL);
+@@ -540,21 +590,21 @@
+ 
+     /*
+      * Read in the CA certificates
+      */
+     cacerts_len = read_binary_file(US901_CACERT, &cacerts);
+     CU_ASSERT(cacerts_len > 0);
+ 
+     /*
+      * Read the server key 
+      */
+-    keyin = BIO_new(BIO_s_file_internal());
++    keyin = BIO_new(BIO_s_file());
+     rv = BIO_read_filename(keyin, US901_SERVER_KEY);
+     CU_ASSERT(rv > 0);
+     priv_key = PEM_read_bio_PrivateKey(keyin, NULL, NULL, NULL);
+     CU_ASSERT(priv_key != NULL);
+     BIO_free(keyin);
+ 
+     /* 
+      * Attempt to init EST server using NULL server key
+      */
+     est_init_logger(EST_LOG_LVL_INFO, NULL);
+@@ -582,21 +632,21 @@
+ 
+     /*
+      * Read in the CA certificates
+      */
+     cacerts_len = read_binary_file(US901_CACERT, &cacerts);
+     CU_ASSERT(cacerts_len > 0);
+ 
+     /*
+      * Read the server cert
+      */
+-    certin = BIO_new(BIO_s_file_internal());
++    certin = BIO_new(BIO_s_file());
+     rv = BIO_read_filename(certin, US901_SERVER_CERT); 
+     CU_ASSERT(rv > 0);
+     x = PEM_read_bio_X509(certin, NULL, NULL, NULL);
+     CU_ASSERT(x != NULL);
+     BIO_free(certin);
+ 
+     /* 
+      * Attempt to init EST server using NULL private key
+      */
+     est_init_logger(EST_LOG_LVL_INFO, NULL);
+@@ -617,31 +667,31 @@
+     X509 *x;
+     EVP_PKEY *priv_key;
+     int rv;
+     EST_CTX *ctx;
+ 
+     LOG_FUNC_NM;
+ 
+     /*
+      * Read the server cert
+      */
+-    certin = BIO_new(BIO_s_file_internal());
++    certin = BIO_new(BIO_s_file());
+     rv = BIO_read_filename(certin, US901_SERVER_CERT); 
+     CU_ASSERT(rv > 0);
+     x = PEM_read_bio_X509(certin, NULL, NULL, NULL);
+     CU_ASSERT(x != NULL);
+     BIO_free(certin);
+ 
+     /*
+      * Read the server key 
+      */
+-    keyin = BIO_new(BIO_s_file_internal());
++    keyin = BIO_new(BIO_s_file());
+     rv = BIO_read_filename(keyin, US901_SERVER_KEY);
+     CU_ASSERT(rv > 0);
+     priv_key = PEM_read_bio_PrivateKey(keyin, NULL, NULL, NULL);
+     CU_ASSERT(priv_key != NULL);
+     BIO_free(keyin);
+ 
+     /* 
+      * Attempt to init EST server using NULL local CA chain
+      */
+     est_init_logger(EST_LOG_LVL_INFO, NULL);
+@@ -662,31 +712,31 @@
+     X509 *x;
+     EVP_PKEY *priv_key;
+     int rv;
+     EST_CTX *ctx;
+ 
+     LOG_FUNC_NM;
+ 
+     /*
+      * Read the server cert
+      */
+-    certin = BIO_new(BIO_s_file_internal());
++    certin = BIO_new(BIO_s_file());
+     rv = BIO_read_filename(certin, US901_SERVER_CERT); 
+     CU_ASSERT(rv > 0);
+     x = PEM_read_bio_X509(certin, NULL, NULL, NULL);
+     CU_ASSERT(x != NULL);
+     BIO_free(certin);
+ 
+     /*
+      * Read the server key 
+      */
+-    keyin = BIO_new(BIO_s_file_internal());
++    keyin = BIO_new(BIO_s_file());
+     rv = BIO_read_filename(keyin, US901_SERVER_KEY);
+     CU_ASSERT(rv > 0);
+     priv_key = PEM_read_bio_PrivateKey(keyin, NULL, NULL, NULL);
+     CU_ASSERT(priv_key != NULL);
+     BIO_free(keyin);
+ 
+     /* 
+      * Attempt to init EST server a corrupted CA chain
+      */
+     est_init_logger(EST_LOG_LVL_INFO, NULL);

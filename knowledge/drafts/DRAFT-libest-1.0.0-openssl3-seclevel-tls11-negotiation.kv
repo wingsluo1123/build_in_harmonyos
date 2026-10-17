@@ -1,0 +1,93 @@
+# DRAFT: OpenSSL 3.x SECLEVEL 过滤 TLS1.0/1.1 的可协商性判定与适配（libest 1.0.0 实证）
+# DRAFT-libest-1.0.0-openssl3-seclevel-tls11-negotiation
+id: DRAFT-libest-1.0.0-openssl3-seclevel-tls11-negotiation
+status: draft
+contributor: libest 1.0.0 适配任务（openharmony-compile-agent, pc1-8）
+created: 2026-09-29
+knowledge_decision: new_draft
+library: libest
+version: 1.0.0
+
+# Layer 0: 错误面
+trigger_tool:           runtime
+phase:                  testing
+error_signature:        no protocols available|SSL routines.*no protocols available|TLS 1\.1.*FAIL|tls_setup_handshake|0A0000BF
+
+# Layer 1: 识别层
+severity:               2
+category:               openssl, tls, compat, test, portability
+title:                  OpenSSL 3.x 默认安全级别(SECLEVEL=2)过滤 TLS1.0/1.1 套件，"no protocols available" 被误判为构建能力限制
+match_keywords:         SECLEVEL, security level, no protocols available, TLS 1.1, TLS1_1, cipher list,
+  DEFAULT@SECLEVEL=0, SSL_CTX_set_security_level, min_proto_version, openssl version -a, options,
+  no-tls1, us901, us894, negative test
+
+# Layer 2: 诊断层
+root_cause:
+  > OpenSSL 3.x（含 3.5.6）默认安全级别为 2（introduced in OpenSSL 1.1.0），
+  该级别会按安全强度过滤 TLS1.0/1.1 的 SHA-1/MD5 系套件：客户端 SSL_CTX 若只设
+  min/max_proto_version 到 TLS1_1 而不调低安全级别，握手在协商前即报
+  "no protocols available"（0A0000BF），表现与"编译期禁用 TLS1.0/1.1"相同。
+  但 `openssl version -a` 的 options 行若无 no-tls1/no-tls1_1 说明编译期未禁用——
+  容易把可修的环境适配误判为不可修复的结构性构建限制。
+affected_scope:
+  > 所有在 OpenSSL 3.x 下用 SSL_CTX_set_min/max_proto_version 固定 TLS1.0/1.1 做
+  协商性测试或负向/正向版本语义断言的老库（EST、TLS 客户端、证书工具）。
+  服务端同理：若服务端也保持默认 SECLEVEL，即使 min_proto_version 设到 TLS1_1
+  同样拒绝 TLS1.1（"unsupported protocol"/alert）。
+verification_cmd: |
+  # 1) 编译期能力核验
+  openssl version -a | grep 'options:'
+  #   若无 no-tls1/no-tls1_1 -> 编译期未禁用
+  # 2) 客户端默认 SECLEVEL 实测
+  SSL_CTX_get_security_level()  # 期望 2 => TLS1.0/1.1 被过滤
+  # 3) 对照实验：SECLEVEL=0 + DEFAULT@SECLEVEL=0 后 TLS1.0/1.1 能否协商
+  SSL_CTX_set_security_level(ctx, 0);
+  SSL_CTX_set_cipher_list(ctx, "DEFAULT@SECLEVEL=0");
+  # 4) 修复后版本语义测试全过（TLS1.1 正向通过、SSL3/TLS1.0 负向拒绝）
+
+# Layer 3: 方案层
+rec_priority:           1
+rec_approach:           seclevel-zero-for-legacy-tls-versions
+rec_description: >
+  对需要协商 TLS1.0/1.1 的测试客户端与服务端上下文同时处理：
+  (1) SSL_CTX_set_security_level(ctx, 0)；
+  (2) SSL_CTX_set_cipher_list(ctx, "DEFAULT@SECLEVEL=0")；
+  (3) 服务端 SSL_CTX_set_min/max_proto_version 显式钉到 TLS1_1/TLS1_2 并
+      SSL_OP_NO_SSLv2|SSLv3|TLSv1 保持负向语义（TLS1.0/SSL3 拒绝）。
+  不改任何断言（us901.c:328 rv>0、us894.c:399 rv<=0 保持原样）。
+rec_command:
+  # 客户端（测试用例内）
+  #   SSL_CTX_set_security_level(ssl_ctx, 0);
+  #   SSL_CTX_set_cipher_list(ssl_ctx, "DEFAULT@SECLEVEL=0");
+  # 服务端（est_server_http.c set_ssl_option）
+  #   SSL_CTX_set_min_proto_version(ssl_ctx, TLS1_1_VERSION);
+  #   SSL_CTX_set_max_proto_version(ssl_ctx, TLS1_2_VERSION);
+  #   SSL_CTX_set_security_level(ssl_ctx, 0);
+  #   SSL_CTX_set_cipher_list(ssl_ctx, "DEFAULT@SECLEVEL=0");
+  #   SSL_CTX_set_options(ssl_ctx, SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3|SSL_OP_NO_TLSv1);
+rec_auto_fix:           false
+rec_impl:               test-harness-adapt
+
+fallback_priority:      2
+fallback_approach:      structural-block-with-evidence
+fallback_description:   若对照实验（SECLEVEL=0 + DEFAULT@SECLEVEL=0）证明 TLS1.0/1.1 仍不可
+  协商，才可按结构性阻塞举证（完整证据 + 恢复条件）并标注待分析端裁决；不得把未做
+  对照实验的"no protocols available"直接判为构建限制。
+fallback_command:       # 需要两侧实测 + openssl version -a options 行原文
+
+# ★ 反例与限制 ★
+counterexample:
+  - 仅凭 s_client -tls1_1 报 "no protocols available" 就判"客户端构建能力限制"是错的，
+    必须结合 openssl version -a options 行与 SECLEVEL 实测（libest r10 误判案例）
+  - 不得为通过而放宽负向断言（SSL3/TLS1.0 必须仍被拒绝，rv<=0 语义保持）
+limitation:
+  - 本条目据 libest 1.0.0 一处实证（US894/US901 版本语义测试）；其他库的测试环境
+    适配点可能不同，但"默认 SECLEVEL=2 过滤旧版本套件"的判定方法通用
+  - 生产环境降低 SECLEVEL 会有安全隐患，仅限测试上下文按需使用
+
+# 关联
+similar_to:               E162
+references:
+  - archives/l/libest/1.0.0/patches/0014-src-est-est_server_http.c.patch
+  - archives/l/libest/1.0.0/patches/0043-test-UT-US894-us894.c.patch
+  - archives/l/libest/1.0.0/patches/0056-test-UT-US901-us901.c.patch
