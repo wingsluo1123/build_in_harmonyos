@@ -1,0 +1,138 @@
+--- a/src/pl-setup.c
++++ b/src/pl-setup.c
+@@ -797,38 +797,98 @@
+ }
+ #endif
+ 
++#ifdef O_C_STACK_GUARDED
++/* Alternate signal stacks belong to OS threads, not movable Prolog engines. */
++static bool
++release_signal_stack(void *memory)
++{ stack_t current;
++
++  if ( sigaltstack(NULL, &current) != 0 )
++    return false;
++  if ( !(current.ss_flags & SS_DISABLE) && current.ss_sp == memory )
++  { stack_t disabled = {0};
++    disabled.ss_flags = SS_DISABLE;
++    if ( sigaltstack(&disabled, NULL) != 0 )
++      return false; /* Keep backing memory alive while it remains registered. */
++  }
++  free(memory);
++  return true;
++}
++
++#ifdef O_PLMT
++static pthread_key_t signal_stack_key;
++static pthread_once_t signal_stack_once = PTHREAD_ONCE_INIT;
++static bool signal_stack_key_ready = false;
++
++static void
++destroy_signal_stack(void *memory)
++{ (void)release_signal_stack(memory);
++}
++
++static void
++create_signal_stack_key(void)
++{ signal_stack_key_ready =
++    pthread_key_create(&signal_stack_key, destroy_signal_stack) == 0;
++}
++#endif
++#endif
++
+ bool
+ initGuardCStack(void)
+ {
+ #ifdef O_C_STACK_GUARDED
+   GET_LD
+-  stack_t ss = {0};
+-
+-  if ( (LD->signal.alt_stack = malloc(SIGSTKSZ)) )
+-  { ss.ss_sp = LD->signal.alt_stack;
++  stack_t current;
++
++  if ( sigaltstack(NULL, &current) != 0 )
++    return false;
++#ifdef O_PLMT
++  if ( pthread_once(&signal_stack_once, create_signal_stack_key) != 0 ||
++       !signal_stack_key_ready )
++    return false;
++#endif
++
++  /* Reuse a registered stack when switching or creating another engine. */
++  if ( current.ss_flags & SS_DISABLE )
++  { void *memory;
++#ifdef O_PLMT
++    memory = pthread_getspecific(signal_stack_key);
++#else
++    memory = LD->signal.alt_stack;
++#endif
++    bool allocated = memory == NULL;
++    if ( allocated && !(memory = malloc(SIGSTKSZ)) )
++      return false;
++
++    stack_t ss = {0};
++    ss.ss_sp = memory;
+     ss.ss_size = SIGSTKSZ;
+-    ss.ss_flags = 0;
+-
+-    if ( sigaltstack(&ss, NULL) == 0)
+-    { DEBUG(MSG_SIGNAL, Sdprintf("Setup altstack (%zd bytes)\n", SIGSTKSZ));
+-
+-      if ( LD == &PL_local_data )	/* main thread, only need this once */
+-      { struct sigaction sa = {0};
+-
+-	sa.sa_flags = SA_ONSTACK;
+-	sa.sa_handler = alt_segv_handler;
+-	sigemptyset(&sa.sa_mask);
+-
+-	if ( sigaction(SIGSEGV, &sa, NULL) == 0 )
+-	{ DEBUG(MSG_SIGNAL, Sdprintf("Setup SEGV on altstack\n"));
+-	  return true;
+-	}
+-      }
++    if ( sigaltstack(&ss, NULL) != 0 )
++    { if ( allocated )
++        free(memory);
++      return false;
+     }
+-  }
+-#endif
+-
++#ifdef O_PLMT
++    if ( allocated && pthread_setspecific(signal_stack_key, memory) != 0 )
++    { (void)release_signal_stack(memory);
++      return false;
++    }
++#else
++    LD->signal.alt_stack = memory;
++#endif
++  }
++
++  if ( LD == &PL_local_data )
++  { struct sigaction sa = {0};
++    sa.sa_flags = SA_ONSTACK;
++    sa.sa_handler = alt_segv_handler;
++    sigemptyset(&sa.sa_mask);
++    return sigaction(SIGSEGV, &sa, NULL) == 0;
++  }
++  return true;
++#else
+   return false;
++#endif
+ }
+ 
+ static void
+@@ -1802,9 +1862,9 @@
+   if ( ld->tabling.node_pool )
+     free_alloc_pool(ld->tabling.node_pool);
+ 
+-#ifdef O_C_STACK_GUARDED
+-  if ( ld->signal.alt_stack )
+-    free(ld->signal.alt_stack);
++#if defined(O_C_STACK_GUARDED) && !defined(O_PLMT)
++  if ( ld->signal.alt_stack && release_signal_stack(ld->signal.alt_stack) )
++    ld->signal.alt_stack = NULL;
+ #endif
+ 
+ #ifdef O_COVERAGE

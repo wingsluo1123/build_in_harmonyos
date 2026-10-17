@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.15)
+project(swi_consumer C)
+find_package(swi REQUIRED CONFIG)
+add_library(native_sum MODULE native_sum.c)
+set_target_properties(native_sum PROPERTIES PREFIX "")
+target_link_libraries(native_sum PRIVATE swi::swi)
+add_executable(embed_swi embed_swi.c)
+target_link_libraries(embed_swi PRIVATE swi::swi)

@@ -1,0 +1,62 @@
+{
+  "expected_official_init_function_sha256": "b5a4dc2e29a64a1eef29ef03700ff93de2fef6dc4ef6aa352469e7595ce80b28",
+  "baseline_source_sha256": "3bc8d1e615edcea2b4cd72f1aa4018648aae764d101be5fb3e579dcf3221f422",
+  "baseline_library_sha256": "3a44257b781120f17d18d8e1e03dd5393c4418b6c7f9acdacf15065a5066283e",
+  "baseline_flags": [
+    "CMAKE_BUILD_TYPE:STRING=Release",
+    "CMAKE_CXX_FLAGS:STRING=-stdlib=libc++",
+    "CMAKE_CXX_FLAGS_RELEASE:STRING='-O2 '",
+    "CMAKE_C_FLAGS:STRING=",
+    "CMAKE_C_FLAGS_RELEASE:STRING=-O3 -DNDEBUG"
+  ],
+  "baseline_initializer_unchanged_from_official": true,
+  "baseline_initializer": "bool\ninitGuardCStack(void)\n{\n#ifdef O_C_STACK_GUARDED\n  GET_LD\n  stack_t ss = {0};\n\n  if ( (LD->signal.alt_stack = malloc(SIGSTKSZ)) )\n  { ss.ss_sp = LD->signal.alt_stack;\n    ss.ss_size = SIGSTKSZ;\n    ss.ss_flags = 0;\n\n    if ( sigaltstack(&ss, NULL) == 0)\n    { DEBUG(MSG_SIGNAL, Sdprintf(\"Setup altstack (%zd bytes)\\n\", SIGSTKSZ));\n\n      if ( LD == &PL_local_data )\t/* main thread, only need this once */\n      { struct sigaction sa = {0};\n\n\tsa.sa_flags = SA_ONSTACK;\n\tsa.sa_handler = alt_segv_handler;\n\tsigemptyset(&sa.sa_mask);\n\n\tif ( sigaction(SIGSEGV, &sa, NULL) == 0 )\n\t{ DEBUG(MSG_SIGNAL, Sdprintf(\"Setup SEGV on altstack\\n\"));\n\t  return true;\n\t}\n      }\n    }\n  }\n#endif\n\n  return false;\n}\n",
+  "baseline_cleanup": "#ifdef O_C_STACK_GUARDED\n  if ( ld->signal.alt_stack )\n  { stack_t current;\n\n    /* The owner must unregister an alternate stack before freeing its\n       backing memory.  Retain it if querying or disabling fails, including\n       cleanup invoked while executing on the alternate stack itself. */\n    if ( sigaltstack(NULL, &current) == 0 )\n    { bool release = (current.ss_flags & SS_DISABLE) ||\n                     current.ss_sp != ld->signal.alt_stack;\n      if ( !release )\n      { stack_t disabled = {0};\n        disabled.ss_flags = SS_DISABLE;\n        release = sigaltstack(&disabled, NULL) == 0;\n      }\n      if ( release )\n      { free(ld->signal.alt_stack);\n        ld->signal.alt_stack = NULL;\n      }\n    }\n  }\n#endif",
+  "current_source_sha256": "a636c14a63bef6d7a26725de42be4de101537b7c197f70845f76af4ebfd481a1",
+  "current_library_sha256": "157cefa569e4a307343c17ce24456fe3b54dbbd5d8f6e3caf79a7cbc2ad58b96",
+  "current_initializer": "bool\ninitGuardCStack(void)\n{\n#ifdef O_C_STACK_GUARDED\n  GET_LD\n  stack_t current;\n\n  if ( sigaltstack(NULL, &current) != 0 )\n    return false;\n#ifdef O_PLMT\n  if ( pthread_once(&signal_stack_once, create_signal_stack_key) != 0 ||\n       !signal_stack_key_ready )\n    return false;\n#endif\n\n  /* Reuse a registered stack when switching or creating another engine. */\n  if ( current.ss_flags & SS_DISABLE )\n  { void *memory;\n#ifdef O_PLMT\n    memory = pthread_getspecific(signal_stack_key);\n#else\n    memory = LD->signal.alt_stack;\n#endif\n    bool allocated = memory == NULL;\n    if ( allocated && !(memory = malloc(SIGSTKSZ)) )\n      return false;\n\n    stack_t ss = {0};\n    ss.ss_sp = memory;\n    ss.ss_size = SIGSTKSZ;\n    if ( sigaltstack(&ss, NULL) != 0 )\n    { if ( allocated )\n        free(memory);\n      return false;\n    }\n#ifdef O_PLMT\n    if ( allocated && pthread_setspecific(signal_stack_key, memory) != 0 )\n    { (void)release_signal_stack(memory);\n      return false;\n    }\n#else\n    LD->signal.alt_stack = memory;\n#endif\n  }\n\n  if ( LD == &PL_local_data )\n  { struct sigaction sa = {0};\n    sa.sa_flags = SA_ONSTACK;\n    sa.sa_handler = alt_segv_handler;\n    sigemptyset(&sa.sa_mask);\n    return sigaction(SIGSEGV, &sa, NULL) == 0;\n  }\n  return true;\n#else\n  return false;\n#endif\n}\n",
+  "registered_fields_checked": [
+    "ss_sp",
+    "ss_size",
+    "ss_flags"
+  ],
+  "host_stack_results": [
+    {
+      "case": "E224-cleanup-only",
+      "returncode": 1,
+      "stdout": "RUNTIME_LIBRARY=/storage/Users/currentUser/work/frj__/swi-validation-cache/p/b/swid110b35116d66/b/build/Release/src/libswipl.so.10\nINITIAL_STACK_FLAGS=0 SIZE=28672 POINTER=0x5aac820000\nHOST_STACK_AT_INIT=overwritten\nREAL_PROLOG_CALL=1\nHOST_STACK_AFTER_CLEANUP=lost\nHOST_STACK_TEST=failed\n",
+      "stderr": ""
+    },
+    {
+      "case": "current-installed",
+      "returncode": 0,
+      "stdout": "RUNTIME_LIBRARY=/storage/Users/currentUser/work/frj__/swi-validation-cache/p/b/swi859ae7fc5da00/p/lib/swipl/lib/aarch64-ohos/libswipl.so.10\nINITIAL_STACK_FLAGS=0 SIZE=28672 POINTER=0x59746a9000\nHOST_STACK_AT_INIT=preserved\nREAL_PROLOG_CALL=1\nHOST_STACK_AFTER_CLEANUP=preserved\nHOST_STACK_TEST=passed\n",
+      "stderr": ""
+    }
+  ],
+  "official_calc_results": {
+    "source_sha256": {
+      "calc.c": "76a92586a9fc42fbf7c0dfa9fe2d877a16842707aa3b88e1bb13e8d1fe8e9db7",
+      "calc.pl": "3ab6ca86af49bea19ccee7ff7aa2782f00ce3cf9e701ba0dea5988472ebea6ee"
+    },
+    "cases": [
+      {
+        "case": "E224-cleanup-only",
+        "returncode": 1,
+        "stdout": "RUNTIME_LIBRARY=/storage/Users/currentUser/work/frj__/swi-validation-cache/p/b/swid110b35116d66/b/build/Release/src/libswipl.so.10\n42\nUPSTREAM_CALC_HOST_STACK_INIT=overwritten\nUPSTREAM_CALC_HOST_STACK_AFTER_PL_HALT=lost\n",
+        "stderr": "Welcome to SWI-Prolog (threaded, 64 bits, version 10.0.2)\nSWI-Prolog comes with ABSOLUTELY NO WARRANTY. This is free software.\nPlease run ?- license. for legal details.\n\nFor online help and background, visit https://www.swi-prolog.org\n\n"
+      },
+      {
+        "case": "current-installed",
+        "returncode": 0,
+        "stdout": "RUNTIME_LIBRARY=/storage/Users/currentUser/work/frj__/swi-validation-cache/p/b/swi859ae7fc5da00/p/lib/swipl/lib/aarch64-ohos/libswipl.so.10\n42\nUPSTREAM_CALC_HOST_STACK_INIT=preserved\nUPSTREAM_CALC_HOST_STACK_AFTER_PL_HALT=preserved\n",
+        "stderr": "Welcome to SWI-Prolog (threaded, 64 bits, version 10.0.2)\nSWI-Prolog comes with ABSOLUTELY NO WARRANTY. This is free software.\nPlease run ?- license. for legal details.\n\nFor online help and background, visit https://www.swi-prolog.org\n\n"
+      }
+    ]
+  },
+  "notes": [
+    "No assertion about real SA_ONSTACK delivery or preservation of SIGSEGV handlers.",
+    "Official calc calls PL_halt with its normal cleanup policy, not explicit PL_cleanup(0).",
+    "Both old and current official calculators compute 42; only the added host-registration assertion distinguishes the results."
+  ]
+}
