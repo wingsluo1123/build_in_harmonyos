@@ -1,0 +1,39 @@
+software: opennurbs
+version: "8.35"
+status: built
+build_date: "2026-10-16"
+build_system: cmake
+configure_options:
+  - "-DBUILD_TESTING=OFF（上游无 CTest 套件；关闭以免生成测试头）"
+  - "-DCMAKE_SYSTEM_NAME=Linux（CMake 无 HarmonyOS 平台文件 ⇒ LINUX 为假，上游 if(LINUX AND NOT ANDROID) 不成立会导致共享库漏链 vendored zlib/freetype/android_uuid）"
+  - "-DCMAKE_POLICY_VERSION_MINIMUM=3.5（vendored android_uuid/CMakeLists.txt 的 cmake_minimum_required 低于 3.5，CMake 4 拒绝）"
+  - "-DON_RUNTIME_NO_FCLOSEALL=1（musl 无 fcloseall；配合 opennurbs_defines.cpp 的回退分支）"
+compiler: clang++
+platform: aarch64-linux-ohos
+dependencies:
+  # 零外部依赖：zlib / freetype263 / android_uuid 均为上游仓内 vendored
+  runtime: []
+install_prefix: "<conan package_folder>"
+products:
+  - lib/libOpenNURBS.so（SHARED 目标 OpenNURBS；OHOS 下已 E318 自签）
+  - lib/libopennurbsStatic.a（STATIC 目标 opennurbsStatic；与本包共享库符号重复，默认不对外暴露）
+  - lib/libzlib.a、lib/libandroid_uuid.a、lib/libopennurbs_public_freetype.a（vendored 静态库，随共享库一并被链入）
+  - include/OpenNURBS/*.h（公共头；上游 install 清单不完整，配方已把源码根目录头整套补齐）
+  - include/OpenNURBS/android_uuid/*.h（上游漏装，配方补齐——否则消费方 opennurbs_system.h 编译失败）
+  - include/opennurbsStatic/*.h（同一批头的第二处安装位，上游布局如此）
+scope_note: >-
+  本包为 Trilinos `percept`（Monty）的可选几何 TPL
+  （LIB_OPTIONAL_TPLS OpenNURBS），不是任何包的硬前置。
+source_pinning:
+  kind: "branch-archive"
+  ref: "8.x"
+  reason: >-
+    上游无 release/tag（只有分支），且本机 GitHub ref 查询通道（api.github.com /
+    git ls-remote / commits.atom）不可达，无法取得 commit sha 钉稳定 URL。
+    故钉分支归档 + sha256（2026-10-16 实测 74943888 字节）；
+    漂移风险与后续钉法见 conandata.yml 注释。
+patches: none
+patch_generation:
+  method: none
+  reason: "上游源码零修改"
+  patches_count: 0
