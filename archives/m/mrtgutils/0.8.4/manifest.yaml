@@ -1,0 +1,45 @@
+# Version-level manifest - mrtgutils 0.8.4
+# Follows the archive metadata conventions used by the repository.
+
+version: "0.8.4"
+software: mrtgutils
+status: pending_ci
+build_date: "2026-10-12"
+build_system: custom
+
+source:
+  url: "https://salsa.debian.org/debian/mrtgutils/-/archive/upstream%2F0.8.4/mrtgutils-upstream-0.8.4.tar.gz"
+  sha256: "f72e31dd88abc82437b6407dfbda1d95a06681d96bca82ab2cec733668ca7f6e"
+  tar_format: tar.gz
+
+build:
+  system: custom
+  method: "direct clang compilation of mrtg-load.c, mrtg-uptime.c, mrtg-ip-acct.c, mrtg-apache.c, and mrtg-sensors.c together with uptime.c and util.c"
+  programs:
+    - mrtg-load
+    - mrtg-uptime
+    - mrtg-ip-acct
+    - mrtg-apache
+    - mrtg-sensors
+  dependencies:
+    - lm-sensors/3.6.0
+  cc: clang
+  cxx: clang++
+
+source_adjustments:
+  - "conanfile.py builds the source directly because the release archive has configure.ac but no generated configure script"
+  - "mrtg-sensors is built against the lm-sensors/3.6.0 package from the artifact repository, which supplies sensors/sensors.h and a static libsensors.a"
+
+patches_applied:
+  - "0001-mrtgutils-ohos-musl-format-and-load-pointer.patch"
+
+knowledge_gained:
+  - "musl printf/scanf do not implement the GNU %Lu integer extension; on OHOS the conversion is not a usable unsigned long long path. Use the standard %llu modifier."
+  - "mrtg-load's setPos() stored the address of a by-value parameter. The pointer became dangling after return; pass the caller's average variable address instead."
+  - "The upstream release archive has no generated configure script, so a direct compilation of the Makefile.am source set avoids a host autoreconf/autotools dependency."
+  - "lm-sensors/3.6.0 ships libsensors as a static archive, so the link flags follow the mrtg-sensors translation units and the packaged binary has no runtime libsensors.so dependency."
+
+verification:
+  upstream_test: "none (upstream 0.8.4 has no tests/ or check target)"
+  test_package: "test_package/test_mrtgutils.sh"
+  result: "pending OHOS GitCode CI"

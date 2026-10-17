@@ -1,0 +1,77 @@
+From: mrtgutils 0.8.4 OHOS adaptation
+Subject: [PATCH] mrtgutils: make output and load selection portable
+
+mrtg-ip-acct used the non-standard "%Lu" integer format for unsigned
+long long values.  GNU libc happens to accept it, while the musl based
+OHOS libc treats the conversion as a long double conversion and emits no
+value at all.  Use the standard C99 "%llu" format for both scanf and
+printf so the interface counters are printed on OHOS.
+
+mrtg-load passed the address of a by-value temporary into setPos().  The
+temporary expires when setPos() returns, leaving the selected pointer
+dangling and making the reported load values undefined.  Pass the
+address of the caller's avg1/avg5/avg15 variables instead.  This keeps
+the intended two-value selection semantics and is also correct on glibc.
+
+No platform macros are introduced; both changes are plain C and preserve
+the upstream interaction model.
+
+diff --git a/mrtg-ip-acct.c b/mrtg-ip-acct.c
+--- a/mrtg-ip-acct.c
++++ b/mrtg-ip-acct.c
+@@ -23,14 +23,14 @@ void print_ipacct(char *dev, int packets)
+     if (strncmp(dev, p, strlen(dev)) == 0) {
+       while (*p != ':') p++; p++;
+       if (packets)
+-        sscanf(p, "%*d %Lu %*d %*d %*d %*d %*d %*d %*d %Lu %*d %*d %*d %*d %*d %*d", &in, &out);
++        sscanf(p, "%*d %llu %*d %*d %*d %*d %*d %*d %*d %llu %*d %*d %*d %*d %*d %*d", &in, &out);
+       else
+-        sscanf(p, "%Lu %*d %*d %*d %*d %*d %*d %*d %Lu %*d %*d %*d %*d %*d %*d %*d", &in, &out);
++        sscanf(p, "%llu %*d %*d %*d %*d %*d %*d %*d %llu %*d %*d %*d %*d %*d %*d %*d", &in, &out);
+     }
+   }
+   fclose(f);
+   
+-  printf("%Lu\n%Lu\n", in, out);
++  printf("%llu\n%llu\n", in, out);
+ }
+   
+ int main(int argc, char **argv)
+diff --git a/mrtg-load.c b/mrtg-load.c
+--- a/mrtg-load.c
++++ b/mrtg-load.c
+@@ -13,7 +13,7 @@ static void usage(int rc)
+   exit(rc);
+ }
+ 
+-static void setPos(double** pos1, double** pos2, double i)
++static void setPos(double** pos1, double** pos2, double* value)
+ {
+   count++;
+   if (count > 2) {
+@@ -21,8 +21,8 @@ static void setPos(double** pos1, double** pos2, double i)
+     exit(2);
+   }
+ 
+-  if (count == 1) *pos1 = &i;
+-  if (count == 2) *pos2 = &i;
++  if (count == 1) *pos1 = value;
++  if (count == 2) *pos2 = value;
+ }
+ 
+ int main(int argc, char **argv)
+@@ -49,9 +49,9 @@ int main(int argc, char **argv)
+         setD(&countm, argv[0], &mult[0],atof(optarg));
+         break;
+       case 'l':
+-        if (strcmp(optarg, "1") == 0)       setPos(&pos1, &pos2, avg1);
+-        else if (strcmp(optarg, "5") == 0)  setPos(&pos1, &pos2, avg5);
+-        else if (strcmp(optarg, "15") == 0) setPos(&pos1, &pos2, avg15);
++        if (strcmp(optarg, "1") == 0)       setPos(&pos1, &pos2, &avg1);
++        else if (strcmp(optarg, "5") == 0)  setPos(&pos1, &pos2, &avg5);
++        else if (strcmp(optarg, "15") == 0) setPos(&pos1, &pos2, &avg15);
+         else {
+           fprintf(stderr, "%s:error: unknown load average period '%s'.\nThe possible periods are 1, 5, and 15.", argv[0], optarg);
+           usage(2);
+---
+2.43.0

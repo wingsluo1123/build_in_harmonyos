@@ -1,0 +1,26 @@
+# Software-level manifest - mrtgutils
+
+software: mrtgutils
+display: "mrtgutils"
+description: "MRTG helper commands for system load, uptime, IP accounting, Apache status, and hardware sensors"
+category: system
+
+homepage: "https://salsa.debian.org/debian/mrtgutils"
+license: GPL-2.0-or-later
+
+build_system: custom
+
+ohos_adaptation:
+  key_points:
+    - "The release archive has Autotools input files but no generated configure script; the recipe compiles the Makefile.am source set directly with the Conan-selected clang."
+    - "mrtg-ip-acct used GNU %Lu integer formatting, which is not usable through musl; the patch uses standard %llu."
+    - "mrtg-load stored the address of a by-value parameter; the patch keeps the selected average variables alive in main()."
+    - "All five upstream programs are packaged; mrtg-sensors links the static libsensors from the published lm-sensors/3.6.0 package."
+  common_dependencies:
+    - lm-sensors/3.6.0
+
+versions:
+  "0.8.4":
+    status: pending_ci
+    build_date: "2026-10-12"
+    conan_ref: "mrtgutils/0.8.4"
