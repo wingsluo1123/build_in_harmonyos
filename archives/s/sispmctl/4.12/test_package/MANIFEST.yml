@@ -1,0 +1,36 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（hmbs 硬门禁）
+# 详见: docs/TEST_QUALITY_SPEC.md 与 SKILL.md
+
+package: sispmctl/4.12
+homepage: "https://sispmctl.sourceforge.net/"
+
+# 上游源码审计（hmbs 硬门禁）：4.12 发布包确认无任何自动化测试
+upstream_tests_exist: false
+upstream_test_audit:
+  - path: "Makefile.am"
+    reason: "仅声明 SUBDIRS=man src、ACLOCAL_AMFLAGS、dist_example_DATA/dist_doc_DATA/dist_artwork_DATA；无 TESTS/check_PROGRAMS/check-local/check_SCRIPTS 目标。make -n check 返回 'No rule to make target'。"
+  - path: "src/Makefile.am"
+    reason: "仅声明 bin_PROGRAMS( sispmctl )、lib_LTLIBRARIES( libsispmctl.la )、pkgdata1/2/3_DATA；无任何测试目标或测试源文件。"
+  - path: "configure.ac"
+    reason: "仅 AC_PROG_CC / LT_INIT / AM_PROG_AR / PKG_CHECK_MODULES(LIBUSB) / AC_CHECK_HEADERS / AC_CHECK_FUNCS；无测试相关宏或 AC_CONFIG_TESTDIR。"
+  - path: "源码树整体（发布包）"
+    reason: "无 tests/、test/ 目录；src/ 下无 *_test 源文件；无 CUnit/gtest/ctest/ATF 等测试框架接入；无 CI 测试配置。"
+  - conclusion: "上游未提供自动化测试套件；功能上实际控制物理 USB 排插，不具备硬件条件下不可自动化，常规编译/链接正确性由 test_package 通过真实纯库 API 调用覆盖。"
+
+upstream_test_total: 0
+upstream_test_count_method: autotools_tests   # 上游无测试目标，注册总数经审计为 0
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_sispmctl.c
+    description: "链接 libsispmctl 真实调用 plannif_reset() + pms2_schedule_to_buffer()/pms2_buffer_to_schedule() 往返（socket/timeStamp/动作哨兵值多断言）+ 执行安装产物 sispmctl -v 校验 4.12 版本串"
+    command: "ctest（test_sispmctl 二进制）+ sispmctl -v"
+
+assertion_count: 2   # 2 个真实测试用例：库 API 往返 + 二进制版本冒烟
