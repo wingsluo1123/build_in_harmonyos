@@ -1,0 +1,57 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for kimageformats/6.28.0.
+
+package: kimageformats/6.28.0
+homepage: https://invent.kde.org/frameworks/kimageformats
+
+upstream_check_command: "ctest --output-on-failure"
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error -E \"<environment-scoped exclusions>\""
+
+# Counting convention (same as the PR-review side): upstream CTest
+# registrations with the full dependency set = 41; this build registers 30
+# (19 read + 9 write + pictest + anitest). Upstream test targets = 6
+# executables: readtest, writetest, pictest, anitest (autotests/) plus
+# imageconverter, imagedump (tests/, which upstream never passes to
+# add_test).
+upstream_test_target_count: 6
+upstream_ctest_registered_count: 30
+upstream_ctest_full_potential_count: 41
+upstream_tests:
+  - file: autotests/readtest.cpp
+    source: kimageformats-6.28.0/autotests/
+    description: "Upstream read suite: 19 CTest registrations with this plugin set (13 unconditional + dds + avif + jp2 + xcf + exr + raw); each decodes every image of read/<format>/ and compares against the recorded reference data, RANDOM ACCESS and SEQUENTIAL ACCESS passes"
+    command: "ctest -R kimageformats-read-"
+    condition: "run in the Conan build with BUILD_TESTING=ON"
+  - file: autotests/writetest.cpp
+    source: kimageformats-6.28.0/autotests/
+    description: "Upstream write suite: 9 CTest registrations with this plugin set (pcx/pic/qoi/rgb/tga + dds/avif/jp2/exr variants); writes a QImage through each handler and compares the result against the reference file"
+    command: "ctest -R kimageformats-write-"
+    condition: "run in the Conan build with BUILD_TESTING=ON"
+  - file: autotests/pictest.cpp
+    source: kimageformats-6.28.0/autotests/
+    description: "Upstream picture test (kimageformats-pic): loads picture fixtures through the plugin chain and checks the decoded results"
+    command: "ctest -R kimageformats-pic"
+    condition: "run in the Conan build with BUILD_TESTING=ON"
+  - file: autotests/anitest.cpp
+    source: kimageformats-6.28.0/autotests/
+    description: "Upstream ANI test (kimageformats-ani): animated-cursor decode checks"
+    command: "ctest -R kimageformats-ani"
+    condition: "run in the Conan build with BUILD_TESTING=ON"
+  - file: tests/imagedump.cpp
+    source: kimageformats-6.28.0/tests/
+    description: "CLI demo (imageconverter/imagedump); no CTest registration upstream (only ecm_mark_as_test, which does not call add_test here); compiled as part of the build"
+    command: "(compiled only; never registered upstream)"
+    condition: "compiled in the Conan build"
+  - file: tests/imageconverter.cpp
+    source: kimageformats-6.28.0/tests/
+    description: "CLI demo (converts between formats through the plugins); never CTest-registered upstream"
+    command: "(compiled only; never registered upstream)"
+    condition: "compiled in the Conan build"
+
+test_package_tests:
+  - file: test_package/test_kimageformats.cpp
+    description: "Consumer end-to-end executor, 8 cases: (1) plugin advertisement via QImageReader::supportedImageFormats, (2) HDR decode of an in-code Radiance fixture, (3) TGA decode with pixel-exact 2x2 fixture, (4) QOI decode with pixel-exact 2x2 fixture, (5) DDS DXT1 decode of an in-code block, (6) EXR write-read roundtrip, (7) JP2 write-read roundtrip, (8) package layout (plugin set present, out-of-scope plugins absent). Per case TEST PASS/TEST FAIL, final TEST SUMMARY, non-zero exit on any failure."
+    command: "conan create (test_package builds and runs test_kimageformats directly on the device)"
+
+assertion_count: 39
