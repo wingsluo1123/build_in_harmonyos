@@ -1,0 +1,34 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（R51：上游测试三步法申报）
+
+package: imageflow/2.3.1_rc01
+homepage: "https://github.com/imazen/imageflow"
+
+# 上游测试命令（Rust cargo workspace；无 make check / ctest / meson test）
+upstream_check_command: "cargo test --workspace"
+
+# conanfile.py build() 方法中是否已集成上游测试
+# （R51 第 2 步在适配阶段以真机实跑 290 passed；生产 conan create 仅构建，
+#   不重复跑上游套件——套件需要 dev-dependencies 与较长测试时长）
+upstream_test_in_build: false
+upstream_test_command: "cargo test --release --target aarch64-unknown-linux-ohos --workspace --lib --bins"
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: "各 crate src/ 内嵌 #[test] + imageflow_core/tests/integration/* + imageflow_tool/tests/test_tool.rs"
+    source: "imageflow-2.3.1-rc01/"
+    description: "上游 cargo 测试套件：本体实跑 290 passed / 0 failed / 4 ignored（单元 99 + 集成 190 + tool self-test 1；ignored 为 upload/sync 组 3 例 + riapi 1 例；doc-tests 因工具链不含 rustdoc 不可运行）"
+    command: "cargo test --release --target aarch64-unknown-linux-ohos --workspace --lib --bins"
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: test_imageflow.py
+    description: "真实图像处理：imageflow_tool PNG->JPEG 8x8（mozjpeg）、PNG->PNG w=16（libpng）、diagnose；+ 鸿蒙特有断言 6 项（AArch64 ELF / musl 解释器 / OHOS 代码签名 x2 / 无危险 RPATH）"
+    command: "PACKAGE_FOLDER=<pkg> python3 test_imageflow.py"
+  - file: test_consumer.c
+    description: "C ABI 消费者：OHOS clang 编译并链接包内 libimageflow.so，调用 imageflow_abi_version / abi_compatible / context_create / context_destroy（实机执行为 conan test 内建步骤）"
+    command: "conan test（自动编译并执行）"
+
+# 测试断言总数（近似值）
+# 上游全树 #[test] 312（平台同口径静态清点）；本包 OHOS 实跑 294（290 通过 + 4 ignored）；test_package 11（6 鸿蒙特有 + 5 图像处理）+ C ABI 5
+assertion_count: 310
