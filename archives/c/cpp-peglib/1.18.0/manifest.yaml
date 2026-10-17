@@ -1,0 +1,47 @@
+version: "1.18.0"
+status: built
+build_date: "2026-10-16"
+conan_ref: "cpp-peglib/1.18.0"
+
+validation_note: "本机端到端：上游 CTest 全量 1176 用例 100% 通过（17 个 GoogleTest 源 × 2 个 target：peglib-test-main / peglib-test-blob-roundtrip）；消费者用例在 -Wall -Wextra -std=c++17 下真编译真运行。OHOS aarch64 侧由平台 CI 构建。"
+
+source:
+  url: "https://github.com/yhirose/cpp-peglib/archive/refs/tags/v1.18.0.tar.gz"
+  sha256: "35cfae68f6e828f066df3c3c9ecce53765a67f780133c96a39f6dc49c8973c62"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_CXX_STANDARD=17"
+    - "-DCMAKE_CXX_EXTENSIONS=OFF"
+    - "-DBUILD_TESTS=ON"
+    - "-DPEGLIB_BUILD_BENCHMARK=OFF"
+    - "-DPEGLIB_BUILD_EXAMPLES=OFF"
+    - "-DPEGLIB_BUILD_LINT=OFF"
+    - "-DPEGLIB_BUILD_PL0=OFF"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "cpp-peglib 1.18.0 仍是 C++17 header-only INTERFACE 库，生产包只安装 peglib.h（CMakeLists.txt:50 install(FILES peglib.h DESTINATION include)）"
+  - "1.18.0 的 test/CMakeLists.txt 用 FetchContent 拉 googletest（固定 commit zip），注册 peglib-test-main 与 peglib-test-blob-roundtrip 两个 target，gtest_discover_tests 把用例展开成 1176 条 CTest 用例"
+  - "1.18.0 新增 CPPPEGLIB_VERSION/CPPPEGLIB_VERSION_NUM 宏（1.18.0 / 0x011200）⇒ 消费者可直接核对头文件版本"
+  - "PEGLIB_BUILD_BENCHMARK 在 1.18.0 里默认 ON，必须显式关掉（benchmark/ 会额外拉 deps）"
+
+test_results:
+  type: local-host
+  upstream_registered_cases: 1176
+  upstream_cases_executed: 1176
+  upstream_cases_passed: 1176
+  consumer_tests_compiled: 1
+  consumer_tests_executed: 1
+  consumer_tests_passed: 1
+  device: "local x86_64（OHOS 侧由平台 CI 复核）"
+  device_validation_date: "2026-10-16"
+  note: |
+    `ctest` 输出 100% tests passed, 0 tests failed out of 1176（耗时 3.97s），
+    两个 target 各 17 个 GoogleTest 源。消费者用例 10 项判据全过。
