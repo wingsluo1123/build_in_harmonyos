@@ -1,0 +1,70 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件 — CI 门禁 L0e 强制要求（docs/TEST_QUALITY_SPEC.md）
+#
+# 清点方式（真实运行统计）：
+#   1. 上游 src/autotests/CMakeLists.txt 以 add_unit_test / ecm_add_tests /
+#      add_test 注册全部 CTest 项；src/lib/CMakeLists.txt 与
+#      src/autotests/plugin/CMakeLists.txt 补充条件注册项
+#   2. conanfile.py build() 内以 BUILD_TESTING=ON 构建后以 ctest 全量运行
+#      （--no-tests=error 守护注册数，QT_QPA_PLATFORM=offscreen、隔离 HOME/XDG、
+#      TZ=Asia/Kolkata、CTEST_PARALLEL_LEVEL=1）
+#   3. 实测输出：100% tests passed, 0 tests failed out of 30
+
+package: kcoreaddons/6.28.0
+homepage: https://invent.kde.org/frameworks/kcoreaddons
+
+# 上游测试入口（上游顶层 CMakeLists.txt 的标准构建测试流程）
+upstream_check_command: "cmake -B build -DBUILD_TESTING=ON -DKF_IGNORE_PLATFORM_CHECK=TRUE && cmake --build build && ctest --test-dir build"
+
+# conanfile.py build() 中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build> --output-on-failure --no-tests=error --timeout 90（build() 内以隔离环境执行；与上游 ctest 判定等价，退出码即判定）"
+
+# 与上游判定的等价性说明：
+#   - 直接使用上游 CTest 注册与 --output-on-failure 判定，不裁剪、不替换任何用例
+#   - 平台条件注册项（klistopenfilesjob unix 分支、INotify/QFileSystemWatcher 后端、
+#     plugin 元数据用例）按上游 CMake 逻辑在 OHOS 实际注册，注册数由
+#     --no-tests=error 与实测计数双重确认
+#   - 需要运行环境的用例（TZ、LANGUAGE、/etc/passwd、硬链接、符号链接）通过补丁 0004 按
+#     平台能力如实处置，属上游测试用例修改，详见正文「上游测试用例修改说明」
+
+upstream_tests:
+  - kaboutdatatest
+  - kaboutdataapplicationdatatest
+  - kautosavefiletest
+  - kcompositejobtest
+  - kformattest
+  - kjobtest
+  - kosreleasetest
+  - krandomtest
+  - kshareddatacachetest
+  - kshelltest
+  - kurlmimedatatest
+  - kstringhandlertest
+  - kmacroexpandertest
+  - kusertest
+  - kprocesslisttest
+  - kfileutilstest
+  - kfuzzymatchertest
+  - knetworkmountstestcanonical
+  - knetworkmountstestnoconfig
+  - knetworkmountstestpaths
+  - knetworkmountsteststatic
+  - klibexectest
+  - kmemoryinfotest
+  - kruntimeplatformtest
+  - kprocesstest
+  - ktexttohtmltest
+  - kdirwatch_stat_unittest
+  - kdirwatch_qfswatch_unittest
+  - kpluginmetadatatest
+  - kpluginfactorytest
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: test.cpp
+    description: "消费者用例（端到端执行器）4 用例 / 13 校验点：以安装后的 KF6::CoreAddons（CMakeDeps 解析项目自带 KF6CoreAddonsConfig.cmake）链接，全链验证 KAboutData 身份/作者簿记、KFormat 字节格式化、KStringHandler 掩码可逆性（含 UTF-8 往返）"
+    command: "./test（test_package conanfile.py test() 内实跑，逐用例 TEST PASS/FAIL + 末行 TEST SUMMARY）"
+
+# 校验计数：上游 30 用例（实跑 30/30）+ 消费者 13 校验点
+assertion_count: 43

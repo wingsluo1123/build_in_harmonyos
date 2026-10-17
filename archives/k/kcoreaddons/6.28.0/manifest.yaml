@@ -1,0 +1,43 @@
+software: kcoreaddons
+version: "6.28.0"
+status: built
+build_date: "2026-10-16"
+conan_ref: "kcoreaddons/6.28.0"
+source:
+  url: "https://download.kde.org/stable/frameworks/6.28/kcoreaddons-6.28.0.tar.xz"
+  sha256: "a713febee2f43bc31986d6c27d846ccab556fc7bc7c1919c3a662495720b431a"
+  tar_format: tar.xz
+build:
+  system: cmake
+  configure_options:
+    - "BUILD_SHARED_LIBS=ON"
+    - "BUILD_TESTING=ON"
+    - "KF_IGNORE_PLATFORM_CHECK=TRUE"
+    - "KCOREADDONS_USE_QML=OFF"
+    - "BUILD_PYTHON_BINDINGS=OFF"
+    - "USE_DBUS=OFF"
+    - "CMAKE_SHARED_LIBRARY_SONAME_CXX_FLAG/CMAKE_SHARED_LIBRARY_SONAME_C_FLAG=-Wl,-soname, (DT_SONAME 注入)"
+    - "CMAKE_CXX_STANDARD=20 + CMAKE_CXX_FLAGS=-std=c++20 (variable_watch 覆盖处置)"
+  dependencies:
+    - "qtbase/6.11.1"
+    - "extra-cmake-modules/6.29.0 (tool)"
+  cc: clang
+  cxx: clang++
+patches_applied:
+  - "0001-CMakeLists.txt.patch"
+  - "0002-src-lib-CMakeLists.txt.patch"
+  - "0003-src-lib-clockskew-harmonyos.patch"
+  - "0004-ohos-upstream-autotest-fixes.patch"
+  - "0005-kaboutdata-ranges.patch"
+  - "0006-qfilecopy-harmonyos-plugin-test.patch"
+knowledge_gained:
+  - "无 Platform/HarmonyOS 模块时 lld 不产出 DT_SONAME：注入 CMAKE_SHARED_LIBRARY_SONAME_C/CXX_FLAG=-Wl,-soname, 修复消费者 DT_NEEDED 记录构建机绝对路径的问题（6.26.0.1 先例延续）"
+  - "kcoreaddons 6.28.0 树要求 ECM >= 6.28.0（find_package(ECM 6.28.0 NO_MODULE)）：注册表无 ecm/6.28.0，以 extra-cmake-modules/6.29.0 为发布基线（kholidays/6.28.0 先例）"
+  - "OHOS 平台判定不等于 CMake UNIX：unix 源集与 dladdr 探测须以 NOT WIN32 AND NOT IOS 接通，且 dladdr 需显式链接 dl（Linux|HarmonyOS 分支）"
+  - "OHOS SDK libc++（clang 15）缺 C++20 ranges 算法：std::ranges::find_if -> std::find_if（kholidays std::none_of 同类）"
+  - "CMAKE_CXX_STANDARD 被上游 variable_watch 覆盖：需经 CMAKE_CXX_FLAGS=-std=c++20 强制生效"
+  - "6.28 autotest 在 OHOS 的差异项：目录监视硬链接用例 QSKIP、符号链接能力缺失 QSKIP（HMDFS 用户卷无 symlink(2)）、用户库 /etc/passwd 缺席 QSKIP、QLocale::c() 时间格式、MIME 复合后缀、LANGUAGE 回退、插件元数据夹具读写循环（EOVERFLOW）"
+  - "设备构建环境统一无版本化 SONAME：OHOS 设备卷不支持符号链接，平台设备构建链路在 generate 前剥离 target 的 VERSION/SOVERSION（设备构建专用，不入配方）；全生态统一发布单文件无版本化 .so，configure 期版本值（版本头文件/ConfigVersion）不受影响"
+upstream_test_pass_rate: "30/30 (100%)"
+adapted_test_pass_rate: "4/4 (100%)"
+test_command: "conan create . --build=missing"
