@@ -1,0 +1,40 @@
+# 软件级 manifest — gammastep
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: gammastep
+display: "gammastep"
+description: "按时间/地理位置调整显示器色温（gamma）的命令行工具，redshift 的活跃分支"
+category: utilities
+homepage: "https://gitlab.com/chinstrap/gammastep"
+license: GPL-3.0-or-later
+
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "源码是 git tag archive（不含 configure/Makefile.in/m4）⇒ build() 第一步 autoreconf -fi，故需 automake/1.18 + libtool/2.5.4.1 + intltool/0.51.0 + gettext/0.22.5.1 四个 build_requires（设备自带 aclocal 是 1.17 driver/1.16 share dir，不可用）"
+    - "四个调节后端 DRM/Wayland/RANDR/VidMode 全部显式 --enable-*：缺任一依赖 configure 直接硬失败，避免静默少编一个后端却宣称四后端齐全；Geoclue2（需 gio）与 GUI（GTK3 Python 托盘）显式 --disable-*"
+    - "X11 依赖必须整条同源：libx11/6.4.0 + libxcb/1.16 + libxxf86vm/1.1.5（libx11/1.8.13.x 钉的是 libxcb/1.17.x + libxau/1.0.12，属另一条世代；混用必 Version conflict）"
+    - "制品仓 wayland 包的 bin/wayland-scanner 在本机不可执行：未签名报 EPERM(rc=126)，binary-sign-tool 自签后因 DT_NEEDED 写死构建机缓存绝对路径而 dlopen 失败 ⇒ 从上游同版本源码静态重建 scanner，并写 wayland-scanner.pc 顶到 PKG_CONFIG_PATH"
+    - "制品仓 .la 元数据里留了构建机的 //lib 与 .conan2 绝对路径（实测 30 份 .la）⇒ 任务局部 libtool 递归 shadow：拷贝 .la 与库产物、重写整条 dependency_libs 闭包与 libdir，再把 shadow 放到 -L 最前"
+    - "wayland 的 cpp_info.libs 收窄为 wayland-client：PkgConfigDeps 会把三个库全写进 wayland-client.pc 的 Libs 行，而 libwayland-cursor 的 codesign 在本设备校验不过（dlopen EACCES），会让整个二进制连 -V 都跑不起来"
+    - "零补丁；两处幂等改写打在 autoreconf 生成的 configure 上（hmdfs 卷的 umask 077 临时目录、intltool 的 XML::Parser 探测）——源码形态无 configure，补丁没有落点"
+    - "运行期四个后端全部不可用：/dev/dri ENOENT、无 Wayland compositor、无 X 服务器 ⇒ 按 appres/ddccontrol 模式交付（编译与参数解析面的消费者断言照常，逐项如实披露能力面，不宣称可实际调节色温）"
+    - "i18n 走 AM_GNU_GETTEXT([external])，musl 无内建 gettext ⇒ 显式声明 host 依赖 gettext/0.22.5.1 提供 libintl"
+  common_dependencies:
+    - "wayland/1.24.0"
+    - "libdrm/2.4.133"
+    - "libxcb/1.16"
+    - "xorgproto/2025.1"
+    - "libx11/6.4.0"
+    - "libxxf86vm/1.1.5"
+    - "gettext/0.22.5.1"
+
+versions:
+  "2.0.9":
+    status: built
+    conan_ref: gammastep/2.0.9
+    build_date: "2026-10-16"
+    source_url: "https://gitlab.com/chinstrap/gammastep/-/archive/v2.0.9/gammastep-v2.0.9.tar.gz"
+    source_sha256: "bbb9d90e1cf30920c1017db4ce5c4652e4c7843fd4c4e34164d99ecbc3bbb4c0"
+    notes: "2.0.9/notes.md（含构建期能力墙 B 证据与运行期能力面披露）"

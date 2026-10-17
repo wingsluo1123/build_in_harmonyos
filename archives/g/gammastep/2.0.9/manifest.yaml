@@ -1,0 +1,50 @@
+# 版本级 manifest — gammastep 2.0.9（ARCHIVE-SPEC v2.0）
+
+version: "2.0.9"
+software: "gammastep"
+
+# 编译状态：published | built | failed | archived
+# 本包只到 W3 本地构建验证 + 消费者测试通过 ⇒ built（制品未上传 ⇒ 不用 published）
+status: built
+
+build_date: "2026-10-16"
+build_system: "autotools"
+
+source:
+  url: "https://gitlab.com/chinstrap/gammastep/-/archive/v2.0.9/gammastep-v2.0.9.tar.gz"
+  sha256: "bbb9d90e1cf30920c1017db4ce5c4652e4c7843fd4c4e34164d99ecbc3bbb4c0"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--enable-drm"
+    - "--enable-wayland"
+    - "--enable-randr"
+    - "--enable-vidmode"
+    - "--disable-geoclue2"
+    - "--disable-gui"
+    - "--build=aarch64-linux"
+    - "--host=aarch64-linux"
+  dependencies:
+    - wayland/1.24.0
+    - libdrm/2.4.133
+    - libxcb/1.16
+    - xorgproto/2025.1
+    - libx11/6.4.0
+    - libxxf86vm/1.1.5
+    - gettext/0.22.5.1
+    - automake/1.18
+    - libtool/2.5.4.1
+    - intltool/0.51.0
+  cc: clang
+  cxx: clang++
+
+# 零补丁（源码树未改；两处幂等改写打在 autoreconf 生成的构建产物 configure 上）
+patches_applied: []
+
+knowledge_gained:
+  - "「制品仓构建期工具执行被拒」是两道独立闸：未签名 ⇒ EPERM(rc=126)；自签后因 DT_NEEDED 写死构建机缓存绝对路径而 dlopen 失败（LD_LIBRARY_PATH 无效）⇒ 处方是从上游源码静态重建工具并把其 .pc 顶到 PKG_CONFIG_PATH。ref: knowledge/drafts/DRAFT-gammastep-2.0.9-wayland-scanner-exec-denied-static-rebuild.kv"
+  - "PkgConfigDeps 会把依赖 cpp_info.libs 全部写进生成的 .pc 的 Libs 行 ⇒ 消费方会链上并不需要的库；若其中某个 .so 的 .codesign 在本设备校验不过，会以 dlopen EACCES 让整个二进制起不来 ⇒ 按真实依赖面收窄 cpp_info.libs。reference: 经验文档/B草稿库/DRAFT-PKG-VER-remote-prebuilt-so-codesign-is-device-bound.kv"
+  - "制品仓 .la 的 dependency_libs/libdir 可能留构建机的 //lib 与 .conan2 绝对路径，libtool 会递归打开 ⇒ 需任务局部递归 shadow（重写整条闭包 + -L 前插），不能只修直接那一层。ref: knowledge/graph/E522.kv"
+  - "本仓 X11 有两条互斥世代（libx11/1.8.13.x→libxcb/1.17+libxau/1.0.12；libx11/6.4.0→libxcb/1.16+libxau/1.0.11），而 libxxf86vm/1.1.5 钉 6.4.0 世代 ⇒ 混用必 Version conflict，须整条同源。ref: archives/x/xgamma/1.0.8/notes.md"
