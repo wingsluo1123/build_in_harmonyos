@@ -1,0 +1,31 @@
+package: whysynth/20170701
+
+# ── R51 上游测试清点 ────────────────────────────────────────────────
+# 清点证据（上游 tag 20170701 的 tarball 解包树，73 个文件）：
+#   · 顶层只有 AUTHORS/COPYING/ChangeLog/INSTALL/Makefile.am/README.rst/TODO/
+#     aclocal.m4/autogen.sh/config.h.ac/configure.ac/doc/extra/src —— **没有
+#     tests/ 或 test/ 目录**（find . -type d -iname '*test*' 为空）
+#   · Makefile.am / src/Makefile.am 里 **没有** TESTS、check_PROGRAMS、
+#     check-local 之类的 automake 测试目标（grep 无命中）
+#   · 没有 ctest / pytest / CMakeLists.txt
+# 即上游确实不带任何自动化测试套件（这是「上游无测试」的申报依据，不是
+# 「没环境跑」）。因此 build() 里没有 make check，改由下面的 test_package
+# 作为真实功能验证。
+upstream_test_in_build: false
+upstream_check_command: ""
+upstream_tests: []
+
+test_package_tests:
+  - file: test_whysynth.c
+    description: >-
+      以最小 DSSI 宿主加载装好的 lib/dssi/whysynth.so：核对 LADSPA/DSSI 描述符
+      元信息（UniqueID 2187、Label "WhySynth"、198 端口与端口方向）、instantiate()
+      （内部走 sampleset_init() → PadSynth 的 fftwf_plan_r2r_1d()，即 libfftw3f
+      的真实使用）、select_program(0,0) 写回宿主控制端口、DSSI configure() 的
+      接受/拒绝路径，最后 run_synth() 送 NOTEON 渲染 0.5 秒，断言输出**非静音**
+      且逐样本有限（无 NaN/Inf），再送 NOTEOFF 渲染一段并断言同样有限。
+    command: "./test_whysynth"
+
+# 实际断言数由测试程序运行时打印（RESULT PASS (N checks, M failures)），
+# 与本次真机运行日志逐字一致。
+assertion_count: 26
