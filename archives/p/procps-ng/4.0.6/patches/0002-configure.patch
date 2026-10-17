@@ -1,0 +1,83 @@
+--- a/configure
++++ b/configure
+@@ -7560,20 +7560,45 @@
+ printf "%s\n" "#define HAVE_DECL___UT_HOSTSIZE $ac_have_decl" >>confdefs.h
+ if test $ac_have_decl = 1
+ then :
+ 
+ printf "%s\n" "#define HAVE_UT_HOSTSIZE_IN_UTMPX 1" >>confdefs.h
+ 
+ fi
+ 
+ fi
+ 
++have_utmpx_funcs=yes
++
++  for ac_func in getutxent setutxent endutxent
++do :
++  as_ac_var=`printf "%s\n" "ac_cv_func_$ac_func" | sed "$as_sed_sh"`
++ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"
++if eval test \"x\$"$as_ac_var"\" = x"yes"
++then :
++  cat >>confdefs.h <<_ACEOF
++#define `printf "%s\n" "HAVE_$ac_func" | sed "$as_sed_cpp"` 1
++_ACEOF
++
++else case e in #(
++  e) have_utmpx_funcs=no ;;
++esac
++fi
++
++done
++if test "x$have_utmpx_funcs" != xno
++then :
++
++printf "%s\n" "#define HAVE_UTMPX_FUNCS 1" >>confdefs.h
++
++fi
++
+ case `pwd` in
+   *\ * | *\	*)
+     { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: Libtool does not cope well with whitespace in \`pwd\`" >&5
+ printf "%s\n" "$as_me: WARNING: Libtool does not cope well with whitespace in \`pwd\`" >&2;} ;;
+ esac
+ 
+ 
+ 
+ macro_version='2.5.4'
+ macro_revision='2.5.4'
+@@ -21569,28 +21594,32 @@
+ $debug ||
+ {
+   tmp= ac_tmp=
+   trap 'exit_status=$?
+   : "${ac_tmp:=$tmp}"
+   { test ! -d "$ac_tmp" || rm -fr "$ac_tmp"; } && exit $exit_status
+ ' 0
+   trap 'as_fn_exit 1' 1 2 13 15
+ }
+ # Create a (secure) tmp directory for tmp files.
++# The 077 umask makes mktemp create a 0700 directory, which on the HarmonyOS PC
++# (HMDFS) sandbox is handed back as an unwritable one, so every file written
++# into it afterwards fails with EACCES. The directory is private to this script
++# run either way, hence the 022 umask.
+ 
+ {
+-  tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null` &&
++  tmp=`(umask 022 && mktemp -d "./confXXXXXX") 2>/dev/null` &&
+   test -d "$tmp"
+ }  ||
+ {
+   tmp=./conf$$-$RANDOM
+-  (umask 077 && mkdir "$tmp")
++  (umask 022 && mkdir "$tmp")
+ } || as_fn_error $? "cannot create a temporary directory in ." "$LINENO" 5
+ ac_tmp=$tmp
+ 
+ # Set up the scripts for CONFIG_FILES section.
+ # No need to generate them if there are no CONFIG_FILES.
+ # This happens for instance with './config.status config.h'.
+ if test -n "$CONFIG_FILES"; then
+ 
+ 
+ ac_cr=`echo X | tr X '\015'`

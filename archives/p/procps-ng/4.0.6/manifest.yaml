@@ -1,0 +1,151 @@
+software: procps-ng
+version: 4.0.6
+status: built
+build_system: autotools
+build_date: "2026-10-15"
+
+source:
+  url: "https://downloads.sourceforge.net/project/procps-ng/Production/procps-ng-4.0.6.tar.xz"
+  sha256: "67bea6fbc3a42a535a0230c9e891e5ddfb4d9d39422d46565a2990d1ace15216"
+  tar_format: tar.xz
+  size_bytes: 1580516
+
+build:
+  system: autotools
+  target: aarch64-unknown-linux-ohos
+  configure_options:
+    - "--disable-shared"
+    - "--enable-static"
+    - "--prefix=<pkg prefix>"
+    - "（未传 --build/--host/--target，三元组由 config.guess 重锚）"
+  dependencies:
+    - ncurses/6.6
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - 0001-config.guess.patch
+  - 0002-configure.patch
+  - 0003-library-sort.c.patch
+  - 0004-src-w.c.patch
+
+patch_detail:
+  - file: 0001-config.guess.patch
+    purpose: "config.guess 增加 HarmonyOS 识别分支：tarball 自带版本不认识 HarmonyOS，回落到需要可写临时目录的编译探测并失败（cannot guess build type）"
+    lines_changed: 12
+    guard: "无平台宏：config.guess 的 os 判定分支，输出 aarch64-unknown-linux-ohos"
+  - file: 0002-configure.patch
+    purpose: "configure：(a) 内嵌临时目录创建 umask 077→022（HMDFS 上 0700 目录拒所有者写入，config.status 写 subs1.awk 被拒）；(b) 新增中性功能探针 HAVE_UTMPX_FUNCS（AC_CHECK_FUNCS([getutxent setutxent endutxent])）"
+    lines_changed: 25
+    guard: "HAVE_UTMPX_FUNCS（中性 autoconf 功能宏，非平台宏）"
+  - file: 0003-library-sort.c.patch
+    purpose: "以库内 library/sort.c 为宿主载入上游自带备用实现 local/strverscmp.c，修补 OHOS libc 缺 strverscmp 导致的链接失败"
+    lines_changed: 15
+    guard: "HAVE_STRVERSCMP（上游 configure 已有该探测；OHOS 上为未定义）"
+  - file: 0004-src-w.c.patch
+    purpose: "src/w.c 由 HAVE_UTMPX_H（仅头文件存在）改为按 HAVE_UTMPX_FUNCS 选 utmp 访问族：OHOS 的 utmpx.h 不声明也不导出 getutxent/setutxent/endutxent"
+    lines_changed: 14
+    guard: "HAVE_UTMPX_FUNCS（同上，中性功能宏）"
+
+compatibility:
+  level: high
+  issues:
+    - "procps_linux_version()（library/version.c）在 HarmonyOS PC 上返回负错误码 -ERANGE：/proc/sys/kernel/osrelease 为 'HongMeng Kernel 1.12.0'，sscanf(\"%u.%u.%u\") 零转换；上游的 /proc/version 回退路径亦不可用（该文件 EACCES）。硬造版本号会让调用方的内核特性门控误判，故不改源码"
+    - "top/watch 需运行时提供 terminfo：设备不带 terminfo 库，须把所用 ncurses 的 share/terminfo 指给 TERMINFO/TERMINFO_DIRS，否则批处理 top -b 亦静默以非零码退出"
+  notes: "可执行程序（ps/top/free/uptime/vmstat/pgrep/pkill/pidof/sysctl/w）与 libproc2 在真机上端到端可用；上游套件 8 项中 7 项通过"
+
+test_results:
+  type: upstream+test_package
+  upstream_check_command: "make check"
+  # 上游 tag v4.0.6（gitlab.com/procps-ng/procps）的测试面由两套互不相交的框架组成。
+  # 全部候选口径列出、取「用例·注册类」最大值作主 N（防少报）：
+  upstream_n_counting_norms:
+    automake_tests: 8
+    dejagnu_dejatool: 14
+    dejagnu_exp_files: 23
+    dejagnu_case_assets_exp_sh_under_test_dirs: 24
+    test_program_sources_c: 12
+    testsuite_assets_all: 30
+    testsuite_test_dirs: 16
+  upstream_total_n: 24
+  upstream_total_n_norm: '上游 tag v4.0.6 的 testsuite/*.test/ 下 *.exp + *.sh 用例资产数（同量纲另有 .exp 23 / DEJATOOL 14；automake TESTS 8 属另一框架，单列不并入）'
+  upstream_run_n: 8
+  upstream_test_count_note: '本包构建用的是 SourceForge 发布 tarball，其 testsuite/ 比 git tag v4.0.6 少 4 个用例文件（pwait.test、skill.test、ps_zombie.exp、sysctl_write.exp，即 tarball 20 vs tag 24）；申报按 tag 全量面取 24，不取 20'
+  # 账本恒等式：TOTAL = PASS + FAIL + SKIP + NOT_RUN
+  upstream_ledger:
+    - suite: 'automake TESTS（单元测试，真机 make check 实跑）'
+      unit: case
+      total: 8
+      passed: 7
+      failed: 1
+      skipped: 0
+      not_run: 0
+    - suite: 'dejagnu 验收套件（testsuite/*.test/）'
+      unit: case_file
+      total: 24
+      passed: 0
+      failed: 0
+      skipped: 0
+      not_run: 24
+  upstream_registered_tests: 8
+  passed: 7
+  failed: 1
+  skipped: 0
+  not_run: 24
+  upstream_failed_detail:
+    - test: library/tests/test_version
+      check: "procps_linux_version()"
+      reason: "osrelease 为 'HongMeng Kernel 1.12.0' → 函数按文档契约返回 -ERANGE（测试断言 >0）；平台事实，未修改上游源码"
+  upstream_not_run_detail:
+    - suite: 'dejagnu 验收套件（24 个用例文件）'
+      reason_primary: '上游 configure.ac:359 用 AM_CONDITIONAL(LINUX, test "x$host_os" = xlinux-gnu) 门控 testsuite/Makefile.am:15-47 的全部 DEJATOOL 注册块；本平台 host_os = linux-ohos ≠ linux-gnu → LINUX 为假 → 套件在 OHOS 上不被注册（此处 make check 并不报 could not find runtest，而是 DEJATOOL 展开为空、0 个工具被注册）'
+      evidence_primary: '构建树 config.status 记 S["LINUX_TRUE"]="#"，且 make -C testsuite check 实跑输出 l=''     ''（空 DEJATOOL）'
+      reason_secondary: '补齐框架后复验仍不可跑：装入仓库内已适配 OHOS 的 dejagnu/1.6.3.1 + expect/5.45.4 + tcl/8.6.14（ohpcd 制品仓有 OHOS 二进制；runtest --version 实测 = DejaGnu 1.6.3 / Expect 5.45.4 / Tcl 8.6），越过注册门控手工跑 free 工具：被测程序输出正确，但 expect 每次 spawn 都注入 sh: /bin/stty: inaccessible or not found（系统镜像无 /bin/stty，exp_tty.c 的 EXP_STTY 规避只覆盖一个调用点且实测不生效），击穿用例首行锚定正则 → free 单个工具即 14 FAIL / 1 unresolved（testsuite/free.sum）'
+      decision: '不改上游 .exp、不往镜像塞 /bin/stty、不把 dejagnu/expect/tcl 加进 tool_requires（LINUX 门控下加了也不会执行，徒增构建期依赖）'
+  note: '主 N = 24（dejagnu 用例资产口径，与平台评审脚本口径一致）；N′ = 8（automake TESTS 全部进入执行，7 通过 / 1 平台事实失败）'
+  test_package: "conan create 退出码 0：libproc2 C 消费者（CMakeDeps 链接 procps-ng::procps-ng，互校 loadavg/uptime/utmp 用户数/全 pids 走查）+ 10 项命令行工具实测（free/uptime/ps/vmstat/top -b/w/sysctl/pgrep/pidof/pkill，其中 pkill 断言 SIGTERM 退出码 -15）"
+
+test_passed: 7
+test_failed: 1
+test_skipped: 0
+
+knowledge_gained:
+  - "HarmonyOS PC 的 config.guess 盲区：老式分支模型不认识 HarmonyOS，回落编译探测需要可写临时目录而沙箱不给 → 必须直接加 HarmonyOS 分支输出三元组"
+  - "HMDFS 坑（再次证实）：configure 的 `(umask 077 && mktemp -d ...)` 目录回来是 0700 且拒所有者写入 → config.status 报 could not setup config files machinery；umask 077→022 即解"
+  - "OHOS 的 utmpx.h 只有 struct 与常量，不声明也不导出 getutxent/setutxent/endutxent（libc 只导出 getutent/setutent/endutent/utmpname）——上游的 HAVE_UTMPX_H 头文件探测会选错访问族；正确做法是加函数级探针 HAVE_UTMPX_FUNCS"
+  - "OHOS libc 缺 strverscmp：上游 configure 已有 HAVE_STRVERSCMP 探测，且自带 local/strverscmp.c 备用实现，宿主挂到 library/sort.c 即可，无需新增平台宏"
+  - "HarmonyOS PC 不带 terminfo 数据库：ncurses 程序（top/watch）在批处理模式下也会因 setupterm 失败而非零退出且**零输出**，须把 ncurses 包的 share/terminfo 指给 TERMINFO/TERMINFO_DIRS"
+  - "设备的 sleep 是 toybox 符号链接，subprocess 经 PATH 解析不到（FileNotFoundError）——测试自造常驻进程应改用包内工具（如 vmstat 1）"
+  - "procps-ng 是单一顶层 Makefile（非递归）构建，libproc2 装到 include/libproc2/、.pc 给 -lproc2；PIDS_VAL(相对索引, 类型, stack) 为三参访问宏"
+  - "发布 tarball 形态下探针只能落预生成 configure：改 configure.ac 会触发 aclocal/automake 维护规则，而 HarmonyOS PC 构建机没有这些工具"
+
+references:
+  - https://gitlab.com/procps-ng/procps
+  - https://downloads.sourceforge.net/project/procps-ng/Production/
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/procps-ng-4.0.6.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/procps-ng-4.0.6.work
+  source_orig_hash: 9e81197633b257e9
+  source_work_hash: 4221220892d61eaa
+  generated_at: '2026-10-15T19:56:13'
+  patches_count: 4
+
+patch_classification:
+  - file: 0001-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: "无平台宏：config.guess 的 OS 判定分支，输出 aarch64-unknown-linux-ohos"
+  - file: 0002-configure.patch
+    type: auto
+    platform_only: True
+    guard: "HAVE_UTMPX_FUNCS（中性 autoconf 功能宏，非平台宏）"
+  - file: 0003-library-sort.c.patch
+    type: auto
+    platform_only: True
+    guard: "HAVE_STRVERSCMP（上游 configure 已有该探测；OHOS 上为未定义）"
+  - file: 0004-src-w.c.patch
+    type: auto
+    platform_only: True
+    guard: "HAVE_UTMPX_FUNCS（同上，中性功能宏）"
