@@ -1,0 +1,53 @@
+# 版本级 manifest — indi-sbig 2.1
+version: "2.1"
+software: "indi-sbig"
+status: built
+build_date: "2026-10-15"
+build_system: cmake
+
+source:
+  url: "https://deb.debian.org/debian/pool/contrib/i/indi-sbig/indi-sbig_2.1+20221220234924.orig.tar.gz"
+  sha256: "54535a116c3305ab7e6b5e27cddfca2830379ec1e06cf06f44ffc9f0a61b3938"
+  tar_format: tar.gz
+  note: >-
+    Debian Astronomy Team 的 orig tarball（contrib pool；= indi-3rdparty 仓 indi-sbig/ 子目录
+    2.1 快照，时间戳 2022-12-20 23:49:24）；URL 的 '+' 写字面量（%2B 会触发 CI pre-download 的
+    file:// 路径不一致）；配方版本号沿用平台任务号 2.1
+
+build:
+  system: cmake
+  configure_options:
+    - "CMAKE_SYSTEM_NAME=Linux (E092: CMake 无 HarmonyOS 平台映射)"
+    - "CMAKE_SYSTEM_PROCESSOR=aarch64"
+    - "CMAKE_FIND_PACKAGE_PREFER_CONFIG=OFF"
+    - "INDI_ROOT=<libindi 包目录>"
+    - "-I<libusb include 根>（sbig_ccd.h 用 <libusb-1.0/libusb.h>）"
+    - "-DCMAKE_POLICY_VERSION_MINIMUM=3.5（patch 0003 同时把声明抬到 3.16）"
+  dependencies:
+    - "libindi/2.2.2.1"
+    - "libsbig/4.9.9"
+    - "cfitsio/4.6.4"
+    - "zlib/1.3.1.1"
+    - "libusb/1.0.27"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "patches/0001-FindINDI.cmake.patch (portability: 版本号正则兼容 INDI 2.x 引号形式)"
+  - "patches/0002-CMakeCommon-cxx17.patch (portability: CMAKE_CXX_STANDARD 14 -> 17)"
+  - "patches/0003-CMakeLists-ohos.patch (portability: cmake_minimum_required 3.0->3.16；INDI_DATA_DIR 归本包 share/indi)"
+  - "patches/0004-sbig-indi2-api.patch (portability: TemperatureNP/FilterSlotNP 访问器 + apply/setState/updateMinMax + BayerTP.setText + FilterNameTP.count()/getName())"
+
+upstream_tests:
+  framework: none
+  test_sources: 0
+  test_command: ""
+  run_in_build: false
+  evidence: >-
+    indi-sbig 2.1 快照无 enable_testing()/add_test()；整棵 indi-3rdparty 仓亦无该驱动用例
+upstream_test_pass_rate: "N/A（上游无测试用例，如实披露）"
+adapted_test_pass_rate: "test_package/check_driver.py 4 项校验——3 通过 + 1 有证据的宿主 SKIP，fails=0，RESULT: PASS"
+
+knowledge_gained:
+  - "INDI 2.x 迁移的第四个变体（沿用 DRAFT-7467/7473 的对照表）：FilterInterface 的 FilterNameT 元素数组在 2.x 不存在，'是否已有滤光片名' 的判断改为 FilterNameTP.count()，注销时 deleteProperty(FilterNameTP)"
+  - "libsbig（厂家静态库）+ libusb 的驱动组合：sbig_ccd.h 用 <libusb-1.0/libusb.h>，需注入 include 根（与 libfli/indi-sx 同款处理）"

@@ -1,0 +1,43 @@
+# conandata.yml — indi-sbig 2.1
+#
+# 源码 = Debian Astronomy Team 的 indi-sbig 官方 orig tarball（contrib pool），即
+# indilib/indi-3rdparty 仓库 indi-sbig/ 子目录 2.1 版本快照（时间戳 2022-12-20 23:49:24）。
+# 2026-10-15 实测：HTTP 200，82435 字节，
+# sha256 54535a116c3305ab7e6b5e27cddfca2830379ec1e06cf06f44ffc9f0a61b3938。
+# URL 里的 '+' 写字面量（%2B 会触发 CI pre-download 的 file:// 路径不一致）。
+# 配方版本号沿用平台任务号 2.1。
+
+sources:
+  url:
+    - "https://deb.debian.org/debian/pool/contrib/i/indi-sbig/indi-sbig_2.1+20221220234924.orig.tar.gz"
+  sha256: "54535a116c3305ab7e6b5e27cddfca2830379ec1e06cf06f44ffc9f0a61b3938"
+
+patches:
+  - patch_file: "patches/0001-FindINDI.cmake.patch"
+    patch_description: >
+      FindINDI.cmake 版本号正则回移上游 master 修复：兼容 INDI 2.x 的
+      INDI_VERSION "2.2.2" 引号形式（否则 FATAL_ERROR failed to detect INDI version）
+    patch_type: "portability"
+  - patch_file: "patches/0002-CMakeCommon-cxx17.patch"
+    patch_description: >
+      cmake_modules/CMakeCommon.cmake 的 CMAKE_CXX_STANDARD 由 14 提升到 17
+      （INDI 2.x 头文件使用 std::any）
+    patch_type: "portability"
+  - patch_file: "patches/0003-CMakeLists-ohos.patch"
+    patch_description: >
+      CMakeLists.txt：①cmake_minimum_required(VERSION 3.0) 在 CMake >= 4 下硬报错，
+      提升到 3.16；②INDI_DATA_DIR 被树内 FindINDI.cmake 定成 libindi 包的数据目录，
+      会让 install(FILES indi_sbig.xml DESTINATION ${INDI_DATA_DIR}) 把设备描述符写进
+      依赖包，改为本包私有的相对路径 share/indi（R49）
+    patch_type: "portability"
+  - patch_file: "patches/0004-sbig-indi2-api.patch"
+    patch_description: >
+      sbig_ccd.cpp 由 INDI 1.x 属性 API 迁移到 INDI 2.x：TemperatureN[0] /
+      FilterSlotN[0] 数组成员改为 TemperatureNP / FilterSlotNP 的
+      setMin/setMax/setValue 与 getMin/getMax/getValue 访问器；
+      IDSetNumber(&TemperatureNP, ...) 改为 TemperatureNP.apply()；
+      BayerT[2] 改为 BayerTP[2].setText()；基类属性 FilterNameTP 的 ->name 改为
+      getName()。驱动自有的 C 结构体属性（ProductInfoTP/FanStateSP/CoolerSP/
+      CoolerNP/IgnoreErrorsSP/FilterConnectionSP/FilterTypeSP/FilterProdcutTP/
+      AONSNP/AOWENP/CenterSP/IpTP）保持原样
+    patch_type: "portability"
