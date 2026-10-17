@@ -1,0 +1,79 @@
+# DRAFT — 并行阶段吞吐必须在时间域归约关键路径
+
+id:                     E591
+trigger_tool:           runtime|test
+phase:                  runtime|testing
+error_signature:        (?:rank|worker).*(?:rate|throughput).*(?:MPI_MAX|max(?:imum)?)|
+                        reported_(?:rate|throughput)=\d+.*critical_path_(?:rate|throughput)=\d+|
+                        (?:maximum|average).*(?:local|per-rank).*(?:rate|throughput)
+
+severity:               2
+category:               runtime, testing, architecture, filesystem
+match_keywords:         MPI, barrier, rank, benchmark, throughput, elapsed time,
+                        critical path, makespan, max local rate, average local rate
+title:                  并行阶段吞吐必须先归约关键路径耗时，不能取最大或平均局部速率
+prescan_pattern:        MPI_(?:All)?[Rr]educe|(?:rate|throughput).*(?:MPI_MAX|MPI_SUM)|
+                        (?:MPI_MAX|MPI_SUM).*(?:rate|throughput)
+prescan_globs:          *.c, *.h, *.cc, *.cpp
+
+root_cause:             屏障协调的并行阶段在每个 rank 先用总操作数除以本地耗时，再对
+                        局部速率取最大值或平均值。最大速率等价于最快 rank，平均速率是
+                        倒数的平均，二者都不等于总操作数除以 makespan。共同正分子时取
+                        最小局部速率与最大 elapsed 数学等价，不属于本知识禁止项。
+affected_scope:         MPI、线程池、分布式任务或多设备协同的同步阶段基准：所有执行单元
+                        共同贡献总工作量，阶段完成受最慢参与者约束，报告目标是整体吞吐。
+                        无同步的独立 rank 指标、异步稳态吞吐、分位数遥测不适用。
+verification_cmd:       conan create archives/m/mdtest/1.9.3 -pr:h=ci/conan/profiles/ohos-aarch64
+                        -pr:b=ci/conan/profiles/ohos-aarch64 --build=mdtest/*
+
+rec_priority:           1
+rec_approach:           reduce-time-then-compute-rate
+rec_description:        保留每个阶段的开始/结束或 elapsed，在参与同一阶段的 communicator
+                        内对完成时间/耗时做关键路径归约（同步同起点时 elapsed 取 MPI_MAX；
+                        仅当时间戳来自统一或已校准的可比较时钟时，start 取 MPI_MIN、finish
+                        取 MPI_MAX），最后只计算一次 total_operations/global_elapsed。barrier
+                        只协调执行顺序而不保证时钟同步；用确定性慢 rank 回归验证报告跟随关键路径。
+rec_command:            replace reduction(local_rate) with reduction(elapsed_time), then compute total_ops/max_elapsed
+rec_auto_fix:           false
+rec_impl:               source-algorithm-patch
+
+fallback_priority:      2
+fallback_approach:      report-rank-local-distribution-explicitly
+fallback_description:   若产品确实需要各 rank 的速率分布，应分别标注 min/median/max local
+                        rate，并另行报告整体 critical-path throughput；不能把某个局部统计量
+                        命名为聚合吞吐。
+fallback_command:       emit local_rate_distribution plus total_ops/global_makespan
+fallback_auto_fix:      false
+fallback_impl:          reporting-contract-change
+
+forbid_1_pattern:       MPI_(?:All)?Reduce.*(?:rate|throughput).*(?:MPI_MAX|MPI_SUM)|
+                        (?:max|average|mean).*(?:rank|worker).*(?:rate|throughput)
+forbid_1_reason:        对局部速率做最大值或算术平均不能恢复同步阶段的关键路径时间。
+forbid_1_consequence:   参与者计时窗口或生产耗时差异越明显，报告值越系统性高估真实整体吞吐。
+forbid_2_pattern:       (?:sleep|delay).*(?:all ranks|every worker)|(?:all ranks|every worker).*(?:sleep|delay)
+forbid_2_reason:        所有 rank 同时等量延迟不能证明归约选择了最慢参与者，测试必须制造可控偏斜。
+forbid_2_consequence:   原实现和正确实现可能同时通过，回归预言机失去区分能力。
+
+principles:             P005
+causes:                 []
+caused_by:              []
+similar_to:             []
+conflicts_with:         []
+prerequisite_of:        []
+
+doc_file:               knowledge/drafts/E591-draft-2789.md
+last_updated:           2026-10-16
+source_event:           mdtest/1.9.3 HarmonyOS PC 迁移；真实 2-rank 三臂在起始 barrier 后、
+                        rank 1 首个文件操作前注入一秒调度偏斜。原实现报告 11208.406 ops/s，
+                        局部速率平均伪修复报告 5291.072 ops/s，先归约最大 elapsed 后报告
+                        7.994 ops/s，与 8 operations/约1秒一致；
+                        test_package 对安装后的命令执行同一回归，回退核心补丁稳定失败。
+authors:                RepXlf <241880136@smail.nju.edu.cn>
+source_pr:              16184
+source_commit:          381c8b699471f53b4b563731425912f117ed3b52
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+draft:                  true
+contributor_id:         2789

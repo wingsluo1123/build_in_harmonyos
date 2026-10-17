@@ -1,0 +1,42 @@
+--- a/mdtest.c
++++ b/mdtest.c
+@@ -1341,0 +1342,15 @@
++static double phase_rate(int enabled, double elapsed, double operations) {
++    double critical_elapsed = elapsed;
++
++    if (!enabled) {
++        return 0;
++    }
++
++    if (barriers) {
++        MPI_Allreduce(&elapsed, &critical_elapsed, 1, MPI_DOUBLE, MPI_MAX,
++                      testcomm);
++    }
++
++    return operations / critical_elapsed;
++}
++
+@@ -1502 +1517 @@
+-        summary_table[iteration].entry[0] = items*size/(t[1] - t[0]);
++        summary_table[iteration].entry[0] = phase_rate(create_only, t[1] - t[0], items * size);
+@@ -1507 +1522 @@
+-        summary_table[iteration].entry[1] = items*size/(t[2] - t[1]);
++        summary_table[iteration].entry[1] = phase_rate(stat_only, t[2] - t[1], items * size);
+@@ -1512 +1527 @@
+-        summary_table[iteration].entry[2] = items*size/(t[3] - t[2]);
++        summary_table[iteration].entry[2] = phase_rate(read_only, t[3] - t[2], items * size);
+@@ -1517 +1532 @@
+-        summary_table[iteration].entry[3] = items*size/(t[4] - t[3]);
++        summary_table[iteration].entry[3] = phase_rate(remove_only, t[4] - t[3], items * size);
+@@ -1695 +1710 @@
+-        summary_table[iteration].entry[4] = items*size/(t[1] - t[0]);
++        summary_table[iteration].entry[4] = phase_rate(create_only, t[1] - t[0], items * size);
+@@ -1700 +1715 @@
+-        summary_table[iteration].entry[5] = items*size/(t[2] - t[1]);
++        summary_table[iteration].entry[5] = phase_rate(stat_only, t[2] - t[1], items * size);
+@@ -1705 +1720 @@
+-        summary_table[iteration].entry[6] = items*size/(t[3] - t[2]);
++        summary_table[iteration].entry[6] = phase_rate(read_only, t[3] - t[2], items * size);
+@@ -1710 +1725 @@
+-        summary_table[iteration].entry[7] = items*size/(t[4] - t[3]);
++        summary_table[iteration].entry[7] = phase_rate(remove_only, t[4] - t[3], items * size);
