@@ -1,0 +1,79 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件 (CI build_and_test.sh L0e 强制要求存在)
+package: pwncat/0.1.2
+homepage: "https://pwncat.org/"
+
+# ---------------------------------------------------------------------------
+# 上游测试入口
+# ---------------------------------------------------------------------------
+# pwncat 无 ctest/pytest 用例；上游用 bash 集成套件（tests/.lib/conf.sh 驱动）
+# + docker 冒烟用例，由 Makefile 编排：
+#   * `make test`  → 72 个 tests/integration/**.sh，每个脚本经 run_test() 展开为
+#                    若干变异轮次（合计 547 轮），CI 侧逐个 `__test-*` 目标执行。
+#   * `make smoke` → 6 个 tests/smoke/*/docker-compose.yml 用例（每个跑 5 遍）。
+#   * `make code-*`→ docker 镜像 cytopia/{pylint,black,mypy,pycodestyle,pydocstyle}
+#                    做静态检查（非功能测试）。
+#
+# CI 的 conan create 流程内不重跑上游集成套件：套件需 ~1 小时、本机回环端口、
+# 两个**仅测试期**需要的环境 shim（toybox `ps` 只认 -ef；运行时 /etc/hosts 缺
+# `::1 localhost` 别名——上游 CI 自己就是靠写 /etc/hosts 补这一行），且本配方
+# 打包的 PyPI sdist 不含 tests/。上游套件由适配阶段在 OHOS aarch64 运行时上以
+# 完整 GitHub tag v0.1.2 源码全量运行，实测结果见版本目录 notes.md「验证结果」
+# 与 reports/test-report.md（63/72 脚本通过；515/547 轮已执行，506 通过）。
+upstream_check_command: "make test   # TEST_PWNCAT_HOST=localhost TEST_PWNCAT_PORT=4444 TEST_PWNCAT_WAIT=2 TEST_PWNCAT_RUNS=1"
+upstream_test_in_build: false
+upstream_test_command: "make test"
+
+upstream_tests:
+  - name: "tests/integration/01-behaviour-quit--client"
+    count: "11 scripts / 148 rounds"
+    description: "客户端在服务端被杀后的退出（TCP）或保持（UDP）行为，default/command 两种形态，含 200/201 HTTP 用例；OHOS 上 9/11 通过，200/201 硬编码 www.google.com:80（本环境无外网），机制已用本地 HTTP/1.1 keep-alive 服务替代验证通过"
+  - name: "tests/integration/02-behaviour-quit--server"
+    count: "11 scripts / 176 rounds"
+    description: "服务端在客户端被杀后的退出/保持/reacc 行为（TCP/UDP）；OHOS 全部通过"
+  - name: "tests/integration/03-behaviour-base--file_transfer"
+    count: "2 scripts / 32 rounds"
+    description: "二进制文件（/bin/ls，609024 字节）经 pwncat 传输；OHOS 传输本体字节一致（sha256 相同），但上游 harness 以 -vvvv 时 pwncat 会把载荷 TRACE 到 stderr，而 OHOS /bin/ls 内含字面量 'ERROR :Range for -f is 1 to %ld'，触发 harness 的 grep ERROR 误报（详见 reports/test-report.md）"
+  - name: "tests/integration/10-mode---local_forward"
+    count: "1 script / 1 round"
+    description: "本地端口转发到 www.google.com:80；本环境无外网，机制已用本地 HTTP 服务替代验证通过（转发后可拿到 Set-Cookie 与响应体）"
+  - name: "tests/integration/11-mode---remote_forward"
+    count: "1 script / 1 round"
+    description: "远程端口转发到 www.google.com:80；本环境无外网（未做替代验证，仅确认外网不可达）"
+  - name: "tests/integration/20-options---nodns"
+    count: "4 scripts / 4 rounds"
+    description: "-n/--nodns 对非数字主机名须给出受控 'Resolve Error'；OHOS 全部通过"
+  - name: "tests/integration/21-options---crlf"
+    count: "24 scripts / 24 rounds"
+    description: "-C/--crlf 的 24 种 CRLF/LF 组合（client/server × crlf_crlf/crlf_lf/crlf_cr/crlf_no）；OHOS 全部通过（上游仅对 Windows 目标用 __DISABLE_CRLF__ 关闭该组，POSIX 上照常执行）"
+  - name: "tests/integration/22-options---keep_open"
+    count: "8 scripts / 112 rounds"
+    description: "-k/--keep-open 服务端重接受（三客户端、default/command、srv_send 变体）；OHOS 全部通过"
+  - name: "tests/integration/23-options---reconn"
+    count: "3 scripts / 42 rounds"
+    description: "--reconn 客户端重连（三服务端、srv_down 变体）；OHOS 全部通过"
+  - name: "tests/integration/25-options---ping_intvl"
+    count: "1 script / 1 round"
+    description: "--ping-intvl 周期载荷（UDP 反向 shell）；OHOS 通过"
+  - name: "tests/integration/26-options---ping_word"
+    count: "1 script / 1 round"
+    description: "--ping-word 自定义 ping 载荷（UDP 反向 shell）；OHOS 通过"
+  - name: "tests/integration/30-cnc---self_inject"
+    count: "5 scripts / 5 rounds"
+    description: "--self-inject 反向 shell 注入（对端为 pwncat 本身，或多/单字节 banner+suffix 的 revshell.py 替身，含 delayed 变体）；OHOS 上 2/5 通过——000（对端为 pwncat）与 003（多字节+0.5s 延迟）通过，001/002/004 在 CnC 与 revshell.py 替身握手处失败（001/002 报 'Unable to create tmpfile'，004 轮询 600 次握手未完成）；同注入通路既已在 000/003 上跑通，且 bin/pwncat 无硬编码 /tmp，故判定为测试替身交互问题而非可移植性缺陷（详见 reports/test-report.md §5.3）"
+  - name: "tests/smoke/200,201,300,301,302,303"
+    count: "6 docker 用例（每个 5 遍）"
+    description: "docker-compose 冒烟（keep_open kill_server、TCP/UDP port_scan banner）；**不可运行** —— 上游 tests/smoke/run.sh 硬依赖 docker/docker-compose，OHOS aarch64 运行时无 docker/podman/nerdctl，且冒烟镜像为 python:*-alpine（x86_64/glibc），见 reports/test-report.md"
+  - name: "make code-{pycodestyle,pydocstyle,pylint,black,mypy}"
+    count: "5 个静态检查目标"
+    description: "经 docker 镜像 cytopia/* 运行；**不可运行**（同上无容器运行时）。属静态检查，非功能测试用例"
+
+test_package_tests:
+  - file: test_pwncat.py
+    description: "R34 真实消费者测试：执行打包产物 bin/pwncat —— 校验 --version/--help 输出与全部 CLI 模式声明，并通过本机回环完成一次真实 netcat 式数据往返（服务端 -k -l 收数据，客户端 stdin 发数据，断言服务端 stdout 与载荷逐字节相同）"
+    command: "python3 test_pwncat.py <package_folder>"
+  - file: test_pwncat_ohos.py
+    description: "鸿蒙特有测试：校验 OHOS aarch64 POSIX 运行时、打包产物存在/可执行/shebang、在 OHOS 运行时上运行 --version，IPv6 字面量 ::1 经 -6 完成回环往返（OHOS 无 ::1 localhost 别名，字面量是可达路径），以及 --nodns 对主机名给出受控 Resolve Error 而非 Traceback"
+    command: "python3 test_pwncat_ohos.py <package_folder>"
+
+assertion_count: 25

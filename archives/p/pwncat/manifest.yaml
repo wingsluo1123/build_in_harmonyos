@@ -1,0 +1,21 @@
+software: pwncat
+display: "pwncat"
+description: "增强版 netcat：防火墙/IDS 规避、绑定与反向 shell、端口转发，可用 Python (PSE) 脚本化"
+category: network
+homepage: "https://pwncat.org/"
+license: MIT
+build_system: python
+
+ohos_adaptation:
+  key_points:
+    - "纯 Python 单文件 CLI（bin/pwncat，246 KB，仅标准库，install_requires=[]），无可导入包、无 C/C++ 编译；按 package_type=application 配方把脚本原样安装为 bin/pwncat"
+    - "零第三方依赖，故无 requires、无补丁、无源码修改 —— bin/pwncat 在 OHOS aarch64 运行时上原样可用"
+    - "上游测试（Makefile `make test` 的 72 个 bash 集成脚本 / 547 轮）在 OHOS aarch64 运行时上全量运行：63/72 脚本、506/515 已执行轮次通过；9 个失败均为环境/测试替身原因（4 个硬编码 www.google.com:80 需外网、2 个 harness grep ERROR 误报、3 个 CnC self-inject 与 revshell.py 替身握手失败），非 pwncat 缺陷。仅需两个**测试期**环境 shim：toybox `ps` 只认 -ef（上游用 BSD `ps auxw` 轮询），以及运行时 /etc/hosts 缺 `::1 localhost` 别名（上游 CI 自己就是写 /etc/hosts 补这一行）。详见 0.1.2/notes.md 与 0.1.2/reports/test-report.md"
+    - "另需 docker 的上游用例（6 个 tests/smoke/* + `make code-*` 静态检查）在本环境不可运行：OHOS aarch64 无 docker/podman/nerdctl，冒烟镜像亦为 x86_64/glibc alpine"
+  common_dependencies: []
+
+versions:
+  "0.1.2":
+    status: built
+    build_date: "2026-10-15"
+    conan_ref: "pwncat/0.1.2"

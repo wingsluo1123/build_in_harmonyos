@@ -1,0 +1,38 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P3",
+      "rule_id": "suggestion",
+      "file": "archives/p/pwncat/0.1.2/packaging/pwncat-0.1.2-ohos-aarch64.tar.gz",
+      "line": 1,
+      "description": "工作区存在 packaging/ 本地 tar.gz（内容为 conan 包缓存里的 bin/pwncat，sha256 6cfb1a07b3c5beec40ef5ba93e46346f0508ccfd0b8f1e8dbb20b1a8f866bc4d）。它只是工具链自身 submit/finish 清单里 packaging_present 自检所需的本地证据（ARCHIVE-SPEC v3.0 已废弃 packaging/），并非以手工打包替代 conan create——包的权威产物由 conan create 生成（pwncat/0.1.2#19f30a3fae2f392f77a60c1def446281:d3de22f79f2ef83180f2040fcac5b6154a36745b）。",
+      "fix_suggestion": "已确认该目录被仓库 .gitignore 的裸 `packaging/` 规则忽略，不在本 PR 的 19 个文件内；无需处理，仅留档说明。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "suggestion",
+      "file": "archives/p/pwncat/0.1.2/ci-metadata.json",
+      "line": 4,
+      "description": "finish/refresh-patch 附带的 ci-metadata.json（同样被 .gitignore 忽略）其 source_trace.url 记录了本地预下载缓存路径 file:///storage/.../.build-cache/predl_cache/ac03d5fa_pwncat-0.1.2.tar.gz。已核对 conandata.yml 未被改写：与同目录 conandata.yml.orig 逐字节相同，官方 URL 仍在（files.pythonhosted.org），sha256 与 PyPI JSON API 及本地复核一致。",
+      "fix_suggestion": "无阻断项。后续同类任务如发现 conandata.yml 被注入 file:// 或镜像域名，需还原官方 URL 后重审（本次未发生）。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "suggestion",
+      "file": "archives/p/pwncat/0.1.2/notes.md",
+      "line": 44,
+      "description": "上游 30-cnc---self_inject 的 3 个变体（001/002/004）在 OHOS 上失败：pwncat CnC 自身日志为 'Unable to create tmpfile'（001/002），004 在 TRIES=600 内未完成握手。已在 reports/test-report.md §5.3 逐条给出日志计数证据，并证明同注入通路在 000/003 上通过、bin/pwncat 无硬编码 /tmp、本环境 tempfile.mkstemp() 正常，故判定为测试替身（逐字节+banner/suffix 的 revshell.py）交互问题而非平台可移植性缺陷，本次不修改上游源码。",
+      "fix_suggestion": "属上游 CnC 远程响应解析鲁棒性话题，超出'移植适配'范围；如后续需要，可向上游提 issue 或在下游以最小补丁放宽 create_remote_tmpfile() 的响应判定，并同步 patches/ 与 conandata.yml。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "suggestion",
+      "file": "archives/p/pwncat/0.1.2/test_package/test_pwncat_ohos.py",
+      "line": 26,
+      "description": "test_pwncat.py 与 test_pwncat_ohos.py 各自重复实现了 _free_port/_wait_listening 两个小工具函数。这是有意为之：两个脚本都由 test_package/conanfile.py 以独立进程直接执行，保持零共享导入，避免引入额外模块路径依赖。",
+      "fix_suggestion": "如需进一步收敛，可在两个脚本都改为被同一 conanfile 调用的前提下抽取公共 helper；当前重复仅约 15 行，不构成 P2。"
+    }
+  ],
+  "summary": "对 pwncat/0.1.2 的 19 个变更文件（archives/p/pwncat/** 13 个 + knowledge/drafts/E591-E593 6 个）执行 W4 独立审计。欺骗类（R34/R8/R9/R19/R40）：未见空壳测试——test_package 真实执行打包产物 bin/pwncat（CLI --version/--help 契约 + 本机回环逐字节数据往返 + ::1 IPv6 往返 + --nodns 受控错误），conan create 内 25 断言全通过；无 #ifdef/-D__OHOS__/replace 注入；status=built 与 conan-verify 结果一致；无手工打包替代 conan create。配方质量（R26/R32/R33/R37/R38/R39）：package_type=application 与 bindirs 一致，conandata.yml 为官方 PyPI URL 且 sha256 经 PyPI JSON API 与本地复核双重确认，无 file://；build() 无裸 shell 变量；commands.json 齐全（type=tool，L0k 通过）；L0j 确认首发布无版本冲突。文件规范与 PR 合规（W2）：变更严格限定在单软件目录 + 本包知识草稿，无框架文件（git diff 校验：非 archives/p/pwncat 与 knowledge/drafts 的文件数为 0）。R51 上游测试三步法：notes.md/reports/test-report.md 给出完整清点的 72 脚本/547 轮，并在 OHOS aarch64 运行时全量执行，如实回填 63/72 脚本、506/515 已执行轮次通过，9 个失败逐条给出技术原因与日志证据，无占位符、无少报。结论：无 P0/P1（P2=0，P3=4 项提示），verdict=pass。"
+}
