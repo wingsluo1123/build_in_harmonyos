@@ -1,0 +1,184 @@
+# 版本级 manifest — skladnik 26.04.2
+# 遵循 ARCHIVE-SPEC v3.0（conanfile.py 是唯一真相源，本文件为交叉校验元数据）
+
+software: skladnik
+version: "26.04.2"
+conan_ref: skladnik/26.04.2
+status: built
+package_type: application
+build_system: cmake
+language: cpp
+created_at: 2026-10-15
+build_date: 2026-10-15
+description: "KDE Sokoban game (Skladnik) - push every stone onto its goal field; Qt6 Widgets + KDEGames6"
+homepage: https://invent.kde.org/games/skladnik
+upstream_source: https://download.kde.org/stable/release-service/26.04.2/src/skladnik-26.04.2.tar.xz
+license: "GPL-2.0-or-later AND GFDL-1.2-only"
+
+source:
+  url: "https://download.kde.org/stable/release-service/26.04.2/src/skladnik-26.04.2.tar.xz"
+  sha256: "e5f202e95b40e98d41c77a48edfee9f1ab41a8c6919f12b97b273d2e4c474feb"
+  tar_format: tar.xz
+  # 校验记录: 2026-10-15 本机 curl -sSL 下载后 shasum -a 256 实测一致
+
+build:
+  system: cmake
+  configure_options:
+    - "-DBUILD_TESTING=OFF"
+    - "-DKF_IGNORE_PLATFORM_CHECK=TRUE"
+    - "-DKF_SKIP_PO_PROCESSING=ON"
+    - "-DCMAKE_DISABLE_FIND_PACKAGE_KF6DocTools=TRUE"
+    - "-DCMAKE_DISABLE_FIND_PACKAGE_POVRay=TRUE"
+    - "-DKDE_INSTALL_LIBDIR=lib"
+    - "-DKDE_INSTALL_USE_QT_SYS_PATHS=OFF"
+    - "-DCMAKE_EXE_LINKER_FLAGS_INIT=-Wl,-z,max-page-size=0x1000 (仅 OHOS，conanfile 注入)"
+    - "-DECM_MODULE_PATH=<ecm>/share/ECM/{modules,find-modules,kde-modules} (conanfile 注入)"
+  dependencies:
+    required:
+      - qtbase/6.11.1
+      - kconfig/6.18.0
+      - kconfigwidgets/6.18.0
+      - kcoreaddons/6.18.0
+      - kcrash/6.18.0
+      - kdbusaddons/6.18.0
+      - ki18n/6.18.0
+      - kwidgetsaddons/6.18.0
+      - kcodecs/6.18.0
+      - kxmlgui/6.18.0
+      - libkdegames/26.04.0
+      - karchive/6.18.0 (override=True，闭包一致性，见 conanfile 注释)
+      - kiconthemes/6.18.0.1 (override=True，非直接依赖；其已发布二进制 package_id 5937e6fd91b6589196a15790f369a1328a4907fb 恰为本闭包所需，使全图 0 节点需源码构建，见 notes.md 关键决策第 4 节)
+    build:
+      - ecm/6.26.0
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "patches/0001-CMakeLists.txt.patch"
+  - "patches/0002-src-CMakeLists.txt.patch"
+  - "patches/0003-src-MainWindow.cpp.patch"
+
+test_results:
+  counting_scheme: >-
+    独立检查项数量。test_package/main.cpp 中每个编号检查项输出一行
+    [PASS]/[FAIL]/[SKIP]，任一 FAIL 则进程退出码非 0。OHOS worker 上 12 项全跑；
+    04 与 06 为 OHOS 专属，在非 OHOS 主机上报 SKIP（本机跑为 10 PASS + 2 SKIP）。
+    MANIFEST.yml、notes.md、PR 两张测试表统一使用此口径。
+  upstream: >-
+    0（N=0）。证据：26.04.2 tarball 内无 tests/、autotests/、test/ 目录；
+    grep -rnE 'add_test|enable_testing|ECMAddTests|ecm_add_tests' 遍历全部
+    CMakeLists.txt 与 *.cmake 无匹配；全树唯一 BUILD_TESTING 出现在
+    snapcraft.yaml 的 -DBUILD_TESTING=OFF。上游 QA 走 KDE CI（.kde-ci.yml），
+    不随 release tarball 发布。
+  test_package: >-
+    12 项独立检查（消费者视角，见 test_package/MANIFEST.yml）：
+    A 组交付 ELF 产物 6 项（01 存在 / 02 ELFCLASS64 小端 / 03 EM_AARCH64 /
+    04 [鸿蒙] PT_LOAD p_align <= 0x1000 / 05 DT_NEEDED 闭包全可解析 /
+    06 [鸿蒙] .codesign 段存在）；
+    B 组交付可执行文件真实运行 2 项（07 --version 退出 0 且输出 0.5.26042 /
+    08 --help 退出 0 且仍暴露位置参数 URL）；
+    C 组安装态主题数据契约 4 项（09 KGameTheme desktop 键 /
+    10 SVG 声明全部 16 个渲染器元素 id / 11 16 个 sprite PNG 全部安装 /
+    12 每个 PNG 的 IHDR 尺寸与 SVG 声明一致）。
+  harmonyos_specific_tests: 3
+  package_id: "e13d88a38c6b3143d16ba5cc634b23b44eb8aed9"
+
+verification:
+  channel: >-
+    CI（官方 HarmonyOS 构建 worker）承担编译与测试执行。本机为 macOS/arm64
+    开发机，Qt 的构建期工具（$qtbase/libexec/moc、$qtbase/bin/qtpaths）是
+    OHOS aarch64 musl 动态可执行文件（interpreter /lib/ld-musl-aarch64.so.1），
+    macOS 无法执行，实测均为 exec format error。
+  local_host: "macOS/arm64 (Apple clang 17.0.0) + Conan 2.29.1 + OpenHarmony 5.1.0 macOS SDK native (clang 15.0.4, aarch64-linux-ohos)，profile ohos-local"
+  local_passed:
+    - "源码 URL 与 SHA256 实测一致（download.kde.org 官方源，e5f202e9...474feb）"
+    - "3 个补丁在原始 26.04.2 源码上 patch -p1 --dry-run 全部 exit 0、无 fuzz，随后实际应用成功"
+    - "打补丁后全树 grep 无残留 KIO::/KUrlMimeData/KF6::KIOCore 调用（仅注释中说明性提及）"
+    - "conan graph info（ohos-local profile）解析成功、graph ERROR=None；改用 kiconthemes/6.18.0.1 override 后 43 个节点 needs building: NONE（全图命中预编译二进制，其 package_id 5937e6fd91b6589196a15790f369a1328a4907fb 与本闭包所需完全一致）。改前用 kiconthemes/6.18.0 时该节点为 Missing（制品仓 6.18.0 已发布二进制锚定 karchive/6.19.0，与本闭包 karchive/6.18.0 override 冲突），每轮 CI 都必须源码重建，这正是 #92382 / #92399 / #92881 三轮红的共同落点"
+    - "src/MainWindow.cpp（含 KIO -> QNetworkAccessManager 改写）对真实 Qt 6.11.1 + KF6 6.18.0 + KDEGames6 头文件 clang++ -fsyntax-only -std=c++17 通过，RC=0（仅 ki18n 上游 deprecation 属性告警）"
+    - "test_package/main.cpp 对真实 Qt 6.11.1 QtCore 头文件 clang++ -fsyntax-only -std=c++17 通过，RC=0"
+    - "C 组数据契约（检查项 09-12）以宿主机等价实现对真实上游数据复算：desktop 键齐全、SVG 声明全部 16 个渲染器 id、themes/CMakeLists.txt 安装的 16 个 sprite 与 SVG 的 16 个 xlink:href 一一对应、16 个 PNG 的 IHDR 尺寸与 SVG 声明逐项一致 —— 4/4 PASS"
+    - "package_id 本机计算为 e13d88a38c6b3143d16ba5cc634b23b44eb8aed9"
+  local_blocked:
+    - "conan create 的编译阶段：kiconthemes/6.18.0 在 CMake configure 期由 ECM KDEInstallDirs6 通过 execute_process 调用 qtpaths 失败（Qt6 qtpaths call failed: exec format error）；即使越过该步，AUTOMOC 亦需执行 OHOS aarch64 的 moc，本机无宿主替代品（无 native Qt 工具链，未安装 brew qt，Docker daemon 未运行）"
+    - "test_package 的执行阶段：conan.tools.build.can_run 为 False（profile 内 tools.build.cross_building:can_run=False），本机无 hdc/真机，12 项检查的实际执行由 CI worker 承担"
+  precedent: >-
+    本机不可执行 Qt 构建期工具时的处置方式沿用已合并先例
+    archives/l/libkcddb/26.04.0（notes.md "Verification / Build and test
+    execution - CI only, and why" + manifest.yaml verification.channel），
+    以及 kfourinline/26.04.0 notes.md 中 "OHOS conan create (local,
+    aarch64, clang, Release)" 记录的 aarch64 OHOS 本机验证形态。
+    status 取 built（未 upload），不宣称 published。
+
+knowledge_gained:
+  - "KDE Gear 游戏裁 KIO 的两种上游形态：kgoldrunner 是 KIO::mkpath（QDir().mkpath() 等价替换，零功能损失）；skladnik 是 KIO::file_copy 远程关卡下载 + KUrlMimeData 拖放取 URL，等价替换为 QNetworkAccessManager（NoLessSafeRedirectPolicy + 阻塞 QEventLoop，对应上游 job->exec()）与 QMimeData::urls()"
+  - "KF6DocTools 在 skladnik 上游本就是非 REQUIRED 且 doc/ 已被 if(KF6DocTools_FOUND) 守卫，因此无需补丁，只要 CMAKE_DISABLE_FIND_PACKAGE_KF6DocTools=TRUE 即可；对比 kgoldrunner 上游把 DocTools 写在 REQUIRED 里必须打补丁"
+  - "src/images/CMakeLists.txt 用 find_package(POVRay) 在渲染器存在时重生成 sprite PNG，而 tarball 已随附渲染结果；不显式 CMAKE_DISABLE_FIND_PACKAGE_POVRay=TRUE 会让构建结果依赖 worker 上是否恰好有 povray，破坏可复现性"
+  - "knewstuff/6.18.0 的 requires 不含 kio（实测 conan download 后读配方），因此 KIO 不在 libkdegames/26.04.0 的传递闭包内，想用 KIO 必须自己引入 kio 并接受跨线源码重建"
+  - "L5a/L5b 的 SONAME 门禁只扫描包内 lib/lib*.so 一级目录，application 包（无 lib/）不触发；因此依赖 libkdegames/26.04.0（无 DT_SONAME）不会让本包 L5 变红，可执行文件的 path-form DT_NEEDED 由 test_package 的运行时兜底逻辑处理"
+  - "Trimming KF6 KIOCore requires explicitly relinking KF6 CoreAddons: upstream target_link_libraries never lists CoreAddons, yet src/main.cpp includes KAboutData, whose include path only arrived through the PUBLIC transitive interface of KIOCore. Omitting the relink makes CI fail with a missing KAboutData header (reproduced in build 92251; same handling as the kgoldrunner 26.04.0 patch)."
+  - "The CI checkout-pr step fetches the PR diff through the shared robot account p_repoRobot, which is rate limited to 200 calls per minute. When it saturates, both the worker and a developer machine get HTTP 429 for the same URL, and the wget fallback also fails because busybox wget rejects the -q option. This is transient platform-side breakage unrelated to the recipe; the correct action is to wait for the window and re-trigger, not to change the recipe."
+  - "依赖侧源码重建往往不是必需的：先查制品仓有没有同上游版本的 R37 适配修复版（X.Y.Z.N）。kiconthemes/6.18.0 在 karchive/6.18.0 override 下必然 Missing、每轮 CI 都要源码重建（本次 3 轮红的共同落点：ctest 挂 / configure 期 fork 失败），但 kiconthemes/6.18.0.1 把 karchive 钉在 6.18.0，其已发布二进制的 package_id 恰为本闭包所需的 5937e6fd91b6589196a15790f369a1328a4907fb；改用 override=True 指向它之后 conan graph info 的 needs building 由 1 变 0，整图预编译。判据：conan list 该包该版本的 * 通配，比对已发布 package_id 与本图谱算出的 id 是否相等"
+  - "worker 报 make[1]: /bin/sh: Resource temporarily unavailable 且 CMake 编译器 ABI 探测 Error 127，是 worker 进程槽耗尽（skill 12.0 的 D 类），发生在依赖包 configure 期、本包代码尚未编译；正确处置不是重刷 CI，而是回到依赖图消除源码重建这一暴露面"
+
+ci_verification:
+  channel: "官方 HarmonyOS CI worker（真机环境），非本机推断"
+  build_number: 92995
+  buildbot_buildid: 107014
+  worker: "OpenHarmonyPCDeveloper-CI-020"
+  ci_revision: "7fe89f3ae9cb1d639b2180a6e35f59fc4e79f324"
+  ci_pr_number: 15886
+  started_at: "2026-10-15 15:51:12"
+  completed_at: "2026-10-15 16:01:19"
+  duration_sec: 607
+  previous_green_builds:
+    - build_number: 92344
+      buildbot_buildid: 106260
+      worker: "OpenHarmonyPCDeveloper-CI-019"
+      ci_revision: "6ae973f332b0d5c30b9ba408b95ccd330470a5d0"
+      duration_sec: 354
+      note: "kiconthemes override 之前；该轮依赖侧仍源码重建 kiconthemes"
+    - build_number: 92409
+      buildbot_buildid: 106325
+      worker: "OpenHarmonyPCDeveloper-CI-003"
+      ci_revision: "5f68e01394987c5382263329a4c46a0afcf924f3"
+      duration_sec: 355
+      note: "纯文档提交后的 head；CI 只读四类文件与 6ae973f3 逐字节相同"
+  buildbot_results: 0
+  state_string: "build successful"
+  exit_code: 0
+  steps_all_pass: true
+  gates:
+    L0: "pass: all checks passed"
+    L1: "pass: upstream tests + test_package executed（L1a/L1b/L1c ok；L1e 破坏性反向验证确认 test genuinely depends on skladnik）"
+    L2: "skip: skladnik version/help failed（非阻塞：L2 裸跑缺 test_package 准备的运行态；同两条断言由检查项 07/08 在 test_package 内全过）"
+    L4: "warn: dangerous functions in patches（关键字误报：扫描正则的 gets 命中 patch 上下文里的 Widgets / ConfigWidgets）"
+    L5: "pass: bin/ has content"
+  build_summary: "Total 1 / Success 1 / Failed 0 / Pass rate 100.0%"
+  test_package_result: "12 passed, 0 failed, 0 skipped（含 3 项鸿蒙特有：04 PT_LOAD max p_align=0x1000、05 21 条 DT_NEEDED 全可解析、06 .codesign 存在）"
+  runtime_evidence: "检查项 07 在 worker 上真实启动安装态二进制并输出 skladnik 0.5.26042"
+  package_revision: "9ce697661a0a7bc561fde9a381e73371"
+  dependency_rebuilt_on_worker: "无。kiconthemes 改用 6.18.0.1 override 后整个依赖闭包命中预编译二进制：本轮日志中 Created package revision 只出现一次且属于本包，对 kiconthemes 的 Calling build() 与 Created package revision 匹配数为 0。此前 #92344 与 #92409 两轮仍需源码重建 kiconthemes/6.18.0（其自带 ctest 100% passed, 0 failed out of 5）"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /var/folders/mz/4dql6xh91bv6q32jnsgc1q7c0000gn/T/builds/skladnik-26.04.2.orig
+  source_work_dir: /var/folders/mz/4dql6xh91bv6q32jnsgc1q7c0000gn/T/builds/skladnik-26.04.2.work
+  source_orig_hash: 94c541cf14a8a485
+  source_work_hash: b04c525a3ed97af8
+  generated_at: '2026-10-15T03:21:42'
+  patches_count: 3
+
+patch_classification:
+  - file: 0001-CMakeLists.txt.patch
+    type: portability
+    platform_only: True
+    guard: none
+  - file: 0002-src-CMakeLists.txt.patch
+    type: portability
+    platform_only: True
+    guard: none
+  - file: 0003-src-MainWindow.cpp.patch
+    type: portability
+    platform_only: True
+    guard: none

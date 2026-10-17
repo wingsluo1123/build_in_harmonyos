@@ -1,0 +1,40 @@
+# Software-level manifest - skladnik
+# Follows ARCHIVE-SPEC v3.0 section 4.1. CI does not read this file; it is a
+# human-readable index and cross-check companion to the version-level recipe.
+
+software: skladnik
+display: "Skladnik"
+description: "KDE Sokoban game (warehouse keeper): push every stone onto its goal field"
+category: gfx
+homepage: "https://invent.kde.org/games/skladnik"
+license: "GPL-2.0-or-later AND GFDL-1.2-only"
+build_system: cmake
+type: application
+
+ohos_adaptation:
+  key_points:
+    - "Trim KIO: upstream uses it in exactly two places (KIO::file_copy to download a remote level collection, KUrlMimeData to read dropped URLs); replaced by QNetworkAccessManager (NoLessSafeRedirectPolicy plus a blocking QEventLoop) and QMimeData::urls(). kio is only published at 6.14.0/6.26.0, and mixing either line with the KF6 6.18 line that libkdegames pins invalidates every prebuilt KF6 binary."
+    - "kdoctools needs no patch: upstream find_package(KF6DocTools) is not REQUIRED and doc/ is already guarded by if(KF6DocTools_FOUND), so CMAKE_DISABLE_FIND_PACKAGE_KF6DocTools=TRUE is enough."
+    - "CMAKE_DISABLE_FIND_PACKAGE_POVRay=TRUE pins the build to the sprite PNGs shipped in the tarball, so a povray binary that happens to exist on the worker cannot change the artifacts."
+    - "KF_IGNORE_PLATFORM_CHECK=TRUE bypasses the KDE platform allowlist (OHOS is not in it)."
+    - "KF_SKIP_PO_PROCESSING=ON skips ki18n_install(po); the worker has no gettext toolchain."
+    - "-Wl,-z,max-page-size=0x1000 (OHOS only) keeps lld from splitting .dynsym/.dynstr into a separate high-address RW LOAD segment that the OHOS musl loader refuses to mmap."
+    - "qtbase and the KF6 packages use cmake_find_mode=none, so conan_cmakedeps_paths.cmake is written by hand and ECM_MODULE_PATH is injected manually."
+    - "The host tools (moc/uic/rcc/kconfig_compiler) are themselves OHOS binaries, so the build and test environments inject the dependency lib dirs plus /system/lib64 into LD_LIBRARY_PATH."
+    - "Runtime needs QT_QPA_PLATFORM=offscreen and an isolated HOME; the executable must carry a valid .codesign section or exec-mapping fails with EACCES."
+  common_dependencies:
+    - qtbase
+    - libkdegames
+    - extra-cmake-modules
+
+versions:
+  "26.04.2":
+    status: built
+    build_date: "2026-10-15"
+    conan_ref: "skladnik/26.04.2"
+    sha256: "e5f202e95b40e98d41c77a48edfee9f1ab41a8c6919f12b97b273d2e4c474feb"
+    build_system: cmake
+    package_type: application
+    upstream_tests: 0
+    test_package_checks: 12
+    harmonyos_specific_tests: 3

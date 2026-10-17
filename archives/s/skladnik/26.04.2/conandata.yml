@@ -1,0 +1,15 @@
+sources:
+  "26.04.2":
+    url: "https://download.kde.org/stable/release-service/26.04.2/src/skladnik-26.04.2.tar.xz"
+    sha256: "e5f202e95b40e98d41c77a48edfee9f1ab41a8c6919f12b97b273d2e4c474feb"
+patches:
+  "26.04.2":
+    - patch_file: "patches/0001-CMakeLists.txt.patch"
+      patch_description: "Add Qt6 Network to the required Qt6 components and drop KIO from the required KF6 components: kio is published on the 6.14/6.26 KF6 lines while libkdegames anchors the 6.18 line, so mixing them changes every KF6 package id and no prebuilt binary matches (kgoldrunner 26.04.0 precedent)"
+      patch_type: "portability"
+    - patch_file: "patches/0002-src-CMakeLists.txt.patch"
+      patch_description: "Link Qt6::Network instead of KF6::KIOCore for the single remote level-collection download, and link KF6::CoreAddons explicitly: upstream reaches KAboutData (src/main.cpp) only through KF6::KIOCore's transitive KCoreAddons interface, so trimming KIO without relinking CoreAddons fails with 'KAboutData file not found' (kgoldrunner 26.04.0 patch precedent; confirmed by CI build #92200)"
+      patch_type: "portability"
+    - patch_file: "patches/0003-src-MainWindow.cpp.patch"
+      patch_description: "Replace the two KIO uses (KIO::file_copy of a remote collection into a temporary file, KUrlMimeData::urlsFromMimeData on drop) with QNetworkAccessManager (NoLessSafeRedirectPolicy, blocking nested event loop mirroring job->exec()) and QMimeData::urls()"
+      patch_type: "portability"

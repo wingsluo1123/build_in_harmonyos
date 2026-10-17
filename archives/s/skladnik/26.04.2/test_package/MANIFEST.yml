@@ -1,0 +1,97 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for skladnik/26.04.2.
+#
+# COUNTING SCHEME (used consistently in notes.md, the PR test tables and the
+# CI logs): one numbered check in skladnik_consumer_test equals one
+# independently judgeable assertion. Each prints exactly one
+# [PASS]/[FAIL]/[SKIP] line and the process exits non-zero if any check
+# fails. On the HarmonyOS worker all 12 checks run; the two OHOS-only checks
+# (04 and 06) report [SKIP] on a non-OHOS host, so a local run shows
+# 10 passed + 2 skipped.
+
+package: skladnik/26.04.2
+homepage: https://invent.kde.org/games/skladnik
+
+upstream_check_command: "grep -rnE 'add_test|enable_testing|ECMAddTests|ecm_add_tests' --include='*.txt' --include='*.cmake' . || true"
+upstream_test_in_build: false
+upstream_test_command: "n/a - upstream registers no test suite (no tests/, autotests/ or test/ directory and no add_test()/enable_testing()/ECMAddTests() call anywhere in the 26.04.2 tarball)"
+
+upstream_tests:
+  - file: "(none)"
+    source: skladnik-26.04.2.tar.xz
+    description: "No upstream test suite (N=0). Evidence: the extracted tarball has no tests/, autotests/ or test/ directory, and the grep in upstream_check_command returns no match over any CMakeLists.txt or *.cmake (the only BUILD_TESTING mention in the whole tree is -DBUILD_TESTING=OFF inside snapcraft.yaml). Upstream QA for this module runs in KDE CI (.kde-ci.yml), not in the release tarball."
+    command: "n/a"
+
+test_package_tests:
+  - file: test_package/main.cpp
+    description: >-
+      Application-package consumer verification (N=0 compensation): 12
+      independent checks over the installed package.
+      Group A, delivered ELF artifact - 01 the installed bin/skladnik
+      exists; 02 it is an ELFCLASS64 little-endian image, so no host binary
+      leaked into the package; 03 e_machine is EM_AARCH64, confirming the
+      cross-compilation target; 04 [HarmonyOS] every PT_LOAD p_align is at
+      most 0x1000, the page layout the OHOS musl loader requires, because
+      the default lld 0x10000 max-page-size splits .dynsym/.dynstr into a
+      separate high-address RW LOAD segment the loader refuses to mmap - the
+      recipe prevents this with -Wl,-z,max-page-size=0x1000; 05 every
+      DT_NEEDED entry resolves against the dependency closure plus the OHOS
+      system lib dir (/system/lib64, which supplies libc++_shared.so and
+      libc.so), load-bearing on OHOS because the loader resolves path-form
+      NEEDED entries literally with no LD_LIBRARY_PATH fallback;
+      06 [HarmonyOS] the
+      executable carries exactly one .codesign section after platform
+      signing, since OHOS refuses to exec-map an ELF without one and reports
+      an unrelated EACCES.
+      Group B, the delivered executable actually runs - 07 skladnik
+      --version exits 0 and prints 0.5.26042 under QT_QPA_PLATFORM=offscreen,
+      exercising QApplication creation, the KF_IGNORE_PLATFORM_CHECK bypass
+      and the KAboutData version pipeline; 08 skladnik --help exits 0 and
+      still advertises the positional URL argument, proving the KIO trim
+      left the level-collection entry point intact.
+      Group C, installed theme data contract consumed by KGameRenderer at
+      runtime - 09 the installed
+      share/skladnik/themes/skladnik_classic.desktop carries the KGameTheme
+      keys PlayField.cpp reads (Type=SVG, FileName=skladnik_classic.svg,
+      VersionFormat=1); 10 the installed theme SVG declares all 16 renderer
+      element ids the game requests (background from PlayField.cpp; goal,
+      man, saveman, object, treasure, stone_0 through stone_5 and halfstone_0
+      through halfstone_3 from GroundItem.cpp with LARGE_STONES=6 and
+      SMALL_STONES=4); 11 all 16 xlink:href sprite PNGs referenced by the
+      SVG are installed under themes/; 12 each of those PNGs is a real PNG
+      whose IHDR geometry matches the width and height the SVG declares for
+      it (stones 192x96, half-stones 96x96, the remaining sprites 192x192,
+      starfield 128x128).
+    command: "./skladnik_consumer_test"
+
+# 12 numbered checks; 04, 05 and 06 are the HarmonyOS-specific ones
+# (rule12: N=3, which satisfies N >= 1). Checks 04 and 06 report [SKIP]
+# when the host is not OHOS.
+assertion_count: 12
+harmonyos_specific_tests: 3
+
+# Judgment boundary for platform/dependency flakes (skill 12.1: recorded
+# consistently here, in notes.md and in the PR body).
+#
+# These 12 checks have never failed for a reason attributable to this package.
+# The only check that ever failed was 05, in CI build #92324, and the cause was
+# this test's own search path omitting the OHOS system lib dir (/system/lib64,
+# which supplies libc++_shared.so and libc.so); fixed in commit 6ae973f3 and
+# green since (#92344 and #92409 both report "21 DT_NEEDED entries all
+# resolve"). Checks 01-12 all pass on both green builds.
+#
+# Red rounds that are NOT test failures and are NOT judged against this
+# package: #92173/#92181/#92373 (checkout-pr could not fetch the PR diff,
+# HTTP 429 on the shared p_repoRobot account), #92200/#92388 (worker-prep and
+# git-clone killed at the 120s timeout), #92382 (the dependency
+# kiconthemes/6.18.0 rebuilt from source ran its own ctest against a worker
+# that mixed two conan homes), #92399/#92881 (the same dependency's CMake
+# compiler probe died with "/bin/sh: Resource temporarily unavailable",
+# Error 127, before any skladnik code was compiled).
+#
+# Follow-up: the last three are all exposed by the dependency-side source
+# rebuild. This recipe now overrides kiconthemes to 6.18.0.1, whose published
+# binary matches the closure, so conan graph info reports zero nodes needing a
+# build. A separate dependency-side PR republishing kiconthemes/6.18.0 against
+# karchive/6.18.0 would remove the same exposure for kgoldrunner,
+# kfourinline, ktuberling and libkdegames consumers.
