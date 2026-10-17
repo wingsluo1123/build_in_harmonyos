@@ -1,0 +1,37 @@
+# 版本级 manifest — installation-report 2.98
+version: "2.98"
+software: "installation-report"
+status: built
+build_date: "2026-10-08"
+build_system: none
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/i/installation-report/installation-report_2.98.tar.xz"
+  sha256: "119b1c56903b609daaced91f70f2426dcb9b2d862f5c3306c3971f52a52a661de40"
+  note: >-
+    Debian native 包（无独立上游仓库）：源码 = 顶层脚本 + debian/（含 debian/po/），
+    debian/rules 只有 `%: dh $@`。该 2.98 版本在 Debian pool 里仍可直取。
+
+build:
+  system: none
+  dependencies: []          # 无 Conan requires（脚本只用 /bin/sh；lspci/lsusb/dmidecode 为可选调用）
+  tools: []
+
+patches_applied: []
+
+upstream_tests:
+  framework: none
+  test_sources: 0
+  test_command: ""
+  run_in_build: false
+  evidence: >-
+    包内无 Makefile、无 t/、无 debian/tests，debian/rules 全文仅 `%: dh $@`
+    —— 上游确无测试，故 build() 只做 shell 语法检查（sh -n，5 个脚本）作为构建期证据，
+    上游通过率记 N/A（如实披露，不虚构）。
+upstream_test_pass_rate: "N/A（上游无测试用例，如实披露）"
+adapted_test_pass_rate: "test_package/test_scripts.sh **5 项校验：3 项通过 + 2 项具名环境 SKIP**（本地 conan create 实测，包创建成功）：①5 个脚本（bin/report-hw、bin/httpd、bin/usb-list、lib/pre-pkgsel.d/50save-logs、lib/finish-install.d/94save-logs）齐备/非空/可执行 ②shebang 均为 /bin/sh ③`sh -n` 语法检查全过 ④数据产物齐备（share/installation-report 与 share/save-logs 的 install-report.template、share/bug/×3、share/man/man1/report-hw.1、share/doc/README.Debian，以及 debian/*.links 软链可解析）⑤best-effort 真跑：`report-hw` 通过；`usb-list` 记 **SKIP（具名环境前置条件）**——本沙箱 `/sys/bus/usb/devices` 为空（条目数 0），该 upstream 脚本带 `set -e`，其内部 `[ -d …usb* ]` 返回非 0 使脚本按设计以 1 退出；`httpd` 默认绑特权端口 :80 按设计不跑（记 SKIP 并说明）——`checks=5 fails=0 skips=2 RESULT: PASS`"
+
+knowledge_gained:
+  - "Debian native 脚本包的适配范式（与 init-system-helpers 同族）：不跑 dh，按 debian/*.install + *.manpages + *.links 声明的映射直接安装；产物可散落在 bin/、lib/<hook.d>/、share/<data>/、share/bug/、share/doc/ 多处，且同一数据文件可能被两个二进制包的 install 清单共同引用（本例 install-report.template → share/installation-report 与 share/save-logs）"
+  - "上游无测试时不要空口写 N/A——用 build() 内的 shell 语法检查（sh -n）+ test_package 的产物/真跑校验把可验证的部分做实，并在 manifest 的 evidence 字段写出清点依据"
+  - "脚本内引用的外部工具（lspci/lsusb/dmidecode）若不是硬依赖（脚本自降级），不应据此声明 Conan 依赖；判据是脚本注释与守卫写法，而非 grep 到命令名"
