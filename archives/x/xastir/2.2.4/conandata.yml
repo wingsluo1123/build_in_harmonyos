@@ -1,0 +1,49 @@
+# conandata.yml — xastir 2.2.4
+# Upstream: Xastir (X Amateur Station Tracking and Information Reporting),
+# the APRS client by the Xastir Group. The official 2.2.4 release artifact is
+# the GitHub tag tarball for Release-2.2.4 (no pre-generated configure; the
+# tree bootstraps via aclocal + autoheader + autoconf + automake -a -c).
+# R39: only the official upstream URL belongs here; the CI adds mirror
+# fallbacks itself (gh-proxy/ghfast/gitclone), so no mirror prefix is kept
+# in the recipe.
+sources:
+  url: "https://github.com/Xastir/Xastir/archive/refs/tags/Release-2.2.4.tar.gz"
+  sha256: "cc521b8590bacc8d1f1f99a6596660c46174f7c809d6ecbbbf4b8dfa57a68419"
+  tar_format: tar.gz
+  upstream_version: "2.2.4"
+
+# Source patches — all guards are capability-based (configure probes and
+# C-library implementation macros), never platform-identity macros:
+#   - configure.ac: AC_CHECK_FUNCS for the optional POSIX thread-cancellation
+#     entry points (some C libraries omit them).
+#   - interface.c: when the probe reports them absent, the cancellation
+#     points degrade to no-ops.  Every worker thread here detaches itself
+#     and is never joined; each loop polls the port state/descriptor, so the
+#     threads end through their normal exit conditions.
+#   - x_spider.c: the setproctitle emulation uses the glibc globals
+#     __progname/__progname_full, so it is guarded by defined(__GLIBC__)
+#     (a C-library implementation macro) rather than by kernel identity
+#     alone: __linux__ is also defined by musl-derived libcs.
+#   - main.c: rindex() is the legacy BSD name absent from some libcs;
+#     strrchr() is the standard equivalent (already used on the macOS/BSD
+#     paths upstream).
+# All other build accommodations (bootstrap order, E232 shell invocation,
+# E050 private linker view, magick/bdb configure flags) live in conanfile.py.
+patches:
+  "2.2.4":
+    - patch_file: "patches/0001-src-interface.c.patch"
+      patch_type: "portability"
+      patch_source: "https://github.com/Xastir/Xastir/archive/refs/tags/Release-2.2.4.tar.gz"
+      patch_description: "Thread cancellation is optional in POSIX: guard the cancellation points with the configure-provided HAVE_PTHREAD_CANCEL/HAVE_PTHREAD_TESTCANCEL macros and degrade to no-ops only where the C library lacks them (threads are detached and end through their normal loop conditions)"
+    - patch_file: "patches/0002-src-main.c.patch"
+      patch_type: "portability"
+      patch_source: "https://github.com/Xastir/Xastir/archive/refs/tags/Release-2.2.4.tar.gz"
+      patch_description: "rindex() is a legacy BSD name that not every C library provides: use the standard strrchr() equivalent"
+    - patch_file: "patches/0003-src-x_spider.c.patch"
+      patch_type: "portability"
+      patch_source: "https://github.com/Xastir/Xastir/archive/refs/tags/Release-2.2.4.tar.gz"
+      patch_description: "The setproctitle emulation depends on the glibc globals __progname/__progname_full: guard it with defined(__GLIBC__) (C-library implementation capability) instead of kernel identity alone, since __linux__ is also defined by musl-derived libcs that do not export __progname_full"
+    - patch_file: "patches/0004-configure.ac.patch"
+      patch_type: "portability"
+      patch_source: "https://github.com/Xastir/Xastir/archive/refs/tags/Release-2.2.4.tar.gz"
+      patch_description: "Probe for the optional POSIX thread-cancellation entry points with AC_CHECK_FUNCS so the source can fall back cleanly where the C library omits them"

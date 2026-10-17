@@ -1,0 +1,51 @@
+# 软件级 manifest — xastir
+software: xastir
+display: "xastir"
+description: "X Amateur Station Tracking and Information Reporting: APRS map client (X11/Motif) by the Xastir Group"
+category: hamradio
+homepage: "https://xastir.org"
+license: GPL-2.0-or-later
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "Written against Xt + Motif (libXm.so.4); depends on the locally adapted motif/2.3.8, libxt/1.3.1, libxext/6.4.0.1, libx11/1.8.13 track."
+    - "libxpm/3.5.17 IS a direct dependency (upstream links -lXpm); its binary for the same track is not published, CI rebuilds it from source — same class as twclock's libxext note."
+    - "Upstream release tarball has NO pre-generated configure: bootstrap = aclocal (conan automake/1.19 via sh wrapper) + autoheader/autoconf/automake -a -c (hnp system 2.72); needs `mkdir m4` first."
+    - "HMDFS quirks handled in-recipe: umask 077→022 in generated configure (0700 temp dirs deny writes), E232 explicit interpreters for configure/scripts/Makefile recipes."
+    - "Worker shell presets LDFLAGS=-L<worker>/usr/local/lib with an old libcurl.so.4 + shared libpcre2-8.so.0: the recipe must environment.prepend() its flags (append order loses -l resolution)."
+    - "E050: private real-file linker view of the dependency closure (libtiff/libjpeg/libwebp/zstd/libxau/libxdmcp symlink nodes unreadable on the worker), first on -L and LD_LIBRARY_PATH; make check binaries genuinely execute through it."
+    - "ImageMagick integration disabled: upstream hard-rejects MagickLibVersion > 0x0700 and the registry only has 7.1.2.29 (0x712); GraphicsMagick unpublished. GeoTIFF/shapelib raster/vector import covers maps."
+    - "Berkeley DB map cache enabled via LIBS=-ldb preseed (upstream's AC_SEARCH_LIBS probe list never tries the bare 'db' name shipped by berkeley-db/4.8.30)."
+    - "Nominatim geocoding stays enabled: cjson/1.7.19 is published, so its upstream tests (12 autotest cases + test_nominatim) run too — the full upstream inventory (249) is exercised."
+    - "All guards are capability-based, never platform-identity macros (R8): thread cancellation is probed with AC_CHECK_FUNCS (HAVE_PTHREAD_CANCEL/HAVE_PTHREAD_TESTCANCEL) and the three cancel call sites are guarded instead of faking success; the glibc-only globals __progname/__progname_full are guarded with defined(__GLIBC__); rindex is replaced by the standard strrchr."
+    - "Thread lifecycle: the net_connect/read/write threads each pthread_detach(pthread_self()) and are never joined (no pthread_join anywhere in the source), so where cancellation is unavailable they end through their normal loop conditions once the port/descriptor is closed."
+    - "Real upstream test suite: 7 check_PROGRAMS (6 base + test_nominatim) + 242 autotest cases = 249, all 249 pass on the OHOS worker with no skips."
+    - "libXt/1.3.1 display-less error path itself crashes on OHOS (minimal XtOpenDisplay repro): headless consumer tests must assert zero loader diagnostics + non-zero exit, not wait for 'Can't open display'."
+  common_dependencies:
+    - motif
+    - libxt
+    - libxext
+    - libx11
+    - libxpm
+    - xorgproto
+    - libgeotiff
+    - shapelib
+    - pcre2
+    - libax25
+    - curl
+    - berkeley-db
+
+versions:
+  "2.2.4":
+    status: built
+    build_date: "2026-10-13"
+    conan_ref: "xastir/2.2.4"
+    note: >-
+      First OHOS adaptation. VPATH autotools build from the GitHub
+      Release-2.2.4 tag tarball (bootstrap required); three portability
+      patches for the OHOS musl libc. All dependency recipes exist in the
+      registry (L0i verified); the libxext/6.4.0.1 and libxpm/3.5.17
+      binaries for the libx11/1.8.13 + zlib/1.3.1.1 graph are not
+      published, so CI rebuilds them from source — see
+      archives/x/xastir/2.2.4/notes.md.

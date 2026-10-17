@@ -1,0 +1,69 @@
+# ═══ Draft knowledge entry — OHOS worker login shell presets
+# LDFLAGS=-L<worker>/usr/local/lib (old libcurl.so.4 + shared
+# libpcre2-8.so.0) hijack -l resolution unless the recipe uses
+# environment.prepend(); HMDFS denies all writes inside 0700 mktemp
+# dirs (autoconf's umask 077 idiom); libXt/1.3.1 display-less error
+# path SIGSEGVs on OHOS (never reaches "Can't open display"); this
+# OHOS conan fork only exports version-keyed conandata patches.
+# Software: xastir 2.2.4
+# Gate: conan-verify G2 + W3 local CI simulation green; consumer test
+# adapted to "zero loader diagnostics + non-zero exit"
+# Status: DRAFT
+
+id: xastir-2.2.4-ohos-worker-ldflags-prepend-umask0700-xt-displayless
+severity: 4
+category: platform|conan|hmdfs|x11|libc
+trigger_tool: ld|conan|configure|config.status|XtOpenDisplay|bash
+phase: build|runtime
+
+keywords: environment.prepend, environment.append, LDFLAGS preset, worker prefix, usr/local/lib, libcurl.so.4, libpcre2-8, DT_NEEDED, unsatisfiable soname, SIGSEGV, umask 077, mktemp, config.guess, config.status, subs1.awk, drwx--S---, EACCES, XtOpenDisplay, Can't open display, display-less, libXt, setproctitle, conandata patches, version-keyed, export_conandata_patches, apply_conandata_patches
+error_signature: Error loading shared library.*libcurl.so.4|Error relocating.*pcre2|can't create.*subs1.awk: Permission denied|dummy.c: Permission denied|cannot guess build type|XtOpenDisplay.*SIGSEGV|rc=139|patch.*does not exist.*export
+match_keywords: prepend, LDFLAGS, worker prefix, libcurl.so.4, pcre2, umask 077, mktemp, config.status, XtOpenDisplay, libXt, display error, conandata, patches format, version-keyed
+
+root_cause: |
+  (1) OHOS worker 登录 shell 预设 LDFLAGS=-L<worker>/usr/local/lib 与
+  CPPFLAGS=-I<worker>/usr/local/include；该前缀有旧 libcurl（SONAME
+  libcurl.so.4）与共享 libpcre2-8.so.0。conan 的环境组合保留预设值在先、
+  recipe 的 environment.append() 追加在后——-lcurl/-lpcre2-8 解析到
+  worker 旧库，产物 DT_NEEDED 出现图外 soname，运行期 loader 找不到
+  → 静默 SIGSEGV（零输出）。
+  (2) HMDFS 对 0700 目录（mktemp 的 077 掩码 + setgid 组合，呈现
+  drwx--S---）拒绝任何写入，即使同进程刚创建它：autoconf 全家
+  （config.guess 的 dummy.c、config.status 的 confXXXX/subs1.awk、
+  autom4te 生成的 testsuite）都用 `umask 077 && mktemp -d` 习语，
+  全部踩中。umask 022 的目录一切正常。
+  (3) libXt/1.3.1 在 OHOS 的无显示错误路径自身崩溃：最小 8 行
+  XtOpenDisplay(NULL,…) 程序在 DISPLAY 取消下静默 SIGSEGV（零输出、
+  零 loader 诊断）——Xt 应用根本到不了 "Can't open display" 文本。
+  与依赖闭包无关（musl 预先重定位）。
+  (4) 本 OHOS conan（2.29.1 私有分支）的 export_conandata_patches 只认
+  版本键控字典（patches: {"2.2.4": [patch_file: …]}）；把补丁文件名
+  当字典键的元数据格式静默导出零文件，apply_conandata_patches 无声
+  不应用——补丁"消失"且无任何报错。
+  (5) remote automake/1.19 recipe 声明 os.version：构建侧 profile 无
+  os.version 即 Invalid（默认 profile 不带）。
+
+solution: |
+  (a) 配方 generate() 一律 environment.prepend() 把依赖 -I/-L 与 E050
+  链接视图放到 worker 预设前缀之前（append 会输给预置值）；
+  test_package 加 DT_NEEDED 反向断言（不得出现 libcurl.so.4 /
+  libpcre2-8.so.0）兜底。
+  (b) 生成 configure 后将 umask 077 全量替换为 umask 022（含内嵌的
+  config.status 模板）+ 显式 --build= 三元组绕过 config.guess。
+  (c) Xt 应用的 headless 消费者测试断言"零动态加载器诊断 + 非零退出"
+  （接受显示错误文本或信号死亡两种形态）；用纯 C 非 X 工具（callpass）
+  做正向功能断言。8 行 XtOpenDisplay 最小程序可独立复现平台缺陷。
+  (d) conandata.yml 补丁用版本键控 + patch_file/patch_type 元数据；
+  close-archive 会把合成补丁规范化为逐文件 000N-<path>.patch。
+  (e) 构建/宿主双上下文都用 ci/conan/profiles/ohos-aarch64（os.version=6.0）。
+  验证：conan create 全绿 + 上游 230/230 + 消费者 6 组断言全过 +
+  W3 本地 CI 模拟通过（注意 zsh 的 heredoc 临时文件须 TMPPREFIX 指向
+  可写目录——TMPDIR 不够）。
+
+fallback: |
+  制品仓修复 worker 前缀旧库后 (a) 的劫持面自然消失，但 prepend 顺序
+  无害且仍应保留；libXt 缺陷待上游/系统库更新后重测。
+
+verify_builds: xastir/2.2.4
+draft: true
+status: DRAFT

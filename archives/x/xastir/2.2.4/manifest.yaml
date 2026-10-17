@@ -1,0 +1,122 @@
+# 版本级 manifest — xastir 2.2.4
+# 文件位置: archives/x/xastir/2.2.4/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "2.2.4"
+
+# 软件名
+software: "xastir"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-13"
+build_system: autotools
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/Xastir/Xastir/archive/refs/tags/Release-2.2.4.tar.gz"
+
+  # 源码校验和
+  sha256: "cc521b8590bacc8d1f1f99a6596660c46174f7c809d6ecbbbf4b8dfa57a68419"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表
+  configure_options:
+    - "--build=aarch64-linux-ohos"
+    - "--host=aarch64-linux-ohos"
+    - "ac_cv_func_malloc_0_nonnull=yes"
+    - "--without-graphicsmagick"
+    - "--without-imagemagick"
+    - "--without-festival"
+    - "--without-gpsman"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - motif/2.3.8
+    - libxt/1.3.1
+    - libxext/6.4.0.1
+    - libxpm/3.5.17
+    - xorgproto/2025.1
+    - libgeotiff/1.7.4
+    - shapelib/1.5.0
+    - pcre2/10.48
+    - libax25/0.0.12-rc5
+    - curl/8.15.0
+    - cjson/1.7.19
+    - berkeley-db/4.8.30
+    - zlib/1.3.1.1
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "patches/0001-src-interface.c.patch"
+  - "patches/0002-src-main.c.patch"
+  - "patches/0003-src-x_spider.c.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "umask 077 && mktemp -d 建的目录在 HMDFS 上对任何写入 EACCES——生成 configure 后全量替换 umask 077→022（含内嵌 config.status 模板）" (ref: xastir-2.2.4-ohos-worker-ldflags-prepend-umask0700-xt-displayless)
+  - "worker shell 预设 LDFLAGS=-L<worker>/usr/local/lib（含旧 libcurl.so.4/共享 libpcre2-8.so.0），conan 环境组合保留预设在先——配方必须 environment.prepend() 抢占 -L/-I 优先级" (ref: xastir-2.2.4-ohos-worker-ldflags-prepend-umask0700-xt-displayless)
+  - "libXt/1.3.1 无显示错误路径在 OHOS 上直接 SIGSEGV（最小 XtOpenDisplay 程序可复现）；headless 消费者测试应断言零 loader 诊断+非零退出，而非等待 'Can't open display'" (ref: xastir-2.2.4-ohos-worker-ldflags-prepend-umask0700-xt-displayless)
+  - "本 OHOS conan 的 conandata patches 只认版本键控字典（patches: {\"2.2.4\": [...]}），patch 文件名做键的元数据格式会静默不导出" (ref: xastir-2.2.4-ohos-worker-ldflags-prepend-umask0700-xt-displayless)
+  - "remote automake/1.19 recipe 需要 os.version——构建侧必须用与 CI 相同的完整 profile" (ref: xastir-2.2.4-ohos-worker-ldflags-prepend-umask0700-xt-displayless)
+  - "能力判据优于平台宏（R8）：线程取消用 AC_CHECK_FUNCS 探测 HAVE_PTHREAD_CANCEL/HAVE_PTHREAD_TESTCANCEL 并守卫调用点（不伪造取消成功）；glibc 专有全局 __progname/__progname_full 用 defined(__GLIBC__) 判据；rindex 用标准 strrchr 等价替换 (ref: xastir-2.2.4-ohos-worker-ldflags-prepend-umask0700-xt-displayless)"
+  - "E050 链接视图需同时覆盖链接期（-L 首位）与运行期（LD_LIBRARY_PATH 首位，make check 的测试二进制真实执行）" (ref: xastir-2.2.4-ohos-bootstrap-magick-bdb-zlib-graph)
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/xastir-2.2.4.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/xastir-2.2.4.work
+  source_orig_hash: dbab0ff2436d412b
+  source_work_hash: 1d94bdc698d9b1fe
+  generated_at: '2026-10-13T19:30:33'
+  patches_count: 3
+
+patch_classification:
+  - file: 0001-src-interface.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-src-main.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-src-x_spider.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
