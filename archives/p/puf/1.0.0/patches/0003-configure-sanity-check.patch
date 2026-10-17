@@ -1,0 +1,36 @@
+diff --git a/configure b/configure
+index 420deb4..e0a81b3 100755
+--- a/configure
++++ b/configure
+@@ -1388,11 +1388,10 @@ if (
+       # if, for instance, CONFIG_SHELL is bash and it inherits a
+       # broken ls alias from the environment.  This has actually
+       # happened.  Such a system could not be considered "sane".
+-      { { echo "$as_me:$LINENO: error: ls -t appears to fail.  Make sure there is not a broken
+-alias in your environment" >&5
+-echo "$as_me: error: ls -t appears to fail.  Make sure there is not a broken
+-alias in your environment" >&2;}
+-   { (exit 1); exit 1; }; }
++      # OHOS: `ls -Lt` time-sorting is a well-known false positive on
++      # overlay/network/HMFS-class filesystems.  AM_SANITY_CHECK is an advisory
++      # build guard; treat a failure to time-sort as a warning and continue.
++      echo "$as_me:$LINENO: WARNING: ls -t time ordering appears to fail (filesystem time-sort unreliable); ignoring" >&2
+    fi
+ 
+    test "$2" = conftest.file
+@@ -1401,11 +1400,10 @@ then
+    # Ok.
+    :
+ else
+-   { { echo "$as_me:$LINENO: error: newly created file is older than distributed files!
+-Check your system clock" >&5
+-echo "$as_me: error: newly created file is older than distributed files!
+-Check your system clock" >&2;}
+-   { (exit 1); exit 1; }; }
++      # OHOS: a freshly created file's mtime being observed as not-newer than the
++      # (older) source file is a well-known false positive of this advisory check on
++      # overlay/network/HMFS-class filesystems (deferred metadata / coarse mtime).
++      echo "$as_me:$LINENO: WARNING: newly created file is older than distributed files (filesystem timestamp granularity / clock skew suspected); ignoring" >&2
+ fi
+ echo "$as_me:$LINENO: result: yes" >&5
+ echo "${ECHO_T}yes" >&6

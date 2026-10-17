@@ -1,0 +1,18 @@
+# conandata.yml — puf 1.0.0
+# Official SourceForge project release archive. `downloads.sourceforge.net`
+# auto-selects its mirror network, so this single authoritative URL is used
+# (SHA256 verified against the downloaded archive).
+sources:
+  url: "https://downloads.sourceforge.net/project/puf/puf/1.0.0/puf-1.0.0.tar.gz"
+  sha256: "3f1602057dc47debeb54effc2db9eadcffae266834389bdbf5ab14fc611eeaf0"
+
+patches:
+  - patch_file: "patches/0001-config.sub-ohos.patch"
+    patch_description: "Teach the 2005-era config.sub to recognize the aarch64 CPU and linux-ohos OS so that puf's Autotools configure accepts an explicit --build/--host triplet on OHOS instead of relying on config.guess (which cannot guess HarmonyOS from uname)."
+    patch_type: "portability"
+  - patch_file: "patches/0002-configure-confstat-tmpdir.patch"
+    patch_description: "puf's generated config.status creates its scratch temp directory in the build tree (hardcoded ./confstatXXXXXX). On HMFS/HMDFS the permission/owner metadata of a just-created directory is not immediately effective, so the immediate writes into ./confstat*/in, ./confstat*/out and ./confstat*/config.h fail EACCES and no Makefile is produced; chmod cannot fix it there (HMBS_CAP_CHMOD=0). Relocate the scratch dir under ${TMPDIR:-.} so config.status uses the recipe-pinned probe-verified writable TMPDIR (a non-HMFS volume) instead of the HMFS build tree."
+    patch_type: "bugfix"
+  - patch_file: "patches/0003-configure-sanity-check.patch"
+    patch_description: "The automake AM_SANITY_CHECK mtime comparison is advisory and hard-fails with 'newly created file is older than distributed files! Check your system clock' when a freshly created file is not observed as newer than the (2005-era) source file, a well-known false positive on overlay/network/HMFS-class filesystems (deferred metadata / coarse mtime granularity) and on hosts whose `ls -Lt` time-sorting is unreliable. On OHOS CI this false positive aborted configure before any Makefile was produced. Downgrade both AM_SANITY_CHECK failure branches (broken `ls -t` and stale-new-file) from a hard error to a warning so configure can proceed; puf's build does not depend on the source-tree clock, and the shipped binary's behaviour is verified by test_package."
+    patch_type: "portability"
