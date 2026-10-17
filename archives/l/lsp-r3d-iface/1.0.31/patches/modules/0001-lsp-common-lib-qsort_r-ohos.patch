@@ -1,0 +1,42 @@
+--- a/src/main/stdlib.cpp
++++ b/src/main/stdlib.cpp
+@@ -54,11 +54,39 @@
+     #endif /* defined(PLATFORM_WINDOWS) */
+     } /* namespace */
+ 
++    #if defined(__OHOS__)
++        // OpenHarmony 的 libc 基于 musl，stdlib.h 只声明 qsort、不提供 GNU 的
++        // qsort_r（即使工具链预定义 __linux__ 从而定义了 PLATFORM_LINUX）。
++        // 这里用普通 qsort 加线程局部比较器上下文实现同等语义：
++        //   * musl 的 qsort 自身不依赖全局状态，可重入；
++        //   * 只有 thunk 需要的比较器上下文需要线程局部存储。
++        static thread_local sort_compar_r_t      ls_tls_cmp;
++        static thread_local void                 *ls_tls_arg;
++
++        static int ls_qsort_r_thunk(const void *a, const void *b)
++        {
++            return ls_tls_cmp(a, b, ls_tls_arg);
++        }
++    #endif /* defined(__OHOS__) */
++
+     LSP_COMMON_LIB_PUBLIC
+     void qsort_r(void *data, size_t count, size_t szof, sort_compar_r_t compar, void *arg)
+     {
+         #if defined(PLATFORM_LINUX) || defined(_GNU_SOURCE) || defined(__GNU__) || defined(PLATFORM_HAIKU)
++            #if defined(__OHOS__)
++            // OHOS 无 GNU qsort_r：走 qsort + 线程局部比较器上下文。
++            // 保存/恢复上层上下文，支持比较函数内再次调用 qsort_r 的嵌套场景。
++            const sort_compar_r_t ls_prev_cmp        = ls_tls_cmp;
++            void * const ls_prev_arg                 = ls_tls_arg;
++
++            ls_tls_cmp                               = compar;
++            ls_tls_arg                               = arg;
++            ::qsort(data, count, szof, &ls_qsort_r_thunk);
++            ls_tls_cmp                               = ls_prev_cmp;
++            ls_tls_arg                               = ls_prev_arg;
++            #else /* __OHOS__ */
+             ::qsort_r(data, count, szof, compar, arg);
++            #endif /* __OHOS__ */
+         #elif defined(PLATFORM_BSD) || defined(PLATFORM_MACOSX)
+             bsd_qsort_r_t sort;
+             sort.arg        = arg;
