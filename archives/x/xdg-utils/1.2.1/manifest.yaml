@@ -1,0 +1,74 @@
+# 版本级 manifest
+# 文件位置: archives/x/xdg-utils/1.2.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.2.1"
+
+# 软件名
+software: xdg-utils
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-13"
+
+# 构建系统
+# cmake | autotools | makefile | meson | custom
+build_system: autotools
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://gitlab.freedesktop.org/xdg/xdg-utils/-/archive/v1.2.1/xdg-utils-v1.2.1.tar.gz"
+
+  # 源码校验和
+  sha256: "f6b648c064464c2636884c05746e80428110a576f8daacf46ef2e554dcfdae75"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表
+  configure_options:
+    - "E060 use-tmpfs-workaround：源码复制到 /data/storage/el2/base tmpfs 构建"
+    - "AWK=/data/service/hnp/bin/awk（/usr/bin/awk 为 toybox 坏符号链接）"
+    - "make -j1 强制（%: %.in %.txt 生成链并行下 sed 自读自写死循环，~35GB 实证）"
+    - "xmlto 离线桩（man/html/html-nochunks/txt 四模式，docbook DTD 联网不可达）"
+    - "跳过 make install（install-sh 新建脚本被 MAC 拒绝），copy2 直接复制产物"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "autotools 脚本/文档生成链四连坑及统一配方模式：config.status 的 $AWK 缓存坏 /usr/bin/awk（E060 tmpfs 之外需显式钉 hnp gawk）；%: %.in %.txt 生成链并行 make 下 sed 自读自写死循环（单文件 ~35GB，-j1 复测正常）；xmlto 需联网拉 docbookx.dtd → 离线桩覆盖全部调用模式；install-sh 新建脚本 MAC 拒绝执行 → copy2 替代 make install（DRAFT-ohos-autotools-script-generation-chain）"
