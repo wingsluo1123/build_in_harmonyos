@@ -1,0 +1,42 @@
+software: kefir
+version: "0.5.0"
+
+status: built
+
+build_date: "2026-10-15"
+build_system: make
+
+source:
+  url: "https://github.com/sourcehut-mirrors/kefir/archive/refs/tags/v0.5.0.tar.gz"
+  sha256: "ae69cb14457ce975a37a963da64bf54b5c997ab6e57b93c4841c7fb50a8b1a98"
+  tar_format: tar.gz
+
+build:
+  system: make
+  configure_options:
+    - "CC from tools.build:compiler_executables"
+    - "USE_SHARED=no"
+    - "PROFILE=release"
+    - "target .BINARIES (skip man pages requiring groff/mandoc)"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "kefir 0.5.0 codegen targets x86_64 System-V ABI only, no non-x86_64 targets yet"
+  - "kefir binary itself is portable C11 and builds on OHOS aarch64; generated code cannot execute on aarch64"
+  - "upstream make test registers ~1883 fixed cases (unit 1 + integration 231 + system 152 + end2end 832 + asmgen 667); csmith/external are separate targets"
+  - "man pages require groff/mandoc absent on OHOS, build only .BINARIES and copy artifacts via python instead of make install"
+
+patch_generation:
+  method: none
+  patches_count: 0
+
+test_results:
+  type: official
+  total: 1883
+  passed: 0
+  failed: 1883
+  note: "placeholder before true-device evidence; real numbers come from hmbs preflight make -k test .done counts"

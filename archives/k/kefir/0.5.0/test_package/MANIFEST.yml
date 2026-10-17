@@ -1,0 +1,37 @@
+package: kefir/0.5.0
+homepage: "https://kefir.protopopov.lv"
+
+upstream_check_command: "make test"
+upstream_test_in_build: true
+upstream_test_command: "make -k test"
+
+upstream_tests:
+  - file: source/tests/unit/*.c
+    source: kefir-0.5.0/source/tests/unit/*.c
+    description: "unit suite (1 binary, 76 .c files, portable compiler internals)"
+    command: "bin/tests/unit.tests"
+  - file: source/tests/integration/*.test.c
+    source: kefir-0.5.0/source/tests/integration/*/*.test.c
+    description: "integration suite (231 .test.c, compile+run via kefir)"
+    command: "make -k test"
+  - file: source/tests/system/*.test.c
+    source: kefir-0.5.0/source/tests/system/*/*.test.c
+    description: "system suite (152 .test.c, codegen x86_64 execution)"
+    command: "make -k test"
+  - file: source/tests/end2end/*
+    source: kefir-0.5.0/source/tests/end2end/*/*.kefir.c
+    description: "end2end suite (832 dirs + 667 asmgen cases, kefir-compile+host-link+run)"
+    command: "make -k test"
+
+test_package_tests:
+  - file: conanfile.py
+    description: "kefir --version runs on OHOS aarch64"
+    command: "kefir --version"
+  - file: conanfile.py
+    description: "kefir --target host-none -S compiles minimal C to x86_64 assembly with expected markers (freestanding, no KEFIR_GNU_INCLUDE/KEFIR_GNU_LIB needed)"
+    command: "kefir --target host-none -S -o hello.s hello.c"
+
+assertion_count: 3
+upstream_test_total: 1883
+upstream_test_count_method: auto
+upstream_tests_exist: true
