@@ -1,0 +1,47 @@
+# DRAFT-libzc-0.4.3-r8-platform-macro-posix — R8 平台条件编译宏违规识别与 POSIX 无条件化改法
+id: DRAFT-libzc-0.4.3-r8-platform-macro-posix
+severity: 1
+category: compliance|patch|posix
+trigger_tool: review|patch|conan
+phase: review|configuration
+keywords: R8, platform macro, __OHOS__, ifdef, POSIX, unconditional, signal fallback, pthread_cancel, AI Review, platform forking
+
+error_signature: #if defined\(__OHOS__\)|#ifdef __OHOS__|#ifdef OHOS|#if defined\(__MUSL__\)|#ifdef __linux__|platform conditional compilation|R8
+
+root_cause: 平台条件编译宏（#if defined(__OHOS__)/#ifdef __OHOS__/__MUSL__/__linux__ 等）使交付
+           源码按平台分叉（platform forking），同份补丁在不同平台编译出不同行为，破坏可复现性
+           与跨平台语义一致性，违反 R8『源码与 patches/ 补丁不得引入平台条件编译宏』。
+
+affected_scope: 所有含平台条件编译宏补丁的三方库（AI Review R8 门禁全仓库适用）
+
+rec_priority: 1
+rec_approach: remove-platform-macro-posix-unconditional
+rec_description: 删除 #if/#endif 平台宏包装，替代实现无条件编译；替代实现全部使用 POSIX 标准接口
+                 （sigaction/pthread_kill/SIGUSR1/pthread_exit/__thread/sig_atomic_t 等）给出所有
+                 平台一致的等价语义；保持延迟取消/join/cleanup 语义、不吞失败；对交付范围全部文件
+                 做平台宏全量扫描零命中取证；移除后完整复验（干净 conan create/上游测试/鸿蒙特有测试）。
+rec_command: patch -p1 --dry-run < 0001-*.patch; grep -rnE '#if.*(__OHOS__|OHOS|__MUSL__|__linux__)|#ifdef (__OHOS__|OHOS|__MUSL__|__linux__)' <交付范围>
+rec_auto_fix: false
+rec_impl: patch-rework
+
+verification_cmd: 新补丁应用到干净上游源 exit 0 且应用后零平台宏；交付态干净 conan create exit 0；上游测试 8/8（TEMP 机制）真实通过；鸿蒙特有测试 exit 0
+
+fallback_priority: 2
+fallback_approach: build-system-capability-probe
+fallback_description: 若功能确实只能按平台提供且无法用无条件 POSIX 语义表达，评估构建系统级能力探测
+                      （configure 探测）替代；仍无法表达时在报告/PR 如实说明并给 R8 例外依据。
+
+forbid_1_pattern: #ifdef __OHOS__|#if defined\(__OHOS__\)|__MUSL__|__linux__|#ifdef OHOS
+forbid_1_reason: R8 禁止一切平台/环境宏变体
+forbid_2_pattern: 空壳 stub|伪 exit 0|吞失败|退化取消语义|仅改注释跳过复验
+forbid_2_reason: 不得删功能后吞失败、不得空壳、不得以『只是去宏』跳过复验
+forbid_3_pattern: hunk 行数不更新
+forbid_3_reason: 删除宏包装后补丁 hunk 头增删行数必须同步更新，否则补丁解析失败
+
+principles: P008
+doc_file: knowledge/drafts/DRAFT-libzc-0.4.3-r8-platform-macro-posix.md
+last_updated: 2026-10-15
+
+authors: tianyi_wang <pc2-44>
+source_pr: 13551
+source_commit: e8a28156624e665c0f8c5a6226722c4f805622d2（R05 在 R04 交付态之上）
