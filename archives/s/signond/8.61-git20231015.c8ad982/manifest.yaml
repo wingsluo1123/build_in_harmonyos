@@ -1,0 +1,38 @@
+version: "8.61-git20231015.c8ad982"
+software: signond
+status: built
+build_date: "2026-10-16"
+conan_ref: "signond/8.61-git20231015.c8ad982"
+build_system: cmake
+
+source:
+  url: "https://gitlab.com/accounts-sso/signond/-/archive/c8ad982/signond-c8ad982.tar.gz"
+  sha256: "b457f7c50c005a5dd73ec103b4be622b7e54dd3cd624690dfc94ffb351eff7b0"
+  tar_format: tar.gz
+  upstream_commit: "c8ad98249af541514ff7a81634d3295e712f1a39"
+  version_name_note: "版本名 8.61-git20231015.c8ad982 为平台任务卡给定的快照标识；固定 commit c8ad982 的实际提交日期为 2023-11-24"
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DSIGNOND_BUILD_UPSTREAM_TESTS=ON"
+    - "-DQt6_DIR=<qtbase-sql-dbus>/lib/cmake/Qt6"
+  dependencies:
+    - qtbase-sql-dbus/6.11.1
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "signond 守护进程需要 Qt6Sql；ohpcd 的 qtbase 以 FEATURE_sql=OFF 构建，必须改用 qtbase-sql-dbus/6.11.1（含 Qt6Sql + plugins/sqldrivers/libqsqlite.so）。"
+  - "上游 signon-plugins.pro 是 HEADERS-only 的 TEMPLATE=lib：qmake 会对 SignOn/authpluginif.h 跑 moc，AuthPluginInterface 的 qt_metacast/staticMetaObject/虚表都在 libsignon-plugins.so 中；CMake AUTOMOC 只扫描 target sources，必须把 SDK 头列为 source，否则插件 dlopen 失败（symbol not found: _ZN19AuthPluginInterface11qt_metacastEPKc）。"
+  - "插件文件名必须是 lib<type>plugin.so（pluginproxy/remotepluginprocess 按 SIGNON_PLUGIN_PREFIX+type+SIGNON_PLUGIN_SUFFIX 拼路径），CMake MODULE 目标需显式 PREFIX lib。"
+  - "守护进程↔插件的认证链路可不经 D-Bus 验证：signonpluginprocess 以 stdin/stdout 说话 ipc.h/blob 协议，测试端用 libsignon-plugins-common 的 BlobIOHandler 即可复现守护进程侧请求（opcode(QDataStream) + mechanism + [int size + 分页 QByteArray]）。"
+  - "BlobIOHandler 的线上格式：sendData 先写 int size，再按 16384 字节分页、每页写成 QByteArray（4 字节长度前缀）；解析响应时须跳过 op(4)+size(4) 再交给 receiveData，且消费长度必须计入每页的 4 字节长度前缀。"
+  - "SSO_LOGGING_OUTPUT=stdout 可让守护进程把日志从 syslog 切到 stderr（默认 syslog，故无总线时看不到 qFatal 文本）。"
+  - "共享库 SONAME：本平台 CMAKE_SYSTEM_NAME=HarmonyOS 对 CMake 是未知系统，CMAKE_SHARED_LIBRARY_SONAME_CXX_FLAG 为空，target 的 VERSION/SOVERSION 属性不会产生 -soname（上游 qmake 也不设 VERSION）；需显式 target_link_options(<t> PRIVATE \"LINKER:-soname,libX.so\")，否则仓内 L5a 门禁报缺 DT_SONAME。"
+  - "插件 SDK 自洽：authpluginif.h/uisessiondata.h 需要 lib/SignOn 的客户端类型头（sessiondata.h/signonerror.h/libsignoncommon.h/SessionData）；把源码树拆包时若不随 SDK 一并安装，signon-plugins.pc 会出现悬空 Requires；在 recipe 里改依赖 libsignon-qt 会把 plain qtbase（第二 Qt6 提供方）拉进依赖图与 qtbase-sql-dbus 冲突，故选择随包安装这 4 个头。"
+  - "平台无 dbus-daemon 且可写挂载点 bind(2) Unix socket 返回 EPERM（抽象命名空间可 bind），D-Bus 会话总线无法在沙箱内搭建——与 libsignon-qt 8.61 的结论一致。"

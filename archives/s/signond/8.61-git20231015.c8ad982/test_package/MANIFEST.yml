@@ -1,0 +1,79 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# 上游 (signond, commit c8ad982) 使用 qmake 构建；测试工程位于 tests/tests.pro
+# (SUBDIRS = passwordplugintest libsignon-qt-tests signond-tests extensions)。
+# 本包只构建守护进程侧 (lib/plugins, lib/signond, src/)；其中仅
+# tests/passwordplugintest 不依赖运行中的 signond 守护进程与会话总线，
+# 已由配方 build() 实际编译并运行；其余套件需要 D-Bus 会话总线。
+
+package: signond/8.61-git20231015.c8ad982
+homepage: "https://gitlab.com/accounts-sso/signond"
+
+# 上游测试构建命令 (qmake 工程，无 make check 目标；先构建测试工程再运行)
+upstream_check_command: "qmake6 tests/passwordplugintest/passwordplugintest.pro && make && ./tests/passwordplugintest/signon-passwordplugin-tests"
+
+# 已在 conanfile.py build() 中集成：CTest 目标 signon-passwordplugin-tests
+upstream_test_in_build: true
+upstream_test_command: "ctest --output-on-failure -R signon-passwordplugin-tests"
+
+upstream_tests:
+  - file: passwordplugintest.cpp
+    source: signond-c8ad982/tests/passwordplugintest/
+    description: >-
+      tests/passwordplugintest (7 个测试函数 + init/cleanupTestCase)：
+      直接实例化真实 PasswordPlugin，驱动 AuthPluginInterface 的
+      process()/userActionFinished()/refresh() 并校验 result/error/
+      userActionRequired 信号载荷。不需要运行中的守护进程，已在 build() 实跑：
+      9 passed / 0 failed / 0 skipped。
+    command: "ctest --output-on-failure -R signon-passwordplugin-tests"
+    executed: true
+  - file: libsignon-qt-tests.pro
+    source: signond-c8ad982/tests/libsignon-qt-tests/
+    description: >-
+      客户端库套件 (6 源文件 / 42 项)：经 tests/run-with-signond.sh +
+      tests/testsession.conf 驱动运行中的 signond 守护进程与会话总线。
+      本沙箱无 dbus-daemon 二进制，且任何可写挂载点 bind(2) Unix socket 均
+      返回 EPERM，无法启动会话总线；该套件测试对象是本包不构建的
+      lib/SignOn（已作为 libsignon-qt 8.61 单独发布）。
+    command: "./tests/libsignon-qt-tests/libsignon-qt-tests"
+    executed: false
+  - file: signond-tests/*.pro
+    source: signond-c8ad982/tests/signond-tests/
+    description: >-
+      守护进程集成套件 (tst_access_control_manager_helper / tst_timeouts /
+      tst_pluginproxy / tst_database / access-control，另有 libqtdbusmock
+      条件下的 session_tool + tst_signond)：全部由 tests/run-with-signond.sh
+      在会话总线上启动 signond 后执行。同上，平台无可用的 D-Bus 会话总线，
+      无法实跑；未修改上游测试源码。
+    command: "tests/run-with-signond.sh ./tst_database"
+    executed: false
+  - file: extensions/extensions.pro
+    source: signond-c8ad982/tests/extensions/
+    description: >-
+      扩展框架套件 (tst_access_control_manager)：同样依赖运行中的守护进程与
+      会话总线，且被测的 src/extensions/cryptsetup 上游默认关闭
+      (CONFIG+=cryptsetup 未启用，需要 libcryptsetup)。
+    command: "tests/run-with-signond.sh ./tst_access_control_manager"
+    executed: false
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: consumer.cpp
+    description: >-
+      端到端消费者用例：spawn 已安装的 bin/signonpluginprocess，经
+      SSO_PLUGINS_DIR 加载已安装的 libpasswordplugin.so，用
+      libsignon-plugins-common 的 BlobIOHandler 说法走真实 IPC 协议完成两条
+      认证流程（密钥齐备直接返回；缺密钥→UI 请求→用户补答→结果）。
+    command: "./signond_consumer <pkg>/bin/signonpluginprocess <pkg>/lib/signon"
+  - file: conanfile.py
+    description: >-
+      CASE 1 在 HarmonyOS 主机上真实执行已安装的 bin/signond，断言其完成配置装载
+      + 凭据管理器构造并停在会话总线探测（qFatal，退出码 134）；CASE 3 断言
+      全部声明的产物存在且守护进程 ELF 的 DT_NEEDED/RUNPATH 无 conan 缓存路径。
+    command: "conan test test_package signond/8.61-git20231015.c8ad982"
+
+# 测试断言总数 (近似值, 用于质量评估)：consumer.cpp 15 项 + test_package 13 项
+assertion_count: 28
