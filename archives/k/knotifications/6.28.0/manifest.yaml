@@ -1,0 +1,34 @@
+software: knotifications
+version: "6.28.0"
+status: built
+build_system: cmake
+created_at: 2026-10-17
+build_date: 2026-10-17
+dependencies:
+  required:
+    - qtbase/6.11.1
+    - kconfig/6.26.0.1
+  build:
+    - ecm/6.28.0
+  optional:
+    - libcanberra
+patches_applied:
+  - patches/0001-CMakeLists.txt.patch
+test_results:
+  type: passed
+  upstream: "passed: upstream CTest add_test count is 0 in this feature set (autotests entry commented out upstream, tests/ HAVE_DBUS-guarded with USE_DBUS=OFF, examples disabled by patch); ctest runs inside conan create with --no-tests=ignore and completes cleanly (0 entries registered)"
+  test_package: "passed: test_knotifications 12 checks (KNotification property surface + KNotificationAction model) + test_knotifications_ohos 6 checks (SONAME/DT_NEEDED consumer regression, platform E537); CTest 2/2; TEST PASS 18 / TEST FAIL 0"
+  package_id: "9ac997b13b31904eacd4cb5763db91fb7c96e609"
+  full_reference: "knotifications/6.28.0@ohpcd/stable#bb3de088c40a98413831bda4192cb866:9ac997b13b31904eacd4cb5763db91fb7c96e609"
+  l0: "pass"
+  l1: "pass"
+  l2: "skip: verify reported no cache path (library-only package, no bin/ smoke)"
+  l4: "skip: verify reported no cache path"
+  l5: "skip: verify reported no cache path"
+source_url: https://download.kde.org/stable/frameworks/6.28/knotifications-6.28.0.tar.xz
+source_sha256: e5d3b284ccc907f190d3ab10995a0ae7fa0f505088acc69edc7adfcc6a8140d6
+knowledge_gained:
+  - "knotifications 6.28.0 keeps the 6.26.0 recipe shape (KF_IGNORE_PLATFORM_CHECK=TRUE, USE_DBUS=OFF, the DBus/Canberra if(FALSE) block, the po/qm disable); the patch additionally re-quiets the Python-bindings probe, drops the unconditional ECMQmlModule include (Qt6Qml is not part of the published qtbase package), and the build dependency moves to ecm/6.28.0."
+  - "OHOS shared-library rules must be SONAME-only: with CMAKE_SHARED_LIBRARY_RUNTIME_* (rpath) defined, cmake's install() rewrites the ELF and strips the RUNPATH, after which the device loader rejects dlopen of the installed library (EACCES). The recipe writes a rules file containing only set(CMAKE_SHARED_LIBRARY_SONAME_C_FLAG/-CXX_FLAG \"-Wl,-soname,\") plus CMAKE_PLATFORM_NO_VERSIONED_SONAME=TRUE; install() then reduces to a byte-identical copy of the build artifact (kitemviews 6.28.0 precedent)."
+  - "libKF6Notifications.so needs only Qt6Gui at configure time from its consumers (KF6NotificationsConfig.cmake.in runs find_dependency(Qt6Gui); KF6Config is find_dependency'd only for static builds); KF6ConfigCore enters as a bare DT_NEEDED at runtime, so the consumer test_package must require kconfig/6.26.0.1 explicitly for the loader to resolve and for the E537 regression check to hold on a clean cache."
+  - "Upstream CTest N is 0 in this feature set: the autotest (knotification_test) needs a DBus session bus and is commented out upstream, and tests/ is HAVE_DBUS-guarded. ctest must run with --no-tests=ignore (not error) so a genuine 0-test set stays green while any real test failure still fails the build; the consumer-side coverage is carried by test_package (12 + 6 checks)."
