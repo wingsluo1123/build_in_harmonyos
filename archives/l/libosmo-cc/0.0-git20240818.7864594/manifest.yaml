@@ -1,0 +1,32 @@
+version: "0.0-git20240818.7864594"
+software: "libosmo-cc"
+status: built
+build_date: "2026-10-17"
+build_system: "custom (recipe-side clang)"
+
+source:
+  url: "https://snapshot.debian.org/file/51ecf68135a856205ee4b8e33eeded49aaefdf59"
+  sha256: "bb4dd720f7daaa9a0ce8a3cbdb4d9f70fc2e90c47afbc07f135c5dc14745b8cd"
+  tar_format: tar.xz
+  note: >-
+    snapshot.debian.org（Debian 官方历史归档）的 0.0~git20240818.7864594 官方 orig 包；
+    URL 是不可变内容地址（sha1），Conan 需显式 filename=libosmo-cc.tar.xz。
+
+build:
+  system: custom
+  configure_options:
+    - "clang -shared -fPIC -O2 -Wall -Wextra -include sys/time.h -I<include> -I<libosmocore/talloc incl> src/*.c -Wl,-soname,libosmocc.so.2 -Wl,--no-undefined -L<libs> -losmocc -losmocore -ltalloc ..."
+  dependencies:
+    - "libosmocore/1.11.0"
+
+upstream_tests:
+  framework: none
+  test_sources: 0
+  test_command: ""
+  run_in_build: false
+  evidence: "快照无 tests/ 目录；Makefile.am 无 check_PROGRAMS/TESTS"
+upstream_test_pass_rate: "N/A（上游无测试用例，如实披露）"
+adapted_test_pass_rate: "test_package：3/3 PASS（OSMO_CC_VERSION 宏、msg 名称查表、IE 名称往返）"
+
+knowledge_gained:
+  - "DRAFT-13369-autotools-snapshot-without-configure-direct-clang-build：上游只有 configure.ac/Makefile.am 且 OHOS 无 automake/aclocal/libtoolize 时，配方内直编的完整做法（含 .so 链接/pkg-config、--no-undefined、musl 头包含、依赖包 cpp_info 缺主体库的处理）"
