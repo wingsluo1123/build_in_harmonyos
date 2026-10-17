@@ -1,0 +1,44 @@
+package: cpp-peglib/1.18.0
+homepage: "https://github.com/yhirose/cpp-peglib"
+
+# 上游测试：顶层 CMake 的 `add_subdirectory(test)` + GoogleTest 的
+# gtest_discover_tests()，17 个源文件注册成两个 target
+# （peglib-test-main / peglib-test-blob-roundtrip）⇒ 1176 条 CTest 用例。
+upstream_check_command: "ctest --output-on-failure"
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build> --output-on-failure"
+
+upstream_tests:
+  - file: test/CMakeLists.txt
+    source: cpp-peglib-1.18.0/test/
+    count: 1176
+    description: >-
+      17 个 GoogleTest 源（test_core/test_peg_syntax/test_rules/test_error/
+      test_token_predicate/test_unicode_state/test_packrat/test_left_recursive/
+      test_first_set/test_integration/test_trace/test_combinators/
+      test_definition_api/test_utf8/test_snapshot/test_mini_js/test_serialize）
+      被编成 peglib-test-main 与 peglib-test-blob-roundtrip（后者把每条语法都从
+      序列化 blob 重新加载），由 gtest_discover_tests 展开为 1176 条 CTest 用例。
+      本机实测 `100% tests passed, 0 tests failed out of 1176`（3.97s）。
+    command: "ctest --output-on-failure"
+
+test_package_tests:
+  - file: test_package.cpp
+    count: 10
+    description: >-
+      消费者用例（真编译真链接交付的 peglib.h，-Wall -Wextra 零告警）：
+      CPPPEGLIB_VERSION / CPPPEGLIB_VERSION_NUM 版本宏；字面量语法构造与接受；
+      算术语法的语义动作 + 优先级（1+2*3 == 7）与括号（(1+2)*3 == 9）；
+      逗号分隔语法切出 3 个 item；`set_logger` 错误回调在第 1 行第 1 列报错且
+      消息非空；`parse(input, val)` 取回语义值 42。
+    command: "./test_package"
+  - file: test_layout.py
+    count: 8
+    description: >-
+      交付形态自检（header-only 口径）：peglib.h 完整性/版本宏/自包含、
+      **包内不得含任何 ELF**（本包没有运行期产物）、include/ 只含 peglib.h、
+      MIT 许可原文、无 .o/.a/.la/.pyc/.so 与隐藏文件（JC5）、头文件声明消费者
+      用到的 7 个 API/宏。
+    command: "python3 test_layout.py --package-folder ... --os ... --arch ... --version ..."
+
+assertion_count: 18
