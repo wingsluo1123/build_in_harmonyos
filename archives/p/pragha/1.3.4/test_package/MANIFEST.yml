@@ -1,0 +1,56 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件 — pragha 1.3.4
+
+package: pragha/1.3.4
+homepage: "https://github.com/pragha-music-player/pragha"
+
+# 上游测试清点（R51 申报表）
+# 证据：
+#   1. 发布 tarball pragha-1.3.4.tar.bz2 无 tests/、test/、check/ 目录；
+#   2. 全部 Makefile.am（根/data/icons/src/po/plugins）无 check_PROGRAMS、
+#      TESTS、XTEST、AC_CONFIG_TESTDIR 声明（grep 证据见 notes.md）；
+#   3. automake 生成的 Makefile.in 仅有递归 check-recursive 空目标，
+#      make check 实际执行为空跑（配方 build() 中已执行并留存日志）。
+# 结论：上游 1.3.4 无自动化测试入口。适配以新增 --selftest（鸿蒙消费者
+# 用例）+ test_package 无头断言补充验证，不冒充上游覆盖。
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "pragha-1.3.4 release tarball"
+    reason: "No tests/, test/, or check/ directory is present in the release tarball."
+  - source: "Makefile.am / configure.ac (1.3.4 source tree)"
+    reason: "No TESTS, check_PROGRAMS, XTEST, or AC_CONFIG_TESTDIR targets exist in any Makefile.am (root, data, data/icons/*, src, po, plugins)."
+  - source: "generated Makefile.in check target"
+    reason: "The only check target is automake's empty recursive check-recursive; make check runs no test programs (verified during the real build)."
+  - conclusion: "Upstream provides no automated test suite; the adaptation adds a headless --selftest consumer case without presenting it as upstream coverage."
+
+upstream_check_command: "make check"
+upstream_test_in_build: true
+upstream_test_command: "make check (automake empty recursive target; zero registered test programs)"
+upstream_tests: []
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: test_pragha.sh
+    description: "Package presence: the installed bin/pragha exists and is executable."
+    command: "sh test_pragha.sh <package>/bin/pragha"
+  - file: test_pragha.sh
+    description: "Upstream CLI contract: --version exits 0 and prints the exact 'pragha 1.3.4' banner."
+    command: "pragha --version"
+  - file: test_pragha.sh
+    description: "Upstream CLI contract: --help exits 0 and lists Usage plus the adaptation's --selftest option."
+    command: "pragha --help"
+  - file: test_pragha.sh
+    description: "New HarmonyOS consumer case --selftest: production-code checks (musicobject round trip/dup/compare, playlist format detection incl. negative case, sqlite3 runtime, GStreamer runtime) must all pass with 'all checks passed'."
+    command: "pragha --selftest"
+  - file: test_pragha.sh
+    description: "New no-display error path: without an X server (the HarmonyOS PC reality) the GUI launch must fail closed with the GTK 'Cannot open display' diagnostic, proving the packaged binary loads and initialises the GTK3/GLib stack it links."
+    command: "pragha"
+
+test_scenario_count: 5
+assertion_count: 14
+assertion_count_basis:
+  package_presence: 2
+  upstream_cli_contract: 5
+  adaptation_selftest: 5
+  no_display_error_path: 2
+  notes: "selftest 断言含退出码、汇总行与 glib/sqlite3/GStreamer 三条运行时绑定行。"

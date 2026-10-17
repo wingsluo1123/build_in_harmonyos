@@ -1,0 +1,119 @@
+--- a/src/pragha-cmdline.c
++++ b/src/pragha-cmdline.c
+@@ -29,6 +29,9 @@
+ 
+ #include <stdlib.h>
+ 
++#include <gst/gst.h>
++#include <sqlite3.h>
++
+ #ifdef HAVE_LIBXFCE4UI
+ #include <libxfce4ui/libxfce4ui.h>
+ #endif
+@@ -36,6 +39,7 @@
+ #include "pragha-playback.h"
+ #include "pragha-window.h"
+ #include "pragha.h"
++#include "pragha-file-utils.h"
+ 
+ static struct PraghaCmdLineOptions {
+ 	gchar *audio_backend;
+@@ -75,6 +79,89 @@
+ 	exit (0);
+ }
+ 
++/* Headless self tests (OHOS consumer case): exercise production helpers
++ * without opening a display. Returns the process exit code via exit(). */
++static gboolean
++cmd_selftest (const gchar *opt_name, const gchar *val, gpointer arg_data, GError **error)
++{
++	gint failures = 0;
++
++	/* 1) GLib runtime contract. */
++	g_print ("pragha selftest: glib %u.%u.%u\n",
++	         glib_major_version, glib_minor_version, glib_micro_version);
++
++	/* 2) Musicobject property round trip, dup and compare. */
++	PraghaMusicobject *mobj = pragha_musicobject_new ();
++	if (mobj == NULL) {
++		g_print ("pragha selftest: FAIL musicobject creation\n");
++		failures++;
++	}
++	else {
++		pragha_musicobject_set_file (mobj, "/music/selftest.flac");
++		pragha_musicobject_set_title (mobj, "selftest title");
++		pragha_musicobject_set_artist (mobj, "selftest artist");
++		pragha_musicobject_set_year (mobj, 2026);
++		pragha_musicobject_set_track_no (mobj, 7);
++		pragha_musicobject_set_length (mobj, 180);
++
++		if (g_strcmp0 (pragha_musicobject_get_file (mobj), "/music/selftest.flac") != 0 ||
++		    g_strcmp0 (pragha_musicobject_get_title (mobj), "selftest title") != 0 ||
++		    g_strcmp0 (pragha_musicobject_get_artist (mobj), "selftest artist") != 0 ||
++		    pragha_musicobject_get_year (mobj) != 2026 ||
++		    pragha_musicobject_get_track_no (mobj) != 7 ||
++		    pragha_musicobject_get_length (mobj) != 180) {
++			g_print ("pragha selftest: FAIL musicobject round trip\n");
++			failures++;
++		}
++
++		PraghaMusicobject *copy = pragha_musicobject_dup (mobj);
++		if (copy == NULL || pragha_musicobject_compare (mobj, copy) != 0) {
++			g_print ("pragha selftest: FAIL musicobject dup/compare\n");
++			failures++;
++		}
++		if (copy)
++			g_object_unref (copy);
++		g_object_unref (mobj);
++	}
++
++	/* 3) Playlist format detection from extensions. */
++	if (pragha_pl_parser_guess_format_from_extension ("stream.m3u") != PL_FORMAT_M3U ||
++	    pragha_pl_parser_guess_format_from_extension ("stream.pls") != PL_FORMAT_PLS ||
++	    pragha_pl_parser_guess_format_from_extension ("stream.xspf") != PL_FORMAT_XSPF ||
++	    pragha_pl_parser_guess_format_from_extension ("notes.txt") != PL_FORMAT_UNKNOWN) {
++		g_print ("pragha selftest: FAIL playlist format detection\n");
++		failures++;
++	}
++
++	/* 4) SQLite runtime is linked and loadable. */
++	if (sqlite3_libversion() == NULL || sqlite3_libversion_number() == 0) {
++		g_print ("pragha selftest: FAIL sqlite3 runtime\n");
++		failures++;
++	}
++	else {
++		g_print ("pragha selftest: sqlite3 %s\n", sqlite3_libversion());
++	}
++
++	/* 5) GStreamer runtime is linked and loadable. */
++	gchar *gst_version = gst_version_string();
++	if (gst_version == NULL || gst_version[0] == '\0') {
++		g_print ("pragha selftest: FAIL gstreamer runtime\n");
++		failures++;
++	}
++	else {
++		g_print ("pragha selftest: %s\n", gst_version);
++	}
++	g_free (gst_version);
++
++	if (failures != 0) {
++		g_print ("pragha selftest: %d failure(s)\n", failures);
++		exit (1);
++	}
++
++	g_print ("pragha selftest: all checks passed\n");
++	exit (0);
++}
++
+ static void
+ cmd_current_state (PraghaApplication *pragha, GApplicationCommandLine *command_line)
+ {
+@@ -186,6 +273,8 @@
+ static const GOptionEntry cmd_entries[] = {
+ 	{"version", 'v', G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK,
+ 	 cmd_version, "Version", NULL},
++	{"selftest", 0, G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK,
++	 cmd_selftest, "Run headless self tests and exit", NULL},
+ 	{"debug", 'e', 0, G_OPTION_ARG_INT,
+ 	 &debug_level, "Enable Debug ( Levels: 1,2,3,4 )", NULL},
+ 	{ "log-file", 'l', 0, G_OPTION_ARG_FILENAME,

@@ -1,0 +1,29 @@
+software: pragha
+display: "Pragha GTK3 轻量级音乐播放器"
+description: "Pragha is a lightweight GTK+ music player based on GStreamer with playlist and music library management"
+category: multimedia
+homepage: "https://github.com/pragha-music-player/pragha"
+license: GPL-3.0-or-later
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "上游随附生成的 autotools 文件（configure/Makefile.in 齐备），无需 autoreconf"
+    - "config.guess/config.sub 补丁识别 aarch64-unknown-linux-ohos；configure 临时目录 umask 022（HMDFS setgid 语义）"
+    - "intltool/gettext 探针以 recipe 内 shim 应答；INTLTOOL_DESKTOP_RULE 的 intltool-merge shim 按真实语义产出 pragha.desktop"
+    - "全依赖 la-free 镜像目录统一 pc libdir：隔离 .la stale 元数据（E236）并让共享 glib 在 ld 搜索中胜出 glib2 静态副本（双 glib 实例对齐）"
+    - "gdkx.h / X11 session 逻辑以 GDK_WINDOWING_X11 守卫（OHOS gtk 为 broadway 后端）"
+    - "新增无头 --selftest 消费者用例（musicobject 往返/dup/compare、播放列表识别、sqlite3/GStreamer 运行时绑定）"
+  common_dependencies:
+    - glib
+    - gtk
+    - gstreamer
+    - sqlite3
+    - taglib
+
+versions:
+  "1.3.4":
+    status: built
+    build_date: "2026-10-14"
+    conan_ref: "pragha/1.3.4"
+    note: "GTK3 音乐播放器；OHOS PC 无显示服务，交付并验证于编译/链接级 + 无头 selftest 与 no-display fail-closed 路径"

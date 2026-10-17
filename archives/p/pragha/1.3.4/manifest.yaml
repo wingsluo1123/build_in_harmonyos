@@ -1,0 +1,83 @@
+# 版本级 manifest — pragha 1.3.4
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "1.3.4"
+software: "pragha"
+status: built
+
+build_date: "2026-10-14"
+build_system: "autotools"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/pragha-music-player/pragha/releases/download/v1.3.4/pragha-1.3.4.tar.bz2"
+  sha256: "e54e6acdc11e6f19c691c6e069fa9d54934c37b0f4b78cd5e835ce9512866ba6"
+  tar_format: tar.bz2
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=/"
+    - "--disable-nls"
+    - "--disable-libpeas-1.0"
+    - "--disable-libnotify"
+    - "--disable-keybinder"
+    - "--disable-libglyr"
+    - "--disable-gudev-1.0"
+    - "--disable-libmtp"
+    - "--disable-libsoup-2.4"
+    - "--disable-rygel-server-2.6"
+    - "--disable-grilo-0.3"
+    - "--disable-grilo-0.2"
+    - "--disable-libclastfm"
+    - "--disable-libcdio"
+    - "--disable-libcdio_paranoia"
+    - "--disable-libcddb"
+    - "--disable-gstreamer-audio"
+    - "--disable-libxfce4ui"
+    - "--disable-totem-plparser"
+  dependencies:
+    - glib/2.84.0.1
+    - gtk/3.24.43
+    - gstreamer/1.28.3
+    - sqlite3/3.53.4
+    - taglib/1.13.1
+    - zlib/1.3.1.1
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-config.guess.patch — 2018 版 config.guess 识别 HarmonyOS uname，输出 aarch64-unknown-linux-ohos"
+  - "0002-config.sub.patch — config.sub 接受 linux-ohos OS 后缀（maybe_os 与 os case 两处）"
+  - "0003-configure-umask.patch — configure 临时目录 umask 077→022（HMDFS setgid 语义拒绝 0700 目录）"
+  - "0004-src-pragha-cmdline-selftest.patch — 新增无头 --selftest 消费者用例（musicobject 往返/dup/compare、播放列表格式识别、sqlite3/GStreamer 运行时绑定），先于 GTK 窗口激活执行"
+  - "0005-configure-intltool-xml-parser.patch — 跳过生成的 intltool 宏中 XML::Parser perl 模块探测（OHOS worker 有 perl 无该 XS 模块；真实 intltool 调用全部由 recipe shim 覆盖，intltool 包配方同款绕法）"
+  - "0006-src-pragha-session-x11-guard.patch — X11 专属 session 管理代码（gdk/gdkx.h、GDK_IS_X11_DISPLAY 窗口 role）以上游 GDK_WINDOWING_X11 后端宏守卫（OHOS gtk 为 broadway 后端）"
+patches_count: 6
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "XDT(Intl) autotools 包在 OHOS 上以 intltool/gettext shim 应答 configure 探针；INTLTOOL_DESKTOP_RULE 的 intltool-merge shim 按真实语义产出 .desktop（strip 下划线前缀） ref: notes.md#知识积累"
+  - "glib(musl proxy-libintl) 消费者需在 glib-2.0.pc 追加 -lintl（sound-juicer 同模式） ref: notes.md#知识积累"
+  - "conan gstreamer 包 pc 名无 -1.0 后缀，消费者用重定向 .pc 映射 gstreamer-1.0 / gstreamer-base-1.0 ref: notes.md#知识积累"
+  - "gtk 图(glib) 与 gstreamer 图(glib2) 并存时以 zlib force 对齐版本使依赖图可解 ref: notes.md#知识积累"
+  - "glib(shared) 与 glib2(static) 双提供者同图时，目录顺序使 ld 优先拾取 glib2 的 libglib-2.0.a 静态链入，与 gtk 运行期共享 libglib-2.0.so 形成双实例（GObject 启动 abort）；全依赖 la-free 镜像 + pc libdir 统一重写后同目录 .so 优先于 .a，共享 glib 必然胜出 ref: notes.md#知识积累 knowledge_ref: knowledge/drafts/E429-draft-A458.md"
+  - "pkg-config .pc 不允许重复 Cflags/Libs 关键字行——增强 pc 必须合并进既有行，追加第二行会使整包 not found ref: notes.md#知识积累"
