@@ -1,0 +1,94 @@
+diff --git a/Quotient/networkaccessmanager.cpp b/Quotient/networkaccessmanager.cpp
+index 36d5898..e22d2f3 100644
+--- a/Quotient/networkaccessmanager.cpp
++++ b/Quotient/networkaccessmanager.cpp
+@@ -33,6 +33,7 @@ public:
+     {
+         return QReadLocker{ &namLock }, baseUrls.value(accountId);
+     }
++#if QT_CONFIG(ssl)
+     void addIgnoredSslError(const QSslError& error)
+     {
+         QWriteLocker{ &namLock }, ignoredSslErrors.push_back(error);
+@@ -45,11 +46,14 @@ public:
+     {
+         return QReadLocker{ &namLock }, ignoredSslErrors;
+     }
++#endif
+ 
+ private:
+     mutable QReadWriteLock namLock{};
+     QHash<QString, QUrl> baseUrls{};
++#if QT_CONFIG(ssl)
+     QList<QSslError> ignoredSslErrors{};
++#endif
+ } d;
+ 
+ } // anonymous namespace
+@@ -66,6 +70,7 @@ void NetworkAccessManager::dropBaseUrl(const QString& accountId)
+     d.dropBaseUrl(accountId);
+ }
+ 
++#if QT_CONFIG(ssl)
+ QList<QSslError> NetworkAccessManager::ignoredSslErrors()
+ {
+     return d.getIgnoredSslErrors();
+@@ -80,6 +85,7 @@ void NetworkAccessManager::clearIgnoredSslErrors()
+ {
+     d.clearIgnoredSslErrors();
+ }
++#endif
+ 
+ NetworkAccessManager* NetworkAccessManager::instance()
+ {
+@@ -99,7 +105,9 @@ QNetworkReply* NetworkAccessManager::createRequest(
+     if (url.scheme() != "mxc"_ls) {
+         auto reply =
+             QNetworkAccessManager::createRequest(op, request, outgoingData);
++#if QT_CONFIG(ssl)
+         reply->ignoreSslErrors(d.getIgnoredSslErrors());
++#endif
+         return reply;
+     }
+     const QUrlQuery query{ url.query() };
+@@ -133,7 +141,9 @@ QNetworkReply* NetworkAccessManager::createRequest(
+     rewrittenRequest.setUrl(DownloadFileJob::makeRequestUrl(baseUrl, url));
+ 
+     auto* implReply = QNetworkAccessManager::createRequest(op, rewrittenRequest);
++#if QT_CONFIG(ssl)
+     implReply->ignoreSslErrors(d.getIgnoredSslErrors());
++#endif
+     const auto& fileMetadata = FileMetadataMap::lookup(
+         query.queryItemValue(QStringLiteral("room_id")),
+         query.queryItemValue(QStringLiteral("event_id")));
+diff --git a/Quotient/networkaccessmanager.h b/Quotient/networkaccessmanager.h
+index 41c108d..10e1f28 100644
+--- a/Quotient/networkaccessmanager.h
++++ b/Quotient/networkaccessmanager.h
+@@ -17,9 +17,11 @@ public:
+     static void addBaseUrl(const QString& accountId, const QUrl& homeserver);
+     static void dropBaseUrl(const QString& accountId);
+ 
++#if QT_CONFIG(ssl)
+     static QList<QSslError> ignoredSslErrors();
+     static void addIgnoredSslError(const QSslError& error);
+     static void clearIgnoredSslErrors();
++#endif
+ 
+     //! Get a NAM instance for the current thread
+     static NetworkAccessManager* instance();
+diff --git a/autotests/testutils.cpp b/autotests/testutils.cpp
+index 91dfdc7..ed93325 100644
+--- a/autotests/testutils.cpp
++++ b/autotests/testutils.cpp
+@@ -23,8 +23,10 @@ std::shared_ptr<Quotient::Connection> Quotient::createTestConnection(
+ {
+     static constexpr auto homeserverAddr = "localhost:1234"_ls;
++#if QT_CONFIG(ssl)
+     auto* const nam = NetworkAccessManager::instance();
+     QObject::connect(nam, &QNetworkAccessManager::sslErrors, nam,
+                      [](QNetworkReply* reply) { reply->ignoreSslErrors(); });
++#endif
+ 
+     auto c = std::make_shared<Connection>();
+     c->enableEncryption(E2EE_Enabled);
