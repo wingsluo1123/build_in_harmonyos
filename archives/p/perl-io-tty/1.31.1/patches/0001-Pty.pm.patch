@@ -1,0 +1,40 @@
+--- a/Pty.pm
++++ b/Pty.pm
+@@ -16,21 +16,36 @@
+ 
+ sub new {
+     my ($class) = $_[0] || "IO::Pty";
+     $class = ref($class) if ref($class);
+     @_ <= 1 or croak 'usage: new $class';
+ 
+     my ( $ptyfd, $ttyfd, $ttyname ) = pty_allocate();
+ 
+     croak "Cannot open a pty" if not defined $ptyfd;
+ 
+-    my $pty = $class->SUPER::new_from_fd( $ptyfd, "r+" );
++    # The target may permit real PTY I/O but deny master metadata.
++    # Select the documented libc FILE import before the legacy conversion:
++    # a failed legacy fdopen can already consume the descriptor.
++    my $pty;
++    my $stream_error;
++    {
++        local $@;
++        $pty = eval { IO::Tty::_ohos_pty_stream($ptyfd) };
++        $stream_error = $@;
++    }
++    if ($stream_error) {
++        POSIX::close($ptyfd);
++        POSIX::close($ttyfd);
++        croak $stream_error;
++    }
++    $pty = $class->SUPER::new_from_fd( $ptyfd, "r+" ) if not $pty;
+     if (not $pty) {
+         POSIX::close($ptyfd);
+         POSIX::close($ttyfd);
+         croak "Cannot create a new $class from fd $ptyfd: $!";
+     }
+     $pty->autoflush(1);
+     bless $pty => $class;
+ 
+     my $slave = IO::Tty->new_from_fd( $ttyfd, "r+" );
+     if (not $slave) {
