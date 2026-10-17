@@ -1,0 +1,73 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: parlatype/4.3
+homepage: "https://github.com/gkarsay/parlatype"
+
+# 上游测试命令 (meson test --list → 7 个用例)
+upstream_check_command: "meson test -C build --list"
+
+# 上游测试已在 conanfile.py build() 中驱动（_run_upstream_tests：
+# 直接运行 intro-tests.json 记录的测试二进制，绕开 meson test 的 python
+# 进程 —— python 需要的 libintl.so.8 与 glib 自带同名库符号集不相容）。
+# 故本配方不调用 `meson test`；实际执行 = 逐条运行下列 command，
+# 与 `meson test -C build` 的 7 个用例一一对应。
+upstream_test_in_build: true
+upstream_test_command: "conanfile.py build() → _run_upstream_tests()：逐条执行 meson-info/intro-tests.json 记录的 cmd（等价 meson test 的 7 个用例）"
+
+# 上游实际运行的测试程序（libparlatype/tests/meson.build 的 tests 列表 7 个
+# meson test() 用例；无显示器/无 GStreamer 共享插件的 5 个在本平台跳过，
+# 跳过原因内联在 conanfile.py 的 _TEST_SKIP）
+upstream_tests:
+  - file: libparlatype/tests/mediainfo.c
+    source: parlatype-4.3/libparlatype/tests/mediainfo.c
+    description: "GstDiscoverer 媒体信息解析（运行通过，无需显示器/共享插件）"
+    command: "./mediainfo --tap -k"
+  - file: libparlatype/tests/waveloader-static.c
+    source: parlatype-4.3/libparlatype/tests/waveloader-static.c
+    description: "波形加载器（静态库变体，运行通过）"
+    command: "./waveloader-static --tap -k"
+  - file: libparlatype/tests/config.c
+    source: parlatype-4.3/libparlatype/tests/config.c
+    description: "配置项解析（跳过：OHOS 无显示服务器，GTK 初始化失败）"
+    command: "./config --tap -k"
+  - file: libparlatype/tests/gst.c
+    source: parlatype-4.3/libparlatype/tests/gst.c
+    description: "GStreamer 元素工厂（跳过：OHOS 只出静态插件，无 scanner/共享插件）"
+    command: "./gst --tap -k"
+  - file: libparlatype/tests/player.c
+    source: parlatype-4.3/libparlatype/tests/player.c
+    description: "播放器管线（跳过：需共享 GStreamer 插件）"
+    command: "./player --tap -k"
+  - file: libparlatype/tests/waveloader.c
+    source: parlatype-4.3/libparlatype/tests/waveloader.c
+    description: "波形加载器（动态库变体；跳过：需共享 GStreamer 插件）"
+    command: "./waveloader --tap -k"
+  - file: libparlatype/tests/waveviewer.c
+    source: parlatype-4.3/libparlatype/tests/waveviewer.c
+    description: "波形视图控件（跳过：需 X11/Wayland 显示）"
+    command: "./waveviewer --tap -k"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_parlatype.sh
+    description: "静态验证包产物：ELF 架构 + 动态依赖链 + 库/二进制符号交叉一致性 + 头文件/pc/schema/翻译"
+    command: "sh test_parlatype.sh <package_folder>"
+    assertions:
+      - "bin/parlatype 存在且非空"
+      - "ELF magic = 0x7f454c46"
+      - "readelf -h 输出含 AArch64 + ELF64"
+      - "readelf -d 动态依赖含 libparlatype.so.7 / libgtk-4.so.1 / libadwaita-1.so.0 / libgio-2.0.so.0 / libglib-2.0.so.0"
+      - "readelf -d 不含 libgstreamer-1.0.so.0（反向断言：GStreamer 系静态链入，不产生 DT_NEEDED）"
+      - ".symtab 中已定义 gst_* 符号 >= 1000 且含 gst_init / gst_element_factory_make / gst_pipeline_new"
+      - "libparlatype.so.7 soname 符号链接存在"
+      - "库导出 >= 60 个 pt_* 符号且含核心 API"
+      - "二进制导入的每个 pt_* 符号均由库导出（链接完整性）"
+      - "6 个公共头文件安装齐全"
+      - "pkg-config 文件声明 -lparlatype"
+      - "GSettings schema + parlatype.mo 翻译 + 桌面项已安装"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 10
