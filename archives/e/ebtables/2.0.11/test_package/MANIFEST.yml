@@ -1,0 +1,79 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI 脚本 build_and_test.sh L0e 强制要求存在）
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: ebtables/2.0.11
+homepage: "https://ebtables.netfilter.org/"
+
+# 上游测试命令：Makefile.am 里既没有 TESTS 也没有 check_PROGRAMS，`make check`
+# 是 automake 生成的空目标。build() 仍然执行一次，把「上游 N=0」落成日志证据
+# （conan 日志里可见 `RUN: make -j1 check` 与 HMBS_UPSTREAM_TESTS upstream=0）。
+upstream_check_command: "make -j1 check"
+upstream_test_in_build: false
+upstream_test_command: "make -j1 check"
+
+# 上游实际测试：**没有**。N = 0，如实写。
+upstream_tests:
+  - file: "(none)"
+    source: "ebtables-2.0.11.tar.gz（98 个 tar 条目，全部为源码/构建脚本，无测试目录）"
+    description: >-
+      ebtables 2.0.11 不含任何测试套件：Makefile.am 无 TESTS、无 check_PROGRAMS、
+      无 test/tests 目录，tarball 里也没有测试数据。build() 内逐项核实
+      （TESTS=absent / check_PROGRAMS=0 / test-dirs=none / extensions/*.c=24）
+      并完整打印，然后仍执行 `make -j1 check`（空目标）作为 N=0 的日志证据。
+    command: "make -j1 check"
+    executed: true
+    cases: 0
+    passed: 0
+    excluded: 0
+    excluded_reason: "不适用（上游无测试用例）"
+
+# conanfile.py build() 内的离线硬门禁：期望值全部由上游源码派生，非配方自造常量
+build_phase_golden_cases:
+  - name: "用户态黄金用例 G1..G9"
+    cases: 35
+    passed: 35
+    hard_gate: true
+    description: >-
+      --version / -V / --help / -h（版本行由 AC_INIT + PROGDATE + PRINT_VERSION
+      宏派生；帮助正文逐字比对 ebtables.c print_help() 的字面量）；-h list_extensions
+      的 4 个分节与 extensions/*.c 的 ebt_register_* + .name 派生集合完全一致；
+      21 个扩展的 -h 输出包含各自 help 函数的全部字面量；
+      -t filter|nat|broute -h 的合法链列表等于 ebtable_*.c 的 VALID_HOOKS /
+      hn[NF_BR_*] 派生值；2 条负例（rc=255 + 上游源码错误文案）；restore 的 usage。
+    command: "conan create（build() 内，用 build 树的 .libs/ebtables-legacy 真跑）"
+  - name: "内核相关用例（CAP_NET_RAW 能力探测）"
+    cases: 4
+    passed: 0
+    hard_gate: false
+    description: >-
+      -t filter|nat|broute -L 与 --atomic-file/--atomic-save 往返；需要 CAP_NET_RAW
+      + 内核 ebtables 模块。能力不足时逐条打印 SKIP 与理由（本机实测：
+      socket(AF_INET, SOCK_RAW, IPPROTO_RAW) → PermissionError，4 条全部 SKIP）。
+    command: "conan create（build() 内）"
+
+# test_package 中自带的测试（消费者视角 + 交付形态）
+test_package_tests:
+  - file: test_ebtables.c
+    description: >-
+      消费者用例：真链接 ebtables::ebtables（lib/libebtc.so.0），调用交付头
+      <ebtables_u.h>/<ethernetdb.h> 的公共 API；判据为外部可核对真值 —— 内核 ABI 的
+      标准判决名 ACCEPT/DROP/CONTINUE/RETURN（含 FILL_TARGET/TARGET_NAME 宏往返）、
+      六个桥接 hook 名与顺序、libc inet_pton 交叉验证的 IPv4/IPv6 解析与 CIDR
+      算术（/24、/60、/64、/128）、上游 extensions/*.c 注册出的 11 匹配/3 watcher/
+      7 目标/3 表、IANA ethertype 值（IPv4 0x0800、ARP 0x0806）
+    command: "./test_ebtables <pkg>/etc/ethertypes"
+    checks: 42
+  - file: test_layout.py
+    description: >-
+      交付形态自检（M）：lib/ 仅 libebtc soname 链且无 .la、真实库 ELF64/ET_DYN 与
+      架构、DT_SONAME、soname 软链可解析、bin/ 交付物集合与无悬空/绝对链接、
+      4 个程序的 ELF 架构与 DT_NEEDED 契约（ebtablesu 上游单独链接）、
+      ebtables-legacy-save 的 perl shebang 与 @sbindir@ 替换、23 个上游头文件闭包、
+      etc/ethertypes 的 IANA 行、man 页版本号、GPL-2.0 原文、无 .la/中间产物、
+      无隐藏文件（JC5）、CMakeDeps 契约、pkg-config 可重定位、消费者 DT_NEEDED、
+      OHOS .codesign 段
+    command: "python3 test_layout.py --package-folder ... --generators-dir ..."
+    checks: 18
+
+assertion_count: 60

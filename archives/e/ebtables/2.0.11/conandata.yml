@@ -1,0 +1,29 @@
+sources:
+  "2.0.11":
+    url: "https://ftp.netfilter.org/pub/ebtables/ebtables-2.0.11.tar.gz"
+    sha256: "b71f654784a726329f88b412ef7b96b4e5d786ed2bd28193ed7b4c0d677dfd2a"
+
+patches:
+  "2.0.11":
+    - patch_file: "patches/0001-config.sub-linux-ohos.patch"
+      strip: 1
+      patch_description: >-
+        The config.sub shipped in this tarball is GNU config.sub 2016-11-04, whose
+        maybe_os/OS lists know linux-musl/linux-uclibc but not linux-ohos, so
+        `configure --build=aarch64-unknown-linux-ohos --host=aarch64-unknown-linux-ohos`
+        aborts with "Invalid configuration `aarch64-unknown-linux-ohos': machine
+        `aarch64-unknown-linux' not recognized". Adds `linux-ohos*` to both lists
+        (same two insertions as archives/b/bluefish/2.2.16/patches/0002-config.sub.patch).
+      patch_type: "portability"
+    - patch_file: "patches/0002-configure-hmdfs-tmpdir-permissions.patch"
+      strip: 1
+      patch_description: >-
+        `configure` creates its config.status scratch directory with
+        `umask 077 && mktemp -d ./confXXXXXX`; on the OHOS worker's HMDFS the
+        0700 directory is not usable by the (UID-mapped) process, so the
+        generated `config.status` dies with
+        "`./config.status: line 816: ./confmOiEAI/subs1.awk: Permission denied`"
+        + "config.status: error: could not setup config files machinery".
+        Restores `umask 022` in the two places, exactly like the merged
+        archives/l/libnftnl/1.3.1 and archives/i/iptables/1.8.13 recipes.
+      patch_type: "portability"
