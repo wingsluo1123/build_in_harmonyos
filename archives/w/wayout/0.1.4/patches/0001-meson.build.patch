@@ -1,0 +1,50 @@
+--- a/meson.build
++++ b/meson.build
+@@ -10,20 +10,24 @@
+   ]
+ )
+ 
+ cc = meson.get_compiler('c')
+ 
+ add_project_arguments(cc.get_supported_arguments([
+   '-D_POSIX_C_SOURCE=200809L',
+   '-DVERSION="0.1.4"',
+   '-fsigned-char',
+   '-Wno-unused-parameter',
++  # The no-op wl_output / xdg_output listener in src/output.c relies on an
++  # unprototyped function so it can fill every callback slot; modern clang
++  # rejects that with -Wstrict-prototypes -Werror.
++  '-Wno-strict-prototypes',
+   '-Wpointer-arith',
+   '-Wformat-security',
+   '-Wunreachable-code',
+   '-Wformat',
+ ]), language: 'c')
+ 
+ if get_option('handle-signals').enabled()
+   add_project_arguments(cc.get_supported_arguments([ '-DHANDLE_SIGNALS' ]), language: 'c')
+ endif
+ 
+@@ -69,21 +73,21 @@
+   install: true,
+ )
+ 
+ scdoc = dependency(
+   'scdoc',
+   version: '>=1.9.2',
+   native: true,
+   required: get_option('man-pages'),
+ )
+ if scdoc.found()
+-  scdoc_prog = find_program(scdoc.get_pkgconfig_variable('scdoc'), native: true)
++  scdoc_prog = find_program(scdoc.get_variable(pkgconfig: 'scdoc'), native: true)
+   sh = find_program('sh', native: true)
+   mandir = get_option('mandir')
+   man_files = [
+     'doc/wayout.1.scd'
+   ]
+   foreach filename : man_files
+     topic = filename.split('.')[-3].split('/')[-1]
+     section = filename.split('.')[-2]
+     output = '@0@.@1@'.format(topic, section)
+ 
