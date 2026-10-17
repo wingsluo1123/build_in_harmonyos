@@ -1,0 +1,34 @@
+software: skktools
+version: "1.3.4-0.20210220"
+status: built
+build_date: "2026-10-16"
+build_system: autotools
+
+source:
+  # 上游 git 快照：skk-dev/skktools，基于 skktools-1_3_4 tag（树内 VERSION=1.3.4），
+  # 取 2021-02-20 的快照 commit 0fe2106fbc052445c611e6c5b2a79899d740edcb
+  url: "https://github.com/skk-dev/skktools/archive/0fe2106fbc052445c611e6c5b2a79899d740edcb.tar.gz"
+  sha256: "6339d1ec42ca19c9ae03318a8196109dedf87140841dd9e7fa79936578a45371"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--with-gdbm=yes"
+  dependencies:
+    - gdbm/1.23
+    - glib2/2.88.0.1
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-config.guess-add-HarmonyOS-support.patch"
+  - "0002-config.sub-add-HarmonyOS-support.patch"
+  - "0003-configure-umask-077-hmdfs-compatibility.patch"
+
+knowledge_gained:
+  - "源码 URL/SHA256 直接内联在 conanfile.py，不使用 conandata.yml，规避 CI conandata 预下载路径 BUILD_DIR 未初始化缺陷"
+  - "skkdic-expr 需要 ndbm 接口：必须依赖 gdbm/1.23（--enable-libgdbm-compat 提供 gdbm/ndbm.h + libgdbm_compat），gdbm/1.24 不行（--disable-libgdbm-compat）"
+  - "skkdic-expr2 经 PKG_CHECK_MODULES(glib-2.0) 探测，需 PkgConfigDeps 暴露 glib-2.0.pc"
+  - "上游 `make test` 为 golden-file 差分测试（4 个目标），可在 Conan build() 内直接执行"
+  - "旧版 configure 的 confXXXXXX 临时目录 umask 077 与 HMDFS 冲突，沿用 gdbm 0003 同款补丁"

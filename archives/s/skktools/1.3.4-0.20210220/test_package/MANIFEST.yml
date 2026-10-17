@@ -1,0 +1,36 @@
+# test_package/MANIFEST.yml — skktools 1.3.4-0.20210220
+package: skktools/1.3.4-0.20210220
+homepage: "https://github.com/skk-dev/skktools"
+
+# Upstream official suite: `make test` in the source tree
+# (test_skkdic-count / test_skkdic-sort / test_skkdic-expr / test_skkdic-expr2),
+# golden files under test/result/.
+upstream_check_command: "make -n test"
+upstream_test_in_build: true
+upstream_test_command: "make test"
+
+upstream_tests:
+  - file: Makefile.in
+    source: skktools-0fe2106fbc052445c611e6c5b2a79899d740edcb/Makefile.in
+    description: "skkdic-count golden test: counts test/SKK-JISYO.S and diffs test/result/skkdic-count (6763 candidates)"
+    command: "make test_skkdic-count"
+  - file: Makefile.in
+    source: skktools-0fe2106fbc052445c611e6c5b2a79899d740edcb/Makefile.in
+    description: "skkdic-sort golden test: sorts test/SKK-JISYO.S.shuffle and diffs test/result/skkdic-sort"
+    command: "make test_skkdic-sort"
+  - file: Makefile.in
+    source: skktools-0fe2106fbc052445c611e6c5b2a79899d740edcb/Makefile.in
+    description: "skkdic-expr golden test: split1 + split2 - split3 piped through skkdic-sort, diffs test/result/skkdic-expr"
+    command: "make test_skkdic-expr"
+  - file: Makefile.in
+    source: skktools-0fe2106fbc052445c611e6c5b2a79899d740edcb/Makefile.in
+    description: "skkdic-expr2 golden test: same merge via glib-based tool, diffs test/result/skkdic-expr2"
+    command: "make test_skkdic-expr2"
+
+test_package_tests:
+  - file: test_package/test_skktools.py
+    description: "Consumer test of the packaged binaries: skkdic-count exact count, skkdic-sort stability/section order, skkdic-expr and skkdic-expr2 dictionary merging"
+    command: "python3 test_package/test_skktools.py <package bin dir>"
+
+# 4 upstream golden targets + 16 test_package assertions (16/16 passed on device)
+assertion_count: 16
