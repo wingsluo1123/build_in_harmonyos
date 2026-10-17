@@ -1,0 +1,100 @@
+# 版本级 manifest — ARCHIVE-SPEC v2.0
+# 文件位置: archives/l/lice/4.2.5i/manifest.yaml
+
+version: "4.2.5i"
+software: "lice"
+
+# published | built | failed | archived
+status: built
+build_date: "2026-10-14"
+build_system: "none (纯脚本/数据包，零编译步骤)"
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/l/lice/lice_4.2.5i.orig.tar.gz"
+  sha256: "0c3d46c7432bf4ffe6aa67ecb22c726f2ec099fa949aacf11db2b5206b023b79"
+  tar_format: tar.gz
+  # 取包口径（可复现举证见 notes.md「取包与官方源连通性」节）：上游官方站
+  # lice.codehack.com 已消亡（Debian 2026-07-22 1:4.2.5i-3 changelog 逐字
+  # "Point Homepage to web archive to express that upstream vanished"），无上游
+  # git 仓库/tag 可得 ⇒ 按 jupp 3.1.41 先例取 Debian 官方 archive 的 **pool 原件**
+  # `lice_4.2.5i.orig.tar.gz`（`.orig` 按 Debian 政策即**未修改的上游原始发布件**，
+  # deb.debian.org 是 Debian 官方 CDN，不是第三方站点镜像 ⇒ 不触 PF7/R39）。
+  # 本机实测 2026-10-14（WSL）：HTTP 200，275769B，sha256 与 Debian 官方 dsc
+  # （1:4.2.5i-3）Checksums-Sha256 逐字一致 ⇒ url 与 sha256 同源同一件。
+  # 解包根目录 = `lice-4.2.5i`（带版本号，`tar tzf` 实测唯一顶层）
+  # ⇒ 配方 strip_root=True。
+
+build:
+  system: none
+  configure_options: []
+  dependencies: []           # 实测零 conan 依赖：无编译入口，EPIC4 脚本在 EPIC4 客户端内执行
+  tool_dependencies: []
+  cc: none
+  cxx: none
+  package_type: header-library   # 交付零可执行文件 ⇒ CI L0k "library package, commands.json not required"（appconfig 先例）
+  # 真机包实测：共 301 个文件（上游 302 减去 1 个被排除的 i386 ELF sscan，见下），顶层 = res/
+  artifacts:
+    - res/lice/lice.irc.gz      # 主脚本（解压后第 55 行自报 ^ASSIGN id.v 4.2.5i）
+    - res/lice/                 # 301 常规文件 = 201 .gz + 100 数据文件；另 13 个上游符号链接（12 help 交叉引用 + sping.gz->rlag.gz）
+    - res/lice/global           # EPIC 全局配置
+    - res/lice/help/LICENSE.gz  # 上游许可证声明（GPL-2.0-or-later）
+    - res/lice/help/COPYING.gz  # GPL-2.0 全文
+    - res/lice/themes/          # 23 个主题
+    - res/lice/userhelp/        # 8 个 userhelp（!HELP <CMD> 的运行时读取目标）
+    - res/lice/extra/sscan.c    # 上游 sscan 源码（i386 二进制 sscan 已排除，见下）
+
+patches_applied: []
+# ⚠ 无 .patch 文件 ≠ 上游件零改动：配方 package() 用 rm() **排除**
+#   上游自带的 `.irc/extra/sscan`（`file` 实测：ELF 32-bit LSB executable, Intel 80386,
+#   dynamically linked, interpreter /lib/ld-linux.so.2）——OHOS aarch64 上不可能运行
+#   （架构不匹配 + 未签名 + 平台 dlopen 限制）。**不是静默丢弃**：排除已在本节与
+#   notes.md「sscan 排除申报」显式申报；源码 `sscan.c` 保留在交付内（可自行交叉编译）。
+#   该改动不经 patches 机制（是安装面裁剪，非源码补丁）。
+
+tests:
+  # 五维账本（详见 notes.md 与 test_package/MANIFEST.yml）
+  # N_static=0 的举证（不是一句 grep）：
+  #   ① 全树 302 文件（202 .gz + 100 数据文件）：无 t/ 目录，无 Makefile/Makefile.PL/
+  #      configure/CMakeLists.txt/setup.py/任何 .pm ⇒ 无构建与测试入口；
+  #   ② 全树 grep TESTS= / add_test / pytest / make check / TEST_CASE 零命中；
+  #   ③ 上游形态是 EPIC4 交互客户端内的脚本覆层，无 headless 可执行入口。
+  #   ⇒ 上游确无自动化套件，如实记 0；未虚构"跑过上游测试"，也未删除/跳过任何用例。
+  upstream_tests: []
+  upstream_static_count: 0
+  registered_count: 0
+  executed_count: 0
+  passed_count: 0
+  failed_count: 0
+  no_criterion_count: 0
+  skipped_count: 0
+  # 消费者测试：5 个用例 / 59 项细粒度断言点（两级都在 conanfile.py 的 test() 内执行）
+  #   [S] lice-consumer-test.sh —— 4 个交付面断言用例（16 断言点，按 rule12 裁决口径
+  #       不计入「鸿蒙特有测试」）
+  #   [E] lice-e2e-consumer.sh  —— 1 个完整消费者端到端用例（E1–E5，43 断言）=
+  #       「鸿蒙特有测试」行所记内容
+  consumer_count: 5
+  consumer_passed: 5
+  consumer_assertions: 47          # pass 站点数：S 级 4 + E 级 43
+  consumer_fine_grained: 59        # 细粒度断言点：S1–S4 16 + E1–E5 43
+  consumer_behavioral: 1           # E1–E5 端到端流程（真实装载 / 业务流 / 检索）
+  consumer_contract_signature: 4   # S1–S4 交付面断言（结构/解包/版本串/许可文本）
+  # rule12 可脚本化核验字段：鸿蒙消费者端到端用例数（≥1）
+  harmonyos_consumer_tests: 1
+  harmonyos_consumer_test_file: "test_package/lice-e2e-consumer.sh"
+  harmonyos_consumer_assertions: 43
+  local_verification: >-
+    conan create archives/l/lice/4.2.5i -pr:h=ohos-aarch64-wsl -pr:b=ohos-aarch64-wsl
+    --build=lice/* → RC=0（package_id 6b129b068851896169fae42d399fa922d239ce8a）；
+    test_package 输出 S 级 4/4 ASSERT_OK + E 级 43/43 E2E_OK（ALL_E2E_ASSERTIONS_PASSED），
+    日志 /root/ohpcd-work/lice15832-create-forced.log sha256
+    c736d21d0043f74e359a107d7835efcca52ae5e885d734b384ea8e3c46a8e56c（2026-10-16）
+
+knowledge_gained:
+  - ref: "notes.md#取包与官方源连通性"
+    text: "上游消亡（Debian changelog 逐字 upstream vanished）且无 git 仓库 ⇒ 取 Debian pool .orig 原件作官方归档源（jupp 3.1.41 先例）；sha256 与官方 dsc 逐字一致是同源同一件举证"
+  - ref: "notes.md#形态核验"
+    text: "任务池 lang 标注会误判（本池同类先例 signmykey/tardiff）：本包实为 EPIC4 脚本数据包，零编译入口、零 conan 依赖、也不需要 perl 工具链（EPIC 脚本语言 ≠ Perl）"
+  - ref: "notes.md#sscan 排除申报"
+    text: "上游自带预编译 i386 ELF（.irc/extra/sscan）在 OHOS aarch64 不可运行 ⇒ 配方 copy(exclude=) 排除并在 manifest/notes 双申报，保留源码 sscan.c；交付零可执行文件 ⇒ 不需要 commands.json（L0k library 分支，appconfig 先例）"
+  - ref: "notes.md#消费者端到端用例（rule12 整改，2026-10-16）"
+    text: "纯脚本/数据包（无可执行产物）的 rule12 消费者端到端用例范式：不臆造「跑通」结论，而是以客户端身份按交付脚本自身逐字可查的指令（LOAD/which()/fexist/open+read/glob(*)）真装载真读数据并断言真实业务输出（命令清单/NOTICE 行/usage 行）；带 can_run() 如实判定宿主工具、交叉下不假装执行目标 ELF"

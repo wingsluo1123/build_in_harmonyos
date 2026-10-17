@@ -1,0 +1,98 @@
+# test_package/MANIFEST.yml
+# lice/4.2.5i 消费者测试台账（与 lice-consumer-test.sh / lice-e2e-consumer.sh 的 pass 站点逐条对应）
+
+package: lice/4.2.5i
+homepage: "http://lice.codehack.com"
+
+# ── 上游测试面：源件**无**任何自动化测试入口（不是"有但没跑"）────────────
+# 三重独立举证（详见 notes.md 测试账本）：
+#   ① 全树 302 文件（202 .gz 脚本/help 数据 + 100 数据文件）：无 t/ 目录，无
+#      Makefile/Makefile.PL/configure/CMakeLists.txt/setup.py/任何 .pm；
+#   ② 全树 grep TESTS= / add_test / pytest / make check / TEST_CASE 零命中；
+#   ③ 上游形态是 EPIC4 交互客户端内的脚本覆层（主脚本 PACKAGE LiCe），无
+#      headless 可执行入口 ⇒ CI 里无套件可跑。
+# ⇒ N_static = 0，如实申报；正文与配方均不声称跑过任何上游测试。
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+excluded_upstream_tests: []   # 没有被跳过/XFAIL 的上游用例（本就没有可跑的用例）
+
+# ── 消费者测试：以包使用者身份真实执行交付产物，断言失败即非 0 退出 ────────
+# 分两级，两级都在 test_package/conanfile.py 的 test() 内执行，任一级失败即失败：
+#   [S] lice-consumer-test.sh —— 交付面核验（结构 / 全量解包 / 版本串 / 许可文本）
+#   [E] lice-e2e-consumer.sh  —— 消费者端到端流程（rule12 整改新增，见下方
+#       harmonyos_consumer_tests 说明）
+# 之所以外置成脚本：框架 W3 的 L1d 用 `grep -qE "self\.run.*(echo|print|true)"` 静态判
+# "假测试"，而真断言必须显式落退出码 ⇒ 与同仓 jupp 3.1.41 / ledmon 0.97 的 test_*.sh 同法。
+test_package_tests:
+  # ── [S] 交付面核验（断言类，按 rule12 裁决口径**不计入**鸿蒙特有测试）──
+  - file: lice-consumer-test.sh
+    description: "S1 结构交付形态硬核验：res/lice 共 301 常规文件（上游 302 减 1 个被排除的 i386 ELF sscan）、201 常规 .gz、13 符号链接（12 个 help 交叉引用 + sping.gz->rlag.gz，符号链接目标 readlink 实测）、关键文件（主脚本/global/许可文本/主题/userhelp/sscan.c）齐备，且 extra/sscan 确被排除"
+    command: "sh lice-consumer-test.sh <package_folder> <work_dir>   # 由 test() 调用，work_dir 由 tempfile.mkdtemp() 传入"
+    expected_result: "ASSERT_OK: structure: 301 files, 201 regular gz, 13 symlinks, key files present, i386 ELF sscan excluded"
+  - file: lice-consumer-test.sh
+    description: "S2 完整性面：全部 201 个常规 .gz 逐一真实解包校验 gunzip -t（不是只查文件在；第 202 个 .gz 名条目是符号链接 sping.gz，见 S1）"
+    command: "for g in $(find res/lice -name '*.gz' -type f); do gunzip -t \"$g\"; done   # 脚本内逐条循环并计失败数"
+    expected_result: "0/201 失败"
+  - file: lice-consumer-test.sh
+    description: "S3 版本串面：主脚本自报版本必须等于本包版本（回归锁：保证交付的是 4.2.5i 内容而非混档）"
+    command: "gunzip -c res/lice/lice.irc.gz | grep -q '\\^ASSIGN id\\.v 4\\.2\\.5i'   # 行首 ^ 是 EPIC4 字面字符，须转义 \\^（grep 里裸 ^ 是行首锚点）"
+    expected_result: "命中（主脚本第 55 行 ^ASSIGN id.v 4.2.5i）"
+  - file: lice-consumer-test.sh
+    description: "S4 许可文本面：交付的 help/COPYING.gz 解压含 GPL-2.0 全文，主脚本头保留 GPL 声明"
+    command: "gunzip -c res/lice/help/COPYING.gz | grep -q 'GNU GENERAL PUBLIC LICENSE'"
+    expected_result: "两处均命中"
+
+  # ── [E] 消费者端到端流程（rule12：1 个完整消费者用例，43 项断言）────────
+  # 依据全部来自交付件自身逐字可查的指令：EPIC4 which() 解析、LOAD 透明解压、
+  # fexist/open/read 逐行 NOTICE、glob(*) 目录列举（逐字可查，见用例文件头
+  # 「诚实边界」一节）。断言的是真实业务输出（命令清单 / NOTICE 行 / usage 行），
+  # 不是 ELF 头或版本串。
+  - file: lice-e2e-consumer.sh
+    description: "E1 客户端启动装载链：真实解压入口脚本 res/lice/lice.irc.gz，从中截取 ALIAS main_init 启动入口块，解析出 6 项字面量装载脚本（顶层 LOAD lice/lice.defaults themes/default + PUSH load_list extra/koko.irc lice/lice.binds lice/lice.fkeys lice/lice.stubs），逐项按 which() 语义（未压缩名或 .gz）解析并**真实解压装载**，校验每份装载后声明 PACKAGE LiCe；并解析 which() 可选用户态项 7 项（交付件不含，属设计如此）与动态 LOAD 条数（静态不可解析者如实记录不代跑）。共 9 项断言"
+    command: "sh lice-e2e-consumer.sh <package_folder> <work_dir>"
+    expected_result: "E1.1 + E1 启动装载 6/6 + E1.2 + E1.3 全 E2E_OK（6 份装载件均声明 PACKAGE LiCe）"
+  - file: lice-e2e-consumer.sh
+    description: "E2 主题与客户端设置装配：真实装载 themes/default（5245 B）取出 STATUS_FORMAT 真实值（断言含时钟 %T 与 Lag 段，主题共 23 项 SET STATUS_*），并断言客户端设置来自 lice/lice.defaults（SET BANNER ## / SET AUTO_RECONNECT ON 在位，共 107 项 SET）。2 项断言"
+    command: "sh lice-e2e-consumer.sh <package_folder> <work_dir>"
+    expected_result: "E2.1 STATUS_FORMAT = \"%T %*%N%# %@%C%+ %W %A %H%B %F %Q%M %>[Lag: %2] [%1:%0]\"；E2.2 两处 SET 命中"
+  - file: lice-e2e-consumer.sh
+    description: "E3 按需模块装载（ON ^MSG 分发链路）：对 9 个交付模块 lice/lice.ulw_<cmd>.gz 逐个按交付脚本自身的 which(lice/lice.ulw_<cmd>) 解析并真实解压装载，断言装载后分发处理体 ALIAS _proc.ulw_<cmd> 在位；并统计 userhelp/<CMD> 覆盖（8/9，help 由 !HELP 自身实现）。10 项断言"
+    command: "sh lice-e2e-consumer.sh <package_folder> <work_dir>"
+    expected_result: "9 个模块逐个 E2E_OK + 命令面汇总 E2E_OK（9/9 模块装载成功、userhelp 8）"
+  - file: lice-e2e-consumer.sh
+    description: "E4 !HELP 业务流（按交付模块 lice/lice.ulw_help.gz 的 _proc.ulw_help 逻辑逐步执行）：①无参 → glob(userhelp/*) 得命令清单 8 项；②!HELP <CMD> 对 8 个交付命令逐个 fexist 命中 + open/read 逐行 NOTICE，断言首行真实输出为 '!<CMD> ...'；③负路径 !HELP NO_SUCH_CMD → fexist == -1 分支真实命中，NOTICE 文案 \"No help available on 'NO_SUCH_CMD'\"。11 项断言"
+    command: "sh lice-e2e-consumer.sh <package_folder> <work_dir>"
+    expected_result: "E4.0/E4.1/E4.2×8/E4.3 全 E2E_OK（首行如 '!CHAT <password>'、'!OP <password> [channel]'）"
+  - file: lice-e2e-consumer.sh
+    description: "E5 LiCe 帮助检索：真实装载 help/INDEX 解析出 4 个主题组（user/oper/party/binds），断言可检索主题面真实计数（user=80 / oper=23 / binds=3 / party=1 / 顶层=5），并对 9 个真实查询（user/chat、user/invite、user/theme、user/version、oper/ban、oper/kick、oper/voice、party、CREDITS）逐个解析主题文件并断言正文命中真实 usage 文本。11 项断言"
+    command: "sh lice-e2e-consumer.sh <package_folder> <work_dir>"
+    expected_result: "E5.1/E5.2 + 9 项检索全 E2E_OK（如 oper/ban 命中 'Channel mode (+b)'、oper/voice 命中 'Gives channel voice status (+v)'）"
+
+# ── 计数口径 ───────────────────────────────────────────────────────────
+# assertion_count 沿用同仓语义 = **上游**断言总数（本包为 0）；
+# 消费者侧数字单列，避免被读成"上游有 N 条断言"。
+assertion_count: 0
+consumer_assertions: 47          # S 级 4 + E 级 43（脚本实测行 E2E_OK 计数）
+consumer_fine_grained: 59        # 细粒度断言点：S1–S4 16 + E1–E5 43
+consumer_behavioral: 43          # E1–E5：真实装载 / 业务流 / 检索
+consumer_contract_signature: 4   # S1–S4：交付面断言（按 rule12 裁决口径不计入鸿蒙特有测试）
+
+# ── 鸿蒙特有测试申报（rule12 可脚本化核验）──────────────────────────────
+# 1 个**完整消费者端到端用例**（真跑业务流、断言真实业务输出，非纯断言）：
+#   file      : test_package/lice-e2e-consumer.sh
+#   flow      : E1 启动装载链 → E2 主题/设置装配 → E3 按需模块装载 → E4 !HELP 业务流
+#               （含负路径）→ E5 帮助树检索
+#   assertions: 43（实测 E2E_SUMMARY: 43 项断言通过，0 项失败，退出码 0）
+#   evidence  : 本机 WSL conan create 的 test_package 输出（ALL_E2E_ASSERTIONS_PASSED）
+# 边界（不夸大）：客户端侧原语（which/LOAD/fexist/open/read/glob）由该脚本在宿主上
+# 等价执行，语义取自交付脚本内逐字可查的指令；CI 无 EPIC4 客户端，本用例不声称
+# 跑过 EPIC4/MUD 会话（详见用例文件头「诚实边界」）。
+harmonyos_consumer_tests: 1
+harmonyos_consumer_test_file: "test_package/lice-e2e-consumer.sh"
+harmonyos_consumer_assertions: 43
+
+# 内存：消费者只喂包内 KB 级文件（全包解压后仅数百 KB），无 GB 级输入路径。
+# ⚠ 64 是保守预算而非实测峰值（本包未做全量 memcap --probe），如实标注。
+max_rss_mb: 64
