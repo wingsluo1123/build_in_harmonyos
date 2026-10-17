@@ -1,0 +1,123 @@
+#====================================================================
+# DRAFT-skktools-gdbm-ndbm-compat-flat-header-libs-probe — autotools 库
+#   探测 ndbm/dbm 兼容接口时，Conan gdbm 包的「头平铺 ndbm.h（非
+#   gdbm/ndbm.h）+ dbm_open 符号在 libgdbm_compat + configure
+#   --with-gdbm 分支 early-skip」三坑叠加；用 shim 头 + ac_cv_* 预置 +
+#   LIBS=-lgdbm_compat 预置三件套归一解决
+# 对应人类文档: knowledge/drafts/DRAFT-skktools-gdbm-ndbm-compat-flat-header-libs-probe.md
+#
+# 本条目为 draft（草稿），尚未由主编审核合入。
+# 触发事件: PR skktools/1.3.4-0.20210220 适配 HarmonyOS PC（autotools，
+#   skkdic-expr 用 ndbm 接口，依赖 gdbm/1.23）
+#====================================================================
+
+id:                     DRAFT-skktools-gdbm-ndbm-compat-flat-header-libs-probe
+trigger_tool:           configure|autoreconf|make|clang|ld|conan
+phase:                  configuration|compile|link
+error_signature:        unknown type name.*DBM|
+                         undeclared identifier.*datum|
+                         ac_cv_header_gdbm_ndbm_h=no|
+                         unable to find library -lgdbm|
+                         undefined symbol: dbm_open
+
+# ═══ Layer 1: 识别层 ═══
+severity:               2
+category:               autotools, configure, dependency, ndbm, gdbm, ohos, portability
+match_keywords:         dbm_open, dbm_close, datum, DBM, gdbm/ndbm.h, ndbm.h,
+                         libgdbm_compat, gdbm_compat, HAVE_GDBM_NDBM_H,
+                         ac_cv_lib_gdbm_dbm_open, ac_cv_lib_gdbm_compat_dbm_open,
+                         --with-gdbm, AC_CHECK_LIB, AC_CHECK_HEADERS, flat header
+title:                  autotools 库探测 ndbm/dbm 兼容接口时，Conan gdbm 包的头平铺
+                          与符号在 compat 库及 --with-gdbm 分支 early-skip 三坑叠加
+                          ——shim 头 + ac_cv_* 预置 + LIBS=-lgdbm_compat 三件套
+
+# ═══ Layer 2: 诊断层 ═══
+root_cause:             Conan 的 gdbm 包（--enable-libgdbm-compat）把 ndbm 兼容头
+                          平铺为 include/ndbm.h（非 gdbm/ndbm.h），configure 的
+                          AC_CHECK_HEADERS(gdbm/ndbm.h) 探不到→HAVE_GDBM_NDBM_H
+                          不定义→DBM/datum 未声明；且 dbm_open 符号在
+                          libgdbm_compat.a 而非 libgdbm.a，AC_CHECK_LIB(gdbm,
+                          dbm_open) 直接失败；更隐蔽的是 --with-gdbm 分支只有
+                          ac_cv_lib_gdbm_compat_dbm_open=yes 时才走头检查并追加
+                          -lgdbm，预置 LIBS=-lgdbm_compat 会让第一条 AC_CHECK_LIB
+                          意外成功而跳过 compat 分支（early-skip），仍拿不到头与
+                          compat 库。三个坑叠加，只修一个仍链接失败
+affected_scope:         所有在 OHOS/Linux 上用 autotools 构建、探测 ndbm/dbm 兼容
+                          接口（dbm_open/datum/DBM/gdbm/ndbm.h）且依赖 Conan gdbm
+                          包的库（skktools/skkdic-expr 即此类）
+verification_cmd:       conan create archives/s/skktools/1.3.4-0.20210220
+                          --build=missing -pr:h=ci/conan/profiles/ohos-aarch64
+                          -pr:b=ci/conan/profiles/ohos-aarch64
+                          # 期望: 覆盖前 unknown type name 'DBM'/undefined
+                          # symbol: dbm_open；覆盖后 HAVE_GDBM_NDBM_H=1、
+                          # 四工具链接成功、upstream golden 4/4、L0-L5 全 pass
+
+# ═══ Layer 3: 方案层 ═══
+rec_priority:           1
+rec_approach:           ndbm-flat-header-shim-ac-cv-libs-preset
+rec_description:        generate() 三件套缺一不可：①生成 gdbm/ndbm.h shim（内容
+                          #include <ndbm.h>）放入临时 include 目录并追加 -I（让
+                          AC_CHECK_HEADERS 命中、HAVE_GDBM_NDBM_H 定义）；②预置
+                          ac_cv_lib_gdbm_dbm_open=yes 与 ac_cv_lib_gdbm_compat_
+                          dbm_open=yes（迫使 --with-gdbm 分支走到头检查）；③预置
+                          LIBS=-lgdbm_compat（静态链接顺序 compat 在前 gdbm 在后，
+                          dbm_open 与 gdbm_* 闭包都能解析）。依赖必须用 gdbm/1.23
+                          （带 compat），1.24 用 --disable-libgdbm-compat 不可用
+rec_command:            # conanfile.py generate() 内
+                          shim_dir = build_folder/compat-include；写 gdbm/ndbm.h
+                          shim；tc.extra_cflags += ["-I"+shim_dir]；
+                          env.define("LIBS","-lgdbm_compat")；
+                          env.define("ac_cv_lib_gdbm_dbm_open","yes")；
+                          env.define("ac_cv_lib_gdbm_compat_dbm_open","yes")
+rec_auto_fix:           false
+rec_impl:               conan-recipe
+
+fallback_priority:      2
+fallback_approach:      source-patch-ndbm-include-path
+fallback_description:   若无法生成 shim（如源码硬 include 多个 ndbm 变体），patch
+                          上游源码把 #include <gdbm/ndbm.h> 改为 <ndbm.h> 并确保
+                          LIBS 含 -lgdbm_compat；改动面更大，仅在 shim 与探测冲突
+                          时使用
+fallback_command:       (逐文件补丁)
+fallback_auto_fix:      false
+fallback_impl:          conan-recipe
+
+# ★ 禁止策略 ★
+forbid_1_pattern:       凭空预置 ac_cv_lib_gdbm_dbm_open=yes（未实测 dbm_open 确在
+                          compat 库、头确平铺）
+forbid_1_reason:        预置 ac_cv_* 会把「依赖缺失」掩盖成「探测通过」，最终链接才崩
+forbid_1_consequence:   掩盖真实依赖缺失，链接期 undefined symbol，反复空跑设备
+forbid_2_pattern:       改用 gdbm/1.24（--disable-libgdbm-compat）仍声明 ndbm 依赖
+forbid_2_reason:        1.24 不提供 ndbm 兼容头/库，属依赖选型错误而非代码缺陷
+forbid_2_consequence:   HAVE_GDBM_NDBM_H 永不可达，且任何 shim 都无 ndbm.h 可含
+
+# ═══ Layer 4: 原则引用 ═══
+principles:
+
+# ═══ 关系图 ═══
+causes:                 []
+caused_by:              []
+similar_to:             E2186, DRAFT-ncdc-1.25-glib-pc-name-autotools-ac-check-lib,
+                         DRAFT-ohos-autotools-rpl-malloc,
+                         DRAFT-ohos-configure-ac-cv-path-tool-override
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file:               knowledge/drafts/DRAFT-skktools-gdbm-ndbm-compat-flat-header-libs-probe.md
+last_updated:           2026-10-16
+source_event:           skktools/1.3.4-0.20210220 HarmonyOS PC 适配（skkdic-expr 用
+                          ndbm 接口，configure 探测 gdbm/ndbm.h 与 dbm_open 三坑叠加）
+
+# ═══ 知识协作 ═══
+authors:                codex <codex@localhost>
+source_pr:
+source_commit:
+
+# ═══ 质量度量 ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-16
+
+draft:                  true
