@@ -1,0 +1,68 @@
+# conandata.yml — overtls 0.3.12
+# Source: 官方 GitHub tag 归档（R39：官方源，镜像 fallback 由 CI get_mirrors 自动补）
+# 上游 tag v0.3.12 → commit 59eba9b327e1a256712cc7ac426d2d084d825a0d
+# sha256 三路互证（2026-10-06 设备实测，三条独立下载路径逐字节一致）：
+#   路 1  https://github.com/.../archive/refs/tags/v0.3.12.tar.gz
+#   路 2  https://codeload.github.com/.../tar.gz/refs/tags/v0.3.12
+#   路 3  权威镜像 gh-proxy.com 同 URL（仅作校验用，未写入本文件——PF7 镜像域名黑名单）
+#   路 C  conan-center-index recipes/overtls/all/conandata.yml → HTTP 404（该包未进 CCI，
+#         权威 sha 需由上游 + 镜像互证，已如实记录）
+sources:
+  url: "https://github.com/ShadowsocksR-Live/overtls/archive/refs/tags/v0.3.12.tar.gz"
+  filename: "overtls-v0.3.12.tar.gz"
+  sha256: "d0ed3ae88721e8ae2a525059a81ce29991af29de920bf580cb0999d0a7ac288b"
+
+# cargo 的运行期库：`rust-toolchain` 的 cargo 动态链接 libssl.so / libcrypto.so /
+# libz.so（实测 NEEDED），这三者不在工具包内，故仍需 Harmonybrew bottle
+# （三个 URL 2026-10-14 设备实测均 HTTP 200 并下载取 sha256，与 harmonybrew
+#  formula 索引 `https://harmonybrew.atomgit.com/api/formula.jws.json` 逐字一致；
+#  rust-1.97.1 bottle 实测 404，正是改用仓库内 rust-toolchain 包的原因）。
+# URL 中的 %40 是 @ 的编码（服务器只认编码形）。
+# **2026-10-14 换 URL 记录**（CI build#89760 确定性红的根因，实测 14:26–14:36 CST）：
+# harmonybrew 对已发布 bottle 做 rebuild/revision 替换后**旧文件即下架**——旧的
+# `openssl%403-3.6.4_1…bottle.tar.gz`（**404**，配方钉的 3.6.4_1 被 3.6.5_1 取代）、
+# `zlib-ng-compat-2.3.3_2…bottle.tar.gz`（**404**，版本未变、以 rebuild 1 重发为
+# `…bottle.1.tar.gz`，旧 rebuild 文件被替换）均不再在架；`ca-certificates-2026-09-25…`
+# 旧 URL 实测仍 200，但 formula 索引已指 revision 1 的 `…2026-09-25_1…`，为与索引
+# 同源（防同类下架）一并换新。三者版本未变或仅 patch/revision 级上移，
+# 用途（libssl.so/libcrypto.so/libz.so/cacert.pem）实测不变（tar 内容已核）。
+runtime_libs:
+  - url: "https://harmonybrew.atomgit.com/bottles/openssl%403-3.6.5_1.arm64_ohos.bottle.1.tar.gz"
+    sha256: "ae1d5bf9252d65d86053e68d7c91fc9d0066016bce50662ce4a32a0b0e954ef2"
+  - url: "https://harmonybrew.atomgit.com/bottles/zlib-ng-compat-2.3.3_2.arm64_ohos.bottle.1.tar.gz"
+    sha256: "7092bfe7af8908f4a7c72493881291fe2416f27fc6502c34e22346a4dbfc4c51"
+  - url: "https://harmonybrew.atomgit.com/bottles/ca-certificates-2026-09-25_1.arm64_ohos.bottle.tar.gz"
+    sha256: "1219809a260a0a347ad4880aedeb8a60def82ac01bedf42bd66152c5a0aca146"
+
+# 备选集：内容与上同，供瞬时网络失败时整体重试一次（配方按序尝试，任一成功即止）。
+runtime_libs_fallback:
+  - url: "https://harmonybrew.atomgit.com/bottles/openssl%403-3.6.5_1.arm64_ohos.bottle.1.tar.gz"
+    sha256: "ae1d5bf9252d65d86053e68d7c91fc9d0066016bce50662ce4a32a0b0e954ef2"
+  - url: "https://harmonybrew.atomgit.com/bottles/zlib-ng-compat-2.3.3_2.arm64_ohos.bottle.1.tar.gz"
+    sha256: "7092bfe7af8908f4a7c72493881291fe2416f27fc6502c34e22346a4dbfc4c51"
+  - url: "https://harmonybrew.atomgit.com/bottles/ca-certificates-2026-09-25_1.arm64_ohos.bottle.tar.gz"
+    sha256: "1219809a260a0a347ad4880aedeb8a60def82ac01bedf42bd66152c5a0aca146"
+
+# OHOS 适配补丁：reqwest 0.13.x 的 `rustls` feature 硬编码启用 aws-lc-rs
+# （`rustls` = `__rustls-aws-lc-rs` → hyper-rustls / rustls 的 aws-lc-rs）。
+# aws-lc-sys 0.45.0 的 CMake 路径在本机与 CI worker 上**不产出 aarch64 perlasm
+# 汇编对象**（构建日志逐字：`Neither OHOS_NDK_HOME nor OHOS_SDK_NATIVE are set!
+# No toolchain found.`；产物 libaws_lc_0_45_0_crypto.a 257 个成员里 0 个 ASM 目标、
+# `Building ASM object` 计数 = 0），而 C 代码按「有汇编」编译 → 链接期 200+ 个
+# `aws_lc_0_45_0_*` 符号未定义（原始失败日志见 $TASK_DIR/conan-create-1.log）。
+# 上游 overtls 自身只用 ring：src/lib.rs:36 安装
+# `rustls::crypto::ring::default_provider()`，src/tls.rs:30/46 显式使用
+# `rustls::crypto::ring::*` 密码套件，WS 握手自实现（src/client.rs:577 的
+# client_async 已注释）→ aws-lc-rs 对本包无功能贡献。
+# 改用 reqwest 的 `rustls-no-provider`（= dep:rustls-platform-verifier + __rustls，
+# 不启用任何 provider）后 `cargo tree -i aws-lc-rs` 报
+# `package ID specification 'aws-lc-rs' did not match any packages`，全树只剩 ring；
+# 唯一的默认 provider 消费者是 server 侧 PanelSyncClient 的 reqwest::Client，
+# 它在 run_server 里紧跟在 `ensure_rustls_crypto_provider()`（src/server.rs:42）之后创建。
+patches:
+  - patch_file: "patches/0001-Cargo.toml-reqwest-rustls-no-provider.patch"
+    patch_description: >-
+      reqwest 改用 rustls-no-provider，去掉 OHOS 上无法链接的 aws-lc-sys，
+      与上游自身的 ring-only 设计一致
+    patch_type: "portability"
+    strip: 1
