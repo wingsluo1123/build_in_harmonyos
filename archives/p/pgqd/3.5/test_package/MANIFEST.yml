@@ -1,0 +1,67 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: pgqd/3.5
+homepage: "https://github.com/pgq/pgqd"
+
+# 上游测试命令 (make check -> ./tests/test.sh)
+upstream_check_command: "make check"
+
+# 上游测试共 6 个用例 (tests/test.sh 的 testlist)
+# 4 个可运行用例由 test_package/test_pgqd.sh 在**真机现场拉起的真实 PostgreSQL
+# 集群**上真实执行（conan create 会运行 test_package，故 CI 日志内有实测痕迹）；
+# 2 个因缺 PgQ 扩展无法运行 —— 清点与实测表见本包 3.5/notes.md「上游测试（R51 三步法）」
+upstream_total: 6
+upstream_run: 4
+upstream_passed: 4
+upstream_failed: 0
+upstream_not_run_reason: "test_ticker / test_maint 需要 `create extension pgq`（skytools PgQ 扩展），OHOS 无该扩展包；其余 4 个用例已在真机 + 真实 PostgreSQL 16.10 上运行通过"
+
+# 上游用例的执行位置：test_package（conan create 自动执行），而非 build()
+# test_pgqd.sh 第 7 步用 upstream_tests.sh（上游 tests/test.sh 的逐字节副本）
+# 在同一集群上运行 4 个用例。放 test_package 而非 build() 是为了让一次 CI 运行
+# 只起 1 个 PostgreSQL 集群（两处都起会让 worker 撞 fork EAGAIN）。
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests:
+  - file: tests/test.sh
+    source: pgqd-3.5/tests/test.sh
+    description: "test_version — pgqd -V 输出版本横幅"
+    command: "./tests/test.sh test_version"
+  - file: tests/test.sh
+    source: pgqd-3.5/tests/test.sh
+    description: "test_show_ini — pgqd --ini 打印样例配置"
+    command: "./tests/test.sh test_show_ini"
+  - file: tests/test.sh
+    source: pgqd-3.5/tests/test.sh
+    description: "test_stop — 守护进程启动后 SIGINT 停止并记录日志"
+    command: "./tests/test.sh test_stop"
+  - file: tests/test.sh
+    source: pgqd-3.5/tests/test.sh
+    description: "test_reload — 守护进程收到 SIGHUP 后重读配置"
+    command: "./tests/test.sh test_reload"
+  - file: tests/test.sh
+    source: pgqd-3.5/tests/test.sh
+    description: "test_ticker — 驱动真实 PgQ 队列 tick（未运行：需 pgq 扩展）"
+    command: "./tests/test.sh test_ticker"
+  - file: tests/test.sh
+    source: pgqd-3.5/tests/test.sh
+    description: "test_maint — 驱动真实 PgQ 队列维护轮转（未运行：需 pgq 扩展）"
+    command: "./tests/test.sh test_maint"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_pgqd.sh
+    description: "鸿蒙真机端到端消费者用例：现场拉起真实 PostgreSQL 集群，安装后的 pgqd 以守护进程连库运行，覆盖 启动/连库/syslog 关闭/SIGHUP 重载/SIGINT 停止 全流程"
+    command: "bash test_pgqd.sh <package_folder> <postgresql_bin>"
+  - file: upstream_tests.sh
+    description: "上游 tests/test.sh 的**逐字节副本**（sha256 05285660418d599e335c12ca1410898fec8c9f4568ff83147b9fb027bbc6e39a，与上游一致）；由 test_pgqd.sh 第 7 步在同一 PostgreSQL 集群上执行 4 个可运行用例"
+    command: "bash upstream_tests.sh test_version test_show_ini test_stop test_reload（由 test_pgqd.sh 第 7 步驱动，无需手工调用）"
+
+# 测试断言总数（按 test_pgqd.sh 逐点清点：二进制存在性 + 4×工具可用性 +
+# 3×CLI 输出 + 集群就绪 + createdb + pidfile + 进程存活 + 启动横幅 +
+# 库扫描 + 无连接错误 + tick 行 + SIGHUP + SIGINT 等，另加第 7 步 4 个上游用例）
+assertion_count: 26

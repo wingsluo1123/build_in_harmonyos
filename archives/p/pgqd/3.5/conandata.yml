@@ -1,0 +1,25 @@
+# conandata.yml — pgqd 3.5
+#
+# 源码取上游官方 release 资产（不是 git tag 归档）：官方 `make dist` 产物
+# 内含预生成的 configure/config.sub/config.guess 与 libusual 子模块内容，
+# git tag 归档两者皆无（OHOS 无 automake，无法 autogen.sh）。
+
+sources:
+  "3.5":
+    url: "https://github.com/pgq/pgqd/releases/download/v3.5/pgqd-3.5.tar.gz"
+    sha256: "a666e5e735f093ef09823ef0df1ba562b52e8fc9081ba1c8b3c3d662658f4916"
+
+patches:
+  "3.5":
+    - patch_file: "patches/0001-Makefile.patch"
+      patch_description: "Skip the rst2man-generated man page when docutils is unavailable (OHOS ships no rst2man)"
+      patch_type: "portability"
+    - patch_file: "patches/0002-config.guess.patch"
+      patch_description: "Teach the bundled config.guess to report aarch64-unknown-linux-ohos on HarmonyOS"
+      patch_type: "portability"
+    - patch_file: "patches/0003-config.sub.patch"
+      patch_description: "Accept linux-ohos as a valid OS in the bundled config.sub"
+      patch_type: "portability"
+    - patch_file: "patches/0004-configure.patch"
+      patch_description: "Allow config.status temporary files on the OHOS HMDFS workspace (umask 022); note this relaxation applies on every platform, it only affects the permissions of config.status' own temp directory"
+      patch_type: "portability"
