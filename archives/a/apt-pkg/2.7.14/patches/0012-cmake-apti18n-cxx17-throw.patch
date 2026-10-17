@@ -1,0 +1,31 @@
+apt 2.7.14 CMake: drop dynamic exception specifications in apti18n.h.in
+
+The generated apti18n.h declares four gettext shims with `throw()`
+dynamic exception specifications.  `throw()` was removed in C++17
+(P0600R1); with -std=c++17 clang rejects the file with a hard error:
+
+  error: ISO C++17 does not allow dynamic exception specifications
+  note: use 'noexcept(true)' instead
+
+The no-gettext fallback path is only compiled when USE_NLS is off, but
+the recipe configures with default USE_NLS=ON yet still hits the shims
+during feature checks on OHOS.  Fix by removing the empty `throw()`
+clauses (equivalent to no-noexcept in C++17 semantics here).
+
+--- a/CMake/apti18n.h.in
++++ b/CMake/apti18n.h.in
+@@ -22,10 +22,10 @@
+ # define N_(x) x
+ #else
+ // apt will not use any gettext
+-extern "C" inline char* setlocale(int, const char*) throw() { return nullptr; }
+-extern "C" inline char* textdomain(const char*) throw() { return nullptr; }
+-extern "C" inline char* bindtextdomain(const char*, const char*) throw() { return nullptr; }
+-extern "C" inline char* dgettext(const char*, const char* msg) throw() { return const_cast<char*>(msg); }
++extern "C" inline char* setlocale(int, const char*) { return nullptr; }
++extern "C" inline char* textdomain(const char*) { return nullptr; }
++extern "C" inline char* bindtextdomain(const char*, const char*) { return nullptr; }
++extern "C" inline char* dgettext(const char*, const char* msg) { return const_cast<char*>(msg); }
+ # define _(x) x
+ # define P_(msg,plural,n) (n == 1 ? msg : plural)
+ # define N_(x) x

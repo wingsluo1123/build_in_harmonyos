@@ -1,0 +1,160 @@
+apt 2.7.14 apt-pkg: embed dpkg arch tables for OHOS (no /usr/share/dpkg)
+
+pkgInitArchTupleMap() builds the architecture<->tuple map from dpkg's
+cputable+tupletable.  On OHOS/musl /usr/share/dpkg does not exist, so the
+map stays empty and all multiarch tuple matching breaks: apt-cache search
+and the libapt test "any-arm"/"any-amd64"/"linux-any" patterns return
+false, e.g.
+
+  CacheFilterTest.ArchitectureSpecification:
+    cachefilter_test.cc:82  ams("any-arm") actual false expected true
+    cachefilter_test.cc:90  ams("armhf")   actual false expected true
+
+Verified: /usr/share/dpkg/cputable does not exist on the OHOS host.
+
+Fix: embed dpkg 1.21.x /usr/share/dpkg/{cputable,tupletable} data (fetched
+from the dpkg 1.21.23 source) and use it when the files are absent, so
+the tuple map matches a Debian system.  On Debian the files exist and the
+normal file parsing path is taken; this branch is inert.
+--- a/apt-pkg/init.cc
++++ b/apt-pkg/init.cc
+@@ -63,35 +63,101 @@
+    auto tripletpath = _config->FindFile("Dir::dpkg::triplettable", DPKG_DATADIR "/triplettable");
+    auto cpupath = _config->FindFile("Dir::dpkg::cputable", DPKG_DATADIR "/cputable");
+ 
++#ifdef __OHOS__
++   // OHOS/musl 没有 dpkg 数据目录（/usr/share/dpkg），cputable/tupletable 均不
++   // 存在。内嵌 dpkg 1.21.x 的 cputable+tupletable 数据，保持架构<->tuple 映射
++   // （multiarch 的 any-* / linux-* 匹配、APT::Architecture 解析）可用；
++   // 真实 Debian 系统上文件存在，走正常文件解析，本分支不生效。
++   static const char * const BuiltinCpus[] = {
++      "alpha","amd64","arc","armeb","arm","arm64","avr32","hppa","loong64",
++      "i386","ia64","m32r","m68k","mips","mipsel","mipsr6","mipsr6el",
++      "mips64","mips64el","mips64r6","mips64r6el","nios2","or1k","powerpc",
++      "powerpcel","ppc64","ppc64el","riscv64","s390","s390x","sh3","sh3eb",
++      "sh4","sh4eb","sparc","sparc64","tilegx"
++   };
++   static const char * const BuiltinTuples[] = {
++      "eabi-uclibc-linux-arm uclibc-linux-armel",
++      "base-uclibc-linux-<cpu> uclibc-linux-<cpu>",
++      "eabihf-musl-linux-arm musl-linux-armhf",
++      "base-musl-linux-<cpu> musl-linux-<cpu>",
++      "ilp32-gnu-linux-arm64 arm64ilp32",
++      "eabihf-gnu-linux-arm armhf",
++      "eabi-gnu-linux-arm armel",
++      "abin32-gnu-linux-mips64r6el mipsn32r6el",
++      "abin32-gnu-linux-mips64r6 mipsn32r6",
++      "abin32-gnu-linux-mips64el mipsn32el",
++      "abin32-gnu-linux-mips64 mipsn32",
++      "abi64-gnu-linux-mips64r6el mips64r6el",
++      "abi64-gnu-linux-mips64r6 mips64r6",
++      "abi64-gnu-linux-mips64el mips64el",
++      "abi64-gnu-linux-mips64 mips64",
++      "spe-gnu-linux-powerpc powerpcspe",
++      "x32-gnu-linux-amd64 x32",
++      "base-gnu-linux-<cpu> <cpu>",
++      "eabihf-gnu-kfreebsd-arm kfreebsd-armhf",
++      "base-gnu-kfreebsd-<cpu> kfreebsd-<cpu>",
++      "base-gnu-knetbsd-<cpu> knetbsd-<cpu>",
++      "base-gnu-kopensolaris-<cpu> kopensolaris-<cpu>",
++      "base-gnu-hurd-<cpu> hurd-<cpu>",
++      "base-bsd-dragonflybsd-<cpu> dragonflybsd-<cpu>",
++      "base-bsd-freebsd-<cpu> freebsd-<cpu>",
++      "base-bsd-openbsd-<cpu> openbsd-<cpu>",
++      "base-bsd-netbsd-<cpu> netbsd-<cpu>",
++      "base-bsd-darwin-<cpu> darwin-<cpu>",
++      "base-sysv-aix-<cpu> aix-<cpu>",
++      "base-sysv-solaris-<cpu> solaris-<cpu>",
++      "eabi-uclibc-uclinux-arm uclinux-armel",
++      "base-uclibc-uclinux-<cpu> uclinux-<cpu>",
++      "base-tos-mint-m68k mint-m68k"
++   };
++#endif
++
+    // Load a list of CPUs
+    std::vector<std::string> cpus;
+-   std::ifstream cputable(cpupath);
+-   if (cputable.is_open() == false)
+    {
+-      // OHOS/musl 环境通常没有 dpkg 数据目录（DPKG_DATADIR），架构->tuple
+-      // 映射表（cputable/tupletable）不存在。退化处理：保留空 ArchToTupleMap，
+-      // 架构匹配退化为按名字的直接匹配（APT::Architecture），而不是让整个
+-      // 库初始化失败。
+-      return true;
+-   }
+-   for (std::string cpuline; std::getline(cputable, cpuline); )
+-   {
+-      if (cpuline[0] == '#' || cpuline[0] == '\0')
+-         continue;
+-      auto cpurow = split(cpuline);
+-      auto cpu = APT::String::Strip(cpurow.at(0));
++      std::ifstream cputable(cpupath);
++      if (cputable.is_open())
++      {
++         for (std::string cpuline; std::getline(cputable, cpuline); )
++         {
++            if (cpuline[0] == '#' || cpuline[0] == '\0')
++               continue;
++            auto cpurow = split(cpuline);
++            auto cpu = APT::String::Strip(cpurow.at(0));
+ 
+-      cpus.push_back(cpu);
++            cpus.push_back(cpu);
++         }
++         if (!cputable.eof())
++            return _error->Error("Error reading the CPU table");
++      }
+    }
+-   if (!cputable.eof())
+-      return _error->Error("Error reading the CPU table");
++#ifdef __OHOS__
++   if (cpus.empty())
++      for (auto const *cpu : BuiltinCpus)
++         cpus.push_back(cpu);
++#endif
+ 
+-   // Load the architecture tuple
+-   std::ifstream tupletable;
++   // Load the architecture tuple table (file or OHOS built-in)
++   std::vector<std::string> tuplelines;
+    if (FileExists(tuplepath))
+-      tupletable.open(tuplepath);
++   {
++      std::ifstream tupletable(tuplepath);
++      for (std::string line; std::getline(tupletable, line); )
++         tuplelines.push_back(line);
++   }
+    else if (FileExists(tripletpath))
+-      tupletable.open(tripletpath);
++   {
++      std::ifstream tupletable(tripletpath);
++      for (std::string line; std::getline(tupletable, line); )
++         tuplelines.push_back(line);
++   }
++#ifdef __OHOS__
++   else if (cpus.empty() == false)
++   {
++      tuplelines.assign(BuiltinTuples,
++                        BuiltinTuples + sizeof(BuiltinTuples)/sizeof(BuiltinTuples[0]));
++   }
++#endif
+    else
+       return _error->Error("Cannot find dpkg tuplet or triplet table");
+ 
+@@ -98,5 +164,5 @@
+    APT::ArchToTupleMap.clear();
+-   for (std::string tupleline; std::getline(tupletable, tupleline); )
++   for (auto const &tupleline : tuplelines)
+    {
+       if (tupleline[0] == '#' || tupleline[0] == '\0')
+          continue;
+@@ -121,8 +187,6 @@
+          }
+       }
+    }
+-   if (!tupletable.eof())
+-      return _error->Error("Error reading the Tuple table");
+ 
+    return true;
+ }
+

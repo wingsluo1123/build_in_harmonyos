@@ -1,0 +1,39 @@
+apt 2.7.14 cmake: fix GNUInstallDirs LIBEXECDIR on OHOS (bin -> lib)
+
+apt's CMake works around a GNUInstallDirs bug by pinning
+CMAKE_INSTALL_LIBEXECDIR to "lib", but only when /etc/debian_version
+exists.  On OHOS/musl that file is absent, and CMake does not know the
+HarmonyOS platform, so GNUInstallDirs resolves LIBEXECDIR to "bin".
+The libexec helpers (apt-helper, solvers, planners, methods) then try to
+install into <prefix>/bin/apt/... while the `apt` binary already exists
+at <prefix>/bin/apt, and `make install` fails with:
+
+  CMake Error at cmdline/cmake_install.cmake:121 (file):
+    file INSTALL destination:
+    /storage/Users/currentUser/test-install-apt-pkg-2.7.14/usr/local/bin/apt
+    is not a directory.
+
+Verified: /etc/debian_version does not exist on the OHOS host; config.h
+had `#define LIBEXEC_DIR "/usr/local/bin/apt"`.
+
+Fix: extend the existing workaround to also pin LIBEXECDIR to "lib" when
+CMAKE_SYSTEM_NAME is HarmonyOS, restoring the Debian layout
+(<prefix>/lib/apt for libexec tools, <prefix>/bin for the apt CLI).
+Inert on Debian.
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -28,7 +28,12 @@
+ set(CMAKE_SHARED_LINKER_FLAGS_COVERAGE "-lgcov")
+ 
+ # Work around bug in GNUInstallDirs
+-if (EXISTS "/etc/debian_version")
++# Debian 上 /etc/debian_version 存在 -> libexec 放 <prefix>/lib/apt；
++# OHOS/musl 没有该文件，而 CMake 不认识 HarmonyOS 平台，GNUInstallDirs 会把
++# LIBEXECDIR 解析成 bin，导致 apt-helper 等 libexec 工具与 apt 本体二进制都
++# 装进 <prefix>/bin，cmake install 直接失败（destination /usr/local/bin/apt
++# is not a directory）。这里对 OHOS 同样固定为 "lib"，保持 Debian 布局。
++if (EXISTS "/etc/debian_version" OR CMAKE_SYSTEM_NAME STREQUAL "HarmonyOS")
+   set(CMAKE_INSTALL_LIBEXECDIR "lib")
+ endif()
+ 
+

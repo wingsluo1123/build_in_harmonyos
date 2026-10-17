@@ -1,0 +1,44 @@
+apt 2.7.14 cmake/methods: undef bionic LFS aliases before seccomp ALLOW list
+
+methods/aptmethod.h builds its seccomp allowlist with SCMP_SYS(what) for
+each syscall name.  The ALLOW(what) macro passes `what` through to
+SCMP_SYS, and because `what` is not an operand of #/## inside ALLOW, the
+argument is fully macro-expanded *before* it reaches SCMP_SYS.
+
+On bionic/musl-style libc headers (OHOS), large-file aliases are defined
+as object-like macros:
+
+  /usr/include/sys/stat.h:    #define fstatat64 fstatat
+  /usr/include/sys/resource.h:#define prlimit64 prlimit
+
+so ALLOW(fstatat64) becomes SCMP_SYS(fstatat) -> __SNR_fstatat, and
+ALLOW(prlimit64) becomes SCMP_SYS(prlimit) -> __SNR_prlimit.  On aarch64
+those syscall names do not exist (the arch uses newfstatat and prlimit64,
+and the OHOS libseccomp seccomp-syscalls.h only defines __SNR_fstatat64
+and __SNR_prlimit64), so the build fails with:
+
+  methods/aptmethod.h:229:7: error: use of undeclared identifier '__SNR_fstatat'
+  methods/aptmethod.h:294:7: error: use of undeclared identifier '__SNR_prlimit'
+
+glibc does not alias these names, which is why upstream builds on Linux.
+
+Fix by undefining the two LFS aliases right before the ALLOW list so the
+64-bit syscall names survive to SCMP_SYS() and map to the arch-correct
+__SNR_fstatat64 / __SNR_prlimit64.  No other use of fstatat64/prlimit64
+exists in the file.
+--- a/methods/aptmethod.h
++++ b/methods/aptmethod.h
+@@ -189,6 +189,12 @@
+    if ((rc = seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(what), 0))) \
+       return _error->FatalE("HttpMethod::Configuration", "Cannot allow %s: %s", #what, strerror(-rc));
+ 
++      /* bionic-style LFS aliases (fstatat64->fstatat, prlimit64->prlimit)
++       * would be expanded by the ALLOW() macro before reaching SCMP_SYS,
++       * producing arch-invalid __SNR_fstatat/__SNR_prlimit on aarch64. */
++#undef fstatat64
++#undef prlimit64
++
+       for (auto &custom : _config->FindVector("APT::Sandbox::Seccomp::Trap"))
+       {
+ 	 if ((rc = seccomp_rule_add(ctx, SCMP_ACT_TRAP, seccomp_syscall_resolve_name(custom.c_str()), 0)))
+

@@ -1,0 +1,48 @@
+apt 2.7.14 CMake: let FindBerkeley.cmake search the conan package prefix
+
+apt's CMake/FindBerkeley.cmake looks for db.h with find_path(... NO_DEFAULT_PATH)
+and a hardcoded list of distro paths (/usr/include/db5, ...).  On a cross
+build (OHOS aarch64) the Berkeley DB headers and libdb archive exist only
+inside the conan package prefix, which is reachable through the toolchain's
+CMAKE_INCLUDE_PATH / CMAKE_PREFIX_PATH but is invisible to find_path when
+NO_DEFAULT_PATH is set.  configure then fails with:
+
+  CMake Error: Could not find Berkeley DB >= 4.1 (missing: BERKELEY_INCLUDE_DIRS)
+  CMake/FindBerkeley.cmake:57 (find_package_handle_standard_args)
+  CMakeLists.txt:95 (find_package)
+
+Fix: drop NO_DEFAULT_PATH.  The explicit distro paths are still searched
+first (they win when present, preserving the original BSD db.h avoidance),
+and the conan-provided CMAKE_INCLUDE_PATH / CMAKE_PREFIX_PATH act as the
+fallback that resolves the cross-compile libdb package.
+
+Verified on the OHOS build: BERKELEY_INCLUDE_DIRS/LIBRARIES now resolve to
+the conan libdb package and configure passes.  No effect on distro builds
+that have db.h in the explicit paths.
+
+--- a/CMake/FindBerkeley.cmake
++++ b/CMake/FindBerkeley.cmake
+@@ -33,8 +33,12 @@
+ # THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+ 
+-# We need NO_DEFAULT_PATH here, otherwise CMake helpfully picks up the wrong
+-# db.h on BSD systems instead of the Berkeley DB one.
++# The original kept NO_DEFAULT_PATH here so CMake does not pick up the wrong
++# db.h on BSD systems instead of the Berkeley DB one.  The explicit distro
++# paths below are searched first and still win when present; dropping
++# NO_DEFAULT_PATH additionally lets the conan-provided CMAKE_INCLUDE_PATH /
++# CMAKE_PREFIX_PATH (cross-compile package prefix) be searched as a fallback,
++# which is required on OHOS/musl where libdb ships only in the conan package.
+ find_path(BERKELEY_INCLUDE_DIRS db.h
+   ${CMAKE_INSTALL_FULL_INCLUDEDIR}/db5
+   /usr/local/include/db5
+@@ -47,8 +51,6 @@
+   ${CMAKE_INSTALL_FULL_INCLUDEDIR}
+   /usr/local/include
+   /usr/include
+-
+-  NO_DEFAULT_PATH
+ )
+ 
+ find_library(BERKELEY_LIBRARIES NAMES db db-5)

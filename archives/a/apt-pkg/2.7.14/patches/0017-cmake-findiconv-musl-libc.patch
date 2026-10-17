@@ -1,0 +1,58 @@
+apt 2.7.14 CMake: accept musl-libc built-in iconv in FindIconv.cmake
+
+apt's CMake/FindIconv.cmake does find_path(ICONV_INCLUDE_DIR NAMES iconv.h)
+and then requires both ICONV_INCLUDE_DIR and ICONV_SYMBOL_FOUND in
+find_package_handle_standard_args().  On a cross build (OHOS aarch64) the
+sysroot header lives in the compiler's built-in include dir
+(<sysroot>/usr/include/iconv.h, wired via clang -config --sysroot), which
+find_path() cannot see because it only walks the prefix paths known to
+CMake -- it does not consult the compiler's implicit include directories.
+musl libc provides iconv_open/iconv/iconv_close itself (no separate
+libiconv), so check_function_exists(iconv_open ICONV_SYMBOL_FOUND)
+already links and reports found, but configure then dies with:
+
+  CMake Error: DEFAULT_MESSAGE (missing: ICONV_INCLUDE_DIR)
+  CMake/FindIconv.cmake:11 (find_package_handle_standard_args)
+  CMakeLists.txt:50 (find_package)
+
+Fix: when the iconv_open symbol is found in libc and neither a libiconv
+library nor a discoverable iconv.h exists, declare Iconv found from the
+symbol check alone (the compiler still resolves <iconv.h> through its
+built-in sysroot include dir).  Also stop propagating the
+"ICONV_INCLUDE_DIR-NOTFOUND" sentinel into ICONV_INCLUDE_DIRS.
+
+This is a portability fix for OHOS/musl; on glibc systems iconv.h is in
+/usr/include so the fallback branch is not taken and behaviour is
+unchanged.  Verified on the OHOS build: configure now passes the Iconv
+gate and the library builds.
+
+--- a/CMake/FindIconv.cmake
++++ b/CMake/FindIconv.cmake
+@@ -8,7 +8,16 @@
+ endif()
+ 
+ include(FindPackageHandleStandardArgs)
+-find_package_handle_standard_args(Iconv DEFAULT_MESSAGE ICONV_INCLUDE_DIR ICONV_SYMBOL_FOUND)
++# OHOS/musl: iconv_open is provided by libc itself (no separate libiconv),
++# and iconv.h is reachable through the cross-compiler's built-in sysroot
++# include dir, which find_path() cannot see (find_path only searches the
++# prefix paths known to CMake, not the compiler's implicit include dirs).
++# In that case the libc symbol check alone proves Iconv is available.
++if (ICONV_SYMBOL_FOUND AND NOT ICONV_INCLUDE_DIR AND NOT ICONV_LIBRARY)
++    find_package_handle_standard_args(Iconv DEFAULT_MESSAGE ICONV_SYMBOL_FOUND)
++else()
++    find_package_handle_standard_args(Iconv DEFAULT_MESSAGE ICONV_INCLUDE_DIR ICONV_SYMBOL_FOUND)
++endif()
+ 
+ if(ICONV_LIBRARY)
+     set(ICONV_LIBRARIES "${ICONV_LIBRARY}")
+@@ -15,6 +24,8 @@
+ else()
+     set(ICONV_LIBRARIES)
+ endif()
+-set(ICONV_INCLUDE_DIRS "${ICONV_INCLUDE_DIR}")
++if(ICONV_INCLUDE_DIR)
++    set(ICONV_INCLUDE_DIRS "${ICONV_INCLUDE_DIR}")
++endif()
+ 
+ mark_as_advanced(ICONV_LIBRARY ICONV_INCLUDE_DIR)

@@ -1,0 +1,29 @@
+apt 2.7.14 cmake: use GNUTLS_INCLUDE_DIRS (plural) in methods target
+
+CMake's built-in FindGnuTLS module sets the variables
+GNUTLS_INCLUDE_DIRS and GNUTLS_LIBRARIES (plural).  methods/CMakeLists.txt
+however referenced the singular form ${GNUTLS_INCLUDE_DIR}, which is never
+defined, so target_include_directories(connectlib ...) received an empty
+list and the compile of methods/connect.cc failed with:
+
+  methods/connect.cc:23:10: fatal error: 'gnutls/gnutls.h' file not found
+
+On a distro Linux build /usr/include happens to hold gnutls/gnutls.h, so
+the empty include list is harmless and the bug is invisible.  On a cross
+build (OHOS) the conan prefix include dir is only reachable through
+GNUTLS_INCLUDE_DIRS and the build fails.
+
+Fix by using the plural variable, matching what CMake's FindGnuTLS
+actually exports.
+--- a/methods/CMakeLists.txt
++++ b/methods/CMakeLists.txt
+@@ -17,7 +17,7 @@
+ 
+ if (HAVE_GNUTLS)
+   target_compile_definitions(connectlib PRIVATE ${GNUTLS_DEFINITIONS})
+-  target_include_directories(connectlib PRIVATE ${GNUTLS_INCLUDE_DIR})
++  target_include_directories(connectlib PRIVATE ${GNUTLS_INCLUDE_DIRS})
+ endif()
+ target_include_directories(http PRIVATE $<$<BOOL:${SYSTEMD_FOUND}>:${SYSTEMD_INCLUDE_DIRS}>)
+ 
+

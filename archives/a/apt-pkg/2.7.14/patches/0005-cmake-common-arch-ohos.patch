@@ -1,0 +1,61 @@
+apt 2.7.14 cmake: derive COMMON_ARCH when dpkg-architecture is absent
+
+apt's CMake runs `dpkg-architecture -qDEB_HOST_ARCH` to learn the native
+architecture and bakes it into config.h as COMMON_ARCH, which
+pkgInitConfig() uses for APT::Architecture.  On OHOS/musl there is no
+dpkg-architecture binary, so execute_process returns empty and COMMON_ARCH
+degenerates to "".  APT::Architecture then stays empty and libapt cannot
+parse any architecture (version/arch handling, getArchitectures, cache
+generation all break).
+
+Verified on the OHOS aarch64 build host:
+
+  $ dpkg-architecture -qDEB_HOST_ARCH ; echo $?
+  sh: dpkg-architecture: inaccessible or not found
+  127
+
+  $ grep '^#define COMMON_ARCH' build-ohos/include/config.h
+  #define COMMON_ARCH ""
+
+Fix: when the command yields an empty string, derive the dpkg arch name
+from CMAKE_SYSTEM_PROCESSOR (and fall back to `uname -m` for the OHOS
+case, where CMake does not know the platform and reports "unknown").
+On real Debian systems dpkg-architecture exists, so this branch is inert.
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -221,6 +221,34 @@
+ if (NOT DEFINED COMMON_ARCH)
+   execute_process(COMMAND dpkg-architecture -qDEB_HOST_ARCH
+                   OUTPUT_VARIABLE COMMON_ARCH OUTPUT_STRIP_TRAILING_WHITESPACE)
++  # OHOS/musl 环境没有 dpkg-architecture，命令输出为空，COMMON_ARCH 会退化成
++  # 空字符串，导致 pkgInitConfig() 里 APT::Architecture 为空、libapt 无法解析
++  # 任何架构。此时按 CMAKE_SYSTEM_PROCESSOR / uname -m 推导 dpkg 架构名；
++  # 真实 Debian 系统上 dpkg-architecture 存在，此分支不生效。
++  if (COMMON_ARCH STREQUAL "")
++    if (CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
++      set(COMMON_ARCH "arm64")
++    elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$")
++      set(COMMON_ARCH "amd64")
++    elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^armv7")
++      set(COMMON_ARCH "armhf")
++    else()
++      # CMake 不认识 HarmonyOS 平台时 CMAKE_SYSTEM_PROCESSOR 为 "unknown"，
++      # 退而取主机 uname -m（本构建在 aarch64 OHOS 设备上执行）。
++      execute_process(COMMAND uname -m
++                      OUTPUT_VARIABLE HOST_M OUTPUT_STRIP_TRAILING_WHITESPACE)
++      if (HOST_M MATCHES "^(aarch64|arm64)$")
++        set(COMMON_ARCH "arm64")
++      elseif (HOST_M MATCHES "^(x86_64|amd64)$")
++        set(COMMON_ARCH "amd64")
++      elseif (HOST_M MATCHES "^armv7|^arm")
++        set(COMMON_ARCH "armhf")
++      else()
++        set(COMMON_ARCH "${HOST_M}")
++      endif()
++    endif()
++    message(STATUS "dpkg-architecture unavailable; derived COMMON_ARCH=${COMMON_ARCH}")
++  endif()
+ endif()
+ if (NOT DEFINED ROOT_GROUP)
+   execute_process(COMMAND id -gn root
+

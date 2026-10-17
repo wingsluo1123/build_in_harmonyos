@@ -1,0 +1,41 @@
+apt 2.7.14 apt-pkg: give debSystem a baseline Score on OHOS
+
+pkgInitSystem() picks the packaging system with the highest
+debSystem::Score.  debSystem::Score only returns >0 when one of
+/var/lib/dpkg/status, /usr/bin/dpkg or /etc/debian_version exists.  None
+of them exist on OHOS (verified), so every system scores 0, pkgInitSystem()
+fails with "Unable to determine a suitable packaging system type" and the
+libapt gtest runner aborts before running any test (gtest_runner.cc returns
+42).
+
+Verified with a debug harness linked against the built libapt-pkg.a:
+
+  pkgInitConfig => 1
+  pkgInitSystem => 0  Sys=0
+  E: Unable to determine a suitable packaging system type
+
+debSystem is the only packaging system compiled into libapt-pkg, so on
+OHOS it must be the default.  Add an __OHOS__-guarded baseline score of 1
+when all probes miss; on real Debian the probes still win and this branch
+is inert.
+--- a/apt-pkg/deb/debsystem.cc
++++ b/apt-pkg/deb/debsystem.cc
+@@ -327,6 +327,17 @@
+       Score += 10;
+    if (FileExists("/etc/debian_version") == true)
+       Score += 10;
++#ifdef __OHOS__
++   // OHOS/musl 上没有 Debian 系统文件（/var/lib/dpkg/status、/usr/bin/dpkg、
++   // /etc/debian_version 均不存在），上面的探测全部落空。debSystem 是
++   // libapt-pkg 里唯一注册的 packaging system；若 Score 全为 0，pkgInitSystem()
++   // 会报 "Unable to determine a suitable packaging system type" 并拒绝初始化，
++   // 导致 apt 客户端与 libapt_test 全部无法启动。
++   // 给 OHOS 一个基线分，保证 debSystem 被选为默认系统；真实 Debian 系统上
++   // 探测仍按原逻辑（Score>0 优先），本分支不生效。
++   if (Score == 0)
++      return 1;
++#endif
+    return Score;
+ }
+ 									/*}}}*/
+
