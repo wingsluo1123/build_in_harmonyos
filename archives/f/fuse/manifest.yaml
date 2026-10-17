@@ -1,0 +1,28 @@
+# 软件级 manifest — fuse
+# 遵循 ARCHIVE-SPEC v2.0
+
+software: "fuse"
+display: "fuse (FUSE 2.x / Libfuse2 legacy ABI)"
+description: "Filesystem in Userspace 2.x 用户态库与工具（旧 ABI 伴生线）"
+category: system
+homepage: "https://github.com/libfuse/libfuse"
+license: "LGPL-2.1-or-later AND GPL-2.0-only"
+build_system: "autotools"
+latest_version: "2.9.9"
+
+ohos_adaptation:
+  key_points:
+    - "E011：configure 用 umask 077 建 config.status 临时目录，HMDFS 上该目录对当前进程不可写 → 补丁改 022"
+    - "自带 config.guess/config.sub 为 2016 版；传 aarch64-unknown-linux-gnu triplet 即可，无需替换（E007/E072）"
+    - "OHOS bionic 缺 pthread_cancel/pthread_setcancelstate（E085），example/ 因此以 --disable-example 跳过"
+    - "R26：libfuse 是系统同名库，静态编译（libfuse.a / libulockmgr.a），避免污染 /lib"
+    - "运行期能力墙：/dev/fuse 存在但 open() 返回 EACCES(13)，os.path.exists() 假阴性；upstream install-exec-hook 的 chmod u+s 与 mknod 在 OHOS 上不生效（E046）⇒ fuse_mount/fusermount 的挂载面不可用"
+    - "验证面收敛：上游无测试套件（R51 清点 0 用例），消费者测试只覆盖可离线调用的库面 API + CLI 的退出码/usage"
+  common_dependencies: []
+
+versions:
+  "2.9.9":
+    status: built
+    build_date: "2026-10-16"
+    conan_ref: "fuse/2.9.9"
+    note: "本机 conan create（aarch64-linux-ohos clang 15.0.4）与 conan-verify G0-G4 通过；待 CI 判定后可回填 published"

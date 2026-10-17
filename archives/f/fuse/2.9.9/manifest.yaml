@@ -1,0 +1,78 @@
+# 版本级 manifest — fuse 2.9.9（FUSE 2.x legacy ABI 线）
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "2.9.9"
+software: "fuse"
+status: built
+build_date: "2026-10-16"
+build_system: autotools
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/libfuse/libfuse/releases/download/fuse-2.9.9/fuse-2.9.9.tar.gz"
+  sha256: "d0e69d5d608cc22ff4843791ad097f554dd32540ddc9bed7638cc6fea7c1b4b5"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: autotools
+  configure_options:
+    - "--enable-static"
+    - "--disable-shared"
+    - "--disable-example"
+    - "--enable-util"
+    - "--build=aarch64-unknown-linux-gnu"
+    - "--host=aarch64-unknown-linux-gnu"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-configure.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "E011: configure 的 umask 077 在 HMDFS 上导致 config.status 临时目录不可写 → 补丁改 022"
+  - "E007/E072: 自带 config.sub 为 2016-11-04 版；传 aarch64-unknown-linux-gnu triplet 即可，无需替换 config.guess/sub"
+  - "E085: example/ 链接 libfuse.so 时撞 OHOS bionic 未实现的 pthread_cancel/pthread_setcancelstate → --disable-example"
+  - "R26: libfuse 是系统同名库，静态编译避免污染 /lib"
+  - "运行期能力墙（新增，已沉淀草稿）：/dev/fuse 存在但 stat/open 返回 EACCES(13)，os.path.exists() 因此假阴性；upstream install-exec-hook 的 chmod u+s / mknod 在 OHOS 上不生效（E046）⇒ fuse_mount/fusermount 挂载面不可用，库面 API 可离线验证"
+
+upstream_tests:
+  present: false
+  suites: []
+  execution_result: "not_run_no_suite"
+  notes: "R51 清点 6 条探针全 0 命中：无 test/tests 目录、全树 Makefile.am 无 TESTS=/check_PROGRAMS=/TESTS_ENVIRONMENT、无 test*.c 测试源；example/ 的 10 个程序是 noinst_PROGRAMS 示例（fusexmp/fusexmp_fh/null/hello/hello_ll/fioc/fioclient/fsel/fselclient/cusexmp），util/ 是 bin_PROGRAMS=fusermount,ulockmgr_server；make check 为 automake 默认空实现。上游注册用例数=0。"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/builds/fuse-2.9.9.orig
+  source_work_dir: /storage/Users/currentUser/builds/fuse-2.9.9.work
+  source_orig_hash: ddcfafd2d02aecaa
+  source_work_hash: d6ce7e04136d06fa
+  generated_at: '2026-10-16T14:40:58'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-configure.patch
+    type: portability
+    platform_only: true
+    guard: none
+    description: "HMDFS umask 077 → 022 for config.status temp dirs (E011)"

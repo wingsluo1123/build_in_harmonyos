@@ -1,0 +1,52 @@
+# test_package/MANIFEST.yml — R51 上游测试清点 + 本包消费者测试声明
+package: fuse/2.9.9
+homepage: "https://github.com/libfuse/libfuse"
+
+# ── 上游测试清点（R51 第一步：适配前清点）─────────────────────────
+# 清点对象 = conandata.yml 声明的官方 tarball（sha256 d0e69d5d…c1b4b5）解包树
+upstream_check_command: "make check"
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_registered_test_count: 0
+upstream_test_inventory:
+  - probe: "find . -maxdepth 2 -type d -iname '*test*'"
+    result: "0 个命中（无 test/ 或 tests/ 目录）"
+  - probe: "grep -rn 'TESTS *=|check_PROGRAMS|TESTS_ENVIRONMENT' --include=Makefile.am ."
+    result: "0 个命中：顶层/example/util 的 Makefile.am 均无 TESTS= / check_PROGRAMS= / TESTS_ENVIRONMENT"
+  - probe: "find . -name 'test*.c' -o -name '*_test.c'"
+    result: "0 个命中（无测试源文件）"
+  - probe: "make check"
+    result: "automake 默认空实现（check-am: all-am，仅构建不执行断言）"
+  - probe: "example/Makefile.am"
+    result: "noinst_PROGRAMS = 10 个示例程序（fusexmp fusexmp_fh null hello hello_ll fioc fioclient fsel fselclient cusexmp），非 TESTS/check_PROGRAMS"
+  - probe: "util/Makefile.am"
+    result: "bin_PROGRAMS = fusermount ulockmgr_server；noinst_PROGRAMS = mount.fuse；无测试声明"
+upstream_tests: []          # 上游没有注册任何测试用例
+upstream_test_count: 0
+upstream_test_executed: 0
+upstream_test_passed: 0
+
+# ── 本包消费者测试（test_package）─────────────────────────────────
+# 上游真无用例（上表 6 条探针为证），故验证面收敛到「消费者视角真跑」：
+#   ① test.c 编译链接 libfuse.a/libulockmgr.a，真调库面 API 并断言返回；
+#   ② conanfile.py test() 真跑随包 CLI（fusermount / ulockmgr_server）断言退出码与输出。
+test_package_tests:
+  - file: test.c
+    source: test_package/test.c
+    description: "库面消费者：fuse_version()/FUSE_VERSION 版本绑定、fuse_opt_parse 取值、fuse_parse_cmdline 真解析、fuse_lowlevel_new 离线建会话、/dev/fuse 设备探针（含 ENOENT 与 /dev/null 负向对照）、fuse_mount 与探针一致性"
+    command: "./test_fuse"
+  - file: conanfile.py
+    source: test_package/conanfile.py
+    description: "CLI 消费者：fusermount --version/-h/无参数/非法选项/-z 无 -u 的退出码与输出断言，ulockmgr_server 落位与可执行位，缺失二进制必须抛 FileNotFoundError 的harness 负向对照"
+    command: "conan test (test() 内 subprocess)"
+
+# 断言数：test.c 内 14 条 CHECK + conanfile.py test() 内 11 条 chk（实测读数见 notes.md）
+assertion_count: 25
+assertion_count_breakdown:      # 25 = 22 取值型 + 3 到达型（与 archives/l/libfuse/3.16.1 同口径，W4 审计复核）
+  value_assertions: 22
+  reached_line_assertions: 3    # ① conanfile.py 的 test.c 执行标记 chk(True,…)（真门 = 紧随的 self.run 非零抛错）
+                                # ② conanfile.py 的缺失二进制对照 chk(True,…)（except 分支到达型，正当负向对照）
+                                # ③ test.c:189（在 :186 已断言 ENOENT 之后近乎恒真；判别力由 :186+INFO 承担）
+                                # 注：不写 conanfile.py 行号，避免随 docstring 长度漂移
+
+test_package_assertions: 25
