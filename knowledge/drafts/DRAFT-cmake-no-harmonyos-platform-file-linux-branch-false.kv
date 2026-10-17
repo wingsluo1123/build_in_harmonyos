@@ -1,0 +1,78 @@
+#====================================================================
+# DRAFT-cmake-no-harmonyos-platform-file-linux-branch-false
+# CMake 没有 HarmonyOS 平台文件 ⇒ LINUX 变量为假 ⇒ 上游 if(LINUX) 分支
+# 被静默跳过：典型后果是共享库漏链 vendored 静态库，消费方链接才报未解析符号
+#====================================================================
+
+id:                     DRAFT-cmake-no-harmonyos-platform-file-linux-branch-false
+trigger_tool:           cmake|conan
+phase:                  configure|link
+error_signature:        System is unknown to cmake, create:\s*Platform/HarmonyOS|undefined reference due to --no-allow-shlib-undefined|Compatibility with CMake < 3\.5 has been removed
+severity:               2
+category:               cmake|ohos|platform-naming|link|portability|packaging
+match_keywords:         CMAKE_SYSTEM_NAME, HarmonyOS, Platform/HarmonyOS, LINUX 变量, if(LINUX), 分支静默跳过, vendored 静态库, DT_NEEDED, --no-allow-shlib-undefined, 漏链, CMAKE_POLICY_VERSION_MINIMUM, install 清单不完整, user_toolchain, opennurbs
+title:                  CMake **没有 HarmonyOS 平台文件** ⇒ `LINUX` 变量为假 ⇒ 上游 `if(LINUX)` 分支被**静默跳过**（典型后果：共享库漏链 vendored 静态库 → 库自己编得过，消费方链接才报 `--no-allow-shlib-undefined`）
+
+root_cause:             本仓工具链的 target 是 `aarch64-unknown-linux-ohos`，但 CMake 没有
+                        `Platform/HarmonyOS.cmake` ⇒ 每次 configure 都打印
+                        `System is unknown to cmake, create: Platform/HarmonyOS ...`。
+                        其直接后果是 CMake 的平台布尔变量（`LINUX`/`UNIX`/…）**为假**，
+                        而多数上游项目用它们做**平台相关链接**：
+                        ```cmake
+                        if (LINUX AND NOT ANDROID)
+                          target_link_libraries( OpenNURBS zlib opennurbs_public_freetype android_uuid)
+                        endif()
+                        ```
+                        ⇒ 该分支被跳过 ⇒ 用**仓内 vendored 静态库**的共享库产物里，
+                        那些符号**未解析且没有 DT_NEEDED**（实测 `readelf -d` 只剩
+                        `libc++_shared.so`/`libc.so` 两条）⇒ **库自己编得过**（静态库链路
+                        也会"看似成功"），但消费方链接 `libOpenNURBS.so` 时报
+                        ```
+                        ld.lld: error: undefined reference due to --no-allow-shlib-undefined: z_deflateInit_
+                        >>> referenced by .../lib/libOpenNURBS.so
+                        ```
+                        ⚠️ 这类缺陷**在包自己构建时完全看不出来**，只在消费测试/下游链接时炸。
+
+affected_scope:         所有依赖 CMake 平台变量分支的上游项目（`if(LINUX)`/`if(UNIX)`/
+                        `if(CYGWIN)`…），尤其是自带 vendored 三方库、按平台决定是否链接它们的
+                        项目（本仓实例：opennurbs）。**判据**：configure 日志出现
+                        `System is unknown to cmake, create: Platform/HarmonyOS`。
+                        另一常见连带后果见下"次生坑"。
+
+verification_cmd:       /data/service/hnp/bin/llvm-readelf -d <pkg>/lib/libX.so | grep NEEDED
+                        # 若产物里应有 zlib/uuid 等依赖却看不到对应 NEEDED ⇒ 命中本坑
+                        grep -rn "if *( *LINUX" <src>/CMakeLists.txt
+
+rec_priority:           1
+rec_approach:           present-platform-as-linux-and-check-consumer-link
+rec_description:        ① **把平台呈现为 Linux**：`tc.cache_variables["CMAKE_SYSTEM_NAME"] = "Linux"`
+                        （用 cache var 以确保覆盖 conan toolchain 里的 `set(CMAKE_SYSTEM_NAME OHOS)`）。
+                        本机编译器 target 本就是 `aarch64-unknown-linux-ohos`，该做法与仓内
+                        bliss/trilinos 注入 user_toolchain 的既有做法同源。
+                        ② **不要只在包内验证**：这类漏链在包自己构建时不可见，必须让
+                        test_package 以**消费方身份**链接共享库才能暴露（本仓 R51 的消费测试
+                        正好承担了这个作用）。
+                        ③ **诊断信号**：`readelf -d` 看 DT_NEEDED 是否缺少预期依赖；
+                        对比"库内是否有未解析符号"（`llvm-readelf --dyn-syms` 里 UND 项）。
+rec_command:            -DCMAKE_SYSTEM_NAME=Linux   # cache var
+rec_auto_fix:           false
+rec_impl:               opennurbs-recipe
+
+fallback_priority:      2
+fallback_approach:      add-harmonyos-platform-file-or-patch-conditions
+fallback_description:   不便改 CMAKE_SYSTEM_NAME 时（例如会牵动交叉编译判定）：① 给项目
+                        补一个 `Platform/HarmonyOS.cmake` 并在其中 `include(Platform/Linux)`
+                        （仓内既有做法之一）；② 或对上游那些 `if(LINUX)` 做小补丁，把条件
+                        扩到 OHOS（与 fcloseall 那类可移植性补丁同法）。二者都比 ① 重，
+                        故默认优先 ①。
+fallback_command:       set(CMAKE_SYSTEM_NAME Linux) + set(CMAKE_CROSSCOMPILING FALSE)
+fallback_auto_fix:      false
+
+# ── 次生坑（同一原因的另一面，实测于 opennurbs 8.35）─────────────────
+# 把平台呈现为 Linux 后，上游 `if (ANDROID OR LINUX)` 才会把仓内 vendored 子目录
+# （freetype263 / android_uuid）纳入配置；而这类老 vendored 子目录的
+# `cmake_minimum_required` 常低于 3.5，CMake 4 会直接拒绝：
+#   CMake Error at android_uuid/CMakeLists.txt:1 (cmake_minimum_required):
+#     Compatibility with CMake < 3.5 has been removed from CMake.
+# 修法即报错给出的官方开关：CMAKE_POLICY_VERSION_MINIMUM=3.5
+# （与 DRAFT 里 kdevelop-pg-qt 的同名坑同源，属 CMake 4 时代的通用坑。）
