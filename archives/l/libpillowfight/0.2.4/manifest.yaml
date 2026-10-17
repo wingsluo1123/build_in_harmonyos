@@ -1,0 +1,30 @@
+# 版本级 manifest — libpillowfight 0.2.4
+
+version: "0.2.4"
+software: libpillowfight
+status: built
+build_date: "2026-09-29"
+build_system: cmake
+
+source:
+  url: "https://github.com/openpaperwork/libpillowfight/archive/refs/tags/0.2.4.tar.gz"
+  sha256: "32933926d9e16c9575c262188eec98c264c4a9505b6674754fff85d1e59cd8dd"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DNO_PYTHON"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "上游构建系统要求 src/pillowfight/_version.h 定义 INTERNAL_PILLOWFIGHT_VERSION 宏，源码包不含该文件，需在 conanfile.py build() 中动态生成"
+  - "上游 CMakeLists.txt 通过 -DNO_PYTHON 排除 Python 绑定代码，仅编译纯 C 库（12 个算法源文件）"
+  - "库仅依赖系统 libm 与 libpthread，OHOS 均支持，无第三方依赖"
+  - "上游测试使用 pytest（Python），OHOS 交叉目标下不可运行，以 test_package 消费者测试 + 鸿蒙特有测试替代验证"
+  - "头文件安装到 include/pillowfight/ 子目录，消费者需使用 include/pillowfight 路径；pf_get_version() 在 NO_PYTHON 下可用"
+  - "lang-preflight 因顶层 setup.py（Python 绑定 pypillowfight）存在按 manifest 判 python 并写 env_unsupported；按 R47 边界规则（绑定包按主体语言判）与 0.3.1 已合入 C 适配先例复核判 C，继续 C 适配并如实记录"

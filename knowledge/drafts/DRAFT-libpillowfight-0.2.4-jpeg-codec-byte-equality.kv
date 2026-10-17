@@ -1,0 +1,61 @@
+# ═══ Draft knowledge entry — 字节级测试对 JPEG 编解码器选择的敏感性：libjpeg vs libjpeg-turbo 对齐 ═══
+# Timestamp: 2026-10-15
+# Software: libpillowfight 0.2.4（知识可跨库复用：任何比对 JPEG 字节流的测试）
+# Task: libpillowfight-0.2.4-r04-upstream-pytest-full-pass-env-alignment-pc1-35-20261015T093500Z
+# Status: DRAFT — 同 stem 配对 knowledge/drafts/DRAFT-libpillowfight-0.2.4-jpeg-codec-byte-equality.md
+#
+# 查重差异: 检索 graph/ 与 drafts/ 未见等价条目（E100 是 jsimd SIMD 检测、E157 是
+# jpeg-version.sh 探测、E331 是 openjp2 符号链接，均为构建期问题；本条是测试期字节
+# 等值断言对 JPEG 编解码器选择的敏感性，机制不同）。
+
+id:                     DRAFT-libpillowfight-0.2.4-jpeg-codec-byte-equality
+trigger_tool:           pytest|Pillow|libjpeg|libjpeg-turbo
+phase:                  testing|runtime
+error_signature:        tobytes\(\).*expected.*jpg|AssertionError.*tobytes|JPEG.*roundtrip.*FAILED|编解码.*边界翻转|quantiz.*boundary
+severity:               2
+category:               ohos, testing, jpeg, codec, byte-equality, pillow, quantization
+match_keywords:         Pillow, libjpeg, libjpeg-turbo, JPEG, tobytes, byte equality, reference image,
+                        quantization, boundary, roundtrip, libjpeg/10, 3.2.0, image tests, libpillowfight
+title:                  字节等值测试对 JPEG 编解码器选择的敏感性：同一像素经 libjpeg 与 libjpeg-turbo 编码/解码产生 max≤6 差异 → 对齐上游 wheel 的 libjpeg-turbo 消除约 95% 边界翻转
+root_cause:             >
+  上游图像测试常用"算法输出经 JPEG 保存→重开→tobytes() 与参考 JPEG 字节等值"断言
+  （上游测试自带注释 beware of JPG compression）。参考 JPEG 由维护者环境（pip wheel 内置
+  libjpeg-turbo）编码生成；设备端 Pillow 若链接非 turbo 的 libjpeg，同一像素的编码量化
+  与解码产生不同字节。实测（同一 RGB 像素，libjpeg/10 vs libjpeg-turbo 3.2.0 编码）：
+  编码器差异 129956 像素（max 通道和 6，共 6559040 像素）；同一参考 jpg 两解码器解码字节
+  不同。字节等值断言下这些差异直接导致测试失败。
+affected_scope:         >
+  图像库/图像算法的字节级测试（JPEG 保存-重开-等值断言）在非参考编解码器环境运行；
+  OHOS 设备端通过 pip 源码构建 Pillow 时默认链接系统 libjpeg（非 turbo）。
+verification_cmd:       |
+  # 同一 RGB 像素分别用 libjpeg 与 libjpeg-turbo 版 Pillow 编码，解码后逐像素比对
+  python3 /storage/Users/currentUser/runnerljs002/r04-ab-jpeg.py
+  # 参考图解码 A/B：同一 jpg 两解码器 tobytes() sha 是否一致
+rec_priority:           1
+rec_approach:           align-pillow-codec-to-turbo
+rec_description:        >
+  运行环境 Pillow 以 libjpeg-turbo 重建（与上游 pip wheel 编解码器一致）：从制品仓获取
+  libjpeg-turbo 头/库（conan libjpeg-turbo/3.x），CPPFLAGS/LDFLAGS 指向其 include/lib 后
+  重新构建安装 Pillow；运行测试时 LD_LIBRARY_PATH 指向 turbo lib。量化 A/B 差异后决定
+  是否足以复原字节流（同编码器同版本时边界翻转消除）。
+rec_command:            |
+  CPPFLAGS="-I$TURBO/include" LDFLAGS="-L$TURBO/lib" python3 -m pip install --force-reinstall --no-deps Pillow
+  LD_LIBRARY_PATH=$TURBO/lib python3 -m pytest tests/tests_X.py -v
+rec_auto_fix:           false
+rec_impl:               pillowfight-turbo-codec-align
+fallback_priority:      2
+fallback_approach:      byte-equality-adjudication
+fallback_description:   >
+  若参考环境编码器版本/质量参数仍不可达（字节流无法逐字节复原），残余翻转需附 A/B 量化
+  与实验证据交分析端裁决；禁止自行放宽断言或重生成参考图。
+forbid_1_pattern:       把参考 JPEG 重新编码生成"匹配"的期望图
+forbid_1_reason:        reference_image_regenerated_to_match_output 属禁止事项
+forbid_2_pattern:       跳过编解码器 A/B 直接归因算法浮点
+forbid_2_reason:        必须先量化编码器差异（本实验证明同像素即 max6 差异）再归因
+principles:             P012
+similar_to:             E100, E157, E331
+doc_file:               knowledge/drafts/DRAFT-libpillowfight-0.2.4-jpeg-codec-byte-equality.md
+last_updated:           2026-10-15
+source_event:           archives/l/libpillowfight/0.2.4（feat/libpillowfight-0.2.4，R04 设备端 pytest 对齐）
+prescan_pattern:        save\(.*JPEG|tobytes\(\).*Image\.open|NamedTemporaryFile.*jpg
+prescan_globs:          **/*.py
