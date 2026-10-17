@@ -1,0 +1,48 @@
+--- a/trzsz-libs/trzsz/libs/transfer.py
++++ b/trzsz-libs/trzsz/libs/transfer.py
+@@ -181,20 +181,22 @@
+         begin_time = time.time()
+         while True:
+             try:
+                 data = file.read(buf_size)
+                 break
+             except (OSError, select.error) as err:
+                 if utils.is_eintr_error(err):
+                     continue
+                 raise
+         length = len(data)
++        if not data:
++            raise utils.TrzszError('Unexpected end of file', trace=False)
+         utils.send_data(data)
+         md5.update(data)
+         utils.check_integer(length)
+         step += length
+         if callback:
+             callback.on_step(step)
+         chunk_time = time.time() - begin_time
+         if length == buf_size and chunk_time < 0.5 and buf_size < utils.CONFIG.max_buf_size:
+             buf_size = min(buf_size * 2, utils.CONFIG.max_buf_size)
+         elif chunk_time >= 2.0 and buf_size > 1024:
+@@ -342,20 +344,22 @@
+ 
+ 
+ def recv_file_data(file, size, callback):
+     step = 0
+     if callback:
+         callback.on_step(step)
+     md5 = hashlib.md5()
+     while step < size:
+         begin_time = time.time()
+         data = utils.recv_data()
++        if not data:
++            raise utils.TrzszError('Received empty file data', trace=False)
+         file.write(data)
+         step += len(data)
+         if callback:
+             callback.on_step(step)
+         utils.send_integer('SUCC', len(data))
+         md5.update(data)
+         chunk_time = time.time() - begin_time
+         if chunk_time > utils.GLOBAL.max_chunk_time:
+             utils.GLOBAL.max_chunk_time = chunk_time
+     return md5.digest()
