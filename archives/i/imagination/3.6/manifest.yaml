@@ -1,0 +1,90 @@
+# 版本级 manifest
+# 文件位置: archives/i/imagination/3.6/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "3.6"
+
+# 构建系统（顶层字段，用于 G4 验证）
+build_system: autotools
+
+# 软件名称（顶层字段，用于 G4 验证）
+software: imagination
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-12"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（Debian orig tarball，与 SourceForge 3.6 发行版同源）
+  url: "https://deb.debian.org/debian/pool/main/i/imagination/imagination_3.6.orig.tar.gz"
+
+  # 源码校验和
+  sha256: "85dfa14acfe78a8a721c86c0056ce6bd1b517e9b7e6ab9fb3a5864b7d37a2d8d"
+
+  # 压缩格式
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  system: autotools
+
+  # 配置选项列表
+  configure_options:
+    - "ac_cv_prog_cc_works=yes"
+    - "ac_cv_prog_cc_cross=yes"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - gtk/3.24.43
+    - intltool/0.51.0
+    - gettext/0.22.5.1
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - patches/0001-configure-ohos-build-fixes.patch
+  - patches/0002-build-drop-doc-subdir.patch
+  - patches/0003-support.h-ngettext-fallback.patch
+
+# 构建期动态处理（非 patch 文件形式）：
+#   - config.guess/config.sub 替换为自包含 OHOS-aware 版本（aris/2.2 先例）
+#   - sox 依赖以 no-op stub 头 + 空 Libs 的 stub sox.pc 注入
+#     PKG_CONFIG_PATH 满足（ohpcd 远程仓无 sox 制品；音频子功能
+#     sox_open_read/sox_open_write 恒返 NULL 被所有调用方按
+#     “无法打开音频文件”路径处理，音频导入/导出整体禁用）
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "tarball 自带 configure + Makefile.in，无需 autoreconf（l3afpad 相反）"
+  - "configure 的 CFLAGS=\"-g -Wall\" 覆写会抹掉 conan 交叉编译标志，需改为 $CFLAGS 追加"
+  - "sox 是无条件 PKG_CHECK_MODULES 硬依赖但平台无制品：stub 头 + 空 Libs pc 是干净禁用路径"
+  - "intltool-merge 的 desktop 模式是纯文本处理，不依赖 XML::Parser（xml 模式才依赖）"
+  - "doc/ 子目录的 DocBook XSL 构建期联网拉取样式表，CI 沙箱必须剔除"
+  - "最终链接需 -lgmodule-2.0（上游 LDADD 硬编码）+ -lintl（glib gi18n 别名）经 make LIBS 变量注入"

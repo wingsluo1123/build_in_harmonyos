@@ -1,0 +1,8 @@
+error_signature: "CFLAGS=\"-g -Wall\".*conan.*cross|checking for XML::Parser.*configure: error|docbook.sourceforge.net.*Failed to resolve|implicit declaration of function 'ngettext'.*Wint-conversion|warning: incompatible pointer to integer conversion returning 'const gchar *' from a function returning 'int'"
+root_cause: "autotools 古董库（2010s 桌面应用，无 AC_CONFIG_HEADERS）交叉编译到 HarmonyOS PC 时的四类系统性问题：①configure.in 硬编码 CFLAGS 覆写（CFLAGS=\"-g -Wall\"）抹掉 conan 注入的交叉编译标志；②intltool 的 XML::Parser perl 模块探测在无 perl-ext 工具链环境失败，但实际只用到 intltool-merge 的 desktop 纯文本模式；③doc/ 子目录的 DocBook XSL 样式表构建期联网拉取 docbook.sourceforge.net，CI 沙箱无外网；④configure.ac 无 AC_CONFIG_HEADERS 时 ENABLE_NLS 永不定义，非 NLS 回退宏块常见漏写 ngettext（gettext/_/N_/Q_ 都有），clang 15 将退化的隐式声明（int 返回值）传 const gchar* 参数报 -Wint-conversion 硬错。"
+solution: "四连修 patch 组合（portability 类型，见 PR !15470 patches/0001~0003）：①CFLAGS 覆写改 $CFLAGS 追加（保留 conan 交叉标志）；②configure.ac 跳过 XML::Parser 探测（intltool/0.51.0 配方先例——只触 intltool-merge desktop 纯文本模式时不依赖该模块）；③Makefile.am/Makefile.in 从 SUBDIRS 剔除 doc/（文档非交付物，构建期联网属上游设计缺陷）；④support.h 非 NLS 回退宏块补上缺失的 ngettext 宏定义。"
+fallback: "①CFLAGS 也可在 conan 配方 build() 内 export 覆盖回去，但 patch 化更可审计；②XML::Parser 可装 perl-XML-Parser 系统包满足探测（增加环境依赖，不推荐）；③DocBook 可离线预取样式表（XSL_DATA_DIR 注入，成本高）；④ngettext 可改用 dgettext(NULL,...) 等价调用（改源码调用点，侵入更大）。"
+verify_builds: "PR !15470（imagination 3.6，HarmonyOS PC aarch64）：13 src/*.c + 15 transitions/*.c 全部编译链接成功，conan create RC=0，test_package 消费者测试 4 用例 93 断言全过（含 15 个 GModule 插件 dlopen 枚举）。关联先例：l3afpad/intltool（umask 077 同族 DRAFT-001）、aris/2.2（E007 config.guess）。"
+draft: true
+status: pending-review
+reference_impl: "archives/i/imagination/3.6/patches/0001-configure-ohos-build-fixes.patch, 0002-build-drop-doc-subdir.patch, 0003-support.h-ngettext-fallback.patch"
