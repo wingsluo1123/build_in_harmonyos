@@ -1,0 +1,48 @@
+# 版本级 manifest — pwncat 0.1.2
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "0.1.2"
+software: pwncat
+status: built
+build_date: "2026-10-15"
+build_system: python
+conan_ref: "pwncat/0.1.2"
+
+source:
+  # 官方 PyPI sdist（不可变制品，canonical files.pythonhosted.org URL；
+  # sha256 取自 PyPI JSON API 并在下载后独立复核，与 conandata.yml 一致）
+  url: "https://files.pythonhosted.org/packages/c9/ce/51f7b53a8ee3b4afe4350577ee92f416f32b9b166f0d84b480fec1717a42/pwncat-0.1.2.tar.gz"
+  sha256: "c7f879df3a58bae153b730848a88b0e324c8b7f8c6daa146e67cf45a6c736088"
+  tar_format: tar.gz
+
+build:
+  system: custom
+  configure_options: []
+  dependencies: []
+  cc: ""
+  cxx: ""
+  python: "3.12（OHOS 构建/测试运行时；无 setuptools/pip 构建后端，脚本原样安装为 bin/pwncat）"
+
+patches_applied: []
+
+# 本包沉淀的知识图谱草稿（Path B）
+knowledge_ref:
+  - "E591-draft-6CE6"
+  - "E592-draft-7206"
+  - "E593-draft-4456"
+
+knowledge_gained:
+  - "纯 Python 单文件 CLI（无可导入包、install_requires=[]）按 package_type=application 配方安装：source() 取官方 sdist → build() 校验 shebang 并实跑 --version/--help 证明脚本在本解释器可运行 → package() 把 bin/pwncat 落到 bin/ 并 chmod 755；build() 即'解释型应用的编译'（ref: 本包 L1，无外部条目，理由：pwncat 是单一可执行脚本，不适合 python-require 的 site-packages 布局）"
+  - "OHOS 运行时 /etc/hosts 只有 '127.0.0.1 localhost' 与 '::1 ip6-localhost ip6-loopback'，缺 '::1 localhost' 别名，于是 getaddrinfo('localhost', ..., AF_INET6) 报 gaierror（字面量 ::1 一切正常）；上游 pwncat CI 自己就是 sudo tee /etc/hosts 补这一行，而 OHOS 上 /etc 是只读 backing file 的符号链接、无 sudo/unshare，只能以 PYTHONPATH=sitecustomize.py 在解析层补别名，且必须尊重 AI_NUMERICHOST 以免改变 --nodns 语义（ref: E591-draft-6CE6）"
+  - "OHOS 的 toybox ps 拒绝 BSD 风格 'ps auxw'（bad auxw），且 -A 会把 CMD 截断为进程名，导致上游集成套件 'ps auxw | grep ... | awk {print $2}' 的进程轮询永远匹配不到；用 PATH 前置的 ps shim 把 auxw/aux 归一为 -ef（第 2 列即 PID、CMD 为完整命令行）即可保住上游断言语义，无需改上游测试（ref: E592-draft-7206）"
+  - "上游文件传输用例用 -vvvv 时程序会把载荷 TRACE 到 stderr，而 OHOS /bin/ls 是 toybox 多元二进制、字符串表内嵌字面量 'ERROR :Range for -f is 1 to %ld'，触发 harness 的 'grep FATAL|ERROR' 误报；判定须与真实缺陷区分：先证明传输本体逐字节一致（sha256+size），再看 stderr 的 ERROR 是否全在 TRACE 载荷转储行内，最后用 strings <payload> 定位字面量来源（ref: E593-draft-4456）"
+  - "bin/pwncat 本身零依赖、零平台特定调用（未使用 ps/proc、无硬编码 /tmp），无需任何源码补丁；9 个失败里剩余 3 个是 CnC self-inject 与 revshell.py（逐字节+banner/suffix）测试替身的握手交互问题（001/002 报 'Unable to create tmpfile'、004 在 TRIES=600 内未完成握手），而同通路在 30/000、30/003 上通过（ref: 本包 L2，测试替身交互，非平台可移植性缺陷）"
+
+test_results:
+  upstream:
+    command: "make test   # HOST=localhost PORT=4444 WAIT=2 RUNS=1（上游 Makefile 默认）"
+    result: "63/72 脚本通过；515/547 轮已执行（506 通过、9 失败）；9 个失败均为环境/harness/测试替身原因，非 pwncat 缺陷"
+    environment: "OHOS aarch64 (HarmonyOS)，Python 3.12.8"
+  test_package:
+    - "test_pwncat.py: 消费者测试（--version/--help + 回环真实数据往返）— PASS"
+    - "test_pwncat_ohos.py: 鸿蒙特有测试（运行时/打包产物/::1 往返/受控 Resolve Error）— PASS"
