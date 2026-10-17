@@ -1,0 +1,23 @@
+From precice-ohos-adapt <precice-ohos-adapt@users.noreply.gitcode.com>
+Subject: [PATCH] Conan Boost mapping: Boost::boost -> Boost::headers
+
+Conan CMakeDeps for boost/1.91.0.1.3 publishes component targets
+Boost::headers / Boost::log / Boost::thread / ... but no umbrella
+Boost::boost target (official Boost CMake provides it). Upstream
+preciceCore links the umbrella for header-only includes, which fails
+the generate step with "Target preciceCore links to Boost::boost but
+the target was not found". Map the umbrella to the Conan header-only
+component; compiled Boost libs stay on their explicit targets.
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -429,7 +429,7 @@
+ # Setup Boost
+ target_compile_definitions(preciceCore PUBLIC BOOST_ALL_DYN_LINK BOOST_ASIO_ENABLE_OLD_SERVICES BOOST_GEOMETRY_DISABLE_DEPRECATED_03_WARNING)
+ target_link_libraries(preciceCore PUBLIC
+-  Boost::boost
++  Boost::headers
+   Boost::log
+   Boost::log_setup
+   Boost::program_options
