@@ -1,0 +1,36 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: websocket-client/1.9.2
+homepage: "https://github.com/websocket-client/websocket-client"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "python3 -m pytest websocket/tests/ -q（sdist 自带套件；PYTHONPATH = pkg : test-deps）"
+
+upstream_tests:
+  - name: "websocket/tests/（sdist 自带，16 个 test_*.py + data/*.txt + echo-server.py）"
+    count: "195 passed / 26 skipped / 21 subtests passed"
+    description: >-
+      测试随 sdist 发布（**包内** `websocket/tests/`），unittest 风格、由 pytest 驱动；
+      纯离线即可跑通（实测 195 passed）。26 个 skip **全部来自上游自己的环境开关**：
+      `TEST_WITH_INTERNET`（默认 0，16 个）与 `TEST_WITH_LOCAL_SERVER`
+      （判据 `LOCAL_WS_SERVER_PORT != "-1"`，涉及 `echo-server.py` 起的本地服务）——
+      非我方挑拣；配方显式清除这两个环境变量，避免环境限制混入结果。
+      测试期依赖仅 `pytest`（装到 `<build>/test-deps`，**不进产物**）；
+      上游 extra `test` 里另有 `websockets`，只被本地服务路径使用，本适配未启用该路径 → 不装（如实披露）。
+
+test_package_tests:
+  - file: check_websocket_client.py
+    description: >-
+      R34 消费者校验（全部离线，含真实 API 与真实 CLI 真跑）：①产物齐备（`websocket/`）
+      ②15 个关键文件齐备（`__init__/_abnf/_app/_core/_dispatcher/_exceptions/_handshake/
+      _http/_logging/_socket/_ssl_compat/_url/_utils/_wsdump/py.typed`）③真实 `import websocket`
+      ④`__version__ == '1.9.2'` ⑤真实离线 API：`_url.parse_url()` 解析 wss/ws 两种 URL
+      （含默认端口与 secure 位）⑥真实离线功能：`ABNF.create_frame('hello')→format()`
+      得 11 字节、首字节 `0x81`，`ABNF.validate()` 通过、`validate_utf8()` 判定正确
+      ⑦**上游 CLI 真跑**：`bin/wsdump --help` rc=0 且打印用法 ⑧证据（模块总字节 + python 版本）
+    command: "python3 check_websocket_client.py <package-folder> <package-folder>/bin/wsdump"
+
+assertion_count: 8

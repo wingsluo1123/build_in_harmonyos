@@ -1,0 +1,49 @@
+# 版本级 manifest — websocket-client 1.9.2
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "1.9.2"
+software: websocket-client
+status: built
+build_date: "2026-10-13"
+build_system: python
+
+source:
+  url: "https://files.pythonhosted.org/packages/d8/cb/a5abcc2891249f393827c650c6296660ce40374ac22d99ab9aea41f9d2a2/websocket_client-1.9.2.tar.gz"
+  sha256: "0fcb57545848be86992e128218fd96dd87a6769ffdb1a968dff79632b85604d0"
+  filename: "websocket_client-1.9.2.tar.gz"
+  note: >-
+    PyPI 官方 sdist（顶层 `websocket/` 包，非 src 布局）。上游 `python_requires=">=3.10"`，
+    本环境 python 3.12 满足。
+
+build:
+  system: custom
+  configure_options: []
+  dependencies:
+    # **零运行期依赖**：setup.py 的 install_requires 为空
+    #   （extras：test = pytest + websockets；optional = python-socks / wsaccel；docs = sphinx 系列）
+    - "（无）"
+    # 测试期依赖（仅 build() 内、**不进产物**；装到 <build>/test-deps）
+    - "pytest（PyPI，测试期）——必须显式装，不依赖宿主自带（prawcore CI #89394 的教训）"
+    # 上游 extra test 里另有 websockets：只被 echo-server.py 的本地服务路径使用，
+    # 本适配未启用 TEST_WITH_LOCAL_SERVER → 不装（如实披露）
+  python: "3.12"
+
+patches_applied: []
+
+upstream_tests:
+  framework: pytest（驱动 unittest 风格用例）
+  test_path: "websocket/tests/（sdist 自带；19 个文件，其中 16 个 test_*.py）"
+  test_command: "python3 -m pytest websocket/tests/ -q（build() 内真跑；PYTHONPATH = pkg : test-deps）"
+  test_count: 195
+  run_in_build: true
+  verified: true
+upstream_test_pass_rate: "**195 passed / 26 skipped / 21 subtests passed（rc=0）**（本地 conan create 实测，纯离线）：26 个 skip **全部来自上游自己的环境开关**——`TEST_WITH_INTERNET`（默认 0，占 16 个）与 `TEST_WITH_LOCAL_SERVER`（判据 `LOCAL_WS_SERVER_PORT != \"-1\"`），**非我方挑拣或整批跳过**；配方还显式清掉这两个环境变量，避免把环境限制混进结果。未标记者的失败会让 build 硬失败（不宽恕）。"
+adapted_test_pass_rate: "test_package/check_websocket_client.py **8 项消费者校验（全部离线）**，本地实测 `checks=8 fails=0 / RESULT: PASS`：①产物齐备（`websocket/` 模块）②15 个关键文件齐备（含 `_abnf.py`/`_core.py`/`_handshake.py`/`_http.py`/`_url.py` 与 `tests/`、`data/`）③真实 `import websocket`（零运行期依赖）④`__version__ == '1.9.2'`⑤真实离线 API：`_url.parse_url()` 正确解析 `wss://example.com:8443/path` → `('example.com', 8443, '/path', True)`、`ws://h/` → `('h', 80, '/', False)`⑥真实离线功能：`ABNF.create_frame('hello')→format()` 得 11 字节且首字节 `0x81`（FIN|TEXT）、`ABNF.validate()` 通过、`validate_utf8()` 判定正确⑦**上游 CLI 真跑**：`bin/wsdump --help` rc=0 且打印用法（入口 `websocket._wsdump:main`）⑧证据（模块总字节 + python 版本）"
+
+knowledge_gained:
+  - category: L1
+    content: "**sdist 自带测试要先验证“能不能跑”再接活**：websocket-client 的 sdist 自带 `websocket/tests/`（含 `data/*.txt` 夹具），直接用宿主 python 就能离线跑通（195 passed），于是适配成本低、口径可信；反之若上游套件在目标 Python 上根本跑不起来（如 ply 3.11 依赖 Python 3.11 已移除的 `unittest.TestCase.assert_`，`testlex/testyacc` 42/43 报错、`testcpp` 超时），应**放弃该库**而不是改上游测试来凑通过率。判定方法：解包 sdist → 按上游 README/CI 的命令直接跑一遍（先别写配方）。"
+    reason: "websocket-client 适配实测——先验可跑性的收益与 ply 的反例"
+  - category: L1
+    content: "**上游 console_scripts 入口要落成自定位脚本**：websocket-client 在 setup.py 里声明了 `wsdump=websocket._wsdump:main`，配方若只装模块就会少一个上游产物 → 落成 `bin/wsdump`（脚本自己把 `<prefix>/lib/pythonX.Y/site-packages` 插进 `sys.path`，不依赖外部 PYTHONPATH），并按 R38 在软件级目录补 `commands.json`；消费者校验里直接 `python bin/wsdump --help` 真跑一次作为证据。"
+    reason: "websocket-client 适配实测——CLI 入口的落地与校验方式"
