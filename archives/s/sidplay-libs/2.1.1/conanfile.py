@@ -64,6 +64,29 @@ class SidplaylibsConan(ConanFile):
     def package(self):
         autotools = Autotools(self)
         autotools.install()
+        # 删除 .la 文件：libtool 链接时优先读 .la 的 dependency_libs，
+        # 其路径在 conan 交叉环境下错误（//lib/...），且 ld.lld 无法解析。
+        import os
+        for _root, _dirs, _files in os.walk(self.package_folder):
+            for _f in _files:
+                if _f.endswith(".la"):
+                    os.remove(os.path.join(_root, _f))
+        # 修正 pkg-config 文件：autotools 安装时 --prefix=/ 使 .pc 的
+        # includedir/libdir 指向根目录 //include //lib，下游 pkg-config
+        # 无法定位包内头文件/库。重写为 ${pcfiledir} 相对定位（conan 惯例），
+        # 并将 Libs 从 .la 改为 -L/-l（ld.lld 无法解析 .la）。
+        _pc_dir = os.path.join(self.package_folder, "lib", "pkgconfig")
+        for _pc in os.listdir(_pc_dir):
+            if not _pc.endswith(".pc"):
+                continue
+            _path = os.path.join(_pc_dir, _pc)
+            _txt = open(_path, encoding="utf-8", errors="replace").read()
+            _txt = _txt.replace("prefix=/", "prefix=${pcfiledir}/../..")
+            _txt = _txt.replace("exec_prefix=${prefix}", "exec_prefix=${prefix}")
+            # 将 ${libdir}/xxx.la 转为 -L${libdir} -lxxx
+            import re
+            _txt = re.sub(r"\$\{libdir\}/lib([\w.-]+)\.la", lambda m: "-L${libdir} -l" + m.group(1), _txt)
+            open(_path, "w", encoding="utf-8").write(_txt)
 
     def package_info(self):
         self.cpp_info.libs = ["sidplay2", "sidutils"]  # link order: sidutils -> sidplay2
