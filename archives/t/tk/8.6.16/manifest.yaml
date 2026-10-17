@@ -1,0 +1,42 @@
+# 版本级 manifest — tk 8.6.16（X11 客户端形态，HarmonyOS PC / OHOS aarch64）
+version: "8.6.16"
+software: "tk"
+status: built
+build_date: "2026-10-16"
+build_system: "autotools"
+conan_ref: "tk/8.6.16"
+
+source:
+  url: "https://prdownloads.sourceforge.net/tcl/tk8.6.16-src.tar.gz"
+  sha256: "be9f94d3575d4b3099d84bc3c10de8994df2d7aa405208173c709cc404a7e5fe"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    # 走 unix/configure 裸 configure（不套 AutotoolsToolchain 的自动 flag 注入）
+    - "--enable-shared=yes"
+    - "--with-tcl=<tcl/8.6.16 包 libdir>（由 TCL_LIB_SPEC 提供 -ltcl8.6）"
+    - "--x-includes=<libx11/1.8.13 包 includedir>"
+    - "--x-libraries=<libx11/1.8.13 包 libdir>（AC_PATH_X 只做链接测试）"
+    - "tcl_cv_sys_version=Linux-6.6（绕过 AC_PATH_XTRA 的运行期探针）"
+    - "CPPFLAGS=-I<tcl|libx11|xorgproto 包 includedir>（Tk 的 CC_SWITCHES 用的是失效的 -I${TCL_GENERIC_DIR}）"
+    - "LDFLAGS=-L<tcl|libx11 包 libdir>"
+  dependencies:
+    - tcl/8.6.16
+    - libx11/1.8.13
+    - xorgproto/2025.1
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "E532：OHOS uname -s 返回 HarmonyOS，tcl.m4 的 system 分支无匹配项 → SHLIB_LD/SHLIB_SUFFIX 落空、共享库链接命令残缺；配方注入 PATH 前置的 uname shim 伪装 Linux 后走 Linux* 分支"
+  - "E530：上游 92 个 .test 套件由 wish/tktest 驱动，必须有真实 X display；本机与 CI worker 均无显示，实测结论见 reports/r51-upstream-tests.txt"
+  - "二进制化 tcl 的 tclConfig.sh 残留原构建树路径（TCL_SRC_DIR）：tk 的 Makefile 用 $(TCLDIR)/library 定位 tcl 脚本库 → 上游测试报 Can't find a usable init.tcl；配方建 TCLDIR 影子目录（library → <tcl pkg>/lib/tcl8.6）+ make 命令行变量覆盖（命令行变量优先于 Makefile 内部赋值）"
+  - "E429（本 PR 新草稿）：USE_TCL_STUBS 构建的库，消费者必须在调 Tk API 前先 Tk_Init 绑定宿主 stub 表，否则 tclStubsPtr 未绑定直接 SIGSEGV"
+  - "E077：SONAME 注入会抹掉 OHOS .codesign 段 → 运行期 dlopen 报 Permission denied；须 objcopy --remove-section .codesign 后重新 binary-sign-tool -selfSign 1"
+  - "AutotoolsDeps 会把 -lX11 等注入 configure 的编译器探针 LIBS，探针运行期找不到 .so → 误报 cannot run C compiled programs；改用裸 configure + 只经 --x-libraries/--with-tcl 提供链接信息"
+  - "HMDFS 不允许硬链接：tk 的 make install 对 man3 建立硬链接会报 Operation not permitted（安装仍成功，非阻塞）"
+  - "安装布局：--prefix=/usr/local + DESTDIR 会把文件埋进 <pkg>/usr/local/**；须先 staging 再按 lib/include/bin/share 分类拷入 package_folder"
