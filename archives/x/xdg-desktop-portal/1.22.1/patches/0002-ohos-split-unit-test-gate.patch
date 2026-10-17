@@ -1,0 +1,96 @@
+diff --git a/meson.build b/meson.build
+--- a/meson.build
++++ b/meson.build
+@@ -141,7 +141,10 @@
+ pipewire_dep = dependency('libpipewire-0.3', version: '>= 0.2.90', required: get_option('pipewire'))
+ libsystemd_dep = dependency('libsystemd', required: get_option('systemd'))
+ gudev_dep = dependency('gudev-1.0', required: get_option('gudev'))
+-umockdev_dep = dependency('umockdev-1.0', required: get_option('tests'))
++# OHOS portability (0002): relax the hard probes that used to abort
++# configure when the desktop-session test stack is absent; the actual
++# requirement is enforced by the enable_pytest gate below.
++umockdev_dep = dependency('umockdev-1.0', required: false)
+ libglnx_dep = dependency('libglnx')
+ gvdb_dep = dependency('gvdb')
+ 
+@@ -155,11 +158,11 @@
+   have_wav_parse = false
+ endif
+ 
+-pytest = find_program('pytest-3', 'pytest', required: get_option('tests'))
++pytest = find_program('pytest-3', 'pytest', required: false)
+ python = pymod.find_installation(
+   'python3',
+   modules: ['dbus', 'dbusmock', 'gi'],
+-  required: get_option('tests'),
++  required: false,
+ )
+ 
+ bwrap = find_program('bwrap', required: get_option('sandboxed-image-validation').allowed() or get_option('sandboxed-sound-validation').allowed())
+@@ -238,18 +241,27 @@
+ subdir('po')
+ subdir('doc')
+ 
+-enable_tests = get_option('tests') \
+-  .require(pytest.found()) \
+-  .require(python.found() and python.language_version().version_compare('>=3.9'),
+-           error_message: 'Python version >=3.9 is required') \
+-  .require(umockdev_dep.found()) \
+-  .require(have_wav_parse,
+-           error_message: 'gst-inspect and the wavparse plugins are required') \
+-  .allowed()
++# OHOS portability (0002): the original single gate required the full
++# pytest+dbusmock+umockdev+gst-inspect stack just to compile ANY test target.
++# Split it: the GTest C unit binaries (test-permission-db / test-xdp-utils /
++# test-xdp-method-info) only need glib, which is always available, so they are
++# gated by the bare feature option; the pytest integration suite keeps the
++# original environment requirements.
++enable_unit_tests = get_option('tests').allowed()
++
++# Computed as a plain boolean (not a feature .require() chain) so a missing
++# desktop-session stack degrades gracefully instead of aborting configure
++# when -Dtests=enabled: on OHOS only the C unit binaries are wanted.
++enable_pytest = get_option('tests').allowed() \
++  and pytest.found() \
++  and python.found() \
++  and python.language_version().version_compare('>=3.9') \
++  and umockdev_dep.found() \
++  and have_wav_parse
+ 
+-enable_installed_tests = get_option('installed-tests')
++enable_installed_tests = get_option('installed-tests') and enable_pytest
+ 
+-if enable_tests
++if enable_unit_tests
+   subdir('tests')
+ endif
+ 
+@@ -261,7 +273,8 @@
+     'Enable libsystemd support': have_libsystemd,
+     'Enable geoclue support': have_geoclue,
+     'Enable gudev support': have_gudev,
+-    'Enable test suite': enable_tests,
++    'Enable unit tests': enable_unit_tests,
++    'Enable pytest suite': enable_pytest,
+     'Enable installed tests:': enable_installed_tests,
+     'Build man pages': rst2man.found(),
+     'Build flatpak interfaces': flatpak_intf_dir != '',
+diff --git a/tests/meson.build b/tests/meson.build
+--- a/tests/meson.build
++++ b/tests/meson.build
+@@ -64,6 +64,7 @@
+   protocol: test_protocol,
+ )
+ 
++if enable_pytest
+ run_test = find_program('run-test.sh')
+ 
+ pytest_args = ['--verbose', '--log-level=DEBUG']
+@@ -149,6 +150,7 @@
+     timeout: 120,
+   )
+ endforeach
++endif # enable_pytest
+ 
+ if enable_installed_tests
+   install_data(

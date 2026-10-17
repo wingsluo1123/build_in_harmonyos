@@ -1,0 +1,37 @@
+sources:
+  url: "https://github.com/flatpak/xdg-desktop-portal/releases/download/1.22.1/xdg-desktop-portal-1.22.1.tar.xz"
+  sha256: "d4879ddb3d65ff1a8f19187497e6f13dc5d267bcac404a5d501218be355753d3"
+patches:
+  "1.22.1":
+    - patch_file: "patches/0001-ohos-optional-fuse3-pipewire-sound-validation.patch"
+      patch_type: "portability"
+      patch_description: >-
+        OHOS adaptation: convert the hard-required fuse3 / libpipewire / gstreamer-pbutils
+        dependencies into meson feature options (fuse3, pipewire, sound-validation),
+        following the existing optional-dependency pattern that upstream already uses
+        for geoclue/gudev (dependency(..., required: get_option(...)) + config_h guard).
+        None of them exist in the OHOS package registry and all three only serve
+        desktop-session backends that are unavailable on an OHOS PC anyway:
+        fuse3 is only used by the document portal FUSE mount backend,
+        pipewire only by the camera / screen-cast / remote-desktop / clipboard portals,
+        gstreamer-pbutils only by the sound validation helper.
+        With the options disabled, meson skips those backends (HAVE_FUSE3 /
+        HAVE_PIPEWIRE config guards) while the core deliverables are preserved:
+        xdg-desktop-portal daemon, xdg-permission-store, xdg-desktop-portal-validate-icon,
+        the D-Bus interface XMLs, portal .service files and the dataonly
+        xdg-desktop-portal.pc (interfaces_dir variable).
+    - patch_file: "patches/0002-ohos-split-unit-test-gate.patch"
+      patch_type: "portability"
+      patch_description: >-
+        OHOS adaptation: split the monolithic upstream test gate. Upstream required
+        the full pytest+dbusmock+umockdev+gst-inspect desktop-session stack just to
+        compile ANY test target, which had forced -Dtests=disabled and left the three
+        GTest C unit binaries (test-permission-db / test-xdp-utils /
+        test-xdp-method-info) unbuildable on OHOS. After the split, the C unit tests
+        are gated by the bare feature option (they only need glib, always present),
+        the pytest integration suite keeps the original environment requirements
+        behind a separate enable_pytest gate, and the pytest/umockdev/python probes
+        are relaxed to required:false so configure no longer aborts when the
+        desktop-session stack is absent. This is what makes the upstream unit tests
+        actually runnable on an OHOS PC build (conan build() runs them with
+        LD_LIBRARY_PATH + G_TEST_* injection).

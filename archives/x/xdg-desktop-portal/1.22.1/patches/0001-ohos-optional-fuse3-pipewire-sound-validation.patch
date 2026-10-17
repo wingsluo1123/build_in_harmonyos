@@ -1,0 +1,197 @@
+diff --git a/document-portal/meson.build b/document-portal/meson.build
+--- a/document-portal/meson.build
++++ b/document-portal/meson.build
+@@ -44,6 +44,12 @@
+   install_dir: systemd_userunit_dir,
+ )
+ 
++if not have_fuse3
++  # FUSE-backed document portal is not built (no fuse3 / no desktop session);
++  # the permission store daemon above still builds without it.
++  subdir_done()
++endif
++
+ document_portal_built_sources = gnome.gdbus_codegen(
+   'document-portal-dbus',
+   sources: [
+diff --git a/meson.build b/meson.build
+--- a/meson.build
++++ b/meson.build
+@@ -130,15 +130,15 @@
+ gio_dep = dependency('gio-2.0')
+ gio_unix_dep = dependency('gio-unix-2.0')
+ json_glib_dep = dependency('json-glib-1.0')
+-fuse3_dep = dependency('fuse3', version: '>= 3.10.0')
++fuse3_dep = dependency('fuse3', version: '>= 3.10.0', required: get_option('fuse3'))
+ gdk_pixbuf_dep = dependency('gdk-pixbuf-2.0')
+-gst_pbutils_dep = dependency('gstreamer-pbutils-1.0')
++gst_pbutils_dep = dependency('gstreamer-pbutils-1.0', required: get_option('sound-validation'))
+ geoclue_dep = dependency(
+   'libgeoclue-2.0',
+   version: '>= 2.5.2',
+   required: get_option('geoclue'),
+ )
+-pipewire_dep = dependency('libpipewire-0.3', version: '>= 0.2.90')
++pipewire_dep = dependency('libpipewire-0.3', version: '>= 0.2.90', required: get_option('pipewire'))
+ libsystemd_dep = dependency('libsystemd', required: get_option('systemd'))
+ gudev_dep = dependency('gudev-1.0', required: get_option('gudev'))
+ umockdev_dep = dependency('umockdev-1.0', required: get_option('tests'))
+@@ -183,6 +183,12 @@
+ have_gudev = gudev_dep.found()
+ config_h.set10('HAVE_GUDEV', have_gudev)
+ 
++have_fuse3 = fuse3_dep.found()
++config_h.set10('HAVE_FUSE3', have_fuse3)
++
++have_pipewire = pipewire_dep.found()
++config_h.set10('HAVE_PIPEWIRE', have_pipewire)
++
+ add_project_arguments(['-DGLIB_VERSION_MIN_REQUIRED=GLIB_VERSION_2_72'], language: 'c')
+ 
+ build_documentation = false
+@@ -260,6 +266,9 @@
+     'Build man pages': rst2man.found(),
+     'Build flatpak interfaces': flatpak_intf_dir != '',
+     'Sandboxed image validation': bwrap.found(),
++    'Build document portal (FUSE)': have_fuse3,
++    'Build PipeWire portals': have_pipewire,
++    'Build sound validation helper': gst_pbutils_dep.found(),
+   },
+   section: 'Optional builds',
+   bool_yn: true,
+diff --git a/meson_options.txt b/meson_options.txt
+--- a/meson_options.txt
++++ b/meson_options.txt
+@@ -54,3 +54,16 @@
+        type: 'feature',
+        value: 'enabled',
+        description: 'Use Bubblewrap to sandbox sound validation. Disabling this option may lead to security vulnerabilities.')
++
++option('sound-validation',
++       type: 'feature',
++       value: 'auto',
++       description: 'Build the sound validation helper (requires gstreamer-pbutils)')
++option('fuse3',
++       type: 'feature',
++       value: 'auto',
++       description: 'Enable FUSE support. Needed for the document portal FUSE mount backend.')
++option('pipewire',
++       type: 'feature',
++       value: 'auto',
++       description: 'Enable PipeWire support. Needed for the camera, screen cast and remote desktop portals.')
+diff --git a/src/meson.build b/src/meson.build
+--- a/src/meson.build
++++ b/src/meson.build
+@@ -85,8 +85,6 @@
+ xdg_desktop_portal_sources = files(
+   'account.c',
+   'background.c',
+-  'camera.c',
+-  'clipboard.c',
+   'dynamic-launcher.c',
+   'email.c',
+   'file-chooser.c',
+@@ -99,14 +97,11 @@
+   'network-monitor.c',
+   'notification.c',
+   'open-uri.c',
+-  'pipewire.c',
+   'power-profile-monitor.c',
+   'print.c',
+   'proxy-resolver.c',
+   'realtime.c',
+   'registry.c',
+-  'remote-desktop.c',
+-  'screen-cast.c',
+   'screenshot.c',
+   'secret.c',
+   'settings.c',
+@@ -124,6 +119,16 @@
+   'xdp-session-persistence.c',
+ )
+ 
++if have_pipewire
++  xdg_desktop_portal_sources += files(
++    'camera.c',
++    'clipboard.c',
++    'pipewire.c',
++    'remote-desktop.c',
++    'screen-cast.c',
++  )
++endif
++
+ xdg_desktop_portal_sources += [
+   xdp_utils_sources,
+   xdp_method_info_sources,
+@@ -215,14 +220,16 @@
+   validate_sound_c_args += '-DHELPER="@0@"'.format(bwrap.full_path())
+ endif
+ 
+-xdp_validate_sound = executable(
+-  'xdg-desktop-portal-validate-sound',
+-  'validate-sound.c',
+-  dependencies: [gst_pbutils_dep],
+-  c_args: validate_sound_c_args,
+-  install: true,
+-  install_dir: libexecdir,
+-)
++if gst_pbutils_dep.found()
++  xdp_validate_sound = executable(
++    'xdg-desktop-portal-validate-sound',
++    'validate-sound.c',
++    dependencies: [gst_pbutils_dep],
++    c_args: validate_sound_c_args,
++    install: true,
++    install_dir: libexecdir,
++  )
++endif
+ 
+ configure_file(
+   input: 'xdg-desktop-portal-rewrite-launchers.service.in',
+diff --git a/src/xdp-context.c b/src/xdp-context.c
+--- a/src/xdp-context.c
++++ b/src/xdp-context.c
+@@ -23,8 +23,10 @@
+ 
+ #include "account.h"
+ #include "background.h"
++#if HAVE_PIPEWIRE
+ #include "camera.h"
+ #include "clipboard.h"
++#endif
+ #include "dynamic-launcher.h"
+ #include "email.h"
+ #include "file-chooser.h"
+@@ -42,8 +44,10 @@
+ #include "proxy-resolver.h"
+ #include "realtime.h"
+ #include "registry.h"
++#if HAVE_PIPEWIRE
+ #include "remote-desktop.h"
+ #include "screen-cast.h"
++#endif
+ #include "screenshot.h"
+ #include "secret.h"
+ #include "settings.h"
+@@ -398,7 +402,9 @@
+ #if HAVE_GEOCLUE
+   init_location (context);
+ #endif
++#if HAVE_PIPEWIRE
+   init_camera (context);
++#endif
+   init_screenshot (context);
+   init_background (context);
+   init_wallpaper (context);
+@@ -407,9 +413,11 @@
+   init_secret (context, context->cancellable);
+   init_global_shortcuts (context);
+   init_dynamic_launcher (context);
++#if HAVE_PIPEWIRE
+   init_screen_cast (context);
+   init_remote_desktop (context);
+   init_clipboard (context);
++#endif
+   init_input_capture (context);
+ #if HAVE_GUDEV
+   init_usb (context);
