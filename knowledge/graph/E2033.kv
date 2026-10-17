@@ -1,0 +1,49 @@
+#====================================================================
+# DRAFT-gcc-snapshot-20260705-ohos-source-tree-and-fresh-build - GCC snapshot OHOS source-tree and fresh-build constraints
+#====================================================================
+
+id:                     E2033
+trigger_tool:           conan|gcc|flex|autotools|bash
+phase:                  source|build|package|testing
+error_signature:        self.settings access in source() method is forbidden|settings.os.version value not defined|GCC_SNAPSHOT_SOURCE_TARBALL|gengtype-lex.cc|move-if-change|get_patches.sh|unknown option code|posix_spawn: Permission denied|posix_spawnp: Permission denied|collect-ld|real-ld|mkheader.sh|OHOS SDK sysroot headers were not found|native/llvm/ohos-sdk.org|conan create TIMED OUT after 3600s|Downloaded 88.7MB|7676387 pass(es)|build_jobs() returned 1|all-target-libgcc
+
+severity:               2
+category:               platform, ohos, autotools, toolchain, bundled-prerequisites
+match_keywords:         gcc-snapshot, GCC snapshot, bundled prerequisites, flex, gengtype-lex.cc, source() forbidden, os.version, HMDFS, TMPDIR, CONFIG_SHELL, SHELL, move-if-change, get_patches.sh, disable-lto, option completion, target selftest, mkheader.sh, GNU as, sysroot, native/sysroot, llvm/bin/clang, HTTP Range, parallel download, mirror fallback, binary signing
+title:                  GCC snapshot 在 HarmonyOS 上需要拆分 source 阶段、本地 tarball 回退与生成器前置
+root_cause:             GCC snapshot 是自举型工具链包，不只是一个普通库。它依赖 bundled GMP/MPFR/MPC，还需要 flex 在 generator 阶段生成 gengtype-lex.cc；同时 Conan 的 source() 不能读取 self.settings，OHOS 分支逻辑必须放到 settings 无关路径。HarmonyOS/HMDFS 下又会叠加脚本直 exec、只读 /tmp、工作目录恢复和权限位差异，所以必须把 source 解包、本地 tarball 回退、short-lived prepare 进程、shell 包装入口和显式 TMPDIR/SHELL/CONFIG_SHELL 一起处理，才能把 fresh build 跑完整。
+affected_scope:         GCC snapshot 类自举工具链包；尤其是带 bundled prerequisites、需要生成器、并在 HarmonyOS PC / HMDFS 环境下构建的 autotools 大包。
+verification_cmd:       在 OHOS 设备上执行 `GCC_SNAPSHOT_SOURCE_TARBALL=<local_tar.xz> conan create archives/g/gcc-snapshot/20260705 -pr:h ci/conan/profiles/ohos-aarch64 -pr:b ci/conan/profiles/ohos-aarch64 --build=missing`，应先完成 source 解包并继续进入 build/package；若缺少 flex 或 shell 包装，通常会在 gengtype-lex.cc、move-if-change、get_patches.sh 或 mkheader.sh 附近失败；目标编译阶段应确认 `-B/data/service/hnp/bin/` 位于构建树 `-B` 之前，并检查 `collect2 -debug` 解析到的 `collect-ld` 是真实 signed ELF。
+
+rec_priority:           1
+rec_approach:           source-range-cache-plus-generator-toolreq
+rec_description:        在 source() 中优先消费 CI file:// 缓存或本地 tarball，远程大包使用有序镜像、并行 Range、有限重试和最终 SHA256；保留 bundled GMP/MPFR/MPC 解包；将 flex 作为 tool_requires 单独适配；对 OHOS 构建显式设置 TMPDIR、CONFIG_SHELL、SHELL，并用有上限的 pipe jobserver；C/static-libgcc 产品关闭 decimal-float，并对 target libgcc 去掉继承的 debug flags。
+rec_command:            config_options(): self.settings.rm_safe("os.version"); source(): if GCC_SNAPSHOT_SOURCE_TARBALL exists, extract it, otherwise consume file:// cache or bounded Range URLs; build_requirements(): self.tool_requires("flex/2.6.4"); generate(): default compiler executables to /data/service/hnp/bin/clang and /data/service/hnp/bin/clang++, then inject flex/bin plus FLEX/LEX; build(): export TMPDIR/CONFIG_SHELL/SHELL and invoke configure/make through shell wrappers with OHOS -j4 pipe jobserver, --disable-decimal-float, and target CFLAGS_FOR_TARGET/CXXFLAGS_FOR_TARGET=-O2 -fPIC while retaining the lower generic cap for non-OHOS
+rec_auto_fix:           false
+rec_impl:               conan-recipe-plus-toolchain-dependency
+
+fallback_priority:      2
+fallback_approach:      split-generator-and-source-cache
+fallback_description:   如果完整 fresh build 仍过慢，可继续把大 tarball 下载移到本机缓存或预热 source cache，但不要把 flex 或其他依赖内联进 gcc-snapshot 主库 PR。
+fallback_command:       seed local source cache for GCC tarball and keep flex as an independent adapted package
+fallback_auto_fix:      false
+fallback_impl:          cache-seeding-plus-separate-pr
+
+forbid_1_pattern:       self.settings\..*source\(\)
+forbid_1_reason:        Conan 禁止在 source() 中读取 settings；这样会让 source 阶段在不同 profile 上直接炸掉。
+forbid_1_consequence:   适配只能停在本机，无法在真机/CI 里稳定复现。
+
+forbid_2_pattern:       tool_requires\("flex/2.6.4"\).*source
+forbid_2_reason:        flex 是生成器前置，不该在 source() 里临时补齐；它应作为独立适配好的 tool_requires。
+forbid_2_consequence:   依赖边界混乱，后续主库 PR 会把依赖适配串进来。
+
+principles:             P010, P011
+doc_file:               knowledge/drafts/DRAFT-gcc-snapshot-20260705-ohos-source-tree-and-fresh-build.md
+last_updated:           2026-09-12
+source_event:           gcc-snapshot/20260705 HarmonyOS 前置适配、PR CI #44737 sysroot 复核、#44812 下载超时、#44864 串行构建超时、#44912/#44956/#44992 all-target-libgcc 时间窗复盘、#45033 成功复跑
+authors:                pc1-47-executor
+source_pr:
+source_commit:
+
+metrics_success_count:  3
+metrics_fail_count:     6

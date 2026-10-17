@@ -1,0 +1,19 @@
+id:                     E2009
+error_signature: handwritten configure exits with "Unknown option --oldincludedir" (or other injected --*dir argument) during Conan AutotoolsToolchain configure step
+match_keywords: handwritten configure,Unknown option,--oldincludedir,--datarootdir,--libdir,--bindir,update_configure_args,AutotoolsToolchain,injected arguments,argument whitelist,conan 2
+category:               build-system, autotools, conan
+severity:               3
+root_cause: Upstream configure is a hand-written script (not autoconf-generated) that validates its argument whitelist and aborts on unrecognized options. Conan 2.x AutotoolsToolchain unconditionally injects standard GNU directory arguments (--prefix --bindir --sbindir --libdir --includedir --oldincludedir --datarootdir); any argument outside the handwritten whitelist (most commonly --oldincludedir) makes configure exit with Unknown option before compilation starts.
+rec_approach: In recipe generate(), drop the offending argument with the official Conan API tc.update_configure_args with value None before tc.generate(). Do not patch the configure script for this and do not hand-write an argument filter. Platform detection failures in the same handwritten configure are a separate concern handled by an E160-class platform patch.
+verification_cmd:
+last_updated: 2026-09-12
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E2009.md
+trigger_tool:           configure
+phase:                  configuration
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        In recipe generate(), drop the offending argument with the official Conan API tc

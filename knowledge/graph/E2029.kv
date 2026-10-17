@@ -1,0 +1,49 @@
+#====================================================================
+# DRAFT-mysql8046-preflight-pf1-stale-local-main — worktree 模式下本地 main 陈旧导致 create-pr PF1 单包闸误拦多包
+# 触发事件: mysql-client-8.0 8.0.46 适配（gitcode_pr.py create-pr 报 PF1 涉及 11 个包目录）
+# 路径: Path B（知识库扩展）
+#====================================================================
+
+id:                     E2029
+trigger_tool:           gitcode_pr.py|create-pr|preflight
+phase:                  ci_gate|pr_creation
+error_signature:        PF1 单包闸: 本 PR 改动涉及 \d+ 个软件包目录|
+                         preflight 前置硬闸未通过.*PF1
+
+severity:               2
+category:               conan, false-positive, preflight, worktree
+match_keywords:         PF1, 单包闸, preflight, create-pr, worktree, 本地 main, stale main, 三点 diff, merge-base, 多包误拦, git fetch origin main:main, libXext 污染
+title:                  Stale local main in shared-repo worktrees makes create-pr PF1 report N unrelated package dirs; fast-forward local main before retrying
+
+root_cause: >
+  preflight 用本地分支名 main 作为 diff 基线（gitcode_pr.py cmd_create_pr
+  传 args.target），未解析到 origin/main；共享 refs 的 worktree 机器上
+  本地 main 不随 origin/main 自动前进，三点 diff 的合并基取的是陈旧
+  提交，main 侧新增的其他包目录全部落入 diff 文件清单。
+
+verification_cmd: >
+  git rev-parse main; git rev-parse origin/main; git fetch origin main:main; python3 scripts/gitcode_pr.py create-pr ... （重试）
+
+rec_priority:           1
+rec_approach:           fast-forward-local-main-before-create-pr（建 PR 前快进本地 main 修正三点 diff 基线）
+rec_description: >
+  多任务共享 worktree 机器上 create-pr 遇 PF1 单包闸报多个无关包目录时，
+  先比对本地 main 与 origin/main：git fetch origin main:main 快进本地
+  main 后重试 create-pr，三点 diff 基线即恢复正确，PF1 恢复单包判定。
+rec_command:            git rev-parse main origin/main && git fetch origin main:main && python3 scripts/gitcode_pr.py create-pr --repo ... （重试）
+rec_auto_fix:           false
+rec_impl:               fast-forward-stale-local-main
+
+doc_file:               knowledge/drafts/DRAFT-mysql8046-preflight-pf1-stale-local-main.md
+last_updated:           2026-09-12
+source_event:           mysql-client-8.0 8.0.46 适配，create-pr PF1 单包闸因本地 main 陈旧误拦 11 个包目录
+authors:                 calbee21
+source_pr:              https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos/merge_requests/9640
+source_commit:          fca0396e3
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     0.9
+metrics_last_used:      2026-09-12
+
+affected_scope:         Stale local main in shared-repo worktrees makes create-pr PF

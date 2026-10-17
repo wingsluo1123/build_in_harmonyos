@@ -1,0 +1,57 @@
+id:                     E2075
+title: "strndupa 宏实现陷阱：clang 内联函数中 alloca 的 llvm.lifetime 标记使返回的栈缓冲立即失效"
+category: toolchain
+severity:               2
+error_signature: "musl-bionic 无 strndupa；自实现 static inline strndupa(alloca) 后字符串被后续解析函数读取时内容损坏（乱码/空串），但编译运行零报错"
+match_keywords:
+  - strndupa
+  - alloca
+  - llvm.lifetime
+  - static inline
+  - musl
+  - clang inliner
+  - stack buffer invalidation
+  - audit_strsplit
+  - token corruption
+  - autotools
+  - make
+  - cmake
+  - clang
+  - OHOS
+  - aarch64-linux-ohos
+  package: libaudit
+  version: "2.7.4"
+  date: "2026-09-15"
+last_updated: "2026-09-15"
+prescan_pattern: "strndupa"
+root_cause: |-
+  glibc 的 strndupa 是基于语句表达式 + alloca 的宏，返回的缓冲存活于**调用者的栈帧**。
+  迁移到 OHOS musl-bionic（无 strndupa）时，直观的 static inline 函数实现
+  `static inline char *strndupa(const char *s, size_t n) { ...alloca...; return p; }`
+  在 clang 下会经过内联：内联后 alloca 分配的内存被插入 llvm.lifetime.start/end
+  标记，函数返回点即 lifetime.end——后续任何对该缓冲的读写（上游 audit_strsplit
+  会原地写 '\0' 分词）踩在标记失效的内存上，产生静默数据损坏（实测 token 乱码），
+  无任何编译期/运行期诊断。
+rec_approach: |-
+  用宏（语句表达式）而非 static inline 函数实现 strndupa，使 alloca 展开在调用点、
+  缓冲归属调用者栈帧（与 glibc 语义一致）：
+
+      #define strndupa(s, n) \
+          (char *)({ const char *_s = (s); size_t _n = (n); \
+             size_t _l = strnlen(_s, _n); \
+             char *_p = __builtin_alloca(_l + 1); \
+             memcpy(_p, _s, _l); _p[_l] = '\0'; _p; })
+
+  验证方法：损坏场景的最小复现是「strndupa → strtok/strsplit 族原地写」，
+  修复后 token 输出与 glibc 一致（libaudit auparse_test 的 diff 参考输出全对齐）。
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E2075.md
+trigger_tool:           make
+phase:                  build
+match_keywords:         musl-bionic, strndupa；自实现, static, inline, strndupa, alloca
+affected_scope:         "strndupa 宏实现陷阱：clang 内联函数中 alloca 的 llvm.lifetime 标记使返回的栈缓冲
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        |-

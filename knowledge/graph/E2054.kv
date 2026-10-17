@@ -1,0 +1,73 @@
+# ═══ Draft knowledge entry — 老 autotools 包的 config.sub 与 aarch64/musl ═══
+# Timestamp: 2026-09-14
+# Software: libcdaudio 0.99.12p2（SourceForge，autoconf 2.59 / config.sub 2005-04-25）
+# Gate: conan-verify G2（conan create）
+# Status: DRAFT — needs human/AI review to promote to E-entry
+#
+# To promote:
+#   1. Review the excerpt below
+#   2. Rename to E0XX.kv and move to knowledge/graph/
+#   3. Add a row to knowledge/graph/index.tsv
+#   4. Write knowledge/doc/E0XX.md
+
+id:                     E2054
+trigger_tool:           conan|conan create|conan-verify|configure|autotools|config.sub
+phase:                  configure
+error_signature:        Invalid configuration `aarch64-unknown-linux-musl': machine `aarch64-unknown-linux' not recognized|
+                         configure: error: .*config\.sub aarch64-unknown-linux-musl failed|
+                         machine `aarch64' not recognized
+
+severity:               2
+category:               ohos, portability, build-system, autotools, toolchain
+match_keywords:         config.sub, config.guess, aarch64, musl, unrecognized machine, Invalid configuration,
+                         --build, --host, cross compile, unknown vendor, autoconf 2.59, old autotools,
+                         pre-2012 tarball, triplet
+title:                  2012 年前的 autotools dist 其 config.sub 不认 aarch64（也不认 musl）：不要照搬 aarch64-*-musl/gnu 三元组，改用带 `unknown` 厂商的四段名配对以保留交叉模式
+
+root_cause: >
+  config.sub 的 cpu/os 名字表是随 automake/autoconf 版本演进的：`aarch64` 约在 2012 年
+  加入 config.sub，`musl` 作为 os 名约 2011 年加入。竞赛池里大量老包（2003—2011 年的
+  autotools dist）自带的 config.sub 早于这两个名字，于是**照搬新包用的**
+  `--build=aarch64-unknown-linux-musl --host=aarch64-unknown-linux-gnu` 会被直接拒绝：
+
+      Invalid configuration `aarch64-unknown-linux-musl':
+        machine `aarch64-unknown-linux' not recognized
+      configure: error: ./config.sub aarch64-unknown-linux-musl failed
+
+  注意报错里的机器名被截成 `aarch64-unknown-linux`——旧 config.sub 先按
+  cpu-vendor-os(-os) 切分，进而判定 cpu 为 `aarch64-unknown-linux` 不认。
+
+rec_approach: >
+  1) 先实测这个 dist 的 config.sub 到底认什么（不要靠猜）：
+
+         for t in aarch64-unknown-linux-gnu aarch64-linux-gnu arm-unknown-linux-gnu \
+                  arm-unknown-linux-musl; do printf '%s -> ' "$t"; ./config.sub "$t"; done
+
+     实测（libcdaudio 2005 版 config.sub）：`aarch64-unknown-linux-gnu` **通过**
+     （带 `unknown` 厂商的四段名对不认识的 cpu 原样放行）、`aarch64-linux-gnu` 被拒、
+     `arm-unknown-linux-gnu` 通过、`arm-unknown-linux-musl` 被拒（musl 不认）。
+  2) 据此构造一对"都能被接受、且彼此不同"的三元组，保持 build≠host（交叉模式，
+     configure 不执行它编译出的程序）：
+         --build=arm-unknown-linux-gnu --host=aarch64-unknown-linux-gnu
+  3) 前提校验：代码库不按 build_cpu 分支。用 `grep -n 'case "$host"' configure.ac`
+     复核（libcdaudio 只按 host_os 分支 beos/irix/solaris，均不命中 → 走 generic 路径）。
+  4) 另一条正路是像本仓 librevenge 那样补 config.sub/config.guess（用现代版本覆盖，
+     以补丁形式随配方带入）——当旧 config.sub 连 host 名字都不认、或代码库确实依赖
+     cpu 名时走这条；能用三元组绕开时优先绕开（改动面最小、不用维护整份 config.sub）。
+
+verification_cmd:
+  libcdaudio 0.99.12p2 设备实机：用上述三元组对后 configure 顺利通过，
+  G0/G1/G2/G3 全部 PASS，`✅ 配方验证通过: libcdaudio 0.99.12p2`；
+  test_package 20/20（版本上报、LBA/MSF/frame 换算、设备错误路径）。
+  对照组：同一配方最初用 aarch64-…-musl/aarch64-…-gnu，在
+  `configure` 第一个检查前即失败，报错文本见 error_signature。
+
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-17
+authors:               unknown
+doc_file:               doc/E2054.md
+affected_scope:         2012 年前的 autotools dist 其 config.sub 不认 aarch64（也不认 musl）：不要
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        >
