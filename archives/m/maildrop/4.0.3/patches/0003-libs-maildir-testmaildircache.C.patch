@@ -1,0 +1,32 @@
+--- a/libs/maildir/testmaildircache.C
++++ b/libs/maildir/testmaildircache.C
+@@ -45,21 +45,28 @@
+ {
+ 	std::ostringstream o;
+ 	o << uid << " " << gid << " " << homedir;
+ 
+ 	s=o.str();
+ 	return true;
+ }
+ 
+ int main(int argc, char **argv)
+ {
+-	std::string me=getpwuid(geteuid())->pw_name;
++	struct passwd *pw=getpwuid(geteuid());
++	const char *envname=getenv("LOGNAME");
++
++	/* A system may keep no passwd entry for the invoking user, in which
++	   case getpwuid() returns NULL; the environment carries the name. */
++
++	std::string me=pw ? pw->pw_name :
++		(envname && *envname ? envname : "nobody");
+ 	std::error_code ec;
+ 
+ 	std::filesystem::remove_all("testmaildircache.dir", ec);
+ 	std::filesystem::create_directory("testmaildircache.dir", ec);
+ 
+ 	const char *a[] = {"AUTHUSER", NULL};
+ 
+ 	maildir_cache_init(100, "testmaildircache.dir", me.c_str(), a);
+ 
+ 	maildir_cache_start();

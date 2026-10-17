@@ -1,0 +1,45 @@
+--- a/libs/maildir/maildirkeywords.C
++++ b/libs/maildir/maildirkeywords.C
+@@ -785,20 +785,38 @@
+ 		    tmpname,
+ 		    newname,
+ 		    true))
+ 	{
+ 		throw std::runtime_error(
+ 			"error saving an updated keyword list");
+ 	}
+ 
+ 	struct stat stat_buf;
+ 
+-	if (link(tmpname.c_str(), newname.c_str()) < 0 ||
+-	    stat(tmpname.c_str(), &stat_buf) < 0 ||
+-	    stat_buf.st_nlink != 2)
+-	{
++	if (link(tmpname.c_str(), newname.c_str()) < 0)
++	{
++		int err=errno;
++
++		/* A filesystem that refuses hard links outright reports
++		   "not permitted"/"not supported" instead of EEXIST. The
++		   temporary file was created next to newname, so renaming it
++		   publishes the same result atomically. */
++
++		if (err == EPERM || err == ENOTSUP || err == EOPNOTSUPP)
++		{
++			if (rename(tmpname.c_str(), newname.c_str()) == 0)
++				return true;
++		}
++
+ 		unlink(tmpname.c_str());
+ 		return false;
+ 	}
++
++	if (stat(tmpname.c_str(), &stat_buf) < 0 ||
++	    stat_buf.st_nlink != 2)
++	{
++		unlink(tmpname.c_str());
++		return false;
++	}
+ 	unlink(tmpname.c_str());
+ 	return true;
+ }

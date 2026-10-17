@@ -1,0 +1,48 @@
+--- a/libs/maildrop/mailbot.C
++++ b/libs/maildrop/mailbot.C
+@@ -831,21 +831,21 @@
+ 	else
+ 	{
+ 		if (!txtfile && !mimefile)
+ 			txtfile="/dev/null";
+ 
+ 		if (txtfile && mimefile)
+ 			usage();
+ 	}
+ 
+ 	{
+-		FILE *f=tmpfile();
++		FILE *f=rfc822::create_tmpfile();
+ 
+ 		if (!f)
+ 		{
+ 			perror(temporary_file_msg);
+ 			exit(EX_IOERR);
+ 		}
+ 		tmpfp=rfc822::fdstreambuf{dup(fileno(f))};
+ 
+ 		fclose(f);
+ 
+@@ -1074,21 +1074,21 @@
+ 		reply_outf=rfc822::fdstreambuf(dup(1));
+ 
+ 		if (reply_outf.error())
+ 		{
+ 			perror("stdout");
+ 			exit(EX_IOERR);
+ 		}
+ 	}
+ 	else
+ 	{
+-		FILE *f=tmpfile();
++		FILE *f=rfc822::create_tmpfile();
+ 
+ 		if (!f)
+ 		{
+ 			perror(temporary_file_msg);
+ 			exit(EX_IOERR);
+ 		}
+ 		reply_outf=rfc822::fdstreambuf{dup(fileno(f))};
+ 
+ 		if (reply_outf.error())
+ 		{

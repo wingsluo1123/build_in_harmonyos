@@ -1,0 +1,32 @@
+--- a/libs/maildrop/maildir.C
++++ b/libs/maildrop/maildir.C
+@@ -245,21 +245,28 @@
+ 				{
+ 					throw strerror(errno);
+ 				}
+ 			}
+ 		}
+ 
+ 		std::string dir;
+ 
+ 		if (link( tmpname.c_str(), newname.c_str()) < 0)
+ 		{
+-			if (errno == EXDEV){
++			/* rename() is the fallback both for a cross-device move
++			   and for a filesystem that refuses hard links outright;
++			   it consumes tmpname either way, which is what the
++			   is_afs flag records. */
++
++			if (errno == EXDEV || errno == EPERM ||
++			    errno == ENOTSUP || errno == EOPNOTSUPP)
++			{
+ 				if(rename(tmpname.c_str(), newname.c_str()) < 0)
+ 					throw "rename() failed.";
+ 				is_afs = 1;
+ 			}
+ 			else
+ 			{
+ 				throw "link() failed.";
+ 			}
+ 		}
+ 		dir=newname;

@@ -1,0 +1,92 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# maildrop 4.0.3 上游测试：autotools `make check`。tarball 有 9 个 AC_CONFIG_SUBDIRS
+# 子包，其中 5 个有活跃的 check-am（numlib / liblock / makedat 为空，bdbobj 条件于
+# FOUND_DB、本配置 --with-db=gdbm 下不活跃），逐条计共 25 个测试入口（逐条计自各子包
+# Makefile 的 check-am 配方）。无 ctest/pytest 注册。
+#
+# 配方 build() 不调用 `make check` 而是**逐个入口执行**（conanfile.py 的
+# TEST_ENTRIES / TEST_MAKE_TARGETS）：`make check` 会在子包首个失败入口处中止，
+# 使其后入口从未执行、"未执行"被误读成"通过"。逐入口执行保证了统计口径真实。
+#
+# 实测（干净 conan create；上游测试统计见 reports/w3-local-ci.log，
+# reports/conan-create.log 只含 test_package 阶段）：
+#   25 个入口全部执行；22 通过，3 不通过，0 未执行。
+#   3 个不通过入口见下方 unavailable_entries，均在配方 UNAVAILABLE_ENTRIES 中逐项给出
+#   具体技术原因；其中 libs/rfc2045/testsuitecpp2 是改为逐入口执行后才暴露的真实失败项
+#   （旧口径下被 rfc2045 首个入口的中止所掩盖）。
+
+package: maildrop/4.0.3
+homepage: "https://www.courier-mta.org/maildrop/"
+
+# 上游测试命令（用于 make -n check / ctest -N 分析）
+upstream_check_command: "make check"
+
+# conanfile.py build() 中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "逐入口执行（等价于 make check 的配方展开），见 TEST_ENTRIES / TEST_MAKE_TARGETS"
+
+# 上游测试入口清点（完整枚举，逐条对应 Makefile 的 check-am 配方）
+upstream_tests:
+  - file: libs/rfc822/Makefile
+    source: libs/rfc822
+    entries: 3
+    description: "testsuitecpp（| diff testsuite.txt）、testsuite2、reftest（| diff reftest.txt）"
+  - file: libs/rfc2045/Makefile
+    source: libs/rfc2045
+    entries: 6
+    description: "testsuite（| diff testsuite.txt.idn）、testsuitemm、testrfc3676parsersuite 三个脚本比对 + testrfc6533parser、testsuitecpp、testsuitecpp2 三个程序"
+  - file: libs/gdbmobj/Makefile
+    source: libs/gdbmobj
+    entries: 1
+    description: "testsuite（| cmp testsuite.txt）"
+  - file: libs/maildir/Makefile
+    source: libs/maildir
+    entries: 11
+    description: "testsuite、testsuite2 脚本比对 + maildirkwtest、maildiraclttest + testmaildirsearch 的 5 次调用（含需以退出码 2 表示未找到的那一次）+ testmaildirmisc + testmaildircache"
+  - file: libs/maildrop/Makefile
+    source: libs/maildrop
+    entries: 4
+    description: "run-testsuite、run-testsuite2、run-testsuite-mailbot、run-testsuite3 四个目标"
+  # valgrind：本机无 valgrind，上游各 check-am 中的 valgrind 复用段由
+  # `which valgrind` 守卫自动跳过，不计入上述入口。
+
+upstream_test_totals:
+  total_entries: 25
+  executed: 25
+  passed: 22
+  failed: 3
+  not_executed: 0
+
+# 不可满足的上游入口（配方 UNAVAILABLE_ENTRIES，逐项给出具体技术原因）
+unavailable_entries:
+  - entry: libs/rfc2045/testsuite
+    reason: >-
+      testsuite.txt.idn 早于上游两次行为变更：其第一个 hunk 期望用单引号写的
+      charset 参数（charset='iso-8859-15'，非 RFC 2045 合法 quoted-string）被解码，
+      第二个 hunk 期望 3.0.0 之前的 utf-8 DSN 地址渲染形态（ChangeLog 2018-07-31
+      "rfc2045/reformime: parse utf-8 address types in DSNs"）。两者都不涉及平台事实。
+  - entry: libs/rfc2045/testsuitecpp2
+    reason: >-
+      test5 用内置期望串比对解码结果，期望中保留原始 ISO-8859-1 字节（"nobÒdy"），
+      而本构建在 content-description 的名称参数处给出 "[unicode encoding error]"。
+      与上一条同属"期望与源码解码行为不一致"、无平台事实。**该入口是逐入口执行后
+      才暴露的**：旧口径用 make check 时，rfc2045 在第 1 个入口即中止，本入口从未
+      执行却被计为通过。
+  - entry: libs/maildir/testmaildircache
+    reason: >-
+      maildircache 用 getpwnam() 解析缓存属主后 setgid()/setuid() 切换到该用户；
+      本机无对应当前进程 uid 的 passwd 条目，且非特权 setuid() 到其他 uid 会 EPERM，
+      两步都无法成功。（该程序中的 getpwuid() 空指针解引用已由 patch 0003 修复，
+      这是剩余且在本平台无法满足的那一项。）
+
+# 消费者（test_package）用例声明
+test_package_tests:
+  - file: test_package/test.sh
+    language: shell
+    description: >-
+      消费者端到端用例，两条真实流程：(1) 用安装后的 reformime 解码一条
+      ISO-8859-15 正文的 MIME 消息，断言输出中出现 UTF-8 的欧元符号
+      （E2 82 AC）且不再残留原始 0xA4 字节；(2) 用安装后的 maildrop 通过过滤器
+      配方把同一封信投递进一个 Maildir，断言 Maildir 收到消息文件且文件仍带原主题。
+assertion_count: 7

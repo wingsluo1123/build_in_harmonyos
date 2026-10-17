@@ -1,0 +1,50 @@
+--- a/libs/rfc822/rfc822.h
++++ b/libs/rfc822/rfc822.h
+@@ -13,39 +13,47 @@
+ #include	<string>
+ #include	<string_view>
+ #include	<vector>
+ #include	<functional>
+ #include	<iterator>
+ #include	<type_traits>
+ #include	<optional>
+ #include	<streambuf>
+ #include	<tuple>
+ #include	<time.h>
++#include	<cstdio>
+ #include	<courier-unicode.h>
+ 
+ #define RFC822_SPECIALS			"()<>[]:;@\\,.\""
+ #define RFC822_SPECIAL_INNAMES		"()<>[]@\\,.\""
+ 
+ #define CORESUBJ_RE 1
+ #define CORESUBJ_FWD 2
+ 
+ /* Internal functions */
+ 
+ void rfc822_parseaddr(size_t ntokens,
+ 		      char (*get_nth_token)(size_t, void *),
+ 		      void (*consume_n_tokens)(size_t, void *),
+ 		      void (*make_quoted_token)(size_t, void *),
+ 		      void (*define_addr_name)(size_t, int, void *),
+ 		      void (*define_addr_tokens)(size_t, int, void *),
+ 		      void *voidp);
+ 
+ namespace rfc822 {
++
++// tmpfile() searches the temporary directory that is compiled into the C
++// library.  Where that directory is a read-only filesystem image, tmpfile()
++// always fails; this variant honours TMPDIR instead, the name POSIX gives to
++// that directory, and falls back to tmpfile() when TMPDIR is unusable.
++
++FILE *create_tmpfile();
+ #if 0
+ }
+ #endif
+ 
+ std::optional<time_t> parse_date(std::string_view);
+ std::string mkdate(time_t);
+ 
+ /*
+ ** address is a hostname, which is IDN-encoded. 'address' may contain an
+ ** optional 'user@', which is preserved.

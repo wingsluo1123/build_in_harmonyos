@@ -1,0 +1,48 @@
+--- a/libs/rfc822/testsuitecpp.C
++++ b/libs/rfc822/testsuitecpp.C
+@@ -883,21 +883,21 @@
+ 
+ 	auto cout_iter=std::ostreambuf_iterator<char>(std::cout);
+ 	rfc822::display_header(
+ 		"SUBJECT",
+ 		"=?iso-8859-1?q?No?= =?iso-8859-1?q?b=D2dy?="
+ 		" <test3@xn--80akhbyknj4f.net>, nobody@example.com",
+ 		"utf-8",
+ 		cout_iter);
+ 	std::cout << "\n";
+ 
+-	FILE *fp=tmpfile();
++	FILE *fp=rfc822::create_tmpfile();
+ 
+ #ifndef BUFSIZ
+ #define BUFSIZ 8192
+ #endif
+ 
+ 	for (int i=0; i<BUFSIZ*2 / 256; ++i)
+ 	{
+ 		for (int j=0; j<256; ++j)
+ 		{
+ 			fputc(i, fp);
+@@ -998,21 +998,21 @@
+ 	for (int i=32; i<32+128; ++i)
+ 		if (q[i] != p[i]) FAIL();
+ 
+ 	for (int i=32+128; i<256; ++i)
+ 		if ((char)ios.get() != p[i]) FAIL();
+ 
+ 	delete[] p;
+ 	delete[] q;
+ 	fclose(fp);
+ 
+-	fp=tmpfile();
++	fp=rfc822::create_tmpfile();
+ 	{
+ 		rfc822::fdstreambuf fds{dup(fileno(fp))};
+ 
+ 		std::ostream o{&fds};
+ 
+ 		o << "XX";
+ 
+ 		if (fds.pubseekpos(0) != 0) FAIL();
+ 
+ 		if (fds.sbumpc() != 'X') FAIL();

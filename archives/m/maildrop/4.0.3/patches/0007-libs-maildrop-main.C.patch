@@ -1,0 +1,127 @@
+--- a/libs/maildrop/main.C
++++ b/libs/maildrop/main.C
+@@ -710,22 +710,49 @@
+ 
+ 	if (!found)
+ 	{
+ #if HAVE_COURIER
+ 		if (!deliverymode)
+ #endif
+ 		{
+ 			my_pw=getpwuid(my_u);
+ 			if (!my_pw)
+ 			{
+-				errexit=EX_TEMPFAIL;
+-				throw "Cannot determine my username.";
++				/* A system may keep no passwd entry for the
++				   invoking user. The environment carries the
++				   same values, and POSIX names them for
++				   exactly this purpose. */
++
++				static struct passwd env_pw;
++
++				const char *env_name=getenv("LOGNAME");
++				const char *env_home=getenv("HOME");
++				const char *env_shell=getenv("SHELL");
++
++				if (!env_name || !*env_name)
++					env_name=getenv("USER");
++
++				if (!env_name || !*env_name ||
++				    !env_home || !*env_home)
++				{
++					errexit=EX_TEMPFAIL;
++					throw "Cannot determine my username.";
++				}
++
++				env_pw.pw_name=(char *)env_name;
++				env_pw.pw_dir=(char *)env_home;
++				env_pw.pw_shell=(char *)
++					(env_shell && *env_shell
++						? env_shell:"/bin/sh");
++				env_pw.pw_uid=my_u;
++				env_pw.pw_gid=getgid();
++				my_pw=&env_pw;
+ 			}
+ 
+ 			maildrop.init_home=my_pw->pw_dir;
+ 			maildrop.init_logname=my_pw->pw_name;
+ 			maildrop.init_shell=
+ 				my_pw->pw_shell && *my_pw->pw_shell
+ 					? my_pw->pw_shell:"/bin/sh";
+ 			maildrop.init_default=
+ 				GetDefaultMailbox(my_pw->pw_name);
+ 		}
+@@ -1037,24 +1064,70 @@
+ 	{
+ 	struct	stat	stat_buf;
+ 
+ 		setprocgroup();
+ 
+ 		if (fstat( fd, &stat_buf) != 0)
+ 			tempfail("stat() failed.");
+ 
+ 		if (!S_ISREG(stat_buf.st_mode))
+ 			tempfail("mailfilter file isn't a regular file.");
+-		if (stat_buf.st_mode & (S_IRWXO | S_IRWXG))
++
++		/* Some filesystems cannot represent private permissions and
++		   leave the group bits permanently set. An operator who knows
++		   which exposure that entails can accept it explicitly with
++		   MAILDROP_TRUST_FILTER_PERMS. World access and the ownership
++		   check below are never waived. */
++
++		const char *trust=getenv("MAILDROP_TRUST_FILTER_PERMS");
++		mode_t rejected=S_IRWXO;
++
++		if (!trust || !*trust || strcmp(trust, "0") == 0)
++			rejected |= S_IRWXG;
++
++		if (stat_buf.st_mode & rejected)
+ 			tempfail("Cannot have world/group permissions on the filter file - for your own good.");
+ 		if (stat_buf.st_uid != getuid())
+-			tempfail("mailfilter file is owned by the wrong user.");
++		{
++			/* A filesystem may map every file's owner id to a fixed
++			   value that never equals the process's own uid. Compare
++			   with a file this process creates in the same directory
++			   instead: a filter file belonging to a different
++			   mapping is still rejected. */
++
++			std::string probe=msg;
++			auto slash=probe.rfind('/');
++
++			if (slash == std::string::npos)
++				probe=".";
++			else
++				probe.resize(slash ? slash : 1);
++
++			probe += "/.maildrop-ownerprobe.XXXXXX";
++
++			int probe_fd=mkstemp(probe.data());
++
++			bool same_owner=false;
++
++			if (probe_fd >= 0)
++			{
++				struct stat probe_stat;
++
++				same_owner=fstat(probe_fd, &probe_stat) == 0 &&
++					probe_stat.st_uid == stat_buf.st_uid;
++				close(probe_fd);
++				unlink(probe.c_str());
++			}
++
++			if (!same_owner)
++				tempfail("mailfilter file is owned by the wrong user.");
++		}
+ 
+ 		if (r.ParseRecipe(in) < 0)
+ 			return (EX_TEMPFAIL);
+ 
+ //		if (maildrop.msgptr->MessageSize() > 0)
+ 			r.ExecuteRecipe();
+ 	}
+ //
+ // If a message is successfully delivered, an exception is thrown.
+ // If we're here, we should deliver to the default mailbox.

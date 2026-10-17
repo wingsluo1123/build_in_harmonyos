@@ -1,0 +1,41 @@
+--- a/libs/rfc2045/rfc2045.h
++++ b/libs/rfc2045/rfc2045.h
+@@ -1310,20 +1310,38 @@
+ 	// Factory for iterators and parsers that use LF(false) or CRLF(true)
+ 	// newline sequence.
+ 
+ 	template<bool crlf> struct line_iter {
+ 		template<typename beg_iter_type, typename end_iter_type>
+ 		struct iter;
+ 
+ 		template<typename src_type>
+ 		struct headers;
+ 
++		// Explicit deduction guides for iter and headers. Both are
++		// defined out-of-line below, and clang 15 does not form
++		// implicit deduction guides for such a nested class template;
++		// it only sees the declarations above. The guides mirror the
++		// constructors of the two classes.
++
++		template<typename beg_iter_type, typename end_iter_type>
++		iter(beg_iter_type &, end_iter_type &)
++			-> iter<beg_iter_type, end_iter_type>;
++
++		template<typename src_type>
++		headers(const entity &, src_type &)
++			-> headers<src_type>;
++
++		template<typename src_type>
++		headers(src_type &, size_t = 0)
++			-> headers<src_type>;
++
+ 		static constexpr std::string_view eol{
+ 			crlf ? "\r\n":"\n"
+ 		};
+ 
+ 		template<typename src_type> static bool try_boundary(
+ 			src_type &&src,
+ 			std::string boundary,
+ 			const entity &e
+ 		);
+ 

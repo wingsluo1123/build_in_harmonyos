@@ -1,0 +1,55 @@
+--- a/libs/maildrop/dotlock.C
++++ b/libs/maildrop/dotlock.C
+@@ -63,21 +63,51 @@
+ 	if (error)
+ 	{
+ 		unlink(templock);
+ 		throw "Unable to close a dot-lock.";
+ 	}
+ 	try
+ 	{
+ 	struct	stat	buf;
+ 
+ 		if (link(templock, finallock) < 0)
+-			; /* ignored */
++		{
++			/* Publishing the lock by hard link needs a filesystem
++			   that supports hard links. Where it refuses them,
++			   O_EXCL gives the same one-winner guarantee, so claim
++			   finallock directly with the pid already written to
++			   templock. EEXIST means someone else holds the lock,
++			   and the ordinary failure path below then reports
++			   contention. */
++
++			if (errno == EPERM || errno == ENOTSUP ||
++			    errno == EOPNOTSUPP)
++			{
++				int fd=open(finallock,
++					    O_CREAT | O_EXCL | O_WRONLY, 0644);
++
++				if (fd >= 0)
++				{
++					ssize_t n=write(fd, b.c_str(), b.size());
++					int closed=close(fd);
++
++					if (n == (ssize_t)b.size() && closed == 0)
++					{
++						name(finallock);
++						unlink(templock);
++						return (0);
++					}
++
++					unlink(finallock);
++				}
++			}
++		}
+ 
+ 	int	rc=stat(templock, &buf);
+ 		if (rc == 0 && buf.st_nlink == 2)
+ 		{
+ 			name(finallock);
+ 			unlink(templock);
+ 			return (0);
+ 		}
+ 		unlink(templock);
+ 	}
