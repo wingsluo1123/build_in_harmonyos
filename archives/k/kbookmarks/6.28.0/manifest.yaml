@@ -1,0 +1,37 @@
+software: kbookmarks
+version: "6.28.0"
+status: built
+build_system: cmake
+created_at: 2026-10-17
+build_date: "2026-10-17"
+dependencies:
+  required:
+    - qtbase/6.11.1
+    - kconfig/6.26.0.1
+    - kcoreaddons/6.26.0.1
+    - kwidgetsaddons/6.28.0
+  build:
+    - ecm/6.28.0
+  optional:
+    - qttools
+patches_applied:
+  - patches/0001-CMakeLists.txt.patch
+test_results:
+  type: passed
+  upstream: "passed: 1/1 upstream CTest autotest (kbookmarktest); the manual UI probe in tests/ is built but not registered as a CTest test upstream"
+  test_package: "passed: 1/1 consumer end-to-end (KBookmarkManager add/save/XBEL on disk, reopen lookup by address, KBookmarkMenu fills a QMenu); 14/14 checks"
+  full_reference: "kbookmarks/6.28.0#50155242f6ef37629c6739a1ebd52fcc:3c719041829c14be84e08fb81d6647409d627970"
+source_url: https://download.kde.org/stable/frameworks/6.28/kbookmarks-6.28.0.tar.xz
+source_mirrors:
+  - https://ftp.funet.fi/pub/mirrors/ftp.kde.org/pub/kde/stable/frameworks/6.28/kbookmarks-6.28.0.tar.xz
+  - https://mirror.freedif.org/KDE/ftp/stable/frameworks/6.28/kbookmarks-6.28.0.tar.xz
+  - https://mirrorservice.org/sites/download.kde.org/stable/frameworks/6.28/kbookmarks-6.28.0.tar.xz
+source_sha256: d7f4048860ef00bc5d135e284dc6b1307d03199c2c13020994b17e38e3741f5c
+knowledge_gained:
+  - "kbookmarks 6.28.0 requires KF6Config, KF6CoreAddons and KF6WidgetsAddons at KF_DEP_VERSION 6.28.0; patches/0001 lowers the floor to 6.26.0 because ohpcd publishes kconfig/kcoreaddons only up to 6.26.0.1 while kwidgetsaddons is at 6.28.0 (kcontacts 6.28.0 precedent)."
+  - "download.kde.org 302-redirects to a regional mirror (mirrors.bfsu.edu.cn from CN networks) that can fail TLS certificate verification on both campus and device networks; conan get()/download() natively accept a URL list (first = primary, rest = mirrors on download error), so conandata.yml lists the official URL plus three sha256-verified authoritative mirrors (R39)."
+  - "KF_SKIP_PO_PROCESSING=ON is a no-patch way to skip po/qm processing: ECM's ecm_process_po_files_as_qm() returns early when the option is set (verified in the ECM 6.26/6.28 sources on device), so no Qt6LinguistTools lookup happens."
+  - "The 6.26->6.28 CMake delta is tiny: cmake_minimum_required 3.16->3.29, KF_VERSION/KF_DEP_VERSION, ECM 6.18->6.28, REQUIRED_QT_VERSION 6.7->6.9, deprecation floors; src/widgets/CMakeLists.txt only moves KF6::Bookmarks from PRIVATE to PUBLIC; autotests/ and tests/ CMakeLists are byte-identical."
+  - "KBookmarkActionMenu derives from KActionMenu (KF6ConfigGui is a PRIVATE link of KF6BookmarksWidgets), so consumers must not instantiate it without linking the ConfigGui target; KBookmarkMenu (plain QObject, QMenu out-parameter) is the safe widgets-side surface for consumer tests."
+  - "KBookmarkMenu populates lazily: the constructor only connects to QMenu::aboutToShow (slotAboutToShow checks a dirty flag), so a headless consumer must call the public ensureUpToDate() before inspecting menu.actions(); a null KBookmarkOwner is safe (it is stored, only dereferenced in owner-gated add* slots)."
+  - "kbookmarks installs a single KF6BookmarksConfig.cmake exporting both KF6::Bookmarks and KF6::BookmarksWidgets; find_dependency() there only requires KF6WidgetsAddons (plus Qt6Widgets/Qt6Xml) for shared builds."
