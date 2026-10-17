@@ -1,0 +1,93 @@
+# conandata.yml — maildrop 4.0.3
+# Single source of truth for the source URL, its hash, and the patches applied
+# on top of the official release tarball (conanfile.py reads this file).
+#
+# Two kinds of edit are deliberately NOT here, because they target files that
+# configure generates and would therefore be overwritten before the build or the
+# tests use them (both are done in build(), next to the toolchain setup):
+#   * the mktemp/mkdir rewrite of the ten generated `configure` scripts;
+#   * the adjustments to the generated test drivers `testsuite` and
+#     `testsuite.mailbot`.
+# See notes.md for the measurement behind each change.
+
+sources:
+  # The canonical downloads.sourceforge.net URL answers with a signed redirect to
+  # this mirror host, and that extra hop times out on the CI worker ("源码下载
+  # 超时"). Pointing at the mirror directly serves the identical tarball (verified
+  # sha256 below) without the redirect, and matches other packages in this
+  # repository that address this host directly.
+  url: "https://master.dl.sourceforge.net/project/courier/maildrop/4.0.3/maildrop-4.0.3.tar.bz2"
+  sha256: "bbbab6c4095a23104088935c0efaea53ad818b6ba846bf2780d1cb684a715e97"
+
+patches:
+  - patch_file: "patches/0001-libs-maildir-maildircreate.C.patch"
+    patch_description: "Deliver into a Maildir on a filesystem without hard links: fall back to rename() for EPERM/ENOTSUP, not only EXDEV"
+    patch_type: "portability"
+
+  - patch_file: "patches/0002-libs-maildir-maildirkeywords.C.patch"
+    patch_description: "Publish keyword update files with rename() when the filesystem refuses hard links (same gap as 0001, second site)"
+    patch_type: "portability"
+
+  - patch_file: "patches/0003-libs-maildir-testmaildircache.C.patch"
+    patch_description: "Stop dereferencing a NULL getpwuid() result in the upstream test program"
+    patch_type: "portability"
+
+  - patch_file: "patches/0004-libs-maildrop-dotlock.C.patch"
+    patch_description: "Claim dot locks with O_CREAT|O_EXCL where link() is unsupported, keeping the one-winner guarantee"
+    patch_type: "portability"
+
+  - patch_file: "patches/0005-libs-maildrop-mailbot.C.patch"
+    patch_description: "Use rfc822::create_tmpfile() for the two temporary files mailbot opens"
+    patch_type: "portability"
+
+  - patch_file: "patches/0006-libs-maildrop-maildir.C.patch"
+    patch_description: "Fall back to rename() for a filesystem that refuses hard links (maildrop's own delivery path)"
+    patch_type: "portability"
+
+  - patch_file: "patches/0007-libs-maildrop-main.C.patch"
+    patch_description: "Fall back to the environment when getpwuid() has no entry, gate the filter-file group-permission check behind MAILDROP_TRUST_FILTER_PERMS, and compare filter ownership against a probe file when the filesystem maps owner ids"
+    patch_type: "portability"
+
+  - patch_file: "patches/0008-libs-maildrop-tempfile.C.patch"
+    patch_description: "Use rfc822::create_tmpfile() for maildrop's shared temporary file"
+    patch_type: "portability"
+
+  - patch_file: "patches/0009-libs-maildrop-testsuite3.C.patch"
+    patch_description: "Use rfc822::create_tmpfile() in the upstream testsuite3 program"
+    patch_type: "portability"
+
+  - patch_file: "patches/0010-libs-rfc2045-makemime.C.patch"
+    patch_description: "Use rfc822::create_tmpfile() in makemime"
+    patch_type: "portability"
+
+  - patch_file: "patches/0011-libs-rfc2045-reformime.C.patch"
+    patch_description: "Use rfc822::create_tmpfile() when reformime spills a pipe to a temporary file"
+    patch_type: "portability"
+
+  - patch_file: "patches/0012-libs-rfc822-rfc822_fdstreambuf.C.patch"
+    patch_description: "Implement rfc822::create_tmpfile() (TMPDIR + mkstemp, libc tmpfile() as fallback) and use it from fdstreambuf::tmpfile()"
+    patch_type: "portability"
+
+  - patch_file: "patches/0013-libs-rfc822-testsuitecpp.C.patch"
+    patch_description: "Use rfc822::create_tmpfile() in the upstream rfc822 testsuite program"
+    patch_type: "portability"
+
+  - patch_file: "patches/0014-config.guess.patch"
+    patch_description: "Teach the tarball's config.guess to recognise HarmonyOS (uname -s returns HarmonyOS; config.sub already accepts the ohos triplet)"
+    patch_type: "portability"
+
+  - patch_file: "patches/0015-libs-maildrop-testsuite.txt.idn.patch"
+    patch_description: "Upstream expected output: record the delivered file mode this filesystem can represent (0640, not 0644)"
+    patch_type: "portability"
+
+  - patch_file: "patches/0016-libs-maildrop-testsuite2.patch"
+    patch_description: "Upstream test suite 2: accept the filter-file exposure explicitly, since this filesystem cannot clear the group bits"
+    patch_type: "portability"
+
+  - patch_file: "patches/0017-libs-rfc2045-rfc2045.h.patch"
+    patch_description: "Add explicit deduction guides for the two nested class templates that are defined out of line; clang 15 forms no implicit guides for those"
+    patch_type: "portability"
+
+  - patch_file: "patches/0018-libs-rfc822-rfc822.h.patch"
+    patch_description: "Declare rfc822::create_tmpfile()"
+    patch_type: "portability"

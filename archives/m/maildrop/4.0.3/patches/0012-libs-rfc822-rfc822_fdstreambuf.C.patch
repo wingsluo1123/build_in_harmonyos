@@ -1,0 +1,68 @@
+--- a/libs/rfc822/rfc822_fdstreambuf.C
++++ b/libs/rfc822/rfc822_fdstreambuf.C
+@@ -1,37 +1,64 @@
+ /*
+ ** Copyright 2025 S. Varshavchik.
+ ** See COPYING for distribution information.
+ */
+ 
+ #include	"rfc822.h"
+ #include	<unistd.h>
+ #include	<cstring>
+ #include	<cstdio>
++#include	<cstdlib>
+ #include	<fcntl.h>
+ 
+ #ifndef BUFSIZ
+ #define BUFSIZ 8192
+ #endif
+ 
+ rfc822::fdstreambuf::~fdstreambuf()
+ {
+ 	(void)sync();
+ 	if (defaultbuf)
+ 		delete[] defaultbuf;
+ 	if (fd >= 0)
+ 		close(fd);
+ }
+ 
++FILE *rfc822::create_tmpfile()
++{
++	const char *tmpdir=getenv("TMPDIR");
++
++	if (tmpdir && *tmpdir)
++	{
++		std::string s{tmpdir};
++
++		s += "/tmp.XXXXXX";
++
++		int fd=mkstemp(s.data());
++
++		unlink(s.c_str());
++
++		if (fd >= 0)
++		{
++			FILE *fp=::fdopen(fd, "w+b");
++
++			if (fp)
++				return fp;
++			close(fd);
++		}
++	}
++	return ::tmpfile();
++}
++
+ rfc822::fdstreambuf rfc822::fdstreambuf::tmpfile()
+ {
+-	FILE *fp=::tmpfile();
++	FILE *fp=create_tmpfile();
+ 
+ 	rfc822::fdstreambuf tmpfilebuf{dup(::fileno(fp))};
+ 
+ 	fclose(fp);
+ 	return tmpfilebuf;
+ }
+ 
+ rfc822::fdstreambuf rfc822::fdstreambuf::tmpfile(const char *tmpdir)
+ {
+ #ifndef O_TMPFILE

@@ -1,0 +1,25 @@
+--- a/libs/rfc2045/makemime.C
++++ b/libs/rfc2045/makemime.C
+@@ -132,21 +132,21 @@
+ 
+ static rfc822::fdstreambuf openfile(std::string_view filename)
+ {
+ 	int ignore;
+ 
+ 	rfc822::fdstreambuf fp=openfile_or_pipe(filename, "r", ignore);
+ 	int	fd=fp.fileno();;
+ 
+ 	if (!isreg(fd))	/* Must be a pipe */
+ 	{
+-		FILE *t=tmpfile();
++		FILE *t=rfc822::create_tmpfile();
+ 		int tfd=dup(fileno(t));
+ 
+ 		if (tfd < 0)
+ 		{
+ 			perror("dup");
+ 			exit(1);
+ 		}
+ 
+ 		rfc822::fdstreambuf tfile{tfd};
+ 		fclose(t);

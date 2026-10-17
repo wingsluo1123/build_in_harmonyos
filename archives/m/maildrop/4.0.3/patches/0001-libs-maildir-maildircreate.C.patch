@@ -1,0 +1,26 @@
+--- a/libs/maildir/maildircreate.C
++++ b/libs/maildir/maildircreate.C
+@@ -262,17 +262,22 @@
+ }
+ 
+ int maildir::movetmpnew(const std::string &tmpname, const std::string &newname)
+ {
+ 	if (link(tmpname.c_str(), newname.c_str()) == 0)
+ 	{
+ 		unlink(tmpname.c_str());
+ 		return 0;
+ 	}
+ 
+-	if (errno != EXDEV)
++	/* Some filesystems do not refuse hard links with EXDEV but with a
++	   plain "not permitted"/"not supported" error; renaming the message
++	   is equally atomic while tmp and new live in the same Maildir, so
++	   fall back for those errors too. */
++
++	if (errno != EXDEV && errno != EPERM && errno != ENOTSUP)
+ 		return -1;
+ 
+ 	/* AFS? */
+ 
+ 	return rename(tmpname.c_str(), newname.c_str());
+ }

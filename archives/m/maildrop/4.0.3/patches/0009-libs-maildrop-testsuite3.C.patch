@@ -1,0 +1,48 @@
+--- a/libs/maildrop/testsuite3.C
++++ b/libs/maildrop/testsuite3.C
+@@ -2,21 +2,21 @@
+ #include "message.h"
+ #include <unistd.h>
+ #include <stdio.h>
+ #include <iostream>
+ #include <sstream>
+ #include <filesystem>
+ 
+ void testsmallmessage(Maildrop &md)
+ {
+ 	Message m{md};
+-	FILE *fp=tmpfile();
++	FILE *fp=rfc822::create_tmpfile();
+ 
+ 	fprintf(fp, "Subject: small message\n"
+ 		"\n"
+ 		"Hello world.\n");
+ 	fseek(fp, 0L, SEEK_SET);
+ 	m.Init(fileno(fp), "From: nobody@example.com\n");
+ 	fclose(fp);
+ 
+ 	std::stringstream ss;
+ 
+@@ -166,21 +166,21 @@
+ 
+ #if	SHARED_TEMPDIR
+ 
+ #else
+ 	std::error_code ec;
+ 	md.tempdir=".tmpdir";
+ 	std::filesystem::create_directory(md.tempdir, ec);
+ #endif
+ 	testsmallmessage(md);
+ 
+-	FILE *f=tmpfile();
++	FILE *f=rfc822::create_tmpfile();
+ 	{
+ 		auto m=long_message();
+ 		fprintf(f, "%s", m.c_str());
+ 	}
+ 
+ 	fseek(f, 0L, SEEK_SET);
+ 	longmessagetest(md, fileno(f), "seekable");
+ 	fclose(f);
+ 
+ 	int pfd[2];
