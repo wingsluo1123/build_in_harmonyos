@@ -1,0 +1,69 @@
+# 版本级 manifest — imageflow 2.3.1_rc01
+
+version: "2.3.1_rc01"
+software: "imageflow"
+
+# 编译状态
+# built：本地 OHOS aarch64 干净构建（conan create）+ conan-verify 8 门禁 PASS +
+# test_package 11/11 + C ABI 消费者 PASS；未上传发布。
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-06"
+build_system: "custom"   # Rust 2024 cargo workspace + C components
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（官方源，R39）；tag v2.3.1-rc01（commit 0635e3863f）
+  url: "https://github.com/imazen/imageflow/archive/refs/tags/v2.3.1-rc01.tar.gz"
+
+  # 源码校验和（实测 sha256）
+  sha256: "1470c78574b329e7996493615f5045e91ddf9eda84061f068ab7cd8ee599446c"
+
+  # 压缩格式
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型（Rust cargo workspace，非 autotools/cmake）
+  system: custom
+
+  # 配置选项列表（cargo 无 configure 选项）
+  configure_options: []
+
+  # 运行期依赖列表（无外部运行期依赖；系统 libz/libc 由 OHOS 提供）
+  dependencies: []
+
+  # 构建期工具依赖（tool_requires）
+  build_tools:
+    - "rust-toolchain/1.97.1"
+    - "openssl/3.5.6.1.1"
+    - "zlib-ng-compat/2.3.3"
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 无源码补丁（全部适配收敛在 conanfile.py 的构建环境构造中）
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "Rust 2024 workspace（libimageflow cdylib + imageflow_tool CLI）在 OHOS aarch64 的可行路径：tool_requires rust-toolchain/1.97.1（宿主=目标 aarch64-unknown-linux-ohos），签名 cargo/rustc/librustc_driver 后 cargo build --locked --release --workspace --target aarch64-unknown-linux-ohos"
+  - "cargo 1.97 运行期需 OpenSSL 3.5+（SSL_get0_group_name，系统 3.0.16 缺失）；Harmonybrew bottle 实测 404 后，改用制品仓静态 openssl/3.5.6.1.1 重链私有 libssl.so/libcrypto.so（cbindgen/0.28.0 先例）；libz.so 由 zlib-ng-compat/2.3.3 重链，不落系统前缀（R49）"
+  - "cargo git 依赖若带 vendor 子模块（imazen/rust-libpng-sys、rust-lcms2-sys fork）：net.git-fetch-with-cli=true 时可用 git url.<ghfast.top>.insteadOf 重写（GIT_CONFIG_COUNT/KEY/VALUE env），主仓库与子模块拉取同时生效（E017）"
+  - "无 .git 的源码 tarball 构建 imageflow 时，imageflow_types/build.rs 需 GIT_COMMIT / GIT_DESCRIBE_ALWAYS_LONG 等 5 个环境变量（上游 Cross.toml 对跨容器构建同样做法）"
+  - "上游测试在 OHOS aarch64 实跑 290 passed / 0 failed / 4 ignored（单元 99 + 集成 190 + tool self-test 1）；rust-toolchain/1.97.1 不含 rustdoc，doc-tests 属环境限制"

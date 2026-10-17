@@ -1,0 +1,189 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "PF9-framework",
+      "file": "archives/i/imageflow/README.md",
+      "line": 1,
+      "description": "Preflight PF9（分支/路径闸）框架误报（本轮独立复现）：`cd ~/build_in_harmonyos && python3 -m scripts.ohc.preflight <repo> 01438b6e61 HEAD` 输出 PF9 bad-list = [archives/i/imageflow/README.md, commands.json, manifest.yaml]（4 段路径一律判为“缺版本目录层”）并 rc=1；同一次运行中 PF1-PF8、PF5 扩面、PF6、R52 全部无任何其它发现。用 preflight.check_branch_and_paths 对 7 个已合并同类包（caph/ivar/jube/transfuse/sockstat/wrapsrv/units-filter，均含 R38/软件级 README+commands.json+manifest.yaml）以相同文件形态模拟，全部同样命中（TRIPS-PF9）。CI 侧 L0m/L0k/L0j 实际 PASS（reports/w3-local-ci.log 第 35-41 行），不产生 “No packages to build”。结论：PF9⟷PF8/R38 已知框架矛盾（前轮 W4 与主管 SUPERVISOR-BOARD 8.2v13 均已登记），非本配方缺陷，非 P1。",
+      "fix_suggestion": "按既定路径：提交时使用官方逃生口 OHC_PREFLIGHT=0 并在 PR 正文登记留痕（当前 PR #14854 正文已含该节）；框架侧建议修 PF9：仅当变更集不含任何 `archives/<字母>/<包>/<版本>/` 文件时才判“缺版本目录层”。"
+    },
+    {
+      "severity": "P2",
+      "rule_id": "R53",
+      "file": "archives/i/imageflow/2.3.1_rc01/test_package/test_imageflow.py",
+      "line": 242,
+      "description": "B3/B5 “OHOS code signature” 断言为 `b\"codesign\" in payload` 存在性检查（B3 line 242-243、B5 line 250-251）。前轮 W4 实测 OHOS SDK clang 会给任何链接产物自动插入 0x1000 字节 .codesign 占位段（未经 binary-sign-tool 的 hello world 亦含非零占位），故该断言无法区分“SDK 占位段”与 binary-sign-tool -selfSign 1 真签名。不构成欺骗：签名流水线有 conan create 日志 'signed artifact' 双条证据 + 包内二进制实机可执行（本轮沙箱复跑 A1-A5 全 rc=0）。",
+      "fix_suggestion": "后续迭代改为校验 .codesign 段内容/结构（或解析 binary-sign-tool 输出），例如比较签名前后段内容差异；当前不阻塞。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "doc-consistency",
+      "file": "archives/i/imageflow/2.3.1_rc01/notes.md",
+      "line": 20,
+      "description": "R51 分布表个别分项与独立复算（本轮 grep 复算，排除 target/、c_components/tests）不符：riapi/src 7 vs 14、core/src 60 vs 63、集成非 visuals 74 vs 75、“其余 ~30” vs 实际 18；总数 309 与申报一致。test-report.md line 8 “执行 74 / 通过 72 / 忽略 3”（72+3≠74，应为 75）。notes.md line 112 交付物表列 4 个头文件，包内实际 7 个 .h（imageflow_default/lua/pinvoke/short/raw/SCREAMING_ENUMS/PrefixedPascalCase）。核心数字（309/290/0/4）与实测一致，均不阻断。",
+      "fix_suggestion": "后续迭代修正分项计数与交付物头文件数；不影响本轮结论。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R49",
+      "file": "archives/i/imageflow/2.3.1_rc01/conanfile.py",
+      "line": 325,
+      "description": "_configure_cargo() 在未设置 CARGO_HOME 时写入共享用户级 ~/.cargo/config.toml（rsproxy 镜像/retry/cainfo）。PF6（共享前缀注入）本轮独立运行 PASS——重链产物全部落 build_folder/cargo-runtime，不注入 /usr/local；此条仅为用户级配置文件覆写/跨任务互相影响的隐患（notes 已说明 ~900MB 缓存复用动机）。",
+      "fix_suggestion": "可选：CARGO_HOME 指向 build_folder 内私有目录（会牺牲缓存复用），或在写入前合并既有 config；低优先级。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R33",
+      "file": "archives/i/imageflow/2.3.1_rc01/conanfile.py",
+      "line": 136,
+      "description": "_find_binary_sign_tool/_ohos_cc/_llvm_tool 硬编码 HNP/SDK 绝对路径（/data/service/hnp/...、ohos-sdk_26.0.0.18），但均有 shutil.which 兜底 + 找不到即 ConanInvalidConfiguration 的 fail-fast，并非 R33 禁止的“裸 shell 环境变量静默失败”形态。",
+      "fix_suggestion": "可选：统一从 [conf] tools.build:compiler_executables 或环境变量解析 OHOS 工具路径（test_package/conanfile.py 已有 conf 优先逻辑可参照）。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "housekeeping",
+      "file": "archives/i/imageflow/2.3.1_rc01/",
+      "line": 1,
+      "description": "工作树存在被 .gitignore 覆盖的本地残留（conandata.yml.orig、conandata.yml.ghfast-bak、__pycache__/、packaging/、test_package/build-release/ 含运行期生成的 input.png/输出图），git check-ignore 逐条验证、`git status --porcelain archives/i/imageflow/` 审计开始时为空、不入 PR 提交。另：本轮审计覆盖写的新 audit-result.json 采用 LF（旧版 155 处 CRLF，将随本次覆盖消失）。",
+      "fix_suggestion": "无需处理（不入库）；可选本地清理。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "manifest",
+      "file": "archives/i/imageflow/manifest.yaml",
+      "line": 4,
+      "description": "软件级 category 用 \"graphics\"（模板建议词表为 gfx 等）；版本级 manifest.yaml line 12 build_date=2026-10-06 与 notes.md “编译结束 2026-10-12 18:51”（W3 重跑日期）并存，属原始构建日期与复验日期的说明缺口。版本命名 2.3.1_rc01 对应上游 tag v2.3.1-rc01（仓库已有 abuild-rootbld/3.18.0_rc3 等同形先例），L0j/L0m/PF8/PF9 分支名均已对齐。均不阻断。",
+      "fix_suggestion": "可选：category 改 gfx；在 notes/manifest 注明 build_date 为首次构建日期。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "submission",
+      "file": "platform PR #14854 body",
+      "line": 1,
+      "description": "平台 PR 正文（GitCode API 拉取，updated_at 2026-10-12T19:12+08）仍引用上一轮 W3 证据（integrity_hash=2ae8a079c50bef38、log_sha256=d7ab9c02...、24537B 时代描述）与修复前表述；当前 .ci-result.json 为 0d51f47cb832430e / e36e5e39...（24140B）。二进制修复提交 087d9c1f 后正文未同步，评审核对时会出现“正文 vs .ci-result.json”不一致观感。",
+      "fix_suggestion": "submit 前重新生成 pr-body.md（submit 会自动从 conandata/conanfile/test-report/notes 刷新），确保 W3 证据引用为 0d51f47cb832430e / e36e5e39b42c...；属提交侧动作，不入归档树。"
+    }
+  ],
+  "summary": "imageflow 2.3.1_rc01 二进制修复版独立审计通过（verdict=pass，P0=0，P1=0；P2=2、P3=6 均不阻断）。对象：worktree ~/runner/imageflow-wt，分支 feat/imageflow-2.3.1_rc01，HEAD 087d9c1f17f226d3c038238e161c74e545d0fd4f（4 commits），base origin/main 01438b6e61889a90d2e9be3d7cff8476b078f7c7；delta vs 前轮 910ce1730c 精确为 4 路径（M notes.md / M test_package/conanfile.py / D test_package/input.png / M test_package/test_imageflow.py）。关键独立复核（全部本轮一手复算/复跑）：① W2 原子性：git diff origin/main...HEAD 12 文件全部位于 archives/i/imageflow/**；HEAD tree 无任何二进制扩展（git ls-tree grep 空）；无 .orig/.bak/.rej 被跟踪；`git status --porcelain archives/i/imageflow/` 审计开始时为空（残留文件均被 .gitignore 覆盖）。② 二进制移除完整性：test_imageflow.py 43 段 base64 独立解码 = 2,313 B、sha256=7d1a73bb65fc3ef3d7f4c0ee0720a78460b86167c6e137d6cb182fc37b4d0f87，与 git show 910ce1730c:...input.png 旧 blob 逐字节一致（旧文件确为二进制 PNG 32x32）；HEAD 中 input.png 已不存在，全部剩余引用均为 materialize_input_png() 运行期生成（含 sha256 自检）；exports_sources 已同步移除 input.png。③ test_package 独立沙箱复跑：git archive HEAD 纯净拷贝（无 input.png/build-release）→ `conan test` rc=0，11/11 断言 + C ABI PASS（ABI 3.2 / compatible / context_create/destroy），运行期生成的 input.png sha256 与旧 blob 一致，输出 out_stretch.jpg 350B(8x8)、out_w16.png 115B。④ W3 哈希：按 finish.py 算法 raw=\"2026-10-12T19:01:42.917185:imageflow:2.3.1_rc01:0\" 复算 integrity_hash=0d51f47cb832430e（一致）；sha256(reports/w3-local-ci.log)=e36e5e39b42c300a01236985e97787858f3b6bf510fbfa08d966bbacdacc639c（24,140B，一致）；W3 日志含 L0/L1/L2/L4/L5 全绿 + L1e 破坏性反向验证。⑤ 平台 PR #14854 复核（GitCode API + pull/14854.diff）：head.sha 即 087d9c1f、base.sha 即 01438b6e61（与本地完全一致）、ci_state_passed=true；diff 文本 sha256=63310a1b...，Binary files=0、GIT binary patch=0、12 个 diff --git；`git apply --check` 于 fresh 树 rc=0、实际 git apply rc=0，apply 后 12 文件 sha256 与 HEAD blob 全部 MATCH（逐字节等价）。⑥ 配方其余面：R32 validate 含 OHOS；R33 无裸环境变量注入（fail-fast）；R38 commands.json 软件级齐备（name/type=tool/ref/binary 校验通过，PF8 PASS）；R34 真实调用（L1e+沙箱复跑，非空壳）；R49 私有 build_folder 注入（PF6 PASS）；PF5 无 __OHOS__/-D__OHOS__/replace 注入；MANIFEST.yml 三处齐备非空。preflight（官方脚本）独立运行：PF1-PF8+R52 零发现，仅 PF9 对软件级三文件误报（已对 7 个已合并同类包复现，P2，非配方缺陷）。包内 ELF 复验（缓存包）：SONAME=libimageflow.so、NEEDED 仅 libz.so/libc.so、无 RUNPATH/RPATH、双产物含 .codesign、包内无系统同名 .so（R26/G3）。⑦ R51：静态 #[test] 复算 309（本轮 W3 源码目录一手复算，排除 target/、c_components/tests）= 申报值；运行态 290 passed / 0 failed / 4 ignored 为前轮 W4 独立复跑证据（源码树/toolchain 未变，测试二进制已被清理未再跑），分布表分项偏差已记 P3。残余风险：A) 提交须走 OHC_PREFLIGHT=0 并在 PR 正文登记 PF9 框架冲突（已有先例与留痕）；B) PR 正文 W3 证据需在 submit 时刷新（P3）；C) B3/B5 断言强度（P2）不影响结论。",
+  "audit_metadata": {
+    "auditor": "W4 independent audit subagent (round 2, binary-fix re-audit)",
+    "audit_time": "2026-10-12T21:35:00+08:00",
+    "repo_dir": "/storage/Users/currentUser/runner/imageflow-wt",
+    "branch": "feat/imageflow-2.3.1_rc01",
+    "head_commit": "087d9c1f17f226d3c038238e161c74e545d0fd4f",
+    "base_commit": "01438b6e61889a90d2e9be3d7cff8476b078f7c7",
+    "prev_head_commit": "910ce1730c",
+    "commits_in_range": 4,
+    "package": "imageflow/2.3.1_rc01",
+    "conan_cache": {
+      "recipe_revision": "ac51343507990abfb33ec3701c9f5fe0",
+      "package_id": "01d92cf349a0dd98ff915f4bd99a04430171517f",
+      "package_revision": "34c96bb3dfa8cb765adc3b5198985919",
+      "settings": "os=OHOS os.version=6.0 arch=armv8 compiler=clang compiler.version=15 build_type=Release options=shared=True"
+    }
+  },
+  "evidence": {
+    "w2_atomicity": {
+      "changed_names_vs_origin_main": 12,
+      "all_within": "archives/i/imageflow/**",
+      "delta_vs_910ce1730c": [
+        "M archives/i/imageflow/2.3.1_rc01/notes.md",
+        "M archives/i/imageflow/2.3.1_rc01/test_package/conanfile.py",
+        "D archives/i/imageflow/2.3.1_rc01/test_package/input.png",
+        "M archives/i/imageflow/2.3.1_rc01/test_package/test_imageflow.py"
+      ],
+      "head_binary_extensions": 0,
+      "tracked_orig_bak_rej": 0,
+      "status_porcelain_subtree_at_audit_start": "clean"
+    },
+    "binary_removal": {
+      "embedded_b64_chunks": 43,
+      "decoded_bytes": 2313,
+      "decoded_sha256": "7d1a73bb65fc3ef3d7f4c0ee0720a78460b86167c6e137d6cb182fc37b4d0f87",
+      "old_blob_sha256_910ce1730c": "7d1a73bb65fc3ef3d7f4c0ee0720a78460b86167c6e137d6cb182fc37b4d0f87",
+      "old_blob_type": "PNG image data, 32 x 32, 8-bit/color RGB, non-interlaced",
+      "match": true,
+      "runtime_materialized_sha256_sandbox": "7d1a73bb65fc3ef3d7f4c0ee0720a78460b86167c6e137d6cb182fc37b4d0f87",
+      "head_references_to_input_png": "runtime generation only (materialize_input_png + sha256 self-check); old audit-result.json provenance entry replaced by this file"
+    },
+    "sandbox_rerun": {
+      "method": "git archive HEAD -> pristine copy; conan test test_package imageflow/2.3.1_rc01 -pr:h=ohos-aarch64 -pr:b=ohos-aarch64",
+      "pre_state_no_input_png": true,
+      "pre_state_no_build_dir": true,
+      "exit_code": 0,
+      "assertions": "11/11 passed (B1-B6 harmonyos-specific, A1-A5 image ops)",
+      "c_abi_consumer": "compile rc=0; run rc=0; ABI 3.2; compatible=true; context_create/destroy OK",
+      "outputs": {
+        "input.png": "2313 B generated at runtime",
+        "out_stretch.jpg": "350 B (8x8)",
+        "out_w16.png": "115 B (16x16)"
+      }
+    },
+    "w3_ci_result": {
+      "file": "archives/i/imageflow/2.3.1_rc01/.ci-result.json",
+      "timestamp": "2026-10-12T19:01:42.917185",
+      "exit_code": 0,
+      "integrity_stored": "0d51f47cb832430e",
+      "integrity_recomputed": "0d51f47cb832430e",
+      "log_sha256_stored": "e36e5e39b42c300a01236985e97787858f3b6bf510fbfa08d966bbacdacc639c",
+      "log_sha256_recomputed": "e36e5e39b42c300a01236985e97787858f3b6bf510fbfa08d966bbacdacc639c",
+      "w3_log_bytes": 24140
+    },
+    "platform_pr": {
+      "url": "https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos/pull/14854",
+      "api_head_sha": "087d9c1f17f226d3c038238e161c74e545d0fd4f",
+      "api_base_sha": "01438b6e61889a90d2e9be3d7cff8476b078f7c7",
+      "diff_sha256": "63310a1bf92a7bb27174d3ab0152a3cc8df56e5bb5f85d221927c60bb524bc45",
+      "binary_files_count": 0,
+      "git_binary_patch_count": 0,
+      "diff_git_entries": 12,
+      "git_apply_check": "rc=0 (fresh tree)",
+      "git_apply": "rc=0; all 12 applied files sha256 == HEAD blobs (byte-identical)",
+      "ci_state_passed": true
+    },
+    "file_sha256": {
+      "archives/i/imageflow/2.3.1_rc01/conandata.yml": "508ccdce6949ccdb9f6087199e6212176f76aedf88574b4fa95bf2be46c1ff9d",
+      "archives/i/imageflow/2.3.1_rc01/conanfile.py": "5d0760dce07c4a81550ecf068e15bb62ca58cf91bf0386e756ca8e1d0b2734a3",
+      "archives/i/imageflow/2.3.1_rc01/manifest.yaml": "e498b78adc49d6ff0945daf12260737e77170e06847c620d12dee629df13c117",
+      "archives/i/imageflow/2.3.1_rc01/notes.md": "7bc3819b4fae869d3d2f7ddf8c2bee82933d2d16dc8f5698210696d9f43563ce",
+      "archives/i/imageflow/2.3.1_rc01/reports/audit-result.json": "self (this file; replaced the previous round copy which had CRLF)",
+      "archives/i/imageflow/2.3.1_rc01/test_package/MANIFEST.yml": "f5be1180a8c9cf06a0756b180725730929bd42ce83034a9752029d013691a6c3",
+      "archives/i/imageflow/2.3.1_rc01/test_package/conanfile.py": "d502f6477387aedee5e429f0e1dfeecc8a2ba40b639ef96bd8b990f9971a68de",
+      "archives/i/imageflow/2.3.1_rc01/test_package/test_consumer.c": "4b12d9007eee1ecd276929fd98f0aed002809bc511d0f40bbeaa9dae7e85c1dc",
+      "archives/i/imageflow/2.3.1_rc01/test_package/test_imageflow.py": "292bd4e746e519a6fa96c59a860d3fb6930cdfcfdb8107e0fda06e0f698e4848",
+      "archives/i/imageflow/README.md": "c06119470891b5b2c8b4da973c08c26c308aa2e706565c4a6b1585a1d5a637f8",
+      "archives/i/imageflow/commands.json": "24fd04deda12597711446e0412f7b51a03502bef1223b972a08ee366e4c9c3e5",
+      "archives/i/imageflow/manifest.yaml": "44a7731ee62677ead6493cf25bea62dff979a5e7cc97e55478088d8bb9c08e25"
+    },
+    "elf_package_facts": {
+      "soname": "libimageflow.so",
+      "needed": ["libz.so", "libc.so"],
+      "runpath_rpath": "none (both artifacts)",
+      "codesign_section": "present in both artifacts (0x1000 placeholder/signature)",
+      "system_named_so_in_package": "none (R26/G3 clean)"
+    },
+    "r51": {
+      "static_test_count_recount_first_hand": 309,
+      "run_counts": "290 passed / 0 failed / 4 ignored (carried from previous W4 independent rerun; source tree/toolchain unchanged in this delta; test binaries pruned since)",
+      "distribution_deviations": "riapi/src 7 vs 14; core/src 60 vs 63; integration non-visuals 74 vs 75; total 309 match"
+    },
+    "preflight": {
+      "command": "cd ~/build_in_harmonyos && python3 -m scripts.ohc.preflight ~/runner/imageflow-wt 01438b6e61 087d9c1f",
+      "result": "PF1-PF8, PF5-expanded, PF6, R52: PASS (no findings). PF9: false positive on software-level files (README.md/commands.json/manifest.yaml), reproduced identically on 7 merged packages; rc=1 attributable solely to this known framework conflict"
+    },
+    "pr_audit_report_rc": "see session log (pre_pr_audit.py report run after this file was written)",
+    "reproduce_commands": [
+      "cd ~/runner/imageflow-wt && git diff --name-status 910ce1730c..HEAD && git ls-tree -r HEAD archives/i/imageflow | grep -Ei '\\.(png|jpe?g|gif|zip|gz|bz2|xz|bin)$'",
+      "git show 910ce1730c:archives/i/imageflow/2.3.1_rc01/test_package/input.png | sha256sum  # -> 7d1a73bb...",
+      "python3 (独立) 解码 test_imageflow.py 内嵌 PNG_B64 -> sha256 == 7d1a73bb...",
+      "mkdir sandbox && git -C ~/runner/imageflow-wt archive HEAD archives/i/imageflow/2.3.1_rc01 | tar -x -C sandbox && cd sandbox/archives/i/imageflow/2.3.1_rc01 && conan test test_package imageflow/2.3.1_rc01 -pr:h=ohos-aarch64 -pr:b=ohos-aarch64",
+      "python3 -c 'import hashlib;raw=\"2026-10-12T19:01:42.917185:imageflow:2.3.1_rc01:0\";print(hashlib.sha256(raw.encode()).hexdigest()[:16])'  # -> 0d51f47cb832430e",
+      "sha256sum ~/runner/imageflow-wt/archives/i/imageflow/2.3.1_rc01/reports/w3-local-ci.log  # -> e36e5e39...",
+      "curl -sSL -o pull.diff https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos/pull/14854.diff && grep -c '^Binary files' pull.diff; grep -c '^GIT binary patch' pull.diff; mkdir ac && cd ac && git apply --check pull.diff",
+      "cd ~/build_in_harmonyos && python3 -m scripts.ohc.preflight ~/runner/imageflow-wt 01438b6e61889a90d2e9be3d7cff8476b078f7c7 087d9c1f17f226d3c038238e161c74e545d0fd4f",
+      "python3 ~/build_in_harmonyos/scripts/pre_pr_audit.py report --audit-result /storage/Users/currentUser/runner/imageflow-wt/archives/i/imageflow/2.3.1_rc01/reports/audit-result.json"
+    ]
+  }
+}
