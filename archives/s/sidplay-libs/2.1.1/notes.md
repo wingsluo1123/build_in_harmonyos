@@ -47,3 +47,8 @@ make install
 - 此包是 sidplay 2.0.9 的**依赖**（R36 拓扑序：先发布本包，再构建 sidplay）
 - 官方 SourceForge 源仍可用；GitHub 镜像 sf-is-evil/sidplay2 只含 sidplay/ CLI 子目录，不含三个库
 - 构建器静态库位于 `lib/sidplay/builders/`，sidplay 通过 pkg-config 的 `builders` 变量定位
+
+---
+
+**编译结束**: 2026-10-18
+**最终状态**: built
