@@ -1,0 +1,56 @@
+# test_package/MANIFEST.yml
+# splix/2.0.1 消费者测试台账（与 test_package/test_splix.sh 的 pass 站点逐条对应）
+
+package: splix/2.0.1
+homepage: "https://github.com/OpenPrinting/splix"
+
+# ── 上游测试面：源件**无**任何自动化测试入口（不是"有但没跑"）──────────────
+# 三重独立举证：
+#   ① 全树只有三个 makefile（Makefile / module.mk / rules.mk / ppd/Makefile），
+#      目标集实测为 all|debug|optimized|clean|distclean|install|installcms|
+#      tags|drv|ppd|cleanppd|optionList —— 无 check/test/ctest 目标；
+#   ② 全树 grep -rn "check:\|ctest\|pytest\|TEST_CASE\|add_test" 零命中；
+#   ③ 上游无 tests/ 目录，无任何测试源文件（tools/ 下是 pjl/qpdl 调试小工具，
+#      不参与构建：module.mk 的 SUBDIRS 只有 src）。
+# ⇒ N_static = 0，如实申报；配方与正文均不声称跑过任何上游测试。
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+excluded_upstream_tests: []   # 没有被跳过/XFAIL 的上游用例（本就没有可跑的用例）
+
+# ── 消费者测试：以包使用者身份真实执行交付产物，断言失败即非 0 退出 ──────────
+# 断言体在 test_splix.sh（conanfile.py 的 test() 只负责调用并透传退出码）。
+# S4 是最强一条：把真实 CUPS raster 页喂进 rastertoqpdl，检查输出的 QPDL 流。
+test_package_tests:
+  - file: test_splix.sh
+    description: "S1 交付形态：rastertoqpdl / pstoqpdl 均在 PATH 上、可执行、非 stub（>=1MB），且 ELF 头为 64-bit LE aarch64（e_machine=0xb7；od 不可用时降级为提示，不影响 S4 的真实执行）"
+    command: "command -v rastertoqpdl; dd if=<bin> bs=1 count=4 | od -An -tx1"
+    expected_result: "PASS x2（两个 filter）"
+  - file: test_splix.sh
+    description: "S2 数据交付：ml2250.ppd 存在、PPD 总数 >= 240（实测 246）、share/cups/drv/output.drv 存在，且 PPD 内 *FileVersion 与本包的 PPDVERSION 一致（2.0.0，上游 2.0.1 未改 include/version.h，见 notes.md）"
+    command: "ls $pkg/share/cups/model/splix/*.ppd | wc -l; grep -q 'FileVersion: \"2.0.0\"' ml2250.ppd"
+    expected_result: "246 PPD / drv 存在 / FileVersion 匹配"
+  - file: test_splix.sh
+    description: "S3 rastertoqpdl 参数校验路径（真实执行）：无参数时退出码 1 并打印 Usage"
+    command: "rastertoqpdl   # 无参数"
+    expected_result: "rc=1 且 stderr 含 'Usage: ... job-id user title copies options'"
+  - file: test_splix.sh
+    description: "S4 端到端：PPD=ml2250.ppd + 真实 CUPS raster 页（sample-8x8.raster.b64（base64 文本，运行时解码为字节一致的临时文件），由 CUPS raster API 按该 PPD 的 cupsCompression 0x11 生成）经 stdin/file 喂入 rastertoqpdl，必须退出 0 并输出完整 QPDL 作业流"
+    command: "PPD=.../ml2250.ppd rastertoqpdl 1 tester 'splix test' 1 '' sample-8x8.raster.b64（base64 文本，运行时解码为字节一致的临时文件） > page.qpdl"
+    expected_result: "rc=0，流向 >300 字节，首尾均为 PJL 通用退出序列 ESC%-12345X，且含 'ENTER LANGUAGE = QPDL'（本轮实测 977 字节）"
+  - file: test_splix.sh
+    description: "S5 pstoqpdl 参数校验路径（真实执行）：无参数时退出码 1 并打印 Usage"
+    command: "pstoqpdl   # 无参数"
+    expected_result: "rc=1 且 stderr 含 'Usage: ... job-id user title copies options'"
+
+# 计数口径：assertion_count 沿用同仓语义 = **上游**断言总数（本包为 0）；
+# 消费者侧数字单列，避免被读成"上游有 9 条断言"。
+assertion_count: 0
+consumer_assertions: 9
+consumer_behavioral: 6            # S1 ELF 头 x2 / S3 / S4（退出码+字节数+首尾 UEL+语言）/ S5 —— 实际执行二进制
+consumer_contract_signature: 3    # S1 存在性+大小 / S2 数据文件+PPD 计数 / S2 FileVersion
+
+# 内存：S4 的输入是 1864 字节的 CUPS raster（8x8 像素，A4 幅面），
+# 过滤器的内部平面缓冲约 4.2MB（日志实测 Plane size=4210800），无 GB 级路径。
+max_rss_mb: 128

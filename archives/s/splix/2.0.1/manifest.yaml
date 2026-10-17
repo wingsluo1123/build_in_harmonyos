@@ -1,0 +1,60 @@
+# 版本级 manifest — ARCHIVE-SPEC v2.0
+# 文件位置: archives/s/splix/2.0.1/manifest.yaml
+
+version: "2.0.1"
+software: "splix"
+
+# published | built | failed | archived
+status: built
+build_date: "2026-10-15"
+build_system: "makefile (上游自带手写 GNU make：Makefile + module.mk + rules.mk)"
+
+source:
+  url: "https://github.com/OpenPrinting/splix/releases/download/2.0.1/splix-2.0.1.tar.xz"
+  sha256: "533946d57897bf62a2cf8f74e488258e11fa0c55028fad43ada24c5686f38a06"
+  tar_format: tar.xz
+  # 官方发布件（OpenPrinting/splix release tag 2.0.1 的附资产，非镜像站）：
+  # 本机实测 2026-10-15 HTTP 200，93032 字节，解包唯一顶层目录 splix-2.0.1/
+  # ⇒ 配方 strip_root=True。项目 2.0.0 时代的主页是 splix.ap2c.org（已失效），
+  # 现由 OpenPrinting 接管，仓库 https://github.com/OpenPrinting/splix。
+
+build:
+  system: makefile
+  configure_options: []          # 上游无 configure，只有 make 变量
+  dependencies:
+    - "cups/2.4.19"              # libcups + libcupsimage（静态）+ 其传递依赖
+    - "libjbig/2.1"              # libjbig85（JBIG 算法）
+  tool_dependencies: []
+  cc: clang                      # tools.build:compiler_executables.c
+  cxx: clang++                   # tools.build:compiler_executables.cpp
+  package_type: application
+  artifacts:
+    - bin/rastertoqpdl           # CUPS raster -> QPDL 过滤器（8,655,464 B，sha256 ab894371eb8d9e5d08ac03b204597e9568f4133d12556f98d5abaad8ea04745f）
+    - bin/pstoqpdl               # PostScript -> CUPS raster -> QPDL 过滤器（8,395,040 B，sha256 ad1be1cda7f43781f64552e367dd8104d772c878deaa2f38f7badeb86238229b）
+    - share/cups/model/splix/    # 246 个 PPD（ppd/ 234 个 + 发布件根目录 12 个 ml2160/ml2165/ml3310*）
+    - share/cups/drv/output.drv  # DRV 描述（sha256 df16dd51ae41ac47b8b96ead42a4ff87f13092d650f8de493f88b2d46b5aef2b）
+    - licenses/COPYING           # GPL-2.0
+
+patches_applied:
+  - patch_file: "patches/0001-module.mk-use-conan-toolchain-flags.patch"
+    patch_description: "把 cups-config 反引号调用换成 CPPFLAGS/LDFLAGS/LIBS，并去掉 MacPorts 遗留的 /opt/local 路径"
+    patch_type: "portability"
+    # 补丁内**不含任何平台宏、不含平台条件判断**（R8 合规）：只是让构建参数
+    # 由 Conan 注入（AutotoolsDeps 计算），而不是从构建机 PATH 上的 cups-config 取。
+
+# 上游件零源码改动之外的安装面说明：
+#   1. 不执行上游 `make install`（该目标依赖构建机 PATH 上的 install(1) 与
+#      cups-config，且会把文件装到构建机的 CUPS 目录）。配方用 copy() 显式落盘，
+#      交付面等价于上游 install 的产物：两个 filter + ppd/ + drv/。
+#   2. 发布件根目录那 12 个 ml2160/ml2165/ml3310* PPD 不在 ppd/ 里，但属于该
+#      发布件的一部分（ppd/Makefile 的 SAMSUNG 列表里也确实列了 ml2160），
+#      故一并交付，避免驱动面板缺型号。
+#   3. 未 strip：上游 optimized 目标自带 -g，二进制内含调试信息（各 ~8MB）。
+
+tests:
+  upstream: none                 # N_static = 0，三重举证见 notes.md
+  consumer: test_package/test_splix.sh   # 17 条断言，S4 为真实 CUPS raster -> QPDL 端到端
+
+knowledge_gained:
+  - "手写 makefile 的 CUPS 过滤器项目可以用 AutotoolsDeps 的 CPPFLAGS/LDFLAGS/LIBS 注入构建参数，无需 autotools/cmake 迁移"
+  - "libcups 静态链入时，cups-config 的输出（构建机 /usr/include、/lib）会把交叉编译引向宿主头文件/库；must override"
