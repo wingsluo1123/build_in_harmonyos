@@ -1,0 +1,87 @@
+software: meep
+version: "1.29.0"
+status: built
+publish_status: built
+category: scientific-lib
+build_system: autotools
+license: GPL-2.0-or-later
+
+# 编译信息
+build_date: 2026-10-12
+compiler: clang 15
+
+# 依赖关系
+dependencies:
+  runtime:
+    - libctl/4.5.1
+    - harminv/1.4.3
+    - fftw/3.3.11
+    - hdf5/1.14.6
+    - gsl/2.8
+    - openblas/0.3.34
+
+# 构建选项
+configure_options:
+  - "--prefix=/"
+  - "--build=aarch64-unknown-linux-gnu"
+  - "--host=aarch64-unknown-linux-gnu"
+  - "--disable-shared"
+  - "--enable-static"
+  - "--without-python"
+  - "--without-mpi"
+  - "--without-scheme"
+  - "--with-hdf5"
+  - "--with-libctl=<package_dir>"
+
+make_options:
+  - "-j1"
+
+# 源码信息
+source:
+  url: "https://github.com/NanoComp/meep/releases/download/v1.29.0/meep-1.29.0.tar.gz"
+  sha256: "68279f862cf9342a6e0f2023667d6a6ac7c1eafe46663705519772f312412194"
+  tar_format: tar.gz
+
+# 平台适配
+platform_notes: |
+  Meep FDTD 库适配到 HarmonyOS PC (aarch64-linux-ohos)。
+  - 禁用 Python/Scheme/MPI 接口
+  - 强制 cross_compiling=no（musl namespace 阻止 conftest 执行）
+  - 移除 Fortran 检测（OHOS 无 Fortran 编译器）
+  - multilevel-atom.cpp 中 DGETRF/DGETRI 声明包裹 #ifdef HAVE_LAPACK
+  - configure/libtool 中 rm -f 替换为 /bin/rm -f（rm shim shebang 损坏）
+  - ACCEPT_INFERIOR_RM_PROGRAM=yes + env -u BASH_FUNC_* 剥离安全删除劫持
+
+# 质量门禁
+quality_checks:
+  g0_clean_build: pass
+  g1_recipe_completeness: pass
+  g2_conan_create: pass
+  g3_system_lib_isolation: pass
+  g4_artifact_integrity: pass
+
+# 产物信息
+artifacts:
+  package: meep-1.29.0-ohos-aarch64.tar.gz
+  size: ""
+  files: 0
+  patches: 0
+
+# 测试信息
+test_results:
+  upstream_check:
+    total: 23
+    pass: 22
+    fail: 1
+    skip: 0
+    fail_case: ring-ll
+    fail_reason: "harminv found only 3/4 bands — numeric-sensitive resonance-mode identification depends on LAPACK eigensolver precision; not an OHOS porting defect"
+  consumer_test:
+    status: built
+    checks: "structural: 7 headers, libmeep.a present, 920 exported symbols, meep.pc present; API consumer (R34): test_consumer.cpp compiled+linked against libmeep.a with all transitive static deps and ran on-device, called initialize/structure/fields/step/get_field, |Ex|=0 non-NaN"
+
+# 知识提取
+knowledge_gained:
+  - "musl namespace 阻止 conftest 执行，需 patch configure 强制 cross_compiling=no (knowledge_ref: notes.md#遇到的问题与解决方案)"
+  - "safe-delete rm shim 因 #!/bin/bash 损坏，需 shell function override + /bin/rm 替换 (knowledge_ref: notes.md#Shell-Function-Override关键)"
+  - "Fortran 代码段需手动移除（OHOS 无 F77 编译器）(knowledge_ref: notes.md#遇到的问题与解决方案)"

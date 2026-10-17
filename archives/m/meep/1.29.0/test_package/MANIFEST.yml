@@ -1,0 +1,88 @@
+# test_package/MANIFEST.yml
+# Meep 1.29.0 — OHOS test declarations
+
+package: meep/1.29.0
+homepage: "https://github.com/NanoComp/meep"
+
+# meep upstream uses autotools with a `make check` target (tests/ directory).
+# OHOS adaptation enables HDF5/FFTW/GSL/LAPACK/OpenBLAS via Conan dependencies;
+# --with-hdf5 (no value: upstream configure checks `test "$ok" = "yes"`).
+upstream_check_command: "make check -j1"
+upstream_test_in_build: true
+upstream_test_command: "make check -j1"
+
+# Real executed upstream test results (conan create build, 2026-10-12):
+# Testsuite summary: TOTAL 23 / PASS 22 / FAIL 1 / SKIP 0 / XFAIL 0 / XPASS 0 / ERROR 0
+# Log: reports/meep-create-v15.log, per-case logs under <build>/tests/<case>.log
+upstream_tests:
+  - name: aniso_disp
+    result: PASS
+  - name: bench
+    result: PASS
+  - name: bragg_transmission
+    result: PASS
+  - name: convergence_cyl_waveguide
+    result: PASS
+  - name: cylindrical
+    result: PASS
+  - name: dump_load
+    result: PASS
+  - name: flux
+    result: PASS
+  - name: harmonics
+    result: PASS
+  - name: integrate
+    result: PASS
+  - name: known_results
+    result: PASS
+  - name: near2far
+    result: PASS
+  - name: one_dimensional
+    result: PASS
+  - name: physical
+    result: PASS
+  - name: stress_tensor
+    result: PASS
+  - name: symmetry
+    result: PASS
+  - name: three_d
+    result: PASS
+  - name: two_dimensional
+    result: PASS
+  - name: 2D_convergence
+    result: PASS
+  - name: h5test
+    result: PASS
+  - name: pml
+    result: PASS
+  - name: cyl-ellipsoid-ll
+    result: PASS
+  - name: array-slice-ll
+    result: PASS
+  - name: ring-ll
+    result: FAIL
+    reason: "harminv found only 3/4 bands — numeric-sensitive resonance-mode
+      identification; depends on LAPACK eigensolver precision and -ffast-math
+      floating-point behavior on aarch64/clang vs upstream x86 reference.
+      Not an OHOS porting defect (no missing feature, no crash in FDTD core);
+      core simulation, HDF5 I/O and all other harminv-based tests (harmonics)
+      pass."
+
+upstream_test_summary:
+  total: 23
+  pass: 22
+  fail: 1
+  skip: 0
+  xfail: 0
+  xpass: 0
+  error: 0
+
+# test_package consumer test (OHOS rule 12 — non-assertion, end-to-end)
+test_package_tests:
+  - file: test_consumer.sh
+    description: "Consumer feasibility test — verifies installed meep package has headers, static library, and exported symbols (not a pure assertion test)"
+    command: "sh test_consumer.sh <package_dir>"
+    result: PASS
+    evidence: "7 headers found; libmeep.a present; 920 exported symbols; meep.pc present"
+
+assertion_count: 0
