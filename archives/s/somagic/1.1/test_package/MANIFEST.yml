@@ -1,0 +1,80 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: somagic/1.1
+homepage: "https://code.google.com/archive/p/easycap-somagic-linux/"
+
+# ── 上游测试审计：确认无测试 ───────────────────────────────────────────────
+# somagic-easycap_1.1.tar.gz 是 Google Code Archive 保存的 easycap-somagic-linux
+# 1.1 发布归档，不含任何自动化测试套件。
+upstream_tests_exist: false
+upstream_test_total: 0
+# 上游完全没有任何测试框架（无 make check/test 目标、无 tests/ 目录、无 ctest /
+# gtest / pytest / automake TESTS 注册），不存在可供统计的用例口径，故没有可用的
+# 统计单位；此非「本次可运行子集」，而是源码归档中确实为零。
+upstream_test_count_method: none
+upstream_test_count_method_note: >
+  上游没有任何测试框架，无法归于 python_def / autotools_tests / gtest_macros /
+  ctest_entries 任一官方口径，故不虚构统计单位；upstream_test_total: 0 表示源码
+  归档中确实不存在测试用例。
+
+upstream_test_audit:
+  source_tarball: "somagic-easycap_1.1.tar.gz"
+  source_url: "https://storage.googleapis.com/google-code-archive-downloads/v2/code.google.com/easycap-somagic-linux/somagic-easycap_1.1.tar.gz"
+  source_sha256: "3a9dd78a47335a6d041cd5465d28124612dad97939c56d7c10e000484d78a320"
+  build_system: "makefile（纯 Makefile，无 configure / CMake / meson）"
+  top_level_files:
+    - "Makefile"
+    - "README"
+    - "somagic-init.c"
+    - "somagic-capture.c"
+    - "somagic-audio-capture.c"
+    - "somagic-both.c"
+    - "man/somagic-init.1"
+    - "man/somagic-capture.1"
+    - "debian/"
+  scanned_for:
+    - "tests/ / test/ 目录"
+    - "Makefile 中 check / test 目标"
+    - "ctest / gtest / pytest / automake TESTS 注册"
+    - "*_test.c / test_*.c 测试源文件"
+    - "CI 测试 job（.github/workflows 等）"
+  scan_result: >
+    tarball 共 21 个条目：顶层为 Makefile / README / 4 个单文件 C 程序
+    (somagic-init.c / somagic-capture.c / somagic-audio-capture.c /
+    somagic-both.c) / man/ 两个手册页 / debian/ 打包目录。无 tests/ 或 test/
+    目录，无 *_test.c / test_*.c 文件，无 CI 配置目录。Makefile 目标仅
+    all / beta / install / install-beta / clean，无 check / test 目标。
+  make_check_output: "make -n check 返回 No rule to make target 'check'"
+  reason: >
+    somagic 1.1 不提供任何自动化测试套件，make check 无目标可执行，
+    故按 no_tests 处理；上游验证面为四个 CLI 工具本身，由 test_package 以
+    消费者视角对打包后的可执行文件做真实行为断言。这是源码审计后的结论，
+    不是「本次只跑了子集」。
+
+# 上游测试命令（无测试框架，无命令可填；置空串以消除清单器「存在测试」误判）
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（upstream_tests_exist: false，故为空表）
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证，真实执行被测二进制)
+test_package_tests:
+  - file: test.sh
+    description: >
+      真实执行打包后的四个 CLI：断言每个可执行文件存在且可执行；
+      somagic-init --version/--help 横幅；somagic-init 默认固件打开失败路径；
+      -f 固定装置触发 libgcrypt GCRY_MD_CRC32 固件校验（"was not recognized"）；
+      --skip-check -f 走真实 libusb_init + 设备枚举路径（鸿蒙内核 netlink 不可用
+      时 libusb_init 失败，补丁后为诊断 + exit 1，此前为 SIGSEGV 139）；
+      somagic-capture --version/--help/参数校验/无设备路径；
+      somagic-both --version/--help；somagic-audio-capture（仅设备 beta，
+      main() 断言设备句柄，无硬件不能运行）以打包后的可执行 ELF 校验。
+    command: "bash test.sh <package>/bin"
+
+# 测试断言总数 (test.sh: 4 个可执行文件存在性检查 + 12 个行为检查 = 16 个 PASS 检查点)
+assertion_count: 16

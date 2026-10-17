@@ -1,0 +1,28 @@
+# 软件级 manifest — somagic
+# 遵循 ARCHIVE-SPEC v3.0
+# 文件位置: archives/s/somagic/manifest.yaml
+
+software: somagic
+display: "somagic (EasyCAP)"
+description: "Somagic EasyCAP DC60 / EasyCAP002 USB 视频采集棒的用户态驱动套件（固件上传 + 视频采集）"
+category: system
+homepage: "https://code.google.com/archive/p/easycap-somagic-linux/"
+license: GPL-2.0-or-later
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "纯 Makefile 项目：以 make 命令行变量注入 Conan 工具链（CC/CFLAGS/LFLAGS），无补丁。"
+    - "libusb-1.0 与 libgcrypt 由 Conan 依赖提供；源码用 <libusb-1.0/libusb.h>，需把 libusb 的 include/ 父目录加入 -I。"
+    - "不调用上游 install 目标（写死 /usr/local）；package() 内拷贝全部四个可执行文件（含 beta 目标）。"
+    - "OHOS 要求 ELF 签名：package() 对四个可执行文件做 binary-sign-tool 自签。"
+    - "上游无自动化测试套件，按 no_tests 申报；test_package 真实执行四个 CLI 补位。"
+  common_dependencies:
+    - libusb
+    - libgcrypt
+
+versions:
+  "1.1":
+    status: built
+    build_date: "2026-10-15"
+    conan_ref: "somagic/1.1"
