@@ -1,0 +1,116 @@
+--- a/libteredo/peerlist.c
++++ b/libteredo/peerlist.c
+@@ -162,20 +162,21 @@
+ 	struct teredo_listitem **pprev, *next;
+ 	teredo_peer peer;
+ } teredo_listitem;
+ 
+ struct teredo_peerlist
+ {
+ 	teredo_listitem *recent, *old;
+ 	unsigned left;
+ 	unsigned expiration;
+ 	pthread_t gc;
++	volatile bool stop; /* cooperative shutdown request */
+ 	pthread_mutex_t lock;
+ #ifdef HAVE_LIBJUDY
+ 	Pvoid_t PJHSArray;
+ #else
+         void *root;
+ #endif
+ };
+ 
+ 
+ static inline teredo_listitem *listitem_create (void)
+@@ -218,28 +219,41 @@
+ }
+ #endif
+ 
+ #include <sched.h>
+ 
+ /**
+  * Peer list garbage collector entry point.
+  *
+  * @return never ever.
+  */
+-static LIBTEREDO_NORETURN void *garbage_collector (void *data)
++static void *garbage_collector (void *data)
+ {
+ 	struct teredo_peerlist *l = (struct teredo_peerlist *)data;
+ 
+ 	for (;;)
+ 	{
+ 		struct timespec delay = { .tv_sec = l->expiration };
+-		while (clock_nanosleep (CLOCK_REALTIME, 0, &delay, &delay));
++
++		/* Sleep in one-second slices: pthread_cancel() is not available
++		   on every supported platform, so teredo_list_destroy() asks this
++		   thread to stop through the stop flag instead. */
++		while (!l->stop && delay.tv_sec > 0)
++		{
++			struct timespec slice = { .tv_sec = 1 };
++
++			if (clock_nanosleep (CLOCK_REALTIME, 0, &slice, &slice) == 0)
++				delay.tv_sec--;
++		}
++
++		if (l->stop)
++			break;
+ 
+ 		int state;
+ 		pthread_setcancelstate (PTHREAD_CANCEL_DISABLE, &state);
+ 		/* cancel-unsafe section starts */
+ 		pthread_mutex_lock (&l->lock);
+ 
+ 		// remove expired peers from hash table
+ 		for (teredo_listitem *p = l->old; p != NULL; p = p->next)
+ 		{
+ #ifdef HAVE_LIBJUDY
+@@ -281,23 +295,24 @@
+ teredo_peerlist *teredo_list_create (unsigned max, unsigned expiration)
+ {
+ 	/*printf ("Peer size: %u/%u bytes\n",sizeof (teredo_peer),
+ 	        sizeof (teredo_listitem));*/
+ 	assert (expiration > 0);
+ 
+ 	teredo_peerlist *l = (teredo_peerlist *)malloc (sizeof (*l));
+ 	if (l == NULL)
+ 		return NULL;
+ 
+-	memset (l, 0, sizeof (l));
++	memset (l, 0, sizeof (*l));
+ 	pthread_mutex_init (&l->lock, NULL);
+ 	l->recent = l->old = NULL;
++	l->stop = false;
+ 	l->left = max;
+ 	l->expiration = expiration;
+ #ifdef HAVE_LIBJUDY
+ 	l->PJHSArray = (Pvoid_t)NULL;
+ #else
+ 	l->root = NULL;
+ #endif
+ 
+ 	if (pthread_create (&l->gc, NULL, garbage_collector, l))
+ 	{
+@@ -341,20 +356,21 @@
+ #else
+ 	tdestroy (root, listitem_free);
+ #endif
+ }
+ 
+ 
+ void teredo_list_destroy (teredo_peerlist *l)
+ {
+ 	teredo_list_reset (l, 0);
+ 
++	l->stop = true;
+ 	pthread_cancel (l->gc);
+ 	pthread_join (l->gc, NULL);
+ 	pthread_mutex_destroy (&l->lock);
+ 
+ 	free (l);
+ }
+ 
+ 
+ teredo_peer *teredo_list_lookup (teredo_peerlist *restrict list,
+                                  const struct in6_addr *restrict addr,

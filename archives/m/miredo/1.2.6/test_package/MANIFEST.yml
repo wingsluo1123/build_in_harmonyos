@@ -1,0 +1,74 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: miredo/1.2.6
+homepage: "https://www.remlab.net/miredo/"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "make check"
+
+# 上游实际运行的测试程序（make check 注册 12 项）
+upstream_tests:
+  - file: compat/test-strlcpy.c
+    source: miredo-1.2.6/compat/test-strlcpy.c
+    description: "strlcpy 兼容实现单元测试"
+    command: "./compat/test-strlcpy"
+  - file: compat/test-closefrom.c
+    source: miredo-1.2.6/compat/test-closefrom.c
+    description: "closefrom() 兼容实现单元测试"
+    command: "./compat/test-closefrom"
+  - file: libteredo/test/list.c
+    source: miredo-1.2.6/libteredo/test/list.c
+    description: "Teredo 对等端列表：空表、插入/查找/过期回收、列表重置"
+    command: "./libteredo/test/libteredo-list"
+  - file: libteredo/test/stresslist.c
+    source: miredo-1.2.6/libteredo/test/stresslist.c
+    description: "对等端列表压力测试（大量插入/查找/回收）"
+    command: "./libteredo/test/libteredo-stresslist"
+  - file: libteredo/test/teredo.c
+    source: miredo-1.2.6/libteredo/test/teredo.c
+    description: "Teredo 隧道对象生命周期与公开 API"
+    command: "./libteredo/test/libteredo-test"
+  - file: libteredo/test/clock.c
+    source: miredo-1.2.6/libteredo/test/clock.c
+    description: "Teredo 时钟回绕/漂移处理"
+    command: "./libteredo/test/libteredo-clock"
+  - file: libteredo/test/v4global.c
+    source: miredo-1.2.6/libteredo/test/v4global.c
+    description: "全球 IPv4 地址判定"
+    command: "./libteredo/test/libteredo-v4global"
+  - file: libteredo/test/addrcmp.c
+    source: miredo-1.2.6/libteredo/test/addrcmp.c
+    description: "Teredo 地址比较/排序"
+    command: "./libteredo/test/libteredo-addrcmp"
+  - file: libteredo/test/md5test.c
+    source: miredo-1.2.6/libteredo/test/md5test.c
+    description: "MD5 实现标准测试向量"
+    command: "./libteredo/test/md5test"
+  - file: libteredo/test/hmac.c
+    source: miredo-1.2.6/libteredo/test/hmac.c
+    description: "HMAC 认证与重放保护"
+    command: "./libteredo/test/libteredo-hmac"
+  - file: libtun6/test_diag.c
+    source: miredo-1.2.6/libtun6/test_diag.c
+    description: "TUN 驱动诊断程序（需 TUN 设备与特权，上游即 SKIP；libtun6/Makefile.am 的 libtun6_diagnose_SOURCES）"
+    command: "./libtun6/libtun6-diagnose"
+  - file: src/checkconf.c
+    source: miredo-1.2.6/src/checkconf.c
+    description: "配置文件解析器 miredo-checkconf 单元测试"
+    command: "./src/miredo-checkconf"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_consumer.c
+    description: "消费者用例：libteredo 公开 API 生命周期 + libtun6 符号解析"
+    command: "./test_miredo_consumer"
+
+# 测试断言总数 (消费者用例断言数, 用于质量评估)
+assertion_count: 5

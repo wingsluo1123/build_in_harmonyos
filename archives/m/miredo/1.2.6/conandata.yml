@@ -1,0 +1,28 @@
+# conandata.yml — miredo 1.2.6 (上游项目 miredo，作者 Rémi Denis-Courmont)
+# 官方来源: remlab.net 项目官网的 release 目录（上游唯一正式发布点），
+#           tarball 与项目主页同域，无镜像/代理/网盘改写。
+# SHA-256 已按上游官方 tarball 实测核验。
+
+sources:
+  url: "https://www.remlab.net/files/miredo/miredo-1.2.6.tar.xz"
+  sha256: "fa26d2f4a405415833669e2e2e22677b225d8f83600844645d5683535ea43149"
+
+patches:
+  - patch_file: "patches/0004-admin-config.guess.patch"
+    patch_description: "E007/E114: 2012 年的 config.guess 不识别 HarmonyOS（uname -s 返回 HarmonyOS），补 HarmonyOS 系统识别分支输出 aarch64-unknown-linux-ohos（原生构建，不用 --build 绕过）；同时移除临时目录创建处的 umask 077——HMDFS 会把 0700 目录属主归一化为其他 uid，umask 077 生成的目录连属主也写不进去（知识库 E110/E114）"
+    patch_type: "portability"
+  - patch_file: "patches/0005-admin-config.sub.patch"
+    patch_description: "E007: config.sub 增加 ohos 三元组支持（maybe_os 匹配 linux-ohos、内核-OS 列表、OS 校验分支），否则 canonical 化 aarch64-unknown-linux-ohos 时报 \"system 'ohos' not recognized\""
+    patch_type: "portability"
+  - patch_file: "patches/0006-libteredo-debug.h.patch"
+    patch_description: "在 libteredo/debug.h 内内联 OHOS 缺少的 POSIX 线程取消 API 回退（pthread_cancel / pthread_setcancelstate / pthread_testcancel，以 libc 特性宏 __GLIBC__ 判定，无平台宏）；并把 glibc 专有的 PTHREAD_MUTEX_ERRORCHECK_NP / PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP 改为特征宏守卫 + POSIX 标准量回退（同 box64 先例）"
+    patch_type: "portability"
+  - patch_file: "patches/0001-libteredo-peerlist.c.patch"
+    patch_description: "无 pthread_cancel 平台上，peerlist 垃圾回收线程原本只能被取消，改为 stop 标志协作式退出（等待按秒切片，destroy 时 join 最多阻塞 1 秒）；同时初始化新增的 stop 字段并修正 memset 尺寸笔误（sizeof 指针 → sizeof 结构体）"
+    patch_type: "portability"
+  - patch_file: "patches/0002-libtun6-tun6.c.patch"
+    patch_description: "E119: 内核 UAPI linux/if_ether.h 与 libc netinet/if_ether.h 都定义 struct ethhdr，非 glibc libc 下重复定义编译失败；按 libc 特性宏 __UAPI_DEF_ETHHDR 守卫（同 xdp-tools 先例）"
+    patch_type: "portability"
+  - patch_file: "patches/0003-src-relayd.c.patch"
+    patch_description: "src/relayd.c 使用 pthread_setcancelstate/pthread_testcancel/pthread_cancel，在同一文件内联线程取消 API 回退（与 0006 同口径，各自独立编译单元，static inline 不冲突）"
+    patch_type: "portability"
