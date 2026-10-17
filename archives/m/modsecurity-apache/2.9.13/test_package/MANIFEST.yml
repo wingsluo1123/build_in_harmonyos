@@ -1,0 +1,50 @@
+package: "modsecurity-apache/2.9.13"
+homepage: "https://github.com/owasp-modsecurity/ModSecurity"
+
+# 上游测试：v2.9.13 tests/ 目录，run-unit-tests.pl 驱动 msc_test 二进制。
+# per-file 记账行（Loaded N tests from <file> / No tests defined for <file> /
+# Passed: p; Failed: f）是标记数字的唯一来源（确定性日志源，不做字符串数数）。
+upstream_check_command: "make -j1 check"
+upstream_test_in_build: true
+upstream_tests_exist: true
+upstream_test_total: 58
+upstream_test_count_method: auto
+upstream_test_unit_note: >-
+  58 = tests/tfn/ 29 个 .t + tests/op/ 29 个 .t + tests/action/ 0（仅 .empty，
+  GitHub API v2.9.13 实数）。perl harness 为单一机器可解析框架（auto）。
+  其中 4 个 1 字节空文件（inspectFile.t / rbl.t / validateDTD.t /
+  validateSchema.t）定义零用例：配方在 build 树以逐条目链接恢复 in-source
+  布局时将其隔离（quarantine，不进 harness 枚举，源码树不动），故标记
+  discovered=54=58-4、skipped=0；用例损失为 0（空文件无断言）。标记 gaps
+  同步声明该差值（count=4，隔离名单来自同轮 seeding 日志）。残留的
+  "No tests defined" 行仍计 skipped 并经 gaps 解释，不计 passed。
+  tests/regression/ 需 live Apache（run-regression-tests.pl 起 server_root），
+  不在 make check 内，本轮不跑、如实声明。
+upstream_test_excluded:
+  - path: "tests/regression/"
+    reason: "needs a live Apache server_root; not part of upstream `make check`"
+
+test_package_tests:
+  - id: "module-load"
+    source: "modsec_module_load.c"
+    command: "modsec_module_load"
+    description: >-
+      静态验证打包的 mod_security2.so 为真正的 Apache DSO：ELF ET_DYN、
+      最小体积、security2_module 入口导出（优先 nm -D，缺失时 dynstr 证明）
+      及 httpd 宿主导入 ap_log_perror。不做 standalone dlopen：
+      musl BIND_NOW 下无 httpd 宿主的 dlopen 必败，与包质量无关。
+  - id: "conf-check"
+    source: "modsec_conf_check.c"
+    command: "modsec_conf_check"
+    description: >-
+      打开打包的 modsecurity.conf-recommended，断言非空且含 SecRuleEngine /
+      SecRequestBodyAccess / 审计指令，防止空 fixture 假绿。
+
+test_counting:
+  upstream_independent_total: 58
+  integration_independent_total: 2
+  shared_static_counted_once: true
+  internal_assertions_counted_as_cases: false
+
+test_case_count: 2
+assertion_count: 6
