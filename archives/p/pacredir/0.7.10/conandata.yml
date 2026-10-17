@@ -1,0 +1,25 @@
+sources:
+  # R39: 官方源（上游 GitHub 的 tag 归档），非个人 fork / 非搬运镜像。
+  # 注：CI 的 build_and_test.sh 会在**运行时**自行做 mirror fallback 改写
+  # （W3 本地模拟跑完会把改写结果留在工作树）。这里保持单一官方源不入仓——
+  # gh-proxy.com 属 PF7 源URL闸的镜像域名黑名单，写进 conandata.yml 会被
+  # 建 PR 前置硬闸拦下；镜像回退是 CI 的运行时行为，不是配方内容。
+  url: "https://github.com/eworm-de/pacredir/archive/refs/tags/0.7.10.tar.gz"
+  sha256: "fa73fb62dda010f20d85cfb8864ec993421641edde2cf999a91dd835c0fe36cc"
+
+# 注意：patches 必须按「版本号」为键（Conan conandata_patches() 的口径，
+# 与 archives/s/systemd/261.1 一致）。写成以补丁文件名为键的字典时，
+# apply_conandata_patches() 会静默返回空列表、补丁不生效。
+patches:
+  "0.7.10":
+    - patch_file: "patches/0001-pacredir.h.patch"
+      patch_description: >-
+        musl/OHOS 可移植性两处修复（不含任何平台宏，glibc 下同样成立）：
+        (1) pacredir.h 补 #include <sys/ioctl.h> —— 上游靠 glibc 的
+        <net/if.h>/<sys/socket.h> 传递暴露 ioctl() 与 SIOCGIFFLAGS，musl 不传递，
+        update_hosts() 里的 ifr.ifr_flags 探测因此报 "call to undeclared function
+        'ioctl'" + "use of undeclared identifier 'SIOCGIFFLAGS'"（-Werror 下即致命）；
+        (2) struct hosts 的 badtime 字段由 glibc 内部 typedef __time_t 改为 POSIX
+        的 time_t —— musl 的 <sys/types.h>/<time.h> 只按 __NEED_* 机制导出 POSIX
+        名，不提供 glibc 的 __*_t 内部别名，否则报 "unknown type name '__time_t'"。
+      patch_type: "portability"
