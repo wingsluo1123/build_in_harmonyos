@@ -1,0 +1,153 @@
+# tup 0.8 — HarmonyOS PC (aarch64) 适配
+# 文件位置: archives/t/tup/0.8/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "0.8"
+software: tup
+status: published
+build_date: "2026-10-08"
+compile_date: "2026-10-08"
+build_system: custom
+
+source:
+  url: "https://github.com/gittup/tup/archive/refs/tags/v0.8.tar.gz"
+  sha256: "45ca35c4c1d140f3faaab7fabf9d68fd9c21074af2af9a720cff4b27cab47d07"
+  tar_format: tar.gz
+
+build:
+  # 上游自带 build.sh（既不是 cmake/autotools，也不是 make）
+  system: custom
+  target: aarch64-unknown-linux-ohos
+  # build.sh 通过环境变量接收，无 configure 参数
+  configure_options:
+    - "TUP_SERVER=ldpreload"
+    - "TUP_LABEL=0.8"
+    - "CC=clang"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+  options:
+    - "TUP_SERVER=ldpreload（沙箱内无可用 /dev/fuse，ldpreload 是唯一可用的依赖追踪后端；build.sh 新增 HarmonyOS 分支）"
+    - "TUP_LABEL=0.8 写入 tup --version（默认 bootstrap）"
+    - "产物 build/tup + build/tup-ldpreload.so，两者必须同目录（depfile.c 按可执行文件路径推导 .so 路径）"
+
+dependencies:
+  required: []
+  optional: []
+
+patches_applied:
+  - file: 0001-build.sh.patch
+    purpose: "build.sh 无 HarmonyOS 分支：uname -s 返回 HarmonyOS 会落到默认 fuse 后端且不链入 Linux 兼容文件（dummy.c/utimensat_linux.c），链接期缺 compat_lock_disable/enable。补丁新增 HarmonyOS 分支并选择 ldpreload 后端（沙箱无可用 /dev/fuse）"
+    lines_changed: 12
+  - file: 0002-src-ldpreload-ldpreload.c.patch
+    purpose: "ldpreload shim 三重缺陷修复：①musl 把 open64/fopen64/stat64 定义为宏，glibc 专有包装器需 __GLIBC__ 守卫；②init_fd 的 ELF 构造器晚于 OHOS 早期已打开文件，depfd==-1 会永久丢弃事件，改为惰性打开；③上游 shim 从不包装 utimensat，而 OHOS 用户态为 toybox（touch 新建文件只 open(O_CREAT)、已存在文件只 utimensat），导致所有用 touch 产出输出的规则报 'Expected to write to file ... but didn't'；另跳过 S_ISDIR 避免为目录建依赖节点"
+    lines_changed: 160
+  - file: 0003-src-tup-db.c.patch
+    purpose: "environ.c 白名单变更后按源码 NOTE 递增 PARSER_VERSION 16 -> 17，促使已有 .tup/db 重建"
+    lines_changed: 2
+  - file: 0004-src-tup-environ.c.patch
+    purpose: "tup 只把'数据库记录过的环境变量'传子进程（PATH/HOME 等白名单 + Tupfile 里 export 过的），于是把 TMPDIR 从子进程环境中剔除；而鸿蒙 /tmp 只读，令 clang/gcc 等一切需要临时目录的命令报 'unable to make temporary file: Read-only file system'。按上游 Windows 分支已有的 TEMP/TMP 先例，把 TMPDIR 加入 environ.c 的 default_env 白名单，使平台级 TMPDIR 与 PATH/HOME 一样被传递"
+    lines_changed: 8
+  - file: 0005-src-tup-file.c.patch
+    purpose: "tup 在解析与命令日志两处使用 libc tmpfile()，而 glibc/musl 都把 /tmp 硬编码进 tmpfile()；鸿蒙 /tmp 是 erofs 只读挂载（知识库 E002/E272），导致 tup 完全无法运行（tmpfile: Permission denied → 1 job failed）。新增 tup_tmpfile() 按 $TMPDIR → .tup/tmp 依次回退，保持 tmpfile() 语义（匿名、自动删除）"
+    lines_changed: 61
+  - file: 0006-src-tup-fileio.h.patch
+    purpose: "声明 tup_tmpfile() 原型，供 parser.c / updater.c 调用"
+    lines_changed: 3
+  - file: 0007-src-tup-parser.c.patch
+    purpose: "解析 Tupfile 的临时文件改用 tup_tmpfile()（原 libc tmpfile() 在只读 /tmp 下失败）"
+    lines_changed: 1
+  - file: 0008-src-tup-updater.c.patch
+    purpose: "命令错误日志的临时文件改用 tup_tmpfile()（原 libc tmpfile() 在只读 /tmp 下失败）"
+    lines_changed: 1
+
+compatibility:
+  level: high
+  issues:
+    - "无 /dev/fuse（ls /dev/fuse: Permission denied，且 /dev 不可写）→ 只能用 ldpreload（纯链接器注入）后端，fuse/fuse3 后端不可选"
+    - "OHOS 用户态为 toybox：touch 与 GNU coreutils 语义不同（补丁 0002 已在 shim 内对齐，无需改动用户态）"
+    - "/tmp 是 erofs 只读挂载：libc 的 tmpfile() 完全不可用（补丁 0003 让 tup 改走 $TMPDIR / .tup/tmp，开箱可用）；需要临时目录的构建命令也能拿到 TMPDIR（补丁 0004）；上游测试里直接把 mkdir/mktemp 写到 /tmp 的用例仍属平台阻塞"
+    - "沙箱限制：HMDFS 不允许创建硬链接（ln 'Operation not permitted'）、不允许扫描 / 根目录 → 上游 full-deps 用例（t4062-t4067/t4171）与个别用例属平台阻塞"
+    - "沙箱缺 gcc/git/sqlite3 等外部工具：相关用例按平台阻塞记录"
+    - "ldpreload 后端上游固有限制：vardict_fd=-1 /* TODO */（t3000 系列）"
+  notes: "编译产物正确：tup（CLI，1.5MB）+ tup-ldpreload.so（依赖追踪注入库），两者同目录安装"
+
+test_results:
+  type: auto
+  total: 981
+  passed: 935
+  failed: 41
+  skipped: 0
+  timeout: 5
+  note: |
+    上游自带测试套件 test/ 的 981 个 t[0-9]*.sh 用例全量执行（100% 覆盖、无跳过，
+    通过率 95.3%）。执行方式：for i in t[0-9]*.sh; do timeout -k 5 180 sh -e "$i"; done。
+    适配前 270 项失败（165 项为 "Expected to write to file ... but didn't"，
+    根因见补丁 0002；其余为 tmpfile: Permission denied，根因见补丁 0003）。
+    四个补丁落地后剩余 41 项失败全部为平台阻塞，按报错签名归类：
+      A 直建只读 /tmp（9 项）
+      B 扫描 / 根目录被拒 / full-deps 系列（17 项）
+      C 沙箱缺外部工具 / 模块 ccache / sqlite3 / python-sh（3 项）
+      D 沙箱禁硬链接 / mkfifo / unix socket（4 项，其中 1 项被 seccomp 以 SIGSYS 终止）
+      E 用户态与工具链语义差异：无 root 语义 / 缺 -pg 支持 / crash 产物 / ghost lib（8 项）
+    另有 5 项按 180s/例 计为平台阻塞超时：3 项 ^b^（run-in-bash）用例
+    （t2201-change-flags / t4181-bash-shell-test / t4182-bash-pipefail-test）
+    + t8093-tup-preserve2 / t8094-tup-preserve-lua。
+    逐项归类与证据见 reports/test-report.md（本地报告，不入库）。
+
+knowledge_gained:
+  - "OHOS/HarmonyOS 的 uname -s 返回 'HarmonyOS'（不是 Linux）：任何按 uname -s 分派的构建脚本都会走错分支，必须显式加 HarmonyOS 分支"
+  - "glibc 与 musl 都把 /tmp 硬编码进 tmpfile()（P_tmpdir）：知识库 E002 推荐的『设置 TMPDIR』对使用 tmpfile() 的程序无效，必须改代码按 $TMPDIR → 项目内临时目录 → /tmp 回退"
+  - "OHOS 运行时是 musl + Linux ABI（clang 定义 __linux__），但 musl 把 open64/fopen64/stat64 定义成宏，glibc 专有符号包装器必须用 __GLIBC__ 守卫隔离"
+  - "ELF 构造器时序：OHOS 在 ldpreload shim 的 init_fd() 构造器之前就会打开文件，构造器里一次性建好的 fd 会永久丢失早期事件，须改为首次使用时惰性打开"
+  - "tup 的 ldpreload shim 以 open() 的 O_WRONLY/O_RDWR 判定'写'，不包装 utimensat：对 GNU coreutils touch 成立（open(O_WRONLY|O_CREAT)），但对 toybox touch 不成立（utimensat / open(O_CREAT)），须同时补 utimensat 与 O_CREAT 实际创建两条路径"
+  - "tup 的依赖图只跟踪文件：把目录的 utimensat 记为写会让 tup 为目录建节点且 create_list 标志永不清理（t5091），shim 需跳过 S_ISDIR"
+  - "tup 只把数据库记录过的环境变量传给子进程（environ.c 的 default_env 白名单：PATH/HOME，Windows 下另有 TEMP/TMP；再加 Tupfile 里 export 过的）。在 /tmp 只读的平台上，必须把 TMPDIR 也列入该白名单，否则 clang/gcc 等命令都拿不到可写临时目录；改动该白名单需按源码注释递增 PARSER_VERSION"
+  - "Conan 的补丁器不处理新增文件（--- /dev/null）hunk：补丁若需要新建文件，必须改写进既有文件，否则 gate2 直接 FAIL"
+  - "跑上游测试套件前必须确认被测二进制身份：tup 的 test/tup.sh 会把仓库根放在 PATH 最前，仓库根的旧 tup 副本会静默遮蔽 build/tup，导致整套结果失真（本次曾出现 289 项伪失败）"
+
+references:
+  - https://github.com/gittup/tup
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/tup-0.8.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/tup-0.8.work
+  source_orig_hash: c9cda4f0a0f1289a
+  source_work_hash: 627c194fb8a34b4e
+  generated_at: '2026-10-16T01:50:09'
+  patches_count: 8
+
+patch_classification:
+  - file: 0001-build.sh.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-src-ldpreload-ldpreload.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-src-tup-db.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-src-tup-environ.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0005-src-tup-file.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0006-src-tup-fileio.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0007-src-tup-parser.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0008-src-tup-updater.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

@@ -1,0 +1,487 @@
+--- a/src/ldpreload/ldpreload.c
++++ b/src/ldpreload/ldpreload.c
+@@ -37,69 +37,85 @@
+ 
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <stdarg.h>
+ #include <string.h>
+ #include <fcntl.h>
+ #include <unistd.h>
+ #include <dlfcn.h>
+ #include <errno.h>
+ #include <pthread.h>
+-
++#include <time.h>
++#include <sys/time.h>
++#include <sys/stat.h>
++
++int stat(const char *filename, struct stat *buf);
++void _mcleanup(void);
++
++/* The __xstat/__xstat64/__lxstat64/__realpath_chk wrappers and the *64
++ * variants of open()/fopen()/stat() are glibc-specific ABI details. musl
++ * (used by OpenHarmony) has no such symbols and, worse, defines open64,
++ * fopen64 and stat64 as macros for open, fopen and stat -- redefining them
++ * here would collide with the non-64 versions a few lines below. Guard the
++ * whole glibc-only surface behind __GLIBC__.
++ */
++#ifdef __GLIBC__
+ int __xstat(int vers, const char *name, struct stat *buf);
+-int stat(const char *filename, struct stat *buf);
+ int stat64(const char *filename, struct stat64 *buf);
+ int __xstat64(int __ver, __const char *__filename,
+ 	      struct stat64 *__stat_buf);
+ int __lxstat64(int vers, const char *path, struct stat64 *buf);
+ char *__realpath_chk(const char *path, char *resolved_path, size_t resolvedlen);
+-void _mcleanup(void);
++#endif
+ 
+ static char cwd[PATH_MAX];
+ static int cwdlen = -1;
+ static void handle_file(const char *file, const char *file2, int at);
+ static void handle_file_dirfd(int dirfd, const char *file, const char *file2, int at);
+ static int ignore_file(const char *file);
+ static int update_cwd(void);
+ 
+ static int (*s_open)(const char *, int, ...);
+-static int (*s_open64)(const char *, int, ...);
+ static int (*s_openat)(int, const char *, int, ...);
+ static FILE *(*s_fopen)(const char *, const char *);
+-static FILE *(*s_fopen64)(const char *, const char *);
+ static FILE *(*s_freopen)(const char *, const char *, FILE *);
+ static int (*s_creat)(const char *, mode_t);
+ static int (*s_symlink)(const char *, const char *);
+ static int (*s_symlinkat)(const char *, int, const char *);
+ static ssize_t (*s_readlink)(const char *, char *, size_t);
+ static char *(*s_realpath)(const char *, char *);
+-static char *(*s_realpath_chk)(const char *, char *, size_t);
+ static int (*s_rename)(const char*, const char*);
+ static int (*s_renameat)(int, const char*, int, const char*);
+ static int (*s_renameat2)(int, const char*, int, const char*, unsigned int flags);
+ static int (*s_mkstemp)(char *template);
+ static int (*s_mkostemp)(char *template, int flags);
+ static int (*s_remove)(const char *);
+ static int (*s_unlink)(const char*);
+ static int (*s_unlinkat)(int, const char*, int);
+ static int (*s_execve)(const char *filename, char *const argv[],
+ 		       char *const envp[]);
+ static int (*s_execv)(const char *path, char *const argv[]);
+ static int (*s_execvp)(const char *file, char *const argv[]);
+ static int (*s_chdir)(const char *path);
+ static int (*s_fchdir)(int fd);
++static int (*s_stat)(const char *name, struct stat *buf);
++#ifdef __GLIBC__
++static int (*s_open64)(const char *, int, ...);
++static FILE *(*s_fopen64)(const char *, const char *);
++static char *(*s_realpath_chk)(const char *, char *, size_t);
+ static int (*s_xstat)(int vers, const char *name, struct stat *buf);
+-static int (*s_stat)(const char *name, struct stat *buf);
+ static int (*s_stat64)(const char *name, struct stat64 *buf);
+ static int (*s_xstat64)(int vers, const char *name, struct stat64 *buf);
+ static int (*s_lxstat64)(int vers, const char *path, struct stat64 *buf);
+ static void (*s_mcleanup)(void);
++#endif
++static int (*s_utimensat)(int, const char *, const struct timespec[2], int);
+ 
+ #define WRAP(ptr, name) \
+ 	if(!ptr) { \
+ 		ptr = dlsym(RTLD_NEXT, name); \
+ 		if(!ptr) { \
+ 			fprintf(stderr, "tup.ldpreload: Unable to wrap '%s'\n", \
+ 				name); \
+ 			exit(1); \
+ 		} \
+ 	}
+@@ -110,20 +126,50 @@
+ 		if(!ptr) { \
+ 			fprintf(stderr, "tup.ldpreload: Unable to wrap '%s' version '%s'\n", \
+ 				name, version); \
+ 			exit(1); \
+ 		} \
+ 	}
+ 
+ static int errored = 0;
+ static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+ static int depfd = -1;
++static const char *depfile_path; /* set in init_fd(), opened in open_depfd() */
++
++/* Lazily open the dependency file. init_fd() runs as an ELF constructor,
++ * which on OpenHarmony happens *after* the loader and some other early
++ * constructors have already opened files. Those events arrive with depfd
++ * still -1, so the descriptor has to be created on first use rather than
++ * up-front. Returns 0 on success, -1 on error.
++ */
++static int open_depfd(void)
++{
++	if(depfd >= 0)
++		return 0;
++	if(!depfile_path)
++		return -1;
++	/* WRAP() can call open() itself, so guard against re-entrancy by
++	 * resolving the real symbol without touching the wrapper above. */
++	if(!s_open)
++		s_open = dlsym(RTLD_NEXT, "open");
++	if(!s_open) {
++		fprintf(stderr, "tup.ldpreload: Unable to wrap 'open'\n");
++		return -1;
++	}
++	depfd = s_open(depfile_path, O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0666);
++	if(depfd < 0) {
++		perror(depfile_path);
++		fprintf(stderr, "tup error: Unable to write dependencies to a temporary file.\n");
++		return -1;
++	}
++	return 0;
++}
+ 
+ static void prepare(void)
+ {
+ 	pthread_mutex_lock(&mutex);
+ }
+ 
+ static void parent(void)
+ {
+ 	int rc;
+ 	rc = pthread_mutex_unlock(&mutex);
+@@ -150,101 +196,135 @@
+ 	if(pthread_atfork(prepare, parent, child) != 0) {
+ 		fprintf(stderr, "tup error: Unable to set pthread atfork handlers.\n");
+ 		goto out_error;
+ 	}
+ 	depfile = getenv(TUP_DEPFILE);
+ 	if(!depfile) {
+ 		fprintf(stderr, "tup error: Unable to find dependency filename in the TUP_DEPFILE environment variable.\n");
+ 		goto out_error;
+ 	}
+ 	WRAP(s_open, "open");
+-	if(depfd < 0) {
+-		depfd = s_open(depfile, O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0666);
+-		if(depfd < 0) {
+-			perror(depfile);
+-			fprintf(stderr, "tup error: Unable to write dependencies to a temporary file.\n");
+-			goto out_error;
+-		}
+-	}
++	/* Open the dependency file lazily (see open_depfd) instead of here.
++	 * On OpenHarmony the dynamic loader and other early constructors may
++	 * open files before this constructor runs; a hard failure here would
++	 * set errored=1 and silently discard every dependency event for the
++	 * whole process. Only the path is remembered now.
++	 */
++	depfile_path = depfile;
+ 	return;
+ 
+ out_error:
+ 	errored = 1;
+ }
+ 
++/* Return non-zero if an open() carrying O_CREAT would have to create the
++ * file, i.e. the path does not exist yet. The probe goes through a plain
++ * libc call so it does not raise a dependency event of its own.
++ *
++ * open(name, O_CREAT) without O_WRONLY/O_RDWR is how the toybox userland
++ * shipped by OpenHarmony creates a missing file (e.g. `touch newfile`).
++ * Creating a file is a write, but the flag test above cannot see it, so
++ * the caller needs to know whether the open is about to create the target.
++ */
++static int will_create(int dirfd, const char *path)
++{
++	struct stat st;
++
++	if(fstatat(dirfd, path, &st, 0) == 0)
++		return 0;
++	return errno == ENOENT;
++}
++
+ int open(const char *pathname, int flags, ...)
+ {
+ 	int rc;
++	int newfile = 0;
+ 	mode_t mode = 0;
+ 
+ 	WRAP(s_open, "open");
+ 	if(flags & O_CREAT) {
+ 		va_list ap;
+ 		va_start(ap, flags);
+ 		mode = va_arg(ap, int);
+ 		va_end(ap);
++		if(!(flags & (O_WRONLY|O_RDWR)))
++			newfile = will_create(AT_FDCWD, pathname);
+ 	}
+ 	rc = s_open(pathname, flags, mode);
+ 	if(rc >= 0) {
+ 		int at = ACCESS_READ;
+ 
+ 		if(flags&O_WRONLY || flags&O_RDWR)
++			at = ACCESS_WRITE;
++		else if(newfile)
+ 			at = ACCESS_WRITE;
+ 		handle_file(pathname, "", at);
+ 	} else {
+ 		handle_file(pathname, "", ACCESS_READ);
+ 	}
+ 	return rc;
+ }
+ 
++#ifdef __GLIBC__
+ int open64(const char *pathname, int flags, ...)
+ {
+ 	int rc;
++	int newfile = 0;
+ 	mode_t mode = 0;
+ 
+ 	WRAP(s_open64, "open64");
+ 	if(flags & O_CREAT) {
+ 		va_list ap;
+ 		va_start(ap, flags);
+ 		mode = va_arg(ap, int);
+ 		va_end(ap);
++		if(!(flags & (O_WRONLY|O_RDWR)))
++			newfile = will_create(AT_FDCWD, pathname);
+ 	}
+ 	rc = s_open64(pathname, flags, mode);
+ 	if(rc >= 0) {
+ 		int at = ACCESS_READ;
+ 
+ 		if(flags&O_WRONLY || flags&O_RDWR)
++			at = ACCESS_WRITE;
++		else if(newfile)
+ 			at = ACCESS_WRITE;
+ 		handle_file(pathname, "", at);
+ 	} else {
+ 		handle_file(pathname, "", ACCESS_READ);
+ 	}
+ 	return rc;
+ }
++#endif
+ 
+ int openat(int dfd, const char *pathname, int flags, ...)
+ {
+ 	int rc;
++	int newfile = 0;
+ 	mode_t mode = 0;
+ 
+ 	WRAP(s_openat, "openat");
+ 	if(flags & O_CREAT) {
+ 		va_list ap;
+ 		va_start(ap, flags);
+ 		mode = va_arg(ap, int);
+ 		va_end(ap);
++		if(!(flags & (O_WRONLY|O_RDWR)))
++			newfile = will_create(dfd, pathname);
+ 	}
+ 	rc = s_openat(dfd, pathname, flags, mode);
+ 	if(rc >= 0) {
+ 		int at = ACCESS_READ;
+ 
+ 		if(flags&O_WRONLY || flags&O_RDWR)
++			at = ACCESS_WRITE;
++		else if(newfile)
+ 			at = ACCESS_WRITE;
+ 		handle_file_dirfd(dfd, pathname, "", at);
+ 	} else {
+ 		handle_file_dirfd(dfd, pathname, "", ACCESS_READ);
+ 	}
+ 	return rc;
+ }
+ 
+ FILE *fopen(const char *path, const char *mode)
+ {
+@@ -253,33 +333,35 @@
+ 	WRAP(s_fopen, "fopen");
+ 	f = s_fopen(path, mode);
+ 	if(f) {
+ 		handle_file(path, "", !(mode[0] == 'r'));
+ 	} else {
+ 		handle_file(path, "", ACCESS_READ);
+ 	}
+ 	return f;
+ }
+ 
++#ifdef __GLIBC__
+ FILE *fopen64(const char *path, const char *mode)
+ {
+ 	FILE *f;
+ 
+ 	WRAP(s_fopen64, "fopen64");
+ 	f = s_fopen64(path, mode);
+ 	if(f) {
+ 		handle_file(path, "", !(mode[0] == 'r'));
+ 	} else {
+ 		handle_file(path, "", ACCESS_READ);
+ 	}
+ 	return f;
+ }
++#endif
+ 
+ FILE *freopen(const char *path, const char *mode, FILE *stream)
+ {
+ 	FILE *f;
+ 
+ 	WRAP(s_freopen, "freopen");
+ 	f = s_freopen(path, mode, stream);
+ 	if(f) {
+ 		handle_file(path, "", !(mode[0] == 'r'));
+ 	} else {
+@@ -342,31 +424,37 @@
+ 		return -1;
+ 	}
+ 	WRAP(s_readlink, "readlink");
+ 	rc = s_readlink(pathname, buf, bufsiz);
+ 	handle_file(pathname, "", ACCESS_READ);
+ 	return rc;
+ }
+ 
+ char *realpath(const char *path, char *resolved_path)
+ {
++#ifdef __GLIBC__
+ 	VWRAP(s_realpath, "realpath", "GLIBC_2.3");
++#else
++	WRAP(s_realpath, "realpath");
++#endif
+ 	handle_file(path, "", ACCESS_READ);
+ 	return s_realpath(path, resolved_path);
+ }
+ 
++#ifdef __GLIBC__
+ char *__realpath_chk(const char *path, char *resolved_path, size_t resolvedlen)
+ {
+ 	WRAP(s_realpath_chk, "__realpath_chk");
+ 	handle_file(path, "", ACCESS_READ);
+ 	return s_realpath_chk(path, resolved_path, resolvedlen);
+ }
++#endif
+ 
+ int rename(const char *old, const char *new)
+ {
+ 	int rc;
+ 
+ 	WRAP(s_rename, "rename");
+ 	rc = s_rename(old, new);
+ 	if(rc == 0) {
+ 		handle_file(old, new, ACCESS_RENAME);
+ 	}
+@@ -552,38 +640,41 @@
+ 	int rc;
+ 	WRAP(s_fchdir, "fchdir");
+ 	rc = s_fchdir(fd);
+ 	if(rc == 0) {
+ 		if(update_cwd() < 0)
+ 			return -1;
+ 	}
+ 	return rc;
+ }
+ 
++#ifdef __GLIBC__
+ int __xstat(int vers, const char *name, struct stat *buf)
+ {
+ 	int rc;
+ 	WRAP(s_xstat, "__xstat");
+ 	rc = s_xstat(vers, name, buf);
+ 	handle_file(name, "", ACCESS_READ);
+ 	return rc;
+ }
++#endif
+ 
+ int stat(const char *filename, struct stat *buf)
+ {
+ 	int rc;
+ 	WRAP(s_stat, "stat");
+ 	rc = s_stat(filename, buf);
+ 	handle_file(filename, "", ACCESS_READ);
+ 	return rc;
+ }
+ 
++#ifdef __GLIBC__
+ int stat64(const char *filename, struct stat64 *buf)
+ {
+ 	int rc;
+ 	WRAP(s_stat64, "stat64");
+ 	rc = s_stat64(filename, buf);
+ 	handle_file(filename, "", ACCESS_READ);
+ 	return rc;
+ }
+ 
+ int __xstat64(int __ver, __const char *__filename,
+@@ -610,20 +701,51 @@
+  * syscall, so we miss the hook. The FUSE checker would catch gmon.out, which
+  * makes it hard to write an accurate Tupfile if FUSE sees it but ldpreload
+  * does not.
+  */
+ void _mcleanup(void)
+ {
+ 	WRAP(s_mcleanup, "_mcleanup");
+ 	handle_file("gmon.out", "", ACCESS_WRITE);
+ 	s_mcleanup();
+ }
++#endif
++
++/* OpenHarmony ships toybox as its core userland. Unlike GNU coreutils
++ * touch -- which opens the target with O_WRONLY|O_CREAT and is caught by
++ * the open() wrapper above -- toybox touch updates timestamps with a bare
++ * utimensat() on an existing file, and creates a missing file with
++ * open(name, O_CREAT). Neither path used to raise a dependency event, so
++ * every rule whose command created its output with `touch` was reported as
++ * "Expected to write to file ... but didn't". Record a successful
++ * timestamp change as a write, matching what the FUSE server does in
++ * tup_fs_utimens().
++ */
++int utimensat(int dirfd, const char *pathname, const struct timespec times[2], int flags)
++{
++	struct stat st;
++	int rc;
++
++	WRAP(s_utimensat, "utimensat");
++	rc = s_utimensat(dirfd, pathname, times, flags);
++	if(rc != 0)
++		return rc;
++	/* tup tracks files, not directories. `touch dir` on the toybox
++	 * userland ends up here, and turning that into a write event makes
++	 * tup create a node for the directory whose create_list flag is
++	 * never cleared. Only report regular-ish targets. */
++	if(fstatat(dirfd, pathname, &st, 0) < 0)
++		return rc;
++	if(!S_ISDIR(st.st_mode))
++		handle_file_dirfd(dirfd, pathname, "", ACCESS_WRITE);
++	return rc;
++}
+ 
+ static int write_all(int fd, const void *data, int size)
+ {
+ 	if(write(fd, data, size) != size) {
+ 		perror("write");
+ 		fprintf(stderr, "tup error: Unable to write %i bytes to the dependency file.\n", size);
+ 		return -1;
+ 	}
+ 	return 0;
+ }
+@@ -633,20 +755,28 @@
+ 	struct access_event event;
+ 	int len;
+ 	int len2;
+ 
+ 	if(errored)
+ 		return;
+ 	if(ignore_file(file))
+ 		return;
+ 	if(ignore_file(file2))
+ 		return;
++	/* Events from the dynamic loader / early constructors predate
++	 * init_fd(), so depfile_path may not be known yet; just drop those. */
++	if(!depfile_path)
++		return;
++	if(open_depfd() < 0) {
++		errored = 1;
++		return;
++	}
+ 
+ 	if(tup_flock(depfd) < 0) {
+ 		fprintf(stderr, "tup error: Unable to lock dependency file for writing [%i]: (file event = %s)\n", depfd, file);
+ 		goto out_error;
+ 	}
+ 	len = strlen(file);
+ 	len2 = strlen(file2);
+ 	event.at = at;
+ 	event.len = len;
+ 	event.len2 = len2;

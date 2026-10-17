@@ -1,0 +1,19 @@
+---
+package: tup/0.8
+homepage: "https://github.com/gittup/tup"
+
+upstream_check_command: "test/test.sh"
+upstream_test_in_build: false
+upstream_test_command: "sh ./test/test.sh --keep-going"
+
+upstream_tests:
+  - name: full_suite
+    command: "sh ./test/test.sh --keep-going"
+    expected: "981 项上游测试；适配后 935 通过 / 41 失败 / 5 超时，剩余失败全部为平台阻塞项（只读 /tmp、缺 git/gcc、无 /dev/fuse、上游 ldpreload 的 vardict TODO）"
+
+test_package_tests:
+  - file: test.sh
+    description: "CLI 消费者验证：--version / server = ldpreload / .so 与可执行同目录 / touch 规则端到端构建 + 增量无重建"
+    command: "bash test.sh"
+
+assertion_count: 4

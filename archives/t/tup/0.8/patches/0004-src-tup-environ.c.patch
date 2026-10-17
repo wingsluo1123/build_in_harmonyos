@@ -1,0 +1,31 @@
+--- a/src/tup/environ.c
++++ b/src/tup/environ.c
+@@ -21,20 +21,28 @@
+ #include "environ.h"
+ #include "entry.h"
+ #include "db.h"
+ #include "tent_tree.h"
+ #include "vardb.h"
+ 
+ static const char *default_env[] = {
+ /* NOTE: Please increment PARSER_VERSION if these are modified */
+ 	"PATH",
+ 	"HOME",
++#ifndef _WIN32
++	/* POSIX: plain commands (compilers, shell scripts) need a writable
++	 * scratch directory. On HarmonyOS /tmp is a read-only erofs mount, so
++	 * TMPDIR has to reach sub-processes just like PATH/HOME do (the Windows
++	 * branch below already lists TEMP/TMP for the same reason).
++	 */
++	"TMPDIR",
++#endif
+ #ifdef _WIN32
+ 	/* Basic Windows variables */
+ 	"SYSTEMROOT",
+ 	/* Visual Studio variables */
+ 	"DevEnvDir",
+ 	"INCLUDE",
+ 	"LIB",
+ 	"LIBPATH",
+ 	"TEMP",
+ 	"TMP",

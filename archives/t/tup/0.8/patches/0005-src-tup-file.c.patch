@@ -1,0 +1,98 @@
+--- a/src/tup/file.c
++++ b/src/tup/file.c
+@@ -21,23 +21,26 @@
+ #define _ATFILE_SOURCE
+ #include "file.h"
+ #include "mempool.h"
+ #include "debug.h"
+ #include "db.h"
+ #include "fileio.h"
+ #include "config.h"
+ #include "entry.h"
+ #include "option.h"
+ #include <stdio.h>
++#include <stdlib.h>
+ #include <string.h>
+ #include <fcntl.h>
+ #include <errno.h>
++#include <limits.h>
++#include <unistd.h>
+ #include <sys/stat.h>
+ 
+ static struct file_entry *new_entry(const char *filename);
+ static void check_unlink_list(const char *filename, struct file_entry_head *u_head);
+ static void handle_unlink(struct file_info *info);
+ static int update_write_info(FILE *f, tupid_t cmdid, struct file_info *info,
+ 			     int *warnings, enum check_type_t check_only);
+ static int update_read_info(FILE *f, tupid_t cmdid, struct file_info *info,
+ 			    int full_deps, tupid_t vardt,
+ 			    int *important_link_removed);
+@@ -867,10 +870,68 @@
+ 		del_file_entry(&info->var_list, r);
+ 	}
+ 
+ 	tent_tree_copy(&root, &info->used_groups_root);
+ 
+ 	if(tup_db_check_actual_inputs(f, cmdid, &root, &info->sticky_root, &info->normal_root, &info->group_sticky_root, &info->output_root, important_link_removed) < 0)
+ 		return -1;
+ 	free_tent_tree(&root);
+ 	return 0;
+ }
++
++/* tmpfile() with a configurable directory.
++ *
++ * libc's tmpfile() hard-codes /tmp (P_tmpdir) on both glibc and musl, so it is
++ * unusable wherever /tmp is not writable. That is the case on OpenHarmony PCs,
++ * where /tmp is a read-only erofs mount. Fall back through:
++ *
++ *   1. $TMPDIR      - the standard override, and what the platform expects
++ *                     (OpenHarmony build tooling sets TMPDIR=$HOME/tmp)
++ *   2. .tup/tmp     - tup's own scratch directory, always writable since tup
++ *                     has to write .tup/db into the same tree. This makes tup
++ *                     work out of the box on platforms without a usable /tmp.
++ *   3. /tmp         - last resort, keeping the historical behaviour.
++ *
++ * Semantics match tmpfile(): the file is unnamed and removed on close (or
++ * immediately after opening), so callers only see the FILE*.
++ */
++FILE *tup_tmpfile(void)
++{
++	const char *dirs[] = {
++		getenv("TMPDIR"),
++		".tup/tmp",
++		"/tmp",
++	};
++	unsigned int i;
++
++	for(i = 0; i < sizeof(dirs) / sizeof(dirs[0]); i++) {
++		const char *dir = dirs[i];
++		char path[PATH_MAX];
++		int fd;
++
++		if(!dir || !dir[0])
++			continue;
++
++		if(i == 1) {
++			/* .tup/tmp may not exist yet (it is created on demand,
++			 * like the graph dumps and command backups).
++			 */
++			if(mkdir(dir, 0777) < 0 && errno != EEXIST)
++				continue;
++		}
++
++		if(snprintf(path, sizeof(path), "%s/tup-tmp-XXXXXX", dir)
++		   >= (int)sizeof(path)) {
++			errno = ENAMETOOLONG;
++			continue;
++		}
++		fd = mkstemp(path);
++		if(fd < 0)
++			continue;
++		if(unlink(path) < 0) {
++			close(fd);
++			continue;
++		}
++		return fdopen(fd, "w+b");
++	}
++	return NULL;
++}
