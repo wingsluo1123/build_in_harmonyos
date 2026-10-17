@@ -1,0 +1,69 @@
+--- /dev/null
++++ b/getMB-measurement.c
+@@ -0,0 +1,66 @@
++/* Adapt the original mbmon read interface to named platform measurements. */
++#include "measurement.h"
++#include <errno.h>
++#include <math.h>
++#include <stdio.h>
++#include <string.h>
++
++extern int fahrn_flag;
++extern int debug_flag;
++extern int TyanTigerMP_flag;
++extern char *probe_request;
++static struct mbmon_measurements current;
++
++const char *mbmon_temperature_label(unsigned int index)
++{
++    if (index >= MBMON_CHANNEL_COUNT) return "unavailable";
++    return current.labels[index][0] ? current.labels[index] : "unavailable";
++}
++
++int InitMBInfo(char method)
++{
++    if ((method != ' ' && method != 'A') || TyanTigerMP_flag ||
++        (probe_request && strcmp(probe_request, "none") != 0)) {
++        errno = ENOTSUP;
++        return -1;
++    }
++    if (mbmon_read_measurements(&current) != 0) return -1;
++    fprintf(stderr, "Backend: %s\n", mbmon_measurement_backend());
++    for (unsigned i = 0; i < MBMON_CHANNEL_COUNT; ++i)
++        fprintf(stderr, "TEMP%u=%s (Celsius; %s)\n", i,
++            current.labels[i][0] ? current.labels[i] : "unavailable",
++            current.valid_temperatures & (1u << i) ? "available" : "unavailable");
++    fprintf(stderr, "Fan RPM and motherboard voltage channels are unavailable in this backend.\n");
++    return 0;
++}
++
++int getTemp(float *a, float *b, float *c)
++{
++    float *dest[] = {a, b, c};
++    for (unsigned i = 0; i < 3; ++i) *dest[i] = NAN;
++    if (mbmon_read_measurements(&current) != 0) return -1;
++    for (unsigned i = 0; i < 3; ++i) {
++        if (!(current.valid_temperatures & (1u << i))) continue;
++        *dest[i] = current.temperatures[i];
++        if (fahrn_flag) *dest[i] = *dest[i] * 1.8f + 32.0f;
++    }
++    if (current.valid_temperatures != 7) {
++        errno = ENODATA;
++        return -1;
++    }
++    return 0;
++}
++
++int getVolt(float *a, float *b, float *c, float *d, float *e, float *f, float *g)
++{
++    *a = *b = *c = *d = *e = *f = *g = NAN;
++    errno = ENOTSUP;
++    return -1;
++}
++
++int getFanSp(int *a, int *b, int *c)
++{
++    *a = *b = *c = -1;
++    errno = ENOTSUP;
++    return -1;
++}

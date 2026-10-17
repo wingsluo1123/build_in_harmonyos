@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.16)
+project(xmbmon_consumer C)
+find_package(xmbmon CONFIG REQUIRED)
+add_executable(measurement_consumer measurement_consumer.c)
+target_link_libraries(measurement_consumer PRIVATE xmbmon::xmbmon m)

@@ -1,0 +1,370 @@
+--- a/xmbmon.c
++++ b/xmbmon.c
+@@ -4,32 +4,41 @@
+  */
+ 
+ #ifdef HAVE_CONFIG_H
+ #include "config.h"
+ #endif
+ 
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <sys/time.h>
+ #include <unistd.h>
++#include <math.h>
++#include <string.h>
++#ifdef MBMON_NAMED_SENSORS
++#include "measurement.h"
++#endif
+ 
+ #include "mbmon.h"
+ 
+ /* X include files */
+ #include <X11/Intrinsic.h>
+ #include <X11/StringDefs.h>
+ 
+ #define DEFAULT_METHOD	' '
+ 
+ #define RES_NAME   "XMBmon"
+ 
+-#define DEFAULT_GEOMETRY  "100x140"
++#ifdef MBMON_NAMED_SENSORS
++#define DEFAULT_GEOMETRY "420x180"
++#else
++#define DEFAULT_GEOMETRY "100x140"
++#endif
+ #define DEFAULT_FONT      "-adobe-helvetica-bold-r-*-*-10-*-*-*-*-*-*-*"
+ 
+ #define DEFAULT_LBFONT    "-adobe-helvetica-bold-r-*-*-12-*-*-*-*-*-*-*"
+ #define DEFAULT_LBCOLOR   "black"
+ 
+ #define DEFAULT_COUNT        "4"
+ #define DEFAULT_CSEC        "20"
+ #define DEFAULT_WSEC      "1800"
+ #define DEFAULT_TMIN      "10.0"
+ #define DEFAULT_TMAX      "50.0"
+@@ -413,47 +422,53 @@
+ "    : -probe chip   ( ) chip="CHIPLIST"\n"
+ "                         for probing monitor chips\n"
+ "    : -TyanTigerMP      for Tyan Tiger MP motherboard\n"
+ "    : -debug/DEBUG      for debug information\n"
+ 	, XMBMON_VERSION, DEFAULT_METHOD);
+ 	exit(1);
+ }
+ 
+ int main(int argc, char *argv[])
+ {
++	if (argc == 2 && strcmp(argv[1], "--version") == 0) {
++		printf("xmbmon %s\n", XMBMON_VERSION);
++		return 0;
++	}
+ 	{
+ 		uid_t uid = getuid();
+ 		int r = seteuid(uid);
+ 		if(r == -1) {
+ 			perror("seteuid");
+ 			return 1;
+ 		}
+ 	}
+ 
+ 	get_args(argc, argv);
+ 
+ 	wgt = XtVaAppInitialize(&app_con, RES_NAME,
+ 			options, XtNumber(options),
+ 			&argc, argv, fallback_resources, NULL);
+ 	XtVaGetApplicationResources(wgt, (caddr_t) &app_resources,
+ 			resources, XtNumber(resources), NULL);
+ 	XtAppAddActions(app_con, actions, XtNumber(actions));
+ 	XtRealizeWidget(wgt);
+ 
+ 	get_res();
++#ifndef MBMON_NAMED_SENSORS
+ 	{
+ 	    int r = seteuid(0);
+ 	    if(r == -1) {
+ 			perror("seteuid");
+ 			return 1;
+ 	    }
+ 	}
++#endif
+ 	init_dt();
+ 
+ 	XtAppAddTimeOut(app_con, t_msec, (XtTimerCallbackProc) alarm_handler, NULL);
+ 	XtAppMainLoop(app_con);
+ 
+ 	return 0;
+ }
+ 
+ void get_res()
+ {
+@@ -563,29 +578,37 @@
+ 		}
+ 			t_indx[2] = 3;
+ 	}
+ }
+ 
+ void quit_proc(void)
+ {
+ 	exit(1);
+ }
+ 
++static void format_reading(int id)
++{
++	if (isfinite(cur_val[id]))
++		snprintf(c_rdv[id], C_LBL, c_rdp[id], cur_val[id]);
++	else
++		snprintf(c_rdv[id], C_LBL, "N/A");
++}
++
+ void repaint_proc(void)
+ {
+ 	int wwd, hht;
+ 	int i, id, n, ww = width -1, hh = height - 1;
+ 	ring_d *p;
+ 
+ 	for (i = 0; i < num_data; i++) {
+ 		id = t_indx[i];
+-		sprintf(c_rdv[id], c_rdp[id], cur_val[id]);
++		format_reading(id);
+ 		cv_width[i] = XTextWidth(fontstr, c_rdv[id], strlen(c_rdv[id]));
+ 	}
+ 
+ 	getWH(&wwd, &hht);
+ 	if (wwd != width) {
+ 		width = wwd;
+ 		ww = width - 1;
+ 		sscl = (float) width / (float) w_range;
+ 	  if (noTemp3_flag) {
+ 		x_rdg[1] = (width - cg_width[1]) / 2;
+@@ -637,27 +660,37 @@
+ 	XDrawString(disp, win, gct, ww-cm_width, hh+1, cvmin, strlen(cvmin));
+ 	XDrawString(disp, win, gct, ww-cm_width, cm_height, cvmax, strlen(cvmax));
+ 
+ 	for (i = 0; i < n_tick + 1; i++) {
+ 		n = hh - (int) ((float) (i + 1) * htck + 0.5);
+ 		XDrawLine(disp, win, gct, 0, n, ww, n);
+ 	}
+ 
+ 	for (i = num_data - 1; i >= 0; i--) {
+ 		id = t_indx[i];
+-		for (n = 0, p = rdp[i]; n < w_counter; n++) {
+-			(points + n)->x = (short) ((float) n * sscl + 0.5);
+-			(points + n)->y = hh \
+-				- (short) ((p->val - orign[i]) * scale[i] + 0.5);
+-			p = p->next;
+-		}
+-		XDrawLines(disp, win, gcl[id], points, w_counter, CoordModeOrigin);
++		int segment = 0;
++		for (n = 0, p = rdp[i]; n < w_counter; n++, p = p->next) {
++			if (!isfinite(p->val)) {
++				if (segment > 1) XDrawLines(disp, win, gcl[id], points, segment, CoordModeOrigin);
++				segment = 0;
++				continue;
++			}
++			points[segment].x = (short)((float)n * sscl + 0.5);
++			/* Keep real values outside the selected range out of the labels.
++			 * Bound the floating-point coordinate before converting to XPoint. */
++			float plot_y = hh - (p->val - orign[i]) * scale[i];
++			if (plot_y < c_lb + c_height) plot_y = c_lb + c_height;
++			if (plot_y > hh) plot_y = hh;
++			points[segment].y = (short)plot_y;
++			segment++;
++		}
++		if (segment > 1) XDrawLines(disp, win, gcl[id], points, segment, CoordModeOrigin);
+ 	}
+ 
+ 	XFlush(disp);
+ }
+ 
+ void getWH(int *width, int *height)
+ {
+ 	Dimension wd, ht;
+ 
+ 	XtVaGetValues(wgt, XtNwidth, &wd, XtNheight, &ht, NULL);
+@@ -685,41 +718,48 @@
+ {
+ 	ring_d *p;
+ 	int n, i, id;
+ 	float d;
+ 	
+ 	if (w_sec < 10 * interval_sec) {
+ 		fprintf(stderr,"wsec(%d) is too small w.r.t sec(%d) --- exit.\n",\
+ 			w_sec, interval_sec);
+ 		exit (1);
+ 	}
+-	if (tmax < tmin) {
+-		fprintf(stderr,"tmin(%f) > tmax(%f), not allowed! --- exit.\n",\
++	if (tmax <= tmin) {
++		fprintf(stderr,"tmin(%f) >= tmax(%f), not allowed! --- exit.\n",\
+ 			tmin, tmax);
+ 		exit (1);
+ 	}
+-	if (vmax < vmin) {
+-		fprintf(stderr,"vmin(%f) > vmax(%f), not allowed! --- exit.\n",\
++	if (vmax <= vmin) {
++		fprintf(stderr,"vmin(%f) >= vmax(%f), not allowed! --- exit.\n",\
+ 			vmin, vmax);
+ 		exit (1);
+ 	}
+ 	if ((n = InitMBInfo(access_method)) != 0) {
+ 		perror("InitMBInfo");
++#ifndef MBMON_NAMED_SENSORS
+ 		if(n < 0)
+ 			fprintf(stderr,"This program needs \"setuid root\"!!\n");
++#endif
+ 		exit (1);
+ 	}
+ 	if (debug_flag)
+ 		exit (0);
+ 
+ 	getTemp(&cur_val[0], &cur_val[1], &cur_val[2]);
+ 	getVolt(&cur_val[3], &d, &d, &d, &d, &d, &d);
++#ifdef MBMON_NAMED_SENSORS
++	for (i = 0; i < 3; ++i)
++		c_rdg[i] = (char *)mbmon_temperature_label(i);
++	c_rdg[3] = "Vcore";
++#endif
+ 	
+ 	disp = XtDisplay(wgt);
+ 	win = XtWindow(wgt);
+ 	getWH(&width, &height);
+ 
+ 	if ((fontstr = XLoadQueryFont(disp, font)) == NULL) {
+ 		fprintf(stderr,"Can't find font: %s\n", font);
+ 		exit (1);
+ 	}
+ 
+@@ -731,21 +771,21 @@
+ 	XSetFont(disp, gct, fontstr->fid);
+ 	for (i = 0; i < num_data; i++) {
+ 		id = t_indx[i];
+ 		if (ColorPix(disp, l_color[id], &(cpix[id])))
+ 			cpix[id] = d_cpix[id];
+ 		gcl[id] = XCreateGC(disp, win, 0, 0);
+ 		XSetLineAttributes(disp, gcl[id], 2, LineSolid, CapRound, JoinRound);
+ 		XSetForeground(disp, gcl[id], cpix[id]);
+ 		XSetFont(disp, gcl[id], fontstr->fid);
+ 		c_rdv[id] = (char *) malloc(C_LBL);
+-		sprintf(c_rdv[id], c_rdp[id], cur_val[id]);
++		format_reading(id);
+ 		cg_width[i] = XTextWidth(fontstr, c_rdg[id], strlen(c_rdg[id]));
+ 		cv_width[i] = XTextWidth(fontstr, c_rdv[id], strlen(c_rdv[id]));
+ 	}
+ 
+ 	if(*label != (char) NULL) {
+ 	  if ((lb_fontstr = XLoadQueryFont(disp, lb_font)) == NULL) {
+ 		fprintf(stderr,"Can't find font for label: %s\n", font);
+ 		exit (1);
+ 	  }
+ 		ColorPix(disp, DEFAULT_LBCOLOR, &d_cpixlb);
+@@ -792,30 +832,27 @@
+ 	orign[3] = vmin;
+ 	cg_w = (cg_width[0] + cg_width[3]) / 2;
+ 	x_rdg[1] = cg_width[0] / 2 + (width - cg_w) / 3 - cg_width[1] / 2;
+ 	x_rdg[2] = cg_width[0] / 2 + (width - cg_w) * 2 / 3 - cg_width[2] / 2;
+ 	x_rdg[3] = width - cg_width[3] - 1;
+ 	cv_w = (cv_width[0] + cv_width[3]) / 2;
+ 	x_rdv[1] = cv_width[0] / 2 + (width - cv_w) / 3 - cv_width[1] / 2;
+ 	x_rdv[2] = cv_width[0] / 2 + (width - cv_w) * 2 / 3 - cv_width[2] / 2;
+ 	x_rdv[3] = width - cv_width[3] - 1;
+   }
+-	y_rdg = fontstr->max_bounds.ascent - 1;
+-/*	y_rdv = 2 * fontstr->max_bounds.ascent + fontstr->max_bounds.descent;
+-	y_rdv = 2 * fontstr->max_bounds.ascent;*/
+-	y_rdv = 2 * y_rdg;
+-/*	c_height = 2 *(fontstr->max_bounds.ascent + fontstr->max_bounds.descent);*/
+-	c_height = 2 * fontstr->max_bounds.ascent;
++	y_rdg = fontstr->max_bounds.ascent + 2;
++	y_rdv = y_rdg + fontstr->max_bounds.ascent + fontstr->max_bounds.descent + 3;
++	c_height = 2 * (fontstr->max_bounds.ascent + fontstr->max_bounds.descent + 3) + 2;
+ 	if(*label != (char) NULL) {
+ /*		x_lb = (width - lb_width) / 2;*/
+ 		x_lb = 2;
+-		c_lb = lb_fontstr->max_bounds.ascent + 1;
++		c_lb = lb_fontstr->max_bounds.ascent + lb_fontstr->max_bounds.descent + 4;
+ 		y_rdg += c_lb;
+ 		y_rdv += c_lb;
+ 	}
+ 	cm_height = c_height + y_rdg - 1;
+ 	cm_width = XTextWidth(fontstr, cvmin, strlen(cvmin)) - 1;
+ 	tscl = (float) (height - c_lb - c_height)/ (tmax - tmin);
+ 	vscl = (float) (height - c_lb - c_height)/ (vmax - vmin);
+ 	htck = (float) (height - c_lb - c_height)/ (float) (n_tick + 1);
+ 	scale[0] = tscl;
+ 	scale[1] = tscl;
+@@ -836,36 +873,39 @@
+ #define	THREDMAX	1.5
+ #define	THREDMIN	0.5
+ void alarm_handler(void)
+ {
+ 	float d, *p;
+ 	int i, id, n;
+ 	float temp_in[4], tpd[4];
+ 
+ 	getTemp(&tpd[0], &tpd[1], &tpd[2]);
+ 	getVolt(&tpd[3], &d, &d, &d, &d, &d, &d);
+-	if (t_msec <= 1000){
+-		for (i = 0; i < NUM_DATA; i++) {
+-			if (THREDMIN < tpd[i]/cur_val[i] && tpd[i]/cur_val[i] < THREDMAX)
+-				temp_in[i] = tpd[i];
+-		}
+-			/* apply 2nd order IIR LPF, by Takayuki Hosoda */
+-		for (i = 0; i < NUM_DATA; i++) {
++	for (i = 0; i < NUM_DATA; ++i) {
++		if (!isfinite(tpd[i])) {
++			cur_val[i] = NAN;
++			iir_reg[i] = 0;
++			continue;
++		}
++		if (!isfinite(cur_val[i]) || cur_val[i] == 0) {
++			cur_val[i] = tpd[i];
++			iir_reg[i] = 0;
++			continue;
++		}
++		temp_in[i] = cur_val[i];
++		if (THREDMIN < tpd[i]/cur_val[i] && tpd[i]/cur_val[i] < THREDMAX)
++			temp_in[i] = tpd[i];
++		if (t_msec <= 1000) {
+ 			d = iir_reg[i];
+ 			iir_reg[i] = d - (2.0 * d + temp_in[i] - cur_val[i]) * iir_tc;
+ 			cur_val[i] -= d * iir_tc;
+-		}
+-	} else {
+-		for (i = 0; i < NUM_DATA; i++) {
+-			if (THREDMIN < tpd[i]/cur_val[i] && tpd[i]/cur_val[i] < THREDMAX)
+-				cur_val[i] = tpd[i];
+-		}
++		} else cur_val[i] = temp_in[i];
+ 	}
+ 
+ 	draw_values();
+ 
+ 	p = fmean + counter;
+ 	for (i = 0; i < num_data; i++) {
+ 		id = t_indx[i];
+ 		*(p + i * n_count) = cur_val[id];
+ 	}
+ 
+@@ -887,19 +927,20 @@
+ 		}
+ 		repaint_proc();
+ 	}
+ 	XtAppAddTimeOut(app_con, t_msec, (XtTimerCallbackProc) alarm_handler, NULL);
+ }
+ 
+ void draw_values(void)
+ {
+ 	int i, id;
+ 
+-	XClearArea(disp, win, 0, y_rdg , 0, y_rdg - c_lb, False);
++	XClearArea(disp, win, 0, y_rdg + fontstr->max_bounds.descent + 1,
++		0, fontstr->max_bounds.ascent + fontstr->max_bounds.descent + 3, False);
+ 	for (i = 0; i < num_data; i++) {
+ 		id = t_indx[i];
+-		sprintf(c_rdv[id], c_rdp[id], cur_val[id]);
++		format_reading(id);
+ 		XDrawString(disp, win, gcl[id], x_rdv[i], y_rdv, \
+ 					c_rdv[id], strlen(c_rdv[id]));
+ 	}
+ 	XFlush(disp);
+ }

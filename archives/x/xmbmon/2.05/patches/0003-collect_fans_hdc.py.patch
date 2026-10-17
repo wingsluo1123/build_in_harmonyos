@@ -1,0 +1,63 @@
+--- /dev/null
++++ b/collect_fans_hdc.py
+@@ -0,0 +1,60 @@
++#!/usr/bin/env python3
++"""Host-assisted live fan collector. Requires HDC shell; keeps unverified raw units."""
++import argparse,json,pathlib,re,subprocess,tempfile,time,uuid
++
++def parse_dump(text):
++    values={};name=None
++    for line in text.splitlines():
++        if line.startswith('Type:'):name=line.partition(':')[2].strip()
++        elif line.startswith('Temperature:') and name in ('fan_speed0','fan_speed1'):
++            value=line.partition(':')[2].strip()
++            if name in values or not re.fullmatch(r'[0-9]+',value) or int(value)>1000000:
++                raise ValueError('Invalid or duplicate fan channel')
++            values[name]=int(value)
++    if len(values)!=2:raise ValueError('Missing fan channels')
++    return values
++
++def main():
++    p=argparse.ArgumentParser(description=__doc__)
++    p.add_argument('--hdc',default='hdc');p.add_argument('--target',required=True)
++    p.add_argument('--remote-output',required=True)
++    p.add_argument('--samples',type=int,default=60);p.add_argument('--interval',type=float,default=1)
++    p.add_argument('--log',type=pathlib.Path,required=True);a=p.parse_args()
++    if not re.fullmatch(r'/[A-Za-z0-9_./-]+',a.remote_output) or '..' in pathlib.PurePosixPath(a.remote_output).parts:p.error('Invalid remote path')
++    if not 1<=a.samples<=3600 or not 1<=a.interval<=60:p.error('Collection bound out of range')
++    prefix=[a.hdc,'-t',a.target];stage=a.remote_output+'.'+uuid.uuid4().hex+'.tmp'
++    a.log.parent.mkdir(parents=True,exist_ok=True)
++    def run(*args):
++        r=subprocess.run(prefix+list(args),capture_output=True,timeout=10)
++        out=r.stdout.decode('utf-8','replace');err=r.stderr.decode('utf-8','replace')
++        if r.returncode or '[Fail]' in out or '[F]' in out:raise RuntimeError(out+err)
++        return out
++    failed=False
++    with tempfile.TemporaryDirectory(prefix='xmbmon-hdc-fans-') as temp,a.log.open('w',encoding='utf-8') as log:
++        local=pathlib.Path(temp)/'snapshot'
++        try:
++            for i in range(a.samples):
++                started=time.monotonic();record={'sample':i,'identity':'HDC shell','unit':'raw','rpm_confirmed':False}
++                try:
++                    stamp=run('shell','date +%s').strip()
++                    if not re.fullmatch('[0-9]+',stamp):raise ValueError('Invalid device time')
++                    raw=run('shell','hidumper -s ThermalService -a -t');values=parse_dump(raw)
++                    record.update(sampled_unix=int(stamp),values=values,source_stdout=raw)
++                    payload=f'XMBMON_FAN_V1 raw {stamp}\n'+''.join(f'{k} {values[k]}\n' for k in sorted(values))+'END\n'
++                except Exception as error:
++                    failed=True;record['error']=repr(error);payload='XMBMON_FAN_V1 invalid 0\nINVALID\n'
++                local.write_text(payload,encoding='ascii',newline='\n')
++                try:
++                    run('file','send',str(local.resolve()),stage)
++                    run('shell','mv -f '+stage+' '+a.remote_output)
++                    record['published']=True
++                except Exception as error:
++                    failed=True;record['transport_error']=repr(error)
++                log.write(json.dumps(record,ensure_ascii=False)+'\n');log.flush()
++                print(json.dumps({k:v for k,v in record.items() if k!='source_stdout'}),flush=True)
++                if i+1<a.samples:time.sleep(max(0,a.interval-(time.monotonic()-started)))
++        finally:
++            try:run('shell','rm -f '+stage)
++            except Exception:pass
++    return 1 if failed else 0
++if __name__=='__main__':raise SystemExit(main())

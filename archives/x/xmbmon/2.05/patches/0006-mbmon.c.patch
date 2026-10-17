@@ -1,0 +1,518 @@
+--- a/mbmon.c
++++ b/mbmon.c
+@@ -17,33 +17,40 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <unistd.h>
+ #include <string.h>
+ #include <sys/time.h>
+ #include <sys/param.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <fcntl.h>
+ #include <time.h>
++#include <math.h>
++#include <errno.h>
+ 
+ #include <netdb.h>
+ #include <sys/socket.h>
+ #include <netinet/in.h>
+ #include <arpa/inet.h>
+ 
+-#ifdef HAVE_GETUTENT
++#if defined(MBMON_CLOCK_UPTIME)
++/* The platform clock supplies uptime without utmp/sysctl. */
++#elif defined(HAVE_GETUTENT)
+ #  include <utmp.h>
+ #else
+ #  include <sys/sysctl.h>
+ #endif
+ 
+ #include "mbmon.h"
++#ifdef MBMON_NAMED_SENSORS
++#include "measurement.h"
++#endif
+ 
+ static const char *MyName = "mbmon";
+ int port = 0;
+ 
+ int usage(void)
+ {
+ 	fprintf(stderr, "MotherBoard Monitor, ver. %s by YRS.\n"
+ "Usage: %s [options...] <seconds for sleep> (default %d sec)\n"
+ " options:\n"
+ "  -V|S|I: access method (using \"VIA686 HWM directly\"|\"SMBus\"|\"ISA I/O port\")\n"
+@@ -53,20 +60,25 @@
+ "  -s [0-9]: for using /dev/smb[0-9]\n"
+ #endif
+ "  -e [0-2]: set extra temperature sensor to temp.[0|1|2] (need -A).\n"
+ "  -p chip: chip="CHIPLIST"\n"
+ "            for probing chips\n"
+ "  -Y: for Tyan Tiger MP/MPX motherboard\n"
+ "  -h: print help message(this) and exit\n"
+ "  -f: temperature in Fahrenheit\n"
+ "  -c count: repeat <count> times and exit\n"
+ "  -P port: run in daemon mode, using given port for clients\n"
++"  -b: keep the TCP server in the foreground\n"
++"  --version: print the version and exit\n"
++#ifdef MBMON_NAMED_SENSORS
++"  --fan-raw FILE [COUNT [SECONDS]]: read fresh diagnostic fan values (unit=raw)\n"
++#endif
+ "  -T|F [1-7]: print Temperature|Fanspeed according to following styles\n"
+ "	style1: data1\\n\n"
+ "	style2: data2\\n\n"
+ "	style3: data3\\n\n"
+ "	style4: data1\\ndata2\\n\n"
+ "	style5: data1\\ndata3\\n\n"
+ "	style6: data2\\ndata3\\n\n"
+ "	style7: data1\\ndata2\\ndata3\\n\n"
+ "  -r: print TAG and Value format\n"
+ "  -u: print system uptime\n"
+@@ -85,21 +97,33 @@
+ 
+ #ifdef LINUX
+ #define PROC_LOADAVG "/proc/loadavg"
+ 
+ 	char file_buf[1024];
+ 	double avg[3];
+ 	int fd;
+ 	ssize_t bytes;
+ #endif
+ 
+-#ifdef HAVE_GETUTENT
++#if defined(MBMON_CLOCK_UPTIME)
++	struct timespec elapsed;
++#ifdef CLOCK_BOOTTIME
++	const clockid_t uptime_clock = CLOCK_BOOTTIME;
++#else
++	const clockid_t uptime_clock = CLOCK_MONOTONIC;
++#endif
++	if (clock_gettime(uptime_clock, &elapsed) != 0) {
++		perror("clock_gettime");
++		exit(1);
++	}
++	uptime = elapsed.tv_sec;
++#elif defined(HAVE_GETUTENT)
+ 	int nusers = 0;
+ 	struct utmp *utent;
+ 
+ 	setutent();
+ 	while ( (utent = getutent()) ) {
+ 		switch (utent->ut_type) {
+ 		case BOOT_TIME:
+ 			uptime = now - utent->ut_time;
+ 			break;
+ 
+@@ -273,24 +297,47 @@
+ 
+ 	dup2(fd, 0);
+ 	dup2(fd, 1);
+ 	dup2(fd, 2);
+ 
+ 	if (fd > 2)
+ 		close (fd);
+ }
+ 
+ 
++static void print_temperature(FILE *out, float value, int integer)
++{
++	if (!isfinite(value))
++		fprintf(out, "N/A");
++	else if (integer)
++		fprintf(out, "%2d", (int)roundf(value));
++	else
++		fprintf(out, "%4.1f", value);
++}
++
++static void print_voltage(FILE *out, float value)
++{
++	if (!isfinite(value)) fprintf(out, "N/A");
++	else fprintf(out, "%+6.2f", value);
++}
++
++static void print_fan(FILE *out, int value)
++{
++	if (value < 0) fprintf(out, "N/A");
++	else fprintf(out, "%4d", value);
++}
++
+ int main(int argc, char *argv[])
+ {
+ 	int n, sec;
+ 	int count = 0, temperature = 0, fanspeed = 0;
++	int foreground = 0, result_status = 0;
+ 	float temp1 = 0.0, temp2 = 0.0, temp3 = 0.0;
+ 	float vc0, vc1, v33, v50p, v12p, v12n, v50n;
+ 	int rot1, rot2, rot3;
+ 	extern char *optarg;
+ 	extern int optind;
+ 	char *name;
+ 	int fd = 0;
+ 	struct sockaddr_in server, client;
+ 	FILE *out = stdout;
+ 
+@@ -306,25 +353,59 @@
+ 	int tagval_flag	= 0 ;
+ 
+ #ifdef LOGGING
+ 	int nfd = 0;
+ 	fd_set mstfdset, rd_fdset;
+ 	logdata log_data[LOGENTRIES];
+ 	logdata *curdata = &log_data[0];
+ 	int index = 0;
+ #endif
+ 
++	if (argc == 2 && strcmp(argv[1], "--version") == 0) {
++		printf("mbmon %s\n", XMBMON_VERSION);
++		return 0;
++	}
++#ifdef MBMON_NAMED_SENSORS
++	if (argc >= 2 && strcmp(argv[1], "--fan-raw") == 0) {
++		if (argc < 3 || argc > 5) usage();
++		long samples = 1, delay = 1;
++		char *end;
++		if (argc >= 4) {
++			samples = strtol(argv[3], &end, 10);
++			if (*end || samples < 1 || samples > 3600) usage();
++		}
++		if (argc == 5) {
++			delay = strtol(argv[4], &end, 10);
++			if (*end || delay < 1 || delay > 60) usage();
++		}
++		int status = 0;
++		for (long sample = 0; sample < samples; ++sample) {
++			struct mbmon_fans_raw fans;
++			if (mbmon_read_fans_raw(argv[2], &fans)) {
++				perror("fan snapshot");
++				puts("fan_speed0=N/A fan_speed1=N/A unit=raw");
++				status = 3;
++			} else {
++				printf("fan_speed0=%d fan_speed1=%d unit=raw sampled_unix=%lld\n",
++					fans.values[0], fans.values[1], fans.sampled_unix);
++			}
++			fflush(stdout);
++			if (sample + 1 < samples) sleep((unsigned)delay);
++		}
++		return status;
++	}
++#endif
+ 	name = argv[0];
+ #if !defined(LINUX) && defined(HAVE_SMBUS) && defined(SMBUS_IOCTL)
+-	while ((ch = getopt(argc,argv,"VSIAfdDYe:p:s:c:T:F:tunNirh")) != -1) {
++	while ((ch = getopt(argc,argv,"VSIAfdDYe:p:s:c:T:F:tunNirhbP:")) != -1) {
+ #else
+-	while ((ch = getopt(argc,argv,"VSIAfdDYe:p:c:T:F:tunNirhP:")) != -1) {
++	while ((ch = getopt(argc,argv,"VSIAfdDYe:p:c:T:F:tunNirhbP:")) != -1) {
+ #endif
+ 	  switch(ch) {
+ 	  case 'V':
+ 		if (method == ' ')
+ 			method = 'V';
+ 		else
+ 			usage();
+ 		break;
+ 	  case 'S':
+ 		if (method == ' ')
+@@ -363,38 +444,45 @@
+ 		break;
+ #endif
+ 	  case 'e':
+ 		n = atoi(optarg);
+ 		if (0 <= n && n <= 2)
+ 			extra_tempNO = n;
+ 		break;
+ 	  case 'p':
+ 		probe_request = optarg;
+ 		break;
++	  case 'b':
++		foreground = 1;
++		break;
+ 	  case 'P':
+ 		port = atoi (optarg);
++		if (port < 1 || port > 65535) usage();
+ 		break;
+ 	  case 'Y':
+ 		TyanTigerMP_flag = 1;
+ 		break;
+ 	  case 'c':
+ 		count = atoi(optarg);
++		if (count < 0) usage();
+ 		break;
+ 	  case 'T':
+ 		if (fanspeed != 0)
+ 			usage();
+ 		temperature = atoi(optarg);
++		if (temperature < 1 || temperature > 7) usage();
+ 		break;
+ 	  case 'F':
+ 		if (temperature != 0)
+ 			usage();
+ 		fanspeed = atoi(optarg);
++		if (fanspeed < 1 || fanspeed > 7) usage();
+ 		break;
+ 	  case 't':
+ 		time_flag = 1;
+ 		break;
+ 	  case 'u':
+ 		uptime_flag = 1;
+ 		break;
+ 	  case 'n':
+ 		if (hostname_flag != 0)
+ 			usage();
+@@ -424,24 +512,30 @@
+ 	if (argc >= 1) {
+ 	  if ((n = atoi(argv[0])) > 0) {
+ 		sec = n;
+ 	  } else {
+ 		fprintf(stderr, "  argument (%s) should be integer, stop!\n", argv[0]);
+ 		exit (1);
+ 	  }
+ 	} else {
+ 		sec = DEFAULT_SEC;
+ 	}
++#ifdef MBMON_NAMED_SENSORS
++	/* The service connection is initialized in the final server process. */
++	if (!port || foreground || debug_flag)
++#endif
+ 	if ((n = InitMBInfo(method)) != 0) {
+ 		perror("InitMBInfo");
++#ifndef MBMON_NAMED_SENSORS
+ 		if (n < 0)
+ 			fprintf(stderr,"This program needs \"setuid root\"!!\n");
++#endif
+ 		exit (1);
+ 	}
+ 	if (debug_flag)
+ 		exit (0);
+ 	
+ 	if (port) {
+ #ifdef LOGGING
+ 		FILE *log;
+ 		log = fopen(LOGFILE, "w");
+ 		if (log == NULL) {
+@@ -459,21 +553,27 @@
+ 		server.sin_port = htons (port);
+ 		server.sin_addr.s_addr = INADDR_ANY;
+ 		if (bind (fd, (struct sockaddr *) &server, sizeof (server)) < 0) {
+ 			perror("bind");
+ 			exit (1);
+ 		}
+ 		if (listen (fd ,5) < 0) {
+ 			perror("listen");
+ 			exit (1);
+ 		}
+-		daemonize();
++		if (!foreground) daemonize();
++#ifdef MBMON_NAMED_SENSORS
++		if (!foreground && InitMBInfo(method) != 0) {
++			perror("InitMBInfo");
++			return 1;
++		}
++#endif
+ #ifdef LOGGING
+ 		/* clear out all entries for logging */
+ 		FD_ZERO(&mstfdset);
+ 		FD_SET(fd, &mstfdset);
+ 		for (index = 0; index < LOGENTRIES; index++) {
+ 			logdata *ld;
+ 			ld = &log_data[index];
+ 			ld->data = 0;
+ 			ld->prev = &log_data[index-1];
+ 			ld->next = &log_data[index+1];
+@@ -482,33 +582,35 @@
+ 			}
+ 			if (index == LOGENTRIES-1) {
+ 				ld->next = &log_data[0];
+ 			}
+ 		}
+ #endif
+ 	}
+ 	while(1) {
+ 
+ 	if (port) {
+-		int c, len = sizeof (struct sockaddr_in);
++		int c;
++		socklen_t len = sizeof (struct sockaddr_in);
+ #ifdef LOGGING
+ 		struct timeval select_timeout = {LOGINTERVAL, 0};
+ 		memcpy(&rd_fdset, &mstfdset, sizeof(fd_set));
+ 		nfd = select(fd+1, (fd_set *)(&rd_fdset), NULL, NULL, &select_timeout);
+ 
+ 		/* open socket as our fd if we accepted a new connection */
+ 		if (nfd > 0) {
+ #endif
+ 		c = accept (fd, (struct sockaddr *) &client, &len);
+ 		if (c < 0)
+ 			continue;
+ 		out = fdopen (c, "w");
++		if (!out) { close(c); continue; }
+ #ifdef LOGGING
+ 		}
+ #endif
+ 	}
+ /* get temperature */
+ 
+ 	getTemp(&temp1, &temp2, &temp3);
+ 
+ /* get fan speeds */
+ 
+@@ -566,87 +668,70 @@
+ 			fprintf(log, prtdata->data);
+ 		}
+ 
+ 		/* close log file */
+ 			fclose(log);
+ 	} else
+ #endif
+ 
+ /* print data */
+ 
+- 	if (tagval_flag) {
+- 		fprintf(out,  "TEMP0 : %4.1f\n", temp1 ) ;
+- 		fprintf(out,  "TEMP1 : %4.1f\n", temp2 ) ;
+- 		fprintf(out,  "TEMP2 : %4.1f\n", temp3 ) ;
+- 		fprintf(out,  "FAN0  : %4d\n", rot1 ) ;
+- 		fprintf(out,  "FAN1  : %4d\n", rot2 ) ;
+- 		fprintf(out,  "FAN2  : %4d\n", rot3 ) ;
+- 		fprintf(out,  "VC0   : %+6.2f\n", vc0 ) ;
+- 		fprintf(out,  "VC1   : %+6.2f\n", vc1 ) ;
+- 		fprintf(out,  "V33   : %+6.2f\n", v33 ) ;
+- 		fprintf(out,  "V50P  : %+6.2f\n", v50p ) ;
+- 		fprintf(out,  "V12P  : %+6.2f\n", v12p ) ;
+- 		fprintf(out,  "V12N  : %+6.2f\n", v12n ) ;
+- 		fprintf(out,  "V50N  : %+6.2f\n", v50n ) ;
+- 	} else if (temperature == 0 && fanspeed == 0) {
+-		fprintf(out, "\n");
+-		fprintf(out, "Temp.= %4.1f, %4.1f, %4.1f;",temp1, temp2, temp3);
+-		fprintf(out, " Rot.= %4d, %4d, %4d\n", rot1, rot2, rot3);
+-		fprintf(out, "Vcore = %4.2f, %4.2f; Volt. = %4.2f, %4.2f, %5.2f, %6.2f, %5.2f\n", vc0, vc1, v33, v50p, v12p, v12n, v50n);
+-	} else if (fanspeed == 0) {
+-		if (integer_flag == 0) {
+-			if (temperature == 1)
+-				fprintf(out, "%4.1f\n", temp1);
+-			else if (temperature == 2)
+-				fprintf(out, "%4.1f\n", temp2);
+-			else if (temperature == 3)
+-				fprintf(out, "%4.1f\n", temp3);
+-			else if (temperature == 4)
+-				fprintf(out, "%4.1f\n%4.1f\n", temp1, temp2);
+-			else if (temperature == 5)
+-				fprintf(out, "%4.1f\n%4.1f\n", temp1, temp3);
+-			else if (temperature == 6)
+-				fprintf(out, "%4.1f\n%4.1f\n", temp2, temp3);
+-			else if (temperature == 7)
+-				fprintf(out, "%4.1f\n%4.1f\n%4.1f\n", temp1, temp2, temp3);
++	{
++		const unsigned styles[] = {0, 1, 2, 4, 3, 5, 6, 7};
++		float temperatures[] = {temp1, temp2, temp3};
++		int fans[] = {rot1, rot2, rot3};
++		float volts[] = {vc0, vc1, v33, v50p, v12p, v12n, v50n};
++		const char *voltage_tags[] = {"VC0", "VC1", "V33", "V50P", "V12P", "V12N", "V50N"};
++		unsigned i, selected;
++		int missing = 0;
++		if (tagval_flag || (!temperature && !fanspeed)) {
++			for (i = 0; i < 3; ++i) {
++				missing |= !isfinite(temperatures[i]) || fans[i] < 0;
++				if (tagval_flag) fprintf(out, "TEMP%u : ", i);
++				else if (i == 0) fprintf(out, "Temp.= ");
++				print_temperature(out, temperatures[i], 0);
++				fprintf(out, tagval_flag ? "\n" : (i == 2 ? "; " : ", "));
++			}
++			for (i = 0; i < 3; ++i) {
++				if (tagval_flag) fprintf(out, "FAN%u  : ", i);
++				else if (i == 0) fprintf(out, "Rot.= ");
++				print_fan(out, fans[i]);
++				fprintf(out, tagval_flag ? "\n" : (i == 2 ? "\n" : ", "));
++			}
++			for (i = 0; i < 7; ++i) {
++				missing |= !isfinite(volts[i]);
++				if (tagval_flag) fprintf(out, "%-5s : ", voltage_tags[i]);
++				else if (i == 0) fprintf(out, "Vcore = ");
++				else if (i == 2) fprintf(out, "Volt. = ");
++				print_voltage(out, volts[i]);
++				fprintf(out, tagval_flag ? "\n" : (i == 6 ? "\n" : (i == 1 ? "; " : ", ")));
++			}
+ 		} else {
+-			if (temperature == 1)
+-				fprintf(out, "%2d\n", (int)(temp1 + 0.5));
+-			else if (temperature == 2)
+-				fprintf(out, "%2d\n", (int)(temp2 + 0.5));
+-			else if (temperature == 3)
+-				fprintf(out, "%2d\n", (int)(temp3 + 0.5));
+-			else if (temperature == 4)
+-				fprintf(out, "%2d\n%2d\n", (int)(temp1 + 0.5), (int)(temp2 + 0.5));
+-			else if (temperature == 5)
+-				fprintf(out, "%2d\n%2d\n", (int)(temp1 + 0.5), (int)(temp3 + 0.5));
+-			else if (temperature == 6)
+-				fprintf(out, "%2d\n%2d\n", (int)(temp2 + 0.5), (int)(temp3 + 0.5));
+-			else if (temperature == 7)
+-				fprintf(out, "%2d\n%2d\n%2d\n", (int)(temp1 + 0.5), (int)(temp2 + 0.5), (int)(temp3 + 0.5));
+-		}
+-	} else if (temperature == 0) {
+-		if (fanspeed == 1)
+-			fprintf(out, "%4d\n", rot1);
+-		else if (fanspeed == 2)
+-			fprintf(out, "%4d\n", rot2);
+-		else if (fanspeed == 3)
+-			fprintf(out, "%4d\n", rot3);
+-		else if (fanspeed == 4)
+-			fprintf(out, "%4d\n%4d\n", rot1, rot2);
+-		else if (fanspeed == 5)
+-			fprintf(out, "%4d\n%4d\n", rot1, rot3);
+-		else if (fanspeed == 6)
+-			fprintf(out, "%4d\n%4d\n", rot2, rot3);
+-		else if (fanspeed == 7)
+-			fprintf(out, "%4d\n%4d\n%4d\n", rot1, rot2, rot3);
+-	}
++			selected = styles[temperature ? temperature : fanspeed];
++			for (i = 0; i < 3; ++i) {
++				if (!(selected & (1u << i))) continue;
++				if (temperature) {
++					missing |= !isfinite(temperatures[i]);
++					print_temperature(out, temperatures[i], integer_flag);
++				} else {
++					missing |= fans[i] < 0;
++					print_fan(out, fans[i]);
++				}
++				fprintf(out, "\n");
++			}
++		}
++		if (missing) {
++			if (!result_status) fprintf(stderr, "Requested measurements unavailable; N/A is not a numeric reading.\n");
++			result_status = 3;
++		}
++	}
++
+ 	if (port) {
+ #ifdef LOGGING
+ 		if (nfd)
+ #endif
+ 		fclose (out);
+ 		continue;
+ 	}
+ 	now = time(NULL);
+ 	if (time_flag == 1) {
+ 		lt = *localtime(&now);
+@@ -658,21 +743,21 @@
+ 	}
+ 	if (hostname_flag == 1) {
+ 		hostname(sh_flag);
+ 	}
+ 
+ /* count */
+ 	if (count != 0) {
+ 	  if (count > 1)
+ 		count--;
+ 	  else
+-		exit(0);
++		exit(result_status);
+ 	}
+ 
+ /* sleep */
+ 	sleep(sec);
+ 
+ 	}
+ 
+ }
+ 
+ #endif			/* ! small_mbmon */
