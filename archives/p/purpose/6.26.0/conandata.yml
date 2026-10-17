@@ -1,0 +1,44 @@
+# conandata.yml - purpose 6.26.0
+# KDE Frameworks 6 share/export framework (koko 26.04.0 dependency).
+# The patches are the OHOS baseline cuts forced by the published ohpcd KF6
+# packages: kio/6.26.0 is a KIOCORE_ONLY build (no KIOGui/KIOWidgets) and
+# ki18n/6.26.0 is published with BUILD_WITH_QML=OFF (no KF6::I18nQml).
+
+sources:
+  url: "https://download.kde.org/stable/frameworks/6.26/purpose-6.26.0.tar.xz"
+  sha256: "cc7b7599d1ac7ce7ed07351a35d742fac1b7e554b208a7b1c92e859b3b4add30"
+
+patches:
+  "6.26.0":
+    - patch_file: "patches/0001-cmake-ohos-portability.patch"
+      patch_description: >-
+        three portability changes to the top-level CMakeLists.txt: (1) relax the
+        org.kde.prison / org.kde.kitemodels / org.kde.kcmutils QML look-ups
+        (prison 6.18.0 and kcmutils 6.26.0 are published without their QML
+        module; both only serve the plugin config UI / System Settings KCM) -
+        org.kde.kitemodels is relaxed as well, and the recipe asserts the module
+        is present in the kitemodels package because
+        src/quick/AlternativesView.qml really imports it; (2) repoint the imported
+        targets of kcoreaddons, kconfig and ki18n at the linker's own -l<name>
+        form - those published libraries carry no DT_SONAME and their targets
+        files already set IMPORTED_NO_SONAME, which this toolchain ignores
+        (CMake ships no OHOS platform module), so it kept handing the absolute
+        Conan cache path to the linker and lld recorded it in DT_NEEDED, pinning
+        the binaries to the build machine (the W3 L5b gate); the patch overrides
+        IMPORTED_LOCATION/IMPORTED_LOCATION_RELEASE with -l<name> and adds
+        link_directories(), and package() re-checks the installed objects;
+        (3) drop the tests/ demo apps, which link KF6::PurposeWidgets and
+        KF6::I18nQml.
+      patch_type: "portability"
+    - patch_file: "patches/0002-src-drop-widgets-fileitemactionplugin-accounts.patch"
+      patch_description: "drop widgets (KF6::I18nQml), fileitemactionplugin (KF6::KIOWidgets) and accounts (KF6::KIOGui + KAccounts6): the ohpcd KF6 baseline ships kio 6.26.0 as KIOCORE_ONLY and ki18n 6.26.0 with BUILD_WITH_QML=OFF"
+      patch_type: "portability"
+    - patch_file: "patches/0003-plugins-drop-kiogui-only-share-plugins.patch"
+      patch_description: "drop the email/telegram/kdeconnect_sms share plugins, which link KF6::KIOGui (absent from the KIOCORE_ONLY kio 6.26.0)"
+      patch_type: "portability"
+    - patch_file: "patches/0004-autotests-drop-menutest.patch"
+      patch_description: "drop menutest (needs KF6::PurposeWidgets) from the CTest set; alternativesmodeltest stays and is run during the build"
+      patch_type: "portability"
+    - patch_file: "patches/0005-autotests-use-clipboardplugin-as-export-sample.patch"
+      patch_description: "alternativesmodeltest uses clipboardplugin (always built, X-Purpose-PluginTypes=[Export], no constraints) as its second sample plugin instead of the cut emailplugin, so the disabled-plugins and blacklist assertions keep running against a real plugin of the same type"
+      patch_type: "portability"

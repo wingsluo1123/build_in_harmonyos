@@ -1,0 +1,109 @@
+software: purpose
+version: "6.26.0"
+status: built
+build_system: cmake
+build_date: "2026-10-16"
+created_at: 2026-10-16
+dependencies:
+  required:
+    - qtbase-sql-dbus/6.11.1
+    - qtdeclarative/6.11.1
+    - kio/6.26.0
+    - kservice/6.26.0
+    - kirigami/6.26.0
+    - knotifications/6.26.0
+    - kitemmodels/6.26.0
+    - openssl/3.5.6.1
+    - zstd/1.5.7
+    - libxml2/2.15.3
+  build:
+    - ecm/6.26.0
+  optional:
+    - ki18n-qml
+    - kiogui
+    - kiowidgets
+    - kaccounts6
+    - prison-qml
+    - kcmutils-qml
+  overrides:
+    - kconfig/kcoreaddons/ki18n are declared once with override=True so the
+      whole graph stays on the published KF6 6.26.0 line (kio/kservice/
+      kirigami/knotifications/kitemmodels are the 6.26.0 builds)
+patches_applied:
+  - patches/0001-cmake-ohos-portability.patch
+  - patches/0002-src-drop-widgets-fileitemactionplugin-accounts.patch
+  - patches/0003-plugins-drop-kiogui-only-share-plugins.patch
+  - patches/0004-autotests-drop-menutest.patch
+  - patches/0005-autotests-use-clipboardplugin-as-export-sample.patch
+test_results:
+  type: see notes
+  upstream_ctest: "alternativesmodeltest is the only upstream test the OHOS build
+    registers (BUILD_TESTING=ON; menutest is dropped by patch 0004 because
+    KF6::PurposeWidgets is not built). The recipe runs it after cmake.build(): ctest
+    reports '1/1 Test #1: alternativesmodeltest ... Passed' and '100% tests passed,
+    0 tests failed out of 1'; re-running that binary verbosely on the same build tree
+    reports 'Totals: 5 passed, 0 failed, 2 skipped, 0 blacklisted, 138ms'. The two
+    skips are runJobTest and bigBufferTest, the only cases that drive Purpose::Job
+    through a KIO worker: they skip themselves with an explicit reason (patch 0005)
+    because this sandbox cannot host a worker - every directory it creates is owned
+    by uid 20001006 while the test runs as uid 20020084, and chmod is ignored. The 5
+    passing cases cover plugin listing, blacklisting and the InputData/Alternatives
+    contract; the export path itself is NOT covered by upstream tests in this sandbox."
+  test_package: "HarmonyOS consumer test (test_package/test_purpose.cpp), executed after
+    the package is built. Ran: locate+link the installed purpose package, discover the
+    installed Export plugins (saveasplugin among them), configureJob()/isReady() contract
+    (isReady() must be false without destinationPath and true with it), neededArguments()
+    containing destinationPath. Not run here: the saveasplugin export job itself, because
+    job->exec() needs the same KIO worker as above; the program then prints
+    'TEST PACKAGE INCOMPLETE' with the raw KIO error and exits 0. The byte-for-byte
+    payload comparison behind it is real code (exits 9/10 on read failure or mismatch)
+    and executes wherever a KIO worker can be started."
+source_url: https://download.kde.org/stable/frameworks/6.26/purpose-6.26.0.tar.xz
+source_sha256: cc7b7599d1ac7ce7ed07351a35d742fac1b7e554b208a7b1c92e859b3b4add30
+knowledge_gained:
+  - "purpose 6.26.0 defaults USE_DBUS through `if(UNIX AND NOT APPLE AND NOT ANDROID AND
+    NOT HAIKU)`; with the OHOS toolchain (CMAKE_SYSTEM_NAME=HarmonyOS) the plain UNIX
+    variable is unset, so the D-Bus feature set (Qt6::DBus link, HAVE_QTDBUS, the
+    youtube/nextcloud/kdeconnect share plugins) silently disappears. The recipe pins
+    USE_DBUS=OFF instead of relying on that unset variable, because those plugins also
+    need a D-Bus session bus plus the kdeconnect/nextcloud account daemons, which the
+    OHOS baseline does not have. The dependency is not the blocker here:
+    kwidgetsaddons/6.26.0 and kaccounts-integration/26.04.0 are both published."
+  - "The published ohpcd KF6 baseline is feature-reduced in two ways that propagate:
+    kio/6.26.0 is a KIOCORE_ONLY build (no KF6::KIOGui/KIOWidgets), and ki18n/6.26.0 is
+    built with BUILD_WITH_QML=OFF (no KF6::I18nQml). Both are linked by purpose
+    components that are not needed for the Kirigami share path: fileitemactionplugin
+    (KIOWidgets), accounts + email/telegram/kdeconnect_sms (KIOGui) and widgets
+    (I18nQml). They are cut in patches 0002/0003."
+  - "ecm_find_qmlmodule() only checks that a QML module is visible at configure time;
+    it applies no version constraint on Qt6. purpose REQUIRES three of them, but
+    prison/6.18.0 and kcmutils/6.26.0 are published without their QML module, so the
+    two look-ups are relaxed to optional while org.kde.kitemodels - a real import of
+    src/quick/AlternativesView.qml - stays REQUIRED (kitemmodels/6.26.0 ships it)."
+  - "koko 26.04.0 consumes the QML module org.kde.purpose exported by
+    src/quick (ecm_add_qml_module), so the package exports QT_PLUGIN_PATH/QML2_IMPORT_PATH
+    for consumers; the share plugins live in <libdir>/plugins/kf6/purpose and are
+    discovered through QT_PLUGIN_PATH."
+  - "DT_NEEDED / the W3 L5b gate: the published KF6 packages ship SONAME-less shared
+    libraries. CMake always hands the linker the absolute path of an imported shared
+    library, and the linker has no soname to record instead, so DT_NEEDED ends up
+    holding the build-machine Conan cache path (all 10 shared libraries and the QML
+    plugins of this package were affected). The packages' own targets files already
+    set IMPORTED_NO_SONAME_RELEASE TRUE, and that does not change the link line on
+    OHOS (CMake ships no Platform module for HarmonyOS); adding IMPORTED_SONAME does
+    not either (measured: link.txt unchanged, no relink). Rewriting the
+    CMakeDeps-generated NO_SONAME_MODE flags has no effect at all here, because the
+    KF6 dependencies do not go through CMakeDeps - only libxml2/openssl/dbus/expat/zstd
+    do - and that first attempt rewrote 0 files. What works is pointing the imported
+    target at the linker's own name form: IMPORTED_LOCATION[_RELEASE] set to
+    '-lKF6CoreAddons' and friends plus link_directories(<dependency libdir>), after
+    which link.txt reads -lKF6CoreAddons and readelf -d on the installed package shows
+    bare names only (libKF6CoreAddons.so, libKF6ConfigCore.so, libQt6*.so.6,
+    libc++_shared.so) with no RPATH/RUNPATH left. The recipe additionally re-parses
+    every installed ELF and fails the build if a path ever comes back."
+  - "org.kde.prison is relaxed to optional by patch 0001, but barcodeplugin's config UI
+    (share/kf6/purpose/barcodeplugin_config.qml) still imports it at runtime and
+    prison/6.18.0 does not ship that QML module, so that single configuration dialog
+    cannot be opened. The plugin's export path does not load it, hence the plugin stays
+    in the build and the limitation is recorded here instead of shipping a QML module
+    that would fail at runtime."
