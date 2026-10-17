@@ -1,0 +1,66 @@
+{
+  "package": "parlatype",
+  "version": "4.3",
+  "audit_tool": "W4 Pre-PR 独立审计（独立子任务，只读，规则文件 .gitcode/code-style.md + .gitcode/review-memory.md）",
+  "audit_rounds": 3,
+  "audit_date": "2026-10-16",
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P3",
+      "rule_id": "code-style#1/#2",
+      "file": "archives/p/parlatype/commands.json",
+      "line": 4,
+      "description": "commands.json 的 homepage 为 \"https://www.parlatype.org/\"，与 conanfile.py 第 53 行 homepage = \"https://www.parlatype.xyz\"（上游官方站点）不一致。属文档一致性问题，不阻塞。",
+      "fix_suggestion": "把 commands.json 的 homepage 统一为上游官方站点。",
+      "resolution": "已修复（审计后）。以上游源码为准核对：解压后的 parlatype-4.3 源码中 https://www.parlatype.xyz 出现 5 次、.org 仅 1 次（遗留引用），README.md:4 明确 'More info and packages available at https://www.parlatype.xyz'。commands.json 已改为 \"https://www.parlatype.xyz\"。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code-style#4",
+      "file": "archives/p/parlatype/4.3/conanfile.py",
+      "line": 588,
+      "description": "package_info() 显式设 libdirs = [] 且 includedirs = []，屏蔽了随包投放的 lib/libparlatype.so.7、include/parlatype/*.h 与 parlatype.pc 对下游的可见性；package_type=\"application\" 下仅设 bindirs 符合工具类规范，但缺少理由说明。不阻塞。",
+      "fix_suggestion": "如确有意不对外暴露 C API，在 package_info 注释里写明理由。",
+      "resolution": "已修复（审计后，仅加注释、不改行为）。package_info() 已补注释说明：application 类型交付形态为「可执行文件 + 应用私有共享库」，libparlatype.so.7 仅由 bin/parlatype 自身链接，.pc 与头文件供本包构建/插件场景使用，不对外提供 C API，故显式清空 libdirs/includedirs 以避免下游误消费应用私有库。"
+    }
+  ],
+  "checked_items": [
+    {"item": "1 占位符残留 {...}/(请填写)/TODO/空 sha256", "result": "PASS", "note": "grep 请填写/TODO/FIXME/XXX 无命中；sha256=b942ec53…dda7 为完整 64 位十六进制，与官方源一致。notes/MANIFEST 中的 <builds>/\"<...>\" 为刻意脱敏，非残留占位。"},
+    {"item": "2 本机绝对路径残留", "result": "PASS", "note": "无 /home、/storage、/Users 等开发者机器路径。conanfile.py:44 _OHOS_BIN=\"/data/service/hnp/bin\" 是 OHOS 镜像自带系统工具链路径，且第 294 行以 os.path.isfile(_signer) 守卫、不存在即跳过重签名。"},
+    {"item": "3 镜像前缀/明文 http/file://", "result": "PASS", "note": "conandata.yml 仅官方源 https://github.com/gkarsay/parlatype/releases/download/v4.3/parlatype-4.3.tar.gz；全目录 grep gh-proxy/ghfast/ghproxy/file:// 无命中，无明文 http://。"},
+    {"item": "4 patches 新增行含平台宏 PF5/R8", "result": "PASS", "note": "0001 仅加 if get_option('help') 守卫 subdir('help')；0002 仅新增 boolean 选项 help（默认 false）。无 __OHOS__ 或任何平台宏，patch_type=portability。"},
+    {"item": "5 conanfile -D__OHOS__/replace() 动态注入", "result": "PASS", "note": "无 -D__OHOS__；无字符串 replace 动态注入宏。唯一 .replace() 在 _inject_meson_archiver（约 184 行），是对生成文件 conan_meson_native.ini 的文本替换（写入 ar/ranlib），非宏注入。"},
+    {"item": "6 R49 注入共享系统前缀", "result": "PASS", "note": "无 SYS_PREFIX、无 /usr/local。_fix_pc_tools 与 _normalize_glib_pc/_fix_iso_codes_pc/_emit_pkgconfig_aliases 的 prefix 均指向 conan 包目录（self.dependencies[...].package_folder），非系统前缀。"},
+    {"item": "7 test_package test() 实质执行 PF3/R34", "result": "PASS", "note": "test_package/conanfile.py test() 断言 bin/parlatype 存在且非空，并以 self.run 调用 test_parlatype.sh 做 10 项静态校验（ELF 架构、DT_NEEDED 依赖链、库导出/二进制导入 pt_* 符号交叉一致性=链接期完整性、gst_* 已定义符号、头文件/pc/schema/翻译）。非空壳、非 stub。"},
+    {"item": "8 R38 commands.json", "result": "PASS", "note": "位于软件级 archives/p/parlatype/commands.json；name=\"parlatype\" 匹配包名；type=\"tool\"；versions.\"4.3\".ref=\"parlatype/4.3\"。包产 bin/parlatype，package_info 设 bindirs=[\"bin\"]，符合 R38。"},
+    {"item": "9 R51 三处口径自洽（7 例 / 2 run 2 passed 0 failed 5 skipped）", "result": "PASS", "note": "conanfile.py:504-510 _TEST_SKIP={config,waveviewer,gst,player,waveloader}=5 例；notes.md 通过 2 例=mediainfo/waveloader-static、跳过 5 例=config/waveviewer（无显示）+gst/player/waveloader（无共享插件）；MANIFEST.yml upstream_tests 恰列 7 例且标注 2 通过 5 跳过。三处逐项一致。"},
+    {"item": "10 R32 settings.os 判断写法", "result": "PASS", "note": "配方未按 self.settings.os 分支，无 == \"Linux\" 漏匹配 OHOS 的写法。OHOS 交叉环境由 MesonToolchain/cross 处理。"},
+    {"item": "11 R33 裸用未定义 shell 环境变量", "result": "PASS", "note": "generate()（约 109-117 行）先 os.environ.pop(AR/AS/STRIP/NM/RANLIB) 再用 shutil.which 解析，缺失即 raise ConanInvalidConfiguration；无裸用 os.environ[\"CC\"] 之类。"},
+    {"item": "12 R37 版本号策略", "result": "PASS", "note": "version=\"4.3\" 取上游版本、首次适配无后缀；未修改已发布版本，无需递增后缀。"},
+    {"item": "13 W2 原子性", "result": "PASS", "note": "14 个交付文件全部位于单一 archives/p/parlatype/（单一版本 4.3），commands.json 处软件级；不含任何框架目录（ci/scripts/templates/SKILL.md 等）。本地流程残留（.ci-result.json/.staging-verified/.build-closed/.handoff.json/ci-metadata.json/conandata.yml.ghfast-bak/reports/*.log/packaging/）经 git status 核实全部被 .gitignore 覆盖、不入库。"},
+    {"item": "14 knowledge-extension 四件套齐备性", "result": "PASS", "note": "①检测脚本 detect-gnome-yelp-itstool.sh（源码特征+环境探测+日志特征，命中 exit 1）；②处理策略 strategy.md（补丁模板/备选取舍/适用口径/与相邻知识区别）；③完整文档 README.md（触发场景/适用范围/限制/复现/实测记录）；④样例演示库=parlatype/4.3 本体（关策略复现 itstool code=126、开策略通过）。四件齐备。"},
+    {"item": "附：shell 脚本安全模式 code-style#7", "result": "PASS", "note": "detect-gnome-yelp-itstool.sh 与 reproduce.sh 均为 #!/usr/bin/env bash + set -euo pipefail，并对三处预期非零调用显式容错（patch 自检 || true；conan create || _rc=$?；run_create ... || RC_OFF=$?）。第 2 轮报的『半合规』已修复。test_parlatype.sh 为 #!/bin/sh + set -eu，系该脚本以 sh（dash）经 conanfile 调用、dash 下 set -o pipefail 会报 Illegal option 的技术原因，属合理例外。"},
+    {"item": "附：补丁文件规范 code-style#12/13", "result": "PASS", "note": "文件名 0001-meson.build.patch / 0002-meson_options.txt.patch 有序编号且与实际文件一致；conandata.yml 每条含 patch_file/patch_description/patch_type=portability，文件存在并被 export_conandata_patches 导出。"}
+  ],
+  "summary": "只读独立审计：verdict=pass，P0/P1 清零，无阻塞项。核验前两轮修复：①P1 R51 上游测试归属——conanfile.py:504-510 的 _TEST_SKIP={config,waveviewer,gst,player,waveloader} 与 notes.md、test_package/MANIFEST.yml 三处逐项一致（7 例、2 run/2 passed/0 failed/5 skipped，通过=mediainfo/waveloader-static），已真正修好；②P2 MANIFEST.yml 断言——已改为 readelf -d 含 libgio-2.0.so.0/libglib-2.0.so.0，并补反向断言『不含 libgstreamer-1.0.so.0』与 .symtab 已定义 gst_* 断言；③P2 code-style#7——两个 knowledge-extension 脚本已改 bash + set -euo pipefail 并显式容错预期非零调用，已修好。必查 14 项全部 PASS。仅两条 P3 提示，均已在审计后落实（commands.json homepage 统一为上游 .xyz；package_info 补屏蔽理由注释，仅注释不改行为）。",
+  "evidence": {
+    "note": "以下 sha256 为提交前最终交付文件内容哈希，由本机 sha256sum 生成，覆盖审计时点之后的两次 P3 修复（commands.json homepage、conanfile.py package_info 注释）。两处均为文档/注释级改动，未触及任何被审计的配方逻辑。",
+    "sha256": {
+      "archives/p/parlatype/commands.json": "a892c1c5866a59737d40668916703cf146d38c9ad68893c0c91bb897f91fd370",
+      "archives/p/parlatype/4.3/conanfile.py": "6074392e35898331dc6042383980a325a3ae52c30ca26d04c8b47cff5409c85e",
+      "archives/p/parlatype/4.3/conandata.yml": "6cbccdecab47f4d81ab132111e7da0b70c397fbc5603f5db5b6b609af2ee7e29",
+      "archives/p/parlatype/4.3/manifest.yaml": "c7ebe7a4a89cf8778f45b6377a7fb2d0aa6e16e3056d13782b37bd15c3de40b7",
+      "archives/p/parlatype/4.3/notes.md": "8b8f493402782cd2e84f272a329bdb7d46b14d816b451ee0345b1bf28c299b45",
+      "archives/p/parlatype/4.3/patches/0001-meson.build.patch": "04fa24d6ba93faa74ccd1a17085138464c22c948899ab9a62c1e07ca16455131",
+      "archives/p/parlatype/4.3/patches/0002-meson_options.txt.patch": "493f5ffd8c8c81acce123e1ff540e0db3d8a11537d15cf9dd0b803be1d5ad3b8",
+      "archives/p/parlatype/4.3/test_package/conanfile.py": "a45a8730b4d5d332aecdde294622e0ebf52f8e65253c95987e27dc5f7ba7aaea",
+      "archives/p/parlatype/4.3/test_package/MANIFEST.yml": "30fbe9f9eed8dcc9a3eb802e428e42acc3f24ce5fb3e23a9257ef1f1fba4ccf5",
+      "archives/p/parlatype/4.3/test_package/test_parlatype.sh": "4933030d34e650f6daf30c92947065f7b8ddc5b9f801be6d7c2898bb0ada192a",
+      "archives/p/parlatype/4.3/knowledge-extension/README.md": "606f4f2d61d4f75aa88765076222f387cb2d043db29881de251e1fba1aa5cb49",
+      "archives/p/parlatype/4.3/knowledge-extension/strategy.md": "4717bd4f182d1ee056f88473cbe3d9ce0a7eb90617c3dd2f781aea5f44a9b26c",
+      "archives/p/parlatype/4.3/knowledge-extension/detect-gnome-yelp-itstool.sh": "ca746974c8667fc433cd8490a8407a424e2f94320163ae6ec423d49bbe3dede7",
+      "archives/p/parlatype/4.3/knowledge-extension/reproduce.sh": "844a3b4aba082292322c94a3c8354a8b9941b6076ef115cf3abfa2761f9b517c"
+    }
+  }
+}
