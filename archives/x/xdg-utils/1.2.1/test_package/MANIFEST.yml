@@ -1,0 +1,60 @@
+# test_package/MANIFEST.yml — xdg-utils 1.2.1
+# 上游官方测试声明文件（CI 脚本 build_and_test.sh L0e 强制要求）
+
+package: xdg-utils/1.2.1
+homepage: "https://gitlab.freedesktop.org/xdg/xdg-utils"
+
+# 上游测试命令（autotests/ 为 POSIX shell 测试，依赖 mock-kreadconfig5 桩）
+upstream_check_command: "./scripts/xdg-mime --version"
+
+# conanfile.py build() 方法中是否已集成上游测试
+# 上游测试全量声明（2026-10-16 按 Septest rule4 实测口径复核）：
+#   autotests/ 6 个 t-*.sh 脚本共 33 个 test_that_it 场景（t-xdg-email 4 /
+#   t-xdg-icon-resource 1 / t-xdg-mime-query-default 1 / t-xdg-open 24 /
+#   t-xdg-screensaver 1 / t-xdg-settings 2）；
+#   tests/ 遗留套件 82 个 t.* 用例文件（去除 debug/ 5 个框架自检后 77 个，
+#   其中 generic/ 5 个为跨命令通用用例，按命令级口径计 72）。两套合计 110。
+# 可集成面（autotests/，依赖桌面会话桩）：
+# 均依赖 autotests/test-lib.sh 构造的 XDG 桌面环境桩（mock-kreadconfig5、
+# 临时 XDG_DATA_DIRS）。这些环境桩与桌面会话语义在 CI worker 沙箱内可运行，
+# 但 OHOS 真机上部分命令路径（xdg-email 的 sendmail、xdg-screensaver 的
+# dbus 探测）超出脚本适配边界。本包 test_package 以真实脚本执行
+# （xdg-mime --version/--help）作为消费者验证，上游测试声明如下、未集成。
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游可集成测试（autotests/*.sh，6 脚本 / 33 场景；tests/ 77 用例未列入，见上全量声明）
+upstream_tests:
+  - file: autotests/t-xdg-email.sh
+    source: xdg-utils-v1.2.1/autotests/t-xdg-email.sh
+    description: "xdg-email 参数分发测试（shell，需桌面环境桩）"
+    command: "bash autotests/t-xdg-email.sh"
+  - file: autotests/t-xdg-icon-resource.sh
+    source: xdg-utils-v1.2.1/autotests/t-xdg-icon-resource.sh
+    description: "xdg-icon-resource 安装/查询测试（shell，需临时 XDG_DATA_DIRS）"
+    command: "bash autotests/t-xdg-icon-resource.sh"
+  - file: autotests/t-xdg-mime-query-default.sh
+    source: xdg-utils-v1.2.1/autotests/t-xdg-mime-query-default.sh
+    description: "xdg-mime query default 测试（shell，需 mock-kreadconfig5）"
+    command: "bash autotests/t-xdg-mime-query-default.sh"
+  - file: autotests/t-xdg-open.sh
+    source: xdg-utils-v1.2.1/autotests/t-xdg-open.sh
+    description: "xdg-open 分发测试（shell）"
+    command: "bash autotests/t-xdg-open.sh"
+  - file: autotests/t-xdg-screensaver.sh
+    source: xdg-utils-v1.2.1/autotests/t-xdg-screensaver.sh
+    description: "xdg-screensaver 测试（shell）"
+    command: "bash autotests/t-xdg-screensaver.sh"
+  - file: autotests/t-xdg-settings.sh
+    source: xdg-utils-v1.2.1/autotests/t-xdg-settings.sh
+    description: "xdg-settings get/set 测试（shell，需 mock-kreadconfig5）"
+    command: "bash autotests/t-xdg-settings.sh"
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: test_package/conanfile.py (test())
+    description: "真实脚本执行：xdg-mime --version 输出 'xdg-mime 1.2.1' 且退出码 0；--help 正常"
+    command: "<prefix>/bin/xdg-mime --version"
+
+# 测试断言总数（近似值：2 条命令断言）
+assertion_count: 2

@@ -1,0 +1,30 @@
+---
+name: ohos-autotools-script-generation-chain
+description: OHOS 沙箱上 autotools「脚本/文档生成链」四连坑：config.status 被 /usr/bin/awk 坏符号链接绊倒（E060 tmpfs 不完全解决）、并行 make 下 %: %.in %.txt 生成链 sed 自读自写死循环（单文件膨胀 ~35GB）、xmlto 需联网拉 docbook DTD、install-sh 新建脚本被 MAC 拒绝执行。
+error_signature: "config.status: error: could not setup config files machinery|subs1.awk: Permission denied|failed to load external entity.*docbookx.dtd|install-sh.*can't execute: Permission denied|make.*Error 126"
+root_cause:             四个独立机制叠加：(1) /usr/bin/awk 是指向 toybox 的坏符号链接（exec 被拒），configure 把它缓存进 config.status 的 $AWK，subs1.awk 处理直接 Permission denied——E060 的 tmpfs 方案解决不了这一层；(2) 上游 `%: %.in %.txt` 生成规则是 `awk | sed > $@` 与 `sh ./$@ --help | grep | sed -e '$d' >> $@.txt` 的管道链，并行 make（-jN）下 sed 进入自读自写循环，KB 级脚本文件膨胀至 ~35GB（xdg-utils 2026-10-14 实证，10 个 sed 并行，合计 ~350GB）；(3) scripts/Makefile 的 all 目标含 html/man，xmlto 联网拉 docbookx.dtd 在沙箱不可达；(4) make install 走上游 install-sh，其复制的新建可执行文件触发 hishell_hap MAC "can't execute: Permission denied"（G17 同源）。
+rec_approach:           tmpfs-plus-tool-pins-plus-offline-shims-plus-copy-install
+rec_detail: |
+  autotools 脚本/文档生成类包的统一配方模式：
+  (a) 源码复制到 tmpfs（/data/storage/el2/base，acpid/2.0.34 先例）构建，
+      规避 HMDFS umask 077 临时目录问题（E060）；
+  (b) 构建环境显式 `AWK=/data/service/hnp/bin/awk`（GNU awk）+ PATH 前置 hnp bin，
+      覆盖 /usr/bin/awk 坏符号链接；
+  (c) `make -j1` 强制：此类生成链并行不安全；真机并行上限经验（--parallel 8）
+      不适用于脚本生成链；
+  (d) 需要文档工具（xmlto/asciidoc 等）的：在 work 根放离线桩脚本（case 分支
+      覆盖上游实际调用的全部 mode，如 man/html/html-nochunks/txt），桩目录前置
+      PATH 让 configure 探测到；桩必须为每个 mode 真实产出目标文件，否则 make
+      反复重跑该规则（正是 sed 循环的放大器）；
+  (e) 跳过 make install，直接用 Python shutil.copy2 复制构建产物（保留执行位），
+     规避 install-sh 新建文件 MAC 拒绝；CMake 包则无需此步。
+verified_instances:     xdg-utils 1.2.1（xdg-* 13 个脚本全部生成、test_package 真实执行 --version/--help 通过，2026-10-14）
+affected_scope:         所有含脚本/文档生成链的 autotools 包（Makefile 出现 %: %.in、xmlto/asciidoc/pod2man、install-sh 的），OBS 观测到 sed 进程数 ≈ make -j 并行度且文件持续增长即为命中
+match_keywords: ["config.status", "subs1.awk", "Permission denied", "sed", "make -j", "docbookx.dtd", "xmlto", "install-sh", "tmpfs", "el2/base", "offline shim"]
+error_excerpt: "./config.status: line 586: ./confDBaobJ/subs1.awk: Permission denied\nconfig.status: error: could not setup config files machinery\n/bin/sh: .././install-sh: can't execute: Permission denied"
+severity:               P1
+category:               platform
+source_pr:              ""
+source_commit:          ""
+last_updated:           2026-10-14
+---
