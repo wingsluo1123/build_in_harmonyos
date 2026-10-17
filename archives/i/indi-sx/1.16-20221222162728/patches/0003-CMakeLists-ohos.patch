@@ -1,0 +1,26 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 12ebc69..2954a09 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,10 +1,19 @@
+-cmake_minimum_required(VERSION 3.0)
++cmake_minimum_required(VERSION 3.16)
+ PROJECT(indi_sx CXX C)
+ 
+ LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules/")
+ LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../cmake_modules/")
+ include(GNUInstallDirs)
+-set(RULES_INSTALL_DIR "/lib/udev/rules.d/")
++# --- OHOS/Conan adaptation (patches/0003) -----------------------------------
++# 1) udev rules must not be written into the host's /lib/udev/rules.d (R49):
++#    keep shipping 99-sx.rules, but inside this package's private prefix.
++# 2) INDI_DATA_DIR is reported by the vendored FindINDI.cmake as the *libindi
++#    package's* data directory, so install(FILES indi_sx.xml DESTINATION
++#    ${INDI_DATA_DIR}) would put the driver descriptor into libindi's package.
++#    Redirect it to this package's own share/indi (relative path).
++set(RULES_INSTALL_DIR "lib/udev/rules.d")
++set(INDI_DATA_DIR "share/indi")
++# ---------------------------------------------------------------------------
+ 
+ SET(CMAKE_CXX_STANDARD 11)
+ set (VERSION_MAJOR 1)

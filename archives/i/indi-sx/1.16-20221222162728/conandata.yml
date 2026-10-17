@@ -1,0 +1,51 @@
+# conandata.yml — indi-sx 1.16-20221222162728
+#
+# 源码 = Debian Astronomy Team 的 indi-sx 官方 orig tarball，即
+# indilib/indi-3rdparty 仓库 indi-sx/ 子目录的 1.16 版本快照
+# （版本时间戳 2022-12-22 16:27:28）。
+# 2026-10-15 实测：HTTP 200，68108 字节，
+# sha256 3adf4821e1a2c89918120163be360a0f3812fc7b459a6e164843310f0b90ed7e。
+# URL 里的 '+' 写字面量（%2B 会触发 CI pre-download 的 file:// 路径不一致）。
+
+sources:
+  url:
+    - "https://deb.debian.org/debian/pool/main/i/indi-sx/indi-sx_1.16+20221222162728.orig.tar.gz"
+  sha256: "3adf4821e1a2c89918120163be360a0f3812fc7b459a6e164843310f0b90ed7e"
+
+patches:
+  - patch_file: "patches/0001-FindINDI.cmake.patch"
+    patch_description: >
+      FindINDI.cmake 版本号正则回移上游 master 修复：兼容 INDI 2.x
+      indiversion.h 的 INDI_VERSION "2.2.2" 引号形式（否则
+      FATAL_ERROR failed to detect INDI version）
+    patch_type: "portability"
+  - patch_file: "patches/0002-CMakeCommon-cxx17.patch"
+    patch_description: >
+      cmake_modules/CMakeCommon.cmake 的 CMAKE_CXX_STANDARD 由 14 提升到 17
+      （INDI 2.x 头文件使用 std::any；本驱动 CMakeLists 自己写的 11 会被
+      include(CMakeCommon) 覆盖，故改 CMakeCommon 即够）
+    patch_type: "portability"
+  - patch_file: "patches/0003-CMakeLists-ohos.patch"
+    patch_description: >
+      CMakeLists.txt：①cmake_minimum_required(VERSION 3.0) 在 CMake >= 4 下硬
+      报错，提升到 3.16；②RULES_INSTALL_DIR 上游写成绝对路径 /lib/udev/rules.d/，
+      会往宿主的系统前缀写 99-sx.rules，改为本包私有相对路径 lib/udev/rules.d
+      （R49）；③INDI_DATA_DIR 被树内 FindINDI.cmake 定成 libindi 包的数据目录，
+      会让 install(FILES indi_sx.xml DESTINATION ${INDI_DATA_DIR}) 把设备描述符
+      写进依赖包，改成本包的相对路径 share/indi
+    patch_type: "portability"
+  - patch_file: "patches/0004-sx-indi2-api.patch"
+    patch_description: >
+      sxccd.cpp / sxwheel.cpp / sxao.cpp 由 INDI 1.x 属性 API 迁移到 INDI 2.x：
+      ①TemperatureN[0].value / FilterSlotN[0].min|max 改为 TemperatureNP[0] /
+      FilterSlotNP[0] 的 setValue/getValue/setMin/setMax 访问器，.s 状态改为
+      setState()/getState()，IDSetNumber(&P, …) 改为 P.apply()；
+      ②GuiderInterface 在 2.x 改为「构造函数传 DefaultDevice* + initProperties(group)
+      + processNumber()」三段式，故 SXAO 构造函数显式初始化 INDI::GuiderInterface(this)，
+      initGuiderProperties(...) 改为 INDI::GuiderInterface::initProperties(GUIDE_CONTROL_TAB)，
+      processGuiderProperties(...) 改为 this->processNumber(dev, name, values, names, n)；
+      ③GuiderInterface 的 GuideNSNP/GuideWENP 已是 INDI::PropertyNumber 对象，
+      defineProperty(P)/deleteProperty(P)/P.getName() 取代取址与 .name 访问。
+      驱动自有的 C 结构体属性（CoolerSP/ShutterSP/AONSNP/AOWENP/CenterP/FWTP/AtLimitLP）
+      保持原样
+    patch_type: "portability"

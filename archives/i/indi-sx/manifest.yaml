@@ -1,0 +1,31 @@
+# 软件级 manifest — indi-sx
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: indi-sx
+display: "INDI Starlight Xpress driver set"
+description: "INDI 驱动集合：Starlight Xpress 的 CCD 相机（indi_sx_ccd）、USB 滤光轮（indi_sx_wheel）、主动光学 AO（indi_sx_ao），以及上游 USB 诊断工具 sx_ccd_test"
+category: application
+homepage: "https://github.com/indilib/indi-3rdparty"
+license: LGPL-2.1-or-later
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "源码采用 Debian main pool 的 indi-sx orig tarball；URL 中的 '+' 必须写字面量"
+    - "INDI 2.x 迁移：Temperature/FilterSlot 基类属性访问器 + BayerTP.setText（补丁 0004）"
+    - "GuiderInterface 三段式改造：构造函数 GuiderInterface(this) / initProperties(group) / processNumber()"
+    - "hidapi 显式依赖：sxwheel 用裸 <hidapi.h> 且直接调用 hid_open/hid_write/hid_read，需 require hidapi 并把它与 libusb 的 libdir/libs 放入链接行"
+    - "libusb 头路径注入 include 根（sxccdusb.h 用 <libusb-1.0/libusb.h>）"
+    - "RULES_INSTALL_DIR 从 /lib/udev/rules.d/ 改本包私有路径、INDI_DATA_DIR 归本包（补丁 0003，R49）"
+    - "上游无测试（CMakeLists 无 enable_testing/add_test；sxccdtest 为交互式工具）；消费者验证由 test_package/check_driver.py 承担"
+  common_dependencies:
+    - "libindi/2.2.2.1"
+    - "cfitsio/4.6.4"
+    - "libusb/1.0.27"
+    - "hidapi/0.15.0"
+
+versions:
+  "1.16-20221222162728":
+    status: built
+    build_date: "2026-10-15"
+    conan_ref: "indi-sx/1.16-20221222162728"
