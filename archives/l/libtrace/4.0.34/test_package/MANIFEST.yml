@@ -1,0 +1,27 @@
+package: libtrace/4.0.34
+homepage: "https://github.com/LibtraceTeam/libtrace"
+
+upstream_check_command: "n/a"
+upstream_test_in_build: false
+upstream_test_command: "n/a"
+
+upstream_tests:
+  - name: upstream-suite-audit
+    command: "ls test/*.c | wc -l ; ls test/traces | wc -l ; ls test/Makefile.am test/Makefile.in"
+    expected: >
+      the 4.x tree ships 43 test programs and a directory of trace fixtures, but
+      `test` is not in the top-level SUBDIRS and test/ has no Makefile.am, so the
+      autotools build never compiles or runs them; the audit runs in build() and
+      its output is recorded in the conan create log
+
+test_package_tests:
+  - file: test_libtrace.c
+    description: >
+      Consumer (application) view: link the installed static libtrace through
+      libtrace::libtrace, open a PCAP fixture the test writes itself, and drive
+      trace_create()/trace_start()/trace_create_packet()/trace_read_packet()
+      plus the end-of-file and destroy paths. Prints one CHECK-OK line per
+      assertion plus LIBTRACE_CONSUMER_OK.
+    command: "./test_libtrace"
+
+assertion_count: 12
