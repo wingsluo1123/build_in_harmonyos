@@ -1,0 +1,20 @@
+--- a/src/api/KWallet/CMakeLists.txt
++++ b/src/api/KWallet/CMakeLists.txt
+@@ -20,8 +20,15 @@
+ add_library(KF6::Wallet ALIAS KF6Wallet)
+ 
+ set_target_properties(KF6Wallet PROPERTIES
+-    VERSION     ${KWALLET_VERSION}
+-    SOVERSION   ${KWALLET_SOVERSION}
++    # OHOS (E018 copy-instead-of-link fallback): the OHOS build sandbox denies
++    # symlink(2) for the conan process tree, so the versioned symlink chain
++    # cmake_symlink_library would create (libKF6Wallet.so.6 / libKF6Wallet.so)
++    # cannot materialize. The VERSION and SOVERSION properties are therefore
++    # left unset (setting them to empty strings still makes CMake emit a
++    # trailing-dot "libKF6Wallet.so." name and try to symlink), the build
++    # produces a plain libKF6Wallet.so whose DT_SONAME CMake emits as its own
++    # bare output name, and the conan recipe ships a byte copy of the file
++    # under the upstream soname name (libKF6Wallet.so.6) in the package step.
+     EXPORT_NAME Wallet
+ )
+ 
