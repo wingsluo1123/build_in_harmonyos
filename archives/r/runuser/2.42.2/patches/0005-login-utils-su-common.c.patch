@@ -1,0 +1,26 @@
+--- a/login-utils/su-common.c
++++ b/login-utils/su-common.c
+@@ -313,21 +313,23 @@
+ 		str2memcpy(ut.ut_id, su->tty_number, sizeof(ut.ut_id));
+ 	if (su->tty_name)
+ 		str2memcpy(ut.ut_line, su->tty_name, sizeof(ut.ut_line));
+ 
+ 	gettimeofday(&tv, NULL);
+ 	ut.ut_tv.tv_sec = tv.tv_sec;
+ 	ut.ut_tv.tv_usec = tv.tv_usec;
+ 	ut.ut_type = LOGIN_PROCESS;	/* XXX doesn't matter */
+ 	ut.ut_pid = getpid();
+ 
++#ifdef HAVE_UPDWTMPX
+ 	updwtmpx(_PATH_BTMP, &ut);
++#endif
+ }
+ 
+ static int supam_conv(	int num_msg,
+ 			const struct pam_message **msg,
+ 			struct pam_response **resp,
+ 			void *data)
+ {
+ 	struct su_context *su = (struct su_context *) data;
+ 
+ 	if (su->suppress_pam_info

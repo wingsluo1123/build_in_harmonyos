@@ -1,0 +1,33 @@
+--- a/lib/shells.c
++++ b/lib/shells.c
+@@ -5,20 +5,30 @@
+ #include <pwd.h>
+ #include <stdlib.h>
+ #include <paths.h>
+ #include <unistd.h>
+ #include <sys/syslog.h>
+ #if defined (HAVE_LIBECONF) && defined (USE_VENDORDIR)
+ #include <libeconf.h>
+ #endif
+ 
+ #include "closestream.h"
++#if !defined(__GLIBC__)
++/* On non-glibc libcs (e.g. OHOS musl) the getusershell(3) family is
++ * neither declared (see include/shells.h) nor implemented. Provide minimal
++ * stubs so runuser/su (which link libcommon) build; getusershell() returns
++ * NULL (no extra shells known). glibc provides the real functions. */
++char *getusershell(void) { return NULL; }
++void  setusershell(void) {}
++void  endusershell(void) {}
++#endif
++
+ #include "shells.h"
+ 
+ #if defined (HAVE_LIBECONF) && defined (USE_VENDORDIR)
+ econf_file *open_etc_shells(void)
+ {
+ 	econf_err error;
+ 	econf_file *key_file = NULL;
+ 
+ 	error = econf_readDirs(&key_file,
+ 			       _PATH_VENDORDIR,

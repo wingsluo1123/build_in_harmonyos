@@ -1,0 +1,31 @@
+--- a/include/shells.h
++++ b/include/shells.h
+@@ -1,17 +1,28 @@
+ /*
+  * SPDX-License-Identifier: GPL-2.0-or-later
+  */
+ #ifndef UTIL_LINUX_SHELLS_H
+ #define UTIL_LINUX_SHELLS_H
+ 
+ #include <stdio.h>
++#if !defined(__GLIBC__)
++/* OHOS/musl neither declares nor implements the getusershell(3) family.
++ * lib/shells.c provides no-op stubs; declare them here so consumers such
++ * as login-utils/su-common.c compile instead of falling back to the implicit
++ * (int-returning) declaration, which is a hard error with -Wint-conversion.
++ * glibc declares them in <unistd.h> and keeps the real implementations. */
++char *getusershell(void);
++void  setusershell(void);
++void  endusershell(void);
++#endif
++
+ 
+ #if defined (HAVE_LIBECONF) && defined (USE_VENDORDIR)
+ # include <libeconf.h>
+ econf_file *open_etc_shells(void);
+ #endif
+ 
+ extern void print_shells(FILE *out, const char *format);
+ extern int is_known_shell(const char *shell_name);
+ 
+ #endif /* UTIL_LINUX_SHELLS_H */

@@ -1,0 +1,88 @@
+# 版本级 manifest — runuser 2.42.2
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "2.42.2"
+software: "runuser"
+
+# 编译状态: published | built | failed | archived
+status: built
+
+build_date: "2026-10-15"
+build_system: "autotools"
+
+source:
+  # 上游 util-linux 源码包（runuser 为其中 login-utils 组件）
+  url: "https://cdn.kernel.org/pub/linux/utils/util-linux/v2.42/util-linux-2.42.2.tar.xz"
+  sha256: "03a05d3adf9602ef128f2da05b84b3205ce60c351e5737c0370f74000679ce8a"
+  tar_format: tar.xz
+
+build:
+  system: autotools
+  configure_options:
+    - "--disable-all-programs"
+    - "--enable-runuser"
+    - "--without-systemd"
+    - "--without-selinux"
+    - "--without-audit"
+    - "--disable-bash-completion"
+    - "--disable-nls"
+    - "--disable-plymouth-support"
+    - "--without-cap-ng"
+    - "--without-utempter"
+    - "--disable-makeinstall-chown"
+    - "--disable-makeinstall-setuid"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - linux-pam/1.7.2
+
+  cc: clang
+  cxx: clang++
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-config-config.guess.patch"
+  - "0002-configure.patch"
+  - "0003-include-shells.h.patch"
+  - "0004-lib-shells.c.patch"
+  - "0005-login-utils-su-common.c.patch"
+
+# 编译中学到的知识（与 util-linux-login 同源同版本，适配点一致）
+knowledge_gained:
+  - "config.guess 需补 HarmonyOS 检测分支（aarch64-unknown-linux-ohos）"
+  - "OHOS musl 无 GNU utmpx 扩展，runuser 的 gnu_utmpx 检查须放宽（参考 util-linux-login 0003）"
+  - "OHOS musl 无 getusershell 家族声明/实现，shells.h/shells.c 需补声明与 no-op stub（参考 util-linux-login 0004）"
+  - "su-common.c 中 updwtmpx 调用须以 HAVE_UPDWTMPX 守卫（参考 util-linux-login 0002）"
+  - "configure 生成 tempdir 用 umask 077，OHOS HMDFS 0700 不可写（E011），改为 umask 022"
+  - "util-linux 测试脚本 shebang 指向 /bin/bash，OHOS 无此路径，需改为 /data/service/hnp/bin/bash 并注入 GNU xargs（toybox xargs 无 -I）"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/runuser-2.42.2.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/runuser-2.42.2.work
+  source_orig_hash: 8ce7e178f77019b5
+  source_work_hash: 9232feaf764d5fc1
+  generated_at: '2026-10-15T18:09:04'
+  patches_count: 5
+
+patch_classification:
+  - file: 0001-config-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-include-shells.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-lib-shells.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0005-login-utils-su-common.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

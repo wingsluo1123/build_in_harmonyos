@@ -1,0 +1,33 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: runuser/2.42.2
+homepage: "https://github.com/util-linux/util-linux"
+
+# 上游测试命令 (util-linux 使用 autotools make check 驱动 tests/run.sh)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（本任务在 OHOS 上实际运行的可执行测试）
+upstream_tests:
+  - file: tests/ts/login/islocal
+    source: runuser-2.42.2/tests/ts/login/islocal
+    description: "islocal helper 测试（登录名校验，2/2 PASSED）"
+    command: "bash tests/run.sh login/islocal"
+  - file: tests/ts/login/logindefs
+    source: runuser-2.42.2/tests/ts/login/logindefs
+    description: "logindefs helper 测试（login.defs 解析，2/2 PASSED）"
+    command: "bash tests/run.sh login/logindefs"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "真实端到端消费者用例：fork+exec 实际执行 runuser 二进制——root 下 `runuser -u nobody -- id -un` 校验切换输出；非 root 下校验 runuser 真实拒绝路径输出与退出码；并校验 --version 输出内容与 --help 退出码"
+    command: "./test_runuser"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 4
