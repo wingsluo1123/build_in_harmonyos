@@ -1,0 +1,50 @@
+# conandata.yml — kdialog 26.04.0
+# Flat sources layout (the recipe carries the version); patches keyed by
+# version for apply_conandata_patches() (kirigami-addons 1.13.0 pattern,
+# mirroring kcron 26.04.1).
+
+sources:
+  # Official URL first, then mainland mirrors (E017: the platform rewrites
+  # github.com URLs to ghfast.top; KDE URLs are not affected). Verified
+  # 2026-10-17 from the Xi'an workstation: the download.kde.org mirror chain
+  # (gwdg / dotsrc / mit.edu endpoints) served the identical tarball
+  # (sha256 cd612d72..., 149132 bytes); the mainland mirrors below stay in
+  # the list for the build/dev device to try in order.
+  url:
+    - "https://download.kde.org/stable/release-service/26.04.0/src/kdialog-26.04.0.tar.xz"
+    - "https://mirrors.bfsu.edu.cn/kde/stable/release-service/26.04.0/src/kdialog-26.04.0.tar.xz"
+    - "https://mirrors.ustc.edu.cn/kde/stable/release-service/26.04.0/src/kdialog-26.04.0.tar.xz"
+    - "https://mirror.nju.edu.cn/kde/stable/release-service/26.04.0/src/kdialog-26.04.0.tar.xz"
+    - "https://mirrors.aliyun.com/kde/stable/release-service/26.04.0/src/kdialog-26.04.0.tar.xz"
+  sha256: "cd612d72c629a5eab5dd2b6385e93e0926df39a6874ece0cf989d345d3aa225f"
+
+patches:
+  "26.04.0":
+    - patch_file: "patches/0001-ohos-link-kiocore.patch"
+      patch_description: >-
+        Link the kdialog target against KF6::KIOCore instead of
+        KF6::KIOWidgets: the published kio/6.26.0 package on ohpcd is the
+        KIOCORE_ONLY baseline (libKF6KIOCore + kioworker/ktrash6/worker
+        set only) and ships no KF6KIOWidgets library. kdialog's only KIO
+        usage is KRecentDocument::add() in the getsavefilename branch, and
+        KRecentDocument is exported by KIOCore (kio
+        src/core/krecentdocument.cpp), so the recent-documents feature is
+        preserved. Pure link-target swap, no platform macros (R8).
+      patch_type: "portability"
+    - patch_file: "patches/0002-ohos-explicit-framework-links.patch"
+      patch_description: >-
+        Declare the directly used KF6 frameworks explicitly: add
+        WidgetsAddons/Config/CoreAddons/I18n to the
+        find_package(KF6 COMPONENTS ...) call and link
+        KF6::WidgetsAddons/KF6::I18n/KF6::ConfigCore/KF6::CoreAddons on
+        the kdialog target. The ohpcd KF6 6.26.0 packages export only each
+        framework's own include directory and flatten dependency links
+        (-lKF6Xxx flags, absolute INTERFACE_LINK_DIRECTORIES), so the
+        transitive include directories a full upstream KF6 install
+        provides do not propagate; kdialog's direct uses (KMessageBox/
+        KPasswordDialog/KNewPasswordDialog/KDatePicker, KAboutData,
+        KConfig, KLocalizedString) previously failed with 'KMessageBox'
+        file not found. The KConfig framework is requested as component
+        Config (its imported targets are KF6::ConfigCore/KF6::ConfigGui).
+        Platform-neutral, unconditional (R8).
+      patch_type: "portability"

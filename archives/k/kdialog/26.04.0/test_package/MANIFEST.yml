@@ -1,0 +1,45 @@
+package: kdialog/26.04.0
+homepage: https://invent.kde.org/utilities/kdialog
+
+# 上游测试清点（R51 第一步）：kdialog 26.04.0 **无任何注册测试**（0 用例）。
+# 证据：
+#   - tests/ 目录仅 3 个交互式演示 shell 脚本（tests/test 2879B、
+#     tests/progressdemo 426B、tests/progresscanceldemo 448B）：需人工点击
+#     按钮或以 qdbus 驱动 kdialog_progress_helper，非自动化用例；
+#   - tests/ 下无 CMakeLists.txt，顶层 CMakeLists.txt 未
+#     add_subdirectory(tests)——脚本不参与构建；
+#   - 全部 CMake 文件中递归查找 add_test/enable_testing/BUILD_TESTING/
+#     ecm_add_test/ctest 用法为空；递归查找文件名含 "test" 的文件仅为
+#     tests/ 本身与 tests/test；
+#   - .kde-ci.yml 声明 8 个 KF6 框架依赖与 require-passing-tests-on:
+#     [Linux, FreeBSD]，但未注册任何测试目标；
+#   - .gitlab-ci.yml 引入 7 个 KDE 共享模板（linux-qt6 / linux-qt6-next /
+#     freebsd-qt6 / flatpak / xml-lint / yaml-lint / snap-snapcraft-lxd），
+#     仅在项目注册测试时才执行 ctest——本项目未注册。
+upstream_test_in_build: false
+upstream_check_command: "(none — 上游未注册任何测试目标，无 ctest 可执行；清点证据见上)"
+upstream_test_command: "(none — 上游 0 用例，见上方清点证据)"
+upstream_tests: []
+
+test_package_tests:
+  - file: test.sh
+    description: >-
+      消费者用例 5 用例 / 10 断言 + 1 鸿蒙特有用例 / 2 断言（共 12）：
+      (1) bin/kdialog 与 bin/kdialog_progress_helper 均存在且可执行；
+      (2) --version 退出 0 且报告 26.04.x 版本串；
+      (3) --help 退出 0 且选项面完整（--passivepopup 与 --progressbar 均已
+      注册；两分支均依赖会话总线，有意不做端到端驱动，见配方 docstring）；
+      (4) --author 输出 KAboutData 作者（David Faure）、--license 输出 GPL
+      许可证文本；
+      (5) 未知选项非零退出并打印 QCommandLineParser 的 "Unknown option"
+      诊断（不得静默成功）；
+      (6) [鸿蒙特有] (6a) --msgbox 进入真实模态事件循环
+      （KMessageBox::createKMessageBox + QDialog::exec），3 秒宽限期内进程
+      存活后 TERM（同时门禁 kdialog 本体 DT_NEEDED closure）；(6b)
+      kdialog_progress_helper 直接启动、有界等待，由 OHOS 动态链接器解析
+      其完整 DT_NEEDED closure，判据为无链接器解析失败字样。两例在 glibc
+      下恒过、在 OHOS 上是真实门禁。
+    command: "sh test.sh <kdialog-bin>"
+
+# 12 条内容断言（用例 1a/1b/2a/2b/3a/3b/4a/4b/5a/5b + 鸿蒙特有 6a/6b）
+assertion_count: 12

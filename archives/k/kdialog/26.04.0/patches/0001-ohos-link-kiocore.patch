@@ -1,0 +1,35 @@
+From 8f4a2c1e6b9d3570a1c2e5f8b0d4a7c3e6f9b2d5 Mon Sep 17 00:00:00 2001
+From: t <t@t>
+Date: Sat, 17 Oct 2026 02:10:00 +0800
+Subject: [PATCH] ohos: link KF6::KIOCore instead of KF6::KIOWidgets
+
+The published kio/6.26.0 package on ohpcd is a KIOCORE_ONLY baseline: it
+ships libKF6KIOCore plus the kioworker/ktrash6/file/remote/trash workers,
+but not KF6KIOWidgets (that library needs kbookmarks/solid/kjobwidgets/
+kiconthemes 6.26, several of which are not published on ohpcd).
+
+kdialog uses exactly one KIO symbol: KRecentDocument::add() in the
+--getsavefilename branch (src/kdialog.cpp), and KRecentDocument is
+exported by KIOCore (kio src/core/krecentdocument.cpp, class
+KIOCORE_EXPORT KRecentDocument). Relinking the target against KF6::KIOCore
+keeps the recent-documents feature intact without pulling in the
+unpublished KIOWidgets library. The other "KIO-looking" call site,
+KColorMimeData::fromMimeData() in the --getcolor branch, belongs to
+KGuiAddons (not KIO) and is unaffected.
+
+No platform macros: this is a pure link-target swap (R8 compliant).
+---
+ src/CMakeLists.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 6b3e57a..9f5e2c8 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -20,5 +20,5 @@
+ target_link_libraries(kdialog
+-    KF6::KIOWidgets
++    KF6::KIOCore
+     KF6::TextWidgets
+     KF6::Notifications
+     KF6::IconThemes

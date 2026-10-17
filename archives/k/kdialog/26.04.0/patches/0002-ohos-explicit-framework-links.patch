@@ -1,0 +1,65 @@
+From 45df1f1e302fe2a0dcc7f87a980bd68e4e688947 Mon Sep 17 00:00:00 2001
+From: t <t@t>
+Date: Sat, 17 Oct 2026 01:54:12 +0800
+Subject: [PATCH] ohos: declare the directly used KF6 frameworks as explicit
+ links
+
+kdialog calls headers from frameworks it does not link explicitly and
+relies on transitive include propagation through the dependency chain
+(KWidgetsAddons: KMessageBox/KPasswordDialog/KNewPasswordDialog/
+KDatePicker; KCoreAddons: KAboutData; KConfig: KConfig; KI18n:
+KLocalizedString, 4 uses).
+
+That propagation exists on a native KF6 installation, but the published
+ohpcd KF6 artifacts export only their own ${_IMPORT_PREFIX}-relative
+header trees and flatten their dependency linkage into plain -l flags
+and -L link directories in the installed Targets files (e.g.
+KF6TextWidgetsTargets.cmake carries "-lKF6SonnetUi;-lKF6I18n" plus
+absolute INTERFACE_LINK_DIRECTORIES instead of imported-target
+references). Consumers therefore get no include directories for the
+transitive frameworks and the build fails with:
+
+  kdialog.cpp:16:10: fatal error: 'KMessageBox' file not found
+
+Fix: add the missing components to find_package(KF6 ... COMPONENTS ...)
+and link the matching imported targets on the kdialog executable. Note
+the KConfig framework is requested under component name "Config", not
+"ConfigCore" (the latter is only the target name: KF6::ConfigCore /
+KF6::ConfigGui). Declaring frameworks whose headers are used directly
+is correct CMake hygiene and is harmless on any KF6 installation (the
+targets resolve identically there).
+
+No platform macros: pure package-configuration change (R8 compliant).
+---
+ CMakeLists.txt     | 2 +-
+ src/CMakeLists.txt | 4 ++++
+ 2 files changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index e3fb7d7..1b375ab 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -23,7 +23,7 @@ include(ECMDeprecationSettings)
+ include(ECMSetupVersion)
+ include(FeatureSummary)
+ # Build dependencies
+-find_package(KF6 ${KF_MIN_VERSION} REQUIRED COMPONENTS TextWidgets Notifications GuiAddons IconThemes WindowSystem KIO DBusAddons)
++find_package(KF6 ${KF_MIN_VERSION} REQUIRED COMPONENTS TextWidgets WidgetsAddons Config CoreAddons I18n Notifications GuiAddons IconThemes WindowSystem KIO DBusAddons)
+ find_package(Qt6 ${QT_MIN_VERSION} CONFIG REQUIRED COMPONENTS DBus)
+ 
+ option(WITHOUT_X11 "Build without X11 integration (skips finding X11)" OFF)
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index b8df17f..681e4a2 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -20,6 +20,10 @@ target_sources(kdialog PRIVATE
+ target_link_libraries(kdialog
+     KF6::KIOCore
+     KF6::TextWidgets
++    KF6::WidgetsAddons
++    KF6::I18n
++    KF6::ConfigCore
++    KF6::CoreAddons
+     KF6::Notifications
+     KF6::IconThemes
+     KF6::GuiAddons
