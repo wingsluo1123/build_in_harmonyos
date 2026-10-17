@@ -1,0 +1,55 @@
+--- /dev/null
++++ b/fan_snapshot.c
+@@ -0,0 +1,52 @@
++/* Optional developer collection channel. Values retain their source unit. */
++#include "measurement.h"
++#include <errno.h>
++#include <fcntl.h>
++#include <math.h>
++#include <stdio.h>
++#include <string.h>
++#include <sys/stat.h>
++#include <time.h>
++#include <unistd.h>
++
++int mbmon_read_fans_raw(const char *path, struct mbmon_fans_raw *out)
++{
++    if (!path || !out) { errno = EINVAL; return -1; }
++    memset(out, 0, sizeof(*out));
++    int fd = open(path, O_RDONLY | O_NONBLOCK | O_NOFOLLOW);
++    if (fd < 0) return -1;
++    struct stat st;
++    if (fstat(fd, &st) || !S_ISREG(st.st_mode) || st.st_size > 2048) {
++        close(fd); errno = EINVAL; return -1;
++    }
++    FILE *file = fdopen(fd, "r");
++    if (!file) { close(fd); return -1; }
++    char header[64], unit[16], name[64], extra[2];
++    long long timestamp = 0, value = 0;
++    int matched = fscanf(file, "%63s %15s %lld", header, unit, &timestamp);
++    if (matched != 3 || strcmp(header, "XMBMON_FAN_V1") || strcmp(unit, "raw")) goto bad;
++    double age = difftime(time(NULL), (time_t)timestamp);
++    if (!isfinite(age) || age < -2 || age > 5) {
++        fclose(file); errno = ESTALE; return -1;
++    }
++    for (unsigned i = 0; i < 2; ++i) {
++        if (fscanf(file, "%63s %lld", name, &value) != 2) goto bad;
++        unsigned slot;
++        if (!strcmp(name, "fan_speed0")) slot = 0;
++        else if (!strcmp(name, "fan_speed1")) slot = 1;
++        else goto bad;
++        if ((out->valid_fans & (1u << slot)) || value < 0 || value > 1000000) goto bad;
++        out->values[slot] = (int)value;
++        out->valid_fans |= 1u << slot;
++    }
++    if (fscanf(file, "%63s", name) != 1 || strcmp(name, "END") ||
++        fscanf(file, "%1s", extra) != EOF || ferror(file)) goto bad;
++    fclose(file);
++    out->sampled_unix = timestamp;
++    return 0;
++bad:
++    fclose(file);
++    memset(out, 0, sizeof(*out));
++    errno = EINVAL;
++    return -1;
++}

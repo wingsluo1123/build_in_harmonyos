@@ -1,0 +1,61 @@
+--- /dev/null
++++ b/measurement_thermal.cpp
+@@ -0,0 +1,58 @@
++/* The platform C++ ABI is confined to this translation unit; the facade is C. */
++#include "platform_cxx_config.h"
++#define THERMAL_SERVICE_DEATH_UT
++#include "thermal_mgr_client.h"
++#include "measurement.h"
++#include <cerrno>
++#include <cmath>
++#include <cstdio>
++#include <cstring>
++#include <exception>
++#include <string>
++
++extern "C" int mbmon_read_measurements(struct mbmon_measurements *out)
++{
++    if (!out) {
++        errno = EINVAL;
++        return -1;
++    }
++    std::memset(out, 0, sizeof(*out));
++    for (unsigned i = 0; i < MBMON_CHANNEL_COUNT; ++i)
++        out->temperatures[i] = NAN;
++    try {
++        auto &client = OHOS::PowerMgr::ThermalMgrClient::GetInstance();
++        const OHOS::PowerMgr::SensorType types[] = {
++            OHOS::PowerMgr::SensorType::SOC,
++            OHOS::PowerMgr::SensorType::BATTERY,
++            OHOS::PowerMgr::SensorType::SHELL
++        };
++        for (unsigned i = 0; i < MBMON_CHANNEL_COUNT; ++i) {
++            std::string label;
++            int32_t initial = INT32_MIN;
++            /* Use the external constructor: the object must carry the system
++             * library's vtable and its matching platform string layout. */
++            OHOS::PowerMgr::ThermalSrvSensorInfo info(label, initial);
++            if (!client.GetThermalSrvSensorInfo(types[i], info)) continue;
++            const auto raw = info.GetTemp();
++            const auto &name = info.GetType();
++            if (raw < -273150 || raw > 1000000 || name.empty() ||
++                name.size() >= MBMON_LABEL_SIZE) continue;
++            out->temperatures[i] = static_cast<float>(raw) / 1000.0f;
++            std::memcpy(out->labels[i], name.c_str(), name.size() + 1);
++            out->valid_temperatures |= 1u << i;
++        }
++    } catch (const std::exception &) {
++        errno = EIO;
++        return -1;
++    }
++    if (out->valid_temperatures == 0) {
++        errno = ENODATA;
++        return -1;
++    }
++    return 0;
++}
++
++extern "C" const char *mbmon_measurement_backend(void)
++{
++    return "OpenHarmony thermal service (system C++ ABI)";
++}

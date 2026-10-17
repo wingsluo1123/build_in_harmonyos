@@ -1,0 +1,78 @@
+--- /dev/null
++++ b/CMakeLists.txt
+@@ -0,0 +1,75 @@
++cmake_minimum_required(VERSION 3.16)
++list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
++project(xmbmon VERSION 2.05 LANGUAGES C)
++
++include(GNUInstallDirs)
++set(MBMON_BACKEND "legacy" CACHE STRING "Measurement backend: legacy or thermal")
++set_property(CACHE MBMON_BACKEND PROPERTY STRINGS legacy thermal)
++option(MBMON_BUILD_GUI "Build the original X11/Xt graphical monitor" ON)
++
++if(MBMON_BACKEND STREQUAL "thermal")
++    enable_language(CXX)
++    set(MBMON_INNER_API_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/platform-headers"
++        CACHE PATH "Pinned OpenHarmony inner API header root")
++    if(NOT EXISTS "${MBMON_INNER_API_HEADERS}/thermal/thermal_mgr_client.h")
++        message(FATAL_ERROR "The thermal backend requires the pinned inner API header bundle")
++    endif()
++    set(MBMON_PLATFORM_LIBRARY_DIRS "/system/lib64/platformsdk;/system/lib64"
++        CACHE STRING "Native platform service library directories")
++    foreach(component thermalsrv_client.z utils.z ipc_single.z)
++        string(REPLACE "." "_" variable "${component}")
++        find_library(MBMON_${variable}_LIBRARY NAMES "${component}"
++            PATHS ${MBMON_PLATFORM_LIBRARY_DIRS} NO_DEFAULT_PATH REQUIRED)
++        list(APPEND platform_libraries "${MBMON_${variable}_LIBRARY}")
++    endforeach()
++    find_library(MBMON_PLATFORM_CXX_LIBRARY NAMES "c++"
++        PATHS ${MBMON_PLATFORM_LIBRARY_DIRS} NO_DEFAULT_PATH REQUIRED)
++    add_library(mbmon_measurement SHARED measurement_thermal.cpp fan_snapshot.c)
++    target_compile_features(mbmon_measurement PRIVATE cxx_std_17)
++    target_include_directories(mbmon_measurement PRIVATE
++        "${MBMON_INNER_API_HEADERS}/thermal" "${MBMON_INNER_API_HEADERS}/utils"
++        "${MBMON_INNER_API_HEADERS}/ipc")
++    target_compile_options(mbmon_measurement PRIVATE -fvisibility=hidden -fvisibility-inlines-hidden)
++    target_link_options(mbmon_measurement PRIVATE -nostdlib++)
++    target_link_libraries(mbmon_measurement PRIVATE ${platform_libraries} "${MBMON_PLATFORM_CXX_LIBRARY}")
++    set_target_properties(mbmon_measurement PROPERTIES
++        BUILD_WITH_INSTALL_RPATH TRUE
++        BUILD_RPATH "${MBMON_PLATFORM_LIBRARY_DIRS}"
++        INSTALL_RPATH "${MBMON_PLATFORM_LIBRARY_DIRS}")
++    add_library(mbmon_backend STATIC getMB-measurement.c)
++    target_link_libraries(mbmon_backend PUBLIC mbmon_measurement m)
++    target_compile_definitions(mbmon_backend INTERFACE MBMON_NAMED_SENSORS MBMON_CLOCK_UPTIME)
++    install(TARGETS mbmon_measurement LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
++    install(FILES measurement.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/xmbmon)
++    install(PROGRAMS collect_fans_hdc.py DESTINATION ${CMAKE_INSTALL_DATADIR}/xmbmon)
++elseif(MBMON_BACKEND STREQUAL "legacy")
++    if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(i.86|x86_64|amd64|AMD64)$")
++        message(FATAL_ERROR "The legacy motherboard backend contains x86 I/O instructions")
++    endif()
++    add_library(mbmon_backend STATIC getMBinfo.c tyan_tiger.c pci_pm.c sensors.c
++        getMB-via.c getMB-smb.c getMB-isa.c smbuses.c smbus_piix4.c smbus_amd.c
++        smbus_ali.c smbus_amd8.c sens_winbond.c sens_via686.c sens_it87.c
++        sens_gl52.c sens_lm85.c sens_lm80.c sens_lm90.c sens_lm75.c sens_wl784.c smb_extemp.c)
++    target_compile_definitions(mbmon_backend PUBLIC LINUX HAVE_GETUTENT)
++    target_link_libraries(mbmon_backend PUBLIC m)
++else()
++    message(FATAL_ERROR "Unknown MBMON_BACKEND: ${MBMON_BACKEND}")
++endif()
++
++add_executable(mbmon mbmon.c)
++target_link_libraries(mbmon PRIVATE mbmon_backend)
++set_target_properties(mbmon PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE
++    INSTALL_RPATH "$ORIGIN;$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
++install(TARGETS mbmon RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
++install(FILES mbmon.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
++
++if(MBMON_BUILD_GUI)
++    find_package(libxt CONFIG REQUIRED)
++    find_package(libx11 CONFIG REQUIRED)
++    add_executable(xmbmon xmbmon.c)
++    target_link_libraries(xmbmon PRIVATE mbmon_backend libxt::libxt libx11::libx11 m)
++    set_target_properties(xmbmon PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE
++        INSTALL_RPATH "$ORIGIN;$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
++    install(TARGETS xmbmon RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
++    install(FILES xmbmon.1x DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
++endif()
