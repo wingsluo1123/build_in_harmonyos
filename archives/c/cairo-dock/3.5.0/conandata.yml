@@ -1,0 +1,41 @@
+# conandata.yml — cairo-dock 3.5.0
+#
+# R39: only the official upstream source.  The project (Cairo-Dock/cairo-dock-core,
+# GPL-3.0) publishes its releases as tags on GitHub; the archive of the `3.5.0`
+# tag is the official 3.5.0 tree and was sha256-verified locally against the
+# GitHub release asset of the same tag.
+# CI appends its own github.com mirror fallback at build time, so the repository
+# copy keeps the canonical URL.
+
+sources:
+  url: "https://github.com/Cairo-Dock/cairo-dock-core/archive/refs/tags/3.5.0.tar.gz"
+  sha256: "67af81683d8178e12f8c2f190936f68658eb1e091d974416a7d1472cc8c7ab63"
+  filename: "cairo-dock-3.5.0.tar.gz"
+
+patches:
+  - patch_file: "patches/0001-Help-src-CMakeLists.txt.patch"
+    patch_description: >-
+      Help/src/CMakeLists.txt calls add_library() *before* link_directories(),
+      and CMake only applies link_directories() to targets created after it, so
+      the Help plug-in is linked with no -L search path at all.  On a
+      distribution where the GTK3/GL stack sits in the default linker path this
+      is invisible; with Conan dependencies it breaks the link with
+      "unable to find library -lrsvg-2 / -lturbojpeg / -lzstd / -lwebp /
+      -lpango-1.0 / ...".  Moving the link_directories() block above
+      add_library() restores upstream's evident intent without changing which
+      libraries the plug-in links.
+    patch_type: "portability"
+  - patch_file: "patches/0002-src-cairo-dock-gui-advanced.c.patch"
+    patch_description: >-
+      src/cairo-dock-gui-advanced.c unconditionally does `#include <gdk/gdkx.h>`
+      and, in _check_group_button(), compares GDK_WINDOW_XID(...) with the id
+      reported by the X11 window-manager backend.  Although the CMake-level X11
+      support is optional (pkg_check_modules("X11" x11) has no REQUIRED), this
+      source file is always built and requires the X11 headers of GTK itself; a
+      GTK built without the X11 backend (OHOS gtk3 is broadway-only, so
+      gdk/gdkx.h does not exist) therefore fails with "fatal error: 'gdk/gdkx.h'
+      file not found".  Wrap the include and the X11-only active-window test in
+      `#ifdef GDK_WINDOWING_X11`; on backends without X11 use the portable
+      gtk_window_is_active() instead (same guard pattern as
+      libcanberra-gtk3/0.30 patches/0007).  On an X11 GTK both branches still available: the guard is evaluable because <gdk/gdk.h> (gdkconfig.h) is now included before it.
+    patch_type: "portability"

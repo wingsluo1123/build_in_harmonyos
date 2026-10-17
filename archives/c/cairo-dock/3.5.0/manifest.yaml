@@ -1,0 +1,72 @@
+version: "3.5.0"
+software: cairo-dock
+status: built
+build_date: "2026-10-16"
+build_system: cmake
+
+source:
+  url: "https://github.com/Cairo-Dock/cairo-dock-core/archive/refs/tags/3.5.0.tar.gz"
+  sha256: "67af81683d8178e12f8c2f190936f68658eb1e091d974416a7d1472cc8c7ab63"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_SYSTEM_NAME=Linux"
+    - "-DCMAKE_SYSTEM_PROCESSOR=aarch64"
+    - "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+    - "-Denable-x11-support=OFF"
+    - "-Denable-wayland-support=OFF"
+    - "-Denable-egl-support=OFF"
+  compile_definitions:
+    - "_POSIX_C_SOURCE=200809L"   # expose POSIX.1-2008 (localtime_r) under upstream's -std=c99
+  dependencies:
+    - gtk/3.24.38.1
+    - librsvg/2.62.3
+    - libxml2/2.15.3.1
+    - dbus-glib/0.114.1
+    - dbus/1.14.10.1
+    - curl/8.15.0.1
+    - mesa/24.3.4.1
+    - glu/9.0.3
+    - glib/2.84.0.1
+    - cairo/1.18.4
+    - cairo-gobject/1.18.4
+    - pango/1.56.4
+    - gdk-pixbuf/2.44.6
+    - atk/2.38.0.1
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-Help-src-CMakeLists.txt.patch"
+  - "0002-src-cairo-dock-gui-advanced.c.patch"
+
+knowledge_gained:
+  - "OHOS 无桌面 libGL.so：上游 CMakeLists 把 gl/glu 放进 REQUIRED 的 pkg_check_modules → 用 mesa/24.3.4.1 的 osmesa.pc 以 'gl' 模块名重新发布（-lOSMesa，桌面 GL 入口点，软件渲染），与 glu/9.0.3 自身的 osmesa.pc 手法一致"
+  - "glib/2.84.0.1 经 PkgConfigDeps 会生成含 gthread-2.0 的完整组件 .pc（实测 generators 目录含 gthread-2.0.pc）；generate() 的 _ensure_gthread_pc() 实为防御性 no-op（abiword-plugin-* 先例仅适用于聚合-only 变体）"
+  - "X11/Wayland/EGL 在 CMake 层为可选后端（pkg_check_modules 无 REQUIRED），OHOS 上显式 -Denable-*-support=OFF；gtk/3.24.38.1 为纯 broadway 后端（gdkconfig.h 无 GDK_WINDOWING_X11），GDK 不含 gdk/gdkx.h"
+  - "'X11 可选' 在源码层被证伪：src/cairo-dock-gui-advanced.c 无条件 #include <gdk/gdkx.h> 且用 GDK_WINDOW_XID；broadway-only GTK 上必编译失败（fatal error: 'gdk/gdkx.h' file not found）→ patches/0002 用 #ifdef GDK_WINDOWING_X11 守卫，非 X11 后端回退 gtk_window_is_active()（libcanberra-gtk3/0.30 patches/0007 同型）"
+  - "上游源码用 glibc 内部宏 __USE_POSIX 取 localtime_r，musl 无效且项目 -std=c99 隐藏 POSIX 声明 → 配方注入 -D_POSIX_C_SOURCE=200809L（add-cflags/feature-test-macro 类）"
+  - "glib/2.84.0.1 以 Windows 式 proxy <libintl.h> 交付（gettext→g_libintl_*），符号由包内 lib/libintl.so 提供；PkgConfigDeps 生成的 glib-2.0.pc 丢掉 -lintl（上游自带 pc 有），而上游 check_library_exists(intl libintl_gettext) 因符号名是 g_libintl_* 也不成立 → 链接缺 g_libintl_gettext；配方对生成的 glib-2.0.pc 追加 -lintl（at-spi2-core/2.60.5、ayatana-ido/0.10.4 同型）"
+  - "dbus/1.14.10.2+ 引入 DBUS_WITH_GLIB → requires glib/2.88.3，与 GTK 树的 glib/2.84.0.1 冲突；对齐 1.14.10.1（dbustest 先例）"
+  - "上游 3.5.0 发布归档的 tests/ 套件不完整：脚本 import 的 CairoDock.py 不在归档内，且需 X 显示 + xdotool + D-Bus → 上游可运行测试 N=0（逐项理由见 test_package/MANIFEST.yml）"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/ohpc-porting/builds/cairo-dock-3.5.0.orig
+  source_work_dir: /storage/Users/currentUser/tmp/ohpc-porting/builds/cairo-dock-3.5.0.work
+  source_orig_hash: 2b169b261e6321d7
+  source_work_hash: e43576d9c49bbd2c
+  generated_at: '2026-10-16T14:50:01'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-Help-src-CMakeLists.txt.patch
+    type: portability
+    platform_only: False
+    guard: 'none'
+  - file: 0002-src-cairo-dock-gui-advanced.c.patch
+    type: portability
+    platform_only: False
+    guard: 'GDK_WINDOWING_X11'

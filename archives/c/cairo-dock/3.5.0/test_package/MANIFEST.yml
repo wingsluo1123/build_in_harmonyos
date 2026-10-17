@@ -1,0 +1,85 @@
+# test_package/MANIFEST.yml — cairo-dock/3.5.0
+#
+# 上游测试清点（R51，2026-10-16，源码 = 官方 3.5.0 tag 归档，sha256
+# 67af81683d8178e12f8c2f190936f68658eb1e091d974416a7d1472cc8c7ab63）：
+#
+# 1) 构建系统内没有任何测试注册：
+#      grep -rn "enable_testing|add_test|include(CTest)" --include=CMakeLists.txt .
+#      → 0 命中（整个源码树，含 tests/ 的父级与子级 CMakeLists）
+#      顶层 CMakeLists.txt 只 add_subdirectory(src data po) + Help。
+#      因此 ctest 无测试可跑（`ctest` 会以 "No tests were found" 退出 8），
+#      构建阶段不存在可执行的 make check / ctest / meson test 目标。
+#
+# 2) tests/ 目录是 13 个 .py 文件（11 个 Test*.py 场景脚本 + main.py 运行器 +
+#    config.py 配置；实测 `ls -1 tests | wc -l` = 13），全部是 Python GUI
+#    集成脚本，不是 C 测试程序：
+#      tests/main.py, Test.py, TestCustomLauncher.py, TestDesklet.py,
+#      TestDockManager.py, TestIconManager.py, TestLauncher.py, TestModules.py,
+#      TestRootDock.py, TestSeparatorIcon.py, TestStackIcon.py, TestTaskbar.py
+#    逐项不可运行的技术原因（每项同一根因，逐项列出）：
+#      - tests/main.py            : 依赖运行中的 dock + D-Bus + xdotool + 显示服务
+#      - tests/Test.py            : 同上（os.system("xdotool key ...")）
+#      - tests/TestCustomLauncher.py: 同上
+#      - tests/TestDesklet.py     : 同上
+#      - tests/TestDockManager.py : 同上
+#      - tests/TestIconManager.py : 同上
+#      - tests/TestLauncher.py    : 同上（并需要 gnome-calculator 等被启动程序）
+#      - tests/TestModules.py     : 同上
+#      - tests/TestRootDock.py    : 同上
+#      - tests/TestSeparatorIcon.py: 同上
+#      - tests/TestStackIcon.py   : 同上
+#      - tests/TestTaskbar.py     : 同上
+#      - tests/config.py          : 被上面脚本 import 的配置模块（非测试本身）
+#    更强的阻断性证据：所有脚本都 `from CairoDock import CairoDock`，而
+#    **官方 3.5.0 发布归档里根本没有 CairoDock.py**
+#    （`tar tzf cairo-dock-3.5.0.tar.gz | grep -i cairodock.py` → 0 命中；
+#     归档只带 tests/*.py，无该模块）→ 上游该套件在发布包中即为不完整状态，
+#     `python3 tests/main.py` 在 import 阶段即失败。
+#
+# 3) 结论：上游可运行自动化测试 N = 0 / N′ = 0（项目内注册数 0，发布包内含
+#    的 12 个脚本因缺模块 + 缺显示服务/xdotool 不可运行）。按 R51 要求，本包
+#    的运行证据由 test_package 的消费者探针提供（见下），并在 notes.md
+#    与 PR 正文如实回填"上游无可运行测试 + 逐项理由"。
+
+package: cairo-dock/3.5.0
+homepage: "https://github.com/Cairo-Dock/cairo-dock-core"
+
+upstream_check_command: "ctest"
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_test_note: >-
+  cairo-dock 3.5.0 的构建系统不注册任何测试（无 enable_testing()/add_test()）；
+  tests/ 目录的 12 个脚本是 GUI 集成脚本，需要显示服务 + D-Bus + xdotool，
+  且其导入的 CairoDock 模块不随发布归档提供 → 上游可运行测试 N=0。
+
+upstream_tests:
+  - file: tests/main.py
+    source: cairo-dock-core-3.5.0/tests/main.py
+    description: "GUI 集成脚本；需要运行中的 dock（X 显示）、D-Bus、xdotool，且 import CairoDock（发布包缺失）→ 不可运行"
+    command: "python3 tests/main.py"
+  - file: tests/TestTaskbar.py
+    source: cairo-dock-core-3.5.0/tests/TestTaskbar.py
+    description: "同上（xdotool + D-Bus + CairoDock 模块缺失）"
+    command: "python3 tests/main.py TestTaskbar"
+
+test_package_tests:
+  - file: test_cairo_dock.c
+    description: "消费者链接+调用探针：经打包的 pkg-config 模块 gldi 链接 -lgldi，调用 cairo_dock_get_version_from_string() / cairo_dock_string_contains() 并断言结果"
+    command: "./test_cairo_dock"
+  - file: conanfile.py
+    description: "打包产物探针：bin/cairo-dock 存在且为 AArch64 ELF；DT_NEEDED 闭包含 libgldi.so.3+GTK3/Cairo/GLib；libgldi 闭包含桌面 GL 提供者；安装的 gldi-config.h 声明 GLDI_VERSION 3.5.0 且未定义 HAVE_X11/HAVE_GLX/HAVE_WAYLAND/HAVE_EGL；执行 bin/cairo-dock --version 验证加载器可解析全闭包"
+    command: "conan create（test_package 于 test 阶段自动执行）"
+
+# 断言计数（全部来自 test_package；逐条对应 conanfile.py test() 与 test_cairo_dock.c）：
+#   A. exe 存在+可执行位 (1) + ELF magic (1) + AArch64 e_machine (1) = 3
+#   B. llvm-readelf 可用 (1) + exe DT_NEEDED 读取成功 (1) + 必需项 4
+#      (libgldi.so.3/libgtk-3.so.0/libcairo.so.2/libglib-2.0.so.0) 均在闭包 (1) = 3
+#   C. libgldi 存在 (1) + libgldi DT_NEEDED 读取成功 (1) + 桌面 GL 提供者
+#      (libOSMesa.so.8 或 libGL.so.1) 在闭包 (1) = 3
+#   D. gldi-config.h 存在 (1) + GLDI_VERSION=="3.5.0" (1) + 4 个可选后端宏未定义 (4) = 6
+#   E. 加载器闭包解析：3 类 loader 错误不发生 (3) = 3
+#   F. 消费者探针已构建 (1) + 探针输出无 "FAIL" (1) = 2
+#   G. 消费者探针进程内 5 项：版本解析 3/5/0 (1)、部分版本保留 micro (1)、
+#      token 命中 (1)、token 不命中 (1)、GLDI_VERSION=="3.5.0" (1) = 5
+# 合计 3+3+3+6+3+2+5 = 25
+assertion_count: 25

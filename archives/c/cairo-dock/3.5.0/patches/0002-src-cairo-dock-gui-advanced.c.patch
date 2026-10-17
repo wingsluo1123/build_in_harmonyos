@@ -1,0 +1,63 @@
+--- a/src/cairo-dock-gui-advanced.c
++++ b/src/cairo-dock-gui-advanced.c
+@@ -15,21 +15,24 @@
+ * GNU General Public License for more details.
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+ 
+ #include <string.h>
+ #include <unistd.h>
+ #define __USE_XOPEN_EXTENDED
+ #include <stdlib.h>
+ #include <glib/gstdio.h>
++#include <gdk/gdk.h>   // pulls in gdkconfig.h which defines GDK_WINDOWING_X11
++#ifdef GDK_WINDOWING_X11
+ #include <gdk/gdkx.h>  // GDK_WINDOW_XID
++#endif
+ 
+ #include "config.h"
+ #include "gldi-icon-names.h"
+ #include "cairo-dock-module-manager.h"
+ #include "cairo-dock-module-instance-manager.h"
+ #include "cairo-dock-icon-facility.h"
+ #include "cairo-dock-log.h"
+ #include "cairo-dock-gui-factory.h"
+ #include "cairo-dock-keyfile-utilities.h"
+ #include "cairo-dock-dialog-factory.h"
+@@ -990,23 +992,34 @@
+ 	if (s_pCurrentButton == button)
+ 		return FALSE;
+ 	s_pCurrentButton = button;  // we don't actually use the content of the pointer, only the address value.
+ 	
+ 	// show the dialog with a delay.
+ 	s_iSidShowGroupDialog = g_timeout_add (330, (GSourceFunc)_show_group_dialog, (gpointer) pGroupDescription);
+ 	return FALSE;
+ }
+ static gboolean _check_group_button (G_GNUC_UNUSED gpointer data)
+ {
++	// The "is the config window still active?" test is X11-specific: upstream
++	// compares the X11 window id of our main window with the id reported by the
++	// X window-manager backend.  On a GTK built without the X11 backend (OHOS
++	// ships a broadway-only gtk3, GDK_WINDOWING_X11 undefined) there is neither
++	// gdkx.h/GDK_WINDOW_XID nor an X11 window-manager backend, so fall back to
++	// the portable GTK activation state (available on every GDK backend).
++#ifdef GDK_WINDOWING_X11
+ 	GldiWindowActor *pActiveWindow = gldi_windows_get_active ();
+ 	Window Xid = GDK_WINDOW_XID (gtk_widget_get_window (s_pMainWindow));
+-	if (gldi_window_get_id (pActiveWindow) != Xid)  // we're not the active window any more, so the 'leave' event was probably due to an Alt+Tab -> the mouse is really out of the button.
++	gboolean bWindowInactive = (gldi_window_get_id (pActiveWindow) != Xid);
++#else
++	gboolean bWindowInactive = ! gtk_window_is_active (GTK_WINDOW (s_pMainWindow));
++#endif
++	if (bWindowInactive)  // we're not the active window any more, so the 'leave' event was probably due to an Alt+Tab -> the mouse is really out of the button.
+ 	{
+ 		gtk_widget_hide (s_pPreviewBox);
+ 		
+ 		gldi_object_unref (GLDI_OBJECT(s_pDialog));
+ 		
+ 		s_pCurrentButton = NULL;
+ 	}
+ 	s_iSidCheckGroupButton = 0;
+ 	return FALSE;
+ }
