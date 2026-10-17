@@ -1,0 +1,29 @@
+# 软件级 manifest — sct
+# 遵循 ARCHIVE-SPEC v2.0 §4.1
+
+software: sct
+display: "sct"
+description: "X11 屏幕色温调节命令行工具（XRandR gamma，1000K-10000K）"
+category: system
+homepage: "https://github.com/0mp/sct"
+license: Unlicense
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "上游为手写 Makefile（无 configure），依赖通过 AutotoolsToolchain/AutotoolsDeps 注入"
+    - "Makefile 用 LDFLAGS += -lX11 -lXrandr 追加链接参数，配方必须以环境变量传 flags，不能用 make 命令行变量（会覆盖 +=）"
+    - "HarmonyOS PC 默认无 X server：无 DISPLAY 时按上游契约返回 1 并打印 Failed to open X display"
+    - "sct 先 XOpenDisplay 再解析 argv，参数范围钳制需要真实 X server 才能验证"
+  common_dependencies:
+    - libxrandr
+    - libx11
+    - libxrender
+    - libxext
+    - xorgproto
+
+versions:
+  "1.0.0":
+    status: built
+    build_date: "2026-10-17"
+    conan_ref: "sct/1.0.0"

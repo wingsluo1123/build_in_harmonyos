@@ -1,0 +1,44 @@
+# 版本级 manifest — sct 1.0.0
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "1.0.0"
+software: "sct"
+
+# 编译状态: published | built | failed | archived
+# PR 阶段尚未由 release 流水线 upload 到制品仓，真实状态为 built
+status: built
+
+build_date: "2026-10-17"
+build_system: makefile
+
+# 源码信息
+source:
+  url: "https://github.com/0mp/sct/archive/refs/tags/1.0.0.tar.gz"
+  sha256: "c247af3d6d1a2a559adf733b428dcc3b399c03cb22f117ff7775f4f387d8d866"
+  tar_format: tar.gz
+
+# 构建配置
+build:
+  system: makefile
+  configure_options: []
+  dependencies:
+    - libxrandr/1.5.5.1
+    - libx11/6.4.0
+    - libxrender/0.9.12
+    - libxext/6.4.0
+    - xorgproto/2025.1
+  cc: clang
+  cxx: clang++
+
+# 补丁信息（上游源码无需修改）
+patches_applied: []
+
+# 知识沉淀
+knowledge_gained:
+  - "GNU make 命令行变量赋值优先于 Makefile 内的 +=：以 make CFLAGS=... 传参会让上游 LDFLAGS += -lX11 -lXrandr 整行失效，链接报 X11 符号未定义；改为环境变量（env=conanbuild）传 CFLAGS/LDFLAGS 后恢复正常（ref: DRAFT-sct-1.0.0-make-commandline-var-suppresses-append）"
+  - "sct 的 Makefile 用 X11INC/X11LIB/INCS/LIBS 指向 /usr/local，交叉编译时置空 INCS= LIBS= 即可消除宿主机路径，同时保留 Makefile 自己追加的 -lX11/-lXrandr（ref: DRAFT-sct-1.0.0-make-commandline-var-suppresses-append）"
+  - "libxrandr/1.5.5.1 固定依赖 libxrender/0.9.12，而后者在 libx11/6.4.0 下的二进制缺失，需 --build=missing 从源码重建（约 1.5 分钟），CI 同样使用 --build=missing（ref: notes.md 遇到的问题 #4）"
+  - "sct 先 XOpenDisplay 再解析 argv，无 X server 时任何参数都走 'Failed to open X display' 退出路径；真实温度范围（1000-10000K）与 gamma 写入只能在有 X server 的环境验证（ref: reports/test-report.md）"
+
+knowledge_ref:
+  - "DRAFT-sct-1.0.0-make-commandline-var-suppresses-append"
