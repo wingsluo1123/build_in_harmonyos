@@ -1,0 +1,48 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for kunitconversion5/5.116.0.
+
+package: kunitconversion5/5.116.0
+homepage: https://invent.kde.org/frameworks/kunitconversion
+
+upstream_check_command: "ctest --output-on-failure"
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error"
+
+upstream_tests:
+  - file: autotests/
+    source: kunitconversion-5.116.0/autotests/
+    description: >
+      KUnitConversion upstream CTest suite. With BUILD_TESTING=ON upstream
+      registers exactly 4 CTest entries: valuetest (6 test functions incl.
+      initTestCase), categorytest (6), convertertest (7) and
+      currencytableinittest (1, qrc-embedded currency.xml snapshot). All 4
+      entries really run through ctest in build(); the three network-bound
+      test functions are QSKIP-guarded in place by patches/0001 (see
+      exclusions below), so the QTest binaries still execute and report
+      SKIP for those functions while the remaining 14 pass.
+    command: "ctest --output-on-failure"
+    status: "executed in build(); exclusions below"
+
+upstream_test_exclusions:
+  - tests: "ConverterTest::testCurrency, ConverterTest::testCurrencyConversionTableUpdate, CategoryTest::testCurrencyTableUpdate"
+    reason: >
+      Assert a live ECB https://www.ecb.europa.eu currency-table download.
+      Qt5Network from the qt5-qtbase/5.15.2.2 supply is built with
+      -no-openssl (no TLS backend) and the CI sandbox has no outbound
+      network route, so the download cannot succeed on OHOS; QSKIP-guarded
+      through patches/0001 (kmbox / kservice QSKIP precedent) instead of
+      being dropped.
+
+test_package_tests:
+  - file: test_package/test.cpp
+    description: >
+      Consumer smoke test, 14 checks: (1-3) Converter::convert across
+      Length/Temperature/Mass with real table multipliers; (4-5) Value
+      toSymbolString/convertTo round-trips; (6-10) category lookup by
+      name, default unit, hasUnit, unknown-unit paths (five checks);
+      (11) category count; (12-14) R53 ELF checks on the packaged
+      libKF5UnitConversion.so (parses, DT_SONAME present, DT_RUNPATH
+      present).
+    command: "conan create (test_package builds and runs test_kunitconversion5)"
+
+assertion_count: 14

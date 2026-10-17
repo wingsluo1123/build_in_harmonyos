@@ -1,0 +1,80 @@
+draft: E751-draft-j669539-kunitconversion5-native-qt5config-consume
+status: pending-editor-review
+id: E751
+title: "KF5 链消费 qt5-qtbase 原生 Qt5Config：cmake_find_mode=none 抑制 CMakeDeps 遮蔽 + conan_cmakedeps_paths.cmake 手工接线 prefix"
+category: build-system, conan, cmake, qt, ohos
+match_keywords: >
+  cmake_find_mode, none, CMakeDeps, shadow, lowercase config, Qt5Config,
+  qt5-qtbase, find_package(Qt5 CONFIG REQUIRED), CMAKE_PREFIX_PATH,
+  conan_cmakedeps_paths.cmake, CMAKE_FIND_PACKAGE_PREFER_CONFIG, KF5,
+  KF5I18nConfig, ECM, CMAKE_AUTOMOC_EXECUTABLE, mkspecs, linux-clang,
+  Qt5CoreConfigExtrasMkspecDir, KF_SKIP_PO_PROCESSING, msgfmt
+error_signature: >
+  Could not find a package configuration file provided by "Qt5"|The imported target "Qt5::Core" references the file.*mkspecs/linux-clang.*but this file does not exist|CMakeDeps.*lowercase.*shadow|AUTOMOC.*no moc executable
+root_cause: >
+  KF5 系列（kunitconversion5/ki18n5 等）上游 CMake 写死 find_package(Qt5 CONFIG
+  REQUIRED Core Network) 与 Qt5Test，需要的是 qt5-qtbase 包内**原生聚合 Qt5Config**
+  （大写、组件齐全、带 mkspecs/imported target 语义）。但 conan CMakeDeps 默认会为
+  依赖生成小写 qt5-qtbase-config.cmake 系生成物，遮蔽原生 config——find_package 解析
+  到 CMakeDeps 生成的小写配置后组件/目标语义不完整而失败。配套缺口：(1) find_mode=none
+  后 prefix 不再自动注入，find_package(Qt5) 无处寻址；(2) ECM/KDECMakeSettings 开
+  AUTOMOC 但 CMakeDeps 不导出 Qt5::moc/rcc 工具；(3) Qt5CoreConfigExtrasMkspecDir
+  .cmake 硬编码 <pkg>/../b/mkspecs/linux-clang（原构建树路径），打包缓存条目从未有
+  构建树；(4) ki18n_install(po) 的 pofiles 目标需要 msgfmt 而沙箱 PATH 无。
+solution: |
+  四步组合（kitemviews5/kconfig5 先例，kunitconversion5 5.116.0 完整实证）：
+
+  1. 抑制遮蔽——generate() 里对原生 config 依赖关掉 CMakeDeps 生成：
+  ```python
+  deps = CMakeDeps(self)
+  deps.set_property("qt5-qtbase", "cmake_find_mode", "none")
+  deps.set_property("ki18n5", "cmake_find_mode", "none")
+  deps.generate()
+  ```
+
+  2. 手工接线 prefix——写 conan_cmakedeps_paths.cmake（tc.generate() 后追加，
+  CMakeDeps 的 toolchain 会 include 它）：
+  ```python
+  lines = ["set(CMAKE_FIND_PACKAGE_PREFER_CONFIG ON)"]
+  qt_pkg = qt5.package_folder
+  lines.append('list(PREPEND CMAKE_PREFIX_PATH "{}")'.format(qt_pkg))
+  lines.append('list(PREPEND CMAKE_PREFIX_PATH "{}/lib/cmake")'.format(qt_pkg))
+  lines.append('list(PREPEND CMAKE_LIBRARY_PATH "{}/lib")'.format(qt_pkg))
+  lines.append('list(PREPEND CMAKE_INCLUDE_PATH "{}/include")'.format(qt_pkg))
+  # ki18n5 自装 KF5I18nConfig.cmake（find_dependency Qt5Core）同法接 prefix；
+  # ECM 是 build-context 依赖：share/ECM/cmake 接入 CMAKE_MODULE_PATH+CMAKE_PREFIX_PATH
+  ```
+
+  3. 工具注入——tc.variables 显式指 qt bin（CMakeDeps 不导出）：
+  ```python
+  for tool, cmake_var in (("moc", "CMAKE_AUTOMOC_EXECUTABLE"),
+                          ("rcc", "CMAKE_AUTORCC_EXECUTABLE")):
+      tc.variables[cmake_var] = os.path.join(qt5.package_folder, "bin", tool)
+  ```
+
+  4. mkspecs 兼容树——Qt5CoreConfigExtras 把 mkspecs 解析为 <pkg>/../b/mkspecs，
+  把包内 mkspecs 整树拷贝到预期位置（qplatformdefs.h 从 mkspec include 目录引入）：
+  ```python
+  source = os.path.join(qt_package_folder, "mkspecs")
+  expected = os.path.join(os.path.dirname(qt_package_folder), "b", "mkspecs")
+  shutil.copytree(source, expected, dirs_exist_ok=True)
+  ```
+  附加：CMAKE_SYSTEM_NAME=Linux 双覆盖（主配方+test_package）保 ECM 注册上游 ctest
+  与 POSIX rpath；KF_SKIP_PO_PROCESSING=ON + GETTEXT_MSGFMT_EXECUTABLE 显式注入
+  （kpeople5 先例）规避 msgfmt 缺失。
+fallback: >
+  若不用 find_mode=none：可让 CMakeDeps 正常生成并用 tc.variables["Qt5_DIR"]
+  显式指原生 Qt5Config 绝对路径——但小写生成物仍可能被部分 find_dependency 解析
+  命中，稳定性差；或自写聚合 shim Qt5Config 转发到组件 config（维护成本高）。
+  find_mode=none+paths 文件接线是 KF5 链最干净方案。
+verify_builds: >
+  PR !14840（kunitconversion5 5.116.0，j669539）：find_package(Qt5 CONFIG REQUIRED
+  Core Network) + autotests Qt5Test 全解析；CTest 4/4（100% tests passed）；
+  test_package 14/14。先例 kitemviews5 / kconfig5。
+reference_impl: >
+  PR !14840 archives/k/kunitconversion5/5.116.0/conanfile.py generate()（120-245 行
+  区段）与 _prepare_qt_mkspec_compat()。
+doc_file: doc/E751.md
+source: >
+  kunitconversion5 5.116.0 OHOS PC 适配（j669539，PR !14840）：KF5 链
+  qt5-qtbase/5.15.2.2 + ki18n5/5.116.0 + ecm/6.26.0 组合消费。
