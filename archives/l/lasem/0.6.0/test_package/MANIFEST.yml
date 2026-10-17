@@ -1,0 +1,60 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: lasem/0.6.0
+homepage: "https://github.com/LasemProject/lasem"
+
+# 上游测试命令 (meson 0.6.0 注册 4 个测试, 见 tests/meson.build)
+upstream_check_command: "meson test --no-rebuild --print-errorlogs --num-processes 1 --verbose --timeout-multiplier 0"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "meson test --no-rebuild --print-errorlogs --num-processes 1 --verbose --timeout-multiplier 0"
+
+# 分母口径: auto(单一可解析框架 meson test, 与 `meson introspect --tests` 一致)。
+# 上游 tests/meson.build 注册 4 个可执行测试: dom/str/filter/suite。
+# 其中 dom/str/filter 为 GLib gtest 单元测试 (dom 7 例 / str 1 例 / filter 5 例,
+# 由 g_test_add_func 注册); suite 为数据驱动渲染回归套件, 递归枚举
+# tests/data/**/*.svg|*.mml (排除 ignore-* 前缀、images/ 目录及 suite.ini
+# ignore 条目), 每个文件注册一个 /render/<path> 子用例并真实渲染到
+# cairo surface (lsm_dom_view_render), 仅在 cairo_status != SUCCESS 时失败。
+upstream_test_total: 4
+upstream_test_count_method: auto
+upstream_tests:
+  - file: tests/dom.c
+    source: lasem-0.6.0.tar.xz/tests/dom.c
+    description: "DOM API 单元测试: 7 个 g_test_add_func 用例 (document/element/node-list/insert-before 等)"
+    command: "meson test dom"
+  - file: tests/str.c
+    source: lasem-0.6.0.tar.xz/tests/str.c
+    description: "字符串工具单元测试: 1 个 g_test_add_func 用例"
+    command: "meson test str"
+  - file: tests/filter.c
+    source: lasem-0.6.0.tar.xz/tests/filter.c
+    description: "SVG filter surface 单元测试: 5 个 g_test_add_func 用例"
+    command: "meson test filter"
+  - file: tests/suite.c
+    source: lasem-0.6.0.tar.xz/tests/suite.c
+    description: "数据驱动渲染回归套件: 枚举 tests/data 下全部 .svg/.mml 文件逐个真实渲染, 子用例数随数据文件数确定"
+    command: "meson test suite"
+
+# test_package 中自带的测试 (消费者视角验证, R34: 真实链接并调用 lasem API)
+test_package_tests:
+  - file: test_lasem.c
+    description: >-
+      消费者视角 3 个场景 / 16 条断言: (1) 内联 MathML(a^2+b^2=c^2) 解析、
+      布局测量 (pango 整形) 与 cairo ARGB32 渲染; (2) 内联 SVG (rect+circle)
+      解析、布局与渲染; (3) DOM 实现 API (create_document/create_element/
+      tag_name/node_name)。退出码 0 且 16/16 断言通过才算成功。OHOS 无 /etc/fonts/fonts.conf，
+      二进制启动时先写最小 fontconfig 配置并经 FONTCONFIG_FILE 绝对路径暴露 /system/fonts
+     （同族 lasem-render 0.5.1 实证），否则 MathML 文本整形无字体可用导致布局爆炸、渲染断言失败。
+    command: "./test_lasem"
+
+# 鸿蒙特有测试: 无独立鸿蒙特有用例, 消费者测试在 OHOS 真机全量执行
+# (渲染链路经由系统字体与可写 TMPDIR, 与 Linux 行为一致)。
+ohos_specific_tests: 0
+
+# 测试断言总数 (消费者测试实测, 待真机 evidence 轮填写实际通过数)
+assertion_count: 16
