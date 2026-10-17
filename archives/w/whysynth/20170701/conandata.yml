@@ -1,0 +1,17 @@
+sources:
+  url: "https://github.com/theabolton/whysynth/archive/refs/tags/20170701.tar.gz"
+  sha256: "217671b105005f0a0fdc09ad2f922c40c896269a1503b59db1462702b8cc2e21"
+
+# 上游 tag 归档只带 configure.ac/Makefile.am（没有 configure/Makefile.in/
+# config.guess/config.sub），所以 build() 里现场引导：autoreconf + tool_requires
+# （automake/libtool/m4），config.guess/config.sub 取 autoconf/2.72 制品
+# 自带的现代版本（刻意不用 autotools-dev 20240727，见 conanfile.py
+# _install_config_helpers()），全程不使用 --build/--host/--target（铁律 #0）。
+patches:
+  - patch_file: "patches/0001-configure.ac.patch"
+    patch_description: >-
+      把可选的 GTK+2 检查包进 m4_ifdef：构建机没装 gtk-2.0.m4 时，autoconf
+      会以 "possibly undefined macro: AM_PATH_GTK_2_0" 直接失败，而 GUI 本来是
+      上游的可选项。加了守卫后，缺宏的机器照常引导并跳过 GUI（与 GTK+ 未找到
+      时的行为一致），有宏的机器行为完全不变。
+    patch_type: "portability"

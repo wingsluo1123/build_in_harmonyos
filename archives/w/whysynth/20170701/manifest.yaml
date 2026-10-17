@@ -1,0 +1,86 @@
+# 版本级 manifest —— whysynth 20170701
+# 文件位置: archives/w/whysynth/20170701/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0（manifest.yaml 为交叉校验元数据；CI 的实际输入是
+# conanfile.py + conandata.yml）
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "20170701"
+
+software: whysynth
+
+# 编译状态
+# published | built | failed | archived
+# conan-verify（G0-G4）已全绿，但**尚未 upload**（制品发布由平台 release
+# 流水线在合入后执行），按 ARCHIVE-SPEC §3 记 built 而不是 published。
+status: built
+
+build_date: "2026-10-16"
+build_system: autotools
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/theabolton/whysynth/archive/refs/tags/20170701.tar.gz"
+  sha256: "217671b105005f0a0fdc09ad2f922c40c896269a1503b59db1462702b8cc2e21"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: autotools
+
+  configure_options:
+    - "产物是 DSSI 插件模块 lib/dssi/whysynth.so（libtool -module -avoid-version，无版本后缀）；不导出库/头供下游链接"
+    - "tag 归档里没有 configure/Makefile.in → build() 现场 autoreconf -fi 引导（tool_requires: automake/1.18、libtool/2.5.4、m4/1.4.19、autoconf/2.72）"
+    - "平台识别（E007）：autoreconf 之后用 autoconf/2.72 制品里已打 OHOS 补丁的 config.guess/config.sub 覆盖源码树并断言三元组 == aarch64-unknown-linux-ohos；不使用 --build/--host/--target"
+    - "GUI（GTK+2，WhySynth_gtk）不构建：上游把 GTK+ 当可选项，构建机缺 gtk-2.0.m4 时由补丁 0001 的 m4_ifdef 守卫跳过；本次不引入 gtk2（GUI 需要显示设备，真机无法驱动/断言，交付物是插件本体）"
+    - "依赖的 lib 目录以 -Wl,--disable-new-dtags,-rpath 写入 DT_RPATH：AutotoolsDeps 把依赖闭包塞进 LIBS/LDFLAGS，conftest 也要加载 liblo/libfftw3f/libasound，否则 configure 报 cannot run C compiled programs"
+    - "安装后删除 libtool 的 *.la 描述文件（含构建机绝对路径）；package() 里用 rm(..., recursive=True)——插件的 .la 落在 lib/dssi/ 子目录，非递归会漏掉"
+
+  dependencies:
+    - dssi/1.1.1
+    - fftw3f/3.3.10
+    - liblo/0.32
+    - alsa-lib/1.2.16.1
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-configure.ac.patch：把 AM_PATH_GTK_2_0 包进 m4_ifdef——构建机没装 gtk-2.0.m4 时 autoconf 会以 'possibly undefined macro: AM_PATH_GTK_2_0' 直接失败，而 GUI 本来是上游可选项；加守卫后缺宏的机器照常引导并跳过 GUI（与 GTK+ 未找到时的行为一致），有宏的机器行为完全不变"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "FFTW 一次构建只出一种精度：本仓 fftw/* 各版本都只建 double（lib/pkgconfig 下只有 fftw3.pc），上游 PKG_CHECK_MODULES(PLUGIN, fftw3f >= 3.0.1) 必须依赖独立包 fftw3f/*（ENABLE_FLOAT=ON），写成 fftw/* 会让 configure 报找不到 fftw3f"
+  - "Conan 2.x 的 copy() 没有 delete= 参数：docs/ADAPTATION_GUIDE.md §4 模板里的 copy(..., keep_path=False, delete=True) 是 Conan 1 写法，照抄会在 package() 直接 TypeError；等价实现是 rm()，且 rm() 默认非递归——插件类包把 .la 装在 lib/<子目录>/ 时必须 recursive=True"
+  - "autoconf/2.72 制品里的 config.guess/config.sub 已按 scripts/patch-autotools-ohos.pl 打过 OHOS 补丁（*:HarmonyOS:*:*）；设备 /data/service/hnp 下同版本安装的是原版，uname -s=HarmonyOS 时会退化成编译探针，在 HMDFS 的 0700 临时目录上必然失败（E007/E011）"
+  - "消费方测试驱动 LADSPA/DSSI 插件时，控制端口初值必须取各端口**声明范围内**的合法值（如 PortRangeHints 的下界）：用统一的越界哨兵（-12345）会让 'Tuning' 这类非 patch 端口把越界值带进 DSP，whysynth 直接把它当频率用（whysynth_voice_render.c:2612 current_pitch *= synth->pitch_bend * *(synth->tuning)），相位累加器向负方向跑飞后在 padsynth.c:612 越界读 sine_wave[] 而段错误。宿主只会给合法值，越界激励是测试缺陷而不是移植缺陷"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/ohpc-porting/builds/whysynth-20170701.orig
+  source_work_dir: /storage/Users/currentUser/tmp/ohpc-porting/builds/whysynth-20170701.work
+  source_orig_hash: daf362c607a3b43a
+  source_work_hash: 4f8ef06958226004
+  generated_at: '2026-10-16T13:24:13'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-configure.ac.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
