@@ -1,0 +1,94 @@
+--- a/cdinfo.c
++++ b/cdinfo.c
+@@ -7,27 +7,32 @@
+  * both that copyright notice and this permission notice appear in
+  * supporting documentation, and that the name of the University of
+  * California not be used in advertising or publicity pertaining to
+  * distribution of the software without specific, written prior
+  * permission.  the University of California makes no representations
+  * about the suitability of this software for any purpose.  It is provided
+  * "as is" without express or implied warranty.
+  */
+ 
+ # include <sys/types.h>
+-# include <sys/buf.h>
+-# include <sun/dkio.h>
+-# include <scsi/targets/srdef.h>
++# include <sys/file.h>
++# include <sys/param.h>
++# include <sys/stat.h>
++# include <fcntl.h>
++# include <unistd.h>
++# include <linux/cdrom.h>
++# include <string.h>
++# include <sys/time.h>
+ 
+ # include <stdio.h>
+ 
+-char cdrom[] =	"/dev/rsr0";
++char cdrom[] =	"/dev/cdrom";
+ 
+ extern char *	cdrom_status();
+ 
+ main() {
+ 	int			fd;
+ 
+ 	if ((fd = open(cdrom, 0)) == -1) {
+ 		fprintf(stderr, "open: ");
+ 		perror(cdrom);
+ 		exit(1);
+@@ -40,29 +45,29 @@
+ 	cdrom_subchnl(fd, CDROM_MSF);
+ }
+ 
+ cdrom_toc(fd, fmt) {
+ 	struct cdrom_tochdr	tochdr;
+ 	struct cdrom_tocentry	tocentry;
+ 	int			trk;
+ 	int			otime, trk_total;
+ 
+ 	if (cdrom_read_tochdr(fd, &tochdr) == -1)
+-		return;
++		return(-1);
+ 
+ 	printf("TRACK\tTIME\tFRAME\tTYPE\n");
+ 
+ 	otime = 0;
+ 
+ 	for (trk = tochdr.cdth_trk0; trk <= tochdr.cdth_trk1; trk++) {
+ 		if (cdrom_read_tocentry(fd, trk, fmt, &tocentry) == -1)
+-			return;
++			return(-1);
+ 
+ 		trk_total = ((int) tocentry.cdte_addr.msf.minute * 60) +
+ 			(int) tocentry.cdte_addr.msf.second;
+ 
+ 		trk_total -= otime;
+ 
+ 		if (otime != 0) {
+ 			printf("%d\t%02d:%02d", trk-1,
+ 			       trk_total / 60,
+ 			       trk_total % 60);
+@@ -74,21 +79,21 @@
+ 			else
+ 				printf("\taudio");
+ 
+ 			printf("\n");
+ 		}
+ 
+ 		otime += trk_total;
+ 	}
+ 
+ 	if (cdrom_read_tocentry(fd, CDROM_LEADOUT, fmt, &tocentry) == -1)
+-		return;
++		return(-1);
+ 
+ 	trk_total = ((int) tocentry.cdte_addr.msf.minute * 60) +
+ 		(int) tocentry.cdte_addr.msf.second;
+ 
+ 	trk_total -= otime;
+ 
+ 	printf("%d\t%02d:%02d", trk-1,
+ 	       trk_total / 60,
+ 	       trk_total % 60);
+ 

@@ -1,0 +1,141 @@
+--- a/internals.c
++++ b/internals.c
+@@ -15,53 +15,59 @@
+ 
+ # include <X11/Intrinsic.h>
+ # include <X11/StringDefs.h>
+ # include <X11/Xaw/Form.h>
+ # include <X11/Xaw/Toggle.h>
+ 
+ # include <stdio.h>
+ 
+ # include "debug.h"
+ # include "cdrom_globs.h"
++#ifdef linux
++# include "cdrom_linux.h"
++#endif
+ #ifdef sun
+ # include "cdrom_sun.h"
+ #endif
+ #ifdef sgi
+ # include "cdrom_sgi.h"
+ #endif
+ 
+ 
+ static XtIntervalId	ivid			= -1;
+ static XtIntervalId	scanivid		= -1;
+ static XtIntervalId	stativid		= -1;
+ static unsigned int	timer_mod		= 1000 / TIMER_PERIOD;
+ unsigned int		timer_fsecs;
+ 
+ 
++static void	scan_update();
++static void	update_track();
++
+ int
+ cdrom_get_curtime() {
+ 
+ 	int curtime;
+ 	int curtrack;
+ 	struct msf curmsf, track_start;
+ 
+ 	if (cdrom_open() == -1) {
+ 		debug_printf(1, "cdrom_get_curtime: error from cdrom_open\n");
+-		return;
++		return(-1);
+ 	}
+ 
+ 	switch (cdrom_status()) {
+ 	case CDROM_PAUSED:
+ 	case CDROM_PLAYING:
+ 	    if (cdrom_get_curmsf(&curmsf) == -1) {
+ 		debug_printf(1, "get_curtime: error reading location\n");
+-		return;
++		return(-1);
+ 	    }
+ 
+ 	    if (((curtrack = cdrom_get_curtrack()) == -1) ||
+ 		(curtrack != cdi.curtrack))
+ 	    {
+ 		return(0);
+ 	    }
+ 	    else
+ 	    {
+ 	        track_start = cdi.addrs[cdi.curtrack - 1];
+@@ -76,21 +82,20 @@
+ 	}
+ }
+ 
+ 
+ /*
+  * we poll the cd-rom drive every TIMER_PERIOD milliseconds to see where 
+  * it is and if it's on a new track, and update the label widget.
+  */
+ void
+ cdrom_timer_on() {
+-	static void	update_track();
+ 
+ 	if (cdi.state & CDROM_STATE_PLAY)
+ 		ivid = XtAppAddTimeOut(appc, TIMER_PERIOD, update_track, NULL);
+ }
+ 
+ 
+ /*
+  * cdrom_timer_off turns off the X timeout.
+  */
+ void
+@@ -297,26 +302,29 @@
+ }
+ 
+ /*
+  * fast-forwards the player through minute/second/frames:
+  */
+ void
+ cdrom_ff () {
+         struct msf	start_addr, end_addr,  next_start;
+ 	char		t;
+ 	int		curtrack;
+-	extern void 	scan_update();
+ 
+ 	if (cdrom_get_curmsf(&start_addr) == -1) {
+ 		debug_printf(1, "ff: error reading location\n");
+ 		return;
+ 	}	
++
++#ifdef linux
++	cdrom_pause();
++#endif
+ 
+ 	curtrack = cdrom_get_curtrack();
+ 
+ 	if (curtrack != cdi.curtrack) 
+ 		track_button_update();
+ 
+ 	/* find start of next track */
+ 	next_start = cdi.addrs[curtrack];
+ 	    
+ 	/* 
+@@ -499,20 +507,23 @@
+ 		debug_printf(1, "cdrom_atend: cycling\n");
+ 		cdi.curtrack = cdi.mintrack;
+ 	}
+ 	else {
+ 		debug_printf(1, "cdrom_atend: all done\n");
+ 		buttons_reset();
+ 		cdrom_reset();
+ 		return;
+ 	}
+ 
++#ifdef linux
++	(void) cdrom_stop();
++#endif
+ 	timer_fsecs = 0;
+ 	cdi.duration = 0;
+ 	timer_button_update();
+ 
+ 	(void) cdrom_play();
+ }
+ 
+ /*
+  * scan_update is called when the scan timeout fires; it updates the timer 
+  * and calls the label update routine.

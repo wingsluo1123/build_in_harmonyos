@@ -1,0 +1,70 @@
+--- a/program.c
++++ b/program.c
+@@ -24,27 +24,38 @@
+ # include <X11/Xaw/Viewport.h>
+ # include <X11/Xaw/Dialog.h>
+ 
+ 
+ # include <stdio.h>
+ # include <string.h>
+ # include <malloc.h>
+ 
+ # include "debug.h"
+ # include "cdrom_globs.h"
++#ifdef linux
++# include "cdrom_linux.h"
++#endif
+ #ifdef sun
+ # include "cdrom_sun.h"
+ #endif
+ #ifdef sgi
+ # include "cdrom_sgi.h"
+ #endif
+ 
++
++static void	cb_move_program_ptr();
++static void	cb_clear_program();
++static void	cb_cancel_program();
++static void	cb_trackbuttons();
++static void	cb_add_10();
++static void	cb_new_track();
++static void	cb_program_all();
+ 
+ /* externally manipulated vars: */
+ char	program_str[100];
+ char	*disc_title = NULL;
+ 
+ static	Widget	program_form;
+ static	Widget	program_display_form;
+ static	Widget	program_anchor;
+ static	Widget	trackbuttons[9];
+ static	Widget	plus10_button;
+@@ -60,28 +71,21 @@
+ 	char	namestr[2];
+ 	int	i;
+ 
+ 	Widget	program_display_viewport;
+ 	Widget	track_select_form;
+ 	Widget	clear_button;
+ 	Widget	cancel_button;
+ 	Widget	save_button;
+ 	Widget	all_button;
+ 
+-	extern	void	cb_move_program_ptr();
+-	extern	void	cb_clear_program();
+-	extern	void	cb_cancel_program();
+ 	extern	void	cb_save_program();
+-	extern	void	cb_trackbuttons();
+-	extern	void	cb_add_10();
+-	extern	void	cb_new_track();
+-	extern	void	cb_program_all();
+ 
+ 	/* 
+ 	 * create program form as a non-managed widget, because this 
+ 	 * form "pops up" when requested, as part of the main form, and
+ 	 * therefore moves along with the main form. (Pop-ups don't do this
+ 	 * easily.)
+ 	 */
+         program_form = XtCreateWidget("programForm",
+ 				formWidgetClass,
+                                 parent_widget,

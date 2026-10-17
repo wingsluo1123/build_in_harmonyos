@@ -1,0 +1,268 @@
+--- a/cdrom_callb.c
++++ b/cdrom_callb.c
+@@ -15,20 +15,23 @@
+ 
+ # include <X11/Intrinsic.h>
+ # include <X11/StringDefs.h>
+ # include <X11/Xaw/Form.h>
+ # include <X11/Xaw/Toggle.h>
+ 
+ # include <stdio.h>
+ 
+ # include "debug.h"
+ # include "cdrom_globs.h"
++#ifdef linux
++# include "cdrom_linux.h"
++#endif
+ #ifdef sun
+ # include "cdrom_sun.h"
+ #endif
+ #ifdef sgi
+ # include "cdrom_sgi.h"
+ #endif
+ 
+ void		cdrom_new_disc();
+ 
+ /*
+@@ -36,20 +39,23 @@
+  * if not playing turns on playing.  if paused then return.
+  * otherwise start cd playing.
+  */
+ /*ARGSUSED*/
+ void
+ cb_cdrom_play(widget, client_data, call_data)
+ 	Widget		widget;
+ 	XtPointer	client_data;
+ 	XtPointer	call_data;
+ {
++	#ifdef linux
++  	cdrom_close_tray();
++#endif
+ 	if (cdrom_open() == -1) {
+ 		debug_printf(1, "cb_cdrom_play: error from cdrom_open\n");
+ 		/* Turn the play button back off */
+ 		play_button_reset();
+ 		eject_button_set();
+ 		return;
+ 	}
+ 
+ 	if (cdi.state & CDROM_STATE_EJECTED) {
+ 		cdrom_new_disc(widget);
+@@ -116,20 +122,23 @@
+  * cb_cdrom_pause toggles pausing on or off.
+  */
+ /*ARGSUSED*/
+ void
+ cb_cdrom_pause(widget, client_data, call_data)
+ 	Widget		widget;
+ 	XtPointer	client_data;
+ 	XtPointer	call_data;
+ 
+ {
++	#ifdef linux
++  	cdrom_close_tray();
++#endif
+ 	if (cdrom_open() == -1) {
+ 		debug_printf(1, "cb_cdrom_pause: error from cdrom_open\n");
+ 		pause_button_reset();
+ 		return;
+ 	}
+ 
+ #ifdef sgi
+ 	if (cdrom_status() == CDROM_NO_STATUS) {
+ 		cdi.state |= CDROM_STATE_EJECTED;
+ 		buttons_reset();
+@@ -208,20 +217,23 @@
+ /*ARGSUSED*/
+ void
+ cb_cdrom_stop(widget, client_data, call_data)
+ 	Widget		widget;
+ 	XtPointer	client_data;
+ 	XtPointer	call_data;
+ {
+ 	Arg	args[1];
+ 	Boolean	state;
+ 
++	#ifdef linux
++  	cdrom_close_tray();
++#endif
+ 	if (cdrom_open() == -1) {
+ 		debug_printf(1, "cb_cdrom_stop: error from cdrom_open\n");
+ 		/* Turn the stop button back off */
+ 		stop_button_reset();
+ 		eject_button_set();
+ 		return;
+ 	}
+ 
+ #ifdef sgi
+ 	if (cdrom_status() == CDROM_NO_STATUS) {
+@@ -257,20 +269,23 @@
+  * cb_cdrom_previous decrments the current track.  if paused or stopped
+  * then return.  otherwise start playing the (new) current track.
+  */
+ /*ARGSUSED*/
+ void
+ cb_cdrom_previous(widget, client_data, call_data)
+ 	Widget		widget;
+ 	XtPointer	client_data;
+ 	XtPointer	call_data;
+ {
++	#ifdef linux
++  	cdrom_close_tray();
++#endif
+ 	if (cdrom_open() == -1) {
+ 		debug_printf(1, "cb_cdrom_previous: error from cdrom_open\n");
+ 		return;
+ 	}
+ 
+ #ifdef sgi
+ 	if (cdrom_status() == CDROM_NO_STATUS) {
+ 		cdi.state |= CDROM_STATE_EJECTED;
+ 		buttons_reset();
+ 		return;
+@@ -346,20 +361,23 @@
+  * cb_cdrom_next incrments the current track.  if paused or stopped
+  * then return.  otherwise start playing the (new) current track.
+  */
+ /*ARGSUSED*/
+ void
+ cb_cdrom_next(widget, client_data, call_data)
+ 	Widget		widget;
+ 	XtPointer	client_data;
+ 	XtPointer	call_data;
+ {
++	#ifdef linux
++  	cdrom_close_tray();
++#endif
+ 	if (cdrom_open() == -1) {
+ 		debug_printf(1, "cb_cdrom_next: error from cdrom_open\n");
+ 		return;
+ 	}
+ 
+ #ifdef sgi
+ 	if (cdrom_status() == CDROM_NO_STATUS) {
+ 		cdi.state |= CDROM_STATE_EJECTED;
+ 		buttons_reset();
+ 		return;
+@@ -443,20 +461,23 @@
+ /*ARGSUSED*/
+ void
+ cb_cdrom_eject(widget, client_data, call_data)
+ 	Widget		widget;
+ 	XtPointer	client_data;
+ 	XtPointer	call_data;
+ {
+ 	Arg	args[1];
+ 	Boolean	state;
+ 
++	#ifdef linux
++  	cdrom_close_tray();
++#endif
+ 	if (cdrom_open() == -1) {
+ 		debug_printf(1, "cb_cdrom_eject: error from cdrom_open\n");
+ 		return;
+ 	}
+ 
+ #ifdef sgi
+ 	if (cdrom_status() == CDROM_NO_STATUS) {
+ 		cdi.state |= CDROM_STATE_EJECTED;
+ 		buttons_reset();
+ 		return;
+@@ -492,20 +513,23 @@
+ }
+ 
+ #ifdef sgi
+ /*ARGSUSED*/
+ void
+ cb_cdrom_audio(widget, client_data, call_data)
+ 	Widget		widget;
+ 	XtPointer	client_data;
+ 	XtPointer	call_data;
+ {
++	#ifdef linux
++  	cdrom_close_tray();
++#endif
+ 	if (cdrom_open() == -1) {
+ 		debug_printf(1, "cb_cdrom_audio: error from cdrom_open\n");
+ 		return;
+ 	}
+ 
+ 	if (cdi.state & CDROM_STATE_PLAY) {
+ 		XBell(XtDisplay(widget), 100);
+ 		if (cdi.scsi_audio) {
+ 			audio_button_set();
+ 		} else {
+@@ -598,20 +622,23 @@
+ }
+ 
+ 
+ /*ARGSUSED*/
+ void
+ cb_cdrom_rewind(widget, client_data, call_data)
+ 	Widget		widget;
+ 	XtPointer	client_data;
+ 	XtPointer	call_data;
+ {
++	#ifdef linux
++  	cdrom_close_tray();
++#endif
+ 	if (cdrom_open() == -1) {
+ 		debug_printf(1, "cb_cdrom_rew: error from cdrom_open\n");
+ 		return;
+ 	}
+ 
+ 	if ((cdi.state & CDROM_STATE_PLAY) || (cdi.state & CDROM_STATE_PAUSE)) {
+ 		debug_printf(1, "cb_cdrom_rew: moving backward in track %d\n",
+ 			    cdi.curtrack);
+ 
+ 		cdrom_rewind();
+@@ -619,20 +646,23 @@
+ }
+ 
+ 
+ /*ARGSUSED*/
+ void
+ cb_cdrom_ff(widget, client_data, call_data)
+ 	Widget		widget;
+ 	XtPointer	client_data;
+ 	XtPointer	call_data;
+ {
++	#ifdef linux
++  	cdrom_close_tray();
++#endif
+ 	if (cdrom_open() == -1) {
+ 		debug_printf(1, "cb_cdrom_ff: error from cdrom_open\n");
+ 		return;
+ 	}
+ 
+ 
+ 	if ((cdi.state & CDROM_STATE_PLAY) || (cdi.state & CDROM_STATE_PAUSE)) {
+ 		debug_printf(1, "cb_cdrom_ff: moving forward in track %d\n",
+ 			    cdi.curtrack);
+ 
+@@ -663,21 +693,24 @@
+              * longer any way to tell if it's a button release:
+              * THIS IS A HACK! (necessary, but *still* a hack.)
+              */
+             pgmButtonUp = False;
+ 
+ 	    return;
+ 	}
+ 
+ 	if ((cdi.state & CDROM_STATE_PROGRAM) == 0)
+ 	{
+-	    if (cdrom_open() == -1) {
++	    #ifdef linux
++  	cdrom_close_tray();
++#endif
++	if (cdrom_open() == -1) {
+ 		debug_printf(1, "cb_cdrom_play: error from cdrom_open\n");
+ 		return;
+ 	    }
+ 	    if (cdi.state & CDROM_STATE_EJECTED) {
+ 		    cdrom_new_disc(widget);
+ 	    }
+ 	    if (cdi.state & CDROM_STATE_SHUFFLE) {
+ 	        debug_printf(1, "cb_cdrom_program: cancelling shuffle mode\n");
+ 	        cdi.state &= ~CDROM_STATE_SHUFFLE;
+ 		shuffle_button_reset();

@@ -1,0 +1,103 @@
+--- a/top_setup.c
++++ b/top_setup.c
+@@ -47,63 +47,67 @@
+ static XrmOptionDescRec options[] = {
+ { "-file",	".file",	XrmoptionSepArg,	(caddr_t) NULL },
+ { "-device",	".device",	XrmoptionSepArg,	(caddr_t) NULL },
+ { "-debug",	".debug",	XrmoptionNoArg,		(caddr_t) "True" },
+ { "-displayTimer", ".displayTimer", XrmoptionNoArg,	(caddr_t) "True" },
+ { "-volBase",	".volBase",	XrmoptionSepArg,	(caddr_t) 0 },
+ { "-volPcent",	".volPcent",	XrmoptionSepArg,	(caddr_t) 0 },
+ { "-cdInfoDir",	".cdInfoDir",	XrmoptionSepArg,	(caddr_t) NULL },
+ };
+ 
+-static XtResource	resources[] = {
+-	{ "file", "File", XtRString, sizeof(String), (Cardinal) &file,
+-		  XtRString, (caddr_t) NULL },
+-	{ "device", "Device", XtRString, sizeof(String), (Cardinal) &device,
+-		  XtRString, (caddr_t) NULL },
+-	{ "debug", "Debug", XtRBoolean, sizeof(Boolean), (Cardinal) &debug,
+-		  XtRBoolean, (caddr_t) &debug },
+-	{ "displayTimer", "DisplayTimer", XtRBoolean, sizeof(Boolean),
+-		  (Cardinal) &display_timer, XtRBoolean,
+-		  (caddr_t) &display_timer },
+-	{ "volBase", "VolBase", XtRFloat, sizeof(float),
+-		  (Cardinal) &volbase, XtRFloat, (caddr_t) &volbase },
+-	{ "volPcent", "VolPcent", XtRFloat, sizeof(float),
+-		  (Cardinal) &volpcent, XtRFloat, (caddr_t) &volpcent },
+-	{ "replayThreshold", "replayThreshold", XtRInt, sizeof(int),
+-		  (Cardinal) &replayThreshold, XtRInt, 
+-		  (caddr_t) &replayThreshold },
+-	{ "scanSkipInterval", "scanSkipInterval", XtRInt, sizeof(int),
+-		  (Cardinal) &scanSkipInterval, XtRInt, 
+-		  (caddr_t) &scanSkipInterval },
+-	{ "scanPauseInterval", "scanPauseInterval", XtRFloat, sizeof(float),
+-		  (Cardinal) &scanPauseInterval, XtRFloat, 
+-		  (caddr_t) &scanPauseInterval },
+-	{ "pauseSkipInterval", "pauseSkipInterval", XtRInt, sizeof(int),
+-		  (Cardinal) &pauseSkipInterval, XtRInt, 
+-		  (caddr_t) &pauseSkipInterval },
+-	{ "pausePauseInterval", "pausePauseInterval", XtRFloat, sizeof(float),
+-		  (Cardinal) &pausePauseInterval, XtRFloat, 
+-		  (caddr_t) &pausePauseInterval },
+-	{ "cdInfoDir", "cdInfoDir", XtRString, sizeof(String), 
+-		  (Cardinal) &cdInfoDir, XtRString, (caddr_t) NULL },
+-};
+-
+ Widget
+ top_setup(argc, argv)
+ 	int		argc;
+ 	char		**argv;
+ {
+ 	Display		*dpy;
+ 
+ 	Pixmap		icon_pixmap;
+ 	Arg		arg;
+ 	char		*s;
++
++	/* Resource table built at run time: the "offset" fields hold the
++	 * absolute addresses of the target globals (base passed as NULL to
++	 * XtGetApplicationResources below), which cannot be folded into
++	 * static initializer constants on modern compilers. */
++	XtResource	resources[] = {
++		{ "file", "File", XtRString, sizeof(String), (Cardinal)(long) &file,
++			  XtRString, (caddr_t) NULL },
++		{ "device", "Device", XtRString, sizeof(String), (Cardinal)(long) &device,
++			  XtRString, (caddr_t) NULL },
++		{ "debug", "Debug", XtRBoolean, sizeof(Boolean), (Cardinal)(long) &debug,
++			  XtRBoolean, (caddr_t) &debug },
++		{ "displayTimer", "DisplayTimer", XtRBoolean, sizeof(Boolean),
++			  (Cardinal)(long) &display_timer, XtRBoolean,
++			  (caddr_t) &display_timer },
++		{ "volBase", "VolBase", XtRFloat, sizeof(float),
++			  (Cardinal)(long) &volbase, XtRFloat, (caddr_t) &volbase },
++		{ "volPcent", "VolPcent", XtRFloat, sizeof(float),
++			  (Cardinal)(long) &volpcent, XtRFloat, (caddr_t) &volpcent },
++		{ "replayThreshold", "replayThreshold", XtRInt, sizeof(int),
++			  (Cardinal)(long) &replayThreshold, XtRInt, 
++			  (caddr_t) &replayThreshold },
++		{ "scanSkipInterval", "scanSkipInterval", XtRInt, sizeof(int),
++			  (Cardinal)(long) &scanSkipInterval, XtRInt, 
++			  (caddr_t) &scanSkipInterval },
++		{ "scanPauseInterval", "scanPauseInterval", XtRFloat, sizeof(float),
++			  (Cardinal)(long) &scanPauseInterval, XtRFloat, 
++			  (caddr_t) &scanPauseInterval },
++		{ "pauseSkipInterval", "pauseSkipInterval", XtRInt, sizeof(int),
++			  (Cardinal)(long) &pauseSkipInterval, XtRInt, 
++			  (caddr_t) &pauseSkipInterval },
++		{ "pausePauseInterval", "pausePauseInterval", XtRFloat, sizeof(float),
++			  (Cardinal)(long) &pausePauseInterval, XtRFloat, 
++			  (caddr_t) &pausePauseInterval },
++		{ "cdInfoDir", "cdInfoDir", XtRString, sizeof(String), 
++			  (Cardinal)(long) &cdInfoDir, XtRString, (caddr_t) NULL },
++	};
+ 
+ 	XtToolkitInitialize();
+ 
+ 	appc = XtCreateApplicationContext();
+ 
+ 	dpy = XtOpenDisplay(appc, NULL, "xcdplayer", "XCdplayer",
+ 			    options, XtNumber(options),
+ 			    (Cardinal *) &argc, argv);
+ 
+ 	if (dpy == NULL) {

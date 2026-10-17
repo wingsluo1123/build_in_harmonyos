@@ -1,0 +1,37 @@
+# conandata.yml — xcdplayer 2.2
+# 源码: X11R5 contrib（R5contrib），GWDG 的 ftp.x.org 完整镜像
+# 指纹核验: sha256 与 FreeBSD ports audio/xcdplayer distinfo 完全一致
+#   (PORTVERSION 2.2, MASTER_SITES=XCONTRIB/../R5contrib, DISTNAME xcdplayer-2.2)
+
+sources:
+  url: "https://ftp.gwdg.de/pub/x11/x.org/R5contrib/xcdplayer-2.2.tar.Z"
+  sha256: "2c8b8c7d8510c68e4691d01d69c128399ca34934325f4abcd3c456c9f35389e1"
+  filename: "xcdplayer-2.2.tar.Z"
+
+patches:
+  - patch_file: "patches/0001-button_setup.c.patch"
+  - patch_file: "patches/0002-cdinfo.c.patch"
+  - patch_file: "patches/0003-cdrom_callb.c.patch"
+  - patch_file: "patches/0004-cdrom_linux.c.patch"
+  - patch_file: "patches/0005-debug.c.patch"
+  - patch_file: "patches/0006-internals.c.patch"
+  - patch_file: "patches/0007-logo_setup.c.patch"
+  - patch_file: "patches/0008-main.c.patch"
+  - patch_file: "patches/0009-program.c.patch"
+  - patch_file: "patches/0010-shuffle.c.patch"
+  - patch_file: "patches/0011-top_setup.c.patch"
+  - patch_file: "patches/0012-cdrom_linux.h.patch"
+  - patch_file: "patches/0013-gray.bm.patch"
+    description: >
+      OHOS/aarch64 适配（per-file 补丁，refresh-patch 生成）。要点：
+      0004/0012 新增 Linux CD-ROM 后端 cdrom_linux.c/.h（linux/cdrom.h ioctl，
+      改编自同作者上游后续版本 xcdplayer 2.3a 的 cdrom_linux.c，接口回移至 2.2
+      语义：char *disc_title、get_stored_info 对齐 2.2 sun 后端）；0008/0005 把
+      main.c/debug.c 的块作用域 static 前置声明提升到文件作用域、debug_printf
+      由 <varargs.h> 改写为 <stdarg.h>；0011 把 top_setup.c 的 XtResource 表改为
+      函数内运行时构建（K&R 指针常量折叠不被现代编译器接受，base=NULL 行为不变）；
+      0007 logo_setup.c 增加 linux include 与音量控制 sgi 百分比分支；0013 vendored
+      gray.bm（xbitmaps 1.1.3 标准 2x2 gray 位图原样拷贝，xbitmaps 不在制品仓）；
+      0001/0002/0003/0006/0009/0010 为其余文件的 linux include、行为分支与前置
+      声明整理，其中 0002 将 cdinfo.c 移植到 linux/cdrom.h + /dev/cdrom。
+      cdgrab.c（Sun raw-SCSI 抓轨诊断工具，上游 2.3a 也未移植）不参与构建。

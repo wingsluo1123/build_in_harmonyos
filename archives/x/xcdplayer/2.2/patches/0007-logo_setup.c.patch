@@ -1,0 +1,257 @@
+--- a/logo_setup.c
++++ b/logo_setup.c
+@@ -21,30 +21,38 @@
+ # include <X11/Xaw/Command.h>
+ # include <X11/Xaw/Toggle.h>
+ # include <X11/Xaw/Scrollbar.h>
+ # include <X11/Xaw/Dialog.h>
+ # include <X11/Xaw/Viewport.h>
+ 
+ # include <math.h>
+ # include <stdio.h>
+ 
+ # include "cdrom_globs.h"
++#ifdef linux
++# include "cdrom_linux.h"
++#endif
+ #ifdef sun
+ # include "cdrom_sun.h"
+ #endif
+ #ifdef sgi
+ # include "cdrom_sgi.h"
+ #endif
+ 
+ # include "logo.xbm"
+ # include "thumb.xbm"
+-# include <X11/bitmaps/gray>
++# include "gray.bm"
++
++static void	cb_track_button();
++static void	cb_timer_button();
++static void	volume_jump_proc();
++static void	volume_scroll_proc();
+ 
+ # define MAXVOL		0xff
+ 
+ void	Done();
+ 
+ static Widget	track_button_widget;
+ static Widget	timer_button_widget;
+ static Widget	volume_scroll_widget;
+ 
+ Widget		title_viewport;
+@@ -54,24 +62,20 @@
+ Widget		title_dialog_widget;
+ Widget		title_done_widget;
+ 
+ static int	vol;
+ 
+ void
+ logo_setup(parent_widget)
+ 	Widget		parent_widget;
+ {
+ 	extern void	leds_label_setup();
+-	extern void	cb_track_button();
+-	extern void	cb_timer_button();
+-	extern void	volume_jump_proc();
+-	extern void	volume_scroll_proc();
+ 	extern void	popup_title_dialog();
+ 	extern void	popdown_title_dialog();
+ 
+ 	Widget		version_label_widget;
+ 	char		version_string[80];
+ 
+ 	Widget		logo_form_widget;
+ 	Widget		logo_label_widget;
+ 	Pixmap		logo_label_pixmap;
+ 	Pixmap		thumb_pixmap;
+@@ -162,50 +166,50 @@
+ 
+ 	     volume_scroll_widget = XtCreateManagedWidget("volumeScrollbar",
+ 						     scrollbarWidgetClass,
+ 						     logo_form_widget,
+ 						     (ArgList) args, 0);
+ 	}
+ 
+ 	XtAddCallback(volume_scroll_widget, XtNjumpProc, volume_jump_proc, 0);
+ 	XtAddCallback(volume_scroll_widget, XtNscrollProc, volume_scroll_proc, 0);
+ 
+-#ifdef sgi
++#if defined(sgi) || defined(linux)
+ 	if ((vol = cdrom_get_volume()) == 0) {
+ 		vol = (int) ((MAXVOL - volbase) * 0.75) + volbase;
+ 	}
+ #else
+ 	vol = (int) ((MAXVOL - volbase) * 0.75) + volbase;
+ #endif
+ 	cdrom_volume(vol, vol); 
+-#ifdef sgi
++#if defined(sgi) || defined(linux)
+ 	XawScrollbarSetThumb(volume_scroll_widget, 
+ 			     (float) (VAL2PCT(vol)),
+ 			     (float) 1.0);
+ #else
+ 	XawScrollbarSetThumb(volume_scroll_widget, (float) 0.75, (float) 1.0);
+ #endif
+ 
+ 	title_viewport = XtCreateManagedWidget ("titleBarViewport",
+ 				viewportWidgetClass,
+ 				logo_form_widget,
+ 				(ArgList) NULL, 0);
+ 
+ 	title_form = XtCreateManagedWidget ("titleForm",
+ 				formWidgetClass,
+ 				title_viewport,
+ 				(ArgList) NULL, 0);
+ 
+ 	if (disc_title != NULL) 
+         	XtSetArg(args[0], XtNlabel, disc_title);
+ 	else
+-#ifdef sgi
++#if defined(sgi) || defined(linux)
+ 		if (cdrom_status() == CDROM_NO_STATUS) {
+ 			XtSetArg(args[0], XtNlabel, NODISCSTR);
+ 		} else {
+ 			XtSetArg(args[0], XtNlabel, NOTITLESTR);
+ 		}
+ #else
+ 		XtSetArg(args[0], XtNlabel, NOTITLESTR);
+ #endif
+ 
+ 	title_button = XtCreateManagedWidget ("titleBar",
+@@ -246,21 +250,21 @@
+ 	XtPointer	client_data;
+ 	XtPointer	call_data;
+ {
+ 	char		track_buf[40];
+ 	Arg		args[1];
+ 	Boolean		state;
+ 
+ 	XtSetArg(args[0], XtNstate, &state);
+ 	XtGetValues(widget, args, 1);
+ 
+-#ifdef sgi
++#if defined(sgi) || defined(linux)
+ 	if (cdrom_status() == CDROM_NO_STATUS) {
+ 		cdi.state |= CDROM_STATE_EJECTED;
+ 		buttons_reset();
+ 		return;
+ 	}
+ #endif
+ 
+ 	if (cdi.state & CDROM_STATE_EJECTED) {
+ 		cdrom_new_disc();
+ 	}
+@@ -293,21 +297,21 @@
+ {
+ 	char		timer_buf[40];
+ 	int		time_remaining;
+ 	Arg		args[1];
+ 	Boolean		state;
+ 
+ 	if (cdi.state & CDROM_STATE_EJECTED) {
+ 		cdrom_new_disc();
+ 	}
+ 
+-#ifdef sgi
++#if defined(sgi) || defined(linux)
+ 	if (cdrom_status() == CDROM_NO_STATUS) {
+ 		cdi.state |= CDROM_STATE_EJECTED;
+ 		buttons_reset();
+ 		return;
+ 	}
+ #endif
+ 
+ 	cdi.duration = cdrom_get_curtime();
+ 
+ 	XtSetArg(args[0], XtNstate, &state);
+@@ -401,21 +405,21 @@
+ 	XtSetArg(args[0], XtNlabel, timer_buf);
+ 	XtSetValues(timer_button_widget, args, 1);
+ }
+ 
+ static void
+ volume_jump_proc(scroll_widget, client_data, percent)
+ 	Widget		scroll_widget;
+ 	XtPointer	client_data;
+ 	XtPointer	percent;
+ {
+-#ifdef sgi
++#if defined(sgi) || defined(linux)
+ 	/* The volume control on SGI is not linear, but is exponential */
+ 	vol = PCT2VAL(*(float *)percent);
+ #else
+ 	vol = (*(float *) percent) * MAXVOL;
+ 	vol = (vol * volpcent) + volbase;
+ #endif
+ 
+ 	if (vol > MAXVOL)
+ 		vol = MAXVOL;
+ 	if (vol <= 0)
+@@ -443,21 +447,21 @@
+ 		abspos = -abspos;
+ 
+ 	XtSetArg(args[0], XtNlength, &length);
+ 	XtGetValues(scroll_widget, args, 1);
+ 
+ 	if (length <= 0)
+ 		length = 1;
+ 
+ 	percent = abspos / (float) length;
+ 
+-#ifdef sgi
++#if defined(sgi) || defined(linux)
+ 	/* The volume control on SGI is not linear, but is exponential */
+ 	if ((vdelta = ((VAL2PCT(vol)) * percent)) < (VAL2PCT(1))) {
+ 		vdelta = (VAL2PCT(1));
+ 	}
+ 	if ((int) position < 0)
+ 		vol = (PCT2VAL((VAL2PCT(vol)) - vdelta));
+ 	else
+ 		vol = (PCT2VAL((VAL2PCT(vol)) + vdelta));
+ #else
+ 	if ((vdelta = (vol * percent)) < 1.0)
+@@ -471,21 +475,21 @@
+ 
+ 	if (vol > MAXVOL)
+ 		vol = MAXVOL;
+ 	if (vol <= 0)
+ 		vol = 1;
+ 
+ 	debug_printf(1, "volume=%u\n", (unsigned int) vol);
+ 
+ 	cdrom_volume(vol, vol);
+ 
+-#ifdef sgi
++#if defined(sgi) || defined(linux)
+ 	XtSetArg (args[0], XtNlength, &length);
+ 	XtGetValues (volume_scroll_widget, args, 1);
+ 	XawScrollbarSetThumb(volume_scroll_widget, 
+ 			     (float) (VAL2PCT(vol)),
+ 			     (float) -1.0);
+ #endif
+ 	top = (double) vol / (double) MAXVOL;
+ 
+ 	XawScrollbarSetThumb(volume_scroll_widget, (float) top, (float) -1.0);
+ }
+@@ -632,19 +636,19 @@
+ 		XtSetValues(title_dialog_widget, args, 1);
+ #endif
+ 		XtSetArg(args[0], XtNvalue, disc_title);
+ 		XtSetValues(title_dialog_widget, args, 1);
+ 		XtSetArg(args[0], XtNlabel, disc_title);
+ 		XtSetValues(title_button, args, 1);
+ 
+ 	}
+ }
+ 
+-#ifdef sgi
++#if defined(sgi) || defined(linux)
+ set_volume(vol) 
+ 	int	vol;
+ {
+ 	XawScrollbarSetThumb(volume_scroll_widget, 
+ 			     (float) (VAL2PCT(vol)),
+ 			     (float) 1.0);
+ }
+ #endif
