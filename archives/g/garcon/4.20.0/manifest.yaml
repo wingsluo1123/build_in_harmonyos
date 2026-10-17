@@ -1,0 +1,68 @@
+software: garcon
+# 版本级 manifest
+# 文件位置: archives/g/garcon/4.20.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "4.20.0"
+
+# 编译状态
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-15"
+
+# 构建系统类型 (顶层字段)
+build_system: autotools
+
+source:
+  url: "https://archive.xfce.org/src/xfce/garcon/4.20/garcon-4.20.0.tar.bz2"
+  sha256: "7fb8517c12309ca4ddf8b42c34bc0c315e38ea077b5442bfcc4509415feada8f"
+  tar_format: tar.bz2
+
+build:
+  toolchain: "OHOS clang 15 (aarch64-linux-ohos) / GNU Autotools"
+  command: "configure + make -j2（tarball 预生成 configure/Makefile.in 直用，patch 后不跑 autoreconf——autotools 工具链分裂在 hnp/usr-local 双前缀且 vendored XDT 宏本地 aclocal 不展开）"
+  parallel: 2
+  flags: ""
+  # patch 0001：跳过 garcon-gtk（依赖 libxfce4ui→xfconf 链，未发布）与
+  # docs（gtk-doc）子目录；核心 libgarcon 库无 libxfce4ui 依赖（审计：
+  # garcon/ 主库目录零引用）。gettext 链路：glib 家族 .pc Libs 追加
+  # -lintl（libxfce4util 4.20.1 先例）。
+
+test:
+  framework: shell
+  command: "test_package/test.c 编译执行"
+  # 上游测试为 noinst 程序未接入 make check（N=0，审计见 test_package/MANIFEST.yml）
+  total_cases: 3
+  passed_cases: 3
+  failed_cases: 0
+  skipped_cases: 0
+  notes: >-
+    上游 garcon 4.20.0 的 tests/ 三程序（test-menu-parser/test-menu-spec/
+    test-display-menu-gtk3）均为 noinst_PROGRAMS，不接入 make check——
+    N=0 注册用例，逐文件审计见 test_package/MANIFEST.yml。功能验证由
+    消费者冒烟补全：版本 API（1.x 断言）、菜单构造+销毁、menu-item-pool
+    构造+销毁共 3 用例真编译真执行真断言。
+
+artifacts:
+  - name: libgarcon-1
+    type: shared-library
+    path: lib/libgarcon-1.so
+
+dependencies:
+  runtime:
+    - name: glib
+      version: "2.84.0.1"
+      reason: "GLib/GObject/GIO 基础（.pc Requires）"
+    - name: gtk
+      version: "3.24.43"
+      reason: "GTK3（.pc Requires，上游 XDT_CHECK_PACKAGE）"
+    - name: libxfce4util
+      version: "4.20.1"
+      reason: "XFCE 基础库（.pc Requires，上游 XDT_CHECK_PACKAGE）"
+  build: []
+
+environment:
+  os: OHOS
+  arch: arm64
+  build_env: "OpenHarmony PC (aarch64), conan 2.29.1 OHOS-adapted"
