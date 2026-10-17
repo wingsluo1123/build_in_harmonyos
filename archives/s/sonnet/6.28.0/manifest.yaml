@@ -1,0 +1,37 @@
+software: sonnet
+version: "6.28.0"
+status: built
+build_system: cmake
+created_at: 2026-10-17
+build_date: "2026-10-17"
+dependencies:
+  required:
+    - qtbase/6.11.1
+    - qtdeclarative/6.11.1
+    - qtshadertools/6.11.1
+  build:
+    - extra-cmake-modules/6.29.0
+    - qt6linguisttools/6.11.1
+patches_applied: []
+test_results:
+  type: passed
+  upstream: "passed: 7/7 upstream CTest autotests executed (BUILD_TESTING=ON inside conan create): sonnet-test_filter, sonnet-test_core, sonnet-test_suggest, sonnet-test_settings, sonnet-test_autodetect, sonnet-test_decorator, sonnet-test_highlighter; the two widgets tests run headless via QT_QPA_PLATFORM=offscreen with an explicit offscreen plugin path; dictionary-less QSKIP paths inside upstream tests execute by upstream design and ctest counts them as passed"
+  test_package: "passed: 6/6 consumer cases / 23 checks (Speller no-backend lifecycle 5, Settings persistence + no-op setter semantics 7, GuessLanguage no-dictionary semantics 2, KF6SonnetUi Highlighter on QTextEdit 3, org.kde.sonnet QML instantiation 2, parsetrigrams6 CLI round-trip 4), executed on the HarmonyOS PC device; TEST SUMMARY: 6/6 cases passed, 23 checks, 0 failures"
+  package_id: "1b9180db9e62194d8376b684eec9400c9e837e9c"
+  full_reference: "sonnet/6.28.0#3cb2de1adf4814f9b7dd01a6595927d7:1b9180db9e62194d8376b684eec9400c9e837e9c"
+  l0: "pass"
+  l1: "pass: upstream CTest 7/7 + consumer test_package 6/6 executed on device"
+  l2: "pass: parsetrigrams6 CLI round-trip (emits trigram data over a word corpus) driven end-to-end by test_package"
+  l4: "pass"
+  l5: "pass"
+source_url: https://download.kde.org/stable/frameworks/6.28/sonnet-6.28.0.tar.xz
+source_sha256: 66c6b439950bec7f67b730e6e49d6d30cba21dad115e4a47c4fe46014cc19c3b
+knowledge_gained:
+  - "sonnet 6.28.0 re-enables the upstream QML surface: with qtdeclarative/6.11.1 and qtshadertools/6.11.1 published to ohpcd, SONNET_USE_QML=ON builds the org.kde.sonnet QML module (SpellcheckHighlighter QML_ELEMENT + the foreign Settings type over Sonnet::Settings) into lib/qml/org/kde/sonnet; the 6.26.0 recipe had SONNET_USE_QML=OFF because Qt6Quick was absent."
+  - "SONNET_USE_WIDGETS=ON keeps KF6SonnetUi (Highlighter/Decorator) building; both widgets autotests now run headless (QT_QPA_PLATFORM=offscreen plus an explicit QT_QPA_PLATFORM_PLUGIN_PATH at the qtbase package), so the full 7-test upstream suite passes, unlike the 6.26.0 run where test_decorator/test_highlighter failed on a runtime gap."
+  - "The upstream data/parsetrigrams6 CLI is installed into bin/, so the package carries bindirs=[\"bin\"] and needs an R38 commands.json registration (type: tool, versions 6.28.0); PF8 requires name==\"sonnet\" and versions[\"6.28.0\"].ref==\"sonnet/6.28.0\"."
+  - "SONNET_NO_BACKENDS=ON keeps the build free of hunspell/aspell/voikko (none published for OHOS) and relaxes the upstream configure-time FATAL_ERROR; the plugin ABI dir (plugins/kf6/sonnet) still ships so a backend can be added without rebuilding the library."
+  - "No-backend semantics verified from upstream source: SettingsImpl::setDefaultLanguage/setDefaultClient only accept values the Loader can serve, so with empty languages()/clients() the setters are no-ops and the getters keep the restore()-seeded QLocale::system().name(); GuessLanguagePrivate prunes its script->language map to dictionary-served languages, so identify() cannot propose a candidate even though the trigram model is embedded. Consumer tests assert exactly this graceful behavior; the trigram data pipeline is covered by the parsetrigrams6 CLI case."
+  - "Device build fix shipped in the recipe (not a device-local profile): the HMDFS user volume rejects symlink() with EPERM, so CMake's versioned .so chain fails (cmake_symlink_library: Permission denied; E330/E331). CMAKE_PLATFORM_NO_VERSIONED_SONAME=ON (toolchain + cache_variables) plus explicit CMAKE_SHARED_LIBRARY_SONAME_C/CXX_FLAG=\"-Wl,-soname,\" makes every shared library a plain-name file with a real DT_SONAME (E383/E537) - build-tree readelf shows SONAME=libKF6SonnetCore.so and SonnetUi records a bare-name NEEDED (kwidgetsaddons 6.28.0 same fix)."
+  - "Several upstream autotests carry QSKIP paths for dictionary-less environments (test_autodetect 'No backends available', test_core/test_suggest/test_highlighter dictionary probes); under SONNET_NO_BACKENDS those paths execute by upstream design and ctest counts the QSKIP as pass - the 7/7 run includes them, which is the honest upstream behavior rather than an OHOS-specific exclusion."
+  - "The org.kde.sonnet QML module is generated into the BUILD tree at <build>/bin/org/kde/sonnet: ECMQmlModule6 sets QT_QML_OUTPUT_DIRECTORY=<build>/bin (matching KDECMakeSettings' RUNTIME_OUTPUT_DIRECTORY), so QML2_IMPORT_PATH must point one level above the qmldir directory per URI segment (<build>/bin for org.kde.sonnet). The recipe derives the import root from the generated qmldir's module line; none of the 7 upstream autotests imports the module today (all C++ core/widgets tests), so the wiring is recomputed correctly for future QML tests."
