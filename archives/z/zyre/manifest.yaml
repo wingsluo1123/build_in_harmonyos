@@ -1,0 +1,23 @@
+software: zyre
+display: "Zyre"
+description: "Proximity-based P2P messaging framework over ZeroMQ: local-area discovery via UDP beacons or gossip, group messaging (JOIN/SHOUT) and the zyre_event API"
+category: network
+homepage: "https://github.com/zeromq/zyre"
+license: MPL-2.0
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "CMake 构建需提升 cmake_minimum_required 以兼容 CMake 4.x（2.0.1 补丁）"
+    - "zproject 生成的 Findczmq/Findlibzmq 为 MODULE 模式，需注入 czmq/zeromq 包 include/lib 搜索路径"
+    - "发布版 zeromq/libzmq.so 无 SONAME，经 Findlibzmq 的 LIBZMQ_LIBRARIES 预置 -L/-l 链接得到相对 DT_NEEDED；libczmq.so 有 SONAME，find_library 直连即可"
+    - "产物 libzyre.so 与 bin/zpinger 需 OHOS ELF 自签名"
+    - "ENABLE_DRAFTS 默认关闭；开启后编入 5 个私有类（zre_msg/zyre_peer/zyre_group/zyre_election/zyre_node）"
+  common_dependencies:
+    - czmq
+
+versions:
+  "2.0.1":
+    status: built
+    build_date: "2026-10-16"
+    conan_ref: "zyre/2.0.1"
