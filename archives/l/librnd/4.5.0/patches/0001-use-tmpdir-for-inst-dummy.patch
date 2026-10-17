@@ -1,0 +1,15 @@
+--- a/src/Makefile.in
++++ b/src/Makefile.in
+@@ -370,6 +370,11 @@
+ SRC_3RD_DIR=$(ROOT)/src_3rd
+ 
+ # where to install src_3rd files that are diverted
+-INST_DUMMY=/tmp/librnd-dummy
++# HMBS/OHOS: /tmp is read-only on the HarmonyOS PC device. Honor the
++# task TMPDIR/TMP/TEMP injected by the build harness; fall back to /tmp
++# only when none of them is set. INST_DUMMY is a diverted (discarded)
++# install destination for the genlist lib, so relocating it is safe.
++INST_DUMMY_TMPDIR = $(or $(TMPDIR),$(TMP),$(TEMP),/tmp)
++INST_DUMMY = $(INST_DUMMY_TMPDIR)/librnd-dummy
+ 
+ OBJS=@/local/librnd/OBJS@ @/local/librnd/OBJS_3RDLIB_NOAUTO@

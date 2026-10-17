@@ -1,0 +1,28 @@
+# 软件级 manifest
+# 文件位置: archives/l/librnd/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+software: librnd
+display: "librnd"
+description: "Modular 2D CAD framework powering pcb-rnd and Ringdove EDA tools"
+category: gfx
+homepage: "http://repo.hu/projects/librnd"
+license: GPL-2.0-or-later
+build_system: custom
+
+ohos_adaptation:
+  key_points:
+    - "自研 scconfig 构建：sh ./configure 生成 Makefile.conf，再 make -j1（非 GNU autotools）"
+    - "无硬依赖：configure 对缺失的 GUI 依赖只告警并自动禁用，OHOS 下显式关闭 gtk/lesstif/gd 以保证无头构建确定性"
+    - "上游 make test 跑 5 个自检套件，配方 build() 内真实执行并输出 HMBS_UPSTREAM_TEST_RESULT"
+  common_dependencies: []
+
+versions:
+  "4.5.0":
+    status: built
+    build_date: "2026-09-30"
+    packaging: conan
+    notes: |
+      首次适配上游 4.5.0。含 1 个可移植补丁（INST_DUMMY 临时目录改用
+      TMPDIR/TMP/TEMP，适配真机 /tmp 只读）；关闭 GUI/GD/lesstif 相关特性，
+      保留 batch 无头 HID 与全部核心库（core/3rd/font/font2/hid/poly/polybool/polybool2）。

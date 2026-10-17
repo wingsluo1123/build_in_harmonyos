@@ -1,0 +1,69 @@
+# test_package/MANIFEST.yml — librnd 4.5.0
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: librnd/4.5.0
+homepage: "http://repo.hu/projects/librnd"
+
+upstream_tests_exist: true
+upstream_test_audit:
+  source_tarball: "librnd-4.5.0.tar.gz (official repo.hu release asset)"
+  source_sha256: "a87850aba31d49b3254aa7f5a8785b9a1e56700a785d123dfe7bc3797659081c"
+  cross_check: >
+    同一 release 的 librnd-4.5.0.tar.bz2 的 sha256 为
+    dae47e4567514e7013a9194399f940877108346dd6b1a3c98aa160a04693efa4，
+    与 Debian 官方 librnd_4.5.0.orig.tar.bz2 的哈希完全一致，交叉验证下载无篡改。
+  build_system: "custom scconfig (sh ./configure 生成 Makefile.conf，再 make；非 GNU autotools)"
+  test_definition: >
+    上游测试入口 tests/Makefile 的 test 目标顺序运行 5 个套件：
+    rnd_printf（tester 全量格式矩阵 + tester.ref diff）、remote
+   （test_all.sh 跑 text/bin/simple/lists 共 4 组 msg/ref diff）、librnd
+   （librnd_test --gui batch + librnd_includes 头闭包，2 个二进制均须退出 0）、
+    conf（conftest 跑 list_merge/list_set/arr_merge/arr_set/scalar 共 5 组
+    .test/.ref diff）、base64（main 跑 6 组向量 roundtrip）。
+    每个套件成功打印 *** QC PASS ***，为逐行解析的唯一确定性信号。
+    计数单位为顶层 make test 套件（5）；5 套件展开为 13 组 diff/binary 子检查。
+  dependency: "none (bundled src_3rd；GUI/GTK/GD 已关闭，无外部测试依赖)"
+  portability_changes: []
+
+upstream_check_command: "make test"
+upstream_test_in_build: true
+upstream_test_command: "make test"
+
+# 计数单位：顶层 make test 套件（tests/Makefile 的 5 个子目录）。
+# 取数命令：make test 日志逐行扫描 *** QC PASS ***（单数据源，无回写修正）。
+upstream_tests:
+  - test_name: "rnd_printf"
+    source: "tests/rnd_printf/tester.c"
+    kind: unit
+  - test_name: "remote"
+    source: "tests/remote/test_parse.c"
+    kind: unit
+  - test_name: "librnd"
+    source: "tests/librnd/librnd_test.c"
+    kind: unit
+  - test_name: "conf"
+    source: "tests/conf/conftest.c"
+    kind: unit
+  - test_name: "base64"
+    source: "tests/base64/main.c"
+    kind: unit
+
+upstream_test_total: 5
+upstream_test_count_method: autotools_tests
+
+# 消费者视角：librnd-core base64 编解码（known-answer + roundtrip，共 6 断言）。
+# test.c 直链全部 8 个 librnd 库，确保每个产出物都被消费验证。
+test_package_tests:
+  - file: test.c
+    scenario: "consumer-api"
+    description: >
+      Build and run a Conan consumer that exercises rnd_base64_bin2str /
+      rnd_base64_str2bin: known-answer encode ("Man" -> "TWFu"), known-answer
+      decode ("TWFu" -> "Man"), and 4 roundtrips (upstream wiki vectors +
+      HarmonyOS payload). Each check prints PASS/FAIL and flips the exit code.
+    command: "./test_probe"
+    assertions: 6
+
+assertion_count: 6
