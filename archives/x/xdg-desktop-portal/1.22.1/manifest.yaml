@@ -1,0 +1,91 @@
+# 版本级 manifest
+# 文件位置: archives/x/xdg-desktop-portal/1.22.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "1.22.1"
+
+status: built
+
+build_system: meson
+
+build_date: "2026-10-06"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/flatpak/xdg-desktop-portal/releases/download/1.22.1/xdg-desktop-portal-1.22.1.tar.xz"
+  sha256: "d4879ddb3d65ff1a8f19187497e6f13dc5d267bcac404a5d501218be355753d3"
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: meson
+  configure_options:
+    - "-Dfuse3=disabled"
+    - "-Dpipewire=disabled"
+    - "-Dsound-validation=disabled"
+    - "-Dgeoclue=disabled"
+    - "-Dgudev=disabled"
+    - "-Dsystemd=disabled"
+    - "-Dflatpak-interfaces=disabled"
+    - "-Dtests=enabled"
+    - "-Dman-pages=disabled"
+    - "-Ddocumentation=disabled"
+    - "-Dsandboxed-image-validation=disabled"
+    - "-Dsandboxed-sound-validation=disabled"
+  dependencies:
+    - glib/2.84.0.1
+    - json-glib/1.10.6
+    - gdk-pixbuf/2.44.6
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - file: "patches/0001-ohos-optional-fuse3-pipewire-sound-validation.patch"
+    type: portability
+    description: >-
+      fuse3/libpipewire/gstreamer-pbutils 改造为 meson feature 选项
+      （fuse3/pipewire/sound-validation），对齐上游 geoclue/gudev 既有
+      可选依赖模式；三者仅在 OHOS 不可用的桌面会话态后端中使用
+      （document portal FUSE 挂载 / camera+screen-cast+remote-desktop
+      portal / 声音校验助手），核心交付不受影响。
+
+# ============================================================
+# 交付物清单
+# ============================================================
+
+deliverables:
+  - "libexec/xdg-desktop-portal (portal 守护进程)"
+  - "libexec/xdg-desktop-portal-validate-icon (图标校验助手)"
+  - "libexec/xdg-permission-store (权限存储守护进程)"
+  - "share/dbus-1/interfaces/*.xml (portal D-Bus 接口 XML, 60+)"
+  - "share/dbus-1/services/*.service (D-Bus 激活文件)"
+  - "lib/systemd/user/*.service (systemd user 单元, 数据文件)"
+  - "lib/pkgconfig/xdg-desktop-portal.pc (dataonly, interfaces_dir 变量)"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "fuse3/libpipewire/gstreamer-pbutils 上游为硬依赖但均不在 OHOS 制品仓；feature 选项化+禁用后核心 daemon 完整交付"
+  - "gstreamer-pbutils-1.0.pc 不随 gst-plugins-base 1.28.3 配方生成（仅 core 5 个 pc 包装），声音校验助手需一并裁剪"
+  - "xdg-permission-store 不依赖 fuse3（仅 gvdb+glib），document-portal 子目录保留、仅跳过 FUSE 挂载后端部分"
+  - "glib 构建期工具（gdbus-codegen/glib-mkenums/glib-compile-resources）从 conan glib 包取：python 工具 sh 包装、ELF 工具 runpath+codesign（evince 48.4 模式）"
+  - "gio-unix-2.0.pc 需从 gio-2.0.pc 手工创建（xdg-dbus-proxy 同款问题）"
+  - "gdk-pixbuf conan 包无 pkg_config_name，meson 查询 gdk-pixbuf-2.0 需从 gdk-pixbuf.pc 造别名"
+  - "上游测试套件（28 文件 189 测试）需 D-Bus session + dbusmock + umockdev，OHOS CI 不可得，禁用 tests"
+  - "沙箱校验依赖 bwrap（bubblewrap），OHOS 无此机制，禁用 sandboxed-image/sound-validation"

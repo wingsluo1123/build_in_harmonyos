@@ -1,0 +1,29 @@
+# 软件级 manifest
+# 文件位置: archives/x/xdg-desktop-portal/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: xdg-desktop-portal
+display: "xdg-desktop-portal (desktop portal service framework)"
+description: "D-Bus portal daemon that brokers desktop integration requests (file chooser, open URI, screenshot, settings, ...) between sandboxed apps and backend implementations; ships portal interface XMLs"
+category: system
+homepage: "https://github.com/flatpak/xdg-desktop-portal"
+license: "LGPL-2.0-or-later"
+
+build_system: meson
+
+ohos_adaptation:
+  key_points:
+    - "fuse3/libpipewire/gstreamer-pbutils 上游硬依赖，feature 选项化裁剪（对齐 geoclue/gudev 可选模式），核心 daemon 完整交付"
+    - "不链接 flatpak（flatpak 只是使用方）；不产出 libportal（独立项目已在档）"
+    - "glib 构建期工具从 conan glib 包取并包装（python 工具 sh 包装 / ELF 工具 runpath+codesign）"
+    - "gio-unix-2.0.pc 手工派生；gdk-pixbuf-2.0.pc 造别名"
+    - "上游测试需 D-Bus session+dbusmock+umockdev，OHOS CI 不可得，交付物断言替代"
+  common_dependencies:
+    - glib/2.84.0.1
+    - json-glib/1.10.6
+    - gdk-pixbuf/2.44.6
+
+versions:
+  "1.22.1":
+    status: built
+    build_date: "2026-10-06"

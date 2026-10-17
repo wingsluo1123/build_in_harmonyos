@@ -1,0 +1,70 @@
+# test_package/MANIFEST.yml
+# xdg-desktop-portal 1.22.1 test package manifest
+package: xdg-desktop-portal/1.22.1
+homepage: "https://github.com/flatpak/xdg-desktop-portal"
+
+# Upstream test suite (tests/ of the 1.22.1 release tarball, sha256
+# d4879ddb3d65ff1a8f19187497e6f13dc5d267bcac404a5d501218be355753d3):
+#   * 3 GTest C unit binaries (test-permission-db / test-xdp-utils /
+#     test-xdp-method-info) — 11 g_test_add_func registrations.
+#   * pytest + dbusmock integration suite — 24 test_*.py files with 188
+#     class-level test methods (189 = the tree-wide `def test_` count
+#     including the conftest.py helper; this is the count the 2402 review
+#     measured).
+# What actually runs after the 0002 gate split (-Dtests=enabled):
+#   * conan build() executes the three GTest binaries on the OHOS target:
+#     9 of 11 cases PASS (method-info/all + /find; alternate-doc-path +
+#     parse-cgroup x4; /db/open + /db/modify). Two explicit exemptions:
+#     /db/serialize hardcodes /tmp/test-permission-db-XXXXXX (mkstemp) and
+#     the OHOS target /tmp is a read-only erofs mount;
+#     /app-id-via-systemd-unit is compiled out by the HAVE_LIBSYSTEMD guard
+#     (-Dsystemd=disabled, libsystemd not in the registry).
+#   * The pytest suite needs a running D-Bus session daemon plus the
+#     python-dbus / python-dbusmock / gi (PyGObject) / umockdev stack:
+#     conftest.py hard-imports gi (verified: ModuleNotFoundError on the
+#     OHOS PyPI source, which has no PyGObject wheel) and the meson
+#     -Dtests probe requires umockdev-1.0 (not in the registry). These are
+#     gated off by the enable_pytest gate of the 0002 patch.
+upstream_check_command: "meson test"
+upstream_test_in_build: true
+upstream_test_command: "conan build() runs tests/test-permission-db, tests/test-xdp-utils, tests/test-xdp-method-info (GTest, TAP output)"
+upstream_tests:
+  - name: tests/ GTest C unit binaries
+    file: tests/test-permission-db.c, tests/test-xdp-utils.c, tests/test-xdp-method-info.c
+    description: "11 g_test cases; 9 PASS on OHOS target via conan build() (0002 gate split); /db/serialize exempted (hardcoded /tmp path, read-only erofs) and /app-id-via-systemd-unit compiled out (-Dsystemd=disabled)"
+    requires_dbus: false
+  - name: tests/ pytest integration suite
+    file: tests/test_*.py (24 files, 188 class-level test methods; 189 tree-wide def test_ count)
+    description: "Requires D-Bus session daemon + python-dbus + python-dbusmock + gi (PyGObject) + umockdev; gi/PyGObject has no OHOS wheel (conftest.py hard import fails, verified) and umockdev-1.0 is not in the registry; gated off by enable_pytest (0002)"
+    requires_dbus: true
+
+# test_package consumer-side verification (executed by conan create)
+test_package_tests:
+  - file: conanfile.py
+    description: >-
+      Verifies deliverables: daemon binary runs and prints
+      "xdg-desktop-portal 1.22.1" (--version, config.h PACKAGE_STRING);
+      xdg-desktop-portal-validate-icon and xdg-permission-store helpers
+      installed; dataonly xdg-desktop-portal.pc present with a working
+      interfaces_dir variable that resolves to the installed portal
+      D-Bus interface XMLs (>=30 files incl. Request/FileChooser/
+      OpenURI/ScreenCast/impl.Request); org.freedesktop.portal.Desktop.service
+      activation file installed; PLUS the HarmonyOS-specific end-to-end
+      consumer case: private D-Bus session bus (dbus-daemon/1.14.10.1 over
+      loopback TCP, ANONYMOUS auth) -> packaged xdg-permission-store started
+      against it -> full PermissionStore API driven through the glib gdbus
+      client (NameHasOwner/List/SetPermission/GetPermission/Lookup/List/
+      gvdb-on-disk/Delete), 8 assertions.
+    command: "conan test"
+  - file: test_smoke.sh
+    description: "Shell-level smoke of daemon --version + pc + interfaces_dir (CI L0c source file)"
+    command: "bash test_smoke.sh <package_folder>"
+
+# Assertions in test_package/conanfile.py test():
+#   1 daemon found + 2 rc==0 + 3 version string + 4 validate-icon +
+#   5 permission-store + 6 pc exists + 7 interfaces_dir set + 8 dir exists +
+#   9..13 five interface XMLs + 14 xml count + 15 service file
+# E2E consumer case assertions (HarmonyOS-specific):
+#   16 name owned + 17 List fresh + 18 SetPermission + 19 GetPermission +
+#   20 Lookup + 21 List + 22 gvdb on disk + 23 Delete+List
+assertion_count: 23
