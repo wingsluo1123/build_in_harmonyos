@@ -1,0 +1,119 @@
+--- a/src/MainWindow.cpp
++++ b/src/MainWindow.cpp
+@@ -5,35 +5,37 @@
+ */
+ 
+ #include "MainWindow.h"
+ 
+ #include "LevelCollection.h"
+ #include "PlayField.h"
+ #include "PlayFieldView.h"
+ 
+ #include <KActionCollection>
+ #include <KConfigGroup>
+-#include <KIO/FileCopyJob>
+ #include <KLocalizedString>
+ #include <KMessageBox>
+ #include <KSelectAction>
+ #include <KSharedConfig>
+ #include <KStandardAction>
+-#include <KUrlMimeData>
+ 
+ #include <QAction>
+ #include <QActionGroup>
+ #include <QApplication>
+ #include <QDragEnterEvent>
++#include <QEventLoop>
+ #include <QFileDialog>
+ #include <QKeyEvent>
+ #include <QMimeData>
++#include <QNetworkAccessManager>
++#include <QNetworkReply>
++#include <QNetworkRequest>
+ #include <QString>
+ #include <QTemporaryFile>
+ 
+ #include <cassert>
+ #include <cstdio>
+ 
+ void MainWindow::createCollectionMenu()
+ {
+     collectionsAct_ = new KSelectAction(i18nc("@title:menu", "Level Collection"), this);
+     actionCollection()->addAction(QStringLiteral("collections"), collectionsAct_);
+@@ -298,29 +300,44 @@
+ 
+     //   int namepos = _url.path().findRev('/') + 1; // NOTE: findRev can return -1
+     //   QString levelName = _url.path().mid(namepos);
+     QString levelName = _url.fileName();
+ 
+     QString levelFile;
+     QTemporaryFile f;
+     if (_url.isLocalFile()) {
+         levelFile = _url.toLocalFile();
+     } else {
+-        //     levelFile = locateLocal("appdata", "levels/" + levelName);
+-        // download file into temporary one
+-        f.open();
+-        KIO::FileCopyJob *job = KIO::file_copy(_url, QUrl::fromLocalFile(f.fileName()), -1, KIO::Overwrite);
+-
+-        job->exec();
+-        if (job->error()) {
++        // Download the remote collection into a temporary file. Upstream
++        // does this with KIO::file_copy; KIO is not part of the KF6
++        // closure published for this platform, so the transfer is served
++        // by QNetworkAccessManager, which covers the http/https/ftp/file
++        // schemes a level-collection URL can realistically use. The
++        // nested event loop mirrors the blocking job->exec() upstream.
++        if (!f.open()) {
+             return;
+         }
++        QNetworkRequest request(_url);
++        request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
++                             QNetworkRequest::NoLessSafeRedirectPolicy);
++        QNetworkAccessManager manager;
++        QNetworkReply *reply = manager.get(request);
++        QEventLoop loop;
++        QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
++        loop.exec();
++        const QByteArray payload = reply->readAll();
++        const bool transferFailed = (reply->error() != QNetworkReply::NoError);
++        reply->deleteLater();
++        if (transferFailed || f.write(payload) != payload.size()) {
++            return;
++        }
++        f.close();
+         levelFile = f.fileName();
+     }
+ 
+     auto *tmpCollection = new LevelCollection(levelFile, levelName);
+ 
+     if (tmpCollection->noOfLevels() < 1) {
+         KMessageBox::error(this, i18nc("@info", "No levels found in file."));
+         delete tmpCollection;
+         return;
+     }
+@@ -344,21 +361,23 @@
+ {
+     if (event->mimeData()->hasUrls()) {
+         event->accept();
+     } else {
+         event->ignore();
+     }
+ }
+ 
+ void MainWindow::dropEvent(QDropEvent *event)
+ {
+-    QList<QUrl> urls = KUrlMimeData::urlsFromMimeData(event->mimeData());
++    // KUrlMimeData belongs to KIO; QMimeData::urls() decodes the same
++    // text/uri-list payload for the plain-URL drops the game accepts.
++    const QList<QUrl> urls = event->mimeData()->urls();
+     if (!urls.isEmpty()) {
+         //     kdDebug() << "MainWindow:Handling QUriDrag..." << endl;
+         if (urls.count() > 0) {
+             const QUrl &url = urls.first();
+             openURL(url);
+         }
+     }
+ }
+ 
+ #include "moc_MainWindow.cpp"
