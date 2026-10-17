@@ -1,0 +1,38 @@
+# xfractint 20.4.10 HarmonyOS PC application package.
+version: "20.4.10"
+software: "xfractint"
+status: built
+build_system: make
+
+source:
+  url: "http://www.fractint.org/ftp/old/linux/xfractint-20.04p10.tar.gz"
+  sha256: "0574540d4ab87e41c4fd128a14c0407e160dd6e312764d3d55554f62abc35781"
+  tar_format: tar.gz
+  upstream_version: "20.04p10"
+
+build:
+  system: make
+  # All variables are passed on the make command line; the Makefiles are not
+  # edited. Only two portability patches touch sources (see conandata.yml).
+  make_overrides:
+    cc: clang
+    cflags: "-I./headers -DXFRACT -DNOBSTRING -DBIG_ANSI_C -DLINUX -fno-builtin -fcommon -O2 (plus libx11/xorgproto -I dirs)"
+    libs: "-L<libx11 closure> -Wl,-rpath-link,<libx11 closure> -lX11 -lm"
+    prefix: "<package>/share/xfractint baked as SRCDIR"
+  dependencies:
+    - libx11/1.8.13.1
+    - xorgproto/2025.1
+
+patches_applied:
+  - "0001-unix.c-fcntl-include.patch"
+  - "0002-editpal-getw-musl.patch"
+
+knowledge_gained:
+  - "E-fcommon: clang -fno-common breaks 1990s codebases with cross-file tentative definitions; add -fcommon on the make command line."
+  - "E-musl-getw: musl libc ships no legacy getw(); provide a local fread-based shim under #ifndef __GLIBC__."
+
+verification:
+  profile: "ci/conan/profiles/ohos-aarch64"
+  target: "HarmonyOS 6.0 aarch64"
+  conan_create: "PASS"
+  headless_check: "PASS: without DISPLAY the binary exits 255 after printing 'Could not open display'"

@@ -1,0 +1,144 @@
+#====================================================================
+# DRAFT-24660-clang-fno-common-tentative-definition-duplicate-symbol
+# 现代 Clang 默认 -fno-common：1990s C 代码库的跨编译单元 tentative
+# definition 在链接期报 duplicate symbol，构建失败
+# 来源: xfractint 20.4.10 适配 (2026-10-16)
+#====================================================================
+
+id:                     DRAFT-24660
+trigger_tool:           clang|make|ld.lld|conan create
+phase:                  compilation|link
+error_signature:        ld\.lld: error: duplicate symbol|multiple definition of
+match_keywords:         -fno-common, -fcommon, tentative definition, duplicate symbol, common symbol, legacy C, clang 11, gcc 10, CFLAGS, 手写 Makefile, 1990s C, xfractint, swftools
+category:               toolchain, legacy-c, compilation
+severity:               2
+status:                 draft
+title:                  现代 Clang（≥11）与 GCC（≥10）默认 -fno-common，1990s C 代码库的跨编译单元 tentative definition 在链接期报 duplicate symbol，构建失败；应用型可执行程序可加 -fcommon 恢复传统 common-symbol 合并语义
+
+root_cause: >
+  上游 Makefile 的 CFLAGS 不指定 -fcommon；设备工具链 clang ≥11（本仓
+  clang 15.0.4，LLVM 基线；GCC ≥10 同）将默认值从 -fcommon 切换为
+  -fno-common。1990s-2000s C 代码惯用"头文件里 int x; 多处出现"的
+  tentative definition 写法：-fcommon 语义下这些定义产生 common symbol
+  并在链接期合并为一份；-fno-common 语义下每个编译单元各自产出一个
+  强定义，链接期 ld.lld 报 duplicate symbol → 构建失败。因果链每一环
+  均有实测：双 TU 探针（默认参数 duplicate symbol，-fcommon 通过）；
+  真实库源码去掉 -fcommon 全量重编后恰好 3 个真实符号（curwin/
+  boxcolor/b_const）报重复，加回 -fcommon 同源码即构建通过。
+
+affected_scope: >
+  任何以 clang ≥11 / GCC ≥10 构建 1990s-2000s C 代码库的项目（典型：
+  手写递归 Makefile、无 configure/cmake、头文件里放 tentative
+  definition）。诊断捷径：见到 ld.lld: error: duplicate symbol +
+  多年未动的 C 库，可直推本因，无需逐符号人工归并。
+
+verification_cmd: >
+  # 合成探针（自包含，全新 shell 可复跑；设备 clang 15.0.4 实测通过）:
+  d=$(mktemp -d) && cd "$d" && \
+  printf 'int shared_var;\nint get_x(void) { return shared_var; }\n' > a.c && \
+  printf 'extern int get_x(void);\nint shared_var;\nint main(void) { shared_var = 42; return get_x() == 42 ? 0 : 1; }\n' > b.c && \
+  clang a.c b.c -o prog_default 2>err_default.txt; echo "default_exit=$?"; \
+  grep -c "duplicate symbol" err_default.txt; \
+  clang -fcommon a.c b.c -o prog_common && ./prog_common; echo "fcommon_exit=$?"
+  # 真实源码复现（强化实证，命令序列）:
+  # 1. 取一份已通过 CI 的配方工作区源码（配方构建缓存中已打补丁的源树，
+  #    或官方归档解包后套用配方 patches/ 的两个补丁），复制到 mktemp 目录;
+  # 2. 依配方 conanfile build() 的 make 命令行覆盖，仅从 CFLAGS 中去掉
+  #    -fcommon（其余旗标与 CI PASS 构建一致，X11 头/库路径以
+  #    conan cache path 查询到的包目录代入），make -j4 全量重编;
+  # 3. 预期链接失败（exit 2），duplicate symbol 恰为 3 个:
+  #    curwin（unix/xfcurses.c）、boxcolor（common/zoom.c）、
+  #    b_const（common/fractalb.c）; 同源码加回 -fcommon 重跑即通过
+  #    （权威 CI PASS 日志在案）。
+
+verification_expect: >
+  探针: default_exit=1 且 err_default.txt 中 duplicate symbol 计数 ≥1
+  （ld.lld: error: duplicate symbol: shared_var）；-fcommon 构建
+  fcommon_exit=0（运行以 get_x()==42 退出码自检）。真实源码复现:
+  去 -fcommon 全量重编链接失败（exit 2）且 duplicate symbol 为上述
+  3 个真实符号；加回 -fcommon 后构建通过。证据结构说明: 本 run 原始
+  失败日志不留存（CI 逐轮覆盖、.ci_logs 仅存最终 PASS 轮日志），阻塞
+  面证据以自包含合成探针 + 真实源码复现命令序列替代，任何人可在全新
+  shell 独立复跑；历史先例参考 Debian xfractint 补丁集对同一问题的
+  同款修复（Bug#966184 一族）。
+
+rec_priority:           1
+rec_approach:           add-fcommon-for-app-type-legacy-executables
+rec_description: >
+  应用型可执行程序（全局符号面巨大、上游无维护活动、源级归并触碰面
+  不可控）在 CFLAGS 加 -fcommon 恢复上游假设的 common-symbol 合并
+  语义，并按 P006 在 notes.md 记录技术债务与期望的上游修复方式
+  （现代化为 extern 声明 + 单一定义）。三档决策边界（与 E491(forbid_1)
+  的冲突裁决）: (a) 应用型可执行 + 符号面大 + 无上游维护 → 允许
+  -fcommon 并记录技术债；(b) 被移植库代码/头文件库/符号面小 → 优先
+  源级 static/extern 归并（fallback），不用 -fcommon 掩盖符号关系；
+  (c) 新写的代码 → 一律禁止依赖 common-symbol 语义（E491 forbid_1
+  原义在新代码域完全适用）。
+rec_command: >
+  make CC=clang CFLAGS="<原有 CFLAGS> -fcommon ..."（命令行整体覆盖
+  上游 CFLAGS；conan 配方中以 self.conf 取 CC、按依赖遍历拼 -I/-L，
+  见案例库配方的 build() 实现与 notes.md 技术债记录）
+rec_auto_fix:           false
+rec_impl:               cflags-override|notes-tech-debt
+
+fallback_priority:      2
+fallback_approach:      source-level-static-extern-merge
+fallback_description: >
+  源级归并：把跨文件 tentative definition 改为"头文件 extern 声明 +
+  唯一一个 .c 定义"（Debian 对同类库的 1020-duplicate-globals 式补丁
+  做法）。语义最干净、是上游现代化的正确方向；但对符号面巨大的
+  legacy 代码触碰文件多、diff 大、与上游漂移风险高——应用型场景下
+  作为 -fcommon 的长期替代而非当轮首选。
+fallback_command:
+fallback_auto_fix:      false
+fallback_impl:          source-patch
+
+forbid_1_pattern:       库代码|新代码.*-fcommon|-fcommon.*新代码
+forbid_1_reason: >
+  对库代码、头文件库或新写代码使用 -fcommon 掩盖声明/定义关系（与
+  E491 forbid_1 原义在库代码/新代码域对齐）：全局变量在多个编译单元
+  各自成强定义的代码本应在源级表达真实链接意图。
+forbid_1_consequence: >
+  重复或歧义的全局状态被链接器静默合并，换编译器/链接模式或抽成
+  库后再暴露，修复成本从编译期转移到运行期。
+
+principles:             P006, P010
+causes:
+caused_by:
+similar_to:             [E491,E293,E531]
+conflicts_with:         E491(forbid_1)
+prerequisite_of:
+
+evidence:
+  - "合成探针: mktemp 双 TU（各含 int shared_var;），默认参数链接
+     ld.lld: error: duplicate symbol: shared_var（exit 1）；加 -fcommon
+     链接并运行成功（exit 0，运行期以 get_x()==42 退出码自检）。
+     设备 clang 15.0.4 实测，verification_cmd 全序列可独立复跑"
+  - "真实源码复现: 已通过 CI 的案例库源码去 -fcommon 全量重编，链接
+     失败且 duplicate symbol 恰为 curwin/boxcolor/b_const 三个真实
+     符号；加回 -fcommon 同源码构建通过（权威 CI PASS 日志在案）"
+  - "案例库配方: archives/x/xfractint/20.4.10/conanfile.py（CFLAGS
+     -fcommon 及技术债注释）、notes.md（构建方式与 patches 清单）、
+     patches/0001、0002"
+  - "上游先例: Debian xfractint 补丁集对同一问题同款修复
+     （Bug#966184 一族）；E491 事件（swftools 0.9.2）可作历史第二案例"
+  - "原始失败日志不留存: CI 逐轮覆盖、.ci_logs 仅存最终 PASS 轮
+     （含 -fcommon 的完整构建命令行），失败面证据以上述两级探针替代"
+
+applies_to:
+  - "1990s-2000s 手写 Makefile 的 C 应用（无 configure/cmake、跨文件
+     tentative definition）在 clang ≥11 / GCC ≥10 下的移植"
+  - "见到 ld.lld: error: duplicate symbol 且符号分布在多个 .c 的
+     legacy C 库构建失败"
+
+source_event: >
+  xfractint 20.4.10（上游 20.04p10）HarmonyOS PC 适配: 首轮 conan
+  create 链接失败于 duplicate symbol；CFLAGS 加 -fcommon（其余覆盖
+  不变）后 CI 全绿。与 E491 事件（swftools）同问题类、不同库实例；
+  本条目化因果链、自包含探针与三档决策边界，并以 conflicts_with
+  挂接 E491(forbid_1) 形成裁决而非翻案。
+
+doc_file:               knowledge/drafts/DRAFT-24660-clang-fno-common-tentative-definition-duplicate-symbol.md
+last_updated:           2026-10-16
+
+authors: builder(xfractint-20.4.10) <noreply.gitcode.com>

@@ -1,0 +1,22 @@
+--- a/common/editpal.c
++++ b/common/editpal.c
+@@ -129,6 +129,19 @@
+ #include "port.h"
+ #include "prototyp.h"
+
++#ifndef __GLIBC__
++/* musl libc (HarmonyOS) does not provide the legacy getw();
++ * read one int-sized word like the glibc getw() does. */
++static int getw(FILE *stream)
++{
++   int word;
++   if (fread(&word, sizeof(word), 1, stream) != 1) {
++      return EOF;
++   }
++   return word;
++}
++#endif
++
+ /*
+  * misc. #defines
+  */
