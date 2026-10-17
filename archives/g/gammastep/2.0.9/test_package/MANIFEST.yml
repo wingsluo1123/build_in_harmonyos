@@ -1,0 +1,40 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# 上游测试清点（§12.72 四口径，2026-10-16 于 gammastep-2.0.9 官方 git tag 源码树实测）：
+#   ① test*/ 框架源码: 0（`find . -type d -name 'test*'` → 0）
+#      注册口径: 0（Makefile.am / src/Makefile.am 均无 `TESTS =` / `check_PROGRAMS =`；
+#      configure.ac 无 AM_PATH_CHECK / AC_CONFIG_TESTDIR 等测试宏；全树无 meson.build）
+#      未注册测试脚本资产: 0（`find . -name '*.sh'` → 0；只有 bootstrap 一个无扩展名脚本，
+#      且它是 autotools bootstrap、不是测试）
+#   ② */res 语料     : 0（`find . -type d -name res` → 0）
+#   ③ **/*RUNTEST*   : 0
+#   ④ src/demo|examples 示例 .c: 0
+#   ⇒ `make check` 注册口径为 0（automake 空转，见 notes.md 实测）
+#   源码内断言: `grep -rn '^[[:space:]]*assert(' src/*.c` → 0（连隐式断言都没有）
+#   ⇒ 适配后新增消费者测试（test_package/test.sh，9 条断言）是**本 PR 唯一的测试面**，
+#     按 §10 口径如实申报：上游 0、适配后 9 条断言 / 1 个消费者程序。
+
+package: gammastep/2.0.9
+homepage: "https://gitlab.com/chinstrap/gammastep"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序 —— 无（四口径清点见文件头注释）
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证, 调用已安装二进制)
+test_package_tests:
+  - file: test.sh
+    description: "消费者测试 — 调用已安装 gammastep 二进制，断言 -V 精确版本串、-h usage、-m list 的方法表头，以及 **-m list 逐条列出四个编译期内建后端 drm/wayland/randr/vidmode**（该表由编译期 gamma_methods[] 生成 ⇒ 直接证明四个 --enable-* 真的生效）+ dummy + 未知方法 rc=1 诊断；9 条断言全部在参数解析阶段返回，不碰任何设备节点/显示服务"
+    command: "bash test.sh"
+
+# 测试断言总数 (test_package 实测断言数)
+assertion_count: 9
