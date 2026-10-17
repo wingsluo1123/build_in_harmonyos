@@ -1,0 +1,19 @@
+--- a/src/JsonCreator.cpp
++++ b/src/JsonCreator.cpp
+@@ -50,7 +50,15 @@
+     QVariantMap jsonData;
+     //QVariant setVar(stringMapToQVariantMap(set));
+     QVariant removeVar( stringListToQVariantList( remove ) );
+-    jsonData.insert( QString( QLatin1String( "set" ) ), set );
++    // Preserve the seconds-only ISO date contract of the original API.
++    // Recent Qt5 JSON conversion otherwise adds a .000 milliseconds suffix.
++    QVariantMap settings = set;
++    for ( QVariantMap::iterator it = settings.begin(); it != settings.end(); ++it )
++    {
++        if ( it.value().type() == QVariant::DateTime )
++            it.value() = it.value().toDateTime().toString( Qt::ISODate );
++    }
++    jsonData.insert( QString( QLatin1String( "set" ) ), settings );
+     jsonData.insert( QString( QLatin1String( "remove" ) ), removeVar );
+     QByteArray jsonByteArray = QJsonWrapper::toJson( QVariant( jsonData ) );
+     return jsonByteArray;
