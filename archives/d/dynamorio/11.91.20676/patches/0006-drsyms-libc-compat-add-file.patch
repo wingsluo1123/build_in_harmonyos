@@ -1,0 +1,85 @@
+--- /dev/null
++++ b/ext/drsyms/drsyms_libc_compat.c
+@@ -0,0 +1,82 @@
++/* **********************************************************
++ * Copyright (c) 2026 The DynamoRIO Project.  All rights reserved.
++ * **********************************************************/
++
++/*
++ * libc compatibility shim for the drsyms extension.
++ *
++ * This file is compiled only when the build system adds it to the drsyms
++ * source list (see ext/drsyms/CMakeLists.txt), so it carries no platform
++ * guard of its own.
++ *
++ * Rationale: the helper archive that drsyms links in for symbol demangling is
++ * a prebuilt archive from a glibc environment.  glibc classifies characters
++ * through a table reachable via __ctype_b_loc(), with flag bits laid out by its
++ * _ISbit() macro; libcs that are not glibc (e.g. musl) do not provide that
++ * symbol, so the demangler fails to link.  Reproduce the glibc ABI with a table
++ * derived from this libc's own character classification.
++ */
++
++#include <ctype.h>
++#include <stddef.h>
++
++#define CTYPE_COMPAT_ISUPPER 0x0100
++#define CTYPE_COMPAT_ISLOWER 0x0200
++#define CTYPE_COMPAT_ISALPHA 0x0400
++#define CTYPE_COMPAT_ISDIGIT 0x0800
++#define CTYPE_COMPAT_ISXDIGIT 0x1000
++#define CTYPE_COMPAT_ISSPACE 0x2000
++#define CTYPE_COMPAT_ISPRINT 0x4000
++#define CTYPE_COMPAT_ISGRAPH 0x8000
++#define CTYPE_COMPAT_ISBLANK 0x0001
++#define CTYPE_COMPAT_ISCNTRL 0x0002
++#define CTYPE_COMPAT_ISPUNCT 0x0004
++#define CTYPE_COMPAT_ISALNUM 0x0008
++
++/* glibc's table is indexed starting at -128 so that it can be subscripted with
++ * a plain (possibly signed) char.  The table is filled in lazily to avoid
++ * depending on static initialisation order.
++ */
++static unsigned short ctype_compat_b[384];
++static const unsigned short *ctype_compat_b_biased;
++static volatile int ctype_compat_b_ready;
++
++const unsigned short **
++__ctype_b_loc(void)
++{
++    if (!ctype_compat_b_ready) {
++        int i;
++        for (i = 0; i < 384; i++) {
++            unsigned char c = (unsigned char)(i - 128);
++            unsigned short flags = 0;
++            if (isupper(c))
++                flags |= CTYPE_COMPAT_ISUPPER;
++            if (islower(c))
++                flags |= CTYPE_COMPAT_ISLOWER;
++            if (isalpha(c))
++                flags |= CTYPE_COMPAT_ISALPHA;
++            if (isdigit(c))
++                flags |= CTYPE_COMPAT_ISDIGIT;
++            if (isxdigit(c))
++                flags |= CTYPE_COMPAT_ISXDIGIT;
++            if (isspace(c))
++                flags |= CTYPE_COMPAT_ISSPACE;
++            if (isprint(c))
++                flags |= CTYPE_COMPAT_ISPRINT;
++            if (isgraph(c))
++                flags |= CTYPE_COMPAT_ISGRAPH;
++            if (isblank(c))
++                flags |= CTYPE_COMPAT_ISBLANK;
++            if (iscntrl(c))
++                flags |= CTYPE_COMPAT_ISCNTRL;
++            if (ispunct(c))
++                flags |= CTYPE_COMPAT_ISPUNCT;
++            if (isalnum(c))
++                flags |= CTYPE_COMPAT_ISALNUM;
++            ctype_compat_b[i] = flags;
++        }
++        ctype_compat_b_biased = &ctype_compat_b[128];
++        ctype_compat_b_ready = 1;
++    }
++    return &ctype_compat_b_biased;
++}

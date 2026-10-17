@@ -1,0 +1,15 @@
+package: "dynamorio/11.91.20676"
+homepage: "https://dynamorio.org/"
+upstream_test_in_build: true
+upstream_test_command: "ctest --output-on-failure"
+upstream_tests:
+  - description: "DynamoRIO's own regression suite (417 ctest cases) is built (BUILD_TESTS=True) and was run locally for the adaptation evidence; it is not run as part of the recipe because a large part of the suite drives DynamoRIO's injected (early-inject) execution mode, which is not functional on OHOS yet - see notes.md."
+    command: "ctest --output-on-failure"
+test_package_tests:
+  - file: "app.c"
+    description: "Runs the packaged DBI engine in-process through the standalone API (dr_app_setup -> dr_app_start -> work -> dr_app_stop -> dr_app_cleanup) and requires a clean exit plus the engine markers"
+    command: "./dr_standalone_smoke"
+  - file: "app.c"
+    description: "Runs the packaged command line launcher (bin64/drrun -version) to prove the packaged tools are executable after the .codesign repair"
+    command: "bin64/drrun -version"
+assertion_count: 5

@@ -1,0 +1,25 @@
+--- a/suite/tests/client-interface/drx_time_scale-test.c
++++ b/suite/tests/client-interface/drx_time_scale-test.c
+@@ -116,11 +116,19 @@
+ {
+     /* Create two POSIX timers to stress different varieties. */
+     struct sigevent se = {};
++#ifdef SIGEV_THREAD_ID
+     se.sigev_notify = SIGEV_THREAD_ID;
+-#ifndef sigev_notify_thread_id
+-#    define sigev_notify_thread_id _sigev_un._tid
+-#endif
++#    ifndef sigev_notify_thread_id
++#        define sigev_notify_thread_id _sigev_un._tid
++#    endif
+     se.sigev_notify_thread_id = syscall(SYS_gettid);
++#else
++    /* musl-based targets (e.g. OHOS) do not expose SIGEV_THREAD_ID nor a
++     * thread id member in struct sigevent: fall back to a process-directed
++     * signal for this first POSIX timer.
++     */
++    se.sigev_notify = SIGEV_SIGNAL;
++#endif
+     intercept_signal(SIGUSR1, signal_handler, false);
+     se.sigev_signo = SIGUSR1;
+     int res = timer_create(CLOCK_REALTIME, &se, &posix_real_id);

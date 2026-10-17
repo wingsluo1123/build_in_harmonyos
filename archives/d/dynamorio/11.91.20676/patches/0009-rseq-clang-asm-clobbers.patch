@@ -1,0 +1,58 @@
+--- a/suite/tests/linux/rseq.cpp
++++ b/suite/tests/linux/rseq.cpp
+@@ -647,7 +647,7 @@
+ 
+         : [rseq_cs] "=m"(reg_rseq->rseq_cs), [restarts] "=m"(restarts)
+         :
+-        : "x0", "x1", "q0", "q1", "memory");
++        : "x0", "x1", "v0", "v1", "memory");
+ #else
+ #    error Unsupported arch
+ #endif
+@@ -809,7 +809,7 @@
+         : [rseq_cs] "=m"(reg_rseq->rseq_cs), [restarts] "=m"(restarts)
+         : [cpu_mask_size] "i"(sizeof(cpu_set_t)),
+           [sysnum_setaffinity] "i"(SYS_sched_setaffinity)
+-        : "x0", "x1", "x2", "x8", "q0", "q1", "memory");
++        : "x0", "x1", "x2", "x8", "v0", "v1", "memory");
+ #    else
+ #        error Unsupported arch
+ #    endif
+@@ -935,7 +935,7 @@
+         : [rseq_cs] "=m"(reg_rseq->rseq_cs), [restarts] "=m"(restarts),
+           [commits] "=m"(commits)
+         : [signum_alarm] "i"(SIGALRM), [sysnum_kill] "i"(SYS_kill)
+-        : "x0", "x1", "x2", "x8", "q0", "q1", "memory");
++        : "x0", "x1", "x2", "x8", "v0", "v1", "memory");
+ #    else
+ #        error Unsupported arch
+ #    endif
+@@ -1052,7 +1052,7 @@
+         : [rseq_cs] "=m"(reg_rseq->rseq_cs), [restarts] "=m"(restarts),
+           [commits] "=m"(commits)
+         :
+-        : "x0", "q0", "q1", "memory");
++        : "x0", "v0", "v1", "memory");
+ #else
+ #    error Unsupported arch
+ #endif
+@@ -1165,7 +1165,7 @@
+         : [rseq_cs] "=m"(reg_rseq->rseq_cs), [restarts] "=m"(restarts),
+           [commits] "=m"(commits)
+         :
+-        : "x0", "q0", "q1", "memory");
++        : "x0", "v0", "v1", "memory");
+ #else
+ #    error Unsupported arch
+ #endif
+@@ -1226,8 +1226,8 @@
+         "str xzr, %[rseq_cs]\n\t"
+         /* clang-format on */
+ 
+-        : [rseq_cs] "=m"(reg_rseq->rseq_cs), [id] "=m"(id), [index] "=g"(index)
+-        : [cpu_id] "m"(reg_rseq->cpu_id)
++        : [rseq_cs] "=m"(reg_rseq->rseq_cs), [id] "=m"(id)
++        : [cpu_id] "m"(reg_rseq->cpu_id), [index] "r"(index)
+         : "x0", "x1", "x2", "x28", "memory");
+     assert(id != RSEQ_CPU_ID_UNINITIALIZED);
+ }

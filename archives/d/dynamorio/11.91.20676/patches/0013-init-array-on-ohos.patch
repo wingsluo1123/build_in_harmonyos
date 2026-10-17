@@ -1,0 +1,25 @@
+--- a/core/unix/os_public.h
++++ b/core/unix/os_public.h
+@@ -246,7 +246,21 @@
+  * without __attribute__((constructor)) but it inexplicably breaks tests if
+  * we add this flag on X86. So we add it only on ARM64 for now.
+  */
+-#if defined(MACOS) && defined(AARCH64)
++/* Some loaders do not invoke DT_INIT for shared objects (only .init_array), so
++ * the _init-based entry points are also registered as constructors.  Whether a
++ * loader does that is not a build-time-probeable property of the compiler or
++ * headers; the case we hit is a musl-libc system, so the workaround is keyed on
++ * the MUSL libc capability (not on a platform name), consistent with the rest of
++ * this port (core/unix/preload.c).  The entry points are idempotent (patches
++ * 0002/0015), so an environment invoking both DT_INIT and .init_array cannot
++ * initialise twice.  Upstream applies the same workaround for macOS ARM64
++ * (i#5383 comment below).
++ */
++#if (defined(MACOS) && defined(AARCH64)) || defined(MUSL)
++/* Some loaders do not invoke DT_INIT for shared objects at all (only
++ * .init_array); our _init-based entry points are therefore also registered as
++ * constructors, as is already needed on macOS ARM64.
++ */
+ #    define INITIALIZER_ATTRIBUTES __attribute__((constructor))
+ #else
+ #    define INITIALIZER_ATTRIBUTES
