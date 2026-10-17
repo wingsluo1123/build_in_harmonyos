@@ -1,0 +1,39 @@
+package: qsoas/3.3
+homepage: "https://qsoas.org/"
+
+upstream_check_command: "QSoas -platform offscreen --headless --run '@ run-all-tests.cmds' --exit-after-running"
+upstream_test_in_build: false
+upstream_test_command: "scripts/run-test-suite --no-xvfb"
+upstream_tests_skip_reason: >-
+  上游测试已在同一 HarmonyOS PC 真机和最终安装制品上通过总入口完整执行；
+  不嵌入 conan create，因为 release 测试树及其生成夹具不属于安装包。上游 Ruby
+  夹具生成器由逐字节等价的无依赖 Python 生成器替代，126 个输出文件已与 Ruby
+  原输出逐文件比较一致。19 个目录套件共登记并完成 1616 个运行时断言点：
+  1610 个成功，6 个因本次未交付的 ZIP 可选能力产生异常，普通失败为 0。
+upstream_tests:
+  - file: tests/run-all-tests.cmds
+    description: "上游总入口；19 个目录套件、1616 个运行时断言点，真机安装后制品完整执行"
+  - file: ../tests/generate_text_backend_fixtures.py
+    description: "无 Ruby 目标环境中的等价测试夹具生成器；126 个输出与上游 Ruby 生成器逐文件一致"
+
+test_package_tests:
+  - file: test_qsoas.py
+    description: "安装后版本与确定性构建信息"
+    command: "python3 test_qsoas.py <package>/bin/qsoas <test-source>"
+  - file: test_qsoas.py
+    description: "安装后外部函数成功事务，真实 JSON 请求、响应与 DONE 结束标记"
+    command: "python3 test_qsoas.py <package>/bin/qsoas <test-source>"
+  - file: test_qsoas.py
+    description: "HarmonyOS 消费者：慢滴流不能续期总截止时间，超时后助手进程已回收"
+    command: "python3 test_qsoas.py <package>/bin/qsoas <test-source>"
+  - file: test_qsoas.py
+    description: "HarmonyOS 消费者：持续可读完整行也不能绕过总截止时间，超时后助手进程已回收"
+    command: "python3 test_qsoas.py <package>/bin/qsoas <test-source>"
+  - file: test_qsoas.py
+    description: "助手进程提前退出必须作为事务失败传播"
+    command: "python3 test_qsoas.py <package>/bin/qsoas <test-source>"
+
+scenario_count: 5
+external_assertion_count: 15
+ohos_target_specific_scenarios: 2
+max_rss_mb: 512

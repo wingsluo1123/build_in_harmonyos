@@ -1,0 +1,20 @@
+--- a/src/general-commands.cc
++++ b/src/general-commands.cc
+@@ -356,6 +356,9 @@
+   if(! file.isEmpty()) {
+     File::checkOpen(file, opts);
+     if(file.endsWith("svg")) {
++#ifdef QSOAS_NO_QTSVG
++      throw RuntimeError("SVG output is not available in this build");
++#else
+       QSvgGenerator * gen = new QSvgGenerator;
+       p = std::unique_ptr<QPaintDevice>(gen);
+       if(pageSize.isEmpty()) {
+@@ -366,6 +369,7 @@
+       gen->setSize(QSize(w,h));
+       gen->setFileName(file);
+       preview = false;
++#endif
+     }
+   }
+   if(! p) {

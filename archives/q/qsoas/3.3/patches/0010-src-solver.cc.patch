@@ -1,0 +1,18 @@
+--- a/src/solver.cc
++++ b/src/solver.cc
+@@ -146,7 +146,14 @@ double Solver::solve()
+   int nb = 0;
+   double xp = currentValue();
+   while(true) {
+-    iterate();
++    // A failed derivative step is a recoverable seed failure for callers
++    // such as the implicit fitter.  Do not let the process-wide GSL error
++    // callback throw through a C frame; consume the status explicitly.
++    gsl_error_handler_t * previousHandler = gsl_set_error_handler_off();
++    int iterationStatus = iterate();
++    gsl_set_error_handler(previousHandler);
++    if(iterationStatus != GSL_SUCCESS)
++      throw GSLError("Root solver iteration failed: %1").arg(gsl_strerror(iterationStatus));
+     double xn = currentValue();
+ 
+     int status = 0;
