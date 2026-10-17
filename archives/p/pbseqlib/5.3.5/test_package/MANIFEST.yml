@@ -1,0 +1,86 @@
+# test_package/MANIFEST.yml — pbseqlib 5.3.5
+# Upstream and consumer test declaration required by CI L0e.
+
+package: pbseqlib/5.3.5
+homepage: "https://github.com/PacificBiosciences/blasr_libcpp"
+
+upstream_tests_exist: true
+upstream_test_audit:
+  source_tarball: "pbseqlib_5.3.5+dfsg.orig.tar.xz (Debian dfsg-cleaned upstream, SHA-256 verified)"
+  source_sha256: "81afecd5d7ccb3cd70ed42cd8afa64876fde4c0deee89e1112c7f3b3d6ee8c49"
+  build_system: "Meson (>= 0.52, C++17)"
+  test_definition: >
+    Upstream tests are 45 *_gtest.cpp files under unittest/
+    (static macro scan counts 122 TEST/TEST_F instances).
+    unittest/meson.build compiles them into a single libblasr_unittest
+    binary and registers 2 meson test() entries: 'libblasr formatting
+    check' (tools/check-formatting lint) and 'libblasr gtest unittests'
+    (the binary, with --gtest_output=xml:libblasr-gtest-unittests.xml).
+    Counting unit is one gtest case, observed at runtime in the XML
+    report (tests/failures/skipped/errors attributes).
+    Take-number commands: gtest XML tests attribute -> discovered,
+    failures + errors -> failed, skipped -> skipped;
+    passed = discovered - failed - skipped. The formatting lint is not
+    a gtest case and contributes 0 to the totals, but the meson test
+    exit code gates the build. Runtime counts come from the true-machine
+    preflight log; the fields below are filled in after the first preflight.
+  dependency: "gtest (Conan host requirement gtest/1.17.0.1 when tests=True, exposed to Meson via hand-written gtest.pc/gtest_main.pc plus PKG_CONFIG_PATH; meson fallback subproject disabled with wrap_mode=nodownload)"
+  portability_changes:
+    - "patches/0001-meson-build.patch adds the missing explicit HDF5 "
+    - "dependency (68 files include H5Cpp.h; same fix as Debian "
+    - "debian/patches/meson.patch); no algorithm code is touched"
+  examples_note: >
+    Upstream has no separate example test entries; scripts/ci/test.sh
+    only runs 'ninja -C <build> test', i.e. the same 2 meson entries.
+
+upstream_check_command: "meson test -C <build-folder> --no-rebuild --print-errorlogs"
+upstream_test_in_build: true
+upstream_test_command: "meson test -C <build-folder> --no-rebuild --print-errorlogs"
+
+upstream_test_total: 122
+upstream_test_count_method: gtest_macros
+# Runtime passed/failed/skipped are filled in from the true-machine
+# preflight log (first evidence round); 0 here means "not yet measured",
+# not "zero passed".
+upstream_test_passed: 0
+upstream_test_failed: 0
+upstream_test_skipped: 0
+
+# Representative sample (all 45 files follow the same pattern; full list in
+# notes.md: 122 macros). Each entry below is one file built into
+# libblasr_unittest.
+upstream_tests:
+  - file: unittest/pbdata/DNASequence_gtest.cpp
+    source: blasr_libcpp-5.3.5/unittest/pbdata/DNASequence_gtest.cpp
+    description: "DNASequence unit tests"
+    command: "./libblasr_unittest --gtest_filter=*DNASequence*"
+  - file: unittest/pbdata/FASTAReader_gtest.cpp
+    source: blasr_libcpp-5.3.5/unittest/pbdata/FASTAReader_gtest.cpp
+    description: "FASTAReader unit tests"
+    command: "./libblasr_unittest --gtest_filter=*FASTAReader*"
+  - file: unittest/hdf/HDFUtils_gtest.cpp
+    source: blasr_libcpp-5.3.5/unittest/hdf/HDFUtils_gtest.cpp
+    description: "HDF utils unit tests"
+    command: "./libblasr_unittest --gtest_filter=*HDFUtils*"
+  - file: unittest/alignment/datastructures/alignment/AlignmentMap_gtest.cpp
+    source: blasr_libcpp-5.3.5/unittest/alignment/datastructures/alignment/AlignmentMap_gtest.cpp
+    description: "AlignmentMap unit tests"
+    command: "./libblasr_unittest --gtest_filter=*AlignmentMap*"
+  - file: unittest/alignment/utils/FileUtils_gtest.cpp
+    source: blasr_libcpp-5.3.5/unittest/alignment/utils/FileUtils_gtest.cpp
+    description: "FileUtils unit tests"
+    command: "./libblasr_unittest --gtest_filter=*FileUtils*"
+
+test_package_tests:
+  - file: test_pbseqlib.cpp
+    scenario: "consumer-api"
+    description: >
+      Build and run a Conan consumer that checks the NucConversion
+      TwoBit/ThreeBit tables and FASTQ_CHAR_TO_QUALITY, copies a
+      std::string into DNASequence, round-trips it through ToString,
+      and verifies ReverseComplementSelf/MakeRC produce GTTT from AAAC.
+      Each of the 8 CHECKs has a failure exit path.
+    command: "./test_pbseqlib"
+    assertions: 8
+
+assertion_count: 8

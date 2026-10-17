@@ -1,0 +1,187 @@
+From: Michael R. Crusoe <crusoe@debian.org>
+Subject: Adapt to pbbam 2.3.0 / pbcopper 2.2.0 changes
+Origin: Debian pbseqlib 5.3.5+dfsg-12, debian/patches/pbbam_2.3.0
+ (pbbam 2.3.0 moved QualityValues/Cigar/Orientation/Strand/Position
+  from PacBio::BAM to PacBio::Data in pbcopper; adapts 4 files,
+  no algorithm change)
+
+--- a/hdf/HDFPulseCallsWriter.cpp
++++ b/hdf/HDFPulseCallsWriter.cpp
+@@ -4,6 +4,7 @@
+ 
+ #include <hdf/HDFPulseCallsWriter.hpp>
+ #include <pbdata/utils/TimeUtils.hpp>
++#include <pbcopper/data/QualityValues.h>
+ 
+ #include <algorithm>
+ #include <cctype>
+@@ -354,7 +355,7 @@
+ {
+     if (HasLabelQV()) {
+         if (read.HasLabelQV()) {
+-            const PacBio::BAM::QualityValues& qvs = read.LabelQV();
++            const PacBio::Data::QualityValues& qvs = read.LabelQV();
+             std::vector<uint8_t> data(qvs.cbegin(), qvs.cend());
+             _CheckRead(read, data.size(), "LabelQV");
+             labelQVArray_.Write(&data[0], data.size());
+@@ -395,7 +396,7 @@
+ {
+     if (HasPulseMergeQV()) {
+         if (read.HasPulseMergeQV()) {
+-            const PacBio::BAM::QualityValues& qvs = read.PulseMergeQV();
++            const PacBio::Data::QualityValues& qvs = read.PulseMergeQV();
+             std::vector<uint8_t> data(qvs.cbegin(), qvs.cend());
+             _CheckRead(read, data.size(), "PulseMergeQV");
+             pulseMergeQVArray_.Write(&data[0], data.size());
+@@ -476,7 +477,7 @@
+ {
+     if (HasAltLabelQV()) {
+         if (read.HasAltLabelQV()) {
+-            const PacBio::BAM::QualityValues& qvs = read.AltLabelQV();
++            const PacBio::Data::QualityValues& qvs = read.AltLabelQV();
+             std::vector<uint8_t> data(qvs.begin(), qvs.end());
+             _CheckRead(read, data.size(), "AltLabelQV");
+             altLabelQVArray_.Write(&data[0], data.size());
+--- a/alignment/datastructures/alignment/FilterCriteria.cpp
++++ b/alignment/datastructures/alignment/FilterCriteria.cpp
+@@ -18,6 +18,8 @@
+ 
+ #include <alignment/datastructures/alignment/FilterCriteria.hpp>
+ #include <pbdata/PrettyException.hpp>
++#include <pbcopper/data/Orientation.h>
++#include <pbcopper/data/Cigar.h>
+ 
+ constexpr float Score::errorunit;
+ 
+@@ -374,26 +376,26 @@
+ {
+     assert(record.IsMapped() and record.Impl().HasTag(AS));
+     DNALength alnLength = static_cast<DNALength>(
+-        record.Sequence(PacBio::BAM::Orientation::NATIVE, true, true).size());
+-    PacBio::BAM::Cigar cigar = record.CigarData();
++        record.Sequence(PacBio::Data::Orientation::NATIVE, true, true).size());
++    PacBio::Data::Cigar cigar = record.CigarData();
+ 
+     uint32_t nMatch = 0, nMismatch = 0, nIns = 0, nDel = 0;
+     for (auto op : cigar) {
+         uint32_t n = op.Length();
+         switch (op.Type()) {
+-            case PacBio::BAM::CigarOperationType::SEQUENCE_MATCH:
++            case PacBio::Data::CigarOperationType::SEQUENCE_MATCH:
+                 nMatch += n;
+                 break;
+-            case PacBio::BAM::CigarOperationType::SEQUENCE_MISMATCH:
++            case PacBio::Data::CigarOperationType::SEQUENCE_MISMATCH:
+                 nMismatch += n;
+                 break;
+-            case PacBio::BAM::CigarOperationType::ALIGNMENT_MATCH:
++            case PacBio::Data::CigarOperationType::ALIGNMENT_MATCH:
+                 nMismatch += n;
+                 break;
+-            case PacBio::BAM::CigarOperationType::INSERTION:
++            case PacBio::Data::CigarOperationType::INSERTION:
+                 nIns += n;
+                 break;
+-            case PacBio::BAM::CigarOperationType::DELETION:
++            case PacBio::Data::CigarOperationType::DELETION:
+                 nDel += n;
+                 break;
+             default:
+--- a/pbdata/SMRTSequence.cpp
++++ b/pbdata/SMRTSequence.cpp
+@@ -3,6 +3,8 @@
+ #include <pbdata/PrettyException.hpp>
+ #include <pbdata/SMRTSequence.hpp>
+ #include <pbdata/utils/SMRTTitle.hpp>
++#include <pbcopper/data/Orientation.h>
++#include <pbcopper/data/Strand.h>
+ 
+ #include <cstdlib>
+ 
+@@ -435,8 +437,8 @@
+ void SMRTSequence::MakeNativeOrientedBamRecord(const PacBio::BAM::BamRecord &record)
+ {
+     bamRecord = PacBio::BAM::BamRecord(record);  // copy first
+-    if (record.IsMapped() and record.AlignedStrand() == PacBio::BAM::Strand::REVERSE) {
+-        PacBio::BAM::BamRecordView bv(record, PacBio::BAM::Orientation::NATIVE, false, false);
++    if (record.IsMapped() and record.AlignedStrand() == PacBio::Data::Strand::REVERSE) {
++        PacBio::BAM::BamRecordView bv(record, PacBio::Data::Orientation::NATIVE, false, false);
+         bamRecord.Impl().Flag(PacBio::BAM::BamRecordImpl::UNMAPPED);  // set flag as unmapped
+         bamRecord.Impl().SetSequenceAndQualities(bv.Sequence(), bv.Qualities().Fastq());
+         if (bamRecord.HasInsertionQV()) bamRecord.InsertionQV(bv.InsertionQVs());
+--- a/alignment/format/BAMPrinterImpl.hpp
++++ b/alignment/format/BAMPrinterImpl.hpp
+@@ -6,6 +6,9 @@
+ #include <algorithm>
+ 
+ #include <pbdata/utils/SMRTTitle.hpp>
++#include <pbcopper/data/Cigar.h>
++#include <pbcopper/data/Strand.h>
++#include <pbcopper/data/Position.h>
+ 
+ using namespace BAMOutput;
+ 
+@@ -41,7 +44,7 @@
+     CreateCIGARString(alignment, read, cigarString, clipping, prefixSoftClip, suffixSoftClip,
+                       prefixHardClip, suffixHardClip, cigarUseSeqMatch, allowAdjacentIndels);
+     SetAlignedSequence(alignment, read, alignedSequence, clipping);
+-    PacBio::BAM::Cigar cigar = PacBio::BAM::Cigar::FromStdString(cigarString);
++    PacBio::Data::Cigar cigar = PacBio::Data::Cigar::FromStdString(cigarString);
+ 
+     // build flag
+     uint16_t flag;
+@@ -52,15 +55,15 @@
+     seqString.assign((char *)alignedSequence.seq, alignedSequence.length);
+ 
+     // Get alignment starting position on reference sequence forward strand.
+-    PacBio::BAM::Position pos = 0;
+-    PacBio::BAM::Strand strand;
++    PacBio::Data::Position pos = 0;
++    PacBio::Data::Strand strand;
+     if (alignment.tStrand == 0) {
+-        pos = static_cast<PacBio::BAM::Position>(alignment.TAlignStart());
+-        strand = PacBio::BAM::Strand::FORWARD;
++        pos = static_cast<PacBio::Data::Position>(alignment.TAlignStart());
++        strand = PacBio::Data::Strand::FORWARD;
+     } else {
+-        pos = static_cast<PacBio::BAM::Position>(alignment.tLength -
++        pos = static_cast<PacBio::Data::Position>(alignment.tLength -
+                                                  (alignment.TAlignStart() + alignment.TEnd()));
+-        strand = PacBio::BAM::Strand::REVERSE;
++        strand = PacBio::Data::Strand::REVERSE;
+     }
+ 
+     if (buildFromScratch) {
+@@ -75,12 +78,12 @@
+         bamRecord.Impl().Bin(0);
+         bamRecord.Impl().InsertSize(0);
+         bamRecord.Impl().MapQuality(static_cast<uint8_t>(alignment.mapQV));
+-        bamRecord.Impl().MatePosition(static_cast<PacBio::BAM::Position>(-1));
++        bamRecord.Impl().MatePosition(static_cast<PacBio::Data::Position>(-1));
+         bamRecord.Impl().MateReferenceId(static_cast<int32_t>(-1));
+         bamRecord.Impl().Position(pos);
+         bamRecord.Impl().ReferenceId(static_cast<int32_t>(alignment.tIndex));
+ 
+-        if (strand == PacBio::BAM::Strand::REVERSE) {
++        if (strand == PacBio::Data::Strand::REVERSE) {
+             bamRecord.Impl().SetReverseStrand(true);
+         }
+ 
+@@ -136,14 +139,14 @@
+         bamRecord.Impl().CigarData(cigar);
+     } else {
+         // The following code can be used to hard-clip reads, if needed.
+-        // PacBio::BAM::Position clipStart = read.bamRecord.QueryStart() + alignment.QAlignStart();
+-        // PacBio::BAM::Position clipEnd = read.bamRecord.QueryStart() + alignment.QAlignEnd();
++        // PacBio::Data::Position clipStart = read.bamRecord.QueryStart() + alignment.QAlignStart();
++        // PacBio::Data::Position clipEnd = read.bamRecord.QueryStart() + alignment.QAlignEnd();
+         // bamRecord = PacBio::BAM::BamRecord::Clipped(read.bamRecord,
+         //                PacBio::BAM::ClipType::CLIP_TO_QUERY,
+         //                clipStart, clipEnd).
+         bamRecord = PacBio::BAM::BamRecord::Mapped(subread.bamRecord,
+                                                    static_cast<int32_t>(alignment.tIndex),
+-                                                   static_cast<PacBio::BAM::Position>(pos), strand,
++                                                   static_cast<PacBio::Data::Position>(pos), strand,
+                                                    cigar, static_cast<uint8_t>(alignment.mapQV));
+     }
+ 

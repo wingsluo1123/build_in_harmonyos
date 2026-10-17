@@ -1,0 +1,25 @@
+From: gcw_6a3w2yXz <gcw_6a3w2yXz@example.com>
+Subject: Define portable __WORDSIZE fallback for non-glibc libcs
+Origin: local portability fix for HarmonyOS PC (HongMeng libc++ / musl-like,
+ no <bits/wordsize.h>); __WORDSIZE is a glibc-internal macro and the
+ upstream `#include <bits/user.h>` fallback does not define it on OHOS,
+ breaking alignment/statistics/StatUtils.cpp with
+ "use of undeclared identifier '__WORDSIZE'" (true-machine preflight
+ [81/186] StatUtils.cpp:18). The fallback keeps glibc shift semantics
+ (31 on 64-bit, 15 on 32-bit); no algorithm change.
+
+--- a/alignment/statistics/StatUtils.cpp
++++ b/alignment/statistics/StatUtils.cpp
+@@ -1,5 +1,11 @@
+ #include <alignment/statistics/StatUtils.hpp>
+ 
+ #ifndef __WORDSIZE
+-#include <bits/user.h>
++// __WORDSIZE is a glibc-internal macro (<bits/wordsize.h>); non-glibc
++// libcs (OHOS/musl with libc++) provide neither it nor a defining
++// <bits/user.h>. Fall back to the long/pointer width so the
++// (__WORDSIZE / 2 - 1) shift below keeps its glibc semantics
++// (31 on 64-bit, 15 on 32-bit). sizeof is evaluated by the compiler,
++// not the preprocessor, so this is valid in the shift expression.
++#define __WORDSIZE (sizeof(unsigned long) * 8)
+ #endif
