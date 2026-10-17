@@ -1,0 +1,80 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: proxycheck/0.49a
+homepage: "https://www.corpit.ru/mjt/proxycheck.html"
+
+# 上游测试命令: 上游 Makefile.in 无 check 目标（本配方的自检执行命令见 upstream_test_command）
+# 实测 `make -n check` -> make: *** No rule to make target 'check'. Stop.
+upstream_check_command: ""
+
+# conanfile.py build() 方法中是否已集成上游测试
+# 上游自身 source_declared_total 仍为 0（无 tests/ 目录、无测试框架、无 make check 目标，
+# 且从未编译 event.c 的 #if TEST 块 —— 不谎称上游注册过）。
+# 本配方把上游自带的 event 层自检显式注册进 build() 并真实执行（详见 notes.md 五维账本）。
+upstream_test_in_build: true
+upstream_test_command: "clang -DTEST -o event_selftest event.c; printf x | timeout 20 ./event_selftest | 断言 input: x"
+
+# 实际注册并运行的测试程序（注册方=本配方 build()，非上游构建系统）
+upstream_tests:
+  - name: event_selftest
+    origin: "上游 event.c:919-964 的 #if TEST 自检块（上游从不编译）+ 本归档补丁 0001-event-selftest-callback-signatures.patch"
+    registered_by: "conanfile.py build()（配方新增注册；上游 N_static 仍为 0）"
+    executed_in_build: true
+    run_rc: 0
+    stdout: "evio method: epoll / input: x"
+    before_patch: "COMPILE_RC=0 + 5 warnings, RUN_RC=139 SIGSEGV"
+    after_patch: "COMPILE_RC=0 + 1 warning, RUN_RC=0"
+
+# 披露：上游存在 1 个「未注册」的自检块，未被任何构建目标编译，因此不计入 N_registered，
+# 但必须如实登记（否则正文写 "上游无测试" 构成少报）。真机取证见 notes.md「上游测试枚举台账」。
+unregistered_upstream_test_blocks:
+  - file: event.c
+    lines: "919-964"
+    guard: "#if TEST"
+    kind: "上游自带 event 层自检/演示 main()"
+    registered_in_build: false
+    probe_compile_rc: 0            # clang -DTEST 单独编译通过（OHOS SDK clang 15.0.4）
+    probe_run_rc: 139              # SIGSEGV：TEST 块回调签名与 typedef 漂移（上游自身缺陷，跨平台）
+    warnings: "4x -Wincompatible-function-pointer-types (event.c:930/942/956/958)"
+    registered_by_this_recipe: true
+    patched: true
+    run_rc_after_patch: 0
+    disposition: "2026-10-12 统筹裁定①：补两行回调签名（patches/0001-event-selftest-callback-signatures.patch）后由 build() 显式编译并执行；改前/改后同源对照读数与输入形态实测见 notes.md"
+
+# test_package 中自带的测试 (消费者视角验证，执行已安装二进制并断言退出码/输出)
+test_package_tests:
+  - file: smoke.sh
+    description: "消费者测试：调用包内 proxycheck/proxylogger，7 条断言覆盖版本宏代入、帮助与协议表、用法错误码、回环端口真实探测（socket + epoll 事件循环）、.invalid 解析失败、proxylogger 的 inetd socket 契约、man1/man3 手册页 staging；全部离线确定性"
+    command: "bash smoke.sh"
+
+# 测试断言总数
+recipe_revision_32bit: "12a50f974ed6e5c5bc83169f142f9bac"
+package_id: "6b129b068851896169fae42d399fa922d239ce8a"
+package_revision: "7e74d4e743d4eb50a0a0fce180af1590"
+w3_round_recipe_revision: "87ba34836dc2dd104e16b3e602eca03d"
+local_rrev_correction: "2026-10-15 消费独立 W4 P1-1：两处跟踪载体原申报 31 位值少一个 3，已按一手载体 reports/conan-create.log:10 更正；本包 rrev 有两个值（verify 轮与 W3 轮）而 pkg id/prev 相同，成因见 manifest.yaml 的 w3_round_note"
+assertion_count: 7
+
+# 资源预算（§14.1④）：memcap-run --probe 实测 proxycheck -h 峰值 RSS 0MB（<1MB），
+# 消费者测试仅调用二进制处理常量参数与回环端口，无大输入。
+max_rss_mb: 256
+
+# 2026-10-15 纯文本落盘轮：r26（2026-10-13 21:3x）route B 真机读数绑定，本轮零构建、零 push。
+local_verification_20261015:
+  bound_tip: "4bd011d4a7f11aeb11a5f7cb81672674a3c2f351"
+  wording_gate: "私有影子 profile 输入下官方工具本地绿 != 官方默认管线绿"
+  conan_verify_run: "python3 scripts/ohc-run.py conan-verify proxycheck 0.49a --profile ohos-aarch64.shadow15461B -> VERIFY_RC=0 (2026-10-13T21:35:37)"
+  conan_verify_report_sha256: "30afe6c431f7c92c90cfdaba014c000f96228950049a421a7330334ca71ca551"
+  w3_run: "CONAN_PROFILE=ohos-aarch64.shadow15461B + ci/conan/setup.sh + ci/conan/build_and_test.sh archives/p/proxycheck/0.49a -> W3_RC=0 (2026-10-13T13:39:56Z)"
+  w3_authoritative_carriers_sha256:
+    ci_metadata: "9469b93119c42c95bfd276809e7a62528537718dd95c5106a2eeab0e60566a2a"
+    inner_conan_log: "518f9d1c99e593511e6e59866ec1def0c6269630f24a70e9f08e3c4e09471fea"
+    driver_stdout: "b2b34d456259c806a820b7c8322cdd7aaf22291cab360d2d69455f5f950bfe4f"
+  l2_ci_smoke: "skip（长选项 --version/--help 上游 0.49a 不认）；本文件 assertion_count=7 走短选项 -h，不得把 L2 计入通过项"
+  consumer_assertions_executed: 7
+  upstream_selftest_executed: true
+  build_closed_marker: "存在但是 2026-10-12 14:30 的旧标记（内容 2026-10-12 14:30 / built），本轮未跑 finish、未刷新它，不得当本轮证据"
+  finish_run: false
+  no_build_this_round: true
