@@ -1,0 +1,24 @@
+# test_package/MANIFEST.yml — edid-decode 20220315
+# CI L0e requires this file to exist.
+
+package: edid-decode/20220315
+homepage: "https://git.linuxtv.org/edid-decode.git/"
+
+# 清点证据：该快照的 Makefile 只有 all / edid-decode / edid-decode.js /
+# clean / install 五个目标，没有 check；test/ 目录只有 18 个 .test 输入样本
+# 与 README，没有任何 runner 脚本 ⇒ 上游无自动化测试可跑。
+upstream_check_command: "make check"
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游没有自动化测试程序（无 runner、无 check 目标）
+upstream_tests: []
+
+# test_package tests (consumer perspective)
+test_package_tests:
+  - file: test_edid_decode.py
+    description: "用已安装的 bin/edid-decode 解析 3 个上游 EDID 样本 + stdin 输入，断言版本/厂商输出，并校验 -h 用法退出码"
+    command: "python3 test_edid_decode.py <package>/bin/edid-decode fixtures"
+
+# 3 个样本 × (1 退出码 + 2 输出) + stdin × 2 + -h × 2 = 13
+assertion_count: 13
