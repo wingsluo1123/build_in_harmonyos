@@ -1,0 +1,32 @@
+# test_package/MANIFEST.yml
+# 上游测试声明 — ci/conan/build_and_test.sh L0e 要求
+package: btrfs-compsize/1.5
+homepage: "https://github.com/kilobyte/compsize"
+
+# ── 上游自动化测试 ─────────────────────────────────────────────
+# compsize 1.5 无自动化测试入口：官方 tag 归档仅 11 个文件，Makefile 只有
+# all/debug/install/uninstall/clean 目标（无 test/check），无 tests/ 目录、
+# 无 ctest/pytest/meson 注册、无 CI 配置。故 L1 上游测试豁免（已登记
+# ci/config/no_official_test.txt）。
+upstream_tests_exist: false
+upstream_test_audit: >-
+  compsize-1.5 归档文件：Makefile / compsize.c / compsize.8 / radix-tree.{c,h} /
+  kerncompat.h / endianness.h / README.md / LICENSE / .gitignore；
+  `grep -nE '^(test|check):' Makefile` -> 无匹配；
+  `find . -iname '*test*'` -> 0（README 仅文字提及测试）；无 CI 配置。
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# ── test_package（消费者视角，在 conan create 内运行）────────────
+test_package_tests:
+  - file: "test.sh"
+    description: >-
+      消费者测试 — 调用已安装 compsize 二进制：(1) `--help` 打印用法并 exit 0；
+      (2) 扫描空目录输出 "No files." 并 exit 1。两条路径均 host-independent，
+      不需要 btrfs 文件系统或 root。
+    command: "bash test.sh"
+
+assertion_count: 2
+ohos_specific_cases: 0
