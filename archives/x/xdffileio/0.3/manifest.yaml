@@ -1,0 +1,45 @@
+software: xdffileio
+version: "0.3"
+status: built
+build_date: "2026-10-10"
+build_system: autotools
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/x/xdffileio/xdffileio_0.3.orig.tar.bz2"
+  sha256: "9f4615cb320963cb8855993960adb46895c4a614c700bc2e2b79c10d4a7312fb"
+  tar_format: tar.bz2
+
+build:
+  system: autotools
+  configure_options:
+    - "--enable-static"
+    - "--disable-shared"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+test_results:
+  upstream:
+    registered: 6
+    ran: 6
+    ok: 6
+    expected_fail: 0
+    fail: 0
+    skipped: 0
+    subtests: "automake TESTS in tests/Makefile.am: testbdf, testedf, testgdf1, testgdf2, readcheck, errorcheck (errorcheck gated by RUN_ERROR_TEST=setrlimit probe)"
+    command: "make check (parsed from tests/test-suite.log # TOTAL/# PASS/# FAIL)"
+    uname_branch: "OHOS|HarmonyOS"
+    verified: "pending device preflight evidence round"
+    verified_log: ""
+  test_package:
+    assertions: 21
+    passed: 21
+    fail: 0
+    verified: "pending device preflight evidence round"
+
+patches_applied: []
+
+knowledge_gained:
+  - "xdffileio 0.3 is autotools-only (no meson/python bindings yet); the Debian orig tarball ships generated configure + gnulib libgnu, so no gnulib-tool/autoreconf bootstrap is needed on device (the GitHub tag archive requires gnulib-tool + autoreconf and is unsuitable)"
+  - "Upstream 0.3 test suite counts in automake TESTS units (tests/Makefile.am): 5 unconditional + errorcheck gated by AC_CHECK_FUNC(setrlimit); OHOS musl provides setrlimit so the suite registers 6"
+  - "xdffileio 0.3 has no mmlib dependency: 0.3 configure.ac/sources contain zero mmlib/MM_CHECK_LIB references (mmlib only required by ; verified against xdffileio-0.3 tag tarball"
