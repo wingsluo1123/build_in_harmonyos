@@ -1,0 +1,43 @@
+software: kservice
+version: "6.28.0"
+status: built
+build_system: cmake
+created_at: 2026-10-17
+build_date: 2026-10-17
+dependencies:
+  required:
+    - qtbase/6.11.1
+    - kconfig/6.26.0.1
+    - kcoreaddons/6.26.0.1
+    - ki18n/6.26.0
+  build:
+    - ecm/6.28.0
+  optional:
+    - kdoctools
+    - python-bindings
+patches_applied:
+  - "patches/0001-lower-kf-dep-version.patch"
+  - "patches/0002-autotests-guard-ohos-fs-sensitive-checks.patch"
+  - "patches/0003-ohos-autotests-xdg-menu-fallback.patch"
+  - "patches/0004-ohos-test-fixture-copy-fallback.patch"
+test_results:
+  type: passed
+  upstream: "passed: 6/6 upstream CTest tests (ksycocatest, ksycoca_xdgdirstest, ksycocathreadtest, kservicetest, kapplicationtradertest, kmimeassociationstest); ksycocatest reports 3 POSIX fs-semantics subchecks guarded (QSKIP with printed reason on the OHOS user volume), all remaining subchecks pass"
+  test_package: "passed: 23/23 checks (test_kservice 13/13 in-process sycoca build + service discovery; packaging asserts 10/10: bare DT_SONAME, no versioned symlink chain, clean DT_NEEDED, kbuildsycoca6 --version/--testmode)"
+  package_id: "08ff486632bbe8da1a11f30478317fb8c06bc5a1"
+  l0: "pass"
+  l1: "pass"
+  l2: "skip: 平台 runner 的 G4 以两级键（本地缓存 → 软件名 → 完整引用）检索，conan 2.29.1 的 list JSON 只以完整引用为键 → 程序包 ID 检索未命中、cache 路径未建立（runner 判非阻塞）; 等效 smoke 由 test_package 打包完整性检查覆盖（kbuildsycoca6 --version 输出 6.28.0）"
+  l4: "skip: 同 l2（无 cache 路径，非阻塞）; 等效检查由 test_package 打包完整性覆盖（ELF SONAME/DT_NEEDED 断言）"
+  l5: "skip: 同 l2（无 cache 路径，非阻塞）; 本任务的 SONAME 缺陷已在上游修复（CMAKE_USER_MAKE_RULES_OVERRIDE 恢复 -soname + CMAKE_PLATFORM_NO_VERSIONED_SONAME=TRUE），test_package 断言裸 DT_SONAME 与洁净 DT_NEEDED"
+source_url: https://download.kde.org/stable/frameworks/6.28/kservice-6.28.0.tar.xz
+source_sha256: d9151195b748361a12d7aeafd8df531d2f45b55d202d7fa5f47c3a11d59877d6
+knowledge_gained:
+  - "kservice 6.28.0 raises KF_DEP_VERSION to 6.28.0 while the ohpcd KF6 stack stops at 6.26.0; patch 0001 lowers the floor back to 6.26.0 (resolve logic untouched). ECM stays at 6.28.0 via the ecm/6.28.0 tool package."
+  - "OHOS CMake emits no SONAME for shared libraries (E383); CMAKE_USER_MAKE_RULES_OVERRIDE injects ohos-shared-library-rules.cmake to restore -soname emission (ki18n 6.26.0 precedent)."
+  - "OHOS/HMDFS user volume rejects symlink creation (E330), so upstream's VERSION/SOVERSION symlink chain fails; CMAKE_PLATFORM_NO_VERSIONED_SONAME=TRUE keeps -soname emission while producing only the unversioned real .so."
+  - "kbuildsycoca6 links the SONAME-less ki18n/6.26.0 package and records path-shaped DT_NEEDED entries; package() rewrites them in place to bare basenames (E537 family) and re-signs the whole tree after the install-time RUNPATH rewrite invalidated .codesign."
+  - "Building the sycoca cache requires a menu under XDG_CONFIG_HOME/menus: applications.menu drives the DefaultAppDirs scan, so a consumer without a menu gets an app-dir-less (empty) service database; KSycoca::setupTestMenu() stages the canonical minimal menu (ksycoca.h static, impl ksycoca.cpp) - used by test_package, with patch 0003 adding the same fallback to upstream ksycocatest."
+  - "serviceByDesktopPath keys strictly on the absolute entryPath recorded at scan time; lookups by bare desktop file name must use serviceByDesktopName (completeBaseName) instead."
+  - "ksycocatest exercises POSIX-only fs semantics (symlink, chmod-then-read, future mtime) that the OHOS user volume cannot satisfy deterministically; patch 0002 guards those three subchecks with QSKIP + printed reason (env-gated, no platform macros - R8 compliant), leaving all other subchecks and assertions intact."
+  - "test_package validates the full consumer path on-device: isolated XDG tree + setupTestMenu-driven cold sycoca build, lookup via serviceByDesktopName and via serviceByDesktopPath with an absolute entryPath, plus a second fixture staged under XDG_DATA_DIRS."

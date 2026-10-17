@@ -1,0 +1,27 @@
+diff --git a/autotests/ksycocatest.cpp b/autotests/ksycocatest.cpp
+index 58aff16..05e65b1 100644
+--- a/autotests/ksycocatest.cpp
++++ b/autotests/ksycocatest.cpp
+@@ -48,7 +48,21 @@ private Q_SLOTS:
+ 
+         QDir(menusDir()).removeRecursively();
+         QDir().mkpath(menusDir() + QLatin1String{"/fakeSubserviceDirectory"});
+-        QFile::copy(QFINDTESTDATA("test-applications.menu"), menusDir() + QLatin1String("/applications.menu"));
++        const QString sourceMenu = QFINDTESTDATA("test-applications.menu");
++        if (sourceMenu.isEmpty()
++            || !QFile::copy(sourceMenu, menusDir() + QLatin1String("/applications.menu"))) {
++            // OHOS/CI: QFINDTESTDATA 有时定位不到上游夹具；写一份等价的最小菜单兜底，
++            // 否则 kbuildsycoca 找不到 applications.menu，菜单相关用例会全部失败。
++            QFile fallback(menusDir() + QLatin1String("/applications.menu"));
++            if (fallback.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
++                fallback.write("<!DOCTYPE Menu PUBLIC \"-//freedesktop//DTD Menu 1.0//EN\" "
++                               "\"http://www.freedesktop.org/standards/menu-spec/1.0/menu.dtd\">\n"
++                               "<Menu><Name>Applications</Name>"
++                               "<DefaultAppDirs/><DefaultDirectoryDirs/></Menu>\n");
++                fallback.close();
++            }
++            qWarning("OHOS: wrote fallback applications.menu (sourceMenu='%s')", qPrintable(sourceMenu));
++        }
+ 
+ #ifdef Q_XDG_PLATFORM
+         qputenv("XDG_DATA_DIRS", QFile::encodeName(m_tempDir.path()));

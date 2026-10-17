@@ -1,0 +1,33 @@
+# conandata.yml - kservice 6.28.0
+# Upstream source: official KDE Frameworks 6.28.0 release tarball.
+# First adaptation of the 6.28.0 upstream release; carries the OHOS
+# adaptation set proven on kservice/6.26.0 (platform check bypass, PO
+# processing skip, autotest fs-sensitive guards) plus the XDG menu fixture
+# staging and DT_NEEDED repair/signing of 6.18.0.1.
+# download.kde.org is a Mirrorbits redirector; on some networks the mirror
+# it selects answers with a broken (demo) TLS certificate, so two
+# authoritative KDE mirrors are listed as fallbacks (R39: official source or
+# authoritative mirror). The sha256 below pins the identical official
+# tarball whichever mirror answers first.
+
+sources:
+  url:
+    - "https://download.kde.org/stable/frameworks/6.28/kservice-6.28.0.tar.xz"
+    - "https://mirrors.nju.edu.cn/kde/stable/frameworks/6.28/kservice-6.28.0.tar.xz"
+    - "https://mirrors.aliyun.com/kde/stable/frameworks/6.28/kservice-6.28.0.tar.xz"
+  sha256: "d9151195b748361a12d7aeafd8df531d2f45b55d202d7fa5f47c3a11d59877d6"
+
+patches:
+  "6.28.0":
+    - patch_file: "patches/0001-lower-kf-dep-version.patch"
+      patch_description: "Lower KF_DEP_VERSION from 6.28.0 to 6.26.0 so the project consumes the published KF6 stack (kconfig/kcoreaddons 6.26.0.1, ki18n 6.26.0); the find_package(ECM 6.28.0) floor is left untouched and is satisfied by the ecm/6.28.0 tool package"
+      patch_type: "portability"
+    - patch_file: "patches/0002-autotests-guard-ohos-fs-sensitive-checks.patch"
+      patch_description: "Skip the autotest cases that depend on POSIX file-permission, timestamp and symlink semantics the OHOS user volume does not provide (whitelisted by KSERVICE_OHOS_SKIP_UNSUPPORTED_FS_TESTS)"
+      patch_type: "portability"
+    - patch_file: "patches/0003-ohos-autotests-xdg-menu-fallback.patch"
+      patch_description: "Provide an inline fallback XDG applications.menu when QFINDTESTDATA cannot locate the upstream fixture in the build tree"
+      patch_type: "portability"
+    - patch_file: "patches/0004-ohos-test-fixture-copy-fallback.patch"
+      patch_description: "Fall back to a plain read()/write() block copy when QFile::copy() fails for the autotest desktop-file fixtures on the OHOS user volume"
+      patch_type: "portability"

@@ -1,0 +1,73 @@
+diff --git a/autotests/kservicetest.cpp b/autotests/kservicetest.cpp
+index 630a191..5ace21a 100644
+--- a/autotests/kservicetest.cpp
++++ b/autotests/kservicetest.cpp
+@@ -37,6 +37,23 @@
+ using namespace std::chrono_literals;
+ using namespace Qt::StringLiterals;
+ 
++// OHOS: 该环境下 QFile::copy() 可能失败（其 link() 快速路径不被支持），
++// 退化为逐字节拷贝，避免夹具投放失败导致整条用例红。
++static bool ohosCopyFixture(const QString &source, const QString &target)
++{
++    if (QFile::copy(source, target))
++        return true;
++    QFile in(source);
++    if (!in.open(QIODevice::ReadOnly))
++        return false;
++    QFile out(target);
++    if (!out.open(QIODevice::WriteOnly | QIODevice::Truncate))
++        return false;
++    const QByteArray data = in.readAll();
++    return out.write(data) == data.size();
++}
++
++
+ QTEST_MAIN(KServiceTest)
+ 
+ extern KSERVICE_EXPORT int ksycoca_ms_between_checks;
+@@ -87,7 +104,7 @@ void KServiceTest::initTestCase()
+         QVERIFY(QDir().mkpath(QStandardPaths::writableLocation(QStandardPaths::ApplicationsLocation)));
+         const QString src = QFINDTESTDATA("org.kde.deleteme.desktop");
+         QVERIFY(!src.isEmpty());
+-        QVERIFY2(QFile::copy(src, deleteMeApp), qPrintable(deleteMeApp));
++        QVERIFY2(ohosCopyFixture(src, deleteMeApp), qPrintable(deleteMeApp));
+         qDebug() << "Created" << deleteMeApp;
+         mustUpdateKSycoca = true;
+     }
+@@ -98,7 +115,7 @@ void KServiceTest::initTestCase()
+         QVERIFY(QDir().mkpath(QStandardPaths::writableLocation(QStandardPaths::ApplicationsLocation)));
+         const QString src = QFINDTESTDATA("org.kde.faketestapp.desktop");
+         QVERIFY(!src.isEmpty());
+-        QVERIFY2(QFile::copy(src, testApp), qPrintable(testApp));
++        QVERIFY2(ohosCopyFixture(src, testApp), qPrintable(testApp));
+         qDebug() << "Created" << testApp;
+         mustUpdateKSycoca = true;
+     }
+@@ -109,7 +126,7 @@ void KServiceTest::initTestCase()
+         QVERIFY(QDir().mkpath(QStandardPaths::writableLocation(QStandardPaths::ApplicationsLocation)));
+         const QString src = QFINDTESTDATA("org.kde.otherfakeapp.desktop");
+         QVERIFY(!src.isEmpty());
+-        QVERIFY2(QFile::copy(src, otherTestApp), qPrintable(otherTestApp));
++        QVERIFY2(ohosCopyFixture(src, otherTestApp), qPrintable(otherTestApp));
+         qDebug() << "Created" << otherTestApp;
+         mustUpdateKSycoca = true;
+     }
+@@ -119,7 +136,7 @@ void KServiceTest::initTestCase()
+         QVERIFY(QDir().mkpath(QStandardPaths::writableLocation(QStandardPaths::ApplicationsLocation)));
+         const QString src = QFINDTESTDATA("org.kde.testnames.desktop");
+         QVERIFY(!src.isEmpty());
+-        QVERIFY2(QFile::copy(src, namesTestApp), qPrintable(namesTestApp));
++        QVERIFY2(ohosCopyFixture(src, namesTestApp), qPrintable(namesTestApp));
+         qDebug() << "Created" << namesTestApp;
+         mustUpdateKSycoca = true;
+     }
+@@ -379,7 +396,7 @@ void KServiceTest::testDeletingService()
+     // Recreate it, for future tests
+     const QString deleteMeApp = QStandardPaths::writableLocation(QStandardPaths::ApplicationsLocation) + QLatin1String("/org.kde.deleteme.desktop");
+     const QString src = QFINDTESTDATA("org.kde.deleteme.desktop");
+-    QVERIFY2(QFile::copy(src, deleteMeApp), qPrintable(deleteMeApp));
++    QVERIFY2(ohosCopyFixture(src, deleteMeApp), qPrintable(deleteMeApp));
+ 
+     runKBuildSycoca();
+ 
