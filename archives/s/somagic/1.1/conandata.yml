@@ -1,0 +1,26 @@
+# conandata.yml — somagic 1.1
+#
+# 源码来源：Google Code Archive 保存的 easycap-somagic-linux 项目 1.1 发布归档。
+# 上游项目页 https://code.google.com/archive/p/easycap-somagic-linux/ 已随
+# Google Code 关停，官方归档镜像 storage.googleapis.com 是该项目唯一权威发布源。
+# sha256 为归档真实哈希（下载后本地实测，未做任何重打包）。
+#
+# 一个补丁：四个 .c 源文件用 OHOS clang 15 工具链原样编译通过（-W -Wall 无报错），
+# 唯一改动是 libusb_init() 返回值检查（见 patches/ 与 notes.md）。
+
+sources:
+  url: "https://storage.googleapis.com/google-code-archive-downloads/v2/code.google.com/easycap-somagic-linux/somagic-easycap_1.1.tar.gz"
+  sha256: "3a9dd78a47335a6d041cd5465d28124612dad97939c56d7c10e000484d78a320"
+
+patches:
+  - patch_file: "patches/0001-guard-libusb-init-failure.patch"
+    patch_description: >
+      Check the return value of libusb_init() in all four programs instead of
+      discarding it. On HarmonyOS (HongMeng kernel) the kernel does not accept
+      netlink sockets (socket(PF_NETLINK, SOCK_RAW, NETLINK_KOBJECT_UEVENT)
+      fails with EPROTONOSUPPORT), so libusb_init() fails and the code that
+      follows dereferences an uninitialised handle: somagic-init dies with
+      SIGSEGV when --skip-check is used (exit 139). Failing fast with a
+      diagnostic restores the intended non-zero exit path. Pure defect fix, no
+      platform #ifdef, also correct on Linux.
+    patch_type: "portability"
