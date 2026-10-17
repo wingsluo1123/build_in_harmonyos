@@ -1,0 +1,45 @@
+version: "2.9.13"
+software: "modsecurity-apache"
+status: built
+build_date: "2026-10-15"
+build_system: "autotools"
+conan_ref: "modsecurity-apache/2.9.13"
+
+source:
+  url: "https://github.com/owasp-modsecurity/ModSecurity/releases/download/v2.9.13/modsecurity-v2.9.13.tar.gz"
+  sha256: "7fa925289a2e0cb5415ba82626cf0495607a4ab09f78831ace5bbd8d81496cc2"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--with-apxs=<private vendored httpd 2.4.67>/bin/apxs"
+    - "--with-apr=<apr/1.7.6 prefix>"
+    - "--with-apu=<private vendored apr-util 1.6.3 prefix>"
+    - "--with-pcre=<pcre/8.45 prefix>"
+    - "--with-pcre2=<pcre2/10.47 prefix>"
+    - "--with-libxml=<libxml2/2.15.3 prefix>"
+    - "--with-lua=<lua/5.4.8 prefix>"
+    - "--with-curl=<curl/8.15.0 prefix>"
+    - "--with-yajl=<yajl/2.1.0 prefix>"
+    - "--with-ssdeep=no"
+    - "--disable-mlogc"
+  dependencies:
+    - apr/1.7.6
+    - pcre/8.45
+    - pcre2/10.47
+    - libxml2/2.15.3
+    - lua/5.4.8
+    - curl/8.15.0
+    - yajl/2.1.0
+    - expat/2.8.2.1
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "patches/0001-ohos-linux-if-h-sockaddr-storage.patch"
+
+knowledge_gained:
+  - "E007: modsecurity/apr-util/httpd 三套 config.guess/config.sub 均需 HarmonyOS 补丁，配方在 build() 内用 Python 复刻 scripts/patch-autotools-ohos.pl 的 5 处正则修改，score<4 直接失败"
+  - "ModSecurity v2 的 CHECK_APR/CHECK_APU 在 apache2-module 开启时是硬错误，apr-util 未发布时只能在配方内私有静态构建，包内不带走"
+  - "ModSecurity v2 configure 必须有可执行的 apxs（查询 INCLUDEDIR/MODULES），httpd 私有构建只为提供 apxs 与头文件，包内只收 mod_security2.so"

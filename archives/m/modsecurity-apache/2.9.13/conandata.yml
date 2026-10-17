@@ -1,0 +1,54 @@
+# conandata.yml — modsecurity-apache 2.9.13
+# File location: archives/m/modsecurity-apache/2.9.13/conandata.yml
+#
+# Three source trees:
+#   modsecurity : upstream ModSecurity v2 release tarball (Apache module + engine).
+#                 Ordered url list reusing the CI-maintained GitHub mirror
+#                 mapping (ci/conan/build_and_test.sh): gh-proxy first,
+#                 official GitHub release asset last as fallback.
+#                 sha256 cross-checked against two independent Arch SRCINFO
+#                 records for the same release asset; conan verifies on fetch.
+#                 Single github.com entry is not enough: direct github fetch
+#                 from the HarmonyOS preflight host is extremely slow and the
+#                 source() download times out (SSH "closed by remote host").
+#   apr-util    : build-only bootstrap. ModSecurity v2 configure hard-requires
+#                 APU (apr-util) whenever the Apache module is enabled, but no
+#                 apr-util conan package is published yet, so the recipe builds
+#                 a private static copy from the official Apache archive.
+#   httpd       : build-only bootstrap. ModSecurity v2 configure hard-requires
+#                 a working apxs + Apache headers for the module. Same situation
+#                 as apr-util: build a private copy, install to the build dir,
+#                 point --with-apxs at it. Only mod_security2.so is packaged.
+# Apache archive entries use an ordered url list (domestic mirrors first,
+# official archive last) with the UNCHANGED official sha256.
+
+sources:
+  modsecurity:
+    url:
+      - "https://gh-proxy.com/https://github.com/owasp-modsecurity/ModSecurity/releases/download/v2.9.13/modsecurity-v2.9.13.tar.gz"
+      - "https://github.com/owasp-modsecurity/ModSecurity/releases/download/v2.9.13/modsecurity-v2.9.13.tar.gz"
+    sha256: "7fa925289a2e0cb5415ba82626cf0495607a4ab09f78831ace5bbd8d81496cc2"
+  apr-util:
+    url:
+      - "https://mirrors.tuna.tsinghua.edu.cn/apache/apr/apr-util-1.6.3.tar.gz"
+      - "https://mirrors.ustc.edu.cn/apache/apr/apr-util-1.6.3.tar.gz"
+      - "https://archive.apache.org/dist/apr/apr-util-1.6.3.tar.gz"
+    sha256: "2b74d8932703826862ca305b094eef2983c27b39d5c9414442e9976a9acf1983"
+  apr:
+    url:
+      - "https://mirrors.tuna.tsinghua.edu.cn/apache/apr/apr-1.7.6.tar.gz"
+      - "https://mirrors.ustc.edu.cn/apache/apr/apr-1.7.6.tar.gz"
+      - "https://archive.apache.org/dist/apr/apr-1.7.6.tar.gz"
+    sha256: "6a10e7f7430510600af25fabf466e1df61aaae910bf1dc5d10c44a4433ccc81d"
+  httpd:
+    url:
+      - "https://mirrors.tuna.tsinghua.edu.cn/apache/httpd/httpd-2.4.67.tar.gz"
+      - "https://mirrors.ustc.edu.cn/apache/httpd/httpd-2.4.67.tar.gz"
+      - "https://archive.apache.org/dist/httpd/httpd-2.4.67.tar.gz"
+    sha256: "10a578d199c3930250534fac629995f34ef7571709a7c88c45239e1fdc88cf77"
+
+patches:
+  2.9.13:
+    - patch_file: "patches/0001-ohos-linux-if-h-sockaddr-storage.patch"
+      patch_description: "Portability: apache2/msc_status_engine.c uses POSIX <net/if.h> instead of kernel <linux/if.h>+<linux/sockios.h> (same struct ifreq/ifconf and SIOCGIF* ioctls on glibc and musl, no platform macro); fixes sockaddr_storage redefinition on musl-based sysroots"
+      patch_type: "portability"
