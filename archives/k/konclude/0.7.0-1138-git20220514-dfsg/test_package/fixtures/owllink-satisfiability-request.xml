@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Consumer end-to-end fixture for konclude on HarmonyOS PC: a self-contained
+  OWLlink (XML binding) request used against the *installed* package's
+  `owllinkserver` over TCP loopback.
+
+  The knowledge base asserts Male and Female to be disjoint and defines
+  Contradiction as their intersection, so the only correct answer to
+  IsClassSatisfiable(Contradiction) is `false`.  Note that the `<ExpectedResult>`
+  element below documents that expected value for OWLlink test readers and
+  carries the same literal, so the consumer case does **not** rest on the boolean
+  value alone: it additionally asserts HTTP 200, an OWLlink `<ResponseMessage>`
+  containing `<OK/>`, the server-side `HTTP request successfully processed` log
+  line emitted by the installed binary, and (in CONSUMER-E2E-01) both positive
+  entailment assertions and a negative control — a service that merely echoes the
+  request cannot satisfy that combination.
+  The element/attribute syntax follows the upstream OWLlink request files that
+  ship in the konclude source tree (Tests/test-request.xml, Tests/1b-satisfiability-request.xml).
+-->
+<RequestMessage xmlns="http://www.owllink.org/owllink#"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:owl="http://www.w3.org/2002/07/owl#"
+    xsi:schemaLocation="http://www.owllink.org/owllink# http://www.owllink.org/owllink-20091116.xsd"
+    xml:base="http://example.org/konclude-ohos/owllink#">
+
+    <CreateKB kb="http://example.org/konclude-ohos/owllink"/>
+
+    <Tell kb="http://example.org/konclude-ohos/owllink">
+        <owl:Declaration>
+            <owl:Class IRI="#Male"/>
+        </owl:Declaration>
+        <owl:Declaration>
+            <owl:Class IRI="#Female"/>
+        </owl:Declaration>
+        <owl:Declaration>
+            <owl:Class IRI="#Contradiction"/>
+        </owl:Declaration>
+        <owl:DisjointClasses>
+            <owl:Class IRI="#Male"/>
+            <owl:Class IRI="#Female"/>
+        </owl:DisjointClasses>
+        <owl:EquivalentClasses>
+            <owl:Class IRI="#Contradiction"/>
+            <owl:ObjectIntersectionOf>
+                <owl:Class IRI="#Male"/>
+                <owl:Class IRI="#Female"/>
+            </owl:ObjectIntersectionOf>
+        </owl:EquivalentClasses>
+    </Tell>
+
+    <IsClassSatisfiable kb="http://example.org/konclude-ohos/owllink" timing="simple">
+        <owl:Class IRI="#Contradiction"/>
+        <!-- should be false -->
+        <ExpectedResult>
+            <BooleanResponse result="false"/>
+        </ExpectedResult>
+    </IsClassSatisfiable>
+
+    <ReleaseKB kb="http://example.org/konclude-ohos/owllink"/>
+
+</RequestMessage>

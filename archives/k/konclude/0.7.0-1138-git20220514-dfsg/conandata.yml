@@ -1,0 +1,59 @@
+# conandata.yml — konclude 0.7.0-1138-git20220514-dfsg
+#
+# 上游：konclude/Konclude（https://github.com/konclude/Konclude）
+# 源码身份：commit 056334ad728429308991e135500d129b8c652490
+#           （2022-05-14 13:10:56 UTC，commit message "fixed brackets"）
+#
+# 任务版本 "0.7.0-1138-git20220514-dfsg" 与 Debian/Ubuntu 源码包版本
+# "0.7.0+1138+git20220514~dfsg" 对应（`+`/`~` 按本仓库既有惯例写作 `-`）。
+# 该 Debian 版本是 tag v0.7.0-1138 之后的开发快照：其 changelog 记录的三条
+# 上游变更（null concept pointer 测试、completion graph caching 修复、
+# "fixed brackets"）与上述 commit 完全吻合。
+#
+# dfsg 后缀的由来：上游树内分发**第三方预编译二进制**
+# （External/librdf/Linux/x64/lib/release/*.a、External/hoard/**/*.lib、
+# 48 个 .dll / 36 个 .lib / 49 个 .pdb），Debian 正是为此做 dfsg 重打包。
+# 本任务**不使用** Debian 重打包产物（R39/PF7），直接取上游官方 GitHub
+# 归档，因此树内这些 x86_64 预编译件仍在，但不参与 aarch64 构建。
+#
+# R39：源 URL 为官方 GitHub 归档（codeload），非镜像、非 fork、非 Debian 重打包。
+sources:
+  "0.7.0-1138-git20220514-dfsg":
+    url: "https://github.com/konclude/Konclude/archive/056334ad728429308991e135500d129b8c652490.tar.gz"
+    sha256: "79293c3c2cce797a1c333b8ca4fc2be0a579eaa78b69d1ed547fd25d5cc371ce"
+
+# ── 补丁（1 个，bugfix）───────────────────────────────────────────────
+#
+# 上游快照自身的求值顺序缺陷（与平台无关，OHOS 与 Linux 同构复现）：
+#   Source/Reasoner/Kernel/Algorithm/CCalculationTableauCompletionTaskHandleAlgorithm.cpp:16106
+#   `applyATLEASTRule()` 的“快速冲突检查”里，作者写了空值守卫
+#   `|| !atmostConcept->getOperandList()`，但它排在调用**之后**；C++ 的短路求值
+#   保证 `hasIdenticalConceptOperands(...)` 先执行，于是当
+#   `atmostConcept->getOperandList()` 为 NULL（无显式 operand 列表的基数限制）
+#   时，函数首句 `opConLinker1->getCount()` 直接空指针解引用。
+#   实测：Tests/roberts-family-full-D.owl.xml 的 classification / realization
+#   稳定 SIGSEGV（3/3 复现，SIGSEGV_MAPERR@0x10，故障线程 QThread）；
+#   FaultLogger 符号化指到 hasIdenticalConceptOperands ← applyATLEASTRule；
+#   寄存器 x1=0 即第一实参为 NULL；反汇编 0x6d8f00 `ldr x9,[x9,#16]` 与
+#   0x10 故障地址一致。consistency / galen / lubm 不受影响。
+#
+# 修复 = 把作者原有的同一个守卫提前到调用之前（纯 OR 操作数互换，
+# 非空路径布尔语义完全不变），不引入任何平台宏、不改其它逻辑。
+#
+# 生成方式说明（R3/R14）：`refresh-patch --auto` 已先行执行，其 difflib 通道
+# 通过通用换行读取，丢失上下文行的 CR，dry-run 必然失败（该文件是 CRLF 行尾：
+# 27676 个 CRLF），故按 R14「脚本失败=手动模式入口」改用 CR 保真的
+# `diff -U10` 机械生成（上下文宽度与工具一致，内容非手写）。
+# 保真校验：应用后文件与探索目录 .work 逐字节一致
+# sha256 3a72fbff8b34394753f5e2d716441d6ebdefcd26dff42b5f247ff0d18a53bd86。
+patches:
+  - patch_file: "patches/0001-null-guard-evaluation-order.patch"
+    patch_description: >-
+      Hoist the NULL guard of atmostConcept->getOperandList() before the
+      hasIdenticalConceptOperands() call in applyATLEASTRule(): upstream wrote
+      the guard after the call, so short-circuit evaluation guaranteed a NULL
+      dereference (SIGSEGV) whenever a cardinality restriction carries no
+      explicit operand list; pure OR-operand reorder, non-NULL semantics
+      unchanged.
+    patch_type: "bugfix"
+    sha256: "4b70d9aad14e78810132f99c7751321105b4902a595ff4d6a228f585f3e38f4c"

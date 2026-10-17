@@ -1,0 +1,58 @@
+# 版本级 manifest — konclude 0.7.0-1138-git20220514-dfsg（遵循 ARCHIVE-SPEC v3.0）
+
+version: "0.7.0-1138-git20220514-dfsg"
+software: "konclude"
+status: built
+build_date: "2026-10-16"
+build_system: qmake
+conan_ref: "konclude/0.7.0-1138-git20220514-dfsg"
+
+source:
+  url: "https://github.com/konclude/Konclude/archive/056334ad728429308991e135500d129b8c652490.tar.gz"
+  sha256: "79293c3c2cce797a1c333b8ca4fc2be0a579eaa78b69d1ed547fd25d5cc371ce"
+  tar_format: tar.gz
+  # 任务版本 0.7.0-1138-git20220514-dfsg 对应 Debian/Ubuntu 源码包
+  # 0.7.0+1138+git20220514~dfsg（开发快照）；源码身份为 tag v0.7.0-1138 之后的
+  # commit 056334ad…（2022-05-14），其 changelog 三条与 Debian 记录逐条吻合。
+  upstream_commit: "056334ad728429308991e135500d129b8c652490"
+  upstream_tag: "v0.7.0-1138 (0002e80635403960a7df5d93bd0e8f994d4952d0)"
+  license: "LGPL-3.0"
+
+build:
+  system: qmake
+  configure_options:
+    - "-spec linux-clang"
+    - "QMAKE_CXX=<profile cpp compiler>"
+    - "QMAKE_LINK=<profile cpp compiler>"
+    - "make -j<jobs> QMAKE_STRIP="
+  project_file: "KoncludeWithoutRedland.pro"
+  dependencies:
+    - qt5-qtbase/5.15.2.2
+  transitive_dependencies:
+    - dbus/1.14.10
+    - expat/2.8.2
+    - zlib/1.3.1
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-null-guard-evaluation-order.patch"
+
+products:
+  executables:
+    - bin/Konclude
+  data:
+    - res/konclude/Configs/default-config.xml
+    - res/konclude/Configs/querying-config.xml
+  licenses:
+    - licenses/LGPL-3.0.txt
+
+knowledge_gained:
+  - "上游 qmake 项目（.pro/.pri）在 OHOS 上可直接用 qt5-qtbase 提供的 qmake 构建；无需另造 CMake 工程"
+  - "qt5-qtbase 制品内的 qt.conf 与 mkspecs/*.pri 硬编码其构建目录，消费方必须做可重定位修正，否则报 Unknown module(s) in QT"
+  - "上游 .pro 链接树内预编译 x86_64 Redland/jemalloc：aarch64 必须切换到上游官方的 WithoutRedland 变体"
+  - "KoncludeWithoutRedland 下 SPARQL 简易解析仍可用（OWL/XML 本体），但 Turtle/RDF 解析静默产出空知识库"
+  - "上游快照 applyATLEASTRule() 的空值守卫求值顺序缺陷导致 SROIQ 本体分类 SIGSEGV；FaultLogger+寄存器+反汇编可闭环定位 NULL 实参"
+  - "refresh-patch 的 difflib 通道用通用换行读取，CRLF 源码的补丁必然 dry-run 失败（本次据 R14 走手动模式并以逐字节校验保真）"
+
+knowledge_ref: []

@@ -1,0 +1,83 @@
+# test_package/MANIFEST.yml
+# 上游测试声明 + 消费者用例声明
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md 与 references/iron-rules.md R51（上游测试三步法）
+
+package: konclude/0.7.0-1138-git20220514-dfsg
+homepage: "https://github.com/konclude/Konclude"
+
+# ── R51 第一步：上游测试清点（证据：tarball 内源码树，commit 056334ad…） ──
+#
+# 清点命令（源码根目录执行）:
+#   find . -name CMakeLists.txt -o -name "*.pro" -o -name configure -o -name meson.build
+#       -> 只有 Konclude.pro / KoncludeLIB.pro / KoncludeWithoutRedland.pro（qmake），
+#          无 CMake / Autotools / Meson，故不存在 cmake.test()/make check 入口
+#   grep -rn "enable_testing\|add_test(" .        -> 0 hits（全树无 ctest 注册）
+#   grep -rn "check:" Makefile* 2>/dev/null       -> 0 hits（无 make check 目标）
+#   ls Tests/                                     -> 12 个文件（8 个 OWL/OWLlink XML +
+#                                                    3 个 .sparql + 1 个 .ttl）
+#   grep -nE "^\s+(\./)?Konclude " Readme.md      -> 9 条文档化调用
+#   ./Konclude -h | sed -n '/^Examples:/,$p'      -> 9 条文档化调用（内置帮助）
+#
+# 结论：上游 **没有任何注册到自动化测试框架的测试**（ctest/pytest/make check
+# 目标数 = 0）。上游的“测试”形态是：Tests/ 自有数据集 + 文档化调用（Readme 与
+# 内置 -h 共 13 条去重后唯一调用）。因此申报口径为：
+#   * 上游注册测试框架用例数 = 0（不是“未找到”，是全树无注册入口，附上述清点命令）
+#   * 上游数据集驱动文档化调用 = 13 条唯一 / 实测执行 14 次（可执行性逐条实测读数
+#     见版本目录 notes.md §7.2，该文件随 PR 入库；reports/test-report.md 为本地
+#     工作副本，按 review-memory §19 不入库）
+upstream_check_command: "ctest -N   # 无 CMake，实测无 ctest 入口"
+upstream_tests_found: 0
+upstream_test_registration: "none (no ctest / pytest / make check target in the tree)"
+# 文档化调用：Readme 9 行 + 内置 -h 9 行 → 去重后 13 个唯一调用；
+# 按两种 -w 语义（Readme 的 -w 2 与 -h 的 -w AUTO）各执行一次 roberts 分类，
+# 故实测执行 14 次。PR「上游用例数」取实测执行数 14，通过 13，未通过 1。
+upstream_documented_invocations_unique: 13
+upstream_documented_invocations_executed: 14
+upstream_documented_invocations_passed: 13
+upstream_documented_invocations_failed: 1
+upstream_test_dataset_files: 12
+
+# conanfile.py build() 中是否运行上游测试
+# 上游无自动化测试套件可运行；文档化调用已由本轮在真机逐条实测（逐条读数见版本目录
+# notes.md §7.2；reports/test-report.md 为不入库的本地工作副本），不放进 build()
+# （否则每次 conan create 都要跑 8 条推理 + 2 个服务，且与消费者用例重复）
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游可自动化运行的测试（上游无注册用例，故为空表——不是偷偷略过）
+upstream_tests: []
+
+# ── R51 第二步 / 规则 12：本包在鸿蒙 PC 真机实际运行并判定业务结果的用例 ──
+#
+# test_consumer.py 驱动 **安装后的** bin/Konclude（绝不用源码树产物），
+# 输入为 test_package/fixtures/ 下的真实 OWL 2 XML 知识库与 OWLlink 请求，
+# 断言的是**推导得到的**业务结果（违反则失败，无法靠回显请求通过）。
+test_package_tests:
+  - file: test_consumer.py
+    case_id: CONSUMER-E2E-01
+    description: >-
+      推理流水线端到端：classification 把 family-reasoning.owl.xml 分类为 OWL/XML
+      直接层次（断言推断出的 Father ⊑ Man、闭包中的 Father ⊑ Person、
+      Contradiction ≡ owl:Nothing，以及负向对照 Woman ⊑ Man 不成立）；
+      satisfiability 回答 #Father='Yes' / #Contradiction='No'；
+      consistency 对重叠断言库报 inconsistent、对一致库报 consistent。
+    command: "python3 test_consumer.py --konclude <pkg>/bin/Konclude --fixtures ./fixtures"
+  - file: test_consumer.py
+    case_id: CONSUMER-E2E-02
+    description: >-
+      OWLlink 服务端端到端（TCP loopback）：启动安装后的 owllinkserver，
+      POST 自包含的 OWLlink 请求（Male/Female 不相交 + Contradiction 为其交集），
+      断言 HTTP 200、响应为 OWLlink ResponseMessage、含 <OK/>，
+      且 IsClassSatisfiable(#Contradiction) 返回 BooleanResponse result="false"。
+      逐条断言读数与 W3 实测见版本目录 notes.md §7.3/§7.4（随 PR 入库）。
+    command: "python3 test_consumer.py --konclude <pkg>/bin/Konclude --fixtures ./fixtures"
+
+# 消费者用例断言总数（CONSUMER-E2E-01 10 项 + CONSUMER-E2E-02 6 项 = 16）
+assertion_count: 16
+consumer_cases: 2
+# 规则 12 口径：在鸿蒙 PC 目标机实际跑通的完整消费者端到端用例数（本仓通行键名）
+harmony_specific_test_count: 2
+harmony_specific_tests:
+  - CONSUMER-E2E-01
+  - CONSUMER-E2E-02
