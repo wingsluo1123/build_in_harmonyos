@@ -1,0 +1,42 @@
+upstream:
+  framework: "Check through Automake parallel-tests"
+  registered_executables: 7
+  registered_cases: 45
+  command: "make check -j1"
+  modified: true
+  modifications:
+    - file: "tests/check_child.c"
+      reason: >
+        Make nested helper processes exit normally after their expected
+        SIGTERM and reject failed fork calls. No assertion is removed and no
+        expected protocol result changes.
+    - file: "tests/check_util.c"
+      reason: >
+        Derive the current Check-generated function name with __func__ instead
+        of assuming either the pre-0.13 unsuffixed spelling or the 0.13+
+        private _fn spelling. The complete logging assertion is retained.
+
+adapted:
+  package_test_files:
+    - "test_ladvd.py"
+  package_assertions: 13
+  harmony_specific_tests: 1
+  consumes_installed_package: true
+  commands:
+    - "ladvd -h"
+    - "ladvdc -h"
+    - "ladvd -d -o -s -L"
+  harmony_consumer_cases:
+    - name: "native one-shot daemon lifecycle"
+      type: "end-to-end installed-command workflow"
+      flow: >
+        Execute the signed installed ladvd on HarmonyOS in debug, one-shot,
+        silent LLDP mode; initialize the daemon and privilege-separation
+        process pair, discover target interfaces, emit a real Ethernet pcap
+        stream header, and observe clean child and parent shutdown.
+
+notes: >
+  check_wrap.c is an upstream support library, not an eighth test executable.
+  All seven executables and all 45 START_TEST cases are executed on native
+  OHOS. The package test adds one native HarmonyOS end-to-end consumer case;
+  its command-entry and flow checks comprise thirteen auxiliary assertions.

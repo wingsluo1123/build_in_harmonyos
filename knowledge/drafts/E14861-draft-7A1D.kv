@@ -1,0 +1,116 @@
+#====================================================================
+# _template.kv — 知识图谱条目模板
+# 用法: 复制此文件为 E14861.kv，填写各字段
+# 对应的人类文档: doc/E14861.md
+#
+# 格式规则:
+#   - key: value（冒号后一个空格，value 到行尾）
+#   - 多行值: 下一行以空格开头 = 续行
+#   - 列表值: 逗号分隔
+#   - 正则值: | 分隔多个模式
+#   - 以 # 开头的行为注释
+#   - 空行忽略
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+# trigger_tool: 出错的工具 (configure/cmake/meson/make/gcc/clang/ld/python/pip/install/test/runtime)
+# phase:         出错阶段 (configuration/compilation/linking/installation/testing/runtime)
+# error_signature: 正则表达式(|分隔), 用于精确匹配日志文本
+id:                     E14861
+trigger_tool: check|make|conan
+phase: testing
+error_signature: invalid output: test_my_fn: debug|Check-generated test function name.*_fn
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+# severity:      3=🔴blocking  2=🟡medium  1=🟢minor  0=✅resolved
+# category:      分类标签（受控词表 64 词，逗号分隔，最多 5 个；add/promote 自动归一化）
+# prescan_pattern: （可选）预编译源码扫描正则——写入后 PreScanner 运行时自动派生
+#                   PSCAN-KB-{id} 规则，无需改 pre-scan-rules.yaml（知识增长即扫描能力增长）
+# prescan_globs:   （可选）扫描范围 glob 列表，默认 '*.c, *.h, *.cc, *.cpp, *.sh, Makefile*, *.mk'
+# 词表: platform, compat, limitation, detection, hmdfs, ohos, selinux, kernel, portability, libc, musl, posix, syscall, headers, threading, socket, network, build-system, cmake, autotools ...（全表见 scripts/ohc/kb_taxonomy.py）
+# match_keywords: 纯文本关键词(逗号分隔), 用于粗筛(固定字符串匹配F)
+# title:         简短标题(一句话描述错误模式)
+severity: 2
+category: testing, compatibility, dependencies, portability
+match_keywords: Check, START_TEST, __func__, test_my_fn, generated function name, dependency upgrade, log oracle
+title: 测试不得依赖 Check START_TEST 宏生成的内部函数名
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+# root_cause:       一句话根因描述(逗号可分行)
+# affected_scope:   影响范围
+# verification_cmd: 验证诊断是否正确的命令
+root_cause: Check 0.13 重写 START_TEST 后把测试体的 C 函数从参数原名改为带 _fn 后缀的内部符号；ladvd 仍把旧函数名硬编码为日志期望，而生产日志宏输出当前 __func__，因此使用已发布 check/0.15.2 时真实行为正确但上游测试稳定失败。宏参数形成的用例名是公开语义，宏展开后的 C 符号不是稳定接口。
+affected_scope: 使用 Check START_TEST 或类似测试宏，并在测试体内断言包含 __func__、函数签名或宏生成内部符号的日志与诊断文本的 C/C++ 项目；尤其是把旧项目迁移到只提供新测试框架版本的平台。
+verification_cmd: Compare official Check 0.12.0 and 0.15.2 START_TEST expansions; run ladvd check_util once without patch 0010 to reproduce test_my_fn versus test_my, then with the __func__-derived oracle and run the complete make check -j1 suite.
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+# 推荐方案 (priority 越小越优先, 从 1 开始)
+rec_priority: 1
+rec_approach: derive-self-referential-oracle-from-current-function
+rec_description: 当被测日志有意输出当前函数名时，在同一测试函数中用 __func__ 构造期望值；保留对完整日志格式和消息的比较，并在完整上游测试套件中验证。
+rec_command: Replace the hard-coded generated function spelling with snprintf(expected, sizeof(expected), "%s: debug\\n", __func__), then run make check -j1.
+rec_auto_fix: false
+rec_impl: source-patch
+
+# 回退方案 (当推荐方案不可用时尝试)
+fallback_priority: 2
+fallback_approach: assert-public-test-case-name-separately
+fallback_description: 若真正要验证 Check 公布的逻辑用例名，改用框架公开的用例名/结果接口并与函数级日志断言分离；不要猜测宏生成符号。
+fallback_command:
+fallback_auto_fix: false
+fallback_impl: source-patch
+
+# ★ 禁止策略 (与推荐方案同等重要) ★
+# forbid_N_pattern:     正则(|分隔), 匹配则拒绝/警告
+# forbid_N_reason:      为什么禁止
+# forbid_N_consequence: 违反后的后果
+forbid_1_pattern:       errstr\s*=\s*"test_[A-Za-z0-9_]+(_fn)?:|(-D|#define).*START_TEST
+forbid_1_reason:        把当前或旧版宏生成符号继续硬编码，或在编译参数中改写框架宏，只会把测试绑定到另一版内部实现。
+forbid_1_consequence:   更换 Check 版本后同类日志断言再次失败，或者测试与框架注册结构不一致。
+forbid_2_pattern:       (删除|跳过|disable).*check_util|TESTS=.*check_util
+forbid_2_reason:        该失败来自测试预期绑定内部符号，不表示被测日志可以不验证。
+forbid_2_consequence:   会丢失日志格式、级别和输出通道的真实上游回归覆盖。
+
+# ═══ Layer 4: 原则引用 ═══
+# principles:    适用的原则 ID 列表(逗号分隔), 在 graph/principles.kv 中定义
+principles: []
+
+# ═══ 关系图 (Relations) ═══
+# causes:          本模式是这些模式的根因 (修好本模式可能同时解决它们)
+# caused_by:       本模式的根因是这些模式 (应先修它们)
+# similar_to:      特征相似可能混淆的模式
+# conflicts_with:  解决方案互相冲突的模式
+# prerequisite_of: 本模式是修复这些模式的前置条件
+causes: []
+caused_by: []
+similar_to: []
+conflicts_with: []
+prerequisite_of: []
+
+# ═══ 元数据 ═══
+doc_file:               knowledge/drafts/E14861-draft-7A1D.md
+last_updated: 2026-10-13
+source_event: ladvd/1.1.2 accepts Check >=0.9.4 and hard-codes test_my in a log oracle; the published HarmonyOS dependency check/0.15.2 expands START_TEST(test_my) to test_my_fn, producing a deterministic upstream test failure until the oracle derives the active function name.
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+# authors: 作者列表 (格式: Name <email>, Name2 <email2>)
+#          草稿生成时自动从 git config 填入；主编合入时保留原作者
+#          合并到已有条目时追加为第二/第三作者
+# source_pr:            添加该条目的 PR 编号
+# source_commit:        添加时的 commit SHA (短)
+authors:                 gcw_vbU49vcA <gcw_vbU49vcA@noreply.gitcode.com>
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics, 方案 D) ═══
+# metrics_success_count: 该修复方案成功次数
+# metrics_fail_count:    该修复方案失败次数
+# metrics_confidence:    置信度 = success / (success + fail)
+# metrics_last_used:     最后使用时间
+metrics_success_count: 1
+metrics_fail_count: 0
+metrics_confidence: 1.0
+metrics_last_used: 2026-10-13
+
+draft: true
+contributor_id: 7A1D
