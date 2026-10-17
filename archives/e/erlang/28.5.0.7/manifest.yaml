@@ -1,0 +1,77 @@
+# 版本级 manifest — erlang 28.5.0.7
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "28.5.0.7"
+software: "erlang"
+
+# 编译状态: published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-13"
+build_system: "custom"
+
+# ============================================================
+# 源码信息
+# ============================================================
+source:
+  # 官方 tag OTP-28.5.0.7（github erlang/otp releases 资产；erlang.org/downloads 同源互核）
+  url: "https://github.com/erlang/otp/releases/download/OTP-28.5.0.7/otp_src_28.5.0.7.tar.gz"
+  sha256: "ddf17db6d3e9b7a7cfac0d72238ddc8ea040fedc5e3dfad82fc90675319d6c93"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+build:
+  # OTP 不是单一 autotools 工程：手写顶层 configure + 递归 make（otp_build 体系）
+  system: custom
+  build_system: custom
+
+  configure_options:
+    - "--build=aarch64-unknown-linux-ohos"
+    - "--host=aarch64-unknown-linux-ohos"
+    - "--without-wx"       # OHOS PC 无 wx GUI 工具包
+    - "--without-odbc"     # 无 unixODBC
+    - "--without-javac"    # 无 Java 编译器（jinterface）
+    - "--with-ssl=<openssl/3.5.7 package_folder>"       # crypto NIF
+    - "--with-ssl-incl=<openssl/3.5.7 package_folder>"
+  configure_env:
+    - "CC=clang, CXX=clang++"
+    - "CONFIG_SHELL=/data/service/hnp/bin/bash, SHELL=/data/service/hnp/bin/bash"
+    - "LC_ALL=C"
+    - "make -jN --jobserver-style=pipe（OHOS 无 mkfifo，FIFO jobserver 退化 -j1）"
+
+  # 编译依赖列表（format: name/version）
+  dependencies:
+    - openssl/3.5.7
+    - zlib/1.3.1
+    - ncurses/6.5
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+patches_applied:
+  - "0001-config-sub-ohos.patch"
+  - "0002-configure-umask-022.patch"
+  - "0003-erts-termcap-ncursesw.patch"
+  - "0004-erl-interface-gethostid-ohos.patch"
+  - "0005-erts-mallopt-ohos.patch"
+  - "0006-erts-inet-uname-ohos.patch"
+  - "0007-config-guess-ohos.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+knowledge_gained:
+  - "OTP release tarball 是手写 configure + 递归 make 体系，conan 配方直接驱动 ./configure / make / make install 比套 AutotoolsToolchain 更贴合上游"
+  - "OHOS /system/bin/sh(mksh) 承载不了 autoconf 脚本：注入 CONFIG_SHELL/SHELL 指向 hnp bash 后 configure 与递归 make 全部自举成功"
+  - "OHOS 三元组 aarch64-unknown-linux-ohos 需要三份自带 config.sub 补 ohos* / linux-ohos*；同一批 config.guess 更需要补 HarmonyOS uname 识别，否则 ts:install / make release_tests 无法推导 TARGET"
+  - "HMDFS chmod 不生效（文件恒 0660）：~/.erlang.cookie 永远过不了 auth 的 owner-only 检查，本机两个 erl 节点 net_adm:ping 恒 pang；epmd 注册与裸 TCP 到 dist 端口均正常 → OHOS 上分布式节点间握手为平台边界，用 -setcookie 显式传 cookie 可让单节点带 distribution 启动"
+  - "musl 缺口三连：无 gethostid()、mallopt() 原型在 malloc.h、uname 返回 'HongMeng Kernel 1.12.0' 厂商串（inet 驱动按现代内核处理）"
+  - "erts termcap 探测要接受宽字符归档 libncursesw"
+  - "OHOS 无 mkfifo，GNU make 默认 FIFO jobserver 建不起来致递归 make 退化为 -j1，--jobserver-style=pipe 恢复并行"
+  - "wx/odbc/jinterface 在 OHOS PC 不可达，边界裁剪；核心交付面（BEAM/编译器/标准库/TUI 工具链）完整"

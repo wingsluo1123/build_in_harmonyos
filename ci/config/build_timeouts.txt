@@ -205,3 +205,14 @@ hpx/1.11.0 10800
 # test_package zdb/zpool 冒烟），make -j1（HMDFS jobserver 限制）。
 zfs-src/2.4.3 10800
 mysql-8.4/8.4.11 14400
+
+# erlang/28.5.0.7: Erlang/OTP is a full language platform — the emulator (erts,
+# pure C), ~25 applications and the self-hosted Erlang compiler all bootstrap
+# from source in one conan create, and the 105MB otp_src tarball is unpacked to
+# a ~1GB tree on HMDFS first. Local wall measurement (aarch64 OHOS PC, -j8,
+# HMDFS, conan 2.29.1): 9761s for source + configure + make + make install +
+# test_package, i.e. > 3600s by a wide margin. 9761 * 1.5 = 14642s, registered
+# as 14700s. Same R21 gray zone as the entries above: ci/ is otherwise off
+# limits for package PRs, but this file is the only timeout channel CI offers
+# and the default 3600s window would KILL the build (elapsedTime > limit).
+erlang/28.5.0.7 14700
