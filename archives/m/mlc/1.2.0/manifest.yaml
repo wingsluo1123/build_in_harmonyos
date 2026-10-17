@@ -1,0 +1,64 @@
+# 版本级 manifest — mlc 1.2.0
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "1.2.0"
+software: mlc
+status: built
+build_date: "2026-10-15"
+build_system: cmake
+
+source:
+  url: "https://git.macaw.me/blue/mlc/archive/1.2.0.tar.gz"
+  sha256: "7fdc668b4a4d04d359e2601f1a7d6fd8770e10cf9a0561e3572def6729a5aa98"
+  filename: "mlc-1.2.0.tar.gz"
+  note: >-
+    上游在 **git.macaw.me**（Gitea 自建站，不是 GitHub）；版本 1.2.0 与平台清单一致，压缩包内单层根目录
+    `mlc/`。sha256 为本地实测值。
+
+build:
+  system: cmake
+  configure_options:
+    - "CMAKE_POLICY_VERSION_MINIMUM=3.5"
+  dependencies:
+    - "flac/1.4.3（find_package(FLAC)）"
+    - "lame/4.0（pkg_check_modules(LAME) → PkgConfig::LAME）"
+    - "taglib/2.3（pkg_check_modules(TAGLIB) → PkgConfig::TAGLIB）"
+    - "libjpeg-turbo/3.2.0（find_package(libjpeg-turbo)）"
+  language: "C++（CMake；用到 pkg-config 的 LAME/TAGLIB）"
+
+patches_applied:
+  - "（无上游源文件补丁）配方内 _patch_upstream_cmake：把两处 CMake 内置目标名换成 conan 目标名、\
+     find_package(JPEG) → find_package(libjpeg-turbo)、并在 add_executable 之前注入依赖 include 目录"
+
+upstream_tests:
+  framework: "（上游没有测试套件）"
+  test_path: "无 —— 仓库里没有 test/tests，CMake 也没有 enable_testing/add_test"
+  test_command: "（上游无）本配方在 build() 内补跑：`mlc --help`"
+  test_count: 0
+  run_in_build: true
+  verified: true
+upstream_test_pass_rate: >-
+  **上游 0 个测试**（如实声明：仓库无 test/tests，CMake 无 enable_testing/add_test）。按仓库既有做法
+  **在配方里补一条真跑的功能级测试**：构建完成后运行产物 `mlc --help`（上游 main.cpp:20 明确支持）并断言
+  打印用法。实测通过（输出首行：Insufficient amount of arguments, launch with "--help" argument to see
+  usage）。构成在 test_package/MANIFEST.yml 里摊开，**不谎称“上游自带测试”**。
+adapted_test_pass_rate: >-
+  test_package/check_mlc.py **6 项消费者校验（全部离线）**，本地实测 `checks=6 fails=0 / RESULT: PASS`：
+  ①产物齐备（bin/mlc，707264 字节）②ELF 头自检（真 ELF64、machine=0xB7 AArch64）③真实运行
+  `mlc --help` 打印用法 ④无参调用有明确输出（非静默退出）⑤许可证（**上游仓库未附许可证文件**
+  —— 如实记录，配方按 AUR/README 标 GPL-3.0-or-later）⑥证据（sha256 + python 版本）。
+
+knowledge_gained:
+  - category: L1
+    content: >-
+      **conan 下 CMake 工程的四处"目标名/路径"不匹配，逐条给可复用处理**：①**CMake ≥4 移除了对
+      cmake_minimum_required(<3.5) 的兼容**（上游写 VERSION 3.0 会直接报 Compatibility with CMake < 3.5
+      has been removed）→ 按报错提示给 `CMAKE_POLICY_VERSION_MINIMUM=3.5`，不改上游；②上游用
+      **CMake 内置模块**的目标名（`FLAC::FLAC`/`JPEG::JPEG`），而 conan 的 CMakeDeps 生成**小写目标**
+      （`flac::flac`/`libjpeg-turbo::libjpeg-turbo`）→ 在配方里改写这两处链接目标；③conan 的 config 按
+      **包名**命名（`libjpeg-turbo-config.cmake`），上游的 `find_package(JPEG)` 找不到它 → 改成
+      `find_package(libjpeg-turbo REQUIRED)`；④依赖 include 不通过目标传播（实测 `lame.h` not found），
+      且 **LAME 的头是嵌套目录** `<lame>/include/lame/lame.h` 而上游写 `#include <lame.h>` → 在
+      **add_executable() 之前**注入依赖 include（含 `<lame>/include/lame`），否则 include_directories
+      对已创建的 target 不生效。
+    reason: "mlc 1.2.0 适配实测——7 轮 CI 才打通（策略下限 / 目标名 / config 命名 / 嵌套头目录）"

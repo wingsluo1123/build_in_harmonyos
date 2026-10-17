@@ -1,0 +1,30 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: mlc/1.2.0
+homepage: "https://git.macaw.me/blue/mlc"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "（上游无测试）本配方补跑：`mlc --help`"
+
+upstream_tests:
+  - name: "（上游没有测试套件：仓库无 test/tests，CMake 无 enable_testing/add_test）"
+    count: 0
+    description: >-
+      **上游测试数 = 0，如实声明**。按仓库既有做法在配方里补一条能真跑的功能级测试：构建完成后运行产物
+      `mlc --help`（上游 main.cpp:20 明确支持 `--help`）并断言打印用法。实测通过。
+
+test_package_tests:
+  - file: check_mlc.py
+    description: >-
+      R34 消费者校验 **6 项**（全部离线）：①产物齐备（bin/mlc 可执行）②ELF 头自检（真 ELF64、
+      machine=0xB7 AArch64）③真实运行 `mlc --help` 打印用法 ④无参调用有明确输出 ⑤许可证（上游仓库
+      未附许可证文件 → 如实记录）⑥证据（sha256 + python 版本）。
+    command: "python3 check_mlc.py <package-folder>"
+
+assertion_count: 6
+added_tests_note: >-
+  本库**上游 0 测试**；上表 `upstream_tests.count = 0`，另在配方内补了 1 条功能级断言
+  （见 `upstream_test_command`），消费者校验 6 条。**三者分开计数**，不混成一句“测试全过”。
