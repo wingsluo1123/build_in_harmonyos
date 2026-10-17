@@ -1,0 +1,15 @@
+sources:
+  url: "https://codeload.github.com/rhboot/pesign/tar.gz/refs/tags/116"
+  sha256: "339d141abe3314322311b3c4259175ef937160ac25be4c219495225917c7cdaa"
+  filename: "pesign-116.tar.gz"
+  note: >-
+    上游 `rhboot/pesign` 的 **116** tag 归档（版本与平台清单一致）；包内单层根目录 `pesign-116/`。
+    上游是**手写 Makefile 体系**（`Make.defaults` / `Make.rules` / `src/Makefile`），不是 autotools，
+    因此**不需要 autoreconf**。sha256 为本地实测值。
+patches:
+  - patch_file: "patches/0001-reallocarray-portability.patch"
+    patch_description: >-
+      HarmonyOS/musl 适配：musl 不声明 `reallocarray()`（被隐式声明成 int → 赋给指针即报
+      incompatible integer to pointer conversion）。两处调用（`src/list.h` / `src/password.c`）改为
+      等价的 `realloc` —— 两处调用之后都紧跟 `if (!...)` 判空，语义不变；只改这两行。
+    patch_type: "portability"

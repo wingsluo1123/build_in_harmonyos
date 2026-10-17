@@ -1,0 +1,90 @@
+# 版本级 manifest — pesign 116
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "116"
+software: pesign
+status: built
+build_date: "2026-10-16"
+build_system: makefile
+
+source:
+  url: "https://codeload.github.com/rhboot/pesign/tar.gz/refs/tags/116"
+  sha256: "339d141abe3314322311b3c4259175ef937160ac25be4c219495225917c7cdaa"
+  filename: "pesign-116.tar.gz"
+  note: >-
+    上游 `rhboot/pesign` 的 **116** tag 归档（版本与平台清单一致），包内单层根目录 `pesign-116/`。
+    上游是**手写 Makefile 体系**（`Make.defaults` / `Make.rules` / `src/Makefile`），不是 autotools，
+    因此不需要 autoreconf。sha256 为本地实测值。
+
+build:
+  system: makefile
+  configure_options:
+    - "make -j1 all（LDFLAGS 显式带 -L/-Wl,-rpath；RANLIB=llvm-ranlib）"
+  dependencies:
+    - "efivar/39（提供的 PKGS 模块：efivar；包内 lib/libefivar.so + libefiboot.so + libefisec.so）"
+    - "nspr/4.37（nspr；libnspr4/libplc4/libplds4）"
+    - "nss/3.118.1（nss；libnss3.so 等）"
+    - "popt/1.19"
+    - "uuid/2.40.1"
+  build_requirements: []
+  language: "C（src/*.c + 自带的 vendored libdpe）"
+  conan_side_adaptations:
+    - "生成器里补一个最小 nss-util.pc 指向 nss 包（制品仓没有独立的 nss-util）"
+    - "musl 垫片 conan_musl_shim.h：声明 error_t / loff_t / qsort_r / secure_getenv / program_invocation_*"
+    - "垫片 .c：实现 secure_getenv（musl 无此函数）+ 两个 program_invocation_* 的 weak 兜底定义"
+    - "LDFLAGS 显式带 -L 与 -Wl,-rpath（依赖的 .so 在消费者环境也要能被加载）"
+    - "按各依赖包内**实际存在的共享库名**生成 -l 列表（上游 nss.pc 的 -lnss/-lnssutil 等对不上）"
+    - "RANLIB=llvm-ranlib（conan 默认给 clang-ranlib，本工具链里没有该名字）"
+  patches:
+    - "patches/0001-reallocarray-portability.patch（8 个 hunk）：loff_t include、__ALIGN undef、"
+    - "  两处 reallocarray→realloc、Make.defaults 去 -Werror/-fshort-wchar 并注入垫片与 -D_GNU_SOURCE、"
+    - "  src/Makefile 去掉 man 页构建目标并让 man 安装行忽略缺失"
+
+upstream_tests:
+  framework: "（上游 116 没有测试目录）"
+  test_path: "无 —— 116 的包内没有 tests/ 目录（117 才有 tests/test-efikeygen-algos.sh）"
+  test_command: "（上游无）本配方补跑：构建后真跑 `pesign --help` 与 `efikeygen --help`"
+  test_count: 0
+  run_in_build: true
+  verified: true
+upstream_test_pass_rate: >-
+  **上游 0 个测试**（如实声明：116 的源码包里没有 tests/ 目录、也没有 test 目标）。按仓库既有做法在配方里
+  补了能真跑的检查：构建后**真跑**两个产物，`pesign --help` 与 `efikeygen --help` 都必须 rc=0 且有输出。
+  **✅ 实测通过**（首行分别是 `Usage: pesign [OPTION...]` / `Usage: efikeygen [OPTION...]`）。
+  语义如实说明：这两条只证明"二进制能加载并执行、CLI 解析可用"，**不代表签名/校验功能已被验证**
+  （那需要 NSS 证书库与 EFI 变量环境，沙箱里不具备）。
+adapted_test_pass_rate: >-
+  test_package/check_pesign.py **6 项消费者校验（全部离线）**，本地实测
+  `checks=6 fails=0 skips=0 / RESULT: PASS`：①产物齐备（bin/pesign 191104 字节 + bin/efikeygen 170624 字节）
+  ②ELF 头自检（真 ELF64、machine=0xB7 AArch64）③**真跑** `pesign --help` rc=0 且有输出
+  ④**真跑** `efikeygen --help` rc=0 且有输出 ⑤许可证随包（licenses/COPYING）⑥证据（sha256 + python 版本）。
+
+deviations:
+  - "`secure_getenv` 由垫片实现为 `getenv`（musl 无此 glibc 扩展；pesign 不是 setuid 程序）"
+  - "man 页不构建、不安装：Make.rules:57 的 `%.1` 规则硬编码调用 `mandoc`，本环境没有该工具"
+  - "`-Werror` 降级为 `-Wno-error`：换 libc 后必然出现宏/类型类警告，其本身不是适配问题"
+  - "去掉 `-fshort-wchar`：musl 的 `wchar_t` 是 unsigned int，加了它会与 sysroot 的 bits/alltypes.h 冲突"
+
+knowledge_gained:
+  - category: L1
+    content: >-
+      **换 libc 时 glibc 专有符号要一次性盘点补齐**：musl 侧 `error_t`（类型）、`qsort_r`、`secure_getenv`、
+      `program_invocation_short_name/name` 都没有或未声明。做法：在源码树里放一个垫片头（放在**已在 -I
+      路径上**的目录，如 `<source>/include/`），再由构建文件用 `-include <名字>` 引入（不需要绝对路径），
+      并在垫片 .c 里给出实现（`secure_getenv`）与 **weak 定义兜底**（`program_invocation_*`，libc 有强定义
+      时自动被采用，不冲突）。clang 15 在 C99 下会把"隐式声明 + int→指针"直接判为**硬错误**，所以声明必须补齐。
+    reason: "pesign 116 适配实测——musl 缺 glibc 扩展的成体系处理"
+  - category: L1
+    content: >-
+      **依赖包提供的 `.pc` 名字可能与包里实际库文件名不一致**：pesign 上游 `nss.pc` 写
+      `-lnss -lssl -lsmime -lnssutil -lsoftokn -lfreebl …`，而 conan 的 nss 包里是 `libnss3.so` /
+      `libnssutil3.so` / `libfreebl3.so` 等 → 结果 `-lnss` 解析不到真正含 NSS 符号的库，报一串
+      `undefined symbol: PK11_*`。可靠做法：**扫描依赖包 lib/ 下实际存在的共享库**生成 `-l` 列表，
+      并用 `LDFLAGS` 传入（共享库不讲究链接顺序）。
+    reason: "pesign 116 适配实测——pkg-config 名字与实际库名不符"
+  - category: L1
+    content: >-
+      手写 Makefile 体系里**要按"哪个变量真的进了编译/链接命令"来注入**：本工程 `ARCH_CFLAGS` 不在
+      编译规则里（实测命令行里看不到 `-mbranch-protection`），而 `CFLAGS`/`LDFLAGS` 是；另外 make 的
+      "忽略错误"前缀 `-` **必须在制表符之后**（写成行首 `-` 会让该行不再是 recipe 行 → `missing separator`）。
+    reason: "pesign 116 适配实测——Makefile 变量通道与 recipe 行语法"
