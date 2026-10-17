@@ -1,0 +1,27 @@
+version: "0.1"
+software: pagetools
+status: built
+build_date: "2026-10-17"
+build_system: makefile
+source:
+  url: "https://downloads.sourceforge.net/project/pagetools/pagetools/0.1/pagetools-0.1.tar.gz"
+  sha256: "7cc184e2d31a0ec2a6a9f161b1b30d765d8cd4bbe677c21125038eff22aa4464"
+  upstream_version: "0.1"
+build:
+  system: makefile
+  configure_options: []
+  dependencies:
+    - "netpbm/10.73.42"
+    - "libtiff/4.7.2"
+  cc: clang
+  cxx: clang++
+patches_applied:
+  - "0001-Makefile-add-LDFLAGS-to-link-commands.patch"
+knowledge_gained:
+  - "Upstream uses a plain GNU Makefile with hardcoded c++ and ar; compiler paths must be overridden via CXX= and AR= on the make command line."
+  - "The Makefile references -lnetpbm and -ltiff; dependency include and library paths must be injected through Conan."
+  - "Upstream Makefile uses $(C++) as variable name; renamed to $(CXX) so it can be overridden from the make command line."
+  - "Upstream Makefile link commands do not include $(LDFLAGS); patched to add it for dependency library search paths."
+  - "Upstream LIBPBM variable defaults to 'pbm'; must be overridden to 'netpbm' for the netpbm package."
+knowledge_ref:
+  - "archives/p/pagetools/0.1/notes.md"
