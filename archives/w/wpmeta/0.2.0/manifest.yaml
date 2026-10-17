@@ -1,0 +1,79 @@
+# 版本级 manifest — wpmeta 0.2.0（HarmonyOS PC / aarch64-unknown-linux-ohos）
+
+version: "0.2.0"
+software: "wpmeta"
+
+# 编译状态
+# built：本地 OHOS aarch64 交叉编译 + 上游测试（10/10 Rust）+ test_package（10/10）
+#        全通过；尚未上传制品仓（upload 由 release 流水线在 PR 合并后执行）。
+status: built
+
+build_date: "2026-10-13"
+build_system: "cargo"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 官方源（R39）：上游仓库 AOSC-Dev/wpmeta，tag `wpmeta-v0.2.0`
+  # （Arch Linux extra/wpmeta 0.2.0-2 同源，其 PKGBUILD 亦指向此 tag）
+  url: "https://github.com/AOSC-Dev/wpmeta/archive/refs/tags/wpmeta-v0.2.0.tar.gz"
+  sha256: "a7b736ce218ddadeb19271cee6ce336a69daf686b7282103605456baef35fe38"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # Rust cargo（虚拟 workspace：localized + wpmeta 两个成员，无 configure 步骤）
+  system: custom
+
+  # cargo 无 configure 选项
+  configure_options: []
+
+  # 无 Conan 运行时依赖（全部 crate 由 cargo 从 crates.io rsproxy 镜像解析，
+  # 203 个锁定依赖均为纯 Rust crate，无系统库链接需求）
+  dependencies: []
+
+  # 构建期工具依赖（tool_requires，来自制品仓 R36）
+  build_tools:
+    - "rust-toolchain/1.97.1"
+
+  # 目标三元组
+  target: "aarch64-unknown-linux-ohos"
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+# 无源码补丁：Cargo.lock 锁定的依赖（libc 0.2.178 等）均已包含
+# aarch64-unknown-linux-ohos 支持（≥ OHOS 支持版本线），构建输入逐字节等于
+# 上游 tarball。如后续需要确定性锁图迁移（E358 口径）再行登记。
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "Rust 虚拟 workspace（根 Cargo.toml 仅 [workspace]）在 cargo build --release --locked 下构建全部成员，产物位于 target/<triple>/release/<bin>，package() 按该路径直取 (knowledge_ref: E340)"
+  - "wpmeta 的依赖树（image→ravif→rav1e 等重型 crate）为纯 Rust 实现，aarch64-unknown-linux-ohos 目标无需任何 C 工具链参与编译，clang 仅作为链接器；Cargo.lock 锁定依赖（libc 0.2.178 等）均已含 OHOS 支持，本次无需 E358 式锁图迁移 (knowledge_ref: E358)"
+  - "cargo 1.97 动态链接未版本化的 libssl.so/libcrypto.so 且需要 OpenSSL 3.5+ 符号，须用 Harmonybrew OHOS bottle 提供运行期共享库 (knowledge_ref: E509)"
+  - "HMDFS 拒绝 chmod（E046），Conan 包内 ELF 即使 0770 也不可 exec（EACCES），Rust 工具链二进制须复制后 binary-sign-tool 自签名 (knowledge_ref: E077)"
+  - "PR 内不得新增任何二进制文件：CI checkout-pr 不 checkout 分支而是 clone main 后 `curl <PR>.diff | git apply`，GitCode 的 PR diff 对新增二进制只给出占位行、不附二进制数据段，apply 必失败（`missing binary patch data`，平台评论区误报为源码下载超时/与 main 冲突，重试无效）；测试所需二进制输入须改为纯文本确定性生成器 + 测试期生成（E650；先例 dbview #9495 / libsoil #12488 / dbskkd-cdb .cdb）(knowledge_ref: E650)"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/wpmeta-0.2.0.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/wpmeta-0.2.0.work
+  source_orig_hash: ""
+  source_work_hash: ""
+  generated_at: ""
+  patches_count: 0
+
+patch_classification: []
