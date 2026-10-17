@@ -1,0 +1,107 @@
+# 版本级 manifest
+# 文件位置: archives/k/kdialog/26.04.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "26.04.0"
+software: "kdialog"
+status: built
+build_date: "2026-10-17"
+build_system: "cmake"
+conan_ref: "kdialog/26.04.0"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://download.kde.org/stable/release-service/26.04.0/src/kdialog-26.04.0.tar.xz"
+  sha256: "cd612d72c629a5eab5dd2b6385e93e0926df39a6874ece0cf989d345d3aa225f"
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+
+  configure_options:
+    - "-DBUILD_TESTING=OFF（上游 0 注册测试；tests/ 仅 3 个交互式演示脚本且不在构建内，清点证据见 test_package/MANIFEST.yml）"
+    - "-DKF_IGNORE_PLATFORM_CHECK=TRUE（OHOS 不在 KDE 平台白名单）"
+    - "-DKF_SKIP_PO_PROCESSING=ON（平台无 msgfmt/lconvert；.qm 目录非功能必需）"
+    - "-DWITHOUT_X11=ON（平台无 X11：上游跳过 find_package(X11)，HAVE_X11 不定义，utils.cpp 的 X11 集成编译排除）"
+    - "-DCMAKE_DISABLE_FIND_PACKAGE_KF6DocTools=TRUE（未发布；26.04.0 无 doc/ 且上游 find_package 无 REQUIRED，属防御性）"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DCMAKE_EXE_LINKER_FLAGS_INIT=-Wl,-z,max-page-size=0x1000 -Wl,--disable-new-dtags（OHOS 加载器要求 4-LOAD 段布局；--disable-new-dtags 保证依赖 RPATH 取 DT_RPATH 形式）"
+    - "-DCMAKE_SHARED_LINKER_FLAGS_INIT / -DCMAKE_MODULE_LINKER_FLAGS_INIT=-Wl,-z,max-page-size=0x1000（同源布局要求）"
+    - "-DCMAKE_BUILD_RPATH / -DCMAKE_INSTALL_RPATH=<依赖 lib 目录集>（OHOS 加载器先于制品自身的坏 RPATH 条目命中已发布 KF6 库；运行时解析主经 package_info() 导出 LD_LIBRARY_PATH）"
+    - "-DQT_ADDITIONAL_PACKAGES_PREFIX_PATH=<qtsvg 前缀>（Qt6Svg 跨包组件查找；否则 find_package(Qt6 ... Svg) 先命中 qtbase 配置而失败）"
+    - "-DECM_MODULE_PATH=<ecm/share/ECM 的 modules;find-modules;kde-modules>（CMakeDeps 的 ECMConfig 不带模块路径，手工注入）"
+    - "conan_cmakedeps_paths.cmake（CMAKE_FIND_PACKAGE_PREFER_CONFIG=ON + CMAKE_PREFIX_PATH/CMAKE_LIBRARY_PATH/CMAKE_INCLUDE_PATH/CMAKE_MODULE_PATH 注入：CMakeDeps 不写 cmake_find_mode=none 的包，kdialog 主配方与 test_package 同源手工补齐）"
+
+  dependencies:
+    - "qtbase/6.11.1.1（override；FEATURE_dbus=ON 变体，导出 Qt6::DBus 组件）"
+    - "qtsvg/6.11.1"
+    - "ktextwidgets/6.26.0"
+    - "knotifications/6.26.0"
+    - "kguiaddons/6.26.0（override）"
+    - "kiconthemes/6.26.0（含 KF6::IconWidgets 同配置第二库）"
+    - "kwindowsystem/6.26.0"
+    - "kio/6.26.0（KIOCORE_ONLY 基线；补丁 0001 链接替换 KF6::KIOCore）"
+    - "kdbusaddons/6.18.0（ohpcd 无 6.26.0；kaccounts-integration 26.04.0 先例，其传递 qtbase-sql-dbus/6.11.1 → dbus/1.14.10 → expat 链）"
+    - "ki18n/6.26.0（override）"
+    - "kconfig/6.26.0（override）"
+    - "kcoreaddons/6.26.0（override）"
+    - "kcrash/6.26.0（override）"
+    - "kcolorscheme/6.26.0（override）"
+    - "kcodecs/6.26.0（override）"
+    - "kwidgetsaddons/6.26.0（override）"
+    - "kcompletion/6.26.0.1（ktextwidgets 闭包）"
+    - "sonnet/6.26.0（传递，ktextwidgets 闭包）"
+    - "kservice/6.26.0（传递，ktextwidgets/kio 闭包）"
+    - "karchive/6.26.0（override；kiconthemes 闭包）"
+    - "openssl/3.5.6.1"
+    - "zstd/1.5.7"
+    - "expat/2.8.2.1（override；dbus/1.14.10 经 kdbusaddons→qtbase-sql-dbus 传递，kcron 26.04.1 先例）"
+    - "libxml2/2.15.3（kio 闭包；OHOS SDK lld 链接期亦需 libxml2.so.16）"
+    - "ecm/6.26.0 (tool_requires)"
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - patches/0001-ohos-link-kiocore.patch
+  - patches/0002-ohos-explicit-framework-links.patch
+
+# ============================================================
+# 测试信息
+# ============================================================
+
+upstream_tests:
+  framework: "none"
+  test_targets: 0
+  test_command: "(none — 上游未注册任何测试目标，无 ctest 可执行；清点证据见 test_package/MANIFEST.yml)"
+  run_in_build: false
+upstream_test_pass_rate: "N/A（上游 0 用例：tests/ 仅 3 个交互式演示脚本（人工点击/qdbus 驱动）且不在构建内，无 CMake 测试注册，.kde-ci.yml 声明 require-passing-tests-on 却无测试目标）"
+adapted_test_pass_rate: "12/12（100%，真机 test_package 消费者套件全员通过；reports/conan-verify-report.md Verdict=PASS）"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "ohpcd 的 kio/6.26.0 是 KIOCORE_ONLY 基线（仅 libKF6KIOCore + kioworker/ktrash6/workers，无 libKF6KIOWidgets）：kdialog 唯一 KIO 符号 KRecentDocument::add()（--getsavefilename 分支）即由 KIOCore 导出（kio src/core/krecentdocument.cpp 的 KIOCORE_EXPORT 类），链接目标 KF6::KIOWidgets -> KF6::KIOCore 一行替换即保留最近文档功能，无需回填 KIOWidgets（后者需 kbookmarks/solid/kjobwidgets/kiconthemes 6.26 全链，其中数个未发布）"
+  - "kdialog 另一处 'KIO 观感' 的调用 KColorMimeData::fromMimeData()（--getcolor 分支）实际属于 KGuiAddons，不受链接替换影响；KF6::IconWidgets 是 kiconthemes 在同一 KF6IconThemes CMake 配置中导出的第二个库（libKF6IconWidgets.so），随 kiconthemes/6.26.0 正常供应，无需额外包或补丁"
+  - "ohpcd 的 KF6 6.26.0 制品不向消费者传播依赖组件的传递 include 目录（每个框架的配置只导出自身 ${_IMPORT_PREFIX} 相对头目录，依赖链接被拍平为 -lKF6Xxx 标志与绝对 INTERFACE_LINK_DIRECTORIES）：上游自全量 KF6 安装继承的隐式头目录在 ohpcd 制品上不成立——消费方须把直用框架显式声明进 find_package(KF6 COMPONENTS ...) 与 target_link_libraries（补丁前真机编译实撞 kdialog.cpp:16 'KMessageBox' file not found / widgets.cpp:22 'KPasswordDialog'；补丁 0002 补 KF6::WidgetsAddons/CoreAddons/ConfigCore/I18n；KConfig 框架的 find_package 组件名为 Config——按目标名写 ConfigCore 会被 FindKF6 判 'missing: ConfigCore'）"
+  - "find_package(Qt6 COMPONENTS DBus) 与 helper 的 qt_add_dbus_adaptor 由 qtbase/6.11.1.1（FEATURE_dbus=ON 变体）满足并可用（kauth 6.26.0 先例）；kdbusaddons 在 ohpcd 仅发布 6.14.0/6.18.0/6.29.0，6.18.0 为该 6.26 线消费者的既有钉法（kaccounts-integration 26.04.0 先例）：其配方自身传递 qtbase-sql-dbus/6.11.1（完整 Qt 构建，含 Sql/Test），Qt6::DBus 于 kdialog 本体的来源仍为 qtbase/6.11.1.1"
+  - "26.04.0 的 --passivepopup 已无 KPassivePopup 回退（kdialog.cpp 仅留注释）：无会话总线时 sendVisualNotification() 返回 false 后 qApp->exec() 进入无窗口事件循环且无事可退出——该分支在无 DBus 设备上挂起，消费者用例有意不驱动；--progressbar 需 kdialog_progress_helper 在 PATH 且等待 DBus 客户端关闭对话框，同样不作端到端驱动。替代验证：--msgbox 是真实模态事件循环（KMessageBox::createKMessageBox + QDialog::exec），作 3 秒宽限存活探针（同时门禁 kdialog 本体 DT_NEEDED closure）；helper 则直接启动做闭包加载门禁（有界等待 + 链接器解析失败字样判定）"
+  - "已发布 KF6 制品的不可移植 DT_NEEDED 两类残留（构建机绝对路径 / 构建树相对 '../../bin/*.so'）照 kcron 26.04.1 全链处置：本包两个可执行文件（kdialog、kdialog_progress_helper）在 package() 阶段原位 .dynstr 改写为裸基名 + 重签（HMDFS 禁 symlink，残留路径形态条目 fail-closed 中止打包）；test_package 侧对依赖库做相对条目归一（patchelf --replace-needed + 重签）+ 绝对条目建链 + 符号链农场（kcolorchooser 26.04.0/kblocks 26.04.0 先例）"
+  - "无会话总线设备上 kdialog 的对话框本体流程不依赖 DBus：--version/--help/--author/--license（KAboutData/QCommandLineParser）与 --msgbox（KMessageBox 本地模态）均可在离屏平台完整驱动；未知选项走 QCommandLineParser 严格失败（'Unknown option' 诊断 + 非零退出）——四类非交互面构成消费者断言主体"

@@ -1,0 +1,46 @@
+# 软件级 manifest — kdialog
+# 文件位置: archives/k/kdialog/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: kdialog
+display: "kdialog"
+description: "KDE 对话框 shell 工具（KDialog）——脚本化 Qt6/KF6 Widgets 对话框（msgbox/yesno/inputbox/imgbox/textbox/combobox/menu/checklist/radiolist/passivepopup/文件选择器/geticon/progressbar/getcolor/slider/calendar 等）加 kdialog_progress_helper D-Bus 助手（--progressbar 服务）；链接适配为 ohpcd 的 KIOCore 基线"
+category: utility
+homepage: "https://invent.kde.org/utilities/kdialog"
+license: "GPL-2.0-or-later"
+build_system: cmake
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "ohpcd kio/6.26.0 为 KIOCORE_ONLY 基线（无 libKF6KIOWidgets）：kdialog 唯一 KIO 符号 KRecentDocument::add() 由 KIOCore 导出，链接替换 KF6::KIOWidgets->KF6::KIOCore 即保留功能（KColorMimeData 属 KGuiAddons 不受影响；KF6::IconWidgets 属 kiconthemes 同配置正常供应）"
+    - "find_package(Qt6 COMPONENTS DBus) 与 qt_add_dbus_adaptor 由 qtbase/6.11.1.1（FEATURE_dbus=ON 变体）满足；kdbusaddons 在 ohpcd 无 6.26.0，按 kaccounts-integration 26.04.0 钉 6.18.0（其传递 qtbase-sql-dbus → dbus → expat 链，expat 用 2.8.2.1 override 收敛）"
+    - "无会话总线设备上 --passivepopup 挂起（26.04.0 无 KPassivePopup 回退：sendVisualNotification() 返回 false 后 qApp->exec() 无窗口可退）；--progressbar 需 helper 在 PATH 且等待 DBus 客户端；消费者验证改以 --msgbox 模态事件循环 3 秒存活探针（兼门禁 kdialog 本体 DT_NEEDED closure）+ helper 直接启动的闭包加载门禁替代"
+    - "OHOS lld 需 -Wl,-z,max-page-size=0x1000（4-LOAD 段布局）；可执行文件另加 --disable-new-dtags 使依赖 RPATH 取 DT_RPATH 形式（先于制品自身坏 RPATH 条目命中已发布 KF6 库）"
+    - "共享设备制品残留两类不可移植 DT_NEEDED（构建机绝对路径 / 构建树相对条目）：本包两个可执行文件在 package() 原位 .dynstr 改写 + 重签（HMDFS 禁 symlink，残留即 fail-closed 中止打包）；test_package 对依赖库做相对归一 / 绝对建链 / 符号链农场"
+    - "上游 tests/ 的 3 个脚本为交互式演示（人工点击/qdbus 驱动），未注册进构建：BUILD_TESTING=OFF，验证面 = test_package 消费者套件（R34/R51）"
+  common_dependencies:
+    - qtbase
+    - qtsvg
+    - ktextwidgets
+    - knotifications
+    - kguiaddons
+    - kiconthemes
+    - kwindowsystem
+    - kio
+    - kdbusaddons
+    - ecm (tool_requires)
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "26.04.0":
+    status: built
+    build_date: "2026-10-17"
+    conan_ref: "kdialog/26.04.0"
+    note: "首次适配：2 补丁（KIOWidgets->KIOCore 链接替换 + 直用 KF6 框架显式声明）；上游 0 注册测试（tests/ 仅交互演示脚本）；消费者 5 用例/10 断言 + 1 鸿蒙特有用例/2 断言（共 12）；八门禁 G0–G4 全 PASS（Verdict=PASS，2026-10-17 真机；L2/L4/L5 无 cache 路径跳过）"
