@@ -1,0 +1,77 @@
+# Independent build wrapper; not part of the Stanford GraphBase.
+cmake_minimum_required(VERSION 3.15)
+project(sgb_wrapper LANGUAGES C)
+include(GNUInstallDirs)
+enable_testing()
+set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(SGB_MODULES gb_flip gb_graph gb_io gb_sort gb_basic gb_books gb_econ
+    gb_games gb_gates gb_lisa gb_miles gb_plane gb_raman gb_rand gb_roget
+    gb_words gb_dijk gb_save)
+set(gen "${CMAKE_CURRENT_BINARY_DIR}/generated")
+file(MAKE_DIRECTORY "${gen}")
+file(MAKE_DIRECTORY "${gen}/input")
+file(COPY "${SGB_SOURCE_DIR}/PROTOTYPES" DESTINATION "${gen}/input")
+foreach(mod IN LISTS SGB_MODULES)
+    file(COPY "${SGB_SOURCE_DIR}/${mod}.w" DESTINATION "${gen}/input")
+endforeach()
+foreach(web boilerplate.w gb_types.w test_sample.w)
+    file(COPY "${SGB_SOURCE_DIR}/${web}" DESTINATION "${gen}/input")
+endforeach()
+# Published ctangle uses bounded filename buffers. Short relative names also
+# keep CWEB include resolution independent of the Conan cache path length.
+foreach(mod IN LISTS SGB_MODULES)
+    execute_process(COMMAND "${CMAKE_COMMAND}" -E env "CWEBINPUTS=input"
+        "${SGB_CTANGLE}" "input/${mod}.w"
+        "input/PROTOTYPES/${mod}.ch" "sgb_${mod}.c"
+        WORKING_DIRECTORY "${gen}" RESULT_VARIABLE rc)
+    if(NOT rc EQUAL 0)
+        message(FATAL_ERROR "ctangle failed for ${mod}: ${rc}")
+    endif()
+    list(APPEND SGB_SOURCES "${gen}/sgb_${mod}.c")
+endforeach()
+execute_process(COMMAND "${CMAKE_COMMAND}" -E env "CWEBINPUTS=input"
+    "${SGB_CTANGLE}" "input/test_sample.w"
+    "input/PROTOTYPES/test_sample.ch" "sgb_test_sample.c"
+    WORKING_DIRECTORY "${gen}" RESULT_VARIABLE rc)
+if(NOT rc EQUAL 0)
+    message(FATAL_ERROR "ctangle failed for test_sample: ${rc}")
+endif()
+add_library(gb STATIC ${SGB_SOURCES})
+target_compile_definitions(gb PRIVATE SYSV)
+target_include_directories(gb PUBLIC "$<BUILD_INTERFACE:${gen}>")
+target_link_libraries(gb PUBLIC m)
+# gb_open first checks the current directory. Package data is relocatable;
+# consumers select share/sgb as their working directory for named data files.
+set(data "${CMAKE_CURRENT_BINARY_DIR}/test-data")
+file(MAKE_DIRECTORY "${data}")
+set(SGB_DATA anna david econ games homer huck jean lisa miles roget words)
+foreach(name IN LISTS SGB_DATA)
+    list(APPEND datafiles "${SGB_SOURCE_DIR}/${name}.dat")
+endforeach()
+file(COPY ${datafiles} "${SGB_SOURCE_DIR}/test.dat" "${SGB_SOURCE_DIR}/sample.correct"
+    "${SGB_SOURCE_DIR}/test.correct" DESTINATION "${data}")
+foreach(test test_io test_graph test_flip)
+    add_executable(${test} "${gen}/${test}.c")
+    target_link_libraries(${test} PRIVATE gb)
+    target_compile_definitions(${test} PRIVATE SYSV)
+    add_test(NAME upstream_${test} COMMAND ${test})
+    set_tests_properties(upstream_${test} PROPERTIES WORKING_DIRECTORY "${data}" TIMEOUT 60)
+endforeach()
+add_executable(test_sample "${gen}/sgb_test_sample.c")
+target_link_libraries(test_sample PRIVATE gb)
+target_compile_definitions(test_sample PRIVATE SYSV)
+add_test(NAME upstream_test_sample COMMAND "${CMAKE_COMMAND}"
+    "-DPROGRAM=$<TARGET_FILE:test_sample>" "-DDATA=${data}"
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/sgb-sample-check.cmake")
+set_tests_properties(upstream_test_sample PROPERTIES TIMEOUT 120)
+install(TARGETS gb ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+foreach(mod IN LISTS SGB_MODULES)
+    list(APPEND headers "${gen}/${mod}.h")
+endforeach()
+install(FILES ${headers} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+install(FILES ${datafiles} DESTINATION "${CMAKE_INSTALL_DATADIR}/sgb")
+install(FILES "${SGB_SOURCE_DIR}/boilerplate.w" "${SGB_SOURCE_DIR}/gb_types.w"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/sgb/cweb")
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/sgb-package-config.cmake"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/sgb" RENAME sgb-config.cmake)

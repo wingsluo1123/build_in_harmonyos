@@ -1,0 +1,32 @@
+package: sgb/20210202
+homepage: "https://www-cs-faculty.stanford.edu/~knuth/sgb.html"
+upstream_check_command: "make tests"
+upstream_test_in_build: true
+upstream_test_command: "ctest --output-on-failure (4 upstream programs; 2 golden comparisons in test_sample)"
+upstream_tests:
+  - file: test_io.c
+    source: gb_io.w
+    description: "Data I/O and checksum checks; generated using upstream PROTOTYPES/gb_io.ch"
+    command: "./test_io"
+  - file: test_graph.c
+    source: gb_graph.w
+    description: "Allocation and graph representation; generated using upstream PROTOTYPES/gb_graph.ch"
+    command: "./test_graph"
+  - file: test_flip.c
+    source: gb_flip.w
+    description: "Reproducible random generator; generated using upstream PROTOTYPES/gb_flip.ch"
+    command: "./test_flip"
+  - file: sgb_test_sample.c
+    source: test_sample.w
+    description: "All sample graph generators; exact sample.correct and test.correct comparisons"
+    command: "./test_sample; compare test.gb and sample.out with upstream golden files"
+test_package_tests:
+  - file: test_sgb.c
+    description: "6 installed libgb consumer cases: graph, generators, Dijkstra, serialization, RNG, installed data"
+    command: "ctest --output-on-failure"
+  - file: sgb_route_consumer.c
+    description: "Native OHOS installed-library end-to-end consumer: import route map, persist graph, restore in a separate process, run Dijkstra, export and verify route report; reject an unknown destination"
+    command: "ctest --output-on-failure -R harmony_consumer_route_workflow"
+    fixtures: "campus-routes.txt; run_route_workflow.cmake"
+# Dynamic CHECK executions are reported per consumer case; upstream internal
+# checks are not conflated with the four program-level tests or CTest entries.
