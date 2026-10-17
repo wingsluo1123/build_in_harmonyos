@@ -1,0 +1,65 @@
+# 版本级 manifest — libtrace 4.0.34
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "4.0.34"
+software: "libtrace"
+status: built
+build_date: "2026-10-15"
+build_system: custom
+
+source:
+  url: "https://github.com/LibtraceTeam/libtrace/archive/refs/tags/4.0.34-1.tar.gz"
+  sha256: "b3e73b9ca6757094047295937ab4d834155a0c64674f499132b56e8f81f8fcc9"
+  tar_format: tar.gz
+  upstream: "https://github.com/LibtraceTeam/libtrace"
+
+build:
+  system: custom
+  configure_options:
+    - "手工复现 configure 产物：生成 config.h 与 libtrace.h（由 libtrace.h.in 替换占位符）"
+    - "直接编译 lib/Makefile.am 的基础源文件（可选后端 DAG/DPDK/pfring/XDP/LLVM/wandder/libnuma 全关）"
+    - "config.h 与上游 configure 探测结果一致（libpcap + libwandio，含 HAVE_PCAP_BPF_H=1 以使 BPF 过滤可用）"
+  dependencies:
+    - libpcap/1.10.6
+    - wandio/4.2.7
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-trace-parallel-pthread-setaffinity-guard.patch"
+
+package_type: library
+artifacts:
+  - "lib/libtrace.a"
+  - "include/libtrace.h、libtrace_parallel.h、dagformat.h、lt_inttypes.h、erftypes.h、format_ndag.h、data-struct/*.h 等 21 个头文件"
+  - "licenses/COPYING、COPYING.LESSER"
+libs:
+  - trace
+requires:
+  - libpcap/1.10.6
+  - wandio/4.2.7
+
+tests:
+  upstream_suite: >
+    43 个测试程序（test/*.c）与一批 trace 样本（test/traces/）；但 test 不在顶层 SUBDIRS、test/ 下没有 Makefile.am，
+    上游 autotools 因此从不编译或运行它们
+  upstream_audit: "build(): ls test/*.c | wc -l、ls test/traces | wc -l、ls test/Makefile.am test/Makefile.in（两个都 No such file），输出进 conan create 日志"
+  upstream_run: >
+    build() 内编译并运行全部 43 个：参数取自上游自己的 do-*.sh 驱动，
+    编译参数对齐上游 test/Makefile（-I../lib -I../libpacketdump，LDLIBS=-ltrace -lpacketdump），
+    运行在 test/ 副本目录 test-run/ 内进行（压缩样本以解压后的同一份报文提供），
+    输出 LTEST-PASS/FAIL-COMPILE/FAIL-RUN（含报错首行）与汇总行
+  upstream_pass_rate: "37/43（86.0%）"
+  upstream_fail_reasons: >
+    编译失败 0 项；运行失败 6 项，逐条附实测报错：
+    test-etsi 需要 libwandder（ETSI LI）后端，而 tag 归档内 libwandder/ 与 wandio/ 是空目录（子模块未打包，实测 0 个文件）；
+    test-live / test-live-snaplen / test-nic / test-hotplug 需要真实抓包网卡与 root；
+    test-seek 不在上游 test/Makefile 的 all: 目标内、也不被任何 do-*.sh 调用，
+    其内置期望（4 个报文）与 4.0.34 的 seek 语义不一致（实测 3 个）
+  consumer_checks: 12
+  consumer_failures: 0
+  consumer_pass_rate: "12/12 (100%)"
+  command: "conan create archives/l/libtrace/4.0.34 -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64"
+
+knowledge_gained:
+  - "knowledge/drafts/DRAFT-14678-libtrace-4.0.34-tag-archive-without-configure-and-generated-header.kv"

@@ -1,0 +1,15 @@
+sources:
+  "4.0.34":
+    url: "https://github.com/LibtraceTeam/libtrace/archive/refs/tags/4.0.34-1.tar.gz"
+    sha256: "b3e73b9ca6757094047295937ab4d834155a0c64674f499132b56e8f81f8fcc9"
+
+patches:
+  - patch_file: "patches/0001-trace-parallel-pthread-setaffinity-guard.patch"
+    patch_description: >
+      libtrace calls pthread_setaffinity_np() inside an #ifdef __linux__ block, but
+      the OHOS aarch64 target is musl-based and musl does not provide that glibc
+      extension, so the library links with an undefined symbol.  The call is now
+      guarded by a feature macro, the same idiom the upstream code already uses
+      for HAVE_PTHREAD_SETNAME_NP, so platforms without thread affinity settings
+      simply skip the CPU pinning (it is an optimisation, not a requirement)
+    patch_type: "portability"
