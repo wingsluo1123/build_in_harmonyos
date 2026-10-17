@@ -1,0 +1,30 @@
+--- a/src/modules/tlsa/Makefile
++++ b/src/modules/tlsa/Makefile
+@@ -21,21 +21,26 @@
+ SSL_BUILDER=$(shell \
+ 	if pkg-config --exists libssl; then \
+ 		echo 'pkg-config libssl'; \
+ 	fi)
+ CRYPTO_BUILDER=$(shell \
+ 	if pkg-config --exists libcrypto; then \
+ 		echo 'pkg-config libcrypto'; \
+ 	fi)
+ endif
+ 
+-DEFS += -DKSR_LIBSSL_STATIC
++DEFS += -DKSR_LIBSSL_STATIC -DKSR_TLSA_OWNED_KEYS
++
++# Keep the embedded OpenSSL allocator/data domain local. Track only keys
++# created by references linked into this module, never other DSOs' keys.
++MOD_LDFLAGS += -Wl,--exclude-libs,libssl.a:libcrypto.a \
++              -Wl,--wrap=pthread_key_create -Wl,--wrap=pthread_key_delete
+ 
+ ifneq ($(SSL_BUILDER),)
+ 
+ ifneq ($(LIBSSL_STATIC_SRCLIB),yes)
+ 	## when static libs (*.a) from packages are compiled with -fPIC
+ 	DEFS += $(shell $(SSL_BUILDER) --cflags)
+ 	LIBS += $(shell $(SSL_BUILDER) --libs-only-L)
+ ifneq ($(CRYPTO_BUILDER),)
+ 	DEFS += $(shell $(CRYPTO_BUILDER) --cflags)
+ 	LIBS += $(shell $(CRYPTO_BUILDER) --libs-only-L)

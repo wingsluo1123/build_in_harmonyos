@@ -1,0 +1,47 @@
+package: kamailio-tlsa/6.0.6
+homepage: https://www.kamailio.org
+upstream_check_command: ''
+upstream_test_in_build: false
+upstream_test_command: python3 run_upstream.py --host BUILD/host-source/src --output
+  BUILD/upstream-results
+upstream_tests:
+- file: upstream/1.sh
+  description: Minimal core startup under foreground supervisor
+- file: upstream/18.sh
+  description: Core command-line option smoke test under foreground supervisor
+upstream_inventory:
+  numbered_git_unit_scripts: 49
+  tlsa_specific_tests: 0
+  executed_unit_scripts: 2
+  passed_unit_scripts: 2
+  reason: 2 applicable core scripts run with documented runtime adaptations; 47 other-component scripts excluded per
+    upstream-audit.json
+test_package_tests:
+- file: test_tlsa.py
+  description: 7 ELF/package checks and 26 real-core TLS/fork/isolation assertions
+  command: Conan test() passes the installed package and matching host build paths
+- file: foreign_state.c
+  description: Independent static OpenSSL peer tracks allocator and thread-key survival
+    in children
+  command: Loaded by test_tlsa.py in the two coexistence cases
+- file: make_certificate.c
+  description: Generate a short-lived localhost certificate for the TLS consumer test
+  command: Invoked by test_tlsa.py; helper failure aborts the test
+assertion_count: 34
+upstream_adapted_passed: 2
+total_executed_checks: 36
+added_negative_test:
+  file: run_upstream.py
+  description: Conflicting -T and -N options fail with the expected parser diagnostic
+adaptation_limits:
+  - Foreground supervision and private ports replace daemon startup and fixed port use
+  - Missing passwd entry excludes same-identity account switching in 18.sh
+  - TLSA transport consumer covers server TLS1.2/TLS1.3 and the default provider
+
+contest_classification:
+  upstream_unit: 2
+  added_general: 33
+  ohos_specific: 1
+  ohos_assertion: 'normal: 12 connections / 4 clients / 2 TCP workers'
+  rationale: Existing real OHOS fork-worker transport assertion covers the foreground descriptor regression; moved from consumer classification, not an additional execution
+  general_negative: '-T/-N CLI rejection is portable and counted under added_general'

@@ -1,0 +1,133 @@
+--- a/src/modules/tls/tls_mod.c
++++ b/src/modules/tls/tls_mod.c
+@@ -49,20 +49,23 @@
+ #include "tls_server.h"
+ #include "tls_domain.h"
+ #include "tls_select.h"
+ #include "tls_config.h"
+ #include "tls_rpc.h"
+ #include "tls_util.h"
+ #include "tls_mod.h"
+ #include "tls_cfg.h"
+ #include "tls_rand.h"
+ #include "tls_ct_wrq.h"
++#ifdef KSR_TLSA_OWNED_KEYS
++#include "../tlsa/tlsa_keys.h"
++#endif
+ 
+ #ifndef TLS_HOOKS
+ #error "TLS_HOOKS must be defined, or the tls module won't work"
+ #endif
+ #ifdef CORE_TLS
+ #error "conflict: CORE_TLS must _not_ be defined"
+ #endif
+ 
+ /*
+  * FIXME:
+@@ -370,52 +373,59 @@
+ 
+ }
+ #endif
+ 
+ /* global config tls_threads_mode = 2 (KSR_TLS_THREADS_MFORK)
+  *  - force all thread-locals to be 0x0 after fork()
+  *  - with OpenSSL loaded the largest value observed
+  *     is < 10
+  *
+  */
++#ifndef KSR_TLSA_OWNED_KEYS
+ static int tls_pthreads_key_mark;
+ static void fork_child(void)
+ {
+ 	int k;
+ 	for(k = 0; k < tls_pthreads_key_mark; k++) {
+ 		if(pthread_getspecific(k) != 0)
+ 			pthread_setspecific(k, 0x0);
+ 	}
+ }
+ 
++#endif /* !KSR_TLSA_OWNED_KEYS */
++
+ static int mod_init(void)
+ {
+ 	int method;
+ 	int verify_client;
+ 	unsigned char rand_buf[32];
++#ifndef KSR_TLSA_OWNED_KEYS
+ 	int k;
++#endif
+ 
+ #ifdef STATISTICS
+ 	/* register statistics */
+ 	if(register_module_stats("tls", mod_stats) != 0) {
+ 		LM_ERR("failed to register statistics\n");
+ 		return -1;
+ 	}
+ #endif
+ #if OPENSSL_VERSION_NUMBER >= 0x10101000L
++#ifndef KSR_TLSA_OWNED_KEYS
+ 	for(k = 0; k < 32; k++) {
+ 		if(pthread_getspecific(k) != 0) {
+ 			LM_WARN("detected initialized thread-locals created before tls.so; "
+ 					"tls.so must be the first module loaded\n");
+ 		}
+ 	}
+ 
++#endif
+ 	if(ksr_tls_threads_mode == KSR_TLS_THREADS_MTEMP) {
+ 		LM_WARN("tls_threads_mode=1 is invalid on kamailio version >= 6; "
+ 				"forcing tls_threads_mode=2\n");
+ 		ksr_tls_threads_mode = KSR_TLS_THREADS_MFORK;
+ 	}
+ #endif /*  OPENSSL_VERSION_NUMBER*/
+ 
+ 	if(tls_disable) {
+ 		LM_WARN("tls support is disabled "
+ 				"(set enable_tls=1 in the config to enable it)\n");
+@@ -530,37 +540,46 @@
+ #if OPENSSL_VERSION_NUMBER >= 0x010101000L
+ 	/*
+ 	 * register the need to be called post-fork of all children
+ 	 * with the special rank PROC_POSTCHILDINIT
+ 	 */
+ 	if(ksr_tls_init_mode & TLS_MODE_FORK_PREPARE) {
+ 		ksr_module_set_flag(KSRMOD_FLAG_POSTCHILDINIT);
+ 	}
+ #endif
+ 	if(ksr_tls_threads_mode == KSR_TLS_THREADS_MFORK) {
++#ifdef KSR_TLSA_OWNED_KEYS
++		if(tlsa_keys_atfork() != 0) {
++			LM_ERR("failed to register TLSA key fork handlers\n");
++			goto error;
++		}
++#else
+ 		pthread_atfork(NULL, NULL, &fork_child);
++#endif
+ 	}
+ 
+ #if OPENSSL_VERSION_NUMBER >= 0x010101000L
+ 	/*
+ 	 * force creation of all thread-locals now so that other libraries
+ 	 * that use pthread_key_create(), e.g. python,
+ 	 * will have larger key values
+ 	 */
+ 	if(ksr_tls_threads_mode > KSR_TLS_THREADS_MNONE) {
+ 		ERR_clear_error();
+ 		RAND_bytes(rand_buf, sizeof(rand_buf));
++#ifndef KSR_TLSA_OWNED_KEYS
+ 		for(k = 0; k < 32; k++) {
+ 			if(pthread_getspecific(k))
+ 				tls_pthreads_key_mark = k + 1;
+ 		}
+ 		LM_WARN("set maximum pthreads key to %d\n", tls_pthreads_key_mark);
++#endif
+ 	}
+ #endif
+ 	return 0;
+ error:
+ 	tls_h_mod_destroy_f();
+ 	return -1;
+ }
+ 
+ 
+ #ifdef KSR_SSL_COMMON
