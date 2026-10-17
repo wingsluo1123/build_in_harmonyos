@@ -1,0 +1,54 @@
+version: "0.1.4"
+software: "wayout"
+status: built
+build_date: "2026-10-17"
+build_system: meson
+
+source:
+  url: "https://git.sr.ht/~proycon/wayout/archive/0.1.4.tar.gz"
+  sha256: "5c947a0384b05dd9277a58547d93ad5659ecf8c56f28921de03b4feb73218b25"
+  tar_format: tar.gz
+
+build:
+  system: meson
+  configure_options:
+    - "-Dman-pages=disabled"
+    - "-Dwrap_mode=nodownload"
+  dependencies:
+    - "wayland/1.24.0"
+    - "wayland-protocols/1.48"
+    - "cairo/1.18.4.2"
+    - "pango/1.58.2"
+    - "expat/2.8.2.1 (override: wayland wants 2.8.2, pango->fontconfig wants 2.8.2.1)"
+  cc: clang
+  cxx: "N/A"
+
+patches_applied:
+  - "0001-meson.build.patch"
+  - "0002-protocol-meson.build.patch"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/wayout-0.1.4.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/wayout-0.1.4.work
+  source_orig_hash: ecf0ef055638f5e9
+  source_work_hash: df870375b142e141
+  generated_at: '2026-10-17T14:00:47'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-meson.build.patch
+    type: portability
+    platform_only: false
+    guard: "none"
+  - file: 0002-protocol-meson.build.patch
+    type: portability
+    platform_only: false
+    guard: "none"
+
+knowledge_gained:
+  - "Meson removed dependency.get_pkgconfig_variable() in 1.6; sources written for older Meson must switch to get_variable(pkgconfig: ...) (wayout 0.1.4, wdisplays family)."
+  - "Conan PkgConfigDeps only emits .pc files for a package's single pkg_config_name, so dependency('wayland-cursor') and dependency('pangocairo') are missing even when the packages ship those libraries; bridge .pc files with the real package prefix are needed."
+  - "The wayland package's bin/wayland-scanner cannot execute on HMFS (unsigned ELF + absolute build-machine DT_NEEDED); stage it with patchelf + re-sign and wrap it with LD_LIBRARY_PATH."
+  - "Meson on OHOS cannot spawn bare command names (ENOENT for pkg-config/ninja/ar/ranlib); the machine file needs absolute paths."
+  - "wayout declares its no-op wl_output listener with an empty parameter list, which modern clang rejects under -Wstrict-prototypes -Werror; disabling that warning at the build-system level keeps the intentional callback table intact."

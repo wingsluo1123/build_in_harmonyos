@@ -1,0 +1,26 @@
+# Upstream test and consumer-test audit for wayout 0.1.4.
+package: wayout/0.1.4
+homepage: "https://git.sr.ht/~proycon/wayout"
+
+# Upstream ships no automated test suite: the tree has no tests/ directory and
+# meson.build registers no test() target (no `meson test` entries at all).
+# The only verification entry points that exist are the build itself and the
+# binary's own CLI contract.
+upstream_check_command: "meson setup build && ninja -C build"
+upstream_test_in_build: false
+upstream_test_command: "N/A - no upstream test target (CLI contract + real wl_display_connect verified instead)"
+
+upstream_tests: []
+
+test_package_tests:
+  - file: test_wayout.py
+    description: "Consumer checks: packaged artifacts; --version/--help contract; unknown option and missing value rejection; invalid delimiter regex; real wl_display_connect failure without a compositor; AArch64 ELF; dynamic pango/cairo/wayland chain"
+    command: "python3 test_wayout.py <package-folder>"
+    executed_by: "test_package/conanfile.py test() using self.run"
+  - file: test_ohos_wayout.py
+    description: "HarmonyOS-specific checks: HarmonyOS kernel, AArch64 device, ELF64/musl loader, on-device startup resolving every DT_NEEDED, CLI contract, real libwayland connection attempt, regcomp error path"
+    command: "python3 test_ohos_wayout.py <package-folder>"
+    executed_by: "test_package/conanfile.py test() on settings.os=OHOS"
+
+# Unique consumer checks: 14 portable + 14 HarmonyOS = 28.
+assertion_count: 28
