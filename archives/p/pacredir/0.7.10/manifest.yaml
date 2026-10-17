@@ -1,0 +1,223 @@
+# 版本级 manifest — pacredir 0.7.10
+# 遵循 ARCHIVE-SPEC v3.0（交叉校验用，CI 不读取）
+#
+# ⚠️ 段落顺序有硬约束：patch_classification 必须放在**文件最后**。
+# scripts/ohc/refresh_patch.py:547 用
+#   re.sub(r'\npatch_classification:.*', '', content, flags=re.DOTALL)
+# 清除旧块后再追加新块，DOTALL 会把该键**到文件末尾**的全部内容一并剥掉。
+# 本文件首轮就因此丢失了 tests / verification / knowledge_gained /
+# knowledge_drafts 四段（finish 的 step [1/10] refresh-patch 与 step [6/10]
+# finalize-archive 都会触发），已恢复并把该键移到末尾。
+
+version: "0.7.10"
+software: "pacredir"
+
+# published | built | failed | archived
+# built = conanfile.py 已生成 + conan create 与 conan-verify 本地实测通过，未 upload。
+# 远程 HarmonyOS CI 终态出来后按仓库定义回填。
+status: built
+
+build_date: "2026-10-15"
+build_system: "makefile"
+conan_ref: "pacredir/0.7.10"
+
+source:
+  url: "https://github.com/eworm-de/pacredir/archive/refs/tags/0.7.10.tar.gz"
+  sha256: "fa73fb62dda010f20d85cfb8864ec993421641edde2cf999a91dd835c0fe36cc"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  # 上游是裸 Makefile，无 configure 阶段。配方只调 `make pacredir`，显式传：
+  configure_options:
+    - "CC=<conan tools.build:compiler_executables[c]>"
+    - "CFLAGS_EXTRA=<AutotoolsDeps 的 CPPFLAGS/CFLAGS/LDFLAGS/LIBS> -Wl,--as-needed -Wl,--exclude-libs,ALL -Wl,--allow-shlib-undefined"
+    - "VERSION=0.7.10"
+    - "ARCH=aarch64"
+    - "ID=ohos"
+  # 编译/链接的其余部分沿用上游 Makefile 自带的 -std=c11 -O2 -fPIC -Wall -Werror
+  # 与 -Wl,-z,now -Wl,-z,relro -pie（不在配方里重复声明，避免与上游漂移）。
+  dependencies:
+    - systemd/261.1
+    - libmicrohttpd/1.0.1
+    - libcurl/8.5.0
+    - iniparser/4.2.6
+    - zlib/1.3.1.1
+  cc: clang
+  cxx: ""
+
+patches_applied:
+  - "0001-pacredir.h.patch"
+
+# ── 测试台账（计数口径全流程唯一：独立检查项数量）──
+tests:
+  counting_convention: "独立检查项数量（independent check items）"
+  upstream:
+    unit: 0
+    integration: 0
+    other: 0
+    total: 0
+    evidence: >-
+      tarball 35 个文件中文件名含 test/check/spec 的为 0；Makefile 16 个目标
+      （all pacredir config.h version.h favicon.png favicon.h style.h %.service
+      %.html install install-bin install-doc install-avahi clean distclean release）
+      里无 check/test/tests/validate；全树 grep
+      cmocka|cunit|check.h|criterion|gtest|catch2|unity.h|pytest|tap_ 无命中；
+      contrib/*.sh 是构建期资产生成脚本而非测试。
+  adapted:
+    unit: 0
+    integration: 9
+    harmonyos_specific: 7
+    total: 16
+    driver: "test_package/test_pacredir.py"
+    harmonyos_specific_items: ["3", "5", "6", "7", "11", "15", "16"]
+    note: "9 + 7 = 16，鸿蒙特有 7 项是 16 项的子集，故集成层记 9 而非 16（避免重复计数）"
+  modified_upstream_tests: false
+  added_because_upstream_has_none: true
+
+# ── 本地实测（profile ohos-local，macOS 交叉编译，clang 15.0.4）──
+verification:
+  conan_create: pass
+  conan_create_rc: 0
+  compile_warnings: 0            # -Wall -Werror 全开
+  conan_verify: "G0-G4 PASS；L2/L4/L5 为『跳过（无 cache 路径）』而非通过，不计成果"
+  w3_local_ci:
+    result: pass
+    JC_RESULT: pass
+    L0_RESULT: pass
+    L1_RESULT: pass
+    L1e_destructive_negative_test: "pass — Negative test confirmed, test genuinely depends on pacredir"
+    L2_RESULT: "skip（macOS 无法执行 aarch64 OHOS ELF，非阻塞）"
+    L4_RESULT: pass
+    L5_RESULT: pass
+    build_summary: "Total 1 / Success 1 / Pass rate 100.0%"
+  w4_pre_pr_audit: "verdict=pass，P0=0 P1=0 P2=1（已修复）P3=5"
+  artifact: "bin/pacredir"
+  artifact_size_first_variant: 700024     # 第一版（libcurl 静态），方案已被 CI #93768 证伪
+  artifact_sha256_first_variant: "18da0fea3f3a46a25642bca185fd6736632ee8b9b8fcd9579533294bcda95b5f"
+  artifact_size_current_probe: 179480     # 现行方案的手工链接探针产物，链接开关与配方一致
+  artifact_final: "pending_ci"            # 配方产物最终尺寸/哈希待远程 CI 回填
+  elf:
+    class: ELF64
+    machine: AArch64
+    type: "DYN + DF_1_PIE (PIE executable)"
+    dt_needed: ["libcurl.so", "libsystemd.so.0", "libc.so"]
+    bind_now: true
+    gnu_relro: true
+    nx_stack: true
+  baked_identity:
+    version: "0.7.10"
+    id: "ohos"
+    arch: "aarch64"
+  generated_assets:
+    favicon_png: "32x32, 752 bytes, 5 chunks(IHDR/PLTE/tRNS/IDAT/IEND), CRC 全通过"
+    style_css: "858 bytes（与上游原文一致）"
+    asset_date: "Wed, 03 Jun 2026 09:31:14 GMT"
+  test_package_runtime: >-
+    本地 can_run()=False（ohos-local profile 显式设
+    tools.build.cross_building:can_run=False，且 macOS 无 qemu-aarch64、
+    docker daemon 未运行），16 项运行期检查在 CI 上执行（CI 用同一 profile 作
+    host 与 build，cross_building() 为假 ⇒ can_run() 为真）。驱动逻辑已用复刻
+    可观测契约的桩守护进程在本地跑通（13/13 绿、可重复，并借此修掉两个真 bug），
+    桩不进归档。
+  remote_ci:
+    round_1:
+      build: "#93768"
+      worker: "OpenHarmonyPCDeveloper-CI-026"
+      result: fail
+      elapsed_sec: 653
+      real_root_cause: >-
+        libcurl/8.5.0 因第一版的 zlib override 加 shared=False 被迫从源码重建，
+        其 CMake 走 make -j20，撞 OHOS SELinux 禁 FIFO（E074/E525）：
+        jobserver mkfifo: Operation not permitted，接着 /bin/sh: can't fork，
+        最终 Error 127。失败发生在依赖阶段，pacredir 连 source() 都没执行。
+      ci_bot_misclassification: >-
+        CI 机器人报「网络问题 / 源码下载超时 (gh-proxy.com)」。实际是 worker 上没有
+        curl，预下载 6 次全报 [Errno 2] No such file or directory: curl，
+        日志里因此留下一串 gh-proxy 的 [fail] 行被分类器误命中。
+      gates_passed_before_failure: >-
+        G0 知识图谱完整性 pass（547 条）、G0e 根目录白名单 pass、L0 全 pass
+        （L0i 五依赖 in registry / L0j 首次发布 / L0k commands.json valid type=tool /
+        L0m 目录结构 / L0n 分支名精确匹配）、KC1-KC5 全 pass（含草稿泄漏检测）、
+        JC prdiff 模式 15 文件 Junk Files 0、JC6 涉及软件数 1。
+    round_2:
+      build: "#94765"
+      sha: "8b8063f3"
+      worker: "OpenHarmonyPCDeveloper-CI-026"
+      result: fail
+      real_root_cause: >-
+        非配方问题。meson setup 完整跑通（Project name: systemd、Build targets in
+        project、Found ninja-1.13.1 at /data/service/hnp/bin/ninja），ninja 在编译任何
+        文件之前的第一个 posix_spawn 即报 Resource temporarily unavailable（EAGAIN），
+        即 worker 进程表枯竭；cleanup 步骤亦 120s 无输出超时。
+      corroborating_evidence: >-
+        同 PR 的 #94536 与 #94537（worker CI-010）在 elapsedTime=0.055 即死于
+        zsh:1: fork failed: resource temporarily unavailable，连 git-clone 都没完成；
+        第 1 轮日志里也伴随 /bin/sh: can't fork - try again。属 R41 的临时 CI 故障。
+      positive_finding: >-
+        本轮实证 worker 上 meson 与 ninja 均可用、systemd 的 meson configure 能跑完，
+        即「把源码重建推给 systemd」这个方向本身成立；第 1 轮的 E525 判断也成立。
+      action: "不改代码，重新评论 /rebuild 重试（基础设施重试，不计入 R42/R43 修复轮次）"
+    round_3:
+      build: "#94856"
+      sha: "e7c35d46"
+      worker: "OpenHarmonyPCDeveloper-CI-003"
+      result: fail
+      elapsed_sec: 82
+      real_root_cause: >-
+        与 round_2 同一错误类别（进程 fork/spawn 枯竭），且发生得更早：
+        /system/bin/sh: .../conanbuildenv-release-armv8.sh[13]: can't fork - try again
+        → systemd/261.1 Error in build() method line 237 meson.configure()。
+        换了 worker（CI-026 → CI-003）依旧。
+      stop_loss_decision: >-
+        按 R41/R42 停损，不再盲重试。判定为机群级 worker 资源枯竭（临时 CI 故障），
+        非本配方问题。决定性排除证据：#94536/#94537（worker CI-010）在
+        elapsedTime=0.055 即死于 zsh:1: fork failed: resource temporarily
+        unavailable，构建步骤表为 worker-prep ❌ / git-clone ❌ / cleanup ❌——
+        连仓库都还没克隆，本 PR 的任何文件尚未被读取。本 PR 共 5 次构建落在
+        4 个不同 worker（CI-010 / CI-026 x2 / CI-003）上，全部出现 fork 或
+        posix_spawn 的 EAGAIN。
+      recipe_layer_faults: >-
+        本 PR 唯一一次真实的配方层失败是 round_1（#93768：依赖图 override 方向
+        选错，导致 libcurl 从源码重建并撞 E525），已修复。round_2 与 round_3 的
+        失败点全部在 systemd/261.1 的 build() 内，pacredir 的 build() 从未被执行到。
+      resume_cmd: >-
+        python3 scripts/gitcode_pr.py trigger-ci --repo
+        OpenHarmonyPCDeveloper/build_in_harmonyos --number 16086
+        （或 python3 scripts/ohc-run.py submit pacredir 0.7.10 --resume）
+    round_4: "pending —— worker 恢复后续跑；CI 绿后回填构建编号与 test_package 16 项逐条结果"
+
+knowledge_gained:
+  - "musl 不传递暴露 <sys/ioctl.h>：glibc 由 <net/if.h>/<sys/socket.h> 间接给出 ioctl() 与 SIOCGIFFLAGS，musl 不给 → -Werror 下致命"
+  - "musl 不提供 glibc 的 __*_t 内部 typedef 族（本例 __time_t）；其头文件只按 __NEED_* 机制导出 POSIX 名"
+  - "上游 Makefile 在解析期用 $(shell) 探测发行版专有文件时，失败会静默产出空串并被编进二进制（本例 ARCH/ID 污染 DNS-SRV TXT 匹配与 User-Agent），构建日志里没有任何可 grep 的报错"
+  - "能力探测宏若同时罩住「类型定义」与「函数定义」，只验证类型存在就注入会让函数悬空（systemd 的 HAVE_MALLINFO2 → 已发布 libsystemd.so 带 U mallinfo2 → 可执行文件消费者链接必炸）"
+  - "OHOS SDK 的 libc.so 是链接桩（.text 仅 336 字节），.dynsym 是 libc.a 的真子集：收了 malloc/mallopt 却漏了 mallinfo/mallinfo2"
+  - "lld 的 --no-allow-shlib-undefined 只对可执行文件输出默认生效，共享库输出默认放行——这正是依赖 DSO 的悬空符号能一路发布进制品仓的通道"
+  - "Rust-only 构建期工具（resvg/oxipng）在 CI 能力矩阵里补不齐时，可用纯标准库 Python 复刻「二进制资产 → C 头」这条链，并对产物做 CRC/维度自校验"
+  - "conandata.yml 的 patches 必须以版本号为键；写成以补丁文件名为键时 apply_conandata_patches() 静默 no-op"
+  - "-Wl,--as-needed 是位置敏感开关，必须排在 -l 之前才生效"
+  - "refresh_patch.py 用 DOTALL 正则清除 patch_classification，会连带吞掉其后的所有段落——manifest.yaml 里该键必须放最后"
+  - "OHOS 上 make -j>1 必炸（SELinux 禁 FIFO 使 GNU make jobserver 失效，E074/E525）；当出错的 make -j 在**依赖包**配方里时下游无法注入 -j1，唯一杠杆是调整依赖图让它不必重建"
+  - "CI 机器人的失败分类不可信：worker 无 curl 使预下载恒失败并在日志里留下一串镜像域名的 [fail] 行，极易被误判成「源码下载超时」；真因要读日志末尾"
+  - "worker 上 GitHub 源本身可达（全仓 3158/7894 个 conandata.yml 用 github.com 源且大量 published，含 vtk/9.4.1 这种大包）；curl.se 亦实测可达"
+
+knowledge_drafts:
+  - "knowledge/drafts/DRAFT-pacredir-0.7.10-silent-shell-probe-bakes-empty-identity.kv"
+  - "knowledge/drafts/DRAFT-pacredir-0.7.10-silent-shell-probe-bakes-empty-identity.md"
+  - "knowledge/drafts/DRAFT-pacredir-0.7.10-capability-macro-guards-type-and-function.kv"
+  - "knowledge/drafts/DRAFT-pacredir-0.7.10-capability-macro-guards-type-and-function.md"
+  - "knowledge/drafts/DRAFT-pacredir-0.7.10-override-direction-avoid-dep-make-j-rebuild.kv"
+  - "knowledge/drafts/DRAFT-pacredir-0.7.10-override-direction-avoid-dep-make-j-rebuild.md"
+
+# ⚠️ 必须保持为文件最后一个顶层键（原因见文件头注释）
+patch_classification:
+  - file: 0001-pacredir.h.patch
+    # refresh-patch --auto / finalize-archive 默认写 type=auto、platform_only=True、
+    # guard='pending'，并按其输出要求由 AI 复核补实。实测复核结论：本补丁两处改动
+    # （补 #include <sys/ioctl.h>、__time_t → time_t）都是**无条件**的 POSIX
+    # 可移植性修复，补丁新增行只有 2 行且平台宏计数为 0，在 glibc 下同样正确编译，
+    # 因此不是 platform_only、无需 guard。
+    type: portability
+    platform_only: false
+    guard: none

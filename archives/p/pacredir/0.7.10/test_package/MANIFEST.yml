@@ -1,0 +1,76 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: pacredir/0.7.10
+homepage: "https://github.com/eworm-de/pacredir"
+
+# ── 计数口径（全流程唯一，notes.md / manifest.yaml / PR 两张表与此一致）──
+# 口径 = 「独立检查项数量」。上游无测试框架，故不用框架原生 case 数；
+# 适配后 16 项每项都是可单独判定成败的独立检查（TAP 风格逐条输出）。
+counting_convention: "独立检查项数量（independent check items）"
+
+# ── 上游测试清点（R51 第 1 步，实测证据）──
+# 上游 pacredir 0.7.10 **没有任何测试资产**，清点证据：
+#   * tarball 共 35 个文件，文件名含 test/check/spec 的为 0 个
+#     （`find . -type f \( -iname '*test*' -o -iname '*check*' -o -iname '*spec*' \) | wc -l` → 0）
+#   * Makefile 全部目标：all pacredir config.h version.h favicon.png favicon.h
+#     style.h %.service %.html install install-bin install-doc install-avahi
+#     clean distclean release —— 无 check / test / tests / validate 目标
+#     （`grep -cE '^(check|test|tests|validate):' Makefile` → 0）
+#   * 源文件仅 pacredir.c / pacredir.h / config.def.h / html.h / static_file.h
+#     + contrib/{service.sh,static_file.sh}（两个构建期资产生成脚本，非测试）
+#   * 全树 grep cmocka|cunit|check.h|criterion|gtest|catch2|unity.h|pytest|tap_ → 无命中
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+upstream_test_count: 0
+upstream_test_count_evidence: >-
+  tarball 35 个文件中 0 个测试文件；Makefile 16 个目标里无 check/test；
+  无测试框架引用（cmocka/cunit/check/criterion/gtest/catch2/unity/pytest/tap 全树 0 命中）
+
+# ── test_package 中自带的测试（消费者视角验证，全部为本次适配新增）──
+test_package_tests:
+  - file: test_pacredir.py
+    description: >-
+      16 个独立检查项，纯 Python 标准库（CI worker 无 curl，也不假设
+      readelf/objdump 在 PATH 上，ELF 检视用 struct 手解）。
+      1-4: CLI 身份（-V 退出码、VERSION 编入、[OHOS] ID/ARCH 编入、-h usage）；
+      5-7: [OHOS] ELF/ABI 契约（AArch64 PIE、RELRO+BIND_NOW+NX、DT_NEEDED 恰为
+      {libcurl.so, libsystemd.so.0, libc.so}）；
+      8-14: 守护进程端到端 HTTP（7077 可连、状态页身份渲染、Server 头、
+      [OHOS] favicon.png 资产链 ETag==sha1 且为可解码 32x32 PNG、style.css
+      逐字节契约、/check 监控端点、无 peer 时 404）；
+      15-16: [OHOS] 无 systemd 平台上的降级与生命周期（首轮 mDNS 更新后存活、
+      SIGUSR1 状态转储 Known hosts 为空）。
+      收尾另做 SIGTERM 干净退出核对（不计入检查项）。
+    command: "python3 test_pacredir.py <package_folder> <daemon_log_path>"
+    assertion_count: 16
+
+# ── 鸿蒙特有测试（rule12 硬门禁：N >= 1）──
+# 这 7 项各自绑定一个本次为 HarmonyOS 做的实际适配点，不是把普通测试改名：
+#   3  ID/ARCH 身份：上游用 $(shell) 探测 /etc/os-release 与 /etc/makepkg.conf
+#      （Arch 专有），OHOS 上两者皆无、静默返回空串并编入二进制，污染运行期
+#      DNS-SRV TXT 对等体匹配与 curl User-Agent —— 本项断言编入值为 ohos/aarch64
+#   5  OHOS 工具链产物形态：ELF64 AArch64 + ET_DYN + DF_1_PIE
+#   6  OHOS lld 加固：PT_GNU_RELRO + BIND_NOW + 不可执行栈
+#   7  OHOS 运行期加载面：DT_NEEDED 恰为 {libcurl.so, libsystemd.so.0, libc.so}，
+#      即 libmicrohttpd/iniparser/zlib 已静态吸收（R26：不往设备 /lib 里塞系统
+#      同名 .so）。libcurl 之所以保留为动态，是因为把它切成静态会强制其从源码
+#      重建，而它的 CMake 走 make -j20、在 OHOS 上必撞 SELinux 禁 FIFO
+#      （E074/E525；远程 CI #93768 已实测失败），且那个 -j20 出自 libcurl 自己
+#      的配方、下游无从干预。本项同时守住 --as-needed 的效果：libsystemd.so
+#      并不需要的 libzstd/liblzma 不得回流到 DT_NEEDED。
+#   11 替代 resvg|oxipng（Rust CLI，制品仓未发布且 CI 无 Rust 工具链）的
+#      纯标准库资产链端到端正确性
+#   15 OHOS 无 systemd-resolved / 无系统总线：sd_bus_open_system() 失败路径
+#      优雅降级（上游 goto fast_finish），守护进程不 abort 且继续服务
+#   16 OHOS 无 journald：sd_notify 返回 0 使 systemd=0，write_log 回退到
+#      stdout/stderr —— 断言 SIGUSR1 状态转储可读且无 mDNS peer
+harmonyos_specific_tests:
+  count: 7
+  items: ["3", "5", "6", "7", "11", "15", "16"]
+
+# 测试断言总数（口径：独立检查项数量）
+assertion_count: 16

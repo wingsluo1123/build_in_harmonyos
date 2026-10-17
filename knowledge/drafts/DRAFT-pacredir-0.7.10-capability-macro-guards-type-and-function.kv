@@ -1,0 +1,151 @@
+# ═══ Draft knowledge entry — 能力探测宏同时罩住「类型定义」与「函数定义」时，
+#       只按头文件里有类型就注入该宏，会让已发布的 DSO 带上悬空符号；
+#       该 DSO 自己能构建能发布，但每一个「可执行文件」消费者链接必炸 ═══
+# Timestamp: 2026-10-15
+# Software: pacredir 0.7.10（受害者/消费者侧）；缺陷源在已发布的 systemd/261 与
+#           systemd/261.1（libsystemd.so.0.44.0 带 U mallinfo2）
+# Gate: G2 (conan create) / linking 阶段
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+# 撞库结论（详见同名 .md 的「相关既有条目」表）：`mallinfo` 在全库（index.tsv
+#   768 条 + doc/ + drafts/ 5440 文件）**0 命中**。E245/E531/E320/E302 覆盖的是
+#   「**本包源码直接调用**了平台缺失的符号，在**本包**源码里加 shim」；
+#   本草稿增量 = 悬空符号来自**已发布的依赖 DSO**（不能改它），且根因是
+#   依赖配方把一个「同时罩住 struct 与 inline 函数」的能力宏按**类型层证据**
+#   注入了；再叠一层 SDK 特有的放大因素：sysroot 的 libc.so 是链接桩，
+#   .dynsym 是 libc.a 的真子集。修复位点在**消费者的链接行**，不在任何源码里。
+
+id:                     DRAFT-pacredir-0.7.10-capability-macro-guards-type-and-function
+trigger_tool:           ld|clang|conan
+phase:                  linking
+error_signature:        undefined reference due to --no-allow-shlib-undefined: mallinfo2|>>> referenced by \S*/lib/\S+\.so$|referenced by .*libsystemd\.so
+severity:               3
+category:               linking, conan, libc, musl, detection
+match_keywords:         mallinfo2, HAVE_MALLINFO2, capability macro, capability probe, struct declared but function missing, undefined reference, --no-allow-shlib-undefined, --allow-shlib-undefined, libsystemd.so, published DSO, dangling symbol, link stub, libc.so vs libc.a, dynsym subset, executable consumer, shared library consumer, nm -D -u, symbol-level verification
+title:                  能力探测宏同时罩住 struct 定义与 inline 函数定义时，只凭「sysroot 头里有这个 struct」就注入 -DHAVE_X=1，会让依赖自带的兜底实现被一并跳过；已发布的 DSO 于是带一个悬空符号，自己能建能发布能过 test_package，但每个可执行文件消费者链接时被 lld 的 --no-allow-shlib-undefined 判死
+
+root_cause:             能力宏 HAVE_MALLINFO2 在依赖包的 musl 兼容头里同时罩住 struct mallinfo2（类型）与 static inline mallinfo2()（函数实现），而依赖配方只凭「sysroot 的 malloc.h 里 grep 得到这个 struct」这一类型层证据就注入了 -DHAVE_MALLINFO2=1，导致兜底实现被一并跳过、已发布的 libsystemd.so.0.44.0 带上悬空的 U mallinfo2；再叠加 SDK 的 libc.so 是链接桩（.text 仅 336 字节，.dynsym 是 libc.a 的真子集，收了 malloc/mallopt 却漏了 mallinfo 家族），lld 在链接可执行文件时按默认的 --no-allow-shlib-undefined 判死。三层叠加，缺一层都不会暴露：
+  ① **宏的作用域跨了两类实体**。systemd 的 musl 兼容头
+     `src/include/musl/malloc.h` 里，`#ifndef HAVE_MALLINFO2` 同时罩住
+     `struct mallinfo2 { ... }` **和** `static inline struct mallinfo2
+     mallinfo2(void) { return (struct mallinfo2){}; }`（见本仓
+     archives/s/systemd/261.1/patches/0005-musl-mallinfo2-guard.patch：
+     `+#endif /* !HAVE_MALLINFO2 */` 落在 inline 函数的右花括号之后）。
+     一个宏，两个语义完全不同的被守卫物：一个是**类型**（只需头里声明），
+     一个是**函数实现**（需要 libc 真的导出符号）。
+  ② **注入依据只到类型层**。systemd/261 与 261.1 的配方在 OHOS 下
+     `tc.c_args.append("-DHAVE_MALLINFO2=1")`，注释写的是「OHOS 定制 musl 的
+     sysroot malloc.h 已自带 mallinfo2」。实测该头**只有 struct**：
+     `grep -n 'mallinfo2 *(' $SYSROOT/usr/include/malloc.h` 无命中，
+     只有第 51 行的 `struct mallinfo2 {`。于是 systemd 自己的兜底实现被跳过，
+     而平台并没有提供函数 → `libsystemd.so.0.44.0` 留下 `U mallinfo2`
+     （`llvm-nm -D -u` 实测），且其 DT_NEEDED 只有 libc.so、FLAGS 带 BIND_NOW。
+  ③ **SDK 的 libc.so 是链接桩，.dynsym 是 libc.a 的真子集**。实测同一 sysroot：
+     libc.so 仅 71128 字节、`.text` 只有 0x150=336 字节（无实现），
+     `.dynsym` 收了 malloc/free/malloc_usable_size/mallopt，
+     却**没有** mallinfo/mallinfo2；而 libc.a 里两者都是 `T`。
+     即：设备上真实 libc 有这个符号，只是链接桩的动态符号表不全，
+     lld 在链接期无从解析。
+  为什么这个缺陷能一路发布出来（这是本条最反直觉的一点）：lld 的 `--no-allow-shlib-undefined` 只对
+  **可执行文件**输出默认生效，共享库输出默认放行。实测同一份 libsystemd.so：
+  `clang -shared ... -lsystemd` → rc=0；`clang <含 main 的 .c> ... -lsystemd`
+  → rc=1 报本条错误。systemd 配方只 `ninja libsystemd.so.0.44.0` 且只打包这个
+  DSO，它自己的 test_package 里那个「编译并运行消费者」的用例又被
+  `can_run(self)` 挡在交叉编译之外（本地 profile 显式设
+  `tools.build.cross_building:can_run=False`），于是**没有任何一环链过可执行文件**。
+  缺陷被完整地带进了制品仓，等第一个可执行文件消费者（本例 pacredir）来引爆。
+affected_scope: >
+  两类主体都会命中：
+  (A) **依赖包的维护者**——任何用 `#ifndef HAVE_X` 守卫 musl/glibc 兼容层的配方，
+      只要那个 `#ifndef` 块里同时含类型定义和函数定义/声明，就不能只凭
+      「sysroot 头里 grep 到类型」注入 `-DHAVE_X=1`。本仓 systemd/261 与 261.1
+      的 HAVE_MALLINFO2 是已实测的实例；同类风险面是所有
+      `src/include/musl/*.h` 式的兼容头（explicit_bzero/statx/crypt_r/
+      secure_getenv/reallocarray/sigisemptyset/qsort_r 等）。
+  (B) **下游消费者**——任何把已发布 DSO 链进**可执行文件**的包。
+      链成共享库不会暴露，所以「我这个库包建过了」完全不能作为证据。
+  平台面：OHOS/HarmonyOS PC（SDK 链接桩 + 定制 musl）最直接；
+  任何 sysroot 用「精简 .dynsym 链接桩 + 完整 .a」这套组合的交叉工具链同理。
+verification_cmd: >
+  SR=$SYSROOT/usr/lib/aarch64-linux-ohos   # 或 <sdk>/native/sysroot/usr/lib/aarch64-linux-ohos
+  # 1) 悬空符号在哪个已发布 DSO 上（消费者侧定位）
+  llvm-nm -D -u <pkg>/lib/libsystemd.so.0.44.0 | grep -w mallinfo2      # → U mallinfo2
+  llvm-readelf -d <pkg>/lib/libsystemd.so.0.44.0 | grep -E 'NEEDED|FLAGS'  # → 只 NEEDED libc.so，且 BIND_NOW
+  # 2) 类型层 vs 符号层（本条的核心判据：两者结论相反）
+  grep -n 'struct mallinfo2' $SYSROOT/usr/include/malloc.h              # → 命中（有类型）
+  grep -nE 'mallinfo2 *\(' $SYSROOT/usr/include/malloc.h                # → 无命中（无函数声明）
+  llvm-nm -D --defined-only $SR/libc.so | grep -w mallinfo2             # → 无命中（桩不导出）
+  llvm-nm    --defined-only $SR/libc.a  | grep -w mallinfo2             # → T mallinfo2（真实 libc 有）
+  llvm-readelf -S $SR/libc.so | grep -E '\.text'                        # → Size 000150（336B ⇒ 链接桩）
+  # 3) 复现「共享库过、可执行文件炸」的不对称（最小复现，两条命令）
+  printf '#include <systemd/sd-bus.h>\nint f(void){sd_bus*b=0;return sd_bus_open_system(&b);}\n' > u.c
+  printf '#include <systemd/sd-bus.h>\nint main(void){sd_bus*b=0;return sd_bus_open_system(&b)<0;}\n' > m.c
+  clang -shared -fPIC -I<pkg>/include u.c -L<pkg>/lib -lsystemd -o libu.so ; echo "shared_rc=$?"   # → 0
+  clang               -I<pkg>/include m.c -L<pkg>/lib -lsystemd -o m       ; echo "exe_rc=$?"      # → 1
+
+rec_priority:           1
+rec_approach:           consumer-link-flag-allow-shlib-undefined
+rec_description: >
+  消费者侧（不能改依赖包时）在链接**可执行文件**的命令上加
+  `-Wl,--allow-shlib-undefined`，只放行**共享库自身**的未定义符号；
+  本包目标文件的未定义符号仍照常报错，因此它不会掩盖本包的真实缺符号问题。
+  安全性论证：该符号在设备真实 libc 里存在（libc.a 里是 `T`，与 libc.so 桩
+  同源构建），且 DSO 的 DT_NEEDED 已含 libc.so，运行期由加载器正常解析；
+  链接桩 .dynsym 不全是**构建期视图**问题，不是运行期缺失。
+  必须在配方注释与 notes.md 里写清「为什么需要、放行范围有多大、什么条件下
+  可以移除」（上游依赖修好后即应移除），按 P006 记为技术债务。
+rec_command: >
+  # Conan 配方（裸 Makefile 项目示例，注入点是上游预留的 CFLAGS_EXTRA）
+  EXTRA="$CPPFLAGS $CFLAGS -Wl,--as-needed $LDFLAGS $LIBS -Wl,--exclude-libs,ALL -Wl,--allow-shlib-undefined"
+  make <target> CC="$CC" CFLAGS_EXTRA="$EXTRA"
+  # CMake 项目：tc.extra_exelinkflags = ["-Wl,--allow-shlib-undefined"]
+  # Autotools 项目：LDFLAGS="$LDFLAGS -Wl,--allow-shlib-undefined"
+  # 验收：链接 rc=0，且 llvm-nm -D -u <产物> 里不含本包自己的未定义符号
+rec_auto_fix:           false
+rec_impl:               set-link-flags
+
+fallback_priority:      2
+fallback_approach:       fix-dependency-capability-macro-scope
+fallback_description:   >
+  根治位在依赖包：把「类型」与「函数实现」拆成两个独立的能力宏，各自按自己那层
+  的证据注入。例如 `HAVE_STRUCT_MALLINFO2`（凭 sysroot 头里有 struct 注入）与
+  `HAVE_MALLINFO2`（凭 `llvm-nm -D --defined-only libc.so | grep -w mallinfo2`
+  或链接级 AC_CHECK_FUNCS 式探测注入），补丁里两块分别守卫。
+  代价：要改**别人的归档目录**（本仓铁律禁止在同一 PR 里做），必须单独开
+  依赖包的新版本（如 systemd/261.2，R37 版本号后缀）并走完整发布流程；
+  且它是 DSO 自身的改动，需要重新发布二进制。因此对当前消费者不是即时可用路径，
+  但应作为 Issue 提给依赖包维护者。
+fallback_command:       llvm-nm -D --defined-only $SYSROOT/usr/lib/aarch64-linux-ohos/libc.so | grep -w mallinfo2   # 用这条（符号层）而不是 grep 头文件（类型层）来决定是否注入
+fallback_auto_fix:      false
+fallback_impl:          patch-source
+
+forbid_1_pattern:       -Wl,--unresolved-symbols=ignore-all|-Wl,--allow-undefined|-z *undefs
+forbid_1_reason:        用「忽略全部未定义符号」代替范围最小的 --allow-shlib-undefined。前者连**本包自己**目标文件的未定义符号也一起放过，等于关掉链接期检查。
+forbid_1_consequence:   本包真实的缺符号问题被推迟到运行期，表现为加载即 "symbol not found" 崩溃或调用到 NULL；且 BIND_NOW 的产物会在 execve 后立刻死，比链接期报错难查得多。
+forbid_2_pattern:       static inline .* mallinfo2|struct mallinfo2 mallinfo2\(void\) *\{ *return
+forbid_2_reason:        在**消费者**侧自己定义一个 mallinfo2 去喂给依赖的 DSO。可执行文件里的定义会进动态符号表并被 libsystemd.so 反向绑定（symbol interposition），把 libc 的真实现顶掉。
+forbid_2_consequence:   依赖库拿到的是恒返回全 0 的假实现而非真实内存统计；标记 hidden 又满足不了 DSO 的引用，两头不讨好。与 E245 的 forbid（不得伪造 API 成功）同一原则。
+forbid_3_pattern:       grep .*malloc\.h.*mallinfo2.*&&.*-DHAVE_MALLINFO2|#ifndef HAVE_\w+[\s\S]{0,400}(struct|typedef)[\s\S]{0,400}(static inline|^\w+ \w+\()
+forbid_3_reason:        仅凭「sysroot 头里 grep 到类型/声明」就注入能力宏，而该宏在补丁里同时罩住了函数实现。类型层的证据不能推出符号层的结论。
+forbid_3_consequence:   依赖自带的兜底实现被静默跳过，已发布 DSO 带悬空符号；因为它自己链的是共享库、test_package 又被 can_run 挡住，缺陷一路发布到制品仓，等第一个可执行文件消费者引爆（本例实测）。
+
+principles:             P006, P012, P013
+causes:                 []
+caused_by:              []
+similar_to:             [E213, E229, E245, E531, E320, E302, E085]
+conflicts_with:         []
+prerequisite_of:        []
+
+prescan_pattern:        -DHAVE_[A-Z0-9_]+=1
+prescan_globs:          conanfile.py, *.patch
+
+doc_file:               knowledge/drafts/DRAFT-pacredir-0.7.10-capability-macro-guards-type-and-function.md
+last_updated:           2026-10-15
+source_event:           pacredir 0.7.10 适配 HarmonyOS PC —— 链接可执行文件时报 undefined reference due to --no-allow-shlib-undefined: mallinfo2（referenced by libsystemd.so）
+authors:                songzhenyan <apVBMI1DvwCqWTll.songzhenyan@noreply.gitcode.com>
+source_pr:
+source_commit:
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-15
