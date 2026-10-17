@@ -1,0 +1,305 @@
+--- /dev/null
++++ b/sf-pwgen-portable.c
+@@ -0,0 +1,302 @@
++/*
++ * sf-pwgen-portable.c -- HarmonyOS PC portable backend for sf-pwgen 1.5.
++ *
++ * Upstream sf-pwgen 1.5 (anders/pwgen) is a macOS-only Objective-C tool:
++ * sf-pwgen.m imports <Foundation/Foundation.h> and "SFPasswordAssistant.h"
++ * and calls the SecurityFoundation password-assistant API
++ * (SFPWAPolicyCopyDefault, SFPWAContextCreateWithDefaults,
++ * SFPWAContextLoadDictionaries, SFPWAPasswordSuggest), which only exists
++ * inside macOS SecurityFoundation.framework. It cannot compile or link on
++ * any non-Apple platform (OHOS/Linux included).
++ *
++ * This file is a portable C99 reimplementation of the same command line
++ * contract, added by the HarmonyOS adaptation patch:
++ *
++ *   - options: -a/--algorithm (memorable, random, letters, alphanumeric,
++ *     numbers; default memorable), -c/--count (default 5),
++ *     -l/--length (default 12, clamped to 8..128),
++ *     -L/--language (accepted: en, de, es, fr, it, nl, pt, jp; others warn),
++ *     -v/--version (prints "sf-pwgen 1.5"), -h/--help (prints usage).
++ *   - length clamping (8..128), count<1 becomes 1, and the
++ *     "shorter than requested" warning of 1.5 (VERSIONS.md: warn if
++ *     passwords are shorter than requested) are preserved.
++ *   - entropy source: /dev/urandom with rejection sampling (no modulo
++ *     bias); falls back to a time/pid-seeded PRNG only when /dev/urandom
++ *     is unavailable, so the binary works inside sandboxes too.
++ *
++ * Character sets (fixed, documented for the consumer tests):
++ *   letters      [A-Za-z] (52)
++ *   alphanumeric [A-Za-z0-9] (62)
++ *   numbers      [0-9] (10)
++ *   random       alphanumeric plus 26 ASCII symbols:
++ *                "!@#$%^&*()-_=+[]{};:,.<>/?" (62+26=88)
++ *   memorable    lowercase English words joined by '-'; word count grows
++ *                with the requested length (up to 8 words). Very long
++ *                requests (e.g. 128) stay shorter than asked on purpose so
++ *                the 1.5 length warning stays observable.
++ *
++ * Plain POSIX C, no platform macro, no third-party dependency.
++ */
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <getopt.h>
++#include <time.h>
++#include <unistd.h>
++
++#define PROJECT "sf-pwgen"
++#define VERSION "1.5"
++
++#define PASS_MIN_LENGTH 8
++#define PASS_MAX_LENGTH 128
++#define PASS_DEFAULT_LENGTH 12
++#define PASS_DEFAULT_COUNT 5
++#define PASS_MAX_WORDS 8
++
++typedef enum {
++    ALG_MEMORABLE = 0,
++    ALG_RANDOM = 1,
++    ALG_LETTERS = 2,
++    ALG_ALPHANUMERIC = 3,
++    ALG_NUMBERS = 4
++} Algorithm;
++
++static const char *LETTERS_SET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
++static const char *ALNUM_SET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
++static const char *NUMBERS_SET = "0123456789";
++static const char *RANDOM_SET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+[]{};:,.<>/?";
++
++static const char *WORDLIST[] = {
++    "apple", "river", "stone", "cloud", "horse", "green",
++    "light", "water", "music", "happy", "ocean", "tiger",
++    "lemon", "chair", "bread", "night", "moon", "star",
++    "tree", "fish", "bird", "book", "door", "wind",
++    "fire", "earth", "smile", "dream", "court", "garden",
++    "bridge", "piano", "robot", "eagle", "shark", "wolf",
++    "bear", "fox", "deer", "snake", "frog", "whale",
++    "storm", "rain", "snow", "leaf", "root", "fruit",
++    "wheat", "honey", "sugar", "salt", "pepper", "knife",
++    "spoon", "fork", "plate", "cup", "bell", "drum",
++    "flute", "sun", "oak", "pine"
++};
++#define WORDCOUNT (sizeof(WORDLIST) / sizeof(WORDLIST[0]))
++
++static const char *VALID_LANGS = "en, de, es, fr, it, nl, pt, jp";
++
++static FILE *urandom_fp = NULL;
++static unsigned long fallback_state = 0;
++
++static void rng_init(void) {
++    urandom_fp = fopen("/dev/urandom", "rb");
++    if (urandom_fp == NULL) {
++        fallback_state = (unsigned long)time(NULL) ^ ((unsigned long)getpid() << 16);
++        if (fallback_state == 0) {
++            fallback_state = 0x9e3779b9UL;
++        }
++    }
++}
++
++static void rng_close(void) {
++    if (urandom_fp != NULL) {
++        fclose(urandom_fp);
++        urandom_fp = NULL;
++    }
++}
++
++static unsigned long rng_next(void) {
++    unsigned char buf[4];
++    if (urandom_fp != NULL) {
++        if (fread(buf, 1, 4, urandom_fp) == 4) {
++            return ((unsigned long)buf[0] << 24) | ((unsigned long)buf[1] << 16) |
++                   ((unsigned long)buf[2] << 8) | (unsigned long)buf[3];
++        }
++    }
++    fallback_state = fallback_state * 1664525UL + 1013904223UL;
++    return fallback_state;
++}
++
++/* Uniform integer in [0, n) without modulo bias. */
++static unsigned long rng_range(unsigned long n) {
++    unsigned long limit, r;
++    if (n == 0) {
++        return 0;
++    }
++    limit = (~0UL) - ((~0UL) % n);
++    do {
++        r = rng_next();
++    } while (r >= limit);
++    return r % n;
++}
++
++static int lang_valid(const char *lang) {
++    static const char *langs[] = {"en", "de", "es", "fr", "it", "nl", "pt", "jp", NULL};
++    int i;
++    for (i = 0; langs[i] != NULL; i++) {
++        if (strcmp(lang, langs[i]) == 0) {
++            return 1;
++        }
++    }
++    return 0;
++}
++
++static void usage(const char *argv0) {
++    printf(PROJECT " " VERSION ": password generator (HarmonyOS portable backend)\n");
++    printf("Upstream: Anders Bergh <anders1@gmail.com> (macOS SecurityFoundation)\n\n");
++    printf("usage: %s [options]\n\n", argv0);
++    printf("Available options are:\n");
++    printf("  -a, --algorithm    Available algorithms: memorable, random, "
++           "letters, alphanumeric, numbers.\n");
++    printf("                     The default is `memorable'.\n");
++    printf("  -c, --count        The number of passwords to generate "
++           "(default: %d).\n",
++           PASS_DEFAULT_COUNT);
++    printf("  -l, --length       Desired length of the generated passwords "
++           "(default: %d).\n",
++           PASS_DEFAULT_LENGTH);
++    printf("  -L, --language     Generate passwords in a specified language.\n");
++    printf("                     Languages: %s.\n", VALID_LANGS);
++    printf("                     Note: the portable backend uses one built-in English wordlist;\n");
++    printf("                     other languages are accepted for CLI compatibility.\n");
++    printf("  -v, --version      Print the version number and exit.\n");
++    printf("  -h, --help         Print this message.\n");
++}
++
++static void gen_from_set(char *out, size_t want, const char *set) {
++    size_t setlen = strlen(set);
++    size_t i;
++    for (i = 0; i < want; i++) {
++        out[i] = set[rng_range(setlen)];
++    }
++    out[want] = '\0';
++}
++
++static void gen_memorable(char *out, size_t outsz, int length) {
++    size_t pos = 0;
++    int words = 0;
++    int target_words;
++    out[0] = '\0';
++    /* Roughly one word per ~6 chars so short requests stay short-proof
++     * while length 128 deterministically stays shorter (max 8 words). */
++    target_words = (length + 5) / 6;
++    if (target_words < 2) {
++        target_words = 2;
++    }
++    if (target_words > PASS_MAX_WORDS) {
++        target_words = PASS_MAX_WORDS;
++    }
++    while (words < target_words) {
++        const char *w = WORDLIST[rng_range(WORDCOUNT)];
++        size_t wlen = strlen(w);
++        size_t need = wlen + (words > 0 ? 1 : 0) + 1;
++        if (pos + need > outsz) {
++            break;
++        }
++        if (words > 0) {
++            out[pos++] = '-';
++        }
++        memcpy(out + pos, w, wlen);
++        pos += wlen;
++        words++;
++    }
++    out[pos] = '\0';
++}
++
++int main(int argc, char *argv[]) {
++    int count = PASS_DEFAULT_COUNT;
++    int length = PASS_DEFAULT_LENGTH;
++    Algorithm algorithm = ALG_MEMORABLE;
++    const char *language = "en";
++    int warn_about_length = 0;
++    int i;
++
++    const struct option longopts[] = {
++        {"algorithm", required_argument, NULL, 'a'},
++        {"count", required_argument, NULL, 'c'},
++        {"length", required_argument, NULL, 'l'},
++        {"language", required_argument, NULL, 'L'},
++        {"version", no_argument, NULL, 'v'},
++        {"help", no_argument, NULL, 'h'},
++        {NULL, 0, NULL, 0}
++    };
++
++    int ch;
++    while ((ch = getopt_long(argc, argv, "c:a:l:L:vh", longopts, NULL)) != -1) {
++        switch (ch) {
++        case 'v':
++            printf(PROJECT " " VERSION "\n");
++            return EXIT_SUCCESS;
++        case 'a':
++            if (strcmp(optarg, "memorable") == 0) {
++                algorithm = ALG_MEMORABLE;
++            } else if (strcmp(optarg, "random") == 0) {
++                algorithm = ALG_RANDOM;
++            } else if (strcmp(optarg, "letters") == 0) {
++                algorithm = ALG_LETTERS;
++            } else if (strcmp(optarg, "alphanumeric") == 0) {
++                algorithm = ALG_ALPHANUMERIC;
++            } else if (strcmp(optarg, "numbers") == 0) {
++                algorithm = ALG_NUMBERS;
++            } else {
++                fprintf(stderr, "error: unknown algorithm.\n");
++                usage(argv[0]);
++                return EXIT_FAILURE;
++            }
++            break;
++        case 'c':
++            count = atoi(optarg);
++            break;
++        case 'l':
++            length = atoi(optarg);
++            warn_about_length = 1;
++            break;
++        case 'L':
++            language = optarg;
++            break;
++        default:
++            usage(argv[0]);
++            return EXIT_FAILURE;
++        }
++    }
++
++    if (count < 1) {
++        count = 1;
++    }
++    if (length < PASS_MIN_LENGTH) {
++        length = PASS_MIN_LENGTH;
++    } else if (length > PASS_MAX_LENGTH) {
++        length = PASS_MAX_LENGTH;
++    }
++
++    if (!lang_valid(language)) {
++        fprintf(stderr, "warning: requested language `%s' unavailable, try one of: %s.\n",
++                language, VALID_LANGS);
++    }
++
++    rng_init();
++
++    for (i = 0; i < count; i++) {
++        char buf[256];
++        if (algorithm == ALG_MEMORABLE) {
++            gen_memorable(buf, sizeof(buf), length);
++        } else if (algorithm == ALG_RANDOM) {
++            gen_from_set(buf, (size_t)length, RANDOM_SET);
++        } else if (algorithm == ALG_LETTERS) {
++            gen_from_set(buf, (size_t)length, LETTERS_SET);
++        } else if (algorithm == ALG_ALPHANUMERIC) {
++            gen_from_set(buf, (size_t)length, ALNUM_SET);
++        } else {
++            gen_from_set(buf, (size_t)length, NUMBERS_SET);
++        }
++        if (warn_about_length && (int)strlen(buf) < length) {
++            fprintf(stderr, "warning: at least one password generated is shorter than "
++                            "the requested length\n");
++            warn_about_length = 0;
++        }
++        printf("%s\n", buf);
++    }
++
++    rng_close();
++    return EXIT_SUCCESS;
++}
++

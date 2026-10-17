@@ -1,0 +1,61 @@
+# 版本级 manifest
+# 文件位置: archives/s/sf-pwgen/1.5/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "1.5"
+
+software: sf-pwgen
+
+# published | built | failed | archived
+# R29: 未 conan upload，故标 built，不伪造 published
+status: built
+
+build_date: "2026-10-16"
+build_system: makefile
+
+conan_ref: "sf-pwgen/1.5"
+
+source:
+  url: "https://github.com/anders/pwgen/archive/refs/tags/1.5.tar.gz"
+  sha256: "e1f1d575638f216c82c2d1e9b52181d1d43fd05e7169db1d6f9f5d8a2247b475"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  make_options:
+    - "cc -O2 -Wall -Wextra -std=c99 -o sf-pwgen sf-pwgen-portable.c"
+    - "CC=<conan conf tools.build:compiler_executables.c> (R33)"
+  configure_options: []
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - patches/0001-ohos-portable-backend.patch
+
+knowledge_gained:
+  - "上游 1.5 为 macOS 专属：sf-pwgen.m 依赖 Foundation/SecurityFoundation 私有 API（SFPWA*），Makefile 硬链三 framework；属平台事实不可编译，非配置问题，不宜用平台宏修补，正确做法是新增可移植后端"
+  - "可移植后端用 /dev/urandom + 拒绝采样去模偏；musl/OHOS 均提供 getopt_long、fopen、time、getpid，无需第三方熵库"
+  - "memorable 词数随请求长度增长（上限 8 词）：默认 12 给 2-3 词无警告，128 必然偏短告警，恰好固化上游 1.5 的警告语义为可执行断言"
+
+# ── 上游测试审计（计数口径：独立检查项数量）────────────────────────
+upstream_tests_exist: false
+upstream_test_total: 0
+upstream_test_count_method: manual_audit
+upstream_test_audit: "审计 pwgen-1.5.tar.gz（sha256 e1f1d575638f216c82c2d1e9b52181d1d43fd05e7169db1d6f9f5d8a2247b475，tag 1.5 / commit 1212ca43967f49a8ef4deed9164a6558a321bcdc）：17 个文件，无 tests/ 目录；唯一测试为 sf-pwgen-test/sf_pwgen_test.m 的空占位 XCTest（testExample 无断言、testPerformanceExample 测空 block，随 Xcode 工程存在，仅为修复 Travis 的占位）；Makefile 仅 all/format/clean，无 check 或 test 目标；无 gtest/criterion/check 等 C 测试框架绑定。上游有效测试用例数为 0。"
+reason: "sf-pwgen 1.5 上游无有效测试框架；适配后在 test_package 补全独立检查项（功能 + 鸿蒙特有）。"
+harmonyos_specific_test_count: 5
+test_package_test_count: 9
+assertion_count: 14
+
+patch_generation:
+  method: handcrafted-new-file
+  source_orig_dir: "pwgen-1.5 (upstream tag tarball)"
+  generated_at: '2026-10-16T00:00:00'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-ohos-portable-backend.patch
+    type: portability
+    platform_only: False
+    guard: 'none — new portable C99 file, no platform macro per R8/PF5; macOS sources untouched'
