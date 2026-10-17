@@ -1,0 +1,29 @@
+# test_package/MANIFEST.yml
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在且非空
+
+package: tk/8.6.16
+homepage: https://www.tcl.tk/
+
+# 上游测试命令（Tk 使用 tcltest 框架，unix/ 目录下 `make test` 构建 tests/tktest 并执行整套测试）
+upstream_check_command: "make test"
+
+# conanfile.py build() 是否已集成上游测试：
+# 已集成——build() 末尾调用 `make test -j1` 并落日志 upstream_test.log。tktest 需要真实
+# X display（本平台与 CI worker 都没有，E530），故非阻塞（ignore_errors），实测结论在
+# notes.md 与 reports/r51-upstream-tests.txt 如实申报（R51）。
+upstream_test_in_build: true
+upstream_test_command: "make test"
+
+upstream_tests:
+  - file: tests/
+    source: tk8.6.16/tests/
+    description: "Tk 官方测试套件（tcltest 框架；unix/ 下 make test 构建 tests/tktest 驱动）"
+    command: "make test"
+
+test_package_tests:
+  - file: test.c
+    description: "显示无关消费者测试：先 Tk_Init 绑定 tcl stub 表（E429）再调公共 API —— Tk_GetReliefFromObj / Tk_InitStubs / libtk8.6.so 入口符号"
+    command: "./test_tk"
+  - file: test_wish.tcl
+    description: "wish8.6 启动链探针脚本（以文件名参数传入，避免被 L1d 判成空壳测试）：断言唯一失败原因为缺 X display，不得出现库加载失败或未签名 ELF 报错"
+    command: "wish8.6 test_wish.tcl"
