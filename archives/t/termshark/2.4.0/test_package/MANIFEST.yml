@@ -1,0 +1,51 @@
+package: termshark/2.4.0
+homepage: "https://termshark.io"
+
+upstream_check_command: "go test ./... 2>&1 | tail -30"
+upstream_test_in_build: true
+upstream_test_command: "go test -count=1 ./..."
+
+upstream_tests:
+  - file: pkg/pcap/loader_tshark_test.go
+    source: termshark-2.4.0/pkg/pcap/loader_tshark_test.go
+    description: "经 tshark 加载 pcap（PDML/PSML 解析）测试"
+    command: "go test ./pkg/pcap/ -v"
+  - file: pkg/pdmltree/pdmltree_test.go
+    source: termshark-2.4.0/pkg/pdmltree/pdmltree_test.go
+    description: "PDML 解析树构建测试"
+    command: "go test ./pkg/pdmltree/ -v"
+  - file: pkg/streams/follow_test.go
+    source: termshark-2.4.0/pkg/streams/follow_test.go
+    description: "流重组（Follow Stream）测试"
+    command: "go test ./pkg/streams/ -v"
+  - file: utils_test.go
+    source: termshark-2.4.0/utils_test.go
+    description: "工具函数测试（含依赖 tshark 的 TestFolders）"
+    command: "go test . -v"
+  - file: pkg/fields/fields_test.go
+    source: termshark-2.4.0/pkg/fields/fields_test.go
+    description: "字段解析测试（依赖 tshark -G fields）"
+    command: "go test ./pkg/fields/ -v"
+
+test_package_tests:
+  - file: test_package/test_termshark.py
+    description: "R34 实质验证：真实二进制 --help（含 -i/-r/-w/-Y/-f）、--version 真实 exec tshark 并输出 TShark banner（证明运行期命令依赖满足）、tshark 对包内随附 pcap 的真实解析、aarch64 ELF 架构校验"
+    command: "python3 test_termshark.py（由 test_package/conanfile.py test() 经 self.run 实际执行）"
+
+assertion_count: 6
+upstream_result_note: >
+  真机（OHOS PC aarch64）实测 go test ./...：12 个包 ok / 1 个包失败。
+  失败为 pkg/shark 的 TestCF1：columnformat.go:257 以 \s+ 对行做 2 段切分，
+  而 tshark 4.x 的 `tshark -G column-formats` 输出 3 列（token / 长名 /
+  字段名），Name 吞掉尾随填充与字段名。上游 master 同款代码完全一致，
+  属上游用例相对新版 tshark 的陈旧，非适配引入；已在 notes.md 如实记录，
+  未修改上游断言、未伪造通过。
+
+notes: >
+  termshark 为 Go CLI（module github.com/gcla/termshark/v2，go 1.13），
+  依赖 ~35 个较老的 Go 模块（经 GOPROXY 解析，实测全部可用）。
+  OHOS 适配沿用已发布的 termsvg/0.11.0 / termshot/0.6.1 Go 模式：
+  自举 go1.26.0 并签名、链接输出放非 hmdfs 工作区规避 E051、
+  go test 的 *.test 二进制由 -exec wrapper 签名。
+  运行期依赖 tshark/4.6.7（ohpcd 已发布，application 型，暴露 bindirs/libdirs），
+  以 self.requires 声明后 Conan 自动为消费者注入 PATH/LD_LIBRARY_PATH。
