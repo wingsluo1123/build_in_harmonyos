@@ -1,0 +1,25 @@
+software: wayland-utils
+display: "wayland-utils"
+description: "wayland-info：Wayland 合成器信息查询工具（打印协议 globals/接口版本/格式/DRM 信息）"
+category: devtools
+homepage: "https://gitlab.freedesktop.org/wayland/wayland-utils"
+license: MIT
+build_system: meson
+
+ohos_adaptation:
+  key_points:
+    - "wayland 包 bin/wayland-scanner 在 OHOS 上不可 execve（conan 缓存内二进制被拒），配方从 wayland 1.24.0 源码编译纯静态 scanner 替代（wayland-protocols/wayneko 先例）"
+    - "消费侧 .pc 影子化：wayland/libdrm 发布包 .pc 前缀为 /、wayland-protocols pkgdatadir 含 \${pc_sysrootdir}，均无法解析；在 generators/fixed_pkgconfig 放改写副本置顶 PKG_CONFIG_PATH（纯消费侧首个实例）"
+    - "meson native file 注入 llvm-ar + native [paths] pkg_config_path（zix/serd/wayland 先例）"
+    - "patchelf 嵌入 DT_RUNPATH 指向 wayland 包 libdir + OHOS 自签（binary-sign-tool），保证 CI L2 裸跑冒烟可执行（wmcdplay drop-rpath 的逆向用法）"
+  common_dependencies:
+    - wayland
+    - wayland-protocols
+    - libdrm
+
+versions:
+  "1.2.0":
+    status: built
+    build_date: "2026-10-15"
+    upstream_version: "1.2.0"
+    source_url: "https://gitlab.freedesktop.org/wayland/wayland-utils/-/archive/1.2.0/wayland-utils-1.2.0.tar.gz"

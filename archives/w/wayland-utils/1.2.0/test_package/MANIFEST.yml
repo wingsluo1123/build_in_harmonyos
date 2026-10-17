@@ -1,0 +1,46 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: wayland-utils/1.2.0
+homepage: "https://gitlab.freedesktop.org/wayland/wayland-utils"
+
+# 上游测试命令（上游无测试套件，无 meson test 目标）
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游没有测试套件：tarball 完整清单（tar tzf 实测）仅
+# meson.build / meson_options.txt / wayland-info/{wayland-info.c,meson.build}
+# / man/{meson.build,wayland-info.man} / COPYING / README.md / .gitlab-ci.yml，
+# 无 tests/ 目录、无 test 目标、无任何测试文件；.gitlab-ci.yml 仅为
+# 各发行版容器内的编译矩阵（无 meson test）。wayland-info 亦无 --version
+# 选项（parse_cmdline 源码实证仅 -h/--help 与 -i/--interface）。
+# 因此上游测试计 0 项；功能验证由本 test_package 三层补测承担
+# （wayland-utils 已列入 ci/config/no_official_test.txt，yell/acpi_call
+# 同款先例）。
+
+upstream_test_notes: >
+  上游 tarball 无 tests/ 目录、无 meson test 目标，上游官方测试 = 0 项。
+  三层补测：层 1 E2E 源级（test_wayland_info_e2e.c，19 接口 × 4 检查点
+  = 76 项：静态 scanner 对 5 组协议 XML 重新生成绑定后逐接口核对接口名/
+  版本/请求计数/XML 原文一致）；层 2 消费者 CLI（test.sh，20 项断言：
+  --help/-h 退出码与文案、未知选项/缺参拒绝、无合成器优雅失败、
+  readelf 级 ELF 属性、RUNPATH、裸跑冒烟）；层 3 鸿蒙特有
+  （test_wayland_info_ohos.c，31 项断言：ELF64/AArch64/PIE/INTERP/NX/
+  RELRO/DT_NEEDED/DT_RUNPATH + 19 个协议接口数据符号存在性）。
+
+test_package_tests:
+  - file: src/test_wayland_info_e2e.c
+    description: "层 1 消费者 E2E：静态 scanner 重新生成 5 组协议绑定（与上游 wayland-info/meson.build generated_protocols 字典一致），编译链接后逐接口核对 wl_interface 数据（接口名/版本/请求计数）与包内 XML 原文——19 用例 × 4 检查点 = 76 项"
+    command: "test_wayland_info_e2e <pkgdatadir>"
+  - file: test.sh
+    description: "层 2 消费者 CLI：执行安装出的 bin/wayland-info，断言 --help 退出码 0 与 usage 文案、未知选项 EXIT_FAILURE 与 Unknown option、缺参 Missing interface name、无合成器 failed to create display、readelf 级 ELF 属性（AArch64/PIE/NX/RELRO/DT_NEEDED）、RUNPATH、env -i 裸跑冒烟——20 项断言"
+    command: "bash test.sh <wayland_libdir>"
+  - file: test_wayland_info_ohos.c
+    description: "层 3 鸿蒙特有（仅 OHOS 编译，#ifndef __OHOS__ #error 守卫）：对安装出的二进制做 ELF 级平台断言（12 项）+ 19 个协议接口数据符号存在性断言（19 项）= 31 项"
+    command: "test_wayland_info_ohos <binary> <wayland_libdir>"
+
+# 测试断言总数：层 1（76）+ 层 2（20）+ 层 3（31）
+assertion_count: 127
