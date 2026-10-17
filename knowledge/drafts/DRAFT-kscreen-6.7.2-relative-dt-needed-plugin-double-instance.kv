@@ -1,0 +1,70 @@
+#====================================================================
+# DRAFT: 依赖包插件的构建树相对 DT_NEEDED → 消费者进程按 CWD 字面解析 → 双实例静默转型失败
+# 来源: kscreen 6.7.2 适配（消费已发布 libkscreen/6.7.2@ohpcd；真机干净重建实证）
+#====================================================================
+
+id:                     DRAFT-kscreen-6.7.2-relative-dt-needed-plugin-double-instance
+trigger_tool:           conan|ld|cmake|readelf|qpluginloader
+phase:                  linking|testing|runtime
+error_signature:        Plugin does not provide valid KScreen backend|does not provide valid .* backend|Error loading shared library \.\./
+severity:               2
+category:               linking, runtime, testing, relocatable, conan
+match_keywords:         DT_NEEDED, 相对路径, 构建树相对, 含斜杠的 NEEDED, 字面路径, CWD, dlopen, QPluginLoader,
+                        双实例, qobject_cast, QMetaObject, 元对象链, 静默失败, 误导性错误串, libKF6Screen,
+                        KSC_Fake, LD_LIBRARY_PATH, 相对目录置首位, 符号链接被拒, EPERM, HMDFS, SONAME
+title:                  已发布依赖包的插件携带构建树相对 DT_NEEDED：装载器按消费者进程 CWD 字面解析，缺失/错副本两分支殊途同归为同一错误串
+root_cause: >
+  已发布依赖包（实例：libkscreen/6.7.2@ohpcd）内的运行期插件 KSC_Fake.so 携带构建树相对
+  DT_NEEDED 条目 "../../bin/libKF6Screen.so"（被链接库 libKF6Screen.so 无 SONAME，链接器把
+  链接命令行上给出的相对路径原样写进 DT_NEEDED）。装载器对含 "/" 的 DT_NEEDED 不走任何搜索
+  路径（LD_LIBRARY_PATH、rpath/RUNPATH 均不适用），而是把该字符串当作字面路径、按当前进程
+  的 CWD 直接 open()。于是该相对串的落点由"装载这个插件的消费者进程"的 CWD 决定，与依赖包
+  自身的安装布局无关——本案例中 ctest 从 <build>/tests 启动测试，落点变成消费者构建树旁的
+  <build>/../bin/。两个分支：①落点无文件 → 插件 dlopen 失败；②落点恰有无关同名副本 →
+  装载器按另一条路径字符串再装载第二份 libKF6Screen.so → 进程内两个实例 → QPluginLoader
+  返回的插件实例做 qobject_cast<KScreen::AbstractBackend*>（基于 QMetaObject 链地址比较）
+  失败。两分支在下游均归并为同一错误串（libkscreen configoperation.cpp:126
+  "Plugin does not provide valid KScreen backend"，经 setError 浮出到测试输出），表象极易
+  误判为"环境缺插件/缺依赖"。
+affected_scope: >
+  任何"消费者进程用 QPluginLoader/dlopen 装载已发布依赖包的插件或共享库，且该插件携带指向其
+  构建树的相对 DT_NEEDED"的组合：KDE/KF6 家族（无 SONAME 的 KF6 库 + 后端插件架构，libkscreen/
+  kpackage/kscreenlocker 系口味）实测命中；同构场景=任何"链接时被链接库无 SONAME 且以相对
+  路径入链"的已发布包。与绝对路径对照组正交：DT_NEEDED 记绝对缓存路径的变体（E537、
+  DRAFT-13577）在任何 CWD 都指向同一固定位置、干净机直接装载失败；相对条目的落点则随消费者
+  CWD 漂移，且"错副本"分支没有装载错误、只有静默转型失败，定位难度更高。
+verification_cmd:       llvm-readelf -d <libkscreen包>/lib/plugins/kf6/kscreen/KSC_Fake.so | grep NEEDED
+                        # 看到相对串条目即命中本模式；再与主程序端 readelf -d 对照，确认两端解析落点是否同一文件
+rec_priority:           1
+rec_approach:           converge-both-resolutions-to-same-file
+rec_description: >
+  消费者侧"物化相对布局 + 相对目录置 LD_LIBRARY_PATH 首位"，让主程序与插件以同一条字面相对串
+  （同一 CWD）打开同一文件、去重为同一装载对象（真机实测单实例）：①在消费者构建树中把相对串目标
+  "<build>/../bin/libKF6Screen.so" 以普通文件复制物化（OHOS 用户卷拒绝 symlink()/link()，实测
+  EPERM；对已存在文件的覆盖写同被拒 → 用 exists 守卫保持幂等）；②conan Environment 里把相对
+  目录 "../../bin" 作为最后一次 prepend 置于 LD_LIBRARY_PATH 最左（conan 末位 prepend 者最左），
+  主程序的裸名 "libKF6Screen.so" NEEDED 即命中同一字面路径。切忌只做①或只做②：只物化副本而
+  主程序仍走其它路径加载 = 双实例仍在，只是从"缺失"分支换到"转型失败"分支。
+rec_command:            见 rec_impl（配方物化方法 + 测试环境注入两处协同）
+rec_auto_fix:           false
+rec_impl:               conanfile.py _stage_relative_backend_layout()（普通文件复制 + exists 幂等守卫）
+                        + test_env.prepend_path("LD_LIBRARY_PATH", "../../bin")（末位 prepend = 最左）
+fallback_priority:      2
+fallback_approach:      rebuild-dependency-with-soname
+fallback_description: >
+  根治在生产者侧：让依赖包以带 SONAME 的方式重链（或重发布），相对串就不会再进 DT_NEEDED。
+  在消费者无法改已发布包、也不允许改包缓存内容的前提下仅作长期方向，短期用推荐方案。
+fallback_command:
+fallback_auto_fix:      false
+forbid_1_pattern:       把无关副本放到相对串落点即当作修复|仅设 cwd 或仅拷贝副本（两者只做其一）
+forbid_1_reason:        副本是第二个 inode/第二个装载对象；主程序与插件必须收敛到同一文件、同一路径字符串，否则双实例仍在，只是失败分支从"缺失"换到"转型失败"。
+forbid_1_consequence:   测试仍在同一误导性错误串上失败，且更难定位（无装载错误、只有静默转型失败）。
+similar_to:             E537（绝对路径版 DT_NEEDED 泄漏与可重定位重链修复）、
+                        DRAFT-13577-ohos-stale-absolute-dt-needed-cache-path（陈旧绝对路径的按路径重建）、
+                        bctoolbox 5.3.115 notes 知识#13（含"/" DT_NEEDED 的 CWD 字面解析规则——同规则、不同场景：该处修自家 tester 的 cwd，本条目修消费者无法改的已发布包）、
+                        E492（无 SONAME 时共享库别名的物化）
+error_excerpt:          libkscreen configoperation.cpp:126 "Plugin does not provide valid KScreen backend"（测试可见面，qWarning 输出）；
+                        backendmanager.cpp:198 "KSC_Fake.so does not provide valid KScreen backend"（QT_LOGGING_RULES="org.kde.kscreen*=true" 打开 qCDebug 后可见真实分支）。
+                        修复前 osdactions 10 个测试函数 0/10 全挂、以 SIGSEGV 收尾；修复后同二进制同环境 12 passed（含 init/cleanup）/0 failed。
+source_pr:             15910
+last_updated:           2026-10-15

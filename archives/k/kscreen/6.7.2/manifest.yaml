@@ -1,0 +1,61 @@
+software: kscreen
+version: "6.7.2"
+status: built
+build_system: cmake
+created_at: 2026-10-15
+build_date: 2026-10-15
+dependencies:
+  required:
+    - qtbase/6.11.1.2
+    - qtdeclarative/6.11.1
+    - libkscreen/6.7.2
+    - kcoreaddons/6.26.0.1
+    - kdbusaddons/6.18.0
+    - ki18n/6.26.0
+    - kwindowsystem/6.26.0
+  build:
+    - ecm/6.26.0
+    - qt6linguisttools/6.11.1
+  transitive:
+    - qtbase/6.11.1
+    - qtbase-sql-dbus/6.11.1
+    - qtwayland/6.11.1
+    - qtshadertools/6.11.1
+    - qttools/6.11.1.1
+    - wayland/1.22.0
+    - wayland-protocols/1.36
+    - dbus/1.14.10
+    - expat/2.8.2
+    - libxkbcommon/1.6.0
+    - libxml2/2.15.3
+    - openssl/3.5.6.1
+    - gettext/0.22.5
+    - libffi/3.4.4
+patches_applied:
+  - 0001-ohos-optional-plasma-integration.patch
+  - 0002-ohos-relocatable-kf6-link.patch
+  - 0003-ohos-kf6-min-version-floor-6.18.0.patch
+test_results:
+  type: upstream_ctest
+  upstream: "1/1 passed (osdactions) — executed on device inside conanfile.py build() via 'ctest --test-dir <build> --output-on-failure --no-tests=error --timeout 120' with the offscreen QPA platform, no session bus (in-process Fake backend) and the relative backend layout staged by the recipe (移植要点 11); 100% tests passed, 0 failed out of 1 (0.17 s), the recipe captures the ctest exit code and a non-zero return fails the build (--no-tests=error: empty discovery is a hard failure, no silent green), full clean create, Package '7a9bda6fb382588e93a40bbc9864bd906fa5e60f'"
+  upstream_test_functions: "QTest test functions: 10/10 passed (testSwitchToExternal, testSwitchToInternal, testClone, testExtendLeft, testExtendRight + the five *Rotated variants) — census from upstream tests/osdactions.cpp; initTestCase/cleanupTestCase not counted as test functions; 1 ctest executable = 1 group. Function-level counts observed on the device run of the same binary and test environment: Totals: 12 passed, 0 failed, 0 skipped (incl. init/cleanup)"
+  test_package: "passed: test_kscreen_plugin ctest 1/1 Passed (0.27 s) + ALL CHECKS PASSED (9) — QPluginLoader loads the packaged kded plugin at the install layout (factory instantiation + IID/Version/autoload metadata), kscreen-console --help real-executed (exit 0), OHOS ELF artifact assertions passed (relocatable DT_NEEDED, KF6 component set, gated artifacts absent)"
+  package_id: "7a9bda6fb382588e93a40bbc9864bd906fa5e60f"
+  l0: "pass"
+  l1: "pass (upstream osdactions + test_package executed and green)"
+  l2: "skip (平台侧跳过: 无 cache 路径 — device norm; reports/conan-verify-report.md)"
+  l4: "skip (平台侧跳过: 无 cache 路径 — device norm; reports/conan-verify-report.md)"
+  l5: "skip (平台侧跳过: 无 cache 路径 — device norm; reports/conan-verify-report.md)"
+source_url: https://download.kde.org/stable/plasma/6.7.2/kscreen-6.7.2.tar.xz
+source_sha256: a67fbbb8c2fa2a875f29d056d72453d340143219b08062a932c7b1f1501add48
+knowledge_gained:
+  - "OHOS 沙箱在全部可写位置拒绝 symlink()（构建树与 $HOME 实测均 EACCES）：recipe 里强制 CMAKE_SYSTEM_NAME=OHOS 的辅助构建（如内置 dbus）会按 Linux 式规则给共享库生成版本名并追加 libfoo.so.X / libfoo.so 符号链接步骤，链接成功后死在该步骤。对策=把版本化 .so 作为显式 Ninja 目标（cmake --build <bld> --target lib/<name>）构建，别名以普通文件复制物化（动态装载器解析等价），package() 随包三个名字。"
+  - "kdbusaddons 6.29 上游 CMakeLists 在 Qt6Gui ≥ 6.10 时强制 find_package(Qt6GuiPrivate REQUIRED)（qtx11extras_p.h，X11 私有头）；ohpcd 的 qtbase/6.11.1.2 闭包内无 XKB_LIBRARY/XKB_INCLUDE_DIR，源码构建必然死在 configure；其制品仓修订又只与 qtbase/6.11.1 线对齐。取 6.18 系列（制品仓二进制与 qtbase-sql-dbus/6.11.1 对齐，kglobalacceld 6.7.2 先例，KDEDModule 公有 API 跨系列不变），并把 KF6_MIN_VERSION 6.26.0→6.18.0（kdbusaddons 无 6.26 系发布；其余组件仍解析到 6.26.0）。"
+  - "ohpcd 的 KF6 包不安装 lib/cmake/KF6/KF6Config.cmake：经 ECM 的 share/ECM/find-modules/FindKF6.cmake 伞形模块逐组件 find_package(KF6<组件> CONFIG) 解析。CMakeDeps 不传播 ECM_MODULE_PATH，配方须显式注入 ECM 三目录；补丁把组件清单收敛为实际用到的 CoreAddons/DBusAddons/I18n/WindowSystem。"
+  - "已发布 KF6 包的无版本 .so 不带 SONAME，CMake 按导入目标绝对路径链接，lld 把 Conan 缓存路径写进 DT_NEEDED（E537 不可重定位）。补丁 0002 的 kscreen_link_kf6_relocatable() 改以 -l:<basename> 链接 + target_link_directories 补库目录，kscreen_common 对象库经 INTERFACE 向 kded 插件传播（kpackage 6.26.0.1 / kscreenlocker 6.7.2 先例）；osdactions（ECMAddTests）与 kscreen-console 上游以 plain 签名 target_link_libraries 链接，CMake 禁止同一目标混用 plain/keyword，helper 的 PLAIN 开关对这类目标改用 plain 形式；helper 调用必须带 DEPS 关键字，cmake_parse_arguments 只收集 DEPS 关键字之后的多值，遗漏时目标名落入 UNPARSED_ARGUMENTS、helper 静默变成 no-op（kscreen_common 实测因缺 libkscreen 头目录编译失败）。"
+  - "OHOS qtbase 的 Qt6DBus 以 dlopen() 加载 libdbus-1.so.3，ohpcd 仅发布静态 libdbus-1.a → 任何 Qt6DBus 消费者运行时都会拿到无效会话总线。配方内置 dbus-1.14.10 官方源码构建共享客户端库随包分发（kglobalacceld 6.7.2 先例；共享 dbus 包发布后可移除）。"
+  - "Plasma KCM/OSD/plasmoid 与 HDR 校准器的依赖（Plasma/PlasmaQuick、LayerShellQt、plasma5support、KF6::KCMUtils/Svg/Crash、Qt6GuiPrivate/Qt6WaylandClient 私有头）均未发布：补丁 0001 把 KSCREEN_PLASMA_INTEGRATION / KSCREEN_BUILD_HDRCALIBRATOR 变为配置选项并保持上游 ON 默认，OHOS 构建只关掉这两个桌面组件组；WITH_X11=OFF 同步上游非 X11 平台路径（XInput 触屏映射）。"
+  - "tests/osdactions 无需会话总线：Fake 后端由测试自身以 KSCREEN_BACKEND=Fake 进程内加载，只需 QT_PLUGIN_PATH 找到 libkscreen 的 KSC_Fake.so 与 qtbase offscreen QPA；配方 BUILD_TESTING=ON 并经 ctest --timeout 120 真机执行（1 个 ctest 目标 = 10 个 QTest 测试函数）。"
+  - "OHOS GNU make 4.4.1 的 jobserver 依赖 mkfifo，沙箱全面拒绝（HMDFS EPERM、/tmp EROFS）：一律 Ninja 生成器（kglobalacceld 6.7.2 先例）。"
+  - "cmake.install 重写已安装 ELF 的 RUNPATH 会失效工具链盖的 .codesign 段，OHOS 内核拒绝执行：package() 对制品树 llvm-objcopy --remove-section .codesign + binary-sign-tool sign -selfSign 1 重签（kscreenlocker 6.7.2 先例）。"
+  - "libkscreen 包内后端插件（KSC_Fake.so 等）带构建树相对 DT_NEEDED '../../bin/libKF6Screen.so'（无 SONAME 包以相对路径链接的下游效应）：装载器对含 '/' 的 NEEDED 不搜 LD_LIBRARY_PATH，直接按测试进程 CWD open()。缺失→dlopen 失败；路径上是无关副本→插件绑定第二个 libKF6Screen 实例，qobject_cast<KScreen::AbstractBackend*> 因 QMetaObject 链地址不匹配失败——两者在 configoperation.cpp 汇成同一错误串 'Plugin does not provide valid KScreen backend'，表象会误导为环境缺插件。对策 _stage_relative_backend_layout()：把 '<build_folder>/../bin/libKF6Screen.so' 以普通文件复制物化（沙箱拒绝 symlink()/link()，实测均 EPERM），并把相对目录 '../../bin' 置于 LD_LIBRARY_PATH 首位——测试主程序按裸名搜索与该相对串解析到同一文件、同一实例；真机 osdactions 12/12 全过。诊断支点=readelf -d 双端 NEEDED 对照 + QT_LOGGING_RULES='org.kde.kscreen*=true' 的 qCDebug 分支定位 + ctypes dlopen 矩阵（中性 CWD 复现失败、相对布局命中成功）。"

@@ -1,0 +1,57 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for kscreen/6.7.2.
+
+package: kscreen/6.7.2
+homepage: https://invent.kde.org/plasma/kscreen
+
+# Upstream ships tests/ with one ecm_add_tests-registered QtTest case
+# (osdactions, BUILD_TESTING=ON) plus a KF6KCMUtils_VERSION-gated KCM smoke
+# test that stays off (KF6_MIN_VERSION 6.26.0 < 6.27.0). osdactions drives
+# the screen actions against libkscreen's Fake backend (KSCREEN_BACKEND=Fake
+# is set by the test itself and BackendManager defaults to InProcess for
+# non-XRandR backends), so no session bus and no backend launcher are
+# needed; the test is compiled by the package build and really executed on
+# the device inside conanfile.py build() via ctest.
+upstream_check_command: "ctest --test-dir <build_folder> -N  # 1 test (osdactions; kcm_smoketest gated on KF6KCMUtils >= 6.27.0)"
+
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build_folder> --output-on-failure --timeout 120 (executed in conanfile.py build(), OS=OHOS)"
+
+upstream_tests:
+  - file: tests/CMakeLists.txt
+    source: kscreen-6.7.2/tests/CMakeLists.txt
+    description: >-
+      1 QtTest case registered with ecm_add_tests: osdactions (the
+      QScreenActions of kscreen_common against libkscreen's Fake backend;
+      TEST_DATA loads the laptopAndExternal.json / steamdeckAndExternal.json
+      configs). The kcm_smoketest case sits behind
+      if(KF6KCMUtils_VERSION VERSION_GREATER_EQUAL "6.27.0") and stays off
+      with KF6_MIN_VERSION 6.26.0.
+    command: "ctest --test-dir <build_folder> --output-on-failure --timeout 120"
+
+test_package_tests:
+  - file: test_package/test_kscreen_plugin.cpp
+    description: >-
+      OHOS consumer test (two real executions, non-zero exit on failure,
+      9 TEST PASS checks): (1) QPluginLoader dlopens the packaged kded
+      plugin (lib/plugins/kf6/kded/kscreen.so) and asserts load(), factory
+      instantiation and the embedded metadata (IID org.kde.KPluginFactory,
+      KPlugin.Version 6.7.2, X-KDE-Kded-autoload true) — the SONAME-less
+      KF6 runtime dependencies must resolve through the recorded package
+      directories; (2) QProcess runs the packaged kscreen-console --help
+      with the offscreen QPA platform and asserts exit 0 plus usage
+      output.
+    command: "conan create (test_package builds and runs test_kscreen_plugin)"
+  - file: test_package/conanfile.py (_elf_artifact_checks)
+    description: >-
+      OHOS-specific artifact assertions (readelf, 10 asserts): the plugin
+      and the console carry only bare-basename DT_NEEDED (no absolute
+      Conan cache paths, E537); the plugin DT_NEEDED contains
+      libKF6Screen/libKF6CoreAddons/libKF6DBusAddons/libKF6I18n and none
+      of the gated components (XmlGui, KCMUtils, Svg, Crash, Plasma,
+      LayerShellQt, WaylandClient); the console keeps
+      libKF6WindowSystem; the gated artifacts (HDR calibrator,
+      Plasma/KCM plugin files) are absent from the package.
+    command: "conan create (test_package test(), OS=OHOS only)"
+
+assertion_count: 19
