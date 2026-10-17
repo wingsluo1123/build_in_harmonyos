@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """Conan test_package — ocl-icd 2.3.5
 
-L1 test: links against the built libOpenCL and calls clGetPlatformIDs.
-A return of CL_SUCCESS (platforms present) or -1001
-(CL_PLATFORM_NOT_FOUND_KHR, no OpenCL driver on the worker) both prove the
-loader library is linkable and callable.
+Runs the installed loader with no vendors and a controlled vendor ICD.
+Checks loader identity, API error handling, and platform dispatch.
 """
 import json
 import os
@@ -37,13 +35,14 @@ class OclIcdTestConan(ConanFile):
         if can_run(self):
             bin_path = os.path.join(self.cpp.build.bindirs[0],
                                     "test_ocl_icd")
-            self.run(bin_path, env="conanrun")
+            self.run(bin_path + " empty", env="conanrun")
+            self.run(bin_path + " fixture", env="conanrun")
             marker = {
                 "executed": True,
                 "passed": True,
-                "command": bin_path,
-                "discovered": 1,
-                "passedCount": 1,
+                "command": bin_path + " empty && " + bin_path + " fixture",
+                "discovered": 2,
+                "passedCount": 2,
             }
             self.output.info("HMBS_TEST_PACKAGE_RESULT="
                              + json.dumps(marker))

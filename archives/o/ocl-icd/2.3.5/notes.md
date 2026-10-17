@@ -171,3 +171,21 @@
 - Upstream tests and test_package unchanged: make check 34/34 in the
   failing run; conandata mirror list retained (no download warnings in
   the round-4 log).
+
+
+## 2026-10-12 消费者测试根因修复（积分赛）
+
+- 版本级 `conanfile.py` / `conandata.yml` 保持逐字节不变；仅修改消费者测试与声明文档。
+- 原 CI 日志：`HMBS_UPSTREAM_TEST_RESULT` 报告上游 34/34、0 skipped；随后消费者在无厂商驱动时返回 `-1001, 0 platform(s)`，错误地强制要求解析 `clIcdGetPlatformIDsKHR` 而失败。先前“ocl-icd 本体必非空”判断已被撤销。
+- 上游 v2.3.5（tag commit `3e1155f0796cb9ac0fe309664d98e4b0ed2c3300`，归档 SHA256 与冻结 conandata 一致）中，`ocl_icd_loader.c:456-457` 向 vendor ICD 查找 `clIcdGetPlatformIDsKHR`；`1174-1200` 的扩展解析先查已知派发表与厂商后缀，再显式提供 `clGetICDLoaderInfoOCLICD`。生成的 `function_description` 不含 `clIcdGetPlatformIDsKHR`。上游 `ocl_test_icdl.c:65-85` 真正测试的是 loader 信息扩展。此前把这两个扩展混为一谈是根因。
+- 新消费者使用 `clGetICDLoaderInfoOCLICD`，校验 OpenCL 版本前缀、软件版本 `2.3.5`、名称、厂商、短缓冲和非法参数；保留真实平台入口及 `clUnloadCompiler`，未知扩展仍须返回 NULL。
+- 新增最小厂商 ICD（安装式客户端驱动：为加载器提供一个受控平台）的共享库，仅模拟驱动边界，不替代被测加载器。两次独立消费者进程通过 `OCL_ICD_VENDORS` 分别选择空目录和该 fixture；清空附加驱动/层环境。每次 CI 都执行“无驱动 27 断言”及“有平台 32 断言”，平台枚举/信息查询失败必须报错。Conan 成功标记只在两次命令均成功后写入，计数为 2/2。
+- macOS 本地证据：官方完整源码的真实 loader 编译运行，原消费者稳定退出 1；新 CMake 构建及 CTest 2/2；关闭 fixture 后有平台路径退出 1（3 个失败）；误链接 Apple loader 时两条路径均失败。Mach-O 不支持上游生成代码中的 ELF symbol aliases，本地证据编译只把生成代码的内部 `*_hid` 名称映射到同一个原始函数，不改 API 行为。这项本地兼容处理仅存在证据目录，未进入配方或消费者。
+- OHOS 边界：旧 CI 的 clang 已生成并成功加载上游 `libdummycl*.so`；冻结配方与 CI 驱动无额外测试库签名操作。新 fixture 同样直接由 CMake/clang 链接，不再改写 ELF（可执行与共享库文件格式）。新消费者的 OHOS 编译、加载及两条路径需最新 CI 重跑确认；本地 CMake 使用真实 loader/headers 的导入目标代替 Conan 下载，未声称本地执行了完整 `conan create`。
+- 可复现证据存于本次核查目录 `修复/agent-ocl/`：官方源码压缩包、tag JSON、`validate.py`、编译/运行日志、负向测试、冻结配方 SHA256 与验证报告。
+
+来源（官方实现与标准交叉核验）：
+
+- [OCL-dev v2.3.5 loader 源码](https://github.com/OCL-dev/ocl-icd/blob/3e1155f0796cb9ac0fe309664d98e4b0ed2c3300/ocl_icd_loader.c#L1135-L1200)
+- [OCL-dev v2.3.5 官方 loader 信息测试](https://github.com/OCL-dev/ocl-icd/blob/3e1155f0796cb9ac0fe309664d98e4b0ed2c3300/ocl_test_icdl.c#L53-L85)
+- [Khronos cl_khr_icd：Adding a Vendor Library](https://registry.khronos.org/OpenCL/specs/unified/html/OpenCL_API.html#cl_khr_icd)

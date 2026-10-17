@@ -30,11 +30,16 @@ upstream_tests:
     description: "上游 autotest 套件：34 个用例覆盖 vendors 枚举、默认平台选择与 Intel workaround"
     command: "make check"
 
-# test_package 中自带的测试 (消费者视角验证)
+# 消费者始终运行两个独立进程，分别覆盖无驱动与受控 ICD 驱动。
 test_package_tests:
   - file: test.c
-    description: "消费者测试：链接 libOpenCL 并调用 clGetPlatformIDs 验证库可链接可调用"
-    command: "./test_ocl_icd"
+    description: "无驱动消费者测试：强制空 vendors；平台数 0 与 -1001；非法枚举参数；解析 loader 自有 clGetICDLoaderInfoOCLICD，校验四项信息及短缓冲/非法 key；未知扩展与 clUnloadCompiler。正常执行 27 个断言。"
+    command: "./test_ocl_icd empty"
+  - file: test.c
+    description: "受控 ICD 消费者测试：test_icd.c 仅实现 vendor 边界，消费者仍链接被测 OpenCL::OpenCL；强制枚举 1 个平台并经 loader dispatch 校验 VENDOR/VERSION。正常执行 32 个断言；驱动缺失/平台查询失败均不得跳过。"
+    command: "./test_ocl_icd fixture"
 
-# 测试断言总数（上游 34 + 消费者 1）
-assertion_count: 35
+# 分开申报上游用例和消费者断言，避免把条件分支算作已执行测试。
+upstream_test_count: 34
+consumer_test_count: 2
+assertion_count: 59
