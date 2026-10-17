@@ -1,0 +1,22 @@
+software: istgt
+display: "istgt"
+description: "iSCSI target daemon（userspace RFC 3720 target + SPC-3 逻辑单元仿真）"
+category: network
+homepage: "https://sourceforge.net/projects/istgt/"
+license: BSD-2-Clause
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "configure 无 AC_CANONICAL_HOST，无需 config.guess/config.sub 补丁（与 icecast 不同）"
+    - "唯一外部依赖 libcrypto（MD5_Init/Update/Final），由 AC_CHECK_LIB 经 AutotoolsToolchain 注入的 LDFLAGS -L 路径解析，无需 pkg-config"
+    - "openssl 固定 1.1.1w：MD5_* 底层 API 在 OpenSSL 4.0 已移除"
+    - "FreeBSD 专属 AC_CHECK_LIB([cam]) 在 OHOS 缺失且为可选依赖（HAVE_LIB_CAM 守卫）；MKDEP 空值上游 Makefile 已守卫"
+    - "OHOS musl 不导出 POSIX 线程取消族（pthread_cancel/setcancelstate/testcancel）；补丁 0001 以 HAVE_PTHREAD_CANCEL 特性宏降级取消点，配方对 OHOS 传 -DHAVE_PTHREAD_CANCEL=0（补丁内不含平台宏）"
+  common_dependencies:
+    - "openssl/1.1.1w"
+
+versions:
+  "0.4-20111008":
+    status: built
+    build_date: "2026-10-16"
