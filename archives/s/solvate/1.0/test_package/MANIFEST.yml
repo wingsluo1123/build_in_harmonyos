@@ -1,0 +1,14 @@
+package: solvate/1.0
+homepage: "https://www.mpibpc.mpg.de/home/grubmueller/downloads/solvate/"
+upstream_check_command: "No upstream test/check target; Debian autopkgtest run-unit-test contains two original CLI commands"
+upstream_test_in_build: false
+upstream_test_command: "Executed by the same consumer orchestrator; preserve original command arguments and inputs"
+upstream_tests:
+  - file: verify_checkpoint.py
+    source: "Debian solvate_1.0-3.debian.tar.xz debian/tests/run-unit-test, unchanged command arguments"
+    description: "Two original distribution business tests, migrated into private CWDs; not upstream unit tests"
+    command: "solvate -r 20.91 -s -v bpti test1; solvate -n 2 -r 40.33 -t 2 -bulk -psf -ion globh test2"
+test_package_tests:
+  - file: verify_checkpoint.py
+    description: "One consumer program, 12 CLI scenarios total: 2 original distribution commands and 10 added checkpoint cases; 60 assertions"
+    command: "python3 verify_checkpoint.py --binary <package>/bin/solvate --data <package>/share/solvate --output <private-new-dir> --environment OHOS-native"
