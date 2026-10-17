@@ -1,0 +1,32 @@
+# test_package/MANIFEST.yml
+# 上游测试声明文件（CI 脚本 build_and_test.sh L0e 强制要求存在）
+#
+# 上游测试清点证据（R51 三步法）:
+#   * wdfs 1.4.2 上游【没有任何测试套件】：源码树无 tests/ 或 test* 文件
+#     （find . -iname '*test*' 空结果）；Makefile.am 仅 `SUBDIRS = src`，
+#     src/Makefile.am 仅 `bin_PROGRAMS = wdfs`，无 TESTS / check_PROGRAMS /
+#     check-local；configure.ac 无 AC_CONFIG_TESTDIR、无 make check 目标。
+#   * 依据 TEST_QUALITY_SPEC：上游无测试 → 说明原因并补充测试（本 test_package
+#     即补充测试：安装后二进制的消费者验证 + 本地 WebDAV 端到端用例）。
+
+package: wdfs/1.4.2
+homepage: "https://github.com/codyps/wdfs"
+
+# 上游测试命令：不存在
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序：无（上游零测试，清点证据见上）
+upstream_tests: []
+
+# test_package 自带测试（消费者视角验证）
+test_package_tests:
+  - file: test.sh
+    description: "消费者测试：执行安装后的 wdfs CLI。① --version（KEY_VERSION 分支 rc=0，banner 含 'wdfs version: 1.4.2'）；② --help（print_help + fuse -ho，验证 libfuse 符号闭合与 FUSE 参数构造，rc=1）；③ 无参数（'missing webdav uri' 校验分支 rc=1）；④ 端到端：本地最小 WebDAV stub server + 真实 neon 会话，断言 server 收到 wdfs 发出的 OPTIONS 请求且进程无崩溃（rc ∈ {0,1,124}，126/127/139 判失败，timeout 30s）。真实挂载需内核 /dev/fuse 与 WebDAV 服务端，CI 环境不可达，见 notes.md。"
+    command: "bash test.sh"
+  - file: webdav_stub.py
+    description: "端到端用例的辅助最小 WebDAV server（响应 OPTIONS/PROPFIND/GET/HEAD 并记录请求行），供 test.sh 用例 ④ 使用。"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 5
