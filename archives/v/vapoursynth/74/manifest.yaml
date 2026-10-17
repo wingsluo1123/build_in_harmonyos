@@ -1,0 +1,45 @@
+software: vapoursynth
+version: "74"
+status: built
+build_system: meson
+compile_date: 2026-10-15
+dependencies:
+  required:
+    - "zimg/3.0.6"
+  optional:
+    - "Python >= 3.12 runtime and Cython >= 3.1 only when the optional python_module binding is enabled"
+patches_applied:
+  - "patches/0001-meson-skip-python-probe-when-disabled.patch"
+  - "patches/0002-meson-keep-api-defines.patch"
+test_results:
+  type: conan-test-package
+  total: 72
+  passed: 72
+  failed: 0
+  note: |
+    The default recipe packages the core library. test_package builds a direct C
+    consumer, verifies getVapourSynthAPI returns a non-null VSAPI pointer, checks
+    the reported API version, creates/frees a VSCore instance, compiles the
+    upstream ExprDebugger from src/core/expr and executes upstream
+    expr_compiler/compiler_test.py over 69 expressions.
+    The optional python_module binding adds the upstream Python suite; it cannot
+    be built on the CI worker because hmmac refuses to dlopen Cython's own
+    compiled modules from user paths (knowledge/doc/E212.md), and the packaged
+    extension could not be dlopen-ed there either. With
+    "-o vapoursynth/*:python_module=True" on a true device the same test_package
+    additionally runs all 11 upstream unittest modules / 157 cases:
+    /storage/Users/currentUser/ohos-test-runs/codex-vapoursynth-74-module-vapoursynth-74-20260728-r1-module-conan-20261015-173737-4027
+    (exit code 0, "Ran 157 tests in 91.137s", OK) and the default path was
+    verified in
+    /storage/Users/currentUser/ohos-test-runs/codex-vapoursynth-74-vapoursynth-74-20260728-r1-conan-20261015-173546-64022
+    (exit code 0, C smoke test + 69 expressions). Both runs used conanfile.py
+    sha256 40154f6100393c5a7925d4e1126b65a25858758afadba724a81639892224f666,
+    the revision merged here.
+knowledge_ref:
+  - "knowledge/doc/E212.md"
+notes:
+  - "Issue: https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos/issues/1456"
+  - "zimg/3.0.6 is published in the ohpcd remote; the official CI resolves and downloads it (L0i reports the dependency in the registry)."
+  - "Default options keep the Python binding off (python_module=False): the CI worker cannot build it, because hmmac refuses to dlopen Cython's own compiled modules from a user path (knowledge/doc/E212.md), and it cannot load the packaged extension from the Conan cache either."
+  - "With -o vapoursynth/*:python_module=True on a true device the extension builds and all 11 upstream unittest modules / 157 cases pass; on a sandboxed worker test_package verifies the packaged module statically instead of reporting a false build failure."
+  - "VSScript and vspipe stay disabled; the Python binding is available through the python_module option."
