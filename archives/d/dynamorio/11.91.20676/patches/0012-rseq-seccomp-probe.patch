@@ -1,0 +1,16 @@
+--- a/core/unix/rseq_linux.c
++++ b/core/unix/rseq_linux.c
+@@ -334,6 +334,13 @@
+ bool
+ rseq_is_registered_for_current_thread(void)
+ {
++    if (is_seccomp_enforcing()) {
++        /* Under a seccomp filter, some sandboxes answer a blocked syscall with a
++         * fatal SIGSYS instead of the -EPERM that the probe below expects, so the
++         * probe cannot be performed there: treat rseq as never registered.
++         */
++        return false;
++    }
+     /* Unfortunately there's no way to query the current rseq struct.
+      * For 64-bit we can pass a kernel address and look for EFAULT
+      * vs EINVAL, but there is no kernel address for 32-bit.

@@ -1,0 +1,68 @@
+--- a/ext/drsyms/CMakeLists.txt
++++ b/ext/drsyms/CMakeLists.txt
+@@ -133,6 +133,14 @@
+   set(srcs
+     drsyms_unix_frontend.c drsyms_unix_common.c
+     demangle.cc drsyms_common.c)
++  if (CMAKE_SYSTEM_NAME STREQUAL "OHOS")
++    # The prebuilt demangler archive references glibc's __ctype_b_loc(), which
++    # the OHOS libc (musl) does not provide; add the compatibility shim.
++    # Follow-up (non-blocking): this is still a platform-name check -- a
++    # capability probe (e.g. checking for __ctype_b_loc at configure time) would
++    # be the fully portable form, as suggested during review.
++    set(srcs ${srcs} drsyms_libc_compat.c)
++  endif ()
+   if (APPLE)
+     set(srcs ${srcs} drsyms_dwarf.c drsyms_macho.c)
+     set(dwarf_libpath
+@@ -190,8 +198,34 @@
+         INPUT_FILE "${patch}"
+         RESULT_VARIABLE patch_result ERROR_VARIABLE patch_err)
+       if (patch_result)
+-        message(FATAL_ERROR "Failed to apply ${patch}: ${patch_err}")
++        # Some toolchains ship a minimal patch(1) implementation (e.g. toybox on
++        # OHOS) that has no GNU "-o" output option and no context fuzz.  These
++        # bundled elfutils patches need both (their hunks carry stale line
++        # numbers and a slightly changed leading context), so fall back to
++        # staging the target file into a mirror tree and applying the patch with
++        # "git apply -C1", which supports line offsets and reduced context.
++        find_program(GIT_EXECUTABLE git DOC "git client")
++        if (NOT GIT_EXECUTABLE)
++          message(FATAL_ERROR "Failed to apply ${patch}: ${patch_err}")
++        endif ()
++        file(STRINGS "${patch}" patch_hdr REGEX "^\\+\\+\\+ b/")
++        list(GET patch_hdr 0 patch_hdr)
++        string(REGEX REPLACE "^\\+\\+\\+ b/" "" patch_rel "${patch_hdr}")
++        set(patch_mirror_dir "${CMAKE_CURRENT_BINARY_DIR}/elfutils-patched")
++        set(patch_mirror "${patch_mirror_dir}/${patch_rel}")
++        get_filename_component(patch_mirror_sub "${patch_mirror}" DIRECTORY)
++        file(MAKE_DIRECTORY "${patch_mirror_sub}")
++        configure_file("${orig_path}" "${patch_mirror}" COPYONLY)
++        execute_process(COMMAND "${GIT_EXECUTABLE}" apply --recount -C1 -p1
++          --directory=elfutils-patched
++          WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
++          INPUT_FILE "${patch}" RESULT_VARIABLE patch_result2 ERROR_VARIABLE patch_err2)
++        if (patch_result2)
++          message(FATAL_ERROR "Failed to apply ${patch}: ${patch_err}\n${patch_err2}")
++        endif ()
++        set(patch_path "${patch_mirror}")
+       endif ()
++      set(PATCHED_FILE_${patch_base} "${patch_path}")
+     endforeach ()
+ 
+     # Common properties for elfutils libraries.
+@@ -211,9 +245,11 @@
+           # Swap in our patched file.
+           list(REMOVE_ITEM ${lib}_files "${orig_path}")
+           get_filename_component(base ${orig_path} NAME)
+-          set(patch_path "${CMAKE_CURRENT_BINARY_DIR}/${base}")
+-          list(APPEND ${lib}_files "${patch_path}")
+-          message(STATUS "Swapped in patched ${patch_path}")
++          if (NOT DEFINED PATCHED_FILE_${base})
++            set(PATCHED_FILE_${base} "${CMAKE_CURRENT_BINARY_DIR}/${base}")
++          endif ()
++          list(APPEND ${lib}_files "${PATCHED_FILE_${base}}")
++          message(STATUS "Swapped in patched ${PATCHED_FILE_${base}}")
+         endif ()
+       endforeach ()
+       add_library(${lib}_pic STATIC ${${lib}_files})

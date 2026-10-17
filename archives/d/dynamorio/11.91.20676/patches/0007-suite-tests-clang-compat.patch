@@ -1,0 +1,31 @@
+--- a/suite/tests/CMakeLists.txt
++++ b/suite/tests/CMakeLists.txt
+@@ -450,8 +450,9 @@
+     set(flags "${ORIG_CMAKE_C_FLAGS}")
+   endif ()
+   # Alpine Linux enables "-Wtrampolines" by default, breaking
+-  # security-linux/trampoline.c.
+-  if (MUSL)
++  # security-linux/trampoline.c.  The option is GCC-only, so skip it for
++  # clang (which rejects unknown -W options under -Werror).
++  if (MUSL AND NOT CMAKE_C_COMPILER_ID MATCHES "Clang")
+     set(flags "${flags} -Wno-trampolines")
+   endif ()
+   if ("${source}" MATCHES ".cpp$" AND WIN32)
+@@ -1200,8 +1201,15 @@
+   # relies on ${defines} from top level
+   # we need a list: else passed as a single arg in quotes
+   string(REGEX REPLACE " " ";" deflist "${defines} ${rundefs}")
++  # The templatex files are plain text: clang warns about apostrophes in them
++  # (e.g. "2's complement"), and any stderr output is treated as a hard error
++  # below, so silence that specific diagnostic.
++  set(cpp_extra_flags "")
++  if (CMAKE_C_COMPILER_ID MATCHES "Clang")
++    set(cpp_extra_flags "-Wno-invalid-pp-token")
++  endif ()
+   execute_process(COMMAND
+-    ${CMAKE_CPP} ${CMAKE_CPP_FLAGS} ${deflist} -E ${CPP_NO_LINENUM}
++    ${CMAKE_CPP} ${CMAKE_CPP_FLAGS} ${cpp_extra_flags} ${deflist} -E ${CPP_NO_LINENUM}
+       ${CPP_KEEP_WHITESPACE} ${template}
+     RESULT_VARIABLE cpp_result
+     ERROR_VARIABLE cpp_err

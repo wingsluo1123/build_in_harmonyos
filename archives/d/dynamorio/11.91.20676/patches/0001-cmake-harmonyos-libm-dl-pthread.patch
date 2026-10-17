@@ -1,0 +1,17 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1913,6 +1913,14 @@
+     set(libmath m)
+     set(libdl dl)
+     set(libpthread "")
++  elseif (CMAKE_SYSTEM_NAME STREQUAL "OHOS")
++    # OHOS uses musl: libm, libdl and libpthread all live in libc.so and the
++    # sysroot only ships empty stub archives for them.  find_library() would
++    # additionally normalise a bare library name into a path under the build
++    # tree, so link the m/dl shims explicitly and treat pthread as part of libc.
++    set(libmath "-lm")
++    set(libdl "-ldl")
++    set(libpthread "")
+   else ()
+     # i#720: cmake fails to find 32-bit libraries in Ubuntu 11.10.
+     # This is because cmake uses CMAKE_LIBRARY_ARCHITECTURE to handle

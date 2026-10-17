@@ -1,0 +1,31 @@
+# 软件级 manifest — dynamorio
+software: dynamorio
+display: "DynamoRIO"
+description: "动态二进制插桩（DBI）框架：运行时代码重写、代码缓存、碎片调度，自带 client API 与大型回归套件"
+category: development
+homepage: "https://dynamorio.org/"
+license: BSD-3-Clause
+build_system: cmake
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+ohos_adaptation:
+  key_points:
+    - "OHOS 拒绝执行 .codesign 记录与文件不一致的 ELF（execve → EPERM）。判据：.codesign 段 +0x10 的 8 字节长度必须等于文件大小。DR 默认在链接后 objcopy/strip 分离调试信息，会破坏该记录 → 必须 -DSPLIT_SYMBOLS=OFF"
+    - "平台遗留：OHOS 版 ld.lld --code-sign 在链接大型静态库（libdynamorio_static.a）时写出与自身输出不一致的签名（长度字段恒为 15460992，与 app 无关），导致产物不可执行 → 配方在 package() 内建签名救援（llvm-objcopy 去 .codesign + binary-sign-tool -selfSign 1）"
+    - "OHOS seccomp 用 SIGSYS 终结进程而非返回 errno：DR 的 clone3 可用性探测（core/unix/os.c）与 rseq 探测/注销（core/unix/rseq_linux.c）会因此被杀 → 需在 OHOS 上跳过"
+    - "OHOS 的 musl 不调用 DT_INIT（只跑 .init_array），也不向 DT_INIT/.init_array 传 argc/argv/envp → DR 的 _init 需改挂 constructor 属性，且环境需从 /proc/self/environ 恢复（libdynamorio.so 用 -nostdlib 链接，不能引用 libc environ）"
+    - "MAP_FIXED_NOREPLACE 在 OHOS 返回 ENOSYS（DR 仅处理 EINVAL）"
+    - "MAKE/工具链：/usr/bin/patch 是 toybox（无 GNU -o、无上下文容错）；GNU as 2.45 不支持 --sysroot（因此不要设 CMAKE_SYSROOT）；clang 15 的 AArch64 asm 只认 v0/v1 clobber、musl 无 SIGEV_THREAD_ID"
+    - "预编译 ext/drsyms/libelftc*.a 是 glibc 产物（引 __ctype_b_loc）→ 需提供 glibc-ABI shim"
+    - "运行期：静态（standalone）形态可用（dr_app_setup/dr_app_start）；early-inject 注入模式在 OHOS 上崩溃，late 注入引擎初始化已通过但目标应用未正常跑完"
+  pitfalls:
+    - "不要设 CMAKE_SYSROOT：会让 CMake 给 GNU as 注入 --sysroot=（as 2.45 不认）"
+    - "musl 下 sysroot 没有 libm/dl/pthread.so（只有 8 字节空 stub .a），且 find_library 会把裸名归一成源码树下的路径"
+
+versions:
+  - version: "11.91.20676"
+    upstream_tag: "e2b756de6eb4da2dd8f3c1535cd51754708dcc12"
+    upstream_note: "非 release tag；= master @ 2026-08-11（版本号末段为 commit 距 epoch 天数）"
+    status: built

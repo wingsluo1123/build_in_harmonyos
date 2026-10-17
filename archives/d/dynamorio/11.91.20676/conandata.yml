@@ -1,0 +1,71 @@
+# conandata.yml — dynamorio 11.91.20676 (upstream master @ 2026-08-11)
+#
+# Version semantics: DynamoRIO versions are "<major.minor>.<days-since-epoch of
+# the commit>" (see CMakeLists.txt: daycount = committer-date / 86400), so
+# 11.91.20676 is NOT a release tag -- it is upstream master at commit
+# e2b756de6eb4da2dd8f3c1535cd51754708dcc12 (2026-08-11T17:14:36Z, daycount 20676).
+# The nearest cronbuild tags are cronbuild-11.91.20672 (2026-08-07) and
+# cronbuild-11.91.20679 (2026-08-14); the official "current version" page follows
+# the same daycount rule (it reported 11.91.20727 on 2026-10-02).
+#
+# Submodules: GitHub source archives do not contain submodule contents.
+#   * third_party/elfutils (DynamoRIO/elfutils fork) is required by ext/drsyms on
+#     64-bit Linux-like targets and is fetched separately at the gitlink pinned by
+#     the parent commit.
+#   * third_party/libipt (Intel PT, x86 only) is intentionally omitted: CMake only
+#     builds drpt2ir/drpt2trace when third_party/libipt/.git exists.
+
+sources:
+  url: "https://github.com/DynamoRIO/dynamorio/archive/e2b756de6eb4da2dd8f3c1535cd51754708dcc12.tar.gz"
+  sha256: "b4b375236823590f3f02faa3f40446791f40e5efef89d33ea1759c52dcb60629"
+
+elfutils:
+  url: "https://github.com/DynamoRIO/elfutils/archive/302252356da5475670ac5b10dadd091c59689425.tar.gz"
+  sha256: "0340ec692461240fdde42a12770650c98504f25fa49f86cbbe47bed4e2d365ef"
+
+patches:
+  - patch_file: "patches/0001-cmake-harmonyos-libm-dl-pthread.patch"
+    patch_description: "Handle OHOS in the required-libs probe: musl provides libm/libdl/libpthread inside libc.so and the sysroot only ships empty stub archives, and find_library() normalises bare names into paths under the build tree"
+    patch_type: "portability"
+  - patch_file: "patches/0002-os-harmonyos-musl-and-mmap-fixes.patch"
+    patch_description: "core/unix/os.c portability fixes, all runtime-detected (no platform macros): (a) prefer the /proc/self/environ snapshot over the loader-provided envp, which some loaders hand over unusable, and never scan past a snapshot for the auxiliary vector; (b) accept ENOSYS as well as EINVAL when retrying without MAP_FIXED_NOREPLACE; (c) skip the SYS_clone3 probe when a seccomp filter is enforcing, since such a probe can be answered with a fatal SIGSYS"
+    patch_type: "portability"
+  - patch_file: "patches/0003-elf-defines-aarch64-irelative-fallback.patch"
+    patch_description: "Provide R_AARCH64_IRELATIVE when the system elf.h omits it (OHOS sysroot does)"
+    patch_type: "portability"
+  - patch_file: "patches/0004-ptrace-lib-include-sys-user-h.patch"
+    patch_description: "Include <sys/user.h> for struct user_fpsimd_struct, which <linux/ptrace.h> provides on glibc but not on musl"
+    patch_type: "portability"
+  - patch_file: "patches/0005-drsyms-git-apply-fallback-and-libc-compat.patch"
+    patch_description: "ext/drsyms: fall back to 'git apply --recount -C1' when patch(1) is a minimal implementation without GNU -o and without context fuzz (some toolchains ship toybox patch), and compile the libc compatibility shim when the target libc is not glibc (still selected by platform name; a configure-time capability probe is a non-blocking follow-up)"
+    patch_type: "portability"
+  - patch_file: "patches/0006-drsyms-libc-compat-add-file.patch"
+    patch_description: "Add ext/drsyms/drsyms_libc_compat.c: glibc-ABI __ctype_b_loc() shim required by the prebuilt demangler archive when linked against a non-glibc libc. The file carries no platform guard: it is added to the source list by patch 0005 only when needed"
+    patch_type: "portability"
+  - patch_file: "patches/0007-suite-tests-clang-compat.patch"
+    patch_description: "suite/tests: silence clang's invalid-pp-token warning for .templatex expected-output text, and keep -Wno-trampolines (a GCC-only option) away from clang under -Werror"
+    patch_type: "portability"
+  - patch_file: "patches/0008-drx-time-scale-sigevent-musl.patch"
+    patch_description: "Guard SIGEV_THREAD_ID usage in drx_time_scale-test.c: musl's struct sigevent has no thread-id member"
+    patch_type: "portability"
+  - patch_file: "patches/0009-rseq-clang-asm-clobbers.patch"
+    patch_description: "suite/tests/linux/rseq.cpp: use the register names clang accepts for AArch64 SIMD clobbers (v0/v1) and require a register for the index operand instead of the memory-permitting 'g' constraint"
+    patch_type: "portability"
+  - patch_file: "patches/0010-scale-time-sigevent-musl.patch"
+    patch_description: "Guard SIGEV_THREAD_ID usage in clients/drcachesim/tests/scale_time.cpp (same musl sigevent difference)"
+    patch_type: "portability"
+  - patch_file: "patches/0011-elfutils-no-gettext.patch"
+    patch_description: "elfutils: drop the libintl dependency (OHOS's libintl.h is an empty stub with no dgettext declaration), matching the approach of the bundled android-aarch64 eu-config patch"
+    patch_type: "portability"
+  - patch_file: "patches/0012-rseq-seccomp-probe.patch"
+    patch_description: "Skip the rseq probe when a seccomp filter is enforcing: such sandboxes may answer a blocked syscall with a fatal SIGSYS instead of the -EPERM DR expects, so the syscall cannot be probed (runtime detection via /proc/self/status, no platform macro)"
+    patch_type: "portability"
+  - patch_file: "patches/0013-init-array-on-ohos.patch"
+    patch_description: "Register the _init entry points as constructors where the loader does not invoke DT_INIT (only .init_array), so the preload/takeover entry point is not silently skipped; this mirrors the upstream macOS ARM64 workaround. Keyed on the MUSL libc capability (not a platform name), since whether a loader calls DT_INIT is not build-time probeable; the registered entry points are idempotent (patches 0002/0015) so an environment invoking both paths cannot initialise twice"
+    patch_type: "portability"
+  - patch_file: "patches/0014-os-private-seccomp-decl.patch"
+    patch_description: "Declare is_seccomp_enforcing() for the rseq module"
+    patch_type: "portability"
+  - patch_file: "patches/0015-preload-init-idempotent.patch"
+    patch_description: "Make the preload/takeover entry points idempotent (static one-shot guard) so registering them as constructors cannot initialise the engine twice when an environment invokes both DT_INIT and .init_array"
+    patch_type: "portability"

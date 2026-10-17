@@ -1,0 +1,25 @@
+--- a/clients/drcachesim/tests/scale_time.cpp
++++ b/clients/drcachesim/tests/scale_time.cpp
+@@ -100,11 +100,19 @@
+     // SIGEV_THREAD_ID is our target timer as we've seen real-world applications
+     // use it.
+     struct sigevent se = {};
++#ifdef SIGEV_THREAD_ID
+     se.sigev_notify = SIGEV_THREAD_ID;
+-#ifndef sigev_notify_thread_id
+-#    define sigev_notify_thread_id _sigev_un._tid
+-#endif
++#    ifndef sigev_notify_thread_id
++#        define sigev_notify_thread_id _sigev_un._tid
++#    endif
+     se.sigev_notify_thread_id = syscall(SYS_gettid);
++#else
++    /* musl-based targets (e.g. OHOS) do not expose SIGEV_THREAD_ID nor a
++     * thread id member in struct sigevent: fall back to a process-directed
++     * signal for the POSIX timer.
++     */
++    se.sigev_notify = SIGEV_SIGNAL;
++#endif
+     intercept_signal(SIGUSR1, signal_handler_posix, false);
+     se.sigev_signo = SIGUSR1;
+     int res = timer_create(CLOCK_PROCESS_CPUTIME_ID, &se, &posix_timer_id);
