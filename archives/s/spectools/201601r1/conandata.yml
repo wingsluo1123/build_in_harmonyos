@@ -1,0 +1,29 @@
+# conandata.yml — spectools 201601r1
+# R39: 官方源（Kismet 官网 kismetwireless.net；Debian 包 watch/control
+# 声明的同源地址 http://www.kismetwireless.net/spectools/）。官方归档
+# spectools-2016-01-R1.tar.xz 经 kismetwireless.net/code/ 目录列表实测
+# 存在，HTTP 200（2026-10-14）。
+# 文件名 spectools-2016-01-R1.tar.xz 按 Debian uversionmangle
+# （s/(\d\d\d\d)-(\d\d)-R(.*)/$1$2r$3/）映射为版本号 201601r1。
+# SHA256 为 2026-10-14 实际下载实测值（HTTP 200，120732 字节）。
+
+sources:
+  url: "https://www.kismetwireless.net/code/spectools-2016-01-R1.tar.xz"
+  sha256: "8d70daaf3b4b71196ca63bbd5df0ef14b82c3b496f63b5cfa434fa637dc08d57"
+
+patches:
+  - patch_file: "patches/0001-config-sub-linux-ohos.patch"
+    patch_description: "E122: tarball 自带 config.sub 为 2001-06-08 版，不认识 aarch64 CPU / linux-ohos OS；替换为 autoconf 2.71 config.sub 并在 kernel-os 识别列表添加 linux-ohos（judy/1.0.5 config.sub 整文件替换先例）"
+    patch_type: "portability"
+  - patch_file: "patches/0002-makefile-depend-cross.patch"
+    patch_description: "禁用 Makefile.in 的 .depend 增量依赖扫描：交叉环境宿主 CXX 的 -MM 看不到 conan 提供的 usb/ncurses 头文件且 GTK 对象未配置；conan 一次性构建无增量依赖需求"
+    patch_type: "portability"
+  - patch_file: "patches/0003-configure-umask022.patch"
+    patch_description: "E011/E129: configure 两处 umask 077 在 HMDFS 产生 setgid 不可写临时目录 → 剥离（mfterm 同款修复）"
+    patch_type: "portability"
+  - patch_file: "patches/0004-configure-ncursesw.patch"
+    patch_description: "ohpcd ncurses/6.6 仅发布宽字符静态库（libncursesw.a 等，无 libncurses.a）→ configure 的 curses 库检查与 CURSLIBS 改用 -lncursesw（API 同源）"
+    patch_type: "portability"
+  - patch_file: "patches/0005-main-return-value.patch"
+    patch_description: "clang 15 在 C99+ 下把 -Wreturn-type 作硬错误（非 void 函数裸 return）→ spectool_raw.c / spectool_curses.c 的 main() 参数解析分支 5 处裸 return 改为 return 0（-h/非法参数 → 正常退出码）"
+    patch_type: "portability"

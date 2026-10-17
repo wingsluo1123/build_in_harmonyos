@@ -1,0 +1,17 @@
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -87,9 +87,11 @@
+ 	@-rm -f $(DEPEND)
+ 	@echo "Generating dependencies... "
+ 	@echo > $(DEPEND)
+-	@$(CXX) $(CFLAGS) -MM \
+-		`echo $(RAWOBJS) $(GTKOBJS) $(CUROBJS) $(NETOBJS) \
+-		| sed -e "s/\.o/\.c/g"` >> $(DEPEND)
++	# Dependency scan disabled for cross builds: conan-provided
++	# usb/ncurses headers live in the cross sysroot (visible to the
++	# real compiler via CPPFLAGS but not to the host CXX invoked
++	# here), and GTK objects are not configured on OHOS. One-shot
++	# conan builds do not need incremental .depend tracking.
+ 
+ include $(DEPEND)
+ 
