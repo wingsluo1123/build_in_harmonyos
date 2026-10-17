@@ -1,0 +1,25 @@
+# conandata.yml — ircd-ircu 2.10.12.19 (Undernet IRC daemon, upstream tag u2.10.12.19)
+#
+# Source: the Undernet IRC project is the current home of ircu2 (the original
+# ircu.org project and the github.com/ircu/ircu repository are both retired —
+# verified: ircu.org no longer resolves and the GitHub repository returns 404).
+# The GitHub release asset under the upstream tag is the authoritative source
+# and is what Debian's `ircd-ircu` source package is derived from.
+
+sources:
+  url: "https://github.com/UndernetIRC/ircu2/releases/download/u2.10.12.19/ircu2.10.12.19.tar.gz"
+  sha256: "79e3264b36c093c1f7c7019511b8ab7d3f0c16086c8b8b2f07463b7bd3787334"
+
+patches:
+  - patch_file: "patches/0001-config.guess-ohos.patch"
+    patch_description: "config.guess（2005-12-23 版）无法识别 HarmonyOS/OpenHarmony 主机（uname -s 为 OHOS），新增 OHOS/HarmonyOS 分支输出 aarch64-unknown-linux-ohos (E007)"
+    patch_type: "portability"
+  - patch_file: "patches/0002-config.sub-ohos-aarch64.patch"
+    patch_description: "config.sub（2005 版）既不认 aarch64 CPU 也不认 linux-ohos OS，对 --host=aarch64-linux-ohos 直接报 Invalid configuration；补 aarch64 CPU、linux-ohos OS 识别与 -linux-ohos 归一化分支 (E007)"
+    patch_type: "portability"
+  - patch_file: "patches/0003-umkpasswd-getpass-musl.patch"
+    patch_description: "musl（鸿蒙所用 libc）完全不提供 getpass(3)，umkpasswd.c 因隐式声明编译失败（clang 15: assigning to 'char *' from 'int'）；就地实现一份关闭回显的单行读取并改调它"
+    patch_type: "portability"
+  - patch_file: "patches/0004-configure-umask-022.patch"
+    patch_description: "autoconf 2.64 的 config.status 用 umask 077 建 confXXXXXX/ 暂存目录，在鸿蒙 worker 的 HMDFS 上该目录建完即不可用，写 subs1.awk 被拒（./config.status: line 610: ./confXXXXXX/subs1.awk: Permission denied → could not setup config files machinery）；暂存目录仅存放本次 configure 生成的 AWK 替换脚本、退出时 rm -rf，改用 umask 022"
+    patch_type: "portability"

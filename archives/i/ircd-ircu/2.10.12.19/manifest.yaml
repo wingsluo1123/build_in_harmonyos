@@ -1,0 +1,83 @@
+# 版本级 manifest
+# 文件位置: archives/i/ircd-ircu/2.10.12.19/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "2.10.12.19"
+software: "ircd-ircu"
+status: built
+build_date: "2026-10-04"
+build_system: autotools
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 上游 tag: u2.10.12.19（ircu.org 与 github.com/ircu/ircu 均已下线，
+  # Undernet IRC 是 ircu2 的现役维护方，GitHub release 为权威发布源；
+  # Debian 源码包 ircd-ircu 2.10.12.19+dfsg 即派生自此版本）
+  url: "https://github.com/UndernetIRC/ircu2/releases/download/u2.10.12.19/ircu2.10.12.19.tar.gz"
+  sha256: "79e3264b36c093c1f7c7019511b8ab7d3f0c16086c8b8b2f07463b7bd3787334"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: autotools
+  # 与 conanfile.py:291-299 实际追加的参数逐项对齐（顺序也一致）。
+  # 2026-10-14（AI 检视 P2）补上原先漏列的 --bindir 与 --with-maxcon：
+  #   * --bindir 决定 config.h 的 SPATH（重启时执行文件的路径），不钉住它会指向
+  #     构建机的默认 prefix，ircd 启动即自杀（notes 第 7 节）；
+  #   * --with-maxcon 若不显式给，上游会取**构建机**的 `ulimit -Hn - 4`，
+  #     可能超出 numnicks 上限而让守护进程起不来（notes 第 8 节、MAX_CONNECTIONS=1024）。
+  configure_options:
+    - "--bindir=<package_folder>/bin"
+    - "--with-symlink=no"
+    - "--with-mode=755"
+    - "--with-maxcon=1024"
+    - "--with-dpath=<package_folder>/ircd"
+    - "--disable-devpoll"
+    - "--disable-kqueue"
+
+  # ircu2 无任何外部库依赖（configure.in 只有 AC_SEARCH_LIBS(crypt, ...) 走 libc，
+  # 其余密码学后端 ircd_crypt_{plain,smd5,native}.c 均随源码分发）
+  dependencies: []
+
+  # 构建期工具（发行 tarball 有意不随包提供生成后的 lexer/parser）
+  tool_dependencies:
+  - flex/2.6.4.2
+  - bison/3.8.2
+  # bison/flex 都要靠 m4 展开 skeleton；显式钉住 m4 的版本，
+  # 不再依赖它们各自传递引入的那一份（bison 烘死的 m4 可能不可用）
+  - m4/1.4.19
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+- "0001-config.guess-ohos.patch"
+- "0002-config.sub-ohos-aarch64.patch"
+- "0003-umkpasswd-getpass-musl.patch"
+- "0004-configure-umask-022.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+- "ircu2 2.10.12.19 的上游 tarball 里 config.guess/config.sub 是 2005-12-23 版：config.sub 连 aarch64 都不认，--host=aarch64-linux-ohos 直接报 Invalid configuration（E007）"
+- "ircu2 发行 tarball 有意不含生成后的 lex.yy.c / y.tab.c / y.tab.h，flex 与 bison 是硬性构建期依赖，必须 tool_requires 补齐"
+- "ircu2 tarball 里带着打包者机器上生成的 Makefile/config.status/config.h，且全部 mtime 都是同一天，make 会误判为最新；source() 必须先删掉这些产物"
+- "Conan 的 AutotoolsToolchain 传 --prefix=/ 并用 DESTDIR 打包；ircu 的 install 目标对 ${DPATH} 不加 DESTDIR 前缀就 mkdir+chmod 700，默认 DPATH=$libdir=/ 会去改系统 /lib，必须用 --with-dpath 钉在包目录内"
+- "ircu2 无 make check 目标；ircd/test/ 下 4 个 C 单元测试程序随 all 目标编译但无人调用，build() 里逐个执行是唯一能跑上游测试的时机"
+- "bison 只检查 m4 子进程的退出码：m4 读完输入却不输出任何东西时 bison 仍退出 0，于是根本不产 y.tab.c，而空的 y.tab.c 是合法 C、编出来是空 y.tab.o，错误被推迟到链接期才报成 undefined symbol: yylval / yyparse（CI 构建 #79156）。修法：显式 tool_requires m4/1.4.19，并用真实 m4 程序实测可用性（不看文件是否存在），在 make 之前用同一个 bison+m4 生成并断言 ircd/y.tab.c 含 yyparse，同时把 M4 作为 make 命令行变量传给 flex/bison"

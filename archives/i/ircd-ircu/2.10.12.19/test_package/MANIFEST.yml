@@ -1,0 +1,57 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: ircd-ircu/2.10.12.19
+homepage: "https://github.com/UndernetIRC/ircu2"
+
+# 上游测试命令 — ircu2 没有 GNU autoconf automake 的 `make check` 目标:
+#   * 顶层 Makefile.in 的目标只有 all/build/config/clean/install/uninstall/...
+#     没有 check / test；
+#   * tests/ 目录里的 test-driver.pl 需要 CPAN 的 POE + POE::Component::IRC，
+#     并且要起两个真实 ircd 实例、sleep 610 秒等 IPcheck 落盘，不适合 CI；
+#   * ircd/test/ 下有 4 个真实的 C 单元测试程序，由顶层 `all`（SUBDIRS =
+#     ircd ircd/test）随主程序一起编译，只是没有被任何 check 目标调用。
+# 注意（AI 检视 2026-10-14）：下面这个脚本**确实存在于上游源码树**
+# （ircd/test/run-tests.sh），但**在本 PR 的 CI 中不执行**——
+# upstream_check_command_run: false 就是这个意思，避免把「上游自带」误读成「CI 跑了」。
+# 理由：它要起两个真实 ircd 实例、并 sleep 610 秒等 IPcheck 落盘，不适合 CI 时窗。
+upstream_check_command: "ircd/test/run-tests.sh"
+upstream_check_command_run: false
+
+# conanfile.py build() 方法中已集成上游测试：make 之后逐个执行 ircd/test/ 下的
+# 4 个测试程序，断言退出码为 0 且输出非空
+upstream_test_in_build: true
+upstream_test_command: "ircd/test/ircd_chattr_t && ircd/test/ircd_in_addr_t && ircd/test/ircd_match_t && ircd/test/ircd_string_t"
+
+# 上游实际运行的测试程序（源码位于 ircd/test/，由 make 编译进构建目录）
+upstream_tests:
+  - file: ircd/test/ircd_chattr_t.c
+    description: "channel attribute (chattr) 位图解析单元测试"
+    command: "ircd/test/ircd_chattr_t"
+  - file: ircd/test/ircd_in_addr_t.c
+    description: "ircd_in_addr_t 包装（IPv4/IPv6 in_addr 构造）单元测试"
+    command: "ircd/test/ircd_in_addr_t"
+  - file: ircd/test/ircd_match_t.c
+    description: "IRC glob 匹配（match.c）单元测试"
+    command: "ircd/test/ircd_match_t"
+  - file: ircd/test/ircd_string_t.c
+    description: "ircd_string 工具（unique_name_vector 等）单元测试"
+    command: "ircd/test/ircd_string_t"
+
+# test_package 中自带的测试（消费者视角验证）
+# R34: 必须实质调用被测包的二进制
+test_package_tests:
+  - file: test.sh
+    description: "端到端功能测试: ircd -v 版本/事件引擎断言 + -? 用法断言 + -k 配置解析正反例 + 真实启动后用裸 TCP 完成 IRC 注册（NICK/USER -> 001/004/005，004 携带版本号）+ QUIT 断开 + SIGTERM 干净退出并释放端口 + convert-conf/umkpasswd/示例配置校验"
+    command: "bash test.sh"
+
+# 测试断言总数。
+# 口径（AI 检视 2026-10-14 指出原值 20 与实际不符后据实修正）：
+#   * 脚本内 `ok "` 31 处 + `bad "` 35 处 = 66 个断言点（写死的 if/else 两侧都算）；
+#   * 单次运行实际执行的断言 = CI 构建 #90810 实测 `27 passed + 3 failed = 30`，
+#     再加 1 条按平台能力记为 `[warn]` 的 RPL_ISUPPORT(005) 检查 = 31。
+# 这里填**单次运行实际执行的断言数**（31）：下游质量统计比的是「跑出来多少条」，
+# 不是「脚本里写了多少分支」。两个口径都写在上面，避免以后被当成笔误来回改。
+assertion_count: 31

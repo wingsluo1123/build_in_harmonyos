@@ -1,0 +1,23 @@
+Portability: the 2005-12-23 config.guess shipped in the tarball does not
+recognise HarmonyOS/OpenHarmony, whose uname -s is OHOS, and would fall
+through to the unknown-host abort at the end of the script.  Map the
+common OHOS machine names onto the aarch64/arm/x86_64/i686 triplets the
+rest of config.guess already knows about.
+
+--- a/config.guess
++++ b/config.guess
+@@ -143,2 +143,14 @@
+ case "${UNAME_MACHINE}:${UNAME_SYSTEM}:${UNAME_RELEASE}:${UNAME_VERSION}" in
++    *:OHOS:*:* | *:HarmonyOS:*:*)
++	# HarmonyOS / OpenHarmony (HongMeng kernel) reports uname -s as OHOS.
++	case "$UNAME_MACHINE" in
++	    aarch64|arm64) MACHINE=aarch64 ;;
++	    armv7*|armv8*) MACHINE=arm ;;
++	    x86_64|amd64)  MACHINE=x86_64 ;;
++	    i?86)         MACHINE=i686 ;;
++	    *)            MACHINE="$UNAME_MACHINE" ;;
++	esac
++	GUESS=${MACHINE}-unknown-linux-ohos
++	echo ${GUESS}
++	exit ;;
+     *:NetBSD:*:*)
