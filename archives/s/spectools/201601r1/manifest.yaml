@@ -1,0 +1,53 @@
+software: spectools
+version: "201601r1"
+status: built
+build_system: autotools
+build_date: "2026-10-14"
+
+source:
+  url: "https://www.kismetwireless.net/code/spectools-2016-01-R1.tar.xz"
+  sha256: "8d70daaf3b4b71196ca63bbd5df0ef14b82c3b496f63b5cfa434fa637dc08d57"
+  tar_format: tar.xz
+  bytes: 120732
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=/"
+    - "--build=aarch64-unknown-linux-ohos"
+    - "--host=aarch64-unknown-linux-ohos"
+  make_targets:
+    - "make -j1"
+    - "make install DESTDIR=<package_folder>"
+  in_tree_build: true
+  dependencies:
+    - libusb-compat/0.1.7
+    - ncurses/6.6
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - patches/0001-config-sub-linux-ohos.patch
+  - patches/0002-makefile-depend-cross.patch
+  - patches/0003-configure-umask022.patch
+  - patches/0004-configure-ncursesw.patch
+  - patches/0005-main-return-value.patch
+
+artifacts:
+  - bin/spectool_raw
+  - bin/spectool_curses
+  - bin/spectool_net
+
+test_results:
+  local_cross_build: pass
+  conan_create: pass
+  harmonyos_specific_test: "18 checks, 0 failures (qemu-aarch64 + OHOS guest rootfs, WSL)"
+  upstream_test_suite: "upstream ships none"
+
+knowledge_gained:
+  - "autotools tarball 自带 2001 版 config.sub 不识别 aarch64-unknown-linux-ohos → 整文件替换为 autoconf 2.71 config.sub 并补 linux-ohos（E122）"
+  - "旧式 .c.o 后缀规则的 Makefile 不支持 VPATH → 必须树内（in-source）configure+make"
+  - "Makefile.in 的 .depend 规则用宿主 CXX -MM 扫源码，交叉环境看不到 conan 依赖头 → 禁用依赖扫描"
+  - "configure 内 umask 077 在 HMDFS 上产生 setgid 不可写临时目录 → 剥离（E011/E129）"
+  - "ohpcd ncurses/6.6 只发布宽字符库 libncursesw.a → configure 的 curses 探测与链接改用 -lncursesw"
+  - "clang 15 在 C99+ 把 -Wreturn-type 当硬错误：main() 中裸 return 编译失败 → 补 return 0（5 处）"
