@@ -1,0 +1,30 @@
+software: kguiaddons
+version: "6.28.0"
+status: built
+build_system: cmake
+created_at: 2026-10-17
+build_date: 2026-10-17
+dependencies:
+  required:
+    - qtbase/6.11.1
+  build:
+    - extra-cmake-modules/6.29.0
+patches_applied: []
+test_results:
+  type: passed
+  upstream: "passed: 8/8 executed upstream CTest autotests (BUILD_TESTING=ON inside conan create): kwordwraptest, kcolorutilstest, kiconutilstest, kcursorsavertest, kkeysequencerecordertest, kurlhandlertest, kcountryflagemojiiconenginetest, kgeourihandlertest (same registered set as the 6.26.0.1 baseline); no exclusions, no skips; ctest tail: '100% tests passed, 0 tests failed out of 8'"
+  test_package: "passed: 8/8 consumer cases over the installed CamelCase headers (kcolorutils-lighten-darken, kcolorutils-contrast-ratio, kcolorutils-mix-tint, kcolorutils-hcy-roundtrip, kcolorutils-overlay-colors, kwordwrap-truncation, kiconutils-addoverlay, kcountryflagemojiiconengine), QGuiApplication on the offscreen platform, executed on the HarmonyOS PC device; TEST SUMMARY: 8 passed, 0 failed"
+  package_id: "57ffd8c720a5bfee7e8827990cd6550a49181c1b"
+  l0: "pass"
+  l1: "pass"
+  l2: "skip: verify reported no cache path (library-only package, no bin/ smoke)"
+  l4: "skip: verify reported no cache path"
+  l5: "skip: verify reported no cache path"
+source_url: https://download.kde.org/stable/frameworks/6.28/kguiaddons-6.28.0.tar.xz
+source_sha256: f46aeca80707e774fcffe8aa82e464a81056ce84f613347a5c9cc24c1c9a8432
+knowledge_gained:
+  - "kguiaddons 6.28.0 is the first adaptation of the 6.28.0 upstream release; the whole 6.26.0.1 recipe carries over unchanged except the version string and the ECM tool_requires, which moves to extra-cmake-modules/6.29.0 because upstream 6.28.0 raises its ECM floor to 6.28.0."
+  - "Upstream 6.26 -> 6.28 source delta is small: src/CMakeLists.txt gains qt_extract_metatypes plus an install of the generated metatypes file into KDE_INSTALL_QTMETATYPESDIR (extra installed directory only, no link or runtime impact), and kurlhandler_p.cpp gains an iOS-only guard; the autotests/ set is unchanged."
+  - "download.kde.org is a Mirrorbits redirector and answers with a broken (demo) TLS certificate on some networks; listing the official URL first with mirrors.nju.edu.cn and mirrors.aliyun.com fallbacks under one sha256 pin lets get() fall through to a working mirror on both the device and CI (R39)."
+  - "The HMDFS user volume rejects symlink(2) with EPERM device-wide (probed in $HOME, $HOME/bih, $HOME/.conan2/p and /tmp, absolute and relative targets alike), so CMake's versioned shared-library chain (libKF6GuiAddons.so.6 -> .so.6.28.0) can never be materialized and cmake_symlink_library fails the post-link step. The recipe disables it with CMAKE_PLATFORM_NO_VERSIONED_SONAME=ON through both tc.variables and tc.cache_variables while keeping CMAKE_SHARED_LIBRARY_SONAME_{C,CXX}_FLAG=-Wl,-soname,: one unversioned real libKF6GuiAddons.so with a bare, relocatable DT_SONAME (kitemodels/kitemviews/kcontacts 6.28.0 precedents)."
+  - "Consumer cases that create pixmaps/icons need a QGuiApplication; on the OHOS device and workers there is no display, so the test_package driver forces QT_QPA_PLATFORM=offscreen and isolates HOME/XDG under its build folder."
