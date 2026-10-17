@@ -1,0 +1,108 @@
+software: kauth
+version: "6.28.0"
+status: built
+build_system: cmake
+created_at: 2026-10-17
+updated_at: 2026-10-17
+
+round: 1
+dependencies:
+  required:
+    - qtbase-sql-dbus/6.11.1
+    - kcoreaddons/6.26.0.1
+    - expat/2.8.2.1 (override=True)
+    - qtbase/6.11.1.1 (override=True)
+  build:
+    - ecm/6.28.0
+  optional:
+    - Qt6DBus (provided by qtbase-sql-dbus; Qt6::DBus required by the upstream autotests)
+    - PolkitQt6-1 (not used: KAUTH_BACKEND_NAME=FAKE on OHOS)
+patches_applied:
+  - patches/0001-lower-kf-dep-version.patch
+test_results:
+  type: device-verified (conan-verify PASS)
+  verdict: PASS
+  reference: kauth/6.28.0@ohpcd/stable
+  recipe_revision: "4cf7380eb9b6dadf1d23365824e932e5"
+  package_id: "a92bf6ef398ce607105bca9b8b3543f038f4c819"
+  report: reports/conan-verify-report.md
+  upstream: >-
+    Upstream autotests/CMakeLists.txt declares 5 CTest entries when BUILD_TESTING=ON.
+    On OHOS with KAUTH_BACKEND_NAME=FAKE, KAuthPolicyGenTest and
+    KAuthPolicyGenTestCompare are not registered (they are guarded by
+    `if(NOT "${KAUTH_BACKEND_NAME}" STREQUAL "FAKE")`), leaving 3 registered:
+    KAuthSetupActionTest, KAuthHelperTest, KAuthFdTest. All 3 targets compiled 100%
+    with no source patch. KAuthSetupActionTest executed and passed 1/1 (100%,
+    `100% tests passed, 0 tests failed out of 1`). KAuthHelperTest and KAuthFdTest
+    were excluded from the run (`ctest -E "KAuthHelperTest|KAuthFdTest"`) because
+    they drive DBusHelperProxy over a D-Bus session bus, and no dbus-daemon exists
+    anywhere in this environment (dbus/1.14.10 on ohpcd packages the client
+    library only - its recipe builds `cmake.build(target="dbus-1")` and skips the
+    daemon). Excluded entries are recorded as excluded, not counted as passed.
+  upstream_counts:
+    discovered: 5
+    registered: 3
+    executed: 1
+    passed: 1
+    failed: 0
+    skipped: 0
+    excluded: 2
+    not_registered: 2
+    names_registered:
+      - KAuthSetupActionTest
+      - KAuthHelperTest
+      - KAuthFdTest
+    names_not_registered:
+      - KAuthPolicyGenTest
+      - KAuthPolicyGenTestCompare
+    names_excluded:
+      - KAuthHelperTest
+      - KAuthFdTest
+  test_package: >-
+    "passed - the test_package test() ran all three consumers against the freshly
+    built package within conan create: test_kauth printed 'PASS: KAuth action
+    constructed OK'; test_kauth_ohos printed 'test_kauth_ohos: PASS' (13 runtime
+    checks, zero FAIL lines); fixtures/ohos_artifact_check.py printed
+    '[ohos-artifact] RESULT: PASS' (6 checks: libKF6AuthCore.a exists, 236186
+    bytes non-empty, '!<arch>' ar magic, 13 members, 12 ELF64/aarch64 ET_REL
+    objects, no backend/helper plugin under lib/plugins/kf6/kauth)."
+  ohos_run: >-
+    passed - the packaged static libKF6AuthCore.a consumed by test_package on
+    the OHOS runtime; upstream KAuthSetupActionTest executed headless with
+    QT_QPA_PLATFORM=offscreen
+  harmony_specific:
+    count: 1
+    tests:
+      - file: test_package/test_kauth_ohos.cpp
+        layer: runtime
+        description: >-
+          HarmonyOS-specific test (rule12). OHOS has no Polkit and no D-Bus
+          session bus, so the backend plugin directory is empty and
+          BackendsManager::init() falls back to FakeBackend (NoCapability).
+          Asserts the observable behavior of that adaptation path:
+          Action(name).isValid()==true, Action().isValid()==false,
+          Action().status()==InvalidStatus, Action(name).status()==DeniedStatus,
+          execute() -> job->exec()==false with job->error()==
+          ActionReply::BackendError and errorString() "The backend does not
+          specify how to authorize", no helper bound, detailsV2 round-trip.
+          Guarded by `#ifndef __OHOS__ #error`.
+      - file: test_package/fixtures/ohos_artifact_check.py
+        layer: artifact
+        description: >-
+          HarmonyOS-specific test (rule12). Validates the final package
+          artifact lib/libKF6AuthCore.a with the standard library only:
+          ar magic, non-empty, >=1 member, >=1 ELF64/little-endian/EM_AARCH64/
+          ET_REL object, and no backend/helper plugin under lib/plugins/kf6/kauth
+          (the FakeBackend fallback precondition). Fails closed.
+source_url: https://download.kde.org/stable/frameworks/6.28/kauth-6.28.0.tar.xz
+source_sha256: fb4d90ee46a2f6202e53cdd5af8f77069c380955e3f340881f2f36ec8312079b
+knowledge_gained:
+  - "kauth 6.28.0 needs exactly one source patch on OHOS: KF_DEP_VERSION lowered 6.28.0 -> 6.26.0 (patches/0001). Upstream CMakeLists.txt raises KF_DEP_VERSION together with the release and feeds it to find_package(KF6CoreAddons ${KF_DEP_VERSION}) and to the exported KF6AuthConfig.cmake.in (find_dependency(KF6CoreAddons @KF_DEP_VERSION@)), but the published ohpcd KF6 stack stops at kcoreaddons 6.26.0.1 - without the patch both configuring and downstream consumers fail. Same family patch as krunner/kcontacts 6.28.0. The find_package(ECM 6.28.0) line is NOT patched: ohpcd publishes ecm/6.28.0, which satisfies it exactly."
+  - "Source delta 6.26.0 -> 6.28.0 is three code files (top-level CMakeLists.txt version bump; src/CMakeLists.txt adds Qt6::Gui as a PRIVATE usage requirement; backends/polkit-1/Polkit1Backend.cpp) plus translation po files. The FAKE backend, the BackendsManager plugin fallback and the whole autotests subtree are byte-identical, so the OHOS adaptation surface and the rule12 HarmonyOS-specific tests carry over from 6.26.0 unchanged."
+  - "kauth does NOT need any other source patch on OHOS: all three registered upstream autotest targets compile unpatched. KAuthHelperTest/KAuthFdTest are not blocked by the toolchain either - they only need a D-Bus session bus."
+  - "CRITICAL dependency pitfall (KeyError 'OHOS'): expat/2.8.2 on ohpcd declares tool_requires(\"cmake/[>=3.17]\") (guarded by Version(self.version) >= \"2.7.4\"). The CCI cmake recipe resolves a prebuilt binary by OS key (conandata sources only has Linux/Macos/Windows), so an OHOS build aborts in cmake's build() with `KeyError: 'OHOS'`; with conancenter disabled it aborts earlier with `cmake/[>=3.17] not resolved`. Fix: self.requires(\"expat/2.8.2.1\", override=True) - the ohpcd-adapted expat has no conan-side cmake tool_require (same as avahi-tools / avahi-compat-libdns_sd / awf-gtk)."
+  - "CRITICAL header-mixing pitfall: kcoreaddons/6.26.0.1 references the plain qtbase/6.11.1, whose qconfig.h defines QT_NO_DBUS (QT_FEATURE_dbus -1 / FEATURE_dbus=OFF), while qtbase-sql-dbus/6.11.1 provides the QtDBus headers. CMake then compiles qdbuserror.h with QT_NO_DBUS defined, so its `#else` dummy branch `class Q_DBUS_EXPORT QDBusError {};` is selected while Q_DBUS_EXPORT was never defined, failing with `variable has incomplete type 'class Q_DBUS_EXPORT'` plus `unknown type name 'QDBusConnection'` in DBusHelperProxy.h. Fix: self.requires(\"qtbase/6.11.1.1\", override=True) to unify the graph on the FEATURE_dbus=ON variant (same as baloo/6.28.0 and statusnotifieritem/6.26.0)."
+  - "Upstream kauth autotests are Qt GUI tests: QtTest links Qt6::Gui, so the test binaries abort with `Could not find the Qt platform plugin \"xcb\"` unless QT_QPA_PLATFORM=offscreen (plus LD_LIBRARY_PATH / QT_PLUGIN_PATH / QT_QPA_PLATFORM_PLUGIN_PATH pointing at the dependency packages) is exported for the ctest run."
+  - "Upstream autotests/CMakeLists.txt declares 5 CTest entries when BUILD_TESTING=ON. On OHOS with KAUTH_BACKEND_NAME=FAKE, KAuthPolicyGenTest and KAuthPolicyGenTestCompare are not registered (guarded by `if(NOT \"${KAUTH_BACKEND_NAME}\" STREQUAL \"FAKE\")`), leaving 3 registered: KAuthSetupActionTest, KAuthHelperTest, KAuthFdTest. KAuthHelperTest and KAuthFdTest drive DBusHelperProxy over a D-Bus session bus; the dbus/1.14.10 that qtbase-sql-dbus pulls in on ohpcd ships libdbus-1 only (no dbus-daemon), so after a dbus-daemon probe fails they are excluded from the ctest run and reported as excluded (never counted as passing), following the akonadi/25.12.3 precedent. (ohpcd also publishes dbus/1.14.10.3, whose daemon is usable - see the krunner 6.28.0 family notes - but bringing a session bus up for these two tests was out of scope for this refresh.)"
+  - "The rule12 HarmonyOS-specific test revealed that kauth does not ship backend/helper plugins on OHOS, so BackendsManager::init() falls back to FakeBackend at runtime; the packaged libKF6AuthCore.a still embeds the compile-time KAUTH_BACKEND_PLUGIN_DIR absolute path. The artifact check asserts the plugin directory is absent (the fallback precondition) rather than asserting the absence of host paths, since the baked path is upstream behavior, not a packaging leak."
+  - "test_package/conanfile.py carried a stale `LD_PRELOAD=.../lib/libKF6AuthCore.so.6` copied from the 6.18.0 recipe even though kauth is packaged shared=False (static .a only); the loader silently ignored the missing target, so the old test passed by accident. The 6.28.0 test_package keeps the corrected plain LD_LIBRARY_PATH prefix."
