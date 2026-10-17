@@ -1,0 +1,213 @@
+# 版本级 manifest
+# 文件位置: archives/p/pwauth/2.3.11/manifest.yaml
+#
+# 状态说明：真机 shadow CI 单包验证通过（L0/L1/L4/L5 pass，L2 skip 非阻塞，
+# conan create + test_package 5/5），尚未 upload，故状态为 built。
+# issue 与 PR 在当前阶段解耦，未绑定 issue。
+
+software: pwauth
+version: "2.3.11"
+status: built
+build_date: "2026-10-15"
+build_system: makefile
+license: BSD-3-Clause
+homepage: "https://github.com/phokz/pwauth"
+conan_ref: "pwauth/2.3.11"
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/p/pwauth/pwauth_2.3.11.orig.tar.gz"
+  mirror: "https://mirrors.tuna.tsinghua.edu.cn/debian/pool/main/p/pwauth/pwauth_2.3.11.orig.tar.gz"
+  sha256: "3c6ab789d6ec92984954b4217418781508df393639adc32514d8491d8825fa22"
+  tar_format: tar.gz
+  note: >-
+    上游 Google Code 项目已下线，GitHub 镜像 phokz/pwauth 仅有 pwauth-2.3.10 标签，
+    2.3.11 只能取 Debian 源码池的 orig.tar.gz（即未经修改的上游发布包）。
+    主源与清华镜像分别下载校验，sha256 完全一致。
+
+build:
+  system: makefile
+  configure_script: false
+  upstream_install_target: false
+  targets:
+    - "pwauth"
+  command: >-
+    make -j1 CC=<tools.build:compiler_executables.c>
+    CFLAGS="<AutotoolsToolchain cflags/defines> -I<linux-pam>/include"
+    LIB="-L<linux-pam>/lib -Wl,-rpath,<linux-pam>/lib -lpam -ldl"
+  outputs:
+    binaries:
+      - "bin/pwauth"
+    libraries: []
+  notes:
+    - "上游 Makefile 自己赋值 CC/CFLAGS/LIB，因此编译参数必须以命令行变量传入 (R33)。"
+    - "上游没有 install 目标，recipe 在 package() 中直接拷贝 pwauth 到 bin/。"
+
+configuration:
+  authentication_backend: PAM
+  backend_reference: "与 Debian pwauth 2.3.11-6 的打包配置一致（PAM 后端）"
+  config_h_changes:
+    - "启用 PAM，取消 SHADOW_SUN（两者同时启用会重复定义 check_auth）"
+    - "关闭 UNIX_LASTLOG / HAVE_LASTLOG_H（OHOS 侧无 lastlog 接口路径）"
+    - "关闭 NOLOGIN_FILE / MIN_NOLOGIN_UID（PAM 负责 nologin 语义）"
+    - "关闭 CHECK_LOGIN_EXPIRATION / CHECK_PASSWORD_EXPIRATION（PAM 负责账号/口令过期）"
+    - "取消 SERVER_UIDS 运行时调用者 uid 检查，改为安装权限（04755）约束"
+    - "MIN_UNIX_UID 由 500 调整为 100（沿用 Debian 取值）"
+    - "关闭 SLEEP_LOCK（/var/run 序列化睡眠锁；PAM/上层负责限速）"
+  disabled_optional_features:
+    - "faillog (FAILLOG_JFH / FAILLOG_OPENBSD / FAILLOG_PWAUTH)"
+    - "checkfaillog 辅助程序（Debian 同样不打包）"
+    - "unixgroup 脚本（Debian 同样不打包）"
+
+dependencies:
+  required:
+    - "linux-pam/1.7.2"
+  build_tools:
+    - "make（OHOS worker 自带）"
+  w0_result: >-
+    linux-pam/1.7.2 已在本仓 main（archives/l/linux-pam/1.7.2，issue #1765）适配，
+    且已发布到 ohpcd：本机 conan download "linux-pam/1.7.2" -r=ohpcd 时，
+    Conan 从远端实际拉取了 package 01d92cf349a0dd98ff915f4bd99a04430171517f
+    （package revision 2f65a36646a4a1d1fc6e1261a3171e3f）。
+    pam-wrapper/1.1.8 已在真机通过同一依赖链验证，依赖无需拆新库。
+    本机 ohpcd 对「不在本地 cache 的 ref」会返回 system acceleration policy not
+    enabled（pwauth/2.3.11 与不存在的包名同样报错），故 W0 判定以真实拉取记录为准，
+    正式门禁由真机/CI 的 L0i(R36) 执行。
+
+patches:
+  - file: "patches/0001-config.h-ohos-defaults.patch"
+    description: "config.h OHOS/PAM 默认配置"
+    type: portability
+  - file: "patches/0002-main.c-ohos-portability.patch"
+    description: "main() 显式返回类型 + bzero 改 memset"
+    type: portability
+  - file: "patches/0003-auth-pam.c-ohos-test-confdir.patch"
+    description: "auth_pam.c 支持 PWAUTH_PAM_CONFDIR（仅供非提权进程的端到端测试，使用 pam_start_confdir）"
+    type: portability
+
+patches_applied:
+  - "0001-config.h-ohos-defaults.patch"
+  - "0002-main.c-ohos-portability.patch"
+  - "0003-auth-pam.c-ohos-test-confdir.patch"
+
+knowledge_gained:
+  - "pwauth 的 config.h 是上游手工维护、随包分发的配置源文件（无 configure/config.h.in），按 PAM 语义改写它属于改源文件，符合 R6"
+  - "SHADOW_SUN 与 PAM 不能同时定义，否则 auth_sun.c 与 auth_pam.c 重复定义 check_auth；OHOS 未声明 getspnam()，因此只能走 PAM"
+  - "上游 Makefile 自己赋值 CC/CFLAGS/LIB，makefile 赋值会覆盖环境变量，编译参数必须在 make 命令行上传入（否则 R33 的 toolchain 取值不会生效）"
+  - "linux-pam 包声明的 system_libs=[dl]，消费者链接 libpam 时需要同时 -ldl，并可用 -Wl,-rpath,<linux-pam>/lib 让安装后二进制脱离 conanrun 运行"
+  - "OHOS 无 /etc/pam.d/pwauth 时 pam_start 失败，pwauth 走 pam_end(NULL) 分支返回 52 (STATUS_INT_ERR)；MIN_UNIX_UID=100 会让 root 登录在 auth_pam.c 的 uid 门限处以 3 (STATUS_BLOCKED) 返回"
+  - "OHOS 的 linux-pam 1.7.2 头文件确实声明 pam_start_confdir()，配合包内 lib/security/pam_permit.so 可以在无系统 /etc/pam.d 的机器上构造真实的端到端认证成功链路（实测 pam_start_confdir/pam_authenticate/pam_acct_mgmt 全 0）；该 API 属 Linux-PAM ≥1.3 扩展，其它 PAM 实现上该钩子会被编译掉"
+  - "把服务目录重定向做成运行时开关时必须限制权限：PWAUTH_PAM_CONFDIR 只在 getuid()==geteuid()（即非 setuid 运行）时生效，避免 setuid 安装被非特权调用者指向自定义 PAM 服务而绕过系统认证"
+  - "资源受限设备上 shadow CI 三个易踩坑点：仓库 profile 的 /data/service/hnp/bin/clang 不存在需换 ~/usr/local/bin；共享 shadow python-user 里的 conan 可能是官方版（无 OHOS setting）；CI 预下载步骤需要 curl 在 PATH 中"
+  - "真机 /tmp 只读，测试里编译消费者程序（clang）和 shell 的临时文件都必须落在 TMPDIR 指向的可写目录，否则报 'unable to make temporary file: Read-only file system'"
+
+upstream_tests:
+  count: 0
+  framework: ""
+  command: ""
+  note: >-
+    上游发布包无 tests/ 目录，Makefile 无 check/test 目标，没有可迁移的上游自动化测试。
+
+test_package:
+  assertions: 7
+  end_to_end_consumer_case: >-
+    test_consumer.c 编译后按 Apache mod_authnz_external 的方式使用 pwauth
+    （fork/exec 二进制 + stdin 传 login/password + 以退出码判定结果）；test.sh 为它
+    准备私有 PAM 服务目录（引用 linux-pam 包的 pam_permit.so），验证一条真正跑通的
+    成功链路，以及两条端到端失败/默认链路。
+  checks:
+    - "端到端成功链路：消费者 + 私有 PAM 服务(pam_permit) → 认证与账号检查全部通过 → 退出码 0（真机实测）"
+    - "端到端失败链路：服务引用的模块无法加载 → 退出码 1（合法非零状态码）"
+    - "端到端默认链路：不设 PWAUTH_PAM_CONFDIR → 落到系统 PAM（OHOS 无 /etc/pam.d/pwauth）→ 退出码 52"
+    - "空 stdin -> 退出码 51 (STATUS_INT_ARGS)（精确断言）"
+    - "未知用户 -> 退出码 1 (STATUS_UNKNOWN)（精确断言）"
+    - "当前用户 + 错误口令 -> pwauth.h 定义的合法非零状态码（真机为 3：uid 0 < MIN_UNIX_UID，停在 uid 门限）"
+    - "llvm-readobj/readelf 确认二进制声明 libpam 依赖（精确断言）"
+  assertion_style_note: >-
+    端到端成功链路断言“退出码必须为 0”（真实认证通过），失败链路断言“非 0 且属于
+    pwauth.h 的状态码集合”，具体取值随设备 PAM 配置与调用者 uid 变化；真机实测值
+    记录在 verification.ohos_real_device 中。
+  not_covered:
+    - "真实系统口令认证（OHOS 的 linux-pam 目前只构建 pam_permit，且设备没有 /etc/pam.d；需要 pam_unix 等模块）"
+
+verification:
+  local:
+    - "下载 Debian 主源与清华镜像 tar 包，两者 sha256 均为 3c6ab789d6ec92984954b4217418781508df393639adc32514d8491d8825fa22"
+    - "隔离 CONAN_HOME 下 conan source：从主源下载源码并通过 sha256 校验，strip_root 后源码位于根目录"
+    - "python -m py_compile conanfile.py test_package/conanfile.py"
+    - "python 校验 conandata.yml / manifest.yaml / test_package/MANIFEST.yml 可解析，commands.json 为合法 JSON"
+    - "用 patch_ng（Conan apply_conandata_patches 的实际实现，strip=0）在 conan source 解出的源码树上应用两个补丁：APPLY OK"
+    - "脚本核对 config.h 8 处宏与 main.c 的 int main / memset：全部符合预期"
+    - "CI L0 门禁静态复核：L0a-L0h、L0k、L0m、L0n 全部满足（L0i 依赖已发布，L0j 该版本尚未发布）"
+    - "新文件均为 LF、无 BOM"
+  not_run_locally:
+    - "conan create：本机 conan 2.29.1 为官方版，settings.yml 不含 OHOS，无法加载 OHOS profile，也没有 OHOS 工具链"
+    - "本地 Linux 编译：WSL Ubuntu-22.04 发行版 ext4.vhdx 缺失无法启动；WSL podman-machine（Fedora 42 container image）无 gcc/pam-devel 且 Fedora 42 源已 404，无法搭建 Linux+libpam 环境"
+  ohos_real_device:
+    topology: "HarmonyOS PC aarch64 真机 + 隔离 Conan job（~/ohos-users/codex-pwauth/pwauth-2.3.11-r1）"
+    run_dir: "/storage/Users/currentUser/ohos-test-runs/codex-pwauth-pwauth-pwauth-2.3.11-r1-ci-20261015-204754-63270"
+    command: 'CI_PACKAGES="archives/p/pwauth/2.3.11" zsh ci/conan/build_and_test.sh（经 ohos-test-runner.sh 持 device-global 锁，wait 0s，约 10 秒）'
+    exit_code: 0
+    gates:
+      l0: "pass: all checks passed（含 L0i linux-pam/1.7.2 已发布、L0k commands.json valid、L0m 目录结构 valid）"
+      l1: "pass: test_package executed；L1e 破坏性反向验证确认测试真实依赖被测包"
+      l2: "skip: pwauth --version/--help failed（上游不支持这两个参数，CI 中非阻塞）"
+      l4: "pass: patches clean"
+      l5: "pass: bin/ has content"
+    summary: "Total 1 / Success 1 / Failed 0"
+    test_package_output:  # 真机 stdout 逐字摘录（不含人工注解）
+      - "PASS 1: end-to-end consumer flow: PAM authentication succeeded -> exit 0"
+      - "PASS 2: end-to-end consumer flow: broken PAM service -> exit 1 (documented non-zero status)"
+      - "PASS 3: default PAM configuration (no private service dir) -> exit 52"
+      - "PASS 4: empty stdin -> exit 51 (STATUS_INT_ARGS)"
+      - "PASS 5: unknown login -> exit 1 (STATUS_UNKNOWN)"
+      - "PASS 6: existing login 'root' + wrong password -> exit 3 (documented non-zero status)"
+      - "PASS 7: binary declares a libpam shared-library dependency"
+      - "test pwauth 2.3.11: 7/7 checks PASS"
+    status_code_notes:  # 上面对应退出码的含义（人工注解，不是脚本输出）
+      "0": "PASS 1 的端到端成功：私有 PAM 服务用 pam_permit.so，pam_authenticate 与 pam_acct_mgmt 均成功"
+      "1": "PASS 2/5 的 STATUS_UNKNOWN — 服务模块无法加载（PAM_AUTH_ERR）或 getpwnam() 失败"
+      "52": "PASS 3 的 STATUS_INT_ERR — 默认走系统 PAM，设备无 /etc/pam.d/pwauth，pam_start 失败后 pam_end 报错"
+      "51": "PASS 4 的 STATUS_INT_ARGS — stdin 读不到 login/password"
+      "3": "PASS 6 的 STATUS_BLOCKED — 登录名 root 的 uid 0 低于 MIN_UNIX_UID=100，停在 auth_pam.c 的 uid 门限"
+    artifact:
+      path: "conan-home/p/b/pwautfd6780d8a2c2c/p/bin/pwauth"
+      size: 23040
+      sha256: "8a26468dfc8c6cca347328553908932176f5902d864c74cd281ab15e4d1f55f4"
+      needed: "[libpam.so.0, libc.so]"
+    compiler: "/storage/Users/currentUser/usr/local/bin/clang (clang-15 wrapper, os=OHOS arch=armv8 build_type=Release)"
+    environment_adaptations:
+      - "仓库 profile 指向 /data/service/hnp/bin/clang，该路径在本机只放 git，故为本次验证新增 ci/conan/profiles/ohos-aarch64-local（仅存在于真机快照，不随仓库提交）"
+      - "共享 ~/ohpc-ci-shadow/python-user 的 conan 是官方版（无 OHOS），改用早期 shadow 运行安装的 OHOS 版 conan 基座 + 本 job 独立 CONAN_HOME"
+      - "CI 预下载步骤需要 curl，runner PATH 中补入 /usr/bin"
+      - "端到端用例需要在测试内编译 test_consumer.c：真机 /tmp 只读，test.sh 把 clang 的临时目录指向自己的 WORK_DIR（TMPDIR）"
+    verified_inputs_sha256:  # 真机运行时的 CI 输入文件哈希，与提交到本分支的文件逐一相同
+      conanfile.py: "4527a896f12bacac46f5dd2d796a6f59b453c1d29e48354939d8520415fd5507"
+      conandata.yml: "c6bd8c44ca8dddfd8be138e70425767e0d07815004b638523443156c812caf6b"
+      test_package/conanfile.py: "ace76f133c72e07d68c97f9a07795f77ab9d712c0866248884d6bb39b913902b"
+      test_package/test.sh: "31a049b14d405ea19c220126947b661447d18a180ba1b3d4fdd019504318ef1f"
+      test_package/test_consumer.c: "de6292d442a006b9a8aa22754a31b4412d14eba7429fdd798b7ed7b50127d92e"
+      test_package/MANIFEST.yml: "452233183aeee123620a65ba285c6991d207cc1ba0ce1a4d2fdfd237e3725040"
+      patches/0001-config.h-ohos-defaults.patch: "5592ab9f1b23b9feb708befbf6d661354b33d21a01ef39023810c49ea8839cc8"
+      patches/0002-main.c-ohos-portability.patch: "3bf9ddb1e920332863c0312746dc7d8c47096e0bcdc1a4d1ef6404dafdd5b6f6"
+      patches/0003-auth-pam.c-ohos-test-confdir.patch: "528f70d943c774d7f45a746dfb07232b89b707a080f5f19d1bf6814bc0a19adc"
+      commands.json: "79ab838aa42d317e97eb8cdbfcf5f8d9652d1e6efd15b71bf9e0b20390c8909a"
+    verified_inputs_note: >-
+      以上 10 个文件是 CI 实际读取的输入（conanfile.py / conandata.yml / test_package /
+      patches / commands.json），哈希来自真机运行时的快照，与提交到本分支的文件逐一相同；
+      真机验证之后只补写了 manifest.yaml / notes.md / README.md / reports/ 这些 CI
+      不读取的元数据。
+  next_commands:
+    real_device_or_shadow_ci:
+      - 'CI_PACKAGES="archives/p/pwauth/2.3.11" zsh ci/conan/build_and_test.sh'
+      - "shadow-ci runner: run-ohos-shadow-ci.sh archives/p/pwauth/2.3.11"
+    preflight:
+      - 'conan download "linux-pam/1.7.2" -r=ohpcd'
+    manual_probe_on_device:
+      - "command -v llvm-readobj readelf id"
+      - "llvm-readobj --dynamic-table <pkg>/bin/pwauth | grep -i pam"
+      - "printf 'nosuchuser\\nx\\n' | <pkg>/bin/pwauth; echo $?   # 期望 1"
+
+known_risks:
+  - "端到端成功链路依赖 linux-pam 包当前提供的 pam_permit 模块（真机实测 pam_start_confdir/pam_authenticate/pam_acct_mgmt 全 0，pwauth 退出码 0）；这是模块级的真实认证链路，但不是“真实系统口令”校验——OHOS 的 linux-pam 未构建 pam_unix，真实口令认证需后续单独适配。"
+  - "补丁 0003 的 PWAUTH_PAM_CONFDIR 钩子只在 getuid()==geteuid()（非提权）时生效，setuid 安装始终走系统 PAM 配置；若审核认为连这个条件也不可接受，可改为编译期开关（默认关闭）。"
+  - "L2 冒烟检出 '--version/--help'：pwauth 不支持这两个参数（它会读 stdin 并以 51 退出），真机实测 L2 为 skip/warn（CI 中该步非阻塞），真实 CLI 验证由 L1（test_package 7/7）承担。"

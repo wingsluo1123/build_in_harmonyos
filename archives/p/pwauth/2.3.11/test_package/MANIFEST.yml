@@ -1,0 +1,43 @@
+# test_package/MANIFEST.yml — pwauth 2.3.11
+#
+# 上游测试声明：pwauth 2.3.11 的发布 tar 包内没有 tests/ 目录，Makefile 也没有
+# check/test 目标（目标只有 pwauth、checkfaillog、*.o、clean、distclean、
+# pwauth.tar），因此上游自动化测试数为 0，本包以消费者视角补全验证。
+
+package: pwauth/2.3.11
+homepage: "https://github.com/phokz/pwauth"
+
+upstream_has_tests: false
+upstream_test_framework: ""
+upstream_test_files: []
+upstream_test_command: ""
+# 上游 Makefile 只有构建目标（pwauth / checkfaillog），没有 check/test 目标，
+# 因此这里没有可声明的上游检查命令。
+upstream_check_command: ""
+upstream_test_in_build: false
+
+test_adaptation_notes: >
+  上游没有可迁移的自动化测试。本包包含一个**完整的端到端消费者用例**：
+  test_consumer.c 被编译后按 Apache mod_authnz_external 的方式使用 pwauth ——
+  fork/exec 已安装的二进制、把 "<login>\n<password>\n" 写进它的 stdin、以退出码
+  作为认证结果。test.sh 为该消费者准备一个私有 PAM 服务目录（服务文件引用
+  linux-pam 包中的 pam_permit.so，补丁 0003 提供 PWAUTH_PAM_CONFDIR 钩子，且仅在
+  进程未提权时生效），于是可以验证一条真正跑通的成功链路：
+  消费者 → pwauth → libpam → pam_permit → 认证+账号检查通过 → 退出码 0；
+  另有两个端到端失败链路（模块无法加载、未使用私有服务目录而落到系统 PAM）。
+  其余检查覆盖失败路径断言（空输入 51、未知用户 1、错误口令的合法非零状态码）与
+  二进制确实声明 libpam 依赖。
+  成功认证依赖 linux-pam 包当前提供的 pam_permit 模块；真实口令认证需要后续单独
+  适配 pam_unix 等模块。
+
+test_package_tests:
+  - file: test_consumer.c
+    description: "端到端消费者：fork/exec pwauth，stdin 传入 login/password，返回 pwauth 的退出码"
+    command: "cc -O2 -o test_consumer test_consumer.c"
+  - file: test.sh
+    description: "编排端到端用例（PAM 成功/失败/默认链路）+ 失败路径断言 + libpam 动态依赖校验"
+    command: "bash test.sh"
+
+# test_package/test.sh 的检查数（上游测试数为 0）：
+#   1 条端到端成功链路 + 2 条端到端失败/默认链路 + 3 条失败路径断言 + 1 条链接校验
+assertion_count: 7

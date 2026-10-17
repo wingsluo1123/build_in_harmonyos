@@ -1,0 +1,27 @@
+# 软件级 manifest
+# 文件位置: archives/p/pwauth/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0 §2.1
+
+software: pwauth
+display: "pwauth"
+description: "PAM based authenticator for Apache mod_authnz_external (login/password on stdin, result in the exit status)"
+category: system
+homepage: "https://github.com/phokz/pwauth"
+license: BSD-3-Clause
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "认证后端改用 PAM（linux-pam/1.7.2），与 Debian 打包口径一致；OHOS 暴露 shadow.h 但未声明 getspnam()，SHADOW_SUN 后端不可链接"
+    - "config.h 通过补丁切换为 OHOS/PAM 默认值：启用 PAM，关闭 lastlog、/etc/nologin、账号/口令过期检查、faillog 与 /var/run 睡眠锁，取消写死的 SERVER_UIDS，MIN_UNIX_UID 取 100"
+    - "main.c 可移植性：补 main() 的显式 int 返回类型，bzero() 改为 memset()"
+    - "上游 Makefile 自己赋值 CC/CFLAGS/LIB，编译参数改由 make 命令行传入（R33：编译器取自 tools.build:compiler_executables，标志取自 AutotoolsToolchain）"
+    - "上游无 install 目标，recipe 手动安装 bin/pwauth，并写入指向 linux-pam 的 rpath 以便脱离 conanrun 运行"
+  common_dependencies:
+    - "linux-pam/1.7.2"
+
+versions:
+  "2.3.11":
+    status: built
+    build_date: "2026-10-15"
+    conan_ref: "pwauth/2.3.11"
