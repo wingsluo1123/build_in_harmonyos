@@ -1,0 +1,26 @@
+software: xfractint
+display: "XFractint"
+description: "X11 fractal generator and zoomer (the UNIX port of Fractint)."
+category: gfx
+homepage: "http://www.fractint.org/"
+license: LicenseRef-Fractint
+build_system: make
+
+ohos_adaptation:
+  key_points:
+    - "Handwritten recursive GNU Makefiles (top + common/ + unix/); all build variables are overridden on the make command line, sources stay unmodified except two portability patches."
+    - "clang defaults to -fno-common; the cross-file tentative definitions in this 1990s codebase require -fcommon (same fix as Debian patch set)."
+    - "CC is hardcoded to /usr/bin/gcc upstream and must be overridden with the HNP clang."
+    - "musl libc lacks the legacy getw(); editpal.c carries a local shim under #ifndef __GLIBC__."
+    - "unix.c uses O_RDONLY without including <fcntl.h>; a one-line include patch fixes it."
+    - "The help compiler ./hc is compiled natively on the device and run (./hc /c) to generate fractint.hlp during the build."
+    - "SRCDIR (help/data directory) is baked as <package>/share/xfractint, matching the recipe install layout."
+    - "The bundled prebuilt unix/calmanfx.o (nasm object, x86) is not used; the nasm path stays disabled (AS=foo)."
+  common_dependencies:
+    - libx11
+
+versions:
+  "20.4.10":
+    status: built
+    build_date: "2026-10-16"
+    conan_ref: "xfractint/20.4.10"
