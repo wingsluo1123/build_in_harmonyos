@@ -1,0 +1,94 @@
+# test_package/MANIFEST.yml — prefix/1.2.11
+# CI (ci/conan/build_and_test.sh L0e) 要求存在本文件：它声明上游测试在哪里，
+# 以及本包自身新增了哪些消费者测试。
+
+package: prefix/1.2.11
+homepage: "https://github.com/dimitri/prefix"
+
+# ── 上游测试台账 ────────────────────────────────────────────────────────────
+# prefix 上游自带回归套件，由 PGXS 的 REGRESS 变量驱动
+# （Makefile:8 `REGRESS = create_extension prefix falcon $(EXPLAINSQL) queries`，
+#  其中 EXPLAINSQL 在 PG 9.0+ 上取 `explain`），
+# 上游 CI 在 PG 9.1–19 全矩阵执行 `make installcheck`
+# （.github/workflows/regression.yml:15-31 `pgversion: 9.1 … 19`，第 45-52 行
+#  运行 `make PROFILE="-Werror"` + `make installcheck`）。
+# 上游用例数 = 5（唯一入口 `make installcheck`）。
+#
+# 用例之间有序依赖，不可拆开单跑：
+#   prefix.sql 建立 ranges/numbers 表 → falcon.sql 建立 tst 表
+#   → explain.sql 同时查询 ranges/numbers/tst。
+upstream_check_command: "make installcheck"
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 5 个上游回归用例，逐字节取自上游 sql/ + expected/
+# （sha256 如下，与 v1.2.11 tarball 完全一致；归档内不做任何删改）。
+upstream_tests:
+  - file: sql/create_extension.sql
+    sha256: "c107a2519a4fcbbe357b2187cc35bfabd484bdd0f2babd823d5ef52b4af42b3b"
+    description: "CREATE EXTENSION prefix 在服务端装载模块"
+  - file: sql/prefix.sql
+    sha256: "ad2c58eda681c4fd59626e42289725ca942ede7e6c4e4210f29d4fb0e969d023"
+    description: "装载 11966 行官方号段表，建 prefix_range 表 + GiST 索引，验证 @>/<@ 对称性（Debian Bug 690160）、pr_penalty 单调性与号码 join 命中数"
+  - file: sql/falcon.sql
+    sha256: "0a971c5b47492ef4551031e3ff47a492176cf997abdb0c9fa1b07e851680ab3e"
+    description: "10 万行号段的 GiST 索引 <@ 检索（顺序扫描与索引扫描结果一致，各 1000 行）"
+  - file: sql/explain.sql
+    sha256: "481e95fea7dac49f329dcb4ecb159dc809687a448ecf3a40e5e4c40506ecc555"
+    description: "最长前缀匹配与索引检索的执行计划校验（计划中含 idx_prefix）"
+  - file: sql/queries.sql
+    sha256: "a44440e39e796a4a4c315b5073a530dbb88dae246464698be8962053e8a49f72"
+    description: "运算符语义（<= <> @> <@ &&）、传递性、集合运算 | &、类型 cast 与 length"
+# expected/ 为 7 个黄金输出文件（create_extension/prefix/falcon/queries 各 1 个，
+# explain 另有 explain.out + explain_1.out + explain_2.out 共 3 个 PG 版本相关变体），
+# 与上游 expected/ 全量一致。
+
+# 上游测试的运行时依赖 fixture（prefix.sql:15 的 \copy 数据源）。
+upstream_fixtures:
+  - file: prefixes.fr.csv
+    sha256: "3d36e30730c8a34274e39353d94dc6c1dbbea0b66e896f8f953462f5689042a9"
+    description: "法国电信监管机构公布的官方电话前缀分配表（11966 行），上游回归用例的真实输入数据"
+
+# ── 适配后新增的消费者测试（conan create 自动执行）──────────────────────────
+test_package_tests:
+  - file: run_pg_test.sh
+    description: "在隔离的 PostgreSQL 18.3 实例中装载包内 prefix.so，先用 pg_regress 重放上游 5 组回归用例（5/5 通过），再执行 4 条鸿蒙特有断言：OH-1 模块在 OHOS 原生 postgres 进程中 dlopen 成功；OH-2 产物 ABI（ELF AArch64、DT_NEEDED 仅 libc.so、无构建机 RUNPATH）；OH-3 = CONSUMER-1 完整消费者端到端业务用例（号码前缀路由，索引路径与真·顺序扫描路径双侧计划守卫 + 结果集交叉校验）；OH-4 包内产物与隔离实例实际装载的模块均等于本文件 artifact_sha256 锚点"
+    command: "bash run_pg_test.sh <pg_bindir> <pkg_libdir> <pkg_sharedir> <tests_dir>"
+  - file: conanfile.py
+    description: "消费者测试入口：require postgresql/18.3 提供 initdb/pg_ctl/psql/pg_regress，模块、control 与 SQL 只从被测包的 package_folder 取（保证 CI L1e 负向破坏性验证真实失败）"
+    command: "conan create . -pr:h=ci/conan/profiles/ohos-aarch64"
+
+# ── 消费者端到端用例台账（规则 12）─────────────────────────────────────────
+consume_tests:
+  - id: CONSUMER-1
+    name: "FR 电话号段路由：号码 → 归属运营商最长前缀匹配"
+    scenario: "运营商收到来电号码后，用官方号段分配表把号码路由到归属运营商"
+    artifact_under_test: "本配方安装后的 prefix/1.2.11 包：lib/prefix.so + share/extension/prefix.control + share/extension/prefix--*.sql（装入隔离 PostgreSQL 18.3 实例的 pkglibdir/sharedir）"
+    real_input: "prefixes.fr.csv —— 法国电信监管机构公布的官方电话前缀分配表，11966 行真实号段记录（随测试归档一并保存）"
+    steps:
+      - "CREATE EXTENSION prefix（服务端 dlopen 本包模块）"
+      - "COPY 官方号段表 → 建 prefix_range 表 ranges + GiST 索引 idx_prefix（gist_prefix_range_ops）"
+      - "构造 5000 个待路由号码（与上游回归用例同构的确定性构造）"
+      - "业务查询：@> 运算符 + 倒排索引做最长前缀匹配，解析每个号码的归属运营商"
+      - "交叉校验：同批号码改走顺序扫描路径，两条互相独立的执行路径结果集必须完全一致"
+      - "计划校验：强制关序扫后执行计划必须出现 idx_prefix（否则交叉校验退化为同一路径）"
+    expected_business_output: "prefixes=11966, ranges=11966, numbers=5000, routed=2019, matched=2019, diff_ix_seq=0（两条路径零差异）, 0146640123→FRANCE TELECOM/0146, 0100091234→LONG PHONE/010009"
+    evidence_log: "conan create 输出中 test_package 段落的 CONSUMER1 结果行；PR 正文「适配后测试用例统计 / 鸿蒙特有测试」= 1"
+
+# 断言总数：5 (上游回归用例) + 4 (鸿蒙断言) = 9；pg_regress 内部另有逐行输出比对
+assertion_count: 9
+
+# ── 交付产物可复现性/回归锚（OH-4 依此断言，排除"装载到错误/陈旧/外来模块"）──
+# 语义：这是**构建产物的冻结值**（本机两次独立构建实测一致），属可复现性与回归
+# 锚点，不是外部独立真值（registry 尚无已发布二进制可比对）；它可捕获产物漂移，
+# 但锚点被顺带更新即会自证，使用时须知悉该局限。
+artifact_sha256: "8cc012391567f187f15290886b9642b9fdd9bf110a03ebbb5d87d3fd4834f25d"
+
+# ── 鸿蒙适配说明（无源码补丁）───────────────────────────────────────────────
+ohos_notes:
+  source_patches: "无。prefix 1.2.11 在 OHOS PC（clang 15.0.4 + OHOS musl）上一次编译通过，未修改任何上游源码，无 patches/ 目录。"
+  tmp_read_only: "OHOS /tmp 是只读 erofs 挂载（E002），测试脚本一律使用 $TMPDIR 或 $HOME/tmp 下的 mktemp 工作目录。上游 prefix 回归用例本身不使用 /tmp，无需路径改写。"
+  csv_path: "prefix.sql 用客户端相对路径 \\copy 读取 prefixes.fr.csv，其解析基准是 pg_regress 的 cwd（不可依赖）。测试脚本在执行前把该路径字面量固定为绝对路径，并在 sql 与 expected 中同步替换以保证 psql 回显逐行匹配；归档内保存的测试文件与上游逐字节一致。"
+  no_unix_socket: "OHOS 构建的 PostgreSQL 18.3 配置含 -DHAVE_NO_UNIX_SOCKETS，不带 unix socket 支持；测试脚本以 unix_socket_directories='' + TCP loopback 启动服务。"
+  posix_fallocate: "OHOS 用户文件系统拒绝 posix_fallocate（实测返回 EACCES），而 PG 18 的 file_extend_method 默认就是 posix_fallocate，导致 COPY / 多行插入在成批扩展数据文件时报 'could not extend file ... with FileFallocate(): Permission denied'（其 HINT 提示磁盘空间，但实测仍有约 639 GB 可用，属误导）。测试脚本按 OHOS 通用要求以 -c file_extend_method=write_zeros 启动服务。"
+  pg_regress_runpath: "PG 18.3 的 pg_regress 位于 lib/postgresql/pgxs/src/test/regress/，其 RUNPATH 只对 bin/ 下的可执行文件有效，因此须设置 LD_LIBRARY_PATH=<pgroot>/lib 才能加载 libpq.so.5。"

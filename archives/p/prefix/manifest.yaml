@@ -1,0 +1,25 @@
+software: prefix
+display: "prefix"
+description: "PostgreSQL prefix_range 数据类型与 GiST 操作符类，用于最长前缀匹配检索（电话号段路由）"
+category: db
+homepage: "https://github.com/dimitri/prefix"
+license: PostgreSQL
+build_system: pgxs
+
+ohos_adaptation:
+  key_points:
+    - "标准 PGXS 扩展：服务端头文件、pgxs.mk 与可重定位 pg_config 全部来自 conan postgresql 包，无需构建 PostgreSQL 源码"
+    - "PGXS 的 LINK.shared 默认带 -Wl,-rpath,'$(libdir)'，会把构建机 conan 缓存路径写进 .so；用 make rpath= 关闭，产物 DT_NEEDED 只剩 libc.so"
+    - "扩展模块只能动态构建（由 postgres 进程 dlopen），不存在静态链接形态"
+    - "OHOS 构建的 PostgreSQL 18.3 带 -DHAVE_NO_UNIX_SOCKETS，部署与测试须以 unix_socket_directories='' + TCP loopback 运行"
+    - "OHOS 用户文件系统拒绝 posix_fallocate（EACCES），PG 18 的 file_extend_method 默认即该路径，部署与测试必须传 -c file_extend_method=write_zeros，否则 COPY / 多行插入报 FileFallocate Permission denied"
+    - "OHOS /tmp 为只读 erofs 挂载（E002），测试脚本使用 $TMPDIR / $HOME/tmp 下的可写工作目录"
+    - "上游 1.2.11 在 OHOS PC（clang 15.0.4 + OHOS musl）上一次编译通过，无需源码补丁"
+  common_dependencies:
+    - "postgresql/18.3"
+
+versions:
+  "1.2.11":
+    status: built
+    build_date: "2026-10-16"
+    conan_ref: "prefix/1.2.11"
