@@ -1,0 +1,22 @@
+# conandata.yml - kauth 6.28.0
+#
+# 源码获取：官方源 download.kde.org（Mirrorbits，按地域 302 跳转就近镜像）。
+# 部分 CI Worker 出网受限，无法直连 download.kde.org，故按 backward-cpp / alex
+# 先例追加国内 KDE 镜像 URL 列表；Conan 2.x 的 get() 会按顺序逐个尝试直到成功。
+# sha256 与官方 download.kde.org 的 .sha256 sidecar 逐字节一致
+# （fb4d90ee... / 2273684 bytes，2026-10-17 经 aliyun 镜像实下校验）。
+
+sources:
+  url:
+    - "https://download.kde.org/stable/frameworks/6.28/kauth-6.28.0.tar.xz"
+    - "https://mirrors.bfsu.edu.cn/kde/stable/frameworks/6.28/kauth-6.28.0.tar.xz"
+    - "https://mirrors.ustc.edu.cn/kde/stable/frameworks/6.28/kauth-6.28.0.tar.xz"
+    - "https://mirror.nju.edu.cn/kde/stable/frameworks/6.28/kauth-6.28.0.tar.xz"
+    - "https://mirrors.aliyun.com/kde/stable/frameworks/6.28/kauth-6.28.0.tar.xz"
+  sha256: "fb4d90ee46a2f6202e53cdd5af8f77069c380955e3f340881f2f36ec8312079b"
+
+patches:
+  "6.28.0":
+    - patch_file: "patches/0001-lower-kf-dep-version.patch"
+      patch_description: "KF_DEP_VERSION 6.28.0 -> 6.26.0: the ohpcd-published KF6 stack stops at 6.26.0 (kcoreaddons fix release 6.26.0.1); find_package(KF6CoreAddons ${KF_DEP_VERSION}) then resolves against the published package, and the same variable feeds the exported KF6AuthConfig so consumers find_dependency(KF6CoreAddons 6.26.0) resolves too. The find_package(ECM 6.28.0) line stays untouched: the ecm/6.28.0 tool package satisfies it exactly"
+      patch_type: "portability"
