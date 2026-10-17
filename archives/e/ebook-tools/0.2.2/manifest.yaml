@@ -1,0 +1,27 @@
+version: "0.2.2"
+software: ebook-tools
+build_system: cmake
+status: built
+build_date: "2026-10-08"
+
+source:
+  url: "https://downloads.sourceforge.net/project/ebook-tools/ebook-tools/0.2.2/ebook-tools-0.2.2.tar.gz"
+  sha256: "cbc35996e911144fa62925366ad6a6212d6af2588f1e39075954973bbee627ae"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+    - "-DOHOS_ARCH=arm64-v8a"
+  dependencies:
+    - libxml2/2.15.3.1
+    - libzip/1.11.4
+  cc: clang (ohos-sdk)
+
+patches_applied: []
+knowledge_gained:
+  - "上游 cmake_minimum_required(VERSION 2.4.0)，CMake 4.x 必须配 -DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+  - "上游 find_package(LibXml2/LibZip) 靠预置缓存变量接线到 conan 依赖（绕交叉 FIND_ROOT_PATH=ONLY）"
+  - "产物 libepub.so 与 bin/einfo 均需 XPM 签名，否则 dlopen/exec 报 Permission denied"
+  - "上游零测试（无 tests/、无 ctest、debian/rules 无测试段），验证靠 test_package 现场构造 EPUB 往返"
