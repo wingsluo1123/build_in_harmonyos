@@ -1,0 +1,23 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 5e33e7d..97d7f69 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -53,6 +53,17 @@ find_package(KF6Contacts ${KF_MIN_VERSION} CONFIG REQUIRED)
+ 
+ if(BUILD_SASL_PLUGIN)
+-    find_package(Sasl2)
++    find_package(Sasl2 QUIET)
++    if(NOT Sasl2_FOUND)
++        find_package(cyrus-sasl CONFIG REQUIRED)
++        if(TARGET cyrus-sasl::cyrus-sasl AND NOT TARGET Sasl2::Sasl2)
++            add_library(Sasl2::Sasl2 INTERFACE IMPORTED)
++            target_link_libraries(Sasl2::Sasl2 INTERFACE cyrus-sasl::cyrus-sasl)
++        endif()
++        if(TARGET cyrus-sasl::cyrus-sasl)
++            get_target_property(Sasl2_INCLUDE_DIRS cyrus-sasl::cyrus-sasl INTERFACE_INCLUDE_DIRECTORIES)
++        endif()
++        set(Sasl2_FOUND TRUE)
++    endif()
+     set_package_properties(Sasl2 PROPERTIES TYPE REQUIRED)
+ endif()
+ 
