@@ -1,0 +1,95 @@
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/1.1.9/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.1.9"
+
+# 软件名
+software: "bdf2sfd"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-07"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（官方直链；⛔ 不得用 Debian 池址，PF7 拉黑 deb.debian.org）
+  url: "https://codeload.github.com/fcambus/bdf2sfd/tar.gz/refs/tags/1.1.9"
+
+  # 源码校验和（本机 curl + sha256sum 实测 2026-10-07）
+  sha256: "d7638e55cf80eb475668dcf062d767b00d3b2d577156f39e7911966b8b711bd6"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表（R1 参数最少化：上游只需 prefix，由 conan CMakeToolchain 提供）
+  configure_options: []
+
+  # 编译依赖列表（格式: name/version）
+  # 实测：CMakeLists 无 find_package/PKG_CHECK_MODULES/AC_CHECK_LIB/target_link_libraries
+  #      check_function_exists(pledge/strtonum) 缺失时用自带 compat/ 兜底 ⇒ libc 级闭合
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 测试口径（三处同源：本件 / notes.md / test_package/MANIFEST.yml + reports/test-report.md）
+# ============================================================
+tests:
+  # 上游测试资产 —— §12.72 四口径 2026-10-07 源码 tag 1.1.9 就地实测
+  #   test*/ 框架源码 0 · */res 语料 4（tests/spleen-*.bdf）· **/*RUNTEST* 0 · src/demo|examples *.c 0
+  #   测试入口在 CMakeLists.txt:65-70：enable_testing() + 5 个 add_test
+  #   ctest -N = 5；ctest 实跑 100% tests passed, 0 tests failed out of 5（0.30s）
+  upstream: 5
+  # 适配后合计 = 上游 5 + 消费者 1（消费者测试另列并计入适配后总数，§10.1）
+  after_adapt: 6
+  evidence: "reports/test-report.md"
+  # 五维数值字段（手册/04 §10.1）
+  N_static: 5              # 上游静态声明（add_test 5 条）
+  N_registered: 5           # 构建系统注册（ctest -N Total Tests: 5）
+  N_executed: 5             # 实际执行（ctest 实跑 5/5）
+  not_executed_categories: 0  # 未执行分类数：无跳过/无预期失败/无条件注册
+  N_consumer: 1             # 新增消费者测试（test_package/test.sh，5 断言，实测 5/5 PASS）
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+# 例如:
+# - "0001-bootstrap-ohos-toolchain.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "conan get() 对末段无扩展名的直链（…/tar.gz/refs/tags/1.1.9）推断不出压缩格式、按 zip 解包报 BadZipFile：conandata.yml sources 显式加 filename 字段即可"
+  - "上游 -f/-p 传入的字体名在 SFD 中原样输出、不加引号（FullName: X / FontName: Y），与 BDF 自带 FONT 属性（带引号）不同，测试断言勿加引号"
+  - "纯可执行转换器（无库产物、无人 include/链接）应声明 package_type=application + cpp_info.bindirs，并配软件级 commands.json（R38/PF8）"
