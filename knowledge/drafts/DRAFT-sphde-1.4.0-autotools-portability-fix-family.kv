@@ -1,0 +1,31 @@
+id: DRAFT-sphde-1.4.0-autotools-portability-fix-family
+trigger_tool: make|conan|test
+phase: configure|compile|testing|package
+error_signature: configure: error: working directory cannot be determined|argument unused during compilation: '-mhtm' \[-Werror,-Wunused-command-line-argument\]|unknown type name 'key_t'|unused function '[^']*' \[-Werror,-Wunused-function\]|variable '[^']*' set but not used \[-Werror,-Wunused-but-set-variable\]|format specifies type unsigned long but the argument has type unsigned long long|incompatible integer to pointer conversion|\[Makefile:...: install-libsphdeincludeHEADERS\] Error 64|while \(SPHSinglePCQueueFull/Empty\) sched_yield
+severity: 3
+category: autotools, build-system, portability, compat, testing, ohos, libc, musl, hmdfs
+match_keywords: hmbs_repair_method, autotools_configure, -wno-unused-but-set-variable, install -c 64, log_compiler, test timeout, ac_pwd, pwd fallback, hmbs_platform_capabilities, clang -Werror, toybox install, INSTALL_DATA, strerror_r, key_t, SIGSYS, -mhtm, dist_doc_DATA
+match_keywords2: patch_ng, gnu patch, fuzz=0, patch stream is incomplete, source file is different
+title: autotools 系库在 OHOS 的编译/测试可移植修复族：clang -Werror 告警抑制、toybox install -c 64 接管 INSTALL、ac_pwd $PWD 回退与 make check LOG_COMPILER 逐测试超时
+root_cause: autotools 系 C/C++ 库在 OHOS 真机常遇四类共性可移植问题：(1) 上游 AM_CFLAGS/AM_CXXFLAGS 恒含 -Wall -Werror，而 OHOS 用 clang 构建，clang 独有的 -Wunused-function/-Wunused-but-set-variable/-Wformat/-Wabsolute-value/-Wunused-command-line-argument（如 -mhtm）等告警被 -Werror 提升为致命错误；(2) HMDFS 上 getcwd(2) 沿 .. 上溯失败使 autoconf configure 的 ac_pwd 检查 abort，GNU patch 与 Conan patch_ng 对 hunk 行号/行数错位与尾随空行解析严格（fuzz=0）导致补丁应用失败；(3) autoconf 把探测到的 toybox install -c 路径烘焙进 INSTALL/INSTALL_DATA，HMDFS 下 -c 路径返回退出码 64、无 GNU coreutils 且不支持 chmod，make install 头文件列表即失败；(4) 上游多线程共享内存测试含无界自旋 while(...) sched_yield()，OHOS 共享内存语义下双双自旋不推进令 make check 无限挂起，且 OHOS seccomp 阻断 System V shm/固定地址 mmap 使依赖 SAS 区域的用例 SIGSYS 崩溃。libc 差异还波及 strerror_r（glibc GNU 版 char* vs musl int）、__pid_t 内部类型、key_t 传递包含等。
+affected_scope: 任何用 autotools(configure/Makefile.am) 构建、以 clang/-Werror 编译、在 HMDFS 上无 GNU coreutils 与 chmod、使用共享内存或 System V IPC 的 C/C++ 三方库
+verification_cmd: 真机 conan create 全流程通过；补丁链用 GNU patch --fuzz=0 与 Conan 同源 patch_ng(fromfile 非 None + apply strip=0 fuzz=False 全 True) 顺序验证；make check 输出 test-suite.log 且经 LOG_COMPILER 逐测试超时能完整结束；install 阶段不再出现 Error 64
+rec_priority: 1
+rec_approach: autotools-ohos-portability-fix-family
+rec_description: 针对 autotools 系库在 OHOS 的共性可移植问题按族施治：在 AM_CFLAGS/AM_CXXFLAGS 末尾（位于 -Werror 之后）追加 -Wno-* 抑制 clang 独有但无害告警（不改测试逻辑）；对 configure 的 ac_pwd 增加 $PWD 回退并让 AX_CHECK 探测在真实 -Wall -Werror 级别下执行；用 index-install(非 -c) 或其他安装动作接管 autoconf 烘焙进 INSTALL/INSTALL_DATA 的 toybox install -c；对无限自旋测试接入 LOG_COMPILER 逐测试超时包装避免单测拖垮整个 make check。
+rec_command: conanfile.py build(): os.chdir(build_folder)+os.environ['PWD']、写纯 sh 的 test-timeout-wrapper.sh 并 setenv LOG_COMPILER、SPHDE_TEST_TIMEOUT(默认300s)；patches/000x-*.patch 由 release tarball 原样文件以 diff -u/补足尾随空行生成并在 /tmp 官方 tarball 验证顺序应用；conandata.yml/manifest.yaml/notes.md 同步登记补丁与根因
+rec_auto_fix: false
+rec_impl: conan-recipe-plus-patches
+fallback_priority: 2
+fallback_approach: divide-and-conquer-patch-chain
+fallback_description: 若同一文件被多个补丁链式触及导致 patch_ng 应用不可靠（独立补丁返回 False 或手写多 hunk 静默漏掉），则折叠为单补丁多 hunk 或拆分到不同源文件，每轮仅针对当前聚焦失败域做最小补丁并用 fuzz=0 严格验证
+fallback_auto_fix: false
+forbid_1_pattern: HMBS_UPSTREAM_TEST_RESULT=\{[^}]*"passed":\s*[0-9]+[^}]*\}|passedCount=158|Signal 31|sphde/1.4.0: ERROR:
+forbid_1_reason: 禁止伪造通过：不允许把信号崩溃/异常码越界的计数当作通过上报，不允许把平台限制(SIGSYS/资源耗尽)硬判为失败或硬改写为通过，不允许在上游测试计数上注入虚假通过与伪造的 L1_RESULT
+forbid_1_consequence: 真机门禁 evidence incomplete 或认定伪造，任务退回修复循环并作废该轮
+similar_to: [DRAFT-openfst-1.4.1-install-c-64-force-install, DRAFT-viennarna-1.0.0-ac-pwd-getcwd-fallback, DRAFT-ccrtp-1.0.0-demo-as-upstream-regression]
+doc_file: knowledge/drafts/DRAFT-sphde-1.4.0-autotools-portability-fix-family.md
+last_updated: 2026-10-13
+source_event: sphde/1.4.0 真机预检 10+ 轮 compile/configure/package/test_package 系列失败并逐类修复，最终通过真机门禁
+authors: hmbs-executor
+source_pr: 13510

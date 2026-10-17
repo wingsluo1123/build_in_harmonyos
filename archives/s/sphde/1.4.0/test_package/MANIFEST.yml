@@ -1,0 +1,165 @@
+# test_package/MANIFEST.yml — sphde 1.4.0
+# Upstream and consumer test declaration required by CI L0e.
+# Facts audited from the sphde/sphde 1.4.0 tag (23f745a); device-execution
+# numbers are filled only from real-device runs (never estimated).
+
+package: sphde/1.4.0
+homepage: "https://github.com/sphde/sphde"
+
+# Upstream suite listing tool
+upstream_check_command: "make check"
+
+# Machine-evidence declaration (required by the device-test gate).
+# Total inventory uses the official upstream unit: the automake TESTS
+# programs listed in src/Makefile.am. 24 entries exist in the file; on
+# aarch64/OHOS only 23 register because sphmultipcqueue_t is gated behind
+# AM_CONDITIONAL(HTM) (POWER transactional memory, -mhtm). The declared
+# total is the full inventory (24) to avoid under-reporting; the 1 entry
+# that cannot register/run on this platform is reported as an
+# `environment` gap in HMBS_UPSTREAM_TEST_RESULT, never as passed.
+upstream_tests_exist: true
+upstream_test_total: 24
+upstream_test_count_method: autotools_tests
+upstream_test_count_detail: "24 automake TESTS programs listed in src/Makefile.am of the 1.4.0 tag (full inventory of `TESTS +=` entries). 23 register on aarch64/OHOS; sphmultipcqueue_t is gated by `if HTM` (POWER hardware transactional memory, -mhtm) which is unavailable on aarch64, so it is counted as a not-executed environment gap (not passed, not zeroed). discovered=24, executed=23 from test-suite.log."
+
+# The main recipe build() runs `make check` after building; automake writes
+# src/test-suite.log which the recipe parses (#TOTAL/#PASS/#FAIL) and emits
+# as HMBS_UPSTREAM_TEST_RESULT, persisted into package res/.
+upstream_test_in_build: true
+upstream_test_command: "make check (runs src/test-suite.log via automake test-driver)"
+
+upstream_tests:
+  - file: src/tests/sphgtod_t.c
+    source: sphde-1.4.0/src/tests/sphgtod_t.c
+    description: "emulated gettimeofday (libsphgtod) test"
+    command: "./sphgtod_t"
+  - file: src/tests/sphgettime_t.c
+    source: sphde-1.4.0/src/tests/sphgettime_t.c
+    description: "emulated clock_gettime (libsphgettime) test"
+    command: "./sphgettime_t"
+  - file: src/tests/sasatom_t.c
+    source: sphde-1.4.0/src/tests/sasatom_t.c
+    description: "SAS atomic primitives test"
+    command: "./sasatom_t"
+  - file: src/tests/bitvec_t.c
+    source: sphde-1.4.0/src/tests/bitvec_t.c
+    description: "bit vector operations test"
+    command: "./bitvec_t"
+  - file: src/tests/sassim_t.c
+    source: sphde-1.4.0/src/tests/sassim_t.c
+    description: "SAS shared-address-space integration test (join/seg/msync/heap/space)"
+    command: "./sassim_t"
+  - file: src/tests/sascompoundheap_t.c
+    source: sphde-1.4.0/src/tests/sascompoundheap_t.c
+    description: "compound heap test"
+    command: "./sascompoundheap_t"
+  - file: src/tests/sasseg_t.c
+    source: sphde-1.4.0/src/tests/sasseg_t.c
+    description: "SAS segment store test"
+    command: "./sasseg_t"
+  - file: src/tests/sphlockfreeheap_t.c
+    source: sphde-1.4.0/src/tests/sphlockfreeheap_t.c
+    description: "lock-free heap test"
+    command: "./sphlockfreeheap_t"
+  - file: src/tests/sphlflogger_t.c
+    source: sphde-1.4.0/src/tests/sphlflogger_t.c
+    description: "lock-free logger test"
+    command: "./sphlflogger_t"
+  - file: src/tests/sphthread_t.c
+    source: sphde-1.4.0/src/tests/sphthread_t.c
+    description: "SPH thread test"
+    command: "./sphthread_t"
+  - file: src/tests/sphlflogger_tt.c
+    source: sphde-1.4.0/src/tests/sphlflogger_tt.c
+    description: "lock-free logger verify (SPH_TIMERTEST_VERIFY=1) test"
+    command: "./sphlflogger_tt"
+  - file: src/tests/sphlflogger_ttt.c
+    source: sphde-1.4.0/src/tests/sphlflogger_ttt.c
+    description: "lock-free logger multi verify (SPH_TIMERTEST_VERIFY=1) test"
+    command: "./sphlflogger_ttt"
+  - file: src/tests/sphlogportal_t.c
+    source: sphde-1.4.0/src/tests/sphlogportal_t.c
+    description: "log portal test"
+    command: "./sphlogportal_t"
+  - file: src/tests/sphlogportal_tt.c
+    source: sphde-1.4.0/src/tests/sphlogportal_tt.c
+    description: "log portal test (second instance; same source sphlogportal_t.c)"
+    command: "./sphlogportal_tt"
+  - file: src/tests/sphcontext_t.c
+    source: sphde-1.4.0/src/tests/sphcontext_t.c
+    description: "SPH context (StringBTree+Index) test"
+    command: "./sphcontext_t"
+  - file: src/tests/sasindex_t.c
+    source: sphde-1.4.0/src/tests/sasindex_t.c
+    description: "SAS index test"
+    command: "./sasindex_t"
+  - file: src/tests/sasindex_tt.c
+    source: sphde-1.4.0/src/tests/sasindex_tt.c
+    description: "SAS index test (threaded, second instance)"
+    command: "./sasindex_tt"
+  - file: src/tests/sasstringbtree_t.c
+    source: sphde-1.4.0/src/tests/sasstringbtree_t.c
+    description: "SAS string btree test"
+    command: "./sasstringbtree_t"
+  - file: src/tests/sasstringbtree_tt.c
+    source: sphde-1.4.0/src/tests/sasstringbtree_tt.c
+    description: "SAS string btree threaded test"
+    command: "./sasstringbtree_tt"
+  - file: src/tests/sphsinglepcqueue_t.c
+    source: sphde-1.4.0/src/tests/sphsinglepcqueue_t.c
+    description: "single-producer/single-consumer queue test"
+    command: "./sphsinglepcqueue_t"
+  - file: src/tests/sphsinglepcqueue_tt.c
+    source: sphde-1.4.0/src/tests/sphsinglepcqueue_tt.c
+    description: "single pc queue test (second instance)"
+    command: "./sphsinglepcqueue_tt"
+  - file: src/tests/sphsinglepcqueue_ttt.c
+    source: sphde-1.4.0/src/tests/sphsinglepcqueue_ttt.c
+    description: "single pc queue test (third instance)"
+    command: "./sphsinglepcqueue_ttt"
+  - file: src/tests/sphdirectpcqueue_ttt.c
+    source: sphde-1.4.0/src/tests/sphdirectpcqueue_ttt.c
+    description: "direct (lock-free SPSC) pc queue test"
+    command: "./sphdirectpcqueue_ttt"
+  - file: src/tests/sphmultipcqueue_t.c
+    source: sphde-1.4.0/src/tests/sphmultipcqueue_t.c
+    description: "multi-producer/multi-consumer queue test; HTM-gated (`if HTM` in src/Makefile.am, POWER -mhtm), not registered/run on aarch64/OHOS — reported as an environment gap, never as passed"
+    command: "(not registered on aarch64/OHOS: HTM unavailable)"
+
+# Note: sphmultipcqueue_t (src/tests/sphmultipcqueue_t.c) is gated behind
+# HTM (POWER transactional memory, -mhtm) in src/Makefile.am and does not
+# compile/register on aarch64 OHOS. It is part of the declared 24-entry
+# upstream inventory and is reported as an `environment` gap in
+# HMBS_UPSTREAM_TEST_RESULT (not executed), never counted as passed.
+
+# Consumer-perspective checks executed by conan create (L1)
+test_package_tests:
+  - file: test.c
+    description: "links libsphde.so and exercises the public C API: SASJoinRegion, SASSimpleHeapCreate/Alloc/write-back/Free/Destroy, SASRemove (6 checked assertions)"
+    command: "./test_sphde"
+  - file: conanfile.py
+    description: "re-emits the persisted HMBS_UPSTREAM_TEST_RESULT from package res/upstream_test_result.json so every round carries upstream evidence"
+
+assertion_count: 6
+
+# Known platform limitation (ohos_feature, not a missing dependency):
+# SPHDE maps the SAS region via System V shared memory (shmget/shmat/shmctl in
+# sasshm.c/sassim.cpp) plus fixed-address mmap(MAP_FIXED) at __SAS_BASE_ADDRESS.
+# On HarmonyOS this either trips seccomp (SIGSYS signal 31, so SAS-region tests
+# abort with "Signal 31 (core dumped)") or, when the mapping succeeds, the
+# multi-threaded lock-free SPSC-queue tests (sphsinglepcqueue_ttt /
+# sphdirectpcqueue_ttt) can spin indefinitely in upstream unbounded
+# `while(...Empty/Full) sched_yield();` loops. The recipe's make check therefore
+# runs every upstream test under a per-test timeout wrapper (LOG_COMPILER=
+# test-timeout-wrapper.sh, SPHDE_TEST_TIMEOUT default 300s) so a hung test is
+# killed and recorded as FAIL instead of stalling the whole job (CI observed a
+# 14400s stall in sphsinglepcqueue_ttt). Non-SAS tests (sphgtod/sphgettime/
+# bitvec/sasatom) pass. The test_package consumer smoke test test.c calls
+# SASJoinRegion() first, which on OHOS crashes with a signal (seccomp SIGSYS /
+# "Signal 31 (core dumped)", shell rc 159/139) inside that call, so it cannot
+# complete; test_package/conanfile.py therefore reports HMBS_TEST_PACKAGE_RESULT
+# with passedCount=0 and an ohos_feature gap and does NOT hard-fail conan create
+# for that documented platform limitation (genuine non-platform failures still
+# raise). The 24-entry inventory stays honest (23 executed + 1 HTM-gated
+# not-executed environment gap); actual pass/fail and gaps are reported
+# in the run markers from the real-device test-suite.log (not edited here).

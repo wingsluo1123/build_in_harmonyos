@@ -1,0 +1,50 @@
+--- a/src/tests/sphdirectpcqueue_ttt.c
++++ b/src/tests/sphdirectpcqueue_ttt.c
+@@ -674,10 +674,18 @@
+           sphFastGetTID(),tn,cpu_list[tn]);
+       } else {
+         char buf[1024];
+-        char *msg = strerror_r(errno,buf,sizeof buf);
+-        if (!msg) msg = buf;
+-        fprintf(stderr,"%6d: sched_setaffinity(thread %d to CPU %d) %s\n",
+-          sphFastGetTID(),tn,cpu_list[tn],msg);
++        buf[0] = '\0';
++#if defined(__GLIBC__) && defined(_GNU_SOURCE)
++        /* GNU strerror_r returns char* which may point to a static string. */
++        char *gnu_msg = strerror_r(errno,buf,sizeof buf);
++        if (gnu_msg && gnu_msg != buf)
++          snprintf(buf,sizeof buf,"%s",gnu_msg);
++#else
++        /* POSIX/XSI strerror_r returns int and writes into buf. */
++        strerror_r(errno,buf,sizeof buf);
++#endif
++        fprintf(stderr,"%6d: sched_setaffinity(thread %d to CPU %d) %s\n",
++          sphFastGetTID(),tn,cpu_list[tn],buf);
+       }
+     CPU_FREE(cset);
+   }
+--- a/src/tests/sphmultipcqueue_t.c
++++ b/src/tests/sphmultipcqueue_t.c
+@@ -847,10 +847,18 @@
+ 				sphFastGetTID(),tn,cpu_list[tn]);
+ 		} else {
+ 			char buf[1024];
+-			char *msg = strerror_r(errno,buf,sizeof buf);
+-			if (!msg) msg = buf;
+-			fprintf(stderr,"%6d: sched_setaffinity(thread %d to CPU %d) %s\n",
+-				sphFastGetTID(),tn,cpu_list[tn],msg);
++			buf[0] = '\0';
++#if defined(__GLIBC__) && defined(_GNU_SOURCE)
++			/* GNU strerror_r returns char* which may point to a static string. */
++			char *gnu_msg = strerror_r(errno,buf,sizeof buf);
++			if (gnu_msg && gnu_msg != buf)
++			  snprintf(buf,sizeof buf,"%s",gnu_msg);
++#else
++			/* POSIX/XSI strerror_r returns int and writes into buf. */
++			strerror_r(errno,buf,sizeof buf);
++#endif
++			fprintf(stderr,"%6d: sched_setaffinity(thread %d to CPU %d) %s\n",
++				sphFastGetTID(),tn,cpu_list[tn],buf);
+ 		}
+ 		CPU_FREE(cset);
+ 	}
