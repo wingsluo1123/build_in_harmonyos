@@ -1,0 +1,20 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI 脚本 L0e 强制要求存在）
+#
+# 上游测试清点（R51）：libosmo-cc 2024 快照没有 tests/ 目录，Makefile.am 也没有
+# check_PROGRAMS/TESTS —— 上游确无测试套件（upstream_tests 为空列表，非占位符）
+
+package: libosmo-cc/0.0-git20240818.7864594
+homepage: "https://gitea.osmocom.org/cc/libosmo-cc"
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+test_package_tests:
+  - file: test_cc.c
+    description: "消费者校验 3 项：①公开头 OSCMO_CC_VERSION 宏；②osmo_cc_msg_value2name 真实查表；③osmo_cc_ie_value2name/name2value 往返 8 个 IE 码 —— 链接安装后的 libosmocc.so 并运行"
+    command: "clang test_cc.c -I<install>/include -L<install>/lib -losmocc … && LD_LIBRARY_PATH=… ./test_cc"
+
+assertion_count: 3

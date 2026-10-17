@@ -1,0 +1,24 @@
+# 软件级 manifest — libosmo-cc
+software: libosmo-cc
+display: "Osmocom call-control library"
+description: "Osmocom 呼叫控制库：Q.931 风格信令消息编解码、会话/SDP、RTP、G.711（osmo-msc/osmo-bts 的基础库）"
+category: library
+homepage: "https://gitea.osmocom.org/cc/libosmo-cc"
+license: GPL-2.0-or-later
+build_system: custom
+
+ohos_adaptation:
+  key_points:
+    - "上游快照无 configure（只有 configure.ac/Makefile.am），OHOS 无 automake/aclocal/libtoolize → 配方内用 clang 直编 src/*.c"
+    - "安装与 autotools 一致：libosmocc.so.2.0.0 + .so/.so.2 链接、include/osmocom/cc/*.h、lib/pkgconfig/libosmocc.pc"
+    - "musl 需 -include sys/time.h（message.c 直接用 struct timeval）"
+    - "libosmocore 包 cpp_info.libs 不含主体库 → 显式 -losmocore，并用 -Wl,--no-undefined 对齐上游 -no-undefined"
+    - "上游无测试（无 tests/、Makefile.am 无 check_PROGRAMS）；消费者用例 3 项由 test_package 承担"
+  common_dependencies:
+    - "libosmocore/1.11.0"
+
+versions:
+  "0.0-git20240818.7864594":
+    status: built
+    build_date: "2026-10-17"
+    conan_ref: "libosmo-cc/0.0-git20240818.7864594"
