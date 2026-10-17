@@ -1,0 +1,28 @@
+id:                     E2271
+severity:               2
+category:               headers, conan, packaging, testing, api
+trigger_tool: conan|cmake|clang
+phase: testing
+error_signature: no member named 'onStep' in 'tweeny::tween<float>'|during() parameters must be of type uint32_t|during() must have one frame count per tween component|static assertion failed.*is_same_v
+
+match_keywords: tweeny, onStep, on(event::step), during, uint32_t, consumer, test_package, no member named, static assertion failed
+
+root_cause: tweeny v4（tag v4.1.0）相对 v3（tag v3）为破坏性 API 升级：1) 事件接口由成员方法 onStep(cb) 改为 t.on(event::step, cb)，回调签名为 event::response(tween&)，返回 event::response::ok/unsubscribe；2) during() 参数强约束为 uint32_t（int 字面量触发 static_assert 'std::is_same_v<int, unsigned int>'），且多值 tween 的 during() 帧数必须与组件数一一对应（'sizeof...(FrameCountsType) == value_count'）；3) seek()/peek() 帧参数由 float 改为 uint32_t。沿用 v3 API 编写的消费者测试在 v4 下编译失败，错误在 conan create test_package 阶段（G2）暴露。
+
+rec_approach: |
+  1) 写 test_package/消费者测试前先读目标版本的头文件与 src/tests/ 上游测试源码，确认真实 API 形态（本库 v4 例：tweeny::from(0.0f).to(100.0f).during(10u).build()；事件用 t.on(tweeny::event::step, [](const auto& t){ ...; return tweeny::event::response::ok; }) 并在回调内 t.peek() 取值）。
+  2) 多值 tween 用 std::get<N>(t.peek())，单值走标量 API；during() 字面量显式写 u 后缀。
+  3) 配方 build() 保持上游测试选项 OFF（如 TWEENY_BUILD_TESTS=OFF），避免把测试框架（Catch2）引入制品依赖；上游自带测试套件在适配流程独立配置（如 -DTWEENY_BUILD_TESTS=ON + 制品仓 Catch2）并枚举/运行，按双口径统计（source_declared_total / configured_executable_total / executed_passed_total）。
+  4) 边界反例（E103）：上游 cmake_minimum_required 声明为 3.23...3.28 区间（最低 ≥3.5）时，CMake 4.x 直接接受，无需注入 CMAKE_POLICY_VERSION_MINIMUM=3.5——E103 只适用于最低版本 < 3.5 的旧项目。
+
+verification_cmd:
+
+last_updated: 2026-09-19
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E2271.md
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        |

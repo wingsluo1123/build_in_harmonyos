@@ -1,0 +1,69 @@
+#====================================================================
+# DRAFT-6054-lgeneral-1.4.4-bundled-gettext-0.10-ac29-subst-loss — gettext 0.10.x 内嵌 intl 与 autoconf 2.69 再生 configure 组合断裂：@l@ 后缀变量与 HAVE_LOCALE_H 探测双双失效
+# 触发事件: lgeneral 1.4.4 适配（intl 目录 make 失败 + 编译错误）
+# 路径: Path B（知识库扩展）
+#====================================================================
+
+id:                     E2147
+trigger_tool:           configure|make|clang
+phase:                  configuration|compilation
+error_signature:        No rule to make target .libintl\.@l@a.|LC_MESSAGES.*undeclared|
+                         implicit declaration of function .dcgettext__|
+
+severity:               2
+category:               ohos, portability, autotools, nls
+match_keywords:         gettext 0.10, 内嵌 intl, @l@, libintl.@l@a,
+                         INTL_LIBTOOL_SUFFIX_PREFIX, config.status,
+                         autoconf 2.69, HAVE_LOCALE_H, LC_MESSAGES,
+                         libintl.h 空壳, dcgettext__, musl, USE_INCLUDED_LIBINTL,
+                         all-yes, intlh.inst, testfile_LDADD, INTLLIBS
+title:                  gettext 0.10.x 内嵌 intl 目录在 autoconf 2.69 再生 configure 下三处断裂（@l@ 不替换 / HAVE_LOCALE_H 不探测 / intlh.inst 缺失），musl 上又叠加 sysroot libintl.h 空壳与 check_PROGRAMS 缺 INTLLIBS
+
+root_cause: >
+  三处断裂同源：gettext 0.10.35 的 intl 机制依赖旧 autoconf 的替换行为，
+  autoconf 2.69 再生的 configure/config.status 不再提供：
+  1) intl/Makefile.in 里 `l = @l@`（libtool 后缀变量，INTL_LIBTOOL_
+     SUFFIX_PREFIX 展开），2.69 的 ac_subst_vars 不含 `l`，config.status
+     不替换 → make 报 "No rule to make target 'libintl.@l@a'"；
+  2) 旧 AM_GNU_GETTEXT 会探测 HAVE_LOCALE_H，2.69 再生后探测丢失 →
+     intl/dgettext.c、intl/libgettext.h 在 `#ifdef HAVE_LOCALE_H` 分支外
+     取不到 locale.h → LC_MESSAGES undeclared（musl 上 locale.h 存在，
+     只是宏没定义）；
+  3) tarball 未随附 intl/intlh.inst.in 模板但 all-yes 目标仍引用
+     intlh.inst → 第二个 No rule 错误。
+  叠加因素（OHOS 特有）：
+  a) OHOS sysroot 的 <libintl.h> 是空壳 stub（无 gettext 原型），包含
+     它的 util/localize.h 产生隐式声明 → 运行时崩；应改包含内嵌
+     intl/libgettext.h（include guard 与 stub 不冲突）；
+  b) 上游 check_PROGRAMS 的 LDADD 只写业务库不写 $(INTLLIBS)——glibc 上
+     dcgettext__ 由 libc 提供，从未显形；musl 上链接报 undefined
+     symbol: dcgettext__。
+
+verification_cmd: >
+  cd archives/l/lgeneral/1.4.4 && conan create . -pr:h=~/.conan2/profiles/ohos-aarch64 -pr:b=~/.conan2/profiles/ohos-aarch64 --build=missing && ls ~/.conan2/p/b/lgene*/p/bin/testfile
+
+rec_priority:           1
+rec_approach:           bundled-gettext-ac29-subst-loss（intl 定点补丁五件套）
+rec_description: >
+  1) intl/Makefile.in 硬编码空 libtool 后缀并移除 intlh.inst 目标；
+  2) intl 两个源文件无条件含 locale.h；3) 用户侧包装头改含内嵌
+  intl/libgettext.h 绕开 OHOS sysroot 空壳 stub；4) check_PROGRAMS 的
+  LDADD 补 $(INTLLIBS) 恢复上游测试；5) configure 去掉 umask 077 子壳
+  （HMDFS）。补丁必须 edit_file/patch -p1 真实落地并验证上下文行。
+rec_command:            cd archives/l/lgeneral/1.4.4 && conan create . -pr:h=~/.conan2/profiles/ohos-aarch64 -pr:b=~/.conan2/profiles/ohos-aarch64 --build=missing
+rec_auto_fix:           false
+rec_impl:               conan-recipe-patches
+
+doc_file:               knowledge/drafts/DRAFT-6054-lgeneral-1.4.4-bundled-gettext-0.10-ac29-subst-loss.md
+last_updated:           2026-09-16
+source_event:           lgeneral 1.4.4 适配，内嵌 intl 在 OHOS 上三处断裂（@l@ 不替换、HAVE_LOCALE_H 丢失、intlh.inst 缺失）+ sysroot libintl.h 空壳 + check_PROGRAMS 缺 INTLLIBS
+authors:                 atomcode-executor
+source_pr:
+source_commit:
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     0.9
+metrics_last_used:      2026-09-16
+
+affected_scope:         gettext 0.10.x 内嵌 intl 目录在 autoconf 2.69 再生 configure 下三处断裂（

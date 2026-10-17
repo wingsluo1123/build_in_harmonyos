@@ -1,0 +1,32 @@
+id:                     E2285
+title: OHOS qtbase 双生态互斥（qtbase/6.11.1 vs qtbase/6.11.1.1）与 KF6 包版本闸的适配策略
+category:               ohos, portability, conan, dependency-graph, kf6
+severity:               2
+error_signature: "Version conflict: Conflict between qtbase/6.11.1.1 and qtbase/6.11.1 in the graph."
+match_keywords: qtbase, 版本冲突, Version conflict, KF6_MIN_VERSION, kdbusaddons, qtbase-sql-dbus, FEATURE_dbus, ecosystem, KF6 生态
+root_cause: >
+  OHOS 制品仓存在两个互斥的 KF6/Qt 生态：
+  (A) qtbase/6.11.1（无 DBus——FEATURE_dbus=OFF）——kconfig/kcoreaddons/ki18n
+  6.26.0、kholidays 6.28.0、qtpositioning 6.11.1、qtdeclarative 6.11.1 居此；
+  (B) qtbase/6.11.1.1——kdbusaddons 6.29.0 居此。
+  conan 版本冲突机制禁止两个 qtbase 版本同图。Qt6::DBus 仅由
+  qtbase-sql-dbus/6.11.1（独立包名，与 qtbase 刻意并存）提供；
+  kdbusaddons 6.18.0 是该生态的 DBusAddons 构建。
+  上游 find_package(KF6 6.26.0) 的版本闸会拒 6.18.0（ConfigVersion 检查
+  PACKAGE_VERSION < PACKAGE_FIND_VERSION → NOT COMPATIBLE）。
+rec_approach: >
+  选生态 A（qtbase/6.11.1 + qtbase-sql-dbus/6.11.1 并存）+ 可移植性补丁
+  放宽上游 KF6_MIN_VERSION 到生态内可用版本（6.18.0）。KDBusService 等
+  KF6::DBusAddons API 自 KF5 起稳定，功能不受影响。
+prescan_pattern: "qtbase/6.11.1.1"
+last_updated: 2026-09-19
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E2285.md
+trigger_tool:           conan
+phase:                  packaging
+affected_scope:         OHOS qtbase 双生态互斥（qtbase/6.11.1 vs qtbase/6.11.1.1）与 KF6 包版本
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        >

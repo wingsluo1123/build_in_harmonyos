@@ -1,0 +1,19 @@
+id:                     E2186
+category:               network, conan, packaging
+severity:               2
+match_keywords: upstream, 404, repository not found, repo deleted, tag missing, source unavailable, Intronics, 等价源, 上游删除
+error_signature: "HTTP 404 on https://github.com/<owner>/<repo> (repository deleted) while task specifies <repo>@<tag>; GitHub API /users/<owner>/repos returns empty list"
+root_cause: 上游仓库被删除/私有化（账号仍在但公开仓库清零），任务指定的精确 tag 源码不可获取。但软件包的"版本号"与"内嵌二进制产物的库版本"是两条线（如 NXP libusbsio：PyPI 包版本 2.1.x 是 wrapper 版本，内嵌 C 库独立用 v2.1a-e 字母修订）——目标平台的产物可能在多个包版本间从未变更，精确 tag 消失≠产物源码消失。
+rec_approach: 四步产物级等价源判定法：①版本语义拆解——strings 提取官方各版本发行物（PyPI whl/sdist 内嵌 so/dll）的库版本串，建立"包版本→库修订"演进表；②MD5 字节级对照——目标平台（如 linux/aarch64）的产物在哪些包版本间逐字节相同（相同=源码未变更）；③快照源核验——找同库版本串的公开源码快照（社区镜像仓库/发行版打包仓），对齐 g_LibVersion 宏与 API 导出面（nm -D 对照）；④证据链落 notes.md+PR 正文（审核答辩材料）。源 URL 用快照仓库 pinned commit + sha256。
+prescan_pattern: "404.*github\\.com/|repository.*not found.*upstream"
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-17
+authors:               unknown
+doc_file:               doc/E2186.md
+trigger_tool:           conan
+phase:                  packaging
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        四步产物级等价源判定法：①版本语义拆解——strings 提取官方各版本发行物（PyPI whl/sdist 内嵌 so/dll）的库版本串，建立"包版本→库修订"演进表
