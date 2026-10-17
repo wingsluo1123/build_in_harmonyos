@@ -1,0 +1,30 @@
+id: DRAFT-xdffileio-0.3-serial-harness-log-line-count
+trigger_tool: make|conan|test
+phase: testing|build
+error_signature: test-suite\.log not found; searched:|install-man3.*Error 64|PASS: errorcheck
+severity: 3
+category: autotools, testing, build-system, ohos
+match_keywords: autotools_configure, serial_harness, test-suite.log, install-man3, make check, upstream-check.log
+title: 串行harness老automake无test-suite.log时落盘逐行计数替代新式汇总
+root_cause: xdffileio 0.3为2012年生成的serial-harness Makefile，make check只逐TEST打印PASS:/FAIL:行而不写test-suite.log，配方只认新式汇总块而错配抛错；同包doc/install-man3多源一次调用设备install装23个手册页返回EX_USAGE64，属同族老autotools形态问题
+affected_scope: 2012年前后生成的serial-harness老automake包且make check只打印PASS:/FAIL:而不写test-suite.log的场景
+verification_cmd: 真机make check打印PASS行且upstream-check.log落盘计数total=6 passed=6，test-suite.log存在时仍优先使用它，0行匹配时如实失败并列出搜索路径
+rec_priority: 1
+rec_approach: serial-log-file-line-count
+rec_description: POSIX可移植重定向落盘upstream-check.log并回显保留预检日志，单正则逐行匹配PASS/FAIL/XFAIL/XPASS/SKIP/ERROR并做恒等式自检；test-suite.log存在仍优先用它，不存在且串行日志一致才用串行计数
+rec_command: conanfile.py: 新增_parse_serial_check_log与落盘upstream-check.log的_run_upstream_tests分支；MANIFEST.yml/notes.md: 记录串行口径与6个TESTS来源
+rec_auto_fix: false
+rec_impl: conan-recipe
+fallback_priority: 2
+fallback_approach: split-man-install-exec-plus-python-copy
+fallback_description: 全量make install倒在doc/install-man3多文件install返回EX_USAGE64时改用make install-exec只装库，头文件与手册页改用纯Python拷贝装入包内并断言主库存在
+fallback_auto_fix: false
+forbid_1_pattern: "discovered":0[^}]*"status":"passed"|total=0.*passed=0
+forbid_1_reason: 禁止零行匹配或无落盘日志下凑数放行；串行计数须有落盘文件与恒等式自检
+forbid_1_consequence: 真机预检evidence incomplete，上游结果不可审计，任务退回修复循环
+similar_to: []
+doc_file: knowledge/drafts/DRAFT-xdffileio-0.3-serial-harness-log-line-count.md
+last_updated: 2026-10-10
+source_event: xdffileio/0.3 真机预检串行harness无test-suite.log与install-man3 Error 64修复为落盘计数与拆分安装
+authors: hmbs-executor
+source_pr: 15241
