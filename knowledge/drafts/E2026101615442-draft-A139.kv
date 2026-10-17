@@ -1,0 +1,116 @@
+#====================================================================
+# _template.kv — 知识图谱条目模板
+# 用法: 复制此文件为 E2026101615442.kv，填写各字段
+# 对应的人类文档: doc/E2026101615442.md
+#
+# 格式规则:
+#   - key: value（冒号后一个空格，value 到行尾）
+#   - 多行值: 下一行以空格开头 = 续行
+#   - 列表值: 逗号分隔
+#   - 正则值: | 分隔多个模式
+#   - 以 # 开头的行为注释
+#   - 空行忽略
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+# trigger_tool: 出错的工具 (configure/cmake/meson/make/gcc/clang/ld/python/pip/install/test/runtime)
+# phase:         出错阶段 (configuration/compilation/linking/installation/testing/runtime)
+# error_signature: 正则表达式(|分隔), 用于精确匹配日志文本
+id:                     E2026101615442
+trigger_tool: conan|Environment|perl
+phase: configure|build|test
+error_signature: Can.t locate Test/Harness.pm|define.*prepend_path.*space-joined
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+# severity:      3=🔴blocking  2=🟡medium  1=🟢minor  0=✅resolved
+# category:      分类标签（受控词表 64 词，逗号分隔，最多 5 个；add/promote 自动归一化）
+# prescan_pattern: （可选）预编译源码扫描正则——写入后 PreScanner 运行时自动派生
+#                   PSCAN-KB-{id} 规则，无需改 pre-scan-rules.yaml（知识增长即扫描能力增长）
+# prescan_globs:   （可选）扫描范围 glob 列表，默认 '*.c, *.h, *.cc, *.cpp, *.sh, Makefile*, *.mk'
+# 词表: platform, compat, limitation, detection, hmdfs, ohos, selinux, kernel, portability, libc, musl, posix, syscall, headers, threading, socket, network, build-system, cmake, autotools ...（全表见 scripts/ohc/kb_taxonomy.py）
+# match_keywords: 纯文本关键词(逗号分隔), 用于粗筛(固定字符串匹配F)
+# title:         简短标题(一句话描述错误模式)
+severity: 1
+category: conan, environment, build-system
+match_keywords: Conan Environment, define_path, define, prepend_path, setdefault, _EnvValue, path=False, first definition, PERL5LIB
+title: Conan路径变量首次define后prepend_path保留标量分隔类型
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+# root_cause:       一句话根因描述(逗号可分行)
+# affected_scope:   影响范围
+# verification_cmd: 验证诊断是否正确的命令
+root_cause: Environment.define creates a scalar _EnvValue with space separator; later prepend_path uses setdefault and retains the first value type and separator.
+affected_scope: Conan 2 environments that define a search-path variable as scalar before adding path entries.
+verification_cmd: Evaluate actual Conan EnvVars with OHOS settings and identical published Perl; scalar-first import rc2, path-first rc0; full original tests and native consumer/Harmony.
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+# 推荐方案 (priority 越小越优先, 从 1 开始)
+rec_priority: 1
+rec_approach: define-path-semantics-at-first-private-variable-definition
+rec_description: Conan Environment先用define建立变量时会保存path=False和默认空格分隔；后续prepend_path通过setdefault沿用已有_EnvValue，不会自动将其改为路径列表。即使最初值已用os.pathsep拼接，追加后仍可能成为带空格的单一搜索目录。对实例私有且明确重建的路径变量，首次用define_path，再prepend_path；传递依赖导出继续采用路径追加，避免覆盖依赖图。
+rec_command: env.define_path("PERL5LIB", core_arch_value); env.prepend_path("PERL5LIB", source_lib)
+rec_auto_fix: false
+rec_impl: Use define_path at the first creation of explicitly private reconstructed paths; retain dependency-export prepend_path semantics.
+
+# 回退方案 (当推荐方案不可用时尝试)
+fallback_priority:      2
+fallback_approach:
+fallback_description:
+fallback_command:
+fallback_auto_fix:      false
+fallback_impl:
+
+# ★ 禁止策略 (与推荐方案同等重要) ★
+# forbid_N_pattern:     正则(|分隔), 匹配则拒绝/警告
+# forbid_N_reason:      为什么禁止
+# forbid_N_consequence: 违反后的后果
+forbid_1_pattern:
+forbid_1_reason:
+forbid_1_consequence:
+# forbid_2_pattern:
+# forbid_2_reason:
+# forbid_2_consequence:
+
+# ═══ Layer 4: 原则引用 ═══
+# principles:    适用的原则 ID 列表(逗号分隔), 在 graph/principles.kv 中定义
+principles:
+
+# ═══ 关系图 (Relations) ═══
+# causes:          本模式是这些模式的根因 (修好本模式可能同时解决它们)
+# caused_by:       本模式的根因是这些模式 (应先修它们)
+# similar_to:      特征相似可能混淆的模式
+# conflicts_with:  解决方案互相冲突的模式
+# prerequisite_of: 本模式是修复这些模式的前置条件
+causes:                 []
+caused_by:              []
+similar_to: kcolorchooser-26.04.0-conan-env-append-space-joined-qt-plugin-path,DRAFT-perl-buildenv-info-missing-dependency-injection,DRAFT-remctl-3.18-conan-buildenv-save-order
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file: knowledge/drafts/E2026101615442-draft-A139.md
+last_updated: 2026-10-16
+source_event: r1463 failed; r1475 real scalar-first rc2/path-first rc0; perl-readonly-2.05.1-official-20261016-r1490 two creates14/188/171+17NA C3H1; observer fbfdc392da37c32a4b06616c6acd38b3f8eda240865177b171e8564c220c29b9
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+# authors: 作者列表 (格式: Name <email>, Name2 <email2>)
+#          草稿生成时自动从 git config 填入；主编合入时保留原作者
+#          合并到已有条目时追加为第二/第三作者
+# source_pr:            添加该条目的 PR 编号
+# source_commit:        添加时的 commit SHA (短)
+authors: 2301_80739235
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics, 方案 D) ═══
+# metrics_success_count: 该修复方案成功次数
+# metrics_fail_count:    该修复方案失败次数
+# metrics_confidence:    置信度 = success / (success + fail)
+# metrics_last_used:     最后使用时间
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+
+draft: true
+contributor_id: A139
