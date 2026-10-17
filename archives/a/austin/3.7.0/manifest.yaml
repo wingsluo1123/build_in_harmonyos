@@ -1,0 +1,67 @@
+# 版本级 manifest — austin 3.7.0
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "3.7.0"
+software: austin
+status: built
+build_date: "2026-10-15"
+build_system: autotools
+
+source:
+  url: "https://codeload.github.com/P403n1x87/austin/tar.gz/refs/tags/v3.7.0"
+  sha256: "225968a4302529b62d212db07fa692446a6df58049f2f444011ef4866604339e"
+  filename: "austin-3.7.0.tar.gz"
+  note: >-
+    上游真实版本 v3.7.0（GitHub tag 已核：v4.0.0 / v3.7.0 / v3.6.0 …），**与平台清单一致**，
+    无版本差异。
+
+build:
+  system: autotools
+  configure_options:
+    - "--build=aarch64-unknown-linux-musl"
+    - "--host=aarch64-unknown-linux-musl"
+    - "LIBS=-largp"
+  dependencies:
+    # 两个依赖**都已在仓库归档**（按"算依赖先扣掉仓库已有"的口径，不构成阻塞）
+    - "argp-standalone/1.5.0（musl/OHOS 没有 glibc 的 argp，而上游 src/argparse.c 直接 #include <argp.h>）"
+    - "libunwind/1.6.2（austinp 原生采样器可选依赖；仓库该包不含 libunwind-ptrace.h → 上游自行跳过 austinp）"
+  build_requirements:
+    - "automake/1.18（源码只有 configure.ac，须 autoreconf 自举）"
+    - "libtool/2.5.4"
+  language: "C（austin 本体 + argp) —— 编译过程里有 C/C++ 系工具链"
+
+patches_applied: []
+
+upstream_tests:
+  framework: "pytest（test/ 下 CUnit + functional + integrity）"
+  test_path: "test/（cunit 17 + functional 33 + integrity 3 + support 2，共 55 个 def test_）"
+  test_command: "上游 test/run.sh → pytest（**在本平台不可执行，原因见下**；上游 harness 自身拒绝 HarmonyOS）"
+  test_count: 55
+  run_in_build: true
+  verified: false
+upstream_test_pass_rate: >-
+  **上游共 55 个用例（cunit 17 + functional 33 + integrity 3 + support 2）；本平台可执行 0/55**
+  （如实声明，不冒充通过）。原因**不是**缺依赖、也**不是**人为跳过，而是**上游测试框架硬编码了平台门**：
+  `test/utils.py` 的 `python(version)` 只接受 `Windows`/`Darwin`/`Linux`，其余一律
+  `raise RuntimeError(f"Unsupported platform: {platform.system()}")`。本机 `platform.system()` =
+  `HarmonyOS` → 实跑上游 integrity 子集即得 `RuntimeError: Unsupported platform: HarmonyOS`
+  （`test/utils.py:89`，已实测）。配方 `_run_upstream_tests()` 把这条做成了**能失败的断言**：
+  一旦上游放开平台门（或改在 Linux 上构建），构建会失败并提示"应改为真实执行上游 55 个用例"。
+  另注：上游 `test/run.sh` 本身也写死作者本机 venv 与私有 `LD_LIBRARY_PATH`，同样不可移植（旁证）。
+  因此按仓库既有做法在配方内补能真跑的测试（见下）。
+adapted_test_pass_rate: >-
+  配方内补的测试：① `austin --help` rc=0 且打印用法（**硬判**，通过 ✓）；
+  ② **真实采样一次**（对 CPython 进程 `-i 1000` 采样）：本环境 rc=33
+  `Cannot launch the given command or it terminated too quickly` —— 根因是本环境**没有 austinp**
+  （仓库 libunwind 不含 `libunwind-ptrace.h`，上游 configure 已明确打印 `not building austinp: missing libunwind`）
+  → **如实记录、不计为通过**（不据此让 build 失败，因为这是环境限制而非适配缺陷）。
+  消费者校验：`test_package/check_austin.py` **7 项全过**（`checks=7 fails=0` / `RESULT: PASS`），
+  其中"真实采样"一项同样标注为"本环境缺 austinp/ptrace 支持——如实记录，不计为通过"。
+
+knowledge_gained:
+  - category: L1
+    content: "**依赖是否阻塞，先扣掉仓库已有的**：austin 需要 argp 与 libunwind，而仓库 `archives/a/argp-standalone`（1.5.0）与 `archives/l/libunwind`（1.6.2）都已归档、制品仓也有二进制 → 按仓库既有归档直接 `requires` 引用即可，**不该因'有依赖'淘汰候选**（这条口径纠正了此前用'零依赖'筛库的误判）。"
+    reason: "austin 适配实测——argp/libunwind 均为仓库已有"
+  - category: L1
+    content: "**autotools 依赖的 include/lib 要显式注入，且静态库要用 `LIBS=` 而非 `LDFLAGS`**：只靠 `AutotoolsToolchain` 自动收集时，austin 的编译行里不会出现 argp 的 include（`#include <argp.h>` 直接 not found）；把 `-largp` 放 LDFLAGS 会排到目标文件之前（静态库顺序不对，静默漏符号），正确做法是 `tc.configure_args.append(\"LIBS=-largp\")` 让它落在链接行末尾。另两条 OHOS 必备：`--build/--host=aarch64-unknown-linux-musl` 显式给三元组（config.guess 认不出），以及**在 autoreconf 之后**把 configure 里的 `umask 077` 改成 022（HMDFS 目录权限，仓库 argp-standalone 同款）。"
+    reason: "austin 适配实测——四轮 CI 才打通（argp include / LIBS 顺序 / 三元组 / umask）"
