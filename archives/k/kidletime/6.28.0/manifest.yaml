@@ -1,0 +1,33 @@
+# 版本级 manifest — kidletime 6.28.0
+version: "6.28.0"
+software: kidletime
+status: built
+build_date: "2026-10-17"
+build_system: cmake
+
+source:
+  url: "https://download.kde.org/stable/frameworks/6.28/kidletime-6.28.0.tar.xz"
+  sha256: "0ada459a4ccdf75d17329bfa4ee42c2c6e7b3ead1ec4b427f82bed063b970ff5"
+  tar_format: tar.xz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DWITH_X11=OFF"
+    - "-DWITH_WAYLAND=OFF"
+    - "-DBUILD_QCH=OFF"
+    - "-DCMAKE_CXX_STANDARD=20"
+    - "-DCMAKE_PLATFORM_NO_VERSIONED_SONAME=ON"
+  dependencies:
+    - qtbase/6.11.1
+  tool_requires:
+    - ecm/6.28.0
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "kidletime 6.28.0 升级自 6.26.0 配方：ECM 升至 6.28 后 KDEInstallDirs6 在 configure 期经 ecm_query_qt 运行 qtbase qtpaths 宿主工具，沙箱 LD_LIBRARY_PATH 中不兼容的 libc++_shared.so 会遮蔽兼容版，需 prepend /system/lib64（kconfig 6.26.0 / bluez-qt 6.28.0 / kitemviews 6.26.0 precedent）"
+  - "CMAKE_PLATFORM_NO_VERSIONED_SONAME=ON：HMDFS 拒绝 symlink()（EPERM），版本化 .so.<major> 符号链接链在真机构建时失败，改为仅输出裸名库文件；配合 CMAKE_SHARED_LIBRARY_SONAME_* 标志保证 DT_SONAME 存在、消费者记录裸 soname 而非构建机绝对路径"
+  - "WITH_X11=OFF/WITH_WAYLAND=OFF 关闭后端，核心库仅依赖 Qt6Core/Qt6Gui；6.28.0 上游代码相对 6.26.0 仅版本号与 Wayland 插件日志类调整，核心适配面不变"
