@@ -1,0 +1,35 @@
+software: zyre
+version: "2.0.1"
+status: built
+build_date: "2026-10-16"
+build_system: cmake
+conan_ref: "zyre/2.0.1"
+
+source:
+  url: "https://github.com/zeromq/zyre/releases/download/v2.0.1/zyre-2.0.1.tar.gz"
+  sha256: "0ba43fcdf70fa1f35b068843a90fdf50b34d65a9be7f2c193924a87a4031a98c"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DZYRE_BUILD_SHARED=ON"
+    - "-DZYRE_BUILD_STATIC=OFF"
+    - "-DENABLE_DRAFTS=OFF"
+    - "-DCMAKE_PLATFORM_NO_VERSIONED_SONAME=ON"
+    - "-DCMAKE_SHARED_LIBRARY_SONAME_C_FLAG=-Wl,-soname,"
+  dependencies:
+    - "czmq/4.2.1"
+  cc: clang
+
+patches_applied:
+  - "0001-CMakeLists.txt.patch"
+
+knowledge_gained:
+  - "CMake 4.x 移除 <3.5 兼容：cmake_minimum_required(2.8.12) 需提升至 3.5...3.27（zeromq/czmq 同款补丁）"
+  - "zproject 的 Findczmq/Findlibzmq 走 MODULE 模式（pkg-config + find_path/find_library），需经 CMAKE_INCLUDE_PATH/CMAKE_LIBRARY_PATH 注入 czmq/zeromq 包 include/lib 目录"
+  - "CMAKE_SYSTEM_NAME=HarmonyOS 是 CMake 未知平台：按 E330 用 CMAKE_PLATFORM_NO_VERSIONED_SONAME=ON + CMAKE_SHARED_LIBRARY_SONAME_C_FLAG=-Wl,-soname, 保住 SONAME（产物单文件 libzyre.so，无版本化软链）"
+  - "发布版 zeromq/libzmq.so 无 SONAME，依赖方须以 -L/-l 形式链接（Findlibzmq 的 LIBZMQ_LIBRARIES 预置）；libczmq.so 有 SONAME，find_library 直连得到相对 DT_NEEDED"
+  - "Conan CMakeDeps 对二阶传递依赖剥离 include/libs 数据：头文件透传型链（zyre.h→czmq.h→zmq.h）的 test_package 需显式 requires czmq 与 zeromq"
+  - "宿主契约：pkg_config_name 必须为 libzyre；bin/zpinger 触发 R38，软件级 commands.json 必备"
+  - "ENABLE_DRAFTS Release 默认 OFF；开启后编入 5 个私有类（zre_msg/zyre_peer/zyre_group/zyre_election/zyre_node）并注册进 zyre_selftest"

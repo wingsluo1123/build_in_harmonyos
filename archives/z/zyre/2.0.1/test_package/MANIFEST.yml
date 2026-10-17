@@ -1,0 +1,31 @@
+package: zyre/2.0.1
+homepage: "https://github.com/zeromq/zyre"
+
+upstream_check_command: "cmake -S . -B build && cmake --build build --target zyre_selftest zpinger"
+upstream_test_in_build: false
+upstream_test_command: "./zyre_selftest all"
+
+upstream_tests:
+  - file: src/zyre_selftest.c
+    source: zyre-2.0.1/src/
+    description: "Upstream zproject selftest: single binary, 7 test functions. Public (Release/ENABLE_DRAFTS=OFF): zyre, zyre_event. Private (only registered with ENABLE_DRAFTS=ON): zre_msg, zyre_peer, zyre_group, zyre_election, zyre_node. Run per test from the build tree root with ./zyre_selftest <TEST>."
+    command: "./zyre_selftest --test zyre && ./zyre_selftest --test zyre_event"
+    result: "Run per test on OHOS device; public tests pass (inproc gossip dual-node interconnect, no external network needed); UDP beacon full path covered by the HarmonyOS consumer flow test; private tests verified with an enable_drafts=True build variant."
+
+test_package_tests:
+  - file: test_zyre.c
+    description: "Consumer test: verify ZYRE 2.0.1 version macros (compile-time and zyre_version()), zyre_new/name/uuid/set_header/destroy lifecycle smoke, zmsg assembly."
+    command: "./test_zyre"
+  - file: test_ohos_flow.c
+    description: "End-to-end consumer flow program: two zyre nodes are created and started serially on the main thread (all socket creation single-threaded by construction), then driven in two threads — they discover each other over real UDP beacons on the OHOS device (ZRE discovery, port 5670), both join group FLOW-GROUP, each waits for the peer's ENTER and JOIN events, beta shouts hello-from-beta, alpha receives the SHOUT with exact payload and shouts back ack-from-alpha, beta receives the ack and stops, alpha waits for beta's EXIT (proof the ack was consumed end-to-end) before stopping, both nodes stop/destroy gracefully, and a flow-report.txt with per-step evidence is written under the work dir."
+    command: "bash test_ohos.sh <lib_dir> test_ohos_flow <work_dir>"
+
+# 新增/鸿蒙特有测试 (rule12)
+added_tests:
+  - name: "harmonyos-specific-consumer-flow"
+    source: test_package/test_ohos.sh
+    description: "鸿蒙特有端到端消费者用例（非纯断言）：运行时探测 OpenHarmony 平台（param get const.ohos.fullname）；readelf 断言 libzyre.so 与消费者二进制为 ELF64/AArch64 且 SONAME=libzyre.so（house E330：OHOS 无版本化 soname）、DT_NEEDED 含 libzyre.so 与相对名 libzmq.so；消费者依赖在 conanrun 环境全闭合（ldd 或路径扫描）；随后真实跑通 ZRE 功能流——双 zyre 节点在 main 线程串行创建并启动（全部 socket 创建单线程化）后由双线程做事件编排，经真机 UDP beacon 相互发现（ENTER）、加入同组（JOIN）、SHOUT 组播收发（精确载荷断言，alpha 以 beta 的 EXIT 握手确认 ack 已被对端消费后才停止，消除 stop 与未刷盘组播报文的竞态）、优雅 stop/destroy，flow-report.txt 落盘逐行证据并以 FLOW-RESULT: PASS 收尾。仅使用公开稳定 API（zyre/zyre_event），所有等待设 60 秒上限防 CI 挂死（吸收调度尖峰）；全部 zyre/czmq socket 创建收进 main 线程串行完成，从构造上消除上游 czmq 4.2.1 在 zsys_init 初始化完成后无锁追发环境/默认值设置器（断言 s_open_sockets==0）与并发首次建连之间的竞态（PR-check #16226 SIGABRT 根因）。"
+    command: "bash test_ohos.sh <lib_dir> test_ohos_flow <work_dir>"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 29
