@@ -1,0 +1,64 @@
+#====================================================================
+# DRAFT-8959-raqm-0.11.0-meson-ninja-ld-library-path-whitespace — 设备环境 LD_LIBRARY_PATH 空白污染使 meson 探测 ninja 失败（exit 127）
+# 触发事件: raqm 0.11.0 适配（conan create 阶段 meson setup 报 Could not detect Ninja v1.8.2 or newer）
+# 路径: Path B（知识库扩展）
+#====================================================================
+
+id:                     E2140
+trigger_tool:           meson|conan create|MesonToolchain|ninja
+phase:                  conan_build|meson_setup
+error_signature:        ERROR: Could not detect Ninja v1\.8\.2 or newer|Error relocating /data/service/hnp/bin/ninja: _Znwm: symbol not found|Error loading shared library libc\+\+_shared\.so: \(needed by /data/service/hnp/bin/ninja\)
+
+severity:               2
+category:               meson, device-env, ld-library-path, ninja, whitespace
+match_keywords:         Could not detect Ninja, ninja, libc++_shared.so, LD_LIBRARY_PATH, 空格, whitespace, meson setup, Popen, exit 127, Error relocating, symbol not found
+title:                  Ambient LD_LIBRARY_PATH carries whitespace-polluted entries; OHOS loader then rejects /data/service/hnp/bin/ninja — normalize before meson subprocesses
+
+root_cause: >
+  1) 设备系统环境注入的 LD_LIBRARY_PATH 含空白污染段（chipset-pub-sdk
+     冒号后多空格），OHOS musl 加载器对带空白的路径段解析失败；
+  2) /data/service/hnp/bin/ninja 无 RPATH 且 NEEDED libc++_shared.so，
+     实际由 /system/lib64 或 /data/storage/el1/bundle/libs/arm64 提供；
+     只要加载器被污染段卡住，即便列表里含正确目录也整体失败；
+  3) bash 直接跑与 python3 Popen 的差异在于子进程环境构造路径——
+     conan build() 的 self.run 经 command_env_wrapper source
+     conanbuild.sh 展开，原样保留污染段；
+  4) meson 1.12 的 ExternalProgram 探测（Popen_safe）在污染环境下
+     对 ninja --version 得 rc=127，判定无可用 ninja。
+
+verification_cmd: >
+  python3 - <<'PY'
+  import os, subprocess
+  ld = os.environ.get("LD_LIBRARY_PATH", "")
+  cleaned = ":".join(s.strip() for s in ld.split(":") if s.strip())
+  print("polluted:", ld != cleaned)
+  env = dict(os.environ, LD_LIBRARY_PATH=cleaned)
+  r = subprocess.Popen(["ninja", "--version"], stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE, universal_newlines=True, env=env)
+  out, err = r.communicate()
+  print("rc:", r.returncode, "out:", out.strip())
+  PY
+
+rec_priority:           1
+rec_approach:           sanitize-ld-library-path-before-meson
+rec_description: >
+  meson 类配方 build() 首行清洗 LD_LIBRARY_PATH 空白段（split(":") +
+  strip + 重组），再调 meson.configure()；对 Popen 型工具探测失败
+  （ninja/clang-scan-deps 等依赖 libc++_shared.so 的 hnp 工具）通用。
+rec_command:            cd archives/r/raqm/0.11.0 && grep -n "sanitize_ld_library_path\|_sanitize" conanfile.py | head -3
+rec_auto_fix:           false
+rec_impl:               conan-recipe-build-env-normalize
+
+doc_file:               knowledge/drafts/DRAFT-8959-raqm-0.11.0-meson-ninja-ld-library-path-whitespace.md
+last_updated:           2026-09-16
+source_event:           raqm 0.11.0 适配，conan create 阶段 meson setup 报 Could not detect Ninja v1.8.2 or newer（设备环境 LD_LIBRARY_PATH 空白污染）
+authors:                j669539
+source_pr:
+source_commit:
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     0.9
+metrics_last_used:      2026-09-16
+
+affected_scope:         Ambient LD_LIBRARY_PATH carries whitespace-polluted entries;

@@ -1,0 +1,50 @@
+#====================================================================
+# DRAFT-glib-networking-2.90.0-tls-backend-bridge — OHOS 上 GLib 仅有
+# GDummyTlsBackend（空实现）导致依赖 glib TLS 的库上游测试 0 执行，
+# 以 glib-networking GIO 模块（openssl 后端 + 共享 glib）桥接真实 TLS 后端
+# 触发事件: glib-networking 2.90.0 适配（libsoup3 http2 测试链恢复）
+# 路径: Path B（知识库扩展）
+#====================================================================
+
+id:                     E2039
+trigger_tool:           meson|conan|clang|g_tls_backend_get_default
+phase:                  conan_build|runtime|testing
+error_signature:        GDummyTlsBackend|tls_available|if\(!tls_available\).*return 0|0 执行|
+                          cannot register existing type|GIO_EXTRA_MODULES|giomoduledir|
+                          GTlsBackendOpenssl|wrong version number
+
+severity:               2
+category:               ohos, meson, conan, gio, glib
+match_keywords:         glib-networking, GDummyTlsBackend, GTlsBackendOpenssl,
+                         g_tls_backend_get_default, GIO module, giomoduledir,
+                         shared glib, libsoup3, http2, tls_available,
+                         LD_LIBRARY_PATH, codesign, meson.install, RUNPATH
+title:                  On OHOS GLib only provides GDummyTlsBackend; install glib-networking's GIO TLS module (openssl backend) against a shared glib so g_tls_backend_get_default() returns a real backend and upstream TLS tests execute
+
+root_cause:             OHOS 缺 GLib 官方 TLS 后端模块；GDummyTlsBackend 空实现
+                        使 tls_available=FALSE，依赖库上游测试短路 0 执行
+  1) glib-networking 是 GIO TLS 后端模块，需与消费进程共享同一 glib 类型系统
+     （shared glib），静态 glib 会双份注册 GObject 类型；
+  2) 模块必须 dlopen 加载，OHOS loader 校验 .codesign 段内嵌哈希，任何
+     post-link 改写（meson.install 清理 RUNPATH）导致哈希失配即拒绝加载；
+  3) 测试运行时需 LD_LIBRARY_PATH 指向共享 glib 库目录。
+
+rec_approach:           install-gio-tls-module-against-shared-glib
+rec_description:        meson 构建 glib-networking（openssl=enabled 单后端），
+                        依赖 ohpcd 已发布的共享 glib/2.88.3 与 openssl/3.5.8.1；
+                        PkgConfigDeps 生成的 gio-2.0.pc 缺 giomoduledir，复制
+                        glib 包真实 .pc 修 prefix 并前置 PKG_CONFIG_PATH，剥离
+                        内嵌 proxy-libintl/zlib/pcre2 的 Requires；package() 用
+                        build 原始 libgioopenssl.so 覆盖 meson.install 改写产物；
+                        测试与消费者以 GIO_EXTRA_MODULES 指向模块目录。
+forbid_1_reason:        静态 glib 下 GIO 模块与消费进程各持一份 GObject 类型系统，
+                        运行时类型注册冲突，上游测试无法执行
+forbid_2_reason:        OHOS loader 校验 .codesign 段内嵌哈希与文件内容一致性
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-17
+authors:               unknown
+doc_file:               doc/E2039.md
+affected_scope:         On OHOS GLib only provides GDummyTlsBackend; install glib-ne
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）

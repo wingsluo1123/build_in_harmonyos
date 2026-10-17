@@ -1,0 +1,56 @@
+id:                     E2038
+title: Motif 全树 make 在 OHOS 上终止于 host-only 工具 tools/wml（wmluiltok 链接 undefined symbol: main）——构建作用域收缩到 lib/（Xm+Mrm）
+
+# ═══ Layer 0: 错误面 ═══
+trigger_tool: make|ld.lld|autotools
+phase: build|link
+error_signature: |
+  ld.lld: error: undefined symbol: main
+  >>> referenced by crt1.c.*Scrt1.o:\(_start_c\)
+  make.*Error 1.*wmluiltok
+  make\[2\]: \*\*\* \[Makefile:[0-9]+: wmluiltok\] Error 1
+
+# ═══ Layer 1: 识别层 ═══
+severity:               2
+category:               build-system, cross-compile, x11
+match_keywords: Motif, wml, wmluiltok, tools/wml, host tool, undefined symbol main, lex, flex, 全树 make, 构建作用域, libXm, Mrm, Scrt1.o, crt1.c
+
+# ═══ Layer 2: 诊断层 ═══
+root_cause: >
+  wmluiltok 是 *构建期 host 工具*（由 .l 经 lex/flex 生成、在构建机上运行，用来把 WML 编译成
+  UIL 资源）。上游假设"本地构建"（host==target）故直接交叉链到目标 CRT；交叉编译到 OHOS 时，
+  生成的 wmluiltok.o 没有 main（生成器未产出/未按 host 编译），而链接器仍按目标可执行文件链接，
+  于是以 Scrt1.o 的 _start_c 引用 main 报错。它与 libXm/Mrm 的目标产物无关。
+affected_scope: >
+  所有"顶层 Makefile 里混编 host 工具 + 目标库"的 autotools 上游：Motif 系（tools/wml、
+  clients/uil 等）、以及任何交叉编译时需要在构建机运行生成器的项目。只交付库的适配完全不需要
+  这些 host 工具。
+# ═══ Layer 3: 方案层 ═══
+rec_priority: 1
+rec_approach: scope-build-to-lib-subdir
+rec_description: >
+  配方 build()/package() 显式把构建与安装限定到 lib/ 子目录（Autotools.make(args=["-C","lib"])
+  / make -C lib install DESTDIR=...），只交付 Xm + Mrm 与其头文件；在 notes.md/manifest.yaml 里
+  如实记录"全树 make 在 tools/wml 失败的原始错误"与"作用域收缩决定"，不静默丢组件。
+rec_command: |
+  autotools.make(args=["-C", "lib", "-j1"])
+  autotools.make(args=["-C", "lib", "check", "-j1"])          # 层1 上游测试痕迹
+  self.run(f"make -C lib install DESTDIR={pkg} -j1")          # package()
+rec_auto_fix: false
+rec_impl: manual
+
+fallback_priority: 2
+fallback_approach: native-build-host-tools
+fallback_description: >
+  在 host profile（非 OHOS 目标）下单独构建 tools/ 下的生成器，再进入目标构建。只有在确实需要
+  交付 mwm/uil/wml 等可执行文件时才值得做；库场景成本高、收益为零。
+fallback_command: N/A
+fallback_auto_fix: false
+
+# ═══ Layer 4: 原则引用 ═══
+principles:               
+# ═══ 元数据 ═══
+last_updated:               2026-10-17
+authors:               unknown
+doc_file:               doc/E2038.md
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）

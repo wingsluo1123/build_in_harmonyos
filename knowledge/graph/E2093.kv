@@ -1,0 +1,27 @@
+id:                     E2093
+severity:               2
+category:               headers, cmake, conan, dependency, packaging
+trigger_tool: conan|cmake
+phase: configuration|link|package
+error_signature: fatal error: 'EABase/eabase.h' file not found|include could not find requested file|target_link_libraries.*bare.*target|No compatible configuration found
+
+match_keywords: EABase, eabase.h, file not found, include, CMakeDeps, header-only, cpp_info.requires, includedirs, consumer
+
+root_cause: EA 系列库（EABase/EAAssert/EASTL/EAStdC 等）的公开头文件相互 include（eaassert.h → "EABase/eabase.h"）。上游 CMakeLists 用裸目标名（target_link_libraries(EAAssert EABase)）假设依赖以 add_subdirectory 内嵌源码树；干净 Conan 构建无该目标，且 header-only 依赖（eabase）经 CMakeDeps 生成的 INCLUDE_DIRS 为空，导致依赖 include 目录不传播到消费者编译行，消费者/库本体编译报 'EABase/eabase.h' file not found。另有上游 CMakeLists include() 子模块内 .cmake 模块（CommonCppFlags 位于 test/packages/EASTL/scripts/CMake）因子模块缺失而失败的连带问题。
+
+rec_approach: 三层修复组合：
+  1) 上游裸目标桥接：补丁把 target_link_libraries(EAAssert EABase) 改为 find_package(eabase REQUIRED) + target_link_libraries(EAAssert eabase::eabase)，配方声明 generators="CMakeDeps" + requires="eabase/0699a15"。
+  2) 配方 package_info 显式传播：self.cpp_info.requires = ["eabase::eabase"]，并把依赖包 includedirs（绝对路径，经 self.dependencies["eabase"].cpp_info.includedirs + package_folder）追加进 self.cpp_info.includedirs——保证消费者只链接 eaassert::eaassert 也能 resolve <EABase/eabase.h>（CMakeDeps 对 header-only 依赖可能生成空 INCLUDE_DIRS，不能只依赖 requires 传递）。
+  3) 子模块 cmake 模块守卫：若上游 include() 的文件位于 git 子模块（tarball 缺失），用 if(EXISTS ...cmake) include() endif() 守卫，干净构建不依赖子模块。
+
+verification_cmd:
+
+last_updated: 2026-09-15
+authors:               unknown
+doc_file:               doc/E2093.md
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        三层修复组合：
+rec_priority:           1
+rec_auto_fix:          false
+rec_impl:               manual

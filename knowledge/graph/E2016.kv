@@ -1,0 +1,81 @@
+#====================================================================
+# DRAFT-autotools-toolchain-vars-empty-vs-unset — autotools configure 对
+#   AS/AR/STRIP 用 ${VAR-default}：环境导出**空串**即取空值（不会回退），
+#   汇编自检失败并报误导性的 "no NEON support"
+# 触发事件: x264 r3223 适配，CI（worker 导出空 AS）configure 阶段失败
+# 路径: Path B（知识库扩展）
+#====================================================================
+
+id:                     E2016
+trigger_tool:           configure|clang|make|conan
+phase:                  configuration
+
+error_signature:        no NEON support, try adding -mfpu=neon to CFLAGS|
+                        If you really want to run on such a CPU, configure with --disable-asm|
+                        unknown architectural extension: (dotprod|i8mm)|
+                        conftest\.S:.*error:.*(unknown directive|unknown architectural extension)
+
+severity:               2
+category:               ohos, portability, build-system, autotools, toolchain
+
+match_keywords:         no NEON support, mfpu=neon, disable-asm, as_check, as_archext_check,
+                        AS 为空, 空串, ${VAR-default}, ${AS-${CC}}, ASFLAGS, conftest.S,
+                        unknown architectural extension, dotprod, i8mm, .arch_extension,
+                        toolchain env, export AS=, ccache, distcc, worker 环境变量
+
+title:                  autotools configure 对 AS/AR/STRIP 用 ${VAR-default}——环境把变量导出成「空串」时取到空值（不同于「未设置」会回退），汇编检查退化为执行 conftest.S 文件，报出与 NEON 无关的误导性 "no NEON support" 并 exit 1
+
+root_cause:             上游 configure 用 ${VAR-default}（只认「未设置」，不认「已设置但为空」）
+                        取工具链变量；调用方把 AS 导出成空串时 AS=\"${AS-${CC}}\" 得到空值，
+                        汇编检查命令退化为执行 conftest.S 文件，as_check 失败后按「CPU 不支持 NEON」
+                        的分支报错退出。同一坑对 AR="${AR-...}"、STRIP="${STRIP-...}" 同样成立。
+                        常见来源：从别处继承的环境（CI worker 的 buildenv、ccache/distcc 包装、
+                        .zshrc/.profile 里的占位导出）把变量设成空值而非删除。
+
+affected_scope: >
+  所有「上游 configure 用 ${VAR-default} 取 AS / AR / RANLIB / STRIP 等工具链变量」的
+  autotools 或手写 configure 项目（x264 的汇编路径、libvpx、各类带 aarch64 汇编优化的
+  多媒体库）；在 CI worker、容器、或任何把工具链变量导出成空串/占位值的构建环境上会命中。
+  本地手工构建通常不命中（这些变量多为未设置），故表现为「本地通过、CI 失败」。
+
+verification_cmd: >
+  # ① 用「空串」精确复现（在源码目录内执行，输出应只剩 2 行且报 no NEON support）
+  export AS=; bash ./configure --host=aarch64-unknown-linux-gnu --enable-shared --enable-static --enable-pic
+  # ② 确认是空值而非未设置（-default 语义验证）
+  bash -c 'AS=; echo "AS=${AS-fallback}"'    # 打印空行 —— 空串不回退
+  bash -c 'unset AS; echo "AS=${AS-fallback}"'  # 打印 fallback —— 未设置才回退
+  # ③ 修法验证（同一目录重跑，应 rc=0 且 asm: yes）
+  export AS=; AS=/data/service/hnp/bin/clang bash ./configure --host=aarch64-unknown-linux-gnu ...
+
+rec_priority:           1
+rec_approach:           pin-all-toolchain-vars-absolute
+rec_description: >
+  在配方调用 configure 的命令行上内联显式赋值 CC/AS/AR/RANLIB/NM/STRIP 的绝对路径
+  （优先 tools.build:compiler_executables，缺省回退 hnp 工具链），使 configure 里所有
+  ${VAR-default} 展开都拿到非空且正确的值，不再受调用方环境（空串/遮蔽/污染）影响。
+rec_command:            CC=/data/service/hnp/bin/clang AS=/data/service/hnp/bin/clang AR=/data/service/hnp/bin/llvm-ar RANLIB=/data/service/hnp/bin/llvm-ranlib NM=/data/service/hnp/bin/llvm-nm STRIP=/data/service/hnp/bin/llvm-strip bash ./configure --host=aarch64-unknown-linux-gnu --enable-shared --enable-static --enable-pic
+rec_auto_fix:           false
+rec_impl:               conan-recipe-pin-toolchain-vars
+
+forbid_1_pattern:       为绕过 as_check 失败而直接加 --disable-asm
+forbid_1_reason:        as_check 失败是「工具链变量取到空值」的表征，不是「CPU 不支持 NEON」；
+                        --disable-asm 会真的丢掉全部 aarch64 汇编优化（实测本机 asm: yes 时可
+                        正常编译并跑通 102 项 checkasm），属把可修的问题降级为功能损失
+forbid_1_consequence:   产物性能大幅下降且掩盖真实根因；后续同类报错仍会复现
+forbid_2_pattern:       认为这是 NEON/CPU 能力问题而去调 -mfpu=neon 或换工具链版本
+forbid_2_reason:        错误文本来自 configure 的 else 分支，该分支不看任何 NEON 探测结果，
+                        只代表 as_check 这一条命令失败；aarch64 上用 -mfpu=neon 亦不适用
+forbid_2_consequence:   在错误方向上消耗多轮 rebuild，问题依旧
+
+doc_file:               knowledge/drafts/DRAFT-autotools-toolchain-vars-empty-vs-unset.md
+last_updated:           2026-09-13
+source_event:           x264 r3223 适配，CI worker 导出空 AS 导致 configure 汇编自检失败并报 "no NEON support"
+authors:                atomcode-executor
+source_pr:              9815
+source_commit:          ee0e8896c
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     0.85
+metrics_last_used:      2026-09-13
+
