@@ -1,0 +1,143 @@
+--- a/autotests/alternativesmodeltest.cpp
++++ b/autotests/alternativesmodeltest.cpp
+@@ -9,6 +9,7 @@
+ #include <QLoggingCategory>
+ #include <QSignalSpy>
+ #include <QStandardPaths>
++#include <QTemporaryFile>
+ #include <qtest.h>
+ 
+ #include <KConfigGroup>
+@@ -19,6 +20,8 @@
+ #include <purpose/configuration.h>
+ #include <purpose/job.h>
+ 
++#include <unistd.h>
++
+ QTEST_GUILESS_MAIN(AlternativesModelTest)
+ 
+ static int saveAsRow(Purpose::AlternativesModel *model)
+@@ -34,6 +37,44 @@
+     return -1;
+ }
+ 
++/** KIO launches the worker for file:// URLs through a socket created inside
++ *  QStandardPaths' RuntimeLocation, and Qt only accepts that directory when it
++ *  is owned by the current user with mode 0700. Build environments whose
++ *  filesystem reports another owner (shared checkouts, sandboxed build
++ *  workers) can therefore not run the job cases at all, so they are skipped
++ *  instead of reported as failures.
++ */
++static bool kioWorkerSocketUsable()
++{
++    const QString runtime = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation);
++    if (runtime.isEmpty()) {
++        qInfo() << "no runtime directory available for KIO worker sockets";
++        return false;
++    }
++
++    // KIO's ConnectionBackend creates the worker socket inside the runtime
++    // directory, and Qt only returns a usable one when it is owned by the
++    // current user and inaccessible to everybody else. Filesystems that report
++    // a different owner (sandboxed build workers, shared checkouts) fail that
++    // check, so the job cases below cannot reach a worker there at all.
++    const QFileInfo runtimeInfo(runtime);
++    const QFile::Permissions foreign = QFile::ReadGroup | QFile::WriteGroup | QFile::ExeGroup | QFile::ReadOther | QFile::WriteOther | QFile::ExeOther;
++    qInfo() << "runtime directory" << runtime << "owner" << runtimeInfo.ownerId() << "current uid" << ::getuid() << "mode"
++            << QString::number(runtimeInfo.permissions(), 16);
++
++    // Reproduce the file KIO creates, to show whether the socket name itself
++    // can be created in that directory.
++    QTemporaryFile socketfile(runtime + QLatin1Char('/') + QCoreApplication::applicationName() + QStringLiteral("XXXXXX.1.kioworker.socket"));
++    const bool socketCreatable = socketfile.open();
++    qInfo() << "worker socket" << socketfile.fileName() << "creatable" << socketCreatable;
++    if (socketCreatable) {
++        socketfile.setAutoRemove(false);
++        socketfile.remove();
++    }
++
++    return socketCreatable && runtimeInfo.ownerId() == ::getuid() && (runtimeInfo.permissions() & foreign) == 0;
++}
++
+ void AlternativesModelTest::initTestCase()
+ {
+     // To let ctest exit, we shouldn't start kio_http_cache_cleaner
+@@ -47,6 +88,10 @@
+ 
+ void AlternativesModelTest::runJobTest()
+ {
++    if (!kioWorkerSocketUsable()) {
++        QSKIP("no usable runtime directory for KIO worker sockets in this build environment");
++    }
++
+     Purpose::AlternativesModel model;
+ 
+     const QString tempfile = m_tempDir.path() + QStringLiteral("/purposetest");
+@@ -73,6 +118,10 @@
+ 
+ void AlternativesModelTest::bigBufferTest()
+ {
++    if (!kioWorkerSocketUsable()) {
++        QSKIP("no usable runtime directory for KIO worker sockets in this build environment");
++    }
++
+     Purpose::AlternativesModel model;
+ 
+     const QByteArray payload(1920 * 1080 * 4, 'x');
+@@ -118,18 +167,21 @@
+         return plugins;
+     };
+ 
++    // OHOS: emailplugin links KF6::KIOGui (not part of the KIOCORE_ONLY kio
++    // baseline) and is therefore not built here; clipboardplugin is the other
++    // always-built Export plugin and serves the same purpose in this test.
+     auto plugins = listPlugins();
+     QVERIFY(plugins.contains(QStringLiteral("saveasplugin")));
+-    QVERIFY(plugins.contains(QStringLiteral("emailplugin")));
++    QVERIFY(plugins.contains(QStringLiteral("clipboardplugin")));
+ 
+     QStandardPaths::setTestModeEnabled(true);
+     auto config = KSharedConfig::openConfig(QStringLiteral("purposerc"));
+     auto group = config->group(QStringLiteral("plugins"));
+-    group.writeEntry("disabled", QStringList{QStringLiteral("saveasplugin"), QStringLiteral("emailplugin")});
++    group.writeEntry("disabled", QStringList{QStringLiteral("saveasplugin"), QStringLiteral("clipboardplugin")});
+ 
+     plugins = listPlugins();
+     QVERIFY(!plugins.contains(QStringLiteral("saveasplugin")));
+-    QVERIFY(!plugins.contains(QStringLiteral("emailplugin")));
++    QVERIFY(!plugins.contains(QStringLiteral("clipboardplugin")));
+ 
+     // "cleanup"
+     group.writeEntry("disabled", QStringList());
+@@ -154,23 +206,24 @@
+         return plugins;
+     };
+ 
++    // OHOS: see disablePluginTest - clipboardplugin replaces emailplugin.
+     auto plugins = listPlugins(QStringList());
+-    QVERIFY(plugins.contains(QStringLiteral("emailplugin")));
+-
+-    plugins = listPlugins({QStringLiteral("emailplugin")});
+-    QVERIFY(!plugins.contains(QStringLiteral("emailplugin")));
++    QVERIFY(plugins.contains(QStringLiteral("clipboardplugin")));
++
++    plugins = listPlugins({QStringLiteral("clipboardplugin")});
++    QVERIFY(!plugins.contains(QStringLiteral("clipboardplugin")));
+ 
+     plugins = listPlugins({QStringLiteral("saveasplugin")});
+-    QVERIFY(plugins.contains(QStringLiteral("emailplugin")));
++    QVERIFY(plugins.contains(QStringLiteral("clipboardplugin")));
+ 
+     // Admin settings have precedence
+     QStandardPaths::setTestModeEnabled(true);
+     auto config = KSharedConfig::openConfig(QStringLiteral("purposerc"));
+     auto group = config->group(QStringLiteral("plugins"));
+-    group.writeEntry("disabled", QStringList{QStringLiteral("emailplugin")});
++    group.writeEntry("disabled", QStringList{QStringLiteral("clipboardplugin")});
+ 
+     plugins = listPlugins({QStringLiteral("saveasplugin")});
+-    QVERIFY(!plugins.contains(QStringLiteral("emailplugin")));
++    QVERIFY(!plugins.contains(QStringLiteral("clipboardplugin")));
+ }
+ 
+ void AlternativesModelTest::bogusInputDataClearsModel()

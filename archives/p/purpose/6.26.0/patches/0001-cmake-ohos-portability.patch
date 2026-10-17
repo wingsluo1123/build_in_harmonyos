@@ -1,0 +1,72 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -46,6 +46,37 @@
+ 
+ find_package(KF6 ${KF_DEP_VERSION} REQUIRED COMPONENTS CoreAddons I18n Config Kirigami Notifications KIO Service)
+ 
++# OHOS baseline fix (the W3 L5b gate): the published kcoreaddons, kconfig and
++# ki18n packages ship their shared libraries without a DT_SONAME. CMake then
++# hands the linker the absolute path of the imported library and the linker has
++# no soname to record instead, so DT_NEEDED ends up holding the build machine's
++# Conan cache path. The packages' own targets files already set
++# IMPORTED_NO_SONAME, and that does not change the link line on this toolchain
++# (CMake ships no Platform module for OHOS, so it keeps using the full path).
++# Pointing the imported target at the linker's own name form instead makes the
++# linker look the library up in the search path and record the bare library
++# name, which the run-time library path can resolve. The versioned libraries
++# (KF6::KIOCore, KF6::Notifications, Qt6::*) keep their real soname and are left
++# untouched.
++foreach(_ohos_soname_less KF6::CoreAddons KF6::ConfigCore KF6::ConfigGui KF6::I18n)
++    if(TARGET ${_ohos_soname_less})
++        get_target_property(_ohos_loc ${_ohos_soname_less} IMPORTED_LOCATION_RELEASE)
++        if(NOT _ohos_loc)
++            get_target_property(_ohos_loc ${_ohos_soname_less} IMPORTED_LOCATION)
++        endif()
++        if(_ohos_loc AND EXISTS "${_ohos_loc}")
++            get_filename_component(_ohos_dir "${_ohos_loc}" DIRECTORY)
++            get_filename_component(_ohos_name "${_ohos_loc}" NAME)
++            string(REGEX REPLACE "^lib" "" _ohos_name "${_ohos_name}")
++            string(REGEX REPLACE "\\.so$" "" _ohos_name "${_ohos_name}")
++            link_directories("${_ohos_dir}")
++            set_target_properties(${_ohos_soname_less} PROPERTIES
++                IMPORTED_LOCATION "-l${_ohos_name}"
++                IMPORTED_LOCATION_RELEASE "-l${_ohos_name}")
++        endif()
++    endif()
++endforeach()
++
+ find_package(KAccounts6)
+ 
+ set_package_properties(KAccounts6 PROPERTIES
+@@ -53,9 +84,18 @@
+                        TYPE OPTIONAL
+ )
+ 
+-ecm_find_qmlmodule(org.kde.prison REQUIRED)
+-ecm_find_qmlmodule(org.kde.kitemmodels REQUIRED)
+-ecm_find_qmlmodule(org.kde.kcmutils REQUIRED)
++# OHOS baseline: ecm_find_qmlmodule() only looks in two places - the consumer's
++# own install prefix (<KDE_INSTALL_FULL_QMLDIR>/<module>) and Qt's own
++# QT_INSTALL_QML - so a QML module that Conan ships as its own package
++# (org.kde.prison from prison/6.18.0, org.kde.kitemmodels from
++# kitemmodels/6.26.0, org.kde.kcmutils from kcmutils/6.26.0) can never be seen
++# at configure time. The modules are resolved at runtime through
++# QML2_IMPORT_PATH, which the recipe exports for consumers; org.kde.kitemmodels
++# is a real import of src/quick/AlternativesView.qml and the recipe asserts
++# that its qmldir is present in the kitemmodels package before configuring.
++ecm_find_qmlmodule(org.kde.prison)
++ecm_find_qmlmodule(org.kde.kitemmodels)
++ecm_find_qmlmodule(org.kde.kcmutils)
+ 
+ ecm_setup_version(${KF_VERSION} VARIABLE_PREFIX PURPOSE
+                         VERSION_HEADER "${CMAKE_CURRENT_BINARY_DIR}/purpose_version.h"
+@@ -70,7 +110,8 @@
+ add_subdirectory( src )
+ if (BUILD_TESTING)
+     add_subdirectory( autotests )
+-    add_subdirectory( tests )
++    # OHOS baseline: tests/ (menudemo, sharetool) links KF6::PurposeWidgets
++    # and KF6::I18nQml, neither of which is available here.
+ endif()
+ 
+ ki18n_install(po)
