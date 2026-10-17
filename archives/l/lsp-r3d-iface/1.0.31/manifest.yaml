@@ -1,0 +1,93 @@
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/1.0.31/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.0.31"
+
+# 软件名
+software: "lsp-r3d-iface"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-09-29"
+build_system: makefile
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://codeload.github.com/lsp-plugins/lsp-r3d-iface/tar.gz/refs/tags/1.0.31"
+
+  # 源码校验和
+  sha256: "718d31cd6a51011aad87c964736548c0264fd54ba596417755c0d18ad08c4c6b"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: makefile
+
+  # 配置选项列表
+  configure_options:
+    - "PLATFORM=Linux"
+    - "FEATURES=\"test strict\""
+  # 例如:
+  # - "-DCMAKE_BUILD_TYPE=Release"
+  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+
+  # 编译依赖列表（格式: name/version）
+  # 上游把 lsp-common-lib / lsp-test-fw 按 *TYPE=src 内嵌编译（源码由 conandata
+  # 预置到 modules/），另按 R27 声明 lsp-common-lib 为 Conan 依赖（其头文件属于
+  # 本包公共接口，transitive_headers 传递）。
+  dependencies:
+    - lsp-common-lib/1.0.49
+  # 例如:
+  # - openssl/1.1.1w
+  # - curl/8.19.0
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+# 本包源码零补丁。唯一源码修正是**预置的内嵌 lsp-common-lib** 的 OHOS qsort_r
+# 移植，补丁在 patches/modules/ 下（见 conandata.yml 的 module_patches 说明，
+# 故意不在 patches/ 顶层：clean-verify 的 G0 会无差别打到主源码树）。
+patches_applied:
+  - "patches/modules/0001-lsp-common-lib-qsort_r-ohos.patch (作用于预置的内嵌 lsp-common-lib)"
+# 例如:
+# - "0001-bootstrap-ohos-toolchain.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "lsp-plugins 上游 modules.mk 用 *_TYPE 区分依赖编译方式：src=按 $(ARTIFACT_DEPS) 规则递归 `make -C modules/<dep> compile` 以 -D<NAME>_BUILTIN 内嵌编译（目标码进本包静态库）；lib/pkg/hdr/bin/opt 则不产出对象。适配配方需按上游 pin 版本从 conandata 预置源码到 modules/"
+  - "预置到 modules/ 的内嵌依赖补丁不能放 patches/ 顶层：clean-verify 的 G0 会把 patches/*.patch 无差别 patch -p1 到主源码树，而 modules/<dep> 预置后才存在会直接判失败。应放 patches/modules/ 并在配方 source() 里用 conan.tools.files.patch(base_path=...) 应用"
+  - "本包公共头引用依赖库头文件时，Conan 侧必须 requires + transitive_headers=True：否则 CMakeDeps 生成的依赖 -data.cmake 里 INCLUDE_DIRS 为空，消费者编译即 'file not found'（仅有 requires 不传 headers 同样不行，Conan 2.29 对非传递依赖不下发 include）"
+  - "Conan 2 不会把裸 name/version 的 requires 解析到 <name>/<version>@ohpcd/stable：缓存/制品仓里的 user/channel 必须显式写全（仓库 R27）。缓存里若残留早期无 user/channel 的同名 recipe，会静默解析到旧包（表现为依赖 include 目录为空），需 conan remove 清理"
+  - "ci/conan/build_and_test.sh 的 L0i 门禁（R36）用 AST 提取 conanfile.py 的 requires/tool_requires 并逐个 conan download --only-recipe -r ohpcd：依赖未发布到制品仓时本地 W3 与 CI 都硬失败。依赖链需按 lsp-test-fw → lsp-common-lib → lsp-r3d-iface → lsp-r3d-base-lib 顺序先发布前者"
+  - "finish 的 G0 干净构建只支持 autotools（写死 <CONFIG_SHELL> ./configure，CONFIG_SHELL 可用环境变量覆盖到 ~/.harmonybrew/bin/bash），makefile 项目必然 exit 127，但该步是非阻塞告警；本机跑 finish 还需 CONAN_PROFILE=ohos-local（否则走到 CI profile 的 /data/service/hnp 工具链）"

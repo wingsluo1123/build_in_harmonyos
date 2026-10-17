@@ -1,0 +1,57 @@
+# conandata.yml — lsp-r3d-iface 1.0.31
+#
+# 单一事实源：主源码 + 构建期内嵌依赖源码 + 补丁清单。
+#
+# 上游自研 make 的依赖分两类（见源码树 modules.mk 的 *_TYPE）：
+#   LSP_COMMON_LIB_TYPE := src   —— 生产依赖，`make` 时由 src/Makefile 的
+#                                  $(ARTIFACT_DEPS) 规则递归
+#                                  `make -C modules/lsp-common-lib compile`
+#                                  以 -D LSP_COMMON_LIB_BUILTIN 内嵌编译；
+#   LSP_TEST_FW_TYPE    := src   —— FEATURES 含 test 时的测试依赖，同样内嵌。
+# 两者上游都走 `make fetch` 的 git clone，构建期不可联网，故在此登记同版本
+# tarball，由 source() 预置到 modules/（离线、可复现、版本与上游 pin 一致）。
+# 二者都不进生产包（头文件 + 静态库），因此不声明 conan requires。
+
+sources:
+  "1.0.31":
+    filename: lsp-r3d-iface-1.0.31.tar.gz
+    url: "https://codeload.github.com/lsp-plugins/lsp-r3d-iface/tar.gz/refs/tags/1.0.31"
+    sha256: "718d31cd6a51011aad87c964736548c0264fd54ba596417755c0d18ad08c4c6b"
+
+# ── 内嵌依赖源码（构建期）────────────────────────────────────────
+# 版本与上游 modules.mk 里 pin 的 * _VERSION 严格一致。
+# 说明：
+#   * lsp-common-lib —— 生产依赖但按 TYPE=src 内嵌编译（目标码并入本包静态库），
+#     因此源码走 conandata；同时 requirements() 声明它为 Conan 依赖，供本包公共头
+#     引用其头文件（见文件末 module_patches 对其源码的 OHOS 修正）。
+#   * lsp-test-fw    —— FEATURES 含 test 时的测试依赖，同样内嵌编译。
+lsp-common-lib:
+  "1.0.49":
+    filename: lsp-common-lib-1.0.49.tar.gz
+    url: "https://codeload.github.com/lsp-plugins/lsp-common-lib/tar.gz/refs/tags/1.0.49"
+    sha256: "6c6a582ee0dcca12f62ed960bf7492ce60b42c6c6847ed14fac797b05b99b636"
+
+lsp-test-fw:
+  "1.0.35":
+    filename: lsp-test-fw-1.0.35.tar.gz
+    url: "https://codeload.github.com/lsp-plugins/lsp-test-fw/tar.gz/refs/tags/1.0.35"
+    sha256: "7a20dbffd2c4fbb36a8cfc6bd79ef72062daca08950681128096ba59eeb526ae"
+
+# codeload.github.com 的 tar.gz 链接不带扩展名，conan 的 get() 会据 URL 误判为
+# zip：所有条目都必须显式给 filename（.tar.gz）。
+
+# codeload.github.com 的 tar.gz 链接不带扩展名，conan 的 get() 会据 URL 误判为
+# zip：所有条目都必须显式给 filename（.tar.gz）。
+
+# 本包源码本身零补丁：patches 表保持为空。
+# 预置到 modules/lsp-common-lib/ 的内嵌依赖源码需要与 lsp-common-lib 1.0.49
+# 归档同样的 OHOS qsort_r 修正，该补丁位于 patches/modules/（**故意不放在
+# patches/ 顶层**：clean-verify 的 G0 会把 patches/*.patch 无差别打到主源码树上，
+# 而该文件只在内嵌源码预置后才存在）。由 conanfile.py 的 source() 用
+# conan.tools.files.patch(base_path="modules/lsp-common-lib") 应用。
+module_patches:
+  - patch_file: "patches/modules/0001-lsp-common-lib-qsort_r-ohos.patch"
+    base_path: "modules/lsp-common-lib"
+    patch_description: "内嵌 lsp-common-lib 的 src/main/stdlib.cpp：OHOS libc(musl) 无 GNU qsort_r，改为 qsort + 线程局部比较器上下文（与 lsp-common-lib 1.0.49 归档的 0001 补丁内容一致，仅路径基准不同）"
+
+patches: {}
