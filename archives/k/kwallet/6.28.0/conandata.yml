@@ -1,0 +1,23 @@
+# conandata.yml — kwallet 6.28.0
+#
+# KDE Frameworks 6 KWallet (kwallet): the KF6::Wallet API library plus the
+# kwalletd6/ksecretd runtime daemons (daemon-enabled test scope, so the
+# upstream test suite executes for real on a live D-Bus stack). The
+# repository already carries an API-only kwallet/6.18.0 baseline (built for
+# libkgapi); this entry delivers the 6.28.0 upgrade under the canonical
+# kwallet package name.
+sources:
+  url: "https://download.kde.org/stable/frameworks/6.28/kwallet-6.28.0.tar.xz"
+  sha256: "e21130c86ffa0be49065648f4e753d63d3d786fab876f511d9d09da16480f691"
+
+patches:
+  "6.28.0":
+    - patch_file: "patches/0001-CMakeLists.txt.patch"
+      patch_description: "Relax KF_DEP_VERSION to 6.18.0 (published ohpcd daemon-scope KF6 generation) and align find_package(ECM) with the published ohpcd 6.26 baseline; drop the ki18n_install(po) call (no msgfmt toolchain, translations not part of the deliverable)"
+      patch_type: "conan"
+    - patch_file: "patches/0002-src-api-KWallet-CMakeLists.txt.patch"
+      patch_description: "Drop the VERSION/SOVERSION target properties (E018: OHOS sandbox denies symlink(2) for the conan process tree, so cmake_symlink_library cannot create the versioned chain); the package step additionally ships a byte copy under the upstream soname file name (libKF6Wallet.so.6)"
+      patch_type: "conan"
+    - patch_file: "patches/0003-src-runtime-kwalletbackend-CMakeLists.txt.patch"
+      patch_description: "Same E018 copy-instead-of-link treatment for the libKF6WalletBackend shared library: drop its VERSION/SOVERSION target properties so cmake_symlink_library no longer attempts the versioned symlink chain at link time; the recipe materializes libKF6WalletBackend.so.6 as a copy in the package"
+      patch_type: "conan"
