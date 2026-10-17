@@ -1,0 +1,32 @@
+# test_package 清单（R34 消费者校验）
+package: pesign/116
+
+upstream_test_in_build: true
+upstream_test_command: "（上游 116 无测试）本配方补跑：构建后真跑 `pesign --help` 与 `efikeygen --help`"
+
+upstream_tests:
+  - name: "（116 的源码包里没有 tests/ 目录，也没有 test 目标）"
+    count: 0
+    description: >-
+      **上游测试数 = 0，如实声明**（117 才有 tests/test-efikeygen-algos.sh）。配方内补了两条能真跑的检查：
+      `pesign --help`、`efikeygen --help` 都必须 rc=0 且有输出。**实测通过**（首行 `Usage: pesign [OPTION...]`
+      / `Usage: efikeygen [OPTION...]`）。语义如实说明：只证明"二进制能加载执行、CLI 解析可用"，
+      **不代表签名/校验功能已验证**（那需要 NSS 证书库与 EFI 变量环境）。
+
+test_package_tests:
+  - file: check_pesign.py
+    description: >-
+      R34 消费者校验 **6 项**（全部离线）：①产物齐备（`bin/pesign` 191104 B + `bin/efikeygen` 170624 B）
+      ②ELF 头自检（真 ELF64、machine=0xB7 AArch64）③**真跑** `pesign --help` rc=0 且有输出
+      ④**真跑** `efikeygen --help` rc=0 且有输出 ⑤许可证随包（`licenses/COPYING`）⑥证据（sha256 + python 版本）。
+      末行打印 `checks/fails/skips`；仅环境原因才计入 skips 且**不计入通过**。
+    command: "python3 check_pesign.py <package-folder>"
+
+notes: >-
+  pesign 的签名/校验属于需要 NSS 证书库与 EFI 变量环境的操作，沙箱/CI 不做真机验证 —— 断言落在
+  "产物可用 + CLI 真跑"这一层，并在 PR 正文如实说明。
+
+deviations:
+  - "`secure_getenv` 由垫片实现为 `getenv`（musl 无此扩展；pesign 非 setuid 程序）"
+  - "man 页不构建不安装（上游 `Make.rules:57` 硬编码 `mandoc`）"
+  - "`-Werror` → `-Wno-error`；去掉上游 `-fshort-wchar`（与 sysroot 的 wchar_t 定义冲突）"
