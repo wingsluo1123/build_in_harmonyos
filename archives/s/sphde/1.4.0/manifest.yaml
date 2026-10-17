@@ -1,0 +1,84 @@
+# 版本级 manifest
+# 文件位置: archives/s/sphde/1.4.0/manifest.yaml
+
+version: "1.4.0"
+software: "sphde"
+status: built
+build_date: "2026-09-25"
+build_system: "autotools"
+
+source:
+  # R39/PF7：只写上游官方源；CI 自动为 github.com 加 gh-proxy 等镜像 fallback。
+  url: "https://github.com/sphde/sphde/archive/refs/tags/1.4.0.tar.gz"
+  sha256: "f49d50979007cf7d9e735de9367cbced86f19a148c202245d9651251b3c2a4e7"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--enable-shared"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-config.guess-ohos.patch"
+  - "0002-config.sub-ohos.patch"
+  - "0003-configure-umask.patch"
+  - "0004-configure-pwd-fallback.patch"
+  - "0005-sasshm-key_t.patch"
+  - "0006-makefile-no-unused-function.patch"
+  - "0007-makefile-no-changelog.patch"
+  - "0008-makefile-wformat-wabsolute.patch"
+  - "0009-sphlflogger-pid-t.patch"
+  - "0010-strerror_r-portable.patch"
+
+knowledge_gained:
+  - "上游多线程共享内存 SPSC 队列测试（sphsinglepcqueue_ttt / sphdirectpcqueue_ttt）含无界自旋 `while (SPHSinglePCQueueFull/Empty(...)) sched_yield();`，在 OHOS 共享内存语义下可无限挂起并拖垮整个 make check，CI 曾整作业 14400s 无输出超时（停在 'FAIL: sphsinglepcqueue_tt' 后）。sphde 生成的 src/Makefile 未定义 LOG_COMPILER，故在 conanfile build() 里写纯 sh 的逐测试超时包装并 setenv LOG_COMPILER 指向它（环境变量被 GNU make 采纳并随递归子 make 传播进 src/），对每个上游测试施加 SPHDE_TEST_TIMEOUT 秒上限（默认 300），超时 kill -9 该测试，wait 返回非零（SIGKILL 通常 137），automake 记为 FAIL（ohos_feature gap），不再拖垮作业；正常快速通过与快速崩溃不受影响"
+  - "SPHDE 使用 autotools，release tarball 自带预生成 configure/Makefile.in，无需 autoconf/automake"
+  - "config.guess/config.sub 为 2014 版，不识别 HarmonyOS 三元组，需打补丁 (E205/E072)"
+  - "configure 临时目录 umask 077 在 HMDFS setgid 下导致写权限失败，需改 022 (E129)"
+  - "HMDFS getcwd 沿 .. 上溯失败，configure 的 ac_pwd=`pwd` 检查 abort；需 $PWD 回退 + build() chdir/PWD (E158)"
+  - "aarch64 clang 接受 -mhtm 但 unused-argument 告警被 AM_CFLAGS 的 -Werror 提升为致命错误；AX_CHECK 探测需加 -Wall -Werror (E143)"
+  - "sasshm.c 先含 sasshm.h 后含 sys/ipc.h，OHOS 传递包含未先提供 key_t；sasshm.h 需显式 #include <sys/types.h> 自包含 (E131)"
+  - "OHOS clang 对未使用的 static inline 函数报 -Wunused-function、对 SPHLFLoggerPrefetch 里仅作 prefetch 副作用的局部变量 touch 报 -Wunused-but-set-variable（GCC 均豁免），上游 AM_CFLAGS/AM_CXXFLAGS 恒含 -Wall -Werror 将其提升为致命错误；需在 Makefile.in 追加 -Wno-unused-function -Wno-unused-but-set-variable"
+  - "顶层 Makefile 的 dist_doc_DATA 含 ChangeLog.md，其生成规则调用 generate-changelog.sh（shebang #!/bin/bash）。OHOS 无 /bin/bash（bash 在 /data/service/hnp/bin/bash）且 tarball 无 git 历史，make all 因 ChangeLog.md 缺失触发规则报 'bad interpreter' 致 Error 126；需从 dist_doc_DATA 移除 ChangeLog.md 并删除其生成规则"
+  - "make check 编译 TESTS 程序时，sphgtod_t.c/sphgettime_t.c 在 OHOS 上因 __WORDSIZE 相关分支使 uint64_t 参与计算得 unsigned long long、而 PRIu64 展开为 'lu'（同宽仅类型名不同）触发 -Wformat，且 llabs() 作用于无符号 uint64_t 差值触发 -Wabsolute-value，被 -Wall -Werror 提升为致命；需在 src/Makefile.in 的 AM_CFLAGS/AM_CXXFLAGS 追加 -Wno-format -Wno-absolute-value"
+  - "tests/sphlflogger_tt.c、sphlflogger_ttt.c、sphlogportal_tt.c、sphsinglepcqueue_tt.c 使用 glibc 内部类型 __pid_t（fdisplayProcMaps 参数与 displayMyProcMaps 局部变量），OHOS musl 系 libc 无 __pid_t 定义，仅公开 pid_t；需把 __pid_t 替换为 pid_t（均 int，与 /proc/%d 的 %d 格式一致）"
+  - "tests/sphdirectpcqueue_ttt.c、sphmultipcqueue_t.c 对 sched_setaffinity 失败分支调用 strerror_r。strerror_r 有两种签名：glibc GNU 版（_GNU_SOURCE）返回 char*（可能指向静态串而非 buf），其余（含 OHOS musl）为 POSIX/XSI 版返回 int 并把结果写入 buf。原写法 char *msg = strerror_r(...) 在 musl 上报 'incompatible integer to pointer conversion' 被 -Wall -Werror 提升为致命；单纯忽略返回值直接读 buf 在 glibc 上可能读到未填充内容。需按 `__GLIBC__ && _GNU_SOURCE` 分支并把结果统一落在 buf：GNU 版取返回值，若非空且非 buf 自身则 snprintf 写回 buf；其余（POSIX/XSI，含 OHOS musl，且 glibc 未定义 _GNU_SOURCE 时）忽略返回值读 buf；先置 buf[0]='\\0'，随后一律打印 buf"
+  - "aarch64 下 configure.ac 的 host 判断不投递 x86_64/PPC 的 -march，sasconf.h 已含 __aarch64__ 段"
+  - "src/Makefile.am 的 TESTS 完整清单 24 个测试程序；其中 sphmultipcqueue_t 在 `if HTM`（POWER 事务内存 -mhtm）条件块内，aarch64/OHOS 上 AM_CONDITIONAL(HTM) 为假 → 不注册、不编译、不运行。上游清单 N 按 24 申报（避免少报），该 1 项未执行按 environment gap 如实上报，绝不归零或计为通过；当前平台注册并执行 23 项（discovered=24, executed=23）"
+  - "GitHub 源码归档直连在目标网络可能超时；conandata.yml 只写官方 GitHub URL（R39/PF7），CI 的 build_and_test.sh 会自动为 github.com 源加 gh-proxy 等镜像 fallback；禁止手写镜像前缀（PF7 源URL闸会拦）"
+  - "SPHDE 硬编码 -lrt（configure.ac LDFLAGS 与 libsphde_la_LIBADD），依赖系统 librt/pthread"
+  - "make all 与 make check 通过后，package() 阶段 autotools.install() 安装头文件时
+    `<runtime>/bin/install -c -m 644 <头文件> <pkg>/include/sphde` 返回 Error 64（无 stderr）。
+    worker 的 toybox install 是精简实现，`-c` 在 HMDFS 的权限/UUID 映射下直接失败 (E596/E188)；
+    且无 GNU coreutils install (E098)、HMDFS 不支持 chmod (E087)。configure 把探测到的 install
+    路径写死进所有子 Makefile 的 INSTALL，INSTALL_DATA/INSTALL_PROGRAM 引用 ${INSTALL} 跟随。
+    修复：在 build() 里写 cp/mkdir 的 install shim（-m MODE 容错跳过 chmod、-d 走 mkdir -p），
+    os.walk 改所有 Makefile 的 INSTALL 指向 shim 绝对路径（E596 openfst 家族验证形态）；
+    不可靠 PATH 前置替换，不可给 Autotools.install() 传 'INSTALL_DATA=$(INSTALL)'（会 Error 126）。"
+  - "autotools 库在共享/受限 CI worker 上，configure 阶段会 fork 数百次 sh/clang 探测，
+    最易受 worker 级 fork/进程资源瞬时耗尽（EAGAIN）影响：日志报
+    'configure[33]: can't fork - try again' 或 'configure: fork: retry: Resource temporarily
+    unavailable'（后者还会打断探测、误判 C++ 预处理器为 /lib/cpp 而报 C++ preprocessor
+    fails sanity check）。判据是同一 recipe revision 在不同 worker 上 PASS/FAIL 不一致，
+    且同批日志里 CI 自身脚本（knowledge_check.sh）也在报 fork（DRAFT-11327：同 SHA 不同
+    worker 结果不一致 = 环境资源问题；E491 forbid_3：改包前先有设备资源证据）。
+    修复（libcmis/0.6.3 已验证形态）：build() 把 autotools.configure() 包成有界退避重试
+    （最多 8 次、退避 15/30/.../105s），仅在失败输出或 config.log 尾部出现 fork 标记时才重试，真实
+    configure 错误立即抛出；内联钉轻量 /bin/sh 与可写 TMPDIR、重试前清理 config.log/
+    config.status/conftest* 残留、加零 fork 资源快照取证；复刻 Autotools.configure() 的命令
+    （load_toolchain_args 读 conanbuild.conf 的 configure_args）并捕获 stdout/stderr 以便判定与回放，
+    不改构建语义与测试口径。"
+
+artifacts:
+  libraries:
+    - "lib/libsphde.so"
+    - "lib/libsphde.a"
+    - "lib/libsphgtod.a"
+    - "lib/libsphgettime.a"
+  headers:
+    - "include/sphde/"
+  binaries:
+    - "bin/sasutil"
