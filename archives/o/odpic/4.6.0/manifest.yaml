@@ -1,0 +1,31 @@
+# 版本级 manifest - odpic 4.6.0
+version: "4.6.0"
+software: "odpic"
+status: published
+build_date: "2026-10-14"
+build_system: "makefile"
+conan_ref: "odpic/4.6.0"
+
+source:
+  url: "https://github.com/oracle/odpi/archive/refs/tags/v4.6.0.tar.gz"
+  sha256: "fdb07c734c59b807787b5677ef23edd52766bd2d3cf075d285994793edeb40c5"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options:
+    - "make CC=<clang> LD=<clang> -j1   (上游 Makefile:45-46 以普通赋值硬编码 CC=gcc / LD=gcc，必须命令行覆盖)"
+    - "make install CC=<clang> LD=<clang> PREFIX=<prefix>   (覆盖必须同样带到 install，否则重链回退 gcc)"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+knowledge_gained:
+  - "无 configure 的纯 Makefile 工程：上游 Makefile 以普通赋值（非 ?=）硬编码 CC=gcc / LD=gcc，而 OHOS 主机仅有 clang，配方必须在 make 命令行同时覆盖 CC 与 LD；LD 在上游链接规则里是链接驱动（携带 -shared / -Wl,-soname），因此必须与 CC 同为 clang 而不是 binutils ld (reference: archives/o/odpic/4.6.0/notes.md#遇到的问题与解决方案)"
+  - "make install 必须携带与 build 相同的 CC/LD 覆盖：Makefile:114 把 lib/ 目录列为普通（非 order-only）前置依赖，all 目标的两处 ln -sf 在链接之后刷新了 lib/ 的 mtime，使此后任何 make 调用都判定 libodpic.so.4.6.0 过期并重跑链接规则；缺覆盖时该次重链回退 gcc，以 'make: gcc: No such file or directory'（exit 127）失败 (reference: archives/o/odpic/4.6.0/reports/build.log)"
+  - "uname -s 在 OHOS 主机返回 \"HarmonyOS\"，上游 Makefile 只有 Darwin / 非 Darwin 两个分支，故正确走 ELF 分支并写入 -Wl,-soname,libodpic.so.4；产物 DT_NEEDED 仅 libc.so，因为 -ldl -lpthread 在 OHOS musl 上由 libc.so 提供 (reference: archives/o/odpic/4.6.0/reports/local-probe-ohos.log)"
+  - "上游 421 例测试（34 个套件）整体依赖 Oracle Instant Client 与可达 Oracle DB：dpiContext__create() 的第一条语句即 dlopen libclntsh.so（版本校验在载入之后），且 TestLib.c 的 dpiTestSuite_initialize() 在注册/运行任何用例之前就要建 context，失败即 FATAL —— 故 OCI 不可加载时 421 例全部无法进入执行（初版实测 N'=0/421，首个错误 DPI-1047）。Oracle 确有 Linux ARM (aarch64) 版 Instant Client，但为 Oracle Linux/glibc 构建，无法在 OHOS musl 上加载 (reference: archives/o/odpic/4.6.0/reports/upstream-tests-run.log)"
+  - "让 421 例进入执行的关键：dpiTestSuite_initialize(minTestCaseId) 仅在 minTestCaseId == 0（只有 TestSuiteRunner）时才连数据库，34 个套件传 1000/1100/…，初始化阶段不需要数据库 —— 故只需 OCI『可加载』即可。据此构造 OCI ABI 桩库（160 符号，机械提取自 src/dpiOci.c 的 dlsym 符号表；仅实现 9 个加载校验/不透明句柄必需入口，其余返回 OCI_ERROR(-1)），实测使 N' 由 0 提升到 421/421：通过 26、失败 395（361 server attach + 27 create pool = 无 Oracle DB 可达；5 例断言服务端 ORA 诊断；2 例 NLS 名称目录属桩缺口） (reference: archives/o/odpic/4.6.0/reports/upstream-tests.md)"
+  - "OCI 桩库的两处保真度陷阱：① OCIThreadKeyGet/Set 必须实现真实单槽语义，否则 ODPI-C 的线程局部错误缓冲失效、所有错误消息为空（表现为纯参数校验用例假失败）；② OCINlsCharSetNameToId 的字符集 id 是函数返回值（dpiOci.c:2613 为 *charsetId = (*fn)(envHandle, name)），若按出参写出会破坏调用方字符串指针指向的内存并导致进程崩溃 (reference: archives/o/odpic/4.6.0/notes.md#对话-5-2026-10-16)"
+  - "ODPI-C 通过 dlopen 在运行期加载 OCI（libclntsh），因此打包库对消费者无任何构建期依赖（R36 洁净）；消费者用例在无 Client 环境下仍能取得库自身产出的 DPI-1047 诊断，可用于证明 .so 已在 OHOS 上成功加载并执行 (reference: archives/o/odpic/4.6.0/reports/local-probe-consumer.log)"
