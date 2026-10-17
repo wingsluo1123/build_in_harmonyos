@@ -1,0 +1,93 @@
+--- a/src/istgt_iscsi.c
++++ b/src/istgt_iscsi.c
+@@ -62,6 +62,45 @@
+ #include "istgt_scsi.h"
+ #include "istgt_queue.h"
+ 
++/*
++ * HAVE_PTHREAD_CANCEL
++ *
++ *	Set to 0 for C libraries that do not provide the POSIX thread
++ *	cancellation API: pthread_cancel(3), pthread_setcancelstate(3) and
++ *	pthread_testcancel(3) are then absent from both the header and the
++ *	library, so this cannot be repaired at link time.  The default is 1,
++ *	i.e. the historical upstream behaviour.
++ *
++ *	The call sites keep their original statement shape either way:
++ *
++ *	  - ISTGT_SETCANCELSTATE() only configures the calling thread for
++ *	    cancellation, so it has nothing to do when cancellation is
++ *	    unavailable.
++ *
++ *	  - ISTGT_TESTCANCEL() is a cancellation point.  Every worker loop
++ *	    that uses it re-checks conn->state immediately afterwards, so
++ *	    the cooperative exit path (CONN_STATE_EXITING) is unaffected.
++ *
++ *	  - ISTGT_CANCEL_THREAD() is the escalation path, taken only after
++ *	    the target connection has already been marked CONN_STATE_EXITING
++ *	    and given a chance to leave on its own.  When cancellation is
++ *	    unavailable the request is skipped; the connection still tears
++ *	    itself down through the normal worker cleanup path.
++ */
++#ifndef HAVE_PTHREAD_CANCEL
++#define HAVE_PTHREAD_CANCEL	1
++#endif
++
++#if HAVE_PTHREAD_CANCEL
++#define ISTGT_SETCANCELSTATE(S)	pthread_setcancelstate((S), NULL)
++#define ISTGT_TESTCANCEL()	pthread_testcancel()
++#define ISTGT_CANCEL_THREAD(T)	pthread_cancel(T)
++#else
++#define ISTGT_SETCANCELSTATE(S)	((void)0)
++#define ISTGT_TESTCANCEL()	((void)0)
++#define ISTGT_CANCEL_THREAD(T)	((void)(T), 0)
++#endif
++
+ #ifdef ISTGT_USE_KQUEUE
+ #include <sys/types.h>
+ #include <sys/event.h>
+@@ -5082,7 +5121,7 @@
+ 	lu_task = NULL;
+ 
+ 	pthread_cleanup_push(worker_cleanup, conn);
+-	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
++	ISTGT_SETCANCELSTATE(PTHREAD_CANCEL_ENABLE);
+ 
+ 	conn->use_sender = 0;
+ 	if (conn->istgt->swmode >= ISTGT_SWMODE_NORMAL) {
+@@ -5129,7 +5168,7 @@
+ 			}
+ 		}
+ 
+-		pthread_testcancel();
++		ISTGT_TESTCANCEL();
+ 		if (conn->state != CONN_STATE_RUNNING) {
+ 			break;
+ 		}
+@@ -5243,7 +5282,7 @@
+ 			opcode = BGET8W(&conn->pdu.bhs.opcode, 5, 6);
+ 
+ #if 0
+-			pthread_testcancel();
++			ISTGT_TESTCANCEL();
+ #endif
+ 			if (conn->state != CONN_STATE_RUNNING) {
+ 				break;
+@@ -6245,7 +6284,7 @@
+ 					    xconn->initiator_addr,
+ 					    xconn->cid);
+ 				}
+-				rc = pthread_cancel(xconn->thread);
++				rc = ISTGT_CANCEL_THREAD(xconn->thread);
+ 				if (rc != 0) {
+ 					ISTGT_ERRLOG("pthread_cancel() failed rc=%d\n", rc);
+ 				}
+@@ -6329,7 +6368,7 @@
+ 					    xconn->initiator_addr,
+ 					    xconn->cid);
+ 				}
+-				rc = pthread_cancel(xconn->thread);
++				rc = ISTGT_CANCEL_THREAD(xconn->thread);
+ 				if (rc != 0) {
+ 					ISTGT_ERRLOG("pthread_cancel() failed rc=%d\n", rc);
+ 				}

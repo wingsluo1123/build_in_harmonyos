@@ -1,0 +1,33 @@
+version: "0.4-20111008"
+software: "istgt"
+status: built
+build_date: "2026-10-16"
+build_system: "autotools"
+
+source:
+  url: "https://ftp.debian.org/debian/pool/main/i/istgt/istgt_0.4~20111008.orig.tar.gz"
+  sha256: "41ddc49dbd0cda81c3f7557e76d27b851e042a32acb448dac1b743c759b0b37e"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=<package_folder>（AutotoolsToolchain 默认值）"
+  dependencies:
+    - openssl/1.1.1w
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-src-istgt_iscsi.c-pthread-cancel-fallback.patch"
+
+musl_compatibility_issues:
+  - "OHOS musl 不导出 POSIX 线程取消族：<pthread.h> 不声明、libc.so 不导出 pthread_cancel(3)/pthread_setcancelstate(3)/pthread_testcancel(3)，sysroot 的 libpthread.a 为空壳（-lpthread 无效）。istgt 的 5 处取消点以补丁 0001 的 HAVE_PTHREAD_CANCEL 特性宏降级（配方对 OHOS 传 -DHAVE_PTHREAD_CANCEL=0），跨线程取消请求被跳过，连接仍经 CONN_STATE_EXITING 协作式收线；同族先例 xmcd 3.3.2 / knowledge/drafts/musl-pthread-cancel-gap/"
+
+knowledge_gained:
+  - "configure 无 AC_CANONICAL_HOST，无需 config.guess/config.sub 补丁（与 icecast 不同）"
+  - "唯一外部依赖 libcrypto（MD5_Init/Update/Final），由 AC_CHECK_LIB 经 AutotoolsToolchain LDFLAGS -L 解析，无 pkg-config"
+  - "openssl 必须用 1.1.1w 世代 API：MD5_* 底层函数在 OpenSSL 4.0 已移除"
+  - "MKDEP（FreeBSD mkdep）在 OHOS 缺失，src/Makefile.in 有空值守卫可直接跳过"
+  - "OHOS musl 无 POSIX 线程取消族（pthread_cancel/setcancelstate/testcancel 既不声明也不导出；libpthread.a 空壳），istgt 的取消点必须走特性宏降级而非链接期补救"
+  - "pthread_cleanup_push/pop 在 musl 下是纯宏，不需要 libc 符号——所以取消点缺口只表现在链接期的 3 个函数符号上"
