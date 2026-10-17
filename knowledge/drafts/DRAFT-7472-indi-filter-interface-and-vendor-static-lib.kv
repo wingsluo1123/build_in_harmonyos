@@ -1,0 +1,97 @@
+#====================================================================
+# DRAFT-7472-indi-filter-interface-and-vendor-static-lib
+# INDI 驱动的两组"隐式契约"在私有前缀/制品仓环境下必须显式化：
+#   A. FilterInterface：1.x 的 FilterNameT 元素数组在 2.x 不存在，
+#      "是否已有滤光片名" 要改成 FilterNameTP.count()，注销用 deleteProperty(FilterNameTP)
+#   B. 厂家静态库（如 libsbig：链接 SBIG_LIBRARIES）会引用 libusb 符号，
+#      而驱动的头文件用版本前缀 <libusb-1.0/libusb.h> —— 必须补 libusb 的 include 根
+# 触发事件: indi-sbig 2.1 适配（archives/i/indi-sbig）
+#====================================================================
+
+id:                     DRAFT-7472-indi-filter-interface-and-vendor-static-lib
+trigger_tool:           cmake|clang|indi
+phase:                  build
+error_signature:        use of undeclared identifier 'FilterNameT'|
+                        no member named 'name' in 'INDI::PropertyNumber'|
+                        'libusb-1\.0/libusb\.h' file not found|
+                        'operator&' is a protected member of 'INDI::PropertyBasic<_INumber>'
+severity:               2
+category:               indi, astronomy, filter-interface, api-migration, vendor-static-lib,
+                        libusb, include-path, portability
+match_keywords:         INDI, indi-3rdparty, libindi, FilterInterface, FilterNameT,
+        FilterNameTP, FilterSlotNP, processNumber, deleteProperty, count(),
+        BayerTP, TemperatureNP, libsbig, SBIG_LIBRARIES, libusb-1.0/libusb.h,
+        FindUSB1, include 根, 私有前缀
+
+title:                  INDI FilterInterface 的 FilterNameT 在 2.x 已移除（改用
+                        FilterNameTP.count()/getName()），且链接厂家静态库（libsbig 等）
+                        的驱动必须补 libusb 的 include 根
+
+root_cause: >
+  A. FilterInterface 属性迁移（与 DRAFT-7467 的通用对照表同源，但这一处最容易被漏）：
+       1.x: INumber/IText 数组 FilterNameT + INumberVectorProperty FilterSlotNP 都是 C 结构体，
+            代码用 `if (FilterNameT != nullptr)` 判断"滤光片名是否已加载"、
+            `deleteProperty(FilterNameTP->name)` / `strcmp(name, FilterNameTP->name)`。
+       2.x: FilterInterface 只保留对象式成员 `INDI::PropertyNumber FilterSlotNP {1}` 与
+            `INDI::PropertyText FilterNameTP {0}`，没有 FilterNameT 数组，也没有 ->name；
+            正确写法：`FilterNameTP.count() > 0` 判存在、`FilterNameTP.getName()` 比对、
+            `deleteProperty(FilterNameTP)` 注销、`FilterSlotNP[0].setMin/setMax/setValue`
+            与 `FilterSlotNP.apply()/setState()`。
+  B. 厂家静态库 + libusb：
+     驱动链接 ${SBIG_LIBRARIES}（静态 libsbig.a）与 ${USB1_LIBRARIES}，而 sbig_ccd.h 里写的是
+     `#include <libusb-1.0/libusb.h>`。树内 FindUSB1.cmake 只把 leaf 目录
+     (`.../include/libusb-1.0`) 放进 USB1_INCLUDE_DIRS，且上游 CMakeLists 从不把它加进
+     include 路径（Linux 发行版靠 /usr/include 恰好满足）。Conan 包布局下必须注入 include **根**。
+
+affected_scope: >
+  A. 所有带滤光轮/滤光片属性的 INDI 驱动（CCD 驱动内建 CFW、独立 FilterWheel 驱动）。
+  B. 所有"链接厂家静态库 + 头文件用版本前缀 include"的驱动（本例 libsbig/4.9.9 + libusb）。
+
+verification_cmd: >
+  grep -n "FilterNameT\|FilterNameTP\|FilterSlotNP" <driver>/*.cpp | head
+  llvm-readelf -d <pkg>/bin/indi_<drv> | grep NEEDED     # 应含 libusb-1.0.so.0
+  python3 test_package/check_driver.py <pkg>/bin <xml> <libindi>/lib <libusb>/lib
+
+rec_priority:           1
+rec_approach:           migrate-filter-interface-and-inject-libusb-include-root
+rec_description: >
+  A. 源码侧（照 DRAFT-7467 对照表，外加 FilterInterface 专项）：
+     `if (FilterNameT != nullptr)` / `if (FilterNameT == nullptr)` / `if (FilterNameT)`
+        → `FilterNameTP.count() > 0` / `== 0` / `> 0`
+     `FilterNameTP->name` → `FilterNameTP.getName()`；`deleteProperty(FilterNameTP->name)` → `deleteProperty(FilterNameTP)`
+     `FilterSlotNP.s = …; IDSetNumber(&FilterSlotNP, …);` → `FilterSlotNP.setState(…); FilterSlotNP.apply();`
+     `IUUpdateMinMax(&TemperatureNP)` → `TemperatureNP.updateMinMax()`
+  B. 配方侧：
+     ```python
+     usb_inc = self.dependencies["libusb"].cpp_info.includedirs[0]
+     if os.path.basename(usb_inc) == "libusb-1.0":
+         usb_inc = os.path.dirname(usb_inc)      # 版本前缀 include 需要"根"
+     tc.extra_cflags.append("-I%s" % usb_inc); tc.extra_cxxflags.append("-I%s" % usb_inc)
+     ```
+rec_command: >
+  cmake --build <build-dir> -j2 && conan create archives/i/indi-sbig/2.1 -pr:h/-pr:b=ci/conan/profiles/ohos-aarch64
+rec_auto_fix:           false
+rec_impl:               patch|recipe
+
+fallback_priority:      2
+fallback_approach:      hardcode-include-path-in-CMakeLists
+fallback_description: >
+  也可打补丁在 CMakeLists 里 `include_directories(${USB1_INCLUDE_DIR}/..)`；但那样把
+  构建机路径假设写死进上游文件，且 `USB1_INCLUDE_DIR` 布局因包而异，不如配方注入稳健。
+fallback_command:       include_directories(${USB1_INCLUDE_DIRS})
+fallback_auto_fix:      false
+fallback_impl:          patch
+
+forbid_1_pattern:       把 FilterNameT 直接改成 FilterNameTP 却保留 ->name 与空指针判断
+forbid_1_reason:        2.x 的成员是对象不是指针：->name 编译不过，空指针判断恒假（属性永远不加载）
+forbid_1_consequence:   编译失败或运行期滤光片名不显示（静默功能缺失）
+
+similar_to:             DRAFT-7467-indi-3rdparty-driver-indi2-property-api-migration（属性 API 迁移总表）、
+                        DRAFT-7473-indi-driver-hidapi-and-guider-interface-migration（另一处接口级迁移 + 依赖显式化）
+conflicts_with:         []
+prerequisite_of:        []
+principles:             P004
+doc_file:               knowledge/drafts/DRAFT-7472-indi-filter-interface-and-vendor-static-lib.md
+last_updated:           2026-10-15
+authors:                Lee-BX
+draft:                  true

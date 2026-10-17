@@ -1,0 +1,24 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 0290621..442e6d5 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,4 +1,4 @@
+-cmake_minimum_required(VERSION 3.0)
++cmake_minimum_required(VERSION 3.16)
+ PROJECT(indi_sbig CXX C)
+ 
+ set (SBIG_VERSION_MAJOR 2)
+@@ -15,6 +15,13 @@ find_package(SBIG REQUIRED)
+ find_package(Threads REQUIRED)
+ find_package(USB1 REQUIRED)
+ 
++# --- OHOS/Conan adaptation (patches/0003) -------------------------------
++# The vendored FindINDI.cmake reports the *libindi package's* data directory,
++# so install(FILES indi_sbig.xml DESTINATION ${INDI_DATA_DIR}) would write the
++# driver descriptor into libindi's package.  Keep it inside this package.
++set(INDI_DATA_DIR "share/indi")
++# ------------------------------------------------------------------------
++
+ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.cmake ${CMAKE_CURRENT_BINARY_DIR}/config.h )
+ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/indi_sbig.xml.cmake ${CMAKE_CURRENT_BINARY_DIR}/indi_sbig.xml )
+ 
