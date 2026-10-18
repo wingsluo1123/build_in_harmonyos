@@ -1,0 +1,37 @@
+software: ming
+version: "0.4.8"
+build_system: autotools
+status: built
+build_date: "2026-10-02"
+
+source:
+  url: "https://github.com/libming/libming/archive/refs/tags/ming-0_4_8.tar.gz"
+  sha256: "2a44cc8b7f6506adaa990027397b6e0f60ba0e3c1fe8c9514be5eb8e22b2375c"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--build/--host=aarch64-unknown-linux-ohos"
+  cc: clang
+
+patches_applied: []
+
+knowledge_gained:
+  - "ming 0.4.8 tag 归档无预生成 configure，需 autogen（libtoolize/aclocal/autoheader/automake/autoconf，tool_requires automake+libtool，libneurosim 同型）"
+  - "OHOS 沙箱 umask 077 + ./confXXXXXX 相对路径临时目录不可写：recipe 级 os.umask(022) + config.status 临时目录改 $TMPDIR 绝对路径"
+  - "make install 递归进子目录会重跑 config.status，需 -o config.status -o Makefile.in + autotools 工具变量 no-op（build 与 install 两处）"
+  - "config.guess 无法识别 HarmonyOS，需显式 --build/--host=aarch64-unknown-linux-ohos"
+  - "可选依赖（X11/gif/png/zlib）configure 缺库自动置空，沙箱无开发库时自动走最小依赖链"
+
+package_contract:
+  libraries: ["ming"]
+  pkg_config: ["ming.pc"]
+  headers: ["ming.h", "mingpp.h"]
+
+test_results:
+  type: consumer
+  total: 1
+  passed: 1
+  failed: 0
+  note: "上游 autotools 项目无独立消费者测试套件；test_package 消费者 1 断言（SWF 版本查询）"
