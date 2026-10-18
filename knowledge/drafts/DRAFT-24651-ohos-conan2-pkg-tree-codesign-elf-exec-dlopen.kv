@@ -1,0 +1,92 @@
+#====================================================================
+# DRAFT-24651-ohos-conan2-pkg-tree-codesign-elf-exec-dlopen
+# — OHOS conan 包树 (.conan2/p/...) 内 .codesign 失效的 ELF：
+#   exec → EPERM (rc=126)；dlopen → EACCES (errno=13)；
+#   同一二进制在构建目录/$HOME 可运行 → 移除失效签名段 + 自签
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     DRAFT-24651-ohos-conan2-pkg-tree-codesign-elf-exec-dlopen
+trigger_tool:           runtime|conan
+phase:                  installation|runtime
+error_signature:        Operation not permitted.*126|EPERM.*\b126\b|errno=13.*EACCES|dlopen.*Permission denied|: 126$
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               3
+category:               ohos, platform, conan, codesign, selinux
+match_keywords:         EPERM, rc=126, EACCES, errno 13, .codesign, .conan2, 包树, package tree, binary-sign-tool, selfSign, llvm-objcopy, remove-section, dlopen, ohpcd, 失效签名
+title:                  OHOS conan 包树内 .codesign 失效的 ELF 无法执行/加载：exec 报 EPERM(126)、dlopen 报 EACCES(13)，同一二进制在构建目录/$HOME 可运行 → 移除失效签名段 + binary-sign-tool 自签
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             OHOS 真机内核对包树路径（.conan2/p/<pkg><hash>/p/... conan 缓存包目录）下 ELF 的
+                        execve/dlopen 强制校验 .codesign 段有效性；ohpcd 制品仓下载的预编译包内二进制可能
+                        携带失效签名（陈旧/错配/占位）。签名校验的强制范围是路径依赖的（实测对照：同一 ELF
+                        在构建目录/$HOME 可执行，包树内 126/EACCES）。
+                        与 E083 的区别：E083 场景 C 层 dlopen 不校验（校验发生在 BiSheng JDK 的额外匹配校验层）；
+                        本条实测包树路径 dlopen 无效签名在内核/加载器级被拒（errno=13，对照同包有效签名库加载正常）。
+                        与 DRAFT-12412 的区别：该条根因是新链接产物的 lld 占位签名 + 配方 has-signature 早退守卫
+                        （子串匹配）bug；本条是"下载来的"预编译包签名本身失效，无配方逻辑 bug，且新增 dlopen EACCES 错误面。
+affected_scope:         所有消费 ohpcd 预编译包、且需在本机执行/加载包内 ELF 的 conan 配方：
+                        ① 宿主构建工具（wayland-scanner/glib-compile-resources 等，build()/generate() 内调用）
+                        ② 运行时 .so 依赖（如 rofi 主二进制 dlopen libwayland-cursor）
+                        本地真机与 CI 均触发（非本地环境噪声）。
+verification_cmd:       |
+  # 1) 路径依赖对照实验：同一 ELF 包树 vs 构建目录
+  .conan2/p/<pkg>/p/bin/<tool>      # → Operation not permitted (rc=126)
+  <builddir>/<tool>                 # → 正常
+  # 2) 签名段检查
+  llvm-readelf -S <pkg>/lib/<lib>.so | grep -i codesign
+  # 3) dlopen 探针（dlopen+dlerror 并打印 errno，区分 EACCES 与依赖缺失）
+  LD_LIBRARY_PATH=<pkg>/lib ./dlprobe <pkg>/lib/<lib>.so    # → errno=13 EACCES
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           strip-invalid-codesign-and-selfsign
+rec_description:        对目标 ELF：复制 → llvm-objcopy --remove-section .codesign → binary-sign-tool sign -selfSign 1
+                        → 放回并注册。宿主工具在 generate() 处理（复制到 build 私有目录 + LD_LIBRARY_PATH wrapper
+                        + tc.binaries 注册）；运行时 .so 在 package() 处理（复制重签入本包 lib/，libdirs=["lib"]
+                        使本包 lib 在消费者 LD_LIBRARY_PATH 中先于依赖包 lib）。
+rec_command:            |
+  tmp=$(mktemp -d) && cp <pkg>/bin/<tool> $tmp/
+  llvm-objcopy --remove-section .codesign $tmp/<tool>
+  binary-sign-tool sign -selfSign 1 -inFile $tmp/<tool> -outFile $tmp/<tool>.s -signAlg SHA256withECDSA
+  mv $tmp/<tool>.s $tmp/<tool> && chmod 755 $tmp/<tool>
+rec_auto_fix:           false
+rec_impl:               pkg-codesign-resign
+
+fallback_priority:      2
+fallback_approach:      require-upstream-resign
+fallback_description:   推动 ohpcd 制品仓侧对该依赖包重新签名发布（根治，可另立依赖项任务）；
+                        绕行期间配方保留重签逻辑，上游修复后移除。
+fallback_command:       
+fallback_auto_fix:      false
+fallback_impl:          
+
+# ★ 禁止策略 ★
+forbid_1_pattern:       chmod [0-7]+ .*\.conan2|chmod [0-7]+ .*\.so
+forbid_1_reason:        失败根因是 .codesign 签名校验，不是 POSIX 权限位（HMDFS 上 chmod 亦被忽略）；chmod 无效且误导。
+forbid_1_consequence:   权限修改无效（仍 126/13），且掩盖真实根因导致排查方向跑偏。
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             
+causes:                 []
+caused_by:              []
+similar_to:             [DRAFT-12412-zsa-wally-ohos-lld-placeholder-codesign, DRAFT-13388-musl-ldso-cannot-load-through-conan-package-symlinks, E083]
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file:               DRAFT-24651-ohos-conan2-pkg-tree-codesign-elf-exec-dlopen.md
+last_updated:           2026-10-16
+source_event:           rofi 2.0.0 OHOS 适配（Wayland 后端）：wayland-scanner/glib-compile-resources exec 126 + libwayland-cursor dlopen EACCES，3 处实证
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:                gcw_Pp8UzTBn <2280277721@qq.com>
+source_pr:              (待 PR 创建后回填)
+source_commit:          (待 PR 创建后回填)
+
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count:  3
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-16
