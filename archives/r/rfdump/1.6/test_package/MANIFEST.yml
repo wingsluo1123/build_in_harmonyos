@@ -1,0 +1,48 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（R51 上游测试三步法 + 积分赛测试用例对比口径）
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: rfdump/1.6
+homepage: "https://www.rfdump.org/"
+
+# ── 上游测试清点（R51 / 积分赛口径）────────────────
+# rfdump 1.6（2008-06，最后一次发行）发布包不含任何自动化测试（上游 N = 0）：
+#   - 源码树只有 src/ 一个子目录，无 tests/ 目录
+#   - find -iname '*test*' -o -iname 'check*' → 0 命中
+#   - 全树 Makefile.am（Makefile.am + src/Makefile.am）grep -E
+#     'TESTS|check_PROGRAMS|XFAIL' → 0 命中
+#   - 无 ctest / pytest / 其他框架注册（C + autotools 工程，无测试框架依赖）
+#   - prescan 报告：有测试 = False
+#   - 实测 `make check` → rc=0 且 "make[1]: Nothing to be done for 'check'."
+# 故上游测试统计：单元测试 0 / 集成测试 0 / 其他测试 0，合计 N = 0。
+
+upstream_check_command: "make check"
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# ── 适配后测试（鸿蒙侧新增，分栏统计，不并入上游分母）────
+# 上游 N=0 → 由本包补全 19 条实断言，随 conan create 执行。
+# 全部断言都真正执行被测二进制（R34），覆盖三条鸿蒙相关代码路径：
+#   A1 产物        : 打包后的 bin/rfdump 存在且可执行
+#   A2-A3 CLI 契约 : --version/--help 在 gtk_init 之前回答（无显示服务器也需要 exit 0）
+#   A4 负向对照    : 无显示服务器时 GUI 启动必须 fail-closed（非 0 退出）
+#   A5 reader 探测 : broadway 显示连接下跑 --probe-reader
+#       - GtkBuilder 资源从可重定位包路径加载且 5/5 关键控件解析成功
+#       - expat 设备表解析出非空条目（实测 26）
+#       - termios bring-up 走到 open("/dev/ttyUSB0") 并按 OS errno 报错
+#       - 锁目录缺失不再硬失败（HarmonyOS 无 /var/lock）
+#       - 退出码区分「无设备节点」（实测 5）
+test_package_tests:
+  - file: test_rfdump.sh
+    description: >
+      19 条消费者断言：产物可执行 1；--version 2（rc + 版本横幅）；--help 3
+      （rc + usage 行 + 记录 --probe-reader）；无显示 fail-closed 1；broadway
+      显示服务器就绪 1；--probe-reader 11（ui 加载 / 控件 5-5 / 可重定位路径 /
+      设备表 / 设备表非空 / 串口 open 尝试 / 设备节点缺失报错 / errno 文本 /
+      无锁文件失败 / device_node=MISSING / 退出码 5）。
+    command: "sh test_rfdump.sh <pkg>/bin/rfdump <result-file> <work-dir>"
+
+# 测试断言总数（鸿蒙侧新增，上游 0 条）
+assertion_count: 19
+upstream_assertion_count: 0

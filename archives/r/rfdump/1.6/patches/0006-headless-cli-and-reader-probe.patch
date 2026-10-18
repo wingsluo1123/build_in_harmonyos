@@ -1,0 +1,140 @@
+diff --git a/src/main.c b/src/main.c
+index db923ff..2bcbd33 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -647,12 +647,86 @@ void writePreferences()
+ 
+ /****************************************************************/
+ 
++static void usage(FILE *out)
++{
++  fprintf(out, "\nusage: rfdump [--setupreader] [-p /dev/tty...] [file.xml]\n"
++	  "       rfdump --probe-reader [-p /dev/tty...]   (headless reader check)\n");
++}
++
+ static void help()
+ {
+-  printf("\nusage: rfdump [--setupreader] [-p /dev/tty...] [file.xml]\n");
++  usage(stdout);
+   exit(1);
+ }
+ 
++/* Headless reader probe: exercises exactly the three code paths that matter
++   on a machine without a graphical session - the packaged GtkBuilder
++   resource, the expat driven tag-type table, and the termios serial bring-up.
++   No window is ever realised.  Exit codes: 0 all good, 2 GUI resource, 3 tag
++   types, 4 no reader attached, 5 no serial device node. */
++static int probe_reader(const char *device)
++{
++  int rc=0;
++  int fd;
++  struct RFIDTagType *types[100];
++  int noTagTypes;
++
++  {
++    GError *error=0;
++    GtkBuilder *probe_builder=gtk_builder_new();
++    char *fn=exe_relative_data_file("rfdump.ui");
++    if(!fn)
++      {
++	fprintf(stderr, "PROBE ui=MISSING exe-relative rfdump.ui not found\n");
++	rc=2;
++      }
++    else if(!gtk_builder_add_from_file(probe_builder, fn, &error))
++      {
++	fprintf(stderr, "PROBE ui=FAIL %s\n", error?error->message:"unknown");
++	rc=2;
++      }
++    else
++      {
++	const char *ids[]={"windowRFDump","treeview1","statusbar","keya","entryTagID",0};
++	int i, found=0;
++	for(i=0; ids[i]; ++i)
++	  if(gtk_builder_get_object(probe_builder, ids[i]))
++	    ++found;
++	printf("PROBE ui=OK widgets=%d/5 file=%s\n", found, fn);
++	if(found < 5)
++	  rc=2;
++      }
++    g_free(fn);
++    g_object_unref(probe_builder);
++  }
++
++  noTagTypes=readTagTypes(types, sizeof_array(types));
++  printf("PROBE tagtypes=%d\n", noTagTypes);
++  if(noTagTypes <= 0)
++    rc=3;
++
++  fd=rfidConnectReader(device, 9600, 0);
++  printf("PROBE serial_device=%s fd=%d\n", device, fd);
++  if(fd < 0)
++    {
++      printf("PROBE reader=ABSENT\n");
++      if(rc == 0)
++	rc=4;
++      if(access(device, F_OK) != 0)
++	{
++	  printf("PROBE device_node=MISSING\n");
++	  if(rc == 4)
++	    rc=5;
++	}
++    }
++  else
++    {
++      printf("PROBE reader=PRESENT\n");
++      serial_cleanup();
++    }
++  return rc;
++}
++
+ static void cleanup()
+ {
+   g_key_file_free(prefs);
+@@ -676,6 +750,26 @@ int main (int argc, char *argv[])
+ {
+   init_reader_arg arg;
+ 
++  /* headless CLI contract: answer --version/--help before the display is
++     opened, so that the packaged binary is testable on a machine that has no
++     graphical session (HarmonyOS PC ships none) */
++  {
++    int a;
++    for(a=1; a<argc; ++a)
++      {
++	if(!strcmp(argv[a], "--version"))
++	  {
++	    printf("rfdump %s\n", VERSION);
++	    return EXIT_SUCCESS;
++	  }
++	if(!strcmp(argv[a], "--help"))
++	  {
++	    usage(stdout);
++	    return EXIT_SUCCESS;
++	  }
++      }
++  }
++
+ #ifdef ENABLE_NLS
+   bindtextdomain (GETTEXT_PACKAGE, PACKAGE_LOCALE_DIR);
+   bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
+@@ -684,6 +778,20 @@ int main (int argc, char *argv[])
+ 
+   gtk_init (&argc, &argv);
+ 
++  {
++    int a, probe=FALSE;
++    const char *probe_device="/dev/ttyUSB0";
++    for(a=1; a<argc; ++a)
++      {
++	if(!strcmp(argv[a], "--probe-reader"))
++	  probe=TRUE;
++	else if(!strcmp(argv[a], "-p") && a+1<argc)
++	  probe_device=argv[++a];
++      }
++    if(probe)
++      return probe_reader(probe_device);
++  }
++
+ #if 0
+   /* check if gtk library will work */
+   gchar *gtk_err = gtk_check_version(GTK_MAJOR_VERSION, GTK_MINOR_VERSION, GTK_MICRO_VERSION);

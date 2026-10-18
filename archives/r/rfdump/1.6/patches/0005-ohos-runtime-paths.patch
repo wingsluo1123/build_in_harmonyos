@@ -1,0 +1,116 @@
+diff --git a/src/main.c b/src/main.c
+index 21d4da6..db923ff 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -756,13 +756,21 @@ int main (int argc, char *argv[])
+   signal(SIGINT, int_handler);
+ 
+ 
+-  /* init gtkbuilder */
++  /* init gtkbuilder; the exe-relative path comes first so that the
++     relocatable Conan layout (<prefix>/bin + <prefix>/share/rfdump) is found */
+   char *fn=0;
+   int i;
++  char *exe_rel=exe_relative_data_file("rfdump.ui");
++  char *candidates[sizeof_array(builder_file)+1];
++  int ncandidates=0;
++  if(exe_rel)
++    candidates[ncandidates++]=exe_rel;
+   for(i=0; i<sizeof_array(builder_file); ++i)
+-    if(access(builder_file[i], R_OK) == 0)
++    candidates[ncandidates++]=builder_file[i];
++  for(i=0; i<ncandidates; ++i)
++    if(access(candidates[i], R_OK) == 0)
+       {
+-	fn=builder_file[i];
++	fn=candidates[i];
+ 	break;
+       }
+ 
+diff --git a/src/rfid.c b/src/rfid.c
+index 9ba7529..739f4fb 100644
+--- a/src/rfid.c
++++ b/src/rfid.c
+@@ -195,19 +195,29 @@ int rfidConnectReader(const char *readerdevice, int baudrate, int binarymode_)
+ 	return -1;
+       }
+ 
+-    /* create lockfile */
++    /* create lockfile (best effort: HarmonyOS has no /var/lock) */
+     FILE *f=fopen(lck, "w");
+     if(!f)
+       {
+-	fprintf(stderr, "Could not create lockfile %s : %s\n", lck, strerror(errno));
+-	return -1;
++	if(errno == ENOENT)
++	  {
++	    fprintf(stderr, "lockfile directory unavailable (%s), continuing without serial lock\n", strerror(errno));
++	    lck[0]=0;
++	  }
++	else
++	  {
++	    fprintf(stderr, "Could not create lockfile %s : %s\n", lck, strerror(errno));
++	    return -1;
++	  }
++      }
++    else
++      {
++	char *user="";
++	if(getenv("USER"))
++	  user=getenv("USER");
++	fprintf(f, "%i rfdump %s\n", getpid(), user);
++	fclose(f);
+       }
+-
+-    char *user="";
+-    if(getenv("USER"))
+-      user=getenv("USER");
+-    fprintf(f, "%i rfdump %s\n", getpid(), user);
+-    fclose(f);
+   }
+ #endif
+ 
+diff --git a/src/tagtypes.c b/src/tagtypes.c
+index ad80802..2c9d2f6 100644
+--- a/src/tagtypes.c
++++ b/src/tagtypes.c
+@@ -118,6 +118,11 @@ static char* rfd_types_fn()
+     "/usr/local/share/rfdump/rfd_types.xml",
+   };
+   int i;
++  /* relocatable Conan layout: <prefix>/bin/rfdump + <prefix>/share/rfdump */
++  char *rel=exe_relative_data_file("rfd_types.xml");
++  if(rel && access(rel, R_OK) == 0)
++    return rel;
++  free(rel);
+   for(i=0; i<sizeof_array(fn); ++i)
+     if(access(fn[i], R_OK) == 0)
+       return fn[i];
+diff --git a/src/tools.h b/src/tools.h
+index 6aabebf..c9a6796 100644
+--- a/src/tools.h
++++ b/src/tools.h
+@@ -32,3 +32,23 @@ do { \
+ } while(0)
+ 
+ #endif
++
++/* Resolve a data file that the package installs in <prefix>/share/rfdump.
++   The Conan package is relocatable, so probe next to the running executable
++   (<bindir>/../share/rfdump/<name>) before falling back to absolute system
++   paths.  Returns a malloc()ed string, or NULL when it cannot be built. */
++static inline char *exe_relative_data_file(const char *name)
++{
++  char exe[PATH_MAX];
++  const ssize_t n = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
++  if(n <= 0)
++    return NULL;
++  exe[n] = 0;
++  char *slash = strrchr(exe, '/');
++  if(!slash)
++    return NULL;
++  *slash = 0;
++  char out[PATH_MAX];
++  SNPRINTF(out, sizeof(out), "%s/../share/rfdump/%s", exe, name);
++  return strdup(out);
++}

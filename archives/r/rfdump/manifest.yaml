@@ -1,0 +1,26 @@
+software: rfdump
+display: "RFDump RFID 标签读写工具"
+description: "RFDump — 通过串口读写 ACG/兼容 RFID 读写器标签数据的 GTK3 工具（标签 ID/类型/厂商/用户数据区）"
+category: electronics
+homepage: "https://www.rfdump.org/"
+license: GPL-2.0-or-later
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "上游 1.6（2008）探测 gtk+-2.0 + libglade-2.0，制品仓都没有；ohpcd gtk/3.24.43 只开 broadway 后端（无 x11/wayland），因此带上 GTK3 + GtkBuilder 移植（改编自 Arch/Debian drop-libglade.patch）"
+    - "发布包自带 2008 年 autoconf 2.61 生成产物；automake 1.18 删除了 AM_CONFIG_HEADER，CI worker 无 autoconf/automake，故直接补丁化 configure/Makefile.in，不跑 autoreconf，并在 build() 给生成产物盖章以抑制 2008 maintainer 规则（否则设备的 autoconf 2.73 会重写 configure 并重新引入 HMDFS 不能写的 umask 077 目录）"
+    - "Conan 包可重定位：rfdump.ui / rfd_types.xml 先按可执行文件同级 ../share/rfdump 查找"
+    - "HarmonyOS 没有 /var/lock（也没有 /var）：串口互斥锁降级为提示后继续，失败点回到真正缺失的设备节点"
+    - "新增无头 --version/--help（gtk_init 之前）与 --probe-reader（不开窗跑 GtkBuilder 资源 + expat 设备表 + termios 串口 bring-up，按失败类别返回不同退出码）"
+    - "lld 不默认 --as-needed：configure 的 conftest 会因未使用的 -lexpat 带上 DT_NEEDED，必须给 configure 注入依赖 libdir 的 LD_LIBRARY_PATH，否则报假的 'cannot run C compiled programs'"
+  common_dependencies:
+    - gtk
+    - expat
+
+versions:
+  "1.6":
+    status: built
+    build_date: "2026-10-18"
+    conan_ref: "rfdump/1.6"
+    note: "GTK3 GUI 在鸿蒙 broadway 后端无法实现主窗口（GtkTreeView 触发 GDK 断言 abort），交付编译/链接/资源加载 + 无头 --probe-reader 串口取证；本机无串口设备节点与 /var 目录树"
