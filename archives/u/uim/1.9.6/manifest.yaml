@@ -1,0 +1,99 @@
+# 版本级 manifest — uim 1.9.6
+# 文件位置: archives/u/uim/1.9.6/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "1.9.6"
+software: "uim"
+
+# 编译状态
+status: built
+
+# 编译日期
+build_date: "2026-10-10"
+build_system: "autotools"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/uim/uim/releases/download/1.9.6/uim-1.9.6.tar.gz"
+  sha256: "5436f5507f64c772da64e8ad7e598cb8b32dc9e5617e01d54e4a71eaf5566a3d"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: autotools
+  configure_options:
+    - "--enable-static"
+    - "--disable-shared"
+    - "--build=aarch64-linux-gnu"
+    - "--host=aarch64-linux-gnu"
+    - "--disable-qt5"
+    - "--disable-qt6"
+    - "--disable-gtk2"
+    - "--enable-gtk3=no"
+    - "--disable-m17n"
+    - "--disable-anthy"
+    - "--disable-canna"
+    - "--disable-eb"
+    - "--disable-wnn"
+    - "--disable-prime"
+    - "--disable-man"
+    - "--disable-scm-docs"
+    - "--disable-pad"
+    - "--disable-skelson"
+    - "--disable-dependency-tracking"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []  # 本包无补丁：平台适配全部在 conanfile.py 中运行时处理（见 notes.md「源码修改」）
+
+# ============================================================
+# 上游测试（R51，构建期真实执行；声明同 test_package/MANIFEST.yml）
+# ============================================================
+
+upstream_test_in_build: true
+upstream_test_total: 288      # 清点口径 = 214 + 68 + 6
+upstream_test_executed: 379   # 实测 = 305 + 68 + 6
+upstream_tests:
+  - suite: "test/"
+    files: 28
+    count: 214                # test/ 递归 `(define (test…` 静态清点
+    runner: "Gauche 0.9.15 + GaUnit + SLIB（构建期搭建）"
+    measured: "28/28 文件执行；305 test group / 291~292 通过 / 13~14 失败+错误 / 4358~4373 断言（涉及 test-im、test-custom、test-intl、util/test-misc，均为上游环境依赖用例）"
+  - suite: "sigscheme/test/"
+    files: 68
+    count: 68                 # 上游 Makefile TESTS = sscm_tests(64) + sscm_optional_tests(4)
+    runner: "sscm（随包构建）"
+    measured: "68/68 执行；65 PASS + 2 SKIP + 1 XFAIL；19175 断言；0 意外失败"
+  - suite: "test2/"
+    files: 6
+    count: 6
+    runner: "uim-sh（随包构建）"
+    measured: "6/6 执行；5 PASS + 1 XFAIL；415 断言；0 意外失败"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "uim 1.9.6 OHOS 适配：禁用所有 GUI 后端，仅保留核心库 + sigscheme (ref: E545)"
+  - "getpeereid() 在 OHOS 不可用，通过 stub + 编译器宏修复 (ref: E545)"
+  - "HMDFS execve() 限制：autotools helper scripts 需 shebang 指向真实 bash ELF (ref: E545)"
+  - "config.status 的 umask 077 mktemp 临时目录在 HMDFS UID 映射下对 worker 进程不可写，configure 需放宽为 umask 022 (ref: E011)"
+  - "OHOS 制品仓 gauche/0.9.15.2 存在两处结构性缺陷：share/gauche-0.98/0.9.15/lib 下 81 个条目是指向构建机 .conan2 路径的断链绝对符号链接；且完全不发布带 C 实现的 ext 模块（gauche.charconv/uvector/unicode/termios/process 等 14 个，pristine 包下 (use gauche.charconv) 直接段错误）。宿主侧解法：以 pinned 官方 Gauche 源码包就地 configure + make ext/charconv 重建 gauche--charconv.so，并用 lib/tools/precomp 预编译纯 Scheme 模块"
+  - "HMDFS：子进程若继承与真实 cwd 不一致的 PWD，getcwd()/pwd 均失败，autoconf 直接报 'configure: error: working directory cannot be determined'；每个子进程必须注入 PWD=<其 cwd>"
+  - "uim test/ 的上游 make check 由 AM_CONDITIONAL(DO_CHECK_IN_TEST, have_gosh_and_gaunit && enable_debug) 门控，默认不注册任何用例；须显式以 gosh test/run-test.scm 驱动 28 个 test-*.scm"

@@ -1,0 +1,43 @@
+{
+  "metadata": {
+    "timestamp": "2026-10-10T16:45:00",
+    "branch": "feat/uim-1.9.6",
+    "base_branch": "main",
+    "package": "uim",
+    "version": "1.9.6",
+    "auditor": "workbuddy-agent"
+  },
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P3",
+      "rule_id": "L1",
+      "file": "archives/u/uim/1.9.6/test_package/MANIFEST.yml",
+      "description": "上游测试已全部在 conan create 的 build() 中真实执行（此前 0/214，本轮整改）。A. sigscheme/test/ 68/68 执行（65 PASS + 2 SKIP + 1 XFAIL，0 意外失败，19175 断言）；B. test2/ 6/6 执行（5 PASS + 1 XFAIL，415 断言）；C. test/ 28/28 文件执行（305 test group / 291~292 通过 / 13~14 失败+错误 / 4358~4373 断言；三轮实测为 6+8、7+7、6+7，涉及文件固定为 test-im、test-custom、test-intl、util/test-misc）。C 套件按“如实申报、不 gate”处理：其 13~14 个失败与错误全部是上游用例对运行环境的依赖（test-im/test-custom 的 uim-sh 交互时序、test-intl 依赖的 gettext 在 OHOS libc 缺失导致 NLS 关闭、util/test-misc 的 m17n 编码差异），不是加载失败，断言与期望值逐字节保持上游原样。依赖问题按审查要求“解决依赖再测”而非跳过：test_requires 增加 gauche/0.9.15.2，GaUnit/SLIB/Gauche 源码按 conandata.yml test_sources 以 pinned sha256 获取，OHOS gauche 包缺失的 14 个 ext 模块与 81 条断链 symlink 由构建期从 Gauche 源码就地重建。",
+      "fix_suggestion": "无需修复。C 套件残留失败为上游环境用例，已在 notes.md「上游测试执行（R51）」与本文件如实申报"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "L2",
+      "file": "archives/u/uim/1.9.6/reports/w3-local-ci.log",
+      "description": "L2 smoke 测试为 skip：uim 为纯静态库包（package_type=library，无 bin/ 目录），无 --version/--help 可执行入口，L2 不适用。",
+      "fix_suggestion": "无需修复（纯库包常规情况）"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R52",
+      "file": "archives/u/uim/1.9.6/manifest.yaml",
+      "description": "build.dependencies 声明为空数组：uim 核心库编译期无外部 conan 依赖（gcroots/sigscheme/replace 均为源码内子模块一并编译），运行时 Scheme 数据已随包发布（share/uim/lib、share/uim/system）。上游测试期依赖（gauche/0.9.15.2）经 test_requires 声明，不进入产物依赖。",
+      "fix_suggestion": "无需修复"
+    }
+  ],
+  "checks": {
+    "rule4_underreporting": "pass — 变更文件 6 个（conandata.yml、conanfile.py、manifest.yaml、notes.md、test_package/MANIFEST.yml、reports/audit-result.json）全部位于 archives/u/uim/1.9.6/，与申报一致；上游用例声明已按三轮实测回填：清点 288 / 实测执行 379 / 断言 23948~23963（原声明 105 属少报，已消除）",
+    "rule5_noncompliant_dirs": "pass — 无 scripts/、ci/、templates/ 等框架目录改动；未修改 ci/config/build_timeouts.txt（超时变更须走独立 infra PR）",
+    "rule12_harmony_test": "pass — 鸿蒙特有测试为四段式端到端消费者用例（构造输入→真实执行→产出结果→校验内容），非断言清单/冒烟",
+    "w2_atomicity": "pass — 仅含 uim/1.9.6 配方变更，无框架文件、无其他库/版本文件",
+    "w3_local_ci": "pass — JC/L0/L1/L4/L5 pass，L2 skip（纯库）",
+    "conan_verify": "pass — G0–G4 全 PASS",
+    "ci_result_json": "pass — .ci-result.json 由 finish W3 步骤生成，exit_code=0"
+  }
+}
