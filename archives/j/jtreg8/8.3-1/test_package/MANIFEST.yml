@@ -1,0 +1,32 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: jtreg8/8.3-1
+homepage: "https://github.com/openjdk/jtreg"
+
+# 上游自测通过 GNU make 目标运行（上游 make/build.sh 下载依赖后由 build/make.sh 执行）。
+# 上游 CI (.github/workflows/test.yml) 先跑 quick-test（HEADLESS=1），再跑全量 test。
+upstream_check_command: "bash build/make.sh quick-test"
+upstream_test_in_build: true
+upstream_test_command: "bash build/make.sh quick-test"
+
+# 上游自测用例（build() 中运行 quick-test；全量 make test 为真机实测统计）
+upstream_tests:
+  - file: test/
+    source: jtreg-8.3+1/test/
+    description: "上游 jtreg 自测套件（GNU make 目标，test/*.gmk）。build() 内运行上游 CI 的初始集 quick-test = 9 个目标（Basic.check/Basic.othervm/Basic.agentvm/i18n×3/JUnitTrace.agentvm/tidy-docs/lockCheck）；全量 make test 在 HarmonyOS PC 真机选中 271 个目标，266 通过 / 4 失败 / 1 挂起（失败均为平台/工具语义差异，逐项根因见 8.3-1/notes.md 与 reports/test-report.md）"
+    command: "bash build/make.sh quick-test"
+
+# test_package 中自带的测试（消费者视角验证，在鸿蒙真机与 CI 运行）
+test_package_tests:
+  - file: test.sh
+    description: "用打包的 bin/jtreg 对迷你 JDK 测试套件（1 个通过用例 + 1 个故意失败用例）做端到端验证：产物存在性、-version 横幅、jtdiff 执行、套件真实编译运行、jtreg 退出码、passed/failed 汇总、summary.txt 与 .jtr 内容（12 项断言，R34 实质性验证）"
+    command: "bash test.sh"
+
+# 测试断言总数
+# 上游：quick-test 9 个 make 目标（build() 内执行）
+# test_package：12 个断言 = 3 产物存在 + 2 版本输出 + 1 jtdiff 执行 + 1 退出码 +
+#   1 汇总行 + 2 summary.txt + 2 .jtr 内容
+assertion_count: 12
