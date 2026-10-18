@@ -1,0 +1,33 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: infnoise/0.3.3
+homepage: "https://github.com/waywardgeek/infnoise"
+
+# 上游测试命令 (bats 测试; 上游无 ctest/make check 注册, 用 bats 运行)
+upstream_check_command: "bats tests/infnoise.bats"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序 (bats 7 用例; 5/7 需真实 USB TRNG 硬件 + ent 工具)
+upstream_tests:
+  - file: tests/infnoise.bats
+    source: infnoise-0.3.3/software/tests/infnoise.bats
+    description: "bats 测试套件 (7 用例): --raw/whitened 熵、--no-output --debug、--list-devices、--serial、--help; 用例 1-5 需 Infinite Noise USB TRNG 设备 + ent"
+    command: "bats tests/infnoise.bats"
+
+# test_package 中自带的测试 (消费者视角验证 + 鸿蒙专项契约)
+test_package_tests:
+  - file: test.c
+    description: "消费者测试: 仅通过公开头文件/API 使用 libinfnoise (listUSBDevices/initInfnoise/deinitInfnoise)"
+    command: "./test_infnoise"
+  - file: harmony_test.c
+    description: "鸿蒙专项测试: 无设备场景下库平台契约断言 (listUSBDevices NULL + message / initInfnoise false / deinitInfnoise 安全)"
+    command: "./harmony_test"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 10
