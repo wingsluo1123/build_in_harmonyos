@@ -1,0 +1,33 @@
+version: "0.9.38"
+software: "osmo-libasn1c"
+status: built
+build_date: "2026-10-17"
+build_system: "custom (recipe-side clang)"
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/o/osmo-libasn1c/osmo-libasn1c_0.9.38.orig.tar.xz"
+  sha256: "13c5b6da2002d3da6f38648f7f6ac8c6177676553126ae5d905d0ee750af401b"
+  tar_format: tar.xz
+  note: >-
+    Debian 官方 orig 归档。该版本只提供 configure.ac 和 Makefile.am，
+    没有预生成的 configure 脚本。
+
+build:
+  system: custom
+  configure_options:
+    - "clang -shared -fPIC -O2 -Wall -Wextra -I<include> -I<include/asn1c> -I<talloc include> src/*.c -Wl,-soname,libasn1c.so.1 -L<talloc lib> -ltalloc -lm -o libasn1c.so.1.0.2"
+  dependencies:
+    - "talloc/2.4.4"
+
+upstream_tests:
+  framework: none
+  test_sources: 0
+  test_command: ""
+  run_in_build: false
+  evidence: "源码树没有 tests 目录，Makefile.am 也没有 check_PROGRAMS/TESTS"
+
+upstream_test_pass_rate: "N/A（无上游测试套件）"
+adapted_test_pass_rate: "test_package 4/4 PASS"
+
+knowledge_gained:
+  - "osmo-libasn1c 使用 asn1c 生成器的分配器根符号；共享库保留 talloc_asn1_ctx 未定义符号，由生成的应用提供定义，与 Debian arm64 官方包一致。"
