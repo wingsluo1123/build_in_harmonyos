@@ -1,0 +1,49 @@
+# 软件级 manifest — sinfo
+# 位置: archives/s/sinfo/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+software: sinfo
+display: "sinfo"
+description: "分布式系统信息监控：sinfod 守护进程采集本机负载、内存占用与 top-N 进程并经 UDP 广播/应答分发，sinfo 客户端以 ncurses 界面或 -H/-L 文本模式汇总展示（类似分布式 top(1)）"
+homepage: "http://www.ant.uni-bremen.de/whomes/rinas/sinfo/"
+license: GPL-2.0
+category: system
+languages: [c++]
+
+# ============================================================
+# 构建信息
+# ============================================================
+
+# 上游 2014 年 orig tarball 已预生成 configure/Makefile.in（autotools）
+build_system: autotools
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "上游主页已失效（302 → 大学院系页），用 Debian pool 的 pristine orig tarball 作源（sha256 与签名 .dsc 一致）"
+    - "2014 年预生成 configure/Makefile.in 免 autoreconf；但其 config.guess/config.sub 不识别 HarmonyOS（注入自终止 HarmonyOS 分支 + config.sub 两处 pattern 接受 linux-ohos），configure 内嵌 umask 077 在 HMDFS 触发 E011（改 022）"
+    - "AX_BOOST_SIGNALS/AX_BOOST_SYSTEM 老宏对 Boost 1.84 已失效（Signals v1 已删除、System 已 header-only），--with-boost-signals=no --with-boost-system=no 跳过找库检查"
+    - "AC_FUNC_MALLOC 交叉编译默认触发 rpl_malloc 宏替换（链接期未定义），configure_vars 注入 ac_cv_func_malloc_0_nonnull=yes"
+    - "Boost 1.84 bind 严格化：按值 signals2 信号（signal<void (Message)>）连接非 const 左值引用成员槽会编译失败（mf1 无匹配调用），槽签名改 const Message& 即可（全库唯一一处）
+    - "守护进程默认 daemonize 并向 255.255.255.255 广播；受限环境用 sinfod -F -q -b 127.0.0.1 收窄到环回"
+  common_dependencies:
+    - boost
+    - ncurses
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "0.0.48":
+    status: built
+    build_date: "2026-10-15"
+    conan_ref: "sinfo/0.0.48"
+    source_url: "https://deb.debian.org/debian/pool/main/s/sinfo/sinfo_0.0.48.orig.tar.gz"

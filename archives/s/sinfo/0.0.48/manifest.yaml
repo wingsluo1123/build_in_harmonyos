@@ -1,0 +1,105 @@
+software: sinfo
+# 版本级 manifest — 遵循 ARCHIVE-SPEC v3.0
+version: "0.0.48"
+
+# 编译状态: published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-15"
+
+conan_ref: sinfo/0.0.48
+
+# ============================================================
+# 源码信息
+# ============================================================
+source:
+  # 上游主页已失效（302 → 大学院系页）；Debian pool 保留的 pristine orig
+  # tarball（与签名 .dsc 的 sha256 一致）是当前唯一稳定的官方原始归档。
+  url: "https://deb.debian.org/debian/pool/main/s/sinfo/sinfo_0.0.48.orig.tar.gz"
+  sha256: "4b6360f863c408e96ca04092ea6bdd61ee14a9e9151b85f64e12ece541b1933f"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+build:
+  # 构建系统类型: cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  configure_options:
+    - "--enable-static"
+    - "--disable-shared"
+    - "--with-boost-signals=no"
+    - "--with-boost-system=no"
+  # AC_FUNC_MALLOC 交叉编译缓存变量（configure_vars 注入）
+  configure_vars:
+    ac_cv_func_malloc_0_nonnull: "yes"
+
+  dependencies:
+    - "boost/1.84.0"
+    - "ncurses/6.6"
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+patches_applied:
+  - "0001-configure-umask.patch"
+  - "0002-config.guess-harmonyos.patch"
+  - "0003-config.sub-linux-ohos.patch"
+  - "0004-boost-bind-const-ref-slot.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+knowledge_gained:
+  - "E011（同族签名 E114）: 2014 年预生成 configure 里 config.status 用 `umask 077 && mktemp -d ./confXXXXXX` 建临时目录，HMDFS 上进程 UID 与映射属主 UID 不同，drwx------ 目录连属主都不可写 → 补丁 0001 改 umask 022（jpegoptim 同款）"
+  - "tarball 自带 2014 版 config.guess/config.sub 不识别 HarmonyOS；config.guess 注入分支必须自终止（echo <三元组>; exit 0），该代脚本主 case 之后没有 GUESS 兜底输出（判据：grep -c 'x\\$GUESS' config.guess → 0）；config.sub 需两处 pattern 同改（maybe_os 表 + OS 列表），只改一处会在 `checking host system type` 报 Invalid configuration"
+  - "AX_BOOST_SIGNALS/AX_BOOST_SYSTEM（autoconf-archive 老宏）对 Boost 1.84 已失效：Signals v1 已删除、System 已 header-only 且制品仓 boost 只构建 filesystem/regex/program_options/iostreams 四库；找不到库即 AC_MSG_ERROR，必须 --with-boost-signals=no --with-boost-system=no 跳过（代码实际只用 header-only 的 asio/signals2/system/bind）"
+  - "AC_FUNC_MALLOC 交叉编译默认按 malloc(0)==NULL 处理 → config.h `#define malloc rpl_malloc` → 包含 config.h 的翻译单元链接期 rpl_malloc 未定义（sinfo/ 下 7 个 .cc/.h 受影响）；修复：configure_vars 注入 ac_cv_func_malloc_0_nonnull=yes"
+  - "MP_WITH_CURSES 是 AX_WITH_CURSES 的 AU_ALIAS：conan ncurses（平铺 ncurses.h + 仅 libncursesw）→ -lncursesw 链接测试与 ncurses.h 头文件测试通过 → CURSES_LIB=-lncursesw、HAVE_NCURSES_H，与 sinfocurses.h 的 #ifdef 分支吻合；其后 AC_CHECK_LIB(ncurses, use_default_colors) 因无 libncurses 失败 → HAVEDEFAULTCOLORS 不定义，use_default_colors() 走 #ifdef 守卫优雅降级"
+  - "sinfo 布局：上游 sinfo → bin/、sinfod → sbin/；Conan 2 AutotoolsToolchain 默认以 --sbindir=${prefix}/bin 重定向，sinfo/sinfod/sshallsinfo（上游 ssh 扇出脚本）同落 bin/（bindirs=[bin]）；lib/sinfo/ 下 pkglib 静态归档是内部支持库，非公开链接接口（libs=[]、libdirs=[]）"
+  - "产物运行时 ABI（OHOS PC glibc）：解释器 /lib/ld-linux-aarch64.so.1、NEEDED 仅 libc.so（libc++/ncurses/boost 全部静态链入）；本机 WSL qemu-user（aarch64 binfmt）可直跑，test_package 9 断言全绿
+  - "上游 idlx RPC 代码生成器产物（*.idlx.{client,parser}.{h,cc}）已随 2014 年 tarball 预生成且 mtime(2014) > .idlx(2011)，make 不触发 idlxcompiler（该工具上游已不可得），无需构建期生成"
+  - "Boost 1.84 bind 严格化：按值 signals2 信号（serverconnectorbase.h 的 signal<void (Message)> sendMessageSignal，全库唯一）连接非 const 左值引用成员槽（queueAndSendMessageSlot(Message&)）时，信号以右值调用槽，mf1<void, C, Message&> 无可行 operator() 重载（boost/bind/bind.hpp:299 no matching function for call）→ 补丁 0004 把槽签名改为 const Message&；全库信号/槽签名审计确认其余组合均为左值引用信号 → 引用/const 引用/按值槽，天然兼容无需改动"
+
+# ============================================================
+# 测试
+# ============================================================
+test:
+  upstream_cases: 1
+  upstream_suite: "make check：libmessage/testmessage check_DATA（testmessage 输出与 testmessage.out.approved 黄金文件 diff）；无 automake TESTS 目标"
+  runnable: 0
+  runnable_note: "交叉编译环境无法执行目标架构二进制，未在配方中集成；端到端功能由 test_package 覆盖"
+  pass_rate: "N/A（上游 check 未在本适配中运行；消费者测试 9/9 断言通过）"
+  consumer_test: "test_sinfo.sh：双二进制版本/帮助断言 + sinfod 前台守护（环回广播）+ sinfo 客户端 UDP/TCP 直连 -H/-L 查询非空 + SIGTERM 干净退出"
+
+# ============================================================
+# 补丁生成与分类
+# ============================================================
+patch_generation:
+  method: "0001-0003 per-file-difflib; 0004 pristine-tarball diff -u"
+  source_orig_dir: /root/ohpcd-work/src/sinfo-0.0.48
+  generated_at: "2026-10-15"
+  patches_count: 4
+
+patch_classification:
+  - file: 0001-configure-umask.patch
+    type: auto
+    platform_only: True
+    guard: "pending"
+  - file: 0002-config.guess-harmonyos.patch
+    type: auto
+    platform_only: True
+    guard: "pending"
+  - file: 0003-config.sub-linux-ohos.patch
+    type: auto
+    platform_only: True
+    guard: "pending"
+  - file: 0004-boost-bind-const-ref-slot.patch
+    type: portability
+    platform_only: False
+    guard: "none"
