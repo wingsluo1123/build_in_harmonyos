@@ -1,0 +1,138 @@
+--- a/swiftc.sh
++++ b/swiftc.sh
+@@ -4,14 +4,32 @@
+ #   sh swiftc.sh hello.swift -o hello        # the patched instrument (the delivered default)
+ #   T2_USE_UNPATCHED=1 sh swiftc.sh ...      # the UNPATCHED compiler from build/swift/bin (for comparison)
+ #
+-# WHAT IT ADDS (only when the caller did NOT already give it -- it never duplicates an option, so the
+-# frozen build recipe in example/build.sh can call this script unchanged):
+-#     -sdk <pkg>/sysroot/ohos
+-#     -resource-dir <pkg>/build/swift/lib/swift
+-#     -tools-directory <pkg>/toolchain/bin
+-#     -Xclang-linker -resource-dir=<pkg>/toolchain/resource/15.0.4
+-#     -I <pkg>/ring/plane/modules   -L <pkg>/ring/plane/lib   -plugin-path <pkg>/ring/plugin
+-#     -Xlinker -rpath -Xlinker <pkg>/ring/plane/lib          (the consumer obligation, see FAILURE-MODES.md)
++# WHAT IT ADDS: the five groups listed ONCE, below, under "THE FLAG TABLE" -- and nothing twice.
++# A group is appended only when the caller did not already give it, so the frozen build recipe in
++# example/build.sh can call this script unchanged.
++#
++# ---------------------------------------------------------------------------------------------
++# locale-r104 PATCH 0001 -- ONE FLAG TABLE, SHARED WITH example/build.sh.
++#
++# Before r104 this front door appended a NARROWER list than the recipe in example/build.sh, so
++# `import Foundation` died with      error: missing required module '_FoundationCShims'
++# in test_package (E3, and R1 with it) while the very same package compiled the demo 35/35 through
++# example/build.sh.  The five groups below are the SAME groups build.sh materialises
++# (CONVENTION.md section 3), written once, here:
++#
++#   G1  target / sysroot / resource-dir / tools-directory / linker
++#   G2  ring plane: modules, lib, plugin-path
++#   G3  Swift runtime + C++ runtime search paths
++#   G4  Foundation's clang-module closure (_FoundationCShims, _FoundationICU, Dispatch)
++#   G5  rpath set (ring + Swift runtime + dispatch)
++#
++# The two tables coincide BY CONSTRUCTION, and that is measurable rather than asserted:
++#
++#     T2_SHOW_FLAGS=1 sh swiftc.sh --version          # -> T2_FLAG_TABLE_ADDED=<n>, tokens on stderr
++#     T2_SHOW_FLAGS=1 sh swiftc.sh <build.sh argv>    # -> T2_FLAG_TABLE_ADDED=0   (parity reading)
++#
++# ★ KEEP IN SYNC WITH example/build.sh: if a group changes there, change it here in the same edit.
++# ---------------------------------------------------------------------------------------------
+ set -u
+ case "$0" in
+   */*) D=$(cd "$(dirname "$0")" && pwd) ;;
+@@ -29,30 +47,91 @@
+   exit 9
+ fi
+ 
+-HAVE_SDK=0; HAVE_RD=0; HAVE_TD=0; HAVE_PLUG=0; HAVE_RI=0; HAVE_RL=0; HAVE_RPATH=0
++# How many arguments the CALLER gave; the T2_SHOW_FLAGS parity reading is relative to this.
++T2_ARGC_IN=0
++for _a in "$@"; do T2_ARGC_IN=$((T2_ARGC_IN + 1)); done
++
++HAVE_TARGET=0; HAVE_SDK=0; HAVE_RD=0; HAVE_TD=0; HAVE_LD=0; HAVE_CLRD=0
++HAVE_PLUG=0; HAVE_RI=0; HAVE_RL=0; HAVE_RPATH=0; HAVE_RPATHSET=0
++HAVE_SWIFTLIB=0; HAVE_CXXL=0
++HAVE_FCSHIMS=0; HAVE_ICUINC=0; HAVE_ICUMAP=0; HAVE_VFS=0; HAVE_DISP=0
+ for a in "$@"; do
+   case "$a" in
++    -target) HAVE_TARGET=1 ;;
+     -sdk) HAVE_SDK=1 ;;
+     -resource-dir) HAVE_RD=1 ;;
++    -resource-dir=*) HAVE_CLRD=1 ;;
+     -tools-directory) HAVE_TD=1 ;;
++    -use-ld=*) HAVE_LD=1 ;;
+     -plugin-path) HAVE_PLUG=1 ;;
++    -fmodule-map-file=*) HAVE_ICUMAP=1 ;;
++    -vfsoverlay) HAVE_VFS=1 ;;
+     "$T2_RING/plane/modules") HAVE_RI=1 ;;
+     "$T2_RING/plane/lib") HAVE_RL=1 ;;
+     -rpath) HAVE_RPATH=1 ;;
++    "$T2_ROOT/build/swift/lib/swift/ohos") HAVE_SWIFTLIB=1 ;;
++    "$T2_ROOT/build/swift/lib/swift/ohos/aarch64") HAVE_RPATHSET=1 ;;
++    "$T2_ROOT/source/swift-foundation/Sources/_FoundationCShims/include") HAVE_FCSHIMS=1 ;;
++    "$T2_ROOT/source/swift-foundation-icu/icuSources/include") HAVE_ICUINC=1 ;;
++    "$T2_ROOT/toolchain/cxx") HAVE_CXXL=1 ;;
++    "$T2_ROOT/source/libdispatch"|"$T2_ROOT/source/libdispatch/src"|"$T2_ROOT/build/dispatch/src"|"$T2_ROOT/source/libdispatch/src/BlocksRuntime"|"$T2_ROOT/build/dispatch/src/swift/swift") HAVE_DISP=1 ;;
+   esac
+ done
+ 
+ # Appended one parameter at a time (never through a string), so paths containing spaces still work.
++# ---- G1: target / sysroot / resource-dir / tools-directory / linker -------------------------
++[ "$HAVE_TARGET" = 1 ] || set -- "$@" -target aarch64-unknown-linux-ohos
+ [ "$HAVE_SDK" = 1 ] || set -- "$@" -sdk "$T2_ROOT/sysroot/ohos"
+ [ "$HAVE_RD" = 1 ] || set -- "$@" -resource-dir "$T2_ROOT/build/swift/lib/swift"
+ [ "$HAVE_TD" = 1 ] || set -- "$@" -tools-directory "$T2_ROOT/toolchain/bin"
+-set -- "$@" -Xclang-linker "-resource-dir=$T2_ROOT/toolchain/resource/15.0.4"
++[ "$HAVE_LD" = 1 ] || set -- "$@" -use-ld=lld
++# The clang-linker resource-dir is the joined `-resource-dir=<path>` form (the Swift one above is a
++# separate `-resource-dir <path>` pair), so it gets its own guard -- otherwise a caller that already
++# passes it (example/build.sh does) would get it twice and the parity reading below could not be 0.
++[ "$HAVE_CLRD" = 1 ] || set -- "$@" -Xclang-linker "-resource-dir=$T2_ROOT/toolchain/resource/15.0.4"
++
++# ---- G2: ring plane ------------------------------------------------------------------------
+ [ "$HAVE_RI" = 1 ] || set -- "$@" -I "$T2_RING/plane/modules"
+ [ "$HAVE_RL" = 1 ] || set -- "$@" -L "$T2_RING/plane/lib"
++[ "$HAVE_PLUG" = 1 ] || set -- "$@" -plugin-path "$T2_RING/plugin"
++
++# ---- G3: Swift runtime + C++ runtime search paths ------------------------------------------
++[ "$HAVE_SWIFTLIB" = 1 ] || set -- "$@" -I "$T2_ROOT/build/swift/lib/swift/ohos"
++[ "$HAVE_CXXL" = 1 ] || set -- "$@" -L "$T2_ROOT/toolchain/cxx"
++
++# ---- G4: Foundation's clang-module closure -------------------------------------------------
++# Foundation.swiftmodule re-exports these three; without them the clang importer stops with
++# `missing required module '_FoundationCShims'` and, once that one is satisfied, `... 'Dispatch'`.
++[ "$HAVE_FCSHIMS" = 1 ] || set -- "$@" -I "$T2_ROOT/source/swift-foundation/Sources/_FoundationCShims/include"
++[ "$HAVE_ICUINC" = 1 ] || set -- "$@" -I "$T2_ROOT/source/swift-foundation-icu/icuSources/include"
++[ "$HAVE_ICUMAP" = 1 ] || set -- "$@" -Xcc "-fmodule-map-file=$T2_ROOT/source/swift-foundation-icu/icuSources/include/_foundation_unicode/module.modulemap"
++[ "$HAVE_VFS" = 1 ] || set -- "$@" -vfsoverlay "$T2_ROOT/build/dispatch/dispatch-vfs-overlay.yaml"
++[ "$HAVE_DISP" = 1 ] || set -- "$@" \
++    -I "$T2_ROOT/source/libdispatch" \
++    -I "$T2_ROOT/source/libdispatch/src" \
++    -I "$T2_ROOT/build/dispatch/src" \
++    -I "$T2_ROOT/source/libdispatch/src/BlocksRuntime" \
++    -I "$T2_ROOT/build/dispatch/src/swift/swift"
++
++# ---- G5: rpath set -------------------------------------------------------------------------
+ [ "$HAVE_RPATH" = 1 ] || set -- "$@" -Xlinker -rpath -Xlinker "$T2_RING/plane/lib"
+-[ "$HAVE_PLUG" = 1 ] || set -- "$@" -plugin-path "$T2_RING/plugin"
++[ "$HAVE_RPATHSET" = 1 ] || set -- "$@" \
++    -Xlinker -rpath -Xlinker "$T2_ROOT/build/swift/lib/swift/ohos" \
++    -Xlinker -rpath -Xlinker "$T2_ROOT/build/swift/lib/swift/ohos/aarch64" \
++    -Xlinker -rpath -Xlinker "$T2_ROOT/runtime/dispatch-install/lib/swift/ohos" \
++    -Xlinker -rpath -Xlinker "$T2_ROOT/build/dispatch"
+ 
+ # The compiler gets its library path on THIS PROCESS ONLY (see env.sh fact (2)): exporting it would
+ # also reach the program the compiler builds, where the same-named dispatch/BlocksRuntime copies in
+ # build/swift/lib/swift/ohos would shadow the ring's own siblings and break the load.
++if [ "${T2_SHOW_FLAGS:-0}" = "1" ]; then
++  T2_ARGC_OUT=0
++  for _a in "$@"; do T2_ARGC_OUT=$((T2_ARGC_OUT + 1)); done
++  echo "T2_FLAG_TABLE_ADDED=$((T2_ARGC_OUT - T2_ARGC_IN))" >&2
++  T2_I=0
++  for _a in "$@"; do
++    T2_I=$((T2_I + 1))
++    if [ "$T2_I" -gt "$T2_ARGC_IN" ]; then echo "T2_FLAG_TABLE_TOKEN=$_a" >&2; fi
++  done
++fi
+ LD_LIBRARY_PATH="$T2_TOOLCHAIN_LD_LIBRARY_PATH" exec "$CC" "$@"
