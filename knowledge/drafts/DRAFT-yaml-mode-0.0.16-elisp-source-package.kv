@@ -1,0 +1,8 @@
+error_signature: "emacs.*not found|ert-run-tests-batch|\\.elc|site-lisp|Invalid or read-only site-lisp"
+root_cause: "elisp 单文件包(如 emacs 的各类 major-mode)的上游构建仅为 emacs --batch 字节码编译生成 .elc;.elc 与 emacs 版本绑定且 OHOS 环境无 emacs,跨环境交付字节码既不可行也不必要。上游自带 ERT 测试(ert-deftest)同样依赖 emacs 运行,CI 无法执行。"
+rec_approach: "交付 .el 源文件到 share/emacs/site-lisp/<pkg>/(load-path 约定);.elc 列入构建产物拦截;上游 ERT 测试按 skipped 申报;rule12 消费用例用纯 Python elisp 结构解析器第二实现:解析顶层 defcustom/defface/defun/defconst/defvar 清单与版本头,提取 defconst 正则表做 elisp→python 保守转换(\\\\( \\\\)|\\\\b \\\\s- 子集,失败跳过计数),再用转换出的正则对上游自带样例逐行做真实语法分类——即该 mode 在 font-lock 中的本职工作。"
+match_keywords: ["emacs", "elisp", "major-mode", "yaml-mode", "site-lisp", "ert", "ert-deftest", ".elc", "byte-compile", "load-path"]
+error_excerpt: "yaml-mode/0.0.16: ERROR: emacs: not found"
+severity: P2
+category: data-package|elisp|emacs|ohos-platform
+last_updated: 2026-10-09
