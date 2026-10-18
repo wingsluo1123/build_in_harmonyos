@@ -1,0 +1,24 @@
+version: "0.2.7"
+status: built
+build_date: "2026-10-13"
+conan_ref: "jigsaw-generator/0.2.7"
+
+source:
+  url: "https://github.com/juliangilbey/jigsaw-generator/archive/refs/tags/upstream/0.2.7.tar.gz"
+  sha256: "f9c2644f719cef1ea89caebb86f17536192f90f7d7aeb4a4c61e987932b664f1"
+  tar_format: tar.gz
+
+build:
+  system: script
+  configure_options: []
+  dependencies: []
+  cc: ""
+  cxx: ""
+
+patches_applied: []
+
+knowledge_gained:
+  - "上游构建仅为一条 sed 替换（Makefile.in 的 build 目标），无 autoconf 编译环节，配方直接复现而不跑 ./configure"
+  - "上游 make -C doc build 经 pdflatex 生成 doc PDF；构建环境不含 LaTeX 且不应把 LaTeX 变编译依赖，故只打包 .tex 源码"
+  - "源码内 tabletex 判定为 `if makepdf and bodytablefile:`：--nomakepdf 时不写 .tex、不发起任何 LaTeX 调用、只出 .md；默认模式则 tex+puzzles 均需 pdflatex 存在（缺失时 subprocess 抛 FileNotFoundError，属上游行为，设备端用 --nomakepdf 规避）"
+  - "运行环境需 python3 + PyYAML + (出 PDF 时) pdflatex；PyYAML 不在 ohpcd 制品仓，不声明为 conan 依赖（与 procdump 处理 zconf.h 同口径：非链接依赖不声明）"
