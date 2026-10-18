@@ -1,0 +1,38 @@
+# 版本级 manifest — xgks 2.6.1-dfsg.2
+
+version: "2.6.1-dfsg.2"
+software: "xgks"
+status: built
+build_date: "2026-10-14"
+build_system: autotools
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/x/xgks/xgks_2.6.1+dfsg.2.orig.tar.gz"
+  sha256: "451dd35080fd3e2fc1f5ed83b8b86e29c5ad0af2adf4c4d08ff13643ece641ab"
+  tar_format: tar.gz
+  origin: "Debian orig tarball（SourceForge 上游发行的 dfsg 规范源，目录版本中的 -dfsg.2 对应归档名中的 +dfsg.2）"
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=/usr"
+  dependencies:
+    - "libx11/1.8.13"
+    - "xorgproto/2025.1"
+  cc: clang
+
+patches_applied:
+  - "patches/0001-xcolours-xcmap-pointer.patch"
+  - "patches/0002-xopws-visual-cast.patch"
+  - "patches/0003-input-void-return.patch"
+
+knowledge_gained:
+  - "clang incompatible-pointer-types: XcInit passes ws->XcMap by value but XcMap_enter needs XcMap*; fixed with &(ws->XcMap) plus GKSindexes OOB fix (Debian xcolours.patch port)"
+  - "clang incompatible-pointer-types: XCreateWindow needs Visual* but gets XVisualInfo*; cast (Visual*)&wk->vinfo (Debian gcc-14.patch xopws hunk port; X path not exercised by MO test)"
+  - "xgks 上游无自动化测试：唯一的 test 目标是交互式 X11 演示，Debian 打包明确禁用测试；本配方 status:no_tests + 消费者 MO 工作站验证"
+  - "1990s Makefile 无 DESTDIR 支持且 fontdb 写死相对 prefix，package() 显式拷贝产物，不调用 make install"
+  - "Fortran 绑定/演示程序/troff 文档超出 OHOS 范围（无 Fortran 编译器，知识 E109），只构建 C 子集"
+  - "旧 autoconf 沿用 libx11/1.8.13 的 OHOS 三件套修复（umask 022、bash 路径、conftest stdin 重定向），fontdb 数字别名用文件拷贝代替 symlink"
+  - "fortc生成器需m4：真机fortc[103]: m4: inaccessible or not found，补build_requirements/tool_requires(m4/1.4.19)（仓内已OHOS构建）"
+  - "clang -Wreturn-type硬错误：input.c三个K&R函数无声明类型即隐式int却全用裸return，补void声明（XgksIProcessXEvent/XgksIDevDisable/XgksIDevEnable）并给static DisCount补int"
+  - "同类硬错误系统性扩散：prmgr/segments/transforms共8个纯裸return函数统一补void，同TU先调用后定义（XgksReDrawSeg/transforms三函数）补void前置声明；conan补丁解析器连续两轮拒收transforms.c（含actual b'/*'指纹，git apply --check却通过），故删除patches/0004，12处编辑全部经source()内replace_in_file完成（onedpl/2022.12.0先例，锚点均为orig包唯一出现、strict=True），0001-0003保留为补丁"
