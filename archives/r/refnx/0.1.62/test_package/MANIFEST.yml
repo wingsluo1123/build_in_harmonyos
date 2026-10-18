@@ -1,0 +1,173 @@
+# test_package/MANIFEST.yml — 上游官方测试声明文件（L0e 门禁要求存在）
+# 详见 docs/TEST_QUALITY_SPEC.md
+#
+# 本文件的每一个计数都由脚本从真机 pytest --junitxml 结果
+# (junit/upstream-pkg.xml) 直接读取求和得到：模块路径取自执行时 pytest 的
+# classname，passed/failed/errors/skipped 取自各 testsuite 的汇总属性。无手工
+# 填写数字。执行对象是 **本配方 conan create 产出的 package_folder**
+# (site-packages/refnx)，不是源码树，因此它验证的是交付物本身。
+
+package: refnx/0.1.62
+homepage: https://refnx.readthedocs.io
+
+# 上游官方测试方式：pytest（测试目录随 sdist 安装进 site-packages/refnx/**/tests）
+upstream_check_command: "python3 -m pytest refnx/"
+
+# conanfile.py build() 是否集成上游测试：false。
+#   原因：跑上游 pytest 需要 scipy、pandas、orsopy、h5py 等运行期依赖，它们未发布
+#   到 OHPCD Conan 制品仓（该仓只有 python/meson/ninja/cython/numpy），CI worker 的
+#   build() 阶段拿不到，硬塞进 build() 只会产出假通过或假失败。上游全量套件因此在
+#   真机离线执行：用本配方 build+install 产出的 4 个扩展 + 平台 OHOS wheel 的
+#   scipy/pandas/orsopy/h5py 等，对 package_folder 逐目录收集，聚合见
+#   reports/test-report.md 与 manifest.yaml 的 upstream_test_run。
+upstream_test_in_build: false
+upstream_test_command: "python3 -m pytest <site-packages>/refnx/<MODULE>/tests -q -p ohos_testdata --junitxml=<MODULE>.xml"
+
+# 上游实际运行结果（7 个 pytest 目录，真机 JUnit，执行对象 = conan 包）
+upstream_tests:
+  - file: refnx/reflect/tests
+    source: refnx-0.1.62.tar.gz/refnx/reflect/tests
+    description: "上游官方 pytest 目录（sdist 自带，安装于 site-packages）；含 Abeles/Parratt 两种算法 × C/Cython/纯 Python 三种内核的交叉验证、Motofit 参考曲线比对、Spline 微切片、Structure/Component 树、界面粗糙度、SLD/Material、交互式建模器"
+    command: "python3 -m pytest refnx/reflect/tests -q -p ohos_testdata --ignore=refnx/reflect/_app/tests/test_app.py --junitxml=reflect_tests.xml"
+    passed: 145
+    failed: 0
+    errors: 0
+    skipped: 0
+  - file: refnx/analysis/tests
+    source: refnx-0.1.62.tar.gz/refnx/analysis/tests
+    description: "上游官方 pytest 目录（sdist 自带）；含 Parameter/Parameters 树、Objective 似然、CurveFitter 最小化（L-BFGS-B/least_squares/differential_evolution）、emcee MCMC、GlobalObjective 多数据集联合精修、NIST StRD 参考拟合"
+    command: "python3 -m pytest refnx/analysis/tests -q -p ohos_testdata --junitxml=analysis_tests.xml"
+    passed: 99
+    failed: 0
+    errors: 0
+    skipped: 0
+  - file: refnx/reduce/tests
+    source: refnx-0.1.62.tar.gz/refnx/reduce/tests
+    description: "上游官方 pytest 目录（sdist 自带）；含 PlatypusNexus 元数据解析、TOF 模拟、批次归约、事件文件读取（_cevent mmap 路径）、xray 数据、峰识别、重分箱"
+    command: "python3 -m pytest refnx/reduce/tests -q -p ohos_testdata --junitxml=reduce_tests.xml"
+    passed: 86
+    failed: 0
+    errors: 0
+    skipped: 0
+  - file: refnx/dataset/tests
+    source: refnx-0.1.62.tar.gz/refnx/dataset/tests
+    description: "上游官方 pytest 目录（sdist 自带）；含 Data1D/ReflectDataset/Dot/MFT/ORSO(orsopy) 各类格式读写与转换"
+    command: "python3 -m pytest refnx/dataset/tests -q -p ohos_testdata --junitxml=dataset_tests.xml"
+    passed: 24
+    failed: 0
+    errors: 0
+    skipped: 0
+  - file: refnx/util/tests
+    source: refnx-0.1.62.tar.gz/refnx/util/tests
+    description: "上游官方 pytest 目录（sdist 自带）；含 ErrorProp 误差传播、general 辅助函数、nsplice 拼接"
+    command: "python3 -m pytest refnx/util/tests -q -p ohos_testdata --junitxml=util_tests.xml"
+    passed: 23
+    failed: 0
+    errors: 0
+    skipped: 0
+  - file: refnx/_lib/tests
+    source: refnx-0.1.62.tar.gz/refnx/_lib/tests
+    description: "上游官方 pytest 目录（sdist 自带）；含 _cutil 的 C flatten/unique 与纯 Python 回退实现的等价性、导入契约"
+    command: "python3 -m pytest refnx/_lib/tests -q -p ohos_testdata --junitxml=_lib_tests.xml"
+    passed: 8
+    failed: 0
+    errors: 0
+    skipped: 0
+  - file: refnx/reflect/_app/tests
+    source: refnx-0.1.62.tar.gz/refnx/reflect/_app/tests
+    description: "上游官方 pytest 目录（sdist 自带）；test_graphproperties.py 为纯数据模型测试，可执行"
+    command: "python3 -m pytest refnx/reflect/_app/tests -q -p ohos_testdata --ignore=refnx/reflect/_app/tests/test_app.py --junitxml=reflect_app_tests.xml"
+    passed: 1
+    failed: 0
+    errors: 0
+    skipped: 0
+
+# 上游总计（7 目录 JUnit 求和，failed/errors 均为 0）
+upstream_total:
+  collected: 386
+  passed: 386
+  skipped: 0
+  failed: 0
+  errors: 0
+  xfailed: 0
+  xpassed: 0
+  reconciliation: "collected(386) = passed(386) + skipped(0) + failed(0) + errors(0)；无 xfail/xpass，无跳过 —— 平台依赖齐全时上游套件全绿"
+  modules: 7
+  pass_rate: "100.00% (0 failed / 0 errors of 386 collected)"
+  run_date: "2026-10-15"
+  run_environment: "HarmonyOS PC aarch64 (HongMeng Kernel 1.13.0), OHPCD CPython 3.12.9 (musl), numpy 2.5.2 + 平台 OHOS wheel 的 scipy/pandas/h5py/matplotlib/xlrd 及纯 Python wheel（orsopy/pyyaml/attrs/corner/periodictable/tqdm）；4 个 refnx 扩展由本配方构建并安装到 conan package_folder 后直接对其跑 pytest（非源码树）"
+  run_time_seconds: 746.46
+  excluded_modules:
+    - file: refnx/reflect/_app/tests/test_app.py
+      tests: 4
+      reason: >-
+        该模块顶层 `from qtpy import QtWidgets, QtCore, QtGui`，需要 qtpy + 一个 Qt 绑定
+        （PySide6/PyQt5）；OHOS 侧未发布任何 Qt 绑定 wheel，qtpy 本身也无法在缺少绑定时导入，
+        因此该模块在 collection 阶段即 ModuleNotFoundError（pytest 报 1 个 collection error，
+        非测试失败）。为得到可比对的 passed/failed 计数，正式运行以
+        --ignore=refnx/reflect/_app/tests/test_app.py 排除该文件，其余 7 个目录全部执行。
+        证据：`python3 -m pytest refnx/reflect/_app/tests/test_app.py --collect-only` ->
+        ModuleNotFoundError: No module named 'qtpy'。
+      evidence_command: "python3 -m pytest refnx/reflect/_app/tests/test_app.py --collect-only -q -o addopts=''"
+
+# test_package 自带的消费者视角测试（真实调用 API，非打印空壳）
+test_package_tests:
+  - file: test_refnx.py
+    description: >-
+      17 项公开 API 消费者验证，数值核心从四个独立方向交叉钉死：_creflect（C, refcalc.c）、
+      _cyreflect（Cython + OpenMP）、_reflect（上游纯 Python 译本）三者必须互相一致，且都必须
+      复现 sdist 自带、由 Motofit 生成的参考曲线（theoretical.txt, 500 点, rel < 1e-9）；六个可
+      选后端（c/c_parratt/cython/cython_parratt/py_parratt/python）全部比对；abeles_vectorised
+      批量路径与标量逐条一致（dev 0.0）；极化核 gepore 在零磁化下非自旋翻转道等于非极化核、
+      自旋翻转道为 0；_cyreflect 的 threads=0/1/4 结果逐位相同（OpenMP on OHOS）；Spline 微切片
+      对均匀剖面退化为等厚单层；Objective 的 chi2/nll/logl 记账与参数树；CurveFitter.fit 从
+      95 Å 起点恢复 100 Å（stderr 0.011, chi2 137.7）；emcee MCMC 后验均值 100.03±0.01；
+      Data1D(dot.out)=1122 点、ReflectDataset(e361r)=99 点、OrsoDataset 存读往返逐位一致；
+      Structure pickle 往返反射率逐位一致。
+    command: "python3 test_refnx.py --json <out>.json"
+    checks: 17
+  - file: test_ohos_platform.py
+    description: >-
+      9 项鸿蒙平台验证（6 静态 + 3 运行期），见下方 added_tests。
+    command: "python3 test_ohos_platform.py --site-dir <site-packages> --runtime --json <out>.json"
+    checks: 9
+
+# 新增鸿蒙特有测试 (rule12)
+added_tests:
+  - name: "harmonyos-specific-test"
+    source: test_package/test_ohos_platform.py
+    description: >-
+      鸿蒙特有断言，用纯 stdlib 自行解析 ELF64（不依赖 readelf，因而在拒绝 dlopen 用户路径的
+      E212 AppSpawn 沙箱内同样可执行），逐一覆盖本配方产出的 4 个扩展，并把扩展总数钉在
+      EXPECTED_EXTENSIONS=4（上游 meson.build 的固定 target 列表）——只移走一个产物也会 6 项
+      全红，而不是 "3/3 全绿"：
+      1) ELF 魔数 + ELF64 + e_machine == EM_AARCH64(183)；
+      2) 必须存在 .codesign 段——OHOS E077 对未签名映射直接拒绝 dlopen；
+      3) 必须自带 DT_NEEDED libpython3.12.so——musl 不把解释器符号导出给 dlopen 对象，
+      否则 PyModuleDef_Init 等符号不可解析（E004）；
+      4) C 库必须是 musl 的 libc.so（出现 libc.so.6/libm.so.6/ld-linux* 即失败），并且每个
+      扩展的 DT_NEEDED 尾部必须精确等于 meson.build 声明的契约——_cutil/_cevent 为 C（仅
+      libc.so），_creflect/_cyreflect 为 C++（+libc++_shared.so），且只有 OpenMP 版
+      _cyreflect 链接 libomp.so；
+      5) 扩展文件名后缀必须等于当前解释器的 EXT_SUFFIX（本端口
+      .cpython-312-aarch64-linux-ohos.so），防止把 Linux glibc wheel 误当 OHOS 产物；
+      参与比对的解释器取自 test_package 自身的 tool_requires("python/3.12.9")（制品仓已发布），
+      并先校验其 EXT_SUFFIX 含 -linux-ohos，因而不会拿设备上 PATH 里的 HNP 解释器
+      （.cpython-312.so）当作基准误判扩展；
+      6) 包内布局：refnx/__init__.py 必须 `from refnx.version import version as __version__`，
+      且 meson 构建期由 tools/gitversion.py 生成的 refnx/version.py 必须写出 0.1.62
+      （sdist 无 git checkout，这一步是 OHOS 构建链上的真实风险点），同时
+      _lib/reflect/reduce/analysis/dataset/util 六个子包与 sdist 数据资产齐全。
+      运行期追加 3 项（仅需 numpy，故在缺 scipy 的 worker 上仍可执行）：平台字符串
+      aarch64、LP64、_cutil 确实从 .so 载入；扩展从 conan 包目录被 dlopen（E004 的运行期
+      证据）+ 在 OHOS 文件系统上 mmap 一个 (120,200) 数组并让打包的 Cython 助手在其上做
+      c_flatten/c_unique（与纯 Python 参考实现逐元素一致）；musl 分配器压力（50 万元素
+      不规则展平）与非连续内存视图输入。
+    command: "python3 test_ohos_platform.py --site-dir <site-packages> [--runtime] --json <out>.json"
+    ohos_specific: true
+
+# 测试断言总数（用于质量评估，由脚本对两个测试源文件的 `assert` 语句计数得来）
+#   test_refnx.py 17 项检查 36 条 assert；test_ohos_platform.py 9 项检查 32 条 assert；
+#   合计 68 条。另：后者 6 项静态检查还会对 4 个扩展逐个执行 ELF 校验
+#   （运行时展开为额外 24 次断言级检查，不计入上面的源码 assert 条数）。
+assertion_count: 68

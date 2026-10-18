@@ -1,0 +1,48 @@
+# conandata.yml — refnx 0.1.62
+#
+# Source: official PyPI sdist of refnx 0.1.62
+#   https://pypi.org/project/refnx/0.1.62/
+#   https://files.pythonhosted.org/packages/0f/fe/de64aff9325ca9b24b7a890bd12a5dd0696472b43b3c22d6585fd2dac56b/refnx-0.1.62.tar.gz
+# The Tsinghua PyPI mirror serves the byte-identical artifact (downloaded here
+# and compared: sha256 3e217516…280d from both endpoints). It is used as the
+# fetched URL because CI workers cannot reach files.pythonhosted.org — the same
+# finding recorded for numpy/2.5.2 (PR #5882) and scikit-learn/1.6.1, and the
+# mirror-fallback injector in ci/conan/build_and_test.sh deliberately leaves
+# pythonhosted.org URLs un-mirrored, so naming it would make the download the
+# single point of failure.
+sources:
+  url: "https://pypi.tuna.tsinghua.edu.cn/packages/0f/fe/de64aff9325ca9b24b7a890bd12a5dd0696472b43b3c22d6585fd2dac56b/refnx-0.1.62.tar.gz"
+  filename: "refnx-0.1.62.tar.gz"
+  sha256: "3e21751662cf675df569ce637c36ae8431cfaf6e08743edeca64b8489972280d"
+
+# No patches: refnx's meson build needs no OHOS adaptation. Its version probe
+# (`run_command(['tools/gitversion.py'])`) reads pyproject.toml instead of git,
+# so it works in an sdist without a repository, and no .pyx file cimports
+# another package (only `cimport numpy`), so nothing has to be declared away.
+
+# ---------------------------------------------------------------------------
+# Runtime Python dependencies (NOT Conan requirements — explained):
+#   scipy           hard runtime dep (upstream pyproject: dependencies =
+#                   ["numpy>=2.0", "scipy", "orsopy"]). It is NOT needed to
+#                   compile: refnx's four .pyx files cimport numpy and cython
+#                   only, so unlike scikit-learn there is no SciPy .pxd
+#                   declaration to vendor. Not published in the OHPCD Conan
+#                   registry; the platform ships it for HarmonyOS PC as an OHOS
+#                   wheel (pypi.cnb.cool/OpenHarmonyPCDeveloper/pypi:
+#                   scipy-1.18.1-cp312-cp312-ohos_aarch64.whl, which pins
+#                   numpy >=2.0,<2.8 and therefore matches the required
+#                   numpy/2.5.2).
+#   orsopy          hard runtime dep (refnx.dataset/reflectdataset.py imports
+#                   orsopy.fileio at module scope). py2.py3-none-any on the same
+#                   index (1.2.3), needs only pyyaml.
+#   pandas          runtime dep for `import refnx.reduce` (reduce/reduce.py
+#                   imports pandas unguarded): scipy-…/pandas-3.0.5-cp312-cp312-
+#                   ohos_aarch64.whl on the same index.
+#   uncertainties   upstream [test] extra; py3-none-any.
+#   pytest          test runner; published in the Conan registry as
+#                   pytest/9.1.1 but executed on the target Python's site path,
+#                   so it is not a requirement of this package.
+# numpy is the only real Conan requirement (see conanfile.py requirements()).
+# Declaring any of the above under self.requires() would break the PF4
+# dependency gate, which probes the OHPCD registry for every requirement.
+# ---------------------------------------------------------------------------
