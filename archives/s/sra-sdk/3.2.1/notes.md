@@ -44,7 +44,7 @@ ninja -C build/sra
 |---|------|------|----------|
 | 1 | `unknown OS HarmonyOS` / `unknown architecture unknown` | CMake 4 依据 clang target 识别出 HarmonyOS，但无 Platform 模块；`CMAKE_HOST_SYSTEM_PROCESSOR` 为 unknown；sra-tools 用 `CMAKE_HOST_SYSTEM_*` 判平台 | 交叉编译语义：`-DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=aarch64`；补丁 `0003` 让 sra-tools 在 `CMAKE_CROSSCOMPILING` 时改用 `CMAKE_SYSTEM_*` |
 | 2 | `AST_error` 重定义为不同类型 / `yyerror` 不可调用 | Bison 3.8 把内建 `error` token 放入 `<prefix>error` 枚举，与上游同名错误回调冲突 | 补丁 `0001`：`#undef yyerror` 并重定向到 `*_error_handler` 回调（不改语义） |
-| 3 | `undefined symbol: pthread_cancel` | OHOS musl 未实现 POSIX 线程取消 | 补丁 `0002`：`KThreadCancel` 在 OHOS 返回 `rcUnsupported`；BGZF 读线程改为协作式取消（cancel 标志 + 条件变量唤醒），Whack 先置位再 join |
+| 3 | `undefined symbol: pthread_cancel` | OHOS musl 未实现 POSIX 线程取消 | 补丁 `0002`：kproc 构建期探测 `HAVE_PTHREAD_CANCEL`（无符号时置空）；`KThreadCancel` 在无取消能力时返回 `rcUnsupported`；BGZF 读线程改为协作式取消（cancel 标志 + 条件变量唤醒），Whack 先置位再 join |
 | 4 | `libxml/xmlreader.h` not found / `ATTRIBUTE_UNUSED` 未定义 | 上游使用旧式 `LIBXML2_INCLUDE_DIR` 变量；libxml2 2.15 删除了 `ATTRIBUTE_UNUSED` | 配方显式传入旧式变量；补丁 `0004` 在函数体内 `(void)ctx` 替代属性宏 |
 | 5 | 打包时批量建符号链接偶发 `EACCES` | HMDFS 在高并发创建大量符号链接时拒绝 | `package()` 采用“符号链接 → 硬链接 → 复制”降级策略，保持 `tool -> tool.3 -> tool.x.y.z` 链 |
 
@@ -55,7 +55,7 @@ ninja -C build/sra
 - `patches/0003-sra-tools-cross-compiling-system.patch` — sra-tools `build/env.cmake`（`apply_conandata_patches` 应用于源码根）。
 - `patches/0004-kxml-libxml2-2.15.patch` — sra-tools `libs/kxml/xml.c`（同上）。
 
-均为可移植性修复，无 stub；平台相关逻辑（`__OHOS__`）仅用于 `pthread_cancel` 能力缺失这一实质分支，并在本文件与 PR 中说明。
+均为可移植性修复，无 stub；`pthread_cancel` 缺失通过构建期能力探测 `HAVE_PTHREAD_CANCEL` 处理，不引入平台条件编译宏。
 
 ## 依赖版本
 

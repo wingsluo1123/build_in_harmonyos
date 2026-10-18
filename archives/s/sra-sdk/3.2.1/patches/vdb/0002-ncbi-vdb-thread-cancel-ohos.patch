@@ -1,22 +1,43 @@
+--- a/libs/kproc/CMakeLists.txt
++++ b/libs/kproc/CMakeLists.txt
+@@ -67,6 +67,18 @@
+ 
+ 
+ #GenerateStaticLibs( ksproc "${SPROC_SRC}" )
++# Detect pthread cancellation at build time (musl does not implement it).
++include( CheckCSourceCompiles )
++set( CMAKE_REQUIRED_LIBRARIES pthread )
++check_c_source_compiles(
++    "#include <pthread.h>
++     int main ( void ) { pthread_t t = pthread_self (); return pthread_cancel ( t ); }"
++    HAVE_PTHREAD_CANCEL )
++unset( CMAKE_REQUIRED_LIBRARIES )
++if ( HAVE_PTHREAD_CANCEL )
++    add_compile_definitions( HAVE_PTHREAD_CANCEL=1 )
++endif()
++
+ GenerateStaticLibs( kproc "${PROC_SRC}" )
+ GenerateStaticLibs( kq queue )
+ 
 --- a/libs/kproc/unix/systhread.c
 +++ b/libs/kproc/unix/systhread.c
-@@ -227,6 +227,12 @@
+@@ -227,6 +227,7 @@
      if ( self == NULL )
          return RC ( rcPS, rcThread, rcSignaling, rcSelf, rcNull );
  
-+#ifdef __OHOS__
-+    /* OHOS (musl) has no POSIX thread cancellation; callers must use an
-+       explicit cooperation mechanism (see libs/align/bam.c). */
-+    (void)self;
-+    return RC ( rcPS, rcThread, rcSignaling, rcFunction, rcUnsupported );
-+#else
++#if HAVE_PTHREAD_CANCEL
      status = pthread_cancel ( self -> thread );
      switch ( status )
      {
-@@ -240,6 +246,7 @@
+@@ -240,6 +241,12 @@
      }
  
      return 0;
++#else
++    /* No POSIX thread cancellation in this libc; callers must use
++       cooperative cancellation (see libs/align/bam.c). */
++    (void)self;
++    return RC ( rcPS, rcThread, rcSignaling, rcFunction, rcUnsupported );
 +#endif
  }
  
@@ -65,3 +86,11 @@
      KThreadWait(self->th, NULL);
      BGZFileWhack(&self->file);
      KConditionRelease(self->need_data);
+@@ -633,6 +643,7 @@
+     };
+ 
+     memset(self, 0, sizeof(*self));
++    self->cancel = false;
+ 
+     rc = BGZFileInit(&self->file, kfp, vt);
+     if (rc == 0) {
