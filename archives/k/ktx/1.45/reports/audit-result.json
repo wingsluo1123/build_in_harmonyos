@@ -1,0 +1,125 @@
+{
+  "metadata": {
+    "timestamp": "2026-10-04T10:40:00",
+    "branch": "feat/ktx-1.45",
+    "base_branch": "main",
+    "package": "ktx",
+    "version": "1.45",
+    "auditor": "local-ai-review (lkyz)",
+    "audited_sha": "c5c3cc5ca2",
+    "scope": "archives/k/ktx/** (10 files, 1 knowledge draft pair)",
+    "rule_sources": [
+      ".gitcode/code-style.md",
+      ".gitcode/review-memory.md",
+      "SKILL.md iron-rules R8/R32/R33/R34/R37/R38/R39/R49",
+      "SKILL.md W0/W0b/W2/W3/W4/W5"
+    ]
+  },
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P3",
+      "rule_id": "R39",
+      "file": "archives/k/ktx/1.45/conandata.yml",
+      "description": "conandata.yml 的 sources.url 使用上游 GitHub tag 归档 https://github.com/QW-Group/ktx/archive/refs/tags/1.45.tar.gz（R39 合规）。已实测 sha256=3bf0e78569fa7d352a2e825257ea37d1e2423480c94f0d18fa58dc265f54288c 与实际下载一致，notes.md / manifest.yaml / 软件级 manifest.yaml 三处记录的 sha256 与 commit d05d6ca6dae1a8b5a1ea23aa9e33f6d99bcc9102 也一致。无残留问题，仅登记以备复核。",
+      "fix_suggestion": "无需修改"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "L5a",
+      "file": "archives/k/ktx/1.45/package()",
+      "description": "CI 的 L5a 用 \"$LIBS\"/lib*.so 通配，只匹配带 lib 前缀的 .so。本包产物按上游 PREFIX \"\" 原样安装为 lib/qwprogs.so，因此 L5a 对本包 skip、不构成把关。已在 notes.md 5.1 与知识草稿 DRAFT-10100 中显式登记，并由 test_package 的 'DT_SONAME (qwprogs.so) matches the installed file name' 断言兜底（SONAME 与文件名一致性）。",
+      "fix_suggestion": "无需修改；若未来上游改用 lib 前缀，L5a 会自动接管"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R38",
+      "file": "archives/k/ktx/manifest.yaml",
+      "description": "R38 要求产物含可执行文件时声明软件级 commands.json。本包唯一产物是共享库 lib/qwprogs.so（上游 add_library(qwprogs SHARED ...)），无 bin/ 可执行文件，故不声明 commands.json，并在软件级 manifest.yaml 中显式写明理由，避免被误判为漏声明。",
+      "fix_suggestion": "无需修改"
+    }
+  ],
+  "checks": {
+    "W0_dependency": {
+      "status": "pass",
+      "evidence": "requirements() 为空；src/+include/ 全树 #include 仅 10 个标准 C 头（assert.h ctype.h limits.h math.h stdarg.h stdint.h stdio.h stdlib.h string.h time.h），上游只 target_link_libraries(qwprogs PRIVATE m)。ktx 1.45 无任何第三方依赖，故 W0 无 conan download 探测对象。"
+    },
+    "W0b_history": {
+      "status": "pass",
+      "evidence": "origin/main 无 archives/k/ktx 历史归档，故无历史 notes.md 可继承；已对齐同族先例 archives/b/basis_universal/2.1.0（CMake+自研 test_package）与 dlopen 型插件 archives/a/abiword-plugin-*/3.0.8。CI 能力矩阵：只需 cmake+cc（均可用），不引入 q3lcc/QVM 等冷门工具链，本地命令在 CI clean 环境可逐字复现。"
+    },
+    "W2_atomicity": {
+      "status": "pass",
+      "evidence": "本 commit 只含 archives/k/ktx/** 与 knowledge/drafts/DRAFT-10100-* 一对草稿；JC6 口径下 archives/<letter>/<pkg> 目录只有 archives/k/ktx 一个。未触碰 SKILL.md / references/ / templates/ / scripts/ / ci/ / index.tsv / SUMMARY.md。"
+    },
+    "W2_structure": {
+      "status": "pass",
+      "evidence": "archives/k/ktx/1.45/ 下 conanfile.py、conandata.yml、manifest.yaml、notes.md、test_package/{conanfile.py,CMakeLists.txt,MANIFEST.yml,ktx_module_test.c} 齐备；软件级 README.md + manifest.yaml 齐备。"
+    },
+    "W3_local_build": {
+      "status": "pass",
+      "evidence": "conan create archives/k/ktx/1.45 --name=ktx --version=1.45 -pr:h=ohos-aarch64-wsl -pr:b=ohos-aarch64-wsl --build=missing -> rc=0，日志 0 个 ERROR；HMBS_TEST_PACKAGE_RESULT={\"executed\":34,\"passed\":34,\"failed\":0}。产物 ELF64/LSB/ET_DYN/EM_AARCH64，DT_SONAME=qwprogs.so，DT_NEEDED=libc.so(musl)。"
+    },
+    "R8_no_platform_macro_in_patches": {
+      "status": "pass",
+      "evidence": "无 patches/ 目录、conandata.yml 无 patches 段 —— 本次适配零源码改动（clang 15 交叉编译零 error，唯一 warning 是上游自身 bot_aim.c:237 unused variable）。PF5 补丁平台宏闸无从触发。"
+    },
+    "R32_settings_os": {
+      "status": "pass",
+      "evidence": "validate() 使用 if self.settings.os not in (\"Linux\", \"OHOS\"): raise ConanInvalidConfiguration(...)，非 == \"Linux\"。"
+    },
+    "R33_no_bare_shell_env": {
+      "status": "pass",
+      "evidence": "build() 仅 cmake = CMake(self); cmake.configure(); cmake.build()，编译器与 flag 全部由 generate() 的 CMakeToolchain 注入；配方正文无裸 ${CC}/${CFLAGS}/${LDFLAGS}（L0h 字面扫描亦通过）。"
+    },
+    "R34_test_substantive": {
+      "status": "pass",
+      "evidence": "test_package/ktx_module_test.c 340 行真实测试：dlopen(RTLD_NOW|RTLD_LOCAL) 加载随包产物、dlsym dllEntry/vmMain、断言内部符号 trap_GetApiVersion 与 G_InitGame 为 NULL、调用 dllEntry(stub_syscall) 完成宿主握手、dlclose、二次 dlopen 幂等，并直接解析 ELF header/section/dynamic 表。实测 34/34 通过；L1e 反向破坏（移走 lib/）时 test() 首个检查即 RuntimeError，判定为真测试。"
+    },
+    "R37_version_strategy": {
+      "status": "pass",
+      "evidence": "首次适配上游 1.45，故 conanfile.version=\"1.45\"、归档目录 archives/k/ktx/1.45，未使用 X.Y.Z.N 后缀。制品仓中不存在 ktx 配方（L0j 无冲突）。"
+    },
+    "R39_official_source_url": {
+      "status": "pass",
+      "evidence": "sources.url = 上游 GitHub tag 归档（官方源，非 fork/网盘/CDN）；sha256 已实测。"
+    },
+    "R49_private_prefix_injection": {
+      "status": "pass",
+      "evidence": "generate() 不注入任何依赖（CPPFLAGS/LDFLAGS/PKG_CONFIG_PATH 全未设置），不存在写死 /usr/local 或共享前缀的问题。"
+    },
+    "PF1_single_package": {
+      "status": "pass",
+      "evidence": "仅 archives/k/ktx 一个软件目录。"
+    },
+    "PF3_test_not_hollow": {
+      "status": "pass",
+      "evidence": "test_package/conanfile.py 的 test() 有 self.run(cmd, env=\"conanrun\") 执行真实二进制并以返回码判定，非 echo/print 空壳。"
+    },
+    "PF4_dependencies_published": {
+      "status": "pass",
+      "evidence": "配方无 requires/tool_requires，PF4 无探测对象（W0 结论一致）。"
+    },
+    "PF5_patch_platform_macro": {
+      "status": "pass",
+      "evidence": "无 patches/ 目录。"
+    },
+    "PF6_dep_injection_prefix": {
+      "status": "pass",
+      "evidence": "generate() 无 environ / 无 /usr/local 字面量。"
+    },
+    "W5_knowledge_drafts": {
+      "status": "pass",
+      "evidence": "knowledge/drafts/DRAFT-10100-prefixless-so-cpp-info-libs-dlopen-plugin.{kv,md} 成对存在；.kv 的 id/trigger_tool/phase/error_signature/match_keywords/category/severity/status/agent_id/root_cause/rec_approach/rec_command/verification_cmd/verification_expect/evidence/applies_to 字段齐备，且全部内容来自本次实测（无捏造的错误条目 —— 本次构建零错误、零补丁）。"
+    },
+    "no_secret_leak": {
+      "status": "pass",
+      "evidence": "本 PR 全部 12 个文件均为配方/元数据/测试源码/知识草稿，不含 token、密钥、内网地址或缓存绝对路径。"
+    },
+    "no_residue": {
+      "status": "pass",
+      "evidence": "提交前已清理 test_package/build/ 与 CMakeUserPresets.json；12 个入库文件全部为 .py/.yml/.yaml/.md/.c/.txt 类源码与文档，无二进制、无 tarball、无状态文件。"
+    }
+  },
+  "summary": "ktx/1.45 W4 Pre-PR 审计判定 PASS：P0=0、P1=0，P3 三条均为已登记的说明性条目（R39 URL 合规说明、L5a 因无 lib 前缀而 skip 的影响与兜底、R38 不声明 commands.json 的理由），均无需修改。配方零源码补丁（clang 15 交叉编译零 error），零第三方依赖（R36 链条为空），test_package 34 项断言实测全通过（其中 16 项鸿蒙特有 ELF 断言），L1e 反向破坏可证真。核心设计决定是 dlopen 型插件保留上游无 lib 前缀文件名 qwprogs.so 且故意留空 cpp_info.libs —— 已用四种写法的实测对比论证，完整记录在 notes.md 5.1 与知识草稿 DRAFT-10100。无 P0/P1 阻塞，可提 PR。"
+}

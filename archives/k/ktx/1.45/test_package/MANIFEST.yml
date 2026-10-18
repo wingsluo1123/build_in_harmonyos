@@ -1,0 +1,69 @@
+# test_package/MANIFEST.yml
+# 测试声明文件（CI build_and_test.sh L0e 强制要求存在）
+#
+# ⚠️ 如实声明测试来源：上游 ktx 1.45【无任何自动化测试】。
+# 已核实上游 tag 1.45（commit d05d6ca）整棵树没有 tests/ 目录，唯一 CI 文件
+# .github/workflows/main.yml 只做交叉编译（build_cmake.sh），不跑任何测试。
+# 因此本包的测试全部是 OHOS 适配自研（见 adapted_tests / test_package_tests）。
+
+package: ktx/1.45
+homepage: "https://github.com/QW-Group/ktx"
+
+# 上游官方测试：无
+upstream_official_tests: []
+
+# 上游的“验证”手段只是编译（build_cmake.sh + .github/workflows/main.yml），
+# 既无 make check 也无 ctest 注册。
+upstream_check_command: "cmake --build build   # upstream CI: build only, no test run"
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 适配补全测试（自研，非上游）
+adapted_tests: []
+
+# test_package 中自带的测试（消费者视角，同样为自研）
+test_package_tests:
+  - file: ktx_module_test.c
+    origin: ohos-adaptation (self-authored, based on ktx 1.45
+            src/g_syscalls.c:dllEntry + src/g_main.c:vmMain ABI)
+    description: >-
+消费者测试：先用 Conan CMakeDeps 解析 ktx::ktx 编译（证明配方生成的 CMake
+      配置可被下游消费），再对随包 lib/qwprogs.so 做真实动态加载（dlopen RTLD_NOW），
+      解析 QuakeWorld mod ABI（dllEntry / vmMain）、执行 dllEntry(syscall
+      trampoline) 服务端握手、验证 dlclose 可卸载；并断言鸿蒙特有 ELF 属性
+      （ELFCLASS64/小端、e_type=ET_DYN、e_machine=EM_AARCH64、
+      DT_SONAME=qwprogs.so、DT_NEEDED=libc.so 且无绝对路径或 ../ 逃逸、
+      导出符号面恰为 {dllEntry, vmMain, _init, _fini} 而内部符号保持 hidden）。
+      最后执行一组**真实鸿蒙运行时用例**（非静态 ELF 检查）：用 uname(2).machine
+      校验运行时架构为 aarch64（getauxval(AT_PLATFORM) 在 OHOS musl 上返回 NULL
+      属正常，不作为断言依据）、读取 /proc/self/auxv 与 /proc/self/exe
+      （OHOS procfs）、在 OHOS 数据分区（HMDFS）真实创建/写入/读回 1 MiB
+      文件并逐字节校验持久化、pthread_create 两个真实 musl 线程在互斥锁
+      保护下各累加 10 万次并校验最终计数（真实线程调度 + libc 同步）。
+    command: "ktx_module_test lib/qwprogs.so"
+
+# 断言明细（共 42 项 check()，全部为适配自研断言；实测 42/42 通过）
+assertion_breakdown:
+  artifact_integrity: 4      # 文件存在/常规文件/非空壳(>100KiB)/可读
+  elf_ohos_properties: 16     # magic/class/endian/header/e_type/e_machine/
+                             # shnum+shoff/shdr 数组可分配/shdr 表可读/
+                             # .shstrtab 定位/.shstrtab 可解析/
+                             # .dynsym+.dynstr 存在/.dynamic 存在/
+                             # DT_SONAME 存在/DT_SONAME 与文件名一致/
+                             # DT_NEEDED=libc.so/DT_NEEDED 无绝对路径或 ../
+  symbol_surface: 4           # .dynsym 非空/导出面白名单(4/4)/dllEntry 在 .dynsym/
+                             # vmMain 在 .dynsym
+  runtime_abi: 10             # dlopen RTLD_NOW 全量重定位/dlsym dllEntry/
+                             # dlsym vmMain/trap_GetApiVersion hidden/
+                             # G_InitGame hidden/dllEntry 握手/
+                             # 二次 dlopen 幂等/dlclose 干净卸载
+  ohos_runtime: 8             # 真实鸿蒙运行时用例（非静态 ELF 检查）：
+                             # uname(2).machine=aarch64（运行时架构；getauxval(AT_PLATFORM)
+                             # 在 OHOS musl 返回 NULL 属正常，不作断言）/
+                             # /proc/self/auxv 可读（OHOS procfs）/
+                             # /proc/self/exe 可读/
+                             # HMDFS 数据分区创建文件/
+                             # 1 MiB 写入 HMDFS/1 MiB 读回逐字节一致（持久化）/
+                             # pthread_create x2 真实 musl 线程/
+                             # 互斥锁保护计数 == 200000（真实调度+同步）
+assertion_count: 42
