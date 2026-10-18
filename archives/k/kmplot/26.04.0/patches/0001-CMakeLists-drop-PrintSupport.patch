@@ -1,0 +1,17 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -28,7 +28,13 @@
+ 
+ option(BUILD_DOC "Whether to build the documentation" ON)
+ 
+-find_package(Qt6 ${QT_MIN_VERSION} CONFIG REQUIRED COMPONENTS Core Gui Svg Widgets PrintSupport)
++# HarmonyOS PC (OHOS): the published qtbase line is built with
++# FEATURE_printsupport=OFF and ships no Qt6PrintSupport module (kapow
++# 1.7.0 / kcron 26.04.1 / kdiagram 3.0.1 precedent), so PrintSupport is
++# dropped from the required components. The plot print action is
++# re-targeted to a QPdfWriter (QtGui) PDF export flow in maindlg.cpp
++# (patch 0004); Gui/Widgets cover the file dialog used for it.
++find_package(Qt6 ${QT_MIN_VERSION} CONFIG REQUIRED COMPONENTS Core Gui Svg Widgets)
+ 
+ find_package (KF6 ${KF6_MIN_VERSION} REQUIRED COMPONENTS
+     Completion

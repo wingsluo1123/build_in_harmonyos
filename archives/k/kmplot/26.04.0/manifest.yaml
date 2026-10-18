@@ -1,0 +1,76 @@
+software: kmplot
+version: "26.04.0"
+status: built
+package_type: application
+build_system: cmake
+created_at: 2026-10-16
+build_date: "2026-10-16"
+language: cpp
+description: "KDE 数学函数绘图器（KmPlot）——Qt6/KF6 Widgets 图形应用，绘制函数图像及其积分/导数，含 KParts 插件模块 kmplotpart"
+homepage: https://invent.kde.org/education/kmplot
+upstream_source: https://download.kde.org/stable/release-service/26.04.0/src/kmplot-26.04.0.tar.xz
+source_url: https://download.kde.org/stable/release-service/26.04.0/src/kmplot-26.04.0.tar.xz
+source_sha256: "46ca9b478e0ec7ff92298e1c9fc9a79d4caa74ff2781bd6c34ac93087e89c01c"
+license: GPL-2.0-or-later
+
+dependencies:
+  required:
+    - qtbase/6.11.1.1
+    - qtsvg/6.11.1
+    - kcompletion/6.14.0
+    - kconfig/6.14.0
+    - kconfigwidgets/6.14.0
+    - kcoreaddons/6.14.0
+    - kcrash/6.14.0
+    - kdbusaddons/6.14.0
+    - kguiaddons/6.14.0
+    - ki18n/6.14.0
+    - kjobwidgets/6.14.0
+    - kio/6.14.0
+    - kparts/6.18.0
+    - ktextwidgets/6.14.0
+    - kwidgetsaddons/6.14.0
+  build:
+    - ecm/6.26.0
+  forced:
+    - qtbase/6.11.1.1 (override=True: FEATURE_dbus=ON variant; kmplot/main.cpp constructs KDBusService and kmplot/CMakeLists.txt generates 4 DBus adaptors via qt_add_dbus_adaptor, while plain qtbase/6.11.1 ships no Qt6DBus — kcachegrind 26.04.0 precedent)
+  optional:
+    - KF6DocTools (absent in the OHOS baseline; BUILD_DOC=OFF drops the DocBook handbook cleanly — upstream guards the REQUIRED lookup behind the option, so no patch is needed)
+
+patches_applied:
+  - 0001-CMakeLists-drop-PrintSupport.patch
+  - 0002-kmplot-CMakeLists-drop-PrintSupport.patch
+  - 0003-maindlg-h-drop-QPrinter.patch
+  - 0004-maindlg-cpp-qpdfwriter-export.patch
+
+test_results:
+  type: no_upstream_tests_consumer_verified
+  upstream: "none (N=0): the 521-member 26.04.0 release tarball holds no tests/, autotests/ or test/ directory and no CMakeLists.txt registers enable_testing()/add_test()/ecm_add_test() (download + sha256 verified audit in test_package/MANIFEST.yml, counting method ctest_entries); upstream QA runs through KDE CI source builds only"
+  test_package: "designed 5/5 consumer cases (5 assertions, 100% design target, pending HarmonyOS PC true-machine execution): (1) --version reports 26.04; (2) --help exposes the CLI surface incl. -f/--function; (3) --author lists the upstream author; (4) [OHOS-specific] shared-library closure load — the shipped binary is launched and the OHOS dynamic linker resolves all DT_NEEDED entries; (5) kmplotpart KParts plugin module ships. Markers HMBS_TEST_PACKAGE_RESULT (discovered/passedCount) + HMBS_UPSTREAM_TEST_RESULT (status no_tests) are emitted by test.sh/test_package conanfile on every run"
+  artifact_checks: "pending true-machine evidence: readelf -d bin/kmplot NEEDED entries all plain basenames after E537 normalization in package(); .codesign section present after re-sign"
+  ohos_run: "pending: conan create + test_package to be executed on the HarmonyOS PC device (OHOS aarch64 profile) by HMBS preflight after this working-tree round"
+
+platform_adaptations:
+  - "PrintSupport-to-QPdfWriter (patches 0001-0004, portability, no platform macros): published qtbase is FEATURE_printsupport=OFF (kapow/kcron/kdiagram precedent); PrintSupport dropped from find_package/link, slotPrint/slotPrintPreview re-targeted to QPdfWriter (QtGui) + QFileDialog PDF export, KPrinterDlg options kept, SVG/PNG slotExport untouched"
+  - "BUILD_DOC=OFF (DocBook handbook + REQUIRED KF6DocTools lookup dropped; upstream guards both behind the option so no patch is needed — kdoctools is not part of the published KF6 closure)"
+  - "KF6 6.14.0 baseline for the whole dependency graph (keditbookmarks 26.04.0 / kparts 6.18.0 precedent): every KF6 entry reuses a published binary, zero dependency rebuilds; kio/6.14.0 is the full variant carrying KIOGui/KIOWidgets (the kmplot executable links KF6::KIOGui) while kio/6.26.0 is KIOCORE_ONLY"
+  - "kparts/6.18.0 (only published KParts line; its binary was built against the same 6.14.0 deps, so no rebuild)"
+  - "qtbase/6.11.1.1 override=True (FEATURE_dbus=ON; KDBusService + qt_add_dbus_adaptor need Qt6DBus)"
+  - "KF_IGNORE_PLATFORM_CHECK=TRUE (KDE platform detection does not know OHOS)"
+  - "KF_SKIP_PO_PROCESSING=ON (translation catalog generation skipped; no gettext msgfmt toolchain needed for the deliverable)"
+  - "No conan libxml2: host OHOS SDK lld uses its own SDK-shipped libxml2.so.16; the SDK llvm/lib dir (derived from the actual compiler, kcontacts 6.14.0 pattern) is put frontmost on LD_LIBRARY_PATH so host lld never loads an OHOS-target conan libxml2 (kbreakout 26.04.0 precedent: no libxml2 in graph)"
+  - "-Wl,-z,max-page-size=0x1000 appended to CMAKE_EXE_LINKER_FLAGS: the OHOS musl loader refuses the lld default 0x10000 multi-RW-LOAD layout (DRAFT-3888 audiocd precedent)"
+  - "ECM_MODULE_PATH + conan_cmakedeps_paths.cmake written manually (qtbase/KF6 packages use cmake_find_mode=none)"
+  - "package(): path-form DT_NEEDED entries normalized to bare basenames in place (.dynstr only, same length) and the ELF re-signed (llvm-objcopy --remove-section .codesign + binary-sign-tool -selfSign 1) — E537 absolute-DT_NEEDED leakage + E077 re-sign-after-dynstr-edit"
+
+known_issues:
+  - "R40 适配完整性：本包未对渲染/输入路径做任何 stub 或裁剪，但真机验证只覆盖「可执行文件加载 + Qt/KF 运行时依赖 closure 解析 + KParts 插件随包安装 + KAboutData/命令行接口」；函数图像实际渲染、鼠标/键盘交互与打印输出需真机人工确认（本机无显示环境），编译通过与消费者用例通过不等于渲染/交互适配已完整验证"
+  - "kmplot is a GUI application: on a headless machine it needs QT_QPA_PLATFORM=offscreen for the metadata smoke; full plotting requires a display/launcher environment"
+  - "The org.kde.kmplot.* DBus interfaces are generated at build time (no session bus exists on HarmonyOS PC, so they are runtime no-ops there; the adaptor generation itself still validates the Qt6DBus toolchain)"
+  - "在线手册不可用（BUILD_DOC=OFF；DocBook 工具链不在 OHOS 基线内）"
+
+knowledge_gained:
+  - "kmplot 26.04.0 has no upstream test suite (521-member tarball audited entry by entry: no tests/autotests/test dir, no ctest registration in either CMakeLists.txt) — consumer verification is the only verification path (R51; counting method ctest_entries, total 0)"
+  - "kmplot upstream guards KF6DocTools behind option(BUILD_DOC): BUILD_DOC=OFF drops the handbook with zero patches, unlike kbreakout whose DocTools lookup was unconditional and needed a patch"
+  - "kmplot links KF6::KIOGui (executable) + KF6::Parts (kmplotpart plugin): the correct OHOS closure is kio/6.14.0-full + kparts/6.18.0 on the KF6 6.14.0 baseline (kparts manifest evidence); kio/6.26.0 KIOCORE_ONLY would fail the KIOGui link"
+  - "kmplot/main.cpp constructs KDBusService and generates 4 qt_add_dbus_adaptor interfaces, so the recipe must use the qtbase/6.11.1.1 FEATURE_dbus=ON variant (kcachegrind precedent), not plain qtbase/6.11.1"

@@ -1,0 +1,50 @@
+# 软件级 manifest
+# 文件位置: archives/k/kmplot/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+software: kmplot
+
+display: "KmPlot"
+
+description: "KDE 数学函数绘图器（KmPlot）——Qt6/KF6 Widgets 图形应用，绘制函数图像及其积分/导数，含 KParts 插件模块"
+
+category: education
+
+homepage: "https://invent.kde.org/education/kmplot"
+
+license: GPL-2.0-or-later
+
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "BUILD_DOC=OFF 干净跳过 DocBook 手册与 REQUIRED KF6DocTools 查找（上游以 option 守卫，无需补丁）"
+    - "KF6 6.14.0 基线全图零重建：kio/6.14.0 为含 KIOGui/KIOWidgets 的完整变体（kio/6.26.0 为 KIOCORE_ONLY，不满足 KF6::KIOGui 直链）"
+    - "kparts/6.18.0（唯一已发布 KParts 行，其二进制即按 6.14.0 依赖构建）承载 kmplotpart 插件模块"
+    - "qtbase/6.11.1.1 override=True（FEATURE_dbus=ON；KDBusService + 4 个 qt_add_dbus_adaptor 需要 Qt6DBus）"
+    - "KF_IGNORE_PLATFORM_CHECK=TRUE + KF_SKIP_PO_PROCESSING=ON（KDE 应用 OHOS 标准 env 组合）"
+    - "无 conan libxml2：宿主 OHOS SDK lld 使用 SDK 自带 libxml2.so.16，配方按实际编译器派生 SDK llvm/lib 并前置于 LD_LIBRARY_PATH（kbreakout 无 libxml2 先例）"
+    - "DT_NEEDED 绝对路径归一化 + 重签（E537/E077）：已发布 KF6 库无 DT_SONAME，链接期会把 conan 缓存绝对路径写进下游 DT_NEEDED"
+  common_dependencies:
+    - qtbase
+    - qtsvg
+    - kcompletion
+    - kconfig
+    - kconfigwidgets
+    - kcoreaddons
+    - kcrash
+    - kdbusaddons
+    - kguiaddons
+    - ki18n
+    - kjobwidgets
+    - kio
+    - kparts
+    - ktextwidgets
+    - kwidgetsaddons
+    - ecm
+
+versions:
+  "26.04.0":
+    status: built
+    build_date: 2026-10-16
+    conan_ref: "kmplot/26.04.0"
