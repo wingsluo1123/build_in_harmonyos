@@ -1,0 +1,33 @@
+type: test_package
+name: libkleo
+version: "26.04.3"
+checks:
+  - cmake_package_discovery
+  - link_exported_library
+  - runtime_dn_consumer
+
+upstream_check_command: "ctest --output-on-failure"
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error"
+
+upstream_tests:
+  - file: autotests/
+    source: libkleo-26.04.3/autotests/
+    description: "16 个 CTest 全部通过，含 keyresolvercoretest、expirycheckertest、classifytest"
+    command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error"
+    result: "16/16。日志原文：100% tests passed out of 16；Total Test time (real) = 24.98 sec"
+    condition: "BUILD_TESTING=ON；私有前缀 bin/gpgconf.ctl 的 rootdir 指向构建目录里的 gnupg-prefix，不改 gnupg 包；LIBKLEO_GNUPG_BIN 指向该私有 bin；OHOS 上 TMPDIR 位于可绑定 AF_UNIX 的目录；测试进程 LD_PRELOAD 拒绝 O_TMPFILE；QT_QPA_PLATFORM_PLUGIN_PATH 只指向 qtbase 的 platforms"
+  - file: tests/
+    source: libkleo-26.04.3/tests/
+    description: "8 个 ecm_mark_as_test 程序未注册到 CTest"
+    command: "在 build/tests 工作目录运行 test_cryptoconfig、test_keyformailbox、test_keyselectiondialog、test_keygen、test_keylister、test_auditlog、test_keyselectioncombo、test_keyresolver"
+    result: "test_cryptoconfig 与 test_keyformailbox 退出码 0。其余 6 个已加载 libKPim6Libkleo.so.6，停在上游 QDialog::exec 或 QApplication::exec，无共享库加载错误，无自动断言"
+    condition: "与 CTest 使用同一运行环境；库 SONAME 为 libKPim6Libkleo.so.6"
+
+test_package_tests:
+  - file: test_package/test.cpp
+    description: "消费者发现 KPim6Libkleo 并调用 Kleo::DN。包含路径是 Libkleo/Dn。"
+    command: "conan create 构建并运行 libkleo_consumer"
+    result: "1/1。日志原文：PASS: libkleo DN consumer API。conan create 退出码 0"
+
+assertion_count: 1

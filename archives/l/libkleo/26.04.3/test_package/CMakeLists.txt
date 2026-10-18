@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.21)
+project(libkleo_consumer LANGUAGES CXX)
+find_package(Qt6 COMPONENTS Core REQUIRED)
+find_package(KPim6Libkleo 6.7.3 CONFIG REQUIRED)
+add_executable(libkleo_consumer test.cpp)
+target_link_libraries(libkleo_consumer PRIVATE KPim6::Libkleo)
