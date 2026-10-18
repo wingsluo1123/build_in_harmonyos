@@ -1,0 +1,21 @@
+# conandata.yml — lirc 0.10.2
+# 官方源：SourceForge LIRC 项目发布目录（上游正式发行 tarball）
+sources:
+  url: "https://downloads.sourceforge.net/project/lirc/LIRC/0.10.2/lirc-0.10.2.tar.bz2"
+  sha256: "3d44ec8274881cf262f160805641f0827ffcc20ade0d85e7e6f3b90e0d3d222a"
+
+patches:
+  "0.10.2":
+    - patch_file: "patches/0001-portability-musl-ohos-cxx17.patch"
+      patch_description: >-
+        Portability fixes required by the OHOS toolchain: the C++17 standard no
+        longer allows the `register` storage class (daemons/lircd.cpp,
+        daemons/lircrcd.cpp), musl does not provide rindex(3)
+        (lib/lirc_client.c), musl's pthread_t is a pointer so the -1 sentinel in
+        plugins/mplay.c cannot compile, the OHOS sysroot <pthread.h> omits
+        the pthread_cancel() prototype used by three plugins, and
+        plugins/default.c must include <sys/sysmacros.h> explicitly: neither the
+        OHOS/musl sysroot nor glibc >= 2.28 still pull the major() macro in
+        through <sys/types.h>, so the call was an implicit declaration and an
+        undefined symbol that made the installed default.so unloadable.
+      patch_type: "portability"

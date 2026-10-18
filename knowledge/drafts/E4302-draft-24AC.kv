@@ -1,0 +1,94 @@
+#====================================================================
+# E4302-draft — autotools tarball 里发行机生成的 config.h 在 out-of-tree 构建下
+#               被引号包含优先命中，宏与目标平台不符（HAVE_LIBUDEV_H 等）
+# 来源: lirc 0.10.2 适配 (2026-10-16)
+#====================================================================
+
+id:                     E4302
+trigger_tool:           clang|make|autotools|configure
+phase:                  compilation
+error_signature:        "'SH_PATH' macro redefined|'LIRC_LOCKDIR' macro redefined|macro redefined.*HAVE_|incompatible integer to pointer conversion.*(udev_device|usb_busses|usb_device)|use of undeclared identifier 'usb_busses'|incomplete definition of type 'struct usb_device'"
+
+severity:               3
+category:               autotools, build-system, detection, headers, portability
+prescan_pattern:        "BUILT_SOURCES[^\\n]*config\\.h|^(lirc/)?config\\.h:\\s*\\.\\./config\\.h"
+prescan_globs:          "Makefile.am, Makefile.in, conanfile.py, configure.ac"
+match_keywords:         config.h, BUILT_SOURCES, macro redefined, SH_PATH, LIRC_LOCKDIR, HAVE_LIBUDEV_H, HAVE_USB_H, out-of-tree, VPATH, quote include, stale generated file, tarball, udev_device, usb_busses
+title:                  tarball 内发行机生成的 config.h 在 out-of-tree 构建下压过新生成的 config.h
+
+root_cause: >-
+  autotools 的 make dist 常把构建机上的生成物一并打进 tarball。lirc 0.10.2 的
+  tarball 里带了一份 lib/lirc/config.h —— 那是**发行机**（装了 libudev/libusb/ALSA）
+  上生成的 config.h，定义了 HAVE_LIBUDEV_H / HAVE_USB_H / HAVE_LINUX_DEVINPUT /
+  HAVE_SOUNDCARD。而 lib/lirc/curl_poll.h 写的是 #include "config.h"，C 预处理
+  对引号包含**先从包含者所在目录**搜索，于是 out-of-tree 构建里永远命中源树里
+  这份陈旧副本，压过构建目录中新生成的 config.h；上游自己的
+  BUILT_SOURCES 规则 "lirc/config.h: ../config.h" 只在 in-tree 构建（srcdir ==
+  builddir）下"顺手"把它覆盖掉，out-of-tree 下则写入另一个目录，问题被隐藏。
+  后果：按旧宏编译的平台代码在没有对应头文件/库的目标上被启用，
+  一片 "incompatible integer to pointer conversion"/"incomplete definition of
+  type 'struct usb_device'"；同时伴随 "macro redefined" 警告。
+affected_scope: >-
+  任何 autotools 项目，只要 ① tarball 里有 list/子目录内的生成 config.h（或其它
+  生成头），② 源码用引号包含它，③ 构建是 out-of-tree（conan 的 basic_layout 默认
+  就是）；也适用于任何"生成物与源文件同目录同名"的情形。
+verification_cmd: >-
+  tar tjf "$TASK_DIR/lirc-0.10.2.tar.bz2" | grep -E '(^|/)lib/.+/config\.h$|(^|/)config\.h$' ;
+  tar xjf "$TASK_DIR/lirc-0.10.2.tar.bz2" -C "$TASK_DIR" lirc-0.10.2/lib ;
+  grep -nE 'HAVE_LIBUDEV_H|HAVE_USB_H|HAVE_SOUNDCARD' "$TASK_DIR/lirc-0.10.2/lib/lirc/config.h" ;
+  grep -rn '#include "config.h"' "$TASK_DIR/lirc-0.10.2/lib"
+
+rec_priority:           1
+rec_approach:           drop-stale-generated-headers
+rec_description: >-
+  在 build() 里（apply_conandata_patches 之后、configure 之前）删掉源树里 tarball
+  自带的陈旧生成头，让 make 在构建目录重新生成并使用：
+  os.remove(os.path.join(self.source_folder, "lib/lirc/config.h"))。
+  这些文件本来就是 BUILT_SOURCES（"lirc/config.h: ../config.h"），删掉不会缺件。
+rec_command:            python3 -c "import os;p='<src>/lib/lirc/config.h';os.path.isfile(p) and os.remove(p)"
+rec_auto_fix:           false
+rec_impl:               manual-edit
+
+fallback_priority:      2
+fallback_approach:      force-in-tree-or-overwrite
+fallback_description: >-
+  若删除会破坏上游 make dist 类目标，可在 configure 之后把构建目录里新生成的
+  config.h 反向覆盖到源树的同路径（cp build/lib/lirc/config.h src/lib/lirc/config.h），
+  效果等价但多一次写源树。
+fallback_command:       cp build-release/lib/lirc/config.h lib/lirc/config.h
+fallback_auto_fix:      false
+fallback_impl:
+
+forbid_1_pattern:       "manually-add-have-defines|echo '#define HAVE_.*' >> config.h"
+forbid_1_reason: >-
+  本条的宏是"多余"而不是"缺失"：往 config.h 追加 HAVE_* 只会加剧不一致。
+  引擎实测会误配到 E151（CMake 探测失败导致 config.h 缺 HAVE_*）。
+forbid_1_consequence:   错方向修改，平台代码依旧被错误启用
+forbid_2_pattern:       "AC_CHECK_LIB\\(\\[udev\\]|-ludev|HAVE_LIBUDEV_H"
+forbid_2_reason: >-
+  不要为了"让宏成立"而引入 libudev/libusb 依赖：平台确实没有这些库，
+  正确做法是让探测结果说话。
+forbid_2_consequence:   依赖闸拦下 / 引入不可得依赖
+
+principles:             P005, P011
+causes:                 []
+caused_by:              []
+similar_to:             [E151]
+conflicts_with:         []
+prerequisite_of:        []
+
+doc_file:               doc/E4302.md
+last_updated:           2026-10-16
+source_event:           "lirc 0.10.2 conan create: lib/drv_enum.c 一片 incompatible integer to pointer conversion + SH_PATH macro redefined"
+
+authors:
+source_pr:
+source_commit:
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-16
+
+draft: true
+contributor_id: "24AC"
