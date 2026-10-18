@@ -1,0 +1,36 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（R51 上游测试三步法）
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: minidraw/ee0989e954
+homepage: "https://github.com/mackron/minidraw"
+
+# 上游无构建系统（single-header 库），无 ctest/make check 注册表
+upstream_check_command: "none (single-header library, no build system)"
+
+# conanfile.py build() 中未集成上游测试（见下：上游测试依赖 GTK 不可运行）
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际存在的测试程序（tests/ 目录清点，R51 申报）
+upstream_tests:
+  - file: tests/minidraw_test_0_automated.c
+    source: minidraw-ee0989e954/tests/minidraw_test_0_automated.c
+    description: "自动化文本 API 测试（UTF-8/UTF-16/UTF-32 转换、BOM、端序），774 行；编译需 GTK（minidraw_testcommon.c 经 minidraw_app.h 引入 GTK 类型），OHOS 无 GTK/pango/cairo，不可本地运行"
+    command: "(unrunnable on OHOS: GTK/Cairo/Pango headers unavailable)"
+  - file: tests/minidraw_test_1_graphics.c
+    source: minidraw-ee0989e954/tests/minidraw_test_1_graphics.c
+    description: "图形后端测试，需要 Cairo/Pango 后端窗口渲染，OHOS 环境无后端，不可本地运行"
+    command: "(unrunnable on OHOS: no Cairo/Pango backend)"
+
+# test_package 中自带的测试（消费者视角验证，替代上游不可运行测试覆盖核心 API）
+test_package_tests:
+  - file: test.c
+    description: "消费者测试：定义 MINIDRAW_IMPLEMENTATION，调用 md_utf8_to_utf16le/md_utf16le_to_utf8/md_utf8_to_utf32le/端序交换/BOM 检测，验证 OHOS aarch64 下文本 API 正确性"
+    command: "./test_minidraw"
+  - file: test_e2e.c
+    description: "端到端绘制消费者测试（r02 rule12）：自实现 custom 软件光栅化后端，真实走通 md_init→md_gc_init→清屏/矩形填充/线段绘制→渲染到 RGBA 像素缓冲→逐像素校验落位与颜色/覆盖→md_gc_uninit/md_uninit 释放全链路"
+    command: "./test_minidraw_e2e"
+
+# 测试断言总数（近似值, 用于质量评估）
+assertion_count: 20
