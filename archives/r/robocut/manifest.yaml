@@ -1,0 +1,31 @@
+# 软件级 manifest — robocut
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: robocut
+display: "Robocut"
+status: built
+
+description: "SVG 绘图仪/刻字机控制程序：Qt5 Widgets GUI + libusb，支持 Graphtec Craft Robo 与 Silhouette Cameo/Portrait/SD"
+category: gfx
+homepage: "https://github.com/Timmmm/robocut"
+license: GPL-3.0-or-later
+build_system: qmake
+
+ohos_adaptation:
+  key_points:
+    - "上游 Robocut.pro 只声明 QT += svg，缺少 widgets（源码用 QApplication/QMainWindow/QDialog…）→ patches/0001 改为 QT += svg widgets"
+    - "ohpcd 单包 qt/5.15.19 是 -skip qtsvg 构建（无 Qt5Svg）→ 须走模块化栈 qt5-qtbase/5.15.2.2 + qt5-qtsvg/5.15.2.1"
+    - "qt5-qtbase / qt5-qtsvg 包内 mkspecs 与 bin/qt.conf 记录的是已删除的构建目录绝对路径 → 配方构造可重定位 qmake 视图（modules-inst 覆盖 modules 转发件 + 写指向 package 的 qt.conf）"
+    - "外置模块 qtsvg 的 QT_MODULE_*_BASE 须固化为 qtsvg 包路径，否则生成的 libQt5Svg.so 绝对路径指向 qtbase"
+    - "libusb/1.0.29 的 includedirs=include/libusb-1.0 与上游 <libusb-1.0/libusb.h> 差一层 → CPATH 补 <pkg>/include，链接走 LIBRARY_PATH"
+    - "HMDFS 上 strip 后的 ELF 不可执行 → qmake/make/install 传 QMAKE_STRIP= / STRIP=true"
+  common_dependencies:
+    - "qt5-qtbase (published 5.15.2.2)"
+    - "qt5-qtsvg (published 5.15.2.1)"
+    - "libusb (published 1.0.29)"
+
+versions:
+  "1.0.11":
+    status: built
+    build_date: "2026-10-18"
+    note: "ohos-aarch64 conan create 通过，test_package 3/3 PASS（--version/--help 实跑）；上游 N=0，鸿蒙特有测试 3 条单列"

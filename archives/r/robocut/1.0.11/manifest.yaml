@@ -1,0 +1,40 @@
+# 版本级 manifest — robocut 1.0.11
+# 遵循 ARCHIVE-SPEC v3.0
+# 状态: built（采信轮 conan create 通过 + test_package PASS；PR 合并且 release upload
+#       确认前不标 published——O5 口径）
+
+version: "1.0.11"
+software: "robocut"
+status: built
+build_date: "2026-10-18"
+build_system: "qmake"
+
+source:
+  url: "https://github.com/Timmmm/robocut/archive/refs/tags/v1.0.11.tar.gz"
+  sha256: "4ddd1255cb94f45d403e95aa4e3cea54d2d9d7dfc473cc7b56dab880e90db95a"
+  tar_format: tar.gz
+
+build:
+  system: qmake
+  configure_options:
+    - "Robocut.pro -spec linux-clang QMAKE_STRIP="
+  dependencies:
+    - "qt5-qtbase/5.15.2.2"
+    - "qt5-qtsvg/5.15.2.1"
+    - "libusb/1.0.29"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-Robocut.pro-add-qt-widgets.patch（QT += svg → QT += svg widgets）"
+
+knowledge_gained:
+  - "robocut 1.0.11 = Timmmm/robocut（tag v1.0.11, commit 37bb8aa3）：Qt5 Widgets GUI + libusb 的 SVG 绘图仪/刻字机控制程序（TEMPLATE=app，非库）"
+  - "上游 Robocut.pro 只声明 QT += svg；Qt5 默认 QT=core gui（mkspecs/features/spec_pre.prf），svg 模块 depends=core gui 不含 widgets → 不显式 QT += widgets 时 <QApplication>/<QMainWindow> 头文件找不到（fatal error）。patches/0001 补齐。"
+  - "ohpcd 的单包 qt/5.15.19 是 -skip qtsvg 构建（无可用 Qt5Svg）→ 需要 QT += svg 的工程必须走模块化栈 qt5-qtbase + qt5-qtsvg"
+  - "qt5-qtbase / qt5-qtsvg 包内 mkspecs 记录构建时绝对路径：bin/qt.conf 的 DevicePaths/Paths/HostPrefix 指向已删除的构建目录、mkspecs/modules/qt_lib_*.pri 转发 include 到已删除的 modules-inst → qmake 报 Unknown module(s) in QT: core gui。须构造可重定位 qmake 视图（复制 mkspecs + modules-inst 覆盖 modules 转发件 + 写指向 package 的 qt.conf）"
+  - "qt_config.prf 在加载每个模块前把 QT_MODULE_*_BASE 统一设为 $$[QT_INSTALL_*]（= qtbase 包），故外置模块（qtsvg）的 .pri 必须把这几项固化为自身包路径，否则 qt.prf 生成指向 qtbase 的 libQt5Svg.so 绝对路径，链接必失败"
+  - "libusb 包的 includedirs=include/libusb-1.0（面向 #include <libusb.h>），上游 #include <libusb-1.0/libusb.h> 需要 CPATH 补 <pkg>/include；-lusb-1.0 链接走 LIBRARY_PATH"
+  - "R51 清点：上游 1.0.11 无任何测试（tarball 0 个 test 条目、Robocut.pro 无 check/test 目标）⇒ 上游 N=0；test_package 消费者冒烟为鸿蒙特有测试（3 条断言，不计入上游分母）"
+
+failure_reason: null
