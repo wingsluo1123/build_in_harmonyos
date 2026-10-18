@@ -1,0 +1,37 @@
+software: "pxr-ts"
+version: "26.08"
+status: built
+build_system: cmake
+build_date: 2026-10-05
+created_at: 2026-10-02
+configure_options:
+  - "-DPXR_BUILD_IMAGING=OFF"
+  - "-DPXR_BUILD_USD_IMAGING=OFF"
+  - "-DPXR_BUILD_USDVIEW=OFF"
+  - "-DPXR_BUILD_TESTS=OFF"
+  - "-DPXR_BUILD_EXAMPLES=OFF"
+  - "-DPXR_BUILD_TUTORIALS=OFF"
+  - "-DPXR_BUILD_USD_TOOLS=OFF"
+  - "-DPXR_ENABLE_PYTHON_SUPPORT=OFF"
+  - "-DPXR_BUILD_EXEC=OFF"
+  - "-DPXR_BUILD_USD_VALIDATION=OFF"
+  - "-DPXR_BUILD_USD=OFF"
+  - "-DPXR_VALIDATE_GENERATED_CODE=OFF"
+  - "-DCMAKE_DISABLE_FIND_PACKAGE_Python=ON"
+  - "-DCMAKE_DISABLE_FIND_PACKAGE_Python3=ON"
+knowledge_gained:
+  - usd_cmake_target: pxr/base/ts/CMakeLists.txt declares LIBRARIES vt gf tf, so building CMake target "ts" pulls in the closure ts, vt, gf, tf, trace, js, arch (vt itself pulls arch/tf/gf/trace/TBB::tbb; trace pulls arch/tf/js; gf pulls arch/tf)
+  - usd_trace_js_dependency: pxr/base/trace links pxr/base/js (its reporter/serialization use JsWriter/JsValue/JsParseStream), so a consumer of libusd_trace.a also needs libusd_js.a on the link line; omitting it yields "undefined symbol: JsWriter::..." from an archive the consumer never mentions directly
+  - usd_static_link_order: for the static USD closure the libs must be listed in topological order (dependents first) - ts, vt, gf, trace, js, tf, arch
+  - usd_lib_prefix: USD static libraries are named libusd_<name>.a, located in build/pxr/base/<name>/ subdirectories
+  - usd_generated_headers: USD generates pxr/pxr.h version header in build/include/, must be packaged alongside source headers
+  - usd_work_headeronly: the work library is header-only, no .a file to copy, but its headers are included by the closure
+  - ohos_sysconf: _SC_LEVEL1_DCACHE_LINESIZE is not defined on OHOS musl; feature-based #ifdef guard with fallback 64 (same as pxr-vt / pxr-gf)
+  - ohos_strerror_r: On OHOS musl, strerror_r returns int (POSIX), not char* (GNU); removing the _GNU_SOURCE branch makes the POSIX path portable
+  - ohos_environ: On OHOS musl, __environ is not available; use environ instead
+  - ohos_deffilemode: DEFFILEMODE is not defined in sys/stat.h on OHOS musl; define as 0666 under feature guard
+  - conan_cmakedeps_note: find_package(TBB) resolves without CMakeDeps because CMakeToolchain adds deps' builddirs to CMAKE_PREFIX_PATH and tbb package ships its own TBBConfig.cmake
+patches_applied:
+  - patch_file: "patches/0001-arch-tf-fixes-for-ohos.patch"
+    description: "Fix arch/tf build errors on OHOS using feature-based guards (no platform macros): _SC_LEVEL1_DCACHE_LINESIZE undefined, strerror_r return type mismatch, __environ to environ, DEFFILEMODE undefined"
+source_url: https://github.com/PixarAnimationStudios/OpenUSD/archive/refs/tags/v26.08.tar.gz
