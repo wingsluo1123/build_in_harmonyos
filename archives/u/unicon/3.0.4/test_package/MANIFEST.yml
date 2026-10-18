@@ -1,0 +1,35 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: unicon/3.0.4
+homepage: "https://sourceforge.net/projects/unicon/"
+
+# 上游无自动化测试框架（无 tests/ 目录、无 make check/ctest/pytest 注册）；
+# 测试入口为 3 处手动编译运行程序（见 upstream_tests，实测记录见 notes.md）
+upstream_check_command: "none（无自动化测试框架）"
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests:
+  - file: hzinput_test.c
+    source: unicon-3.0.4/unicon/ImmModules/cce/hzinput_test.c
+    description: "行内输入单位测试（手动编译运行）：kexue→科学，1/1 PASS"
+    command: "./hzinput_test"
+  - file: intcode_test.c
+    source: unicon-3.0.4/unicon/ImmModules/cce/intcode_test.c
+    description: "GB18030 内码测试（手动编译运行）：GBK 8140→嗀、GB18030 81308139→锗，2/2 PASS"
+    command: "./intcode_test"
+  - file: test.cpp
+    source: unicon-3.0.4/unicon/client/test.cpp
+    description: "交互式输入法客户端（无自动化入口）；4 处移植修复后进程内+TCP 形态实测 PASS（kexue→1科学）"
+    command: "./test <module.so> <dict>"
+
+test_package_tests:
+  - file: consumer_test.cpp
+    description: "消费者用例：进程内形态全公开 API 流程，kexue→科学、zhongguo→中国（2 硬断言+API 调用检查）"
+    command: "./consumer_test <module.so> <dict>"
+
+# 测试断言总数（近似值，用于质量评估）
+assertion_count: 9

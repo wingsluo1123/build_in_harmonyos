@@ -1,0 +1,78 @@
+--- a/unicon/ImmModules/turbo/Makefile.in
++++ b/unicon/ImmModules/turbo/Makefile.in
+@@ -1,34 +1,34 @@
+ prefix=@prefix@
+ CFLAGS=@CFLAGS@
+ # CFLAGS += -V2.7.2.3 -I.
+ CFLAGS += -I.
+ PROG = TL_hzinput.so
+ TL_OBJS = xl_hzinput.o TL_hzinput.o  xl_phrase.o xl_sysphrase.o xl_mfile.o
+ 
+-CFLAGS = -g -Wall -I../../include -I.
++CFLAGS = -g -Wall -fPIC -I../../include -I.
+ 
+ all:dlib
+ dlib: $(PROG)
+ 
+ xl_mfile.o : xl_mfile.c xl_mfile.h
+-	gcc $(CFLAGS) -c xl_mfile.c -o xl_mfile.o
++	$(CC) $(CFLAGS) -c xl_mfile.c -o xl_mfile.o
+ TL_hzinput.o : TL_hzinput.c
+-	gcc $(CFLAGS) -DUNICON_LIB=\"$(prefix)/lib/unicon\" -c TL_hzinput.c -o TL_hzinput.o
++	$(CC) $(CFLAGS) -DUNICON_LIB=\"$(prefix)/lib/unicon\" -c TL_hzinput.c -o TL_hzinput.o
+ xl_hzinput.o : xl_hzinput.c
+-	gcc $(CFLAGS) -c xl_hzinput.c -o xl_hzinput.o
++	$(CC) $(CFLAGS) -c xl_hzinput.c -o xl_hzinput.o
+ xl_phrase.o : xl_phrase.c
+-	gcc $(CFLAGS) -c xl_phrase.c -o xl_phrase.o
++	$(CC) $(CFLAGS) -c xl_phrase.c -o xl_phrase.o
+ xl_sysphrase.o : xl_sysphrase.c
+-	gcc $(CFLAGS) -c xl_sysphrase.c -o xl_sysphrase.o
++	$(CC) $(CFLAGS) -c xl_sysphrase.c -o xl_sysphrase.o
+ $(PROG): $(TL_OBJS)
+-	gcc $(TL_OBJS) -shared -o $(PROG)
++	$(CC) $(TL_OBJS) -shared -o $(PROG)
+ 
+ # GB Support
+ gbdata: cin2tab addphrase levelphrase
+ 	@echo "==== making GB Data, will take a long time ==="
+ 	./levelphrase sort.char.count  sort.word.count  word.count
+ 	./addphrase -c sort.char.count -o tl_sysphrase.gb.bin 
+ 	./addphrase -c sort.word.count -o tl_sysphrase.gb.bin
+ 	./addphrase -c word.count -o tl_sysphrase.gb.bin
+ 	./cin2tab -c gb/zrm-2 -o tl_sysphrase.gb.bin
+ 	./cin2tab -c gb/ziranma -o tl_sysphrase.gb.bin
+@@ -44,28 +44,28 @@
+ 
+ # Big5 Support
+ big5data: cin2tab
+ 	@echo "==== making BIG5 Data, will take a long time ===="
+ 	./cin2tab -c xcin-25/cantonese -o tl_sysphrase.big5.bin 
+ 	./cin2tab -c xcin-25/cj -o tl_sysphrase.big5.bin 
+ 	./cin2tab -c xcin-25/pinyin -o tl_sysphrase.big5.bin 
+ 	./cin2tab -c xcin-25/simplex -o tl_sysphrase.big5.bin
+ 
+ cin2tab : cin2tab.c $(TL_OBJS)
+-	gcc -c -g -I../../include -I. cin2tab.c -o cin2tab.o
+-	gcc $(TL_OBJS) cin2tab.o -o cin2tab
++	$(CC) -c -g -I../../include -I. cin2tab.c -o cin2tab.o
++	$(CC) $(TL_OBJS) cin2tab.o -o cin2tab
+ 
+ addphrase : addphrase.c $(TL_OBJS)
+-	gcc -g -c -I. -I../../include addphrase.c -o addphrase.o
+-	gcc $(TL_OBJS) addphrase.o -o addphrase
++	$(CC) -g -c -I. -I../../include addphrase.c -o addphrase.o
++	$(CC) $(TL_OBJS) addphrase.o -o addphrase
+ levelphrase : levelphrase.c
+-	gcc -g -I../../include -I.  levelphrase.c -o levelphrase
++	$(CC) -g -I../../include -I.  levelphrase.c -o levelphrase
+ install: all
+ 	mkdir -p $(prefix)/lib/unicon/modules/turbo
+ 	cp -f *.so $(prefix)/lib/unicon/modules/turbo
+ data-install: big5data gbdata
+ 	mkdir -p $(prefix)/lib/unicon/modules/turbo/dict/{gb,gbk,big5}
+ 	cp -f tl_sysphrase.*.bin $(prefix)/lib/unicon/modules/turbo
+ 	cp -f gb/*.tab $(prefix)/lib/unicon/modules/turbo/dict/gb
+ 	cp -f gbk/*.tab $(prefix)/lib/unicon/modules/turbo/dict/gbk
+ 	cp -f xcin-25/*.tab $(prefix)/lib/unicon/modules/turbo/dict/big5
+ clean:

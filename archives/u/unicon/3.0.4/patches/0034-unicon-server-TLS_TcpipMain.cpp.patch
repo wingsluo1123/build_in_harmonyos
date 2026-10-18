@@ -1,0 +1,330 @@
+--- a/unicon/server/TLS_TcpipMain.cpp
++++ b/unicon/server/TLS_TcpipMain.cpp
+@@ -28,31 +28,33 @@
+ #include <string.h>
+ #include <errno.h>
+ #include <time.h>
+ #include <sys/types.h>
+ #include <sys/socket.h>
+ #include <netinet/in.h>
+ #include <arpa/inet.h>
+ #include <signal.h>
+ #include <netdb.h>
+ #include <unistd.h>
+-#include <iostream.h>
+-#include <pth.h>
++#include <iostream>
++using namespace std;
++#include <pthread.h>
+ 
+ #include <TLS_MemFile.hpp>
+ #include <TLS_HzInput.hpp>
+ #include <TLS_ImmOp.hpp>
+ #include <ImmComm.h>
+ #include <TLS_PthSocket.hpp>
+ 
+ #define MAXREQLINE 1024
+ TLS_CImmOp *pMyCImmOp = NULL;
++static int g_conn_count;
+ 
+ static void InitAllTLS_CHzInput (TLS_CHzInput **aTLS_CHzInput, int total);
+ static void DeleteAllTLS_CHzInput (TLS_CHzInput **aTLS_CHzInput, int total);
+ static void SaveTLS_CHzInput (TLS_CHzInput *pTLS_CHzInput, TLS_CHzInput **aTLS_CHzInput, int total);
+ static void RemoveTLS_CHzInput (TLS_CHzInput *pTLS_CHzInput, 
+                             TLS_CHzInput **aTLS_CHzInput, int total);
+ 
+ void GetBufPhrase (char *buf, PhraseItem *p)
+ {
+     char *p1 = buf;
+@@ -77,31 +79,32 @@
+     char caLine[MAXREQLINE];
+     char str[256], str1[256];
+     int n;
+ 
+     long Command, bExit = 0;
+     long handle, total;
+     TLS_CMemFile *MemIn = new TLS_CMemFile (caLine, 0, MAXREQLINE);
+     TLS_CMemFile *MemOut = new TLS_CMemFile (512);
+     TLS_CHzInput *pTLS_CHzInput = NULL;
+     TLS_CHzInput *aTLS_CHzInput[64];
+-    ImmOperation * pImmOp = NULL;
++    ImmOp_T *pImmOp = NULL;
+     TLS_CPthSocket MyTLS_CPthSocket (fd);
+ 
+     InitAllTLS_CHzInput (aTLS_CHzInput, 64);
+     printf ("========== Begin New Client Socket =========== \n");
+     /* read request */
+     while (bExit == 0) {
+         n = MyTLS_CPthSocket.read (caLine, MAXREQLINE);
+         if (n < 0) {
+             fprintf(stderr, "read error: errno=%d\n", errno);
+             close(fd);
++            g_conn_count--;
+             return NULL;
+         }
+         MemIn->rewind ();
+         MemIn->SetBufLen (n);
+         MemOut->rewind ();
+         *MemIn >> Command;
+         if (Command != IMM_OPEN_SERVER && pTLS_CHzInput == NULL)
+             *MemOut << (long) IMM_IMM_NOTOPEN;
+         else  switch (Command) {
+             case IMM_OPEN_SERVER:  
+@@ -115,49 +118,63 @@
+                 cout << "decode : " << ImmModule << ":" 
+                      << ImmTable << ":" << type << "\n";
+                 pImmOp = pMyCImmOp->OpenImm (str, type);
+                 if (pImmOp == NULL) {
+                     *MemOut << (long) IMM_NO_SUCH_IMM;
+                     break;
+                 }
+                 pTLS_CHzInput = new TLS_CHzInput (pImmOp, str1, type);
+                 if (pTLS_CHzInput->error == 1)
+                 {
+-                    pMyCImmOp->CloseImm (pTLS_CHzInput->pImmOp);
+-                    delete pTLS_CHzInput;
++                    ImmOp_T *slib = pTLS_CHzInput->pImmSlib;
++                    delete pTLS_CHzInput;	/* dtor: module close, before UnloadImm */
++                    pMyCImmOp->CloseImm (slib);
+                     *MemOut << (long) IMM_ILEGAL_FILE;
+                     break;
+                 }
+                 SaveTLS_CHzInput (pTLS_CHzInput, aTLS_CHzInput, 64);
+                 *MemOut << (long) IMM_NORMAL;
+                 *MemOut << (long) pTLS_CHzInput;
+-                PSTR szImmName = pImmOp->name;
++                PSTR szImmName = pImmOp->pImmOp->name;
+                 *MemOut << szImmName;
+                 cout << "pTLS_CHzInput = " << (long) pTLS_CHzInput << "\n";
+                 break;
+             }
+             case IMM_CLOSE_SERVER:
+                 *MemIn >> handle;
+                 pTLS_CHzInput = (TLS_CHzInput *) handle;
+                 *MemOut << (long) IMM_NORMAL;
+                 bExit = 1;
+                 RemoveTLS_CHzInput (pTLS_CHzInput, aTLS_CHzInput, 64);
+-                pMyCImmOp->CloseImm (pTLS_CHzInput->pImmOp);
+-                delete pTLS_CHzInput;
++                {
++                    ImmOp_T *slib = pTLS_CHzInput->pImmSlib;
++                    delete pTLS_CHzInput;	/* dtor: module close, before UnloadImm */
++                    pMyCImmOp->CloseImm (slib);
++                }
+                 pTLS_CHzInput = NULL;
+                 break;
+             case IMM_RESET_INPUT:
+                 *MemIn >> handle;
+                 pTLS_CHzInput = (TLS_CHzInput *) handle;
+                 pTLS_CHzInput->ResetInput ();
+                 *MemOut << (long) IMM_NORMAL;
+                 break;
++            case IMM_SET_INPUTMODE:
++            {
++                long mode;
++                *MemIn >> handle;
++                *MemIn >> mode;
++                pTLS_CHzInput = (TLS_CHzInput *) handle;
++                pTLS_CHzInput->SetInputMode (mode);
++                *MemOut << (long) IMM_NORMAL;
++                break;
++            }
+             case IMM_KEY_FILTER:
+             {
+                 char key;
+                 int rt, len;
+                 *MemIn >> handle;
+                 pTLS_CHzInput = (TLS_CHzInput *) handle;
+                 *MemIn >> key;
+ 
+                 rt = pTLS_CHzInput->KeyFilter (key, str, &len);
+ 
+@@ -229,30 +246,30 @@
+                 *MemIn >> handle;
+                 pTLS_CHzInput = (TLS_CHzInput *) handle;
+                 pTLS_CHzInput->FlushUserPhrase ();
+                 *MemOut << (long) IMM_NORMAL;
+                 break;
+            default:
+                 *MemOut << (long) IMM_BAD_REQUEST;
+                 break;
+         }
+         /* simulate a little bit of processing ;) */
+-        pth_yield (NULL);
+         n = MyTLS_CPthSocket.write (MemOut->pGetBuf (), MemOut->GetBufLen());
+         //pth_write(fd, MemOut->pGetBuf (), MemOut->GetBufLen());
+     }
+     /* close connection and let thread die */
+     delete MemIn;
+     delete MemOut;
+     DeleteAllTLS_CHzInput (aTLS_CHzInput, 64);
+     close(fd);
+     printf ("========== End Client Socket =========== \n");
++    g_conn_count--;
+     return NULL;
+ }
+ 
+ static void InitAllTLS_CHzInput (TLS_CHzInput **aTLS_CHzInput, int total)
+ {
+     for (int i = 0; i < total; i++)
+         aTLS_CHzInput[i] = NULL;
+ }
+ 
+ static void DeleteAllTLS_CHzInput (TLS_CHzInput **aTLS_CHzInput, int total)
+@@ -296,133 +313,139 @@
+  * A useless ticker we let run just for fun in parallel
+  */
+ 
+ static void *ticker(void *_arg)
+ {
+     time_t now;
+     char *ct;
+     float avload;
+ 
+     for (;;) {
+-        pth_sleep(5);
++        sleep(5);
+         now = time(NULL);
+         ct = ctime(&now);
+-        ct[strlen(ct)-1] = NUL;
+-        pth_ctrl(PTH_CTRL_GETAVLOAD, &avload);
++        ct[strlen(ct)-1] = '\0';
++        avload = 0.0f;
+         fprintf(stderr, "ticker woken up on %s, average load: %.2f\n", 
+                 ct, avload);
+     }
+     /* NOT REACHED */
+     return NULL;
+ }
+ 
+ /*
+  * And the server main procedure
+  */
+ 
+ #if defined(FD_SETSIZE)
+ #define REQ_MAX FD_SETSIZE-100
+ #else
+ #define REQ_MAX 100
+ #endif
+ 
+ static int s;
+-pth_attr_t attr;
++pthread_attr_t attr;
+ 
+ static void myexit(int sig)
+ {
+     close(s);
+-    pth_kill();
+-    pth_attr_destroy(attr);
++    pthread_attr_destroy(&attr);
+     fprintf(stderr, "**Break\n");
+     exit(0);
+ }
+ 
+ int StartImmService (int argc, char *argv[]) 
+ {
+     struct sockaddr_in sar;
+     struct protoent *pe;
+     struct sockaddr_in peer_addr;
+     socklen_t peer_len;
+     int sr;
+     int port;
+ 
+     /* initialize scheduler */
+-    pth_init();
+     signal(SIGPIPE, SIG_IGN);
+     signal(SIGINT,  myexit);
+     signal(SIGTERM, myexit);
+ 
+     /* argument line parsing */
+     if (argc != 2) {
+         fprintf(stderr, "Usage: %s <port>\n", argv[0]);
+         exit(1);
+     }
+     port = atoi(argv[1]);
+     if (port <= 0 || port >= 65535) {
+         fprintf(stderr, "Illegal port: %d\n", port);
+         exit(1);
+     }
+ 
+     fprintf(stderr, "This is Chinese Input Server 0.1.\n");
+     /* run a just for fun ticker thread */
+-    attr = pth_attr_new();
+-    pth_attr_set(attr, PTH_ATTR_NAME, "ticker");
+-    pth_attr_set(attr, PTH_ATTR_JOINABLE, FALSE);
+-    pth_attr_set(attr, PTH_ATTR_STACK_SIZE, 32*1024);
++    pthread_attr_init(&attr);
++    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
++    if (pthread_attr_setstacksize(&attr, 256*1024) != 0) {
++        fprintf(stderr, "warning: requested stack size unavailable, using default\n");
++    }
+ //    pth_spawn(attr, ticker, NULL);
+ 
+     /* create TCP socket */
+     if ((pe = getprotobyname("tcp")) == NULL) {
+         perror("getprotobyname");
+         exit(1);
+     }
+     if ((s = socket(AF_INET, SOCK_STREAM, pe->p_proto)) == -1) {
+         perror("socket");
+         exit(1);
+     }
+ 
+     /* bind socket to port */
+     sar.sin_family      = AF_INET;
+     sar.sin_addr.s_addr = INADDR_ANY;
+     sar.sin_port        = htons(port);
+-    if (bind(s, (struct sockaddr *)&sar, sizeof(struct sockaddr_in)) == -1) {
++    if (::bind(s, (struct sockaddr *)&sar, sizeof(struct sockaddr_in)) == -1) {
+         perror("socket");
+         exit(1);
+     }
+ 
+     /* start listening on the socket with a queue of 10 */
+     if (listen(s, REQ_MAX) == -1) {
+         perror("listen");
+         exit(1);
+     }
+ 
+     /* finally loop for requests */
+-    pth_attr_set(attr, PTH_ATTR_NAME, "handler");
+     fprintf(stderr, "listening on port %d (max %d simultaneous connections)\n", port, REQ_MAX);
+     for (;;) {
+         /* accept next connection */
+         peer_len = sizeof(peer_addr);
+-        if ((sr = pth_accept(s, (struct sockaddr *)&peer_addr, &peer_len)) == -1) {
++        if ((sr = accept(s, (struct sockaddr *)&peer_addr, &peer_len)) == -1) {
+             perror("accept");
+-            pth_sleep(1);
++            sleep(1);
+             continue;
+         }
+-        if (pth_ctrl(PTH_CTRL_GETTHREADS) >= REQ_MAX) {
++        if (g_conn_count >= REQ_MAX) {
+             fprintf(stderr, "currently no more connections acceptable\n");
+             continue;
+         }
+         fprintf(stderr, "connection established (fd: %d, ip: %s, port: %d)\n", 
+                 sr, inet_ntoa(peer_addr.sin_addr), ntohs(peer_addr.sin_port));
+ 
+         /* spawn new handling thread for connection */
+-        pth_spawn(attr, handler, (void *)((long)sr));
++        {
++            pthread_t th;
++            if (pthread_create(&th, &attr, handler, (void *)((long)sr)) == 0) {
++                g_conn_count++;
++            } else {
++                perror("pthread_create");
++                close(sr);
++            }
++        }
+     }
+ }
+ 
+ #include <TLS_DoubleByteConvertor.hpp>
+ #include <TLS_AsciiConvertor.hpp>
+ #include <TLS_const.h>
+ 
+ TLS_CDoubleByteConvertor *pCDoubleByteConvertor = NULL;
+ TLS_CAsciiConvertor *pCAsciiConvertor [N_ASCII_CONVERTOR];
+ 

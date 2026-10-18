@@ -1,0 +1,41 @@
+--- a/unicon/ImmModules/cxterm/Makefile.in
++++ b/unicon/ImmModules/cxterm/Makefile.in
+@@ -1,33 +1,27 @@
+ prefix=@prefix@
+ CFLAGS = @CFLAGS@
+ # CFLAGS += -V2.7.2.3 -I.
+ CFLAGS += -I.
+ PROG = cxterm_hzinput.so
+ OBJS = hzinput.o Cxterm_hzinput.o
+ 
+-CFLAGS = -g -Wall -I../../include -I.
++CFLAGS = -g -Wall -fPIC -I../../include -I.
+ 
+-all: $(PROG) 
+-	cd utils && make
+-	cd dict  && make 
++all: $(PROG)
+ $(PROG) : $(OBJS)
+-	gcc $(OBJS) -shared -o $(PROG)
++	$(CC) $(OBJS) -shared -o $(PROG)
+ Cxterm_hzinput.o : Cxterm_hzinput.c
+-	gcc $(CFLAGS) -c Cxterm_hzinput.c -o Cxterm_hzinput.o
++	$(CC) $(CFLAGS) -c Cxterm_hzinput.c -o Cxterm_hzinput.o
+ hzinput.o : hzinput.c
+-	gcc $(CFLAGS) -c hzinput.c -o hzinput.o
++	$(CC) $(CFLAGS) -c hzinput.c -o hzinput.o
+ install: all
+ 	mkdir -p $(prefix)/lib/unicon/modules/cxterm
+ 	cp *.so $(prefix)/lib/unicon/modules/cxterm
+-	cd utils && make install
+-	cd dict  && make install
+ clean:
+ 	rm -f *.o core a.out *.bak test *.so *~
+ 	cd utils && make clean
+-	cd dict  && make clean
+ 
+ distclean: clean
+ 	rm -f Makefile tags TAGS
+ 	cd utils && make distclean
+-	cd dict  && make distclean
+ 

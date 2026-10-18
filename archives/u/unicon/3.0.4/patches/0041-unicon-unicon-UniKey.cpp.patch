@@ -1,0 +1,30 @@
+--- a/unicon/unicon/UniKey.cpp
++++ b/unicon/unicon/UniKey.cpp
+@@ -33,23 +33,26 @@
+ #include <sys/ioctl.h>
+ #include <ctype.h>
+ #include <sys/time.h>
+ #include <errno.h>
+ #include <signal.h>
+ #include <sys/ioctl.h>
+ #if (__GNU_LIBRARY__ >= 6)
+ #include <sys/perm.h>
+ #else
+ #include <linux/types.h>
+-#include <linux/termios.h>
+ #endif
+ #include <linux/vt.h>
++/* struct termios/winsize come from the libc <termios.h> only: including the
++ * kernel UAPI <linux/termios.h> alongside it redefines those structs on
++ * modern (musl-based) libcs. VT_RESIZE/VT_GETSTATE/vtsizes come from
++ * <linux/vt.h>, which does not depend on the UAPI termios header. */
+ #include <termios.h>
+ 
+ #include <UniKey.hpp>
+ 
+ CUniKey::CUniKey (char *szDevice, int resize)
+ {
+     fd = open (szDevice, 0);
+     if (fd < 0)
+     {
+         printf ("Can't open %s\n", szDevice);

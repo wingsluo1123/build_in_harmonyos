@@ -1,0 +1,53 @@
+# ═══ Draft knowledge entry — 手写 configure+Makefile.in 老包的 Conan custom 配方五件套（含 install/data-install 分裂陷阱）═══
+# Timestamp: 2026-10-16
+# Software: unicon 3.0.4（1990s 手写 shell configure + Makefile.in，非 autoconf/cmake）
+# Gate: conan create package() 后产物缺失（dict 数据目录为空）+ 编译期工具链不匹配
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id: draft-unicon-3.0.4-handwritten-makefile-in-recipe
+title: 手写 configure+Makefile.in（非 autoconf）老包的 Conan custom 配方：补丁层 CC/CXX 环境变量化、build() 补数据目标、package() 必查 install 是否分裂出 data-install（漏跑=数据目录空包）、补拷头文件、摘可执行保纯库形态
+trigger_tool: make|configure|install
+phase: installation
+error_signature: g\+\+: *(No such file or directory|command not found)|gcc: *No such file or directory|make: *No rule to make target|Couldn't access.*dict/|No such file or directory.*\.map$
+severity: 2
+category: build-system|portability|headers|compat|ohos
+match_keywords: Makefile.in, 手写 configure, custom 构建, data-install,
+  install 分裂, CC 硬编码, 头文件不安装, dict 空, prefix
+keywords: Makefile.in, 手写 configure, custom 构建, data-install, install
+  分裂, CC 硬编码, g++ 缺失, 头文件补拷, 纯库形态, unicon, prefix,
+  conanfile, basic_layout
+approach: 老手写构建系统（configure 是手工 shell 脚本而非 autoconf 产物，
+  Makefile.in 硬编码 CC=gcc/CXX=g++）在 OHOS 上走 Conan custom 配方（无
+  AutotoolsToolchain 标准钩子可用），五件套缺一不可：①补丁层：Makefile.in 的
+  CC/CXX 环境变量化（取 conanbuild 环境导出的 clang/clang++，R33 禁止裸用
+  shell 变量默认值——OHOS 无 g++/gcc，硬编码直接 No such file）；②build()：
+  ./configure --prefix={self.package_folder} → make → 逐个补跑数据生成目标
+  （如 make -C unicon ccedata gbdata big5data——数据生成依赖树内已构建的
+  可执行文件，构建机跑 OHOS 原生二进制无碍）；③package()：make install 之后
+  必须核对上游 install 目标是否分裂出 data-install（install: all 只装库、
+  数据另立目标的老包极常见）——漏跑 data-install = 包内数据目录存在但全空，
+  编译链接全绿、运行才炸（unicon 实例：dict/ 空，pinyin.map 缺失，
+  consumer test 断言失败）；④package() 补拷头文件（老包 install 常不装
+  include/：copy 源树 include → 包 include/）；⑤package_info：libdirs 指非
+  标准路径（如 lib/unicon）、libs 显式列全，纯库形态包须摘掉全部可执行
+  （免 R38 commands.json 要求）。诊断口诀：conan create 绿但 test_package
+  运行断言挂 → 先查包内数据/头文件是否齐全（conan cache path 后 ls -R），
+  再回头核上游 install 目标的依赖闭包。
+root_cause: 手写 Makefile.in 的 install 目标依赖闭包不完整（install 只装库、
+  数据/头文件另立目标或不装）+ CC/CXX 硬编码在 OHOS 不存在——conan create
+  的"编译通过"只证明 build() 成功，不证明 package() 产物完整。
+affected_scope: 所有手写 configure + Makefile.in（非 autoconf/cmake/meson）
+  的老包在 OHOS 的 Conan custom 配方
+verification_cmd: conan cache path unicon/3.0.4:0 2>/dev/null | xargs -I{} find {} -name "*.map" -o -name "*.tab" | head
+rec_priority: 1
+rec_approach: custom-recipe-five-piece-set
+rec_description: 补丁层 CC/CXX 环境变量化 + build() 补数据目标 + package()
+  核对 install 分裂并补跑 data-install + 补拷头文件 + package_info 非标准
+  libdirs/纯库形态裁剪。
+rec_command: # package():
+  # self.run("make install")
+  # self.run("make data-install")   # 上游 install 分裂出数据目标时必跑
+  # copy(self, "*.h", src=.../include, dst=.../include)
+rec_auto_fix: false
+related: E097, E156, E108, E041
+source_pr: unicon 3.0.4 适配（本 PR，路径 B 知识库扩展）
