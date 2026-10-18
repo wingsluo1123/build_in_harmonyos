@@ -1,0 +1,98 @@
+#====================================================================
+# DRAFT-xine-0.99.14-config-sub-ohos-triplet-precondition
+# E566 边界：显式 --build/--host 三元组方案仍要求 config.sub 先认识 ohos
+#====================================================================
+
+id:                     DRAFT-xine-0.99.14-config-sub-ohos-triplet-precondition
+draft:                  true
+trigger_tool:           configure|config.sub|config.guess|conan
+phase:                  configure
+error_signature:        Invalid configuration `.*-linux-ohos': OS `ohos' not recognized|cannot guess system type|unable to guess system type|configure: error: cannot guess build type
+severity:               2
+category:               autotools|configure|cross-compile|platform|compat
+match_keywords:         config.sub, config.guess, aarch64-unknown-linux-ohos, --host, --build,
+                         OS ohos not recognized, E566, explicit-build-host-triplet, 三元组前置条件,
+                         AutotoolsToolchain, build == host, 2022-01-09
+title:                  E566 推荐的“显式传 --build/--host 跳过 config.guess”在旧 config.sub 上并不成立——config.sub 先拒绝 ohos 内核字段，三元组路线仍以修改 config.sub 为前提
+
+classification:         Path B candidate; final classification is subject to review
+
+root_cause:          OHOS 上 build == host，Conan 的 AutotoolsToolchain 不主动下发 `--build/--host` 三元组，于是 autotools 的 configure 会运行随源码分发的 `config.guess` 自行探测。E566 给出的方案是“显式传 `--build=… --host=…` 跳过探测”。但该方案只绕过了 **config.guess**，没有绕过**config.sub**：configure 拿到任何非默认别名后都会 `sh config.sub <alias>` 规范化，而 2022-01-09 版 config.sub 的 OS 表里没有 `ohos`，对 `aarch64-unknown-linux-ohos`直接返回 `Invalid configuration ...: OS 'ohos' not recognized`（实测 rc=1）。因此对携带旧 config.sub 的 tarball，三元组方案与补丁方案**同样要改 config.sub**，并不少改文件，也没有减少源码侵入；两条路线的真实分界点是 config.sub 是否认识 ohos。
+
+affected_scope:      所有源码树内自带 2024-01-01 以前 config.sub 的 autotools 包（tarball 不随`autoreconf -fiv` 重新生成、OHOS 上也不允许改生成文件）；包含 bundled config.* 的老项目（xine 家族、大量 2010-2020 年间发布的 C/C++ 包）。
+
+verification_cmd: >
+  cd <src_root>
+  sh ./config.sub aarch64-unknown-linux-ohos; echo "rc=$?"   # 未打补丁：OS `ohos' not recognized + rc=1
+  sh ./config.guess                                            # 未打补丁：unable to guess system type
+  grep -n "timestamp = " config.guess config.sub               # 判断是否携带 ohos 支持的版本
+  grep -n "| fiwix\* )\|linux-musl\*" config.sub                 # 待插入的 os 别名分支位置
+
+rec_priority:           1
+rec_approach:           patch-config-guess-and-config-sub-when-sub-rejects-ohos
+rec_description:     先用 `sh config.sub <三元组>` 实测，再决定路线：config.sub 已接受 ohos → 用 E566 的显式 `--build/--host`（零源码侵入）；config.sub 拒绝 ohos → 打 config.guess + config.sub 双补丁，此时三元组方案并不更轻。config.guess 加 `aarch64:HarmonyOS:*:*) GUESS=aarch64-unknown-linux-ohos ;;`（放在其它`case $UNAME_MACHINE:$UNAME_SYSTEM:…` 分支之前），config.sub 在 CPU 别名表加 `ohos*`、OS 表加 `linux-ohos*`。选择补丁路线时优先与同上游家族、仓库内已合入的兄弟包保持一致。
+rec_command: >
+  # config.guess
+  +    aarch64:HarmonyOS:*:*)
+  +	GUESS=aarch64-unknown-linux-ohos
+  +	;;
+  # config.sub
+  -    | fiwix* )
+  +    | fiwix* | ohos* )
+  -    | linux-musl* | linux-relibc* | linux-uclibc* )
+  +    | linux-musl* | linux-relibc* | linux-uclibc* | linux-ohos* )
+rec_auto_fix:           false
+rec_impl:               patch-config-guess-plus-config-sub
+
+forbid_1_pattern:       assume-explicit-triplet-always-avoids-config-files
+forbid_1_reason:        `--host` 只是把别名交给 config.sub 规范化；旧 config.sub 不认 ohos 时同样失败，
+                         “零源码改动”的假设不成立。
+forbid_1_consequence:   按 E566 字面执行后 configure 仍红，且报错从 config.guess 变成 config.sub，
+                         容易被当成新问题重复排查；两轮试错之后仍回到补丁路线。
+
+forbid_2_pattern:       patch_only_config_guess
+forbid_2_reason:        只补 config.guess 时探测能产出三元组，但紧接着的 config.sub 规范化仍 rc=1。
+forbid_2_consequence:   `configure: error: cannot guess build type` 或 invalid configuration 继续阻塞，
+                         并让人误判 config.guess 分支写错。
+
+similar_to:             [E566, E051, DRAFT-xine-0.99.14-in-tree-build-pollutes-patch-baseline]
+conflicts_with:         []
+prerequisite_of:        []
+
+path_b_candidate:       true
+path_b_boundary:        只记录“E566 三元组方案对 config.sub 版本的前置依赖”这一边界判据；
+                         config.guess 探测失败本体、OHOS 三元组取值、umask 077 版 config.guess 问题均归 E566/E490，不在本条重复。
+
+reusable_knowledge_count: 3
+reusable_knowledge_1:    决策前置探针：`sh config.sub <三元组>; echo $?`，rc=0 才可能走零侵入的显式三元组路线。
+reusable_knowledge_2:    configure 对 --build/--host 的处理必经 config.sub 规范化，config.sub 与 config.guess 是两个独立门槛。
+reusable_knowledge_3:    同一上游家族的多个包应统一走同一路线（补丁或三元组），避免兄弟包之间 config.* 处理方式分叉。
+
+diagnostic_matrix:       unable to guess system type -> 看 config.guess timestamp 是否认识 HarmonyOS
+                         Invalid configuration ... OS `ohos' not recognized -> config.sub 版本门槛，必须补 os 别名
+                         -> 若本包计划用显式三元组，此错误说明三元组路线不可行
+knowledge_reuse_scope:   任何 bundled config.* 的老 autotools 包在 OHOS 上做平台识别时的路线选择
+
+fallback_priority:      2
+fallback_approach:      tool-requires-autoreconf-to-regenerate-config-files
+fallback_description:   若项目有 `configure.ac` 且工具链具备 autoconf/automake，可用
+                         `autoreconf -fiv` 重新生成本身的 configure 并注入新版 config.*，从而避免给
+                         生成文件打补丁。但 tarball-only 项目（只有生成的 configure，无 configure.ac）不适用，
+                         且 R6 禁止直接改生成文件——重新生成必须在 build() 里显式执行而非以补丁形式提交。
+fallback_command:       autoreconf -fiv
+fallback_auto_fix:      false
+fallback_impl:          autoreconf-regenerate
+
+doc_file:               knowledge/drafts/DRAFT-xine-0.99.14-config-sub-ohos-triplet-precondition.md
+last_updated:           2026-10-17
+source_event:           xine/0.99.14 适配：G0 命中 E566 后实测 config.sub 拒绝 ohos，改为 0001/0002 补丁路线
+authors:                Qoder
+source_pr:
+source_commit:
+
+verification_result: >
+  xine/0.99.14 实测：未打补丁的 .orig 基线 `sh config.sub aarch64-unknown-linux-ohos` →
+  `Invalid configuration \`aarch64-unknown-linux-ohos': OS \`ohos' not recognized`，rc=1；
+  打补丁后的 .work 基线同命令输出 `aarch64-unknown-linux-ohos`，rc=0，`sh config.guess` 亦输出同值。
+  最终 0001/0002 补丁路线 conan create G2 PASS，`reports/conan-create.log` 中
+  `checking build system type... aarch64-unknown-linux-ohos`，test_package 27/27 断言通过。

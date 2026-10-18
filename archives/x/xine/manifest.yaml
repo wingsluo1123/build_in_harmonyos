@@ -1,0 +1,34 @@
+# 软件级 manifest — xine（上游项目 xine-ui）
+# 遵循 ARCHIVE-SPEC v2.0
+
+software: xine
+display: "xine-ui (xine X11 front-end)"
+description: "xine 媒体播放器的 X11 前端，交付 xine / xine-check / xine-bugreport 三个命令及皮肤、图标、desktop/mime、man 页面数据"
+category: multimedia
+homepage: "https://sourceforge.net/projects/xine/"
+license: GPL-2.0-or-later
+
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "bundled config.guess(2022-01-09)/config.sub 不识别 uname -s=HarmonyOS；OHOS 上 build==host，AutotoolsToolchain 不下发 --build/--host 三元组，必须让 config.guess 自己猜出 aarch64-unknown-linux-ohos"
+    - "OHOS 系统调用策略以 SIGSYS 终止 setreuid()（setuid(geteuid()) 不受影响），上游 session_ctrl 测试入口只能编译不能执行"
+    - "OHOS libc 无 pthread_cancel/pthread_testcancel 且无 framebuffer 控制台 → --without-fb 门控 fbxine"
+    - "Conan 合成的 libxine.pc 不带 plugindir → configure 的 XINE_MIME 退化成 /mime.types，需三级回落并在空值时改用树内 mime.default"
+    - "misc/desktops 的 ./mime.default 前置条件带字面双引号，.am 与 .in 必须成对修（OHOS 不重跑 autoreconf，生成的 Makefile 不能直接打补丁）"
+    - "configure/make 会运行刚链接的 conftest，必须用 Environment + save_script 把依赖 libdir 前插 LD_LIBRARY_PATH；PKG_CONFIG_LIBDIR 钉到 generators_folder 防系统库抢依赖"
+  common_dependencies:
+    - xine-lib
+    - libx11
+    - libxext
+    - libxv
+    - libpng
+    - libjpeg-turbo
+    - curl
+
+versions:
+  "0.99.14":
+    status: published
+    build_date: 2026-10-17
+    notes: "5 个补丁（config.guess/config.sub/configure/misc-desktops Makefile.am+in）；上游测试入口 10 项全清点（实测 4、不适用 6）；test_package 27/27 断言通过，含 3 个鸿蒙特有端到端消费者用例"

@@ -1,0 +1,94 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "A/R29-机制表述自相矛盾",
+      "file": "archives/x/xine/0.99.14/conandata.yml",
+      "line": 14,
+      "description": "0003 的 patch_description (b) 写 \"'umask 077 && mktemp -d ./confXXXXXX' yields drwx--S--- which even the owner cannot write into\"，与本 PR 自己在 notes.md:174 / README.md:138 / 新草稿 .kv:22 实测并采用的机制（本机在 HMDFS 挂载上得到同样的 drwx--S--- 但 owner 分支可写；拒写只发生在 worker 上属主 uid ≠ 进程 uid、检查落 group 分支）直接相反。同一句错写也出现在 notes.md:70（\"权限检查落 group 分支 → 连 owner 也写不进去\"，前后半句互斥），并被 fix 提交 57eae489da 的 commit message 重复。conandata.yml 是随配方入库、检视者第一眼看得到的文本，口径不能与自己标注的证据相反。",
+      "fix_suggestion": "把 (b) 改成与实测一致：\"HarmonyOS HMDFS forces the setgid bit onto new directories, so 'umask 077 && mktemp -d ./confXXXXXX' yields drwx--S--- (empty group bits); on the CI worker the recorded owner uid differs from the process uid, the permission check falls to the group branch, and config.status dies on 'subs1.awk: Permission denied' (knowledge E129)\"。notes.md:70 同步删去「连 owner 也写不进去」。"
+    },
+    {
+      "severity": "P2",
+      "rule_id": "D/R51-统计数字不可复核",
+      "file": "archives/x/xine/0.99.14/notes.md",
+      "line": 175,
+      "description": "\"仓库 144 个包用 022（000 13、002 9、007 6）\" 在仓库里复现不出来。本轮独立遍历 archives/*/*/*/patches/*.patch（只统计含 '-...umask 077' 的补丁，再看 '+...umask 0xx' 的取值）：改成 022 的包约 **650 个**（按软件名去重约 636）、000 约 135 个、002 约 32 个、007 约 20 个；量级差约 4.5 倍，000 的「13」与实测差一个数量级。相对次序（022 ≫ 000 > 002 ≈ 007）与「022 是主流」的定性结论成立，但把一个精确、声称可复核的计数写错，检视者按字面复算会得到完全不同的数字。同口径还出现在 pr-body.md:123、DRAFT-xine-0.99.14-hmdfs-mount-semantics-local-green-ci-red.kv:28 与 .md:80。",
+      "fix_suggestion": "二选一：①改成本轮实测值并附可复算口径（遍历 archives/*/*/*/patches/*.patch，统计含 -umask 077 的补丁中 + 行的 umask 取值分布 → 022 ≈ 650 包 / 000 = 135 / 002 = 32 / 007 = 20）；②删掉具体计数，只保留「umask 022 是本仓库绝对主流取值 + E129 rec 1 原值」这一定性判据。四处口径一并同步。"
+    },
+    {
+      "severity": "P2",
+      "rule_id": "D/R51-证据枚举不完整",
+      "file": "archives/x/xine/0.99.14/notes.md",
+      "line": 179,
+      "description": "\"全树 umask 077 命中 config.guess 与 Makefile.in 两处\" 属漏计。本轮对未打补丁的 .orig 源码树逐行普查：'umask 077' 共 **9 行 / 6 个文件** —— config.guess:119/120/121、configure:16709/16714（打补丁后即文中引用的 :16717/:16722）、Makefile.in:748，另外 **misc/xine-bugreport:19、misc/xine-check.sh.in:19、misc/xine-check:19 三处被整体遗漏**。这三处并非无关：xine-check / xine-bugreport 是随包安装的运行期脚本（commands.json 声明的命令之一），其 umask 077 在设备上就会执行，而 D1–D4 断言正好实跑 xine-check。pr-body.md:124 写「三处」、草稿 .md:87 与 .kv:80-81 同样只列 config.guess 与 Makefile.in，三处口径之间还互相不一致（两处 / 三处）。",
+      "fix_suggestion": "改写成可复算的完整清单：「全树 6 文件 9 行：configure 2 行在构建路径上；config.guess 3 行在 set_cc_for_build()（实测 sh config.guess 返回 aarch64-unknown-linux-ohos、不建 cgXXXXXX，TMPDIR 指向 HMDFS 亦然）；Makefile.in 1 行在 distcheck 的 $$dc_destdir；misc/{xine-bugreport,xine-check.sh.in,xine-check} 各 1 行属**运行期**脚本、不在构建路径，本机 D1–D4 实测 xine-check rc=0」，并说明 misc 三处的运行期语义留待真机/有 display 环境评估，避免留下会被复算否证的「只剩两处」结论。"
+    },
+    {
+      "severity": "P2",
+      "rule_id": "A/R9-有效性口径越界",
+      "file": "archives/x/xine/0.99.14/manifest.yaml",
+      "line": 75,
+      "description": "knowledge_gained 末条写 \"…故 E129 的 sed 改 umask **是有效修复**\"，而同一份 PR 的 README.md:138、notes.md:177、pr-body.md 补充说明 12 第③条都把证据口径固定为「本机全绿不是该修复有效的证据，有效性只能由远端 CI 判定」。「非空操作」与「有效修复」是两件事：本轮实测（与作者一致）只证明前者——鸿蒙 toybox 的 mktemp -d 目录 mode 确实随 umask 变化（077→drwx--S---、022→drwxr-s--x）。同一越界措辞也出现在 knowledge/drafts/DRAFT-xine-0.99.14-hmdfs-mount-semantics-local-green-ci-red.kv:56，而配套的 .md:55 用的是正确写法（「不是空操作」）。",
+      "fix_suggestion": "manifest.yaml:75 与草稿 .kv:56 把「是有效修复」改为「确实改变新建目录的 mode，因而不是空操作（有效性由远端 CI 判定）」，与 .md:55 及三段式证据口径（传导 / 无回归 / 有效性）对齐。"
+    },
+    {
+      "severity": "P2",
+      "rule_id": "B/graph._REQUIRED_FIELDS-草稿缺必填字段",
+      "file": "knowledge/drafts/DRAFT-xine-0.99.14-hmdfs-mount-semantics-local-green-ci-red.kv",
+      "line": 24,
+      "description": "新增草稿缺 `verification_cmd:`。该键在 scripts/ohc/graph.py:27-32 的 _REQUIRED_FIELDS 中（也在 _TEMPLATE_FIELDS 的 Layer 2），本 PR 前 5 条草稿都有该键（grep '^verification_cmd:' 各命中 1 次），只有第 6 条没有；W5 入库时 graph add 会打印 \"Missing required fields: ['verification_cmd']\" 并需要交互放行。本轮用 draft_review.review_draft 实测：新草稿 quality 三项全 True（error_signature / root_cause / rec_approach / rec_description 均写在同一行，避开了 _parse_simple_fields 不解析缩进续行的缺陷），唯独此项缺失。",
+      "fix_suggestion": "在第 24 行 affected_scope 之后补一行同值域字段，例如 verification_cmd:  for u in 077 022 007 002; do d=$( (umask $u; mktemp -d \"./c${u}XXXXXX\") ); ls -ld \"$d\"; ( cd \"$d\" && : > f ) && echo WRITABLE || echo DENIED; done; grep -c \"umask 077\" <build_folder>/config.status  —— 注意值必须与键写在同一行。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "D/R51-先例结论超出原始记录",
+      "file": "knowledge/drafts/DRAFT-xine-0.99.14-hmdfs-mount-semantics-local-green-ci-red.md",
+      "line": 24,
+      "description": "「pcre2（Buildbot #7020）修复为 umask 077 → umask 022 后**转绿**」在被引来源里查不到回执：archives/a/analog/homebrew/notes.md:34-38 只记录了失败事实（\"证据：Buildbot #7020\"）与修复动作，没有任何重跑结果；全仓 grep '7020' 仅命中该失败行。逐字同签名与修复取值这两点本轮复核为真，但「转绿」正是 pr-body.md:123 / notes.md:175 / .md:81 / .kv:28 用来否决 DRAFT-10863 的 007 的决定性判据，被写成了事实而实为推断。",
+      "fix_suggestion": "改述为「…记录以 umask 022 作为修复动作，未见重跑回执」，或先查到 analog/homebrew 该次修复后的 build 号再写「转绿」。四处口径一并同步。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "D/文档-取值描述不准",
+      "file": "archives/x/xine/0.99.14/notes.md",
+      "line": 201,
+      "description": "第 2 轮方向写成「给 group/other 写位的 umask 007/umask 002」。按同一文档（notes:174 与草稿 .md:61-62）自己的实测表：007 → drwxrws---（group 有 w，other 无任何权限）、002 → drwxrws--x（group 有 w，other 仅 --x），两者都不给 other 写位。该措辞会让下一轮按字面去找「other 可写」的取值而误判方向。",
+      "fix_suggestion": "改为「给 **group** 写位的 umask 007 / umask 002（other 仍无写位）」。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "B/draft_review-折叠字段读不到",
+      "file": "knowledge/drafts/DRAFT-xine-0.99.14-config-sub-ohos-triplet-precondition.kv",
+      "line": 20,
+      "description": "本 PR 前 5 条草稿的 root_cause 均写成 YAML 折叠块（'root_cause: >' + 缩进续行）。scripts/ohc/draft_review.py:55-64 的 _parse_simple_fields 会跳过以空白开头的行，因此只取到 '>'。本轮实测 review_draft：这 5 条 quality.has_root_cause=False，第 6 条（同行写法）三项全 True。属仓库通行写法（约 625/3519 份草稿同样折叠），不阻断本 PR，但同一 PR 内两种写法并存会使 W5 质量预检对 5 条报「缺根因」。",
+      "fix_suggestion": "把 5 份草稿的 root_cause（以及同类折叠的 rec_description / affected_scope）压成「键: 值」同一行，与第 6 条统一写法。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "suggestion-path_b 边界与正文重叠",
+      "file": "knowledge/drafts/DRAFT-xine-0.99.14-hmdfs-mount-semantics-local-green-ci-red.kv",
+      "line": 22,
+      "description": "path_b_boundary（.kv:49-52、.md:7）已声明「属主 uid ≠ 进程 uid → 落 group 分支」的机理归 DRAFT-10863、修复动作与取值归 E129/E114，但同文件的 root_cause(.kv:22)、.md:26-33 与 manifest.yaml:75 又把这套机理完整复述了一遍。边界声明本身成立（没有重复记录修复动作），只是复述量偏大，DRAFT-10863 转正后需两处同步维护。",
+      "fix_suggestion": "root_cause 只保留本条独有的三点差异（两侧挂载语义不同 → 本机复现不出拒写、toybox mktemp 受 umask 影响、站点按可达性筛选），机理一句「详见 DRAFT-10863」指过去即可。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "suggestion-机制与取值张力未在正文点明",
+      "file": "archives/x/xine/0.99.14/reports/pr-body.md",
+      "line": 120,
+      "description": "根因段说 worker 上权限检查落 group 分支而 group 位为空，取值段（pr-body:123）采 umask 022 —— 022 在 HMDFS 上得到 drwxr-s--x，即 group 只有 r-x、**没有 w**；按同一套静态模型，向该目录创建 subs1.awk 仍需目录写位。草稿 .md:77 如实承认了这层张力并说明为何仍取 022（E129 原值 + 远端同签名先例 + 只有 2 轮修复预算），但 pr-body 与 notes 的根因段没有把张力写出来，检视者容易读成「022 补齐了 group 权限」。修复动作本身遵循 E129 rec 1（rec_auto_fix: true），故不判为错误。",
+      "fix_suggestion": "在 pr-body.md:123 / notes.md:175 各补一行：「022 只给 group r-x、不给 w；按 group 分支模型更严格的是 007/002，本轮采 E129 原值 022 是走『与知识图谱一致 + 有远端同签名先例』的口径，若远端仍以同一行 EACCES 失败则第 2 轮转 007」，与草稿 .md:77 措辞对齐。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "A/R29-审计报告入库口径",
+      "file": "archives/x/xine/README.md",
+      "line": 139,
+      "description": "该行现在的表述是诚实的（明确写了随 PR 提交的 reports/audit-result.json 是第三轮、第 1 轮 CI 修复之后另起一轮复审、其报告在复审落地时替换同名文件），本轮实测与之一致；残留两点：①入库的 audit-result.json 仍是 16:50 的第三轮报告，自述「0003 为单个 hunk」「changed_files=32」，与修复后的最终 34 文件快照不同（属已如实标注的历史快照）；②notes.md:193（注意事项 11）与 pr-body.md:93（补充说明 10）仍只写「审计做了三轮」，且 notes:193 称第三轮是「对**最终** 32 文件快照」，「最终」二字在加 hunk + 新增第 6 对草稿之后已不成立。",
+      "fix_suggestion": "把本轮（第四轮）报告按 README 的承诺替换入库，并将 notes:193 / pr-body:93 的轮数与「最终 32 文件」改为「第三轮 32 文件 / 第四轮 34 文件」；若决定不入库替换，则把 README:139 的「在复审落地时替换同名文件」改为不承诺具体动作的表述，避免成为前向声明。"
+    }
+  ],
+  "summary": "第四轮（W4 Pre-PR）独立审计：本轮增量（0003 的第二个 hunk、回填的 patch_classification、新增的第 6 对知识草稿、README/notes/pr-body/conandata 的同步）在**技术事实层面成立**，但**口径层面存在 5 项 P2 需修正**。逐条实测：①0003 恰为 2 个 hunk，@@ -9741,21 +9741,29 @@（+9/-1）与 @@ -16699,26 +16707,26 @@（+2/-2，26/26 算术自洽，全补丁 +11/-3），hunk2 只动两行 umask 077→022；补丁集仍 5 个且与 conandata.yml 的 5 条声明、manifest 的 patches_applied 一致，patch_classification 已回填为 type: portability / guard: 'none'（0001/0002 platform_only True、0003–0005 False）；②改位正确：tarball 内确实无 config.status（.orig 全树不存在该文件），0003 只补 configure；传导已独立复核——复验构建目录 …/p/b/xinec43b546b57fde/b/build-release/config.status 的 'umask 077' 计数为 0、:626/:631 均为 umask 022；可达性结论亦独立复核为真（sh config.guess 返回 aarch64-unknown-linux-ohos、rc=0，TMPDIR 指向 HMDFS 也不产生 cgXXXXXX；Makefile.in:748 位于 distcheck 规则内）；③但 5 处口径超出证据：conandata.yml:14 与 notes.md:70 说目录「连 owner 也写不进去」，与本 PR 自己的实测（本机 HMDFS 上 owner 分支可写）相反；notes:179/pr-body:124/草稿 .md:87 的全树 umask 077 枚举漏计（实测 6 文件 9 行，遗漏 misc/xine-bugreport、misc/xine-check.sh.in、misc/xine-check 三处运行期脚本）；manifest.yaml:75 与草稿 .kv:56 把「非空操作」写成「有效修复」，与 README:138/notes:177 自定的证据口径冲突；④判据可复核性：144/13/9/6 这组计数复现不出来（实测约 650/135/32/20），pcre2 #7020 的「转绿」在被引 notes.md 里没有回执（同签名与取值两点为真），E129/E114 内容与 rec（umask 077→022、rec_auto_fix: true）核对一致；⑤E051/E085/E114/E129/E490/E515/E524/E553/E566/E608 的 .kv 与 .md 均存在且内容与 PR 引用相符；⑥新草稿 kv/md 成对、关键字段同行（draft_review 实测 quality 三项全 True，明显优于前 5 条折叠写法），与 E129/E114/DRAFT-10863 的边界已声明且不重复记录修复动作，但缺 graph._REQUIRED_FIELDS 里的 verification_cmd；⑦数字全一致：11 个直接依赖（conanfile 的 self.requires 恰 11 条，与 notes/README 逐条对齐）、5 个补丁、9 次上游调用与 7/9、20 个唯一 check 目录 / 27 次进入事件 / 19 行 Nothing to be done、27 条断言（A5+B13+C5+D4）——本轮在仓库外临时目录对修复后的包真机复跑 test.sh 得 ASSERTIONS=27 PASSED=27 FAILED=0，无回归口径成立；⑧原子性成立：git diff --name-only origin/main...HEAD 恰 34 个文件，全部落在 archives/x/xine/** 与 knowledge/drafts/DRAFT-xine-0.99.14-*，两个新草稿确在 knowledge/drafts/；archives/l/libxext 的脏文件为大小写不敏感挂载既有产物，按任务约定不计入本 PR；⑨R8/PF5：patches/*.patch 无任何平台宏命中。结论：无欺骗、无配方正确性缺陷，P0=P1=0 → verdict=pass，可在处理上述 P2 口径项（或明确记录不改）后提 PR。"
+}
