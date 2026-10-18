@@ -1,0 +1,35 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: ukopp/4.9
+homepage: "https://kornelix.com/ukopp"
+
+# 上游测试命令（用于 make -n check 分析）
+upstream_check_command: "make -n check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游 make check 实际运行的测试程序
+# ukopp 4.9 无任何测试目标/测试代码：
+# R51 清点证据：
+#   - Makefile 目标仅有 ukopp / install / uninstall / clean——无 check/
+#     test 目标（grep -n "check\|test" Makefile 无测试钩子）
+#   - tarball 无 tests/ 目录、无 *test* 源文件、无 CI 配置
+#   - kornelix 系工具（ukopp/kodillo 等）上游均无自动化测试
+upstream_tests: []
+
+# test_package 中自带的测试（消费者视角验证，真实执行 ukopp 二进制）
+test_package_tests:
+  - file: test_ukopp.sh
+    description: "分层打包探针 + 真实命令行模式运行：A1 打包二进制存在且可执行；A2 ELF64/AArch64 魔数（e_machine=0xb7）；A3 DT_NEEDED 闭包含 GTK3 栈（libgtk-3.so.0/libgdk-3.so.0/libglib-2.0.so.0，readelf 缺失时跳过）；A4-A7 功能运行：ukopp -nogui（全新 $HOME，stdin 非 tty）→ rc=0，zinitapp 重定向产物 $HOME/.ukopp/logfile 存在、含启动横幅 ========== start ukopp、含版本报告 ukopp v.4.9（getuid()==0 时为 you have root privileges 分支，同判通过）；-nogui 不调 gtk_init()（headless 安全），无 job 文件时不执行备份直接干净退出。执行模型按产物 ELF e_machine 判定：交叉开发机 qemu-aarch64 -L /opt/ohos-guest -E LD_PRELOAD=libfdchkshim.so 仿真（shim 补 __fd_chk），CI OHOS worker 原生直跑（musicpc/tasksh/array-hash/vimpc 同款）"
+    command: "sh test_ukopp.sh <ukopp-bin>"
+
+# 测试用例数与断言数（test_ukopp.sh 实际统计：A1 存在/可执行 + A2 ELF64
+# AArch64 + A3 DT_NEEDED GTK3 栈 + A4 rc=0 + A5 logfile 产生 + A6 启动横幅
+# + A7 版本/root 分支报告）
+case_count: 7
+assertion_count: 7
