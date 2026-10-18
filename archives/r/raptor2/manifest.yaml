@@ -1,0 +1,29 @@
+software: raptor2
+display: "Raptor RDF Syntax Library"
+description: "高性能 C 库，用于解析与序列化 RDF（RDF/XML、Turtle、N-Triples、N-Quads、TriG、RSS、RDFa、RDF/JSON），并提供 rapper 命令行工具"
+category: data
+homepage: "https://librdf.org/raptor/"
+license: "LGPL-2.1-or-later OR GPL-2.0-or-later OR Apache-2.0"
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "config.guess/config.sub 需增加 HarmonyOS 与 linux-ohos 三元组识别（否则 configure 在 build type 阶段即中断）"
+    - "autoconf 生成的 configure/config.status 用 `umask 077 && mktemp -d` 建临时目录，在本机文件系统上得到不可写的 drwx--S---(2700)，必须去掉 umask 077"
+    - "libxml2 >= 2.11 移除 xmlEntity.checked，libxml2 >= 2.13 把 nanohttp 声明置于 LIBXML_HTTP_STUBS_ENABLED 之后：分别需要版本守卫与改用 libcurl WWW 后端"
+    - "ICU 为 C++ 静态库，C 链接驱动需显式 -lc++"
+    - "make check 的二进制需把本图依赖 libdirs 前置到 LD_LIBRARY_PATH（否则被 SDK lld 自带的 libxml2.so.16 遮蔽或找不到 libyajl.so.2）"
+  common_dependencies:
+    - libxml2
+    - libxslt
+    - yajl
+    - curl
+    - icu4c
+
+versions:
+  "2.0.16":
+    status: built
+    format: conan
+    build_date: "2026-10-16"
+    conan_ref: "raptor2/2.0.16"
+    note: "OHOS/aarch64 原生构建；上游 make check 19/19 单测程序 + 1233 语料检查项（1205 PASS + 28 项上游 EXPECTED_FAILURES）全绿；2 个鸿蒙消费者用例（C API、rapper CLI）实测 PASS。"
