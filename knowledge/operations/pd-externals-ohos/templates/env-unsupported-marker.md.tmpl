@@ -1,0 +1,34 @@
+# Pd 外部库不可适配 / 需降级时的标记规范（env_unsupported 等）
+
+> 仅当按策略 A/B 处理后**仍**无法在 OHOS 上构建时才使用本模板。
+> 若只是缺编译器/头集，属于**可修**问题，不要标记为不可适配。
+
+## 1. 判定分支
+
+| 现象 | 结论 | result status |
+|---|---|---|
+| `cc -dumpmachine` 三元组失败 / `s_stuff.h not found` | 可修：策略 A+B（显式 CC + puredata 头集） | 继续适配 |
+| 消费者符号作用域失败 | 可修：策略 C（dlopen + LD_PRELOAD 于运行步） | 继续适配 |
+| 上游用 **Max/MSP 专属** 源码且无 Pd 分支（`#ifdef MAXMSP` 独占实现） | 本体不可适配（缺 Pd 端实现） | `env_unsupported` |
+| 需要 GUI/Pd 图形栈（tcl/tk、Gem/OpenGL 窗口）才有意义 | 平台不支持（OHOS 无对应图形栈） | `env_unsupported` |
+| 依赖未发布的 Pd 家族包 | 先发依赖 | `dependency_missing` |
+| 上游源码站不可达（重试 3 次 >30 分钟） | 环境外部因素 | `dependency_missing`（R41 止损） |
+
+## 2. 标记必须附带的证据（缺一即被质疑）
+
+1. 检测器输出：`python3 knowledge/operations/pd-externals-ohos/scripts/pd_external_guard.py log <build.log>`
+   （`VERDICT=` 与命中行）；
+2. 干净环境（新建 `CONAN_HOME`、无下载缓存）的 `conan create` 失败日志尾巴；
+3. 已尝试的修复动作清单（策略 A/B/C 中哪些已试、各自的报错）；
+4. 语言/平台事实证据（如 `Makefile` 中 MAXMSP 分支的绝对行号）。
+
+## 3. notes.md 登记格式
+
+```markdown
+### 不可适配判定（<库> <版本>）
+- 判定：env_unsupported
+- 依据：<一行根因>
+- 证据：<检测器 VERDICT + 命中行> / <conan create 日志摘要> / <源码行号>
+- 已尝试：策略 A（CC=clang）→ …；策略 B（PDINCLUDEDIR）→ …
+- 关联知识：knowledge/operations/pd-externals-ohos/（pd 外部库适配类）
+```

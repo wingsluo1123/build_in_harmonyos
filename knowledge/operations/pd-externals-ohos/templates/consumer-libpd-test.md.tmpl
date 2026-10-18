@@ -1,0 +1,57 @@
+# Pd 外部对象的消费者测试规范（策略 C）
+
+> 适用：本 SKILL 覆盖的 Pd 外部库（产物是 `<name>.pd_linux`，由 Pd 宿主 dlopen，
+> 不是可链接库）。样例实现：`archives/p/pd-vbap/1.2.1/test_package/`。
+
+## 1. 为什么需要这一类测试
+
+外部对象的符号 `class_new` / `gensym` / `pd_error` / `outlet_new` … 全部由 Pd 引擎提供。
+因此**裸 dlopen 必然失败**（实测）：
+```
+OSError: Error relocating .../vbap.pd_linux: pd_error: symbol not found
+```
+合法的消费者只有两种：①真正的 Pd 宿主（`pd` 二进制）；②嵌入式引擎 `libpd`。
+本规范采用 ②（CI 可 headless 运行，且能断言 DSP 数值）。
+
+## 2. musl/OHOS 的符号作用域陷阱（本拓展新发现）
+
+`libpd.so` 的符号必须位于**进程全局符号域**，否则 dlopen 外部对象时报
+`Error relocating … pd_error: symbol not found`。实测三种形态：
+
+| 消费者形态 | 结果 | 结论 |
+|---|---|---|
+| 二进制链接 `-lpd`（libpd 作为 DT_NEEDED） | ❌ 外部对象加载失败 | musl 下 DT_NEEDED 不算 dlopen 的全局域 |
+| 运行时 `dlopen(libpd.so, RTLD_NOW\|RTLD_GLOBAL)` | ❌ 仍失败 | 已加载对象再次 dlopen 不会补登记为 global |
+| 运行步骤 `LD_PRELOAD=<libpd.so>`（+ 上述 dlopen） | ✅ 18/18 通过 | 等效于宿主自身的 `-rdynamic` |
+
+**推荐写法**：测试程序**不链接** libpd，运行时 `dlopen(libpd.so)` + `dlsym` 取 API，
+运行 e2e 二进制那一步注入 `LD_PRELOAD`。
+
+> ⚠️ 铁律边界：`LD_LIBRARY_PATH`/依赖库目录**只允许注入运行 e2e 二进制的那一步**，
+> 绝不能进入编译/链接子进程（会顶掉 SDK 自带库，lld 崩溃）。
+> `LD_PRELOAD` 只含单个 `libpd.so`，作用域更窄，同样只用于运行步。
+
+## 3. 测试用例必含（N≥1 完整消费者用例）
+
+1. **加载**：`dlopen(<ext>.pd_linux)` + `dlsym(<name>_setup)` + 调用 → 断言不崩且无 Pd 控制台报错；
+2. **实例化**：在消费者补丁里 `[<name>]` 能在 libpd 中成功创建（控制台无 `couldn't create`）；
+3. **契约**：调用对象方法/发送消息（如 vbap 的 `define_loudspeakers` + `bang`），
+   经 `[s <recv>]` → `libpd_bind(<recv>)` + `libpd_set_listhook` 收回结果；
+4. **数值断言**：对 DSP 输出做**可判定的**断言，不能只打印。样例（vbap）：
+   - 增益平方和 ≈ 1（能量守恒，容差 0.02）；
+   - 声像方位落入最近的扬声器（-45° → 0 号、+45° → 1 号、0° → 二者均分）；
+   - 5.1 配置下 0° 峰值落在中置扬声器；-135° 落在 0 号；
+5. **零 Pd 控制台错误**：printhook 里统计 `error` / `couldn't create` / `failed` 必须为 0。
+
+## 4. 环境要求
+
+- `TMPDIR` 必须可写（OHOS 目标机 `/tmp` 只读）；
+- 运行步：`LD_LIBRARY_PATH=<libpd 包>/lib`、`LD_PRELOAD=<libpd 包>/lib/libpd.so`；
+- 补丁里的 `[<name>]` 与产物须能被宿主搜索到（Pd 优先搜补丁自身目录，
+  样例做法：把 `.pd_linux` 与 `*.pd` 放在同一目录 / 用 `pd -path`）。
+
+## 5. 上游测试与鸿蒙测试的关系
+
+上游 `unittests/*.pd` 依赖 `testtools/unit-test-frame`（puredata 包**不**分发该目录）
+与 GUI 宿主，CI 无 → 如实登记为「不可运行 + 具体技术原因」；
+鸿蒙侧补的即本规范的 libpd 消费者测试（可 headless、可断言数值）。
