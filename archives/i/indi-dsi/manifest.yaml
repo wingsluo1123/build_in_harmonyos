@@ -1,0 +1,33 @@
+# 软件级 manifest — indi-dsi
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: indi-dsi
+display: "INDI Meade DSI Driver"
+description: "INDI 天文框架的 Meade DSI/DSI II/DSI III 相机驱动（C++ 可执行程序，USB bulk 协议，libusb-1.0 直连）"
+category: library
+homepage: "https://github.com/indilib/indi-3rdparty"
+license: LGPL-2.1-or-later
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "E092：CMake 不识别 HarmonyOS → 强制 CMAKE_SYSTEM_NAME=Linux（同 libindi 配方）"
+    - "上游 cmake_minimum_required(VERSION 3.0) → 注入 cache 变量 CMAKE_POLICY_VERSION_MINIMUM=3.5"
+    - "OHOS libc++：C++ 驱动目标需链接 c++/c++abi（见 package_info system_libs）"
+    - "libindi 未安装 INDIConfig.cmake → 用驱动自带 FindINDI.cmake，配方注入 INDI_INCLUDE_DIR/INDI_ROOT"
+    - "FindCFITSIO 双注入短路；OHOS cfitsio 为静态库且引 zlib 符号 → libz.a 追加进 CFITSIO_LIBRARIES 保链接序"
+    - "FindUSB1 预置 USB1_INCLUDE_DIR（include/libusb-1.0 子目录）+USB1_LIBRARY；DsiDevice.h 带前缀引用 <libusb-1.0/libusb.h> → extra_cxxflags -I 注入包 include 根"
+    - "快照以绝对路径安装 udev 规则(/lib/udev/rules.d)与 fx2 固件(/lib/firmware) → 配方改写为包内 share/ 相对路径"
+    - "产出为可执行驱动（非库）且上游无测试 → test_package vendor Util.cpp 自研探测 tokenize_str（R34/R51）"
+  common_dependencies:
+    - libindi
+    - cfitsio
+    - libusb
+    - zlib
+
+versions:
+  "0.4-20221223123028":
+    status: built
+    build_date: "2026-10-14"
+    conan_ref: "indi-dsi/0.4-20221223123028"
+    note: "INDI Meade DSI 相机驱动（CMake，USB/libusb，依赖全已在制品仓）"

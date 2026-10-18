@@ -1,0 +1,21 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 5924d1d..1df0a9a 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -8,8 +8,16 @@ include(GNUInstallDirs)
+ IF(APPLE)
+ set(FIRMWARE_INSTALL_DIR "/usr/local/lib/indi/DriverSupport/dsi")
+ ELSE(APPLE)
++# Guarded: a plain set() here would shadow the non-FORCE cache variables
++# injected by conan_toolchain.cmake (RULES_INSTALL_DIR/FIRMWARE_INSTALL_DIR
++# -> package-relative share/ paths); only fall back to the absolute system
++# defaults when nothing was injected.
++if(NOT DEFINED RULES_INSTALL_DIR)
+ set(RULES_INSTALL_DIR "/lib/udev/rules.d")
++endif()
++if(NOT DEFINED FIRMWARE_INSTALL_DIR)
+ set(FIRMWARE_INSTALL_DIR "/lib/firmware")
++endif()
+ ENDIF()
+ set (DSI_VERSION_MAJOR 0)
+ set (DSI_VERSION_MINOR 4)
