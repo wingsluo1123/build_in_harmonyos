@@ -1,0 +1,128 @@
+--- a/src/mainwindow.cpp
++++ b/src/mainwindow.cpp
+@@ -9,22 +9,24 @@
+ #include <QActionGroup>
+ #include <QDebug>
+ #include <QDir>
+ #include <QFileDialog>
+ #include <QFileInfo>
+ #include <QHBoxLayout>
+ #include <QInputDialog>
+ #include <QLabel>
+ #include <QMenu>
+ #include <QPointer>
++#ifdef KTURTLE_HAVE_PRINTSUPPORT
+ #include <QPrintDialog>
+ #include <QPrinter>
++#endif
+ #include <QSaveFile>
+ #include <QStackedWidget>
+ #include <QStandardPaths>
+ #include <QStatusBar>
+ #include <QTimer>
+ 
+ #include "interpreter/errormsg.h"
+ #include "interpreter/translator.h"
+ #include <KActionCollection>
+ #include <KConfigGroup>
+@@ -82,42 +84,46 @@
+     if (editor->maybeSave()) {
+         event->accept();
+         writeConfig();
+     } else {
+         event->ignore();
+     }
+ }
+ 
+ void MainWindow::filePrintDialog()
+ {
++#ifdef KTURTLE_HAVE_PRINTSUPPORT
+     QPrinter printer;
+     QPointer<QPrintDialog> printDialog = new QPrintDialog(&printer, this);
+     if (printDialog->exec()) {
+         QPainter painter;
+         painter.begin(&printer);
+         editor->document()->drawContents(&painter);
+         painter.end();
+     }
+     delete printDialog;
++#endif
+ }
+ 
+ void MainWindow::canvasPrintDialog()
+ {
++#ifdef KTURTLE_HAVE_PRINTSUPPORT
+     QPrinter printer;
+     QPointer<QPrintDialog> printDialog = new QPrintDialog(&printer, this);
+     if (printDialog->exec()) {
+         QPainter painter;
+         painter.begin(&printer);
+         canvas->scene()->render(&painter);
+         painter.end();
+     }
+     delete printDialog;
++#endif
+ }
+ 
+ void MainWindow::showDirectionDialog()
+ {
+     directionDialog = new DirectionDialog(canvas->turtleAngle(), this);
+     connect(directionDialog, &DirectionDialog::pasteText, editor, &Editor::insertPlainText);
+ }
+ void MainWindow::showColorPicker()
+ {
+     if (!colorPicker) {
+@@ -211,23 +217,25 @@
+     a = actionCollection()->addAction(KStandardAction::SaveAs, QStringLiteral("file_save_as"), editor, SLOT(saveFileAs()));
+     a->setStatusTip(i18n("Save the current file under a different name"));
+     a->setWhatsThis(i18n("Save File As: Save the current file under a different name"));
+ 
+     exportToHtmlAct = actionCollection()->addAction(QStringLiteral("file_export_to_html"));
+     exportToHtmlAct->setText(i18n("Export to &HTML..."));
+     exportToHtmlAct->setStatusTip(i18n("Export the contents of the editor as HTML"));
+     exportToHtmlAct->setWhatsThis(i18n("Export to HTML: Export the contents of the editor as HTML"));
+     connect(exportToHtmlAct, &QAction::triggered, this, &MainWindow::exportToHtml);
+ 
++#ifdef KTURTLE_HAVE_PRINTSUPPORT
+     a = actionCollection()->addAction(KStandardAction::Print, QStringLiteral("file_print"), this, SLOT(filePrintDialog()));
+     a->setStatusTip(i18n("Print the code"));
+     a->setWhatsThis(i18n("Print: Print the code"));
++#endif
+ 
+     a = actionCollection()->addAction(KStandardAction::Quit, QStringLiteral("file_quit"), this, SLOT(close()));
+     a->setStatusTip(i18n("Quit KTurtle"));
+     a->setWhatsThis(i18n("Quit: Quit KTurtle"));
+ 
+     // Edit menu actions
+     a = KStandardAction::undo(editor->view(), SLOT(undo()), ac);
+     a->setStatusTip(i18n("Undo a change in the editor"));
+     a->setWhatsThis(i18n("Undo: Undo a change in the editor"));
+     a->setEnabled(false);
+@@ -292,25 +300,27 @@
+     exportToPngAct->setStatusTip(i18n("Export the current canvas to a PNG raster image"));
+     exportToPngAct->setWhatsThis(i18n("Export to PNG: Export the current canvas to a PNG raster image"));
+     connect(exportToPngAct, &QAction::triggered, this, &MainWindow::exportToPng);
+ 
+     exportToSvgAct = actionCollection()->addAction(QStringLiteral("canvas_export_to_svg"));
+     exportToSvgAct->setText(i18n("Export to &Drawing (SVG)..."));
+     exportToSvgAct->setStatusTip(i18n("Export the current canvas to Scalable Vector Graphics"));
+     exportToSvgAct->setWhatsThis(i18n("Export to SVG: Export the current canvas to Scalable Vector Graphics"));
+     connect(exportToSvgAct, &QAction::triggered, this, &MainWindow::exportToSvg);
+ 
++#ifdef KTURTLE_HAVE_PRINTSUPPORT
+     printCanvasAct = new QAction(QIcon::fromTheme(QStringLiteral("document-print")), i18n("&Print Canvas..."), this);
+     actionCollection()->addAction(QStringLiteral("canvas_print"), printCanvasAct);
+     printCanvasAct->setStatusTip(i18n("Print the canvas"));
+     printCanvasAct->setWhatsThis(i18n("Print: Print the canvas"));
+     connect(printCanvasAct, &QAction::triggered, this, &MainWindow::canvasPrintDialog);
++#endif
+ 
+     // Run menu actions
+     runAct = new QAction(QIcon::fromTheme(QStringLiteral("media-playback-start")), i18n("&Run"), this);
+     actionCollection()->addAction(QStringLiteral("run"), runAct);
+     actionCollection()->setDefaultShortcut(runAct, QKeySequence(Qt::Key_F5));
+     runAct->setStatusTip(i18n("Execute the program"));
+     runAct->setWhatsThis(i18n("Run: Execute the program"));
+     connect(runAct, &QAction::triggered, this, &MainWindow::run);
+ 
+     pauseAct = new QAction(QIcon::fromTheme(QStringLiteral("media-playback-pause")), i18n("&Pause"), this);
