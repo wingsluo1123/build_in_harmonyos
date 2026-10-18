@@ -1,0 +1,36 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: pixelize/2.0.0-git20220108.d1f9da9
+homepage: "https://github.com/jcdubois/pixelize"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+# 上游 pixelize d1f9da9 无自动化测试套件：Makefile 只有
+# all/make_db/pixelize/obj/depend/clean 目标，无 check/TESTS；快照 54 个
+# 文件中无任何 test_*.{c,h}；无 .github/.gitlab-ci 等测试配置。
+# R51 清点证据：
+#   - Makefile 目标清点：all/make_db/pixelize/obj/%.o/depend/
+#     include/pixelize_model.h/clean/obj，无 check/test 目标
+#   - ls src/：17 个 .c + 16 个 .h，无 test 文件
+#   - 无 tests/ 目录、无 CI 配置、无测试脚本
+upstream_tests: []
+
+# test_package 中自带的测试（消费者视角验证，真实执行两二进制）
+test_package_tests:
+  - file: test.sh
+    description: "消费者测试：真实运行 pixelize + make_db——① pixelize --help（GOption 在显示初始化前处理 --help，rc=0 + usage 含 [image_file]）② make_db --help（rc=0 + usage 含 [FILE...]）③④ 未知选项负向（GOption 拒绝 → main() else 分支 Error: in parameters + exit(1)）⑤⑥ 无显示环境启动负向（broadway 后端无 broadwayd → gtk_init_with_args 显示打开失败 → 同一 else 分支 exit(1)，almanah/0.12.4 同款无头断言，同时证明 gtk/glib/gdk-pixbuf/pango/cairo 动态链接链完整解析）；conanfile.py 另有 ELF e_machine 门禁（两二进制必须为 aarch64 ELF，对应 settings arch=armv8）；执行模型按产物 ELF e_machine 判定：交叉开发机 qemu-aarch64 -L /opt/ohos-guest -E LD_PRELOAD=fortify/compat shims（libchkfcnshim/libmemchrchkshim/libpcmchkshim/libarc4shim，冒号分隔，musl ldso 语法——产物与 gtk/pango/cairo/expat 依赖链引用 __*_chk 与 arc4random* 符号，上游 musl 无）仿真，CI OHOS worker 原生直跑（vimpc/musicpc/tasksh/array-hash 同款）"
+    command: "sh test.sh <pixelize-bin> <make_db-bin>"
+
+# 测试用例数与断言数（test.sh 实际统计：6 个 ok() 断言 +
+# conanfile.py 1 个 ELF e_machine 门禁）
+case_count: 7
+assertion_count: 7
