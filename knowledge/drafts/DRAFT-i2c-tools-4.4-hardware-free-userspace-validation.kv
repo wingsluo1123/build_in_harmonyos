@@ -1,0 +1,27 @@
+id:                     DRAFT-i2c-tools-4.4-hardware-free-userspace-validation
+trigger_tool:           i2c-tools|conan create|test_package
+phase:                  testing
+error_signature:        I2C bus out of range|ioctl.*EBADF|no upstream test/check target
+severity:               2
+category:               ohos, linux-kernel-uapi, i2c, testing, hardware-free
+match_keywords:         /dev/i2c-*, I2C_SMBUS, ioctl, i2c-stub, no hardware, hardware-free CLI checks, invalid fd, no test target, parser boundary, bus access
+title:                  Linux I2C userspace package 在没有真实适配器时：分离无硬件契约检查与总线事务，避免把缺失硬件伪报为测试通过
+root_cause:             Linux I2C 用户态工具把输入解析、设备枚举、打开 /dev/i2c-* 与 ioctl 事务串在一条命令路径中；无真实适配器时，安全的版本信息、列表和参数拒绝路径仍可验证，但扫描与 SMBus/I2C 事务需要 adapter。上游没有测试源或 check/test 目标，因此必须区分“上游无测试”与“上游测试通过”，并为消费者接口补足可重复检查。
+affected_scope:         直接使用 Linux I2C/SMBus UAPI、/dev/i2c-* 或 ioctl 的用户态库和工具，在没有真实 I2C 设备、但需要做可审计构建/消费者验证的 Linux、HarmonyOS 或其他嵌入式环境。此条不证明任何物理总线、设备功能或内核驱动兼容性。
+verification_cmd:       make -n check; make -n test; find . -path '*test*' -type f; i2cdetect -V; i2cdetect -l; i2cdetect 1048576; i2cget 1048576 0x50; compile a libi2c consumer that calls i2c_smbus_read_byte(-1)
+rec_priority:           1
+rec_approach:           separate hardware-free contracts from bus transactions and report upstream test absence explicitly
+rec_description:        1) audit the exact release tree for test sources and check/test targets; zero findings means upstream denominator 0, not a passing executed suite; 2) run deterministic CLI contracts that exit before opening a bus (version, listing, invalid bus range); 3) link a real consumer against packaged libi2c and verify documented ioctl error propagation with an invalid descriptor; 4) never count build steps as tests or report hardware paths as covered; 5) exercise transactions only when a real adapter or intentionally provisioned i2c-stub exists, recording that setup separately.
+rec_command:            inventory the release Makefile and tree; run only safe CLI checks and invalid-fd consumer checks; log upstream 0/0 separately from the consumer test count; do not invoke scanning or device transactions without an adapter
+rec_auto_fix:           false
+similar_to:             E1064 (resource-unavailable negative-path boundary; different I2C mechanism)
+caused_by:
+conflicts_with:
+doc_file:               knowledge/drafts/DRAFT-i2c-tools-4.4-hardware-free-userspace-validation.md
+last_updated:           2026-10-17
+source_event:           i2c-tools v4.4 HarmonyOS PC adapter task #15486; hardware-free validation boundary audit
+authors:                iKalous_OscarP <328>
+source_pr:
+source_commit:
+draft: true
+contributor_id:         328
