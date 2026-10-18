@@ -1,0 +1,63 @@
+version: "1.2"
+
+software: "lugaru"
+
+# Conan 引用（供下游与脚本按需精确引用）
+conan_reference: "lugaru/1.2"
+
+status: built
+
+build_date: "2026-10-18"
+build_system: "cmake"
+
+source:
+  url: "https://gitlab.com/osslugaru/lugaru/-/archive/1.2/lugaru-1.2.tar.gz"
+  sha256: "6e2acc14d62f2bf6b329ddbed8d50d1428ae159b986be1d7833c004a7bfa5a9f"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  toolchain: "conan CMakeToolchain + 显式 seed 上游遗留变量（OPENAL_LIBRARY / PNG_LIBRARY / JPEG_LIBRARY / ZLIB_LIBRARY / SDL2_LIBRARIES / OPENGL_gl_LIBRARY / OPENGL_glu_LIBRARY / OGG_LIBRARY / VORBIS{,FILE,ENC}_LIBRARY + 各自 INCLUDE_DIR）"
+  configure_options:
+    - "-DSYSTEM_INSTALL=OFF"
+    - "-DOPENGL_gl_LIBRARY=<gl4es>/lib/libGL.so（固定管线 GL 1.x over GLES）"
+    - "-DOPENGL_glu_LIBRARY=<glu>/lib/libGLU.so（gluPerspective）"
+    - "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+    - "PKG_CONFIG_PATH=<generators>（pkg_check_modules(SDL2 sdl2 REQUIRED)）"
+  dependencies:
+    - zlib/1.3.1.1
+    - libpng/1.6.58
+    - libjpeg-turbo/3.2.0
+    - libogg/1.3.6
+    - libvorbis/1.3.7
+    - openal/1.25.2
+    - sdl2/2.30.10
+    - gl4es/1.1.6
+    - glu/9.0.3
+    - mesa/24.3.4.1 (glu/9.0.3 的传递依赖：cpp_info.requires=["mesa::mesa"])
+    - pkgconf/3.0.6 (tool_requires)
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-cmake-ohos-compat.patch"
+
+knowledge_gained:
+  # 每条均为「模式 + ref 引用」，ref 指向知识图谱条目 / 仓库既有先例 / 上游源码位置。
+  - "OpenGL 提供者选型判据：先数源码里的 GL 入口类型再决定栈——lugaru 是纯固定管线（glBegin/glEnd/glMatrixMode/glVertex3f/glOrtho 等，Source/Graphic/gamegl.hpp），GLESv2/EGL 没有这些入口，必须走 gl4es/1.1.6（libGL.so）；astromenace/1.3.2 的 GLESv2 直连之所以成立，是因为它自带 gles_compat.cpp 垫片。reference: archives/a/astromenace/1.3.2/conanfile.py:409-449, archives/c/critter/2.0.4/conanfile.py:322-323"
+  - "glu/9.0.3 通过 cpp_info.requires=[\"mesa::mesa\"] 传递引入 mesa/24.3.4.1（OpenGL 实现面）；实测**显式** requires mesa/24.3.4.1.1.1 反而解不出（其 X11 闭包含 libxrender/0.9.12，ohpcd 无该配置二进制）⇒ 走 glu 的传递版本即可，不要手工钉 24.3.4.1.1.1。reference: archives/g/glu/9.0.3/conanfile.py package_info()"
+  - "gl4es 的 libGL.so **不导出 GLU**（实测 llvm-nm -D：45 个 glu* 命中全是 glUniform*，gluPerspective 缺失），但它随包安装 include/GL/glu.h 头文件 ⇒ 头能编、链接必炸。必须另加 glu/9.0.3（libGLU.so 实测导出 gluPerspective/gluLookAt）并把 ${OPENGL_glu_LIBRARY} 显式接进链接行（patch 0001）。reference: /tmp/ch/home-zhuli7-lugaru/p/gl4es*/p/include/GL/glu.h 与 glu*/p/lib/libGLU.so"
+  - "CMake 4.x 与 2017 年代工程的组合坑：cmake_minimum_required(VERSION 3.0) 直接硬错；`set(CMAKE_CXX_FLAGS \"... --std=gnu++11 ${CMAKE_CXX_FLAGS}\")` 这种**前置拼接**会被 profile 的 -std=gnu++17 覆盖，而 `register` 关键字在 C++17 已被删除（clang 实测 error: ISO C++17 does not allow 'register' storage class specifier）。修法是反转拼接顺序让上游声明的 gnu++11 落最后。reference: patches/0001-cmake-ohos-compat.patch, Source/Math/XYZ.hpp:58,206"
+  - "CMakeDeps 只产出现代 IMPORTED target，而上游根 CMakeLists 消费的是 Find 模块留下的遗留变量（${OPENAL_LIBRARY}/${PNG_LIBRARY}/${JPEG_LIBRARY}/${ZLIB_LIBRARIES}/${SDL2_LIBRARIES}/${OPENGL_LIBRARIES}/${OGG_LIBRARY}/${VORBISFILE_LIBRARY}）⇒ configure 前必须逐个 -D 播种（先用 find_library/find_path 实测确认包内真实文件名）。reference: 本包 conanfile.py _cmake_args()"
+  - "libpng 的头在 include/libpng16/png.h、SDL2 的头在 include/SDL2/SDL.h ⇒ 只把依赖的 include/ 根加进编译行仍会 `png.h not found`，要按 header 实际所在目录补 -I（本包 _header_dir() 递归定位）。reference: 本包 conanfile.py _include_dirs()"
+  - "上游 CMake/Modules/FindOggVorbis.cmake 用 find_library(OGG/VORBIS/VORBISFILE/VORBISENC)+find_path(VORBIS_INCLUDE_DIR/OGG_INCLUDE_DIR)，且 FOUND 判定缺一不可（REQUIRED 会 FATAL_ERROR）⇒ 四个库变量与两个头目录都要播种。reference: 上游 CMake/Modules/FindOggVorbis.cmake"
+  - "应用的可执行文件与资源必须同目录：lugaru 以 DATA_DIR=\"Data\"（相对工作目录）找资源（Source/Utils/Folders.hpp:26-27、Folders.cpp:39），上游 install(DIRECTORY Data DESTINATION ${CMAKE_INSTALL_PREFIX}) 正是这个布局 ⇒ package() 落 bin/lugaru + bin/Data/。reference: 上游 CMakeLists.txt:316-317"
+  - "上游 install() 规则在 SYSTEM_INSTALL=OFF 时把可执行文件装到 prefix 根（不是 bin/）且会 add_definitions(-DDATA_DIR=绝对路径)，对 Conan 包不适用 ⇒ 用 package() 手工摆布局更可控（critter/2.0.4 同款）。reference: 上游 CMakeLists.txt:303-319"
+  - "无显示设备的真实可测面：main.cpp 在任何 SDL 初始化之前就打印版本横幅并处理 --version/--help（选项解析错误返回 1）⇒ 消费者测试可在无 GPU/合成器环境下真实执行并断言退出码与文案，而不必伪造“运行通过”。reference: 上游 Source/main.cpp:624-652"
+  - "gl4es 的 GL/gl.h 只在 __EMSCRIPTEN__/__APPLE__ 下开 GL_GLEXT_PROTOTYPES——lugaru 自己在 gamegl.hpp:380 **先** #define 了它再 include <GL/gl.h>，因此不触发该坑（同族对照 critter/2.0.4 与草稿 E702）。reference: 上游 Source/Graphic/gamegl.hpp:380-389"
+  - "上游测试面审计结论：顶层与 CMake/Modules 无 enable_testing()/add_test()，全仓无 *test* 文件，.gitlab-ci.yml 只有 build_gcc/build_clang 两个构建 stage ⇒ 属「上游无测试用例」，需下游补消费者测试并真实执行。ref: 本包 test_package/MANIFEST.yml"
+
+verification:
+  conan_create: "conan create archives/l/lugaru/1.2 -pr:h=./ci/conan/profiles/ohos-aarch64 -pr:b=./ci/conan/profiles/ohos-aarch64 --build=lugaru/*"
+  result: "PASS — 6 用例 / 24 项断言，通过 24、失败 0"
+  artifact: "bin/lugaru — ELF64 LSB AArch64 (e_machine=183), ET_DYN(PIE), PT_INTERP=/lib/ld-musl-aarch64.so.1"
