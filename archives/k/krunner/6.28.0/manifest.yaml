@@ -1,0 +1,106 @@
+# 版本级 manifest
+# 文件位置: archives/k/krunner/6.28.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "6.28.0"
+
+# 软件名
+software: "krunner"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-16"
+build_system: "cmake"
+
+# Conan 引用
+conan_ref: "krunner/6.28.0"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://download.kde.org/stable/frameworks/6.28/krunner-6.28.0.tar.xz"
+  sha256: "c4c1fccbe6e04acc8d5891df4eca20a4b6be24c032a10e92839a41c1bb847cc4"
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+
+  configure_options:
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DBUILD_TESTING=ON"
+    - "-DKF_IGNORE_PLATFORM_CHECK=TRUE"
+    - "-DCMAKE_CXX_STANDARD=20"
+    - "-DCMAKE_CXX_STANDARD_REQUIRED=ON"
+    - "-DECM_MODULE_PATH=<ecm>/share/ECM/{modules,find-modules,kde-modules}"
+  # 不设 CMAKE_SHARED_LIBRARY_SONAME flags：真机 /storage 禁 symlink，
+  # 版本化 .so 符号链创建必 EPERM；DT_SONAME 由补丁 0002 在平台无
+  # soname flag 时直传 -Wl,-soname,libKF6Runner.so
+
+  dependencies:
+    - "qtbase/6.11.1"
+    - "qtbase-sql-dbus/6.11.1"
+    - "kconfig/6.26.0.1"
+    - "kcoreaddons/6.26.0.1"
+    - "ki18n/6.26.0"
+    - "kitemmodels/6.26.0"
+    - "kwindowsystem/6.26.0.1"
+    - "extra-cmake-modules/6.29.0"
+    - "dbus/1.14.10.3"
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-lower-kf-dep-version.patch"
+  - "0002-ohos-basename-soname-link.patch"
+  - "0003-ohos-optional-kwaylandextras.patch"
+  - "0004-ohos-libcxx-ranges-compat.patch"
+  - "0005-test-dbusplugins-fixtures.patch"
+  - "0006-test-dbusplugins-plain-copy.patch"
+
+# ============================================================
+# 测试信息
+# ============================================================
+
+upstream_tests:
+  framework: "ctest"
+  test_targets: 7
+  test_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error --timeout 300"
+  run_in_build: true
+upstream_test_pass_rate: "7/7（真机执行全部通过；会话总线由配方 _start_session_bus 自起——unix EXTERNAL + getpwuid shim，逐条口径见 notes.md 与 test_package/MANIFEST.yml）"
+adapted_test_pass_rate: "45/45（真机：消费者 E2E 23/23 + OHOS 制品检查 22/22；conan-verify 八门禁 Verdict PASS）"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "QFile::copy() 的 Qt 6 实现走 QSaveFile 临时文件 + rename：在本 CI 镜像上即使目标目录刚创建且可写、fixture 源文件存在，两次复制仍静默返回 false（上游丢弃返回值的写法只会留下 0-vs-1）；绕过该路径、用 QFile 读写直拷并在每条失败路径打印 errorString，是可诊断且可用的 fixture 安装法"
+  - "QFile::copy() 目标已存在时返回 false 且不覆盖：上游 autotest 丢弃返回值时，复用的 XDG_DATA_HOME 会让 fixture 安装静默变成 no-op，下游断言只剩 0-vs-1 的不明所以；安装 fixture 应先去旧文件、断言两次复制、把目录清单/复制源与结果/QStandardPaths 数据位置/元数据 offer 列表 dump 进日志"
+  - "KWaylandExtras 头只在 kwindowsystem 带 Wayland 支持构建时发布；消费侧以 __has_include 能力探测（C++17 原生特性、无平台宏）编译出运行时本就由 KWindowSystem::isPlatformWayland() 门控的激活令牌块，其余环境保持上游行为"
+  - "libc++ 15 默认 _LIBCPP_HAS_NO_INCOMPLETE_RANGES：std::ranges 算法在 -std=c++20 下也不解析；解锁须 -D_LIBCPP_ENABLE_EXPERIMENTAL（全树翻转实验库行为），全树唯一用法改写为语义等价的 std::all_of 迭代器对重载更小更稳"
+  - "KPluginMetaData(const QString&) 是 QPluginLoader 插件语义：对普通 JSON 元数据文件 valid=0、pluginId 回退为文件名 stem、name 空；非插件来源元数据必须走 KPluginMetaData(QJsonObject, fileName) ctor（6.0 起）"
+  - "QueryMatch::setId 组合为 <runnerId>_<id> 保 match id 跨 runner 全局唯一，除非 runner 元数据顶层声明 X-Plasma-Runner-Unique-Results: true（AbstractRunnerPrivate::hasUniqueResults 读取）"
+  - "发布的 KF6 库无 DT_SONAME（targets 带 IMPORTED_NO_SONAME=TRUE）→ 按绝对缓存路径链接把机器私有路径烧进 DT_NEEDED（E537）；lld 按命令行原样记录名字 → -l:<basename> + target_link_directories 是可重定位链接的解；Qt6 库有真 SONAME 可留导入目标"
+  - "KDE 安装的 targets 文件只设 per-config IMPORTED_LOCATION_RELEASE，且 get_target_property 未设置时返回非空 -NOTFOUND 哨兵串——每个查找必须哨兵门（朴素 if(NOT var) 会把哨兵误判为已设置）"
+  - "4 个上游 autotest（经 krunner_configure_test 挂 testremoterunner D-Bus helper）需要活的会话总线：配方自起 dbus-daemon 时须把自身包 lib 目录钉在 LD_LIBRARY_PATH 首位（先于 DT_RUNPATH 被搜索），否则环境里另一份缺符号的 libdbus-1.so.3 会先被选走、daemon 在打印地址前即死于重定位错误"
+  - "test-shim 源（getpwuid_r 覆写）经 export_sources 导出时须用 shutil.copytree 落单层（tools.files.copy 会把匹配项相对 src 的路径一并保留、多嵌一层目录），编译侧按 source_folder / export_sources_folder / recipe_folder 三基查找：缓存构建的 recipe_folder 只有 conanfile 本身，缺 shim 时静默返回等于整条 unix 总线路径失效"
+  - "起不了会话总线的环境仍保留 warn+waiver 保底（kdbusaddons 先例）：3 个非总线套件必须通过、4 个总线套件失败仅告警不失败，不阻塞构建"

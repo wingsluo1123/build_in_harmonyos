@@ -1,0 +1,29 @@
+diff --git a/autotests/threadingtest.cpp b/autotests/threadingtest.cpp
+index add48ee8c10347692ffb041cd240b6956a51ab62..27179078c14d31c80e387873a827fc2f8522df9e 100644
+--- a/autotests/threadingtest.cpp
++++ b/autotests/threadingtest.cpp
+@@ -5,6 +5,7 @@
+ #include <KRunner/AbstractRunnerTest>
+ #include <KRunner/RunnerManager>
+ #include <QTest>
++#include <algorithm>
+ #include <memory>
+ 
+ using namespace KRunner;
+@@ -39,7 +40,15 @@
+ 
+         const auto matches = manager->matches();
+         QCOMPARE(matches.size(), 2);
+-        QVERIFY(std::ranges::all_of(matches, [this](QueryMatch m) {
++        // libc++ 15 (the OHOS SDK C++ library) ships the ranges
++        // algorithms disabled by default
++        // (_LIBCPP_HAS_NO_INCOMPLETE_RANGES), so std::ranges::all_of does
++        // not resolve even under -std=c++20; enabling them takes
++        // -D_LIBCPP_ENABLE_EXPERIMENTAL, which flips experimental
++        // standard-library behaviour tree-wide. This is the tree's only
++        // ranges use, and std::all_of is the semantically identical
++        // short-circuiting algorithm every standard library provides.
++        QVERIFY(std::all_of(matches.cbegin(), matches.cend(), [this](QueryMatch m) {
+             return m.runner() == fakeRunner;
+         }));
+ 

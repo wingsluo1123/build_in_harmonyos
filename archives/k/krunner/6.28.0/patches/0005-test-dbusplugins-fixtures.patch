@@ -1,0 +1,46 @@
+--- a/autotests/runnermanagersinglerunnermodetest.cpp
++++ b/autotests/runnermanagersinglerunnermodetest.cpp
+@@ -8,6 +8,7 @@
+ #include <KConfigGroup>
+ #include <KSharedConfig>
+ #include <QCoreApplication>
++#include <QDebug>
+ #include <QObject>
+ #include <QProcess>
+ #include <QStandardPaths>
+@@ -92,11 +93,32 @@
+     manager = std::make_unique<RunnerManager>(config->group("Plugins"), config->group("State"), this);
+     // Ensure no system runners are picked up
+     manager->setAllowedRunners(QStringList{"dbusrunnertest", "dbusrunnertestmulti"});
+-    // Copy the service files to the appropriate location and only load runners from there
++    // Copy the service files to the appropriate location and only load runners from there.
++    // QFile::copy() refuses to overwrite an existing destination, so drop stale copies
++    // first and assert both copies: silently continuing with a missing or outdated
++    // service file turns the runner-count check into an unexplainable failure.
+     QString location = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/krunner/dbusplugins/";
+     QDir().mkpath(location);
+-    QFile::copy(QFINDTESTDATA("plugins/dbusrunnertest.desktop"), location + "dbusrunnertest.desktop");
+-    QFile::copy(QFINDTESTDATA("plugins/dbusrunnertestmulti.desktop"), location + "dbusrunnertestmulti.desktop");
++    const QString testDesktop = QFINDTESTDATA("plugins/dbusrunnertest.desktop");
++    const QString multiDesktop = QFINDTESTDATA("plugins/dbusrunnertestmulti.desktop");
++    QFile::remove(location + "dbusrunnertest.desktop");
++    QFile::remove(location + "dbusrunnertestmulti.desktop");
++    const bool copiedTest = QFile::copy(testDesktop, location + "dbusrunnertest.desktop");
++    const bool copiedMulti = QFile::copy(multiDesktop, location + "dbusrunnertestmulti.desktop");
++    QStringList offeredRunnerIds;
++    const auto offeredMetaData = RunnerManager::runnerMetaDataList();
++    for (const KPluginMetaData &metaData : offeredMetaData) {
++        offeredRunnerIds << metaData.pluginId();
++    }
++    qWarning() << "runner dbusplugins fixtures:"
++               << "location" << location
++               << "entries" << QDir(location).entryList()
++               << "sources" << testDesktop << multiDesktop
++               << "copied" << copiedTest << copiedMulti
++               << "genericDataLocations" << QStandardPaths::standardLocations(QStandardPaths::GenericDataLocation)
++               << "offeredRunnerIds" << offeredRunnerIds;
++    QVERIFY(copiedTest);
++    QVERIFY(copiedMulti);
+ 
+     // Only enabled runner should be loaded and have results
+     auto matches = launchQuery("foo");

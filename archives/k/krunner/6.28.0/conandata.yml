@@ -1,0 +1,29 @@
+# conandata.yml — krunner 6.28.0
+# sha256 verified against the official KDE tarball: the value was fetched
+# from the download.kde.org .sha256 sidecar and matches the tarball fetched
+# through the NJU mirror (135020 bytes, HTTP 200).
+
+sources:
+  url: "https://download.kde.org/stable/frameworks/6.28/krunner-6.28.0.tar.xz"
+  sha256: "c4c1fccbe6e04acc8d5891df4eca20a4b6be24c032a10e92839a41c1bb847cc4"
+
+patches:
+  "6.28.0":
+    - patch_file: "patches/0001-lower-kf-dep-version.patch"
+      patch_description: "KF_DEP_VERSION 6.28.0 -> 6.26.0: the ohpcd-published KF6 stack stops at 6.26.0 (kconfig/kcoreaddons fix releases 6.26.0.1); the find_package(ECM 6.28.0) line stays untouched because the extra-cmake-modules/6.29.0 tool package satisfies it"
+      patch_type: "portability"
+    - patch_file: "patches/0002-ohos-basename-soname-link.patch"
+      patch_description: "Relocatable basename SONAME linkage: the published KF6 libraries carry no DT_SONAME, so linking them by their absolute Conan cache paths bakes machine-private paths into DT_NEEDED (non-relocatable, E537). lld records the name as given on the command line, so the KF6 dependencies (CoreAddons/ConfigCore/I18n/ItemModels/WindowSystem -- exactly the components the sources consume) are linked by exact-file-name -l: flags (bare basenames) with the dependency directories attached PRIVATE to KF6Runner; the imported targets leave the link declaration except KF6::CoreAddons, which stays INTERFACE-only because the public headers (abstractrunner.h, runnermanager.h) include <KPluginFactory>/<KPluginMetaData> and the installed KF6RunnerConfig.cmake already find_dependency(KF6CoreAddons) from upstream -- it is exported by name, never by absolute path. Since the targets leave the link line, usage requirements are copied by walking the INTERFACE_LINK_LIBRARIES transitive closure of the direct deps, with -NOTFOUND sentinel guards on every get_target_property lookup (KDE targets files set IMPORTED_LOCATION_RELEASE only; kscreenlocker 6.7.2 0008 precedent, device-proven); KF6Runner additionally passes -Wl,-soname,libKF6Runner.so explicitly where the platform module defines no soname flag"
+      patch_type: "portability"
+    - patch_file: "patches/0003-ohos-optional-kwaylandextras.patch"
+      patch_description: "dbusrunner.cpp includes <KWaylandExtras> unconditionally, but the published kwindowsystem 6.26.0.1 package ships no such header: the KWaylandExtras activation-token API is only published when kwindowsystem is built with Wayland support. The consuming block is already gated on KWindowSystem::isPlatformWayland() at run time, so a __has_include capability probe (plain C++17 feature test, no platform macros) compiles the block out where the header is absent (KRUNNER_HAVE_KWAYLANDEXTRAS stays undefined) and keeps upstream behaviour everywhere else"
+      patch_type: "portability"
+    - patch_file: "patches/0004-ohos-libcxx-ranges-compat.patch"
+      patch_description: "autotests/threadingtest.cpp calls std::ranges::all_of, but the OHOS SDK libc++ ships the ranges algorithms disabled by default (_LIBCPP_HAS_NO_INCOMPLETE_RANGES): the call does not resolve even under -std=c++20 (device-verified with the SDK clang++), and enabling the algorithms would take -D_LIBCPP_ENABLE_EXPERIMENTAL, flipping experimental standard-library behaviour tree-wide. The tree has exactly one ranges use; std::all_of is the semantically identical short-circuiting iterator-pair algorithm every standard library provides, so the call is rewritten onto it and the file gains the <algorithm> include it previously relied on transitively"
+      patch_type: "portability"
+    - patch_file: "patches/0005-test-dbusplugins-fixtures.patch"
+      patch_description: "autotests/runnermanagersinglerunnermodetest.cpp testLoadingDisabledRunner() installs the two DBus-runner .desktop fixtures with bare QFile::copy() calls whose return value is discarded. QFile::copy() refuses to overwrite an existing destination, so in an environment with a reused XDG_DATA_HOME the install is a silent no-op and the following runner-count assertion fails as an opaque 0-vs-1 mismatch with no hint about which step went wrong. The block now removes stale destination files first, asserts both copies, and dumps the fixture directory listing, the copy sources and results, the QStandardPaths data locations and the metadata-offer list through qWarning so the ctest log shows exactly what the manager could see. Test-only: no library code is touched"
+      patch_type: "portability"
+    - patch_file: "patches/0006-test-dbusplugins-plain-copy.patch"
+      patch_description: "follow-up to 0005: the CI log shows both QFile::copy() calls of 0005 still returning false even though the destination directory was created and is writable, so the two fixtures never reach $XDG_DATA_HOME/krunner/dbusplugins and testLoadingDisabledRunner still ends in the opaque 0-vs-1. The QSaveFile temporary-file + rename path behind QFile::copy() fails silently in this environment; the fixtures are installed with a plain QFile read/write copy (source opened ReadOnly, destination WriteOnly|Truncate, short-write check) and every failure path prints the file error string. Assertions and query logic remain upstream. Test-only: no library code is touched"
+      patch_type: "portability"
