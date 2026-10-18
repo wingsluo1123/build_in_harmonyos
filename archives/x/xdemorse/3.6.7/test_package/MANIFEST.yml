@@ -1,0 +1,61 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本（build_and_test.sh L0e）强制要求此文件存在
+package: xdemorse/3.6.7
+homepage: "https://www.qsl.net/5b4az/pkg/morse/xdemorse/xdemorse.html"
+
+# ── 上游测试清点（R51 三步法 ①：枚举式，不用笼统话术）────────────────
+# 枚举上游 tarball（xdemorse-3.6.7）的全部顶层内容：
+#   .xdemorse/  ABOUT-NLS  AUTHORS  COPYING  ChangeLog  INSTALL  Makefile.am/.in  NEWS  README
+#   aclocal.m4  autogen.sh  compile  config.guess  config.h.in  config.rpath  config.sub
+#   configure  configure.ac  depcomp  doc/  files/  install-sh  m4/  missing  po/  src/
+# 逐条结论（可复核）：
+#   · **无 `tests/`、无 `test/` 目录**；
+#   · **`TESTS` / `check_PROGRAMS` / `check-local` 在各 `Makefile.am` 中命中 0**
+#     ⇒ **上游没有 `make check` 目标**（autotools 的标准测试钩子根本不存在）；
+#   · `configure.ac` 里只有 `AC_CONFIG_FILES([Makefile …])`，**无 `AC_CONFIG_TESTDIR`**；
+#   · `doc/`、`files/`、`.xdemorse/` 是**文档/UI 资源**，不是测试数据。
+#   ⇒ 注册测试、未注册测试程序、随附样例数据**三者均为 0**（逐项可复核，非话术）。
+
+# ── 实跑（R51 ②）──────────────────────────────────────────────────────
+upstream_check_command: >-
+  各 Makefile.am 里 TESTS/check_PROGRAMS/check-local 命中 0；无 tests/ 与 test/ 目录；
+  configure.ac 无 AC_CONFIG_TESTDIR
+upstream_test_in_build: false
+upstream_test_command: "(不适用：上游没有测试可跑)"
+upstream_test_declaration:
+  registered_ctest_cases: 0
+  unregistered_upstream_programs: 0
+  unregistered_sample_data: 0
+  executed: 0
+  passed: 0
+  reason: >-
+    上游不存在任何测试（注册/未注册都没有），剩下的只有**程序运行验证**；而它在本平台
+    跑不起来，给的是**代码级、可复核**的原因，不是"没试"：上游 `src/main.c` 第 **48 行**
+    先调 `gtk_init(&argc, &argv)`，直到第 **51 行**才 `getopt(argc, argv, "hv")` 解析
+    `-h/-v` ⇒ **任何命令行选项都需要显示环境**，连 `-v` 也无法在无显示会话里到达 ✗。
+  exemption: "不适用（N=0）"
+
+# ── 上游程序真跑尝试（rule4「能跑就必须跑」）──────────────────────────
+upstream_program_run:
+  command: "xdemorse -v   （在 test_package/test() 内、用本包依赖自身的 LD_LIBRARY_PATH 执行）"
+  attribution: "归因于**无显示**（gtk_init 失败）⇒ 记 **环境性 SKIP**"
+  skip_is_not_pass: true            # SKIP ≠ PASS：如实登记，绝不冒充通过
+  reason_code_level: "src/main.c:48 gtk_init(...) 早于 :51 getopt(...) ⇒ 选项解析在无显示时不可达"
+  failure_policy: "非显示原因的失败 ⇒ smoke.sh 直接非 0 退出（FAIL，不掩盖）"
+
+# ── 回填（R51 三步法 ③，如实）──────────────────────────────────────────
+upstream_test_result: >-
+  上游测试 = **0**（无 `tests/`、无 `make check` 钩子，逐项可复核）；程序运行验证
+  **结构性不可行**（代码级原因：`gtk_init` 先于 `getopt`）⇒ 记**环境性 SKIP**，
+  **不宣称**运行期可用。
+
+# ── 消费侧（本配方自己的验证）──────────────────────────────────────────
+consumer_test:
+  command: "conan test → test_package/smoke.sh：产物 + 动态依赖解析 + 真跑尝试（`-v`）"
+  assertions:
+    - "bin/xdemorse 存在且可执行"
+    - "动态依赖可解析（不出现 `Error loading shared library`）"
+    - "真跑 `-v` 按 rule4 分类：无显示 ⇒ SKIP（有据且不冒充通过）/ 其他失败 ⇒ FAIL"
+    - "OHOS 上该可执行含 .codesign/.note.ohos（E318 自签证据）"
+    - "licenses/ 非空"
