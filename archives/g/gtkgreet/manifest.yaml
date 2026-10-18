@@ -1,0 +1,33 @@
+# 软件级 manifest — gtkgreet
+software: gtkgreet
+display: "gtkgreet"
+description: "greetd 的 GTK 欢迎界面（greeter 客户端：会话列表 + 登录表单，经 greetd IPC 登录）"
+category: gui
+homepage: "https://sr.ht/~kennylevinsen/gtkgreet"
+license: GPL-3.0-or-later
+build_system: meson
+
+ohos_adaptation:
+  key_points:
+    - "greetd 不是本包的构建依赖：gtkgreet 自带 greetd IPC 协议实现（json-c 编解码 + AF_UNIX socket，gtkgreet/proto.c），源码不包含 greetd 头文件、不链接 greetd 库；构建期真依赖只有 gtk+-3.0 与 json-c，greetd 属运行期配套"
+    - "构建期工具链：本机 PATH 无 meson，故配方 tool_requires meson/1.11.0（制品仓已发布）；ninja 由构建环境提供"
+    - "meson i18n.gettext 在配置阶段即需 PATH 上有 msgfmt；gettext 位于 host requires 时其 bin 不进构建环境 PATH，故在 generate() 里把该包 bin 前置进 PATH，使 msgfmt 取自制品仓中为 OHOS 构建的那份"
+    - "上游 meson_options.txt 的 layershell 与 man-pages 默认 auto；制品仓暂无 gtk-layer-shell 与 scdoc，配方显式传 -Dlayershell=disabled -Dman-pages=disabled 固化行为"
+    - "制品仓 gtk/3.24.43 的 glib-2.0.pc 缺 -lintl（glib 2.84 的 g_libintl_* 符号在 libintl.so），在 generate() 中补入，避免链接期 undefined symbol"
+    - "上游 meson.build 设 werror=true，clang15 的 -Wextra 对 GOptionEntry 终止项 { NULL } 报 missing field 'short_name' initializer 并升级为硬错误；补丁 0001 补全该终止项全部字段（不全局压制告警）"
+    - "OHOS HMFS 上未签名 ELF 不可执行，package() 对 bin/ 逐个两轮 remove-section .codesign + selfSign"
+    - "软件级 commands.json 声明该 CLI 工具（R38）；R38 要求它位于 archives/<首字母>/<包名>/ 下而非版本目录内"
+    - "上游无测试套件（无 test/ 目录、无 meson test 用例），test_package 做产物级冒烟：校验 bin/gtkgreet 存在，并在非交叉构建时执行 --help 断言退出码 0"
+  common_dependencies:
+    - "gtk/3.24.43"
+    - "json-c/0.18"
+    - "gettext/0.22.5.1"
+    - "meson/1.11.0"
+
+versions:
+  "0.8":
+    status: built
+    build_date: "2026-10-16"
+    conan_ref: "gtkgreet/0.8"
+    source_url: "https://git.sr.ht/~kennylevinsen/gtkgreet/archive/0.8.tar.gz"
+    source_sha256: "e5c70219da191a60e2e009412603e05c36cee15bbbf7657dbbeaa1d21a692873"
