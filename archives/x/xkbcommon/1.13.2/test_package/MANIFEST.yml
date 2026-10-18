@@ -1,0 +1,40 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（L0e 要求）
+
+package: xkbcommon/1.13.2
+homepage: "https://github.com/xkbcommon/libxkbcommon"
+
+# 上游测试命令（meson test 注册的用例）
+upstream_check_command: "meson test"
+
+# conanfile.py build() 中是否已集成上游测试（本地验证阶段执行）
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（核心库，无需 x11/外部数据）
+upstream_tests:
+  - file: test/keymap.c
+    source: xkbcommon-1.13.2/test/keymap.c
+    description: "keymap 编译与查询测试（核心库）"
+    command: "./test-keymap"
+  - file: test/state.c
+    source: xkbcommon-1.13.2/test/state.c
+    description: "xkb_state 状态机测试（核心库）"
+    command: "./test-state"
+  - file: test/keysym.c
+    source: xkbcommon-1.13.2/test/keysym.c
+    description: "keysym 转换测试（核心库）"
+    command: "./test-keysym"
+  - file: test/compose.c
+    source: xkbcommon-1.13.2/test/compose.c
+    description: "compose 表遍历测试（OHOS 上 U1D1B9 高值 keysym 遍历差异，见 notes.md）"
+    command: "./test-compose"
+
+# test_package 中自带的测试（消费者视角验证，鸿蒙特有冒烟）
+test_package_tests:
+  - file: test.c
+    description: "鸿蒙冒烟：xkb_context_new/xkb_keymap_new_from_string/xkb_state_update_key/xkb_keysym_to_utf8 实质调用"
+    command: "./test_xkbcommon"
+
+# 测试断言总数（近似值，质量评估用）
+assertion_count: 120
