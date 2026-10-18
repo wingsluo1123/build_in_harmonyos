@@ -1,0 +1,19 @@
+sources:
+  url:
+    - "https://gh-proxy.com/https://github.com/meganz/sdk/archive/refs/tags/v4.17.1d.tar.gz"
+    - "https://github.com/meganz/sdk/archive/refs/tags/v4.17.1d.tar.gz"
+  sha256: "a9d3fffd6ecdfac4005cc84b9972a36b28aeb049febd4c688c537f4f097aaeec"
+patches:
+  "4.17.1d":
+    - patch_file: "patches/0001-tests-cxx17-for-gtest-1.17.patch"
+      patch_description: "Build upstream test programs as C++17: gtest 1.17.x headers require C++17 (kept for clarity; global patch below already covers it)"
+      patch_type: "portability"
+    - patch_file: "patches/0002-configure-cxx17-global.patch"
+      patch_description: "Build whole tree as C++17: automake orders per-target CXXFLAGS before global CXXFLAGS so a test-only -std flag loses to configure.ac global -std=c++11"
+      patch_type: "portability"
+    - patch_file: "patches/0003-vpath-config-h-include.patch"
+      patch_description: "VPATH build fix: prepend top_builddir include so generated include/mega/config.h is found on out-of-tree builds"
+      patch_type: "portability"
+    - patch_file: "patches/0004-stdfs-clang-filesystem.patch"
+      patch_description: "Clang C++17 uses std::filesystem: clang defines __GNUC__=4 so the GNUC>=800 gate misroutes C++17 to removed <experimental/filesystem>; exempt clang, fix legacy std::__fs::filesystem namespace"
+      patch_type: "portability"
