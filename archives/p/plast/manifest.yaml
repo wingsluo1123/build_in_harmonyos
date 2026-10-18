@@ -1,0 +1,27 @@
+software: plast
+display: "PLAST"
+description: "并行局部序列比对搜索工具：库对库的蛋白/核酸相似性搜索，多线程且内存占用小"
+category: library
+homepage: "https://plast.inria.fr/"
+license: AGPL-3.0-only
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "上游只支持 x86-64（README 要求 Intel/AMD 64bit + SSE2+）。三个 SIMD kernel 改用 SIMDe 头编译为 NEON，语义与 x86 版本一致，未退化到标量迭代器"
+    - "整个 OS 抽象层由自定义宏 __LINUX__ 选择，该宏只在 CMAKE_SYSTEM_NAME MATCHES \"Linux\" 分支注入；OHOS 下需按 E092 覆盖 CMAKE_SYSTEM_NAME=Linux，否则 DefaultFactory 的线程/时间/文件/内存工厂指针未初始化"
+    - "顶层 find_package(JNI REQUIRED) 且源码用 GLOB_RECURSE 收集全部文件，JDK 缺失时整库无法配置；配方把 JNI 改为可选"
+    - "非 debug 分支硬编码 -msse3，aarch64 上 clang 直接报错，需按目标架构条件化"
+    - "OHOS 的 /tmp 只读：SystemCommand 的临时文件与上游单元测试的临时文件都必须改用 TMPDIR（E002）"
+    - "aarch64 上 char 默认无符号，暴露两处上游真实缺陷：fgetc 的 EOF 哨兵失效导致读循环死转；用 char 返回 -1 变 255 被当作数组下标导致反向链结果错误并段错误"
+    - "OHOS profile 固定 cppstd=17，C++17 已移除 register 存储类说明符，遗留源码需删掉该关键字"
+  common_dependencies:
+    - simde
+    - cppunit
+
+versions:
+  "2.3.2":
+    status: built
+    build_date: "2026-10-15"
+    conan_ref: "plast/2.3.2"
+    source_url: "https://github.com/PLAST-software/plast-library/archive/refs/tags/v2.3.2.tar.gz"

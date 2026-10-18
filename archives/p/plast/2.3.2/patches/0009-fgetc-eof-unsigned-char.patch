@@ -1,0 +1,20 @@
+diff --git a/src/os/impl/CommonOsImpl.hpp b/src/os/impl/CommonOsImpl.hpp
+index 8361c33..724d594 100644
+--- a/src/os/impl/CommonOsImpl.hpp
++++ b/src/os/impl/CommonOsImpl.hpp
+@@ -76,8 +76,13 @@ public:
+         {
+             result = strlen (tmp);
+ 
+-            /** we skip all characters until we reach the next '\n'. */
+-            if (result > 0)  {  for (char c = tmp[result-1];  c !='\n' &&  c!=EOF;  c = fgetc (_handle))  {}  }
++            /** we skip all characters until we reach the next '\n'.
++             *  Note that 'c' must be an int: fgetc returns EOF (-1) at end of
++             *  file and comparing it through a plain 'char' only works where
++             *  char is signed; on architectures where char is unsigned (arm64
++             *  for instance) the comparison never matches EOF and the loop
++             *  would spin forever on a last line without any '\n'. */
++            if (result > 0)  {  for (int c = (unsigned char) tmp[result-1];  c !='\n' &&  c!=EOF;  c = fgetc (_handle))  {}  }
+         }
+ 
+         /** We return the result. */
