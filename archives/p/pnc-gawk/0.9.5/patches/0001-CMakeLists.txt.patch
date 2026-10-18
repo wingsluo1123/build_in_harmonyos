@@ -1,0 +1,70 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,18 +1,39 @@
+ cmake_minimum_required(VERSION 3.10)
+ project("pnc" VERSION 0.9.5 LANGUAGES C CXX)
+ 
+-find_library(LIBPHONENUMBER phonenumber PATHS /usr/local/lib REQUIRED)
+-find_library(LIBGEOCODING geocoding PATHS /usr/local/lib REQUIRED)
+-find_library(LIBICUUC icuuc PATHS /usr/local/lib REQUIRED)
++if(PNC_CONAN_PACKAGE_MODE)
++	# Dependencies (libphonenumber, libgeocoding, ICU and their static
++	# closure) are supplied by Conan as an explicit link group; see
++	# PNC_EXTRA_LINK_LIBRARIES below.
++	set(LIBPHONENUMBER "")
++	set(LIBGEOCODING "")
++	set(LIBICUUC "")
++else()
++	find_library(LIBPHONENUMBER phonenumber PATHS /usr/local/lib REQUIRED)
++	find_library(LIBGEOCODING geocoding PATHS /usr/local/lib REQUIRED)
++	find_library(LIBICUUC icuuc PATHS /usr/local/lib REQUIRED)
++endif()
+ 
+-include_directories(BEFORE SYSTEM /usr/local/include)
++# Dependency include directories and the static link closure are injected by
++# the build driver (Conan); no system-wide prefix is assumed.
++if(PNC_DEP_INCLUDE_DIRS)
++	include_directories(SYSTEM ${PNC_DEP_INCLUDE_DIRS})
++endif()
++if(PNC_EXTRA_LINK_LIBRARIES)
++	link_libraries(${PNC_EXTRA_LINK_LIBRARIES})
++endif()
++
++# gawkapi.h comes from the GNU Awk package, injected by the build driver.
++if(GAWK_INCLUDE_DIR)
++	include_directories(SYSTEM ${GAWK_INCLUDE_DIR})
++endif()
+ 
+ add_compile_definitions(VERSION=\"${PROJECT_VERSION}\")
+ 
+ add_executable(pnc
+ 	src/pnc.cc
+ )
+ 
+ target_link_libraries(pnc
+ 	${LIBICUUC} ${LIBPHONENUMBER} ${LIBGEOCODING}
+ )
+@@ -28,20 +49,23 @@
+ 	TARGETS pnc
+ 	RUNTIME DESTINATION bin
+ )
+ 
+ install(
+ 	FILES pnc.1
+ 	DESTINATION share/man/man1
+ )
+ 
+ include(CheckIncludeFiles)
++if(GAWK_INCLUDE_DIR)
++	set(CMAKE_REQUIRED_INCLUDES ${CMAKE_REQUIRED_INCLUDES} ${GAWK_INCLUDE_DIR})
++endif()
+ check_include_files(
+ 	"stdio.h;errno.h;stdio.h;stddef.h;string.h;stdlib.h;sys/types.h;sys/stat.h;gawkapi.h"
+ 	HAVE_GAWK_H
+ )
+ 
+ if(HAVE_GAWK_H)
+ 	add_subdirectory(gawkext)
+ else()
+ 	message(WARNING "Excluding gawk plugin as needed headers (namely gawkapi.h) were not found!")
+ endif(HAVE_GAWK_H)
