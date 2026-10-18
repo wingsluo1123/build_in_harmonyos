@@ -1,0 +1,40 @@
+# 软件级 manifest — pommed
+# 遵循 ARCHIVE-SPEC v2.0
+
+software: pommed
+display: "pommed"
+description: "Apple 笔记本热键处理守护进程 — LCD/键盘背光、环境光、CD 弹出、蜂鸣与视频输出"
+category: system
+homepage: "https://sources.debian.org/src/pommed/"
+license: GPL-2.0-or-later
+build_system: makefile
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "上游只提供递归 Makefile：无 configure、无 `make check`、无 install 目标，也没有任何测试程序；`package()` 手工安装 bin/ + share/"
+    - "同一 tarball 里还带 gpomme（GTK+ 2）与 wmpomme（X11/WindowMaker）两个 GUI 客户端。二者需要 GTK+2 / dbus-glib / X11 一整套依赖，Debian 亦将其拆成独立二进制包，本次适配只构建 pommed 守护进程本体"
+    - "Makefile 用 `test -e /usr/include/sys/inotify.h`、`/usr/include/sys/timerfd.h` 探测构建机头文件；OHOS sysroot 里两个头文件都存在，但 /usr/include 下没有，会被误判为缺失并回退到仅支持 x86/ppc 的 syscall 编号 shim（aarch64 上直接 #error）。用命令行覆盖 `INOTIFY_CFLAGS=` / `TIMERFD_CFLAGS=` 强制使用 sysroot 真头文件，无需改 Makefile"
+    - "Makefile 调 `pkg-config dbus-1` 与 `pkg-config libpci`，而 PkgConfigDeps 按 Conan 包名生成 dbus.pc / pciutils.pc；在 generate() 里补建 dbus-1.pc / libpci.pc 别名"
+    - "mactel/nv8600mgt_backlight.c 依赖 x86 I/O 端口原语（outb/inb/iopl）；aarch64 上 <sys/io.h> 存在但为空，故补丁加入架构守卫，让 probe() 如实报告硬件不支持（非空壳 stub）"
+    - "2011 年的 C 代码在 clang 15 下需要 -fcommon（lcd_bck_info 在 3 个编译单元里都是暂定定义，clang 默认 -fno-common 会重复符号）"
+    - "libaudiofile.a 内含 C++ 目标文件，纯 C 链接行仍需 -lc++"
+    - "musl libc 不传递包含 pthread 类型与 PATH_MAX：beep.h 补 <pthread.h>、mactel/ambient.c 补 <limits.h>"
+  common_dependencies:
+    - "dbus/1.14.10"
+    - "alsa-lib/1.2.16.1"
+    - "audiofile/0.3.6"
+    - "libconfuse/3.3"
+    - "pciutils/3.13.0"
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "1.39-dfsg":
+    status: published
+    build_date: "2026-10-16"
