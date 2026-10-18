@@ -1,0 +1,26 @@
+software: kunitconversion
+display: "KUnitConversion"
+description: "KDE Frameworks 6 单位换算库（KF6UnitConversion：Converter/Value/Unit/UnitCategory API 与内置单位表、ECB 汇率表下载）"
+category: library
+homepage: "https://invent.kde.org/frameworks/kunitconversion"
+license: LGPL-2.0-or-later
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "KF_DEP_VERSION 6.28.0→6.26.0（patches/0001）：find_package(KF6I18n ${KF_DEP_VERSION}) 会被在仓 ki18n（最高 6.26.0）的 ConfigVersion 拒绝；ki18n_install(po) 无需补丁——KF_SKIP_PO_PROCESSING=ON 使 KI18N_INSTALL() 早退，且在仓 ki18n 已带放宽的 Gettext 查找"
+    - "E537：ki18n 6.26.0 的 libKF6I18n.so 无 DT_SONAME，imported target 链接会把绝对缓存路径写进 DT_NEEDED → patches/0002 剔除 KF6::I18n target、保留 include 目录、裸名 -lKF6I18n 链接，制品 DT_NEEDED 5 条全裸 basename"
+    - "E330：HMDFS 用户卷拒 symlink()（EPERM），带 VERSION/SOVERSION 的共享库后置符号链直接失败构建 → CMAKE_PLATFORM_NO_VERSIONED_SONAME=ON（variables+cache_variables 双通道）+ 显式 -Wl,-soname,，产出单个无版本名 libKF6UnitConversion.so（DT_SONAME 裸名可重定位）"
+    - "E731：两个 ECB 汇率表下载上游用例（convertertest::testCurrency、categorytest::testCurrencyTableUpdate）经 patches/0003 原地 QSKIP（OHOS CI 沙箱无出网 HTTPS 路由）；验证逻辑原样保留，离线货币路径由 valuetest::testCurrencyNotDownloaded 与 currencytableinittest 全量覆盖，条目级 CTest 4/4 全过"
+    - "BUILD_PYTHON_BINDINGS=OFF（上游守卫 ANDROID/APPLE/WIN32/HAIKU 不含 OHOS，且 Shiboken6/PySide6 未发布）；C++20（CMAKE_CXX_STANDARD=20 + -std=c++20）；ECM_MODULE_PATH 与 conan_cmakedeps_paths.cmake 手工导出（ECM 经 extra-cmake-modules/6.28.0 tool_requires）"
+    - "测试运行环境：HOME/XDG_* 重定向 + QT_QPA_PLATFORM=offscreen + /system/lib64/SDK llvm/lib 前置 LD_LIBRARY_PATH；$HOME/.qttest/share/libkunitconversion/ 预建（currencytableinittest 经 QFile::copy 落快照表而该调用不建父目录，离线解析快照）"
+  common_dependencies:
+    - qtbase/6.11.1
+    - ki18n/6.26.0
+
+versions:
+  "6.28.0":
+    status: built
+    build_date: "2026-10-17"
+    conan_ref: "kunitconversion/6.28.0"
+    note: "首次适配（新包）：真机八门禁 Verdict PASS（报告 2026-10-17T01:27:49）；上游 CTest 4/4 执行项全过（17 个测试函数 15 通过 + 2 项网络 QSKIP）；消费者用例 17/17 + 6/6；制品 DT_NEEDED 全裸、DT_SONAME 裸名"

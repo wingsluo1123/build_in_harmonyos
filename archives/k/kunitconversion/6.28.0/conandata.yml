@@ -1,0 +1,23 @@
+# conandata.yml — kunitconversion 6.28.0
+#
+# 源码获取：官方源 download.kde.org（Mirrorbits 按地域 302 跳转）为第一优先；
+# CI Worker 出网受限、设备侧地域镜像证书链异常时由其兜底，追加国内 KDE 镜像
+# （mirrors.nju.edu.cn，KDE 官方镜像列表成员，托管字节一致的 tarball，sha256
+# 与官方同值）。Conan 2.x get() 按序逐个尝试，任一成功即用。
+sources:
+  url:
+    - "https://download.kde.org/stable/frameworks/6.28/kunitconversion-6.28.0.tar.xz"
+    - "https://mirrors.nju.edu.cn/kde/stable/frameworks/6.28/kunitconversion-6.28.0.tar.xz"
+  sha256: "b3e7dc0ad758a994f5171c6fb9a4bbf59bb51bdf7e0fecf0df6a3b55f2e5bd6b"
+
+patches:
+  "6.28.0":
+    - patch_file: "patches/0001-CMakeLists.txt.patch"
+      patch_description: "ohpcd adaptation: KF_DEP_VERSION 6.28.0 -> 6.26.0 so find_package(KF6I18n ${KF_DEP_VERSION}) accepts the published ki18n 6.26.0"
+      patch_type: "portability"
+    - patch_file: "patches/0002-src-CMakeLists.txt.patch"
+      patch_description: "ohpcd adaptation: link ki18n's soname-less libKF6I18n.so by bare name so DT_NEEDED stays relocatable (E537)"
+      patch_type: "portability"
+    - patch_file: "patches/0003-ohos-skip-currency-network-autotests.patch"
+      patch_description: "ohpcd adaptation: QSKIP the two ECB currency-table download autotests (no outbound HTTPS route in the OHOS sandbox); the offline currency paths stay covered by valuetest/currencytableinittest"
+      patch_type: "portability"
