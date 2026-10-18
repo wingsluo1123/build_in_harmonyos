@@ -1,0 +1,359 @@
+--- a/src/scrot.c
++++ b/src/scrot.c
+@@ -66,6 +66,7 @@
+ #include "options.h"
+ #include "scrot.h"
+ #include "util.h"
++#include "scrot_imlib_compat.h"
+
+ static void initXAndImlib(const char *, int);
+ static void uninitXAndImlib(void);
+@@ -262,15 +262,26 @@
+ // save image to fd, filename only used for logging
+ // fd will be closed after calling this function
+ static void scrotSaveImage(int fd, const char *filename)
+ {
++#ifdef SCROT_USE_IMLIB_COMPAT
++    /* imlib2 < 1.11 (e.g. X-less 1.9.1) has no imlib_save_image_fd():
++       forward to the temp-file splice in scrot_imlib_compat.h and read
++       back the recorded errno instead of imlib_get_error(). */
++    imlib_save_image_fd(fd, filename);
++    int imErr = scrot_compat_get_error();
++    if (imErr)
++        errx(EXIT_FAILURE, "failed to save image: %s: %s",
++            filename, scrot_compat_strerror(imErr));
++#else
+     imlib_save_image_fd(fd, filename);
+     int imErr = imlib_get_error();
+     if (imErr) {
+         const char *errmsg = imlib_strerror(imErr);
+         const char imlibPrefix[] = "Imlib2: ";
+         if (strncmp(errmsg, imlibPrefix, sizeof(imlibPrefix) - 1) == 0)
+             errmsg += sizeof(imlibPrefix) - 1;
+         errx(EXIT_FAILURE, "failed to save image: %s: %s",
+             filename, errmsg);
+     }
++#endif
+ }
+@@ -1024,3 +1024,252 @@
+     free(images);
+     return ret;
+ }
++
++#ifdef SCROT_USE_IMLIB_COMPAT
++/* ---- in-source imlib2 1.9.1 (X-less) compat, see scrot_imlib_compat.h ----
++ * Only the six X-capture entry points plus the fd-save fallback are defined
++ * here (non-static: scrot_selection.c links against them). Everything else
++ * keeps using the real imlib2 1.9.1 core, which is display-independent. */
++
++static Display *scrot_compat_display = NULL;
++static Visual *scrot_compat_visual = NULL;
++static Colormap scrot_compat_colormap = 0;
++static Drawable scrot_compat_drawable = 0;
++static int scrot_compat_error = 0;
++
++void imlib_context_set_display(Display *display)
++{
++    scrot_compat_display = display;
++}
++
++void imlib_context_set_visual(Visual *visual)
++{
++    scrot_compat_visual = visual;
++}
++
++void imlib_context_set_colormap(Colormap colormap)
++{
++    scrot_compat_colormap = colormap;
++}
++
++void imlib_context_set_drawable(Drawable drawable)
++{
++    scrot_compat_drawable = drawable;
++}
++
++static void scrot_mask_info(unsigned long mask, int *shift, int *bits)
++{
++    int s = 0, b = 0;
++    if (mask) {
++        while (!(mask & 1UL)) {
++            mask >>= 1;
++            s++;
++        }
++        while (mask & 1UL) {
++            mask >>= 1;
++            b++;
++        }
++    }
++    *shift = s;
++    *bits = b;
++}
++
++static int scrot_mask_to_8(unsigned long pixel, unsigned long mask)
++{
++    int shift, bits;
++    unsigned long v, max;
++    if (!mask)
++        return 0;
++    scrot_mask_info(mask, &shift, &bits);
++    if (bits <= 0 || bits >= (int)(8 * sizeof(unsigned long)))
++        return 0;
++    v = (pixel & mask) >> shift;
++    max = (1UL << bits) - 1UL;
++    return (int)(v * 255UL / max);
++}
++
++/* Convert an XImage region to an Imlib image using only Xlib plus the
++ * display-independent imlib2 core, so it links against X-less imlib2 builds.
++ * TrueColor/DirectColor visuals (and any ZPixmap carrying RGB masks) go
++ * through generic mask extraction; PseudoColor falls back to XQueryColor
++ * with the stored display/colormap and fails honestly (NULL) without one. */
++static Imlib_Image scrot_convert_ximage(XImage *xi, int x0, int y0, int w,
++    int h)
++{
++    DATA32 *buf;
++    Imlib_Image im;
++    int x, y;
++    int use_mask_path = 0;
++
++    if (!xi || w <= 0 || h <= 0)
++        return NULL;
++    if (x0 < 0) {
++        w += x0;
++        x0 = 0;
++    }
++    if (y0 < 0) {
++        h += y0;
++        y0 = 0;
++    }
++    if (x0 + w > xi->width)
++        w = xi->width - x0;
++    if (y0 + h > xi->height)
++        h = xi->height - y0;
++    if (w <= 0 || h <= 0)
++        return NULL;
++
++    if (scrot_compat_visual &&
++        (scrot_compat_visual->class == TrueColor ||
++         scrot_compat_visual->class == DirectColor))
++        use_mask_path = 1;
++    else if (xi->red_mask || xi->green_mask || xi->blue_mask)
++        use_mask_path = 1;
++    if (!use_mask_path &&
++        (!scrot_compat_display || !scrot_compat_colormap))
++        return NULL;
++
++    buf = malloc((size_t)w * (size_t)h * sizeof(DATA32));
++    if (!buf)
++        return NULL;
++    for (y = 0; y < h; y++) {
++        for (x = 0; x < w; x++) {
++            unsigned long px = XGetPixel(xi, x0 + x, y0 + y);
++            int r, g, b;
++            if (use_mask_path) {
++                r = scrot_mask_to_8(px, xi->red_mask);
++                g = scrot_mask_to_8(px, xi->green_mask);
++                b = scrot_mask_to_8(px, xi->blue_mask);
++            } else {
++                XColor c;
++                c.pixel = px;
++                XQueryColor(scrot_compat_display, scrot_compat_colormap, &c);
++                r = c.red >> 8;
++                g = c.green >> 8;
++                b = c.blue >> 8;
++            }
++            buf[(size_t)y * (size_t)w + (size_t)x] =
++                ((DATA32)0xFF << 24) | ((DATA32)r << 16) |
++                ((DATA32)g << 8) | (DATA32)b;
++        }
++    }
++    im = imlib_create_image_using_copied_data(w, h, buf);
++    free(buf);
++    return im;
++}
++
++Imlib_Image imlib_create_image_from_drawable(Drawable d, int x, int y, int w,
++    int h, char need_to_grab_x)
++{
++    Drawable target = d ? d : scrot_compat_drawable;
++    XImage *xi;
++    Imlib_Image im;
++    (void)need_to_grab_x;
++    if (!scrot_compat_display || !target || w <= 0 || h <= 0)
++        return NULL;
++    xi = XGetImage(scrot_compat_display, target, x, y, (unsigned int)w,
++        (unsigned int)h, AllPlanes, ZPixmap);
++    if (!xi)
++        return NULL;
++    im = scrot_convert_ximage(xi, 0, 0, xi->width, xi->height);
++    XDestroyImage(xi);
++    return im;
++}
++
++Imlib_Image imlib_create_image_from_ximage(XImage *ximage, XImage *mask, int x,
++    int y, int w, int h, char need_to_grab_x)
++{
++    (void)mask;
++    (void)need_to_grab_x;
++    if (!ximage)
++        return NULL;
++    return scrot_convert_ximage(ximage, x, y, w, h);
++}
++
++/* imlib2 1.9.1 has no imlib_save_image_fd() (added in 1.11): save with the
++ * ancient imlib_save_image() to a temp file, then splice the bytes to fd.
++ * The image format was already fixed by the caller via
++ * imlib_image_set_format(), so the extension-less temp path is fine. A
++ * missing or empty temp file counts as failure. Like upstream, fd is always
++ * closed; the first errno is kept for scrot_compat_get_error(). */
++void imlib_save_image_fd(int fd, const char *file)
++{
++    const char *tmpdir = getenv("TMPDIR");
++    char path[1024];
++    char io[8192];
++    int tfd, sfd;
++    struct stat st;
++    int n;
++    (void)file;
++    scrot_compat_error = 0;
++    if (!tmpdir || !*tmpdir)
++        tmpdir = "/tmp";
++    n = snprintf(path, sizeof(path), "%s/scrot-save-XXXXXX", tmpdir);
++    if (n < 0 || (size_t)n >= sizeof(path)) {
++        scrot_compat_error = ENAMETOOLONG;
++        close(fd);
++        return;
++    }
++    tfd = mkstemp(path);
++    if (tfd < 0) {
++        scrot_compat_error = errno ? errno : EIO;
++        close(fd);
++        return;
++    }
++    close(tfd);
++    imlib_save_image(path);
++    if (stat(path, &st) != 0 || st.st_size <= 0) {
++        scrot_compat_error = EIO;
++        unlink(path);
++        close(fd);
++        return;
++    }
++    sfd = open(path, O_RDONLY);
++    if (sfd < 0) {
++        scrot_compat_error = errno ? errno : EIO;
++        unlink(path);
++        close(fd);
++        return;
++    }
++    for (;;) {
++        ssize_t nr = read(sfd, io, sizeof(io));
++        ssize_t off = 0;
++        if (nr == 0)
++            break;
++        if (nr < 0) {
++            if (errno == EINTR)
++                continue;
++            scrot_compat_error = errno;
++            break;
++        }
++        while (off < nr) {
++            ssize_t nw = write(fd, io + off, (size_t)(nr - off));
++            if (nw < 0) {
++                if (errno == EINTR)
++                    continue;
++                scrot_compat_error = errno;
++                break;
++            }
++            off += nw;
++        }
++        if (scrot_compat_error)
++            break;
++    }
++    close(sfd);
++    unlink(path);
++    close(fd);
++}
++
++int scrot_compat_get_error(void)
++{
++    return scrot_compat_error;
++}
++
++const char *scrot_compat_strerror(int err)
++{
++    if (err == 0)
++        return "Success";
++    if (err > 0)
++        return strerror(err);
++    return "Imlib2 save failed";
++}
++#endif /* SCROT_USE_IMLIB_COMPAT */
+--- a/src/scrot_selection.c
++++ b/src/scrot_selection.c
+@@ -52,6 +52,7 @@
+ #include "selection_classic.h"
+ #include "selection_edge.h"
+ #include "util.h"
++#include "scrot_imlib_compat.h"
+
+ static void scrotSelectionCreate(void);
+ static void scrotSelectionDestroy(void);
+--- /dev/null
++++ b/src/scrot_imlib_compat.h
+@@ -0,0 +1,56 @@
++/* scrot_imlib_compat.h: build scrot 2.0.0 against X-less imlib2 1.9.1.
++ *
++ * Upstream 2.0.0 requires imlib2 >= 1.11.0 with X (see deps.pc): it calls
++ * imlib_context_set_display/visual/colormap/drawable,
++ * imlib_create_image_from_drawable/ximage and imlib_save_image_fd(), none
++ * of which exist in an X-less imlib2 1.9.1 (its Imlib2.h hides the X entry
++ * points behind X_DISPLAY_MISSING and it predates imlib_save_image_fd()).
++ *
++ * This header selects the compat path and declares the in-source shims
++ * (defined at the end of scrot.c, linked into the same binary):
++ *  - X context setters: stored in static globals for the grab shims;
++ *  - grab shims: XGetImage + generic TrueColor/PseudoColor conversion using
++ *    only Xlib and the display-independent imlib2 core;
++ *  - fd-save shim: imlib_save_image() to a temp file, spliced to the fd.
++ *
++ * The compat path self-disables (SCROT_USE_IMLIB_COMPAT stays undefined)
++ * once the graph resolves imlib2 >= 1.11 without X_DISPLAY_MISSING, so the
++ * same patch is forward-compatible with the future native dependency.
++ * IMLIB2_VERSION is MAJOR*10000 + MINOR*100 + MICRO; 1.11.0 == 11100.
++ * A header without IMLIB2_VERSION counts as 0 (undefined -> 0 in #if).
++ */
++#ifndef SCROT_IMLIB_COMPAT_H
++#define SCROT_IMLIB_COMPAT_H
++
++#include <Imlib2.h>
++
++#if !defined(IMLIB2_VERSION) || (IMLIB2_VERSION < 11100) || \
++    defined(X_DISPLAY_MISSING)
++#define SCROT_USE_IMLIB_COMPAT 1
++#endif
++
++#ifdef SCROT_USE_IMLIB_COMPAT
++#include <X11/Xlib.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++void imlib_context_set_display(Display *display);
++void imlib_context_set_visual(Visual *visual);
++void imlib_context_set_colormap(Colormap colormap);
++void imlib_context_set_drawable(Drawable drawable);
++Imlib_Image imlib_create_image_from_drawable(Drawable d, int x, int y, int w,
++    int h, char need_to_grab_x);
++Imlib_Image imlib_create_image_from_ximage(XImage *ximage, XImage *mask,
++    int x, int y, int w, int h, char need_to_grab_x);
++void imlib_save_image_fd(int fd, const char *file);
++int scrot_compat_get_error(void);
++const char *scrot_compat_strerror(int err);
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif /* SCROT_USE_IMLIB_COMPAT */
++#endif /* SCROT_IMLIB_COMPAT_H */
