@@ -1,0 +1,31 @@
+software: kdesu
+display: "KDESu"
+description: "KDE Frameworks 6 privilege escalation library (KF6Su, kdesud, kdesu_stub)"
+category: library
+homepage: "https://invent.kde.org/frameworks/kdesu"
+license: LGPL-2.0-or-later
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "KF_IGNORE_PLATFORM_CHECK=TRUE bypasses the KDE platform allowlist (OHOS not listed)"
+    - "X11 is optional upstream (find_package(X11)); the OHOS sysroot does not provide it, so HAVE_X11=0 and the Xauthority code paths compile out"
+    - "CMAKE_SHARED_LIBRARY_SONAME_{C,CXX}_FLAG injected for os=OHOS (Generic platform module has no soname rule; E330/kcodecs precedent); the device profile's no-versioned-soname user_toolchain yields the platform-standard single unversioned libKF6Su.so with DT_SONAME set"
+    - "ECM_MODULE_PATH set manually (CMakeDeps-generated ECMConfig.cmake does not propagate it)"
+    - "conan_cmakedeps_paths.cmake generated manually (qtbase uses cmake_find_mode=none)"
+    - "The SDK system library directory (/system/lib64) is prepended to LD_LIBRARY_PATH for configure and test runs (sandbox libc++_shared.so shadowing)"
+    - "Upstream kdesudtest/kdesutest are built and executed through ctest inside build(); results are reported verbatim (R51). kdesudtest passes; kdesutest cannot run in the device sandbox because pty allocation is denied before su/sudo is spawned"
+    - "kdesud/kdesu_stub install to <prefix>/bin/kf6 on this platform; the package stays library type (package_type=library, no cpp_info.bindirs), so no commands.json (R38/L0k)"
+  common_dependencies:
+    - qtbase
+    - kconfig
+    - kcoreaddons
+    - ki18n
+    - kpty
+    - ecm
+
+versions:
+  "6.26.0":
+    status: built
+    build_date: "2026-10-17"
+    conan_ref: "kdesu/6.26.0"
