@@ -1,0 +1,33 @@
+software: xdemorse
+version: "3.6.7"
+status: built
+build_date: "2026-10-17"
+build_system: autotools
+source:
+  url: "https://www.qsl.net/5b4az/pkg/morse/xdemorse/xdemorse-3.6.7.tar.bz2"
+  sha256: "2d512d14047083175c621442684edfca8d86563faaddd44c27df86722f09adbf"
+  filename: "xdemorse-3.6.7.tar.bz2"
+  note: >-
+    上游官方站本机实测可达（HTTP 200，261,054 字节）；Debian 池里没有对应 orig 包（404 ✗）
+    ⇒ 直接用官方站归档。tarball 内**已随包生成 `configure`**（无需 autoreconf）。
+build:
+  system: autotools
+  dependencies:
+    - gtk/3.24.43            # configure.ac: pkg_modules="gtk+-3.0 >= 3.22.0"
+    - alsa-lib/1.2.16.1      # configure.ac: AC_CHECK_LIB([asound], [snd_pcm_open])
+  injected: >-
+    PkgConfigDeps（生成 gtk+-3.0 / alsa 的 .pc，否则 configure 的 PKG_CHECK_MODULES 失败 ✗）
+    + AutotoolsToolchain；**`--disable-nls`**（上游 AM_GNU_GETTEXT 是硬前置，而本仓无 gettext）。
+products:
+  - bin/xdemorse（OHOS 上已 E318 自签）
+  - share/xdemorse/**（数据/图标）、share/locale/**（i18n 关闭时为空）
+  - licenses/COPYING
+verification:
+  conan_create: "见 notes.md「本地实测」（构建后回填）"
+  upstream_tests: >-
+    上游未附可自动运行的测试套件（Debian 侧也只跑 "superficial" autopkgtest）；
+    本配方不宣称跑过上游测试（详见 test_package/MANIFEST.yml）。
+  consumer_test: "产物存在且可执行 + OHOS 自签证据 + 许可证"
+scope_note: >-
+  GUI 应用：运行需要显示服务与**声卡音频输入**（从电台/信号源取音）；本平台无显示服务、
+  亦无真实音频输入 ⇒ 交付为「可构建、产物完整、已签名」的制品（与仓内其它 GUI 栈同例）。
