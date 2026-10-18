@@ -1,0 +1,25 @@
+# conandata.yml — xfontsel 1.1.2
+# 源码: X.Org 官方发布归档 (https://www.x.org/releases/individual/app/)
+# R39: 官方正式源；sha256 与官方发布文件一致（148792 字节）。
+
+sources:
+  url: "https://www.x.org/releases/individual/app/xfontsel-1.1.2.tar.xz"
+  sha256: "78ff018757c7b22137cf5d3526ef5e9388bc0cdead1f00daf2c898e2e274553f"
+
+patches:
+  # E007 / E205：原生 build=host（铁律 #0 禁止 --build/--host/--target）。
+  # 设备 uname -s 为 HarmonyOS，tarball 自带 config.guess（2024-07-27）不认识
+  # 该 OS（且用编译探针写 $TMPDIR，HMFS 上失败）→ configure 报 "cannot guess
+  # build type"。补丁教 config.guess 把 HarmonyOS/aarch64 判为
+  # aarch64-unknown-linux-ohos（tarball 自带 config.sub 已接受该三元组，
+  # 无需 config.sub 补丁），并把临时目录 umask 077 放宽为 022（HMFS/E011）。
+  - patch_file: "patches/0001-config.guess.patch"
+    patch_description: "config.guess: recognize HarmonyOS as aarch64-unknown-linux-ohos; relax temp-dir umask (E007/E205/E011)"
+    patch_type: "portability"
+
+  # E011 / E114：HMDFS 下 conan 缓存父目录对 getcwd() 不可达，autoconf 2.73
+  # 生成的 configure 顶部严格 `pwd` 判定直接 abort；config.status 用
+  # `umask 077 && mktemp -d ./confXXXXXX` 创建的临时目录在 HMFS 上不可写。
+  - patch_file: "patches/0002-configure.patch"
+    patch_description: "configure: PWD fallback when getcwd/pwd is unavailable; HMDFS-safe config.status temp-dir umask (E011/E114)"
+    patch_type: "portability"
