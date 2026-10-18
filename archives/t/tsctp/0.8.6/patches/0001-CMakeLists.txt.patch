@@ -1,0 +1,48 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -54,20 +54,22 @@
+       COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
+ ENDIF()
+ 
+ 
+ #############################################################################
+ #### OS DEPENDENT                                                        ####
+ #############################################################################
+ 
+ IF (CMAKE_SYSTEM_NAME MATCHES "Linux")
+    MESSAGE(STATUS "${CMAKE_SYSTEM_NAME} supported")
++ELSEIF (CMAKE_SYSTEM_NAME MATCHES "HarmonyOS")
++   MESSAGE(STATUS "${CMAKE_SYSTEM_NAME} supported (Linux-compatible)")
+ ELSEIF (CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
+    MESSAGE(STATUS "${CMAKE_SYSTEM_NAME} supported")
+ ELSEIF (CMAKE_SYSTEM_NAME MATCHES "NetBSD")
+    MESSAGE(STATUS "${CMAKE_SYSTEM_NAME} supported")
+ # ELSEIF (CMAKE_SYSTEM_NAME MATCHES "OpenBSD")
+    # OpenBSD does not support SCTP!
+ ELSEIF (CMAKE_SYSTEM_NAME MATCHES "Darwin")
+    MESSAGE(STATUS "${CMAKE_SYSTEM_NAME} supported")
+ ELSE()
+    MESSAGE(FATAL_ERROR "${CMAKE_SYSTEM_NAME} not supported (yet?)")
+@@ -108,21 +110,21 @@
+ #############################################################################
+ 
+ # ====== Threads ============================================================
+ FIND_PACKAGE(Threads REQUIRED)
+ 
+ # ====== Kernel SCTP ========================================================
+ CHECK_INCLUDE_FILE(netinet/sctp.h HAVE_NETINET_SCTP_H)
+ IF (HAVE_NETINET_SCTP_H)
+    SET(SCTP_INCLUDE "netinet/sctp.h")
+    ADD_DEFINITIONS(-DHAVE_KERNEL_SCTP -DHAVE_NETINET_SCTP_H)
+-   IF (CMAKE_SYSTEM_NAME MATCHES "Linux")
++   IF (CMAKE_SYSTEM_NAME MATCHES "Linux|HarmonyOS")
+       FIND_LIBRARY(SCTP_LIB sctp REQUIRED)
+    ELSE()
+       FIND_LIBRARY(SCTP_LIB sctp)
+    ENDIF()
+    IF (SCTP_LIB)
+       SET(CMAKE_REQUIRED_LIBRARIES ${CMAKE_REQUIRED_LIBRARIES} ${SCTP_LIB})
+    ELSE()
+       SET(SCTP_LIB "")
+    ENDIF()
+ ENDIF()
