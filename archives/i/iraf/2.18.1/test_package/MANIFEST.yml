@@ -1,0 +1,39 @@
+package: iraf/2.18.1
+homepage: "https://github.com/iraf-community/iraf"
+upstream_tests_exist: true
+upstream_test_audit: >-
+  v2.18.1 test/*.md contains 136 executable CL command blocks. The upstream
+  Makefile test target runs all of them with ecl.e, then the seven cl.md
+  blocks once more with cl.e: 143 invocations. Original skip/xfail/arch
+  selectors are retained. Count blocks containing ^[a-z>]+> inside fenced
+  code sections; do not count input-file blocks as tests.
+upstream_check_command: "timeout 1800 make test"
+upstream_test_in_build: true
+upstream_test_command: "timeout 1800 make test"
+upstream_tests:
+  - file: "test/*.md"
+    description: "136 ECL doctest blocks covering OS, compiler, images, numerical routines, lists, tables and NOAO"
+  - file: "test/cl.md"
+    description: "7 blocks repeated with the classic CL interpreter"
+upstream_test_cases: 143
+test_package_tests:
+  - file: test_iraf.sh
+    command: "zsh test_iraf.sh"
+    description: "16 installed-package scenarios including F2C failure, context, SSH fixture, scratch paths, tmerge/tiimage data/type regressions and file protection"
+  - file: test_context.c
+    description: "Production declarations and macros in packaged headers: 42, zero mapped to one, negative status"
+  - file: test_rcmd.c
+    description: "Packaged SSH transport: stream, stderr, descriptor closure, argument and exec failures"
+test_files:
+  - path: test_package/test_iraf.sh
+    test_type: R34
+    assertion_count: 22
+  - path: test_package/test_context.c
+    test_type: R34
+    assertion_count: 6
+  - path: test_package/test_rcmd.c
+    test_type: R34
+    assertion_count: 5
+test_package_test_count: 3
+consumer_assertion_count: 33
+assertion_count: 33
