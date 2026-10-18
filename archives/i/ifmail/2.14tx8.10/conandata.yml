@@ -1,0 +1,75 @@
+# conandata.yml — ifmail 2.14tx8.10
+#
+# Source provenance (R39, checked 2026-10-16):
+#   * www.average.org/ifmail (the LSM's "Official homepage") is a 2001 meta-refresh
+#     stub pointing at ifmail.sourceforge.net;
+#   * SourceForge projects/ifmail only carries ifmail-stable/{2.9..2.15} and
+#     ifmail-devel/{3.02,3.03} — no tx8.10 tarball anywhere in the file tree;
+#   * GitHub search for "ifmail" returns only downstream forks (larsks/ifmail-lks,
+#     pld-linux/ifmail, ...), and AUR has no ifmail package;
+#   * the only surviving pristine copy of the 2.14tx8.10 release is the Debian
+#     pool .orig tarball. This is the *upstream* release tarball, not a Debian
+#     repackaging: the -32.debian.tar.xz quilt series is deliberately NOT used,
+#     every portability fix lives in patches/ below.
+#   * sha256 cross-checked against ifmail_2.14tx8.10-32.dsc "Checksums-Sha256"
+#     (5135f3bb...d920, 501678 bytes) and against the local shasum -a 256 output.
+#   * PF7 pre-declared exception: deb.debian.org is on the Debian-host list, so
+#     submit needs --no-preflight with this note as the justification (same
+#     precedent as archives/r/rdate/1.11, whose conandata.yml carries the same
+#     pre-declaration).
+# NOTE (CI source-fetch risk, pre-declared): the CI mirror-rewrite step only
+# proxies github.com URLs; deb.debian.org is fetched directly.
+
+sources:
+  url: "https://deb.debian.org/debian/pool/main/i/ifmail/ifmail_2.14tx8.10.orig.tar.gz"
+  sha256: "5135f3bb0373bb82b983e7db61294fc56827538409cf56a1c5e45aee8f26d920"
+
+patches:
+  - patch_file: "patches/0001-ifcico-hydra.c.patch"
+    patch_description: "Declare xtodos() (defined in filelist.c) in hydra.c: the implicit int return made 'outbuf = xtodos(...)' an int-to-pointer conversion, a hard error on clang 15"
+    patch_type: "portability"
+  - patch_file: "patches/0002-ifcico-mxlookup.c.patch"
+    patch_description: "Drop the two BIND resolver knob writes (_res.options/_res.retrans) and replace libresolv-private _getshort()/_getlong() with local big-endian readers: musl ships struct __res_state 'purely for broken apps' but no _res object and OHOS has no libresolv, so ifroute failed to link"
+    patch_type: "portability"
+  - patch_file: "patches/0003-ifcico-respfreq.c.patch"
+    patch_description: "K&R <varargs.h> add_report() converted to C99 <stdarg.h> (plus a matching prototype), and the BSD re_comp()/re_exec() mask matcher wrapped over POSIX regcomp()/regexec(): musl provides neither varargs.h nor re_comp/re_exec, so ifcico failed to link"
+    patch_type: "portability"
+  - patch_file: "patches/0004-ifgate-message.c.patch"
+    patch_description: "Make ref_dbase an extern declaration in message.c (ifmail.c owns the definition): duplicate tentative definitions only link under -fcommon (gcc < 10) and are a 'duplicate symbol' error with clang's default -fno-common"
+    patch_type: "portability"
+  - patch_file: "patches/0005-ifgate-nlindex.c.patch"
+    patch_description: "Drop the direct <ndbm.h>/<dbm.h> include; nlindex.h already pulls it in. gdbm's compat ndbm.h has no include guard, so a second inclusion in the same TU is a hard 'typedef redefinition' error"
+    patch_type: "portability"
+  - patch_file: "patches/0006-ifgate-nodecheck.c.patch"
+    patch_description: "Same unguarded-ndbm.h fix as 0005, keeping <fcntl.h> (it was inside the removed #ifdef HAS_NDBM_H block) for O_RDWR/O_CREAT"
+    patch_type: "portability"
+  - patch_file: "patches/0007-iflib-testglue.c.patch"
+    patch_description: "New file: supplies version/reldate/copyright/usage() for the iflib self-test targets. rdconfig.o references those front-end symbols and iflib ships none of them, so upstream's 'make testconf'/'make testscan' could never link on any platform"
+    patch_type: "portability"
+  - patch_file: "patches/0008-iflib-lutil.c.patch"
+    patch_description: "Convert loginf()/logerr()/debug() from <varargs.h>+va_dcl to <stdarg.h> varargs (lutil.h already declares them ANSI-style) and include xutil.h for xstrcpy/xstrcat: clang 15's varargs.h is an #error stub and the implicit int returns were hard errors"
+    patch_type: "portability"
+  - patch_file: "patches/0009-iflib-make_new_ref.c.patch"
+    patch_description: "Include <stdlib.h> for exit() (implicit declaration)"
+    patch_type: "portability"
+  - patch_file: "patches/0010-iflib-trap.c.patch"
+    patch_description: "Remove the pre-glibc kernel-header detour (<linux/version.h> + <linux/signal.h> under __KERNEL__) and include <stdlib.h> for abort(): those kernel headers redeclare sigset_t/sigaltstack/sigval and clash with musl's userspace <signal.h>, which already provides struct sigcontext"
+    patch_type: "portability"
+  - patch_file: "patches/0011-ifcico-flaglex.l.patch"
+    patch_description: "Define YY_SKIP_YYWRAP: flex emits 'extern int yywrap ( void );' in the generated scanner, which the file's own zero-argument '#define yywrap() 1' turns into a 'too many arguments provided to function-like macro invocation' error"
+    patch_type: "portability"
+  - patch_file: "patches/0012-ifgate-nlindex.h.patch"
+    patch_description: "Drop 'extern struct _fkey fkey[]' (struct _fkey is only defined in ifcico/nodelist.h, so the declaration is an 'array has incomplete element type' error here and ifgate never uses fkey) and mirror ifcico's <dbm.h> fallback branch"
+    patch_type: "portability"
+  - patch_file: "patches/0013-iflib-parsedate.y.patch"
+    patch_description: "Include <string.h> for strcmp and give date_lex() a real prototype plus external linkage: bison's generated yyparse() calls the scanner before its definition, so a static definition collided with the earlier non-static implicit declaration"
+    patch_type: "portability"
+  - patch_file: "patches/0014-iflib-xutil.h.patch"
+    patch_description: "Replace the K&R '#define size_t unsigned int' fallback with <stddef.h>: the macro shadows the real typedef (truncating sizes on LP64) and poisons every system header included after xutil.h"
+    patch_type: "portability"
+  - patch_file: "patches/0015-iflib-Makefile.patch"
+    patch_description: "Route the four -DTESTING self-test rules through ${CC}/${CFLAGS}/${INCLUDES}/${DEFINES}/${LIBS} instead of hardcoded 'cc -g -Wall' (which dropped every feature macro and the dbm library) and link testglue.c into testconf/testscan"
+    patch_type: "portability"
+  - patch_file: "patches/0016-ifgate-Makefile.patch"
+    patch_description: "Replace the two `ln` hard-link steps that create ifnews from ifmail with `cp`: HMDFS (which backs $HOME and the conan cache) cannot create hard links, so `ln ifmail ifnews` aborts the whole build with 'cannot create hard link ... Operation not permitted' (E079). ifnews is the same program under a different argv[0], and package() stores them as two files anyway"
+    patch_type: "portability"

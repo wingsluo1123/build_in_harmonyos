@@ -1,0 +1,45 @@
+# test_package/MANIFEST.yml - ifmail 2.14tx8.10
+#
+# 计数口径（唯一口径，贯穿本文件 / notes.md / 构建日志 / PR 两张表）：
+#   独立可判定检查项（independent check items）。每个 ok/bad/assert_* 调用计 1 项。
+#
+package: ifmail/2.14tx8.10
+homepage: "http://ifmail.sourceforge.net/"
+
+# ---------------------------------------------------------------- 上游测试
+# 上游没有 make check / ctest / TESTS 之类的正式测试目标。清点结果（源码树
+# ifmail-2.14tx8.10.orig，逐目录 grep）：
+#   * iflib/Makefile 有 4 个 -DTESTING 自测目标：testconf(rdconfig.c)、
+#     testscan(scanout.c)、testtrap(trap.c)、testrfcaddr(rfcaddr.c)，配套
+#     tryconf/tryscan/trytrap/tryrfcaddr 运行目标；
+#   * ifgate/Makefile 的 tryt/tryn/trym/tryu/tryp 与 ifcico/Makefile 的
+#     tryc/tryp 是手工调用真实二进制、依赖 /var/spool 现场数据的示例，
+#     没有可判定断言，不计入；
+#   * 全树 find -iname '*test*' 只命中 ifgate/testmail（示例邮件文本）、
+#     ifgate/nodecheck.{c,h}（节点检查逻辑，非测试）与 misc/contrib/tic/
+#     checker.pl（contrib 脚本，不参与构建）。
+upstream_check_command: "无 make check/ctest 目标；上游自测入口是 iflib/Makefile 的 testconf/testscan/testtrap/testrfcaddr（-DTESTING 构建）"
+upstream_test_in_build: true
+upstream_test_command: "make -C iflib testconf testscan testrfcaddr <make overrides> && <CONFIG_SHELL> uptests/run_upstream_tests.sh <workdir>"
+
+upstream_tests:
+  - file: uptests/run_upstream_tests.sh
+    source: "ifmail-2.14tx8.10.orig/iflib/Makefile（testconf/testscan/testrfcaddr 目标）+ iflib/rdconfig.c、iflib/scanout.c、iflib/rfcaddr.c 的 #ifdef TESTING main()"
+    description: "真实构建并执行上游 3 个 -DTESTING 自测程序，共 30 项断言：testconf 8 项（rc + 配置解析轨迹 address/myfqdn/nodelist/domtrans/汇总块/configname）、testscan 9 项（rc + 域、outbound 目录、FTS 名 139c00e6.out/.flo 的识别与分类、net/node 十六进制解码为 2:5020/230、scanout 返回码）、testrfcaddr 13 项（rc + 6 个地址的 target/remainder/comment）"
+    command: "<CONFIG_SHELL> uptests/run_upstream_tests.sh <workdir>  # 末尾打印 UPSTREAM TESTS: 30/30"
+  - file: iflib/trap.c (#ifdef TESTING)
+    source: "ifmail-2.14tx8.10.orig/iflib/Makefile 的 testtrap/trytrap 目标"
+    description: "不执行，计 0 项。-DTESTING 构建下 trap() 的收尾是 printf(\"\\n\") 而非 abort()（trap.c 末尾 #ifdef TESTING / #else abort() / #endif），处理器返回后同一条非法写会重复触发，没有确定终态；参考构建实测 rc=133 且零字节输出。按 harmonyos-porting §6.1 只断言可自洽推导的部分，故不纳入"
+    command: "无（不执行）"
+
+# ------------------------------------------------------------ test_package
+test_package_tests:
+  - file: test_ifmail.sh
+    description: "消费者测试，20 项：13 个支持 -h 的二进制（ifcico/ifindex/ifinfo/ifreq/ifroute/nlpatch/nlookup/ifmail/ifnews/iftoss/ifpack/ifunpack/ifstat）逐个断言 rc=0 且首行为 '<prog> ver. 2.14-tx8.10 of '；make_new_ref 无参时按文档 exit(2) 并报 could not open ref_db；ifmail -I <不存在> 返回 65（EX_DATAERR，ifmail.8 RETURN CODES）；ifinfo <不可解析地址> 返回 64（EX_USAGE）；ifindex 建索引 rc=0；nlookup -v 2:5020/230 的 stdout 与 fixtures/nlookup-v-230.expected 逐字节一致（diff）；nlookup 2:5020/230.1 得到 Petr.Petrov@p1.f230.n5020.z2.ftn；nlookup 2:9999/9999 得到文档所述的 dummy 条目 Sysop@f9999.n9999.z2.ftn"
+    command: "<CONFIG_SHELL> test_package/test_ifmail.sh <workdir>  # 末尾打印 CONSUMER TESTS: 20/20"
+  - file: test_ifmail_ohos.sh
+    description: "鸿蒙特有测试，2 个场景 / 12 项。OHOS-1（5 项）ndbm 由 libgdbm_compat 承载：OHOS/musl 根本没有 ndbm 实现，ifmail 的 dbm_open/dbm_store/dbm_fetch 全部走 gdbm/1.23 的 compat 层（静态链接），ifindex 在设备文件系统上写索引、nlookup 读回并逐字节比对 8 行输出，且断言 compat 层的两文件布局（数据在 index.pag，非空）与二次重建既有索引；OHOS-2（7 项）K&R varargs 转 C99 stdarg：clang 15 的 <varargs.h> 是 #error 桩，lutil.c 的 loginf/logerr/debug 与 respfreq.c 的 add_report 必须转换，转换错误不会编译失败而会静默错读参数表，故断言 4 种不同签名的格式化输出（%d、%s、%s%s%s+%08lx、%u x4+%d+%lu）在调试文件里取值正确，含由夹具行长度推导出的偏移 135/266"
+    command: "<CONFIG_SHELL> test_package/test_ifmail_ohos.sh <workdir>  # 末尾打印 HARMONYOS-SPECIFIC TESTS: 12/12"
+
+# 合计：上游 30 + 消费者 20 + 鸿蒙特有 12 = 62
+assertion_count: 62

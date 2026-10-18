@@ -1,0 +1,218 @@
+# manifest.yaml - ifmail 2.14tx8.10 版本级元数据
+# 交叉校验用（CI 的唯一构建输入是 conanfile.py，本文件不被 CI 读取）
+
+# ============================================================
+# 必须字段
+# ============================================================
+version: "2.14tx8.10"
+software: ifmail
+# published | built | failed | archived
+status: built
+build_date: "2026-10-16"
+conan_ref: "ifmail/2.14tx8.10"
+build_system: "makefile（顶层 Makefile + include CONFIG；上游无 configure/cmake/meson）"
+
+description: "ifmail：FidoNet <-> Internet 传输与网关套件。ifcico 负责拨号/TCP 上的 FTN 会话（FTSC/EMSI/YooHoo/Wazoo/Hydra/Janus/Zmodem/Xmodem/binkp），ifgate 提供邮件与新闻网关（ifmail/ifnews/iftoss/ifpack/ifunpack/ifstat），另有 nodelist 索引与查询工具（ifindex/ifinfo/nlookup/ifroute/nlpatch/ifreq）"
+category: "network"
+license: GPL-2.0-or-later
+homepage: "http://ifmail.sourceforge.net/"
+
+compiler: "clang (OHOS NDK clang-15)"
+target_arch: aarch64
+target_os: ohos
+
+# ============================================================
+# 源码信息
+# ============================================================
+source:
+  # 上游官网 www.average.org/ifmail 只是 2001 年的跳转页，指向 ifmail.sourceforge.net；
+  # SourceForge 的 ifmail-stable/ 只到 2.9..2.15（非 tx 分支），ifmail-devel/ 只有 3.02/3.03，
+  # 全树没有 tx8.10；GitHub 只有下游 fork，AUR 无此包。2.14tx8.10 唯一存世的原版
+  # release tarball 就是 Debian pool 的 .orig（非 Debian 重打包：-32.debian.tar.xz 的
+  # quilt 系列一律未用，全部可移植性修改都在 patches/ 里）。
+  url: "https://deb.debian.org/debian/pool/main/i/ifmail/ifmail_2.14tx8.10.orig.tar.gz"
+  sha256: "5135f3bb0373bb82b983e7db61294fc56827538409cf56a1c5e45aee8f26d920"
+  tar_format: tar.gz
+  sha256_evidence: "ifmail_2.14tx8.10-32.dsc 的 Checksums-Sha256 与本机 shasum -a 256 双向一致（501678 字节）"
+
+# ============================================================
+# 构建配置
+# ============================================================
+build:
+  system: makefile
+  # 无 configure 步骤：平台选择全部通过 make 命令行变量覆盖完成（conanfile.py:_make_args）
+  configure_options: []
+  make_overrides:
+    - "CC/AR/RANLIB 取自 tools.build:compiler_executables（R33，不读 shell 环境变量）"
+    - "CFLAGS 追加 -DDO_NEED_TIME：parsedate.y 与 gettime.c 只在该宏下 include <time.h>，否则 musl 下 struct tm 不完整"
+    - "LIBS 改为 -L<gdbm>/lib -lgdbm_compat -lgdbm：CONFIG 的 Linux 值是 -lgdbm -lresolv，OHOS musl 把 resolver 并入 libc 且无 libresolv"
+    - "YACC=\"bison -y\" LEX=flex AWK=awk（tool_requires 提供；worker 无系统 yacc/lex/awk）"
+    - "SHELL 指向 CONFIG_SHELL（OHOS 无 /bin/sh）"
+    - "USE_NLS=no：po/ 需要 msgfmt 生成的 catalog 与 libintl，只影响交互消息本地化（非核心可选功能）"
+    - "REFERENCES_MSC96=yes：保留 MSGID <-> Message-ID 参考库（iflib/ref.c，走 ndbm）与 make_new_ref 工具"
+    - "BINDIR/CONFIGFILE/MAPTABDIR/DEBUGFILE/LOGFILE/LOCKDIR/PUBDIR/NEWSSPOOL/FAKEDIR 全部指向 package_folder（烤入二进制的编译期默认路径）"
+    - "-j1（R9/E525：GNU make>=4.4 的 jobserver FIFO 在 HMDFS 不可用）"
+  dependencies:
+    - gdbm/1.23          # --enable-libgdbm-compat 的那个版本，提供 <ndbm.h> + libgdbm_compat.a
+  build_dependencies:    # 仅 worker 原生构建时 tool_requires；本地 macOS 模拟走 flex_bison_native
+    - bison/3.8.2
+    - flex/2.6.4.2
+    - awk/20251225
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 产物
+# ============================================================
+artifacts:
+  - bin/ifcico
+  - bin/ifindex
+  - bin/ifinfo
+  - bin/ifreq
+  - bin/ifroute
+  - bin/nlpatch
+  - bin/nlookup
+  - bin/ifmail
+  - bin/ifnews           # 上游是 ifmail 的硬链接，打包后为同内容独立文件
+  - bin/iftoss
+  - bin/ifpack
+  - bin/ifunpack
+  - bin/ifstat
+  - bin/make_new_ref
+  - share/ifmail/maptabs/    # 字符集转换表；MAPTABDIR 烤入的就是这个目录
+  - etc/ifmail/config.sample
+  - etc/ifmail/Areas.sample
+  - share/man/man8/*.8       # ifcico ifindex ifinfo ifreq ifroute nlpatch ifmail iftoss cleanup_ref make_new_ref
+  - share/man/man3/parsedate.3
+  - share/man/fr/man8/ifcico.8.fr
+  - share/doc/ifmail/        # README README.first README.charset Changelog.TX Credits.TX LSM LSM.TX CONFIG
+  - var/log/ifmail/ var/lock/ var/spool/{uucppublic,news,ifmail/fake}/   # 烤入默认路径对应的空目录（.keep 占位）
+
+# ============================================================
+# 测试
+# ============================================================
+test_result: PASS   # 本地（交叉构建 + conan-verify + W3 + 参考构建）与真机（远程 CI #97651：conan-build-test / test_package / L0 / L1 全通过）双向通过；详见 notes.md §6.1-§6.2
+test_summary: "口径=独立可判定检查项。上游 iflib/Makefile 有 4 个 -DTESTING 自测目标，其中 3 个（testconf/testscan/testrfcaddr）在 build() 末尾由 uptests/run_upstream_tests.sh 真实执行并断言 30 项；testtrap 不执行（-DTESTING 分支的处理器 return 而非 abort()，故障指令重复执行，无确定终态；参考构建实测 rc=133 且零输出）。test_package 另有消费者测试与鸿蒙特有测试，详见 test_package/MANIFEST.yml"
+# 远程 CI 取证（三轮均未进入编译阶段，详见 notes.md §6.1）：
+#   #96094/#96105 checkout-pr —— PR head 被解析成官方仓空占位分支，pull/16259.diff 为 0 字节；
+#     推送提交到官方仓任务分支后 diff 恢复 188327 B / 39 文件（head=e7ada20163）
+#   #96134 conan-build-test 的 G0 —— ci/conan/build_and_test.sh 的 G0b/G0d 写死三位条目号
+#     E[0-9][0-9][0-9]，知识库跨过 E999 后把 E1000.kv..E1035.kv 判为非标准（36 个），
+#     index.tsv(1035) vs .kv(999) 必然不等 ⇒ L0-L5 全部 blocked_by_G0。属 CI 门禁缺陷，
+#     本包未触碰 knowledge/graph/ 与 index.tsv，无法在本 PR 内修复。
+#   #96xxx（G0 修复后的一轮）conan create —— 真机原生编译 133 个 .c 全部通过、ifmail 链接成功
+#     （15 个补丁在真机生效），但 ifgate/Makefile:92 的 `ln ifmail ifnews` 报
+#     `ln: cannot create hard link from 'ifmail' to 'ifnews': Operation not permitted`
+#     ⇒ HMDFS 不支持硬链接（E079）。已加补丁 0016 把两处 ln 改为 cp（E079 推荐方案）。
+#   第 5/6 轮 #97651（worker CI-036）与 #97680（worker CI-011）——**两轮 CI 校验均通过**
+#     （构建输入同为含补丁 0016 的 head 4e8e7ba5；其后 5321ee75 只改文档）：
+#     7 步全绿（含 conan-build-test），Conan test_package 通过，L0（结构完整性）通过，
+#     L1（测试执行验证）通过 ⇒ 真机 62/62（30 项上游自测在 build() 内 + 32 项 test_package）。
+#     判定因果已在 #97085/#97479 实证：build()/test_package 任一断言失败都会让 conan create
+#     非零退出并记为 L1_RESULT=fail。逐条 [pass] 行属 conan-build-test 步骤全文，
+#     看板默认只渲染 cleanup 步骤，未取得全文（此点按证据纪律标注为"由门禁结论推得"）。
+test_commands:
+  - "make -C iflib testconf testscan testrfcaddr（构建上游自测程序）"
+  - "uptests/run_upstream_tests.sh <workdir>（30 项断言，末尾打印 UPSTREAM TESTS: N/N）"
+  - "test_package/test_ifmail.sh（消费者测试）"
+  - "test_package/test_ifmail_ohos.sh（鸿蒙特有测试）"
+
+# ============================================================
+# 补丁信息
+# ============================================================
+patches_applied:
+  - "0001-ifcico-hydra.c.patch（补 xtodos() 原型：隐式 int 返回使 char* 赋值成为硬错误）"
+  - "0002-ifcico-mxlookup.c.patch（去掉 _res 调参 + 用本地大端读取替代 libresolv 私有的 _getshort/_getlong）"
+  - "0003-ifcico-respfreq.c.patch（varargs->stdarg；BSD re_comp/re_exec -> POSIX regcomp/regexec）"
+  - "0004-ifgate-message.c.patch（ref_dbase 重复暂定定义 -> extern，-fno-common 下为 duplicate symbol）"
+  - "0005-ifgate-nlindex.c.patch（去掉重复 include <ndbm.h>：gdbm compat 头无 include guard）"
+  - "0006-ifgate-nodecheck.c.patch（同上，保留 <fcntl.h>）"
+  - "0007-iflib-testglue.c.patch（新增：为 testconf/testscan 补 version/reldate/copyright/usage()，上游自测目标此前根本无法链接）"
+  - "0008-iflib-lutil.c.patch（loginf/logerr/debug 由 <varargs.h>+va_dcl 转 <stdarg.h>；补 xutil.h）"
+  - "0009-iflib-make_new_ref.c.patch（补 <stdlib.h> 以声明 exit）"
+  - "0010-iflib-trap.c.patch（删掉 pre-glibc 的 <linux/version.h>+<linux/signal.h> __KERNEL__ 分支：与 musl 用户态 <signal.h> 冲突；补 <stdlib.h>）"
+  - "0011-ifcico-flaglex.l.patch（定义 YY_SKIP_YYWRAP：flex 生成的 extern int yywrap(void) 与文件内 #define yywrap() 1 相撞）"
+  - "0012-ifgate-nlindex.h.patch（删掉未使用的 extern struct _fkey fkey[]（不完整类型数组）；补 <dbm.h> 回退分支）"
+  - "0013-iflib-parsedate.y.patch（补 <string.h>；date_lex 去掉 static 并给出原型，bison 生成的 yyparse 先调用后定义）"
+  - "0014-iflib-xutil.h.patch（K&R 的 #define size_t unsigned int 换成 <stddef.h>：LP64 截断 + 污染后续系统头）"
+  - "0015-iflib-Makefile.patch（4 个 -DTESTING 自测目标改走 ${CC}/${CFLAGS}/${INCLUDES}/${DEFINES}/${LIBS}，并把 testglue.c 链进 testconf/testscan）"
+  - "0016-ifgate-Makefile.patch（ifnews 的两处 ln 硬链接改 cp：HMDFS 不支持硬链接，真机 CI #96xxx 实测 `ln: cannot create hard link ... Operation not permitted` 直接中断构建；命中既有知识 E079，按其推荐方案 command-substitute→cp 处置）"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+knowledge_gained:
+  # 每条都带 ref:（check-knowledge-gap 用它判断"已引用"）
+  - "gdbm 的 compat 层 <ndbm.h> 没有 include guard（实测 grep -c 'ifndef|pragma once' == 0）：同一 TU 二次包含即 typedef redefinition ('struct DBM' vs 'struct DBM') 硬错误，消费方必须把包含点收敛到项目头 —— 已沉淀草稿 (ref: DRAFT-ifmail-2.14tx8.10-gdbm-compat-ndbm-no-include-guard)"
+  - "制品仓 gdbm/1.23 是 --enable-libgdbm-compat（含 ndbm.h/dbm.h/libgdbm_compat.a），gdbm/1.24 反而是 --disable-libgdbm-compat（连 ndbm.h 都没有）；conan list 看不出开关，必须下载配方/包体实测 (ref: DRAFT-ifmail-2.14tx8.10-gdbm-compat-ndbm-no-include-guard)"
+  - "clang 15/17 的 <varargs.h> 是只含 #error 的桩头，K&R 的 va_dcl + 单参 va_start(ap) 会同时炸出三条硬错误；必须逐入口转 C99 stdarg，并同步 ANSI 原型/前置声明/包含顺序，CFLAGS 绕不过去 —— 已沉淀草稿 (ref: DRAFT-ifmail-2.14tx8.10-kr-varargs-clang-error-stub-stdarg)"
+  - "musl 只提供 struct __res_state 类型（头文件自注 'unused; purely for broken apps'）而没有 _res 对象，也没有 libresolv 私有的 _getshort/_getlong —— 命中既有条目，按其口径处置 (ref: E516)"
+  - "musl 无 BSD re_comp/re_exec（glibc 需 _REGEX_RE_COMP 才暴露），只有 POSIX regcomp/regexec；老代码的掩码匹配要包一层 (engine 查重未命中既有条目；本次只在 notes 记录，未单独申报草稿) (ref: notes.md#4-适配点逐条)"
+  - "readconfig() 结束时会 freopen(debugfile, 'a', stderr)，配置之后的所有诊断都进调试文件；debugfile 未配置时落到编译期 DEBUGFILE —— 本包排障/测试取证的必备前提，属单包行为，不申报通用条目 (ref: notes.md#7-已知限制路径-a核心能力完整)"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /var/folders/mz/4dql6xh91bv6q32jnsgc1q7c0000gn/T/builds/ifmail-2.14tx8.10.orig
+  source_work_dir: /var/folders/mz/4dql6xh91bv6q32jnsgc1q7c0000gn/T/builds/ifmail-2.14tx8.10.work
+  source_orig_hash: ccf13b83e990138f
+  source_work_hash: a007a2ce5d8bf1c4
+  generated_at: '2026-10-16T18:22:58'
+  patches_count: 14
+
+patch_classification:
+  - file: 0001-ifcico-hydra.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-ifcico-mxlookup.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-ifcico-respfreq.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-ifgate-message.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0005-ifgate-nlindex.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0006-ifgate-nodecheck.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0007-iflib-testglue.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0008-iflib-lutil.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0009-iflib-make_new_ref.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0010-iflib-trap.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0011-ifcico-flaglex.l.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0012-ifgate-nlindex.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0013-iflib-parsedate.y.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0014-iflib-xutil.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

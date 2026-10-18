@@ -1,0 +1,62 @@
+--- a/ifcico/mxlookup.c
++++ b/ifcico/mxlookup.c
+@@ -39,6 +39,25 @@
+ 
+ static char *cname = NULL;
+ 
++/* BIND's private _getshort()/_getlong() answer-buffer readers live in
++ * libresolv on glibc; musl exports neither (and there is no libresolv at
++ * all), so the link fails with "undefined symbol: _getshort". They are plain
++ * big-endian loads out of the DNS answer, so read the wire bytes directly. */
++
++static unsigned int mx_getshort (char *cp)
++{
++	return (((unsigned int)(unsigned char)cp[0]) << 8) |
++	        ((unsigned int)(unsigned char)cp[1]);
++}
++
++static unsigned long mx_getlong (char *cp)
++{
++	return (((unsigned long)(unsigned char)cp[0]) << 24) |
++	       (((unsigned long)(unsigned char)cp[1]) << 16) |
++	       (((unsigned long)(unsigned char)cp[2]) << 8) |
++	        ((unsigned long)(unsigned char)cp[3]);
++}
++
+ /*
+  * Store records in user(s) buffer
+  */
+@@ -140,8 +159,10 @@
+ 	
+ 	res_init ();
+ 
+-	_res.options &= ~RES_DEFNAMES;
+-	_res.retrans = 3;
++	/* musl's <resolv.h> ships struct __res_state "unused; purely for broken
++	 * apps" but no _res object, so these BIND resolver knobs are not
++	 * reachable. They only nudged the retry count and the domain-search
++	 * default, neither of which musl's resolver honours. */
+ 
+ 	addr = inet_addr (node);
+ 	h_errno = TRY_AGAIN;
+@@ -188,16 +209,16 @@
+ 	if ((cp = exp_cdname (cp, msg, name)) == NULL)
+ 		return NULL;			/* compression error */
+ 
+-	type = _getshort (cp);
++	type = mx_getshort (cp);
+ 	cp  += sizeof (u_short);
+ 
+-	class=  _getshort (cp);
++	class=  mx_getshort (cp);
+ 	cp  += sizeof (u_short);
+ 
+-	ttl  = _getlong (cp);
++	ttl  = mx_getlong (cp);
+ 	cp  += sizeof (u_long);
+ 
+-	dlen = _getshort (cp);
++	dlen = mx_getshort (cp);
+ 	cp  += sizeof (u_short);
+ 	cp1  = cp;
+ 

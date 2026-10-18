@@ -1,0 +1,17 @@
+address     2:5020/230@fidonet
+myfqdn      fido.example.org
+# Layout note: scanout() walks the *parent* of outbound and logs one
+# "checking directory <name> against outb" line per entry it finds there, so
+# everything the tools create lives under spool/ while the debug file stays
+# outside it. That keeps the assertions independent of unrelated work files.
+inbound     @WORKDIR@/spool/inb
+outbound    @WORKDIR@/spool/outb
+nodelist    @WORKDIR@/spool/nl.d/nodelist
+database    @WORKDIR@/spool/ifdbm
+domtrans    .fidonet .ftn
+# readconfig() freopen()s stderr onto debugfile once it finishes, so every
+# post-config message from testscan lands in that file instead of the
+# terminal (rdconfig.c falls back to the compiled-in DEBUGFILE when the key
+# is absent, and that path is not writable here). Keep this the last line:
+# run_upstream_tests.sh quotes the trace line numbers 1, 2, 9 and 11 above.
+debugfile   @WORKDIR@/ifdebug
