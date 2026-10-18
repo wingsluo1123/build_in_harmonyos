@@ -1,0 +1,53 @@
+--- a/src/paprefs.cc
++++ b/src/paprefs.cc
+@@ -20,21 +20,23 @@
+ #ifdef HAVE_CONFIG_H
+ #include <config.h>
+ #endif
+ 
+ #include <signal.h>
+ 
+ #include <gtkmm.h>
+ #include <libintl.h>
+ #include <giomm/dbusconnection.h>
+ #include <giomm/dbusproxy.h>
++#ifdef GDK_WINDOWING_X11
+ #include <gdk/gdkx.h>
++#endif
+ 
+ #include <pulse/version.h>
+ 
+ #define MODULE_GROUPS_PATH "/org/freedesktop/pulseaudio/module-groups"
+ #define MODULE_GROUP_SCHEMA "org.freedesktop.pulseaudio.module-group"
+ #define MAX_MODULES 10
+ 
+ class MainWindow : public Gtk::Window {
+ public:
+     MainWindow(BaseObjectType* cobject, const Glib::RefPtr<Gtk::Builder>& x);
+@@ -347,21 +349,26 @@
+ 
+     if (b)
+         packages.push_back(Glib::ustring(b));
+ 
+     proxy = Gio::DBus::Proxy::create_for_bus_sync(Gio::DBus::BusType::BUS_TYPE_SESSION,
+                                                       "org.freedesktop.PackageKit",
+                                                       "/org/freedesktop/PackageKit",
+                                                       "org.freedesktop.PackageKit.Modify");
+ 
+     Glib::VariantContainerBase params = Glib::VariantContainerBase::create_tuple(std::vector<Glib::VariantBase>({
++#ifdef GDK_WINDOWING_X11
+         Glib::Variant<guint>::create(GDK_WINDOW_XID(get_window()->gobj())),
++#else
++        // Broadway-only 平台（如 OHOS）无 X11 窗口 ID，PackageKit 接受 0
++        Glib::Variant<guint>::create((guint)0),
++#endif
+         Glib::Variant<std::vector<Glib::ustring>>::create(packages),
+         Glib::Variant<Glib::ustring>::create("show-confirm-search,hide-finished")
+     }));
+ 
+     try {
+         proxy->call_sync("InstallProvideFiles", params);
+ 
+         checkForModules();
+         updateSensitive();
+     } catch (const Glib::Error& err) {

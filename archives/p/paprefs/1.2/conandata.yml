@@ -1,0 +1,18 @@
+# conandata.yml — paprefs 1.2
+# 取源用 GitLab 官方 tag 归档：freedesktop.org 的 /software/pulseaudio/paprefs/
+# 发布包对非浏览器 UA 返回 403（CI 干净环境实测 source() AuthenticationException:
+# 403 Forbidden，本地因 download_cache 命中该 tarball 未暴露）。归档与发布 tar.xz
+# 逐文件 sha256 完全一致（64 文件全同），取源方式同 pulseaudio/17.0 先例。
+sources:
+  url: "https://gitlab.freedesktop.org/pulseaudio/paprefs/-/archive/v1.2/paprefs-v1.2.tar.gz"
+  sha256: "3ec501aa97bb539991ee4cc87f4fd59fb76357a1b7ce978a62af1ecff7835470"
+patches:
+  - patch_file: "patches/0001-meson.build.patch"
+    patch_description: "project() 增加 'c' 语言（intl-wrapper.c 为 C 源，需 C 编译器）；OHOS gtk/3.24.43 为 Broadway-only（无 X11 后端）"
+    patch_type: "portability"
+  - patch_file: "patches/0002-src-meson.build.patch"
+    patch_description: "meson.build 源列表加入 intl-wrapper.c（g_libintl_* → libintl_* 转发，E508/ohos-nls-libintl），文件由配方 res/ 提供"
+    patch_type: "portability"
+  - patch_file: "patches/0003-src-paprefs.cc.patch"
+    patch_description: "守卫 gdk/gdkx.h include 与 GDK_WINDOW_XID 调用（GTK 自带 GDK_WINDOWING_X11 宏），Broadway 下 PackageKit 窗口 ID 传 0"
+    patch_type: "portability"
