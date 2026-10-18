@@ -1,0 +1,125 @@
+diff --git a/Kconfig b/Kconfig
+index 8b6139d..6fee9a4 100644
+--- a/Kconfig
++++ b/Kconfig
+@@ -53,6 +53,17 @@ config HAVE_LIBUBOOTENV
+ 	bool
+ 	option env="HAVE_LIBUBOOTENV"
+ 
++config UBOOTENV
++	bool "support for U-Boot environment variables"
++	depends on HAVE_LIBUBOOTENV
++	default y
++	help
++	  Store SWUpdate variables (for example the hawkBit action_id)
++	  into the bootloader environment through libubootenv.
++	  Say N when libubootenv is not available for the target: the
++	  variable interface is compiled out and reports that it is not
++	  supported at runtime.
++
+ config HAVE_LIBEBGENV
+        bool
+        option env="HAVE_LIBEBGENV"
+diff --git a/Makefile.flags b/Makefile.flags
+index 267d74a..02a0c7d 100644
+--- a/Makefile.flags
++++ b/Makefile.flags
+@@ -108,8 +108,12 @@ KBUILD_CFLAGS += --sysroot=$(CONFIG_SYSROOT)
+ export SYSROOT=$(CONFIG_SYSROOT)
+ endif
+ 
+-# Always link pthread, libubootenv, and json-c
+-LDLIBS += pthread ubootenv json-c
++# Always link pthread and json-c
++LDLIBS += pthread json-c
++# libubootenv is only needed when the variables interface is built in
++ifeq ($(CONFIG_UBOOTENV),y)
++LDLIBS += ubootenv
++endif
+ # lua
+ ifneq ($(CONFIG_LUA),)
+ LDFLAGS_swupdate += -Wl,-E
+diff --git a/core/swupdate_vars.c b/core/swupdate_vars.c
+index b207494..9d74d87 100644
+--- a/core/swupdate_vars.c
++++ b/core/swupdate_vars.c
+@@ -22,6 +22,7 @@
+ 
+ #include "swupdate_vars.h"
+ 
++#ifdef CONFIG_UBOOTENV
+ char *namespace_default = NULL;
+ 
+ static inline void libuboot_cleanup(struct uboot_ctx *ctx)
+@@ -171,3 +172,54 @@ bool swupdate_set_default_namespace(const char *namespace)
+ 
+ 	return namespace_default != NULL;
+ }
++
++#else /* !CONFIG_UBOOTENV */
++
++/*
++ * libubootenv is not available on this target (CONFIG_UBOOTENV=n).
++ * Keep the interface but report that the feature is not supported
++ * instead of silently ignoring variable updates.
++ */
++int swupdate_vars_initialize(struct uboot_ctx **ctx, const char *namespace)
++{
++	(void)ctx;
++	(void)namespace;
++	return -ENOTSUP;
++}
++
++char *swupdate_vars_get(const char *name, const char *namespace)
++{
++	(void)name;
++	(void)namespace;
++	return NULL;
++}
++
++int swupdate_vars_set(const char *name, const char *value, const char *namespace)
++{
++	(void)name;
++	(void)value;
++	(void)namespace;
++	return -ENOTSUP;
++}
++
++int swupdate_vars_unset(const char *name, const char *namespace)
++{
++	(void)name;
++	(void)namespace;
++	return -ENOTSUP;
++}
++
++int swupdate_vars_apply_list(const char *filename, const char *namespace)
++{
++	(void)filename;
++	(void)namespace;
++	return -ENOTSUP;
++}
++
++bool swupdate_set_default_namespace(const char *namespace)
++{
++	(void)namespace;
++	return false;
++}
++
++#endif /* CONFIG_UBOOTENV */
+diff --git a/include/swupdate_vars.h b/include/swupdate_vars.h
+index 1dcab97..2f4ae06 100644
+--- a/include/swupdate_vars.h
++++ b/include/swupdate_vars.h
+@@ -7,7 +7,12 @@
+ 
+ #pragma once
+ 
++#ifdef CONFIG_UBOOTENV
+ #include <libuboot.h>
++#else
++/* libubootenv is not available: only an opaque pointer is needed. */
++struct uboot_ctx;
++#endif
+ #include <stdbool.h>
+ 
+ int swupdate_vars_initialize(struct uboot_ctx **ctx, const char *namespace);

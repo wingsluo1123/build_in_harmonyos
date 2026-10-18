@@ -1,0 +1,118 @@
+#====================================================================
+# E760 (draft) — Conan 静态包同时安装 .so：链接器取动态库，运行期
+#   该目录不在 runenv（require.run=False）→ Error loading shared library
+# 触发事件: swupdate 2026.05.1（libarchive/3.8.7 声明 shared=False 但 lib/
+#   同时有 libarchive.a 与 libarchive.so.13；swupdate 链接后带
+#   DT_NEEDED libarchive.so.13，conanrun 环境里没有该目录）
+#====================================================================
+
+id:                     E760
+trigger_tool:           conan|ld|make|runtime
+phase:                  linking|runtime
+error_signature:        'Error loading shared library lib[a-zA-Z0-9._+-]+: \(needed by|Error relocating [^\n]*: [A-Za-z_][A-Za-z0-9_]*: symbol not found|ld\.lld: error: unable to find library -l[a-zA-Z0-9._+-]+'
+
+# ═══ Layer 1: 识别层 ═══
+severity:               2
+category:               conan, dependency, packaging, linking, runtime
+prescan_pattern:
+prescan_globs:
+match_keywords:         conan, shared=False, static-library, libarchive.a,
+                        libarchive.so.13, DT_NEEDED, LD_LIBRARY_PATH,
+                        VirtualRunEnv, conanrun, require.run, NEEDED,
+                        Error loading shared library, Error relocating,
+                        symbol not found, 影子目录, shadow dir, -L 搜索顺序
+title:                  Conan 声明 static 的依赖包同时装出 .so：链接器优先取
+                        .so，而 runenv（按 shared/require.run 判定）不导出该
+                        目录 ⇒ 运行期 "Error loading shared library"
+
+# ═══ Layer 2: 诊断层 ═══
+root_cause: >
+  Conan 2 的 VirtualRunEnv 只把「需要运行」的依赖（require.run=True，即
+  shared=True 的包或 application）的 libdir 写进 LD_LIBRARY_PATH；对
+  shared=False（static-library）的包，Conan 认为链接期就被吸收、运行期不需要，
+  因而其目录从不进入 conanrun 环境。而 OHOS 制品仓里有包在 shared=False 的
+  构建里仍然同时安装 libX.a 与 libX.so（实测 libarchive/3.8.7：包 options
+  shared=False，lib/ 下 libarchive.a 与 libarchive.so.13 并存），链接器按
+  「同目录优先 .so」的规则取动态库 ⇒ 产物带上 DT_NEEDED libarchive.so.13，
+  与 Conan 的运行期模型不一致。运行/加载该产物时报
+  "Error loading shared library libarchive.so.13: (needed by <bin>)" 及随后
+  一串 "Error relocating <bin>: archive_*: symbol not found"（符号其实在 .a
+  里，链接时被 .so 截走）。测试面上还有一个隐蔽后果：上游/自建 test_package
+  里所有「期望失败」的断言会因为二进制根本起不来（rc=127/126）而**假通过**，
+  只有 assert_true 类用例才暴露。
+affected_scope: >
+  链接期依赖 OHOS 制品仓中 shared=False 却同时装 .so 的包的所有 C/C++
+  配方（本仓实测 libarchive/3.8.7；openssl、lua、zlib、libmtd、libubi 只装
+  .a，libconfig/json-c/libcurl 是 shared=True，均不受影响）。
+verification_cmd:       |-
+                        # 1) 产物是否带该包的 DT_NEEDED
+                        readelf -d <build>/bin/<binary> | grep NEEDED
+                        # 2) 该包是否 shared=False 且 .a/.so 并存
+                        conan list -r=ohpcd "libarchive/3.8.7:*" | grep shared
+                        ls "$(conan cache path libarchive/3.8.7:<pid>)/lib"   # 同时列 libarchive.a 与 libarchive.so.13
+                        # 3) 修好之后：NEEDED 里应无 libarchive.so.13
+                        readelf -d <build>/bin/<binary> | grep -c libarchive   # 期望 0
+
+# ═══ Layer 3: 方案层 ═══
+rec_priority:           1
+rec_approach:           static-shadow-libdir-first
+rec_description: >
+  在 conanfile.py 的 generate() 里为每个 shared=False（用
+  dep.options.get_safe("shared") 判定，注意 _PackageOption.__bool__ 才是
+  真值）的依赖建一个「影子目录」，只把该依赖 libdir 下的 lib*.a 复制进去，
+  再把这个影子目录放在 LDFLAGS 的 -L 列表**最前**（链接器按目录顺序取首个
+  匹配）。这样 -lX 命中影子目录里的 .a，静态链入、DT_NEEDED 消失，运行期
+  不再需要该目录，也与 Conan 的运行期模型一致。配方实测：swupdate
+  2026.05.1 + libarchive/3.8.7 修后 `readelf -d bin/swupdate` 的 libarchive
+  计数由 1 → 0，test_package 13/13 通过。
+rec_command:            '见 rec_description；关键三步：mkdir 影子目录 → 复制 shared=False 依赖的 lib*.a → libdirs = [shadow] + libdirs（用于 -L 与 LD_LIBRARY_PATH）'
+rec_auto_fix:           false
+rec_impl:               conan-recipe-static-shadow-dir
+
+fallback_priority:      2
+fallback_approach:      export-static-dep-libdir-to-runenv
+fallback_description: >
+  不动链接面，改为在消费侧（test_package 的 generate() 或消费方配方）把该
+  依赖的 libdir 追加进 LD_LIBRARY_PATH。注意：仅在 test_package 里
+  `self.requires("<pkg>/<ver>")` 也**不会**让 VirtualRunEnv 导出它
+  （实测：显式 require 后 conanrunenv 仍只有 shared=True 的三个包）——必须
+  自己用 Environment().append("LD_LIBRARY_PATH", ...) 落一个额外 env 脚本。
+fallback_command:       'python: env = Environment(); env.append("LD_LIBRARY_PATH", libdir); env.vars(self).save_script("...")，再 self.run(cmd, env=["conanrun", "<script>"])'
+fallback_auto_fix:      false
+fallback_impl:          extra-env-script
+
+forbid_1_pattern:       rm[[:space:]]+.*conan2/p/.*/lib[a-zA-Z0-9._+-]*\.so|
+                        mv[[:space:]]+.*conan2/p/.*\.so
+forbid_1_reason:        删/移共享 conan 缓存里的 .so 会污染其他任务与共享设备上的
+                        同一包（本设备 /storage/Users/currentUser/.conan2 是
+                        全设备共用缓存）
+forbid_1_consequence:   其他任务链接行为变化且不可追溯；缓存被 conan 校验为损坏
+
+# ═══ Layer 4: 原则引用 ═══
+principles:
+
+# ═══ 关系图 ═══
+causes:                 []
+caused_by:              []
+similar_to:             E274
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file:               doc/E760.md
+last_updated:           2026-10-16
+source_event:           swupdate 2026.05.1（libarchive/3.8.7）
+
+# ═══ 知识协作 ═══
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-16
+
+draft: true
+contributor_id: 3B6E

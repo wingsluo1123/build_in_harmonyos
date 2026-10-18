@@ -1,0 +1,77 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# 本包的上游测试面（swupdate 是 Kbuild/make 工程，无 ctest/meson）：
+#   1) 单元测试：test/ 下 10 个 cmocka 二进制，`make test` 构建并执行（TAP 输出）
+#   2) 验收测试：scripts/acceptance-tests/CheckImage.mk 的 `swupdate -c` 端到端目标，
+#      `make acceptance-tests` 执行（本配置启用 6 个）
+# 两者都由 conanfile.py 的 build() 真实执行（upstream_test_in_build: true）。
+
+package: swupdate/2026.05.1
+homepage: "https://github.com/sbabic/swupdate"
+
+# 上游测试命令（Kbuild：`make tests` = test + acceptance-tests）
+upstream_check_command: "make tests"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "make test; make acceptance-tests SWU_CLEAN=true"
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: test/Makefile
+    source: swupdate-2026.05.1/test/Makefile
+    description: "cmocka 单元测试：10 个二进制共 61 个注册用例（本配置构建 9 个 / 60 例；test_crypt_pkcs11 需 softhsm2-util 生成 token 夹具，未构建）"
+    command: "make test"
+  - file: test/test_util.c
+    source: swupdate-2026.05.1/test/test_util.c
+    description: "test_util 3 例（ustrtoull / size_delimiter_match / is_filename_valid）"
+    command: "./test/test_util"
+  - file: test/test_network_ipc_if.c
+    source: swupdate-2026.05.1/test/test_network_ipc_if.c
+    description: "test_network_ipc_if 2 例（swupdate_dwl_url 填充/截断）"
+    command: "./test/test_network_ipc_if"
+  - file: test/test_hash.c
+    source: swupdate-2026.05.1/test/test_hash.c
+    description: "test_hash 2 例（sha1/sha256 标准向量；含上游 648eff6da1f0 的期望值回移）"
+    command: "./test/test_hash"
+  - file: test/test_crypt.c
+    source: swupdate-2026.05.1/test/test_crypt.c
+    description: "test_crypt 4 例（AES-128/192/256 + 失败路径）"
+    command: "./test/test_crypt"
+  - file: test/test_verify.c
+    source: swupdate-2026.05.1/test/test_verify.c
+    description: "test_verify 1 例（RSA 签名校验）"
+    command: "./test/test_verify"
+  - file: test/test_json.c
+    source: swupdate-2026.05.1/test/test_json.c
+    description: "test_json 2 例（json get_key / get_path_key）"
+    command: "./test/test_json"
+  - file: test/test_server_hawkbit.c
+    source: swupdate-2026.05.1/test/test_server_hawkbit.c
+    description: "test_server_hawkbit 6 例（hawkBit 部署/回执/取消/工件/轮询/待处理动作）"
+    command: "./test/test_server_hawkbit"
+  - file: test/test_mongoose_upload.c
+    source: swupdate-2026.05.1/test/test_mongoose_upload.c
+    description: "test_mongoose_upload 1 例（上传响应格式）"
+    command: "./test/test_mongoose_upload"
+  - file: test/test_flash_handler.c
+    source: swupdate-2026.05.1/test/test_flash_handler.c
+    description: "test_flash_handler 39 例（MTD/CFI 写入路径，mock 驱动；依赖 libmtd/libubi 制品）"
+    command: "./test/test_flash_handler"
+  - file: scripts/acceptance-tests/CheckImage.mk
+    source: swupdate-2026.05.1/scripts/acceptance-tests/CheckImage.mk
+    description: "验收测试：9 个 `swupdate -c` 目标（本配置启用 6 个：FileNotFound/CrapFile/ImgNameError/InvOptsNoImg/InvOptsCheckWithWeb/InvOptsCheckWithSur）"
+    command: "make acceptance-tests SWU_CLEAN=true"
+
+# test_package 中自带的测试（消费者视角验证，调用已安装的二进制）
+test_package_tests:
+  - file: test.sh
+    description: "消费者测试 13 条断言：--version 指纹、-h 的 5 个功能面指纹（--check/--key/--key-aes/webserver/suricatta）、2 条负例、3 条工具可用性（首条断言 --version rc=0，失败即退出以防负例假通过）"
+    command: "bash test_package/test.sh"
+
+# 上游测试用例总数（单元 61 + 验收 9 = 70；本配置实际执行 60 + 6 = 66）
+# 另有 test_package（鸿蒙特有）13 条断言，不计入上游分母。
+assertion_count: 70
