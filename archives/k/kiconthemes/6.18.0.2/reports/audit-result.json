@@ -1,0 +1,152 @@
+{
+  "verdict": "pass",
+  "package": "kiconthemes",
+  "version": "6.18.0.2",
+  "auditor": "independent-subagent",
+  "timestamp": "2026-10-16T10:57:26Z",
+  "issues": [
+    {
+      "severity": "P3",
+      "rule_id": "code_style #12/#13 (已受理/有意保留)",
+      "file": "archives/k/kiconthemes/6.18.0.2/conandata.yml",
+      "line": 10,
+      "description": "DISPOSITIONED/ACCEPTED：patches 条目只写 patch_file，未加 patch_description 与 patch_type（当前 sha256 6fc0067719bd4469743b0d9d710cc6c359ac09be2836ed356f7f022025bd9f21，grep patch_description=0）。作者在 pr-body 第 8 条①明确受理：有意保持与经本机实测覆盖的 6.18.0.1 配方极简 delta 一致，Conan 会退化为 patch_type=file / patch_description=patch_file，功能无影响。审计方接受该处置，不再要求本 PR 修改。",
+      "fix_suggestion": "无需在本 PR 修改；若后续统一 conandata 元数据，可与其他 KF6 包一并补齐 patch_description/patch_type。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "review_memory #24 (已披露/待主编确认)",
+      "file": "archives/k/kiconthemes/6.18.0.2/reports/pr-body.md",
+      "line": 113,
+      "description": "DISCLOSED：PR body 第 5 条如实说明 PF9 路径闸被软件级三个标准文件（manifest.yaml / README.md / commands.json）命中，故建 PR 时显式使用 --no-preflight；第 8 条②再次登记该残留项并标注需主编确认（规则 24）。已披露、有仓内先例（libdisplay-info 0.4.0、zpaqfranz 63.3），审计方接受该处置，仅保留为流程记录。",
+      "fix_suggestion": "在 !16257 上取得维护者对 PF9 例外的确认，或后续让软件级同步文件走正式白名单/豁免机制。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "docs-consistency (范围外记录)",
+      "file": "archives/k/kiconthemes/6.18.0.1/manifest.yaml",
+      "line": 30,
+      "description": "OUT OF SCOPE：6.18.0.1/manifest.yaml 的 test_results.full_reference 写 kiconthemes/6.18.0#238238cf...:68da9b6f...#683912ea...，与制品仓不符（ohpcd 中 kiconthemes/6.18.0 只有 revision f82185f3a6daed7a2bae8d5f14a6e773；6.18.0.1 的 binary package_id 为 5937e6fd91b6589196a15790f369a1328a4907fb）。该文件非本 PR 变更，作者在 pr-body 第 8 条③说明未纳入本次修复；本 PR 关于「package_id 与 6.18.0.1 相同」的说法经 ohpcd 核实为真。按作者要求仅作范围外记录。",
+      "fix_suggestion": "另开 chore 修正该旧 manifest，不要混入本 PR。"
+    }
+  ],
+  "checks": [
+    {
+      "id": "version-vs-dir",
+      "result": "pass",
+      "evidence": "conanfile.py:56 version = \"6.18.0.2\" == 目录名；conandata.yml patches 键 \"6.18.0.2\" == version（apply_conandata_patches 按 str(conanfile.version) 命中）。"
+    },
+    {
+      "id": "conandata-sha256-url",
+      "result": "pass",
+      "evidence": "url=https://download.kde.org/stable/frameworks/6.18/kiconthemes-6.18.0.tar.xz（KDE 官方 HTTPS）；sha256=b9714609... 与实物 tar.xz 一致；yaml.safe_load 通过。patch_description/patch_type 缺失见 P3（已受理）。"
+    },
+    {
+      "id": "test-package-real-run",
+      "result": "pass",
+      "evidence": "test_package/conanfile.py test() 真跑 self.run(executable, env=\"conanrun\") + cmake.test()；test.cpp 真实调用 KIconLoader::global() 判空；MANIFEST.yml 存在；conan-create-61802.log:792-793 RUN ./test_kiconthemes → PASS，:802 1/1 passed。"
+    },
+    {
+      "id": "requires-published",
+      "result": "pass",
+      "evidence": "ohpcd 中 qtbase/6.11.1、qtsvg/6.11.1、karchive/6.18.0、openssl/3.5.6.1、zstd/1.5.7、ki18n/6.18.0、kwidgetsaddons/6.18.0、kcolorscheme/6.18.0、ecm/6.26.0 全部存在；6.18.0.2 binary requires 为 karchive/6.18.Z。"
+    },
+    {
+      "id": "karchive-closure",
+      "result": "pass",
+      "evidence": "karchive/6.18.0 shared:True；karchive/6.19.0 shared:False；已发布 kiconthemes/6.18.0 唯一 revision f82185f3a6daed7a2bae8d5f14a6e773 的 binary 68da9b6f... 依赖静态 karchive/6.19.0:952b2781...；knewstuff/6.18.0 binary 依赖 karchive/6.18.Z。"
+    },
+    {
+      "id": "graph-evidence",
+      "result": "pass",
+      "evidence": "graph-61802.json 仅 karchive/6.18.0#8dd9a9b4a5805de0465a33ef039f385c；gA.txt 含 1 处 karchive 版本冲突，gB.txt 0 处。"
+    },
+    {
+      "id": "api-claims-verified",
+      "result": "pass",
+      "evidence": "karchive 6.18.0/6.19.0 的 src/kcompressiondevice.h sha256 同为 f1cb9ea0...；上游 CMakeLists.txt:4/69、KF6IconThemesConfig.cmake.in:14、src/CMakeLists.txt:66、src/kiconloader.cpp:34,669 全部真实。"
+    },
+    {
+      "id": "patch-applies",
+      "result": "pass",
+      "evidence": "patch_ng 解析补丁为 2 条目（CMakeLists.txt 1 hunk、autotests/CMakeLists.txt 1 hunk），上下文与上游 6.18.0 逐行匹配；log:126 Apply patch 无失败；无 __OHOS__ 平台宏注入。"
+    },
+    {
+      "id": "commands-json-L0k",
+      "result": "pass",
+      "evidence": "commands.json 合法 JSON，name=kiconthemes、type=tool、含 6.18.0.2；包内确有 bin/kiconfinder6，package_info() bindirs=[\"bin\"]，package_type=library（与 kpackage 同构）。"
+    },
+    {
+      "id": "status-truthfulness",
+      "result": "pass",
+      "evidence": "版本目录 manifest status: built；ohpcd 无 kiconthemes/6.18.0.2 → 未上传，标 built 属实。"
+    },
+    {
+      "id": "hashes-and-full-ref",
+      "result": "pass",
+      "evidence": "本地 cache kiconthemes/6.18.0.2#556eb8f9c411ccdceecf049c46327dc0 : 5937e6fd91b6589196a15790f369a1328a4907fb # bc27539c4ba7d3212820cdd8a8712c33，与 create log:635-637 及 manifest/test-report 完全一致；ohpcd 上 6.18.0.1 的 package_id 同为 5937e6fd..."
+    },
+    {
+      "id": "test-numbers",
+      "result": "pass",
+      "evidence": "create log: 5/5 ctest、29 passed、8 passed、Signed 4 OHOS ELF；test-report 42/42、8=7+1，pr-body 9→8，均自洽。"
+    },
+    {
+      "id": "junk-files",
+      "result": "pass",
+      "evidence": "提交文件清单无 *.log/.build-context*/__pycache__/*.o/*.so/*.a/tar；test_package/build/**、bin/** 被 .gitignore 覆盖，未入 PR。"
+    },
+    {
+      "id": "pr-atomicity",
+      "result": "pass",
+      "evidence": "提交仅改 archives/k/kiconthemes/（+feedback/SKILL_FEEDBACK_d4efc98b.md，规则 28），未触碰 SKILL.md/references/templates/scripts/ci/index.tsv。"
+    },
+    {
+      "id": "pr-body-placeholders",
+      "result": "pass",
+      "evidence": "pr-body.md/notes.md/manifest.yaml/test_package 内无 '请填写'、无 TODO/FIXME/XXX。"
+    },
+    {
+      "id": "system-lib64-doc-fix",
+      "result": "pass",
+      "evidence": "三处口径已全部版本限定且彼此一致：notes.md:74-78（6.26.0 recipe additionally prepends /system/lib64；6.18-line does not set that entry，实测 6.18.0.2 configure/qtpaths 成功）、README.md:23-28（同样限定 **6.26.0**）、软件级 manifest.yaml:16（“the 6.26.0 recipe prepends ... while the 6.18-line refs (6.18.0.2) do not set that entry and configure/qtpaths succeed without it”）。配方 grep /system/lib64 = 0，与新表述一致，原 P3 #4 关闭。（create log 无逐字 qtpaths 行，configure 成功可证该机制性表述。）"
+    },
+    {
+      "id": "pr-body-disposition",
+      "result": "pass",
+      "evidence": "pr-body 第 5 条已把 PF9 命中文件数更正为软件级三个标准文件（manifest.yaml/README.md/commands.json，与实际提交一致）；第 8 条登记 W4 结论 verdict=pass、P0/P1/P2=0，并逐条给出三个残留 P3 处置（①conandata 极简 delta ②--no-preflight 待主编确认 ③6.18.0.1 full_reference 范围外），与本审计 JSON 一致；第 6 条引用 reports/audit-result.json。"
+    },
+    {
+      "id": "audit-artifact",
+      "result": "pass",
+      "evidence": "archives/k/kiconthemes/6.18.0.2/reports/audit-result.json 在本次哈希计算时尚未落盘（故未纳入 file_sha256 映射），作者确认本审计 JSON 写入后立即 `git add -f` 补入（reports/ 被 .gitignore:96 命中，需 -f）。补入后 notes.md:99、pr-body.md:122 的引用与 manifest l0 的 W4 pass 即有据；按作者说明记为将被满足的检查，不作为开放 P2/P3。"
+    },
+    {
+      "id": "fixes-commit-state",
+      "result": "warn",
+      "evidence": "本轮四项文档修正目前均仅在工作树（git status M：6.18.0.2/notes.md、6.18.0.2/reports/pr-body.md、README.md、manifest.yaml；HEAD 804263b490 未含），需 commit/push 后评审内容才与修正一致。工作树另有与本 PR 无关的 archives/l/libxext/{README.md,manifest.yaml} 未提交修改（非本 PR 文件）。"
+    }
+  ],
+  "file_sha256": {
+    "archives/k/kiconthemes/6.18.0.2/.conan-verified": "4b09e772fd622697ebe2fa7b389920005ef43de68a4c6d3612b69bca7c336d05",
+    "archives/k/kiconthemes/6.18.0.2/.handoff.json": "0ea234b5d57caa32312025568fda47d0aa9082cbde6bef6947e33040010bcd28",
+    "archives/k/kiconthemes/6.18.0.2/.submit-state.json": "7945fa0d39b581d1ac3f6af1456705cd5ab4cbb07eabc5fc0a21fcc42ccffa60",
+    "archives/k/kiconthemes/6.18.0.2/conandata.yml": "6fc0067719bd4469743b0d9d710cc6c359ac09be2836ed356f7f022025bd9f21",
+    "archives/k/kiconthemes/6.18.0.2/conanfile.py": "fe1b612fdc35e0490d62683c21cf2a65961e1238256ec9ac05b619709232b5a7",
+    "archives/k/kiconthemes/6.18.0.2/manifest.yaml": "d4c45afd58810cf2e2a767d780a5b858f8dc1adf200c5e9fade4f989a02cfd1e",
+    "archives/k/kiconthemes/6.18.0.2/notes.md": "6d12cda05a4bfa6fc1f29903c783f9a06fbccec39538b73796d1b8401ac2b670",
+    "archives/k/kiconthemes/6.18.0.2/patches/0001-CMakeLists.txt.patch": "dd7d9b506477840da1d720ebcc230621292b36d2d4aaaf0b5e9906145ef2981d",
+    "archives/k/kiconthemes/6.18.0.2/reports/conan-create.log": "bda18983df004817004eab7881bfd98ea11837d896ad1ee10dba9d86a5aa2970",
+    "archives/k/kiconthemes/6.18.0.2/reports/conan-verify-report.md": "87331345a5d9bbdaebbd75ee27eebb7dea4523b80d9c5f623994e4ec34ac135c",
+    "archives/k/kiconthemes/6.18.0.2/reports/pr-body.md": "520c4c924726702d1b1058f58f8b14fa0a8a8303070ca4804b959b33ec4ec219",
+    "archives/k/kiconthemes/6.18.0.2/reports/test-report.md": "4ba9f8576358780be2269f03ae35490480336ce48d617121d684c18297997d45",
+    "archives/k/kiconthemes/6.18.0.2/test_package/CMakeLists.txt": "b2e8e02d7201ed2eaef01e3a4231afb1bc1ce4e69812bcc54ceb84256a2a9348",
+    "archives/k/kiconthemes/6.18.0.2/test_package/MANIFEST.yml": "a76d46d2a6b7c9c8367cdf3f4b7c68bb3d855d3e832cc1a411d0ee6705ff87d8",
+    "archives/k/kiconthemes/6.18.0.2/test_package/conanfile.py": "ccd39809f65a504d5d9d2bb8858cb8a3986de3bc95226e2af53f1d2963ee3ae6",
+    "archives/k/kiconthemes/6.18.0.2/test_package/test.cpp": "cfe3c1fb830d545057e9b6d518e0f0237fe591d55187f7f0b8c29d3788c79ef7",
+    "archives/k/kiconthemes/manifest.yaml": "c25b8f8f6dd850b72f8f579456711dea165763b8ff6a94034a793d3e5ff79976",
+    "archives/k/kiconthemes/README.md": "bd66c579d0ec76610d2a734e9f343904cb53c439cf156588bdf2595bebc24505",
+    "archives/k/kiconthemes/commands.json": "2e63bc59152a4292371ab24822c3f92ed09c445fe46c6f7aac9359023c4be557"
+  },
+  "summary": "第三轮（终版）W4 独立复检：P0/P1/P2 均为 0，判定 pass。上一轮遗留的软件级 manifest.yaml:16 的 /system/lib64 绝对表述已做版本限定，notes.md、README.md、manifest.yaml 三处口径现完全一致，该 P3 关闭；pr-body 第 5 条已把 PF9 命中更正为软件级三个标准文件，第 8 条登记 W4 结论与三个残留 P3 的处置，与本次审计一致。三个残留 P3 均为已受理/已披露/范围外：conandata 有意不加 patch_description/patch_type 以保持与实测 6.18.0.1 配方一致的极简 delta；--no-preflight 绕 PF9 已在 PR body 披露并待主编确认（规则 24）；6.18.0.1/manifest.yaml 的陈旧 full_reference 属范围外记录。配方本体、test_package 真实性、依赖闭包、commands.json、垃圾文件与 556eb8f9/5937e6fd/bc27539c 三处哈希在复检中未变且全部核实为真；reports/audit-result.json 尚未落盘但作者确认写入本 JSON 后立即 git add -f 补入，故记为将被满足的检查而非开放问题。"
+}

@@ -21,15 +21,24 @@ KIconWidgets add-on library. Ships `libKF6IconThemes.so` and
   which is not part of the qtbase package in this repository.
 - `KF_SKIP_PO_PROCESSING=ON`: no translated catalog payload.
 - ECM 6.26+ `KDEInstallDirs6` executes the qtbase `qtpaths` host tool at
-  configure time; the recipe prepends `/system/lib64` to `LD_LIBRARY_PATH`
-  so `qtpaths` resolves the compatible `libc++_shared.so` (the sandbox
-  default contains an incompatible one under
-  `/data/storage/el1/bundle/libs/arm64`).
+  configure time. The **6.26.0** recipe prepends `/system/lib64` to
+  `LD_LIBRARY_PATH` so `qtpaths` resolves the compatible `libc++_shared.so`
+  (the sandbox default contains an incompatible one under
+  `/data/storage/el1/bundle/libs/arm64`); the 6.18-line recipes do not set
+  that entry and configure/`qtpaths` succeed without it.
 - Upstream autotests run headless under `QT_QPA_PLATFORM=offscreen`:
   5/5 CTest targets plus the kiconloader_unittest subset (29/29 checks; one
   shared-mime-info data row is unavailable in the current OHOS baseline)
   and the kiconengine_unittest subset (8/8 checks; testMode needs
   BreezeIcons) pass on OHOS.
+- **6.18-line karchive pin (`6.18.0.2`)**: the published `kiconthemes/6.18.0`
+  recipe revision `f82185f3` pinned the static `karchive/6.19.0`, which
+  conflicts with the `karchive/6.18.0` closure that the rest of the 6.18 line
+  (`knewstuff/6.18.0`, `libkdegames/26.04.0`, ...) carries. The 6.18-line refs
+  require the shared `karchive/6.18.0` instead. kiconthemes only touches
+  `KCompressionDevice`, whose header is identical in karchive 6.18.0 and
+  6.19.0, and upstream itself requires `KF6Archive >= 6.18.0`
+  (`KF_DEP_VERSION`), so no 6.19-only API is used.
 
 ## Dependencies
 
