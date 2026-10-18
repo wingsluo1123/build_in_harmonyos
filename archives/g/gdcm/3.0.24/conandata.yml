@@ -1,0 +1,20 @@
+sources:
+  url: "https://github.com/malaterre/GDCM/archive/refs/tags/v3.0.24.tar.gz"
+  sha256: "d88519a094797c645ca34797a24a14efc10965829c4c3352c8ef33782a556336"
+
+# 上游测试语料 gdcmData 故意不接进配方（做过完整实测，结论与证据见 notes.md）：
+# 源码 tarball 里 Testing/Data 是 gdcmData 的 git submodule，v3.0.24 的 gitlink 固定在
+# a0bba51684aa0cc929186ebc8870a27ce1930996（git://git.code.sf.net/p/gdcm/gdcmdata），
+# 而 SourceForge 只发布单一 gdcmData.tar.gz 快照，无法按 URL+sha256 固定到该修订。
+# 实测：把官方快照解到 Testing/Data → CTest 注册数从 199 涨到 232（+33 项数据驱动用例），但 25 项失败
+# （TestMD5 直接报语料文件本身的哈希对不上代码内参考表：D_CLUNIE_RG3_JPLY.dcm
+#  期望 6867e0e4f8a1feb871a1ee8dcfac838e，快照里是 d06de3e3b941dce6c2c2c896fe42584b；
+#  TestCleaner4 则报 "Could not read: JPEGInvalidSecondFrag.dcm"——快照含 3.0.24 还不支持的语料）。
+# 语料的哈希差与 CPU/OS 无关，属"语料修订 ≠ 代码修订"，硬挂进来只会把包做成
+# 11% 假失败。故按上游发布形态（无 gitlink 语料）构建，注册的全部用例照常执行。
+
+patches:
+  "3.0.24":
+    - patch_file: "patches/0001-fix-TestRescaler2-unsigned-char.patch"
+      patch_description: "TestRescaler2 Case11/12 假设 plain char 为 signed（x86 语义），arm64 OHOS 下 char 无符号导致 (char)(min+i) 回绕、min2>max2 断言失败；改用 signed char 明确符号性"
+      patch_type: "portability"

@@ -1,0 +1,99 @@
+# ═══ Draft knowledge entry — 上游测试语料（gitlink 数据集）不可按修订固定 ═══
+# GDCM 的测试语料 gdcmData 是 Testing/Data 的 git submodule：发布 tarball 里是空目录，
+# CMake 用 find_path(GDCM_DATA_ROOT test.acr ...) 定位；把 SourceForge 唯一那份
+# gdcmData.tar.gz 快照解进去，CTest 注册数 199→232（+33 项数据驱动用例），但 25 项失败（11%）——全部是
+# "语料修订 ≠ 代码修订"：TestMD5 比对的是语料文件的静态哈希，TestCleaner4 读不动
+# 快照里比本版本更新的语料。哈希差与 CPU/OS 无关，不是移植缺陷，却会把包做成
+# "11% 假失败"；且语料 ctest 单轮 1223.78s，叠加构建后撞 CI 默认 3600s 上限。
+# Software: gdcm 3.0.24
+# Status: DRAFT
+
+id:                     gdcm-3.0.24-test-corpus-revision-skew
+trigger_tool:           ctest|cmake|conan
+phase:                  test
+severity:               3
+category:               test|upstream-data|conan-recipe|ci-timeout
+error_signature:        Problem reading image from:.*|Missing md5 .* for:|Could not read:.*\.dcm|Found [0-9a-f]{32} instead of [0-9a-f]{32}|Could not find repository gdcmData
+
+keywords:               gdcmData, Testing/Data, git submodule, gitlink, GDCM_DATA_ROOT, find_path, TestMD5, TestCleaner4, 语料修订, 快照, SourceForge, ctest -N, 注册数, 假失败, 豁免, DEFAULT_BUILD_TIMEOUT
+match_keywords:         gdcmData, GDCM_DATA_ROOT, submodule, gitlink, TestMD5, md5 参考表, 语料, snapshot, ctest, 注册, 超时, 3600
+
+root_cause:             |
+  上游把测试语料与代码分两处版本化：代码 tarball 里 Testing/Data 只是 gitlink
+  （v3.0.24 固定到 a0bba51684aa0cc929186ebc8870a27ce1930996，
+  git://git.code.sf.net/p/gdcm/gdcmdata），语料本体在 SourceForge 上只有一份
+  gdcmData.tar.gz 快照（sha256 54ff2db5511f01eecc5d012f46083382ce49348b9e1ce62db87b06e5d860890f），
+  不能按修订号取用。而 gdcm 的断言有两类直接把"语料修订"当常量用：
+  (1) 语料文件的静态哈希表（Testing/Source/Data/gdcmMD5DataImages.cxx 与
+      Testing/Source/Common/Cxx/TestMD5.cxx）——快照里的文件哈希与代码内参考值不符，
+      实测 D_CLUNIE_RG3_JPLY.dcm 期望 6867e0e4f8a1feb871a1ee8dcfac838e、快照是
+      d06de3e3b941dce6c2c2c896fe42584b；
+  (2) 语料可读性——快照含 3.0.24 尚不支持的文件，TestCleaner4 报
+      "Could not read: JPEGInvalidSecondFrag.dcm"。
+  两类都与 OS/CPU 无关（纯数据-代码错配），因此把它当移植缺陷去"修"必然走偏；
+  把它当缺陷"报"则让包背上 11% 假失败。另外 conan 配方的 source() 只能按
+  URL+sha256 取物，gitlink 修订无法表达，等于配方层面就没有正确取用语料的通道。
+
+affected_scope:         |
+  任何"测试语料以 submodule/独立仓库版本化、且断言里嵌语料哈希/可读性"的包
+  （GDCM/gdcmData、ITK/ITKData、VTK/Data、OpenCV/opencv_extra 等）。
+  判据：ctest/make check 注册数在挂语料前后跳变，且失败信息是哈希/文件读不动
+  而不是崩溃或符号错误。
+
+verification_cmd:       |
+  1) 不挂语料：cmake -DGDCM_BUILD_TESTING=ON ... && ctest --test-dir <b> -N  # 199 项
+  2) 挂语料：解 gdcmData.tar.gz 到 Testing/Data 后重新 configure，ctest -N → 232 项；
+     ctest 单轮 1223.78s(real)，25 项失败；
+  3) 判定错配：grep 失败项是否属于 TestMD5/静态哈希表或"Could not read"类；
+     与 CPU 架构无关的哈希差即语料修订错配。
+
+rec_priority:           1
+rec_approach:           ship-upstream-release-form-without-corpus
+rec_description:        |
+  按上游发布形态构建（Testing/Data 保持空 gitlink 目录，不设 GDCM_DATA_ROOT），
+  把该形态下 ctest -N 注册的全部用例编译并执行、并在 PR 里以注册数为分母如实声明；
+  语料实验的完整数据（199→232、+33 项、25 失败、两条哈希证据、耗时）写进 notes.md 与知识条目。
+  关键细节：不要用 -DGDCM_DATA_ROOT 手动指到空目录——那会让 if(GDCM_DATA_ROOT)
+  分支成立、语料驱动用例注册却拿不到文件表，制造出"注册了但什么都不测"的假覆盖。
+rec_command:            |
+  # 配方里只留源码 tarball，删掉语料 source 与 GDCM_DATA_ROOT 定义
+  cmake -B <b> -S <src> -DGDCM_BUILD_TESTING=ON -DBUILD_TESTING=ON ...
+  ctest --test-dir <b> -N                      # 分母 = 注册数，打进构建日志
+rec_auto_fix:           true
+rec_impl:               conandata-only
+
+fallback_priority:      2
+fallback_approach:      pin-corpus-by-revision-when-retrievable
+fallback_description:   若语料存在"可按修订取用"的官方镜像（如 GitHub 镜像可用
+  /archive/<sha>.tar.gz 取快照并能填 sha256），则挂语料换全量注册；但必须先核算
+  CI 时间预算——conan create 的超时来自 ci/config/build_timeouts.txt，
+  默认 DEFAULT_BUILD_TIMEOUT=3600s，语料 ctest 单轮就 1223.78s，加上整包构建
+  很可能越线，且该配置文件不在适配 PR 允许提交的目录内（archives/、knowledge/）。
+fallback_command:       conan create ...  # 挂语料版需先本地计时：ctest real 时间 + 构建时间 < 3600s
+fallback_auto_fix:      false
+fallback_impl:          recipe-change
+
+forbid_1_pattern:       -DGDCM_DATA_ROOT=[^ ]*$
+forbid_1_reason:        把 GDCM_DATA_ROOT 指到空目录（或修订不匹配的语料）会注册出"跑不到任何文件"的用例，制造假覆盖。
+forbid_1_consequence:   注册数虚高、用例空转，PR 分母失真，review 按 rule4 判少报/虚报。
+
+forbid_2_pattern:       gdcmData\.tar\.gz.*sha256
+forbid_2_reason:        SourceForge 快照无法对应 v3.0.24 的 gitlink 修订，写进 conandata 等于把不可复现的数据依赖固化进配方。
+forbid_2_consequence:   11% 假失败 + 语料 ctest 撞 CI 默认 3600s 超时。
+
+principles:             []
+causes:                 []
+caused_by:              []
+similar_to:             []
+conflicts_with:         []
+prerequisite_of:        []
+
+doc_file:               knowledge/drafts/gdcm-3.0.24-test-corpus-revision-skew.md
+last_updated:           2026-10-18
+source_event:           gdcm 3.0.24 适配（分支 feat/gdcm-3.0.24）：挂 SourceForge 语料实测 232 注册/25 失败/1223.78s，改按上游发布形态（无 gitlink 语料）构建
+authors:                Qoder
+source_pr:              pending
+source_commit:          pending
+
+metrics_success_count:  0
+metrics_fail_count:     0

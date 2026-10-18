@@ -1,0 +1,75 @@
+# 版本级 manifest — 遵循 ARCHIVE-SPEC v2.0
+# 文件位置: archives/g/gdcm/3.0.24/manifest.yaml
+
+version: "3.0.24"
+software: gdcm
+status: built
+build_date: "2026-10-18"
+build_system: cmake
+
+source:
+  url: "https://github.com/malaterre/GDCM/archive/refs/tags/v3.0.24.tar.gz"
+  sha256: "d88519a094797c645ca34797a24a14efc10965829c4c3352c8ef33782a556336"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  # 工具链：SDK ohos.toolchain.cmake + 裸 cmake（os=OHOS 下 CMakeToolchain 的
+  # CMAKE_SYSTEM_NAME 映射问题，ML-0035）；完整开关见 conanfile.py build()
+  configure_options:
+    - "-DCMAKE_TOOLCHAIN_FILE=<SDK>/build/cmake/ohos.toolchain.cmake"
+    - "-DOHOS_ARCH=arm64-v8a"
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DCMAKE_PLATFORM_NO_VERSIONED_SONAME=ON"
+    - "-DGDCM_BUILD_SHARED_LIBS=OFF"
+    - "-DGDCM_BUILD_APPLICATIONS=ON"
+    - "-DGDCM_BUILD_TESTING=ON"
+    - "-DGDCM_USE_SYSTEM_ZLIB=ON"
+    - "-DGDCM_USE_SYSTEM_EXPAT=ON"
+    - "-DGDCM_USE_SYSTEM_CHARLS=OFF"
+    - "-DGDCM_USE_SYSTEM_JSON=OFF"
+    - "-DGDCM_USE_SYSTEM_UUID=OFF"
+    - "-DGDCM_USE_SYSTEM_OPENJPEG=OFF"
+    - "-DGDCM_USE_SYSTEM_LJPEG=OFF"
+    - "-DGDCM_BUILD_DOCBOOK_MANPAGES=OFF"
+    - "-DGDCM_WRAP_PYTHON=OFF"
+    - "-DGDCM_USE_VTK=OFF"
+  dependencies:
+    - zlib/1.3.1.1
+    - expat/2.8.4
+  # 其余第三方件（openjpeg/charls/jpeg8/12/16/md5/uuid/socketxx）用上游内嵌 Utilities 源码
+  cc: clang
+  cxx: clang++
+  total_time_sec: 786   # 本机 conan create 全程（库构建 + 194 项 ctest + test_package），2026-10-18 绿构建
+
+patches_applied:
+  - patches/0001-fix-TestRescaler2-unsigned-char.patch
+  # 注意：3.2.11 需要的 0001-expat-include-dirs.patch 在 3.0.24 不需要——
+  # Source/InformationObjectDefinition/CMakeLists.txt:42-45 已有 EXPAT include 守卫块
+
+# 平铺的通过/失败计数（本地 review 门禁 check4 读顶层键；详情见下方 test_report）
+test_passed: 194
+test_failed: 0
+
+test_report:
+  upstream_registered: 199
+  exempted_network: 5
+  ran: 194
+  passed: 194
+  pass_rate: 100%
+  evidence: 'conan create 内嵌 ctest（签名后本机执行）：Total Tests: 199 → "100% tests passed, 0 tests failed out of 194"，Total Test time (real) = 11.92 sec（W3 本地 CI 模拟 reports/w3-local-ci.log，直跑为 12.85 sec；TestFindStudyRootQuery/TestFindPatientRootQuery 逐条 Passed）'
+  upstream_check_command: "ctest --test-dir <build-ohos> -N"
+  exemption_reason: "5 项硬编码外网 DICOM 服务器（www.dicomserver.co.uk / 51.75.171.41:11112）的 C-ECHO/C-FIND 网络往返测试，沙箱无出站 DICOM 端口；二进制照常编译，仅 ctest 派发阶段排除"
+  corpus_note: "上游测试语料 gdcmData 不接入（v3.0.24 gitlink 固定在 a0bba51，SourceForge 只有不可按修订取用的快照）；实测挂快照 → 注册 199→232、25 项失败（语料修订错配，非移植缺陷）、单轮 1223.78 s。详见 notes.md 与 knowledge/drafts/gdcm-3.0.24-test-corpus-revision-skew.kv"
+  test_package: "端到端消费者用例：库写出 Secondary Capture DICOM → Reader/ImageReader 读回逐字节比对 → 制品包内 6 个 CLI（gdcminfo/gdcminfo --md5sum/gdcmdump/gdcmconv --raw/gdcmdiff/gdcmxml）消费同一文件；断言 67 条（C++ 29 + Python 38），运行输出 'gdcm test_package: ALL OK'"
+
+knowledge_gained:
+  - "ohos.toolchain.cmake 强制 CMAKE_RANLIB=<SDK>/llvm/bin/llvm-ranlib，但设备 SDK 的 llvm/bin 缺 llvm-ranlib（只有 ar/nm/objcopy）→ 静态库链接报 'Error running link command'；SDK 只读，修法=configure 后重写 build 树所有 link.txt 的 ranlib 路径（幂等，CI 有 ranlib 时自动跳过）；命令行 -DCMAKE_RANLIB 只改 cache、不重生成 link.txt，因此无效"
+  - "库清单不能照抄同族版本：3.0.24 的 Utilities/gdcmrle/CMakeLists.txt:7 把 add_library(gdcmrle) 注释掉了（RLE 源码进 gdcmMSFF），且 GDCM_USE_SYSTEM_{ZLIB,EXPAT}=ON 时 Utilities/CMakeLists.txt:21/68 的 add_subdirectory 被跳过 → 无 libgdcmzlib/libgdcmexpat；实际 install 树只有 14 个 .a"
+  - "gdcmMEXD 用 target_link_libraries(... LINK_PRIVATE socketxx)（Source/MessageExchangeDefinition/CMakeLists.txt:99）：LINK_PRIVATE 不进导出清单，但 llvm-nm -u 实测留有 sockbuf/sockinetbuf/iosockinet 等未定义符号，静态库消费方必须显式链 socketxx，否则 undefined reference；用 'nm -u | grep socket' 探会得到假阴性（需 c++filt 或按类名检索）"
+  - "plain char 符号性是实现定义：OHOS arm64 SDK 下 char 是 unsigned（numeric_limits<char>::min()==0），上游 TestRescaler2 的 TestRescaler2Func<char,char> 假设 signed（x86 语义）→ 输入输出双向回绕断言失败；显式 signed char 修复"
+  - "PS3.5 6.2 填充语义实测校准：奇数长 UI 补 0x00、奇数长 CS 补空格 0x20、偶数长不补；Attribute::GetValue() 不去填充——按'预期补空格'写的 UI 断言会假失败"
+  - "GDCM_DATA_ROOT 不要手动指向空目录：if(GDCM_DATA_ROOT) 分支成立会让数据驱动用例注册但文件表为空 → 用例空转、注册数虚高（假覆盖）；交给上游 find_path() 自然判空"
+  - "GDCM_BUILD_DOCBOOK_MANPAGES 不在 GDCM_DOCUMENTATION 守卫内（Utilities/doxygen/CMakeLists.txt:228），开着会取在线 docbook DTD，无外网时构建在 35% 处失败"
+  - "/dev/shm 占满时 conan 并行下载 ThreadPool 起不来，报 OSError [Errno 28]（磁盘其实很空）；绕过 = 'conan create ... -cc core.download:parallel=0'，注意 -c 拒绝 core.*、-cc 不能放子命令前；属本地设备环境问题，勿写进随 PR 提交的配置"
