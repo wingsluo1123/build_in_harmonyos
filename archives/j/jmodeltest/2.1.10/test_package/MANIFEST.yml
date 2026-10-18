@@ -1,0 +1,36 @@
+# test_package/MANIFEST.yml
+# 上游测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: jmodeltest/2.1.10
+homepage: "https://github.com/ddarriba/jmodeltest2"
+
+# 上游测试命令: jmodeltest 2.1.10 为纯 Java 应用 (ant 构建)，无 make check，
+# 上游源码不含任何测试套件 (无 src/test、无 JUnit)。真实功能验证通过其
+# 命令行子命令实现。
+upstream_check_command: "无（上游无测试套件）"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: "无（上游无测试套件）"
+
+# 上游实际运行的测试程序
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证)
+# 上游无测试用例，适配后补全消费者用例；CLI 提供 headless 数据转换路径，
+# 不需要外部 phyml 二进制（完整 model-selection 才需要 phyml）。
+test_package_tests:
+  - file: test.sh
+    description: >
+      使用打包产物 launcher 端到端验证：
+      (1) 包结构检查 (launcher + jModelTest.jar + vendor libs)；
+      (2) `jmodeltest -help` 打印 usage (JVM + jar + classpath 冒烟)；
+      (3) `jmodeltest -d 18S_insects2.nex -getPhylip` 真实读取比对数据并
+          转换为 Phylip 写出 .phy 文件 (headless、无需 phyml)。
+    command: "bash test.sh <package_dir> <build_dir>"
+
+# 测试断言总数 (近似值, 用于质量评估)
+# -help 断言 (1) + getPhylip 转换成功断言 (1) + phylip 产物非空断言 (1) + 结构检查 (3 处)
+assertion_count: 6
