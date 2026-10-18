@@ -1,0 +1,56 @@
+--- a/shfsmount/shfsumount.c
++++ b/shfsmount/shfsumount.c
+@@ -53,20 +53,30 @@
+                 return 0;
+         }
+         if ((getuid() != 0) && ((getuid() != st.st_uid) || 
+ 	     ((st.st_mode & S_IRWXU) != S_IRWXU))) {
+                 errno = EPERM;
+                 return 0;
+         }
+         return 1;
+ }
+ 
++/* addmntent(3) is a GNU libc extension; libc that only ships the read side of
++ * <mntent.h> needs the mtab line written directly.  Same 1-on-error contract.
++ */
++static int
++shfs_addmntent(FILE *f, struct mntent *m)
++{
++	return fprintf(f, "%s %s %s %s %d %d\n", m->mnt_fsname, m->mnt_dir,
++		       m->mnt_type, m->mnt_opts, m->mnt_freq, m->mnt_passno) < 0;
++}
++
+ static int update_mtab(char *mnt)
+ {
+ 	int fd;
+ 	FILE *mtab;
+ 	FILE *new_mtab;
+ 	struct mntent *ment;
+ 
+         if ((fd = open(MOUNTED"~", O_RDWR|O_CREAT|O_EXCL, 0600)) == -1) {
+                 fprintf(stderr, "Can't get "MOUNTED"~ lock file");
+                 return 0;
+@@ -76,21 +86,21 @@
+                 fprintf(stderr, "Can't open " MOUNTED ": %s\n", strerror(errno));
+                 return 0;
+         }
+         if ((new_mtab = setmntent(MOUNTED".tmp", "w")) == NULL) {
+                 fprintf(stderr, "Can't open " MOUNTED".tmp" ": %s\n", strerror(errno));
+                 endmntent(mtab);
+                 return 0;
+         }
+         while ((ment = getmntent(mtab))) {
+                 if (strcmp(ment->mnt_dir, mnt) != 0)
+-                        addmntent(new_mtab, ment);
++                        shfs_addmntent(new_mtab, ment);
+         }
+         endmntent(mtab);
+         if (fchmod(fileno(new_mtab), S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH) < 0) {
+                 fprintf(stderr, "Error changing mode of %s: %s\n",
+                         MOUNTED".tmp", strerror(errno));
+                 return 0;
+         }
+         endmntent(new_mtab);
+         if (rename(MOUNTED".tmp", MOUNTED) < 0) {
+                 fprintf(stderr, "Cannot rename %s to %s: %s\n",

@@ -1,0 +1,61 @@
+# test_package/MANIFEST.yml — shfs 0.35
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在。
+# 口径: 用例数 == 断言数 == 9（与 PR 正文「适配后测试用例统计」一致）
+
+package: shfs/0.35
+homepage: "https://shfs.sourceforge.net/"
+
+# 上游没有测试目标：`make check` 在 shfs-0.35 里不存在（顶层 Makefile 只有
+# all/clean/install/uninstall/utils/module/docs/dist/deb/rpm 系列目标）。
+# 唯一的上游测试工件是随 mount 工具一起发布的两个能力探测脚本，它们被投递给
+# 远端 shell 执行并把结论读回来，即本表 upstream_tests 的两项。
+upstream_check_command: "make -n check   # No rule to make target 'check'"
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（2 项，全部执行）
+upstream_tests:
+  - file: shell-test.in
+    source: shfs-0.35/shfsmount/shell-test.in
+    description: "shell 能力探测：对 echo/chgrp/chmod/chown/cut/dd/df/expr/ln/ls/mkdir/mv/rm/read/rmdir/tee/test/touch/wc 共 19 个 POSIX 原语做 type 检查，全部可用才回 ok stable"
+    command: "sh res/shfs/shell-test.in"
+  - file: perl-test.in
+    source: shfs-0.35/shfsmount/perl-test.in
+    description: "perl 能力探测：perl 存在且 $] >= 5、Fcntl/IO::File/POSIX 模块可加载、seteuid 试探判断 preserve 能力，通过回 ok stable"
+    command: "sh res/shfs/perl-test.in"
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: test_shfs.sh
+    description: "U1 上游用例 shell-test.in 逐字执行，结论必须为 ok stable"
+    command: "/bin/sh res/shfs/shell-test.in"
+  - file: test_shfs.sh
+    description: "U2 上游用例 perl-test.in 逐字执行，结论必须为 ok stable（root 下允许尾随 preserve）"
+    command: "/bin/sh res/shfs/perl-test.in"
+  - file: test_shfs.sh
+    description: "H1 鸿蒙特有测试：以本机 /bin/sh 顶替远端主机跑通 shfs 协议全链路（探测→selected: perl→helper 加载 ### 200→s_init ### 200），进程恰好停在 mount(2) 被 seccomp 拦下的 SIGSYS(159)，/proc/mounts 无残留"
+    command: "shfsmount -t perl -c 'exec /bin/sh' -vvv -n <mnt>"
+  - file: test_shfs.sh
+    description: "H2 鸿蒙特有测试：非 root 应用 uid 下的挂载选项装配与 root-only 门禁（-o cachesize=4,ro 原样拼进 mount data；-o uid=0 在建连接前退出 2）"
+    command: "shfsmount -v -n -o cachesize=4,ro <mnt>; shfsmount -o uid=0 <mnt>"
+  - file: test_shfs.sh
+    description: "C1 配方显式传入的 SHFS_VERSION 与协议号已烧进二进制"
+    command: "shfsmount -V"
+  - file: test_shfs.sh
+    description: "C2 --help 输出 usage 并退出 0，getopt_long 表完整"
+    command: "shfsmount --help"
+  - file: test_shfs.sh
+    description: "C3 未知 -t 协议在建连接前失败（退出 2，不触发 mount(2)）"
+    command: "shfsmount -t nosuch -c 'exec /bin/sh' <mnt>"
+  - file: test_shfs.sh
+    description: "C4 挂载点不存在时 fullpath() 失败分支：上游把 NULL 交给 %s，musl 打印 (null) 且不段错误"
+    command: "shfsmount <no-such-dir>"
+  - file: test_shfs.sh
+    description: "C5 shfsumount 三入口契约：无参 usage(1)、-v 版本(0)、非 shfs 目录被 statfs 魔数守卫拒识 EINVAL(1)"
+    command: "shfsumount; shfsumount -v; shfsumount <mnt>"
+
+# 断言总数：9 个用例，按用例级 pass/fail 计 1 条断言（用例数与断言数由 test_shfs.sh
+# 末尾的 CASES -ne 9 自检锁死）。"恰好 1 条断言"指记账口径，不是说套件只有 9 个判据：
+# 用例内部合计约 30 个检查点（退出码 + grep 判据：H1 5 项、H2 4 项、C5 7 项等），
+# 任一检查点失败即该用例整体记 FAIL。
+assertion_count: 9
