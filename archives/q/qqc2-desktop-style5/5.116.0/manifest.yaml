@@ -1,0 +1,39 @@
+software: qqc2-desktop-style5
+build_system: cmake
+
+# 版本级 manifest
+# 文件位置: archives/q/qqc2-desktop-style5/5.116.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "5.116.0"
+status: built
+build_date: "2026-10-17"
+
+source:
+  url: "https://download.kde.org/stable/frameworks/5.116/qqc2-desktop-style-5.116.0.tar.xz"
+  sha256: "cf7b6351af45c38cb4c01fd6ea57347abacf886f425596d0a76fb9ce7f3f2d1b"
+  tar_format: tar.xz
+
+build:
+  system: cmake
+  notes:
+    - "CMake + Ninja 交叉编译；产出 QML 样式插件 org.kde.qqc2desktopstyle。"
+
+dependencies:
+  build:
+    - ecm/6.26.0
+  runtime:
+    - qt5-qtbase/5.15.2.2
+    - qt5-qtdeclarative/5.15.2
+    - qt5-qtquickcontrols2/5.15.2
+    - kconfig5/5.116.0
+    - kirigami2/5.116.0
+
+platform_differences:
+  - "Qt5 CMake 配置桥：qt5-qtdeclarative 不发 Qt5Qml/Quick 原生 CMake config（仅 cmake_file_name=Qt5Qml），故经 CMakeDeps + 手写 Qt5Config 桥分发 Quick/QuickControls2 到真实 config（kirigami2 先例）。"
+  - "QColor 缺失传递 include：plugin/kquickstyleitem.cpp 与 kirigami-plasmadesktop-integration/plasmadesktoptheme.cpp 直接使用 QColor 却未 include <QColor>，已发布 Qt5 链不提供传递 include → 打补丁显式添加。"
+  - "KF5IconThemes（kiconthemes5）与 KF5ConfigWidgets 为上游 OPTIONAL：kiconthemes5 未发布，故 plasmadesktop-integration 模块按上游缺件分支不构建。"
+  - "X11 可选项在 OHOS 缺失（find_package(X11) 失败），按上游分支跳过 Qt5X11Extras。"
+  - "OHOS SONAME/rpath 规则 + DT_NEEDED 归一化 + binary-sign-tool 重签名（kirigami2 先例）。"
+
+patches_count: 1
