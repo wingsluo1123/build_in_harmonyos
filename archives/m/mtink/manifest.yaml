@@ -1,0 +1,24 @@
+software: mtink
+display: "EPSON printer status monitor"
+description: "Status monitor and maintenance tool for EPSON inkjet printers (parallel/USB bidirectional port)"
+category: utility
+homepage: "http://xwtools.automatix.de/mtink/"
+license: GPL-2.0-or-later
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "Upstream ships a hand-written `Configure` + Makefile.ORG (not autotools); `Configure -x` builds the console configuration only, which drops every Motif/X11 compile and link rule out of the build face - zero source patches"
+    - "The Motif closure is not resolvable from the published ohpcd binaries (conan install --requires=motif/2.3.8 --build=never -> Missing prebuilt package 'libxext/6.4.0.1'), and CI builds dependencies with --build=<pkg>/*, so the GUI face cannot be delivered until that dependency split is fixed"
+    - "clang 15 defaults to -fno-common, so the 2007 tentative definitions collapse into duplicate strong symbols at link time; -fcommon fixes all of them"
+    - "libusb is dead code on the Linux/OHOS face: mainSrc/usbHlp.c is entirely inside #ifdef MACOS and `Configure -m` is self-contradictory upstream (it defines MACOS while rw.c is inside #ifndef MACOS)"
+    - "Upstream `install-*` targets are root-guarded and write to /etc and /usr/lib/cups, so packaging is done with copy(); the delivered ELFs are self-signed with binary-sign-tool"
+    - "No printer device node exists on HarmonyOS PC (/dev/lp*, /dev/parport*, /dev/usb/lp*) although the sysroot ships linux/lp.h and linux/ppdev.h, so the parport/USB ioctl face is verified only down to a deterministic exit code and failure wording"
+  common_dependencies: []
+
+versions:
+  "1.0.16":
+    status: built
+    build_date: "2026-10-18"
+    conan_ref: "mtink/1.0.16"
+    note: "Console configuration (Configure -x): bin/ttink, bin/mtinkd, bin/askPrinter; upstream N=0, 30 packaged consumer assertions; formal publication remains pending"
