@@ -1,0 +1,34 @@
+software: jdim
+display: "JDim"
+description: "JDim — GTK3-based 2ch browser (JD improved desktop client)"
+category: utility
+homepage: "https://github.com/JDimproved/JDim"
+license: GPL-2.0-or-later
+build_system: autotools
+
+status: published
+
+ohos_adaptation:
+  key_points:
+    - "GitHub tag archive 无 configure/aclocal.m4 -> build() 内 autoreconf 自举（automake/1.18 + libtool/2.5.4 由 tool_requires 提供）"
+    - "AX_CXX_COMPILE_STDCXX([17]) 由 tool_requires autoconf-archive/2024.10.16 提供，宏经 ACLOCAL_PATH 注入"
+    - "PKG_CHECK_MODULES 用各依赖包自带的 lib/pkgconfig（不用 PkgConfigDeps：gtkmm/3.24.11 的 components 引用 atkmm::atkmm-1.6，而 atkmm/2.28.4 无 components）"
+    - "gnutls/3.8.10 的 gnutls.pc 落在 lib/ 且 prefix 指向构建机前缀 -> 配方按需补写 gnutls.pc/gtest_main.pc shim"
+    - "generated configure 的 umask 077 -> 022（HMDFS E011/E114）"
+    - "上游 12 个 gtest 源文件 / 1 个 check_PROGRAM / 531 个 TEST_F 原子用例，在 build() 内 make check 真实执行"
+  common_dependencies:
+    - gtkmm
+    - gnutls
+    - libx11
+    - libsm
+    - libice
+    - alsa-lib
+    - libxcrypt
+    - zlib
+    - cmigemo
+    - gtest
+
+versions:
+  "0.10.1":
+    status: published
+    build_date: "2026-10-18"
