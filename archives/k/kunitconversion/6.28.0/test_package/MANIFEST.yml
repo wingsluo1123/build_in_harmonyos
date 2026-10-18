@@ -1,0 +1,26 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for kunitconversion/6.28.0.
+
+package: kunitconversion/6.28.0
+homepage: https://invent.kde.org/frameworks/kunitconversion
+
+upstream_check_command: "ctest --output-on-failure"
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error"
+
+upstream_tests:
+  - file: autotests/
+    source: kunitconversion-6.28.0/autotests/
+    description: "KUnitConversion upstream CTest suite: 4 registered entries = 17 QTest functions (valuetest 6, categorytest 5, convertertest 5, currencytableinittest 1) covering the Value/Converter/UnitCategory API, the compiled unit tables (Length/Temperature/Mass/Velocity/BinaryData/... conversions) and the currency-table handling (offline paths + the two ECB-download cases QSKIP-guarded by patches/0003)"
+    command: "ctest --output-on-failure"
+    condition: "run in the Conan build with BUILD_TESTING=ON; TEST-mode data dir \$HOME/.qttest/share/libkunitconversion pre-created by the recipe so currencytableinittest parses its embedded snapshot offline"
+
+test_package_tests:
+  - file: test_package/test.cpp
+    description: "Consumer smoke drives the packaged libKF6UnitConversion.so through the public API: version header binding, Converter::convert across Length/Temperature/Mass, Value::convertTo string/reference conversions (Celsius->Kelvin, m/s->km/h, B->KiB, m->km), toSymbolString formatting, UnitCategory lookups (id/defaultUnit/hasUnit), invalid-category/unit handling and the populated table set."
+    command: "conan create (test_package builds and runs test_kunitconversion)"
+  - file: test_package/test_ohos_soname.cpp
+    description: "OHOS SONAME/DT_NEEDED regression check: parses its own ELF dynamic section and the loaded libKF6UnitConversion.so (located via /proc/self/maps / LD_LIBRARY_PATH candidates), asserting no slash-qualified DT_NEEDED entries and a bare DT_SONAME libKF6UnitConversion.so (platform E537)."
+    command: "conan create (test_package builds and runs test_kunitconversion_ohos)"
+
+assertion_count: 23

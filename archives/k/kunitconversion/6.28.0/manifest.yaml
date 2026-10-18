@@ -1,0 +1,36 @@
+software: kunitconversion
+version: "6.28.0"
+status: built
+build_system: cmake
+created_at: 2026-10-17
+build_date: 2026-10-17
+dependencies:
+  required:
+    - qtbase/6.11.1
+    - ki18n/6.26.0
+  build:
+    - extra-cmake-modules/6.28.0
+  optional: []
+patches_applied:
+  - patches/0001-CMakeLists.txt.patch
+  - patches/0002-src-CMakeLists.txt.patch
+  - patches/0003-ohos-skip-currency-network-autotests.patch
+test_results:
+  type: passed
+  upstream: "passed: 4/4 registered upstream CTest entries (valuetest, categorytest, convertertest, currencytableinittest; 17 QTest functions of which 15 execute), BUILD_TESTING=ON inside conan create; the two ECB-download functions (convertertest::testCurrency, categorytest::testCurrencyTableUpdate) are QSKIP-guarded in place by patches/0003 (E731, sandbox has no outbound HTTPS route)"
+  test_package: "passed: Value/Converter consumer smoke 17/17 checks (test_kunitconversion) and SONAME/DT_NEEDED consumer regression 6/6 checks (test_kunitconversion_ohos); CTest 2/2"
+  l0: "pass"
+  l1: "pass"
+  l2: "skip: verify reported no cache path (library-only package, no bin/ smoke)"
+  l4: "skip: verify reported no cache path"
+  l5: "skip: verify reported no cache path"
+source_url: https://download.kde.org/stable/frameworks/6.28/kunitconversion-6.28.0.tar.xz
+source_sha256: b3e7dc0ad758a994f5171c6fb9a4bbf59bb51bdf7e0fecf0df6a3b55f2e5bd6b
+knowledge_gained:
+  - "kunitconversion 6.28.0 is a new package. The KF6-ceiling pattern applies through patches/0001 (KF_DEP_VERSION 6.28.0 -> 6.26.0 for the single-component find_package(KF6I18n ${KF_DEP_VERSION}) form), and the po layer needs no patch at all: with KF_SKIP_PO_PROCESSING=ON, KI18N_INSTALL() in ki18n 6.26.0's KF6I18nMacros.cmake early-returns, and the published ki18n already ships the relaxed Gettext lookup (ki18n 6.28.0 precedent)."
+  - "E537: ki18n 6.26.0 publishes libKF6I18n.so without DT_SONAME, so linking the imported KF6::I18n target records its absolute conan-cache path in DT_NEEDED; patches/0002 drops the target, keeps its INTERFACE_INCLUDE_DIRECTORIES and links by bare name through $<TARGET_LINKER_FILE_DIR:KF6::I18n> + -lKF6I18n - the linker records the bare basename (kcontacts 6.28.0 precedent)."
+  - "E330: HMDFS rejects symlink() with EPERM, so any target with VERSION/SOVERSION set (kunitconversion sets SOVERSION 6) fails the post-link cmake_symlink_library step; CMAKE_PLATFORM_NO_VERSIONED_SONAME=ON (variables+cache_variables) plus explicit CMAKE_SHARED_LIBRARY_SONAME_{C,CXX}_FLAG=-Wl,-soname, yields one unversioned real libKF6UnitConversion.so with a bare relocatable DT_SONAME (DRAFT-cmake-harmonyos-system-name-soname)."
+  - "E731: two upstream autotests (convertertest::testCurrency, categorytest::testCurrencyTableUpdate) download the ECB currency table over HTTPS; the OHOS CI sandbox has no outbound route, so patches/0003 prepends a QSKIP guard in place (verification logic stays in the tree, no test registration changes). The offline currency paths remain covered by valuetest::testCurrencyNotDownloaded and currencytableinittest, and the entry-level result stays '100% tests passed, 0 tests failed out of 4' (a QSKIP inside a QTest exits 0)."
+  - "currencytableinittest copies its embedded currency.xml snapshot into the QStandardPaths test-mode data dir ($HOME/.qttest/share/libkunitconversion/); QFile::copy does not create parent directories, so the recipe pre-creates that directory in the ctest runtime env - otherwise the fully-offline table test fails on a fresh HOME (j669539 kunitconversion5 !14840 precedent)."
+  - "Upstream src/velocity.cpp stores the km/h factor as 0.277778 (six significant digits), so 1 m/s round-trips to 3.5999971, not 3.6 - consumer tests must compare with a tolerance that accommodates the table's precision (1e-4 here) instead of exact equality; the first device cycle failed on this."
+  - "Recipe authoring: conandata.yml patches must be keyed by the version string ('6.28.0': [...]); under any other keying apply_conandata_patches silently applies zero patches with no error, which the first device cycle exposed only indirectly as find_package(KF6I18n 6.28.0) being rejected (the KF_DEP_VERSION patch had not been applied)."
