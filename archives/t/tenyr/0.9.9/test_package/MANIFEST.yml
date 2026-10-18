@@ -1,0 +1,97 @@
+# test_package/MANIFEST.yml — tenyr 0.9.9
+# 上游官方测试声明文件（CI L0e 硬门禁要求存在）
+#
+# 上游测试登记口径（与审查员实测 N=112 一致，加法可复核）：
+#   make check_sw 的测试程序登记 = check_sim 测试程序 + check_compile 测试程序
+#   + SDL 门控运行用例：
+#     - check_sim：44 个程序（16 op + 25 run + 3 demo），每个程序在
+#       interp / interp_prealloc 两种模拟器风格下各执行一次（日志 88 行，
+#       计数单位为“测试程序”而非“执行行”）。
+#     - check_compile：66 个程序（41 个 pass_compile 正汇编 + 25 个
+#       fail_compile 负汇编），由 test/Makefile positive/negative 全量汇编。
+#     - SDL 门控运行用例：2 个（led、bm_mults，mk/misc.mk `SDL_RUNS`），
+#       上游仅在 SDL!=0 时注册（ifneq ($(SDL),0) RUNS += $(SDL_RUNS)）；
+#       OHOS 软件核心以 SDL=0 构建（与上游 CI wine job 的 SDL=0/JIT=0
+#       配置一致），SD=0 下该 2 用例不在 RUNS 中，未执行。
+#   44 + 66 + 2 = 112。
+#
+# 真机执行：44 sim + 66 compile = 110 执行、110 通过、0 失败、2 跳过（SDL 门控）。
+
+package: tenyr/0.9.9
+homepage: "https://github.com/kulp/tenyr"
+
+upstream_tests_exist: true
+upstream_test_audit:
+  source_tarball: "https://github.com/kulp/tenyr/archive/refs/tags/v0.9.9.tar.gz"
+  source_sha256: "29010e3df8449e9210faf96ca5518d573af4ada4939fe1e7cfbc169fe9179224"
+  build_system: "makefile (top-level GNU make, no autotools/CMake; lexer.l/parser.y regenerated with flex+bison at build time)"
+  test_definition: >
+    Upstream exposes `make check` -> check_sw + check_hw.  check_hw requires
+    Icarus Verilog + VPI (unavailable on OHOS), so the software suite
+    `make check_sw` is run.  Its registered test-program total (reviewed
+    N=112) is the sum of:
+      (1) check_sim 44 programs: 16 op tests (test/op/*.tas) + 25 run tests
+          (test/run/*.tas, non-SDL) + 3 demos (ex/*_demo.tas);
+      (2) check_compile 66 programs: 41 pass_compile (test/pass_compile/*.tas,
+          positive assembly must succeed) + 25 fail_compile
+          (test/fail_compile/*.tas, negative assembly must fail);
+      (3) 2 SDL-gated run tests (led, bm_mults; mk/misc.mk `SDL_RUNS`, only
+          registered under `ifneq ($(SDL),0)`).
+    44 + 66 + 2 = 112.
+  portability_changes:
+    - "patches/0001-fix-sextend32-long-to-int32-cast.patch: -Werror=shorten-64-to-32 in src/common.h SEXTEND32 (%p long->int32)"
+    - "patches/0002-fix-disabled-macro-expansion-stdin-stdout.patch: OHOS sysroot self-referential stdin/stdout macros -> -Werror=disabled-macro-expansion in tas.c/tsim.c/tld.c/serial.c (ungated by PEDANTIC); downgraded via -W$(PEDANTRY_EXCEPTION)disabled-macro-expansion, same as upstream lexer.o/parser.o"
+  counting_unit: "make-check test-program registry (44 sim + 66 compile = 110 executed; 2 SDL-gated run tests not registered/executed in the SDL=0 software core)"
+  verification: "make check_sw JIT=0 SDL=0 PEDANTIC=0 parsed natively: 44 sim programs (88 execution lines) + 66 compile programs = 110 executed, 110 passed, 0 failed; 2 SDL-gated run tests skipped (environment) => marker status=incomplete (110/112; rule4: passed requires passed==discovered, gaps sum=2=discovered-passed)"
+
+upstream_test_total: 112
+upstream_test_count_method: "auto"  # 单一且可解析的 make-check 测试程序登记（44 sim + 66 compile + 2 SDL 门控）
+upstream_test_count_detail: "112 = 44 (16 op + 25 run + 3 demo) check_sim programs + 66 (41 pass_compile + 25 fail_compile) check_compile programs + 2 SDL-gated run tests (led, bm_mults)；真机执行 110（44 sim + 66 compile），2 SDL 设备用例在 SDL=0 软件核心下不注册/不执行（gaps environment）"
+
+upstream_check_command: "make -j1 check_sw JIT=0 SDL=0 PEDANTIC=0 (software checks; check_hw requires iverilog/VPI)"
+upstream_test_in_build: true
+upstream_test_command: "make -j1 check_sw JIT=0 SDL=0 PEDANTIC=0 CC=<toolchain-clang>"
+
+# 上游实际运行的测试程序登记（每项的真实执行见 notes.md「上游测试审计」）。
+upstream_tests:
+  - file: test/op/*.tas
+    source: tenyr-0.9.9/test/op/*.tas
+    description: "16 条指令 op 测试（add/and/andn/at/eq/gte/lsh/lt/mult/or/orn/pack/rsha/rshl/sub/xor），自校验：成功时寄存器 B=0xffffffff"
+    command: "make check_sim"
+  - file: test/run/*.tas
+    source: tenyr-0.9.9/test/run/*.tas
+    description: "25 个运行级测试（指令/伪指令/重定位/自修改代码等，非 SDL），自校验 B=0xffffffff"
+    command: "make check_sim"
+  - file: ex/qsort_demo.tas
+    source: tenyr-0.9.9/ex/qsort_demo.tas
+    description: "qsort 示例程序（外部校验，第 5 行 = eight）"
+    command: "make check_sim"
+  - file: ex/bsearch_demo.tas
+    source: tenyr-0.9.9/ex/bsearch_demo.tas
+    description: "bsearch 示例程序（外部校验）"
+    command: "make check_sim"
+  - file: ex/trailz_demo.tas
+    source: tenyr-0.9.9/ex/trailz_demo.tas
+    description: "trailz 示例程序（外部校验）"
+    command: "make check_sim"
+  - file: test/pass_compile/*.tas
+    source: tenyr-0.9.9/test/pass_compile/*.tas
+    description: "41 个正汇编测试（must assemble：tas 接受并产出 .to）"
+    command: "make check_compile"
+  - file: test/fail_compile/*.tas
+    source: tenyr-0.9.9/test/fail_compile/*.tas
+    description: "25 个负汇编测试（must fail：tas 拒绝并打印 failed as expected）"
+    command: "make check_compile"
+  - file: test/run/sdl/led.tas + ex/bm_mults.tas
+    source: tenyr-0.9.9/test/run/sdl/led.tas
+    description: "2 个 SDL 设备运行用例（mk/misc.mk SDL_RUNS = led bm_mults），上游仅在 SDL!=0 时注册；OHOS 软件核心 SDL=0，未执行（gaps environment）"
+    command: "make check_sim (SDL!=0 配置)"
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: test_tenyr.sh
+    description: "真实执行 tas/tld/tsim：①tas 汇编一个最小程序并产出非空对象 ②tld 链接产出非空可执行 ③tsim 模拟运行至完成 ④⑤⑥ 三个工具均输出 version 且 rc=0（6 项确定性断言）"
+    command: "bash test_tenyr.sh <bin>"
+
+# 测试断言总数（test_tenyr.sh 的 6 项断言）
+assertion_count: 6
