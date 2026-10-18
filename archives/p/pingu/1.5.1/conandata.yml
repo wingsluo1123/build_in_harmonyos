@@ -1,0 +1,41 @@
+# conandata.yml — pingu 1.5.1
+# Upstream: https://github.com/ncopa/pingu (tag v1.5.1, commit 9dc7220c92a759a65840c6014d7c31f2d0cd9c55)
+#
+# 0001 configure: 上游手写 configure 用 "pkg-config --exist" 探测 libev，
+#      而 pkg-config 只有 --exists；该探测恒失败，libev 头文件/lib 目录不在
+#      默认搜索路径时（例如 Conan 包）配置必然失败。
+# 0002 src/Makefile: 对象规则用 $($@_CFLAGS) 展开成 pingu_adm.o_CFLAGS，
+#      永远匹配不到 pingu_CFLAGS，LIBEV_CFLAGS 被丢弃。
+# 0003-0007: musl 派生 sysroot（OpenHarmony）的 <linux/socket.h> 不像 glibc
+#      那样屏蔽内核 UAPI 的 struct sockaddr_storage，同时见到 libc 头与
+#      netlink UAPI 头的 TU 会报 "redefinition of 'sockaddr_storage'"。
+#      用 libc 鉴别探针（__linux__ && !__GLIBC__）在引入 UAPI 头期间重命名
+#      内核侧定义，glibc 路径逐字不变，且不使用平台宏。
+
+sources:
+  url: "https://github.com/ncopa/pingu/archive/refs/tags/v1.5.1.tar.gz"
+  sha256: "97f4d6e8eaf0eccdd70b3efe337b07e84f640278bab7a24694639d3616dad071"
+
+patches:
+  "1.5.1":
+    - patch_file: "patches/0001-configure.patch"
+      patch_description: "configure: probe pkg-config with --exists instead of the non-existent --exist"
+      patch_type: "portability"
+    - patch_file: "patches/0002-src-Makefile.patch"
+      patch_description: "src/Makefile: apply LIBEV_CFLAGS to the pingu/pinguctl objects"
+      patch_type: "portability"
+    - patch_file: "patches/0003-src-mtu.c.patch"
+      patch_description: "mtu.c: keep the kernel UAPI sockaddr_storage out of the libc namespace on musl sysroots"
+      patch_type: "portability"
+    - patch_file: "patches/0004-src-netlink.c.patch"
+      patch_description: "netlink.c: keep the kernel UAPI sockaddr_storage out of the libc namespace on musl sysroots"
+      patch_type: "portability"
+    - patch_file: "patches/0005-src-pingu_host.c.patch"
+      patch_description: "pingu_host.c: keep the kernel UAPI sockaddr_storage out of the libc namespace on musl sysroots"
+      patch_type: "portability"
+    - patch_file: "patches/0006-src-pingu_iface.c.patch"
+      patch_description: "pingu_iface.c: keep the kernel UAPI sockaddr_storage out of the libc namespace on musl sysroots"
+      patch_type: "portability"
+    - patch_file: "patches/0007-src-pingu_netlink.c.patch"
+      patch_description: "pingu_netlink.c: keep the kernel UAPI sockaddr_storage out of the libc namespace on musl sysroots"
+      patch_type: "portability"

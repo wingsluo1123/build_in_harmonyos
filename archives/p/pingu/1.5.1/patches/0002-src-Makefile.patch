@@ -1,0 +1,29 @@
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -69,20 +69,26 @@
+ 	icmp.o
+ 
+ lua-client.o_CFLAGS = $(LUA_CFLAGS)
+ client.so_OBJS = \
+ 	lua-client.o
+ 
+ client.so_LDFLAGS = -shared
+ 
+ ALL_OBJS= $(pingu_OBJS) $(pinguctl_OBJS) $(mtu_OBJS) $(client.so_OBJS)
+ 
++# The object rule expands $($@_CFLAGS) with $@ = "pingu_adm.o", which never
++# matches pingu_CFLAGS, so LIBEV_CFLAGS is dropped and libev is only found when
++# its headers live in the default include path.  pinguctl includes pingu_adm.h,
++# which needs the libev headers as well.
++$(pingu_OBJS) $(pinguctl_OBJS): CFLAGS += $(LIBEV_CFLAGS)
++
+ all: $(TARGETS) $(SUBDIRS)
+ 
+ %.o: %.c
+ 	$(CC) $(CFLAGS) $($@_CFLAGS) -c $<
+ 
+ $(TARGETS):
+ 	$(CC) $(LDFLAGS) $($@_LDFLAGS) $($@_OBJS) $($@_LIBS) -o $@
+ 
+ pingu: $(pingu_OBJS)
+ pinguctl: $(pinguctl_OBJS)

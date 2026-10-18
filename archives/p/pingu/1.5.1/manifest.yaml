@@ -1,0 +1,80 @@
+# pingu 1.5.1 — 版本级归档元数据（ARCHIVE-SPEC v2.0）
+software: pingu
+version: "1.5.1"
+status: built
+build_date: "2026-10-17"
+build_system: make
+
+source:
+  url: "https://github.com/ncopa/pingu/archive/refs/tags/v1.5.1.tar.gz"
+  sha256: "97f4d6e8eaf0eccdd70b3efe337b07e84f640278bab7a24694639d3616dad071"
+  tar_format: tar.gz
+  upstream_repo: "https://github.com/ncopa/pingu"
+  upstream_commit: "9dc7220c92a759a65840c6014d7c31f2d0cd9c55"
+
+build:
+  system: make
+  configure_options:
+    - "--prefix=/usr"
+    - "--exec-prefix=/usr"
+    - "--sysconfdir=/etc"
+    - "--localstatedir=/var"
+    - "--disable-doc"
+  dependencies:
+    - libev/4.33
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-configure.patch"
+  - "0002-src-Makefile.patch"
+  - "0003-src-mtu.c.patch"
+  - "0004-src-netlink.c.patch"
+  - "0005-src-pingu_host.c.patch"
+  - "0006-src-pingu_iface.c.patch"
+  - "0007-src-pingu_netlink.c.patch"
+
+knowledge_gained:
+  - "musl 派生 sysroot 的 <linux/socket.h> 不屏蔽内核 UAPI struct sockaddr_storage，与 libc 头同 TU 报重定义（ref: E1604）"
+  - "手写 configure 用 'pkg-config --exist libev' 探测（正确选项 --exists），探测恒失败并回退 -lev；libev 在非默认前缀时配置失败（ref: E568）"
+  - "configure 把探测程序写到 $TMPDIR；OpenHarmony 上 /tmp 只读，必须把 TMPDIR 指到可写目录（ref: E002）"
+  - "OHOS 用户态没有 coreutils install(1)，上游 'make install' 报 127；应在 package() 直接拷贝产物（ref: E108）"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/pingu-1.5.1.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/pingu-1.5.1.work
+  source_orig_hash: 37a92cd80ed5fdad
+  source_work_hash: 64adc87c292262cb
+  generated_at: '2026-10-17T20:51:05'
+  patches_count: 7
+
+patch_classification:
+  - file: 0001-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-src-Makefile.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-src-mtu.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-src-netlink.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0005-src-pingu_host.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0006-src-pingu_iface.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0007-src-pingu_netlink.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

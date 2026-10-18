@@ -1,0 +1,58 @@
+# test_package/MANIFEST.yml
+# 上游测试声明 + test_package 用例清单
+#
+# 上游测试清点（2026-10-17，pingu v1.5.1 源码包全量列举）：
+#   - 源码包内无 tests/ 目录，也没有任何 *_test.c / test_*.c 文件
+#        顶层文件：Makefile README.md configure pingu.conf
+#        src/：17 个 .c + 头部文件（无测试源）
+#        doc/：asciidoc 手册源（pingu.txt.in 等），无测试
+#   - configure（手写 shell，非 autotools）不提供 check/test target：
+#        grep -n 'check\|test' configure 仅命中 strlcpy 探测代码片段
+#   - Makefile / src/Makefile 的目标只有 all / install / clean：
+#        grep -E '^(all|install|clean|check|test):' Makefile src/Makefile
+#        -> all, install, clean（无 check，无 test）
+#   - 上游 README.md 的 "Build requirements" 只提到 libev 与 asciidoc，
+#     未提及任何测试套件
+# 结论：上游无自动化测试入口，本仓库不修改上游测试用例（无测试用例可改）。
+#       test_package 用例为适配方新增的可执行回归测试，不替代上游统计。
+
+package: pingu/1.5.1
+homepage: "https://github.com/ncopa/pingu"
+
+# 上游测试命令（用于 make -n check / ctest -N / meson test --list 分析）
+upstream_check_command: "make check"
+upstream_check_command_result: >
+  make: *** No rule to make target 'check'.  Stop.
+  （上游 Makefile 仅定义 all / install / clean）
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_test_count: 0
+
+# 上游实际运行的测试程序（无）
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证，逐项可执行)
+test_package_tests:
+  - file: test_pingu.sh
+    description: "T1 pingu -V 打印版本横幅并以 0 退出"
+    command: "pingu -V"
+  - file: test_pingu.sh
+    description: "T2 pingu -h 打印 usage 并以 1 退出"
+    command: "pingu -h"
+  - file: test_pingu.sh
+    description: "T3 pingu -d -c <不存在的配置> 报错并以 1 退出"
+    command: "pingu -d -c /tmp/absent.conf"
+  - file: test_pingu.sh
+    description: "T4 pinguctl -a <不存在的管理套接字> 报错并以 1 退出"
+    command: "pinguctl -a /tmp/absent.ctl"
+  - file: test_pingu.sh
+    description: "T5 mtu 无参数打印 usage 并以 3 退出"
+    command: "mtu"
+  - file: test_pingu.sh
+    description: "T6 鸿蒙特有：产物为 OHOS/musl ELF（ld-musl 解释器）、NEEDED libev.so、netlink 适配代码已链接进 pingu"
+    command: "readelf -l/-d/-s $(command -v pingu)"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 6
