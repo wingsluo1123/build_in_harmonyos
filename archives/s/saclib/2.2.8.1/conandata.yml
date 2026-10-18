@@ -1,0 +1,69 @@
+# SACLIB 2.2.8 source provenance — 2.2.8.1 is a re-release of the same upstream
+# release, so the entries below are keyed by the recipe version (2.2.8.1) while
+# the tarball is still upstream 2.2.8: the suffix never appears in a download
+# URL or in a version check against upstream.
+#
+# The keys must be the recipe version: Conan 2's export_conandata_patches() and
+# apply_conandata_patches() both look the patch list up as
+# self.conan_data["patches"][self.version], so a "2.2.8" key silently produced an
+# empty patch list for the 2.2.8.1 recipe and no patch was exported at all
+# (caught by the archive-level check: sysdep/ohosAarch64 was missing).
+#
+# Upstream (www.usna.edu) publishes no source release on a code hosting
+# platform.  The release tarball is the exact file redistributed by both the
+# SageMath upstream mirror and the Debian source archive; Debian and Fedora
+# build their saclib packages from it.
+#
+# 3060308 bytes
+# sha256 E8E3ACB253C64394F35C8E17942F764CAE34DF731F3FE3D749B6A2AE1FB8203B
+#
+# Equivalence was proven by downloading the file from three independent
+# official hosters and comparing the full sha256 — all three are
+# E8E3ACB2...203B, same size, same version:
+#   https://files.sagemath.org/spkg/upstream/saclib/saclib2.2.8.tar.gz
+#   https://mirrors.mit.edu/sage/spkg/upstream/saclib/saclib2.2.8.tar.gz
+#   https://deb.debian.org/debian/pool/main/s/saclib/saclib_2.2.8.orig.tar.gz
+# No version substitution or repacking is involved: this is one byte-identical
+# upstream tarball served by three mirrors.
+#
+# The Debian host is the one actually used, because it is the mirror the CI
+# workers are known to reach: it appears in 563 recipes on main (it is also the
+# documented fallback there for hosts such as ftp.gnu.org that the workers
+# cannot reach), whereas mirrors.mit.edu appears in 4.  The first CI run for
+# this package failed in `checkout-pr` (the worker could not download the PR
+# diff at all), so the source host was re-checked against that constraint.
+sources:
+  "2.2.8.1":
+    url: "https://deb.debian.org/debian/pool/main/s/saclib/saclib_2.2.8.orig.tar.gz"
+    sha256: "E8E3ACB253C64394F35C8E17942F764CAE34DF731F3FE3D749B6A2AE1FB8203B"
+patches:
+  "2.2.8.1":
+    - patch_file: "patches/0001-sysdep-ohos-aarch64-port.patch"
+      patch_description: >-
+        Add an OHOS/aarch64 system-dependent port (sysdep/ohosAarch64) and teach
+        sconf/mksysdep.pl to select it, so that the generated sysdep.h does not
+        pull in the glibc-only <ieee754.h> and GC() does not spill x86 registers.
+      patch_type: "portability"
+      patch_source: "https://github.com/chriswestbrown/saclib"
+    - patch_file: "patches/0002-weak-sacmain-hook.patch"
+      patch_description: >-
+        Mark SACLIB's optional sacMain() hook as a weak reference, so that a
+        consumer that defines main() itself can never clash with the archive
+        member that holds SACLIB's default main().  Also adds the __weak
+        attribute macro to include/sacsys.h.
+      patch_type: "portability"
+      patch_source: "Debian saclib packaging (debian/patches/saclib-attr.patch, __weak part)"
+    - patch_file: "patches/0003-ohos-round-macros.patch"
+      patch_description: >-
+        Define rounddown()/roundup() for the OHOS AArch64 port.  include/hfloats.h
+        only defined them for _SPARC_SOLARIS_, _X86_LINUX_ and _MAC_OSX_, so with
+        the OHOS port (_OHOS_AARCH64_) they were undeclared identifiers:
+        src/HIACC.c, HIPCHT.c, HIPFES.c, HIPROD.c, HIPTR1.c, HIQUOT.c and HISUM.c
+        then compiled implicit function declarations into calls to the external
+        symbols rounddown/roundup, which no library provides (7 + 6 dangling
+        references in libsaclibo.a).  SACLIB itself only runs `ar`, never a link,
+        so they stayed invisible until the first downstream consumer (qepcad)
+        linked libsaclibo.a.  The new branch mirrors the upstream
+        X86_LINUX/MAC_OSX wording exactly.
+      patch_type: "portability"
+      patch_source: "reported and patch drafted by the qepcad 1.74 adaptation session"
