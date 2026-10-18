@@ -1,0 +1,36 @@
+software: profiled
+display: "profiled"
+description: "Sailfish/Nemo profile settings 守护进程：libprofile 客户端库 + profiled D-Bus 服务 + profileclient/profile-tracker 工具"
+category: system-daemon
+license: BSD-2-Clause
+homepage: https://github.com/sailfishos/profiled
+repository: https://github.com/sailfishos/profiled
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "dbus-gmain 是 git submodule（mode 160000），GitHub 归档包不含内容；配方按 tag 记录的 commit d42176ae 单独取 sailfishos-mirror/dbus-glib 的 dbus-gmain.{c,h}"
+    - "VERS 默认取 debian/changelog 首行（自 1.0.12 起未更新），须以 make VERS=<版本> 覆盖，否则 profile.pc 版本号错误"
+    - "dbus 依赖包只提供 dbus.pc（pkg-config 名 dbus），上游 Makefile 写死 dbus-1；配方在 generate() 补一份 dbus-1.pc"
+    - "OHOS 无 install(1)：上游 install-* 规则不可用，package() 自行落盘 bin/lib/include/pkgconfig"
+    - "unique.c 使用 GCC 嵌套函数（auto int cmp），clang 不支持；补丁 0001 移到文件作用域"
+    - "运行期需要 D-Bus 会话总线；OHOS 沙箱下用 TCP 监听（tcp:host=127.0.0.1）可稳定拉起"
+    - "静态配置目录 /etc/profiled 缺省时使用内建 profile（general/meeting/outdoors/silent）"
+  common_dependencies:
+    - dbus
+    - glib
+    - pkgconf
+
+versions:
+  1.0.13:
+    status: built
+    build_date: "2026-10-17"
+    patches: 1
+    notes: "make + clang 15；dbus/1.14.10.2 + glib/2.88.3（+ pkgconf/3.0.6 构建工具）"
+
+keywords:
+  - profile
+  - dbus
+  - sailfish
+  - settings
+  - daemon
