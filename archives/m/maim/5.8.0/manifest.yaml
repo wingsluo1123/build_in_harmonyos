@@ -1,0 +1,47 @@
+version: "5.8.0"
+software: maim
+status: built
+build_date: "2026-10-16"
+conan_ref: "maim/5.8.0"
+build_system: cmake
+
+source:
+  url: "https://github.com/naelstrof/maim/archive/refs/tags/v5.8.0.tar.gz"
+  sha256: "ecafe01dcbe4246071c58ff36acdcd93d290ed501f67933334b646436650450e"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DMAIM_UNICODE=ON"
+  dependencies:
+    - libx11/6.4.0
+    - libxext/6.4.0
+    - libxrender/0.9.12
+    - libxfixes/6.1.0
+    - libxcomposite/0.4.6
+    - libxrandr/1.5.5.1
+    - libpng/1.6.58.3
+    - libjpeg-turbo/3.2.0.1
+    - libwebp/1.6.0.1
+    - slop/7.7
+    - glm/1.0.3
+    - icu/76.1
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-CMakeLists.txt.patch"
+
+knowledge_gained:
+  - "maim 5.8.0 ships no test directory and registers no CTest target (upstream N=0)"
+  - "ICU 76 headers require C++17, so maim's pinned CXX_STANDARD 11 cannot compile CXXOPTS_USE_UNICODE"
+  - "slop/7.7 pins libxext/6.4.0.1 while libxfixes/libxcomposite/libxrandr pin libxext/6.4.0; =force converges the graph on the 6.4.0 track"
+  - "The legacy modules/FindSLOP.cmake requires GLX, which HarmonyOS PC does not provide; Conan targets bypass that module"
+
+patch_classification:
+  - file: 0001-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
