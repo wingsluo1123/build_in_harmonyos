@@ -1,0 +1,65 @@
+{
+  "verdict": "pass",
+  "audit_round": 2,
+  "covers": "post-CI-fix working tree (conanfile _ensure_java in-process JDK bootstrap)",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "R51",
+      "file": "archives/j/jtreg8/8.3-1/notes.md",
+      "line": 37,
+      "description": "Row #7 claims a standalone on-device bootstrap verification ('真机独立验证 285.9MB tarball 解压与 bin/java -version rc=0'), but no log or artifact of that standalone run survives on the device, and the Oct-8 local W3 rerun takes the early-return path ('Java found at /storage/Users/currentUser/bishengjdk17', .ci_logs line 102), so the bootstrap code path has no preserved execution evidence. This audit independently re-verified every externally checkable component: streamed download of the pinned URL hashes to exactly ce074909ff5c13e7e7675eb243ee15424f0343610312c526552a1a08d199e28f, the tarball root is 'bishengjdk17/' (matching the nested-root branch), and device conan 2.29.1 download() supports the sha256 kwarg — so the committed claim is consistent with all facts, but currently rests on unpreserved evidence.",
+      "fix_suggestion": "Preserve a bootstrap-path log (e.g. a HOME-redirected sandbox run of _ensure_java with JAVA_HOME unset and ~/bishengjdk17 hidden) under reports/ alongside the next local rerun, or soften the notes wording to describe the audit-verified facts (hash pin + layout) rather than an unarchived run."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R52",
+      "file": "archives/j/jtreg8/8.3-1/reports/w3-local-ci.log",
+      "line": 1,
+      "description": "Evidence staleness: reports/w3-local-ci.log and reports/.ci-result.json are the Oct-4 pre-fix run (timestamp 2026-10-04T20:13:57, log_sha256 e3b1469a...); the post-fix rerun evidence exists only as gitignored .ci_logs/conan_build_jtreg8_8.3-1.log (recipe jtreg8/8.3-1#dbdf25fde53f4a9ca2ceaf95200f2d38 exported 2026-10-08 03:21:27 UTC, i.e. after conanfile.py mtime 11:19:56 +0800; test_package 12/12 OK). The L0/L1/L1e/L4/L5 gate steps of the rerun were not preserved in any log. Mitigation: all gate inputs except conanfile.py are byte-identical to the Oct-4-passed tree (sha256-verified) and the only conanfile-sensitive gate (L0o quoted 'curl'/'wget' literals) was re-checked clean by this audit (grep rc=1).",
+      "fix_suggestion": "After the next full build_and_test.sh rerun, refresh the reports/ copies (they are gitignored local evidence) so the archived log matches the recipe actually shipped."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R52",
+      "file": "archives/j/jtreg8/8.3-1/reports/audit-result.json",
+      "line": 1,
+      "description": "The tracked audit-result.json is the round-1 result (audited HEAD 61a3a6675, 'working tree clean, matches HEAD') and therefore no longer describes the tree containing the in-process JDK bootstrap fix. Resolved by this audit: this round-2 result replaces the file (uploaded to reports/audit-result.json).",
+      "fix_suggestion": "None — replacement performed by this re-audit; commit the updated file together with conanfile.py/notes.md/manifest.yaml."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style",
+      "file": "archives/j/jtreg8/8.3-1/conanfile.py",
+      "line": 175,
+      "description": "Bootstrap failure-path robustness nits (happy path verified): (a) if an earlier interrupted bootstrap left a partial ~/bishengjdk17 without bin/java, os.rename(root, target) fails on the existing directory and the re-raised OSError aborts the build instead of clearing the stale partial install; (b) an exception inside tarfile.extractall (lines 157-161) leaks the staging dir and the 285.9MB tarball (cleanup at lines 155/167/172/178/180 is only on handled paths, no try/finally).",
+      "fix_suggestion": "On rename OSError with a target lacking bin/java, rmtree(target) then retry the rename once; wrap the extract/publish block in try/finally to always rmtree(staging) and best-effort remove the tarball."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code_style",
+      "file": "archives/j/jtreg8/8.3-1/conanfile.py",
+      "line": 205,
+      "description": "Pre-existing (unchanged by this fix, passed round 1; noted for the record): _fetch's urllib fallback builds ssl._create_unverified_context(), disabling TLS verification for the Ant/TestNG/JDK-fallback downloads. Acceptable because every _fetch result is hash-pinned and verified after download (sha1 for Ant/TestNG LICENSE, sha256 for the JDK), so tampering is detected, but a verified-context first attempt would be cleaner.",
+      "fix_suggestion": "Try a default (verifying) SSL context first and fall back to the unverified context only on certificate failure, keeping the existing post-download hash checks."
+    }
+  ],
+  "summary": "Re-audit (round 2) of the post-CI-fix working tree at HEAD 6c7a80e15 + uncommitted conanfile.py/notes.md/manifest.yaml (git status confirms exactly these three tracked files modified; only untracked extra is feedback/SKILL_FEEDBACK_ab231aa5.md, outside the PR). The rewritten _ensure_java bootstraps BiShengJDK 17.0.13 fully in-process and was verified against the real artifact: streaming the pinned URL through sha256sum reproduces the pinned ce074909ff5c13e7e7675eb243ee15424f0343610312c526552a1a08d199e28f exactly, and the tarball root is 'bishengjdk17/', matching the nested-root branch; conan 2.29.1 (the setup.sh-provisioned version) supports download(..., sha256=..., retry=, retry_wait=). The fallback path re-verifies sha256 in-process. Publish is race-safe (atomic os.rename with concurrent-winner detection and staging cleanup), staging is pid-suffixed, no secrets or personal absolute paths are introduced (BISHENG_JDK_URL points at the public cmd-pkgs release host), and there are zero quoted 'curl'/'wget' literals anywhere in the recipe/test_package (L0o-style grep rc=1) — curl is only invoked inside self.run lines and via conan's download(). Post-fix local rerun evidence confirmed: .ci_logs/conan_build_jtreg8_8.3-1.log shows the new recipe exported 2026-10-08 03:21:27 UTC (jtreg8/8.3-1#dbdf25fde53f4a9ca2ceaf95200f2d38) with the full build and test_package 12/12 PASS after the conanfile edit. All round-1 invariants re-hold: settings four fields, validate() Linux/OHOS, official GitHub source URL + sha256 f54c1772... in conandata.yml (byte-identical to HEAD), patch unchanged and macro-free, test_package unchanged (12 ok() assertions matching MANIFEST.yml/test-report.md/README/notes), commands.json/README/software manifest unchanged, no placeholders/__OHOS__/file:// in any tracked PR file (grep hits exist only in unrelated pre-existing knowledge drafts and in round-1 audit-report prose), round-1 P2/P3 fixes persist (test_results.total=271, 12-assertion wording, clean notes tail), and source_orig_dir/source_work_dir in manifest.yaml are repo-wide provenance convention. Knowledge drafts DRAFT-12683-*.kv/.md exist as two kv+md pairs with non-empty error_signature/root_cause/rec_approach/title. Zero P0, zero P1; verdict pass. Residual uncertainty: CI-worker conan version parity (an ancient conan without checksum kwargs in download() would raise a loud TypeError, not a silent failure) and the fact that no CI run has exercised the new bootstrap inside the actual EAGAIN sandbox yet (fix is uncommitted); the fork-free property is structural (no subprocess in the new path).",
+  "checked_files_sha256": {
+    "archives/j/jtreg8/8.3-1/conanfile.py": "bd19bc6600a380a979eb8c677f72026ef94d2f91d3c03931a91baf136d7cf267",
+    "archives/j/jtreg8/8.3-1/conanfile.py@HEAD": "a4e6a296da38f73d2cb35233ac97de22084fd4cb9766a367b673ef20bec5d142",
+    "archives/j/jtreg8/8.3-1/conandata.yml": "d5affcfaf5b62afda7ef63c4f68f73212a517ae8bf5dfe8195d81123fdf42126",
+    "archives/j/jtreg8/8.3-1/conandata.yml@HEAD": "d5affcfaf5b62afda7ef63c4f68f73212a517ae8bf5dfe8195d81123fdf42126",
+    "archives/j/jtreg8/8.3-1/test_package/test.sh": "05d67873de40f328bf724a37aabff243cbe77e0370bb371f5bb85aff589eabc3",
+    "archives/j/jtreg8/8.3-1/test_package/test.sh@HEAD": "05d67873de40f328bf724a37aabff243cbe77e0370bb371f5bb85aff589eabc3",
+    "archives/j/jtreg8/8.3-1/patches/0001-make-Platform.gmk.patch": "0ed67e09878e714bec8b0a42a46dc40398ab7d7b1c499eec9c02385d73649f9a",
+    "archives/j/jtreg8/8.3-1/patches/0001-make-Platform.gmk.patch@HEAD": "0ed67e09878e714bec8b0a42a46dc40398ab7d7b1c499eec9c02385d73649f9a",
+    "archives/j/jtreg8/8.3-1/test_package/conanfile.py": "1cab4d9cec79f0686c26144bc74de6b913d2b51434bb6e9beb45540d3e4d8790",
+    "archives/j/jtreg8/8.3-1/test_package/conanfile.py@HEAD": "1cab4d9cec79f0686c26144bc74de6b913d2b51434bb6e9beb45540d3e4d8790",
+    "archives/j/jtreg8/8.3-1/test_package/MANIFEST.yml": "ee400717546f48c9b606cdd4f5d8e8c61744ad878866e6468a5ed39cafc15ea6",
+    "archives/j/jtreg8/8.3-1/notes.md": "eeeb17058de1dd1906875727dddd966cd15ebf5193909502aad5a63814b1e827",
+    "archives/j/jtreg8/8.3-1/notes.md@HEAD": "8be451745c1aee261baf4533b78f095ede7aa5e4c87c92d819a5785e49d20377",
+    "archives/j/jtreg8/8.3-1/manifest.yaml": "84bf49f3625e8e1f8620d81eeb38666dcb70f6a20982266ec4020659ec2e188e",
+    "archives/j/jtreg8/8.3-1/manifest.yaml@HEAD": "6a0eb60091c0d45fb556a0ec5b5c1eaed9e8ec6a2c2082ced1507e53bbb963b7"
+  }
+}

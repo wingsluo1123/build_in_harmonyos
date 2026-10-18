@@ -1,0 +1,70 @@
+version: "8.3-1"
+software: jtreg8
+status: built
+build_date: "2026-10-04"
+build_system: makefile
+
+source:
+  url: "https://github.com/openjdk/jtreg/archive/refs/tags/jtreg-8.3+1.tar.gz"
+  sha256: "f54c1772da0123c3a494ece93063fa7067b8a9f5d124db0aff7d13c846362828"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options: []
+  env:
+    JAVA_HOME: "BiShengJDK 17.0.13（缺失时配方内纯 Python 引导安装到 ~/bishengjdk17：conan download + tarfile 进程内解压，sha256 钉校验）"
+    JTREG_VERSION_STRING: "8.3+1"
+    CODE_TOOLS_URL_BASE: "https://github.com/openjdk"
+    MAVEN_REPO_URL_BASE: "https://maven.aliyun.com/repository/central"
+  dependencies:
+    - "bishengjdk 17.0.13"
+    - "apache-ant 1.10.15（配方自取、sha1 钉校验、缓存于 ~/apache-ant-1.10.15）"
+    - "JT Harness jt6.0-b24 / AsmTools 9.1-b01（上游 build.sh 从 GitHub 源码构建）"
+    - "JUnit 1.14.2 / TestNG 7.3.0 / Guice 5.1.0 / JCommander 1.82（上游 build.sh 经 Maven 镜像下载并校验）"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-make-Platform.gmk.patch"
+
+knowledge_gained:
+  - "HarmonyOS 的 `uname -s` 返回 HarmonyOS；上游 make/Platform.gmk 未识别时会落入 Windows 分支（PS=';'），javac 在 -Werror 下报 [path] bad path element，需按 Linux 语义加分支（唯一补丁）"
+  - "BiShengJDK 在鸿蒙上 os.name=HarmonyOS、os.version='HongMeng Kernel 1.12.0'（含空格）——jtreg/JavaTest 的 ProblemList OSNAME-REV 排除选择器因此失配（自测 ProblemList 目标多跑 1 例）"
+  - "设备 toybox grep 不支持 BRE 的 \\+ 量词（GNU grep 支持），导致上游自测 SkippedExceptionTest 的 summary 断言失败（测试结果本身正确）"
+  - "鸿蒙文件权限/SELinux 下 chmod 只读语义受限：上游 CleanupTests.retain 预置的'不可删除文件'实际可删，jtreg 正常清理复用 scratch 目录（5 个用例全 PASS，仅目录计数断言不同）"
+  - "上游 build.sh 依赖 wget -q；设备 toybox wget 不支持，需要 wget→curl shim；raw.githubusercontent.com 不可达，TestNG LICENSE 改从 GitHub 的 testng 源码 tarball 提取（sha1 钉校验）"
+  - "archive.apache.org 从设备下载被限速至 ~20KB/s，Ant 由配方预取缓存到用户目录后经 ANT 环境变量传给 build.sh"
+  - "CI worker（AppSpawn 沙箱、共享 UID）缺 JDK 时 cmd-pkgs install-jdk.sh 的 tar xzf fork 解压子进程会 EAGAIN（tar: fork: Resource temporarily unavailable，构建 #73652/#73653 复现）——JDK 引导须在配方内纯进程完成：conan download() + tarfile（zlib 进程内）+ rename 竞态发布"
+
+upstream_tests:
+  full_suite_on_device: "make test：选中 271 个自测目标，266 通过 / 4 失败 / 1 挂起（失败与挂起均为平台/工具语义差异，见 test_results.failed_tests）"
+  build_quick_test: "make quick-test：9/9 通过（Basic check/othervm/agentvm、i18n x3、JUnitTrace.agentvm、tidy-docs、lockCheck）"
+
+test_results:
+  total: 271
+  passed: 266
+  failed: 4
+  hung: 1
+  quick_test_total: 9
+  quick_test_passed: 9
+  failed_tests:
+    - "CleanupTests.agentvm.retain: 鸿蒙 chmod/只读语义受限，'不可删除文件'可被删除，scratch 目录计数 1 != 5（5 个用例全部 PASS）"
+    - "ExplicitIds.othervm: -othervm 模式在该用例上挂起（>45 分钟无进展，终止）；同套件 -agentvm 模式通过"
+    - "ProblemList: JVM os.version 含空格（'HongMeng Kernel 1.12.0'），OSNAME-REV 排除条目失配，改为 passed:2; excluded:4（期望 passed:1）"
+    - "SkippedExceptionTest.agentvm / SkippedExceptionTest.othervm: 设备 toybox grep 不支持 BRE '\\+'，summary 断言无法匹配（测试结果与期望一致：passed:1; failed:2; skipped:1）"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/work/kasumizawa-miyuu/tmp/builds/jtreg8-8.3-1.orig
+  source_work_dir: /storage/Users/currentUser/work/kasumizawa-miyuu/tmp/builds/jtreg8-8.3-1.work
+  source_orig_hash: 6523cd9a42b3fe6f
+  source_work_hash: bdd6e7a5563316b7
+  generated_at: '2026-10-04T19:58:28'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-make-Platform.gmk.patch
+    type: portability
+    platform_only: True
+    guard: 'uname -s == HarmonyOS'
