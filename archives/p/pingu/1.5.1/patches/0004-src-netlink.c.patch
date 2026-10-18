@@ -1,0 +1,39 @@
+--- a/src/netlink.c
++++ b/src/netlink.c
+@@ -3,24 +3,36 @@
+ #include <stdio.h>
+ #include <fcntl.h>
+ #include <unistd.h>
+ #include <string.h>
+ 
+ #include <sys/types.h>
+ #include <sys/ioctl.h>
+ #include <sys/socket.h>
+ #include <netinet/in.h>
+ 
++/* musl-derived sysroots (e.g. OpenHarmony) do not guard the kernel UAPI
++ * definition of struct sockaddr_storage the way glibc does, so a TU that also
++ * sees the libc headers fails with "redefinition of 'sockaddr_storage'".
++ * Rename the kernel-side definition while the UAPI headers are parsed. */
++#if defined(__linux__) && !defined(__GLIBC__)
++#define sockaddr_storage __uapi_sockaddr_storage
++#define PINGU_RESTORE_SOCKADDR_STORAGE 1
++#endif
+ #include <asm/types.h>
+ #include <linux/netlink.h>
+ #include <linux/rtnetlink.h>
+ #include <linux/ip.h>
++#ifdef PINGU_RESTORE_SOCKADDR_STORAGE
++#undef sockaddr_storage
++#undef PINGU_RESTORE_SOCKADDR_STORAGE
++#endif
+ 
+ #ifndef FALSE
+ #define FALSE 0
+ #endif
+ #ifndef TRUE
+ #define TRUE 1
+ #endif
+ 
+ #define NLMSG_TAIL(nmsg) \
+ 	((struct rtattr *) (((void *) (nmsg)) + NLMSG_ALIGN((nmsg)->nlmsg_len)))
