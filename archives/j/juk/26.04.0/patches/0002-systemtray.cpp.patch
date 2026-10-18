@@ -1,0 +1,57 @@
+--- a/systemtray.cpp
++++ b/systemtray.cpp
+@@ -16,21 +16,28 @@
+  * this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
+ #include "systemtray.h"
+ 
+ #include <kiconloader.h>
+ #include <kactioncollection.h>
+ #include <kactionmenu.h>
+ #include <kwindowsystem.h>
+ #include <KLocalizedString>
++// OHOS: X11 is not a platform feature - KWindowSystem is built without the
++// X11 backend there, so the KX11Extras header is not shipped. Probe for it
++// and compile the X11-only composition query conditionally; the non-X11 path
++// keeps the upstream default of assuming a composition manager.
++#if __has_include(<KX11Extras>)
+ #include <KX11Extras>
++#define JUK_HAVE_KX11EXTRAS 1
++#endif
+ 
+ #include <QAction>
+ #include <QMenu>
+ #include <QTimer>
+ #include <QWheelEvent>
+ #include <QColor>
+ #include <QPushButton>
+ #include <QPalette>
+ #include <QPixmap>
+ #include <QScreen>
+@@ -277,23 +284,25 @@
+         }
+     }
+ }
+ 
+ void SystemTray::slotFadeOut()
+ {
+     m_startColor = m_labels[0]->palette().color(QPalette::Text); //textColor();
+     m_endColor = m_labels[0]->palette().color(QPalette::Window); //backgroundColor();
+ 
+     m_hasCompositionManager = true;
++#ifdef JUK_HAVE_KX11EXTRAS
+     if(KWindowSystem::isPlatformX11()) {
+         m_hasCompositionManager = KX11Extras::compositingActive();
+     }
++#endif
+ 
+     connect(this, &SystemTray::fadeDone,
+             m_popup, &QWidget::hide);
+     connect(m_popup, &PassiveInfo::mouseEntered,
+             this, &SystemTray::slotMouseInPopup);
+ 
+     m_fadeStepTimer->start(1500 / STEPS);
+ }
+ 
+ // If we receive this signal, it's because we were called during fade out.
