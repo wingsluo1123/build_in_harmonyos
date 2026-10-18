@@ -1,0 +1,31 @@
+package: genometools/1.6.2
+homepage: "https://github.com/genometools/genometools"
+
+# 上游测试命令。两个入口：
+# ① bin/gt -test：C 内建单元测试（无外部依赖，build() 内执行）
+# ② testsuite/：Ruby 驱动（testsuite.rb + *_include.rb），设备无 ruby 解释器
+upstream_check_command: "bin/gt -test（内建单元测试）；testsuite/（Ruby，未执行）"
+upstream_test_in_build: true
+upstream_test_command: "build() 内 LD_LIBRARY_PATH=<src>/lib ./bin/gt -test"
+
+upstream_tests:
+  - file: "bin/gt -test"
+    source: "genometools-1.6.2.tar.gz"
+    description: "上游内建 C 单元测试套件（src/core 等模块自测），退出码 0 即全过"
+    command: "./bin/gt -test"
+  - file: "testsuite/*_include.rb"
+    source: "genometools-1.6.2.tar.gz"
+    description: "Ruby 驱动的功能回归集；OHOS 设备无 ruby 解释器（command -v ruby 无结果），属缺工具依赖未执行，不计划入通过数"
+    command: "cd testsuite && ruby testsuite.rb -testdata … -bin …（未执行）"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_genometools.c
+    description: "消费者 API 断言：gt_hashmap 插入/查询/缺失、GtStr 追加与内容、gt_version() 可用（共 7 条，conanrun 与裸环境各跑一次）"
+    command: "./test_genometools"
+  - file: "-"
+    description: "安装的 bin/gt 裸环境 -version 与 -test 全量内建单元测试"
+    command: "<pkg>/bin/gt -version && <pkg>/bin/gt -test"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 11
