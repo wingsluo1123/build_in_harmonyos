@@ -1,0 +1,25 @@
+# 软件级 manifest — vtable（上游项目 vtable-dumper）
+software: vtable
+display: "Vtable-Dumper"
+description: "列出 C++ 共享库中虚函数表（vtable）内容的命令行工具"
+category: system
+homepage: "https://github.com/lvc/vtable-dumper"
+license: LGPL-2.1-or-later
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "上游 Makefile 硬编码 -lstdc++，OHOS 工具链只提供 libc++：补丁 0001 把运行时库名参数化为 CXXLIB（补丁本身保留上游默认值 -lstdc++），配方在本仓唯一面向的 OHOS profile 下无条件覆盖为 CXXLIB=-lc++"
+    - "平台任务 slug 是 vtable，上游项目名是 vtable-dumper：Conan 包名/目录名取 slug，构建产出的可执行文件保持上游真名 vtable-dumper"
+    - "libelf 由 Conan 依赖 elfutils/0.195.1 提供；设备 /lib64/libelf.so 的 SONAME 是 libelf.so 且不导出 gelf_*/elf_version，与 libelf.so.1 无加载歧义"
+    - "LDFLAGS 加 -Wl,--disable-new-dtags 生成 DT_RPATH：可执行文件 rpath 可继承到 libelf.so.1 的传递依赖 libzstd.so.1，工具无需 LD_LIBRARY_PATH 即可直接运行（实测 env -u LD_LIBRARY_PATH 通过）"
+    - "不静态链接 libelf.a：静态链接会再拉入 zlib（elf_compress.o 需要 deflateInit_），静态面扩散，故保留动态链接 + rpath"
+  common_dependencies:
+    - elfutils
+
+versions:
+  "1.2":
+    status: built
+    build_date: "2026-10-16"
+    conan_ref: "vtable/1.2"
+    note: "上游无测试套件（Makefile 无 check 目标）；13 项鸿蒙消费者端到端断言全绿"
