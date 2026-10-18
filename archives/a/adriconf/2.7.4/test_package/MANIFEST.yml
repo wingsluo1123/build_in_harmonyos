@@ -1,0 +1,66 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（R51 上游测试三步法）
+# adriconf 2.7.4 上游测试：tests/ 目录 10 个 gtest/gmock 测试源文件（C++），
+# CMake target runUnitTests（EXCLUDE_FROM_ALL），共 64 个测试用例。
+
+package: adriconf/2.7.4
+homepage: "https://gitlab.freedesktop.org/mesa/adriconf"
+
+# 上游测试命令（CMake：构建 runUnitTests 目标并运行）
+upstream_check_command: "cmake --build build --target runUnitTests && ./build/tests/runUnitTests --gtest_brief=1"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "./build/tests/runUnitTests --gtest_brief=1"
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: tests/ApplicationOptionTest.cpp
+    source: adriconf-2.7.4/tests/ApplicationOptionTest.cpp
+    description: "应用选项解析单元测试"
+    command: "./runUnitTests"
+  - file: tests/ApplicationTest.cpp
+    source: adriconf-2.7.4/tests/ApplicationTest.cpp
+    description: "应用行为单元测试"
+    command: "./runUnitTests"
+  - file: tests/ConfigurationResolverTest.cpp
+    source: adriconf-2.7.4/tests/ConfigurationResolverTest.cpp
+    description: "配置解析器单元测试"
+    command: "./runUnitTests"
+  - file: tests/DeviceTest.cpp
+    source: adriconf-2.7.4/tests/DeviceTest.cpp
+    description: "设备单元测试"
+    command: "./runUnitTests"
+  - file: tests/DriverConfigurationTest.cpp
+    source: adriconf-2.7.4/tests/DriverConfigurationTest.cpp
+    description: "驱动配置单元测试"
+    command: "./runUnitTests"
+  - file: tests/DriverOptionTest.cpp
+    source: adriconf-2.7.4/tests/DriverOptionTest.cpp
+    description: "驱动选项单元测试"
+    command: "./runUnitTests"
+  - file: tests/GPUInfoTest.cpp
+    source: adriconf-2.7.4/tests/GPUInfoTest.cpp
+    description: "GPU 信息单元测试"
+    command: "./runUnitTests"
+  - file: tests/ParserTest.cpp
+    source: adriconf-2.7.4/tests/ParserTest.cpp
+    description: "drirc 解析器单元测试"
+    command: "./runUnitTests"
+  - file: tests/ProfileTest.cpp
+    source: adriconf-2.7.4/tests/ProfileTest.cpp
+    description: "配置档单元测试"
+    command: "./runUnitTests"
+  - file: tests/SectionTest.cpp
+    source: adriconf-2.7.4/tests/SectionTest.cpp
+    description: "配置段单元测试"
+    command: "./runUnitTests"
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: test_adriconf.sh
+    description: "验证安装产物：bin/adriconf 为 ELF + --help 输出可读（R34）"
+    command: "./test_adriconf.sh"
+
+# 测试断言总数（近似值，用于质量评估）
+assertion_count: 202
