@@ -1,0 +1,29 @@
+package: i2c-tools/4.4
+homepage: "https://git.kernel.org/pub/scm/utils/i2c-tools/i2c-tools.git"
+
+upstream_tests_exist: false
+upstream_check_command: "none; the upstream v4.4 Makefile has no check/test target"
+upstream_test_in_build: false
+upstream_test_command: "none; v4.4 contains no registered upstream userspace tests"
+upstream_tests: []
+upstream_test_result:
+  discovered: 0
+  executed: 0
+  passed: 0
+  failed: 0
+  skipped: 0
+  xfail: 0
+  broken: 0
+  ratio: "0/0 (100%)"
+
+test_package_tests:
+  - file: conanfile.py
+    description: "Five CLI version checks, hardware-free adapter listing, two parser boundary checks, and three libi2c invalid-fd error propagation checks"
+    command: "conan create . --test-folder test_package"
+  - file: test_i2c_api.c
+    description: "Consumer link and three ioctl error propagation checks using fd -1; no I2C device is opened"
+    command: "test_i2c_api"
+
+assertion_count: 11
+not_covered:
+  - "I2C transactions, adapter functionality ioctls, device scanning, and EEPROM reads require a real adapter or a kernel i2c-stub and are not claimed by these checks."
