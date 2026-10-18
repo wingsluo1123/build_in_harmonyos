@@ -5,8 +5,9 @@ KDE Frameworks 6 — holiday calendars and astronomical events.
 `libKF6Holidays.so` provides:
 
 - **Holiday region data** — a large set of regional holiday definitions
-  (plan language, parsed at build time by bison/flex into
-  `holidayparserplan.cpp` / `holidayscannerplan.cpp`)
+  (plan language; 6.28.0 generates the parser with bison/flex at build time,
+  6.18.0 instead ships the generated `holidayparserplan.cpp` /
+  `holidayscannerplan.cpp` in the release tarball)
 - **Astronomy** — `KHolidays::SunRiseSet` (classic sunrise/sunset for a
   date/location), `KHolidays::SunEvents` (all solar event times around the
   closest solar noon: astronomical/nautical/civil dawn & dusk, sunrise,
@@ -19,6 +20,7 @@ KDE Frameworks 6 — holiday calendars and astronomical events.
 | Version | Notes |
 |---------|-------|
 | 6.28.0  | First HarmonyOS PC adaptation (knighttime dependency) |
+| 6.18.0  | KF6 6.18 release line (no source patches; pre-generated parser sources) |
 
 ## Consumer
 

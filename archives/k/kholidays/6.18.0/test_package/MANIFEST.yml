@@ -1,0 +1,38 @@
+package: kholidays/6.18.0
+homepage: "https://invent.kde.org/frameworks/kholidays"
+upstream_check_command: ""
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build-dir> --output-on-failure --no-tests=error"
+upstream_tests:
+  - file: autotests/testlunar.cpp
+    description: "Upstream lunar phase computation test"
+  - file: autotests/testseasons.cpp
+    description: "Upstream astro seasons test"
+  - file: autotests/testsunriseset.cpp
+    description: "Upstream sunrise/sunset computation test"
+  - file: autotests/testzodiac.cpp
+    description: "Upstream zodiac signs test"
+  - file: autotests/testholidayregion.cpp
+    description: "Upstream holiday region parsing/data test"
+  - file: autotests/testsunevents.cpp
+    description: "Upstream solar events (dawn/dusk/noon) test"
+upstream_test_note: >-
+  6 upstream autotests are registered by autotests/CMakeLists.txt under
+  BUILD_TESTING; they are executed via ctest during conan create with the
+  offscreen Qt platform and an isolated XDG/HOME environment. The 6.18.0
+  release does not yet ship the testcategories autotest that later KF6
+  releases add.
+test_package_tests:
+  - file: test_kholidays.cpp
+    description: >-
+      Real consumer test: find_package(KF6Holidays) + KF6::Holidays link.
+      Part 1 exercises KHolidays::HolidayRegion against the compiled-in
+      holiday plan data (region validity, region/country codes, fixed-date
+      German public holidays, holiday count for a full year, holiday name
+      and category). Part 2 exercises KHolidays::SunEvents for Beijing
+      around the 2025 June solstice (event ordering civil/astronomical dawn
+      < sunrise < solar noon < sunset < dusk, day length and solar-noon UTC
+      ranges) and the polar day/night/twilight predicates at 89N. The
+      deprecated KHolidays::SunRiseSet free functions are not used.
+    command: "test_kholidays"
+assertion_count: 23
