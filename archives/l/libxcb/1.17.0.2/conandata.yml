@@ -1,0 +1,33 @@
+# conandata.yml — libxcb 1.17.0.2
+#
+# 同一个上游 tarball（libxcb 1.17.0，xorg 官方发布包），本版本是 **OHOS 适配增量**：
+#   · 在 1.17.0.1 的两处补丁（OHOS autotools 三连 & TMPDIR 用于 display 测试）之上，
+#     新增 0003 —— 让 **unix socket 目录** 可被环境变量 `X_UNIX_SOCKET_DIR` 覆盖。
+#
+# 为什么需要（实测，2026-10-18）：
+#   本平台 `/tmp` 是**只读 erofs**，而 libxcb 把 `/tmp/.X11-unix/X` 写死在
+#   `src/xcb_util.c:_xcb_open()` 里 ⇒ 任何 X11 客户端都连不上（Xvfb 也建不了该目录：
+#   `_XSERVTransSocketUNIXCreateListener: mkdir(/tmp/.X11-unix) failed, errno = 30`）。
+#   平台能力实测：AF_UNIX **路径型** socket 在可写目录（/data/storage/el2/base/cache）
+#   **可用** ✓，仅在 hmdfs(/storage) 与 /dev/shm 上 EPERM ✗ ⇒ 只要目录可配就能跑通。
+#   补丁**不改变默认行为**：未设置该环境变量时仍用 `/tmp/.X11-unix/X` ✓。
+
+sources:
+  "1.17.0.2":
+    url: "https://xorg.freedesktop.org/archive/individual/lib/libxcb-1.17.0.tar.xz"
+    sha256: "599ebf9996710fea71622e6e184f3a8ad5b43d0e5fa8c4e407123c88a59a6d55"
+
+patches:
+  "1.17.0.2":
+    - patch_file: "patches/0001-support-ohos-configure.patch"
+      patch_description: "Accept linux-ohos Autotools triplets and avoid Linux-only abstract socket probing on OHOS."
+      patch_type: "portability"
+      strip: 1
+    - patch_file: "patches/0002-use-tmpdir-in-display-test.patch"
+      patch_description: "Use TMPDIR for parse_display_unix test temporary files on systems with read-only /tmp."
+      patch_type: "portability"
+      strip: 1
+    - patch_file: "patches/0003-honour-X_UNIX_SOCKET_DIR.patch"
+      patch_description: "Make the unix socket base directory overridable via X_UNIX_SOCKET_DIR (read-only /tmp on OHOS PC); default unchanged."
+      patch_type: "portability"
+      strip: 1
