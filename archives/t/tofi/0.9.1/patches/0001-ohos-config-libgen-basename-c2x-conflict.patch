@@ -1,0 +1,34 @@
+--- a/src/config.c	2026-10-18 04:29:08.356458750 +0800
++++ b/src/config.c	2026-10-18 04:29:08.708455312 +0800
+@@ -1,6 +1,15 @@
+ #include <ctype.h>
+ #include <errno.h>
+-#include <libgen.h>
++/*
++ * POSIX dirname() is the only <libgen.h> symbol this file uses.
++ * The OHOS sysroot <string.h> declares a K&R `char *basename();` under
++ * _GNU_SOURCE; with -std=c2x that means `char *basename(void)`, which
++ * conflicts with <libgen.h>'s `char *basename(char *)` prototype, so
++ * <libgen.h> cannot be included at all in this translation unit.
++ * Declaring dirname() directly is equivalent on glibc/musl and leaves the
++ * upstream call site untouched.
++ */
++char *dirname(char *);
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+--- a/src/history.c	2026-10-18 04:29:08.452452500 +0800
++++ b/src/history.c	2026-10-18 04:29:08.712456250 +0800
+@@ -1,6 +1,11 @@
+ #include <errno.h>
+ #include <fcntl.h>
+-#include <libgen.h>
++/*
++ * <libgen.h> is included but no libgen symbol is used here; on OHOS its
++ * `char *basename(char *)` prototype conflicts with the GNU
++ * `char *basename();` that the sysroot <string.h> declares under _GNU_SOURCE
++ * (c2x), so the include is dropped.
++ */
+ #include <stdbool.h>
+ #include <stdio.h>
+ #include <stdlib.h>
