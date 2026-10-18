@@ -1,6 +1,6 @@
 #!/bin/sh
 # OHOS-specific consumer checks for sra-sdk.
-set -u
+set -eu
 
 BIN="$1"
 LIB="$2"

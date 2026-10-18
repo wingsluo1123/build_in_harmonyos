@@ -50,10 +50,10 @@ ninja -C build/sra
 
 ## 源码修改
 
-- `patches/0001-ncbi-vdb-bison38-error-handler.patch` — ncbi-vdb schema 两个 bison 语法文件。
-- `patches/0002-ncbi-vdb-thread-cancel-ohos.patch` — ncbi-vdb `kproc/unix/systhread.c`、`align/bam.c`。
-- `patches/0003-sra-tools-cross-compiling-system.patch` — sra-tools `build/env.cmake`。
-- `patches/0004-kxml-libxml2-2.15.patch` — sra-tools `libs/kxml/xml.c`。
+- `patches/vdb/0001-ncbi-vdb-bison38-error-handler.patch` — ncbi-vdb schema 两个 bison 语法文件（由配方手动应用到 `ncbi-vdb/` 源树）。
+- `patches/vdb/0002-ncbi-vdb-thread-cancel-ohos.patch` — ncbi-vdb `kproc/unix/systhread.c`、`align/bam.c`（同样手动应用到 `ncbi-vdb/`）。
+- `patches/0003-sra-tools-cross-compiling-system.patch` — sra-tools `build/env.cmake`（`apply_conandata_patches` 应用于源码根）。
+- `patches/0004-kxml-libxml2-2.15.patch` — sra-tools `libs/kxml/xml.c`（同上）。
 
 均为可移植性修复，无 stub；平台相关逻辑（`__OHOS__`）仅用于 `pthread_cancel` 能力缺失这一实质分支，并在本文件与 PR 中说明。
 
@@ -70,7 +70,9 @@ conan create archives/s/sra-sdk/3.2.1 \
 # 构建、打包、test_package 全部通过
 ```
 
-上游测试：见 `reports/test-report.md`（190 项 CTest，全量执行）。
+上游测试：见 `reports/test-report.md`。190 项 CTest 在适配期手动执行
+（`ctest --output-on-failure --timeout 300 -j4`），不属于 `conan build` 步骤；
+`test_package` 由 `conan create` 自动执行并通过。
 
 ## 交付物
 

@@ -33,6 +33,9 @@ class SraSdkConan(ConanFile):
     license = "Public Domain"
     homepage = "https://github.com/ncbi/sra-tools"
     url = ""
+    # The SDK ships both static NGS/VDB libraries and shared VDB libraries;
+    # static-library keeps consumers on the static link path, which is the
+    # reliable option on OHOS where dlopen from app data dirs is restricted.
     package_type = "static-library"
     settings = "os", "arch", "compiler", "build_type"
     exports_sources = "patches/*", "patches/vdb/*"
