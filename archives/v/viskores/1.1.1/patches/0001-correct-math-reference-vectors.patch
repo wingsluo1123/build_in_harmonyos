@@ -1,0 +1,27 @@
+--- a/viskores/testing/UnitTestMath.cxx
++++ b/viskores/testing/UnitTestMath.cxx
+@@ -884,8 +884,11 @@
+     viskores::Float32 c = 41563.4f;
+     viskores::Float32 d = -24871.969f;
+     viskores::Float32 computed = viskores::DifferenceOfProducts(a, b, c, d);
+-    // Expected result, computed in double precision and cast back to float:
+-    viskores::Float32 expected = 5.376600027084351f;
++    // Form the reference from the actual Float32 inputs. For this example,
++    // both products and their difference are exactly representable in Float64.
++    viskores::Float32 expected = static_cast<viskores::Float32>(
++      static_cast<viskores::Float64>(a) * static_cast<viskores::Float64>(b) -
++      static_cast<viskores::Float64>(c) * static_cast<viskores::Float64>(d));
+ 
+     viskores::UInt64 dist = viskores::FloatDistance(expected, computed);
+     VISKORES_MATH_ASSERT(
+@@ -926,8 +929,8 @@
+     dist = viskores::FloatDistance(7.5e-8f, roots[1]);
+     VISKORES_MATH_ASSERT(dist < 3, "Float distance for quadratic roots exceeds 3 ulps.");
+ 
+-    // Kahan's example:
+-    auto roots64 = viskores::QuadraticRoots(94906265.625, 94906267.000, 94906268.375);
++    // Kahan's example: a*x*x - (a+c)*x + c has roots 1 and c/a.
++    auto roots64 = viskores::QuadraticRoots(94906265.625, -189812534.0, 94906268.375);
+     dist = viskores::FloatDistance(1.0, roots64[0]);
+     VISKORES_MATH_ASSERT(dist < 3, "Float distance for quadratic roots exceeds 3 ulps.");
+ 
