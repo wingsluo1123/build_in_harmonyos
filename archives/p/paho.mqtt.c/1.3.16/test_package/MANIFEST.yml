@@ -1,0 +1,19 @@
+package: paho.mqtt.c/1.3.16
+homepage: "https://github.com/eclipse/paho.mqtt.c"
+
+upstream_check_command: "ctest --test-dir build --show-only"
+upstream_test_in_build: false
+upstream_test_command: "ctest --test-dir build --output-on-failure"
+
+upstream_tests:
+  - file: test/CMakeLists.txt
+    source: https://github.com/eclipse/paho.mqtt.c/blob/v1.3.16/test/CMakeLists.txt
+    description: "The upstream test/ tree contains 25 C source files and 9 Python scripts. The full static+shared+SSL CTest registry contains 279 test case items: static 127 (99 non-WebSocket, 28 WebSocket) plus shared 152 (99 non-WebSocket, 53 WebSocket). A 277-item count is lower by the two separately registered static/shared CTest items for test_connect_destroy-1-execute-destroy-during-connect (#278 and #279); both passed in their respective HarmonyOS non-WebSocket runs. Of the 279 registrations, 263 have direct CTest Passed records and 16 MQTT v5 registrations (8 upstream protocol scenarios x static/shared) passed in focused protocol-driver runs with 0 failures. Each item has passing evidence across initial and focused executions; no single full-suite rerun was performed. Many cases require broker, proxy, TLS certificates, WebSocket fixtures, or Linux services."
+    command: "ctest --test-dir build --output-on-failure"
+
+test_package_tests:
+  - file: test_harmonyos_mqtt.c
+    description: "Four distinct runtime test items: HarmonyOS uname probe, plain MQTT loopback CONNECT/PUBLISH/DISCONNECT, and ssl:// MQTT roundtrips negotiating TLS 1.2 and TLS 1.3. The default build executes 2/2 items and the SSL build executes 4/4 (six item executions total across both configurations, with two shared items). Conan also links the static package into a shared-library probe to validate PIC for HarmonyOS native modules."
+    command: "./test_paho_mqtt_c"
+
+assertion_count: 8
