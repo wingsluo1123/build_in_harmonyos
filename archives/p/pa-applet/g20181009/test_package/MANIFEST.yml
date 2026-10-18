@@ -1,0 +1,55 @@
+# test_package/MANIFEST.yml
+# 上游测试声明 + 消费者侧用例清单（CI L0e 门禁读取）
+
+package: pa-applet/g20181009
+homepage: "https://github.com/fernandotcl/pa-applet"
+
+# 上游（fernandotcl/pa-applet@3b4f8b3）没有任何测试套件：
+# - 无 tests/ 目录、无 test_*.c；
+# - Makefile.am 只有 bin_PROGRAMS / man_MANS，没有 check_PROGRAMS 或 TESTS，
+#   即 `make check` 是空目标；
+# - 程序是 GUI 托盘小程序，没有可脚本化的功能入口。
+# 因此可测面 = 程序自身的 CLI 选项矩阵 + 产物契约（静态断言）。
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# 上游 CLI 用例矩阵 —— 逐条覆盖，脚本内明确判 PASS / FAIL / SKIP（含原因）
+upstream_cli_cases:
+  - case: "--help"
+    expectation: "exit 0，用法串包含 --disable-key-grabbing / --disable-notifications"
+  - case: "--bogus-option"
+    expectation: "被 GOption 解析器拒绝，非 0 退出（证明选项解析面是活的）"
+  - case: "--disable-key-grabbing"
+    expectation: "选项被接受，不报未知选项"
+  - case: "--disable-notifications"
+    expectation: "选项被接受，不报未知选项"
+  - case: "--disable-key-grabbing --disable-notifications"
+    expectation: "两个上游选项组合被接受"
+  - case: "(无参数)"
+    expectation: "完整启动路径：gtk_init → 连接 PulseAudio → 建托盘图标"
+
+# 静态断言（不依赖执行进程，运行期不可用时仍成立）
+static_assertions:
+  - "包内含 pa-applet 二进制（缺失即失败，L1e 破坏性检查）"
+  - "二进制带可执行位"
+  - "二进制是合法 ELF"
+  - "DT_NEEDED 含 gtk-3 / libpulse / libpulse-mainloop-glib / libnotify（证明 X11 守卫补丁没有回退功能面）"
+  - "nm 可见补丁保留的 key_grabber_init / key_grabber_free（strip 后无法判定则 SKIP，不冒充 PASS）"
+
+# 运行期用例的跳过原因（实测，非推测）
+runtime_skip_reason: >-
+  本机/设备从 Conan 缓存直接执行整套 GTK3 依赖栈时，OHOS 动态加载器无法解析
+  libintl 相关符号（g_libintl_bindtextdomain / g_libintl_dgettext / g_libintl_gettext
+  等），libpulse/libpulse-mainloop-glib/libnotify 亦报 Error loading shared library，
+  进程未进入 main()。这是平台加载器限制，与包本身正确性无关；同栈应用
+  （pamixer/1.6、pulseaudio/17.0 test_package）采用同样的窄口径豁免。
+  运行期用例的执行留待具备可用 GTK3 运行环境的设备/CI 会话。
+
+test_package_tests:
+  - file: test_pa_applet.sh
+    description: "静态断言 7 项 + 上游 CLI 用例 6 条，逐条判 PASS/FAIL/SKIP 并打印跳过原因与汇总"
+    command: "bash test_pa_applet.sh"
+
+assertion_count: 13
