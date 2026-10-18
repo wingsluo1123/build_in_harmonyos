@@ -1,0 +1,28 @@
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -159,10 +159,23 @@
+ PRIVATE
+     KF6::CoreAddons
+     KF6::ConfigCore
+-    KF6::I18n
+-    KF6::I18nLocaleData
+     KF6::Codecs # for the vcard parser
+ )
++
++# ohpcd: ki18n 6.26.0 publishes libKF6I18n.so and libKF6I18nLocaleData.so
++# without DT_SONAME, so linking the KF6::I18n / KF6::I18nLocaleData imported
++# targets records their absolute conan-cache paths in DT_NEEDED (E537).
++# Keep the include directories, but link both libraries by bare name through
++# their package lib directory; the linker records relocatable basenames.
++target_include_directories(KF6Contacts PRIVATE
++    "$<TARGET_PROPERTY:KF6::I18n,INTERFACE_INCLUDE_DIRECTORIES>"
++    "$<TARGET_PROPERTY:KF6::I18nLocaleData,INTERFACE_INCLUDE_DIRECTORIES>"
++)
++target_link_directories(KF6Contacts PRIVATE
++    "$<TARGET_LINKER_FILE_DIR:KF6::I18n>"
++    "$<TARGET_LINKER_FILE_DIR:KF6::I18nLocaleData>"
++)
++target_link_libraries(KF6Contacts PRIVATE -lKF6I18n -lKF6I18nLocaleData)
+ 
+ install(TARGETS KF6Contacts ${_out_targets} EXPORT KF6ContactsTargets ${KF_INSTALL_TARGETS_DEFAULT_ARGS})
+ 

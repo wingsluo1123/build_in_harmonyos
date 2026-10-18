@@ -1,0 +1,26 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for kcontacts/6.28.0.
+
+package: kcontacts/6.28.0
+homepage: https://invent.kde.org/frameworks/kcontacts
+
+upstream_check_command: "ctest --output-on-failure"
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error"
+
+upstream_tests:
+  - file: autotests/
+    source: kcontacts-6.28.0/autotests/
+    description: "KContacts upstream CTest suite: 32 registered entries = 29 ecm_add_tests unit tests (Addressee/Address/PhoneNumber/ContactGroup models, vCard 2.1/3.0/4.0 line parsing, vcarddragtest MIME drag/drop, import/export) + kcontacts-testroundtrip (explicit add_test) + kcontacts-addressformattest (postal address formatting, KF6::I18nLocaleData-backed KCountry) + kcontacts-picturetest (photo handling, Qt6Gui)"
+    command: "ctest --output-on-failure"
+    condition: "run in the Conan build with BUILD_TESTING=ON; iso-codes share tree staged through XDG_DATA_DIRS for the KCountry-backed tests"
+
+test_package_tests:
+  - file: test_package/test.cpp
+    description: "Consumer smoke creates Addressee/Address models and round-trips a contact through the packaged VCardConverter 3.0/4.0 serializer/parser plus the multi-contact list API."
+    command: "conan create (test_package builds and runs test_kcontacts)"
+  - file: test_package/test_ohos_soname.cpp
+    description: "OHOS SONAME/DT_NEEDED regression check: parses its own ELF dynamic section and the loaded libKF6Contacts.so (located via /proc/self/maps), asserting no slash-qualified DT_NEEDED entries and a bare DT_SONAME libKF6Contacts.so (platform E537)."
+    command: "conan create (test_package builds and runs test_kcontacts_ohos)"
+
+assertion_count: 13
