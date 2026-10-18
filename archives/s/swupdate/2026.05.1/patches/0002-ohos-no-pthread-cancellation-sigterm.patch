@@ -1,0 +1,25 @@
+diff --git a/core/swupdate.c b/core/swupdate.c
+index e98301c..635d6af 100644
+--- a/core/swupdate.c
++++ b/core/swupdate.c
+@@ -567,7 +567,20 @@ static void print_registered_updatetypes(struct swupdate_cfg *sw)
+ 
+ static void sigterm_handler(int __attribute__ ((__unused__)) signum)
+ {
++#if defined(__OHOS__)
++	/*
++	 * OHOS/HarmonyOS libc implements no POSIX thread cancellation:
++	 * pthread_cancel() is not declared in <pthread.h> and not exported
++	 * by libc.so.  The network daemon thread therefore cannot be
++	 * cancelled; terminate the process from here instead.  exit()
++	 * still runs the atexit() handlers that upstream reaches by
++	 * cancelling the thread, and the supervisor loop does not block
++	 * forever in pthread_join().
++	 */
++	exit(exit_code);
++#else
+ 	pthread_cancel(network_daemon);
++#endif
+ }
+ 
+ int main(int argc, char **argv)

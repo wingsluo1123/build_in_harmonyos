@@ -1,0 +1,22 @@
+software: swupdate
+display: "SWUpdate"
+description: "SWUpdate — 嵌入式 Linux/OpenHarmony 软件更新代理（本地与 OTA 更新、签名校验与加密镜像、内置 web 服务器、hawkBit 客户端、Lua 扩展）"
+category: tool
+homepage: "https://github.com/sbabic/swupdate"
+license: GPL-2.0-only
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "构建系统是 Kbuild（kernel 风格 make + Kconfig），依赖不做自动探测：Makefile.deps 只给 HAVE_* 默认 y、真正读它的是 Kconfig option env=，配方必须显式声明每个 HAVE_*（缺库给 n）并把 conan 依赖的头/库路径经 CONFIG_EXTRA_CFLAGS + 环境 LDFLAGS + CONFIG_EXTRA_LDLIBS 注入（EXTRA_LDFLAGS 不会被子 make 继承，LDFLAGS 才会）"
+    - "libubootenv 在本版本是硬依赖而非可选面（core/Makefile 恒编译 swupdate_vars.o、include/swupdate_vars.h 顶层 include <libuboot.h>、Makefile.flags 恒链接 -lubootenv）；OHOS 制品仓 '*uboot*' 0 命中 ⇒ 补丁新增 Kconfig UBOOTENV 把该面收敛为可关闭分支（未启用时 swupdate_vars_* 返回 -ENOTSUP，不静默吞写操作）"
+    - "OHOS libc 无 POSIX 线程取消（libc.so 中 pthread_cancel/pthread_testcancel/pthread_setcanceltype 计数 0，libpthread.a 仅 8 字节占位）⇒ SIGTERM 处理器改为 exit(exit_code)，上游 pthread_cancel 只在非 __OHOS__ 分支保留"
+    - "Makefile:190-191 把 LD 默认成 $(CROSS_COMPILE)cc（不是 ld）、HOSTCC 默认也是 cc；OHOS 无 cc 别名 ⇒ 配方显式钉 CC/LD/HOSTCC 到 profile 的 compiler_executables"
+    - "strip 会作废 lld 链接期自签的 .codesign ⇒ SKIP_STRIP=y 按 unstripped 打包；且 lld 自签对本工程的 ELF 不可用（内嵌长度字段恒为 0x53740≠实际长度、execve EPERM/EXIT=126、.so 亦 dlopen 失败）⇒ 配方对 bin/* 与 lib/*.so* 统一 llvm-objcopy --remove-section .codesign + binary-sign-tool sign -selfSign 1 重签"
+    - "test/Makefile 的 %.lnk 戳记从不创建 ⇒ 每次 make test 都重新链接测试二进制，重签挂在 EXECUTE_TEST 里紧挨执行前；EXECUTE_TEST 的 LD_LIBRARY_PATH=$(objtree) 会覆盖 conan 依赖目录 ⇒ 补丁改为追加"
+  common_dependencies: ["openssl/3.5.8.1", "libconfig/1.8.2", "json-c/0.18", "libcurl/8.5.0", "libarchive/3.8.7", "lua/5.4.8", "zlib/1.3.1.1"]
+
+versions:
+  "2026.05.1":
+    status: built
+    build_date: "2026-10-16"

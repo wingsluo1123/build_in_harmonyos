@@ -1,0 +1,17 @@
+diff --git a/Makefile b/Makefile
+index ade736c..da4f484 100644
+--- a/Makefile
++++ b/Makefile
+@@ -23,6 +23,12 @@ MAKEFLAGS += -r --no-print-directory
+ OSNAME := $(shell uname -s)
+ ifeq ($(OSNAME),Linux)
+ export HAVE_LINUX = y
++else ifeq ($(OSNAME),HarmonyOS)
++# OpenHarmony / HarmonyOS PC: ELF userspace on the Linux kernel ABI, the
++# MTD/UBI ioctl interfaces used by the CONFIG_MTD/UBIVOL faces are the Linux
++# ones.  Without this, HAVE_LINUX=n silently removes MTD (and its unit test
++# binary test_flash_handler) from every configuration.
++export HAVE_LINUX = y
+ else
+ export HAVE_LINUX = n
+ endif
