@@ -1,0 +1,34 @@
+# test_package/MANIFEST.yml — libmems 1.6.0-4725
+# 上游无测试套件：显式审计（upstream_tests_exist: false + 非空 upstream_test_audit）
+
+package: libmems/1.6.0-4725
+homepage: "http://sourceforge.net/p/mauve/code/HEAD/tree/libMems/trunk/"
+
+upstream_check_command: null
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests: []
+upstream_tests_exist: false
+upstream_test_audit:
+  - path: "libmems_1.6.0+4725.orig.tar.xz（Debian Med 发布的 Mauve SVN r4725 快照，sha256=67265e1e…0c41e91）"
+    finding: "145 个文件全部清点：无 testsuite/、tests/、test/ 或 unittests/ 目录；唯一的测试痕迹是下述 Makefile 草稿"
+  - path: "Makefile.am（顶层）"
+    finding: "SUBDIRS 仅 libMems；EXTRA_DIST 仅 doxygen/工程文件；无 TESTS、check_PROGRAMS、TESTS_ENVIRONMENT 接线"
+  - path: "libMems/Makefile.am"
+    finding: "lib_LTLIBRARIES 仅 libMems-1.6.la；TestSML/TestSMLstatic 相关 5 行全部被注释且依赖 wx-config，从未接入任何测试目标；无 check/test 目标"
+  - path: "configure.ac"
+    finding: "仅 PKG_CHECK_MODULES 依赖检查（libGenome/libMUSCLE/Boost）与 OpenMP 探测；无测试框架接线"
+  - path: "Debian libmems 打包（salsa.debian.org/med-team/libmems，Build-Depends 含 debhelper-compat 13）"
+    finding: "debian/rules 仅执行构建与安装，未运行任何上游测试，佐证上游无可接入的测试套件"
+
+# rule4 门禁：上游测试总数声明（审计口径 autotools_tests：两级 Makefile.am 无 TESTS，接线数为 0）
+upstream_test_total: 0
+upstream_test_count_method: "autotools_tests"
+
+test_package_tests:
+  - file: test_mems.c
+    description: "消费者功能测试：真实链接 libMems-1.6 并调用 twister.h C API 完成 4 项数值验证——MT19937 参考向量（seed 5489 首输出 3499211612）、重播种确定性、RandTwisterDouble 值域 [0,1]、CreateTwisterSeed 可用性（R34 合规）"
+    command: "./test_mems"
+
+assertion_count: 4
