@@ -1,0 +1,54 @@
+diff --git a/src/kleo/defaultkeyfilter.cpp b/src/kleo/defaultkeyfilter.cpp
+index 4b624dd..e78d612 100644
+--- a/src/kleo/defaultkeyfilter.cpp
++++ b/src/kleo/defaultkeyfilter.cpp
+@@ -26,7 +26,8 @@ using namespace Kleo;
+ 
+ static bool is_card_key(const Key &key)
+ {
+-    return std::ranges::any_of(key.subkeys(), [](const auto &subkey) {
++    const auto subkeys = key.subkeys();
++    return std::any_of(subkeys.begin(), subkeys.end(), [](const auto &subkey) {
+         return subkey.isCardKey() && !subkey.canRenc();
+     });
+ }
+diff --git a/src/models/keycache.cpp b/src/models/keycache.cpp
+index 86b7385..ea7ff28 100644
+--- a/src/models/keycache.cpp
++++ b/src/models/keycache.cpp
+@@ -72,7 +72,7 @@ static auto emptyStringsRemoved(const std::vector<std::string> &strings)
+ {
+     std::vector<std::string> result;
+     result.reserve(strings.size());
+-    std::ranges::remove_copy_if(strings, std::back_inserter(result), std::mem_fn(&std::string::empty));
++    std::remove_copy_if(strings.begin(), strings.end(), std::back_inserter(result), std::mem_fn(&std::string::empty));
+     return result;
+ }
+ 
+diff --git a/src/utils/assuan.cpp b/src/utils/assuan.cpp
+index 7e9eb80..e90c259 100644
+--- a/src/utils/assuan.cpp
++++ b/src/utils/assuan.cpp
+@@ -25,7 +25,9 @@
+ #include <gpgme++/context.h>
+ #include <gpgme++/defaultassuantransaction.h>
+ #include <gpgme++/error.h>
+ 
++#include <algorithm>
++
+ using namespace GpgME;
+ using namespace Kleo;
+ using namespace Kleo::Assuan;
+@@ -76,10 +78,10 @@ static inline bool needsToBePercentEscaped(unsigned char ch)
+ QByteArray Kleo::Assuan::escapeAttributeValue(QByteArrayView value)
+ {
+     static const char *HexChars = "0123456789ABCDEF";
+-    const int numberToPercentEscape = std::ranges::count_if(value, needsToBePercentEscaped);
++    const int numberToPercentEscape = std::count_if(value.begin(), value.end(), needsToBePercentEscaped);
+     QByteArray result{value.size() + 2 * numberToPercentEscape, Qt::Uninitialized};
+     auto resultIt = result.begin();
+-    std::ranges::for_each(value, [&resultIt](unsigned char ch) {
++    std::for_each(value.begin(), value.end(), [&resultIt](unsigned char ch) {
+         if (needsToBePercentEscaped(ch)) {
+             *resultIt = '%';
+             resultIt++;
