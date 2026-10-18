@@ -1,0 +1,37 @@
+# 版本级 manifest — plotsauce 0-0.1
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "0-0.1"
+software: "plotsauce"
+status: built
+build_date: "2026-10-17"
+build_system: "cmake"
+
+source:
+  url: "https://codeload.github.com/Cavewhere/plotsauce/tar.gz/173c0304e788fd7b0b06982a4ff9c333ede86eff"
+  sha256: "bfe090a08db625eb03a0d26fb1f62f46e8f96b93d8522fbf0f95e94cecb54920"
+  tar_format: tar.gz
+  # 第二源：survex 1.2.44 官方 tarball（vendored src/survex/img.c + img.h，
+  # 见 conandata.yml sources[1]）
+  secondary_sources:
+    - url: "https://survex.com/software/1.2.44/survex-1.2.44.tar.gz"
+      sha256: "91b75ff7ed3b8707a33cd5ad7b385f95cd305efb730ab3840bd38b87a7d63804"
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_BUILD_TYPE=Release"
+  dependencies:
+    - "qt/5.15.19"
+    - "zlib/1.3.1"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-CMakeLists.txt.patch"
+  - "0002-survex-img-api-version.patch"
+
+knowledge_gained:
+  - "上游 QBS 构建改写为 CMake（同 dewalls 1.0.0 先例），仅构建 plotsauce.qbs 声明的同一应用目标"
+  - "上游 .qbs 依赖的外部 cavern-3dReader 产品不在仓库内；Debian 以 vendored survex img.c/img.h 补位，本配方从 survex 1.2.44 官方 tarball 取官方原件"
+  - "上游无任何测试用例（无 tests/ 目录、无测试产品声明），test_package 补齐端到端测试"

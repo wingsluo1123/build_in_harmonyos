@@ -1,0 +1,32 @@
+# test_package/MANIFEST.yml — plotsauce 0-0.1
+# 上游官方测试声明文件 (docs/TEST_QUALITY_SPEC.md)
+
+package: plotsauce/0-0.1
+homepage: "https://github.com/Cavewhere/plotsauce"
+
+# 上游测试现状清点（R51 第一步：清点证据）
+# 上游仓库仅含 LICENSE、main.cpp、plotsauce.qbs、src/*.cpp|h（10 个文件），
+# 无 tests/ 目录、无 ctest/pytest 注册、plotsauce.qbs 未声明任何测试产品
+# （tree: https://api.github.com/repos/Cavewhere/plotsauce/git/trees/master）。
+# 结论：上游确无测试用例。
+upstream_check_command: "none"
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序：无（上游无任何测试文件）
+upstream_tests: []
+
+# test_package 中自带的测试（R51 第三步：补齐测试——上游无测试，本适配补齐）
+# 覆盖：真实 .3d 解析 → XML 输出 → 内容断言，端到端验证打包二进制
+test_package_tests:
+  - file: test_sample3d.cpp
+    source: "test_package/test_sample3d.cpp"
+    description: "生成确定性 Survex .3d v8 样例输入（用 vendored survex img.c writer 在参考机上生成）"
+    command: "./test_sample3d <out.3d>"
+  - file: test_plotsauce.cpp
+    source: "test_package/test_plotsauce.cpp"
+    description: "gunzip 转换输出并断言 PlotSauceDocument/Stations/Lines/站点/标签结构（6 项断言）"
+    command: "./test_plotsauce <out.xml.gz>"
+
+# 测试断言总数（test_plotsauce.cpp 中 expect() 调用数）
+assertion_count: 6

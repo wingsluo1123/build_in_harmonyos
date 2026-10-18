@@ -1,0 +1,35 @@
+--- /dev/null
++++ b/CMakeLists.txt
+@@ -0,0 +1,32 @@
++cmake_minimum_required(VERSION 3.16)
++project(plotsauce VERSION 0.1 LANGUAGES C CXX)
++
++# plotsauce: Qt5 console application converting Survex .3d survey files to XML.
++# Upstream uses QBS only; this CMakeLists.txt is an OHOS adaptation that builds
++# the same "plotsauce" target declared in plotsauce.qbs, with the survex .3d
++# reader (src/survex/img.c, vendored from the official survex 1.2.44 tarball)
++# standing in for the external "cavern-3dReader" QBS product.
++
++set(CMAKE_CXX_STANDARD 11)
++set(CMAKE_CXX_STANDARD_REQUIRED ON)
++
++find_package(Qt5 5.15 REQUIRED COMPONENTS Core Xml Gui)
++find_package(ZLIB REQUIRED)
++
++set(PLOTSAUCE_SOURCES
++    main.cpp
++    src/psLine.cpp
++    src/psStation.cpp
++    src/psStationLookup.cpp
++    src/psSurvex3DParser.cpp
++    src/psXMLWriter.cpp
++    src/survex/img.c)
++
++add_executable(plotsauce ${PLOTSAUCE_SOURCES})
++target_include_directories(plotsauce PRIVATE
++    ${CMAKE_CURRENT_SOURCE_DIR}/src
++    ${CMAKE_CURRENT_SOURCE_DIR}/src/survex)
++target_link_libraries(plotsauce PRIVATE Qt5::Core Qt5::Xml Qt5::Gui ZLIB::ZLIB)
++
++include(GNUInstallDirs)
++install(TARGETS plotsauce RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
