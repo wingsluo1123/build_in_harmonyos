@@ -1,0 +1,109 @@
+--- a/imap4d/preauth.c
++++ b/imap4d/preauth.c
+@@ -15,21 +15,25 @@
+    along with GNU Mailutils.  If not, see <http://www.gnu.org/licenses/>. */
+ 
+ /* Preauth support for imap4d */
+ 
+ #include "imap4d.h"
+ #include "des.h"
++#include <stdlib.h>
+ 
+ 
+ /* Stdio preauth */
+ 
+ static char *
+ do_preauth_stdio ()
+ {
+   struct passwd *pw = getpwuid (getuid ());
+-  return pw ? mu_strdup (pw->pw_name) : NULL;
++  const char *name = pw ? pw->pw_name : getenv ("LOGNAME");
++  if (!name || !*name)
++    name = getenv ("USER");
++  return name && *name ? mu_strdup (name) : NULL;
+ }
+ 
+ 
+ /* IDENT (AUTH, RFC1413) preauth */
+ #define USERNAME_C "USERID :"
+ 
+--- a/mail/alt.c
++++ b/mail/alt.c
+@@ -13,12 +13,13 @@
+ 
+    You should have received a copy of the GNU General Public License
+    along with GNU Mailutils.  If not, see <http://www.gnu.org/licenses/>. */
+ 
+ #include "mail.h"
+ #include <pwd.h>
++#include <stdlib.h>
+ 
+ static mu_list_t alternate_names = NULL;
+ static char *my_email;
+ static char *my_name;
+ 
+ /*
+@@ -54,18 +55,21 @@
+ void
+ mail_set_my_name (char *name)
+ {
+   if (!name)
+     {
+       struct passwd *pw = getpwuid (getuid ());
+-      if (!pw)
++      const char *user = pw ? pw->pw_name : getenv ("LOGNAME");
++      if (!user || !*user)
++	user = getenv ("USER");
++      if (!user || !*user)
+ 	{
+ 	  mu_error (_("Cannot determine my username"));
+ 	  exit (1);
+ 	}
+-      name = pw->pw_name;
++      name = (char *) user;
+     }
+   my_name = mu_strdup (name);
+   my_email = mu_get_user_email (name);
+   if (!my_email)
+     {
+       mu_error(_("Cannot determine my email address: %s"),
+--- a/mh/msgchk.c
++++ b/mh/msgchk.c
+@@ -17,12 +17,13 @@
+ #include "mh.h"
+ #include "mailutils/kwd.h"
+ #include "mailutils/folder.h"
+ #include "mailutils/auth.h"
+ #include "mailutils/datetime.h"
+ #include <pwd.h>
++#include <stdlib.h>
+ 
+ static char prog_doc[] = N_("Check for messages");
+ static char args_doc[] = N_("USER [USER...]");
+ 
+ int date_option = 1;
+ int apop_option;
+@@ -361,18 +362,21 @@
+     {
+       if (remote_user)
+ 	rc |= checkmail (remote_user, 1);
+       else
+ 	{
+ 	  struct passwd *pw = getpwuid (getuid ());
+-	  if (!pw)
++	  const char *name = pw ? pw->pw_name : getenv ("LOGNAME");
++	  if (!name || !*name)
++	    name = getenv ("USER");
++	  if (!name || !*name)
+ 	    {
+ 	      mu_error (_("cannot determine my username"));
+ 	      return 2;
+ 	    }
+-	  rc |= checkmail (pw->pw_name, 1);
++	  rc |= checkmail ((char *) name, 1);
+ 	}
+     }
+   else if (remote_user)
+     {
+       mu_error (_("no arguments are allowed when the -user option is given"));
+       return 2;

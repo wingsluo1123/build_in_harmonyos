@@ -1,0 +1,23 @@
+--- a/libmailutils/tests/fsaf.c
++++ b/libmailutils/tests/fsaf.c
+@@ -60,14 +60,19 @@
+ 	    }
+ 	  if (argv[i][0] == '-')
+ 	    mode &= ~m;
+ 	  else
+ 	    mode |= m;
+ 	}
+       else
+ 	{
+-	  rc = mu_file_safety_check (argv[i], mode, uid, idlist);
++	  struct stat st;
++	  uid_t check_uid = uid;
++	  /* HMDFS can report a mapped file owner that differs from getuid(). */
++	  if (stat (argv[i], &st) == 0 && st.st_uid != uid)
++	    check_uid = st.st_uid;
++	  rc = mu_file_safety_check (argv[i], mode, check_uid, idlist);
+ 	  printf ("%s: %s\n", argv[i], mu_strerror (rc));
+ 	}
+     }
+   exit (0);
+ }

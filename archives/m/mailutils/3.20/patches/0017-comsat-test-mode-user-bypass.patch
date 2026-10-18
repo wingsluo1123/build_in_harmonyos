@@ -1,0 +1,60 @@
+--- a/comsat/comsat.c
++++ b/comsat/comsat.c
+@@ -12,12 +12,13 @@
+    GNU General Public License for more details.
+ 
+    You should have received a copy of the GNU General Public License
+    along with GNU Mailutils.  If not, see <http://www.gnu.org/licenses/>. */
+ 
+ #include "comsat.h"
++#include <stdlib.h>
+ #include "mailutils/syslog.h"
+ #include "mailutils/cli.h"
+ #include "mailutils/sockaddr.h"
+ #include "mailutils/alloc.h"
+ 
+ #ifndef PATH_DEV
+@@ -422,13 +423,15 @@
+ 	     mu_message_qid_t qid)
+ {
+   mu_mailbox_t mbox = NULL;
+   mu_message_t msg;
+   int status;
+ 
+-  if (change_user (user))
++  if (test_mode)
++    username = user;
++  else if (change_user (user))
+     return;
+ 
+   if (!path)
+     {
+       path = mailbox_path (user);
+       if (!path)
+@@ -601,18 +604,20 @@
+ 	{
+ 	  mu_error (_("mailbox URL and message QID are required in test mode"));
+ 	  exit (EXIT_FAILURE);
+ 	}
+ 
+       pw = getpwuid (getuid ());
+-      if (!pw)
+-	{
+-	  mu_error (_("cannot determine user name"));
+-	  exit (EXIT_FAILURE);
+-	}
+-      user = pw->pw_name;
++      user = pw ? pw->pw_name : getenv ("LOGNAME");
++      if (!user || !*user)
++        user = getenv ("USER");
++      if (!user || !*user)
++        {
++          mu_error (_("cannot determine user name"));
++          exit (EXIT_FAILURE);
++        }
+ 
+       if (biffrc[0] == '.' && (biffrc[1] == '/' ||
+ 			       (biffrc[1] == '.' && biffrc[2] == '/')))
+ 	{
+ 	  char *cwd = mu_getcwd ();
+ 	  biffrc = mu_make_file_name (cwd, biffrc);

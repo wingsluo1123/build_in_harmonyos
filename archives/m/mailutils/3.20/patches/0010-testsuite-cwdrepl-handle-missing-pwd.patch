@@ -1,0 +1,49 @@
+--- a/testsuite/cwdrepl.c
++++ b/testsuite/cwdrepl.c
+@@ -203,15 +203,21 @@
+     size_t size = 0;
+     char *buf = NULL;
+     char *p;
+-    
+-    do {
++
++    for (;;) {
+ 	buf = bufrealloc(buf, &size);
+ 	if (!buf) {
+ 	    perror("getcwd_alloc");
+ 	    abort();
+ 	}
+-    } while ((p = getcwd(buf, size)) == NULL && errno == ERANGE);
+-    return buf;
++	p = getcwd(buf, size);
++	if (p)
++	    return buf;
++	if (errno != ERANGE) {
++	    free(buf);
++	    return NULL;
++	}
++    }
+ }
+ 
+ ssize_t
+@@ -263,8 +269,18 @@
+     for (i = 1; i < argc; i += 2)
+ 	newdir(argv[i], argv[i + 1]);
+     
+-    newdir(getenv("PWD"), ".");
+-    newdir (getcwd_alloc(), ".");
++    {
++	char const *pwd = getenv("PWD");
++	char *cwd;
++
++	if (pwd && *pwd)
++	    newdir(pwd, ".");
++	cwd = getcwd_alloc();
++	if (cwd) {
++	    newdir(cwd, ".");
++	    free(cwd);
++	}
++    }
+     
+     while ((n = input(&buf, &size)) >= 0) {
+ 	struct dirtrans *dt;

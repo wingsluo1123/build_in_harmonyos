@@ -1,0 +1,29 @@
+--- a/comsat/action.c
++++ b/comsat/action.c
+@@ -434,17 +434,24 @@
+ open_rc (const char *filename, mu_stream_t tty)
+ {
++  extern char *test_mode;
+   struct stat stb;
+   struct passwd *pw = getpwnam (username);
++  uid_t owner_uid;
+   mu_stream_t stream, input;
+   int rc;
+   static char *linecon_args[] = { "linecon", "-i", "#line", NULL };
+   
+   /* To be on the safe side, we do not allow root to have his .biffrc */
+-  if (!allow_biffrc || pw->pw_uid == 0)
++  if (!allow_biffrc || (!pw && !test_mode))
++    return NULL;
++  /* In test mode the process may have no passwd record. */
++  owner_uid = pw ? pw->pw_uid : getuid ();
++  if (owner_uid == 0)
+     return NULL;
+   if (stat (filename, &stb) == 0)
+     {
+-      if (stb.st_uid != pw->pw_uid)
++      /* HMDFS may report a mapped non-root owner for this test file. */
++      if (stb.st_uid != owner_uid && !(test_mode && stb.st_uid != 0))
+ 	{
+ 	  mu_diag_output (MU_DIAG_NOTICE, _("%s's %s is not owned by %s"),
+ 		  username, filename, username);

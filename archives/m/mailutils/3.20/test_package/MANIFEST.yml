@@ -1,0 +1,132 @@
+# test_package/MANIFEST.yml — upstream and target-specific test declaration (CI L0e)
+package: mailutils/3.20
+homepage: "https://www.gnu.org/software/mailutils/"
+
+# All Autotest suites included by the GNU Mailutils 3.20 distribution.
+upstream_check_command: "make -j2 check"
+upstream_test_in_build: true
+upstream_test_command: "make -j2 -k check"
+
+upstream_tests:
+  - file: comsat/tests/testsuite.at
+    source: mailutils-3.20/comsat/tests/testsuite.at
+    description: "comsat daemon"
+    command: "make -j2 -k check"
+  - file: frm/tests/testsuite.at
+    source: mailutils-3.20/frm/tests/testsuite.at
+    description: "frm utility"
+    command: "make -j2 -k check"
+  - file: imap4d/tests/testsuite.at
+    source: mailutils-3.20/imap4d/tests/testsuite.at
+    description: "IMAP4 server"
+    command: "make -j2 -k check"
+  - file: libmailutils/tests/testsuite.at
+    source: mailutils-3.20/libmailutils/tests/testsuite.at
+    description: "core library (list, URL, MIME, Sieve, locker, and related APIs)"
+    command: "make -j2 -k check"
+  - file: libmu_auth/tests/testsuite.at
+    source: mailutils-3.20/libmu_auth/tests/testsuite.at
+    description: "authentication library"
+    command: "make -j2 -k check"
+  - file: libproto/dotmail/tests/testsuite.at
+    source: mailutils-3.20/libproto/dotmail/tests/testsuite.at
+    description: "dotmail mailbox driver"
+    command: "make -j2 -k check"
+  - file: libproto/maildir/tests/testsuite.at
+    source: mailutils-3.20/libproto/maildir/tests/testsuite.at
+    description: "maildir mailbox driver"
+    command: "make -j2 -k check"
+  - file: libproto/mailer/tests/testsuite.at
+    source: mailutils-3.20/libproto/mailer/tests/testsuite.at
+    description: "mailer library"
+    command: "make -j2 -k check"
+  - file: libproto/mbox/tests/testsuite.at
+    source: mailutils-3.20/libproto/mbox/tests/testsuite.at
+    description: "mbox mailbox driver"
+    command: "make -j2 -k check"
+  - file: libproto/mh/tests/testsuite.at
+    source: mailutils-3.20/libproto/mh/tests/testsuite.at
+    description: "MH mailbox driver"
+    command: "make -j2 -k check"
+  - file: libtests/testsuite.at
+    source: mailutils-3.20/libtests/testsuite.at
+    description: "shared library test helpers"
+    command: "make -j2 -k check"
+  - file: mail/tests/testsuite.at
+    source: mailutils-3.20/mail/tests/testsuite.at
+    description: "mailx client"
+    command: "make -j2 -k check"
+  - file: mda/lmtpd/tests/testsuite.at
+    source: mailutils-3.20/mda/lmtpd/tests/testsuite.at
+    description: "LMTP daemon"
+    command: "make -j2 -k check"
+  - file: mda/mda/tests/testsuite.at
+    source: mailutils-3.20/mda/mda/tests/testsuite.at
+    description: "mail delivery agent"
+    command: "make -j2 -k check"
+  - file: mda/putmail/tests/testsuite.at
+    source: mailutils-3.20/mda/putmail/tests/testsuite.at
+    description: "putmail utility"
+    command: "make -j2 -k check"
+  - file: messages/tests/testsuite.at
+    source: mailutils-3.20/messages/tests/testsuite.at
+    description: "messages utility"
+    command: "make -j2 -k check"
+  - file: mh/tests/testsuite.at
+    source: mailutils-3.20/mh/tests/testsuite.at
+    description: "MH message handling system"
+    command: "make -j2 -k check"
+  - file: mimeview/tests/testsuite.at
+    source: mailutils-3.20/mimeview/tests/testsuite.at
+    description: "MIME viewer"
+    command: "make -j2 -k check"
+  - file: readmsg/tests/testsuite.at
+    source: mailutils-3.20/readmsg/tests/testsuite.at
+    description: "readmsg utility"
+    command: "make -j2 -k check"
+  - file: sieve/tests/testsuite.at
+    source: mailutils-3.20/sieve/tests/testsuite.at
+    description: "Sieve interpreter"
+    command: "make -j2 -k check"
+  - file: testsuite/testsuite.at
+    source: mailutils-3.20/testsuite/testsuite.at
+    description: "auxiliary tools (cwdrepl/mockmail/mockmta)"
+    command: "make -j2 -k check"
+
+optional_upstream_tests:
+  - file: libmu_scm/tests/testsuite.at
+    source: mailutils-3.20/libmu_scm/tests/testsuite.at
+    condition: "Guile support is optional and not part of the default make-check target"
+
+upstream_make_check_suite_count: 21
+upstream_make_check_case_count: 1389
+upstream_skip_policy: "zero skipped, unsupported, or unresolved cases across all 21 configured make-check suites; enforce 1,389 expected cases"
+
+test_package_tests:
+  - file: "none in the HarmonyOS device run"
+    category: "PC 特有测试"
+    cases: 0
+    assertions: 0
+    description: "No PC-only binary is executed on the HarmonyOS device; the portable API case is listed separately."
+    command: "not run on the HarmonyOS device"
+  - file: test_mailutils.c
+    category: "通用 API 测试"
+    cases: 1
+    assertions: 14
+    description: "consumer API assertions: mu_list / mu_url / mu_locker / file safety"
+    command: "ctest --output-on-failure"
+  - file: test_mail_flow.sh
+    category: "消费者用例"
+    cases: 1
+    assertions: 6
+    description: "consumer end-to-end flow: putmail creates a mailbox and delivers one message; mail and readmsg read it back"
+    command: "sh ./test_mail_flow.sh <package_folder>"
+  - file: test_ohos_mailutils.sh
+    category: "鸿蒙特有测试"
+    cases: 1
+    assertions: 24
+    description: "HarmonyOS-specific: platform identity, CLI/server smoke test, version"
+    command: "sh ./test_ohos_mailutils.sh <package_folder>"
+
+test_package_case_count: 3
+assertion_count: 44
