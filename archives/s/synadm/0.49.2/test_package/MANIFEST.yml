@@ -1,0 +1,52 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md §4.3
+
+package: synadm/0.49.2
+homepage: "https://codeberg.org/synadm/synadm"
+
+# ── 上游测试结论: NO_UPSTREAM_TESTS（三项独立证据，详见 reports/test-report.md）──
+#   1. 官方 PyPI sdist synadm-0.49.2.tar.gz 共 27 个文件，无 test*/ 目录、
+#      无 pytest/tox/unittest 文件、无 setup.py/pyproject 测试入口。
+#   2. codeberg 上游 master 树共 79 个条目，按 test|spec|check 关键字筛出 0 个测试路径。
+#   3. .forgejo/workflows 仅两个: lint.yaml（实测逐字确认只做 `flake8 synadm`，
+#      无测试调用）与 release.yaml（打包发布）。
+# 结论: 上游 0 个自动化测试用例，"完整运行上游全部测试用例" 无可运行对象；
+#       本包 63 个用例全部为适配组新增，覆盖上游 API/CLI/打包元数据与鸿蒙平台特性。
+upstream_check_command: "none（上游无 make check / pytest / tox 入口）"
+upstream_test_in_build: false
+upstream_test_command: "none"
+upstream_test_count: 0
+upstream_test_result: "N/A — 上游不提供自动化测试（三项证据见上），无失败风险项"
+upstream_tests: []
+
+# ── test_package 中自带的测试（消费者视角验证，R34 实质测试）──
+test_files:
+  - path: "test_package/test_synadm.py"
+    test_type: "R34"
+    test_count: 42
+    assertion_count: 67
+    description: "通用消费者套件（42 用例 / 67 断言，stdlib unittest + 本地 HTTP stub server，0 网络依赖）：来源校验（synadm 及 8 个 registry 依赖 click/requests/tabulate/pyyaml/certifi/chardet/idna/urllib3 必须从各自 package_folder 导入，PYTHONNOUSERSITE 隔离 user-site）+ PEP-427 dist-info 与 importlib.metadata 版本（synadm 0.49.2 / User-Agent 契约）+ entry_points console_script + 14 个模块 import 面与 __main__.py 文件 + 5 个输出格式化器（APIHelper.FORMATTERS 键集合完整性：human/json/minified/pprint/yaml，含 None/多级嵌套表/list-of-str/标量回退）+ API 请求构造（base_url 归一化、/_synapse/admin 前缀、MXID URL 引号化、Bearer 头、分页参数、error 传播）+ CLI 端到端（对 stub Synapse 跑 user list/details、server version、rooms、media、whois，含 --no-confirm/-o json/-c 配置）+ python -m synadm 入口等价性"
+    command: "python3 test_package/test_synadm.py <package_folder> <dep=name=path ...>"
+    executable: true
+  - path: "test_package/test_synadm_ohos.py"
+    test_type: "R34"
+    test_count: 21
+    assertion_count: 47
+    description: "鸿蒙特有套件（21 用例 / 47 断言；沙箱能力运行时探测：设备原生 21 全跑，禁 AF_UNIX bind 的 CI worker 上 5 个 socket 用例按实测 errno skip 且套件仍 rc=0）：平台标识（os.name=posix 前提 + 遍历全量 .py 证明 synadm 不读 sys.platform、cli/_helper.py posix 守卫存在；os.uname sysname=HarmonyOS / release 含 HongMeng / machine=aarch64）+ synadm.write_config 在 posix 分支下真实落盘且权限收敛为 other 无任何访问位、group 无写/执行位（不落入 'Unsupported OS' 分支）+ debug log 在 ~/.local/share/synadm 可写读回 + AF_UNIX 传输（vendored requests_unixsocket 来源校验、http+unix:// base_url 百分号编码、经本地 unix socket stub Synapse 完成 version/v2/users 往返并核验 Authorization/User-Agent/X-Forwarded-* 头、CLI 经 socket 跑 user list 与 version）+ OHOS 文件系统语义（HMDFS 大小写不敏感→包内无同名大小写冲突路径、无 .conan2/host 构建路径泄漏、包内 .py 无 /tmp 写入且实测 /tmp 为只读挂载、状态目录落在可写 $HOME）+ 原生调用（bin/synadm 直接 exec、which 解析到包内、python -m synadm 等价、解释器与 lib/pythonX.Y 版本一致、sun_path <108 字节）"
+    command: "python3 test_package/test_synadm_ohos.py <package_folder> <dep=name=path ...>"
+    executable: true
+
+# 测试断言总数（实测，用于质量评估）
+test_package_tests:
+  - file: test_synadm.py
+    description: "通用消费者套件：42 用例 / 67 断言，全部通过"
+    command: "conan create 自动执行（test() 内经 env=\"conanrun\" 调用）"
+    executable: true
+  - file: test_synadm_ohos.py
+    description: "鸿蒙特有套件：21 用例 / 47 断言，设备原生全部通过（CI worker 沙箱禁 AF_UNIX bind → 5 个 socket 用例按实测 errno skip，套件 rc=0）"
+    command: "conan create 自动执行（test() 内经 env=\"conanrun\" 调用）"
+    executable: true
+
+assertion_count: 114

@@ -1,0 +1,63 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "claim-accuracy (audit focus-2)",
+      "file": "archives/s/synadm/0.49.2/notes.md",
+      "line": 115,
+      "description": "notes.md still reports the OHOS suite as '21 用例 / 45 断言'. The actual file test_package/test_synadm_ohos.py has 47 self.assert* calls (the CI-fix commit added 2 assertions: the 'no sys.platform / cli/_helper.py posix guard' pair and the second permission assertion), so 45 does not hold. notes.md:11 in the same file already says '63 用例 / 114 断言', making notes.md internally contradictory (45+67=112 != 114), and it contradicts the primary artifacts pr-body.md, reports/test-report.md, test_package/MANIFEST.yml and manifest.yaml, which correctly say 47/114. notes.md:117 also still says '4 个关键问题' while test-report.md now has 5 (§4.1-§4.5, new §4.5).",
+      "fix_suggestion": "Update notes.md:115 to '21 用例 / 47 断言' and notes.md:117 to '5 个关键问题' so the counts match test_synadm_ohos.py and the other four artifacts.",
+      "resolution": "已修复（提交 b53bbfb630+）：notes.md 的清单行改为 21 用例 / 47 断言、关键问题改为 5 个。"
+    },
+    {
+      "severity": "P2",
+      "rule_id": "audit-prompt §严重程度 (审计文件与实际矛盾)",
+      "file": "archives/s/synadm/0.49.2/reports/audit-result.json",
+      "line": 45,
+      "description": "This committed W4 audit snapshot is stale relative to the revision it now ships alongside: its summary states 'test_synadm_ohos.py 实有 21 处 / 45 断言' and '63 用例/112 断言', and its P2 resolution block (line 22) claims the '首个/此前无人踩到' novelty wording was deleted from the drafts/report. In reality the file has 47 asserts / 114 total, and reports/test-report.md:213 still contains the exact sentence '这是本仓库首个依赖 requests 的 Python 包，此前无人踩到'. It also names only '两篇草稿 E600/E601' while a third draft (E610, added in the very same commit) now exists. Judged P2, not P0: the file is a point-in-time audit of the previous (r1) input which it names ('audit-input-synadm.json'), its pass verdict is still consistent with reality, and the drift is +2 assertions from a later legitimate commit plus one partially-applied wording fix - it under-reports rather than fabricating a pass.",
+      "fix_suggestion": "Regenerate reports/audit-result.json for the current revision (47/114, three drafts E600/E601/E610), or explicitly scope it as 'r1 snapshot'. Either finish removing the '此前无人踩到' phrase in test-report.md:213 (as the resolution block claims) or correct the resolution text.",
+      "resolution": "已修复：本文件即该修订版（r2）的审计快照，计数为 47/114 与三篇草稿 E600/E601/E610；test-report.md §4.2 中『本仓库首个依赖 requests 的 Python 包，此前无人踩到』已改写为指向 E600 草稿的客观表述。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R34 / claim-accuracy",
+      "file": "archives/s/synadm/0.49.2/reports/test-report.md",
+      "line": 173,
+      "description": "§3.4 asserts that 'sun_path 长度、socket 路径、百分号编码等前置条件在两侧都成立' (pr-body.md:114 repeats 'socket 路径形态 ... 在两侧都执行并通过'). This overstates CI-worker coverage: the percent-encoding check lives in test_socket_path_is_percent_encoded_before_the_request, which is test #10 and is one of the 5 cases that call require_socket() and are skipped on the worker. Only test_af_unix_socket_path_fits_the_kernel_limit actually runs on both sides, as the same sentence then admits. The SKIP enumeration itself (#6-#10) is correct, so this is a prose slip, not a hidden pass.",
+      "fix_suggestion": "Drop '百分号编码' (and the pr-body's 'socket 路径形态') from the 'holds on both sides' list, or state plainly that the percent-encoding behaviour is verified on the device only.",
+      "resolution": "已修复：test-report.md §3.4 与 pr-body.md 均改为『两侧都执行的只有 sun_path 长度与 vendored 来源校验两条；百分号编码等 5 条仅在设备原生验证』。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "claim-accuracy (measured vs derived)",
+      "file": "archives/s/synadm/0.49.2/reports/pr-body.md",
+      "line": 112,
+      "description": "'CI worker sandbox 58 PASS + 5 SKIP' is presented as a measured environment-matrix result, but no artifact inside the PR (only reports/w3-local-ci.log, which is the device run) evidences a post-fix remote CI execution. The number is reproducible from the round-1 failure signature (EPERM on bind / chmod 0640 / non-linux sys.platform) plus the new probe logic - I confirmed by loading the suite and forcing AF_UNIX_BINDABLE=False that suite B yields exactly 5 skipped and 16 non-skipped, so the arithmetic is sound - but it is a derivation, not an observation.",
+      "fix_suggestion": "Either attach the remote CI log for the fixed revision, or label the worker row 'expected (derived from the round-1 failure signature; re-run pending)' until the CI re-run lands.",
+      "resolution": "已修复：pr-body.md 环境矩阵的 CI worker 行显式标注『由首轮 CI 实测签名 + 探针逻辑推算，复跑结论以 CI 评论为准』。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R34 (assertion strength)",
+      "file": "archives/s/synadm/0.49.2/test_package/test_synadm_ohos.py",
+      "line": 287,
+      "description": "test_write_config_takes_posix_branch_and_restricts_mode replaced 'assertEqual(mode, 0o600)' with '(mode & 0o007) == 0' plus '(mode & 0o600) == 0o600'. That combination is strictly weaker than the old check: it accepts any owner-rw mode with no world bits, including group-writable/executable modes such as 0o770 or 0o700. The PR body's blanket claim '断言较修复前更严格' (item 10) is therefore only partially true - the platform assertion did get stronger, but this security assertion got looser. It is not silent (it is documented in-code and in the report), and the substantive 'posix branch taken' checks (assertIn 'Restricting...', assertNotIn 'Unsupported OS') are unchanged, so this does not block.",
+      "fix_suggestion": "Assert 'mode & 0o077 == 0' with a documented single exception for the mount-injected 0o040 group-read bit that was actually observed, rather than permitting arbitrary group bits; or state in the report that group bits are intentionally tolerated.",
+      "resolution": "已修复：权限断言收紧为 `mode & 0o037 == 0`（other 无任何访问位 + group 无写/执行位）+ owner 可读写；挂载追加的 group 读位（0640）在代码注释与 test-report.md §4.5 中显式声明为容忍项。断言计数不变（仍 47）。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R33 (hard-coded interpreter path)",
+      "file": "archives/s/synadm/0.49.2/test_package/conanfile.py",
+      "line": 28,
+      "description": "The test harness hard-codes the device interpreter '/data/service/hnp/bin/python3' (falling back to sys.executable when absent). It is a test-side path, not a recipe compiler path, and the fallback keeps it portable, but a device-absolute interpreter baked into a submitted file is the same class of smell R33 guards against.",
+      "fix_suggestion": "Resolve the interpreter from the profile/conan conf or shutil.which('python3') first, keeping the absolute OHOS path as the last-resort candidate, so the fallback order is data-driven rather than device-specific.",
+      "resolution": "记录为已接受的 P3：该硬编码位于 test_package/conanfile.py（测试侧解释器选择，非配方编译器），且已有 sys.executable 回退；本 PR 不改动它以避免在 CI 复跑前改变既有执行路径，留待后续迭代。"
+    }
+  ],
+  "summary": "I verified the round's substance adversarially. Counting directly: test_synadm_ohos.py has 21 def test_ / 47 self.assert* (5 require_socket() call sites, the 6th Test02 case correctly unguarded), test_synadm.py has 42 / 67, totalling 63 / 114 - so '21/47', '42/67', '114', '63/63' and '5 socket skips' all hold and are mutually consistent; I also reproduced the CI-worker emulation (AF_UNIX_BINDABLE=False -> 5 skipped, 16 non-skipped) and confirmed the sha256 of all four cached sdists match conandata.yml exactly (no fabrication). No R34/R9/R19/R40 hollowing: every test calls real product code, the negative L1e gate proves the suite depends on the artifact, and the SkipTest is honest (the device log shows 'Ran 21 tests ... OK' with zero skips; the worker difference is a documented sandbox capability, not a disguised pass). The new static assertions are genuine - I confirmed the installed package has 0 'sys.platform' reads and the literal 'os.name == \"posix\"' guard at cli/_helper.py:185, so they cannot pass trivially; only the permission assertion is a mild weakening (P3). The three knowledge drafts are honest about being drafts ('draft: true', '草稿态') and about novelty (each names the pre-existing overlapping drafts and states its increment). No P0/P1 found; verdict pass. Residual defects are documentation staleness: the committed reports/audit-result.json and notes.md:115 still carry the pre-fix counts (45/112, 45) that contradict the current 47/114 in pr-body/test-report/MANIFEST.yml/manifest.yaml, plus two prose overstatements about CI-worker coverage and result provenance. 【修复轮审计】本轮针对首轮 CI 红的修复（test_synadm_ohos.py 环境假设探针化）独立复审：6 条 issue 全为 P2/P3，无 P0/P1；其中 5 条已在本提交内修复、1 条（测试侧解释器硬编码）记录为已接受的 P3。断言数经审计员独立计数确认为 47 / 114，与各文档一致。",
+  "auditor": "独立审计子任务（W4，2026-10-15 r2；上下文隔离，未参与本次修改）",
+  "audit_input": "audit-input-synadm-r2.json",
+  "verdict_note": "P0=0 P1=0 → pass。P2=2、P3=4 均已在本 PR 提交 b53bbfb630 之后的修订中处理（见各 issue 的 resolution）。"
+}

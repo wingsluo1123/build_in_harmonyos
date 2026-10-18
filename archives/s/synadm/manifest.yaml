@@ -1,0 +1,32 @@
+# 软件级 manifest — 遵循 ARCHIVE-SPEC v2.0
+# 文件位置: archives/s/synadm/manifest.yaml
+
+software: synadm
+display: "synadm"
+description: "Matrix Synapse homeserver 管理命令行工具（Python CLI，支持 http 与本地 unix socket 管理 API）"
+category: utility
+homepage: "https://codeberg.org/synadm/synadm"
+license: "GPL-3.0-or-later"
+
+build_system: python
+
+ohos_adaptation:
+  key_points:
+    - "纯 Python noarch：无 C/C++ 编译步骤，配方 package_id() 用 self.info.clear()，build() 只做 compileall 预编译（PYTHONPYCACHEPREFIX 不污染包目录）"
+    - "运行期依赖闭包必须逐项以 run=True 声明（含 registry 件自身的传递依赖），否则被 Conan 判为 Skipped binaries、对 package_info() 不可见，消费端 import 崩"
+    - "PYTHONPATH 注入要遍历 self.dependencies.host.values() 并探测两种 site 布局（lib/pythonX.Y/site-packages 与顶层平铺）"
+    - "手工铺 .dist-info 时目录名按 PEP-427 把 - 归一化为 _（importlib.metadata 的查找键），synadm 的 User-Agent 与 click.version_option 依赖它"
+    - "OHOS /tmp 只读：vendored 上游包必须 prune 测试资产（testutils 之类写死 /tmp 的文件）"
+    - "HMDFS 大小写不敏感：包内路径树需静态校验无同名大小写冲突"
+    - "OHOS 支持 AF_UNIX 且私有 $HOME 路径容得下 sun_path(108B)，synadm 的 http+unix:// 管理链路可直接在鸿蒙上实测"
+    - "上游无自动化测试（sdist/codeberg 树/workflows 三处取证均为 0），63 用例全由适配组承担并在 MANIFEST.yml 如实声明"
+  common_dependencies:
+    - click
+    - requests
+    - tabulate
+    - pyyaml
+
+versions:
+  "0.49.2":
+    status: built
+    build_date: 2026-10-15
