@@ -1,0 +1,85 @@
+--- a/libmailutils/auth/system.c
++++ b/libmailutils/auth/system.c
+@@ -40,12 +40,38 @@
+ #include <mailutils/iterator.h>
+ #include <mailutils/mailbox.h>
+ #include <mailutils/mu_auth.h>
+ #include <mailutils/errno.h>
+ 
+ /* System database */
++/* HarmonyOS developer shells may have no passwd entry for the process UID.
++   Use an explicit LOGNAME/USER identity when resolving the current account. */
++static struct passwd *
++mu_auth_system_current_user (uid_t uid)
++{
++  static struct passwd pw;
++  const char *name = getenv ("LOGNAME");
++  const char *home = getenv ("HOME");
++
++  if (!name || !*name)
++    name = getenv ("USER");
++  if (!name || !*name || (uid != getuid () && uid != geteuid ()))
++    return NULL;
++
++  memset (&pw, 0, sizeof pw);
++  pw.pw_name = (char *) name;
++  pw.pw_passwd = (char *) "";
++  pw.pw_uid = uid;
++  pw.pw_gid = getegid ();
++  pw.pw_gecos = (char *) name;
++  pw.pw_dir = (char *) (home && *home ? home : ".");
++  pw.pw_shell = (char *) "/bin/sh";
++  return &pw;
++}
++
++
+ static int
+ mu_auth_system (struct mu_auth_data **return_data, const struct passwd *pw)
+ {
+   char *mailbox_name;
+   int rc;
+   
+@@ -75,24 +101,41 @@
+ 			const void *key,
+ 			void *func_data MU_ARG_UNUSED,
+ 			void *call_data MU_ARG_UNUSED)
+ {
+   if (!key)
+     return EINVAL;
+-  return mu_auth_system (return_data, getpwnam (key));
++  {
++    struct passwd *pw = getpwnam (key);
++    if (!pw)
++      {
++	const char *name = getenv ("LOGNAME");
++	if (!name || !*name)
++	  name = getenv ("USER");
++	if (name && *name && strcmp (name, key) == 0)
++	  pw = mu_auth_system_current_user (geteuid ());
++      }
++    return mu_auth_system (return_data, pw);
++  }
+ }
+ 
+ static int
+ mu_auth_system_by_uid (struct mu_auth_data **return_data,
+ 		       const void *key,
+ 		       void *func_data MU_ARG_UNUSED,
+ 		       void *call_data MU_ARG_UNUSED)
+ {
+   if (!key)
+     return EINVAL;
+-  return mu_auth_system (return_data, getpwuid (*(uid_t*) key));
++  {
++    uid_t uid = *(uid_t *) key;
++    struct passwd *pw = getpwuid (uid);
++    if (!pw)
++      pw = mu_auth_system_current_user (uid);
++    return mu_auth_system (return_data, pw);
++  }
+ }
+ 
+ static int
+ mu_authenticate_generic (struct mu_auth_data **return_data MU_ARG_UNUSED,
+ 			 const void *key,
+ 			 void *func_data MU_ARG_UNUSED,
