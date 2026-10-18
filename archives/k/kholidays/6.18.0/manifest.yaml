@@ -1,0 +1,33 @@
+software: kholidays
+version: "6.18.0"
+status: published
+build_date: "2026-10-17"
+conan_ref: "kholidays/6.18.0"
+source:
+  url: "https://invent.kde.org/frameworks/kholidays/-/archive/v6.18.0/kholidays-v6.18.0.tar.gz"
+  sha256: "491850a1b997816fc2e3b3ece5d68f25c2b5e948eed88881c58256a23a4fb971"
+  tar_format: tar.gz
+build:
+  system: cmake
+  configure_options:
+    - "BUILD_TESTING=ON"
+    - "KF_IGNORE_PLATFORM_CHECK=TRUE"
+    - "CMAKE_CXX_STANDARD=20 (conan cppstd block removed, profile pins 17)"
+  dependencies:
+    - "qtbase/6.11.1"
+    - "qtdeclarative/6.11.1"
+    - "ecm/6.26.0 (tool)"
+    - "qt6linguisttools/6.11.1 (tool)"
+  cc: clang
+  cxx: clang++
+patches_applied: []
+knowledge_gained:
+  - "The 6.18.0 release tarball ships the generated plan-parser sources (src/parsers/plan2/holidayparserplan.cpp + holidayscannerplan.cpp) and src/CMakeLists.txt compiles them directly, so no bison/flex/m4 tool_requires are needed at this release line (the 6.28.0 recipe does need them)"
+  - "kholidays 6.18.0 already uses C++20 (std::numbers::pi in src/lunarphase.cpp via <numbers>), so the conan cppstd block must be removed and CMAKE_CXX_STANDARD=20 set even though the repository profile pins cppstd=17"
+  - "The OHOS SDK libc++ (clang 15) provides <numbers> under -std=c++20 but NOT the C++20 ranges algorithm overloads (std::ranges::none_of is missing); 6.18.0 uses only the former, so it needs the C++20 switch without the 6.28.0 portability patch"
+  - "The kholidays holiday plan data is compiled into libKF6Holidays.so through holidays/holidays.qrc (prefix :/org.kde.kholidays/plan2), so HolidayRegion works at runtime with no external data files"
+  - "SunEvents (API since 6.15) carries the polar predicates as member functions (isPolarDay/isPolarNight/isPolarTwilight); the KHolidays::SunRiseSet free functions with the same names are deprecated since 6.15 and should not be used by consumers"
+  - "ECM >= 6.18.0 is requested upstream but the published ECM line starts at 6.20.0; the KF6 6.18.0 baseline value ecm/6.26.0 (kconfig/kcoreaddons/ki18n/kxmlgui/kwidgetsaddons 6.18.0) is reused"
+upstream_test_pass_rate: "6/6 (100%)"
+adapted_test_pass_rate: "100% (consumer test 23/23 assertions)"
+test_command: "conan create . --build=missing"
