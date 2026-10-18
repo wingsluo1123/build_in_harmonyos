@@ -1,0 +1,179 @@
+--- a/tools.h
++++ b/tools.h
+@@ -28,6 +28,24 @@
+ #include <sys/types.h>
+ #include "thread.h"
+ 
++// --- Non-glibc C library portability (e.g. the musl based OpenHarmony libc) ---
++// VDR is written against glibc and uses a few glibc only helpers. Provide
++// minimal equivalents when <features.h> did not define __GLIBC_PREREQ.
++#ifndef __GLIBC_PREREQ
++#define __GLIBC_PREREQ(maj, min) 1 // no glibc: always take the modern code path
++#define VDR_NO_GLIBC 1
++#ifndef DEFFILEMODE
++#define DEFFILEMODE (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH) // 0666
++#endif
++#ifndef ACCESSPERMS
++#define ACCESSPERMS (S_IRWXU | S_IRWXG | S_IRWXO) // 0777
++#endif
++typedef int (*__compar_fn_t)(const void *, const void *);
++#endif
++#ifndef __attribute_format_arg__
++#define __attribute_format_arg__(x) __attribute__((format_arg(x)))
++#endif
++
+ typedef unsigned char uchar;
+ 
+ extern int SysLogLevel;
+--- a/tools.c
++++ b/tools.c
+@@ -677,7 +677,13 @@
+ {
+   if (!FileName)
+      return NULL;
++#ifdef VDR_NO_GLIBC
++  // The musl based OpenHarmony libc has no canonicalize_file_name();
++  // realpath() with a NULL buffer allocates the result just the same.
++  char *TargetName = realpath(FileName, NULL);
++#else
+   char *TargetName = canonicalize_file_name(FileName);
++#endif
+   if (!TargetName) {
+      if (errno == ENOENT) // file doesn't exist
+         TargetName = strdup(FileName);
+--- a/osd.c
++++ b/osd.c
+@@ -12,7 +12,11 @@
+ #include <stdlib.h>
+ #include <sys/ioctl.h>
+ #include <sys/stat.h>
++#ifdef VDR_NO_GLIBC
++#include <unistd.h>
++#else
+ #include <sys/unistd.h>
++#endif
+ #include "device.h"
+ #include "tools.h"
+ 
+--- a/thread.c
++++ b/thread.c
+@@ -23,6 +23,11 @@
+ #include <sys/wait.h>
+ #include <unistd.h>
+ #include "tools.h"
++#ifdef VDR_NO_GLIBC
++// The musl based OpenHarmony libc does not declare (but does export)
++// pthread_cancel(); VDR uses it in cThread::Cancel().
++extern "C" int pthread_cancel(pthread_t);
++#endif
+ 
+ #define ABORT { dsyslog("ABORT!"); cBackTrace::BackTrace(); abort(); }
+ 
+@@ -160,7 +165,13 @@
+   writeLockThreadId = 0;
+   pthread_rwlockattr_t attr;
+   pthread_rwlockattr_init(&attr);
++#ifdef VDR_NO_GLIBC
++  // The musl based OpenHarmony libc has no rwlock "kind" attribute and
++  // therefore no PTHREAD_RWLOCK_PREFER_*_NP constants.
++  (void)PreferWriter;
++#else
+   pthread_rwlockattr_setkind_np(&attr, PreferWriter ? PTHREAD_RWLOCK_PREFER_WRITER_NP : PTHREAD_RWLOCK_PREFER_READER_NP);
++#endif
+   pthread_rwlock_init(&rwlock, &attr);
+ }
+ 
+@@ -210,7 +221,11 @@
+   locked = 0;
+   pthread_mutexattr_t attr;
+   pthread_mutexattr_init(&attr);
++#ifdef VDR_NO_GLIBC
++  pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK);
++#else
+   pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK_NP);
++#endif
+   pthread_mutex_init(&mutex, &attr);
+ }
+ 
+--- a/vdr.c
++++ b/vdr.c
+@@ -662,6 +662,14 @@
+      }
+   else if (Terminal) {
+      // Claim new controlling terminal
++#ifdef VDR_NO_GLIBC
++     // The musl based OpenHarmony libc declares stdin/stdout/stderr as
++     // "FILE *const", so they cannot be reassigned. freopen() redirects the
++     // already existing stream, making the assignment redundant anyway.
++     (void)freopen(Terminal, "r", stdin);
++     (void)freopen(Terminal, "w", stdout);
++     (void)freopen(Terminal, "w", stderr);
++#else
+      stdin  = freopen(Terminal, "r", stdin);
+      stdout = freopen(Terminal, "w", stdout);
+      stderr = freopen(Terminal, "w", stderr);
+@@ -668,3 +676,4 @@
++#endif
+      HasStdin = true;
+      tcgetattr(STDIN_FILENO, &savedTm);
+      }
+@@ -1587,7 +1596,11 @@
+               // Memory cleanup:
+               static time_t LastMemoryCleanup = 0;
+               if ((Now - LastMemoryCleanup) > MEMCLEANUPDELTA) {
++#ifdef VDR_NO_GLIBC
++                 // The musl based OpenHarmony libc has no malloc_trim().
++#else
+                  malloc_trim(0);
++#endif
+                  LastMemoryCleanup = Now;
+                  }
+               }
+--- a/svdrp.c
++++ b/svdrp.c
+@@ -73,7 +73,15 @@
+ 
+ cIpAddress::cIpAddress(void)
+ {
++#ifdef VDR_NO_GLIBC
++  // INADDR_ANY expands to ((in_addr_t) 0x00000000), a *non literal* null
++  // pointer constant, which clang rejects in C++11 and later. Clang selects
++  // the overload from the argument types, so hand over the wildcard address
++  // in its text form instead.
++  Set("0.0.0.0", 0);
++#else
+   Set(INADDR_ANY, 0);
++#endif
+ }
+ 
+ cIpAddress::cIpAddress(const char *Address, int Port)
+--- a/eit.c
++++ b/eit.c
+@@ -30,6 +30,10 @@
+ 
+ #include "eit.h"
+ #include <sys/time.h>
++#ifdef VDR_NO_GLIBC
++// The musl based OpenHarmony libc does not declare (but does export) adjtime().
++extern "C" int adjtime(const struct timeval *, struct timeval *);
++#endif
+ #include "epg.h"
+ #include "i18n.h"
+ #include "libsi/section.h"
+--- a/i18n.c
++++ b/i18n.c
+@@ -124,8 +124,14 @@
+ static void SetEnvLanguage(const char *Locale)
+ {
+   setenv("LANGUAGE", Locale, 1);
++#ifdef VDR_NO_GLIBC
++  // _nl_msg_cat_cntr is a glibc internal that makes gettext reload its
++  // catalogues; the musl based OpenHarmony libc has no such symbol.
++  (void)Locale;
++#else
+   extern int _nl_msg_cat_cntr;
+   ++_nl_msg_cat_cntr;
++#endif
+ }
+ 
+ static void SetLanguageNames(void)
