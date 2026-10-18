@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.20)
+project(test_libgsasl C)
+find_package(libgsasl CONFIG REQUIRED)
+add_executable(test_libgsasl test_libgsasl.c)
+target_link_libraries(test_libgsasl PRIVATE libgsasl::libgsasl)
