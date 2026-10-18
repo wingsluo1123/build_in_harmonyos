@@ -1,0 +1,49 @@
+software: libgfbgraph
+version: "0.2.5"
+status: built
+build_date: "2026-10-16"
+build_system: autotools
+
+source:
+  url: "https://gitlab.gnome.org/Archive/libgfbgraph/-/archive/v_0_2_5/libgfbgraph-v_0_2_5.tar.gz"
+  sha256: "3f53e548464dd64b0887b9f2d7093bd3367e1e4f6932a7c79f527b66255c0804"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--build=aarch64-unknown-linux-ohos"
+    - "--host=aarch64-unknown-linux-ohos"
+    - "--disable-introspection"
+    - "--enable-shared"
+    - "--disable-static"
+  dependencies:
+    - "glib/2.84.0.1.1"
+    - "json-glib/1.10.6"
+    - "libsoup3/3.6.5-r3"
+    - "sqlite3/3.49.1"
+    - "librest/0.10.2"
+    - "gnome-online-accounts/3.56.5"
+    - "libxml2/2.15.3"
+    - "dbus/1.14.10"
+    - "zlib/1.3.1.1"
+  cc: clang
+
+patches_applied:
+  - 0001-rest-1.0-libsoup3.patch
+
+test_results:
+  type: upstream-and-consumer
+  upstream_registrations: 6
+  upstream_active_cases: 4
+  upstream_executed_pass: 4
+  upstream_not_registered: 2
+  upstream_skipped: 0
+  make_check_programs: 2
+  make_check_pass: 2
+  make_check_fail: 0
+  consumer_total: 10
+  consumer_passed: 10
+  note: "CI #92572 暴露下载版 json-glib .so 无法加载；配方从固定 SHA-256 的官方源码重建测试运行库。在设备上不强制 Conan 重建 json-glib 时，make check 两个测试程序通过 2/2，SKIP 0；活动上游用例 4/4。gtestutils.c 的 2 个 g_test_add 位于 #if 0，不是活动用例（程序 TAP 1..0）。test_package CONSUMER_RESULT 10/10，conan create 退出码 0。"
+
+knowledge_ref: []
