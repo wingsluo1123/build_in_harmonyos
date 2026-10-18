@@ -1,0 +1,51 @@
+--- /dev/null
++++ b/tests/test_pagination.py
+@@ -0,0 +1,48 @@
++# SPDX-License-Identifier: GPL-3.0-or-later
++
++"""Initial query parameters must not override a server's next URL."""
++
++import json
++from pathlib import Path
++from unittest import TestCase
++from urllib.parse import parse_qs, urlsplit
++
++import responses
++
++from wlc import API_URL, Translation, Weblate
++
++
++class PaginationTest(TestCase):
++    @responses.activate
++    def test_initial_params_only_on_first_page(self) -> None:
++        fixtures = Path(__file__).parent / "test_data" / "api"
++        queries = []
++        expected = [
++            {"page": ["1"], "q": ["hello"]},
++            {"page": ["2"]},
++            {"page": ["3"]},
++        ]
++
++        def respond(request):
++            self.assertLess(len(queries), 3, "pagination did not terminate")
++            query = parse_qs(urlsplit(request.url).query)
++            self.assertEqual(query, expected[len(queries)])
++            queries.append(query)
++            filename = "translations"
++            if len(queries) > 1:
++                filename += f"--GET--page={len(queries)}"
++            return 200, {}, (fixtures / filename).read_bytes()
++
++        responses.add_callback(
++            responses.GET,
++            f"{API_URL}translations/",
++            callback=respond,
++            content_type="application/json",
++        )
++        params = {"page": 1, "q": "hello"}
++        translations = list(Weblate().list_factory("translations/", Translation, params))
++        self.assertEqual(queries, expected)
++        first = json.loads((fixtures / "translations").read_bytes())
++        self.assertEqual(len(translations), first["count"])
++        self.assertEqual(len({item.url for item in translations}), first["count"])
++        self.assertEqual(params, {"page": 1, "q": "hello"})

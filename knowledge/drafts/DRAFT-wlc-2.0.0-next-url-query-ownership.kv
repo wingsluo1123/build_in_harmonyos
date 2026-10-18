@@ -1,0 +1,22 @@
+id: DRAFT-wlc-2.0.0-next-url-query-ownership
+trigger_tool: python|test|runtime
+phase: testing|runtime
+error_signature: AssertionError: {'page': ['2', '1'], 'q': ['hello']} != {'page': ['2']}
+severity: 2
+category: python,runtime,network,testing
+match_keywords: AssertionError: {'page':
+title: 完整 next URL 与首次 params 重复合并，后续页携带两个 page 值
+root_cause: 分页循环把服务端 next 完整 URL 作为新 path，却继续传首次请求的 params；requests 将 params 追加到 URL 已有 query，使 page=2 后再出现 page=1，过滤参数也被重复重放
+affected_scope: 跟随完整 next URL 且仍传首请求 params 的 Python HTTP 客户端；仅适用于服务端 next 已包含后续 query 的协议，不适用于 next 只返回路径或必须每轮发送独立签名参数的接口
+verification_cmd: python3.12 -B -m unittest discover -s tests -t . -v
+rec_priority: 1
+rec_approach: next-url-owns-following-query
+rec_description: 仅在第一次 get 成功后将局部 params 设为 None，后续完全采用 next 的 query；首请求过滤参数和原同源校验保留。用原 responses 和三页固件验证首参一次、后续页码唯一、50 个唯一结果和三请求终止
+rec_auto_fix: false
+rec_impl: wlc/client.py:Weblate.list_factory; tests/test_pagination.py:PaginationTest.test_initial_params_only_on_first_page
+doc_file: knowledge/drafts/DRAFT-wlc-2.0.0-next-url-query-ownership.md
+last_updated: 2026-10-17
+source_event: orrkri task11924 wlc2.0.0; fixed PyPI sdist bd499954d3e27e8bb211d2eb9bb5a91cdd4120ed9d5fb8c273296ff22f97d826; host regression FAIL before / PASS after; OHOS H1-008 original218 plus installed consumer PASS and official W3 rc0, H1-009 separate added regression1 PASS; no combined219 command; L2 warning retained
+draft: true
+contributor_id: CBE1
+authors: orrkri
