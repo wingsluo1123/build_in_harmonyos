@@ -1,0 +1,113 @@
+package: eckit/2.0.7.1
+homepage: "https://github.com/ecmwf/eckit"
+baseline_28: "回合 28（2026-10-12）分支已 rebase 到最新 upstream/main 01438b6e61889a90d2e9be3d7cff8476b078f7c7：fix/eckit-2.0.7 新 tip 由 9 个本窗提交重放得到，behind=0 / ours=9 / 三点=9，PR 面对 upstream/main 只剩本包 10 个文件（772 增 / 21 删），不再出现他窗 knowledge/drafts 的删除面。rebase 未改配方输入（conanfile.py blob 3ed03b33469093abde44b42db00f20d9efbdc262、conandata.yml blob 9d2f051c5cfcc5979f6bac2c64b2c41a28de2647、patches 0001-0005 逐字未变），实测非构建 conan export 复算仍为 RREV 0467f30b8ac1050fbd32683f9ea7c8a9（2026-10-12 06:16:36 UTC）⇒ 下面 create#8 的端到端证据在 rebase 后仍然绑定当前修订，不需也不得再起第二次 create 来'重绑'。rebase 手段=git checkout -b 临时分支自 upstream/main + cherry-pick 本窗 9 提交（全部 CP_RC=0 无冲突）+ branch -f 移动 fix/eckit-2.0.7；无 force push、未动他人 worktree/分支，旧 tip af0d32363 仍在 reflog 可回捞。git rebase --autostash 在本 worktree 结构上不可用（HMDFS 大小写叠写使 archives/l/libXext/README.md 与 manifest.yaml 恒为 unstaged，autostash 建出 3fde31ae5 后仍报 cannot rebase: You have unstaged changes 并原样回滚，两文件 sha256 回滚前后逐字一致（26bd9228... 与 f85a944d...），git stash list 为空）。"
+baseline_30: "回合 30（2026-10-12）起点读数（point-in-time 快照，随本轮提交即推进，故不作为当前断言）：分支 fix/eckit-2.0.7 tip = 6e13aef88e55bc6b5af907bbec019dced13f9b27；面对 upstream/main 的三点 diff = 11 files changed, 887 insertions(+), 22 deletions(-)（本包 9 文件 + knowledge/drafts 成对 2 文件）；behind=0 / ahead=11（git rev-list --count 实测）。上段 baseline_28 里的 'd2fc2f237 / 10 files changed, 772 insertions(+), 21 deletions(-)' 是回合 28 rebase 当刻（文档重绑提交 adc0d9fed 之前）的读数，文件集合不变、计数已推进，现已在 notes.md 同处标注为 rebase 当刻快照。绑定约定（本轮锁定，杜绝再次 NOT-ANCESTOR 绑定）：①构建/测试证据只绑'配方输入最后一次改动的祖先提交'，载体 git log -1 --format=%H HEAD -- archives/e/eckit/2.0.7/conanfile.py = 4cf7ef21869ff7882a7dc7745ce4c93a665c4eff（git merge-base --is-ancestor 该值 HEAD 返回 0；git diff --stat 4cf7ef218 HEAD -- conanfile.py conandata.yml patches/ 为空）；②tip 类绑定只写进 result.json（官方生成器 --commit-hash）与 archives/e/eckit/2.0.7/manifest.yaml 的 evidence.tip_before_this_commit，不写进本文件（本文件自身入库，写当前 tip 即自指）；③此前本文件第 4/54/83 行把 create#8 写成'绑当前 tip f2c5a9cdc'属证据-提交错绑：f2c5a9cdc 经 git merge-base --is-ancestor 实测 NOT-ANCESTOR（回合 28 换线时被丢弃的旧线），三处已全部改绑上述真实祖先提交。rrev 未因文档改动变化（exports 实测仅 1 .py + 1 .yml + 5 .patch）⇒ 起了构建=否。"
+create9_e2e: "create#9（2.0.7.1 首次端到端，本窗一手取证）：rc=0，ELAPSED_S=1717，MEMCAP[run] peak=435MB/budget=4000MB（MEMCAP 用时 1710.2s），gate.sh 8000 的 GATE_RC=0，本窗私有 build-slot 快照 SLOT_OK 17:39:33（全机基准 2 槽、本窗只占 1 槽、未抢第 3 槽），jobs=2，独立 CONAN_HOME=~/tmp/ch/home-QDR-1009-E02-eckit，命令 conan create . --build=\"eckit/*\" -pr:h=ohos-aarch64 -pr:b=build-native（外层 sh build-slot.QDR-1009-E02.sh --wait 3600 --mem 8000 -- python3 memcap-run.py --mb 4000 -- …）；修订三件 RREV=ec9c1763c4cb84752953546e4a58c8c7 / PKID=ac5dbe63be94cf44531a6b18ac4b40fa5a84d380 / prev=878b12add91ab798519648358cb47f29（日志一手 Full package reference 行 eckit/2.0.7.1#ec9c1763c4cb84752953546e4a58c8c7:ac5dbe63be94cf44531a6b18ac4b40fa5a84d380#878b12add91ab798519648358cb47f29）。同次 build() 门内 ctest 原文：100% tests passed out of 211（日志 2151 行）、Total Test time (real) = 94.45 sec（2158 行）、Label Time Summary eckit=94.09 sec*proc (211 tests) / executable=84.89 (193 tests) / script=9.20 (18 tests)。零执行分母自证（同一 rrev 构建树、本窗实测、无构建）：ctest --show-only Total Tests 216（216 个 id、216 个唯一名），带锚定 --exclude-regex 后 Total Tests 211，差值恰为 5，且同族兄弟全留（eckit_test_log_callback/channels/colour/json/tcp/threads 与 maths_floating_point_exception_FE_DIVBYZERO/INEXACT/INVALID/OVERFLOW/UNDERFLOW）。计数口径纠正并披露：ctest 行形态是 Test 后三空格再加 #N: ，上一版探针按裸串 Test#N 只数到 117/112，本轮改用允许空白的匹配且只认 Total Tests 行，得 216/211。被豁免 5 项在本 rrev 逐一单跑复现（ctest -R 锚定单个项目名 + memcap-run.py --mb 1500，非构建、非 create）：ONEOFF_RC 全为 8，#3 eckit_test_container_sharedmemarray（SIGSYS，si_code=1(SYS_SECCOMP) / si_syscall=190(semget)）、#19 eckit_test_filesystem_filemode（Failed，断言点 test_filemode.cc:153/196/209/232/245，HMDFS 默认文件模式 E011）、#57 eckit_test_log（Failed，musl unlink 失败不填 errno，报错文本 No error information）、#69 eckit_test_maths_floating_point_exceptions（Failed，216 项中唯一 WILL_FAIL 契约）、#154 eckit_test_safe_casts（Failed，默认 char 签名 ABI 差异，同树 -fsigned-char 对照 RC=0）；五项峰值 RSS 仅 5-7MB ⇒ 豁免不是为绕开内存。包内容实测：bin/eckit-version 35328 B 在位并以 LD_LIBRARY_PATH=包 lib 真跑 rc=0（stdout 2.0.7，peak 2MB），lib 内 11 个 .so（libeckit.so 3189248 B）、pkgconfig 12 个 .pc，与 package_info 的 bindirs 申报一致。test_package 在同一次 create 内真实编译（RUN: clang++ -std=c++17 test.cpp -o test_probe … -leckit 带 rpath）并以 bash -c ./test_probe 执行，五组断言逐条打印、末行 eckit 2.0.7: 全部断言通过（版本三处 2.0.7 / 宏 / int 20007、MD5 三向量、Tokenizer、AEC 往返、SystemInfo）。W3 通过不等于 published（未 upload），亦不等于可提审（本修订独立 W4 未做，本窗不得自审）。"
+create8_e2e_historical_on_2_0_7: "conan create #8 = 历史证据（属 2.0.7 归档线 rrev 0467f30b8a...，不是本版本 2.0.7.1；本版本权威见 create9_e2e）（配方输入=提交 4cf7ef21869ff7882a7dc7745ce4c93a665c4eff 的三件套 blob；该提交是 HEAD 的祖先，也是 archives/e/eckit/2.0.7/conanfile.py 的最后一次改动提交（自证载体：git log -1 --format=%H HEAD -- archives/e/eckit/2.0.7/conanfile.py 实测该值），分支此后仅追加文档提交、输入 blob 未变 ⇒ 同一 rrev 仍成立）。2026-10-12 设备 12:27:56 起槽（SLOT_OK，build-slot 快照 --wait 3600 --mem 8000，基准 2 槽时另一槽由 QDR-1009-E07 c-ares 持有），gate.sh 8000 GATE_PASS（MemAvailable=11520MB / stat -f Inodes Free=40869112 / 编译器进程 1），独立 CONAN_HOME=~/tmp/ch/home-QDR-1009-E02-eckit（只从已验证 home 复制 global.conf + 根级 remotes.json + profiles；先跑非构建预热 conan install . --build=never WARM_RC=0，证明 8 节点依赖二进制在 ohpcd 远端可得，属 clean-room 解析）。终态 CREATE_RC=0，ELAPSED_S=1776（MEMCAP 用时 1766.7s），MEMCAP[run] peak=426MB/budget=4000MB。RREV 0467f30b8ac1050fbd32683f9ea7c8a9（Exported 2026-10-12 04:27:58 UTC，与在祖先提交 4cf7ef2186 上 `conan export` 复算同值；回合 29/30 文档提交后再次 `conan export` 复算仍为该 rrev）/ PKID ac5dbe63be94cf44531a6b18ac4b40fa5a84d380 / prev d387e6767143aef1b53b849af3d5d520；full reference eckit/2.0.7#0467f30b...:ac5dbe63...#d387e676...；build+package 目录 新家 p/b/eckite1a6be7ff5cfc。同次 build() 门内 ctest 原文：100% tests passed out of 211、Total Test time 100.94s、Label Time Summary executable=193 script=18 eckit=211（198-5 逐项豁免=193，注册分母 216 未缩）。零执行自证（同一次 rrev 的构建树）：ctest --show-only Total Tests: 216；带锚定 --exclude-regex 后 Total Tests: 211，且同族兄弟全部保留（eckit_test_log_callback/channels/colour/json/tcp/threads 与 eckit_test_maths_floating_point_exception_FE_DIVBYZERO/INEXACT/INVALID/OVERFLOW/UNDERFLOW）；被豁免 5 项在本轮日志仍有 5 条 Built target（未删用例）。包内容实测：bin/eckit-version 35,328B 存在且以 LD_LIBRARY_PATH=包 lib 真跑输出 2.0.7 rc=0（peak 2MB），lib/libeckit.so 3,189,248B 等 5 个 .so 在位 ⇒ 包级 commands.json(binary:true) 与 package_info 的 bindirs 申报在当前 rrev 上一致。test_package 在同一次 create 内真实编译（RUN: clang++ -std=c++17 test.cpp -o test_probe，含 -leckit 与 rpath）并以 bash -c './test_probe' 执行，五组断言逐条打印：版本 2.0.7/宏/int 20007、MD5 三个 RFC 1321 向量、Tokenizer a:bb:ccc、AEC 往返 4096->1804B 逐字节一致、SystemInfo dynamicLibraryName(eckit)=libeckit.so（OHOS 走 SystemInfoLinux），末行『eckit 2.0.7: 全部断言通过』。W3 通过不等于 published（未 upload），亦不等于可提审（W4 第 4 轮独立审计未做）。"
+create7_e2e_historical: "conan create #7 端到端 rc=0（2026-10-11 设备 18:40:22 起槽，ELAPSED_S=1725，MEMCAP peak=518MB/budget=4000MB）：RREV af53dddb9db893da77840448aaacd542 / PKID ac5dbe63be94cf44531a6b18ac4b40fa5a84d380 / prev fdf860f04e9fbcbc0a77cff57c489aa7，build+package 目录 p/b/eckit009e86d8d68b9（目录名按 build request，非 rrev 前缀），待验证 HEAD 20303bf4c8bab34f13c22410e5ff8b2420599a24。同次执行 build() 门内 ctest 原文：100% tests passed out of 211、Total Test time 96.43s、Label executable=193 script=18（198-5 逐项豁免=193，注册分母 216 未缩）；被豁免 5 项仍 Built target（未删用例）；test_package 真实编译并以 './test_probe' 执行，输出『eckit 2.0.7: 全部断言通过』。**历史档位说明**：#7 的 rrev 对应提交 20303bf4c8，早于 P0-1 修法（package_info 加 bindirs）⇒ 不绑当前 tip，仅作 create#8 的同配方族历史对照。"
+upstream_test_in_build: true
+upstream_check_command: "ctest --output-on-failure --exclude-regex <5 anchored case names> (invoked by cmake.test(build_tool_args=[ARGS=...]) in the recipe build())"
+upstream_test_command: "cmake --build <build>/Release --target test -- 'ARGS=--output-on-failure -E \"^eckit_test_(container_sharedmemarray|filesystem_filemode|log|maths_floating_point_exceptions|safe_casts)$$\"'"
+upstream_tests:
+  - file: "tests/*/CMakeLists.txt"
+    source: "https://github.com/ecmwf/eckit/archive/refs/tags/2.0.7.tar.gz (sha256 376aa865b317d9533c1c88e1a7d15ca248420cc8a048570f3fe216e123991b51)"
+    description: >-
+      ecbuild registration sites ecbuild_add_test( = 138 across 28 CMakeLists.txt files
+      (bare add_test( = 0; reproducible: grep -ro 'ecbuild_add_test(' <src>/ --include=CMakeLists.txt | wc -l = 138, grep -rl same pattern = 28 files; the loose form without the parenthesis is 142 because 4 more hits sit on a different line inside tests/geo/CMakeLists.txt, so this package reports the anchored 138/28 pair only). Under this recipe's feature set ENABLE_TESTS=ON registers 216 ctest cases,
+      of which 198 are labelled "executable". create#6 (fresh rebuild after conan remove -c) executed
+      all of them: 211 Passed / 5 Failed
+      (#3 eckit_test_container_sharedmemarray SIGSYS, #19 eckit_test_filesystem_filemode,
+      #57 eckit_test_log, #69 eckit_test_maths_floating_point_exceptions, #154 eckit_test_safe_casts).
+      Earlier create#5 independently produced the same denominator and the same 5-item failure set
+      (93.01 s vs create#6 91.07 s), so the numbers are reproducible across two separate executions.
+      Platform-mechanism / upstream-test-contract causes only; per-case technical reasons in notes.md
+      (round-23 定案 table: root cause / platform-limited vs caused-by-this-port / 10-section handling).
+      Cases are NOT reclassified, NOT deleted and the 216 denominator is NOT shrunk.
+      Round 24 (coordinator decision): the build() test gate now excludes exactly those 5
+      platform-limited cases by name via CMake/CTest's own anchored --exclude-regex (per-case
+      test_skipped; GNU Make 4.4.1 "test" rule is literally "ctest $(ARGS)"), so a fresh create
+      runs 211/211 while the 216 registration denominator and the 5 documented signatures remain.
+      Measured with --show-only (zero execution): anchored form keeps 211 and retains all sibling
+      cases (eckit_test_log_channels ..., floating_point_exception_FE_*); dropping the trailing
+      anchor yields 205 (11 siblings wrongly dropped) and is therefore not used.
+    command: "ctest --output-on-failure"
+  - file: "regressions/CMakeLists.txt"
+    source: "same tag tarball"
+    description: >-
+      1 ecbuild_add_test registration site expanding to 18 shell regression cases labelled "script"
+      (ECKIT-166.sh / ECKIT-175.sh / ECKIT-221.sh etc.), all included in the 216 executed denominator
+      and all Passed.
+    command: "ctest --output-on-failure"
+test_package_tests:
+  - file: test.cpp
+    description: >-
+      Consumer test built and run as a user of the library: compiled from test.cpp against the
+      installed headers, linked against libeckit, then executed as ./test_probe. Five assertion groups:
+      runtime version vs ECKIT_VERSION macro vs version_int()==20007; MD5 against three RFC 1321
+      standard vectors; Tokenizer split of "a:bb:ccc"; AEC compress/decompress round-trip (libaec);
+      SystemInfo dynamicLibraryName()/executablePath() (regression assertion for patch 0004).
+    command: "./test_probe"
+assertion_count: 5
+n_consumer_programs: 1
+max_rss_mb: 4000
+measured_peak_rss_mb: 435
+measured_peak_rss_mb_source: "create#9（本版本 2.0.7.1 端到端 rc=0，绑本修订 ec9c1763c4cb84752953546e4a58c8c7，MEMCAP[run] peak=435MB/budget=4000MB，用时 1710.2s）；同配方族历史对照 create#8=426MB、create#7=518MB、create#6=460MB、create#5=442MB"
+upstream_test_totals:
+  source_round: "create#9（本版本 2.0.7.1 当前交付档位：build() 门内逐项豁免后的同次执行；证据绑本修订 ec9c1763c4cb84752953546e4a58c8c7 的 exports 输入（conanfile.py + conandata.yml + patches/0001-0005，实测于 conanmanifest.txt），不绑 tip——tip 绑定只由 result.json 与 manifest.yaml 的 evidence.tip_before_this_commit 承载）"
+  n_static_registration_sites: 138
+  n_registered: 216
+  n_executed: 211
+  n_passed: 211
+  n_failed: 0
+  n_exempted_per_case: 5
+  label_executable: 193
+  label_script: 18
+  total_test_time_sec: 94.45
+  pass_rate_statement: "注册分母 216 -> 211/216 (97.7%), 5 项逐项 test_skipped 附技术原因; 本 run 执行项 211/211 (100%)"
+upstream_test_totals_fullrun:
+  source_round: "create#6（无豁免全量真跑，历史对照：rc=2 未出包）"
+  n_registered: 216
+  n_executed: 216
+  n_passed: 211
+  n_failed: 5
+  label_executable: 198
+  label_script: 18
+  total_test_time_sec: 91.07
+  pass_rate_statement: "211/216 (97.7%), 日志自报 98%; create#5 独立复现同一分母与同一 5 项失败集 (93.01 s)"
+notes: >-
+  Historical (superseded): under create#6 the recipe had no per-case exclusion, so cmake.test()
+  propagated the 5 failing cases and conan create ended rc=2 with the test_package step
+  unreachable; test.cpp was then executed out-of-band (round 22) with the exact CXX_FLAGS and
+  CXX_INCLUDES from the build tree's flags.make and the real link.txt, under memcap-run.py --mb 800,
+  rc=0 with all five assertion groups printing (independent carrier, not a substitute for the
+  conan test_package run).
+  Authoritative state for this version (2.0.7.1): create#9 (see create9_e2e above) returns rc=0 on recipe revision ec9c1763c4cb84752953546e4a58c8c7,
+  exported from archives/e/eckit/2.0.7.1/ (conanfile.py version = 2.0.7.1, conandata.yml patches key = 2.0.7.1,
+  sources still the upstream 2.0.7 tag tarball sha256 376aa865...). It runs the in-build ctest gate with
+  the 5 platform-limited cases excluded per case (211 executed of 216 registered, 94.45 s), and executes
+  test_package for real inside the pipeline ('./test_probe' -> all five assertion groups printed, final line
+  create#7 remains a historical reading on the older rrev af53dddb9... (commit 20303bf4c8, before the
+  package_info bindirs=["bin"] fix) and is not bound to the current tip.
+  create#6 terminal readings (round 22 launch, round 23 closure; fresh tree after conan remove -c,
+  one build slot, MAKEFLAGS=-j2, memcap --mb 4000): CREATE_RC=2, ELAPSED_S=1645,
+  MEMCAP[run] peak=460MB budget=4000MB rc=1 elapsed 1625.5s,
+  RREV=8057e2e84f8b16ee05e381d8f715da81 (2026-10-11 08:20:44 UTC), and that revision shows
+  "No packages found" => no PKID/prev exists for it because the build failed before package().
+  The 40-hex string ac5dbe63be94cf44531a6b18ac4b40fa5a84d380 is a conan package_id, NOT a git object
+  (git cat-file fails on it) and must not be cited as a commit.
+  Build folder of create#6 is .../p/b/eckita32a57605b7b5/b/build/Release; create#5 used
+  eckitaead498222279. Both runs carry the SAME rrev 8057e2e84f... (grep of 'eckit/2.0.7#<32hex>' in
+  both logs), so a differing build-folder name does NOT imply a differing recipe revision - conan
+  names build folders per build request, not per rrev.
+  Per-case handling under AGENTS section 10: all 5 failures are platform-mechanism or
+  upstream-test-contract, evidenced item by item (item 3 pinned to seccomp RET_TRAP on semget/190 via
+  si_syscall + musl semget backtrace frame bound to the create#6 tree + a fork-per-primitive C probe
+  showing semget/shmget/shmat/semop killed while shmctl/semctl/statx return errno, POSIX shm_open and
+  MAP_SHARED|ANON mmap working); the only allowed route is per-case test_skipped with technical
+  reason, which the coordinator decided in round 24 and the recipe now implements (anchored CTest
+  --exclude-regex injected through cmake.test(build_tool_args=[ARGS=...]); the gate is not softened
+  and ignore_errors is not used). This manifest still does not claim the port is complete or ready
+  all passed). Update for this version: the package_info bindirs=["bin"] fix is already inside rrev ec9c1763c4cb84752953546e4a58c8c7,
+  so the PF8/P0-1 finding is now answered by measurement rather than argument (bin/eckit-version present at
+  35328 B, runs rc=0 under memcap). The create#5-#8 readings above are historical evidence of the 2.0.7 line;
+  the independent W4 audit for this revision has not been run yet (this window must not self-audit).
