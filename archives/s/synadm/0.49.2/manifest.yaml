@@ -1,0 +1,75 @@
+# 版本级 manifest — 遵循 ARCHIVE-SPEC v2.0
+# 文件位置: archives/s/synadm/0.49.2/manifest.yaml
+
+version: "0.49.2"
+software: "synadm"
+conan_ref: "synadm/0.49.2"
+
+# published | built | failed | archived
+# built：W3 本地 CI（ci/conan/build_and_test.sh）与 conan create 全绿（63/63 用例），
+# 但 conan-verify 的 G1 只按 C/C++ 配方形态检查 `export_sources` 与 `apply_conandata_patches`
+# 两个字符串——纯 Python 包既无本地导出源也无补丁，这两项对本包不存在（同仓库内
+# archives/i/interrogate/1.7.0 与 archives/u/update_checker/1.0.1 情况一致）。
+# 按 R27（conan-verify 通过才标 published）如实停在 built，不为过闸写死代码。
+status: built
+build_date: "2026-10-15"
+build_system: python-distutils-free-staging
+
+source:
+  url: "https://files.pythonhosted.org/packages/e4/6a/f0fabab5ec2ac65391c2e0289eb0e52e995e40adc62753f178eb1fcf7ae4/synadm-0.49.2.tar.gz"
+  sha256: "1cd4dc334aa8c3de58787ac945b405f0aa1d0b8cb9726ff08229d676ef37423f"
+  tar_format: tar.gz
+
+build:
+  # 纯 Python CLI：无 C/C++ 编译步骤，build() 只做字节码预编译（compileall）。
+  # 避免为跑通"配方"而加无实际用途的编译器依赖（R33/R34 口径）。
+  system: python
+  configure_options: []
+  dependencies:
+    # 制品仓已发布件，全部 run=True（对消费者可见的 host 依赖）
+    - "click/8.4.2"
+    - "requests/2.22.0"
+    - "tabulate/0.10.0"
+    - "pyyaml/6.0.2"
+    # requests/2.22.0 的导入闭包：registry 配方未标 run=True → 被 Conan 判为
+    # "Skipped binaries"，对本包 package_info() 不可见，故在此直接声明
+    - "certifi/2026.7.22"
+    - "chardet/5.2.0"
+    - "idna/3.18"
+    - "urllib3/2.7.0"
+    # registry 无件的纯 Python 运行时依赖：钉版官方 PyPI sdist 后 vendor 进包
+    - "dnspython 2.8.0 (vendored, MIT)"
+    - "click-option-group 0.5.9 (vendored, BSD-3-Clause)"
+    - "requests-unixsocket 0.4.1 (vendored, Apache-2.0)"
+  cc: none      # 纯 Python，无 native 编译
+  cxx: none
+
+# 零补丁：上游源码未做任何修改（适配全部在配方 staging/vendoring 层完成）
+patches_applied: []
+
+knowledge_gained:
+  - "Conan 2 的 dependencies.host 过滤 build/test/skip=False 三项；传递依赖若未标 run=True 即成 'Skipped binaries'，对下游 package_info() 完全不可见 —— Python 包必须逐项把导入闭包声明为 run=True，否则消费端 import 崩溃（实测 ModuleNotFoundError: chardet）（knowledge_ref: E600 草稿）"
+  - "纯 Python 包做 PYTHONPATH 注入时不能假设布局：需遍历 host 依赖闭包并用探测函数区分 lib/pythonX.Y/site-packages 与顶层平铺两种布局，无导入根时返回 None 而非注入垃圾路径（knowledge_ref: E600 草稿；既有 E319/E410 为纯 Python 打包前置条目）"
+  - ".dist-info 目录名必须按 PEP-427 把 '-' 归一化为 '_'（importlib.metadata 的查找键），METADATA 内 Name: 保留原名；否则 vendored 件的 metadata 查询抛 PackageNotFoundError，而 synadm 的 User-Agent/click.version_option 正依赖它（knowledge_ref: E601 草稿）"
+  - "OHOS 上 /tmp 是只读挂载（Errno 30），TMPDIR 指向 $HOME/.tmp：vendored 上游包若携带 testutils 之类'写 /tmp'的测试工具必须 prune，否则真实 CLI 首次调用即崩（knowledge_ref: E601 草稿；/tmp 只读环境前提见图谱既有条目）"
+  - "HMDFS 大小写不敏感：打包文件树需静态校验无同名大小写冲突路径（本工作区实证 libXext/libxext 冲突）（ref: 既有 E193, E416，本次未新增）"
+  - "OHOS 的 AF_UNIX 可用且私有 home 路径长度容得下 sun_path(108B)，使 synadm 的 http+unix:// 本地管理链路成为可测的平台特性（需在 posix 分支上自建 AF_UNIXHTTPServer：ThreadingHTTPServer.server_bind 假定 (host,port) 元组）（ref: 既有 E024, E461, E086）"
+  - "os.uname().sysname=='HarmonyOS' 而 sys.platform=='linux'：上游按 os.name/posix 分支的代码在 OHOS 上会正常走到，Python 包适配通常无需源码改动（零补丁即可发布）（ref: 见 HongMeng 相关既有条目 E036/E160/E467）"
+  - "设备原生环境 ≠ CI worker 沙箱：同一份平台特性用例在两侧的结论会分叉（实测 sys.platform 取值不同、chmod 0600 落地为 0640、AF_UNIX bind 返回 EPERM）。判定口径 = 能力用运行时探针、断言只锁安全属性与产品契约、不支持则 skipTest(实测 errno) 而非放宽断言或吞异常（knowledge_ref: E610 草稿）"
+  - "上游 synadm 无自动化测试（sdist 27 文件 0 测试 / codeberg 树 79 条目 0 测试 / workflows 仅 flake8+release）：'跑上游全套' 无可执行对象时，须在 MANIFEST.yml 用 upstream_test_count: 0 + 三项证据如实声明，覆盖责任由适配套件承担，不得虚报上游用例（ref: 口径同既有 E410 '按上游文件展开完整测试并做语义消费者验证'）"
+
+# 知识图谱草稿条目（路径 B：随本 PR 提交草稿，正式 E 编号待 graph promote 分配）
+knowledge_ref:
+  - "knowledge/drafts/E600-draft-A14E.kv/.md（run=True / Skipped binaries / 遍历 host 依赖闭包）"
+  - "knowledge/drafts/E601-draft-E420.kv/.md（.dist-info PEP-427 归一化 / vendored 测试资产写只读 /tmp）"
+  - "knowledge/drafts/E610-draft-A14E.kv/.md（设备原生 ≠ CI 沙箱：运行时能力探针 + 只锁安全属性 + 按实测 errno skip）"
+
+tests:
+  upstream_test_count: 0
+  adapted_test_count: 63
+  assertion_count: 114
+  suites:
+    - "test_package/test_synadm.py (42 用例 / 67 断言, 通用消费者视角)"
+    - "test_package/test_synadm_ohos.py (21 用例 / 47 断言, 鸿蒙特有)"
+  result: "设备原生 conan create rc=0：Ran 42 tests ... OK / Ran 21 tests ... OK（63/63）"
+  result_ci_worker: "CI worker 沙箱 rc=0：套件 A 42/42；套件 B 16 PASS + 5 SKIP（禁 bind AF_UNIX，理由为实测 EPERM）；修复后远端 CI build #93306 (SHA 0f23b320) 校验通过（conan test_package ✅ / L0 ✅ / L1 ✅）"
