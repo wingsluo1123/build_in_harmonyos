@@ -1,0 +1,53 @@
+# test_package/MANIFEST.yml -- libuv 1.53.0
+package: libuv/1.53.0
+homepage: "https://libuv.org/"
+
+# 上游测试命令
+upstream_check_command: "ctest --output-on-failure (uv_run_tests_a TAP)"
+upstream_test_in_build: true
+upstream_test_command: "uv_run_tests_a (cwd=source, TAP: 1..N/ok/not ok/# SKIP; bulk crash falls back to per-test isolation `uv_run_tests_a <name>` with one TAP verdict each)"
+
+# 上游存在测试；总数以真机 TAP 头 1..527 为准（2026-10-16 预检，discovered=527）
+upstream_tests_exist: true
+upstream_test_total: 527
+# 单一 TAP runner，可解析，故用 auto；ctest -N 仅 2 条目（uv_test/uv_test_a），非单元口径
+upstream_test_count_method: auto
+upstream_test_audit:
+  - path: "test/test-list.h (libuv-v1.53.0.tar.gz, sha256 cb0d6dd2...c53e64)"
+    finding: "463 处 TEST_DECLARE + 72 处 TEST_FS_DECLARE（Linux/OHOS 下 FS 翻倍为 144，见 runner.h TEST_FS_DECLARE/TEST_FS_ENTRY）；真机 TAP 头 1..527 与 --list 枚举一致，为 OHOS/Linux 下 TASK_LIST 实际条目数；ctest -N 仅 2 条目为套件入口，非单元口径"
+  - path: "CMakeLists.txt (LIBUV_BUILD_TESTS)"
+    finding: "add_test(NAME uv_test ...) + add_test(NAME uv_test_a ...) 共 2 个 ctest 条目，分别执行 uv_run_tests / uv_run_tests_a，每个条目跑完全部 TASK_LIST（TAP 输出 1..N/ok/not ok/# SKIP）"
+  - path: "test/runner.c (run_tests/log_tap_result) + test/run-tests.c (main --list)"
+    finding: "TAP 口径确定：ok N - name 为通过，ok N - name # SKIP 为跳过，not ok N - name 为失败；build() 逐行解析 verdict 行计数，恒等式 passed+failed==executed、executed+skipped<=discovered；--list 每行一个测试名，用于 discovered 交叉核对"
+  - path: "test/fixtures/ (empty_file/lorem_ipsum.txt 等)"
+    finding: "非空带参文件；执行前查非空，必要时桩验证 harness 能抓失败；通过与静默跳过区分（# SKIP 计跳过不计通过）"
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: test/runner.c
+    source: libuv-1.53.0/test/runner.c
+    description: "libuv test runner (upstream, TAP)"
+    command: "./uv_run_tests_a"
+
+# test_package 新增测试
+test_package_tests:
+  - file: test.c
+    description: "新增冒烟测试，覆盖 uv_version_string/uv_default_loop/uv_timer_init/uv_os_get_passwd/uv_loop_close 验证 API 调用，5 条 PASS 行"
+    command: "./test_libuv"
+
+# 断言总数（5 条 PASS 行）
+assertion_count: 5
+
+# 测试结果说明（HMBS 硬证据）：
+# - build() 以 LIBUV_BUILD_TESTS=ON 构建后执行 uv_run_tests_a（cwd=source，
+#   保证 fixtures 可用），逐行解析 TAP 的 ok/not ok/# SKIP 得到实际计数，
+#   持久化为 build_folder/upstream_test_result.json，失败不抛异常只记 status，
+#   由 HMBS 判定 gaps；缺二进制或缺 TAP 头则抛异常。
+# - package() 把 upstream_test_result.json 复制进包内 res/
+# - test_package test() 先跑 ./test_libuv 按 `PASS: <name>` 确认冒烟结果
+#   （确定性计数，discovered=5），再输出 HMBS_TEST_PACKAGE_RESULT，并重读
+#   <package>/res/upstream_test_result.json 输出 HMBS_UPSTREAM_TEST_RESULT
+#   （包缓存命中时 build() 不重跑，但 test 必跑，保证每轮证据出现）。
+# - 不足 100% 时标记带 gaps 数组逐项解释；冒烟失败或 JSON 缺失则
+#   ConanException 显式失败，不默认通过；仅 status 为 passed 时不带 gaps，
+#   以预检日志里的 gaps 为最终结论。
