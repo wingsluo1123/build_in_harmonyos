@@ -1,0 +1,82 @@
+# 版本级 manifest
+# 文件位置: archives/s/spdk/25.05/manifest.yaml
+
+version: "25.05"
+software: "spdk"
+status: built
+build_date: "2026-10-18"
+build_system: "custom (./configure + make)"
+
+source:
+  url: "https://github.com/spdk/spdk/archive/refs/tags/v25.05.tar.gz"
+  sha256: "57639f69494bb2141fc4e5c810c655aeaf705724f021c6a4bc2ff82381b8de2b"
+  tar_format: tar.gz
+  submodule_dpdk:
+    url: "https://github.com/spdk/dpdk/archive/cf36799c473a686fa14fde9af97f917a2125d3d5.tar.gz"
+    codeload: "https://codeload.github.com/spdk/dpdk/tar.gz/cf36799c473a686fa14fde9af97f917a2125d3d5"
+    sha256: "33329a9ccf3e34f61467c50f8c54c2677de2ef5e41b802a7dcc9944c61c9bab5"
+    version: "25.03.0"
+    note: >-
+      上游 tarball 不含 dpdk 子模块；source() 单独下载该 pinned commit。
+      sources.url 保持单值 GitHub 形态（供 CI 镜像注入），codeload 作为真机可达的
+      字节一致回退端点。
+
+build:
+  system: custom
+  dpdk_build:
+    tool: "meson + ninja"
+    cross_file:
+      host_machine: "system=linux cpu_family=aarch64 cpu=armv8-a endian=little"
+      properties: "platform=generic numa=false"
+    options:
+      - "default_library=static"
+      - "c_args/cpp_args=-fno-emulated-tls"
+      - "disable_drivers=*/*,*/*/*（保留 bus/pci、bus/vdev、mempool/ring）"
+      - "disable_apps=* / enable_docs=false / tests=false / enable_kmods=false"
+  spdk_configure_options:
+    - "--with-dpdk=<bundled dpdk prefix>"
+    - "--disable-tests --enable-unit-tests --disable-examples --disable-apps"
+    - "--without-vhost --without-virtio（仅 Linux 支持）"
+    - "--without-uring --without-rbd --without-daos --without-fc --without-idxd"
+    - "--without-crypto --without-vbdev-compress --without-dpdk-compressdev"
+    - "--without-vfio-user --without-xnvme --without-ocf --without-fuse"
+    - "--without-nvme-cuse --without-avahi --without-golang --without-usdt"
+    - "--without-vtune --without-rdma --without-ublk --without-aio-fsdev"
+  env:
+    - "CFLAGS/CXXFLAGS=-fno-emulated-tls -I<libuuid> -I<openssl> -I<libaio>"
+    - "LDFLAGS=-L<libuuid> -L<openssl> -L<libaio>"
+    - "make --jobserver-style=pipe（HMDFS 不支持 jobserver FIFO）"
+  dependencies:
+    - libuuid/2.42.2
+    - openssl/3.5.6.1
+    - libaio/0.3.112.1
+  build_tool_requires:
+    - pyelftools/0.33
+  test_requires:
+    - cunit/2.1-3
+  cc: clang
+
+patches_applied:
+  - "0001-dpdk-ohos-portability.patch（DPDK：emutls 无关的 TLS/affinity/cancel/sockaddr/argv 适配）"
+  - "0002-spdk-ohos-portability.patch（SPDK：ISA-L 非 Linux 关闭 / pci_event sockaddr / bdev_aio falloc）"
+  - "0003-pmd-use-configured-archiver.patch（PMD生成器使用交叉文件中的绝对archiver路径）"
+  - "0004-unit-test-fixtures.patch（仅单测环境的 robust mutex 调用模拟；不链接到安装库）"
+  - "0005-unit-writable-fixtures.patch（私有可写目录中的临时文件）"
+  - "0006-unit-dix-requires-crypto.patch（DIX 加密序列依赖已有 crypto 功能条件）"
+  - "0007-hkdf-explicit-empty-salt.patch（OpenSSL 空盐参数兼容，生产代码）"
+  - "0008-unit-auth-drive-delayed-poller.patch（推进测试时钟并执行延迟断连 poller）"
+
+knowledge_gained:
+  - "OHOS clang 默认 -femulated-tls；DPDK 每核变量经 version script 导出但不含 __emutls_v.* 控制符号 → 共享库链接 undefined；统一 -fno-emulated-tls 改用原生 TLS（OHOS 运行时支持，实测通过）"
+  - "OHOS <linux/socket.h> 与 <sys/socket.h> 重复定义 struct sockaddr_storage（E091/E119）：在 netlink.h/if.h 包含处局部重命名 UAPI 类型（#define sockaddr_storage __linux_sockaddr_storage ... #undef）"
+  - "bionic 无 pthread_cancel：DPDK 的 mp/eventdev 线程使用有限等待与协作停止，并 join 后释放资源；pthread affinity 通过 Meson 特性探测选择原调用或 sched_*affinity + pthread_gettid_np；无 glibc program_invocation_short_name：用 argv[0] basename"
+
+test_results:
+  consumer: "6/6（test_package：CRC-32C/CRC-32 已知结果向量、两项增量一致性、Base64 编解码往返）"
+  upstream: "103 程序，1635/1635 配置内用例通过；基线 1635/1636（99.94%），1 项 ISA-L crypto 用例条件排除，19 个可选模块程序未构建"
+  source_registration_sites: 1384
+  baseline_registered_cases: 1636
+  configured_cases: 1635
+  conditional_exclusions: 1
+  unbuilt_optional_programs: 19
+  conan_create_rc: 0

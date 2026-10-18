@@ -1,0 +1,35 @@
+software: spdk
+display: "SPDK (Storage Performance Development Kit)"
+description: >-
+  SPDK 是一套用 C 编写的高性能存储用户态框架：以轮询（polled-mode）、异步、
+  无锁方式驱动 NVMe、virtio、AIO 等块设备，并在此之上提供 bdev、blob、
+  blobfs、lvol、iSCSI target、NVMe-oF（nvmf）target、vhost 等服务与库，外加
+  RPC/JSON-RPC 配置接口。全部库都建立在 DPDK 的 EAL 环境抽象之上。
+category: storage
+homepage: "https://github.com/spdk/spdk"
+license: BSD-3-Clause
+build_system: custom
+
+ohos_adaptation:
+  key_points:
+    - "上游 tarball 不含 git 子模块；source() 下载 v25.05 tag 锁定的 DPDK fork（spdk/dpdk@cf36799，版本 25.03.0）并在配方内先用 meson 构建，再以 --with-dpdk= 交给 SPDK configure"
+    - "DPDK 以交叉构建方式编译：cross file system='linux'、cpu='armv8-a'、properties platform='generic'、numa=false；主机三元组为 aarch64-unknown-linux-ohos"
+    - "OHOS clang 默认启用 emulated TLS（__emutls_v.*）；DPDK 每核变量经 version script 导出但不含 emutls 控制符号，导致共享库链接 undefined；DPDK 与 SPDK 统一改用原生 TLS（-fno-emulated-tls），与上游 Linux 布局一致"
+    - "sockaddr_storage 重定义（E091/E119）：在 UAPI netlink/if.h 包含处局部重命名类型，包含后立即 undef"
+    - "bionic libc 扩展差异：DPDK 使用有限等待和协作退出、join 后释放资源；affinity 通过 Meson 能力探测选择 pthread 或 sched_*affinity+pthread_gettid_np；进程名取 argv[0] basename"
+    - "ISA-L 依赖 GNU as ≥ 2.24，OHOS 无此汇编器：补丁令 configure 仅在 sys_name==Linux 时启用 ISA-L（非 Linux 直接关闭）"
+    - "SPDK bdev_aio 用到 FALLOC_FL_* fallocate 模式，OHOS <fcntl.h> 未导出：include <linux/falloc.h>"
+    - "DPDK pmdinfogen 需要一个 PATH 上的 ar：构建时提供 ar→llvm-ar 的 shim"
+    - "OHOS/HMDFS 不支持 make jobserver 的 FIFO：make 用 --jobserver-style=pipe"
+    - "运行面：DPDK EAL 需要 hugepage/vfio/uio 等 OHOS 不提供的私有内核接口，故默认只对外暴露不依赖 EAL 运行时的 CPU-only 库（util/log/json），其余库照常编译打包（如实申报）"
+  common_dependencies:
+    - openssl
+    - libuuid
+    - libaio
+    - pyelftools
+    - cunit
+
+versions:
+  "25.05":
+    status: built
+    build_date: "2026-10-18"

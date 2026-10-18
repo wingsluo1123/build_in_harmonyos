@@ -1,0 +1,36 @@
+--- a/configure
++++ b/configure
+@@ -1239,7 +1239,7 @@
+ 	exit 1
+ fi
+ 
+-if [[ $arch == x86_64* ]] || [[ $arch == aarch64* ]]; then
++if [[ $sys_name == "Linux" ]] && { [[ $arch == x86_64* ]] || [[ $arch == aarch64* ]]; }; then
+ 	CONFIG[ISAL]=y
+ 	# make sure the submodule is initialized
+ 	if [ ! -f "$rootdir"/isa-l/autogen.sh ]; then
+--- a/lib/env_dpdk/pci_event.c
++++ b/lib/env_dpdk/pci_event.c
+@@ -12,7 +12,10 @@
+ 
+ #ifdef __linux__
+ 
++/* Keep the UAPI sockaddr_storage separate from the libc definition. */
++#define sockaddr_storage __linux_sockaddr_storage
+ #include <linux/netlink.h>
++#undef sockaddr_storage
+ 
+ #define SPDK_UEVENT_MSG_LEN 4096
+ #define SPDK_UEVENT_RECVBUF_SIZE 1024 * 1024
+--- a/module/bdev/aio/bdev_aio.c
++++ b/module/bdev/aio/bdev_aio.c
+@@ -5,6 +5,9 @@
+  */
+ 
+ #include "bdev_aio.h"
++
++/* FALLOC_FL_* are not exposed by every libc fcntl.h. */
++#include <linux/falloc.h>
+ 
+ #include "spdk/stdinc.h"
+ 

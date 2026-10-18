@@ -1,0 +1,268 @@
+--- a/dpdk/config/meson.build
++++ b/dpdk/config/meson.build
+@@ -243,6 +243,12 @@
+     endif
+ endif
+ 
++foreach func : ['pthread_setaffinity_np', 'pthread_getaffinity_np', 'pthread_gettid_np']
++    if cc.has_function(func, args: '-D_GNU_SOURCE', prefix: '#include <pthread.h>')
++        dpdk_conf.set('RTE_HAS_' + func.to_upper(), 1)
++    endif
++endforeach
++
+ has_libfdt = false
+ fdt_dep = cc.find_library('fdt', required: false)
+ if fdt_dep.found() and cc.has_header('fdt.h')
+--- a/dpdk/lib/eal/common/eal_common_proc.c
++++ b/dpdk/lib/eal/common/eal_common_proc.c
+@@ -10,6 +10,7 @@
+ #include <libgen.h>
+ #include <limits.h>
+ #include <pthread.h>
++#include <poll.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+@@ -281,7 +282,7 @@
+ 	msgh.msg_controllen = sizeof(control);
+ 
+ retry:
+-	msglen = recvmsg(fd, &msgh, 0);
++	msglen = recvmsg(fd, &msgh, MSG_DONTWAIT);
+ 
+ 	/* zero length message means socket was closed */
+ 	if (msglen == 0)
+@@ -290,6 +291,8 @@
+ 	if (msglen < 0) {
+ 		if (errno == EINTR)
+ 			goto retry;
++		if (errno == EAGAIN || errno == EWOULDBLOCK)
++			return -EAGAIN;
+ 
+ 		EAL_LOG(ERR, "recvmsg failed, %s", strerror(errno));
+ 		return -1;
+@@ -405,9 +408,18 @@
+ 	int fd;
+ 
+ 	while ((fd = rte_atomic_load_explicit(&mp_fd, rte_memory_order_relaxed)) >= 0) {
++		struct pollfd pfd = { .fd = fd, .events = POLLIN };
+ 		int ret;
+ 
++		/* Bound the wait so cleanup can stop and join an idle handler. */
++		ret = poll(&pfd, 1, 100);
++		if (ret == 0 || (ret < 0 && errno == EINTR))
++			continue;
++		if (ret < 0 || (pfd.revents & POLLIN) == 0)
++			break;
+ 		ret = read_msg(fd, &msg, &sa);
++		if (ret == -EAGAIN)
++			continue;
+ 		if (ret <= 0)
+ 			break;
+ 
+@@ -672,8 +684,11 @@
+ 	if (fd < 0)
+ 		return;
+ 
+-	pthread_cancel((pthread_t)mp_handle_tid.opaque_id);
+-	rte_thread_join(mp_handle_tid, NULL);
++	/* mp_fd == -1 stops the handler after at most one poll interval. */
++	if (rte_thread_join(mp_handle_tid, NULL) != 0) {
++		EAL_LOG(ERR, "Failed to join mp thread; keeping its socket open");
++		return;
++	}
+ 	close_socket_fd(fd);
+ }
+ 
+--- a/dpdk/lib/eal/linux/eal.c
++++ b/dpdk/lib/eal/linux/eal.c
+@@ -934,7 +934,11 @@
+ 		return -1;
+ 	}
+ 
+-	eal_log_init(program_invocation_short_name);
++	{
++		const char *prog = argv[0] ? argv[0] : "dpdk";
++		const char *slash = strrchr(prog, '/');
++		eal_log_init(slash ? slash + 1 : prog);
++	}
+ 
+ 	/* checks if the machine is adequate */
+ 	if (!rte_cpu_is_supported()) {
+--- a/dpdk/lib/eal/linux/eal_dev.c
++++ b/dpdk/lib/eal/linux/eal_dev.c
+@@ -7,7 +7,10 @@
+ #include <unistd.h>
+ #include <signal.h>
+ #include <sys/socket.h>
++/* Keep the UAPI sockaddr_storage separate from the libc definition. */
++#define sockaddr_storage __linux_sockaddr_storage
+ #include <linux/netlink.h>
++#undef sockaddr_storage
+ 
+ #include <rte_string_fns.h>
+ #include <rte_log.h>
+--- a/dpdk/lib/eal/unix/rte_thread.c
++++ b/dpdk/lib/eal/unix/rte_thread.c
+@@ -5,6 +5,7 @@
+ 
+ #include <errno.h>
+ #include <pthread.h>
++#include <sched.h>
+ #include <stdbool.h>
+ #include <stdlib.h>
+ #include <string.h>
+@@ -394,14 +395,42 @@
+ rte_thread_set_affinity_by_id(rte_thread_t thread_id,
+ 		const rte_cpuset_t *cpuset)
+ {
++#ifdef RTE_HAS_PTHREAD_SETAFFINITY_NP
+ 	return pthread_setaffinity_np((pthread_t)thread_id.opaque_id,
+ 		sizeof(*cpuset), cpuset);
++#elif defined(RTE_HAS_PTHREAD_GETTID_NP)
++	pid_t tid = pthread_gettid_np((pthread_t)thread_id.opaque_id);
++	int rc;
++
++	if (tid <= 0)
++		return ESRCH;
++	rc = sched_setaffinity(tid, sizeof(*cpuset), cpuset);
++	return rc == 0 ? 0 : errno;
++#else
++	(void)thread_id;
++	(void)cpuset;
++	return ENOTSUP;
++#endif
+ }
+ 
+ int
+ rte_thread_get_affinity_by_id(rte_thread_t thread_id,
+ 		rte_cpuset_t *cpuset)
+ {
++#ifdef RTE_HAS_PTHREAD_GETAFFINITY_NP
+ 	return pthread_getaffinity_np((pthread_t)thread_id.opaque_id,
+ 		sizeof(*cpuset), cpuset);
+-}
++#elif defined(RTE_HAS_PTHREAD_GETTID_NP)
++	pid_t tid = pthread_gettid_np((pthread_t)thread_id.opaque_id);
++	int rc;
++
++	if (tid <= 0)
++		return ESRCH;
++	rc = sched_getaffinity(tid, sizeof(*cpuset), cpuset);
++	return rc == 0 ? 0 : errno;
++#else
++	(void)thread_id;
++	(void)cpuset;
++	return ENOTSUP;
++#endif
++}
+--- a/dpdk/lib/eventdev/rte_event_eth_rx_adapter.c
++++ b/dpdk/lib/eventdev/rte_event_eth_rx_adapter.c
+@@ -13,6 +13,7 @@
+ #include <rte_cycles.h>
+ #include <rte_thread.h>
+ #include <rte_common.h>
++#include <rte_stdatomic.h>
+ #include <dev_driver.h>
+ #include <rte_errno.h>
+ #include <ethdev_driver.h>
+@@ -168,6 +169,8 @@
+ 	uint32_t num_intr_vec;
+ 	/* Thread blocked on Rx interrupts */
+ 	rte_thread_t rx_intr_thread;
++	/* Stop is observed between bounded interrupt waits. */
++	RTE_ATOMIC(bool) intr_thread_stop;
+ 	/* Configuration callback for rte_service configuration */
+ 	rte_event_eth_rx_adapter_conf_cb conf_cb;
+ 	/* Configuration callback argument */
+@@ -1169,9 +1172,10 @@
+ 	struct rte_epoll_event *epoll_events = rx_adapter->epoll_events;
+ 	int n, i;
+ 
+-	while (1) {
++	while (!rte_atomic_load_explicit(&rx_adapter->intr_thread_stop,
++			rte_memory_order_relaxed)) {
+ 		n = rte_epoll_wait(rx_adapter->epd, epoll_events,
+-				RTE_EVENT_ETH_INTR_RING_SIZE, -1);
++				RTE_EVENT_ETH_INTR_RING_SIZE, 100);
+ 		if (unlikely(n < 0))
+ 			RTE_EDEV_LOG_ERR("rte_epoll_wait returned error %d",
+ 					n);
+@@ -1623,6 +1627,8 @@
+ 	snprintf(thread_name, sizeof(thread_name),
+ 			"evt-rx%d", rx_adapter->id);
+ 
++	rte_atomic_store_explicit(&rx_adapter->intr_thread_stop, false,
++			rte_memory_order_relaxed);
+ 	err = rte_thread_create_internal_control(&rx_adapter->rx_intr_thread,
+ 			thread_name, rxa_intr_thread, rx_adapter);
+ 	if (!err)
+@@ -1642,14 +1648,13 @@
+ {
+ 	int err;
+ 
+-	err = pthread_cancel((pthread_t)rx_adapter->rx_intr_thread.opaque_id);
+-	if (err)
+-		RTE_EDEV_LOG_ERR("Can't cancel interrupt thread err = %d",
+-				err);
+-
++	rte_atomic_store_explicit(&rx_adapter->intr_thread_stop, true,
++			rte_memory_order_relaxed);
+ 	err = rte_thread_join(rx_adapter->rx_intr_thread, NULL);
+-	if (err)
++	if (err) {
+ 		RTE_EDEV_LOG_ERR("Can't join interrupt thread err = %d", err);
++		return -err;
++	}
+ 
+ 	rte_free(rx_adapter->epoll_events);
+ 	rte_ring_free(rx_adapter->intr_ring);
+--- a/dpdk/lib/telemetry/telemetry.c
++++ b/dpdk/lib/telemetry/telemetry.c
+@@ -8,6 +8,7 @@
+ #ifndef RTE_EXEC_ENV_WINDOWS
+ #include <unistd.h>
+ #include <pthread.h>
++#include <sched.h>
+ #include <sys/socket.h>
+ #include <sys/un.h>
+ #include <sys/stat.h>
+@@ -588,7 +589,12 @@
+ 		v1_socket.path[0] = '\0';
+ 		return -1;
+ 	}
++#ifdef RTE_HAS_PTHREAD_SETAFFINITY_NP
+ 	pthread_setaffinity_np(t_old, sizeof(*thread_cpuset), thread_cpuset);
++#elif defined(RTE_HAS_PTHREAD_GETTID_NP)
++	if (pthread_gettid_np(t_old) > 0)
++		sched_setaffinity(pthread_gettid_np(t_old), sizeof(*thread_cpuset), thread_cpuset);
++#endif
+ 	set_thread_name(t_old, "dpdk-telemet-v1");
+ 	TMTY_LOG_LINE(DEBUG, "Legacy telemetry socket initialized ok");
+ 	pthread_detach(t_old);
+@@ -642,7 +648,12 @@
+ 		v2_socket.path[0] = '\0';
+ 		return -1;
+ 	}
++#ifdef RTE_HAS_PTHREAD_SETAFFINITY_NP
+ 	pthread_setaffinity_np(t_new, sizeof(*thread_cpuset), thread_cpuset);
++#elif defined(RTE_HAS_PTHREAD_GETTID_NP)
++	if (pthread_gettid_np(t_new) > 0)
++		sched_setaffinity(pthread_gettid_np(t_new), sizeof(*thread_cpuset), thread_cpuset);
++#endif
+ 	set_thread_name(t_new, "dpdk-telemet-v2");
+ 	pthread_detach(t_new);
+ 	atexit(unlink_sockets);
+--- a/dpdk/lib/vhost/vhost.h
++++ b/dpdk/lib/vhost/vhost.h
+@@ -12,7 +12,10 @@
+ #include <unistd.h>
+ #include <linux/virtio_net.h>
+ #include <sys/socket.h>
++/* Keep the UAPI sockaddr_storage separate from the libc definition. */
++#define sockaddr_storage __linux_sockaddr_storage
+ #include <linux/if.h>
++#undef sockaddr_storage
+ #include <sys/mman.h>
+ 
+ #include <rte_log.h>

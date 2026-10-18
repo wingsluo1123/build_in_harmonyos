@@ -1,0 +1,102 @@
+#====================================================================
+# DRAFT-ohos-default-emulated-tls-breaks-version-script-exports
+# OHOS clang 默认启用 emulated TLS（-femulated-tls）：__thread 变量编译成
+# __emutls_v.<name>，而 ELF version script 只列真实符号名、不含 emutls 控制
+# 符号 → 定义了该 __thread 变量的 .so 不导出 __emutls_v.*，其它 .so 链接时
+# 报 undefined symbol: __emutls_v.<name>。
+# 来源: spdk 25.05（含捆绑 spdk/dpdk@cf36799 = DPDK 25.03.0）适配 (2026-10-15)
+#====================================================================
+
+id:                     DRAFT-SPDK2505-EMUTLS
+trigger_tool:           clang|ld.lld|meson|ninja|make|conan create
+phase:                  linking
+error_signature:        undefined symbol: __emutls_v\.|undefined symbol: __emutls_get_address|cannot find __emutls_v|__emutls_v\.[A-Za-z_]
+match_keywords:         emutls, emulated TLS, __emutls_v, __emutls_get_address, -femulated-tls, -fno-emulated-tls, TLS, thread-local, __thread, version script, version.map, --version-script, shared library, undefined symbol, OHOS, bionic, clang, DPDK, SPDK, per_lcore, per-lcore
+category:               libc, portability, linking, build-system
+severity:               3
+status:                 draft
+forbid_1_pattern:       -Wl,--undefined(-|-)version
+forbid_1_reason:        用 --undefined 强行保留 __emutls_v.* 只是绕开导出问题，仍未统一 TLS 模型；跨 .so 仍会出现控制块不一致。
+forbid_2_pattern:       objcopy.*__emutls_v
+forbid_2_reason:        后处理符号覆盖面太窄（变量可能很多）且非通用，换个库即失效。
+
+root_cause: >
+  OHOS 的 clang（harmonybrew clang 23.1.1，target aarch64-unknown-linux-ohos）
+  默认采用 **emulated TLS**（等价 -femulated-tls）。此时
+      __thread int x;
+  不再生成原生 TLS 符号 `x`，而是生成一个 32 字节控制块
+      __emutls_v.x            （GLOBAL OBJECT，定义在声明该变量的 TU 内）
+  + 对运行时函数 __emutls_get_address 的引用：
+      $ llvm-readelf -s tls.o | grep -E 'x$|emutls'
+      6: ... OBJECT GLOBAL DEFAULT 4 __emutls_v.x
+      7: ... NOTYPE GLOBAL UND    __emutls_get_address
+  加 -fno-emulated-tls 后才回到原生 TLS：
+      6: ... TLS    GLOBAL DEFAULT 4 x
+  单可执行文件场景没问题（控制块与 __emutls_get_address 同链接）。问题出在
+  **共享库 + ELF version script**：
+    * DPDK 每个库都有 version.map，由 --version-script 控制导出符号；
+      脚本里写的是业务符号（rte_* / per_lcore__* 等），**不会**列出
+      __emutls_v.* 这类编译器内部符号；
+    * 于是定义 `RTE_DEFINE_PER_LCORE(int, _rte_errno)` 的 librte_eal.so 在
+      版本脚本过滤下**不导出** __emutls_v.per_lcore__rte_errno；
+    * 其它 .so（librte_ring/timer/dmadev/...）以 -Wl,--no-undefined 链接时，
+      引用该控制块 → 
+        ld.lld: error: undefined symbol: __emutls_v.per_lcore__rte_errno
+        >>> referenced by eal_common_errno.c
+  根因是编译器默认 TLS 模型与 ELF 符号版本脚本假设的“TLS 就是符号本身”不一致，
+  不是缺库。glibc/gcc 平台默认原生 TLS，故上游从未暴露此问题。
+
+affected_scope: >
+  * 任何用 __thread/_Thread_local/RTE_DEFINE_PER_LCORE 并**通过 version script
+    （--version-script / version.map / -fvisibility）限定导出**、且被其它
+    共享库引用的 C/C++ 项目；在 OHOS clang 上按默认 TLS 模型链接共享库即触发。
+  * 本次实测：DPDK 25.03.0 的底层库、以及其上层 SPDK 25.05。判定依据是
+    `ld.lld: undefined symbol: __emutls_v.*`（含 __emutls_v.per_lcore_*、
+    __emutls_v.per_lcore__rte_errno、__emutls_v.per_lcore_trace_mem 等）。
+  * 与 E026（TLS/thread-local storage 支持、tls_model 扩展、musl 不支持
+    __attribute__((tls_model))）**不是同一子族**：E026 是“编译期不支持 TLS/扩展”，
+    本坑是“OHOS 默认选了 emulated TLS，运行期支持原生 TLS，只是导出模型冲突”。
+
+verification_cmd: >
+  printf '__thread int x;\nint getx(void){return x;}\n' > t.c
+  # 默认（emulated TLS）
+  $SDK/bin/clang -c -fPIC t.c -o t.o
+  $SDK/bin/llvm-readelf -s t.o | grep -E 'x$|emutls'
+  # 期望看到 __emutls_v.x（OBJECT）与 __emutls_get_address（UND）
+  # 对照
+  $SDK/bin/clang -c -fPIC -fno-emulated-tls t.c -o t2.o
+  $SDK/bin/llvm-readelf -s t2.o | grep -E 'x$|emutls'
+  # 期望看到原生 TLS：`x`（TLS OBJECT），无 emutls 符号
+
+rec_priority:           1
+rec_approach:           disable-emulated-tls
+rec_description: >
+  对 OHOS 目标统一加 -fno-emulated-tls（CFLAGS/CXXFLAGS，以及 meson 的
+  c_args/cpp_args），改用原生 TLS，与上游 Linux 布局一致；OHOS 运行时（bionic/
+  musl 系）支持原生 TLS，跨 .so 的线程局部变量读写实测正常。
+  同时把它随包传播给消费者：Conan 配方 package_info() 里
+  cpp_info.cflags = ['-fno-emulated-tls']，避免“库用原生 TLS、消费者用 emutls”
+  的混合模型（会再次产生 __emutls_v.* 未定义 / 控制块不一致）。
+rec_command: >
+  # SPDK/DPDK: configure CFLAGS/CXXFLAGS=-fno-emulated-tls
+  # DPDK meson: meson setup build --cross-file cross.txt \
+  #   -Dc_args=-fno-emulated-tls -Dcpp_args=-fno-emulated-tls ...
+  # Conan: self.cpp_info.cflags = ['-fno-emulated-tls']
+rec_auto_fix:           false
+rec_impl:               source-patch
+
+fallback_priority:      2
+fallback_approach:      whitelist-emutls-symbols
+fallback_description: >
+  若因某些原因必须保留 emulated TLS，可把编译器内部符号加入导出白名单：
+  version script 里加 `global: __emutls_v.*; __emutls_get_address;`，或在链接
+  时用 -Wl,--dynamic-list 暴露它们。缺点：符号名随变量增多而膨胀、可读性差，
+  且仍要保证 __emutls_get_address 在运行时可解析（bionic 提供）。
+fallback_command: >
+  # version.map 追加：
+  # { global: rte_*; __emutls_v.*; __emutls_get_address; local: *; };
+fallback_auto_fix:      false
+fallback_impl:          source-patch
+
+principles:              P005, P014
+caused_by:
