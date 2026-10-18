@@ -1,0 +1,26 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for kconfig/6.28.0.
+
+package: kconfig/6.28.0
+homepage: https://invent.kde.org/frameworks/kconfig
+
+upstream_check_command: "ctest --output-on-failure"
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error -E \"^(kconfigcore-kconfigtest|kconfigcore-kdesktopfiletest|kconfigcore-test_kconf_update|kconfiggui-kstandardshortcutwatchertest|kconfigcompiler-basic-test)$\""
+
+upstream_tests:
+  - file: autotests/
+    source: kconfig-6.28.0/autotests/
+    description: "KConfig upstream CTest/autotests suite with the org.kde.config QML module built (KCONFIG_USE_QML=ON) and the kconfig_compiler QML test set (Test14-Test19, test14qml-test17qml) enabled"
+    command: "ctest --output-on-failure"
+    condition: "run in the Conan build with BUILD_TESTING=ON; excludes five OHOS-incompatible tests"
+
+test_package_tests:
+  - file: test_package/test.cpp
+    description: "Consumer cases over KF6::ConfigCore/KF6::ConfigGui, the kwriteconfig6/kreadconfig6 tools, KWindowConfig on a QWindow and the org.kde.config QML module (KAuthorized singleton inside a QQmlEngine, cross-checked against the C++ API)."
+    command: "conan create (test_package builds and runs test_kconfig)"
+  - file: test_package/xt_main.cpp
+    description: "KConfig XT consumer case: kconfig_add_kcfg_files drives the packaged kconfig_compiler through the installed CMake package; the generated skeleton defaults, save and reload are verified."
+    command: "conan create (test_package builds and runs test_kconfig_xt)"
+
+assertion_count: 9
