@@ -1,0 +1,61 @@
+software: libkdegames
+version: "24.12.3"
+status: built
+build_system: cmake
+created_at: 2026-10-17
+dependencies:
+  required:
+    - qtbase/6.11.1
+    - qtdeclarative/6.11.1
+    - qtsvg/6.11.1
+    - karchive/6.18.0
+    - kcolorscheme/6.18.0
+    - kcompletion/6.18.0
+    - kconfig/6.18.0
+    - kconfigwidgets/6.18.0
+    - kcoreaddons/6.18.0
+    - kdnssd/6.29.0
+    - kguiaddons/6.18.0
+    - ki18n/6.18.0
+    - kiconthemes/6.18.0
+    - knewstuff/6.18.0
+    - kxmlgui/6.18.0
+    - openal-soft/1.25.2
+    - libsndfile/1.2.2
+  build:
+    - ecm/6.26.0
+  optional:
+    - svgcleaner
+    - 7Zip
+patches_applied: []
+test_results:
+  type: passed
+  upstream: >-
+    passed: 2/2 registered upstream CTest tests executed and green
+    (libkdegamesprivate-kgamesvgdocumenttest 113 assertions,
+    libkdegamesprivate-kgamepropertytest 11 assertions). Upstream tests/
+    holds a third target, kgamepopupitemtest, which is a manual GUI demo:
+    0 QCOMPARE/QVERIFY assertions, main() enters app.exec() and upstream's
+    ecm_mark_as_test() is a no-op when BUILD_TESTING=ON, so it is built but
+    never registered as a ctest entry. Running it headless (offscreen and
+    minimal QPA, software Quick backend) hangs at window show because no
+    display server exists on this builder; that is reported as-is rather
+    than claimed as passing.
+  test_package: >-
+    passed: 1/1 OHOS-side consumer test (test_package/test.cpp) compile/
+    link/runtime. Covers KGameClock (timeString/setTime seconds + HH:MM:SS
+    roundtrip, pause/resume), KGameTheme (identifier/name/license/author
+    roundtrips, rejects nonexistent desktop file) and KGamePopupItem
+    (hide-on-click, messageTimeout, messageOpacity and sharpness accessor
+    roundtrips, brush/text-colour styling, InstantHide/AnimatedHide).
+    Output: "PASS: KGameClock/KGameTheme/KGamePopupItem API OK".
+  full_reference: "libkdegames/24.12.3#7731c2437858b5c2e9f088cac42f5d15:53177846b8b3702149a9a58a031101b0207dd639#0aa6b5678cd82f469ddf4a697effa3da"
+source_url: https://invent.kde.org/games/libkdegames/-/archive/v24.12.3/libkdegames-v24.12.3.tar.gz
+source_sha256: 5bd661dff44b331b36ac4394d1f1bf4175c5d1b04cad65ed0cd857ea902e50a9
+knowledge_gained:
+  - "libkdegames 24.12.3 builds against Qt6 >= 6.5.0 and KF6 >= 6.0.0 and installs libKDEGames6/libKDEGames6Private with CMake package name KDEGames6 and imported targets KDEGames6 / KDEGames6Private."
+  - "find_package(KF6 COMPONENTS ...) here needs Archive/ColorScheme/Completion/Config/ConfigWidgets/DNSSD/GuiAddons/IconThemes/I18n/NewStuff/XmlGui; the KF6 config files pull further requirements through find_dependency (KF6ConfigWidgets -> KF6WidgetsAddons, KF6NewStuffCore -> KF6Attica, KF6ConfigWidgets -> KF6ColorScheme), so the generated CMake prefix path must cover the whole dependency graph, not only the direct requires."
+  - "The newest kiconthemes/6.18.0 recipe revision requires karchive/6.19.0 which conflicts with knewstuff/6.18.0 (karchive/6.18.0); self.requires('karchive/6.18.0', override=True) pins a single karchive for the whole graph and must be repeated in test_package/conanfile.py or a standalone `conan test` graph cannot resolve."
+  - "A conan binary package whose folder holds only .so files and no conaninfo.txt/conanmanifest.txt is an interrupted extract, not a broken registry upload: the KF6 chain then fails with a cascading 'FindKF6 ... could not be found' message. Clear those recipes with `conan remove -c` and let create re-download before blaming the recipe."
+  - "Upstream tests/ (kgamepopupitemtest) is a manual GUI demo with no assertions and is never registered through ecm_mark_as_test when BUILD_TESTING=ON; only src/private/tests contributes ctest entries. Any 'test count' claim for this package must say 2, not 3."
+  - "KGamePopupItem::showMessage() starts a QVariantAnimation that needs a live scene view and event loop; a headless consumer test that calls it segfaults (exit 139). Keep the scene/addItem/accessor/forceHide surface in smoke tests and leave showMessage to an interactive run."
