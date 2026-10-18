@@ -1,0 +1,25 @@
+package: clutter/1.26.4.1
+homepage: "https://gitlab.gnome.org/GNOME/clutter"
+
+# clutter 上游测试清点（tests/ 逐目录）：conform 注册 83 用例
+# （actor 13 文件/classes 1/general 7/deprecated 5 类，tests/conform/
+# *.c 逐文件 CLUTTER_TEST_UNIT grep 实数）+ scripts UI 数据 15 +
+# interactive 53 + micro-bench 5 + performance 7 + accessibility
+# check_PROGRAMS 5（cally 示例程序，非注册用例）。
+# conform 83 例中纯 CPU 可运行 17 例（color 5/units 3/interval 3/
+# model 5/binding-pool 1——函数体零改动归档 upstream_unit/，附
+# scripts/ 两份 script 用例数据）；其余 66 例依赖 clutter_init 的
+# EGL 显示服务与 stage/GL 渲染路径——OHOS 无显示服务（/dev/dri
+# 不存在），系统级阻塞，如实记录省略（0 运行，非失败；cogl
+# 1.22.8 合入先例同款口径）。interactive/micro-bench/performance
+# 全部为 GL 交互/性能程序，同因省略。
+# 纯 CPU 子集 17/17 由 test_clutter.py 对安装包编译实跑通过。
+upstream_tests: 83
+upstream_test_command: "纯 CPU 子集 17/17 实跑通过（test_clutter.py 内编译运行：color 5/units 3/interval 3/model 5/binding-pool 1）；其余 66 例需 clutter_init 的 EGL 显示服务与 GL 渲染环境（OHOS 无显示服务）——如实记录未运行（0/66）"
+
+test_package_tests:
+  - file: test_clutter.py
+    description: "消费测试：libclutter-1.0.so 存在 + clutter.h 头文件存在 + 编译链接运行 consumer.c（纯 CPU API 冒烟：clutter_color/units/actor/interval/binding_pool）+ 上游纯 CPU 子集 5 文件 17 用例编译并逐文件实跑（PASS/FAIL 汇总）"
+    command: "python3 test_clutter.py <package_folder>"
+
+assertion_count: 23
