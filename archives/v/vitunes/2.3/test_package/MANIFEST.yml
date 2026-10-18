@@ -1,0 +1,34 @@
+# test_package/MANIFEST.yml — vitunes 2.3
+# 上游官方测试声明文件（CI 脚本 build_and_test.sh L0e 强制要求）
+
+package: vitunes/2.3
+homepage: "https://github.com/ryanflannery/vitunes"
+
+# 上游测试命令（上游为手写 Makefile 项目，无 configure/Makefile.am/CTest 测试注册）
+upstream_check_command: "make"   # 上游 Makefile 只有 vitunes/debug/clean/install/uninstall 目标，无 check/test 目标
+
+# conanfile.py build() 中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序：上游无任何测试用例
+# 清点证据（release tarball vitunes-2.3.tar.gz 共 46 个条目）：
+#   * 无 test/ tests/ 目录，无 *test* 文件（源码仅 18 个 .c/.h + players/ + compat/）
+#   * Makefile / Makefile.linux 无 check/test/tests 目标（仅 vitunes、debug、clean、install、uninstall、man-debug、publish-repos、cscope.out）
+#   * GitHub 仓库 ryanflannery/vitunes（tag 2.3 = commit 01d19ea6）无 CI 配置与测试文件
+upstream_tests: []
+
+# test_package 中自带的测试（消费者视角验证 CLI；L0c 测试源文件）
+test_package_tests:
+  - file: test_vitunes.py
+    description: >-
+      端到端驱动 vitunes CLI：1) -e help 列出 e-command；2) -e init 建库；
+      3) -e add 递归扫描含嵌套目录/带标签 FLAC/非音频文件/指回祖先的符号链接环的音乐树
+      （断言目录恰好访问 4 次=环被终止、新增 2 个文件、无错误行、汇总行计数正确）；
+      4) -e check -s 显示经本包 taglib C 绑定提取的元数据；
+      5) -e flush 导出数据库条目；6) -e update 复扫报 2 个未变更文件
+    command: "python3 test_vitunes.py <package_folder>/bin/vitunes"
+    executed_by: "test_package/conanfile.py test() 通过 self.run 执行（L0d）"
+
+# 测试断言总数（上游无断言；test_package 11 项断言，conan create 内实测 11/11 通过）
+assertion_count: 11
