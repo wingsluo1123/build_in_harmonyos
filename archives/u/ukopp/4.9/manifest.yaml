@@ -1,0 +1,77 @@
+software: ukopp
+# 版本级 manifest — 遵循 ARCHIVE-SPEC v3.0
+version: "4.9"
+
+# 编译状态: published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-16"
+
+conan_ref: ukopp/4.9
+
+# ============================================================
+# 源码信息
+# ============================================================
+source:
+  # Debian 官方打包归档（deb.debian.org pool 主站，上游 kornelix.com 分发的
+  # 同一 orig tarball；R39：官方分发渠道原始归档）
+  url: "https://deb.debian.org/debian/pool/main/u/ukopp/ukopp_4.9.orig.tar.gz"
+  sha256: "a9350506b7cb2c6c3c7ba59ae5f9e6a755a5ada0fc995585b404b7a4cf01c2a3"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+build:
+  # 构建系统类型: cmake | autotools | makefile | meson | custom
+  system: makefile
+
+  configure_options: []
+
+  dependencies:
+    - "glib/2.84.0.1"
+    - "gtk/3.24.43"
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+knowledge_gained:
+  - "上游为 2014 年裸 Makefile 工程（非 autotools）：默认目标 in-source 编译 ukopp-4.9.cc + zfuncs.cc 并链接 `pkg-config --libs gtk+-3.0 -lpthread`；Makefile 未定义 CXX（make 缺省 g++）→ make 命令行传 CXX（R33：编译器从 tools.build:compiler_executables conf 获取）"
+  - "上游 make install 调用 xdg-desktop-menu（OHOS 无此工具）→ 不跑上游 install 目标，package() 手工布局产物（bin + share/ukopp/{data,icons} + share/doc/ukopp + man1/ukopp.1 + applications/ukopp.desktop + licenses/copyright，与 Debian 包一致）"
+  - "zfuncs zinitapp() 在 stdin 非 tty 时把 stdout/stderr freopen 到 $HOME/.ukopp/logfile（追加模式）——headless/管道运行 ukopp 时 stdout 拿不到输出，断言必须读 logfile；$HOME 未设置时 snprintf(zuserdir) 得到 (null) 路径 → mkdir 失败 → zappcrash，测试必须提供可写 $HOME"
+  - "-nogui 命令行模式：main() 先解析 -nogui 置 Fgui=0 → 不调 gtk_init()（headless 安全），mLog=mWin=0（输出走 STDOUT→logfile 重定向）；无 job 文件时 initfunc 仅初始化任务数据 + BDpoop() 探测设备（udevadm/udevinfo 均缺失时 Ndisk=0 打印 no devices found，不崩溃）→ 干净退出 rc=0"
+  - "initfunc 按 getuid() 分支：非 root 走 Help/about 路径打印 ukopp v.4.9 + free software 许可行；root 打印 you have root privileges——版本断言两分支都接受（qemu-user 下 getuid 透传宿主 uid）"
+  - "zfuncs.cc 以 -D PREFIX -D DOCDIR 编译期固化文档路径（Makefile 缺省 /usr、/usr/share/doc/ukopp，与 Debian 打包一致）；仅影响 GUI 帮助文档/用户手册定位（zdocdir/zdatadir），不影响 -nogui 命令行模式"
+  - "PkgConfigDeps 生成 gtk+-3.0.pc/glib-2.0.pc（本机 conan 缓存绝对路径；gtk 包自带 .pc 的 prefix 是 CI worker 路径，本地不可用——必须用生成路径，PKG_CONFIG_PATH 显式注入 generators 目录，bart-view 同款）"
+  - "C++11 -Wreserved-user-defined-literal：close-quote 紧跟宏标识符（RSEP1\" %d , %d \"RSEP2）被词法为 UDL 后缀致宏不展开，clang 15 硬错误；修复 = 字面量与宏之间补空格（patches/0001，全源码仅 ukopp-4.9.cc:1277 一处）——2014 年前老代码移植 clang/C++11 的典型雷"
+  - "glib 包的组件 pkg-config 名同时生成 glib-2.0.pc 与 glib-2.0-unofficial.pc（同包同 prefix）；gtk+-3.0.pc 的 Requires: 含 glib-2.0-unofficial/cairo/pango/gdk-pixbuf/atk/fribidy/epoxy，均由依赖图闭包解析"
+  - "测试执行模型按产物 ELF e_machine 判定（0xB7 AARCH64 vs 0x3E X86_64），不用 Conan cross_building()——OHOS 交叉 profile 的 -pr:h/-pr:b 同文件，Conan 误报 host==build；本机 x86_64 WSL 用 qemu-aarch64 -L /opt/ohos-guest -E LD_PRELOAD=/opt/ohos-guest/lib/libfdchkshim.so 仿真执行（shim 补 __fd_chk），CI OHOS worker 原生直跑（musicpc/tasksh/array-hash/vimpc 同款）"
+
+# ============================================================
+# 测试
+# ============================================================
+test:
+  upstream_cases: 0
+  upstream_suite: "无：Makefile 仅 ukopp/install/uninstall/clean 目标，无 check/test 钩子；tarball 无 tests/ 目录、无 *test* 源文件、无 CI 配置（kornelix 系工具上游均无自动化测试）"
+  runnable: 0
+  runnable_note: "上游无测试目标；交叉编译环境无上游测试可运行，未在配方中集成"
+  pass_rate: "N/A（上游无 make check 可运行用例；消费者测试 7/7 断言通过）"
+  consumer_test: "test_ukopp.sh：分层探针（A1 二进制存在/可执行、A2 ELF64/AArch64 魔数、A3 DT_NEEDED GTK3 栈）+ 功能运行（A4-A7：ukopp -nogui 全新 $HOME → rc=0、$HOME/.ukopp/logfile 产生、启动横幅、版本/root 分支报告）；执行模型按产物 ELF e_machine 判定（本机 qemu 仿真 + libfdchkshim.so，CI OHOS worker 原生直跑）"
+
+# ============================================================
+# 补丁生成与分类
+# ============================================================
+patch_generation:
+  method: "手工 unified diff（diff -u 对上游原始源文件生成，marco 同款机制：patches/ 目录 + conandata.yml patches 节 + apply_conandata_patches）"
+  generated_at: "2026-10-16"
+  patches_count: 1
+
+patch_classification:
+  - file: "patches/0001-cxx11-udl-space.patch"
+    type: "portability"
+    lines_changed: 1
+    description: "ukopp-4.9.cc:1277（parse_retention）：RSEP1\" %d , %d \"RSEP2 字符串字面量与 RSEP2 宏之间补一个空格。C++11 起 -Wreserved-user-defined-literal：close-quote 紧跟标识符被词法为用户自定义字面量后缀，宏无法展开；clang 15 硬错误（2014 年源码风格，仅老 gcc 默认 gnu++98 可编译）。补丁不改变语义（sscanf 格式串拼接结果相同），仅加空格恢复宏展开。全源码扫描（ukopp-4.9.cc/zfuncs.cc/zfuncs.h）确认仅此一处 close-quote+宏 模式。"
