@@ -1,0 +1,95 @@
+# 版本级 manifest
+# 文件位置: archives/v/vcf-split/0.1.5-10/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "0.1.5-10"
+software: vcf-split
+status: built
+build_date: "2026-10-15"
+build_system: makefile
+
+source:
+  url: "https://codeload.github.com/auerlab/vcf-split/tar.gz/0f2fd0a"
+  sha256: "a1e9d22ac85721e248c60ed8ca09b9ee26d7dccbf2c7c8b01d441231ab77e083"
+  tar_format: tar.gz
+  upstream_tag: "0.1.5"
+  upstream_commit: "0f2fd0a"
+  version_note: "0.1.5-10 = upstream git describe 0.1.5-10-g0f2fd0a (10 commits after tag 0.1.5)"
+
+build:
+  system: makefile
+  targets:
+    - "vcf-split"
+  outputs:
+    - "bin/vcf-split"
+  dependencies:
+    - biolibc/0.2.7
+    - libxtend/0.2.1
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-Makefile.depend.patch"
+
+test_passed: 100
+test_failed: 0
+
+tests:
+  upstream_suite: "Test/test.sh"
+  upstream_tests_declared: 22
+  upstream_tests_executed: 22
+  upstream_tests_passed: 22
+  upstream_tests_not_run: 0
+  upstream_tests_not_run_reason: "Interactive pause() prompts, the wc -l diagnostic banner, the SLURM Tools/run-test.sbatch job and the Bench/* bcftools comparisons carry no assertions; see notes.md and test_package/MANIFEST.yml"
+  added_consumer_scenarios: 3
+  added_harmony_specific_cases: 2
+  test_package_assertions: 78
+
+test_results:
+  profile: "ohos-aarch64-6.0"
+  upstream_framework: "Test/test.sh fixture diff"
+  upstream_total: 22
+  upstream_passed: 22
+  upstream_failed: 0
+  consumer_workflows_total: 3
+  consumer_workflows_passed: 3
+  consumer_assertions_passed: 48
+  harmony_specific_total: 2
+  harmony_specific_passed: 2
+  harmony_specific_assertions_passed: 55
+  test_package_assertions_total: 78
+  test_package_assertions_passed: 78
+  test_package_assertions_failed: 0
+
+validation:
+  ohos_aarch64:
+    date: "2026-10-15"
+    compiler: "clang 15.0.4 (OHOS SDK ohos-sdk_26.0.0.18, sysroot aarch64-linux-ohos)"
+    build: pass
+    upstream_fixture: "22/22"
+    test_package: "23/23"
+
+knowledge_gained:
+  - "上游 Makefile.depend 为同级目录开发工作流写死了 ../local/include/... 路径，在 Conan 隔离构建目录下 make 直接报 No rule to make target；用补丁收敛依赖行、由配方注入依赖 include/lib 位置"
+  - "Conan 2 的 apply_conandata_patches 按 export_sources_folder 解析 patch_file，配方加补丁时必须把 patches/* 写进 exports_sources，否则 conan create 在 build() 抛 FileNotFoundError"
+  - "OHOS SDK sysroot 提供 sysexits.h，同族 auerlab 项目并非一概需要兼容头，应按实测决定"
+  - "OHOS 的 clang 15 默认产物已是完整 PIE + BIND_NOW + NX，无需显式 -fPIE/-pie"
+  - "上游 test.sh 含交互式 pause() 且使用 bashism 时，只重放其断言主体并如实申报未执行项"
+
+knowledge_ref:
+  - "knowledge/drafts/vcf-split-0.1.5-10-patch-export-sources-conan2.kv"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/vcf-split-0.1.5-10.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/vcf-split-0.1.5-10.work
+  source_orig_hash: 3a0fe20646e9abb1
+  source_work_hash: a2f96002785ffb17
+  generated_at: '2026-10-15T01:09:14'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-Makefile.depend.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

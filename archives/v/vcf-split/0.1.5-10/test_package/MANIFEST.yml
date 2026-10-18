@@ -1,0 +1,44 @@
+package: vcf-split/0.1.5-10
+homepage: "https://github.com/auerlab/vcf-split"
+
+upstream_check_command: "Test/test.sh"
+upstream_test_in_build: true
+upstream_test_command: "cd Test && ../vcf-split test-all-fields- 1 11 < test.vcf && ../vcf-split --fields chrom,pos,ref,alt,format test-limited-fields- 1 11 < test.vcf && for col in 1 2 3 4 5 6 7 8 9 10 11; do diff correct-all-fields-$col.vcf test-all-fields-$col.vcf; diff correct-limited-fields-$col.vcf test-limited-fields-$col.vcf; done"
+
+upstream_tests:
+  - file: Test/test.sh
+    source: "vcf-split-0f2fd0a/Test/test.sh"
+    description: "Upstream suite: two split invocations (all fields, and --fields chrom,pos,ref,alt,format) each producing 11 single-sample VCFs, compared with diff against 22 checked-in expected fixtures. Upstream also wraps the checks in an interactive pause() prompt and requires a prior ./cave-man-install.sh run, so the recipe replays the non-interactive assertions only."
+    command: "cd Test && ../vcf-split test-all-fields- 1 11 < test.vcf && ../vcf-split --fields chrom,pos,ref,alt,format test-limited-fields- 1 11 < test.vcf && diff each test-*.vcf against correct-*.vcf"
+
+not_run_upstream_tests:
+  - file: Test/test.sh
+    description: "The two interactive pause() prompts and the wc -l diagnostic banner; they assert nothing and block unattended CI."
+  - file: Tools/run-test.sbatch
+    description: "SLURM batch job that pipes a 137,977-sample BCM through bcftools; needs a cluster, bcftools and the TOPMed dataset."
+  - file: Bench/bcf-bench, Bench/test-vcftools, Bench/dbgap-to-single-sample
+    description: "Benchmark comparisons against bcftools/vcftools, not correctness tests; need those external tools plus large BCF inputs."
+
+test_package_tests:
+  - file: test_vcf_split.py
+    description: "Replay the upstream split invocations against the packaged Test/ fixtures and compare all 22 produced VCFs with the expected outputs."
+    command: "python3 test_vcf_split.py <package-folder>"
+    assertion_count: 23
+  - file: test_vcf_split_workflow.py
+    description: "Complete consumer workflows driven end to end on the installed binary: (1) split an 11-sample VCF into 11 single-sample VCFs and assert each output has exactly one sample column ('SAMPLE'), 10 records and CHROM/POS/REF/ALT identical to the multi-sample input; (2) --fields chrom,pos,ref,alt,format drops the INFO column while keeping one sample per file; (3) --max-calls 3 stops the sweep after 3 variant calls in all 11 outputs."
+    command: "python3 test_vcf_split_workflow.py <package-folder>"
+    assertion_count: 48
+  - file: test_ohos_binary.py
+    description: "OHOS platform conformance of the packaged executable: AArch64 ELF, ET_DYN (position-independent executable), .note.ohos.ident present, non-executable GNU_STACK (NX), PT_GNU_RELRO present and DT_FLAGS with DF_BIND_NOW (full RELRO), DT_FLAGS_1 with DF_1_PIE. ELF is parsed in pure Python."
+    command: "python3 test_ohos_binary.py <package-folder>"
+    assertion_count: 7
+
+harmony_specific_tests:
+  - file: test_vcf_split_workflow.py
+    description: "Consumer use case: full multi-sample to single-sample VCF split workflow executed on the OHOS/aarch64 runner (3 workflows, 22 single-sample VCFs produced end to end)."
+    assertion_count: 48
+  - file: test_ohos_binary.py
+    description: "OHOS platform properties of the produced binary (OHOS identification note, PIE, NX, full RELRO)."
+    assertion_count: 7
+
+assertion_count: 78
