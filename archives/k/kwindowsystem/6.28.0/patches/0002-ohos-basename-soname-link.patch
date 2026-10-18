@@ -1,0 +1,22 @@
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -8,11 +8,19 @@
+ qt_extract_metatypes(KF6WindowSystem)
+ 
+ set_target_properties(KF6WindowSystem PROPERTIES
+     VERSION     ${KWINDOWSYSTEM_VERSION}
+     SOVERSION   ${KWINDOWSYSTEM_SOVERSION}
+     EXPORT_NAME WindowSystem
+ )
++
++# No CMake platform module defines the shared-library soname flag in this
++# configuration, so the unversioned output would carry no DT_SONAME. Stamp
++# the basename soname explicitly; platforms that define the flag (Linux)
++# keep their own CMake soname handling (device-verified kscreenlocker 6.7.2).
++if(NOT CMAKE_SHARED_LIBRARY_SONAME_CXX_FLAG)
++    target_link_options(KF6WindowSystem PRIVATE "-Wl,-soname,libKF6WindowSystem.so")
++endif()
+ 
+ ecm_create_qm_loader(KF6WindowSystem kwindowsystem6_qt)
+ 
+ target_sources(KF6WindowSystem PRIVATE
