@@ -1,0 +1,54 @@
+version: "2.1"
+software: "lsh-utils"
+status: published
+build_date: "2026-10-18"
+build_system: "autotools"
+
+source:
+  # The upstream release host serves the same 1540150-byte tarball over http
+  # and https; https is used because the source-URL gate rejects plain-http
+  # sources.  Both schemes were downloaded and their sha256 compared equal.
+  url: "https://www.lysator.liu.se/~nisse/archive/lsh-2.1.tar.gz"
+  sha256: "8bbf94b1aa77a02cac1a10350aac599b7aedda61881db16606debeef7ef212e3"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--disable-pam"
+    - "--without-tcpwrappers"
+    - "--disable-kerberos"
+    - "--disable-gss"
+    - "--disable-utmp"
+    # OHOS ships a stropts.h with the I_* constants but libc has no
+    # isastream(); configure's header-only probe would enable the STREAMS
+    # branch in server_pty.c and lshd would fail to link.
+    - "ac_cv_header_stropts_h=no"
+  dependencies:
+    - "gmp/6.3.0"
+    - "nettle/3.10.2.1"
+    - "liboop/1.0.1"
+    - "zlib/1.3.1.1"
+  cc: clang
+  cxx: clang++
+  cflags: "-fgnu89-inline -fcommon -O0"
+
+patches_applied:
+  - "0001-ohos-autotools-config.patch"
+  - "0002-nettle3-dsa-compat.patch"
+  - "0003-ohos-nettle3-and-portability.patch"
+  - "0004-ohos-hmdfs-seed-file-ownership.patch"
+
+knowledge_gained:
+  - "lsh 2.1 声明依赖只有 gmp/liboop（configure.ac 的 AC_CHECK_LIB）与可选 zlib，但 nettle/hogweed 只出现在链接行 src/Makefile.am:116 `LDADD = liblsh.a spki/libspki.a -lnettle -lhogweed` 与 src/ 下 25 个 `#include <nettle/*.h>`；configure.ac 里根本没有 nettle 检查 ⇒ 漏声明会在链接期才炸。required deps 实为 4 个。"
+  - "钉 gmp/6.3.0 而非 gmp/6.3.0.1：nettle/3.10.2.1 的配方 requires gmp/6.3.0，用 6.3.0.1 会在依赖图判版本冲突。"
+  - "lsh 2.1 是 nettle 2.x 时代代码。nettle 3.x 把 struct dsa_public_key/dsa_private_key 定义与 dsa_sha1_*_digest/dsa_generate_keypair 挪进官方 <nettle/dsa-compat.h>，该 compat 在 nettle/3.10.2.1 里有真实现（libhogweed.a 中 nettle_dsa_public_key_init / nettle_dsa_compat_generate_keypair / nettle_dsa_sha1_verify_digest 均为 T 符号）⇒ 只需 include + 适配 dsa_keypair_from_sexp_alist 的新增 params 形参，不必重写 DSA 层。"
+  - "dsa-compat.h 的 struct dsa_public_key 与 struct dsa_params 前三个成员（p/q/g）布局相同（该头自述 layout must be identical），故 (struct dsa_params *) &pub 是官方认可的传参方式。"
+  - "OHOS/musl 既没有 getpass 的声明也没有实现：grep -rn getpass $SR/usr/include 0 命中、nm -D libc.so | grep -c getpass = 0。用 /dev/tty + termios（关 ECHO）自实现局部替代，askpass 程序路径不受影响。"
+  - "OHOS/musl 的 utmpx.h 只有 struct utmpx，不含任何 getutxid/pututxline 函数声明且 libc 无这些符号 ⇒ 用上游自带 --disable-utmp 把 utmp/wtmp 记账整体编译掉，而不是补 missing 符号。"
+  - "OHOS sysroot 带 stropts.h（有 I_PUSH 等常量）但 libc 无 isastream()：configure 的 AC_CHECK_HEADERS(stropts.h) 会成功，server_pty.c 的 STREAMS 分支被编入而 lshd 链接报 undefined symbol: isastream。用 autoconf 缓存变量 ac_cv_header_stropts_h=no 精确关掉这条不可用分支（与知识库 §12.58 musl malloc/realloc 检测误判的处置同型）。"
+  - "bundled GNU argp（src/argp，因 OHOS/musl 无 argp.h 而自建）在 argp-fmtstream.h 用 extern inline 并在 .c 里给外联副本，clang 默认 C99+ inline 语义直接报 redefinition of a 'extern inline' function is not supported in C99 mode ⇒ CFLAGS 加 -fgnu89-inline（仓库同款先例 ifile/1.3.9、memcacheq/0.2.1）。"
+  - "clang 15 默认 -fno-common：上游把两个暂定定义留在头文件里（server_userauth.h:108 的 server_userauth_none_preauth、x11_req_handler），每个 TU 都发强符号 ⇒ ld.lld duplicate symbol。加 -fcommon 恢复上游当年的链接模型。"
+  - "lsh 2.1 的 config.guess（2005-03-17 版）无 HarmonyOS 分支且其 mktemp 走 umask 077（HMDFS 上建出不可写目录）；config.sub（2013 版）完全不认识 aarch64-unknown-linux-ohos；四个自动生成的 configure 都有 (umask 077 && mktemp -d ./confXXXXXX) ⇒ config.status 报 can't create ./confXXXXXX/subs1.awk: Permission denied。三处一起补（config.guess 加 aarch64:HarmonyOS 分支、config.sub 加 linux-ohos*、configure umask 077→022）。"
+  - "2013 年代码在 -O1 及以上被误编译：lsh_string_format_sexp() 用两遍 vformat 预测/写入 sexp 长度，-O2 下预测值少 1 字节（实测 pass1=1426）导致格式化器写入 0 字节、产出内容损坏的加密私钥文件；-DNDEBUG 把断言编译掉后表现为「不报错但解不开」，打开断言则 abort。逐档实测 -O1/-O2/-O3 均失败、-O0 正常，故配方用 -O0。"
+  - "上游 4 个 testsuite 的注册入口合计 71 项（src/testsuite 16 程序 + 37 脚本、src/spki 7+4、src/sftp 0+5、src/argp 0+2）；dispatch 卡上写的 19 只是 src/testsuite 里名字含 lsh 的子集，不是注册入口口径。"

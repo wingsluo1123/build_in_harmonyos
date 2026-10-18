@@ -1,0 +1,234 @@
+diff --git a/src/crypto.c b/src/crypto.c
+index ff20b11..33f25e6 100644
+--- a/src/crypto.c
++++ b/src/crypto.c
+@@ -322,7 +322,9 @@ make_cast128_cbc_instance(struct crypto_algorithm *algorithm, int mode,
+ 			? do_cast128_encrypt
+ 			: do_cast128_decrypt);
+ 
+-  cast128_set_key(&self->ctx.ctx, algorithm->key_size, key);
++  /* Nettle 3 dropped the length argument from cast128_set_key: the
++   * CAST-128 key is always 16 octets. */
++  cast128_set_key(&self->ctx.ctx, key);
+   CBC_SET_IV(&self->ctx, iv);
+ 
+   return(&self->super);
+diff --git a/src/dummy.c b/src/dummy.c
+index 96b715e..72fd518 100644
+--- a/src/dummy.c
++++ b/src/dummy.c
+@@ -41,86 +41,86 @@
+ #include "lsh.h"
+ 
+ /* Referenced by ssh_format.c */
+-unsigned
++size_t
+ nettle_mpz_sizeinbase_256_s(const mpz_t x UNUSED)
+ { abort(); }
+ 
+-unsigned
++size_t
+ nettle_mpz_sizeinbase_256_u(const mpz_t x UNUSED)
+ { abort(); }
+ 
+ void
+-cbc_encrypt(void *ctx UNUSED, nettle_crypt_func f UNUSED,
+-	    unsigned block_size UNUSED, uint8_t *iv UNUSED,
+-	    unsigned length UNUSED, uint8_t *dst UNUSED,
++cbc_encrypt(const void *ctx UNUSED, nettle_cipher_func *f UNUSED,
++	    size_t block_size UNUSED, uint8_t *iv UNUSED,
++	    size_t length UNUSED, uint8_t *dst UNUSED,
+ 	    const uint8_t *src UNUSED)
+ { abort(); }
+ 
+ void
+-cbc_decrypt(void *ctx UNUSED, nettle_crypt_func f UNUSED,
+-	    unsigned block_size UNUSED, uint8_t *iv UNUSED,
+-	    unsigned length UNUSED, uint8_t *dst UNUSED,
++cbc_decrypt(const void *ctx UNUSED, nettle_cipher_func *f UNUSED,
++	    size_t block_size UNUSED, uint8_t *iv UNUSED,
++	    size_t length UNUSED, uint8_t *dst UNUSED,
+ 	    const uint8_t *src UNUSED)
+ { abort(); }
+ 
+ void
+-ctr_crypt(void *ctx UNUSED, nettle_crypt_func f UNUSED,
+-	  unsigned block_size UNUSED, uint8_t *iv UNUSED,
+-	  unsigned length UNUSED, uint8_t *dst UNUSED,
++ctr_crypt(const void *ctx UNUSED, nettle_cipher_func *f UNUSED,
++	  size_t block_size UNUSED, uint8_t *iv UNUSED,
++	  size_t length UNUSED, uint8_t *dst UNUSED,
+ 	  const uint8_t *src UNUSED)
+ { abort(); }
+ 
+ void
+ hmac_digest(const void *outer UNUSED, const void *inner UNUSED, void *state UNUSED,
+ 	    const struct nettle_hash *hash UNUSED,
+-	    unsigned length UNUSED, uint8_t *digest UNUSED)
++	    size_t length UNUSED, uint8_t *digest UNUSED)
+ { abort(); }
+ 
+-unsigned
++size_t
+ sexp_vformat(struct nettle_buffer *buffer UNUSED,
+ 	     const char *format UNUSED, va_list args UNUSED)
+ { abort(); }
+ 
+-unsigned
++size_t
+ sexp_transport_vformat(struct nettle_buffer *buffer UNUSED,
+ 		       const char *format UNUSED, va_list args UNUSED)
+ { abort(); }
+ 
+ int
+ sexp_transport_iterator_first(struct sexp_iterator *iterator UNUSED,
+-			      unsigned length UNUSED, uint8_t *input UNUSED)
++			      size_t length UNUSED, uint8_t *input UNUSED)
+ { abort(); }
+ 
+ void
+ nettle_buffer_init_size(struct nettle_buffer *buffer UNUSED,
+-			unsigned length UNUSED, uint8_t *space UNUSED)
++			size_t length UNUSED, uint8_t *space UNUSED)
+ 			
+ { abort(); }
+ 
+ 
+ /* Referenced by lsh_string.c */
+-uint8_t *
+-memxor(uint8_t *dst UNUSED, const uint8_t *src UNUSED, size_t n UNUSED)
++void *
++memxor(void *dst UNUSED, const void *src UNUSED, size_t n UNUSED)
+ { abort(); }
+ 
+ void
+-nettle_mpz_get_str_256(unsigned length UNUSED, uint8_t *s UNUSED, const mpz_t x UNUSED)
++nettle_mpz_get_str_256(size_t length UNUSED, uint8_t *s UNUSED, const mpz_t x UNUSED)
+ { abort(); }
+ 
+ void
+ base64_encode_init(struct base64_encode_ctx *ctx UNUSED)
+ { abort(); }
+ 
+-unsigned
++size_t
+ base64_encode_update(struct base64_encode_ctx *ctx UNUSED,
+-		     uint8_t *dst UNUSED,
+-		     unsigned length UNUSED,
++		     char *dst UNUSED,
++		     size_t length UNUSED,
+ 		     const uint8_t *src UNUSED)
+ { abort(); }
+ 
+-unsigned
++size_t
+ base64_encode_final(struct base64_encode_ctx *ctx UNUSED,
+-		    uint8_t *dst UNUSED)
++		    char *dst UNUSED)
+ { abort(); }
+ 
+ void
+@@ -129,10 +129,10 @@ base64_decode_init(struct base64_decode_ctx *ctx UNUSED)
+ 
+ int
+ base64_decode_update(struct base64_decode_ctx *ctx UNUSED,
+-		     unsigned *dst_length UNUSED,
++		     size_t *dst_length UNUSED,
+ 		     uint8_t *dst UNUSED,
+-		     unsigned src_length UNUSED,
+-		     const uint8_t *src UNUSED)
++		     size_t src_length UNUSED,
++		     const char *src UNUSED)
+ { abort(); }
+ 
+ int
+@@ -142,7 +142,7 @@ base64_decode_final(struct base64_decode_ctx *ctx UNUSED)
+ /* Referenced by parse.c */
+ void
+ nettle_mpz_set_str_256_s(mpz_t x UNUSED,
+-			 unsigned length UNUSED, const uint8_t *s UNUSED)
++			 size_t length UNUSED, const uint8_t *s UNUSED)
+ { abort(); }
+ 
+ /* Referenced by werror.c */
+diff --git a/src/unix_interact.c b/src/unix_interact.c
+index e8b66d5..6090aae 100644
+--- a/src/unix_interact.c
++++ b/src/unix_interact.c
+@@ -30,6 +30,9 @@
+ #include <assert.h>
+ #include <errno.h>
+ 
++#include <stdio.h>
++#include <string.h>
++
+ #include <signal.h>
+ 
+ #include <fcntl.h>
+@@ -167,6 +170,57 @@ do_kill_window_subscriber(struct resource *s)
+ 
+ #define IS_TTY(self) ((self)->tty_fd >= 0)
+ 
++/* OHOS/musl provides neither a declaration nor an implementation of the
++ * historical getpass(3).  Keep the interactive password prompt working with
++ * a minimal local equivalent: read one line from /dev/tty with echo
++ * switched off, into a static buffer (the classic getpass contract).
++ * The askpass-program path is unaffected. */
++static char *
++lsh_interact_getpass(const char *prompt)
++{
++  static char buffer[256];
++  struct termios old, noecho;
++  FILE *tty;
++  int fd, restore = 0;
++  size_t length;
++
++  tty = fopen("/dev/tty", "r+");
++  if (!tty)
++    return NULL;
++  fd = fileno(tty);
++
++  fputs(prompt, tty);
++  fflush(tty);
++
++  if (tcgetattr(fd, &old) == 0)
++    {
++      noecho = old;
++      noecho.c_lflag &= ~ECHO;
++      if (tcsetattr(fd, TCSAFLUSH, &noecho) == 0)
++	restore = 1;
++    }
++
++  if (!fgets(buffer, sizeof(buffer), tty))
++    {
++      if (restore)
++	tcsetattr(fd, TCSAFLUSH, &old);
++      fputc('\n', tty);
++      fclose(tty);
++      return NULL;
++    }
++
++  if (restore)
++    tcsetattr(fd, TCSAFLUSH, &old);
++  fputc('\n', tty);
++  fclose(tty);
++
++  length = strlen(buffer);
++  if (length > 0 && buffer[length - 1] == '\n')
++    buffer[length - 1] = '\0';
++
++  return buffer;
++}
++
+ static int
+ unix_is_tty(struct interact *s)
+ {
+@@ -223,7 +277,7 @@ read_password(struct unix_interact *self,
+ 	return NULL;
+ 
+       /* NOTE: This function uses a static buffer. */
+-      password = getpass(cprompt);
++      password = lsh_interact_getpass(cprompt);
+   
+       if (!password)
+ 	return NULL;

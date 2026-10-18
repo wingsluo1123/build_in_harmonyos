@@ -1,0 +1,40 @@
+diff --git a/src/unix_random.c b/src/unix_random.c
+index 7facc5f..2dbede3 100644
+--- a/src/unix_random.c
++++ b/src/unix_random.c
+@@ -132,18 +132,26 @@ read_initial_seed_file(struct yarrow256_ctx *ctx,
+       return 0;
+     }
+ 
+-  /* Check permissions */
++  /* Check permissions.
++   *
++   * HarmonyOS/HMDFS reports neither real ownership nor real mode bits
++   * through fstat(): a file this process just created with mode 0600
++   * comes back with a synthetic owner (the file_manager uid, measured
++   * 20001006 while getuid() returns 20020084) and with the group read
++   * and write bits set, and lsh-make-seed's fchmod() cannot clear them.
++   * The two strict checks below therefore rejected the seed file lsh
++   * itself had just written, which aborted every key operation with
++   * "Seed file not owned by you!".  Keep both conditions visible as
++   * warnings but do not refuse to start; on this platform the seed
++   * file is protected by the enclosing ~/.lsh directory rather than by
++   * the mode bits HMDFS refuses to report. */
+   if (sbuf.st_uid != getuid())
+-    {
+-      werror("Seed file not owned by you!\n");
+-      return 0;
+-    }
++    werror("Warning: seed file owner uid is not this process's uid "
++	   "(HarmonyOS/HMDFS reports a synthetic owner).\n");
+ 
+   if (sbuf.st_mode & (S_IRWXG | S_IRWXO))
+-    {
+-      werror("Too permissive permissions on seed-file.\n");
+-      return 0;
+-    }
++    werror("Warning: seed file has group/other permission bits set "
++	   "(HarmonyOS/HMDFS always reports them).\n");
+   
+   seed = read_seed_file(fd);
+   if (!seed)
