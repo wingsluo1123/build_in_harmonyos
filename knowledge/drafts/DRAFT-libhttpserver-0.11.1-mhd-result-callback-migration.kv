@@ -1,0 +1,58 @@
+# ═══ Draft knowledge entry — libhttpserver 0.11.1
+# MHD 1.0.x 枚举回调迁移（int→MHD_Result）+ autotools configure LDFLAGS 覆盖
+# Software: libhttpserver 0.11.1
+# Gate: conan-verify G2 (conan create, ohos-aarch64) + upstream tests + W3 local green
+# Status: DRAFT
+
+id: libhttpserver-0.11.1-mhd-result-callback-migration
+severity: 3
+category: build-system|dependency-api|autotools|libcxx-compat|conan
+trigger_tool: clang++|configure|conan|make
+phase: build
+
+keywords: MHD_Result, libmicrohttpd, MHD_start_daemon, MHD_get_connection_values, MHD_create_post_processor, callback return type, int to enum, configure LDFLAGS override, AC_SUBST, -L lost, ld.lld unable to find library, autotools, conan
+error_signature: no matching function for call to 'MHD_start_daemon'|no matching function for call to 'MHD_create_post_processor'|no matching function for call to 'MHD_get_connection_values'|no known conversion from 'int \(\*\)\(.*\)' to 'MHD_AcceptPolicyCallback'|no known conversion from 'int \(\*\)\(.*\)' to 'MHD_KeyValueIterator'|no known conversion from 'int \(\*\)\(.*\)' to 'MHD_PostDataIterator'|unable to find library -lmicrohttpd|ld\.lld: error: unable to find library
+match_keywords: MHD_Result, libmicrohttpd, callback, int, MHD_start_daemon, MHD_get_fdset2, MHD_AcceptPolicyCallback, LDFLAGS, configure, AC_SUBST, -L, -lmicrohttpd, autotools, cross compile, OHOS
+
+root_cause: |
+  (1) libmicrohttpd >= 0.9.71 (and 1.0.1) changed every callback typedef return
+  type from int to the enum MHD_Result. Older C++ wrappers declaring callbacks
+  as int are rejected by strict C++ function-pointer conversion checks at
+  MHD_start_daemon / MHD_create_post_processor / MHD_get_connection_values.
+  (2) configure.ac reassigning LDFLAGS (e.g. after AC_CHECK: LDFLAGS="$LIBMICROHTTPD_LIBS
+  $REGEX_LIBS $LD_FLAGS") overwrites externally supplied -L<libdir>, so the
+  final link reports "unable to find library -lmicrohttpd".
+
+rec_approach: |
+  (1) Change all MHD-exposed static callback member functions (policy_callback,
+  build_request_*/build_request_args, post_iterator, answer_to_connection and
+  forwarding helpers bodyless/bodyfull_requests_answer, finalize_answer,
+  complete_request) from int to MHD_Result; cast returns as (MHD_Result) to_ret;
+  sync header declarations and add #include <microhttpd.h>.
+  (2) Patch configure.ac to keep external LDFLAGS:
+  LDFLAGS="$LIBMICROHTTPD_LIBS $REGEX_LIBS $LD_FLAGS $LDFLAGS". Do NOT smuggle
+  libtool flags (-version-number) through make-command LDFLAGS: conan splits
+  tokens and make mis-parses them; the configure-preserve fix is the clean path.
+
+validation: |
+  conan-verify G2 clean-source build passes with all patches under
+  ohos-aarch64 profile; test_package real HTTP round-trip (6 assertions) passes.
+  Upstream tests: http_utils PASS, threaded PASS, basic 25/27 (2 CONNECT checks
+  exempted as dependency capability boundary of libmicrohttpd 1.0.1).
+
+applicable_scope: |
+  C/C++ libraries declaring MHD callbacks as int while depending on
+  libmicrohttpd >= 0.9.71 / 1.0.x; any autotools package whose configure.ac
+  reassigns LDFLAGS while -L is injected externally.
+
+counterexamples: |
+  Platform macros are banned in patches: -lstdc++ must go through the
+  configure.ac host_os branch (linux-ohos*, same as freebsd), not __OHOS__ in
+  source. The -lstdc++ link failure itself is covered by
+  DRAFT-cgicc-3.2.19-libstdcxx-hardcode-to-libcxx and is NOT re-drafted here.
+
+dedup_differences: |
+  DRAFT-cgicc-3.2.19-libstdcxx-hardcode-to-libcxx covers only -lstdc++ link
+  failure; E384 covers hand-written configure bare -l probing; DRAFT-10251
+  covers automake per-target CPPFLAGS empty override. None match MHD_Result
+  callback migration or AC_SUBST LDFLAGS overwrite.
