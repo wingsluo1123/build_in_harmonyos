@@ -1,0 +1,128 @@
+# 版本级 manifest
+# 文件位置: archives/d/durak/2.1.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "2.1.1"
+
+# 软件名
+software: durak
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-09-22"
+build_system: cmake
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/werto87/durak/archive/refs/tags/v2.1.1.tar.gz"
+
+  # 源码校验和
+  sha256: "44b6ef260c4f509ea85c7988d8d1257226153e1203d3e4524c08ee5f356d65d3"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表
+  configure_options:
+    - "-DCMAKE_CXX_STANDARD=20"
+    - "-DCMAKE_CXX_FLAGS=-D_LIBCPP_ENABLE_EXPERIMENTAL"
+  # 例如:
+  # - "-DCMAKE_BUILD_TYPE=Release"
+  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - "confu_json/1.2.4"
+    - "boost/1.90.0"
+    - "magic_enum/0.9.7"
+    - "catch2/2.13.10 (test only)"
+  # 例如:
+  # - openssl/1.1.1w
+  # - curl/8.19.0
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-durak-CMakeLists.txt.patch"
+  - "0002-durak-game.hxx.patch"
+  - "0003-durak-move.hxx.patch"
+  - "0004-durak-print.hxx.patch"
+  - "0005-test-CMakeLists.txt.patch"
+# 例如:
+# - "0001-bootstrap-ohos-toolchain.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "OHOS libc++ 15 默认定义 _LIBCPP_HAS_NO_INCOMPLETE_RANGES，C++20 ranges 算法（find_if/count_if/transform/binary_search/copy_if/find）实现头实际存在但被宏隐藏；-D_LIBCPP_ENABLE_EXPERIMENTAL 编译标志解锁即可，且须经 cpp_info.defines 传导给消费者"
+  - "C++23 std::ranges::contains 在 libc++ 15 完全缺失（无 ranges_contains.h），改写为 std::ranges::find(r,v) != std::ranges::end(r) 语义等价"
+  - "libc++ 15 <format> 头声明可用但运行库未编译 format 部分（INCOMPLETE_FORMAT），std::format 链接报 undefined symbol format_error；改 ostream 流式输出"
+  - "MSVC 专有 #pragma warning 在 clang -Werror 下报 unknown pragma，需 #ifdef _MSC_VER 守卫"
+  - "conan CMakeDeps 只导出 Boost::boost 不导出上游引用的 Boost::headers；配方级补丁改链接目标"
+  - "conan test_package 消费 header-only 库时传递依赖 include 不物化，需 test_package requirements() 显式声明 boost/confu_json"
+# 例如:
+# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
+# - "内嵌 libuv 需要禁用，使用系统 libuv"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/durak-2.1.1.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/durak-2.1.1.work
+  source_orig_hash: 464e6fc64f1bf566
+  source_work_hash: 183b7de0c14211eb
+  generated_at: '2026-09-22T15:45:54'
+  patches_count: 5
+
+patch_classification:
+  - file: 0001-durak-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-durak-game.hxx.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-durak-move.hxx.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-durak-print.hxx.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0005-test-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
