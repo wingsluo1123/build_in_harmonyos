@@ -1,0 +1,38 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: juce/9.0.3
+homepage: "https://juce.com/"
+
+# 上游测试命令 (JUCE 9 为 CMake 构建, 测试内嵌于模块源码, 由 UnitTestRunner 驱动)
+upstream_check_command: "cmake --build . && ./UnitTestRunner"
+
+# conanfile.py build() 方法中是否已集成上游测试 (构建期未集成, 测试在归档验证阶段独立运行)
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序 (代表性子集, 完整台账见 notes.md 测试台账,
+# 全部 152 个 UnitTest 子类源文件: juce_core 50 等)
+upstream_tests:
+  - file: modules/juce_core/unit_tests/juce_UnitTest.cpp
+    source: JUCE-9.0.3/modules/juce_core/unit_tests/juce_UnitTest.cpp
+    description: "JUCE 单元测试框架本体 (UnitTest 注册/运行)"
+    command: "./juce_unit_tests"
+  - file: modules/juce_core/text/juce_String_test.cpp
+    source: JUCE-9.0.3/modules/juce_core/text/juce_String_test.cpp
+    description: "juce_core 字符串与文本 API 测试 (公开 API 消费验证)"
+    command: "./juce_unit_tests"
+  - file: modules/juce_core/containers/juce_Array_test.cpp
+    source: JUCE-9.0.3/modules/juce_core/containers/juce_Array_test.cpp
+    description: "juce_core Array 容器测试"
+    command: "./juce_unit_tests"
+
+# test_package 中自带的测试 (消费者视角验证, 鸿蒙专项)
+test_package_tests:
+  - file: test_package/main.cpp
+    description: "消费者程序: 仅用公开头文件+公开 API (juce::String::toUpperCase/contains), 编译链接运行, 断言输出包含 HARMONYOS"
+    command: "./test_juce"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 4
