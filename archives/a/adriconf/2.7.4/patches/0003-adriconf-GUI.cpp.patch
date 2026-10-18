@@ -1,0 +1,46 @@
+--- a/adriconf/GUI.cpp
++++ b/adriconf/GUI.cpp
+@@ -138,40 +138,40 @@
+         for (auto& possibleApp : driver->getApplications()) {
+             auto itemBox = Gtk::manage(new Gtk::Button);
+             itemBox->set_label(possibleApp->getName());
+             itemBox->set_visible(true);
+             itemBox->get_style_context()->add_class("profileItem");
+             itemBox->signal_clicked().connect(
+                 sigc::bind(sigc::mem_fun(*this, &GUI::onApplicationSelected),
+                            possibleApp,
+                            driver));
+ 
+-            this->profileList->append(*itemBox);
++            this->profileList->insert(*itemBox, -1);
+         }
+     }
+ 
+     auto newButton = Gtk::manage(new Gtk::Button());
+     newButton->set_image_from_icon_name("list-add");
+     newButton->set_visible(true);
+     newButton->get_style_context()->add_class("profileItem");
+     newButton->signal_clicked().connect([this]() {
+         this->screenSwitcher->set_visible_child("newProfileScreen");
+     });
+-    this->profileList->append(*newButton);
++    this->profileList->insert(*newButton, -1);
+ 
+     auto aboutButton = Gtk::manage(new Gtk::Button());
+     aboutButton->set_image_from_icon_name("help-about");
+     aboutButton->set_visible(true);
+     aboutButton->get_style_context()->add_class("profileItem");
+     aboutButton->signal_clicked().connect(
+         [this]() { this->screenSwitcher->set_visible_child("aboutScreen"); });
+-    this->profileList->append(*aboutButton);
++    this->profileList->insert(*aboutButton, -1);
+ }
+ 
+ void GUI::drawApplicationOptions() {
+     auto selectedAppOptions = this->currentApp->getOptions();
+ 
+     /* Get the notebook itself */
+     auto* pNotebook
+         = this->gladeBuilder->get_widget<Gtk::Notebook>("editProfileContent");
+     if (!pNotebook) {
+         this->logger->error(
