@@ -1,0 +1,66 @@
+# test_package/MANIFEST.yml — toontag 0.0-git20220105193632.41237ef
+# 上游官方测试声明文件（CI L0e 硬门禁要求存在）
+
+package: toontag/0.0-git20220105193632.41237ef
+homepage: "https://github.com/edrosten/tag"
+
+# 上游测试套件存在性：无（经审计上游源码确认：无任何自动化测试框架）
+upstream_tests_exist: false
+
+# HMBS rule4 门禁：非负整数总数 + 与官方一致的统计口径。
+# 口径 autotools_tests：Makefile.am 的 TESTS / check_PROGRAMS 注册数 = 0。
+upstream_test_total: 0
+upstream_test_count_method: autotools_tests
+
+# 上游测试审计（源码：edrosten/tag commit 41237ef，快照见 conandata.yml）
+upstream_test_audit:
+  source_tarball: "edrosten-tag-41237ef.tar.gz (GitHub API tarball)"
+  source_sha256: "696ae1c0005fb70d2d6bce6f819ea78d96e4aa061747ca7671c652d2bb6d01eb"
+  source_url: "https://api.github.com/repos/edrosten/tag/tarball/41237efe686d286bc9009eae70d1758b7c6282c5"
+  commit: "41237efe686d286bc9009eae70d1758b7c6282c5"
+  top_level_files:
+    - Makefile.am         # 仅 lib_LTLIBRARIES = libtoontag.la + pkginclude_HEADERS，无 TESTS / check_PROGRAMS / TESTS_ENVIRONMENT
+    - configure.in        # AC_INIT/AM_INIT_AUTOMAKE + TooN 头检查，无测试宏、无 AC_CONFIG_TESTDIR
+    - src/                # quartic/threepointpose/absorient/handeye/five_point/polynomial/fourpointpose 实现，无测试源
+    - tag/                # 20 个公开头（quartic/absorient/five_point/handeye/kalmanfilter/ransac/unscented/...），含内联算法，无测试框架
+    - test/               # 4 个手工演示程序（见 manual_programs_only），未被任何构建目标或 harness 引用
+  scanned_for:
+    - "TEST( / TEST_F (gtest) — 0 命中"
+    - "def test_ (pytest) — 全树无 .py 测试"
+    - "enable_testing / add_test (ctest) — 0 命中"
+    - "Makefile.am TESTS / check_PROGRAMS / check-local 目标 — 0 命中"
+    - "tests/ 自动化套件 — 不存在（仅 test/ 手工演示目录）"
+    - "make check / ctest 目标 — 上游未定义"
+  scan_result: "0 matches — 全树无自动化测试入口；Makefile.am 无 TESTS/check_PROGRAMS；configure.in 无测试宏；无 CTest/gtest/pytest 接线"
+  make_check_output: "make -n check 展开为空目标（automake 默认 check-am: all-am），执行 0 用例退出 0，不构成测试套件"
+  manual_programs_only:
+    - "test/absorient.cpp — 手工演示：随机点集算绝对定向，打印位姿与残差，无断言、无 PASS/FAIL 判定"
+    - "test/fivepoint.cpp — 手工演示：main 直接调用 testPerturbation() 跑 2x1000000 次随机扰动并打印误差，无断言"
+    - "test/handeye.cpp — 手工演示：手眼标定打印程序，无断言"
+    - "test/sim.cpp — 手工演示：仿真打印程序，无断言"
+  reason: "toontag 上游发布快照不含任何自动化测试套件；功能验证由 test_package 真实调用库 API（quartic 求根 + 绝对定向 + 本质矩阵，8 断言）完成"
+
+# 上游测试命令（无自动化套件，故 check 命令不适用）
+upstream_check_command: ""
+
+# conanfile.py build() 是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（upstream_tests_exist: false，见上方审计）
+# 上游无测试，真机预检输出 HMBS_UPSTREAM_TEST_RESULT status:"no_tests" discovered:0 executed:0
+upstream_tests: []
+
+# test_package 自带的消费者测试（R34：必须实质调用被测包 API）
+test_package_tests:
+  - file: test_toontag.cpp
+    description: "消费者测试：quartic 四次方程求根（x^4-5x^2+4 的 4 实根）+ computeAbsoluteOrientation 已知 SE3 恢复（平移/旋转/残差）+ getEssentialMatrix 行列式为零 + se3_from_E 返回 4 解 + computeRotation 正交性，共 8 断言"
+    command: "./test_toontag"
+
+# 鸿蒙特有测试用例（本包为纯数值算法库，无鸿蒙系统接口调用；消费者测试在 OHOS aarch64 真机实际运行即覆盖平台验证）
+ohos_specific_tests:
+  count: 0
+  cases: []
+
+# 测试断言总数（test_toontag.cpp 的 8 个显式 CHECK，与 HMBS_TEST_PACKAGE_RESULT discovered=8 一致）
+assertion_count: 8
