@@ -1,0 +1,52 @@
+diff --git a/src/key_grabber.c b/src/key_grabber.c
+index 6b5bb4e..33208e4 100644
+--- a/src/key_grabber.c
++++ b/src/key_grabber.c
+@@ -7,9 +7,14 @@
+  *
+  */
+ 
+-#include <gdk/gdkx.h>
+ #include <gtk/gtk.h>
++
++/* GDK_WINDOWING_X11 来自 gtk/gtk.h 引入的 gdkconfig.h。未启用 X11 的 GDK
++ * 后端不安装 gdk/gdkx.h，也不提供 GDK_DISPLAY_XDISPLAY 等 X11 专用入口。 */
++#if defined(GDK_WINDOWING_X11)
++#include <gdk/gdkx.h>
+ #include <X11/Xlib.h>
++#endif
+ 
+ #include "key_grabber.h"
+ 
+@@ -19,6 +24,8 @@ static key_grabber_cb volume_raise_cb = NULL;
+ static key_grabber_cb volume_lower_cb = NULL;
+ static key_grabber_cb volume_mute_cb = NULL;
+ 
++#if defined(GDK_WINDOWING_X11)
++
+ static key_grabber_cb *grabbers[NUM_KEYS_TO_GRAB] = {
+     &volume_raise_cb,
+     &volume_lower_cb,
+@@ -166,6 +173,22 @@ void key_grabber_ungrab_keys(void)
+     }
+ }
+ 
++#else /* !GDK_WINDOWING_X11 */
++
++/* 当前 GDK 后端未启用 X11。全局媒体键抓取依赖 XGrabKey 与 gdk/gdkx.h，
++ * 二者在该后端均不可得，故保留公开 API 但改为一次性诊断提示。 */
++void key_grabber_grab_keys(void)
++{
++    g_printerr("pa-applet: global media key grabbing needs the GDK X11 backend; "
++               "this GDK build has no X11 backend, skipping key grabs\n");
++}
++
++void key_grabber_ungrab_keys(void)
++{
++}
++
++#endif /* GDK_WINDOWING_X11 */
++
+ void key_grabber_register_volume_raise_callback(key_grabber_cb cb)
+ {
+     volume_raise_cb = cb;

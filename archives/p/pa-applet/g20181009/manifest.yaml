@@ -1,0 +1,40 @@
+# 版本级 manifest — pa-applet g20181009
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "g20181009"
+software: "pa-applet"
+status: built
+build_date: "2026-10-17"
+build_system: "cmake"   # 上游 autotools，本配方自带 CMakeLists（环境无 automake）
+
+source:
+  url: "https://codeload.github.com/fernandotcl/pa-applet/tar.gz/3b4f8b3"
+  sha256: "32dcd0663cca120cf60d1046443884f854448e7bb71226a416915ae9beb33e11"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options: []
+  dependencies:
+    - "gtk/3.24.43"
+    - "pulseaudio/17.0.1"
+    - "libnotify/0.8.3.1"
+    - "glib/2.84.0.1"
+    - "zlib/1.3.1.1"
+    - "gdk-pixbuf/2.44.6.1"
+    - "expat/2.8.2.1"
+    - "harfbuzz/14.2.0.1.1.1"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-guard-x11-key-grabber.patch"
+
+knowledge_gained:
+  - "上游 autotools + 无 automake 环境：按 Makefile.am 复刻自带 CMakeLists.txt（仓库已有 40+ 先例）"
+  - "codeload 无扩展名 URL 必须在 conandata 声明 filename，否则 conan 猜 zip 报 BadZipFile"
+  - "conandata 的 patches 写成「文件名→条目」映射会被 apply_conandata_patches 当版本字典静默跳过，必须用 list"
+  - "补丁要在 source() 里打：conan 随后把源树复制作构建目录，build() 里打只改 s/ 不改 b/src"
+  - "gtk broadway-only 无 gdk/gdkx.h：X11-only 代码用 GDK_WINDOWING_X11 源码守卫（知识库 gui-toolkit-backend-macro-guard）"
+  - "pulseaudio/17.0 无 mainloop-glib 组件，需 17.0.1；glib 线冲突时 force 到 gtk 侧只重建小包"
+  - "pango 头 include <hb.h> 但不传播 harfbuzz include，消费者需显式声明 harfbuzz"
