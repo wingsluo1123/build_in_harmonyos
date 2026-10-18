@@ -1,0 +1,73 @@
+# test_package/MANIFEST.yml
+#
+# gnome-desktop 44.1 — 上游测试与消费者测试声明
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: gnome-desktop/44.1
+homepage: "https://gitlab.gnome.org/GNOME/gnome-desktop"
+
+# 上游测试入口
+# 上游 tests/meson.build 不注册 test()（源码注释：Don't run these tests at
+# build-time with test(): currently both tests rely on our locales having been
+# installed），测试入口是 4 个 GLib g_test 可执行文件，编译后手动运行。
+upstream_check_command: "./tests/bg-slide-show; ./tests/wall-clock; ./tests/wallclock-reftest; ./tests/languages"
+upstream_test_in_build: false
+upstream_test_command: "conan create … -o &:with_tests=True"
+
+upstream_tests:
+  - file: tests/bg-slide-show.c
+    program: tests/bg-slide-show
+    description: "幻灯片起始时间解析（子进程设置 TZ=C / TZ=US/Eastern）"
+    case_count: 2
+    cases:
+      - "/bg-slide-show/starttime-no-dst"
+      - "/bg-slide-show/starttime-dst"
+  - file: tests/wall-clock.c
+    program: tests/wall-clock
+    description: "GnomeWallClock 时钟串格式化 / GSettings 变更通知"
+    case_count: 5
+    cases:
+      - "/wall-clock/colon-vs-ratio"
+      - "/wall-clock/space-vs-en-space"
+      - "/wall-clock/24h-clock-format"
+      - "/wall-clock/notify-clock"
+      - "/wall-clock/weekday-setting"
+  - file: tests/wallclock-reftest.c
+    program: tests/wallclock-reftest
+    description: "GTK UI 渲染对照（每个 *.ui 一个用例，需 GTK 显示后端与 locale）"
+    case_count: 4
+    cases:
+      - "C.ui"
+      - "en_US.utf-8.ui"
+      - "he_IL.utf8.ui"
+      - "ja_JP.utf8.ui"
+  - file: tests/languages.c
+    program: tests/languages
+    description: "locale 为 NULL 时的语言名解析"
+    case_count: 1
+    cases:
+      - "/languages/using-null-locale"
+
+# 实测结果（2026-10-17，OHOS aarch64 真机，详见 reports/test-report.md）
+upstream_test_result:
+  total: 12
+  passed: 6
+  failed: 2
+  not_run: 4
+  detail: >-
+    bg-slide-show: 1 通过 / 1 失败（GLib 无 TZif 时区数据，与 libc mktime 不一致）；
+    wall-clock: 5/5 通过（运行前需现场编译 gsettings-desktop-schemas 的 schema）；
+    wallclock-reftest: 4 项未执行（无 X/Wayland/broadway 显示后端）；
+    languages: 1 项失败（OHOS 无 libc locale 数据库，上游函数降级 warning 被 g_test 判负）。
+
+# test_package 中的消费者测试（适配后新增的鸿蒙用例）
+test_package_tests:
+  - file: src/test_gnome_desktop.c
+    description: >-
+      消费者测试：CMake find_package(gnome-desktop-3.0) + 链接后调用真实 API —
+      gnome_get_platform_version / gnome_normalize_locale /
+      gnome_get_language_from_locale / GnomeWallClock 时钟串与 24h-12h 格式化 /
+      GnomeXkbInfo 规则解析
+    command: "./test_gnome_desktop"
+    assertion_count: 6
+    result: "6/6 passed"
