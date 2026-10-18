@@ -1,0 +1,51 @@
+libosmscout-client-qt: 在无 OpenGL 的 Qt6 构建下编译通过
+
+OHOS 版 qtbase/6.11.1 未构建 OpenGL 模块（qtgui-config.h 里
+QT_FEATURE_opengl 为 -1，并定义 QT_NO_OPENGL），而 QtGui 下
+qopenglcontext.h / qopenglfunctions.h 的全文都在 #ifndef QT_NO_OPENGL 内。
+于是 `#include <QOpenGLContext>` 能成功（头文件存在、内容为空），但
+QOpenGLContext / QOpenGLFunctions 并未声明，编译器报的是
+"use of undeclared identifier" 而不是 "file not found"。
+
+TiledMapRenderer::RenderMap() 里那段代码只是探测 GL_ARB_texture_non_power_of_two
+扩展，以便在足够新的 GL 上关闭瓦片缩放（把 glPowerOfTwoTexture 从默认的
+Upscaling 降为 NoScaling）。没有 OpenGL 时该优化无意义，直接跳过即保持
+默认行为，语义等价。
+
+上游补丁 libosmscout_4.patch 也改本文件，但其 hunk 在 445 行附近，与本补丁
+的 29/205 行区域不重叠；本补丁先由 conan 施加，上游补丁随后在 configure
+阶段以偏移方式应用。
+
+对应上游文件（Framstag/libosmscout @ acb1e4b6）：
+  libosmscout-client-qt/src/osmscoutclientqt/TiledMapRenderer.cpp
+
+diff --git a/backend/libosmscout/libosmscout-client-qt/src/osmscoutclientqt/TiledMapRenderer.cpp b/backend/libosmscout/libosmscout-client-qt/src/osmscoutclientqt/TiledMapRenderer.cpp
+--- a/backend/libosmscout/libosmscout-client-qt/src/osmscoutclientqt/TiledMapRenderer.cpp
++++ b/backend/libosmscout/libosmscout-client-qt/src/osmscoutclientqt/TiledMapRenderer.cpp
+@@ -29,8 +29,10 @@
+ #include <QGuiApplication>
+ #include <QScreen>
+ #include <QtCore>
++#ifndef QT_NO_OPENGL
+ #include <QOpenGLContext>
+ #include <QOpenGLFunctions>
++#endif
+ 
+ namespace osmscout {
+ TiledMapRenderer::TiledMapRenderer(QThread *thread,
+@@ -205,6 +207,7 @@ bool TiledMapRenderer::RenderMap(QPainter& painter,
+   onlineTileCache.clearPendingRequests();
+   offlineTileCache.clearPendingRequests();
+ 
++#ifndef QT_NO_OPENGL
+   if (QOpenGLContext *glContext = QOpenGLContext::currentContext();
+       glContext
+       && this->glPowerOfTwoTexture != GLPowerOfTwoTexture::NoScaling
+@@ -215,6 +218,7 @@ bool TiledMapRenderer::RenderMap(QPainter& painter,
+     // This is changed just once (on the first render request),
+     // so there is no need to invalidate tile cache after the change.
+   }
++#endif
+ 
+   if (!TiledRenderingHelper::RenderTiles(painter,request,layerCaches,unknownColor,-1,tileGridColor)){
+     return false;
