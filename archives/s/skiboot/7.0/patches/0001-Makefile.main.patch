@@ -1,0 +1,25 @@
+--- a/Makefile.main
++++ b/Makefile.main
+@@ -43,21 +43,21 @@
+ endif
+ endif
+ 
+ # clang tends to emit more warnings so stop those breaking the build for now
+ ifeq ($(cc-name),clang)
+ CWARNS += -Wno-error
+ endif
+ 
+ # Host tools and options
+ HOSTCC=gcc
+-HOSTEND=$(shell uname -m | sed -e 's/^i.*86$$/LITTLE/' -e 's/^x86.*/LITTLE/' -e 's/^ppc64le/LITTLE/' -e 's/^ppc.*/BIG/')
++HOSTEND=$(shell uname -m | sed -e 's/^i.*86$$/LITTLE/' -e 's/^x86.*/LITTLE/' -e 's/^ppc64le/LITTLE/' -e 's/^ppc.*/BIG/' -e 's/^aarch64.*/LITTLE/' -e 's/^arm.*/LITTLE/')
+ HOSTCFLAGS:=-O1 $(CWARNS) -DHAVE_$(HOSTEND)_ENDIAN -MMD
+ HOSTCFLAGS += $(call try-cflag,$(HOSTCC),-std=gnu11)
+ HOSTCFLAGS += $(call try-cflag,$(HOSTCC),-m64)
+ HOSTCFLAGS += $(call try-cflag,$(HOSTCC),-Wjump-misses-init) \
+ 	  $(call try-cflag,$(HOSTCC),-Wsuggest-attribute=const) \
+ 	  $(call try-cflag,$(HOSTCC),-Wsuggest-attribute=noreturn) \
+ 	  $(call try-cflag,$(HOSTCC),-Wno-error=suggest-attribute=const) \
+ 	  $(call try-cflag,$(HOSTCC),-Wno-error=suggest-attribute=noreturn)
+ HOSTCFLAGS += -DDEBUG -DCCAN_LIST_DEBUG
+ 

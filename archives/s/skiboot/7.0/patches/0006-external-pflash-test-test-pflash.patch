@@ -1,0 +1,25 @@
+--- a/external/pflash/test/test-pflash
++++ b/external/pflash/test/test-pflash
+@@ -27,21 +27,21 @@
+ cmp_with_ff() {
+ 	if [ "$#" -ne 3 ] ; then
+ 		fail_test;
+ 	fi
+ 	file="$1";
+ 	start="$2";
+ 	len="$3";
+ 
+ 	blank=$(mktemp --tmpdir="$DATA_DIR" blank.pnorXXXXXX);
+ 	dd status=none if=/dev/zero bs="$len" count=1 | tr '\000' '\377' > "$blank"
+-	cmp --bytes="$len" --ignore-initial="$start:0" "$file" "$blank";
++	cmp -n "$len" "$file" "$blank" "$start" 0;
+ 	if [ "$?" -ne 0 ] ; then
+ 		fail_test;
+ 	fi
+ 	#fail_test; will trigger a cleanup straight away
+ 	rm $blank;
+ }
+ 
+ #The reason for it is that this way there is a completely independant
+ #way of calculating checksums so if checksums fail, we can be
+ #confident its because libflash/libffs changed
