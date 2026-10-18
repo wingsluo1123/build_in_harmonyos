@@ -1,0 +1,10 @@
+# libdbusmenu-glib16.04.0原生适配
+
+官方发布源码760376bytes，SHA256b9cc4a2acd74509435892823607d966d424bd9ad5d0b00938f27240a1bfa878a。配方由发布包的预生成源构建GLib协议库11个翻译单元，实际执行原8入口15编译程序。公开头7项、版本化SONAME和许可证随库打包。真实发布GLib2.84.0.1/dbustest19.04.0.1与独立build-context D-Bus1.16.2.1提供完整原生闭包。
+
+Conan命令值编译器须拆成实际可执行文件和CMAKE_C_COMPILER_ARG1保留必需wrapper参数；结合公开GLib头/库传递及实际build_folder/bindir绝对路径，使原始多进程套件之后的CMake消费者真实编译、签名、执行。保留旧失败，新增child_find空链、两项命中、未命中及删除后查找回归。 本次原始gtester测试辅助工具复用E452私有ELF副本重新签名规则，新增原始发布字节EPERM与私有签名RC0的对照证据及不修改provider缓存的真实原套件验证，不另造通用签名知识。
+
+原4个测试数据头373字段仅等价C99语法修改，原Makefile与断言保留；产品child_find修复和新增生命周期回归独立核验。完整正式libdbusmenu-glib-16.04.0-official-20261016-r1289两次create各原8/8、C6/H1、Finish35与事务释放通过。观察SHA2567f3efb7bd15f106135d3df45659bdf574faa8e7c7bc43b7c9423999ef4ec9d3a，日志SHA256ca1ea00d3a0f87985927093eead87bfd3a81c01152d264707cef0ae405d231b7。当前新HEAD平台CI与Review继续独立验收。
+
+
+正式CI121774/build108615在原始objects入口启动发布gtester时被系统拒绝（Operation not permitted），原始断言尚未开始。独立r1287在同一运行库闭包对照：原始发布gtester为EPERM(errno1)，私有重签副本--help RC0，发布文件字节不变。复用E452：将已声明GLib2.84.0.1的gtester及同版libglib-2.0.so.0/libintl.so.8复制到当前数字UID所有0700临时目录，使用真实SDK签名并逐一核对原provider字节未改；原Makefile生成器仅把gtester执行路径绑定为此副本。保持原8入口、15程序、9个objects断言、全部参数、严格警告与300秒预算。libdbusmenu-glib-16.04.0-official-20261016-r1289准备阶段特意不预先重签发布gtester，两次正式create均原8/8、消费者6/6、Harmony1/1，独立审计确认唯一launch、自有进程0及release/postrelease。每轮私有副本及总线根均由上下文清理。存在codesign段不等于当前执行签名有效，实际平台CI仍按新HEAD另验。
