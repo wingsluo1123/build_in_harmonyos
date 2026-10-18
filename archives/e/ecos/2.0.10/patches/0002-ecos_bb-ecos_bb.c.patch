@@ -1,0 +1,117 @@
+--- a/ecos_bb/ecos_bb.c
++++ b/ecos_bb/ecos_bb.c
+@@ -277,21 +277,21 @@
+     }
+ #if MI_PRINTLEVEL > 1
+     PRINTTEXT("split_idx:%u, split_val:%f\n", *split_idx, *split_val);
+ #endif
+ }
+ 
+ /*
+  * Updates the solver's lb and ub contraints for integer variables
+  * to the bounds specified by the node
+  */
+-static void set_prob(ecos_bb_pwork *prob, char *bool_node_id, pfloat *int_node_id)
++static void set_prob(ecos_bb_pwork *prob, signed char *bool_node_id, pfloat *int_node_id)
+ {
+     idxint i;
+     for (i = 0; i < prob->num_bool_vars; ++i)
+     {
+         switch (bool_node_id[i])
+         {
+         case MI_ONE:
+             ecos_updateDataEntry_h(prob->ecos_prob, 2 * i, -1.0);    /*ecos_prob->h[2*i] = -(1.0); // -x <= -1 <=> x >= 1*/
+             ecos_updateDataEntry_h(prob->ecos_prob, 2 * i + 1, 1.0); /*ecos_prob->h[2*i + 1] = 1.0;*/
+             break;
+@@ -375,21 +375,21 @@
+     }
+     return ret_val;
+ }
+ 
+ /**
+  * Initializes strong branching by copying current state in tmp_branching nodes
+  */
+ static void initialize_strong_branching(ecos_bb_pwork *problem, idxint node_idx)
+ {
+     // copy away tmp bool and int node since it's needed by another function -.-
+-    const int bool_node_size = sizeof(char) * problem->num_bool_vars;
++    const int bool_node_size = sizeof(signed char) * problem->num_bool_vars;
+     const int int_node_size = sizeof(pfloat) * 2 * problem->num_int_vars;
+ 
+     // copy over current state to tmp_branching_nodes
+ 
+     memcpy(problem->tmp_branching_bool_node_id, get_bool_node_id(node_idx, problem), bool_node_size);
+     memcpy(problem->tmp_branching_int_node_id, get_int_node_id(node_idx, problem), int_node_size);
+ }
+ 
+ /*
+  * Calculates the relaxation (and ecos_result) for the tmp_branching node
+@@ -398,21 +398,21 @@
+ {
+     set_prob(problem, problem->tmp_branching_bool_node_id, problem->tmp_branching_int_node_id);
+     *ecos_result = ECOS_solve(problem->ecos_prob);
+     *relaxation = eddot(problem->ecos_prob->n, problem->ecos_prob->x, problem->ecos_prob->c);
+ }
+ 
+ /*
+  * Checks if the ecos result is infeasible, if so it fixes the variable to the other_val
+  */
+ static int check_infeasible_bool_var(ecos_bb_pwork *problem, const idxint ecos_result, const pfloat relaxation, const idxint node_idx,
+-                                     const char other_val, const idxint var_idx, idxint *split_idx, pfloat *split_val,
++                                     const signed char other_val, const idxint var_idx, idxint *split_idx, pfloat *split_val,
+                                      const pfloat current_value)
+ {
+     if (is_infeasible(ecos_result) || relaxation > problem->global_U)
+     {
+         //fix value to MI_ONE, no branching needed
+         get_bool_node_id(node_idx, problem)[var_idx] = other_val;
+         problem->tmp_branching_bool_node_id[var_idx] = other_val;
+ #if PRINTLEVEL >= 3
+         PRINTTEXT("Found infeasible node path for down-branching in node [%d] in var [%d]\n", node_idx, i);
+ #endif
+@@ -457,21 +457,21 @@
+ }
+ 
+ /*
+  * calculates the q_down and q_up using strong-branching for a bool var
+  * returns 1 if one of the paths is infeasible
+  */
+ static int strong_branch_bool_var(ecos_bb_pwork *problem, idxint *split_idx, pfloat *split_val, const idxint node_idx,
+                                   pfloat *q_down, pfloat *q_up, const idxint i, const pfloat current_value)
+ {
+     // save val before branching
+-    const char orig_val = problem->tmp_branching_bool_node_id[i];
++    const signed char orig_val = problem->tmp_branching_bool_node_id[i];
+     idxint ecos_result;
+     // branch down
+     problem->tmp_branching_bool_node_id[i] = MI_ZERO;
+     calc_tmp_branching_problem(problem, q_down, &ecos_result);
+     if (check_infeasible_bool_var(problem, ecos_result, *q_down, node_idx, MI_ONE, i, split_idx, split_val, current_value))
+     {
+         return 1;
+     }
+     // branch up
+     problem->tmp_branching_bool_node_id[i] = MI_ONE;
+@@ -947,21 +947,21 @@
+             }
+             *sum_ptr += change_in_q / change_in_var;
+             *cnt_ptr += 1;
+         }
+ 
+         /* Figure out if x is already an integer solution
+ 			if the solution had no numerical errors*/
+         branchable = 1;
+         for (i = 0; i < prob->num_bool_vars; ++i)
+         {
+-            prob->tmp_bool_node_id[i] = (char)pfloat_round(prob->ecos_prob->x[prob->bool_vars_idx[i]]);
++            prob->tmp_bool_node_id[i] = (signed char)pfloat_round(prob->ecos_prob->x[prob->bool_vars_idx[i]]);
+             branchable &= float_eqls(prob->ecos_prob->x[prob->bool_vars_idx[i]], (pfloat)prob->tmp_bool_node_id[i], prob->stgs->integer_tol);
+         }
+         for (i = 0; i < prob->num_int_vars; ++i)
+         {
+             prob->tmp_int_node_id[2 * i + 1] = pfloat_round(prob->ecos_prob->x[prob->int_vars_idx[i]]);
+             prob->tmp_int_node_id[2 * i] = -(prob->tmp_int_node_id[2 * i + 1]);
+             branchable &= float_eqls(prob->ecos_prob->x[prob->int_vars_idx[i]], prob->tmp_int_node_id[2 * i + 1], prob->stgs->integer_tol);
+         }
+         branchable = !branchable;
+ 
