@@ -1,0 +1,116 @@
+{
+  "verdict": "pass",
+  "counts": {"P0": 0, "P1": 0, "P2": 2, "P3": 8},
+  "audit_scope": "sndio 1.10.0 OHOS/arm64 Conan 适配，最终提交状态（分支 feat/sndio-1.10.0）",
+  "auditor": "独立审计者（与实现者不同会话，只读核验）",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "PKG-LICENSE-01",
+      "file": "archives/s/sndio/1.10.0/conanfile.py",
+      "line": 148,
+      "description": "package() 未把上游 LICENSE 拷到 licenses/，与仓内其它配方惯例不一致",
+      "evidence": "包目录只有 bin/ include/ lib/，无 licenses/",
+      "fix_suggestion": "copy(self, \"LICENSE\", src=self.source_folder, dst=<pkg>/licenses)"
+    },
+    {
+      "severity": "P2",
+      "rule_id": "DELIV-REPORT-01",
+      "file": ".gitignore",
+      "line": 98,
+      "description": "reports/test-report.md 被全局忽略且无 sndio 例外，PR 里报告会缺失，README 指向死链",
+      "evidence": ".gitignore:98 reports/test-report.md；git check-ignore 命中",
+      "fix_suggestion": "仿 archives/l/lz4/1.10.0 增加 !archives/s/sndio/1.10.0/reports/ 例外"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "RECIPE-SHELL-10",
+      "file": "archives/s/sndio/1.10.0/conanfile.py",
+      "line": 57,
+      "description": "_shell() 三处候选都不存在时会返回一个不存在的路径，错误信息滞后到 bash 调用",
+      "evidence": "无显式存在性校验分支",
+      "fix_suggestion": "循环内校验 os.path.exists，全部失败抛 ConanException"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "RECIPE-FPIC-09",
+      "file": "archives/s/sndio/1.10.0/conanfile.py",
+      "line": 79,
+      "description": "声明了 fPIC option 但 CFLAGS 无条件加 -fPIC，option 实际无效",
+      "evidence": "cflags = [opt, \"-fPIC\"]",
+      "fix_suggestion": "if self.options.get_safe(\"fPIC\", True): cflags.append(\"-fPIC\")"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "RECIPE-MAN-11",
+      "file": "archives/s/sndio/1.10.0/conanfile.py",
+      "line": 128,
+      "description": "man 页先装进包的 share/man 再 rmdir 删除，布局上像装过又删掉",
+      "evidence": "--mandir=<pattern>/share/man + package() rmdir(share)",
+      "fix_suggestion": "--mandir 指到 build_folder，包内不安装 man"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "TEST-ELF-ROBUST-04",
+      "file": "archives/s/sndio/1.10.0/test_package/conanfile.py",
+      "line": 190,
+      "description": "soname 文件不存在时静默跳过 DT_SONAME 断言（在 shared 分支内）",
+      "evidence": "if shared and os.path.exists(soname):",
+      "fix_suggestion": "shared 分支内直接断言文件存在"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "TEST-PC-VER-03",
+      "file": "archives/s/sndio/1.10.0/test_package/conanfile.py",
+      "line": 215,
+      "description": "pc 版本仅通过 pkg-config 二进制验证，worker 上该二进制缺失时版本完全未验证",
+      "evidence": "仅 FileNotFoundError 分支 WARN",
+      "fix_suggestion": "直接解析 sndio.pc 的 Version: 字段（不依赖二进制）"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "TEST-SKIP-02",
+      "file": "archives/s/sndio/1.10.0/test_package/conanfile.py",
+      "line": 270,
+      "description": "跳过项只在 warning 里出现，成功汇总不体现跳过数",
+      "evidence": "success 只报 all tests passed",
+      "fix_suggestion": "汇总同时打印 N 条环境跳过"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "TEST-SIGNAL-06",
+      "file": "archives/s/sndio/1.10.0/test_package/conanfile.py",
+      "line": 246,
+      "description": "数据通路只验指定编码下的长度与 RMS，未验输出与输入逐字节一致",
+      "evidence": "written == expected_bytes + rms 阈值",
+      "fix_suggestion": "加 data == payload 逐字节断言"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "TEST-STATIC-01",
+      "file": "archives/s/sndio/1.10.0/test_package/conanfile.py",
+      "line": 181,
+      "description": "静态构建下 ELF/DT_NEEDED 断言不适用，原实现会走异常路径",
+      "evidence": "DT_NEEDED 段在 static 下不存在",
+      "fix_suggestion": "shared 门控 + 显式 SKIP 记录"
+    }
+  ],
+  "post_audit_fixes": [
+    {"issue": "PKG-LICENSE-01", "fix": "package() 增加 copy LICENSE -> licenses/", "evidence": "包目录含 licenses/LICENSE；release 归档 17 条目含 licenses/LICENSE"},
+    {"issue": "DELIV-REPORT-01", "fix": ".gitignore 增加 archives/s/sndio/1.10.0/reports/ 及其 *.md、audit-result.json 例外", "evidence": "git check-ignore 不再命中 reports/test-report.md"},
+    {"issue": "RECIPE-SHELL-10", "fix": "_shell() 逐个候选校验存在性，全部缺失抛 ConanException", "evidence": "conan create RC=0 使用 CONFIG_SHELL"},
+    {"issue": "RECIPE-FPIC-09", "fix": "fPIC 按 option 决定是否加 -fPIC", "evidence": "默认 True 构建通过"},
+    {"issue": "RECIPE-MAN-11", "fix": "--mandir 指向 build_folder，包内不装 man", "evidence": "包目录无 share/"},
+    {"issue": "TEST-ELF-ROBUST-04", "fix": "shared 分支内直接断言 soname 文件存在后再读 DT_SONAME", "evidence": "[ok] libsndio.so.7.3 carries DT_SONAME=libsndio.so.7"},
+    {"issue": "TEST-PC-VER-03", "fix": "自解析 sndio.pc 的 Version: 字段，值取自依赖 ref", "evidence": "[ok] sndio.pc declares Version: 1.10.0"},
+    {"issue": "TEST-SKIP-02", "fix": "汇总打印环境跳过数", "evidence": "success: all HarmonyOS consumer tests passed (1 environment skip(s))"},
+    {"issue": "TEST-SIGNAL-06", "fix": "增加 data == payload 逐字节断言", "evidence": "[ok] aucat output is byte-identical to the input"},
+    {"issue": "TEST-STATIC-01", "fix": "ELF 段按 shared 门控，static 记 SKIP", "evidence": "shared 构建 24 条 [ok]、0 FAIL"}
+  ],
+  "verification": {
+    "conan_create": "RC=0，24 条 [ok]，0 条 [FAIL]，1 条环境 SKIP（pkg-config 二进制缺失）",
+    "log": "sndio-create5.log",
+    "package_layout": "bin/(4 CLI) include/sndio.h lib/(libsndio.so{,.7,.7.0,.7.3}) lib/pkgconfig/sndio.pc licenses/LICENSE",
+    "elf": "DT_NEEDED=libsndio.so.7,libc.so（无含 / 条目）；DT_SONAME=libsndio.so.7"
+  }
+}

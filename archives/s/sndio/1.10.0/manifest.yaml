@@ -1,29 +1,42 @@
 software: sndio
 version: "1.10.0"
 status: built
-build_date: "2026-06-05"
+build_system: custom
+build_date: "2026-10-17"
+created_at: 2026-10-17
 
 source:
   url: "https://sndio.org/sndio-1.10.0.tar.gz"
-  sha256: ""
+  sha256: "bebd3bfd01c50c9376cf3e7814b9379bed9e17d0393b5113b7eb7a3d0d038c54"
   tar_format: tar.gz
 
-build:
-  system: custom
-  configure_options:
-    - "--disable-alsa"
-  dependencies: []
-  cc: clang
-  cxx: clang++
+dependencies:
+  required: []
+  build: []
+  optional: []
+  overrides: []
 
 patches_applied:
-  - "0001-bsd-compat-bsd-compat.h.patch"
-  - "0002-bsd-compat-getpeereid.c.patch"
-  - "0003-configure.patch"
+  - patches/0001-bsd-compat-bsd-compat.h.patch
+  - patches/0002-bsd-compat-getpeereid.c.patch
+  - patches/0003-configure.patch
 
-knowledge_gained:
-  - "sndio configure needs HarmonyOS case added (alsa=no, ldadd=-lm)"
-  - "bsd-compat/getpeereid.c needs __OHOS__ guard for struct ucred (musl incomplete headers)"
-  - "bsd-compat/bsd-compat.h needs SOCK_CLOEXEC guard wrapped in ifndef for HarmonyOS"
-  - "No ALSA lib available on HarmonyOS NEXT"
-  - "HarmonyOS NEXT uses musl libc; bsd-compat functions compiled automatically"
+test_results:
+  upstream: "none - the 1.10.0 tarball ships no regress/ directory, so there is no
+    upstream test suite to run"
+  test_package: "HarmonyOS consumer test (test_package/), executed by conan create
+    after the package is built. Real assertions, all [ok] in the recorded run:
+    the CMake consumer builds and links libsndio and resolves all 24 public entry
+    points; sio_initpar() leaves every parameter at the ~0u sentinel; sio_open()/
+    sioctl_open()/mio_open() return NULL for an absent device; installed layout
+    (include/sndio.h, lib/pkgconfig/sndio.pc, bin/{aucat,sndiod,sndioctl,midicat},
+    lib/libsndio.so{,.7,.7.3}); the consumer's DT_NEEDED is the bare soname
+    libsndio.so.7 with no build path (parsed from the ELF dynamic section in pure
+    Python, no readelf dependency); libsndio.so.7.3 carries DT_SONAME=libsndio.so.7;
+    sndio.pc is relocatable (prefix=${pcfiledir}) and links -lsndio; `aucat -n`
+    runs a real off-line playback->record pipeline (16000 B raw s16 in, 16000 B
+    out, non-silent); each installed tool executes and prints its usage string.
+    Not covered anywhere: anything that needs a live sndiod (sio_open on a real
+    device, the sndiod daemon itself) - there is no audio hardware in the sandbox
+    and sndiod's -f only accepts existing sndio devices, so those paths are
+    asserted as clean NULL returns instead of being reported as passes."
