@@ -1,0 +1,32 @@
+# 软件级 manifest
+# 文件位置: archives/x/xshogi/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+software: xshogi
+display: "XShogi"
+description: "GNU Shogi（日本将棋）引擎的 X11/Athena（Xt/Xaw）图形前端"
+category: gfx
+homepage: "https://www.gnu.org/software/gnushogi/"
+license: GPL-3.0-or-later
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "AC_PATH_XTRA 预置 ac_cv_have_x='have_x=yes' 跳过 xmkmf 探测（CI/真机无 xmkmf、无系统 X11 树），X 头/库路径全走 Conan 依赖（AutotoolsDeps）"
+    - "libXt/Xt 不实现 -help/-version，补丁 0001 在 XtAppInitialize 前加 -version早退，使无头 L2 smoke 可通过（xeyes/appres 同款约定）"
+    - "tarball 自带预生成 configure/Makefile.in/parser.c/scanner.c；configure.ac 未用 AC_CANONICAL_*，无需 config.guess/config.sub 补丁"
+    - "运行期 X11 动态库全部来自 Conan 依赖（设备无系统 X11 树），package_info() 注入 runenv LD_LIBRARY_PATH"
+  common_dependencies:
+    - xorgproto
+    - libx11
+    - libxext
+    - libxt
+    - libxmu
+    - libxaw
+
+versions:
+  "1.4.2":
+    status: built
+    build_date: "2026-10-16"
+    conan_ref: "xshogi/1.4.2"
+    note: "autotools；上游无测试套件（N=0）；补丁 0001 为无头 -version 早退"
