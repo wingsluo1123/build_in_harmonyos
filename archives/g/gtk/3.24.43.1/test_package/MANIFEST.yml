@@ -1,0 +1,29 @@
+package: gtk/3.24.43.1
+homepage: "https://www.gtk.org/"
+
+upstream_check_command: "meson test --list"
+upstream_test_in_build: false
+upstream_test_command: ""
+# R51 上游测试三步法：gtk 3.24.43 上游 tests/ 含大量 GUI 测试（testfilechooser/
+# testgeometry 等），运行需要可用显示会话（X11 display 或 broadwayd）。本适配环境
+# 无显示后端，配方 tests=false 不构建上游测试；测试完备性由 test_package 消费者用例
+# 承担（真实 API + X11 后端实质断言）。
+upstream_tests:
+  - file: tests/testfilechooser.c
+    source: gtk+-3.24.43/tests/testfilechooser.c
+    description: "GTK file chooser widget test"
+    command: "meson test --suite gtk"
+  - file: tests/testgeometry.c
+    source: gtk+-3.24.43/tests/testgeometry.c
+    description: "GTK geometry handling test"
+    command: "meson test"
+
+test_package_tests:
+  - file: test.c
+    description: "Consumer test: gtk_get_*_version / gtk_check_version / gtk_widget_get_type + X11 后端实质断言（GDK_WINDOWING_X11 编译期守卫、gdk_x11_display_get_type 链接期符号）"
+    command: "./test_GTK"
+  - file: CMakeLists.txt
+    description: "pkg-config 契约断言：gtk+-3.0 与 gtk+-x11-3.0 两个 .pc 均必须可解析（后者即 vino 3.22.0 一类 X11 消费者的探测入口）"
+    command: "cmake -S . -B build"
+
+assertion_count: 5
