@@ -1,0 +1,103 @@
+package: libthreadar/1.6.1
+homepage: "https://github.com/Edrusb/libthreadar"
+
+# Full source audit: one manual upstream test case; no registered make-check cases.
+upstream_test_in_build: true
+upstream_test_command: "doc/examples/test_barrier (explicit run after make)"
+upstream_test_status: pass
+upstream_test_reason: >-
+  PASS in the clean local Linux x86_64 conan create validation run;
+  UPSTREAM-CASE reported workers=10. This is not an OHOS device result.
+upstream_tests:
+  - file: doc/examples/test_barrier.cpp
+    case_count: 1
+    status: pass
+    reason: >-
+      PASS: clean local validation create reported
+      UPSTREAM-CASE test_barrier: PASS (workers=10); device execution was not
+      performed because the two-hop device tunnel 127.0.0.1:2200 was down as
+      of 06:05 CST and this session was explicitly NO-DEVICE.
+    description: "One manual ten-worker barrier scenario; the ten participants are not separate cases."
+    command: "doc/examples/test_barrier"
+
+upstream_registered_test_targets: []
+upstream_non_test_examples:
+  - "hello_world"
+  - "stack_sizer"
+  - "fast_tampon_example.cpp"
+  - "thread_example.cpp"
+  - "barrier_example.cpp"
+  - "condition_example.cpp"
+
+test_package_status: pass
+test_package_reason: >-
+  The clean local validation create completed package() and test_package on
+  Linux x86_64: the header relocation scan and six consumer cases passed.
+  Device execution was not performed because the two-hop tunnel
+  127.0.0.1:2200 was down as of 06:05 CST and this session was explicitly
+  NO-DEVICE.
+test_package_tests:
+  - file: conanfile.py
+    case_count: 1
+    cases:
+      - name: package_header_relocation
+        status: pass
+        reason: "PASS: TEST-PACKAGE-CASE package_header_relocation: PASS headers=15 absolute_includes=0 in the clean local validation create."
+    description: "Scan installed public headers for absolute include directives that would retain the configured Conan package prefix."
+  - file: test_package.cpp
+    case_count: 6
+    cases:
+      - name: condition_lock_unlock
+        status: pass
+        reason: "PASS: TEST-PACKAGE-CASE condition_lock_unlock: PASS in the clean local validation create."
+      - name: thread_run_join_restart
+        status: pass
+        reason: "PASS: TEST-PACKAGE-CASE thread_run_join_restart: PASS in the clean local validation create."
+      - name: thread_cooperative_cancel
+        status: pass
+        reason: "PASS: TEST-PACKAGE-CASE thread_cooperative_cancel: PASS in the clean local validation create."
+      - name: mutex_concurrency
+        status: pass
+        reason: "PASS: TEST-PACKAGE-CASE mutex_concurrency: PASS in the clean local validation create."
+      - name: semaphore_accounting
+        status: pass
+        reason: "PASS: TEST-PACKAGE-CASE semaphore_accounting: PASS in the clean local validation create."
+      - name: barrier_rendezvous
+        status: pass
+        reason: "PASS: TEST-PACKAGE-CASE barrier_rendezvous: PASS in the clean local validation create."
+    description: "Consumer checks for condition lock/unlock, thread run/join/restart/cooperative cancellation, mutex concurrency, semaphore accounting, and barrier rendezvous."
+    command: "test_libthreadar"
+
+assertion_count: 7
+declared_total_case_count: 8
+
+validation_evidence:
+  environment: "Fresh CONAN_HOME in an ephemeral Ubuntu 24.04 x86_64 container; Conan 2.29.1; GCC 13.3.0."
+  validation_create: pass
+  validation_copy: >-
+    A disposable copy used Ubuntu system Autotools and shell wrappers for the
+    distro Perl aclocal/automake scripts. The copy omitted the pinned
+    tool_requires because the exact clean create could not fetch automake/1.18;
+    the tracked recipe, static source URL, and mirror configuration were not
+    changed for this validation.
+  configure_output: "checking build system type... x86_64-unknown-linux-gnu"
+  upstream_summary: "UPSTREAM-SUMMARY total=1 pass=1 fail=0"
+  consumer_summary: "TEST-PACKAGE-SUMMARY total=6 pass=6 fail=0 notrun=0"
+  header_scan_output: "TEST-PACKAGE-CASE package_header_relocation: PASS headers=15 absolute_includes=0"
+  exact_recipe_create: >-
+    A separate fresh Conan 2.29.1 create of the tracked recipe stopped before
+    libthreadar build(): the pinned automake/1.18 source archive at
+    https://ftp.gnu.org/gnu/automake/automake-1.18.tar.gz timed out after
+    retries. This was a build-requirement download failure, not a case result.
+  previous_ci_failure: >-
+    CI #98075 / Buildbot build 112717 on head
+    7977822e095e5b7142ded1367b11afba96171c4d failed during configure before any
+    case ran: config.guess line 1613 could not write
+    build-release/cgcOIEj/dummy.c (Permission denied), followed by
+    "config.guess: unable to guess system type" and
+    "configure: error: cannot guess build type; you must specify one".
+  device_status: >-
+    NOT-RUN: NO-DEVICE by instruction; the two-hop tunnel 127.0.0.1:2200 was
+    down as of 06:05 CST. No device command was executed.
+  candidate_ci_status: >-
+    No new-head CI log was read or polled in this session.
