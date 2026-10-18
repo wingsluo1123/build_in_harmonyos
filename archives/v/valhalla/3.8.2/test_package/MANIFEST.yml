@@ -1,0 +1,40 @@
+# test_package/MANIFEST.yml
+# valhalla 3.8.2 - upstream/consumer test declaration.
+
+package: valhalla/3.8.2
+homepage: "https://github.com/valhalla/valhalla"
+
+upstream_tests_exist: true
+upstream_test_audit: >-
+  Valhalla ships a large GoogleTest suite.  The self-contained, offline part
+  is the Gurka framework (test/gurka/test_*.cc): each test synthesises an OSM
+  PBF inline, builds graph tiles in-process through the mjolnir API and runs
+  routing requests - no network and no prebuilt tiles required.  The recipe
+  builds the `gurka` target and runs every gurka_* executable from build();
+  the pass/fail summary is packaged under reports/gurka-results.txt.
+  The remaining targets (test/*.cc, cost/tyr inline tests) and the CLI-driven
+  tile fixtures (utrecht_tiles, ...) additionally need the online timezone
+  database built by scripts/valhalla_build_timezones, which requires the
+  spatialite/spatialite_tool CLIs (not available) - those are not run.
+upstream_check_command: "make -C build run-gurka"
+upstream_test_in_build: true
+upstream_test_command: "cmake --build build --target gurka && run each gurka_* binary"
+upstream_tests:
+  - name: "Gurka (test/gurka/test_*.cc)"
+    framework: GoogleTest
+    note: "built and run in build(); counts recorded in reports/gurka-results.txt"
+
+test_package_tests:
+  - file: test_valhalla.cpp
+    description: "C++20 consumer: GraphId pack/unpack and PointLL great-circle distance against the installed library"
+    command: "./test_valhalla"
+
+test_files:
+  - path: "test_package/test_valhalla.cpp"
+    test_type: "R34"
+    assertion_count: 9
+
+test_package_test_count: 1
+consumer_assertion_count: 9
+upstream_test_cases: 0
+assertion_count: 9

@@ -1,0 +1,18 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 6fd2ec7..681b71e 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -276,7 +276,12 @@ if(ENABLE_DATA_TOOLS)
+   find_program(SPATIALITE_TOOL_EXECUTABLE NAMES spatialite_tool)
+   find_program(SPATIALITE_EXECUTABLE NAMES spatialite)
+   if(NOT SPATIALITE_TOOL_EXECUTABLE OR NOT SPATIALITE_EXECUTABLE)
+-    message(FATAL_ERROR "spatialite-tools not found: need both 'spatialite_tool' and 'spatialite', install the correct package for your system.")
++    # OHOS: the spatialite / spatialite_tool CLIs are only required by the
++    # online timezone-database builder (scripts/valhalla_build_timezones),
++    # which is not run during the build or the Gurka test suite.  The library
++    # and the data tools themselves only need libspatialite, so downgrade the
++    # hard configure error to a warning.
++    message(WARNING "spatialite-tools not found: timezone builder will be unavailable")
+   endif()
+   pkg_check_modules(LuaJIT REQUIRED IMPORTED_TARGET luajit)
+   pkg_check_modules(GEOS REQUIRED IMPORTED_TARGET geos)

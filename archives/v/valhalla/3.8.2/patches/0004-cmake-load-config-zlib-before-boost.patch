@@ -1,0 +1,16 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 6fd2ec7..8c2c575 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -122,6 +122,11 @@ endif()
+ set(CMAKE_FIND_PACKAGE_PREFER_CONFIG ON)
+ 
+ # Boost has no .pc file..
++# OHOS/Conan: Boost's CMakeDeps config links its iostreams component against
++# ZLIB::ZLIB, but pkg_check_modules(ZLIB ...) above already set ZLIB_FOUND, so
++# the generated BoostConfig skips find_dependency(ZLIB).  Load the config-mode
++# ZLIB explicitly so the ZLIB::ZLIB target exists before Boost is processed.
++find_package(ZLIB CONFIG REQUIRED)
+ find_package(Boost 1.71 REQUIRED)
+ add_definitions(-DBOOST_NO_CXX11_SCOPED_ENUMS)
+ add_definitions(-DBOOST_ALLOW_DEPRECATED_HEADERS)
