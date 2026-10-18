@@ -1,0 +1,32 @@
+--- a/numerics/CMakeLists.txt
++++ b/numerics/CMakeLists.txt
+@@ -98,27 +98,27 @@
+ # --- Extra setup for the component ---
+ if(MLCPSIMPLEX_FOUND OR BUILD_AS_CPP) 
+   set_target_properties(${COMPONENT} PROPERTIES LINKER_LANGUAGE CXX)
+   file(GLOB_RECURSE C_FILES ${CMAKE_CURRENT_SOURCE_DIR} *.c)
+   set_source_files_properties(${C_FILES} PROPERTIES LANGUAGE CXX)
+ else()
+   set_target_properties(${COMPONENT} PROPERTIES LINKER_LANGUAGE C)
+ endif()
+ 
+ # Links with other Siconos components
+-target_link_libraries(numerics PRIVATE externals)
++target_link_libraries(numerics PUBLIC externals)
+ 
+ # Links with non-Siconos libraries
+ 
+ # Blas/Lapack from externals
+ target_include_directories(numerics PRIVATE $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>/externals/blas_lapack)
+-target_link_libraries(numerics PUBLIC $<BUILD_INTERFACE:LAPACK::LAPACK>)
++target_link_libraries(numerics PUBLIC LAPACK::LAPACK)
+ #target_link_libraries(numerics INTERFACE LAPACK::LAPACK)
+ 
+ if(CMAKE_DL_LIBS)
+   # CMAKE_DL_LIBS needed for dlopen or equivalent
+   target_link_libraries(numerics PRIVATE ${CMAKE_DL_LIBS})
+ endif()
+ 
+ # -- Optional deps --
+ 
+ # Always searched and activated if found :

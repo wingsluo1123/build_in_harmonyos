@@ -1,0 +1,28 @@
+--- a/kernel/src/utils/SiconosAlgebra/test/BlockVectorTest.cpp
++++ b/kernel/src/utils/SiconosAlgebra/test/BlockVectorTest.cpp
+@@ -470,21 +470,24 @@
+   for(unsigned int i = 0; i < size2; ++i)
+     (*tmp2)(i) = 100 * i;
+ 
+   SP::BlockVector  xB(new BlockVector(tmp1, tmp2));
+ 
+   SP::SiconosVector  y(new SiconosVector(7));
+ 
+   xB->insertPtr(y);
+   CPPUNIT_ASSERT_EQUAL_MESSAGE("testInsert : ", xB->numberOfBlocks() == 3, true);
+   CPPUNIT_ASSERT_EQUAL_MESSAGE("testInsert : ", xB->size() == (7 + size), true);
+-  CPPUNIT_ASSERT_EQUAL_MESSAGE("testInsert : ", xB->vector(2) != y, true);
++  // insertPtr shares the supplied vector, as documented by the API.
++  CPPUNIT_ASSERT_EQUAL_MESSAGE("testInsert : ", xB->vector(2) == y, true);
++  (*y)(0) = 42.0;
++  CPPUNIT_ASSERT_EQUAL_MESSAGE("testInsert shared write : ", (*xB->vector(2))(0) == 42.0, true);
+   CPPUNIT_ASSERT_EQUAL_MESSAGE("testInsert : ", *xB->vector(2) == *y, true);
+ 
+   xB->insertPtr(y);
+   CPPUNIT_ASSERT_EQUAL_MESSAGE("testInsert : ", xB->numberOfBlocks() == 4, true);
+   CPPUNIT_ASSERT_EQUAL_MESSAGE("testInsert : ", xB->size() == (14 + size), true);
+   CPPUNIT_ASSERT_EQUAL_MESSAGE("testInsert : ", xB->vector(3) == y, true);
+ 
+   std::cout << "--> insert test ended with success." <<std::endl;
+ }
+ 

@@ -1,0 +1,42 @@
+--- a/kernel/tests-common/TestMain.cpp
++++ b/kernel/tests-common/TestMain.cpp
+@@ -9,29 +9,37 @@
+  *
+  * http://www.apache.org/licenses/LICENSE-2.0
+  *
+  * Unless required by applicable law or agreed to in writing, software
+  * distributed under the License is distributed on an "AS IS" BASIS,
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+ */
+ 
++#include <cppunit/Test.h>
+ #include <cppunit/extensions/TestFactoryRegistry.h>
+ #include <cppunit/ui/text/TestRunner.h>
+ #include <iostream>
+ 
+ 
+ int main()
+ {
+   // The object to run tests
+   CppUnit::TextUi::TestRunner runner;
+ 
+   // Get test classes that have been registered
+   CppUnit::TestFactoryRegistry &registry = CppUnit::TestFactoryRegistry::getRegistry();
+ 
+   // Put tests into the runner
+-  runner.addTest(registry.makeTest());
++  CppUnit::Test* suite = registry.makeTest();
++  if(suite->countTestCases() == 0)
++  {
++    delete suite;
++    std::cerr << "No CppUnit cases registered" << std::endl;
++    return 1;
++  }
++  runner.addTest(suite);
+ 
+   // Run tests
+-  runner.run("", false, true, false);
++  return runner.run("", false, true, false) ? 0 : 1;
+ }

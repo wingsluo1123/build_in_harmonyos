@@ -1,0 +1,204 @@
+--- a/scripts/siconos.py.in
++++ b/scripts/siconos.py.in
+@@ -1,11 +1,11 @@
+-#!/usr/bin/env @Python3_EXECUTABLE@
++#!/usr/bin/env python3
+ """Classes and functions used at runtime
+ to configure, build and execute siconos examples
+ 
+ Siconos is a program dedicated to modeling, simulation and control
+ of non smooth dynamical systems.
+ 
+ Copyright 2021 INRIA.
+ 
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+@@ -22,21 +22,23 @@
+ 
+ import argparse
+ import os
+ import tempfile
+ import subprocess
+ import datetime
+ import sys
+ import platform
+ import logging
+ from pathlib import Path
+-from packaging import version
++def _cmake_version(value):
++    """Only major/minor CMake thresholds are compared below."""
++    return tuple(int(part) for part in value.split(".")[:2])
+ import shutil
+ 
+ 
+ def main():
+     """process :
+        - parse command line
+        - process options
+        - generate CMakeLists.txt for the current driver (if any)
+        - configure, build and execute.
+ 
+@@ -151,38 +153,41 @@
+             build_project(args)
+     # If execution is required :
+     # Rq : default is yes,
+     # call siconos --no-exec for no execution.
+     if not args.no_exec:
+         cmd = []
+         # Check user-defined prefixes (.e.g valgrind)
+         if args.exec_prefix:
+             cmd += args.exec_prefix
+ 
+-        env = os.environ
++        env = os.environ.copy()
+         # If the driver file is python, set python exe
+         if args.is_python:
+             cmd += ['@Python3_EXECUTABLE@']
+             # for python modules
+             if('PYTHONPATH') in env:
+                 env['PYTHONPATH'] += ':' + \
+                     siconos_pythonpath.resolve().as_posix()
+             else:
+                 env['PYTHONPATH'] = siconos_pythonpath.resolve().as_posix()
+ 
+         cmd += [Path(args.exe_full_name).as_posix()]
+ 
+         # Execute ...
+         format_msg('run ' + ' '.join(cmd), args.quiet)
+ 
+         # for plugins
+-        env['LD_LIBRARY_PATH'] = args.rundir.as_posix()
++        paths = [args.rundir.as_posix(), (siconos_root_dir / 'lib').as_posix()]
++        if env.get('LD_LIBRARY_PATH'):
++            paths.append(env['LD_LIBRARY_PATH'])
++        env['LD_LIBRARY_PATH'] = os.pathsep.join(paths)
+         run_command(cmd, args.quiet, env)
+ 
+     # Clean build directory, if required
+     if args.remove_build:
+         # Be sure to close log files to avoid race condition
+         logging.shutdown()
+         siconos_clean(args.build_dir, args.quiet)
+ 
+ 
+ # ------------ Siconos config ------------
+@@ -202,21 +207,21 @@
+ is_windows = 'Windows' in platform.uname()
+ is_darwin = 'Darwin' in platform.uname()
+ 
+ # List of installed components
+ components = '@COMPONENTS@'.split(';')
+ 
+ # Check if Microsoft Virtual C++ has been used
+ msvc = '@MSVC@' != ''
+ 
+ # Current version of cmake
+-cmake_version = version.parse("@CMAKE_VERSION@")
++cmake_version = _cmake_version("@CMAKE_VERSION@")
+ 
+ # Compiler id. One of
+ # https://cmake.org/cmake/help/latest/variable/CMAKE_LANG_COMPILER_ID.html#variable:CMAKE_<LANG>_COMPILER_ID
+ compiler_id = "@CMAKE_CXX_COMPILER_ID@"
+ if not compiler_id:
+     compiler_id = "@CMAKE_C_COMPILER_ID@"
+ 
+ siconos_command_description = '''
+ ===============================================================\n
+ 
+@@ -572,21 +577,21 @@
+         result += '\n# === Create plugin {} === \n'.format(plugin.name)
+         result += 'add_library({} MODULE {})\n'.format(plugin.name,
+                                                        srcfiles[0])
+         for sourcefile in srcfiles:
+             result += 'target_sources({} PRIVATE {})\n'.format(plugin.name,
+                                                                sourcefile)
+         extra_args.includes.append(dd)
+         result += prepare_target(plugin.name, extra_args)
+         result += 'set_target_properties({}'.format(plugin.name)
+         result += ' PROPERTIES PREFIX "")\n'
+-        #f 'Clang' in compiler_id and cmake_version > version.parse("3.13"):
++        #f 'Clang' in compiler_id and cmake_version > _cmake_version("3.13"):
+         #    result += 'target_link_options({}'.format(plugin.name)
+         #    result += ' PRIVATE "-undefined dynamic_lookup")\n'
+         #elif 'Clang' in compiler_id:
+         #    result += 'set_target_properties({} '.format(plugin.name)
+         #    result += 'PROPERTIES LINK_FLAGS "-undefined dynamic_lookup")\n'
+         result += 'install(TARGETS {}'.format(plugin.name)
+         result += ' DESTINATION {})\n'.format(extra_args.rundir)
+ 
+     return result
+ 
+@@ -628,29 +633,31 @@
+     # or if the sources are c++.
+     if not plugins_dirs and args.is_python:
+         build_required = False
+ 
+     if not build_required:
+         # exit if no build has been set from command line.
+         return False
+     result = 'project({} CXX C)\n'.format(args.exe_name)
+     # cmake minimum version
+     result += 'cmake_minimum_required(VERSION 3.7)\n'
+-    if cmake_version >= version.parse("3.12"):
++    if cmake_version >= _cmake_version("3.12"):
+         result += 'cmake_policy(SET CMP0074 NEW)\n'
+ 
+     if args.debug:
+         build_type = 'Debug'
+     else:
+         build_type = 'Release'
+     result += 'set(CMAKE_BUILD_TYPE {})\n'.format(build_type)
+ 
++    # Honor the installed package's RPATH policy in generated drivers.
++    result += 'set(CMAKE_SKIP_RPATH @CMAKE_SKIP_RPATH@)\n'
+     # Rpath stuff
+     result += 'set(CMAKE_SKIP_BUILD_RPATH  FALSE)\n'
+     result += 'set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)\n'
+     result += 'set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)\n'
+ 
+     # find siconos package and components
+     result += 'set(@PROJECT_NAME@_DIR {}'.format(siconos_root_dir)
+     result += '/@ConfigPackageLocation@)\n'.format(siconos_root_dir)
+     result += 'find_package(@PROJECT_NAME@ @MAJOR_VERSION@.@MINOR_VERSION@'
+     result += '.@PATCH_VERSION@ CONFIG REQUIRED)\n'
+@@ -738,38 +745,38 @@
+     """
+     if msvc and is_windows:
+         cmake_cmd = str(Path(siconos_package_dir, 'cmake-vc.bat'))
+     else:
+         cmake_cmd = 'cmake'
+ 
+     cmake_source_dir = args.build_dir
+     #env = []
+     if configure:
+         format_msg('Configure project (cmake)', args.quiet)
+-        if cmake_version >= version.parse("3.13"):
++        if cmake_version >= _cmake_version("3.13"):
+             cmake_configure_command = [cmake_cmd, '-S', cmake_source_dir,
+                                        '-B', args.build_dir]
+         else:
+             cmake_configure_command = [cmake_cmd,
+                                        '-E', 'chdir', args.build_dir,
+                                        cmake_cmd, cmake_source_dir]
+ 
+         if args.generator and is_windows:
+             cmake_configure_command += ['-G', args.generator]
+         run_command(cmake_configure_command, args.quiet)
+ 
+     if build:
+         format_msg('Build project (make)', args.quiet)
+         cmake_build_command = [cmake_cmd, '--build', args.build_dir,
+                                '--target', 'install', '--']
+         if args.jobs:
+-            cmake_build_command += ['-j', args.jobs]
++            cmake_build_command += ['-j', str(args.jobs)]
+         if args.verbose:
+             cmake_build_command += ['VERBOSE=1']
+         run_command(cmake_build_command, args.quiet)
+ 
+ 
+ def run_command(command, quiet, env=None):
+     """wrap subprocess run to deal with
+     different versions of python.
+ 
+     Parameters
