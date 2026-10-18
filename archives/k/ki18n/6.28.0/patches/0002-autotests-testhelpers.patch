@@ -1,0 +1,39 @@
+--- a/autotests/testhelpers.cpp	2026-10-16 21:58:01.143601700 +0800
++++ b/autotests/testhelpers.cpp	2026-10-16 21:58:01.198721100 +0800
+@@ -40,7 +40,35 @@
+         return false;
+     }
+ 
+-    if (!sourceFile.copy(targetFile.absoluteFilePath())) {
++    // QFile::copy() can fail on filesystems where the OS-level copy it
++    // performs internally (e.g. copy_file_range()) is unsupported or fails
++    // with an unexpected error, because Qt then reports the failure without
++    // falling back to a plain block copy. Do the copy with ordinary
++    // read()/write() calls here; they work whatever the filesystem supports.
++    bool copied = false;
++    {
++        QFile in(sourceFile.fileName());
++        QFile out(targetFile.absoluteFilePath());
++        if (in.open(QIODevice::ReadOnly) && out.open(QIODevice::WriteOnly)) {
++            copied = true;
++            char block[8192];
++            qint64 n;
++            while ((n = in.read(block, sizeof(block))) > 0) {
++                if (out.write(block, n) != n) {
++                    copied = false;
++                    break;
++                }
++            }
++            if (n < 0 || !out.flush()) {
++                copied = false;
++            }
++            out.close();
++            in.close();
++        }
++    }
++    if (copied) {
++        QFile::setPermissions(targetFile.absoluteFilePath(), sourceFile.permissions());
++    } else {
+         qWarning() << "Failed to copy test config file" << sourceFile.fileName() << "to target location" << targetFile.absoluteFilePath();
+         return false;
+     }

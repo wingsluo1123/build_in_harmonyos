@@ -1,0 +1,39 @@
+software: ki18n
+version: "6.28.0"
+status: built
+build_system: cmake
+created_at: 2026-10-16
+build_date: "2026-10-16"
+dependencies:
+  required:
+    - qtbase/6.11.1
+    - qtdeclarative/6.11.1
+    - gettext/0.22.5.1
+  build:
+    - ecm/6.28.0
+  optional: []
+patches_applied:
+  - patches/0001-cmake-KF6I18nMacros.cmake.in.patch
+  - patches/0002-autotests-testhelpers.patch
+test_results:
+  type: passed_with_exclusions
+  upstream: "passed: 12/12 executed upstream CTest autotests (100%); 4 locale-data tests excluded because the optional iso-codes runtime data is unavailable on OHOS (registered N=16, executed N'=12)"
+  test_package: "passed: KLocalizedString C++ API + KLocalizedContext instantiation (R34), plus import org.kde.ki18n (KI18n singleton + i18n context object) through an offscreen QQmlEngine; qmldir/plugin/qmltypes and DT_NEEDED assertions (R53)"
+  ohos_run: "local HarmonyOS PC native build via conan create -pr:h/-pr:b=ci/conan/profiles/ohos-aarch64"
+  l0: "pass"
+  l1: "pass"
+  l2: "skip: no bin/ dir (pure library + QML module)"
+  l4: "pass"
+  l5: "pass"
+source_url: https://download.kde.org/stable/frameworks/6.28/ki18n-6.28.0.tar.xz
+source_sha256: 820ce5858c6db732d68da53572a0e7db8353e4372d2122debcfb0f9ff10b85db
+knowledge_gained:
+  - "The org.kde.ki18n QML module was introduced upstream in KF 6.21 (src/i18n-qml/CMakeLists.txt uses ecm_add_qml_module URI \"org.kde.ki18n\"); 6.18/6.19/6.20 only build libKF6I18nQml.so, so re-basing on a 6.18 revision cannot produce the module."
+  - "The QML type exposed by org.kde.ki18n is the singleton 'KI18n' (LocalizedContext QML_NAMED_ELEMENT(KI18n), QML_FOREIGN(KLocalizedQmlContext)); KLocalization::setupLocalizedContext() must run first so the singleton's create() can find the engine root-context object. The legacy C++ class KLocalizedContext (src/i18n, deprecated since 6.8) is separate and still compiles/instantiates."
+  - "OHOS CMake emits no SONAME by default, so the QML plugin linked against a sibling build-tree library records '../../bin/libKF6I18n.so' in DT_NEEDED; restoring CMAKE_SHARED_LIBRARY_SONAME_*/RUNTIME_* via CMAKE_USER_MAKE_RULES_OVERRIDE makes the linker record the bare SONAME (libKF6I18n.so, unversioned). Same root fix as kitemodels 6.18.0.1 / attica 6.14.0."
+  - "The OHOS/HMDFS user volume rejects symlink()/mkfifo() with EPERM; because upstream ki18n sets VERSION/SOVERSION, CMake's cmake_symlink_library versioned chain (libKF6I18n.so.6.28.0 -> .so.6 -> .so) failed the link step with 'System Error: Permission denied'. Setting CMAKE_PLATFORM_NO_VERSIONED_SONAME=TRUE while keeping -Wl,-soname, emits a single unversioned real .so with the relocatable bare SONAME and no symlink calls (E330)."
+  - "CMake rewrites the RUNPATH of installed shared libraries, invalidating the OHOS build-time .codesign section; every packaged ELF must be re-signed with llvm-objcopy --remove-section .codesign + binary-sign-tool sign --selfSign 1 (6 ELFs for ki18n 6.26.0.1)."
+  - "Conan's CMakeDeps-generated gettext config declares a bogus 'asprintf' library on OHOS and shadows CMake's own FindGettext module when KF6I18nMacros.cmake runs find_package(Gettext). Consumers must set cmake_find_mode=none for gettext (CMakeDeps.set_property) so FindGettext is used, or find_package(Gettext) fails at configure time."
+  - "ki18n 6.28 upstream autotests: 16 registered; the 4 KF6::I18nLocaleData tests need the optional iso-codes JSON runtime data and remain excluded on OHOS; the other 12 (incl. ki18ndeclarativetest and ki18n_install, which needs gettext msgfmt) pass."
+  - "Upstream ki18n 6.28 raised the ECM floor to 6.28.0 (find_package(ECM 6.28.0 NO_MODULE) in the top-level CMakeLists); ecm/6.28.0 is published in the registry, so the port only bumps tool_requires. The 6.26.0 -> 6.28.0 source delta is small and Qt-6.11-oriented (FindLibIntl accepts 'gnuintl'; ktranscript uses Q_APPLICATION_STATIC, Qt >= 6.10; i18n-qml includes the lowercase qqmlintegration.h) and cmake/KF6I18nMacros.cmake.in stays byte-identical, so patch 0001 applies unchanged."
+  - "The upstream ktranscript autotest deploys its Qt test config via QFile::copy() (autotests/testhelpers.cpp, deployTestConfig). Qt 6.11 takes its engine-level copy path (copy_file_range() class) and reports failure without falling back to a block copy when the destination filesystem rejects it, so the deployment failed deterministically on the OHOS user volume on every worker (identical failure observed on two CI workers: ktranscript-test.ini, destination directory present, source readable). Patch 0002 replaces the copy with an ordinary read()/write() loop plus a permissions copy; platform-agnostic (R8), upstream test logic untouched."
