@@ -1,0 +1,29 @@
+#====================================================================
+# Draft: HarmonyOS 目标下 CMake 不定义 UNIX —— 上游 if(UNIX) 保护的源文件
+#        被静默丢弃，链接期才报 undefined（Q_OBJECT 符号一起缺）
+#====================================================================
+
+id:                     DRAFT-OHOS-CMAKE-UNIX-UNDEFINED
+trigger_tool:           conan|clang|cmake
+phase:                  configure|link
+error_signature:        undefined symbol: .*::(staticMetaObject|catched)|undefined reference to .*(staticMetaObject|metaObject)|if\(UNIX\)|CMAKE_SYSTEM_NAME.*HarmonyOS
+
+severity:               2
+category:               ohos-platform|build-system|cmake
+match_keywords:         UNIX, if(UNIX), if(UNIX AND NOT APPLE), CMAKE_SYSTEM_NAME, HarmonyOS, OHOS, undefined symbol, undefined reference, staticMetaObject, qt_metacall, -DUNIX=ON, cache_variables, conan_toolchain, CMakeLists, 源文件丢失
+
+title:                  OHOS 适配版 conan 把 os=OHOS 映射为 CMAKE_SYSTEM_NAME=HarmonyOS，CMake 因此不设 UNIX 变量；上游 if(UNIX) 分支登记的源文件被静默排除，构建/链接期才暴露为 undefined（含 moc 生成的 staticMetaObject）
+
+root_cause:             实测（CMake 4.1.2 + ci/conan/profiles/ohos-aarch64）：探针工程打印 "UNIX=[] OHOS=[] ANDROID=[] LINUX=[] SYSTEM=[HarmonyOS]" —— platform 目录只有 Platform/OHOS.cmake（2 行，且系统名是 HarmonyOS 不是 OHOS），HarmonyOS 不在 CMake 的 UNIX 判据里，故 UNIX 为假。若工程用 if(UNIX) 登记**必需**源文件（osmin 1.15.1 的 src/signalhandler.cpp 即此形态），该编译单元不会进入目标：configure 全绿、无任何警告，直到链接 osmin 可执行文件才报 4 个未定义符号（SignalHandler::SignalHandler(QObject*)、catchSignal(int)、catched(int)、staticMetaObject —— Q_OBJECT 的 moc 输出也只扫描目标 sources，源被丢弃则 moc 符号同样缺）。取证：grep -c signalhandler build2/CMakeFiles/osmin.dir/build.make → 0；注入 -DUNIX=ON 后同一命令 → 13。
+affected_scope:         所有 CMake 工程、且用 if(UNIX)/if(UNIX AND NOT APPLE) 之类的平台分支登记必需源文件（信号处理、socket、dlopen、文件系统、进程管理…）；目标为 OHOS/HarmonyOS（CMAKE_SYSTEM_NAME=HarmonyOS）时必然命中。也包括第三方 CMake 模块里按 UNIX 选择实现的分支。判定不能只看 configure 是否成功——必须核对构建系统实际纳入了哪些源文件。
+verification_cmd:       cmake -S probe -B b -DCMAKE_TOOLCHAIN_FILE=<conan_toolchain.cmake> 2>&1 | grep PROBE   # 期望 UNIX=[]；加 -DUNIX=ON 后期望 UNIX=[ON]
+rec_priority:           1
+rec_approach:           inject-unix-cache-variable
+rec_description:        (1) 症状识别：链接期 undefined 且符号集里带 staticMetaObject/qt_metacall（Q_OBJECT/moc 特征），或上游 CMakeLists 里有 if(UNIX) 包裹 list(APPEND ...)；同时报错 CMakeSystem.cmake 显示 CMAKE_SYSTEM_NAME "HarmonyOS"。三者同现即本条目。(2) 处理策略走"编译变量约束"而非改源码：conan 配方 generate() 里 tc.cache_variables["UNIX"] = "ON"（等价命令行 -DUNIX=ON）——HarmonyOS 用户态确为类 UNIX（Linux 内核 + musl/bionic），恢复 UNIX 语义与代码预期一致；比给每个上游工程打补丁更小、更通用。(3) 验证必须看构建系统纳入的源文件集合：grep -c <被丢源文件名> <build-dir>/CMakeFiles/<target>.dir/build.make（或 Makefile / build.ninja），0→非 0 才算修好；只看 configure 退出码会漏判。(4) 检索技巧：源码树 grep -rn 'if *( *UNIX' CMakeLists.txt，命中即预警。
+rec_command:            cmake -DUNIX=ON <其他原有参数>   # conan 配方内等价于 tc.cache_variables["UNIX"] = "ON"
+rec_auto_fix:           false
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+# PR 交付后回填（与仓内绝大多数草稿同阶段做法一致）
+source_pr:
+source_commit:
