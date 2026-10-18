@@ -1,0 +1,258 @@
+diff --git a/fli_ccd.cpp b/fli_ccd.cpp
+index d78eae1..73630d3 100644
+--- a/fli_ccd.cpp
++++ b/fli_ccd.cpp
+@@ -422,11 +422,11 @@ bool FLICCD::setupParams()
+     }
+     else
+     {
+-        TemperatureN[0].value = FLICam.temperature; /* CCD chip temperatre (degrees C) */
+-        TemperatureN[0].min   = MIN_CCD_TEMP;
+-        TemperatureN[0].max   = MAX_CCD_TEMP;
+-        IUUpdateMinMax(&TemperatureNP);
+-        IDSetNumber(&TemperatureNP, nullptr);
++        TemperatureNP[0].setValue(FLICam.temperature); /* CCD chip temperature (degrees C) */
++        TemperatureNP[0].setMin(MIN_CCD_TEMP);
++        TemperatureNP[0].setMax(MAX_CCD_TEMP);
++        TemperatureNP.updateMinMax();
++        TemperatureNP.apply();
+         LOGF_DEBUG("FLIGetTemperature() succeed -> %f", FLICam.temperature);
+     }
+ 
+@@ -745,7 +745,7 @@ void FLICCD::TimerHit()
+         }
+     }
+ 
+-    switch (TemperatureNP.s)
++    switch (TemperatureNP.getState())
+     {
+         case IPS_IDLE:
+         case IPS_OK:
+@@ -753,30 +753,30 @@ void FLICCD::TimerHit()
+             {
+                 if ((err = FLIGetTemperature(fli_dev, &ccdTemp)))
+                 {
+-                    TemperatureNP.s = IPS_IDLE;
+-                    IDSetNumber(&TemperatureNP, nullptr);
++                    TemperatureNP.setState(IPS_IDLE);
++                    TemperatureNP.apply();
+                     LOGF_ERROR("FLIGetTemperature() failed. %s.", strerror(-err));
+                     break;
+                 }
+                 if ((err = FLIGetCoolerPower(fli_dev, &ccdPower)))
+                 {
+                     CoolerNP.s = IPS_IDLE;
+-                    IDSetNumber(&TemperatureNP, nullptr);
+-                    IDSetNumber(&TemperatureNP, "FLIGetCoolerPower() failed. %s.", strerror(-err));
++                    TemperatureNP.apply();
++                    TemperatureNP.apply("FLIGetCoolerPower() failed. %s.", strerror(-err));
+                     break;
+                 }
+             }
+ 
+-            if (fabs(TemperatureN[0].value - ccdTemp) >= TEMP_THRESHOLD)
++            if (fabs(TemperatureNP[0].getValue() - ccdTemp) >= TEMP_THRESHOLD)
+             {
+-                TemperatureN[0].value = ccdTemp;
+-                IDSetNumber(&TemperatureNP, nullptr);
++                TemperatureNP[0].setValue(ccdTemp);
++                TemperatureNP.apply();
+             }
+ 
+             if (fabs(CoolerN[0].value - ccdPower) >= TEMP_THRESHOLD)
+             {
+                 CoolerN[0].value = ccdPower;
+-                CoolerNP.s       = TemperatureNP.s;
++                CoolerNP.s       = TemperatureNP.getState();
+                 IDSetNumber(&CoolerNP, nullptr);
+             }
+             break;
+@@ -785,14 +785,14 @@ void FLICCD::TimerHit()
+             if (sim)
+             {
+                 ccdTemp               = FLICam.temperature;
+-                TemperatureN[0].value = ccdTemp;
++                TemperatureNP[0].setValue(ccdTemp);
+             }
+             else
+             {
+                 if ((err = FLIGetTemperature(fli_dev, &ccdTemp)))
+                 {
+-                    TemperatureNP.s = IPS_IDLE;
+-                    IDSetNumber(&TemperatureNP, nullptr);
++                    TemperatureNP.setState(IPS_IDLE);
++                    TemperatureNP.apply();
+                     LOGF_ERROR("FLIGetTemperature() failed. %s.", strerror(-err));
+                     break;
+                 }
+@@ -800,7 +800,7 @@ void FLICCD::TimerHit()
+                 if ((err = FLIGetCoolerPower(fli_dev, &ccdPower)))
+                 {
+                     CoolerNP.s = IPS_IDLE;
+-                    IDSetNumber(&TemperatureNP, "FLIGetCoolerPower() failed. %s.", strerror(-err));
++                    TemperatureNP.apply("FLIGetCoolerPower() failed. %s.", strerror(-err));
+                     break;
+                 }
+             }
+@@ -814,12 +814,12 @@ void FLICCD::TimerHit()
+             if (fabs(CoolerN[0].value - ccdPower) >= TEMP_THRESHOLD)
+             {
+                 CoolerN[0].value = ccdPower;
+-                CoolerNP.s       = TemperatureNP.s;
++                CoolerNP.s       = TemperatureNP.getState();
+                 IDSetNumber(&CoolerNP, nullptr);
+             }
+ 
+-            TemperatureN[0].value = ccdTemp;
+-            IDSetNumber(&TemperatureNP, nullptr);
++            TemperatureNP[0].setValue(ccdTemp);
++            TemperatureNP.apply();
+             break;
+ 
+         case IPS_ALERT:
+diff --git a/fli_cfw.cpp b/fli_cfw.cpp
+index f79e545..7a7dbe4 100644
+--- a/fli_cfw.cpp
++++ b/fli_cfw.cpp
+@@ -232,9 +232,9 @@ bool FLICFW::setupParams()
+         return false;
+     }
+ 
+-    FilterSlotN[0].min   = 1;
+-    FilterSlotN[0].max   = FLIFilter.count;
+-    FilterSlotN[0].value = FLIFilter.raw_pos + 1;
++    FilterSlotNP[0].setMin(1);
++    FilterSlotNP[0].setMax(FLIFilter.count);
++    FilterSlotNP[0].setValue(FLIFilter.raw_pos + 1);
+ 
+     return true;
+ }
+@@ -285,17 +285,17 @@ void FLICFW::turnWheel()
+     switch (TurnWheelS[0].s)
+     {
+         case ISS_ON:
+-            if (current_filter < FilterSlotN[0].max)
++            if (current_filter < FilterSlotNP[0].getMax())
+                 target_filter = current_filter + 1;
+             else
+-                target_filter = FilterSlotN[0].min;
++                target_filter = FilterSlotNP[0].getMin();
+             break;
+ 
+         case ISS_OFF:
+-            if (current_filter > FilterSlotN[0].min)
++            if (current_filter > FilterSlotNP[0].getMin())
+                 target_filter = current_filter - 1;
+             else
+-                target_filter = FilterSlotN[0].max;
++                target_filter = FilterSlotNP[0].getMax();
+             break;
+     }
+ 
+diff --git a/fli_pdf.cpp b/fli_pdf.cpp
+index 8778f1a..3dc8d12 100644
+--- a/fli_pdf.cpp
++++ b/fli_pdf.cpp
+@@ -85,8 +85,8 @@ bool FLIPDF::updateProperties()
+ 
+     if (isConnected())
+     {
+-        defineProperty(&FocusAbsPosNP);
+-        defineProperty(&FocusRelPosNP);
++        defineProperty(FocusAbsPosNP);
++        defineProperty(FocusRelPosNP);
+         defineProperty(&HomeSP);
+         defineProperty(&FocusInfoTP);
+         setupParams();
+@@ -95,8 +95,8 @@ bool FLIPDF::updateProperties()
+     }
+     else
+     {
+-        deleteProperty(FocusAbsPosNP.name);
+-        deleteProperty(FocusRelPosNP.name);
++        deleteProperty(FocusAbsPosNP);
++        deleteProperty(FocusRelPosNP);
+         deleteProperty(HomeSP.name);
+         deleteProperty(FocusInfoTP.name);
+ 
+@@ -259,25 +259,25 @@ bool FLIPDF::setupParams()
+         return false;
+     }
+ 
+-    FocusAbsPosN[0].min   = 1;
+-    FocusAbsPosN[0].max   = FLIFocus.max_pos;
+-    FocusAbsPosN[0].value = FLIFocus.current_pos;
++    FocusAbsPosNP[0].setMin(1);
++    FocusAbsPosNP[0].setMax(FLIFocus.max_pos);
++    FocusAbsPosNP[0].setValue(FLIFocus.current_pos);
+ 
+-    IUUpdateMinMax(&FocusAbsPosNP);
+-    IDSetNumber(&FocusAbsPosNP, "Setting initial absolute position");
++    FocusAbsPosNP.updateMinMax();
++    FocusAbsPosNP.apply("Setting initial absolute position");
+ 
+-    FocusRelPosN[0].min   = 1.;
+-    FocusRelPosN[0].max   = FLIFocus.max_pos;
+-    FocusRelPosN[0].value = 0.;
++    FocusRelPosNP[0].setMin(1.);
++    FocusRelPosNP[0].setMax(FLIFocus.max_pos);
++    FocusRelPosNP[0].setValue(0.);
+ 
+-    IUUpdateMinMax(&FocusRelPosNP);
+-    IDSetNumber(&FocusRelPosNP, "Setting initial relative position");
++    FocusRelPosNP.updateMinMax();
++    FocusRelPosNP.apply("Setting initial relative position");
+ 
+     /////////////////////////////////////////
+     // 6. Focuser speed is set to 100 tick/sec
+     //////////////////////////////////////////
+-    FocusSpeedN[0].value = 100;
+-    IDSetNumber(&FocusSpeedNP, "Setting initial speed");
++    FocusSpeedNP[0].setValue(100);
++    FocusSpeedNP.apply("Setting initial speed");
+ 
+     return true;
+ }
+@@ -332,16 +332,16 @@ void FLIPDF::TimerHit()
+         if (!FLIFocus.steps_remaing)
+         {
+             InStep          = false;
+-            FocusAbsPosNP.s = IPS_OK;
+-            if (FocusRelPosNP.s == IPS_BUSY)
++            FocusAbsPosNP.setState(IPS_OK);
++            if (FocusRelPosNP.getState() == IPS_BUSY)
+             {
+-                FocusRelPosNP.s = IPS_OK;
+-                IDSetNumber(&FocusRelPosNP, nullptr);
++                FocusRelPosNP.setState(IPS_OK);
++                FocusRelPosNP.apply();
+             }
+         }
+ 
+-        FocusAbsPosN[0].value = FLIFocus.steps_remaing;
+-        IDSetNumber(&FocusAbsPosNP, nullptr);
++        FocusAbsPosNP[0].setValue(FLIFocus.steps_remaing);
++        FocusAbsPosNP.apply();
+     }
+     else // we need to display the current position after move finished
+     {
+@@ -350,8 +350,8 @@ void FLIPDF::TimerHit()
+             LOGF_ERROR("FLIGetStepperPosition() failed. %s.", strerror((int)-err));
+             return;
+         }
+-        FocusAbsPosN[0].value = FLIFocus.current_pos;
+-        IDSetNumber(&FocusAbsPosNP, nullptr);
++        FocusAbsPosNP[0].setValue(FLIFocus.current_pos);
++        FocusAbsPosNP.apply();
+     }
+ 
+     if (timerID == -1)
+@@ -363,7 +363,7 @@ IPState FLIPDF::MoveAbsFocuser(uint32_t targetTicks)
+ {
+     int err = 0;
+ 
+-    if (targetTicks < FocusAbsPosN[0].min || targetTicks > FocusAbsPosN[0].max)
++    if (targetTicks < FocusAbsPosNP[0].getMin() || targetTicks > FocusAbsPosNP[0].getMax())
+     {
+         LOG_ERROR("Error, requested absolute position is out of range.");
+         return IPS_ALERT;

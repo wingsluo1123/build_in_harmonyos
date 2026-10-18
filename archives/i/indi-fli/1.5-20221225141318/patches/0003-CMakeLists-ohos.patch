@@ -1,0 +1,58 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 3e11ade..f569e8e 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,4 +1,4 @@
+-cmake_minimum_required(VERSION 3.0)
++cmake_minimum_required(VERSION 3.16)
+ PROJECT(indi_fli C CXX)
+ 
+ LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules/")
+@@ -27,6 +27,20 @@ include_directories( ${FLI_INCLUDE_DIR})
+ 
+ include(CMakeCommon)
+ 
++# --- OHOS/Conan adaptation (patches/0003) -----------------------------------
++# 1) libusb: the driver links the *static* libfli.a (the Conan artifact ships
++#    the archive by default), and libfli's USB backend references libusb-1.0
++#    symbols.  The 2022 driver tree has no FindUSB1 wiring for this directory,
++#    so resolve the library here and put it on every link line below.
++# 2) INDI_DATA_DIR: the vendored FindINDI.cmake reports the *libindi package's*
++#    data directory, so install(FILES indi_fli.xml DESTINATION ${INDI_DATA_DIR})
++#    would write the driver descriptor into libindi's package folder.  Redirect
++#    it to a path relative to this package's own prefix (R49: never write into
++#    another package's / shared system prefix).
++find_library(USB1_LIBRARY NAMES usb-1.0)
++set(INDI_DATA_DIR "share/indi")
++# ---------------------------------------------------------------------------
++
+ IF (LEGACY_MODE)
+ # Legacy mode to support older INDI properties used in some observatories.
+ add_definitions(-DLEGACY_MODE)
+@@ -39,7 +53,7 @@ set(flipdf_SRCS
+ 
+ add_executable(indi_fli_focus ${flipdf_SRCS})
+ 
+-target_link_libraries(indi_fli_focus ${INDI_LIBRARIES} ${FLI_LIBRARIES} ${M_LIB} ${ZLIB_LIBRARY})
++target_link_libraries(indi_fli_focus ${INDI_LIBRARIES} ${FLI_LIBRARIES} ${M_LIB} ${ZLIB_LIBRARY} ${USB1_LIBRARY})
+ 
+ install(TARGETS indi_fli_focus RUNTIME DESTINATION bin )
+ 
+@@ -50,7 +64,7 @@ set(flicfw_SRCS
+ 
+ add_executable(indi_fli_wheel ${flicfw_SRCS})
+ 
+-target_link_libraries(indi_fli_wheel ${INDI_LIBRARIES} ${FLI_LIBRARIES} ${M_LIB} ${ZLIB_LIBRARY})
++target_link_libraries(indi_fli_wheel ${INDI_LIBRARIES} ${FLI_LIBRARIES} ${M_LIB} ${ZLIB_LIBRARY} ${USB1_LIBRARY})
+ 
+ install(TARGETS indi_fli_wheel RUNTIME DESTINATION bin )
+ 
+@@ -61,7 +75,7 @@ set(fliccd_SRCS
+ 
+ add_executable(indi_fli_ccd ${fliccd_SRCS})
+ 
+-target_link_libraries(indi_fli_ccd ${INDI_LIBRARIES} ${FLI_LIBRARIES} ${CFITSIO_LIBRARIES} ${M_LIB} ${ZLIB_LIBRARY})
++target_link_libraries(indi_fli_ccd ${INDI_LIBRARIES} ${FLI_LIBRARIES} ${CFITSIO_LIBRARIES} ${M_LIB} ${ZLIB_LIBRARY} ${USB1_LIBRARY})
+ 
+ install(TARGETS indi_fli_ccd RUNTIME DESTINATION bin)
+ 
