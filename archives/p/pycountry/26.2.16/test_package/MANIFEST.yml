@@ -1,0 +1,13 @@
+# pycountry 是 xkeyboard-config 上游套件的输入：缺失时 tests/test_rules_xml.py
+# 的 ISO 校验用例被 pytest skip，到位后转为真实执行（实测 3164 → 1663 skipped，
+# 1501 项转为执行；与 xkbcomp 配套后 8680 个参数化用例点全部真跑）。
+# 本包无运行期依赖，导出面只有 PYTHONPATH；产物无 bin/，故无 commands.json（R38）。
+test_files:
+- path: "test_package/test_pycountry.py"
+test_type: "R34"
+assertion_count: 18
+description: "来源校验（pycountry 必须来自 package_folder；ISO 3166-1 数据库随包）+ 真实 ISO API（countries/subdivisions/languages/currencies/scripts/search_fuzzy；缺码返回 None）+ 分发元数据一致（26.2.16）+ gettext 翻译目录随包（163 个语言目录）"
+upstream_test_in_build: true
+upstream_test_command: "python3 -m pytest -c <source>/pyproject.toml -o required_plugins= -o pythonpath= -o 'addopts=--doctest-glob=*.rst' <source>/src/pycountry/tests <source>/README.rst（cwd=staged site-packages；pytest 9.1.1 由 tool_requires 提供）"
+upstream_test_count: 54
+upstream_test_result: "54 passed / 0 failed（53 个测试函数 + 1 个 README doctest 项；本机实测 2.11s）"
