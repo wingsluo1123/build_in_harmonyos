@@ -1,0 +1,50 @@
+package: mir/1.0.0
+homepage: https://github.com/vnmakarov/mir
+upstream_check_command: "make -f GNUmakefile test-all; complete registered native runtime targets and seven C2M modes"
+upstream_test_in_build: true
+upstream_test_command: "python3 test_package/native_upstream.py --source <Conan source_folder> --build <Conan build_folder> --launcher test_package/native_cc_launcher.py --cc <Conan C compiler> --ar <Conan archiver>"
+upstream_inventory_count: 7544
+upstream_inventory_definition: "57 leaf targets (including eight bootstrap variants) + every independently registered case/mode pair in seven C2M groups; native upstream architecture/option filters unchanged"
+upstream_tests:
+  - file: native_upstream.py
+    source: GNUmakefile
+    description: "All 57 native leaf targets: ADTs, serialization, interpreter, generator, readme, tools, C frontend and eight bootstrap variants; each exit code and bootstrap comparison checked"
+    command: "make -f GNUmakefile <each native leaf target enumerated by native_upstream.py>"
+  - file: native_upstream.py
+    source: c-tests/runtests.sh
+    description: "C2M interpreter: unchanged architecture/option-qualified source cases, exact expected stdout/stderr/exit checks"
+    command: "make -f GNUmakefile c2mir-interp-test"
+  - file: native_upstream.py
+    source: c-tests/runtests.sh
+    description: "C2M whole-function generator at the upstream default optimization level"
+    command: "make -f GNUmakefile c2mir-gen-test"
+  - file: native_upstream.py
+    source: c-tests/runtests.sh
+    description: "C2M lazy basic-block generator including all five long-double regressions"
+    command: "make -f GNUmakefile c2mir-bb-gen-test"
+  - file: native_upstream.py
+    source: c-tests/runtests.sh
+    description: "C2M generator optimization level zero"
+    command: "make -f GNUmakefile c2mir-gen-test0"
+  - file: native_upstream.py
+    source: c-tests/runtests.sh
+    description: "C2M generator optimization level one"
+    command: "make -f GNUmakefile c2mir-gen-test1"
+  - file: native_upstream.py
+    source: c-tests/runtests.sh
+    description: "C2M generator optimization level three"
+    command: "make -f GNUmakefile c2mir-gen-test3"
+  - file: native_upstream.py
+    source: c-tests/runtests.sh
+    description: "C2M parallel generator at the upstream configured concurrency"
+    command: "make -f GNUmakefile c2mir-parallel-gen-test"
+test_package_tests:
+  - file: test.c
+    description: "One installed-package consumer: interpreter and eager/lazy/lazy-BB ARM64 code generation, cold/hot calls, negative/zero/64-bit arguments; OHOS consumer ELF codesign required before native execution"
+    command: "./test_mir"
+consumer_count: 1
+assertion_count: 28
+boundaries:
+  - "The count is independent registered execution identities, not a claim of 7544 distinct source files."
+  - "Optional LLVM bridge and benchmarks are outside this configured native suite; none is counted as executed or passed."
+  - "No expected exit code or upstream architecture filter is weakened to conceal a failure."

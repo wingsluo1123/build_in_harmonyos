@@ -1,0 +1,28 @@
+--- a/mir-bin-run.c
++++ b/mir-bin-run.c
+@@ -20,21 +20,24 @@
+ #define MIR_ENV_VAR_TYPE "MIR_TYPE"
+ 
+ struct lib {
+   char *name;
+   void *handler;
+ };
+ typedef struct lib lib_t;
+ 
+ /* stdlibs according to c2mir */
+ #if defined(__unix__)
+-#if UINTPTR_MAX == 0xffffffff
++#if defined(__OHOS__)
++static lib_t std_libs[] = {{"/system/lib64/libc.so", NULL}};
++static const char *std_lib_dirs[] = {"/system/lib64"};
++#elif UINTPTR_MAX == 0xffffffff
+ static lib_t std_libs[]
+   = {{"/lib/libc.so.6", NULL},   {"/lib32/libc.so.6", NULL},     {"/lib/libm.so.6", NULL},
+      {"/lib32/libm.so.6", NULL}, {"/lib/libpthread.so.0", NULL}, {"/lib32/libpthread.so.0", NULL}};
+ static const char *std_lib_dirs[] = {"/lib", "/lib32"};
+ #elif UINTPTR_MAX == 0xffffffffffffffff
+ #if defined(__x86_64__)
+ static lib_t std_libs[] = {{"/lib64/libc.so.6", NULL},
+                            {"/lib/x86_64-linux-gnu/libc.so.6", NULL},
+                            {"/lib64/libm.so.6", NULL},
+                            {"/lib/x86_64-linux-gnu/libm.so.6", NULL},

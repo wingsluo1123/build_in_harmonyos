@@ -1,0 +1,85 @@
+software: mir
+version: 1.0.0
+status: built
+build_date: "2026-10-15"
+build_system: makefile
+conan_ref: mir/1.0.0
+description: MIR portable interpreter, C11 frontend and native code generator
+license: MIT
+homepage: https://github.com/vnmakarov/mir
+source:
+  url: https://github.com/vnmakarov/mir/archive/refs/tags/v1.0.0.tar.gz
+  sha256: fdc934db5c858ee9aa77c09e21a3ed19ddc243ae441eb4c9b08e79b203c34055
+build:
+  system: makefile
+dependencies: []
+knowledge_gained:
+  - E550-draft-MR10 transparent ARM64 callbacks require full-width SIMD state and both lazy entrances.
+validation: formal native r6 shared/static and official finish r2 Conan verification/local CI each passed 7544/7544 plus consumer 1/1 with C2MIR_PARALLEL enabled; aggregate finish RC0; worker CI and platform Review remain separate
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /d/Projects/harmonyPC/workspace/high-three-adaptation-20261014-01/mir-original/mir-1.0.0
+  source_work_dir: /d/Projects/harmonyPC/workspace/high-three-adaptation-20261014-01/source/mir-1.0.0
+  source_orig_hash: 577f53648bf3bdca
+  source_work_hash: d1c8d2f286cd3d6e
+  generated_at: '2026-10-15T02:54:30'
+  patches_count: 14
+
+patch_classification:
+  - file: 0001-check-threads.sh.patch
+    type: build-portability
+    platform_only: false
+    guard: configured compiler; no platform-specific behavior
+  - file: 0002-mir-aarch64.c.patch
+    type: architecture-runtime
+    platform_only: false
+    guard: AArch64 backend; full-width invisible callback state
+  - file: 0003-mir-bin-driver.c.patch
+    type: portability
+    platform_only: true
+    guard: __OHOS__ libc branch
+  - file: 0004-mir-bin-run.c.patch
+    type: portability
+    platform_only: true
+    guard: __OHOS__ libc branch
+  - file: 0005-c-tests-runtests.sh.patch
+    type: test-portability
+    platform_only: false
+    guard: original architecture and option filters retained
+  - file: 0006-c2mir-c2mir-driver.c.patch
+    type: portability
+    platform_only: true
+    guard: __OHOS__ libc branch
+  - file: 0007-c2mir-c2mir.c.patch
+    type: portability
+    platform_only: false
+    guard: opt-in C2M_SYSTEM_INCLUDE and C2M_TARGET_INCLUDE
+  - file: 0008-mir-tests-get-thunk-addr.c.patch
+    type: test-api-alignment
+    platform_only: false
+    guard: current public MIR API
+  - file: 0009-mir-tests-hello.c.patch
+    type: test-api-alignment
+    platform_only: false
+    guard: current public MIR API
+  - file: 0010-mir-tests-io.c.patch
+    type: test-portability
+    platform_only: false
+    guard: checked TMPDIR serialization roundtrip
+  - file: 0011-mir-tests-issue219.c.patch
+    type: test-api-alignment
+    platform_only: false
+    guard: current public MIR API
+  - file: 0012-GNUmakefile.patch
+    type: build-portability
+    platform_only: false
+    guard: generated bootstrap table in out-of-source build directory
+  - file: 0013-c2mir-aarch64-mirc_aarch64_linux.h.patch
+    type: portability
+    platform_only: true
+    guard: __OHOS__ embedded platform definitions
+  - file: 0014-c2mir-aarch64-mirc_aarch64_stddef.h.patch
+    type: portability
+    platform_only: true
+    guard: __OHOS__ unsigned wchar_t and musl typedef guard

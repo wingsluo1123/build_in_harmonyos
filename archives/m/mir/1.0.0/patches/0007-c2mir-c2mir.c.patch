@@ -1,0 +1,31 @@
+--- a/c2mir/c2mir.c
++++ b/c2mir/c2mir.c
+@@ -13980,20 +13980,28 @@
+     break;
+   default: abort ();
+   }
+ }
+ 
+ static void init_include_dirs (c2m_ctx_t c2m_ctx) {
+   int MIR_UNUSED added_p = FALSE;
+ 
+   VARR_CREATE (char_ptr_t, headers, 0);
+   VARR_CREATE (char_ptr_t, system_headers, 0);
++  /* Allow toolchains with a private sysroot to supply system headers without
++     baking a workstation-specific absolute path into the compiler binary. */
++  const char *system_include = getenv ("C2M_SYSTEM_INCLUDE");
++  const char *target_include = getenv ("C2M_TARGET_INCLUDE");
++  if (system_include != NULL && system_include[0] != 0)
++    VARR_PUSH (char_ptr_t, system_headers, system_include);
++  if (target_include != NULL && target_include[0] != 0)
++    VARR_PUSH (char_ptr_t, system_headers, target_include);
+   for (size_t i = 0; i < c2m_options->include_dirs_num; i++) {
+     VARR_PUSH (char_ptr_t, headers, c2m_options->include_dirs[i]);
+     VARR_PUSH (char_ptr_t, system_headers, c2m_options->include_dirs[i]);
+   }
+   VARR_PUSH (char_ptr_t, headers, NULL);
+ #if defined(__APPLE__) || defined(__unix__)
+   VARR_PUSH (char_ptr_t, system_headers, "/usr/local/include");
+ #endif
+ #ifdef ADDITIONAL_INCLUDE_PATH
+   if (ADDITIONAL_INCLUDE_PATH[0] != 0) {

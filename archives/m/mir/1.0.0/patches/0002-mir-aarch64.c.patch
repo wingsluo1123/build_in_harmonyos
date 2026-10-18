@@ -1,0 +1,87 @@
+--- a/mir-aarch64.c
++++ b/mir-aarch64.c
+@@ -710,22 +710,33 @@
+     0xa9bf7bfd, /* stp R29, R30, [SP, #-16]! */
+     0xa9bf1fe6, /* stp R6, R7, [SP, #-16]! */
+     0xa9bf17e4, /* stp R4, R5, [SP, #-16]! */
+     0xa9bf0fe2, /* stp R2, R3, [SP, #-16]! */
+     0xd10043ff, /* sub SP, SP, #16 */
+     0xf90007e8, /* str x8, [SP, #8] */
+     0xadbf1fe6, /* stp Q6, Q7, [SP, #-32]! */
+     0xadbf17e4, /* stp Q4, Q5, [SP, #-32]! */
+     0xadbf0fe2, /* stp Q2, Q3, [SP, #-32]! */
+     0xadbf07e0, /* stp Q0, Q1, [SP, #-32]! */
++    /* A generated MIR callee saves full-width v8-v15.  Its first-call
++       generator callback must honor the same contract before the callee
++       prologue has run; the C ABI alone only preserves their low halves. */
++    0xadbf3fee, /* stp Q14, Q15, [SP, #-32]! */
++    0xadbf37ec, /* stp Q12, Q13, [SP, #-32]! */
++    0xadbf2fea, /* stp Q10, Q11, [SP, #-32]! */
++    0xadbf27e8, /* stp Q8, Q9, [SP, #-32]! */
+     0xd63f0140, /* call *x10 */
+     0xaa0003e9, /* mov x9, x0 */
++    0xacc127e8, /* ldp Q8, Q9, SP, #32 */
++    0xacc12fea, /* ldp Q10, Q11, SP, #32 */
++    0xacc137ec, /* ldp Q12, Q13, SP, #32 */
++    0xacc13fee, /* ldp Q14, Q15, SP, #32 */
+     0xacc107e0, /* ldp Q0, Q1, SP, #32 */
+     0xacc10fe2, /* ldp Q2, Q3, SP, #32 */
+     0xacc117e4, /* ldp Q4, Q5, SP, #32 */
+     0xacc11fe6, /* ldp Q6, Q7, SP, #32 */
+     0xf94007e8, /* ldr x8, [SP, #8] */
+     0x910043ff, /* add SP, SP, #16 */
+     0xa8c10fe2, /* ldp R2, R3, SP, #16 */
+     0xa8c117e4, /* ldp R4, R5, SP, #16 */
+     0xa8c11fe6, /* ldp R6, R7, SP, #16 */
+     0xa8c17bfd, /* ldp R29, R30, SP, #16 */
+@@ -767,37 +778,48 @@
+ 
+ /* change to (b|br) to */
+ void _MIR_replace_bb_thunk (MIR_context_t ctx, void *thunk, void *to) {
+   _MIR_redirect_thunk (ctx, thunk, to);
+ }
+ 
+ static const uint32_t save_fplr = 0xa9bf7bfd;    /* stp R29, R30, [SP, #-16]! */
+ static const uint32_t restore_fplr = 0xa8c17bfd; /* ldp R29, R30, SP, #16 */
+ 
+ static const uint32_t save_insns2[] = {
+-  /* save r10-r18,v16-v31: should be used only right after save_insn */
++  /* Save r10-r18 and q8-q31 right after save_insns.  The BB generator
++     callback is invisible to the generated program.  AAPCS64 preserves
++     only the low 64 bits of v8-v15 across C calls, so a live 128-bit long
++     double in those registers must be saved here too. */
+   0xf90043ea, /* str R10, [SP, #128]  */
+   0xa9bf4bf1, /* stp R17, R18, [SP, #-16]! */
+   0xa9bf43ef, /* stp R15, R16, [SP, #-16]! */
+   0xa9bf3bed, /* stp R13, R14, [SP, #-16]! */
+   0xa9bf33eb, /* stp R11, R12, [SP, #-16]! */
+   0xadbf7ffe, /* stp Q30, Q31, [SP, #-32]! */
+   0xadbf77fc, /* stp Q28, Q29, [SP, #-32]! */
+   0xadbf6ffa, /* stp Q26, Q27, [SP, #-32]! */
+   0xadbf67f8, /* stp Q24, Q25, [SP, #-32]! */
+   0xadbf5ff6, /* stp Q22, Q23, [SP, #-32]! */
+   0xadbf57f4, /* stp Q20, Q21, [SP, #-32]! */
+   0xadbf4ff2, /* stp Q18, Q19, [SP, #-32]! */
+   0xadbf47f0, /* stp Q16, Q17, [SP, #-32]! */
++  0xadbf3fee, /* stp Q14, Q15, [SP, #-32]! */
++  0xadbf37ec, /* stp Q12, Q13, [SP, #-32]! */
++  0xadbf2fea, /* stp Q10, Q11, [SP, #-32]! */
++  0xadbf27e8, /* stp Q8, Q9, [SP, #-32]! */
+ };
+ static const uint32_t restore_insns2[] = {
+-  /* restore r10-r18,v16-v32: should be used only right before restore_insns */
++  /* Restore in reverse order, immediately before restore_insns. */
++  0xacc127e8, /* ldp Q8, Q9, SP, #32 */
++  0xacc12fea, /* ldp Q10, Q11, SP, #32 */
++  0xacc137ec, /* ldp Q12, Q13, SP, #32 */
++  0xacc13fee, /* ldp Q14, Q15, SP, #32 */
+   0xacc147f0, /* ldp Q16, Q17, SP, #32 */
+   0xacc14ff2, /* ldp Q18, Q19, SP, #32 */
+   0xacc157f4, /* ldp Q20, Q21, SP, #32 */
+   0xacc15ff6, /* ldp Q22, Q23, SP, #32 */
+   0xacc167f8, /* ldp Q24, Q25, SP, #32 */
+   0xacc16ffa, /* ldp Q26, Q27, SP, #32 */
+   0xacc177fc, /* ldp Q28, Q29, SP, #32 */
+   0xacc17ffe, /* ldp Q30, Q31, SP, #32 */
+   0xa8c133eb, /* ldp R11, R12, SP, #16 */
+   0xa8c13bed, /* ldp R13, R14, SP, #16 */
