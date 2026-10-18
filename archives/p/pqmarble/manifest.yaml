@@ -1,0 +1,25 @@
+software: pqmarble
+display: "Marble (pqmarble)"
+description: "GNOME Marble — Gtk 应用通用库（SideWindow / Loadable / Progressable / Settings / Utils），Vala 编写、C ABI 共享库"
+category: library
+homepage: "https://gitlab.gnome.org/raggesilver/marble"
+license: GPL-3.0-or-later
+
+build_system: meson
+
+ohos_adaptation:
+  key_points:
+    - "valac 的 vapi 搜索目录是编译期硬编码前缀，包重定位后必须用 wrapper 补 --vapidir"
+    - "meson 在 OHOS 上找不到 valac/llvm-ar/llvm-ranlib（PATH 未含构建工具），需写进 machine file 的 [binaries]"
+    - "conan 包内 ELF 工具（glib-compile-resources 等）未签名，execve 返回 EPERM，需复制后 binary-sign-tool 自签名"
+    - "meson gnome 模块的 compile_resources 依赖 gio-2.0.pc 的 glib_compile_resources 变量，需显式写 [binaries]"
+    - "g-ir-compiler 需要 GLib-2.0/GObject-2.0 的 GIR，OHOS 侧 glib 包未安装 → .typelib 生成用 meson option 关闭"
+    - "产物 libmarble.so 必须签名，否则 OHOS 加载器拒绝 dlopen"
+  common_dependencies:
+    - glib
+    - gtk
+
+versions:
+  "1.3.0":
+    status: built
+    build_date: "2026-10-17"

@@ -1,0 +1,41 @@
+--- a/meson_options.txt
++++ b/meson_options.txt
+@@ -1 +1,2 @@
+ option('tests', type : 'boolean', value : false)
++option('introspection_typelib', type : 'boolean', value : true)
+--- a/src/meson.build
++++ b/src/meson.build
+@@ -34,19 +34,21 @@
+ install_data('marble.deps',
+              install_dir: join_paths(get_option('prefix'), get_option('datadir'), 'vala', 'vapi'))
+ 
+-g_ir_compiler = find_program('g-ir-compiler')
++if get_option('introspection_typelib')
++  g_ir_compiler = find_program('g-ir-compiler')
+ 
+-custom_target(marble_typelib,
+-  command: [
+-    g_ir_compiler,
+-    '--shared-library', marble_lib.full_path(),
+-    '--output', '@OUTPUT@',
+-    join_paths(meson.current_build_dir(), marble_gir)
+-  ],
+-  output: marble_typelib,
+-  depends: marble_lib,
+-  install: true,
+-  install_dir: get_option('libdir') / 'girepository-1.0')
++  custom_target(marble_typelib,
++    command: [
++      g_ir_compiler,
++      '--shared-library', marble_lib.full_path(),
++      '--output', '@OUTPUT@',
++      join_paths(meson.current_build_dir(), marble_gir)
++    ],
++    output: marble_typelib,
++    depends: marble_lib,
++    install: true,
++    install_dir: get_option('libdir') / 'girepository-1.0')
++endif
+ 
+ marble_lib_dep = declare_dependency(
+     link_with: marble_lib,

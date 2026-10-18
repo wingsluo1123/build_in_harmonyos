@@ -1,0 +1,38 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明（R51 上游测试三步法第 1 步：适配前清点）
+package: pqmarble/1.3.0
+homepage: "https://gitlab.gnome.org/raggesilver/marble"
+
+# ── 上游测试入口清点结论 ───────────────────────────────────────────
+# 上游 v1.3.0 源码树（commit 710a677a）中的测试相关文件：
+#   src/tests/meson.build        —— 仅在 -Dtests=true 时编译
+#   src/tests/test.vala          —— Gtk.Application 交互式演示窗口（marble_test）
+#   src/tests/marbletest.gresource.xml + layouts/marbletest.ui
+#   test.sh / Makefile           —— flatpak-builder 驱动的 `make test` / `make test-run`
+# 没有 meson test() / unit test / 断言框架的注册项，故 `meson test` 输出
+# "No tests defined"；marble_test 是 GUI 交互程序（上游 Makefile 的 test-run
+# 目标即启动该窗口），不含自动化断言。
+upstream_check_command: "meson setup build -Dtests=true && ninja -C build  # 上游无 meson test 注册"
+
+# conanfile.py build() 是否已集成上游测试：是（默认 with_tests=True，编出 marble_test）
+upstream_test_in_build: true
+upstream_test_command: "meson setup --native-file ... -Dtests=true && meson compile  # 生成 src/tests/marble_test"
+
+# 上游实际存在的测试程序（人工/GUI 验证，无自动断言）
+upstream_tests:
+  - file: src/tests/test.vala
+    source: marble-v1.3.0.tar.gz
+    description: "上游交互式测试程序 marble_test（Gtk.Application 演示 Marble.SideWindow），需显示环境，无自动化断言"
+    command: "./src/tests/marble_test"
+
+# test_package 自带的消费侧测试（C API 实质调用 + 鸿蒙特有断言）
+test_package_tests:
+  - file: test_pqmarble.c
+    description: "GType 注册 / CSS provider 解析 / 产物 ELF aarch64+OHOS ABI（鸿蒙特有）/ 无显示环境"
+    command: "./test_pqmarble"
+
+# 断言总数（与实测一致）：test_package 实际执行 10 条 check
+#   types/{settings,loadable,progressable,side_window,loadable_is_overlay,settings_is_abstract}  = 6
+#   css/{provider_created,roundtrip}                                                             = 2
+#   ohos/{aarch64,abi-note}（鸿蒙特有）                                                          = 2
+assertion_count: 10
