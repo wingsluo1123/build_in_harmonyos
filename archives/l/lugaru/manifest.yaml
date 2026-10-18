@@ -1,0 +1,57 @@
+software: lugaru
+name: lugaru
+
+description: >-
+  Lugaru —— 3D 动作游戏（低多边形狼兔格斗，ragdoll 物理与连招系统），
+  Wolfire Games 2010 年开源、由 osslugaru 社区继续维护；鸿蒙 PC 版用 gl4es
+  提供固定管线 OpenGL 渲染，SDL2 负责窗口/输入，OpenAL + Ogg/Vorbis 负责音频。
+
+category: gfx
+license: GPL-2.0-or-later
+website: "https://gitlab.com/osslugaru/lugaru"
+homepage: "https://osslugaru.gitlab.io"
+
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "OHOS 无桌面 GL/GLX，也没有可用的 opengl Conan 包（opengl/4.6 不在 ohpcd 远端）⇒ 直连 GLESv2/EGL 对纯固定管线渲染器不可行（GLES2 无 glBegin/glMatrixMode/glOrtho 等入口）；GL 栈钉在 gl4es/1.1.6 的 libGL.so，GLU 由 glu/9.0.3 提供（gl4es 只带头文件不导出 gluPerspective）"
+    - "CMake 4.x 拒绝 cmake_minimum_required(VERSION 3.0)；且上游把 --std=gnu++11 拼在 ${CMAKE_CXX_FLAGS} 之前会被 profile 的 -std=gnu++17 覆盖，而 register 关键字在 C++17 已删除（clang 硬错）⇒ patches/0001 修这两处"
+    - "上游消费 Find 模块的遗留变量（OPENAL_LIBRARY/PNG_LIBRARY/JPEG_LIBRARY/ZLIB_LIBRARIES/SDL2_LIBRARIES/OPENGL_LIBRARIES/OGG_LIBRARY/VORBIS*_LIBRARY）而 CMakeDeps 只产出现代 target ⇒ configure 前逐个 -D 播种"
+    - "SDL2 走上游 pkg_check_modules(SDL2 sdl2 REQUIRED) ⇒ PkgConfigDeps + PKG_CONFIG_PATH，pkgconf 走 tool_requires"
+    - "应用以 DATA_DIR=\"Data\" 相对工作目录找资源 ⇒ bin/lugaru 与 bin/Data/ 必须同目录；上游 install 规则在 SYSTEM_INSTALL=OFF 时落到 prefix 根，故 package() 手工摆布局"
+    - "运行时 gl4es dlopen 后端 ⇒ package_info() 导出 LIBGL_GLES=/system/lib64/libGLESv3.so、LIBGL_EGL=/system/lib64/libEGL.so"
+  common_dependencies:
+    - gl4es
+    - glu
+    - sdl2
+    - openal
+    - libpng
+    - libjpeg-turbo
+    - libogg
+    - libvorbis
+    - zlib
+
+versions:
+  - version: "1.2"
+    status: built
+    compiled_at: "2026-10-18"
+    notes: |
+      - 上游 tag 无 v 前缀；归档直链 https://gitlab.com/osslugaru/lugaru/-/archive/1.2/lugaru-1.2.tar.gz
+      - 上游无自动化测试（N_static=0），适配后补消费者测试 6 用例 / 24 项断言并真实执行
+      - 产物 bin/lugaru（AArch64 PIE）+ bin/Data/（542 个资源文件，与可执行文件同目录）
+    dependencies:
+      - zlib/1.3.1.1
+      - libpng/1.6.58
+      - libjpeg-turbo/3.2.0
+      - libogg/1.3.6
+      - libvorbis/1.3.7
+      - openal/1.25.2
+      - sdl2/2.30.10
+      - gl4es/1.1.6
+      - glu/9.0.3
+      - mesa/24.3.4.1 (glu 传递依赖，OpenGL 实现面)
+    provides:
+      - bin/lugaru
+      - bin/Data
+      - share/man/man6/lugaru.6

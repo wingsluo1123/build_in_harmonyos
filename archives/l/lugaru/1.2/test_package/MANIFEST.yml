@@ -1,0 +1,71 @@
+package: lugaru/1.2
+homepage: "https://gitlab.com/osslugaru/lugaru"
+
+# ---------------------------------------------------------------------------
+# 上游测试审计（lugaru 1.2 = gitlab.com/osslugaru/lugaru，tag 1.2，
+# 2017-02-11，commit c7b99378439735c60f84869b05c6ebde53083667）
+# 结论：上游没有任何可接入的测试套件 —— 全仓 grep
+# "enable_testing|add_test|ctest|BUILD_TESTING|include(CTest)" 命中 0 行，
+# 全仓 find -iname "*test*" 命中 0 个文件/目录。
+# ---------------------------------------------------------------------------
+upstream_check_command: null
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests_exist: false
+upstream_tests: []
+upstream_test_audit:
+  - path: "CMakeLists.txt（顶层，340 行）"
+    finding: >-
+      仅 project/版本常量/find_package/add_executable/install，无
+      enable_testing()、无 add_test()、无 ctest/check 目标
+  - path: "CMake/Modules/FindOggVorbis.cmake"
+    finding: "唯一 find-module，只做 find_library/find_path 探测，无测试注册"
+  - path: "Source/（41 个 .cpp + 37 个 .hpp）"
+    finding: >-
+      find -iname "*test*" 命中 0：无 test/ 目录、无 *test* 源文件；
+      游戏逻辑、平台层（PlatformUnix/PlatformWindows）、工具（Utils/pack.c 等）
+      均无自检入口
+  - path: "Misc/（fix-hardcoded-hex-paths.sh、list-hardcoded-paths-fixes.txt、
+    lugaru-icon.psd）"
+    finding: "资产修补/清单脚本，无 make check / ctest / 测试命令"
+  - path: "Dist/Linux/（lugaru.6、lugaru.desktop、lugaru.appdata.xml、lugaru.png）"
+    finding: "发行打包资产，无测试"
+  - path: ".gitlab-ci.yml"
+    finding: >-
+      只有 build_gcc / build_clang 两个 stage：dnf 装依赖 → cmake → make -j4 →
+      make install → 归档 artifacts，全程无任何测试步骤、无对测试结果的依赖
+  - path: "Docs/、Data/（542 个资源文件）"
+    finding: "文档与游戏资源，无测试"
+
+# ---------------------------------------------------------------------------
+# 适配后由 test_package 补全的消费者测试（6 用例 / 24 项断言）
+# ---------------------------------------------------------------------------
+test_package_tests:
+  - file: conanfile.py
+    description: >-
+      静态校验 3 例（16 项断言），不依赖执行环境：
+      packaged-layout（bin/lugaru 存在 + 可执行位；bin/Data/ 八个资源子目录齐、
+      资源文件数 >= 500；share/man/man6/lugaru.6；licenses/COPYING.txt）；
+      elf-ohos-aarch64（ELF64/LE、e_machine=AArch64(183)、ET_DYN(PIE)、
+      PT_INTERP=/lib/ld-musl-aarch64.so.1、DT_NEEDED 含 libGL.so.1 与 libGLU.so.1）；
+      runenv-contract（包导出的 LIBGL_GLES/LIBGL_EGL 落入 conanrun）
+  - file: conanfile.py + test_lugaru.sh
+    description: >-
+      真实执行被测二进制 3 例（8 项断言，单次启动各一条，无需 GPU/合成器）：
+      cli-version（退出码 0 + stdout 含 "Version 1.2" + 上游横幅）；
+      cli-help（退出码 0 + usage 含 "-v, --version" / "-h, --help"）；
+      cli-unknown-option（退出码 1 + 输出含 "Unknown option"）
+
+# ---------------------------------------------------------------------------
+# 不可覆盖面（如实申报，未用“跳过”冒充通过）
+# ---------------------------------------------------------------------------
+not_covered:
+  - "真实渲染：进入游戏主循环需要 GL 上下文 + 显示设备（本机无 Wayland 合成器/
+    无 GPU 会话），SetUp() 之后的画面、模型、地形加载路径未在 CI 中执行"
+  - "输入/音频：SDL 事件循环、OpenAL 播放需要真实设备"
+  - "关卡/存档流程：需要人工操作与完整资源交互"
+  - "产物形态披露（非缺陷）：readelf -d 实测 DT_NEEDED 里 libvorbisfile.so 被记成
+     **绝对路径**（conan 侧 libvorbisfile.so 未带 SONAME，链接器只好落路径）；
+     同机解析正常、CGI/CI 同机复现一致，但该条目跨机分发不可移植——
+     与 E2118 的 bare SONAME 同族。其余 libGL.so.1 / libGLU.so.1 / libpng16.so.16 /
+     libjpeg.so.62 / libogg.so / libc++_shared.so 均为正常 SONAME。"
