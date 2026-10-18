@@ -1,0 +1,62 @@
+#====================================================================
+# Draft: iw 6.17 — OHOS app 沙箱对 AF_NETLINK 的**协议号白名单**
+#        （只放行 NETLINK_ROUTE(0)），以及
+#        「上游存在 check 目标 ≠ 存在测试套件」的 rule4/R51 计数口径
+# Task:  平台任务 15547 / feat/iw-6.17
+# 定位:  两条互补机制
+#   (1) 运行期能力墙 —— **修正** E237 的框架：E237 把 generic netlink 不可用
+#       归因为「内核缺 NETLINK_GENERIC 协议族」（设施缺失）；实测 errno 是
+#       EACCES(13)（权限），设施缺失应为 EAFNOSUPPORT(97)。补上判别探针。
+#   (2) 测试计数 —— 与 DRAFT-ydpdict-1.0.4.1 是**对偶**：
+#       ydpdict 讲「TESTS 空但 check_PROGRAMS 非空 ⇒ 别少报 N」；
+#       本条讲「check 目标存在但其语义是 lint ⇒ 别无中生有报 N>0」。
+#====================================================================
+
+id:                     DRAFT-iw-6.17-ohos-generic-netlink-sandbox-and-linter-check
+trigger_tool:           "iw|libnl|nl80211|conan|make|sparse"
+phase:                  "runtime|testing|verification"
+error_signature:        "Failed to connect to generic netlink\\.|socket\\(AF_NETLINK.*NETLINK_GENERIC.*(EACCES|Permission denied)|redefinition of 'sockaddr_storage'"
+severity:               2
+category:               "runtime, sandbox, netlink, testing, detection, portability"
+match_keywords:         "AF_NETLINK, NETLINK_GENERIC, NETLINK_ROUTE, nl80211, generic netlink, iw, ethtool, libnl, EACCES, EAFNOSUPPORT, seccomp, app sandbox, 能力墙, check target, sparse, cgcc, lint, R51, rule4, N_static, upstream_tests, 测试清点"
+title:                  "OHOS app 沙箱对 AF_NETLINK 只放行 NETLINK_ROUTE(0)——其余协议号（含内核未分配的）一律在 socket 创建时返回 EACCES(13) 而非 EAFNOSUPPORT，故 generic-netlink 的 nl80211 工具运行期不可达；且上游存在 check 目标不等于存在测试套件，sparse/cgcc 这类 lint 型 check 目标既不可执行也不计入 N"
+
+root_cause:             【机制一，netlink 协议号白名单而非设施缺失】OHOS app 沙箱在 socket 创建阶段就按协议号裁决 AF_NETLINK。socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE=0) 成功且可 bind，而 NETLINK_GENERIC=16 直接返回 EACCES(13)。判别性证据是未分配协议号——proto=30 与 proto=31（内核未注册任何协议族）同样返回 EACCES(13) 而非 EAFNOSUPPORT(97)，说明裁决发生在沙箱策略层、按协议号做白名单，先于内核解析协议族是否存在。这与 E237「HongMeng Kernel 缺 NETLINK_GENERIC 协议族」的框架不同：设施缺失的可判别签名是 EAFNOSUPPORT，不是 EACCES。后果是一切经 generic netlink 访问 nl80211 的工具（iw、ethtool 的 netlink 后端、libnl 的 genl API）运行期必然失败于「Failed to connect to generic netlink.」，rc=1；但 CLI 契约面（--version、usage 与命令表）完全可用，可作真实断言。【机制二，check 目标的存在性不等于测试套件】iw 6.17 全树无 tests 目录、无 Makefile.am（仅裸 Makefile）、无 TESTS 与 check_PROGRAMS 变量、无 test*.c、无 ctest 或 add_test、无 RUNTEST 驱动、无 demo 与 examples 目录（R51 六探针全 0）。Makefile 里唯一的 check 目标是让 make 以 CC=CHECK 走 cgcc 重新构建一遍，即 sparse/cgcc **静态分析 lint**（本机 sparse 与 cgcc 均不存在）。它既不是测试执行面、也不构成上游注册用例。若把「存在 check 目标」当判据，会得出相反结论——或照抄 autotools.make 的 check 目标把 lint 当测试跑（失败，或更糟，空跑假绿），或据此申报 N 大于 0（与 rule4 实测口径不符）。
+
+affected_scope:         ① 所有在 OHOS app 沙箱内使用 generic netlink（NETLINK_GENERIC）的工具与库，包括 iw、ethtool 的 netlink 后端、libnl 的 genl API 使用者、wpa_supplicant 系、nfacct、ss 与 ip 的 genl 面。不适用于只用 NETLINK_ROUTE 的代码（可创建可 bind），也不适用于纯信息面工具。② 所有把「是否有测试套件」建立在 check 目标存在性上的清点流程（rule4 与 R51）。命中形态是上游有 check 目标但它是 linter、静态分析、格式检查或打包目标（sparse、cgcc、cppcheck、clang-tidy、shellcheck、check-format），或由第三方工具驱动而非测试框架。
+
+verification_cmd:       "python3 - <<'PY'\nimport socket, errno\nfor p in (0, 16, 30):\n    try:\n        socket.socket(16, 3, p).close(); print(p, 'OK')\n    except OSError as e:\n        print(p, errno.errorcode.get(e.errno))\nPY"
+
+rec_priority:           1
+rec_approach:           "probe-classify-sandbox-denial + assert-capability-wall-verbatim + tri-state-test-counting"
+rec_description:        (1) 先做协议号判别探针，不要只看 EACCES，要同时探一个内核未分配的协议号——未分配号也给 EACCES 说明是沙箱白名单，给 EAFNOSUPPORT 才是内核设施缺失；两句话写进 notes，避免把权限问题误诊成内核裁剪。(2) 运行期断言如实逐字固定能力墙：对需要内核回话的子命令断言 rc=1 且文案含「Failed to connect to generic netlink.」，不要放宽成「rc 非 0 即可」，更不要跳过；平台一旦放开，该断言立刻翻红暴露。(3) 编译期与运行期必须分开记账：redefinition of sockaddr_storage 是 sysroot 头不一致（可修，见 E119 与 E1604），generic netlink 不可达是沙箱策略（不可修）；混为一谈会导致「修了编译以为修好了运行」。(4) 测试清点按三态分类而不是二态「有没有 check 目标」——真测试套件（TESTS 变量、ctest 或 add_test 有注册项）要真跑；无任何测试资产时 N_static 为 0；有 check 目标但语义是 lint、格式或打包时 N_static 仍为 0，并在正文写明该 check 目标不是测试套件、不执行、不计入 N。第三类最容易被误报。
+rec_command:            "make -n check 2>&1 | head; grep -n '^check:' -A2 Makefile"
+rec_auto_fix:           false
+
+fallback_priority:      2
+fallback_approach:      "static-analysis-target-declared-lint-only"
+fallback_description:   若必须让 make check 有输出以证明跑过了，可在 sparse 可用时执行该 lint 目标并如实标注为 lint 结果（例如报告 sparse 告警数），但不得计入 upstream_tests 的 N 或通过率。本平台 sparse 与 cgcc 都不存在，故正确处置是明确写「不可执行且非测试套件」，而不是塞一个假套件。
+fallback_command:       "command -v sparse cgcc || echo 'sparse/cgcc absent - check target not executable'"
+fallback_auto_fix:      false
+
+forbid_1_pattern:       "upstream_test_in_build true 而实际零执行|把 lint 目标当 make check 测试跑|断言放宽为 rc 非 0 即可|用 __OHOS__ 守卫跳过 linux/socket.h"
+forbid_1_reason:        申报 true 而零执行就是平台 rule4 的零执行欺骗形态。把 lint 当测试会失败或空跑假绿。放宽断言会让平台放开后仍然显示绿色、丧失暴露能力。__OHOS__ 是平台宏，语义应为「哪一侧 libc」而不是「哪个平台」（E1604 的 forbid 口径），PF5 与 R8 会拦，E119 的原处方即此坑。
+forbid_1_consequence:   rule4 判 FAIL 并自动取消提审（rr 归 null）；PF5 与 R8 拦截补丁；能力墙被静默掩盖。
+
+# ═══ 关系图 ═══
+similar_to:             E237, E119, E1604, DRAFT-ydpdict-1.0.4.1-autotools-empty-tests-check-programs-audit, E461, E1240
+caused_by:              []
+conflicts_with:         []
+
+# ═══ 元数据 ═══
+doc_file:               knowledge/drafts/DRAFT-iw-6.17-ohos-generic-netlink-sandbox-and-linter-check.md
+last_updated:           2026-10-17
+source_event:           "iw 6.17 适配（平台任务 15547；R51 六探针 N_static=0；test_package 11 断言实跑 11/11）"
+
+# ═══ 知识协作 ═══
+authors:                主理-5
+source_pr:
+source_commit:
+
+draft: true
+contributor_id: 主理-5
