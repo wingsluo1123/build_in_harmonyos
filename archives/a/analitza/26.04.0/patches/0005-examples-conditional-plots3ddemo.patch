@@ -1,0 +1,26 @@
+--- a/analitzaplot/examples/CMakeLists.txt
++++ b/analitzaplot/examples/CMakeLists.txt
+@@ -4,11 +4,20 @@
+ add_executable(plotsdictionarydemo plotsdictionarydemo.cpp)
+ target_link_libraries(plotsdictionarydemo AnalitzaWidgets)
+ 
+-add_executable(plots3ddemo plots3ddemo.cpp)
+-target_link_libraries(plots3ddemo AnalitzaWidgets Qt6::OpenGLWidgets)
++if(TARGET Qt6::OpenGLWidgets)
++    add_executable(plots3ddemo plots3ddemo.cpp)
++    target_link_libraries(plots3ddemo AnalitzaWidgets Qt6::OpenGLWidgets)
++endif()
+ 
++# export3dplotdemo only needs the plot model and the X3D exporter: its
++# Plotter3DES subclass stubs the rendering entry points, so it stays
++# available - and keeps the upstream export CTest cases running - on builds
++# without the OpenGL module.
+ add_executable(export3dplotdemo export3dplotdemo.cpp)
+-target_link_libraries(export3dplotdemo AnalitzaWidgets Qt6::OpenGLWidgets)
++target_link_libraries(export3dplotdemo AnalitzaWidgets)
++if(TARGET Qt6::OpenGLWidgets)
++    target_link_libraries(export3dplotdemo Qt6::OpenGLWidgets)
++endif()
+ 
+ find_library(SNDFILE sndfile)
+ if (SNDFILE_FOUND)

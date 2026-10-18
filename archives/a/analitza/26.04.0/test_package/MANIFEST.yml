@@ -1,0 +1,41 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for analitza/26.04.0.
+
+package: analitza/26.04.0
+homepage: https://invent.kde.org/education/analitza
+
+upstream_check_command: "ctest --output-on-failure"
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error"
+
+upstream_tests:
+  - file: analitza/tests/
+    source: analitza-26.04.0/analitza/tests/
+    description: "analitza core QTest suite: 8 programs registered by ecm_add_tests (analitzatest, expressiontest, exptest, mathmlpresentationtest, typechecktest, builtintest, commandstest, matchingtest)"
+    command: "ctest --output-on-failure"
+    condition: "built with BUILD_TESTING=ON; the test binaries resolve the build-tree Analitza/Qt libraries through the LD_LIBRARY_PATH prepared by the recipe"
+  - file: analitzaplot/tests/
+    source: analitza-26.04.0/analitzaplot/tests/
+    description: "analitzaplot QTest suite: 5 programs (planecurvetest, spacecurvetest, surfacetest, plotsmodeltest, plotsdictionarymodeltest) covering the 2D/3D geometry backends and the plot models"
+    command: "ctest --output-on-failure"
+    condition: "built with BUILD_TESTING=ON; runs headless with QT_QPA_PLATFORM=offscreen"
+  - file: analitzagui/tests/
+    source: analitza-26.04.0/analitzagui/tests/
+    description: "analitzagui QTest suite: operatorsmodeltest over the OperatorsModel"
+    command: "ctest --output-on-failure"
+    condition: "built with BUILD_TESTING=ON; runs headless with QT_QPA_PLATFORM=offscreen"
+  - file: analitzaplot/examples/
+    source: analitza-26.04.0/analitzaplot/examples/
+    description: "4 script-type CTest cases (export-test-sin-stl, export-test-sin-x3d, export-test-fancy-stl, export-test-fancy-x3d) driving the export3dplotdemo X3D/STL exporter; kept buildable without OpenGL through the capability-guarded Plotter3DES"
+    command: "ctest --output-on-failure"
+    condition: "export3dplotdemo is built unconditionally by patch 0005, so the export cases run on the OpenGL-less OHOS qtbase line"
+
+test_package_tests:
+  - file: test_package/test.cpp
+    description: "Consumer executor: version header, Analyzer evaluation (2+3*4, 2^10), PlotsFactory 2D PlaneCurve sampling, 3D Surface marching-cubes geometry, Plotter3DES X3D export document, filters() capability advertisement, AnalitzaGui VariablesModel and the AnalitzaWidgets PlotsView2D/ExpressionEdit views; prints per-case TEST PASS/FAIL and exits non-zero on any failure"
+    command: "conan create (test_package builds and runs test_analitza)"
+  - file: test_package/test_ohos_soname.cpp
+    description: "OHOS ELF regression check: live AnalitzaPlot API touch, consumer DT_NEEDED basename-only entries and bare libAnalitzaPlot.so reference, packaged library parsed from the loader-resolved path, bare DT_SONAME (E330 unversioned layout) and basename-only DT_NEEDED (E537)"
+    command: "conan create (test_package builds and runs test_ohos_soname)"
+
+assertion_count: 16
