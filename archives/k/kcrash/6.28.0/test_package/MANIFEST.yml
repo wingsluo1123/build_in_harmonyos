@@ -1,0 +1,26 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for kcrash/6.28.0.
+
+package: kcrash/6.28.0
+homepage: https://invent.kde.org/frameworks/kcrash
+
+upstream_check_command: "ctest --output-on-failure"
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error"
+
+upstream_tests:
+  - file: autotests/
+    source: kcrash-6.28.0/autotests/
+    description: "KCrash upstream CTest/autotests suite (kcrashtest, coreconfigtest, metadatatest) with BUILD_TESTING=ON and the test_crasher crash-injection helper"
+    command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error"
+    condition: "run in the Conan build with BUILD_TESTING=ON"
+
+test_package_tests:
+  - file: test_package/test_kcrash.cpp
+    description: "Consumer cases over KF6::Crash: DrKonqi toggle surface, crash-handler getters after setEmergencySaveFunction, error-information setters, plus two crash E2E cases driving the consumer_crasher child (emergency save function runs on SIGSEGV; AutoRestart | AlwaysDirectly restarts it)."
+    command: "conan create (test_package builds and runs test_kcrash)"
+  - file: test_package/consumer_crasher.cpp
+    description: "Deliberately crashing child process used by the two E2E cases; exercises setEmergencySaveFunction / setFlags(AutoRestart | AlwaysDirectly) and logs its lifecycle into a caller-provided file."
+    command: "spawned by test_kcrash during the E2E cases"
+
+assertion_count: 5
