@@ -1,0 +1,33 @@
+software: kitemviews
+version: "6.28.0"
+status: built
+build_system: cmake
+created_at: 2026-10-16
+build_date: 2026-10-16
+dependencies:
+  required:
+    - qtbase/6.11.1
+  build:
+    - ecm/6.28.0
+  optional:
+    - qttools
+patches_applied:
+  - patches/0001-CMakeLists.txt.patch
+test_results:
+  type: passed
+  upstream: "passed: 1/1 upstream CTest autotest (kitemviews-klistwidgetsearchlinetest, BUILD_TESTING=ON inside conan create); the 3 tests/ GUI demos are never CTest-registered upstream and were each launched under offscreen QPA (rc=124 = timeout stop, event loop alive, no crash)"
+  test_package: "passed: 27 checks across 3 consumer cases (KTreeWidgetSearchLine 13 / KCategorizedView 8 / KListWidgetSearchLine 6); TEST SUMMARY: 3 passed, 0 failed"
+  package_id: "57ffd8c720a5bfee7e8827990cd6550a49181c1b"
+  full_reference: "kitemviews/6.28.0#76472cea74156150fb6d56c39ed6ae91"
+  l0: "pass"
+  l1: "pass"
+  l2: "skip: no bin/ smoke (library only, no CLI tools)"
+  l4: "pass"
+  l5: "pass"
+source_url: https://download.kde.org/stable/frameworks/6.28/kitemviews-6.28.0.tar.xz
+source_sha256: 2b474a0a0ca1d59111ab864d4f05100e0056b5204d52dfbab6776ca0fbfdd402
+knowledge_gained:
+  - "kitemviews 6.28.0 keeps the 6.26.0 recipe shape: KF_IGNORE_PLATFORM_CHECK=TRUE, BUILD_DESIGNERPLUGIN=OFF, the po/qm patch (0001) still applies to the 6.28 tree, and the build dependency moves to ecm/6.28.0."
+  - "OHOS shared-library rules must be SONAME-only: if CMAKE_SHARED_LIBRARY_RUNTIME_C/CXX_FLAGS are defined, cmake's install() rewrites the ELF and strips the RUNPATH, after which the device loader rejects dlopen of the installed library (EACCES). The recipe writes a rules file containing only set(CMAKE_SHARED_LIBRARY_SONAME_C_FLAG/-CXX_FLAG \"-Wl,-soname,\") plus CMAKE_PLATFORM_NO_VERSIONED_SONAME=TRUE and CMAKE_USER_MAKE_RULES_OVERRIDE_C/CXX; install() then reduces to a byte-identical copy of the build artifact (build md5 == install md5 == 812802935386db608fb349d1db885ace; readelf: SONAME=libKF6ItemViews.so, no RPATH/RUNPATH, DT_NEEDED bare basenames)."
+  - "Deterministic SIGSEGV in KCategoryDrawer::drawCategory (kcategorydrawer.cpp:48): the drawer dereferences an invalid QModelIndex for a phantom Block inserted by QHash::operator[] when a category proxy is sorted before the source model is populated. Upstream master carries the identical code path (not fixed upstream). Usage fix = canonical ordering (view.setModel -> populate source -> proxy.sort) and waitFor both category blocks (block heights are lazy and need at least one paint)."
+  - "The tests/ GUI demos are interactive main()/exec() programs upstream never passes to add_test (ECM ecm_mark_as_test does not call add_test in this configuration): 4 upstream build targets total = 1 CTest-registered autotest + 3 launch-only demos; the demos are validated by an offscreen QPA launch (still in the event loop after 6 s, then stopped by timeout)."
