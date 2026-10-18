@@ -1,0 +1,31 @@
+package: urjtag/2021.03
+homepage: "http://urjtag.org"
+
+upstream_check_command: "make check"
+upstream_test_in_build: true
+upstream_test_command: "make check -j1"
+upstream_tests: []
+upstream_test_evidence: >-
+  上游 tarball 没有任何测试（如实申报 0 个用例）：grep 全部 40+ 个 Makefile.am，
+  TESTS/check_PROGRAMS/check_SCRIPTS 零命中；src/ 下只有 flash/lib/tap/part/bfin/
+  bus/cmd/pld/global/(svf/bsdl/stapl/jim) 子目录，无 tests/ 或 test/ 目录、无测试
+  脚本。`make check` 各子目录均为空目标，已在 build() 中执行并在构建日志留痕。
+
+test_package_tests:
+  - file: test_urjtag.py
+    description: >-
+      jtag 命令行契约（--version 输出 UrJTAG 2021.03 / --help 用法与退出码）+
+      真跑 JTAG 脚本（jtag -n 执行 help+quit，走完整命令解析/派发循环，无硬件；
+      命令列表含 svf/bsdl 模块，验证静态链入）+ bsdl2jtag 缺参用法契约（exit 1 +
+      usage 文本）+ 鸿蒙 ELF 断言（aarch64 PIE、解释器为 OHOS 并存的两个 musl
+      loader 之一并显式排除 glibc loader、DT_NEEDED = OHOS libc.so +
+      libusb-1.0.so、无 glibc 专有 soname、无绝对路径、liburjtag.a 为合法 ar
+      归档且含 aarch64 ELF 成员、公共头文件与 share/ 器件数据库已安装）+
+      --version 输出确定性
+    command: "python3 test_urjtag.py --jtag <jtag 命令前缀> --bsdl2jtag <bsdl2jtag 命令前缀> --pkgroot <urjtag 包根>"
+
+assertion_count: 30
+harmonyos_specific_tests: 1
+harmonyos_specific_assertions: 8
+harmonyos_specific_files:
+  - test_urjtag.py

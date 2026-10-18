@@ -1,0 +1,97 @@
+version: "2021.03"
+software: urjtag
+status: built
+build_date: "2026-10-17"
+build_system: autotools
+conan_ref: "urjtag/2021.03"
+
+source:
+  url: "https://downloads.sourceforge.net/project/urjtag/urjtag/2021.03/urjtag-2021.03.tar.xz"
+  alt_url: "https://urjtag.org/releases/urjtag-2021.03.tar.xz"
+  mirror_url: "https://distfiles.macports.org/urjtag/urjtag-2021.03.tar.xz"
+  sha256: "b0a2eaa245513af096dc4d770109832335c694c6c12aa5e92fefae8685416f1c"
+  tar_format: tar.xz
+  note: >-
+    上游官方发布渠道：SourceForge 官方项目托管（urjtag 项目页
+    urjtag.sourceforge.io 即在 SourceForge，downloads.sourceforge.net 为其
+    文件发布区）与 urjtag.org release 页。适配网络实测（2026-10-16）：
+    urjtag.org 间歇性完全不可达（HEAD/GET 均连接超时）；
+    downloads.sourceforge.net HEAD 稳定 200 但 body 传输断流（多次重试
+    未获完整文件）；distfiles.macports.org 一次成功取到完整 tarball。
+    conandata.yml 三 URL 共用同一 sha256，且该 sha256+字节数（1208440）
+    与官方 Debian 源包元数据 urjtag_2021.03-5.dsc 公布的
+    urjtag_2021.03.orig.tar.xz 完全一致 —— 源码身份由独立官方渠道
+    （Debian 打包元数据）交叉验证。
+
+build:
+  system: "GNU Autotools（tarball 自带 autoconf 2.64 时代预生成的 configure + libtool，无需 bootstrap）"
+  library_type: >-
+    静态库（shared=False 默认，产物 lib/liburjtag.a）：tarball 自带 libtool
+    对 host_os=ohos 落入 generic（不支持）分支且以宿主机 x86_64 ld 探测交叉
+    clang，can_build_shared=no，只产 .a；与仓库 autotools 库惯例一致
+    （a52dec、aalib 均 shared=False）。jtag/bsdl2jtag 静态链入 liburjtag，
+    libusb-1.0.so 仍为动态 DT_NEEDED 依赖。
+  configure_options:
+    - "--disable-nls（AM_GNU_GETTEXT(external) 会引入 gettext 工具链，@LIBINTL@ 置空即可）"
+    - "--disable-python（SWIG python bindings 在 OHOS 用户态无用且需 python-dev）"
+    - "--enable-svf / --enable-bsdl（tarball 自带 flex/bison 生成产物，零再生成，构建机不需要 flex/bison）"
+    - "--disable-shared（OHOS libtool 限制，见 library_type）"
+  dependencies:
+    - "libusb/1.0.29（USB JTAG 线缆支持，PKG_CHECK_MODULES libusb-1.0；动态共享库）"
+    - "readline/8.3（交互命令历史，VL_LIB_READLINE 链接探测；ohpcd 注册为静态库）"
+    - "ncurses/6.6（readline 的传递依赖，ohpcd 注册为静态库）"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - file: "patches/0001-configure-umask-hmdfs-scratch-dir.patch"
+    target: "configure"
+    reason: >-
+      预防 HMDFS setgid + umask 077 陷阱（知识库 E011 / E114 / E129 / E136，
+      tanidvr/1.4.1 CI #66193 实测踩坑）：configure/config.status 用
+      `umask 077 && mktemp -d "./confXXXXXX"` 建临时目录，HMDFS 强制 setgid
+      后该目录变成 drwx--S---（2700），连属主都无法在里面建文件，
+      config.status 写 subs1.awk 必然失败。补丁把 configure 里两处
+      `umask 077` 去掉（改用默认 umask）；config.status 由 configure 生成，
+      同一个补丁同时覆盖两处。无平台宏，无行为语义改变（临时目录仍是
+      mktemp 随机名）。
+    verified_locally: >-
+      本地 WSL（ext4）conan create 全绿；补丁 --dry-run -p1 干净应用，
+      打补丁后 configure 的 `umask 077` 命中数 = 0（打补丁前为 2）。
+      HMDFS 上的实际效果待 CI 复验（本机无法模拟 setgid 语义）。
+
+test_passed: 1
+test_failed: 0
+
+test_results:
+  upstream_suite: none
+  upstream_note: >-
+    上游没有任何测试（实测清点）：grep 全部 40+ 个 Makefile.am，
+    TESTS/check_PROGRAMS/check_SCRIPTS 零命中；无 tests/ 或 test/ 目录、
+    无测试脚本。如实申报 0 个上游用例；`make check` 为空目标，
+    已在 build() 中执行并在构建日志留痕。
+  test_package_registered: 1
+  test_package_executed: 1
+  assertion_count: 30
+  harmonyos_specific_assertions: 8
+  note: >-
+    消费者用例全部执行交付物本身（不是空壳）：jtag 的命令行契约 6 项断言
+    （--version 输出 UrJTAG 2021.03、--help 用法与退出码）、jtag -n 真跑
+    JTAG 脚本（help+quit 走完整命令解析/派发循环，无硬件）6 项断言
+    （含命令列表中 svf/bsdl 模块静态链入验证）、bsdl2jtag 缺参用法契约
+    2 项断言，以及鸿蒙特有的 8 项断言（aarch64 OHOS PIE ELF、解释器为
+    OHOS 并存的两个 loader 之一（/lib/ld-musl-aarch64.so.1 或
+    /lib/ld-linux-aarch64.so.1，并显式排除 glibc 的
+    ld-linux-aarch64.so.2）、DT_NEEDED = OHOS libc.so + libusb-1.0.so、
+    无 glibc 专有 soname、无绝对路径、liburjtag.a 为合法 ar 归档且含
+    aarch64 ELF 成员）、公共头文件/器件数据库安装 3 项断言、--version
+    输出确定性 1 项断言。
+
+knowledge_gained:
+  - "SVF/BSDL player 的 flex/bison 生成产物（svf_flex.c / svf_bison.c/h / bsdl_* / vhdl_*）随 tarball 发行且 mtime 新于 .l/.y 输入，configure 对无现代 flex 的环境显式回退到 *_bison.h —— 这类 autotools 包不需要构建机装 flex/bison，也不用为「预生成文件是否会被重新生成」担心（make 只按 mtime 比较）。"
+  - "urjtag.org 在适配网络上是「HEAD 200 / GET 连接超时」的半可达状态；conandata 登记字节级一致的 distfiles 镜像兜底前，sha256 必须与官方 Debian .dsc 公布的上游哈希三源交叉验证（官方 dsc / release 页 HEAD / 镜像下载体）。"
+  - "readline/8.3 与 ncurses/6.6 在 ohpcd 注册表里都是静态库（shared: False）：urjtag 的 VL_LIB_READLINE 链接探测直接吃静态库，jtag 二进制对 libreadline 没有运行时依赖 —— DT_NEEDED 断言不能写 libreadline，要断言的是 libusb-1.0.so（真共享依赖）。"
+  - "tarball 自带的 libtool 对 host_os=ohos 没有分支（generic → ld_shlibs=no）且用宿主机 x86_64 /usr/bin/ld 探测交叉 clang，can_build_shared=no 只产 .a —— 与 readline/ncurses 在 ohpcd 注册为静态库同理，OHOS 上 autotools 库按仓库惯例（a52dec/aalib）默认 shared=False，用「命令列表含 svf/bsdl 模块」断言验证静态链入而非 DT_NEEDED。"
+  - "musl 没有 ualarm()：svf.c 直接调用会在链接期报 undefined reference；用一次性 setitimer(ITIMER_REAL, it_value=delay, it_interval=0) 语义等价替换（返回值恒 0 的封装），补丁零平台宏。"
+  - "CI L2 冒烟测试（裸跑 bin --version）是非阻塞项：多共享依赖的二进制裸跑需要 conanrun 环境提供 LD_LIBRARY_PATH，worker 上打不中只出 warn；真实门禁是 L0/L1/L1e/L4/L5。"
+  - "package_type=library 且产物含 bin/ 时，L0k 门禁仍要求软件级 commands.json（detect_bindirs 只看 cpp_info.bindirs 是否非空）—— 库+工具混合包按 a52dec 先例：package_type 保持 library + commands.json 声明 binary: true。"
