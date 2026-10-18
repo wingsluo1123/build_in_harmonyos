@@ -1,0 +1,394 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 1f4957b18e6ccc168679d589239b225058b4734e..685628c4e1eb3698fce1aa53005774e3975aefc1 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,4 +1,4 @@
+-cmake_minimum_required(VERSION 3.2)
++cmake_minimum_required(VERSION 3.10)
+ project(cascade)
+ 
+ set(CMAKE_CXX_STANDARD 17)
+@@ -39,6 +39,12 @@ include_directories(${FLEX_INCLUDE_DIRS})
+ include_directories(${CMAKE_BINARY_DIR}/src)
+ include_directories(.)
+ include_directories(src/cascade)
++if(CASCADE_EXTRA_INCLUDE_DIRS)
++  include_directories(SYSTEM ${CASCADE_EXTRA_INCLUDE_DIRS})
++endif()
++if(CASCADE_EXTRA_LIBRARY_DIRS)
++  link_directories(${CASCADE_EXTRA_LIBRARY_DIRS})
++endif()
+ 
+ add_subdirectory(include)
+ add_subdirectory(share)
+diff --git a/share/cascade/verilator/build_verilator_32.sh b/share/cascade/verilator/build_verilator_32.sh
+index b2561c50c52b3b4467743ca8e3c27de0f6a615b6..ebf10502c302d717022612b5e5ede4c6eb9e269c 100755
+--- a/share/cascade/verilator/build_verilator_32.sh
++++ b/share/cascade/verilator/build_verilator_32.sh
+@@ -6,10 +6,10 @@
+ # Check whether cxx compiler maps to clang or g++
+ $2 --version | grep clang 
+ if [ $? -eq 0 ] ; then
+-  VER_INSTALL=/usr/local/share/verilator/
++  VER_INSTALL="${VERILATOR_ROOT:-/usr/local/share/verilator}"
+   ARGS="-fbracket-depth=4096 -Qunused-arguments"
+ else 
+-  VER_INSTALL=/usr/share/verilator/
++  VER_INSTALL="${VERILATOR_ROOT:-/usr/share/verilator}"
+   ARGS="-ftemplate-depth=4096 -fconstexpr-depth=4096"
+ fi
+ 
+diff --git a/share/cascade/verilator/build_verilator_64.sh b/share/cascade/verilator/build_verilator_64.sh
+index d84ac10b00d68ab43353757bcf1d7fc7afa3f480..95b98e0191ff3b52b2c6ad9aa9eb6f7cd29c25eb 100755
+--- a/share/cascade/verilator/build_verilator_64.sh
++++ b/share/cascade/verilator/build_verilator_64.sh
+@@ -6,10 +6,10 @@
+ # Check whether cxx compiler maps to clang or g++
+ $2 --version | grep clang 
+ if [ $? -eq 0 ] ; then
+-  VER_INSTALL=/usr/local/share/verilator/
++  VER_INSTALL="${VERILATOR_ROOT:-/usr/local/share/verilator}"
+   ARGS="-fbracket-depth=4096 -Qunused-arguments"
+ else 
+-  VER_INSTALL=/usr/share/verilator/
++  VER_INSTALL="${VERILATOR_ROOT:-/usr/share/verilator}"
+   ARGS="-ftemplate-depth=4096 -fconstexpr-depth=4096"
+ fi
+ 
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index b7968f6789ee23576c34d576aac83bb9848eea13..fe895a047312995fc434ea5c6882b02099975dd2 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -11,7 +11,12 @@ flex_target(verilog_lexer cascade/verilog/parse/verilog.ll ${CMAKE_CURRENT_BINAR
+ add_flex_bison_dependency(verilog_lexer verilog_parser)
+ 
+ file (GLOB_RECURSE SRC "*.cc")
+-add_library(libcascade SHARED STATIC 
++if(BUILD_SHARED_LIBS)
++  set(CASCADE_LIBRARY_TYPE SHARED)
++else()
++  set(CASCADE_LIBRARY_TYPE STATIC)
++endif()
++add_library(libcascade ${CASCADE_LIBRARY_TYPE}
+   ${BISON_verilog_parser_OUTPUTS} 
+   ${FLEX_verilog_lexer_OUTPUTS}
+   ${SRC}
+diff --git a/src/cascade/common/system.h b/src/cascade/common/system.h
+index 5517b662e03aea33340e2355c4100d8557a1df62..2f4d4e3b4d38283c724b16d40b4bed57b9895e5b 100644
+--- a/src/cascade/common/system.h
++++ b/src/cascade/common/system.h
+@@ -50,6 +50,9 @@ namespace cascade {
+ // environment-specific build-time constants.
+ 
+ struct System {
++  // Returns the root directory for writable temporary files.
++  static std::string tmp_root();
++
+   // Returns the directory that cascade is installed in
+   static std::string src_root();
+ 
+@@ -70,6 +73,11 @@ struct System {
+   static std::string cxx_compiler();
+ };
+ 
++inline std::string System::tmp_root() {
++  const auto* const path = std::getenv("CASCADE_TMP_DIR");
++  return (path == nullptr || *path == '\0') ? "/tmp" : path;
++}
++
+ #ifdef __APPLE__
+ inline std::string System::src_root() {
+   char buffer[1024];
+diff --git a/src/cascade/target/compiler/remote_compiler.cc b/src/cascade/target/compiler/remote_compiler.cc
+index f057cd3bd797d6f70f590a5312bf6d102c4a5ff5..31566f4f5ac76e4784015f87d64ec9ceee0f472c 100644
+--- a/src/cascade/target/compiler/remote_compiler.cc
++++ b/src/cascade/target/compiler/remote_compiler.cc
+@@ -31,6 +31,9 @@
+ #include "target/compiler/remote_compiler.h"
+ 
+ #include <cassert>
++#include <cstdlib>
++#include <sys/select.h>
++#include <sys/time.h>
+ #include <unordered_map>
+ #include "common/log.h"
+ #include "common/sockserver.h"
+@@ -46,8 +49,12 @@ using namespace std;
+ namespace cascade {
+ 
+ RemoteCompiler::RemoteCompiler() : Compiler(), Thread() { 
+-  set_path("/tmp/fpga_socket");
+-  set_port(8800);
++  const auto* const path = std::getenv("CASCADE_SOCKET_PATH");
++  const auto* const port = std::getenv("CASCADE_PORT");
++  set_path((path == nullptr) ? "/tmp/fpga_socket" : path);
++  set_port((port == nullptr)
++    ? 8800
++    : static_cast<uint32_t>(std::strtoul(port, nullptr, 10)));
+ 
+   sock_ = nullptr;
+ }
+diff --git a/src/cascade/target/core/avmm/avalon/avalon_compiler.h b/src/cascade/target/core/avmm/avalon/avalon_compiler.h
+index bdd4ed58ce4f7451513c4daf0f1c56d0c72a41af..e9ca2834ce98a93a7634d9b04780138d850fc438 100644
+--- a/src/cascade/target/core/avmm/avalon/avalon_compiler.h
++++ b/src/cascade/target/core/avmm/avalon/avalon_compiler.h
+@@ -88,9 +88,10 @@ inline bool AvalonCompiler<M,V,A,T>::compile(const std::string& text, std::mutex
+   (void) lock;
+ 
+   AvalonCompiler<M,V,A,T>::get_compiler()->schedule_state_safe_interrupt([this, &text]{
+-    System::execute("mkdir -p /tmp/avalon/");
+-    char path[] = "/tmp/avalon/program_logic_XXXXXX.v";
+-    const auto fd = mkstemps(path, 2);
++    const auto temp_dir = System::tmp_root() + "/avalon";
++    System::execute("mkdir -p " + temp_dir);
++    auto path = temp_dir + "/program_logic_XXXXXX.v";
++    const auto fd = mkstemps(path.data(), 2);
+     close(fd);
+ 
+     std::ofstream ofs(path);
+diff --git a/src/cascade/target/core/avmm/de10/de10_compiler.cc b/src/cascade/target/core/avmm/de10/de10_compiler.cc
+index 213119896c7ffb2b48c92c1e94e8445213b88afc..a555af2a02bd3a03ab26c515de25ec375da82953 100644
+--- a/src/cascade/target/core/avmm/de10/de10_compiler.cc
++++ b/src/cascade/target/core/avmm/de10/de10_compiler.cc
+@@ -223,9 +223,10 @@ void De10Compiler::reprogram(sockstream* sock) {
+     sock->read(reinterpret_cast<char*>(rbf.data()), len);
+ 
+     // Form a path to the temporary location we'll be storing the rbf file
+-    System::execute("mkdir -p /tmp/de10/");
+-    char path[] = "/tmp/de10/DE10_NANO_SoC_GHRD_XXXXXX.rbf";
+-    const auto fd = mkstemps(path, 4);
++    const auto temp_dir = System::tmp_root() + "/de10";
++    System::execute("mkdir -p " + temp_dir);
++    auto path = temp_dir + "/DE10_NANO_SoC_GHRD_XXXXXX.rbf";
++    const auto fd = mkstemps(path.data(), 4);
+     close(fd);
+ 
+     // Copy the rbf file to this location
+diff --git a/src/cascade/target/core/avmm/de10/quartus_server.cc b/src/cascade/target/core/avmm/de10/quartus_server.cc
+index ca45327b8748dc49a0239624e683d2ad52f84bf4..ee772765fe31856a0225e89b0821a966f492a39f 100644
+--- a/src/cascade/target/core/avmm/de10/quartus_server.cc
++++ b/src/cascade/target/core/avmm/de10/quartus_server.cc
+@@ -42,7 +42,7 @@ using namespace std;
+ namespace cascade::avmm {
+ 
+ QuartusServer::QuartusServer() : Thread() { 
+-  set_cache_path("/tmp/quartus_cache/");
++  set_cache_path(System::tmp_root() + "/quartus_cache/");
+   set_quartus_path("");
+   set_quartus_tunnel_command("");
+   set_port(9900);
+@@ -226,10 +226,11 @@ bool QuartusServer::compile(const std::string& text) {
+   }
+ 
+   // Otherwise, compile the code and add a new entry to the cache
+-  System::execute("mkdir -p /tmp/de10/");
+-  char path[] = "/tmp/de10/program_logic_XXXXXX.v";
+-  const auto fd = mkstemps(path, 2);
+-  const auto dir = string(path).substr(0, 30);
++  const auto temp_dir = System::tmp_root() + "/de10";
++  System::execute("mkdir -p " + temp_dir);
++  auto path = temp_dir + "/program_logic_XXXXXX.v";
++  const auto fd = mkstemps(path.data(), 2);
++  const auto dir = path.substr(0, path.rfind('/'));
+   close(fd);
+ 
+   System::execute("cp -R " + System::src_root() + "/share/cascade/de10 " + dir);
+diff --git a/src/cascade/target/core/avmm/ulx3s/ulx3s_compiler.h b/src/cascade/target/core/avmm/ulx3s/ulx3s_compiler.h
+index 5e741edac7c698a615f2a34a0c55d920a632b931..666ccfa610d0cdf8c0bf9bc30d7f3061b44dcb43 100644
+--- a/src/cascade/target/core/avmm/ulx3s/ulx3s_compiler.h
++++ b/src/cascade/target/core/avmm/ulx3s/ulx3s_compiler.h
+@@ -106,9 +106,10 @@ inline bool Ulx3sCompiler<M,V,A,T>::compile(const std::string& text, std::mutex&
+ 
+   // Compile a cache entry if none previously existed
+   if (cache_.find(text) == cache_.end()) {
+-    char path[] = "/tmp/ulx3s/program_logic_XXXXXX.v";
+-    const auto fd = mkstemps(path, 2);
+-    const auto dir = std::string(path).substr(0,31);
++    const auto temp_dir = System::tmp_root() + "/ulx3s";
++    auto path = temp_dir + "/program_logic_XXXXXX.v";
++    const auto fd = mkstemps(path.data(), 2);
++    const auto dir = path.substr(0, path.rfind('/'));
+     close(fd);
+ 
+     System::execute("mkdir -p " + dir);
+@@ -140,12 +141,13 @@ inline bool Ulx3sCompiler<M,V,A,T>::compile(const std::string& text, std::mutex&
+     std::stringstream ss;
+     ss << "bitstream_" << cache_.size() << ".bit";
+ 
++    const auto cache_dir = temp_dir + "/cache32";
+     std::ofstream ofs2;
+     if constexpr (std::is_same<T, uint32_t>::value) {
+-      System::execute("cp " + dir + "/root32.bit /tmp/ulx3s/cache32/" + ss.str());
+-      ofs2.open("/tmp/ulx3s/cache32/index.txt", std::ios::app);
+-      ofs2 << text << '\0' << "/tmp/ulx3s/cache32/" << ss.str() << '\0';
+-      cache_[text] = "/tmp/ulx3s/cache32/" + ss.str();
++      System::execute("cp " + dir + "/root32.bit " + cache_dir + "/" + ss.str());
++      ofs2.open(cache_dir + "/index.txt", std::ios::app);
++      ofs2 << text << '\0' << cache_dir << "/" << ss.str() << '\0';
++      cache_[text] = cache_dir + "/" + ss.str();
+     }
+   }
+ 
+@@ -218,16 +220,17 @@ inline void Ulx3sCompiler<M,V,A,T>::stop_compile() {
+ 
+ template <size_t M, size_t V, typename A, typename T>
+ inline void Ulx3sCompiler<M,V,A,T>::init_tmp() {
+-  System::execute("mkdir -p /tmp/ulx3s");
+-  System::execute("mkdir -p /tmp/ulx3s/cache32");
+-  System::execute("touch /tmp/ulx3s/cache32/index.txt");
++  const auto temp_dir = System::tmp_root() + "/ulx3s";
++  const auto cache_dir = temp_dir + "/cache32";
++  System::execute("mkdir -p " + cache_dir);
++  System::execute("touch " + cache_dir + "/index.txt");
+ }
+ 
+ template <size_t M, size_t V, typename A, typename T>
+ inline void Ulx3sCompiler<M,V,A,T>::init_cache() {
+   std::ifstream ifs;
+   if constexpr (std::is_same<T, uint32_t>::value) {
+-    ifs.open("/tmp/ulx3s/cache32/index.txt");
++    ifs.open(System::tmp_root() + "/ulx3s/cache32/index.txt");
+   }
+   while (true) {
+     std::string text;
+diff --git a/src/cascade/target/core/avmm/verilator/verilator_compiler.h b/src/cascade/target/core/avmm/verilator/verilator_compiler.h
+index 3d8a9e4da8bf7b9cf6257774e7f18717542f2ae4..752b6cf62b05117f7b862e6d610fdc5d3c41c1de 100644
+--- a/src/cascade/target/core/avmm/verilator/verilator_compiler.h
++++ b/src/cascade/target/core/avmm/verilator/verilator_compiler.h
+@@ -92,10 +92,11 @@ template <size_t M, size_t V, typename A, typename T>
+ inline bool VerilatorCompiler<M,V,A,T>::compile(const std::string& text, std::mutex& lock) {
+   stop_compile();
+ 
+-  System::execute("mkdir -p /tmp/verilator/");
+-  char path[] = "/tmp/verilator/program_logic_XXXXXX.v";
+-  const auto fd = mkstemps(path, 2);
+-  const auto dir = std::string(path).substr(0,35);
++  const auto temp_dir = System::tmp_root() + "/verilator";
++  System::execute("mkdir -p " + temp_dir);
++  auto path = temp_dir + "/program_logic_XXXXXX.v";
++  const auto fd = mkstemps(path.data(), 2);
++  const auto dir = path.substr(0, path.rfind('/'));
+   close(fd);
+ 
+   System::execute("mkdir -p " + dir);
+@@ -143,11 +144,8 @@ inline bool VerilatorCompiler<M,V,A,T>::compile(const std::string& text, std::mu
+ 
+ template <size_t M, size_t V, typename A, typename T>
+ inline void VerilatorCompiler<M,V,A,T>::stop_compile() {
+-  if constexpr (std::is_same<T, uint32_t>::value) {
+-    System::execute(R"(pkill -9 -P `ps -ax | grep build_verilator_32.sh | awk '{print $1}' | head -n1`)");
+-  } else if constexpr (std::is_same<T, uint64_t>::value) {
+-    System::execute(R"(pkill -9 -P `ps -ax | grep build_verilator_64.sh | awk '{print $1}' | head -n1`)");
+-  } 
++  // Compilation is synchronous and waits for its own child PID in compile().
++  // Do not search the global process table: that can kill another session.
+ }
+ 
+ } // namespace cascade::avmm
+diff --git a/src/cascade/target/core/proxy/proxy_compiler.cc b/src/cascade/target/core/proxy/proxy_compiler.cc
+index 33d799377c6d752515346143aa9cef7e9ae74070..3009533da4ac9bbe40478c9c9ad043e57212a309 100644
+--- a/src/cascade/target/core/proxy/proxy_compiler.cc
++++ b/src/cascade/target/core/proxy/proxy_compiler.cc
+@@ -30,6 +30,9 @@
+ 
+ #include "target/core/proxy/proxy_compiler.h"
+ 
++#include <cstdlib>
++#include <sys/select.h>
++#include <sys/time.h>
+ #include <sstream>
+ 
+ using namespace std;
+@@ -208,2 +211,6 @@ sockstream* ProxyCompiler::get_unix_sock(const string& loc) {
+-  return new sockstream(loc.c_str()); 
++  const auto* const path = std::getenv("CASCADE_SOCKET_PATH");
++  if (loc == "/tmp/fpga_socket" && path != nullptr) {
++    return new sockstream(path);
++  }
++  return new sockstream(loc.c_str());
+ }
+diff --git a/test/CMakeLists.txt b/test/CMakeLists.txt
+index 7c7bbfdd98a83db61f7ef36330d54e280d9154e6..d88495c4b9fc887ffde5e331078dc4223ced16d9 100644
+--- a/test/CMakeLists.txt
++++ b/test/CMakeLists.txt
+@@ -15,4 +15,4 @@ add_executable(run_benchmark harness.cc benchmark/benchmark.cc)
+ target_link_libraries(run_benchmark libcascade gtest benchmark Threads::Threads ${CMAKE_DL_LIBS})
+ 
+ add_custom_command(TARGET run_regression POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/share/cascade ${CMAKE_BINARY_DIR}/share/cascade)
+-add_test(NAME regression COMMAND ${CMAKE_BINARY_DIR}/test/run_regression WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/..)
++add_test(NAME regression COMMAND ${CMAKE_BINARY_DIR}/test/run_regression WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/test)
+diff --git a/test/regression/remote.cc b/test/regression/remote.cc
+index ee3a10899fa336ff0b7154b8355a20651c5e2d25..5370048219f966f8ffbed9e96c1f85db25b62f50 100644
+--- a/test/regression/remote.cc
++++ b/test/regression/remote.cc
+@@ -29,19 +29,49 @@
+ // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ 
+ #include "include/cascade_slave.h"
+ #include "gtest/gtest.h"
+ #include "test/harness.h"
++#include <netinet/in.h>
++#include <sys/socket.h>
++#include <unistd.h>
++#include <cstdlib>
++#include <string>
+ 
+ using namespace cascade;
+ 
+ int main(int argc, char** argv) {
+   ::testing::InitGoogleTest(&argc, argv);
+ 
++  int probe = ::socket(AF_INET, SOCK_STREAM, 0);
++  if (probe < 0) return 1;
++  sockaddr_in address{};
++  address.sin_family = AF_INET;
++  address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
++  address.sin_port = 0;
++  if (::bind(probe, reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0) {
++    ::close(probe);
++    return 1;
++  }
++  socklen_t address_size = sizeof(address);
++  if (::getsockname(probe, reinterpret_cast<sockaddr*>(&address), &address_size) != 0) {
++    ::close(probe);
++    return 1;
++  }
++  const auto port = ntohs(address.sin_port);
++  ::close(probe);
++  const auto path = "@cascade-regression-" + std::to_string(::getpid());
++  const auto port_text = std::to_string(port);
++  ::setenv("CASCADE_SOCKET_PATH", path.c_str(), 1);
++  ::setenv("CASCADE_PORT", port_text.c_str(), 1);
++
+   CascadeSlave slave;
+-  slave.set_listeners("/tmp/fpga_socket", 8800);
++  slave.set_listeners(path, port);
+   slave.run();
+ 
+-  return RUN_ALL_TESTS();
++  const auto result = RUN_ALL_TESTS();
++  slave.stop_now();
++  slave.wait_for_stop();
++  return result;
+ }
+ 
+ TEST(one_to_one, hello_1) {
+diff --git a/tools/CMakeLists.txt b/tools/CMakeLists.txt
+index a1c8cab2dd9bd9853f4d2bb3a56c5a0f7662341d..945a13d1315e5fd7f60acd67aea3a668ea87aa81 100644
+--- a/tools/CMakeLists.txt
++++ b/tools/CMakeLists.txt
+@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.10)
+ set(THREADS_PREFER_PTHREAD_FLAG ON)
+ find_package(Threads REQUIRED)
+ 
++find_package(ncurses REQUIRED)
+ add_executable(cascade cascade.cc)
+ target_link_libraries(cascade PRIVATE libcascade Threads::Threads ${CMAKE_DL_LIBS})
+ install(TARGETS cascade RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
+@@ -19,5 +20,5 @@ target_link_libraries(quartus_server PRIVATE libcascade Threads::Threads)
+ install(TARGETS quartus_server RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
+ 
+ add_executable(sw_fpga sw_fpga.cc)
+-target_link_libraries(sw_fpga PRIVATE libcascade ncurses Threads::Threads)
++target_link_libraries(sw_fpga PRIVATE libcascade ncurses::ncurses Threads::Threads)
+ install(TARGETS sw_fpga RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)

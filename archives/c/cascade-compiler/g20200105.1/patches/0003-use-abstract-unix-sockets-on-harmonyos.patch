@@ -1,0 +1,64 @@
+diff --git a/src/cascade/common/sockserver.h b/src/cascade/common/sockserver.h
+index 54960a7..2358041 100644
+--- a/src/cascade/common/sockserver.h
++++ b/src/cascade/common/sockserver.h
+@@ -79,13 +79,22 @@ inline sockserver::sockserver(const char* path, size_t backlog) {
+   struct sockaddr_un addr;
+   bzero(&addr, sizeof(addr));
+   addr.sun_family = AF_UNIX;
+-  strncpy(addr.sun_path, path, sizeof(addr.sun_path)-1);
+-  unlink(path);
++  const bool abstract = path[0] == '@';
++  const auto* const name = abstract ? path + 1 : path;
++  if (abstract) {
++    strncpy(addr.sun_path + 1, name, sizeof(addr.sun_path) - 2);
++  } else {
++    strncpy(addr.sun_path, name, sizeof(addr.sun_path) - 1);
++    unlink(path);
++  }
++  const auto name_length = std::strlen(abstract ? addr.sun_path + 1 : addr.sun_path);
++  const auto address_length = static_cast<socklen_t>(
++    offsetof(sockaddr_un, sun_path) + name_length + 1);
+ 
+   fd_ = ::socket(AF_UNIX, SOCK_STREAM, 0);
+   if (fd_ == -1) {
+     return;
+-  } else if (::bind(fd_, (struct sockaddr*) &addr, sizeof(addr)) != 0) {
++  } else if (::bind(fd_, (struct sockaddr*) &addr, address_length) != 0) {
+     ::close(fd_);
+     fd_ = -1;
+   } else if (::listen(fd_, backlog) != 0) {
+diff --git a/src/cascade/common/sockstream.h b/src/cascade/common/sockstream.h
+index 3f8a1f8..e01f6ac 100644
+--- a/src/cascade/common/sockstream.h
++++ b/src/cascade/common/sockstream.h
+@@ -32,6 +32,7 @@
+ #define CASCADE_SRC_COMMON_SOCKSTREAM_H
+ 
+ #include <arpa/inet.h>
++#include <cstddef>
+ #include <cstring>
+ #include <fcntl.h>
+ #include <netinet/in.h>
+@@ -101,10 +102,19 @@ inline int sockstream::unix_sock(const char* path) {
+   struct sockaddr_un dest;
+   bzero(&dest, sizeof(dest));
+   dest.sun_family = AF_UNIX;
+-  strncpy(dest.sun_path, path, sizeof(dest.sun_path)-1);
++  const bool abstract = path[0] == '@';
++  const auto* const name = abstract ? path + 1 : path;
++  if (abstract) {
++    strncpy(dest.sun_path + 1, name, sizeof(dest.sun_path) - 2);
++  } else {
++    strncpy(dest.sun_path, name, sizeof(dest.sun_path) - 1);
++  }
++  const auto name_length = std::strlen(abstract ? dest.sun_path + 1 : dest.sun_path);
++  const auto address_length = static_cast<socklen_t>(
++    offsetof(sockaddr_un, sun_path) + name_length + 1);
+ 
+   fd_ = socket(AF_UNIX, SOCK_STREAM, 0);
+-  if ((fd_ != -1) && (::connect(fd_, (struct sockaddr*)&dest, sizeof(dest)) != 0)) {
++  if ((fd_ != -1) && (::connect(fd_, (struct sockaddr*)&dest, address_length) != 0)) {
+     ::close(fd_);
+     fd_ = -1;
+   } 
