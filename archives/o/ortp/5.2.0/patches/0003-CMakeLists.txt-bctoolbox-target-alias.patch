@@ -1,0 +1,19 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 6a8ae78..faf7fa5 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -80,6 +80,14 @@ find_library(LIBM NAMES m)
+ if(NOT DISABLE_BC_PACKAGE_SEARCH)
+ 	find_package(bctoolbox 0.2.0 REQUIRED)
+ endif()
++# Conan CMakeDeps exports the dependency as the bctoolbox::bctoolbox
++# imported target only; src/CMakeLists.txt links the bare "bctoolbox" name,
++# which CMake then degrades to a plain -lbctoolbox flag without the package's
++# INTERFACE_INCLUDE_DIRECTORIES (compile fails on bctoolbox/logging.h).
++# Alias the namespaced target under the bare name when only it exists.
++if(TARGET bctoolbox::bctoolbox AND NOT TARGET bctoolbox)
++	add_library(bctoolbox ALIAS bctoolbox::bctoolbox)
++endif()
+ 
+ check_include_file(sys/uio.h HAVE_SYS_UIO_H)
+ check_include_file(sys/audio.h HAVE_SYS_AUDIO_H)

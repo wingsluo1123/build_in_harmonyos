@@ -62,3 +62,19 @@ pkg-config --cflags ortp      # 输出: -I/storage/Users/currentUser/usr/local/i
 - 源码仓库：https://gitlab.linphone.org/BC/public/ortp
 - GitHub 镜像：https://github.com/BelledonneCommunications/ortp
 - 许可证：GNU AGPLv3 或 商业许可
+## 归档版本
+
+| 版本 | 状态 | 说明 |
+|------|------|------|
+| 5.2.0 | built | 2026-10-15 原生 W3：上游 1/1 + consumer 1/1；新 head 远端 CI/发布另核实 |
+
+## 2026-10-15 Conan 配方状态
+
+以上 5.5.0、手工预构建及 pkg-config 记录属于 2026-05 历史。
+当前配方依赖 bctoolbox/5.3.115，并从其已发布包接入 tester archive，
+bcunit/5.3.113 为测试依赖。默认共享构建在 HarmonyOS PC 真机执行原始
+ortp_tester 1/1 和安装后 consumer 1/1，W3 与负向包依赖检查通过。
+原始 FEC/first 仅为 NULL 指针占位断言，不代表 FEC 算法测试。
+当前配方移除 pkg-config/CMake 安装元数据，由 Conan CMakeDeps 生成消费配置。
+完整证据和边界见 5.2.0/notes.md 与 reports/test-report.md；新 head 远端
+CI 和制品发布另行核实，不能由历史预构建或本地 W3 推断。

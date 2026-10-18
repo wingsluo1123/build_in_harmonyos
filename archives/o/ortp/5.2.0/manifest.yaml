@@ -1,92 +1,51 @@
 software: ortp
-# 版本级 manifest 模板
-# 文件位置: archives/{letter}/{name}/5.2.0/manifest.yaml
-# 遵循 ARCHIVE-SPEC v2.0
-
-# ============================================================
-# 必须字段
-# ============================================================
-
-# 版本号
-version: "5.2.0"
-
-# 编译状态
-# published | built | failed | archived
-status: published
-
-# 编译日期（YYYY-MM-DD）
-build_date: "2026-05-22"
-
-# ============================================================
-# 源码信息
-# ============================================================
-
+version: 5.2.0
+status: built
+build_date: '2026-10-15'
 source:
-  # 源码下载 URL
-  url: "file:///storage/Users/currentUser/builds/ortp-5.2.0.tar.gz"
-
-  # 源码校验和
-  sha256: ""
-
-  # 压缩格式
-  # tar.gz | tar.xz | tar.bz2 | zip
+  url: https://gitlab.linphone.org/BC/public/ortp/-/archive/5.2.0/ortp-5.2.0.tar.gz
+  sha256: 32a0accf5c19df17ef27bd77473fe636f4ecc8eafcaf710e3b49a582776e78ac
   tar_format: tar.gz
-
-# ============================================================
-# 构建配置
-# ============================================================
-
+  mirror_note: GitHub 官方镜像与 gh-proxy 同 sha256（字节一致已验证）
 build:
-  # 构建系统类型
-  # cmake | autotools | makefile | meson | custom
-  system: autotools
-
-  # 配置选项列表
-  configure_options: []
-  # 例如:
-  # - "-DCMAKE_BUILD_TYPE=Release"
-  # - "-DCMAKE_SYSTEM_NAME=OHOS"
-
-  # 编译依赖列表（格式: name/version）
-  dependencies: []
-  # 例如:
-  # - openssl/1.1.1w
-  # - curl/8.19.0
-
-  # 编译器
+  system: cmake
+  build_system: cmake
+  configure_options:
+  - ENABLE_DOC=OFF
+  - ENABLE_TESTS=OFF
+  - ENABLE_UNIT_TESTS=ON
+  - ENABLE_STRICT=OFF
+  dependencies:
+  - bctoolbox/5.3.115
   cc: clang
-  cxx: clang++
-
-# ============================================================
-# 补丁信息
-# ============================================================
-
-# 应用的补丁列表
-patches_applied: []
-# 例如:
-# - "0001-bootstrap-ohos-toolchain.patch"
-
-# ============================================================
-# 知识沉淀
-# ============================================================
-
-# 编译中学到的知识
-knowledge_gained: []
-# 例如:
-# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
-# - "内嵌 libuv 需要禁用，使用系统 libuv"
-
-patch_generation:
-  method: per-file-difflib
-  source_orig_dir: /storage/Users/currentUser/builds/ortp-5.2.0.orig
-  source_work_dir: /storage/Users/currentUser/builds/ortp-5.2.0.work
-  source_orig_hash: 449ead3048fda7fc
-  source_work_hash: 9faf860ce8e3484d
-  generated_at: '2026-05-25T14:18:23'
-  patches_count: 1
-
-patch_classification:
-  - file: 0001-CMakeLists.txt.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
+  test_dependencies:
+  - bcunit/5.3.113
+  - 'bctoolbox/5.3.115: installed libbctoolbox-tester.a'
+patches_applied:
+- patches/0004-ohos-shared-library-soname.patch
+- patches/0001-CMakeLists.txt.patch
+- patches/0002-src-CMakeLists.txt-bc-macro-fallback.patch
+- patches/0003-CMakeLists.txt-bctoolbox-target-alias.patch
+- patches/0005-enable-published-tester-framework.patch
+knowledge_gained:
+- tester/fec_tester.c 注册 1 个原始 FEC/first 用例（仅 NULL 指针占位断言）；完整 ortp_tester 在 OHOS 真机执行通过，不能声称
+  FEC 算法覆盖。
+- cmake_minimum_required 3.1 与 CMake 4.x 不兼容，提升 3.5（复用 2026-05 真机预构建已验证补丁）
+- CMSG_NXTHDR 宏在 OHOS 头文件下触发 clang sign-compare 告警，STRICT 路径需 -Wno-error=sign-compare
+  或 ENABLE_STRICT=OFF
+- gitlab.linphone.org tag 归档与 GitHub 官方镜像归档字节一致（sha256 相同），镜像列表形态可用三源
+- main 中本目录原有 notes.md/manifest 为空模板，本 PR 补齐真实配方（archives/o/ortp/5.2.0 原无 conanfile.py）
+validation:
+  environment: HarmonyOS 6.1.0.117 arm64 / OHOS Conan 2.29.1 / Clang 15
+  upstream:
+    passed: 1
+    failed: 0
+    skipped: 0
+  consumer:
+    passed: 1
+    failed: 0
+    skipped: 0
+  w3_log_sha256: 2d92a85b0878b89dd531527e94a4ee891ffbd2cb6a735571498d6425b57ada2a
+  remote_ci: 'new head pending after push; previous 90261cae CI #92908 passed consumer
+    only'
+  publication: not claimed

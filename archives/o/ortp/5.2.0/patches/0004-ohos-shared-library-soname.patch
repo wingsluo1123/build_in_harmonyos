@@ -1,0 +1,16 @@
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -118,6 +118,12 @@ if(ENABLE_SHARED)
+ 	add_library(ortp SHARED ${ORTP_HEADER_FILES} ${ORTP_SOURCE_FILES_C} ${ORTP_SOURCE_FILES_CXX})
+ 	set_target_properties(ortp PROPERTIES LINKER_LANGUAGE CXX)
+ 	set_target_properties(ortp PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON)
++	# CMake has no built-in HarmonyOS platform module, so SOVERSION alone
++	# does not emit a SONAME flag. Keep the native unversioned filename and
++	# record its relative ELF identity explicitly for downstream consumers.
++	if(CMAKE_SYSTEM_NAME STREQUAL "HarmonyOS" OR CMAKE_SYSTEM_NAME STREQUAL "OHOS")
++		set_property(TARGET ortp APPEND_STRING PROPERTY LINK_FLAGS " -Wl,-soname,libortp.so")
++	endif()
+ 	if(APPLE)
+ 		if(IOS)
+ 			set(MIN_OS ${LINPHONE_IOS_DEPLOYMENT_TARGET})

@@ -1,0 +1,27 @@
+# conandata.yml — ortp 5.2.0
+
+sources:
+  # 官方源列表：gitlab tag 归档第一 + GitHub 官方镜像第二（已验证字节
+  # 一致，sha256 相同），conan 2 原生按序多源尝试；代理类镜像 fallback
+  # 由 CI 自动注入（R39：只写官方原始 URL）
+  url:
+    - "https://gitlab.linphone.org/BC/public/ortp/-/archive/5.2.0/ortp-5.2.0.tar.gz"
+    - "https://github.com/BelledonneCommunications/ortp/archive/refs/tags/5.2.0.tar.gz"
+  sha256: "32a0accf5c19df17ef27bd77473fe636f4ecc8eafcaf710e3b49a582776e78ac"
+
+patches:
+  - patch_file: "patches/0004-ohos-shared-library-soname.patch"
+    patch_description: "Record the relative libortp.so SONAME on HarmonyOS/OHOS, whose unknown CMake platform does not emit the upstream SOVERSION linker flag"
+    patch_type: "portability"
+  - patch_file: "patches/0001-CMakeLists.txt.patch"
+    patch_description: "CMakeLists.txt: raise cmake_minimum_required 3.1 -> 3.5 (CMake 4.x compatibility) and add -Wno-error=sign-compare for the CMSG_NXTHDR type-comparison warning (reuses the patch verified by the 2026-05 on-device prebuild)"
+    patch_type: "portability"
+  - patch_file: "patches/0002-src-CMakeLists.txt-bc-macro-fallback.patch"
+    patch_description: "src/CMakeLists.txt: provide a no-op bc_apply_compile_flags when bctoolbox is consumed via Conan CMakeDeps (generated config exports only the imported target, not the upstream compile-flags helper macros; ENABLE_STRICT=OFF keeps the flag lists advisory)"
+    patch_type: "portability"
+  - patch_file: "patches/0003-CMakeLists.txt-bctoolbox-target-alias.patch"
+    patch_description: "CMakeLists.txt: alias bctoolbox::bctoolbox under the bare 'bctoolbox' target name that src/CMakeLists.txt links (Conan CMakeDeps exports only the namespaced imported target; the bare name degrades to a plain -lbctoolbox flag and loses INTERFACE_INCLUDE_DIRECTORIES)"
+    patch_type: "portability"
+  - patch_file: "patches/0005-enable-published-tester-framework.patch"
+    patch_description: "Expose the published bctoolbox tester archive and BCUnit to the original upstream ortp_tester without modifying its tests"
+    patch_type: "portability"

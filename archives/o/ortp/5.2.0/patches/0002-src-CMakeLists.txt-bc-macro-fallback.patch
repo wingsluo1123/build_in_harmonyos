@@ -1,0 +1,22 @@
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 54b44f9..e62598e 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -94,6 +94,17 @@ if(WIN32)
+ 	endif()
+ endif()
+ 
++# Conan CMakeDeps's generated bctoolbox-config.cmake only exports the
++# imported target; the compile-flags helper macros shipped in upstream
++# bctoolbox's own CMake config are absent, which makes configure fail with
++# "Unknown CMake command bc_apply_compile_flags". With ENABLE_STRICT=OFF the
++# STRICT_OPTIONS_* lists only carry advisory warning flags, so a no-op
++# passthrough is equivalent for this build path.
++if(NOT COMMAND bc_apply_compile_flags)
++	macro(bc_apply_compile_flags)
++	endmacro()
++endif()
++
+ bc_apply_compile_flags(ORTP_SOURCE_FILES_C STRICT_OPTIONS_CPP STRICT_OPTIONS_C)
+ bc_apply_compile_flags(ORTP_SOURCE_FILES_CXX STRICT_OPTIONS_CPP STRICT_OPTIONS_CXX)
+ 
