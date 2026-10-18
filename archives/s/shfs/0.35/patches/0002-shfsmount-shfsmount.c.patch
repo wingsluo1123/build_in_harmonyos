@@ -1,0 +1,56 @@
+--- a/shfsmount/shfsmount.c
++++ b/shfsmount/shfsmount.c
+@@ -205,20 +205,30 @@
+ 	for (i = 0; i <= n; i++) {
+ 		if (st.st_gid == groups[i]) {
+ 			if ((st.st_mode & S_IRWXG) == S_IRWXG)
+ 				return 1;
+ 		}
+ 	}
+ 	errno = EPERM;
+         return 0;
+ }
+ 
++/* addmntent(3) is a GNU libc extension; libc that only ships the read side of
++ * <mntent.h> needs the mtab line written directly.  Same 1-on-error contract.
++ */
++static int
++shfs_addmntent(FILE *f, struct mntent *m)
++{
++	return fprintf(f, "%s %s %s %s %d %d\n", m->mnt_fsname, m->mnt_dir,
++		       m->mnt_type, m->mnt_opts, m->mnt_freq, m->mnt_passno) < 0;
++}
++
+ static int
+ update_mtab(char *mnt, char *dev, char *opts)
+ {
+ 	int fd;
+ 	FILE *mtab;
+ 	struct mntent ment;
+ 
+         ment.mnt_fsname = dev;
+         ment.mnt_dir = mnt;
+         ment.mnt_type = "shfs";
+@@ -228,21 +238,21 @@
+ 
+         if ((fd = open(MOUNTED"~", O_RDWR|O_CREAT|O_EXCL, 0600)) == -1) {
+                 fprintf(stderr, "Can't get "MOUNTED"~ lock file");
+                 return 0;
+         }
+         close(fd);
+         if ((mtab = setmntent(MOUNTED, "a+")) == NULL) {
+                 fprintf(stderr, "Can't open " MOUNTED);
+                 return 0;
+         }
+-        if (addmntent(mtab, &ment) == 1) {
++        if (shfs_addmntent(mtab, &ment)) {
+                 fprintf(stderr, "Can't write mount entry");
+                 return 0;
+         }
+         if (fchmod(fileno(mtab), 0644) == -1) {
+                 fprintf(stderr, "Can't set perms on "MOUNTED);
+                 return 0;
+         }
+         endmntent(mtab);
+         if (unlink(MOUNTED"~") == -1) {
+                 fprintf(stderr, "Can't remove "MOUNTED"~");

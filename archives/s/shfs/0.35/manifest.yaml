@@ -1,0 +1,117 @@
+# 版本级 manifest — shfs 0.35（archives/s/shfs/0.35）
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "0.35"
+software: "shfs"
+
+# published | built | failed | archived
+status: built                # R29 口径：conan create/verify 已 PASS 但尚未 conan upload → built；发布流水线（合并后）上传成功再转 published
+
+build_date: "2026-10-17"
+build_system: "makefile"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://sourceforge.net/projects/shfs/files/shfs/shfs-0.35/shfs-0.35.tar.gz/download"
+  sha256: "0d48ffe4d801180c15466f20aaa5802adb9d22067e8941e051dc3c64717ec3c2"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: makefile
+  configure_options: []
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+# 上游是"Linux 内核模块 + 用户态 mount 工具"混合体；配方只构建 shfsmount/ 用户态部分
+# （顶层 all: module utils docs 的 module 分支进 shfs/ 编内核模块，本平台无对应物）。
+# 下面这行是等价的手工命令（本机 profile 解析结果）；配方实际取
+# conf tools.build:compiler_executables:c，取不到则回退 str(settings.compiler)，
+# 运行时 CC 可能是 SDK 里 clang 的绝对路径，见 conanfile.py build()。
+build_command: "make -j1 -C shfsmount CC=clang LINKER=clang SHFS_VERSION=0.35"
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-shfsmount-Makefile.patch"
+  - "0002-shfsmount-shfsmount.c.patch"
+  - "0003-shfsmount-shfsumount.c.patch"
+
+# ============================================================
+# 测试结果（口径：用例数 == 断言数 == 9，与 test_package/MANIFEST.yml、
+# reports/test-report.md、PR 正文「适配后测试用例统计」三处一致）
+# 断言按用例级 pass/fail 计（expect() 每用例记 1 条）；用例内部另有约 30 个
+# 检查点（退出码 + grep 判据：H1 5 项、H2 4 项、C5 7 项等），任一失败该用例判 FAIL。
+# ============================================================
+
+test_total: 9
+test_passed: 9
+test_failed: 0
+test_skipped: 0
+upstream_tests_total: 2
+upstream_tests_executed: 2
+ohos_specific_tests: 2
+added_contract_tests: 5
+
+# ============================================================
+# 知识沉淀（路径 B：知识为必交项）
+# ============================================================
+
+knowledge_gained:
+  - "clang 拒绝 GCC 遗留的 -I- include 分隔符，须按语义改写为 -iquote/-I；错误在 driver 参数解析阶段，无文件名行号 —— knowledge_ref: knowledge/drafts/E2141-draft-24E4.kv"
+  - "OHOS libc 的 <mntent.h> 只有读侧，addmntent(3) 缺失在链接期报 undefined symbol（clang 把隐式声明降为 warning 所以错误面不在编译器）；包内 static 写侧 helper 按 mtab(5) 六字段直接 fprintf —— knowledge_ref: knowledge/drafts/E2142-draft-24E4.kv"
+  - "源码 tar 含符号链接成员时 conan 的 source→build copytree(symlinks=True) 必炸：建链成功但紧接着的 copystat(follow_symlinks=False) 走 lchmod，鸿蒙文件系统返回 EACCES；失败早于 build()，只能在解压阶段 excludes 排除 —— knowledge_ref: knowledge/drafts/E2143-draft-24E4.kv"
+  - "SourceForge 以 /download 结尾的 URL 隐藏归档扩展名，conan 格式嗅探报 BadZipFile，须用 conandata 的 filename: 显式补 .tar.gz —— ref: knowledge/graph/E483.kv"
+  - "mount(2)/umount2(2) 被鸿蒙 seccomp 拦为 SIGSYS：用户态挂载工具的端到端断言应固化成\"恰好停在 syscall 边界且 /proc/mounts 无残留\" —— reference: knowledge/drafts/DRAFT-mhddfs-0.1.39.0-ohos-fuse-consumer-mount-boundary.kv"
+
+# submit 自检第 8 项按项目根目录解析这些路径，必须真实存在
+knowledge_ref:
+  - "knowledge/drafts/E2141-draft-24E4.kv"
+  - "knowledge/drafts/E2141-draft-24E4.md"
+  - "knowledge/drafts/E2142-draft-24E4.kv"
+  - "knowledge/drafts/E2142-draft-24E4.md"
+  - "knowledge/drafts/E2143-draft-24E4.kv"
+  - "knowledge/drafts/E2143-draft-24E4.md"
+  - "knowledge/graph/E483.kv"
+  - "knowledge/drafts/DRAFT-mhddfs-0.1.39.0-ohos-fuse-consumer-mount-boundary.kv"
+
+# patch_generation / patch_classification 由 refresh-patch 自动写回（每次会重写这两块），
+# 所以口径说明放在它们之前。分类字段人工复核后的结论：
+#   type=portability 与 conandata.yml 的 patch_type 一致；
+#   guard=none —— 三个补丁体内都没有平台宏（shfs_addmntent 是纯 POSIX 写法，可原样提交上游），
+#   platform_only=True 只表示"仅本平台需要触发该修改"（clang driver / musl 与 glibc 的差异）。
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /data/storage/el2/base/files/home/.tmp/builds/shfs-0.35.orig
+  source_work_dir: /data/storage/el2/base/files/home/.tmp/builds/shfs-0.35.work
+  source_orig_hash: e32f4bde4d09b767
+  source_work_hash: 67363a12720a5221
+  generated_at: '2026-10-17T19:49:55'
+  patches_count: 3
+
+patch_classification:
+  - file: 0001-shfsmount-Makefile.patch
+    type: portability
+    platform_only: True
+    guard: 'none'
+  - file: 0002-shfsmount-shfsmount.c.patch
+    type: portability
+    platform_only: True
+    guard: 'none'
+  - file: 0003-shfsmount-shfsumount.c.patch
+    type: portability
+    platform_only: True
+    guard: 'none'

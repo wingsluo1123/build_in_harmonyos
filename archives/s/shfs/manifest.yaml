@@ -1,0 +1,33 @@
+# 软件级 manifest — shfs
+# 遵循 ARCHIVE-SPEC v2.0
+
+software: shfs
+display: "shfs"
+description: "SSH 后端文件系统挂载工具 — 用远端 shell/perl 把远端文件树挂载到本地（仅用户态 shfsmount / shfsumount）"
+category: utility
+homepage: "https://shfs.sourceforge.net/"
+license: GPL-2.0-or-later
+build_system: makefile
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "顶层 Makefile 的 `all` 会 descend 进 shfs/（Linux 内核模块），OHOS 无对应物，只构建 `shfsmount/` 子树的用户态工具"
+    - "上游 Makefile 用 GCC 遗留的 `-I-` 头文件搜索开关，clang 15 直接拒绝，改写为两条 `-iquote`（`-iquote .` + `-iquote ../shfs/Linux-2.4/`）保持等价语义"
+    - "OHOS sysroot 的 `mntent.h` 只导出读侧 API（setmntent/endmntent/getmntent/getmntent_r），`addmntent(3)` 为 glibc 专有 → 缺失符号在链接期即暴露，用本地 `shfs_addmntent()` 按 mtab(5) 六字段格式 fprintf 补齐"
+    - "鸿蒙 PC 上 `mount(2)` 被 seccomp 拦截（SIGSYS，shell 状态码 159），用户态工具可完整跑到挂载调用边界，但无法真正建立挂载点；端到端测试以此为停止点"
+    - "发布 tar 的 debian/changelog 是指向 ../Changelog 的软链接，conan 的 source→build 拷贝在 HMDFS 上触发 lchmod EACCES，解包时用 excludes=['*/debian/*'] 排除"
+    - "命令行工具产物必须声明软件级 `commands.json`（hicmd 格式，R38）"
+  common_dependencies: []
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "0.35":
+    status: built            # R29 口径：conan create/verify 已 PASS 但尚未 conan upload → built；发布流水线（合并后）上传成功再转 published
+    build_date: "2026-10-17"

@@ -1,0 +1,73 @@
+#====================================================================
+# Draft E2142 — OHOS libc 的 <mntent.h> 只有读侧：addmntent(3) 是
+#                glibc 扩展，链接期 undefined symbol（编译期仅 warning）
+# 来源: archives/s/shfs/0.35（feat/shfs-0.35）
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E2142
+trigger_tool:           clang|ld.lld|make
+phase:                  linking
+error_signature:        ld.lld: error: undefined symbol: addmntent|undeclared function 'addmntent'|implicit declaration of function 'addmntent'
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               3
+category:               libc, musl, headers, posix, portability
+match_keywords:         addmntent, mntent.h, mtab, setmntent, getmntent, endmntent, MOUNTED, undefined symbol, mount table, update_mtab
+title:                  往 /etc/mtab 写挂载条目的用户态挂载助手在 OHOS 链接失败：addmntent(3) 是 glibc 扩展，OHOS libc 的 <mntent.h> 只导出读侧（setmntent/getmntent/getmntent_r/endmntent），且 clang 把隐式函数声明降为 warning，错误面落在 ld.lld 而不是编译器
+
+root_cause:             mtab 读写 API 在 libc 里是不对称的。OHOS 用 musl 系 libc，其 <mntent.h> 只提供 POSIX/Unix 读侧四个符号（setmntent/getmntent/getmntent_r/endmntent）；glibc 的写侧扩展 addmntent()（以及 rmmntent 之类）不存在。shfs 0.35 的 shfsmount.c/shfsumount.c 各自实现 update_mtab()，直接调 addmntent() → 链接期 undefined symbol。放大误判的两个因素：(1) clang 15 对未声明函数默认给 -Wimplicit-function-declaration **warning**（不是 error），编译阶段一路绿灯，到 ld.lld 才炸，容易被误读成"少链了某个库"而去找 -l mount / -l mnt；(2) 同头文件里的 MOUNTED 宏在 OHOS sysroot 的 <mntent.h> 中定义为 "/etc/mtab"（不在 <sys/param.h>，那边只提供 MAXPATHLEN=4096），说明可读不可写是刻意的 API 面而非装漏包。
+affected_scope:         一切自己维护 /etc/mtab 的用户态挂载工具：shfs（本条实证）、sshfs/fuse-utils、smbnetfs、mhddfs、curlftpfs、zfs/zpool 用户态栈（E627 的组合签名里就含这条）、以及任何 fuse 上层 filesystem 的 mount helper。排查面：grep -rn "addmntent" 与 nm -u 结果里的 mntent 符号
+verification_cmd:       printf '#include <mntent.h>\n#include <stdio.h>\nint main(void){FILE*f=fopen("/tmp/x","w");struct mntent m={0};return addmntent(f,&m);}\n' > "${TMPDIR:-/tmp}/m.c" && clang "${TMPDIR:-/tmp}/m.c" -o "${TMPDIR:-/tmp}/m"; echo rc=$?   # 期望 warning + ld.lld: error: undefined symbol: addmntent，rc=1
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:         local-write-side-mntent-shim
+rec_description:        在包内补一个 static 写侧 helper，按 mtab(5) 的六字段文本格式（fsname dir type opts freq passno，空格分隔、单行）直接 fprintf，并保持与 addmntent 相同的"出错返回非 0"契约，调用点只换函数名，改动面最小、无平台宏、可原样提交上游。shfs 0.35 落地形态见 archives/s/shfs/0.35/patches/0002-shfsmount-shfsmount.c.patch 与 0003-shfsmount-shfsumount.c.patch：static int shfs_addmntent(FILE *f, struct mntent *m) { return fprintf(f, "%s %s %s %s %d %d\n", ...) < 0; }，同时修掉 update_mtab() 里 if (addmntent(...) == 1) 的判定（helper 用 < 0 判定，须同步改成布尔判非 0）。
+rec_command:            # 上游 shfsmount.c:215 附近插入 helper，并把 addmntent( 调用替换为 shfs_addmntent(
+rec_auto_fix:           false
+rec_impl:               source-patch
+
+fallback_priority:      2
+fallback_approach:      platform-guard-disable-mtab-write
+fallback_description:   若该软件写 mtab 仅为"记账"且平台本来就没有可用的 mount(2)（OHOS 挂载类 syscall 不可用），可用 #ifdef __OHOS__ 守卫跳过 mtab 更新（必须有实质逻辑：跳过写入并保留原有错误提示，禁止空壳 return 0）。此方案让功能降级而非伪造成功（P013），需在 notes.md 与 PR 说明里写清取舍。
+fallback_command:       # 见本条 forbid_2：不允许空壳 stub
+fallback_auto_fix:      false
+fallback_impl:          source-patch
+
+# ★ 禁止策略 ★
+forbid_1_pattern:       LDFLAGS.*-l[a-z]*mnt|-lmount|LIBS.*-lmnt
+forbid_1_reason:        符号在 libc 里根本不存在，不存在任何可提供 addmntent 的库；加 -l 只会变成 "library not found"
+forbid_1_consequence:   链接错误换成另一个链接错误，白耗一轮 CI（R44：先 diagnose 再修）
+forbid_2_pattern:       #ifdef __OHOS__[\s\S]{0,80}return[[:space:]]+0;[\s\S]{0,40}#endif
+forbid_2_reason:        空壳守卫违反 R6（平台宏必须有实质逻辑），把"没写成 mtab"伪装成成功，运行时行为与上游语义背离且无法被测试发现
+forbid_2_consequence:   测试通过但 mtab 记账静默丢失，后续 PR 复盘才发现欺骗性实现（CI review-memory 欺骗检测项）
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             P005, P011, P013
+
+# ═══ 关系图 ═══
+causes:                 []
+caused_by:              []
+similar_to:             [E627]
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file:               doc/E2142.md
+last_updated: 2026-10-17
+source_event:           archives/s/shfs/0.35 conan create（update_mtab 调 addmntent，ld.lld undefined symbol）
+
+# ═══ 知识协作 ═══
+authors:                Qoder-Agent <agent@local>
+source_pr:
+source_commit:
+
+# ═══ 质量度量 ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-17
+
+draft: true
+contributor_id: 24E4
