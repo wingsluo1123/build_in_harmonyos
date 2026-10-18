@@ -1,0 +1,43 @@
+sources:
+  url: "https://github.com/kulp/tenyr/archive/refs/tags/v0.9.9.tar.gz"
+  sha256: "29010e3df8449e9210faf96ca5518d573af4ada4939fe1e7cfbc169fe9179224"
+
+patches:
+  - patch_file: "patches/0001-fix-sextend32-long-to-int32-cast.patch"
+    patch_description: >
+      Fix a -Werror=shorten-64-to-32 implicit precision-loss error in
+      src/common.h SEXTEND32(): `ext | (val & ((1L << bits) - 1))`
+      promotes to `long` on LP64 and is implicitly narrowed back to
+      int32_t, which the strict clang build (mk/compiler/clang.mk) turns
+      into a hard error.  Wrapping the expression in an explicit
+      (int32_t) cast is a portable fix (applies to all platforms), not an
+      OHOS-specific macro.
+    patch_type: "portability"
+  - patch_file: "patches/0002-fix-disabled-macro-expansion-stdin-stdout.patch"
+    patch_description: >
+      OHOS sysroot stdio.h/ctype.h declare stdin/stdout/stderr and the ctype
+      helpers (isprint/isspace/isdigit/...) as self-referential or recursive
+      macros, so plain uses such as `in = stdin;`, `fprintf(stderr, ...)` or
+      `isprint(ch)` expand to non-expanding recursive macros.  mk/compiler/
+      clang.mk appends -Weverything and -Werror=disabled-macro-expansion to
+      PEDANTIC_FLAGS unconditionally (independent of PEDANTIC), promoting
+      -Wdisabled-macro-expansion to a hard error for any object that refs such
+      a macro (common.c uses stderr, tas.c/tsim.c/tld.c/serial.c use
+      stdin/stdout, asm.c uses isprint(), etc.).  This downgrades the
+      diagnostic to a warning globally (all objects) using the same
+      -W$(PEDANTRY_EXCEPTION)disabled-macro-expansion mechanism upstream
+      already applies to the flex/bison-generated lexer.o and parser.o
+      (portable fix, not OHOS-specific).
+    patch_type: "portability"
+  - patch_file: "patches/0003-fix-dogfood-random-dd-conv-lcase.patch"
+    patch_description: >
+      Upstream scripts/random.sh lowercases its random hex stream with
+      `dd conv=lcase`, which is a GNU coreutils-only conv mode.  On the
+      HarmonyOS host the `dd` on PATH is the toybox/busybox implementation
+      and rejects it ("dd: bad conv=lcase", exit 1), so the piped string is
+      empty and the dogfood random round-trip check (mk/misc.mk dogfood ->
+      scripts/dogfood.sh) fails for all four formats/flags ("random:
+      FAILED"), making `make check_sw` return non-zero.  Replacing that
+      filter with the POSIX `tr 'A-F' 'a-f'` produces the same lowercase hex
+      stream with a portable tool (portable fix, not OHOS-specific).
+    patch_type: "portability"
