@@ -1,0 +1,45 @@
+--- a/test_twodict.py
++++ b/test_twodict.py
+@@ -256,21 +256,21 @@
+             # Overwrite the tearDown method for each test case
+             test_case.tearDown = self.tearDownForTestCases
+ 
+             self.addTests(test_loader.loadTestsFromTestCase(test_case))
+ 
+         assert self.countTestCases() == self.TEST_CASES_COUNT
+ 
+     @staticmethod
+     def tearDownForTestCases(test_case):
+         """Test the status of the parent dictionary."""
+-        current_dict = super(test_case.tdict.__class__, test_case.tdict).copy()
++        current_dict = dict(dict.items(test_case.tdict))
+         expected_dict = test_case.expected_dict
+ 
+         test_case.assertEqual(current_dict, expected_dict)
+ 
+ 
+ class TestDelItem(unittest.TestCase, ExtraAssertions):
+ 
+     """Test case for the TwoWayOrderedDict __delitem__ method."""
+ 
+     def setUp(self):
+@@ -634,17 +634,18 @@
+         suite.addTest(test_suite())
+ 
+     return suite
+ 
+ 
+ def main():
+     verb_lvl = 2 if "-v" in sys.argv else 1
+     failfast_sts = True if "-f" in sys.argv else False
+ 
+     runner = unittest.TextTestRunner(verbosity=verb_lvl, failfast=failfast_sts)
+-    runner.run(all_tests_suite())
++    result = runner.run(all_tests_suite())
++    sys.exit(not result.wasSuccessful())
+ 
+     #unittest.main()
+ 
+ 
+ if __name__ == "__main__":
+     main()
