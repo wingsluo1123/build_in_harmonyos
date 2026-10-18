@@ -1,0 +1,26 @@
+software: qt5-qtscript
+version: 5.15.2
+status: built
+build_date: 2026-10-15
+build_system: qmake
+# qmake 从依赖的 qt5-qtbase Conan 包中取得（configure/build 期由 conanfile.py
+# 注入 PATH 与 QTDIR），不依赖任何本机手工安装的 Qt prefix。
+configure_options:
+  - "qtscript.pro -spec linux-clang"
+compiler: clang++
+platform: aarch64-linux-ohos
+dependencies:
+  - qt5-qtbase 5.15.2.2
+# 交付形态为 Conan 包，安装前缀即 Conan 的 package_folder（运行期由 Conan 解析），
+# 不是固定路径。package() 从构建树 lib/include/mkspecs/cmake 目录拷贝产物。
+install_prefix: "<conan package_folder>"
+products:
+  - libQt5Script.so.5.15.2
+  - libQt5ScriptTools.so.5.15.2
+  - Qt5Script headers
+  - Qt5ScriptTools headers
+patches: none
+patch_generation:
+  method: none
+  reason: "上游源码零修改；qtscript 5.15.2 内置 JavaScriptCore 无 .S 汇编文件，aarch64/clang 下纯 C++ 编译无平台差异补丁"
+  patches_count: 0
