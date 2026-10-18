@@ -1,0 +1,66 @@
+diff --git a/src/dsa.c b/src/dsa.c
+index b903979..f0eff70 100644
+--- a/src/dsa.c
++++ b/src/dsa.c
+@@ -29,6 +29,7 @@
+ 
+ #include <nettle/bignum.h>
+ #include <nettle/dsa.h>
++#include <nettle/dsa-compat.h>
+ #include <nettle/sexp.h>
+ #include <nettle/sha.h>
+ 
+@@ -313,7 +314,8 @@ make_dsa_verifier(struct signature_algorithm *self UNUSED,
+   NEW(dsa_verifier, res);
+   init_dsa_verifier(res);
+ 
+-  if (dsa_keypair_from_sexp_alist(&res->key, NULL, DSA_MAX_BITS, DSA_SHA1_Q_BITS, i))
++  if (dsa_keypair_from_sexp_alist((struct dsa_params *) &res->key, res->key.y,
++				  NULL, DSA_MAX_BITS, DSA_SHA1_Q_BITS, i))
+     return &res->super;
+ 
+   KILL(res);
+@@ -332,7 +334,9 @@ make_dsa_signer(struct signature_algorithm *c,
+   
+   dsa_private_key_init(&res->key);
+ 
+-  if (dsa_keypair_from_sexp_alist(&verifier->key, &res->key, DSA_MAX_BITS, DSA_SHA1_Q_BITS, i))
++  if (dsa_keypair_from_sexp_alist((struct dsa_params *) &verifier->key,
++				  verifier->key.y, res->key.x,
++				  DSA_MAX_BITS, DSA_SHA1_Q_BITS, i))
+     {
+       res->random = self->random;
+       res->verifier = verifier;
+diff --git a/src/lsh-keygen.c b/src/lsh-keygen.c
+index 4e6d9c2..75a89f6 100644
+--- a/src/lsh-keygen.c
++++ b/src/lsh-keygen.c
+@@ -40,6 +40,7 @@
+ #endif
+ 
+ #include <nettle/dsa.h>
++#include <nettle/dsa-compat.h>
+ #include <nettle/rsa.h>
+ 
+ #include "crypto.h"
+diff --git a/src/spki/verify.c b/src/spki/verify.c
+index b8fb062..42e91f2 100644
+--- a/src/spki/verify.c
++++ b/src/spki/verify.c
+@@ -26,6 +26,7 @@
+ 
+ #include <nettle/bignum.h>
+ #include <nettle/dsa.h>
++#include <nettle/dsa-compat.h>
+ #include <nettle/rsa.h>
+ 
+ #include "certificate.h"
+@@ -74,7 +75,7 @@ spki_verify_dsa(const uint8_t *digest,
+   dsa_public_key_init(&dsa);
+   dsa_signature_init(&rs);
+ 
+-  res = (dsa_keypair_from_sexp_alist(&dsa, NULL,
++  res = (dsa_keypair_from_sexp_alist((struct dsa_params *) &dsa, dsa.y, NULL,
+ 				     RSA_KEYSIZE_LIMIT, DSA_SHA1_Q_BITS, &key->sexp)
+ 	 && spki_parse_type(key)
+ 	 && dsa_signature_from_sexp(&rs, &signature->sexp, DSA_SHA1_Q_BITS)
