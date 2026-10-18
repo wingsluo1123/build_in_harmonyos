@@ -1,0 +1,56 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI L0e 强制要求存在）
+package: ocamlbuild/0.16.1
+homepage: "https://github.com/ocaml/ocamlbuild"
+
+# 上游测试入口（Makefile 的 test 目标；实际由 build() 逐组运行）
+upstream_check_command: "make test-internal test-findlibonly test-external"
+upstream_test_in_build: true
+upstream_test_command: "make test-internal test-findlibonly test-external"
+
+# 上游测试统计（R51，真机实测 2026-10-04）
+upstream_tests:
+  source: "upstream testsuite（testsuite/internal.ml、findlibonly.ml、external.ml，由 testsuite/ocamlbuild_test.ml 驱动）"
+  mechanism: >
+    build() 通过上游 make 目标逐组运行：internal 44/44 通过（核心规则/插件/cmxs/C stub/
+    依赖与卫生检查等），findlibonly 3/3 通过（ocamlfind 集成），external 3/3 被上游
+    requirement guard 跳过（camlp4、camlp4.macro、menhir 包在制品仓不可用；
+    上游第 4 个 external 用例 Camlp4NativePlugin 本身已被注释）。
+  discovered: 50
+  passed: 47
+  skipped: 3
+  modified_reason: "无上游源码修改；仅环境 shim（as/-cc/-use-runtime/签名/ocamlmklib 补丁/findlib conf），见 notes.md"
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: test_package/test.sh
+    description: >
+      消费者测试：8 项产物断言；`ocamlbuild -version`；普通工程（hello.ml）
+      的 native+bytecode 构建与真机运行；findlib e2e（-use-ocamlfind -package str）
+      构建并运行。
+    command: "sh test.sh <pkg_dir> <ocaml_lib> <ocaml_bin> <find_lib> <find_bin> <shim> <cc>"
+
+# 断言总数（test.sh 实测打印 assertions=N）
+assertion_count: 18
+
+# 鸿蒙特有测试（rule12：至少一个完整消费者用例）
+harmony_specific_test_count: 2
+harmony_specific_tests:
+  - file: test_package/test.sh
+    kind: e2e_consumer_case
+    label: "鸿蒙特有测试"
+    description: >
+      普通工程消费者用例：用打包的 ocamlbuild 在设备上构建 hello.native 与
+      hello.byte，并分别直接执行（native 为签名 ELF；bytecode 依赖 -use-runtime
+      修复的 shebang），断言输出 HELLO_OK。
+    executed: true
+    result: "HELLO_OK（native + bytecode 两路径）"
+  - file: test_package/test.sh
+    kind: e2e_consumer_case
+    label: "鸿蒙特有测试"
+    description: >
+      findlib 端到端用例：用打包的 ocamlbuild 以 -use-ocamlfind -package str
+      构建 strtest.native，在设备上运行并断言正则匹配输出 FIND_E2E_OK name；
+      覆盖 findlib conf/topfind 修复后的真实消费路径。
+    executed: true
+    result: "FIND_E2E_OK name"
