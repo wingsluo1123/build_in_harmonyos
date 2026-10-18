@@ -1,0 +1,98 @@
+#====================================================================
+# E4301-draft — musl/OHOS 上 pthread API 的两个错位：sysroot <pthread.h> 不声明
+#               pthread_cancel()（符号在运行时 libc 里），且 pthread_t 是指针类型
+# 来源: lirc 0.10.2 适配 (2026-10-16)
+#====================================================================
+
+id:                     E4301
+trigger_tool:           clang|make|gcc|ld
+phase:                  compilation|linking
+error_signature:        "call to undeclared function 'pthread_cancel'|implicit declaration of function 'pthread_cancel'|no member named 'pthread_cancel'|undeclared identifier 'pthread_cancel'|incompatible integer to pointer conversion.*pthread_t|'pthread_t' \\(aka 'struct __pthread \\*'\\)|comparison between pointer and integer.*pthread_t"
+
+severity:               2
+category:               headers, threading, ohos, libc, posix
+prescan_pattern:        "\\bpthread_(cancel|setcancelstate|setcanceltype|testcancel)\\s*\\("
+prescan_globs:          "*.c, *.h, *.cc, *.cpp"
+match_keywords:         pthread_cancel, pthread.h, implicit function declaration, OHOS sysroot, native api, stub libc.so, runtime libc, llvm-nm, pthread_setcancelstate, pthread_t, struct __pthread, pointer sentinel, -1, int-conversion, threading, plugin
+title:                  musl/OHOS 的 pthread：sysroot 头缺 pthread_cancel 声明 + pthread_t 是指针（-1 哨兵不成立）
+
+root_cause: >-
+  OHOS SDK 的 sysroot 与运行时是两套面：sysroot/usr/include/pthread.h 的 148 个
+  pthread_* 里没有 pthread_cancel / pthread_setcancelstate，sysroot 的 stub
+  libc.so（链接期用）也不导出该符号；但设备运行时 /system/lib64/libc.so 明确导出
+  （llvm-nm -D 显示 T pthread_cancel）。于是源码调用 pthread_cancel() 时 clang 报
+  "call to undeclared function"，链接阶段因为共享库默认允许未定义符号而**不报错**，
+  形成"编译有警告、链接通过、运行正常"的三段式假象；一旦某个包把 -Werror 打开或
+  改用 --no-undefined 链接，就会突然变成硬失败。
+affected_scope: >-
+  任何直接在源码里调用 pthread_cancel()/pthread_setcancelstate()/pthread_testcancel()
+  的包（常见于用取消点终止工作线程的插件/守护进程），以及任何把未声明函数当
+  硬错误的构建配置（-Werror、-Werror=implicit-function-declaration、
+  -Wl,--no-undefined）。注意与"musl 根本没有该符号"是两回事。
+
+  同一族还有第二个错位：musl 的 pthread_t 是 **指针**（clang 报
+  "aka 'struct __pthread *'"），而 glibc 的 pthread_t 是 unsigned long。老代码普遍用
+  `pthread_t tid = -1;` 当"未创建"哨兵并比较 `!= -1`，在 musl 下直接是硬错误
+  "incompatible integer to pointer conversion initializing 'pthread_t'"；
+  改法是把哨兵换成 0（glibc 下 pthread_t 为 0 同样不是合法线程 id，语义等价）。
+  两个错位常同时出现在同一批线程代码里，排查时一起看。
+verification_cmd: >-
+  nm -D /system/lib64/libc.so | grep pthread_cancel > "$TASK_DIR/probe-pthread-cancel.txt" ;
+  nm -D "$(clang -print-resource-dir)/../../../../sysroot/usr/lib/aarch64-linux-ohos/libc.so" | grep -c pthread_cancel ;
+  grep -c pthread_cancel "$(clang -print-resource-dir)/../../../../sysroot/usr/include/pthread.h"
+
+rec_priority:           1
+rec_approach:           add-explicit-prototype
+rec_description: >-
+  两处分别做最小可移植改动：① 在调用点所在的源文件里补一行显式原型
+  extern int pthread_cancel(pthread_t thread);（放在 #include <pthread.h> 之后）——
+  运行时符号由真实 libc 提供，无需桩实现、无需改链接参数，且与 glibc 系统头里的
+  声明逐字相同、重复声明合法；② 把 `pthread_t tid = -1` 哨兵改成 0（比较与复位
+  一并改），glibc 下同样成立。
+rec_command:            sed -i '/#include <pthread.h>/a extern int pthread_cancel(pthread_t thread);' plugins/foo.c && sed -i 's/pthread_t\\([[:space:]]*\\)*tid = -1/pthread_t tid = 0/' plugins/foo.c
+rec_auto_fix:           false
+rec_impl:               source-patch
+
+fallback_priority:      2
+fallback_approach:      avoid-cancellation
+fallback_description: >-
+  只有在目标平台确实不投递取消信号时才改用协作式退出（volatile stop 标志 +
+  pthread_join，或把 stop pipe 加进 poll 集合）。先做符号核验再选这条，
+  否则会把"只是头文件没声明"误判成"没有这个能力"而做大改。
+fallback_command:
+fallback_auto_fix:      false
+fallback_impl:
+
+forbid_1_pattern:       "-D__OHOS__|#ifdef __OHOS__"
+forbid_1_reason: >-
+  本条是头文件缺口，补声明对所有平台都合法，不需要平台宏；且补丁新增 __OHOS__
+  行会撞平台宏门禁（PF5）。
+forbid_1_consequence:   引入平台分支且被预检拦下
+forbid_2_pattern:       "pthread_cancel\\s*\\(.*\\)\\s*;\\s*$.*return 0|Wl,--allow-shlib-undefined"
+forbid_2_reason: >-
+  不要把 pthread_cancel 调用整段删成空壳（会静默改变线程回收语义），也不要靠
+  --allow-shlib-undefined 掩盖；符号是存在的，缺的只是声明。
+forbid_2_consequence:   线程泄漏或信号语义静默丢失
+
+principles:             P005, P011
+causes:                 []
+caused_by:              []
+similar_to:             [E093]
+conflicts_with:         []
+prerequisite_of:        []
+
+doc_file:               doc/E4301.md
+last_updated:           2026-10-16
+source_event:           "lirc 0.10.2 conan create: plugins/atwf83.c、zotac.c、mplay.c 报 call to undeclared function 'pthread_cancel'"
+
+authors:
+source_pr:
+source_commit:
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-16
+
+draft: true
+contributor_id: "5EC2"

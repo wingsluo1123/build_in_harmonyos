@@ -1,0 +1,57 @@
+package: lirc/0.10.2
+homepage: "https://www.lirc.org"
+
+# The release tarball has no test/ tree and no make check target, so the
+# upstream CppUnit suite (git tag lirc-0.10.2) is vendored under
+# ../upstream-tests/ and compiled+run from build() with clang++.
+upstream_check_command: "./run-tests"
+upstream_test_in_build: true
+upstream_test_command: >-
+  clang++ -o run-tests -g -std=c++11 -I. -I../lib -I../include <cppunit include> \
+  run-tests.cpp <cppunit lib> -L../lib/.libs -llirc -llirc_client &&
+  ./run-tests
+
+upstream_tests:
+  - file: ClientTest.h
+    source: lirc-0.10.2-git/test/ClientTest.h
+    description: "9 lirc_client cases: lircd socket receive, lircrc parsing, code2char, set/get mode"
+    command: "./run-tests"
+  - file: DecodeTest.h
+    source: lirc-0.10.2-git/test/DecodeTest.h
+    description: "8 registered cases driving tests/*/run-test.sh (upstream registers 5 of them onto testSpaceEnc1)"
+    command: "./run-tests"
+  - file: DrvAdminTest.h
+    source: lirc-0.10.2-git/test/DrvAdminTest.h
+    description: "3 cases: driver load plus hardcoded driver/plugin registry counts"
+    command: "./run-tests"
+  - file: IrRemoteTest.h
+    source: lirc-0.10.2-git/test/IrRemoteTest.h
+    description: "9 ir_remote configuration parsing cases"
+    command: "./run-tests"
+  - file: LogTest.h
+    source: lirc-0.10.2-git/test/LogTest.h
+    description: "3 lirc_log level/string conversion cases"
+    command: "./run-tests"
+  - file: OptionsTest.h
+    source: lirc-0.10.2-git/test/OptionsTest.h
+    description: "3 lirc_options load/add-defaults/set-option cases"
+    command: "./run-tests"
+
+test_package_tests:
+  - file: test_lirc.cpp
+    description: >-
+      Links the installed liblirc_client: lirc_readconfig_only() parses a lircrc,
+      lircrc_class is read back and lirc_code2char() maps KEY_POWER to `power`
+    command: "./test_lirc"
+  - file: conanfile.py
+    description: >-
+      Runs the packaged bin/lircd --version (asserts `lircd 0.10.2`) and
+      bin/lirc-lsplugins -U <pkg>/lib/lirc/plugins -q (asserts the shipped plugin
+      directory enumerates)
+    command: "lircd --version; lirc-lsplugins -U <pkg>/lib/lirc/plugins -q"
+
+# Upstream registered CppUnit cases (ADD_TEST call sites) — single unit, same
+# figure as the upstream table of the pull request.  The HarmonyOS consumer
+# assertions are counted separately and reported in the "鸿蒙特有测试" row.
+assertion_count: 35
+harmonyos_test_assertions: 5
