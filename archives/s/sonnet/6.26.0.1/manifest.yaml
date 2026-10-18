@@ -1,0 +1,39 @@
+# 版本级 manifest — sonnet 6.26.0.1
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "6.26.0.1"
+software: "sonnet"
+
+# 编译状态: built (本地 conan create 通过，未上传远端)
+status: built
+build_date: "2026-10-08"
+build_system: cmake
+
+source:
+  url: "https://mirrors.nju.edu.cn/kde/stable/frameworks/6.26/sonnet-6.26.0.tar.xz"
+  sha256: "3ac4e165c0b3c79eda416b754bb837292f354188a1220f2065f57f686489af25"
+  tar_format: tar.xz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DBUILD_TESTING=ON"
+    - "-DKF_IGNORE_PLATFORM_CHECK=TRUE"
+    - "-DSONNET_USE_WIDGETS=ON"
+    - "-DSONNET_NO_BACKENDS=ON"
+    - "-DKF_SKIP_PO_PROCESSING=ON"
+    - "-DBUILD_DESIGNERPLUGIN=OFF"
+  dependencies:
+    - qtbase/6.11.1
+    - qtbase-gui/6.11.1
+    - ecm/6.26.0 (tool_requires)
+  cc: clang
+  cxx: clang++
+
+# 6.26.0.1 适配修复：注入 CMAKE_SHARED_LIBRARY_SONAME_{C,CXX}_FLAG，
+# 修复 6.26.0 产物缺 DT_SONAME 导致消费者 DT_NEEDED 记录构建机绝对路径的问题。
+# 产物自检: libKF6SonnetCore.so / libKF6SonnetUi.so soname=1 abs_needed=0。
+patches_applied: []
+
+knowledge_gained: []
