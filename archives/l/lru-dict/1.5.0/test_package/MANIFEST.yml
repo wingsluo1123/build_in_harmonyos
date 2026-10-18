@@ -1,0 +1,33 @@
+# test_package/MANIFEST.yml — lru-dict 1.5.0
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: lru-dict/1.5.0
+homepage: "https://github.com/amitdev/lru-dict"
+
+# 上游测试命令
+#   上游 pyproject.toml [tool.cibuildwheel] test-command = "python -m pytest -v"，
+#   test-sources = ["test"]，入口为 test/test_lru.py（unittest.TestCase）。
+#   本配方用 stdlib unittest 跑同一批用例：lru-dict 的用例全是 TestCase，
+#   unittest 可完整收集，无需引入 pytest（少一个构建期 pip 依赖）。
+upstream_check_command: "python3 -m unittest discover -s test -p 'test_*.py' -v"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "<conan python>/bin/python3.12 -m unittest discover -s test -p 'test_*.py' -v"
+
+# 上游实际运行的测试程序：
+# - test/test_lru.py —— 上游唯一测试模块，TestLRU 共 26 个用例（容量/淘汰
+#   顺序/视图/统计/回调/pop/popitem/setdefault/resize/子类化/引用计数）。
+# - test/test_ohos_lru_dict.py —— **适配新增的鸿蒙专项用例**（构建期由
+#   build() 拷入上游 test/ 目录参加同一次 discover）：OHOS ABI 标签、
+#   .codesign 段、真实 dlopen 加载、OHOS 运行期语义、/tmp 无关性。
+# 实跑结果以 conan create 日志为准（unittest 报告落 build 目录
+# upstream-unittest.log）。
+
+# 消费者测试（conan test_package）
+consumer_tests:
+  - test_lru_dict.py       # 公开 API 契约（消费者视角，跑在 site-packages 产物上）
+  - test_ohos_lru_dict.py  # 鸿蒙专项用例（同时是消费者可行性验证）
+consumer_command: "<conan python>/bin/python3.12 -m unittest -v <module>"

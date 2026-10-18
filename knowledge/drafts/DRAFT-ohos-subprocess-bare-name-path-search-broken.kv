@@ -1,0 +1,99 @@
+#====================================================================
+# DRAFT — on this HarmonyOS device Python subprocess cannot resolve ANY
+#         bare command name via PATH (posix_spawn); only absolute paths
+#         work. Breaks ohc tooling that shells out to bare `git`.
+# Draft only: do not promote without reviewer assignment.
+# Trigger event: lru-dict/1.5.0 adaptation — preflight PF9 / changed_files
+#====================================================================
+
+id:                     DRAFT-ohos-subprocess-bare-name-path-search-broken
+trigger_tool:           ohc-run|preflight|create-pr|submit
+phase:                  preflight, testing, tooling
+error_signature:        FileNotFoundError.*No such file or directory: 'git'|PF0 环境闸.*无法计算变更文件|FileNotFoundError: \[Errno 2\].*: '(ls|sh|git|python3)'
+
+severity:               3
+category:               platform, ohos, tooling, python
+prescan_pattern:        subprocess\.(run|Popen|check_output)\(\s*\[\s*["']git["']
+prescan_globs:          scripts/**/*.py, ci/**/*.sh
+match_keywords:         FileNotFoundError, posix_spawn, subprocess, PATH search,
+                         bare command name, absolute path, git, changed_files,
+                         PF9, PF0, preflight, run_preflight, HarmonyOS, bin_sh
+title:                  本机 Python subprocess 无法按 PATH 解析裸命令名（posix_spawn），只有绝对路径可用
+
+root_cause:             在本 HarmonyOS PC 设备上用 CPython 3.12 调
+                        subprocess.run(["git", ...])（env 传或不传都一样）会抛
+                        FileNotFoundError: [Errno 2] No such file or directory: 'git'，
+                        但同一 PATH 下 bash 能找到 /data/service/hnp/bin/git，
+                        shutil.which("git") 也能返回该路径。
+                        实测不止 git：["ls","/"]、["sh","-c","echo ok"]、
+                        ["python3","--version"] 全部同样失败；而
+                        ["/data/service/hnp/bin/git","--version"] 正常。
+                        即：CPython 的 posix_spawn 在本设备上不做（或做不通）
+                        PATH 搜索；把裸名换成绝对路径即恢复。
+                        自建 shim 目录（普通文件、置于 PATH 首位）同样失败，
+                        故与目标是否为符号链接无关，是 PATH 搜索本身失效。
+                        影响面：任何 shell out 裸命令名的 ohc 工具，例如
+                        scripts/ohc/preflight.py 的 changed_files() 与
+                        check_branch_and_paths()（均用 ["git", ...]）——
+                        run_preflight 会因取不到变更文件而走 PF0 fail-closed，
+                        导致本机无法 create-pr / submit。
+
+affected_scope:         本设备（及同类 HarmonyOS PC 环境）上所有用
+                        subprocess/Popen 调**裸命令名**的 Python 代码；
+                        典型受害者为 ohc 的 preflight / 任何封装 git 的步骤。
+                        bash 脚本自身不受影响（bash 的 PATH 搜索正常）。
+verification_cmd:       python3 -c "import subprocess; subprocess.run(['ls','/'])"
+                          # → FileNotFoundError: [Errno 2] ...: 'ls'
+                        python3 -c "import subprocess; subprocess.run(['/bin/ls','/'])"
+                          # → 正常
+                        python3 -c "import shutil; print(shutil.which('git'))"
+                          # → /data/service/hnp/bin/git（能解析，但 subprocess 用不了）
+
+rec_priority:           1
+rec_approach:           resolve-command-to-absolute-path-before-subprocess
+rec_description:        在 subprocess 调用前把命令名解析为绝对路径：
+                            exe = shutil.which("git") or "git"
+                            subprocess.run([exe, *args], ...)
+                        或在封装层统一做（推荐，一处修复覆盖全工具）。
+                        验证/复现时也可用一次性 harness shim 钩住
+                        subprocess.run，把裸名替换为 shutil.which() 结果——这样
+                        门禁逻辑本身无需改动即可原样运行（lru-dict 适配即用此法
+                        跑通 PF1-PF9）。CI/worker 侧若 PATH 搜索正常，则无影响，
+                        故该修复对本机与 CI 均安全。
+rec_command:           exe=$(command -v git); "$exe" --version
+rec_auto_fix:           false
+rec_impl:               resolve-command-to-absolute-path-before-subprocess
+
+fallback_priority:      2
+fallback_approach:      harness-shim-bare-names-to-absolute
+fallback_description:   无法改工具源码时，在验证脚本里 monkeypatch
+                        subprocess.run：若 cmd[0] 是不含 "/" 的裸名，则用
+                        shutil.which() 解析为绝对路径后再调用。门禁/被测逻辑
+                        保持原样，仅修复调用层，结论仍然可信。
+fallback_command:       python3 - <<'PY'
+                        import shutil, subprocess
+                        _o = subprocess.run
+                        def _p(cmd,*a,**k):
+                            if isinstance(cmd,(list,tuple)) and cmd and "/" not in str(cmd[0]):
+                                r = shutil.which(cmd[0])
+                                if r: cmd = [r]+list(cmd[1:])
+                            return _o(cmd,*a,**k)
+                        subprocess.run = _p
+                        PY
+fallback_auto_fix:      true
+fallback_impl:          harness-shim-bare-names-to-absolute
+
+forbid_1_pattern:       把 FileNotFoundError: 'git' 判为「仓库/分支不存在」并据此改写门禁结论
+forbid_1_reason:        该异常是平台的 PATH 搜索失效，不是 git 语义错误；按前者
+                        解读会得出「无变更文件」之类的错误结论，进而放行或误拦。
+forbid_1_consequence:   PF0/PF9 结论失真（例如把「有变更」当成「无变更」），
+                        掩盖真实问题或造成无谓的 fail-closed。
+
+principles:             []
+causes:                 []
+caused_by:              []
+conflicts_with:         []
+similar_to:             []
+prerequisite_of:        []
+related_docs:           []
+knowledge_domain:       platform

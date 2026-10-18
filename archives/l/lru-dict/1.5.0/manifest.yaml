@@ -1,0 +1,141 @@
+# 版本级 manifest — lru-dict 1.5.0
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "1.5.0"
+software: lru-dict
+status: published
+build_date: "2026-10-14"
+build_system: custom          # 直接调用 OHOS SDK clang 编译单个 C 扩展单元（见 conanfile.py docstring）
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 上游官方 tag 归档（R39 合规：GitHub 官方 archive，非 fork / 非镜像 / 非网盘）
+  url: "https://github.com/amitdev/lru-dict/archive/refs/tags/v1.5.0.tar.gz"
+  sha256: "831634fafa1055776d145b7dafb54da00f28fcf6fd1d75fc3fbb0018f1c3eda0"
+  compression: tar.gz
+  archive_root: "lru-dict-1.5.0"
+
+# ============================================================
+# 软件识别
+# ============================================================
+
+software_identity:
+  homepage_actual: "https://github.com/amitdev/lru-dict"
+  note: |
+    固定容量、按最近最少使用（LRU）淘汰的 dict 容器。交付形态是**带 C 扩展
+    的 Python 包**：src/lru/__init__.py 只是 4 行再导出壳，实现是
+    src/lru/_lru.c（796 行 CPython C-API）。PyPI 分发名 lru-dict，
+    导入名 lru。
+
+# ============================================================
+# 依赖信息
+# ============================================================
+
+dependencies:
+  required:
+    - "python/3.12.9"
+  optional: []
+  note: |
+    · python/3.12.9 —— 提供 Python.h 与 libpython3.12.so。链接期必需：
+      产物 DT_NEEDED = [libpython3.12.so.1.0, libc.so]（readelf 实测），
+      不烘焙绝对 rpath（导入时由解释器已加载的同名 so 解析）。
+    · 运行期无第三方依赖（pyproject.toml: dependencies = []）。
+
+    **package_type=library 的原因**：conan 禁止 python-require 依赖带类型的
+    库（python/3.12.9 传递带入 static-library 的 libffi），故声明
+    library + shared 选项（与 lazy-object-proxy 1.12.0 / cffi 2.1.1 /
+    psutil 一致）。
+
+    传递带入（由 python/3.12.9 解析，本包不直接使用）：
+    bzip2/1.0.8, gdbm/1.24, libffi/3.5.2, ncurses/6.6, openssl/1.1.1w,
+    proxy-libintl/0.5, readline/8.3, sqlite3/3.49.1, xz/5.6.2, zlib/1.3.1.1
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: custom
+  configure_options: []
+  dependencies:
+    - python/3.12.9
+  cc: clang
+
+build_config:
+  target: aarch64-unknown-linux-ohos
+  package_id: "01d92cf349a0dd98ff915f4bd99a04430171517f"
+  options:
+    - "shared=True"
+  notes: |
+    单编译单元直接调 OHOS SDK clang（conf: tools.build:compiler_executables.c，
+    profile ohos-aarch64 → /data/service/hnp/bin/clang，R33 不依赖 shell 变量）：
+
+      clang -shared -fPIC -O2 -Isrc -I<python>/include/python3.12 \
+            src/lru/_lru.c -L<python>/lib -lpython3.12 \
+            -o src/lru/_lru<EXT_SUFFIX>
+
+    EXT_SUFFIX 取 conan python 的 sysconfig 实测值
+    `.cpython-312-aarch64-linux-ohos.so`（与 OHOS 宿主 CPython 3.12 一致），
+    不硬编码猜测。
+
+    不用上游 setup.py：pyproject.toml 把 build 后端钉死为
+    setuptools==80.9.0，ohpcd 无该制品，按 PF4 不能写成 tool_requires，只能
+    构建期从平台 pip 镜像引导；直接编译可整条链路去掉这个网络依赖
+    （仓内 fastconstmap 0.9.0 同款做法）。
+
+    **.codesign**：OHOS dlopen 要求 .so 带 .codesign 段，否则报
+    `ImportError: ... Permission denied`（E077）。本平台实测 OHOS SDK clang
+    15.0.4 链接期自动生成该段 → 配方只做「校验兜底」：正常路径仅校验不改动
+    （保留工具链可信签名），段丢失才用 binary-sign-tool 重签并复验，仍失败
+    则显式报错。打包后实测 .codesign 仍在（conan copy() 未破坏）。
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 兼容性
+# ============================================================
+
+compatibility:
+  level: high
+  issues: []
+  notes: |
+    src/lru/_lru.c 全文件只 #include <Python.h>，仅用 CPython C-API
+    （Py_ssize_t / PyObject 等），无平台条件编译分支、无 POSIX 专有接口、
+    无第三方 C 依赖 —— 零源码补丁直编通过（grep 实测
+    __linux__/_WIN32/pthread/malloc.h 零命中）。
+    产物在 OHOS aarch64（clang 15 / musl / CPython 3.12）下：编译、签名、
+    dlopen、LRU 语义、引用计数全部正常；OHOS 原生 python3
+    （sys.platform=ohos）直接消费产物通过。
+
+# ============================================================
+# 测试结果
+# ============================================================
+
+test_results:
+  upstream_suite: "python3 -m unittest discover -s test -p 'test_*.py' -v（build() 内实跑；上游入口 test/test_lru.py = 26 用例，另并入随包新增的鸿蒙用例 8 个）"
+  upstream_result: "34 passed, 0 failed, 0 skipped（26 上游 + 8 鸿蒙新增；rc=0，conan create 实跑 2026-10-14）"
+  consumer_suite: "test_package/test_lru_dict.py + test_package/test_ohos_lru_dict.py（conan test_package 实跑）"
+  consumer_result: "15 + 8 = 23 passed, 0 failed（rc=0；含 site-packages 来源断言与 OHOS ABI/.codesign/dlopen 断言）"
+
+references:
+  - https://github.com/amitdev/lru-dict
+  - https://pypi.org/project/lru-dict/1.5.0/
+  - https://github.com/amitdev/lru-dict/blob/v1.5.0/src/lru/_lru.c
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "OHOS SDK clang 15.0.4（Target: aarch64-unknown-linux-ohos）链接期自动生成 .codesign 段 —— 无需手工 binary-sign-tool；用 llvm-objcopy --remove-section .codesign 剥离后 import 立即报 Permission denied，证明该段是 dlopen 的必要条件（E077 要求；E212 为同一症状的另一根因）。knowledge_ref: DRAFT-lru-dict-ohos-sdk-clang-auto-codesign"
+  - "conan 的 copy() 在 export_sources() 中会保留 pattern 的相对目录结构：copy(self, 'test_package/x.py', src=recipe_folder, dst=export_sources_folder) 落点是 export_sources_folder/test_package/x.py，不是扁平落点。knowledge_ref: DRAFT-conan-export-sources-copy-keeps-pattern-dirs"
+  - "CPython C 扩展的 DT_NEEDED=libpython3.12.so.1.0 在导入时由解释器已加载的同名 so 解析，因此不必烘焙绝对 rpath；宿主 OHOS python3 与 conan python 依赖解释器都能直接 import。reference: notes.md#编译步骤"
+  - "lru-dict 用例全是 unittest.TestCase，用 stdlib unittest 即可完整收集 26 个用例，无需引入 pytest（省掉构建期 pip 依赖）。reference: notes.md#上游测试实跑r51"
+  - "本机 Python subprocess 无法按 PATH 解析裸命令名（posix_spawn），只有绝对路径可用，影响 ohc preflight 的 changed_files/PF9。knowledge_ref: DRAFT-ohos-subprocess-bare-name-path-search-broken"
