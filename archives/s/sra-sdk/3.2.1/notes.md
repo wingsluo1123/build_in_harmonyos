@@ -86,7 +86,7 @@ conan create archives/s/sra-sdk/3.2.1 \
 ## 注意事项
 
 - **共享库 dlopen 限制**：本机 OHOS 策略拒绝从应用数据目录 `dlopen` 任意 `.so`
-  （`Permission denied`），导致上游 7 项 Python 绑定测试无法运行；工具与 C/C++ SDK
+  （`Permission denied`），导致上游 6 项 Python 绑定测试无法运行；工具与 C/C++ SDK
   使用静态链接不受影响。使用 Python 绑定时需将 `libncbi-ngs.so` 放入应用 bundle 的
   原生库目录。
 - `CMAKE_SYSTEM_NAME=Linux` 仅用于让 CMake 选择 Linux 平台语义；编译器默认 triple
