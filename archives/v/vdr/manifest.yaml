@@ -1,0 +1,38 @@
+# 软件级 manifest — vdr
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: vdr
+display: "vdr"
+description: "数字视频录像机（Video Disk Recorder）——DVB-S/C/T 数字电视录制与回放主程序"
+category: multimedia
+homepage: "https://www.tvdr.de/"
+license: GPL-2.0-or-later
+build_system: makefile
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "手写 GNU make 项目：Makefile + 可选 Make.config，无 configure/cmake/meson；.c 也用 $(CXX) 编译，故必须显式传 CXX（默认 gcc/g++）"
+    - "Make.config.template 含 CC=gcc/CXX=g++ 硬赋值与 ifdef M32 保护的 -m32；默认路径不含 -m32，但若照抄模板会引入 gcc 假设"
+    - "make 命令行传 CXXFLAGS 会顶掉 Makefile 内的 'CXXFLAGS += -fPIC'（命令行变量优先，+= 被忽略），因此只传 CC/CXX/PKG_CONFIG/CINCLUDES/LIBS"
+    - "编译期主坑是 glibc 专属符号面：__GLIBC_PREREQ / DEFFILEMODE / __compar_fn_t / __attribute_format_arg__ / malloc_trim 在 OHOS musl 头集全缺"
+    - "DVB 设备头（linux/dvb/*.h）在 sysroot 齐全故 ioctl 面可编译；坑在运行期——/dev/dvb 与 /sys/class/dvb 双缺，适配器枚举恒为 0"
+    - "OHOS sys/capability.h 只有 capget/capset，无 libcap 的 cap_t/cap_from_text，需 conan libcap"
+    - "gettext 家族、adjtime、pthread_cancel 在 SDK 链接期 libc.so 桩中缺失但运行期 musl 加载器导出，以 -L/lib -l:ld-musl-aarch64.so.1 链接"
+  common_dependencies:
+    - libjpeg-turbo/3.2.0
+    - libcap/2.78
+    - freetype/2.14.3
+    - fontconfig/2.18.1.1
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "2.6.9":
+    status: built
+    build_date: "2026-10-18"
