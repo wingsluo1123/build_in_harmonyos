@@ -1,0 +1,41 @@
+# test_package/MANIFEST.yml
+# 上游测试声明 — freerdp 3.26.0
+package: freerdp/3.26.0
+homepage: "https://www.freerdp.com/"
+
+# 上游测试命令（157 个 ctest 用例由 BUILD_TESTING 打开）
+upstream_check_command: "ctest -N"
+
+# conanfile.py 的 build() 传 -DBUILD_TESTING=OFF，配方构建期不跑上游测试，
+# 上游测试在适配过程中单独用 ctest 执行（见 notes.md 的 150/157 记录）
+upstream_test_in_build: false
+upstream_test_command: "ctest --output-on-failure"
+
+upstream_tests:
+  - file: TestCryptoHash.c
+    source: winpr/libwinpr/crypto/test/TestCryptoHash.c
+    description: "WinPR 哈希原语（含 MD4/MD5/SHA 系列）：校验内置 MD4 路径可用"
+    command: "ctest -R TestCryptoHash"
+  - file: TestNTLM.c
+    source: winpr/libwinpr/utils/test/TestNTLM.c
+    description: "NTLM 认证向量：依赖 MD4 与 RC4，验证 legacy provider 缺失后的内置实现"
+    command: "ctest -R TestNTLM"
+  - file: TestFileDeleteFile.c
+    source: winpr/libwinpr/file/test/TestFileDeleteFile.c
+    description: "WinPR 文件 API：OHOS 无 Windows 属性语义，属环境性失败"
+    command: "ctest -R TestFileDeleteFile"
+  - file: TestSynchBarrier.c
+    source: winpr/libwinpr/synch/test/TestSynchBarrier.c
+    description: "WinPR 同步原语（pthread 封装）：验证 musl 下线程同步可用"
+    command: "ctest -R TestSynchBarrier"
+
+test_package_tests:
+  - file: test.cpp
+    description: "消费者视角：链接包内 libwinpr3/libfreerdp3，验证版本查询、WinPR 事件与内置
+      Unicode 转换、freerdp_new/freerdp_context_new 生命周期，并对包内每个 .so 校验
+      DT_SONAME 相对路径与 DT_NEEDED 无绝对路径（鸿蒙专属），最后检查 libwinpr3.so
+      不再引用 musl 缺失的 pthread_cancel"
+    command: "./freerdp_consumer"
+
+# 消费者测试内部有 10 个独立校验分支（每个失败都立即 return 1）
+assertion_count: 10
