@@ -1,0 +1,52 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: hmbs <hmbs@local>
+Date: Tue, 14 Oct 2026 00:00:00 +0000
+Subject: [PATCH 4/4] Fix std::hash specialization for libc++
+
+Upstream forward-declares the std::hash primary template before
+specializing it for osl types. libstdc++ tolerates the redundant
+declaration, but libc++ (which already declares std::hash via
+<functional>) diagnoses the specialization template-name as
+ambiguous ("reference to 'hash' is ambiguous", candidate
+'std::hash'). Include <functional> and specialize directly; no
+__OHOS__ macro, pure standard-library portability fix.
+
+--- a/core/osl/basic_type.h
++++ b/core/osl/basic_type.h
+@@ -1,6 +1,7 @@
+ #ifndef OSL_BASIC_TYPE_H
+ #define OSL_BASIC_TYPE_H
+ #include "osl/config.h"
++#include <functional>
+ #include <type_traits>
+ #include <cassert>
+ #include <iosfwd>
+@@ -1352,8 +1353,7 @@
+ namespace std
+ {
+-  template <typename T> struct hash;
+   template <> struct hash<osl::Move>
+   {
+     unsigned long operator()(osl::Move m) const { return m.intValue(); }
+   };
+ } // namespace stl
+--- a/core/osl/hashKey.h
++++ b/core/osl/hashKey.h
+@@ -6,6 +6,7 @@
+ #include "osl/basic_type.h"
+ #include "osl/bits/pieceStand.h"
+ #include "osl/simpleState.h"
++#include <functional>
+ #include <cstddef>
+ 
+ namespace osl
+@@ -188,9 +189,8 @@
+ namespace std
+ {
+-  template <typename T> struct hash;
+   template <>
+   struct hash<osl::HashKey>{
+     unsigned long operator()(const osl::HashKey& h) const {
+       return h.signature();
+     }
+   };
