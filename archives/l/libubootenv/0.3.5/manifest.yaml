@@ -1,0 +1,94 @@
+# manifest.yaml — libubootenv 0.3.5
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+software: libubootenv
+version: "0.3.5"
+
+status: built
+
+build_date: "2026-10-18"
+build_system: cmake
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/sbabic/libubootenv/archive/refs/tags/v0.3.5.tar.gz"
+  sha256: "dc27ddcb377e259d898256e90449bc3128437660cacc33dc75f6630d3e52c44e"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+
+  configure_options:
+    - "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+    - "-DBUILD_DOC=OFF"
+
+  dependencies:
+    - zlib/1.3.1
+    - libyaml/0.2.5
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息 (inline replace_in_file in conanfile.py build())
+# ============================================================
+
+patches_applied:
+  - type: inline
+    description: "cmake_minimum_required 2.6 → 3.5 (CMake 4.x compat)"
+    files:
+      - CMakeLists.txt
+      - src/CMakeLists.txt
+  - type: inline
+    description: "SONAME explicit LINKER:-soname,libubootenv.so (CMake ignores VERSION/SOVERSION)"
+    files:
+      - src/CMakeLists.txt
+  - type: inline
+    description: "Conan dependency paths injected at build() stage"
+    files:
+      - src/CMakeLists.txt
+  - type: inline
+    description: "OHOS SDK <mtd/ubi-user.h> bug — skip include, provide UBI stubs"
+    files:
+      - src/uboot_env.c
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "libubootenv 使用 CMake 构建系统；cmake_minimum_required 2.6 与 CMake 4.x 不兼容，需提升至 3.5"
+  - "CMake 在 OHOS 平台忽略 VERSION/SOVERSION 属性，必须显式 target_link_options(LINKER:-soname,...) 设置 SONAME"
+  - "OHOS SDK <mtd/ubi-user.h> 头文件存在 __packed 重定义 bug，需用 __OHOS__ 宏跳过并提供桩结构"
+  - "OHOS 无 UBI 子系统；libuboot_initialize(&ctx, NULL) 可在无 MTD 设备情况下纯内存工作"
+  - "Conan find_package(zlib/libyaml) 在 OHOS 交叉编译下失效；需在 build() 阶段获取 cpp_info 路径后注入 CMake"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /data/storage/el2/base/cache/builds/libubootenv-0.3.5.orig
+  source_work_dir: /data/storage/el2/base/cache/builds/libubootenv-0.3.5.work
+  source_orig_hash: 64787cb19601f2a3
+  source_work_hash: c3adbb2cd6797714
+  generated_at: '2026-10-18T02:46:28'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-src-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
