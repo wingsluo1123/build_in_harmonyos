@@ -1,0 +1,48 @@
+version: "0.9.0rc2-1"
+software: "aconnectgui"
+status: "built"
+build_date: "2026-10-17"
+build_system: "autotools"
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/a/aconnectgui/aconnectgui_0.9.0rc2-1.orig.tar.gz"
+  sha256: "70e97c71fe8d6a854b1af59f3c97dcc3906e47123e5a628358bc092154c8e975"
+  tar_format: "tar.gz"
+
+build:
+  system: "autotools"
+  configure_options: []
+  dependencies:
+    - "fltk/1.4.5"
+    - "alsa-lib/1.2.12"
+  cc: "clang"
+  cxx: "clang++"
+
+patches_applied:
+  - "0001-fix-main-return-type.patch"
+
+knowledge_gained:
+  - "aconnectgui is an FLTK-based GUI application (not a library) wrapping the ALSA aconnect utility."
+  - "Source is the Debian orig tarball aconnectgui_0.9.0rc2.orig.tar.gz (Debian package 0.9.0rc2-1). deb.debian.org and snapshot.debian.org no longer carry the package, so the byte-identical Debian-derivative Trisquel pool is used (sha256 verified)."
+  - "Source tarball has no pre-generated configure; autoreconf output shipped in preconf/ (configure, Makefile.in, aclocal.m4, src/Makefile.in, src/config.h.in, aux files)."
+  - "configure.in used AM_PATH_ALSA; replaced with PKG_CHECK_MODULES([ALSA], [alsa >= 0.9.0]) so detection uses alsa.pc provided by the alsa-lib dependency."
+  - "configure checks for fltk via AC_CHECK_LIB(fltk, numericsort) then fl_numericsort; ALSA via PKG_CHECK_MODULES."
+  - "autoconf 2.71 nested AC_CHECK_LIB produces ac_fn_c_try_link call before its definition in the generated configure; fixed by moving the function definition earlier in preconf/configure."
+  - "make would regenerate configure if input files are newer; preconf files are touched after overlay to prevent this."
+  - "COPYING file missing from source; created manually to satisfy automake."
+  - "main() has implicit int return type; patched for C++17 compliance (src/Window.cxx)."
+
+homepage: "https://github.com/radiganm/aconnectgui"
+license: "GPL-2.0-only"
+
+tests:
+  upstream:
+    command: ""
+    cases: 0
+    passed: 0
+    note: "No upstream test suite."
+  adapted:
+    command: "test_package/test.sh"
+    cases: 1
+    passed: 1
+    pass_rate: "1/1 (100%)"
