@@ -1,0 +1,22 @@
+Qt 5.15 already specializes std::hash for QString/QStringRef/QByteArray/QBitArray
+(src/corelib/tools/qhashfunctions.h, lines 204-209) with no disableable guard, so
+kdevelop-pg-qt's own q_Hash_to_tr1_hash(QBitArray) becomes a redefinition:
+
+    kdev-pg/kdev-pg-regexp.cpp:54:1: error: redefinition of 'hash<QBitArray>'
+    .../qhashfunctions.h:209:1: note: previous definition is here
+
+Guard the local definition for Qt < 5.15 only. Zero functional change on 5.15,
+where Qt's own specialization is used (same qHash-based implementation).
+
+--- a/kdev-pg/kdev-pg-regexp.cpp
++++ b/kdev-pg/kdev-pg-regexp.cpp
+@@ -51,7 +51,9 @@
+     };                                                      \
+ }
+ 
++#if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
+ q_Hash_to_tr1_hash(QBitArray)
++#endif
+ 
+ namespace KDevPG
+ {

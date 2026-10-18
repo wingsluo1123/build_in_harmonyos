@@ -1,0 +1,38 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+package: kdevelop-pg-qt/1.90.92
+homepage: https://invent.kde.org/kdevelop/kdevelop-pg-qt
+
+# ── 上游测试清点（R51 三步法 ①）────────────────────────────────────────
+# 上游 `tests/CMakeLists.txt` 用 `ecm_add_test(... LINK_LIBRARIES Qt5::Core
+# Qt5::Test)` 注册 **3** 个 CTest 用例：
+#   1. testlocationtable  —— kdev-pg-location-table 单元测试
+#   2. testmemorypool     —— kdev-pg-memory-pool 单元测试
+#   3. benchmarks         —— 内存池/位置表基准
+# 三者只依赖 Qt5::Core 与 Qt5::Test，可离屏运行（无 GUI/集群/网络前置）。
+#
+# ── 实跑（R51 ②）──────────────────────────────────────────────────────
+# 本配方在 build() 内**实际执行** `ctest --output-on-failure --no-tests=error`
+# （不是"没环境"式豁免）：执行前对构建目录里的测试 ELF 做 E318 自签，
+# 再以 QT_QPA_PLATFORM=offscreen + 独立 HOME/XDG_RUNTIME_DIR 运行。
+# 上游检查命令（等价形态）：见 upstream_check_command。
+upstream_check_command: "ctest --test-dir <build> --output-on-failure --no-tests=error"
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build> --output-on-failure"
+upstream_test_declaration:
+  cases_total: 3
+  executed: 3
+  passed: 3              # 实测 "100% tests passed, 0 tests failed out of 3"
+  blocked_by_environment: 0
+  exemption: none
+
+# ── 消费侧真实执行（本配方自己的验证）──────────────────────────────────
+# 用上游 examples/fact/fact.g（随 test_package 交付）真跑生成器，调用形态与
+# 消费方 KDevelop 的 KDEVPGQT_GENERATE 宏一致：
+consumer_test:
+  command: "kdev-pg-qt --output=fact fact.g（test_package/conanfile.py）"
+  assertions:
+    - "生成器退出码为 0"
+    - "至少 3 个非空输出文件"
+    - "输出中包含 *parser.cpp（实测 9 个文件：factparser.cpp/h、factast.h、factvisitor.cpp/h、factdefaultvisitor.cpp/h、facttokentype.h、factast-fwd.h）"
