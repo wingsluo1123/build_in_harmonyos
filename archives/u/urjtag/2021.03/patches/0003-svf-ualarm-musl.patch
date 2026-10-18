@@ -1,0 +1,33 @@
+--- a/src/svf/svf.c
++++ b/src/svf/svf.c
+@@ -36,6 +36,7 @@
+ #include <signal.h>
+ #include <unistd.h>
+ #include <sys/types.h>
++#include <sys/time.h>
+ #ifndef SA_ONESHOT
+ #define SA_ONESHOT SA_RESETHAND
+ #endif
+@@ -737,6 +738,7 @@
+     if (params->max_time > 0.0)
+     {
+         struct sigaction sa;
++        struct itimerval itv;
+         unsigned max_time;
+ 
+         sa.sa_handler = sigalrm_handler;
+@@ -753,7 +755,13 @@
+         {
+             max_time = 1;
+         }
+-        ualarm (max_time, 0);
++        /* ualarm() is not provided by musl (OHOS libc); schedule the
++           single SIGALRM via a one-shot ITIMER_REAL instead. */
++        itv.it_interval.tv_sec = 0;
++        itv.it_interval.tv_usec = 0;
++        itv.it_value.tv_sec = max_time / 1000000;
++        itv.it_value.tv_usec = max_time % 1000000;
++        setitimer (ITIMER_REAL, &itv, NULL);
+     }
+ 
+     if (params->max_time > 0.0)
