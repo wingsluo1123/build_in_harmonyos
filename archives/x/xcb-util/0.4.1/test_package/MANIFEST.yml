@@ -1,0 +1,52 @@
+package: xcb-util/0.4.1
+homepage: "https://gitlab.freedesktop.org/xorg/lib/libxcb-util"
+
+# The release tarball ships no test programs: there is no tests/ directory and
+# src/Makefile.am has no TESTS/check_PROGRAMS entries, so `make check` is the
+# automake no-op. The recipe still invokes `make check` so the build log
+# carries a trace of the upstream check target.
+upstream_check_command: "make check"
+upstream_test_in_build: true
+upstream_test_command: "make check"
+upstream_tests: []
+upstream_test_notes: "xcb-util 0.4.1 release tarball contains no upstream test programs; make check has no TESTS to run."
+
+test_package_tests:
+  - file: test.c
+    description: >-
+      Generic consumer test (no X server needed; knowledge entry E530
+      strong-typed relocation + ABI pinning): takes the address of every
+      xcb_aux_parse_color / xcb_event_get_{label,error_label,request_label} /
+      xcb_atom_name_{by_screen,unique} export with the exact documented
+      signature, pins the byte layout of the xcb_params_cw_t /
+      xcb_params_gc_t / xcb_params_configure_window_t / xcb_params_keyboard_t
+      packing structs with _Static_assert + offsetof, then really calls the
+      pure helpers: xcb_aux_parse_color over valid (#123456, #ABC) and
+      invalid (#1234, #GGG, "red", NULL) inputs, the three label lookup
+      tables including out-of-range NULL results, the vasprintf-based atom
+      name builders, and the XCB_AUX_ADD_PARAM mask bookkeeping
+      (back_pixel -> bit 1, event_mask -> bit 11).
+    command: "ctest --output-on-failure"
+  - file: test_ohos_port.c
+    description: >-
+      OHOS-specific port test asserting the platform differences introduced
+      by this adaptation: (1) the __OHOS__ toolchain guard is actually
+      active for this build; (2) the loaded library is the versioned shared
+      object libxcb-util.so.1, located through the loader's own bookkeeping
+      (dl_iterate_phdr — load-bearing because the OHOS loader ignores
+      DT_RUNPATH); (3) the ELF DT_NEEDED entries of the shipped library are
+      parsed from the file on disk and must name the direct dependency
+      libxcb.so.1 (the dependency wired through the recipe's explicit
+      -L/-Wl,-rpath-link closure) while being bare sonames only, never
+      absolute or ../ paths (unresolvable via LD_LIBRARY_PATH on OHOS); the
+      toolchain-owned transitive set (libXau/libXdmcp/libc, same as the
+      xcb-util-wm precedent) is deliberately not over-pinned; (4)
+      libxcb.so.1 with xcb_connect resolves at runtime through the same
+      environment.
+    command: "ctest --output-on-failure"
+
+assertion_count: 37
+# 29 runtime assertions in test.c (25 expects + 4 parse_color invalid-input
+# rejects included) + 8 runtime assertions in test_ohos_port.c, plus 12
+# compile-time _Static_assert ABI pins (xcb_params_* struct layouts) that
+# gate compilation of the generic test itself.
