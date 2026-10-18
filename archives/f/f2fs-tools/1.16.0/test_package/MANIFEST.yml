@@ -1,0 +1,48 @@
+file: "test_package/run_consumer_checks.py"
+runner: "python3 run_consumer_checks.py"
+assertion_count: 12
+cases:
+  - name: "mkfs.f2fs-version"
+    command: "mkfs.f2fs -V"
+    assertion: "exit 0 and output contains 1.16.0"
+  - name: "fsck.f2fs-version"
+    command: "fsck.f2fs -V"
+    assertion: "exit 0 and output contains 1.16.0"
+  - name: "dump.f2fs-version"
+    command: "dump.f2fs -V"
+    assertion: "exit 0 and output contains 1.16.0"
+  - name: "defrag.f2fs-version"
+    command: "defrag.f2fs -V"
+    assertion: "exit 0 and output contains 1.16.0"
+  - name: "resize.f2fs-version"
+    command: "resize.f2fs -V"
+    assertion: "exit 0 and output contains 1.16.0"
+  - name: "sload.f2fs-version"
+    command: "sload.f2fs -V"
+    assertion: "exit 0 and output contains 1.16.0"
+  - name: "f2fslabel-version"
+    command: "f2fslabel -V"
+    assertion: "exit 0 and output contains 1.16.0"
+  - name: "f2fs_io-command-table"
+    command: "f2fs_io help"
+    assertion: "exit 0 and command table contains fsync"
+  - name: "f2fscrypt-command-table"
+    command: "f2fscrypt help"
+    assertion: "exit 0 and output contains Available commands"
+  - name: "parse.f2fs-missing-argument-diagnostic"
+    command: "parse.f2fs"
+    assertion: "exit 1 and output contains Usage: parse.f2fs"
+  - name: "mkfs-regular-image"
+    command: "mkfs.f2fs -f <temporary 128 MiB regular file>"
+    assertion: "exit 0 and formatter output contains F2FS-tools"
+  - name: "fsck-regular-image"
+    command: "fsck.f2fs -f <image from mkfs-regular-image>"
+    assertion: "exit 0 and checker output contains FSCK"
+results:
+  status: not_run_no_device_this_session
+  completed: 0
+  pass: 0
+  fail: 0
+  not_run: 12
+  cause: "NO-DEVICE this session: no HarmonyOS target package was built or installed because the 2026-10-18 07:44 CST second hop 127.0.0.1:2200 returned Connection refused; per-case records are in reports/test-package-results.tsv."
+runtime_policy: "The runner records 12 explicit SKIP results when Conan can_run() is false; command execution errors and failed assertions count as FAIL. Temporary-workspace/image prerequisite skips include a concrete per-case reason."

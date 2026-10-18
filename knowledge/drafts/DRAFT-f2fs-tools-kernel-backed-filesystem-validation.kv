@@ -1,0 +1,57 @@
+# ═══ Layer 0: 错误面 ═══
+id:                     DRAFT-f2fs-tools-kernel-backed-filesystem-validation
+trigger_tool:           configure|make|ioctl|mount|test|runtime
+phase:                  configuration|testing|runtime
+error_signature:        F2FS_IOC_.*(ENOTTY|EOPNOTSUPP)|mount.*f2fs.*(EPERM|EACCES|ENODEV)
+
+# ═══ Layer 1: 识别层 ═══
+severity:               2
+category:               kernel, ohos, portability, testing
+match_keywords:         F2FS_IOC, f2fs_io, loop mount, fsstress, filesystem image, HarmonyOS
+title:                  Separate image-level checks from kernel-facing filesystem validation
+
+# ═══ Layer 2: 诊断层 ═══
+root_cause:             F2FS image tools can operate on regular files, while ioctl, mount, resize-under-mount, and power-loss paths depend on kernel support, privilege, and a disposable device; build or --version success proves only the user-space binary contract
+affected_scope:         Linux filesystem utility packages that ship image tools plus direct filesystem ioctl or privileged mount/stress tests
+verification_cmd:      mkfs.f2fs -f <scratch-image> && fsck.f2fs -f <scratch-image>; separately run the upstream mount/ioctl matrix on a compatible kernel and isolated device
+
+# ═══ Layer 3: 方案层 ═══
+rec_priority:           1
+rec_approach:           split-image-and-kernel-validation
+rec_description:        Keep regular-file formatter/checker consumers separate from privileged kernel-facing scenarios and report both result sets explicitly
+rec_command:            mkfs.f2fs -f "$TMPDIR/f2fs.img" && fsck.f2fs -f "$TMPDIR/f2fs.img"; run the pinned upstream matrix on an isolated F2FS-capable device
+rec_auto_fix:           false
+rec_impl:               manual
+fallback_priority:      2
+fallback_approach:
+fallback_description:
+fallback_command:
+fallback_auto_fix:     false
+fallback_impl:
+forbid_1_pattern:       --version.*(mount|ioctl)|version.*kernel.*PASS
+forbid_1_reason:        A version or help command does not exercise the mounted filesystem's ioctl contract or kernel implementation
+forbid_1_consequence:   A user-space build is incorrectly presented as proof that the target kernel supports F2FS operations
+forbid_2_pattern:       mount.*(without.*isolated|shared.*mount)|spo_test.*\/dev\/sdb1
+forbid_2_reason:        The upstream power-loss scenario writes to a raw block device and forces a reboot
+forbid_2_consequence:   A shared or non-disposable target can lose data or reboot an unrelated service
+
+principles:             R34, R51
+causes:                 []
+caused_by:              []
+similar_to:             E265
+conflicts_with:         []
+prerequisite_of:        []
+
+doc_file:               knowledge/drafts/DRAFT-f2fs-tools-kernel-backed-filesystem-validation.md
+last_updated:           2026-10-18
+source_event:           DEP task 15495, f2fs-tools 1.16.0
+
+authors:                iKalous_OscarP <iKalous_OscarP@noreply.gitcode.com>
+source_pr: 16522
+source_commit: 3ef913e169babddea317b597aef0f5f4785e01d7
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+draft:                  true
+contributor_id:         iKalous_OscarP

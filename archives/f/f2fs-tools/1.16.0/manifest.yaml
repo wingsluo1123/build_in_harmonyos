@@ -1,0 +1,114 @@
+software: f2fs-tools
+version: "1.16.0"
+status: recipe_checks_run_no_device_this_session
+build_system: autotools
+source:
+  upstream_url: "https://git.kernel.org/pub/scm/linux/kernel/git/jaegeuk/f2fs-tools.git"
+  tag: "v1.16.0"
+  commit: "06c027abc6153c4a97cba5317844e8dcaaee3cf7"
+  tree: "9c3ad82b3acaac8665211a7d7ad650879ef352af"
+  archive_url: "https://github.com/kernelorg-mirror/linux_kernel_git_jaegeuk_f2fs-tools/archive/refs/tags/v1.16.0.tar.gz"
+  archive_sha256: "cdb2c85e52e2fea075569fe661764dc026ad3640501add2aa9927f605596bc63"
+  archive_policy: "GitHub static archive of the upstream tag copied by the kernelorg-mirror account (which labels its copies unofficial); kernel.org Google Git confirms tag commit/tree, github.com is CI mirror-covered per rule A/R39, and SHA pins bytes. No git.kernel.org snapshot or clone."
+
+build:
+  target: "aarch64-unknown-linux-ohos"
+  options:
+    - "--enable-static"
+    - "--disable-shared"
+    - "--with-blkid"
+    - "--with-selinux"
+    - "--with-lzo2"
+    - "--with-lz4"
+  build_tools:
+    - "autoconf/2.72"
+    - "automake/1.18"
+    - "libtool/2.5.4"
+    - "m4/1.4.19"
+  dependencies:
+    required:
+      - "libuuid/2.42.2"
+      - "libblkid/2.42.2"
+      - "libselinux/3.10.1"
+      - "lzo2/2.10"
+      - "lz4/1.10.0.3"
+  patches_applied:
+    - "patches/0001-ohos-portable-install-and-ldconfig.patch"
+  notes:
+    - "Static build avoids libtool shared-library symlink hooks."
+    - "fsck tool aliases are installed as copies for destination filesystems without symlink support."
+    - "configure.ac's LDCONFIG probe has no generated-makefile consumer; its fallback is a no-op."
+
+outputs:
+  commands:
+    - "mkfs.f2fs"
+    - "fsck.f2fs"
+    - "dump.f2fs"
+    - "defrag.f2fs"
+    - "resize.f2fs"
+    - "sload.f2fs"
+    - "f2fslabel"
+    - "f2fs_io"
+    - "f2fscrypt"
+    - "fibmap.f2fs"
+    - "parse.f2fs"
+  libraries:
+    - "libf2fs"
+    - "libf2fs_format"
+
+upstream_test_inventory:
+  file: "reports/upstream-test-inventory.tsv"
+  total_cases: 113
+  source_defined_tests:
+    resize_matrix_scenarios: 108
+    sha512_known_answer_vectors: 3
+    standalone_stress_scenario: 1
+    power_loss_reboot_scenario: 1
+  execution_detail:
+    matrix_sizes_gib: [4, 5, 8, 11, 16, 25, 32, 55, 64]
+    resize_invocations_nested_inside_matrix: 360
+    fsstress_invocations_nested_or_standalone: 181
+  results:
+    status: not_run_no_device_this_session
+    completed: 0
+    pass: 0
+    fail: 0
+    not_run: 113
+    cause: "NO-DEVICE this session: the 2026-10-18 07:44 CST two-hop check reached the jump host but SSH to 127.0.0.1:2200 returned Connection refused; per-case records are in reports/upstream-test-results.tsv."
+  notes:
+    - "One matrix case is one (from_sload|from_mount, source size, destination size) scenario; nested resize/fsck/fsstress calls are steps in that scenario, not independent registered cases."
+    - "The three UNITTEST SHA-512 vectors are explicit source-level cases, although Makefile.am and CI do not register them."
+    - "The SPO start path is one test scenario; it writes /dev/sdb1, loads a kernel module, changes sysrq controls, and reboots. It was not launched because no explicitly disposable device was identified."
+    - "dumpf2fs.sh and tracepoint.sh are diagnostics, not assertion-bearing tests."
+
+test_package:
+  runner: "test_package/run_consumer_checks.py"
+  total_cases: 12
+  results:
+    status: not_run_no_device_this_session
+    completed: 0
+    pass: 0
+    fail: 0
+    not_run: 12
+    cause: "NO-DEVICE this session: no HarmonyOS target package was built or installed because the 2026-10-18 07:44 CST second hop 127.0.0.1:2200 returned Connection refused; per-case records are in reports/test-package-results.tsv."
+  cases:
+    - "mkfs.f2fs -V"
+    - "fsck.f2fs -V"
+    - "dump.f2fs -V"
+    - "defrag.f2fs -V"
+    - "resize.f2fs -V"
+    - "sload.f2fs -V"
+    - "f2fslabel -V"
+    - "f2fs_io help command table"
+    - "f2fscrypt help command table"
+    - "parse.f2fs missing-argument diagnostic"
+    - "mkfs.f2fs creates a disposable regular-file image"
+    - "fsck.f2fs validates the disposable regular-file image"
+
+platform_boundaries:
+  - "f2fs_io includes the Linux fs ioctl interface and issues F2FS_IOC_* requests; behavior requires a compatible F2FS kernel and mounted filesystem."
+  - "The verify.sh integration matrix requires root-equivalent mount/umount, loop-backed F2FS, xfstests ltp/fsstress, and a writable isolated temporary directory."
+  - "spo_test.sh uses a raw block device, kernel module insertion, sysrq reboot, and a stress helper from an F2FS kernel source checkout; it must only run on an explicitly disposable device."
+
+
+ci: "No new-head CI result is claimed; CI was not polled in this session."
