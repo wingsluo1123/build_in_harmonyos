@@ -1,0 +1,50 @@
+package: mfoc/0.10.7-git20180724
+homepage: "https://github.com/nfc-tools/mfoc"
+
+# Upstream test suite existence (audited source tarball)
+upstream_tests_exist: false
+
+# Upstream test audit (source: mfoc-ba072f1.tar.gz, sha256 e9e01a38896d1b8dbff591cc2f39236d91b4995ea52abb63d0b7fe02aa8ab4bb)
+upstream_test_audit:
+  source_tarball: "mfoc-ba072f16f6b2a655d51da2171ecfb83e26c0ef58.tar.gz"
+  source_sha256: "e9e01a38896d1b8dbff591cc2f39236d91b4995ea52abb63d0b7fe02aa8ab4bb"
+  commit: "ba072f16f6b2a655d51da2171ecfb83e26c0ef58 (2018-07-24, update debian dir)"
+  top_level_files:
+    - configure.ac        # AC_INIT + AM_INIT_AUTOMAKE + PKG_CHECK_MODULES(libnfc); no test macros
+    - Makefile.am         # SUBDIRS = src only; no TESTS / check_PROGRAMS / check-local
+    - src/Makefile.am     # bin_PROGRAMS = mfoc only; no TESTS / check_PROGRAMS
+    - src/*.c             # mfoc/crapto1/crypto1/mifare/nfc-utils/slre; no TEST()/TEST_F/def test_
+    - debian/             # packaging only, no autopkgtest
+  scanned_for:
+    - "TEST( / TEST_F (gtest)"
+    - "def test_ (pytest)"
+    - "Makefile.am TESTS / check_PROGRAMS / check-local"
+    - "tests/ / test/ / spec/ / t/ dirs"
+    - "make check / ctest targets"
+    - "find . -name '*test*' (whole tree)"
+  scan_result: "0 matches - no tests/ dir; configure.ac has no test macros; Makefile.am / src/Makefile.am have no TESTS/check_PROGRAMS; sources have no gtest/pytest cases; make -n check is automake default empty target"
+  make_check_output: "make check expands to automake empty target (check-am: all-am / check-recursive), executes 0 cases exit 0"
+  reason: "mfoc 0.10.7-git20180724 is a single-binary NFC tool; upstream tag mfoc-0.10.7 and snapshot ba072f1 contain no automated test suite"
+
+# Upstream test command (no suite, hence empty to avoid planner misjudging as existing tests)
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# Upstream tests actually run (upstream_tests_exist: false)
+upstream_tests: []
+
+# Consumer tests in test_package
+test_package_tests:
+  - file: "test.sh"
+    description: "Smoke test for mfoc binary via -h help and missing-arg negative control"
+    command: "bash test.sh"
+  - file: "conanfile.py"
+    description: "Conan test() entry, runs test.sh and re-emits HMBS machine evidence markers (test_package discovered=1 + upstream no_tests/0)"
+    command: "conan test test_package"
+
+assertion_count: 1
+
+# HMBS preflight fields (new gate format)
+upstream_test_total: 0
+upstream_test_count_method: "auto"
