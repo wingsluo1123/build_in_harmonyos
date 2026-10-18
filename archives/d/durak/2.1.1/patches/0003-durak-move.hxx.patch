@@ -1,0 +1,36 @@
+--- a/durak/move.hxx
++++ b/durak/move.hxx
+@@ -14,29 +14,33 @@
+ #include <boost/fusion/sequence/intrinsic_fwd.hpp>
+ #include <cstdlib>
+ #include <iostream>
+ #include <map>
+ #include <variant>
+ 
+ namespace durak
+ {
+ typedef std::vector<std::pair<PlayerRole, std::string>> PlayerRolesPlayerId;
+ }
++#ifdef _MSC_VER
+ #pragma warning(push)
+ #pragma warning(disable:4003)
++#endif
+ BOOST_FUSION_DEFINE_STRUCT ((durak), RoundInformation, (durak::PlayerRolesPlayerId, playerRoles))
+ BOOST_FUSION_DEFINE_STRUCT ((durak), StartAttack, (std::vector<durak::Card>, cards))
+ BOOST_FUSION_DEFINE_STRUCT ((durak), AssistAttack, (durak::PlayerRole, playerRole) (std::vector<durak::Card>, cards))
+ BOOST_FUSION_DEFINE_STRUCT ((durak), Pass, )
+ BOOST_FUSION_DEFINE_STRUCT ((durak), Defend, (durak::Card, cardToBeat) (durak::Card, card))
+ BOOST_FUSION_DEFINE_STRUCT ((durak), DrawCardsFromTable, )
++#ifdef _MSC_VER
+ #pragma warning(pop)
++#endif
+ namespace durak
+ {
+ typedef std::variant<RoundInformation, StartAttack, AssistAttack, Pass, Defend, DrawCardsFromTable> HistoryEvent;
+ 
+ 
+ inline bool
+ operator== (durak::RoundInformation const &x, durak::RoundInformation const &y)
+ {
+   return x.playerRoles == y.playerRoles;
+ }

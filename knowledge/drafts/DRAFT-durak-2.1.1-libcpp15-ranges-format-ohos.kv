@@ -1,0 +1,58 @@
+id: DRAFT-durak-2.1.1-libcpp15-ranges-format-ohos
+title: OHOS libc++15 ranges 算法被 _LIBCPP_HAS_NO_INCOMPLETE_RANGES 宏隐藏、C++23 std::ranges::contains 缺失、std::format 运行库无符号（C1-C3 组合，durak 2.1.1 实证）
+category: ohos, toolchain, libc++, c++20, c++23, portability, conan
+severity: 2
+error_signature: >
+  "no member named 'find_if' in namespace 'std::ranges'|
+   no member named 'contains' in namespace 'std::ranges'|
+   undefined symbol: vtable for std::__n1::format_error|
+   undefined symbol: std::__n1::__throw_format_error"
+match_keywords: >
+  _LIBCPP_HAS_NO_INCOMPLETE_RANGES, _LIBCPP_ENABLE_EXPERIMENTAL,
+  std::ranges, ranges::contains, std::format, libc++, clang 15,
+  OHOS SDK 26, undefined symbol format_error, __throw_format_error
+error_excerpt: >
+  error: no member named 'find_if'/'count_if'/'transform'/'binary_search'/
+  'copy_if'/'find' in namespace 'std::ranges'（20 errors，game.hxx）；
+  error: no member named 'contains' in namespace 'std::ranges'（game.hxx
+  两处，即使 -D_LIBCPP_ENABLE_EXPERIMENTAL 仍缺）；
+  ld.lld: error: undefined symbol: vtable for std::__n1::format_error /
+  std::__n1::__throw_format_error（print.hxx 使用 std::format）
+root_cause: >
+  C1: OHOS SDK 26 配套 libc++ 15.0.4 的 __config 在非实验模式默认定义
+  _LIBCPP_HAS_NO_INCOMPLETE_RANGES；__algorithm/ranges_*.h 实现文件实际
+  存在（find_if/count_if/sort/binary_search/transform/copy_if/find），但被
+  该宏守卫而不可见，导致 C++20 ranges 算法 "no member named X in namespace
+  'std::ranges'" 编译失败。
+  C2: std::ranges::contains 是 C++23 特性，libc++ 15 头文件无
+  __algorithm/ranges_contains.h，任何标志下都不存在。
+  C3: libc++ 15 的 <format> 头声明可用（解锁后），但运行时库 libc++.so
+  未编译 format 部分（INCOMPLETE_FORMAT），头声明 → 运行库缺符号 → 链接失败
+  （undefined symbol: vtable for std::__n1::format_error）。
+rec_approach: >
+  C1: 编译标志 -D_LIBCPP_ENABLE_EXPERIMENTAL 解锁 incomplete ranges
+  （无需改源码）；conan 配方 generate() 注入 CMAKE_CXX_FLAGS，并需通过
+  cpp_info.defines 传导给消费者（durak 即如此，package_info.defines =
+  ["_LIBCPP_ENABLE_EXPERIMENTAL"]）。
+  C2: 改写为 C++20 等价 std::ranges::find(r, v) != std::ranges::end(r)
+  （语义完全一致）。
+  C3: 改写为 ostream 流式输出（os << "Card: {" << v << " , " << name <<
+  "}"），输出格式与上游一致。
+solution: |
+  实证（durak 2.1.1，PR 待建）：
+  - 配方 generate(): tc.cache_variables["CMAKE_CXX_FLAGS"] =
+    "-D_LIBCPP_ENABLE_EXPERIMENTAL"；package_info.defines 传导。
+  - patches/0002-durak-game.hxx.patch: std::ranges::contains → find != end
+  - patches/0004-durak-print.hxx.patch: std::format → ostream
+  - 上游 25 用例（63 断言）全过；消费者 test_package 1/1 通过。
+fallback: >
+  C1 若禁用 experimental：可将 ranges 算法逐个改写为迭代器对版本
+  （参见 DRAFT-E5xx-ohos-libcpp-missing-ranges-algorithms，但该草稿根因
+  描述为"裁剪版缺失"，与实测"宏守卫隐藏实现"不同——编译标志方案更优）。
+  C3 无运行库符号时只能改流式输出或换实现。
+verify_builds: "durak 2.1.1 conan create（_test 25/25、63 断言）+ test_package 消费者通过；conan-verify G0-G4/L2/L4/L5 全过"
+prescan_pattern: >
+  std::ranges::(find_if|count_if|transform|binary_search|copy_if|find|
+  contains)|std::format\(|_LIBCPP_HAS_NO_INCOMPLETE_RANGES
+kb_ref: "similar_to DRAFT-E5xx-ohos-libcpp-missing-ranges-algorithms（C1 触发域重叠，根因/方案不同）；C7 reuse E477"
+last_updated: 2026-10-04
