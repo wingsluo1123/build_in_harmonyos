@@ -1,0 +1,37 @@
+# manifest.yaml for mfoc 0.10.7-git20180724
+# Follows ARCHIVE-SPEC v2.0
+
+version: "0.10.7-git20180724"
+software: mfoc
+status: built
+build_date: "2026-10-15"
+build_system: autotools
+
+source:
+  url: "https://github.com/nfc-tools/mfoc/archive/ba072f16f6b2a655d51da2171ecfb83e26c0ef58.tar.gz"
+  sha256: "e9e01a38896d1b8dbff591cc2f39236d91b4995ea52abb63d0b7fe02aa8ab4bb"
+  tar_format: tar.gz
+  commit: "ba072f16f6b2a655d51da2171ecfb83e26c0ef58"
+  commit_date: "2018-07-24"
+
+build:
+  system: autotools
+  configure_options: []
+  dependencies:
+    - libnfc/1.8.0
+    - libtool/2.5.4.1 # host requires: bin/mfoc DT_NEEDED libltdl.so.7 (libnfc static)
+  build_requirements:
+    - automake/1.18
+    - libtool/2.5.4.1
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "mfoc is application type, ships only bin/mfoc + man page"
+  - "GitHub commit archive needs autoreconf -fi (no pre-generated configure)"
+  - "configure uses PKG_CHECK_MODULES for libnfc, needs PKG_CONFIG_PATH injection"
+  - "No upstream test suite (no TESTS/check_PROGRAMS/tests dir)"
+  - "mfoc -h exits 0 with Usage + version; missing -O exits non-zero (negative control)"
+  - "bin/mfoc DT_NEEDED libltdl.so.7 at runtime: libtool must be host requires, not only tool_requires"
