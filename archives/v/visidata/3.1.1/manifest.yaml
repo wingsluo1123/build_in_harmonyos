@@ -1,0 +1,59 @@
+# 版本级 manifest — visidata 3.1.1
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "3.1.1"
+software: visidata
+status: built
+build_date: "2026-10-17"
+build_system: pip
+
+source:
+  url: "https://pypi.cnb.cool/OpenHarmonyPCDeveloper/pypi/-/packages/packages/6c/41/b026336b7075a2c8461c1ba0dfffd456902f736722f4a016f21fee1e6d7c/visidata-3.1.1.tar.gz"
+  sha256: "8c4484158f0851e4887e595542bd65bdd991de9c20652b442b3fd9742ce8b031"
+  filename: "visidata-3.1.1.tar.gz"
+  note: >-
+    上游 `saulpw/visidata` **3.1.1** 的 PyPI sdist（平台 pip 镜像直链），版本与平台清单一致。
+    本地实测 13,166,704 字节、317 个文件、单层根目录 `visidata-3.1.1/`；仓库自带 `visidata/tests/`。
+
+build:
+  system: pip
+  steps:
+    - "pip install --target <包>/python python-dateutil importlib-metadata（运行时依赖）"
+    - "pip install --no-deps --target <包>/python .（上游 setup.py）"
+    - "按上游 entry_points `visidata=visidata.main:vd_cli` 生成 <包>/bin/visidata；上游 scripts 的 bin/vd、bin/vd2to3.vdx 一并复制到 bin"
+  dependencies: ["python-dateutil", "importlib-metadata"]
+  build_requirements: []
+  conan_side_adaptations:
+    - "测试环境按属主挑 TMPDIR（pytest 的 tmp_path 校验属主，HMDFS 上构建目录属主不同）"
+    - "测试环境清 XDG_CACHE_HOME/XDG_CONFIG_HOME/XDG_DATA_HOME、补 /system/bin 到 PATH"
+
+upstream_tests:
+  framework: "pytest（visidata/tests/，含 conftest.py）"
+  test_path: "visidata/tests/"
+  test_command: "python -m pytest -q -p no:cacheprovider visidata/tests"
+  test_count: 37
+  run_in_build: true
+  verified: true
+upstream_test_pass_rate: >-
+  **37/37（100%）** —— 本地实跑 `37 passed in 6.66s`。用例内容未做任何修改。
+adapted_test_pass_rate: >-
+  test_package/check_visidata.py **6 项消费者校验（全部离线）**，本地实测
+  `checks=6 fails=0 skips=0 / RESULT: PASS`：①命令齐备（bin/visidata + bin/vd）②模块可导入且版本正确
+  （`visidata.__version__ = 3.1.1`）③**真跑** `visidata --version`（首行 `saul.pw/VisiData v3.1.1`）
+  ④**真实批处理**：离线 CSV 经 `vd -b -o` 导出成功 ⑤许可证随包（licenses/LICENSE.gpl3）⑥证据。
+
+deviations: []
+
+knowledge_gained:
+  - category: L1
+    content: >-
+      **终端类工具的"真跑"要用批处理模式**：visidata 这类全屏 TUI 不能交互，但上游支持
+      `vd -b -o <out> <in>` 批处理 —— 消费者校验据此可以真正驱动一次"读 CSV → 导出"的数据链路，
+      比只跑 `--version` 有说服力得多。
+    reason: "visidata 3.1.1 适配实测——消费者校验设计"
+  - category: L1
+    content: >-
+      **上游 `scripts=` 与 `entry_points` 常常并存**：visidata 既有 `console_scripts`
+      （`visidata=visidata.main:vd_cli`），又把 `bin/vd`、`bin/vd2to3.vdx` 作为 `scripts=` 发布。
+      配方需要两条都处理：按 entry_points 生成启动脚本 + 复制实体脚本并补可执行位。
+    reason: "visidata 3.1.1 适配实测——命令入口安装"

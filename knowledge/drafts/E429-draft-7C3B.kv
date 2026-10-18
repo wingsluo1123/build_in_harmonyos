@@ -1,0 +1,63 @@
+id:                     E429
+trigger_tool:           pytest|runtime
+phase:                  testing, packaging
+error_signature:        not owned by the current user|XDG_CACHE_HOME|console script not generated|scripts= not installed
+
+severity:               2
+category:               testing, packaging, portability
+match_keywords:         pytest, tmp_path, TMPDIR, 属主, HMDFS, XDG_CACHE_HOME, entry_points, scripts=, 批处理
+title:                  TUI/数据类工具交付时的两个要点：测试环境前提与"批处理可验证性"
+
+root_cause:             ①pytest 的 tmp_path 校验"临时目录属主 == 当前用户"，HMDFS 上构建目录属主是映射后的
+                          另一 uid → `OSError: The temporary directory ... is not owned by the current user`；
+                          此外环境里的 XDG_CACHE_HOME/XDG_CONFIG_HOME 会绕过用例 monkeypatch 的 HOME。
+                        ②TUI 类工具不能交互，若消费者校验只断言 `--version` 或文件存在，交付质量无法验证；
+                          而上游往往提供批处理入口（本例 visidata 的 `vd -b -o <out> <in>`），可以真正驱动
+                          "读文件 → 处理 → 导出"链路。
+affected_scope:         所有在 uid 映射文件系统上跑 pytest 的构建；所有 TUI/交互式命令行工具的消费者校验。
+verification_cmd:       stat -c %u "$TMPDIR"; echo x | <pkg>/bin/<cmd> --version
+
+rec_priority:           1
+rec_approach:           owned-tmpdir-plus-batch-mode-assertion
+rec_description:        ①测试环境按"属主 == 当前 uid 且可写"挑选 TMPDIR（专用临时挂载点优先），并清掉
+                          XDG_CACHE_HOME/XDG_CONFIG_HOME/XDG_DATA_HOME；②消费者校验尽量走工具的**批处理/非交互**
+                          入口做真实数据链路断言，而不是只检查版本号或文件存在。
+rec_command:            export TMPDIR=<owned>; unset XDG_CACHE_HOME; <pkg>/bin/<cmd> -b -o out.csv in.csv
+rec_auto_fix:           false
+rec_impl:               manual
+
+fallback_priority:      2
+fallback_approach:      install-entry-points-and-scripts-together
+fallback_description:   上游同时声明 `console_scripts` 与 `scripts=` 时两条都要装：按 entry_points 生成启动脚本，
+                        同时把 `scripts=` 的实体脚本复制到 `<包>/bin` 并 chmod 755（不依赖 pip 落盘位置）。
+fallback_command:       cp <src>/bin/<script> <pkg>/bin/ && chmod 755 <pkg>/bin/<script>
+fallback_auto_fix:      false
+fallback_impl:          manual
+
+forbid_1_pattern:       assertion-on-version-only-for-tui
+forbid_1_reason:        TUI 工具的核心价值在数据处理链路，只断言版本号等于没验证
+forbid_1_consequence:   交付物"能启动但可能不能干活"，问题要等用户真正使用才暴露
+
+principles:
+
+causes:                 []
+caused_by:              []
+similar_to:             []
+conflicts_with:         []
+prerequisite_of:        []
+
+doc_file:               doc/E429.md
+last_updated:           2026-10-17
+source_event:           visidata 3.1.1 适配（TMPDIR 属主 + 批处理校验 + entry_points/scripts 并存）
+
+authors:
+source_pr:
+source_commit:
+
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+
+draft: true
+contributor_id: 7C3B
