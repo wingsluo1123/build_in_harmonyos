@@ -1,0 +1,38 @@
+--- a/tests/s_test.py
++++ b/tests/s_test.py
+@@ -573,20 +573,35 @@
+             for key in sorted(d):
+                 try:
+                     print("  ", key, TAGS[ifd][key]["name"], d[key][:10])
+                 except:
+                     print("  ", key, TAGS[ifd][key]["name"], d[key])
+         print("**********************************************")
+ 
+ # test utility methods----------------------------------------------
+ 
+     def _compare_value(self, v1, v2):
++        # Pillow >= 6 returns rational EXIF values (and nested rational
++        # tuples) as IFDRational objects, while upstream requirements.txt
++        # pins Pillow 4.2.1, which returned plain (numerator, denominator)
++        # tuples.  Normalize IFDRational back to tuples so the original
++        # assertions keep their exact semantics under the Pillow build
++        # available for OHOS.
++        def normalize(v):
++            if hasattr(v, "numerator") and hasattr(v, "denominator") \
++                    and not isinstance(v, int):
++                return (v.numerator, v.denominator)
++            if isinstance(v, tuple):
++                return tuple(normalize(x) for x in v)
++            return v
++        v1 = normalize(v1)
++        v2 = normalize(v2)
+         if type(v1) != type(v2):
+             if isinstance(v1, tuple):
+                 self.assertEqual(pack_byte(*v1), v2)
+             elif isinstance(v1, int):
+                 self.assertEqual(struct.pack("B", v1), v2)
+             elif isinstance(v2, int):
+                 self.assertEqual(struct.pack("B", v2), v1)
+             elif isinstance(v1, bytes) and isinstance(v2, str):
+                 try:
+                     self.assertEqual(v1, v2.encode("latin1"))
