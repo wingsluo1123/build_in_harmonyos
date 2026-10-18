@@ -1,0 +1,80 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -86,22 +86,22 @@
+ 
+ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+     set(MACOSX_BUNDLE_ICON_FILE icone.icns)
+     set(app_icon "${CMAKE_CURRENT_SOURCE_DIR}/resources/interface/icone.icns")
+     set_source_files_properties(${app_icon}
+         PROPERTIES
+         MACOSX_PACKAGE_LOCATION "Resources"
+     )
+ endif()
+ 
+-find_package(QT NAMES Qt6 REQUIRED COMPONENTS Concurrent Core Multimedia Network PrintSupport Sql Widgets Xml)
+-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Concurrent Core Multimedia Network PrintSupport Sql Widgets Xml)
++find_package(QT NAMES Qt6 REQUIRED COMPONENTS Concurrent Core Multimedia Network Sql Widgets Xml)
++find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Concurrent Core Multimedia Network Sql Widgets Xml)
+ 
+ 
+ # Verification de la version de Qt
+ string(SUBSTRING ${QT_PREFERRED_VERSION} 0 1 QT_PREFERRED_VERSION_MAJOR)
+ 
+ if(NOT ${QT_VERSION_MAJOR} EQUAL ${QT_PREFERRED_VERSION_MAJOR})
+     message(FATAL_ERROR "Qt ${QT_VERSION} is not suited to compile ${TARGET}. Use Qt ${QT_PREFERRED_VERSION} in preference")
+ endif()
+ 
+ 
+@@ -250,21 +250,20 @@
+         ${LIBRARY_SOURCES}
+         ${app_icon}
+         resources.qrc
+     )
+ 
+     target_link_libraries(${TARGET}
+         PRIVATE
+         Qt${QT_VERSION_MAJOR}::Concurrent
+         Qt${QT_VERSION_MAJOR}::Multimedia
+         Qt${QT_VERSION_MAJOR}::Network
+-        Qt${QT_VERSION_MAJOR}::PrintSupport
+         Qt${QT_VERSION_MAJOR}::Sql
+         Qt${QT_VERSION_MAJOR}::Widgets
+         Qt${QT_VERSION_MAJOR}::Xml
+     )
+ 
+     if(${QT_VERSION} VERSION_LESS 6.1.0)
+       set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.astropedia.previsat)
+     endif()
+ 
+     set_target_properties(${TARGET} PROPERTIES
+@@ -275,30 +274,22 @@
+         WIN32_EXECUTABLE TRUE
+     )
+ 
+     qt_finalize_executable(${TARGET})
+ 
+     if(${CMAKE_BUILD_TYPE} STREQUAL "Release")
+ 
+         set(RELEASE_FLAGS
+             -Os
+             -fbounds-check
+-            -fbranch-target-load-optimize
+             -fcaller-saves
+             -fcommon
+-            -fcprop-registers
+-            -fcrossjumping
+-            -floop-optimize
+-            -foptimize-register-move
+-            -fpeephole
+-            -fpeephole2
+-            -frerun-cse-after-loop
+             -fstrength-reduce
+             -malign-double
+             -s
+         )
+ 
+         set(LANGUAGE_OPTIONS
+             -no-obsolete
+         )
+     endif()
+ 

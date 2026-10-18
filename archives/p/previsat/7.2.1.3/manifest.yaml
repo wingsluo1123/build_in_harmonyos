@@ -1,0 +1,129 @@
+# 版本级 manifest — previsat 7.2.1.3
+# 遵循 ARCHIVE-SPEC v2.0
+
+# 版本号
+version: "7.2.1.3"
+
+# 软件名
+software: previsat
+
+# 编译状态
+# published | built | failed | archived
+# 本地 conan create 构建 + test_package 运行时验证通过（OHOS aarch64）
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-16"
+build_system: cmake
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（上游官方下载入口 SourceForge previsat 项目）
+  url: "https://downloads.sourceforge.net/project/previsat/previsat/previsat7-2/previsat7-2-1-3/previsat-7.2.1.3-src.tar.gz"
+  upstream_url: "https://downloads.sourceforge.net/project/previsat/previsat/previsat7-2/previsat7-2-1-3/previsat-7.2.1.3-src.tar.gz"
+  homepage: "http://previsat.free.fr/"
+
+  # 源码校验和
+  sha256: "0cbe9a3c66f03612a4b2e86f2b955bc09d2c52be7b116cb4514db77c780845ed"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表
+  configure_options:
+    - "PORTABLE_BUILD=1"
+    - "BUILD_TEST=OFF"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - qtbase-sql-dbus/6.11.1
+    - qtmultimedia/6.11.1
+    - qtbase/6.11.1
+    - qtshadertools/6.11.1
+
+  # 缺失依赖（阻塞，W0/R36）
+  missing_dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "patches/0001-CMakeLists-qt6-modules-and-clang-flags.patch"
+  - "patches/0002-src-interface-previsat-unused-print-includes.patch"
+  - "patches/0003-src-librairies-corps-systemesolaire-luneconst-constexpr-sqrt.patch"
+  - "patches/0004-src-librairies-corps-terreconst-constexpr-sqrt.patch"
+  - "patches/0005-src-interface-carte-carte-qvectoriterator-ctad.patch"
+  - "patches/0006-src-configuration-configuration-listeFics-redefinition.patch"
+  - "patches/0007-src-librairies-dates-date-qvectoriterator-ctad.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "PreviSat 要求 Qt6 {Sql, PrintSupport, Multimedia} 三模块同时可用，但制品仓中 qtmultimedia/6.11.1 精确 requires qtbase/6.11.1（FEATURE_sql=OFF 且 FEATURE_printsupport=OFF），而含 Sql/PrintSupport 的 qtbase/6.11.1.3 与之冲突；解法＝qtbase-sql-dbus 变体（Sql/Core/Gui/Widgets/Network/Xml/Concurrent）+ qtmultimedia，且 PrintSupport 在源码中仅剩未使用的 include（可安全移除）(knowledge_ref: E441)"
+  - "多 Qt6 前缀装配：Qt6_DIR 指向含 Sql 的基础包，其余模块包经 QT_ADDITIONAL_PACKAGES_PREFIX_PATH + CMAKE_PREFIX_PATH 提供，代码/链接（含 moc/uic/rcc 工具）即可整体工作 (knowledge_ref: E323)"
+  - "clang 15 未实现 C++20 别名模板 CTAD：Qt6 的 QVectorIterator 是 QListIterator 的别名模板，QVectorIterator it(x) 直接报 alias template requires template arguments，需补显式模板参数 (knowledge_ref: E397)"
+  - "constexpr 初始化中调用 C 库 sqrt() 在 clang/libc++ 下非法（GCC 可常量折叠，且 __builtin_sqrt 同样不被该 clang 接受）→ 内联同一表达式的 IEEE-754 double 字面值（位级等价） (knowledge_ref: E397)"
+  - "上游 release 选项夹带 GCC 专属优化开关（-fbranch-target-load-optimize/-fcprop-registers/-fcrossjumping/-floop-optimize/-foptimize-register-move/-fpeephole/-fpeephole2/-frerun-cse-after-loop），clang 15 报 unknown argument 硬失败，需在补丁中剔除 (knowledge_ref: E137)"
+  - "上游 configuration.cpp 在 Q_OS_LINUX 分支与主干各定义一个同名局部变量 listeFics，同一函数作用域内重定义 → 定义 Q_OS_LINUX 的平台（OHOS 属之）无法编译，需重命名 (knowledge_ref: E091)"
+  - "Qt6 GUI 应用在无窗口系统的 OHOS 上可经 offscreen QPA 插件无头启动，运行期自建 log/、cache/、data/config 等目录并写出日志，可作为可执行包的真实运行时测试依据 (knowledge_ref: E527)"
+  - "上游数据库经 QSqlDatabase(\"QSQLITE\") 打开，Qt6Sql 驱动插件（libqsqlite.so）由基础包 plugins/sqldrivers 提供，测试环境需把依赖包 plugins 目录加入 QT_PLUGIN_PATH，否则报 driver not loaded (knowledge_ref: E547)"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/previsat-7.2.1.3.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/previsat-7.2.1.3.work
+  source_orig_hash: 4412790f95348181
+  source_work_hash: 7025a944ef3d3a97
+  generated_at: '2026-10-16T19:00:00'
+  patches_count: 7
+  note: "补丁为 CRLF 保真统一 diff（refresh-patch --auto 对 CRLF 源文件会丢失 \\r 导致补丁无法应用）"
+
+patch_classification:
+  - file: 0001-CMakeLists-qt6-modules-and-clang-flags.patch
+    type: portability
+    platform_only: true
+    guard: 'none'
+  - file: 0002-src-interface-previsat-unused-print-includes.patch
+    type: portability
+    platform_only: true
+    guard: 'none'
+  - file: 0003-src-librairies-corps-systemesolaire-luneconst-constexpr-sqrt.patch
+    type: portability
+    platform_only: true
+    guard: 'none'
+  - file: 0004-src-librairies-corps-terreconst-constexpr-sqrt.patch
+    type: portability
+    platform_only: true
+    guard: 'none'
+  - file: 0005-src-interface-carte-carte-qvectoriterator-ctad.patch
+    type: portability
+    platform_only: true
+    guard: 'none'
+  - file: 0006-src-configuration-configuration-listeFics-redefinition.patch
+    type: portability
+    platform_only: true
+    guard: 'none'
+  - file: 0007-src-librairies-dates-date-qvectoriterator-ctad.patch
+    type: portability
+    platform_only: true
+    guard: 'none'
