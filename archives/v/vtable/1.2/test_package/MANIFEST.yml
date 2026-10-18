@@ -1,0 +1,48 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: vtable/1.2
+homepage: "https://github.com/lvc/vtable-dumper"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make -n check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游没有测试套件：tag 1.2 的官方 tarball 只含 6 个文件
+# (INSTALL / LICENSE / Makefile / README / dump-vtable.c / dump-vtable.h)，
+# Makefile 仅有 all / install / uninstall / clean 四个目标，不存在 check
+# 或 test 目标：实测 `make -n check` 输出
+#     make: *** No rule to make target 'check'.  Stop.
+# 树内无 tests/ 目录、无 test*.c、无 CI 配置、无任何测试框架依赖。
+# 因此上游官方测试 = 0 项；功能验证由本 test_package 的 test.sh 端到端
+# 断言（C1–C12）承担，对安装出的 bin/vtable-dumper 实测。
+upstream_tests: []
+
+upstream_test_notes: >
+  上游 tarball 6 个文件、Makefile 目标仅 all/install/uninstall/clean，
+  `make -n check` 报 "No rule to make target 'check'"，上游官方测试 = 0 项。
+  test.sh 的 13 项断言为鸿蒙侧补测，全部基于输出内容而非退出码（该工具
+  失败时亦返回 0）：C1 -dumpversion == 1.2；C2 用工具链真实编译出消费者
+  C++ 共享库；C3/C6 两个多态类的 vtable 被正确识别；C4/C7 槽位数与逐行
+  打印的槽位数量一致（7 / 6）；C5/C8 虚函数名 demangle 正确；
+  C9 typeinfo 槽位正确；C10 -mangled 输出改名符号；C11/C12 非 ELF 输入被
+  判为失败且不产生任何 vtable 输出。
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.sh
+    description: >
+      消费者端到端：编译真实 C++ 多态共享库 → 用安装后的 vtable-dumper 导出
+      其 vtable → 断言类名/槽位数虚函数名/typeinfo/失败路径
+    command: "bash test.sh <pkg>/bin/vtable-dumper"
+  - file: vtable_consumer.cpp
+    description: 被 dump 的消费者共享库源码（两个多态类 Document/Invoice）
+    command: "clang++ -shared -fPIC -o libvtable_consumer.so vtable_consumer.cpp"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 13

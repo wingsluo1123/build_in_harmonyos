@@ -1,0 +1,26 @@
+--- a/Makefile
++++ b/Makefile
+@@ -1,17 +1,22 @@
+ prefix ?= /usr
++
++# Name of the C++ runtime library that provides __cxa_demangle.
++# Defaults to the libstdc++ spelling used by glibc toolchains; toolchains
++# that ship the runtime under a different name override it (CXXLIB=-lc++).
++CXXLIB ?= -lstdc++
+ 
+ .PHONY: all install uninstall clean
+ all: vtable-dumper
+ 
+ install: vtable-dumper
+ 	mkdir -p $(DESTDIR)$(prefix)/bin/
+ 	install vtable-dumper $(DESTDIR)$(prefix)/bin/
+ 
+ vtable-dumper: dump-vtable.c dump-vtable.h
+-	$(CC) $(CFLAGS) $(LDFLAGS) -o vtable-dumper dump-vtable.c -ldl -lelf -lstdc++
++	$(CC) $(CFLAGS) $(LDFLAGS) -o vtable-dumper dump-vtable.c -ldl -lelf $(CXXLIB)
+ 
+ uninstall:
+ 	rm -f $(DESTDIR)$(prefix)/bin/vtable-dumper
+ 
+ clean:
+ 	rm -f vtable-dumper
