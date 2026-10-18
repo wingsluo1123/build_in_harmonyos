@@ -1,0 +1,40 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI L0e 强制要求存在）
+
+package: tofi/0.9.1
+homepage: "https://github.com/philj56/tofi"
+
+# 上游测试命令（test/meson.build 用 test() 注册，TAP 协议）
+upstream_check_command: "meson test"
+
+# build() 中是否集成了上游测试命令（conanfile.py 的 build() 调用 meson.test()）
+upstream_test_in_build: true
+upstream_test_command: "meson test"
+
+# tofi 0.9.1 上游测试清点结果：2 个可执行目标 / 80 条原子断言
+# 证据：test/meson.build 的 tests = ['config', 'utf8'] 循环 test(test_file, t,
+#       protocol: 'tap')；断言入口 test/config.c 的 is_valid/isnt_valid 39+29 条、
+#       test/utf8.c 的 is_match(×2)/isnt_match(×2)/isnt_simple_match/isnt_fuzzy_match 共 12 条。
+upstream_tests:
+  - file: test/config.c
+    source: tofi-0.9.1/test/config.c
+    description: "config_apply() 对 anchor / 光标样式 / 布尔 / 颜色 / 有符号/无符号/百分比/方向值的取值校验（TAP，68 条断言）"
+    command: "meson test config"
+  - file: test/utf8.c
+    source: tofi-0.9.1/test/utf8.c
+    description: "fuzzy_match_simple_words() / fuzzy_match_words() 的大小写折叠与组合变音符号匹配（TAP，12 条断言，含 1 条 tap_todo）"
+    command: "meson test utf8"
+
+# test_package 自带的消费者测试（命令行工具：执行已安装的 bin/tofi）
+test_package_tests:
+  - file: src/test_tofi.sh
+    description: "检查 bin/tofi 产物、符号链接与 DT_NEEDED，并真实执行已安装二进制（--help / 非法选项值 / 无 Wayland display）"
+    command: "bash src/test_tofi.sh <pkg>"
+
+# 断言总数（产物 8 + 运行 4）：
+#   1 bin/tofi exists / 2 executable / 3 tofi-run 符号链接 / 4 tofi-drun 符号链接
+#   5 ELF 含 "Usage: tofi [options]" / 6 ELF 含 "Couldn't connect to Wayland display."
+#   7 DT_NEEDED 链 libwayland-client.so.0 / 8 DT_NEEDED 链 libcairo.so.2
+#   9  --help 退出 0 / 10 --anchor 非法值退出 1 / 11 --horizontal 非法值退出 1
+#   12 无 display 时退出 1
+assertion_count: 12

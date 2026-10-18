@@ -1,0 +1,37 @@
+software: tofi
+display: "tofi"
+description: "A minimal, highly configurable launcher for wlroots-based Wayland compositors（Wayland 启动器 / dmenu 替代）"
+category: utilities
+homepage: "https://github.com/philj56/tofi"
+license: MIT
+build_system: meson
+status: built
+
+ohos_adaptation:
+  key_points:
+    - "Wayland 启动器（tofi / tofi-run / tofi-drun），C2x + meson；同时构建内部工具 tofi-compgen（install: false）"
+    - "依赖字体栈 freetype/2.14.3 + harfbuzz/14.4.0 + cairo/1.18.4.2 + pango/1.58.2 + glib/2.84.0.1，Wayland 侧 wayland/1.24.0 + wayland-protocols/1.48 + libxkbcommon/1.13.1"
+    - "musl 无 fts(3)：upstream 用 cc.find_library('fts') 找 libfts，需 musl-fts/1.2.7 并以 extra_cflags/extra_ldflags 注入其 -I/-L（该依赖不走 pkg-config）"
+    - "wayland-scanner 从 wayland 1.24.0 源码静态编译替代（制品仓 scanner 的 .codesign 已被 meson 安装期改写作废且 DT_NEEDED 内嵌构建机绝对路径 libexpat.so）→ E2200 / DRAFT-ohos-static-tool-bypass-dlopen-limit"
+    - "制品仓 .pc 的 prefix 为 / 或构建机缓存路径：除变量改写外，freetype2.pc 这类还硬编码 Libs: -L//lib，需一并重写根相对 -L/-I；pkg-config 看不到的纯传递依赖（libffi/pcre2/pixman/libpng/fontconfig…）提升为直接 requires"
+    - "OHOS sysroot <string.h> 的 _GNU_SOURCE 分支声明 K&R char *basename();，在 tofi 的 -std=c2x 下与 <libgen.h> 原型冲突（两种 include 顺序都冲突）→ 补丁 0001 改 src/config.c（直接声明 dirname）与 src/history.c（移除未使用的 include）"
+    - "安装后的 ELF 必须重签名（E077）：meson 安装期会就地改写 ELF（RUNPATH→占位符）使 .codesign 失效"
+    - "上游有真实测试：test/meson.build 以 protocol: 'tap' 注册 2 个目标（config、utf8），共 80 条断言；配方 build() 内 meson.test() 真跑"
+    - "手写 TAP harness 的退出码与断言脱钩（tap_not_ok 只打印、main 恒返回 EXIT_SUCCESS）⇒ 判定只能交给 TAP 解析器（新增 DRAFT-tofi-0.9.1-tap-exit-code-decoupled-suite）"
+  common_dependencies:
+    - "freetype/2.14.3"
+    - "harfbuzz/14.4.0"
+    - "cairo/1.18.4.2"
+    - "pango/1.58.2"
+    - "glib/2.84.0.1"
+    - "wayland/1.24.0"
+    - "wayland-protocols/1.48"
+    - "libxkbcommon/1.13.1"
+    - "musl-fts/1.2.7"
+
+versions:
+  "0.9.1":
+    status: built
+    build_date: "2026-10-18"
+    source_url: "https://github.com/philj56/tofi/archive/refs/tags/v0.9.1.tar.gz"
+    packaging: "packaging/"

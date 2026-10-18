@@ -1,0 +1,28 @@
+# conandata.yml — tofi 0.9.1
+#
+# 官方源：GitHub tag v0.9.1 的官方归档（R39 合规）。
+# 实测：HTTP 200、430699 字节，sha256 由本机 sha256sum 计算；与
+# https://codeload.github.com/philj56/tofi/tar.gz/refs/tags/v0.9.1 字节完全一致
+# （两 URL 均实测 200 / 430699 / dd55347b…）。此处取
+# .../archive/refs/tags/v0.9.1.tar.gz 形态：codeload 的 URL 末段是无扩展名的
+# 版本号，conan 的 get() 会按 zip 解包并报 BadZipFile: File is not a zip file。
+sources:
+  url: "https://github.com/philj56/tofi/archive/refs/tags/v0.9.1.tar.gz"
+  sha256: "dd55347b509af786f133def64f3a86f1db258b5e196de80e53d62827bdcc37bc"
+
+# wayland 源码，仅用于编译静态 wayland-scanner（见 conanfile.py 顶部说明）。
+# 版本必须与 requires 的 wayland 版本一致（配方内有显式校验）。
+scanner_sources:
+  url: "https://gitlab.freedesktop.org/wayland/wayland/-/releases/1.24.0/downloads/wayland-1.24.0.tar.xz"
+  sha256: "82892487a01ad67b334eca83b54317a7c86a03a89cfadacfef5211f11a5d0536"
+
+patches:
+  - patch_file: "patches/0001-ohos-config-libgen-basename-c2x-conflict.patch"
+    patch_description: >-
+      OHOS sysroot 的 <string.h> 在 _GNU_SOURCE 下声明 K&R 的
+      `char *basename();`，在 -std=c2x（tofi 的 default_options）下等价于
+      `char *basename(void)`，与 <libgen.h> 的 `char *basename(char *)` 原型
+      冲突（两种 include 顺序都冲突）。src/config.c 只用 dirname()，改为直接
+      声明 POSIX dirname()；src/history.c 未使用任何 libgen 符号，直接移除该
+      include。两处上游调用点均未改动。
+    patch_type: "portability"

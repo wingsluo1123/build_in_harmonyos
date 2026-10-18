@@ -1,0 +1,96 @@
+# 版本级 manifest（与 conandata.yml 交叉校验；不一致时以 conandata.yml 为准）
+
+version: "0.9.1"
+software: "tofi"
+
+# built：本地 conan-verify + CI 同构门禁通过，尚未经平台 upload
+status: built
+build_date: "2026-10-18"
+build_system: "meson"
+conan_ref: "tofi/0.9.1"
+
+source:
+  url: "https://github.com/philj56/tofi/archive/refs/tags/v0.9.1.tar.gz"
+  sha256: "dd55347b509af786f133def64f3a86f1db258b5e196de80e53d62827bdcc37bc"
+  tar_format: tar.gz
+
+# 构建期额外源码：wayland 1.24.0，仅用于编译静态 wayland-scanner
+scanner_source:
+  url: "https://gitlab.freedesktop.org/wayland/wayland/-/releases/1.24.0/downloads/wayland-1.24.0.tar.xz"
+  sha256: "82892487a01ad67b334eca83b54317a7c86a03a89cfadacfef5211f11a5d0536"
+
+build:
+  system: meson
+  configure_options:
+    - "-Ddefault_library=static"   # tofi 只产出可执行文件，不产出共享库
+  dependencies:
+    - freetype/2.14.3
+    - harfbuzz/14.4.0
+    - cairo/1.18.4.2
+    - pango/1.58.2
+    - wayland/1.24.0
+    - wayland-protocols/1.48
+    - libxkbcommon/1.13.1
+    - glib/2.84.0.1
+    - musl-fts/1.2.7
+    - expat/2.8.2.1
+    - libffi/3.4.4
+    - zlib/1.3.1.1
+    - pcre2/10.45
+    - pixman/0.46.4
+    - libpng/1.6.58
+    - fontconfig/2.18.1.1
+    - fribidi/1.0.16
+    - libthai/0.1.29
+    - libdatrie/0.2.13
+  tool_requires:
+    - meson/1.11.0
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-ohos-config-libgen-basename-c2x-conflict.patch"
+
+upstream_tests:
+  count: 80
+  registered: 2
+  executed: 80
+  passed: 79
+  expected_fail: 1
+  skipped: 0
+  command: "meson test"
+  evidence: >-
+    test/meson.build 以 protocol: 'tap' 注册 2 个目标（tofi:config、tofi:utf8）；
+    testlog.txt 实测 TAP plan：config `1..68` 全部 ok、utf8 `1..12`（11 ok +
+    `not ok 12 ... # TODO Needs composed character comparison`，上游 tap_todo 标注的
+    预期失败）；meson 汇总 Ok: 2 / Fail: 0。conanfile.py 的 build() 调用 meson.test()
+    真实执行；⚠ 该套件退出码与断言脱钩（见知识草稿），判定只能由 TAP 解析器给出。
+
+consumer_tests:
+  file: test_package/src/test_tofi.sh
+  program: 1
+  assertions: 12
+  pass: 12
+  fail: 0
+  skip: 0
+  note: "断言 9-12 真实执行已安装的 bin/tofi（--help / 非法 anchor / 非法布尔值 / 无 Wayland display），断言真实输出与退出码"
+
+elf_signing:
+  required: true
+  reason: "鸿蒙只执行带有效 .codesign 的 ELF（E077）；meson 安装期就地改写 ELF（RUNPATH→占位符）使该段失效，故 package() 末尾用 binary-sign-tool sign -selfSign 1 重新签名"
+  knowledge_ref: "E077"
+
+knowledge_gained:
+  - "手写 TAP harness 的退出码与断言结果脱钩（tap_not_ok 只打印 `not ok`，测试 main() 恒 return EXIT_SUCCESS）⇒ 任何『跑二进制看 rc』的集成都假绿，判定必须交给 TAP 解析器（本包新增 DRAFT-tofi-0.9.1-tap-exit-code-decoupled-suite）"
+  - "OHOS sysroot 的 <string.h> 在 _GNU_SOURCE 下声明 K&R `char *basename();`，-std=c2x 下等价 `(void)`，与 <libgen.h> 的 POSIX 原型两种 include 顺序都冲突（入选 经验文档/B草稿库 候选）"
+  - "meson 安装期会就地改写 ELF（把 RUNPATH 的构建机绝对路径替换为占位符），使链接器写入的 .codesign 失效 -> 应用类配方必须在 package() 末尾重新签名，否则安装后的二进制在设备上 execve 被拒（EPERM，报错不含 codesign 字样）"
+  - "制品仓 wayland 包自带的 wayland-scanner 不可执行（.codesign 被安装期 ELF 改写作废 + DT_NEEDED 内嵌不存在的构建机缓存绝对路径 libexpat.so 且缺 libxml2.so.16）-> 从 wayland 源码静态编译只依赖 libc 的 scanner 替代（E2200 命中）"
+  - "musl 无 fts(3)：上游用 cc.find_library('fts') 而非 pkg-config，除 requires musl-fts 外还要把它的 -I/-L 注入全局编译/链接参数"
+  - ".pc 修补两类：变量改写之外，freetype2.pc 这类把 `-L//lib` 写死在 Libs 行（打包 prefix=/），必须重写根相对 -L/-I；纯传递依赖被 conan 记为 Skipped binary 不装 .pc，需提升为直接 requires"
+  - "expat 版本冲突：wayland/1.24.0 要 expat/2.8.2（.so 无 SONAME），fontconfig/2.18.1.1 用干净重建的 2.8.2.1 -> override 统一为 2.8.2.1（libwayland-*.so 不链接 expat）"
+
+knowledge_ref:
+  - "E077"
+  - "E2200"
+  - "DRAFT-ohos-static-tool-bypass-dlopen-limit"
+  - "DRAFT-tofi-0.9.1-tap-exit-code-decoupled-suite"
