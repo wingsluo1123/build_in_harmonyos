@@ -1,0 +1,377 @@
+--- a/portio.c
++++ b/portio.c
+@@ -23,221 +23,351 @@
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ 
+ You should have received a copy of the GNU General Public License
+ along with this program; if not, write to the Free Software
+ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ 
+ .- */
+ 
+ #include "Python.h"
++#include <errno.h>
++
++/* Port I/O is an x86-only userspace facility: <sys/io.h> provides the in/out
++   instruction wrappers on x86 only (on other architectures the header exists
++   but is empty, so the calls would link as unresolved symbols).  On non-x86
++   the module is built with PORTIO_HAS_PORT_IO = 0: every I/O entry point
++   keeps its documented signature but fails explicitly instead of returning
++   arbitrary data. */
++#if defined(__i386__) || defined(__x86_64__)
+ #include <sys/io.h>
++#define PORTIO_HAS_PORT_IO 1
++#else
++#define PORTIO_HAS_PORT_IO 0
++#endif
++
++/* module specific exception (declared here so that the unsupported platform
++   implementations below can raise it; registered into the module in
++   PyInit_portio / initportio) */
++static PyObject *Error;
++
++#if !PORTIO_HAS_PORT_IO
++#if defined(__aarch64__)
++#define PIO_ARCH "aarch64"
++#elif defined(__arm__)
++#define PIO_ARCH "arm"
++#elif defined(__riscv)
++#define PIO_ARCH "riscv"
++#else
++#define PIO_ARCH "non-x86"
++#endif
++
++/* Raise portio.error and return NULL, so that callers never mistake a
++   silently ignored access for a successful port operation. */
++static PyObject *
++pio_unsupported (const char *name)
++{
++  PyErr_Format(Error,
++    "%s: port I/O is not available on this architecture (%s): the x86 "
++    "in/out instructions and <sys/io.h> do not exist here", name, PIO_ARCH);
++  return NULL;
++}
++#endif
++
+ 
+ static PyObject *pio_outb(PyObject *self,PyObject *args)
+ {
+   unsigned char data;
+   unsigned short int port;
+   if (!PyArg_ParseTuple(args,"BH",&data,&port)) return NULL;
++#if PORTIO_HAS_PORT_IO
+   outb(data,port);
+   Py_INCREF(Py_None);
+   return Py_None;
++#else
++  return pio_unsupported("outb");
++#endif
+ }
+ 
+ static PyObject *pio_outw(PyObject *self,PyObject *args)
+ {
+   unsigned short int data;
+   unsigned short int port;
+   if (!PyArg_ParseTuple(args,"HH",&data,&port)) return NULL;
++#if PORTIO_HAS_PORT_IO
+   outw(data,port);
+   Py_INCREF(Py_None);
+   return Py_None;
++#else
++  return pio_unsupported("outw");
++#endif
+ }
+ 
+ static PyObject *pio_outl(PyObject *self,PyObject *args)
+ {
+   unsigned int data;
+   unsigned short int port;
+   if (!PyArg_ParseTuple(args,"IH",&data,&port)) return NULL;
++#if PORTIO_HAS_PORT_IO
+   outl(data,port);
+   Py_INCREF(Py_None);
+   return Py_None;
++#else
++  return pio_unsupported("outl");
++#endif
+ }
+ 
+ static PyObject *pio_outb_p(PyObject *self,PyObject *args)
+ {
+   unsigned char data;
+   unsigned short int port;
+   if (!PyArg_ParseTuple(args,"BH",&data,&port)) return NULL;
++#if PORTIO_HAS_PORT_IO
+   outb_p(data,port);
+   Py_INCREF(Py_None);
+   return Py_None;
++#else
++  return pio_unsupported("outb_p");
++#endif
+ }
+ 
+ static PyObject *pio_outw_p(PyObject *self,PyObject *args)
+ {
+   unsigned short int data;
+   unsigned short int port;
+   if (!PyArg_ParseTuple(args,"HH",&data,&port)) return NULL;
++#if PORTIO_HAS_PORT_IO
+   outw_p(data,port);
+   Py_INCREF(Py_None);
+   return Py_None;
++#else
++  return pio_unsupported("outw_p");
++#endif
+ }
+ 
+ static PyObject *pio_outl_p(PyObject *self,PyObject *args)
+ {
+   unsigned int data;
+   unsigned short int port;
+   if (!PyArg_ParseTuple(args,"IH",&data,&port)) return NULL;
++#if PORTIO_HAS_PORT_IO
+   outl_p(data,port);
+   Py_INCREF(Py_None);
+   return Py_None;
++#else
++  return pio_unsupported("outl_p");
++#endif
+ }
+ 
+ static PyObject *pio_outsb(PyObject *self,PyObject *args)
+ {
+   unsigned short int port;
+   Py_buffer string;
+   unsigned long int count;
+   if (!PyArg_ParseTuple(args,"Hs*k",&port,&string,&count)) return NULL;
++#if PORTIO_HAS_PORT_IO
+   outsb(port,string.buf,count);
+   Py_INCREF(Py_None);
+   return Py_None;
++#else
++  PyBuffer_Release(&string);
++  return pio_unsupported("outsb");
++#endif
+ }
+ 
+ static PyObject *pio_outsw(PyObject *self,PyObject *args)
+ {
+   unsigned short int port;
+   Py_buffer string;
+   unsigned long int count;
+   if (!PyArg_ParseTuple(args,"Hs*k",&port,&string,&count)) return NULL;
++#if PORTIO_HAS_PORT_IO
+   outsw(port,string.buf,count);
+   Py_INCREF(Py_None);
+   return Py_None;
++#else
++  PyBuffer_Release(&string);
++  return pio_unsupported("outsw");
++#endif
+ }
+ 
+ static PyObject *pio_outsl(PyObject *self,PyObject *args)
+ {
+   unsigned short int port;
+   Py_buffer string;
+   unsigned long int count;
+   if (!PyArg_ParseTuple(args,"Hs*k",&port,&string,&count)) return NULL;
++#if PORTIO_HAS_PORT_IO
+   outsl(port,string.buf,count);
+   Py_INCREF(Py_None);
+   return Py_None;
++#else
++  PyBuffer_Release(&string);
++  return pio_unsupported("outsl");
++#endif
+ }
+ 
+ static PyObject *pio_inb(PyObject *self,PyObject *args)
+ {
+   unsigned short int port;
+   unsigned char data;
+   if (!PyArg_ParseTuple(args,"H",&port)) return NULL;
++#if PORTIO_HAS_PORT_IO
+   data = inb(port);
+   return Py_BuildValue("B",data);
++#else
++  return pio_unsupported("inb");
++#endif
+ }
+ 
+ static PyObject *pio_inw(PyObject *self,PyObject *args)
+ {
+   unsigned short int port;
+   unsigned short int data;
+   if (!PyArg_ParseTuple(args,"H",&port)) return NULL;
++#if PORTIO_HAS_PORT_IO
+   data = inw(port);
+   return Py_BuildValue("H",data);
++#else
++  return pio_unsupported("inw");
++#endif
+ }
+ 
+ static PyObject *pio_inl(PyObject *self,PyObject *args)
+ {
+   unsigned short int port;
+   unsigned int data;
+   if (!PyArg_ParseTuple(args,"H",&port)) return NULL;
++#if PORTIO_HAS_PORT_IO
+   data = inl(port);
+   return Py_BuildValue("I",data);
++#else
++  return pio_unsupported("inl");
++#endif
+ }
+ 
+ static PyObject *pio_inb_p(PyObject *self,PyObject *args)
+ {
+   unsigned short int port;
+   unsigned char data;
+   if (!PyArg_ParseTuple(args,"H",&port)) return NULL;
++#if PORTIO_HAS_PORT_IO
+   data = inb_p(port);
+   return Py_BuildValue("B",data);
++#else
++  return pio_unsupported("inb_p");
++#endif
+ }
+ 
+ static PyObject *pio_inw_p(PyObject *self,PyObject *args)
+ {
+   unsigned short int port;
+   unsigned short int data;
+   if (!PyArg_ParseTuple(args,"H",&port)) return NULL;
++#if PORTIO_HAS_PORT_IO
+   data = inw_p(port);
+   return Py_BuildValue("H",data);
++#else
++  return pio_unsupported("inw_p");
++#endif
+ }
+ 
+ static PyObject *pio_inl_p(PyObject *self,PyObject *args)
+ {
+   unsigned short int port;
+   unsigned int data;
+   if (!PyArg_ParseTuple(args,"H",&port)) return NULL;
++#if PORTIO_HAS_PORT_IO
+   data = inl_p(port);
+   return Py_BuildValue("I",data);
++#else
++  return pio_unsupported("inl_p");
++#endif
+ }
+ 
+ static PyObject *pio_insb(PyObject *self,PyObject *args)
+ {
+   unsigned short int port;
+   Py_buffer string;
+   unsigned long int count;
+   if (!PyArg_ParseTuple(args,"Hs*k",&port,&string,&count)) return NULL;
++#if PORTIO_HAS_PORT_IO
+   insb(port,string.buf,count);
+   Py_INCREF(Py_None);
+   return Py_None;
++#else
++  PyBuffer_Release(&string);
++  return pio_unsupported("insb");
++#endif
+ }
+ 
+ static PyObject *pio_insw(PyObject *self,PyObject *args)
+ {
+   unsigned short int port;
+   Py_buffer string;
+   unsigned long int count;
+   if (!PyArg_ParseTuple(args,"Hs*k",&port,&string,&count)) return NULL;
++#if PORTIO_HAS_PORT_IO
+   insw(port,string.buf,count);
+   Py_INCREF(Py_None);
+   return Py_None;
++#else
++  PyBuffer_Release(&string);
++  return pio_unsupported("insw");
++#endif
+ }
+ 
+ static PyObject *pio_insl(PyObject *self,PyObject *args)
+ {
+   unsigned short int port;
+   Py_buffer string;
+   unsigned long int count;
+   if (!PyArg_ParseTuple(args,"Hs*k",&port,&string,&count)) return NULL;
++#if PORTIO_HAS_PORT_IO
+   insl(port,string.buf,count);
+   Py_INCREF(Py_None);
+   return Py_None;
++#else
++  PyBuffer_Release(&string);
++  return pio_unsupported("insl");
++#endif
+ }
+ 
+ static PyObject *pio_ioperm(PyObject *self,PyObject *args)
+ {
+   unsigned long int from;
+   unsigned long int extent;
+   int enable;
+   int status;
+   if (!PyArg_ParseTuple(args,"kki",&from,&extent,&enable)) return NULL;
++#if PORTIO_HAS_PORT_IO
+   status = ioperm(from,extent,enable);
+   if (status) status = errno;
++#else
++  /* no port I/O on this architecture: report the documented error code instead of success */
++  status = ENOSYS;
++#endif
+   return Py_BuildValue("i",status);
+ }
+ 
+ static PyObject *pio_iopl(PyObject *self,PyObject *args)
+ {
+   int level;
+   int status;
+   if (!PyArg_ParseTuple(args,"i",&level)) return NULL;
++#if PORTIO_HAS_PORT_IO
+   status = iopl(level);
+   if (status) status = errno;
++#else
++  /* no port I/O on this architecture: report the documented error code instead of success */
++  status = ENOSYS;
++#endif
+   return Py_BuildValue("i",status);
+ }
+ 
+ /* List of methods defined in the module */
+ 
+ static struct PyMethodDef methods[] = {
+   {"outb",(PyCFunction)pio_outb,METH_VARARGS,NULL},
+   {"outw",(PyCFunction)pio_outw,METH_VARARGS,NULL},
+   {"outl",(PyCFunction)pio_outl,METH_VARARGS,NULL},
+   {"outb_p",(PyCFunction)pio_outb_p,METH_VARARGS,NULL},
+@@ -351,22 +481,20 @@
+ iopl (level)\n\
+   Set the I/O privilege level of the current process. When level is 3\n\
+   access is granted to any I/O port.\n\
+   On success, zero is returned. On error, the errno code is returned.\n\
+   The use of iopl requires root privileges.\n\
+ \n\
+ ";
+ 
+ /* module init for both python < 3.0 and >= 3.0 */
+ 
+-static PyObject *Error;
+-
+ #if PY_MAJOR_VERSION < 3	/* is python < 3.0 */
+ 
+ PyMODINIT_FUNC
+ initportio(void)
+ {
+   PyObject *m;
+   m = Py_InitModule3("portio", methods, documentation);
+   if(m == NULL)
+     return;
+ 
