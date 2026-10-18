@@ -1,0 +1,37 @@
+software: kcodecs
+version: "6.28.0"
+status: built
+build_system: cmake
+build_date: 2026-10-17
+created_at: 2026-10-17
+dependencies:
+  required:
+    - qtbase/6.11.1
+    - libiconv/1.17
+  build:
+    - ecm/6.28.0
+patches_applied:
+  - patches/0001-CMakeLists.txt.patch
+  - patches/0002-src-CMakeLists.txt.patch
+  - patches/0003-src-kcodecs.cpp.patch
+  - patches/0004-autotests-CMakeLists.txt.patch
+  - patches/0005-src-kcharsets.cpp.patch
+test_results:
+  type: passed_with_exclusions
+  upstream: "passed: 6/6 executed upstream CTest autotests (BUILD_TESTING=ON inside conan create); rfc2047test excluded at run time (its 'working-QP' rows need QStringEncoder('ISO-8859-15'), unavailable because the OHOS qtbase is built without ICU)"
+  test_package: "passed: 1/1 (KCodecs consumer smoke - base64 round-trip, quoted-printable round-trip, RFC2047 decode; 3 assertions)"
+  ohos_run: "device conan-verify PASS 2026-10-17 (VERIFY_RC=0; package id 546f25c40e62843f04e563647cb09d4d09d8b48c). First device round died at link time on HMDFS symlink EPERM -> CMAKE_PLATFORM_NO_VERSIONED_SONAME=ON."
+  l0: "pass"
+  l1: "pass"
+  l2: "skip: no bin/ dir (library package)"
+source_url: https://download.kde.org/stable/frameworks/6.28/kcodecs-6.28.0.tar.xz
+source_sha256: b0a9ae34b389c6460adad5323d21bb9e43638acb58da9685f8dc8d821c38a4d8
+knowledge_gained:
+  - "kcodecs 6.28.0（本版）：设备用户卷（HMDFS）拒绝 symlink()（EPERM），CMake 链接后创建的版本化软链（libKF6Codecs.so.6/.so）直接使 build 失败（'failed to create symbolic link ../bin/libKF6Codecs.so.6: Permission denied'）。修复 = CMAKE_PLATFORM_NO_VERSIONED_SONAME=ON（工具链变量 + 缓存变量双设），制品以纯名 libKF6Codecs.so 发布，注入的 -Wl,-soname 仍烘焙真实 DT_SONAME=libKF6Codecs.so，消费者 NEEDED 保持可重定位相对名（kwidgetsaddons 6.28.0 / kcolorpicker / expat 先例）。"
+  - "kcodecs 6.28.0：ecm 由 6.26.0 升至 6.28.0（上游 6.28 源码 find_package(ECM 6.28.0)）；qtbase/6.11.1、libiconv/1.17 不变。"
+  - "kcodecs 6.28.0：补丁 0003 按 6.28.0 树重新生成（上游删除了 <stdio.h> include 与 Q_OS_WIN 块，命中原 hunk 上下文）；0001/0002/0004/0005 与 6.26.0.1 逐字节一致。"
+  - "kcodecs 6.26.0 / 6.26.0.1（基线）：OHOS 原生构建落在 CMake Generic 平台模块（无 Platform/HarmonyOS），CMAKE_SHARED_LIBRARY_SONAME_* 为空 -> 不注入 -Wl,-soname, 时 lld 不产生 DT_SONAME（CI L5a），消费者会记录绝对构建路径（L5c）。"
+  - "kcodecs keeps the 6.18.0-era OHOS adaptation set: ecm_install_po_files_as_qm disabled (Qt6LinguistTools unavailable), libiconv fallback for RFC2047 legacy charset decoding (qtbase built without ICU)."
+  - "kencodingproberunittest（6.26.0 新上游测试）未链接 KF6::Codecs，C++20 特性不传递，OHOS 工具链下以 c++17 编译 std::span 失败 -> 补丁 0004 显式加 cxx_std_20（仅 CMake，未改测试源码）；6.28.0 沿用（补丁逐字节一致）。"
+  - "kcharsets.cpp 使用 std::string_view <=> std::string_view，OHOS libc++（clang 15）未实现 -> 补丁 0005 改为 compare() <=> 0；6.28.0 沿用（补丁逐字节一致）。"
+  - "rfc2047test 的 working-QP 行依赖 ICU 提供的 ISO-8859-15 编码器；OHOS qtbase 无 ICU 时 KCodecs 回退 System codec，属环境限制，按 kconfig 排除清单先例运行期排除（用例仍编译）。"
