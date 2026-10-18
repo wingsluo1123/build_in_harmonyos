@@ -1,0 +1,77 @@
+# 策略模板：meson 直驱交叉配方 build() + test_package 两步法
+#
+# 来源：sratom 0.6.22 / lilv 0.28.0 G2 实证（见 samples/ 与 SKILL.md §3）。
+# 用法：把两个模板块对应抄进 conanfile.py build() 与 test_package/conanfile.py，
+# 按 <尖括号> 占位符替换包名/依赖集；保持注释里的实证记录。
+
+# ---- conanfile.py build()（配方主构建）----
+# 要点：
+#   1) cross file 由 conf 提供的编译器生成（R33：禁裸 shell env）
+#   2) 库形态用 --default-library=shared|static 表达——上游 meson_options.txt
+#      通常没有 shared 选项（lv2 生态 drobilla 系全实证），-Dshared= 直接报
+#      "Unknown option"，true/false 字面量则报 invalid choice
+#   3) PKG_CONFIG_PATH 指向 PkgConfigDeps 生成目录
+#   4) tests=disabled 保持库配方纯净，上游测试走 R51 离线三步法
+
+    def build(self):
+        src = self.source_folder
+        bld = self.build_folder
+        gen = self.generators_folder
+        cc = self.conf.get("tools.build:compiler_executables", {}).get(
+            "c") or "cc"
+        ar = os.path.join(os.path.dirname(cc), "llvm-ar")
+        ar_line = f"ar = '{ar}'\n" if os.path.exists(ar) else ""
+        cross = os.path.join(bld, "ohos-cross.ini")
+        with open(cross, "w") as fh:
+            fh.write(
+                "[binaries]\n"
+                f"c = '{cc}'\n"
+                f"{ar_line}"
+                "pkg-config = 'pkg-config'\n"
+                "\n[host_machine]\n"
+                "system = 'linux'\n"
+                "cpu_family = 'aarch64'\n"
+                "cpu = 'aarch64'\n"
+                "endian = 'little'\n"
+                "\n[properties]\n"
+                "needs_exe_wrapper = true\n")
+        # meson --default-library 取值是 shared/static（true/false 为非法
+        # choice，G2 实证）
+        libtype = "shared" if self.options.shared else "static"
+        bdir = os.path.join(bld, "build")
+        self.run(
+            f'PATH="{os.path.dirname(cc)}:$PATH" '
+            f'PKG_CONFIG_PATH="{gen}" '
+            f"meson setup {bdir} {src} --cross-file {cross} "
+            "--wrap-mode=nodownload "
+            f"--default-library={libtype} "
+            "-Dprefix=/ "
+            "<上游特性裁剪项，逐个 -D<feature>=disabled>",
+            env="conanbuild")
+        self.run(f"meson compile -C {bdir}", env="conanbuild")
+        self.run(f"meson install -C {bdir} --destdir {bld}", env="conanbuild")
+
+# ---- test_package/conanfile.py（消费者测试构建，两步法）----
+# 要点：
+#   1) 直接消费的每个依赖头文件域都要显式 requires（传递依赖不生成 .pc，
+#      sratom G2 两轮实证）
+#   2) 嵌套 "$(pkg-config ...)" 子 shell 展开在 conan 沙箱不稳（G2 实证）——
+#      必须两步法：pkg-config 输出落盘文件，Python 读回字面量 flags
+#   3) 库实体名带上游版本后缀（lib<name>-0），兜底 -l 前先核实命名
+
+    def build(self):
+        cc = self.conf.get("tools.build:compiler_executables", {}).get(
+            "c") or "cc"
+        src = os.path.join(self.source_folder, "<test源文件>.c")
+        exe = os.path.join(self.build_folder, "<test二进制名>")
+        gen = self.generators_folder
+        flags_file = os.path.join(self.build_folder, "pc-flags.txt")
+        self.run(f'PKG_CONFIG_PATH="{gen}" pkg-config --cflags --libs '
+                 f'<pc名1> <pc名2> ... > "{flags_file}"')
+        with open(flags_file) as fh:
+            flags = fh.read().strip()
+        self.run(f"{cc} {src} -o {exe} {flags}")
+
+    def test(self):
+        exe = os.path.join(self.build_folder, "<test二进制名>")
+        self.run(f'"{exe}"', env="conanrun")

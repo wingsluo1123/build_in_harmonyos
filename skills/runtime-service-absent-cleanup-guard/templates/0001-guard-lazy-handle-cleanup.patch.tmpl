@@ -1,0 +1,34 @@
+--- a/<SRC_FILE>
++++ b/<SRC_FILE>
+@@ -<CTX_START>,<CTX_LEN> +<CTX_START>,<NEW_LEN> @@
+   for (<TYPE> i = 0U; i < <OBJ>->num_ports; ++i) {
+     <free-resource>(<OBJ>->ports[i].<field>);
+     <OBJ>->ports[i].<field> = NULL;
+-    <lib>_<consume>(<OBJ>->instance, i, NULL);
++    if (<OBJ>->instance) {
++      <lib>_<consume>(<OBJ>->instance, i, NULL);
++    }
+   }
+
+# ---------------------------------------------------------------------------
+# 补丁模板：清理路径惰性句柄 NULL 守卫（runtime-service-absent-cleanup-guard）
+#
+# 何时用：目标平台缺运行期服务（音频服务器 / 显示服务 / DBus）时，被测程序
+#   以 SIGSEGV 退出而不是打印错误优雅退出；且检测脚本 L1 在某个
+#   close/deactivate/cleanup 函数的循环里命中「无守卫解引用 <OBJ>-><handle>」。
+#
+# 填法：
+#   <SRC_FILE>   出问题的清理函数所在文件（相对源码根）
+#   <CTX_START>  hunk 起始行；<CTX_LEN>/<NEW_LEN> 必须**精确**（@@ 计数错会
+#                导致补丁静默不生效：toybox patch 的经典坑，务必 git apply --check 复验）
+#   <OBJ>        持有惰性句柄的结构体变量名（如 proc / jalv->process）
+#   <field>      句柄字段名（instance / client / display / conn）
+#   <lib>_<consume>  解引用句柄的调用（如 lilv_instance_connect_port）
+#
+# 铁律：
+#   1) 守卫只包住「解引用」本身，不要改变释放顺序 —— 上游语义（先释放 evbuf
+#      再断开端口）必须保留，否则可能引入 use-after-free。
+#   2) 不要用 if (!instance) return; 提前返回 —— 那会跳过后续资源释放，造成泄漏。
+#   3) 生成补丁后必须 `git apply --check`（或 PATH 里放 busybox patch）复验，
+#      再跑一次无服务的消费者测试，确认 rc 从 139 变成「优雅失败」。
+# ---------------------------------------------------------------------------

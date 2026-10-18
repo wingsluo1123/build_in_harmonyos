@@ -1,0 +1,35 @@
+name: jalv
+software: jalv
+version: "1.10.0"
+letter: j
+status: published
+build_date: 2026-10-18
+build_system: meson (upstream) / direct compiler driver (conanfile build(), 两步法)
+upstream:
+  name: jalv (LV2 plugin host)
+  version: "1.10.0"
+  homepage: https://drobilla.net/software/jalv.html
+  source_url: https://download.drobilla.net/jalv-1.10.0.tar.xz
+  sha256: 5b49a4344c4d5608d2e30e4db5332c857ca61fd6333fb6f32c8a6c469b6d37ad
+language: c
+dependencies:
+  - lv2/1.18.11-git
+  - lilv/0.28.0
+  - sratom/0.6.22
+  - sord/0.16.22
+  - zix/0.8.1-git.1
+  - suil/0.10.26
+  - jack/1.9.22
+patches_applied:
+  - "0001-guard-null-instance-when-backend-open-failed.patch"
+upstream_tests:
+  present: true
+  evidence: "上游 test/test_symap 单元测试在构建期实跑通过，证据见 reports/test-report.md"
+  upstream_test_in_build: true
+harmonyos_test:
+  present: true
+  file: test_package/conanfile.py
+  description: "消费者测试：加载 mda-lv2 真实插件 bundle（.so + TTL），断言版本串/usage 契约/插件解析成功，且无音频服务器时必须优雅失败（rc=1）而非崩溃（rc=139）"
+verification:
+  conan_verify: pass
+  notes: reports/
