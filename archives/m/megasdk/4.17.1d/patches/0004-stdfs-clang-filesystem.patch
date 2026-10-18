@@ -1,0 +1,27 @@
+--- a/tests/integration/stdfs.h
++++ b/tests/integration/stdfs.h
+@@ -1,15 +1,21 @@
+ #pragma once
+ 
+-#if (__cplusplus >= 201703L) && (!defined(__GNUC__) || (__GNUC__ * 100 + __GNUC_MINOR__) >= 800)
++// OHOS portability (megasdk/4.17.1d): clang defines __GNUC__=4 for
++// compatibility, so the GNUC>=800 gate below misclassifies clang+C++17 as
++// "experimental". Current libc++ removed <experimental/filesystem>, hence
++// exempt clang explicitly; GCC logic is unchanged. The legacy
++// std::__fs::filesystem internal namespace is likewise gone, use
++// std::filesystem.
++#if (__cplusplus >= 201703L) && (!defined(__GNUC__) || defined(__clang__) || (__GNUC__ * 100 + __GNUC_MINOR__) >= 800)
+     #include <filesystem>
+     namespace fs = std::filesystem;
+     #define USE_FILESYSTEM
+ #elif (__cplusplus >= 201700L)
+     #include <experimental/filesystem>
+     namespace fs = std::experimental::filesystem;
+     #define USE_FILESYSTEM
+ #elif (__clang_major__ >= 11)
+     #include <filesystem>
+-    namespace fs = std::__fs::filesystem;
++    namespace fs = std::filesystem;
+     #define USE_FILESYSTEM
+ #elif !defined(__MINGW32__) && !defined(__ANDROID__) && (!defined(__GNUC__) || (__GNUC__*100+__GNUC_MINOR__) >= 503)
+     #define USE_FILESYSTEM

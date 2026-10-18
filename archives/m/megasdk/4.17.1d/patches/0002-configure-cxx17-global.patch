@@ -1,0 +1,15 @@
+--- a/configure.ac
++++ b/configure.ac
+@@ -144,8 +144,11 @@
+ AC_ARG_ENABLE(debug,
+     AS_HELP_STRING([--enable-debug], [enable support for running in debug mode]),
+     [], [enable_debug=no])
+
+-CXXFLAGS="$CXXFLAGS -std=c++11 -Wall -Wextra -Wconversion -Wno-unused-parameter"
++# gtest 1.17.x headers require C++17; build the whole tree (lib + test
++# programs) as C++17. Automake puts per-target CXXFLAGS before the global
++# CXXFLAGS, so a test-only flag would lose to the global -std=c++11.
++CXXFLAGS="$CXXFLAGS -std=c++17 -Wall -Wextra -Wconversion -Wno-unused-parameter"
+ # Enable debug flags / build
+ if test "x$enable_debug" = "xyes" ; then
+     AM_CXXFLAGS="-Wall -g -ggdb3 -O0"

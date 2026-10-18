@@ -1,0 +1,18 @@
+--- a/tests/include.am
++++ b/tests/include.am
+@@ -36,9 +36,13 @@ tests_test_integration_SOURCES = \
+     tests/integration/main.cpp \
+     tests/integration/SdkTest_test.cpp \
+     tests/integration/Sync_test.cpp
+
+-tests_test_unit_CXXFLAGS = -I$(GTEST_DIR)/include $(FI_CXXFLAGS) $(RL_CXXFLAGS) $(ZLIB_CXXFLAGS) $(CARES_FLAGS) $(LIBCURL_FLAGS) $(CRYPTO_CXXFLAGS) $(DB_CXXFLAGS) $(SODIUM_CXXFLAGS) $(LIBSSL_FLAGS)
++# gtest 1.17.x headers require C++17 (static_assert "C++ versions less than
++# C++17 are not supported"). The core libmega stays at upstream C++11; only
++# the test programs that include <gtest/...> are built as C++17. Per-target
++# CXXFLAGS come after the global -std=c++11, so the last -std wins there.
++tests_test_unit_CXXFLAGS = -I$(GTEST_DIR)/include $(FI_CXXFLAGS) $(RL_CXXFLAGS) $(ZLIB_CXXFLAGS) $(CARES_FLAGS) $(LIBCURL_FLAGS) $(CRYPTO_CXXFLAGS) $(DB_CXXFLAGS) $(SODIUM_CXXFLAGS) $(LIBSSL_FLAGS) -std=c++17
+ tests_test_unit_LDADD = -L$(GTEST_DIR)/lib/ -lgmock -lgtest -lgtest_main $(CRYPTO_LIBS) $(SODIUM_LDFLAGS) $(SODIUM_LIBS) $(top_builddir)/src/libmega.la
+
+-tests_test_integration_CXXFLAGS = -I$(GTEST_DIR)/include -I$(top_builddir)/include $(FI_CXXFLAGS) $(RL_CXXFLAGS) $(ZLIB_CXXFLAGS) $(CARES_FLAGS) $(LIBCURL_FLAGS) $(CRYPTO_CXXFLAGS) $(DB_CXXFLAGS) $(SODIUM_CXXFLAGS) $(LIBSSL_FLAGS)
++tests_test_integration_CXXFLAGS = -I$(GTEST_DIR)/include -I$(top_builddir)/include $(FI_CXXFLAGS) $(RL_CXXFLAGS) $(ZLIB_CXXFLAGS) $(CARES_FLAGS) $(LIBCURL_FLAGS) $(CRYPTO_CXXFLAGS) $(DB_CXXFLAGS) $(SODIUM_CXXFLAGS) $(LIBSSL_FLAGS) -std=c++17
+ tests_test_integration_LDADD = -L$(GTEST_DIR)/lib/ -lgmock -lgtest -lgtest_main $(CRYPTO_LIBS) $(SODIUM_LDFLAGS) $(SODIUM_LIBS) $(top_builddir)/src/libmega.la
