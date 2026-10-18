@@ -1,0 +1,42 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for indi-dsi.
+
+package: indi-dsi/0.4-20221223123028
+homepage: https://github.com/indilib/indi-3rdparty
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests:
+  - file: "(none)"
+    source: indi-dsi-0.4+20221223123028
+    description: >
+      Upstream ships no test suite (source-tree inventory: 34 files —
+      dsi_ccd/DsiDevice/DsiDeviceFactory/DsiPro*/DsiColor*/DsiTypes/Util/
+      NamedEnum/download_fx2 driver sources, CMakeLists/cmake_modules/
+      config.h.cmake/indi_dsi.xml.cmake, 99-meadedsi.rules,
+      meade-deepskyimager.hex firmware and docs/packaging; no tests/
+      directory, no ctest/gtest registration). The only exercisable public
+      helper without camera hardware is tokenize_str() from Util.cpp
+      (called by DsiDevice.cpp:178), vendored in the consumer probe below.
+    command: "(none upstream)"
+
+test_package_tests:
+  - file: test_package/test_dsi.cpp
+    description: >
+      Consumer probe compiles the vendored Util.cpp (pure std, no external
+      deps) and asserts tokenize_str delimiter semantics in six groups:
+      mixed default delimiters, consecutive delimiters collapse, leading
+      delimiters skipped, trailing delimiter no empty tail, empty input,
+      custom single delimiter.
+    command: "c++ -std=c++17 test_dsi.cpp Util.cpp && run"
+  - file: test_package/conanfile.py
+    description: >
+      Layer 2: driver binary bin/indi_dsi_ccd presence hard assert
+      (R34/L1e: test must fail without package artifacts) + best-effort
+      --help probe; exec-restricted environments (EPERM/126) only warn,
+      presence is what is asserted.
+    command: "test -f bin/indi_dsi_ccd && indi_dsi_ccd --help"
+
+assertion_count: 6

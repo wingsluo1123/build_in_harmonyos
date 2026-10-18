@@ -1,0 +1,77 @@
+# 版本级 manifest — indi-dsi 0.4-20221223123028
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "0.4-20221223123028"
+software: indi-dsi
+status: built
+build_date: "2026-10-14"
+build_system: cmake
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/i/indi-dsi/indi-dsi_0.4+20221223123028.orig.tar.gz"
+  sha256: "32c8ce7f3848abecebddc105567ab1875628a1c365c2a9981594927b44bae612"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - CMAKE_SYSTEM_NAME=Linux
+    - CMAKE_SYSTEM_PROCESSOR=aarch64
+    - CMAKE_POLICY_VERSION_MINIMUM=3.5
+  dependencies:
+    - libindi/2.2.2.1
+    - cfitsio/4.6.4
+    - libusb/1.0.27
+    - zlib/1.3.1.1
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - category: L1
+    content: "indi-dsi 是 Meade DSI/DSI II/DSI III（Pro & Color）相机的 INDI 驱动可执行程序（非库），INDI::CCD 子类；USB bulk 协议由 DsiDevice 层经 libusb-1.0 直连（不依赖 INDI 连接插件），首连上传 fx2 固件（meade-deepskyimager.hex 随包安装）；源码树无任何 libnova 引用（INDI::CCD 链不传递 libnova，与 INDI::Dome/Telescope 不同）"
+    reason: "实测 CMakeLists：find_package(CFITSIO/INDI/ZLIB/USB1 全 REQUIRED)，add_executable(indi_dsi_ccd)；grep 全树无 libnova/ln_ 命中；DsiDevice.cpp 仅 <libusb-1.0/libusb.h>"
+  - category: L1
+    content: "OHOS cfitsio 包为静态库（lib/libcfitsio.a）且 nm 实测含未定义 zlib 符号（deflate/deflateEnd/deflateInit2_ 等），而快照 CMakeLists 的 find_package(ZLIB REQUIRED) 结果从不进链接行 → libz.a 必须显式追加进 FindCFITSIO 短路口径的 CFITSIO_LIBRARIES（保链接序：cfitsio 在前）"
+    reason: "nm -u libcfitsio.a 实测 deflate 系符号；OHOS zlib 包同为静态（lib/libz.a）；WSL 彩排 configure 实测 Found CFITSIO 带出 libz.a"
+  - category: L1
+    content: "FindUSB1.cmake 无短路分支但 find_path/find_library 对预置 cache 变量天然空转：注入 USB1_INCLUDE_DIR=<libusb>/include/libusb-1.0（模块自检 <libusb.h> 裸引用所需子目录）+USB1_LIBRARY=<libusb>/lib/libusb-1.0.so；另 DsiDevice.h/download_fx2.h 带前缀引用 <libusb-1.0/libusb.h> 且快照 CMakeLists 无 include_directories(${USB1_INCLUDE_DIR}) → 包 include 根走 extra_cxxflags -I 注入"
+    reason: "快照 FindUSB1.cmake/CMakeLists 源码实测；WSL 彩排 configure Found USB1 + 11 个 .o 编译全过双重实证"
+  - category: L1
+    content: "快照 CMakeLists 以绝对路径安装 udev 规则（/lib/udev/rules.d）与 fx2 固件（/lib/firmware）——conan 打包会把绝对路径写到包外；配方注入包内相对路径 RULES_INSTALL_DIR=share/udev/rules.d + FIRMWARE_INSTALL_DIR=share/firmware（install(FILES DESTINATION 相对路径) 自动拼 prefix，不动上游源码）"
+    reason: "CMake install 对 DESTINATION 绝对/相对路径的行为差异；上游 master 后期引入 INDI_INSTALL_UDEV_RULES/FIRMWARE 选项可证该安装面需要开关（本包采用更轻的路径覆写）"
+  - category: L1
+    content: "雷4（驱动源码 libindi 1.x API）在本包极轻：上游 master 与本快照逐文件对比，dsi_ccd.cpp 仅两处 IUSaveText(&BayerT[2], ...)→BayerTP[2].setText(...)（libindi 2.2.2 的 CCD::BayerTP 已 INDI::PropertyText 化，原始 IText 数组 BayerT 移除）；DsiDevice.h 的 207→258 行大重构为纯 USB 层自洽头（不含 INDI 引用、DsiDevice.cpp 与 master 逐字一致），无需跟随——0003 两 hunk 即全部所需同步"
+    reason: "api.github.com 拉 master 全树逐文件 cmp + 真 OHOS libindi 2.2.2 头验证（BayerTP {3} 为 PropertyText）+ patch_ng 链打完 dsi_ccd.cpp 与 master 逐字节一致 三重实证"
+  - category: L1
+    content: "上游确无测试用例（R51）：源码包全树 34 文件仅 dsi_ccd/DsiDevice/DsiDeviceFactory/DsiPro*/DsiColor*/DsiTypes/Util/NamedEnum/download_fx2 驱动源码、CMakeLists/cmake_modules/config.h.cmake/indi_dsi.xml.cmake、99-meadedsi.rules、meade-deepskyimager.hex 与文档/打包文件，无 tests/ 目录、无 ctest/gtest 注册；test_package vendor 纯 std 公共助手 Util.cpp（tokenize_str，DsiDevice.cpp:178 真实调用）自研 6 组断言探测，深层 USB 协议路径需实体相机"
+    reason: "源码包全树清点（无测试框架痕迹）；tokenize_str 语义六组断言（默认/连续/前导/尾随/空/自定义分隔符）WSL x86_64 实测全 PASS"
+  - category: L1
+    content: "对无条件普通 set() 的上游 CMakeLists，conan 工具链非 FORCE cache 注入机制性失效（普通变量 > cache 变量）——必须以补丁加 if(NOT DEFINED) 守卫（0004，RULES/FIRMWARE_INSTALL_DIR）；find_path 型变量（INDI_DATA_DIR）注入相对值会被 PATH 类型锚定到构建目录导致产物逃逸出包，必须注入绝对路径 <自身 package_folder>/...（不可指依赖包——install 越包边界）"
+    reason: "MateBook 第 1 轮 FAIL@G2 实测（install 写 /lib/udev EPERM + xml 落 INDI_DATA_DIR-NOTFOUND/）+ WSL 假二进制 install 彩排复现并验证修复（四件套全落 prefix、零泄漏）；同族 starbook 同款 FindINDI find_path 风险已预防性同修"
+
+notes: |
+  indi-dsi 是 Meade DSI 系列相机的 INDI 驱动，纯 C++，USB/libusb 协议，
+  无 GUI/媒体/内核依赖，源码树无 libnova 引用。
+
+  适配要点：
+  - CMake 构建，强制 CMAKE_SYSTEM_NAME=Linux（E092，CMake 不识别 HarmonyOS）。
+  - 上游 cmake_minimum_required(VERSION 3.0) → 注入 cache 变量
+    CMAKE_POLICY_VERSION_MINIMUM=3.5（CMake 4.x 移除 <3.5 兼容）。
+  - 用驱动自带 FindINDI 模块：INDI_INCLUDE_DIR 指 include/libindi 子目录、
+    库解析靠 INDI_ROOT（注入 INDI_LIBRARIES 会被模块覆盖）。
+  - FindCFITSIO 双注入短路；静态 libcfitsio.a 引 zlib 符号 → libz.a 追加进
+    CFITSIO_LIBRARIES 保链接序。
+  - FindUSB1 预置 USB1_INCLUDE_DIR（include/libusb-1.0 子目录）+USB1_LIBRARY；
+    源码带前缀引用 <libusb-1.0/libusb.h> → extra_cxxflags -I 注入包 include 根。
+  - udev 规则/固件的绝对安装路径改写为包内 share/ 相对路径。
+  - patches 0001-0003 修 libindi 2.x 迁移四雷（正则/cxx17/两处 BayerTP 回移）。
+  - 产出为可执行程序 indi_dsi_ccd（R38：软件级 commands.json 声明）。
+
+  test_package（R34/R51）：
+  - 上游无测试套件（R51 声明，清点证据见 knowledge_gained 末条）。
+  - Layer 1：vendor 编译包内 src/Util.cpp，自研探测 test_dsi.cpp 六组断言
+    覆盖 tokenize_str 分隔符语义（默认混合/连续/前导/尾随/空/自定义）。
+  - Layer 2：bin/indi_dsi_ccd 存在性硬断言（L1e 依赖锚点）+ --help
+    best-effort（捕获返回码 warn；EPERM/126 属环境限制）。
