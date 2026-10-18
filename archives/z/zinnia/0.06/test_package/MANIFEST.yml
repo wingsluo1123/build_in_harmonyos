@@ -1,0 +1,30 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: zinnia/0.06
+homepage: "https://zinnia.sourceforge.net/"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（R51 清点：上游无 C/C++ 测试目录与 TESTS 注册；
+# 仅有 perl/test.pl, ruby/test.rb, python/test.py 语言绑定测试与 sdk/example 示例）
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证, R34 实质测试)
+test_package_tests:
+  - file: test_zinnia.cpp
+    description: "调用 zinnia C++ API（version/Recognizer/Character/parse）验证库可链接可运行（R34）"
+    command: "./test_zinnia"
+  - file: test_zinnia_e2e.cpp
+    description: "鸿蒙特有端到端消费者测试（rule12）：Trainer 训练 H/V 两分类模型 -> Recognizer 加载 -> classify 验证 top1，覆盖 train->model->recognize 完整闭环"
+    command: "./test_zinnia_e2e"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 10
