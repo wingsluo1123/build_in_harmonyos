@@ -1,0 +1,47 @@
+# 版本级 manifest
+# 文件位置: archives/w/wt/4.14.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "4.14.0"
+build_system: cmake
+software: wt
+status: built
+build_date: "2026-10-12"
+
+source:
+  url: "https://github.com/emweb/wt/archive/refs/tags/4.14.0.tar.gz"
+  sha256: "c11b3b92377c5fa82a466e32618e7ae417c371e8aa294a455c67d497cb86b2ae"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "BUILD_EXAMPLES=OFF"
+    - "BUILD_TESTS=OFF"
+    - "ENABLE_SSL=ON"
+    - "ENABLE_HARU=OFF"
+    - "ENABLE_PANGO=OFF"
+    - "ENABLE_SQLITE=OFF"
+    - "ENABLE_POSTGRES=OFF"
+    - "ENABLE_FIREBIRD=OFF"
+    - "ENABLE_MYSQL=OFF"
+    - "ENABLE_OPENGL=OFF"
+    - "ENABLE_UNWIND=OFF"
+    - "ENABLE_LIBWTTEST=OFF"
+    - "ENABLE_LIBWTDBO=OFF"
+    - "WT_CPP17_FILESYSTEM_IMPLEMENTATION=std"
+    - "WT_ASIO_IMPLEMENTATION=boost"
+  dependencies:
+    - boost/1.91.0.1.4
+    - zlib/1.3.1.1
+    - openssl/3.5.7
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "WtFindBoost.txt 是 find_package(Boost) 包装器：优先 IMPORTED 目标 Boost::<comp>，conan CMakeDeps 可直接满足（无需 BOOST_PREFIX 注入）"
+  - "WT_CPP17_FILESYSTEM_IMPLEMENTATION=std 可完全绕开 boost::filesystem 组件，依赖面少一件"
+  - "WT_ASIO_IMPLEMENTATION 默认 boost：asio 头随 boost 包头文件全体发布，无需独立 asio 包"
+  - "上游 Wt::Test testsuite 需 Wt::Test harness + 网络服务场景，CI 沙箱不可行；以 test_package 端到端 HTTP 服务冒烟替代（真实 WServer+wthttp+socket 取页断言）"
