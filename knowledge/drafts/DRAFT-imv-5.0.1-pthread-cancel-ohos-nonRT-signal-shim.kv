@@ -1,0 +1,160 @@
+# ═══ 知识草稿 — OHOS POSIX 线程取消三层缺失下保住 cancel→join 语义：非 RT 信号（SIGUSR1）+ handler 内 pthread_exit 的零补丁兼容 TU ═══
+# 机制取自配送池 DRAFT-spiped-1.6.4-pthread-cancel-ohos-nonRT-signal-shim（见 dedup_notes），
+# 本文件是它在 imv 5.0.1 上的**首次真实交付与验证**，读数全部为本任务（7452 / 链主-97）实测。
+# 命名：DRAFT-<包>-<版本>-<slug>（手册/03 §6.2 ③）
+
+id:                     DRAFT-imv-5.0.1-pthread-cancel-ohos-nonRT-signal-shim
+status:                 pending-editor-review
+trigger_tool:           clang|ld.lld|meson|conan
+phase:                  linking|runtime
+error_signature:        'undefined symbol: pthread_cancel|call to undeclared function ''pthread_cancel''|undefined reference to `pthread_cancel''|implicit declaration of function ''pthread_cancel'''
+severity:               2
+category:               platform|libc|musl|threading|linking|runtime
+match_keywords:         pthread_cancel, pthread_testcancel, pthread_setcancelstate, pthread_setcanceltype, PTHREAD_CANCELED, undefined symbol pthread_cancel, implicit declaration pthread_cancel, ENOSYS 38, errno 38, pthread_join 永久挂起, pthread_join 不返回, SIGRTMIN, SIGRTMAX, RT 信号被吞, signal swallowed, sigaction, pthread_kill, pthread_exit, cancel then join, 线程取消, 兼容 TU, -include, extra object
+keywords:               pthread_cancel 链接失败, ENOSYS 空壳, cancel→join 挂死, SIGUSR1 替代, SIGRTMIN handler 不触发, 自建取消兼容层, 零上游补丁, meson 挂链接行
+
+title:                  OHOS 上 POSIX 线程取消 API 三层缺失（SDK 头不声明 + 动态桩 libc.so 不导出 + 运行时导出却是返回 ENOSYS 的空壳）⇒ 真依赖“取消以解除阻塞”的 cancel→join 关闭路径必须自建非 RT 信号（SIGUSR1）兼容层：handler 内 pthread_exit(PTHREAD_CANCELED) 才能让 join 返回（RT 信号在 OHOS 被静默吞掉，handler 永不运行）
+
+root_cause: OHOS（musl 系）对 POSIX 线程取消 API 是「三层同时缺失」，三层各自会把排查引向错误方向：
+  ① **SDK sysroot 的 `<pthread.h>` 完全不声明** pthread_cancel / pthread_testcancel /
+     pthread_setcancelstate / pthread_setcanceltype（PTHREAD_CANCELED 等宏常量仍在）。
+     `c_std=c99` 或更新标准下，clang 直接报 `call to undeclared function 'pthread_cancel';
+     ISO C99 and later do not support implicit function declarations`，首条真实错误看起来像
+     源码/C 标准问题而不是平台缺失；
+  ② **同一 sysroot 的“动态桩”libc.so 不导出**这些符号 ⇒ 即便压掉编译告警，
+     链接期报 `ld.lld: error: undefined symbol: pthread_cancel`；
+  ③ **设备运行时的 `/system/lib64/libc.so` 其实导出** pthread_cancel（`nm -D` 显示 `T`），
+     但它是一个**空壳**：实测 `pthread_cancel(pthread_self())` 返回 **38 (ENOSYS)**，
+     且「取消一个阻塞线程再 join」的路径必然**永久挂起**。
+  由此产生两个反直觉后果：
+  - 把符号交给运行时解析（`-Wl,-z,undefs` / `--unresolved-symbols=ignore-all`）能过链接，
+    运行期却挂死在后续 join——比链接失败更难查；
+  - 按「musl 不实现线程取消」写 `return 0` 的空实现同样只解决链接：调用方以为取消成功，
+    随后 join 永久阻塞（对 cancel→join 形态是**把链接错误升级成静默挂起**）。
+  另有一条本平台独有事实（本轮与配送池各自实测）：**RT 信号在 OHOS 上被静默吞掉**——
+  `sigaction(SIGRTMIN)` 与 `pthread_kill(self, SIGRTMIN)` 都返回 0，
+  但 handler **永不运行**（got=0）；而 **SIGUSR1 可用**（got=1）。
+  因此可用的路线是「非 RT 信号 + handler 内 pthread_exit」。
+  本任务的载体：imv 5.0.1 的关闭路径正是 cancel→join
+  —— `src/imv.c:1242 pthread_cancel(pipe_stdin_thread)` 紧接着 `pthread_join`，
+  被取消线程正阻塞在 `pipe_stdin()` 的 read/poll 上（取消的目的就是解除该阻塞）。
+
+affected_scope: 任何在关闭/超时路径上「真依赖取消来解除阻塞」的上游（取消阻塞在 read/write/poll 的工作线程，
+  随后 join 收线）。按用途分三档：
+  - **只探测 pthread 是否可用**（`#pragma weak` / 配置期 `cc.has_function`）：
+    属 E085 / DRAFT-aml 场景，走其特征检测 + 宏守卫即可，不必自建兼容层；
+  - **只「尽力取消」且不 join**：`return 0` 空实现即可，不必用本条；
+  - **真依赖取消解除阻塞再 join**（本包 imv、配送池宿主 spiped 等）：必须用本条的兼容层，
+    或改用协作式唤醒（close/shutdown 目标 fd 让 read/write 返回）——否则必然挂死。
+  不适用：用 pthread_kill 传自定义信号做协作退出、本就不依赖取消语义的包；OHOS 之外的平台
+  （glibc 有强声明与真实现，musl 上游亦有实现）。
+
+verification_cmd: # ① 头文件面（实测 0）：
+  grep -c pthread_cancel <sysroot>/usr/include/pthread.h
+  # ② 桩库面（实测 0）：
+  llvm-nm -D --defined-only <sysroot>/usr/lib/aarch64-linux-ohos/libc.so | grep -c pthread_cancel
+  # ③ 运行时面（实测有 T）：llvm-nm -D --defined-only /system/lib64/libc.so | grep 'T pthread_cancel'
+  # ④ 空壳证明（实测 rc=38=ENOSYS）：本任务 ~/tmp/uc2/主理-7/imv/repro/pc_probe.c
+  #    dlsym(RTLD_DEFAULT,"pthread_cancel") 非空 -> 调用 pthread_self() -> rc=38
+  # ⑤ RT 信号对照（实测 SIGUSR1 got=1 / SIGRTMIN got=0，两者 sigaction 与 pthread_kill 都 rc=0）
+  # ⑥ 兼容层前后读数（本任务 repro/cancel_join_test.c，取消阻塞在 read() 的线程后 join）：
+  #    改前：clang 报 call to undeclared function（c99）；链接 imv 目标报 undefined symbol: pthread_cancel
+  #    改后（-include compat.h + 编进 compat.c）：pthread_cancel -> 0 / pthread_join -> 0 / reader_returned=0
+
+prescan_pattern:        pthread_cancel|pthread_testcancel|pthread_setcancelstate|pthread_setcanceltype
+prescan_globs:          '**/*.c, **/*.h, **/*.cc, **/*.cpp'
+
+rec_approach:           self-hosted-nonRT-signal-cancel-shim-via-extra-object
+rec_description: 零上游补丁：配方在 generate() 里写出一个兼容 TU（4 个 API 定义）与一个声明头，
+  用 `-include <hdr>` 消掉上游的 undeclared-function 错误（c99 下是硬错误），
+  把 build() 里编译出的 .o 挂到链接行（meson 用 `tc.extra_cflags += ["-include", hdr]` /
+  `tc.extra_ldflags += [obj]`；autotools 用 CPPFLAGS/LDFLAGS；CMake 用
+  target_link_libraries 或 CMAKE_C_FLAGS）。兼容 TU 的 pthread_cancel 用 **SIGUSR1**
+  装 handler，handler 内直接 `pthread_exit(PTHREAD_CANCELED)`，从而恢复
+  「取消即可解除阻塞、join 能返回」的真实语义。
+  上线前必须 `grep` 确认上游未占用 SIGUSR1（imv 实测 src/ 内无
+  SIGUSR1/sigaction/signal() 调用，故安全）；pthread_setcancelstate/type 退化为
+  记录型空实现、pthread_testcancel 为空。
+rec_command: /* 兼容 TU（节选） */
+  static void imv_pthread_cancel_handler(int signo){ (void)signo; pthread_exit(PTHREAD_CANCELED); }
+  int pthread_cancel(pthread_t thread){
+    static int installed = 0;
+    if (!installed) { struct sigaction sa; memset(&sa,0,sizeof sa);
+      sa.sa_handler = imv_pthread_cancel_handler; sigemptyset(&sa.sa_mask);
+      if (sigaction(SIGUSR1,&sa,NULL) != 0) return -1; installed = 1; }
+    return pthread_kill(thread, SIGUSR1); }
+  int pthread_setcancelstate(int state, int *oldstate){ (void)state; if(oldstate)*oldstate=PTHREAD_CANCEL_ENABLE; return 0; }
+  int pthread_setcanceltype(int type, int *oldtype){ (void)type; if(oldtype)*oldtype=PTHREAD_CANCEL_DEFERRED; return 0; }
+  void pthread_testcancel(void){}
+
+fallback_approach:      cooperative-wakeup-or-detach
+fallback_description: 若不能占用信号：①把「取消阻塞线程」改写为协作式唤醒——`shutdown()`/`close()` 目标 fd
+  使阻塞的 read/write 返回 0/错误，工作线程自然退出，再 join；②照 gnuchess 先例把
+  cancel+join 换成 pthread_detach（线程随 EOF/quit 自然退出，进程退出回收），不引入挂起；
+  ③确无跨库增量时才退回 E085 的 `return 0` 空实现，并在 notes/正文写明
+  「OHOS 上取消语义缺失、该路径在信号触发时并不真正解除阻塞」的已知限制。
+fallback_command: /* 协作式：*/ shutdown(peer_fd, SHUT_RDWR); pthread_join(thr, NULL);
+
+safety_boundary: 与既有同症状条目的分界（这是本条判 create 的关键）：
+  - **E513（guarded-signal-thread-exit）症状与核心机制相同，但交付形态不同 ⇒ 按手册/03 §6.2
+    注 2 判 create**：E513 的 `rec_impl: source-patch`，要求改上游源码里「创建可 join 线程 /
+    设置取消点」的位置；本条给出的是**零上游补丁的配方侧注入**——配方生成兼容 TU、用
+    `-include` 强制声明、把编出的 `.o` 挂到链接行，本包 `patches: {}` 已实测通过，对
+    「打包他人上游、不便改源码」的场景可直接复用（即"多一条可选路径 + 适用面与代价"）。
+    另本条的 handler 用 `pthread_exit(PTHREAD_CANCELED)`（E513 用 `pthread_exit(0)`），
+    使 `pthread_join(&retval)` 能取到 PTHREAD_CANCELED，保留真实取消语义；
+  - **两条平台事实为 E513 未载**（本任务实测）：① 运行时 `/system/lib64/libc.so` 虽导出
+    `T pthread_cancel`，调用却返回 **ENOSYS(38)**（空壳，`nm` 有导出 ≠ 可用）；
+    ② **RT 信号被静默吞掉**（`sigaction`/`pthread_kill` 均 rc=0 而 handler got=0），
+    只有 SIGUSR1 等非 RT 信号可用——后者推翻经验库 12d §4 记的「SIGRTMIN + pthread_exit」路线；
+  - `E085`（PTHREAD_IN_USE_DETECTION_HARD）症状串重叠，但其 rec 是「探测 pthread 是否可用」、
+    fallback 是 `return 0` 空实现——对「真依赖取消解除阻塞」的 cancel→join 会静默挂起；
+  - `DRAFT-E680-ohos-no-pthread-cancellation`（samhain）给的是「集中 shim 补 3 个符号」，
+    保留真实 mutex/线程，但**不涉及跨线程取消是否真能解除阻塞**，全文无信号；
+  - `DRAFT-xmcd-3.3.2-ohos-musl-missing-pthread-cancel` 给特性宏间接层：自中止路径
+    `pthread_cancel(pthread_self())` → `pthread_exit`，**跨线程取消降级为「记录日志 + 空操作」**，
+    依赖调用点之后确有 stop/join 收管线；不保取消语义；
+  - `DRAFT-20003-ohos-pthread-cancel-missing-soft-cancel-hang`（yate）是「关掉硬取消走软取消，
+    再给出测试侧超时守卫」；
+  - `DRAFT-aml-1.0.0-...-meson-feature-detect` 是 Meson `cc.has_function` + HAVE 宏守卫
+    （整体旁路该调用）。
+  以上五条都**不含任何信号方案**，因此「非 RT 信号 + handler 内 pthread_exit 保住 cancel→join」
+  这条解法与适用面（跨线程取消真的解除阻塞）未被覆盖 ⇒ 按手册/03 §6.2 条件 2 判 **create**。
+  反例/风险：若上游自己占用 SIGUSR1（或工作线程依赖「延迟取消」语义只在取消点退出），
+  本条修法不成立，必须先 grep 确认；若包只是探测型用途，用本条属于过度实现。
+safety_note: 本任务（imv 5.0.1，平台任务 7452）实测：改前链接 `imv` 目标报
+  `ld.lld: error: undefined symbol: pthread_cancel`；改后 52/52 目标全部链接成功，
+  `meson test` 上游 3 个测试目标 5/5 通过，消费者测试 14/14 通过。
+  读者注意：配送池原草稿的宿主包（spiped 1.6.4）PR 未交付，本条是**首次随真实 PR 交付**
+  的批次，前后读数由本任务补齐。
+
+dedup_notes: ① **来源（必须显式声明）**：机制**取自配送池**
+  `经验文档/B草稿库/DRAFT-spiped-1.6.4-pthread-cancel-ohos-nonRT-signal-shim.kv`
+  （主理-8 于 2026-10-18 实撞写入池；其自述 dedup 结论即 create）。
+  本文件是它在 imv 5.0.1 上的首次真实交付：症状（`undefined symbol: pthread_cancel`）、
+  载体（`src/imv.c:1242` cancel→join，被取消线程阻塞在 read/poll）、
+  三层缺失读数、SIGUSR1/SIGRTMIN 对照、兼容层前后读数**全部由本任务独立复跑**，
+  不是照抄池件；
+  ② 与 **E513** 的分界见 safety_boundary：症状与核心机制相同，但 E513 是 source-patch、
+     本条是零上游补丁的配方侧注入，且增补两条平台事实（ENOSYS 空壳 / RT 信号被吞）
+     ⇒ 按手册/03 §6.2 注 2「多一条可选路径 + 适用面与代价本身就是可复用知识」判 create；
+  ③ 与 E085 的分界（症状重叠、其解法为探测 + 空实现、对 cancel→join 会挂死）见 safety_boundary；
+  ④ 经验库 12d §4 记的「SIGRTMIN handler + pthread_exit」路线在本平台**无效**
+  （本轮实测 SIGRTMIN handler got=0）⇒ 本条是对它的更正；
+  ⑤ 经验库 12b（gnuchess 改 pthread_detach）是另一条可行路线，已收进 fallback。
+
+similar_to:             E513, E085, DRAFT-E680-ohos-no-pthread-cancellation, DRAFT-xmcd-3.3.2-ohos-musl-missing-pthread-cancel, DRAFT-20003-ohos-pthread-cancel-missing-soft-cancel-hang, DRAFT-aml-1.0.0-ohos-pthread-setcancelstate-meson-feature-detect
+conflicts_with:         []
+caused_by:              []
+
+source_event: imv 5.0.1（平台任务 7452，activity_id=6，主理-7，链主-97）2026-10-18 适配轮。
+  首条真实错误（链接 `imv` 目标）：ld.lld: error: undefined symbol: pthread_cancel
+  载体：src/imv.c:1242 `pthread_cancel(pipe_stdin_thread);` + 紧随的 `pthread_join`。
+  修法落地于 archives/i/imv/5.0.1/conanfile.py 的 generate()/build()
+  （写 compat TU + `-include` 声明头 + 编 .o 挂链接行），**上游源码零补丁**。
+source_commit: 设备侧复现与前后读数：~/tmp/uc2/主理-7/imv/repro/
+  （pc_probe.c：运行时 dlsym + ENOSYS 38 + SIGUSR1/SIGRTMIN 对照；
+   cancel_join_test.c + pthread_cancel_compat.{c,h}：取消阻塞在 read() 的线程后 join 返回）
+  与 ~/tmp/uc2/主理-7/imv/PROGRESS-97.md（逐步骤断点）。
+
+authors: 链主-97（机制来自配送池 主理-8）
