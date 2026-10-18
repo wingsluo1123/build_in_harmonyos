@@ -1,0 +1,58 @@
+#====================================================================
+# DRAFT-typometer-1.0.1-jna-harmonyos-platform-detection.kv
+# HarmonyOS 上 os.name=HarmonyOS 使 JNA 平台识别失效：Java 应用必须显式识别 HarmonyOS
+# 并禁用 X11/WinAPI native 路径，回退纯 Java/AWT 后端
+#====================================================================
+
+id:                     DRAFT-typometer-1.0.1-jna-harmonyos-platform-detection
+trigger_tool:           java|jna|conan
+phase:                  runtime
+error_signature:        UnsatisfiedLinkError.*libX11|libX11.so.*(No such file|not found)|Platform.isLinux\(\).*false|RESOURCE_PREFIX.*harmonyos-aarch64|UnsatisfiedLinkError.*libfreetype
+
+severity:               2
+category:               ohos, java, jna, jvm, platform-detection, gui
+match_keywords:         jna, Platform.isLinux, Platform.isWindows, os.name, HarmonyOS, OHOS, aarch64, harmonyos-aarch64, RESOURCE_PREFIX, libX11, XOpenDisplay, Native.register, UnsatisfiedLinkError
+title:                  HarmonyOS 上 JNA 平台识别失效（os.name=HarmonyOS）：Java 应用必须显式识别 HarmonyOS 并禁用 X11/WinAPI native 路径，回退纯 Java/AWT 后端
+
+root_cause:             JNA 通过 System.getProperty("os.name") 的关键字（linux/win/mac）判定平台；HarmonyOS 的 os.name="HarmonyOS" 不含 "linux"，故 Platform.isLinux()=false、Platform.isWindows()=false，Platform.RESOURCE_PREFIX="harmonyos-aarch64"。JNA 4.2.0 的 jar 内不含 harmonyos-aarch64 的 libjnidispatch，且 OHOS 不提供 LinuxScreenAccessor 依赖的 X11 客户端库(libX11)。若应用按 "Linux -> 调用 native X11" 的常规分支实现，在 OHOS 上会误入 native 路径导致 UnsatisfiedLinkError(libX11)/崩溃；依赖 Platform.isLinux() 的判定还随 JNA 版本对 os.name 的处理而变，行为脆弱。
+affected_scope:         所有在 HarmonyOS 上运行、通过 JNA 判定平台或调用 native 屏幕/输入 API 的 Java 应用（实例: typometer 1.0.1 的 ScreenAccessor）
+verification_cmd:       java -cp typometer-1.0.1.jar Probe2   # 期望: os.name=HarmonyOS / isHarmonyOS=true / isNativeApiSupported=false
+
+rec_priority:           1
+rec_approach:           explicit-harmonyos-platform-branch
+rec_description:        在平台判定处显式识别 HarmonyOS/OHOS（os.name 含 "harmony" 或以 "ohos" 开头），令 native API 可用性返回 false 并跳过 Windows/Linux native 访问器，回退到可移植的纯 Java/AWT 实现；不改变 Windows/Linux 既有行为。
+rec_command:            static boolean isHarmonyOS(){ String os=System.getProperty("os.name","").toLowerCase(); return os.contains("harmony")||os.startsWith("ohos"); } ; if(isNative && !isHarmonyOS()){ ...Platform.isWindows()/isLinux()... }
+rec_auto_fix:           false
+rec_impl:               manual
+
+fallback_priority:      2
+fallback_approach:      upgrade-jna-with-ohos-support
+fallback_description:   若确需 native 路径，则升级到提供 OHOS/aarch64 dispatcher 的 JNA 版本并显式配置平台识别；否则保持纯 Java 回退（本库场景 native 屏幕 API 在 OHOS 无对应实现，回退即最终方案）。
+fallback_command:
+fallback_auto_fix:      false
+fallback_impl:          manual
+
+forbid_1_pattern:       依赖 JNA Platform.isLinux() 判定 HarmonyOS 并调用 libX11
+forbid_1_reason:        os.name="HarmonyOS" 不含 linux，该判定为 false，依赖它会在不同 JNA 版本下随机误入/漏入 native 路径
+forbid_1_consequence:   OHOS 上 UnsatisfiedLinkError 崩溃或静默降级不一致
+
+principles:
+
+causes:
+caused_by:
+similar_to:             DRAFT-12609-jakarta-cdi-api-ohos-device-java-maven-toolchain
+conflicts_with:
+prerequisite_of:
+
+doc_file:               knowledge/drafts/DRAFT-typometer-1.0.1-jna-harmonyos-platform-detection.md
+last_updated: 2026-10-14
+source_event:           typometer 1.0.1 OHOS 适配：os.name=HarmonyOS，JNA Platform.isLinux()=false，ScreenAccessor 增加 HarmonyOS 分支（patch 0001）
+
+authors:                OpenDesk
+source_pr:
+source_commit:
+
+metrics_success_count: 1
+metrics_fail_count: 0
+metrics_confidence: 0.8
+metrics_last_used: 2026-10-14
