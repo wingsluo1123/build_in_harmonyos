@@ -1,0 +1,46 @@
+--- a/t/spaced-directives.t
++++ b/t/spaced-directives.t
+@@ -1,23 +1,30 @@
+ #!perl -T
+ 
+ use strict;
+ use warnings;
+-
+-use Test::More skip_all => "Not written yet";
+-use Test::Builder::Tester tests => 2;
++use Test::Builder::Tester tests => 3;
+ use Test::More;
+ 
+-BEGIN {
+-    use_ok( 'Test::Pod' );
++BEGIN { use_ok('Test::Pod'); }
++
++# perlpodspec (Perl 5.42.2, Pod Definitions): spaces/tabs alone form a
++# blank line. Keep the original whitespace-bearing fixture unchanged.
++{
++    my $name = 'Whitespace-only blank lines separate POD paragraphs';
++    test_out("ok 1 - $name");
++    pod_file_ok('t/spaced-directives.pod', $name);
++    test_test('Original spaced-directives fixture follows the POD specification');
+ }
+ 
+-BAD: {
+-    my $name = 'Test name: Something not likely to accidentally occur!';
+-    my $file = 't/spaced-directives.pod';
+-    test_out( "not ok 1 - $name" );
+-    pod_file_ok( $file, $name );
++# Independent invalid fixture: accepting blank separators must not turn
++# real unknown directives into successful POD validation.
++{
++    my $name = 'Unknown directives still fail';
++    my $file = 't/unknown-directive.pod';
++    test_out("not ok 1 - $name");
++    pod_file_ok($file, $name);
+     test_fail(-1);
+-    test_diag('*** WARNING: line containing nothing but whitespace in paragraph at line 11 in file t/spaced-directives.pod');
+-    test_diag('*** WARNING: line containing nothing but whitespace in paragraph at line 17 in file t/spaced-directives.pod');
+-    test_test( "$name is bad" );
++    test_diag("$file (9): Unknown directive: =over4");
++    test_diag("$file (13): Unknown directive: =under");
++    test_test('Original invalid directives retain their error diagnostics');
+ }
