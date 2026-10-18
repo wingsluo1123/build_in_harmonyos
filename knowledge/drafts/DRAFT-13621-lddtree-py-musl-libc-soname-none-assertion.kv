@@ -1,0 +1,8 @@
+error_signature: "grep -i none|libc.so => None|musl|lddtree.py 649|负向断言 glibc-only"
+root_cause: "lddtree.py 对无法解析 soname 的 NEEDED 库打印 'None'（lddtree.py:649，musl 布局下 /bin/sh 的 libc.so 无对应 .so soname 链）。上游冒烟用例 lddtree-py 的断言 `lddtree.py /bin/bash | grep -i 'none'` 是负向断言（期望输出中不出现 none），按 glibc 布局书写——glibc 下所有 NEEDED 库都能解析，无 None 行。musl/OHOS 下出现 None 行即命中 grep 导致 FAIL。上游 alpine/musl CI 是 -Dtests=false，musl 路径从未被测过，属上游测试的平台盲区而非下游适配缺陷。"
+rec_approach: "遇到此类上游负向断言 FAIL：先验证工具本体行为（rc=0、树结构正确、无法解析的库显示 None 是上游算法的平台边界），确认非适配缺陷后不修改上游断言；用 test_package 的正向断言（真实 ELF 输入、树结构、溯源）覆盖真实行为，并在 notes.md R51 表如实申报 raw 结果与平台边界。"
+match_keywords: ["musl", "soname", "None", "负向断言", "glibc-only", "上游测试盲区", "lddtree"]
+error_excerpt: "libc.so => None\nFAIL: lddtree.py.smoke (grep -i 'none' 命中)"
+severity: P2
+category: testing
+last_updated: 2026-10-14
