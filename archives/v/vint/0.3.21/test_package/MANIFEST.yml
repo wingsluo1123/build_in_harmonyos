@@ -1,0 +1,33 @@
+# test_package 清单（R34 消费者校验）
+package: vint/0.3.21
+
+upstream_test_in_build: true
+upstream_test_command: "python -m pytest -q test（现代 pytest 跑上游同一套用例；上游 tox 钉的 3.3.2 在 py3.12 装不上）"
+
+upstream_tests:
+  - name: "上游自带用例（test/ 下 unit / integration / acceptance，49 个 test_*.py）"
+    count: 272
+    description: >-
+      本地实跑 **271 passed, 1 skipped**，即 **271/271（100%）**（那 1 个 skip 是上游自身标注的，
+      非适配引入）。测试环境的 3 处适配（bin/vint 可执行位、python shim、静音 Python 警告）
+      不改上游源码与任何用例 —— 详见本目录 ../notes.md §3.4。
+
+test_package_tests:
+  - file: check_vint.py
+    description: >-
+      R34 消费者校验 **7 项**（全部离线）：①命令产物齐备（bin/vint）②模块随包（python/vint/）
+      ③运行时依赖随包（yaml / ansicolor / chardet）④**真跑** `vint --version`（rc=0，输出 0.3.21）
+      ⑤**真实 lint 行为**：故意写坏的 vim script 被报出（rc=1，输出 `unexpected token`）
+      ⑥许可证随包 ⑦证据（sha256 + python 版本）。末行打印 `checks/fails/skips`；
+      仅环境原因才计入 skips 且**不计入通过**。
+    command: "python3 check_vint.py <package-folder>"
+
+notes: >-
+  vint 的命令入口是 `console_scripts: vint = vint:main`；`pip install --target` 因目标根目录存在同名
+  `vint/` 包目录而**不会生成**该脚本，且 vint 没有 `__main__`（`python -m vint` 不可用），
+  故本包由配方自行生成 `<包>/bin/vint`。
+
+deviations:
+  - "运行时依赖钉 setuptools<81（vint 未声明 pkg_resources，而 setuptools 84 已移除它）"
+  - "本体用 --no-deps 安装（setup.py 里的 enum34/pathlib/typing 是 py2 backport，对 py3.12 有害）"
+  - "测试环境：补回 bin/vint 可执行位、造 python shim、静音 Python 警告（均为环境适配，不改上游）"
