@@ -1,0 +1,29 @@
+software: kpkpass
+display: "KPkPass"
+description: "KDE PIM Apple Wallet pass library (KPim6PkPass + QML module org.kde.pkpass)"
+category: library
+homepage: "https://invent.kde.org/pim/kpkpass"
+license: LGPL-2.0-or-later
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "KF_IGNORE_PLATFORM_CHECK=TRUE bypasses the KDE platform allowlist (OHOS not listed, E092)"
+    - "KF_SKIP_PO_PROCESSING=ON: Qt6LinguistTools is not part of the published qtbase package"
+    - "The org.kde.pkpass QML plugin is built unconditionally upstream, so qtdeclarative/6.11.1 is a hard dependency; qtbase and qtdeclarative both use cmake_find_mode=none and are located through a hand-written conan_cmakedeps_paths.cmake (kitemodels 6.26.0 precedent)"
+    - "find_package(KF6 COMPONENTS Archive) resolves through ECM's FindKF6 module against the karchive/6.26.0 package prefix"
+    - "ECM 6.26+ KDEInstallDirs6 runs the qtbase qtpaths host tool at configure time; /system/lib64 is prepended to LD_LIBRARY_PATH so the compatible libc++_shared.so is found (kconfig 6.26.0 precedent)"
+    - "SharedMimeInfo is resolved through ECM's find module; UPDATE_MIME_DATABASE_EXECUTABLE pins shared-mime-info/2.5.1, whose version >= 2.5 disables both MIME XML install rules"
+    - "CMAKE_PLATFORM_NO_VERSIONED_SONAME=TRUE plus explicit -Wl,-soname, flags keep DT_SONAME while producing a single unversioned libKPim6PkPass.so (HMDFS refuses versioned symlinks, E330; attica 6.14.0 precedent)"
+    - "CMake install rewrites the installed RUNPATH, invalidating the OHOS build-time .codesign section; both packaged ELFs are re-signed with binary-sign-tool -selfSign 1"
+  common_dependencies:
+    - qtbase
+    - qtdeclarative
+    - karchive
+    - ecm
+
+versions:
+  "25.12.3":
+    status: built
+    build_date: "2026-10-18"
+    conan_ref: "kpkpass/25.12.3"

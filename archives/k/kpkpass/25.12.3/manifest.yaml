@@ -1,0 +1,33 @@
+software: kpkpass
+version: "25.12.3"
+status: built
+build_system: cmake
+created_at: 2026-10-18
+build_date: 2026-10-18
+dependencies:
+  required:
+    - qtbase/6.11.1
+    - qtdeclarative/6.11.1
+    - karchive/6.26.0
+  build:
+    - ecm/6.26.0
+    - shared-mime-info/2.5.1
+patches_applied: []
+test_results:
+  type: passed
+  upstream: "passed: 2/2 upstream CTest cases (pkpasstest, fieldtest) executed on the HarmonyOS PC device inside conan create (ctest 100% tests passed, 0 tests failed out of 2)"
+  test_package: "passed: 21/21 installed-consumer checks in test_package (embedded boardingpass-v1.pkpass parsed through KPim6::PkPass, barcode/field/location/logo/raw-data checks, installed org.kde.pkpass QML module import; TEST SUMMARY: 21 passed, 0 failed)"
+  package_id: "d9d4dedfe10107f64df5d6139e3c238cb07fbc0e"
+  l0: "pass"
+  l1: "pass: upstream tests + test_package executed"
+  l2: "skip: no bin/ smoke (library package)"
+  l4: "skip: verify report L4 static security scan skipped (no cache path; G4 could not resolve the package ID to query 'conan cache path')"
+  l5: "skip: verify report L5 artifact baseline skipped (no cache path; G4 could not resolve the package ID to query 'conan cache path')"
+source_url: https://download.kde.org/stable/release-service/25.12.3/src/kpkpass-25.12.3.tar.xz
+source_sha256: f916bdc37c11740cc527ee76a1326d3457ed9bf153d609cdb5ea7bb581885df9
+knowledge_gained:
+  - "kpkpass installs its public headers under include/KPim6/KPkPass and exports INTERFACE_INCLUDE_DIRECTORIES=include/KPim6, so consumers include <KPkPass/pass.h> style paths; pass.h only forward-declares QImage, so consumers that call Pass::logo() must include <QImage> themselves."
+  - "The org.kde.pkpass QML plugin (src/quick) is built unconditionally upstream, so qtdeclarative is a hard dependency even for C++-only consumers of KPim6PkPass."
+  - "ECM 6.26 FindSharedMimeInfo runs update-mime-database -v at configure time; version >= 2.5 disables both upstream MIME XML install rules, so pinning shared-mime-info/2.5.1 through UPDATE_MIME_DATABASE_EXECUTABLE avoids needing a MIME database update during install."
+  - "HMDFS rejects the versioned .so.6/.so symlink chain CMake creates for a VERSION/SOVERSION target (symlink EPERM at link time); CMAKE_PLATFORM_NO_VERSIONED_SONAME=TRUE plus explicit CMAKE_SHARED_LIBRARY_SONAME_CXX_FLAG=-Wl,-soname, produces a single unversioned libKPim6PkPass.so that still records DT_SONAME (attica 6.14.0 precedent)."
+  - "CMake install rewrites the installed RUNPATH, which invalidates the OHOS build-time .codesign section; both packaged ELFs (the library and the QML plugin) are re-signed with binary-sign-tool -selfSign 1 in package()."
