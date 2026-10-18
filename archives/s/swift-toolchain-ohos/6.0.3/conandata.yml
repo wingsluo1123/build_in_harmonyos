@@ -1,0 +1,64 @@
+# conandata.yml -- swift-toolchain-ohos 6.0.3
+#
+# 载荷 = OHOS 自建 Swift 工具链最小集（prefix-d，locale-r98 冻结）。
+# 它是**预编译快照**，不是上游源码发行物：swift.org 不为 OHOS 发行工具链。
+# sha256 是**真值**（现场重算，两次独立读数一致）；URL 是**唯一待答复项**。
+#
+# ★ 托管位已落地（locale-r110）：载荷托管于**自建制品仓的 Release 资产**；匿名 GET 实测 200 / 189,124,959 B / sha256 与本文件逐字一致（19.5 s，9.7 MB/s）。
+#   PF7 源 URL 闸（scripts/ohc/preflight.py:356-382,415-419）要求 https 官方源，
+#   黑名单含 cnb.cool / file:// / 明文 http / gitcode·gitee 搬运源；
+#   PF2+JC2/JC3 又禁止把 tarball 提交进仓。
+#   二者叠加 ⇒「既不能进仓、又没有官方 URL」。
+#   # ★ 与 PF7 的已知冲突（已在 PR !14355 说明中登记）：PF7 会把 gitcode/gitee 域名的 conandata url 判为"搬运源"；本载荷为我方自建产物、无上游源可指，且平台单文件上限 100 MiB、LFS 取件需鉴权 ⇒ 该 Release 资产是唯一匿名可下的位置。依 PF7 自带出口（官方托管例外 → PR 说明登记后 --no-preflight），本项按例外处理；若须改放官方制品位（cmd-pkgs），只替换本行 url，sha256 一字不动。原约束：
+#   （那会踩 PF7 的另两条）。占位符形态按 r101 任务书 §0.2-1：<PENDING-P2:hosting>。
+#
+# ★ 已排除的三种"看起来能用"的填法（写在这里防止落地轮临时改坏）：
+#   1. file://<CI 预下载缓存> —— PF7 明列第 1 类违规（71 例，CI 预下载改写未还原）；
+#   2. cnb[.]cool 的制品域名 —— 组织自有，但在 PF7 镜像黑名单内
+#      （★ locale-r111：写成**不带 scheme**的形态。CI 的 pre-download 会把本注释里带
+#       `https://` 的写法当成"第 2 个源 URL"去试一次，白跑一轮下载）；
+#   3. 任何 <PENDING...> 之外的假 URL —— 骨架红线禁止假 URL / 假 sha256。
+
+sources:
+  url: "https://gitcode.com/gcw_hL6s3dcK/swift-toolchain-ohos/releases/download/payload-6.0.3/swift-toolchain-ohos-6.0.3-ohos-aarch64.tar.gz"
+  sha256: "922277ac19fe3e2a8ff56c4d5a8ce27c6d3f32cbdf1dfbe2cd872dfbcd2c63b8"
+
+# ★ locale-r104：补丁面从**空表**变成**一条**（0001）。
+# 载荷本身是预编译快照，没有源码可以打补丁；这一条打的是**包内前门** `swiftc.sh` 的 flag 表 ——
+# r103 已把 test_package E3 的归属钉到「前门比载荷自带的 example/build.sh 窄」，而
+# example/build.sh 是归属判定的**控制装置**（必须一字不改），所以被改的是 swiftc.sh。
+#
+# ★ locale-r112：补丁面从**一条**变成**两条**（新增 0002）。
+# 真机 CI #97027 的 E3 原文指名 `build/swift/lib/swift/SwiftGlibc/module.modulemap:29` 的 `header`
+# 是**构建机绝对路径**（`…/swift-clean-llvm15-full-candidate-20260915-205500/build/swift/lib/swift/
+# ohos/aarch64/SwiftGlibc.h`）：本机因为那棵老树还在盘上所以绿，干净设备上没有 ⇒ header not found。
+# 该文件是**编译期被 clang 解析的文本**（不是二进制），所以能在配方侧把它相对化，而**不动归档、
+# 不改 sha256**。同一补丁顺带清掉同一病根的三处 class-B（会被执行的）绝对路径。
+#
+# 结构照抄仓库既有配方（全仓 2,592 个 conandata.yml 带 patch_file）：**平铺列表** +
+# patch_file / patch_description / patch_type，并显式 `strip: 1`（补丁头是 git 形态的 a/ b/）。
+# apply_conandata_patches 对 list 与 {version: [...]} 两种形态都支持
+# （conan/tools/files/patches.py），本文件用平铺列表。
+patches:
+  - patch_file: "patches/0001-swiftc-shared-flag-table.patch"
+    patch_description: >-
+      swiftc.sh 的前门 flag 表比载荷自带的 example/build.sh 窄（少 G1 的 target/use-ld、
+      G3 的 Swift 运行时与 C++ 运行时搜索路径、G4 的 Foundation clang-module 闭包
+      _FoundationCShims/_FoundationICU/Dispatch、G5 的完整 rpath 集），导致 test_package 的
+      E3 报 missing required module '_FoundationCShims'、R1 随之失败。本补丁把前门改成与
+      example/build.sh 的**同一张五组 flag 表**（守卫式追加：调用方已给则不重复），
+      并加 T2_SHOW_FLAGS 诊断，使「两张表重合」成为可测读数而不是断言。
+    patch_type: "portability"
+    strip: 1
+  - patch_file: "patches/0002-payload-relocatable-paths.patch"
+    patch_description: >-
+      载荷里有三处**会被解析**的绝对路径写着构建机的目录：包内 SwiftGlibc 的 module.modulemap
+      有 3 条 header（第 29 行 header、第 32 行 textual header assert.h、第 39 行 CUUID 的 header），
+      以及 toolchain/bin 下三个 wrapper（ohos-clang、ohos-clang++、llvm-ranlib）的 exec 目标。
+      前者是 clang 编译期解析的，后者是执行时解析的；在别的机器上都不存在（CI E3 报的就是
+      SwiftGlibc/module.modulemap:29 header not found）。本补丁把 header 改成**相对 modulemap
+      自身目录**的形态（同目录的 glibc.modulemap 本来就是这个形态），把 wrapper 的 exec 目标改成
+      **$0 相对**。搬移到任何路径都仍可解析（0-178），不改归档、不改 sha256。
+    patch_type: "portability"
+    strip: 1
+

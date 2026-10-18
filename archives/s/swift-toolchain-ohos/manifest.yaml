@@ -1,0 +1,28 @@
+# manifest.yaml -- 软件级（archives/s/swift-toolchain-ohos/manifest.yaml）
+# 遵循 ARCHIVE-SPEC v2.0 / templates/manifest-software.yaml
+# ★ 位置说明：本档在**软件级**目录（与版本目录 6.0.3/ 同级），不是版本目录内。
+
+software: swift-toolchain-ohos
+display: "Swift 工具链 (OpenHarmony)"
+description: "OHOS 自建 Swift 6.0.3 工具链最小集：patched instrument/bin/swiftc ＋ ring/（Foundation 平面：libFoundation.so 族 ＋ 模块）＋ clang 15/lld/resource-dir/libc++ ＋ OHOS sysroot ＋ Swift 运行时闭包 ＋ dispatch 头面；包根 wrapper（env.sh/swiftc.sh/build-demo.sh）自定位。"
+category: toolchain
+homepage: "https://www.swift.org/"
+license: "Apache-2.0 WITH Swift-exception"
+build_system: custom
+
+ohos_adaptation:
+  key_points:
+    - "路径 B（贡献创新）：非现成三方库适配，而是新建的平台基础设施包；与 archives/r/rust-toolchain/1.97.1 同族"
+    - "唯一与 rust 先例不同的地方：rust 有官方 dist tarball 可下载，OHOS 的 Swift 工具链是自建的，上游无对应发行物 ⇒ 载荷托管位置待验收方答复（PENDING-P2-1）"
+    - "载荷为自定位快照：包内 env.sh 把编译期烘死的绝对 RUNPATH 全部指回包内副本，任意绝对路径解包即可工作（两处路径已实测全绿）"
+    - "交付默认编译器是 instrument/bin/swiftc（已打 OHOS 补丁的那一份）；build/swift/bin/swiftc 为未打补丁版，仅作对照"
+    - "消费者义务三条：编译走包根 swiftc.sh（而非裸 swiftc）；链接必须带 ring/plane/lib 的 RUNPATH；绝不导出编译器的库路径为 LD_LIBRARY_PATH（会遮蔽环内同名不同构建的 libdispatch.so / libBlocksRuntime.so，客户端装载期即死）"
+    - "TMPDIR 必须可写：env.sh 默认把 TMPDIR 指向包内；本机 /tmp 是 0 字节只读挂载"
+    - "driver 无源码补丁面（预编译载荷）；本包唯一一条补丁是包内前门 swiftc.sh 的 flag 表（patches/0001-swiftc-shared-flag-table.patch，7,968 B）；G1 要求的 export_sources 是方法，apply_conandata_patches 在 build() 内真应用这一条"
+  common_dependencies: []
+
+versions:
+  "6.0.3":
+    status: built
+    build_date: "2026-09-26"
+    # ★ published_as 待落地轮：载荷尚未进制品仓（PENDING-P2-1/P2-2 未答）
