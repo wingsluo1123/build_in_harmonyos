@@ -1,0 +1,23 @@
+# conandata.yml — sircbot 0.4
+# 官方源码：Alpine Linux 官方 distfiles 归档（与上游 APKBUILD / T2 引用的 URL 一致）
+# 上游仓库：https://git.alpinelinux.org/cgit/sircbot/ ，对应 tag v0.4
+# sha256 为源码包真实哈希，已核验
+
+sources:
+  url: "https://dev.alpinelinux.org/archive/sircbot/sircbot-0.4.tar.xz"
+  sha256: "3f32fe97131402f827a6acba8507c372e53ce19690e732d226bb9a4d89313ce0"
+
+patches:
+  # 可移植性补丁：不引入任何平台宏，全部为「历史行为优先 + 回退」的 POSIX 实现
+  - patch_file: "patches/0001-sircbot-send.c.patch"
+    patch_description: >-
+      sircbot-send：socket 目录改为运行时可配置（SIRCBOT_RUNDIR，默认仍为
+      /var/run/sircbot）；路径名 AF_UNIX 被内核拒绝时回退到抽象命名空间
+    patch_type: "portability"
+
+  - patch_file: "patches/0002-sircbot.c.patch"
+    patch_description: >-
+      sircbot：运行目录/钩子目录运行时可配置并按需创建；run-parts 不可用时提供
+      POSIX 目录扫描回退；通道 socket 在路径名 bind 被拒时回退到抽象命名空间；
+      初始化限流时间戳 last_data_sent/last_ping，修复出站队列永不刷新
+    patch_type: "portability"

@@ -1,0 +1,24 @@
+# 软件级 manifest — sircbot
+# 遵循 ARCHIVE-SPEC v2.0
+
+software: sircbot
+display: "sircbot"
+description: "极简 IRC bot：连接 IRC 服务器、加入指定频道，并为每个频道提供 unix socket，脚本可用 sircbot-send 投递消息"
+category: network
+homepage: "https://git.alpinelinux.org/cgit/sircbot/"
+license: GPL-2.0-only
+
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "HarmonyOS PC 拒绝在用户可写目录 bind 路径名 AF_UNIX socket（EPERM），通道 socket 需回退到抽象命名空间"
+    - "鸿蒙无 /var/run 且 /var 不可写，运行目录须经 SIRCBOT_RUNDIR 指到可写位置（守护进程模式还要写 pidfile）"
+    - "鸿蒙 /etc 为只读文件系统，钩子目录须经 SIRCBOT_HOOKSDIR 重定向"
+    - "系统未提供 run-parts(8)，钩子执行依赖补丁内置的 POSIX 目录扫描回退"
+  common_dependencies: []
+
+versions:
+  "0.4":
+    status: built
+    build_date: "2026-10-15"
