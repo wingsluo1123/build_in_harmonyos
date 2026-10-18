@@ -1,0 +1,40 @@
+# 版本级 manifest
+# 文件位置: archives/g/gnu-efi/4.0.4/manifest.yaml
+
+version: "4.0.4"
+software: "gnu-efi"
+status: built
+build_date: "2026-10-16"
+build_system: makefile
+
+source:
+  url: "https://github.com/ncroxon/gnu-efi/archive/refs/tags/4.0.4.tar.gz"
+  sha256: "40b61e842a4efcbf80f3e53b2f220c044e8cfe46eb4dd6396c83b751240b1c0d"
+  tar_format: tar.gz
+  tag: "4.0.4"
+
+build:
+  system: makefile
+  configure_options: []
+  make_options:
+    - "ARCH=aarch64"
+    - "CC=<clang from tools.build:compiler_executables>"
+    - "HOSTCC=<clang>"
+    - "AS=<clang>"
+    - "LD=<ld.lld>"
+    - "AR=<llvm-ar>"
+    - "RANLIB=<llvm-ranlib>"
+    - "OBJCOPY=<GNU objcopy>"
+    - "INSTALL=<ginstall>"
+    - "install: INSTALLROOT=<package_folder> PREFIX=/"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "ref:DRAFT-gnu-efi-4.0.4-raw-makefile-installroot-prefix-and-version-drift —— gnu-efi 的 make install 走 INSTALLROOT（DESTDIR 只是回退值）且 LIBDIR/INCLUDEDIR 挂死在 PREFIX=/usr/local：仅传 DESTDIR=<pkgdir> 会落进 <pkgdir>/usr/local/{lib,include}，必须 INSTALLROOT=<pkgdir> PREFIX=/ 双管齐下。"
+  - "ref:DRAFT-gnu-efi-4.0.4-raw-makefile-installroot-prefix-and-version-drift —— gnu-efi.pc 在 make 阶段生成，install 目标不再依赖它 ⇒ 先 make 后 install 时装出的 .pc 保留旧前缀（陈旧 pkg-config 元数据）。"
+  - "ref:DRAFT-gnu-efi-4.0.4-raw-makefile-installroot-prefix-and-version-drift —— 上游 Makefile 的 VERSION 变量为 4.0.3 而 tag 为 4.0.4（同一变量就是 gnu-efi.pc 的 @VERSION@ 来源）：配方在 make 命令行传 VERSION=<包版本>（命令行覆盖上游 export VERSION，不改上游源码），交付的 .pc 报 Version: 4.0.4、与包版本一致；源码树内滞后本身仍如实披露。"
+  - "ref:E108 —— OHOS 无 install(1)，上游 INSTALL := install 直接 Error 127；本配方显式传 INSTALL=ginstall（GNU coreutils）。"

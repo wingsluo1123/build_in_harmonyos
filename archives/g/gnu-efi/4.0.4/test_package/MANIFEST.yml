@@ -1,0 +1,41 @@
+package: gnu-efi/4.0.4
+homepage: https://github.com/ncroxon/gnu-efi
+
+upstream_test_count: 4
+upstream_test_executed: 4
+upstream_test_passed: 4
+upstream_test_run_location: device-side harness (QEMU AAVMF + UEFI Shell), outside conan build
+upstream_check_command: "UEFI_DIR=./image QEMU_CMD=\"qemu-system-aarch64 -M virt -cpu cortex-a57 -m 1024 -nodefaults -nographic -serial stdio -net none -drive if=pflash,format=raw,unit=0,file=<harness>/AAVMF.fd,readonly=on -drive format=raw,file=fat:rw:image\" tests/run_tests.sh"
+upstream_test_in_build: false
+upstream_test_command: "UEFI_DIR=./image QEMU_CMD=\"qemu-system-aarch64 -M virt -cpu cortex-a57 -m 1024 -nodefaults -nographic -serial stdio -net none -drive if=pflash,format=raw,unit=0,file=<harness>/AAVMF.fd,readonly=on -drive format=raw,file=fat:rw:image\" tests/run_tests.sh"
+upstream_test_result: "TOTAL 4 / PASS 4 / FAIL 0 / ERROR 0 (rc=0); per-case 001..004 each rc=0"
+upstream_tests:
+  - file: tests/run_tests.sh
+    source: gnu-efi-4.0.4/tests/run_tests.sh
+    description: "QEMU/AAVMF driven UEFI runtime suite; 4 scenarios scripted in tests/test_list.txt (001 ConOut text output, 002 Test args, 003 Print args, 004 Test driver)"
+    command: "tests/gen_tests.sh tests/test_list.txt && UEFI_DIR=./image QEMU_CMD=\"qemu-system-aarch64 -M virt -cpu cortex-a57 -m 1024 -nodefaults -nographic -serial stdio -net none -drive if=pflash,format=raw,unit=0,file=<harness>/AAVMF.fd,readonly=on -drive format=raw,file=fat:rw:image\" tests/run_tests.sh"
+
+test_package_tests:
+  - file: test_gnuefi.py
+    description: >
+      Consumer test: compile a UEFI application against the packaged headers,
+      link it with crt0-efi-aarch64.o + elf_aarch64_efi.lds + libefi.a +
+      libgnuefi.a, convert it with objcopy -O efi-app-aarch64 and check the
+      result is a PE32+ aarch64 EFI application. Every check goes through
+      Checks.check() and the run ends with a printed `assertions N/M` line.
+    command: "python3 test_gnuefi.py <package_folder>"
+
+# `grep -c 'checks.check(' test_package/test_gnuefi.py` = 16
+# (13 value assertions + 3 arrival assertions, marked "arrival check" in the
+#  source; each arrival assertion directly follows a subprocess.run(check=True)
+#  step and confirms that step actually produced its artifact).
+assertion_count: 16
+assertion_count_breakdown:
+  value_assertions: 13
+  reached_line_assertions: 3
+  reached_line_details:
+    - "test_gnuefi.py:os.path.isfile(obj) —— clang -c（check=True）之后的到达型"
+    - "test_gnuefi.py:os.path.isfile(so) —— ld.lld 链接（check=True）之后的到达型"
+    - "test_gnuefi.py:os.path.isfile(efi) —— objcopy（check=True）之后的到达型"
+  runtime_evidence: "测试脚本末尾打印 `assertions N/M`（实测 assertions 16/16）"
+
