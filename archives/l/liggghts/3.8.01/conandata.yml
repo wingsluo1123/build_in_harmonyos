@@ -1,0 +1,44 @@
+# LIGGGHTS-PUBLIC sources for the 3.8.01 adaptation.
+#
+# R39: the URL is the official upstream release archive (CFDEMproject on GitHub).
+#
+# Version mapping (verified, not assumed): upstream has no 3.8.01 tag.  The
+# public release of this code line is 3.8.0 - src/version_liggghts.txt contains
+# "3.8.0" and release-notes.txt is headed "Release notes for LIGGGHTS-PUBLIC,
+# version 3.8.0".  Version 3.8.01 is the adaptation revision of 3.8.0 (R37).
+sources:
+  url: "https://github.com/CFDEMproject/LIGGGHTS-PUBLIC/archive/refs/tags/3.8.0.tar.gz"
+  sha256: "9cb2e6596f584463ac2f80e3ff7b9588b7e3638c44324635b6329df87b90ab03"
+
+patches:
+  # dump_mesh_vtk.{h,cpp} are the only VTK sources in the tree that ignore the
+  # project's own LAMMPS_VTK switch (their siblings dump_mesh_vtm.* and
+  # dump_vtk.* are guarded).  Without this guard the sources cannot be compiled
+  # at all unless VTK is present - see notes.md for why VTK output is disabled
+  # on this target.
+  - patch_file: "patches/0001-guard-mesh-vtk-dumps-with-lammps-vtk.patch"
+    patch_description: "Guard dump_mesh_vtk.{h,cpp} with the project's LAMMPS_VTK switch like their siblings"
+    patch_type: "portability"
+
+
+  # Utils::int_to_string bound a non-const lvalue reference to a temporary
+  # stream; libc++/clang rejects that.  Rewritten to the same three-statement
+  # form used by the neighbouring Utils::double_to_string.
+  - patch_file: "patches/0002-fix-int-to-string-rvalue-stream.patch"
+    patch_description: "Build Utils::int_to_string with a named stream (libc++ rejects binding an lvalue reference to a temporary)"
+    patch_type: "portability"
+
+  # NeighList::numneigh is an int*, so "numneigh > 0" is an ordered
+  # pointer/integer comparison that clang rejects.  The guard intent (skip when
+  # the list has no neighbour array) is preserved with a truthiness test, the
+  # form current LAMMPS uses.
+  - patch_file: "patches/0003-fix-neighlist-pointer-comparison.patch"
+    patch_description: "Replace the ordered pointer/zero comparison on NeighList::numneigh with a null test"
+    patch_type: "portability"
+
+  # Upstream writes to `screen` in Region::reset_random() without checking it for
+  # NULL.  LAMMPS/LIGGGHTS allow `-screen none` (screen == NULL), so any
+  # insertion fix that resets the region RNG dereferences a NULL FILE*.
+  - patch_file: "patches/0004-fix-null-screen-in-region-reset-random.patch"
+    patch_description: "Guard the screen write in Region::reset_random() (NULL-dereference with -screen none)"
+    patch_type: "bugfix"

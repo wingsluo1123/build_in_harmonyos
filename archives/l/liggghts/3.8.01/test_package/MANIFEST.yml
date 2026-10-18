@@ -1,0 +1,86 @@
+# test_package/MANIFEST.yml — 上游测试声明（CI L0e 强制）
+#
+# 清点（R51）：LIGGGHTS-PUBLIC 3.8.0 没有 tests/ 目录，Makefile 也没有 check 目标
+# （可用 target：machine / clean / stubs / makelib / makeshlib / …）。上游自带的
+# 验证资产是 examples/LIGGGHTS/Tutorials_public 下的公开教程算例：
+#
+#     $ find examples/LIGGGHTS/Tutorials_public -name "in.*" | wc -l
+#     28
+#
+# 本机实测（2026-10-15，鸿蒙 PC 原生 OHOS/aarch64 执行真实产物，逐个串行，每例 300s 上限）：
+#   * 原样运行（上游算例一字不改）：1/28 —— 27 个失败中 19 个在 `dump … custom/vtk` 处报
+#     ERROR: Invalid dump style，因为 OHOS 制品仓的 vtk/9.4.1 未启用 MPI
+#     （缺 vtkMPIController/ParallelMPI 模块），VTK 输出样式在本目标不可用（证据见 notes.md）。
+#   * 仅去掉 VTK dump 请求行：22/28 实测通过（第一轮统一 `-in` + 300s 上限得 18/28；
+#     第二轮按上游文档化调用方式再转 3 个：insert_stream 两段式顺序、particle_particle 传 -var、
+#     sph_1 给足预算后 1285s 跑完；第三轮长算例 hydrogel_multicontact 给足预算后 3444s 跑完）。
+#   * 其余 6 项终判不可修（上游已删除的 pair_style、CFDEM/PASCAL 耦合侧命令与可选包、CFD 侧参数文件、
+#     教程与源码版本不匹配），逐条证据见 notes.md 与 PR 说明。
+#
+# build() 内执行的 10 个算例是上述通过集合中的代表性子集，覆盖：restart/初始化、
+# 网格磨损、黏结接触、新接触模型族、运动网格、颗粒热传导、多接触、网格壁面、堆积插入。
+# 其余通过算例（hysteresis / noHysteresis / mesh_tet / insert_stream / heatTransfer_1 /
+# sph_2 / movingMeshGran / multisphere）因 CI 时间预算未纳入 build()，其验证记录见 notes.md。
+
+package: liggghts/3.8.01
+homepage: "https://github.com/CFDEMproject/LIGGGHTS-PUBLIC"
+
+upstream_check_command: "make check  # 上游无该目标；改用 lmp_mpi -in <tutorial>/in.*"
+upstream_test_in_build: true
+upstream_test_command: "lmp_mpi -in examples/LIGGGHTS/Tutorials_public/<tutorial>/in.<name>"
+
+upstream_tests:
+  - file: in.liggghts_init
+    source: LIGGGHTS-PUBLIC-3.8.0/examples/LIGGGHTS/Tutorials_public/ParScale/fluidizedBedTempParScale/in.liggghts_init
+    description: "流化床初始化：插入颗粒并写 restart（dump custom 文本输出）"
+    command: "lmp_mpi -in in.liggghts_init"
+  - file: in.chute_wear
+    source: LIGGGHTS-PUBLIC-3.8.0/examples/LIGGGHTS/Tutorials_public/chute_wear/in.chute_wear
+    description: "滑槽磨损：STL 网格壁面 + 磨损模块（mesh_module_stress）"
+    command: "lmp_mpi -in in.chute_wear"
+  - file: in.cohesion
+    source: LIGGGHTS-PUBLIC-3.8.0/examples/LIGGGHTS/Tutorials_public/cohesion/in.cohesion
+    description: "黏结接触模型（cohesionEnergyDensity + 插入）"
+    command: "lmp_mpi -in in.cohesion"
+  - file: in.noCohesion
+    source: LIGGGHTS-PUBLIC-3.8.0/examples/LIGGGHTS/Tutorials_public/cohesion/in.noCohesion
+    description: "无黏结对照组"
+    command: "lmp_mpi -in in.noCohesion"
+  - file: in.newModels
+    source: LIGGGHTS-PUBLIC-3.8.0/examples/LIGGGHTS/Tutorials_public/contactModels/in.newModels
+    description: "新接触模型族（Edinburgh / Luding / Thornton-Ning 等）"
+    command: "lmp_mpi -in in.newModels"
+  - file: in.conveyor
+    source: LIGGGHTS-PUBLIC-3.8.0/examples/LIGGGHTS/Tutorials_public/conveyor/in.conveyor
+    description: "输运带：运动网格壁面 + 颗粒输运（mesh_mover_linear）"
+    command: "lmp_mpi -in in.conveyor"
+  - file: in.heatGran
+    source: LIGGGHTS-PUBLIC-3.8.0/examples/LIGGGHTS/Tutorials_public/heatTransfer_2/in.heatGran
+    description: "颗粒热传导（fix heat/gran + 热源）"
+    command: "lmp_mpi -in in.heatGran"
+  - file: in.hydrogel_default
+    source: LIGGGHTS-PUBLIC-3.8.0/examples/LIGGGHTS/Tutorials_public/hydrogel_multicontact/in.hydrogel_default
+    description: "多接触（颗粒-网格耦合）默认配置"
+    command: "lmp_mpi -in in.hydrogel_default"
+  - file: in.meshGran
+    source: LIGGGHTS-PUBLIC-3.8.0/examples/LIGGGHTS/Tutorials_public/meshGran/in.meshGran
+    description: "三角网格壁面颗粒流"
+    command: "lmp_mpi -in in.meshGran"
+  - file: in.packing
+    source: LIGGGHTS-PUBLIC-3.8.0/examples/LIGGGHTS/Tutorials_public/packing/in.packing
+    description: "插入 + 粒径生长的堆积算例（fix insert/pack + fix adapt）"
+    command: "lmp_mpi -in in.packing"
+
+test_package_tests:
+  - file: test_liggghts.in
+    description: "消费者测试（单元级）：确定性 DEM 功能测试——125 个 20mm 颗粒在 0.1m 立方箱内重力接触 1000 步；断言退出码、完成横幅、颗粒数=125、动能有限且非零、日志无 ERROR（5 项）"
+    command: "./test_liggghts.sh"
+  - file: test_ohos_runtime.sh
+    description: "鸿蒙特有测试（运行时行为，5 项）：①gz 压缩数据文件（-DLAMMPS_GZIP 的 popen(gunzip) 通路）——明文与 gz 各跑一遍并要求最终热力学行逐位相同（T1a/T1b/T1c，同时验证镜像运行期提供 gunzip）②insert/pack 配 -screen none 跑通——补丁 0004 的运行时回归（撤销补丁的对照产物在同一算例上 rc=134 中止、无完成横幅，已反向验证）③用 mpiexec -n 2 跑确定性算例，断言 `on 2 procs`（本包是 MPI 构建，并行通路必须在目标机可用）"
+    command: "./test_ohos_runtime.sh"
+  - file: check_ohos.py
+    description: "鸿蒙特有测试（产物属性，16 项断言）：AArch64 ELF / ET_DYN(PIE) / PT_INTERP=/lib/ld-musl-aarch64.so.1；DT_NEEDED 全为裸 SONAME、无绝对路径、不含 libz；BIND_NOW；包内 bin 与 licenses 对 group/other 可读；`lmp_mpi -h` 在 OHOS 加载器下真实启动并打印横幅与用法"
+    command: "python3 check_ohos.py <liggghts package_folder>"
+
+# 断言数 = 消费者测试 5 项 + 鸿蒙特有（运行时 5 项 + 产物属性 16 项）+ 上游算例 3 项/个 × 10
+assertion_count: 56

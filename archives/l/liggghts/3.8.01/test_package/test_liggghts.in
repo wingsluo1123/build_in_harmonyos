@@ -1,0 +1,42 @@
+# LIGGGHTS functional test deck (deterministic, single rank).
+#
+# test_liggghts.data holds 125 spheres (d = 20 mm, rho = 2500 kg/m3) on a
+# 5x5x5 simple-cubic lattice exactly filling a 0.1 m cubic box, so the packing
+# starts at contact.  The DEM solver then integrates 1000 steps of
+# Hertz-Mindlin contact with Coulomb friction under gravity on a granular wall.
+# Positions, diameters and densities come from the data file, so the particle
+# set - and therefore every assertion in test_liggghts.sh - is deterministic.
+
+units           si
+atom_style      granular
+atom_modify     map array
+boundary        f f f
+newton          off
+communicate     single vel yes
+
+read_data       test_liggghts.data
+
+neighbor        0.002 bin
+neigh_modify    delay 0
+
+# material / contact model properties (Hertz-Mindlin with history)
+fix             m1 all property/global youngsModulus peratomtype 5.e6
+fix             m2 all property/global poissonsRatio peratomtype 0.45
+fix             m3 all property/global coefficientRestitution peratomtypepair 1 0.3
+fix             m4 all property/global coefficientFriction peratomtypepair 1 0.5
+
+pair_style      gran model hertz tangential history
+pair_coeff      * *
+
+timestep        0.00001
+
+# floor, integrator, gravity
+fix             zwall all wall/gran model hertz tangential history primitive type 1 zplane 0.0
+fix             integ all nve/sphere
+fix             grav all gravity 9.81 vector 0.0 0.0 -1.0
+
+compute         erot all erotate/sphere
+thermo_style    custom step atoms ke c_erot
+thermo          100
+
+run             1000
