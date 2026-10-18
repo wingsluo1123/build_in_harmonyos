@@ -1,0 +1,117 @@
+#====================================================================
+# _template.kv — 知识图谱条目模板
+# 用法: 复制此文件为 E429.kv，填写各字段
+# 对应的人类文档: doc/E429.md
+#
+# 格式规则:
+#   - key: value（冒号后一个空格，value 到行尾）
+#   - 多行值: 下一行以空格开头 = 续行
+#   - 列表值: 逗号分隔
+#   - 正则值: | 分隔多个模式
+#   - 以 # 开头的行为注释
+#   - 空行忽略
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+# trigger_tool: 出错的工具 (configure/cmake/meson/make/gcc/clang/ld/python/pip/install/test/runtime)
+# phase:         出错阶段 (configuration/compilation/linking/installation/testing/runtime)
+# error_signature: 正则表达式(|分隔), 用于精确匹配日志文本
+id:                     E429
+trigger_tool: conan|create|test_package
+phase: testing
+error_signature: 只校验了一个产物|清单声明与 bin/ 不一致|辅助产物未随包安装|漏检多产物包
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+# severity:      3=🔴blocking  2=🟡medium  1=🟢minor  0=✅resolved
+# category:      分类标签（受控词表 64 词，逗号分隔，最多 5 个；add/promote 自动归一化）
+# prescan_pattern: （可选）预编译源码扫描正则——写入后 PreScanner 运行时自动派生
+#                   PSCAN-KB-{id} 规则，无需改 pre-scan-rules.yaml（知识增长即扫描能力增长）
+# prescan_globs:   （可选）扫描范围 glob 列表，默认 '*.c, *.h, *.cc, *.cpp, *.sh, Makefile*, *.mk'
+# 词表: platform, compat, limitation, detection, hmdfs, ohos, selinux, kernel, portability, libc, musl, posix, syscall, headers, threading, socket, network, build-system, cmake, autotools ...（全表见 scripts/ohc/kb_taxonomy.py）
+# match_keywords: 纯文本关键词(逗号分隔), 用于粗筛(固定字符串匹配F)
+# title:         简短标题(一句话描述错误模式)
+severity: 2
+category: testing, packaging
+match_keywords: 多产物包, 多驱动, add_executable ×N, 清单交叉引用, INDI XML, driversList, desktop 文件, udev 规则, DT_NEEDED 逐个审计, best-effort 运行, SKIP
+title: 一个工程产出**多个**可执行/数据文件时（本包 6 驱动 + 1 XML + 1 udev 规则），消费者校验不能只验"其中一个产物"——应把产物清单化、逐产物做架构审计、并把清单文件（XML/JSON/desktop）与 bin/ 做**双向**比对（缺一条/多一条都判失败），另加辅助产物落点与 best-effort 运行检查
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+# root_cause:       一句话根因描述(逗号可分行)
+# affected_scope:   影响范围
+# verification_cmd: 验证诊断是否正确的命令
+root_cause: 单驱动包的消费者校验只要"验一个 bin + 一个 XML"就够，而多产物包极易出现三类漏检： ①只验了第一个可执行文件，其余 5 个即使架构错误/未安装也照样 PASS； ②清单文件（如 INDI 的 `driversList` XML、desktop 文件、pkg-config）与实际 `bin/` 不一致—— 少声明一条（客户端发现不了）或声明的可执行并不存在（运行期才炸）； ③辅助产物（udev 规则、systemd unit、图标等）被安装到包外/被丢弃，单看 bin/ 完全发现不了。
+affected_scope: 所有"一个 recipe 产出多个可执行/数据文件"的包（驱动集合、CLI 套件、字体/桌面数据包）；以及任何"上游用清单文件登记产物"的工程
+verification_cmd: python3 check_all_drivers.py <bindir> <resdir>/indi/<manifest>.xml <dep-pkg>/lib [<辅助产物路径>] # 断言：逐 bin ELF + 清单双向比对 + 逐 bin DT_NEEDED + 辅助产物存在 + best-effort 运行
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+# 推荐方案 (priority 越小越优先, 从 1 开始)
+rec_priority: 1
+rec_approach: enumerate-artifacts-and-cross-check-the-manifest
+rec_description: 把期望产物写成脚本内的常量元组（`EXPECTED_DRIVERS = (...)`），然后： ①**逐产物**做架构/非空/ELF 审计（AArch64 + 64 位 + 非空 + magic）；②解析清单文件（正则抓 `<driver name="…">EXE</driver>` 之类），做**双向**比对——声明的都要在 bin/ 里找到，bin/ 里的 也都要被声明（缺/多都判失败）；③对每个产物（或按同一链接配置抽样）做 DT_NEEDED 静态闭包审计 （期望依赖库齐备、条目均为裸 soname、且都能在依赖包内找到）；④按落点断言辅助产物； ⑤运行类检查 best-effort，宿主拒绝（沙箱 mmap/未签名/权限）记 SKIP 并打印原文，绝不把平台限制 记成失败、也不把未运行写成通过。输出统一的 `checks=/fails=/skips=` 三计数便于 CI 解析。
+rec_command: python3 check_all_drivers.py <bindir> <xml> <libindi-pkg>/lib <rules-file>
+rec_auto_fix: false
+rec_impl: manual
+
+# 回退方案 (当推荐方案不可用时尝试)
+fallback_priority: 2
+fallback_approach: iterate-the-installed-tree-instead-of-a-hard-coded-list
+fallback_description: 若产物数量多到不便硬编码，改为遍历包内 `bin/`（或 install 清单）自动枚举产物并逐个审计，再用清单文件比对集合差异；代价是"上游本应安装但没装"的产物无法被发现，需与上游 install 规则对账（grep add_executable/install 后与 bin/ 实际内容比对）。
+fallback_command: grep -nE "add_executable|install\(" <src>/CMakeLists.txt # 与包内 bin/ 实际内容对账
+fallback_auto_fix: false
+fallback_impl: manual
+forbid_1_pattern:
+
+# ★ 禁止策略 (与推荐方案同等重要) ★
+# forbid_N_pattern:     正则(|分隔), 匹配则拒绝/警告
+# forbid_N_reason:      为什么禁止
+# forbid_N_consequence: 违反后的后果
+forbid_1_pattern:
+forbid_1_reason:
+forbid_1_consequence:
+# forbid_2_pattern:
+# forbid_2_reason:
+# forbid_2_consequence:
+
+# ═══ Layer 4: 原则引用 ═══
+# principles:    适用的原则 ID 列表(逗号分隔), 在 graph/principles.kv 中定义
+principles:
+
+# ═══ 关系图 (Relations) ═══
+# causes:          本模式是这些模式的根因 (修好本模式可能同时解决它们)
+# caused_by:       本模式的根因是这些模式 (应先修它们)
+# similar_to:      特征相似可能混淆的模式
+# conflicts_with:  解决方案互相冲突的模式
+# prerequisite_of: 本模式是修复这些模式的前置条件
+causes:                 []
+caused_by:              []
+similar_to:             []
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file:               doc/E429.md
+last_updated: 2026-10-08
+source_event:           # 触发此条目创建的编译事件(如有)
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+# authors: 作者列表 (格式: Name <email>, Name2 <email2>)
+#          草稿生成时自动从 git config 填入；主编合入时保留原作者
+#          合并到已有条目时追加为第二/第三作者
+# source_pr:            添加该条目的 PR 编号
+# source_commit:        添加时的 commit SHA (短)
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics, 方案 D) ═══
+# metrics_success_count: 该修复方案成功次数
+# metrics_fail_count:    该修复方案失败次数
+# metrics_confidence:    置信度 = success / (success + fail)
+# metrics_last_used:     最后使用时间
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+
+draft: true
+contributor_id: 0173

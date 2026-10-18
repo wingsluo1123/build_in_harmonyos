@@ -1,0 +1,30 @@
+# 软件级 manifest — indi-armadillo-platypus
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: indi-armadillo-platypus
+display: "INDI Lunatico Astro drivers"
+description: "INDI 驱动集：Lunatico Astro 设备（Seletek 旋转器、DragonFly 圆顶/控制器、Beaver 圆顶、Armadillo/Platypus 调焦器），一个 CMake 工程产出 6 个可执行文件"
+category: application
+homepage: "https://github.com/indilib/indi-3rdparty"
+license: LGPL-2.1-or-later
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "indi-3rdparty 单体仓驱动子目录适配范式（源码 pin 到 commit 且保留整棵树；build_script_folder 只构建本驱动子目录）"
+    - "**多驱动包**：一个 CMake 工程产出 6 个可执行文件（indi_seletek_rotator / indi_dragonfly_dome / indi_dragonfly / indi_beaver_dome / indi_armadillo_focus / indi_platypus_focus）+ 1 个 INDI XML（indi_lunatico.xml）——消费者校验逐一对每个 bin 做 ELF 审计并核对 XML 交叉引用"
+    - "依赖仅 libindi/2.2.2.1 + libnova/0.16（均已合入，conan install 实测可解析；libnova 头经 indi 头链间接包含）"
+    - "INDI_DATA_DIR 预置为相对 share/indi（否则 XML 被 install 写进 libindi 包，见 DRAFT-24001）"
+    - "RULES_INSTALL_DIR 上游硬编码绝对路径 /usr/lib/udev/rules.d → 按同族 libfli 的既有做法重定向进私有前缀 lib/udev/rules.d"
+    - "上游 udev 规则安装守卫 CMAKE_SYSTEM_NAME MATCHES \"Linux\" → 按 E092 走 Linux 路径（同族 libfli 先例）"
+    - "package_info 暴露 bin/lib/share 并注入 libindi 的 lib 目录到 LD_LIBRARY_PATH"
+    - "上游无测试（CMakeLists 无 enable_testing/add_test，全仓无该驱动用例）；消费者验证由 test_package 承担"
+  common_dependencies:
+    - "libindi/2.2.2.1"
+    - "libnova/0.16"
+
+versions:
+  "1.0-20221226082641":
+    status: built
+    build_date: "2026-10-07"
+    conan_ref: "indi-armadillo-platypus/1.0-20221226082641"

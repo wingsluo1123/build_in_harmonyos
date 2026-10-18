@@ -1,0 +1,30 @@
+# conandata.yml — indi-armadillo-platypus 1.0-20221226082641
+#
+# 源码为 indi-3rdparty 单体仓库（驱动位于其 indi-armadillo-platypus/ 子目录）。
+# 该子目录 CMakeLists.txt 会把 "../cmake_modules" 追加进 CMAKE_MODULE_PATH
+# （include(CMakeCommon) 与 find_package(INDI) 都依赖它），故必须保留整棵仓库树
+# （source 用 strip_root=True）。
+#
+# 源码代次对齐到 commit 945fbe12d13f3472643931e24e444a4ca69d4ed5（v2.2.2 代，
+# 与制品仓 libindi 2.2.2.1 同代）；同快照兄弟驱动 indi-aok / indi-talon6 /
+# indi-maxdomeii 用同一 commit 与同一 sha256 构建通过。比赛版本号
+# 1.0-20221226082641 是 Debian 打包日期戳；该 commit 树内确实含本驱动目录。
+#
+# 注：使用 codeload.github.com（GitHub 官方归档主机）并显式给 filename——
+# 与 https://github.com/indilib/indi-3rdparty/archive/<commit>.tar.gz 字节完全一致
+# （sha256 实测相同）；codeload URL 的 basename 是裸 commit、不带 .tar.gz，
+# 需 filename 以便 Conan 识别解压格式。
+
+sources:
+  url: "https://codeload.github.com/indilib/indi-3rdparty/tar.gz/945fbe12d13f3472643931e24e444a4ca69d4ed5"
+  sha256: "6dee1f35741058690488257737af1ffdf20edccd0dcca1054e7906c9ba58d87a"
+  filename: "indi-3rdparty-945fbe12d13f3472643931e24e444a4ca69d4ed5.tar.gz"
+
+patches:
+  "1.0-20221226082641":
+    - patch_file: "patches/0001-indi-armadillo-platypus-CMakeLists-portability.patch"
+      patch_description: "①把 find_package(INDI REQUIRED) 改为显式请求 driver+align+client 组件，使 libindiclient 被记入 DT_NEEDED（musl loader 需它解析 libindidriver/libindiAlignmentDriver 引入的 tty_write_string 等符号）；②把硬编码的绝对路径 RULES_INSTALL_DIR=/usr/lib/udev/rules.d 改为相对 ${CMAKE_INSTALL_LIBDIR}/udev/rules.d——上游用的是普通 SET()（会遮蔽 toolchain 预置），而该绝对路径要写入宿主机的 /usr/lib/udev/rules.d（root 所有、构建用户不可写）→ file cannot create directory 使 install 失败并把产物写穿包前缀。仅改构建脚本，不改被编译源码。"
+      patch_type: "portability"
+    - patch_file: "patches/0002-indi-armadillo-platypus-add-unittests.patch"
+      patch_description: "在驱动子目录的 CMakeLists.txt 末尾追加受 INDI_BUILD_UNITTESTS 守卫的 GTest 目标（enable_testing + find_package(GTest) + add_executable(test-armadillo-platypus tests/test_arm_plat_focuser.cpp) + add_test(run-tests ...)），与兄弟驱动 indi-maxdomeii 的既有约定一致。上游该驱动本身没有测试，此补丁只**新增**测试目标、不改任何现有构建目标与源码；测试源由配方在 source() 阶段拷入。"
+      patch_type: "portability"
