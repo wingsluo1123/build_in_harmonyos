@@ -1,0 +1,23 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for plasma-activities/6.7.2.
+
+package: plasma-activities/6.7.2
+homepage: https://invent.kde.org/plasma/plasma-activities
+
+upstream_check_command: "ctest --output-on-failure"
+upstream_test_in_build: true
+upstream_test_command: "conan create runs ctest (BUILD_TESTING=ON): QFlatSetTest is the only upstream test registered with CTest"
+
+upstream_tests:
+  - file: autotests/core/CMakeLists.txt
+    source: plasma-activities-6.7.2/autotests/core/
+    description: "QFlatSetTest (1 QTest function: test1) exercises the Plasma::FlatSet container; PlasmaActivitiesTest (6 further QTest functions) is built but has no add_test upstream and its custom runner needs kactivitymanagerd over a session D-Bus, which OHOS does not provide (see notes.md for the per-function inventory)"
+    command: "ctest --output-on-failure"
+    condition: "runs inside the Conan build (BUILD_TESTING=ON); QFlatSetTest needs no service, the PlasmaActivitiesTest runner does"
+
+test_package_tests:
+  - file: test_package/src/consumer_e2e.cpp
+    description: "Offline consumer contract, 7 cases with per-case TEST PASS/TEST FAIL and TEST SUMMARY: version contract, Consumer service status, Consumer offline defaults, Controller completed futures, Controller remaining operations, Info availability, Info unknown id. Any failure exits 1."
+    command: "conan create (test_package builds and runs consumer_e2e)"
+
+assertion_count: 29
