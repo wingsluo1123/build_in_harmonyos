@@ -1,0 +1,71 @@
+software: xcb-util
+# 版本级 manifest 模板
+# 文件位置: archives/x/xcb-util/0.4.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.4.1"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-16"
+
+# 构建系统
+build_system: autotools
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://www.x.org/archive/individual/lib/xcb-util-0.4.1.tar.gz"
+
+  # 源码校验和
+  sha256: "21c6e720162858f15fe686cef833cf96a3e2a79875f84007d76f6d00417f593a"
+
+  # 压缩格式
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: autotools
+
+  configure_options:
+    - "--build=aarch64-unknown-linux-gnu"
+    - "--host=aarch64-unknown-linux-gnu"
+    - "--enable-shared"
+    - "--disable-static"
+
+  dependencies:
+    - libxcb/1.17.0
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "Since 0.3.8 xcb-util is a single library (libxcb-util, version-info 1:0:0) merged from the former atom/aux/event helpers; it installs four pkg-config files (xcb-util.pc plus xcb-aux/xcb-atom/xcb-event.pc aliases) that all resolve to the same lib, so one cpp_info component plus pkg_config_aliases models it"
+  - "XCB_UTIL_COMMON (shared across the xcb-util family, including xcb-util-wm) runs pkg-config --variable=xcbproto_version xcb; Conan's minimal generated xcb.pc lacks the variable and it must be patched in from the real xcb.pc in the libxcb package"
+  - "Unlike xcb-util-wm, xcb-util needs NO xorgproto require: src/ references no X11/ header, the only external header is <xcb/xcb.h> and the only linked library is libxcb"
+  - "The x.org release tarball ships pre-generated configure/Makefile.in; the OHOS device has no automake/libtool, so autoreconf is not a viable route for this family"
+  - "Fulfils the link contract of upstream xdo (LDLIBS -lxcb-util, #include <xcb/xcb_aux.h>), unblocking xdo 0.5.7 on this platform"
