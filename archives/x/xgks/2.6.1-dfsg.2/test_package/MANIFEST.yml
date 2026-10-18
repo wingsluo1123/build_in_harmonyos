@@ -1,0 +1,61 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: xgks/2.6.1-dfsg.2
+homepage: "http://xgks.sourceforge.net"
+
+# 上游测试清点（R51，源码包实测 2026-10-14）：
+#   xgks_2.6.1+dfsg.2.orig.tar.gz（1688680 字节，
+#   sha256 451dd35080fd3e2fc1f5ed83b8b86e29c5ad0af2adf4c4d08ff13643ece641ab）
+#   共 698 个归档条目。
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "源码树 (xgks_2.6.1+dfsg.2.orig.tar.gz, 698 条目)"
+    reason: "无 tests/ 或 test/ 目录；唯一的 test 相关文件是 src/bugs/test.cgm（二进制 CGM fixture）和 src/port/fortc/test.src（fortc 工具的输入探针），均非测试套件。"
+  - source: "src/Makefile.in / src/progs/Makefile.in 的 test 目标"
+    reason: "唯一的 test 入口是 progs/test：运行 pmark/pline/defcolors/hanoi/mi/font 等交互式 X11 演示（pmark/pline 需 X display，gksdemo 为交互程序）；无自动化断言、无测试框架。"
+  - source: "debian/rules (Debian 官方打包)"
+    reason: "override_dh_auto_test 明确写死为 Testing disabled as tests are interactive；Debian 从不运行上游测试。"
+  - source: "构建系统与测试框架"
+    reason: "autoconf 2.13 + 手写递归 Makefile，无 TESTS/check_PROGRAMS 变量，无 CTest/gtest/pytest 依赖；configure.in 仅探测编译器/X11/troff，无测试框架探测。"
+  - conclusion: "上游 2.6.1-dfsg.2 未提供自动化测试；由 test_package 对打包的 C 库做消费者视角的真实 API 验证（MO 文件工作站 + 3 种图元 + 落盘断言，共 6 项），绝不冒充上游覆盖率。"
+
+upstream_test_total: 0
+upstream_test_count_method: manual_audit
+# 上游无测试套件，保持空命令：HMBS 把非空值视为"上游有测试"，会与
+# no_tests/0 冲突而拒收（ifplugd/0.28 同款接线）。
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "真实调用打包的 C 库：gopengks 打开 GKS，gopenws 打开 MO 文件工作站（无需 X 显示）"
+    command: "./test_xgks"
+  - file: test.c
+    description: "gactivatews + gsetwswindow 激活工作站并设置窗口"
+    command: "./test_xgks"
+  - file: test.c
+    description: "绘制三类输出图元：gpolyline + gpolymarker + gfillarea"
+    command: "./test_xgks"
+  - file: test.c
+    description: "gdeactivatews + gclosews + gclosegks 有序关闭"
+    command: "./test_xgks"
+  - file: test.c
+    description: "落盘断言：test_xgks.gksm 存在且非空（空文件即判失败，防静默空转）"
+    command: "./test_xgks"
+
+test_scenario_count: 5
+assertion_count: 6
+assertion_count_basis:
+  gks_open: 1
+  mo_workstation_open: 1
+  activate_and_window: 1
+  three_primitives: 1
+  orderly_close: 1
+  metafile_nonempty: 1
+privilege_required_for_test: false
+privilege_note: "MO（metafile output）工作站只写本地文件，不开 X 连接、不碰输入设备；无需 root 与显示器。"
