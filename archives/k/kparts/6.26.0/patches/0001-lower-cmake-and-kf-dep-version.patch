@@ -1,0 +1,23 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,7 +1,18 @@
+-cmake_minimum_required(VERSION 3.29)
++# OHOS adaptation: the OpenHarmony SDK toolchains we build with ship
++# CMake 3.28.2 (native SDK build-tools) and the CI worker / host
++# toolchains are in the same range; upstream's 3.29 floor is only a
++# release-script default and no 3.29-only command is used here.
++cmake_minimum_required(VERSION 3.22)
+ 
+ set(KF_VERSION "6.26.0") # handled by release scripts
+-set(KF_DEP_VERSION "6.26.0") # handled by release scripts
++# ohpcd publishes KIOWidgets only in kio/6.14.0 (kio/6.26.0 is a
++# KIOCORE_ONLY build: no KIOWidgets target, no KUriFilter header,
++# while src/navigationextension.cpp really uses KUriFilter and
++# src/CMakeLists.txt links KF6::KIOWidgets). Mixing kio/6.14.0 into
++# the 6.26 series forces a kio source rebuild whose trash worker
++# cannot compile against the published Solid package, so the whole
++# KF6 graph stays on the published 6.14.0 series (API-compatible).
++set(KF_DEP_VERSION "6.14.0") # adapted: see notes.md
+ project(KParts VERSION ${KF_VERSION})
+ 
+ include(FeatureSummary)
