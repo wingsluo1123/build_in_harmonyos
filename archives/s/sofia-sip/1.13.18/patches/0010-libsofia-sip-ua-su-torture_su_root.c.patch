@@ -1,0 +1,69 @@
+--- a/libsofia-sip-ua/su/torture_su_root.c
++++ b/libsofia-sip-ua/su/torture_su_root.c
+@@ -445,24 +445,24 @@
+   }
+   else {			/* second run */
+     if (++rt->rt_woken == rt->rt_sockets)
+       su_root_break(rt->rt_root);
+   }
+ 
+   return 0;
+ }
+ 
+ 
+-int event_test(root_test_t rt[1])
++int event_test(root_test_t rt[1], int N)
+ {
+   BEGIN();
+-  int i = 0, N = 2048;
++  int i = 0;
+   test_ep_t *n, *nodes, *list = NULL;
+   su_sockaddr_t su[1];
+   socklen_t sulen;
+ 
+   TEST_1(nodes = calloc(N, sizeof *nodes));
+ 
+   memset(su, 0, sulen = sizeof su->su_sin);
+   su->su_len = sizeof su->su_sin;
+   su->su_family = AF_INET;
+   su->su_sin.sin_addr.s_addr = htonl(0x7f000001); /* 127.0.0.1 */
+@@ -888,21 +888,38 @@
+ 
+   su_init();
+ 
+   do {
+     rt = rt1, *rt = *rt0;
+ 
+     retval |= test_api(rt);
+ 
+     retval |= init_test(rt, prefer[i].name, prefer[i].create, prefer[i].start);
+     retval |= register_test(rt);
+-    retval |= event_test(rt);
++    {
++      int event_fds = 2048;
++      char const *root_setting = getenv("SOFIA_ROOT_TEST_FDS");
++      if (root_setting) {
++        int requested = atoi(root_setting);
++        if (requested > 0 && requested <= event_fds)
++          event_fds = requested;
++      }
++      if (strcmp(prefer[i].name, "poll") == 0) {
++        char const *poll_setting = getenv("SOFIA_POLL_TEST_FDS");
++        if (poll_setting) {
++          int requested = atoi(poll_setting);
++          if (requested > 0 && requested <= event_fds)
++            event_fds = requested;
++        }
++      }
++      retval |= event_test(rt, event_fds);
++    }
+     retval |= timer_test(rt);
+     retval |= clone_test(rt, 1);
+     retval |= clone_test(rt, 0);
+     retval |= deinit_test(rt);
+   } while (prefer[++i].create);
+ 
+   su_deinit();
+ 
+   return retval;
+ }

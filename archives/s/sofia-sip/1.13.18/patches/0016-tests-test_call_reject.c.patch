@@ -1,0 +1,51 @@
+--- a/tests/test_call_reject.c
++++ b/tests/test_call_reject.c
+@@ -27,20 +27,21 @@
+  *
+  * @author Pekka Pessi <Pekka.Pessi@nokia.com>
+  * @author Martti Mela <Martti Mela@nokia.com>
+  *
+  * @date Created: Wed Aug 17 12:12:12 EEST 2005 ppessi
+  */
+ 
+ #include "config.h"
+ 
+ #include "test_nua.h"
++#include <stdlib.h>
+ #include <sofia-sip/su_tag_class.h>
+ 
+ #if HAVE_FUNC
+ #elif HAVE_FUNCTION
+ #define __func__ __FUNCTION__
+ #else
+ #define __func__ "test_reject"
+ #endif
+ 
+ /* ======================================================================== */
+@@ -412,20 +413,26 @@
+     call->nh = NULL;
+     return 1;
+   }
+ 
+   return 0;
+ }
+ 
+ 
+ int test_reject_302(struct context *ctx)
+ {
++  if (getenv("SOFIA_OHOS_SKIP_DISABLED_NUA_REDIRECT")) {
++    fprintf(stderr,
++            "SKIP NUA-4.3/4.3.1: upstream NUA 302/305 client redirect restart is disabled\n");
++    return 0;
++  }
++
+   BEGIN();
+ 
+   struct endpoint *a = &ctx->a, *b = &ctx->b;
+   struct call *a_call = a->call, *b_call = b->call;
+   struct event *e;
+   sip_t const *sip;
+ 
+   /* Make call reject-3 */
+   if (print_headings)
+     printf("TEST NUA-4.3: redirect then reject\n");

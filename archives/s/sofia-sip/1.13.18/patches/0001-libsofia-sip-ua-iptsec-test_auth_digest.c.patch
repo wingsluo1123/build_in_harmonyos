@@ -1,0 +1,52 @@
+--- a/libsofia-sip-ua/iptsec/test_auth_digest.c
++++ b/libsofia-sip-ua/iptsec/test_auth_digest.c
+@@ -1298,21 +1298,21 @@
+ 
+   END();
+ }
+ 
+ #if HAVE_FLOCK
+ #include <sys/file.h>
+ #endif
+ 
+ #include <sofia-sip/auth_plugin.h>
+ 
+-char tmppasswd[] = "/tmp/test_auth_digest.XXXXXX";
++char tmppasswd[512] = "/tmp/test_auth_digest.XXXXXX";
+ 
+ #include <unistd.h>
+ 
+ static void rmtmp(void)
+ {
+   if (tmppasswd[0])
+     unlink(tmppasswd);
+ }
+ 
+ char const passwd[] =
+@@ -1329,20 +1329,26 @@
+ /* Test digest authentication client and server */
+ int test_module_io(void)
+ {
+   auth_mod_t *am, am0[1];
+   auth_passwd_t *apw, *apw2;
+   int tmpfd;
+ 
+   BEGIN();
+ 
+ #ifndef _WIN32
++  char const *tmpdir = getenv("TMPDIR");
++  if (tmpdir && *tmpdir) {
++    int n = snprintf(tmppasswd, sizeof tmppasswd,
++                     "%s/test_auth_digest.XXXXXX", tmpdir);
++    TEST_1(n > 0 && (size_t)n < sizeof tmppasswd);
++  }
+   tmpfd = mkstemp(tmppasswd); TEST_1(tmpfd != -1);
+ #else
+   tmpfd = open(tmppasswd, O_WRONLY); TEST_1(tmpfd != -1);
+ #endif
+   atexit(rmtmp);		/* Make sure temp file is unlinked */
+ 
+   TEST_SIZE(write(tmpfd, passwd, strlen(passwd)), strlen(passwd));
+   TEST(close(tmpfd), 0);
+ 
+   /* Test file reading operation */

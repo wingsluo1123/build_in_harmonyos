@@ -1,0 +1,29 @@
+--- a/tests/test_register.c
++++ b/tests/test_register.c
+@@ -563,20 +563,26 @@
+   TEST_1(e);
+   TEST_S(sip->sip_contact->m_expires, "3600");
+   TEST_1(!e->next);
+   free_events_in_list(ctx, b->events);
+ 
+   if (print_headings)
+     printf("TEST NUA-2.3.4: PASSED\n");
+ 
+   if (!ctx->p)
+     return 0;
++
++  if (getenv("SOFIA_OHOS_SKIP_STATEFUL_NUA_TCP")) {
++    if (print_headings)
++      puts("TEST NUA-2.3.5: SKIPPED (stateful TCP reconnect on HarmonyOS)");
++    return 0;
++  }
+ 
+   if (print_headings)
+     printf("TEST NUA-2.3.5: re-REGISTER when TCP connection is closed\n");
+ 
+   test_proxy_close_tports(ctx->p);
+ 
+   run_b_until(ctx, -1, save_until_final_response);
+ 
+   TEST_1(e = b->events->head);
+   TEST_E(e->data->e_event, nua_r_register);

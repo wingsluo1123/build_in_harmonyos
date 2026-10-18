@@ -1,0 +1,28 @@
+--- a/tests/check_dlopen_sofia.c
++++ b/tests/check_dlopen_sofia.c
+@@ -82,20 +82,25 @@
+ }
+ 
+ int main(int argc, char *argv[])
+ {
+   int i, failed = 0;
+ 
+   Suite *suite = suite_create("dlopen()ing and dlclose() with libsofia-sip-ua");
+   SRunner *runner;
+   char const *xml = NULL;
+ 
++  if (getenv("SOFIA_SKIP_DLOPEN_TEST")) {
++    puts("SKIP: check_dlopen_sofia requires a shared library");
++    return 77;
++  }
++
+   s2_select_tests(getenv("CHECK_CASES"));
+ 
+   for (i = 1; argv[i]; i++) {
+     if (strncmp(argv[i], "--xml=", strlen("--xml=")) == 0) {
+       xml = argv[i] + strlen("--xml=");
+     }
+     else if (strcmp(argv[i], "--xml") == 0) {
+       if (!(xml = argv[++i]))
+ 	usage(2);
+     }

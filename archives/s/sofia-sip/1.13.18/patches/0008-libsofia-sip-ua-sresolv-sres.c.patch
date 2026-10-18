@@ -1,0 +1,24 @@
+--- a/libsofia-sip-ua/sresolv/sres.c
++++ b/libsofia-sip-ua/sresolv/sres.c
+@@ -3667,20 +3667,21 @@
+     SU_DEBUG_5(("sres_decode_msg: %s\n", m->m_error));
+     return -1;
+   }
+ 
+   err = m->m_flags & SRES_HDR_RCODE;
+ 
+   if (m->m_ancount == 0 && err == 0)
+     err = SRES_RECORD_ERR;
+ 
+   if (err == SRES_RECORD_ERR ||
++      err == SRES_SERVER_ERR ||
+       err == SRES_NAME_ERR ||
+       err == SRES_UNIMPL_ERR ||
+       err == SRES_AUTH_ERR)
+     errorcount = 1;
+ 
+   total = errorcount + m->m_ancount + m->m_nscount + m->m_arcount;
+ 
+   answers = su_zalloc(chome, (total + 2) * sizeof answers[0]);
+   if (!answers)
+     return -1;

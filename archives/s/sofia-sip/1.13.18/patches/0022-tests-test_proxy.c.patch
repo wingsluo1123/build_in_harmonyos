@@ -1,0 +1,20 @@
+--- a/tests/test_proxy.c
++++ b/tests/test_proxy.c
+@@ -800,8 +800,16 @@
+     if (domain && domain->prefs.record_route)
+       t->rr = 1;
+ 
+-    if (process(t) < 200)
++    if (process(t) < 200) {
++      if (getenv("SOFIA_OHOS_TEST_PROXY_NO_WS") &&
++          t->method == sip_method_invite) {
++        /* NTA consumes downstream 100 Trying without calling proxy_response.
++           Send a local 100 from the original INVITE transaction so the UAC
++           can send a queued CANCEL instead of waiting for its timeout. */
++        (void)nta_incoming_treply(irq, SIP_100_TRYING, TAG_END());
++      }
+       return 0;
++    }
+ 
+     proxy_tr_destroy(t);
+   }

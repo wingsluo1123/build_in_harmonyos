@@ -1,0 +1,55 @@
+--- a/libsofia-sip-ua/nua/nua_session.c
++++ b/libsofia-sip-ua/nua/nua_session.c
+@@ -968,20 +968,22 @@
+     else if (soa_set_remote_sdp(nh->nh_soa, NULL, sdp, len) < 0) {
+       LOG3("error parsing SDP");
+       sdp = NULL;
+       cr->cr_graceful = 1;
+       ss->ss_reason = "SIP;cause=400;text=\"Malformed Session Description\"";
+     }
+     else if (soa_process_answer(nh->nh_soa, NULL) < 0) {
+       LOG5("error processing SDP");
+       /* XXX */
+       sdp = NULL;
++      received = NULL;
++      cr->cr_answer_recv = 0;
+     }
+     else if (soa_activate(nh->nh_soa, NULL) < 0) {
+       /* XXX - what about errors? */
+       LOG3("error activating media after");
+     }
+     else {
+       ss->ss_sdp_version = soa_get_user_version(nh->nh_soa);
+       LOG5("processed SDP");
+     }
+   }
+@@ -1305,24 +1307,27 @@
+       sip_header_remove(msg, sip, (sip_header_t*)sip->sip_priority);
+     while (sip->sip_proxy_require)
+       sip_header_remove(msg, sip, (sip_header_t*)sip->sip_proxy_require);
+     while (sip->sip_require)
+       sip_header_remove(msg, sip, (sip_header_t*)sip->sip_require);
+     while (sip->sip_subject)
+       sip_header_remove(msg, sip, (sip_header_t*)sip->sip_subject);
+     while (sip->sip_supported)
+       sip_header_remove(msg, sip, (sip_header_t*)sip->sip_supported);
+ 
+-    if (ss == NULL || ss->ss_state > nua_callstate_ready || pl_s)
++    if (ss == NULL || ss->ss_state > nua_callstate_ready)
+       ;
+     else if (cr->cr_offer_recv && !cr->cr_answer_sent) {
+-      if (nh->nh_soa == NULL) {
++      if (pl_s) {
++	cr->cr_answer_sent = 1, ss->ss_oa_sent = Answer;
++      }
++      else if (nh->nh_soa == NULL) {
+ 	if (session_get_description(sip, NULL, NULL))
+ 	  cr->cr_answer_sent = 1, ss->ss_oa_sent = Answer;
+       }
+       else if (soa_generate_answer(nh->nh_soa, NULL) < 0 ||
+ 	  session_include_description(nh->nh_soa, 1, msg, sip) < 0) {
+ 	status = 900, phrase = "Internal media error";
+ 	reason = "SIP;cause=500;text=\"Internal media error\"";
+ 	/* reason = soa_error_as_sip_reason(nh->nh_soa); */
+       }
+       else {

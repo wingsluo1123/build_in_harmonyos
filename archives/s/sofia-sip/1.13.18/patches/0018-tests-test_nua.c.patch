@@ -1,0 +1,58 @@
+--- a/tests/test_nua.c
++++ b/tests/test_nua.c
+@@ -251,37 +251,48 @@
+     }
+     else if (argv[i][0] != '-') {
+       break;
+     }
+     else {
+       fprintf(stderr, "test_nua: unknown argument \"%s\"\n\n", argv[i]);
+       usage(1);
+     }
+   }
+ 
++  if (getenv("SOFIA_OHOS_TEST_NUA_NO_NAT")) {
++    o_inat = 0;
++    if (print_headings)
++      puts("HarmonyOS test mode: disabled cross-family test NAT");
++  }
++
+   if (o_attach) {
+     char line[10], *l;
+     printf("%s: pid %lu\n", name, (unsigned long)getpid());
+     printf("<Press RETURN to continue>\n");
+     l = fgets(line, sizeof line, stdin);
+   }
+ #if HAVE_ALARM
+   else if (o_alarm) {
++    unsigned int timeout = 120;
++
+     signal(SIGALRM, sig_alarm);
+-    if (o_expensive) {
++    if (getenv("SOFIA_OHOS_TEST_NUA_EXTENDED_TIMEOUT")) {
++      timeout = 300;
++      printf("%s: extending timeout to %u seconds for HarmonyOS test matrix\n",
++             name, timeout);
++    }
++    else if (o_expensive) {
++      timeout = 240;
+       printf("%s: extending timeout to %u because expensive tests\n",
+-	     name, 240);
+-      alarm(240);
+-    }
+-    else {
+-      alarm(120);
+-    }
++             name, timeout);
++    }
++    alarm(timeout);
+   }
+ #endif
+ 
+ #if HAVE_OPEN_C
+   tstflags |= tst_verbatim;
+   level = 9;
+   o_inat = 1; /* No NATs */
+   ctx->threading = 1;
+   ctx->quit_on_single_failure = 1;
+   su_log_soft_set_level(nua_log, level);
