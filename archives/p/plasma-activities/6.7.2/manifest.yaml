@@ -1,0 +1,31 @@
+software: plasma-activities
+version: "6.7.2"
+status: built
+build_system: cmake
+created_at: 2026-10-18
+build_date: "2026-10-18"
+dependencies:
+  required:
+    - qtbase-sql-dbus/6.11.1
+    - qtbase/6.11.1
+    - qtdeclarative/6.11.1
+    - kconfig/6.26.0.1
+    - kcoreaddons/6.26.0.1
+  build:
+    - ecm/6.26.0
+  optional: []
+patches_applied:
+  - patches/0001-manager-guard-null-session-bus.patch
+test_results:
+  type: passed_with_exclusions
+  upstream: "passed: QFlatSetTest 1/1 executed upstream CTest autotest; PlasmaActivitiesTest (6 further QTest functions) is built but not registered with CTest upstream and requires kactivitymanagerd + a session D-Bus, unavailable on OHOS"
+  test_package: "passed: offline consumer E2E 7/7 cases (version contract, Consumer status/defaults, Controller futures and remaining operations, Info availability and unknown id)"
+source_url: https://download.kde.org/stable/plasma/6.7.2/plasma-activities-6.7.2.tar.xz
+source_sha256: 18379349eb05382a165d3b59c13b756fdb7e681b11d57ca9e2fbae3ffee4a34a
+knowledge_gained:
+  - "plasma-activities needs Qt6 Core+DBus at top level and Gui/Qml/Quick/Sql in src/imports; the plain qtbase/6.11.1 package ships FEATURE_dbus=OFF and no Sql module, so qtbase-sql-dbus/6.11.1 (superset build) provides Qt6 and is prepended last in both CMAKE_PREFIX_PATH and LD_LIBRARY_PATH (kactivitymanagerd 6.7.2 precedent)."
+  - "Qt6Config.cmake resolves components relative to Qt6_DIR; the QML module needs QT_ADDITIONAL_PACKAGES_PREFIX_PATH pointing at the qtdeclarative prefix, otherwise find_package(Qt6 COMPONENTS Qml Quick) fails (analitza 26.04.0 precedent)."
+  - "HMDFS rejects symlink() with EPERM, so the upstream VERSION/SOVERSION chain for libPlasmaActivities.so.7 cannot be created; CMAKE_PLATFORM_NO_VERSIONED_SONAME=ON plus explicit -Wl,-soname, flags in both variable and cache_variable channels emit an unversioned library with a real DT_SONAME (E330 family)."
+  - "Upstream registers only QFlatSetTest with CTest; the PlasmaActivitiesTest integration runner has no add_test and its TestRunner spawns kactivitymanagerd via QStandardPaths::findExecutable and talks to the manager over a session D-Bus, which the OHOS sandbox does not provide."
+  - "plasma-activities-cli6 busy-waits for serviceStatus() == Running, so it never terminates without kactivitymanagerd; the consumer E2E therefore drives the offline Consumer/Controller/Info contract directly instead of shelling out to the CLI."
+  - "QDBusConnection::sessionBus().interface() is nullptr when no session bus is reachable; upstream Manager::self()/serviceOwnerChanged() dereference it without a check, so every Consumer construction segfaults on OHOS. A null-check patch (0001) guards all three sites; the same defect hits any headless system without a session D-Bus."

@@ -1,0 +1,40 @@
+--- a/src/lib/manager_p.cpp	2026-10-18 00:32:19.454731500 +0800
++++ b/src/lib/manager_p.cpp	2026-10-18 00:33:02.459201300 +0800
+@@ -54,21 +54,23 @@
+             // creating a new instance of the class
+             Manager::s_instance = new Manager();
+ 
+-            if (QDBusConnection::sessionBus().interface()->isServiceRegistered(KAMD_DBUS_SERVICE)) { // already running
++            auto busInterface = QDBusConnection::sessionBus().interface();
++
++            if (busInterface && busInterface->isServiceRegistered(KAMD_DBUS_SERVICE)) { // already running
+                 s_instance->m_serviceStatus = Running;
+             } else { // not running
+                 bool disableAutolaunch = QCoreApplication::instance()->property("org.kde.KActivities.core.disableAutostart").toBool();
+ 
+                 qCDebug(KAMD_CORELIB) << "Should we start the daemon?";
+                 // start only if not disabled and we have a dbus connection at all
+-                if (!disableAutolaunch && QDBusConnection::sessionBus().interface()) {
++                if (!disableAutolaunch && busInterface) {
+                     qCDebug(KAMD_CORELIB) << "Starting the activity manager daemon";
+-                    auto busInterface = QDBusConnection::sessionBus().interface();
+                     auto pending = busInterface->asyncCall(QStringLiteral("StartServiceByName"), KAMD_DBUS_SERVICE, uint(0));
+                     s_instance->m_serviceStatus = Manager::Starting;
+                     QDBusPendingCallWatcher *watcher = new QDBusPendingCallWatcher(pending, s_instance);
+                     connect(watcher, &QDBusPendingCallWatcher::finished, watcher, []() {
+-                        const bool isRunning = QDBusConnection::sessionBus().interface()->isServiceRegistered(KAMD_DBUS_SERVICE);
++                        auto serviceInterface = QDBusConnection::sessionBus().interface();
++                        const bool isRunning = serviceInterface && serviceInterface->isServiceRegistered(KAMD_DBUS_SERVICE);
+                         s_instance->m_serviceStatus = isRunning ? Manager::Running : Manager::NotRunning;
+                         Q_EMIT s_instance->serviceStatusChanged(s_instance->m_serviceStatus);
+                     });
+@@ -94,7 +96,8 @@
+     Q_UNUSED(oldOwner);
+ 
+     if (serviceName == KAMD_DBUS_SERVICE) {
+-        const bool isRunning = QDBusConnection::sessionBus().interface()->isServiceRegistered(KAMD_DBUS_SERVICE);
++        auto serviceInterface = QDBusConnection::sessionBus().interface();
++        const bool isRunning = serviceInterface && serviceInterface->isServiceRegistered(KAMD_DBUS_SERVICE);
+         m_serviceStatus = isRunning ? Manager::Running : Manager::NotRunning;
+         Q_EMIT serviceStatusChanged(m_serviceStatus);
+ 
