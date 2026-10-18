@@ -1,0 +1,28 @@
+# conandata.yml — kcolorscheme 6.26.0.1
+# sha256 verified against the official KDE tarball (74149a03...c969f1).
+#
+# R39 source fallback: download.kde.org (Mirrorbits) 302s to a regional
+# mirror (mirrors.bfsu.edu.cn from CN networks) whose TLS certificate
+# fails verification on the device network (self-signed). conan's get()
+# tries the URLs in order; mirror.nju.edu.cn and mirrors.aliyun.com were
+# downloaded on 2026-10-18 and sha256-checked byte-identical to the
+# official tarball (51636 bytes; mirrors.ustc.edu.cn redirects to the same
+# failing bfsu host and is therefore omitted).
+
+sources:
+  url:
+    - "https://download.kde.org/stable/frameworks/6.26/kcolorscheme-6.26.0.tar.xz"
+    - "https://mirror.nju.edu.cn/kde/stable/frameworks/6.26/kcolorscheme-6.26.0.tar.xz"
+    - "https://mirrors.aliyun.com/kde/stable/frameworks/6.26/kcolorscheme-6.26.0.tar.xz"
+  sha256: "74149a0379bd8bf6590d3c1f7f8c503665e0f3adafc2adbd44fc6bb764c969f1"
+
+# The patches key is the RECIPE version (apply_conandata_patches looks up
+# conan_data["patches"][self.version]); the upstream source version is the
+# tarball in sources, not this key. A "6.26.0" key is silently ignored for
+# a 6.26.0.1 recipe (found on the device: no -l:/-soname flags reached the
+# link line).
+patches:
+  "6.26.0.1":
+    - patch_file: "patches/0002-ohos-basename-soname-link.patch"
+      patch_description: "Relocatable basename SONAME linkage: the published KF6 6.26.0 libraries carry no DT_SONAME (their installed targets set IMPORTED_NO_SONAME; kguiaddons and ki18n have no published .1 release), so linking them by absolute Conan cache paths bakes machine-private paths into libKF6ColorScheme.so's DT_NEEDED (L5a/L5b/L5c). The four consumed KF6 components (ConfigCore/ConfigGui/GuiAddons/I18n) are linked by exact-file-name -l: flags with their directories attached PRIVATE; KF6::ConfigCore stays on the link INTERFACE by NAME because the public headers include <KSharedConfig> and the installed KF6ColorSchemeConfig.cmake already find_dependency(KF6Config) upstream. Usage requirements of the deps that left the link line are copied by walking the INTERFACE_LINK_LIBRARIES closure with -NOTFOUND sentinel guards; the shared library passes -Wl,-soname,libKF6ColorScheme.so explicitly where the OHOS platform module defines no soname flag"
+      patch_type: "portability"
