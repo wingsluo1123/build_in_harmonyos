@@ -1,0 +1,26 @@
+# 软件级 manifest — jasmin-sable
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: jasmin-sable
+display: "Jasmin (Java bytecode assembler)"
+description: "Jasmin：把 .j/.jas 汇编文本编译成 .class 的 Java 字节码汇编器（含同包附带的 jas 字节码库；运行需要 java-cup 运行时）"
+category: application
+homepage: "https://github.com/Sable/soot/tree/develop/jasmin"
+license: GPL-2.0-or-later
+build_system: javac
+
+ohos_adaptation:
+  key_points:
+    - "老 ant 工程**不跑 ant**：自动生成的源码（`parser.java`/`sym.java`、`generated/scm/**`）**已随 tarball 提供** → 直接用 JDK 的 javac 编译即可，省掉 java_cup 生成与 autogen 两段流程"
+    - "多源码集：汇编器 `import jas.*` → 必须同时编译 `src/jasmin` + **`lib/jas/src`** + `generated/scm`，否则缺类"
+    - "**java-cup 是运行期依赖**（源码 `import java_cup.*`）→ 制品仓没有，按'构建/测试期依赖自取'从 Maven Central 取（钉 sha256）并**随包提供**到 `libexec/`，否则 `jasmin` 跑不起来"
+    - "产物：`libexec/jasmin-sable-2.5.0.jar` + `libexec/java-cup-*.jar` + `bin/jasmin` 包装脚本（自带 classpath）"
+    - "上游无测试套件 → 通过率 N/A（如实披露）；验证由消费者端到端承担（**真跑**：汇编 .jas → 执行生成的类并断言输出）"
+  common_dependencies:
+    - "java-cup-11b-20160615-3.jar（Maven Central，随包提供）"
+
+versions:
+  "2.5.0":
+    status: built
+    build_date: "2026-10-08"
+    conan_ref: "jasmin-sable/2.5.0"
