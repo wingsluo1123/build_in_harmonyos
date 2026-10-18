@@ -1,0 +1,98 @@
+#====================================================================
+# DRAFT — lwgps 2.4.0：顶层 CMake 把测试专用配置头注入库目标编译
+#          → 库与消费者结构体布局错位 → test_package Signal 11
+# 路径 B 草稿（knowledge_decision: new_draft），跨库可复用候选
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+# trigger_tool: 出错的工具
+# phase:         出错阶段
+# error_signature: 正则表达式(|分隔), 用于精确匹配日志文本
+id: DRAFT-lwgps-2.4.0-cmake-test-config-struct-layout-mismatch
+trigger_tool: cmake|conan|ctest
+phase: packaging|testing|runtime
+error_signature: \*\*\*Exception: SegFault|Signal 11 \(core dumped\)|0% tests passed, 2 tests failed out of 2
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+# severity:      3=🔴blocking  2=🟡medium  1=🟢minor  0=✅resolved
+# category:      分类标签
+severity: 3
+category: build-system, cmake, packaging, runtime
+match_keywords: lwgps, add_subdirectory, 测试配置注入, opts 头文件, 结构体布局错位, test_package, SegFault, Signal 11, ABI 不一致, 库独立子目录构建
+title: 顶层 CMake 把测试专用配置头注入库目标编译导致库与消费者结构体布局错位（test_package Signal 11）；配方应只构建库子目录并保持打包头文件与库同配置
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+# root_cause:       一句话根因描述
+# affected_scope:   影响范围
+# verification_cmd: 验证诊断是否正确的命令
+root_cause: lwgps 顶层 CMakeLists 在 add_subdirectory(tests) 内先 include 测试的 cmake.cmake（set LWGPS_OPTS_FILE=tests/test_parse_sat_det/lwgps_opts.h，其中 LWGPS_CFG_STATEMENT_GPGSV_SAT_DET=1）再 add_subdirectory(lwgps)，使库在编译期看到含 sats_in_view_desc[48] 的 lwgps_t；而 conan 配方打包的消费者头文件 lwgps_opts.h 来自官方空模板（默认 opts，无 SAT_DET 字段），lwgps_t 更小。库按大结构体写入，消费者按小结构体访问 → 静默内存越界 → test_package 两个测试均 Signal 11（同一现象：字段读到垃圾值 course=0 + 段错误）
+affected_scope: 顶层 CMake 把测试专用 opts/配置头经 add_subdirectory 注入库目标编译的 C/C++ 库；以及任何"库结构体含仅在测试配置中启用的字段"的 CMake 工程
+verification_cmd: conan create archives/l/lwgps/2.4.0 -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 --build=missing && ctest --test-dir <test_package>/build/clang-15-armv8-17-release --output-on-failure
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority: 1
+rec_approach: library-only-subdir-build-with-default-opts
+rec_description: 配方 build() 用 cmake.configure(build_script_folder="lwgps") 只构建库子目录（LWGPS_OPTS_FILE 未设 → 使用默认 lwgps_opts_template.h），package() 从构建目录根复制 liblwgps.a，并打包与库同配置的默认 lwgps_opts.h（由官方模板复制产出）；禁止使用顶层 CMakeLists 构建（会把测试 opts 注入库）
+rec_command: cmake.configure(build_script_folder="lwgps")
+rec_auto_fix: false
+rec_impl: manual
+
+fallback_priority: 2
+fallback_approach: explicit-opts-file-pin
+fallback_description: 若库子目录构建不可行（如库目标定义依赖顶层变量），可显式 -DLWGPS_OPTS_FILE=<官方模板路径> 固定配置，但须保证与打包头文件逐字节一致
+fallback_command: cmake.configure(variables={"LWGPS_OPTS_FILE": "<source>/lwgps/src/include/lwgps/lwgps_opts_template.h"})
+fallback_auto_fix: false
+fallback_impl: manual
+
+# ★ 禁止策略 ★
+forbid_1_pattern: 用顶层 CMakeLists 完整构建后打包|忽略测试 opts 与打包头文件配置差异
+forbid_1_reason: 顶层构建会把测试专用配置（如 SAT_DET 结构体字段）编进库，消费者头文件不一致即静默内存错误
+forbid_1_consequence: test_package 两测试 Signal 11（core dumped），CI 红、浪费轮次
+forbid_2_pattern: 修改上游测试 lwgps_opts.h|删除上游测试配置
+forbid_2_reason: 测试配置属上游树，修改以"让库通过"会伪造构建事实
+forbid_2_consequence: 归档与官方源不一致，补丁链路污染
+forbid_3_pattern: .ci-result\.json 手写|跳过 W3
+forbid_3_reason: W3/CI 门禁防伪要求（伪造通过=流程缺陷）
+forbid_3_consequence: 审计失真一票否决
+
+# ═══ Layer 4: 原则引用 ═══
+principles: P012
+
+# ═══ 关系图 (Relations) ═══
+causes:
+caused_by:
+similar_to: E543, E249, E040
+conflicts_with:
+prerequisite_of:
+
+# ═══ 查重差异（vs 现有条目，路径 B 必填） ═══
+dedup_vs_E543_draft_5CC4: |
+  E543-draft-5CC4（fossa NS_ENABLE_IPV6）与本条目同属"库与消费者结构体布局 ABI 不一致 →
+  静默运行期越界/段错误"家族，但：(1) 触发机制不同——E543 是配方只把 -D 传给库、漏写
+  cpp_info.defines；本条是上游 CMake 顶层把测试专用配置头注入库目标编译；(2) 方案不同——
+  E543 靠 cpp_info.defines 下发宏钉死契约；本条方案对该机制无效（分歧源在库编译期配置），
+  须库独立子目录构建保持与打包头文件同配置；(3) 症状签名不同——E543 error_signature 为
+  编译期 no member/sizeof mismatch，本条为运行期 test_package SegFault；(4) E543 仍为草稿
+  （draft:true）未转正。故非等价命中，本候选为新增跨库可复用知识。
+dedup_vs_other: |
+  已比对 E040（mandb 空指针）、E213（l64a 缺失）、E249（free 非 malloc）、E338（getpwuid
+  NULL 空指针）、E194（musl 头文件缺失）、E470（header-only 配方）及 36 个根级 DRAFT-* 对：
+  均不在"测试配置注入库编译 → 结构体布局错位"范畴，无等价命中。
+
+# ═══ 元数据 ═══
+doc_file: knowledge/drafts/DRAFT-lwgps-2.4.0-cmake-test-config-struct-layout-mismatch.md
+last_updated: 2026-09-28
+source_event: lwgps 2.4.0 适配（task lwgps-2.4.0-r01-bootstrap-and-adapt-pc2-47-20260928T080743Z）
+
+# ═══ 知识协作 ═══
+authors: tianyi_wang
+source_pr:
+source_commit:
+
+# ═══ 质量度量 ═══
+metrics_success_count: 1
+metrics_fail_count: 0
+metrics_confidence: 1.0
+metrics_last_used: 2026-09-28
+
+draft: true

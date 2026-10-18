@@ -1,0 +1,112 @@
+#====================================================================
+# DRAFT — lwgps 2.4.0：上游测试清点必须按官方枚举器全量枚举，
+#          顶层 CMakeLists 默认装配只含 1 个入口 → rule4 少报
+# 路径 B 草稿（knowledge_decision: new_draft），跨库可复用候选
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+# trigger_tool: 出错的工具
+# phase:         出错阶段
+# error_signature: 正则表达式(|分隔), 用于精确匹配日志文本
+id: DRAFT-lwgps-2.4.0-upstream-test-entry-census-method
+trigger_tool: ctest|cmake|test.py|conan
+phase: testing|reporting
+error_signature: No tests were found|1/1 Test|0 tests failed out of 1|rule4.*少报|N=4|TEST_CMAKE_FILE_NAME
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+# severity:      3=🔴blocking  2=🟡medium  1=🟢minor  0=✅resolved
+# category:      分类标签
+severity: 2
+category: build-system, cmake, testing, reporting
+match_keywords: lwgps, test.py, cmake.cmake, TEST_CMAKE_FILE_NAME, glob, 测试入口普查, 上游测试清点, rule4, 少报, 顶层默认装配, add_subdirectory(tests), enable_testing
+title: 上游 CMake 测试清点必须按官方枚举器（tests/test.py 递归 glob *.cmake）全量枚举；顶层 CMakeLists 默认 TEST_CMAKE_FILE_NAME 只装配 1 个入口，据此申报 N 会触发平台 rule4 少报
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+# root_cause:       一句话根因描述
+# affected_scope:   影响范围
+# verification_cmd: 验证诊断是否正确的命令
+root_cause: lwgps 2.4.0 顶层 CMakeLists 用 `set(TEST_CMAKE_FILE_NAME "test_parse_sat_det/cmake.cmake")` + `add_subdirectory(tests)` 装配测试：仅默认装配 test_parse_sat_det 一个入口。而上游官方枚举器 `tests/test.py`（上游 CI build-and-test.yml 即运行 `python test.py`）递归 glob `tests/**/*.cmake`（排除 __build__）枚举出 4 个测试入口（beidou/ext_time/sat_det/standard），每个入口经 `include()` 注入独立测试源与专用 lwgps_opts.h、在 tests/CMakeLists.txt 各注册 1 项 add_test(NAME Test)。r01 只按顶层默认装配运行 ctest（1/1）申报 N=1，平台实测上游 N=4 → rule4 少报 FAIL
+affected_scope: 顶层 CMakeLists 用「默认变量 + add_subdirectory」只装配部分测试入口的 CMake 工程（每入口一个 cmake.cmake/include 文件、tests/CMakeLists.txt 逐入口 add_test 的布局）；以及任何依赖"顶层默认装配计数"申报上游测试 N 的适配任务
+verification_cmd: cd <unmodified-upstream>/tests && python3 -c "import glob,os; files=[f for f in glob.glob(os.path.join(os.getcwd(),'**','*.cmake'),recursive=True) if '__build__' not in f]; print(len(files))"  # 官方枚举器口径 N；再对每个入口 -DTEST_CMAKE_FILE_NAME=<abs cmake.cmake> 独立 configure+build+ctest 逐项运行
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority: 1
+rec_approach: census-via-official-enumerator-and-per-entry-run
+rec_description: 清点上游测试必须以官方枚举器（test.py 或等价 glob）为准，不用顶层 CMakeLists 默认装配：①在未修改上游树递归枚举全部 *.cmake（或 ctest/pytest 注册）入口，逐入口列出路径/源/注册项；②对每个入口在 tests/<entry>/__build__ 用 -DTEST_CMAKE_FILE_NAME=<绝对路径> 独立 configure+build+ctest 真实运行（ctest 需在含 add_test 的子目录运行）；③按实测 N 申报并与平台 N 对账，全部入口分类为可运行且已运行/未运行/不可运行并留日志与 SHA-256
+rec_command: cmake -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -S../.. -G Ninja -DTEST_CMAKE_FILE_NAME=<abs>/cmake.cmake && cmake --build . && ctest . --output-on-failure -C Debug
+rec_auto_fix: false
+rec_impl: manual
+
+fallback_priority: 2
+fallback_approach: explicit-top-level-census-with-cmake-file-inventory
+fallback_description: 若无法直接运行上游 test.py（如无 Python 环境），可用 `find tests -name '*.cmake'` 与 `grep -l 'add_test' tests/**/CMakeLists.txt` 逐目录清点，并将 CTestTestfile.cmake 在哪些子目录生成列为计数依据（参照 DRAFT-21003 ctest-subdir-testfile）
+fallback_command: find <upstream>/tests -name '*.cmake' | sort; find <build> -name CTestTestfile.cmake
+fallback_auto_fix: false
+fallback_impl: manual
+
+# ★ 禁止策略 ★
+forbid_1_pattern: 按顶层 CMakeLists 默认装配申报 N|只跑默认 TEST_CMAKE_FILE_NAME 就报 1/1|changed_numbers_only_without_census
+forbid_1_reason: 顶层默认装配 ≠ 全部上游测试入口；只改数字不做普查与逐入口运行即 rule4 少报
+forbid_1_consequence: 平台 rule4 FAIL（实测 N > 声明 N），PR 被退回返工
+forbid_2_pattern: build-tests=false|跳过未运行入口后把数量写成 0
+forbid_2_reason: 禁用/跳过测试目标不能把数量写 0，未运行与不可运行入口必须逐项给出证据
+forbid_2_consequence: upstream_test_skip_without_ledger 命中，result 被拒
+forbid_3_pattern: 用「环境不支持」泛化表述给不可运行入口定性
+forbid_3_reason: 不可运行入口必须给尝试命令/退出码/缺依赖/阻塞归属/恢复条件
+forbid_3_consequence: 证据不完整，终态无法通过 result_contract 预检
+
+# ═══ Layer 4: 原则引用 ═══
+principles: R51
+
+# ═══ 关系图 (Relations) ═══
+causes:
+caused_by:
+similar_to: DRAFT-21003, E410, E231, E294
+conflicts_with:
+prerequisite_of:
+
+# ═══ 查重差异（vs 现有条目，路径 B 必填） ═══
+dedup_vs_DRAFT_21003: |
+  DRAFT-21003（lwjson，ctest-subdir-testfile）覆盖「enable_testing/add_test 在子目录 →
+  CTestTestfile.cmake 只生成在 <build>/tests/ → 顶层 ctest 'No tests were found' 假阳性，
+  需 --test-dir <build>/tests」。本条目标不同：不是"在哪运行 ctest"，而是"上游有多少
+  测试入口、顶层默认装配只含 1 个、清点必须以官方枚举器 glob *.cmake 为准、并逐入口
+  独立 configure 运行"——触发机制（顶层 TEST_CMAKE_FILE_NAME 默认值截断入口集 vs
+  子目录 CTestTestfile 位置）、方案（官方枚举器普查+逐入口运行 vs --test-dir 子目录）、
+  症状（平台 rule4 少报 N 申报 vs 本地 ctest 假阳性）均不同。非等价命中。
+dedup_vs_E410: |
+  E410（adapt，Python pytest）覆盖「pytest 默认发现不了非标准命名模块 → 需按上游
+  run_tests.sh 展开全部模块」。同为"只跑默认/单个入口造成测试覆盖不足"家族，但语言
+  与框架不同（C/CMake vs Python/pytest）、枚举机制不同（glob *.cmake + TEST_CMAKE_FILE_NAME
+  vs pytest 模块命名）、申报后果不同（rule4 少报 vs 语义覆盖缺失）。非等价命中。
+dedup_vs_E231: |
+  E231 覆盖「官方测试发现必须绑定已校验压缩包（证据来源可证明）」，是来源绑定问题；
+  本条是"入口清点口径"问题（默认装配 vs 官方枚举器）。正交，非等价命中。
+dedup_vs_E294: |
+  E294 覆盖「共享包用第二个静态构建树恢复完整上游测试」，是 BUILD_SHARED_LIBS 变体问题；
+  与本条（顶层默认装配截断入口集）机制不同。非等价命中。
+dedup_vs_other: |
+  已比对 E321（header-only 迁移+测试入口恢复）、E327/E328（测试证据边界）、E344
+  （excluded_upstream_tests）、E353（静态测试目标别名）、E366（elisp 批处理）、E370
+  （Meson testlog）、E417（格式覆盖率按 CI 变体声明）、E489（CTest 执行前签名闭包）、
+  E698（make test 自建树断言）、E738（Bazel-only 测试补 CMake 入口）及快照 547 条
+  正式条目 + 4662 条草稿：均不在"顶层默认装配截断上游测试入口 → 清点须用官方枚举器
+  glob *.cmake 并逐入口运行"范畴，无等价命中。
+
+# ═══ 元数据 ═══
+doc_file: knowledge/drafts/DRAFT-lwgps-2.4.0-upstream-test-entry-census-method.md
+last_updated: 2026-10-15
+source_event: lwgps 2.4.0 r02 返工（task lwgps-2.4.0-r02-upstream-test-entry-census-full-run-pc2-47-20261015T120000Z，rule4 少报修正）
+
+# ═══ 知识协作 ═══
+authors: tianyi_wang
+source_pr:
+source_commit:
+
+# ═══ 质量度量 ═══
+metrics_success_count: 1
+metrics_fail_count: 0
+metrics_confidence: 1.0
+metrics_last_used: 2026-10-15
+
+draft: true
