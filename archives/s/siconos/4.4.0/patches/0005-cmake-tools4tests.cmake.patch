@@ -1,0 +1,34 @@
+--- a/cmake/tools4tests.cmake
++++ b/cmake/tools4tests.cmake
+@@ -383,29 +383,29 @@
+   else()
+     # Otherwise, still need the path to current component dir for tests
+     # that load plugins.
+     LIST(APPEND LDLIBPATH "${CMAKE_BINARY_DIR}/${COMPONENT}")
+   endif()
+   LIST(APPEND LDLIBPATH "${CMAKE_BINARY_DIR}/wrap/siconos/tests")
+   if (NOT CMAKE_SYSTEM_NAME MATCHES WINDOWS)
+     STRING(REPLACE ";" ":" LDLIBPATH "${LDLIBPATH}")
+   endif()
+   if (CMAKE_SYSTEM_NAME MATCHES APPLE)
+-    if ($ENV{DYLD_LIBRARY_PATH})
++    if(DEFINED ENV{DYLD_LIBRARY_PATH} AND NOT "$ENV{DYLD_LIBRARY_PATH}" STREQUAL "")
+       set(LDLIBPATH "${LDLIBPATH}:$ENV{DYLD_LIBRARY_PATH}")
+     endif()
+     SET(LDLIBPATH "DYLD_LIBRARY_PATH=${LDLIBPATH}")
+   else()
+     if (CMAKE_SYSTEM_NAME MATCHES WINDOWS)
+       SET(LDLIBPATH "Path=${LDLIBPATH};$ENV{Path}")
+     else()
+-      if ($ENV{LD_LIBRARY_PATH})
++      if(DEFINED ENV{LD_LIBRARY_PATH} AND NOT "$ENV{LD_LIBRARY_PATH}" STREQUAL "")
+         set(LDLIBPATH "${LDLIBPATH}:$ENV{LD_LIBRARY_PATH}")
+       endif()
+       SET(LDLIBPATH "LD_LIBRARY_PATH=${LDLIBPATH}")
+     endif()
+   endif()
+ endmacro()
+ 
+ # ----------------------------------------
+ # Declaration of a siconos test run with python.
+ #

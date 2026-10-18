@@ -1,0 +1,34 @@
+--- a/numerics/src/QP/ConvexQP_ProjectedGradient.c
++++ b/numerics/src/QP/ConvexQP_ProjectedGradient.c
+@@ -208,22 +208,29 @@
+         //NM_gemv(1.0, M, z, 2.0, w);
+ 
+ 
+         /* theta = 0.5 R^T M r + r^T q */
+         theta = 0.5*  cblas_ddot(n, w, 1, z, 1);
+ 
+         // Compute direction d_k = z - z_k
+         cblas_dcopy(n, z, 1, direction, 1);
+         cblas_daxpy(n, -1, z_k, 1, direction, 1);
+ 
+-        correction = mu * cblas_ddot(n, w_k, 1, direction, 1);
+-        criterion =    theta - theta_k - correction;
++        const double gradient_step = cblas_ddot(n, w_k, 1, direction, 1);
++        correction = mu * gradient_step;
++        /* M is symmetric positive semidefinite by the ConvexQP contract.
++           For d=z-z_k, f(z)-f(z_k)=g_k^T d + 0.5*d^T M*d.
++           Avoid subtracting two nearly equal objective values near convergence.
++           w is workspace here; compute_error_reduced restores the final M*z+q. */
++        NM_gemv(1.0, M, direction, 0.0, w);
++        criterion = (1.0 - mu) * gradient_step
++                    + 0.5 * cblas_ddot(n, direction, 1, w, 1);
+         if(verbose > 1) printf("theta = %e\t theta_k = %e\t  correction = %e\t criterion = %e\n", theta, theta_k, correction, criterion);
+         rho = rho*tau;
+         ls_iter++;
+         if(rho < rhomin)
+           break;
+       }
+       /* store the old z */
+       cblas_dcopy(n, z, 1, z_k, 1);
+       /* Compute the value fo the cost function (we use w as tmp) */
+       /* q --> velocity_k */

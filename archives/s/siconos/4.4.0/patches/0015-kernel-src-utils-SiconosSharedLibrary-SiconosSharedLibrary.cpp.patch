@@ -1,0 +1,25 @@
+--- a/kernel/src/utils/SiconosSharedLibrary/SiconosSharedLibrary.cpp
++++ b/kernel/src/utils/SiconosSharedLibrary/SiconosSharedLibrary.cpp
+@@ -46,21 +46,21 @@
+     THROW_EXCEPTION("can not open or find plugin");
+   }
+ #endif
+ #ifdef _SYS_UNX
+   /* -------------------------------------------------------------------------------------- *
+    * For RTLD_DEEPBIND, see                                                                 *
+    * https://stackoverflow.com/questions/34073051/when-we-are-supposed-to-use-rtld-deepbind *
+    * We may want to change this behaviour                                                   *
+    * -------------------------------------------------------------------------------------- */
+ 
+-#ifdef __APPLE__
++#if !defined(RTLD_DEEPBIND)
+   HandleRes = dlopen(pluginPath.c_str(), RTLD_LAZY);
+ #else
+   HandleRes = dlopen(pluginPath.c_str(), RTLD_LAZY | RTLD_DEEPBIND);
+ #endif
+ 
+   if(!HandleRes)
+   {
+     std::cout << "dlerror() :" << dlerror() <<std::endl;
+     THROW_EXCEPTION("can not open or find plugin");
+   }

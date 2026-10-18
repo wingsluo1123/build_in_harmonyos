@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.15)
+project(test_siconos LANGUAGES C CXX)
+find_package(siconos CONFIG REQUIRED)
+add_executable(test_siconos test_siconos.c)
+target_link_libraries(test_siconos PRIVATE Siconos::numerics m)
+add_executable(test_dynamics test_dynamics.cpp)
+target_compile_features(test_dynamics PRIVATE cxx_std_17)
+target_link_libraries(test_dynamics PRIVATE Siconos::control Siconos::io)

@@ -1,0 +1,61 @@
+id: DRAFT-cppunit-odepack-result-exit-status
+draft: true
+contributor_id: frj__
+trigger_tool: ctest|cppunit|flang|conan
+phase: testing
+error_signature: FORCED_NERR=[1-9][0-9]* RC=0|CPPUNIT_INTERNAL_FAILURES=[1-9][0-9]* RC=0
+severity: 3
+category: testing, cmake, fortran, runtime, toolchain, portability
+match_keywords: CppUnit, TextUi::TestRunner, runner.run, nerr, ODEPACK, DLSODA, DLSODE, DLSODES, STOP, CTest, process exit, failure propagation
+title: CppUnit 布尔结果与 ODEPACK 数值错误计数必须透传到进程退出码，否则 CTest 会把真实失败判为通过
+root_cause: >
+  CTest 默认根据进程退出码判定。CppUnit 的 runner.run 返回布尔成功值，
+  但 Siconos 4.4.0 共用 TestMain 忽略该返回值，main 末尾隐式返回 0。
+  同一项目捆绑的七个 Netlib ODEPACK 驱动会累计并打印 nerr，却无条件 STOP，
+  Fortran 运行时仍以 0 退出。这里真实断言/数值校验已经执行并失败，
+  不是零用例、信号退出或加载失败。正确清点和 WIFEXITED 检查均不能弥补内部状态丢失。
+affected_scope: >
+  CTest/Make/Conan 调用的旧式测试驱动：框架 API 返回 bool、main 未透传；
+  或 Fortran 驱动打印错误计数后普通 STOP。不能据此认定所有 CppUnit/Fortran 测试都有缺陷。
+verification_cmd: >
+  识别前提是同一次驱动运行既有内部失败又正常 RC=0；仅有 Failures:1 或 nerr>0、但进程 RC=1 不属于本条。
+  诊断脚本应将实际内部失败数和捕获到的进程状态合并为 CPPUNIT_INTERNAL_FAILURES=N RC=M 或 FORCED_NERR=N RC=M。
+  用同一个 CppUnit fixture 分别运行成功和失败断言，再对原始/修补 TestMain 做 2x2 对照；
+  失败输出相同而原版 RC=0、修版 RC=1。对 DLSODA 原驱动和修补驱动，在既有 nerr 汇总前
+  注入 nerr=1，两版均打印 1，原版 RC=0、修版 RC=1。注入仅存在于独立负例副本中。
+rec_priority: 1
+rec_approach: propagate-existing-framework-result-to-process-status
+rec_description: >
+  CppUnit 使用 return runner.run(...) ? 0 : 1。
+  已有 nerr 的 Fortran 驱动在原 STOP 前加 if (nerr .ne. 0) stop 1；
+  不改原计数、误差阈值、输入或参考值。只打印状态的演示应检查已有失败状态，
+  并按 demo/status 验证申报，不能把没有数值 oracle 的输出称为数值断言。
+rec_command: |
+  // CppUnit main:
+  return runner.run("", false, true, false) ? 0 : 1;
+  // Fortran fixed-form, after the existing nerr summary:
+        if (nerr .ne. 0) stop 1
+        stop
+rec_auto_fix: false
+rec_impl: manual
+forbid_1_pattern: return\s+runner\.run\([^;]*\)\s*;
+forbid_1_reason: 直接把 bool 返回为 int 会将 true=1 的成功结果反向判成失败
+forbid_1_consequence: 必须显式映射成功到0、失败到非0，不能只在前面增加 return
+forbid_2_pattern: FAIL_REGULAR_EXPRESSION.*error
+forbid_2_reason: 泛匹配 error 会把 Number of errors encountered = 0 等正常汇总也判失败
+forbid_2_consequence: 保持明确计数与状态契约，或使用严格的非零汇总解析，不泛扫关键字
+principles: R34, R51
+causes: []
+caused_by: []
+similar_to: E1707, E1732, E807, E883, E924
+conflicts_with: []
+prerequisite_of: []
+doc_file: knowledge/drafts/DRAFT-cppunit-odepack-result-exit-status.md
+last_updated: 2026-10-17
+source_event: siconos 4.4.0 task 10598 native OHOS negative-control experiments
+source_pr: https://atomgit.com/OpenHarmonyPCDeveloper/build_in_harmonyos/merge_requests/16511
+authors: frj__
+metrics_probe_runs: 6
+metrics_original_failure_exit: 0
+metrics_fixed_failure_exit: 1
+metrics_zero_guard_regressions: 2
