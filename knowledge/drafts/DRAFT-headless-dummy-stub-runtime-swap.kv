@@ -1,0 +1,66 @@
+id:                     DRAFT-headless-dummy-stub-runtime-swap
+trigger_tool:           interpreter|lisp|scheme|autotools|configure|require|init
+phase:                  building|testing|consumer-run
+error_signature:        Signal 11 \(core dumped\)|SIGSEGV.*no error|启动即崩|bad interpreter
+severity:               2
+category:               ohos, headless, dummy-stub, runtime-layer, bisect, lisp, graphics
+match_keywords:         without-x, dummygraph, dummy stub, nongraph, require, init.lsp,
+                        spin-proto, depth-cuing, SIGSEGV, bisect, replacement runtime,
+                        无头, 替代层, 桩
+title:                  --without-x only switches the C layer; the runtime script layer still loads the dynamic-graphics stack and segfaults on dummy-stub dispatch — swap in the upstream replacement runtime (nongraph pattern) and bisect the require chain
+root_cause:             configure-level headless switches compile dummy stubs (empty
+                        implicit-int functions returning garbage), but the runtime
+                        init chain (init.lsp) still unconditionally requires the
+                        dynamic-graphics files; a message dispatch into a stub
+                        (graph2.lsp: (send spin-proto :depth-cuing t)) consumes the
+                        garbage return and segfaults deterministically. The device is
+                        headless: no fix inside the stub is possible; the runtime layer
+                        must be swapped to the upstream-provided replacement
+                        (nongraph.lsp gnuplot layer) and the same require dropped from
+                        downstream files (regress.lsp).
+rec_priority:           1
+rec_approach:           three-level prefix bisection along the runtime require/load
+                        chain (init prefix -> loaded file prefix -> next require) using
+                        exit-code counting with head -n prefix files, then an
+                        idempotent in-recipe edit swapping the require for the
+                        replacement layer; markers via captured output are unreliable
+                        because SEGV drops stdio buffers.
+rec_command:            head -n $k init.lsp > init.lsp && echo (exit) | ./interpreter; rc=139 => prefix contains the first crashing form
+rec_auto_fix:           false
+rec_impl:               conan-recipe-idempotent-init-edit
+fallback_priority:      2
+fallback_approach:      none-stub-is-unfixable
+fallback_description:   Do not try to make dummy stubs return sane values; document the
+                        dynamic-graphics commands as a platform hard limit in
+                        notes/PR and keep the replacement plotting layer.
+forbid_1_pattern:       # .*headless
+forbid_1_reason:        Comments appended into Lisp runtime files must use `;`; `#`
+                        raises `illegal character after #` and aborts the runtime load
+                        mid-init.
+forbid_1_consequence:   The replacement layer never loads and the crash returns in a
+                        different guise.
+forbid_2_pattern:       restore without md5 verify
+forbid_2_reason:        Instrumenting shared runtime files (init.lsp) and restoring from
+                        a .orig copy chain breaks silently; later probes then measure a
+                        polluted input (observed false negative: 0/20 crashes on an
+                        instrumented file believed to be the original).
+forbid_2_consequence:   Wrong bisection baseline; conclusions do not reproduce.
+affected_scope:         Interpreter/environment packages with configure headless
+                        switches whose runtime init still requires the dynamic-graphics
+                        stack, on devices with no display backend (OHOS PC); also any
+                        "startup SEGV with no error output" where the crash happens
+                        during auto-init before stdin is read.
+verification_cmd:       prefix-bisect each runtime file with >=10 repeats of exit-code counting; after the runtime swap, full build + upstream suite + consumer harness must pass with exit 0
+example_evidence:       xlispstat 3.52.23: init.lsp:58 (require graphics) -> graphics.lsp:565
+                        (require graph2) -> graph2.lsp:31 (send spin-proto :depth-cuing t);
+                        20/20 SEGV before, r25 fully green after (upstream 155/155, test_package 10/10)
+knowledge_ref:          E336-draft-gtk-broadway-display-backend, E527,
+                        DRAFT-lightmapper-2.8-gl-link-stub-headless-cpu-test,
+                        DRAFT-ohos-silent-codegen-miscompile-byte-exact-oracle
+dedup_statement:        E336/E527 cover display-backend substitution (broadway), not
+                        runtime require-chain replacement nor stub-dispatch SEGV
+                        bisection; lightmapper covers GL-stub link/consumer-test issues
+                        for header-only libraries; the optimization-level SEGV class is
+                        covered by the miscompile-oracle/libstb drafts. No existing
+                        entry covers dummy-stub runtime dispatch SEGV + official
+                        replacement-runtime swap + the three-level bisection method.
