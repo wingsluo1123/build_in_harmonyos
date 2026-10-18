@@ -1,0 +1,36 @@
+version: "1.0.15-rivoreo-r2-rc-20250214-e8c6289"
+software: "mfiutil"
+status: built
+build_date: "2026-10-17"
+build_system: makefile
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/m/mfiutil/mfiutil_1.0.15-rivoreo-r2~rc-20250214-e8c6289.orig.tar.bz2"
+  sha256: "21f303c6a467c45a0f32f48eeb5118e641850b23d42f8352b93e0c75a8bba63a"
+  tar_format: tar.bz2
+
+build:
+  system: makefile
+  configure_options: []
+  dependencies: []
+  cc: clang
+  cxx: clang++
+  make_target: "default"
+
+patches_applied: []
+
+knowledge_gained:
+  - "mfiutil 是 FreeBSD usr.sbin/mfiutil 的 Linux/多平台移植版（Rivoreo 项目维护），纯 C（13 个 .c + 2 个头），手写 Makefile，仅依赖 libc，无任何第三方库依赖"
+  - "Linux 代码路径由编译器预定义宏 __linux__ 选择（OHOS clang 目标 aarch64-unknown-linux-ohos 同样定义 __linux__）；FreeBSD 专属块（HAVE_MFI_DRIVER/sys/sysctl.h）、Solaris 块（__SVR4/sys/ioccom.h/libdevinfo.h）、Darwin 块（AvailabilityMacros.h）均被条件编译排除，无需补丁"
+  - "上游 Makefile 硬编码 CC:=gcc 与 CFLAGS(-std=gnu99 -Wall -Wno-unused-value -Os -I include)，GNU make 语义下命令行赋值可覆盖 CC，CFLAGS 保持 Makefile 默认值即可，无需 Makefile 补丁"
+  - "Gitiles +archive 归档为扁平结构（无顶层目录），conan get 必须 strip_root=False"
+  - "上游只为 1.0.15-rivoreo-r1 打过 release tag；本版本（Debian 快照版 1.0.15-rivoreo-r2~rc-20250214-e8c6289 对应上游提交 e8c6289）在官方仓库无 tag，直接取该提交的官方 Gitiles 归档"
+  - "mfiutil version 是纯用户land命令（不打开 ioctl 设备），输出 'mfiutil version 1.0.15-rivoreo-r2'，适合做 L2 烟雾测试；show adapter 等硬件命令在无控制器机器上稳定走设备打开失败路径（err(1) 退出）"
+  - "Linux 下运行时会读 /proc/devices 寻找 megaraid_sas_ioctl 主设备号并尝试 mknod /dev/megaraid_sas_ioctl_node（仅当驱动存在时成功），设备缺失时 open 失败退出，属预期行为"
+
+test_results:
+  type: manual
+  total: 6
+  passed: 6
+  failed: 0
+knowledge_ref: []
