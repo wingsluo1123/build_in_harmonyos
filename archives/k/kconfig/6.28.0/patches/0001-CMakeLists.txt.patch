@@ -1,0 +1,35 @@
+--- a/autotests/CMakeLists.txt
++++ b/autotests/CMakeLists.txt
+@@ -38,7 +38,6 @@
+ 
+ ecm_add_tests(
+     kconfignokdehometest.cpp
+-    kconfigtest.cpp
+     kdesktopfiletest.cpp
+     test_kconf_update.cpp
+     ksharedconfig_in_global_object.cpp
+@@ -48,6 +47,14 @@
+     LINK_LIBRARIES KF6::ConfigCore Qt6::Test Qt6::Concurrent Qt6::CorePrivate
+ )
+ 
++# kconfigtest.cpp uses std::chrono calendar types (days/weeks/months/years,
++# C++20 chrono). The OHOS libc++ headers available to clang 15 with cppstd=17
++# do not provide them, so the test target cannot compile on HarmonyOS. The
++# test is already excluded at run time on OHOS; skip building the target too.
++if(NOT HARMONYOS)
++ecm_add_test(kconfigtest.cpp TEST_NAME kconfigtest LINK_LIBRARIES KF6::ConfigCore Qt6::Test Qt6::Concurrent)
++endif()
++
+ add_dependencies(test_kconf_update kconf_update)
+ 
+ if(TARGET Qt6::Gui)
+@@ -74,7 +81,9 @@
+ target_compile_definitions(kstandardshortcutwatchertest PRIVATE "-DKCONFIGGUI_STATIC_DEFINE")
+ 
+ # These tests do a global cleanup of ~/.qttest, so they can't run in parallel
++if(NOT HARMONYOS)
+ set_tests_properties(kconfigcore-kconfigtest PROPERTIES RUN_SERIAL TRUE)
++endif()
+ set_tests_properties(kconfigcore-kconfignokdehometest PROPERTIES RUN_SERIAL TRUE)
+ set_tests_properties(kconfiggui-kconfigguitest PROPERTIES RUN_SERIAL TRUE)
+ 
