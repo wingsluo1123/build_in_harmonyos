@@ -1,0 +1,141 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI 脚本 build_and_test.sh L0e 强制要求）
+# 详见 docs/TEST_QUALITY_SPEC.md
+
+package: pnmixer/0.7.2
+homepage: "https://github.com/nicklan/pnmixer"
+
+# ── 上游测试清点证据（N_static = 0，逐条留证，非"没找到"）────────────────
+#  - tar -xzf pnmixer-0.7.2.tar.gz 后顶层为：
+#    .gitattributes .githooks .gitignore .travis.yml AUTHORS CMakeLists.txt
+#    COPYING ChangeLog HACKING.md MAINTAINING.md README.md cmake/ data/ po/ src/
+#    —— 无 tests/、test/、t/、test-suite/ 目录。
+#  - 递归 grep 'add_test|enable_testing|ctest'（*.txt/*.cmake）→ 0 命中（rc=1）。
+#  - find . -iname '*test*' -o -iname '*check*' → 0 文件。
+#  - .travis.yml 只做 cmake+make 构建矩阵，不调用任何测试目标。
+#  ⇒ 上游无自动化测试套件：N_static = N_registered = N_executed = 0，
+#     未执行分类数亦为 0；因此本适配只有消费者测试（真实执行交付物），
+#     ⛔ 不谎称跑过不存在的 make check / ctest。
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "pnmixer-0.7.2/CMakeLists.txt"
+    reason: "顶层只 add_subdirectory(data|po|src) 与两个 formatting 自定义目标，无 enable_testing()/add_test()。"
+  - source: "pnmixer-0.7.2/src/CMakeLists.txt"
+    reason: "只有 add_executable(pnmixer ...) 与 install(TARGETS ...)，无测试目标。"
+  - source: "pnmixer-0.7.2/.travis.yml"
+    reason: "构建矩阵 = cmake -DWITH_GTK3 + make，无测试步骤。"
+  - conclusion: "上游静态声明 0 项、构建系统注册 0 项、实跑 0 项；分母无来源，不得反填。"
+
+upstream_check_command: "cmake -S . -B build && cmake --build build   # 无 check/test 目标"
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# ── 消费者测试（test_package，真实执行交付物）────────────────────────────
+# A. 结构性/链接性/安装面（test_pnmixer.sh，15 项硬断言）：不执行被测二进制 ⇒
+#    必须始终真正通过；产物被移走/被破坏时必须真正失败（CI L1e 依赖此点）。
+# B. CLI 契约（4 项，无需显示）：GOptionContext 在 GTK 后置钩子之前处理 --help。
+# C. 未知选项落穿（1 项）：上游 main() 忽略 g_option_context_parse() 返回值，
+#    未知选项不被拒绝而与裸调用等价 —— 按真实契约断言，不写假期望。
+# D. 无显示快速失败（1 项）：非 0 退出 + 有诊断输出，不得挂死。
+# E. 有显示版本（2 项，--version/-v）：用 gtk 包自带 bin/broadwayd 起私有 display
+#    后真实执行 —— GTK 后置钩子会先 gtk_init()，所以这两个选项需要显示。
+# F. broadway 真启动（1 项）：pnmixer -d 真跑，断言日志里 6 个启动标记
+#    （从已安装的 glade 建 UI、创建托盘图标、装载已安装的 pixmap、创建热键子系统、
+#     挂载音频子系统、进入 ---- Running main loop ----）且进程不自行退出。
+test_package_tests:
+  - file: test_pnmixer.sh
+    description: "[结构性] bin/pnmixer 存在。"
+    command: "test -f <package>/bin/pnmixer"
+  - file: test_pnmixer.sh
+    description: "[结构性] bin/pnmixer 可执行。"
+    command: "test -x <package>/bin/pnmixer"
+  - file: test_pnmixer.sh
+    description: "[结构性] 产物是合法 ELF（magic 7f454c46）。"
+    command: "head -c4 <package>/bin/pnmixer | od -An -tx1"
+  - file: test_pnmixer.sh
+    description: "[链接真实性] DT_NEEDED 含 libgtk-3.so（gtk+-3.0）。"
+    command: "llvm-readelf -d <package>/bin/pnmixer"
+  - file: test_pnmixer.sh
+    description: "[链接真实性] DT_NEEDED 含 libasound.so（alsa）。"
+    command: "llvm-readelf -d <package>/bin/pnmixer"
+  - file: test_pnmixer.sh
+    description: "[链接真实性] DT_NEEDED 含 libgdk-3.so（GTK3 的 GDK）。"
+    command: "llvm-readelf -d <package>/bin/pnmixer"
+  - file: test_pnmixer.sh
+    description: "[链接真实性] DT_NEEDED 含 libX11.so（x11）。"
+    command: "llvm-readelf -d <package>/bin/pnmixer"
+  - file: test_pnmixer.sh
+    description: "[链接真实性] DT_NEEDED 含 libglib-2.0.so（glib-2.0）。"
+    command: "llvm-readelf -d <package>/bin/pnmixer"
+  - file: test_pnmixer.sh
+    description: "[负向] DT_NEEDED 不含 libnotify.so（WITH_LIBNOTIFY=OFF 的实物校验）。"
+    command: "llvm-readelf -d <package>/bin/pnmixer"
+  - file: test_pnmixer.sh
+    description: "[OHOS 签名] ELF 含 .codesign 段（未签名产物不可加载）。"
+    command: "llvm-readelf -SW <package>/bin/pnmixer"
+  - file: test_pnmixer.sh
+    description: "[安装面] share/applications/pnmixer.desktop 落盘。"
+    command: "test -f <package>/share/applications/pnmixer.desktop"
+  - file: test_pnmixer.sh
+    description: "[安装面] share/icons/hicolor/128x128/apps/pnmixer.png 落盘。"
+    command: "test -f <package>/share/icons/hicolor/128x128/apps/pnmixer.png"
+  - file: test_pnmixer.sh
+    description: "[安装面] share/man/man1/pnmixer.1 落盘。"
+    command: "test -f <package>/share/man/man1/pnmixer.1"
+  - file: test_pnmixer.sh
+    description: "[安装面] share/pnmixer/pixmaps/pnmixer-high.png 落盘。"
+    command: "test -f <package>/share/pnmixer/pixmaps/pnmixer-high.png"
+  - file: test_pnmixer.sh
+    description: "[安装面] share/pnmixer/ui/popup-menu-gtk3.glade 落盘。"
+    command: "test -f <package>/share/pnmixer/ui/popup-menu-gtk3.glade"
+  - file: conanfile.py
+    description: "[CLI 契约] --help 退出码 0 且含 ' - A mixer for the system tray.'。"
+    command: "<package>/bin/pnmixer --help"
+  - file: conanfile.py
+    description: "[CLI 契约] --help 输出含选项 '--version'。"
+    command: "<package>/bin/pnmixer --help"
+  - file: conanfile.py
+    description: "[CLI 契约] --help 输出含选项说明 'Show version and exit'。"
+    command: "<package>/bin/pnmixer --help"
+  - file: conanfile.py
+    description: "[CLI 契约] --help 输出含 GTK 选项组标题 '--help-gtk'。"
+    command: "<package>/bin/pnmixer --help"
+  - file: conanfile.py
+    description: "[负向·真实契约] 未知选项不被拒绝，行为等同裸调用（落到 gtk_init 后按无显示失败）。"
+    command: "<package>/bin/pnmixer --not-a-pnmixer-option"
+  - file: conanfile.py
+    description: "[无显示行为] 无 DISPLAY 时真实运行必须**快速失败**（非 0 退出 + 有诊断输出），不得挂死。"
+    command: "<package>/bin/pnmixer"
+  - file: conanfile.py
+    description: "[有显示契约] 起 broadwayd 私有 display 后 --version 退出码 0 且精确打印 'pnmixer version: 0.7.2'。"
+    command: "<gtk pkg>/bin/broadwayd :77 & GDK_BACKEND=broadway <package>/bin/pnmixer --version"
+  - file: conanfile.py
+    description: "[有显示契约] 同上，短选项 -v 亦打印 'pnmixer version: 0.7.2'。"
+    command: "GDK_BACKEND=broadway <package>/bin/pnmixer -v"
+  - file: conanfile.py
+    description: "[真启动] pnmixer -d 在有显示时载入已安装 glade/pixmap、创建托盘图标与热键子系统、挂载音频、进入主循环，且不自行退出。"
+    command: "GDK_BACKEND=broadway <package>/bin/pnmixer -d"
+
+# 断言总数：
+#   结构性/链接性/安装面 = 15 项（硬断言）
+#   CLI 契约 = 4 项 ｜ 未知选项落穿 = 1 项 ｜ 无显示快速失败 = 1 项
+#   有显示版本 = 2 项 ｜ 有显示真启动 = 1 项
+#   合计 24 项（全部真实执行或有实物 oracle；无占位、无可容忍的"假通过"）
+test_scenario_count: 24
+assertion_count: 24
+assertion_count_basis:
+  structural_presence_and_elf: 3
+  dt_needed_modules: 5
+  dt_needed_negative_libnotify: 1
+  ohos_codesign_section: 1
+  install_surface: 5
+  cli_contract: 4
+  cli_unknown_option_fallthrough: 1
+  headless_fail_fast: 1
+  live_display_version: 2
+  live_display_startup: 1
+runtime_limitations_tolerated:
+  - "OHOS 加载器拒绝签名无效的依赖共享库：若被测交付物的某个依赖 .so 签名不被接受，进程会在加载阶段以 'Error loading shared library ...' 结束 —— 该情形按先例打印 'Execution skipped due to OHOS platform limitation: ...'。本包已实测到该缺陷的实物（libnotify），并通过 WITH_LIBNOTIFY=OFF 从依赖面消除，因此正常运行路径下不会触发。"
+  - "无 X11/Wayland 服务：托盘本体（GtkStatusIcon 需要 X11 系统托盘协议）不可用；本测试用 gtk 包自带的 broadwayd 起私有 display 覆盖初始化路径，裸调用按快速失败断言（不是容忍项）。"
+  - "无音频设备：/dev/snd 不可访问 ⇒ ALSA 必然报 'cannot find card 0' 并走 'No soundcard could be hooked !' 分支；mixer 读写行为不可验证，已如实披露。"

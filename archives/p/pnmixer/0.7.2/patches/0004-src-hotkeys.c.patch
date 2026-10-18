@@ -1,0 +1,228 @@
+--- a/src/hotkeys.c
++++ b/src/hotkeys.c
+@@ -13,34 +13,33 @@
+  * This file handles the hotkeys subsystem, including
+  * communication with Xlib and intercepting key presses
+  * before they can be interpreted by Gtk/Gdk.
+  * @brief Hotkeys subsystem.
+  */
+ 
+ #ifdef HAVE_CONFIG_H
+ #include "config.h"
+ #endif
+ 
+-#include <gdk/gdkx.h>
+-#include <X11/XKBlib.h>
+-
+ #include "audio.h"
+ #include "prefs.h"
+ #include "support-intl.h"
+ #include "support-log.h"
+ #include "hotkey.h"
+ #include "hotkeys.h"
+ 
+ #include "main.h"
+ 
+ /* Helpers */
+ 
++#ifdef HAVE_GDK_X11
++
+ /* Removes the previously attached key_filter() function from
+  * the root window.
+  */
+ static void
+ hotkeys_remove_filter(GdkFilterFunc filter, gpointer data)
+ {
+ 	GdkWindow *window;
+ 
+ 	window = gdk_x11_window_foreign_new_for_display
+ 	         (gdk_display_get_default(), GDK_ROOT_WINDOW());
+@@ -54,20 +53,22 @@
+ static void
+ hotkeys_add_filter(GdkFilterFunc filter, gpointer data)
+ {
+ 	GdkWindow *window;
+ 
+ 	window = gdk_x11_window_foreign_new_for_display
+ 	         (gdk_display_get_default(), GDK_ROOT_WINDOW());
+ 
+ 	gdk_window_add_filter(window, filter, data);
+ }
++
++#endif				/* HAVE_GDK_X11 */
+ 
+ /* Public functions & callbacks */
+ 
+ struct hotkeys {
+ 	/* Audio system */
+ 	Audio  *audio;
+ 	/* Hotkeys */
+ 	Hotkey *mute_hotkey;
+ 	Hotkey *up_hotkey;
+ 	Hotkey *down_hotkey;
+@@ -75,20 +76,21 @@
+ 
+ /**
+  * This function is called before Gtk/Gdk can respond
+  * to any(!) window event and handles pressed hotkeys.
+  *
+  * @param gdk_xevent the native event to filter
+  * @param event the GDK event to which the X event will be translated
+  * @param data user data set when the filter was installed
+  * @return a GdkFilterReturn value, should be GDK_FILTER_CONTINUE only
+  */
++#ifdef HAVE_GDK_X11
+ static GdkFilterReturn
+ key_filter(GdkXEvent *gdk_xevent, G_GNUC_UNUSED GdkEvent *event, gpointer data)
+ {
+ 	XKeyEvent *xevent = (XKeyEvent *) gdk_xevent;
+ 	Hotkeys *hotkeys = (Hotkeys *) data;
+ 	Hotkey *mute_hotkey = hotkeys->mute_hotkey;
+ 	Hotkey *up_hotkey   = hotkeys->up_hotkey;
+ 	Hotkey *down_hotkey = hotkeys->down_hotkey;
+ 	Audio *audio = hotkeys->audio;
+ 	gint type;
+@@ -104,20 +106,22 @@
+ 	if (mute_hotkey && hotkey_matches(mute_hotkey, key, state))
+ 		audio_toggle_mute(audio, AUDIO_USER_HOTKEYS);
+ 	else if (up_hotkey && hotkey_matches(up_hotkey, key, state))
+ 		audio_raise_volume(audio, AUDIO_USER_HOTKEYS);
+ 	else if (down_hotkey && hotkey_matches(down_hotkey, key, state))
+ 		audio_lower_volume(audio, AUDIO_USER_HOTKEYS);
+ 
+ 	return GDK_FILTER_CONTINUE;
+ }
+ 
++#endif				/* HAVE_GDK_X11 */
++
+ /**
+  * Reload hotkey preferences.
+  * This has to be called each time the preferences are modified.
+  *
+  * @param hotkeys a Hotkeys instance.
+  */
+ void
+ hotkeys_reload(Hotkeys *hotkeys)
+ {
+ 	gboolean enabled;
+@@ -132,20 +136,27 @@
+ 	hotkeys->up_hotkey = NULL;
+ 
+ 	hotkey_free(hotkeys->down_hotkey);
+ 	hotkeys->down_hotkey = NULL;
+ 
+ 	/* Return if hotkeys are disabled */
+ 	enabled = prefs_get_boolean("EnableHotKeys", FALSE);
+ 	if (enabled == FALSE)
+ 		return;
+ 
++#ifndef HAVE_GDK_X11
++	/* No X11 GDK backend (e.g. the broadway-only OHOS GTK3 build): global key
++	 * grabbing needs an X server keymap, so the feature is unavailable.  Say
++	 * so once, instead of reporting a bogus per-key grab failure. */
++	WARN("Global hotkeys are unavailable: this GDK build has no X11 backend");
++	return;
++#else
+ 	/* Setup mute hotkey */
+ 	mute_err = FALSE;
+ 	key = prefs_get_integer("VolMuteKey", -1);
+ 	mods = prefs_get_integer("VolMuteMods", 0);
+ 	if (key != -1) {
+ 		hotkeys->mute_hotkey = hotkey_new(key, mods);
+ 		if (hotkeys->mute_hotkey == NULL)
+ 			mute_err = TRUE;
+ 	}
+ 
+@@ -174,31 +185,34 @@
+ 		run_error_dialog("%s:\n%s%s%s%s%s%s",
+ 		                 _("Could not grab the following HotKeys"),
+ 		                 mute_err ? _("Mute/Unmute") : "",
+ 		                 mute_err ? "\n" : "",
+ 		                 up_err ? _("Volume Up") : "",
+ 		                 up_err ? "\n" : "",
+ 		                 down_err ? _("Volume Down") : "",
+ 		                 down_err ? "\n" : ""
+ 		                );
+ 	}
++#endif				/* HAVE_GDK_X11 */
+ }
+ 
+ /**
+  * Unbind hotkeys manually. Should be paired with a hotkeys_bind() call.
+  *
+  * @param hotkeys a Hotkeys instance.
+  */
+ void
+ hotkeys_unbind(Hotkeys *hotkeys)
+ {
++#ifdef HAVE_GDK_X11
+ 	hotkeys_remove_filter(key_filter, hotkeys);
++#endif
+ 
+ 	if (hotkeys->mute_hotkey)
+ 		hotkey_ungrab(hotkeys->mute_hotkey);
+ 	if (hotkeys->up_hotkey)
+ 		hotkey_ungrab(hotkeys->up_hotkey);
+ 	if (hotkeys->down_hotkey)
+ 		hotkey_ungrab(hotkeys->down_hotkey);
+ }
+ 
+ /**
+@@ -209,36 +223,40 @@
+ void
+ hotkeys_bind(Hotkeys *hotkeys)
+ {
+ 	if (hotkeys->mute_hotkey)
+ 		hotkey_grab(hotkeys->mute_hotkey);
+ 	if (hotkeys->up_hotkey)
+ 		hotkey_grab(hotkeys->up_hotkey);
+ 	if (hotkeys->down_hotkey)
+ 		hotkey_grab(hotkeys->down_hotkey);
+ 
++#ifdef HAVE_GDK_X11
+ 	hotkeys_add_filter(key_filter, hotkeys);
++#endif
+ }
+ 
+ /**
+  * Cleanup the hotkey subsystem.
+  *
+  * @param hotkeys a Hotkeys instance.
+  */
+ void
+ hotkeys_free(Hotkeys *hotkeys)
+ {
+ 	if (hotkeys == NULL)
+ 		return;
+ 
+ 	/* Disable hotkeys */
++#ifdef HAVE_GDK_X11
+ 	hotkeys_remove_filter(key_filter, hotkeys);
++#endif
+ 
+ 	/* Free anything */
+ 	hotkey_free(hotkeys->mute_hotkey);
+ 	hotkey_free(hotkeys->up_hotkey);
+ 	hotkey_free(hotkeys->down_hotkey);
+ 	g_free(hotkeys);
+ }
+ 
+ /**
+  * Creates the hotkeys subsystem, and bind the hotkeys.
+@@ -255,14 +273,16 @@
+ 
+ 	hotkeys = g_new0(Hotkeys, 1);
+ 
+ 	/* Save audio pointer */
+ 	hotkeys->audio = audio;
+ 
+ 	/* Load preferences */
+ 	hotkeys_reload(hotkeys);
+ 
+ 	/* Bind hotkeys */
++#ifdef HAVE_GDK_X11
+ 	hotkeys_add_filter(key_filter, hotkeys);
++#endif
+ 
+ 	return hotkeys;
+ }

@@ -1,0 +1,33 @@
+--- a/src/alsa.c
++++ b/src/alsa.c
+@@ -18,20 +18,30 @@
+  * starting messing up the code, so think twice.
+  * @brief Alsa audio subsystem.
+  */
+ 
+ #ifdef HAVE_CONFIG_H
+ #include "config.h"
+ #endif
+ 
+ #define _GNU_SOURCE /* exp10() */
+ #include <math.h>
++
++/* exp10() is a GNU/libc extension.  On this platform <math.h> does not declare
++ * it and the shared libm does not export it (only a static libc.a member
++ * exists), so the calls below fail to link with "undefined symbol: exp10".
++ * pow(10, x) is the same value and is always available; no code takes the
++ * address of exp10, so the macro is a safe drop-in. */
++#ifndef exp10
++#define exp10(x) pow(10.0, (x))
++#endif
++
+ #include <glib.h>
+ #include <alsa/asoundlib.h>
+ 
+ #include "support-log.h"
+ #include "alsa.h"
+ 
+ #define ALSA_DEFAULT_CARD "(default)"
+ #define ALSA_DEFAULT_HCTL "default"
+ 
+ /*

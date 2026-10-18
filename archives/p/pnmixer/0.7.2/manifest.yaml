@@ -1,0 +1,105 @@
+# 版本级 manifest — pnmixer 0.7.2
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "0.7.2"
+software: "pnmixer"
+
+# published：conan-verify Verdict PASS（G0–G4 全 PASS；L2/L4/L5 报告已出，未上传 registry）
+status: published
+build_date: "2026-10-18"
+build_system: cmake
+
+source:
+  url: "https://codeload.github.com/nicklan/pnmixer/tar.gz/refs/tags/v0.7.2"
+  sha256: "433487da386396f8d39244395220992ff73fe5191d0226febaead403a0cd6f2c"
+  tar_format: tar.gz
+  size_bytes: 237961
+  filename: "pnmixer-0.7.2.tar.gz"
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+    - "-DWITH_GTK3=ON"
+    - "-DWITH_LIBNOTIFY=OFF"
+    - "-DENABLE_NLS=OFF"
+    - "-DCMAKE_INSTALL_PREFIX=<package_folder>"
+  dependencies:
+    - gtk/3.24.43
+    - alsa-lib/1.2.16.1
+    - libx11/1.8.13.1
+  dependency_notes:
+    - "gtk/3.24.43 传递提供 glib/2.84.0.1、gdk-pixbuf/2.44.6.1、pango、cairo、atk、libepoxy 等"
+    - "libnotify 未声明（WITH_LIBNOTIFY=OFF）：制品仓 libnotify 的 libnotify.so.4.0.0 签名被 OHOS 加载器拒绝，链上它交付物无法启动"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-src-alsa.c.patch"
+  - "0002-src-hotkey.c.patch"
+  - "0003-src-hotkey.h.patch"
+  - "0004-src-hotkeys.c.patch"
+  - "0005-src-ui-popup-window.c.patch"
+  - "0006-src-ui-prefs-dialog.c.patch"
+
+tests:
+  upstream_static: 0
+  upstream_registered: 0
+  upstream_executed: 0
+  upstream_not_executed: 0
+  consumer_programs: 1
+  consumer_assertions: 24
+  consumer_assertion_breakdown:
+    structural_linkage_install: 15
+    cli_contract: 4
+    cli_unknown_option_fallthrough: 1
+    headless_fail_fast: 1
+    live_display_version: 2
+    live_display_startup: 1
+
+knowledge_gained:
+  - "ref: E002 / P014 —— OHOS /tmp 是只读 erofs：cmake/clang 的临时目录必须在 generate()/build() 里改指 build_folder 私有目录（TMPDIR/TMP/TEMP 三写）"
+  - "ref: E276 / E483 —— codeload.github.com 的 tar.gz 直链末段是 tag 名（无 .tar.gz 后缀），conandata 必须显式给 filename，否则 conan 按末段猜格式报 BadZipFile"
+  - "ref: E527 —— OHOS 的 gtk3 只编 broadway 后端（x11_backend=false/wayland_backend=false），include/gtk-3.0 下没有 gdk/gdkx.h、libgdk-3 也没有 gdk_x11_* 符号；任何 include <gdk/gdkx.h> 的上游代码必须做编译期探测（__has_include）+ 守卫"
+  - "reference: E527 —— 同一个 broadway 后端反过来是**可测面**：gtk 包自带 bin/broadwayd，起一个私有 display 后 GtkStatusIcon 程序的完整初始化路径能真跑（version 分支、glade 装载、pixmap 装载、audio 挂载、进入主循环），消费者测试因此不必停留在结构性断言"
+  - "ref: E660 —— ENABLE_NLS=ON 时上游 CMakeLists 会 FATAL_ERROR 要求 xgettext，且 support-intl.h 会 include 空壳 <libintl.h>；置 OFF 后既不需要 gettext 工具链也不链接 -lintl"
+  - "ref: E527 家族 —— glib 的 exp10() 是本平台缺失的 GNU 扩展：OHOS sysroot 的 <math.h> 不声明它、共享 libm 也不导出（只有静态 libc.a 有），链接期报 undefined symbol: exp10；换成 pow(10,x) 等价且必然可用"
+  - "reference: 上游 CMakeLists.txt:1 的 cmake_minimum_required(VERSION 3.0) + CMake 4.1.2 移除 <3.5 兼容的策略检查 —— platform 的 CMake 4.1.2 移除了 cmake_minimum_required(<3.5) 兼容，必须用 CMakeToolchain.cache_variables 注入 CMAKE_POLICY_VERSION_MINIMUM=3.5（写成普通 variables 进 toolchain 文件不参与策略检查）"
+  - "reference: E468（PkgConfigDeps 写 .pc 但不扩展 PKG_CONFIG_PATH）—— 本条命中既有条目、未新增草稿；CMakeToolchain 不会像 AutotoolsToolchain 那样自动把 generators 目录塞进 PKG_CONFIG_PATH，pkg_check_modules 项目必须自己在 build() 里铺好 PKG_CONFIG_PATH"
+  - "reference: 已合入的 lomiri-polkit-agent/0.3.3（同一 glib/2.84 vs 2.88 冲突，改用 libnotify/0.8.3）—— 制品仓 libnotify/0.8.3.1 以 force=True 钉 glib/2.88.0.1，与全部已发布 gtk3 的 glib/2.84.0.1 不可解；0.8.3 与 glib/2.84 同代可直接用（已合入 lomiri-polkit-agent/0.3.3 同款处置）"
+  - "reference: E1131 / E1670（.codesign 失效 ⇒ dlopen Permission denied 家族）—— 制品仓 libnotify 的 lib/libnotify.so.4.0.0 带 .codesign 段但签名不被 OHOS 加载器接受（dlopen → Permission denied；同一字节重签后可继续做依赖解析），因此任何链 libnotify 的交付物在 OHOS 上无法启动——依赖制品侧缺陷"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/pnmixer-0.7.2.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/pnmixer-0.7.2.work
+  source_orig_hash: 6921a1bb0b39296d
+  source_work_hash: ec596535ba27f910
+  generated_at: '2026-10-18T05:45:13'
+  patches_count: 6
+
+patch_classification:
+  - file: 0001-src-alsa.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-src-hotkey.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-src-hotkey.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-src-hotkeys.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0005-src-ui-popup-window.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0006-src-ui-prefs-dialog.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
