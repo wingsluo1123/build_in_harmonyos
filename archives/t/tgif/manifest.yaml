@@ -1,0 +1,25 @@
+software: tgif
+display: "tgif"
+description: "X11 交互式二维绘图工具（Motif/Xt 风格），可编辑 .obj 矢量图、HyperGraphics 与 Tangram-II 支持"
+category: graphics
+homepage: "https://sourceforge.net/projects/tgif/"
+license: QPL-1.0
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "上游 4.2.5 发布 tarball 是脏的（打包自已 configure 的树），移除 config.status/config.h/config.log/Makefile 残留，使 Conan 的 VPATH 构建可运行"
+    - "Makefile 把编译期 -D 定义写在 CFLAGS 里，会覆盖工具链 CFLAGS；改为 AM_CPPFLAGS，让上游定义与 Conan 工具链 CFLAGS 同时生效"
+    - "configure 创建 config.status 临时目录时用 umask 077，HMDFS 下该目录连属主都不可写（E114），补丁去掉 umask 077"
+    - "tgif_LDADD 中 -lXext/-lSM/-lICE/-lXmu 无任何符号引用且与 Conan 依赖图冲突，裁剪为实际使用的 -lX11 -lXt -lm -lz"
+    - "并行 make 的 jobserver FIFO 在 HMDFS 上 EPERM（E074），构建固定 make -j1"
+  common_dependencies:
+    - libx11
+    - libxt
+    - zlib
+
+versions:
+  "4.2.5":
+    status: built
+    build_date: "2026-10-18"
+    conan_ref: "tgif/4.2.5"
