@@ -1,0 +1,61 @@
+software: konquest
+version: "26.04.0"
+status: built
+package_type: application
+build_system: cmake
+created_at: 2026-10-18
+language: cpp
+description: "KDE galactic strategy conquest game (Konquest) - Qt6/KF6 QGraphics application built on KDEGames6/libkdegames"
+homepage: https://invent.kde.org/games/konquest
+upstream_source: https://download.kde.org/stable/release-service/26.04.0/src/konquest-26.04.0.tar.xz
+source_sha256: 8a627220f878875d49ed32cf69383db55a5c3341f7a2294185f4fdfdcfb1bd48
+license: "GPL-2.0-or-later AND GFDL-1.2-only"
+
+dependencies:
+  required:
+    - qtbase/6.11.1
+    - qtsvg/6.11.1
+    - qtscxml/6.11.1
+    - karchive/6.18.0 (override=True)
+    - kcodecs/6.18.0
+    - kcolorscheme/6.18.0
+    - kconfig/6.18.0
+    - kconfigwidgets/6.18.0
+    - kcoreaddons/6.18.0
+    - kcrash/6.18.0
+    - kdbusaddons/6.18.0
+    - kguiaddons/6.18.0
+    - ki18n/6.18.0
+    - kwidgetsaddons/6.18.0
+    - kxmlgui/6.18.0
+    - libkdegames/26.04.0
+  build:
+    - ecm/6.26.0
+  forced:
+    - karchive/6.18.0 (override=True: libkdegames 26.04.0 graph precedent)
+
+patches_applied:
+  - patches/0001-cmake.patch
+
+test_results:
+  type: no_upstream_tests_consumer_verified
+  upstream: "No upstream test suite: the 26.04.0 tarball contains no tests/, autotests/ or test/ directory and no add_test()/enable_testing()/ecm_add_tests() call in any CMakeLists.txt. Upstream QA for this module happens via KDE CI source builds (.kde-ci.yml requires-passing-tests-on: Linux/FreeBSD/Windows)."
+  test_package: "Runtime smoke of the shipped executable: (1) konquest --version prints the 2.4.26040 version string and exits 0 (QT_QPA_PLATFORM=offscreen headless-safe); (2) ELF NEEDED runtime loadability verification (readelf-based). Plus a HarmonyOS-specific NON-ASSERTING test (rule12 consumer feasibility): OHOS musl loader NEEDED closure observation — each NEEDED entry probed against the injected runtime library paths with an observational report only, never affecting the exit code."
+  package_id: "73fa59e4770a5bf315d16f5e3b11a30a1257e5e0"
+
+platform_adaptations:
+  - "KF6 DocTools removed from REQUIRED component list and doc/ handbook + kdoctools_install(po) dropped (patch 0001): kdoctools not in KF6 closure"
+  - "KF_IGNORE_PLATFORM_CHECK=TRUE (KDE platform detection does not know OHOS)"
+  - "KF_SKIP_PO_PROCESSING=ON (translation catalogs skipped)"
+  - "Linker flags -Wl,-z,max-page-size=0x1000: OHOS musl loader workaround"
+  - "ECM_MODULE_PATH + conan_cmakedeps_paths.cmake written manually (qtbase/KF6 packages use cmake_find_mode=none)"
+
+known_issues:
+  - "konquest is a GUI game: on a headless machine needs QT_QPA_PLATFORM=offscreen for the --version smoke; full gameplay requires a display/launcher environment"
+
+knowledge_gained:
+  - "KDE Games GUI apps build on OHOS via conan with KF_IGNORE_PLATFORM_CHECK=TRUE + KF_SKIP_PO_PROCESSING=ON and a manually written conan_cmakedeps_paths.cmake (qtbase/KF6 use cmake_find_mode=none, so ECM cannot find Conan-generated package configs through its default module path). knowledge_ref: E1406 (cmake_find_mode=none 依赖 config 手动注入同源机制)、E1261 (ECM 6.26 KDE 平台检测先例)"
+  - "kdoctools is not part of the published KF6 closure on OHOS: remove DocTools from find_package(KF6 REQUIRED COMPONENTS), drop add_subdirectory(doc) and kdoctools_install(po) — klickety/kfourinline/konquest all follow the same patch pattern. knowledge_ref: 同模式先例配方 archives/k/klickety/26.04.0、archives/k/kfourinline/26.04.0（跨软件经验，未单独入图）"
+  - "OHOS musl loader needs -Wl,-z,max-page-size=0x1000 (16KB page) pinned on the executable link; without it the binary fails to load on 16KB-page devices. knowledge_ref: E004 (musl 运行时链接问题族)"
+  - "qtscxml (Qt6 StateMachine) is a real runtime requirement of KDEGames-based games (KGameXmlStateLoader); test_package must add openal-soft/libsndfile consumer deps only if libKDEGames6.so symbols actually leak into the closure. knowledge_ref: 同模式先例配方 archives/k/klickety/26.04.0（openal-soft 消费依赖先例）"
+  - "test_package for application packages should separate assertions (smoke) from HarmonyOS-specific non-asserting consumer-feasibility observations (rule12): closure observation prints evidence but never decides the exit code. knowledge_ref: 本仓 rule12 惯例，先例 test_package 见 archives/k/kfourinline/26.04.0"

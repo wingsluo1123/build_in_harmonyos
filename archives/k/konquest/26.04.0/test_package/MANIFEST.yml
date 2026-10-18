@@ -1,0 +1,28 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for konquest/26.04.0.
+
+package: konquest/26.04.0
+homepage: https://invent.kde.org/games/konquest
+
+upstream_check_command: "grep -rn 'add_test\|enable_testing\|ecm_add_tests' --include='*.txt' --include='*.cmake' . | grep -v '^./po' || true"
+upstream_test_in_build: false
+upstream_test_command: "n/a - upstream registers no test suite (no tests/, autotests/ or add_test() in the 26.04.0 tarball)"
+
+upstream_tests:
+  - file: "(none)"
+    source: konquest-26.04.0.tar.xz
+    description: "No upstream test suite: the tarball contains no tests/, autotests/ or test/ directory and no add_test()/enable_testing()/ecm_add_tests() call in any CMakeLists.txt. Upstream QA for this module happens via KDE CI source builds (.kde-ci.yml requires-passing-tests-on: Linux/FreeBSD/Windows)."
+    command: "n/a"
+
+test_package_tests:
+  - file: test_package/test.sh
+    description: "Runtime smoke of the shipped executable: (1) konquest --version prints the 26.04.0 version string and exits 0 (QCommandLineParser/KAboutData handle --version before GUI creation, QT_QPA_PLATFORM=offscreen headless-safe); (2) ELF NEEDED runtime loadability verification (readelf-based consumer feasibility test)."
+    command: "conan create (test_package runs test.sh against the installed bin/konquest)"
+  - file: test_package/test.sh
+    description: "HarmonyOS-specific NON-ASSERTING test (rule12 consumer feasibility): OHOS musl loader NEEDED closure observation — every NEEDED entry of the konquest ELF is probed against the injected runtime library paths (LD_LIBRARY_PATH conan dependency dirs + /system/lib64) and each resolution result is printed as an observational report with a summary line. It never alters the exit code and never fails the test; pass/fail is decided solely by the smoke assertions above. Provides reviewable consumer-side loadability evidence under the OHOS musl dynamic loader."
+    command: "conan create (test.sh 'NEEDED closure observation' section; informational output only, no verdict)"
+    non_asserting: true
+    harmonyos_specific: true
+
+assertion_count: 4
+non_asserting_harmonyos_tests: 1
