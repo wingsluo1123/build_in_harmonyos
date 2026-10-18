@@ -1,0 +1,42 @@
+# 版本级 manifest — palapeli 26.04.0
+version: "26.04.0"
+software: "palapeli"
+
+status: pending
+build_system: cmake
+created_at: 2026-10-17
+
+source:
+  url: "https://download.kde.org/stable/release-service/26.04.0/src/palapeli-26.04.0.tar.xz"
+  sha256: "8bf301eec4a319bc7a979c6ce6bb42c76001794cb1773fec828b44b8d61574ab"
+  tar_format: tar.xz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DBUILD_TESTING=OFF"
+    - "-DKDE_SKIP_TEST_SETTINGS=ON"
+  dependencies:
+    - "qtbase-sql-dbus/6.11.1 (提供 Qt6::DBus，供 KDBusAddons/Notifications 链)"
+    - "qtsvg/6.11.1"
+    - "KF6 6.18.0 全闭包: kconfig kcoreaddons ki18n kcrash karchive kbookmarks kauth"
+    - "  kcolorscheme kcompletion kconfigwidgets kguiaddons kiconthemes kitemviews"
+    - "  kjobwidgets kservice kwidgetsaddons kwindowsystem solid kdbusaddons"
+    - "  knotifications kxmlgui knewstuff kdnssd attica (均 override=True)"
+    - "kio/6.14.0 (制品仓无 6.18.0 线；其 KF6 6.14 pin 由 override 拉回 6.18.0，需源码构建)"
+    - "libkdegames/26.04.0.1 (KDEGames6；26.04.0 为 SONAME 缺陷版，弃用)"
+    - "ecm/6.26.0 (tool_requires)"
+    - "shared-mime-info/2.5.1 (tool_requires，提供 update-mime-database 满足 mime/ 子目录)"
+  cc: clang
+  cxx: clang++
+
+license: "GPL-2.0-or-later (代码) / GFDL-1.2-or-later (文档) / BSD-3-Clause / CC0-1.0 (杂项)"
+
+patches_applied:
+  - "patches/0001-CMakeLists.txt.patch (桌面集成组件可选化：KF6DocTools 从 REQUIRED 组件表移除、删 add_subdirectory(doc)、删 kdoctools_install(po)；对应 knowledge/operations/kf6-desktop-integration)"
+
+test_results:
+  type: consumer
+  upstream: "NO_UPSTREAM_TESTS: 上游无测试套件（无 autotests/、无 tests/ 目录，全树无 add_test/enable_testing/ECMAddTests；证据见 test_package/MANIFEST.yml 与 notes.md）"
+  test_package: "pending（权威 CI 首跑回填）"

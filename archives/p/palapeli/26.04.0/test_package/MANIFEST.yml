@@ -1,0 +1,61 @@
+# MANIFEST.yml - test_package for palapeli 26.04.0
+name: palapeli
+version: "26.04.0"
+test_type: consumer
+description: >
+  Consumer test for the palapeli 26.04.0 conan package on HarmonyOS PC
+  (aarch64). Unlike a plain GUI-only KDE app, palapeli ships a real library
+  (libpala) with an exported CMake package (PalaConfig), so the test is a
+  genuine library consumer: it links Pala::Pala through find_package(Pala),
+  loads the three installed slicer plugins with QPluginLoader, builds a
+  SlicerJob from the plugins' own property defaults and actually runs the
+  slicing algorithm through the public Slicer::process() wrapper. Artifact
+  and ELF portability assertions (no path-form DT_NEEDED, libKDEGames6 in
+  the app's DT_NEEDED, SONAME on libpala.so) run alongside.
+build_system: cmake
+language: cxx
+runner: direct
+
+# ---------------------------------------------------------------------------
+# NO_UPSTREAM_TESTS route (discovery_status: EVIDENCE_COMPLETE)
+# ---------------------------------------------------------------------------
+# Upstream 26.04.0 ships no test suite. Verified against the official release
+# archive
+# (https://download.kde.org/stable/release-service/26.04.0/src/palapeli-26.04.0.tar.xz,
+#  sha256 8bf301eec4a319bc7a979c6ce6bb42c76001794cb1773fec828b44b8d61574ab):
+#   - no autotests/ directory, no tests/ directory
+#   - no add_test()/enable_testing()/include(ECMAddTests)/ecm_add_test
+#     anywhere in the source tree (grep over all CMakeLists.txt, po/ excluded)
+#   - the four subdirectory CMakeLists (libpala, slicers, src, mime) only build
+#     the library, the plugins and the executable
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+discovery_status: EVIDENCE_COMPLETE
+
+# test_package 中自带的测试 (消费者视角验证)
+# R34: 必须实质消费被测包的产物（链接 libpala，加载已安装插件，真跑切图）
+test_package_tests:
+  - file: consumer.cpp
+    description: >
+      Real library consumer: find_package(Pala) + link Pala::Pala; load
+      palapeli_{rect,jigsaw,goldberg}slicer.so via QPluginLoader and
+      qobject_cast<Pala::Slicer*> (also proves libpala/plugin ABI parity);
+      construct Pala::SlicerJob on a 400x300 image with each plugin's
+      propertyList() defaults; call Slicer::process(); assert non-empty
+      pieces, unique non-empty property keys, and for the rectangular
+      slicer an exact tiling (sum of piece areas == 120000 == input area).
+    command: "PALAPELI_PLUGIN_DIR=<pkg>/lib/plugins/palapelislicers palapeli_consumer"
+  - file: test_palapeli.sh
+    description: >
+      Artifact + OHOS portability assertions on the installed tree:
+      bin/palapeli (executable), lib/libpala.so, 4 plugins, mimetype XML,
+      desktop file; no path-form DT_NEEDED in the app, libpala and plugins
+      (E537 parity); libKDEGames6.so present in the app's DT_NEEDED (real
+      consumption of libkdegames 26.04.0.1); SONAME on libpala.so;
+      mime.cache non-empty when shared-mime-info tooling was available.
+    command: "sh test_palapeli.sh <pkg>"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 24
