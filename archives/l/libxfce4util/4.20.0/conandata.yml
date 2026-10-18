@@ -1,0 +1,41 @@
+# conandata.yml — libxfce4util 4.20.0
+# Official Xfce release archive; sha256 cross-anchored against the FreeBSD
+# ports distinfo by the scout stage and re-verified locally.
+# archive.xfce.org is the canonical host; mirror.netcologne.de is the Xfce
+# project's listed mirror kept as downloader fallback.
+
+sources:
+  url:
+    - "https://archive.xfce.org/src/xfce/libxfce4util/4.20/libxfce4util-4.20.0.tar.bz2"
+    - "https://mirror.netcologne.de/xfce/src/xfce/libxfce4util/4.20/libxfce4util-4.20.0.tar.bz2"
+  sha256: "21493f9c9995a282823db93839f6b9f06ae31edb094191ba9acf04d932a2b592"
+
+patches:
+  - patch_file: "patches/0001-config.guess.patch"
+    patch_description: >-
+      config.guess: add the *:HarmonyOS:*:* uname case so the bundled script
+      reports aarch64-unknown-linux-ohos on HarmonyOS PC hosts
+    patch_type: "portability"
+  - patch_file: "patches/0002-config.sub.patch"
+    patch_description: >-
+      config.sub: accept the ohos kernel-os combination.  The 2022-era script
+      rejects the aarch64-unknown-linux-ohos triplet outright (rc=1): the
+      basic-OS whitelist gains ohos* and the kernel-os validation gains
+      linux-ohos*
+    patch_type: "portability"
+  - patch_file: "patches/0003-configure.patch"
+    patch_description: >-
+      configure: create its private temporary directory with umask 022 instead
+      of 077 — on the OHOS HMDFS the 077 permissions leave the mktemp -d
+      directory unusable (E011)
+    patch_type: "portability"
+  - patch_file: "patches/0004-disable-nls-i18n-guards.patch"
+    patch_description: >-
+      xfce-i18n.c / libxfce4util-private.c: guard the bindtextdomain /
+      bind_textdomain_codeset / textdomain calls with ENABLE_NLS.  Under
+      --disable-nls the calls stayed live while the glib sysroot's
+      proxy-libintl header rebound them to g_libintl_*, whose only supplier
+      DSO lives inside the glib package — leaving unresolved symbols in
+      libxfce4util.so that fail consumers' lld --no-allow-shlib-undefined
+      link (E015/E027 family, xapp-2.8.9 signature)
+    patch_type: "portability"
