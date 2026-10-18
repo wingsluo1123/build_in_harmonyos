@@ -1,0 +1,70 @@
+--- a/py3.12/multiprocess/util.py
++++ b/py3.12/multiprocess/util.py
+@@ -106,11 +106,9 @@
+ # Abstract socket support
+ 
+ def _platform_supports_abstract_sockets():
+-    if sys.platform == "linux":
+-        return True
+-    if hasattr(sys, 'getandroidapilevel'):
+-        return True
+-    return False
++    # Reuse the running interpreter's platform capability decision.
++    from multiprocessing.util import abstract_sockets_supported
++    return abstract_sockets_supported
+ 
+ 
+ def is_abstract_socket_namespace(address):
+@@ -448,6 +446,11 @@
+ #
+ 
+ def spawnv_passfds(path, args, passfds):
++    # Bootstrap this third-party stdlib fork even with -E/-I.
++    args = list(args)
++    if '-c' in args:
++        command = args.index('-c') + 1
++        args[command] = 'import sys; sys.path[:0] = %r; ' % sys.path + args[command]
+     import _posixsubprocess
+     import subprocess
+     passfds = tuple(sorted(map(int, passfds)))
+--- a/py3.12/multiprocess/context.py
++++ b/py3.12/multiprocess/context.py
+@@ -265,6 +265,9 @@
+             methods = ['spawn', 'fork'] if sys.platform == 'darwin' else ['fork', 'spawn']
+             if reduction.HAVE_SEND_HANDLE:
+                 methods.append('forkserver')
++            default = self._default_context._name
++            methods.remove(default)
++            methods.insert(0, default)
+             return methods
+ 
+ 
+@@ -320,12 +323,11 @@
+         'spawn': SpawnContext(),
+         'forkserver': ForkServerContext(),
+     }
+-    if sys.platform == 'darwin':
+-        # bpo-33725: running arbitrary code after fork() is no longer reliable
+-        # on macOS since macOS 10.14 (Mojave). Use spawn by default instead.
+-        _default_context = DefaultContext(_concrete_contexts['fork']) #FIXME: spawn
+-    else:
+-        _default_context = DefaultContext(_concrete_contexts['fork'])
++    # Follow this interpreter's safe default; keep explicit contexts.
++    import multiprocessing.context as _stdlib_context
++    _default_context = DefaultContext(
++        _concrete_contexts[_stdlib_context._default_context._default_context._name]
++    )
+ 
+ else:
+ 
+--- a/py3.12/multiprocess/connection.py
++++ b/py3.12/multiprocess/connection.py
+@@ -77,6 +77,8 @@
+     if family == 'AF_INET':
+         return ('localhost', 0)
+     elif family == 'AF_UNIX':
++        if util.abstract_sockets_supported:
++            return '\0' + tempfile.mktemp(prefix='listener-%d-' % os.getpid(), dir='')
+         return tempfile.mktemp(prefix='listener-', dir=util.get_temp_dir())
+     elif family == 'AF_PIPE':
+         return tempfile.mktemp(prefix=r'\\.\pipe\pyc-%d-%d-' %
