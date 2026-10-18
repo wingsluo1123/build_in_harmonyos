@@ -1,0 +1,47 @@
+0001-ohos-public-header-glu-conditionalization.patch
+
+Conditionalize the X11/GLX includes of the public header
+include/lsp-plug.in/r3d/glx/backend.h with __has_include feature detection
+(no platform macros in the public header, R8). On OpenHarmony (no X11, no
+desktop GL/GLX) the placeholder typedefs keep the lsp::r3d::glx::backend_t
+declaration complete; the platform backend implementation fills the handle
+members. On Linux/BSD nothing changes.
+
+--- a/include/lsp-plug.in/r3d/glx/backend.h
++++ b/include/lsp-plug.in/r3d/glx/backend.h
+@@ -27,10 +27,35 @@
+ #include <lsp-plug.in/r3d/base/backend.h>
+ 
+ // Standard libraries
++// The X11/GLX system headers are optional: feature detection via
++// __has_include keeps this public header free of platform macros (R8) while
++// staying compilable on platforms that ship neither X11 nor desktop GL/GLX
++// (e.g. OpenHarmony). The fallback typedefs below are opaque storage only -
++// on such platforms the handle members are filled in by the platform backend
++// implementation shipped with the recipe.
++#if defined(__has_include)
++#  if __has_include(<X11/Xlib.h>) && __has_include(<GL/gl.h>) && __has_include(<GL/glx.h>)
++#    define LSP_R3D_GLX_HAS_SYSTEM_GLX 1
++#  endif
++#endif
++
++#ifdef LSP_R3D_GLX_HAS_SYSTEM_GLX
+ #include <X11/X.h>
+ #include <X11/Xlib.h>
+ #include <GL/gl.h>
+ #include <GL/glx.h>
++#else
++// No X11/GLX on this platform (e.g. OpenHarmony): placeholder types with the
++// same handle shape that keep the backend_t declaration complete. They are
++// opaque storage only - the OHOS backend stores its EGL handles in these
++// members (GLXFBConfig* holds the EGLConfig, GLXContext the EGLContext).
++typedef void            Display;
++typedef unsigned long   XID;
++typedef XID             Window;
++typedef XID             GLXPbuffer;
++typedef void            *GLXContext;
++typedef void            GLXFBConfig;
++#endif
+ 
+ namespace lsp
+ {
