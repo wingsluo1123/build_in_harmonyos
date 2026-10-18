@@ -1,0 +1,58 @@
+--- a/py3.12/multiprocess/tests/mp_fork_bomb.py
++++ b/py3.12/multiprocess/tests/mp_fork_bomb.py
+@@ -1,4 +1,8 @@
+-import multiprocessing, sys
++import ast
++import sys
++if len(sys.argv) > 2:
++    sys.path[:0] = ast.literal_eval(sys.argv[2])
++import multiprocess as multiprocessing
+ 
+ def foo():
+     print("123")
+--- a/py3.12/multiprocess/tests/mp_preload.py
++++ b/py3.12/multiprocess/tests/mp_preload.py
+@@ -1,4 +1,4 @@
+-import multiprocessing
++import multiprocess as multiprocessing
+ 
+ multiprocessing.Lock()
+ 
+--- a/py3.12/multiprocess/tests/__init__.py
++++ b/py3.12/multiprocess/tests/__init__.py
+@@ -4386,7 +4386,7 @@
+         # bpo-36867: test that a SharedMemoryManager uses the
+         # same resource_tracker process as its parent.
+         cmd = '''if 1:
+-            from multiprocessing.managers import SharedMemoryManager
++            from multiprocess.managers import SharedMemoryManager
+ 
+ 
+             smm = SharedMemoryManager()
+@@ -4589,7 +4589,7 @@
+     def test_shared_memory_cleaned_after_process_termination(self):
+         cmd = '''if 1:
+             import os, time, sys
+-            from multiprocessing import shared_memory
++            from multiprocess import shared_memory
+ 
+             # Create a shared_memory segment, and send the segment name
+             sm = shared_memory.SharedMemory(create=True, size=10)
+@@ -4597,6 +4597,8 @@
+             sys.stdout.flush()
+             time.sleep(100)
+         '''
++        # Keep -E while explicitly exposing this installed fork to the child.
++        cmd = 'import sys; sys.path[:0] = %r\n' % sys.path + cmd
+         with subprocess.Popen([sys.executable, '-E', '-c', cmd],
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE) as p:
+@@ -5381,7 +5383,7 @@
+         sm = multiprocessing.get_start_method()
+         name = os.path.join(os.path.dirname(__file__), 'mp_fork_bomb.py')
+         if sm != 'fork':
+-            rc, out, err = test.support.script_helper.assert_python_failure(name, sm)
++            rc, out, err = test.support.script_helper.assert_python_failure(name, sm, repr(sys.path))
+             self.assertEqual(out, b'')
+             self.assertIn(b'RuntimeError', err)
+         else:
