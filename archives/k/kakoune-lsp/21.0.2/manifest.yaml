@@ -1,0 +1,118 @@
+software: kakoune-lsp
+# 版本级 manifest
+# 文件位置: archives/k/kakoune-lsp/21.0.2/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "21.0.2"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-14"
+
+# 构建系统类型 (顶层字段)
+build_system: cargo
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/kakoune-lsp/kakoune-lsp/archive/refs/tags/v21.0.2.tar.gz"
+
+  # 源码校验和
+  sha256: "34b4718af5ee39a05a1a176a25cdde4333d2de548e84c148389552e893bc7cc0"
+
+  # 压缩格式
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建工具链
+  toolchain: "Harmonybrew Rust 1.98.1 (r1 bottle bootstrap) / OHOS clang 15 linker"
+
+  # 构建命令
+  command: "cargo build --release --locked -j 2"
+
+  # 并行度
+  parallel: 2
+
+  # 特殊构建参数
+  flags: ""
+  # 默认 feature 集为空：唯一 feature crash-reporting 拉 sentry/openssl-sys
+  # （C 库），不启用——纯 Rust 依赖集零 C 库链接需求。
+
+# ============================================================
+# 测试信息
+# ============================================================
+
+test:
+  # 测试框架
+  framework: cargo
+
+  # 测试命令
+  command: "cargo test --release --locked --tests"
+
+  # 上游注册用例数（16 #[test] across markup/position/text_edit/util）
+  total_cases: 16
+
+  # 通过用例数（本机实测）
+  passed_cases: 16
+
+  # 失败用例数
+  failed_cases: 0
+
+  # 跳过用例数（doc-tests 排除：OHOS Rust 工具链无 rustdoc）
+  skipped_cases: 0
+
+  # 说明
+  notes: >-
+    上游 cargo test 套件在 test_package 阶段对 conandata 同源 tarball
+    重新下载执行（alacritty/0.17.0 先例）；--tests 排除 doc-tests 阶段
+    （OHOS Rust 工具链无可用 rustdoc）。消费者冒烟（--version/--help/
+    --kakoune）由 test.sh 执行并输出 HMBS_TEST_PACKAGE_RESULT。
+
+# ============================================================
+# 产物信息
+# ============================================================
+
+artifacts:
+  # 主产物
+  - name: kak-lsp
+    type: binary
+    path: bin/kak-lsp
+
+# ============================================================
+# 依赖信息
+# ============================================================
+
+dependencies:
+  runtime: []
+  build: []
+  # 纯 Rust 依赖集（Cargo.lock 320 包经 rsproxy.cn sparse 镜像拉取），
+  # 无 conan 依赖、无系统 C 库链接需求（NEEDED 仅 libc++_shared.so/libc.so）。
+
+# ============================================================
+# 环境信息
+# ============================================================
+
+environment:
+  # 目标操作系统
+  os: OHOS
+
+  # 目标架构
+  arch: arm64
+
+  # 构建环境
+  build_env: "OpenHarmony PC (aarch64), conan 2.29.1 OHOS-adapted"
