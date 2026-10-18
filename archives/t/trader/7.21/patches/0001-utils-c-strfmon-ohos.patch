@@ -1,0 +1,249 @@
+--- a/src/utils.c	2026-10-12 15:35:07.548041701 +0000
++++ b/src/utils.c	2026-10-12 15:36:38.132407015 +0000
+@@ -236,6 +236,16 @@
+ 
+ static bool is_posix_locale = false;		// Override strfmon()?
+ 
++#if !defined (__GLIBC__)
++/* Forward declaration of the strfmon() compatibility shim defined at the
++   end of this file.  It must precede xwcsfmon()'s call (an implicit
++   non-static declaration would otherwise conflict with the static
++   definition at the end of this translation unit). */
++static ssize_t strfmon (char *restrict buf, size_t maxsize,
++		const char *restrict format, ...);
++#endif /* !__GLIBC__ */
++
++
+ 
+ /************************************************************************
+ *                  Module-specific function prototypes                  *
+@@ -1429,3 +1439,229 @@
+ 
+ /***********************************************************************/
+ // End of file
++
++/***********************************************************************/
++/* strfmon() compatibility shim for OpenHarmony (OHOS)
++ * ---------------------------------------------------------------------
++ * OpenHarmony's libc (musl-derived) does not export the POSIX/XOpen
++ * strfmon() function, while xwcsfmon() (above) calls it for monetary
++ * formatting.  Provide a self-contained, portable implementation with
++ * POSIX strfmon() semantics:
++ *
++ *     %[flags][field width][.precision]i|n
++ *
++ *     flags: =C   fill character (default space)
++ *            ^    disable digit grouping
++ *            +    force a leading '+' sign for positive values
++ *            (    enclose negative values in parentheses
++ *            !    suppress the currency symbol
++ *            -    left-justify within the field width
++ *
++ *     'i' uses the international currency symbol, 'n' the national one.
++ *
++ * Guarded by !__GLIBC__ so the native libc strfmon() is still used on
++ * glibc platforms (avoids a duplicate symbol on glibc/BSD).  OpenHarmony's
++ * libc is musl-derived (non-glibc) and does not export strfmon.
++ */
++#if !defined (__GLIBC__)
++
++static ssize_t
++strfmon (char *restrict buf, size_t maxsize,
++         const char *restrict format, ...)
++{
++    struct lconv *lc;
++    const char *cur_sym, *thousands, *int_curr;
++    const char *p;
++    char *out;
++    size_t used = 0;
++    ssize_t total = 0;
++    va_list ap;
++
++    if (buf == NULL || format == NULL || maxsize == 0)
++	return -1;
++
++    lc = localeconv ();
++    thousands = lc->thousands_sep;
++    int_curr  = (lc->int_curr_symbol && *lc->int_curr_symbol)
++		    ? lc->int_curr_symbol : "";
++    cur_sym   = (lc->currency_symbol && *lc->currency_symbol)
++		    ? lc->currency_symbol : "";
++
++    out = buf;
++    va_start (ap, format);
++    p = format;
++
++#define STRFMON_PUT_STR(s_, len_) do {					\
++	size_t _n = (len_);						\
++	if (_n > maxsize - used)					\
++	    _n = maxsize - used;					\
++	memcpy (out + used, (s_), _n);					\
++	used += _n;							\
++	total += (ssize_t) (len_);					\
++    } while (0)
++
++    while (*p != '\0')
++    {
++	if (*p != '%')
++	{
++	    STRFMON_PUT_STR (p, 1);
++	    p++;
++	    continue;
++	}
++	p++;				/* skip '%' */
++	if (*p == '\0')			/* trailing bare % -> invalid */
++	{
++	    errno = EINVAL;
++	    va_end (ap);
++	    return -1;
++	}
++
++	/* flags */
++	char fill = ' ';
++	int no_group = 0, force_sign = 0, paren = 0, no_sym = 0;
++	int left = 0, intl = 0, have_width = 0, width = 0, prec = -1;
++	for (;;)
++	{
++	    if (*p == '=')
++	    {
++		p++;
++		if (*p == '\0')
++		{
++		    errno = EINVAL; va_end (ap); return -1;
++		}
++		fill = *p++;
++	    }
++	    else if (*p == '^')		{ no_group = 1; p++; }
++	    else if (*p == '+')		{ force_sign = 1; p++; }
++	    else if (*p == '(')		{ paren = 1; p++; }
++	    else if (*p == '!')		{ no_sym = 1; p++; }
++	    else if (*p == '-')		{ left = 1; p++; }
++	    else break;
++	}
++	/* field width */
++	while (*p >= '0' && *p <= '9')
++	{
++	    width = width * 10 + (*p - '0');
++	    have_width = 1;
++	    p++;
++	}
++	/* precision */
++	if (*p == '.')
++	{
++	    p++;
++	    prec = 0;
++	    while (*p >= '0' && *p <= '9')
++	    {
++		prec = prec * 10 + (*p - '0');
++		p++;
++	    }
++	}
++	if (*p == 'i')		{ intl = 1; p++; }
++	else if (*p == 'n')	{ intl = 0; p++; }
++	else
++	{
++	    errno = EINVAL;
++	    va_end (ap);
++	    return -1;
++	}
++	if (prec < 0)
++	    prec = 2;
++
++	double val = va_arg (ap, double);
++	int negative = (val < 0);
++	double aval = negative ? -val : val;
++
++	/* currency symbol the value is formatted against */
++	const char *sym = intl ? int_curr : cur_sym;
++	if (no_sym)
++	    sym = "";
++
++	int group = !no_group && thousands && *thousands;
++
++	/* Build the numeric part with the requested precision. */
++	char digits[128];
++	snprintf (digits, sizeof digits, "%.*f", prec, aval);
++
++	/* ---- assemble <sign><currency><grouped-number> or ( ... ) ---- */
++	char amount[512];
++	char *apos = amount;
++	char signbuf[2];
++	signbuf[0] = '\0';
++	if (negative)
++	    signbuf[0] = (paren) ? '\0' : '-';
++	else if (force_sign)
++	    signbuf[0] = '+';
++	signbuf[1] = '\0';
++
++	if (negative && paren)
++	    *apos++ = '(';
++	if (signbuf[0])
++	{
++	    if (negative ? !paren : 1)
++		*apos++ = signbuf[0];
++	}
++	/* currency symbol before the number */
++	size_t sl = strlen (sym);
++	memcpy (apos, sym, sl); apos += sl;
++	/* number (with digit grouping) */
++	{
++	    char grouped[512];
++	    char *gp = grouped;
++	    size_t dl = strlen (digits);
++	    const char *dp = strchr (digits, '.');
++	    size_t intlen = dp ? (size_t) (dp - digits) : dl;
++	    if (group && intlen > 3)
++	    {
++		size_t k;
++		for (k = 0; k < intlen; k++)
++		{
++		    *gp++ = digits[k];
++		    size_t remaining = intlen - k - 1;
++		    if (remaining > 0 && remaining % 3 == 0)
++			*gp++ = thousands[0];
++		}
++		/* append the '.' and fractional digits, if any */
++		if (dp)
++		{
++		    memcpy (gp, dp, dl - (size_t) (dp - digits));
++		    gp += dl - (size_t) (dp - digits);
++		}
++	    }
++	    else
++	    {
++		memcpy (gp, digits, dl);
++		gp += dl;
++	    }
++	    *gp = '\0';
++	    size_t gl = strlen (grouped);
++	    memcpy (apos, grouped, gl); apos += gl;
++	}
++	if (negative && paren)
++	    *apos++ = ')';
++	*apos = '\0';
++
++	/* Apply field width / fill / justification */
++	char field[600];
++	size_t alen = strlen (amount);
++	int w = have_width ? width : (int) alen;
++	if (w < (int) alen)
++	    w = (int) alen;
++	if (w > 500)
++	    w = 500;
++	memset (field, fill, (size_t) w);
++	if (left)
++	    memcpy (field, amount, alen);
++	else
++	    memcpy (field + (w - (int) alen), amount, alen);
++	field[w] = '\0';
++	STRFMON_PUT_STR (field, (size_t) w);
++    }
++
++    if (used >= maxsize)
++	used = maxsize - 1;
++    out[used] = '\0';
++    va_end (ap);
++    return total;
++}
++
++#endif /* !__GLIBC__ */

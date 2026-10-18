@@ -1,0 +1,67 @@
+# 版本级 manifest — Star Traders (trader) 7.21
+# 遵循 ARCHIVE-SPEC v3.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "7.21"
+software: "trader"
+
+# 编译状态: built（真机 rule4 门禁通过后由 HMBS 更新为 published）
+status: built
+
+build_date: "2026-10-14"
+build_system: autotools
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 官方发布归档（ftp.zap.org.au / www.zap.org.au）与 Debian 源码仓库保存的
+  # .orig.tar.xz 位级相同，sha256 一致；CI 网络下官方站点不可达，故采用镜像
+  # 列表回退（见 conandata.yml）。
+  url: "https://deb.debian.org/debian/pool/main/t/trader/trader_7.21.orig.tar.xz"
+  sha256: "541d1180dde04173c071d5c59eaf72a6572f8dfc8065e184eaf7d14bccd0257d"
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: autotools
+  configure_options:
+    - "--disable-nls"
+    - "--with-ncurses"
+  dependencies:
+    - ncurses/6.6
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-utils-c-strfmon-ohos.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "trader 使用 AM_GNU_GETTEXT([external])+gnulib；OHOS 无外部 gettext 链，--disable-nls 可使 po/ 与 data/ 的 .desktop/.metainfo 生成目标变为 no-op，规避外部 gettext/autopoint/libintl 依赖"
+  - "AX_WITH_CURSES 需宽字符 Curses（NcursesW，含 colour）；ncurses/6.6 conan 依赖经 PkgConfigDeps 暴露 ncursesw.pc，configure --with-ncurses 自动检测"
+  - "上游无自动化测试套件：无 TESTS/check_PROGRAMS/tests 目录，make check 为 no-op，status=no_tests 如实上报"
+  - "OHOS libc 为 musl 系，缺 POSIX strfmon()；用 !defined(__GLIBC__) 守卫提供自包含 strfmon 兼容实现（勿用 __OHOS__，部分 OHOS clang 目标不预定义该宏）"
+  - "autoconf 生成的 configure/config.status 用 `umask 077 && mktemp -d ./confXXXXXX` 建临时目录；在 setgid 的 HMDFS 挂载上会得到 owner 不可写目录导致 subs1.awk Permission denied，需就地把 umask 077 改 022"
+  - "profile buildenv 注入的 CONFIG_SHELL 在 HMDFS 构建目录 getcwd() 失败；把 CONFIG_SHELL=/bin/sh 就近内联在 configure 命令前缀可绕开"
+  - "官方源码站 ftp.zap.org.au 在 CI 网络下连接超时；Debian 源码仓库的 .orig.tar.xz 与官方发布位级相同，用镜像列表（清华/阿里/南大/Debian 主站）回退，官方 URL 保留最后"
+
+versions:
+  "7.21":
+    status: built
+    build_date: "2026-10-14"
+    conan_ref: "trader/7.21"
