@@ -1,0 +1,23 @@
+diff --git a/src/util.cpp b/src/util.cpp
+index 92e5fbb..fd166ec 100644
+--- a/src/util.cpp
++++ b/src/util.cpp
+@@ -47,8 +47,17 @@
+ // Provide own definition of std::__libcpp_verbose_abort to avoid missing symbols error on macOS with old
+ // system libc++.1.dylib. The symbol is there for macOS 13 Ventura and later, but not macOS 12 and earlier.
+ // See #3071 for more details.
++// [OHOS/HarmonyOS portability] The exception specification must follow the *host* libc++
++// declaration: libc++ >= 20 declares std::__libcpp_verbose_abort noexcept (see
++// libcxx/include/__verbose_abort, _LIBCPP_VERBOSE_ABORT_NOEXCEPT), libc++ < 20 (e.g. the OHOS
++// SDK libc++ 15.0.4) does not. Upstream keys this on ISPC_LLVM_VERSION >= 20, which assumes
++// that the host libc++ matches the LLVM version ISPC links against; on OHOS the host libc++ is
++// the SDK's 15.0.4 while LLVM is 20.1.8, so the build fails with
++//     src/util.cpp:50:11: error: exception specification in declaration does not match
++//     previous declaration
++// Follow the host libc++ version instead.
+ void std::__libcpp_verbose_abort(char const *format, ...)
+-#if ISPC_LLVM_VERSION >= ISPC_LLVM_20_0
++#if _LIBCPP_VERSION >= 200000
+     noexcept
+ #endif
+ {

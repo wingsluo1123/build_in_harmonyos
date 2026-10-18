@@ -1,0 +1,78 @@
+# 版本级元数据（AI 元数据，CI 不读）
+# status 取 ARCHIVE-SPEC 枚举：built（已构建并完成设备验证；未确认 release upload ⇒ 不写 published，见 AGENTS §1 O5）
+version: "1.28.2"
+software: ispc
+status: built
+build_date: "2026-10-11"
+conan_ref: "ispc/1.28.2"
+build_system: cmake
+
+source:
+  url: "https://github.com/ispc/ispc/archive/refs/tags/v1.28.2.tar.gz"
+  sha256: "0b7d1d73afa93c015814b99c97b88fa45bce822d7904e8fc4a95666ba8e3fb92"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DLLVM_CONFIG_EXECUTABLE=<llvm-project pkg>/bin/llvm-config"
+    - "-DLLVM_DIR=<llvm-project pkg>/lib/cmake/llvm"
+    - "-DX86_ENABLED=<ON 当 llvm-config --targets-built 含 X86>"
+    - "-DARM_ENABLED=<ON 当 llvm-config --targets-built 含 ARM>"
+    - "-DWASM_ENABLED=OFF"
+    - "-DXE_ENABLED=OFF"
+    - "-DISPC_INCLUDE_TESTS=ON"
+    - "-DISPC_INCLUDE_BENCHMARKS=OFF"
+    - "-DISPC_INCLUDE_EXAMPLES=OFF"
+    - "-DISPC_INCLUDE_RT=OFF"
+    - "-DISPC_LIBRARY=OFF"
+    - "-DISPC_LIBRARY_JIT=OFF"
+    - "-DISPC_PREPARE_PACKAGE=OFF"
+    - "-DISPC_STATIC_LINK=OFF"
+    - "-DISPC_STATIC_STDCXX_LINK=OFF"
+    - "-DCLANGPP_EXECUTABLE=<build>/_host_tools/clang++"
+  dependencies:
+    - llvm-project/20.1.8
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "patches/0001-host-libcxx-verbose-abort-noexcept.patch"
+
+test_results:
+  upstream_suites:
+    - name: "lit (check-all, tests/lit-tests)"
+      command: "cmake --build <build> --target check-all"
+      total: 647
+      passed: 546
+      failed: 3
+      skipped: 98
+      not_run: 0
+    - name: "func-tests (scripts/run_tests.py)"
+      command: "cd <src> && ISPC_HOME=<build>/bin python3 scripts/run_tests.py -t neon-i32x4 -a aarch64 -o O2 -c clang++ -j N --fail_db tests/fail_db.txt"
+      total: 1576
+      passed: 1567
+      failed: 0
+      skipped: 9
+      not_run: 0
+  upstream_total: 2223
+  upstream_passed: 2113
+  upstream_failed: 3
+  upstream_skipped: 107
+  upstream_not_run: 0
+  upstream_pass_rate: "95.05%"
+  test_package: "1 用例（conan create 自动执行 test_package：ispc --version 冒烟 → neon-i32x4 codegen → --target=host asm → clang++ 链接并执行，含 66 项数值断言）；通过"
+  note: "逐条未通过项归因见 reports/test-report.md（reports/ 被 .gitignore 忽略，不入 PR）"
+
+knowledge_gained:
+  - "ISPC 1.28.2 硬依赖 Clang 前端库（CMakeLists.txt:411 CLANG_LIBRARY_LIST = clangFrontend clangBasic clangEdit clangLex clangSupport clangASTMatchers），只提供 LLVM 的包无法构建 ispc"
+  - "ISPC 的 FindLLVM.cmake 只在 --targets-built 同时含 AArch64 与 ARM 时置 LLVM_SUPPORTS_ARM；aarch64 宿主上 X86_HOST=OFF 且 ARM/WASM/XE 全 OFF 时 CMakeLists.txt:357 直接 FATAL_ERROR"
+  - "依赖包 package_type=library ⇒ bindirs 不进 PATH，必须显式 -DLLVM_CONFIG_EXECUTABLE；FindLLVM.cmake 对 clang/clang++/llvm-as/FileCheck 用 NO_DEFAULT_PATH 只看 llvm-config 同目录"
+  - "宿主 libc++ 版本决定 std::__libcpp_verbose_abort 的异常规格：libc++ >= 20 为 noexcept、libc++ < 20（OHOS SDK 15.0.4）不是；ISPC 按所链接 LLVM 版本判断会编译失败（补丁 0001）"
+  - "ISPC_PREPARE_PACKAGE=ON 默认打开 ISPC_STATIC_LINK ⇒ `-static-libstdc++` 让可执行文件静态链入 libc++，与动态链接 libc++_shared.so 的 libLLVM.so 同进程冲突 ⇒ std::bad_cast；须显式关闭"
+  - "ISPC_PREPARE_PACKAGE=ON 会注册 ExternalProject_Add(ispc_web)：构建期 git clone github.com/ispc/ispc.github.com.git（文档站）；CI worker 无 github 直连 ⇒ ispc_web-download 步必失败（build#89756）。置 OFF 并在 package() 从源码目录补齐 LICENSE/ReleaseNotes/contrib/examples 即可保持产物等价（web HTML 不参与编译运行）"
+  - "上游 GenerateBuiltins.cmake 编译 builtins-c-cpu.cpp 写死 Debian multiarch 头路径，且用 `clang++ | llvm-as` 管道吞掉 clang 失败 ⇒ OHOS 上静默产出空位码，下游报 undefined symbol: __do_print"
+  - "lit 把依赖包 bin/ 前置进测试 PATH ⇒ 依赖包自带的裸 clang 遮蔽设备工具链（stdio.h/-lc 找不到）；在 <build>/bin（lit PATH 更靠前）放宿主编译器包装脚本即可"
+  - "lit 的 LINUX_HOST 特性取自 platform.system()：conan buildenv PATH 选中的 OHOS python3.12 返回 HarmonyOS ⇒ 8 个 REQUIRES: LINUX_HOST 用例判 UNSUPPORTED（用 harmonybrew python3.13（Linux）复跑则 8 个全部 PASS，647 中 554 通过）"
