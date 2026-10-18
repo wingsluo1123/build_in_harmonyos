@@ -1,0 +1,34 @@
+#====================================================================
+# DRAFT-pnmixer-0.7.2-ohos-libm-missing-gnu-math-exp10
+# OHOS 的 <math.h> 不声明、共享 libm 也不导出 GNU 扩展 exp10() ⇒
+# 老 C 代码链接期报 undefined symbol: exp10，用 pow(10,x) 等价替换
+# 来源: pnmixer 0.7.2 适配 (2026-10-18)
+#====================================================================
+
+id:                     DRAFT-pnmixer-0.7.2-ohos-libm-missing-gnu-math-exp10
+trigger_tool:           clang|ld.lld|conan create
+phase:                  linking
+error_signature:        undefined symbol: exp10|undefined reference to .exp10|referenced by .*\.c\.(obj|o)
+match_keywords:         exp10, exp10f, exp10l, GNU extension, _GNU_SOURCE, math.h, libm, musl, undefined symbol, ld.lld, pow(10,x), dB volume scaling, alsa, pnmixer, llvm-nm, libc.a
+category:               libc, musl, math, porting, linking
+severity:               2
+status:                 draft
+title:                  OHOS 的 <math.h> 不声明、共享 libm 也不导出 GNU 扩展 exp10()（只有静态 libc.a 里有该成员）⇒ 沿用 glibc 的旧 C 代码在链接期报 undefined symbol: exp10；改为 pow(10,x) 等价且必然可用
+root_cause:             exp10() 不是 C 标准函数而是 glibc 的 GNU 扩展（glibc 的 math.h 在 _GNU_SOURCE 下声明它、libm.so 导出它），OHOS/musl 这一侧两处都不满足：①sysroot 的 <math.h> 没有 exp10 声明（实测 grep -n exp10 $SYSROOT/usr/include/math.h 无命中），因此源码即使写了 #define _GNU_SOURCE 也拿不到原型（clang 只给隐式声明警告、不成错）；②共享 libm 不导出该符号（实测 llvm-nm -D --defined-only libm.so | grep -c ' exp10$' = 0），llvm-nm --defined-only 只在静态 libc.a 里能找到 ' T exp10'（=1），即符号"存在但不可动态取用"，所以问题只在链接期暴露、编译期毫无提示。实测 pnmixer 用它做 ALSA dB 增益到线性幅度换算（upstream src/alsa.c: normalized = exp10((value - max) / 6000.0)），Linux 开发机（glibc）全绿、OHOS 目标侧报 ld.lld: error: undefined symbol: exp10 / >>> referenced by alsa.c / >>> CMakeFiles/pnmixer.dir/alsa.c.obj:(alsa_card_get_volume)，是典型"本地绿、目标红"的 libc 差异；同族还可能有 exp10f/exp10l 等 glibc-only 数学扩展。
+affected_scope:         HarmonyOS PC（musl）上编译的一切沿用 glibc 习惯的 C/C++ 代码：使用 exp10/exp10f/exp10l（及同类 GNU-only 数学扩展）而目标 libc 不提供的程序；ALSA 音量/增益（dB↔线性）换算这一族工具尤甚。判据很便宜：链接期报 undefined symbol: <数学函数名> 且该名字在 $SYSROOT/usr/include/math.h 里 grep 不到 ⇒ 即本条家族，不必猜平台差异。
+rec_priority:           1
+rec_approach:           replace-gnu-exp10-with-pow10
+rec_description:        在调用点之前提供一个数学等价、必然可用的回退定义，不做平台宏分支：#ifndef exp10 / #define exp10(x) pow(10.0, (x)) / #endif。四条要点：①#ifndef 守卫——在不缺该函数的 libc 上不覆盖既有定义/宏；②只在"不取 exp10 地址"的代码里可用（&exp10、函数指针赋值会因宏编译失败，先 grep -n exp10 src/*.c 确认用法）；③不引入 __OHOS__ 等平台宏（R8/PF5 合规），回退在全部 POSIX 平台语义相同；④别顺手改成 expl/powl，那是另一族 libc 差异点。
+rec_command:            grep -n 'exp10' src/*.c ; 在 #include <math.h> 之后加 #ifndef exp10 / #define exp10(x) pow(10.0,(x)) / #endif ; 重新 conan create
+rec_auto_fix:           false
+rec_impl:               source-patch
+fallback_priority:      2
+fallback_approach:      link-static-libc
+fallback_description:   若确实必须保留原符号（例如有函数指针取址），可改为从静态 libc.a 取该成员，但那会牵入静态链接面、与共享闭包混链，代价远大于收益，本族实践中不推荐，仅在无法改源码时考虑。
+verification_cmd:       llvm-nm -D --defined-only $SYSROOT/usr/lib/aarch64-linux-ohos/libm.so | grep -c ' exp10$' ; llvm-nm --defined-only $SYSROOT/usr/lib/aarch64-linux-ohos/libc.a | grep -c ' T exp10$'
+verification_expect:    ①共享 libm 的 exp10 动态符号数 = 0（实测），故链接必失败；②静态 libc.a 里 ' T exp10' = 1（实测）⇒ 符号"存在但不可动态取用"，这解释了为什么问题只在链接期出现；③用 pow(10,x) 回退后 conan create 链接通过（pnmixer 实测 G2 PASS、消费者测试 24/24）。
+evidence:               archives/p/pnmixer/0.7.2/patches/0001-src-alsa.c.patch（+10 行，exp10→pow 回退宏）; archives/p/pnmixer/0.7.2/notes.md 问题表 #8（含 llvm-nm 实测读数）; 首错原文 ld.lld: error: undefined symbol: exp10 / >>> referenced by alsa.c / >>> CMakeFiles/pnmixer.dir/alsa.c.obj:(alsa_card_get_volume)
+applies_to:             所有在 OHOS/musl 上编译、且使用 exp10/exp10f/exp10l 等 glibc-only 数学扩展的 C/C++ 项目; ALSA 音量/增益换算（dB↔线性）这一族代码（pnmixer 等混音器类工具）; 邻近但不同：E419（plain char signedness，同属 aarch64/musl 语义差异但机制与症状都不同）、E660（OHOS libintl.h 空壳 + gettext 制品，同属"头在实现不在"家族，但那条是头文件空壳且实现属外部制品，本条是连声明都没有、实现只在静态 libc.a 里）
+principles:             P005, P011
+source_package:         pnmixer/0.7.2
+source_pr:              PRE_CREATE

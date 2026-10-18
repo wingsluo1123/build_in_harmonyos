@@ -1,0 +1,41 @@
+# 软件级 manifest — pnmixer
+# 遵循 ARCHIVE-SPEC v3.0 §2.1
+
+software: pnmixer
+display: "pnmixer"
+description: "ALSA 音量混音器（GTK+3 系统托盘图标，OBmixer/AbsVolume 的衍生作品）"
+category: system
+homepage: "https://github.com/nicklan/pnmixer"
+license: GPL-3.0-or-later
+build_system: cmake
+
+# 顶层状态字段（§12.56：软件级 manifest 缺 status 会被 presubmit 硬拦）
+status: published
+
+ohos_adaptation:
+  key_points:
+    - "纯 CMake 工程（16 个 .c / 单可执行 bin/pnmixer）；skill 的 conan-init 模板只出 autotools 骨架，配方需手写为 CMakeToolchain"
+    - "cmake_minimum_required(VERSION 3.0) 在平台 CMake 4.1.2 下被拒 ⇒ 注入 CMAKE_POLICY_VERSION_MINIMUM=3.5，且必须是 cache_variables（普通 variables 不进策略检查）"
+    - "依赖经 pkg_check_modules 声明：alsa / glib-2.0 / x11 / gtk+-3.0>=3.12.0（可选 libnotify 本适配关闭）；PkgConfigDeps 生成的 .pc 名与上游模块名逐字一致（各依赖配方已设 pkg_config_name），无需别名"
+    - "CMake 消费 pkg-config 时必须自己把 generators 目录与各依赖 pkgconfig 目录放进 PKG_CONFIG_PATH（AutotoolsToolchain 才有内置行为，CMakeToolchain 没有）"
+    - "libnotify 置 OFF（WITH_LIBNOTIFY=OFF）：① 制品仓 libnotify 的 libnotify.so.4.0.0 带 .codesign 段但签名被 OHOS 加载器拒绝（dlopen → Permission denied；同一字节重签后可继续依赖解析），链上它交付物在 main() 之前就死；② libnotify/0.8.3.1 还以 force=True 钉 glib/2.88.0.1，与全部已发布 gtk3 的 glib/2.84.0.1 不可解，任何 override 都改 package_id 触发 meson 源码重建，而本工具链无 meson（实测 'meson: inaccessible or not found' → Error 127）"
+    - "关掉 libnotify 后全图落到已发布二进制（conan graph info → {Cache:25, Skip:9}），交付物可真启动"
+    - "ENABLE_NLS 必须置 OFF：上游 CMakeLists 在 ON 时 FIND_PROGRAM(xgettext) 找不到就 FATAL_ERROR；且 support-intl.h 会 include <libintl.h>（OHOS 上是空壳，E660）"
+    - "OHOS 的 gtk3 只编 broadway 后端 ⇒ 无 <gdk/gdkx.h>、无 gdk_x11_* 符号：6 个 portability 补丁用 __has_include + HAVE_GDK_X11 守卫热键子系统，并把 GNU 专有的 exp10() 换成 pow(10,x)"
+    - "OHOS /tmp 为只读 erofs（E002）⇒ 配方内 TMPDIR/TMP/TEMP 指向 build_folder 私有目录"
+    - "交付二进制在 package() 内用 binary-sign-tool 自签名并回读 .codesign 段计数（未签名 ELF 在 OHOS 上不可加载）"
+    - "codeload 直链末段无扩展名 ⇒ conandata 必须显式 filename（E276/E483）"
+    - "可测面：gtk 包自带 bin/broadwayd，起私有 display 后 --version/-v 与 -d 真启动（glade/pixmap 装载 → 音频挂载 → 进入主循环）都能真跑；无显示时 --help 仍可用、裸调用按快速失败断言"
+  common_dependencies:
+    - gtk
+    - glib
+    - gdk-pixbuf
+    - alsa-lib
+    - libx11
+
+versions:
+  "0.7.2":
+    status: published
+    build_date: "2026-10-18"
+    conan_ref: "pnmixer/0.7.2"
+    note: "上游 0 测试（N_static=0，逐条留证）；消费者测试 24 项断言：15 项结构性/链接性/安装面硬断言 + 4 项 CLI + 1 项未知选项落穿 + 1 项无显示快速失败 + 2 项有显示版本 + 1 项 broadway 真启动（6 个启动标记）。ENABLE_NLS=OFF 与 WITH_LIBNOTIFY=OFF 均已披露并留证。"

@@ -1,0 +1,40 @@
+--- a/src/hotkey.h
++++ b/src/hotkey.h
+@@ -10,21 +10,36 @@
+ 
+ /**
+  * @file hotkey.h
+  * Header for hotkey.c.
+  * @brief Header for hotkey.c.
+  */
+ 
+ #ifndef _HOTKEY_H_
+ #define _HOTKEY_H_
+ 
+-#include <gdk/gdkx.h>
++/* GDK may be built without the X11 backend, in which case <gdk/gdkx.h> is not
++ * installed at all (the OHOS GTK3 package ships the broadway backend only).
++ * Detect the header at compile time instead of assuming the backend; when it is
++ * absent the whole hotkey subsystem is compiled out below and degrades to a
++ * no-op (there is no X server to grab global keys from anyway).
++ */
++#if defined(__has_include)
++#  if __has_include(<gdk/gdkx.h>)
++#    include <gdk/gdkx.h>
++#    define HAVE_GDK_X11 1
++#  endif
++#endif
++
++#ifndef HAVE_GDK_X11
++#  include <gdk/gdk.h>
++#endif
+ 
+ struct hotkey {
+ 	/* These values should only be accessed for reading,
+ 	 * and shouldn't be modified outside of hotkey.c
+ 	 */
+ 	guint code; /* Key code */
+ 	GdkModifierType mods; /* Key modifier */
+ 	unsigned long int sym; /* X Key Symbol */
+ 	gchar *str; /* Gtk Accelerator string */
+ };
