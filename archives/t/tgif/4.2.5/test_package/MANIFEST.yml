@@ -1,0 +1,42 @@
+package: tgif/4.2.5
+homepage: "https://sourceforge.net/projects/tgif/"
+
+upstream_check_command: "make check"
+upstream_test_in_build: true
+upstream_test_command: "make check"
+
+upstream_test_census:
+  denominator: 0
+  usable: 0
+  tests_directories: 0
+  test_named_files: 2
+  registered_tests: 0
+  automake_TESTS_variable: false
+  automake_check_PROGRAMS: false
+  note: "The only *test* names in the tarball are testdrive.c / testdrive.pl, an
+    interactive Prolog foreign-function-interface driver. It is not listed in
+    tgif_SOURCES and is never built; `make check` registers no TESTS and no
+    check_PROGRAMS, so the upstream suite is genuinely empty (N = 0)."
+
+upstream_tests: []
+
+test_package_tests:
+  - file: test_tgif.py
+    description: "tgif -print -justversion prints 'Tgif Version 4.2 (patchlevel 5)' and exits 0 (non-GUI path)"
+    command: "tgif -print -justversion"
+  - file: test_tgif.py
+    description: "tgif -version without a display prints the version banner then fails deterministically ('Can't open display')"
+    command: "tgif -version"
+  - file: test_tgif.py
+    description: "bare tgif without a display takes the same deterministic error path"
+    command: "tgif"
+  - file: test_tgif.py
+    description: "an unknown option is rejected (non-zero exit)"
+    command: "tgif --definitely-not-an-option"
+  - file: conanfile.py
+    description: "HarmonyOS-specific: packaged ELF is AArch64, DT_NEEDED carries libX11.so/libXt.so, and the ELF section table holds exactly 1 '.codesign' section (OHOS ld.lld --code-sign / binary-sign-tool signature; absent on a generic Linux ELF) — fail-closed"
+    command: "readelf -h -d -S bin/tgif"
+
+assertion_count: 14
+max_rss_mb: 512
+build_mem_budget_mb: 1000
