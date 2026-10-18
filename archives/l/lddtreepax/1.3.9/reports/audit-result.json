@@ -1,0 +1,58 @@
+{
+  "verdict": "pass",
+  "audited_at": "2026-10-14",
+  "branch": "feat/lddtreepax-1.3.9",
+  "package": "lddtreepax/1.3.9",
+  "auditor": "independent pre-PR subagent (W4, context-isolated)",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "code_style",
+      "file": "archives/l/lddtreepax/1.3.9/conanfile.py",
+      "line": 131,
+      "description": "package_info() 中 `raise ConanException(...)` 使用 ConanException，但原 import 仅 `from conan.errors import ConanInvalidConfiguration`，未导入 ConanException。当 pyelftools site-packages 缺失（`if not sites:` 分支）时会触发 NameError 而非预期干净报错。正常路径不触发，conan create 正常。【已在建 PR 前修复：补入 ConanException 导入，conan create 复验 RC=0】",
+      "fix_suggestion": "在 conan.errors 增加导入 ConanException（已修复）。"
+    },
+    {
+      "severity": "P2",
+      "rule_id": "code_style:§5",
+      "file": "archives/l/lddtreepax/1.3.9/conanfile.py",
+      "line": 30,
+      "description": "`url = \"\"  # CI fills this` 属 code_style §5 模板占位符。经核验为仓库惯例（1408 个配方同款，兄弟配方 pax-utils/1.3.10 亦如此），保留不改。",
+      "fix_suggestion": "保留（仓库惯例，CI 注入约定）。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "suggestion",
+      "file": "archives/l/lddtreepax/README.md",
+      "line": 13,
+      "description": "README 补丁名 `0001-lddtreepax-portable-python3-shebang.patch` 与实际 `0001-lddtree-py-portable-python3-shebang.patch` 不一致。",
+      "fix_suggestion": "后续迭代统一为实际补丁文件名。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "suggestion",
+      "file": "archives/l/lddtreepax/1.3.9/notes.md",
+      "line": 65,
+      "description": "notes.md/顶层 manifest 写 test_package『4 条实质断言』，MANIFEST.yml assertion_count=5（4 实质行为 + 1 前置校验 site-packages 可定位）。口径可辩护但易误读。",
+      "fix_suggestion": "后续迭代注明『4 条实质 + 1 条前置校验』。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "suggestion",
+      "file": "archives/l/lddtreepax/manifest.yaml",
+      "line": 11,
+      "description": "顶层 manifest build_date=2026-10-13，版本级=2026-10-14（编译结束日）。顶层偏旧一天。",
+      "fix_suggestion": "后续迭代对齐口径。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "suggestion",
+      "file": "archives/l/lddtreepax/1.3.9/test_package/conanfile.py",
+      "line": 35,
+      "description": "test() 硬编码设备绝对路径 /data/service/hnp/bin/python3（带 sys.executable 回退，非阻断），与主配方 _bash() 同模式。",
+      "fix_suggestion": "保留回退即可。"
+    }
+  ],
+  "summary": "审计通过（无 P0、无 P1）。欺骗性检查全绿：test_package 对真实 /bin/sh 直接执行已安装 lddtreepax 并做 5 条实质断言（非空壳，R34 合规），补丁无平台宏（R8 合规），sha256 为合法 64-hex 且 conandata/manifest/notes 三处一致（非伪造），status=built 真实，源为 gentoo/pax-utils 官方 codeload tag 制品（R39 合规），build() 如实披露上游用例空跑与探针 FAIL（R51 三步法如实回填，非谎报）。检出 2 处 P2 + 4 处 P3：其中 P2『缺失 ConanException 导入』已在建 PR 前修复并 conan create 复验 RC=0，P2『url 占位符』为仓库惯例保留，P3 均为文档/路径建议后续迭代处理。"
+}
