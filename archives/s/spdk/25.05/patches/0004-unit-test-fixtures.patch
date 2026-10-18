@@ -1,0 +1,27 @@
+From: OHOS SPDK port
+Subject: [PATCH] Make unit test environment fixtures independent of libc robust mutexes
+
+The NVMe unit tests already simulate the primary process, device environment,
+allocation, and mutex initialization. Also model the two robust mutex calls in
+that test environment. These mocks are not linked into the installed libraries
+and do not provide or claim runtime robust mutex support on OHOS.
+All upstream test registrations and assertions remain intact.
+
+--- a/lib/ut_mock/mock.c
++++ b/lib/ut_mock/mock.c
+@@ -5,6 +5,15 @@
+ 
+ #include "spdk_internal/mock.h"
+ 
++/* Unit fixtures model successful OS calls, just as the existing mutex-init
++ * wrapper does when MOCK_SET is active. These are not runtime replacements
++ * for robust, process-shared mutexes (which some target libcs do not export).
++ * DEFINE_STUB retains MOCK_SET/MOCK_ENQUEUE for explicit error scenarios.
++ */
++DEFINE_STUB(pthread_mutexattr_setrobust, int,
++            (pthread_mutexattr_t *attr, int robustness), 0);
++DEFINE_STUB(pthread_mutex_consistent, int, (pthread_mutex_t *mutex), 0);
++
+ DEFINE_WRAPPER(calloc, void *, (size_t nmemb, size_t size), (nmemb, size))
+ 
+ DEFINE_WRAPPER(pthread_mutex_init, int,

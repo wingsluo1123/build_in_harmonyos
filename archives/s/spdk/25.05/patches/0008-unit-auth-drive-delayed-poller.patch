@@ -1,0 +1,193 @@
+From: OHOS SPDK port
+Subject: [PATCH] Advance the unit clock for the delayed authentication disconnect
+
+The v25.05 implementation schedules Failure1 disconnects after 100ms, while
+the unit tests still expect the final error state immediately after recv.
+Drive the real poller using the existing mock clock. All original protocol,
+message, and final-state assertions remain unchanged; no state is forced.
+
+--- a/test/unit/lib/nvmf/auth.c/auth_ut.c
++++ b/test/unit/lib/nvmf/auth.c/auth_ut.c
+@@ -112,6 +112,20 @@
+ #define ut_prep_send_cmd(req, cmd, buf, len) ut_prep_cmd(req, cmd, buf, len, tl)
+ #define ut_prep_recv_cmd(req, cmd, buf, len) ut_prep_cmd(req, cmd, buf, len, al)
+ 
++/* Failure1 responses intentionally disconnect after a delay. Drive the
++ * existing mock clock and real poller before checking the final state.
++ * The protocol assertions below are unchanged.
++ */
++static void
++ut_auth_recv_exec(struct spdk_nvmf_request *req)
++{
++	nvmf_auth_recv_exec(req);
++	if (req->qpair->auth->state == NVMF_QPAIR_AUTH_FAILURE1) {
++		spdk_delay_us(NVMF_AUTH_FAILURE1_DELAY_US);
++		poll_threads();
++	}
++}
++
+ static void
+ test_auth_send_recv_error(void)
+ {
+@@ -151,7 +165,7 @@
+ 	ut_clear_resp(&req);
+ 	recv_cmd.secp = SPDK_NVMF_AUTH_SECP_NVME + 1;
+ 
+-	nvmf_auth_recv_exec(&req);
++	ut_auth_recv_exec(&req);
+ 	CU_ASSERT(g_req_completed);
+ 	CU_ASSERT_EQUAL(cpl->status.sct, SPDK_NVME_SCT_GENERIC);
+ 	CU_ASSERT_EQUAL(cpl->status.sc, SPDK_NVME_SC_INVALID_FIELD);
+@@ -177,7 +191,7 @@
+ 	ut_clear_resp(&req);
+ 	recv_cmd.spsp0 = 2;
+ 
+-	nvmf_auth_recv_exec(&req);
++	ut_auth_recv_exec(&req);
+ 	CU_ASSERT(g_req_completed);
+ 	CU_ASSERT_EQUAL(cpl->status.sct, SPDK_NVME_SCT_GENERIC);
+ 	CU_ASSERT_EQUAL(cpl->status.sc, SPDK_NVME_SC_INVALID_FIELD);
+@@ -203,7 +217,7 @@
+ 	ut_clear_resp(&req);
+ 	recv_cmd.spsp1 = 2;
+ 
+-	nvmf_auth_recv_exec(&req);
++	ut_auth_recv_exec(&req);
+ 	CU_ASSERT(g_req_completed);
+ 	CU_ASSERT_EQUAL(cpl->status.sct, SPDK_NVME_SCT_GENERIC);
+ 	CU_ASSERT_EQUAL(cpl->status.sc, SPDK_NVME_SC_INVALID_FIELD);
+@@ -216,7 +230,7 @@
+ 	ut_clear_resp(&req);
+ 	send_cmd.tl = req.length + 1;
+ 
+-	nvmf_auth_recv_exec(&req);
++	ut_auth_recv_exec(&req);
+ 	CU_ASSERT(g_req_completed);
+ 	CU_ASSERT_EQUAL(cpl->status.sct, SPDK_NVME_SCT_GENERIC);
+ 	CU_ASSERT_EQUAL(cpl->status.sc, SPDK_NVME_SC_INVALID_FIELD);
+@@ -229,7 +243,7 @@
+ 	ut_clear_resp(&req);
+ 	recv_cmd.al = req.length - 1;
+ 
+-	nvmf_auth_recv_exec(&req);
++	ut_auth_recv_exec(&req);
+ 	CU_ASSERT(g_req_completed);
+ 	CU_ASSERT_EQUAL(cpl->status.sct, SPDK_NVME_SCT_GENERIC);
+ 	CU_ASSERT_EQUAL(cpl->status.sc, SPDK_NVME_SC_INVALID_FIELD);
+@@ -644,7 +658,7 @@
+ 	auth->fail_reason = SPDK_NVMF_AUTH_FAILED;
+ 	auth->tid = 8;
+ 
+-	nvmf_auth_recv_exec(&req);
++	ut_auth_recv_exec(&req);
+ 	CU_ASSERT(g_req_completed);
+ 	CU_ASSERT_EQUAL(cpl->status.sct, 0);
+ 	CU_ASSERT_EQUAL(cpl->status.sc, 0);
+@@ -663,7 +677,7 @@
+ 	auth->state = NVMF_QPAIR_AUTH_NEGOTIATE;
+ 	auth->fail_reason = 0;
+ 
+-	nvmf_auth_recv_exec(&req);
++	ut_auth_recv_exec(&req);
+ 	CU_ASSERT(g_req_completed);
+ 	CU_ASSERT_EQUAL(cpl->status.sct, 0);
+ 	CU_ASSERT_EQUAL(cpl->status.sc, 0);
+@@ -683,7 +697,7 @@
+ 	auth->fail_reason = SPDK_NVMF_AUTH_FAILED;
+ 	req.iov[0].iov_len = cmd.al = req.length = sizeof(*msg) - 1;
+ 
+-	nvmf_auth_recv_exec(&req);
++	ut_auth_recv_exec(&req);
+ 	CU_ASSERT(g_req_completed);
+ 	CU_ASSERT_EQUAL(cpl->status.sct, SPDK_NVME_SCT_GENERIC);
+ 	CU_ASSERT_EQUAL(cpl->status.sc, SPDK_NVME_SC_INVALID_FIELD);
+@@ -729,7 +743,7 @@
+ 	auth->digest = SPDK_NVMF_DHCHAP_HASH_SHA384;
+ 	auth->tid = 8;
+ 
+-	nvmf_auth_recv_exec(&req);
++	ut_auth_recv_exec(&req);
+ 	CU_ASSERT(g_req_completed);
+ 	CU_ASSERT_EQUAL(auth->state, NVMF_QPAIR_AUTH_REPLY);
+ 	CU_ASSERT_EQUAL(msg->auth_type, SPDK_NVMF_AUTH_TYPE_DHCHAP);
+@@ -757,7 +771,7 @@
+ 	auth->dhgroup = SPDK_NVMF_DHCHAP_DHGROUP_2048;
+ 	auth->tid = 8;
+ 
+-	nvmf_auth_recv_exec(&req);
++	ut_auth_recv_exec(&req);
+ 	CU_ASSERT(g_req_completed);
+ 	CU_ASSERT_EQUAL(auth->state, NVMF_QPAIR_AUTH_REPLY);
+ 	CU_ASSERT_EQUAL(msg->auth_type, SPDK_NVMF_AUTH_TYPE_DHCHAP);
+@@ -780,7 +794,7 @@
+ 	auth->tid = 8;
+ 	MOCK_SET(RAND_bytes, -1);
+ 
+-	nvmf_auth_recv_exec(&req);
++	ut_auth_recv_exec(&req);
+ 	CU_ASSERT(g_req_completed);
+ 	CU_ASSERT_EQUAL(qpair.state, SPDK_NVMF_QPAIR_ERROR);
+ 	CU_ASSERT_EQUAL(fail->auth_type, SPDK_NVMF_AUTH_TYPE_COMMON_MESSAGE);
+@@ -798,7 +812,7 @@
+ 	auth->state = NVMF_QPAIR_AUTH_CHALLENGE;
+ 	auth->tid = 8;
+ 
+-	nvmf_auth_recv_exec(&req);
++	ut_auth_recv_exec(&req);
+ 	CU_ASSERT(g_req_completed);
+ 	CU_ASSERT_EQUAL(qpair.state, SPDK_NVMF_QPAIR_ERROR);
+ 	CU_ASSERT_EQUAL(fail->auth_type, SPDK_NVMF_AUTH_TYPE_COMMON_MESSAGE);
+@@ -816,7 +830,7 @@
+ 	auth->state = NVMF_QPAIR_AUTH_CHALLENGE;
+ 	auth->tid = 8;
+ 
+-	nvmf_auth_recv_exec(&req);
++	ut_auth_recv_exec(&req);
+ 	CU_ASSERT(g_req_completed);
+ 	CU_ASSERT_EQUAL(qpair.state, SPDK_NVMF_QPAIR_ERROR);
+ 	CU_ASSERT_EQUAL(fail->auth_type, SPDK_NVMF_AUTH_TYPE_COMMON_MESSAGE);
+@@ -835,7 +849,7 @@
+ 	auth->tid = 8;
+ 	cmd.al = req.length = req.iov[0].iov_len = sizeof(msg) + 47;
+ 
+-	nvmf_auth_recv_exec(&req);
++	ut_auth_recv_exec(&req);
+ 	CU_ASSERT(g_req_completed);
+ 	CU_ASSERT_EQUAL(qpair.state, SPDK_NVMF_QPAIR_ERROR);
+ 	CU_ASSERT_EQUAL(fail->auth_type, SPDK_NVMF_AUTH_TYPE_COMMON_MESSAGE);
+@@ -1100,7 +1114,7 @@
+ 	g_req_completed = false;
+ 	auth->state = NVMF_QPAIR_AUTH_SUCCESS1;
+ 
+-	nvmf_auth_recv_exec(&req);
++	ut_auth_recv_exec(&req);
+ 	CU_ASSERT(g_req_completed);
+ 	CU_ASSERT_EQUAL(auth->state, NVMF_QPAIR_AUTH_COMPLETED);
+ 	CU_ASSERT_EQUAL(qpair.state, SPDK_NVMF_QPAIR_ENABLED);
+@@ -1119,7 +1133,7 @@
+ 	memset(auth->cval, 0xa5, 48);
+ 	MOCK_SET(spdk_nvme_dhchap_get_digest_length, 48);
+ 
+-	nvmf_auth_recv_exec(&req);
++	ut_auth_recv_exec(&req);
+ 	CU_ASSERT(g_req_completed);
+ 	CU_ASSERT_EQUAL(auth->state, NVMF_QPAIR_AUTH_SUCCESS2);
+ 	CU_ASSERT_EQUAL(msg->auth_type, SPDK_NVMF_AUTH_TYPE_DHCHAP);
+@@ -1137,7 +1151,7 @@
+ 	auth->state = NVMF_QPAIR_AUTH_SUCCESS1;
+ 	cmd.al = req.iov[0].iov_len = req.length = sizeof(*msg) - 1;
+ 
+-	nvmf_auth_recv_exec(&req);
++	ut_auth_recv_exec(&req);
+ 	CU_ASSERT(g_req_completed);
+ 	CU_ASSERT_EQUAL(auth->state, NVMF_QPAIR_AUTH_ERROR);
+ 	CU_ASSERT_EQUAL(qpair.state, SPDK_NVMF_QPAIR_ERROR);
+@@ -1156,7 +1170,7 @@
+ 	MOCK_SET(spdk_nvme_dhchap_get_digest_length, 48);
+ 	cmd.al = req.iov[0].iov_len = req.length = sizeof(*msg) + 47;
+ 
+-	nvmf_auth_recv_exec(&req);
++	ut_auth_recv_exec(&req);
+ 	CU_ASSERT(g_req_completed);
+ 	CU_ASSERT_EQUAL(auth->state, NVMF_QPAIR_AUTH_ERROR);
+ 	CU_ASSERT_EQUAL(qpair.state, SPDK_NVMF_QPAIR_ERROR);
