@@ -1,0 +1,35 @@
+# conandata.yml — lttng-ust 2.12.10
+#
+# 软件: lttng-ust（LTTng 用户态追踪库，https://lttng.org/）
+# 内容: liblttng-ust / liblttng-ust-tracepoint / liblttng-ust-ctl /
+#       liblttng-ust-{fd,fork,dl,libc-wrapper,cyg-profile,cyg-profile-fast}
+#       共享库 + include/lttng/*.h 公共头 + bin/lttng-gen-tp 工具。
+# 构建系统: autotools (configure + make)
+#
+# 依赖（ohpcd 远程仓已发布）:
+#   liburcu/0.15.6 —— RCU 核心依赖。configure 用 AC_CHECK_HEADERS(urcu-bp.h) +
+#                     AC_CHECK_LIB(urcu-cds / urcu-bp) 探测（本包**不使用**
+#                     pkg-config，全树 0 处 PKG_CHECK_MODULES）。
+# 可选依赖 numa / jni-interface / java-agent / python-agent / sdt 全部默认关闭
+# 或显式 --disable-numa（平台无 libnuma）。
+
+sources:
+  url: "https://lttng.org/files/lttng-ust/lttng-ust-2.12.10.tar.bz2"
+  sha256: "aa802851c6d08c653ac1dd7da8f552baaa5d87e9b03c2d6a8b7a04322e53dc47"
+
+patches:
+  - patch_file: "patches/0001-config-config.guess.patch"
+    patch_description: "config.guess: 识别 HarmonyOS/OHOS（uname -s = HarmonyOS；未打补丁时脚本落到编译探针分支，在 HMDFS 上因 dummy.c 不可写而以 rc=1 'unable to guess system type' 退出）并输出 aarch64-unknown-linux-ohos"
+    patch_type: "portability"
+  - patch_file: "patches/0002-config-config.sub.patch"
+    patch_description: "config.sub: 接受 linux-ohos 三元组——OS 合法性表补 ohos*、kernel-os 组合表补 linux-ohos*（否则 'Invalid configuration `aarch64-unknown-linux-ohos`: OS `ohos` not recognized'，configure 直接 rc=1）"
+    patch_type: "portability"
+  - patch_file: "patches/0003-configure.patch"
+    patch_description: "configure: 建 $ac_tmp 的 (umask 077 && mktemp -d/mkdir) 改为 umask 022 —— toybox mktemp -d 遵循 umask，umask 077 在 HMDFS 上落盘的 2700 目录不可写，config.status 建 subs1.awk 报 Permission denied 后 'could not setup config files machinery'"
+    patch_type: "portability"
+  - patch_file: "patches/0004-tracepoint-dlclose.patch"
+    patch_description: "include/lttng/tracepoint.h: 析构路径 dlclose() 失败时的 abort() 降级为警告（两处）——OHOS/musl 上 dlclose() 对本库自己 dlopen 的 handle 返回 -1，未修复时任何使用 tracepoint.h 的消费者程序（tracef/tracelog/tracepoint）都在退出时被 abort 打死（实测 tests/hello、tests/ctf-types rc=139）。清理失败不影响功能。"
+    patch_type: "portability"
+  - patch_file: "patches/0005-tools-lttng-gen-tp-python3.patch"
+    patch_description: "tools/lttng-gen-tp: shebang `#!/usr/bin/env python` → `#!/usr/bin/env python3`（平台只有 python3，无 `python` 命令；脚本本身是 py2/py3 兼容写法，`--help` 实测 rc=0）。未修复时 conan-verify 的 L2（平台功能矩阵：bin/ 下可执行文件必须能跑 --version/--help/-V/-h）恒 FAIL。同族先例：archives/c/cloud-utils*/patches 的 python3 shebang 补丁。"
+    patch_type: "portability"

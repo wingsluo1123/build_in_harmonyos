@@ -1,0 +1,41 @@
+# test_package/MANIFEST.yml
+# 上游测试来源与断言统计（CI 门禁 build_and_test.sh L0e 需要此文件存在）
+
+package: lttng-ust/2.12.10
+homepage: "https://lttng.org/"
+
+# 上游测试命令（tests/Makefile.am 注册 4 个 TESTS；拆两组跑的原因见 conanfile.py）
+upstream_check_command: "make -C tests check TESTS=\"snprintf/test_snprintf gcc-weak-hidden/test_gcc_weak_hidden libringbuffer/test_smp\" ; make -C tests check TESTS=\"ust-elf/test_ust_elf\" LOG_COMPILER=<绝对路径 bash>"
+
+# conanfile.py build() 中已集成上游测试（3 个用例硬门禁；ust-elf 平台阻塞、
+# 采集证据但非失败条件）
+upstream_test_in_build: true
+upstream_test_command: "make -C tests check TESTS=\"snprintf/test_snprintf gcc-weak-hidden/test_gcc_weak_hidden libringbuffer/test_smp\""
+
+# 上游实际运行的测试程序（N 汇总见 manifest.yaml；N=88 取 plan_tests 最大值）
+upstream_tests:
+  - file: tests/snprintf/snprintf.c
+    source: lttng-ust-2.12.10/tests/snprintf/snprintf.c
+    description: "ust_safe_snprintf() 格式化结果比对（plan_tests 1）"
+    command: "./tests/snprintf/test_snprintf"
+  - file: tests/ust-elf/ust-elf.c
+    source: lttng-ust-2.12.10/tests/ust-elf/ust-elf.c
+    description: "liblttng-ust 的 ELF 解析（memsz/build-id/debuglink/PIC，plan_tests 48）——本平台被 POSIX shm 缺陷阻塞，7–12 条断言后 SIGSEGV"
+    command: "./tests/ust-elf/test_ust_elf <srcdir>/tests/ust-elf"
+  - file: tests/gcc-weak-hidden/main.c
+    source: lttng-ust-2.12.10/tests/gcc-weak-hidden/main.c
+    description: "weak+hidden 可见性跨编译单元一致性（plan_tests 2）"
+    command: "./tests/gcc-weak-hidden/test_gcc_weak_hidden"
+  - file: tests/libringbuffer/test_smp.c
+    source: lttng-ust-2.12.10/tests/libringbuffer/test_smp.c
+    description: "get_num_possible_cpus_from_mask()/num_possible_cpus()（plan_tests 37）"
+    command: "./tests/libringbuffer/test_smp"
+
+# test_package 中新增的测试（消费者视角验证；**分栏**，不计入上游分母）
+test_package_tests:
+  - file: test_lttng_ust.c
+    description: "消费者探针：版本宏 ×2 + tracef()/tracelog() 可链接可调用 ×2 + 真实 TRACEPOINT_EVENT 注册与触发 ×1（共 5 条断言）"
+    command: "clang -std=c11 -D_GNU_SOURCE test_lttng_ust.c tp.c -o test_lttng_ust_probe <incs> <libs> && ./test_lttng_ust_probe"
+
+# 鸿蒙侧消费者断言总数（分栏，不并入上游 88）
+assertion_count: 5

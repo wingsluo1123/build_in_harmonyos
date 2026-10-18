@@ -1,0 +1,86 @@
+#====================================================================
+# E4311 — conan Release 注入的 -DNDEBUG 断掉 <assert.h> 传递链
+#          → 共享库留下 UND assert → OHOS 运行期 relocation 失败
+# 草稿（draft: true），经主编审核后 promote 为正式条目
+# 对应人类文档：knowledge/drafts/E4311-draft-4DB5.md
+#
+# 格式规则：
+#   - key: value（冒号后一个空格，value 到行尾）
+#   - 多行值：下一行以空格开头 = 续行（续行内不要再出现 ASCII 冒号+空格）
+#   - 列表值：逗号分隔；正则值：| 分隔多个模式
+#   - 以 # 开头的行为注释；空行忽略（多行值里不要留空行）
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E4311
+trigger_tool:           runtime|test
+phase:                  runtime|testing
+error_signature: call to undeclared function .assert.|implicit-function-declaration.*assert|Error relocating .*assert.*symbol not found|undefined symbol. assert|UND assert
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity: 2
+category: build-system,autotools,portability,libc
+prescan_pattern: assert\s*\(
+prescan_globs: '*.c, *.h, Makefile*, configure.ac, conanfile.py'
+match_keywords: NDEBUG, -DNDEBUG, ndebug, assert, assert.h, urcu/assert.h, implicit-function-declaration, undefined symbol, symbol not found, Error relocating, conan Release, AutotoolsToolchain, liburcu, liblttng-ust
+title: conan Release 默认注入的 -DNDEBUG 断掉 liburcu <urcu/assert.h> 的 <assert.h> 传递链 ⇒ 共享库留下 UND assert ⇒ OHOS 运行期 relocation 失败
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause: liburcu 的 include/urcu/assert.h 是**条件包含**——`#ifdef NDEBUG` 时只定义 `urcu_posix_assert()`（不求值），`#else` 分支才 `#include <assert.h>`。下游包（实测 lttng-ust 2.12.10）有若干 .c **自己没写 `#include <assert.h>`**，只靠 `<urcu/uatomic.h>` → `urcu/uatomic/uassert.h` → `urcu/assert.h` 这条链把 assert.h 带进来。
+ conan 的 AutotoolsToolchain 在 build_type ∈ {Release, RelWithDebInfo, MinSizeRel} 时把 `self.ndebug = "NDEBUG"` 注入 `CPPFLAGS`（autotoolstoolchain.py 的 `defines` 属性 → `env.append("CPPFLAGS", ...)`），于是链断——这些 TU 把 `assert()` 当**未声明函数**调用（clang 只报 `-Wimplicit-function-declaration` 警告），共享库因此留下一个 UND `assert` 符号。
+ libtool 默认不给共享库加 `--no-undefined`（本仓库配方又普遍加 `-Wl,--allow-shlib-undefined`），所以**链接期完全静默**；glibc 恰好导出兼容符号 `assert`，所以在 glibc 环境里连运行期都看不到问题。
+ OHOS/musl 的 libc 不导出 `assert`（只导出 `__assert_fail`）⇒ 消费者一运行就报 `Error relocating …/liblttng-ust.so.0` 加 `assert` 符号缺失（rc=127），且因为是**加载期**失败，`main()` 里的日志一行都打不出来。
+affected_scope: 所有「autotools 配方 + conan Release/RelWithDebInfo/MinSizeRel + 依赖 liburcu（或任何把 <assert.h> 放在 NDEBUG 条件分支里的头）+ 自己漏 include <assert.h> 的 TU」组合；换 libc（glibc → musl/OHOS）时才暴露，属典型「链接全绿、换平台加载即死」。
+verification_cmd: 产物判据——readelf --dyn-syms <pkg>/lib/<name>.so 里 grep -w assert，正常只应见 UND __assert_fail，出现 UND assert 即命中；运行期 oracle——用该包编一个只 return 0 的消费者并执行，命中时 rc=127 且 stderr 为 Error relocating 加 assert 符号缺失。
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           drop-ndebug-from-autotools-toolchain
+rec_description: 在配方的 generate() 里显式清掉 conan 注入的 NDEBUG（`tc = AutotoolsToolchain(self)` 之后 `tc.ndebug = None`），使 `<urcu/assert.h>` 走 `#else` 分支正常 `#include <assert.h>`；实测 UND 由 `assert` 变为可解析的 `__assert_fail`，运行 rc=0。该做法同时回到上游 autotools 的默认语义——上游自身 CFLAGS 默认是 `-g -O2`，**不定义 NDEBUG**（NDEBUG 是 CMake/发行版打包惯例，不是 autotools 默认）。
+rec_command: python3 -c "print('tc = AutotoolsToolchain(self); tc.ndebug = None')"   # 落到配方 generate() 内
+rec_auto_fix:           false
+rec_impl:               manual-review
+
+fallback_priority:      2
+fallback_approach:      patch-missing-assert-include
+fallback_description: 若要保留 NDEBUG（Release 语义：断言编译期消失），就给那批漏 include 的 TU 补 `#include <assert.h>`（上游补丁形态，更根治，但改动上游源码，需逐文件确认）。不要用「在共享库里补一个 assert 符号」或继续用 --allow-shlib-undefined 掩盖——那是把加载期崩溃留到运行期。
+fallback_command: readelf --dyn-syms <pkg>/lib/<name>.so 里 grep -w assert   # 补 include 后应为 0 命中 assert
+fallback_auto_fix:      false
+fallback_impl:          source-patch
+
+# ★ 禁止策略 ★
+forbid_1_pattern: allow-shlib-undefined
+forbid_1_reason: 该选项让共享库的未定义符号检查静默化，正是本坑在链接期完全无输出的原因；用它「解决」本坑等于把加载期失败留到运行期。
+forbid_1_consequence: CI 全绿、设备加载即 rc=127，且 main() 里的日志一行都打不出来，排查方向会被带偏到动态链接器/RPATH/签名。
+forbid_2_pattern: define\s*\(?\s*NDEBUG
+forbid_2_reason: 手工再注入 NDEBUG 会让本条目的修复失效（传递链再次断开）。
+forbid_2_consequence: 复现原始 UND assert → 运行期 relocation 失败。
+
+# ═══ Layer 4: 原则引用 ═══
+principles:
+
+# ═══ 关系图 (Relations) ═══
+causes:                 []
+caused_by:              []
+similar_to:             [E1940, E013]
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file:               knowledge/drafts/E4311-draft-4DB5.md
+last_updated:           2026-10-18
+source_event: lttng-ust 2.12.10 适配（feat/lttng-ust-2.12.10）——conan create 构建成功、进入 test_package 执行阶段即报 `Error relocating …/liblttng-ust.so.0` 加 assert 符号缺失（rc=127）。readelf 实测该 .so 有 `104  UND assert`；构建日志给出精确 TU 清单（liblttng-ust/lttng-events.c 的 188/204/624/647、lttng-ust-statedump.c 的 389、ust-core.c 的 78，共 6 处 call to undeclared function 'assert'）。对照——同一份源码用手工 autotools 构建（CFLAGS=-g -O2，无 -DNDEBUG）得到 UND __assert_fail、运行 rc=0。日志见 $TASK_DIR/w3-create-4.log 与 $TASK_DIR/w3-testpkg-2.log。
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:                Awstme <awstme@qq.com>
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+
+draft: true
+contributor_id: 4DB5

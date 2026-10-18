@@ -1,0 +1,126 @@
+# manifest.yaml — lttng-ust 2.12.10
+#
+# 文件位置: archives/l/lttng-ust/2.12.10/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "2.12.10"
+software: "lttng-ust"
+
+# O5：只有合并后 release upload 确认才写 published，此前一律 built
+status: built
+
+build_date: "2026-10-18"
+build_system: autotools
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://lttng.org/files/lttng-ust/lttng-ust-2.12.10.tar.bz2"
+  sha256: "aa802851c6d08c653ac1dd7da8f552baaa5d87e9b03c2d6a8b7a04322e53dc47"
+  tar_format: tar.bz2
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+compiler: clang
+
+dependencies:
+  required:
+    - "liburcu/0.15.6"
+  optional:
+    - "numa（显式 --disable-numa：平台无 libnuma，且 configure 默认 enable 时探测失败即 AC_MSG_ERROR）"
+    - "jni-interface / java-agent-* / python-agent / sdt（上游默认关闭）"
+
+patches_applied:
+  - "0001-config-config.guess.patch"
+  - "0002-config-config.sub.patch"
+  - "0003-configure.patch"
+  - "0004-tracepoint-dlclose.patch"
+  - "0005-tools-lttng-gen-tp-python3.patch"
+
+build:
+  system: autotools
+  cc: clang
+  configure_options:
+    - "--build=aarch64-unknown-linux-ohos"
+    - "--host=aarch64-unknown-linux-ohos"
+    - "--disable-numa"
+    - "--disable-man-pages"
+    - "--enable-shared --disable-static"
+
+# ============================================================
+# 测试信息
+# ============================================================
+
+test_results:
+  type: "automake parallel-tests (TAP)，tests/Makefile.am 注册 4 个 TESTS"
+  # N 取候选数法最大值（逐项归因见 notes.md「N 清点」一节）：
+  #   ① automake TESTS 注册数             = 4
+  #   ② tests/ 下 noinst_PROGRAMS 程序数  = 12
+  #   ③ 静态 ok() 调用点                  = 20
+  #   ④ 各用例 plan_tests 声明数之和      = 88  ← N（最大值）
+  # （doc/examples/ 的样例是 make 期的编译面，不注册为 TESTS，不计入 N）
+  upstream_check_command: "make -C tests check TESTS=\"snprintf/test_snprintf gcc-weak-hidden/test_gcc_weak_hidden libringbuffer/test_smp\" ; make -C tests check TESTS=\"ust-elf/test_ust_elf\" LOG_COMPILER=<绝对路径 bash>"
+  upstream_total: 88
+  upstream_passed: 40
+  upstream_failed: 0
+  upstream_skipped: 0
+  upstream_not_run: 48
+  consumer_total: 5
+  consumer_passed: 5
+
+test_status: partial
+
+test_note: >-
+  TOTAL(N)=88 = PASS 40 + FAIL 0 + SKIP 0 + NOT_RUN 48。
+  ① 3 个**不加载 liblttng-ust** 的 TAP 用例完整通过（硬门禁，全绿）：
+  snprintf/test_snprintf 1/1、gcc-weak-hidden/test_gcc_weak_hidden 2/2、
+  libringbuffer/test_smp 37/37 ⇒ PASS 40。取数命令与分组原因见 notes.md §5.2
+  （LOG_COMPILER 只对脚本型用例成立，混跑会把 ELF 当脚本执行 → status 126；
+  且 `TESTS="a b c"` 作为单个 make 参数会被 shell 拆开而静默少跑）。
+  ② ust-elf/test_ust_elf（plan_tests 48）计 NOT_RUN 48，原因是**环境**：
+  本机 `/dev/shm`（tmpfs，1.0 GiB）被写满（`df -h /dev/shm` = 1.0G/1.0G/0/100%，
+  `shutil.disk_usage` free=0），而 tmpfs 的 ftruncate 只改 i_size、页在首次触碰时
+  才分配 ⇒ `shm_open`/`ftruncate`/`mmap` 全报成功、对该映射**首次读或写**却无法
+  分配页，本机把该失败投递成 **SIGSEGV**（Linux 常规应为 SIGBUS），把 ENOSPC 完全
+  掩盖（对同一 fd 直写可见 `errno=28 ENOSPC`）。liblttng-ust 的 ust_listener 线程
+  恰好读这个映射，且其创建时 `sigfillset`+`pthread_sigmask` 屏蔽了全部信号 ⇒
+  同步 SIGSEGV 无法被用户态 handler 捕获，进程 rc=139。实测该用例每次跑到
+  7–12 条断言（均 PASS）后被打断，条数随运行变化。
+  该现象与本包无关：同一消费者程序链接**已发布**的 lttng-ust/2.15.1 亦同形；
+  匿名 MAP_SHARED、普通文件 MAP_SHARED、memfd_create+mmap、liburcu 对照组全部 rc=0。
+  **可重跑性**：`/dev/shm` 恢复空间后同一份提交应能取得该用例的干净读数
+  （本会话期内该共享 tmpfs 不可自查/清理：`ls /dev/shm` → Permission denied）。
+  ③ 鸿蒙侧消费者用例 5 条（test_package：版本宏 ×2、tracef/tracelog 可调用 ×2、
+  真实 TRACEPOINT_EVENT 注册 ×1）**分栏**统计，不计入上游分母；本轮
+  `conan create` 实测 TAP `1..5` / `# failed: 0`。
+
+test_package_note: >-
+  test_package/conanfile.py 编译 test_lttng_ust.c + tp.c（真实
+  TRACEPOINT_EVENT）并执行；它**不启动会话等待路径**，实测 60/60 稳定通过。
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "OHOS 上 /dev/shm（全设备共享的 1 GiB tmpfs）写满时，POSIX shm 的 mmap 映射在首次触碰未分配页时以 **SIGSEGV** 呈现（Linux 常规应为 SIGBUS），把 ENOSPC 完全掩盖：shm_open/ftruncate/fstat/mmap 全报成功，对同一 fd 直写才可见 errno=28 ENOSPC。若该访问发生在 sigfillset+pthread_sigmask 屏蔽了全部信号的线程里，用户态 handler 收不到、只剩 rc=139。lttng-ust 的 ust_listener 线程在 wait_for_sessiond() 读该映射时命中。属环境条件（非包缺陷），但『ENOSPC → 不可捕获 SIGSEGV』的掩盖机制值得沉淀（knowledge_ref: E4310-draft-8CAA.kv）"
+
+  - "conan 的 AutotoolsToolchain 在 Release/RelWithDebInfo/MinSizeRel 下把 -DNDEBUG 注入 CPPFLAGS，会打断 liburcu `urcu/assert.h` 的 `#else #include <assert.h>` 传递链；lttng-ust 有 3 个 TU 自己没写 `#include <assert.h>`（lttng-events.c / lttng-ust-statedump.c / ust-core.c）⇒ 共享库留下 UND `assert`，OHOS 的 libc 不导出该符号 ⇒ 消费者加载期 `Error relocating …: assert: symbol not found`（rc=127）。配方 generate() 内 `tc.ndebug = None` 修复（实测 UND 变为可解析的 `__assert_fail`、test_package 5/5 通过）（knowledge_ref: E4311-draft-4DB5.kv）"
+
+
+knowledge_ref:
+  - "knowledge/drafts/E4310-draft-8CAA.kv"
+  - "knowledge/drafts/E4311-draft-4DB5.kv"
+
+known_limits:
+  - "运行期（环境条件，非包缺陷）：当 /dev/shm（全设备共享的 1 GiB tmpfs）写满时，任何链接 liblttng-ust 且存活超过约 1ms 的程序都会被 SIGSEGV 终止（ENOSPC 被呈现为不可捕获的 SIGSEGV）。/dev/shm 有空间时该路径正常（memfd/匿名映射对照组全部 rc=0）；本执行体会话期内 /dev/shm 已满且不可自查/清理，运行期干净读数留待空间恢复后补取。"
+  - "依赖制品质量：liburcu/0.15.6 包内 7 个 .la 的 libdir='//lib' 且 dependency_libs 含构建机私有前缀（-L/…/usr/local/lib）——配方用 _relocate_dep_libtool_archives() 在配方侧重写副本规避，依赖包本体未改，建议制品侧修复。"
+  - "liblttng-ust-ctl.so / liblttng-ust-fork.so 等消费者若同时链接 liblttng-ust-tracepoint.so，需在链接期加 -Wl,--allow-shlib-undefined：OHOS sysroot 的 libc.so 桩未导出 pthread_cancel/pthread_setcancelstate，lld 的 --no-allow-shlib-undefined 会误报未定义。"
