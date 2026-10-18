@@ -1,0 +1,72 @@
+--- a/unicon/client/test.cpp
++++ b/unicon/client/test.cpp
+@@ -17,26 +17,27 @@
+  * GNU General Public License for more details.
+  *
+  * You should have received a copy of the GNU General Public License
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+  *
+  * See the file COPYING directory of this archive
+  * Author: see CREDITS
+  */
+ 
+-#include <iostream.h>
++#include <iostream>
++using namespace std;
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <Phrase.h>
+-#include <TLC_ImmClient.h>
+-#include <TLC_ImmModule.h>
++#include <ImmClient.h>
++#include <ImmModule.h>
+ 
+ #ifdef __DLL_SUPPORT__
+ #ifdef  __cplusplus
+ extern "C" {
+ #endif
+     extern long TCP_Connect (char *szIpAddr, short Port);
+     extern int TCP_Disconnect (long handle);
+     extern int LibOpen ();
+     extern int LibRelease ();
+ #ifdef  __cplusplus
+@@ -52,33 +53,36 @@
+         cout << argv[0] << " " << "<ip> " << "<port>" << "\n";
+         exit (-1);
+     }        
+ #ifdef __DLL_SUPPORT__
+     LibOpen ();
+ #endif
+     ImmServer_T t = IMM_OpenClient (argv[1], atoi (argv[2]));
+     cout << "OpenClient ()\n";
+ 
+     IMM *MyImm = IMM_OpenInput (t, "../ImmModules/CCE/cce_pinyin.so",
+-                                "../datas", IMM_CCE);
++                                "../dict", IMM_CCE);
+     cout << "immOpen (....)\n";
++    IMM_SetInputMode (MyImm, IMM_DOUBLE_BYTE_MODE);
+ 
+     do
+     {
+         char ch;
+         printf ("please input a key:(q == exit):");
+         scanf ("%c", &ch);
+         if (ch == 'q')
+             break;
+         if (ch == '\r' || ch == '\n')
+             continue;
+-        long n = IMM_KeyPressed (MyImm, ch);
++        char selbuf[MAX_PHRASE_BUFFER];
++        int seplen;
++        long n = IMM_KeyFilter (MyImm, ch, selbuf, &seplen);
+         cout << "in test.cpp:total:" << n << "\n";
+         IMM_GetInputDisplay (MyImm, mbuf, sizeof (mbuf));
+         cout << "Input::" << mbuf << "\n";
+         IMM_GetSelectDisplay (MyImm, mbuf, sizeof (mbuf));
+         cout << "Selection::" << mbuf << "\n";
+ /*
+         for (long i = 0; i < n; )
+         { 
+             char temp[8192];
+             PhraseItem MyPhrase[20]; 

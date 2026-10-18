@@ -1,0 +1,315 @@
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/3.0.4/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "3.0.4"
+
+# 软件名
+software: "unicon"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-15"
+build_system: custom
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://deb.debian.org/debian/pool/main/u/unicon/unicon_3.0.4+dfsg1.orig.tar.xz"
+
+  # 源码校验和
+  sha256: "3a7a364d4048da81f58e835e7f9fa60d239c5aa0204afb854264bdcc2c17d155"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: custom
+
+  # 配置选项列表（空：conan 配方 build() 自行传 --prefix=package_folder；
+  # clean-verify 注入自身 DEFAULT_PREFIX，勿写字面占位符）
+  configure_options: []
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+  # 例如:
+  # - openssl/1.1.1w
+  # - curl/8.19.0
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+- "patches/0001-Makefile.in.patch"
+- "patches/0002-unicon-ImmModules-cce-Makefile.in.patch"
+- "patches/0003-unicon-ImmModules-cce-hzinput_test.c.patch"
+- "patches/0004-unicon-ImmModules-cce-inputs-Makefile.in.patch"
+- "patches/0005-unicon-ImmModules-cce-inputs-cin2dat.c.patch"
+- "patches/0006-unicon-ImmModules-cce-inputs-tab2dat.c.patch"
+- "patches/0007-unicon-ImmModules-cce-intcode_test.c.patch"
+- "patches/0008-unicon-ImmModules-cce-xl_hzinput.h.patch"
+- "patches/0009-unicon-ImmModules-cce-xl_pinyin.c.patch"
+- "patches/0010-unicon-ImmModules-cxterm-Makefile.in.patch"
+- "patches/0011-unicon-ImmModules-cxterm-utils-Makefile.in.patch"
+- "patches/0012-unicon-ImmModules-cxterm-utils-cit2tit.c.patch"
+- "patches/0013-unicon-ImmModules-cxterm-utils-tit2cit.c.patch"
+- "patches/0014-unicon-ImmModules-turbo-Makefile.in.patch"
+- "patches/0015-unicon-client-Makefile.in.patch"
+- "patches/0016-unicon-client-TLC_ImmServer.cpp.patch"
+- "patches/0017-unicon-client-TLC_ImmServer.hpp.patch"
+- "patches/0018-unicon-client-TLC_MemFile.cpp.patch"
+- "patches/0019-unicon-client-TLC_MemFile.hpp.patch"
+- "patches/0020-unicon-client-TLC_SocketClient.cpp.patch"
+- "patches/0021-unicon-client-TLC_SocketClient.hpp.patch"
+- "patches/0022-unicon-client-TLC_Utils.h.patch"
+- "patches/0023-unicon-client-test.cpp.patch"
+- "patches/0024-unicon-include-ImmDefs.h.patch"
+- "patches/0025-unicon-include-Phrase.h.patch"
+- "patches/0026-unicon-server-Makefile.in.patch"
+- "patches/0027-unicon-server-TLS_Debug.cpp.patch"
+- "patches/0028-unicon-server-TLS_Debug.hpp.patch"
+- "patches/0029-unicon-server-TLS_ImmOp.cpp.patch"
+- "patches/0030-unicon-server-TLS_LibMain.cpp.patch"
+- "patches/0031-unicon-server-TLS_MemFile.cpp.patch"
+- "patches/0032-unicon-server-TLS_MemFile.hpp.patch"
+- "patches/0033-unicon-server-TLS_PthSocket.cpp.patch"
+- "patches/0034-unicon-server-TLS_TcpipMain.cpp.patch"
+- "patches/0035-unicon-unicon-Makefile.in.patch"
+- "patches/0036-unicon-unicon-MyConfig.cpp.patch"
+- "patches/0037-unicon-unicon-MyConfig.hpp.patch"
+- "patches/0038-unicon-unicon-MyInputArea.cpp.patch"
+- "patches/0039-unicon-unicon-SysConfig.cpp.patch"
+- "patches/0040-unicon-unicon-SysConfig.hpp.patch"
+- "patches/0041-unicon-unicon-UniKey.cpp.patch"
+- "patches/0042-unicon-unicon-UniKey.hpp.patch"
+- "patches/0043-unicon-client-TLC_Utils.cpp.patch"
+- "patches/0044-unicon-server-TLS_AsciiConvertor.hpp.patch"
+# 例如:
+# - "0001-bootstrap-ohos-toolchain.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+- "1990s pth 私有线程库 → pthread 全量移植（17 处）：pth_spawn/pth_join/pth_terminate → pthread_create/pthread_join/pthread_exit；原 32KB 线程栈在 64 位下不足以支撑 dlopen+模块加载深栈 → 256KB"
+- "malloc 中硬编码结构头常数（6/4）以 32 位指针为前提，64 位下每条少分配 4 字节 → 堆损坏段错误；统一改 sizeof 基线"
+- "1990s client/server 协议不对称：client 有命令而 server handler 无对应 case（IMM_SET_INPUTMODE 被 default 丢弃）；移植时须按命令头常量表逐一对照 handler switch"
+- "上游 install 目标不安装头文件时，recipe package() 须从源码树补拷 include/"
+- "手写 Makefile.in 配方模式：CC/CXX 环境变量化 + -fPIC，由 AutotoolsToolchain 的 conanbuild 环境注入（R33）"
+- "卸载顺序：dlclose/UnloadImm 前必须先完成模块清理（析构），否则析构访问已释放的 slib/pImmOp 崩溃"
+# 例如:
+# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
+# - "内嵌 libuv 需要禁用，使用系统 libuv"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/unicon-3.0.4.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/unicon-3.0.4.work
+  source_orig_hash: 0def42c8e521dbbe
+  source_work_hash: cf8a47858db09b4e
+  generated_at: '2026-10-16T13:35:05'
+  patches_count: 44
+
+patch_classification:
+  - file: 0001-Makefile.in.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-unicon-ImmModules-cce-Makefile.in.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-unicon-ImmModules-cce-hzinput_test.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-unicon-ImmModules-cce-inputs-Makefile.in.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0005-unicon-ImmModules-cce-inputs-cin2dat.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0006-unicon-ImmModules-cce-inputs-tab2dat.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0007-unicon-ImmModules-cce-intcode_test.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0008-unicon-ImmModules-cce-xl_hzinput.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0009-unicon-ImmModules-cce-xl_pinyin.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0010-unicon-ImmModules-cxterm-Makefile.in.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0011-unicon-ImmModules-cxterm-utils-Makefile.in.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0012-unicon-ImmModules-cxterm-utils-cit2tit.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0013-unicon-ImmModules-cxterm-utils-tit2cit.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0014-unicon-ImmModules-turbo-Makefile.in.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0015-unicon-client-Makefile.in.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0016-unicon-client-TLC_ImmServer.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0017-unicon-client-TLC_ImmServer.hpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0018-unicon-client-TLC_MemFile.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0019-unicon-client-TLC_MemFile.hpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0020-unicon-client-TLC_SocketClient.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0021-unicon-client-TLC_SocketClient.hpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0022-unicon-client-TLC_Utils.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0023-unicon-client-test.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0024-unicon-include-ImmDefs.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0025-unicon-include-Phrase.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0026-unicon-server-Makefile.in.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0027-unicon-server-TLS_Debug.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0028-unicon-server-TLS_Debug.hpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0029-unicon-server-TLS_ImmOp.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0030-unicon-server-TLS_LibMain.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0031-unicon-server-TLS_MemFile.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0032-unicon-server-TLS_MemFile.hpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0033-unicon-server-TLS_PthSocket.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0034-unicon-server-TLS_TcpipMain.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0035-unicon-unicon-Makefile.in.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0036-unicon-unicon-MyConfig.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0037-unicon-unicon-MyConfig.hpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0038-unicon-unicon-MyInputArea.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0039-unicon-unicon-SysConfig.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0040-unicon-unicon-SysConfig.hpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0041-unicon-unicon-UniKey.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0042-unicon-unicon-UniKey.hpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0043-unicon-client-TLC_Utils.cpp.patch
+    type: manual
+    platform_only: True
+    guard: 'pending'
+  - file: 0044-unicon-server-TLS_AsciiConvertor.hpp.patch
+    type: manual
+    platform_only: True
+    guard: 'pending'

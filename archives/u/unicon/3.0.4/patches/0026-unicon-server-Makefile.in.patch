@@ -1,0 +1,54 @@
+--- a/unicon/server/Makefile.in
++++ b/unicon/server/Makefile.in
+@@ -4,25 +4,25 @@
+ DLIB_PROG = libimm_server.so
+ 
+ APP_OBJS = TLS_HzInput.o TLS_ImmOp.o TLS_TcpipMain.o  TLS_MemFile.o \
+        TLS_PthSocket.o TLS_Debug.o \
+        TLS_DoubleByteConvertor.o TLS_AsciiConvertor.o
+ 
+ DLIB_OBJS = TLS_HzInput.o TLS_ImmOp.o TLS_MemFile.o TLS_PthSocket.o \
+        TLS_Debug.o TLS_LibMain.o TLS_DoubleByteConvertor.o \
+        TLS_AsciiConvertor.o
+ 
+-LIBS = /usr/lib/libpth.so -ldl
++LIBS = -ldl -lpthread
+ 
+ # CFLAGS = -g -D__IMM_DEBUG__ -Wall -I. -I/usr/include -I../include 
+-CFLAGS = -g -Wall -I. -I/usr/include -I../include
+-CC=g++
++CFLAGS = -g -Wall -fPIC -I. -I/usr/include -I../include
++CC=$(CXX)
+ 
+ all: $(DLIB_PROG)
+ 
+ libimm_server.so: $(DLIB_OBJS)
+ 	$(CC) $(DLIB_OBJS) -shared -o $(DLIB_PROG)
+ 
+ TLS_LibMain.o : TLS_LibMain.cpp
+ 	$(CC) $(CFLAGS) -DUNICON_LIB=\"$(prefix)/lib/unicon\" -c TLS_LibMain.cpp -o TLS_LibMain.o
+ 
+ app: $(APP_OBJS) 
+@@ -31,21 +31,21 @@
+ 	$(CC) $(CFLAGS) -c TLS_HzInput.cpp -o TLS_HzInput.o
+ TLS_ImmOp.o : TLS_ImmOp.cpp TLS_ImmOp.hpp
+ 	$(CC) $(CFLAGS) -c TLS_ImmOp.cpp -o TLS_ImmOp.o
+ TLS_MemFile.o : TLS_MemFile.cpp TLS_MemFile.hpp
+ 	$(CC) $(CFLAGS) -c TLS_MemFile.cpp -o TLS_MemFile.o
+ TLS_PthSocket.o : TLS_PthSocket.cpp TLS_PthSocket.hpp
+ 	$(CC) $(CFLAGS) -c TLS_PthSocket.cpp -o TLS_PthSocket.o
+ TLS_Debug.o : TLS_Debug.cpp TLS_Debug.hpp
+ 	$(CC) $(CFLAGS) -c TLS_Debug.cpp -o TLS_Debug.o
+ TLS_TcpipMain.o : TLS_TcpipMain.cpp
+-	$(CC) $(CFLAGS) -DUNICON_LIB="$(prefix)/lib/unicon" -c TLS_TcpipMain.cpp -o TLS_TcpipMain.o
++	$(CC) $(CFLAGS) -DUNICON_LIB=\"$(prefix)/lib/unicon\" -c TLS_TcpipMain.cpp -o TLS_TcpipMain.o
+ TLS_DoubleByteConvertor.o : TLS_DoubleByteConvertor.cpp TLS_DoubleByteConvertor.hpp
+ 	$(CC) $(CFLAGS) -c TLS_DoubleByteConvertor.cpp -o TLS_DoubleByteConvertor.o
+ TLS_AsciiConvertor.o : TLS_AsciiConvertor.cpp
+ 	$(CC) $(CFLAGS) -c TLS_AsciiConvertor.cpp -o TLS_AsciiConvertor.o
+ 
+ install: all
+ 	mkdir -p $(prefix)/bin
+ 	mkdir -p $(prefix)/lib/unicon
+ 	if [ -f $(APP_PROG) ]; then  cp -f $(APP_PROG) $(prefix)/bin; fi
+ 	if [ -f $(DLIB_PROG) ]; then  cp -f $(DLIB_PROG) $(prefix)/lib/unicon; fi

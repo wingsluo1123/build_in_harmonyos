@@ -1,0 +1,93 @@
+--- a/unicon/client/TLC_ImmServer.cpp
++++ b/unicon/client/TLC_ImmServer.cpp
+@@ -23,20 +23,21 @@
+  * Author: see CREDITS
+  */
+ 
+ /*****************************************************************************
+  *
+  * ImmServer.c  ===  Communicaton between Server and Client 
+  *
+  *****************************************************************************/
+ #include <stdio.h>
+ #include <stdlib.h>
++#include <string.h>
+ #include <TLC_ImmServer.hpp>
+ #include <ImmComm.h>
+ 
+ TLC_CImmServer::TLC_CImmServer (char *szIpAddr, u_short port)
+ {
+     pCSocketClient = new TLC_CSocketClient (szIpAddr, port);
+     MemIn = new TLC_CMemFile (512), 
+     MemOut = new TLC_CMemFile (512);
+ }
+ 
+@@ -140,21 +141,21 @@
+     /* get the frame */
+     long state;
+     long rt, a;
+ 
+     *MemIn >> state;
+     *MemIn >> rt;
+     
+     if (rt == 2)
+     {
+         *MemIn >> a;
+-        *MemIn >> (PSTR) buf;
++        *MemIn >> buf;
+         *len = (int) a;
+     }
+     if (state == IMM_NORMAL)
+         return (int) rt;
+     return 0;
+ }
+ 
+ int TLC_CImmServer::SetInputMode (IMM_HANDLE handle, long mode)
+ {
+     MemOut->rewind ();
+@@ -210,21 +211,21 @@
+     pCSocketClient->Write (MemOut->pGetBuf(), MemOut->GetBufLen ());
+ 
+     /* receive the reply */
+     int n = pCSocketClient->Read (MemIn->pGetBuf(), MemOut->GetMax ());
+     MemIn->rewind ();
+     MemIn->SetBufLen (n);
+ 
+     /* get the frame */
+     long state;
+     *MemIn >> state;
+-    *MemIn >> (PSTR) buf;
++    *MemIn >> buf;
+ 
+     if (state == IMM_NORMAL)
+         return 1;
+     return 0;
+ }
+ 
+ int TLC_CImmServer::GetSelectDisplay (IMM_HANDLE handle, char *buf, long buflen)
+ {
+     MemOut->rewind ();
+     *MemOut << (long) IMM_GET_SELECT_DISPLAY;
+@@ -235,21 +236,21 @@
+     /* receive the reply */
+     int n = pCSocketClient->Read (MemIn->pGetBuf(), MemOut->GetMax ());
+     MemIn->rewind ();
+     MemIn->SetBufLen (n);
+ 
+     /* get the frame */
+     long state;
+     long total;
+     *MemIn >> state;
+     *MemIn >> total;
+-    *MemIn >> (PSTR) buf;
++    *MemIn >> buf;
+ 
+     if (state == IMM_NORMAL)
+         return (int) total;
+     return 0;
+ }
+ 
+ int TLC_CImmServer::SetPhraseItem (IMM_HANDLE handle, u_long n, 
+                         char *szCode, char *szPhrase, u_long freq)
+ {
+     MemOut->rewind ();
