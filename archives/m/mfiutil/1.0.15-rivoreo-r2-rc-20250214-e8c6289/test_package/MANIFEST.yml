@@ -1,0 +1,49 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh) 要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: mfiutil/1.0.15-rivoreo-r2-rc-20250214-e8c6289
+homepage: "https://rivoreo.one/?id=Project:mfiutil"
+
+# 上游测试存在性审计（hmbs 硬门禁要求）
+# 审计结论：mfiutil（Rivoreo 移植版）上游正式测试为 0
+upstream_tests_exist: false
+upstream_test_audit: |
+  审计结论：mfiutil 上游正式测试为 0，证据完整。
+  1. 上游官方归档（Rivoreo Gitiles，提交 e8c62898089593cd039b7d0360e030f04f9bfb45，
+     即版本串内嵌提交，2025-02-14）文件清单共 19 项：.gitignore、INSTALL、Makefile、
+     mfiutil.8、mfiutil.c、mfiutil.h、scsi_inquiry.h、human_readable.c、mfi_bbu.c、
+     mfi_cmd.c、mfi_config.c、mfi_drive.c、mfi_evt.c、mfi_flash.c、mfi_foreign.c、
+     mfi_patrol.c、mfi_properties.c、mfi_show.c、mfi_volume.c、include/dev/mfi/
+     （mfi_ioctl.h、mfireg.h）。无 tests/、test/、regress/ 目录。
+  2. Makefile 目标仅：default、clean、install（.PHONY 声明同）。无 check/test
+     目标；执行 `make check` 将报 "No rule to make target 'check'"。
+  3. 全文件搜索 make check / make test / TESTS / check_PROGRAMS / check-local /
+     ctest / pytest 均无匹配。
+  4. INSTALL 文件只说明构建与支持的操作系统/驱动组合，未提及任何测试设施。
+  5. 上游 FreeBSD 原版 usr.sbin/mfiutil 同样不带测试套件（FreeBSD src 该目录无
+     tests 子目录）；Debian sid 打包（1.0.15-rivoreo-r2~rc-20250214-e8c6289-2）
+     的 debian/tests 亦为空，无 autopkgtest。
+  6. 上游不在 no_official_test.txt 白名单中（该白名单仅用于已知 OHOS 不兼容场景）。
+
+# 上游测试命令 (mfiutil has no make check target)
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序 (mfiutil has no upstream tests)
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.sh
+    description: "真实执行打包后的 mfiutil：ELF magic、version 精确版本串、无参 usage 非零退出、未知命令报错、无控制器时 show adapter 走设备打开失败路径、非法选项拒绝"
+    command: "sh test.sh <bin>"
+
+# 测试断言总数 (test_package 6 条断言)
+assertion_count: 6
+
+# 测试套件覆盖说明
+test_suite_gaps:
+  none: "上游无正式测试套件；mfiutil 的功能执行依赖 MegaRAID 控制器硬件（ioctl 设备节点），测试机无法提供，故 test_package 只覆盖可确定执行的用户land路径与硬件缺失时的失败路径，不伪造硬件响应"
