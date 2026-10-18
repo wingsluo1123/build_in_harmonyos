@@ -1,0 +1,64 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: libnetfilter_acct/1.0.3
+homepage: "https://www.netfilter.org/projects/libnetfilter_acct/"
+
+# 上游测试命令 (用于 make -n check 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "make check"
+
+# 上游实际运行的测试程序
+# 说明: libnetfilter_acct 上游没有自动化测试套件 —— 树内无 tests/ 目录、
+# 无 TESTS 变量、无 add_test/enable_testing。examples/Makefile.am 只声明
+#     check_PROGRAMS = nfacct-get nfacct-add nfacct-del
+# 因此 `make check` = check-recursive，实际效果是编译并链接 examples/ 下
+# 全部 3 个 check_PROGRAMS（链接 ../src/libnetfilter_acct.la + ${LIBMNL_LIBS}）。
+#
+# ⚠ 计数口径（防 rule4 少报/虚报误读）:
+#   N_static（上游声明的用例）= 0 —— 上游没有 automake 用例（无 TESTS）。
+#   可执行用例数 = 0 / 实测通过 = 0 / 跳过 = 0 / 失败 = 0。
+#   下面 3 条是 check_PROGRAMS「构建目标」而非用例：make check 编译并链接它们，
+#   产物 3/3 成功（各 39360 B），但它们不被上游执行（交互式示例，运行需内核
+#   nfnetlink ACCT 对象与 CAP_NET_ADMIN）⇒ 执行数 = 0，不申报任何通过率。
+upstream_static_case_count: 0
+upstream_executable_case_count: 0
+upstream_executed_count: 0
+upstream_skipped_count: 0
+upstream_failed_count: 0
+upstream_check_programs_compiled: 3
+
+upstream_tests:
+  - file: examples/nfacct-get.c
+    source: libnetfilter_acct-1.0.3/examples/nfacct-get.c
+    description: "check_PROGRAMS build target (NOT an automake test case): compiled+linked against libnetfilter_acct.la by make check; never executed — upstream registers no TESTS runner"
+    command: "make check (compile+link only)"
+  - file: examples/nfacct-add.c
+    source: libnetfilter_acct-1.0.3/examples/nfacct-add.c
+    description: "check_PROGRAMS build target (NOT an automake test case): compiled+linked by make check; never executed"
+    command: "make check (compile+link only)"
+  - file: examples/nfacct-del.c
+    source: libnetfilter_acct-1.0.3/examples/nfacct-del.c
+    description: "check_PROGRAMS build target (NOT an automake test case): compiled+linked by make check; never executed"
+    command: "make check (compile+link only)"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: >-
+      Consumer test, 24 assertions: nfacct_alloc/nfacct_free lifecycle;
+      nfacct_attr_set_str / nfacct_attr_set_u64 / nfacct_attr_set /
+      nfacct_attr_unset / nfacct_attr_get / nfacct_attr_get_str /
+      nfacct_attr_get_u64 round-trip; nfacct_nlmsg_build_hdr +
+      nfacct_nlmsg_build_payload -> nfacct_nlmsg_parse_payload round-trip
+      (libmnl attribute coding + big-endian fields); nfacct_snprintf
+      PLAIN and JSON rendering. Assertion count is verified inside the
+      program (built-in accounting check, cannot drift silently).
+    command: "./test_libnetfilter_acct"
+
+# 测试断言总数 (test_package/test.c 内 CHECK() 调用数, 程序内自校验)
+assertion_count: 24
