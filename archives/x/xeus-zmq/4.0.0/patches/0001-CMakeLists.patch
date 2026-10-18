@@ -1,0 +1,41 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 39f057c828..571cd4c813 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -85,4 +85,4 @@ set(XEUS_ZMQ_TEST_DIR ${CMAKE_CURRENT_SOURCE_DIR}/test)
+-set(xeus_REQUIRED_VERSION 5.0.0)
++set(xeus_REQUIRED_VERSION 6.0.0)
+ set(nlohmann_json_REQUIRED_VERSION 3.11.3)
+ set(cppzmq_REQUIRED_VERSION 4.8.1)
+ set(zeromq_REQUIRED_VERSION 4.3.2)
+@@ -125,6 +125,21 @@ endif ()
+ 
+ find_package(OpenSSL REQUIRED)
+ 
++# Conan/CMakeDeps exports namespaced targets (xeus::xeus); this project
++# links against the unqualified `xeus` target. Create an alias so both
++# Conan-generated and upstream-style consumers resolve.
++if(TARGET xeus::xeus AND NOT TARGET xeus)
++    add_library(xeus INTERFACE IMPORTED)
++    set_property(TARGET xeus PROPERTY INTERFACE_LINK_LIBRARIES xeus::xeus)
++endif()
++
++# cppzmq is header-only and CMakeDeps does not propagate libzmq through
++# it; link libzmq explicitly for the private implementation.
++if(NOT TARGET libzmq AND TARGET libzmq::libzmq)
++    add_library(libzmq INTERFACE IMPORTED)
++    set_property(TARGET libzmq PROPERTY INTERFACE_LINK_LIBRARIES libzmq::libzmq)
++endif()
++
+ # Source files
+ # ============
+ 
+@@ -247,7 +262,7 @@ macro(xeus_zmq_create_target target_name linkage output_name)
+         ${target_name}
+         PUBLIC nlohmann_json::nlohmann_json
+         PUBLIC ${XEUS_TARGET_NAME}
+-        PRIVATE ${CPPZMQ_TARGET_NAME}
++        PRIVATE ${CPPZMQ_TARGET_NAME} libzmq
+         PRIVATE OpenSSL::Crypto
+     )
+ 

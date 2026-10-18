@@ -1,0 +1,20 @@
+package: xeus-zmq/4.0.0
+homepage: "https://github.com/jupyter-xeus/xeus-zmq"
+
+upstream_check_command: "cmake -DXEUS_ZMQ_BUILD_TESTS=ON .. && ctest --test-dir build --output-on-failure -j1"
+upstream_test_in_build: false
+upstream_test_command: "ctest --test-dir build --output-on-failure -j1"
+
+upstream_tests:
+  - file: test/test_kernel*.py
+    source: xeus-zmq-4.0.0/test/
+    description: "Upstream pytest-based kernel integration tests (test_kernel, test_kernel_control, test_kernel_shell) plus test_handshake executable."
+    command: "ctest --test-dir build --output-on-failure -j1"
+    result: "Upstream suite needs doctest, pytest and a live jupyter kernel; disabled in the packaged build (XEUS_ZMQ_BUILD_TESTS=OFF). Covered at consumer level by test_package."
+
+test_package_tests:
+  - file: test.cpp
+    description: "Consumer test: assert installed version + binary (SOVERSION) macros and call xeus::make_zmq_context() to build a real ZeroMQ-backed xeus context (7 assertions)."
+    command: "./test_xeus_zmq"
+
+assertion_count: 7
