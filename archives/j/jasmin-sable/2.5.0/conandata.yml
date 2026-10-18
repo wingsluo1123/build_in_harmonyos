@@ -1,0 +1,32 @@
+# conandata.yml — jasmin-sable 2.5.0
+#
+# 上游是 **Jasmin**（Java 字节码汇编器：把 .j/.jas 汇编文本编译成 .class），
+# 源码取 Debian 的 orig tarball：
+#   https://deb.debian.org/debian/pool/main/j/jasmin-sable/jasmin-sable_2.5.0.orig.tar.xz
+# 仓库布局：`src/jasmin/`（汇编器本体，主类 `jasmin.Main`）、`src/jasmin/parser.cup` + 已生成的
+#   `parser.java`/`sym.java`、`generated/scm/`（scm 相关自动生成类）、`lib/jas/src/**`（同包内
+#   附带的独立 "jas" 字节码库）、`bin/jasmin`（`java jasmin.Main $*` 包装脚本）、`build.xml`（ant）。
+#
+# 依赖：**源码直接 `import java_cup.*` / `java_cup.runtime.*`**（解析器与运行时）
+#   → java-cup 的 jar 是**编译期与运行期**都必须的；制品仓里没有 java-cup
+#   → 按"测试/构建期依赖自取"口径从 Maven Central 取（钉 sha256），并在包内随产物提供
+#   （否则 `jasmin` 无法运行）。
+#
+# 上游测试：包内**无测试套件**（`find -name "*Test*.java"` 为空；`lib/jas/tests/all.java`
+#   是 lib/jas 的示例而非测试框架）→ 上游通过率记 **N/A** 并如实披露；
+#   验证由 test_package 承担（**真跑**：用打包后的 jar 汇编一段 .jas 并校验生成的 .class）。
+
+sources:
+  url: "https://deb.debian.org/debian/pool/main/j/jasmin-sable/jasmin-sable_2.5.0.orig.tar.xz"
+  filename: "jasmin-sable_2.5.0.orig.tar.xz"
+  sha256: "14fc8d13ba0e89ec2a2b926f84b3b51e1be5b80f6f4e54a234b540a48edb9eba"
+
+# 构建/运行期自取 jar（随包提供，因为运行也需要）
+build_time_jars:
+  - name: "java-cup"
+    filename: "java-cup-11b-20160615-3.jar"
+    url: "https://repo1.maven.org/maven2/com/github/vbmacher/java-cup/11b-20160615-3/java-cup-11b-20160615-3.jar"
+    sha256: "b9e6f99a4c0d1b22866fc1d7b34600b250ac6966288f306c4f19270539ccc7b8"
+    why: "源码 import java_cup.* / java_cup.runtime.*：编译与运行都必须（随包提供）"
+
+patches: []

@@ -1,0 +1,45 @@
+# 版本级 manifest — jasmin-sable 2.5.0
+version: "2.5.0"
+software: "jasmin-sable"
+status: built
+build_date: "2026-10-08"
+build_system: javac
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/j/jasmin-sable/jasmin-sable_2.5.0.orig.tar.xz"
+  sha256: "14fc8d13ba0e89ec2a2b926f84b3b51e1be5b80f6f4e54a234b540a48edb9eba"
+  note: >-
+    Debian orig tarball。仓库含三处源码：`src/jasmin/`（汇编器本体，主类 `jasmin.Main`，
+    且 **`parser.java`/`sym.java` 已随源码提供**，无需重跑 java_cup 生成）、`lib/jas/src/**`
+    （同包附带的 jas 字节码库，被汇编器 `import jas.*` 使用）、`generated/scm/**`
+    （scm 自动生成类，**已随 tarball 提供**，无需跑 autogen 流程）。
+
+build:
+  system: javac
+  dependencies: []          # 无 Conan requires
+  build_time_jars:
+    - "java-cup-11b-20160615-3.jar（源码 import java_cup.* / java_cup.runtime.*）—— 编译期**与运行期**都需要，随包提供"
+  build_steps:
+    - "javac 编译 src + lib/jas/src + generated 三处（classpath 含 java-cup）"
+    - "jar 打包 → libexec/jasmin-sable-2.5.0.jar；java-cup jar 一并放入 libexec/"
+    - "生成 bin/jasmin 包装脚本（自带 classpath，指向 libexec 下两个 jar）"
+  jdk: "bishengjdk17（JAVA_HOME → ~/bishengjdk17 → PATH 三级解析）；上游 build.xml 用 source/target=1.5，本适配用 JDK 17 默认级别编译"
+
+patches_applied: []
+
+upstream_tests:
+  framework: none
+  test_sources: 0
+  test_command: ""
+  run_in_build: false
+  evidence: >-
+    包内**无测试套件**：`find -name "*Test*.java"` 为空；`lib/jas/tests/all.java` 是 lib/jas 的
+    示例程序而非测试框架；`build.xml` 也没有 test 目标 → 上游通过率记 **N/A**（如实披露，不虚构）。
+    验证由 test_package 承担：**真跑** —— 用打包后的 jar 汇编一段真实 `.jas`，再执行生成的类并断言输出。
+upstream_test_pass_rate: "N/A（上游无测试套件，如实披露）"
+adapted_test_pass_rate: "test_package/check_jasmin.py **4 项全部通过**（本地 conan create 实测，包创建成功；`checks=4 fails=0 skips=0 RESULT: PASS`）：①产物齐备（`bin/jasmin` 可执行 + `libexec/` 下 jasmin jar 与 **java-cup jar（运行期依赖随包提供）**）②jasmin jar 内含 `jasmin/Main.class`、`jasmin/parser.class`、`jas/ClassEnv.class`（主类与一并编译的 jas 包）③**端到端真跑**：`bin/jasmin Hello.jas` → 生成合法 `Hello.class`（magic `CAFEBABE`）→ `java Hello` 输出 **`JASMIN_OK`**（同时证明 java-cup 运行期可用、包装脚本 classpath 正确）④证据：jasmin jar 176202 B sha256=`1cd6637b…`、java-cup jar 124231 B sha256=`b9e6f99a…`、JDK=bishengjdk17"
+
+knowledge_gained:
+  - "**Java 包的“运行期依赖”容易漏**：本例汇编器源码直接 `import java_cup.*` → java-cup 不只是构建期依赖，**运行期也必须**；只把它当 build-dep 会让产物在运行时 NoClassDefFoundError。判据是看源码 import 与 `build.xml` 的 javac classpath，而不是看 Debian 的 Depends（Debian 用 ${java:Depends} 折算，看不到具体 jar）"
+  - "老 ant 工程可以不跑 ant：**若自动生成的源码（parser.java/sym.java、generated/scm/**）已随 tarball 提供**，直接用 javac 编译即可，省掉 cup/autogen 两段生成流程（本包即如此）"
+  - "多源码集工程要按 `build.xml` 的 `<src path>` 与源码实际 import 关系取集合：本包汇编器 `import jas.*` → 必须同时编译 `lib/jas/src`，否则缺类"
