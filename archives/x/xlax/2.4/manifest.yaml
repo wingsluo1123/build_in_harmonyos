@@ -1,0 +1,51 @@
+# 版本级 manifest — xlax 2.4
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "2.4"
+software: "xlax"
+
+# PR 阶段尚未由 release 流水线上传到制品仓，真实状态为 built
+status: built
+
+build_date: "2026-10-17"
+# 上游是 1992 年的 Imake 工程，OHOS 无 imake/xmkmf，recipe 直接用 profile
+# 工具链编制单一翻译单元（xmkmf 路线见 conanfile.py 文档串 / notes.md）
+build_system: custom
+
+# 源码信息
+source:
+  url: "https://hea-www.harvard.edu/~fine/Tech/xlax2.4.tar.gz"
+  sha256: "aae925379d15ccec6fa9f82b14096d14613c9d342820e515aa61052bbe9ad2dc"
+  tar_format: tar.gz
+
+# 构建配置
+build:
+  system: custom
+  configure_options:
+    - "$CC -std=gnu17 -O2 -Wall -Wno-unused-result"
+    - "-I<dep>/include (aggregated from the Conan host graph)"
+    - "-lXaw7 -lXmu -lXt -lX11 -lXext -lXpm -lm"
+  dependencies:
+    - libxaw/1.0.14
+    - libxmu/1.3.1.1
+    - libxt/1.3.1
+    - libx11/1.8.13
+    - libxext/6.4.0.1
+    - libxpm/3.5.17
+    - xorgproto/2025.1
+  cc: clang
+  cxx: clang++
+
+# 补丁信息
+patches_applied:
+  - "0001-fix-warnings.patch"
+  - "0002-ansi-prototypes.patch"
+  - "0003-headless-selftest.patch"
+
+# 知识沉淀
+knowledge_gained:
+  - "Imake 工程在 OHOS 上不可用（无 imake/xmkmf）：XawClientLibs 展开为 Xaw Xmu Xt X11，直接编译单一 xlax.c 即可（ref: E1200）"
+  - "Debian 的 fix-warnings.diff 是在 typos/use-libbsd 之后生成的，行号带偏移；Conan 2.29 用内置 patch_ng 精确匹配，必须按依赖顺序用 GNU patch 重算补丁（ref: E1083）"
+  - "libxaw/1.0.14 与 libxmu/1.3.1.1 用 force=True 钉 libx11/1.8.13，会把 libxext/libxpm 的 package_id 从 libx11/6.4 配置翻到 1.8 配置（minor_mode），制品仓只有 6.4 配置的二进制（ref: E1419）"
+  - "OHOS 6.0 的 musl 已提供 strlcpy/strlcat（`nm -D /lib/ld-musl-aarch64.so.1` 可见 `T strlcpy`/`T strlcat`，实测 strlcpy 返回 src 全长 10、strlcat 返回 8，符合 OpenBSD 语义），因此 Debian 的 use-libbsd.diff 不需要，链接也不含 libbsd（实测反驳 ref: E1993，该条目称 musl 至今无此二函数）"
+  - "HarmonyOS PC 无 X server：适配增加 --version/--selftest 无头入口，在 XtAppInitialize() 之前返回（ref: E637）"
