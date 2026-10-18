@@ -1,0 +1,67 @@
+software: vbindiff
+version: "3.0-beta5"
+status: built
+build_date: "2026-10-13"
+build_system: autotools
+source:
+  url: "https://archive.ubuntu.com/ubuntu/pool/universe/v/vbindiff/vbindiff_3.0-beta5.orig.tar.gz"
+  sha256: "f04da97de993caf8b068dcb57f9de5a4e7e9641dc6c47f79b60b8138259133b8"
+  tar_format: tar.gz
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=/"
+    - "--bindir=${prefix}/bin"
+    - "--sbindir=${prefix}/bin"
+    - "--libdir=${prefix}/lib"
+    - "--includedir=${prefix}/include"
+    - "--oldincludedir=${prefix}/include"
+    - "CPPFLAGS=-I<ncurses package_folder>/include"
+    - "LIBS=-L<ncurses package_folder>/lib -lformw -lmenuw -lpanelw -lncursesw"
+  dependencies:
+    - "ncurses/6.6"
+  cc: clang
+  cxx: clang++
+  compiler_executables_note: "framework profile ci/conan/profiles/ohos-aarch64 resolves clang/clang++/bash under /data/service/hnp/bin, which does not exist on the current device; the real-device create below therefore used an out-of-repo content copy of the #15461 profile passed through the official CLI --profile entry point; see notes.md section 4"
+patches_applied: []
+test_results:
+  type: not_executed
+  total: 0
+  passed: 0
+  failed: 0
+test_ledger:
+  upstream_static_declared: 0
+  upstream_registered: 0
+  upstream_executed: 0
+  upstream_not_executed_reason: "0 cases exist upstream: the check entry point really ran (RUN: make check -j1, 2026-10-13 15:33) and returned trivially, no TESTS variable and no test program"
+  consumer_assertions_designed: 7
+  consumer_assertions_executed: 7
+knowledge_ref:
+  - "DRAFT-E690-content-encoding-x-gzip-conan-decode-two-faced-sha256"
+  - "E718-opt-3.19-dead-upstream-pool-four-source-pf7"
+notes: |
+  - 本地 G2/W3 以仓库外 profile 内容副本通过；官方默认管线（仓库 ci/conan/profiles/ohos-aarch64
+    sha 7ebd43d28468fe5795bd149ccf81b42429eb5ef63965914388eea2e9d711b793 的 /data/service/hnp
+    路径本机不存在）仍红。副本 sha256 67404bc17c0beae386d56bcae21d9002388e095e82210e2f8d02a886891ff19e，来源 #15461
+    head 1f9ac70298a59d6bb5c6722558262121b46f4ecc；该验证 view 与其 profile 不入库、不推送、不混入本 PR。
+  - r22（2026-10-17 14:14-14:18，实机）在显式验证 view（HEAD 516ce56ed3f4b782494daaaaf86b6668f0b66662）上
+    官方 conan-verify RC=0（G0-G4 PASS）+ 官方 finish built step[5/10] W3 本地 CI 模拟首次通过：
+    .ci-result.json exit_code=0，log_sha256 13309059b357c3822d52cee63db94d66f2d034a004c9c8e0a9b94847369b9e73，真编译非缓存。
+  - r23（本轮，2026-10-17）在**实际最终 tip** 上机械复跑同一对官方命令取新绑定读数；新绑定的
+    .ci-result.json / reports/w3-local-ci.log / reports/conan-verify-report.md 的 sha256 记于本地 reports/
+    （按 .gitignore 属本地留盘证据，不入库）与 STATE-r23、README-audit-r23，供独立 W4 逐字核对；
+    未过独立审计不发布。
+  - real-device create produced package revision a455d3abbd7f30b1fdfe109703f86f11
+    (package id 5451db01063ffef70a6f03c02395d1808faeb5e5) at 2026-10-13 15:33; the
+    conan-verify at 19:10 reused that cached package and turned the consumer layer green
+    (passed=7 failed=0, VERIFY_RC=0).
+  - build_date records the date of the real-device create that produced the package.
+  - Upstream 3.0_beta5 release tarball ships configure and Makefile.in and registers no
+    automated test cases, so the upstream counts above are 0 by measurement, not by
+    assumption (notes.md section 3 lists the counted registration patterns).
+  - The archive is the Ubuntu pool .orig payload, byte-identical to the upstream cjmweb
+    payload; the file-face sha256 f04da97d... is what conan stores, because this host does
+    not declare Content-Encoding: gzip (notes.md section 2).
+  - The published ncurses/6.6 package ships only wide library names, so the recipe passes
+    -lformw -lmenuw -lpanelw -lncursesw as a configure variable instead of letting
+    upstream probe the non-wide names.
