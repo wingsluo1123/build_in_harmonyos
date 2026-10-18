@@ -1,0 +1,61 @@
+# 版本级 manifest — kpeople 6.28.0
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "6.28.0"
+software: kpeople
+status: built
+build_date: "2026-10-16"
+build_system: cmake
+conan_ref: "kpeople/6.28.0"
+
+source:
+  url: "https://download.kde.org/stable/frameworks/6.28/kpeople-6.28.0.tar.xz"
+  sha256: "a5bcf11a6cbca46d4bf83399fe9c0c3c9aaf228be81b05ba966a4ba51256fd0a"
+  tar_format: tar.xz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DBUILD_TESTING=ON"
+    - "-DBUILD_QCH=OFF"
+    - "-DENABLE_EXAMPLES=OFF"
+    - "-DUSE_DBUS=OFF"
+    - "-DKF_IGNORE_PLATFORM_CHECK=TRUE"
+    - "-DKF_SKIP_PO_PROCESSING=ON"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DCMAKE_PLATFORM_NO_VERSIONED_SONAME=ON"
+  dependencies:
+    - qtbase-sql-dbus/6.11.1
+    - qtdeclarative/6.11.1
+    - kcoreaddons/6.18.0
+    - kwidgetsaddons/6.18.0
+    - ki18n/6.18.0
+    - kitemviews/6.18.0
+    - kcontacts/6.18.0
+    - ecm/6.26.0
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "patches/0001-CMakeLists.txt.patch"
+
+knowledge_gained:
+  - category: L1
+    content: "CMake 平台模块事实：以 CMAKE_SYSTEM_NAME=OHOS 配置时，SDK/CMake 携带的 Platform/OHOS.cmake 全文即 include(Platform/Linux)，UNIX 变量为真——任何按 UNIX/LINUX 推导平台能力默认值的上游逻辑都会在 OHOS 上被误触发（E622 平台事实，本包从『能力默认自动打开』一侧再次实测）。"
+    reason: "平台真理；USE_DBUS 被误开的直接根因"
+  - category: L2
+    content: "kpeople 6.28.0 顶层 CMakeLists.txt:33-43 按 UNIX 默认把 USE_DBUS 置 ON；HAVE_QTDBUS=1 后 PersonManager 把合并通知改经 QDBusConnection::sessionBus() 回环广播（personmanager.cpp 67-80 / 219-239），而 PersonsModel 只连本地信号（personsmodel.cpp:95-96）——无会话总线设备上 send() 静默失败：数据库事务已提交、内存模型不刷新（personsmodeltest mergeContacts QTRY rowCount 4 vs 3 → 后续 QFATAL 崩溃循环）。修复：配方钉 tc.variables[\"USE_DBUS\"]=\"OFF\" 走进程内信号路径（KF5 姊妹包 kpeople5 同口径），修复后 3 目标 10/10 用例全绿。"
+    reason: "模式经验（KF6 option(USE_DBUS) 家族 / 通知回环设计通用）；已沉淀草稿 DRAFT-cmake-ohos-unix-true-dbus-auto-enable-signal-loss"
+  - category: L2
+    content: "Conan 2.29.1 的 CMakeToolchain.cache_variables 只写入 generators/CMakePresets.json 的 cacheVariables 段；凡不走 --preset、以手工 -DCMAKE_TOOLCHAIN_FILE 配置的配方（本包为注入 CMAKE_USER_MAKE_RULES_OVERRIDE 而手工配置）都看不到它——变量必须放 toolchain.variables（写进 conan_toolchain.cmake 成为 cache 条目），否则静默丢失（CMakeCache 无该键）。本次 CMAKE_PLATFORM_NO_VERSIONED_SONAME 因此晚了四个构建轮次才生效。"
+    reason: "模式经验；与 E622 记录的子工程陷阱是同一底层机制的主工程手工配置场景"
+  - category: L2
+    content: "KF6 版本墙：kpeople 6.28.0 钉 KF_DEP_VERSION=6.28.0 且 find_package(ECM 6.28.0)，而制品仓基线为 6.18.0 家族（kcontacts 链）+ ECM 6.26.0；补丁 0001 把两处门槛下调到基线并删除 ki18n_install(po)（无 Qt Linguist 工具；kcontacts 6.18.0 先例）。影响面仅构建期版本门槛与语言目录安装，不改运行时代码。"
+    reason: "模式经验（KF6 顶层组件对制品仓基线降级；kcontacts/ksvg 先例）"
+  - category: L1
+    content: "HMDFS 用户卷拒符号链接（EPERM），CMake 默认的版本化库符号链接链无法建立；CMAKE_PLATFORM_NO_VERSIONED_SONAME=ON + 经 CMAKE_USER_MAKE_RULES_OVERRIDE_C/CXX 注入显式 -Wl,-soname/-rpath 只产出单个 libKF6People.so，DT_SONAME 真实在位、消费者 DT_NEEDED 记录可重定位名（test_package 的 test_ohos_soname 执行器对打包产物实测）。"
+    reason: "平台真理（任何共享库适配通用）"
+  - category: L1
+    content: "OHOS 上 QTest 进程 fatal 后进入崩溃报告循环（同一信号反复重放、不响应 TERM），无 --timeout 的 ctest 永久挂死；上游测试统一以 ctest --output-on-failure --no-tests=error --timeout 300 执行，把挂死转换成失败（本包修复前 personsmodeltest QFATAL 实测）。"
+    reason: "平台真理（任何在设备上跑 QTest/ctest 的适配通用）"
