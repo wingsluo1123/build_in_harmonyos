@@ -1,0 +1,39 @@
+# 软件级 manifest — indi-apogee
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: indi-apogee
+display: "INDI Apogee"
+description: "INDI 驱动：Apogee（阿普奇）CCD 相机（indi_apogee_ccd）与独立滤光轮（indi_apogee_wheel）"
+category: system
+homepage: "https://github.com/indilib/indi-3rdparty"
+license: LGPL-2.1-or-later
+build_system: cmake
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "驱动源码里没有 main()：入口由 libindi 的 libs/indibase/indidrivermain.c 提供并编进 libindidriver。该 main 只认 -v，随后阻塞读 stdin，stdin EOF 即 exit(1)——所以退出码/`-v` 都不是有效探针，正确探针是往 stdin 喂 `<getProperties version=\"1.7\"/>` 再看 stdout 里的 `<def...>`"
+    - "要区分『驱动自己声明的属性』与『从 libindi 基类继承的属性』：前者用裸 C 结构体，libindi 2.2.2 仍完整保留该 C API（无需改动）；后者（INDI::CCD::TemperatureNP、INDI::FilterInterface::FilterSlotNP/FilterNameTP）在 2.x 已是 INDI::PropertyNumber/PropertyText 对象且旧名被删除，必须做属性 API 迁移"
+    - "libapogee3 的 cpp_info.includedirs 是 include/libapogee（其公有头互相扁平 include），而上游源码写 `#include <libapogee/Xxx.h>`；交叉环境必须显式补 `-I<libapogee3>/include`"
+    - "INDI_DATA_DIR 必须显式钉住：FindINDI.cmake 靠 find_path(drivers.xml PATH_SUFFIXES share/indi) 推导，而制品仓的 libindi 不装 drivers.xml，否则 install(FILES xxx.xml) 会落进名为 INDI_DATA_DIR-NOTFOUND 的目录"
+    - "CMAKE_POLICY_VERSION_MINIMUM=3.5 必须走 configure 命令行 -D（cache 变量）：工具链文件到 project() 才由 CMake 加载，晚于 CMakeLists.txt:1 的 cmake_minimum_required，写进 toolchain 无效"
+    - "产物 bin/indi_apogee_ccd、bin/indi_apogee_wheel 需 llvm-objcopy 剥 .codesign 段 + binary-sign-tool sign -selfSign 1 自签，否则真机执行报 Operation not permitted（E077）"
+    - "产物动态链接依赖的共享库（真机实测缺的是 libindidriver.so.2、libindiAlignmentDriver.so.2）。运行期**光把依赖包的 libdir 挂进 LD_LIBRARY_PATH 不管用**：HMDFS 上未签名（或签名失效）的 OHOS 共享库无法 mmap(PROT_EXEC)，依赖 libdir 里那批 .so 都没有效签名，loader 只会更早撞上坏候选，报 'Error loading shared library <so>: (needed by ...)'（**不带 errno**，极易误诊成路径问题）。可行做法是**自包含 staging**：把产物二进制与全部依赖 .so 的已重签副本放进同一目录（llvm-objcopy 剥 .codesign + binary-sign-tool -selfSign 1 + chmod 0755），再由脚本用显式冒号把该目录**前置**到 LD_LIBRARY_PATH —— 不要用 conan 的 Environment.append（追加会排在坏 libdir 之后，且实测拼出过冒号后带空格的无效条目）。staging 建在仓库树外 ~/.cache/。另注：libindi / libapogee3 两个上游配方不签自己的 .so"
+    - "无真实 Apogee 硬件：test_package 只做 INDI 协议层往返（喂 getProperties 看是否回出属性定义），不连接设备"
+  common_dependencies:
+    - libindi
+    - libapogee3
+    - cfitsio
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "1.9-20221223184417":
+    status: built
+    build_date: "2026-10-03"
+    conan_ref: "indi-apogee/1.9-20221223184417"
