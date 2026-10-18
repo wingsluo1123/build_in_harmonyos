@@ -92,5 +92,5 @@ conan create archives/s/sra-sdk/3.2.1 \
 - 测试数据在源码树内（`test/` 约 172MB）；`SlowTest_*` 需要访问 NCBI SRA 网络数据。
 ---
 
-**编译结束**: 2026-10-18 21:18
+**编译结束**: 2026-10-18 21:38
 **最终状态**: built
