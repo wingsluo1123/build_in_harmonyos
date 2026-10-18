@@ -1,0 +1,64 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: patch <patch@local>
+Date: Sun, 18 Oct 2026 12:03:17 +0800
+Subject: [PATCH 3/3] 0003 dclib-color: support musl const stdout/stderr
+ reassignment
+
+---
+ dclib/dclib-color.c | 19 +++++++++++++++----
+ 1 file changed, 15 insertions(+), 4 deletions(-)
+
+diff --git a/dclib/dclib-color.c b/dclib/dclib-color.c
+index 3d1654b..7a34d75 100644
+--- a/dclib/dclib-color.c
++++ b/dclib/dclib-color.c
+@@ -2706,6 +2706,16 @@ void CloseStdLog()
+     SetupStdMsg();
+ }
+ 
++///////////////////////////////////////////////////////////////////////////////
++
++static void set_std_stream ( FILE *const *dest, FILE *f )
++{
++    // musl based libcs (OpenHarmony) declare stdout/stderr as 'FILE *const'.
++    // WIT's log redirection needs to reassign them, so write through
++    // the const qualified pointer (the underlying storage is writable).
++    *(FILE **)dest = f;
++}
++
+ ///////////////////////////////////////////////////////////////////////////////
+ ///////////////////////////////////////////////////////////////////////////////
+ 
+@@ -2739,8 +2749,8 @@ void RestoreStdFiles ( SavedStdFiles_t *ssf )
+ {
+     DASSERT(ssf);
+ 
+-    stdout = ssf->std_out;
+-    stderr = ssf->std_err;
++    set_std_stream(&stdout, ssf->std_out);
++    set_std_stream(&stderr, ssf->std_err);
+     stdlog = ssf->std_log;
+     stdmsg = ssf->std_msg;
+     stdwrn = ssf->std_wrn;
+@@ -2768,7 +2778,8 @@ void RedirectStdFiles
+     if (ssf)
+ 	SaveStdFiles(ssf);
+ 
+-    stdout = stdwrn = stdmsg = f;
++    stdmsg = stdwrn = f;
++    set_std_stream(&stdout, f);
+     colout = colwrn = colmsg = colset ? colset : GetFileColorSet(f);
+ 
+     // special handling for stdlog
+@@ -2780,7 +2791,7 @@ void RedirectStdFiles
+ 
+     if (err_too)
+     {
+-	stderr = stdout;
++	set_std_stream(&stderr, stdout);
+ 	colerr = colout;
+     }
+ }
+-- 
+2.34.1
+

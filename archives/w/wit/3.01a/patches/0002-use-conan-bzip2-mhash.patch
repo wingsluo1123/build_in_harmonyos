@@ -1,0 +1,172 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: patch <patch@local>
+Date: Sun, 18 Oct 2026 11:56:46 +0800
+Subject: [PATCH 2/3] 0002 use conan bzip2 and mhash
+
+---
+ Makefile            |  7 ++++---
+ src/crypt.h         |  3 ++-
+ src/iso-interface.c | 12 +++++++-----
+ src/lib-bzip2.c     |  3 +--
+ src/wit-sha1.c      | 41 +++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 55 insertions(+), 11 deletions(-)
+ create mode 100644 src/wit-sha1.c
+
+diff --git a/Makefile b/Makefile
+index b66a8b8..6a03476 100644
+--- a/Makefile
++++ b/Makefile
+@@ -207,7 +207,7 @@ endif
+ 
+ # lib summary
+ LIB_LIST	+= libbz2 lzma
+-LIB_OBJECTS	+= $(LIBBZ2_OBJ) $(LZMA_OBJ)
++LIB_OBJECTS	+= $(LZMA_OBJ)
+ RM_FILES	+= $(foreach l,$(LIB_LIST),src/$(l)/*.{d,o})
+ 
+ 
+@@ -251,7 +251,7 @@ WIT_O		:= lib-std.o lib-file.o lib-sf.o \
+ 		   lib-wdf.o lib-wia.o lib-ciso.o lib-gcz.o \
+ 		   iso-interface.o wbfs-interface.o patch.o \
+ 		   titles.o match-pattern.o dclib-utf8.o \
+-		   sha1dgst.o sha1_one.o \
++		   wit-sha1.o \
+ 		   $(DCLIB_O)
+ 
+ LIBWBFS_O	:= tools.o file-formats.o libwbfs.o wiidisc.o cert.o rijndael.o
+@@ -264,7 +264,7 @@ endif
+ UI_OBJECTS	:= $(sort $(MAIN_TOOLS_OBJ))
+ #C_OBJECTS	:= $(sort $(OTHER_TOOLS_OBJ) $(WIT_O) $(LIBWBFS_O) $(LZMA_O) $(TOBJ_ALL))
+ C_OBJECTS	:= $(sort $(OTHER_TOOLS_OBJ) $(WIT_O) $(LIBWBFS_O) $(TOBJ_ALL))
+-ASM_OBJECTS	:= ssl-asm.o
++ASM_OBJECTS	:=
+ 
+ # all objects + sources
+ #ALL_OBJECTS	= $(sort $(WIT_O) $(LIBWBFS_O) $(LZMA_O) $(ASM_OBJECTS) $(LIB_OBJECTS))
+@@ -316,6 +316,7 @@ ifeq ($(HAVE_ZLIB),1)
+  LIBS		+= -lz
+ endif
+ LIBS		+= -lm $(XLIBS)
++LIBS		+= -lbz2 -lmhash
+ 
+ DISTRIB_RM	= ./wit-v$(VERSION)-r
+ DISTRIB_BASE	= wit-v$(VERSION)-r$(REVISION_NEXT)
+diff --git a/src/crypt.h b/src/crypt.h
+index 729907b..c6d6ad2 100644
+--- a/src/crypt.h
++++ b/src/crypt.h
+@@ -37,7 +37,8 @@
+ #ifndef WIT_CRYPT_H
+ #define WIT_CRYPT_H 1
+ 
+-#include "crypto/wit-sha.h"
++//#include "crypto/wit-sha.h"
++unsigned char *WIT_SHA1(const unsigned char *d, size_t n, unsigned char *md);
+ #define SHA1 WIT_SHA1
+ 
+ // random functions
+diff --git a/src/iso-interface.c b/src/iso-interface.c
+index bab973e..39b40ac 100644
+--- a/src/iso-interface.c
++++ b/src/iso-interface.c
+@@ -52,6 +52,8 @@
+ #include "dirent.h"
+ #include "crypt.h"
+ 
++#include <mutils/mhash.h>
++
+ //
+ ///////////////////////////////////////////////////////////////////////////////
+ ///////////////			 dump helpers			///////////////
+@@ -5776,11 +5778,11 @@ enumError Skeletonize
+     const enumOFT oft = CalcOFT(output_file_type,0,0,OFT__WDF_DEF);
+ 
+     {
+-	WIT_SHA_CTX ctx;
+-	if (!WIT_SHA1_Init(&ctx))
++	MHASH td;
++	if ((td = mhash_init(MHASH_SHA1)) == MHASH_FAILED)
+ 	{
+ 	    ASSERT(0);
+-	    exit(0);
++	    exit(1);
+ 	}
+ 
+ 	int i;
+@@ -5788,10 +5790,10 @@ enumError Skeletonize
+ 	{
+ 	    wd_memmap_item_t * mi = mm.item + i;
+ 	    noPRINT("### %p %9llx %6llx\n",mi->data,mi->offset,mi->size);
+-	    WIT_SHA1_Update(&ctx,mi->data,mi->size);
++	    mhash(td, mi->data, mi->size);
+ 	}
+ 	u8 h[WII_HASH_SIZE];
+-	WIT_SHA1_Final(h,&ctx);
++	mhash_deinit(td, h);
+ 
+ 	snprintf(fname,sizeof(fname),
+ 		"%s/%.6s-%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x"
+diff --git a/src/lib-bzip2.c b/src/lib-bzip2.c
+index d22cc41..d700e2b 100644
+--- a/src/lib-bzip2.c
++++ b/src/lib-bzip2.c
+@@ -40,8 +40,7 @@
+   #ifndef NO_BZIP2
+ /******************/
+ 
+-//#include <bzlib.h>
+-#include "libbz2/bzlib.h"
++#include <bzlib.h>
+ #include "lib-bzip2.h"
+ 
+ /************************************************************************
+diff --git a/src/wit-sha1.c b/src/wit-sha1.c
+new file mode 100644
+index 0000000..d59d358
+--- /dev/null
++++ b/src/wit-sha1.c
+@@ -0,0 +1,41 @@
++#include <stdio.h>
++#include <string.h>
++#include <mhash.h>
++
++#if 0
++#include <openssl/sha.h>
++unsigned char *WIT_SHA1_ssl(const unsigned char *d, size_t n, unsigned char *md)
++{
++        SHA_CTX c;
++        static unsigned char m[20];
++
++        if (md == NULL) md=m;
++        if (!SHA1_Init(&c))
++                return NULL;
++        SHA1_Update(&c,d,n);
++        SHA1_Final(md,&c);
++        return(md);
++}
++#endif
++
++unsigned char *WIT_SHA1(const unsigned char *d, size_t n, unsigned char *md)
++{
++	MHASH td;
++	if ((td = mhash_init(MHASH_SHA1)) == MHASH_FAILED)
++		return NULL;
++	mhash(td, d, n);
++	mhash_deinit(td, md);
++	return(md);
++}
++
++#if 0
++int main() {
++	char *bleh = "22:40 → fritz09 [~Adium@port-5452.pppoe.wtnet.de] has joined #29c3";
++	char md[1024] = { 0 };
++	WIT_SHA1(bleh, strlen(bleh), md);
++	printf("md = %s\n", md);
++	memset(md, '\0', sizeof(md));
++	WIT_SHA1_ssl(bleh, strlen(bleh), md);
++	printf("md = %s\n", md);
++}
++#endif
+-- 
+2.34.1
+
