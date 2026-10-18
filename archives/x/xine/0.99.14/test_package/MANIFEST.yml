@@ -1,0 +1,123 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: xine/0.99.14
+homepage: "https://sourceforge.net/projects/xine/"
+
+# 上游测试命令 (用于 make -n check 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "make -j1 -C src/xitk session_ctrl"
+
+# ─────────────────────────────────────────────────────────────────────
+# 上游测试清点（证据：reports/test-report.md §1/§2）
+#
+#   * 自动化测试套件：0 个 —— `make check` 在全部 20 个递归 check 目录中
+#     均为 "Nothing to be done for 'check'"；无 TESTS=、无 check_PROGRAMS、
+#     无 ctest/pytest 入口。
+#
+#   * 计数口径（与 reports/test-report.md、PR 正文完全一致）：
+#       上游入口（程序级，清点）  = 10  = 实测程序 4 + 不适用入口 6
+#                                    （本文件 upstream_tests 恰为 10 个条目）
+#       实测程序                  = 4   (xine / xine-check / xine-bugreport / session_ctrl)
+#       实测用例调用（执行次数）  = 9   (xine 5 + xine-check 1 + xine-bugreport 1 + session_ctrl 2)
+#       不适用入口                = 6   (test / xine-remote / fbxine / aaxine / cacaxine / dfbxine)
+# ─────────────────────────────────────────────────────────────────────
+upstream_tests:
+  - file: src/xitk/main.c
+    source: xine-ui-0.99.14/src/xitk/main.c
+    description: "xine (bin_PROGRAMS): X11 前端主程序，无显示环境下驱动 keymap 发射器与用户配置加载器"
+    command: "xine --version | --help | --keymap=default | --keymap=remapped | --keymap=lirc"
+    cases: 5
+    applicable: true
+    result: "PASS（5 次调用全部按上游设计 rc=1 退出并产出确定输出；见 test.sh A/B 组）"
+    log: "reports/test-report.md"
+  - file: misc/xine-check.sh.in
+    source: xine-ui-0.99.14/misc/xine-check.sh.in
+    description: "xine-check (bin_SCRIPTS, 由 build-xine-check.pl 生成): 系统诊断脚本"
+    command: "xine-check"
+    cases: 1
+    applicable: true
+    result: "PASS rc=0，44 行报告；无 DISPLAY 时跳过 X 项并继续（test.sh D 组）"
+    log: "reports/test-report.md"
+  - file: misc/Makefile.am
+    source: xine-ui-0.99.14/misc/Makefile.am
+    description: "xine-bugreport (bin_SCRIPTS, xine-check 的副本): 交互式缺陷报告生成器"
+    command: "xine-bugreport"
+    cases: 1
+    applicable: true
+    result: "实测运行至 'please select (1..16):' 交互提示，420s 内不自行结束（timeout rc=124，产出 2468 行）；故不纳入自动化用例"
+    log: "reports/test-report.md"
+  - file: src/xitk/ctrl_test.c
+    source: xine-ui-0.99.14/src/xitk/ctrl_test.c
+    description: "session_ctrl (EXTRA_PROGRAMS): 会话远程控制客户端测试程序"
+    command: "make -j1 -C src/xitk session_ctrl && src/xitk/session_ctrl 0"
+    cases: 2
+    applicable: true
+    result: "构建 PASS（OHOS 交叉编译通过，27008 字节 ELF）；运行尝试 rc=159 —— ctrl_test.c:38 调用的 connect_to_session()（定义在 session_common.c:51，setreuid() 在其 :68）无条件调用 setreuid()，OHOS 系统调用策略以 SIGSYS 终止进程，故配方只编译不执行"
+    log: "reports/test-report.md"
+  - file: src/xitk/xine-toolkit/test.c
+    source: xine-ui-0.99.14/src/xitk/xine-toolkit/test.c
+    description: "test (EXTRA_PROGRAMS): xitk 控件画廊"
+    command: "make -j1 -C src/xitk/xine-toolkit test"
+    cases: 0
+    applicable: false
+    reason: "上游自身腐化：Makefile.am 未给该目标任何 Imlib 头路径，test.c 使用本 tarball 中已不存在的 xitk/Imlib 接口（ImlibData、xitk_get_key_modifier、XITK_WIDGET_LIST_GC 等 20 个 error），且在 Linux 上同样编不过；此外它需要真实 X display 才能运行"
+    log: "reports/test-report.md"
+  - file: src/xitk/network.c
+    source: xine-ui-0.99.14/src/xitk/network.c
+    description: "xine-remote (bin_PROGRAMS, 条件 HAVE_READLINE): 远程控制 REPL 客户端"
+    command: "./configure --with-readline"
+    cases: 0
+    applicable: false
+    reason: "m4/readline.m4 的 AC_CHECK_READLINE 只遍历硬编码前缀（/usr/include、/usr/local/include 等），不查 CPPFLAGS/LDFLAGS，故看不到 Conan 的 readline/8.3；其后续 ncurses 探测只试 -lncurses，而 OHOS ncurses 仅发布 libncursesw.a（无 libncurses/libtinfo）→ configure 输出 'readline.h... not found / no readline found, xine network interface will be disabled'"
+    log: "reports/test-report.md"
+  - file: src/fb/main.c
+    source: xine-ui-0.99.14/src/fb/main.c
+    description: "fbxine (bin_PROGRAMS, 条件 HAVE_FB): framebuffer 前端"
+    command: "./configure --without-fb"
+    cases: 0
+    applicable: false
+    reason: "src/fb/keys.c 使用 pthread_cancel()/pthread_testcancel()，OHOS libc 未提供（独立链接探针证实 undefined symbol），且鸿蒙 PC 无 framebuffer 控制台 → 配方显式 --without-fb"
+    log: "reports/test-report.md"
+  - file: src/aaui/main.c
+    source: xine-ui-0.99.14/src/aaui/main.c
+    description: "aaxine (bin_PROGRAMS, 条件 HAVE_AA): AAlib 字符画前端"
+    command: "./configure (AM_PATH_AALIB)"
+    cases: 0
+    applicable: false
+    reason: "AM_PATH_AALIB 依赖 aalib-config|aainfo 探测，图中虽有 aalib/1.4p5 但 configure 输出 'checking for aalib-config... no' → HAVE_AA 未定义；字符画前端非核心播放路径，不在本次适配范围"
+    log: "reports/test-report.md"
+  - file: src/aaui/main.c
+    source: xine-ui-0.99.14/src/aaui/main.c
+    description: "cacaxine (bin_PROGRAMS, 条件 HAVE_CACA): libcaca 字符画前端"
+    command: "pkg-config caca"
+    cases: 0
+    applicable: false
+    reason: "libcaca 未发布到制品仓（'checking for caca >= 0.99beta19... no'，'checking for caca cucul... no'）"
+    log: "reports/test-report.md"
+  - file: src/dfb/main.c
+    source: xine-ui-0.99.14/src/dfb/main.c
+    description: "dfbxine (bin_PROGRAMS, 条件 HAVE_DIRECTFB): DirectFB 前端"
+    command: "pkg-config directfb"
+    cases: 0
+    applicable: false
+    reason: "directfb 未发布到制品仓，且上游在 configure.ac 的可选依赖开关块中将其与 fonts 安装一同关闭；鸿蒙 PC 亦无 DirectFB 图形栈"
+
+# test_package 中自带的测试 (消费者视角验证)
+# R34: 必须实质调用被测包的二进制
+test_package_tests:
+  - file: test.sh
+    description: "端到端消费者测试：打包 xine 二进制的身份/用法、keymap 导出→安装为 ~/.xine/keymap→再导出的字节级闭环、lirc 跨格式一致性、桌面/mime/man 数据完整性（补丁生效验证）、xine-check 在 HarmonyOS 上的无显示诊断（27 项断言，含 3 个鸿蒙特有消费者用例）"
+    command: "bash test.sh"
+    assertions: 27
+    ohos_specific_cases: 3
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 27
+# 鸿蒙特有用例数（>=1 契约）
+ohos_specific_cases: 3

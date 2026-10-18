@@ -1,0 +1,253 @@
+xine 0.99.14（上游项目 xine-ui）—— 上游测试用例普查证据（R51 / 规则 4「不得少报」）
+==============================================================================
+生成时间: 2026-10-17（本文件由本次适配的实测记录汇编，所有命令与输出均为原样摘录）
+源码基线: xine-ui-0.99.14.tar.xz，sha256 d4d490d5cece70e2bb9849c9e482f2cf87af0302d451b614476fdcc3642cd9c3
+           解包后未修改副本 = /data/storage/el2/base/files/home/.tmp/builds/xine-ui-0.99.14.orig
+构建副本  : /data/storage/el2/base/files/home/.tmp/builds/xine-ui-0.99.14.work（就地构建、已打 5 个补丁）
+
+结论口径（与 test_package/MANIFEST.yml、reports/test-report.md、notes.md、
+archives/x/xine/README.md、reports/pr-body.md 完全一致）：
+  上游自动化测试用例 = 0；可验证行为全部落在「程序级入口」，共 10 个入口，
+  其中实测 4 个（9 次调用）、判定不适用 6 个（各附根因，见 §E/§F 与 test-report.md §2.5–2.10）。
+
+------------------------------------------------------------------------------
+§A. 是否存在自动化测试套件 —— automake 测试声明普查
+------------------------------------------------------------------------------
+$ find . -name Makefile.am | wc -l
+  18          # tarball 自带 Makefile.am 总数
+
+$ grep -rnE 'TESTS=|check_PROGRAMS' --include=Makefile.am .
+  <无输出，grep rc=1 —— 0 命中：没有任何目录向 automake 注册测试>
+
+$ grep -rnE 'add_test\(|enable_testing\(' .   # ctest 路线
+  <无输出，rc=1 —— 非 CMake 工程，无 ctest>
+$ find . -name pytest.ini -o -name setup.cfg -o -name tox.ini -o -name conftest.py
+  <无输出，rc=0 —— 无 pytest/tox 工程>
+$ find . -type d -name workflows -o -name .gitlab-ci.yml -o -name configure.ac.orig
+  <无输出，rc=0 —— tarball 内不带 CI workflow>
+
+=> 上游 xine-ui 0.99.14 无任何自动化测试套件：无 TESTS=、无 check_PROGRAMS、
+   无 ctest/pytest/tox、tarball 内不带 CI workflow。因此「上游测试用例数」的
+   非零分母只能由程序级入口给出（§C），而不是伪造为 0 后跳过验证。
+
+------------------------------------------------------------------------------
+§B. `make check` 全量递归输出（原文，94 行）
+------------------------------------------------------------------------------
+$ make check          # 在已 configure 的构建副本里执行，rc=0
+
+Making check in doc
+make[1]: Entering directory '<WORK>/doc'
+Making check in man
+make[2]: Entering directory '<WORK>/doc/man'
+Making check in de
+make[3]: Entering directory '<WORK>/doc/man/de'
+make[3]: Nothing to be done for 'check'.
+make[3]: Leaving directory '<WORK>/doc/man/de'
+Making check in en
+make[3]: Entering directory '<WORK>/doc/man/en'
+make[3]: Nothing to be done for 'check'.
+make[3]: Leaving directory '<WORK>/doc/man/en'
+Making check in es
+make[3]: Entering directory '<WORK>/doc/man/es'
+make[3]: Nothing to be done for 'check'.
+make[3]: Leaving directory '<WORK>/doc/man/es'
+Making check in fr
+make[3]: Entering directory '<WORK>/doc/man/fr'
+make[3]: Nothing to be done for 'check'.
+make[3]: Leaving directory '<WORK>/doc/man/fr'
+Making check in nl
+make[3]: Entering directory '<WORK>/doc/man/nl'
+make[3]: Nothing to be done for 'check'.
+make[3]: Leaving directory '<WORK>/doc/man/nl'
+Making check in pl
+make[3]: Entering directory '<WORK>/doc/man/pl'
+make[3]: Nothing to be done for 'check'.
+make[3]: Leaving directory '<WORK>/doc/man/pl'
+make[3]: Entering directory '<WORK>/doc/man'
+make[3]: Nothing to be done for 'check-am'.
+make[3]: Leaving directory '<WORK>/doc/man'
+make[2]: Leaving directory '<WORK>/doc/man'
+make[2]: Entering directory '<WORK>/doc'
+make[2]: Nothing to be done for 'check-am'.
+make[2]: Leaving directory '<WORK>/doc'
+make[1]: Leaving directory '<WORK>/doc'
+Making check in po
+make[1]: Entering directory '<WORK>/po'
+make[1]: Nothing to be done for 'check'.
+make[1]: Leaving directory '<WORK>/po'
+Making check in misc
+make[1]: Entering directory '<WORK>/misc'
+Making check in desktops
+make[2]: Entering directory '<WORK>/misc/desktops'
+make  check-am
+make[3]: Entering directory '<WORK>/misc/desktops'
+make[3]: Nothing to be done for 'check-am'.
+make[3]: Leaving directory '<WORK>/misc/desktops'
+make[2]: Leaving directory '<WORK>/misc/desktops'
+make[2]: Entering directory '<WORK>/misc'
+make[2]: Nothing to be done for 'check-am'.
+make[2]: Leaving directory '<WORK>/misc'
+make[1]: Leaving directory '<WORK>/misc'
+Making check in src
+make[1]: Entering directory '<WORK>/src'
+Making check in common
+make[2]: Entering directory '<WORK>/src/common'
+make[2]: Nothing to be done for 'check'.
+make[2]: Leaving directory '<WORK>/src/common'
+Making check in xitk
+make[2]: Entering directory '<WORK>/src/xitk'
+Making check in xine-toolkit
+make[3]: Entering directory '<WORK>/src/xitk/xine-toolkit'
+Making check in po
+make[4]: Entering directory '<WORK>/src/xitk/xine-toolkit/po'
+make[4]: Nothing to be done for 'check'.
+make[4]: Leaving directory '<WORK>/src/xitk/xine-toolkit/po'
+make[4]: Entering directory '<WORK>/src/xitk/xine-toolkit'
+make[4]: Nothing to be done for 'check-am'.
+make[4]: Leaving directory '<WORK>/src/xitk/xine-toolkit'
+make[3]: Leaving directory '<WORK>/src/xitk/xine-toolkit'
+Making check in .
+make[3]: Entering directory '<WORK>/src/xitk'
+make[3]: Nothing to be done for 'check-am'.
+make[3]: Leaving directory '<WORK>/src/xitk'
+make[2]: Leaving directory '<WORK>/src/xitk'
+Making check in aaui
+make[2]: Entering directory '<WORK>/src/aaui'
+make[2]: Nothing to be done for 'check'.
+make[2]: Leaving directory '<WORK>/src/aaui'
+Making check in dfb
+make[2]: Entering directory '<WORK>/src/dfb'
+make[2]: Nothing to be done for 'check'.
+make[2]: Leaving directory '<WORK>/src/dfb'
+Making check in fb
+make[2]: Entering directory '<WORK>/src/fb'
+make[2]: Nothing to be done for 'check'.
+make[2]: Leaving directory '<WORK>/src/fb'
+make[2]: Entering directory '<WORK>/src'
+make[2]: Nothing to be done for 'check-am'.
+make[2]: Leaving directory '<WORK>/src'
+make[1]: Leaving directory '<WORK>/src'
+make[1]: Entering directory '<WORK>'
+make[1]: Leaving directory '<WORK>'
+
+计数定义（三个数字统计对象不同，勿混用）：
+  唯一被进入的 check 目录 = 20 个（含顶层 <WORK> 自身）
+  make 递归「进入」事件 = 27 次（同一目录会被父目录二次进入，如 <WORK>/doc/man）
+  离开事件 = 27 次；`Making check in X` 声明行 = 20 行
+  打印「无可执行目标」的行 = 19 行（`Nothing to be done for 'check'` 12 行 + `'check-am'` 7 行）
+  差的第 20 个目录是顶层 <WORK>：它只 Enter/Leave（第 93–94 行），其 check 目标是
+     纯递归转发，连 Nothing-to-be-done 都不打印。
+  执行用例数 = 0（全文无 PASS/FAIL/ok/SKIP，无 error），make rc=0。
+
+------------------------------------------------------------------------------
+§C. 程序级入口清点（10 个 = 实测 4 + 不适用 6），逐条来自 automake 声明原文
+------------------------------------------------------------------------------
+$ grep -rnE '^(bin_PROGRAMS|sbin_PROGRAMS|bin_SCRIPTS|EXTRA_PROGRAMS) =' --include=Makefile.am .
+./misc/Makefile.am:38:bin_SCRIPTS = xine-check xine-bugreport
+./src/aaui/Makefile.am:13:bin_PROGRAMS = $(aa_programs) $(caca_programs)
+./src/dfb/Makefile.am:13:bin_PROGRAMS = ${dfb_programs} 
+./src/fb/Makefile.am:9:bin_PROGRAMS = ${fb_programs}
+./src/xitk/Makefile.am:20:bin_PROGRAMS = $(xine_ui)
+./src/xitk/Makefile.am:21:EXTRA_PROGRAMS = session_ctrl
+./src/xitk/xine-toolkit/Makefile.am:17:EXTRA_PROGRAMS = test
+
+$ grep -nE '^(if |remote =|xine_ui =|aa_programs =|caca_programs =|dfb_programs =|fb_programs =)' \
+      src/xitk/Makefile.am src/aaui/Makefile.am src/dfb/Makefile.am src/fb/Makefile.am
+  src/xitk/Makefile.am:9:if HAVE_READLINE
+  src/xitk/Makefile.am:10:remote = xine-remote
+  src/xitk/Makefile.am:13:if HAVE_X11
+  src/xitk/Makefile.am:14:xine_ui = xine $(remote)
+  src/xitk/Makefile.am:111:if HAVE_TAR
+  src/xitk/Makefile.am:115:if HAVE_LIRC
+  src/aaui/Makefile.am:5:if HAVE_AA
+  src/aaui/Makefile.am:6:aa_programs = aaxine
+  src/aaui/Makefile.am:9:if HAVE_CACA
+  src/aaui/Makefile.am:10:caca_programs = cacaxine
+  src/dfb/Makefile.am:9:if HAVE_DIRECTFB
+  src/dfb/Makefile.am:10:dfb_programs = dfbxine
+  src/dfb/Makefile.am:15:if HAVE_DIRECTFB
+  src/fb/Makefile.am:5:if HAVE_FB
+  src/fb/Makefile.am:6:fb_programs = fbxine
+  src/fb/Makefile.am:17:if HAVE_LIRC
+
+展开后的 10 个入口（归属见 test-report.md §3）：
+  1  xine                     src/xitk/Makefile.am:20 bin_PROGRAMS = $(xine_ui)，:14 xine_ui = xine $(remote)（HAVE_X11）
+  2  xine-remote              src/xitk/Makefile.am:10 remote = xine-remote（if HAVE_READLINE，实测未启用）
+  3  aaxine / 4 cacaxine      src/aaui/Makefile.am:13 $(aa_programs) $(caca_programs)（HAVE_AA / HAVE_CACA）
+  5  fbxine                   src/fb/Makefile.am:9 ${fb_programs}（HAVE_FB，本次 --without-fb 门控）
+  6  dfbxine                  src/dfb/Makefile.am:13 ${dfb_programs}（HAVE_DIRECTFB）
+  7  session_ctrl             src/xitk/Makefile.am:21 EXTRA_PROGRAMS（make all 不构建，配方显式构建）
+  8  test                     src/xitk/xine-toolkit/Makefile.am:17 EXTRA_PROGRAMS（上游死代码）
+  9  xine-check               misc/Makefile.am:38 bin_SCRIPTS
+ 10  xine-bugreport           misc/Makefile.am:38 bin_SCRIPTS
+
+$ grep -n 'bin_SCRIPTS' misc/Makefile.am
+22:	$(bin_SCRIPTS) \
+38:bin_SCRIPTS = xine-check xine-bugreport
+
+------------------------------------------------------------------------------
+§D. configure 关键行（平台识别与两处门控的实际输出）
+------------------------------------------------------------------------------
+$ sh configure --prefix=... --without-fb --disable-nls   # 摘要，完整日志 9958 字节
+  54:checking build system type... aarch64-unknown-linux-ohos
+  55:checking host system type... aarch64-unknown-linux-ohos
+  14:checking whether we are cross compiling... no
+  49:checking whether NLS is requested... yes
+  68:checking whether to use NLS... no
+  96:checking for readline.h... not found
+  97:*** no readline found, xine network interface will be disabled ***
+  78:checking for libxine >= 1.1.0... yes
+
+说明：`checking build system type... aarch64-unknown-linux-ohos` 是 0001-config.guess.patch +
+0002-config.sub.patch 的生效结果（OHOS 上 build==host，AutotoolsToolchain 不下发三元组，
+`checking whether we are cross compiling... no` 即为证）；`no readline found` 是上游 m4 探测
+宏的假阴性（见 notes.md 问题 5 / 知识草稿 DRAFT-...-ac-check-readline-hard-prefix-ncursesw）。
+
+------------------------------------------------------------------------------
+§E. `session_ctrl` 入口的可执行性差分探针
+------------------------------------------------------------------------------
+$ make -j1 -C src/xitk session_ctrl
+  PASS —— 产出 27008 字节 ELF arm64 动态可执行文件（校验交叉编译与链接）
+$ src/xitk/session_ctrl 0
+  rc=159（128+31=SIGSYS），零输出
+
+独立探针（与 xine-ui 无关，证明是平台系统调用策略而非适配缺陷）：
+  setuid(geteuid())            -> rc=0，进程存活
+  setreuid(getuid(), getuid()) -> rc=159（SIGSYS），进程被终止
+
+调用点归属（源码实测）：
+  51:int connect_to_session(int session) {
+  src/xitk/session_common.c:66-70
+    
+        snprintf(saddr.un.sun_path, sizeof(saddr.un.sun_path), "%s%s%d", (xine_get_homedir()), "/.xine/session.", session);
+        if (setreuid(stored_uid, euid) == -1)
+          perror("setreuid() failed");
+    #ifdef SUN_LEN
+  38:  if((fd = connect_to_session(session)) == -1)   # ctrl_test.c 的 main 调用它
+
+=> `session_ctrl` 在鸿蒙 PC 上只能编译、不能执行，故配方 build() 只构建不运行；
+   该入口计入「实测 2 次调用（编译 + 运行尝试）」，运行结果按平台事实记录，不计失败用例。
+
+------------------------------------------------------------------------------
+§F. `xine-bugreport` 交互式阻塞记录
+------------------------------------------------------------------------------
+$ timeout 420 xine-bugreport < /dev/null | tee bugreport.out   # rc=124（超时）
+  产出 2468 行后停在自身提示 `please select (1..16):`，无法无人值守跑完
+  => 登记为实测入口（1 次调用），不写入 test.sh 自动断言
+
+------------------------------------------------------------------------------
+§G. 复现方式
+------------------------------------------------------------------------------
+tar -xf xine-ui-0.99.14.tar.xz && cd xine-ui-0.99.14
+grep -rnE 'TESTS=|check_PROGRAMS' --include=Makefile.am .     # 0 命中
+./configure --prefix=/usr/local --without-fb --disable-nls
+make check                                                     # rc=0，0 个用例执行
+make -j1 -C src/xitk session_ctrl                              # 产出 ELF，但不执行
+
+$ sha256sum check.log    -> 9890a6e8d35fa3637ed417f08b92eed0d7d10bff2e4b9c2de3f313f5c5ca2097   (6957 字节，本文件 §B 摘录自它)
+$ sha256sum cfg5.log     -> d81190cb1a4774c221238f69fdb5373ae0e0983ec7c8a6ab0dd510fca40c1b1b   (9958 字节，本文件 §D 摘录自它)
+
+注：§B/§D 摘自本次适配过程中保存在工作区外的原始日志（check.log 94 行 / cfg5.log），
+    因其属过程日志、按 review-memory §三#19 不宜整体入库，故在此摘录关键内容入 PR；
+    本包已随 PR 提交的机器日志只有 reports/conan-create.log 与 reports/w3-local-ci.log
+    （与 main 上 97 / 69 个已合并包的既有惯例一致）。

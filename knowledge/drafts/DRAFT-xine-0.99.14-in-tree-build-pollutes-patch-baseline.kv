@@ -1,0 +1,93 @@
+#====================================================================
+# DRAFT-xine-0.99.14-in-tree-build-pollutes-patch-baseline
+# 探索阶段就地构建改写 tarball 自带文档/打包脚本 → finish 重跑 refresh-patch 时补丁集虚高
+#====================================================================
+
+id:                     DRAFT-xine-0.99.14-in-tree-build-pollutes-patch-baseline
+draft:                  true
+trigger_tool:           make|configure|refresh-patch|finish|conan
+phase:                  patch-generation
+error_signature:        refresh-patch 生成补丁数与 conandata.yml 不一致|No rule to make target|build_and_test.sh.*patch_file|dry-run 失败|L0c patch 文件路径或格式错误
+severity:               3
+category:               patch|build-system|make|configure|workflow|filesystem
+match_keywords:         refresh-patch, finish Step 1, 精准模式, 追踪文件, in-tree build, 就地构建,
+                         doc/man, SlackBuild, build_rpms.sh, DEFAULT_PREFIX, 补丁虚高, conandata.yml,
+                         diff -rq, .orig .work, dry-run 失败, 基线污染
+title:                  autotools 就地构建会把自己分发的文档/打包脚本当作生成物重写（填入实际 --prefix），污染 .orig/.work 差分基线；finish Step 1 无条件重跑 refresh-patch 时补丁数虚高并与 conandata.yml 失配
+
+classification:         Path B candidate; final classification is subject to review
+
+root_cause:          xine-ui 的 `configure`/`make` 在源码树内直接运行（模式 B 探索编译），会就地重写 tarball 自带的“看起来像源文件、其实是构建产物”的文件：`doc/man/{de,en,es,fr,nl,pl}/*.1`（man 页面里写入实际`$DEFAULT_PREFIX` 路径）、`misc/SlackBuild`、`misc/build_rpms.sh`。`refresh-patch --auto` 的精准模式只比对**它追踪的那批文件**（本例 22 个），无法区分“真实适配改动”与“构建副产物”，于是把这些重写也 diff 成补丁。流程放大点在于 **`finish` Step 1 无条件重跑 `refresh-patch --auto`**（`_SKIP_PATCH_GENERATION`只在 Step 2 close-archive 里生效），所以哪怕 AI 事先已经生成并核对过补丁集，finish 仍会按当前（已被构建污染）的 `.work` 重算：本例 5 个 → 13 个。结果 `conandata.yml` 里的 5 个 patch_file 名字与实际 13 个补丁失配（且 0004 号段重排），`conan-verify` G2 与 W3 `build_and_test.sh` 报 patch 路径/格式错误。同时 17 个被改写的追踪文件里只有 8 个能干净反 apply 生成补丁，另 9 个报 `dry-run 失败`，让补丁编号进一步错位。
+
+affected_scope:      模式 B（探索性编译）下在源码树内直接跑 configure/make 的所有 autotools 包；特别是 tarball 内自带 man 页面、发行版打包脚本（SlackBuild/spec/rpm 脚本）的项目。
+
+verification_cmd: >
+  diff -rq <name-ver>.orig <name-ver>.work          # 列出全部差异文件
+  # 期望差异文件数 == conandata.yml patches 条目数 == patches/ 下 .patch 文件数
+  grep -c "prefix" <work>/doc/man/en/xine.1          # 若已被构建改写，值与 .orig 不同
+  python3 <SKILL_ROOT>/scripts/ohc-run.py refresh-patch --auto <软件> <版本> --dry-run 2>/dev/null || true
+
+rec_priority:           1
+rec_approach:           restore-build-artifacts-from-orig-before-finish
+rec_description:     finish 之前做一次“基线卫生”：用 `diff -rq .orig .work` 枚举差异，把其中**非适配**的构建副产物（man 页面、发行版打包脚本等）用 `.orig` 的原始文件逐个 `cp -p` 覆盖回 `.work`，使两端差异只剩真实改动；再删掉旧补丁目录跑 `refresh-patch --auto`，核对“补丁数 == conandata.yml 条目数 == manifest.patches_count”。判据：`.orig`/`.work` 的差异集合必须等于“你打算提交给上游的可移植性修复集合”，多出来的每一个都必须在 notes.md 里能说出理由。
+rec_command: >
+  cd $HOME/.tmp/builds
+  diff -rq xine-ui-0.99.14.orig xine-ui-0.99.14.work \
+    | sed -n 's/^Files .* and \(.*\) differ$/\1/p' > /dev/null   # 逐一确认非适配文件
+  for f in doc/man/de/*.1 doc/man/en/*.1 doc/man/es/*.1 doc/man/fr/*.1 \
+           doc/man/nl/*.1 doc/man/pl/*.1 misc/SlackBuild misc/build_rpms.sh; do
+    cp -p "xine-ui-0.99.14.orig/$f" "xine-ui-0.99.14.work/$f"
+  done
+  diff -rq xine-ui-0.99.14.orig xine-ui-0.99.14.work              # 现在只剩 5 个真实适配文件
+rec_auto_fix:           false
+rec_impl:               restore-orig-artifacts-then-refresh-patch
+
+forbid_1_pattern:       edit_conandata_to_match_inflated_patches
+forbid_1_reason:        把 conandata.yml 改成引用 13 个补丁（含 man 页面/打包脚本）是“把污染固化成方案”。
+forbid_1_consequence:   补丁集包含与适配无关的 prefix 字面量，换环境重建即失效；PR 审阅被无关 diff 淹没。
+
+forbid_2_pattern:       skip_finish_and_ship_stale_patches
+forbid_2_reason:        绕过 finish 直接交付手工补丁会让“补丁 == 基线差异”这条不变量失去工具背书。
+forbid_2_consequence:   CI 侧 refresh/校验与本地不一致，问题在 PR 阶段才暴露。
+
+similar_to:             [E490, E515, DRAFT-xine-0.99.14-config-sub-ohos-triplet-precondition]
+conflicts_with:         []
+prerequisite_of:        []
+
+path_b_candidate:       true
+path_b_boundary:        只记录“就地构建污染 .orig/.work 差分基线 + finish Step 1 无条件重跑 refresh-patch”
+                         这一流程性机制与其卫生判据；补丁格式/strip 层级归 E515，执行位归 E490。
+
+reusable_knowledge_count: 3
+reusable_knowledge_1:    finish Step 1 一定重跑 refresh-patch（_SKIP_PATCH_GENERATION 只影响 close-archive），所以补丁集以 finish 时刻的 .work 为准。
+reusable_knowledge_2:    自动化工具（configure/make）会重写 tarball 内“源文件外观”的生成物；判定补丁合理性要看差异集合而非补丁个数。
+reusable_knowledge_3:    修基线用 .orig 反向覆盖 .work（cp -p 保时间戳/权限），不要手工编辑补丁文件或改 conandata 迁就污染结果。
+
+diagnostic_matrix:       refresh-patch 补丁数 > 预期 -> diff -rq .orig .work 列举差异
+                         -> 差异文件含 doc/man、发行版打包脚本 -> 判定构建副产物污染
+                         -> cp -p 从 .orig 恢复这些文件 -> 重跑 refresh-patch
+                         -> conan-verify G2 FAIL 且报 patch 路径/数量 -> 同一根因的另一表现
+knowledge_reuse_scope:   模式 B 探索编译 + refresh-patch/conan 双轨交付的一切 autotools 包
+
+fallback_priority:      2
+fallback_approach:      out-of-tree-exploration-build
+fallback_description:   从源头避免污染：探索阶段用独立 build 目录（`mkdir b && cd b && ../configure …`），
+                         源码树保持只读。但不少老包（如 xine-ui 的 misc/desktops 规则）依赖树内文件，
+                         out-of-tree 未必全通，故仍应在 finish 前跑一次 `diff -rq` 核对基线。
+fallback_command:       mkdir -p build && cd build && ../configure --prefix=… && make -j1
+fallback_auto_fix:      false
+fallback_impl:          separate-build-dir
+
+doc_file:               knowledge/drafts/DRAFT-xine-0.99.14-in-tree-build-pollutes-patch-baseline.md
+last_updated:           2026-10-17
+source_event:           xine/0.99.14 第一次 finish：补丁 5→13，conan-verify G2 FAIL，W3 build_and_test.sh RC=1
+authors:                Qoder
+source_pr:
+source_commit:
+
+verification_result: >
+  xine/0.99.14 实测：污染态 refresh-patch 输出“精准模式: 只对 22 个追踪文件生成补丁”→ 13 个补丁
+  （5 个真实 + 8 个 doc/man ×3、doc/man/nl ×3、misc/SlackBuild、misc/build_rpms.sh 伪补丁，
+  另 9 个差异文件 dry-run 失败），work hash `c38a4afa020a4a8d`；
+  按本方案用 .orig 反向覆盖 17 个构建副产物后重跑 → 恰好 5 个补丁，work hash 回到 `461951f4e5147c7d`
+  （orig hash 始终 `fac5e461998783bb`）。此后 conan-verify G0-G4 全 PASS，finish W3 本地 CI 模拟 PASS。

@@ -1,0 +1,136 @@
+# 版本级 manifest — xine 0.99.14（HarmonyOS PC 适配；上游项目 xine-ui）
+# 文件位置: archives/x/xine/0.99.14/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# 版本号
+version: "0.99.14"
+
+# 软件名
+software: "xine"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-17"
+build_system: "autotools"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://downloads.sourceforge.net/project/xine/xine-ui/0.99.14/xine-ui-0.99.14.tar.xz"
+  sha256: "d4d490d5cece70e2bb9849c9e482f2cf87af0302d451b614476fdcc3642cd9c3"
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: autotools
+  configure_options:
+    - "--without-fb"
+    - "--disable-nls"
+  dependencies:
+    - xine-lib/1.2.13
+    - libx11/6.4.0
+    - libxext/6.4.0
+    - libxv/1.0.13
+    - libxinerama/1.1.5
+    - libxxf86vm/1.1.5
+    - libxtst/1.2.5
+    - libxscrnsaver/1.2.5
+    - libpng/1.6.58
+    - libjpeg-turbo/3.2.0.1
+    - curl/8.15.0.1
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-config.guess.patch"
+  - "0002-config.sub.patch"
+  - "0003-configure.patch"
+  - "0004-misc-desktops-Makefile.am.patch"
+  - "0005-misc-desktops-Makefile.in.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "bundled config.guess (2022-01-09) 不识别 uname -s=HarmonyOS，需加 aarch64:HarmonyOS:*:* 分支输出 aarch64-unknown-linux-ohos，并让 config.sub 接受 ohos*/linux-ohos；OHOS 上 build==host，AutotoolsToolchain 不发 --build/--host 三元组，所以必须让 config.guess 自己猜得出（兄弟包 xine-lib 用 2009 版 config.guess，同一族坑，但那一版还要先改 umask 077->022）。"
+  - "OHOS 系统调用策略直接以 SIGSYS 终止 setreuid()（实测 rc=159），而 setuid(geteuid()) 返回 0 且进程存活；xine-ui 的 session_ctrl 经 ctrl_test.c:38 调用 connect_to_session()（定义在 src/xitk/session_common.c:51，setreuid() 在其 :68）无条件 setreuid()，故上游 session_ctrl 测试入口只能编译不能执行。"
+  - "OHOS libc 不提供 pthread_cancel/pthread_testcancel，xine-ui 的 src/fb/keys.c 依赖它们，且鸿蒙 PC 无 framebuffer 控制台 -> --without-fb 是正确的门控选择（xine-lib 里 pthread_cancel 在核心路径上，只能改写源码）。"
+  - "Conan 为 xine-lib 合成的 libxine.pc 不带 plugindir 变量，xine-ui configure 的 XINE_MIME 于是变成 /mime.types，misc/desktops 报 'No rule to make target'；configure 需加 pkg-config -> xine-config -> 空值三级回落，空值时改用树内 mime.default。"
+  - "misc/desktops/Makefile.am 与 Makefile.in 里 './mime.default' 前置条件带字面双引号，make 把它当成不可满足的目标名；OHOS 上不重跑 autoreconf，所以 .am 与 .in 必须同时修（Makefile 由 config.status 生成，不能直接打补丁）。"
+  - "m4/readline.m4 的 AC_CHECK_READLINE 只遍历硬编码前缀、不查 CPPFLAGS/LDFLAGS，看不到 Conan 交付的 readline/8.3；且其 ncurses 探测只试 -lncurses，而 OHOS ncurses 仅发布 libncursesw.a -> xine-remote 自动关闭。"
+  - "OHOS 上交叉编译 + 链接成功不等于可执行：configure/make 会运行刚链接出的 conftest，必须把依赖 libdir 前插 LD_LIBRARY_PATH（Environment + save_script），否则报 'Error loading shared library libxine.so.2'。"
+  - "本机 W3 绿不等于 CI 绿：本机 conan home 在应用私有挂载（同一命令建出的 mktemp 目录恒为 drwx------ 且可写），CI worker 的 conan home 在 HMDFS 挂载 `/storage/Users/currentUser/.cache/conan2`（同一命令得 drwx--S---），于是 autoconf 写 ./confXXXXXX/subs1.awk 只在远端 EACCES。实测边界要说清：本机在自己那台机器的 HMDFS 挂载上建出的 drwx--S--- 目录仍可写，所以“worker 上属主 uid 与进程 uid 不一致、权限检查落 group 分支”只是解释性假设，本机既证实不了、也不该写成“连 owner 也写不进去”。鸿蒙 mktemp 是 toybox 0.8.12，mktemp -d 的目录 mode 确实受 umask 影响（GNU coreutils 恒 0700 的语义不成立），故 E129 的 sed 改 umask 不是空操作；有效性只能由远端判定——红两次（#97241 @10831c00/CI-030、#97272 @06016b90/CI-001，同一崩溃行同一签名）、改后绿三次（#97351 @57eae489/CI-040 即有效性回执；#97427 @c0e15e69/CI-021 与 #97445 @63d216c8/CI-026 只保证各自那笔提交有绿构建）；五次构建落在五台不同 worker，跨机一致排除了「单机抖动」这一替代解释。修复轮按错误签名计为 1 轮（预算 2）。取值 022 的依据是同族依赖 xine-lib/1.2.13 对同一 autoconf 站点已有同形补丁加 E129 rec 1 原值（pcre2 #7020 签名逐字相同但未见重跑回执），而不是按本机静态分析推更严格的 007。站点要按可达性普查而不是按印象列举：全树 umask 077 共 9 行/6 文件，configure 的 mktemp 块在构建路径上，config.guess 的 set_cc_for_build（实测不建 cgXXXXXX）、Makefile.in 的 distcheck 不在，misc/{xine-bugreport,xine-check,xine-check.sh.in} 三处属运行期、留作未验证面。"
+
+# 引用与新增（复用既有结论 + 本次路径 B 新草稿）
+knowledge_ref:
+  reused:
+    - "E051 setreuid -> SIGSYS"
+    - "E085 OHOS libc 无 pthread_cancel"
+    - "E114 config.status 临时目录拒写（bypass-mktemp 方案，本包采 E129 的 sed-replace，见 notes.md 问题 15）"
+    - "E129 HMDFS umask 077 使 mktemp 目录不可写（远端 CI 修复采用其 rec 1：umask 077 -> 022）"
+    - "E490 autotools helper 执行位丢失"
+    - "E515 补丁 strip 层级（git 风格 a/ b/）"
+    - "E524 禁止向共享 prefix 注入依赖"
+    - "E553 x11.pc prefix 与 --host 交叉模式"
+    - "E566 config.guess 平台探测失败（本包按实测偏离，见 notes.md 问题 1b）"
+    - "E608 pkg-config 单值兜底变量多依赖失配"
+  new_drafts:
+    - "DRAFT-xine-0.99.14-conan-pc-missing-plugindir-variable"
+    - "DRAFT-xine-0.99.14-config-sub-ohos-triplet-precondition"
+    - "DRAFT-xine-0.99.14-in-tree-build-pollutes-patch-baseline"
+    - "DRAFT-xine-0.99.14-extra-programs-upstream-denominator"
+    - "DRAFT-xine-0.99.14-ac-check-readline-hard-prefix-ncursesw"
+    - "DRAFT-xine-0.99.14-hmdfs-mount-semantics-local-green-ci-red"
+
+# ============================================================
+# 补丁生成元数据（refresh-patch --auto 写入）
+# ============================================================
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /data/storage/el2/base/files/home/.tmp/builds/xine-ui-0.99.14.orig
+  source_work_dir: /data/storage/el2/base/files/home/.tmp/builds/xine-ui-0.99.14.work
+  source_orig_hash: fac5e461998783bb
+  source_work_hash: 953f45919bd05041
+  generated_at: '2026-10-17T17:13:36'
+  patches_count: 5
+
+patch_classification:
+  - file: 0001-config.guess.patch
+    type: portability
+    platform_only: True
+    guard: 'none'
+  - file: 0002-config.sub.patch
+    type: portability
+    platform_only: True
+    guard: 'none'
+  - file: 0003-configure.patch
+    type: portability
+    platform_only: False
+    guard: 'none'
+  - file: 0004-misc-desktops-Makefile.am.patch
+    type: portability
+    platform_only: False
+    guard: 'none'
+  - file: 0005-misc-desktops-Makefile.in.patch
+    type: portability
+    platform_only: False
+    guard: 'none'
+
+# 分类说明（0001/0002 仅影响 HarmonyOS 分支，其余三个在任何平台都是正确性/可移植性修复；
+# 0003 的两个 hunk 都改变所有平台的行为：XINE_MIME 推导，以及 config.status 临时目录
+# 的 umask 077→022（放宽 umask 在任何平台都只是权限取舍，不引入平台分支）；
+# 五个补丁均不使用 __OHOS__ 等平台宏，guard 一律 none —— PF5 校验项）

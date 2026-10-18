@@ -1,0 +1,21 @@
+# conandata.yml — xine-ui 0.99.14
+sources:
+  url: "https://downloads.sourceforge.net/project/xine/xine-ui/0.99.14/xine-ui-0.99.14.tar.xz"
+  sha256: "d4d490d5cece70e2bb9849c9e482f2cf87af0302d451b614476fdcc3642cd9c3"
+
+patches:
+  - patch_file: "patches/0001-config.guess.patch"
+    patch_description: "Recognise aarch64:HarmonyOS as aarch64-unknown-linux-ohos; the bundled config.guess (2022-01-09) cannot guess the build type on OHOS"
+    patch_type: "portability"
+  - patch_file: "patches/0002-config.sub.patch"
+    patch_description: "Accept ohos*/linux-ohos in the bundled config.sub so the guessed build triplet canonicalises"
+    patch_type: "portability"
+  - patch_file: "patches/0003-configure.patch"
+    patch_description: "Two configure fixes. (a) Derive XINE_MIME from pkg-config plugindir with an xine-config fallback, and leave it empty when neither answers; the Conan-synthesised libxine.pc carries no plugindir variable, so the old code produced XINE_MIME=/mime.types and misc/desktops failed with 'No rule to make target'. (b) Relax the config.status scratch-dir umask from 077 to 022: HarmonyOS HMDFS forces the setgid bit onto new directories, so 'umask 077 && mktemp -d ./confXXXXXX' yields drwx--S--- (empty group bits), and on the CI worker config.status then died on 'subs1.awk: Permission denied' (knowledge E129, whose rec 1 is exactly this sed; the sibling xine-lib/1.2.13 patch fixes the same autoconf site the same way). Remote build #97272 failed here, #97351 passed after the change"
+    patch_type: "portability"
+  - patch_file: "patches/0004-misc-desktops-Makefile.am.patch"
+    patch_description: "Drop the literal double quotes around the ./mime.default prerequisite in the non-XINE_LIST rule (quotes made it an unsatisfiable target name)"
+    patch_type: "portability"
+  - patch_file: "patches/0005-misc-desktops-Makefile.in.patch"
+    patch_description: "Same quote fix in the generated Makefile.in, which is what config.status instantiates (autoreconf is not re-run on OHOS)"
+    patch_type: "portability"
