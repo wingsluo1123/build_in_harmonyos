@@ -1,0 +1,84 @@
+package: pizzly/0.37.3
+homepage: "https://github.com/pmelsted/pizzly"
+
+# ── 上游测试清点（R51 第一步）────────────────────────────────────────────────
+# 清点结论：上游**没有任何自动化测试注册**。
+#   * CMakeLists.txt 中不存在 enable_testing() / add_test() / ctest / gtest / Catch2，
+#     也没有 test 目标（`grep -inE "enable_testing|add_test|ctest|gtest|catch|boost" CMakeLists.txt`
+#     无输出）。
+#   * 源码树中唯一的可执行入口是 main.cpp（`grep -rlE "int main" --include=*.cpp` 仅此一个）。
+#   * 唯一的 test/ 目录是 snakemake 示例流水线（test/Snakefile），它依赖**外部** kallisto
+#     程序（不是本仓库构建产物）与 test/reads_*.fastq.gz，用于人工验证 kallisto+pizzly
+#     联动，不构成可自动化执行的测试套件，也不注册任何用例数。
+# 因此上游测试用例数 = 0（不是"未找到"，是确实没有可计数的自动化用例）。
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests: []
+
+# ── 消费者端到端用例（鸿蒙 PC 目标机实跑）──────────────────────────────────
+test_package_tests:
+  - file: test_pizzly.sh
+    id: "E2E-PIZZLY-001"
+    description: >-
+      融合基因检出主流程：以真实 kallisto 0.52.0 `quant --fusion` 输出（fixtures/fusion.txt，
+      由上游 test/reads_*.fastq.gz 与 test/transcripts.fasta.gz 生成）为输入，配合上游自带的
+      参考 GTF/FASTA，执行候选融合过滤 → 断点级转录本组装 → 丰度定量，断言
+      「Number of kept records 308 out of 366」、output.json 中 9 对融合基因（含真实致癌融合
+      EML4-ALK，paircount=4）、146 条组装融合转录本，且 output.fusions.fasta 的 146 条记录与
+      JSON 的 fasta_record 一一对应、序列长度等于记录的区间跨度。
+    command: "bash test_pizzly.sh (E2E-PIZZLY-001 段)"
+  - file: test_pizzly.sh
+    id: "E2E-PIZZLY-002"
+    description: >-
+      GTF 注释缓存生成与复用：首次运行生成 cache.txt；二次运行必须命中缓存分支
+      （stderr 出现「Opening cached file」与「loaded 36 genes and 289 transcripts」），
+      且 output.json 的 sha256 与 output.fusions.fasta 与冷启动运行完全一致。
+    command: "bash test_pizzly.sh (E2E-PIZZLY-002 段)"
+
+# ── fixtures 来源与完整性 ──────────────────────────────────────────────────
+fixtures:
+  - file: fixtures/fusion.txt
+    bytes: 199238
+    sha256: "aa1cc960ebc2d96c1edf4d9f6a6d86adbf2ccad7ad1c9d1166390f47644094dd"
+    source: >-
+      kallisto/0.52.0（制品仓 ohpcd 预编译包）执行
+      `kallisto index -k 31 -i transcripts.kidx transcripts.fasta.gz` 后
+      `kallisto quant -i transcripts.kidx -o kallisto_out --fusion reads_1.fastq.gz reads_2.fastq.gz`，
+      取 kallisto_out/fusion.txt；输入 reads/transcripts 取自上游 tag v0.37.3 的 test/ 目录，
+      与上游 test/Snakefile 的 rule index / rule kallisto_quant 参数一致。
+  - file: fixtures/transcripts.gtf.gz.b64
+    bytes: 109138
+    sha256: "ee7b4559069312e808c0d309c5bd6fa1a8e0856095faa50ded43345921b6efb1"
+    decoded:
+      name: transcripts.gtf.gz
+      bytes: 80788
+      sha256: "9a2cf33ec78412f4cc7c087b4be88bb6596b9c76658e5e952092eb90673246ab"
+    encoding: base64
+    source: >-
+      上游 tag v0.37.3 的 test/transcripts.gtf.gz（Ensembl 85 子集）原样，按仓库约定以 base64
+      承载（test_package 内不提交裸归档扩展名，先例 archives/b/blur、archives/b/bozohttpd）。
+      test_pizzly.sh 在运行时 base64 -d 解码并校验解码结果的 sha256。
+  - file: fixtures/transcripts.fasta.gz.b64
+    bytes: 107261
+    sha256: "0940a098c3adbede62d1838335a9d05415d48fb827aadff3b27d78d452df637c"
+    decoded:
+      name: transcripts.fasta.gz
+      bytes: 79399
+      sha256: "bcf11e8d281971dd7b3a1cc6892cd399863fdf43e05c76b1a58f328327d0c281"
+    encoding: base64
+    source: >-
+      上游 tag v0.37.3 的 test/transcripts.fasta.gz（参考转录组）原样，同样以 base64 承载，
+      运行时解码并校验 sha256。
+
+# 测试断言总数：test_pizzly.sh 中实际执行的断言
+#   fixture 完整性: 2（两个 .b64 解码后 sha256 校验）
+#   E2E-PIZZLY-001: 1(version 冒烟，见下注) + 2(GTF/保留数 grep) + 2(产物存在)
+#                   + 5(JSON 顶层/9 对/EML4-ALK/ID/paircount) + 1(transcripts 数)
+#                   + 1(自洽循环断言按记录计) + 1(146 条 fasta) + 1(json↔fasta 一致)
+#                   + 1(序列长度核对) = 15
+#   E2E-PIZZLY-002: 1(cache 非空) + 3(grep) + 2(sha256/内容一致) = 6
+#   合计 2 + 15 + 6 = 23
+# 注：`--version` 冒烟行只计入断言数，不计入 E2E 用例数（用例数为 2）。
+assertion_count: 23
