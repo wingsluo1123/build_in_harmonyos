@@ -1,0 +1,31 @@
+--- a/virtio.c
++++ b/virtio.c
+@@ -176,20 +176,28 @@
+  * Return: the used event (available only if VIRTIO_RING_F_EVENT_IDX is set)
+  *         used_event is a performant alternative where the driver
+  *         specifies how far the device can progress before a notification
+  *         is required.
+  */
+ static inline uint16_t vring_get_used_event(const struct vu_virtq *vq)
+ {
+ 	return le16toh(*virtq_used_event(vq));
+ }
+
++/* vring_need_event() is missing from sysroot's linux/virtio_ring.h.
++ * Copied from upstream kernel header (include/uapi/linux/virtio_ring.h). */
++static inline bool vring_need_event(uint16_t event_idx, uint16_t new_idx,
++				   uint16_t old_idx)
++{
++	return (uint16_t)(new_idx - event_idx - 1) < (uint16_t)(new_idx - old_idx);
++}
++
+ /**
+  * virtqueue_get_head() - Get the head of the descriptor chain for a given
+  *                        index
+  * @vq:		Virtqueue
+  * @idx:	Available ring entry index
+  * @head:	Head of the descriptor chain
+  */
+ static void virtqueue_get_head(const struct vu_virtq *vq,
+ 			       unsigned int idx, unsigned int *head)
+ {

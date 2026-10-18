@@ -1,0 +1,27 @@
+--- a/isolation.c
++++ b/isolation.c
+@@ -80,20 +80,24 @@
+ #include <sys/socket.h>
+ #include <sys/syscall.h>
+ #include <sys/types.h>
+ #include <netinet/in.h>
+ #include <netinet/if_ether.h>
+
+ #include <linux/audit.h>
+ #include <linux/capability.h>
+ #include <linux/filter.h>
+ #include <linux/seccomp.h>
++#include <linux/close_range.h>
++
++/* close_range() may not be declared in libc headers */
++extern int close_range(unsigned int, unsigned int, unsigned int);
+
+ #include "util.h"
+ #include "seccomp.h"
+ #include "passt.h"
+ #include "log.h"
+ #include "isolation.h"
+ #include "conf.h"
+
+ #define CAP_VERSION	_LINUX_CAPABILITY_VERSION_3
+ #define CAP_WORDS	_LINUX_CAPABILITY_U32S_3

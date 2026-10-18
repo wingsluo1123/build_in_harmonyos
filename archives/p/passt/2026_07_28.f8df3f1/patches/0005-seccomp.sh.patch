@@ -1,0 +1,25 @@
+--- a/seccomp.sh
++++ b/seccomp.sh
+@@ -256,21 +256,21 @@
+ 
+ printf '%s\n' "${HEADER}" > "${OUT}"
+ __profiles="$(sed -n 's/[\t ]*\*[\t ]*#syscalls:\([^ ]*\).*/\1/p' ${IN} | sort -u)"
+ for __p in ${__profiles}; do
+ 	__calls="$(sed -n 's/[\t ]*\*[\t ]*#syscalls\(:'"${__p}"'\|\)[\t ]\{1,\}\(.*\)/\2/p' ${IN})"
+ 	__calls="${__calls} ${EXTRA_SYSCALLS:-}"
+ 	__calls="$(filter ${__calls})"
+ 
+ 	cols="$(stty -a 2>/dev/null | sed -n 's/.*columns \([0-9]*\).*/\1/p' || :)" 2>/dev/null
+ 	case $cols in [0-9]*) col_args="-w ${cols}";; *) col_args="";; esac
+-	echo "seccomp profile ${__p} allows: ${__calls}" | tr '\n' ' ' | fmt -t ${col_args}
++	echo "seccomp profile ${__p} allows: ${__calls}" | tr '\n' ' ' | fmt ${col_args}
+ 
+ 	# Pad here to keep gen_profile() "simple"
+ 	__count=0
+ 	for __c in ${__calls}; do __count=$(( __count + 1 )); done
+ 	__padded=$(( 1 << (( $(log2 ${__count}) + 1 )) ))
+ 	for __i in $( seq ${__count} $(( __padded - 1 )) ); do
+ 		__calls="${__calls} read"
+ 	done
+ 
+ 	gen_profile "${__p}" ${__calls}
