@@ -1,0 +1,41 @@
+id: E429
+trigger_tool: python|test|runtime
+phase: testing|runtime
+error_signature: ModuleNotFoundError: No module named .pkg_resources.
+severity: 3
+category: compat, portability, testing, detection
+match_keywords: pkg_resources, iter_entry_points, importlib.metadata, entry_points, dist-info, LOAD_METADATA_PLUGINS, LOAD_FORMATTER_PLUGINS
+title: 废弃入口点 API 迁移必须用真实插件元数据验证分组和关闭开关
+root_cause: Legacy plugin registry imports pkg_resources although packaging metadata omits the runtime dependency; plain top-level import can pass without exercising lazy registry discovery. Replacing discovery with an empty result hides the import error but disables plugins.
+affected_scope: Python 3.8+ plugin registries using iter_entry_points group/name/load without legacy dependency activation or resource extraction semantics
+verification_cmd: ISBNLIB_PACKAGE_ROOT=<installed-site> python3 -I -S archives/i/isbnlib/3.10.14/test_package/test_isbnlib.py
+rec_priority: 1
+rec_approach: migrate-entry-point-discovery-with-real-dist-info-regression
+rec_description: Use importlib.metadata.entry_points; select(group=...) on selectable results or mapping.get(group, ()) on Python 3.8/3.9. Preserve name/load and configuration gates. In a fresh isolated interpreter install real METADATA and entry_points.txt fixtures, execute discovered callables and verify unrelated groups/disabled plugins stay absent.
+rec_command: python3 -I -S test_isbnlib.py InstalledIsbnlibTests.test_11_plugin_groups InstalledIsbnlibTests.test_12_plugins_disabled InstalledIsbnlibTests.test_13_no_plugins
+rec_auto_fix: false
+rec_impl:
+forbid_1_pattern: def iter_entry_points.*return.*\[\]
+forbid_1_reason: Returning no plugins only conceals the missing import and drops user functionality
+forbid_1_consequence: Basic import passes while installed plugins disappear
+forbid_2_pattern: pip install.*setuptools
+forbid_2_reason: Ambient tool installation is not a declared portable runtime closure
+forbid_2_consequence: Clean consumer still fails; no Conan publication evidence
+principles:
+causes: []
+caused_by: []
+similar_to: E512, E319, E447
+conflicts_with: []
+prerequisite_of: []
+doc_file: drafts/E429-draft-ISBN.md
+last_updated: 2026-10-16
+source_event: isbnlib 3.10.14 on HarmonyOS PC; isolated registry failure, true dist-info plugin regression and installed-consumer validation
+authors: chenicia <2301_79503900@noreply.gitcode.com>
+source_pr:
+source_commit:
+metrics_success_count: 1
+metrics_fail_count: 0
+metrics_confidence: 1.0
+metrics_last_used: 2026-10-16
+draft: true
+contributor_id: ISBN
