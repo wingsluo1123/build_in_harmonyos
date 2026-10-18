@@ -1,0 +1,27 @@
+name: libxls
+version: "1.6.4"
+test_type: upstream_and_consumer
+upstream_tests:
+  source: "https://github.com/libxls/libxls/tree/v1.6.4"
+  command: "make -j1 check && ./test2_libxls test2.xls && ./test_cpp test2.xls"
+  registered_entries: 1
+  case_count: 3
+  cases:
+    - "test_libxls: registered Automake TESTS entry"
+    - "test2_libxls: upstream C reader example"
+    - "test_cpp: upstream C++ reader example"
+consumer_tests:
+  command: "consumer test2.xls && python3 test_cli.py <installed-xls2csv> test2.xls <private-work>"
+  case_count: 2
+  description: "One packaged API consumer plus one installed xls2csv end-to-end workflow"
+harmony_specific_tests:
+  case_count: 1
+  description: "Installed CLI parses an XLS file in a Chinese/space path on OHOS; exact output, 24x11 dimensions and missing-input failure checked"
+validation_status: pending_target_execution
+fixture_transport:
+  encoded: test2.xls.b64
+  decoded: test2.xls
+  manifest: fixture-manifest.json
+  bytes: 35840
+  sha256: df7d4e07b72284c17ecca138412b48d4217041e5f81a7c297b331c546a20604a
+  source: upstream test/files/test2.xls, unchanged original bytes
