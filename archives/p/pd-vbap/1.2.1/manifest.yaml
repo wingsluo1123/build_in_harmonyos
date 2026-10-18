@@ -1,0 +1,62 @@
+# 版本级 manifest
+# 文件位置: archives/p/pd-vbap/1.2.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "1.2.1"
+software: "pd-vbap"
+status: published
+build_date: "2026-10-01"
+build_system: "makefile"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # GitHub 官方 tarball 投递主机（codeload），tag v1.2.1，与
+  # https://github.com/pure-data/vbap/archive/refs/tags/v1.2.1.tar.gz 同字节
+  url: "https://codeload.github.com/pure-data/vbap/tar.gz/refs/tags/v1.2.1"
+  sha256: "7a754a9c5051f2f9e8e243e1cd5c348255bae348430fec9d4d60e4649facd6d1"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 上游 vendored 的 pd-lib-builder（Makefile.pdlibbuilder 0.6.0）
+  system: makefile
+  configure_options:
+    - 'CC=<clang from tools.build:compiler_executables>'
+    - 'PDINCLUDEDIR=<puredata package>/include/pd'
+    - '-j1'
+  dependencies:
+    - puredata/0.54.1
+  # 仅 test_package（作为 Pd 引擎宿主）使用
+  test_dependencies:
+    - libpd/0.16.1
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "pd-lib-builder 外部库在 OHOS 上默认 CC=cc 硬失败（无 cc/gcc），须显式传 CC=<clang>（R33：从 tools.build:compiler_executables 取值）"
+  - "编译 Pd 外部库必须用 puredata 包的 include/pd（含 s_stuff.h 等内部头）；libpd 包只有 include/libpd，不能用"
+  - "puredata/0.54.1 是 package_type=application 且 cpp_info.includedirs 为空，取头集须用 dependencies['puredata'].package_folder"
+  - "conan get() 按 URL 文件名选解包器：URL 末段是 tag 名时须显式 filename=\"<name>.tar.gz\"，否则 BadZipFile"
+  - "本仓 conan 基线不支持 conf.get('tools.build:compiler_executables:c')，须读整 dict 再取 'c'（check_type=dict）"
+  - "musl 下 dlopen 的 Pd 外部对象无法解析 Pd 引擎符号（pd_error/gensym）——消费者测试须在运行步 LD_PRELOAD=libpd.so"
+  - "Pd 按补丁所在目录解析 class：消费者测试须把 .pd_linux 与 .pd 放在同一目录"

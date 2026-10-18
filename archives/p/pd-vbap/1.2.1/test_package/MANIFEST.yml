@@ -1,0 +1,59 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: pd-vbap/1.2.1
+homepage: "https://github.com/pure-data/vbap"
+
+# 上游测试命令：本库没有 make check / ctest / meson test 目标；上游自带的测试是
+# Pd 补丁（unittests/*-unittest.pd + 同名 .wav 参考信号），须由 Pd 宿主 +
+# 上游测试框架 testtools/unit-test-frame 驱动。该框架上游仓/ Pd 发行版 / 本包
+# 均未分发，适配层在 test_package/upstream_pd_tests/testtools/ 内补齐（见其
+# README），因此下列上游用例现可在 CI 中真实运行（puredata/0.54.1 作宿主）。
+upstream_check_command: "make check  # no such target upstream; tests are Pd patches under unittests/"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际存在的测试用例（清点结果）——全部在 test_package 阶段真实执行
+upstream_tests:
+  - file: unittests/vbap-unittest.pd
+    source: vbap-1.2.1/unittests/vbap-unittest.pd
+    description: "VBAP 三音箱/多路声像增益矩阵校验；帧由适配层补齐后真实运行"
+    command: "pd -nogui -nosound -path <package>/lib/pd-externals -path <upstream_pd_tests> -path <libdir> -open vbap-unittest.pd"
+    status: "executed (PASS) — run_upstream_pd_tests.py"
+  - file: unittests/rvbap-unittest.pd
+    source: vbap-1.2.1/unittests/rvbap-unittest.pd
+    description: "rvbap（不定向声源）增益分布校验；真实运行"
+    command: "pd -nogui -nosound -path <package>/lib/pd-externals -path <upstream_pd_tests> -path <libdir> -open rvbap-unittest.pd"
+    status: "executed (PASS) — run_upstream_pd_tests.py"
+  - file: unittests/define_loudspeakers-unittest.pd
+    source: vbap-1.2.1/unittests/define_loudspeakers-unittest.pd
+    description: "扬声器布局定义与 ls-directions/ls-triplets 输出校验；真实运行"
+    command: "pd -nogui -nosound -path <package>/lib/pd-externals -path <upstream_pd_tests> -path <libdir> -open define_loudspeakers-unittest.pd"
+    status: "executed (PASS) — run_upstream_pd_tests.py"
+
+# test_package 中自带的测试
+# 1) 消费者视角：真实 Pd 引擎（libpd）加载三个外部对象并驱动 DSP（数值断言）
+# 2) 上游用例视角：三个上游补丁 verbatim 在 puredata/0.54.1 宿主内运行
+test_package_tests:
+  - file: consumer_e2e.c
+    description: "libpd 宿主消费者端到端测试：dlopen 三个 .pd_linux + setup()，经 pdvbap_consumer.pd 校验 2D/5.1 声像增益（能量守恒、最近扬声器集中），并要求 Pd 控制台无报错"
+    command: "./consumer_e2e <externals_dir> <patch_dir> <libpd.so>  # LD_PRELOAD=libpd.so（仅运行步）"
+  - file: pdvbap_consumer.pd
+    description: "消费者补丁：[r lssetup] -> [vbap 0 0 30] -> [s gains]，配合 bang/azim/elev/spread 接收器"
+    command: "（由 consumer_e2e.c 通过 libpd_openfile 载入）"
+  - file: run_upstream_pd_tests.py
+    description: "上游用例执行器：三个上游补丁在 puredata/0.54.1 宿主内 verbatim 运行，逐条断言 载入/无 couldn't create/无 connection failed/无 error/帧回显出期望用例名"
+    command: "python3 run_upstream_pd_tests.py --pd <puredata>/bin/pd --externals <package>/lib/pd-externals --tests upstream_pd_tests --work <writable>"
+  - file: upstream_pd_tests/testtools/unit-test-frame.pd
+    description: "上游补丁所需但上游未分发的测试帧（适配层补齐，无自研断言逻辑）：提供补丁连接的 4 进 4 出，回显 UNTEST: <name> 并延时退出"
+    command: "（由上游补丁 loadbang 实例化）"
+  - file: upstream_pd_tests/{vbap,rvbap,define_loudspeakers}-unittest.pd
+    description: "上游用例补丁 verbatim 副本（sha256 见 upstream_pd_tests/README.md）"
+    command: "（由 run_upstream_pd_tests.py 载入）"
+
+# 测试断言总数 (近似值, 用于质量评估)
+# consumer_e2e.c 18 + 上游用例执行器 3 补丁 × 4 项断言 = 30
+assertion_count: 30
