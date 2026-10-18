@@ -1,0 +1,35 @@
+# 软件级 manifest — slurm-wlm
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: slurm-wlm
+display: "Slurm Workload Manager"
+description: "Slurm 集群工作负载管理器（作业提交/调度/记账工具链与 libslurm 客户端库）"
+category: system
+homepage: "https://www.schedmd.com/"
+license: GPL-2.0-or-later
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "必须用 SchedMD release tarball（自带预生成 configure）：OHOS 主机没有 automake/aclocal/libtoolize，无法从 configure.ac 引导"
+    - "自带的 2022 版 config.sub 不认识 ohos → --build/--host 退化为 aarch64-linux-gnu（工具链与 sysroot 仍是 OHOS）"
+    - "HMDFS 上 getcwd() 失效（E114/E386）：build() 预置 PWD，config.status 用 umask 022 创建临时目录（E129/E011）"
+    - "musl 缺 glibc-only 符号：sys/unistd.h、res_n* 走补丁；getpwent_r/getgrent_r/euidaccess/pthread_cancel*/inet_nsap_*/canonicalize_file_name 走「兼容头 -include + 垫片静态库」两件套"
+    - "cpu_set_t/CPU_SET 需要 -D_GNU_SOURCE；可选后端 numactl/freeipmi/NVML/RSMI/MySQL 关闭"
+    - "包型保持 application：改成 library 会让 AutotoolsToolchain 注入 --disable-shared --enable-static，插件 .so 不产出、二进制 blob 链接缺符号（知识草稿 DRAFT-10718-conan-package-type-drives-autotools-shared-static-flags）"
+    - "上游 41 个 libcheck 用例在 build() 里 make check 实跑，结果打印为 SLURM-UPSTREAM-* 行"
+  common_dependencies:
+    - munge
+    - hwloc
+    - json-c
+    - http-parser
+    - readline
+    - ncurses
+    - libcap
+    - libaio
+
+versions:
+  "25.11.4":
+    status: built
+    build_date: "2026-10-14"
+    conan_ref: "slurm-wlm/25.11.4"
