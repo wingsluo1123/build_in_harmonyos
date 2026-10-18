@@ -1,0 +1,36 @@
+# 版本级 manifest — esmtp 1.2（ARCHIVE-SPEC v2.0）
+
+# ── 必须字段 ──────────────────────────────────────────────
+version: "1.2"
+software: "esmtp"
+status: built
+build_date: "2026-10-08"
+build_system: "autotools"
+
+# ── 源码信息 ──────────────────────────────────────────────
+source:
+  # SourceForge 官方直链（设备侧实测 200 / 127921B / md5 79a9c1f9… 与官方 API 一致）
+  url: "https://downloads.sourceforge.net/project/esmtp/esmtp/1.2/esmtp-1.2.tar.bz2"
+  sha256: "a0d26931bf731f97514da266d079d8bc7d73c65b3499ed080576ab606b21c0ce"
+  tar_format: "tar.bz2"
+
+# ── 构建配置 ──────────────────────────────────────────────
+build:
+  system: autotools
+  # 上游 configure 无必选项；libESMTP 探测由配方注入的 libesmtp-config 完成
+  configure_options: []
+  dependencies:
+    - "libesmtp/1.1.0"
+  cc: clang
+  cxx: clang++
+
+# ── 补丁信息 ──────────────────────────────────────────────
+patches_applied:
+  - "0001-add-informational-long-options.patch"
+  - "0002-skip-noop-setregid.patch"
+
+# ── 知识沉淀 ──────────────────────────────────────────────
+knowledge_gained:
+  - "esmtp 1.2 的 configure 硬依赖 libesmtp-config，而 libESMTP >= 1.0（meson）不再安装该脚本：需在配方侧生成中性 helper 并注入 PATH"
+  - "esmtp 上游零测试资产（四类目录 + 八类标记全 0 命中）：协议面验证只能由 test_package 承担"
+  - "SourceForge 直链取源必须带三段 project/<p>/<p>/<ver>/ 路径；写成两段得 404，带浏览器 UA 另得 403（Cloudflare 挑战页），两者不可混为一谈"

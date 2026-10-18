@@ -1,0 +1,26 @@
+--- a/main.c
++++ b/main.c
+@@ -108,6 +108,23 @@
+ 		mode = ENQUEUE;
+ 	}
+ 
++
++	/*
++	 * esmtp 1.2 only implements sendmail-compatible short options, so
++	 * "--version"/"--help" used to fall through to the option switch and
++	 * exit with EX_USAGE.  Add the two conventional informational options
++	 * so the installed binary can be queried by scripts and smoke tests.
++	 */
++	if (argc == 2 && strcmp (argv[1], "--version") == 0)
++	{
++		printf ("%s\n", PACKAGE_STRING);
++		exit (EX_OK);
++	}
++	if (argc == 2 && strcmp (argv[1], "--help") == 0)
++	{
++		printf ("usage: esmtp [options] [recipient ...]\n");
++		exit (EX_OK);
++	}
+ 	while ((c = getopt (argc, argv, "A:B:b:C:cd:e:F:f:Gh:IiL:M:mN:nO:o:p:q:R:r:sTtV:vX:")) != EOF)
+ 		switch (c)
+ 		{
