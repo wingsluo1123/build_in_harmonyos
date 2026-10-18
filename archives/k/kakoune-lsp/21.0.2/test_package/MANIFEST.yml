@@ -1,0 +1,48 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: kakoune-lsp/21.0.2
+homepage: "https://github.com/kakoune-lsp/kakoune-lsp"
+
+# 上游测试命令 (cargo test for Rust projects)
+upstream_check_command: "cargo test --release --locked --tests"
+
+# 上游测试在主配方 build() 阶段执行（below/0.11.0 先例）——CI worker
+# 在 test_package 阶段无 cargo；build 阶段判定由 L1 门禁承载，
+# HMBS_UPSTREAM_TEST_RESULT 标记随构建日志输出。
+upstream_test_in_build: true
+upstream_test_command: "cargo test --release --locked --tests"
+
+# 上游测试存在性审计（hmbs 硬门禁要求）
+upstream_tests_exist: true
+upstream_test_audit: |
+  审计结论：上游 kakoune-lsp 21.0.2 存在单元测试套件，已接入并在真机完整执行。
+  1. 注册口径 N=16（cargo test --tests 框架 "running N tests" 行对账）：
+     - src/markup.rs：1 个 #[test]
+     - src/position.rs：3 个 #[test]
+     - src/text_edit.rs：11 个 #[test]
+     - src/util.rs：1 个 #[test]
+  2. 执行方式：cargo test --release --locked --tests（主配方 build()
+     阶段，below/0.11.0 先例），全部离线纯逻辑测试，无网络/在线数据集
+     依赖，可在 HarmonyOS aarch64 真机完整执行。
+  3. doc-tests 说明：cargo test 默认的 doc-tests 阶段因 OHOS rust 工具链
+     （Harmonybrew bottle）无可用 rustdoc 无法执行（cargo spawn rustdoc
+     即 ENOENT，与同仓库已合入的 alacritty/0.17.0、argc/1.24.0 先例
+     一致，判定为平台限制）；--tests 排除该阶段，kakoune-lsp 源码无
+     rust doctest 块（0 个 doctest 用例受影响），不修改任何测试源。
+  4. 平台豁免：无（16/16 全通过，0 失败 0 过滤）。
+  5. 计数方式：以真机 cargo test 的 "test result:" 框架输出行为准
+     （passed/failed/filtered 全部取自框架输出，非静态统计）。
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: src/markup.rs
+    source: kakoune-lsp-21.0.2/src/markup.rs
+  - file: src/position.rs
+    source: kakoune-lsp-21.0.2/src/position.rs
+  - file: src/text_edit.rs
+    source: kakoune-lsp-21.0.2/src/text_edit.rs
+  - file: src/util.rs
+    source: kakoune-lsp-21.0.2/src/util.rs
