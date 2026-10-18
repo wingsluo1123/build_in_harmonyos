@@ -1,0 +1,51 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for baloo-widgets/26.04.0 (upstream 26.04.0).
+
+package: baloo-widgets/26.04.0
+homepage: https://invent.kde.org/libraries/baloo-widgets
+
+# Upstream declares its suite through ecm_add_test()/ecm_add_tests() and KDE CI
+# runs ctest in the build tree.
+upstream_check_command: "ctest --output-on-failure"
+upstream_test_in_build: true
+upstream_test_command: >
+  ctest --output-on-failure --timeout 300
+
+# Registered by upstream autotests/CMakeLists.txt (6 test binaries).
+upstream_tests:
+  - file: autotests/extractortest.cpp
+    source: baloo-widgets-26.04.0/autotests/extractortest.cpp
+    description: "OndemandExtractor extracts meta data through the packaged baloo_filemetadata_temp_extractor helper"
+    condition: "needs the helper executable produced by src/ondemandextractor"
+  - file: autotests/filemetadatadatedisplaytest.cpp
+    source: baloo-widgets-26.04.0/autotests/filemetadatadatedisplaytest.cpp
+    description: "FileMetaDataProvider date display formatting"
+    condition: "offscreen Qt platform (QT_QPA_PLATFORM=offscreen)"
+  - file: autotests/filemetadataitemcounttest.cpp
+    source: baloo-widgets-26.04.0/autotests/filemetadataitemcounttest.cpp
+    description: "FileMetaDataProvider item count handling"
+    condition: "offscreen Qt platform"
+  - file: autotests/filemetadatamergedatatest.cpp
+    source: baloo-widgets-26.04.0/autotests/filemetadatamergedatatest.cpp
+    description: "FileMetaDataProvider::mergeData() merging of per-item meta data maps"
+    condition: "pure unit test, no indexer required"
+  - file: autotests/filemetadatawidgettest.cpp
+    source: baloo-widgets-26.04.0/autotests/filemetadatawidgettest.cpp
+    description: "FileMetaDataWidget / TagWidget end-to-end widget behaviour"
+    condition: "needs a running Baloo index (tags/comments/rating come from the index DB)"
+  - file: autotests/widgetfactorytest.cpp
+    source: baloo-widgets-26.04.0/autotests/widgetfactorytest.cpp
+    description: "WidgetFactory property/item widget creation"
+    condition: "offscreen Qt platform"
+
+# Consumer test of this recipe (R34: real API, not a print-only shell).
+test_package_tests:
+  - file: test_package/test_baloo_widgets.cpp
+    description: >
+      Links KF6::BalooWidgets through the packaged KF6BalooWidgetsConfig.cmake and drives the
+      public API: FileMetaDataProvider read-only round trip, setItems()/items()/data() state,
+      label() translation lookup, WidgetFactory date format, FileMetaDataWidget read-only and
+      date format properties.
+    command: "conan create (test_package builds and runs test_baloo_widgets) - see reports/test-report.md"
+
+assertion_count: 18
