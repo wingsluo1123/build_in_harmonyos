@@ -1,0 +1,39 @@
+# 版本级 manifest — uuu 1.5.243
+
+version: "1.5.243"
+software: "uuu"
+status: built
+build_date: "2026-10-15"
+build_system: cmake
+
+source:
+  url: "https://github.com/nxp-imx/mfgtools/releases/download/uuu_1.5.243/uuu_source-uuu_1.5.243.tar.gz"
+  sha256: "dee3be0f337c631bf93232f5ea42440f07782ce005c9219a14731d66bbe83658"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "BZIP2_INCLUDE_DIR/BZIP2_LIBRARIES hints from Conan bzip2 package (FindBZip2)"
+    - "CMakeDeps + PkgConfigDeps for openssl/libusb/zstd/zlib (tinyxml2 NOT from Conan)"
+    - "vendored tinyxml2 9.0.0 wired into lib uuc_s in source() via replace_in_file (no Conan dep, no patch files, no extra compiler invocation)"
+    - ".tarball-version stamped with 1.5.243 (libuuu gen_ver.sh, nixpkgs precedent)"
+    - "CMAKE_SYSTEM_NAME=Linux on OHOS (E092, CMake 4.x HarmonyOS unknown)"
+  dependencies:
+    - bzip2/1.0.8
+    - libusb/1.0.27
+    - openssl/1.1.1w
+    - zstd/1.5.6
+    - zlib/1.3.1
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "Top-level CMake adds only libuuu + uuu; bundled zlib/zstd/libusb/bzip2 submodules are not built (tinyxml2 EXCEPTION: vendored 9.0.0 IS built by recipe, see below)"
+  - "Conan tinyxml2 dead-ends on OHOS preflight: shared needs absent signing tools (validate), static has no cppstd=17 binary and recipe rebuild fails on CMake 4.4.3 Platform/HarmonyOS; vendored 9.0.0 (upstream pinned) wired into uuc_s via replace_in_file in source()"
+  - "uuu has no CTest suite; only bundled third-party submodules contain tests (never added)"
+  - "libuuu gen_ver.sh prefers source-root .tarball-version over git describe"
+  - "libuuu/zip.cpp uses zlib inflate directly, no libzip dependency"
+  - "libuuu/usbhotplug.cpp global CAutoDeInit throws on libusb_init failure -> SIGABRT in OHOS sandbox (no USB); recipe degrades gracefully (no throw + guarded exit/list) so version/help/-udev run, device paths error out (xfel 1.3.5 precedent)"
