@@ -1,0 +1,36 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 25a8ddb..9aca4f2 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -2,7 +2,10 @@ cmake_minimum_required (VERSION 3.10)
+ 
+ project(PlastLibrary)
+ 
+-find_package (JNI REQUIRED)
++# The JNI bridge (src/launcher/jni) is an optional Java binding and needs a JDK.
++# Look for it, but do not require it: the C++ library and the command line tools
++# are self contained and are still built when no JDK is installed.
++find_package (JNI)
+ 
+ ################################################################################
+ # The version number.
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 5d3178c..6c5af4a 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -27,7 +27,14 @@ add_definitions (${plast-flags})
+ 
+ file (GLOB_RECURSE  LibraryFiles  ./*)
+ 
+-include_directories (${plast-includes}  ${JAVA_INCLUDE_PATH} ${JAVA_INCLUDE_PATH2})
++if (JNI_FOUND)
++    include_directories (${plast-includes}  ${JAVA_INCLUDE_PATH} ${JAVA_INCLUDE_PATH2})
++else()
++    # No JDK available: drop the JNI binding instead of failing the whole build.
++    message("-- JNI not found: building PLAST without the Java binding")
++    list (FILTER LibraryFiles EXCLUDE REGEX "/launcher/jni/")
++    include_directories (${plast-includes})
++endif()
+ 
+ add_library    (PlastLibrary-static  STATIC  ${LibraryFiles} )
+ #add_library    (PlastLibrary-dynamic SHARED  ${LibraryFiles} )

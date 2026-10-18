@@ -1,0 +1,145 @@
+﻿software: plast
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "2.3.2"
+
+# 编译状态
+# published | built | failed | archived
+# built：真机 conan create 全流程通过（编译 + 打包 + 上游单元测试 88/88 实执行通过，
+# 8 例因归档缺 fixture 早退 + test_package 消费者测试），尚未执行 release 流水线的 conan upload。
+status: built
+
+build_date: "2026-10-15"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 上游源码（PLAST-software 是 plast.inria.fr 指向的官方 GitHub 组织；
+  # 历史下载站 plast.gforge.inria.fr 已无法解析）
+  url: "https://github.com/PLAST-software/plast-library/archive/refs/tags/v2.3.2.tar.gz"
+  sha256: "9068b4904fa638c57e427eedd1682cd74eba0e1478f9256ecf1768bc538f08d6"
+  tar_format: tar.gz
+  upstream_homepage: "https://plast.inria.fr/"
+  license: "AGPL-3.0-only"
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+  build_system: cmake
+
+  # 由 conanfile.py generate() 注入的 CMake cache 变量
+  configure_options:
+    - "-DCMAKE_SYSTEM_NAME=Linux            # E092：os=OHOS 时 conan 映射为 CMake 不认识的 HarmonyOS"
+    - "-DSIMDE_INCLUDE_DIR=<simde>/include  # SIMDe 头文件目录（SSE kernel 移植）"
+    - "-DCPPUNIT_INCLUDE_DIR=<cppunit>/include  # 上游 CppUnit 单元测试"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - "simde/0.8.2"       # header-only，三个 SSE kernel 的跨架构实现
+    - "cppunit/1.15.1"    # test_requires：仅供 build() 内构建/运行上游 PlastLibraryTest，不进入消费者依赖图
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - file: "0001-cmake-minimum-required.patch"
+    description: "cmake_minimum_required 2.6 → 3.10 并前移到 project() 之前（CMake 4 拒绝 <3.5）"
+    type: portability
+  - file: "0002-cmake-optional-jni.patch"
+    description: "JNI/Java 绑定改为可选：OHOS 无 JDK，缺失时排除 src/launcher/jni 而不是整体配置失败"
+    type: portability
+  - file: "0003-cmake-portable-cpu-flags.patch"
+    description: "-msse3 仅在 x86 目标上传递（aarch64 上 clang 会直接报错）"
+    type: portability
+  - file: "0004-simde-portable-simd-kernels.patch"
+    description: "SmallGapHitIteratorSSE8 / UngapHitIteratorSSE8 / UngapHitIteratorSSE16 改用 SIMDe 头（语义不变），并接入 SIMDE_INCLUDE_DIR"
+    type: portability
+  - file: "0005-test-in-tree-db-fixtures.patch"
+    description: "上游 test target 改为使用仓库内 FASTA fixture 与真实二进制路径，避免访问已失效的 plast.gforge.inria.fr"
+    type: portability
+  - file: "0006-cxx17-drop-register.patch"
+    description: "StatisticsPlastn.cpp 去掉 C++17 已移除的 register 存储类说明符（OHOS profile 的 cppstd=17 下 clang 报错）"
+    type: portability
+  - file: "0007-systemcommand-tmpdir.patch"
+    description: "SystemCommand 的临时文件改用 TMPDIR（OHOS 上 /tmp 只读）"
+    type: portability
+  - file: "0008-unit-tests-tmpdir.patch"
+    description: "上游单测的临时文件改用 TMPDIR，不再硬编码 /tmp"
+    type: portability
+  - file: "0009-fgetc-eof-unsigned-char.patch"
+    description: "fgetc 结果用 int 承载：char 在 aarch64 上无符号，EOF 哨兵失效会在末行无换行时死循环"
+    type: portability
+  - file: "0010-test-runner-report-failures.patch"
+    description: "PlastLibraryTest 打印失败断言详情并返回非零状态，失败不再被吞掉"
+    type: portability
+  - file: "0011-skip-unavailable-fixture-tests.patch"
+    description: "8 个依赖 test/db 语料（归档未附带、上游来源已失效）的用例显式 skip 并打印原因"
+    type: portability
+  - file: "0012-reading-frame-unsigned-char.patch"
+    description: "反向阅读框方向值用 int 承载：char 在 aarch64 上无符号，-1 变 255，导致反向链索引越界（plastx 结果错误 + 段错误）"
+    type: portability
+  - file: "0013-install-generated-version-header.patch"
+    description: "生成的 misc/api/version.hpp 安装到规范路径，避免包内 version 宏停留在 unstable-master 占位值"
+    type: portability
+
+# ============================================================
+# 真机验证（2026-10-15）
+# ============================================================
+
+verification:
+  command: "conan create . -pr:h=ohos-aarch64 -pr:b=ohos-aarch64 --build=missing"
+  result: "EXITCODE=0"
+  device: "HarmonyOS aarch64 / clang 15.0.4 / cmake 4.1.2 / conan 2.31.1 / git 2.45.2"
+  upstream_unit_tests: "上游 19 个测试文件共 119 处 new TestCaller，未被注释禁用的 108 处；其中 12 处位于整文件 #if 0 的 TestMisc.cpp，故实际编译并启动 96 个（OK (96 tests)）；本环境 88 个实际执行断言并通过，8 个因归档缺 test/db fixture 在用例体内早退"
+  test_package: "ALL PLAST CONSUMER TESTS PASSED"
+  end_to_end: "PlastCmd -p plastp -> 'qry sub 100.00 76 0 0 6 81 1 76 1e-42 151.4'"
+  artifacts:
+    - "bin/PlastCmd         sha256 2f34e79bb362148e913e9f56295271a5700c8ba7b17013a5547bd392d465247f"
+    - "bin/makeplastdb      sha256 4875fe73f1c99d13a9508ed5d7051731629f8beb5eb2b52e71100d24939dcb24"
+    - "lib/libPlastLibrary.a sha256 79178f3f590883ce1a7bb68fbd5ec4241d0472fa7b1f1fc29c2bf0a11ca62085"
+  elf: "elf64-littleaarch64; NEEDED = libc++_shared.so, libc.so only"
+  report: "reports/device-verification.md"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "上游 README 明确要求 Intel/AMD 64bit + SSE2+，但 SIMD 面非常收敛：只有 3 个翻译单元使用 _mm_* 内建（SmallGapHitIteratorSSE8.cpp 54 处、UngapHitIteratorSSE8.cpp 22 处、UngapHitIteratorSSE16.cpp 21 处），因此用 SIMDe 头替换即可完整保留 kernel 语义，无需退化到标量迭代器"
+  - "PLAST 的整个 OS 抽象层（线程/时间/文件/mmap 文件/内存）由自定义宏 __LINUX__ 选择，而该宏只在 CMakeLists 的 CMAKE_SYSTEM_NAME MATCHES Linux 分支里定义；OHOS 下 conan 把 CMAKE_SYSTEM_NAME 映射为 HarmonyOS，若不处理则 DefaultFactory 的 _thread/_time/_file/_memory/_fileMem 全部保持未初始化（运行期空指针），必须按 E092 覆盖 CMAKE_SYSTEM_NAME=Linux"
+  - "find_package(JNI REQUIRED) 是最硬的门禁：ohpcd 制品仓没有 openjdk/jdk 配方（conan download 全部返回 system acceleration policy not enabled），OHOS 上也没有 JDK，Java 绑定必须做成可选"
+  - "上游 test target 有两处失效：runTest.sh 会去 plast.gforge.inria.fr 下载测试数据（该域名已不存在），并且硬编码 <build>/bin/PlastLibraryTest，而 EXECUTABLE_OUTPUT_PATH 实际是 ${PROJECT_BINARY_DIR}/bin/${CMAKE_BUILD_TYPE}，单配置生成器下路径不匹配"
+  - "上游 src/CMakeLists.txt 用 file(GLOB_RECURSE LibraryFiles ./*) 收集全部源码，包含 src/pcre（内置 PCRE 8.31）与 src/launcher/jni，因此 JNI 头缺失会直接让整库配置/编译失败"
+  - "test/unit/CMakeLists.txt 用裸 FIND_PATH/FIND_LIBRARY 查找 CppUnit；把 conan 依赖的 include 目录预置进 CPPUNIT_INCLUDE_DIR 缓存变量即可，FIND_LIBRARY 会通过 <include>/../lib 提示路径找到 libcppunit.a"
+  - "PLAST 的 R37 相关经验：本库为首次适配，版本号保持上游 2.3.2，未加适配后缀"
+  - "aarch64 上 char 默认无符号，PLAST 有两处真实缺陷由此而来（补丁 0009 / 0012）：一是 fgetc 的 EOF 哨兵失效导致死循环，二是阅读框反向链方向值 -1 变 255 被当作数组下标，造成反向链翻译结果错误并在大库上段错误。clang 的 -Wtautological-constant-out-of-range-compare 在编译期就警告了 0009，构建日志中的这类 warning 值得当作 aarch64 移植线索逐条排查"
+  - "同源问题：main.cpp 的测试 runner 只创建 TestResultCollector 而不输出、恒 return 0，导致失败被静默吞掉；配套补丁 0010 让失败可见且让 make test 真正以非零退出"
+  - "test_package 里 conanrun 生成的 runenv 在 OHOS 上可能为空（VirtualRunEnv 未写入 PATH），把包内 bin/ 目录显式传给测试脚本比依赖 runenv 更可靠"
+  - "上游 install(FILES .../version.hpp DESTINATION include/os/api/) 是笔误，源码树里的 unstable-master 占位 version.hpp 会随 install(DIRECTORY src/) 一起进包并覆盖生成头"
+  - "大体量库在 HMDFS 上的构建并行度：PLAST 有 146 个源文件（161 个编译步骤）且 CMake 生成递归 Makefile。HMDFS 不支持 mkfifo（P020），GNU make 的 jobserver 因此退化为 pipe，子 make 拿不到有效 jobserver 时会按无限并行运行，`-j20` 下瞬间耗尽进程配额，表现为**没有任何编译诊断的编译失败**（`make: jobserver mkfifo: Operation not permitted` / `/bin/sh: can't fork - try again` / `Error 127`）。按 E074 显式 `cmake.build(build_tool_args=[\"-j1\"])` 后编译全程通过（CI 构建 #93278 → #93345 对比）"
+
+# ============================================================
+# 产物
+# ============================================================
+
+artifacts:
+  - "bin/PlastCmd          # 命令行比对工具（plastp / tplastn / plastx / tplastx / plastn）"
+  - "bin/makeplastdb       # 构建 quick-reader bank（<bank>.fa.info）"
+  - "lib/libPlastLibrary.a # C++11 静态库"
+  - "include/**           # 公共头文件（含生成的 misc/api/version.hpp）"
+  - "test/PlastLibraryTest + test/db/  # 上游 CppUnit 测试程序与 FASTA fixture（上游行为，未裁剪）"
+
+package_type: static-library
+commands_json: "archives/p/plast/commands.json"

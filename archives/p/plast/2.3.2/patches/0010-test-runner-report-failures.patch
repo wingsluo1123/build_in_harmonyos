@@ -1,0 +1,26 @@
+diff --git a/test/unit/src/main.cpp b/test/unit/src/main.cpp
+index 48de15e..5b4a998 100644
+--- a/test/unit/src/main.cpp
++++ b/test/unit/src/main.cpp
+@@ -16,6 +16,8 @@
+ 
+ #include "cppunit.h"
+ 
++#include <cppunit/TextOutputter.h>
++
+ extern "C" Test* TestOs_suite();
+ extern "C" Test* TestDesignPattern_suite();
+ extern "C" Test* TestSequenceIterator_suite();
+@@ -94,5 +96,11 @@ int main (int argc, char **argv)
+ 
+     runner.run (controller);
+ 
+-    return 0;
++    /** We print the details of the failing tests, if any. */
++    CppUnit::TextOutputter outputter (&result, std::cout);
++    outputter.write ();
++
++    /** We report the status of the suite to the caller, so that a build system
++     *  driving this runner does not consider a failing suite as a success. */
++    return result.wasSuccessful() ? 0 : 1;
+ }

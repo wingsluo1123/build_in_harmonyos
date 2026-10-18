@@ -1,0 +1,83 @@
+﻿# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: plast/2.3.2
+homepage: "https://plast.inria.fr/"
+
+# 真机执行结果（2026-10-15）：CppUnit 汇总行 OK (96 tests)。
+# 三个口径必须分清（详见 PR 正文「测试用例对比」的逐 suite 对账表）：
+#   119 = 上游测试源码中 new TestCaller 语句总数（19 个测试文件）
+#   108 = 其中未被 // 或 /* */ 注释禁用的（11 处被注释禁用）——本项目审查工具的实测口径
+#    96 = 实际参与编译的用例数：另有 12 处位于 TestMisc.cpp，而该文件整体 #if 0
+#         （编译为空 TU、不产生符号），上游 main.cpp 也没有它的 extern 声明
+#         96 与 CppUnit 汇总行 OK (96 tests) 完全吻合。
+#    96 = main.cpp 的 runner 实际 addTest 的 18 个 suite 所含用例数，也就是
+#         CppUnit 汇总行 OK (96 tests) 统计的**启动**用例数。
+#    88 = 本环境实际执行断言并通过的用例数；其余 8 个因 test/db fixture 不在
+#         release 归档中而在用例体内提前返回（CppUnit 仍计为 OK）。
+# 因此按 88/88 实执行通过表述，不写 96/96。清单见 reports/device-verification.md。
+
+# 上游测试入口：根 CMakeLists.txt 定义了自定义 target "test"
+# （补丁 0005 之前它调用 test/runTest.sh，会去已失效的
+#  plast.gforge.inria.fr 下载 FASTA 数据，并使用错误的二进制路径）
+upstream_check_command: "make test"
+upstream_test_in_build: true
+upstream_test_command: "cmake --build <build-dir> --target test   # == test/PlastLibraryTest <src>/test/db"
+
+# 上游 CppUnit 单元测试：test/unit/src 下 19 个测试文件、108 处未被注释禁用的注册语句，
+# 其中 96 处实际编译（main.cpp 注册 18 个 suite）；TestMisc.cpp 整文件 #if 0，12 处不可编译。
+# 下面只列出与本次适配最相关的 8 个套件，非全集。
+upstream_tests:
+  - file: test/unit/src/main.cpp
+    source: plast-library-2.3.2/test/unit/src/main.cpp
+    description: "CppUnit 主程序，注册 18 个测试套件"
+    command: "test/PlastLibraryTest <src>/test/db"
+  - file: test/unit/src/TestOs.cpp
+    source: plast-library-2.3.2/test/unit/src/TestOs.cpp
+    description: "OS 抽象层（内存、容器、并行命令分发/线程）"
+    command: "test/PlastLibraryTest <src>/test/db"
+  - file: test/unit/src/TestDatabaseCompare.cpp
+    source: plast-library-2.3.2/test/unit/src/TestDatabaseCompare.cpp
+    description: "库间比较（查询/参考库遍历）"
+    command: "test/PlastLibraryTest <src>/test/db"
+  - file: test/unit/src/TestAlgoInitializer.cpp
+    source: plast-library-2.3.2/test/unit/src/TestAlgoInitializer.cpp
+    description: "算法初始化与 plastp/plastx 全流程（自带 FASTA fixture）"
+    command: "test/PlastLibraryTest <src>/test/db"
+  - file: test/unit/src/TestPlast.cpp
+    source: plast-library-2.3.2/test/unit/src/TestPlast.cpp
+    description: "PLAST 算法端到端结果校验"
+    command: "test/PlastLibraryTest <src>/test/db"
+  - file: test/unit/src/TestPlastLike.cpp
+    source: plast-library-2.3.2/test/unit/src/TestPlastLike.cpp
+    description: "plastp/plastx/plastn 结果与参考输出比对"
+    command: "test/PlastLibraryTest <src>/test/db"
+  - file: test/unit/src/TestDatabaseIndex.cpp
+    source: plast-library-2.3.2/test/unit/src/TestDatabaseIndex.cpp
+    description: "数据库索引（使用 sapiens_1Mo.fa）"
+    command: "test/PlastLibraryTest <src>/test/db"
+  - file: test/unit/src/TestBugs.cpp
+    source: plast-library-2.3.2/test/unit/src/TestBugs.cpp
+    description: "历史缺陷回归（空序列、bug15696）"
+    command: "test/PlastLibraryTest <src>/test/db"
+
+# test_package 自带的消费者测试
+test_package_tests:
+  - file: test_plast_api.cpp
+    description: "C++ 库 API 消费者：PlastOptionsParser + PlastCmd 直接跑 plastp 并校验比对结果"
+    command: "./test_plast_api data/bank.fa data/query.fa out.txt"
+  - file: test.sh
+    description: "打包后的 PlastCmd / makeplastdb 端到端：正例 >=90% identity、反例 <90%、makeplastdb 生成 bank"
+    command: "bash test.sh data ./test_plast_api"
+
+# 测试断言规模（仅供参考，**不是**通过率分母）：
+#   静态 token 计数约 475 处 CPPUNIT_ASSERT 家族（其中恰好 1 处 CPPUNIT_ASSERT_THROW）。
+#   该数字包含 #if 0 体内、未激活 #else 分支与被注释掉的写法，也包含
+#   TestSequenceDatabase.cpp 的 CHECK、TestFilter.cpp 的 TEST/TEST2 等宏的**定义**；
+#   这些宏在运行期会展开成多条断言，因此实际执行的断言数高于该静态值。
+#   本配方的通过率口径是「用例」而非「断言」：上游 108 处未被注释禁用的注册语句中，
+#   96 处实际编译并启动，88 处实际执行断言并通过，8 处因 test/db fixture 未随归档发布而提前返回。
+# test_package 侧另有 10 项断言（test.sh 6 项 + test_plast_api.cpp 4 项），逐条可复核。
+assertion_count: 475

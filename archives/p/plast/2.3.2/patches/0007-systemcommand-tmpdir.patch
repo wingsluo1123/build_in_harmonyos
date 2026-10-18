@@ -1,0 +1,21 @@
+diff --git a/src/designpattern/impl/SystemCommand.cpp b/src/designpattern/impl/SystemCommand.cpp
+index 6e2a749..b2b6412 100644
+--- a/src/designpattern/impl/SystemCommand.cpp
++++ b/src/designpattern/impl/SystemCommand.cpp
+@@ -87,8 +87,14 @@ SystemCommand::SystemCommand (os::IFile* output, const char* format, ...)
+ 
+     if (_outputfile != 0)
+     {
+-        /** We create a temporary file name for gathering all command outputs. */
+-        snprintf (_tmpFilename, sizeof(_tmpFilename), "/tmp/%p", this);
++        /** We create a temporary file name for gathering all command outputs.
++         *  The directory holding it comes from TMPDIR when this variable is
++         *  defined; some platforms (HarmonyOS for instance) mount /tmp read
++         *  only, so the hard coded path could not be created there. */
++        const char* tmpDir = getenv ("TMPDIR");
++        if (tmpDir == 0 || tmpDir[0] == 0)  {  tmpDir = "/tmp";  }
++
++        snprintf (_tmpFilename, sizeof(_tmpFilename), "%s/%p", tmpDir, this);
+ 
+         /** We modify the request. */
+         snprintf (_buffer, sizeof(_buffer), "%s > %s", tmp, _tmpFilename);
