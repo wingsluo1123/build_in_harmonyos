@@ -1,0 +1,32 @@
+software: swaks
+display: "swaks"
+description: "SMTP 事务测试工具（Swiss Army Knife for SMTP），用于构造、调试和脚本化 SMTP 会话"
+category: network
+homepage: "https://jetmore.org/john/code/swaks/"
+license: GPL-2.0-or-later
+build_system: custom
+
+ohos_adaptation:
+  key_points:
+    - "单文件 Perl 脚本，无构建系统：适配重点是解释器依赖声明，而不是编译"
+    - "perl/5.42.2 声明为运行时依赖（run=True），由 Conan 的 VirtualRunEnv 注入 conanrun PATH"
+    - "脚本硬 use Pod::Usage / File::Spec::Functions，依赖检查必须覆盖 perl 包的核心模块"
+    - "上游自带 #!/usr/bin/env perl 可移植 shebang，OHOS 1.12.0 起有 /usr/bin/env，无需补丁（E037）"
+    - "消费测试用 test_package/mock_smtp.pl 起 loopback SMTP sink，跑真实 ESMTP 会话并断言会话记录"
+    - "CI 门禁 L0p 要求 settings 含 os/compiler/build_type/arch 四项；纯脚本包不能只写 os/arch"
+    - "L2 smoke 不激活 conanrun：解释器来自 Conan 依赖的脚本包（设备无系统 perl）只能 L2=skip（CI 标为 non-blocking）"
+    - "OHOS perl 包缺 Net::SSLeay，因此**包内** --tls* 不可用，--support 会如实报告"
+    - "上游回归套件在 git 仓库 testing/（发布资产不含）：2,589 例 / 12 组；真机全量实测 2,589 例、通过 2,133（82.39%），首轮为 70.83%"
+    - "Net::SSLeay 阻塞可解：设备上手工 xsubpp+clang 编译 Net::SSLeay 1.96 静态链 OHOS openssl/3.5.8 后，TLS supported、_options-tls 252/252、_exec-transactions 首次执行 235 例（122 pass）"
+    - "剩余 455 例失败里 418 例（92%）是 harness hostname munge 环境差异（设备 hostname 恰为 localhost），非 swaks 缺陷；缺可选模块类失败已降为 0（IO::Socket::INET6 也手编成真实现，--support 16/16 supported）"
+    - "该设备 perl 上 perl Makefile.PL 会 futex 死锁、Config{cc} 指向不存在的 clang → 任何 XS 模块（Net::SSLeay、Socket6）都必须手工 xsubpp+clang 并补 AutoSplit"
+  common_dependencies:
+    - perl
+
+versions:
+  "20240103.0":
+    status: built
+    build_date: "2026-10-15"
+    conan_ref: "swaks/20240103.0"
+    ohos_run_id: "codex-swaks-20240103.0-swaks-20240103.0-r1-conan-20261015-150019-49419"
+    ohos_result: "L0/L1/L4/L5 pass，L2 skip（non-blocking），test_package 27/27"

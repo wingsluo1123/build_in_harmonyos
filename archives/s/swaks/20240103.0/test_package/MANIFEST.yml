@@ -1,0 +1,128 @@
+package: swaks/20240103.0
+homepage: "https://jetmore.org/john/code/swaks/"
+upstream_repository: "https://github.com/jetmore/swaks"
+
+upstream_check_command: "perl testing/regressions/bin/run-all.pl（上游 git 仓库测试套件，需从 tag 归档获取）"
+upstream_test_in_build: false
+upstream_test_command: >-
+  SWAKS_TEST_SWAKS=<package>/bin/swaks perl testing/regressions/bin/run-all.pl
+  （不放进 build()：套件完整跑一遍约 7 分钟，且其中 235 例依赖上游测试服务器）
+
+# ── 上游测试套件清点（更正：套件在 git 仓库中，发布资产不含） ──────────────
+upstream_tests: []
+upstream_test_inventory:
+  release_asset: "swaks-20240103.0.tar.gz"
+  release_asset_sha256: "0e531b4d164058802e7266b14f4dc1897099d096f930820de2f9b5eb08dcdbe8"
+  note: >-
+    官方发布资产只含 swaks/README.txt/LICENSE.txt/doc/*.txt，不含测试；但**上游仓库确实有完整回归套件**，
+    位于 testing/（需从 tag 归档 https://github.com/jetmore/swaks/archive/refs/tags/v20240103.0.tar.gz 获取）。
+    套件由 testing/regressions/bin/run-all.pl（headless）驱动，用例为 testing/regressions/<group>/*.test，
+    期望输出在同组 out-ref/ 下，测试服务器为 testing/server/smtp-server.pl。
+  upstream_expected: 2589
+  upstream_out_ref_files: 7718
+  upstream_group_cases:
+    _options-data: 382
+    _options-output: 379
+    _options-protocol: 374
+    _options-tls: 252
+    _options-auth: 246
+    _exec-transactions: 235
+    _options-transport: 216
+    _options-xclient: 166
+    _options-proxy: 163
+    _options-processing: 113
+    _exec-output-dump: 58
+    _exec-output: 5
+  upstream_executed: 2589
+  upstream_passed: 2133
+  upstream_failed: 455
+  upstream_skipped: 1
+  upstream_pass_rate: "82.39%"
+  upstream_not_executed: 0
+  upstream_group_results:
+    _exec-output: {total: 5, passed: 0, failed: 5}
+    _exec-output-dump: {total: 58, passed: 48, failed: 10}
+    _exec-transactions: {total: 235, passed: 122, failed: 113}
+    _options-auth: {total: 246, passed: 240, failed: 6}
+    _options-data: {total: 382, passed: 136, failed: 245, skipped: 1}
+    _options-output: {total: 379, passed: 364, failed: 15}
+    _options-processing: {total: 113, passed: 67, failed: 46}
+    _options-protocol: {total: 374, passed: 370, failed: 4}
+    _options-proxy: {total: 163, passed: 163, failed: 0}
+    _options-tls: {total: 252, passed: 252, failed: 0}
+    _options-transport: {total: 216, passed: 205, failed: 11}
+    _options-xclient: {total: 166, passed: 166, failed: 0}
+  ohos_run:
+    device: "HarmonyOS / HongMeng Kernel 1.12.0 / aarch64"
+    run_id: "codex-swaks-20240103.0-swaks-upstream-full-20261017-111510-31879"
+    swaks_under_test: "包内 bin/swaks（conan 制品，244177 字节，与发布资产一致）"
+    elapsed: "453s"
+    result: "Total 2589 / PASS 2133 / FAIL 455 / SKIP 1（82.39%，12 组全部执行，无未执行组）"
+    baseline: "2026-10-15 基线：执行 2,354（_exec-transactions 未执行）→ PASS 1,667 / FAIL 686（70.83%）；两轮共同执行的 2,353 例上 1,667 → 2,005（70.8% → 85.2%）"
+    command: "SWAKS_TEST_SWAKS=<pkg>/bin/swaks perl testing/regressions/bin/run-all.pl（不带 pattern = 12 组全跑，经设备 runner 全局锁）"
+    failure_attribution_overlapping:
+      - "418 例（91%）harness hostname munge 环境差异：设备 hostname 恰为 localhost，harness 把它替换成 LOCAL_HOST_NAME，而上游 out-ref 里是字面 localhost —— 纯环境差异，非 swaks 缺陷，改 swaks 无法消除"
+      - "32 例 `_exec-transactions/062xx`：用例自己 `SET_ENV PERL5LIB .` 打掉核心库路径，是该 perl 包 prefix=/ 构建的遗留环境问题"
+      - "缺可选 Perl 模块导致的失败：**0 例**——IO::Socket::INET6 也已在设备上手编成真实现（见 environment_provisions），`swaks --support` 16 行全部 supported"
+      - "4 例 TLS/SSL 残留；19 例未归因（unix-domain socket 3 例、上游 ref 面向 git 开发副本等）"
+    environment_provisions:
+      description: >-
+        为让上游套件全量跑通，在 $HOME 下的环境目录补齐缺失模块；**未写入 swaks conan 包、未改任何 conan
+        配方**，openssl 使用独立 CONAN_HOME。其中 Net::SSLeay 是**真实现**（不是桩）。
+      real_modules:
+        - "Net::SSLeay 1.96：设备上手写 xsubpp + clang 编译 XS，静态链接 ohpcd 的 OHOS OpenSSL 3.5.8；
+           SSLeay_version(0) = 'OpenSSL 3.5.8 25 Aug 2026'，swaks --support 报 '=== TLS supported'，
+           _options-tls 252/252 PASS"
+        - "Authen::NTLM 1.09 / Authen::SASL 2.2100 / Net::DNS 1.57 / Digest::HMAC 1.05 / Net::IP 1.26（CPAN 真实现）"
+        - "Socket6 0.29（设备手工编 XS：手写 config.h + xsubpp + clang -fPIC -shared）与 IO::Socket::INET6 2.73（CPAN 纯 Perl）—— `swaks --support` 16/16 全 supported"
+        - "Capture::Tiny 0.50 / Algorithm::Diff 1.201 / Text::Diff 1.46 / Proc::Background 1.32（harness 依赖，纯 Perl 真实现）"
+      stub_modules:
+        - "Term::ReadKey 2.38-stub（仅满足编译期；headless 不调用，被调用即 die）——该桩在 Net::SSLeay 之前就已存在，非本轮引入"
+      none_missing: "无：swaks --support 16/16 全部 supported"
+      known_device_defect: >-
+        该设备 perl 上 `perl Makefile.PL` 会 futex 死锁（/proc: hm_futex_wait_interruptible、CPU 不增长），
+        因此 Net::SSLeay 采用手工 xsubpp + clang 构建；后续任何 XS 模块都需同样处理。
+      upstream_modifications: "无：.test / out-ref/ / bin/run-tests.pl / testing/server/smtp-server.pl 均未修改"
+
+downstream_reference_tests:
+  - file: "Formula/s/swaks.rb"
+    source: "Homebrew/homebrew-core"
+    source_url: "https://github.com/Homebrew/homebrew-core/blob/HEAD/Formula/s/swaks.rb"
+    description: >-
+      Homebrew 官方公式：install 只做 bin.install "swaks"，test 只执行 swaks --version；
+      公式记录的 tarball sha256 与本包 conandata.yml 一致，可作为官方源等价性的旁证
+    command: "swaks --version"
+    expected: 1
+    executed: 1
+    passed: 1
+    failed: 0
+    reference_sha256: "0e531b4d164058802e7266b14f4dc1897099d096f930820de2f9b5eb08dcdbe8"
+
+test_package_tests:
+  - file: "test_swaks.sh"
+    description: >-
+      驱动包内 bin/swaks 与 test_package/mock_smtp.pl 完成真实 ESMTP 会话，并对会话记录做断言；
+      不是 --help 空壳 smoke
+    command: "/system/bin/sh test_swaks.sh <package>/bin/swaks <conan test build folder>"
+    fixture: "mock_smtp.pl"
+    scenarios:
+      - "shebang/E037 前置条件、perl 运行时依赖是否真的进入 conanrun PATH、Pod::Usage 是否存在"
+      - "swaks --version / --help / --support 命令面"
+      - "socket 传输：完整 ESMTP 事务，断言 EHLO/MAIL FROM/RCPT TO/DATA 结尾点/QUIT 与正文标记"
+      - "socket 传输：RCPT 被 550 拒绝时 swaks 必须非 0 退出并回显 550 与原因"
+      - "pipe 传输：--pipe 通道（条件执行，仅当 --support 报告 Pipe Transport 可用）"
+    expected: "24 条必需断言 + 3 条 pipe 断言"
+    ohos_device_result: >-
+      真机 shadow CI（HarmonyOS / HongMeng Kernel 1.12.0 / aarch64，
+      run_id codex-swaks-20240103.0-swaks-20240103.0-r1-conan-20261015-150019-49419）：
+      SWAKS_CONSUMER_TEST_RESULT PASS=27 FAIL=0（pipe 传输在 OHOS perl 包中可用，3 条条件断言全部执行）
+    executed: 27
+    passed: 27
+    failed: 0
+
+# 上游套件用例数（2,589）单独统计；本包的断言数是 test_package 27 条 + 下游参考 1 条
+upstream_assertion_count: 2589
+downstream_reference_assertion_count: 1
+test_package_assertion_count: 24
+test_package_conditional_assertion_count: 3
+assertion_count: 2617
