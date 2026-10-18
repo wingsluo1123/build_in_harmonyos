@@ -1,0 +1,13 @@
+--- a/libvdeplug4/libvdeplug.c	2020-10-14 01:48:58.000000000 +0800
++++ b/libvdeplug4/libvdeplug.c	2026-10-17 18:58:34.765359844 +0800
+@@ -51,6 +51,10 @@
+ 	struct vde_open_args *open_args;
+ };
+ 
++#ifndef RTLD_DEEPBIND
++/* musl libc (OHOS) does not provide RTLD_DEEPBIND; fall back to plain RTLD_NOW */
++#define RTLD_DEEPBIND 0
++#endif
+ static VDECONN *vde_open_module_lib(char *filename, struct vde_open_parms *parms) {
+ 	void *handle=dlopen(filename, RTLD_NOW | RTLD_DEEPBIND);
+ 
