@@ -1,0 +1,25 @@
+--- a/configure.ac
++++ b/configure.ac
+@@ -1026,21 +1026,21 @@
+ fi
+ AC_MSG_RESULT($xml_names)
+ 
+ 
+ have_libcurl=0
+ have_libfetch=0
+ need_libcurl=0
+ need_libxml_www=0
+ need_libfetch=0
+ 
+-if test "X$CURL_CONFIG" != X; then
++if test "X$CURL_CONFIG" != X || test "X$libcurl_source" = "Xpkg-config"; then
+   CPPFLAGS="$CPPFLAGS $LIBCURL_CFLAGS"
+   LIBS="$LIBS $LIBCURL_LIBS"
+   AC_CHECK_HEADER(curl/curl.h)
+   AC_CHECK_FUNC(curl_easy_init, have_curl_easy_init=yes, have_curl_easy_init=no)
+ 
+   AC_MSG_CHECKING(for libcurl library)
+   if test $have_curl_easy_init = yes -a "$ac_cv_header_curl_curl_h" = yes; then
+     libcurl_min_version_dec=`echo $libcurl_min_version | $AWK -F. '{printf("%d\n", 10000*$1 + 100*$2 + $3)};'`
+     libcurl_version_dec=`echo $LIBCURL_VERSION | $AWK -F. '{printf("%d\n", 10000*$1 + 100*$2 + $3)};'`
+     if test $libcurl_version_dec -lt $libcurl_min_version_dec; then

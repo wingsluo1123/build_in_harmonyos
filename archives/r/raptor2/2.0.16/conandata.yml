@@ -1,0 +1,42 @@
+# conandata.yml — raptor2 2.0.16
+# Source: official librdf.org release tarball (https://librdf.org/raptor/)
+# SHA256 verified against the downloaded tarball (1,750,726 bytes).
+
+sources:
+  url: "https://download.librdf.org/source/raptor2-2.0.16.tar.gz"
+  sha256: "089db78d7ac982354bdbf39d973baf09581e6904ac4c92a98c5caadb3de44680"
+
+patches:
+  - patch_file: "patches/0001-build-config.guess.patch"
+    patch_description: >-
+      Teach the bundled config.guess to recognise HarmonyOS (uname -s = HarmonyOS)
+      and emit aarch64-unknown-linux-ohos, so configure does not fall back to its
+      compile-and-run guess (also avoids the umask-077 temp dir, see 0003).
+    patch_type: "portability"
+  - patch_file: "patches/0002-build-config.sub.patch"
+    patch_description: >-
+      Accept the ohos OS and linux-ohos kernel in config.sub so the triplet
+      produced by config.guess validates ("Kernel `linux' not known to work with
+      OS `ohos'" otherwise).
+    patch_type: "portability"
+  - patch_file: "patches/0003-configure.patch"
+    patch_description: >-
+      Drop `umask 077` from configure/config.status temp-dir creation: on this
+      target's filesystem a mode-0700 (drwx--S---) directory rejects file creation
+      even by its owner, so config.status cannot write its subs1.awk machinery.
+    patch_type: "platform"
+  - patch_file: "patches/0004-configure.ac.patch"
+    patch_description: >-
+      configure.ac counterpart of the libcurl detection fix: when libcurl is only
+      discoverable through pkg-config (no curl-config in PATH), have_libcurl was
+      never set, so the upstream-default curl WWW backend silently degraded to the
+      libxml nanohttp backend (unusable with libxml2 >= 2.13 which guards those
+      declarations behind LIBXML_HTTP_STUBS_ENABLED).
+    patch_type: "portability"
+  - patch_file: "patches/0005-src-raptor_libxml.c.patch"
+    patch_description: >-
+      Cap the xmlEntity.checked guard at LIBXML_VERSION < 21100. The field is a
+      libxml2 private symbol removed in 2.11.0, so libxml2 >= 2.11 fails to compile
+      with "no member named 'checked' in 'struct _xmlEntity'". Same fix as the
+      upstream/distro hotfix (SUSE hotfix-libxml-2.11.patch).
+    patch_type: "portability"

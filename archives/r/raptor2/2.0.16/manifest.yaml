@@ -1,0 +1,82 @@
+software: "raptor2"
+version: "2.0.16"
+status: built
+build_date: "2026-10-16"
+conan_ref: "raptor2/2.0.16"
+build_system: "autotools"
+
+source:
+  url: "https://download.librdf.org/source/raptor2-2.0.16.tar.gz"
+  sha256: "089db78d7ac982354bdbf39d973baf09581e6904ac4c92a98c5caadb3de44680"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--with-yajl=<yajl package folder>"
+    - "--without-xslt-config"
+  dependencies:
+    - libxml2/2.15.3.1
+    - libxslt/1.1.45.2
+    - yajl/2.1.0
+    - curl/8.22.0
+    - icu4c/78.3
+  cc: clang
+  cxx: clang++
+  notes: >-
+    Native OHOS/aarch64 build (build == host, clang 15.0.4).  LDFLAGS gains -lc++
+    because ICU is a C++ library linked statically into this C library.
+
+patches_applied:
+  - "0001-build-config.guess.patch"
+  - "0002-build-config.sub.patch"
+  - "0003-configure.patch"
+  - "0004-configure.ac.patch"
+  - "0005-src-raptor_libxml.c.patch"
+
+test_results:
+  type: official
+  upstream_src_unit_tests: 19
+  upstream_src_passed: 19
+  upstream_tests_corpus_checks: 1233
+  upstream_tests_corpus_passed: 1205
+  upstream_tests_corpus_expected_failures: 28
+  consumer_cases: 2
+
+knowledge_gained:
+  - "config.guess: 用 scripts/patch-autotools-ohos.pl 后仍须补 config.sub 的 kernel-os 白名单（脚本第 2.3 步因 2.1 已写入 linux-ohos 而误判 skip）"
+  - "HMDFS/HMFS 上 umask 077 + mktemp -d 生成的 drwx--S--- 目录属主也无法写入，autotools 的 configure/config.status 临时目录机制必须去掉 umask 077"
+  - "libxml2 >= 2.11 移除了 xmlEntity.checked 私有字段，raptor2 2.0.16 需要把守卫改为 LIBXML_VERSION >= 20627 && < 21100"
+  - "libxml2 >= 2.13 的 nanohttp 声明被 LIBXML_HTTP_STUBS_ENABLED 包住，OHPCD libxml2/2.15.3.1 未开启 HTTP stubs，raptor2 的 libxml WWW 后端不可用，必须走 libcurl 后端"
+  - "raptor2 configure.ac 在 libcurl 仅由 pkg-config 发现时不置 have_libcurl，--with-www=curl 会静默退化为 libxml 后端"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/raptor2-2.0.16.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/raptor2-2.0.16.work
+  source_orig_hash: 16543b5f43f53a59
+  source_work_hash: b606569756397bb6
+  generated_at: '2026-10-16T23:29:58'
+  patches_count: 5
+
+patch_classification:
+  - file: 0001-build-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-build-config.sub.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-configure.ac.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0005-src-raptor_libxml.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
