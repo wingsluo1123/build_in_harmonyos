@@ -1,0 +1,29 @@
+software: analitza
+display: "Analitza"
+description: "KDE education math expression parser/evaluator with 2D/3D plotting engine (Analitza, AnalitzaPlot, AnalitzaGui, AnalitzaWidgets) and the org.kde.analitza QML module"
+category: library
+homepage: "https://invent.kde.org/education/analitza"
+license: GPL-2.0-or-later
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "Qt6PrintSupport / Qt6OpenGL / Qt6OpenGLWidgets are absent from the published qtbase/6.11.1 line: top-level find_package uses OPTIONAL_COMPONENTS and every link/compile/install site is guarded with if(TARGET ...) (patches 0001-0005)"
+    - "plotter3d_es.h consumes the ANALITZA_HAVE_OPENGL PUBLIC compile definition exported by the AnalitzaPlot target (resolved from TARGET Qt6::OpenGL at configure time; __has_include(<QOpenGLFunctions>) is only the non-CMake fallback) and plotter3d_es.cpp probes __has_include(<QPrinter>): the GL scene and PDF saving are compiled out, the 3D math model and X3D/STL export path stay available (patches 0002 + 0006, no platform macros)"
+    - "CMAKE_PLATFORM_NO_VERSIONED_SONAME=TRUE (E330): HMDFS rejects the versioned .so symlink chain; libraries ship as single files with bare DT_SONAME from the injected -Wl,-soname rule (OHOS CMake has no SONAME rule of its own)"
+    - "cmake install() rewrites RUNPATH and invalidates the OHOS .codesign section: package() re-signs every ELF with llvm-objcopy --remove-section .codesign + binary-sign-tool sign -selfSign 1"
+    - "ECM_MODULE_PATH set manually and conan_cmakedeps_paths.cmake written by the recipe (CMakeDeps ECMConfig does not propagate the module path; qtbase/qtsvg/qtdeclarative use cmake_find_mode=none)"
+    - "QT_ADDITIONAL_PACKAGES_PREFIX_PATH resolves the split Qt6 packages (Qt6Svg in qtsvg, Qt6Qml/Qt6Quick in qtdeclarative); Qt6LinguistTools_DIR pinned from the qt6linguisttools tool requirement for ECMPoQmTools"
+    - "Upstream CTest (18 entries) runs inside conan create: build-tree libs mirrored into each test dir (copy fallback on HMDFS), QT_QPA_PLATFORM=offscreen, isolated HOME/XDG, /system/lib64 prepended to LD_LIBRARY_PATH"
+  common_dependencies:
+    - qtbase
+    - qtsvg
+    - qtdeclarative
+    - ecm
+    - qt6linguisttools
+
+versions:
+  "26.04.0":
+    status: built
+    build_date: "2026-10-17"
+    conan_ref: "analitza/26.04.0"

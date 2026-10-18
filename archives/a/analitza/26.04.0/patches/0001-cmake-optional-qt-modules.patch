@@ -1,0 +1,26 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -33,9 +33,23 @@
+     Test
+     Qml
+     Quick
++    OPTIONAL_COMPONENTS
+     PrintSupport
++    OpenGL
+     OpenGLWidgets
+ )
++
++# HarmonyOS adaptation: probe the optional Qt modules through their imported
++# targets rather than assuming a platform feature set. Qt builds without a
++# module ship neither its targets nor the matching headers (for example the
++# OHOS qtbase line is built with OpenGL and PrintSupport disabled), so the
++# affected rendering and export paths are compiled out in the sources.
++if(NOT TARGET Qt6::PrintSupport)
++    message(STATUS "Analitza: Qt6PrintSupport unavailable, PDF export disabled")
++endif()
++if(NOT TARGET Qt6::OpenGL OR NOT TARGET Qt6::OpenGLWidgets)
++    message(STATUS "Analitza: Qt6OpenGL/Qt6OpenGLWidgets unavailable, 3D rendering disabled")
++endif()
+ set(ANALITZA_INCLUDE_INSTALL_DIR "${KDE_INSTALL_INCLUDEDIR}/Analitza6")
+ 
+ ecm_setup_version(${ANALITZA_VERSION} VARIABLE_PREFIX ANALITZA

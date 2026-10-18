@@ -1,0 +1,282 @@
+--- a/analitzaplot/plotter3d_es.cpp
++++ b/analitzaplot/plotter3d_es.cpp
+@@ -32,9 +32,22 @@
+ #include <QFile>
+ #include <QPixmap>
+ #include <QUrl>
+-#include <QPrinter>
+ #include <QPainter>
+ 
++// Capability probe for the optional Qt PrintSupport module (used only by the
++// PDF branch of save()); the header is installed only when the module exists.
++#if defined(__has_include)
++#  if __has_include(<QPrinter>)
++#    define ANALITZA_HAVE_PRINTSUPPORT 1
++#  endif
++#endif
++#ifndef ANALITZA_HAVE_PRINTSUPPORT
++#  define ANALITZA_HAVE_PRINTSUPPORT 0
++#endif
++#if ANALITZA_HAVE_PRINTSUPPORT
++#include <QPrinter>
++#endif
++
+ #if defined(HAVE_IEEEFP_H)
+ #include <ieeefp.h>
+ // bool isinf(double x) { return !finite(x) && x==x; }
+@@ -43,10 +56,11 @@
+ using namespace std;
+ using namespace Analitza;
+ 
+-const GLubyte Plotter3DES::XAxisArrowColor[] = {250 -1, 1, 1};
+-const GLubyte Plotter3DES::YAxisArrowColor[] = {1, 255 - 1, 1};
+-const GLubyte Plotter3DES::ZAxisArrowColor[] = {1, 1, 255 - 1};
++const quint8 Plotter3DES::XAxisArrowColor[] = {250 -1, 1, 1};
++const quint8 Plotter3DES::YAxisArrowColor[] = {1, 255 - 1, 1};
++const quint8 Plotter3DES::ZAxisArrowColor[] = {1, 1, 255 - 1};
+ 
++#if ANALITZA_HAVE_OPENGL
+ static QOpenGLBuffer createSurfaceBuffer(Surface* surf)
+ {
+     Q_ASSERT(QOpenGLContext::currentContext());
+@@ -65,6 +79,7 @@
+ 
+     return buffer;
+ }
++#endif
+ 
+ Plotter3DES::Plotter3DES(QAbstractItemModel* model)
+     : m_model(model)
+@@ -81,10 +96,12 @@
+ 
+ Plotter3DES::~Plotter3DES()
+ {
++#if ANALITZA_HAVE_OPENGL
+     for (int i = 0; i < m_itemGeometries.size(); ++i)
+     {
+         m_itemGeometries.take(itemAt(i)).destroy();
+     }
++#endif
+ 
+ //     glDeleteLists(m_sceneObjects.value(RefPlaneXY), 1);
+ //     glDeleteLists(m_sceneObjects.value(XArrowAxisHint), 1);
+@@ -94,6 +111,7 @@
+ 
+ void Plotter3DES::initGL()
+ {
++#if ANALITZA_HAVE_OPENGL
+     initializeOpenGLFunctions();
+ 
+     //TODO: provide GLSL version
+@@ -118,6 +136,7 @@
+         "}"
+     );
+     program.link();
++#endif
+ 
+     if (m_model && m_model->rowCount() > 0) {
+         updatePlots(QModelIndex(), 0, m_model->rowCount()-1);
+@@ -152,6 +171,7 @@
+ 
+ void Plotter3DES::drawPlots()
+ {
++#if ANALITZA_HAVE_OPENGL
+     glClearColor(0, 0, 0, 1);
+     glEnable(GL_DEPTH_TEST);
+     glDepthMask(true);
+@@ -223,6 +243,7 @@
+     }
+     program.disableAttributeArray(vertexLocation);
+     program.release();
++#endif
+ }
+ 
+ void Plotter3DES::exportSurfaces(const QString& path) const
+@@ -241,7 +262,9 @@
+         if (!item)
+             return;
+ 
++#if ANALITZA_HAVE_OPENGL
+         m_itemGeometries.take(item).destroy();
++#endif
+ 
+         if (item->isVisible()) {
+             //         addFuncs(QModelIndex(), s.row(), s.row());
+@@ -253,10 +276,12 @@
+     const int count = m_model->rowCount();
+     if (count <= e)
+     {
++#if ANALITZA_HAVE_OPENGL
+         for (int i = e; i < count; ++i)
+         {
+             m_itemGeometries.take(itemAt(i)).destroy();
+         }
++#endif
+     }
+ 
+     renderGL();
+@@ -275,10 +300,12 @@
+ {
+     m_plottingFocusPolicy = fp;
+ 
++#if ANALITZA_HAVE_OPENGL
+     for (int i = 0; i < m_itemGeometries.size(); ++i)
+     {
+         m_itemGeometries.take(itemAt(i)).destroy();
+     }
++#endif
+ 
+     updatePlots(QModelIndex(), 0, m_model->rowCount()-1);
+ }
+@@ -333,6 +360,7 @@
+ 
+ CartesianAxis Plotter3DES::selectAxisArrow(int x, int y)
+ {
++#if ANALITZA_HAVE_OPENGL
+     GLint viewport[4];
+     GLubyte pixel[3];
+ 
+@@ -345,6 +373,11 @@
+     if (memcmp(pixel, ZAxisArrowColor, sizeof(pixel)) == 0) return ZAxis;
+ 
+     return InvalidAxis;
++#else
++    Q_UNUSED(x);
++    Q_UNUSED(y);
++    return InvalidAxis;
++#endif
+ }
+ 
+ void Plotter3DES::fixRotation(const QVector3D& vec)
+@@ -404,6 +437,7 @@
+ 
+ void Plotter3DES::drawAxes()
+ {
++#if ANALITZA_HAVE_OPENGL
+     glLineWidth(1.5f);
+ 
+     static GLfloat const xVertices[] = {
+@@ -472,10 +506,12 @@
+     glDrawArrays(GL_TRIANGLE_FAN, 0, 6);
+ 
+     program.disableAttributeArray(vertexLocation);
++#endif
+ }
+ 
+ void Plotter3DES::drawRefPlane()
+ {
++#if ANALITZA_HAVE_OPENGL
+     glLineWidth(1.f);
+     const float lims = 10;
+     QVector<QVector3D> vxs;
+@@ -496,6 +532,7 @@
+     program.setAttributeArray(vertexLocation, GL_FLOAT, vxs.constData(), 3);
+     glDrawArrays(GL_LINES, 0, vxs.size());
+     program.disableAttributeArray(vertexLocation);
++#endif
+ }
+ 
+ bool Plotter3DES::save(const QUrl& url)
+@@ -507,6 +544,7 @@
+     if(path.endsWith(QLatin1String(".x3d")) || path.endsWith(QLatin1String(".stl"))) {
+         exportSurfaces(path);
+     } else if(path.endsWith(QLatin1String(".pdf"))) {
++#if ANALITZA_HAVE_PRINTSUPPORT
+         auto px = grabImage();
+ //this pulls widgets
+         QPrinter printer;
+@@ -522,6 +560,10 @@
+         painter.begin(&printer);
+         painter.drawImage(QPoint(0,0), px);
+         painter.end();
++#else
++        // No PrintSupport in this Qt build: PDF export is unavailable.
++        return false;
++#endif
+     } else {
+         auto px = grabImage();
+         return px.save(path);
+@@ -531,5 +573,11 @@
+ 
+ QStringList Plotter3DES::filters() const
+ {
+-    return {QObject::tr("PNG Image (*.png)"), QObject::tr("PDF Document (*.pdf)"), QObject::tr("X3D Document (*.x3d)"), QObject::tr("STL Document (*.stl)")};
++    QStringList filters;
++    filters << QObject::tr("PNG Image (*.png)");
++#if ANALITZA_HAVE_PRINTSUPPORT
++    filters << QObject::tr("PDF Document (*.pdf)");
++#endif
++    filters << QObject::tr("X3D Document (*.x3d)") << QObject::tr("STL Document (*.stl)");
++    return filters;
+ }
+--- a/analitzaplot/plotter3d_es.h
++++ b/analitzaplot/plotter3d_es.h
+@@ -27,10 +27,26 @@
+ #include <QRect>
+ #include <QVector3D>
+ #include <QMatrix4x4>
++#include "analitzaplotexport.h"
++
++// HarmonyOS adaptation: the build system exports ANALITZA_HAVE_OPENGL as a
++// PUBLIC compile definition of the AnalitzaPlot target (resolved from
++// Qt6::OpenGL), so the library and every consumer of this installed header
++// agree on the class layout below. The __has_include probe only covers
++// consumers that compile the header outside the exported CMake target.
++#if !defined(ANALITZA_HAVE_OPENGL) && defined(__has_include)
++#  if __has_include(<QOpenGLFunctions>) && __has_include(<QOpenGLBuffer>) && __has_include(<QOpenGLShaderProgram>)
++#    define ANALITZA_HAVE_OPENGL 1
++#  endif
++#endif
++#ifndef ANALITZA_HAVE_OPENGL
++#  define ANALITZA_HAVE_OPENGL 0
++#endif
++#if ANALITZA_HAVE_OPENGL
+ #include <QOpenGLFunctions>
+ #include <QOpenGLBuffer>
+ #include <QOpenGLShaderProgram>
+-#include "analitzaplotexport.h"
++#endif
+ 
+ class QAbstractItemModel;
+ 
+@@ -51,7 +67,10 @@
+  * reference planes for example)
+  */
+ 
+-class ANALITZAPLOT_EXPORT Plotter3DES : private QOpenGLFunctions
++class ANALITZAPLOT_EXPORT Plotter3DES
++#if ANALITZA_HAVE_OPENGL
++    : private QOpenGLFunctions
++#endif
+ {
+     public:
+         //TODO transparency effect when select current item
+@@ -152,7 +171,9 @@
+ 
+         QAbstractItemModel* m_model;
+ 
++#if ANALITZA_HAVE_OPENGL
+         QMap<PlotItem*, QOpenGLBuffer> m_itemGeometries; // pair:=<indexdata_id, vertex-normals_id>
++#endif
+ 
+         PlotStyle m_plotStyle;
+         PlottingFocusPolicy m_plottingFocusPolicy;
+@@ -160,7 +181,7 @@
+         //scene properties
+         QMap<SceneObjectType, uint > m_sceneObjects;
+         QRectF m_viewport;
+-        const GLfloat m_depth;
++        const float m_depth;
+         qreal m_scale;
+         QMatrix4x4 m_rot;
+         QVector3D m_rotFixed;
+@@ -170,7 +191,9 @@
+         QVector3D m_lightpos;
+         QColor m_referencePlaneColor;
+ 
++#if ANALITZA_HAVE_OPENGL
+         QOpenGLShaderProgram program;
++#endif
+         QMatrix4x4 m_projection;
+ };
+ 
