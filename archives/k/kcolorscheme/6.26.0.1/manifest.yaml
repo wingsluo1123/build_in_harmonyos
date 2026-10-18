@@ -1,0 +1,32 @@
+software: kcolorscheme
+version: "6.26.0.1"
+status: built
+build_system: cmake
+created_at: 2026-10-18
+dependencies:
+  required:
+    - qtbase/6.11.1
+    - kconfig/6.26.0.1
+    - kguiaddons/6.26.0
+    - ki18n/6.26.0
+    - libxkbcommon/1.6.0
+  build:
+    - ecm/6.26.0
+  optional: []
+patches_applied:
+  - "0002-ohos-basename-soname-link.patch"
+test_results:
+  type: pending
+  revision_reason: "6.26.0.1: (1) 6.26.0 的已发布二进制在部分 qtbase 变体（如 kwin 6.7.2 覆盖到 qtbase/6.11.1.2）下需要从源码重建，而其配方未声明 libxkbcommon，也未提供 XKB_INCLUDE_DIR/XKB_LIBRARY，配置阶段在 Qt6GuiPrivate 的 find_dependency(XKB) 处失败（'Could NOT find XKB'）；(2) OHOS CMake 无 Platform/HarmonyOS 模块，产物缺 DT_SONAME 且 DT_NEEDED 记录构建机绝对路径（L5 门禁 3 项失败）。本修订补 libxkbcommon 与 XKB 缓存变量；kguiaddons/ki18n 在 ohpcd 无已发布的 6.26.0.1（配方在主线但从未上传），故依赖保持已发布的 6.26.0，并由补丁 0002 按精确文件名 -l:libKF6*.so 链接四个 KF6 组件、显式传 -Wl,-soname,libKF6ColorScheme.so；package() 重新自签名 ELF；上游源码与测试用例不变。"
+  upstream: "pending: 本修订在 CI/真机重建后执行 1 项上游 CTest（kcolorschemetest）"
+  test_package: "pending: 本修订在 CI/真机执行 KColorScheme 消费者测试"
+source_url: https://download.kde.org/stable/frameworks/6.26/kcolorscheme-6.26.0.tar.xz
+source_sha256: 74149a0379bd8bf6590d3c1f7f8c503665e0f3adafc2adbd44fc6bb764c969f1
+knowledge_gained:
+  - "kcolorscheme 6.26.0 requires Qt >= 6.9 and KF6Config, KF6GuiAddons, and KF6I18n 6.26.0."
+  - "Qt 6.10 or newer requires the private Qt6GuiPrivate CMake target during the library build."
+  - "The complete upstream test suite is one CTest executable registered from autotests/kcolorschemetest.cpp."
+  - "Qt6GuiPrivate 的 FindXKB 先做 find_package(libxkbcommon CONFIG)，回退到 XKB_INCLUDE_DIR/XKB_LIBRARY；配方必须同时提供依赖与缓存变量，否则 qtbase 变体触发源码重建时配置失败。"
+  - "ohpcd 中 kguiaddons/ki18n 没有已发布的 6.26.0.1（主线配方未上传时，conan 报 'system acceleration policy not enabled' 是缺版本的通用错误）；对无 DT_SONAME 的依赖用 -l:<basename> + target_link_directories 才是可重定位链接的解，不能靠升依赖版本。"
+  - "OHOS 构建不加载 CMake 的 Platform/HarmonyOS 模块，CMAKE_SHARED_LIBRARY_SONAME_* 为空 → 产物无 DT_SONAME；补丁 0002 在平台无 soname flag 时直传 -Wl,-soname,libKF6ColorScheme.so，避免版本化 .so 符号链在 /storage 上 EPERM。"
+  - "KDE 安装的 targets 文件只设 per-config IMPORTED_LOCATION_RELEASE，且 get_target_property 未设置时返回非空 -NOTFOUND 哨兵串——每个查找必须哨兵门。"
