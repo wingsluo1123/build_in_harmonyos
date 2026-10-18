@@ -1,0 +1,43 @@
+# version-level manifest — piexif 1.1.3
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "1.1.3"
+software: "piexif"
+status: built
+build_date: "2026-10-16"
+build_system: "custom"
+
+source:
+  url: "https://codeload.github.com/hMatoba/Piexif/tar.gz/refs/tags/1.1.3"
+  sha256: "abfd9a67795e23d7a76f9407d60841efa68c5d6e43376b295bb821a30602c569"
+  tar_format: tar.gz
+
+build:
+  system: custom
+  configure_options: []
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-tests-s_test.py.patch"
+
+knowledge_gained:
+  - "纯 Python 库（python-require）无编译步骤：package() 直接把 piexif/ 复制到 lib/python3.12/site-packages"
+  - "上游测试用 PIL.Image._getexif() 交叉校验：Pillow>=6 返回 IFDRational 而非 Pillow 4.2.1 的 (num, den) 元组，测试比较助手需归一化 rational 类型"
+  - "制品仓 pillow（cp312-linux-ohos）与设备 harmonybrew python3.12（EXT_SUFFIX 为 -linux-musl）ABI 相同但扩展名后缀不同，可用符号链接影子目录对齐后运行"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: <build-workspace>/piexif-1.1.3.orig
+  source_work_dir: <build-workspace>/piexif-1.1.3.work
+  source_orig_hash: e7212f9fd4c0d17b
+  source_work_hash: 2becc91a186ae67c
+  generated_at: '2026-10-16T20:37:08'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-tests-s_test.py.patch
+    type: portability
+    platform_only: True
+    guard: none (test-helper compatibility)

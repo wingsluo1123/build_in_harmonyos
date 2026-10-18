@@ -1,0 +1,104 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "file": "archives/p/piexif/1.1.3/conanfile.py",
+      "line": 206,
+      "message": "_probe_interpreter 仍然用 `except Exception: return None` 吞掉全部探测异常（超时、Exec format error、权限、编码错误等），并以 `stdout` 前两行必须是版本号与 EXT_SUFFIX 的刚性行序解析（conanfile.py:210-213）。后果：一个可用的 python3.12 只要打印 banner/sitecustomize 警告，或探测出现瞬时异常，就会被判为「不可用」，进而落到 python_exe is None 的 OHOS 降级分支，而该分支的 smoke 又被跳过（见下一条）。这与 code_style 第 10 条「禁止静默吞错」直接冲突；上一轮已提出，本轮未修改（b4→b5 的 conanfile.py 逐字节相同）。",
+      "recommendation": "只捕获 (OSError, subprocess.SubprocessError)，用 self.output.warning 记录每个 candidate 与异常原因；探测改为 `-I -c \"print('VER=..');print('SUF=..')\"` 并按 key=value 解析，不依赖行序号，避免把合法解释器误判为缺失。"
+    },
+    {
+      "severity": "P2",
+      "file": "archives/p/piexif/1.1.3/conanfile.py",
+      "line": 345,
+      "message": "OHOS + 完全探测不到 python3.12 时，_degraded_verification(reason, None) 会整段跳过 smoke（`if python_exe is not None`），build() 只剩 11 个模块的 compile() 与 AST 计数两项静态检查，库在 build 阶段一次都没有被执行。这正是上一轮 P1① 建议中「至少用 sys.executable 跑纯 Python smoke」的未落实部分——conan 自身的解释器（W3 日志 line249 显示为 python3.14）完全能跑 _SMOKE_CODE。目前真正兜底的是 test_package 的 6 例 12 断言（真实 API），故不构成 P1，但仍属 fail-open 面收窄而非消除。",
+      "recommendation": "无解释器分支改用 sys.executable（不校验 3.12，仅要求 3.x）执行 _SMOKE_CODE，把「suite 无法执行」与「库完全未被验证」区分开；若 smoke 也失败则抛错。"
+    },
+    {
+      "severity": "P3",
+      "file": "archives/p/piexif/1.1.3/conanfile.py",
+      "line": 336,
+      "message": "防减报证据仍是 `ast.walk` 统计所有以 test 开头的 FunctionDef（含嵌套函数与辅助函数），既不校验其属于 TestCase，也不等于 unittest 的收集数。属 fail-closed 的弱口径（多算会硬失败、不会静默放过），但作为「55 例仍在」的证据强度不足，上一轮 P3 未处理。",
+      "recommendation": "仅统计 ClassDef（基类含 TestCase）下的 test* 方法，或改为执行层面收集（如 python -m unittest 的 Ran 行）后再比对 55。"
+    },
+    {
+      "severity": "P3",
+      "file": "archives/p/piexif/1.1.3/conanfile.py",
+      "line": 204,
+      "message": "`sysconfig.get_config_var('EXT_SUFFIX') or '.so'` 在取不到后缀时回退为 `.so`，_build_pillow_shadow 会把 `_imaging.cpython-312-*.so` 改名成 `_imaging.so`，import machinery 不会加载，表现为 `cannot import name '_imaging'`（无 E212 文本），于是硬失败而不是按预期降级。属 fail-closed，但诊断信息会误导。",
+      "recommendation": "取不到 EXT_SUFFIX 时不要改名（保留原文件名），或直接把该解释器判为不可用并记录原因。"
+    },
+    {
+      "severity": "P3",
+      "file": "archives/p/piexif/1.1.3/conanfile.py",
+      "line": 159,
+      "message": "`ran == 0` 同时覆盖「输出里没有 Ran 行」（导入期崩溃/被信号杀掉）与「Ran 0 tests」两种情形，E212 降级实际上判定的是「没有用例跑过」而非字面上的 Ran 0 tests。虽然四条件合取后绕过面很窄（且随后 smoke 会真的 import piexif），但与文档表述不完全一致，也缺少 returncode/末尾行落盘便于追溯。",
+      "recommendation": "显式区分 ran_match 是否为 None，并在降级日志中记录 proc.returncode 与输出末尾 30 行，便于平台 CI 复盘。"
+    },
+    {
+      "severity": "P3",
+      "file": "archives/p/piexif/1.1.3/conanfile.py",
+      "line": 378,
+      "message": "package() 与 package_info() 固定安装到 lib/python3.12/site-packages，而 W3 日志 line249 的消费者测试实际用 python3.14 运行。纯 Python 下不影响功能（test_package 6 例通过），但目录版本与运行解释器不一致，后续引入字节码/ABI 处理会踩坑。",
+      "recommendation": "用构建期推导的 want_mm 统一目录名，或统一用不带版本号的 lib/site-packages 并在 README 说明约定。"
+    },
+    {
+      "severity": "P3",
+      "file": "archives/p/piexif/1.1.3/test_package/conanfile.py",
+      "line": 42,
+      "message": "`self.run('%s -B \"%s\" \"%s\"' % (sys.executable, script, site_packages))` 对解释器路径不加引号，路径含空格即断裂，且拼接字符串交给 shell 保留了注入面（当前入参均为 conan cache 路径，风险低）。上一轮已提出，本轮未改。",
+      "recommendation": "用 shlex.quote(sys.executable) 或改参数列表形式，其余参数保持一致转义。"
+    },
+    {
+      "severity": "P3",
+      "file": "archives/p/piexif/1.1.3/reports/test-report.md",
+      "line": 88,
+      "message": "G4 条目已如实写出 conan-verify「无法找到程序包 ID」而跳过可执行产物校验（较上一轮有改进），但同句「lib/ 产物基线由 L5 校验通过」放在 conan-verify 小节内会被读成 conan-verify 的 L5；实际 conan-verify-report.md 的 L2/L4/L5 全部为「⏭️ 跳过（无 cache 路径）」，通过的是 W3 日志 line280 的 L5。",
+      "recommendation": "改为「G4 未能定位 package id，产物完整性未由 conan-verify 校验；lib/ 基线由 W3 的 L5（w3-local-ci.log:280 L5_RESULT=pass: lib/ has content）校验」，避免跨门禁混记。"
+    },
+    {
+      "severity": "P3",
+      "file": "archives/p/piexif/1.1.3/reports/test-report.md",
+      "line": 48,
+      "message": "四条分支用例表已标注为「临时注入桩 harness、不入仓」，并明确「正式证据以 W3 真实执行行为为准」，披露口径诚实、不再冒充入仓证据；但表中 modules=11 collected=55/55 smoke=pass、Ran 3 tests 等仍是不可复现的自述，本 bundle 内无任何 harness 输出。结合源码逐条核对，四条分支与代码行为（conanfile.py:109-112、158-173）一致，故不判为夸大。",
+      "recommendation": "保留标注即可；若要提高可核性，可在 notes 中附四条分支对应的源码行号与判定伪代码（无需提交 harness）。"
+    },
+    {
+      "severity": "P3",
+      "file": "notes.md",
+      "line": 61,
+      "message": "notes.md:61-62 以既成事实口吻写「平台 CI 沙箱（E212 loader 边界，PIL 不可 dlopen）：降级验证通过——modules=11 collected=55/55 smoke=pass」，但 bundle 内没有对应平台 CI 日志或构建号（只给了失败的 #95929/#95950/#96023/#97158/#97254）。该结论与代码路径自洽，但平台侧降级路径的真实发生与否无法独立复核。",
+      "recommendation": "补上通过降级路径的那次平台 CI 构建号（与失败构建号并列），或将其标注为「按代码推断的预期行为」，与设备实测区分。"
+    },
+    {
+      "severity": "P3",
+      "file": "archives/p/piexif/1.1.3/reports/test-report.md",
+      "line": 6,
+      "message": "两处细节与证据不一致：第 6 行称 G2 用「设备 profile ohos-aarch64-device」，而 conan-verify-report.md:5 为 `ohos-aarch64`；第 17 行的用例类分布（ExifTests 32 / UTests 7 / HelperTests 9 / WebpTests 7）在 w3-local-ci.log 中无对应行（日志仅 `Ran 55 tests`），无法核对（总数 55 正确）。上一轮 P3 未处理。",
+      "recommendation": "引用真实 profile 名；类级分布改为引用可复现的 -v 输出片段，否则删除该细分。"
+    },
+    {
+      "severity": "P3",
+      "file": "archives/p/piexif/1.1.3/manifest.yaml",
+      "line": 7,
+      "message": "build_date 仍为 2026-10-16，与本轮实际构建/收尾时间 2026-10-18（notes.md:80/83、.build-closed 2026-10-18 13:03）不一致；build_system: custom 不在 code_style 第 14 条枚举（cmake|autotools|makefile|meson）内，导致 conan-verify-report G0 仍报「构建系统: unknown，跳过预查询」。上一轮 P3 未处理。",
+      "recommendation": "更新 build_date 为实际构建日期；为 custom 在仓库规范中登记取值或改用已登记值。"
+    },
+    {
+      "severity": "P3",
+      "file": "notes.md",
+      "line": 80,
+      "message": "notes.md 存在重复的收尾块：line80 `**编译结束**: 2026-10-18` 后接分隔线，line83 又写 `**编译结束**: 2026-10-18 13:03` + `**最终状态**: built`。收尾标记存在（P2#6 要求满足），但重复且日期格式不一，属编辑残留。",
+      "recommendation": "删除 line80 的旧收尾块，仅保留带时间与最终状态的最后一组。"
+    },
+    {
+      "severity": "P3",
+      "file": "archives/p/piexif/1.1.3/reports/test-report.md",
+      "line": 13,
+      "message": "报告多处把 reports/w3-local-ci.log、reports/conan-create.log、reports/conan-verify-report.md 当作可检索的仓库内证据（第13、18、90行），但 changed_files 中 reports/ 只有 test-report.md（规则19 不允许 *.log 入仓）。这也是 G2「55 例执行证据」在本 bundle 内缺位的原因：conan-verify-report 只记 G2 PASS，实际 55 例证据仅 W3 日志一份。",
+      "recommendation": "在报告中显式写明这些日志是「本地工作区产物、不入仓」，并把可核实的稳定标记串（如 upstream suite: ran=55, exit=0, ok=True）作为引用锚点。"
+    }
+  ],
+  "summary": "独立复核，未采信作者说明。先按 b3→b4→b5 的 diff 确认修复是实质代码改动而非注释：P1① 见 conanfile.py:109-112（python_exe is None 时先判 settings.os != OHOS 即抛 ConanException，仅 OHOS 才降级）；P1② 见 conanfile.py:158-173（loader_denied 需同时满足 os==OHOS、ran==0、输出含 ImportError/ModuleNotFoundError、含 Permission denied/Operation not permitted 四条件，该 return 只在四条件成立时发生，真跑过用例再失败与测试异常仍走 raise；随后 smoke 会真正 import piexif，堵住了「piexif 本身坏掉被当环境问题」的路径）。两处 P1 均确认修复，未发现新的绕过路径（returncode!=0 与 not passed 是 fail-closed 合取，降级后仍有 compile/AST/smoke 三段校验）。W3 日志逐字命中：197 `piexif/1.1.3: Forced build from source`、223 `[upstream] Ran 55 tests in 0.294s`、225 `OK`、226 `upstream suite: ran=55, exit=0, ok=True`、232 `package(): Packaged 11 '.py' files`、249 test_package 以 python3.14 -B 运行、258 `Ran 6 tests in 0.001s`、260 `OK`、272 `L1e: Negative test confirmed — test genuinely depends on piexif`、276-280 `L0_RESULT=pass`/`L1_RESULT=pass`/`L2_RESULT=skip`/`L4_RESULT=pass`/`L5_RESULT=pass`、288 `Pass rate: 100.0% (1/1)`；日志中检索不到 degraded/SMOKE，证明本轮走的是真实 55 例路径而非降级。sha256(w3-local-ci.log)=e1af6b0f04ffa87fe3722ec42c244f2acc9b9cce3cdc803e1cf1d1d1284fe1af 与 .ci-result.json 的 log_sha256 完全一致，时间戳 13:05:25(+08)=05:05:25Z 与日志 05:03:44Z 导出、.handoff 05:05:28Z 收尾自洽，日志未被调包。变更集 12 个文件与 diff_stat 一致，reports/ 仅 test-report.md（audit-result 属本轮审计后写入），notes.md 有收尾标记；上一轮残留的 test_package/conanbuild*.sh、conanrun*.sh、deactivate_* 已全部清除（b4 有、b5 无），archive 内无 __pycache__、无 conandata.yml.ghfast-bak；conanfile 与全部入仓文档已无用户级绝对路径字面量（仅 /data/service/hnp 平台前缀与 /usr/bin 标准前缀，可接受）；patch 仅 `--- a/tests/s_test.py` / `+++ b/tests/s_test.py` 一个 hunk（@@ -573,20 +573,35 @@），只加 normalize(IFDRational)→(num,den) 并归一化 v1/v2，断言与库代码未动；11 个模块与历史打包产物 piexif-1.1.3-ohos-aarch64.tar.gz 内的 11 个 .py 相互印证；无密钥、无 CRLF、无 TODO 占位符；test_package 为 6 例 12 断言（手工逐条计数），从已安装 site-packages 导入并含 3 个负例。仍存在 2×P2 + 12×P3，均不构成 P0/P1：P2 是 _probe_interpreter 的 except Exception 静默吞错＋刚性行序解析（上一轮 P2 未改）和 OHOS 无解释器时 smoke 被整体跳过；P3 集中在 AST 计数口径、EXT_SUFFIX 回退、python3.12 目录与 3.14 消费者、G4 跨门禁记混 L5、四分支注入桩与平台 CI 降级数值无日志可核、profile 名/类分布/build_date 等文档细节。这些均不影响放行：真实 55 例与消费端 6 例都有可核日志，降级路径被 OS 与四条件双重收窄且仍执行 smoke，消费端测试在 CI 上照常真实执行。判定 pass。"
+}
