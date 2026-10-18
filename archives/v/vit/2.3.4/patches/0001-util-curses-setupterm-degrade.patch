@@ -1,0 +1,22 @@
+--- a/vit/util.py
++++ b/vit/util.py
+@@ -1,10 +1,16 @@
+ import os
+ import sys
+ import curses
+ import shlex
+ 
+ from urwid.util import calc_width
+ 
+-curses.setupterm()
+-e3_seq = curses.tigetstr('E3') or b''
+-clear_screen_seq = curses.tigetstr('clear') or b''
++# 无 terminfo 数据库的环境（容器/CI/无终端）里 setupterm() 会抛 _curses.error，
++# 导致 import vit 直接失败；这里降级为空序列，仅在真正清屏时退化为无操作。
++try:
++    curses.setupterm()
++    e3_seq = curses.tigetstr('E3') or b''
++    clear_screen_seq = curses.tigetstr('clear') or b''
++except curses.error:
++    e3_seq = b''
++    clear_screen_seq = b''
