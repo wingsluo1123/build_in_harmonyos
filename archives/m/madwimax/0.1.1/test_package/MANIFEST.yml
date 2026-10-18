@@ -1,0 +1,31 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: madwimax/0.1.1
+homepage: "https://github.com/ago/madwimax"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "（上游无测试）本配方补跑：`madwimax --help` 与 `madwimax --version`"
+
+upstream_tests:
+  - name: "（上游没有测试套件：无 test/tests 目录，Makefile.am 里没有 TESTS）"
+    count: 0
+    description: >-
+      **上游测试数 = 0，如实声明**。按仓库既有做法在配方里补能真跑的功能级测试：构建完成后运行产物
+      ①`madwimax --help`（上游 src/wimax.c:652）②`madwimax --version` → `madwimax 0.1.1`
+      （上游 src/wimax.c:648）。真实驱动功能需 WiMAX USB 设备 + TAP 设备，本环境不执行（如实记录）。
+
+test_package_tests:
+  - file: check_madwimax.py
+    description: >-
+      R34 消费者校验 **7 项**（全部离线）：①产物齐备（bin/madwimax 可执行）②ELF 头自检（真 ELF64、
+      machine=0xB7 AArch64）③`--help` 打印用法 ④`--version` 输出 ⑤许可证随包（COPYING）
+      ⑥证据（sha256 + python 版本）⑦运行边界如实记录（需 WiMAX USB + TAP）。
+    command: "python3 check_madwimax.py <package-folder>"
+
+assertion_count: 7
+added_tests_note: >-
+  本库**上游 0 测试**；上表 `upstream_tests.count = 0`，另在配方内补了 2 条功能级断言
+  （见 `upstream_test_command`），消费者校验 7 条。**三者分开计数**，不混成一句“测试全过”。
