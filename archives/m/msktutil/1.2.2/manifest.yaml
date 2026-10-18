@@ -1,0 +1,34 @@
+version: "1.2.2"
+software: msktutil
+status: built
+build_date: "2026-10-14"
+build_system: autotools
+
+source:
+  url: "https://github.com/msktutil/msktutil/releases/download/1.2.2/msktutil-1.2.2.tar.gz"
+  sha256: "31f5bf11ab546d58736deca1f5a4033312049492511c0be1093220ca6cfd41a2"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--build=aarch64-unknown-linux-gnu"
+    - "--host=aarch64-unknown-linux-gnu"
+    - "--with-udns=no"
+  dependencies: []
+  # krb5 / openldap / cyrus-sasl 未发布到 ohpcd 制品仓，真机系统前缀也没有这些
+  # devel 包；generate() 用 cmd-pkgs 预编译包补齐 openldap-2.6.7 + krb5-1.22.1
+  # 到 /storage/Users/currentUser/usr/local，sasl.h/prop.h 从上游 cyrus-sasl
+  # 2.1.28 tag 获取（cmd-pkgs 无 cyrus-sasl 包；msktutil 仅用 SASL 类型定义，
+  # 不链接 libsasl，见 conanfile.py）。
+  cc: clang
+
+patches_applied: []
+
+knowledge_gained:
+  - "上游 1.2.2 release tarball 自带生成的 configure（dist 包），无需 autoreconf 自举（与 adcli 的 GitLab 快照不同）。"
+  - "msktutil 是纯命令行工具：产物仅 sbin/msktutil（Conan 强制装到 bin/）+ man 页，需 commands.json（R38）。"
+  - "krb5/openldap/cyrus-sasl devel 真机系统前缀缺失：generate() 用 cmd-pkgs 预编译包补齐（openldap-2.6.7、krb5-1.22.1），sasl.h/prop.h 取自上游 cyrus-sasl 2.1.28 tag；configure 需显式 CPPFLAGS/LDFLAGS 及 -Wl,-rpath。"
+  - "cyrus-sasl 2.1.28 的 include/sasl.h 无条件 #include \"prop.h\"，vendor 时必须同时提供 prop.h（放同一 include/sasl/ 目录），否则 configure 的 SASL 头检查失败。"
+  - "可选 udns 后端用 --with-udns=no 关闭，走 libc/libresolv 回退，不引入 libudns 依赖。"
+  - "上游 1.2.2 无任何测试套件（Makefile.in 无 check/TESTS 目标，仅 distcheck 回显版本号），test_package 对打包二进制做消费端冒烟校验。"
