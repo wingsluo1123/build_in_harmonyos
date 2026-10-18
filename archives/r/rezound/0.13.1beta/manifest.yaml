@@ -1,0 +1,154 @@
+# 版本级 manifest
+# 位置: archives/r/rezound/0.13.1beta/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "0.13.1beta"
+software: "rezound"
+status: built
+build_date: "2026-10-14"
+build_system: autotools
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # SourceForge 官方下载端点。注意不能写成项目页的
+  # ".../rezound-0.13.1beta.tar.gz/download"：conan 的 get() 用
+  # os.path.basename(url) 推断落盘文件名并据此选解压器，名为 "download"
+  # 的文件会被当成 zip 解压并抛 BadZipFile。
+  url: "https://downloads.sourceforge.net/project/rezound/ReZound/0.13.1beta/rezound-0.13.1beta.tar.gz"
+  sha256: "9adc3450caae0d22996082fe0f184cdd5314362a212420eb9afdbfd869dd9223"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: autotools
+
+  # 实际传给 configure 的参数（--prefix 等由 AutotoolsToolchain 生成，未列）
+  configure_options:
+    # 交叉编译三元组，OHOS 下显式指定（config.sub 不认识 aarch64-linux-ohos，
+    # 见 0001 补丁）
+    - "--build=aarch64-linux-ohos"
+    - "--host=aarch64-linux-ohos"
+    # fox 由 AX_PATH_GENERIC 通过 <prefix>/bin/fox-config 定位；该私有聚合
+    # 前缀建在 build_folder 内（R49/E524），不写共享前缀
+    - "--with-fox-prefix=<build_folder>/deps-prefix"
+    # OHOS 无对应实现的音频/FFT 后端，显式关闭使配置确定化
+    - "--disable-oss"
+    - "--disable-portaudio"
+    - "--disable-jack"
+    - "--disable-pulse"
+    - "--disable-fftw3"
+    - "--disable-ladspa"
+
+  # 交叉编译无法运行目标二进制，AC_C_BIGENDIAN(configure.ac:180) 由环境变量定值
+  environment:
+    ac_cv_c_bigendian: "no"
+    CPPFLAGS: "-I<build_folder>/deps-prefix/include"
+    LDFLAGS: "-L<build_folder>/deps-prefix/lib"
+    LD_LIBRARY_PATH: "<各依赖 package_folder>/lib（前置，供 configure 探针与 reswrap 运行）"
+
+  # 直接依赖（name/version）
+  dependencies:
+    - fox/1.6.57          # GUI 工具包：libFOX-1.6 + fox-config + reswrap（均强制）
+    - boost/1.91.0.1.3    # 仅头文件（boost/detail/atomic_count.hpp）
+
+  # 传递依赖（由 fox 带入的 X11 栈，均取制品仓已发布版本）
+  transitive_dependencies:
+    - libx11/6.4.0
+    - libxext/6.4.0.1
+    - libxau/1.0.11
+    - libxdmcp/1.1.5
+    - libxcb/1.16
+    - xtrans/1.6.0
+    - xorgproto/2025.1
+    - libpng/1.6.58
+    - libjpeg-turbo/3.2.0
+    - libtiff/4.7.2
+    - libwebp/1.6.0
+    - zlib/1.3.1.1
+    - bzip2/1.0.8
+    - xz/5.6.2
+    - zstd/1.5.7
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-config-config.sub.patch"
+  - "0002-configure.patch"
+  - "0003-src-PoolFile-TPoolFile.cpp.patch"
+  - "0004-src-PoolFile-TPoolFile.h.patch"
+  - "0005-src-backend-CTrigger.h.patch"
+  - "0006-src-frontend_fox-convert_images.sh.patch"
+  - "0007-src-misc-CNestedDataFile-anytype.h.patch"
+  - "0008-src-misc-TMemoryPipe.h.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "conan get() 用 os.path.basename(url) 推断文件名并据此选解压器：SourceForge 项目页的 /download 结尾 URL 会被当 zip 解压（BadZipFile），须改用 downloads.sourceforge.net/project/<proj>/<path>/<file> 直链形式"
+  - "fox-config 的 prefix 固化为 '/'（上游在 DESTDIR staging 前烘焙），--prefix= 覆盖只改脚本内部变量，includedir/libdir 已定型：-I/-L 必须由配方直接注入，不能指望 fox-config --cflags/--libs"
+  - "AX_PATH_GENERIC 通过 PATH 查找 fox-config、AC_PATH_PROG 查找 reswrap —— 二者必须经 build env PATH 暴露，否则 configure.ac:739/746 直接 AC_MSG_ERROR"
+  - "新版 libc++ 下 map<const string, T> 非法（const 限定键类型），须去掉 const（TPoolFile.h/.cpp 共 4 处）"
+  - "新版 libc++ 不再间接包含 <string>，头文件须显式自包含（TMemoryPipe.h、CTrigger.h）"
+  - "vector<bool> 是特化：operator[] 返回代理引用而非 bool&，模板 anytype_to_string 无法推导元素类型而落到未定义的primary template，须补普通重载"
+  - "make 并行会踩 HMDFS jobserver fifo，OHOS 上固定 make -j1"
+  - "configure 的 (umask 077 && mktemp -d) 造出的 confXXXXXX 目录在 HMDFS 上权限不可用（E011），改为 umask 022"
+
+# ============================================================
+# 补丁生成信息（refresh-patch --auto）
+# ============================================================
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/rezound-0.13.1beta.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/rezound-0.13.1beta.work
+  source_orig_hash: d7a0479612534f6a
+  source_work_hash: bb71c6f64fc348ce
+  generated_at: '2026-10-15T18:03:49'
+  patches_count: 8
+
+patch_classification:
+  - file: 0001-config-config.sub.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-src-PoolFile-TPoolFile.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-src-PoolFile-TPoolFile.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0005-src-backend-CTrigger.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0006-src-frontend_fox-convert_images.sh.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0007-src-misc-CNestedDataFile-anytype.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0008-src-misc-TMemoryPipe.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
