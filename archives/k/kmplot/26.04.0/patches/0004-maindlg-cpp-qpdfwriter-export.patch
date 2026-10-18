@@ -1,0 +1,104 @@
+--- a/kmplot/maindlg.cpp
++++ b/kmplot/maindlg.cpp
+@@ -23,9 +23,10 @@
+ #include <QMimeDatabase>
+ #include <QMimeType>
+ #include <QPixmap>
+-#include <QPrintDialog>
+-#include <QPrintPreviewDialog>
+-#include <QPrintPreviewWidget>
++// OHOS: QPrinter/QPrintDialog/QPrintPreviewDialog (Qt PrintSupport) are not
++// published (see patch 0001). The plot print action exports to PDF through
++// QPdfWriter (QtGui, kcron 26.04.1 precedent) instead.
++#include <QPdfWriter>
+ #include <QSvgGenerator>
+ #include <QTemporaryFile>
+ #include <QTimer>
+@@ -667,61 +668,43 @@
+ 
+ void MainDlg::slotPrint()
+ {
+-    QPrinter prt(QPrinter::PrinterResolution);
+-    prt.setResolution(72);
++    // HarmonyOS PC (OHOS): the published qtbase builds Qt with
++    // FEATURE_printsupport=OFF, so QPrinter/QPrintDialog (Qt PrintSupport)
++    // are unavailable. Re-target the print action to a QPdfWriter (QtGui)
++    // PDF export flow (kcron 26.04.1 precedent); the KPrinterDlg page still
++    // supplies header-table/background/size options consumed by
++    // setupPrinter(), and slotExport() keeps covering SVG/PNG export.
+     KPrinterDlg *printdlg = new KPrinterDlg(m_parent);
+     printdlg->setObjectName("KmPlot page");
+-    QPointer<QPrintDialog> printDialog = new QPrintDialog(&prt, m_parent);
+-    printDialog->setOptionTabs(QList<QWidget *>() << printdlg);
+-    printDialog->setWindowTitle(i18nc("@title:window", "Print Plot"));
+-
+-    if (printDialog->exec()) {
+-        setupPrinter(printdlg, &prt);
+-    }
+-    delete printDialog;
++    const QString fileName = QFileDialog::getSaveFileName(m_parent, i18nc("@title:window", "Export Plot to PDF"),
++                                                           QStringLiteral("kmplot.pdf"), QStringLiteral("Portable Document Format (*.pdf)"));
++    if (fileName.isEmpty()) {
++        delete printdlg;
++        return;
++    }
++    QPdfWriter writer(fileName);
++    writer.setCreator(QStringLiteral("kmplot"));
++    writer.setTitle(i18n("KmPlot Plot"));
++    writer.setResolution(72);
++    setupPrinter(printdlg, &writer);
++    delete printdlg;
+ }
+ 
+ void MainDlg::slotPrintPreview()
+ {
+-    QPrinter prt(QPrinter::PrinterResolution);
+-    QPointer<QPrintPreviewDialog> preview = new QPrintPreviewDialog(&prt);
+-    QPointer<KPrinterDlg> printdlg = new KPrinterDlg(m_parent);
+-    QList<QToolBar *> toolbarlist = preview->findChildren<QToolBar *>();
+-    if (!toolbarlist.isEmpty()) {
+-        QAction *printSettings = toolbarlist.first()->addAction(QIcon::fromTheme("configure"), i18n("Print Settings"));
+-        QList<QPrintPreviewWidget *> previewWidgetsList = preview->findChildren<QPrintPreviewWidget *>();
+-        QPrintPreviewWidget *previewWidget = previewWidgetsList.first();
+-        connect(printSettings, &QAction::triggered, [preview, previewWidget, printdlg] {
+-            QDialog *printSettingsDialog = new QDialog(preview, Qt::WindowFlags());
+-            printSettingsDialog->setWindowTitle(i18nc("@title:window", "Print Settings"));
+-            QVBoxLayout *mainLayout = new QVBoxLayout;
+-            printSettingsDialog->setLayout(mainLayout);
+-            mainLayout->addWidget(printdlg);
+-            QDialogButtonBox *buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+-            connect(buttonBox, &QDialogButtonBox::accepted, [previewWidget, printSettingsDialog] {
+-                previewWidget->updatePreview();
+-                printSettingsDialog->close();
+-            });
+-            connect(buttonBox, &QDialogButtonBox::rejected, printSettingsDialog, &QDialog::reject);
+-            mainLayout->addWidget(buttonBox);
+-            printSettingsDialog->show();
+-        });
+-    }
+-    connect(preview, &QPrintPreviewDialog::paintRequested, [this, &printdlg, &prt] {
+-        setupPrinter(printdlg, &prt);
+-    });
+-    preview->exec();
+-    delete printdlg;
+-    delete preview;
+-}
+-
+-void MainDlg::setupPrinter(KPrinterDlg *printDialog, QPrinter *printer)
++    // OHOS: QPrintPreviewDialog is part of the unpublished Qt PrintSupport
++    // module, so the preview action reuses the same QPdfWriter PDF export
++    // flow as slotPrint(); the exported PDF is the printable preview.
++    slotPrint();
++}
++
++void MainDlg::setupPrinter(KPrinterDlg *printDialog, QPaintDevice *device)
+ {
+     View::self()->setPrintHeaderTable(printDialog->printHeaderTable());
+     View::self()->setPrintBackground(printDialog->printBackground());
+     View::self()->setPrintWidth(printDialog->printWidth());
+     View::self()->setPrintHeight(printDialog->printHeight());
+-    View::self()->draw(printer, View::Printer);
++    View::self()->draw(device, View::Printer);
+ }
+ 
+ void MainDlg::editAxes()

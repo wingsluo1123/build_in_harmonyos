@@ -1,0 +1,27 @@
+--- a/kmplot/maindlg.h
++++ b/kmplot/maindlg.h
+@@ -19,7 +19,10 @@
+ // Qt includes
+ #include <QDomDocument>
+ #include <QMenu>
+-#include <QPrinter>
++// OHOS: QPrinter (Qt PrintSupport) is not published (see patch 0001).
++// Printing renders through QPdfWriter (QtGui, a QPaintDevice subclass),
++// so the printer hook below only needs the QPaintDevice base class.
++#include <QPaintDevice>
+ #include <QStack>
+ #include <QStandardPaths>
+ 
+@@ -157,8 +160,10 @@
+ private:
+     /// Settings the standard and non standard actions of the application.
+     void setupActions();
+-    /// Sets the printer options and draw the plot with the current options.
+-    void setupPrinter(KPrinterDlg *printDialog, QPrinter *printer);
++    /// Sets the print options and draws the plot with the current options.
++    /// OHOS: the device is a QPdfWriter (QtGui) instead of a QPrinter
++    /// (Qt PrintSupport, not published); View::draw() only needs paint-device API.
++    void setupPrinter(KPrinterDlg *printDialog, QPaintDevice *device);
+     /// Called when a file is opened. The filename is m_url
+     bool openFile() override;
+ 

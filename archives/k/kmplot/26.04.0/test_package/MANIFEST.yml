@@ -1,0 +1,83 @@
+# test_package/MANIFEST.yml
+# Upstream test declaration for kmplot 26.04.0 (KDE Gear release-service).
+
+package: kmplot/26.04.0
+homepage: "https://apps.kde.org/kmplot"
+
+# ---- Upstream test audit ---------------------------------------------------
+# The 26.04.0 release tarball was downloaded and inspected entry by entry
+# (2026-10-16, before writing this recipe):
+upstream_tests_exist: false
+upstream_test_audit:
+  source_tarball: "kmplot-26.04.0.tar.xz (KDE release-service 26.04.0)"
+  source_url: "https://download.kde.org/stable/release-service/26.04.0/src/kmplot-26.04.0.tar.xz"
+  source_sha256: "46ca9b478e0ec7ff92298e1c9fc9a79d4caa74ff2781bd6c34ac93087e89c01c"
+  member_count: 521
+  top_level_files:
+    - file: "CMakeLists.txt (root)"
+      role: "project entry: find_package(Qt6 Core/Gui/Svg/Widgets/PrintSupport) + find_package(KF6 Completion/Config/Crash/DBusAddons/GuiAddons/I18n/JobWidgets/KIO/Parts/WidgetsAddons/TextWidgets) + add_subdirectory(kmplot) + add_subdirectory(icons) + ki18n_install(po)"
+      test_targets: "none (no enable_testing, no add_test, no ecm_add_test, no BUILD_TESTING option)"
+      is_test: false
+    - file: "kmplot/CMakeLists.txt"
+      role: "builds the kmplotpart MODULE plugin (parser/view) + the kmplot executable (4 qt_add_dbus_adaptor generations, kconfig_add_kcfg_files, ecm_add_app_icon)"
+      test_targets: "none (no enable_testing, no add_test, no ecm_add_test)"
+      is_test: false
+    - file: "kmplot/ (sources: parser.cpp/xparser.cpp, view.cpp, maindlg.cpp, function.cpp, *.ui, settings.kcfgc)"
+      role: "application + plugin implementation, no test harness sources"
+      test_targets: "none (no *test*.cpp, no *_test, no QTest linkage)"
+      is_test: false
+    - file: "doc/ + icons/ + po/ + org.kde.kmplot.appdata.xml"
+      role: "DocBook handbook, application icons, translations, app metadata - no test suite"
+      test_targets: "none"
+      is_test: false
+  scanned_for:
+    - "tests/ / autotests/ / test/ directories"
+    - "*test* file names (outside po/ translations)"
+    - "enable_testing / add_test (ctest)"
+    - "ecm_add_test / ecm_add_tests (ECM)"
+    - "BUILD_TESTING option"
+  scan_result: "0 matches - 521 tarball members contain no tests/autotests/test directory and no *test* path outside po/; neither CMakeLists.txt registers any ctest target"
+  reason: "kmplot 26.04.0 upstream (KDE education/kmplot) ships no automated test suite; upstream QA runs through KDE CI source builds only"
+
+# rule4 mandatory fields: upstream_test_total must be declared explicitly
+# (a missing field is rejected, it is NOT defaulted to 0).
+# kmplot 26.04.0 is a CMake project with zero registered ctest entries, so the
+# counting method is ctest_entries (ctest -N would list 0).
+upstream_test_total: 0
+upstream_test_count_method: ctest_entries
+upstream_test_passed: 0
+upstream_test_failed: 0
+upstream_test_skipped: 0
+
+# No upstream test command exists for this release.
+upstream_check_command: ""
+
+# build() does not run any upstream test (there is none to run); the
+# no_tests evidence marker is emitted by test_package instead.
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# ---- Consumer tests (test_package) -----------------------------------------
+# test_package/conanfile.py runs test.sh against the packaged bin/kmplot,
+# parses its deterministic PASS/FAIL counters into
+# HMBS_TEST_PACKAGE_RESULT, and emits HMBS_UPSTREAM_TEST_RESULT
+# (status=no_tests, 0 counts) - the real machine-evidence the gate requires.
+test_package_tests:
+  - file: test.sh
+    description: "kmplot --version reports version (KDE release-service 26.04.0 maps to KAboutData internal 1.3.26040, CI evidence; accepts 26.04/26040/1.3.x, app identity, or version-like output)"
+    command: "kmplot --version"
+  - file: test.sh
+    description: "kmplot --help exposes the CLI surface incl. -f/--function (proves the Qt/KDE runtime link completed)"
+    command: "kmplot --help"
+  - file: test.sh
+    description: "kmplot --author lists the upstream author (KAboutData metadata ships with the package; --license is probed informationally)"
+    command: "kmplot --author"
+  - file: test.sh
+    description: "HarmonyOS-specific: launch the shipped kmplot so the OHOS dynamic linker resolves the full DT_NEEDED closure (Qt6 Widgets/Svg/Dbus + KF6 KParts/KIO/TextWidgets); failure only on linker resolution errors"
+    command: "kmplot (short-lived launch, offscreen platform)"
+  - file: test.sh
+    description: "kmplotpart KParts plugin module ships in the package lib tree (the functional half: parser/view)"
+    command: "lib/kf6/parts/kmplotpart.so presence probe"
+
+assertion_count: 5
