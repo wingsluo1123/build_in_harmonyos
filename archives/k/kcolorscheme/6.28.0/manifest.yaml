@@ -1,0 +1,100 @@
+# 版本级 manifest
+# 文件位置: archives/k/kcolorscheme/6.28.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "6.28.0"
+
+# 软件名
+software: "kcolorscheme"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-17"
+build_system: "cmake"
+
+# Conan 引用
+conan_ref: "kcolorscheme/6.28.0"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://download.kde.org/stable/frameworks/6.28/kcolorscheme-6.28.0.tar.xz"
+  # R39 镜像回退：download.kde.org 302 到 regional 镜像（CN 网络为
+  # mirrors.bfsu.edu.cn）在校园 PC 与真机网络上 TLS 证书校验失败
+  # （self-signed，真机 source() 首枪即因此红）；conandata.yml 给出
+  # 「官方源 + bfsu/ustc/nju/aliyun」URL 列表，conan get() 按序回退，
+  # 真机实测第 4 项 mirror.nju.edu.cn 命中（四个镜像逐一比对 sha256
+  # 与官方 tarball 逐字节一致，51804 bytes，2026-10-17）。
+  sha256: "129c98fd9ba3428cafbd7263557a9ea47c0d4f157b8a5f56b209a95dc9815e6a"
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+
+  configure_options:
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DBUILD_TESTING=ON"
+    - "-DKF_IGNORE_PLATFORM_CHECK=TRUE"
+    - "-DKF_SKIP_PO_PROCESSING=ON"
+    - "-DCMAKE_CXX_STANDARD=20"
+    - "-DCMAKE_CXX_STANDARD_REQUIRED=ON"
+    - "-DECM_MODULE_PATH=<ecm>/share/ECM/{modules,find-modules,kde-modules}"
+  # 不设 CMAKE_SHARED_LIBRARY_SONAME flags：真机 /storage 禁 symlink，
+  # 版本化 .so 符号链创建必 EPERM；DT_SONAME 由补丁 0002 在平台无
+  # soname flag 时直传 -Wl,-soname,libKF6ColorScheme.so
+
+  dependencies:
+    - "qtbase/6.11.1"
+    - "kconfig/6.26.0.1"
+    - "kguiaddons/6.26.0"
+    - "ki18n/6.26.0"
+    - "extra-cmake-modules/6.29.0"
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-lower-kf-dep-version.patch"
+  - "0002-ohos-basename-soname-link.patch"
+
+# ============================================================
+# 测试信息
+# ============================================================
+
+upstream_tests:
+  framework: "ctest"
+  test_targets: 1
+  test_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error --timeout 300"
+  run_in_build: true
+upstream_test_pass_rate: "1/1（真机执行全部通过，conan-verify 收官干净重建实录 Passed 0.72 sec；kcolorschemetest 含 5 个 Q_SLOTS、10 个数据行用例，含 kcolorschemetest.colors 夹具的 7 ColorSet 读色比对）"
+adapted_test_pass_rate: "49/49（真机：消费者 E2E 29/29 + OHOS 制品检查 20/20）；conan-verify 八门禁 Verdict PASS（G0–G4 全 ✅，RC=0）"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "download.kde.org（Mirrorbits）在 CN 网络 302 到 mirrors.bfsu.edu.cn，该镜像 TLS 证书在校园 PC 与真机网络均校验失败（self-signed）；mirrors.ustc.edu.cn 亦 302 到 mirrors4.bfsu.edu.cn 同败。conan get() 的 URL 列表按序回退实测有效：官方→bfsu→ustc 各 3 次重试后由 mirror.nju.edu.cn / mirrors.aliyun.com 命中（两镜像 200 且 sha256 与官方 tarball 逐字节一致）——R39 的 conandata 「官方源 + 权威镜像列表」是此环境的正解（kbookmarks / kauth 6.28.0 先例）"
+  - "发布的 KF6 库无 DT_SONAME（targets 带 IMPORTED_NO_SONAME=TRUE）→ 按绝对缓存路径链接把机器私有路径烧进 DT_NEEDED（E537）；lld 按命令行原样记录名字 → -l:<basename> + target_link_directories 是可重定位链接的解；公共头暴露的组件（KF6::ConfigCore，kcolorscheme.h include <KSharedConfig>）留在 INTERFACE 按名导出——上游 KF6ColorSchemeConfig.cmake 自带 find_dependency(KF6Config)，无需手工 find_dependency"
+  - "KDE 安装的 targets 文件只设 per-config IMPORTED_LOCATION_RELEASE，且 get_target_property 未设置时返回非空 -NOTFOUND 哨兵串——每个查找必须哨兵门（朴素 if(NOT var) 会把哨兵误判为已设置；kscreenlocker 6.7.2 0008 先例）"
+  - "KColorScheme::adjustBackground 实现为按组 setBrush(group, role, KColorScheme(group, set, config).background(newRole))——同一 group/set/config 下与直接构造的 KColorScheme(group, set) 背景色严格相等，消费者测试可断言 QPalette 结果 == scheme 背景色（kcolorscheme.cpp 505-634 实证）"
+  - "KStatefulBrush 默认构造（以及内联构造）按文档对所有 brush() 重载返回默认 QBrush()（style == Qt::NoBrush）——可作消费者用例的稳定断言点"
+  - "kcolorscheme 上游 autotest 只有单目标 kcolorschemetest：QTest 的 readColors 经 QFINDTESTDATA 读取随源发布的 kcolorschemetest.colors 夹具，把 7 个 ColorSet × Active/Inactive 的每个角色色值锚定到 (colorSet, roleOffset, group) 编码表——比逐值硬编码更强的夹具语义"
