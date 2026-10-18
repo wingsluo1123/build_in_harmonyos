@@ -1,0 +1,50 @@
+# 版本级 manifest — interception-dual-function 1.5.0
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "1.5.0"
+software: "interception-dual-function"
+status: built
+build_date: "2026-10-13"
+build_system: makefile
+
+source:
+  url: "https://gitlab.com/interception/linux/plugins/dual-function-keys/-/archive/1.5.0/dual-function-keys-1.5.0.tar.gz"
+  sha256: "b0946b81a51655711eb1e8156a8086eef6e60002305ce2553a1e0a9fbdbdc4bf"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options: []
+  dependencies:
+    - yaml-cpp/0.8.0
+    - libevdev/1.13.7
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-cfg.cpp.patch"
+
+knowledge_gained:
+  - "OHOS clang 15 sysroot 自带 linux/input.h 等内核 UAPI 头，libevdev 下游无需头文件注入"
+  - "yaml-cpp 对标量 YAML 节点 Node::size() 返回 0：calloc(node.size(), ...) 在标量分支只拿到 1 字节堆块，写 ->code 越界——glibc calloc(0) 返回块足够大而掩盖，OHOS musl 下 SIGSEGV"
+  - "上游 Makefile 硬编码 CC/CXX/INCS/CFLAGS/CXXFLAGS/LDFLAGS；用 make 命令行变量覆盖（命令行优先于 Makefile 赋值），CPPFLAGS 保持上游原样（含 -D_POSIX_C_SOURCE/-DVERSION）"
+  - "clang 15 对 K&R 风格函数定义报 -Wstrict-prototypes，上游 -Werror 会因此失败，覆盖 CFLAGS/CXXFLAGS 时需移除 -Werror"
+
+patch_generation:
+  method: per-file-difflib
+  # 路径为 2026-10-13 首次适配时的取证目录（当时归档名为 interception-dual-function-keys）；
+  # 2026-10-14 归档名改为 interception-dual-function（见 1.5.0/notes.md「归档名变更」），
+  # 源码与补丁内容未变，下列 hash 仍对应同一源码树。
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/interception-dual-function-keys-1.5.0.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/interception-dual-function-keys-1.5.0.work
+  source_orig_hash: abe8ac9275619a63
+  source_work_hash: 366790c17ddf1f56
+  generated_at: '2026-10-13T13:12:56'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-cfg.cpp.patch
+    type: bugfix
+    platform_only: False
+    guard: none
+    rationale: "上游真实缺陷（yaml-cpp 标量 Node::size()==0 → calloc(0) 堆越界）；glibc 侥幸不崩、OHOS musl 必崩，非平台宏、非空壳补丁"

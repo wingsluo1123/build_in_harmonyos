@@ -1,0 +1,44 @@
+package: interception-dual-function/1.5.0
+homepage: "https://gitlab.com/interception/linux/plugins/dual-function-keys"
+
+# 上游测试清点（R51 三步法第 1 步）：
+#   dual-function-keys 1.5.0 源码树仅 Makefile / config.mk / dfk.c / cfg.cpp /
+#   cfg.h / doc/ / dual-function-keys.1|.md / LICENSE.md，
+#   无 tests/ 目录、无 test/check 目标（Makefile 只有 all/clean/install/
+#   uninstall/ctags/doc 目标）、无 ctest/pytest/meson 注册。
+#   README.md 中唯一与测试相关的表述是 `man -l dual-function-keys.1`（人工查看
+#   man page），非自动化测试。上游确无自动化测试套件。
+# → 功能验证由 test_package 消费者测试完成（R34：真实执行交付物）。
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests: []
+
+# test_package 自带测试（消费者视角，R34：真实执行交付物）
+test_package_tests:
+  - file: test_dfk.py
+    description: |
+      上游接口功能测试（6 条断言）：以真实 input_event 二进制流驱动
+      `dual-function-keys -c <cfg.yaml>`——T01 tap 合成 TAP 键（shift 轻按→delete）、
+      T02 hold 保留 HOLD 键、T03 未映射键透传、T04 EV_REL 非按键事件透传、
+      T05 `-v` 版本号 rc=0、T06 缺 -c 打印 usage rc=1。
+    command: "bash test_dfk.sh <package>/bin"
+    assertion_count: 6
+  - file: test_ohos.sh
+    description: |
+      鸿蒙专项测试（5 条断言）：ELF64/AArch64 身份、musl 解释器
+      （ld-musl-aarch64.so.1）、NEEDED 含动态 libevdev 且无 Linux-only 条目、
+      二进制在 OHOS 上真实执行、calloc(0) 回归探针（标量 TAP/HOLD 映射跑
+      tap 序列要求 rc=0 且输出 4 个按键事件——上游 Node::size()==0 缺陷在
+      glibc 被掩盖、在 OHOS musl 必崩，补丁回归即在此步炸掉）。
+    command: "bash test_ohos.sh <package>/bin"
+    assertion_count: 5
+
+assertion_count: 11
+
+notes: |
+  上游无自动化测试套件（清点证据见上）。test_package 为消费者视角：直接运行
+  安装后的命令行可执行文件，覆盖 tap/hold/透传/命令行契约，并额外做鸿蒙平台
+  断言（ELF64/AArch64、musl 身份、无 Linux 专有依赖、设备端可执行）与
+  calloc(0) 缺陷回归探针。

@@ -1,0 +1,23 @@
+software: interception-dual-function
+display: "interception-dual-function"
+description: "interception-tools 的双功能键插件：拦截并改写键盘 input_event 流，把同一个键的『轻按』与『长按』映射到不同按键（如 hold=ctrl / tap=delete）。"
+category: utility
+homepage: "https://gitlab.com/interception/linux/plugins/dual-function-keys"
+license: MIT
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "内核 UAPI 头 linux/input.h 由 OHOS clang 15 sysroot 自带，无需头文件注入"
+    - "依赖 yaml-cpp（静态）与 libevdev（动态）；两者的 OHOS binary 均已发布到制品仓"
+    - "随包补丁 1 枚：build_tap()/build_hold() 标量分支用 YAML::Node::size() 分配（yaml-cpp 对标量返回 0），calloc(0) 后写 ->code 堆越界；glibc 返回块足够大而侥幸不崩，OHOS musl 下必崩（SIGSEGV）"
+    - "上游 Makefile 硬编码 CC/CXX/INCS/CFLAGS/CXXFLAGS/LDFLAGS，用 make 命令行变量覆盖（R33）；-Werror 因 clang 15 的 -Wstrict-prototypes 移除"
+    - "交付 ELF 在 package() 内 selfSign 签名（E077/E135）"
+  common_dependencies:
+    - yaml-cpp/0.8.0
+    - libevdev/1.13.7
+
+versions:
+  "1.5.0":
+    status: built
+    build_date: "2026-10-13"
