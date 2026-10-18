@@ -1,0 +1,38 @@
+# 版本级 manifest — kjobwidgets 6.28.0（遵循 ARCHIVE-SPEC v3.0）
+
+version: "6.28.0"
+software: "kjobwidgets"
+status: built
+build_date: "2026-10-18"
+build_system: "cmake"
+
+source:
+  url: "https://download.kde.org/stable/frameworks/6.28/kjobwidgets-6.28.0.tar.xz"
+  sha256: "a13fcc9c861a90a540e5f93028fa7fae48f4c8643dadd287f3d54f5f24fab3da"
+
+ohos_adaptation:
+  key_points:
+    - "KF_IGNORE_PLATFORM_CHECK=TRUE（OHOS 不在 KDE 平台列表）"
+    - "WITH_X11=OFF / USE_DBUS=ON（qtbase/6.11.1.1 提供 Qt6DBus；上游 2 个 autotest 实测 2/2 Passed，ctest --no-tests=error 强制注册数）"
+    - "BUILD_PYTHON_BINDINGS=OFF（工具链无 shiboken6）"
+    - "ECM_MODULE_PATH 手工注入（CMakeDeps 不传播）"
+    - "qtbase cmake_find_mode=none → 手工 conan_cmakedeps_paths.cmake"
+    - "CMAKE_PLATFORM_NO_VERSIONED_SONAME=ON（HMDFS 拒 symlink，不生成版本化 .so 软链）"
+    - "CMAKE_SHARED_LIBRARY_SONAME_*_FLAG 注入（双变量；E330，CI L5a SONAME 闸）"
+  common_dependencies:
+    - qtbase/6.11.1.1
+    - kcoreaddons/6.28.0
+    - kwidgetsaddons/6.28.0
+    - knotifications/6.28.0
+
+upstream_tests:
+  registered: 2
+  executed: 2
+  result: "2/2 passed (ctest)"
+  note: "autotests/kuiserver2jobtrackertest{,2}；USE_DBUS=ON 时 HAVE_QTDBUS 守卫解除，实测全部通过"
+
+versions:
+  "6.28.0":
+    status: built
+    build_date: "2026-10-18"
+    conan_ref: "kjobwidgets/6.28.0"
