@@ -1,0 +1,11 @@
+# test_package MANIFEST.yml (CI L0e)
+package: jalv
+version: "1.10.0"
+upstream_test_present: true
+upstream_test_evidence: "上游 test/test_symap 单测（源 test/test_symap.c，随 meson 构建注册）；无音频链路测试"
+upstream_test_in_build: true
+upstream_test_blockers: "上游完全没有「宿主加载插件 + 音频后端失败」这类测试，所以鸿蒙侧必须补消费者测试，否则崩溃类缺陷无法被构建期发现"
+harmonyos_test:
+  present: true
+  source: conanfile.py
+  description: "鸿蒙特有消费者测试（真实运行链路）：需 mda-lv2/1.2.12 真实插件 bundle，LV2_PATH 指向其父目录，(1) 断言 jalv -V 版本串与 -h 的 PLUGIN_STATE 契约；(2) 真跑 jalv -i http://drobilla.net/plugins/mda/Delay，断言插件被真实解析（Plugin: <uri>）；(3) 无音频服务器时 rc 必须为 1 并打印 Failed to connect to audio system，rc=139（SIGSEGV）单独断言失败作为回归守卫；(4) 有服务时以 timeout 20 兜底，rc=124 视为通过"

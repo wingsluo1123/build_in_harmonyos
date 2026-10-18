@@ -1,0 +1,44 @@
+# test_package 断言模板：运行期服务缺失时必须「优雅失败」，不许崩溃
+#
+# 抄用要点：
+#   1) 必须真的加载一个真实消费对象（这里是第三方插件 bundle），不许纯 --version 空壳；
+#   2) 崩溃退出码（139 / -11）要**单独断言**，不要用 rc != 0 一把抓 ——
+#      否则「崩溃」和「优雅失败」会被判成同一个结果，本类缺陷就被测试掩盖了；
+#   3) 有服务时程序会常驻，必须给超时（124 视为「服务存在，运行正常」）；
+#   4) 日志一律重定向到文件，禁止接管道（SIGPIPE 会让被测进程提前死掉）。
+
+RC_NO_SERVICE = 1      # 目标平台无运行期服务时的**期望**退出码（实测校准）
+RC_TIMEOUT = 124       # timeout(1) 杀掉常驻进程
+RC_SIGSEGV = 139       # 128 + 11：本模板要防的就是它
+
+# ... requirements() 里 self.requires(self.tested_reference_str) + 真实消费对象 ...
+
+def test(self):
+    if not can_run(self):
+        return
+
+    # 有服务时程序常驻：20s 上限只防挂死；输出落文件
+    rc = self.run(
+        f'<SERVICE_ENV>="<provider-package>/<data-dir>" '
+        f'timeout 20 <binary> <real-consumer-arg> '
+        f'> {self.build_folder}/host.txt 2>&1',
+        env="conanrun",
+        ignore_errors=True)
+
+    log = load(self, os.path.join(self.build_folder, "host.txt"))
+
+    # 崩溃回归守卫（插补丁前这里会是 139）
+    assert rc != RC_SIGSEGV, \
+        f"crashed instead of failing gracefully when service absent:\n{log}"
+
+    # 真实消费对象必须被解析加载
+    assert "Plugin: <real-consumer-uri>" in log, \
+        f"did not load the real consumer object:\n{log}"
+
+    if rc == RC_NO_SERVICE:
+        assert "Failed to connect to <service>" in log, \
+            f"missing graceful backend error message:\n{log}"
+    elif rc == RC_TIMEOUT:
+        self.output.info("service present: ran until guard timeout")
+    else:
+        raise ConanException(f"unexpected exit code {rc}:\n{log}")
