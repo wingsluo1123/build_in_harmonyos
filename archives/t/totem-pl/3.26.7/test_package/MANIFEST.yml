@@ -1,0 +1,23 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: totem-pl/3.26.7
+homepage: "https://gitlab.gnome.org/GNOME/totem-pl-parser"
+
+# 上游测试：meson 构建内置 3 个测试程序（parser/podcast/disc，2026-04 重发版
+# 将 podcast 测试拆出为独立程序），测试数据在 plparse/tests/（50+ 播放列表样本）。
+upstream_check_command: "meson test"
+upstream_test_in_build: true
+upstream_test_command: "meson test -j1"
+
+# test_package 消费者用例：模拟 totem 播放器同构流程
+supplementary_tests:
+  - file: test_package/test.c
+    count: 8
+    description: >-
+      写临时 m3u（2 条目）+ 注入最小 MIME globs → totem_pl_parser_new →
+      连接 entry-parsed 信号 → totem_pl_parser_parse 解析 file:// URI →
+      断言结果 SUCCESS、条目数=2、首/次条目 URI 正确（8 处 g_assert 族断言：
+      setup 4 + 结果 4，任一失败即非零退出）。
