@@ -1,0 +1,78 @@
+--- a/include/ecos_bb.h
++++ b/include/ecos_bb.h
+@@ -116,21 +116,21 @@
+ 	} node;
+ 
+ 	/* Wrapper for mixed integer module */
+ 	typedef struct ecos_bb_pwork
+ 	{
+ 		/* Mixed integer data */
+ 		idxint num_bool_vars;
+ 		idxint num_int_vars;
+ 
+ 		node *nodes;
+-		char *bool_node_ids;
++		signed char *bool_node_ids;
+ 		pfloat *int_node_ids;
+ 
+ 		idxint *bool_vars_idx;
+ 		idxint *int_vars_idx;
+ 
+ 		/* ECOS data */
+ 		pwork *ecos_prob;
+ 
+ 		/* Modified pointers to ecos internals */
+ 		/* Use these to edit or reset the h variables */
+@@ -146,27 +146,27 @@
+ 		pfloat *y;   /* multipliers for equality constaints */
+ 		pfloat *z;   /* multipliers for conic inequalities  */
+ 		pfloat *s;   /* slacks for conic inequalities       */
+ 		pfloat kap;  /* kappa (homogeneous embedding)       */
+ 		pfloat tau;  /* tau (homogeneous embedding)         */
+ 		stats *info; /* info of best iterate               */
+ 		pfloat global_U;
+ 		pfloat global_L;
+ 
+ 		/* Tmp data */
+-		char *tmp_bool_node_id;
++		signed char *tmp_bool_node_id;
+ 		pfloat *tmp_int_node_id;
+ 		idxint iter;
+ 		idxint dive_node_id;
+ 
+ 		/* Tmp nodes used for strong branching */
+-		char *tmp_branching_bool_node_id;
++		signed char *tmp_branching_bool_node_id;
+ 		pfloat *tmp_branching_int_node_id;
+ 
+ 		/* Pseudocost branching values */
+ 		pfloat *pseudocost_bin_sum;
+ 		pfloat *pseudocost_int_sum;
+ 		idxint *pseudocost_bin_cnt;
+ 		idxint *pseudocost_int_cnt;
+ 
+ 		/* Stored pointers to prevent memory leaks */
+ 		pfloat *Gpr_new;
+@@ -195,21 +195,21 @@
+ 
+ 	void ECOS_BB_cleanup(ecos_bb_pwork *prob, idxint num_vars_keep);
+ 
+ 	void updateDataEntry_h(ecos_bb_pwork *w, idxint idx, pfloat value);
+ 
+ 	void updateDataEntry_c(ecos_bb_pwork *w, idxint idx, pfloat value);
+ 
+ 	settings_bb *get_default_ECOS_BB_settings();
+ 
+ 	/* Calculate the offset into the node_id array */
+-	static char *get_bool_node_id(idxint idx, ecos_bb_pwork *prob)
++	static signed char *get_bool_node_id(idxint idx, ecos_bb_pwork *prob)
+ 	{
+ 		return &prob->bool_node_ids[prob->num_bool_vars * idx];
+ 	}
+ 
+ 	static pfloat *get_int_node_id(idxint idx, ecos_bb_pwork *prob)
+ 	{
+ 		return &prob->int_node_ids[prob->num_int_vars * idx * 2];
+ 	}
+ 
+ 	static pfloat abs_2(pfloat number)
