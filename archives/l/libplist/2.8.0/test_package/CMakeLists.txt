@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.15)
+project(libplist_consumer C)
+find_package(libplist-2.0 CONFIG REQUIRED)
+add_executable(consumer test.c)
+target_link_libraries(consumer PRIVATE libplist::core)
