@@ -1,0 +1,42 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: typometer/1.0.1
+homepage: "https://github.com/pavelfatin/typometer"
+
+# 上游测试命令（Java/Maven 项目：`mvn package` 触发 surefire 执行 JUnit4）
+upstream_check_command: "mvn clean package -B -DskipTests=false"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "mvn clean package -B -DskipTests=false"
+
+# 上游实际运行的测试程序（JUnit 4.12，surefire 汇总 89 个用例）
+upstream_tests:
+  - file: src/test/java/com/pavelfatin/typometer/data/CsvDataTest.java
+    source: typometer-1.0.1/src/test/java/com/pavelfatin/typometer/data/CsvDataTest.java
+    description: "CSV data read/write round-trip (2 cases)"
+    command: "mvn -B test -Dtest=CsvDataTest"
+  - file: src/test/java/com/pavelfatin/typometer/metrics/MetricsTest.java
+    source: typometer-1.0.1/src/test/java/com/pavelfatin/typometer/metrics/MetricsTest.java
+    description: "Screen-metrics detection over 37 editor screenshots (parameterized)"
+    command: "mvn -B test -Dtest=MetricsTest"
+  - file: src/test/java/com/pavelfatin/typometer/metrics/RecognitionTest.java
+    source: typometer-1.0.1/src/test/java/com/pavelfatin/typometer/metrics/RecognitionTest.java
+    description: "Pattern recognition over 49 reference images (parameterized)"
+    command: "mvn -B test -Dtest=RecognitionTest"
+  - file: src/test/java/com/pavelfatin/typometer/metrics/HeapTest.java
+    source: typometer-1.0.1/src/test/java/com/pavelfatin/typometer/metrics/HeapTest.java
+    description: "Heap-space accounting for the pixel queue (1 case)"
+    command: "mvn -B test -Dtest=HeapTest"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: TestTypometer.java
+    description: "Consumer test (self-contained, no fixtures): JAR class loading + real public API calls (SummaryStatistics/Series/ChartData/FrequencyDistribution) + HarmonyOS platform detection"
+    command: "java -cp <packaged-jar> TestTypometer [--require-harmonyos]"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 19

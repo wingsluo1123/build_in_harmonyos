@@ -1,0 +1,61 @@
+# manifest.yaml — typometer 1.0.1 (HarmonyOS PC)
+# 遵循 ARCHIVE-SPEC v3.0 §4.2
+version: "1.0.1"
+software: "typometer"
+status: "built"
+build_date: "2026-10-14"
+conan_ref: "typometer/1.0.1"
+
+source:
+  url: "https://github.com/pavelfatin/typometer/archive/refs/tags/v1.0.1.tar.gz"
+  sha256: "9dc64f72b5b2772ab533544ea30567a0b7f7abda219b62e289d83248805fc999"
+  tar_format: tar.gz
+  upstream: "https://github.com/pavelfatin/typometer"
+  license: "Apache-2.0"
+
+build:
+  system: maven
+  configure_options:
+    - "-DskipTests=false"
+  entry: "mvn clean package -B"
+  output_artifact: "target/typometer-1.0.1.jar"
+  dependencies:
+    - "bishengjdk 17.0.13"
+    - "apache-maven 3.9.11（配方自取，sha256 校验）"
+  cc: javac
+  cxx: ""
+
+patches_applied:
+  - "0001-src-main-java-com-pavelfatin-typometer-screen-ScreenAccessor.java.patch"
+
+upstream_tests:
+  framework: junit4
+  discovered: 89
+  passed: 89
+  failed: 0
+  skipped: 0
+  command: "mvn clean package -B -DskipTests=false"
+
+knowledge_gained:
+  - "typometer 是 Java 8 (source/target 8) Swing 应用，Maven 构建，依赖 net.java.dev.jna:jna:4.2.0；maven-shade-plugin 生成含 JNA 的 uber-jar（主类 com.pavelfatin.typometer.Application），maven-assembly-plugin 生成 bin 分发包（ref: DRAFT-typometer-1.0.1-java-maven-ohos-jar-app）"
+  - "OHOS 上 os.name=HarmonyOS，JNA 4.2.0 的 Platform.isLinux() 返回 false，且 JNA jar 内不存在 harmonyos-aarch64 native dispatcher（Platform.RESOURCE_PREFIX=harmonyos-aarch64）（ref: DRAFT-typometer-1.0.1-jna-harmonyos-platform-detection）"
+  - "适配补丁在 ScreenAccessor 中显式识别 HarmonyOS/OHOS，禁止选用 LinuxScreenAccessor（依赖 X11/libX11）与 WindowsScreenAccessor，回退到可移植的 AwtRobotScreenAccessor；避免在 OHOS 上误加载不存在的 native 库（ref: DRAFT-typometer-1.0.1-jna-harmonyos-platform-detection）"
+  - "上游测试为 JUnit 4.12，surefire 汇总 89 个用例（CsvDataTest 2、MetricsTest 37、RecognitionTest 49、HeapTest 1），全部 headless 纯计算，在 HarmonyOS/aarch64 + JDK17 上全绿（ref: DRAFT-typometer-1.0.1-java-maven-ohos-jar-app）"
+  - "Swing GUI 运行时需要 libfreetype.so.6（JDK libfontmanager.so 依赖），OHOS 开发镜像未预置该库；GUI 显示还依赖图形显示服务，属运行时环境项，不影响构建/单测/打包（ref: DRAFT-typometer-1.0.1-java-maven-ohos-jar-app）"
+  - "Maven Central 直连在 OHOS 网络偶发重置，配方经阿里云 central 镜像（settings.xml mirror）构建，失败重试 3 次并回退直连（ref: DRAFT-typometer-1.0.1-java-maven-ohos-jar-app）"
+  - "R32: validate() 检查 settings.os in (Linux, OHOS)；R38: JAR 置于 libexec/（库包），无需 commands.json（ref: DRAFT-typometer-1.0.1-java-maven-ohos-jar-app）"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/typometer-1.0.1.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/typometer-1.0.1.work
+  source_orig_hash: 1b5a7822e3844395
+  source_work_hash: 15010b97255e7d9f
+  generated_at: '2026-10-14T13:39:57'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-src-main-java-com-pavelfatin-typometer-screen-ScreenAccessor.java.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
