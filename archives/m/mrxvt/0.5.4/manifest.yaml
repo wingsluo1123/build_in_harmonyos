@@ -1,0 +1,48 @@
+software: mrxvt
+version: "0.5.4"
+status: built
+build_date: "2026-10-18"
+
+source:
+  url: "https://downloads.sourceforge.net/project/materm/mrxvt%20source/0.5.4/mrxvt-0.5.4.tar.gz"
+  sha256: "f403ad5a908fcd38a55ed0a7e1b85584cb77be8781199653a39b8af1a9ad10d7"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--enable-xft"
+    - "--disable-xpm"
+    - "--disable-jpeg"
+    - "--disable-png"
+    - "--enable-256colors"
+    - "--disable-utmp"
+    - "--disable-wtmp"
+    - "--disable-lastlog"
+    - "--disable-sessionmgr"
+    - "--disable-debug"
+    - "--x-includes=<conan-dep>/include"
+    - "--x-libraries=<conan-dep>/lib"
+  dependencies:
+    - "libx11/1.8.13"
+    - "libxft/2.3.8"
+    - "libxrender/0.9.12"
+    - "xorgproto/2025.1"
+    - "fontconfig/2.18.3"
+    - "freetype/2.14.3"
+    - "libsm/1.2.4"
+    - "libice/1.1.2"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "mrxvt-fix-dup-symbol.patch: Fix duplicate symbol macroFnNames from header enum variable definition"
+
+knowledge_gained:
+  - "mrxvt is an autotools-based X11 terminal emulator requiring Xft/X11/fontconfig"
+  - "Source tarball on SourceForge uses 'mrxvt source' (with space) in path — must URL-encode as mrxvt%20source"
+  - "Disable utmp/wtmp/lastlog/session-mgr as they require system services unavailable on OHOS"
+  - "XPM/JPEG/PNG support disabled: libxpm/3.5.17 requires libx11/6.4.0 (force=True), conflicts with libxft's libx11/1.8.13"
+  - "AC_PATH_X cannot find X11 in Conan layout; must pass --x-includes/--x-libraries explicitly"
+  - "Cross-compilation: AC_CHECK_SIZEOF/setpgrp need cache variables for aarch64 target"
+  - "Duplicate symbol macroFnNames: enum with variable in rxvtlib.h included by all .c files; patch to remove variable"
