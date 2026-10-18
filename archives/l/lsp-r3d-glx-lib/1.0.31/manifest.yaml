@@ -1,0 +1,96 @@
+# 版本级 manifest
+# 文件位置: archives/l/lsp-r3d-glx-lib/1.0.31/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.0.31"
+
+# 软件名
+software: "lsp-r3d-glx-lib"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-09-29"
+build_system: makefile
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://codeload.github.com/lsp-plugins/lsp-r3d-glx-lib/tar.gz/refs/tags/1.0.31"
+
+  # 源码校验和
+  sha256: "3242dc2a7e927758d9de472cb4d026acb9c4bd97b8911629df2c04f8e9904cb6"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: makefile
+
+  # 配置选项列表（make config 命令行，完整见 notes.md）
+  configure_options:
+    - "PLATFORM=Linux"
+    - "PLATFORM_OHOS=1"
+    - "FEATURES=\"test strict\""
+    - "INSTALL_HEADERS=1"
+    - "LIBX11_CFLAGS= LIBX11_LDFLAGS= LIBGL_CFLAGS= LIBGL_LDFLAGS="
+    - "LSP_R3D_GLX_LIB_LDFLAGS=\"-lEGL\""
+
+  # 编译依赖列表（格式: name/version）
+  # 上游把 lsp-common-lib / lsp-r3d-iface / lsp-r3d-base-lib（生产）与
+  # lsp-test-fw（测试）按 *_TYPE=src 内嵌编译（源码由 conandata 预置到
+  # modules/）；另按 R27 声明 lsp-r3d-iface 与 lsp-r3d-base-lib 为 Conan
+  # 依赖（两者的头文件属于本包公共接口，transitive_headers 传递）。
+  # 上游 LIBX11/LIBGL 为 pkg 型系统依赖：OHOS 上不存在，新后端（EGL
+  # pbuffer）不依赖它们，构建时显式清空其 pkg-config 标志。
+  dependencies:
+    - lsp-r3d-iface/1.0.31
+    - lsp-r3d-base-lib/1.0.31
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "patches/0001-ohos-public-header-glu-conditionalization.patch（公共头 X11/GLX include 用 __has_include 条件化，缺失时给占位 typedef；不引入平台宏）"
+  - "patches/0002-ohos-makefile-build-ohos-backend.patch（src/Makefile：make 变量 PLATFORM_OHOS=1 时编译 src/ohos/*.cpp 而非 src/main/backend.cpp）"
+  - "patches/modules/0001-lsp-common-lib-qsort_r-ohos.patch（作用于预置的内嵌 lsp-common-lib：musl 无 GNU qsort_r）"
+
+# OHOS 后端源码（非补丁，随配方 export_sources 导出、source() 拷入 src/ohos/）
+extra_sources:
+  - "ohos/backend.cpp（EGL pbuffer 离屏后端，实现与上游 src/main/backend.cpp 同一组 glx::backend_t 虚表函数）"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "OHOS 无 X11/桌面 GL/GLX，但普通原生进程可用 EGL_DEFAULT_DISPLAY + pbuffer 离屏渲染（EGL 1.4, vendor=OpenHarmony），据此新写独立 OHOS 后端而非判定不可适配（DRAFT-ohos-egl-headless-no-gles1-baseline）"
+  - "OHOS 的 libGLESv3.so 导出符号是调度空桩：直连 gl* 链接运行无错但什么也不做，必须 eglGetProcAddress 运行时解析；本后端因此只用函数指针、不导出/不引用任何 GL 符号（readelf 实测 13 个 EGL 未定义符号、0 个 gl*），也无需 -Wl,-Bsymbolic 包装层与 -lGLESv3"
+  - "GLES3.2 只提供桌面 GL 的子集：glClearDepthf（非 glClearDepth）、glReadBuffer 对单缓冲 pbuffer 无意义；glShadeModel/GL_RESCALE_NORMAL/GL_COLOR_MATERIAL/glLight*/glVertexPointer/glDrawArrays 等 GL1.x 固定管线入口在 OHOS 完全不存在（eglGetProcAddress 返回 NULL），set_lights/draw_primitives 只能做桩并如实返回 STATUS_NOT_IMPLEMENTED"
+  - "上游 make 的 PLATFORM=Linux 会把 pkg 型 LIBX11/LIBGL 加进依赖并经 pkg-config 探测：构建机若装有 X11（brew libx11）会把宿主 -lX11/-I 注入交叉链接；用 make 命令行变量显式清空这些 CFLAGS/LDFLAGS（命令行变量优先于 makefile 内 eval 赋值）可得到与宿主机环境无关的确定性构建"
+  - "EGL surface 尺寸不可变：locate() 改变视口尺寸必须 eglDestroySurface + eglCreatePbufferSurface 重建（与上游 GLX 销毁/重建 pbuffer 同构）"
+  - "静态库消费者的工厂注册踩坑：导出注册的静态 Factory 对象位于合并归档成员内，消费者只引用 Factory::enumerate 时成员不会被拉入、枚举列表为空；先构造 glx::factory_t（公共 API）即可把成员拉入并触发静态注册"
