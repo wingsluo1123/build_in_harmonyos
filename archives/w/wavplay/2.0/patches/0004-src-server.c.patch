@@ -1,0 +1,53 @@
+--- a/src/server.c
++++ b/src/server.c
+@@ -410,42 +410,48 @@
+ ServerWorkProc(DSPFILE *dfile) {
+ 	SVRMSG msg;	
+ 	int z;
+ 
+ 	if ( MsgFromClient(clntIPC,&msg,IPC_NOWAIT) != 0 )
+ 		return 0;			/* No messages from client */
+ 
+ 	/*
+ 	 * Shut the DSP up right away if we hit pause:
+ 	 */
+-	if ( msg.msg_type == ToSvr_Pause )
++	if ( msg.msg_type == ToSvr_Pause ) {
++#ifndef HAVE_OHOS_AUDIO
+ 		ioctl(dfile->fd,SNDCTL_DSP_RESET,0);
++#endif
++	}
+ 
+ 	/*
+ 	 * If we get a Pause request, we block here indefinitely until
+ 	 * another message from the client arrives:
+ 	 */
+ 	while ( msg.msg_type == ToSvr_Pause ) {
+ 		/*
+ 		 * During a "pause", we block on a client request message get:
+ 		 */
+ 		if ( MsgFromClient(clntIPC,&msg,0) )
+ 			return -1;		/* Failed msg read */
+ 	}
+ 
+ 	/*
+ 	 * Non pause message received:
+ 	 */
+ 	z = Serve(&msg,1);			/* Server from within work procedure */
+ 
+-	if ( z )				/* Shut up DSP if we're stopping */
++	if ( z ) {				/* Shut up DSP if we're stopping */
++#ifndef HAVE_OHOS_AUDIO
+ 		ioctl(dfile->fd,SNDCTL_DSP_RESET,0);
++#endif
++	}
+ 	return z;
+ }
+ 
+ /*
+  * This is the main server loop:
+  */
+ int
+ Server(key_t IPCKey) {
+ 	SVRMSG msg;
+ 	uid_t uid;

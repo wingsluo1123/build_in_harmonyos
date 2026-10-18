@@ -1,0 +1,80 @@
+--- a/include/wavplay.h.in
++++ b/include/wavplay.h.in
+@@ -20,20 +20,24 @@
+ #define _wavplay_h_ "$Id: wavplay.h.in,v 1.2 2011/06/03 01:49:50 ve3wwg Exp $"
+ 
+ #define WAVPLAY_VERSION		"@WAVPLAY_VERSION@"
+ 
+ #include <stdarg.h>
+ #include <sys/types.h>
+ #include <sys/ipc.h>
+ #include <sys/stat.h>
+ #include <stdint.h>
+ 
++#ifdef HAVE_OHOS_AUDIO
++#include <pthread.h>
++#endif
++
+ /*
+  * From the Linux man page semctl(2) :
+  */
+ #ifdef HAVE_OS_LINUX
+ 	/* Use long options under Linux */
+ #	undef USE_GETOPT_STD
+ 
+ #	if defined(__GNU_LIBRARY__) && !defined(_SEM_SEMUN_UNDEFINED)
+ 		/* union semun is defined by including <sys/sem.h> */
+ #		define HAVE_SEMUN 1
+@@ -246,23 +250,51 @@
+ /*
+  * This macro is used to return the system file descriptor
+  * associated with the open WAV file, given a (WAVFILE *).
+  */
+ #define WAV_FD(wfile) (wfile->fd)		/* Return file descriptor */
+ 
+ /*
+  * This structure manages an opened DSP device.
+  */
+ typedef struct {
+-	int	fd;				/* Open fd of /dev/dsp */
++	int	fd;				/* Open fd of /dev/dsp (unused on OHOS) */
+ 	int	dspblksiz;			/* Size of the DSP buffer */
+ 	char	*dspbuf;			/* The buffer */
++	/*
++	 * OHOS native audio backend (OH_AudioRenderer / OH_AudioCapturer):
++	 * populated only when built with -DHAVE_OHOS_AUDIO (capability macro
++	 * supplied by the build system, not a platform macro); unused on
++	 * other platforms, which see exactly the upstream structure.
++	 */
++#ifdef HAVE_OHOS_AUDIO
++	void	*renderer;			/* OH_AudioRenderer* (playback) */
++	void	*capturer;			/* OH_AudioCapturer* (recording) */
++	/* Playback callback sync (callback thread <-> main thread) */
++	void	*play_wfile;		/* WAVFILE* source the callback reads */
++	int	play_bps;			/* bytes per sample incl. channels */
++	unsigned long play_remain;	/* bytes not yet handed to renderer */
++	volatile int play_done;		/* callback sets when source exhausted */
++	int	play_cb_active;		/* in-flight playback callbacks (drain) */
++	pthread_mutex_t play_mutex;
++	pthread_cond_t play_cond;
++	/* Recording callback sync */
++	void	*rec_wfile;		/* WAVFILE* sink the callback writes */
++	int	rec_bps;			/* bytes per sample incl. channels */
++	volatile unsigned long rec_bytes;	/* bytes captured so far */
++	unsigned long rec_total;	/* target capture bytes (0 = until stop) */
++	volatile int rec_stop;		/* main thread sets to stop capture */
++	volatile int rec_err;		/* set by callback on a failed write */
++	int	rec_cb_active;		/* in-flight capture callbacks (drain on close) */
++	pthread_mutex_t rec_mutex;
++	pthread_cond_t rec_cond;
++#endif /* HAVE_OHOS_AUDIO */
+ } DSPFILE;
+ 
+ /*
+  * This structure manages server information and state:
+  */
+ typedef struct {
+ 	UInt32	SamplingRate;			/* Sampling rate in Hz */
+ 	Chan	Channels;			/* Mono or Stereo */
+ 	UInt32	Samples;			/* Sample count */	
+ 	UInt16	DataBits;			/* Sample bit size (8/12/16) */
