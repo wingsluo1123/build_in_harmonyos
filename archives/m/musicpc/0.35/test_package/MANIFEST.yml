@@ -1,0 +1,53 @@
+# test_package/MANIFEST.yml — musicpc 0.35
+# 上游测试：mpc 0.35 上游用 meson test() 只注册了 1 个测试目标
+#   test/meson.build -> test('test_format', executable('test_format', ...))
+# 由 meson 选项 test=true 启用（meson_options.txt，默认 false），依赖 libcheck。
+# test/test_format.c 含 6 个 START_TEST（test_empty/test_basic/test_group/
+# test_fallback/test_default/test_escape），断言 format_song() 的格式化输出，
+# 歌单对象由 libmpdclient 的 mpd_song_begin/mpd_song_feed 在进程内构造 ——
+# 不需要 MPD 服务器、不需要网络、不需要音频设备。
+#
+# 本轮已真实执行：conanfile.py 的 build() 末尾调用 _run_upstream_tests()，
+# 用上游自己的 meson 测试驱动跑，结果 **1/1 PASS**（libcheck 内部 6/6 checks）。
+#   执行模型按被测 ELF 的 ELF 头判定（不看 cross_building()：OHOS profile 对
+#   -pr:h/-pr:b 传同一个文件，conan 会认定 host == build，而 ELF 是 aarch64）：
+#     native   — CI 鸿蒙 PC worker：meson test 直接 exec，不加 --wrapper；
+#     emulated — x86_64 交叉机（如 WSL）：meson test --wrapper
+#                "qemu-aarch64 -L /opt/ohos-guest -E LD_PRELOAD=
+#                 /opt/ohos-guest/lib/libfdchkshim.so"（libmpdclient 是动态库，
+#                其 OHOS 构建调用 __fd_chk，模拟 guest libc 不实现该符号；
+#                先例 tasksh 1.2.0 / array-hash 0.7.2）。
+#   上游测试源文件未被修改（patches: []，test_format.c 与上游 tarball 一致）。
+#
+# 以下 4 条是本次补的消费者断言，每条都真实执行已安装的 mpc 二进制
+# （stdout/stderr + 退出码双重判定），且均无需 MPD 服务器：
+# 连接路径停在 libmpdclient 连接层，报 "MPD error: Connection refused"
+# （构建机无 MPD server 是事实前提，预期终态）。
+# test_package/conanfile.py 同样按 ELF 头判定 native/emulated，两种模型下
+# 4 条断言口径完全一致。
+
+package: musicpc/0.35
+homepage: "https://www.musicpd.org/clients/mpc/"
+
+# 上游测试命令
+upstream_check_command: "meson test"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "meson test -C <build> -v --print-errorlogs"
+
+# meson test 实际运行的测试程序（上游 test/meson.build 里的唯一 test() 目标）
+upstream_tests:
+  - file: test_format.c
+    source: mpc-0.35/test/test_format.c
+    description: "libcheck 套件 test_format：6 个 START_TEST 断言 format_song() 的格式化输出（含默认格式串、分组/回退、转义），无需 MPD 服务器"
+    command: "./test/test_format"
+
+# test_package 中自带的测试
+test_package_tests:
+  - file: test.sh
+    description: "消费者测试 — 4 条断言全部执行已安装 mpc 二进制（未知命令错误+版本串 / help 命令表 / 两条 libmpdclient 连接层路径）"
+    command: "sh test.sh"
+
+# 测试断言总数：上游 test_format 内 6 个 libcheck checks + test_package 4 条消费者断言
+assertion_count: 10
