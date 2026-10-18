@@ -1,0 +1,139 @@
+# Upstream test census for Sofia-SIP v1.13.18.
+package: sofia-sip/1.13.18
+homepage: "https://github.com/freeswitch/sofia-sip"
+
+upstream_check_command: "make -n check"
+upstream_test_in_build: true
+upstream_test_command: "make check"
+upstream_test_directory_count: 4
+upstream_test_directories: [tests, libsofia-sip-ua/sdp/tests, libsofia-sip-ua/sip/tests, win32/tests]
+# Runner registration inventory only; this target count is not the test-case count.
+upstream_registered_suite_count: 17
+upstream_registered_test_target_count: 43
+
+upstream_test_item_results:
+  passed: 404
+  skipped: 8
+  failed: 0
+  total: 412
+  nua_result_items_passed: 144
+  nua_items_skipped: 5
+  check_framework_cases_passed: 223
+  check_nua_items_skipped: 2
+  standalone_items_passed: 37
+  static_only_dlopen_item_skipped: 1
+auxiliary_cli_smoke_probes_skipped_excluded_from_test_items: 6
+conan_test_package_item_results:
+  passed: 2
+  failed: 0
+adapted_total_test_items:
+  passed: 406
+  skipped: 8
+  failed: 0
+  total: 414
+
+upstream_runnable_suites:
+  - name: "tests"
+    makefile: "tests/Makefile.am"
+    targets: [test_nua, check_dlopen_sofia, check_sofia]
+    target_count: 3
+    command: "make -C tests check"
+  - name: "GLib adapter"
+    makefile: "libsofia-sip-ua-glib/su-glib/Makefile.am"
+    targets: [su_source_test, torture_su_glib_timer]
+    target_count: 2
+    command: "make -C libsofia-sip-ua-glib/su-glib check"
+  - name: "BNF"
+    makefile: "libsofia-sip-ua/bnf/Makefile.am"
+    targets: [torture_bnf]
+    target_count: 1
+    command: "make -C libsofia-sip-ua/bnf check"
+  - name: "HTTP"
+    makefile: "libsofia-sip-ua/http/Makefile.am"
+    targets: [test_http]
+    target_count: 1
+    command: "make -C libsofia-sip-ua/http check"
+  - name: "IPT"
+    makefile: "libsofia-sip-ua/ipt/Makefile.am"
+    targets: [torture_base64]
+    target_count: 1
+    command: "make -C libsofia-sip-ua/ipt check"
+  - name: "IPT security"
+    makefile: "libsofia-sip-ua/iptsec/Makefile.am"
+    targets: [test_auth_digest]
+    target_count: 1
+    command: "make -C libsofia-sip-ua/iptsec check"
+  - name: "Message"
+    makefile: "libsofia-sip-ua/msg/Makefile.am"
+    targets: [test_msg]
+    target_count: 1
+    command: "make -C libsofia-sip-ua/msg check"
+  - name: "NTA"
+    makefile: "libsofia-sip-ua/nta/Makefile.am"
+    targets: [run_check_nta, run_test_nta_api, run_test_nta]
+    target_count: 3
+    command: "make -C libsofia-sip-ua/nta check"
+  - name: "NTH"
+    makefile: "libsofia-sip-ua/nth/Makefile.am"
+    targets: [test_nth]
+    target_count: 1
+    command: "make -C libsofia-sip-ua/nth check"
+  - name: "NUA"
+    makefile: "libsofia-sip-ua/nua/Makefile.am"
+    targets: [check_nua]
+    target_count: 1
+    command: "make -C libsofia-sip-ua/nua check"
+  - name: "SDP"
+    makefile: "libsofia-sip-ua/sdp/Makefile.am"
+    targets: [torture_sdp, run_test_sdp]
+    target_count: 2
+    command: "make -C libsofia-sip-ua/sdp check"
+  - name: "SIP"
+    makefile: "libsofia-sip-ua/sip/Makefile.am"
+    targets: [torture_sip, run_test_sip_msg, run_test_date]
+    target_count: 3
+    command: "make -C libsofia-sip-ua/sip check"
+  - name: "SOA"
+    makefile: "libsofia-sip-ua/soa/Makefile.am"
+    targets: [test_soa]
+    target_count: 1
+    command: "make -C libsofia-sip-ua/soa check"
+  - name: "Resolver"
+    makefile: "libsofia-sip-ua/sresolv/Makefile.am"
+    targets: [check_sres_sip, torture_sresolv, run_test_sresolv, torture_sres_domain]
+    target_count: 4
+    command: "make -C libsofia-sip-ua/sresolv check"
+  - name: "SU core"
+    makefile: "libsofia-sip-ua/su/Makefile.am"
+    targets: [torture_su, torture_su_port, torture_su_alloc, torture_su_time, torture_su_tag, test_htable, test_htable2, torture_rbtree, torture_heap, test_memmem, torture_su_bm, torture_su_root, torture_su_timer, run_addrinfo, run_localinfo, run_test_su]
+    target_count: 16
+    command: "make -C libsofia-sip-ua/su check"
+  - name: "Transport"
+    makefile: "libsofia-sip-ua/tport/Makefile.am"
+    targets: [test_tport]
+    target_count: 1
+    command: "make -C libsofia-sip-ua/tport check"
+  - name: "URL"
+    makefile: "libsofia-sip-ua/url/Makefile.am"
+    targets: [torture_url]
+    target_count: 1
+    command: "make -C libsofia-sip-ua/url check"
+
+test_package_tests:
+  - file: test_sofia_consumer.c
+    description: "消费者测试：初始化 GLib-backed su_root，创建 NUA agent 与 handle，并验证清理路径"
+    command: "./test_sofia_consumer"
+  - file: test_sofia_harmonyos.c
+    description: "HarmonyOS 原生集成测试：GLib 主循环驱动 Sofia NUA，通过 loopback UDP 完成 OPTIONS/200 SIP 事务"
+    command: "./test_sofia_harmonyos"
+harmonyos_tests:
+  - file: test_sofia_harmonyos.c
+    operation: "发送一条 SIP OPTIONS 到本机 UDP responder，并回传包含 Via/From/To/Call-ID/CSeq 的 200 响应"
+    runtime: "HarmonyOS PC 6.0 AArch64，su_glib_root_gsource 附着到 GMainLoop"
+    success_marker: "SOFIA_SIP_HARMONYOS_OPTIONS_OK"
+upstream_aggregate_exclusions:
+  - name: "registrar_1_4_1"
+    reason: "HarmonyOS AArch64 loopback TCP state makes this NUA test time out after prior transport cases; the case remains enabled by default and is excluded only when the Conan recipe sets SOFIA_OHOS_SKIP_STATEFUL_NUA_TCP=1."
+  - name: "call_2_1_3_2"
+    reason: "Same sequence-dependent HarmonyOS loopback TCP timeout; the case remains enabled by default and is excluded only when the Conan recipe sets SOFIA_OHOS_SKIP_STATEFUL_NUA_TCP=1."
+assertion_count: 6

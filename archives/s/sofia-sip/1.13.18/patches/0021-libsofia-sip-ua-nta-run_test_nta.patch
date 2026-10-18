@@ -1,0 +1,42 @@
+--- a/libsofia-sip-ua/nta/run_test_nta
++++ b/libsofia-sip-ua/nta/run_test_nta
+@@ -194,29 +194,35 @@
+ # -g is also very nice option for named
+ named -f -c $namedfile &
+ pid=$!
+ while ! test -r $pidfile && kill -0 $! 2>/dev/null
+ do
+     sleep 1
+ done
+ 
+ if test -r $pidfile ; then
+ # export SOFIA_DEBUG=9
++    if test -n "$SOFIA_OHOS_TEST_NTA_NO_WS"; then
++        sipcontact="sip:*:$contact;transport=udp,tcp;comp=sigcomp"
++    else
++        sipcontact="sip:*:$contact;comp=sigcomp"
++    fi
+     sink=$sink down=$down \
+     ipv6=$ipv6 \
+-    SIPCONTACT="sip:*:$contact;comp=sigcomp" \
++    SIPCONTACT="$sipcontact" \
+     SIPSCONTACT="sips:*:$sips;comp=sigcomp" \
+     TEST_NTA_CERTDIR=$srcdir/../tport/ \
+     $VALGRIND ./test_nta "$@" - $resolvfile
+     exit=$?
+     kill $(cat $pidfile)
+     rm $pidfile $zonefile $resolvfile $namedfile 2>/dev/null
+     exit $exit
+ else
+     echo "$0: cannot start named (check apparmor/selinux)"
+     ipv6=$ipv6 $VALGRIND exec ./test_nta "$@"
+ fi
+ 
+ else # not having BIND and portbind
+-    ipv6=$ipv6 $VALGRIND exec ./test_nta "$@"
+-fi
+-
++    echo "$0: skipping: BIND named and portbind are required for the synthetic DNS fixture"
++    exit 77
++fi
++

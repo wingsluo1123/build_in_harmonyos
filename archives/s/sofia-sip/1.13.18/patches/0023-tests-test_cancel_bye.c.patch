@@ -1,0 +1,20 @@
+--- a/tests/test_cancel_bye.c
++++ b/tests/test_cancel_bye.c
+@@ -97,6 +97,9 @@
+ 
+   switch (callstate(tags)) {
+   case nua_callstate_calling:
++  case nua_callstate_proceeding:
++    if (ep->state.n++)
++      return 0;
+     CANCEL(ep, call, nh,
+ 	   /* sf.net bug #173323 */
+ 	   SIPTAG_CALL_ID_STR("non-existing-call-id"),
+@@ -181,6 +184,7 @@
+   a_call->sdp = "m=audio 5008 RTP/AVP 8";
+   b_call->sdp = "m=audio 5010 RTP/AVP 0 8";
+ 
++  a->state.n = 0;
+   if (print_headings)
+     printf("TEST NUA-5.1.1: cancel call\n");
+ 

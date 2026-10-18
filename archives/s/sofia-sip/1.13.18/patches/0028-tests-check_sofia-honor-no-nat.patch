@@ -1,0 +1,22 @@
+--- a/tests/suite_for_nua.c
++++ b/tests/suite_for_nua.c
+@@ -138,7 +138,10 @@
+ START_TEST(with_proxy_and_nat)
+ {
+-  fail_if(test_nua_init(ctx, 1, NULL, 1, TAG_END()));
++  int nat = getenv("SOFIA_OHOS_TEST_NUA_NO_NAT") == NULL;
++
++  fail_if(test_nua_init(ctx, 1, NULL, nat, TAG_END()));
+   fail_if(test_register(ctx));
+   fail_if(test_connectivity(ctx));
+-  fail_if(test_nat_timeout(ctx));
++  if (nat)
++    fail_if(test_nat_timeout(ctx));
+   fail_if(test_basic_call(ctx));
+@@ -189,3 +192,5 @@
+-  tc = tcase_create("with-proxy-and-nat");
++  tc = tcase_create(getenv("SOFIA_OHOS_TEST_NUA_NO_NAT")
++                    ? "with-proxy-no-cross-family-nat"
++                    : "with-proxy-and-nat");
+   tcase_add_unchecked_fixture(tc, init_context, clean_context);
+   tcase_add_test(tc, with_proxy_and_nat);

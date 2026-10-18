@@ -1,0 +1,51 @@
+--- a/tests/test_100rel.c
++++ b/tests/test_100rel.c
+@@ -27,20 +27,21 @@
+  *
+  * @author Pekka Pessi <Pekka.Pessi@nokia.com>
+  * @author Martti Mela <Martti.Mela@nokia.com>
+  *
+  * @date Created: Wed Aug 17 12:12:12 EEST 2005 ppessi
+  */
+ 
+ #include "config.h"
+ 
+ #include "test_nua.h"
++#include <stdlib.h>
+ #include <sofia-sip/auth_common.h>
+ #include <sofia-sip/su_tag_class.h>
+ 
+ #if HAVE_FUNC
+ #elif HAVE_FUNCTION
+ #define __func__ __FUNCTION__
+ #else
+ #define __func__ "test_call_hold"
+ #endif
+ 
+@@ -2344,20 +2345,26 @@
+   if (print_headings)
+     printf("TEST NUA-10.7: PASSED\n");
+ 
+   END();
+ }
+ 
+ int redirect_pracked(CONDITION_PARAMS);
+ 
+ int test_180rel_redirected(struct context *ctx)
+ {
++  if (getenv("SOFIA_OHOS_SKIP_DISABLED_NUA_REDIRECT")) {
++    fprintf(stderr,
++            "SKIP NUA-10.8.1/10.8.2: upstream NUA 302/305 client redirect restart is disabled\n");
++    return 0;
++  }
++
+   BEGIN();
+ 
+   struct endpoint *a = &ctx->a,  *b = &ctx->b;
+   struct call *a_call = a->call, *b_call = b->call;
+   struct event *e, *ep, *ei;
+   sip_t *sip;
+ 
+   if (print_headings)
+     printf("TEST NUA-10.8.1: Call with 100rel and 180\n");
+ 
