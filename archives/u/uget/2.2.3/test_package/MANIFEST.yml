@@ -1,0 +1,79 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: uget/2.2.3
+homepage: "https://ugetdm.com"
+
+# 上游测试存在性审计（hmbs 硬门禁要求；上游确有测试，已接入并在真机执行）
+upstream_tests_exist: true
+upstream_test_audit: |
+  审计结论：上游 uGet 2.2.3 存在自动化测试程序（tests/ 下 6 个 noinst
+  测试程序，plain C main 无条件 return 0），未注册进 automake TESTS
+  （`make check` 不会运行它们），配方 build() 在 `make all` 后逐个真实
+  执行并断言退出码 0。
+  1. tests/Makefile.am 声明 noinst_PROGRAMS = test-json、test-jsonrpc、
+     test-plugin+app、test-info、test-uglib、test-uget（C++ 标准布局
+     变体 test-uglib-cxx/test-uget-cxx 已被上游注释掉），各程序链接
+     树内 libuget.a/libuglib.a + GLib/CURL/PTHREAD（test-plugin+app 另
+     链 libcrypto/libgcrypt）。
+  2. 程序性质：纯 C 单元/冒烟测试 —— JSON 解析（UgJson）、JSON-RPC
+     socket（UgJsonRpc）、插件与 app 状态机（含 curl/aria2/media/mega
+     插件全局初始化）、info 序列化、uglib 字符串/URI 工具、uget 数据
+     解析器；无网络下载、无 GUI 依赖、无头可跑。
+  3. 运行方式：conanfile.py build() 在 `make all`（顶层 SUBDIRS 含
+     tests，noinst_PROGRAMS 默认构建）后逐个执行 tests/<prog>，断言
+     退出码 0，结果持久化为包内 res/upstream_test_result.json，
+     test_package 阶段读取并裸 print 输出 HMBS_UPSTREAM_TEST_RESULT
+     标记。
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make all (tests/ noinst_PROGRAMS) && tests/test-json ... (非 TESTS，build() 显式执行)"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "tests/test-{json,jsonrpc,plugin+app,info,uglib,uget} (逐个执行于 build())"
+
+# 上游测试用例（真机可运行集合 = 6 个 noinst 测试程序）
+upstream_tests:
+  - file: tests/test-json.c
+    source: "uget-2.2.3/tests/test-json.c"
+    description: "JSON 解析器单元测试（UgJson 序列化/反序列化）"
+    command: "build() 执行 tests/test-json"
+  - file: tests/test-jsonrpc.c
+    source: "uget-2.2.3/tests/test-jsonrpc.c"
+    description: "JSON-RPC socket 单元测试（UgJsonRpc + UgSocketServer）"
+    command: "build() 执行 tests/test-jsonrpc"
+  - file: tests/test-plugin+app.c
+    source: "uget-2.2.3/tests/test-plugin+app.c"
+    description: "插件与 app 状态机冒烟测试（curl/aria2/media/mega 插件全局初始化 + uget_app_grow）"
+    command: "build() 执行 tests/test-plugin+app"
+  - file: tests/test-info.c
+    source: "uget-2.2.3/tests/test-info.c"
+    description: "info 数据序列化单元测试（UgInfo）"
+    command: "build() 执行 tests/test-info"
+  - file: tests/test-uglib.c
+    source: "uget-2.2.3/tests/test-uglib.c"
+    description: "uglib 工具单元测试（URI 解析/解码、字符串处理、正则匹配）"
+    command: "build() 执行 tests/test-uglib"
+  - file: tests/test-uget.c
+    source: "uget-2.2.3/tests/test-uget.c"
+    description: "uget 数据解析器单元测试（UgetData/UgetCommon 解析）"
+    command: "build() 执行 tests/test-uget"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.sh
+    description: "3 个无头用例：uget-gtk --version 横幅断言（uGet 2.2.3）、
+      --help 选项列表断言（--quiet 等，gtk_init 前处理）、
+      uget-gtk-1to2 无参横幅断言（1.10.x，EXIT_SUCCESS）"
+    command: "sh test.sh <uget-gtk> <uget-gtk-1to2>"
+
+# 测试断言总数 (近似值)
+# 上游 6 个 noinst 测试程序（build() 真机执行）；test_package 3 条消费者断言
+assertion_count: 9
+
+# 测试套件覆盖说明
+test_suite_gaps:
+  integration: "上游 tests/ 未覆盖真实下载流程（需网络）与 GTK 界面交互；test_package 以 --version/--help/1to2 横幅验证动态链接与启动路径（均在 gtk_init 前处理），GUI 交互与真实下载留待真机人工验收"
