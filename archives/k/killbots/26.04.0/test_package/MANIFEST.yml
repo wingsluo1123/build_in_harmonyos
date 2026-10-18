@@ -1,0 +1,22 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for killbots/26.04.0.
+
+package: killbots/26.04.0
+homepage: https://invent.kde.org/games/killbots
+
+upstream_check_command: "grep -rn 'add_test\\|enable_testing\\|ecm_add_tests' --include='*.txt' --include='*.cmake' . | grep -v '^./po' || true"
+upstream_test_in_build: false
+upstream_test_command: "ctest --test-dir build -R enginetest (requires full KDE CI infrastructure)"
+
+upstream_tests:
+  - file: tests/enginetest.cpp
+    source: killbots-26.04.0.tar.xz
+    description: "Upstream Qt Test suite: enginetest with 4 test functions (testValidCells, testRandomEmptyCell, testMoveIsValid, testMoveIsSafe). Requires KDE CI infrastructure (KDE games testing framework) not available in OHOS PC CI; verified by KDE CI upstream."
+    command: "ctest -R enginetest"
+
+test_package_tests:
+  - file: test_package/test.sh
+    description: "Runtime smoke of the shipped executable: killbots --version prints the 26.04.0 version string and exits 0 (QCommandLineParser/KAboutData handle --version before GUI creation, QT_QPA_PLATFORM=offscreen keeps it headless-safe). OHOS-specific: shared library closure check (dlopen libQt6Core) + .codesign signature check."
+    command: "conan create (test_package runs test.sh + OHOS closure/signature checks against the installed bin/killbots)"
+
+assertion_count: 4
