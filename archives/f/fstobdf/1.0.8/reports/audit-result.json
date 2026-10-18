@@ -1,0 +1,66 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P3",
+      "rule_id": "code-style-13",
+      "file": "archives/f/fstobdf/1.0.8/conandata.yml",
+      "line": 8,
+      "description": "sources.url 使用双元素列表而非标准示例中的单值标量；属有意为之（两处均为 x.org 官方宿主，防单值镜像改写指到死镜像），PR 内附实测证据说明",
+      "fix_suggestion": "保留现状即可；若 CI L0n 只接受单值 URL 可再收敛为 xorg.freedesktop.org 官方 URL（suggestion，无强制规则出处）"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R26",
+      "file": "archives/f/fstobdf/1.0.8/conanfile.py",
+      "line": 118,
+      "description": "fstobdf 链接系统同名库 libX11/libxcb 等为动态依赖（ELF NEEDED 实测），非静态链接；但 fstobdf 是 application 工具包而非同名 C 库包，R26 字面只约束库名与系统库同名（zlib/openssl/libxml2/ncurses 等）的库类型包，本案按 family 先例动态链接不构成违规",
+      "fix_suggestion": "保持现状；同族 X11 app 配方均如此（suggestion）"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R32",
+      "file": "archives/f/fstobdf/1.0.8/conanfile.py",
+      "line": 43,
+      "description": "OS 兼容检查（ConanInvalidConfiguration）放在 configure() 而非 Conan 2.x 惯用的 validate()；OHOS 事实 embraces 已确认（not in (\"Linux\",\"OHOS\")），仅函数归属非标准",
+      "fix_suggestion": "迁移至 validate()（不阻塞提 PR）"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code-style-12",
+      "file": "archives/f/fstobdf/1.0.8/conandata.yml",
+      "line": 19,
+      "description": "patch_description 使用长说明句（含枚举错误码），格式为 '0001 xxx' 前缀 + 空格分隔，符合文件名派生惯例，仅与 code_style 极简示例相比信息量更大",
+      "fix_suggestion": "保持现状即可（suggestion）"
+    },
+    {
+      "severity": "P2",
+      "rule_id": "R3-adjacent",
+      "file": "archives/f/fstobdf/1.0.8/patches/0001-config.guess.patch",
+      "line": 1,
+      "description": "补丁由 `~/builds/fstobdf-1.0.8.orig` tar 原件逐文件 `diff -u` 生成（notes.md 明示），非走 refresh-patch --auto；模板生成器对本包不可用（notes.md 记录），且 patches 实测 patch -p1 rc=0",
+      "fix_suggestion": "建议后续统一走 refresh-patch 工具链以利可追溯；不阻塞提 PR"
+    }
+  ],
+  "summary": "无 P0/P1 欺骗或结构性阻断：test_package 真跑被测二进制（9 条实断言 + 2 组负向对照），双补丁均为分发性 autotools 桂构脚本且不注入 __OHOS__ 宏，commands.json/manifest/README 内部一致且 status 如实标注中 built，W2 单配方为原子依据本包 diff 基线归零——允许提 PR；余下 3 条 P2/P3 为规范性建议，仅 R3 相关项（补丁未经 refresh-patch --auto 流水）建议后续统一。",
+  "audit_meta": {
+    "audit_tool": "pre_pr_audit.py generate + atomcode 5.2.1 --no-tools --ephemeral (z-ai/glm-5.3-flash)",
+    "audited_head": "abe8ae0b5972be975738f80c1a55ee6d242e5759",
+    "audit_input_sha256": "9c4627e201a5f30540f4dc0c843bf0e1e9d7fcf59fc69424e721b9de79187256",
+    "report_rc": 0,
+    "file_sha256": {
+      "archives/f/fstobdf/1.0.8/conandata.yml": "abc1539efb610dc10d93fd97ad9e5beb4c4d06d8c65d1a41a5610ed1fa135bde",
+      "archives/f/fstobdf/1.0.8/conanfile.py": "cfd57a368fd23671417ceb281435e82de323a28d75e12fb8288114247f54d6ba",
+      "archives/f/fstobdf/1.0.8/manifest.yaml": "011ed79dff82e43aaf0811bd05aa5be7c37908e72db81bfa96d990b95e686819",
+      "archives/f/fstobdf/1.0.8/notes.md": "1f828418b5eb545b08d168c3ad12039cc62160bcecbd2037d3c09962d4689405",
+      "archives/f/fstobdf/1.0.8/patches/0001-config.guess.patch": "9e027064f476e6759df0f04d09e08b7473b8b53eb5a488c6d920e3e4a5d35ea3",
+      "archives/f/fstobdf/1.0.8/patches/0002-configure-hmdfs-pwd-tmpdir.patch": "5bccfd98f820cfcf47033bf930e572d2697f953a4310338dfe825ce2a5d551a1",
+      "archives/f/fstobdf/1.0.8/test_package/MANIFEST.yml": "b65cb8a49acead9ebe97643279b1b870eab45ad1e72f586f9136c197a585f344",
+      "archives/f/fstobdf/1.0.8/test_package/conanfile.py": "d26a7c9fff4e6d085a45d5e81d2104efd4b4eb10f025f8d9fd050136efae8807",
+      "archives/f/fstobdf/1.0.8/test_package/test.sh": "5b6cca414e0fc106d95ebb8f59a23f1f4719b79cf6b5fe4dca5b7f10051d89f2",
+      "archives/f/fstobdf/README.md": "34db04516297b0f4f39a182b95d46a8c2c04f12d9c3a3820cf6e1d54c9b80f27",
+      "archives/f/fstobdf/commands.json": "9bf080aa68acb05c44ba3ba1ba0b7a52fff9b156983168712d04036b59da93da",
+      "archives/f/fstobdf/manifest.yaml": "d0702df42795bde5f89d90f3705f3f303db89b86f46bea8b14ef8a1ccc094204"
+    }
+  }
+}
