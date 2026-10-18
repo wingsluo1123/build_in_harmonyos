@@ -1,0 +1,91 @@
+# 版本级 manifest
+# 文件位置: archives/l/lam/7.1.4/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "7.1.4"
+
+# 软件名
+software: lam
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-11"
+build_system: autotools
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://deb.debian.org/debian/pool/main/l/lam/lam_7.1.4.orig.tar.gz"
+
+  # 源码校验和
+  sha256: "7cd5f289b9e4887d2a62532c33d93265a049b372ae23d0a6309e6870fef811ae"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表
+  configure_options:
+    - "--without-romio"
+    - "--without-fc"
+    - "--disable-shared"
+    - "--enable-static"
+    - "--build=aarch64-linux-ohos"
+    - "--host=aarch64-linux-ohos"
+    - "CFLAGS=-O2 -fPIC"
+    - "CXXFLAGS=-O2 -fPIC"
+    - "SHELL=/bin/sh"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-configure-main-signature.patch"
+  - "0002-config-guess-ohos.patch"
+  - "0003-config-sub-ohos.patch"
+  - "0004-configure-libtool-sh-invocation.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "2007 老版 config.guess 没有 GUESS 变量统一出口，HarmonyOS 识别分支必须直接 echo+exit，patch-autotools-ohos.pl 的新版写法不适用"
+  - "2007 老版 config.sub 识别 aarch64-unknown-linux-ohos 需要 4 处修改：KERNEL-OS 拆分列表加 linux-ohos*、CPU 列表加 aarch64、基础 os 列表加 -ohos*/-linux-ohos*、-linux* 分支内保护 ohos 不被改写为 linux-gnu"
+  - "LAM 7.1.4 的 configure 有 7 处 conftest 写错 main(int argc, char* argv) 签名，clang 15 直接拒绝，必须批量改为 char* argv[]"
+  - "LAM 的 hcc/mpicc/mpic++ wrapper 是编译期生成的 ELF 二进制而非脚本，在 OHOS 上 --showme 可用但实际编译静默失败；消费者应直接用 clang 配合 cpp_info 的 -I/-L/-l 标志"
+  - "LAM 运行时（lamboot/lamd/mpirun -np N/lamhalt）在 OHOS 上完整可用，多进程本地 launch 不受限，优于 mpich gforker 在同环境的先例"
+  - "master/slave 架构的 MPI 示例必须按各自设计模式运行：fault 需 mpirun n0 ./master 且 cwd 下有正确命名的 ./slave；mandelbrot 需 myapp schema（h master : C -s h slave）；直接 mpirun -np 2 master 会因多个 master 互相等待而死锁"
+  - "LAM 包内 23 份 config.guess/config.sub 字节级相同，补丁只改 config/ 下规范副本后可用 conanfile 程序化复制到其余 22 份"
+  - "conan 缓存所在文件系统不保留 exec 位时：configure 生成的 libtool shebang 由 SHELL 变量决定（libtool.m4 生成 '#! $SHELL'），即使 shebang 指向可用的 /bin/sh，直接 exec 该文件仍会 EACCES；顶层 configure 的 6 处链接器探测须改为 \"$SHELL $libtool\" 显式调用（0004 补丁），Makefile 内 $(SHELL) 调用不受影响"
+  - "该文件系统同样拒绝 mkfifo，GNU make -j2 的 jobserver 建立失败会偶发破坏并行 recipe 执行（Error 1 且无真实编译错误）；串行 make 约 25 分钟，远小于 CI 默认 3600s 超时"
