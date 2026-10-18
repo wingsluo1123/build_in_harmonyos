@@ -1,0 +1,72 @@
+# 版本级 manifest
+# libdbusmenu-glib 16.04.0(上游正式终版,溯源见 notes.md)
+
+version: "16.04.0"
+software: "libdbusmenu-glib"
+status: built
+build_date: "2026-10-02"
+build_system: direct-drive
+
+source:
+  url: "https://gitee.com/src-openeuler/libdbusmenu/raw/openEuler-22.03-LTS/libdbusmenu-16.04.0.tar.gz"
+  sha256: "b9cc4a2acd74509435892823607d966d424bd9ad5d0b00938f27240a1bfa878a"
+  tar_format: tar.gz
+
+build:
+  system: direct-drive
+  # 上游为 autotools,但 release configure 硬依赖 intltool(其展开含
+  # 七处独立致命检查:perl/intltool 三脚本/gettext 工具/automake 与
+  # intltool 版本 grep),库规则以裸 PATH 调 glib-genmarshal 与
+  # xsltproc,2016 年 config.sub 不识 ohos 三元组——OHOS worker 上
+  # 这些工具全部缺失或不可执行。tarball 已自带全部预生成源
+  # (marshal/enum-types/gdbus XML C 数组),build() 直接驱动 11 个
+  # 翻译单元编译并自行落 libtool 版本化 SONAME(subunit 1.4.5 贡献式
+  # 包装同款先例),glibc 全链路预验证 11/11 TU + 冒烟 5/5。
+  compile_flags:
+    - "-fPIC"
+    - "-O1"
+    - "-DNDEBUG"
+    - "-DGETTEXT_PACKAGE=\"libdbusmenu\""
+    - "-DG_LOG_DOMAIN=\"LIBDBUSMENU-GLIB\""
+  link:
+    soname: "libdbusmenu-glib.so.4"
+    realname: "libdbusmenu-glib.so.4.0.12"
+    version_info: "4:12:0"
+  dependencies:
+    - "glib/2.84.0.1"
+  cc: clang
+
+patches_applied: []
+
+knowledge_gained: []
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: F:/HarmonyPC/all-pr-submit-20261014-01a13972/dbusmenu-formal-source-r969/orig
+  source_work_dir: F:/HarmonyPC/all-pr-submit-20261014-01a13972/dbusmenu-formal-source-r969/work
+  source_orig_hash: 84c7fe5484f0e96d
+  source_work_hash: b288048ac3483537
+  generated_at: '2026-10-16T06:56:53'
+  patches_count: 5
+
+patch_classification:
+  - file: 0001-libdbusmenu-glib-menuitem.c.patch
+    type: portability
+    platform_only: False
+    guard: 'Original assertions retained; product child_find traverses nonempty lists'
+  - file: 0002-tests-test-glib-layout.h.patch
+    type: portability
+    platform_only: False
+    guard: 'Original assertions retained; product child_find traverses nonempty lists'
+  - file: 0003-tests-test-glib-properties.h.patch
+    type: portability
+    platform_only: False
+    guard: 'Original assertions retained; product child_find traverses nonempty lists'
+  - file: 0004-tests-test-glib-proxy.h.patch
+    type: portability
+    platform_only: False
+    guard: 'Original assertions retained; product child_find traverses nonempty lists'
+  - file: 0005-tests-test-glib-submenu.h.patch
+    type: portability
+    platform_only: False
+    guard: 'Original assertions retained; product child_find traverses nonempty lists'
