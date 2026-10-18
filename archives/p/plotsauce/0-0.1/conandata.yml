@@ -1,0 +1,27 @@
+# conandata.yml — plotsauce 0-0.1
+#
+# Sources:
+#  1. plotsauce upstream master snapshot (official GitHub repository, pinned
+#     commit 173c0304e788fd7b0b06982a4ff9c333ede86eff; upstream publishes no
+#     release tarballs).
+#  2. survex 1.2.44 official tarball (https://survex.com). Upstream plotsauce.qbs
+#     delegates .3d parsing to an external "cavern-3dReader" product that is not
+#     shipped in the plotsauce repository; Debian vendored survex src/img.c +
+#     src/img.h (byte-identical to survex 1.2.44 img.h) to fill that gap. This
+#     recipe does the same, sourcing the files from the official survex release
+#     instead of a repackaged copy.
+
+sources:
+  - url: "https://codeload.github.com/Cavewhere/plotsauce/tar.gz/173c0304e788fd7b0b06982a4ff9c333ede86eff"
+    sha256: "bfe090a08db625eb03a0d26fb1f62f46e8f96b93d8522fbf0f95e94cecb54920"
+  - url: "https://survex.com/software/1.2.44/survex-1.2.44.tar.gz"
+    sha256: "91b75ff7ed3b8707a33cd5ad7b385f95cd305efb730ab3840bd38b87a7d63804"
+
+patches:
+  "0-0.1":
+    - patch_file: "patches/0001-CMakeLists.txt.patch"
+      patch_type: "conan"
+      patch_description: "Build the upstream QBS-declared targets with CMake"
+    - patch_file: "patches/0002-survex-img-api-version.patch"
+      patch_type: "portability"
+      patch_description: "Vendored survex img.h: use the IMG_API_VERSION=1 date API the parser expects (Debian precedent)"
