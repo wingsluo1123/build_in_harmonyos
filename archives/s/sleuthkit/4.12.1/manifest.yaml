@@ -1,114 +1,62 @@
-software: sleuthkit
-# 版本级 manifest 模板
-# 文件位置: archives/{letter}/{name}/4.12.1/manifest.yaml
+# 版本级 manifest — sleuthkit 4.12.1
 # 遵循 ARCHIVE-SPEC v2.0
+# 状态:MateBook 真机验证(round5,2026-10-15)后定稿;实测数字见 test_results。
 
-# ============================================================
-# 必须字段
-# ============================================================
-
-# 版本号
 version: "4.12.1"
-
-# 编译状态
-# published | built | failed | archived
-status: published
+software: "sleuthkit"
+status: built
+build_date: "2026-10-15"
 build_system: autotools
-
-# 编译日期（YYYY-MM-DD）
-build_date: "2026-05-25"
-
-# ============================================================
-# 源码信息
-# ============================================================
+conan_ref: "sleuthkit/4.12.1"
 
 source:
-  # 源码下载 URL
   url: "https://github.com/sleuthkit/sleuthkit/releases/download/sleuthkit-4.12.1/sleuthkit-4.12.1.tar.gz"
-
-  # 源码校验和
-  sha256: ""
-
-  # 压缩格式
-  # tar.gz | tar.xz | tar.bz2 | zip
+  sha256: "6b2de0baabc6a38429a33993114ca3820329b477d5038cbf45fcf69fca8addfd"
   tar_format: tar.gz
 
-# ============================================================
-# 构建配置
-# ============================================================
-
 build:
-  # 构建系统类型
-  # cmake | autotools | makefile | meson | custom
   system: autotools
-
-  # 配置选项列表
-  configure_options: []
-  # 例如:
-  # - "-DCMAKE_BUILD_TYPE=Release"
-  # - "-DCMAKE_SYSTEM_NAME=OHOS"
-
-  # 编译依赖列表（格式: name/version）
-  dependencies: []
-  # 例如:
-  # - openssl/1.1.1w
-  # - curl/8.19.0
-
-  # 编译器
+  configure_options:
+    - "--build=aarch64-unknown-linux-ohos"
+    - "--prefix=<package_folder>"
+    - "--with-pic"
+    - "--disable-shared"
+    - "--enable-static"
+    - "--without-afflib"
+    - "--without-libewf"
+    - "--without-libbfio"
+    - "--without-libvhdi"
+    - "--without-libvmdk"
+    - "--without-libvslvm"
+  dependencies:
+    - zlib/1.3.2
   cc: clang
-  cxx: clang++
+  upstream_test_command: "make -j1 <4 个 check_PROGRAMS> + gen_upstream_fixtures.py 生成合成镜像 + 4 程序全部真实执行 (tests/)"
 
-# ============================================================
-# 补丁信息
-# ============================================================
+test_results:
+  target: "OpenHarmony aarch64"
+  upstream_framework: "make check(tests/:TESTS=runtests.sh test_libraries.sh + check_PROGRAMS=4 个 C++ API 测试)"
+  upstream_discovered: 6
+  upstream_passed: 4
+  upstream_failed: 0
+  upstream_skipped: 2
+  upstream_note: "check_PROGRAMS 4 个测试程序全部真实执行(13 个执行单元:read_apis 6 子测试/fs_fname_apis 2/fs_attrlist_apis 3/fs_thread_test 2 组确定性 diff);TESTS 2 个脚本离线不可运行按上游设计豁免——runtests.sh 需非公开的 $HOME/from_brian 镜像(上游注释明言 not public),test_libraries.sh 运行时从 Google Drive 下载镜像且 mmls 子测试依赖 --without-* 关闭的 libvmdk/libvhdi/libewf。release tarball 不含磁盘镜像(tests/Makefile.am 预期 data/ 未随包发布),配方自带 gen_upstream_fixtures.py(纯 Python 标准库)在构建期生成 6 个满足上游断言的合成 FAT12/16/32+NTFS 镜像供执行。真机实测(round5,2026-10-15)。"
+  test_package_passed: 12
+  test_package_failed: 0
+  test_package_assertions: 12
+  execution: "真机 round5(2026-10-15,SHA ef8d4732fe):conan create rc=0(缓存已清全量重建,6 镜像生成 + check_PROGRAMS 4/4 真实执行)→ conan test rc=0(消费者 12/12)→ finish exit_code=0(integrity_hash 54ee0f1525216e5e)→ W4 审计 pass(P0=0/P1=0)"
 
-# 应用的补丁列表
 patches_applied:
-  - "0001-config-config.guess.patch"
-  - "0002-config-config.sub.patch"
-  - "0003-configure.patch"
-  - "0004-tsk-pool-Makefile.patch"
-  - "0005-tsk-pool-Makefile.am.patch"
-# 例如:
-# - "0001-bootstrap-ohos-toolchain.patch"
+  - "0001-ohos-config-sub-triplet.patch"
+  - "0002-configure-umask-022.patch"
+  - "0003-remove-werror-pool-util.patch"
 
-# ============================================================
-# 知识沉淀
-# ============================================================
-
-# 编译中学到的知识
-knowledge_gained: []
-# 例如:
-# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
-# - "内嵌 libuv 需要禁用，使用系统 libuv"
-
-patch_generation:
-  method: per-file-difflib
-  source_orig_dir: /storage/Users/currentUser/tmp/builds/sleuthkit-4.12.1.orig
-  source_work_dir: /storage/Users/currentUser/tmp/builds/sleuthkit-4.12.1.work
-  source_orig_hash: f2b6cd33d579a2b0
-  source_work_hash: a521068795b4249d
-  generated_at: '2026-05-25T16:22:41'
-  patches_count: 5
-
-patch_classification:
-  - file: 0001-config-config.guess.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0002-config-config.sub.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0003-configure.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0004-tsk-pool-Makefile.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0005-tsk-pool-Makefile.am.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
+knowledge_gained:
+  - "官方 release tarball 自带生成的 configure(config.guess 2021-08-14),无需 autoreconf/tool_requires automake"
+  - "config.guess 认不出 HarmonyOS(设备 uname 返回 HarmonyOS);用 --build=aarch64-unknown-linux-ohos 显式三元组规避,0001 补丁让 config.sub 接受 *-*-linux-ohos"
+  - "旧 stub 补丁(0001-0005,config.guess/config.sub 整文件替换等)针对另一份 4.12.1 快照(config.guess 2021-06-03),对官方 release tarball 有 4/5 不能应用,已全部重做"
+  - "configure 生成的 mktemp 脚本段含 umask 077(两处,configure:24261/24266),HMDFS setgid 目录下临时目录不可写(E114),0002 改 umask 022"
+  - "tsk/pool 与 tsk/util 两处 Makefile.am 设 -Werror(-Wall -Wextra -Werror),OHOS SDK 头文件警告会中止编译,0003 移除(旧 stub 只处理了 tsk/pool,漏了 tsk/util)"
+  - "上游全部外部依赖均为可选(TSK_OPT_DEP_CHECK);zlib 经 Conan/ AutotoolsDeps 注入启用,afflib/libewf/libbfio/libvhdi/libvmdk/libvslvm 用 --without-* 显式关闭保证确定性"
+  - "make check 的 TESTS 按上游设计不可离线运行(runtests.sh 需非公开 from_brian 镜像,test_libraries.sh 需 Google Drive 下载);check_PROGRAMS 需外部镜像根目录参数,release tarball 不含任何磁盘镜像——配方自带纯标准库生成器 gen_upstream_fixtures.py 按各测试断言构造 6 个合成 FAT12/16/32+NTFS 镜像(fat12.dd/fat-img-kw.dd/fat32.dd/fe_test_1.img/ntfs-comp-1.img/ntfs-img-kw-1.dd),使 4 个测试程序可离线真实执行"
+  - "openssl 支持在 configure.ac 中整段注释掉(307-310 行),非可用选项"
