@@ -1,0 +1,78 @@
+software: libuser
+version: "0.64-git20241106-dfsg"
+status: built
+build_system: autotools
+build_date: "2026-09-26"
+language: C
+homepage: "https://pagure.io/libuser/"
+license: LGPL-2.0-or-later
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/libu/libuser/libuser_0.64+git20241106~dfsg.orig.tar.gz"
+  sha256: "e383cbdabb782ea8e8f6df1351ecd491f3b62f4f9b171c44e03cce9e1cec4658"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--enable-shared"
+    - "--disable-static"
+    - "--without-python"
+    - "--without-sasl"
+    - "--without-ldap"
+    - "--without-selinux"
+    - "--without-audit"
+    - "--enable-gtk-doc=no"
+    - "--disable-nls"
+  dependencies:
+    - "glib/2.84.0.1"
+    - "popt/1.16"
+    - "linux-pam/1.7.2"
+    - "proxy-libintl/0.5"
+  cc: clang
+
+patches_applied: []
+
+test_results:
+  upstream:
+    registered: 7
+    audit: "Makefile.am TESTS 官方总数 7：常驻 5（tests/config_test.sh, tests/fs_test, tests/files_test, tests/pwhash_test, tests/utils_test）+ 仅 if LDAP 注册 2（tests/default_pw_test, tests/ldap_test，需 /usr/sbin/slapd；本配方 --without-ldap 未注册，以 ohos_feature 缺口说明）"
+    ran: "待 HMBS 真机预检回填"
+    passed: "待 HMBS 真机预检回填"
+    command: "make check -j1（conanfile.py build() 内 best-effort 执行，计数解析自 test-suite.log）"
+  test_package:
+    total: 6
+    description: "消费者视角 6 组：context_start / modules_loaded / user_default / group_default / ent_id_roundtrip / config_moduledir"
+    passed: "待 HMBS 真机预检回填"
+
+knowledge_ref: []
+
+configure_options:
+  - "--enable-shared"
+  - "--disable-static"
+  - "--without-python"
+  - "--without-sasl"
+  - "--without-ldap"
+  - "--without-selinux"
+  - "--without-audit"
+  - "--enable-gtk-doc=no"
+  - "--disable-nls"
+
+artifacts:
+  - lib/libuser.so
+  - lib/libuser/libuser_files.so
+  - lib/libuser/libuser_shadow.so
+  - lib/pkgconfig/libuser.pc
+  - include/libuser/user.h
+  - bin/luseradd
+  - bin/lusermod
+  - bin/luserdel
+  - bin/lgroupadd
+  - bin/lgroupmod
+  - bin/lgroupdel
+  - bin/lpasswd
+  - bin/lchage
+  - bin/lchfn
+  - bin/lchsh
+  - bin/lid
+  - bin/lnewusers
