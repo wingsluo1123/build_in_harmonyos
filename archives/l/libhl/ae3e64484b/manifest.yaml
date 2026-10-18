@@ -1,0 +1,95 @@
+# 版本级 manifest
+# 文件位置: archives/l/libhl/ae3e64484b/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "ae3e64484b"
+
+# 软件名
+software: "libhl"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-15"
+build_system: "autotools"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/xant/libhl/archive/ae3e64484bbee53b2868b68cd7b92bf1bdbc18d2.tar.gz"
+
+  # 源码校验和
+  sha256: "ea9b57f2e8960949d8aa36dc4537b7328e89fcca88744ccb47c111744e869f0c"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表
+  configure_options:
+  - "--prefix=<package_folder>（由 AutotoolsToolchain 注入）"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-build-aux-config.guess.patch"
+  - "0002-build-aux-config.sub.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "上游构建系统位于 build/ 子目录（预生成 configure），必须在 build/ 内启动 configure，srcdir 才能解析为仓库根（VPATH out-of-tree 布局）"
+  - "build/configure 位于 EXCLUDE_DIRS(build) 内，refresh-patch 无法为其生成补丁，且 configure 被内容启发式判定为生成文件——此类修复走配方内 replace_in_file（先例 abook 0006-configure.patch）"
+  - "HMDFS + toybox mktemp：umask 077 && mktemp -d 产生 2700 目录进程不可写；去掉 umask 077 后为 2751 可写（configure 临时目录修复依据）"
+  - "上游手写 install 目标忽略 DESTDIR 且不建目标目录，配方用 copy() 直接打包 lib/ 与 include/"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/libhl-ae3e64484b.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/libhl-ae3e64484b.work
+  source_orig_hash: dae3921bc9aa9279
+  source_work_hash: df5acdbf370b5359
+  generated_at: '2026-10-15T18:48:40'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-build-aux-config.guess.patch
+    type: portability
+    platform_only: True
+    guard: 'none'
+  - file: 0002-build-aux-config.sub.patch
+    type: portability
+    platform_only: True
+    guard: 'none'
