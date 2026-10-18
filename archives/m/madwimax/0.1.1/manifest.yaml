@@ -1,0 +1,78 @@
+# 版本级 manifest — madwimax 0.1.1
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "0.1.1"
+software: madwimax
+status: built
+build_date: "2026-10-15"
+build_system: autotools
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/m/madwimax/madwimax_0.1.1.orig.tar.gz"
+  sha256: "0b552e6a6face4534bc65c4d377dce177c6a1bd39785a63f6d57f1d79e772429"
+  filename: "madwimax_0.1.1.orig.tar.gz"
+  note: >-
+    源取 Debian 源包的 orig（= 上游 `ago/madwimax` 的 0.1.1 官方发布 tarball，与平台清单一致；
+    GitHub 标注语言 **C**）。**改用该源的原因**：它自带已生成的 `configure`/`Makefile.in`/
+    `config.guess`/`depcomp`/`install-sh` → 构建时可直接 configure；CI 构建 #94280 曾在
+    **autoreconf 之后卡满 1 小时墙钟被判超时**，换此源即绕开那一步。
+    其内附的 `config.sub`/`config.guess` 仍是 2009 年版本、认不出 aarch64 三元组 → 配方在 configure 前
+    从 conan 的 `automake` 包取现代版本覆盖这两个脚本（**不重跑 autoreconf**）。
+    包内单层根目录 `madwimax-0.1.1/`；sha256 为本地实测值。
+
+build:
+  system: autotools
+  configure_options:
+    - "--build=aarch64-unknown-linux-musl"
+    - "--host=aarch64-unknown-linux-musl"
+    - "--without-man-pages"
+    - "--sbindir=<package>/bin"
+  dependencies:
+    - "libusb/1.0.27（唯一外部依赖；上游 configure.ac:60 PKG_CHECK_MODULES libusb-1.0）"
+  build_requirements:
+    - "automake/1.18"
+    - "libtool/2.5.4"
+  extra_defines:
+    - "__MUSL__（见 knowledge_gained：修 musl 与内核 uapi 头的 sockaddr_storage 冲突）"
+  language: "C（autotools；pthread + libusb）"
+
+patches_applied:
+  - "（无上游源文件补丁）配方内 acc: 通过 --without-man-pages 关掉 asciidoc 硬检查；通过 -D__MUSL__ 消除 \
+     sockaddr_storage 重定义；package() 显式补装 bin/madwimax"
+
+upstream_tests:
+  framework: "（上游没有测试套件）"
+  test_path: "无 —— 无 test/tests 目录，Makefile.am 里也没有 TESTS"
+  test_command: "（上游无）本配方在 build() 内补跑：`madwimax --help` 与 `madwimax --version`"
+  test_count: 0
+  run_in_build: true
+  verified: true
+upstream_test_pass_rate: >-
+  **上游 0 个测试**（如实声明：无 test/tests，Makefile.am 无 TESTS）。按仓库既有做法**在配方里补真跑的功能级
+  测试**：构建完成后运行产物 —— ①`madwimax --help` 打印用法 ✓（上游 `src/wimax.c:652` 支持 `-h,--help`）；
+  ②`madwimax --version` → `madwimax 0.1.1` ✓（`src/wimax.c:648`）。它是**硬件驱动**：真正工作需 WiMAX USB
+  设备 + TAP 设备，本环境不执行，**如实记录**（不冒充通过）。构成在 test_package/MANIFEST.yml 里摊开。
+adapted_test_pass_rate: >-
+  test_package/check_madwimax.py **7 项消费者校验（全部离线）**，本地实测 `checks=7 fails=0 / RESULT: PASS`：
+  ①产物齐备（bin/madwimax，47552 字节）②ELF 头自检（真 ELF64、machine=0xB7 AArch64）③`madwimax --help`
+  打印用法 ④`madwimax --version` 输出 `madwimax 0.1.1` ⑤许可证随包（COPYING）⑥证据（sha256 + python 版本）
+  ⑦运行边界如实记录（真实驱动功能需 WiMAX USB + TAP，本环境不执行）。
+
+knowledge_gained:
+  - category: L1
+    content: >-
+      **OHOS 上 musl 与内核 uapi 头的 `sockaddr_storage` 冲突，可以一个 -D 解决**：上游 `src/tap_dev.c` 先
+      `#include <sys/socket.h>` 再 `#include <linux/if.h>` → 后者带出 `linux/socket.h` 又定义一次
+      `struct sockaddr_storage` → `error: redefinition of 'sockaddr_storage'`。**看 sysroot 的 musl 头**：
+      `sys/socket.h:376` 是 `#ifndef __MUSL__` 包裹 → 只要给编译加 **`-D__MUSL__`**，musl 就不再自定义该
+      结构，只剩内核头那份 → 冲突消失（一个 -D 的补丁，**不用改上游源码**）。这类"musl 头 + linux uapi
+      头"的重复定义，先查 musl 侧有没有 `__MUSL__`/`__DEFINED_*` 守卫再决定要不要动源码。
+    reason: "madwimax 0.1.1 适配实测——sockaddr_storage 重定义"
+  - category: L1
+    content: >-
+      **上游 configure 的"文档工具硬检查"与"sbin 安装"两处小坑**：①madwimax 的 `configure.ac` 默认要生成
+      man 页 → 里面**硬检查 asciidoc**（`AC_MSG_ERROR "asciidoc not found"`，实测直接挡住 configure）；
+      同处 `AC_ARG_WITH(man-pages)` 提供了 **`--without-man-pages`**，文档非必需时加上即可绕开；
+      ②上游是 `sbin_PROGRAMS = madwimax`，实测 `make install` 没把产物落到我们期望的 `bin/` →
+      配方在 `package()` 里**显式补装一次** `bin/madwimax`，让包内布局与 `commands.json` 约定一致。
+    reason: "madwimax 0.1.1 适配实测——asciidoc 硬检查与 sbin 布局"
