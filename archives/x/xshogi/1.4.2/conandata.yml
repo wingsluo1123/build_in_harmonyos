@@ -1,0 +1,23 @@
+# conandata.yml — xshogi 1.4.2
+#
+# 源码身份：GNU 官方发布包（ftp.gnu.org/pub/gnu/gnushogi/xshogi-<ver>.tar.gz，
+# 与 Debian xshogi 1.4.2 的 debian/watch 上游表达式一致）。
+# 只写官方 URL：CI/W3 会自动追加镜像 fallback（R39/PF7），配方内不写任何镜像前缀。
+# sha256 为设备实测值（256442 字节 tarball）。
+
+sources:
+  url: "https://ftp.gnu.org/gnu/gnushogi/xshogi-1.4.2.tar.gz"
+  sha256: "2e2f1145e3317143615a764411178f538bd54945646b14fc2264aaeaa105dab6"
+
+patches:
+  - patch_file: "patches/0001-add-version-option.patch"
+    patch_type: "portability"
+    strip: 1
+    patch_description: >-
+      main() 在 XtAppInitialize 之前处理 -version/--version（单双横线均可），
+      打印 "xshogi version 1.4.2 based on xboard version 2.0/2.1" 后 exit(0)。
+      libXt 不实现 -help/-version（libXt-1.3.1 Initialize.c 的选项表无这两项），
+      上游 xshogi 也不处理它们：无此早退时任何命令行选项都会先走到
+      XtAppInitialize → XOpenDisplay，无头环境必然 "Can't open display" 退出，
+      无头 L2 smoke（bin/xshogi --version）无法通过。纯追加，无平台宏，
+      非 OHOS 专属（同仓库 X11 GUI 包 xeyes 1.3.1 / appres 1.0.7 同款约定）。
