@@ -1,0 +1,63 @@
+package: xapp/3.2.2
+homepage: "https://github.com/linuxmint/xapp"
+
+upstream_check_command: "grep -c 'test(' $(find . -name meson.build)  # 0 hits across 13 meson.build files; no tests/ dir"
+
+upstream_test_in_build: false
+upstream_test_command: "none — upstream xapp 3.2.2 ships no automated test suite (NO_UPSTREAM_TESTS, discovery EVIDENCE_COMPLETE)"
+
+upstream_tests: []
+# Discovery record (Scout-A, re-verified by Builder against the 3.2.2 tree):
+#   - all 13 meson.build files: zero test() calls (grep -c 'test(' = 0)
+#   - no tests/ directory anywhere in the tree
+#   - test-scripts/: 7 manual interactive GUI demos (xapp-favorites,
+#     xapp-gpu-offload-helper, xapp-gtk-window, xapp-icon-chooser-dialog,
+#     xapp-kbd-layout-controller, xapp-status-applet,
+#     xapp-status-icon-variants — Python + gi, need a real display/desktop
+#     session), not wired into any meson target
+#   - .github/workflows/: only build.yml, delegating to linuxmint
+#     do-builds.yml (build/package + codespell), no test step
+#   - meson_options.txt: no test-related switch
+# 3.2.2 delta re-verification (Builder, against the packaged 3.2.2 tree,
+# byte-compared with the 2.8.9 source):
+#   - root meson.build: version line only (2.8.9 → 3.2.2); meson >= 0.56.0
+#     and the dbus-1 get_variable(session_bus_services_dir) probe unchanged
+#   - libxapp/meson.build, xapp-gtk-window.c, meson_options.txt:
+#     byte-identical to 2.8.9 → the X11 guard patch carries over unchanged
+#     (git apply --check clean against the 3.2.2 tree)
+#   - only library-code change: internal GVariant logic in
+#     xapp-gpu-offload-helper.c (new "Discrete" key parsed into a private
+#     hash table; the file is compiled INTO libxapp and exports no new
+#     symbol, so no cheap pure-logic assertion exists — not added; the
+#     adaptation surface the 20 assertions below cover is untouched)
+#   - license unchanged (COPYING GPL-3 + COPYING.LESSER LGPL-3);
+#     gettext consumers unchanged (7 libxapp/*.c include glib/gi18n-lib.h);
+#     org.x.apps.favorites schema still ships key "list" type "as" default []
+
+test_package_tests:
+  - file: test_xapp.c
+    description: >-
+      OHOS-specific consumer test (20 TAP checks, no display connection;
+      carried over from the 2.8.9 baseline and re-verified applicable to
+      3.2.2): (1) xapp.pc metadata closure enforced at CMake configure —
+      pkg-config 0.29.2 must resolve name/version + Requires
+      (gtk+-3.0/gobject-2.0/cairo) + Requires.private (xkbfile), version
+      >= 3.2.2 guarded in CMakeLists.txt; (2) headless GType registration —
+      xapp_gtk_window_get_type is-a GTK_TYPE_WINDOW,
+      xapp_favorites_get_type valid; (3) loader/closure —
+      dlopen("libxapp.so.1") + dlsym of the mkenums-generated
+      xapp_scroll_direction_get_type and public xapp_set_xid_progress
+      (xid=0 safely no-ops), and g_libintl_bindtextdomain resolvable in
+      global scope (glib musl proxy-libintl -lintl closure landed);
+      (4) guard/closure evidence — packaged libxapp.so.1 carries NO libX11
+      DT_NEEDED string (broadway-only GTK) and its DT_NEEDED set stays
+      inside the conan closure (gio/glib/gtk); on OHOS musl libxapp's own
+      gettext resolves through libc/glib so no libintl DT_NEEDED exists
+      (2.8.9 run CI run-4 evidence), while g_libintl_* stay reachable
+      globally via libglib (3); (5) gsettings — packaged schema compiles
+      via glib-compile-schemas --targetdir into gschemas.compiled, then
+      g_settings_new("org.x.apps.favorites") + default read + set/get
+      roundtrip through the memory backend (no dconf, no session bus).
+    command: "./test_xapp"
+
+assertion_count: 20
