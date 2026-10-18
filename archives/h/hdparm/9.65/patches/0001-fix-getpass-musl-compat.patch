@@ -1,0 +1,42 @@
+--- a/hdparm.c
++++ b/hdparm.c
+@@ -35,6 +35,39 @@
+ #include "hdparm.h"
+ #include "sgio.h"
+ 
++#ifndef getpass
++/* OHOS musl libc does not provide the getpass() GNU extension.
++   Provide a minimal implementation for HarmonyOS PC.
++   Like glibc getpass(), terminal echo is disabled while typing. */
++#include <termios.h>
++static char *getpass(const char *prompt) {
++    static char buf[128];
++    struct termios old, noecho;
++    char *ret = NULL;
++    int restore = 0;
++
++    fprintf(stderr, "%s", prompt);
++    fflush(stderr);
++    if (tcgetattr(STDIN_FILENO, &old) == 0) {
++        noecho = old;
++        noecho.c_lflag &= ~(ECHO);
++        if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &noecho) == 0)
++            restore = 1;
++    }
++    if (fgets(buf, sizeof(buf), stdin)) {
++        size_t len = strlen(buf);
++        if (len > 0 && buf[len-1] == '\n')
++            buf[len-1] = '\0';
++        ret = buf;
++    }
++    if (restore)
++        tcsetattr(STDIN_FILENO, TCSAFLUSH, &old);
++    fputc('\n', stderr);
++    fflush(stderr);
++    return ret;
++}
++#endif /* getpass */
++
+ static int    argc;
+ static char **argv;
+ static char  *argp;
