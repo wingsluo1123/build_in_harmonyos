@@ -1,0 +1,43 @@
+# test_package/MANIFEST.yml
+# Upstream test declaration for librem-ec 0.9.2.
+
+package: librem-ec/0.9.2
+homepage: "https://source.puri.sm/nicole.faerber/librem-ec-acpi-dkms"
+
+# ---- Upstream test audit ---------------------------------------------------
+# Audited the v0.9.2 source tarball (librem-ec-acpi-dkms-v0.9.2.tar.gz,
+# 13093 bytes, sha256 f238547e...) and its build files (no tests exist):
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "v0.9.2 tarball top-level listing (22 entries)"
+    reason: "Single C file librem_ec_acpi.c (797 lines) plus Kbuild Makefile, dkms.conf, debian/ and initramfs helpers; no tests/, test/, *_test.c or test_*.sh anywhere in the tree."
+  - source: "Makefile (Kbuild wrapper)"
+    reason: "Defines only 'all' (make -C $(KERNEL_DIR) M=$(PWD) modules) and 'clean' targets; no check/test target, no TESTS or check_PROGRAMS variable."
+  - source: "debian/rules + debian/librem-ec-acpi-dkms.dkms"
+    reason: "dh overrides only install/dkms helpers (AUTOINSTALL=yes); dh_auto_configure/build/test/clean are all overridden to no-ops, so no test step exists in packaging either."
+  - conclusion: "Upstream 0.9.2 provides no automated tests; the adaptation's test_package validates the packaged kernel-module source contract and does not claim upstream coverage."
+
+# rule4 machine-evidence declaration: upstream registers zero tests.
+# Single parseable Kbuild Makefile with no test targets, hence auto.
+upstream_test_total: 0
+upstream_test_count_method: auto
+upstream_test_passed: 0
+upstream_test_failed: 0
+upstream_test_skipped: 0
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# ---- Consumer tests (test_package) -----------------------------------------
+# test_package/conanfile.py runs check_source.sh against the packaged
+# src/librem_ec_acpi.c, which emits HMBS_TEST_PACKAGE_RESULT (8 assertions)
+# and HMBS_UPSTREAM_TEST_RESULT (no_tests, 0 counts) as machine evidence.
+test_package_tests:
+  - file: check_source.sh
+    description: "Verify packaged source driver identity, MODULE_LICENSE, Purism ACPI IDs, kernel/ACPI headers, LED, hwmon/power-supply, battery-threshold and ACPI evaluation path"
+    command: "sh check_source.sh <package>/src/librem_ec_acpi.c"
+    executable: true
+
+assertion_count: 8
