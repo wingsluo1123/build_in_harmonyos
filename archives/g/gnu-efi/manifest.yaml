@@ -1,0 +1,25 @@
+# 软件级 manifest — gnu-efi
+software: gnu-efi
+display: "GNU-EFI"
+description: "UEFI Boot/Runtime Services 封装、GNU-EFI 运行期库与 ELF→PE32+ EFI 构建工具链（efibootmgr 一类工具的地基）"
+category: system
+homepage: "https://github.com/ncroxon/gnu-efi"
+license: GPL-2.0-or-later OR BSD-3-Clause
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "上游是手写 Makefile（无 configure / 无 CMake），工具变量形如 $(CROSS_COMPILE)gcc 且不读 Conan toolchain 文件 ⇒ ARCH/CC/HOSTCC/AS/LD/AR/RANLIB/OBJCOPY/INSTALL 全部在 make 命令行显式传入（R33：不依赖未定义的 shell 变量）"
+    - "install 采用两层前缀：INSTALLROOT（DESTDIR 仅是其回退值）只给外层根，LIBDIR/INCLUDEDIR 仍挂在硬编码 PREFIX=/usr/local 上 ⇒ 打包必须同传 INSTALLROOT=<package_folder> 与 PREFIX=/，否则产物落进 <pkg>/usr/local/{lib,include}"
+    - "gnu-efi.pc 在 make 阶段生成、install 目标不再依赖它（只做拷贝）⇒ 打包后把前缀改写为 ${pcfiledir}/../.. 使其可重定位；同时用 VERSION=<包版本> 覆盖上游滞后的 in-tree VERSION（源码树写 4.0.3、发布 tag 为 4.0.4），使交付的 .pc 的 Version 与实际包版本一致（上游树内滞后仍如实披露，不改上游源码）"
+    - "OpenHarmony 无 install(1)（command -v install 为空）⇒ 上游 INSTALL := install 会 Error 127，配方显式传 INSTALL=ginstall（GNU coreutils；不可用时落到包内 POSIX shim）"
+    - "GNU objcopy 为必需依赖（-O efi-app-aarch64）；消费者侧 Print()/CHAR16 要求 2 字节宽字符，应使用 C11 u\"…\"（上游示例口径），用 L\"…\" 时须自带 -fshort-wchar"
+  common_dependencies: []
+
+versions:
+  "4.0.4":
+    status: built
+    conan_ref: gnu-efi/4.0.4
+    build_date: "2026-10-16"
+    source_url: "https://github.com/ncroxon/gnu-efi/archive/refs/tags/4.0.4.tar.gz"
+    source_sha256: "40b61e842a4efcbf80f3e53b2f220c044e8cfe46eb4dd6396c83b751240b1c0d"
