@@ -1,0 +1,25 @@
+--- a/src/xir/graph/serialize_v2.cpp
++++ b/src/xir/graph/serialize_v2.cpp
+@@ -106,21 +106,21 @@
+   };
+ 
+ #define DECLARE_PB_CPP_MAPPING_VEC(pb_type, cpp_type)                          \
+   DECLARE_PB_CPP_MAPPING(pb_type, std::vector<cpp_type>)                       \
+   pb_type convert_t<std::vector<cpp_type>, pb_type>::fun(                      \
+       const vector<cpp_type>& x) {                                             \
+     {                                                                          \
+       auto ret = pb_type{};                                                    \
+       auto value = ret.mutable_value();                                        \
+       value->Reserve(x.size());                                                \
+-      for (const auto& v : x) {                                                \
++      for (const cpp_type v : x) {                                                \
+         *(value->Add()) = convert_from_cpp_type_to_pb(v);                      \
+       }                                                                        \
+       return ret;                                                              \
+     }                                                                          \
+   }                                                                            \
+   vector<cpp_type> convert_t<pb_type, std::vector<cpp_type>>::fun(             \
+       const pb_type& x) {                                                      \
+     auto value = std::vector<cpp_type>{};                                      \
+     value.reserve(x.value().size());                                           \
+     for (const auto& v : x.value()) {                                          \

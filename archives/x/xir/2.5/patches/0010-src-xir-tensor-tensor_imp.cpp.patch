@@ -1,0 +1,25 @@
+--- a/src/xir/tensor/tensor_imp.cpp
++++ b/src/xir/tensor/tensor_imp.cpp
+@@ -26,21 +26,21 @@
+ namespace xir {
+ 
+ TensorImp::TensorImp(const std::string& name,
+                      const std::vector<std::int32_t>& dims,
+                      const DataType& data_type)
+     : name_(name), shape_(dims), data_type_(data_type) {
+   UNI_LOG_CHECK(this->data_type_.valid(), XIR_INVALID_DATA_TYPE)
+       << this->to_string() << "'s data type, " << this->data_type_.to_string()
+       << " is invalid.";
+   for (int i = 0; i < static_cast<int>(shape_.size()); i++)
+-    UNI_LOG_CHECK((shape_[i] >= 0) | (shape_[i] == -1), XIR_MEANINGLESS_VALUE)
++    UNI_LOG_CHECK((shape_[i] >= 0) || (shape_[i] == -1), XIR_MEANINGLESS_VALUE)
+         << "The shape of each dim can only >= 0 or == -1, -1 means that this "
+            "value has not been specified yet. But tensor \""
+         << name << "\"'s dims are " << xir::to_string(dims) << ".";
+ };
+ 
+ const std::string TensorImp::get_name() const { return name_; }
+ 
+ const Op* TensorImp::get_producer() const {
+   return const_cast<const Op*>(this->producer_);
+ }

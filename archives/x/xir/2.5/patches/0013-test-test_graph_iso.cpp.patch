@@ -1,0 +1,85 @@
+--- a/test/test_graph_iso.cpp
++++ b/test/test_graph_iso.cpp
+@@ -14,20 +14,40 @@
+  * limitations under the License.
+  */
+ 
+ #include <iostream>
+ #include <string>
+ #include <vector>
+ 
+ #include "UniLog/UniLog.hpp"
+ #include "xir/attrs/attrs.hpp"
+ #include "xir/graph/graph.hpp"
++[[maybe_unused]] static std::unique_ptr<xir::Attrs> xir_test_const_attrs() {
++  auto a = xir::Attrs::create();
++  a->set_attr<std::vector<std::int32_t>>("shape", {3, 3, 3, 3});
++  a->set_attr<std::string>("data_type", "FLOAT32");
++  a->set_attr<std::vector<char>>("data",
++      std::vector<char>(3 * 3 * 3 * 3 * 4, 1));
++  return a;
++}
++[[maybe_unused]] static std::unique_ptr<xir::Attrs> xir_test_data_attrs() {
++  auto a = xir::Attrs::create();
++  a->set_attr<std::vector<std::int32_t>>("shape", {1, 8, 8, 8});
++  a->set_attr<std::string>("data_type", "FLOAT32");
++  return a;
++}
++[[maybe_unused]] static std::unique_ptr<xir::Attrs> xir_test_concat_attrs() {
++  auto a = xir::Attrs::create();
++  a->set_attr<std::int32_t>("axis", 3);
++  return a;
++}
++
+ 
+ std::shared_ptr<xir::Graph> create_test_graph();
+ void test_topo(xir::Subgraph* sub);
+ 
+ int main(int, char* argv[]) {
+   UniLog::Initial(argv[0], UNI_LOG_STD, UNI_LOG_LEVEL_INFO,
+                   UNI_LOG_STD_LEVEL_INFO);
+   auto graph = create_test_graph();
+ 
+   auto graph_template = xir::GraphTemplate::create("conv-conv");
+@@ -46,36 +66,36 @@
+   }
+ 
+   return 0;
+ }
+ 
+ xir::Op* add_conv(std::string name, std::shared_ptr<xir::Graph> graph,
+                   xir::Op* input) {
+   auto attrs = xir::Attrs::create();
+   attrs->set_attr<std::vector<int>>("kernel", {3, 3});
+   attrs->set_attr<std::vector<int>>("stride", {3, 3});
+-  attrs->set_attr<int>("pad_mode", 0);
++  attrs->set_attr<std::string>("pad_mode", "SAME");
+   attrs->set_attr<std::vector<int>>("pad", {1, 1, 1, 1});
+ 
+-  auto weights = graph->add_op(name + "_w", "const", xir::Attrs::create(), {},
++  auto weights = graph->add_op(name + "_w", "const", xir_test_const_attrs(), {},
+                                xir::DataType{"FLOAT32"});
+-  auto bias = graph->add_op(name + "_b", "const", xir::Attrs::create(), {},
++  auto bias = graph->add_op(name + "_b", "const", xir_test_const_attrs(), {},
+                             xir::DataType{"FLOAT32"});
+   return graph->add_op(
+       name, "conv2d", xir::Attrs::clone(attrs.get()),
+       {{"weights", {weights}}, {"bias", {bias}}, {"input", {input}}},
+       xir::DataType{"FLOAT32"});
+ }
+ 
+ std::shared_ptr<xir::Graph> create_test_graph() {
+   std::shared_ptr<xir::Graph> graph = xir::Graph::create("graph_test");
+-  auto data = graph->add_op("data", "data", xir::Attrs::create(), {},
++  auto data = graph->add_op("data", "data", xir_test_data_attrs(), {},
+                             xir::DataType{"FLOAT32"});
+   auto conv0 = add_conv("conv0", graph, data);
+   auto conv1 = add_conv("conv1", graph, conv0);
+   auto conv2 = add_conv("conv2", graph, conv0);
+   auto concat =
+-      graph->add_op("concat", "concat", xir::Attrs::create(),
++      graph->add_op("concat", "concat", xir_test_concat_attrs(),
+                     {{"input", {conv1, conv2}}}, xir::DataType{"FLOAT32"});
+   add_conv("conv3", graph, concat);
+   return graph;
+ }

@@ -1,0 +1,141 @@
+# 版本级 manifest
+# 文件位置: archives/x/xir/2.5/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "2.5"
+software: xir
+# published | built | failed | archived
+status: published
+build_date: "2026-10-17"
+build_system: cmake
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/x/xir/xir_2.5.orig.tar.xz"
+  sha256: "113d9ee2929755212c6fbd9bf6187c60cbef58152e10add4e54345a625b4c501"
+  tar_format: tar.xz
+
+build:
+  system: cmake
+  configure_options:
+    - "-G Ninja"
+    - "-DCMAKE_TOOLCHAIN_FILE=<ohos-sdk>/build/cmake/ohos.toolchain.cmake"
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=<deps-preload>.cmake"
+    - "-DCMAKE_CXX_FLAGS=-Wno-unused-command-line-argument"
+    - "-DBUILD_CONTRIB=OFF"
+    - "-DBUILD_TEST=ON"
+    - "-DBUILD_DOC=OFF"
+    - "-DBUILD_PYTHON=OFF"
+    - "-DINSTALL_HOME=OFF"
+  dependencies:
+    - "unilog/2.5"
+    - "protobuf/21.12"
+    - "boost/1.85.0"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-3rd-party-hash-library-crc32.cpp.patch"
+  - "0002-3rd-party-hash-library-keccak.cpp.patch"
+  - "0003-3rd-party-hash-library-md5.cpp.patch"
+  - "0004-3rd-party-hash-library-sha1.cpp.patch"
+  - "0005-3rd-party-hash-library-sha256.cpp.patch"
+  - "0006-3rd-party-hash-library-sha3.cpp.patch"
+  - "0007-src-xir-config-config.hpp.in.patch"
+  - "0008-src-xir-graph-serialize_v2.cpp.patch"
+  - "0009-src-xir-op-shape_inference.cpp.patch"
+  - "0010-src-xir-tensor-tensor_imp.cpp.patch"
+  - "0011-src-xir-tensor-tensor_imp.hpp.patch"
+  - "0012-test-test_graph_impl.cpp.patch"
+  - "0013-test-test_graph_iso.cpp.patch"
+  - "0014-test-test_subgraph.cpp.patch"
+  - "0015-test-test_subgraph_iso.cpp.patch"
+  - "0016-test-test_subgraph_topo.cpp.patch"
+  - "0017-tools-cmd_dump_code.cpp.patch"
+
+knowledge_gained:
+  - "CMakeDeps traits 剥离：包 package_type=shared-library 时，conan transform_downstream 对其传递依赖向下游消费者硬编码 headers=False/libs=False，CMakeDeps 据此清空传递依赖的 INCLUDE_DIRS/LIBS —— shared 包公共头若 include 传递依赖头（xir attrs.hpp → UniLog.hpp），消费者编译必挂；修复为在自身 cpp_info 显式 append 依赖绝对 includedirs（unilog 'EA header-only draft' 同款先例）"
+  - "glog 0.7 消费方必须显式声明 GLOG_USE_GLOG_EXPORT，否则 <glog/logging.h> was not included correctly 直接 #error；经公共头链引入 glog 的包需在 cpp_info.defines 传播该宏"
+  - "bare cmake 经 CMakeDeps imported target 链接依赖时 lld 将绝对路径写进 DT_NEEDED（conan 缓存路径，CI 不可复现，L5b SONAME gate 拦截）；conan 缓存构建树目录不可写（patchelf open: Operation not permitted），须在 package() 安装后用 patchelf --replace-needed 重写为 basename 再签名"
+  - "xir 内置 op 表要求 conv2d weights 为 4 维 NCHW（shape_inference.cpp 校验，2 维直接 UNILOG FATAL XIR_INVALID_ARG_OCCUR）；上游测试代码与内置 op 表漂移（pad_mode int→string、concat axis 缺省），R51 上游测试须注入 attrs helpers 对齐"
+  - "上游 11 个测试 main 无 add_test 注册，直接执行 .bin；test_subgraph_topo 依赖外部 graphviz dot（OHOS 无），no-op dot shim 使 save_to_dot 断言真实执行、渲染输出披露为空文件（CI L1d fake-test 正则按行匹配 self.run 与 echo/print/true 同行，注释中同现也会误判，配方注释需规避）"
+  - "HMDFS 下 python glob 的 recursive '**' 不够可靠（构建树深层匹配失败），ELF 扫描用 os.walk；conan 缓存 .conan2/p/b 目录文件 patchelf 写入报 Operation not permitted，包目录 p/ 可写"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /data/storage/el2/base/cache/builds/xir-2.5.orig
+  source_work_dir: /data/storage/el2/base/cache/builds/xir-2.5.work
+  source_orig_hash: bf97c7a6d0c2f2cf
+  source_work_hash: fc2d4bac5c62b216
+  generated_at: '2026-10-17T21:39:54'
+  patches_count: 17
+
+patch_classification:
+  - file: 0001-3rd-party-hash-library-crc32.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-3rd-party-hash-library-keccak.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-3rd-party-hash-library-md5.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-3rd-party-hash-library-sha1.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0005-3rd-party-hash-library-sha256.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0006-3rd-party-hash-library-sha3.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0007-src-xir-config-config.hpp.in.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0008-src-xir-graph-serialize_v2.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0009-src-xir-op-shape_inference.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0010-src-xir-tensor-tensor_imp.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0011-src-xir-tensor-tensor_imp.hpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0012-test-test_graph_impl.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0013-test-test_graph_iso.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0014-test-test_subgraph.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0015-test-test_subgraph_iso.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0016-test-test_subgraph_topo.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0017-tools-cmd_dump_code.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

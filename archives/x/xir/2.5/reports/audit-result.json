@@ -1,0 +1,14 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "R38-PF9",
+      "file": "archives/x/xir/commands.json",
+      "line": 1,
+      "description": "软件级 commands.json/README.md/manifest.yaml 为 4 段路径（archives/x/xir/file），与 PF9 版本目录层级检查冲突；库+CLI 包按 lasem-render 先例提交，PR 走 --no-preflight 并在正文披露",
+      "fix_suggestion": "submit 时使用 --no-preflight 并在 PR 正文披露软件级文件清单与理由（bin/xir CLI 属上游 tools/xir 构建，R38/L0k 要求 CLI 包提供 commands.json）"
+    }
+  ],
+  "summary": "7 项只读审计（检视修复轮，基于工作树真实证据）：(1) R34 欺骗性行为：test_package/test.cpp 实质调用 xir API（Graph::create/add_op/serialize/deserialize/get_root_subgraph/get_op_num/has_op），const 数据缓冲区已按检视意见补乘 sizeof(float)=4（shape{1,1,8,8} FLOAT32 需 256 字节），无 echo/print/true 组合行；(2) R39/源码纯净：变更 7 文件全部位于 archives/x/xir/2.5/ 版本目录内（conandata.yml/manifest.yaml/packaging/gen_xmodel.cpp/test_package/test.cpp/reports×3），无依赖库源码/recipe/日志混入，libXext 与 knowledge/graph E*.kv 改动不 staged；(3) R51 申报真实性：MANIFEST.yml 11 项与 reports/upstream-test.log（已按 round 34 新日志重刷）逐项一致（9 pass / 0 fail / 2 skip，skip 原因显式披露），test_deserialize_model 消费检视修复后新 fixture（bias 独立 const op）通过；(4) 检视意见落实：conandata.yml/manifest.yaml 源码 URL http→https（curl HEAD 200 OK，sha256 不变，round 34 conan-create.log:112 实测 https 下载），gen_xmodel.cpp bias 不再复用权重张量 w；(5) 证据一致性：round 34 conan-create.log（710 行）含 HMBS_UPSTREAM_TEST_RESULT（status=passed, 11/9/0/2, 行 544-545）、HMBS_TEST_PACKAGE_RESULT（passed, 行 710）、L5b fix: 3 absolute DT_NEEDED rewritten（行 583）、Package 'b6e8528ca3e890b103a3283df428461f8a8b131b' created（行 598）；test-report.md 行号引用与实际对齐，并已纠正『conan-create.log 随本 PR 提交』的不实声明为本地留存；(6) manifest.yaml 字段完整（source.url/sha256 与 conandata 一致），conandata.yml sha256=113d9ee2... 与 Debian 源实测一致；(7) R38：bin/xir CLI（7 子命令）已提供软件级 commands.json（lasem-render 先例）。已知披露：L2 smoke test xir help 退出码非零（上游行为，non-blocking）；step5b 知识图谱历史 E*.kv 裸 | 问题为仓库级历史遗留（工作树已按 |- 绕法处理，不提交）；scripts/gitcode_pr.py monitor-review 子命令 unreplied_opinions NameError 为仓库脚本问题（非本包文件，未修改）。"
+}
