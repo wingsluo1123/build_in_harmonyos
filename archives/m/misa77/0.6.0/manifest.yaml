@@ -1,0 +1,100 @@
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/0.6.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.6.0"
+
+# 软件名
+software: "misa77"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-09-28"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/welcome-to-the-sunny-side/misa77/archive/refs/tags/v0.6.0.tar.gz"
+
+  # 源码校验和
+  sha256: "29e67e76571e33c9fd8e916a90c07e20496428275a3886e4fb5602c19704e995"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表
+  configure_options:
+  - "-DCMAKE_BUILD_TYPE=Release"
+  - "-DMISA77_BUILD_TESTS=OFF"
+  # 例如:
+  # - "-DCMAKE_BUILD_TYPE=Release"
+  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+  # 例如:
+  # - openssl/1.1.1w
+  # - curl/8.19.0
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+- "0001-CMakeLists.txt.patch"
+# 例如:
+# - "0001-bootstrap-ohos-toolchain.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+- "reuse_existing E506: undefined symbol:.*_neon — HarmonyOS cmake 平台探测返回 CMAKE_SYSTEM_PROCESSOR=unknown 导致 NEON 实现源未编译，uname -m 回填解决（等价命中，路径 A）"
+- "related E092: System is unknown to cmake — CMake 不识别 HarmonyOS 平台，需修正平台/处理器探测"
+# 例如:
+# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
+# - "内嵌 libuv 需要禁用，使用系统 libuv"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/misa77-0.6.0.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/misa77-0.6.0.work
+  source_orig_hash: f4c5bed1db47d0e2
+  source_work_hash: 28e273aa1b86e2f4
+  generated_at: '2026-09-28T23:36:40'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-CMakeLists.txt.patch
+    type: portability
+    platform_only: True
+    guard: 'none'
