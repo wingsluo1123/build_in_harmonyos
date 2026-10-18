@@ -1,0 +1,27 @@
+software: libgweather-4
+display: "libgweather"
+description: "GNOME 天气与世界位置信息库（GWeather），提供世界位置数据库访问、时区/日出日落计算与多天气服务后端"
+category: network
+homepage: "https://gitlab.gnome.org/GNOME/libgweather"
+license: GPL-2.0-or-later
+build_system: meson
+ohos_adaptation:
+  key_points:
+    - "交叉构建关闭 introspection/gtk_doc/vala（g-ir-scanner/vapigen 不可用）"
+    - "glib 模块 .pc compat 生成 + glib 工具变量（glib_mkenums/glib_compile_schemas）补丁进 glib-2.0.pc"
+    - "gweather-locations.pc 需回填 locations_db 变量（Conan PkgConfigDeps 只产出 prefix/lib/include）"
+    - "运行期 Locations.bin 路径可用 LIBGWEATHER_LOCATIONS_PATH 覆盖编译期 GWEATHER_LOCATIONS_DB"
+    - "GSettings schema（org.gnome.GWeather4）随包装入 share/glib-2.0/schemas 并由 glib-compile-schemas 编译"
+    - ".so 交付前需 binary-sign-tool 重签（OHOS loader 要求 .codesign 段）"
+  common_dependencies:
+    - glib
+    - libsoup3
+    - libxml2
+    - json-glib
+    - geocode-glib
+    - gweather-locations
+versions:
+  "4.6.0":
+    status: pending_ci
+    build_date: "2026-09-30"
+    conan_ref: "libgweather-4/4.6.0"
