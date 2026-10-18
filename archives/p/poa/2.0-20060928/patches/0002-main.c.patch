@@ -1,0 +1,55 @@
+--- a/main.c
++++ b/main.c
+@@ -24,23 +24,28 @@
+     *bold_seq_name=NULL,*subset_file=NULL,*subset2_file=NULL,*rm_subset_file=NULL,
+     *rm_subset2_file=NULL;
+   float bundling_threshold=0.9;
+   int exit_code=0,count_sequence_errors=0,please_print_snps=0,
+     report_consensus_seqs=0,report_major_allele=0,use_aggressive_fusion=0;
+   int show_allele_evidence=0,please_collapse_lines=0,keep_all_links=0;
+   int remove_listed_seqs=0,remove_listed_seqs2=0,please_report_similarity;
+   int do_global=0, do_progressive=0, do_preserve_sequence_order=0;
+   char *reference_seq_name="CONSENS%d",*clustal_out=NULL;
+ 
++  if (argc == 2 && strcmp(argv[1], "--version") == 0) {
++    puts("poa " PROGRAM_VERSION);
++    return 0;
++  }
++
+   black_flag_init(argv[0],PROGRAM_VERSION);
+ 
+-  if (argc<2) {
++  if (argc<2 || (argc == 2 && strcmp(argv[1], "--help") == 0)) {
+     fprintf(stderr,"\nUsage: %s [OPTIONS] MATRIXFILE\n"
+ "Align a set of sequences or alignments using the scores in MATRIXFILE.\n"
+ "Example: %s -read_fasta multidom.seq -clustal m.aln blosum80.mat\n\n"
+ "INPUT:\n"
+ "  -read_fasta FILE       Read in FASTA sequence file.\n"
+ "  -read_msa FILE         Read in MSA alignment file.\n"
+ "  -read_msa2 FILE        Read in second MSA file. \n" 
+ "  -subset FILE           Filter MSA to include list of seqs in file.\n"
+ "  -subset2 FILE          Filter second MSA to include list of seqs in file.\n"
+ "  -remove FILE           Filter MSA to exclude list of seqs in file.\n"
+@@ -68,21 +73,21 @@
+ "  -clustal FILE          Write out MSA in CLUSTAL format.\n"
+ "  -po FILE               Write out MSA in PO format.\n"
+ "  -preserve_seqorder     Write out MSA with sequences in their input order.\n"
+ "  -printmatrix LETTERS   Print score matrix to stdout.\n"
+ "  -best                  Restrict MSA output to heaviest bundles (PIR only).\n"
+ "  -v                     Run in verbose mode (e.g. output gap penalties).\n\n"
+ "  NOTE:  One of the -read_fasta, -read_msa, or -read_msa_list arguments\n" 
+ "         must be used, since a sequence or alignment file is required.\n\n"
+ "For more information, see http://www.bioinformatics.ucla.edu/poa.\n\n"
+ 	    ,argv[0],argv[0]);
+-    exit(-1);
++    return argc == 2 ? 0 : 255;
+   }
+ 
+   FOR_ARGS(i,argc) { /* READ ALL THE ARGUMENTS */
+     ARGMATCH_VAL("-tolower",do_switch_case,switch_case_to_lower);
+     ARGMATCH_VAL("-toupper",do_switch_case,switch_case_to_upper);
+     ARGMATCH_VAL("-v",logfile,stdout);
+     ARGMATCH_VAL("-best",ibundle,0); /*RESTRICT FASTA OUTPUT TO HB */
+     ARGMATCH_VAL("-hb",do_analyze_bundles,1);/*CALCULATE HEAVIEST BUNDLING*/
+     ARGGET("-printmatrix",print_matrix_letters);
+     ARGGET("-read_msa",po_filename); /* READ A MSA FILE FOR ALIGNMENT/ANALYSIS*/
