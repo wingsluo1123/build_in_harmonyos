@@ -1,0 +1,51 @@
+software: kxmlgui
+version: "6.28.0"
+status: built
+build_system: cmake
+created_at: 2026-10-18
+dependencies:
+  required:
+    - qtbase/6.11.1
+    - kconfig/6.26.0
+    - kconfigwidgets/6.18.0
+    - kcoreaddons/6.26.0
+    - kguiaddons/6.26.0
+    - ki18n/6.26.0
+    - kiconthemes/6.26.0
+    - kitemviews/6.26.0
+    - kwidgetsaddons/6.26.0
+    - openssl/3.5.6.1
+    - zstd/1.5.7
+  build:
+    - ecm/6.28.0
+  optional:
+    - qtdbus
+    - kglobalaccel
+    - qttools
+    - qtprintsupport
+    - shiboken6
+    - pyside6
+  overrides:
+    - kconfigwidgets/6.18.0 transitive KF6 deps are overridden to the 6.26.0
+      line (kconfig/kcoreaddons/kguiaddons/ki18n/kwidgetsaddons/kcolorscheme/
+      kcodecs at 6.26.0) so the dependency graph resolves without version
+      conflicts
+patches_applied:
+  - patches/0001-CMakeLists.txt.patch
+  - patches/0002-src-CMakeLists.txt.patch
+  - patches/0003-src-kshortcutseditor.cpp.patch
+  - patches/0004-autotests-kxmlgui_unittest.cpp.patch
+test_results:
+  type: see notes
+  upstream: "N=82 (reviewer-measured declaration, same gauge as 6.26.0; autotests/ and tests/ sources are byte-identical between 6.26.0 and 6.28.0): autotests/ 6 CTest targets with 74 QTest function/slot definitions (81 out-of-line void Class::name( definitions minus 7 initTestCase/cleanupTestCase lifecycle definitions; of the 74, 68 are test/setup slots per rule4-count.py, which additionally excludes *_data, and 6 are *_data data providers) + tests/ 8 manual GUI verification programs (marked by ecm_mark_as_test, which does not register CTest tests; upstream runs them manually); tests/krichtexteditor is a 1-program conditional subdirectory (KTextWidgets not published) and is excluded from N"
+  test_package: "consumer executor: 6 cases covering window construction/title, action collection add+lookup, action category registration, createGUI/factory, toolbar auto-creation, auto-save settings group; per-case TEST PASS/FAIL + TEST SUMMARY + exit 1 on failure"
+source_url: https://download.kde.org/stable/frameworks/6.28/kxmlgui-6.28.0.tar.xz
+source_sha256: e40b86ebb9f1be00255cd4835ab0b0ac8650c47d0eb17a47d9df7d4b5658df58
+knowledge_gained:
+  - "The KF6 6.28 train is not published to ohpcd beyond ecm 6.28.0; patch 0001 lowers KF_DEP_VERSION to the proven 6.26.0 floor, and the 6.28 sources compile against it because the new KKeySequenceRecorder::Pattern API already exists in kguiaddons 6.26.0."
+  - "kconfigwidgets is only published at 6.18.0 on ohpcd; the find_package floor is lowered via patch and the conan graph uses override=True on the transitive KF6 deps to keep a single 6.26 copy of each library."
+  - "kiconthemes/6.26.0 ships both libKF6IconThemes.so and libKF6IconWidgets.so (src/widgets split); KF6IconThemesTargets.cmake defines the KF6::IconWidgets imported target, so kxmlgui's KF6::IconWidgets link needs no extra find_package."
+  - "Qt6PrintSupport is removed from the OHOS build by patching the top-level find_package, the private link item, and the KShortcutsDialog Print action; the internal print slot is left inert."
+  - "autotests/kxmlgui_unittest.cpp marks the two locale behavior rows as QEXPECT_FAIL (Continue) only when $LANGUAGE was updated as requested but QLocale::system() did not follow; a regression in the language-variable update itself, or an unexpected pass (XPASS), still fails the test."
+  - "Unversioned SONAME plus explicit -soname flags (both plain and cache variables) are required because HMDFS rejects symlink() on device and lld would otherwise emit no DT_SONAME."
+  - "ECM 6.28 KDEInstallDirs6 runs the qtbase qtpaths host tool during configure; /system/lib64 and the SDK llvm lib dir must be prepended to LD_LIBRARY_PATH to avoid the sandbox libc++_shared.so shadowing the compatible one."
