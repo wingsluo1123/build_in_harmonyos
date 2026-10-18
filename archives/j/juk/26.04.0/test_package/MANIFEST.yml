@@ -1,0 +1,34 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for juk/26.04.0.
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: juk/26.04.0
+homepage: https://invent.kde.org/multimedia/juk
+
+# 上游测试命令 (用于 ctest -N 分析)
+upstream_check_command: "ctest -N"
+
+# conanfile.py build() 方法中已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error"
+
+# 上游实际运行的测试（tests/CMakeLists.txt 通过 ECMAddTests 注册）
+upstream_tests:
+  - file: tests/tagguessertest.cpp
+    source: juk-26.04.0/tests/
+    description: "Single upstream autotest: TagGuesser (tagguesser.cpp) filename -> tag guessing patterns; registered by ecm_add_test(TEST_NAME tagguessertest) and linked against Qt6::Test / KF6::ConfigCore / KF6::CoreAddons. Run inside conan create with BUILD_TESTING=ON; result recorded in notes.md."
+    command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error"
+    condition: "run in the Conan build with BUILD_TESTING=ON"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_package/test.cpp
+    description: "Consumer smoke: KF6Config key/value round-trip through KSharedConfig/KConfigGroup (the config layer juk uses), proving the published KF6 chain is consumable from a fresh CMake project."
+    command: "conan create (test_package builds and runs test_juk)"
+  - file: test_package/conanfile.py
+    description: "Artefact checks on the juk package: bin/juk exists and runs (--version), org.kde.juk desktop entry installed, DT_NEEDED contains libKF6KIOWidgets.so / libKF6KIOCore.so / libKF6KIOFileWidgets.so (machine-checkable proof that the full kio build, not the KIOCORE_ONLY one, is required)."
+    command: "conan create (test_package test() assertions)"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 7

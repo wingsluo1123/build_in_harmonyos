@@ -1,0 +1,141 @@
+# 版本级 manifest
+# 文件位置: archives/j/juk/26.04.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "26.04.0"
+
+# 软件名
+software: "juk"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-02"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（官方源，R39）
+  url: "https://download.kde.org/stable/release-service/26.04.0/src/juk-26.04.0.tar.xz"
+
+  # 源码校验和
+  sha256: "dd0e6bab880be130b4f594712174ab9080800afcb99527f4f152168b946e8cae"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表
+  configure_options:
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DBUILD_TESTING=ON"
+    - "-DBUILD_QCH=OFF"
+    - "-DKF_IGNORE_PLATFORM_CHECK=TRUE"
+    - "-DKF_SKIP_PO_PROCESSING=ON"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DCMAKE_CXX_STANDARD=20"
+    - "-DCMAKE_CXX_STANDARD_REQUIRED=ON"
+    - "-DCMAKE_BUILD_RPATH=$ORIGIN"
+    - "-DCMAKE_EXE_LINKER_FLAGS=-Wl,--disable-new-dtags"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - qtbase/6.11.1
+    - qtsvg/6.11.1
+    - qtmultimedia/6.11.1
+    - taglib/2.3
+    - kio/6.14.0
+    - kconfigwidgets/6.18.0
+    - kdbusaddons/6.18.0
+    - kdoctools/6.19.0
+    - kglobalaccel/6.18.0
+    - knotifications/6.18.0
+    - kstatusnotifieritem/6.26.0
+    - ktextwidgets/6.18.0
+    - kwallet/6.18.0
+    - kxmlgui/6.18.0
+    - karchive/6.19.0
+    - kauth/6.18.0
+    - kbookmarks/6.18.0
+    - kcodecs/6.18.0
+    - kcolorscheme/6.18.0
+    - kcompletion/6.18.0
+    - kconfig/6.18.0
+    - kcoreaddons/6.18.0
+    - kcrash/6.18.0
+    - kguiaddons/6.18.0
+    - ki18n/6.18.0
+    - kiconthemes/6.18.0
+    - kitemviews/6.18.0
+    - kjobwidgets/6.18.0
+    - kservice/6.18.0
+    - kwidgetsaddons/6.18.0
+    - kwindowsystem/6.26.0
+    - solid/6.18.0
+    - zlib/1.3.2
+    - ecm/6.26.0
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-CMakeLists.txt.patch"
+  - "0002-systemtray.cpp.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "kio/6.26.0 在本制品仓是 KIOCORE_ONLY（无 KIOWidgets/KIOFileWidgets），需要 widgets 的消费方必须钉 kio/6.14.0"
+  - "制品仓 KF6 模块按版本覆盖不均（无 6.26 的 kconfigwidgets/kdbusaddons 等、无 6.14 的 kglobalaccel），必须逐模块取可用版本并用 override 统一共享基底"
+  - "zlib/1.3.1 的静态 binary 非 PIC（clang 构建），下游以链接期 relocation R_AARCH64_... 报错；钉 zlib/1.3.2"
+  - "conan taglib/2.3 导出 TagLib::tag，上游 CMake 找 Taglib::Taglib → 在 generate() 注入别名，不改上游 CMake"
+  - "OHOS kdoctools 缺 DocBook 4.5 DTD，KF6 handbook 文档链必须裁掉"
+  - "制品仓 KF6 二进制带构建机绝对路径 DT_NEEDED（E537），test_package 运行前须物化这些路径并落 scratch CWD"
+  - "OHOS loader 无法处理含空白的 host LD_LIBRARY_PATH，需显式列出 /system/lib64* 目录"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmpdir/builds/juk-26.04.0.orig
+  source_work_dir: /storage/Users/currentUser/tmpdir/builds/juk-26.04.0.work
+  source_orig_hash: 0021d97e92985583
+  source_work_hash: 0523f447016362dd
+  generated_at: '2026-10-02T23:29:28'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-systemtray.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
