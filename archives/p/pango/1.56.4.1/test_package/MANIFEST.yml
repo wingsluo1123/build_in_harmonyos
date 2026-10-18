@@ -1,0 +1,49 @@
+package: pango/1.56.4.1
+upstream_test_in_build: true
+upstream_tests:
+  - name: test-coverage
+    source: tests/test-coverage.c
+    command: "./test-coverage -k --tap"
+    result: "PASS（3 ok / 0 not ok, exit=0）"
+  - name: testboundaries
+    source: tests/testboundaries.c
+    data: [boundaries.utf8]
+    command: "./testboundaries -k --tap"
+    result: "PASS（1 ok / 0 not ok, exit=0）"
+  - name: testboundaries_ucd
+    source: tests/testboundaries_ucd.c
+    data: [CharBreakTest.txt, EmojiBreakTest.txt, GraphemeBreakTest.txt,
+           LineBreakTest.txt, SentenceBreakTest.txt, WordBreakTest.txt]
+    command: "./testboundaries_ucd -k --tap"
+    result: "PASS（6 ok 含 1 项条件性 SKIP / 0 not ok, exit=0）"
+  - name: testcolor
+    source: tests/testcolor.c
+    command: "./testcolor -k --tap"
+    result: "PASS（3 ok / 0 not ok, exit=0）"
+  - name: testscript
+    source: tests/testscript.c
+    command: "./testscript -k --tap"
+    result: "PASS（1 ok / 0 not ok, exit=0）"
+  - name: testlanguage
+    source: tests/testlanguage.c
+    command: "./testlanguage -k --tap"
+    result: "PASS（2 ok / 0 not ok, exit=0）"
+  - name: testmatrix
+    source: tests/testmatrix.c
+    command: "./testmatrix -k --tap"
+    result: "PASS（10 ok / 0 not ok, exit=0）"
+  - name: testtabs
+    source: tests/testtabs.c
+    command: "./testtabs -k --tap"
+    result: "PASS（3 ok / 0 not ok, exit=0）"
+upstream_test_scope: "tests/meson.build 前 8 个无条件测试（无字体/X11 显示依赖）；其余 15+ 个 testsuite 用例被 build-testsuite 选项门控且依赖 fontmap 字体环境，未纳入"
+test_package_tests:
+  - file: test.c
+    description: "pango 主库功能断言（泰文断行，libthai 接入判据）"
+    command: "./test_probe"
+    result: "PASS（exit=0，真实运行）"
+  - file: test_xft.c
+    description: "xft 后端消费者用例测试（鸿蒙特有，非断言型：头可达/符号注册/版本一致）"
+    command: "./test_xft_probe"
+    result: "PASS（exit=0，真实运行）"
+assertion_count: 11
