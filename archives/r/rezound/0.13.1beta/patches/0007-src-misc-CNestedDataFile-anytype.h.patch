@@ -1,0 +1,41 @@
+--- a/src/misc/CNestedDataFile/anytype.h
++++ b/src/misc/CNestedDataFile/anytype.h
+@@ -155,20 +155,38 @@
+ 	string s;
+ 	size_t l=any.size();
+ 	s="{";
+ 	for(size_t t=0;t<l;t++)
+ 	{
+ 		// leaving type in case it's not able to deduce aruments and chooses the default template implemenation
+ 		// if I knew how to constrain the original definition of the template, I would make it fully constrained
+ 		s+=anytype_to_string(any[t]);
+ 		if(t!=(l-1))
+ 				s+=",";
++	}
++	return s+"}";
++}
++
++
++// vector<bool> is a specialisation whose operator[] returns a proxy reference instead of
++// bool& (libc++: __bit_const_reference), so the generic vector overload above cannot
++// deduce the element type and would fall back to the undefined primary template.
++// This ordinary overload matches exactly and takes precedence over the template.
++inline const string anytype_to_string(const vector<bool> &any)
++{
++	string s="{";
++	size_t l=any.size();
++	for(size_t t=0;t<l;t++)
++	{
++		s+=anytype_to_string<bool>(bool(any[t]));
++		if(t!=(l-1))
++			s+=",";
+ 	}
+ 	return s+"}";
+ }
+ 
+ 
+ // ----------------------------------------------------------------------------
+ 
+ namespace s2at // s2at signifies string_to_anytype/anytype_to_string
+ {
+ 	using namespace std;
