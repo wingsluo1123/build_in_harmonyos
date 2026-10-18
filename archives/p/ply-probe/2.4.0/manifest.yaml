@@ -1,0 +1,63 @@
+# 版本级 manifest — ply-probe 2.4.0（上游 iovisor/ply）
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "2.4.0"
+software: "ply-probe"
+
+# 编译状态（本地 conan create 全绿；待 CI release 上传制品仓后置 published）
+# published | built | failed | archived
+status: built
+build_date: "2026-10-02"
+build_system: "autotools"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/iovisor/ply/archive/refs/tags/2.4.0.tar.gz"
+  sha256: "f7c1461f3c570c91f28b1d33424846ead0d6e4429e4a9ce4429db8f2327283a5"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: autotools
+  configure_options: []
+  dependencies:
+    - flex/2.6.4
+    - bison/3.8.2
+    - automake/1.18
+    - libtool/2.5.4
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-configure-ac-pin-version.patch"
+  - "0002-config-guess-harmonyos.patch"
+  - "0003-config-sub-ohos.patch"
+  - "0004-tracepoint-use-posix-strchr-strrchr.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "OHOS 未提供内核追踪接口：bpf() 以 SIGSYS 终止进程（信号 31，rc=159），而非返回 ENOSYS"
+  - "perf_event_open() 在 OHOS 返回 EACCES；/proc/kallsyms 地址被 kptr_restrict 抹零"
+  - "kallsyms cache 无法创建 → ply 的 kprobe 脚本编译期即失败（ply -e 静默返回 1）"
+  - "/sys/kernel/debug/tracing 与 /sys/kernel/tracing 存在但无后端支撑（仅目录表象）→ tracepoint 脚本解析失败；探针加载必然 SIGSYS"
+  - "config.guess/config.sub 由 libtoolize + automake --add-missing 落地，OHOS 补丁须在 automake 之后应用（E007）"
+  - "autoconf 生成的 config.status 使用 mktemp -d 建临时目录，OHOS 下该目录不可写（drwx--S---），须禁用 mktemp 分支（E114）"
+  - "OHOS libc 未导出 legacy BSD index()/rindex()（链接期 undefined reference），须改为 strchr()/strrchr()"
+  - "知识图谱扩展：E545（内核追踪特性平台不支持）+ prescan_pattern 派生规则 PSCAN-KB-E545"
