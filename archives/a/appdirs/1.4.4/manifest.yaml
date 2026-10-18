@@ -1,12 +1,12 @@
 version: "1.4.4"
 software: "appdirs"
 status: built
-build_date: "2026-09-20"
+build_date: "2026-10-15"
 build_system: none
 difficulty: A
 
 source:
-  url: "https://github.com/ActiveState/appdirs/archive/refs/tags/1.4.4.tar.gz"
+  url: "https://github.com/activestate/appdirs/archive/refs/tags/1.4.4.tar.gz"
   sha256: "6db10570b4f0176a05924c20745ff73385497e57829634fb3e756e15636ff408"
   tar_format: tar.gz
 
@@ -23,16 +23,24 @@ patches_applied: []
 
 knowledge_gained:
   - "appdirs 1.4.4 为纯 Python 单模块库（appdirs.py，仅依赖 sys/os stdlib），无 C/C++ 编译、零运行时依赖；HarmonyOS PC 适配只需拷贝模块到 site-packages（同 python-magic/rich/pathspec 纯 Python noarch 模式），无需任何源码补丁。"
-  - "上游测试仅 1 个文件 test/test_api.py（unittest，Test_AppDir 类 3 个用例：test_metadata/test_helpers/test_dirs），源码声明总数=3，当前配置全部实例化并执行通过：3/3 = 100%。目录 API 在无 HOME/XDG 环境下仍返回 str 类型（函数式 API 与 AppDirs 类属性 API 双入口均覆盖）。"
+  - "上游测试仅 1 个文件 test/test_api.py（unittest，Test_AppDir 类 3 个用例：test_metadata/test_helpers/test_dirs），源码声明总数=3，当前配置全部实例化并执行通过：3/3 = 100%。目录 API 在无 HOME/XDG 环境下仍返回 str 类型（函数式 API 与 AppDirs 类属性 API 双入口均覆盖）。2026-10-15 设备隔离 venv（pytest 9.1.1）对官方 tag tarball 独立复跑 3 passed / 0 failed，双口径一致。"
   - "R38 判定：setup.py 无 scripts= 也无 entry_points=（无 console_scripts），py_modules=[\"appdirs\"] 纯库包，无 bin/ 产物 → 不需要 commands.json（纯库包不应伪造）。"
 
 verification:
   w0_dependency_check: pass_no_dependencies
   local_source_check: pass
-  upstream_tests: "pass 3/3 = 100%（test_api.py: test_metadata/test_helpers/test_dirs）"
+  upstream_tests: "pass 3/3 = 100%（test_api.py: test_metadata/test_helpers/test_dirs）。
+    双口径：build() 内嵌 unittest（CI conan create 真实执行）+ 2026-10-15
+    设备隔离 venv（pytest 9.1.1）独立复跑 3 passed / 0 failed（0.03s，证据
+    reports/dep-upstream/appdirs-upstream-rerun.log）"
   conan_verify: pass
-  shadow_ci: pending
-  device_test: pending
+  shadow_ci: "pass — 权威 CI ci/conan/build_and_test.sh
+    （CI_PACKAGES=archives/a/appdirs/1.4.4，CI_BRANCH=fix/appdirs-1.4.4，
+    logs/ci-appdirs-120647.log）1/1 全过：G0/L0（含 L0j first publish、
+    L0k 纯库免 commands.json、L0m、L0n）/KC/JC/conan create
+    （内嵌 unittest 3/3）/L1a/L1e 破坏性负测/L5 全过，CI_EXIT=0"
+  device_test: pass — test_package 消费者测试（test_appdirs.py）+ OHOS 专项
+    测试（test_ohos_appdirs.py，XDG_CACHE_HOME 沙箱语义）CI L1 真实执行双 PASS
 
 # 双口径测试台账（adaptation_validation）
 test_ledger:
@@ -43,8 +51,10 @@ test_ledger:
       classification: "独立上游用例（unittest TestCase 方法，用户测试源）"
       instantiated: true
       executed: true
-      result: "passed"
-      command: "python3 -m unittest -v test.test_api"
+      result: "passed。双口径：build() 内嵌 unittest 3/3（CI conan create 真实
+        执行）+ 2026-10-15 设备隔离 venv（pytest 9.1.1）独立复跑 3 passed /
+        0 failed（0.03s，证据 reports/dep-upstream/appdirs-upstream-rerun.log）"
+      command: "python3 -m unittest -v test.test_api；python3 -m pytest test/ -v"
       exit_code: 0
     - source: "test/__init__.py"
       declared_cases: 0
@@ -58,9 +68,26 @@ test_ledger:
       instantiated: false
       executed: false
       result: "not_a_test"
-  configured_executable_total: 3
+    - source: "test_package/test_appdirs.py"
+      declared_cases: 13
+      classification: "消费者离线测试（R34）：5 个函数式 helper + AppDirs 类
+        5 属性 + 版本元数据 + version 三元组，断言全部返回非空 str"
+      instantiated: true
+      executed: true
+      result: "passed（CI L1 真实执行）"
+      command: "python3 test_appdirs.py <site-packages>"
+    - source: "test_package/test_ohos_appdirs.py"
+      declared_cases: 9
+      classification: "OHOS 专项测试（2026-10-15 入台账）：OHOS 沙箱路径语义
+        （XDG_CACHE_HOME 遵循）、绝对路径与 version 三元组契约；上游无此断言。
+        其中 2 条为 XDG_CACHE_HOME 环境条件断言"
+      instantiated: true
+      executed: true
+      result: "passed（CI L1 真实执行）"
+      command: "python3 test_ohos_appdirs.py <site-packages>"
+  configured_executable_total: 3（上游 unittest 口径）
   executed_passed_total: 3
   failed_total: 0
   uninstantiated_total: 0
-  pass_rate: "3/3 = 100%"
+  pass_rate: "上游 3/3 = 100%；test_package 消费者 2/2 通过（CI L1）"
   mapping: "源码声明(3 unittest 方法) -> 无条件宏/编译分支 -> 无构建目标(纯 Python) -> unittest 注册 3 项 -> 实际执行 3 项全过"
