@@ -1,0 +1,37 @@
+Drop the `umask 077` around Autoconf's config.status scratch directory.
+
+On HarmonyOS/HMDFS a directory's permission bits are rewritten by the file
+system: a normal `mkdir` yields 0o2771 (setgid forced, still writable) while
+`umask 077 && mktemp -d` yields 0o2700, whose owning uid is the hmdfs account
+id rather than the calling uid, so the "other" class (---) is the one that
+applies and even the creating process cannot write into its own scratch
+directory.  configure/config.status then aborts with
+  ./config.status: line 839: ./confXXXXXX/subs1.awk: Permission denied
+  config.status: error: could not setup config files machinery
+Measured on this image (uid maps to hmdfs account uid, not the process uid):
+  mkdir mode 0700            -> 0o2771  WRITE OK
+  mkdir + chmod 0700         -> 0o2771  WRITE OK
+  mktemp -d                  -> 0o2771  WRITE OK
+  (umask 077 && mktemp -d)   -> 0o2700  WRITE FAIL Permission denied
+The scratch tree only ever holds generated substitution scripts for the current
+build, created and removed by the same process, so the tightened umask buys
+nothing here.  Same workaround as archives/a/aaphoto/0.45 and the
+abiword-plugin-* recipes.
+
+--- a/configure
++++ b/configure
+@@ -20067,12 +20067,12 @@
+ # Create a (secure) tmp directory for tmp files.
+ 
+ {
+-  tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null` &&
++  tmp=`mktemp -d "./confXXXXXX" 2>/dev/null` &&
+   test -d "$tmp"
+ }  ||
+ {
+   tmp=./conf$$-$RANDOM
+-  (umask 077 && mkdir "$tmp")
++  mkdir "$tmp"
+ } || as_fn_error $? "cannot create a temporary directory in ." "$LINENO" 5
+ ac_tmp=$tmp
+ 
