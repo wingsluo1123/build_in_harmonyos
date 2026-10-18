@@ -1,0 +1,20 @@
+diff --git a/src/eckit/system/SystemInfo.cc b/src/eckit/system/SystemInfo.cc
+index 1111111..2222222 100644
+--- a/src/eckit/system/SystemInfo.cc
++++ b/src/eckit/system/SystemInfo.cc
+@@ -54,7 +54,14 @@
+ #endif
+ 
+ #if defined(__linux__)
+-    if (StringTools::startsWith(ECKIT_OS_NAME, "Linux")) {
++    // HarmonyOS PC: ecbuild defines <project>_OS_NAME from the raw CMAKE_SYSTEM ("OHOS"),
++    // while <project>_OS_STR is the normalised name ("linux.64"). OHOS runs on the Linux
++    // kernel with musl and a working /proc, so SystemInfoLinux is the right implementation
++    // here; without this the factory falls through to NOTIMP and every eckit-based
++    // application aborts inside the Main constructor (pre-main) with "Not implemented".
++    if (StringTools::startsWith(ECKIT_OS_NAME, "Linux") ||
++        StringTools::startsWith(ECKIT_OS_NAME, "OHOS") ||
++        StringTools::startsWith(ECKIT_OS_NAME, "HarmonyOS")) {
+         return new SystemInfoLinux();
+     }
+ #endif

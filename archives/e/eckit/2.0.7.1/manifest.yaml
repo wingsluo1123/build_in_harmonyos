@@ -1,0 +1,72 @@
+software: eckit
+version: "2.0.7.1"
+build_system: cmake
+status: built
+build_date: "2026-10-15"
+source:
+  url: "https://github.com/ecmwf/eckit/archive/refs/tags/2.0.7.tar.gz"
+  sha256: "376aa865b317d9533c1c88e1a7d15ca248420cc8a048570f3fe216e123991b51"
+  tar_format: tar.gz
+build:
+  system: cmake
+  generator: "Unix Makefiles"
+  jobs: 2
+  cc: clang
+  cxx: clang++
+  configure_options:
+    - "-DCMAKE_PROJECT_eckit_INCLUDE=<source_folder>/eckit_adapt_libzip.cmake（由 recipe generate() 用 save() 写入，不是仓库文件）"
+    - "-DCMAKE_POLICY_DEFAULT_CMP0091=NEW"
+    - "-DCMAKE_BUILD_TYPE=Release"
+    - "ctest --output-on-failure --exclude-regex <锚定的 5 个项目名>（经 cmake.test(build_tool_args=[ARGS=...]) 注入）"
+  dependencies:
+    - ecbuild/3.15.0
+    - libaec/1.1.7
+    - libzip/1.11.4
+    - bzip2/1.0.8
+    - eigen/3.4.0
+    - lz4/1.10.0
+patches_applied:
+  - "patches/0001-musl-uid_t.patch"
+  - "patches/0002-musl-strerror_r.patch"
+  - "patches/0003-ohos-no-pthread-cancel.patch"
+  - "patches/0004-ohos-systeminfo-linux.patch"
+  - "patches/0005-geo-unzip-libzip-gate.patch"
+knowledge_gained:
+  - "DRAFT-eckit-2.0.7.1-ctest-anchored-per-case-exclusion（B判定=create）：CMake/CTest 的锚定 --exclude-regex 逐项豁免平台受限用例，去锚会多删 11 个同族兄弟；注册分母 216 不删不缩"
+  - "OHOS: ecbuild 的 OS_NAME 取原始 CMAKE_SYSTEM 且未把 HarmonyOS 归一化为 Linux ⇒ 补丁 0004 让 makeSystemInfo() 的 Linux 分支同时接受 OHOS/HarmonyOS"
+  - "OHOS/musl: 不间接引入 sys/types.h（0001）、只有 POSIX 版 strerror_r（0002）、libc 无线程取消机制故 ThreadControler::kill() 降级 no-op（0003）"
+  - "OHOS: conan CMakeDeps 生成 libzip::libzip 而上游 src/eckit/geo 链接 libzip::zip ⇒ 用 CMAKE_PROJECT_eckit_INCLUDE 钩子补 ALIAS；该 .cmake 由 recipe 在 generate() 内 save() 到 self.source_folder，仓库不需要保存它，把它提交进归档目录既不生效（exports_sources 只含 patches/*）又扩大归档目录违规面"
+  - "OHOS: HMDFS 默认文件模式与 Unix 契约不同（知识库 E011），是 eckit_test_filesystem_filemode 受限的一手原因"
+knowledge_ref:
+  - "E011（HMDFS 默认文件模式 660）"
+tests:
+  n_static_registration_sites: 138
+  n_registered: 216
+  n_executed: 211
+  n_passed: 211
+  n_failed: 0
+  n_per_case_skipped: 5
+  label_executable: 193
+  label_script: 18
+  n_consumer_programs: 1
+  n_consumer_assertions: 5
+  total_test_time_sec: 94.45
+  full_run_control: "历史对照（属 2.0.7 归档线 create#6，rrev 8057e2e84f...，无豁免全量真跑 216 执行 / 211 通过 / 5 失败 / 91.07 s ⇒ rc=2 未出包）；本版本 2.0.7.1 在当前 rrev ec9c1763c4cb84752953546e4a58c8c7 的 build() 门内执行 211/211 通过（94.45 s），被豁免的 5 项本轮在同一 rrev 逐一单跑复现同一失败集（notes.md 回合38 段）"
+  pass_rate_statement: "注册分母 216 下 211/216（97.7%），5 项逐项 test_skipped 附技术原因；create#9 执行项 211/211（100%，ctest 原文 100% tests passed out of 211）"
+evidence:
+  branch: "fix/eckit-2.0.7.1"
+  tip_before_this_commit: "b544378a4ea82b4959135eebb21f5e509eeebf91"  # = 本提交的前一个提交（新分支唯一父提交，即建分支时的 upstream/main）
+  baseline: "upstream/main b544378a4ea82b4959135eebb21f5e509eeebf91（2026-10-15 13:35:32 +0800 抓取，本分支由此建出，落后量 0）"
+  recipe_revision: "ec9c1763c4cb84752953546e4a58c8c7"
+  package_id: "ac5dbe63be94cf44531a6b18ac4b40fa5a84d380"
+  prev: "878b12add91ab798519648358cb47f29"
+  rrev_binding_note: "本轮实测 exports 内容＝`conan cache path` 下 conanmanifest.txt 登记的四类文件：conanfile.py + conandata.yml + export_source/patches/0001-0005（`exports_sources = \"patches/*\"` 在 conanfile.py:21）；manifest.yaml / notes.md / test_package/* 均不在 exports 内 ⇒ 这三件的后续文档改动不改变 rrev，无需为文档重跑构建"
+  create_run: "create#9（2.0.7.1 首次端到端，本窗一手取证）：rc=0，ELAPSED_S=1717，MEMCAP[run] peak=435MB/budget=4000MB（MEMCAP 用时 1710.2s），gate.sh 8000 的 GATE_RC=0，本窗私有 build-slot 快照 SLOT_OK 17:39:33（全机基准 2 槽、本窗只占 1 槽、未抢第 3 槽），jobs=2，独立 CONAN_HOME=~/tmp/ch/home-QDR-1009-E02-eckit，命令 conan create . --build=\"eckit/*\" -pr:h=ohos-aarch64 -pr:b=build-native（外层 sh build-slot.QDR-1009-E02.sh --wait 3600 --mem 8000 -- python3 memcap-run.py --mb 4000 -- …）"
+  build_log: "设备一手日志 ~/tmp/uc2/QDR-1009-E02/create-eckit-9.log（282885 B，sha256 e4c28637ed869895d9805448540df0a3e288e14aa16413fbb230a8d9c5a3e6c5）；同批 ~/tmp/uc2/QDR-1009-E02/create-eckit-9.rc（2 B，内容 0，sha256 9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa）与 create-eckit-9.summary（2507 B，sha256 506c7c8c583855adc2581af8be3eacc76f91a8725f8f585ccaa9811b3d52638d）。该 summary 的 [8]/[9] 段读数 NO_BUILD_FOLDER / NO_PACKAGE_FOLDER 经本窗复查是探针脚本自身的取值错误（不是构建结论）：脚本按 `Build folder: ` / `Package folder: `（带冒号）grep，而 conan 2.29.1 实际输出是 `eckit/2.0.7.1: Build folder <路径>`（无冒号），故变量为空、[8] 的被豁免项单跑与 [9] 的包内容检查被 [ -d ] 守卫跳过（oneoff-9.log / eckit-version-9.log 因此从未生成）。真实路径读数由本窗另行取证：Build folder=~/tmp/ch/home-QDR-1009-E02-eckit/p/b/eckitbeb08d077a043/b/build/Release（日志 2161 行原文）与 Package folder=~/tmp/ch/home-QDR-1009-E02-eckit/p/b/eckitbeb08d077a043/p（日志 3158 行原文），两目录均在场；包内容、bin/eckit-version 真跑与被豁免 5 项单跑读数见本地载体 r38-verify.out / r38-probe2.out / r38-probe3.out / r38-probe4.out；summary 原文未删改，保留作探针自证。本版本的测试/内存/修订读数在 manifest.yaml 的 tests 与 memory 段、notes.md 回合38 段、test_package/MANIFEST.yml 的 create9_e2e 段同源一致"
+  hook_self_generated_proof: "本版本构建树内实测（非引用旧轮）：~/tmp/ch/home-QDR-1009-E02-eckit/p/b/eckitbeb08d077a043/b/eckit_adapt_libzip.cmake＝207 B，mtime 2026-10-15 17:39，sha256 d12b59688086f0a23bcc56b194ffaf6b1ab3d01309963c19f14b33a7e489c559，与 2.0.7 轮次那份字节逐字相同 ⇒ recipe generate() 内 save() 的钩子自证在当前 rrev 复现；该件不在本版本归档目录内（已移出至 ~/tmp/uc2/QDR-1009-E02/byproduct-2.0.7.1/eckit_adapt_libzip.cmake，同 sha256）：exports_sources 只含 patches/*，把它提交进归档目录既不生效又扩大违规面；同族先例＝HEAD 里的 archives/e/eckit/2.0.7/ 也只有 11 件、不含此 .cmake"
+memory:
+  max_rss_mb: 4000
+  measured_peak_rss_mb: 435
+knowledge_drafts:
+  - "knowledge/drafts/DRAFT-eckit-2.0.7.1-ctest-anchored-per-case-exclusion.kv"
+  - "knowledge/drafts/DRAFT-eckit-2.0.7.1-ctest-anchored-per-case-exclusion.md"
