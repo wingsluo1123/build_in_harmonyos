@@ -1,0 +1,70 @@
+--- a/src/locks.c
++++ b/src/locks.c
+@@ -11,20 +11,21 @@
+  * under the  terms  of  the GNU General Public License as published by the
+  * Free Software Foundation.
+  * 
+  * This  program  is  distributed  in  the hope that it will be useful, but
+  * WITHOUT   ANY   WARRANTY;   without   even  the   implied   warranty  of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
+  * Public License for more details (licensed by file COPYING or GPLv*).
+  */
+ static const char rcsid[] = "$Id: locks.c,v 1.1 2011/06/01 02:42:25 ve3wwg Exp $";
+ 
++#ifndef HAVE_OHOS_AUDIO
+ #include <stdio.h>
+ #include <stdarg.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <signal.h>
+ #include <errno.h>
+ #include <unistd.h>
+ #include <sys/types.h>
+ #include <sys/ipc.h>
+ #include <sys/sem.h>
+@@ -207,12 +208,45 @@
+ 
+ 	while ( (s = semop(ipc,sops,1)) < 0 && errno == EINTR ) ;
+ 
+ 	if ( s < 0 )
+ 		err("%s: Unlocking the %s semaphore",
+ 			strerror(errno),
+ 			playrecx?"Record":"Play");
+ 
+ 	return s;
+ }
++#endif /* !HAVE_OHOS_AUDIO */
++
++#ifdef HAVE_OHOS_AUDIO
++#include <sys/types.h>
++#include "wavplay.h"
++
++/*
++ * OHOS: there is no /dev/dsp on OHOS - the audio device is owned by the
++ * audio service, which enforces exclusive access itself (binder IPC)
++ * rather than via user-space POSIX semaphores on a device file. There is
++ * therefore no user-space lock to take: returning 0 is the correct
++ * device-exclusivity semantics on this platform, not a stub. The caller
++ * only invokes these when wavopts->ipc >= 0 (server/GUI mode), so they
++ * are defensive no-ops.
++ */
++int
++OpenDSPLocks(key_t LockIPCKey,int SemUndoFlag,ErrFunc erf) {
++	(void) LockIPCKey; (void) SemUndoFlag; (void) erf;
++	return 0;	/* fake IPC id; LockDSP/UnlockDSP are no-ops on OHOS */
++}
++
++int
++LockDSP(int ipc,int playrecx,ErrFunc erf,unsigned timeout_secs) {
++	(void) ipc; (void) playrecx; (void) erf; (void) timeout_secs;
++	return 0;
++}
++
++int
++UnlockDSP(int ipc,int playrecx,ErrFunc erf) {
++	(void) ipc; (void) playrecx; (void) erf;
++	return 0;
++}
++#endif /* HAVE_OHOS_AUDIO */
+ 
+ /* $Source: /cvsroot/wavplay/code/src/locks.c,v $ */

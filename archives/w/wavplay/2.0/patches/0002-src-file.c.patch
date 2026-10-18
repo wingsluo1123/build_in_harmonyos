@@ -1,0 +1,699 @@
+--- a/src/file.c
++++ b/src/file.c
+@@ -40,20 +40,28 @@
+ #include <assert.h>
+ 
+ #ifdef HAVE_OS_LINUX
+ #include <linux/soundcard.h>
+ #endif
+ #ifdef HAVE_OS_BSD
+ #include <machine/soundcard.h>
+ #endif
+ 
+ #include "wavplay.h"
++
++#ifdef HAVE_OHOS_AUDIO
++#include <ohaudio/native_audiostreambuilder.h>
++#include <ohaudio/native_audiorenderer.h>
++#include <ohaudio/native_audiocapturer.h>
++#include <pthread.h>
++#include <time.h>
++#endif
+ 
+ extern int clntIPC;    /* Needed for message passing in PlayDSP */
+ 
+ /* Number of updates sent to the client per second during playback and */
+ /* record.  For high sample rates in stereo, too many per second floods the */
+ /* client.  3 is a compromise between update speed and smoothness; 4 tends */
+ /* to cause "jumpy" updates.  (The cause of the jumps probably lie in */
+ /* LessTif and/or X since the IPC messages are sent regularly). */
+ #define RECPLAY_UPDATES_PER_SEC                3
+ 
+@@ -391,20 +399,21 @@
+ 
+ 	/*
+ 	 * Return successfuly opened file:
+ 	 */
+ 	return wfile;
+ }
+ 
+ /*
+  * Open /dev/dsp for reading or writing:
+  */
++#ifndef HAVE_OHOS_AUDIO
+ DSPFILE *
+ OpenDSP(WAVFILE *wfile,int omode,ErrFunc erf) {
+ 	int e;					/* Saved errno value */
+ 	int t;					/* Work int */
+ 	unsigned long ul;			/* Work unsigned long */
+ 	DSPFILE *dfile = (DSPFILE *) malloc(sizeof (DSPFILE));
+ 
+ 	v_erf = erf;				/* Set error reporting function */
+ 
+ 	if ( dfile == NULL ) {
+@@ -767,12 +776,645 @@
+ 		if ( work_proc != NULL && work_proc(dfile) )	/* Did work_proc() return TRUE? */
+ 			break;					/* Yes, quit recording */
+ 	}
+ 
+ 	wfile->wavinfo.Samples = bytes_written & ~(bytes_per_sample-1);
+ 	return 0;	/* All samples played successfully */
+ 
+ errxit:	wfile->wavinfo.Samples = bytes_written & ~(bytes_per_sample-1);
+ 	return -1;	/* Indicate error return */
+ }
++#endif /* !HAVE_OHOS_AUDIO */
++
++#ifdef HAVE_OHOS_AUDIO
++/*
++ * OHOS native audio backend.
++ *
++ * OHOS exposes no synchronous Write()/Read() audio API and no /dev/dsp.
++ * Audio flows through the audio service (binder) via OH_AudioRenderer
++ * (playback) and OH_AudioCapturer (recording), both callback-driven:
++ *
++ *   OpenDSP   -> OH_AudioStreamBuilder_Create + GenerateRenderer/Capturer
++ *   PlayDSP   -> OH_AudioRenderer_Start; the OnWriteData callback streams
++ *                PCM straight from the WAV file; main thread waits for EOF
++ *   RecordDSP -> OH_AudioCapturer_Start; the OnReadData callback streams
++ *                captured PCM into the WAV file; main thread waits for N
++ *   CloseDSP  -> Stop + Release
++ *
++ * Device access and locking are owned by the audio service, so the
++ * user-space /dev/dsp POSIX-semaphore lock (locks.c) is a no-op here.
++ * Only 8/16-bit PCM mono/stereo are supported (OHOS sample formats).
++ */
++
++static OH_AudioStream_SampleFormat
++oh_map_fmt(UInt16 bits) {
++	/* Only 8/16-bit are valid on OHOS; OpenDSP rejects anything else
++	 * before mapping so no device is created with a wrong format. */
++	switch (bits) {
++	case 8 :  return AUDIOSTREAM_SAMPLE_U8;
++	case 16 : return AUDIOSTREAM_SAMPLE_S16LE;
++	default : return AUDIOSTREAM_SAMPLE_S16LE;
++	}
++}
++
++/*
++ * Playback data callback (advanced: returns the number of bytes filled).
++ * The audio server invokes this to fill its output buffer; we stream the
++ * WAV file straight into it. Returning 0 tells the server the source is
++ * exhausted so it sleeps until the renderer is stopped.
++ */
++static int32_t
++oh_play_write_cb(OH_AudioRenderer *renderer,void *userData,void *buffer,int32_t length) {
++	DSPFILE *dfile = (DSPFILE *) userData;
++	WAVFILE *wfile;
++	int32_t to_read;
++	int32_t n = 0;
++
++	(void) renderer;
++	if ( dfile == NULL )
++		return 0;
++	pthread_mutex_lock(&dfile->play_mutex);
++	dfile->play_cb_active++;		/* in-flight; drained before free */
++	wfile = (WAVFILE *) dfile->play_wfile;
++	if ( wfile == NULL || dfile->play_remain == 0 || dfile->play_bps <= 0 ) {
++		dfile->play_done = 1;
++		dfile->play_cb_active--;
++		pthread_cond_broadcast(&dfile->play_cond);
++		pthread_mutex_unlock(&dfile->play_mutex);
++		return 0;
++	}
++	/* Clamp in the 64-bit domain: casting play_remain to int32_t would
++	 * wrap for PCM sources larger than 2 GiB. */
++	to_read = ( dfile->play_remain < (unsigned long) length )
++	    ? (int32_t) dfile->play_remain : length;
++	to_read = (to_read / dfile->play_bps) * dfile->play_bps;	/* frame-align */
++	if ( to_read > 0 ) {
++		n = (int32_t) read(wfile->fd,buffer,(size_t) to_read);
++		if ( n < 0 )
++			n = 0;
++		n = (n / dfile->play_bps) * dfile->play_bps;
++		dfile->play_remain -= (unsigned long) n;
++		if ( dfile->play_remain == 0 || n < to_read )
++			dfile->play_done = 1;
++	} else
++		dfile->play_done = 1;
++	dfile->play_cb_active--;
++	pthread_cond_broadcast(&dfile->play_cond);
++	pthread_mutex_unlock(&dfile->play_mutex);
++	return n;
++}
++
++/*
++ * Capture data callback: the audio server invokes this with captured PCM;
++ * we stream it straight into the WAV file. Writes are frame-aligned and
++ * truncated at rec_total so a capture never overshoots its request; the
++ * write-all loop keeps rec_bytes in sync with the bytes actually written.
++ * A failed write sets rec_err/rec_stop so the main loop can bail out. The
++ * rec_cb_active counter lets CloseDSP drain in-flight callbacks before
++ * freeing dfile (the callback dereferences it, so freeing mid-write would
++ * be a use-after-free).
++ */
++static void
++oh_rec_read_cb(OH_AudioCapturer *capturer,void *userData,void *audioData,int32_t audioDataSize) {
++	DSPFILE *dfile = (DSPFILE *) userData;
++	WAVFILE *wfile;
++	long to_write = 0;
++	long off = 0;
++
++	(void) capturer;
++	if ( audioDataSize <= 0 || dfile == NULL )
++		return;
++	pthread_mutex_lock(&dfile->rec_mutex);
++	dfile->rec_cb_active++;
++	wfile = (WAVFILE *) dfile->rec_wfile;
++	if ( wfile != NULL && !dfile->rec_stop && dfile->rec_bps > 0 ) {
++		to_write = (long) audioDataSize;
++		if ( dfile->rec_total > 0 &&
++		     to_write > (long) (dfile->rec_total - dfile->rec_bytes) )
++			to_write = (long) (dfile->rec_total - dfile->rec_bytes);
++		to_write = (to_write / dfile->rec_bps) * dfile->rec_bps;	/* frame-align */
++	}
++	pthread_mutex_unlock(&dfile->rec_mutex);
++
++	if ( to_write > 0 ) {
++		const char *p = (const char *) audioData;
++		while ( off < to_write ) {
++			ssize_t w = write(wfile->fd,p + off,(size_t) (to_write - off));
++			if ( w <= 0 )
++				break;
++			off += w;
++		}
++	}
++	pthread_mutex_lock(&dfile->rec_mutex);
++	if ( off > 0 )
++		dfile->rec_bytes += (unsigned long) off;
++	if ( off < to_write ) {
++		dfile->rec_err = 1;	/* short write / write error: stop capture */
++		dfile->rec_stop = 1;
++	} else if ( dfile->rec_total > 0 && dfile->rec_bytes >= dfile->rec_total )
++		dfile->rec_stop = 1;	/* target reached: stop capture */
++	dfile->rec_cb_active--;
++	pthread_cond_broadcast(&dfile->rec_cond);
++	pthread_mutex_unlock(&dfile->rec_mutex);
++}
++
++DSPFILE *
++OpenDSP(WAVFILE *wfile,int omode,ErrFunc erf) {
++	DSPFILE *dfile;
++	OH_AudioStreamBuilder *builder = NULL;
++	OH_AudioStream_Result rc;
++	int channels;
++	OH_AudioStream_SampleFormat fmt;
++
++	v_erf = erf;
++	dfile = (DSPFILE *) malloc(sizeof (DSPFILE));
++	if ( dfile == NULL ) {
++		err("%s: Opening DSP device",strerror(errno=ENOMEM));
++		return NULL;
++	}
++	memset(dfile,0,sizeof *dfile);
++	dfile->fd = -1;
++	pthread_mutex_init(&dfile->play_mutex,NULL);
++	pthread_cond_init(&dfile->play_cond,NULL);
++
++	/* Reject unsupported formats/rates up front so a device is never
++	 * created with a setting OHOS cannot honor (12/24/32-bit, 0 Hz). */
++	if ( wfile->wavinfo.DataBits != 8 && wfile->wavinfo.DataBits != 16 ) {
++		err("OHOS: cannot process %u bit samples (use 8 or 16)",
++		    (unsigned) wfile->wavinfo.DataBits);
++		errno = EINVAL;
++		pthread_mutex_destroy(&dfile->play_mutex);
++		pthread_cond_destroy(&dfile->play_cond);
++		free(dfile);
++		return NULL;
++	}
++	if ( wfile->wavinfo.SamplingRate <= 0 ) {
++		err("OHOS: invalid sampling rate %lu",
++		    (unsigned long) wfile->wavinfo.SamplingRate);
++		errno = EINVAL;
++		pthread_mutex_destroy(&dfile->play_mutex);
++		pthread_cond_destroy(&dfile->play_cond);
++		free(dfile);
++		return NULL;
++	}
++
++	fmt      = oh_map_fmt(wfile->wavinfo.DataBits);
++	channels = (wfile->wavinfo.Channels == Stereo) ? 2 : 1;
++
++	if ( omode == O_WRONLY ) {
++		OH_AudioRenderer *renderer = NULL;
++		rc = OH_AudioStreamBuilder_Create(&builder,AUDIOSTREAM_TYPE_RENDERER);
++		if ( rc != AUDIOSTREAM_SUCCESS ) {
++			err("OHOS: OH_AudioStreamBuilder_Create: %d",rc);
++			errno = EIO;
++			pthread_mutex_destroy(&dfile->play_mutex);
++			pthread_cond_destroy(&dfile->play_cond);
++			free(dfile);
++			return NULL;
++		}
++		OH_AudioStreamBuilder_SetSamplingRate(builder,(int32_t) wfile->wavinfo.SamplingRate);
++		OH_AudioStreamBuilder_SetChannelCount(builder,channels);
++		OH_AudioStreamBuilder_SetSampleFormat(builder,fmt);
++		OH_AudioStreamBuilder_SetEncodingType(builder,AUDIOSTREAM_ENCODING_TYPE_RAW);
++		OH_AudioStreamBuilder_SetLatencyMode(builder,AUDIOSTREAM_LATENCY_MODE_NORMAL);
++		OH_AudioStreamBuilder_SetRendererInfo(builder,AUDIOSTREAM_USAGE_MUSIC);
++		OH_AudioStreamBuilder_SetFrameSizeInCallback(builder,1024);
++		OH_AudioStreamBuilder_SetRendererWriteDataCallbackAdvanced(builder,oh_play_write_cb,dfile);
++		rc = OH_AudioStreamBuilder_GenerateRenderer(builder,&renderer);
++		OH_AudioStreamBuilder_Destroy(builder);
++		if ( rc != AUDIOSTREAM_SUCCESS || renderer == NULL ) {
++			err("OHOS: GenerateRenderer: %d",rc);
++			errno = EIO;
++			pthread_mutex_destroy(&dfile->play_mutex);
++			pthread_cond_destroy(&dfile->play_cond);
++			free(dfile);
++			return NULL;
++		}
++		dfile->renderer = renderer;
++	} else {
++		OH_AudioCapturer *capturer = NULL;
++		rc = OH_AudioStreamBuilder_Create(&builder,AUDIOSTREAM_TYPE_CAPTURER);
++		if ( rc != AUDIOSTREAM_SUCCESS ) {
++			err("OHOS: OH_AudioStreamBuilder_Create(capturer): %d",rc);
++			errno = EIO;
++			pthread_mutex_destroy(&dfile->play_mutex);
++			pthread_cond_destroy(&dfile->play_cond);
++			free(dfile);
++			return NULL;
++		}
++		OH_AudioStreamBuilder_SetSamplingRate(builder,(int32_t) wfile->wavinfo.SamplingRate);
++		OH_AudioStreamBuilder_SetChannelCount(builder,channels);
++		OH_AudioStreamBuilder_SetSampleFormat(builder,fmt);
++		OH_AudioStreamBuilder_SetEncodingType(builder,AUDIOSTREAM_ENCODING_TYPE_RAW);
++		OH_AudioStreamBuilder_SetLatencyMode(builder,AUDIOSTREAM_LATENCY_MODE_NORMAL);
++		OH_AudioStreamBuilder_SetCapturerInfo(builder,AUDIOSTREAM_SOURCE_TYPE_MIC);
++		OH_AudioStreamBuilder_SetFrameSizeInCallback(builder,1024);
++		OH_AudioStreamBuilder_SetCapturerReadDataCallback(builder,oh_rec_read_cb,dfile);
++		rc = OH_AudioStreamBuilder_GenerateCapturer(builder,&capturer);
++		OH_AudioStreamBuilder_Destroy(builder);
++		if ( rc != AUDIOSTREAM_SUCCESS || capturer == NULL ) {
++			err("OHOS: GenerateCapturer: %d",rc);
++			errno = EACCES;	/* typically missing MICROPHONE permission */
++			pthread_mutex_destroy(&dfile->play_mutex);
++			pthread_cond_destroy(&dfile->play_cond);
++			free(dfile);
++			return NULL;
++		}
++		dfile->capturer = capturer;
++		dfile->rec_wfile = wfile;
++		dfile->rec_bytes = 0;
++		dfile->rec_total = 0;
++		dfile->rec_stop  = 0;
++		dfile->rec_err   = 0;
++		dfile->rec_cb_active = 0;
++		pthread_mutex_init(&dfile->rec_mutex,NULL);
++		pthread_cond_init(&dfile->rec_cond,NULL);
++	}
++	return dfile;
++}
++
++int
++CloseDSP(DSPFILE *dfile,ErrFunc erf) {
++	struct timespec ts;
++	int tries;
++	v_erf = erf;
++	if ( dfile == NULL ) {
++		err("%s: DSPFILE is not open",strerror(errno=EINVAL));
++		return -1;
++	}
++	if ( dfile->renderer != NULL ) {
++		OH_AudioRenderer *renderer = (OH_AudioRenderer *) dfile->renderer;
++		/*
++		 * Stop, then drain any in-flight playback callback before
++		 * releasing: the callback dereferences dfile, so freeing it
++		 * while a callback is mid-read would be a use-after-free.
++		 */
++		OH_AudioRenderer_Stop(renderer);
++		pthread_mutex_lock(&dfile->play_mutex);
++		tries = 0;
++		while ( dfile->play_cb_active > 0 && tries < 50 ) {
++			clock_gettime(CLOCK_REALTIME,&ts);
++			ts.tv_nsec += 100000000;	/* 100 ms */
++			if ( ts.tv_nsec >= 1000000000L ) { ts.tv_sec++; ts.tv_nsec -= 1000000000L; }
++			pthread_cond_timedwait(&dfile->play_cond,&dfile->play_mutex,&ts);
++			tries++;
++		}
++		if ( dfile->play_cb_active > 0 ) {
++			/*
++			 * Wedged callback: it still references dfile, the mutex and
++			 * the condvar, so releasing any of them would be a
++			 * use-after-free. Unrecoverable - terminate the process.
++			 */
++			pthread_mutex_unlock(&dfile->play_mutex);
++			err("OHOS: playback callback did not drain; aborting to avoid use-after-free");
++			exit(1);
++		}
++		pthread_mutex_unlock(&dfile->play_mutex);
++		OH_AudioRenderer_Release(renderer);
++		dfile->renderer = NULL;
++	}
++	if ( dfile->capturer != NULL ) {
++		OH_AudioCapturer *capturer = (OH_AudioCapturer *) dfile->capturer;
++		/*
++		 * Signal stop, then drain any in-flight capture callback before
++		 * releasing: the callback dereferences dfile, so freeing it
++		 * while a callback is mid-write would be a use-after-free.
++		 */
++		pthread_mutex_lock(&dfile->rec_mutex);
++		dfile->rec_stop = 1;
++		pthread_mutex_unlock(&dfile->rec_mutex);
++		OH_AudioCapturer_Stop(capturer);
++		pthread_mutex_lock(&dfile->rec_mutex);
++		tries = 0;
++		while ( dfile->rec_cb_active > 0 && tries < 50 ) {
++			clock_gettime(CLOCK_REALTIME,&ts);
++			ts.tv_nsec += 100000000;	/* 100 ms */
++			if ( ts.tv_nsec >= 1000000000L ) { ts.tv_sec++; ts.tv_nsec -= 1000000000L; }
++			pthread_cond_timedwait(&dfile->rec_cond,&dfile->rec_mutex,&ts);
++			tries++;
++		}
++		if ( dfile->rec_cb_active > 0 ) {
++			/*
++			 * Wedged callback (e.g. stuck disk write): it still
++			 * references dfile, the mutex and the condvar, so
++			 * releasing any of them would be a use-after-free.
++			 * Unrecoverable - terminate the process.
++			 */
++			pthread_mutex_unlock(&dfile->rec_mutex);
++			err("OHOS: capture callback did not drain; aborting to avoid use-after-free");
++			exit(1);
++		}
++		pthread_mutex_unlock(&dfile->rec_mutex);
++		OH_AudioCapturer_Release(capturer);
++		dfile->capturer = NULL;
++		pthread_mutex_destroy(&dfile->rec_mutex);
++		pthread_cond_destroy(&dfile->rec_cond);
++	}
++	pthread_mutex_destroy(&dfile->play_mutex);
++	pthread_cond_destroy(&dfile->play_cond);
++	if ( dfile->dspbuf != NULL )
++		free(dfile->dspbuf);
++	free(dfile);
++	return 0;
++}
++
++int
++PlayDSP(DSPFILE *dfile,WAVFILE *wfile,DSPPROC work_proc,ErrFunc erf) {
++	OH_AudioRenderer *renderer = (OH_AudioRenderer *) dfile->renderer;
++	unsigned long duration_ms;
++	unsigned long play_initial;
++	long max_polls;
++	int bps;
++	int rate;
++	int user_stop;
++	int done;
++	int tries;
++	struct timespec ts;
++
++	v_erf = erf;
++	if ( wfile->rw != 'R' ) {
++		err("%s: WAVFILE must be open for reading",strerror(errno=EINVAL));
++		return -1;
++	}
++	if ( renderer == NULL ) {
++		err("%s: DSPFILE has no renderer (OpenDSP failed)",strerror(errno=EINVAL));
++		return -1;
++	}
++	switch ( wfile->wavinfo.DataBits ) {
++	case 8 :  bps = 1; break;
++	case 16 : bps = 2; break;
++	default :
++		err("%s: OHOS cannot process %u bit samples (use 8 or 16)",
++		    strerror(errno=EINVAL),(unsigned) wfile->wavinfo.DataBits);
++		return -1;
++	}
++	if ( wfile->wavinfo.Channels == Stereo )
++		bps *= 2;
++	else if ( wfile->wavinfo.Channels != Mono ) {
++		err("%s: DSPFILE control block is corrupted (chan_mode)",strerror(errno=EINVAL));
++		return -1;
++	}
++
++	/* Publish source state to the playback callback thread (under the
++	 * lock so the callback never observes a torn state). */
++	pthread_mutex_lock(&dfile->play_mutex);
++	dfile->play_wfile  = wfile;
++	dfile->play_bps    = bps;
++	play_initial = wfile->wavinfo.Samples * (unsigned long) bps;
++	dfile->play_remain = play_initial;
++	dfile->play_done   = 0;
++	pthread_mutex_unlock(&dfile->play_mutex);
++
++	/* Seek to the requested start sample. */
++	if ( lseek(wfile->fd,(off_t) (wfile->StartSample * bps),SEEK_CUR) < 0 ) {
++		err("%s: seeking WAV file",strerror(errno));
++		return -1;
++	}
++
++	if ( OH_AudioRenderer_Start(renderer) != AUDIOSTREAM_SUCCESS ) {
++		err("OHOS: OH_AudioRenderer_Start failed");
++		return -1;
++	}
++
++	/*
++	 * Wait for the callback to exhaust the source (real-time playback) or
++	 * for work_proc to request a stop. The deadline is 3x the nominal
++	 * duration plus 30 s to absorb the audio service's output buffer.
++	 */
++	rate = (int) wfile->wavinfo.SamplingRate;
++	if ( rate <= 0 )
++		rate = 44100;	/* defensive: guard the division below */
++	duration_ms = ((unsigned long) wfile->wavinfo.Samples * (unsigned long) bps * 1000UL)
++	    / (unsigned long) rate;
++	max_polls = (long) (duration_ms * 3UL / 20UL) + 1500;
++	user_stop = 0;
++	pthread_mutex_lock(&dfile->play_mutex);
++	done = dfile->play_done;
++	pthread_mutex_unlock(&dfile->play_mutex);
++	for ( ; max_polls-- > 0 && !done; ) {
++		if ( work_proc != NULL && work_proc(dfile) ) {
++			user_stop = 1;
++			break;
++		}
++		usleep(20000);	/* 20 ms poll */
++		pthread_mutex_lock(&dfile->play_mutex);
++		done = dfile->play_done;
++		pthread_mutex_unlock(&dfile->play_mutex);
++	}
++
++	OH_AudioRenderer_Flush(renderer);
++	OH_AudioRenderer_Stop(renderer);
++	/*
++	 * Drain any in-flight playback callback on every path (success, user
++	 * stop, timeout): the callback may still be reading wfile->fd, and the
++	 * caller closes/frees the WAVFILE as soon as PlayDSP returns (before
++	 * CloseDSP runs). No in-flight callback may survive a return.
++	 */
++	pthread_mutex_lock(&dfile->play_mutex);
++	tries = 0;
++	while ( dfile->play_cb_active > 0 && tries < 50 ) {
++		clock_gettime(CLOCK_REALTIME,&ts);
++		ts.tv_nsec += 100000000;	/* 100 ms */
++		if ( ts.tv_nsec >= 1000000000L ) { ts.tv_sec++; ts.tv_nsec -= 1000000000L; }
++		pthread_cond_timedwait(&dfile->play_cond,&dfile->play_mutex,&ts);
++		tries++;
++	}
++	if ( dfile->play_cb_active > 0 ) {
++		/*
++		 * Wedged callback: the caller would free the WAVFILE (and CloseDSP
++		 * would free dfile) while the callback still references both - a
++		 * use-after-free. Unrecoverable - terminate the process.
++		 */
++		pthread_mutex_unlock(&dfile->play_mutex);
++		err("OHOS: playback callback did not drain; aborting to avoid use-after-free");
++		exit(1);
++	}
++	/*
++	 * Settle the consumed bytes in the WAVFILE header state (the OSS
++	 * sibling implementation decrements DataBytes as it reads; here the
++	 * callback consumes, so settle once after the drain).
++	 */
++	{
++		unsigned long consumed = play_initial - dfile->play_remain;
++		pthread_mutex_unlock(&dfile->play_mutex);
++		if ( consumed > (unsigned long) wfile->wavinfo.DataBytes )
++			consumed = wfile->wavinfo.DataBytes;
++		wfile->wavinfo.DataBytes -= (UInt32) consumed;
++	}
++	if ( !done && !user_stop ) {
++		/* deadline exhausted without EOF: audio service unresponsive */
++		err("OHOS: playback timed out (audio service unresponsive)");
++		return -1;
++	}
++	return 0;
++}
++
++int
++RecordDSP(DSPFILE *dfile,WAVFILE *wfile,UInt32 samples,DSPPROC work_proc,ErrFunc erf) {
++	OH_AudioCapturer *capturer = (OH_AudioCapturer *) dfile->capturer;
++	struct timespec ts;
++	struct timespec last_prog;
++	unsigned long total_bytes;
++	unsigned long last_bytes;
++	long max_polls;
++	int bps;
++	int rate;
++	int no_progress;
++	int timed_out;
++	int tries;
++
++	v_erf = erf;
++	if ( wfile->rw != 'W' ) {
++		err("WAVFILE must be open for writing",strerror(errno=EINVAL));
++		return -1;
++	}
++	if ( capturer == NULL ) {
++		err("DSPFILE has no capturer (OpenDSP failed)",strerror(errno=EINVAL));
++		return -1;
++	}
++	switch ( wfile->wavinfo.DataBits ) {
++	case 8 :  bps = 1; break;
++	case 16 : bps = 2; break;
++	default :
++		err("OHOS cannot process %u bit samples (use 8 or 16)",
++		    (unsigned) wfile->wavinfo.DataBits);
++		errno = EINVAL;
++		return -1;
++	}
++	if ( wfile->wavinfo.Channels == Stereo )
++		bps *= 2;
++	else if ( wfile->wavinfo.Channels != Mono ) {
++		err("DSPFILE control block is corrupted (chan_mode)",strerror(errno=EINVAL));
++		return -1;
++	}
++
++	dfile->rec_bps   = bps;
++	dfile->rec_wfile = wfile;
++	dfile->rec_bytes = 0;
++	dfile->rec_stop  = 0;
++	dfile->rec_total = (samples > 0) ? (unsigned long) samples * (unsigned long) bps : 0;
++
++	total_bytes = dfile->rec_total;
++
++	if ( OH_AudioCapturer_Start(capturer) != AUDIOSTREAM_SUCCESS ) {
++		err("OHOS: OH_AudioCapturer_Start failed");
++		return -1;
++	}
++
++	/* No-progress watchdog baseline (infinite-capture safety net). */
++	clock_gettime(CLOCK_MONOTONIC,&last_prog);
++	last_bytes = 0;
++	no_progress = 0;
++	timed_out = 0;
++
++	/*
++	 * Poll until the capture is full, rec_stop is set, or work_proc asks
++	 * to stop. For a finite capture (total_bytes > 0) add a deadline of
++	 * 3x the nominal duration plus 30 s so a silent/stopped audio service
++	 * cannot hang us forever; an infinite capture (total_bytes == 0) gets
++	 * a 30 s no-progress watchdog for the same reason.
++	 */
++	rate = (int) wfile->wavinfo.SamplingRate;
++	if ( rate <= 0 )
++		rate = 44100;	/* defensive: guard the division below */
++	if ( total_bytes > 0 ) {
++		unsigned long duration_ms =
++		    ((unsigned long) samples * (unsigned long) bps * 1000UL) / (unsigned long) rate;
++		max_polls = (long) (duration_ms * 3UL / 100UL) + 300;
++	} else
++		max_polls = 0;	/* 0 = no deadline (record until stopped) */
++
++	while ( 1 ) {
++		pthread_mutex_lock(&dfile->rec_mutex);
++		if ( !dfile->rec_stop
++		    && !(total_bytes > 0 && dfile->rec_bytes >= total_bytes) ) {
++			clock_gettime(CLOCK_REALTIME,&ts);
++			ts.tv_nsec += 100000000;	/* 100 ms */
++			if ( ts.tv_nsec >= 1000000000L ) { ts.tv_sec++; ts.tv_nsec -= 1000000000L; }
++			pthread_cond_timedwait(&dfile->rec_cond,&dfile->rec_mutex,&ts);
++		}
++		{
++			int stop = dfile->rec_stop;
++			int full = (total_bytes > 0 && dfile->rec_bytes >= total_bytes);
++			unsigned long cur = dfile->rec_bytes;
++			pthread_mutex_unlock(&dfile->rec_mutex);
++			if ( stop || full )
++				break;
++			if ( work_proc != NULL && work_proc(dfile) )
++				break;
++			if ( total_bytes > 0 && --max_polls <= 0 ) {
++				timed_out = 1;	/* partial capture: report as failure */
++				break;
++			}
++			if ( total_bytes == 0 ) {
++				/* No-progress watchdog: a wedged audio service delivers no
++				 * callbacks, which would hang the capture forever. */
++				if ( cur != last_bytes ) {
++					last_bytes = cur;
++					clock_gettime(CLOCK_MONOTONIC,&last_prog);
++				} else {
++					struct timespec now;
++					clock_gettime(CLOCK_MONOTONIC,&now);
++					if ( now.tv_sec - last_prog.tv_sec > 30 ) {
++						no_progress = 1;
++						break;
++					}
++				}
++			}
++		}
++	}
++
++	dfile->rec_stop = 1;
++	OH_AudioCapturer_Flush(capturer);
++	OH_AudioCapturer_Stop(capturer);
++	/*
++	 * Drain any in-flight capture callback before returning: the callback
++	 * writes wfile->fd, and the caller closes/frees the WAVFILE as soon as
++	 * RecordDSP returns (before CloseDSP runs).
++	 */
++	pthread_mutex_lock(&dfile->rec_mutex);
++	tries = 0;
++	while ( dfile->rec_cb_active > 0 && tries < 50 ) {
++		clock_gettime(CLOCK_REALTIME,&ts);
++		ts.tv_nsec += 100000000;	/* 100 ms */
++		if ( ts.tv_nsec >= 1000000000L ) { ts.tv_sec++; ts.tv_nsec -= 1000000000L; }
++		pthread_cond_timedwait(&dfile->rec_cond,&dfile->rec_mutex,&ts);
++		tries++;
++	}
++	if ( dfile->rec_cb_active > 0 ) {
++		/*
++		 * Wedged callback: the caller would free the WAVFILE (and CloseDSP
++		 * would free dfile) while the callback still references both - a
++		 * use-after-free. Unrecoverable - terminate the process.
++		 */
++		pthread_mutex_unlock(&dfile->rec_mutex);
++		err("OHOS: capture callback did not drain; aborting to avoid use-after-free");
++		exit(1);
++	}
++	pthread_mutex_unlock(&dfile->rec_mutex);
++
++	/* Drop any partial trailing frame so the file stays frame-aligned. */
++	dfile->rec_bytes = (dfile->rec_bytes / (unsigned long) bps) * (unsigned long) bps;
++	wfile->wavinfo.Samples = (UInt32) (dfile->rec_bytes / (unsigned long) bps);
++	if ( timed_out ) {
++		err("OHOS: capture deadline reached (audio service unresponsive); %lu of %lu bytes captured",
++		    (unsigned long) dfile->rec_bytes,(unsigned long) total_bytes);
++		return -1;
++	}
++	if ( no_progress ) {
++		err("OHOS: no capture progress for 30 s (audio service unresponsive)");
++		return -1;
++	}
++	if ( dfile->rec_err ) {
++		err("OHOS: writing WAV samples failed (disk full?); %lu of %lu bytes captured",
++		    (unsigned long) dfile->rec_bytes,(unsigned long) total_bytes);
++		return -1;
++	}
++	if ( dfile->rec_bytes == 0 ) {
++		err("OHOS: no audio data captured (check microphone permission/device)");
++		return -1;
++	}
++	return 0;
++}
++#endif /* HAVE_OHOS_AUDIO */
+ 
+ /* $Source: /cvsroot/wavplay/code/src/file.c,v $ */
