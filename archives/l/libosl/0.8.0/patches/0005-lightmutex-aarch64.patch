@@ -1,0 +1,98 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: hmbs <hmbs@local>
+Date: Tue, 14 Oct 2026 00:00:00 +0000
+Subject: [PATCH 5/5] Make LightMutex portable to non-x86 (AArch64)
+
+std/osl/misc/lightMutex.h implements its spinlock with x86-only inline
+asm: 'movl/xchgl' + '=&q' constraint (byte-addressable x86 registers)
+and the 'pause' hint. AArch64 clang rejects the 'q' constraint
+("invalid output constraint '=&q' in asm"), which breaks the std/full
+build on OHOS armv8. Keep the exact x86 fast path untouched; on other
+architectures use the compiler atomic test-and-set/release builtins
+with identical semantics, and emit 'yield' instead of 'pause' in the
+spin-wait. Architecture detection only, no platform macro.
+
+--- a/std/osl/misc/lightMutex.h
++++ b/std/osl/misc/lightMutex.h
+@@ -59,6 +59,7 @@
+       LightMutex() :data(0) {}
+       bool tryLock(){
+ 	if(data!=0) return false;
++#if defined(__i386__) || defined(__x86_64__)
+ 	int dummy;
+ #ifdef __GNUC__
+ 	asm __volatile__(" movl $1,%0" "\n\t"
+@@ -70,11 +71,21 @@
+ #  error "not supported"
+ #endif
+ 	return dummy==0;
++#else
++	/* Non-x86 (e.g. AArch64): the 'q' constraint only names x86
++	   byte-addressable registers, so use a compiler atomic
++	   test-and-set with identical semantics. Arch check only. */
++	return __sync_lock_test_and_set(const_cast<int*>(&data), 1)==0;
++#endif
+       }
+       bool waitLock(int counter){
+ 	for(int i=0;i<counter;i++){
+ #ifdef __GNUC__
++#if defined(__i386__) || defined(__x86_64__)
+ 	  asm __volatile__(" pause" "\n\t");
++#elif defined(__aarch64__)
++	  asm __volatile__(" yield" "\n\t");
++#endif
+ #endif
+ 	  if(data==0)
+ 	    return true;
+@@ -91,7 +102,11 @@
+ 	}
+       }
+       void unlock(){
++#if defined(__i386__) || defined(__x86_64__)
+ 	data=0;
++#else
++	__sync_lock_release(const_cast<int*>(&data));
++#endif
+       }
+     };
+     
+@@ -128,6 +143,7 @@
+       LightMutexChar() :data(0) {}
+       bool tryLock(){
+ 	if(data!=0) return false;
++#if defined(__i386__) || defined(__x86_64__)
+ 	char dummy;
+ #ifdef __GNUC__
+ 	asm __volatile__(" movb $1,%0" "\n\t"
+@@ -139,11 +155,19 @@
+ #  error "not supported"
+ #endif
+ 	return dummy==0;
++#else
++	/* Non-x86 (e.g. AArch64): same portable test-and-set as above. */
++	return __sync_lock_test_and_set(const_cast<char*>(&data), 1)==0;
++#endif
+       }
+       bool waitLock(int counter){
+ 	for(int i=0;i<counter;i++){
+ #ifdef __GNUC__
++#if defined(__i386__) || defined(__x86_64__)
+ 	  asm __volatile__(" pause" "\n\t");
++#elif defined(__aarch64__)
++	  asm __volatile__(" yield" "\n\t");
++#endif
+ #endif
+ 	  if(data==0)
+ 	    return true;
+@@ -160,7 +184,11 @@
+ 	}
+       }
+       void unlock(){
++#if defined(__i386__) || defined(__x86_64__)
+ 	data=0;
++#else
++	__sync_lock_release(const_cast<char*>(&data));
++#endif
+       }
+     };
+ #endif

@@ -1,0 +1,43 @@
+# test_package/MANIFEST.yml — libosl 0.8.0
+# CI L0e requires this file to exist.
+
+package: libosl/0.8.0
+homepage: "https://gps.tanaka.ecc.u-tokyo.ac.jp/gpsshogi/"
+
+# ── HMBS upstream-test declaration (rule4) ─────────────────────────────
+upstream_tests_exist: true
+upstream_test_audit: >-
+  Upstream ships a Boost.Test suite: core/test, std/test and full/test
+  directories containing 150 .t.cc files with 577 BOOST_AUTO_TEST_CASE
+  cases, driven by three testAll binaries (core/std/full testAll.cc
+  built from upstream Makefiles). Count audited from the upstream
+  source tree snapshot; the authoritative per-suite totals are confirmed
+  on the HarmonyOS machine by Boost.Test's own "Running N test cases"
+  report lines during conan create.
+upstream_test_total: 577
+upstream_test_count_method: auto
+
+# Upstream test entry points (run inside conanfile.py build()).
+upstream_check_command: "make run-test"
+upstream_test_in_build: true
+upstream_test_command: "./testAll --report_level=detailed --log_level=test_suite --catch_system_errors=yes (in core/test, std/test, full/test)"
+upstream_tests:
+  - file: "core/test/*.t.cc"
+    source: "libosl_0.8.0.orig.tar.gz"
+    description: "Upstream Boost.Test suite for the core library (board, moves, effects)."
+    command: "(cd core/test && ./testAll --report_level=detailed --log_level=test_suite --catch_system_errors=yes)"
+  - file: "std/test/*.t.cc"
+    source: "libosl_0.8.0.orig.tar.gz"
+    description: "Upstream Boost.Test suite for the std library (records, ratings, books)."
+    command: "(cd std/test && ./testAll --report_level=detailed --log_level=test_suite --catch_system_errors=yes)"
+  - file: "full/test/*.t.cc"
+    source: "libosl_0.8.0.orig.tar.gz"
+    description: "Upstream Boost.Test suite for the full library (search, evaluation, game play)."
+    command: "(cd full/test && ./testAll --report_level=detailed --log_level=test_suite --catch_system_errors=yes)"
+
+# ── test_package tests (consumer perspective) ──────────────────────────
+test_package_tests:
+  - file: "test_osl.cpp"
+    description: "Calls the real public API: Move/Square classification, CSA initial-state parsing with NumEffectState consistency check, aarch64 platform configuration check (one ctest case per group: move_api/initial_state/platform_config; consumer compiles the installed headers at C++14 like the library)."
+    command: "ctest --output-on-failure"
+assertion_count: 3

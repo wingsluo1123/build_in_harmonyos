@@ -1,0 +1,54 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: hmbs <hmbs@local>
+Date: Tue, 14 Oct 2026 00:00:00 +0000
+Subject: [PATCH 1/3] Only include <emmintrin.h> on x86/x86_64
+
+Upstream includes <emmintrin.h> whenever __INTEL_COMPILER or __clang__
+is defined. OHOS builds with clang 15 for aarch64, which has no SSE
+headers, so the include fails. The SSE code paths are already guarded
+by OSL_USE_SSE (x86-only) with scalar fallbacks, so restricting the
+include to x86/x86_64 is sufficient. Additionally, quadInt.h forces
+the scalar fallback on non-x86 even if the build system defines
+OSL_USE_SSE (the __builtin_ia32_* intrinsics do not exist on
+aarch64 clang; tripleInt.h gets the same enforcement in the recipe
+source() because its 0.8.0 warning block differs from later upstream
+text and a patch hunk will not apply there): arch detection only,
+no __OHOS__ macro is introduced; pure architecture feature detection.
+
+--- a/core/osl/bits/quadInt.h
++++ b/core/osl/bits/quadInt.h
+@@ -7,7 +7,7 @@
+ #include "osl/container.h"
+ #include "osl/bits/align16New.h"
+
+-#if (defined __INTEL_COMPILER || defined __clang__)
++#if (defined(__i386__) || defined(__x86_64__)) && (defined __INTEL_COMPILER || defined __clang__)
+ #  include <emmintrin.h>
+ #  ifdef __INTEL_COMPILER
+ #    define __builtin_ia32_pxor128 _mm_xor_pd
+--- a/full/osl/tripleInt.h
++++ b/full/osl/tripleInt.h
+@@ -7,7 +7,7 @@
+ #include "osl/config.h"
+ #include <iosfwd>
+
+-#if (defined __INTEL_COMPILER || defined __clang__)
++#if (defined(__i386__) || defined(__x86_64__)) && (defined __INTEL_COMPILER || defined __clang__)
+ #  include <emmintrin.h>
+ #  define __builtin_ia32_pxor128 _mm_xor_si128
+ #  define __builtin_ia32_psubd128 _mm_sub_epi32
+--- a/core/osl/bits/quadInt.h
++++ b/core/osl/bits/quadInt.h
+@@ -24,6 +24,12 @@
+ #else
+ #  warning "QuadInt without SSE"
+ #endif
+ #endif
++/* Non-x86 clang (e.g. aarch64) provides no __builtin_ia32_* intrinsics:
++   force the scalar fallback even if OSL_USE_SSE was forced on by the
++   build system. Architecture detection only, no platform macro. */
++#if !defined(__i386__) && !defined(__x86_64__)
++# undef OSL_USE_SSE
++#endif
+
+ namespace osl
