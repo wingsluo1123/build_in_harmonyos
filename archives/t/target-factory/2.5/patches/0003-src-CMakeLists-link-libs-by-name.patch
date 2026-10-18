@@ -1,0 +1,26 @@
+diff -ruN a/src/CMakeLists.txt b/src/CMakeLists.txt
+--- a/src/CMakeLists.txt	2026-10-17 18:30:57.578041563 +0800
++++ b/src/CMakeLists.txt	2026-10-17 18:34:22.770026563 +0800
+@@ -72,7 +72,21 @@
+   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+   $<INSTALL_INTERFACE:include>
+ )
+-target_link_libraries(${PROJECT_NAME} PUBLIC protobuf::libprotobuf PRIVATE unilog::unilog)
++if(TARGET_FACTORY_SONAME_LIBS)
++  # unilog, glog and gflags ship no DT_SONAME, so CMake links their imported
++  # targets by absolute package path and records that path in our DT_NEEDED.
++  # Link them by name through the directories the recipe injects and keep
++  # unilog::unilog only for its include interface (UniLog.hpp needs glog).
++  target_link_directories(${PROJECT_NAME} PRIVATE ${TARGET_FACTORY_SONAME_LIBDIRS})
++  target_include_directories(${PROJECT_NAME} PRIVATE
++    $<TARGET_PROPERTY:unilog::unilog,INTERFACE_INCLUDE_DIRECTORIES>)
++  target_compile_definitions(${PROJECT_NAME} PRIVATE
++    $<TARGET_PROPERTY:unilog::unilog,INTERFACE_COMPILE_DEFINITIONS>)
++  target_link_libraries(${PROJECT_NAME} PUBLIC protobuf::libprotobuf
++                        PRIVATE ${TARGET_FACTORY_SONAME_LIBS})
++else()
++  target_link_libraries(${PROJECT_NAME} PUBLIC protobuf::libprotobuf PRIVATE unilog::unilog)
++endif()
+ 
+ # add python api
+ if(BUILD_PYTHON)
