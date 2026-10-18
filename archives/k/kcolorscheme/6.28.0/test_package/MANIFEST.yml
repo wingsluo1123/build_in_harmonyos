@@ -1,0 +1,92 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for kcolorscheme/6.28.0.
+# CI script (build_and_test.sh L0e) requires this file to exist.
+# See: docs/TEST_QUALITY_SPEC.md
+
+package: kcolorscheme/6.28.0
+homepage: https://invent.kde.org/frameworks/kcolorscheme
+
+# Upstream test commands (used for ctest -N analysis)
+upstream_check_command: "ctest -N"
+
+# Upstream tests ARE integrated in this Conan build (BUILD_TESTING=ON):
+# the single ctest target builds and executes on the device.
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error --timeout 300"
+
+# 上游测试用例口径（rule2 / rule4）
+#
+# 上游 N=1（autotests/CMakeLists.txt 的唯一注册：
+# ecm_add_test(kcolorschemetest.cpp LINK_LIBRARIES Qt6::Test KF6::ColorScheme)，
+# 另 BUILD_TESTING=ON 时无其他 ecm_add_tests 目标）。
+# 该 QTest 二进制含 5 个 private Q_SLOTS：
+#   benchConstruction_data / benchConstruction（2 个数据行：default/explicit）、
+#   readColors_data / readColors（7 个数据行：7 个 ColorSet）、
+#   readContrast（1 行：对比度 0.5 断言）。
+# 即 3 个测试函数、10 个数据行用例（外加 QTEST_MAIN 隐式的
+# initTestCase/cleanupTestCase 生命周期槽）。
+# 适配后 N'=1：无平台裁剪，真机 ctest 全过。
+# 真机执行结果（本 head，2026-10-17）：1/1 通过（Passed 0.63 sec）。
+# readColors 经 QFINDTESTDATA("kcolorschemetest.colors") 读取随源发布的
+# 色彩夹具，对 7 个 ColorSet × Active/Inactive 两态逐角色（2 背景角色 +
+# 8 前景角色 + 2 装饰角色 × 两组状态）与上游编码表比对。
+upstream_tests:
+  - file: autotests/CMakeLists.txt
+    source: kcolorscheme-6.28.0/autotests/CMakeLists.txt
+    description: "上游唯一 ctest 目标 kcolorschemetest（ecm_add_test；Qt6::Test + KF6::ColorScheme）。5 个 Q_SLOTS、10 个数据行用例：构造基准（default/explicit 两行）、7 个 ColorSet 的背景/前景/装饰角色读色比对（含 kcolorschemetest.colors 夹具）、对比度因子 0.5 断言。"
+    command: "ctest --test-dir <build_folder> -N"
+    condition: "BUILD_TESTING=ON，真机 ctest 执行（本 head 1/1 全过）"
+
+# test_package tests (consumer-side verification)
+test_package_tests:
+  - file: test_package/test_kcolorscheme.cpp
+    description: "消费者行为验证：find_package(KF6ColorScheme) 经包内 KF6ColorSchemeConfig.cmake 解析（配方 cmake_find_mode=none，CMakeDeps 不遮蔽）+ 链接 KF6::ColorScheme；QT_QPA_PLATFORM=offscreen + 密闭 XDG 根下 29 用例——KColorScheme(view) 背景/前景/装饰取色（4）；contrastF/frameContrast 值域 [0,1]（2）；7 个 ColorSet 循环的背景+前景有效性（14）；inactive 态取色（1）；KStatefulBrush 三构造重载（背景/前景/装饰）+ 默认构造按文档返回空 QBrush（4）；静态与成员 shade() 重载（2）；adjustBackground 把 QPalette::Base 精确改写为该 scheme 的背景色（1）；拷贝 operator== 语义（1）。check() 逐例 TEST PASS/FAIL + SUMMARY + 任一失败 exit(1)（jakarta-authentication-api 3.0.0 先例）。"
+    command: "conan create (test_package builds and runs test_kcolorscheme)"
+  - file: test_package/test_kcolorscheme_elf.py
+    description: "OHOS 制品验证：lib/ 下 libKF6ColorScheme.so* 恰为单一无版本实体文件 libKF6ColorScheme.so（OHOS /storage 禁 symlink，无 .so.6/.so.6.28.0 符号链，且终组件非 symlink）；实体文件为 ELF64、小端、ET_DYN、EM_AARCH64；节表含 .text 与 .codesign（package() 重签步骤产物）；动态节 DT_SONAME == libKF6ColorScheme.so（补丁 0002 在平台无 soname flag 时直传 -Wl,-soname）且每个 DT_NEEDED 条目为纯基名（无路径分隔符，杜绝机器私有缓存路径烧进依赖记录，E537）。仅做结构化 ELF 头/节表/动态节读取（纯 struct.unpack_from），不对二进制做文本 grep。本 head 真机 20/20（8 条基名 DT_NEEDED）。"
+    command: "python test_kcolorscheme_elf.py <package_folder>"
+  - file: test_package/test_kcolorscheme_fixdeps.py
+    description: "注册表卫生（绝对路径变体）：平台发布的多个 KF6 库的 DT_NEEDED 携带发布机私有绝对路径（<HOME>/.cache/conan2/p/b/…/p/lib/libKF6*.so）；OHOS 加载器对含路径条目按字面打开、无搜索路径回退，缺少该目录的 worker 在 main() 前即死于加载。脚本扫描 LD_LIBRARY_PATH 全部目录 + 兼容 bin 的运行时闭包，按基名映射把每条缺失的路径条目在其字面路径复制补位（拷贝非符号链，/storage 禁 symlink）。仅落盘形态为 Conan cache 包路径的条目（normpath 折叠后含 .conan2/p/ 或 .cache/conan2/p/ 段且 basename 以 lib 开头，校验与写入使用同一折叠值）。退出码恒 0（无法满足的条目打警告），测试运行本身仍是验收门。本次交付版真机全链运行（conan create 干净构建，2026-10-17）脚本走完扫描路径、无需补位。"
+    command: "python test_kcolorscheme_fixdeps.py <compat_bin_dir>"
+
+# 鸿蒙特有测试条数 (rule12)：固定 12 条 + 每个 DT_NEEDED 条目 1 条
+# （test_kcolorscheme_elf.py 的 12+N 条里，除去与平台无关的 4 条）
+ohos_specific_tests: "16（8+N，真机 N=8）"
+ohos_specific_description: >
+  test_package/test_kcolorscheme_elf.py 的 12+N 条制品检查点中，8+N 条
+  直接绑定鸿蒙产物形态，构成 rule12 的鸿蒙特有测试（N = DT_NEEDED
+  条目数，每条一个基名检查点）：
+    (1) EM_AARCH64(183) —— OHOS 只接受 AArch64 产物，宿主交叉编译器残留的
+        x86-64 会在这里立刻失败（检查的是字节级 ABI，不是文件名）；
+    (2) ET_DYN(3) —— OHOS 要求共享对象/PIE 形态；
+    (3) EI_CLASS = ELFCLASS64(2)、EI_DATA = ELFDATA2LSB(1)、
+        EI_VERSION = EV_CURRENT(1) —— 64 位小端 ELF，
+        32 位或大端产物在此失败；
+    (4) 节表含 .codesign —— package() 对每一个安装的 ELF 跑
+        llvm-objcopy --remove-section .codesign + binary-sign-tool
+        -selfSign 1；CMake 在 install 时会重写 RUNPATH，令构建期签名失效，
+        未重签的库会被 OHOS 加载器以 "Permission denied" 拒绝。节表里
+        看得见 .codesign 是这一步骤真的发生了的证据；
+    (5) lib/ 下恰为单一无版本实体文件 libKF6ColorScheme.so —— OHOS
+        /storage 禁 symlink，SOVERSION 版本链（.so.6.28.0/.so.6/.so）
+        创建必 EPERM（kscreenlocker round 21 真机实录），配方不设
+        CMAKE_SHARED_LIBRARY_SONAME flags、产物天然无符号链
+        （kpackage/6.26.0.1 先例）；本检查点拒绝任何残留的版本链或符号链；
+    (6) 动态节 DT_SONAME == libKF6ColorScheme.so —— 平台无 soname flag 时
+        库默认无 DT_SONAME，补丁 0002 直传 -Wl,-soname 使 OHOS 加载器
+        按基名解析依赖；本检查点验证该直传真的进入链接结果；
+    (7) 每个 DT_NEEDED 条目为纯基名（无路径分隔符，N 条）—— ohpcd 发布的
+        KF6 库不带 DT_SONAME（IMPORTED_NO_SONAME=TRUE），按绝对缓存路径
+        链接会把机器私有路径烧进 DT_NEEDED（E537）；补丁 0002 把 KF6
+        依赖改由精确文件名 -l: 标志链接（lld 按命令行原样记录名字），
+        本检查点逐条验证依赖记录可重定位。
+  全部检查只做结构化 ELF 头/节表/程序头/动态节读取（纯 Python
+  struct.unpack_from），不对二进制做文本 grep，也不调用
+  readelf/file/nm/strings —— 那些工具在 OHOS 上不可用或不适合从测试里驱动。
+  另 4 条（ELF magic、节表含 .text、实体文件存在性 isfile、DT_NEEDED
+  解析非空）是平台无关的解析健全性检查，不计入本条。
+
+# Test check count (approximate, for quality assessment)
+# 行为检查点 29 条（test_kcolorscheme.cpp）+ OHOS 制品检查 12+N 条
+# （test_kcolorscheme_elf.py，N=DT_NEEDED 条目数，真机 N=8）= 49
+assertion_count: "49（41+N，真机 N=8）"

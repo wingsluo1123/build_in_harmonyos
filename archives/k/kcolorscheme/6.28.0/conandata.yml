@@ -1,0 +1,31 @@
+# conandata.yml — kcolorscheme 6.28.0
+# sha256 verified against the official KDE tarball: the value was fetched
+# from the download.kde.org .sha256 sidecar and matches the local tarball
+# byte-for-byte (51804 bytes).
+#
+# R39 source fallback: download.kde.org 302s to a regional mirror
+# (mirrors.bfsu.edu.cn from CN networks) whose TLS certificate fails
+# verification on the device network, so the recipe lists the official
+# source first plus the authoritative KDE mirrors as fallbacks -- conan's
+# get() tries the URLs in order until one succeeds. Every fallback URL
+# was downloaded and sha256-checked on 2026-10-17 against the official
+# tarball (all byte-identical, 51804 bytes; kbookmarks / kauth 6.28.0
+# precedent).
+
+sources:
+  url:
+    - "https://download.kde.org/stable/frameworks/6.28/kcolorscheme-6.28.0.tar.xz"
+    - "https://mirrors.bfsu.edu.cn/kde/stable/frameworks/6.28/kcolorscheme-6.28.0.tar.xz"
+    - "https://mirrors.ustc.edu.cn/kde/stable/frameworks/6.28/kcolorscheme-6.28.0.tar.xz"
+    - "https://mirror.nju.edu.cn/kde/stable/frameworks/6.28/kcolorscheme-6.28.0.tar.xz"
+    - "https://mirrors.aliyun.com/kde/stable/frameworks/6.28/kcolorscheme-6.28.0.tar.xz"
+  sha256: "129c98fd9ba3428cafbd7263557a9ea47c0d4f157b8a5f56b209a95dc9815e6a"
+
+patches:
+  "6.28.0":
+    - patch_file: "patches/0001-lower-kf-dep-version.patch"
+      patch_description: "KF_DEP_VERSION 6.28.0 -> 6.26.0: the ohpcd-published KF6 stack stops at 6.26.0 (kconfig fix release 6.26.0.1; kguiaddons and ki18n stop at 6.26.0); the find_package(ECM 6.28.0) line stays untouched because the extra-cmake-modules/6.29.0 tool package satisfies it"
+      patch_type: "portability"
+    - patch_file: "patches/0002-ohos-basename-soname-link.patch"
+      patch_description: "Relocatable basename SONAME linkage: the published KF6 libraries carry no DT_SONAME, so linking them by their absolute Conan cache paths bakes machine-private paths into DT_NEEDED (non-relocatable, E537). lld records the name as given on the command line, so the four KF6 components the sources consume (ConfigCore/ConfigGui/GuiAddons/I18n) are linked by exact-file-name -l: flags (bare basenames) with the dependency directories attached PRIVATE to KF6ColorScheme; KF6::ConfigCore additionally stays on the link INTERFACE because the public headers include <KSharedConfig> and the installed KF6ColorSchemeConfig.cmake already find_dependency(KF6Config) from upstream -- exported by name, never by absolute path. Usage requirements of the deps that left the link line are copied by walking the INTERFACE_LINK_LIBRARIES transitive closure of the direct KF6 deps with -NOTFOUND sentinel guards on every get_target_property lookup (KDE targets files set IMPORTED_LOCATION_RELEASE only; kscreenlocker 6.7.2 0008 precedent, device-proven); the library also passes -Wl,-soname,libKF6ColorScheme.so explicitly where the platform module defines no soname flag"
+      patch_type: "portability"
