@@ -1,0 +1,84 @@
+# 版本级 manifest
+# 文件位置: archives/q/qt5-qttranslations/5.15.2/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "5.15.2"
+
+# 软件名
+software: "qt5-qttranslations"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-16"
+build_system: resource
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（官方单条 URL 为主，附同制品镜像 fallback）
+  url: "https://download.qt.io/archive/qt/5.15/5.15.2/submodules/qttranslations-everywhere-src-5.15.2.tar.xz"
+  # 源码校验和（官方源 + 清华/中科大镜像三源实测一致）
+  sha256: "d5788e86257b21d5323f1efd94376a213e091d1e5e03b45a95dd052b5f570db8"
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型：纯资源包，无编译；仅 lrelease 资源转换
+  system: resource
+
+  # 资源转换命令
+  configure_options:
+  - "lrelease <translations/*.ts> -qm <translations/*.qm>"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+  - "qt5-qtbase/5.15.2.2"
+  - "qttools/6.11.1.1"
+
+  # 编译器（本件不做 C/C++ 编译，字段保留以满足 spec）
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+- "制品仓无任何 Qt5 qttools 包（qt5-qttools/5.15.2、qttools/5.15.2 均 404），qt5-qtbase 只含 Qt5 基础模块（无 Qt Linguist）——Qt5 qttranslations 的 lrelease 转换必须外借工具 [knowledge_ref: knowledge/drafts/mlite-0.5.5-qt5-qttools-missing-lrelease.kv]"
+- "用 Qt6 qttools/6.11.1.1 的 lrelease 转换 Qt5 的 .ts，产物 .qm 可被 Qt5.15 的 QTranslator 正常加载（test_package 用 qt5-qtbase 的 QTranslator 实测：load 成功且 !isEmpty）"
+- "上游 5.15.2 为 qmake TEMPLATE=aux 工程（无 CMake），其 translations.pro 经 qtPrepareTool 调用 lrelease；本配方不复刻 qmake 构建（qtbase 包内嵌构建机路径 + 缺 .qmake.conf），直接按 updateqm 语义逐 .ts 调 lrelease"
+- "上游 updateqm 之外还 write_file() 生成 17 个空的 <module>_en.ts（16 个 TS_MODULES + qt），一并编译为对应 .qm（共 283 个）"
+
+# ============================================================
+# 测试结果
+# ============================================================
+
+test_results:
+  upstream:
+    total: 266
+    command: "lrelease translations/*.ts -qm translations/*.qm (upstream updateqm target)"
+    status: built
+  added:
+    total: 13
+    status: built
+
+dependency_for: []
