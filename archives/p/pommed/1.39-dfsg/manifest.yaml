@@ -1,0 +1,90 @@
+# 版本级 manifest — pommed 1.39-dfsg
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "1.39-dfsg"
+software: "pommed"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-16"
+build_system: makefile
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/p/pommed/pommed_1.39~dfsg.orig.tar.gz"
+  sha256: "2d052c8eccc08f1dc070cc8d96316734afb7623ae849277857754b0233ded131"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: makefile
+  configure_options: []
+  dependencies:
+    - "dbus/1.14.10"
+    - "alsa-lib/1.2.16.1"
+    - "audiofile/0.3.6"
+    - "libconfuse/3.3"
+    - "pciutils/3.13.0"
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-pommed-beep.h.patch"
+  - "0002-pommed-mactel-ambient.c.patch"
+  - "0003-pommed-mactel-nv8600mgt_backlight.c.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "musl libc (OHOS) does not expose pthread types or PATH_MAX transitively: 2011-era C that only included <syslog.h>/<stdio.h> still needs explicit <pthread.h>/<limits.h> (reference: E552)"
+  - "The mactel NV8600MGT backlight driver drives the firmware SMI interface through x86 I/O ports (outb/inb/iopl from <sys/io.h>); on aarch64 <sys/io.h> exists but is empty, so the only correct port is to compile the driver out of the port-IO path and let probe() report the hardware unsupported (reference: E551)"
+  - "Legacy Makefiles that probe the build host with `test -e /usr/include/...` mis-detect a cross/native OHOS sysroot; overriding the make variable from the command line (INOTIFY_CFLAGS= TIMERFD_CFLAGS=) keeps the real sysroot headers in use without patching the Makefile (reference: E550)"
+  - "PkgConfigDeps names its .pc files after the Conan package ref (dbus.pc, pciutils.pc) while upstream Makefiles ask pkg-config for dbus-1 / libpci: synthesise the expected alias names in generate() (reference: E555)"
+  - "2011 C with tentative definitions duplicated across translation units (lcd_bck_info in three files) needs -fcommon with clang >= 11 / GCC >= 10 (-fno-common is the default) (reference: E553)"
+  - "libaudiofile.a contains C++ objects, so a C-only link line still needs libc++ (-lc++) (reference: E554)"
+
+knowledge_ref:
+  - "E550-draft-PMD1"
+  - "E551-draft-PMD1"
+  - "E552-draft-PMD1"
+  - "E553-draft-PMD1"
+  - "E554-draft-PMD1"
+  - "E555-draft-PMD1"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /data/storage/el2/base/files/home/.tmp/builds/pommed-1.39-dfsg.orig
+  source_work_dir: /data/storage/el2/base/files/home/.tmp/builds/pommed-1.39-dfsg.work
+  source_orig_hash: 8ada43e2da37719f
+  source_work_hash: 1ad11c274f301cee
+  generated_at: '2026-10-16T01:30:48'
+  patches_count: 3
+
+patch_classification:
+  - file: 0001-pommed-beep.h.patch
+    type: portability
+    platform_only: True
+    guard: 'none'
+  - file: 0002-pommed-mactel-ambient.c.patch
+    type: portability
+    platform_only: True
+    guard: 'none'
+  - file: 0003-pommed-mactel-nv8600mgt_backlight.c.patch
+    type: portability
+    platform_only: True
+    guard: 'x86 arch guard (__i386__ / __x86_64__)'
