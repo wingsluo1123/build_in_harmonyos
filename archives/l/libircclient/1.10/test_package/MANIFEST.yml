@@ -1,0 +1,29 @@
+package: "libircclient/1.10"
+
+upstream_tests:
+  # 1.10 只带 examples/（演示程序，需要终端和 OpenSSL 的 SSL 样例），
+  # 没有可供非交互执行的自带测试套件，故上游独立用例数为 0。
+  []
+
+test_package_tests:
+  - id: "installed-package-api-conformance"
+    source: "test_package.c"
+    command: "./libircclient_consumer"
+    checks: 8
+    notes: "会话生命周期、user context、option 标志与错误映射；无网络"
+
+  - id: "end-to-end-irc-session"
+    source: "test_package.c"
+    command: "./libircclient_consumer"
+    checks: 11
+    notes: "本进程内起假 IRC 服务器（127.0.0.1 随机端口）：被测库真实 TCP 连接 →
+           发 NICK/USER → 收到 001 触发 event_connect → 应答服务器 PING 为 PONG →
+           服务器关闭使 irc_run() 退出并记录错误。非 mock：字节走真实 socket，
+           由库自身的解析器与事件分发处理"
+
+test_counting:
+  upstream_independent_total: 0
+  harmony_specific_consumer_cases: 2
+  harmony_specific_consumer_checks: 19
+  shared_static_counted_once: true
+  internal_assertions_counted_as_cases: false
