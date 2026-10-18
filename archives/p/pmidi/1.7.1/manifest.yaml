@@ -1,0 +1,77 @@
+# 版本级 manifest — pmidi 1.7.1
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "1.7.1"
+software: pmidi
+
+# 编译状态: published | built | failed | archived
+# built: conan-verify 通过（G2 conan create + test_package 通过），尚未经 CI release 上传制品仓
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-13"
+build_system: autotools
+
+# ============================================================
+# 源码信息
+# ============================================================
+source:
+  # 官方发布点：SourceForge pmidi 项目（官网 parabola.me.uk/alsa/pmidi.html 指向）
+  url: "https://downloads.sourceforge.net/project/pmidi/pmidi/1.7.1/pmidi-1.7.1.tar.gz"
+  sha256: "a500d9e41235ea741ffccce9541df9f74318663a62ec18d8081eb1119cd93514"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=${prefix}"
+  dependencies:
+    - alsa-lib/1.2.16.1
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+patches_applied:
+  - "0001-config.guess.patch"
+  - "0002-config.sub.patch"
+  - "0003-configure.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+knowledge_gained:
+  - "config.guess（2015 版）无 HarmonyOS 分支：uname -s=HarmonyOS 导致 'cannot guess build type'；补 *:HarmonyOS:*:* 分支时必须 echo+exit（各 case 分支自行返回，缺 exit 会继续走到需编译 dummy.c 的兜底逻辑）（ref: E007）"
+  - "config.sub（2015 版，无 basic_os 机制）需两处修改：maybe_os 列表加 linux-ohos*（否则 os 被拆成 -ohos、machine 变成 aarch64-unknown-linux）+ OS 白名单加 -linux-ohos*；仅改白名单不生效（ref: E072 / E122）"
+  - "configure 的 config.status 临时目录用 umask 077 创建 ./confXXXXXX，HMDFS 上不可写 → 'could not setup config files machinery'，改 umask 022（ref: E011 / E114 / E129）"
+  - "configure 的 AC_RUN_IFELSE/cross-compile 试探程序链接 -lasound 后运行期找不到 libasound.so/libatopology.so → 'cannot run C compiled programs'；需在构建环境把依赖 lib 目录加入 LD_LIBRARY_PATH（与 aseqjoy 同款）"
+  - "pmidi 自带 src/glib.c 最小 GLib 子集：不声明 glib 依赖时 configure 探测 glib.h 失败并自动启用内置实现（WITH_INCLUDED_GLIB=1），无需外部 GLib"
+  - "HMDFS 不支持 make jobserver 的 mkfifo，autotools make 用 -j1"
+  - "OHOS 内核无 ALSA sequencer（/dev/snd/seq 不存在），pmidi 的播放/端口枚举（-l）在设备上运行时报 'Could not open sequencer'；属平台运行期能力限制，不影响构建与 --version 验证"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/pmidi-1.7.1.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/pmidi-1.7.1.work
+  source_orig_hash: 614561b4b5a8575f
+  source_work_hash: a5088f9cd27ac87a
+  generated_at: '2026-10-13T14:29:59'
+  patches_count: 3
+
+patch_classification:
+  - file: 0001-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-config.sub.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

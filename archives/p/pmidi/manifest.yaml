@@ -1,0 +1,28 @@
+# 软件级 manifest — pmidi
+# 遵循 ARCHIVE-SPEC v2.0
+
+software: pmidi
+display: "pmidi"
+description: "ALSA 命令行 MIDI 文件播放器：通过 ALSA sequencer 播放 MIDI，也可用于测试 ALSA 客户端/端口"
+category: multimedia
+homepage: "https://www.parabola.me.uk/alsa/pmidi.html"
+license: GPL-2.0-only
+
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "config.guess（2015 版）不认识 HarmonyOS，需补 aarch64-unknown-linux-ohos 分支且必须 echo+exit"
+    - "config.sub（2015 版）需把 linux-ohos 加入 maybe_os 列表与 OS 白名单，否则被改写成 linux-gnu"
+    - "E011：configure 中 config.status 临时目录 umask 077→022（HMDFS 上 077 目录不可写）"
+    - "configure 试探程序运行期需 LD_LIBRARY_PATH 含依赖 lib 目录（alsa-lib 的 libasound/libatopology），否则报 cannot run C compiled programs"
+    - "pmidi 自带 src/glib.c 最小 GLib 子集，不声明 glib 依赖即可编译（WITH_INCLUDED_GLIB=1）"
+    - "OHOS 内核无 ALSA sequencer，播放/端口枚举在设备上不可用（平台能力限制，非适配缺陷）"
+  common_dependencies:
+    - alsa-lib
+
+versions:
+  "1.7.1":
+    status: built
+    build_date: "2026-10-13"
+    notes: "conan-verify 全通过；3 个补丁（config.guess / config.sub / configure-umask）；产物 bin/pmidi + man1/pmidi.1"
