@@ -1,0 +1,23 @@
+software: sqruff
+display: "sqruff"
+description: "高性能 SQL linter 与格式化器（Rust）"
+category: tool
+homepage: "https://github.com/quarylabs/sqruff"
+license: Apache-2.0
+build_system: cargo
+
+# 跨版本通用的 OHOS 适配知识
+ohos_adaptation:
+  key_points:
+    - "Rust workspace（edition 2024，MSRV 1.96）：cargo build --release --locked --bin sqruff；单一 CLI 二进制（lint/fix/parse/rules/templaters/lsp 子命令，LSP 内嵌）"
+    - "工具链与运行库全部来自 ohpcd 制品仓（tool_requires：rust-toolchain/1.97.1 + openssl/3.5.6.1.1）——cargo/rustc 私有拷贝 + 探测失败才 binary-sign-tool 自签名；cargo 的 libssl/libcrypto 由 openssl 静态 PIC 重链为私有 DSO；零外部 URL（不使用 harmonybrew bottle 下载，其固定 URL 随版本轮换必 404）"
+    - "私有 CARGO_HOME/config.toml：rsproxy.cn sparse 镜像 + multiplexing=false（cargo 链接的 libcurl 无 HTTP/2）+ CA；不落源码树、不写公共前缀（R49）"
+    - "上游测试在 build() 内真实执行：SQRUFF_SKIP_UNSUPPORTED_TEMPLATERS=1 cargo test --locked -j 4 --no-fail-fast --workspace --exclude sqruff-cli-python --exclude sqruff-wasm --tests（--tests 排除无 rustdoc 的 doc-tests；68 例 jinja/pyo3 用例按上游官方开关跳过并如实申报），计数硬门禁 + res/upstream_test_result.json 随包；test_package 重发 HMBS 标记并硬校验"
+  common_dependencies: []
+
+# 版本索引（所有已归档版本，含状态）
+versions:
+  "0.39.0":
+    status: built
+    build_date: "2026-10-12"
+    conan_ref: "sqruff/0.39.0"
