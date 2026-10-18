@@ -1,0 +1,23 @@
+package: poa/2.0-20060928
+homepage: "https://sourceforge.net/projects/poamsa/"
+upstream_check_command: "make -n check: no rule; README section II.A.3 contains one executable example"
+upstream_test_in_build: true
+upstream_test_command: "python3 test_package/cli_regression.py <poa> <source> <fixtures> <output>"
+upstream_tests:
+  - file: README
+    source: poaV2/README section II.A.3
+    description: "Unmodified README multidom example; gap placement compared to Debian reference"
+    command: "poa -read_fasta multidom.seq -clustal multidom.aln blosum80.mat"
+downstream_reference:
+  source: "https://deb.debian.org/debian/pool/main/p/poa/poa_2.0+20060928-8.debian.tar.xz"
+  files: [debian/test/multidom.clustal, debian/tests/run-unit-test, debian/tests/test_data]
+  scenarios: 6
+  note: "Debian regressions are downstream tests, not an upstream registered suite."
+test_package_tests:
+  - file: test.c
+    description: "Eight library scenarios: matrix, initialization, global/local alignment, callback, fusion, serialization, consensus, numeric data"
+    command: "test_poa <package>/share/poa/blosum80.mat"
+  - file: cli_regression.py
+    description: "17 CLI scenarios on both build output and installed CLI/data: 1 README reference, 6 Debian, 10 additional"
+    command: "python3 cli_regression.py <package>/bin/poa <package>/share/poa data packaged-cli-results"
+consensus_fixture_note: "12 residues; upstream heaviest_bundle.c rejects paths shorter than 10. Strict consensus assertions retained."

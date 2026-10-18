@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.15)
+project(poa_consumer LANGUAGES C)
+find_package(poa CONFIG REQUIRED)
+add_executable(test_poa test.c)
+target_link_libraries(test_poa PRIVATE poa::lpo)
+set_target_properties(test_poa PROPERTIES C_STANDARD 99)
