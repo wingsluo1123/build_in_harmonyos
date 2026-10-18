@@ -1,0 +1,231 @@
+#====================================================================
+# DRAFT-blur-effect-1.1.3-gbm-drm-offscreen-to-egl-pbuffer
+# OHOS 无 /dev/dri、无 libgbm ⇒ 把 gbm_create_device + gbm_surface 整条离屏
+# 路径换成 eglGetDisplay(EGL_DEFAULT_DISPLAY) + eglCreatePbufferSurface，
+# 并从 pkg-config 必需项里删掉 libdrm/gbm/egl/glesv2。
+# 触发事件: blur-effect 1.1.3 适配（archives/b/blur-effect，PR #16672）
+#
+# ★重复源披露（必读，勿据此判重复前先读完本条）：
+#   同一上游、同一份源码（sha256 80baead168e117cdbd7dd915dac94b8055e63dc05ec5797f
+#   3030acfaf19e5654）已由**已合入的姊妹配方** archives/b/blur/1.1.3 覆盖，
+#   该配方已发布到制品仓（revision 9addfb36f648f708107c9e8f716765a6）。
+#   本包 blur-effect/1.1.3 是**同一份源码的第二个归档实例**，补丁 0001/0002 与
+#   消费者测试与姊妹配方同源。
+#   ⚠ 但该机制**从未进过 knowledge/graph**：本条目是它的**图谱首次收录**，
+#     且首次把"离屏路径从 GBM+DRM 迁到 EGL pbuffer"写成可复用处方
+#     （含 pkg-config 必需项手术、pbuffer 尺寸与图像尺寸一致、GLES 严格性两处）。
+#====================================================================
+
+id:                     DRAFT-blur-effect-1.1.3-gbm-drm-offscreen-to-egl-pbuffer
+trigger_tool:           cmake|pkg-config|ld|runtime|conan
+phase:                  configure|link|runtime
+error_signature:        gbm\.h: No such file or directory|
+                         Package .*libdrm.* was not found in the pkg-config search path|
+                         Package .*gbm.* was not found in the pkg-config search path|
+                         undefined reference to .gbm_create_device|
+                         undefined reference to .gbm_surface_create|
+                         no card found|
+                         cannot create gbm surface|
+                         /dev/dri/card[0-9].*No such file or directory
+
+severity:               2
+category:               platform, ohos, graphics, egl, cmake, portability
+match_keywords:         gbm, gbm_create_device, gbm_surface_create, gbm_device,
+                         libgbm, libdrm, /dev/dri, DRM render node, card0,
+                         eglGetDisplay, EGL_DEFAULT_DISPLAY, EGL_PBUFFER_BIT,
+                         eglCreatePbufferSurface, pbuffer, 离屏渲染, offscreen,
+                         pkg_check_modules 必需项, GLES3 严格性, #version 首行,
+                         texture2D 移除, 无窗口系统
+
+title:                  OHOS 无 /dev/dri 与 libgbm：把 GBM+DRM 离屏路径整条换成
+                        EGL 默认显示 + pbuffer 表面，并从 pkg-config 必需项删掉
+                        libdrm/gbm/egl/glesv2；pbuffer 尺寸须与图像尺寸一致
+
+root_cause: >
+  **入口是"上游把离屏渲染绑死在 Linux 的 GBM + DRM 上"**，不是链路里少了某个包。
+  典型的 Linux 离屏 GL 写法（blur-effect 1.1.3 原文）分三步：
+    ① 探测并打开 DRM 渲染节点：扫 `/sys/class/drm/card*`、`open("/dev/dri/cardN")`；
+    ② `gbm_create_device(fd)` 建 GBM 设备；
+    ③ `gbm_surface_create(gbm, w, h, GBM_FORMAT_XRGB8888, GBM_BO_USE_SCANOUT|RENDERING)`
+       建缓冲，再 `eglGetDisplay(gbm)` + `eglCreateWindowSurface(..., gbm_surface, ...)`
+       把这个 GBM 表面当成 EGL 的原生窗口。
+  构建侧对应地把 libdrm/gbm/egl/glesv2 全列为 `pkg_check_modules(... REQUIRED ...)`。
+
+  到了 OHOS：
+    · **没有 `/dev/dri` 渲染节点**（`/sys/class/drm/card*` 也不存在）⇒ 步骤① 直接
+      走不下去，运行时表现为 `no card found`；
+    · **没有 libgbm** ⇒ 构建期 `gbm.h: No such file or directory`，
+      pkg-config 报 `Package 'gbm' was not found`；步骤②③ 无解；
+    · 系统 EGL/GLESv3 **不提供 `.pc` 描述文件**（是平台库，不是 pkg-config 模块）
+      ⇒ 即便 `.pc` 齐备也拿不到模块名，"照抄 Linux 的依赖清单"这条路本身就不通。
+
+  三个关键判断（都不显然）：
+    · **不要坚持原生 GBM/DRM 路线**：OHOS 无渲染节点，即使凑齐 `gbm.pc`/`libdrm.pc`
+      运行时也必挂；把预算花在"补齐 .pc"上是沉没成本。
+    · **EGL 默认显示在普通原生进程里可用**（`EGL_DEFAULT_DISPLAY` 可初始化），
+      但要 **pbuffer** 表面（不是 window surface），且配置必须选
+      `EGL_SURFACE_TYPE = EGL_PBUFFER_BIT`。
+    · **pbuffer 尺寸必须是图像尺寸**，不能图省事写死一个小尺寸——最终回读
+      （`glReadPixels`）在全图尺寸的默认帧缓冲上做，尺寸不符会越界读，表现为
+      大图输出错误或崩溃（本包历史上正是硬编码 64x64 踩过这个坑）。
+
+  同批的 GLES 严格性两处摩擦（换 pbuffer 后立刻暴露，与 GBM 无关）：
+    · `#version 300 es` **必须是着色器源码第一行**，前面不能有换行；
+    · GLSL ES 3.00 已移除 `texture2D`，须用 `texture`。
+
+affected_scope: >
+  **适用**：上游把**离屏**渲染/计算绑死在 GBM+DRM 上的命令行工具或库
+  （图像处理、无窗口的 GPU 计算、批处理渲染）。判断特征：源码里出现
+  `gbm_create_device` / `gbm_surface_create` / `/dev/dri/card`，或构建系统把
+  libdrm/gbm 列为硬依赖；**且该程序不需要窗口系统**。
+  **边界（重要）**：本条**不**覆盖"窗口系统 + GL 上下文"型库/框架（freeglut、
+  GLUT 系、GUI 工具包）——那类需要新写平台后端并清点平台层契约函数，属另一条
+  既有条目的适用面（见 similar_to 的 E2090，其 affected_scope 明确把
+  "纯 shader/GLES2 且不自建窗口的应用"排除在本条所属的一侧）。
+  **代价**：失去 DRM 侧的 buffer 导出与显式设备选择（`-d drmdev` 这类选项随之
+  移除）；无法在无 EGL 默认显示的环境里指定替代显示。
+
+verification_cmd:       # ① 判平台能力（决定走 EGL 还是白折腾）
+                        ls /dev/dri 2>/dev/null; ls /sys/class/drm 2>/dev/null      # 期望：都不存在
+                        pkg-config --exists gbm libdrm egl glesv2; echo $?          # 期望：非 0
+                        # ② 判原生路线是否值得留
+                        conan install --requires=mesa/<ver> --build=never -pr:h=<ohos> -pr:b=<ohos>
+                        # ③ 换完跑端到端
+                        <bin> in.png -o out.png     # 断言输出为合法 PNG、尺寸不变、内容确已模糊
+
+verification_evidence:  blur-effect 1.1.3 消费者测试：2 个用例（32x32、256x256）×
+                        5 条断言 = 10 条断言全部通过（真 PNG → 真渲染 → 输出校验：
+                        合法 PNG、尺寸不变、内容确已变化）；小图输出 342 B PNG、
+                        大图输出 15855 B PNG。原生 GBM/DRM 路线探针实测不可行：
+                        `conan install --requires=mesa/24.3.4.1.1.1 --build=never` 首错
+                        `ERROR: Missing prebuilt package for 'libxrender/0.9.12'`
+                        ⇒ 缓存内检不到 gbm.pc/glesv2.pc/egl.pc/libdrm.pc。
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           replace-gbm-drm-offscreen-path-with-egl-default-display-pbuffer
+rec_description: >
+  两步同时做，缺一不可：
+  **构建侧**：从 `pkg_check_modules(... REQUIRED gdk-pixbuf-2.0 libdrm gbm egl glesv2)`
+  里**删掉 libdrm/gbm/egl/glesv2**（平台不提供这四个 .pc），保留真正来自 pkg-config
+  的模块；链接行改为**直链平台库** `EGL GLESv3`，并把 pkg-config 给出的库目录补进
+  `link_directories(${DEPS2_LIBRARY_DIRS})`，否则其余模块的 `-L` 进不了链接搜索路径。
+  **源码侧**：删掉 DRM 设备探测（`/sys/class/drm/card*` 扫描、`open("/dev/dri/cardN")`、
+  `choose_best_card`）与 GBM 设备/表面字段；`setup_context()` 改为
+    `ctx.display = eglGetDisplay(EGL_DEFAULT_DISPLAY)`
+    → `eglInitialize` → `eglBindAPI(EGL_OPENGL_ES_API)`
+    → 配置属性用 `EGL_SURFACE_TYPE, EGL_PBUFFER_BIT`
+    → `eglCreatePbufferSurface(display, conf, {EGL_WIDTH, ctx.width, EGL_HEIGHT,
+       ctx.height, EGL_NONE})` → `eglMakeCurrent(display, surf, surf, ctx)`
+  并把随之失效的 CLI 选项（如 `-d drmdev`）一并移除、`usage()` 同步。
+  三条落地约束：
+    ① **pbuffer 必须按图像尺寸创建**（不能写死小尺寸，否则全图尺寸的
+       `glReadPixels` 回读越界）；
+    ② **`#version 300 es` 必须在着色器源码第一行**（改用 `R"(#version 300 es` 紧贴）；
+    ③ GLSL ES 3.00 用 `texture` 替代已移除的 `texture2D`。
+rec_command: |
+  # 构建侧（CMakeLists.txt）
+  - pkg_check_modules(DEPS2 REQUIRED gdk-pixbuf-2.0 libdrm gbm egl glesv2)
+  + pkg_check_modules(DEPS2 REQUIRED gdk-pixbuf-2.0)
+  + link_directories(${DEPS2_LIBRARY_DIRS})
+  - target_link_libraries(blur_image ${DEPS2_LIBRARIES})
+  + target_link_libraries(blur_image ${DEPS2_LIBRARIES} EGL GLESv3)
+
+  # 源码侧（setup_context()）
+  - ctx.fd = open(card, O_RDWR|O_CLOEXEC|O_NONBLOCK);
+  - ctx.gbm = gbm_create_device(ctx.fd);
+  - ctx.gbm_surface = gbm_surface_create(ctx.gbm, w, h, GBM_FORMAT_XRGB8888, ...);
+  - ctx.display = eglGetDisplay(ctx.gbm);
+  - ctx.surface = eglCreateWindowSurface(ctx.display, conf, (EGLNativeWindowType)ctx.gbm_surface, NULL);
+  + ctx.display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+  + eglInitialize(ctx.display, &major, &minor);
+  + /* 配置：EGL_SURFACE_TYPE, EGL_PBUFFER_BIT */
+  + const EGLint pb_att[] = { EGL_WIDTH, ctx.width, EGL_HEIGHT, ctx.height, EGL_NONE };
+  + ctx.surface = eglCreatePbufferSurface(ctx.display, conf, pb_att);
+rec_auto_fix:           false
+rec_impl:               source-plus-build-system-patch
+
+applicability:          适合：上游把**离屏**渲染/计算绑死在 GBM+DRM 上的命令行工具或库
+                        （图像处理、无窗口 GPU 计算、批处理渲染），且该程序不需要窗口系统。
+                        判据 = 源码出现 gbm_create_device / gbm_surface_create /
+                        /dev/dri/card，或构建系统把 libdrm/gbm 列为硬依赖。
+counterexamples:        窗口系统 + GL 上下文型库/框架（freeglut / GLUT 系 / GUI 工具包）
+                        → 属 E2090 的适用面（需新写平台后端 + 清点平台层契约函数），
+                        本条只换离屏表面，不解决窗口/事件/光标语义；
+                        需要 DRM 的 buffer 导出或显式设备选择 → 本条主动放弃该能力；
+                        纯 GLES2 且用直连导出符号渲染 → 另见 E2089（直连符号是调度空桩，
+                        真函数须经 eglGetProcAddress），本条不覆盖该失败面。
+
+fallback_priority:      2
+fallback_approach:      keep-egl-but-create-context-surfaceless-with-EGL_KHR_surfaceless_context
+fallback_description: >
+  若目标 EGL 实现确实不提供 pbuffer 配置，可退为
+  `EGL_KHR_surfaceless_context` + 不绑定任何表面（`eglMakeCurrent(display,
+  EGL_NO_SURFACE, EGL_NO_SURFACE, ctx)`）后直接渲染到 FBO。
+  代价：多一层 FBO 管理，且需要先确认扩展真的存在（`eglQueryString(display,
+  EGL_EXTENSIONS)` 里查 `EGL_KHR_surfaceless_context`），不能假定。
+fallback_command:       eglQueryString(ctx.display, EGL_EXTENSIONS) | grep EGL_KHR_surfaceless_context
+fallback_auto_fix:      false
+fallback_impl:          surfaceless-fbo-rendering
+
+forbid_1_pattern:       补齐\s*(gbm|libdrm)\.pc|为\s*gbm\s*做.{0,12}包|装\s*libgbm.{0,12}适配|保留.{0,10}GBM.{0,10}原生路线
+forbid_1_reason:        OHOS 没有 `/dev/dri` 渲染节点、也没有 libgbm；把预算花在
+                        "补齐 .pc 描述文件 / 造一个 libgbm 包"上，运行时仍然必然失败
+                        （没有任何渲染节点可供打开），属结构性沉没成本。
+forbid_1_consequence:   先在构建期"凑齐依赖"让编译过，再在运行期以 `no card found`
+                        之类信息失败；失败点从构建期漂移到运行期，且看起来像设备问题。
+forbid_2_pattern:       EGL_WIDTH,\s*(64|32|16)\b|pbuffer.{0,20}固定(小)?尺寸|hardcode.{0,15}pbuffer
+forbid_2_reason:        最终回读（glReadPixels）在全图尺寸的默认帧缓冲上做，
+                        pbuffer 写死小尺寸会导致越界读，小图恰好过、大图才炸
+                        （本包 256x256 用例正是为抓这个而加）。
+forbid_2_consequence:   小尺寸用例全绿、大尺寸用例输出错乱或崩溃，回归面被"样例选小了"掩盖。
+
+similar_to:             [E2090, E2089, E1493, E754]
+dedup_notes: >
+  ★权威源 = upstream/main 的 knowledge/graph/（2297 条 E*.kv，git archive 抽出后
+  keygrep，排除 index.tsv）。实测命中数：
+    · "gbm_create_device" = 0；"gbm_surface" = 0；"libgbm" = 0；"/dev/dri" = 0
+      ⇒ **GBM/DRM 离屏入口这一侧图谱完全无先例**（本条的入口面）
+    · "eglGetDisplay" = 3 → E2089 / E2090 / E754
+    · "PbufferSurface" = 3 → E2089 / E2090 / E276
+    · "EGL_DEFAULT_DISPLAY" = 2 → E2089 / E2090
+    · "pbuffer" = 4 → E1493 / E2089 / E2090 / E276
+  最相似 = **E2090**（"OHOS 无 X11/Wayland/Android-glue，但普通原生进程即可用 EGL
+  离屏（EGL_DEFAULT_DISPLAY + EGL_KHR_surfaceless_context + pbuffer）——窗口工具库
+  可据此移植"）。**必须说清边界**：E2090 讲的是"**平台能力**已具备 + 窗口型框架
+  该新写平台后端"，其入口是编译期 `X11/Xlib.h file not found`、其判据是平台层契约
+  函数清点（freeglut 契约 46 个 vs EGL 层 3 个），并**明确把"纯 shader/GLES2 且
+  不自建窗口的应用"排除在自己的适用面之外**；本条讲的正是被它排除的那一侧——
+  **入口是 `gbm_create_device`/`gbm_surface_create`/`/dev/dri` 缺失**，处方是
+  "整条离屏路径换成 pbuffer + pkg-config 必需项手术"，不涉及窗口/事件/光标语义。
+  换言之：E2090 是"能不能用 EGL 离屏"的可行性判据，本条是"已经用着 GBM 的离屏
+  程序怎么迁到 EGL 离屏"的迁移处方；两条互补而非重复。
+  次相似 = **E2089**（OHOS `libGLESv2.so` 直连导出符号是调度空桩，真函数须经
+  `eglGetProcAddress`）：本条的被测程序用 GLES**3**、且经 EGL 上下文正常取函数，
+  与"直连 GLESv2 导出符号"是不同失败面，作为边界引用。
+  另 = **E754**（libepoxy 的 EGL 启用修订）与 **E1493**（gl4es 补桌面 GL）都涉及
+  EGL/GLES，但一条是分发库的构建选项、一条是固定管线兼容层，均非离屏表面迁移。
+  ⚠ **重复源披露（已写入本条 .kv 头部与 .md）**：同一上游同一份源码已由已合入姊妹
+  配方 archives/b/blur/1.1.3 覆盖且已发布制品仓（revision
+  9addfb36f648f708107c9e8f716765a6）；该机制**从未进 knowledge/graph**，
+  本条目是其**图谱首次收录**，本包为**第二归档实例**。
+resolution: >
+  落地于 archives/b/blur-effect/1.1.3/patches/0001-CMakeLists.txt.patch 与
+  0002-src-blur_image.cc.patch，消费者测试 test_package/test.sh 断言
+  2 用例 × 5 断言 = 10 条全过。
+
+doc_file:               knowledge/drafts/DRAFT-blur-effect-1.1.3-gbm-drm-offscreen-to-egl-pbuffer.md
+last_updated:           2026-10-18
+source_event:           blur-effect 1.1.3 适配：上游 GBM+DRM 离屏路径在 OHOS 上
+                        构建期 `gbm.h: No such file or directory` / pkg-config 找不到
+                        libdrm/gbm，原生路线探针亦不可行
+authors:                wanderlust_0823
+source_pr:              16672
+source_commit:
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     0.85
+metrics_last_used:      2026-10-18
+
+draft:                  true
