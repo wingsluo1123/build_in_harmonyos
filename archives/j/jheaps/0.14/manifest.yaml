@@ -1,0 +1,24 @@
+software: jheaps
+version: "0.14"
+status: built
+build_date: "2026-10-14"
+build_system: maven
+compiler: "OpenJDK 17.0.13 (BiSheng) + Apache Maven 3.8.6"
+source:
+  url: "https://github.com/d-michail/jheaps/archive/refs/tags/jheaps-0.14.tar.gz"
+  sha256: "e09aa581818a220257d3ab17e3a6c54fefe8d1419228c40536eb5514a7fb3022"
+  tar_format: tar.gz
+build:
+  system: maven
+  configure_options: []
+  build_options: "mvn -B -Dstyle.color=never -Duser.home=<build> -Dmaven.repo.local=<build>/m2-repository -Dmaven.javadoc.skip=true clean package"
+  dependencies:
+    - "jdk >= 17 (BiSheng bishengjdk17, conandata build_tools.bisheng_jdk)"
+    - "maven >= 3.8 (Apache Maven 3.8.6, conandata build_tools.maven)"
+patches_applied:
+  - "0001-jdk17-felix-bundle-plugin-compat.patch"
+knowledge_gained:
+  - "maven-bundle-plugin 4.2.1 (bnd 5.2) 在 JDK 9+ 抛 ConcurrentModificationException（FELIX-6259/JDK-8176894），属性升到 5.1.9 修复，OSGi 指令不变"
+  - "OHOS 设备 JVM user.home='?'，须 -Duser.home + -Dmaven.repo.local 钉进构建目录"
+  - "上游 jacoco 0.75 覆盖率门绑在 verify；用 clean package（test+jar）避开，测试与产物口径不变"
+  - "上游测试静态 @Test=428 经 JUnit 继承扇出为 51 套件 1391 执行用例（8 个抽象基类在每个具体子类重跑）"
