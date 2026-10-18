@@ -1,0 +1,50 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: kmines/26.04.0
+homepage: "https://invent.kde.org/games/kmines"
+
+# 上游测试清点（R51 第一步）：kmines 26.04.0 未注册任何测试（0 用例）。
+# 证据：
+#   - 解包树中不存在任何名称含 test 的文件或目录
+#     （find . -iname "*test*" 返回空；无 tests/、autotests/、test/）；
+#   - 递归检查全部 CMakeLists.txt 与 *.cmake：
+#     add_test / ecm_add_test / enable_testing / BUILD_TESTING / ctest
+#     均无命中，顶层未 add_subdirectory(tests)；
+#   - .kde-ci.yml 的 require-passing-tests-on 列出
+#     Linux/FreeBSD/Windows，但项目未注册任何测试目标；
+#   - .gitlab-ci.yml 仅引入 KDE 共享 CI 模板，无自建测试作业。
+upstream_test_in_build: false
+upstream_check_command: "(none — 上游未注册任何测试目标，无 ctest 可执行)"
+upstream_test_command: "(none — 上游 0 用例，见上方清点证据)"
+upstream_tests: []
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: main.cpp
+    description: >-
+      消费者端到端套件 4 用例、约 29 个检查点（每用例输出独立
+      TEST PASS / TEST FAIL 行，末尾 TEST SUMMARY 汇总，main() 在任一
+      用例失败时以 1 退出）：(1) installed_binary_version —— 离屏执行
+      安装后的 bin/kmines --version，要求退出码 0 且输出含 kmines 与上游
+      版本串 4.0.26040（KMINES_VERSION = "4.0." + 不补零的 compact 版本
+      26/04/0）；(2) theme_discovery —— KGameThemeProvider::
+      discoverThemes("themes") 经 QStandardPaths::AppDataLocation 发现
+      安装到 share/kmines/themes 的六套主题，逐一检查 graphicsPath 存在、
+      大小 > 1000 字节且首三字节为 gzip 魔数 1f 8b 08（SVGZ）；
+      (3) theme_sprite_render —— KGameRenderer::spriteExists("mainWidget")
+      为真，spritePixmap("mainWidget", 64x64) 返回非空 64x64 QPixmap，
+      走真实 SVGZ -> QSvgRenderer -> QPixmap 渲染链路；(4) app_boot ——
+      以隔离 HOME 离屏启动安装的 kmines，要求启动链路取得进展：进程
+      存活满 5 秒，或（在无 DBus 会话总线的镜像上）以 KDBusAddons 的
+      "DBus session bus not found" 精确诊断退出——后者证明 ELF/Qt/KF6
+      加载链已完整走完，任何其他早退均判失败。被测二进制由配方
+      package() 内完成 DT_NEEDED 规范化与自签名，测试直接运行该制品，
+      不改写 Conan 缓存中的包目录。真机结果：TEST SUMMARY:
+      4 passed, 0 failed；conan create 完整通过。
+    command: "./kmines_consumer_test"
+
+# 测试检查点总数（近似值，用于质量评估）
+assertion_count: 29
