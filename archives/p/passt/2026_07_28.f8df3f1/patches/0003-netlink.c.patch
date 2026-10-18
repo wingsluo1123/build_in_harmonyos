@@ -1,0 +1,29 @@
+--- a/netlink.c
++++ b/netlink.c
+@@ -20,20 +20,26 @@
+ #include <limits.h>
+ #include <unistd.h>
+ #include <signal.h>
+ #include <stdlib.h>
+ #include <stdbool.h>
+ #include <stdint.h>
+ #include <arpa/inet.h>
+ #include <netinet/in.h>
+ #include <netinet/if_ether.h>
+ #include <net/if_arp.h>
++
++/* Prevent linux/socket.h from redefining sockaddr_storage */
++#ifndef _UAPI_LINUX_SOCKET_H
++#define _UAPI_LINUX_SOCKET_H
++typedef unsigned short __kernel_sa_family_t;
++#endif
+
+ #include <linux/netlink.h>
+ #include <linux/rtnetlink.h>
+
+ #include "util.h"
+ #include "passt.h"
+ #include "log.h"
+ #include "ip.h"
+ #include "netlink.h"
+ #include "epoll_ctl.h"
