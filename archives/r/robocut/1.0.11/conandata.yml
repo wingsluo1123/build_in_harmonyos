@@ -1,0 +1,16 @@
+# conandata.yml — robocut 1.0.11
+# 上游 tag: v1.0.11 (github.com/Timmmm/robocut, commit 37bb8aa303016326fcf74fcd7157b7e6d3bf8f28)
+# 归档 URL 为 GitHub tag 自动 tarball，两次独立下载 sha256 一致（实测）。
+
+sources:
+  url: "https://github.com/Timmmm/robocut/archive/refs/tags/v1.0.11.tar.gz"
+  sha256: "4ddd1255cb94f45d403e95aa4e3cea54d2d9d7dfc473cc7b56dab880e90db95a"
+
+# 上游 Robocut.pro 只声明 `QT += svg`，但全部源码使用 QtWidgets 类
+# （QApplication/QMainWindow/QDialog/QFileDialog/QMessageBox/QPushButton…）；
+# Qt5 的默认 QT 是 `core gui`（mkspecs/features/spec_pre.prf），svg 模块
+# depends=core gui 也不含 widgets → 不显式声明时 <QApplication> 等头文件
+# 找不到（实测 `fatal error: 'QApplication' file not found`）。
+patches:
+  "1.0.11":
+    - patch_file: "patches/0001-Robocut.pro-add-qt-widgets.patch"

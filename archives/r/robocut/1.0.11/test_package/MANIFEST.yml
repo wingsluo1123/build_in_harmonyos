@@ -1,0 +1,30 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: robocut/1.0.11
+homepage: "https://github.com/Timmmm/robocut"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（R51 清点：robocut 1.0.11 上游无任何测试）
+#   - tarball 54 个条目里无 test/ tests/ 目录，无 tst_* / *_test 文件
+#   - Robocut.pro 无 TEST/check 目标、无 QT += testlib；qmake 生成的 Makefile 中
+#     `make check` 是 qmake 默认空目标（check: first），无任何用例被构建或运行
+#   - 清点命令：tar tzf v1.0.11.tar.gz | grep -Ei 'test' → 0 命中
+# 故上游 N = 0（TOTAL=0，PASS=0，FAIL=0，SKIP=0，NOT_RUN=0），N′ = 0。
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证；鸿蒙特有测试，不计入上游分母)
+test_package_tests:
+  - file: test.sh
+    description: "消费者冒烟：conanrun 环境下实跑 bin/robocut，断言 A1 二进制在 PATH、A2 --version rc=0 且自报 1.0.11、A3 --help rc=0 且打印 Usage"
+    command: "test.sh"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 3
