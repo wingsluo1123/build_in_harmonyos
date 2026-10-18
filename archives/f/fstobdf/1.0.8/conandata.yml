@@ -1,0 +1,28 @@
+# conandata.yml - fstobdf 1.0.8
+#
+# 上游官方源（R39）：两个 URL 均为 x.org 官方宿主，实测提供字节相同的 tarball。
+# www.x.org 走 301 重定向到 xorg.freedesktop.org（本机 curl -sSL 实测
+# HTTP=200 SIZE=129208 URL=https://xorg.freedesktop.org/archive/individual/app/fstobdf-1.0.8.tar.xz）。
+# url 写成列表是有意为之：单值镜像改写路径会把 x.org 网址指向死镜像。
+# 两个副本 sha256 实测相等：69be41c4d5093bbc3f04c9af6fa9497ad8e931e8d3f687412a66885fe81aa46d
+sources:
+  url:
+    - "https://www.x.org/releases/individual/app/fstobdf-1.0.8.tar.xz"
+    - "https://xorg.freedesktop.org/archive/individual/app/fstobdf-1.0.8.tar.xz"
+  sha256: "69be41c4d5093bbc3f04c9af6fa9497ad8e931e8d3f687412a66885fe81aa46d"
+
+# 两件补丁都作用在上游随 tarball 分发的 autotools 分发脚本上（configure /
+# config.guess），不注入任何平台预处理器宏（R8 / PF5），上游 C 源码零改动。
+#
+# 为什么只有两件（而不是同族的 config.guess + config.sub + configure 三件）：
+#   * config.sub：本 1.0.8 tarball 自带的是较新版本，实测
+#     `./config.sub aarch64-unknown-linux-ohos` -> rc=0 且原样回显该三元组
+#     （其 OS 白名单已含 `ohos*`、内核-OS 白名单已含 `linux-ohos*`），
+#     因此不需要 config.sub 补丁。
+patches:
+  - patch_file: "patches/0001-config.guess.patch"
+    patch_description: "config.guess: recognize `uname -s = HarmonyOS` and emit aarch64-unknown-linux-ohos (E007); without it configure aborts with 'cannot guess build type; you must specify one'"
+    patch_type: "portability"
+  - patch_file: "patches/0002-configure-hmdfs-pwd-tmpdir.patch"
+    patch_description: "configure: fall back to $PWD when `pwd` (getcwd) fails on HMDFS ('cannot access parent directories' -> 'working directory cannot be determined'), and create config.status's scratch dir with umask 022 + mkdir + chmod 755 instead of umask 077 + mktemp -d, which yields a 700 dir HMDFS refuses to write ('./confXXXXXX/subs1.awk: Permission denied') (E386/E129/E110/E112)"
+    patch_type: "portability"
