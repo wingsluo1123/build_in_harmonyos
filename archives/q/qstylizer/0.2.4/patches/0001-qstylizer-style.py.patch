@@ -1,0 +1,65 @@
+--- a/qstylizer/style.py
++++ b/qstylizer/style.py
+@@ -1,16 +1,17 @@
+ # coding: utf-8
+ 
+ import re
+ import copy
+ import collections
+ import inflection
++import tinycss2
+ 
+ import qstylizer.descriptor.prop
+ import qstylizer.descriptor.subcontrol
+ import qstylizer.descriptor.pseudostate
+ import qstylizer.descriptor.pseudoprop
+ import qstylizer.descriptor.qclass
+ import qstylizer.descriptor.stylerule
+ 
+ 
+ QPROPERTIES = qstylizer.descriptor.prop.PropParent.get_attr_options()
+@@ -117,31 +118,39 @@
+         ):
+             key = inflection.underscore(key)
+ 
+         if key and key[0] != "[":
+             key = key.replace("not_", "!").replace(":", "").replace("_", "-")
+ 
+         return key
+ 
+     @staticmethod
+     def _sanitize_value(value):
+-        """Strip the value of any semi-colons.
++        """Strip trailing declaration semi-colons, preserving literal values.
+ 
+         :param value: A value of any type
+ 
+         """
+         try:
+-            if type(value) in [str, unicode]:
+-                return value.replace(";", "")
++            string_types = [str, unicode]
+         except NameError:
+-            if type(value) in [str, bytes]:
+-                return value.replace(";", "")
++            string_types = [str]
++
++        if type(value) in string_types:
++            tokens = tinycss2.parse_component_value_list(value)
++            end = len(value.rstrip())
++            while tokens and tokens[-1].type == "whitespace":
++                tokens.pop()
++            while tokens and tokens[-1].type == "literal" and tokens[-1].value == ";":
++                value = value[:end - 1] + value[end:]
++                end -= 1
++                tokens.pop()
+ 
+         return value
+ 
+     def find_or_create_child_rule(self, name):
+         """Find or create a child rule from a string key.
+ 
+         If the key rule already exists, return the rule.
+         If there is a comma in requested key, return a StyleRuleList object.
+         Otherwise create rules from the style rule names in the key and return
+         the top level rule or property.
