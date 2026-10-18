@@ -1,0 +1,35 @@
+# 版本级 manifest — uanytun 0.3.7（AI 元数据）
+software: "uanytun"
+version: "0.3.7"
+status: built
+build_date: "2026-10-16"
+build_system: makefile
+
+source:
+  url: "https://anytun.org/download/uanytun-0.3.7.tar.gz"
+  sha256: "076318c771c908386c4408dda0769171542da701785302903641ce23fd33a295"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options:
+    - "--target=Linux"
+    - "--prefix=$PREFIX"
+    - "--use-clang"
+    - "--no-manpage"
+    - "--no-examples"
+  dependencies:
+    - "libgcrypt/1.11.0"
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "uanytun 随源码自带手写 src/configure（非 autotools）：它把环境变量 CFLAGS/LDFLAGS 直接拼进 include.mk，拼接处没有空格（CFLAGS=$CFLAGS'-g -O2'），传参必须以空格结尾，否则 -I<dir>-g 粘连导致 gcrypt.h not found"
+  - "该 configure 把 CC 写死为裸 clang（--use-clang）或 gcc，不支持 --host/--build 交叉三元组；交叉编译靠 conan profile 的 buildenv PATH 或 make 命令行覆盖 CC=<绝对路径>"
+  - "gcrypt.h 会 #include <gpg-error.h>，因此链接 libgcrypt 的包必须同时把传递依赖 libgpg-error 的 include 目录加进 CFLAGS"
+  - "src/Makefile 无 check 目标，上游没有测试套件；验证只能靠 test_package 真实执行二进制"
+  - "configure --target=Linux 时用符号链接把 src/linux/tun.c 挂到 src/tun.c，OHOS 设备侧 /dev/net/tun 缺失不影响编译与 --version/--help"
+
+patch_classification: []
