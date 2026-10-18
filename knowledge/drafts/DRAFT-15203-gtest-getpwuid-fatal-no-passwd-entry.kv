@@ -1,0 +1,39 @@
+# DRAFT-15203: 容器 uid 不在 /etc/passwd 时 g_test 二进制 FATAL 启动崩溃（纯 C shim 解法）
+id:                     DRAFT-15203
+trigger_tool:           test
+phase:                  testing
+error_signature:        Bail out!|Signal 6 \(core dumped\)|TAP version 14.*random seed.*(无后续用例输出)
+severity:               3
+category:               platform, ohos
+match_keywords:         getpwuid_r, g_get_user_name, passwd, Signal 6, LD_PRELOAD, Error relocating, g_test, TAP
+title:                  容器 uid 不在 /etc/passwd 时，调用 g_get_user_name() 的 g_test 二进制 FATAL 启动崩溃、零用例执行
+root_cause:             容器 uid（如 20020090）不在 /etc/passwd；g_test 二进制的 main 若调用 g_get_user_name()/g_get_home_dir()（如 totem-plparser 测试 main 的 check_http() → g_get_user_name()），glib 的 g_get_user_name_real 在 getpwuid_r 失败时 FATAL：进程在注册用例前 abort（Signal 6），日志只有 TAP 头 + random seed，零用例执行；LD_PRELOAD 的 .so 若带 libc 外符号则子进程（如 videosite 派生的 /bin/sh）继承后 relocation 错误死亡（rc=127）
+affected_scope:         uid 不在 /etc/passwd 的容器环境中、main 调用 g_get_user_name()/g_get_home_dir() 的所有 g_test 二进制（GNOME 系测试套件）
+verification_cmd:       nm -D libshim.so 应只导出 getpwuid_r（U 仅 libc）；LD_PRELOAD=libshim.so HOME=$HOME ./parser 应输出 TAP 用例而非 Signal 6
+rec_priority:           1
+rec_approach:           ldpload-getpwuid-shim
+rec_description:        LD_PRELOAD 纯 C getpwuid_r 拦截器（返回合成条目 pw_name="user"、pw_dir=$HOME、返回 0），.so 只允许带 libc 符号
+rec_auto_fix:           false
+rec_impl:
+fallback_priority:      2
+fallback_approach:
+fallback_description:
+fallback_command:
+fallback_auto_fix:      false
+fallback_impl:
+principles:
+causes:                 []
+caused_by:              []
+similar_to:             []
+conflicts_with:         []
+prerequisite_of:        []
+doc_file:               drafts/DRAFT-15203-gtest-getpwuid-fatal-no-passwd-entry.md
+last_updated:           2026-10-16
+source_event:           totem-pl/3.26.7 OHOS 适配（2026-10-16，OHOS 真机 aarch64）
+authors:                gcw_Pp8UzTBn <2280277721@qq.com>
+source_pr:
+source_commit:
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:

@@ -1,0 +1,33 @@
+# 版本级 manifest — totem-pl 3.26.7
+# 遵循 ARCHIVE-SPEC v3.0 §4.2
+# CI 不读取此文件（spec §6：仅人类交叉校验）；权威配方为 conanfile.py / conandata.yml
+
+version: "3.26.7"
+status: built
+build_date: "2026-10-16"
+conan_ref: "totem-pl/3.26.7"
+
+source:
+  url: "https://download.gnome.org/sources/totem-pl-parser/3.26/totem-pl-parser-3.26.7.tar.xz"
+  sha256: "60d517c1acabe54ae337f64451264fc76730696eaae26b5480fb37166689b5f3"
+  tar_format: tar.xz
+
+build:
+  system: meson
+  configure_options:
+    - "-Dintrospection=false"
+    - "-Ddefault_library=shared"
+  dependencies:
+    - glib/2.84.0.2
+    - libxml2/2.15.3.1
+    - libarchive/3.8.7
+    - uchardet/0.0.7
+    - libgcrypt/1.12.2
+    - "zlib/1.3.1.1 (override: 消解 glib→zlib/1.3.2 与 libarchive→zlib/1.3.1.1 冲突)"
+
+patches_applied: []
+
+knowledge_gained:
+  - "DRAFT-15201: OHOS 无 shared-mime-info MIME 数据库，构建最小 globs+magic+subclasses 并经 XDG_DATA_HOME/set_mime_dirs 注入（magic 文件须带 MIME-Magic\0\n 头）"
+  - "DRAFT-15202: meson install rpath fixup 在 hmdfs 上 in-place 重写 .so 损坏 ELF（dlopen EACCES），package() sha256 校验+重拷"
+  - "DRAFT-15203: 容器 uid 不在 /etc/passwd 时 g_get_user_name() 使 g_test FATAL（Signal 6 零用例），纯 C LD_PRELOAD getpwuid_r 拦截（.so 禁带 glib 符号）"
