@@ -1,0 +1,38 @@
+# test_package/MANIFEST.yml — skiboot 7.0 上游测试声明
+package: skiboot/7.0
+homepage: "https://github.com/open-power/skiboot"
+
+# 上游测试命令（external/* 为 skiboot 的宿主机工具测试套件）
+upstream_check_command: "make -C external/{pflash,gard,ffspart} check; make ccan-check secvar-check hw-ipmi-check libstb/test/run-stb-container-check libc/test/run-{snprintf,memops,stdlib,ctype}-check libflash/test/test-{ipmi-hiomap,blocklevel,flash,ecc}-check core/test/run-*-check"
+
+# conanfile.py build() 已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "make -C external/{pflash,gard,ffspart} check; make ccan-check secvar-check hw-ipmi-check libstb/test/run-stb-container-check libc/test/run-{snprintf,memops,stdlib,ctype}-check libflash/test/test-{ipmi-hiomap,blocklevel,flash,ecc}-check core/test/run-*-check"
+
+# 上游实际运行的测试程序（共 84 例：external 37 + 宿主机单测 47）
+upstream_tests:
+  - file: external/pflash/test/test-pflash
+    source: skiboot-7.0/external/pflash/test/test-pflash
+    description: "pflash 镜像工具套件：usage/info/erase/erase-parts/program-rand/bad-numbers/miscprint（7 例）"
+    command: "make -C external/pflash check"
+  - file: external/gard/test/test-gard
+    source: skiboot-7.0/external/gard/test/test-gard
+    description: "opal-gard GARD 分区套件：list/show/usage/create/clear（12 例）"
+    command: "make -C external/gard check"
+  - file: external/ffspart/test/test-ffspart
+    source: skiboot-7.0/external/ffspart/test/test-ffspart
+    description: "ffspart FFS/PNOR 生成套件：参数/shape/TOC/边界（18 例）"
+    command: "make -C external/ffspart check"
+  - file: Makefile.check（ccan/core/libc/libflash/libstb/secvar/hw-ipmi）
+    source: skiboot-7.0/{ccan,core,libc,libflash,libstb}/test/Makefile.check
+    description: "宿主机单元测试：ccan 15 + core 15 + libc 4 + libflash 4 + libstb 1 + secvar 7 + hw/ipmi 1（47 例）"
+    command: "make ccan-check secvar-check hw-ipmi-check libstb/test/run-stb-container-check libc/test/run-{snprintf,memops,stdlib,ctype}-check libflash/test/test-{ipmi-hiomap,blocklevel,flash,ecc}-check core/test/run-*-check"
+
+# test_package 中的消费者测试
+test_package_tests:
+  - file: test_ohos.py
+    description: "鸿蒙特有：AArch64/musl ELF、ARCH_ARM 后端选择、符号/版本字符串；可执行时追加 ffspart→pflash 全流程（沙箱禁止执行时降级为 26 项静态断言）"
+    command: "python3 test_ohos.py <package_folder>"
+
+# 断言总数：上游 84 + 消费者 38（运行模式）/ 26（静态降级）
+assertion_count: 122

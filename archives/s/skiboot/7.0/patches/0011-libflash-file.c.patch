@@ -1,0 +1,34 @@
+--- a/libflash/file.c
++++ b/libflash/file.c
+@@ -183,27 +183,29 @@
+ 	struct stat st;
+ 
+ 	if (asprintf(&path, "/proc/self/fd/%d", file_data->fd) == -1)
+ 		return FLASH_ERR_MALLOC_FAILED;
+ 
+ 	if (lstat(path, &st)) {
+ 		free(path);
+ 		return FLASH_ERR_PARM_ERROR;
+ 	}
+ 
+-	lpath = malloc(st.st_size + 1);
++	/* OHOS procfs reports a fixed st_size for /proc/self/fd links, so it
++	 * cannot be used to size the readlink() buffer. */
++	lpath = malloc(PATH_MAX);
+ 	if (!lpath) {
+ 		free(path);
+ 		return FLASH_ERR_MALLOC_FAILED;
+ 	}
+ 
+-	len = readlink(path, lpath, st.st_size +1);
++	len = readlink(path, lpath, PATH_MAX - 1);
+ 	if (len == -1) {
+ 		free(path);
+ 		free(lpath);
+ 		return FLASH_ERR_PARM_ERROR;
+ 	}
+ 	lpath[len] = '\0';
+ 
+ 	*name = lpath;
+ 
+ 	free(path);

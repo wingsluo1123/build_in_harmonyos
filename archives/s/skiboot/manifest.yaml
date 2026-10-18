@@ -1,0 +1,27 @@
+# 软件级 manifest — skiboot
+software: skiboot
+display: "skiboot (OPAL)"
+description: "OpenPOWER OPAL 固件及其用户态工具集（pflash/opal-gard/ffspart/XSCOM）"
+category: system
+homepage: "https://github.com/open-power/skiboot"
+license: Apache-2.0 OR GPL-2.0-or-later
+
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "固件本体为 ppc64 专属（-mcpu=power8 + PowerPC 汇编），OHOS/aarch64 仅适配 external/ 下的用户态工具"
+    - "get_arch.sh 需识别 __aarch64__ 才能选择 ARM 闪存后端（ast_ahb_readl），否则退化为 ARCH_UNKNOWN 桩"
+    - "musl alltypes.h 已定义 __LITTLE_ENDIAN/__BYTE_ORDER，ccan/endian 需加保护以适配 -Werror"
+    - "OHOS 无 /bin/bash，make_version.sh 与 test/run.sh 需改用 /usr/bin/env bash"
+    - "OHOS procfs 的 st_size 不可作为 readlink 缓冲长度；CI worker 的 /tmp 可能只读，且禁止从 source 目录执行二进制，测试应在 build_folder 副本中运行"
+    - "上游 make check 的宿主机单测需 HOSTEND 识别 aarch64；部分 core/libc/hdata 用例含 PowerPC 汇编无法在 aarch64 运行"
+    - "OHOS procfs 的 /proc/self/fd/<n> lstat st_size 固定为 64，readlink 派生路径超过 63 字节会被截断；测试需使用短 TMPDIR"
+    - "toybox 的 stat/cmp 不支持 GNU 长选项，上游 shell 测试需改用 POSIX 形式"
+  common_dependencies: []
+
+versions:
+  "7.0":
+    status: built
+    build_date: "2026-10-18"
+    conan_ref: "skiboot/7.0"

@@ -1,0 +1,21 @@
+--- a/external/common/get_arch.sh
++++ b/external/common/get_arch.sh
+@@ -1,11 +1,15 @@
+ #!/bin/sh
+ # SPDX-License-Identifier: Apache-2.0 OR GPL-2.0-or-later
+ 
++CPP="${1}cpp"
++if ! command -v "$CPP" >/dev/null 2>&1; then
++	CPP="${CC:-cc}"
++fi
++
+ echo "#if defined(__powerpc__)
+ echo -n ARCH_POWERPC
+-#elif defined(__arm__)
++#elif defined(__arm__) || defined(__aarch64__)
+ echo -n ARCH_ARM
+ #else
+ echo -n ARCH_UNKNOWN
+-#endif" | $1cpp | /bin/sh
+-
++#endif" | $CPP -E - | /bin/sh

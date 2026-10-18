@@ -1,0 +1,35 @@
+--- a/external/pflash/test/tests/03-erase-parts
++++ b/external/pflash/test/tests/03-erase-parts
+@@ -28,29 +28,28 @@
+ yes yes | run_binary "./pflash" "-F $DATA_DIR/$CUR_TEST.pnor -e -P ONE"
+ if [ "$?" -ne 0 ] ; then
+ 	fail_test;
+ fi
+ 
+ one_start=$(get_part_start "$DATA_DIR/$CUR_TEST.ffs" "ONE");
+ one_len=$(get_part_len "$DATA_DIR/$CUR_TEST.ffs" "ONE");
+ one_end=$(get_part_end "$DATA_DIR/$CUR_TEST.ffs" "ONE");
+ cmp_with_ff "$DATA_DIR/$CUR_TEST.pnor" "$one_start" "$one_len"
+ 
+-cmp --bytes="$one_start" "$DATA_DIR/$CUR_TEST.pnor" \
++cmp -n "$one_start" "$DATA_DIR/$CUR_TEST.pnor" \
+ 	"$DATA_DIR/$CUR_TEST.bk";
+ if [ "$?" -ne 0 ] ; then
+ 	fail_test;
+ fi
+ 
+-cmp --ignore-initial="$one_end" \
+-	--bytes="$(expr $(stat --printf="%s" "$DATA_DIR/$CUR_TEST.pnor") - "$one_end")" \
+-	"$DATA_DIR/$CUR_TEST.pnor" "$DATA_DIR/$CUR_TEST.bk"
++cmp -n "$(expr $(stat -c %s "$DATA_DIR/$CUR_TEST.pnor") - "$one_end")" \
++	"$DATA_DIR/$CUR_TEST.pnor" "$DATA_DIR/$CUR_TEST.bk" "$one_end" "$one_end"
+ if [ "$?" -ne 0 ] ; then
+ 	fail_test;
+ fi
+ # The test infrastructure will clean up but lets no chew unnecessarily
+ # though disk space
+ rm "$DATA_DIR/$CUR_TEST.pnor" "$DATA_DIR/$CUR_TEST.bk"
+ 
+ diff_with_result
+ 
+ pass_test
