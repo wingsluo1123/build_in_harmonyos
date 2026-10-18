@@ -1,0 +1,38 @@
+software: valhalla
+display: "valhalla (OpenStreetMap routing engine)"
+description: >-
+  Valhalla is a C++20 routing engine for OpenStreetMap data: it builds tiled
+  graph data from OSM PBF (mjolnir), runs bidirectional A*/Dijkstra, matrix,
+  isochrone, map-matching and time-dependent routing (thor/meili/loki) and
+  serialises routes in many formats (tyr/odin).
+category: routing
+homepage: "https://github.com/valhalla/valhalla"
+license: MIT
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "上游 GitHub release tarball 不含 third_party/ 的 git 子模块：source() 按 3.8.2 tag 内记录的 gitlink commit 逐个下载并解包"
+    - "共享 profile 为 cppstd=17，配方 configure() 对自身强制 C++20"
+    - "OHOS libc++ 默认 _LIBCPP_HAS_NO_INCOMPLETE_RANGES/_FORMAT：std::views/std::format 需 -D_LIBCPP_ENABLE_EXPERIMENTAL；且 libc++.so 未导出 std::format_error 关键符号，需在库内补定义；chrono formatter 仍缺失，日志时间戳改 strftime"
+    - "未设置 CMAKE_SYSTEM_NAME 时 CMake 认不出 HarmonyOS：共享库无 SONAME、依赖记录相对 NEEDED、无 RPATH；设 CMAKE_SYSTEM_NAME=OHOS（走 Platform/OHOS.cmake→Platform/Linux）修复"
+    - "protobuf 强制 CMake MODULE 模式（CONFIG 的 protobuf-config 需要 absl::* 目标，本制品仓 abseil-cpp 只导出 abseil-cpp::abseil-cpp）"
+    - "pkg_check_modules(ZLIB) 设置 ZLIB_FOUND，令 CMakeDeps 的 BoostConfig 跳过 find_dependency(ZLIB)，需显式 find_package(ZLIB CONFIG)"
+    - "关闭 ENABLE_SERVICES（缺 libprime_server）、Python/Node 绑定、GeoTIFF"
+  common_dependencies:
+    - boost
+    - protobuf
+    - geos
+    - sqlite3
+    - libspatialite
+    - curl
+    - zlib
+    - lz4
+    - expat
+    - openssl
+    - luajit-openresty
+
+versions:
+  "3.8.2":
+    status: built
+    build_date: "2026-10-13"

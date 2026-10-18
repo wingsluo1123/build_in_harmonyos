@@ -1,0 +1,59 @@
+diff --git a/src/mjolnir/graphtilebuilder.cc b/src/mjolnir/graphtilebuilder.cc
+index ecaabcf..7e973ea 100644
+--- a/src/mjolnir/graphtilebuilder.cc
++++ b/src/mjolnir/graphtilebuilder.cc
+@@ -475,13 +475,13 @@ void GraphTileBuilder::StoreTileData() {
+   }
+ 
+   // Write the edge data (update edge_info_offset_)
+-  int64_t current_size = in_mem.tellp();
++  int64_t current_size = static_cast<int64_t>(in_mem.tellp());
+   header_builder_.set_edgeinfo_offset(header_builder_.complex_restriction_reverse_offset() +
+                                       reverse_restriction_size);
+   for (const auto& edgeinfo : edgeinfo_list_) {
+     in_mem << edgeinfo;
+   }
+-  int64_t edge_info_size = in_mem.tellp() - current_size;
++  int64_t edge_info_size = static_cast<int64_t>(in_mem.tellp()) - current_size;
+ 
+   // Write the names
+   header_builder_.set_textlist_offset(header_builder_.edgeinfo_offset() + edge_info_size);
+@@ -490,7 +490,7 @@ void GraphTileBuilder::StoreTileData() {
+   }
+ 
+   // Add padding (if needed) to align to 8-byte word.
+-  int tmp = in_mem.tellp() % 8;
++  int tmp = static_cast<int>(static_cast<int64_t>(in_mem.tellp()) % 8);
+   int padding = (tmp > 0) ? 8 - tmp : 0;
+   if (padding > 0 && padding < 8) {
+     in_mem.write("\0\0\0\0\0\0\0\0", padding);
+@@ -1340,7 +1340,7 @@ void GraphTileBuilder::AddBins(const std::string& tile_dir,
+     in_mem.write(reinterpret_cast<const char*>(bin.data()), bin.size() * sizeof(GraphId));
+   }
+   header.set_bounding_circle_offset(
+-      added_bounding_circles ? (sizeof(GraphTileHeader) + in_mem.tellp()) : 0);
++      added_bounding_circles ? (sizeof(GraphTileHeader) + static_cast<int64_t>(in_mem.tellp())) : 0);
+ 
+   // the updated bounding circles
+   for (const auto& circle : circles) {
+@@ -1359,7 +1359,7 @@ void GraphTileBuilder::AddBins(const std::string& tile_dir,
+   end = reinterpret_cast<const char*>(tile->header()) + tile->header()->end_offset();
+   in_mem.write(begin, end - begin);
+   // maybe pad since the bounding circles are 4 bytes
+-  int tmp = in_mem.tellp() % 8;
++  int tmp = static_cast<int>(static_cast<int64_t>(in_mem.tellp()) % 8);
+   int padding = (tmp > 0) ? 8 - tmp : 0;
+   if (padding > 0 && padding < 8) {
+     in_mem.write("\0\0\0\0\0\0\0\0", padding);
+diff --git a/valhalla/filesystem_utils.h b/valhalla/filesystem_utils.h
+index ddeec56..0c4bee8 100644
+--- a/valhalla/filesystem_utils.h
++++ b/valhalla/filesystem_utils.h
+@@ -5,6 +5,7 @@
+ #include <chrono>
+ #include <filesystem>
+ #include <fstream>
++#include <sstream>
+ #include <thread>
+ 
+ #ifdef _WIN32

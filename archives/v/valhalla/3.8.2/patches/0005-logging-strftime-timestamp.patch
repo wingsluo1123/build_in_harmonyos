@@ -1,0 +1,52 @@
+diff --git a/src/midgard/logging.cc b/src/midgard/logging.cc
+index 13921ec..efd8c94 100644
+--- a/src/midgard/logging.cc
++++ b/src/midgard/logging.cc
+@@ -4,6 +4,7 @@
+ #include <boost/property_tree/ptree.hpp>
+ 
+ #include <chrono>
++#include <ctime>
+ #include <filesystem>
+ #include <fstream>
+ #include <iostream>
+@@ -17,9 +18,23 @@
+ 
+ namespace {
+ 
+-// append current timestamp formatted as: "year-mo-dy hr:mn:sc.xxxxxxxxx"
++// append current timestamp formatted as: "year-mo-dy hr:mn:sc"
+ void append_timestamp(std::string& buffer) {
+-  std::format_to(std::back_inserter(buffer), "{0:%F} {0:%T}", std::chrono::system_clock::now());
++  // OHOS libc++'s <format> does not implement the chrono formatters
++  // (std::formatter<std::chrono::time_point> is deleted), so format the
++  // current time with strftime instead of std::format_to("{0:%F} {0:%T}").
++  const std::time_t now = std::chrono::system_clock::to_time_t(
++      std::chrono::system_clock::now());
++  std::tm tm{};
++#if defined(_WIN32)
++  gmtime_s(&tm, &now);
++#else
++  gmtime_r(&now, &tm);
++#endif
++  char timestamp[32];
++  if (std::strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", &tm)) {
++    buffer += timestamp;
++  }
+ }
+ 
+ // the Log levels we support
+@@ -382,3 +397,13 @@ void logging::ConfigureFromPtree(const boost::property_tree::ptree& config) {
+ 
+ } // namespace midgard
+ } // namespace valhalla
++
++// The OHOS libc++ shared library is built without _LIBCPP_ENABLE_EXPERIMENTAL,
++// so although <format> becomes usable when the macro is defined for consumers,
++// the out-of-line std::format_error members (destructor, vtable, typeinfo) are
++// not present in libc++.so.  Provide the key function here so linking against
++// libc++ succeeds.
++namespace std {
++format_error::~format_error() noexcept {
++}
++} // namespace std
