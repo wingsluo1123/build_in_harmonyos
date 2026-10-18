@@ -1,0 +1,30 @@
+# test_package 清单（R34 消费者校验）
+package: vit/2.3.4
+
+upstream_test_in_build: true
+upstream_test_command: "python -m pytest -q -p no:cacheprovider test"
+
+upstream_tests:
+  - name: "上游 test/（test_color_mappings.py、test_list_batcher.py，基于 unittest）"
+    count: 10
+    description: >-
+      本地实跑 **10 passed** → **10/10（100%）**，用例内容未做任何修改。
+
+test_package_tests:
+  - file: check_vit.py
+    description: >-
+      R34 消费者校验 **6 项**（全部离线）：①命令产物齐备（bin/vit）②模块可导入且版本正确
+      （`vit.version.VIT = 2.3.4`）③入口参数解析可用（`vit --help` 输出用法）
+      ④**核心组件真实调用**（ListBatcher 分批 + `task_256_to_urwid_256` 颜色映射）
+      ⑤许可证随包（licenses/LICENSE）⑥证据（sha256 + python 版本）。
+      末行打印 `checks/fails/skips`；仅环境原因才计入 skips 且**不计入通过**。
+    command: "python3 check_vit.py <package-folder>"
+
+notes: >-
+  运行时依赖 tasklib、urwid 随包装到 `<包>/python`；命令按上游 `entry_points`
+  （`vit=vit.command_line:main`）生成。补丁 0001 修的是导入期 curses.setupterm 在无 terminfo 环境下必抛的问题，
+  同时修复运行时。
+
+deviations:
+  - "补丁 0001：vit/util.py 的导入期 curses.setupterm() 改为 try/except 降级（无 terminfo 环境必需）"
+  - "测试环境：按属主挑 TMPDIR、清 XDG 变量、补 /system/bin 到 PATH"
