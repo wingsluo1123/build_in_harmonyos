@@ -1,0 +1,94 @@
+--- a/src/interface/carte/carte.cpp
++++ b/src/interface/carte/carte.cpp
+@@ -1132,21 +1132,21 @@
+                             Configuration::instance()->noradStationSpatiale())) {
+ 
+                     Satellite sat = Configuration::instance()->listeSatellites().first();
+                     sat.CalculCercleAcquisition(station);
+ 
+                     QPolygonF poly;
+                     QVector<QPolygonF> zones;
+ 
+                     const QPointF pt0(QPointF(DEG2PX(sat.zone().at(0).x()), DEG2PX(sat.zone().at(0).y())));
+                     poly.append(pt0);
+-                    
++
+                     for(unsigned int i=0; i<sat.zone().size(); i++) {
+ 
+                         const QPointF ptActuel(DEG2PX(sat.zone()[i].x()), DEG2PX(sat.zone()[i].y()));
+                         const QPointF ptPrec = poly.last();
+ 
+                         // Gestion du meridien 180 degres
+                         if (fabs(ptActuel.x() - ptPrec.x()) > (_largeurCarte / 2)) {
+ 
+                             const int signe = (ptActuel.x() < ptPrec.x()) ? 1 : -1;
+                             poly.append(QPointF(ptActuel.x() + signe * _largeurCarte, ptActuel.y()));
+@@ -1158,21 +1158,21 @@
+ 
+                         poly.append(ptActuel);
+                     }
+ 
+                     if (fabs(poly.last().x() - pt0.x()) < (_largeurCarte / 2)) {
+                         poly.append(pt0);
+                     }
+ 
+                     zones.append(poly);
+ 
+-                    QVectorIterator it2(zones);
++                    QVectorIterator<QPolygonF> it2(zones);
+                     while (it2.hasNext()) {
+ 
+                         res.clear();
+                         res.addPolygon(it2.next());
+ 
+                         QGraphicsPathItem * const path = new QGraphicsPathItem(res);
+                         path->setPen(crayon2);
+                         scene->addItem(path);
+                     }
+                 }
+@@ -1780,21 +1780,21 @@
+                             }
+                         }
+                     }
+                 } else {
+                     pen.setColor(Qt::white);
+                     pen.setWidthF(1.1);
+                 }
+ 
+                 pen.setCosmetic(true);
+ 
+-                QVectorIterator it(zones);
++                QVectorIterator<QPolygonF> it(zones);
+                 while (it.hasNext()) {
+ 
+                     res.clear();
+                     res.addPolygon(it.next());
+ 
+                     QGraphicsPathItem * const path = new QGraphicsPathItem(res);
+                     path->setPen(pen);
+                     scene->addItem(path);
+                 }
+             }
+@@ -1973,21 +1973,21 @@
+         _resize = false;
+         fi.close();
+     }
+ 
+     QPainterPath res;
+     QPen pen;
+     pen.setWidthF(1.);
+     pen.setColor((echelleMin > 0.) ? QColor("#999999") :  QColor("#CCCCCC"));
+     pen.setCosmetic(true);
+ 
+-    QVectorIterator it(poly);
++    QVectorIterator<QPolygonF> it(poly);
+     while (it.hasNext()) {
+ 
+         const QPolygonF frontiere = it.next();
+ 
+         res.clear();
+         res.addPolygon(frontiere);
+ 
+         QGraphicsPathItem * const path = new QGraphicsPathItem(res);
+         path->setPen(pen);
+         grp->addToGroup(path);
