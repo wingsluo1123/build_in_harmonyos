@@ -1,0 +1,29 @@
+--- a/consio.cpp
++++ b/consio.cpp
+@@ -192,22 +192,25 @@
+     // than MAXPASSWORD_RAR. Thus we removed this check as not working
+     // and not that necessary. Low level FlushConsoleInputBuffer doesn't help
+     // for high level ReadConsole, which in line input mode seems to store
+     // the rest of string in its own internal buffer.
+ #else
+     std::vector<char> StrA(MAXPASSWORD*4); // "*4" for multibyte UTF-8 characters.
+ #ifdef __VMS
+     fgets(StrA.data(),StrA.size()-1,stdin);
+ #elif defined(__sun)
+     strncpyz(StrA.data(),getpassphrase(""),StrA.size());
++#elif defined(__GLIBC__)
++    strncpyz(StrA.data(),getpass(""),StrA.size());
+ #else
+-    strncpyz(StrA.data(),getpass(""),StrA.size());
++    // getpass() is absent in musl-based libc such as OpenHarmony. Use fgets.
++    fgets(StrA.data(),StrA.size()-1,stdin);
+ #endif
+     CharToWide(StrA.data(),Str);
+     cleandata(StrA.data(),StrA.size()*sizeof(StrA[0]));
+ #endif
+   }
+   RemoveLF(Str);
+ }
+ #endif
+ 
+ 

@@ -1,0 +1,41 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（R51：上游测试三步法申报）
+
+package: rar/7.23
+homepage: "https://www.rarlab.com/rar_add.htm"
+
+# 上游测试命令：unrarsrc-7.2.7.tar.gz 不含任何测试套件——
+# 无 tests/ 目录、无 check/test 目标（makefile 仅有 all/unrar/sfx/lib/install/clean），
+# `make -n check` 报 "No rule to make target 'check'"。清点证据见 notes.md。
+upstream_check_command: ""
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（上游无测试，如实申报 0）
+upstream_tests: []
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: test.cpp
+    description: "libunrar 消费者 API 测试 4 项：RARGetDllVersion 版本一致 / 不存在归档优雅失败 / 夹具列出 hello.txt 且大小正确 / RAR_TEST 完整性校验"
+    command: "./test_rar <plain.rar> <hello_size>（由 test_rar.py 驱动）"
+    assertion_count: 4
+  - file: test_rar.py
+    description: "CLI 功能测试 3 项：`unrar t` 完整性 All OK / `unrar x` 解压字节级一致 / 错误口令负例（rc!=0 且不落盘）"
+    command: "PACKAGE_FOLDER=<pkg> TEST_BIN=<built> python3 test_rar.py"
+    assertion_count: 3
+
+# 鸿蒙特有测试 (HarmonyOS-specific)
+harmonyos_specific_tests:
+  - file: test_rar.py
+    description: "鸿蒙特有测试 4 项：AArch64 ELF / OHOS musl loader (ld-musl-aarch64.so.1) / OHOS codesign 签名 / stdin 口令解密密夹具（consio.cpp getpass→fgets 鸿蒙适配点）"
+    command: "PACKAGE_FOLDER=<pkg> TEST_BIN=<built> python3 test_rar.py"
+    assertion_count: 4
+
+# 依赖测试：无外部依赖
+dependency_tests: []
+
+# 测试断言总数（口径：独立检查项）= lib API 4 + CLI 3 + 鸿蒙特有 4
+assertion_count: 11
