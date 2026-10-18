@@ -1,0 +1,113 @@
+--- a/fc-solve/source/scripts/gen-c-lookup-files.pl
++++ b/fc-solve/source/scripts/gen-c-lookup-files.pl
+@@ -7,18 +7,10 @@
+ 
+ package Code::Gen::Emitter;
+ 
+-use Moo;
+-
+-has lang => ( is => 'ro', required => 1 );
+-has is_rust => (
+-    is      => 'lazy',
+-    default => sub {
+-        return shift()->lang eq 'rust';
+-    },
+-);
+-has typedefs       => ( is => 'ro', required => 1 );
+-has header_headers => ( is => 'ro', required => 1 );
+-
++# Plain-Perl replacement for the former Moo-based class.  OHOS does not ship
++# the Moo CPAN distribution (nor its Role::Tiny / Sub::Quote chain), and this
++# class only needs read-only accessors plus two lazily computed values, so the
++# same interface is implemented with a blessed hash.
+ my %lang_map = (
+     'c' => {
+         start_array => '{',
+@@ -29,12 +21,53 @@
+         end_array   => ']',
+     },
+ );
+-has lang_record => (
+-    is      => 'lazy',
+-    default => sub {
+-        return $lang_map{ shift()->lang() };
+-    },
+-);
++
++sub new
++{
++    my ( $class, @args ) = @_;
++    my %args = ( ( @args == 1 && ref( $args[0] ) eq 'HASH' ) ? %{ $args[0] } : @args );
++    foreach my $required (qw( lang typedefs header_headers ))
++    {
++        die "Missing required argument '$required'\n"
++            if !exists( $args{$required} );
++    }
++    return bless( \%args, $class );
++}
++
++sub lang
++{
++    return $_[0]->{lang};
++}
++
++sub is_rust
++{
++    my ($self) = @_;
++    if ( !exists( $self->{is_rust} ) )
++    {
++        $self->{is_rust} = ( $self->lang() eq 'rust' );
++    }
++    return $self->{is_rust};
++}
++
++sub typedefs
++{
++    return $_[0]->{typedefs};
++}
++
++sub header_headers
++{
++    return $_[0]->{header_headers};
++}
++
++sub lang_record
++{
++    my ($self) = @_;
++    if ( !exists( $self->{lang_record} ) )
++    {
++        $self->{lang_record} = $lang_map{ $self->lang() };
++    }
++    return $self->{lang_record};
++}
+ 
+ sub calc_headers_code
+ {
+@@ -67,18 +100,15 @@
+     return $self->lang_record()->{$field};
+ }
+ 
+-has start_array => (
+-    is      => 'lazy',
+-    default => sub {
+-        return shift()->lookup_lang_field('start_array');
+-    },
+-);
+-has end_array => (
+-    is      => 'lazy',
+-    default => sub {
+-        return shift()->lookup_lang_field('end_array');
+-    },
+-);
++sub start_array
++{
++    return $_[0]->lookup_lang_field('start_array');
++}
++
++sub end_array
++{
++    return $_[0]->lookup_lang_field('end_array');
++}
+ 
+ sub data2code
+ {

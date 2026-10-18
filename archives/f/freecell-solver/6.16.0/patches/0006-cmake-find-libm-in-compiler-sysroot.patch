@@ -1,0 +1,16 @@
+--- a/fc-solve/source/cmake/Shlomif_Common.cmake
++++ b/fc-solve/source/cmake/Shlomif_Common.cmake
+@@ -120,7 +120,12 @@
+ # If it cannot find it, it fails with an error.
+ MACRO(FIND_LIBM)
+     IF (UNIX)
+-        FIND_LIBRARY(LIBM_LIB m)
++        # OHOS: the compiler sysroot lives outside CMake's default library
++        # search prefixes, so also search the compiler's own implicit link
++        # directories.  There libm.a is an empty archive (musl keeps the math
++        # routines in libc.so), which links cleanly and keeps the upstream
++        # -lm contract on platforms that do provide a real libm.
++        FIND_LIBRARY(LIBM_LIB m HINTS ${CMAKE_C_IMPLICIT_LINK_DIRECTORIES})
+         IF(LIBM_LIB STREQUAL "LIBM_LIB-NOTFOUND")
+             MESSAGE(FATAL_ERROR "Cannot find libm")
+         ELSE()

@@ -1,0 +1,48 @@
+package: freecell-solver/6.16.0
+homepage: "https://fc-solve.shlomifish.org/"
+
+upstream_check_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error"
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error"
+
+# The upstream C unit-test programs live in t/ of the CMake source tree
+# (fc-solve/source).  Upstream registers only the Perl run-tests.pl
+# harness; the adaptation registers the same five C programs with CTest
+# (patch 0002) because the CPAN modules the harness needs are absent on
+# OHOS.
+upstream_tests:
+  - file: fc-solve/source/t/card-test-render.c.tt
+    source: freecell-solver-6.16.0.tar.xz/fc-solve/source/t/card-test-render.c.tt
+    description: "Card rendering (cmocka): render cards to text"
+    command: "ctest -R ^card-test-render$"
+  - file: fc-solve/source/t/card-test-parse.c.tt
+    source: freecell-solver-6.16.0.tar.xz/fc-solve/source/t/card-test-parse.c.tt
+    description: "Card parsing (cmocka): parse card strings"
+    command: "ctest -R ^card-test-parse$"
+  - file: fc-solve/source/t/bit-reader-and-writer-test.c
+    source: freecell-solver-6.16.0.tar.xz/fc-solve/source/t/bit-reader-and-writer-test.c
+    description: "Bit reader/writer encoding round-trips (cmocka)"
+    command: "ctest -R ^bit-reader-and-writer$"
+  - file: fc-solve/source/t/debondt-delta-states-test.c
+    source: freecell-solver-6.16.0.tar.xz/fc-solve/source/t/debondt-delta-states-test.c
+    description: "Debondt delta-state derivation (cmocka)"
+    command: "ctest -R ^delta-states-debondt$"
+  - file: fc-solve/source/t/dbm-kaztree-compare-records-test.c
+    source: freecell-solver-6.16.0.tar.xz/fc-solve/source/t/dbm-kaztree-compare-records-test.c
+    description: "DBM Kaztree record comparison (cmocka)"
+    command: "ctest -R ^dbm-kaztree-compare-records$"
+
+test_package_tests:
+  - file: test.c
+    description: >-
+      CMake consumer drives the public solver API on Microsoft deal #24:
+      version, preset handling, game parameters, solving, move replay and
+      the solved-foundations state string
+    command: "./test_freecell_solver"
+  - file: conanfile.py
+    description: >-
+      Installed-package contract: fcs_user.h header, libfreecell-solver.pc
+      and its -lfreecell-solver link line
+    command: "python conanfile.py contract checks"
+
+assertion_count: 13

@@ -1,0 +1,110 @@
+# 版本级 manifest
+# 文件位置: archives/f/freecell-solver/6.16.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "6.16.0"
+software: "freecell-solver"
+status: built
+build_date: "2026-10-18"
+build_system: "cmake"
+conan_ref: "freecell-solver/6.16.0"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://downloads.sourceforge.net/project/fc-solve/fc-solve/freecell-solver-6.16.0.tar.xz"
+  sha256: "71b8882e68f1be62529069018d0c732b75078669077c96348279575849f34313"
+  tar_format: tar.xz
+  bundled_sources:
+    - name: rinutils
+      version: "0.6.0"
+      url: "https://codeload.github.com/shlomif/rinutils/tar.gz/refs/tags/0.6.0"
+      sha256: "81966e7f73a9a8e095dd06c159cfb8dd0da2b78942ba83b323d7ff59f74800cf"
+      staged_at: "fc-solve/source/rinutils"
+      license: MIT
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+
+  configure_options:
+    - "build_script_folder=fc-solve/source（tarball 内 CMake 工程根；源包 <source_folder>/fc-solve/source）"
+    - "rinutils 0.6.0 预置在 fc-solve/source/rinutils：发布 tarball 未带该子模块头文件，cmake/rinutils_bootstrap.cmake 期望 <src>/rinutils/rinutils/include（补丁 0007 同时移除非 git 检出上必然失败的 git submodule update 分支）"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DDISABLE_APPLYING_RPATH=ON + -DCMAKE_INSTALL_RPATH=$ORIGIN:$ORIGIN/../lib（上游默认把 CMAKE_INSTALL_FULL_LIBDIR 烤进可执行文件；改为可搬迁 $ORIGIN 布局）"
+    - "-DBUILD_STATIC_LIBRARY=OFF（上游主库本就只建 SHARED；静态孪生只放大构建时间）"
+    - "-DFCS_WITH_TEST_SUITE=ON（上游 t/ 下 cmocka C 单测程序照常构建并注册 CTest）"
+    - "-DFCS_SKIP_PERL_TEST_HARNESS=ON、-DFCS_SKIP_PERL_GENERATED_TESTS=ON、-DSKIP_PERL_TESTING_TASK_CHECK=ON（OHOS Perl 无 CPAN：Moo/Template/Task::FreecellSolver 等缺席；三开关由补丁 0001/0002 新增）"
+    - "构建目录内 Platform/HarmonyOS.cmake 垫片（include(Platform/Linux)，CMake 无 HarmonyOS 平台模块，E140/fluidsynth 先例）"
+    - "-DCMAKE_PLATFORM_NO_VERSIONED_SONAME=TRUE（HMDFS 禁 symlink：单文件无版本 .so + 裸 DT_SONAME，E330；package() 对 install 重写 RUNPATH 后的 ELF 重签 .codesign）"
+    - "-DCMAKE_EXE_LINKER_FLAGS_INIT / -DCMAKE_SHARED_LINKER_FLAGS_INIT=-Wl,-z,max-page-size=0x1000（OHOS 加载器 4K 段布局）"
+    - "TMPDIR=$HOME/tmp（/tmp 只读；Path::Tiny->tempdir 与 pod2man 包装器按 TMPDIR 落盘）"
+    - "PERL5LIB=<libpath-tiny-perl>/lib/perl5（configure/build 期 perl 生成器 use Path::Tiny）"
+
+  dependencies:
+    - "gperf/3.3 (tool_requires，上游 FIND_PROGRAM(_GPERF) FATAL_ERROR 硬依赖)"
+    - "libpath-tiny-perl/0.118 (tool_requires，6 个 perl 生成器 use Path::Tiny；OHOS Perl 无 CPAN)"
+    - "cmocka/2.0.2 (test_requires，t/ 下 5 个 cmocka C 单测程序)"
+
+  system_dependencies:
+    - libm
+    - libc
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - patches/0001-cmake-relax-moo-python-build-requirements.patch
+  - patches/0002-t-build-cmocka-tests-via-cmake-package.patch
+  - patches/0003-scripts-gen-c-lookup-files-plain-perl.patch
+  - patches/0004-scripts-gen-presets-no-template-toolkit.patch
+  - patches/0005-t-generate-card-tests-no-template-toolkit.patch
+  - patches/0006-cmake-find-libm-in-compiler-sysroot.patch
+  - patches/0007-cmake-skip-git-submodule-for-vendored-rinutils.patch
+
+# ============================================================
+# 测试信息
+# ============================================================
+
+upstream_tests:
+  framework: "CTest（上游 t/ 下 cmocka C 单测程序）"
+  test_targets: 5
+  test_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error"
+  run_in_build: true
+
+upstream_test_pass_rate: "5/5（100%，真机 conan create 内 CTest 实跑：card-test-render、card-test-parse、bit-reader-and-writer、delta-states-debondt、dbm-kaztree-compare-records 全部 Passed）"
+adapted_test_pass_rate: "13/13（100%，test_package/test_freecell_solver 13 项 TEST PASS）+ 3/3（安装契约：fcs_user.h / libfreecell-solver.pc / -lfreecell-solver；reports/conan-verify-report.md Verdict=PASS）"
+
+device_verify:
+  date: "2026-10-18"
+  profile: "ohos-aarch64-full"
+  result: "PASS（G0–G3 全 PASS；G4 报「无法找到程序包 ID」、L2/L4/L5 因无 cache 路径跳过——conan 2.29.1 本地缓存 JSON 键不兼容所致，等价项已在真机手工取证：fc-solve --version rc=0、SONAME/RUNPATH/RELRO/PIE、deal #24 CLI 求解成功）"
+  package_id: "01d92cf349a0dd98ff915f4bd99a04430171517f"
+  report: "reports/conan-verify-report.md"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "freecell-solver 6.16.0 的 CMake 工程在 tarball 的 fc-solve/source 子目录（仓库路径），但发布包不含 rinutils 子模块；cmake/rinutils_bootstrap.cmake 先试 find_package(Rinutils QUIET)，未命中且目录已存在时会执行 git submodule update --init —— 在解包 tarball（非 git 检出）上必败。配方把 rinutils 0.6.0 解到 fc-solve/source/rinutils（bootstrap 期望的 <src>/rinutils/rinutils/include），补丁 0007 删除 submodule 分支，configure 全离线。"
+  - "依赖真实性：上游 FIND_PROGRAM(_GPERF) 缺失即 FATAL_ERROR；configure/build 期 6 个 perl 生成器（gen-c-lookup-files.pl、gen-cmd-line-radix-tree.pl、gen-presets.pl、gen-move-funcs.pl、gen-man-page.pl、t/generate-card-tests.pl）全部 use Path::Tiny，而 OHOS Perl 无 CPAN —— 故 gperf/3.3 与 libpath-tiny-perl/0.118 均为 tool_requires，PERL5LIB 指向包的 lib/perl5。"
+  - "GMP 不是本目标依赖：cmake/Shlomif_Common.cmake 的 MY_FIND_GMP 仅在 HAVE_INT128 不成立时查找 libgmp；aarch64 clang 的 __SIZEOF_INT128__ 成立，该分支整段跳过（gmp 无需打包）。"
+  - "FCS_ENABLE_DBM_SOLVER 默认 ON 时上游只构建 delta-states-debondt-test 与 dbm-kaztree-compare-records 两个变体之一（DEBONDT_DELTA_STATES 决定）；配方断言 <build>/t 下两个 delta 程序中恰有一个存在，避免测试注册随上游开关漂移。"
+  - "上游只注册 Perl run-tests.pl 一条 CTest；OHOS 缺 Task::FreecellSolver/Test::Differences 等 CPAN 模块，适配把同一批上游 C 程序逐条注册为 5 个 CTest 用例（不改测试代码），并把 cmocka 从 pkg_check_modules 改为 FIND_PACKAGE(cmocka CONFIG)（OHOS 无 cmocka 的 pkg-config 条目，CMakeDeps 导出 cmocka::cmocka）。"
+  - "E330/E077：HMDFS 拒绝 VERSION/SOVERSION 的 .so 符号链接链 —— CMAKE_PLATFORM_NO_VERSIONED_SONAME=TRUE 产出单文件 libfreecell-solver.so（裸 DT_SONAME）；cmake install() 重写 RUNPATH 会破坏 OHOS 构建期 .codesign，package() 以 llvm-objcopy --remove-section .codesign + binary-sign-tool -selfSign 1 重签全部 8 个 ELF（7 个 bin 工具 + 1 个库）。"
+  - "pub API 细节：freecell_solver_user_current_state_stringify 的显示模式（parseable_output=0）对上盘行做 16 列对齐且省略 'Foundations:' 前缀；消费者若断言完成态应传 parseable_output=1，得到规范形式 'Foundations: H-K C-K D-K S-K'。"
+  - "安装树含 7 个 ELF CLI（fc-solve、freecell-solver-range-parallel-solve、freecell-solver-fc-pro-range-solve、dbm-fc-solver、depth-dbm-fc-solver、freecell-solver-multi-thread-solve、pi-make-microsoft-freecell-board）、5 个 Python 棋盘助手、8 页 man6、presetrc + presets 共享数据、10 个公共头与 libfreecell-solver.pc；bin 非空故必须有 commands.json（PF8/R38）。"
