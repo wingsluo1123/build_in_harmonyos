@@ -1,0 +1,58 @@
+# manifest.yaml — ktx 1.45（版本级编译元数据）
+software: ktx
+version: "1.45"
+status: built
+package_type: library
+build_system: cmake
+
+upstream:
+  name: ktx
+  homepage: https://github.com/QW-Group/ktx
+  tag: "1.45"
+  commit: d05d6ca6dae1a8b5a1ea23aa9e33f6d99bcc9102
+  license: GPL-2.0-or-later
+  language: c
+  source_url: https://github.com/QW-Group/ktx/archive/refs/tags/1.45.tar.gz
+  source_sha256: 3bf0e78569fa7d352a2e825257ea37d1e2423480c94f0d18fa58dc265f54288c
+
+description:
+  summary: >-
+    KTX（Kombat Teams eXtreme）是 QuakeWorld 服务器扩展 mod，以原生共享库
+    qwprogs.so 形式由 QuakeWorld 服务器（MVDSV / FTEQW）dlopen 加载。
+  deliverables:
+    - lib/qwprogs.so         # 原生模块（dlopen 入口 dllEntry，无 lib 前缀）
+    - include/ktx/*.h        # mod ABI 头文件
+    - licenses/LICENSE.md    # GPL-2.0-or-later
+
+dependencies:
+  requires: []          # 纯 C99 + libm，无第三方依赖
+  tool_requires: []
+  system_libs:
+    - m
+
+toolchain:
+  target: aarch64-linux-ohos
+  compiler: clang 15
+  conan_profile: ohos-aarch64-wsl
+  libc: musl
+
+adaptation:
+  patches: []           # 无需补丁，OHOS 交叉编译零改动通过
+  ohos_specific_changes: []
+  notes_ref: notes.md
+
+test:
+  upstream_tests: 0
+  upstream_test_note: 上游 1.45 无任何自动化测试（无 tests/ 目录，CI 只编译）
+  test_package: test_package/
+  assertions: 34
+  assertions_passed: 34
+  ohos_specific_tests: 16
+  ohos_specific_note: >-
+    鸿蒙特有测试 = test_package/MANIFEST.yml 的 elf_ohos_properties 组（16 项）：
+    ELF magic / ELFCLASS64 / 小端 / ELF64 头可读 / e_type=ET_DYN /
+    e_machine=EM_AARCH64 / shnum+shoff / shdr 数组可分配 / shdr 表可读 /
+    .shstrtab 定位 / .shstrtab 可解析 / .dynsym+.dynstr 存在 / .dynamic 存在 /
+    DT_SONAME 存在 / DT_SONAME=qwprogs.so 与文件名一致 /
+    DT_NEEDED=libc.so(musl) / DT_NEEDED 无绝对路径或 ../ 逃逸。
+    余下 18 项分属 artifact_integrity(4)、symbol_surface(4)、runtime_abi(10)。

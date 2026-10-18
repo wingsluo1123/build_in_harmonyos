@@ -1,3 +1,17 @@
+## 同名不同上游：本目录归档了两个不同上游的 `ktx`
+
+`ktx` 这个名字对应两个互不相关的上游，本目录同时收纳它们的归档条目，
+按版本号区分（软件级元数据由两者共同维护）：
+
+| 版本 | 上游 | 交付形态 | 归档路径 |
+|------|------|----------|----------|
+| `1.45` | [QW-Group/ktx](https://github.com/QW-Group/ktx) — Kombat Teams eXtreme，QuakeWorld 服务器扩展 mod | 共享库 `lib/qwprogs.so`（由 QuakeWorld 服务器 `dlopen` 加载），无命令行工具 | `archives/k/ktx/1.45/` |
+| `4.3.2` | [KhronosGroup/KTX-Software](https://github.com/KhronosGroup/KTX-Software) — Khronos 纹理容器库 | 静态库 `libktx.a` + `bin/` 命令行工具 | `archives/k/ktx/4.3.2/` |
+
+两者**不是重复归档**：上游仓库、许可证（GPL-2.0-or-later vs Apache-2.0）、
+产物类型（库/工具）与适配要点都不同。1.45 的详细适配说明见
+[`1.45/README.md`](1.45/README.md) 与 [`1.45/notes.md`](1.45/notes.md)。
+
 # KTX
 
 KTX is the Khronos texture container library and tool set: `libktx` reads and
