@@ -1,0 +1,66 @@
+version: "g20200105.1"
+software: "cascade-compiler"
+status: "built"
+build_date: "2026-10-16"
+build_system: "cmake"
+
+source:
+  url: "https://codeload.github.com/vmware-archive/cascade/tar.gz/f4f7ae8bd1dd379790c0e58c286df90b8d1cdcde"
+  sha256: "b76107bebbe2c9f8737a652ff4e3c8ebf3fcbf13f672b34aa65c9899e7ab8442"
+  tar_format: "tar.gz"
+
+build:
+  system: "cmake"
+  configure_options:
+    - "-DBUILD_TESTING=ON"
+    - "-DBUILD_SHARED_LIBS=ON"
+  dependencies:
+    - "ncurses/6.4"
+    - "flex/2.6.4.2"
+    - "bison/3.8.2"
+    - "googletest/1.18.0"
+    - "google-benchmark/1.9.5"
+  bundled_build_tools:
+    - name: "verilator"
+      version: "4.038"
+      source: "https://codeload.github.com/verilator/verilator/tar.gz/refs/tags/v4.038"
+      sha256: "0a4a11ae9ca64aa995b1c5895e4367043a72fa4cf89a6781b6877b0f78b27863"
+      jobs: 2
+  cc: "clang"
+  cxx: "clang++"
+  jobs: 2
+
+patches_applied:
+  - "0001-ohos-build-and-isolated-regressions.patch"
+  - "0002-enable-aarch64-64bit-regressions.patch"
+  - "0003-use-abstract-unix-sockets-on-harmonyos.patch"
+
+upstream_tests:
+  type: "GoogleTest"
+  source: "test/regression/*.cc"
+  source_declarations: 294
+  architecture_gated_out_on_aarch64: 0
+  expected_aarch64_cases: 294
+  ctest_entries: 1
+
+test_results:
+  type: "upstream-google-test"
+  total: 294
+  passed: 294
+  failed: 0
+  skipped: 0
+  suites: 16
+  ctest_entries_passed: 1
+  consumer_tests_total: 1
+  consumer_tests_passed: 1
+  duration_sec: 290.063
+  notes: "Device Conan create exited 0; 294/294 upstream tests passed with 0 skips; test_cascade consumer exited 0."
+
+evidence:
+  device_create_log: "reports/device-create.log"
+  device_create_log_sha256: "d107d0621d695a6eb7f1369883fdddd4a164e39a801c1edb9140c1c914539299"
+  hello3_repeat_log: "reports/diagnostic/hello3-repeat.log"
+  hello3_repeat_log_sha256: "9586cd6d63e508fe496751a790195147e61a820142249217eb1a3ff7a3ff6b6b"
+  hello3_repeat_count: 500
+  hello3_repeat_passed: 500
+  hello3_repeat_skipped: 0

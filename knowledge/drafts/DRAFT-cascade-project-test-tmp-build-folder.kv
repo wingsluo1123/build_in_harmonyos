@@ -1,0 +1,45 @@
+# Draft knowledge entry: scope project-specific test scratch to the Conan build folder
+id:                     DRAFT-cascade-project-test-tmp-build-folder
+trigger_tool:           conan|cmake|ctest
+phase:                  testing
+error_signature:        CASCADE_TMP_DIR.*Permission denied|CASCADE_TMP_DIR.*Read-only file system|fixed.*device.*tmp.*path
+severity:               2
+category:               conan, filesystem, build-system, testing, environment
+match_keywords:         CASCADE_TMP_DIR, project temporary directory, self.build_folder, Conan test_package, task isolation, HarmonyOS
+title:                  Conan 配方的项目级测试临时目录应限定到当前 build_folder
+root_cause:             项目专用测试环境变量若指向设备上的固定任务路径，会脱离当前 Conan build 的生命周期，可能复用旧文件或与共享设备上的其他构建碰撞；标准 TMPDIR 也不能覆盖上游读取的专用变量。
+affected_scope:         通过 CASCADE_TMP_DIR 等项目专用变量选择测试 scratch/cache 的 Conan 配方，尤其是同一设备上并行运行多个任务或主包与 test_package 的构建。
+verification_cmd:       conan create <recipe> -pr:h=<ohos-profile> -pr:b=<ohos-profile> --build=missing -c:a tools.build:jobs=2；确认构建与 test_package 分别传入各自 self.build_folder/_cascade_tmp，并检查上游测试计数、跳过数和退出码。
+rec_priority:           1
+rec_approach:            build-folder-scoped-project-tmpdir
+rec_description:        在 build() 或 test() 中从 self.build_folder 派生项目专用 scratch 目录，创建后通过上游支持的环境变量传入；test_package 使用自己的 build_folder。
+rec_command:             cascade_tmp_dir = os.path.join(self.build_folder, "_cascade_tmp"); os.makedirs(cascade_tmp_dir, exist_ok=True); self.run('CASCADE_TMP_DIR="{}" ctest ...'.format(cascade_tmp_dir))
+rec_auto_fix:            false
+rec_impl:                conan-recipe
+fallback_priority:       2
+fallback_approach:        per-process-user-cache
+fallback_description:   若构建系统不暴露独立 build_folder，则在当前任务私有目录下创建唯一子目录并显式传入项目变量。
+fallback_command:        CASCADE_TMP_DIR="$TASK_PRIVATE_DIR/<package-build>" ctest --test-dir <build-dir>
+fallback_auto_fix:       false
+fallback_impl:           environment
+forbid_1_pattern:        /storage/Users/[^/]+/work/[^/]+/[^ ]*cascade-tmp-[^ ]*
+forbid_1_reason:         固定设备路径绑定旧账号或任务，不会随 Conan 包构建隔离，也可能复用其他任务的文件。
+forbid_1_consequence:    测试缓存或 scratch 跨任务碰撞、权限失败，且 CI 与真机的目录行为不一致。
+principles:
+causes:                  []
+caused_by:               []
+similar_to:              DRAFT-coinor-vol-1.5.4-tmpdir-writable-probe-fallback
+conflicts_with:          []
+prerequisite_of:         []
+doc_file:                knowledge/drafts/DRAFT-cascade-project-test-tmp-build-folder.md
+last_updated:            2026-10-16
+source_event:            cascade-compiler g20200105.1 HarmonyOS regression temporary-directory isolation, PR !15713
+authors:                 iKalous_OscarP
+source_pr:               15713
+source_commit:
+metrics_success_count:   1
+metrics_fail_count:      0
+metrics_confidence:      1.0
+metrics_last_used:       2026-10-16
+draft:                   true
+contributor_id:          iKalous_OscarP
