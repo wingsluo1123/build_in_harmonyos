@@ -1,0 +1,73 @@
+software: attr
+version: 2.5.2.1
+conan_ref: attr/2.5.2.1
+status: built
+build_date: '2026-10-18'
+source:
+  upstream_project: https://savannah.nongnu.org/projects/attr
+  url: https://download.savannah.gnu.org/releases/attr/attr-2.5.2.tar.gz
+  sha256: 39bf67452fa41d0948c2197601053f48b3d78a029389734332a6309a680c6c87
+  upstream_version: 2.5.2
+license:
+  expression: GPL-2.0-or-later AND LGPL-2.1-or-later
+  components:
+    libattr: LGPL-2.1-or-later
+    getfattr: GPL-2.0-or-later
+    setfattr: GPL-2.0-or-later
+    attr: GPL-2.0-or-later
+build:
+  system: autotools
+  command: conan create archives/a/attr/2.5.2.1 -pr:h=ohos-aarch64 -pr:b=ohos-aarch64 --build=missing
+  jobs: 2
+  conan_home: ~/work/psj/ch-attr
+  device: HarmonyOS aarch64
+  create_exit: 0
+  configure_adaptation: 0003-configure-hmdfs-umask.patch; fixes the observed config.status permission failure caused by upstream umask
+    077 on HMDFS
+  network_in_build: false
+patches_applied:
+- 0001-config.guess-ohos.patch
+- 0002-config.sub-ohos.patch
+- 0003-configure-hmdfs-umask.patch
+upstream_tests:
+  registered_cases: 149
+  groups:
+  - path: test/attr.test
+    registered_cases: 119
+    pass: 87
+    fail: 32
+    notrun: 0
+  - path: test/root/getfattr.test
+    registered_cases: 30
+    pass: 0
+    fail: 0
+    notrun: 30
+  pass: 87
+  fail: 32
+  notrun: 30
+  make_check_exit: 2
+  pass_rate: 87/149 (58.4%; 32 failed, 30 not run)
+  evidence: test_package/MANIFEST.yml
+consumer_test:
+  registered_checks: 6
+  pass: 6
+  fail: 0
+  notrun: 0
+  result: passed
+  checks:
+  - C consumer calls attr_set and attr_get on a temporary build-folder file
+  - package PATH setfattr writes an extended attribute
+  - package PATH getfattr reads the value
+  - package PATH attr -s writes an extended attribute
+  - package PATH attr -g reads the value
+  tool_resolution: Conan tested package package_folder/bin was prepended to PATH
+  filesystem_boundary: All six checks passed; no xattr errno was generated.
+package_info:
+  component: libattr
+  headers:
+  - attr/attributes.h
+  - attr/libattr.h
+  - attr/error_context.h
+  library: libattr.a
+  cmake_target: attr::libattr
+upstream_tests_modified: false
