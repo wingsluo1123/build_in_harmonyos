@@ -1,0 +1,32 @@
+version: "1.14.0"
+software: "libosmo-mgcp-client"
+status: built
+build_date: "2026-10-17"
+build_system: "custom (recipe-side clang)"
+
+source:
+  url: "https://snapshot.debian.org/file/54afb84c536c9f4b3eec8255fc5fda5ec1501658"
+  sha256: "abf85011b52fe2a030bdc46bf552985a7951ee866daade767b14df771d6bf5b5"
+  tar_format: tar.xz
+  note: "Debian snapshot 的 osmo-mgw 1.14.0+dfsg1 官方 orig 归档"
+
+build:
+  system: custom
+  configure_options:
+    - "clang -shared -fPIC -O2 -std=gnu11 -fno-emulated-tls -I<include> -I<generated include> src/libosmo-mgcp-client/*.c -Wl,-soname,libosmo-mgcp-client.so.14 -Wl,--no-undefined"
+  dependencies:
+    - "libosmocore/1.11.0"
+    - "libosmo-abis/2.0.0"
+
+upstream_tests:
+  framework: autotest
+  test_sources: 2
+  test_command: "tests/mgcp_client/mgcp_client_test and tests/mgcp/mgcp_test"
+  run_in_build: false
+  evidence: "2/2 实际运行通过，stdout/stderr 与上游期望文件一致；两个测试均静态编入对应上游源文件"
+
+upstream_test_pass_rate: "2/2（100%）"
+adapted_test_pass_rate: "test_package 5/5 PASS"
+
+knowledge_gained:
+  - "mgcp_client 公共头依赖构建期生成的 mgcp_common.h；该文件必须从 osmocom/mgcp/mgcp_common.h 复制到制品 include 后才能被消费者使用。"
