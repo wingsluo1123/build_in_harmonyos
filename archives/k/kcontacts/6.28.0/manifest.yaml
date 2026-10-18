@@ -1,0 +1,38 @@
+software: kcontacts
+version: "6.28.0"
+status: built
+build_system: cmake
+created_at: 2026-10-16
+build_date: 2026-10-16
+dependencies:
+  required:
+    - qtbase/6.11.1
+    - kconfig/6.26.0.1
+    - kcoreaddons/6.26.0.1
+    - kcodecs/6.26.0.1
+    - ki18n/6.26.0
+    - iso-codes/4.16.0
+  build:
+    - extra-cmake-modules/6.28.0
+    - shared-mime-info/2.5.1
+  optional: []
+patches_applied:
+  - patches/0001-CMakeLists.txt.patch
+  - patches/0002-src-CMakeLists.txt.patch
+test_results:
+  type: passed
+  upstream: "passed: 32/32 executed upstream CTest entries (32 registered = 29 ecm_add_tests unit tests + kcontacts-testroundtrip + kcontacts-addressformattest + kcontacts-picturetest), BUILD_TESTING=ON inside conan create"
+  test_package: "passed: Addressee/Address model + VCardConverter 3.0/4.0 round-trip consumer smoke (7/7 checks) and SONAME/DT_NEEDED consumer regression check on the produced artifact (6/6 checks); CTest 2/2 (test_kcontacts, test_kcontacts_ohos)"
+  l0: "pass"
+  l1: "pass"
+  l2: "skip: verify reported no cache path (library-only package, no bin/ smoke)"
+  l4: "skip: verify reported no cache path"
+  l5: "skip: verify reported no cache path"
+source_url: https://download.kde.org/stable/frameworks/6.28/kcontacts-6.28.0.tar.xz
+source_sha256: 389d6128f18bee9113844615f535eeb870605f6fce968ca5c18d85a22478b8a2
+knowledge_gained:
+  - "kcontacts 6.28.0 keeps the vCard 2.1/3.0/4.0 + LDIF feature set; the KF6 dependency ceiling must be lowered to the published 6.26.0.x line via the KF_DEP_VERSION patch, and ECMQmlModule must be gated behind USE_QML=OFF because Qt6Qml is not published to ohpcd."
+  - "The country-backed address tests (kcontacts-addresstest / kcontacts-addressformattest) resolve iso-codes JSON through XDG_DATA_DIRS; taking iso-codes/4.16.0 as a runtime requirement and injecting its share/ tree unlocks the two tests that kcontacts 6.18.0 had to exclude (30/30 with 2 excluded)."
+  - "HMDFS rejects symlink() with EPERM, so any CMake target with VERSION/SOVERSION set (kcontacts is one, unlike kconfig) fails its post-link cmake_symlink_library step on the device; CMAKE_PLATFORM_NO_VERSIONED_SONAME=ON plus explicit -Wl,-soname, flags produces one unversioned library with a relocatable DT_SONAME (DRAFT-cmake-harmonyos-system-name-soname; kpeople 6.28.0 / kcolorpicker 0.3.1 precedents)."
+  - "ki18n 6.26.0 publishes libKF6I18n.so / libKF6I18nLocaleData.so without DT_SONAME; linking the KF6::I18n imported targets makes the linker record their absolute conan-cache paths in DT_NEEDED (platform entry E537). IMPORTED_SONAME stamps have no effect on CMake 4.1.2 (link line unchanged, artifact byte-identical); the fix is to drop the two targets from the link list and link by bare name (-L<package lib dir> -lKF6I18n -lKF6I18nLocaleData) while keeping their include directories - the linker records bare basenames (confirmed with a device linker micro-probe before the full rebuild). Post-hoc patchelf is not viable: the HMDFS user volume rejects mmap(PROT_EXEC) on rewritten files."
+  - "OHOS consumer tests that re-open a loaded library must not rely on the /proc/self/maps pathname: it is the kernel-side canonical view of the conan cache (e.g. /data/service/el2/100/hmdfs/account/files/Docs/.conan2/...), which a test process cannot open even though the loader mapped it from the /storage path. Re-open through the LD_LIBRARY_PATH candidate list the loader itself used (kcontacts 6.28.0 test_ohos_soname.cpp; the full consumer-level SONAME/DT_NEEDED regression net for E537 + the bare-DT_SONAME adaptation)."
