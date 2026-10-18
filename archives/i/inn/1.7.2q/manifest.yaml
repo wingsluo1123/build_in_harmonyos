@@ -1,0 +1,114 @@
+package: inn
+version: "1.7.2q"
+homepage: "https://www.eyrie.org/~eagle/software/inn/"
+license: ISC
+status: built
+build_system: custom-make
+build_date: "2026-10-15"
+
+source:
+  url: "https://launchpad.net/ubuntu/+archive/primary/+files/inn_1.7.2q.orig.tar.gz"
+  sha256: "5573ece29352ad2a90de39b5a7d3e91d47e7b8b94bd46e18187686313b9e1354"
+
+patches_applied:
+  - "0001-parsedate-yacc-prototype.patch"
+  - "0002-use-system-prototypes.patch"
+  - "0003-implicit-declarations.patch"
+  - "0004-inet-addr-return-type.patch"
+  - "0005-overlapping-strcpy-memmove.patch"
+  - "0006-makefile-destdir-support.patch"
+  - "0007-loadave-linux-proc.patch"
+  - "0008-subst-strerror-portable.patch"
+  - "0009-lib-makefile-ar-knob.patch"
+  - "0010-checkconf-builtins-tab-check.patch"
+  - "0011-subst-use-rename.patch"
+  - "0012-byteorder-system-prototypes.patch"
+
+build:
+  configure_options:
+    - "config/config.data generated from config.dist (CC/CFLAGS/LDFLAGS from Conan conf, install roots under package folder)"
+    - "PERL_SUPPORT=DONT TCL_SUPPORT=DONT (no system perl/tcl on HarmonyOS)"
+    - "USE_CHAR_CONST=DO OFFSET_T=off_t LOCK/CLX/NBIO=FCNTL FORK=fork MMAP trio (Debian-validated values)"
+  dependencies: []
+
+upstream_tests:
+  command: "none - upstream ships no test suite"
+  test_count: 0
+  notes: >-
+    inn-1.7.2q has no tests/ directory and no check/test make target in any
+    of its 10 Makefiles (audited from the tarball file list and per-Makefile
+    target scan under the strict ^(check|test) rule; lib parsedate is a
+    -DTEST debug helper never run by any target, config sedtest is a
+    sed-capability probe, lib/checkart.c is a library source file and
+    samples/inncheck is a runtime script — none of them is a test suite;
+    the recipe re-runs the scan on device and emits
+    HMBS_UPSTREAM_TEST_RESULT status no_tests). test_package therefore
+    carries the whole verification load (see below).
+
+test_package:
+  assertion_count: 20
+  description: >-
+    Links the packaged libinn.a and exercises three public subsystems:
+    wildmat shell-style matching (9 checks), Radix32 base-32 encoding
+    (6 checks), GetTimeInfo plus parsedate on fixed RFC 822 vectors
+    (4 checks), and INNVersion (1 check); then smoke-runs the packaged
+    convdate binary on a fixed date string. Counts come from real exit
+    codes, never stdout scraping.
+
+knowledge_gained:
+  - "INN 1.x has no configure script: config/config.data (edited copy of config.dist) plus the config/subst tool expand @<VAR>@ placeholders; the recipe generates config.data from Conan conf"
+  - "config quiet/all runs a perl interpreter-fixing step; HarmonyOS has no system perl, so the recipe runs only `make substitutions` (same reason inn2 passes --without-perl)"
+  - "Top-level `make install` runs makedirs.sh which unconditionally chowns to the news account; per-directory `make install` with package-rooted _PATH_* knobs avoids it, and installit.sh -O/-G already skip chown when not root"
+  - "lib/dbz.c includes <dbz.h>, which only exists after the `make ../include/dbz.h` rule runs — the recipe builds it explicitly before lib"
+  - "Debian -52 builds this exact tarball with -std=gnu17 (too many K&R prototypes to fix); clang 15 defaults to gnu17, the recipe pins it explicitly"
+  - "Upstream never released a 1.7.2q tarball at ISC; 1.7.2q is the Debian/Ubuntu canonical version, so conandata points at the distro archives with a verified sha256"
+
+patch_classification:
+  - file: 0001-parsedate-yacc-prototype.patch
+    type: backport
+    platform_only: False
+    guard: none
+  - file: 0002-use-system-prototypes.patch
+    type: portability
+    platform_only: False
+    guard: none
+  - file: 0003-implicit-declarations.patch
+    type: portability
+    platform_only: False
+    guard: none
+  - file: 0004-inet-addr-return-type.patch
+    type: bugfix
+    platform_only: False
+    guard: none
+  - file: 0005-overlapping-strcpy-memmove.patch
+    type: bugfix
+    platform_only: False
+    guard: none
+  - file: 0006-makefile-destdir-support.patch
+    type: portability
+    platform_only: False
+    guard: none
+  - file: 0007-loadave-linux-proc.patch
+    type: portability
+    platform_only: True
+    guard: none
+  - file: 0008-subst-strerror-portable.patch
+    type: portability
+    platform_only: True
+    guard: none
+  - file: 0009-lib-makefile-ar-knob.patch
+    type: portability
+    platform_only: False
+    guard: none
+  - file: 0010-checkconf-builtins-tab-check.patch
+    type: portability
+    platform_only: True
+    guard: none
+  - file: 0011-subst-use-rename.patch
+    type: portability
+    platform_only: True
+    guard: none
+  - file: 0012-byteorder-system-prototypes.patch
+    type: portability
+    platform_only: False
+    guard: none

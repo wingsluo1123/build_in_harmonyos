@@ -1,0 +1,22 @@
+--- a/config/subst.c
++++ b/config/subst.c
+@@ -54,6 +54,11 @@ extern char	*strcpy();
+ static char *
+ xstrerror()
+ {
++    /* POSIX strerror() is available on every target; the legacy
++       sys_errlist/sys_nerr fallback below is not (removed from POSIX
++       and absent from several modern libcs), so prefer strerror(). */
++    return strerror(errno);
++#if 0
+     extern int	sys_nerr;
+ #if !defined(__FreeBSD__) && !defined(__NetBSD__)
+     extern char	*sys_errlist[];
+@@ -65,6 +70,7 @@ xstrerror()
+ 	return sys_errlist[errno];
+     (void)sprintf(buff, "Error code %d\n", errno);
+     return buff;
++#endif
+ }
+ 
+ 

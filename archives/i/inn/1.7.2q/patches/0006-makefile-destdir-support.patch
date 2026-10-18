@@ -1,0 +1,120 @@
+--- a/Makefile
++++ b/Makefile
+@@ -48,7 +48,7 @@ install:	directories
+ ##  Directories where files get put.
+ directories:
+ 	chmod +x ./makedirs.sh
+-	DESTDIR=$(DESTDIR) ./makedirs.sh;
++	DESTDIR=$(DESTDIR) ./makedirs.sh -p
+ 
+ ##  Other generic targets.
+ lint depend tags ctags profiled:
+@@ -75,7 +75,8 @@ update:
+ 	    echo "" ; \
+ 	    echo "cd $$D ; $(MAKE) $(FLAGS) install ; cd .." ; \
+ 	    cd $$D; $(MAKE) $(FLAGS) install || exit 1 ; cd .. ; \
+-	done
++	done ; \
++	cd site; $(MAKE) $(FLAGS) update
+ 
+ ##  Build subst (for configuration).
+ subst c sh quiet sedtest:
+@@ -94,7 +95,7 @@ clobber realclean:	clean
+ 	rm -rf inews.* rnews.* nntplib.*
+ 	rm -f lib/dbz.c include/dbz.h doc/dbz.3z
+ 	rm -f tags */tags core */core a.out */a.out foo */foo
+-	rm -f CHANGES *~
++	rm -f *~
+ 	rm -fr $(TARDIR)
+ 	@echo ""
+ 	cd site ; make clobber ; cd ..
+--- a/makedirs.sh
++++ b/makedirs.sh
+@@ -95,7 +95,7 @@ ${NEWSLIB} ${INNDDIR} ${LOCKSDIR} \
+ ${NEWSBIN} ${CONTROLPROGS} ${RNEWSPROGS} \
+ ${PATH_AUTHDIR} ; do
+ 
+-    if [ ! -d ${F} ] ; then
++    if [ ! -d ${DESTDIR}${F} ] ; then
+ 	mkdir ${PFLAG} ${DESTDIR}${F} || exit 1
+ 	${CHOWN} ${NEWSUSER} ${DESTDIR}${F} || exit 1
+ 	chgrp ${NEWSGROUP} ${DESTDIR}${F} || exit 1
+--- a/frontends/Makefile
++++ b/frontends/Makefile
+@@ -48,10 +48,10 @@ ALL	= inews rnews ctlinnd getlist inncon
+ all:		$(ALL)
+ 	date >$@
+ 
+-install:	$(INEWS) $(RNEWS) \
+-		$(NEWSBIN)/ctlinnd $(NEWSBIN)/getlist $(NEWSBIN)/innconfval \
+-		$(RNEWSPROGS)/c7unbatch \
+-		$(RNEWSPROGS)/decode $(RNEWSPROGS)/encode
++install:	$D$(INEWS) $D$(RNEWS) \
++		$D$(NEWSBIN)/ctlinnd $D$(NEWSBIN)/getlist \
++		$D$(NEWSBIN)/innconfval $D$(RNEWSPROGS)/c7unbatch \
++		$D$(RNEWSPROGS)/decode $D$(RNEWSPROGS)/encode
+ 
+ clobber clean:
+ 	rm -f *.o $(ALL)
+@@ -104,21 +104,21 @@ profiled:
+ 	#load $(CFLAGS) $<
+ 
+ ##  Low-level install actions.
+-$(INEWS):		inews
++$D$(INEWS):		inews
+ 	$(SHELL) ../installit.sh $(OWNER) -m 02555 -b .OLD $? $@
+-$(RNEWS):		rnews
++$D$(RNEWS):		rnews
+ 	$(SHELL) ../installit.sh $(ROWNER) -m 04550 -b .OLD $? $@
+-$(NEWSBIN)/ctlinnd:	ctlinnd
++$D$(NEWSBIN)/ctlinnd:	ctlinnd
+ 	$(SHELL) ../installit.sh $(OWNER) -m  0550 -b .OLD $? $@
+-$(NEWSBIN)/getlist:	getlist
++$D$(NEWSBIN)/getlist:	getlist
+ 	$(SHELL) ../installit.sh $(OWNER) -m  0555 -b .OLD $? $@
+-$(NEWSBIN)/innconfval:	innconfval
++$D$(NEWSBIN)/innconfval:	innconfval
+ 	$(SHELL) ../installit.sh $(OWNER) -m  0555 -b .OLD $? $@
+-$(RNEWSPROGS)/c7unbatch:	c7unbatch.sh
++$D$(RNEWSPROGS)/c7unbatch:	c7unbatch.sh
+ 	$(SHELL) ../installit.sh $(OWNER) -m  0555 -b .OLD $? $@
+-$(RNEWSPROGS)/decode:		decode
++$D$(RNEWSPROGS)/decode:		decode
+ 	$(SHELL) ../installit.sh $(OWNER) -m  0555 -b .OLD $? $@
+-$(RNEWSPROGS)/encode:		encode
++$D$(RNEWSPROGS)/encode:		encode
+ 	$(SHELL) ../installit.sh $(OWNER) -m  0555 -b .OLD $? $@
+ 
+ ##  Dependencies.  Default list, below, is probably good enough.
+--- a/site/Makefile
++++ b/site/Makefile
+@@ -95,7 +95,7 @@ MOST		= \
+ 	actsync.cfg actsync.ign scanspool
+ 
+ MOST_INSTALLED	= \
+-	$D$(PATH_NEWSBOOT) $D$(PATH_SCHEMA) \
++	$D$(PATH_NEWSBOOT) \
+ 	$D$(CTLBIN)/checkgroups $D$(CTLBIN)/default $D$(CTLBIN)/ihave \
+ 	    $D$(CTLBIN)/newgroup $D$(CTLBIN)/rmgroup $D$(CTLBIN)/sendme \
+ 	    $D$(CTLBIN)/sendsys $D$(CTLBIN)/senduuname $D$(CTLBIN)/version \
+@@ -133,7 +133,7 @@ REST_INSTALLED	= \
+ 	$D$(PATH_NNRPACCESS) $D$(PATH_NNTPPASS) \
+ 	$D$(PATH_CONFIG) $D$(PATH_MODERATORS) \
+ 	$D$(PATH_CONTROLCTL) $D$(PATH_EXPIRECTL) $D$(NEWSLIB)/nntpsend.ctl \
+-	$D$(PATH_CTLWATCH) $D$(PATH_DISTPATS) \
++	$D$(PATH_CTLWATCH) $D$(PATH_DISTPATS) $D$(PATH_SCHEMA) \
+ 	$D$(PATH_ACTSYNC_CFG) $D$(PATH_ACTSYNC_IGN) \
+ 	$D$(CTLBIN)/sample.control
+ 
+--- a/config/Makefile
++++ b/config/Makefile
+@@ -95,7 +95,7 @@ subst:		subst.c subst.sh
+ 	$(IFTRUE) '! -f subst' 'echo Cannot make subst ; exit 1'
+ c:
+ 	@rm -f subst
+-	$(CC) -o subst subst.c
++	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o subst subst.c
+ sh:
+ 	@rm -f subst
+ 	cp subst.sh subst
+
