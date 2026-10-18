@@ -1,0 +1,48 @@
+# 版本级 manifest — jdim 0.10.1（遵循 ARCHIVE-SPEC v2.0）
+version: "0.10.1"
+software: jdim
+status: published
+build_date: "2026-10-18"
+build_system: autotools
+
+source:
+  url: "https://github.com/JDimproved/JDim/archive/refs/tags/JDim-v0.10.1.tar.gz"
+  sha256: "884fef563c0ff314426d3b35887ad5dafe9456e1ace6792f5772794937cf7a17"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--build=aarch64-unknown-linux-gnu"
+    - "--host=aarch64-unknown-linux-ohos"
+    - "--with-sessionlib=xsmp"
+    - "--with-tls=gnutls"
+    - "--with-migemo"
+    - "--with-alsa"
+  dependencies:
+    - "gtkmm/3.24.11"
+    - "libx11/1.8.13"
+    - "libsm/1.2.6"
+    - "libice/1.1.2"
+    - "alsa-lib/1.2.16"
+    - "gnutls/3.8.10"
+    - "libxcrypt/4.5.2"
+    - "zlib/1.3.1.1"
+    - "cmigemo/1.2-gh0.20220623"
+    - "gtest/1.17.0"
+  build_requirements:
+    - "automake/1.18"
+    - "libtool/2.5.4"
+    - "autoconf-archive/2024.10.16"
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "GitHub tag archive 无 configure/aclocal.m4：build() 内 autoreconf -fi 自举；tool_requires 提供 automake/libtool/autoconf-archive。ref: DRAFT-jdim-0.10.1-aclocal-path-libtool-m4-clobber"
+  - "autoconf-archive 的 buildenv_info.define_path(ACLOCAL_PATH) 会覆盖 libtool 的 append_path：aclocal.m4 缺 libtool.m4 -> automake 报 library used but 'RANLIB' is undefined。ref: DRAFT-jdim-0.10.1-aclocal-path-libtool-m4-clobber"
+  - "PKG_CHECK_MODULES 用 PkgConfigDeps 生成的全图 .pc；gtkmm 组件引用 atkmm::atkmm-1.6 而 atkmm 无 components，需在 generate() 镜像 component（含绝对路径 dirs）"
+  - "已发布 .la 的 dependency_libs 烤死构建机绝对路径，libtool 优先 .la -> 需每个依赖建无 .la 的 lib 影子目录并改 cpp_info.libdirs"
+  - "profile [buildenv] PATH/LD_LIBRARY_PATH 为赋值语义，buildenv_info 注入会被覆盖：上游需要的宿主工具（gdk-pixbuf-csource）要把 env 前缀直接写进 make 规则"
+  - "out-of-source 构建下 make check 必须在 build 目录执行；上游静态 531 条 TEST_F 中 5 条被 #ifdef _POSIX_C_SOURCE 排除，注册 526，平台字符集能力墙使 4 条失败（基线 522）"
