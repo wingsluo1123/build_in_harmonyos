@@ -1,0 +1,30 @@
+# manifest.yaml - ifmail 软件级元数据
+software: ifmail
+display: "ifmail (ifmail-tx 2.14tx8.10)"
+description: "FidoNet <-> Internet 传输与网关套件：ifcico 通过串口/TCP 跑 FTN 会话（FTSC/EMSI/YooHoo/Wazoo/Hydra/Janus/Zmodem/Xmodem/binkp），ifgate 在 FTN netmail/echomail 与 RFC-822 邮件、RFC-1036 新闻之间双向网关，另含节点表索引与查询工具"
+category: "network"
+homepage: "http://ifmail.sourceforge.net/"
+license: GPL-2.0-or-later
+build_system: "makefile (顶层 Makefile + include CONFIG；无 configure/cmake/meson)"
+
+ohos_adaptation:
+  key_points:
+    - "构建系统是 1999 年的手写 Makefile + CONFIG 变量文件：没有 configure 可探测平台，所有选择走 make 命令行覆盖（CC/AR/RANLIB/CFLAGS/LIBS/YACC/LEX/AWK/SHELL/USE_NLS/路径），CONFIG 自带的 Linux OPTS 块对 musl 基本适用，只补 -DDO_NEED_TIME"
+    - "ndbm 依赖：OHOS/musl 无 ndbm 实现，制品仓 gdbm/1.23 是 --enable-libgdbm-compat 的版本（含 <ndbm.h> 与 libgdbm_compat.a，静态），gdbm/1.24 反而是 --disable-libgdbm-compat 无 ndbm.h，必须选 1.23"
+    - "gdbm 的 compat <ndbm.h> 没有 include guard：同一 TU 二次包含即 typedef redefinition 硬错误（补丁 0005/0006 让 nlindex.h 成为唯一包含点）"
+    - "musl 缺口三处：无 BSD re_comp/re_exec（补丁 0003 换 POSIX regcomp/regexec）、无 _res 对象与 libresolv 私有的 _getshort/_getlong（补丁 0002）、<varargs.h> 在 clang 15 是 #error 桩（补丁 0003/0008 转 C99 stdarg）"
+    - "trap.c 的 pre-glibc 分支会 include <linux/version.h> + <linux/signal.h>（__KERNEL__），与 musl 用户态 <signal.h> 的 sigset_t/sigaltstack/sigval 冲突；删掉该分支即可，musl 自己提供 struct sigcontext（补丁 0010）"
+    - "-fno-common：ifgate/message.c 与 ifmail.c 各自暂定定义 ref_dbase，gcc<10 能合并、clang 直接 duplicate symbol（补丁 0004）"
+    - "flex 生成的扫描器会写 extern int yywrap(void)，与 flaglex.l 里的 #define yywrap() 1 相撞；按 flex 约定定义 YY_SKIP_YYWRAP（补丁 0011）"
+    - "readconfig() 结束时 freopen(debugfile, \"a\", stderr)：配置之后的所有诊断都进调试文件而不是终端；debugfile 未配置时会落到编译期 DEBUGFILE，故配方把 DEBUGFILE/LOGFILE 指向 package_folder 并在打包时创建对应目录"
+    - "运行时路径全部烤入二进制（CONFIGFILE/MAPTABDIR/DEBUGFILE/LOGFILE/LOCKDIR/PUBDIR/NEWSSPOOL/FAKEDIR），配方统一指到 package_folder 并把 maptabs 装到 MAPTABDIR 所指位置；站点配置用 -I 传入，misc/config 以 config.sample 形式安装（它 include /etc/ifmail/passwds 且 spool 指向 /var/spool/ifmail，在新系统上不存在）"
+    - "USE_NLS=no：po/ 需要 msgfmt 生成 catalog 与 libintl，只影响交互消息本地化，属非核心可选功能"
+    - "上游自测目标 testconf/testscan 因 rdconfig.o 引用 version/reldate/copyright/usage() 而在任何平台都无法链接（iflib 不提供这些符号），补丁 0007/0015 补 testglue.c 并让 4 个 -DTESTING 规则走 ${CC}/${CFLAGS}/${DEFINES}/${LIBS}"
+
+versions:
+  "2.14tx8.10":
+    status: built
+    build_date: "2026-10-16"
+    conan_ref: "ifmail/2.14tx8.10"
+    source_url: "https://deb.debian.org/debian/pool/main/i/ifmail/ifmail_2.14tx8.10.orig.tar.gz"
+    source_sha256: "5135f3bb0373bb82b983e7db61294fc56827538409cf56a1c5e45aee8f26d920"

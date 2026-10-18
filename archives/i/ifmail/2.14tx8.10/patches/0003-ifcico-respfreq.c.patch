@@ -1,0 +1,93 @@
+--- a/ifcico/respfreq.c
++++ b/ifcico/respfreq.c
+@@ -5,24 +5,50 @@
+ #include <string.h>
+ #include <ctype.h>
+ #include <sys/stat.h>
+-#ifdef HAS_REGEX_H
+-#define _REGEX_RE_COMP
+-#include <regex.h>
+-#else
+-char *re_comp(char*);
+-int re_exec(char*);
+-#endif
+ #include "directory.h"
+ #include "session.h"
+ #include "xutil.h"
+ #include "lutil.h"
+ #include "config.h"
+ #ifndef NOFREQREPORT
+-#include <varargs.h>
++#include <stdarg.h>
+ #include "ftnmsg.h"
+ #endif
+ #include "version.h"
++
++/* The mask matching below was written against the BSD re_comp()/re_exec()
++ * pair. POSIX never standardised them: glibc only exposes them behind
++ * _REGEX_RE_COMP and musl does not provide them at all (the link fails with
++ * "undefined symbol: re_comp"). Wrap the POSIX regcomp()/regexec() pair and
++ * keep the historical call shape so both call sites stay untouched: the mask
++ * is compiled once per search (an unparseable mask matches nothing, as
++ * before) and matching stays unanchored apart from the '^' the caller
++ * already prepends. Placed after the includes so logerr() is declared. */
++#include <regex.h>
++
++static regex_t req_mask_re;
++static int req_mask_ready=0;
++
++static void req_mask_comp(char *mask)
++{
++	if (req_mask_ready)
++	{
++		regfree(&req_mask_re);
++		req_mask_ready=0;
++	}
++	if (regcomp(&req_mask_re,mask,REG_NOSUB) == 0) req_mask_ready=1;
++	else logerr("invalid file request mask \"%s\"",mask);
++}
+ 
++static int req_mask_exec(char *str)
++{
++	if (!req_mask_ready) return 0;
++	return (regexec(&req_mask_re,str,0,NULL,0) == 0);
++}
++
++#define re_comp(mask) req_mask_comp(mask)
++#define re_exec(str) req_mask_exec(str)
++
+ #ifndef S_ISDIR
+ #define S_ISDIR(st_mode)       (((st_mode) & S_IFMT) == S_IFDIR)
+ #endif
+@@ -44,7 +70,9 @@
+ 
+ #ifndef NOFREQREPORT
+ static void attach_report(file_list**);
+-static void add_report();
++/* Match the C99 varargs definition below: a prototype-less forward
++ * declaration conflicts with it on modern compilers. */
++static void add_report(char*,...);
+ static char *report_text=NULL;
+ static unsigned long report_total=0L;
+ #endif
+@@ -612,15 +640,15 @@
+ 	report_text=NULL;
+ }
+ 
+-static void add_report(va_alist)
+-va_dcl
++/* K&R <varargs.h> entry point converted to C99 <stdarg.h>: add_report() is
++ * already forward-declared as a varargs function above and every call site
++ * passes the format string first. */
++static void add_report(char *fmt, ...)
+ {
+ 	va_list args;
+-	char *fmt;
+ 	char buf[1024];
+ 
+-	va_start(args);
+-	fmt=va_arg(args,char*);
++	va_start(args, fmt);
+ 
+ 	if (report_text == NULL)
+ 	{

@@ -1,0 +1,130 @@
+#====================================================================
+# DRAFT-ifmail-2.14tx8.10-gdbm-compat-ndbm-no-include-guard
+# gdbm compat 层的 <ndbm.h> 没有 include guard；制品仓 gdbm 1.23/1.24
+# 的 --enable/--disable-libgdbm-compat 开关相反，选错版本连头文件都没有
+# 来源: ifmail 2.14tx8.10 适配 (2026-10-16, PR 待建)
+#====================================================================
+
+id:                     DRAFT-ifmail-2.14tx8.10-gdbm-compat-ndbm-no-include-guard
+trigger_tool:           clang|cc|conan|ld
+phase:                  dependency-resolve|compilation|linking
+error_signature:        typedef redefinition with different types \('struct DBM' vs 'struct DBM'\)|unguarded header; consider using|ndbm\.h' included multiple times|fatal error: 'ndbm\.h' file not found|fatal error: 'dbm\.h' file not found|undefined symbol: dbm_open|undefined symbol: dbm_fetch|ld\.lld: error: cannot find -lgdbm_compat
+match_keywords:         ndbm.h, dbm.h, DBM, datum, typedef redefinition, unguarded header, included multiple times, gdbm, gdbm_compat, libgdbm_compat, enable-libgdbm-compat, disable-libgdbm-compat, dbm_open, dbm_store, dbm_fetch, dbm_firstkey, dbm_nextkey, HAS_NDBM_H, dbminit
+category:               compat, headers, dependency, packaging
+severity:               2
+status:                 draft
+agent_id:               6E98
+title: OHOS 无系统 ndbm，只能用 gdbm compat 层：其 <ndbm.h> 无 include guard（同一 TU 二次包含即硬错误），且制品仓 gdbm/1.23 与 gdbm/1.24 的 compat 开关相反
+
+root_cause: OHOS/musl 根本不提供 ndbm/dbm（没有 <ndbm.h>、<dbm.h>，libc 里也没有
+  dbm_open 一族符号），凡是用经典 dbm API 的老软件（ifmail、nmh、rgb、
+  inn、leafnode、fetchmail 之类）都必须由 gdbm 的 compat 层代打。这里有两个
+  互相独立、都会致命的地雷：
+  (1) **依赖选型地雷**：制品仓里 gdbm 有两个版本，compat 开关**相反**——
+      gdbm/1.23 的配方是 `--enable-libgdbm-compat`（包内实测有
+      include/ndbm.h、include/dbm.h、lib/libgdbm_compat.a，shared=False 静态），
+      gdbm/1.24 的配方是 `--disable-libgdbm-compat`（包内**只有** gdbm.h +
+      libgdbm，连 ndbm.h 都没有）。按"选新版本"的直觉 requires gdbm/1.24，
+      编译期就是 `fatal error: 'ndbm.h' file not found`；而 `conan list`
+      只看得到"gdbm 存在"，看不出 compat 被关掉了，必须下载配方/包体实测。
+  (2) **头文件地雷**：gdbm compat 的 `ndbm.h` **完全没有 include guard**
+      （实测 `grep -c "ifndef\|pragma once" <gdbm>/include/ndbm.h` == 0），
+      而它又 `typedef struct { ... } DBM;`。同一个 TU 里第二次包含它，clang
+      直接 `typedef redefinition with different types ('struct DBM' vs
+      'struct DBM')` 硬错误并附 `note: unguarded header; consider using
+      #ifdef guards or #pragma once`。老代码极易踩中：项目自己的头
+      （如 ifmail 的 ifgate/nlindex.h）包含 <ndbm.h>，而 .c 文件按 K&R 习惯
+      **也**直接包含一次 <ndbm.h>，glibc 的 ndbm.h（来自 glibc 或 libgdbm-compat
+      的 glibc 打包）带 guard 所以从来不出事，换到 OHOS 就炸。
+  两个地雷的症状完全不同（缺头 vs 类型重定义），但根因都在"gdbm compat 层
+  替代系统 ndbm"这一层，必须一起检查。
+
+affected_scope: 任何在 OHOS 上使用经典 dbm/ndbm API 的软件：源码出现 dbm_open/dbm_store/
+  dbm_fetch/dbm_firstkey/dbm_nextkey/dbm_delete/dbmclose/dbminit/fetch/store/
+  nextkey，或 configure 里出现 `--with-ndbm`/`AC_CHECK_HEADERS(ndbm.h)`/
+  `checking for dbm_open in -lgdbm_compat`。实测命中：ifmail 2.14tx8.10
+  （iflib/ref.c、ifgate/{msgidbm,ifdbm,nlindex,nodecheck}.c、ifcico/nlindex.c
+  共 30 处 dbm_* 调用）；邻近先例：nmh/1.8（自带 ndbmcompat/ndbm.h shim 走
+  gdbm/1.24）、rgb/1.1.1（notes 记录 gdbm/1.23 compat 层能让
+  `checking for dbm_open in -lgdbm_compat... yes` 通过）。
+
+rec_priority:           1
+rec_approach:           pick-compat-enabled-gdbm-and-single-include-point
+rec_description: 两步，都是最小改动、不引入任何平台宏：
+  (1) 依赖选型：`requires("gdbm/1.23")`（compat 打开的那个版本），链接顺序
+      `-lgdbm_compat -lgdbm`（compat 在前）；先用
+      `conan download gdbm/<ver> -r=ohpcd --only-recipe` 读配方里的
+      configure_args 确认开关，再 `conan download gdbm/<ver> -r=ohpcd` 下载
+      包体、`ls <pkg>/include <pkg>/lib` 确认 ndbm.h/dbm.h/libgdbm_compat
+      真实存在，不要凭 `conan list` 的结果推断。
+  (2) 包含纪律：让**项目自己的头**成为 <ndbm.h> 的唯一包含点，删掉 .c 里
+      重复的直接包含（保留同块内其它必要头，如 <fcntl.h> 的 O_RDWR/O_CREAT）。
+      若上游头只在 `#ifdef HAS_NDBM_H` 分支里包含 ndbm.h，把 `#else` 的
+      <dbm.h> 分支也补齐，两个分支都只出现一次。
+rec_command: >
+  conan download gdbm/1.23 -r=ohpcd --only-recipe && grep -n "libgdbm-compat" $(conan cache path gdbm/1.23)/e/conanfile.py
+rec_auto_fix:           false
+rec_impl:               manual-patch
+
+fallback_priority:      2
+fallback_approach:      vendor-ndbm-shim-over-gdbm-native
+fallback_description: 当只能依赖 compat 被关闭的 gdbm（例如未来 1.23 下架、或包已被下游锁定）时，
+  按 nmh/1.8 的做法随配方带一个 ndbmcompat/ndbm.h shim，用 gdbm 原生 API
+  （gdbm_open/gdbm_fetch/gdbm_store/gdbm_firstkey/gdbm_nextkey/gdbm_delete/
+  gdbm_close）实现 dbm_* 接口，并把 shim 目录加进 -I。代价是要自己保证
+  语义（ndbm 的 .dir/.pag 双文件布局 vs gdbm 单文件、dbm_error 与 gdbm_errno
+  的映射），且必须自带 guard。
+fallback_command:       cp -r <recipe>/ndbmcompat $SRC/ && CFLAGS="$CFLAGS -I$SRC/ndbmcompat"
+fallback_auto_fix:      false
+fallback_impl:          manual-patch
+
+forbid_1_pattern:       -DDBM|-Ddbm_open=|#define dbm_open|#define DBM\b
+forbid_1_reason:        用宏把 dbm_* 改名或直接 #define DBM 绕开重定义，只是把类型冲突换成符号缺失，链接期照样 undefined symbol: dbm_open。
+forbid_1_consequence:   编译期"过了"，链接期或运行期才炸；且宏会污染同一 TU 里其它使用 DBM/datum 的代码。
+forbid_2_pattern:       sed -i.*ndbm\.h|patch.*include/ndbm\.h
+forbid_2_reason:        不要去改依赖包里的 ndbm.h（给它加 guard）。包是共享制品，改动不进 git、下次 conan install 就没了，还会让本地与 CI 行为不一致。
+forbid_2_consequence:   本地"修好"、CI 复现原错误；或反之，形成无法解释的差异。
+forbid_3_pattern:       requires\("gdbm/1\.24"\).*ndbm|gdbm/1\.24.*HAS_NDBM_H
+forbid_3_reason:        gdbm/1.24 在制品仓是 --disable-libgdbm-compat 构建，包内没有 ndbm.h/dbm.h/libgdbm_compat（实测）。需要 ndbm 就必须选 1.23 或走 fallback shim。
+forbid_3_consequence:   fatal error: 'ndbm.h' file not found，或 undefined symbol: dbm_open。
+
+prescan_pattern:        dbm_open\s*\(|dbm_fetch\s*\(|dbminit\s*\(|#include\s*<ndbm\.h>|#include\s*<dbm\.h>
+principles:             P005, P006, P011
+causes:                 []
+caused_by:              []
+similar_to:             E119
+conflicts_with:         []
+prerequisite_of:        []
+
+verification_cmd: G=$(conan cache path gdbm/1.23)/p; printf '#include <ndbm.h>\n#include <ndbm.h>\nint main(void){DBM *d=dbm_open("x",0,0600);(void)d;return 0;}\n' > /tmp/ndbm2.c; clang --target=aarch64-linux-ohos --sysroot=$SYSROOT -c /tmp/ndbm2.c -I$G/include -o /dev/null; grep -c 'ifndef\|pragma once' $G/include/ndbm.h; grep -n 'libgdbm-compat' $(conan cache path gdbm/1.23)/e/conanfile.py $(conan cache path gdbm/1.24)/e/conanfile.py
+verification_expect: 与 ifmail 无关的最小复现（2026-10-16 实测）：
+  (a) 单次包含 <ndbm.h> 的 TU 编译 rc=0；
+  (b) 同一 TU 二次包含 → `ndbm.h:42:3: error: typedef redefinition with
+      different types ('struct DBM' vs 'struct DBM')` + `note: unguarded
+      header`；宿主 Apple clang 17 与 OHOS clang 15 **同样报错**，说明这是
+      gdbm compat 头自身的缺陷，不是 OHOS 工具链特有；
+  (c) `grep -c 'ifndef\|pragma once' <gdbm1.23>/include/ndbm.h` == 0（无 guard）；
+  (d) gdbm/1.23 配方含 `--enable-libgdbm-compat`，gdbm/1.24 配方含
+      `--disable-libgdbm-compat`；
+  (e) 修好之后（唯一包含点）：ifmail 的 ifgate/nlindex.c、nodecheck.c 编译通过，
+      且 ifindex→nlookup 的 dbm_store/dbm_fetch 往返在参考构建上输出与预期
+      逐字节一致（archives/i/ifmail/2.14tx8.10/test_package/test_ifmail_ohos.sh
+      的 OHOS-1，5 项）。
+
+evidence:
+  - "最小复现：/private/tmp/ndbm1.c（单次包含 rc=0）与 /private/tmp/ndbm2.c（二次包含报 typedef redefinition），OHOS clang 15 与 Apple clang 17 双工具链均复现"
+  - "grep -c 'ifndef|pragma once' ~/.conan2/p/gdbmaa77d3992c61d/p/include/ndbm.h == 0"
+  - "~/.conan2/p/gdbmaa77d3992c61d/p/{include/{ndbm.h,dbm.h,gdbm.h},lib/{libgdbm.a,libgdbm_compat.a}}（gdbm/1.23, shared=False, os=OHOS arch=armv8）"
+  - "gdbm/1.23 配方 generate(): tc.configure_args.append('--enable-libgdbm-compat')；gdbm/1.24 配方 generate(): tc.configure_args.append('--disable-libgdbm-compat')"
+  - "archives/i/ifmail/2.14tx8.10/patches/0005-ifgate-nlindex.c.patch、0006-ifgate-nodecheck.c.patch、0012-ifgate-nlindex.h.patch（唯一包含点 + 补 dbm.h 回退分支）"
+  - "archives/i/ifmail/2.14tx8.10/conanfile.py: requires('gdbm/1.23') + LIBS='-lgdbm_compat -lgdbm'（含选型理由注释）"
+  - "archives/i/ifmail/2.14tx8.10/notes.md §2（依赖预检表，含 1.23/1.24 对比）"
+  - "conan-verify G1/G2/G3/G4 + L2/L4/L5 全 PASS（archives/i/ifmail/2.14tx8.10/reports/conan-verify-report.md）"
+  - "graph 引擎查重：`ohc-run.py engine \"ndbm.h:42:3: error: typedef redefinition ... unguarded header\"` 只命中 E119（sockaddr_storage 双头重定义，同类不同对），index.tsv 全文 grep ndbm/gdbm 只有 E042（Python gdbm 的 RPATH，无关）⇒ 本条为真实缺口"
+
+applies_to:
+  - "任何用经典 dbm/ndbm API 的 C 软件在 OHOS 上的适配（ifmail/nmh/rgb/inn/leafnode/fetchmail 家族）"
+  - "configure 里有 AC_CHECK_HEADERS(ndbm.h) 或 --with-ndbm/--with-db 选项的 autotools 项目"
+  - "手写 Makefile 且用 -DHAS_NDBM_H 之类开关切换 ndbm/dbm 分支的老项目"
+  - "不适用于：只用 gdbm 原生 API（gdbm_open/gdbm_fetch）的软件——那条路径不需要 compat 层，也就不受本条影响"
+  - "不适用于：BDB/ Berkeley DB（db.h + db_create）路线，那是另一套 API 与另一个包"

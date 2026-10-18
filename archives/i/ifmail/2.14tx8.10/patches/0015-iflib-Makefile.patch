@@ -1,0 +1,43 @@
+--- a/iflib/Makefile
++++ b/iflib/Makefile
+@@ -128,26 +128,34 @@
+ 	${INSTALL} -o ${MANOWNER} -g ${MANGROUP} -m ${MANMODE} cleanup_ref.8 ${MANDIR}/man8/cleanup_ref.8
+ 	${INSTALL} -o ${MANOWNER} -g ${MANGROUP} -m ${MANMODE} make_new_ref.8 ${MANDIR}/man8/make_new_ref.8
+ 
+-testconf:	rdconfig.c config.h utlib.a
+-	cc -g -Wall -DTESTING rdconfig.c utlib.a -o $@
++# The self-test rules hardcoded "cc -g -Wall" and dropped ${CFLAGS},
++# ${INCLUDES}, ${DEFINES} and ${LIBS}, so they could not build outside a
++# 1990s native Linux tree (no config.h feature macros, no cross compiler,
++# no dbm library). Route them through the same variables the objects use.
++# rdconfig.o references version/reldate/copyright/usage(), which the real
++# front ends supply (generated version.c + each program's usage()). iflib
++# ships none of them, so these self-tests never linked; testglue.c provides
++# the four symbols for test builds only.
++testconf:	rdconfig.c config.h testglue.c utlib.a
++	${CC} ${CFLAGS} ${INCLUDES} ${DEFINES} -DTESTING rdconfig.c testglue.c utlib.a ${LIBS} -o $@
+ 
+ tryconf: testconf
+ 	./testconf ../misc/config
+ 
+-testscan:	scanout.c scanout.h utlib.a
+-	cc -g -Wall -DTESTING scanout.c utlib.a -o $@
++testscan:	scanout.c scanout.h testglue.c utlib.a
++	${CC} ${CFLAGS} ${INCLUDES} ${DEFINES} -DTESTING scanout.c testglue.c utlib.a ${LIBS} -o $@
+ 
+ tryscan: testscan
+ 	./testscan ../misc/config
+ 
+ testtrap:	trap.c
+-	cc -g -Wall -DNEED_TRAP -DTESTING trap.c utlib.a -o $@
++	${CC} ${CFLAGS} ${INCLUDES} ${DEFINES} -DNEED_TRAP -DTESTING trap.c utlib.a ${LIBS} -o $@
+ 
+ trytrap:	testtrap
+ 	./testtrap
+ 
+ testrfcaddr:	rfcaddr.c rfcaddr.h
+-	cc -g -Wall -DTESTING rfcaddr.c utlib.a -o $@
++	${CC} ${CFLAGS} ${INCLUDES} ${DEFINES} -DTESTING rfcaddr.c utlib.a ${LIBS} -o $@
+ 
+ tryrfcaddr:	testrfcaddr
+ 	./testrfcaddr

@@ -1,0 +1,38 @@
+--- a/iflib/parsedate.y
++++ b/iflib/parsedate.y
+@@ -24,6 +24,7 @@
+ #include "configdata.h"
+ #include <stdio.h>
+ #include <ctype.h>
++#include <string.h>
+ #include <sys/types.h>
+ #if	defined(DO_NEED_TIME)
+ #include <time.h>
+@@ -37,7 +38,12 @@
+ #define yylex		date_lex
+ #define yyerror		date_error
+ 
++/* The generated yyparse() calls the scanner before its definition below;
++ * without a prototype that call is an implicit declaration (an error under
++ * -Werror=implicit-function-declaration). */
++int date_lex(void);
+ 
++
+     /* See the LeapYears table in Convert. */
+ #define EPOCH		1970
+ #define END_OF_TIME	2038
+@@ -665,8 +671,12 @@
+ }
+ 
+ 
+-static int
+-date_lex()
++/* Bison's generated yyparse() calls yylex() (renamed date_lex below) before
++ * this definition, so a static definition collides with that earlier
++ * non-static declaration on C99 compilers: drop the internal linkage and
++ * give the definition a real prototype. */
++int
++date_lex(void)
+ {
+     register char	c;
+     register char	*p;
