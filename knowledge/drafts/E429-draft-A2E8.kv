@@ -1,0 +1,88 @@
+#====================================================================
+# E429 — OHOS 制品仓 vtk 未启用 ParallelMPI：依赖 vtkMPIController 的库
+#        无法编译或启用其 VTK 输出功能
+# 来源: liggghts 3.8.01 适配 (2026-10-15, 平台任务 id 8465)
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E429
+trigger_tool:           clang|make|cmake|runtime
+phase:                  compilation|runtime
+error_signature:        fatal error: 'vtkMPIController\.h' file not found|vtkMPIController\.h: No such file|cannot open shared object file.*libvtkParallelMPI|libvtkParallelMPI-9\.[0-9]+\.so: No such file|Invalid dump style
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               2
+category:               ohos, limitation, dependency, detection
+match_keywords:         vtkMPIController, vtkParallelMPI, libvtkParallelMPI, ParallelMPI, vtkMultiProcessController, PartitionController, VTK_MODULE_ENABLE_VTK_ParallelMPI, LAMMPS_VTK, dump custom/vtk, dump mesh/vtk, Invalid dump style, vtk/9.4.1
+title:                  OHOS 制品仓 vtk 未启用 ParallelMPI，依赖 vtkMPIController 的库无法编译该模块（自带开关时可关闭，但运行期该输出样式报 Invalid dump style）
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause: >
+  制品仓（ohpcd）发布的 vtk 包在构建时没有启用 MPI 支持：VTK 的并行能力来自
+  ParallelMPI 模块（其头文件 vtkMPIController.h、库 libvtkParallelMPI-<ver>.so），
+  该模块只在 VTK_MODULE_ENABLE_VTK_ParallelMPI=YES 且构建期 MPI 可用时才产出。
+  OHOS 已发布的 vtk/9.4.1 二者皆无：include/vtk-9.4/ 下没有 vtkMPIController.h，
+  lib/ 下没有 libvtkParallelMPI-9.4.so。于是任何直接引用该模块的库（VTK 并行
+  控制器 vtkMPIController / vtkMultiProcessController::PartitionController）
+  在 OHOS 上根本编译不过——这与库本身的可移植性无关，是依赖侧能力缺口。
+  典型受害形态是「把 VTK 输出放在编译开关后」的仿真类库：LAMMPS 家族
+  （LIGGGHTS-PUBLIC 3.8.0）的 Makefile.mpi 默认 -DLAMMPS_VTK，其
+  dump_vtk.*/custom_vtm.*/local_gran_vtk.*/mesh.cpp 无条件 #include
+  <vtkMPIController.h>；实测 10 个 VTK 源文件里 8 个因该头文件缺失而失败。
+  关闭开关后其余功能完整可编译，但算例里的 dump custom/vtk、dump mesh/vtk 等
+  输出请求在运行期报 "ERROR: Invalid dump style"（样式未被注册），
+  表现为「编译通过但上游算例批量失败」，容易被误判成适配缺陷。
+affected_scope: >
+  所有依赖 VTK 并行/MPI 能力的库与程序：LAMMPS 家族（LIGGGHTS、LAMMPS 本体）的
+  dump vtk / custom/vtk / mesh/vtk / mesh/gran/VTK 输出样式；ParaView 系后处理链；
+  任何以 vtkMPIController、vtkMultiProcessController::PartitionController 做
+  并行收集/分区的代码。纯串行 VTK I/O（vtkXMLWriter 等）不受影响。
+verification_cmd:       VTK_P=$(conan cache path vtk/9.4.1); ls "$VTK_P"/include/vtk-9.4/vtkMPIController.h; ls "$VTK_P"/lib/libvtkParallelMPI-*.so
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           probe-before-enable-then-disable-optional
+rec_description:        先用 verification_cmd 探测 vtk 包是否含 ParallelMPI；库自身有 VTK 开关时关闭该功能、保留其余全部功能，并在 R51 测试口径中把「依赖该输出样式的上游用例」单列原因（不改仿真本体，只去掉输出请求行）
+rec_command:            conan cache path vtk/<ver>   # 再 ls include/vtk-*/vtkMPIController.h 与 lib/libvtkParallelMPI*
+rec_auto_fix:           false
+rec_impl:
+
+fallback_priority:      2
+fallback_approach:      dependency-side-rebuild-then-reenable
+fallback_description:   必须启用该功能时，先由依赖侧发布一个启用 MPI 的 vtk 修订版本（VTK_MODULE_ENABLE_VTK_ParallelMPI=YES + MPI 可用，按 R37 加版本后缀），再重新打开库的 VTK 开关；这是依赖链上游任务，不应在本库配方里用 stub 绕过
+fallback_command:       conan create <vtk-recipe> -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64
+fallback_auto_fix:      false
+fallback_impl:
+
+forbid_1_pattern:       (class|struct)\s+vtkMPIController|touch\s+.*vtkMPIController\.h|create.*vtkMPIController\.h
+forbid_1_reason:        自造一个同名类/空头文件来顶替 VTK 的 MPI 控制器，会产出并行分区与收集语义全错的后处理产物，属于伪造依赖能力；同时把真实的依赖缺口从日志里抹掉，让后续同类库继续踩同一个坑
+forbid_1_consequence:   产物在并行/多进程场景静默产出错误数据；按 R40（深度适配不得以 stub 冒充实质性适配）与赛事诚信红线（虚报适配状态）判定为不合格交付
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             R40, R51
+
+# ═══ 关系图 (Relations) ═══
+causes:                 []
+caused_by:              []
+similar_to:             []
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file:               doc/E429.md
+last_updated: 2026-10-15
+source_event:           liggghts 3.8.01 适配：10 个 VTK 源文件 8 个因 vtkMPIController.h 缺失失败；关闭 LAMMPS_VTK 后 28 个上游教程算例原样运行仅 1 个通过，其中 19 个报 Invalid dump style（另 8 个为上游其它原因，逐条见 notes.md）
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:                Yunan0718 (AtomCode A2E8)
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics, 方案 D) ═══
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+
+draft: true
+contributor_id: A2E8

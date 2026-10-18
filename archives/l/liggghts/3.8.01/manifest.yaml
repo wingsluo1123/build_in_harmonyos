@@ -1,0 +1,39 @@
+# 版本级 manifest — liggghts 3.8.01（上游 3.8.0 的适配修订）
+version: "3.8.01"
+software: liggghts
+status: built
+build_date: "2026-10-15"
+build_system: makefile
+
+source:
+  url: "https://github.com/CFDEMproject/LIGGGHTS-PUBLIC/archive/refs/tags/3.8.0.tar.gz"
+  sha256: "9cb2e6596f584463ac2f80e3ff7b9588b7e3638c44324635b6329df87b90ab03"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options:
+    - "make -j1 mpi   # src/Makefile -> src/MAKE/Makefile.mpi -> lmp_mpi"
+    - "SHELL=$(CONFIG_SHELL)         # OHOS 无 /bin/bash，src/Makefile 写死该路径"
+    - "LMP_INC=-DLAMMPS_GZIP -DSUPERQUADRIC_ACTIVE_FLAG -DNONSPHERICAL_ACTIVE_FLAG"
+    - "VTK_INC= VTK_PATH= VTK_LIB=   # Makefile.mpi 默认 VTK 6.2 参数，本目标不启用 VTK 输出"
+  dependencies:
+    - mpich/5.0.1
+    - zlib/1.3.2.1
+    - boost/1.91.0.1.4
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-guard-mesh-vtk-dumps-with-lammps-vtk.patch"
+  - "0002-fix-int-to-string-rvalue-stream.patch"
+  - "0003-fix-neighlist-pointer-comparison.patch"
+  - "0004-fix-null-screen-in-region-reset-random.patch"
+
+knowledge_gained:
+  - "手写 Makefile 项目必须显式传入 CC/LINK/CCFLAGS/MPI_*/PKG_*/VTK_*；src/Makefile 会把 SHELL 写死为 /bin/bash"
+  - "Makefile.mpi 默认 LIB=-lstdc++ 且带 VTK 6.2 链接参数，OHOS 下需置空 LIB 并清空 VTK_*"
+  - "LIGGGHTS 的 model package（asphere/cohesionmodels/surfacemodels…）不是 Makefile target，而是编译宏 SUPERQUADRIC_ACTIVE_FLAG / NONSPHERICAL_ACTIVE_FLAG / CONVEX_ACTIVE_FLAG"
+  - "超二次曲面需要 beta 函数；OHOS libc++ 15 没有 __STDCPP_MATH_SPEC_FUNCS__，因此必须走 boost 分支"
+  - "OHOS 制品仓的 vtk/9.4.1 未启用 MPI（缺 vtkMPIController/ParallelMPI），dump custom/vtk 等 VTK 输出样式无法启用"
+  - "上游 3.8.0 存在 -screen none 下 fprintf(screen,…) 未判空的空指针崩溃（Region::reset_random 等）"
