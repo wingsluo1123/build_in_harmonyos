@@ -1,0 +1,152 @@
+software: swaks
+version: "20240103.0"
+status: built
+build_date: "2026-10-15"
+build_system: custom
+conan_ref: "swaks/20240103.0"
+
+source:
+  url: "https://github.com/jetmore/swaks/releases/download/v20240103.0/swaks-20240103.0.tar.gz"
+  sha256: "0e531b4d164058802e7266b14f4dc1897099d096f930820de2f9b5eb08dcdbe8"
+  tar_format: tar.gz
+  equivalent_official_url: "https://www.jetmore.org/john/code/swaks/files/swaks-20240103.0.tar.gz"
+  equivalence_evidence: >-
+    上游官网 tarball 与 GitHub Release 资产逐字节一致（均为 121308 字节、sha256
+    0e531b4d164058802e7266b14f4dc1897099d096f930820de2f9b5eb08dcdbe8），Homebrew
+    Formula/s/swaks.rb 记录的 sha256 也与两者相同。
+
+build:
+  system: custom
+  configure_options: []
+  # swaks 是单文件 Perl 脚本，没有编译步骤；此依赖是"目标机上运行脚本所需的解释器"，
+  # 因此声明为运行时依赖（self.requires("perl/5.42.2", run=True)）。
+  dependencies:
+    - perl/5.42.2
+  runtime_only_dependencies:
+    - perl/5.42.2
+  cc: n/a
+  cxx: n/a
+
+patches_applied: []
+
+validation:
+  w0_dependencies:
+    status: passed
+    date: "2026-10-15"
+    method: "全新 CONAN_HOME + conan download perl/5.42.2 -r=ohpcd（R35），并在真机 shadow CI 中复现"
+    result: "perl/5.42.2 制品包 6b129b068851896169fae42d399fa922d239ce8a 下载成功（17.0MB，os=OHOS/6.0/armv8/clang15/libc++）；真机 L0i 输出 [ok] dependency in registry: perl/5.42.2"
+    module_inventory:
+      present:
+        - "Pod::Usage 2.05（脚本顶层硬 use，含 Pod::Text/Pod::Simple/Pod::Escapes 渲染链路）"
+        - "File::Spec::Functions"
+        - "IO::Socket::IP / IO::Socket::INET / IO::Socket::UNIX"
+        - "IPC::Open2"
+        - "Sys::Hostname / POSIX / Time::HiRes / MIME::Base64 / Digest::MD5 / Digest::SHA / Net::Netrc"
+      absent_optional:
+        - "Net::SSLeay（TLS 不可用，--support 会如实报告）"
+        - "Net::DNS / Authen::NTLM / Authen::SASL（可选特性缺口，不影响 SMTP 主流程）"
+  local_static:
+    status: passed
+    date: "2026-10-15"
+    checks:
+      - "python -m py_compile conanfile.py test_package/conanfile.py"
+      - "conandata.yml / manifest.yaml / test_package/MANIFEST.yml 均可被 YAML 解析；commands.json 合法"
+      - "conan export + conan inspect（隔离 CONAN_HOME，不污染共享缓存）"
+      - "sha256 与 GitHub Release、上游官网、Homebrew 公式三方一致"
+      - "CI L0 门禁本地仿真（G0e + L0a-L0q）16/16 通过；属仿真，不等同真 CI"
+      - "test_package/test_swaks.sh 在本机 perl 5.42.2 上跑通 27/27 断言（含 socket 与 pipe 两种传输）"
+      - "R34/L1e 反向验证：移除包内 bin/swaks 后测试按预期失败（非假通过）"
+  ohos:
+    status: passed
+    date: "2026-10-15"
+    device: "HarmonyOS / HongMeng Kernel 1.12.0 / aarch64（经 SSH，走 ohos-test-runner.sh 隔离 job + 全局锁）"
+    run_id: "codex-swaks-20240103.0-swaks-20240103.0-r1-conan-20261015-150019-49419"
+    command: "zsh ci/conan/build_and_test.sh archives/s/swaks/20240103.0"
+    exit_code: 0
+    result: "Build Summary Total=1 Success=1 Failed=0；L0=pass, L1=pass, L2=skip(非阻塞), L4=pass, L5=pass"
+    conan_create:
+      source: "Sources correctly downloaded from https://gh-proxy.com/https://github.com/jetmore/swaks/releases/download/v20240103.0/swaks-20240103.0.tar.gz（镜像回退生效）"
+      build_check: "source script verified (244177 bytes, upstream shebang kept)"
+      packaged: "bin/swaks + licenses/LICENSE.txt + share/doc/swaks/{README,Changes,recipes,ref}.txt"
+    consumer_test: "SWAKS_CONSUMER_TEST_RESULT PASS=27 FAIL=0（24 条必需断言 + 3 条 pipe 传输断言）"
+    l1e_negative_test: "[sabotage] bin/ moved away → [ok] Negative test confirmed（测试确实依赖被测包）"
+    l2_note: >-
+      L2 smoke 直接以环境 PATH 执行 bin/swaks --version，不激活 conanrun 运行环境；设备上
+      既没有系统 perl，perl 自身也需要依赖包注入的 PERL5LIB，因此该检查对"解释器由 Conan 依赖提供
+      的脚本包"结构上无法通过。CI 脚本本身将其标为 non-blocking。package 在 conanrun 下由
+      test_package 证明 --version/--help 均 rc=0（见下）。
+    independent_check: >-
+      在 test_package 之外手工模拟 conanrun（PATH 加依赖 perl/bin，PERL5LIB 指向依赖 perl5 目录）：
+      swaks --version → "swaks version 20240103.0" rc=0；swaks --help → 正常渲染 POD rc=0；
+      swaks --support → IPv4/v6 Socket Transport / Pipe Transport / UNIX Socket Transport supported，
+      TLS not available: requires Net::SSLeay。
+    upstream_regression_suite:
+      run_id: "codex-swaks-20240103.0-swaks-upstream-full-20261017-111510-31879"
+      source: "上游 tag 归档 testing/（发布资产不含），经 gh-proxy 下载到设备后解包"
+      cases_total: 2589
+      executed: 2589
+      passed: 2133
+      failed: 455
+      skipped: 1
+      pass_rate: "82.39%"
+      not_executed: 0
+      elapsed: "453s"
+      baseline: "首轮 2,354 例 / 1,667 pass（70.83%，_exec-transactions 未执行）；共同 2,353 例子集 70.8% → 85.2%"
+      failure_causes: "hostname munge 418（92%，含 062xx 32 例）/ 缺模块 0（INET6 已真实现）/ TLS 残留 4 / 未归因 19"
+      blocking_issue_resolved: >-
+        `_exec-transactions` 的 Net::SSLeay 阻塞已解除：设备上手工 xsubpp + clang 编译 Net::SSLeay 1.96、
+        静态链接 ohpcd 的 OHOS openssl/3.5.8（真实现，非桩），swaks --support 报 TLS supported，
+        _options-tls 252/252 通过、_exec-transactions 首次执行 235 例（122 pass）。
+      environment_provisions: >-
+        job 局部 lib：Net::SSLeay 1.96（真编）、Socket6 0.29（真编）、IO::Socket::INET6 2.73、Authen::NTLM 1.09、
+        Authen::SASL 2.2100、Net::DNS 1.57、Digest::HMAC 1.05、Net::IP 1.26、Capture::Tiny 0.50、
+        Algorithm::Diff 1.201、Text::Diff 1.46、Proc::Background 1.32；Term::ReadKey 仍为编译期最小桩
+        （headless 不调用，且在本轮之前就存在；本轮未新增任何桩）。
+        未写入 swaks conan 包、未改任何 conan 配方；openssl 使用独立 CONAN_HOME。
+
+test_results:
+  type: official
+  # 上游套件在 git 仓库 testing/（发布资产不含），用例 2,589（12 组）
+  upstream_total: 2589
+  upstream_executed: 2589
+  upstream_passed: 2133
+  upstream_failed: 455
+  upstream_skipped: 1
+  upstream_pass_rate: "82.39%"
+  upstream_not_executed: 0
+  upstream_baseline: "2026-10-15：执行 2,354 / PASS 1,667 / FAIL 686（70.83%，_exec-transactions 未执行）；两轮共同执行的 2,353 例上 1,667 → 2,005（70.8% → 85.2%）"
+  upstream_failure_attribution:
+    harness_hostname_munge_environment: 418   # 含原误归为 perl 库路径的 32 例 062xx（munge 连命令行里的 localhost 一起替换）
+    missing_optional_perl_modules: 0         # Socket6/INET6 已手编成真实现，--support 16/16 supported
+    tls_ssl_residual: 4
+    unattributed: 19
+  upstream_run_id: "codex-swaks-20240103.0-swaks-upstream-full-20261017-111510-31879"
+  upstream_command: "SWAKS_TEST_SWAKS=<pkg>/bin/swaks perl testing/regressions/bin/run-all.pl（12 组全跑，经设备 runner 全局锁）"
+  downstream_reference_passed: 1
+  test_package_assertions: 24
+  test_package_conditional_assertions: 3
+  test_package_executed: 27
+  test_package_passed: 27
+  test_package_failed: 0
+  total_passed: 2155
+  total_failed: 455
+  status: verified-on-ohos
+
+knowledge_ref:
+  - E037
+
+knowledge_gained:
+  - "swaks 是单文件 Perl 脚本：没有构建系统，适配重点是解释器依赖声明与真实 SMTP 会话证据"
+  - "脚本硬 use Pod::Usage、File::Spec::Functions，并运行时 require IO::Socket::IP/IPC::Open2 等核心模块；依赖检查要清点 perl 包内部模块，而不只是确认包名已发布"
+  - "OHOS perl 5.42.2 包内已含 Pod::Usage 2.05 与 Pod::Text/Pod::Simple/Encode 整条 POD 渲染链路，也含 IO::Socket::IP 与 IPC::Open2；缺 Net::SSLeay/Net::DNS/Authen::NTLM/Authen::SASL，真机 --support 已如实报告 TLS not available"
+  - "Pod::Usage 文档里出现的 use Pod::Find 位于 __END__ 之后的 POD 段，不是加载期依赖，不需要 Pod-Parser"
+  - "#!/usr/bin/env perl 是上游自带的可移植 shebang，OHOS（HongMeng Kernel 1.12.0 起）已有 /usr/bin/env，无需打补丁（E037）"
+  - "CI 门禁 L0p 要求 settings 必须声明 os/compiler/build_type/arch 四项；纯脚本包照抄 acme.sh 的 settings=(\"os\",\"arch\") 会被 L0 拦截（本包首轮真机构建即因此失败，已修正）"
+  - "L2 smoke 不激活 conanrun：解释器由 Conan 依赖提供的脚本包（perl 不在设备 PATH 上）结构上无法通过 L2，CI 将其标为 non-blocking，需在 PR 中说明"
+  - "上游发布 tarball 不含 testing/ 回归框架，但**上游 git 仓库有完整套件**（2,589 例 / 12 组）；第一次提交只看了发布资产、把上游用例记成 0，被人工审查判为少报，已更正为真实数量并附真机执行结果"
+  - "上游套件真机全量实测（2026-10-17）：2,589 例全部执行 → PASS 2,133 / FAIL 455 / SKIP 1（82.39%）；较首轮（2,354 例 / 1,667 pass / 70.83%）在同一 2,353 例子集上从 70.8% 提到 85.2%"
+  - "**Net::SSLeay 不是不可解**：在设备上手工 xsubpp + clang 编译 Net::SSLeay 1.96、静态链接 ohpcd 的 OHOS openssl/3.5.8 后，swaks --support 报 TLS supported，_options-tls 252/252 全过，_exec-transactions 首次执行 235 例（122 pass）"
+  - "该设备 perl 有两个硬坑：①Config{cc} 指向不存在的 /data/service/hnp/bin/clang；②`perl Makefile.PL` futex 死锁 → 任何 XS 模块都必须手写 xsubpp + clang（用 Config.pm 覆盖层修 cc/archlibexp），且手工构建后要自己跑 AutoSplit"
+  - "剩余 455 例失败里 418 例（92%）是 harness 的 hostname munge 环境差异（设备 hostname 恰为 localhost，被替换成 LOCAL_HOST_NAME，而上游 ref 是字面 localhost），非 swaks 缺陷；PERL5OPT 能修掉其中 32 例的 strict.pm 报错，但最终仍被 munge 判死"
+  - "IO::Socket::INET6 也能真做出来：Socket6 的 autoconf 在设备上失败，但手写 config.h + xsubpp + clang -shared 可编成（真实现），装好后 swaks --support 16/16 全 supported，缺模块类失败降为 0"
+  - "裸 CLI 选项名是 --support（脚本内部 okey 为 get_support）；本机演练先于真机发现了这个命名差异"
