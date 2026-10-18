@@ -1,0 +1,83 @@
+version: "3.52.23"
+software: "xlispstat"
+status: built   # 真机 shadow CI 全绿（r25, exit 0）；CI upload 成功后由流水线转 published
+build_date: "2026-10-16"
+build_system: autotools
+
+source:
+  url: "https://homepage.cs.uiowa.edu/~luke/xls/xlispstat/current/xlispstat-3-52-23.tar.gz"
+  sha256: "9bf165eb3f92384373dab34f9a56ec8455ff9e2bf7dff6485e807767e6ce6cf4"
+  tar_format: tar.gz
+  upstream_tag: "current release tarball (upstream GitHub mirror jhbadger/xlispstat has no tags)"
+  upstream_commit: "unspecified-in-tarball"
+
+build:
+  system: autotools
+  method: "configure --without-x + make xlisp / xlisp.wks / xlispstat (-j1); build must run the interpreter natively to compile src/lsp/*.lsp and dump xlisp.wks"
+  configure_options:
+    - "--prefix=/"
+    - "--without-x   # GNUPLOT (terminal) graphics system; no libX11/Xaw link"
+    - "UCFLAGS=\"$CFLAGS -O2\"   # upstream Makefiles ignore env CFLAGS"
+  dependencies: []
+  cc: clang
+  cxx: n/a
+
+patches_applied:
+  - "patches/0001-relocatable-xlisplib.patch   # setup.shell: wrapper prefers inherited XLISPLIB over baked /lib/xlispstat (relocatable Conan package)"
+  - "in-recipe: config/config.guess HarmonyOS branch injection（幂等；2002 版 echo/exit 风格输出 <machine>-unknown-linux-gnu；E007。r1 实证该 hunk 用 .patch 在设备 patch(1) 上 FAILED、桌面端仅 fuzz 2，故改为配方内注入）"
+
+test_results:
+  type: shadow_ci_harmonyos_aarch64
+  total_packages: 1
+  passed_packages: 1
+  failed_packages: 0
+  l0: pass
+  l1: pass
+  l2: skip   # bin/xlispstat is an sh script and HMDFS refuses script exec; consumer tests drive the signed interpreter ELF directly (see notes)
+  l4: pass
+  l5: pass
+  upstream:
+    expected_cases: "10 test files listed in tests/test.lsp; per-file check counts echoed by recipe-owned runner"
+    executed: 155
+    passed: 155
+    failed: 0
+    pass_rate: "100%"
+    unrunnable: 0
+    note: "HarmonyOS PC aarch64 native conan create (r25, exit 0): arith 30, complex 14, manip 9, matrix 10, matrix2 4, blas 35, math 26, prob 15, trig 9, rans 3."
+  test_package:
+    assertions: 10
+    executed: 10
+    passed: 10
+    failed: 0
+    pass_rate: "100%"
+
+validation:
+  local_preflight: passed
+  ohos_build: passed
+  upstream_test_result: "155/155 checks passed (10/10 files)"
+  test_package_result: "10/10 assertions passed"
+  shadow_ci: passed
+  shadow_ci_run: "device job ohos-users/codex/xlispstat-3.52.23-20261013 r25, exit 0"
+  profile: ohos-aarch64
+  notes:
+    - "Build requires can_run: interpreter must execute natively during make to compile .lsp -> .fsl and save xlisp.wks. Cross-compile-only hosts raise ConanInvalidConfiguration by design."
+    - "OHOS: top-level ./xlisp is signed with binary-sign-tool before the lsp-compile steps execute it."
+
+knowledge_gained:
+  - "Upstream offers --without-x which downgrades GRAPHSYS to GNUPLOT: a pure terminal build with no X11/ncurses dependency; the X11/Athena build would need libxaw/libxmu/libxt (not yet packaged here)."
+  - "Upstream GitHub mirror (jhbadger/xlispstat) has no tags; the canonical reproducible source is the uiowa release tarball (URL/SHA256 cross-checked against the Homebrew formula)."
+  - "Upstream recursive Makefiles hardcode CFLAGS from UCFLAGS; pass UCFLAGS on the configure command line to inject toolchain flags."
+  - "The build and install are three separate top-level targets (xlisp, xlisp.wks, xlispstat); splitting them lets the interpreter be signed before the .lsp compilation runs on OHOS."
+  - "setup.shell-generated xlispstat wrapper bakes XLISPLIB=${prefix}/lib/xlispstat; a one-line patch makes it honor an inherited XLISPLIB so package_info runenv keeps the package relocatable."
+  - "Bundled config.guess is 2002-03-20 echo/exit style and rejects both HarmonyOS uname and aarch64->ohos triples (its config.sub rejects aarch64 entirely); emitting <machine>-unknown-linux-gnu from a HarmonyOS branch passes the vintage config.sub unchanged (E007)."
+  - "With GCC=yes (clang defines __GNUC__) the *linux* configure branch appends -export-dynamic to ULDFLAGS; override via make command-line ULDFLAGS=\"-Wl,--export-dynamic\" instead of patching generated configure."
+  - "HEADLESS: with --without-x the dummygraph C stubs make (require graphics) -> graph2.lsp (send spin-proto :depth-cuing t) a deterministic SIGSEGV; replace with the upstream nongraph.lsp gnuplot layer and drop the same require from regress.lsp."
+  - "HMDFS refuses script execution via shebang (bad interpreter), while signed ELF exec works: the consumer test drives the signed interpreter directly; the sh wrapper is shipped for interactive shells that permit script exec."
+  - "OHOS device stack default (8MB) is insufficient for xlisp GC mark recursion on large workspaces; raise ulimit -s in build steps, the installed wrapper, and the consumer test harness."
+  - "Build with -O1 -fno-strict-aliasing: -O2/-O3 corrupt the old GC (optimization-sensitive UB); verified by device-side rebuild comparison."
+  - "Device profile differences matter: 134/51 style profiles need the -fixed variant (os.version + K&R-tolerant cflags); conan may be a native ELF launcher (never python3 it)."
+
+knowledge_contribution:
+  type: "preflight_draft"
+  draft: "none yet; promote after first successful device shadow CI"
+  scope: "Native-run-required autotools builds on OHOS; staged make targets to sign mid-build."

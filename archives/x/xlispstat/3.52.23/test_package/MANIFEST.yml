@@ -1,0 +1,41 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for xlispstat 3.52.23.
+
+package: xlispstat/3.52.23
+homepage: "https://homepage.stat.uiowa.edu/~luke/xls/xlsinfo/"
+
+upstream_check_command: "no make check upstream; see tests/README: run xlisp and load tests/test"
+upstream_test_in_build: true
+upstream_test_command: "./xlisp xls-test-runner.lsp (recipe-owned runner replicating tests/test.lsp; echoes per-file check counts)"
+
+upstream_tests:
+  - file: tests/test.lsp (+ arith/complex/manip/matrix/matrix2/blas/math/prob/trig/rans .lsp)
+    source: xlispstat-3-52-23/tests/
+    description: "Official 'thorough tests from new S' numerical regression suite (10 files)"
+    command: "./xlisp xls-test-runner.lsp"
+    expected: "no 'test failed in <file> at check <n>' lines; per-file evidence '[xls-test] <file> checks=<n>'"
+    expected_cases: "per-file check counts echoed at run time (not fixed upstream)"
+
+# Execution evidence: filled after the first HarmonyOS aarch64 native build.
+upstream_test_summary:
+  discovered: "10 upstream test files (fixed list in tests/test.lsp)"
+  executed: 155
+  passed: 155
+  failed: 0
+  pass_rate: "100%"
+  evidence: "HarmonyOS PC aarch64 native conan create r25 (exit 0): per-file checks arith 30, complex 14, manip 9, matrix 10, matrix2 4, blas 35, math 26, prob 15, trig 9, rans 3; zero failure lines."
+
+test_package_tests:
+  - file: test_xlispstat.sh
+    description: "PATH/XLISPLIB env, shipped runtime files, startup banner version, arithmetic, mapcar, statistics-layer mean"
+    command: "bash test_xlispstat.sh"
+
+test_package_summary:
+  discovered: 10
+  executed: 10
+  passed: 10
+  failed: 0
+  pass_rate: "100%"
+  evidence: "HarmonyOS PC aarch64 shadow CI r25: consumer harness drove the signed interpreter (xlisp -w xlisp.wks) with exit 0; harness covers PATH/env, runtime files, banner version, arithmetic, mapcar, statistics mean."
+
+assertion_count: 10
