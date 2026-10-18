@@ -1,0 +1,27 @@
+# conandata.yml — libhttpserver 0.11.1
+# 镜像列表形态（#3135 修法）：CI Pre-download 段 curl 缺失回退 conan 下载器后仍多源自愈
+
+sources:
+  url:
+    - "https://github.com/etr/libhttpserver/archive/refs/tags/v0.11.1.tar.gz"
+    - "https://gh-proxy.com/https://github.com/etr/libhttpserver/archive/refs/tags/v0.11.1.tar.gz"
+  sha256: "a5c3d2fb08cce842c0e9c900340260deb20b6fc4827fa0c94306aa34e50e5239"
+
+patches:
+  "0.11.1":
+    - patch_file: "patches/0001-configure.ac.patch"
+      patch_description: "configure.ac：linux-ohos host_os 分支去掉 -lstdc++ 硬编码（OHOS 工具链 libc++）+ 保留外部传入 LDFLAGS（-L 丢失导致链接找不到 libmicrohttpd）"
+      patch_type: "bugfix"
+      patch_source: "https://github.com/etr/libhttpserver"
+    - patch_file: "patches/0002-src-httpserver-details-http_endpoint.hpp.patch"
+      patch_description: "libc++ pair 构造 SFINAE：http_endpoint 拷贝构造/operator</operator=/match 改为 public（同上游 0.19.0 演进）"
+      patch_type: "bugfix"
+      patch_source: "https://github.com/etr/libhttpserver"
+    - patch_file: "patches/0003-src-httpserver-webserver.hpp.patch"
+      patch_description: "MHD 1.0.1 API：webserver.hpp 回调声明 int -> MHD_Result + include microhttpd.h"
+      patch_type: "bugfix"
+      patch_source: "https://github.com/etr/libhttpserver"
+    - patch_file: "patches/0004-src-webserver.cpp.patch"
+      patch_description: "MHD 1.0.1 API：webserver.cpp 回调返回类型 int -> MHD_Result（MHD_start_daemon/MHD_create_post_processor/MHD_get_connection_values 签名）"
+      patch_type: "bugfix"
+      patch_source: "https://github.com/etr/libhttpserver"
