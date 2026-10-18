@@ -1,0 +1,47 @@
+version: "1.6.1"
+status: not_run_device_validation
+build_date: "2026-10-18"
+conan_ref: "libthreadar/1.6.1"
+
+source:
+  url: "https://github.com/Edrusb/libthreadar/archive/refs/tags/v1.6.1.tar.gz"
+  sha256: "84b76be23b3d4cfc25c36fe961f9c07a6c4754ea48fb670d1c0520a544cf8797"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--enable-shared or --disable-shared according to Conan option"
+    - "--disable-static or --enable-static according to Conan option"
+  dependencies:
+    - "autoconf/2.72 (build tool)"
+    - "automake/1.18 (build tool)"
+    - "libtool/2.5.4 (build tool)"
+    - "m4/1.4.19 (build tool)"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "patches/0001-probe-pthread-cancel-and-fallback.patch"
+  - "patches/0002-keep-installed-header-includes-relative.patch"
+
+knowledge_gained:
+  - "E085: HarmonyOS musl does not provide pthread_cancel; use the library's cooperative cancel path when the feature probe fails."
+  - "A custom Autotools header installer must not bake the configured absolute pkgincludedir into same-directory public-header includes; see the paired Path B draft."
+
+validation:
+  conan_create: >-
+    NOT-RUN: this session is NO-DEVICE because the device seats are held by
+    fix-opm-common-15330 and work-mpich-544. CI #98007 on pre-fix head fdbecef7
+    stopped during configure when config.guess line 1613 could not write
+    /storage/Users/currentUser/.cache/tmp/cgmdPAiK/dummy.c (Permission denied),
+    followed by configure: error: cannot guess build type. No CI result was
+    polled after the new fix was prepared.
+  upstream_cases: "0/1 (0.0%; 0 fail, 1 not-run)"
+  test_package: "0/7 (0.0%; 0 fail, 7 not-run)"
+  not_run_reason: >-
+    This session is NO-DEVICE because device seats are held by
+    fix-opm-common-15330 and work-mpich-544. CI #98007 on pre-fix head fdbecef7
+    failed during configure before any test case ran; the new recipe redirects
+    TMPDIR to Conan's build folder only while configure runs. No CI result was
+    polled after the fix was prepared.
