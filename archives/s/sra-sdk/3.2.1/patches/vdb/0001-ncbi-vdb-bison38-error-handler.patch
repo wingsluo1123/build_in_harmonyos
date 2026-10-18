@@ -1,0 +1,30 @@
+--- a/libs/schema/schema-ast.y
++++ b/libs/schema/schema-ast.y
+@@ -40,7 +40,11 @@
+         return p_sb . NextToken ( p_token -> tok );
+     }
+ 
+-    void AST_error ( ctx_t ctx, void * p_parser, ASTBuilder & p_builder, ParseTreeScanner & p_sb, const char * p_msg )
++    /* Bison >= 3.8 prefixes the built-in error token into the token-kind
++       enum, colliding with this callback; use a distinct handler. */
++    #undef yyerror
++    #define yyerror AST_error_handler
++    void AST_error_handler ( ctx_t ctx, void * p_parser, ASTBuilder & p_builder, ParseTreeScanner & p_sb, const char * p_msg )
+     {
+         INTERNAL_ERROR ( xcUnexpected, "%s: %s", p_sb . GetSourceFileName (), p_msg );
+     }
+--- a/libs/schema/schema-grammar.y
++++ b/libs/schema/schema-grammar.y
+@@ -38,7 +38,11 @@
+     #include "schema-lex.h"
+     #define Schema_lex SchemaScan_yylex
+ 
+-    void Schema_error ( YYLTYPE *                   p_llocp,
++    /* Bison >= 3.8 prefixes the built-in error token into the token-kind
++       enum, colliding with this callback; use a distinct handler. */
++    #undef yyerror
++    #define yyerror Schema_error_handler
++    void Schema_error_handler ( YYLTYPE *                   p_llocp,
+                         ctx_t                       ctx,
+                         ParseTree **                p_root,
+                         ErrorReport *               p_errors,

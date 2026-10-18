@@ -1,0 +1,67 @@
+--- a/libs/kproc/unix/systhread.c
++++ b/libs/kproc/unix/systhread.c
+@@ -227,6 +227,12 @@
+     if ( self == NULL )
+         return RC ( rcPS, rcThread, rcSignaling, rcSelf, rcNull );
+ 
++#ifdef __OHOS__
++    /* OHOS (musl) has no POSIX thread cancellation; callers must use an
++       explicit cooperation mechanism (see libs/align/bam.c). */
++    (void)self;
++    return RC ( rcPS, rcThread, rcSignaling, rcFunction, rcUnsupported );
++#else
+     status = pthread_cancel ( self -> thread );
+     switch ( status )
+     {
+@@ -240,6 +246,7 @@
+     }
+ 
+     return 0;
++#endif
+ }
+ 
+ 
+--- a/libs/align/bam.c
++++ b/libs/align/bam.c
+@@ -527,6 +527,7 @@
+     rc_t volatile rc;
+     unsigned volatile nque;
+     bool eof;
++    bool volatile cancel;
+     uint8_t buffer[sizeof(zlib_block_t) * BUFFER_COUNT];
+ };
+ 
+@@ -567,14 +568,18 @@
+ 
+     KLockAcquire(self->lock);
+     for (bufno = 0; ; bufno = (bufno + 1) % BUFFER_COUNT) {
+-        while (self->nque == BUFFER_COUNT)
++        while (self->nque == BUFFER_COUNT && !self->cancel)
+             KConditionWait(self->need_data, self->lock);
++        if (self->cancel)
++            break;
+         {
+             BGZThreadFileWorkQElem work;
+ 
+             work.pos = BGZFileGetPos(&self->file);
+             work.buf = &self->buffer[bufno * sizeof(zlib_block_t)];
+             rc = BGZFileRead(&self->file, work.buf, &work.bsz);
++            if (self->cancel)
++                break;
+             if ( GetRCObject( rc ) == (enum RCObject)rcData && GetRCState( rc ) == rcInsufficient )
+                 work.buf = NULL;
+             else if ( rc != 0 )
+@@ -611,7 +616,12 @@
+ 
+ static void BGZThreadFileWhack(BGZThreadFile *const self)
+ {
+-    KThreadCancel(self->th);
++    KLockAcquire(self->lock);
++    self->cancel = true;
++    self->rc = RC(rcAlign, rcFile, rcReading, rcThread, rcCanceled);
++    KConditionSignal(self->need_data);
++    KConditionSignal(self->have_data);
++    KLockUnlock(self->lock);
+     KThreadWait(self->th, NULL);
+     BGZFileWhack(&self->file);
+     KConditionRelease(self->need_data);

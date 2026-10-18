@@ -1,0 +1,35 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI L0e 强制要求存在）
+
+package: sra-sdk/3.2.1
+homepage: "https://github.com/ncbi/sra-tools"
+
+# 上游测试：CMake/CTest 套件（sra-tools 3.2.1 配置 190 项）
+upstream_check_command: "ctest --output-on-failure"
+upstream_test_in_build: true
+upstream_test_command: "ctest"
+
+upstream_tests:
+  - file: "test/libs, test/vdb, test/schema, test/search, test/external"
+    description: "VDB/NGS 核心库单元测试（Test_KFile_Stream / Test_VDB / Test_WVDB / SraSchema / SraSearch 等）"
+    command: "ctest"
+  - file: "test/external/{vdb-dump,vdb-validate,vdb-config,prefetch,fasterq-dump,sra-info}"
+    description: "工具级命令与参数测试（版本、帮助、错误码、输出格式）"
+    command: "ctest"
+  - file: "ngs/ngs-sdk/examples"
+    description: "NGS C++/Python 示例对真实 SRA 数据的回归（SlowTest_NGS_Run_and_diff 等）"
+    command: "ctest -R SlowTest"
+  - file: "test/internal, test/loaders, test/test-tools"
+    description: "内部工具/加载器测试（需 BUILD_TOOLS_INTERNAL/LOADERS/TEST_TOOLS=ON，默认关闭）"
+    command: "ctest"
+
+# test_package 中自带的消费者测试
+test_package_tests:
+  - file: test_ngs.cpp
+    description: "NGS C++ API 消费者测试：打开不存在的 read collection，断言 SDK 返回 ErrorMsg（覆盖 ngs-c++ + VDB 读取后端）"
+    command: "./test-ngs-api"
+  - file: test_ohos.sh
+    description: "鸿蒙特有检查：3 个工具为 AArch64 ELF；libncbi-vdb.so 不依赖 OHOS musl 缺失的 pthread_cancel；内嵌 kfg 配置可在设备文件系统加载"
+    command: "sh test_ohos.sh <bindir> <libdir>"
+
+assertion_count: 6

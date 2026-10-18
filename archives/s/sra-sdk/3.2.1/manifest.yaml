@@ -1,0 +1,38 @@
+version: "3.2.1"
+status: built
+build_date: "2026-10-18"
+conan_ref: "sra-sdk/3.2.1"
+
+source:
+  url: "https://github.com/ncbi/sra-tools/archive/refs/tags/3.2.1.tar.gz"
+  sha256: "2558683c217ad2318833ab7731939617ed91dc79a6b1dee92bf88b56a1dc142a"
+  tar_format: tar.gz
+  vdb_url: "https://github.com/ncbi/ncbi-vdb/archive/refs/tags/3.2.1.tar.gz"
+  vdb_sha256: "535511984928ec5bac02a61fc6b4d1ca72a5b69c742f4882eabd32ed3a97621c"
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_SYSTEM_NAME=Linux"
+    - "-DCMAKE_SYSTEM_PROCESSOR=aarch64"
+    - "-DLIBS_ONLY=ON (ncbi-vdb)"
+    - "-DTOOLS_ONLY=OFF (sra-tools)"
+    - "-DVDB_LIBDIR=<ncbi-vdb build>/lib"
+    - "-DVDB_INCDIR=<ncbi-vdb source>/interfaces"
+  dependencies:
+    - libxml2/2.15.3
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-ncbi-vdb-bison38-error-handler.patch"
+  - "0002-ncbi-vdb-thread-cancel-ohos.patch"
+  - "0003-sra-tools-cross-compiling-system.patch"
+  - "0004-kxml-libxml2-2.15.patch"
+
+knowledge_gained:
+  - "Bison >= 3.8 把内建 error token 以前缀形式放进 token-kind 枚举，与用户定义的同名 yyerror 回调冲突；用 #undef yyerror 重定向到独立 handler 即可"
+  - "OHOS musl 无 pthread_cancel/pthread_setcancelstate；阻塞线程的取消须改为协作式（标志位 + 条件变量），不能假设取消能打断阻塞调用"
+  - "CMake 4 在 OHOS 上把 CMAKE_SYSTEM_NAME 识别为 HarmonyOS 且 CMAKE_HOST_SYSTEM_PROCESSOR=unknown；交叉编译工程应使用 CMAKE_SYSTEM_* 而不是 CMAKE_HOST_SYSTEM_*"
+  - "libxml2 2.15 移除了 ATTRIBUTE_UNUSED 等兼容宏，旧代码需改为函数体内 (void)param"
+  - "本机 OHOS 策略拒绝对应用数据目录下的 .so 执行 dlopen（Permission denied），Python 绑定类测试需将库放入应用 bundle 原生库目录"

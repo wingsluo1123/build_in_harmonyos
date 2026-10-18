@@ -1,0 +1,30 @@
+sources:
+  "3.2.1":
+    url: "https://github.com/ncbi/sra-tools/archive/refs/tags/3.2.1.tar.gz"
+    sha256: "2558683c217ad2318833ab7731939617ed91dc79a6b1dee92bf88b56a1dc142a"
+
+# sra-sdk is built from two companion NCBI source trees: the toolkit (sra-tools)
+# and the SDK libraries (ncbi-vdb). Both are needed to produce the release
+# binaries, so the SDK source is fetched alongside the toolkit source.
+vdb_sources:
+  "3.2.1":
+    url: "https://github.com/ncbi/ncbi-vdb/archive/refs/tags/3.2.1.tar.gz"
+    sha256: "535511984928ec5bac02a61fc6b4d1ca72a5b69c742f4882eabd32ed3a97621c"
+
+patches:
+  "3.2.1":
+    - patch_file: "patches/0003-sra-tools-cross-compiling-system.patch"
+      patch_description: "Use CMAKE_SYSTEM_* when cross-compiling; HarmonyOS reports its host processor as unknown"
+      patch_type: "portability"
+    - patch_file: "patches/0004-kxml-libxml2-2.15.patch"
+      patch_description: "libxml2 2.15 dropped ATTRIBUTE_UNUSED; mark unused parameter in the function body instead"
+      patch_type: "portability"
+
+vdb_patches:
+  "3.2.1":
+    - patch_file: "patches/vdb/0001-ncbi-vdb-bison38-error-handler.patch"
+      patch_description: "Bison >= 3.8 prefixes the built-in error token, colliding with the parser error callback"
+      patch_type: "portability"
+    - patch_file: "patches/vdb/0002-ncbi-vdb-thread-cancel-ohos.patch"
+      patch_description: "OHOS musl lacks pthread_cancel; BGZF reader thread uses cooperative cancellation"
+      patch_type: "portability"

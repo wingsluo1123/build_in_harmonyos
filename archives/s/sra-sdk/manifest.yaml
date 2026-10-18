@@ -1,0 +1,25 @@
+software: sra-sdk
+display: "NCBI SRA Toolkit and SDK"
+description: "NCBI 序列读取档案（SRA）工具包与 NGS/VDB SDK"
+category: data
+homepage: "https://github.com/ncbi/sra-tools"
+license: Public Domain
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "sra-sdk 由 sra-tools + ncbi-vdb 两棵配套源码树构建，VDB 未在制品仓发布，按 NCBI 发行方式同源构建"
+    - "交叉编译使用 CMAKE_SYSTEM_NAME=Linux + CMAKE_SYSTEM_PROCESSOR=aarch64，编译器默认 triple 仍为 aarch64-linux-ohos"
+    - "sra-tools env.cmake 使用 CMAKE_HOST_SYSTEM_*，交叉编译时须改用目标三元组"
+    - "Bison 3.8 将内建 error token 纳入 <prefix>error 枚举，需重定向 yyerror 回调"
+    - "OHOS musl 无 pthread_cancel，BGZF 读线程改为协作式取消"
+    - "libxml2 2.15 移除 ATTRIBUTE_UNUSED，kxml 改为函数体内标记未使用参数"
+    - "本机策略拒绝从应用数据目录 dlopen 任意 .so，Python 绑定测试需把 libncbi-ngs.so 放入应用 bundle 原生库目录"
+  common_dependencies:
+    - libxml2
+
+versions:
+  "3.2.1":
+    status: built
+    build_date: "2026-10-18"
+    conan_ref: "sra-sdk/3.2.1"
