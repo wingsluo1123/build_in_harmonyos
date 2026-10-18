@@ -1,0 +1,29 @@
+software: freecell-solver
+display: "Freecell Solver"
+description: "C library and command-line tools that solve Freecell and similar card solitaire games"
+category: library
+homepage: "https://fc-solve.shlomifish.org/"
+license: MIT
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "The release tarball does not bundle the rinutils submodule; source() stages rinutils 0.6.0 at fc-solve/source/rinutils (the path cmake/rinutils_bootstrap.cmake expects) and patch 0007 drops the git-submodule branch that cannot run on an extracted tarball"
+    - "OHOS perl ships no CPAN: Moo and Template Toolkit generators are rewritten in plain Perl (patches 0003-0005), Path::Tiny comes from the libpath-tiny-perl/0.118 tool requirement through PERL5LIB, and the Perl test harness / perl-generated .t scripts are disabled by new FCS_* switches (patches 0001/0002)"
+    - "The five upstream cmocka C test programs are registered with CTest directly (no test-code changes) and cmocka is consumed through FIND_PACKAGE(cmocka CONFIG) because OHOS has no pkg-config entry for it (patch 0002)"
+    - "gperf is a configure-time hard requirement (FIND_PROGRAM + FATAL_ERROR); GMP is not needed because MY_FIND_GMP is a no-op when HAVE_INT128 holds (aarch64)"
+    - "CMake has no Platform/HarmonyOS module: a build-folder-only Platform/HarmonyOS.cmake shim includes Platform/Linux (E140/fluidsynth precedent)"
+    - "CMAKE_PLATFORM_NO_VERSIONED_SONAME=TRUE (E330): HMDFS rejects the versioned .so symlink chain, so libfreecell-solver.so ships as a single file with a bare DT_SONAME"
+    - "cmake install() rewrites RUNPATH and invalidates the OHOS .codesign section: package() re-signs all eight ELFs with llvm-objcopy --remove-section .codesign + binary-sign-tool sign -selfSign 1"
+    - "DISABLE_APPLYING_RPATH=ON plus CMAKE_INSTALL_RPATH=$ORIGIN:$ORIGIN/../lib keeps the package relocatable, so the installed fc-solve and the other CLI tools run in place"
+    - "TMPDIR points at $HOME/tmp because /tmp is read-only on the device and Path::Tiny->tempdir honours it"
+  common_dependencies:
+    - gperf
+    - libpath-tiny-perl
+    - cmocka
+
+versions:
+  "6.16.0":
+    status: built
+    build_date: "2026-10-18"
+    conan_ref: "freecell-solver/6.16.0"
