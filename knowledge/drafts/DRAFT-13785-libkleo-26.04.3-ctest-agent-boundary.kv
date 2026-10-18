@@ -1,0 +1,46 @@
+id: DRAFT-13785-libkleo-26.04.3-ctest-agent-boundary
+trigger_tool: conan|cmake|gpgconf|ctest
+phase: test
+error_signature: gpg-agent.*not found|openpgp.hasSecret\(\).*FALSE|QTemporaryFile|Could not find the Qt platform plugin|Error loading shared library \.\./bin/libKPim6Libkleo\.so
+severity: 2
+category: ohos|conan|gnupg|qt|testing
+match_keywords: libkleo, 26.04.3, gpgconf.ctl, rootdir, O_TMPFILE, QTemporaryFile, AF_UNIX, QT_QPA_PLATFORM_PLUGIN_PATH, offscreen
+title: GnuPG 不可重定位安装、套接字临时目录与 Qt 临时文件让 Libkleo 测试误失败
+root_cause: |
+  gnupg/2.5.22 以 prefix=/ 装进 Conan 缓存后，gpgconf 仍找 /bin/gpg-agent。
+  默认临时目录在 /storage 上不能绑定 AF_UNIX，而上游测试把 GNUPGHOME 放在 QDir::tempPath()。
+  /data/storage/el2/base 可以绑定套接字，但 O_TMPFILE 打开成功后 linkat 赋名失败，QTemporaryFile::fileName() 为空，Kleo::classify() 返回 0。
+  QT_QPA_PLATFORM_PLUGIN_PATH 是平台插件搜索列表；对每个依赖前置空的 plugins/platforms 会挡住 qtbase 的 libqoffscreen.so。
+affected_scope: libkleo/26.04.3 在 HarmonyOS PC AArch64 上适用；后续源码版本需重新核对。
+verification_cmd: |
+  conan create archives/l/libkleo/26.04.3 -pr:h=ohos-aarch64 -pr:b=ohos-aarch64 --build=missing
+rec_priority: high
+rec_approach: |
+  在构建目录复制 gnupg 的 bin 与 libexec，并在私有 bin 写 gpgconf.ctl，不改 gnupg 包。把 TMPDIR 放到可绑定 AF_UNIX 的目录；测试进程拒绝 O_TMPFILE；平台插件路径只指向 qtbase。
+rec_description: |
+  上游注册 16 个 CTest。设备日志原文为 100% tests passed out of 16。
+  test_cryptoconfig 与 test_keyformailbox 退出码 0。
+  另外 6 个未注册交互程序加载 libKPim6Libkleo.so.6 后停在事件循环，不计通过或失败。
+  消费者输出 PASS: libkleo DN consumer API，1/1 通过。
+rec_command: |
+  ctest --test-dir <build-folder> --output-on-failure --no-tests=error
+rec_auto_fix: false
+rec_impl: |
+  在 libkleo/26.04.3 的构建目录里复制 gnupg 的 bin 与 libexec，并在私有 bin 写 gpgconf.ctl，不改 gnupg 包。只有 LIBKLEO_GNUPG_BIN 非空时才用 gpgme_set_engine_info 指向它，不搜索 PATH，home_dir 保持空。设置 TMPDIR，并用 ohos_notmpfile.so 只拒绝完整 O_TMPFILE 掩码。
+  QT_QPA_PLATFORM_PLUGIN_PATH 只定义一次，指向 qtbase 的 plugins/platforms。
+  SONAME 与 libKPim6Libkleo.so.6 别名复用 E207、E274、E330、E383、E537，不作为本条目的新机制。
+forbid_1_pattern: ctest --exclude-regex .*(keyresolvercoretest|expirycheckertest)
+forbid_1_reason: 这两项的失败来自 GnuPG 组件路径和套接字目录，排除后再写成通过会少报。
+forbid_1_consequence: 审查按实跑口径判少报，并且密钥解析与过期检查路径没有被执行。
+principles: R34|R40|R51
+similar_to: E002|E024|E272|E383|E461
+doc_file: knowledge/drafts/DRAFT-13785-libkleo-26.04.3-ctest-agent-boundary.md
+last_updated: 2026-10-04
+source_event: OHPCD 任务 14632 设备 conan create，缓存 ch-lbk14632
+authors: iKalous_OscarP
+source_pr: "13449"
+metrics_upstream_targets: 16
+metrics_passed_targets: 16
+metrics_consumer: 1/1
+draft: true
+contributor_id: 328

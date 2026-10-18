@@ -1,0 +1,62 @@
+--- a/src/kleo/keyserverconfig.cpp
++++ b/src/kleo/keyserverconfig.cpp
+@@ -15,1 +15,2 @@
+ #include <QString>
++#include <algorithm>
+@@ -137 +138 @@
+-    std::ranges::copy(std::as_const(d->additionalFlags), std::back_inserter(flags));
++    std::copy(d->additionalFlags.begin(), d->additionalFlags.end(), std::back_inserter(flags));
+--- a/src/kleo/defaultkeyfilter.cpp
++++ b/src/kleo/defaultkeyfilter.cpp
+@@ -28,5 +28,6 @@
+ {
+-    return std::ranges::any_of(key.subkeys(), [](const auto &subkey) {
++    const auto subkeys = key.subkeys();
++    return std::any_of(subkeys.begin(), subkeys.end(), [](const auto &subkey) {
+         return subkey.isCardKey() && !subkey.canRenc();
+     });
+ }
+--- a/src/utils/assuan.cpp
++++ b/src/utils/assuan.cpp
+@@ -15,0 +16 @@
++#include <algorithm>
+@@ -77 +78 @@ QByteArray Kleo::Assuan::escapeAttributeValue(QByteArrayView value)
+-    const int numberToPercentEscape = std::ranges::count_if(value, needsToBePercentEscaped);
++    const int numberToPercentEscape = std::count_if(value.begin(), value.end(), needsToBePercentEscaped);
+@@ -80 +81 @@ QByteArray Kleo::Assuan::escapeAttributeValue(QByteArrayView value)
+-    std::ranges::for_each(value, [&resultIt](unsigned char ch) {
++    std::for_each(value.begin(), value.end(), [&resultIt](unsigned char ch) {
+--- a/src/utils/compliance.cpp
++++ b/src/utils/compliance.cpp
+@@ -21,0 +22 @@
++#include <algorithm>
+@@ -137 +138,2 @@
+-    std::ranges::copy_if(allCompliantAlgorithms(), std::back_inserter(result), isAvailable);
++    const auto algorithms = allCompliantAlgorithms();
++    std::copy_if(algorithms.begin(), algorithms.end(), std::back_inserter(result), isAvailable);
+--- a/src/models/keycache.cpp
++++ b/src/models/keycache.cpp
+@@ -73 +73 @@
+-    std::ranges::remove_copy_if(strings, std::back_inserter(result), std::mem_fn(&std::string::empty));
++    std::remove_copy_if(strings.begin(), strings.end(), std::back_inserter(result), std::mem_fn(&std::string::empty));
+--- a/src/ui/openpgpcertificatecreationdialog.cpp
++++ b/src/ui/openpgpcertificatecreationdialog.cpp
+@@ -20,0 +21 @@
++#include <algorithm>
+@@ -55 +56 @@ static QStringList initCompliantAlgorithms()
+-    std::ranges::transform(compliantAlgorithms, std::back_inserter(result), &QString::fromStdString);
++    std::transform(compliantAlgorithms.begin(), compliantAlgorithms.end(), std::back_inserter(result), &QString::fromStdString);
+--- a/src/ui/treeview_p.cpp
++++ b/src/ui/treeview_p.cpp
+@@ -4,0 +5 @@
++#include <algorithm>
+@@ -66 +67 @@
+-    const auto numVisibleColumns = std::ranges::count_if(actions, std::mem_fn(&QAction::isChecked));
++    const auto numVisibleColumns = std::count_if(actions.begin(), actions.end(), std::mem_fn(&QAction::isChecked));
+--- a/src/ui/keyrequester.cpp
++++ b/src/ui/keyrequester.cpp
+@@ -21,0 +22 @@
++#include <algorithm>
+@@ -226 +227 @@
+-        if (std::ranges::all_of(d->mKeys, &Kleo::DeVSCompliance::keyIsCompliant)) {
++        if (std::all_of(d->mKeys.begin(), d->mKeys.end(), &Kleo::DeVSCompliance::keyIsCompliant)) {
