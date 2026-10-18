@@ -1,0 +1,97 @@
+# 版本级 manifest
+# 文件位置: archives/k/kmines/26.04.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "26.04.0"
+software: "kmines"
+status: built
+build_date: "2026-10-18"
+build_system: "cmake"
+conan_ref: "kmines/26.04.0"
+package_type: application
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://invent.kde.org/games/kmines/-/archive/v26.04.0/kmines-v26.04.0.tar.gz"
+  sha256: "cfe906a34034cafda9e74b7b38937a63b4b2d14850ae57a64e859375b54869ba"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+
+  configure_options:
+    - "-DBUILD_TESTING=OFF（上游 0 注册测试；清点证据见 test_package/MANIFEST.yml）"
+    - "-DKF_IGNORE_PLATFORM_CHECK=TRUE（OHOS 不在 KDE 平台白名单）"
+    - "-DKF_SKIP_PO_PROCESSING=ON（平台无 msgfmt/lconvert；.qm 目录非功能必需）"
+    - "-DCMAKE_INSTALL_LIBDIR=lib"
+    - "-DCMAKE_EXE_LINKER_FLAGS_INIT=-Wl,-z,max-page-size=0x1000（OHOS 加载器要求 4-LOAD 段布局；audiocd 26.04.3 先例）"
+    - "-DCMAKE_SHARED_LINKER_FLAGS_INIT=-Wl,-z,max-page-size=0x1000（同源布局要求）"
+    - "-DQT_ADDITIONAL_PACKAGES_PREFIX_PATH=<qtsvg 前缀>（Qt6Svg 跨包组件查找；否则 find_package(Qt6 ... Svg) 先命中 qtbase 配置而失败）"
+    - "-DECM_MODULE_PATH=<ecm/share/ECM 的 modules;find-modules;kde-modules>（CMakeDeps 生成的 ECMConfig 不带模块路径，手工注入）"
+    - "conan_cmakedeps_paths.cmake（CMAKE_FIND_PACKAGE_PREFER_CONFIG=ON + CMAKE_PREFIX_PATH/CMAKE_LIBRARY_PATH/CMAKE_INCLUDE_PATH 注入：CMakeDeps 不写 cmake_find_mode=none 的包，kmines 主配方与 test_package 同源手工补齐）"
+    - "KF6DocTools 不注入：上游 find_package(KF6DocTools) 无 REQUIRED，doc/ 与 kdoctools_install(po) 都在 if(KF6DocTools_FOUND) 内，未发布时自动跳过——本包无需补丁"
+
+  dependencies:
+    - "qtbase/6.11.1"
+    - "qtsvg/6.11.1"
+    - "kconfig/6.18.0"
+    - "kconfigwidgets/6.18.0"
+    - "kcoreaddons/6.18.0"
+    - "kcrash/6.18.0"
+    - "kdbusaddons/6.18.0"
+    - "kdnssd/6.29.0"
+    - "ki18n/6.18.0"
+    - "ktextwidgets/6.18.0（KF6::TextWidgets）"
+    - "kwidgetsaddons/6.18.0"
+    - "kxmlgui/6.18.0"
+    - "kiconthemes/6.18.0.1（override=True：6.18.0 最新配方修订转向 karchive/6.19.0，registry 无 6.18 线二进制；6.18.0.1 是该配方对 karchive/6.18.0 的重建，kmousetool 26.04.0 先例）"
+    - "libkdegames/26.04.0.1（KDEGames6 + KDEGames6Private；.1 修订携带 SONAME/DT_NEEDED 修复）"
+    - "karchive/6.18.0（override=True：与 knewstuff/6.18.0 闭包保持一致）"
+    - "ecm/6.26.0 (tool_requires)"
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 测试信息
+# ============================================================
+
+upstream_tests:
+  framework: "none"
+  test_targets: 0
+  test_command: "(none — 上游未注册任何测试目标，无 ctest 可执行；清点证据见 test_package/MANIFEST.yml)"
+  run_in_build: false
+upstream_test_pass_rate: "N/A（上游 0 用例：解包树中无任何名称含 test 的文件或目录，全部 CMake 文件无 add_test/ecm_add_test/enable_testing/BUILD_TESTING/ctest 用法）"
+adapted_test_pass_rate: "4/4（100%，真机 test_package 消费者套件 4 用例全部通过：TEST SUMMARY: 4 passed, 0 failed；见 reports/conan-verify-report.md）"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "KGameRenderer 对无 QObject parent 的 KGameThemeProvider 执行 provider->setParent(this)，析构时随 renderer 一起 delete；上游 KMinesScene 即 new 出 provider 交给 renderer 托管。消费者测试若把 provider 放在栈上传入，renderer 析构会对栈指针执行 delete（真机 SIGSEGV 实锤，scope exit 即崩）——必须照上游所有权模型堆分配"
+  - "已发布 KF6/KDEGames6 制品的 DT_NEEDED 含构建机绝对路径（$HOME/.cache/conan2/p/<hash>/p/lib/*.so）。OHOS musl 对含 '/' 的 NEEDED 按字面路径解析、无 LD_LIBRARY_PATH 回退；本机 CONAN_HOME 为 $HOME/.conan2，路径不存在则加载失败。test_package 的绝对 NEEDED 修复层必须建父目录后创建映射；HMDFS 上 symlink(2) 返回 EACCES，需退化为 shutil.copy2（ktextwidgets 6.18.0 设备侧手工拷贝先例）"
+  - "KSharedDataCache 在 HMDFS 上无法建立文件映射：'Couldn't establish file backed memory mapping, will fallback to anonymous memory'。该告警无害，KGameRenderer 默认策略（UseDiskCache | UseRenderingThreads）下 SVGZ 渲染与析构均正常——此前疑似磁盘缓存拆卸崩溃，实际根因是栈 provider 被 renderer 删除的双重释放"
+  - "kmines 版本串由 KMINES_VERSION = '4.0.' + RELEASE_SERVICE_COMPACT_VERSION 构成，compact 直接拼接 26/04/0 且不补零，安装后二进制输出 'kmines 4.0.26040'（不是 4.0.260400）；消费者用例按实际输出校验"
+  - "kiconthemes 6.18.0 与已知 karchive 6.19.0 需求冲突的解法：用 registry 已发布的 6.18.0.1（同配方对 karchive/6.18.0 的重建）配 override=True，package_id 与 6.18 闭包相容（kmousetool 26.04.0 先例）"
+  - "ktextwidgets/6.18.0 从源码构建时 download.kde.org 被 bfsu 镜像证书劫持（SSLCertVerificationError）；用 NJU 镜像 tarball 种子 core.sources:download_cache（blob 按 sha256 落盘，先 rm .dirty）可离线完成源码构建"
+  - "KDEGames6 是伞形 CMake 包（FindKF6 之后由 ECM/KDEGames 配置分发），消费者测试需同时链接 KDEGames6 与 Qt6 Widgets，并按依赖图补齐 openal-soft 等 libKDEGames6.so 的运行时 DT_NEEDED 闭包"
+  - "无头消费者测试启动 GUI 应用时，不要在 msleep 后用 QProcess::state() 判断存活：没有事件循环时子进程退出通知不被处理，进程已退出仍报 Running（kmines app_boot 曾因此假 PASS）。应以 waitForFinished(5000) 驱动状态机并持续排空管道；waitForFinished 在进程已结束时同样返回 false，需再用 state()!=NotRunning 区分真正存活。本镜像不运行 DBus 会话总线且无 dbus-launch，KF6 GUI 在 KDBusAddons 初始化处打印 'DBus session bus not found' 后以 rc=1 退出，该精确诊断可用于确认 ELF/Qt/KF6 加载链已完整走完"
+  - "OHOS 只能执行带 .codesign 段的 ELF，而 DT_NEEDED 改写会使 .codesign 失效，因此签名必须发生在制品产出环节：kmines 在 package() 内先把路径形 DT_NEEDED 改为纯 basename（等长改写 .dynstr），再对整个包内 ELF 自签名（kbreakout 26.04.0 先例）。消费者测试只搭运行时兼容层，不再就地改写 Conan 缓存中的包目录；绝对 NEEDED 兜底仅允许写入 Conan cache/build 根内"
