@@ -1,0 +1,34 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: wlrctl/0.2.2
+homepage: "https://git.sr.ht/~brocellous/wlrctl"
+
+# 上游无测试套件（CLI 工具，无 test/ 目录、无 meson test()/benchmark()）
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游测试存在性审计（hmbs 硬门禁要求）
+upstream_tests_exist: false
+upstream_test_audit: |
+  审计结论：上游 wlrctl 0.2.2 不存在测试套件（N=0）。
+  1. 上游仓库（git.sr.ht/~brocellous/wlrctl v0.2.2 归档逐文件核对）：
+     main.c/keyboard.c/pointer.c/toplevel.c/output.c/util.c/
+     ascii_raw_keymap.c（源码）、protocol/（4 个协议 XML + 生成规则）、
+     meson.build/meson_options.txt、completions/zsh/_wlrctl、
+     wlrctl.1.scd、include/（6 个内部头文件）、README、LICENSE——
+     无 test/ 目录、无 *test* 源文件、无 meson test()/benchmark()。
+  2. meson.build 仅有 executable() 目标与 man/zsh-completion 安装项，
+     无 test 目标；grep '#\[test\]|assert_test|_test' 仅命中源码内的
+     assert() 防御性断言（非测试用例）。
+  3. 功能验证由消费者冒烟测试补全（test_package/test.sh）：
+     --version/-v（版本标识 wlrctl v0.2.2）、--help/-h（usage 文本）、
+     无参数 usage、未知命令、keyboard/pointer/toplevel/output 四个子
+     命令的参数校验错误路径共 15 个用例，全部真执行真断言（所有
+     路径在 wl_display_connect 之前终止，无需 Wayland 会话）。
+
+# 上游实际运行的测试程序（无——N=0）
+upstream_tests: []

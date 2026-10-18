@@ -1,0 +1,107 @@
+software: wlrctl
+# 版本级 manifest
+# 文件位置: archives/w/wlrctl/0.2.2/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "0.2.2"
+
+# 编译状态
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-15"
+
+# 构建系统类型 (顶层字段)
+build_system: meson
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://git.sr.ht/~brocellous/wlrctl/archive/v0.2.2.tar.gz"
+  sha256: "b5b3836091c41de09a832df1e5eb4747841d7ae670367e413487d5be7a5f2849"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  toolchain: "OHOS clang 15 (aarch64-linux-ohos)"
+  command: "meson setup + meson compile (conan Meson wrapper), wayland-scanner via [binaries] injection (copied + re-signed)"
+  parallel: 2
+  flags: ""
+  # 任务卡原描述为 Rust/cargo；实测 v0.2.2 源码为 C + Meson
+  # （7 个 .c + 4 个协议 XML + 静态协议 glue 库），本 manifest 按实测
+  # 源码记录。wayland-scanner 来自 wayland/1.22.0 conan 包 bin/
+  # （拷贝至 build 目录无条件重签后经 shell wrapper 使用——libxml2
+  # 路径仅注入 scanner 子进程，防 lld 符号冲突）。
+
+# ============================================================
+# 测试信息
+# ============================================================
+
+test:
+  framework: shell
+  command: "test_package/test.sh"
+  # 上游无测试套件（N=0，审计见 test_package/MANIFEST.yml）
+  total_cases: 15
+  passed_cases: 15
+  failed_cases: 0
+  skipped_cases: 0
+  notes: >-
+    上游 wlrctl 0.2.2 无测试套件（无 test/ 目录、无 meson test()/
+    benchmark() 目标，逐文件审计见 test_package/MANIFEST.yml）。
+    功能验证由消费者冒烟补全：--version/-v（wlrctl v0.2.2 版本标识）、
+    --help/-h/无参数（usage 文本）、未知命令、keyboard/pointer/
+    toplevel/output 四个子命令的参数校验错误路径共 15 用例真执行真
+    断言（全部路径在 wl_display_connect 之前终止，无需 Wayland 会话）。
+
+# ============================================================
+# 产物信息
+# ============================================================
+
+artifacts:
+  - name: wlrctl
+    type: binary
+    path: bin/wlrctl
+  - name: wlrctl zsh completions
+    type: doc
+    path: share/zsh/site-functions/_wlrctl
+  - name: LICENSE
+    type: doc
+    path: licenses/LICENSE
+
+# ============================================================
+# 依赖信息
+# ============================================================
+
+dependencies:
+  runtime:
+    - name: wayland
+      version: "1.22.0"
+      reason: "libwayland-client 运行时链接（wlroots 协议客户端）"
+    - name: libxkbcommon
+      version: "1.13.1"
+      reason: "libxkbcommon 运行时链接（虚拟键盘 keymap xkb_context）"
+  build:
+    - name: wayland
+      version: "1.22.0"
+      reason: "wayland-scanner 协议 XML → C 代码生成（构建期）"
+    - name: libxml2
+      version: "2.15.3"
+      reason: "wayland-scanner 自身 NEEDED libxml2.so.16（构建上下文）"
+
+# ============================================================
+# 环境信息
+# ============================================================
+
+environment:
+  os: OHOS
+  arch: arm64
+  build_env: "OpenHarmony PC (aarch64), conan 2.29.1 OHOS-adapted"
