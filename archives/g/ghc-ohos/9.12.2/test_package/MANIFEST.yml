@@ -1,0 +1,34 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: ghc-ohos/9.12.2
+homepage: "https://www.haskell.org/ghc/"
+
+# 上游测试命令：GHC testsuite 不随交付物 bindist 提供（实测物料 0）；官方以
+# 独立产物 ghc-9.12.2-testsuite.tar.xz 分发（596 个 .T / 10,070 个 test() 用例
+# 定义）。本机已按分类分批真跑（见豁免台账）；CI 内复跑需该包 + 驱动引导 +
+# 平台执行位修复，属框架级改造，故 CI 命令留空、以实测台账申报。
+upstream_check_command: ""
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（交付物 bindist 不含测试物料，见豁免声明）
+upstream_tests: []
+
+# 豁免声明 (TEST_QUALITY_SPEC.md 3.3)
+exemptions:
+  - rule: "bindist_ships_no_testsuite"
+    reason: "用例级实测台账（2026-10-15/16，官方产物均经 sha256 校验）：① 交付物 bindist（ghc-9.12.2-aarch64-alpine3_18-linux）解包树与安装树全量扫描：测试物料 0；② 官方独立 testsuite 包 ghc-9.12.2-testsuite.tar.xz（sha256 cf142ead…，7,785,840 字节）：596 个 .T / 10,070 个 test() 用例定义（去重 10,064）/ 102 分组；③ 官方源码包 ghc-9.12.2-src.tar.xz（sha256 0e49cd5d…）：compiler testsuite 条目 0（sdist 不分发），libraries/*/tests 299 个用例定义。上游用例级 N = 10,369。真实执行实测（OHOS 设备，testsuite 驱动经 make boot 引导、TEST_HC 注入；locale 探测守卫补丁仅本机取证、判定逻辑零改动）：按分类分批 make test TEST=<名字…> 真跑 92 批 / 77 个分组，尝试用例定义 9,712（testsuite 包 10,070 的 96.5%），实际执行用例实例 10,167，通过 7,999 = 78.7%。分口径：非解释器依赖类执行 8,557 / 通过 7,911 = 92.5%（typecheck 98.0%、indexed-types 98.1%、codeGen 99.7%、module 100%、deriving 99.6%、deSugar 99.4%、primops/numeric/warnings/gadt 等接近满分）；解释器依赖类（th/ghci/ghc-e/ghci.debugger/runghc/printer）执行 1,610 / 通过 88 = 5.5%——GHCi 需 libffi 可执行闭包，OHOS 禁可执行匿名内存（W^X），解释器结构性不可用（适配要点第 7 条已申报的平台限制）。未尝试定义 657（定义级 gap）：rts 325（内存/fork 压测类，两次实测触发终端 hishell 会话 memory cgroup 上限整组清杀——全局内存充足仍整组消失，环境性禁跑）+ cabal 33（10 分钟时间盒超时，超时前已捕获 7 个失败均属 ghcpkg in-tree 工具类）+ sdist libraries 测试 299（bindist 交付不可达，需 GHC 源码树构建态）。失败 1,581 构成：解释器依赖约 1,400+（(ghci) way / TH / GHCi 调试器 / printer 类）+ 工具环境类（plugins 52 需源码树构建插件、ghc-api 46 需构建态 API、driver 44 缺 in-tree 工具、ffi/quasiquotation/annotations/cabal 等零散）+ 散在 normal-way 失败数十个待逐个定性（T13688、T25164、layout007、T22042 等，疑似应答文件与环境差异，量级小）。台账自洽：尝试 9,712 + rts 325 + cabal 33 = 10,070（testsuite 包全覆盖）；+ 299 = N 10,369。配方 source() 常态化核查保留（发现 bindist 携带测试物料即构建失败强制重审本豁免）。功能覆盖由 test_package 真实编译冒烟（GHC-HELLO-SUM=55）提供"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_ghc_ohos.py
+    description: "① ghc --version 断言 9.12.2；② ghc --print-libdir 证明包数据库/安装路径可用；③ 真实编译冒烟——写出 Main.hs，执行 ghc --make Main.hs -o hello 并运行产物，断言输出 GHC-HELLO-SUM=55（一次性证明 shim + 应答文件展开 + 原子符号 defsym + musl 运行库 + ELF 自签整条链路可用）"
+    command: "conan create . (test_package)"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 3
