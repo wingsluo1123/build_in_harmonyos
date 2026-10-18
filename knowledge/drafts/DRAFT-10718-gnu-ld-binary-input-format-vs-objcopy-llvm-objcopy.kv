@@ -1,0 +1,130 @@
+#====================================================================
+# DRAFT-10718-gnu-ld-binary-input-format-vs-objcopy-llvm-objcopy
+# `ld -r --format=binary`（把脚本/文本内嵌成可重定位对象）是 GNU ld 专有输入格式：
+#   设备上 $(LD)=GNU ld → 全绿；平台 CI worker 上 $(LD)=ld.lld →
+#   "ld.lld: error: target emulation unknown: -m or at least one .o file required"，
+#   certgen/sacct/scontrol/sinfo/slurmctld 等 13 个内联该规则的目标全部中断
+# 触发事件: slurm-wlm 25.11.4 适配（archives/s/slurm-wlm/25.11.4）——
+#   CI #91950 / #92479 在 src/plugins/certgen/script 报编译失败，本地同 commit 全绿
+#====================================================================
+
+id:                     DRAFT-10718-gnu-ld-binary-input-format-vs-objcopy-llvm-objcopy
+trigger_tool:           ld|ld.lld|objcopy|llvm-objcopy|automake|autotools|make
+phase:                  build
+error_signature:        target emulation unknown: -m or at least one .o file required|
+                        ld.lld: error: target emulation unknown|
+                        objcopy: '\w+\.bino': No such file or directory|
+                        llvm-objcopy: error: '\w+\.bino': No such file or directory|
+                        make\[\d\]: \*\*\* \[Makefile:\d+: \w+\.bino\] Error 1
+severity:               2
+category:               toolchain, linker, lld, binutils, objcopy, binary-blob,
+        binary-embed, automake-inline, portability, local-vs-ci-parity, makefile
+match_keywords:         --format=binary, -b binary, ld -r,
+        "target emulation unknown", .bino, make_ref.include,
+        _binary_%_start, _binary_help_txt_start, objcopy -I binary,
+        input-target=binary, elf64-littleaarch64, -B aarch64,
+        ld.lld, llvm-objcopy, GNU ld 专有, GNU objcopy 专有, 内嵌脚本, 内嵌二进制,
+        二进制资源内嵌, 二进制 blob 伪 .lo, libtool 伪对象, pic_object=,
+        "本机能过 CI 不能过", 构建机工具链差异, hnp bin, binutils.org, ohos-sdk llvm
+
+title:                  `$(LD) -r --format=binary` 是 GNU ld 专有输入格式，worker 上 $(LD)=ld.lld
+                        时无法把 <name>.txt 内嵌成对象（报 target emulation unknown）；
+                        改用 `objcopy -I binary -O <elf target> -B <arch>` 生成同一组
+                        _binary_<name>_{start,end,size} 符号，GNU/LLVM 两套 objcopy 都支持
+
+root_cause: >
+  把一段文本/脚本内嵌进程序，工具有两条实现路线：
+    A. 链接器：`ld -r -o out.bino -z noexecstack --format=binary in.txt`
+       → 生成 .data 里的 blob 与 _binary_in_txt_{start,end,size} 符号；
+    B. objcopy：`objcopy -I binary -O <target> -B <arch> ... in.txt out.bino`
+       → 同一组符号（GNU 与 LLVM 的命名规则一致）。
+  路线 A 的 `--format=binary`（= `-b binary`）是 GNU ld 的输入格式，lld 不实现：
+  lld 拿不到“输入是裸二进制”的语义，也找不到输出格式/输入对象，于是报
+  `ld.lld: error: target emulation unknown: -m or at least one .o file required`；
+  规则里的第二步 objcopy 随后报 `'xxx.bino': No such file or directory`，
+  make 的报错行只落在 `%.bino` 规则上 —— 错误信息完全不指向“这个 ld 不是 GNU ld”。
+
+  为什么“本机绿、CI 红”：profile 只把 /data/service/hnp/bin 前置进 PATH，
+  该目录里的 ld/objcopy 指向谁取决于构建机装了哪些 hnp 包：
+    - 适配设备：额外装了 binutils.org 2.45 → ld=GNU ld、objcopy=GNU objcopy → A 可用；
+    - CI worker：只有 ohos-sdk 的 llvm 工具链 → ld=ld.lld、objcopy=llvm-objcopy → A 不可用。
+  这不是“环境偶发”（区别于 DRAFT-11327 的 fork EAGAIN），而是工具链可选组件不同导致的
+  确定性差异：同配方 + 同 profile，构建机构成不同 → 一个能过、一个过不了。
+
+affected_scope: >
+  - 任何用 `ld -r --format=binary` / `-b binary` 内嵌脚本、文本或二进制资源的
+    autotools/make 包（slurm 的 make_ref.include 是最典型的一例：规则被 automake
+    内联进 13 个 Makefile.in → certgen/script、sacct、sacctmgr、sackd、scontrol、
+    scrontab、scrun、sinfo、slurmctld、slurmd/slurmd、slurmrestd、sprio、squeue）。
+  - 广义上所有“本机能过 ≠ CI 能过”的工具链可选项差异（GNU binutils vs LLVM 工具链）：
+    判断依据应是生成的 Makefile 里 LD = / OBJCOPY = 的实际取值，而不是本地 which ld。
+
+verification_cmd: >
+  # 1) 复现（把 lld 当 ld 用，与 CI 报错原文一致）
+  ld.lld -r -o x.bino -z noexecstack --format=binary certgen.sh.txt
+  #    → ld.lld: error: target emulation unknown: -m or at least one .o file required
+  # 2) 等价替换（GNU 与 LLVM objcopy 都应成功；符号必须一致）
+  for oc in objcopy llvm-objcopy; do
+    $oc -I binary -O elf64-littleaarch64 -B aarch64 --rename-section \
+        .data=.rodata,alloc,load,readonly,data,contents certgen.sh.txt "$oc.bino"
+    nm "$oc.bino" | sort
+  done
+  #    → _binary_certgen_sh_txt_end / _binary_certgen_sh_txt_size / _binary_certgen_sh_txt_start
+  # 3) 与旧产物（GNU ld 版）对照，逐符号相同
+  nm <build>/src/plugins/certgen/script/certgen.sh.bino | sort
+  # 4) 规则确实不再走 $(LD)
+  grep -rn -- "--format=binary" <build>/**/Makefile       # 期望 0 命中
+  # 5) 工具链解析对齐证据（本机 vs CI）
+  which -a ld objcopy && grep -m1 '^LD = ' <build>/Makefile
+
+rec_priority:           1
+rec_approach:           replace-ld-binary-input-with-objcopy-binary-input
+rec_description: >
+  把 .bino 规则从“链接器生成 + objcopy 改名”两步换成一步 objcopy：
+
+  ```makefile
+  %.bino: %.txt
+  	$(AM_V_GEN)curr_dir=$(shell pwd); cd $(abs_srcdir); @OBJCOPY@ -I binary -O elf64-littleaarch64 -B aarch64 --rename-section .data=.rodata,alloc,load,readonly,data,contents "$(notdir $<)" "$(abs_builddir)/$*.bino"; cd $$curr_dir
+  ```
+
+  要点：
+  ① 目标名按平台写死（OHOS PC = aarch64 → -O elf64-littleaarch64 -B aarch64）；
+  ② --rename-section 合并进同一步（省掉第二步，也避免中间文件缺失时的二次报错）；
+  ③ 符号与 GNU ld 版逐符号一致（_binary_<name>_start/_end/_size），消费侧代码零改动；
+  ④ 必须同时改源头与内联副本：本例 make_ref.include（源头）+ 13 个已内联该规则的
+     Makefile.in。OHOS 主机没有 automake/aclocal/libtoolize，configure 只读 Makefile.in
+     生成 Makefile，只改 .am/源头不生效。
+rec_command: >
+  objcopy -I binary -O elf64-littleaarch64 -B aarch64 --rename-section \
+      .data=.rodata,alloc,load,readonly,data,contents in.txt out.bino
+  grep -rn -- "--format=binary" <build>/**/Makefile     # 验收：应为 0 命中
+rec_auto_fix:           false
+rec_impl:               patch|recipe
+
+fallback_priority:      2
+fallback_approach:      point-LD-at-a-gnu-ld
+fallback_description: >
+  让 $(LD) 指到 GNU ld：configure 传 LD=<gnu-ld>，或把含 GNU ld 的 binutils 目录
+  前置到 PATH（本例设备恰好装了 binutils.org 2.45，所以本地不显形）。
+  代价：要求构建机确实装了 binutils，worker 上未必有（本方案在 CI 上不可靠）；
+  且这是“绕过差异”而非“消除差异”，构建结果依赖构建机装包情况。
+fallback_command:       ./configure LD=/path/to/gnu-ld ...
+fallback_auto_fix:      false
+fallback_impl:          recipe
+
+forbid_1_pattern:       只在本地 conan create 绿灯就认定 CI 也能过（尤其当 ld/objcopy 来自本机 PATH）
+forbid_1_reason:        构建机的 hnp 包构成会改变 $(LD)/$(OBJCOPY) 的解析结果（GNU 还是 LLVM）
+forbid_1_consequence:   配方在 CI 上以“编译失败/链接失败”的面貌失败，报错点落在 make 规则上，
+                        与配方代码无直接关联；且同一规则被内联进多个 Makefile.in 时会连续炸
+
+similar_to:             DRAFT-11327（fork EAGAIN 环境性间歇失败——那条讲“偶发”，本条讲“工具链可选组件不同”）、
+                        DRAFT-E007（config.sub 不认新 OS——同属“工具链/环境能力假设”类）、
+                        DRAFT-10718-conan-package-type-drives-autotools-shared-static-flags
+                        （同包内另一条：blob 伪 .lo 在纯静态构建下丢成员）
+conflicts_with:         []
+prerequisite_of:        []
+principles:             P004
+doc_file:               knowledge/drafts/DRAFT-10718-gnu-ld-binary-input-format-vs-objcopy-llvm-objcopy.md
+last_updated:           2026-10-15
+authors:                Lee-BX
+draft:                  true

@@ -1,0 +1,132 @@
+#====================================================================
+# DRAFT-10718-conan-package-type-drives-autotools-shared-static-flags
+# Conan 的 AutotoolsToolchain 会把"包类型/ shared 选项"翻成 --disable-shared --enable-static，
+#   于是 package_type="library" + shared=False 的配方被静默改成纯静态构建：
+#   ① 可加载模块（插件 .so）根本不产出；② libtool 对"二进制 blob 伪 .lo"的处理改变，链接缺符号
+# 触发事件: slurm-wlm 25.11.4 适配（archives/s/slurm-wlm/25.11.4）——
+#           把 package_type 从 application 改成 library 后 conan create 从绿变红
+#====================================================================
+
+id:                     DRAFT-10718-conan-package-type-drives-autotools-shared-static-flags
+trigger_tool:           conan|autotools|configure|libtool|ld.lld
+phase:                  configure|build
+error_signature:        --disable-shared|
+                        build_libtool_libs=no|
+                        undefined symbol: _binary_\w+_start|
+                        Error relocating .*: \w+: symbol not found|
+                        Does not exist or not a regular file
+severity:               2
+category:               conan, autotools, packaging, libtool, plugins, loadable-modules, ohos
+match_keywords:         package_type, package_type=library, shared 选项, AutotoolsToolchain,
+                        _get_shared_static_flags, --disable-shared, --enable-static, enable_shared,
+                        build_libtool_libs, config.status, libtool 脚本, pkglib_LTLIBRARIES,
+                        loadable modules, 插件不产出, .so 缺失, 伪 .lo, 二进制 blob,
+                        objcopy rename-section, _binary_*_start, lib_ref.la, dlopen 失败,
+                        R26, R38, DRAFT-12592
+
+title:                  Conan 的 AutotoolsToolchain 会按 package_type + shared 选项注入 --disable-shared/--enable-static：对"同时产出静态库、可加载插件与二进制 blob 对象"的 autotools 包，改成 library/static 包型会静默把构建降级成纯静态，导致插件 .so 不产出、libtool 的伪 .lo 归档丢成员
+
+root_cause: >
+  conan.tools.gnu.AutotoolsToolchain._get_shared_static_flags() 把 **Conan 计算出来的包类型**
+  翻成 autotools 开关：
+
+  ```python
+  if self._conanfile.package_type is PackageType.SHARED:
+      args.extend(["--enable-shared", "--disable-static"])
+  elif self._conanfile.package_type is PackageType.STATIC:
+      args.extend(["--disable-shared", "--enable-static"])
+  ```
+
+  而 package_type 是由 recipe 的 `package_type` 属性 + `options["shared"]` 共同判定的
+  （`package_type="library"` + `shared=False` → PackageType.STATIC）。
+  于是"把包型从 application 改成 library"这一步，会让 configure 收到
+  `--disable-shared --enable-static`：config.status 的 `enable_shared='no'`，
+  生成的 `libtool` 脚本里 `build_libtool_libs=no`。
+
+  这条链路有两个**看起来毫不相干**的后果：
+
+  ① **可加载模块不产出**：autotools 里 `pkglib_LTLIBRARIES` + `-module` 的插件（slurm 的
+     `lib/slurm/*.so`：sched/backfill、select/cons_tres、serializer/json ...）在
+     `build_libtool_libs=no` 时只产出 `.a/.o`，**没有 .so**。任何"运行时按 PluginDir 找插件"
+     的代码路径（单元测试、配置解析、服务启动）随之失败，报错却是
+     "No such file or directory / could not find plugin / Unable to process configuration file"。
+  ② **二进制 blob 伪 .lo 归档丢成员**：slurm 用
+     `ld -r -o help.bino -z noexecstack --format=binary help.txt` + `objcopy --rename-section ...`
+     造 blob 对象，再手写一个"伪 `.lo`"（`pic_object='help.bino'`）交给 libtool 归档。
+     在 `build_libtool_libs=yes` 时 libtool 会把 blob 放进 `.libs/lib_ref.a`
+     （`ar cr .libs/lib_ref.a help.bino usage.bino`）；改成 `no` 之后，同一条规则变成
+     `ar cr .libs/lib_ref.a <其它参数>`，blob 不在成员里 → 链接报
+     `undefined symbol: _binary_help_txt_start / _binary_help_txt_end`。
+     报错点（sacct 链接）与根因（包型元数据）相距极远。
+
+  注意这条**与 DRAFT-12592 的结论方向相反**：DRAFT-12592 说"同时交付可执行文件与可链接库的包
+  必须声明 package_type=library"（目的是让 CMakeDeps 正常传播 headers/libs）。两者冲突时以
+  **产物形态**为准：如果库是"插件/可加载模块"或以 blob 对象为主的构建，静态包型会直接破坏构建，
+  此时应保留 application，并在 test_package 里显式指向安装树（或改用 shared-library 包型）。
+
+affected_scope: >
+  所有用 conan.tools.gnu.AutotoolsToolchain 且满足任一条件的配方：
+  (a) 构建产物包含 `-module` 可加载插件（运行时 dlopen）；
+  (b) 使用"二进制 blob + 伪 .lo"注入符号的 autotools 技巧；
+  (c) 需要在一次构建里同时得到 .a 与 .so。
+  识别特征：conanfile 里同时出现 `package_type = "library"`（或 shared=False + library）
+  与 `AutotoolsToolchain`，并且 configure 命令行里出现 `--disable-shared`。
+
+verification_cmd: >
+  # 1) configure 是否被注入了 shared/static 开关
+  grep -m1 "  \$ .*configure" <build>/config.log | tr ' ' '\n' | grep -E "shared|static"
+  # 2) 生成的 libtool 脚本结论
+  grep -m1 "^build_libtool_libs" <build>/libtool
+  grep -m1 "^enable_shared"      <build>/config.status
+  # 3) 插件 .so 是否产出（预期：build_libtool_libs=no 时缺失）
+  ls -d <build>/src/plugins/*/*/.libs | head
+  ls    <build>/src/plugins/serializer/json/.libs/*.so
+  # 4) blob 归档成员（预期：no 时只剩其它参数，没有 help.bino）
+  grep -m1 "ar cr .libs/lib_ref.a" <build 日志>
+
+rec_priority:           1
+rec_approach:           keep-application-package-type-when-the-build-produces-loadable-modules
+rec_description: >
+  ①先确认产物形态：`ls <build>/src/plugins/*/*/.libs` 是否有 .so（有 → 构建确实需要
+  enable_shared=yes）；②若需要 .so 插件，就不要让 Conan 注入 `--disable-shared`：
+  - 首选：保持 `package_type = "application"`（Conan 不加任何 shared/static 标志，
+    autotools 走自身默认 enable-shared=yes，一次构建同时得到 .a 与 .so）；
+  - 若该包确实只想交付共享库：用与产物一致的包型（例如 shared-library）并接受
+    `--disable-static`（静态库不再产出）；
+  - 千万不要"为了满足 library 包型的 KB 建议"把能构建的配方改成静态包型。
+  ③代价与补偿：application 包型下 CMakeDeps 不传播 include/libs（DRAFT-12592），
+  在 test_package 里显式指向 `dep.package_folder` 的 include/lib 即可（消费者用例一样真实）。
+rec_command: >
+  package_type = "application"      # 保持 autotools 自身的 enable-shared 默认
+  conan create ... && ls lib/slurm/*.so
+rec_auto_fix:           false
+rec_impl:               recipe
+
+fallback_priority:      2
+fallback_approach:      append-enable-shared-explicitly-and-verify-argument-order
+fallback_description: >
+  若必须保留 library 包型，可在 `tc.configure_args` 末尾自行追加 `--enable-shared --enable-static`
+  来覆盖（autoconf 对同名开关取最后一次出现）。风险：Conan 注入的开关位置随版本变化，
+  覆盖可能失效；且包型元数据与实际产物（同时有 .a/.so）不一致，需要人工复核，
+  因此只作为临时手段，并在注释里写清原因。
+fallback_command:       tc.configure_args.extend(["--enable-shared", "--enable-static"])
+fallback_auto_fix:      false
+fallback_impl:          manual
+
+forbid_1_pattern:       把可构建的 autotools 配方从 application 改成 library（或把 shared 设为 False）
+                        却又期望插件 .so / 静态库同时产出
+forbid_1_reason:        AutotoolsToolchain 会据此注入 --disable-shared / --disable-static，
+                        构建形态与你以为的完全不同
+forbid_1_consequence:   插件 .so 不产出、blob 归档丢成员，报错点（dlopen / 链接缺符号）
+                        与根因（包型元数据）相距极远，容易误判为平台适配问题而反复排查
+
+similar_to:             DRAFT-12592-ohos-conan-application-pkgtype-strips-cppinfo（同一条"包型"轴上的另一面：
+                        那条讲 application 让 CMakeDeps 不传播 headers/libs，本条讲 library/static 让
+                        autotools 被迫纯静态 → 两条一起看才能定包型）
+conflicts_with:         []
+prerequisite_of:        []
+principles:             P004
+doc_file:               knowledge/drafts/DRAFT-10718-conan-package-type-drives-autotools-shared-static-flags.md
+last_updated:           2026-10-14
+authors:                Lee-BX
+draft:                  true

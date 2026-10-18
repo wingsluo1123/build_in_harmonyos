@@ -1,0 +1,39 @@
+--- a/src/common/slurm_resolv.c
++++ b/src/common/slurm_resolv.c
+@@ -65,24 +65,24 @@
+ 	int len;
+ 	list_t *controllers;
+ 
+-	if (res_ninit(&res)) {
++	if (res_init()) {
+ 		error("%s: res_ninit error: %m", __func__);
+ 		return NULL;
+ 	}
+ 
+ 	res.ndots = 2;
+ 
+-	if ((len = res_nsearch(&res, SRV_RECORD, C_IN, T_SRV,
++	if ((len = res_search(SRV_RECORD, C_IN, T_SRV,
+ 			       answer, sizeof(answer))) < 0) {
+ 		error("%s: res_nsearch error: %s",
+ 		      __func__, hstrerror(h_errno));
+-		res_nclose(&res);
++		(void)0;
+ 		return NULL;
+ 	}
+ 
+ 	if (ns_initparse(answer, len, &handle) < 0) {
+ 		error("%s: ns_initparse error: %m", __func__);
+-		res_nclose(&res);
++		(void)0;
+ 		return NULL;
+ 	}
+ 
+@@ -119,6 +119,6 @@
+ 	} else
+ 		list_sort(controllers, _sort_controllers);
+ 
+-	res_nclose(&res);
++	(void)0;
+ 	return controllers;
+ }

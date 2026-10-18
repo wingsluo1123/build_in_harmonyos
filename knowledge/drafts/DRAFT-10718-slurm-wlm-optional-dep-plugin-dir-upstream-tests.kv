@@ -1,0 +1,96 @@
+#====================================================================
+# DRAFT-10718-slurm-wlm-optional-dep-plugin-dir-upstream-tests
+# 上游单元测试里"校验配置中列出的插件目录必须存在"的那几条，失败原因常常是
+#   可选依赖没接上（--with-X 决定插件是否产出）——先接已发布的依赖，再谈适配缺陷
+# 触发事件: slurm-wlm 25.11.4 HarmonyOS PC 适配（archives/s/slurm-wlm/25.11.4）
+#           serializer-test / topology-test 因 serializer/yaml/.libs 不存在而致命失败
+#====================================================================
+
+id:                     DRAFT-10718-slurm-wlm-optional-dep-plugin-dir-upstream-tests
+trigger_tool:           configure|make|conan
+phase:                  configure|testing
+error_signature:        Bad value \"[^\"]*\.libs[^\"]*\" for PluginDir|
+                        error: PluginDir: .*: No such file or directory|
+                        unable to locate \w+ parser library|
+                        fatal: Unable to process configuration file
+severity:               2
+category:               testing, autotools, optional-dependency, plugin, ohos, upstream-tests
+match_keywords:         上游用例通过率, make check, 插件目录, PluginDir, .libs, 可选依赖,
+                        --with-*, HAVE_YAML, WITH_YAML, serializer/yaml, serializer-test,
+                        topology-test, 配置解析失败, Unable to process configuration file,
+                        libyaml, portable-libyaml, 依赖已发布, R51, rule4
+
+title:                  上游上测试用例会校验"配置里列出的插件目录必须存在"：报错面是插件目录/配置解析失败时，先核对上游 configure 的可选开关（--with-X）并在制品仓里找对应依赖，接上已发布的依赖往往才是真正的修复
+
+root_cause: >
+  slurm 的不少单元测试不走"纯 API 调用"，而是先加载一份测试配置（slurm.conf 片段），
+  而 slurm 的配置解析器会**逐个 stat** PluginDir 里列出的目录，任一目录不存在就
+  直接致命退出（"Bad value ... for PluginDir" / "fatal: Unable to process configuration file"）。
+  测试夹具里列的插件目录是上游默认全量插件的集合，其中 serializer/yaml/.libs 只有在
+  configure 探测到 libyaml（--with-yaml=PATH，HAVE_YAML/WITH_YAML）时才会被构建出来。
+  于是：设备/CI 上没有 libyaml → yaml 序列化插件目录不存在 → serializer-test 与 topology-test
+  这两条"看起来与 yaml 无关"的用例稳定失败。
+
+  关键判据：失败文本指向**目录不存在/配置解析**，而不是断言失败或链接错误；并且用
+  `ls src/plugins/*/*/.libs` 能立刻看到"只缺某一个插件目录"，与 configure 日志里的
+  "checking for <lib> installation... <空>/<path>" 一一对应。
+
+  反例也很重要：接依赖不是"能编译就行"，要确认该依赖**已在制品仓发布**（本例
+  portable-libyaml/0.2.5 已发布，且是 libyaml 的 portable 发行版，提供 include/yaml.h 与 lib/libyaml.a），
+  配方里补 `self.requires(...)` + 把 `--with-yaml=<pkg_folder>` 交给 configure 即可；
+  没有发布过的依赖不能靠本机手编绕过去（R36）。
+
+affected_scope: >
+  所有"可选后端决定插件/模块是否产出、而测试夹具又要求这些目录存在"的上游测试套件；
+  也适用于测试夹具依赖可选工具/数据目录的场景（autotools 的 --with-X、CMake 的 -DWITH_X）。
+  识别特征：失败用例集中在"加载配置/枚举插件"的路径上，且 `ls` 能指出缺失目录。
+
+verification_cmd: >
+  # 1) 失败面：是插件目录缺失，而不是断言失败
+  grep -rn "PluginDir\|Unable to process configuration file" testsuite/**/*.log
+  # 2) 哪些插件目录真的产出了？
+  ls -d <build>/src/plugins/*/*/.libs
+  # 3) configure 对可选依赖的探测结论
+  grep -n "checking for libyaml installation" <build>/config.log
+  grep -n "define HAVE_YAML"                <build>/config.h
+  # 4) 接上依赖后重跑整树
+  make -k check
+
+rec_priority:           1
+rec_approach:           wire-the-published-optional-dependency-then-rerun-the-whole-suite
+rec_description: >
+  ①先看失败用例的失败面是不是"目录/配置"，②再看上游 configure 里是哪个 --with-X 决定该目录是否产出，
+  ③在制品仓里确认该依赖已发布（`conan download <ref> -r=<remote>`，R35 口径），
+  ④配方里补 requires + `--with-X=<dep.package_folder>`（像 munge/hwloc/json-c/http-parser 那样统一处理），
+  ⑤整树重跑 make check 并如实回填通过率。
+  本例：+ portable-libyaml/0.2.5 与 --with-yaml，serializer-test/topology-test 由 FAIL 转 PASS。
+rec_command: >
+  self.requires("portable-libyaml/0.2.5")
+  tc.configure_args.append("--with-yaml=%s" % self.dependencies["portable-libyaml"].package_folder)
+  make -j1 -k check
+rec_auto_fix:           false
+rec_impl:               recipe
+
+fallback_priority:      2
+fallback_approach:      document-the-exemption-in-MANIFEST.yml
+fallback_description: >
+  若该可选依赖在制品仓里确实没有（或它自己无法在 OHOS 上适配），不要在配方里私编依赖绕过 R36，
+  也不要去改上游测试夹具；按 docs/TEST_QUALITY_SPEC.md §3.3 在 test_package/MANIFEST.yml 里
+  为该组用例逐条声明豁免（写明"需要 XX 可选依赖，制品仓未发布"），并在测试报告里如实计数。
+fallback_command:       （MANIFEST.yml upstream_tests 逐条标注豁免原因；报告里如实计入 FAIL）
+fallback_auto_fix:      false
+fallback_impl:          manual
+
+forbid_1_pattern:       为了让 make check 变绿而修改上游测试夹具（删掉 PluginDir 里的 yaml 目录 / 改 slurm.conf 片段）
+forbid_1_reason:        测试夹具是上游用例的一部分，改它等于篡改用例；真正缺的是可选依赖
+forbid_1_consequence:   掩盖真实覆盖率，并在复审时被判"申报与实际不符"（R51）
+
+similar_to:             DRAFT-10251（可选测试框架缺失导致测试套件被静默排除，TOTAL: 0 —— 那条是"没跑"，
+                        本条是"跑了但缺插件目录"）；DRAFT-10718-slurm-wlm-libcheck-default-timeout-nameservice-test（同套用例的另一类失败面）
+conflicts_with:         []
+prerequisite_of:        []
+principles:             P004
+doc_file:               knowledge/drafts/DRAFT-10718-slurm-wlm-optional-dep-plugin-dir-upstream-tests.md
+last_updated:           2026-10-14
+authors:                Lee-BX
+draft:                  true

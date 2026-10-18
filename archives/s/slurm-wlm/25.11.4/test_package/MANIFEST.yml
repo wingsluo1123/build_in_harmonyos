@@ -1,0 +1,69 @@
+package: slurm-wlm/25.11.4
+homepage: "https://www.schedmd.com/"
+
+# 上游测试命令（build() 内执行）
+upstream_check_command: "make check"
+upstream_test_in_build: true
+upstream_test_command: "make -j1 -k check"
+
+# 上游测试环境要求（build() 内固定，见 conanfile.py 的 _run_upstream_tests）
+upstream_test_env:
+  - "TEMP=<build>/check-tmp（libcheck 的 fork 通信临时目录，设备 /tmp 不可写）"
+  - "CK_DEFAULT_TIMEOUT=120（libcheck 默认 4s 对 dns-test 的名字服务调用太短）"
+  - "CHECK_CFLAGS/CHECK_LIBS 指向 test_requires 的 check/0.15.2，使 configure 的 HAVE_CHECK 生效"
+
+upstream_tests:
+  - name: testsuite/slurm_unit
+    command: "make -j1 -k check"
+    count: 41
+    source: >
+      slurm-25.11.4/testsuite/slurm_unit/**（common 13、common/bitstring 2、common/hostlist 2、
+      common/slurm_protocol_defs 5、common/slurm_protocol_pack 2、common/slurmdb_defs 1、
+      common/slurmdb_pack 14、backfill 1、topology 1），libcheck(Check) 0.15.2 驱动，
+      由 configure 的 PKG_CHECK_MODULES([CHECK], [check >= 0.9.8]) → AM_CONDITIONAL(HAVE_CHECK) 门控
+    expected: "37/41 通过（90.2%），结果以 SLURM-UPSTREAM-* 行写入 conan create 日志"
+    observed: "SLURM-UPSTREAM-TESTS total=41 pass=37 fail=4 error=0 skip=0 rate=90.2%"
+    exemptions_note: >
+      4 条豁免全部实测复核过，原因属上游用例自身或平台环境/加载器差异，不是适配改动引入的
+    exemptions:
+      - test: serializer-test
+        reason: >
+          用例先加载测试用 slurm.conf，其 PluginDir 列出全量插件目录，其中 serializer/yaml/.libs
+          只在 configure 探测到 libyaml（--with-yaml）时产出；libyaml 是上游可选后端。
+          实测接上制品仓的 portable-libyaml/0.2.5（requires + --with-yaml）后，插件目录与
+          serializer_yaml.so 正常产出、全树 make -j1 通过，但该用例失败面下移到
+          `serializer_required: could not find plugin for application/json`（插件 dlopen 阶段的符号解析），
+          仍未通过；通过率不变，故不引入该额外依赖。证据：reports/test-report.md §4.3。
+      - test: topology-test
+        reason: >
+          第一阶段与 serializer-test 同因（缺 serializer/yaml 插件目录）；接入 libyaml 后继续报
+          `plugin_load_from_file: dlopen(.../certgen_script.so): Error relocating ...:
+          slurm_get_log_level: symbol not found`。该符号在 libslurmfull.so 中确实已导出
+          （nm -D --defined-only 可见），测试程序也 NEEDED libslurmfull.so，属 musl 加载器对
+          dlopen 插件符号作用域的行为差异，与适配改动无关。证据：reports/test-report.md §4.3。
+      - test: backfill-test
+        reason: >
+          上游用例按 testsuite/slurm_unit/backfill/Makefile.am 链接
+          -L$(top_builddir)/src/api/.libs -lslurmfull，但 libslurmfull 不含 slurmctld 目标文件
+          （job_fail_qos / make_node_idle / acct_policy_* / fed_mgr_* 等 40+ 符号，`nm` 已核对），
+          运行期报 "Error relocating ...: symbol not found"。该缺口来自上游的库划分，
+          与 HarmonyOS 适配无关（glibc 构建同样缺这些符号）。
+      - test: slurm_addto_id_char_list-test
+        reason: >
+          用例取 getpwuid(geteuid()) / getpwuid(0) 的用户名做断言；设备 /etc/passwd 中没有当前
+          uid（20020083）的条目，getpwuid() 返回 NULL，用例内 ck_abort_msg("No user name found")
+          在非测试上下文触发（check_msg.c:80）。属平台环境数据限制，同族知识：
+          DRAFT-10175-rmlint-2.10.3-getpwuid-null-no-passwd-db-segfault、
+          DRAFT-mairix-0.24-ohos-musl-getpwuid-app-uid-no-passwd。
+
+test_package_tests:
+  - file: test_slurm.c
+    description: >
+      Consumer (application) view: find_package(Slurm) + link the installed libslurm and drive the
+      public API from the installed headers (slurm/slurm.h + slurm/slurm_version.h) - the version
+      reported by slurm_api_version() must decode through SLURM_VERSION_MAJOR/MINOR/MICRO, round-trip
+      through SLURM_VERSION_NUM() and agree with the packaged headers (25.11 series). Prints one
+      CHECK-OK line per assertion plus SLURM_CONSUMER_OK.
+    command: "./test_slurm"
+
+assertion_count: 6
