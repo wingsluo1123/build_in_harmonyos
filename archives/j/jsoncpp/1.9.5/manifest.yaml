@@ -1,5 +1,5 @@
 software: jsoncpp
-# 版本级 manifest 模板
+# 版本级 manifest
 # 文件位置: archives/{letter}/{name}/1.9.5/manifest.yaml
 # 遵循 ARCHIVE-SPEC v2.0
 
@@ -12,27 +12,27 @@ version: "1.9.5"
 
 # 编译状态
 # published | built | failed | archived
-status: published
+status: built
 
 # 构建系统类型
 build_system: cmake
 
 # 编译日期（YYYY-MM-DD）
-compile_date: "2026-05-21"
+compile_date: "2026-10-15"
+build_date: "2026-10-15"
 
 # ============================================================
 # 源码信息
 # ============================================================
 
 source:
-  # 源码下载 URL
-  url: "file:///storage/Users/currentUser/.opendesk/apps/skills/resources/openharmony-compile-agent/../tarballs/jsoncpp-1.9.5.tar.gz"
+  # 源码下载 URL (R39: 必须为官方源)
+  url: "https://github.com/open-source-parsers/jsoncpp/archive/refs/tags/1.9.5.tar.gz"
 
   # 源码校验和
-  sha256: ""
+  sha256: "f409856e5920c18d0c2fb85276e24ee607d2a09b5e7d5f0a371368903c275da2"
 
   # 压缩格式
-  # tar.gz | tar.xz | tar.bz2 | zip
   tar_format: tar.gz
 
 # ============================================================
@@ -47,15 +47,14 @@ build:
   # 配置选项列表
   configure_options:
     - "-DCMAKE_BUILD_TYPE=Release"
-  # 例如:
-  # - "-DCMAKE_BUILD_TYPE=Release"
-  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DBUILD_STATIC_LIBS=OFF"
+    - "-DBUILD_OBJECT_LIBS=OFF"
+    - "-DJSONCPP_WITH_TESTS=ON"
+    - "-DJSONCPP_WITH_POST_BUILD_UNITTEST=OFF"
 
   # 编译依赖列表（格式: name/version）
   dependencies: []
-  # 例如:
-  # - openssl/1.1.1w
-  # - curl/8.19.0
 
   # 编译器
   cc: clang
@@ -66,16 +65,16 @@ build:
 # ============================================================
 
 # 应用的补丁列表
-patches_applied: []
-# 例如:
-# - "0001-bootstrap-ohos-toolchain.patch"
+patches_applied:
+  - "0001-src-lib_json-CMakeLists.txt.patch"
+  - "0002-test-runjsontests.py.patch"
 
 # ============================================================
 # 知识沉淀
 # ============================================================
 
 # 编译中学到的知识
-knowledge_gained: []
-# 例如:
-# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
-# - "内嵌 libuv 需要禁用，使用系统 libuv"
+knowledge_gained:
+  - "OHOS 平台需通过 CMakeToolchain 补齐 CMAKE_SHARED_LIBRARY_SONAME_*_FLAG 等链接器变量，否则无 SONAME"
+  - "HarmonyOS 上禁用 VERSION/SOVERSION 以避免 HMDFS 符号链接问题（保留 basename SONAME）"
+  - "HarmonyOS Python 3.12 os.popen 文本解码失败，需改为 subprocess.PIPE + 显式 UTF-8 解码"
