@@ -1,0 +1,54 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: slcfitsio/0.4.7-pre.19
+homepage: "https://space.mit.edu/cxc/software/slang/modules/cfitsio/"
+
+# 上游测试命令（slcfitsio 的 src/Makefile 内 `test:` 目标）
+upstream_check_command: "make test"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序：src/Makefile 的 test 目标是
+#   @for X in tests/test_*.sl; do slsh $$X; done
+# 即对 src/tests/test_*.sl 逐个执行 `slsh <file>`。
+# 注意：上游这个目标不检查执行结果（脚本结尾只 message("Passed"/"Failed")，
+# 退出码恒为 0），失败检测由 test_package 的驱动层补上。
+# sha256 为上游 tarball 内原文（slcfitsio-pre0.4.7-19.tar.gz，
+# sha256 913cf288070c36629bdae9d9695d6f2ced6af488c669b8bcb5316a2de8d7ea2c）。
+upstream_tests:
+  - file: src/tests/test_fits.sl
+    source: slcfitsio-pre0.4.7-19/src/tests/test_fits.sl
+    sha256: "8e454551da7dafd4c80d90340b559b402dc341848b6c4c2433c78853315dfb6b"
+    description: "官方 FITS 回归脚本：图像与二进制表写入/回读、关键字/注释/日期/BLANK 关键字、按行读取列。"
+    command: "slsh tests/test_fits.sl"
+  - file: src/tests/test_wcs.sl
+    source: slcfitsio-pre0.4.7-19/src/tests/test_wcs.sl
+    sha256: "a23548c244873dfc33824c261f0d7b856018d98f8969cf3365097e1d24192556"
+    description: "官方 WCS 回归脚本（fitswcs.sl 封装层）：fitswcs_bin_wcs / fitswcs_rebin_wcs 的 CRPIX 与 CDELT 计算断言。"
+    command: "slsh tests/test_wcs.sl"
+
+# test_package 中自带的测试（消费者视角验证：真实加载安装后的模块）
+# 上游 Makefile test 目标里的 2 个脚本**全部**纳入执行，并由驱动层逐条给出结论。
+test_package_tests:
+  - file: test_fits.sl
+    description: "上游 test_fits.sl 的包内适配版（仅改装载路径与结尾退出码，断言体逐字保留）：由 run_test.sh 把 @PKG@ 替换为安装目录，通过真实 slsh 加载 cfitsio-module.so，执行图像 + 二进制表写读回环；断言失败则 exit 1。"
+    command: "sh run_test.sh <slcfitsio package folder>"
+  - file: test_wcs.sl
+    description: "上游 test_wcs.sl 的包内适配版（同样只改装载路径与退出码）：经真实 slsh 加载包内 cfitsio-module.so 与 fitswcs.sl，执行 fitswcs_bin_wcs / fitswcs_rebin_wcs 的 CRPIX/CDELT 断言；断言失败则 exit 1。"
+    command: "sh run_test.sh <slcfitsio package folder>"
+  - file: run_test.sh
+    description: "测试驱动：定位包内模块与 S-Lang 封装脚本、准备临时工作目录、以 SLANG_MODULE_PATH 指向包内模块目录依次运行两个上游回归脚本，逐条打印 UPSTREAM_CASE PASS|FAIL <file> (rc=N) 与末尾 UPSTREAM_SUMMARY <n>/2；在宿主存在 /opt/ohos-guest guest shim 时注入 LD_PRELOAD（模拟执行模型，真机无 shim 则为空、行为不变）。任一脚本非零退出即整体失败。"
+    command: "sh run_test.sh <slcfitsio package folder>"
+
+# 测试断言总数 (近似值, 用于质量评估)
+# test_fits.sl: 4 次关键字写读比较 + 1 次 logical 读回 + 图像回环 1 次 +
+#   二进制表 3 列比较 + 按行读取比较 1 次 = 10 个断言点。
+# test_wcs.sl : fitswcs_bin_wcs 的 CRPIX / CDELT 2 项 +
+#   fitswcs_rebin_wcs 的 CRPIX / CDELT 2 项 = 4 个断言点。
+# 任一失败即 Failed++，脚本末尾 exit(1)。
+assertion_count: 14
