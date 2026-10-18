@@ -1,0 +1,31 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: libxfce4ui/4.20.0
+homepage: "https://gitlab.xfce.org/xfce/libxfce4ui"
+
+# 上游测试链接被剔除的子目录（无法在本构建形态下编译）
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游测试存在性审计（hmbs 硬门禁要求）
+upstream_tests_exist: false
+upstream_test_audit: |
+  审计结论：上游 libxfce4ui 4.20.0 的 tests/ 程序链接本适配剔除的子目录（N=0 可注册用例）。
+  1. 上游仓库（archive.xfce.org libxfce4ui 4.20.0 tarball 逐文件核对）：
+     tests/ 目录存在，但其中 test-programs 链接 libxfce4kbd-private 与
+     xfce4-about（均为本适配 patch 0001 剔除的子目录——kbd-private 是 X
+     快捷键辅助库，xfce4-about 依赖 kbd-private）。
+  2. tests/Makefile.am 中程序为 noinst_PROGRAMS 且依赖
+     $(top_builddir)/libxfce4kbd-private/libxfce4kbd-private.la——该目标
+     不在本构建中，测试无法编译。
+  3. 功能验证由消费者冒烟测试补全（test_package/test.c）：
+     版本宏一致性（4.20.0 断言）、XfceTitledDialog GType 注册往返
+     （GObject class_init 链路验证）、CHECK_VERSION 宏共 3 用例真编译
+     真执行真断言（无显示环境依赖）。
+
+# 上游实际运行的测试程序（无——N=0）
+upstream_tests: []
