@@ -1,0 +1,50 @@
+# 版本级 manifest
+# tsctp 0.8.6 — HarmonyOS PC (OHOS aarch64) 适配
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "0.8.6"
+software: "tsctp"
+
+# published | built | failed | archived
+status: published
+build_date: "2026-10-17"
+build_system: cmake
+
+source:
+  url: "https://github.com/dreibh/tsctp/archive/refs/tags/tsctp-0.8.6.tar.gz"
+  sha256: "c4defcd5228b4f02598f8ee660e35c9cd32794354006b2db909b623621873785"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_SYSTEM_NAME=HarmonyOS（由 Conan OHOS profile 自动注入）"
+    - "-DCMAKE_REQUIRED_INCLUDES=<lksctp-tools>/include"
+    - "-DCMAKE_LIBRARY_PATH=<lksctp-tools>/lib"
+  dependencies:
+    - lksctp-tools/1.0.21
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-CMakeLists.txt.patch"
+
+knowledge_gained:
+  - "Conan OHOS profile 把 os=OHOS 映射为 CMAKE_SYSTEM_NAME=HarmonyOS（不是 OHOS），上游 CMake 的 OS 白名单必须按 HarmonyOS 匹配"
+  - "上游用 CHECK_INCLUDE_FILE/FIND_LIBRARY 探测 netinet/sctp.h 与 libsctp，用 CMAKE_REQUIRED_INCLUDES + CMAKE_LIBRARY_PATH + extra_cflags(-I) 即可注入 Conan 依赖，不必改上游探测逻辑"
+  - "HarmonyOS HongMeng Kernel 1.12.0 未内置 SCTP 协议栈：socket(IPPROTO_SCTP) 返回 EPROTONOSUPPORT(93)，/proc/net/sctp 与 net.sctp sysctl 均不存在；编译期适配不受影响，运行期端到端 SCTP 流量测试无法在本机执行"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/tsctp-0.8.6.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/tsctp-0.8.6.work
+  source_orig_hash: 6824a9f4be16fd96
+  source_work_hash: bc425e3611f057c3
+  generated_at: '2026-10-17T18:10:00'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-CMakeLists.txt.patch
+    type: portability
+    platform_only: true
+    guard: none    # 仅 CMAKE_SYSTEM_NAME 字符串分支，无任何平台预处理器宏（R8 / PF5）

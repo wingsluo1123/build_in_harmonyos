@@ -1,0 +1,49 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件 — tsctp 0.8.6
+#
+# 上游测试入口清点（R51 三步法第一步，2026-10-17 实测）：
+#   * 无 tests/ 目录、无 CTest 注册：根 CMakeLists.txt 无 enable_testing()/add_test()/
+#     include(CTest)，实测 `ctest -N` 输出 "Total Tests: 0"。
+#   * 无 pytest / autotest / debian autopkgtest（解包源码内无 debian/tests 目录）。
+#   * 真实功能测试入口 = 上游 src/ 目录下两个 shell 驱动脚本，调用 tsctp 二进制
+#     （客户端）与另一个 tsctp 进程（服务端）之间做 SCTP 流量互操作测试：
+#         src/batch      <START> <END> <DELTA> <TIME> <LOCAL_ADDR> <REMOTE_ADDR>
+#         src/batchLoop  <START> <END> <TIME> <LOCAL_ADDR> <REMOTE_ADDR>
+#   * ci/ci-test、ci/ci-build、freebsd/tsctp/test-packaging 是打包/安装脚本（.deb/.rpm/pkg），
+#     不是功能测试；debian/rules 仅 dh_auto_build/install，无 override_dh_auto_test。
+#
+# 结论：上游没有自动化单元测试入口（0 个注册用例），只有 2 个需要真实 SCTP 协议栈的
+# 端到端驱动脚本。二者已在 OHOS 上真实执行，结果见 reports/test-report.md。
+
+package: tsctp/0.8.6
+homepage: "https://www.nntb.no/~dreibh/tsctp/"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "ctest -N (实测: Total Tests: 0 — 上游未注册任何测试)"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的功能测试驱动脚本（需要真实 SCTP 协议栈 + 一个对端 tsctp 服务端）
+upstream_tests:
+  - file: src/batch
+    source: tsctp-0.8.6/src/batch
+    description: "客户端批量发送驱动：对每个 bufsize 递增点执行 ./tsctp -v -l <n> -T <time> -L <addr> <peer>"
+    command: "./batch 1 2 1 1 127.0.0.1 127.0.0.1"
+  - file: src/batchLoop
+    source: tsctp-0.8.6/src/batchLoop
+    description: "客户端循环发送驱动：bufsize 按 1/10/100/1000 步进循环执行 tsctp 客户端"
+    command: "./batchLoop 1 2 1 127.0.0.1 127.0.0.1"
+
+# test_package 中自带的测试 (消费者视角验证, 调用已安装二进制)
+test_package_tests:
+  - file: test.sh
+    description: "消费者测试 — 调用已安装 tsctp：① 上游 CLI 用法横幅 + exit 1；② SCTP 服务端 socket 路径（无崩溃，优雅报错或正常监听）；③ 二进制内已静态链入 libsctp 符号"
+    command: "bash test.sh"
+  - file: test_ohos/run_ohos_test.sh
+    description: "鸿蒙专项验证 — aarch64 ELF / 宿主路径泄漏 / libsctp 符号 / SCTP 协议栈探测 / CLI 面（5 项）"
+    command: "sh test_ohos/run_ohos_test.sh <已安装 tsctp 路径>"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 8
