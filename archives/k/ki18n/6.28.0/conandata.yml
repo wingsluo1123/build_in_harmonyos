@@ -1,0 +1,26 @@
+# conandata.yml - ki18n 6.28.0
+# Upstream source: official KDE Frameworks 6.28.0 release tarball.
+# First adaptation of the 6.28.0 upstream release; ships the QML module
+# org.kde.ki18n and carries the kitemodels/kirigami SONAME + ELF re-sign
+# hardening proven on ki18n/6.26.0.1.
+# download.kde.org is a Mirrorbits redirector; on some networks the mirror
+# it selects answers with a broken (demo) TLS certificate, so two
+# authoritative KDE mirrors are listed as fallbacks (R39: official source or
+# authoritative mirror). The sha256 below pins the identical official
+# tarball whichever mirror answers first.
+
+sources:
+  url:
+    - "https://download.kde.org/stable/frameworks/6.28/ki18n-6.28.0.tar.xz"
+    - "https://mirrors.nju.edu.cn/kde/stable/frameworks/6.28/ki18n-6.28.0.tar.xz"
+    - "https://mirrors.aliyun.com/kde/stable/frameworks/6.28/ki18n-6.28.0.tar.xz"
+  sha256: "820ce5858c6db732d68da53572a0e7db8353e4372d2122debcfb0f9ff10b85db"
+
+patches:
+  "6.28.0":
+    - patch_file: "patches/0001-cmake-KF6I18nMacros.cmake.in.patch"
+      patch_description: "Relax the Gettext requirement in KF6I18nMacros so configure succeeds when msgfmt is not required for PO processing (KF_SKIP_PO_PROCESSING path)"
+      patch_type: "portability"
+    - patch_file: "patches/0002-autotests-testhelpers.patch"
+      patch_description: "Deploy the ktranscript autotest config with a plain read()/write() block copy instead of QFile::copy(), whose internal OS-level copy path fails on the OHOS user volume"
+      patch_type: "portability"
