@@ -1,0 +1,81 @@
+# test_package/MANIFEST.yml — 上游官方测试声明 + 消费者测试声明（CI L0e 强制要求）
+package: libxfconf/4.20.0
+homepage: "https://gitlab.xfce.org/xfce/xfconf"
+
+# ── 上游测试情况审计（4.20.0 tarball 实测，2026-10-17）──────────────────────
+# 注册单元：Autotools `make check`（automake TESTS）
+#   - tests/*/Makefile.am 各自 `check_PROGRAMS`，经 tests/Makefile.inc
+#     的 `TESTS = $(check_PROGRAMS)` + `LOG_COMPILER = tests-driver.sh` 注册
+#     → 33 个用例（set/has/get/reset 各 7、property-changed-signal 2、
+#       object-bindings 1、others 1、tests-end 1）
+#   - xfconf/Makefile.am: `if HAVE_GNUC_VISIBILITY → TESTS = abicheck.sh`
+#     → 1 个用例（导出符号 vs xfconf/xfconf.symbols）
+#   → 合计 34 个注册用例
+# 上游未注册的目录：docs/（gtk-doc）、po/（gettext）、completions/、
+#   gsettings-backend/ —— make check 进入但无 TESTS 条目。
+# 运行前置（上游设计如此）：tests-driver.sh 先拉起 xfconfd（XFCONF_RUN_IN_TEST_MODE=1），
+#   用例通过 GDBus 连 *会话总线* 对 org.xfce.XfconfTest 做 Ping 后走真实读写链路。
+upstream_check_command: "make check"
+upstream_test_in_build: false
+upstream_test_command: "make check -j1 CPP=\"/data/service/hnp/bin/clang -E -x c\"（HarmonyOS PC 真机，私有会话总线 = unix:abstract，2026-10-17）"
+upstream_tests:
+  - file: xfconf/abicheck.sh
+    source: xfconf-4.20.0/xfconf/abicheck.sh
+    description: "导出 ABI 冻结检查：cpp -DINCLUDE_INTERNAL_SYMBOLS -DINCLUDE_VARIABLES -DALL_FILES xfconf.symbols 生成期望符号表，nm .libs/libxfconf-0.so* | awk 取 [DRTG] 符号生成实际符号表，diff 比对（57 个导出符号）"
+    result: "PASS（1/1）—— 57 个导出符号与 xfconf.symbols 完全一致"
+  - file: tests/set-properties/
+    source: xfconf-4.20.0/tests/set-properties/
+    description: "xfconf_channel_set_* 写入 7 种类型（string/int/uint64/double/arrayv/boolean/stringlist）后由 xfconfd 持久化"
+    result: "PASS 7/7（t-set-string, t-set-int, t-set-uint64, t-set-double, t-set-arrayv, t-set-boolean, t-set-stringlist）"
+  - file: tests/has-properties/
+    source: xfconf-4.20.0/tests/has-properties/
+    description: "xfconf_channel_has_property 对 7 种类型属性存在性判定（注：上游 t_has_int_SOURCES 指向 t-has-string.c，t-has-int 与 t-has-string 共用同一源文件，属上游历史写法，本适配不改）"
+    result: "PASS 7/7（t-has-string, t-has-int, t-has-uint64, t-has-double, t-has-arrayv, t-has-boolean, t-has-stringlist）"
+  - file: tests/get-properties/
+    source: xfconf-4.20.0/tests/get-properties/
+    description: "xfconf_channel_get_* 读回 7 种类型并校验取值"
+    result: "PASS 7/7（t-get-string, t-get-int, t-get-uint64, t-get-double, t-get-arrayv, t-get-boolean, t-get-stringlist）"
+  - file: tests/reset-properties/
+    source: xfconf-4.20.0/tests/reset-properties/
+    description: "xfconf_channel_reset_property 复位 7 种类型属性"
+    result: "PASS 7/7（t-reset-string, t-reset-int, t-reset-uint64, t-reset-double, t-reset-arrayv, t-reset-boolean, t-reset-stringlist）"
+  - file: tests/property-changed-signal/
+    source: xfconf-4.20.0/tests/property-changed-signal/
+    description: "跨连接 property-changed 信号投递（基础 + detailed 两种签名）"
+    result: "PASS 2/2（t-string-changed-signal, t-string-changed-signal-detailed）"
+  - file: tests/object-bindings/
+    source: xfconf-4.20.0/tests/object-bindings/
+    description: "xfconf_g_property_bind/unbind 与 GObject 属性双向绑定"
+    result: "PASS 1/1（t-object-bindings）"
+  - file: tests/others/
+    source: xfconf-4.20.0/tests/others/
+    description: "回归用例 t-issue-16（上游 issue #16 复现）"
+    result: "PASS 1/1（t-issue-16）"
+  - file: tests/tests-end/
+    source: xfconf-4.20.0/tests/tests-end/
+    description: "收尾用例：tests-driver.sh 识别 t-tests-end 后关闭 xfconfd，验证守护进程可被优雅回收"
+    result: "PASS 1/1（t-tests-end）"
+upstream_test_totals:
+  registered: 34
+  passed: 34
+  failed: 0
+  skipped: 0
+  errors: 0
+  pass_rate: "100.0%"
+  log: "reports/upstream-tests-make-check.log"
+  summary: "reports/upstream-tests-summary.tsv"
+
+# ── 鸿蒙适配新增的消费者用例（HarmonyOS 侧新增测试）───────────────────────
+# 上游 34 个用例全部依赖真实会话总线 + xfconfd，纯 conan 消费者（以及 CI）
+# 无法直接复用；因此适配层新增 1 组鸿蒙消费者用例，走 test_package 在
+# `conan create` 里真实编译 + 链接 + 运行，覆盖上游未覆盖的“安装后制品可用性”。
+test_package_tests:
+  - file: test.c
+    description: "HarmonyOS 消费者用例（新增）：第三方程序用 <xfconf/xfconf.h> 编译、链接已安装的 libxfconf-0.so.3，并真实调用库内代码路径 19 个断言 —— ①XFCONF_TYPE_UINT16/INT16 基本类型注册、GValue 持有、uint16/int16 取值往返 ②GValue transform 注册方向（G_TYPE_INT↔XFCONF_TYPE_UINT16、XFCONF_TYPE_UINT16→G_TYPE_STRING）③XFCONF_ERROR quark 名（xfconf_daemon_error）与 XfconfError 枚举成员 ④XFCONF_TYPE_CHANNEL 注册、GObject 派生关系、类型名 XfconfChannel ⑤xfconf_named_struct_register 进程内结构体注册 ⑥xfconf_array_free(NULL) 空指针安全 ⑦无会话总线时 xfconf_init 优雅失败（FALSE + GError）⑧未初始化时 xfconf_shutdown 安全"
+    command: "./test_libxfconf"
+    result: "19/19 断言通过（21 个调用点中成功路径分支的 2 项因无会话总线走 else 分支未执行；reports/test-package-output.log）"
+
+# 断言总数：19（实测计分）。test.c 共 21 个 CHECK() 调用点；xfconf_init() 的成功/失败两个
+# 互斥分支各含独立断言，本机无会话总线走 else 分支，故实际计分 21-2=19，与日志
+# "checks: 19, errors: 0" 一致；errors==0 时整体 PASS。
+assertion_count: 19
