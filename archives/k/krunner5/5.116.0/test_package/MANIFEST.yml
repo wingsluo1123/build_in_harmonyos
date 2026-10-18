@@ -1,0 +1,80 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# krunner5 5.116.0 上游测试：autotests/ 下 6 个 ecm_add_test 注册的 QTest 类
+# （exclude_deprecated_before_and_at=5.91.0 档位下实际编译的 private
+# Q_SLOTS，已排除 initTestCase/cleanupTestCase 与 *_data 数据提供函数），
+# 合计 27 个用例。全部已并入 conanfile build() 的 `ctest` 调用；
+# 其中 3 个需要 D-Bus 会话总线的类通过 dbus-run-session 私总线执行
+# （无 dbus 工具链的镜像上以 -E 排除并在 notes.md 记录）。
+
+package: krunner5/5.116.0
+homepage: "https://invent.kde.org/frameworks/krunner"
+
+# 上游测试命令（build() 内嵌执行；进程级私有会话总线见下）
+upstream_check_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error"
+
+# conanfile.py build() 中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "dbus-run-session -- ctest --test-dir <build_folder> --output-on-failure --no-tests=error"
+
+# 上游实际运行的测试用例。
+# 注册方式：autotests/CMakeLists.txt 的 ecm_add_tests。
+# count/count_unit 为该测试类的 QTest 用例数（5.91.0 排除档位下编译的槽位）。
+upstream_tests:
+  - file: autotests/runnermatchmethodstest.cpp
+    source: krunner-5.116.0/autotests/
+    count: 4
+    count_unit: cases
+    description: "RunnerContextMatchMethodsTest — RunnerContext 的 addMatch/addMatches 批量与去重 4 个用例；removeMatch* 3 个（deprecated 5.81）与 match(id) 2 个（deprecated 5.79）槽位随 5.91.0 排除档位编译剔除"
+    command: "ctest -R runnermatchmethodstests"
+  - file: autotests/runnermanagerhistorytest.cpp
+    source: krunner-5.116.0/autotests/
+    count: 4
+    count_unit: cases
+    description: "RunnerManagerHistoryTest — 启动历史 boost/建议列表（静态 fakerunnerplugin + kcoreaddons_desktop_to_json 元数据）4 个用例"
+    command: "ctest -R runnermanagerhistorytest"
+  - file: autotests/testmetadataconversion.cpp
+    source: krunner-5.116.0/autotests/
+    count: 1
+    count_unit: cases
+    description: "TestMetaDataConversion — 旧 metadata.desktop 到 KPluginMetaData 的转换 1 个用例"
+    command: "ctest -R testmetadataconversion"
+  - file: autotests/dbusrunnertest.cpp
+    source: krunner-5.116.0/autotests/
+    count: 9
+    count_unit: cases
+    description: "DBusRunnerTest — D-Bus runner 协议（启动 testremoterunner 远端进程、服务注册后 match 往返、动作请求、生命周期、通配符）9 个用例；需要 D-Bus 会话总线（WITH_KSERVICE=0，kservice 相关分支编译剔除）"
+    command: "dbus-run-session -- ctest -R dbusrunnertest"
+  - file: autotests/runnermanagersinglerunnermodetest.cpp
+    source: krunner-5.116.0/autotests/
+    count: 6
+    count_unit: cases
+    description: "RunnerManagerSingleRunnerModeTest — 单 runner 模式（加载/禁用/不存在 id）6 个用例；testAdvertisedSingleRunners（deprecated 5.81）槽位随 5.91.0 排除档位编译剔除；需要 D-Bus 会话总线"
+    command: "dbus-run-session -- ctest -R runnermanagersinglerunnermodetest"
+  - file: autotests/runnermanagertest.cpp
+    source: krunner-5.116.0/autotests/
+    count: 3
+    count_unit: cases
+    description: "RunnerManagerTest — matchesChanged 调度/重置完成信号/销毁不崩溃 3 个用例；需要 D-Bus 会话总线"
+    command: "dbus-run-session -- ctest -R runnermanagertest"
+
+# 因 5.91.0 排除档位而未注册的上游测试（如实声明，见 notes.md）
+# - autotests/runnercontexttest.cpp：注册条件为 EXCLUDE_DEPRECATED_BEFORE_AND_AT
+#   VERSION_LESS 5.76.0，且链接 KF5::KIOCore（不在本链条内），未注册（1 个上游用例）。
+
+# test_package 中自带的测试（消费者视角验证，调用已安装库）
+test_package_tests:
+  - file: test.cpp
+    count: 31
+    count_unit: assertions
+    description: >-
+      消费者测试 — 用 KPluginMetaData（KPlugin JSON）构造 AbstractRunner
+      子类，跑通 match() -> RunnerContext::addMatch() -> matches() 全链，
+      校验 QueryMatch 值语义（isValid/拷贝/按 relevance 排序）、
+      RunnerSyntax 构造与 RunnerContext::matchesChanged 信号；并断言
+      HarmonyOS 适配（libKF5Runner.so 无版本 DT_SONAME、DT_RUNPATH、
+      .codesign 段）。
+    command: "./test_krunner5"
+
+# 上游测试用例总数（= 27；见上方各类 count 之和 4+4+1+9+6+3）
+assertion_count: 27
