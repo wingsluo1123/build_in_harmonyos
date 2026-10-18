@@ -1,0 +1,44 @@
+--- a/subprojects/libnkutils/core/src/format-string.c
++++ b/subprojects/libnkutils/core/src/format-string.c
+@@ -661,39 +661,40 @@
+ 
+             gsize c = 0;
+             do
+             {
+                 ++c;
+                 *m = '\0';
+             } while ( ( m = _nk_format_string_strchr_escape(m, e - m, '/', '\0') ) != NULL );
+             c = ( c + 1 ) / 2 + 1;
+ 
+             token.replace = g_new(NkFormatStringRegex, c);
++            gsize alloc = c;
+             c = 0;
+             do
+             {
+                 GError *_inner_error_ = NULL;
+                 token.replace[c].regex = g_regex_new(++w, G_REGEX_OPTIMIZE, 0, &_inner_error_);
+                 if ( token.replace[c].regex == NULL )
+                 {
+                     g_set_error(error, NK_FORMAT_STRING_ERROR, NK_FORMAT_STRING_ERROR_REGEX, "Wrong regex: %s", _inner_error_->message);
+                     g_clear_error(&_inner_error_);
+                     goto fail;
+                 }
+ 
+                 w = w + strlen(w) + 1;
+                 token.replace[c].replacement = _nk_format_string_parse(FALSE, ( w > e ) ? "" : w, identifier, error);
+                 if ( token.replace[c].replacement == NULL )
+                     goto fail;
+                 w += strlen(w);
+                 ++c;
+-            } while ( w < e );
++            } while ( w < e && c < alloc - 1 );
+             token.replace[c].regex = NULL;
+         }
+         break;
+         default:
+             continue;
+         }
+ 
+         *e = *b = '\0';
+ 
+         ++self->size;

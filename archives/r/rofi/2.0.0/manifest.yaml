@@ -1,0 +1,109 @@
+# 版本级 manifest
+# 文件位置: archives/r/rofi/2.0.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "2.0.0"
+
+# 软件名
+software: "rofi"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-16"
+build_system: "meson"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/davatorium/rofi/releases/download/2.0.0/rofi-2.0.0.tar.gz"
+
+  # 源码校验和
+  sha256: "f81659b175306ff487e35d88d6b36128e85a793bfb56b64fa22c62eb54c4abd0"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: meson
+
+  # 配置选项列表
+  configure_options:
+  - "-Ddefault_library=shared"
+  - "-Dxcb=disabled"
+  - "-Dwayland=enabled"
+  - "-Dimdkit=false"
+  - "-Dcheck=enabled"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+  - glib/2.84.0.1
+  - cairo/1.18.4
+  - pango/1.56.4
+  - gdk-pixbuf/2.44.6.1.1
+  - libxkbcommon/1.13.1
+  - wayland/1.22.0
+  - wayland-protocols/1.36
+  - libffi/3.4.4
+  - zlib/1.3.1.1
+  - pcre2/10.45
+  - graphite2/1.3.14
+  - expat/2.8.2
+  - fontconfig/2.18.1
+  # 构建工具 tool_requires: flex/2.6.4.2, bison/3.8.2
+  # 测试框架 test_requires: check/0.15.2
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+- "0001-subprojects-libnkutils-core-src-format-string.c.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+- "OHOS 包树 (.conan2/p/...) 内 ELF 执行需有效 .codesign，无效报 EPERM (126)；.so dlopen 无效签名报 EACCES (13) → llvm-objcopy --remove-section .codesign 后 binary-sign-tool sign -selfSign 1（appstream/aravis 先例）"
+- "ohpcd wayland/1.22.0 包内 libwayland-cursor.so.0.22.0 的 .codesign 失效（同包 client 正常）→ package() 复制重签入本包 lib/ 并在 libdirs 前置"
+- "check 0.15.2 临时目录优先级 TEMP → P_tmpdir（编译期固定 /tmp，OHOS 只读）→ build() 内 os.environ 注入 TEMP=<build>/test-tmp"
+- "libnkutils format-string '/' 分支 OOB 写（上游 sardemff7/libnkutils master 未修复）→ 2 行最小补丁"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/rofi-2.0.0.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/rofi-2.0.0.work
+  source_orig_hash: 11ebe93440a5b752
+  source_work_hash: c52cb0a915b00511
+  generated_at: '2026-10-16T18:19:12'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-subprojects-libnkutils-core-src-format-string.c.patch
+    type: bugfix
+    platform_only: False
+    guard: 'none'
