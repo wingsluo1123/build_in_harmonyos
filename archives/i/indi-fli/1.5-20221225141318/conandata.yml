@@ -1,0 +1,56 @@
+# conandata.yml — indi-fli 1.5-20221225141318
+#
+# 源码 = Debian Astronomy Team 的 indi-fli 官方 orig tarball，即
+# indilib/indi-3rdparty 仓库 indi-fli/ 子目录的 1.5 版本快照
+# （版本时间戳 2022-12-25 14:13:18 = 该子目录当日提交时刻）。
+#
+# 上游从不为单个 3rdparty 驱动单独打 tag，Debian pool 的 orig.tar.gz 是该版本
+# 的权威可下载源；本仓库既有的 indi-fishcamp / indi-gpsnmea / indi-beefocus
+# 三个兄弟驱动采用同一来源模式。
+# 2026-10-15 实测：HTTP 200，60838 字节，
+# sha256 b8956302d74e944dfdba95cae510df4d86d4aecaee3745617b10a48510c000e2。
+#
+# 说明：URL 里的 '+' 写成字面量而不是 %2B。CI 的 pre-download 步骤会用 URL
+# 末段拼出 file:// 路径再交给 Conan percent-decode，写成 %2B 时会在磁盘上按
+# 字面 '+' 查找、而缓存文件名保留 '%2B' → FileNotFoundError
+# （与 libfli 2.0-20221221182632 / indi-gpsnmea 的同类注释一致）。
+
+sources:
+  url:
+    - "https://deb.debian.org/debian/pool/main/i/indi-fli/indi-fli_1.5+20221225141318.orig.tar.gz"
+  sha256: "b8956302d74e944dfdba95cae510df4d86d4aecaee3745617b10a48510c000e2"
+
+patches:
+  - patch_file: "patches/0001-FindINDI.cmake.patch"
+    patch_description: >
+      FindINDI.cmake 版本号正则回移上游 master 修复：兼容 INDI 2.x
+      indiversion.h 的 INDI_VERSION "2.2.2" 引号形式（否则
+      FATAL_ERROR failed to detect INDI version）
+    patch_type: "portability"
+  - patch_file: "patches/0002-CMakeCommon-cxx17.patch"
+    patch_description: >
+      cmake_modules/CMakeCommon.cmake 的 CMAKE_CXX_STANDARD 由 14 提升到 17：
+      INDI 2.x 头文件（defaultdevice.h 使用 std::any）要求 C++17；回移上游
+      master 同一处改动
+    patch_type: "portability"
+  - patch_file: "patches/0003-CMakeLists-ohos.patch"
+    patch_description: >
+      CMakeLists.txt 三处上游构建缺陷修复：①cmake_minimum_required(VERSION 3.0)
+      在 CMake >= 4 下硬报错，提升到 3.16；②驱动链接的是静态 libfli.a，其 USB
+      后端引用 libusb-1.0 符号，而该驱动树没有 FindUSB1 wiring，补
+      find_library(usb-1.0) 并加入三个可执行文件的链接行；③INDI_DATA_DIR 被
+      树内 FindINDI.cmake 定成 libindi 包的数据目录，会让
+      install(FILES indi_fli.xml DESTINATION ${INDI_DATA_DIR}) 把设备描述符写进
+      依赖包，改为本包私有的相对路径 share/indi（R49）
+    patch_type: "portability"
+  - patch_file: "patches/0004-fli-indi2-api.patch"
+    patch_description: >
+      fli_ccd.cpp / fli_cfw.cpp / fli_pdf.cpp 由 INDI 1.x 属性 API 迁移到 INDI 2.x：
+      基类成员在 2.x 由 C 结构体变为 INDI::Property* 对象，故
+      ①TemperatureN/FilterSlotN/FocusAbsPosN/FocusRelPosN/FocusSpeedN 数组成员改为
+      对应 *NP 属性的 [i].setMin/setMax/setValue 与 getMin/getMax/getValue 访问器；
+      ②.s 状态读写改为 setState()/getState()；③IUUpdateMinMax(&P) 改为 P.updateMinMax()；
+      ④IDSetNumber(&P, ...) 改为 P.apply(...)；⑤updateProperties() 中基类属性由
+      defineProperty(&P) / deleteProperty(P.name) 改为 defineProperty(P) /
+      deleteProperty(P)（上游 2.2 源与此逐行一致；驱动自有的 C 结构体属性保持原样）
+    patch_type: "portability"
