@@ -1,0 +1,116 @@
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 4c531fc911efbd309abb7101a21e0a7804b811e0..3c8b7ba882ddb67c8546a409a54320f22d7c4798 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -65,15 +65,102 @@
+ target_link_libraries(KF6Runner
+     PUBLIC
+         Qt6::Core
+-        KF6::CoreAddons # KPluginFactory
+-    PRIVATE
+-        Qt6::DBus
+-        Qt6::Gui
+-        KF6::ConfigCore
+-        KF6::I18n
+-        KF6::ItemModels
+-        KF6::WindowSystem
+-)
++)
++# 0002: Qt6::DBus/Qt6::Gui stay PRIVATE exactly as upstream (round 1 on
++# device: dropping them left dbusrunner.cpp without <QDBusArgument> --
++# Qt6::Gui still arrived transitively through KF6::WindowSystem, but
++# Qt6::DBus had no other provider and the compile failed). The Qt6
++# libraries ship proper versioned SONAMEs (libQt6DBus.so.6 is a real
++# file in the package), so linking them through their imported targets
++# stays relocatable; only the OHOS-built KF6 libraries (no DT_SONAME)
++# need the basename -l: treatment below.
++target_link_libraries(KF6Runner PRIVATE Qt6::DBus Qt6::Gui)
++# 0002: relocatable basename SONAME linkage (kscreenlocker 6.7.2 0008 /
++# kpackage/6.26.0.1 0005 precedent, device-proven). The published KF6
++# dependency libraries carry no DT_SONAME, so linking them by their
++# absolute Conan cache paths bakes machine-private paths into DT_NEEDED
++# (non-relocatable, E537). lld records the name as given on the command
++# line, so the KF6 dependencies are linked by exact-file-name -l: flags
++# (bare basenames) with the dependency directories attached PRIVATE to
++# this target. Only the KF6 components the sources actually consume are
++# listed: KConfig/KSharedConfig/KConfigGroup (kconfig), KLocalizedString
++# (ki18n), KDescendantsProxyModel (kitemmodels), KWindowSystem
++# (kwindowsystem) and the KPluginFactory/KPluginMetaData classes
++# (kcoreaddons). KF6::CoreAddons additionally stays on the link
++# INTERFACE because the public headers (abstractrunner.h, runnermanager.h)
++# include <KPluginFactory>/<KPluginMetaData>: consumers need its usage
++# requirements, and the installed KF6RunnerConfig.cmake already
++# find_dependency(KF6CoreAddons) from upstream. It is exported by NAME
++# only, never by absolute path, so KF6RunnerTargets.cmake stays
++# relocatable. The KDE-installed targets files set only the per-config
++# IMPORTED_LOCATION_RELEASE, and get_target_property returns the
++# "<var>-NOTFOUND" sentinel string for an unset property, so every lookup
++# must be sentinel-guarded (a plain if(NOT var) misreads the non-empty
++# sentinel as "set" and silently skips the fallback -- kscreenlocker
++# round 23).
++target_link_libraries(KF6Runner INTERFACE KF6::CoreAddons) # KPluginFactory, for the public headers
++set(_kr_direct_deps
++    KF6::CoreAddons KF6::ConfigCore KF6::I18n KF6::ItemModels KF6::WindowSystem
++)
++set(_kr_kf6_dirs "")
++set(_kr_kf6_libs "")
++foreach(_kr_t IN LISTS _kr_direct_deps)
++    set(_kr_loc "")
++    get_target_property(_kr_loc ${_kr_t} IMPORTED_LOCATION_RELEASE)
++    if(NOT _kr_loc OR _kr_loc MATCHES "-NOTFOUND$")
++        get_target_property(_kr_loc ${_kr_t} IMPORTED_LOCATION)
++    endif()
++    if(_kr_loc AND NOT _kr_loc MATCHES "-NOTFOUND$")
++        get_filename_component(_kr_dir "${_kr_loc}" DIRECTORY)
++        get_filename_component(_kr_base "${_kr_loc}" NAME)
++        list(APPEND _kr_kf6_dirs "${_kr_dir}")
++        list(APPEND _kr_kf6_libs "-l:${_kr_base}")
++    endif()
++endforeach()
++if(_kr_kf6_dirs)
++    list(REMOVE_DUPLICATES _kr_kf6_dirs)
++    list(REMOVE_DUPLICATES _kr_kf6_libs)
++    target_link_directories(KF6Runner PRIVATE ${_kr_kf6_dirs})
++    target_link_libraries(KF6Runner PRIVATE ${_kr_kf6_libs})
++endif()
++# Usage requirements (include dirs/definitions) of the KF6 deps no longer
++# arrive through the link line; walk the transitive closure of the direct
++# KF6 deps and copy them (KConfigGroup from kconfig, KLocalizedString
++# from ki18n, KDescendantsProxyModel from kitemmodels and the kcoreaddons
++# classes arrive through this walk; the KF6 targets also reach the Qt6
++# interface directories through their INTERFACE_LINK_LIBRARIES).
++# kscreenlocker 6.7.2 0008 rounds 25/26 precedent.
++set(_kr_walk KF6::CoreAddons KF6::ConfigCore KF6::I18n KF6::ItemModels KF6::WindowSystem)
++set(_kr_seen "")
++while(_kr_walk)
++    list(GET _kr_walk 0 _kr_cur)
++    list(REMOVE_AT _kr_walk 0)
++    list(FIND _kr_seen "${_kr_cur}" _kr_idx)
++    if(_kr_idx EQUAL -1 AND TARGET ${_kr_cur})
++        list(APPEND _kr_seen "${_kr_cur}")
++        get_target_property(_kr_inc ${_kr_cur} INTERFACE_INCLUDE_DIRECTORIES)
++        if(_kr_inc AND NOT _kr_inc MATCHES "-NOTFOUND$")
++            target_include_directories(KF6Runner SYSTEM PRIVATE ${_kr_inc})
++        endif()
++        get_target_property(_kr_defs ${_kr_cur} INTERFACE_COMPILE_DEFINITIONS)
++        if(_kr_defs AND NOT _kr_defs MATCHES "-NOTFOUND$")
++            target_compile_definitions(KF6Runner PRIVATE ${_kr_defs})
++        endif()
++        get_target_property(_kr_ll ${_kr_cur} INTERFACE_LINK_LIBRARIES)
++        foreach(_kr_item IN LISTS _kr_ll)
++            if(TARGET ${_kr_item})
++                list(APPEND _kr_walk "${_kr_item}")
++            endif()
++        endforeach()
++    endif()
++endwhile()
++# The OHOS platform module defines no soname flag, so without this the
++# shared library would be linked without DT_SONAME. Pass the basename
++# soname explicitly (kscreenlocker 6.7.2 0008 precedent). Gated on the
++# platform soname flag so Linux keeps the versioned SOVERSION chain.
++if(NOT CMAKE_SHARED_LIBRARY_SONAME_CXX_FLAG)
++    target_link_options(KF6Runner PRIVATE "-Wl,-soname,libKF6Runner.so")
++endif()
+ ecm_generate_headers(KRunner_CamelCase_HEADERS
+   HEADER_NAMES
+     AbstractRunner

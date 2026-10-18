@@ -1,0 +1,68 @@
+--- a/autotests/runnermanagersinglerunnermodetest.cpp
++++ b/autotests/runnermanagersinglerunnermodetest.cpp
+@@ -7,6 +7,7 @@
+ 
+ #include <KConfigGroup>
+ #include <KSharedConfig>
++#include <QByteArray>
+ #include <QCoreApplication>
+ #include <QDebug>
+ #include <QObject>
+@@ -19,6 +20,36 @@
+ #include "kpluginmetadata_utils_p.h"
+ 
+ using namespace KRunner;
++
++namespace
++{
++// QFile::copy() goes through QSaveFile's temporary-file + rename path, which
++// fails silently in this build environment even though the destination
++// directory exists and is writable. Install the fixture with a plain
++// read/write copy and surface the error string if anything goes wrong.
++bool installTestDataFile(const QString &source, const QString &destination)
++{
++    QFile in(source);
++    if (!in.open(QIODevice::ReadOnly)) {
++        qWarning() << "test data source open failed:" << source << in.errorString();
++        return false;
++    }
++    const QByteArray contents = in.readAll();
++    in.close();
++    QFile out(destination);
++    if (!out.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
++        qWarning() << "test data destination open failed:" << destination << out.errorString();
++        return false;
++    }
++    const qint64 written = out.write(contents);
++    out.close();
++    if (written != contents.size()) {
++        qWarning() << "test data short write:" << destination << written << contents.size();
++        return false;
++    }
++    return true;
++}
++} // namespace
+ 
+ class RunnerManagerSingleRunnerModeTest : public AbstractRunnerTest
+ {
+@@ -96,15 +127,17 @@
+     // Copy the service files to the appropriate location and only load runners from there.
+     // QFile::copy() refuses to overwrite an existing destination, so drop stale copies
+     // first and assert both copies: silently continuing with a missing or outdated
+-    // service file turns the runner-count check into an unexplainable failure.
++    // service file turns the runner-count check into an unexplainable failure. The copy
++    // itself is done with plain reads/writes because QFile::copy()'s QSaveFile path
++    // fails silently in this build environment.
+     QString location = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/krunner/dbusplugins/";
+     QDir().mkpath(location);
+     const QString testDesktop = QFINDTESTDATA("plugins/dbusrunnertest.desktop");
+     const QString multiDesktop = QFINDTESTDATA("plugins/dbusrunnertestmulti.desktop");
+     QFile::remove(location + "dbusrunnertest.desktop");
+     QFile::remove(location + "dbusrunnertestmulti.desktop");
+-    const bool copiedTest = QFile::copy(testDesktop, location + "dbusrunnertest.desktop");
+-    const bool copiedMulti = QFile::copy(multiDesktop, location + "dbusrunnertestmulti.desktop");
++    const bool copiedTest = installTestDataFile(testDesktop, location + "dbusrunnertest.desktop");
++    const bool copiedMulti = installTestDataFile(multiDesktop, location + "dbusrunnertestmulti.desktop");
+     QStringList offeredRunnerIds;
+     const auto offeredMetaData = RunnerManager::runnerMetaDataList();
+     for (const KPluginMetaData &metaData : offeredMetaData) {
