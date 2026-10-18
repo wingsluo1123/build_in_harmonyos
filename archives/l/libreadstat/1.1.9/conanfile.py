@@ -56,7 +56,7 @@ from conan.tools.layout import basic_layout
 
 
 class ReadstatConan(ConanFile):
-    name = "readstat"
+    name = "libreadstat"
     version = "1.1.9"
     description = (
         "ReadStat: MIT-licensed C library and command line tools for reading "
@@ -282,7 +282,7 @@ class ReadstatConan(ConanFile):
         self.cpp_info.system_libs = ["m"]
         # readstat/extract_metadata are installed to bin/ by `make install`
         # (bin_PROGRAMS) — declares them for consumers and, per R38/L0k, makes
-        # the software-level commands.json mandatory (archives/r/readstat/).
+        # the software-level commands.json mandatory (archives/l/libreadstat/).
         self.cpp_info.bindirs = ["bin"]
         self.cpp_info.set_property("cmake_file_name", "readstat")
         self.cpp_info.set_property("cmake_target_name", "readstat::readstat")

@@ -1,5 +1,5 @@
 /*
- * Consumer-side verification for readstat/1.1.9 (HarmonyOS PC adaptation).
+ * Consumer-side verification for libreadstat/1.1.9 (HarmonyOS PC adaptation).
  *
  * Links ONLY against the packaged library through the installed public header
  * <readstat.h>, and exercises real library entry points:

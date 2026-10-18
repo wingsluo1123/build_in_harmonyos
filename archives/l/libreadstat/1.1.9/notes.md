@@ -1,8 +1,36 @@
 # readstat 1.1.9 适配笔记
 
+> **第二轮（2026-10-14，分支 `feat/readstat-1.1.9`）复核结论**：
+> 配方主体（`conanfile.py` / `conandata.yml`）与制品仓已发布的 `libreadstat/1.1.9`
+> 逐字节一致（CI L0j 判据：conanfile.py + conandata.yml 均未改动 → 版本号保持
+> `1.1.9`，不递增；本轮变更全部落在 `test_package/` 与 `reports/`，而 CI 用
+> `--build="${pkg_name}/*"` 强制重建并跑 test_package，因此新增消费者用例会在 CI 真实执行）。
+> 本轮新增内容：
+> 1. **鸿蒙消费者回归用例** `test_package/consumer_round_trip.c`（41 条断言）：经公共
+>    writer API 用真实 POSIX `write(2)` 在 HMDFS 上落盘 `.sav` 与 zlib 压缩 `.zsav`，
+>    再用 `readstat_parse_sav` 从磁盘读回逐值比对（double/int32/string 各 3 行，含
+>    `1e300`、`-2147483647` 边界值），并校验变量名、行列计数、`readstat_set_row_limit(1)`
+>    行窗口与缺失文件守卫。
+> 2. **已打包 CLI 实跑** `test_package/cli_smoke.py`（10 条断言）：对上面产出的 `.sav`
+>    运行包内 `bin/readstat`（元数据清单 + CSV 转换到 stdout）并断言输出内容。
+> 3. 既有 `test.c` 更名 `consumer_error_paths.c`（内容不变，7 条断言），与新增套件拆成
+>    两个可执行文件，失败可归因。
+> 4. 证据与统计见 `reports/test-report.md`；真实构建日志 `reports/w3-conan-create.log`
+>    （sha256 `b312396bd831b53c50227369f98cf25cd6429db28a1c2c1f8b81702214a67510`）。
+>
+> **包名变更（2026-10-16）**：conan 包名由 `readstat` 改为 **`libreadstat`**，归档目录随之
+> 由 `archives/r/readstat/` 迁移到 `archives/l/libreadstat/`（`git mv` 保留历史），
+> `conanfile.py` 的 `name = "libreadstat"`、`commands.json`、软件级/版本级 manifest 同步更新。
+> **消费者可见标识一律保持上游原名**：库文件 `readstat`（`libreadstat.a`）、头文件 `readstat.h`、
+> CMake `find_package(readstat)` / `readstat::readstat`、pkg-config `readstat`、
+> 命令 `readstat` 与 `extract_metadata`（`cpp_info.libs = ["readstat"]` 等未改动）。
+> 制品仓此前只有 `readstat/1.1.9`，`libreadstat/1.1.9` 为本包首次发布标识。
+>
+> 其余章节为第一轮记录，仍然有效。
+
 ## 编译环境
 - 构建系统: autotools（上游仅有 configure.ac + Makefile.am；VS17/ 为 MSVC 工程，tarball 内无 CMake）
-- 编译日期: 2026-09-26
+- 编译日期: 2026-09-26（第一轮）/ 2026-10-14（第二轮复核：强制重编 + 上游测试 + test_package）
 - 编译器: clang 15.0.4 / clang++（OHOS SDK，`/data/service/hnp/bin/clang`）
 - 平台: HarmonyOS PC aarch64（HongMeng Kernel 1.12.0）
 - 状态: built
@@ -59,20 +87,43 @@ make install DESTDIR=<package_folder>
 ## 验证结果
 
 ```bash
-# 手工编译（Mode B Step 2，$BUILD_SRC_DIR）
+# 第一轮：手工编译（Mode B Step 2，$BUILD_SRC_DIR）
 AUTORECONF_RC=0 CONFIGURE_RC=0 MAKE_RC=0 INSTALL_RC=0 CHECK_RC=0
 # make check 汇总（_build/test-suite.log）
 #   # TOTAL: 4   # PASS: 4   # SKIP: 0   # FAIL: 0   # ERROR: 0
 #   PASS: test_readstat / test_dta_days / test_sav_date / test_double_decimals
 # 安装树清点：7 个文件（bin/readstat、bin/extract_metadata、include/readstat.h、
 #             lib/libreadstat.*、share/man/man1/*.1）
-# 逐项断言清点见 test_package/MANIFEST.yml（assertion_count=336378）
+# 逐项断言清点见 test_package/MANIFEST.yml（assertion_count=336378
+#   = test_readstat 1352（插桩实测 loop_hits）+ test_dta_days 164364
+#     + test_sav_date 170651 + test_double_decimals 11）
+
+# 第二轮：强制重编全链路复核（配方未改动，仅新增消费者测试）
+conan create . -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 \
+    -r=ohpcd --build=readstat/*
+# → Building from source（真实重编）
+# → make check: # TOTAL: 4  # PASS: 4  # SKIP: 0  # FAIL: 0  # ERROR: 0  （PASS: 4 项同名）
+# → test_package: consumer_error_paths 7/7、consumer_round_trip 41/41、cli_smoke 10/10，FAIL=0
+# 日志：reports/w3-conan-create.log（sha256 b312396b…a67510）
+# 统计与逐项用例：reports/test-report.md
 ```
 
 ## 注意事项
 
 - 上游 `configure.ac` 的 `READSTAT_MICRO_VERSION` 仍是 8（上游 TODO 未同步 1.1.9），因此
-  安装产物 soname 为 `libreadstat.so.1.1.8`；本配方默认静态交付，不受影响，属上游已知问题。
-- `extract_metadata` 无 `--version`/`--help` 选项（只认 `<input> <output>` 参数），conan-verify
-  L2 smoke 对它会走 `--help` 回退分支，属预期。
-- 上游 `dump_buffer()` 在 `DEBUG` 下写 `/tmp`；默认构建未定义 `DEBUG`，不触碰只读 `/tmp`。
+  安装产物 soname 为 `libreadstat.so.1.1.8`（`readstat --version` 亦打印 1.1.8）；本配方默认
+  静态交付，不受影响，属上游已知问题。
+- `extract_metadata` 只认 `<input> <output>` 参数，无参时打印 usage；上游 `src/bin/main.h`
+  丢弃 `portable_main()` 的返回值，因此 usage 分支退出码为 0。实测口径有两处，勿混淆：
+  CI 的 L2 冒烟（`build_and_test.sh`）实跑 `extract_metadata --version` 并判 OK；
+  `conan-verify` 的 L2 因无 cache 路径而记为"跳过"，其报告中的 PASS 不等于跑过冒烟。
+- **只读 `/tmp` 与上游 `dump_buffer()`**：本设备 `/tmp` 为只读 `erofs`（实测 `mount` → `erofs (ro)`，
+  `touch /tmp/x` → `Read-only file system`）。上游 `Makefile.am` 为 `test_readstat` 钉了
+  `-DDEBUG=1`，因此 `src/test/test_readstat.c:37` 的 `/tmp/test_readstat.<ext>` 诊断转储在
+  **失败路径**上落地不成功（本设备 libc 为 musl，`fwrite(…, NULL)` 不崩溃，静默丢弃）。
+  该转储只用于失败诊断、不参与用例判定，成功路径不触发（实测直跑输出 0 字节、exit 0），
+  按 R8“补丁最小化、不夹带平台宏”不改上游源码，如实记录于此。
+---
+
+**编译结束**: 2026-10-14 20:09
+**最终状态**: built
