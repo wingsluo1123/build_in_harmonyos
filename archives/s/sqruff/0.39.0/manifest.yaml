@@ -1,0 +1,82 @@
+software: sqruff
+# 版本级 manifest
+# 文件位置: archives/{letter}/{name}/0.39.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.39.0"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-12"
+
+# 构建系统类型 (顶层字段)
+build_system: cargo
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（GitHub 官方 codeload 入口，archive 官方 302 目标；
+  # G2 的 E017 github.com→ghfast.top 改写不影响官方 codeload 域）
+  url: "https://codeload.github.com/quarylabs/sqruff/tar.gz/refs/tags/v0.39.0"
+
+  # 源码校验和
+  sha256: "af54cd921fa8565d69bec17678d6f38c6aa062acf5eb7d68fcdf9597d6372737"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | cargo | custom
+  system: cargo
+
+  # 配置选项列表
+  configure_options:
+  - "--locked"
+  - "--bin sqruff"
+
+  # 编译依赖列表（格式: name/version）
+  # Rust crate 依赖由上游 Cargo.lock 管理（--locked 锁定；Cargo.lock 共
+  # 240 个 package：10 个 workspace 成员 + 230 个 registry crate，
+  # 0 个 git 依赖）；工具链与 cargo 运行库来自制品仓 tool_requires
+  # （rust-toolchain/1.97.1 + openssl/3.5.6.1.1，见 knowledge_gained）
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+# 0 源码补丁：sqruff 上游源码在 OHOS 上零修改构建（工具链/镜像配置全部
+# 由配方生成到 .cargo/config.toml，不改任何源文件）
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "sqruff 0.39.0 是 Rust workspace（edition 2024，MSRV 1.96），单一 CLI bin `sqruff`（lint/fix/parse/rules/templaters/lsp 子命令；LSP 内嵌同二进制），cargo build --release --locked --bin sqruff"
+  - "cargo 工具链与运行库全部来自 ohpcd 制品仓（rust-toolchain/1.97.1 + openssl/3.5.6.1.1，tool_requires）：cargo/rustc 私有拷贝、探测失败才 binary-sign-tool 自签名；cargo 的 libssl/libcrypto 由 openssl 静态 PIC 重链为私有 DSO——零外部 URL 依赖，避免 harmonybrew bottle 版本轮换导致的固定 URL 404（tracexec/below/comet 先例）"
+  - "私有 CARGO_HOME/config.toml：rsproxy.cn sparse 镜像 + multiplexing=false（cargo 链接的 libcurl 无 HTTP/2）+ CA 显式指定；不落源码树、不写公共前缀（R49）"
+  - "上游测试：build() 内执行 SQRUFF_SKIP_UNSUPPORTED_TEMPLATERS=1 cargo test --locked -j 4 --no-fail-fast --workspace --exclude sqruff-cli-python --exclude sqruff-wasm --tests（计数硬门禁 + res/upstream_test_result.json 随包）；test_package 重发 HMBS_UPSTREAM_TEST_RESULT 并硬校验计数（tracexec/0.17.0 范式）；--tests 排除 doc-tests 空阶段（工具链无 rustdoc）；cli-python 需 pyo3/Python、lib-wasm 需 wasm-bindgen 目标，均非 OHOS 运行时组件故排除"
