@@ -1,0 +1,23 @@
+package: locket/1.0.0
+homepage: "https://github.com/mwilliamson/locket.py"
+upstream_check_command: "python3 -m pytest -v tests"
+upstream_test_in_build: true
+upstream_test_command: "python3 -m pytest -v tests"
+upstream_test_count: 16
+upstream_tests:
+  - file: tests/locket_tests.py
+    source: locket.py-1.0.0/tests/locket_tests.py
+    description: "16 official tests: lock lifecycle, non-reentrancy, process exclusion, timeout and killed process recovery"
+    command: "python3 -m pytest -v tests"
+test_package_tests:
+  - file: test_locket.py
+    description: "10 installed-package consumer tests, including threads and real child processes"
+    command: "python3 test_locket.py"
+assertion_count: 15
+upstream_modifications:
+  - file: tests/locket_tests.py
+    reason: "Fixed 100 ms child-start assumptions fail under load; wait for child readiness and positive lock transitions instead"
+    patch: patches/0001-tests-locket_tests.py.patch
+    test_count_change: 0
+    assertion_removal: 0
+excluded_tests: []
