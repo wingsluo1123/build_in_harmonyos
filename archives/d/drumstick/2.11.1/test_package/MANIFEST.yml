@@ -1,0 +1,55 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件 — drumstick 2.11.1
+# 上游测试 = CTest 注册的 Qt Test 套件 (tests/ 目录, BUILD_TESTING=ON):
+#   alsaTest1, alsaTest2, fileTest1, fileTest2, fileTest3, rtTest, widgetsTest
+#   (alsaTest2 与 rtTest 在 Linux-like 系统仅在 /dev/snd 存在时注册)
+# test_package 单独测试 = 消费者视角的 SMF 往返 + 数据类断言
+
+package: drumstick/2.11.1
+homepage: "https://drumstick.sourceforge.io"
+
+upstream_check_command: "ctest"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "cmake.test()  (ctest --output-on-failure)"
+
+# 上游实际运行的测试程序 (CTest 注册条目)
+upstream_tests:
+  - file: tests/alsaTest1/alsatest1.cpp
+    source: drumstick-RELEASE_2_11_1/tests/alsaTest1/alsatest1.cpp
+    description: "ALSA event data class unit tests (no sequencer hardware)"
+    command: "./bin/alsaTest1"
+  - file: tests/alsaTest2/alsatest2.cpp
+    source: drumstick-RELEASE_2_11_1/tests/alsaTest2/alsatest2.cpp
+    description: "ALSA sequencer integration test (registered only if /dev/snd exists)"
+    command: "./bin/alsaTest2"
+  - file: tests/fileTest1/filetest1.cpp
+    source: drumstick-RELEASE_2_11_1/tests/fileTest1/filetest1.cpp
+    description: "SMF parsing unit tests"
+    command: "./bin/fileTest1"
+  - file: tests/fileTest2/filetest2.cpp
+    source: drumstick-RELEASE_2_11_1/tests/fileTest2/filetest2.cpp
+    description: "SMF parsing unit tests"
+    command: "./bin/fileTest2"
+  - file: tests/fileTest3/filetest3.cpp
+    source: drumstick-RELEASE_2_11_1/tests/fileTest3/filetest3.cpp
+    description: "RIFF RMID parsing unit tests"
+    command: "./bin/fileTest3"
+  - file: tests/rtTest/rttest.cpp
+    source: drumstick-RELEASE_2_11_1/tests/rtTest/rttest.cpp
+    description: "RT backend manager enumeration test (Linux-like: needs /dev/snd/seq)"
+    command: "./bin/rtTest"
+  - file: tests/widgetsTest/widgetstest.cpp
+    source: drumstick-RELEASE_2_11_1/tests/widgetsTest/widgetstest.cpp
+    description: "Widgets piano palette unit tests (QT_QPA_PLATFORM=offscreen)"
+    command: "./bin/widgetsTest"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_drumstick.cpp
+    description: "SMF write/read round trip + ALSA data class + RT backend enumeration checks (links Drumstick::ALSA/File/RT; Widgets covered by upstream widgetsTest)"
+    command: "./test_drumstick"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 12
