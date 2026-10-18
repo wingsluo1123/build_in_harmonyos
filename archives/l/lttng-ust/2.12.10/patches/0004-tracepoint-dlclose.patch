@@ -1,0 +1,35 @@
+--- a/include/lttng/tracepoint.h
++++ b/include/lttng/tracepoint.h
+@@ -399,8 +399,13 @@
+ 
+ 	ret = dlclose(tracepoint_dlopen_ptr->liblttngust_handle);
+ 	if (ret) {
+-		fprintf(stderr, "Error (%d) in dlclose\n", ret);
+-		abort();
++		/*
++		 * OHOS/musl: dlclose() returns -1 for the handle lttng-ust opened
++		 * itself, so the upstream abort() here kills **every** program that
++		 * uses tracepoint.h (tracef/tracelog/tracepoint) on exit.  Failing to
++		 * unload during teardown is not fatal: warn and clear the handle.
++		 */
++		fprintf(stderr, "Warning: dlclose failed (%d)\n", ret);
+ 	}
+ 	memset(tracepoint_dlopen_ptr, 0, sizeof(*tracepoint_dlopen_ptr));
+ }
+@@ -541,8 +546,14 @@
+ 			&& !__tracepoint_ptrs_registered) {
+ 		ret = dlclose(tracepoint_dlopen_ptr->liblttngust_handle);
+ 		if (ret) {
+-			fprintf(stderr, "Error (%d) in dlclose\n", ret);
+-			abort();
++			/*
++			 * OHOS/musl: dlclose() returns -1 for the handle lttng-ust opened
++			 * itself, so the upstream abort() here kills **every** program
++			 * that uses tracepoint.h (tracef/tracelog/tracepoint) on exit.
++			 * Failing to unload during teardown is not fatal: warn and clear
++			 * the handle.
++			 */
++			fprintf(stderr, "Warning: dlclose failed (%d)\n", ret);
+ 		}
+ 		memset(tracepoint_dlopen_ptr, 0, sizeof(*tracepoint_dlopen_ptr));
+ 	}
