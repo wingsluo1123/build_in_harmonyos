@@ -1,0 +1,41 @@
+package: maim/5.8.0
+homepage: "https://github.com/naelstrof/maim"
+
+upstream_check_command: "ctest --output-on-failure"
+upstream_test_in_build: true
+upstream_test_command: "ctest --output-on-failure"
+
+upstream_test_census:
+  denominator: 0
+  usable: 0
+  tests_directories: 0
+  test_named_files: 0
+  registered_tests: 0
+  cmake_enable_testing: false
+  cmake_add_test: false
+
+upstream_tests: []
+
+test_package_tests:
+  - file: test_maim.py
+    description: "maim --version 输出与源码 MAIM_VERSION 一致（v5.8.0）"
+    command: "maim --version"
+  - file: test_maim.py
+    description: "maim --help 输出上游帮助正文及选项表"
+    command: "maim --help"
+  - file: test_maim.py
+    description: "HarmonyOS 特有测试：无 DISPLAY 时进入确定性错误路径（设备无 X server）"
+    command: "env -u DISPLAY maim"
+  - file: test_maim.py
+    description: "显式不可达 --xdisplay=:663 的确定性错误路径"
+    command: "maim --xdisplay=:663"
+  - file: test_maim.py
+    description: "未知选项被 cxxopts 拒绝（非零退出）"
+    command: "maim --definitely-not-an-option"
+  - file: conanfile.py
+    description: "HarmonyOS 特有测试：AArch64 ELF，动态依赖 X11/png/jpeg/webp，且不含 GL/GLX/GLEW；并且 ELF 段表内恰好 1 个 `.codesign`（由 binary-sign-tool 自签名，OHOS 专有属性）"
+    command: "readelf -h -d -S bin/maim"
+
+assertion_count: 28
+max_rss_mb: 512
+build_mem_budget_mb: 1000
