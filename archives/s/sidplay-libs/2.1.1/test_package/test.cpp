@@ -14,6 +14,9 @@
 
 // ---- Minimal PSID v1 tune (6502: load addr 0x1000, init=play=RTS) ----
 // Layout matches the PSID file format consumed by SidTune's memory ctor.
+// PSID v1 header is 118 bytes; SidTune additionally requires bufLen >=
+// sizeof(psidHeader)+2 (v2-extended struct = 124+2=126), so pad payload
+// with NOP/RTS data to keep the parser happy.
 static const uint8_t kMinimalPsid[] = {
     'P', 'S', 'I', 'D',                      // magic
     0x00, 0x01,                              // version = 1
@@ -27,15 +30,15 @@ static const uint8_t kMinimalPsid[] = {
     // name / author / released (32 bytes each, zero-filled)
     0x00
 };
-// 63 bytes above + zero fill to 118 = dataOffset; then 1 byte data (RTS).
-// Build the real buffer with proper field sizes:
-static uint8_t g_tune[119];  // 118-byte header + 1 byte payload
+// 23 bytes above + zero fill to 118 = dataOffset; then padded payload.
+// Build a 128-byte buffer: 118-byte header + 10 bytes of 6502 code.
+static uint8_t g_tune[128];
 static void buildMinimalPsid() {
     std::memset(g_tune, 0, sizeof(g_tune));
     std::memcpy(g_tune, kMinimalPsid, sizeof(kMinimalPsid));
-    // pad name/author/released (already zero) — header is exactly 118 bytes
-    // payload: init/play routine = RTS
-    g_tune[118] = 0x60;  // RTS
+    // payload: init/play routine = RTS (0x60), padded with NOP (0xEA)
+    for (size_t i = 118; i < sizeof(g_tune); ++i)
+        g_tune[i] = (i == 118) ? 0x60 : 0xEA;
 }
 
 int main() {
