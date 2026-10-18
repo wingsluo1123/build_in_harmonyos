@@ -1,0 +1,26 @@
+upstream_tests_exist: false
+upstream_test_command: "make check"
+upstream_test_entry: "test-fm-path.c"
+
+upstream_test_results:
+  total: 0
+  passed: 0
+  failed: 0
+  skipped: 0
+  note: "libfm 的 --with-extra-only 模式仅构建 libfm-extra.so，上游测试 test-fm-path.c 需要完整 libfm.la（libfm 主库 + libfm-gtk），因此上游测试不可执行。仅依赖 test_package 的消费者测试（FmXmlFile API 运行时可用性、XML 往返解析、属性提取、错误处理）验证库功能。"
+
+test_package_tests:
+  test_consumer_xml_parse:
+    type: executable
+    source: test_libfm_extra_consumer.c
+    description: "libfm-extra 消费者测试：解析 XML 数据、序列化往返、提取属性、错误处理"
+  test_consumer_ohos_runtime_usability:
+    type: executable
+    source: test_libfm_extra_consumer.c
+    description: "鸿蒙平台运行时可用性：GType 系统、对象实例化、共享库加载"
+
+assertion_count: 4
+
+harmonyos_specific_tests:
+  - name: "consumer_ohos_runtime_usability"
+    description: "验证共享库 libfm-extra.so 在 OHOS 平台可加载、GObject 类型系统可用、对象可实例化"
