@@ -1,0 +1,107 @@
+# 版本级 manifest — asterisk-opus 22.10.1
+# 遵循 ARCHIVE-SPEC v3.0
+
+# 版本号
+version: "22.10.1"
+
+# 软件名
+software: asterisk-opus
+
+# 编译状态
+status: tested
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-03"
+build_system: autotools
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（GitHub codeload tag；downloads.asterisk.org 在 OHOS 沙箱 404）
+  url: "https://codeload.github.com/asterisk/asterisk/tar.gz/refs/tags/22.10.1"
+
+  # 源码校验和（sha256，实测）
+  sha256: "373c98f4d4a1b923b42def0aee03f4e36aca9d1c244a8eeda646da8a97f89663"
+
+  # 压缩格式
+  compression: tar.gz
+
+  # 压缩包内源码目录名（strip_root 前）
+  archive_root: "asterisk-22.10.1"
+
+# ============================================================
+# 依赖信息
+# ============================================================
+
+dependencies:
+  required:
+    - "libedit/20240808"
+    - "libxml2/2.15.3"
+    - "ncurses/6.6"
+    - "e2fsprogs/1.47.4"
+    - "jansson/2.15.1.1"
+    - "sqlite3/3.49.1"
+  optional: []
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build_config:
+  target: aarch64-unknown-linux-ohos
+  options: []
+  notes: "package_type=shared-library；Asterisk 全量 autotools 构建，只编译 res_format_attr_opus.so；该模块提供 Opus 格式属性，不包含 codec_opus 编解码实现"
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-config.guess.patch"
+  - "0002-configure.patch"
+  - "0003-include-asterisk-astmm.h.patch"
+  - "0004-include-asterisk-utils.h.patch"
+  - "0005-menuselect-config.guess.patch"
+  - "0006-menuselect-config.sub.patch"
+  - "0007-menuselect-configure.patch"
+  - "0008-include-asterisk-utils-raii_var-no-auto.patch"
+
+# ============================================================
+# 兼容性
+# ============================================================
+
+compatibility:
+  level: medium
+  issues: []
+  notes: "沿用同版本 Asterisk 模块先例的 OHOS 移植补丁；仅编译 Opus 格式属性模块，不依赖 libopus"
+
+# ============================================================
+# 测试结果
+# ============================================================
+
+test_results:
+  type: manual
+  passed: 1
+  failed: 0
+  note: |
+    上游测试：Asterisk 的 test/ 目录是 C 单元测试（main/ 各模块 test_*.c），
+    Opus 格式属性模块**无专属上游测试**
+    ——rule 1.2 如实声明"上游无测试"（非跳过）。
+    构建在 WSL worktree /home/codex-work/asterisk-opus 中执行，并通过 HDC 在鸿蒙真机完成。
+    test_package R34 真实产物校验——res_format_attr_opus.so 存在、
+    为 ELF shared object，并包含 Asterisk 模块入口数据。
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "asterisk-opus 的目标是 res_format_attr_opus.so，而不是 codec_opus；前者只依赖 Asterisk 模块 ABI，后者才是编解码器实现"
+  - "构建使用 Asterisk 全量 autotools 初始化，但只显式编译并打包 res/res_format_attr_opus.so"
+  - "res_format_attr_opus 的菜单依赖为空；packaging/menuselect.makedeps 保持该事实，避免伪造 libopus 外部依赖"
+
+references:
+  - https://www.asterisk.org/
+  - https://docs.asterisk.org/Configuration/CLI/
