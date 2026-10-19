@@ -1,0 +1,34 @@
+#====================================================================
+# DRAFT-libxext-6.4.0.1-dependency-variant-r37-increment.kv
+# 主题: 依赖闭包变体补发不能修改已发布版本 recipe——R37/R40 硬门禁要求递增版本后缀 + 分支名精确匹配
+# 来源: libxext/6.4.0.1（PR #16696）依赖变体补发失败诊断
+#====================================================================
+
+id:                     DRAFT-LIBXEXT-6.4.0.1-DEPENDENCY-VARIANT-R37-INCREMENT
+title:                  已发布 Conan 包的"依赖闭包变体"缺失时，不能在同一版本号下改 recipe 补发（cnb.cool 不支持同版本多 revision，R37 拦截）；必须递增版本后缀（6.4.0.1→6.4.0.1.1）建新目录新配方，并把分支名改为精确匹配 包名-新版本（R40），再更新所有下游 requires 引用
+trigger_tool:           ci/conan/build_and_test.sh|conan create|conan upload
+phase:                  L0-quality-gate
+error_signature:        already published with different recipe|version_not_incremented|cnb\.cool.*409|branch name mismatch \(R40\)|branch_name_r40|分支名带额外后缀
+severity:               2
+category:               conan, package_id, dependency-closure, artifact-registry, versioning
+match_keywords:         依赖变体, 变体补发, package id, eab792, force=True, libx11/1.8.13, R37 版本递增, R40 分支名, 同版本多 revision, 下游引用
+root_cause:             Conan package id 由 settings + options + 依赖闭包共同决定。已发布版本（如 libxext/6.4.0.1 只发布过基于 libx11/6.4.0 的变体 e647…）被下游（libxmu/1.3.1.1 以 force=True 钉 libx11/1.8.13）解析出另一个 package id（eab792…）时，制品仓缺该变体。试图在同一版本号下修改 recipe 的 requirements（6.4.0→1.8.13+force）以补发变体，会触发 R37/L0j：制品仓已存在该版本且 recipe 内容变化 → cnb.cool 不支持同版本多 recipe revision（409）→ 必须递增版本后缀。同时 R40/L0n 要求分支名去掉前缀后逐字等于 包名-版本号，带"-variant"等后缀的分支一律硬失败。
+affected_scope:         已发布版本需补发"依赖闭包变体"或"options 变体"的 Conan 包；凡是 package id 取决于 requires 版本线/options/依赖闭包的下游解析场景。
+verification_cmd:       conan list "libxext/6.4.0.1:*" -r=ohpcd  # package_id 级核对缺哪些变体；conan graph info --requires=libxext/6.4.0.1 --build=never -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64  # 看 force 钉版后解析出的实际 package id
+rec_priority:           1
+rec_approach:           increment-version-suffix-and-exact-branch
+rec_description:        把目标依赖声明落到"下一个适配版本"：libxext/6.4.0.1 → 新建 archives/l/libxext/6.4.0.1.1/ 目录（上游源码 tarball 与 sha256 完全不变，唯一差异是 requirements() 中 libx11 改为 1.8.13 并加 force=True），conanfile.py version/conandata.yml 版本键/manifest.yaml/test_package 同步递增；恢复已发布 6.4.0.1 目录原状；分支名改为 feat/libxext-6.4.0.1.1（R40 精确匹配，前缀 feat/ 允许）；并把所有下游 requires("libxext/6.4.0.1") 更新为 6.4.0.1.1（CI hint 明确要求"更新 archives/ 目录和所有下游引用"）。
+rec_command:            cp -r archives/l/libxext/6.4.0.1 archives/l/libxext/6.4.0.1.1 && 修改 version/requires/conandata/manifest → 本地 CI 同款脚本验证 → git push 新分支 → /rebuild
+rec_auto_fix:           false
+rec_impl:               manual-conan-recipe
+forbid_1_pattern:       (修改已发布版本的 conanfile\.py|同一版本.*force|6\.4\.0\.1.*补发变体)
+forbid_1_reason:        制品仓 cnb.cool 不支持同版本多 recipe revision；改已发布版本 recipe 必然 409，本地构建通过也救不回（E1520：local PASS cannot override registry identity conflict）
+forbid_1_consequence:   反复 R37 失败，浪费 CI 轮次，且污染已发布版本的可复现身份
+forbid_2_pattern:       分支名.*(-variant|-fix|_[0-9])
+forbid_2_reason:        R40/L0n 硬门禁：分支名去掉前缀后必须逐字等于 包名-版本号，带后缀一律拦截；分支名与目录版本分裂还会导致平台任务匹配失败
+forbid_2_consequence:   branch_name_r40 失败，无法进入构建阶段
+distinct_from:          E1509（exact override 需新包标识）侧重编译期下游闭包变化；E1520（published version 需新 recipe+branch identity）讲通用递增规则；DRAFT-conan2-option-variant-no-fallback-publish-new-version 讲 options 变体（shared=True）；本条聚焦"依赖闭包变体"补发的发布侧双门禁（R37+R40）与完整动作清单，是 E1509/E1520 在 X11 依赖族（libxext/libxmu/libx11/force 钉版）上的落地实例。
+principles:
+causes:                 []
+notes:                  实测：libxext/6.4.0.1 2026-09-01 发布时依赖图未含 force 1.8.13 的 libxmu，只产出 e647…（libx11/6.4.0）变体；libxmu/1.3.1.1 合入后 force 钉 libx11/1.8.13，下游（zutty 等）解析出 eab792… 变体缺失，被迫从源码重编 libxext；PR #16696 试图改 6.4.0.1 recipe 补发，被 R37+R40 拦截（CI #98287）。正确出路即本条：递增 6.4.0.1.1。
+last_updated:           2026-10-18
