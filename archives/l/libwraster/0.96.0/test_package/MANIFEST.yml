@@ -1,0 +1,21 @@
+software: libwraster
+version: "0.96.0"
+test_type: explicit
+test_executables:
+  - libwraster_test
+  - libwraster_consumer
+upstream_check_command: "make check"
+upstream_tests: []
+test_package_tests:
+  - file: "test.c"
+    description: "API level assertions on the installed public core image API (RCreateImage/RClearImage/RPutPixel/RGetPixel/RScaleImage/RReleaseImage/RMessageForError) with no X server involved; X11-bound entry points are covered by the downstream wmglobe dockapp."
+    command: "./libwraster_test"
+    assertion_count: 15
+  - file: "consumer.c"
+    description: "End-to-end consumer for the headless flow of a dockapp: builds a 4x4 master icon from four specification colours, scales it to 8x8, punches a fully transparent 2x2 window and writes a real XPM artefact with the library's own RSaveImage writer while reading the finished image back through RGetPixel. test() then decodes the artefact with an independent XPM reader, compares it pixel for pixel with the in-memory image, checks both against the input specification (quadrant colours, transparent window, palette) and reruns the consumer to require byte identical artefacts."
+    command: "./libwraster_consumer <output-dir>"
+    artefacts:
+      - "dockapp-icon.xpm"
+      - "consumer-report.txt"
+    assertion_count: 7
+assertion_count: 22
