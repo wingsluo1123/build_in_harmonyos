@@ -1,0 +1,18 @@
+# conandata.yml — libespeak-ng 1.51.0
+
+sources:
+  # 官方 git archive tarball（R39 官方源）。
+  # ⚠ 上游 releases/download 的 espeak-ng-1.51.tar.gz 打包件缺内部头文件
+  #   与 phsource/dictsource/espeak-ng-data 数据源（1MB 残缺包），不可用于
+  #   完整构建；git archive（14MB，含完整数据）为正确选择。
+  url: "https://github.com/espeak-ng/espeak-ng/archive/refs/tags/1.51.tar.gz"
+  sha256: "f0e028f695a8241c4fa90df7a8c8c5d68dcadbdbc91e758a97e594bbb0a3bdbf"
+
+patches:
+  - patch_file: "patches/0001-fix-std-sample-ambiguity.patch"
+    description: >
+      src/speechPlayer/src/speechWaveGenerator.cpp 在 `using namespace std;`
+      下使用 `sample* sampleBuf` 参数类型 —— libc++ 提供 C++17 std::sample
+      （<__algorithm/sample.h>），与全局 struct sample 同名导致歧义
+      "reference to 'sample' is ambiguous"。改用全局命名空间限定 ::sample*
+      （无平台宏，纯 C++ 命名冲突修复）。

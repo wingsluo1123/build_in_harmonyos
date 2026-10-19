@@ -1,0 +1,115 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（R51 上游测试三步法：清点 → 实测 → 回填）
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: libespeak-ng/1.51.0
+homepage: "https://github.com/espeak-ng/espeak-ng"
+
+# 上游测试命令（用于 make -n check / ctest -N / meson test --list 分析）
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: "make check"
+
+# 上游实际运行的测试程序（tests/ 目录清点，21 项）
+upstream_tests:
+  - file: tests/encoding.test
+    source: libespeak-ng-1.51.0/tests/encoding.c
+    description: "encoding 测试（文本编码处理）"
+    command: "./tests/encoding.test"
+  - file: tests/readclause.test
+    source: libespeak-ng-1.51.0/tests/readclause.c
+    description: "readclause 测试（子句切分）"
+    command: "./tests/readclause.test"
+  - file: tests/translate.test
+    source: libespeak-ng-1.51.0/tests/translate.c
+    description: "translate 测试（多语言翻译/合成）"
+    command: "./tests/translate.test"
+  - file: tests/ssml.test
+    source: libespeak-ng-1.51.0/tests/ssml.test
+    description: "SSML 解析与音频哈希测试（prosody 哈希因平台浮点差异未通过）"
+    command: "./tests/ssml.test"
+  - file: tests/ssml-fuzzer.test
+    source: libespeak-ng-1.51.0/tests/ssml-fuzzer.c
+    description: "SSML fuzz 测试"
+    command: "./tests/ssml-fuzzer.test"
+  - file: tests/api.test
+    source: libespeak-ng-1.51.0/tests/api.c
+    description: "API 测试（espeak_Initialize/Synth 等）"
+    command: "./tests/api.test"
+  - file: tests/ieee80.test
+    source: libespeak-ng-1.51.0/tests/ieee80.c
+    description: "IEEE80 浮点测试"
+    command: "./tests/ieee80.test"
+  - file: tests/dictionary.test
+    source: libespeak-ng-1.51.0/tests/dictionary.test
+    description: "字典测试"
+    command: "./tests/dictionary.test"
+  - file: tests/language-phonemes.test
+    source: libespeak-ng-1.51.0/tests/language-phonemes.test
+    description: "多语言音素音频哈希测试（ltg 音频哈希因平台浮点差异未通过）"
+    command: "./tests/language-phonemes.test"
+  - file: tests/language-replace.test
+    source: libespeak-ng-1.51.0/tests/language-replace.test
+    description: "多语言替换规则测试"
+    command: "./tests/language-replace.test"
+  - file: tests/language-pronunciation.test
+    source: libespeak-ng-1.51.0/tests/language-pronunciation.test
+    description: "多语言发音测试"
+    command: "./tests/language-pronunciation.test"
+  - file: tests/language-numbers-cardinal.test
+    source: libespeak-ng-1.51.0/tests/language-numbers-cardinal.test
+    description: "多语言基数词测试"
+    command: "./tests/language-numbers-cardinal.test"
+  - file: tests/language-numbers-ordinal.test
+    source: libespeak-ng-1.51.0/tests/language-numbers-ordinal.test
+    description: "多语言序数词测试"
+    command: "./tests/language-numbers-ordinal.test"
+  - file: tests/non-executable-files-with-executable-bit.test
+    source: libespeak-ng-1.51.0/tests/non-executable-files-with-executable-bit.test
+    description: "非可执行文件权限检查测试"
+    command: "./tests/non-executable-files-with-executable-bit.test"
+  - file: tests/klatt.test
+    source: libespeak-ng-1.51.0/tests/klatt.test
+    description: "Klatt 共振峰合成测试"
+    command: "./tests/klatt.test"
+  - file: tests/mbrola.test
+    source: libespeak-ng-1.51.0/tests/mbrola.test
+    description: "MBROLA 语音测试"
+    command: "./tests/mbrola.test"
+  - file: tests/variants.test
+    source: libespeak-ng-1.51.0/tests/variants.test
+    description: "语音变体测试"
+    command: "./tests/variants.test"
+  - file: tests/windows-installer.test
+    source: libespeak-ng-1.51.0/tests/windows-installer.test
+    description: "Windows 安装包测试（在 OHOS 上 PASSED）"
+    command: "./tests/windows-installer.test"
+  - file: tests/bom.test
+    source: libespeak-ng-1.51.0/tests/bom.test
+    description: "BOM 字节序标记检查（上游 git tag 自带 BOM，非本次引入）"
+    command: "./tests/bom.test"
+  - file: tests/voices.test
+    source: libespeak-ng-1.51.0/tests/voices.test
+    description: "语音列表测试"
+    command: "./tests/voices.test"
+  - file: tests/cmd_options.test
+    source: libespeak-ng-1.51.0/tests/cmd_options.test
+    description: "命令行选项测试"
+    command: "./tests/cmd_options.test"
+
+# test_package 中自带的测试 (消费者视角验证，R34 实质调用)
+test_package_tests:
+  - file: test.c
+    description: "espeak_Initialize + espeak_Terminate 基础初始化/终止验证（库可用性最小子集）"
+    command: "./test_basic"
+  - file: test_libespeak_ng.c
+    description: "espeak_Initialize/espeak_Synth 合成英文音频→WAV 并校验非空（R34 实质测试）"
+    command: "./test_libespeak-ng"
+  - file: test_cli.sh
+    description: "CLI 端到端消费者用例（鸿蒙特有测试）：真实运行包内 espeak-ng 命令合成 WAV 并校验 RIFF/WAVE 魔数与非空"
+    command: "sh test_cli.sh <bindir> <datadir> <libdir>"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 8
