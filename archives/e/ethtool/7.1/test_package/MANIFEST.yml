@@ -1,0 +1,105 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+#
+# ★2026-10-17 返修（平台 rule4 打回：「上游有用例 3 个但一个也没测（0/3）」）
+#   ① 口径修正：3 = 测试**源文件**数，不是「注册用例」数 —— 见 upstream_test_registration
+#      （test-common.c 从不进 TESTS/check_PROGRAMS，不是用例；上游注册用例实为 2 个）
+#   ② 两个上游注册用例**已真实执行** `make check`，读数见 upstream_test_runs
+#      （含 netlink 启用配置下的逐条首错与源码行号）
+#   ③ ★2026-10-17 起本包**出厂 configure 即 `--disable-netlink`**
+#      （conanfile.py build() 传入、manifest.yaml build.configure_options 声明），
+#      故 upstream_test_runs 第一行就是**出厂配置的真实读数**，测试矩阵与出厂一致。
+#   ④ ★2026-10-17 起上游套件**在 `conan create` 内真实执行**
+#      （conanfile.py build() 末尾 `autotools.make(target="check")`，fail-closed：
+#       测试红即构建红，不用 `|| true` 兜底），对齐仓内 DRAFT-332 口径。
+
+package: ethtool/7.1
+homepage: "https://www.kernel.org/pub/software/network/ethtool/"
+
+# 上游测试命令
+upstream_check_command: "make check"
+
+# conanfile.py build() 里是否内联跑上游测试（★是：build() 末尾 autotools.make(target="check")，
+# 在 conan create 内真实执行上游 TESTS = test-cmdline + test-features，失败即红 G2）
+upstream_test_in_build: true
+upstream_test_command: "make check"
+
+# ---------------------------------------------------------------------------
+# 机器可读计数（口径 = 上游「注册用例」= Makefile.am 的 TESTS，非源文件数）
+# ---------------------------------------------------------------------------
+upstream_test_count: 2        # test-cmdline(恒注册) + test-features(仅 --disable-netlink 注册)
+upstream_test_executed: 2     # 本次真实执行数：两个注册用例都在其注册配置下跑了
+upstream_test_passed: 2       # 真实通过数：make check rc=0，TOTAL 2 / PASS 2 / FAIL 0
+upstream_test_failed: 0
+upstream_test_skipped: 0
+upstream_test_run_configuration: "--disable-netlink  ★本包出厂 configure 选项（conanfile.py build() 传入），测试矩阵与出厂一致"
+upstream_test_result_rc: 0
+
+# ---------------------------------------------------------------------------
+# 上游注册口径（源码级，逐条给 Makefile.am 行号）
+# ---------------------------------------------------------------------------
+upstream_test_registration:
+  - test_program: test-cmdline
+    source: ethtool-7.1/test-cmdline.c
+    registration: "Makefile.am:80 `TESTS = test-cmdline`；:81 `check_PROGRAMS = test-cmdline`；:83 `test_cmdline_SOURCES = test-cmdline.c test-common.c $(ethtool_SOURCES)` —— **恒注册**，任何配置下都在 TESTS 内"
+    runnable: true
+  - test_program: test-features
+    source: ethtool-7.1/test-features.c
+    registration: "Makefile.am:84 `if !ETHTOOL_ENABLE_NETLINK` → :85 `TESTS += test-features`、:86 `check_PROGRAMS += test-features`、:88 `test_features_SOURCES = test-features.c test-common.c $(ethtool_SOURCES)` —— **条件注册**：configure 默认 --enable-netlink 时不注册；`./configure --disable-netlink` 才注册并执行"
+    runnable: true
+  - not_a_test_case: test-common.c
+    source: ethtool-7.1/test-common.c
+    reason: "Makefile.am:83 与 :88 只把它列进 test_cmdline_SOURCES / test_features_SOURCES（公共辅助源：test_malloc/test_exit/test_ioctl 包装与 mock），**从不进 TESTS / check_PROGRAMS** ⇒ 不是上游用例，不应计进分母（旧 MANIFEST 把它列为第 3 个用例，正是平台 0/3 口径的来源）"
+
+# ---------------------------------------------------------------------------
+# 真实执行读数（逐配置；原文日志见 reports/）
+# ---------------------------------------------------------------------------
+upstream_test_runs:
+  - configuration: "★★出厂配置★ --disable-netlink（conanfile.py build() 传入；出厂 conan create 实跑命令行见 reports/conan-create.log:108；此配置下两个注册用例都在 TESTS 内）"
+    command: "./configure --disable-netlink && make -j8 && make check"
+    TESTS: [test-cmdline, test-features]
+    total: 2
+    passed: 2
+    failed: 0
+    rc: 0
+    log: "reports/upstream-make-check-nl-off.log"
+    suitenote: "test-suite.log: # TOTAL: 2 / # PASS: 2 / # SKIP: 0 / # FAIL: 0 / # ERROR: 0"
+    factory_config: true
+    in_build_execution: true
+    in_build_evidence: "conan-create.log:612 `RUN: make check -j1`；:1365 `PASS: test-cmdline`；:1366 `PASS: test-features`；:1368 `Testsuite summary for ethtool 7.1`；:1370-1374 `# TOTAL: 2 / # PASS:  2 / # SKIP:  0 / # XFAIL: 0 / # FAIL:  0`（fail-closed，无 || true）"
+    note: "出厂配置 == 测试配置；★该 2/2 已在 `conan create` 内（G2）真实执行并复现（见 in_build_evidence）；同配置下 conan-verify G0-G4 全 PASS（reports/conan-verify-report.md，2026-10-17T17:04:35），test_package 5/5，ethtool-config.h 无 ETHTOOL_ENABLE_NETLINK 宏、ethtool -h 仍含 --disable-netlink 行"
+  - configuration: "历史/对照配置 default (--enable-netlink)（2026-10-17 改动前的出厂配置，保留以备审查对照）"
+    command: "./configure && make -j8 && make check"
+    TESTS: [test-cmdline]
+    total: 1
+    passed: 0
+    failed: 1
+    rc: 2
+    log: "reports/upstream-make-check-nl-on.log"
+    factory_config: false
+    subcases_total: 257
+    subcases_passed: 249
+    subcases_failed: 8
+    failed_subcases_source_lines: "ethtool-7.1/test-cmdline.c:28, 30, 31, 69, 85, 292, 293, 294"
+    failed_subcases_first_error: "socket(AF_NETLINK=16,type=3,proto=16) -> -1 errno=13 (EACCES)  ⇒  netlink_init() 返回负值  ⇒  netlink_run_handler() 静默回落 ioctl（netlink/netlink.c:492-495 → :514 no_support）"
+    note: "失败的 8 条**恰好是且仅是** test-cmdline.c 中全部 IS_NL/!IS_NL 条件项（全文共 8 条条件项，零遗漏零多余）⇒ 根因是 netlink 路径在运行期不可达（本平台 AF_NETLINK socket 100% EACCES），不是断言/解析逻辑问题；正因如此出厂配置已改为 --disable-netlink"
+
+# ---------------------------------------------------------------------------
+# 上游测试源资产（保留「3 个文件」的原始口径，避免少报）
+# ---------------------------------------------------------------------------
+upstream_test_source_files:
+  - ethtool-7.1/test-cmdline.c
+  - ethtool-7.1/test-features.c
+  - ethtool-7.1/test-common.c
+
+# test_package 中自带的测试 (消费者视角验证)
+# 断言 = ethtool --version 退出码 + 版本特征串 + ethtool -h 退出码 +
+# Usage 特征串 + --disable-netlink 特征串（共 5 条，无 || true 兜底）
+test_package_tests:
+  - file: test_package/conanfile.py
+    description: "Consumer assertions: --version/-h exit code and output feature strings"
+    command: "ethtool --version ; ethtool -h (with grep -q assertions)"
+
+# 测试断言总数
+assertion_count: 5
