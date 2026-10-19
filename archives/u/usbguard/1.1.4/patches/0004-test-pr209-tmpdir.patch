@@ -1,0 +1,20 @@
+--- a/src/Tests/Regression/github-PR209-config-parser.cpp
++++ b/src/Tests/Regression/github-PR209-config-parser.cpp
+@@ -29,11 +29,16 @@
+ #include <fcntl.h>
+ #include <unistd.h>
+ 
++#include <cstdlib>
++
+ using namespace usbguard;
+ 
+ static std::string createFile(const std::vector<std::string> lines)
+ {
+-  std::string filepath("/tmp/usbguard-test.XXXXXX");
++  const char* tmpdir = ::getenv("TMPDIR");
++  const std::string scratch_dir =
++    (tmpdir != nullptr && *tmpdir != '\0') ? std::string(tmpdir) : std::string("/tmp");
++  std::string filepath(scratch_dir + "/usbguard-test.XXXXXX");
+   const int fd = ::mkstemp(&filepath[0]);
+ 
+   if (fd < 0) {

@@ -1,0 +1,38 @@
+# conandata.yml — usbguard 1.1.4
+#
+# 官方上游：https://github.com/usbguard/usbguard （tag usbguard-1.1.4 → commit
+# f22233175f7a4539bc96ede8e3d67f7017b6675b），sha256 实测自官方 tarball。
+#
+# 注意：usbguard 的源码树把 PEGTL 与 Catch2 作为 git 子模块引用
+# （.gitmodules → src/ThirdParty/PEGTL、src/ThirdParty/Catch），GitHub 的
+# tag 归档**不包含**子模块内容（两个目录在 tarball 里为空）。上游 release
+# 流程本身也依赖这两个子模块（AM_DISTCHECK_CONFIGURE_FLAGS 使用
+# --with-bundled-catch --with-bundled-pegtl）。因此配方在 source() 里按上游
+# 在 1.1.4 树中钉住的提交补齐：
+#   src/ThirdParty/PEGTL → ColinH/PEGTL 3.2.5 (eeba7fa1180655bd683be620cc31be35607442ca)
+#   src/ThirdParty/Catch → catchorg/Catch2 v2.13.8 (216713a4066b79d9803d374f261ccb30c0fb451f)
+# 三个 tarball 均指向官方正式源（R39）。
+sources:
+  usbguard:
+    url: "https://github.com/usbguard/usbguard/archive/refs/tags/usbguard-1.1.4.tar.gz"
+    sha256: "607c811fb65260634a6c3f58efb6351c9be36216eb4f4483a4606e744aefc5ec"
+  pegtl:
+    url: "https://github.com/ColinH/PEGTL/archive/refs/tags/3.2.5.tar.gz"
+    sha256: "4ecefe4151b14684a944dde57e68c98e00224e5fea055c263e1bfbed24a99827"
+  catch:
+    url: "https://github.com/catchorg/Catch2/archive/refs/tags/v2.13.8.tar.gz"
+    sha256: "b9b592bd743c09f13ee4bf35fc30eeee2748963184f6bea836b146e6cc2a585a"
+patches:
+  "1.1.4":
+    - patch_file: "patches/0001-configure-ac-version-literal.patch"
+      patch_description: "configure.ac 用字面量 1.1.4 取代 m4_esyscmd_s([cat VERSION])（VERSION 文件因遮蔽 libc++ <version> 被移除，见 0003）"
+      patch_type: "portability"
+    - patch_file: "patches/0002-makefile-am-drop-version-dist.patch"
+      patch_description: "EXTRA_DIST 中移除已删除的 VERSION 文件"
+      patch_type: "portability"
+    - patch_file: "patches/0003-remove-shadowing-version-file.patch"
+      patch_description: "删除源码根目录的 VERSION：OHOS 用户卷大小写不敏感，该文件（内容 1.1.4）会遮蔽 libc++ 的 <version> 头，导致所有 TU 报 expected unqualified-id"
+      patch_type: "portability"
+    - patch_file: "patches/0004-test-pr209-tmpdir.patch"
+      patch_description: "回归测试 PR209 的临时文件从硬编码 /tmp 改为 $TMPDIR（OHOS 的 /tmp 为只读文件系统，mkstemp 必失败）"
+      patch_type: "portability"

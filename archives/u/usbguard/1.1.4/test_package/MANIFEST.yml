@@ -1,0 +1,142 @@
+# test_package/MANIFEST.yml — usbguard 1.1.4
+#
+# 上游测试声明（CI build_and_test.sh L0e 强制要求本文件存在）。
+# 详见：docs/TEST_QUALITY_SPEC.md
+#
+# ─────────────────────────────────────────────────────────────────────
+# 上游测试总数 N = 17（R51 逐项清点，实测自 usbguard-1.1.4 官方源码树）
+# ─────────────────────────────────────────────────────────────────────
+# 上游测试入口是顶层 `check: all` → 递归进入 src/Tests/Makefile.am。
+# src/Tests/Makefile.am 的 automake `TESTS` 列表由 3 个 configure 条件门控：
+#
+#   CATCH_ENABLED（默认 on，本配方 --with-bundled-catch）  → test-unit, test-regression
+#   FULL_TEST_SUITE_ENABLED（--enable-full-test-suite，默认 off）
+#       → Source/check-driver.sh, UseCase/000..005（7 项）
+#   WITH_LDAP（--with-ldap，默认 off）
+#       → LDAP/Sanity/ldap-nsswitch.sh, LDAP/UseCase/ldap-test-1..5（6 项）
+#
+# 三个条件全部开启时 TESTS = 2（USB/Rules）+ 2（Catch2）+ 7（full）+ 6（LDAP）
+#                              = 17 项  ← 上游测试总数 N = 17
+# （同样，2 个 Catch2 二进制展开为 17 个 TEST_CASE：unit 13 + regression 4。）
+#
+# ─────────────────────────────────────────────────────────────────────
+# 本 PR 构建内实际运行 N' = 4（上游默认条件：CATCH on / FULL off / LDAP off）
+# ─────────────────────────────────────────────────────────────────────
+# build() 内 `make check` 真跑：automake 汇总 TOTAL=4 PASS=4 FAIL=0 SKIP=0 ERROR=0。
+# 其余 13 项属上游默认关闭的 opt-in 套件，构建内不启用；设备侧补充实跑与逐项
+# 技术原因见下方 `device_side_evidence` 与 notes.md「上游测试」段。
+# R51：失败/跳过/未运行不记 PASS；未跑项必须给具体技术原因（不是"没环境"）。
+
+package: usbguard/1.1.4
+homepage: "https://github.com/usbguard/usbguard"
+
+upstream_check_command: "make check"
+upstream_test_in_build: true
+upstream_test_command: "make check"
+
+upstream_total: 17
+upstream_run_in_build: 4
+
+# 上游 TESTS 全量（17 项），逐项标注门控条件与本次运行状态。
+upstream_tests:
+  # ── 默认条件（CATCH_ENABLED，构建内实跑 PASS=4）──
+  - file: src/Tests/USB/test-descriptor-parser.sh
+    source: usbguard-1.1.4/src/Tests/USB/test-descriptor-parser.sh
+    gate: "默认（无条件）"
+    status: "PASS（构建内 make check）"
+    description: "descriptor 解析：对每个 data/*.bin 运行 usbguard read-descriptor 并与同名 .out 比对"
+  - file: src/Tests/Rules/test-rules.sh
+    source: usbguard-1.1.4/src/Tests/Rules/test-rules.sh
+    gate: "默认（无条件）"
+    status: "PASS（构建内 make check）"
+    description: "规则解析：usbguard-rule-parser 接受 test-rules.good、拒绝 test-rules.bad、能解析 test-rules.file"
+  - file: src/Tests/Unit/*.cpp
+    source: usbguard-1.1.4/src/Tests/Unit/
+    gate: "CATCH_ENABLED（默认 on）"
+    status: "PASS（构建内 make check）"
+    description: "test-unit：Catch2 单元测试，13 个 TEST_CASE / 423 断言（Rule/RuleParser/Base64/UEvent/UEventParser/Utility/RuleAttribute_id/IPCServer_AccessControl/UMockdevDeviceDefinition）"
+  - file: src/Tests/Regression/*.cpp
+    source: usbguard-1.1.4/src/Tests/Regression/
+    gate: "CATCH_ENABLED（默认 on）"
+    status: "PASS（构建内 make check）"
+    description: "test-regression：Catch2 回归测试，4 个 TEST_CASE / 15 断言（ghi37/ghi113/ghi247/github-PR209）"
+
+  # ── FULL_TEST_SUITE_ENABLED（--enable-full-test-suite，默认 off）──
+  - file: src/Tests/Source/check-driver.sh
+    gate: "FULL_TEST_SUITE_ENABLED"
+    status: "NOT_RUN（设备侧试跑失败：见 device_side_evidence）"
+    description: "源码卫生检查驱动（copyright/vim-modeline/code-style/spell-check/private-with-build-config/public-without-build-config）"
+  - file: src/Tests/UseCase/000_executable.sh
+    gate: "FULL_TEST_SUITE_ENABLED"
+    status: "NOT_RUN（设备侧试跑失败：toybox mktemp 模板限制）"
+    description: "二进制可执行性（usbguard / usbguard-daemon -h）"
+  - file: src/Tests/UseCase/001_cli_policy.sh
+    gate: "FULL_TEST_SUITE_ENABLED"
+    status: "SKIP（设备侧 exit 77：无 umockdev-wrapper）"
+    description: "umockdev 驱动的策略生成 CLI 测试"
+  - file: src/Tests/UseCase/002_cli_devices.sh
+    gate: "FULL_TEST_SUITE_ENABLED"
+    status: "SKIP（设备侧 exit 77：无 modprobe/dummy_hcd，需 root）"
+    description: "经 dummy_hcd/g_mass_storage 的授权测试"
+  - file: src/Tests/UseCase/003_cli_devices_umockdev.sh
+    gate: "FULL_TEST_SUITE_ENABLED"
+    status: "SKIP（设备侧 exit 77：无 umockdev-wrapper）"
+    description: "umockdev 驱动的设备授权测试"
+  - file: src/Tests/UseCase/004_daemonize.sh
+    gate: "FULL_TEST_SUITE_ENABLED"
+    status: "NOT_RUN（设备侧试跑失败：toybox mktemp 模板限制）"
+    description: "daemon 以空配置守护化、PID 文件校验"
+  - file: src/Tests/UseCase/005_cli_devices_advanced.sh
+    gate: "FULL_TEST_SUITE_ENABLED"
+    status: "SKIP（设备侧 exit 77：无 umockdev-wrapper）"
+    description: "CLI apply-device-policy 高级参数测试"
+
+  # ── WITH_LDAP（--with-ldap，默认 off）──
+  - file: src/Tests/LDAP/Sanity/ldap-nsswitch.sh
+    gate: "WITH_LDAP"
+    status: "NOT_RUN（需 OpenLDAP 服务器 + 免密 root 改 /etc/nsswitch.conf；--with-ldap 还需 libldap）"
+    description: "usbguard 对 nsswitch.conf 的处理"
+  - file: src/Tests/LDAP/UseCase/ldap-test-1.sh
+    gate: "WITH_LDAP"
+    status: "NOT_RUN（同上：需 OpenLDAP 服务器 + 免密 root）"
+    description: "LDAP 规则源用例 1"
+  - file: src/Tests/LDAP/UseCase/ldap-test-2.sh
+    gate: "WITH_LDAP"
+    status: "NOT_RUN（同上）"
+    description: "LDAP 规则源用例 2"
+  - file: src/Tests/LDAP/UseCase/ldap-test-3.sh
+    gate: "WITH_LDAP"
+    status: "NOT_RUN（同上）"
+    description: "LDAP 规则源用例 3"
+  - file: src/Tests/LDAP/UseCase/ldap-test-4.sh
+    gate: "WITH_LDAP"
+    status: "NOT_RUN（同上）"
+    description: "LDAP 规则源用例 4"
+  - file: src/Tests/LDAP/UseCase/ldap-test-5.sh
+    gate: "WITH_LDAP"
+    status: "NOT_RUN（同上）"
+    description: "LDAP 规则源用例 5"
+
+# 设备侧补充实跑证据（2026-10-15，真实用户会话；非构建内 make check）。
+# 目的：如实核实 13 项 opt-in 套件在本 OHOS 目标上的可运行性，逐项给出具体技术原因。
+device_side_evidence:
+  job_id: "usbguard-r4-fts-20261015-1"
+  log: "$HOME/.local/share/ohpc-porting/runs/usbguard-r4-fts-20261015-1/output.log"
+  method: "以 automake TESTS_ENVIRONMENT 同款环境直接运行 FULL_TEST_SUITE 的 7 个 .sh（上游 harness 约定 0=PASS/77=SKIP/其他=FAIL）"
+  results:
+    - "UseCase/001,002,003,005 → exit 77 SKIP（缺 umockdev-wrapper / modprobe；与 configure 已关闭 umockdev 一致）"
+    - "UseCase/000,004 → FAIL：bash-testlib.sh 用 `mktemp --tmpdir name.XXXXXX.log`，OHOS 的 mktemp 为 toybox 0.8.12，要求模板以 X 结尾，故 'need XXXXXX: Invalid argument'"
+    - "Source/check-driver.sh → FAIL/超时：CheckScripts 依赖 astyle/aspell（OHOS 无）且执行超时"
+  ldap: "LDAP 6 项未运行：需 OpenLDAP 服务器（slapd）+ 免密 root 修改 /etc/nsswitch.conf；--with-ldap configure 路径还需 libldap 头/库（目标机无）"
+
+# test_package 中自带的测试（消费者视角验证交付产物本身）
+test_package_tests:
+  - file: test_usbguard.cpp
+    description: "消费者测试：链接 libusbguard，调用 Rule::fromString / getTarget / getDeviceID / getSerial / getName / toString，对非法规则断言抛异常（仅用上游实际安装的公开头）"
+    command: "./test_usbguard（9 项库 API 断言）"
+  - file: conanfile.py
+    description: "test()：运行库 API 消费者二进制；运行包内 usbguard --version 断言 1.1.4；usbguard-rule-parser 对合法规则返回 0、对非法规则返回非 0"
+    command: "test_usbguard + bin/usbguard + bin/usbguard-rule-parser"
+
+# 消费者/鸿蒙特有测试断言总数 = 9（库 API）+ 3（CLI：--version / rule-parser rc0 / rc1）= 12
+assertion_count: 12
