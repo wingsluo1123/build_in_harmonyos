@@ -1,0 +1,29 @@
+--- a/src/unittests/CMakeLists.txt
++++ b/src/unittests/CMakeLists.txt
+@@ -34,7 +34,7 @@
+   endif()
+ 
+   add_executable(${m_NAME} ${m_SOURCE})
+-  target_link_libraries(${m_NAME} ${m_DEPENDS} ${m_LIBS} Qt::Test)
++  target_link_libraries(${m_NAME} ${m_DEPENDS} ${m_LIBS} Qt${QT_VERSION_MAJOR}::Test)
+   if (CMAKE_CXX_BYTE_ORDER STREQUAL "BIG_ENDIAN")
+     target_compile_definitions(${m_NAME} PUBLIC WORDS_BIGENDIAN=1)
+   endif()
+@@ -54,13 +54,15 @@
+ endfunction()
+ 
+ enable_testing()
+-find_package(Qt6 ${REQUIRED_QT_VERSION} REQUIRED COMPONENTS Test)
++find_package(Qt${QT_VERSION_MAJOR} ${REQUIRED_QT_VERSION} REQUIRED COMPONENTS Test)
+ 
+ add_subdirectory(base)
+ add_subdirectory(client)
+ add_subdirectory(common)
+ add_subdirectory(deskflow)
+-add_subdirectory(gui)
++if(BUILD_GUI)
++  add_subdirectory(gui)
++endif()
+ add_subdirectory(net)
+ add_subdirectory(platform)
+ add_subdirectory(server)
