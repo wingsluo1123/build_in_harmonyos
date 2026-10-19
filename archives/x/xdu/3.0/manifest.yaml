@@ -1,0 +1,49 @@
+# 版本级 manifest — xdu 3.0
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "3.0"
+software: "xdu"
+
+# 编译状态: published | built | failed | archived
+# PR 阶段尚未由 release 流水线 upload 到制品仓，真实状态为 built
+status: built
+
+build_date: "2026-10-17"
+build_system: custom
+
+# 源码信息
+source:
+  # Debian 官方 pool 的 xdu_3.0.orig.tar.gz（上游原版 xdu-3.0.tar.Z 未打补丁，
+  # 权威镜像源，R39 合规；上游原始发布点 ftp.arl.mil 已失效）
+  url: "https://deb.debian.org/debian/pool/main/x/xdu/xdu_3.0.orig.tar.gz"
+  sha256: "42c018597e31fade56e44b21ed7041f23756532df6e114b5475b4a50cd4df881"
+  tar_format: tar.gz
+
+# 构建配置
+build:
+  # Imakefile 项目（X11R6 contrib，1994），OHOS 无 imake/xorg-cf-files，
+  # 采用 README 官方手工直编路径：cc -o xdu xdu.c xwin.c -lXaw7 -lXt -lXext -lX11
+  system: custom
+  configure_options: []
+  dependencies:
+    - "libxaw/1.0.14（Athena 控件集：Label/Form/AsciiText/AsciiSrc，xdu 核心依赖）"
+    - "libxt/1.3.1"
+    - "libxext/6.4.0.1"
+    - "libx11/1.8.13"
+    - "libxmu/1.3.1.1（libxaw 传递依赖）"
+    - "libxpm/3.5.17（libxaw 传递依赖）"
+    - "libxcb/1.17.0 + libxau/1.0.11（libX11.so.6 运行期 DT_NEEDED，run=True）"
+  cc: clang
+  cxx: ""
+
+# 补丁信息
+patches_applied: []
+
+# 知识沉淀
+knowledge_gained:
+  - "Imakefile 项目（X11R6 contrib）在 OHOS 无 imake/xorg-cf-files 可用，按 README 官方手工直编路径 cc -o xdu xdu.c xwin.c -lXaw -lXt -lXext -lX11 即可，无需 xmkmf"
+  - "1994 年 K&R C 代码（隐式 int 返回/无原型/无 return 值）在 clang 15 下需 -Wno-return-type -Wno-implicit-int -Wno-implicit-function-declaration -Wno-deprecated-non-prototype 才能通过（xdrawrect 无 return 实测报 error）"
+  - "libxaw 包同时提供 libXaw6/libXaw7 双 ABI，链接须显式 -lXaw7（未版本化 libXaw.so 是符号链接，HMFS 物化不可靠，E050 同款思路）"
+  - "X11 图形工具无 -version 选项且 -help 在 XtAppInitialize 之后才处理：无 DISPLAY 环境运行会先报 'Can't open display' 干净退出，可作 test_package 动态链接链完整性的行为断言（缺库时 loader 报 'Error loading shared library' + exit 127 可区分）"
+  - "libX11.so.6 运行期 DT_NEEDED 需要 libxcb.so.1/libXau.so.6（libxcb 传递依赖 libXdmcp.so.6），配方须显式声明 run=True + test_package LD_PRELOAD 绝对路径兜底（xeyes 第 4 轮真机根因同款，HMBS [stale_runtime_library]）"
+  - "xdu 3.0 上游无自动化测试（Imakefile 仅有 ComplexProgramTarget/InstallAppDefaults 目标，无 check/TESTS，无 tests/ 目录），按守则显式审计声明"
