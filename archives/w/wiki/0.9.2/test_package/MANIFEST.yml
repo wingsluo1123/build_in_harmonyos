@@ -1,0 +1,44 @@
+# test_package/MANIFEST.yml
+# 上游测试声明文件（CI 门禁 build_and_test.sh L0e 强制要求存在）
+
+package: wiki/0.9.2
+homepage: "https://github.com/Builditluc/wiki-tui"
+
+# 上游测试命令（本配方 build() 内真实执行）
+upstream_check_command: "cargo test --release --workspace --exclude wiki-api-macros --lib --bins"
+upstream_test_in_build: true
+upstream_test_command: "cargo test --release --workspace --exclude wiki-api-macros --lib --bins"
+
+# ── 上游测试存在性审计（对本任务取得的 v0.9.2 源码树核验）──────────────
+upstream_tests_exist: true
+upstream_test_audit: |
+  wiki-tui v0.9.2 ships no top-level tests/ directory; the only upstream test
+  is the inline #[test] unit test in wiki-api/src/search.rs
+  (namespace display/from_string round-trip; grep count: 1).
+  The root-level test_search.rs is a manual network harness, not wired into
+  cargo's test discovery (not under tests/, not referenced by any mod), so
+  `cargo test` does not compile it.
+  MEASURED (local `conan create`): see HMBS_UPSTREAM_TEST_RESULT marker in the
+  conan create log; `cargo test --release --workspace --exclude
+  wiki-api-macros --lib --bins` executed the inline unit test(s) on the real
+  device. wiki-api-macros (proc-macro crate) is excluded: its lib test binary
+  fails to relocate against the host proc-macro dylib on OHOS (exit 127), a
+  test-harness limitation, not a product defect; doctests are skipped because
+  the minimal rust-lang dist ships no rustdoc binary.
+
+upstream_tests:
+  - file: "wiki-api/src/search.rs（内联 #[test]，grep 计数 1）"
+    source: "wiki-tui-0.9.2/wiki-api/src/"
+    description: "上游内联单元测试：Namespace 枚举 display/from_string 往返断言（Main/User/Project/File/MediaWiki/Template/Help/Category 8 组）"
+    command: "cargo test --release --workspace --exclude wiki-api-macros --lib --bins"
+
+# test_package 中自带的测试（消费者视角）
+test_package_tests:
+  - file: test_wiki_tui.sh
+    description: >-
+      真实执行交付的 bin/wiki-tui 并断言：①--version 报出 0.9.2；
+      ②--help 列出 --language 选项；③--config-path 输出真实路径
+      （非 TUI 纯 IO 路径）；④未知参数以非零退出（错误路径未被吞掉）
+    command: "sh test_wiki_tui.sh <pkg_dir>"
+
+assertion_count: 4

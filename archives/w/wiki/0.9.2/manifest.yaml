@@ -1,0 +1,84 @@
+software: wiki
+# 版本级 manifest
+# 文件位置: archives/{letter}/{name}/0.9.2/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.9.2"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-17"
+
+# 构建系统类型 (顶层字段)
+build_system: cargo
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/Builditluc/wiki-tui/archive/refs/tags/v0.9.2.tar.gz"
+
+  # 源码校验和
+  sha256: "4f51547c0597ee9d6be9e946a612bfc052f8addd59b01f2bd599b31c3b636004"
+
+  # 压缩格式
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  system: cargo
+
+  # 配置选项列表（cargo build --release；不用 --locked：patches/0001 修改了
+  # wiki-api 的 reqwest feature 声明，cargo 需按新 manifest 更新 Cargo.lock）
+  configure_options:
+  - "build --release"
+  - "test --release --workspace --exclude wiki-api-macros --lib --bins"
+
+  # 编译依赖列表（格式: name/version）
+  # Rust crate 依赖由上游 Cargo.lock + rsproxy sparse 镜像管理；
+  # Rust 工具链（rust-toolchain/1.97.1）与 cargo 运行期共享库
+  # （openssl/3.5.8.1 + zlib/1.3.2.1 静态 PIC 重链）均为 tool_requires
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+- "patches/0001-wiki-api-reqwest-switch-to-rustls.patch"
+# 1 源码补丁：wiki-api 的 reqwest 切换到 rustls-tls（纯 Rust TLS），
+# 去掉 native-tls → openssl-sys 依赖链，应用层零 OpenSSL 依赖
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "wiki-tui 0.9.2 是 Rust workspace（wiki-tui + wiki-api + wiki-api-macros 3 crates，368 个 lock crate），cargo build --release 构建 bin/wiki-tui"
+  - "rust-toolchain/1.97.1（rust-lang 官方最小 dist）不含 rustdoc：cargo test 的 doctest 阶段无法执行，需用 --lib --bins 排除 doctest（argc/martin/stylua 同款先例）"
+  - "proc-macro crate（wiki-api-macros）的 lib 测试二进制在 OHOS 上 exec 时对宿主 proc-macro 动态库重定位失败（exit 127, symbol not found），cargo test 需 --exclude 该 crate；构建不受影响"
+  - "rust-toolchain 二进制不带 OHOS code signature：复制出 cargo/rustc/librustc_driver-*.so 后用 binary-sign-tool -selfSign 1 自签名；rustc 签名副本搬离包目录后推导不到 sysroot（E0463），需 RUSTFLAGS --sysroot=<包目录> 显式指定"
+  - "Harmonybrew bottle CDN 会轮换旧版（openssl@3-3.6.4_1 / zlib-ng-compat-2.3.3_2 实测 404）：cargo 运行期 libssl/libcrypto/libz 改用制品仓 conan 包 openssl/3.5.8.1 + zlib/1.3.2.1 的静态 PIC 归档重链私有 .so（clang -shared --whole-archive，cbindgen 0.28.0 方案），注入 LD_LIBRARY_PATH（OHOS loader 忽略 DT_RUNPATH）——零 CDN 依赖、零系统前缀污染"
+  - "reqwest 0.12 默认 native-tls 拉 openssl-sys：wiki-api 仅用 Client::get().send().text()，切 default-features=false + rustls-tls 后应用层零 OpenSSL 依赖（patches/0001）"
+  - "workspace 根执行 cargo test 默认只跑根 package，需 --workspace 才会跑 wiki-api 的内联 #[test]；上游唯一测试在 wiki-api/src/search.rs（Namespace 往返断言，1 处）"
+  - "Cargo.lock 随补丁更新：改 Cargo.toml 的 feature 声明后不用 --locked，cargo 从 rsproxy sparse 解析 rustls 依赖族重写 lock（CARGO_BUILD_JOBS=1 限并发规避 HMFS Text file busy）"
