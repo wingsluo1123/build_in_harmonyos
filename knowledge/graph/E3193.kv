@@ -1,0 +1,26 @@
+id:                     E3193
+title: 源码住在发行版包管理器树内（MASTER_SITES=none，无上游 tarball）时，用"目录最后变更 commit + 逐文件 download() 固定 SHA256"获取源码，不引入 conandata.yml、不解压、不自造 tarball
+category:               conan, distro-in-tree, reproducibility, sourcing
+match_keywords: MASTER_SITES none, ports 树内源码, no release tarball, pkgsrc, in-tree sources, per-file download, codeberg raw commit, conandata.yml 缺陷, BadZipFile, bsd.port.mk, uidfix, 单文件 C 工具
+error_signature: 404 .*raw/commit/[0-9a-f]{8}\b|BadZipFile|BUILD_DIR: parameter not set|invalid sha256
+root_cause: 一类上游（FreeBSD ports、pkgsrc 等）根本不发布源码归档，源码文件直接提交在包管理器仓库树内；常规"找 release tarball + conandata.yml"流程在此类包上没有输入对象。同时该场景有三个叠加陷阱：单文件 raw URL 无归档后缀（get()/解压路径会被格式推断为 zip）；conandata.yml 触发 CI pre-download 基础设施缺陷与镜像改写；raw 端点只认完整 40 位 commit（短 sha 404）。
+affected_scope: 源码为包管理器树内少量独立文件的包（实测 raidtest 1.3 = ports benchmarks/raidtest，r3 全门禁 pass）；不适用于树内需包管理器构建框架才有意义的构建文件、含子模块/大体积/二进制 asset 的源码。
+verification_cmd: curl -s "<host>/api/v1/repos/<org>/<repo>/commits?sha=main&path=<dir>&limit=1" | jq -r .[0].sha   # 目录最后变更 commit（完整 40 位）; curl -sfL "<base>/<file>" | sha256sum   # 固化后写进配方
+rec_approach: per-file-download-pinned-commit-no-conandata
+rec_description: "配方内写 _files_base=<repo>/raw/commit/<完整sha>/<dir> 与每文件 _sha256，source() 逐文件 download(self, url, name, sha256=...)。取目录级最后变更 commit 把漂移面压到'本包目录被改才失效'。决策顺序：①不自造 tarball 上传私仓（不可复现）；②不用 get()/解压路径（raw 无后缀会被判 zip）；③不写 conandata.yml（避开 pre-download BUILD_DIR 缺陷与镜像 fallback 改写）；④包管理器自带构建文件（bsd.port.mk 片段 Makefile）弃用并在 notes 说明，build() 直接用 Conan conf 提供的编译器。"
+rec_command: grep -n "download(" <recipe>/conanfile.py   # expect: 逐文件 url+name+sha256，无 get(、无 conan_data
+forbid_1_pattern: get\(self.*conan_data|conandata\.yml
+forbid_1_reason: 单文件 raw URL 无归档后缀会被格式推断坑（BadZipFile 家族）；conandata.yml 触发 CI pre-download 缺陷。
+forbid_2_pattern: codeload|raw/commit/[0-9a-f]{7,11}\b
+forbid_2_reason: codeberg raw 端点 404 短 commit；且分支名（main）会让 SHA256 随无关 commit 漂移。
+principles:               
+source_event: raidtest 1.3 适配（FreeBSD ports benchmarks/raidtest，2026-10-04，r3 真机 L0/L1/L4/L5 pass）
+doc_file: knowledge/drafts/DRAFT-in-tree-distro-sources-per-file-pin.md
+severity:               2
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-19
+authors:               unknown
+trigger_tool:           conan
+phase:                  packaging

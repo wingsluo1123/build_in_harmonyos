@@ -1,0 +1,18 @@
+error_signature: "error: non-constant-expression cannot be narrowed from type 'signed char' to 'char' in initializer list.*\\[-Wc++11-narrowing\\]"
+root_cause: "clang 15 turns -Wc++11-narrowing into a hard error for the C++ that sip generates for test/module_attrs (it initialises char from a signed-char expression). Upstream targets GCC/MSVC where this is only a warning, so the generated code is valid there but rejected here."
+rec_approach: "Export CXXFLAGS with -Wno-c++11-narrowing when running the upstream test suite: `CXXFLAGS='-Wno-c++11-narrowing' python3 -m pytest test/`. This only relaxes the diagnostic for the test build; the packaged module is unaffected. Alternative if it ever matters for a shipped artifact: const_cast to unsigned char in the .sip — but do not patch upstream for a diagnostic-only difference."
+match_keywords: ["Wc++11-narrowing", "non-constant-expression cannot be narrowed", "signed char", "char", "module_attrs", "sip"]
+severity:               1
+category: toolchain
+last_updated: 2026-09-30
+id:                     E3179
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E3179.md
+trigger_tool:           make
+phase:                  build
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        "Export CXXFLAGS with -Wno-c++11-narrowing when running the upstream test suite: `CXXFLAGS='-Wno-c++

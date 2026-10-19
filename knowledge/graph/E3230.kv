@@ -1,0 +1,74 @@
+# ═══ Draft knowledge entry — 平台专属前端包名不等于"整包不可适配"：同源多前端 tarball 的可构建子集判定 ═══
+# Timestamp: 2026-10-05
+# Software: pinentry-mac 1.3.1.1（上游 GPGTools/pinentry v1.3.1.1，macosx/ 目标）
+# Gate: autotools configure（--host=aarch64-unknown-linux-ohos）
+# Status: UNMATCHED — 查重未命中（index.tsv / E*.kv / knowledge/operations 均无
+#         「同源多前端 tarball 的可构建子集判定」条目），需人工审核提升为正式 E-entry
+#
+# To promote:
+#   1. 审查下方 error_excerpt 与根因
+#   2. 重命名 E0XX.kv 并移到 knowledge/graph/
+#   3. 在 knowledge/graph/index.tsv 增加一行
+#   4. 生成 doc/E0XX.md
+
+id:                     E3230
+title: 平台专属前端包名不等于整包不可适配——同源多前端 tarball 的可构建子集判定
+severity:               2
+category:               portability, buildsystem, triage
+trigger_tool: autoconf|automake|clang
+phase: configuration
+error_signature: OS `ohos' not recognized|Kernel `linux' not known to work with OS `ohos'|configure: error: No pinentry enabled|The curses library is required
+match_keywords: SUBDIRS, AM_CONDITIONAL, apple-darwin, macosx, curses, tty, buildable subset, env_unsupported
+
+root_cause: 上游 pinentry 用**同一个源码树**交付多个平台前端，`SUBDIRS`（`Makefile.am:120`）
+  由 `${pinentry_curses} ${pinentry_tty}` 等**变量拼接**而成，各变量由对应
+  `AM_CONDITIONAL` 按 host 决定是否置位。`macosx/` 只受 `BUILD_PINENTRY_MACOSX` 门控
+  （`configure.ac:127` 仅 `*-apple-darwin*` 为真），因此 OHOS
+  （`aarch64-unknown-linux-ohos`）上 `pinentry_macosx=no`、`macosx/Makefile` 不生成 ——
+  但这**只是把该子目录排除**，`SUBDIRS` 里仍有 `curses` 与 `tty` 两个纯 C 前端。
+  容易误判的原因是把「包名含 -mac」当成了「该包的制品只能由 macosx/ 产出」：实际上
+  这两者在上游是**同一份 tarball、同一套构建系统**，`pinentry-mac` 这个平台任务名
+  并未在源码层面独占 `macosx/`。实测证据：`--enable-pinentry-curses --enable-pinentry-tty`
+  并关闭全部 GUI 后 `CONFIGURE_RC=0`，`Default Pinentry .: pinentry-curses`，
+  产出 `pinentry-curses`（490760 B）与 `pinentry-tty`（86384 B），二者均为
+  `ELF 64-bit LSB pie executable, ARM aarch64`。
+
+affected_scope: 所有「同一上游 tarball 内按 host 选择性构建多平台前端」的包，在挑选可构建
+  子集时的判定；尤其当平台任务名指向某个 GUI/平台专属前端时。**此时不能直接判不可适配，
+  须先确认整包是否有目标平台可用的前端。** 通用判据：包名指向的前端若受 host 闸门排除，
+  仍需检查 `SUBDIRS` 汇总行是否有其他前端变量可置位；有则可适配（精选子集），
+  无才判结构性不可适配。
+
+caused_by:
+conflicts_with:
+prerequisite_of:
+
+rec_priority: 1
+
+rec_approach: 遇到「平台任务名指向某平台专属前端」的包，先做**可构建子集**四步勘察，
+  再决定走路径 A 还是判不可适配：
+  (1) 列出 tarball 顶层前端目录，并统计语言构成：
+      `for d in */; do echo "$d .c=$(find $d -maxdepth 1 -name '*.c'|wc -l) .m=$(find $d -maxdepth 1 -name '*.m'|wc -l)"; done`
+      —— 只要存在含 `.c` 的前端，整包就可能可适配。
+  (2) 读 `Makefile.am` 的 `SUBDIRS` 汇总行，确认候选前端是**变量拼接**（`${pinentry_curses}`）
+      还是被硬编码排除；变量拼接意味着可用 `--enable-*` 精准选取子集。
+  (3) 用 `--enable-<可移植前端> --disable-<其余全部>` 直接 configure 验证：
+      当且仅当 `CONFIGURE_RC=0` 且 `Default Pinentry` 指向该前端、对应 `Makefile` 生成，
+      子集成立。仅当所有前端都依赖目标平台没有的能力时才判 env_unsupported。
+  (4) 三个实测坑（都会让人误判为"不可适配"）：
+      ① `autoreconf -fi` 会**重新生成** `build-aux/config.sub`，把已打的 ohos 补丁覆盖掉
+         → 必须先 autoreconf **再**打 config.sub 补丁（或把补丁放进 `patches/` 由配方统一应用）；
+      ② 只有 `.pc` 不够：gpg-error/libassuan 用 `gpgrt-config`/`libassuan-config`
+         **脚本**探测，须把依赖包的 `bin/` 前置到 PATH 并导出 `GPGRT_CONFIG`/`LIBASSUAN_CONFIG`；
+      ③ 编译期还需显式 `-I<dep>/include`（`assuan.h` → `gpg-error.h` 会链式缺失），
+         仅靠 pkg-config 的 `--cflags` 不一定传到（本项目的 CFLAGS 未带上依赖 include）。
+  收益：把「同源多前端的包」正确判成可适配子集，避免误报不可适配、白烧时间，并给出可复用的勘察命令。
+
+rec_command: for d in */; do printf '%-12s .c=%s .m=%s\n' "$d" "$(find $d -maxdepth 1 -name '*.c'|wc -l)" "$(find $d -maxdepth 1 -name '*.m'|wc -l)"; done; grep -nE 'SUBDIRS|AM_CONDITIONAL' Makefile.am configure.ac
+rec_auto_fix:               false
+rec_impl:               manual
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E3230.md
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        遇到「平台任务名指向某平台专属前端」的包，先做**可构建子集**四步勘察，

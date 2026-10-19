@@ -1,0 +1,19 @@
+id:                     E3164
+category:               platform, compat, shell
+phase: runtime
+match_keywords: awk, toybox awk, Unknown option, renv, -f /dev/fd/3, shebang, script arguments, polyglot, heredoc
+error_signature: "awk: Unknown option 'q' (see \"awk --help\") when running '#!/usr/bin/awk -f' scripts with dash-prefixed script arguments"
+root_cause: "toybox 0.8.12 awk violates POSIX argument parsing: after the first operand it still parses dash-prefixed arguments as awk's own options instead of passing them to the script's ARGV. Upstream awk scripts with shebang '#!/usr/bin/awk -f' that accept flags like -q silently break on OHOS. env -S is unavailable so shebang tricks don't help."
+rec_approach: "Convert the awk script into a single-file sh+awk polyglot: shebang #!/bin/sh, then 'exec awk -f /dev/fd/3 -- \"$@\" 3<<'QUOTED_EOF'' followed by the original awk program body and the terminator line. The '--' stops option parsing so dash-prefixed script arguments reach ARGV untouched; quoting the heredoc delimiter prevents shell expansion of the program body (important for scripts emitting \\$ escapes); keeping everything in one file preserves rset's remote-staging distribution model (rset copies renv to the target host as a single file)."
+prescan_pattern: "#!/usr/bin/awk -f"
+severity:               2
+last_updated: 2026-10-03
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E3164.md
+trigger_tool:           make
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        "Convert the awk script into a single-file sh+awk polyglot: shebang #!/bin/sh, then 'exec awk -f /de

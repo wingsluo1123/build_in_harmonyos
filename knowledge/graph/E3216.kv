@@ -1,0 +1,59 @@
+#====================================================================
+# DRAFT - clReflect 0.5.11 OHOS 适配：lld map 解析 + SDK LLVM __h ABI 消费闭环
+# contributor: pc1-2
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E3216
+trigger_tool:           clang|ld.lld|cmake|conan|clReflectScan|clReflectExport
+phase:                  configuration|compilation|linking|runtime|testing
+error_signature:        Unknown format of gcc map file|CommandLine Error.*registered more than once|unrecognized instruction mnemonic.*int|reference to unresolved using declaration|unable to find library -lc\+\+
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               2
+category:               ohos, build-system, toolchain, llvm, linking
+match_keywords:         lld map, -Wl,-Map, GNU ld map, clReflectExport, MapFileParser,
+  __config_site, _LIBCPP_ABI_NAMESPACE, __h, __n1, libclang-cpp.so, monolith,
+  ClangTool, demangled, GetLoadAddress, -no-pie, CMake 4, cmake_minimum_required
+title:                  OHOS 上 ClangTool 系工具消费 SDK LLVM monolith 需 __h __config_site；lld map 格式与 GNU ld 不同需独立解析；函数地址重定位依赖非 PIE 链接
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             >
+  ① OHOS SDK 预编译 clang/LLVM 共享库（libclang-cpp.so/libLLVM-15.so monolith）
+  以 libc++ ABI 内联命名空间 std::__h 构建，而设备对外头（libcxx-ohos）与
+  libc++_shared.so 为 std::__n1；ClangTool-based 工具经 C++ API 与 monolith 交互时
+  模板实例化符号 ABI 不匹配，必须先以自定义 __config_site 强制
+  _LIBCPP_ABI_NAMESPACE __h 编译消费方 TU（对外发布的静态库可保持默认 __n1）。
+  ② OHOS 工具链默认 lld 链接器，-Wl,-Map 产出的 .map 为固定列宽
+  VMA/LMA/Size/Align/Out/In/Symbol 布局且符号已 demangle；GNU ld 的 map 首行
+  "Archive member included..." 且符号需 __cxa_demangle；按 GNU 格式解析的工
+  具必报 "Unknown format of gcc map file!"。
+  ③ OHOS 运行时 GetLoadAddress()（dlopen(0)+dlsym "_start"）返回 0，
+  RebaseFunctions 无法做 base 重定位；要落地 map VMA 函数地址必须非 PIE 链接
+  使 map VMA == 运行时绝对地址。
+  ④ 个别跨平台 C++ 库内联 x86 汇编（asm("int $0x3")）在 aarch64 不合法，需
+  __builtin_trap() 兜底。
+# ═══ Layer 3: 方案层 (Solution) ═══
+rec_priority:           1
+rec_approach:           clang-tool-lld-map-habi-console
+rec_description:        四件套闭环（详见 fix_hint a-d），公式化为可复用 checklist：
+  ClangTool 消费 SDK LLVM monolith → __config_site(__h)+scan 专用 ABI 副本；
+  解析链接器 map → 双格式分支（GNU ld / lld）；运行反射调用测试 → 非 PIE 链接。
+rec_command:            # 见 archives/c/clreflect/0.5.11/ 的 conanfile.py 与 patches/
+rec_auto_fix:           false
+rec_impl:               source-patch
+
+# ═══ 适用边界 / 反例 ═══
+适用范围:               OHOS PC 上以 clang-tooling C++ API 消费 SDK LLVM monolith 的库
+                        （CastXML 同族）；任何解析 -Wl,-Map 输出的工具；依赖 map 函数
+                        地址的反射调用测试二进制。
+反例:                  纯 C API 消费 LLVM（libclang.h）无 ABI 覆盖需求；静态链接 LLVM
+                        源码的构建不适用 lld map 差异；仅 header-only 无函数地址场景
+                        无需非 PIE。
+
+# ═══ 关系图 ═══
+last_updated:           2026-10-04
+authors:               unknown
+doc_file:               doc/E3216.md
+affected_scope:         OHOS 上 ClangTool 系工具消费 SDK LLVM monolith 需 __h __config_site
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）

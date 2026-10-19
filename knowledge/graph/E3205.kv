@@ -1,0 +1,33 @@
+#====================================================================
+# DRAFT-uefitool-0.28.0-a73-guids-csv-gui-resource-only-cwd-lookup
+# 数据文件只进 GUI 的 Qt 资源、CLI 侧按 CWD 相对路径查找、读失败静默降级
+# ——退出码与输出结构全都不变，只有"可读名"悄悄消失
+#====================================================================
+
+id:                     E3205
+trigger_tool:           runtime|install|conan
+phase:                  runtime
+error_signature:        （无错误输出 —— 这正是本条目的核心）裸 GUID 串出现在本应显示可读名之处：\b[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}\b
+severity:               2
+category:               platform, detection, conan, packaging, runtime
+match_keywords:         guids.csv, GUID database, initGuidDatabase, guidDatabaseLookup, guidToUString, Qt resource, qrc, alias, resource path, relative path, current working directory, CWD, silent failure, install rule, share directory, readable name, hex fallback
+title:                  数据文件只打进 GUI 的 Qt 资源、CLI 侧却按当前工作目录用相对路径查找 —— 读失败静默降级成裸 GUID，退出码与输出结构全不变
+root_cause:             上游把 GUID→可读名映射表（12042 行 CSV）**只**通过 GUI 的 Qt 资源清单引用（qrc 的 <file alias="guids.csv">），两个 CLI 子工程的 install 规则里没有它；而 CLI 在 main() 的**第一行**就 initGuidDatabase("guids.csv") —— **相对路径 ⇒ 按当前工作目录解析**。读文件失败的路径在实现里是静默的：读函数返回空串、库里填充 0 条、不报错、不中止、不改退出码；查表函数查不到就回退成 usprintf 的裸十六进制格式。于是「剥离 GUI 后数据文件不再随包安装」这件事**没有任何可观察信号**，只有依赖它的字段值悄悄退化。
+affected_scope:         把数据文件（映射表/词典/规则表/时区库/证书库）只挂在 GUI 侧资源里、而命令行侧用相对路径或当前目录查找的所有上游；尤其是"先剥离 GUI 再交付 CLI"的适配场景 —— 上游从未在有 GUI 的环境里暴露过这个问题
+verification_cmd:       grep -rn "guids.csv" <src>/ 2>/dev/null | grep -v Binary; grep -rn "\.qrc" -e "<file" <src>/ | head; 运行 CLI 的 report 子模式并对同一镜像跑两次（CWD 有/无该数据文件），diff 两份输出
+rec_priority:           P1
+rec_approach:           安装期把数据文件装到包的 share/<pkg>/ 下；消费侧在使用前把它放到工作目录（或显式传绝对路径）。并在消费者测试里用「有/无该文件」**双向**断言，把沉默失败变成可见失败。
+rec_command:            copy(self, "guids.csv", src=os.path.join(self.source_folder, "common"), dst=os.path.join(self.package_folder, "share", "uefitool"))
+principles:             P013
+doc_file:               knowledge/drafts/DRAFT-uefitool-0.28.0-a73-guids-csv-gui-resource-only-cwd-lookup.md
+last_updated:           2026-10-04
+source_event:           uefitool 0.28.0-a73 适配：剥离 Qt6 GUI 后发现 GUID 可读名全部退化为裸十六进制串，追查到 guids.csv 只挂在 GUI 的 Qt 资源里且 CLI 按 CWD 相对路径查找
+authors:                uefitool-adapter
+source_pr:
+source_commit:
+
+metrics_success_count:  0
+metrics_fail_count:     0
+rec_auto_fix:               false
+rec_impl:               manual
+rec_description:        安装期把数据文件装到包的 share/<pkg>/ 下

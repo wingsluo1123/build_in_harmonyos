@@ -1,0 +1,44 @@
+#====================================================================
+# DRAFT-retro-gtk-1.0.2-conan-meson-libexecdir-bin-merge
+# Conan MesonToolchain 默认把 libexecdir 归并到 bin/：
+# 上游 libexec helper 会落到 bin/ 并改变编译期路径常量，需显式还原
+#====================================================================
+
+id:                     E3186
+trigger_tool:           conan|meson
+phase:                  configuration|packaging
+error_signature:        libexecdir = 'bin'.*conan_meson_native.ini|install_dir.*libexec.*installed to .*/bin/|Program .*libexec/.* not found at runtime
+
+severity:               2
+category:               build-system, meson, conan, packaging
+match_keywords:         libexecdir, MesonToolchain, conan_meson_native.ini, [project options], install_dir, RETRO_RUNNER_PATH, helper 二进制, bin/ 与 libexec/ 布局, 编译期路径常量, 内部 helper, commands.json, 纯库包
+title:                  Conan MesonToolchain 默认 libexecdir=bin：上游 libexec helper 落错目录且运行时路径常量随之改变
+
+root_cause:             Conan 2 的 MesonToolchain 在生成的 machine file 的 [project options] 段默认写入 bindir='bin'、sbindir='bin'、libexecdir='bin'（把所有可执行落点归并到 bin/，以便包布局简单）。若上游 meson.build 把内部 helper 装在 `libexecdir`（如 retro-gtk 的 retro-runner），则 (a) helper 会出现在包的 bin/，(b) 任何由 `libexecdir` 派生的编译期常量（如 RETRO_RUNNER_PATH=`/libexec/retro-runner`）与实际安装位置不一致，运行期找不到 helper，(c) 包内出现 bin/ 可执行文件还会让"纯库包"的 CLI/tool 判定（commands.json 门禁）含混。
+affected_scope:         所有用 meson 构建、且上游把 helper/daemon 装到 libexecdir 的包（GNOME 系、桌面后端、语言运行时 helper）。retro-gtk 1.0.2 实测：默认落 bin/retro-runner，显式设置后落 libexec/retro-runner。
+verification_cmd:       grep libexecdir <build>/conan/conan_meson_native.ini（默认 libexecdir = 'bin'）; 配置 -Dlibexecdir=libexec 后 find <pkg> -name retro-runner 应命中 libexec/。
+
+rec_priority:           1
+rec_approach:           set-libexecdir-project-option-explicitly
+rec_description:        在 generate() 里 `tc.project_options["libexecdir"] = "libexec"`（或与上游布局一致的值），还原上游安装语义；同时把 helper 暴露方式写进 notes/README（包内 libexec/<helper>，运行期可用环境变量或上游约定定位），保持 package_type=library 且 cpp_info.bindirs 为空，避免误判为 CLI 包。
+rec_command:            tc.project_options["libexecdir"] = "libexec"
+rec_auto_fix:           false
+rec_impl:               conan-recipe-meson-project-option
+
+fallback_priority:      2
+fallback_approach:      keep-bin-layout-and-fix-path-constant
+fallback_description:   若上游代码把 helper 路径写死成 bindir 派生（少数项目），可保留 Conan 默认并在配方中接受 bin/<helper>；此时需在 package_info/README 明确 helper 位置，且注意"库包内含 bin/ 可执行"对 CLI 门禁的影响。
+fallback_command:      (无命令，布局决策项)
+fallback_auto_fix:      false
+fallback_impl:          documentation-only
+
+principles:               
+doc_file:               knowledge/drafts/DRAFT-retro-gtk-1.0.2-conan-meson-libexecdir-bin-merge.md
+last_updated:           2026-10-12
+source_event:           retro-gtk 1.0.2 HarmonyOS PC 适配（retro-runner 安装目录）
+source_pr:              ""
+source_commit:          ""
+
+metrics_success_count:  0
+metrics_fail_count:     0
+authors:               unknown

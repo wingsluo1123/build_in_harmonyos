@@ -1,0 +1,80 @@
+# ═══ Draft knowledge entry — conan 2 构建环境不注入 host 依赖 bin：
+#    configure AC_PATH_PROGS 找不到构建工具（svm_learn 等）
+#    须 generate() prepend_path 注入，define_path 覆盖语义会清空系统 PATH
+# Software: yamcha 0.33 (同类面：conan 2 Autotools 配方中构建阶段依赖
+#    host 依赖提供的可执行文件的任何软件)
+# Gate: 本地 OHOS 交叉 conan create 全绿 + 宿主真实 TinySVM make check 4/4
+# Status: DRAFT
+# PR:     yamcha 0.33 知识库扩展（路径 B）
+
+id:                     E3235
+severity:               2
+category:               ohos, build-system, autotools, conan
+trigger_tool: conan|configure
+phase: configuration
+
+error_signature: |
+  checking for svm_learn\.\.\. no|
+  configure: error: .* required for (training|building)|
+  checking for .*config(-script)?\.\.\. no.*could not be found
+
+match_keywords: conanbuild PATH, VirtualBuildEnv, host requires bindir, AC_PATH_PROGS, configure cannot find, prepend_path, define_path, svm_learn, run=True
+
+root_cause: |
+  conan 2 的 VirtualBuildEnv 生成 conanbuild 环境时**只遍历 build context
+  依赖的 buildenv_info 与 host 依赖的 buildenv_info**；普通 host requires
+  的 cpp_info.bindirs / runenv 不会进入 conanbuild PATH。于是 configure
+  的 AC_PATH_PROGS / AC_PATH_PROG 查找构建期需要的可执行文件（如训练
+  工具 svm_learn）时必然 no → configure 按 AC_MSG_ERROR 硬失败。
+  requires(..., run=True) 同样无效（runenv 只在 conanrun 环境，且该机制
+  不跨到 configure 阶段）。修复须在 generate() 用
+  environment().prepend_path("PATH", dep.package_folder/bin) 注入；
+  environment().define_path("PATH", ...) 是**覆盖语义**，会把系统 PATH
+  整个清掉（configure 随即报 sed/chmod: command not found、
+  cannot create .lineno），与不注入一样致命。
+
+affected_scope: |
+  conan 2.x Autotools 配方中 configure 阶段需要 host 依赖提供
+  可执行文件的软件（AC_PATH_PROGS / AC_PATH_PROG / 脚本探测宏）；
+  特别是老 autotools 项目把工具路径烘焙进 Makefile 的场景
+  （yamcha 的 training/Makefile 烘焙 SVM_LEARN，tinysvm 同为训练链）。
+
+verification_cmd: |
+  grep -E "checking for svm_learn" <build>/config.log
+  # 修复前: checking for svm_learn... no → configure: error
+  # 修复后: found <conan2>/p/tinys*/p/bin/svm_learn → result: <绝对路径>
+
+# ═══ 方案层 ═══
+rec_priority: 1
+rec_approach: prepend-path-in-generate
+rec_description: |
+  在 generate() 中对该 host 依赖调用
+  environment().prepend_path("PATH", os.path.join(dep.package_folder, "bin"))
+  并 apply；若构建系统把工具路径烘焙进 Makefile/脚本，同时提供
+  环境变量兜底（wrapper 支持 ${SVM_LEARN} 之类覆盖）。
+rec_command: |
+  # conanfile.py
+  def generate(self):
+      env = VirtualBuildEnv(self)
+      dep = self.dependencies["<tool-dep>"]
+      env.environment().prepend_path("PATH", os.path.join(dep.package_folder, "bin"))
+      env.vars(self).save_script("conanbuild_extra.sh")
+rec_auto_fix: true
+rec_impl: conanfile-edit
+
+fallback_priority: 2
+fallback_approach: config-script-prefix-arg
+fallback_description: |
+  对 config-script 探测宏（AM_PATH_* / AC_PATH_PROG + *-config 脚本）：
+  显式传 --with-<lib>-prefix=<package_folder>，宏内直接把脚本变量置为
+  绝对路径，绕过 PATH 搜索（cdcd 0.6.6 先例同法）。
+fallback_command: |
+  tc.configure_args.append(f"--with-<lib>-prefix={pkg_folder}")
+fallback_auto_fix: false
+
+prescan_pattern: checking for [a-z_]+\.\.\. no.*configure: error
+
+principles:               
+last_updated: 2026-10-01
+authors:               unknown
+doc_file:               doc/E3235.md

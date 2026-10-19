@@ -1,0 +1,123 @@
+#====================================================================
+# DRAFT-ohos-upstream-tests-bare-import-unpublished-dep —— 上游测试文件裸 import
+#   未发布依赖（psutil）致测试套件整体不可收集，需显式申报而非静默跳过
+# 对应文档: knowledge/drafts/DRAFT-ohos-upstream-tests-bare-import-unpublished-dep.md
+#
+# 本条目为 draft（草稿），尚未由主编审核合入。正式编号由 graph promote 分配。
+#====================================================================
+
+id:                     E3217
+trigger_tool:           python|pytest|conan
+phase:                  testing
+error_signature:        ModuleNotFoundError: No module named 'psutil'|
+                         ImportError while loading conftest|
+                         ERRORS.*no module named|
+
+severity:               2
+category:               python, conan, testing, dependency-gate, r51
+match_keywords:         psutil, bare import, tests/__init__.py, pytest collection,
+                         conftest import failure, test_requires, PF4, R51,
+                         上游测试不可收集, 显式申报, skip reason, greenlet,
+                         如实申报, 依赖闸, 未发布依赖
+title:                  上游测试文件**裸 import** 未发布依赖（如 psutil）会使整个
+                        测试套件不可收集 —— 须**显式输出理由**申报，不得静默跳过
+                        或伪报通过
+
+# ═══ Layer 2: 诊断层 ═══
+root_cause:            部分上游项目的测试辅助模块在**导入期**执行裸 import
+                        （无 try/except 守卫），例如 greenlet 的
+                        ``src/greenlet/tests/__init__.py:17`` 直接
+                        ``import psutil``。后果不是"某个用例跳过"，而是 pytest
+                        **连收集（collection）都做不到**——因为在 import 测试包
+                        阶段即抛 ``ModuleNotFoundError``。
+                        而该依赖（psutil）**未发布到制品仓（ohpcd）**，按 **PF4**
+                        （依赖须先发布后使用）不能作为 ``test_requires`` 引入。
+                        于是形成困境：上游测试客观不可运行，但**不能**因此：
+                          (a) 静默跳过并当作"测试通过"（违反 R51 如实申报）；
+                          (b) 伪报"上游未提供测试"（上游明明有，只是缺依赖）；
+                          (c) 引入未发布依赖（违反 PF4，且会卡住依赖闸）。
+                        正确处置是**显式探测并输出不可运行的确切理由**，同时把
+                        验证责任转移到消费者测试（test_package）身上。
+                        易误判点：错误信息是 ``ModuleNotFoundError``，容易被当作
+                        本适配的构建/环境缺陷去排查，而真因在上游测试文件的
+                        导入期写法 + 制品仓缺该依赖。
+affected_scope:         上游测试辅助模块存在**导入期裸 import** 的项目，且该依赖
+                        未发布到制品仓；典型是测试期才用到的辅助库（psutil /
+                        覆盖度工具 / 报告工具等）。与"上游根本不提供测试"不同：
+                        本类上游**有**测试，只是缺一个测试期依赖。
+                        与「依赖版本不满足」不同：不是版本问题，是**依赖不存在**
+                        且按规则不能临时引入。
+verification_cmd:       ① 确认测试是否因导入期裸 import 而整体不可收集：
+                          grep -rn "^import psutil\|^import <dep>" <src>/**/tests/__init__.py
+                          # 有输出且无 try/except 包裹 → 即命中本条
+                        # ② 直接试跑，观察是否连收集都失败：
+                        python3 -m pytest <src>/tests -q --collect-only
+                        # ModuleNotFoundError: No module named 'psutil'
+                        # ③ 确认该依赖是否已发布（决定能否作 test_requires）：
+                        conan list "psutil/*" -r=<remote>     # 无 → PF4 禁止引入
+
+# ═══ Layer 3: 方案层 ═══
+rec_priority:           1
+rec_approach:           probe-and-report-explicitly
+rec_description:        在 ``build()`` 的上游测试环节**先探测该依赖是否可用**，
+                        不可用则**显式输出完整理由**并返回，同时：
+                          · ``test_package/MANIFEST.yml`` 内
+                            ``upstream_test_in_build: false`` 并写明原因；
+                          · 消费者测试（test_package）承担**该包真正可用性**的
+                            验证责任，且断言要有实质（对编译型扩展而言，
+                            import 成功本身即证明链接问题已解决）。
+                        探测代码须**在 pytest 之前独立探测**（如
+                        ``subprocess.run([py, "-c", "import psutil"])``），
+                        而不是"跑 pytest 失败后猜原因"——后者的 stderr 里
+                        ModuleNotFoundError 可能被其他收集错误淹没。
+                        将来该依赖一旦发布，探测自动通过、上游测试随即
+                        开始真实执行，无需改配方（自愈式设计）。
+rec_command:            # build() 内：
+                        #   probe = subprocess.run([py,"-c","import psutil"], capture_output=True)
+                        #   if probe.returncode != 0:
+                        #       self.output.warning("上游测试跳过：tests/__init__.py 裸 import "
+                        #           "psutil 且 psutil 未发布（PF4 禁止作 test_requires）")
+                        #       return
+rec_auto_fix:           false
+rec_impl:               probe-and-report-explicitly
+
+fallback_priority:      2
+fallback_approach:      vendor-minimal-shim-for-test
+fallback_description:   仅当**该依赖确实必需、且短期内不会发布**时，可考虑为测试
+                        提供一个**最小 shim**（如仅实现被测代码实际用到的少数
+                        接口）。代价高且脆弱：shim 与真库行为不一致会给出**虚假
+                        通过**，因此必须极其克制，并在 notes.md 明确标注"测试运行
+                        在 shim 之上，非真实依赖"。
+fallback_command:       # 在测试 PYTHONPATH 前置一个最小 psutil shim 目录
+fallback_auto_fix:      false
+fallback_impl:          vendor-minimal-shim-for-test
+
+forbid_1_pattern:       上游测试.*(不可运行|无法收集).*(便|就).*(跳过|忽略).*(不|未).*(说明|输出|申报)|
+                         测试.*(失败|报错).*(当作|视为).*通过
+forbid_1_reason:        违反 R51：不可运行必须**逐条写清技术原因**，不能让
+                        "跳过"与"通过"在记录上无差别——否则质量评估失真。
+forbid_1_consequence:   测试覆盖率虚高，缺陷被掩盖。
+
+forbid_2_pattern:       为.*上游测试.*(引入|添加|requires).*(未发布|不在).*制品仓.*依赖|
+                         直接把 psutil.*(写成|作为).*test_requires
+forbid_2_reason:        违反 PF4（依赖须先发布后使用），且会卡住 CI 依赖闸，
+                        让整个 PR 无法合并。
+forbid_2_consequence:   依赖闸红灯，阻塞交付；且把"要发布一个包"的负担
+                        悄悄转嫁给本次适配。
+
+principles:               
+doc_file:               knowledge/drafts/DRAFT-ohos-upstream-tests-bare-import-unpublished-dep.md
+last_updated:           2026-09-16
+source_event:           greenlet 3.5.6 适配（tests/__init__.py:17 裸 import psutil；
+                        psutil 未发布 → 上游测试不可收集，配方显式输出理由并
+                        转由 test_package 覆盖）
+
+authors:                AtomCode (deepseek-flash) <noreply@atomgit.com>
+source_pr:
+source_commit:
+
+metrics_success_count:  1
+metrics_fail_count:     1
+metrics_confidence:     0.9
+metrics_last_used:      2026-09-16
+
