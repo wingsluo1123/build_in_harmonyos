@@ -1,0 +1,26 @@
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -127,7 +127,22 @@
+     get_filename_component( _kdeincludexslt_name ${_kdeincludexslt} NAME )
+     string( REGEX REPLACE ".cmake$" "" _kdeincludexslt_out "${_kdeincludexslt_name}" )
+     set( _kdeincludexslt_binarypath "${CMAKE_CURRENT_BINARY_DIR}/customization/${_kdeincludexslt_out}" )
+-    configure_file( ${_kdeincludexslt} ${_kdeincludexslt_binarypath} )
++    if(DocBookXSL_FOUND)
++        configure_file( ${_kdeincludexslt} ${_kdeincludexslt_binarypath} )
++    else()
++        # DocBook XSL data is optional (patch 0002). The upstream template
++        # would embed the literal DocBookXSL_DIR-NOTFOUND sentinel in its
++        # xsl:import elements, which makes the installed stylesheet unusable.
++        # Drop the unavailable imports so the stylesheet stays valid.
++        file(READ ${_kdeincludexslt} _kdeincludexslt_content)
++        string(REPLACE "<xsl:import href=\"@DOCBOOKXSL_DIR@/html/autoidx.xsl\"/>" ""
++               _kdeincludexslt_content "${_kdeincludexslt_content}")
++        string(REPLACE "<xsl:import href=\"@DOCBOOKXSL_DIR@/html/chunk.xsl\"/>" ""
++               _kdeincludexslt_content "${_kdeincludexslt_content}")
++        string(REPLACE "<xsl:import href=\"@DOCBOOKXSL_DIR@/manpages/docbook.xsl\"/>" ""
++               _kdeincludexslt_content "${_kdeincludexslt_content}")
++        file(WRITE ${_kdeincludexslt_binarypath} "${_kdeincludexslt_content}")
++    endif()
+     if(NOT RELOCATABLE_DOCBOOK_FILES)
+         install(FILES ${_kdeincludexslt_binarypath}
+             DESTINATION ${KDE_INSTALL_DATADIR_KF}/kdoctools/customization )
