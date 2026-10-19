@@ -1,0 +1,39 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+
+package: newuoa-cpp/0.1.2
+homepage: "https://github.com/elsid/newuoa-cpp"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+# newuoa-cpp 0.1.2 的 CMakeLists.txt 只构建库目标 newuoa，未声明任何
+# enable_testing()/add_test()/CTest 注册项，也未集成任何测试框架。
+upstream_check_command: "ctest -N (无注册项；上游 CMakeLists 未启用测试)"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+# 上游源码仅有 2 个示例程序（src/example_function.c、src/example_closure.cpp），
+# 属于样例而非独立测试用例，不计入 source_declared_total；此处如实列出。
+upstream_tests:
+  - file: src/example_function.c
+    source: newuoa-cpp-0.1.2/src/example_function.c
+    description: "上游示例（C 接口），非测试用例；已在本轮编译并运行验证（result=-144）"
+    command: "./example_function_ohos"
+  - file: src/example_closure.cpp
+    source: newuoa-cpp-0.1.2/src/example_closure.cpp
+    description: "上游示例（C++ 闭包接口），非测试用例；已在本轮编译并运行验证（result=-144）"
+    command: "./example_closure_ohos"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "消费者用例：仅用已安装公开头文件与 C 接口 newuoa() 链接并运行，断言收敛到 -144"
+    command: "./test_newuoa_c"
+  - file: test_ohos.cpp
+    description: "鸿蒙专项用例：C++ newuoa_closure_const 闭包接口，断言收敛到 0 (x=(3,-2))"
+    command: "./test_newuoa_ohos"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 4

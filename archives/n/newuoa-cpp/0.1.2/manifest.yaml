@@ -1,0 +1,84 @@
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/0.1.2/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.1.2"
+
+# 软件名
+software: "newuoa-cpp"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-09-29"
+build_system: cmake
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/elsid/newuoa-cpp/archive/refs/tags/v0.1.2.tar.gz"
+
+  # 源码校验和
+  sha256: "660274f2ab2188bdf096c0ed0eefa8e10fe563e440064bc4e48ce547a8ef90a4"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表
+  configure_options: []
+  # 例如:
+  # - "-DCMAKE_BUILD_TYPE=Release"
+  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+  # 例如:
+  # - openssl/1.1.1w
+  # - curl/8.19.0
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+# 例如:
+# - "0001-bootstrap-ohos-toolchain.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+- "E092：CMake 不认识 HarmonyOS 平台，需依赖 Conan CMakeToolchain 自动映射 CMAKE_SYSTEM_NAME=HarmonyOS；conan create 实测通过，无需手写补丁"
+- "conan-init 按包名推断 cpp_info.libs 会把 newuoa-cpp 误写为库名，实际 CMake 产物库名为 newuoa（libnewuoa.a、目标 newuoa::newuoa），必须按实际产物修正 libs 与 cmake_target_name"
+- "E017 GitHub URL 会被 conan-verify 临时注入 ghfast 镜像并在完成后恢复；提交前必须核对 conandata.yml 恢复为官方 HTTPS URL，代理改写地址不得入库"
+- "test_package 模板空壳 test.c 违反 R34/PF3，必须以真实 API 调用（newuoa()/newuoa_closure_const()）断言可观察结果，并新增鸿蒙专项用例与消费者用例分开计数"
+# 例如:
+# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
+# - "内嵌 libuv 需要禁用，使用系统 libuv"
