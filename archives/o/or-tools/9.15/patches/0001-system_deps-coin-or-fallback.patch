@@ -1,0 +1,20 @@
+diff --git a/cmake/system_deps.cmake b/cmake/system_deps.cmake
+index 617abe1..71ea05a 100644
+--- a/cmake/system_deps.cmake
++++ b/cmake/system_deps.cmake
+@@ -53,7 +53,14 @@ if(USE_COINOR)
+   endif()
+ 
+   if(NOT BUILD_Osi AND NOT TARGET Coin::Osi)
+-    find_package(Osi REQUIRED)
++    find_package(Osi QUIET)
++    if(NOT TARGET Coin::Osi)
++      # The Conan "coin-or" package provides the Osi library under its own
++      # recipe target name (coin-or::coin-or); find_package(Osi) has no
++      # matching CONFIG file, so fall back to the Conan-provided config.
++      # check_deps.cmake later bridges coin-or::coin-or to Coin::Osi.
++      find_package(coin-or CONFIG REQUIRED)
++    endif()
+   endif()
+ 
+   if(NOT BUILD_Clp AND NOT TARGET Coin::ClpSolver)

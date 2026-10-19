@@ -1,0 +1,35 @@
+sources:
+  or-tools:
+    url: "https://github.com/google/or-tools/releases/download/v9.15/or-tools-9.15.tar.gz"
+    sha256: "599c870319bb127441d92c452d8f79bca46ca6fd295c1deb8031ed303a361311"
+  # Official abseil-cpp source (same tag as the abseil-cpp/20260107.1 package).
+  # Used only to build the absl/status/internal/status_matchers.cc test library
+  # that the published abseil-cpp package omits (its testing components are not
+  # built). Header-only matchers used by 49 upstream or-tools *_test.cc.
+  abseil-src:
+    url: "https://github.com/abseil/abseil-cpp/archive/refs/tags/20260107.1.tar.gz"
+    sha256: "4314e2a7cbac89cac25a2f2322870f343d81579756ceff7f431803c2c9090195"
+  # Official protobuf-matchers source (v0.1.1, the GIT_TAG or-tools fetches).
+  # or-tools cmake/dependencies.cmake FetchContent-declares it via git clone,
+  # which fails on the CI worker (github.com unreachable). Extract it here and
+  # point FetchContent at the local dir via FETCHCONTENT_SOURCE_DIR_* instead.
+  protobuf-matchers-src:
+    url: "https://github.com/inazarenko/protobuf-matchers/archive/refs/tags/v0.1.1.tar.gz"
+    sha256: "0f4fec84ffc5a9122cf181e32779b5d9f715855224cb2bf369f70e39eb2213dd"
+
+patches:
+  - patch_file: "patches/0001-system_deps-coin-or-fallback.patch"
+    patch_description: "system_deps.cmake: fall back to the Conan coin-or CONFIG package when find_package(Osi) has no matching config file"
+    patch_type: "portability"
+  - patch_file: "patches/0002-check_deps-target-aliases.patch"
+    patch_description: "check_deps.cmake: alias Conan CMakeDeps targets (zlib::zlib, bzip2::bzip2, coinutils::coinutils, coin-or::coin-or, clp::clp, cgl::cgl, cbc::cbc) to the ZLIB::ZLIB / BZip2::BZip2 / Coin::* names or-tools expects; rebuild the missing absl::status_matchers test library from the official abseil source (OR_TOOLS_ABSEIL_SRC) as a real static lib"
+    patch_type: "portability"
+  - patch_file: "patches/0003-ortools-config-consumer-aliases.patch"
+    patch_description: "ortoolsConfig.cmake.in: bridge Conan recipe target names to ZLIB::ZLIB / BZip2::BZip2 / Coin::* on the consumer side so installed ortools targets resolve"
+    patch_type: "portability"
+  - patch_file: "patches/0004-gmock-death-test-string_view-overload.patch"
+    patch_description: "googletest v1.17.0 无 absl::string_view MakeDeathTestMatcher 重载，or-tools math_opt 测试传 constexpr absl::string_view 死亡测试匹配器，在 ortools/base/gmock.h 补兼容重载，测试断言语义不变"
+    patch_type: "portability"
+  - patch_file: "patches/0005-protobuf-matchers-static.patch"
+    patch_description: "dependencies.cmake: 在 FetchContent_MakeAvailable(protobuf-matchers) 前置 BUILD_SHARED_LIBS OFF，静态化 protobuf-matchers；上游对全部 FetchContent 依赖强制 BUILD_SHARED_LIBS ON 产出 libprotobuf-matchers.so，其无 SONAME 且 DT_NEEDED 记录相对路径 ../../bin/...（按 build/bin 布局校准），HarmonyOS 加载器按 CWD 解析相对 NEEDED（已验证），在 conan build/Release 布局下解析错位导致 175 个上游 ctest 二进制启动即加载失败；静态化彻底消除运行时 .so 加载"
+    patch_type: "portability"
