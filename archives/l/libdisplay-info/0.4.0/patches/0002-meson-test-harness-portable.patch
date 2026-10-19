@@ -1,0 +1,20 @@
+diff --git a/test/edid-decode-check.sh b/test/edid-decode-check.sh
+index 761cae3..c14f2c0 100755
+--- a/test/edid-decode-check.sh
++++ b/test/edid-decode-check.sh
+@@ -14,7 +14,14 @@ cp "$ref" "$workdir/ref"
+ "$DI_EDID_DECODE" <"$edid" >"$workdir/di" || [ $? = 254 ]
+ 
+ if [ -f "$diff" ]; then
+-	patch "$workdir/ref" "$diff"
++	# Apply the fixture delta to the reference output. Rewrite the header
++	# names to the local file so that both GNU patch and the alternative
++	# implementations bundled by some distributions patch `ref` here
++	# (they disagree on which of the ---/+++ names to pick when both exist).
++	# `-p0 -i` is the portable invocation: GNU patch's "target file as a
++	# positional argument" form is not understood everywhere.
++	sed -e '1s|^--- .*|--- ref|' -e '2s|^+++ .*|+++ ref|' "$diff" >"$workdir/ref.diff"
++	(cd "$workdir" && patch -p0 -i ref.diff >/dev/null)
+ fi
+ 
+ diff -u "$workdir/ref" "$workdir/di"
