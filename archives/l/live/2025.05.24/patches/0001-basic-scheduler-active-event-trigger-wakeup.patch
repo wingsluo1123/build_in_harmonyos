@@ -1,0 +1,254 @@
+--- a/BasicUsageEnvironment/include/BasicUsageEnvironment0.hh
++++ b/BasicUsageEnvironment/include/BasicUsageEnvironment0.hh
+@@ -98,6 +98,11 @@
+   virtual void triggerEvent(EventTriggerId eventTriggerId, void* clientData = NULL);
+
+ protected:
++  virtual void eventTriggerWasSignaled();
++      // Called once for each trigger bit that changes from idle to pending.
++      // Subclasses may use this to wake a blocking event-loop wait.
++
++protected:
+   BasicTaskScheduler0();
+
+ protected:
+--- a/BasicUsageEnvironment/BasicTaskScheduler0.cpp
++++ b/BasicUsageEnvironment/BasicTaskScheduler0.cpp
+@@ -145,15 +145,21 @@
+     if ((eventTriggerId&mask) != 0) {
+       fTriggeredEventClientDatas[i] = clientData;
+ #ifndef NO_STD_LIB
+-      (void)fTriggersAwaitingHandling[i].test_and_set();
++      Boolean wasAlreadyPending = fTriggersAwaitingHandling[i].test_and_set();
+ #else
++      Boolean wasAlreadyPending = fTriggersAwaitingHandling[i];
+       fTriggersAwaitingHandling[i] = True;
+ #endif
++      if (!wasAlreadyPending) eventTriggerWasSignaled();
+     }
+     mask >>= 1;
+   }
+ }
+
++void BasicTaskScheduler0::eventTriggerWasSignaled() {
++  // The base scheduler has no blocking-wait wakeup mechanism.
++}
++
+
+ ////////// HandlerSet (etc.) implementation //////////
+
+--- a/BasicUsageEnvironment/include/BasicUsageEnvironment.hh
++++ b/BasicUsageEnvironment/include/BasicUsageEnvironment.hh
+@@ -46,11 +46,9 @@
+
+ class BasicTaskScheduler: public BasicTaskScheduler0 {
+ public:
+-  static BasicTaskScheduler* createNew(unsigned maxSchedulerGranularity = 10000/*microseconds*/);
+-    // "maxSchedulerGranularity" (default value: 10 ms) specifies the maximum time that we wait (in "select()") before
+-    // returning to the event loop to handle non-socket or non-timer-based events, such as 'triggered events'.
+-    // You can change this is you wish (but only if you know what you're doing!), or set it to 0, to specify no such maximum time.
+-    // (You should set it to 0 only if you know that you will not be using 'event triggers'.)
++  static BasicTaskScheduler* createNew(unsigned maxSchedulerGranularity = 0);
++    // Event triggers actively wake "select()", so no periodic scheduler tick is
++    // needed by default.  A positive value explicitly requests a periodic tick.
+   virtual ~BasicTaskScheduler();
+
+ protected:
+@@ -64,6 +62,8 @@
+   // Redefined virtual functions:
+   virtual void SingleStep(unsigned maxDelayTime);
+
++  virtual void eventTriggerWasSignaled();
++
+   virtual void setBackgroundHandling(int socketNum, int conditionSet, BackgroundHandlerProc* handlerProc, void* clientData);
+   virtual void moveSocketHandling(int oldSocketNum, int newSocketNum);
+
+@@ -77,6 +77,15 @@
+   fd_set fExceptionSet;
+
+ private:
++  Boolean setupEventTriggerWakeupChannel();
++  void closeEventTriggerWakeupChannel();
++  static void eventTriggerWakeupHandler(void* clientData, int mask);
++  void eventTriggerWakeupHandler();
++  Boolean eventTriggersRemainPending() const;
++
++private:
++  int fEventTriggerWakeupSockets[2];
++
+ #if defined(__WIN32__) || defined(_WIN32)
+   // Hack to work around a bug in Windows' "select()" implementation:
+   int fDummySocketNum;
+--- a/BasicUsageEnvironment/BasicTaskScheduler.cpp
++++ b/BasicUsageEnvironment/BasicTaskScheduler.cpp
+@@ -21,6 +21,12 @@
+ #include "BasicUsageEnvironment.hh"
+ #include "HandlerSet.hh"
+ #include <stdio.h>
++#include <errno.h>
++#if !defined(__WIN32__) && !defined(_WIN32)
++#include <fcntl.h>
++#include <sys/socket.h>
++#include <unistd.h>
++#endif
+ #if defined(_QNX4)
+ #include <sys/select.h>
+ #include <unix.h>
+@@ -33,7 +39,8 @@
+ }
+
+ BasicTaskScheduler::BasicTaskScheduler(unsigned maxSchedulerGranularity)
+-  : fMaxSchedulerGranularity(maxSchedulerGranularity), fMaxNumSockets(0)
++  : fMaxSchedulerGranularity(maxSchedulerGranularity), fMaxNumSockets(0),
++    fEventTriggerWakeupSockets{-1, -1}
+ #if defined(__WIN32__) || defined(_WIN32)
+   , fDummySocketNum(-1)
+ #endif
+@@ -42,15 +49,135 @@
+   FD_ZERO(&fWriteSet);
+   FD_ZERO(&fExceptionSet);
+
+-  if (maxSchedulerGranularity > 0) schedulerTickTask(); // ensures that we handle events frequently
++  Boolean wakeupChannelReady = setupEventTriggerWakeupChannel();
++  if (maxSchedulerGranularity > 0) {
++    schedulerTickTask(); // The caller explicitly requested periodic polling.
++  } else if (!wakeupChannelReady) {
++    // Preserve event-trigger liveness if the active wakeup channel cannot be
++    // installed.  This is a degraded fallback, not the normal path.
++    fMaxSchedulerGranularity = 10000;
++    schedulerTickTask();
++  }
+ }
+
+ BasicTaskScheduler::~BasicTaskScheduler() {
++  closeEventTriggerWakeupChannel();
+ #if defined(__WIN32__) || defined(_WIN32)
+   if (fDummySocketNum >= 0) closeSocket(fDummySocketNum);
+ #endif
+ }
+
++Boolean BasicTaskScheduler::setupEventTriggerWakeupChannel() {
++#if defined(__WIN32__) || defined(_WIN32)
++  return False;
++#else
++  int sockets[2] = {-1, -1};
++  if (socketpair(AF_UNIX, SOCK_DGRAM, 0, sockets) < 0) return False;
++
++  for (unsigned i = 0; i < 2; ++i) {
++    int statusFlags = fcntl(sockets[i], F_GETFL, 0);
++    int descriptorFlags = fcntl(sockets[i], F_GETFD, 0);
++    if (statusFlags < 0 || descriptorFlags < 0
++        || fcntl(sockets[i], F_SETFL, statusFlags|O_NONBLOCK) < 0
++        || fcntl(sockets[i], F_SETFD, descriptorFlags|FD_CLOEXEC) < 0) {
++      close(sockets[0]);
++      close(sockets[1]);
++      return False;
++    }
++  }
++
++#ifdef FD_SETSIZE
++  if (sockets[0] >= (int)FD_SETSIZE || sockets[1] >= (int)FD_SETSIZE) {
++    close(sockets[0]);
++    close(sockets[1]);
++    return False;
++  }
++#endif
++
++  fEventTriggerWakeupSockets[0] = sockets[0];
++  fEventTriggerWakeupSockets[1] = sockets[1];
++  setBackgroundHandling(fEventTriggerWakeupSockets[0], SOCKET_READABLE,
++                        eventTriggerWakeupHandler, this);
++  if (!FD_ISSET(fEventTriggerWakeupSockets[0], &fReadSet)) {
++    closeEventTriggerWakeupChannel();
++    return False;
++  }
++  return True;
++#endif
++}
++
++void BasicTaskScheduler::closeEventTriggerWakeupChannel() {
++#if !defined(__WIN32__) && !defined(_WIN32)
++  if (fEventTriggerWakeupSockets[0] >= 0) {
++    disableBackgroundHandling(fEventTriggerWakeupSockets[0]);
++    close(fEventTriggerWakeupSockets[0]);
++    fEventTriggerWakeupSockets[0] = -1;
++  }
++  if (fEventTriggerWakeupSockets[1] >= 0) {
++    close(fEventTriggerWakeupSockets[1]);
++    fEventTriggerWakeupSockets[1] = -1;
++  }
++#endif
++}
++
++void BasicTaskScheduler::eventTriggerWasSignaled() {
++#if !defined(__WIN32__) && !defined(_WIN32)
++  if (fEventTriggerWakeupSockets[1] < 0) return;
++
++  unsigned char byte = 1;
++  ssize_t result;
++  do {
++#ifdef MSG_NOSIGNAL
++    result = send(fEventTriggerWakeupSockets[1], &byte, 1,
++                  MSG_DONTWAIT|MSG_NOSIGNAL);
++#else
++    result = send(fEventTriggerWakeupSockets[1], &byte, 1, MSG_DONTWAIT);
++#endif
++  } while (result < 0 && errno == EINTR);
++
++  // EAGAIN means that the level-triggered channel remains readable.  The
++  // event loop drains it, dispatches one pending trigger, and rearms it while
++  // any enumerable pending state remains.
++  if (result < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
++    static char const message[] =
++      "BasicTaskScheduler: event-trigger wakeup channel failed\n";
++    ssize_t ignored = write(STDERR_FILENO, message, sizeof message - 1);
++    (void)ignored;
++  }
++#endif
++}
++
++void BasicTaskScheduler::eventTriggerWakeupHandler(void* clientData, int /*mask*/) {
++  ((BasicTaskScheduler*)clientData)->eventTriggerWakeupHandler();
++}
++
++void BasicTaskScheduler::eventTriggerWakeupHandler() {
++#if !defined(__WIN32__) && !defined(_WIN32)
++  unsigned char byte;
++  for (;;) {
++    ssize_t result = recv(fEventTriggerWakeupSockets[0], &byte, 1, 0);
++    if (result > 0) continue;
++    if (result < 0 && errno == EINTR) continue;
++    if (result < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) break;
++    break;
++  }
++  // Coalesce all queued notifications. SingleStep() dispatches one trigger
++  // and rearms this level-triggered channel if pending state remains.
++#endif
++}
++
++Boolean BasicTaskScheduler::eventTriggersRemainPending() const {
++  if (!fEventTriggersAreBeingUsed) return False;
++  for (unsigned i = 0; i < MAX_NUM_EVENT_TRIGGERS; ++i) {
++#ifndef NO_STD_LIB
++    if (fTriggersAwaitingHandling[i].test()) return True;
++#else
++    if (fTriggersAwaitingHandling[i]) return True;
++#endif
++  }
++  return False;
++}
++
+ void BasicTaskScheduler::schedulerTickTask(void* clientData) {
+   ((BasicTaskScheduler*)clientData)->schedulerTickTask();
+ }
+@@ -205,6 +332,10 @@
+     } while (i != fLastUsedTriggerNum);
+   }
+
++  // Keep the level-triggered wakeup invariant even if producer notifications
++  // were coalesced because the nonblocking channel was full.
++  if (eventTriggersRemainPending()) eventTriggerWasSignaled();
++
+   // Also handle any delayed event that may have come due.
+   fDelayQueue.handleAlarm();
+ }

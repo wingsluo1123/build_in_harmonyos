@@ -1,0 +1,18 @@
+package: live/2025.05.24
+homepage: "http://www.live555.com/liveMedia/"
+
+upstream_check_command: "none (upstream provides programs/examples, but no registered automatic test suite)"
+upstream_test_in_build: true
+upstream_test_command: "make -j4 (builds all 37 self-contained program targets; test count remains 0)"
+upstream_tests: []
+
+exemptions:
+  - rule: "upstream_has_no_registered_test_suite"
+    reason: "The release has no make check/test target or registered automatic cases. All 34 default testProgs and three servers are compiled (37/37 applicable targets). The separately inventoried optional GSM skeleton cannot be linked because upstream deliberately omits testGSMEncoder.cpp and requires a user-supplied createNewGSMAudioSource()."
+
+test_package_tests:
+  - file: test_package/test_live.cpp
+    description: "Installed-library HarmonyOS PC end-to-end scenario: public default and explicit tick semantics, monotonic cross-thread latency, combined and concurrent delivery, deterministically observed EAGAIN plus coalescing/rearm, and initialization-failure fallback."
+    command: "conan create . --profile:host ohos-aarch64 --profile:build ohos-aarch64 --build=live/2025.05.24"
+
+assertion_count: 8
