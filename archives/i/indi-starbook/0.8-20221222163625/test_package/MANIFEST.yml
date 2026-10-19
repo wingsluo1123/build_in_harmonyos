@@ -1,0 +1,45 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for indi-starbook.
+
+package: indi-starbook/0.8-20221222163625
+homepage: https://github.com/indilib/indi-3rdparty
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests:
+  - file: test_starbook.cpp
+    source: indi-starbook-0.8+20221222163625
+    description: >
+      Upstream official GTest suite (INDI_BUILD_UNITTESTS branch of the
+      CMakeLists — the option is commented out upstream so the test was
+      never built there; source-tree inventory: no tests/ directory, no
+      ctest registration, this single file is upstream's only test asset).
+      Two TESTs, 7 assertions: StarbookDriver.cmd_res (4: "OK"->OK,
+      "ERROR"->ERROR_UNKNOWN, "OK    "->OK, "    OK"->OK) and
+      StarbookDriver.time (3 DateTime operator<< formats).
+    command: "(built via -DINDI_BUILD_UNITTESTS=ON; vendored by test_package)"
+
+test_package_tests:
+  - file: test_package/test_starbook.cpp
+    description: >
+      Layer 1 (official caliber): compiles the vendored upstream official
+      test test_starbook.cpp + the protocol-types layer starbook_types.cpp
+      (both vendored in test_package/ — CI L0c requires test sources inside
+      test_package/; starbook_types.cpp is the post-0004 ltrim version)
+      against the real libnova/GTest dependency packages (CMakeDeps:
+      libnova::libnova + GTest::gtest) and runs the binary. Patch 0004 makes
+      CommandResponse skip leading whitespace so the upstream test's
+      documented intent ("    OK" -> OK) genuinely passes — upstream never
+      built this dead test; verified 2/2 PASSED.
+    command: "cmake configure + build; run test_starbook"
+  - file: test_package/conanfile.py
+    description: >
+      Layer 2: driver binary bin/indi_starbook_telescope presence hard
+      assert (R34/L1e: test must fail without package artifacts) +
+      best-effort --help probe; exec-restricted environments (EPERM/126)
+      only warn, presence is what is asserted.
+    command: "test -f bin/indi_starbook_telescope && indi_starbook_telescope --help"
+
+assertion_count: 7
