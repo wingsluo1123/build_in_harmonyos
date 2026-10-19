@@ -1,0 +1,27 @@
+id: E554
+draft: true
+title: Preserve compile-only targets when replaying a header-library upstream test inventory
+trigger_tool: test|clang
+phase: testing
+severity: 2
+category: testing, autotools, build-system
+match_keywords: header-only, check_PROGRAMS, TESTS, conditional inventory, compile-only, generated configure missing, source mapping
+error_signature: Upstream test/build inventory mismatch|Unknown upstream condition
+root_cause: A source-tag header-library archive may omit bootstrap output, while its original Automake inputs define both compile-only check_PROGRAMS and a smaller runtime TESTS set. Treating the sets as equal either drops compile-only coverage or inflates the runtime denominator.
+affected_scope: Header-only C++ libraries with unchanged upstream test sources and explicit conditional Automake inventories but no generated configure/Makefile.in in the source tag.
+verification_cmd: Evaluate original known feature conditions from the selected compiler standard/package configuration; fail on unknown conditions, require TESTS to be a unique subset of check_PROGRAMS, compile every enabled program, run each registered runtime entry and bind source/binary/log hashes.
+rec_priority: 1
+rec_approach: separate-compile-coverage-from-runtime-test-count
+rec_description: Keep both original sets and their source mappings. Run only the actual TESTS entries but build the full check_PROGRAMS set; do not remove targets or count compile-only programs/inner assertions as runtime cases. Declare optional dependency/standard configurations honestly and reject unsupported inventory syntax rather than guessing.
+rec_command: Require unique TESTS IDs and TESTS subset-of check_PROGRAMS; retain a runtime_registered flag per compiled target.
+rec_auto_fix: false
+rec_impl: upstream-inventory-runner
+forbid_1_pattern: check_PROGRAMS.*equal.*TESTS|compile.only.*runtime.PASS
+forbid_1_reason: Build-only tests and runtime tests are distinct upstream contracts.
+forbid_1_consequence: A replay can silently omit compile coverage or misreport the N/N denominator.
+doc_file: knowledge/drafts/E554-draft-AS38.md
+last_updated: 2026-10-15
+source_event: Native standalone Asio 1.38.2 C++17 has 353 enabled check_PROGRAMS but 347 runtime TESTS, including 6 build-only unit targets. All 353 compiled and 347 executed successfully, then installed consumers passed 2/2; log SHA256 39a6b34ac9664f4f064825ad55f633ab5dd5b267b1adc89822c3c28dad226a33.
+authors: 2501_91199785; team 诶，云朵
+source_pr:
+source_commit:
