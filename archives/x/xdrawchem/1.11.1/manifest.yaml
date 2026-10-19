@@ -1,0 +1,83 @@
+# 版本级 manifest — xdrawchem 1.11.1
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "1.11.1"
+software: "xdrawchem"
+status: built
+build_date: "2026-10-16"
+build_system: qmake
+
+source:
+  url: "https://gitlab.com/yamanq/xdrawchem/-/archive/v1.11.1/xdrawchem-v1.11.1.tar.gz"
+  sha256: "4e90e37e713dbd45f53c545c4adedb41154bb6881515c850c1af9c7979f8224b"
+  tar_format: tar.gz
+
+build:
+  system: qmake
+  # qmake 命令行（in-source build；上游 .pro 只支持 in-source）
+  configure_options:
+    - "-spec linux-clang"
+    - "-qtconf <fixed qt.conf>（Prefix/HostPrefix=真实 package 目录）"
+    - "CONFIG+=release（补丁已移除上游硬编码 CONFIG += debug）"
+    - "PREFIX=<package_folder>（使上游 INSTALLS 直接安装到位）"
+    - "QMAKE_STRIP=true（上游 install_target 会 strip；OHOS 加载器拒绝 stripped ELF）"
+    - "QMAKE_RCC/QMAKE_MOC/QMAKE_UIC=<pkg>/bin/{rcc,moc,uic}"
+    - "make -j1（HMDFS 无 mkfifo，jobserver 不可用）"
+  dependencies:
+    required:
+      - "qt5-qtbase/5.15.2.2 (published；带 Qt5Widgets，override 统一 qt5-qtsvg 的精确引用)"
+      - "qt5-qtsvg/5.15.2 (published；QT += svg)"
+      - "openbabel/3.2.1 (published；PKGCONFIG += openbabel-3)"
+    transitive:
+      - "zlib/1.3.1 (published)"
+      - "dbus/1.14.10 (published)"
+      - "expat/2.8.2 (published)"
+      - "libxml2/2.15.3.1 (published)"
+      - "eigen/3.4.1 (published)"
+      - "rapidjson/1.1.0 (published)"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-xdrawchem.pro.patch"
+  - "0002-xdrawchem-http.cpp.patch"
+
+knowledge_gained:
+  - "xdrawchem 1.11.1 的上游是 gitlab.com/yamanq/xdrawchem（tag v1.11.1）：GitHub 镜像 bryanherger/xdrawchem 只有 1.10.2-1 与 v2.0rc*，SourceForge 只到 1.10.2-1 / v2.0，Ubuntu/Debian 的 1:1.11.1 即取自该 GitLab（debian/copyright 的 Source: 与 debian/watch searchmode=plain 双重佐证）——按包名在 GitHub 找版本会误判'上游无此版本'"
+  - "qt5-qtbase/5.15.2.2 与 qt5-qtsvg/5.15.2 包内 mkspecs/{modules,modules-inst}/*.pri 与 bin/qt.conf 均记录**构建期** conan 私有前缀（.../p/b/<hash>/b）：qmake 解析 QT += core gui xml network widgets printsupport 全部落到 Unknown module(s)，并伴随 48 条 Cannot read <stale>/mkspecs/modules-inst/qt_lib_*.pri；修法=把两个包的 .pri 复制到构建目录、正则整体改写前缀为真实 package 目录并经 QMAKEMODULES 暴露（QMAKEMODULES 优先），再以修正 qt.conf + -qtconf + 命令行 QMAKE_RCC/MOC/UIC 兜底（qconf 2.5 先例）"
+  - "Qt 5.15 的 qlogging.h 只前置声明 QDebug（头注释：In order to use the qDebug() stream, you must #include<QDebug>）：源文件用 qDebug() << … 却未包含 <QDebug> 且不经其他 Qt 头间接引入时，clang 15 报 calling 'debug' with incomplete return type 'QDebug' + use of overloaded operator '<<' is ambiguous（与 QColor/QMatrix/QVariant 的 operator<< 候选冲突），编译中断；老工程（xdrawchem 2011-2020 代码）依赖历史 Qt 的隐式传递包含，属 Qt 5.15 收紧头依赖后的常见可移植性缺口（草稿 xdrawchem-1.11.1-qdebug-incomplete-type-qt515）"
+  - "上游 .pro 无条件 CONFIG += debug（并 QMAKE_CXXFLAGS_DEBUG += -O0 -g3）时，qmake 命令行 CONFIG-=debug **无法覆盖**（.pro 在命令行赋值之后求值，实测 CXXFLAGS 仍为 -pipe -g -O0 -g3 且产物 12MB），必须改工程文件"
+  - "openbabel 包内 lib/pkgconfig/openbabel-3.pc 的 prefix/libdir 指向构建期目录：PKGCONFIG += openbabel-3 探测失败；用 Conan PkgConfigDeps 重新生成（set_property pkg_config_name=openbabel-3）并自行把 generators 目录注入 PKG_CONFIG_PATH（PkgConfigDeps 不注入）"
+  - "Qt5 qmake 应用的 mixin 优先级：QMAKEMODULES 目录的 .pri 优先于 Qt 安装 mkspecs/modules 内的同名条目，因此'复制+改写+QMAKEMODULES'可以在不改动 conan 缓存包的前提下修复失效的模块描述"
+  - "OHOS 加载器拒绝 stripped ELF：execve 返回 'Operation not permitted'（EPERM，不是权限位问题）。上游 qmake 工程的 install_target 规则带 `-$(STRIP) <安装后的二进制>`，Makefile 里 STRIP=strip → 经 make install 打包的二进制被 strip 后完全无法执行；而环境变量 QMAKE_STRIP 与 `make QMAKE_STRIP=` 均无效（Makefile 变量名是 STRIP，qmake 期已定值），必须在 qmake 命令行传 QMAKE_STRIP=true 才能把 STRIP 写成 true（实测）。判定证据：同一份未 strip 二进制可正常进入动态加载器（报缺 .so 而非 EPERM），strip 后立即 EPERM"
+
+validation:
+  conan_create: pass
+  conan_verify: pass
+  test_package: "5/5 PASS"
+  upstream_tests: "上游无自动化测试（find -iname '*test*' 0 命中；无 tests/、无 check/test 目标、无 ctest/pytest/meson 注册）"
+  l2_smoke: "CI/W3 的 L2 直跑为 skip（non-blocking：L2 不注入 conanrun 的 LD_LIBRARY_PATH，缺 libopenbabel/libQt5Svg 等）；等价断言由 test_package TC-01 在 conanrun 环境下实跑通过：xdrawchem --version exit=0，输出 XDrawChem 1.11.0"
+
+failure_reason: null
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/xdrawchem-1.11.1.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/xdrawchem-1.11.1.work
+  source_orig_hash: e6ac4718110113bd
+  source_work_hash: bcb563796db4d8e1
+  generated_at: '2026-10-16T21:03:19'
+  patches_count: 2
+
+patch_classification:
+  # refresh-patch --auto 写入的是占位值（type: auto / guard: pending），此处按实际语义补全：
+  # 两个补丁都不含平台宏、不是平台专属守卫，仅为可移植性修复（与 conandata.yml 的
+  # patch_type: portability 一致）。
+  - file: 0001-xdrawchem.pro.patch
+    type: portability
+    platform_only: False
+    guard: 'none'
+  - file: 0002-xdrawchem-http.cpp.patch
+    type: portability
+    platform_only: False
+    guard: 'none'
