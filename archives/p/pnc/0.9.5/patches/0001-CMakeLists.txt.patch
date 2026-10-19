@@ -1,0 +1,56 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,11 +1,25 @@
+ cmake_minimum_required(VERSION 3.10)
+ project("pnc" VERSION 0.9.5 LANGUAGES C CXX)
+ 
+-find_library(LIBPHONENUMBER phonenumber PATHS /usr/local/lib REQUIRED)
+-find_library(LIBGEOCODING geocoding PATHS /usr/local/lib REQUIRED)
+-find_library(LIBICUUC icuuc PATHS /usr/local/lib REQUIRED)
+-
+-include_directories(BEFORE SYSTEM /usr/local/include)
++# Conan 生成的 pkg-config 元数据由构建环境（PKG_CONFIG_PATH）提供。
++# 选择 pkg-config 而非 find_package：libphonenumber 的静态依赖链
++# (protobuf/abseil-cpp/icu4c) 只在 .pc 中表达完整——protobuf 包刻意不提供
++# CMake 配置（cmake_find_mode=none），find_package 会在 find_dependency 处断链。
++find_package(PkgConfig QUIET)
++if(PkgConfig_FOUND)
++	pkg_check_modules(PNC_PHONENUMBER IMPORTED_TARGET libphonenumber)
++endif()
++
++# 回退到上游的 /usr/local 查找，保持非 Conan 构建方式可用。
++if(PNC_PHONENUMBER_FOUND)
++	set(PNC_PHONENUMBER_LIBS PkgConfig::PNC_PHONENUMBER)
++else()
++	find_library(LIBPHONENUMBER phonenumber PATHS /usr/local/lib REQUIRED)
++	find_library(LIBGEOCODING geocoding PATHS /usr/local/lib REQUIRED)
++	find_library(LIBICUUC icuuc PATHS /usr/local/lib REQUIRED)
++	include_directories(BEFORE SYSTEM /usr/local/include)
++	set(PNC_PHONENUMBER_LIBS ${LIBICUUC} ${LIBPHONENUMBER} ${LIBGEOCODING})
++endif()
+ 
+ add_compile_definitions(VERSION=\"${PROJECT_VERSION}\")
+ 
+@@ -14,7 +28,7 @@
+ )
+ 
+ target_link_libraries(pnc
+-	${LIBICUUC} ${LIBPHONENUMBER} ${LIBGEOCODING}
++	${PNC_PHONENUMBER_LIBS}
+ )
+ 
+ enable_testing()
+@@ -35,6 +49,13 @@
+ )
+ 
+ include(CheckIncludeFiles)
++# gawkapi.h 来自 pkg-config 的 gawk 模块，探针需要显式带上其 include 目录。
++if(PkgConfig_FOUND)
++	pkg_check_modules(PNC_GAWK IMPORTED_TARGET gawk)
++endif()
++if(PNC_GAWK_FOUND)
++	set(CMAKE_REQUIRED_INCLUDES ${CMAKE_REQUIRED_INCLUDES} ${PNC_GAWK_INCLUDE_DIRS})
++endif()
+ check_include_files(
+ 	"stdio.h;errno.h;stdio.h;stddef.h;string.h;stdlib.h;sys/types.h;sys/stat.h;gawkapi.h"
+ 	HAVE_GAWK_H
