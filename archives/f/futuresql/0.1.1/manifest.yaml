@@ -1,0 +1,36 @@
+software: futuresql
+version: "0.1.1"
+status: built
+build_system: cmake
+created_at: 2026-10-18
+build_date: 2026-10-18
+dependencies:
+  required:
+    - qtbase-sql-dbus/6.11.1
+  build:
+    - ecm/6.26.0
+    - qcoro/0.13.0
+patches_applied: []
+test_results:
+  type: passed
+  upstream: "passed: 2/2 upstream QTest slots (tests/sqlitetest.cpp: testDeserialization and testMigration; registered as 1 CTest case, 1/1 passed) with BUILD_TESTING=ON inside conan create; the case bodies run as QCoro::Task coroutines on an in-memory SQLite database"
+  test_package: "passed: 8/8 consumer checks (DatabaseType::SQLite -> QSQLITE driver, QSqlDatabase::isOpen via runOnThread, CREATE TABLE verified via sqlite_master, INSERT verified via SELECT count(*), getResults<Row>/getResult<Row> deserialization) over the packaged libfuturesql6 and the packaged QSQLITE driver plugin"
+  package_id: "fe643a6a365d349533fe6eecb9772405e9423933"
+  package_id_evidence: "conan create log 2026-10-18: \"Package 'fe643a6a365d349533fe6eecb9772405e9423933' created\"; Full package reference futuresql/0.1.1@ohpcd/stable#971338c46d8124fccda057a781df9b5e:fe643a6a365d349533fe6eecb9772405e9423933#22b0001bbb93903ee4e737d860a4c013"
+  ohos_run: "conan create on device 2026-10-18, rc=0, symlink probe: unsupported, sqlitetest 1/1 passed, test_package 8/8 passed"
+  l0: "pass"
+  l1: "pass"
+  l2: "skip: no bin/ dir (library package)"
+  l4: "skip: conan-verify reports no cache path; manually verified on device -- DT_NEEDED = libQt6Sql.so.6, libQt6Core.so.6, libc++_shared.so, libc.so"
+  l5: "skip: conan-verify reports no cache path; manually verified on device -- DT_SONAME = libfuturesql6.so; FutureSQLTargets-release.cmake has IMPORTED_SONAME_RELEASE and no IMPORTED_NO_SONAME"
+source_url: https://download.kde.org/stable/futuresql/futuresql-0.1.1.tar.xz
+source_sha256: e44ed8d5a9618b3ca7ba2983ed9c5f7572e6e0a5b199f94868834b71ccbebd43
+knowledge_gained:
+  - "futuresql 0.1.1 is archived upstream: download.kde.org/stable/futuresql redirects to the KDE Attic. The Attic mirrors (ftp.gwdg.de, mirrors.nju.edu.cn, mirrors.ustc.edu.cn) plus the official download.kde.org URL are listed in conandata.yml; the tarball sha256 e44ed8d5…cbcbebd43 was verified byte-for-byte from the official tarball."
+  - "futuresql links Qt6 Core + Sql. Only qtbase-sql-dbus/6.11.1 (FEATURE_sql=ON, dbus/1.14.10, QSQLITE driver plugin) provides Qt6Sql on OHOS; the baseline qtbase is built with FEATURE_sql=OFF and must not shadow it in CMAKE_PREFIX_PATH/LD_LIBRARY_PATH."
+  - "Upstream autotests need QCoro6::Core only at test time (QCoro::Task coroutine test bodies). Declaring it with test_requires keeps qcoro and its baseline qtbase out of the consumers' dependency graph."
+  - "The upstream top-level CMakeLists calls qcoro_enable_coroutines(), which is defined in the real QCoro6Coro/QCoroMacros.cmake. The CMakeDeps-generated QCoro6Config.cmake only declares Conan component targets and lacks the macro, so find_package(QCoro6) must resolve the real package config: prepend <qcoro>/lib/cmake ahead of the generators folder (QCoro6Config -> QCoro6CoreConfig -> find_dependency(QCoro6Coro) -> QCoroMacros.cmake)."
+  - "HMDFS on the device refuses symlink(2) with EACCES (Permission denied; EPERM/ENOSYS/EOPNOTSUPP are the other refusals handled). CMake's VERSION/SOVERSION symlink chain (libfuturesql6.so -> libfuturesql6.so.0) aborts the link step. A runtime capability probe in generate() sets CMAKE_PLATFORM_NO_VERSIONED_SONAME=ON when symlinks are unavailable, keeping the injected -Wl,-soname, flag so the installed libfuturesql6.so still carries DT_SONAME (DRAFT-7341 libtiff precedent). On hosts where symlinks work the upstream versioned layout is preserved."
+  - "CMake has no Platform/HarmonyOS module: CMAKE_SHARED_LIBRARY_SONAME_{C,CXX}_FLAG must be injected in generate() or the shared library ships without DT_SONAME (CI L5a) and exported targets get IMPORTED_NO_SONAME TRUE (L5c)."
+  - "ECM_MODULE_PATH must be set manually: ecm is a build-context tool_requires, so CMakeDeps generates no ECMConfig.cmake; the real ECMConfig.cmake is located through CMAKE_PREFIX_PATH."
+  - "ECM's KDEInstallDirs6 runs Qt6::qtpaths at configure time, so the qtbase-sql-dbus bin/ and lib/ directories must be on PATH/LD_LIBRARY_PATH during cmake configure."

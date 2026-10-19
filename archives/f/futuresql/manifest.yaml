@@ -1,0 +1,25 @@
+software: futuresql
+display: "FutureSQL"
+description: "Non-blocking SQL database framework for Qt 6 (runs queries on a dedicated database thread and exposes the results through QFuture)"
+category: library
+homepage: "https://invent.kde.org/libraries/futuresql"
+license: LGPL-2.1-only OR LGPL-3.0-only OR LicenseRef-KDE-Accepted-LGPL
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "Requires Qt6Sql: use qtbase-sql-dbus (FEATURE_sql=ON, QSQLITE driver plugin); the baseline qtbase has FEATURE_sql=OFF"
+    - "CMAKE_SHARED_LIBRARY_SONAME_{C,CXX}_FLAG injected: CMake has no Platform/HarmonyOS module"
+    - "HMDFS refuses symlink(2): a runtime probe sets CMAKE_PLATFORM_NO_VERSIONED_SONAME=ON, keeping DT_SONAME on the unversioned libfuturesql6.so"
+    - "qcoro/0.13.0 is a test_require for the upstream QCoro coroutine tests; its real QCoro6 config (with QCoroMacros.cmake) must win over the CMakeDeps-generated one"
+    - "ECM_MODULE_PATH set manually and conan_cmakedeps_paths.cmake written by the recipe (ecm is a tool_require; qtbase uses cmake_find_mode=none)"
+  common_dependencies:
+    - qtbase-sql-dbus
+    - ecm
+    - qcoro
+
+versions:
+  "0.1.1":
+    status: built
+    build_date: "2026-10-18"
+    conan_ref: "futuresql/0.1.1"
