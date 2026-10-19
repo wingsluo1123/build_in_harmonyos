@@ -1,0 +1,58 @@
+#====================================================================
+# DRAFT-launchpad-dist-only-version-obs-pristine-intltool-deadlock-direct-drive.kv
+# 对应的人类文档: knowledge/drafts/DRAFT-launchpad-dist-only-version-obs-pristine-intltool-deadlock-direct-drive.md
+#====================================================================
+
+# ═══ Layer 0: 场景面 ═══
+id:                     E3505
+trigger_tool: conan|configure|make|pkg-config
+phase: source|configuration|build
+error_signature: intltool-update not found|perl not found|GNU gettext tools not found|Your intltool is too old|config.sub.*Invalid configuration|g_quark_from_static_string.*expected|GETTEXT_PACKAGE.*#error
+
+# ═══ Layer 1: 识别层 ═══
+severity:               2
+category:               portability, build-system, autotools, conan, intltool
+match_keywords: Launchpad, 16.04.0, Ubuntu daily, OBS, openSUSE Factory, pristine tarball, Source0, intltool, IT_PROG_INTLTOOL, gi18n-lib.h, G_LOG_DOMAIN, 直驱编译, direct-drive, soname, version-info
+title: Launchpad 时代版本的全网溯源锚 + intltool 死锁包的直驱编译(中型多 TU GLib 库)
+
+# ═══ Layer 2: 诊断层 ═══
+root_cause: (1) bzr/daily 时代的 Launchpad 项目不建产品 release,裸版本号的 pristine tarball 只活在未重打包的发行源码包里(openSUSE Factory spec 的 Source0 钉原始 URL 即为字节级未重打包证明),而 launchpad /+download/ 端点已死、发行池只有 daily 版;(2) 该年代 release configure 的 IT_PROG_INTLTOOL 展开含七处独立致命检查(perl/intltool 三脚本/gettext/automake/版本 grep),Makefile.am 裸 PATH 调 glib-genmarshal/xsltproc,config.sub 不识 ohos——CI worker 无法走上游构建。
+affected_scope: Launchpad/Ubuntu YY.MM 风格版本号的 GLib 栈库(libdbusmenu/libindicator/libappindicator 系列);一切 configure 硬依赖 intltool/gnome-common 的 2010-2016 autotools 包;生成物已随包分发、源码零平台系统头的多 TU 中型库。
+verification_cmd: WSL glibc 预验证(11/11 TU+链接+冒烟 5/5)后 conan create archives/l/libdbusmenu-glib/16.04.0 -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 --build=missing
+
+# ═══ Layer 3: 方案层 ═══
+rec_priority: 1
+rec_approach: obs-pristine-tarball-anchor-plus-direct-drive-compile
+rec_description: (1) 版本锚=OBS 公共源 API 直链 + sha256,notes 写全证据链;(2) build() 内嵌 TU 白名单直驱编译,PkgConfigDeps+pkg-config 取依赖 flags,自行落 libtool 版本化 SONAME(-version-info C:R:A → soname .so.(C-A)、file .so.(C-A).A.R),pc/include 按上游 pc.in 镜像;(3) 编译 flags 必带 -DGETTEXT_PACKAGE 与 -DG_LOG_DOMAIN;(4) musl 按 json-glib 先例给 glib .pc 补 -lintl;(5) test_package 真实消费者 find_package 链接做对象级断言。
+rec_command: conan create archives/l/libdbusmenu-glib/16.04.0 -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 --build=missing
+rec_auto_fix: false
+rec_impl:
+
+# ★ 禁止策略 ★
+forbid_1_pattern: stub.*(intltool|perl|xgettext|msgfmt)|fake.*version
+forbid_1_reason: IT_PROG_INTLTOOL 七处版本 grep 各自解析输出,伪造输出脆且不可审计
+forbid_1_consequence: 任何一处 grep 变体即炸,评审无法追溯
+forbid_2_pattern: patch.*configure|host=aarch64.*ohos
+forbid_2_reason: 万行生成 configure 的 neutralize 补丁漂移面大;2016 config.sub 拒绝 ohos 三元组
+forbid_2_consequence: 大补丁难评审;configure 在 --host 阶段直接 fatal
+
+# ═══ Layer 4: 原则引用 ═══
+principles:
+
+# ═══ 关系图 ═══
+# ═══ 元数据 ═══
+doc_file:               knowledge/drafts/DRAFT-launchpad-dist-only-version-obs-pristine-intltool-deadlock-direct-drive.md
+last_updated: 2026-10-02
+source_event:           libdbusmenu-glib 16.04.0 适配(task libdbusmenu-glib/16.04.0,10 火种积分赛)
+
+# ═══ 知识协作 ═══
+authors: 2301_80739235 <2047361658@qq.com>
+source_pr:
+source_commit:
+
+# ═══ 质量度量 ═══
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+rec_impl:               manual

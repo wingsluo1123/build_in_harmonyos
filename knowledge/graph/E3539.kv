@@ -1,0 +1,51 @@
+#====================================================================
+# Draft: eckit 2.0.7.1 on OHOS aarch64 -- per-case test_skipped for
+#        platform-limited ctest cases, injected at the official
+#        CMake/CTest point under conan's cmake.test()
+# 写法说明：本仓 scripts/ohc/draft_review.py 用 _parse_simple_fields 逐行取
+#           "key: value"，块标量（>-）会被读成字面 ">-" 而使质量预检查空，
+#           故全部值写成单行明文标量（值内不得出现 ASCII 的冒号+空格）。
+#====================================================================
+
+id:                     E3539
+trigger_tool:           conan|cmake|ctest|make
+phase:                  test
+error_signature:        no closing quote|Error 2|Tests failed.*out of [0-9]+|Total Tests[:][ ]205|SIGSYS|SYS_SECCOMP|The following tests FAILED
+
+severity:               2
+category:               platform, ohos, packaging-contract, test-gate
+match_keywords:         ctest, exclude-regex, test_skipped, build_tool_args, cmake.test, ARGS, anchored regex, Unix Makefiles, Makefile test rule, denominator, rule4 少报, SYS_SECCOMP, HMDFS 文件模式, WILL_FAIL, signed char
+
+title:                  平台受限的上游 ctest 用例要在 conan cmake.test() 内逐项豁免——注入点是生成器相关的 Makefile test 规则 ARGS，正则必须锚定全名，并用零执行 --show-only 与单跑复现双向自证"没删用例、也没让判据空转"
+
+root_cause:             配方按 §10 硬门把上游测试接进 build()（cmake.build() 后 cmake.test()），个别用例在本设备属平台机制受限（SysV IPC 被 seccomp 击杀 si_code=1/SYS_SECCOMP 且 si_syscall=190=semget、HMDFS 默认文件模式 660、musl unlink 失败不填 errno、上游 WILL_FAIL 契约在非 x86 反转、AArch64 默认 char 无符号）。这些用例失败会让 cmake.test() 以 Error 2 终止整条 conan create，包永远产不出来；而"整条跳过测试"或"删用例"又同时违反 §10 与 rule4 少报。唯一可审计的路径是在 CTest 的执行集合上逐条豁免、其余用例仍在同一道门内真跑。本树生成器是 Unix Makefiles，其 test 目标规则原文为 ctest $(ARGS)，故官方注入点是 conan 的 cmake.test(build_tool_args=[...])——它把 ARGS=<ctest 参数> 作为 make 的变量覆盖传进去。conan 的 cmd_args_to_string 对含空格 token 用单引号原样包裹，而本设备 /bin/sh 不是 GNU bash，make 再展开时直接报 no closing quote，必须改用双引号并用 make 的字面转义双美元号把锚点美元符送到 ctest。最后，-E 的正则一旦不写首尾锚点，并列的或运算会连带吞掉同族兄弟（实测 216 掉到 205，误排 11 项），分母被静默缩小而日志仍显示 100% 通过——这正是 rule4 少报的真实成因之一。
+
+affected_scope:         任何在 conan 配方里用 cmake.test()（或 cmake.build(target="test")）执行上游 CTest 套件、且存在少量平台机制受限用例的包；OHOS/musl 上成批出现同类问题（SysV IPC、/proc 读取、HMDFS 文件模式、musl errno 语义、char 符号性、上游 WILL_FAIL 契约）。不适用——测试整体 0 执行（0 执行不可交付）、失败由本次适配或补丁引入、需要改上游断言才能通过、上游根本没有自动化测试（应按 §10 另设真实 API/行为测试并如实写 0）。
+
+verification_cmd:       零执行预验（不跑用例、不占构建槽、不新建 create）—— cmake --build <build>/Release --target test -- 'ARGS=--show-only -E "^eckit_test_(container_sharedmemarray|filesystem_filemode|log|maths_floating_point_exceptions|safe_casts)$"' 应得 Total Tests[:][ ]211 且五条点名均不在列表、同族兄弟全部保留；去掉末尾锚点应得 205（反例，证明锚定必要）；判据不空转反证—— ctest -R "^eckit_test_container_sharedmemarray$" 复现 SIGSYS 且 rc=8
+
+rec_priority:           1
+rec_approach:           conan-cmake-test-args-anchored-exclusion-with-zero-exec-selfproof
+
+rec_description:        (1) 先全量真跑一次不改判据的 create，把每条失败的稳定签名与一手技术原因逐条落到 notes.md（本案 create#5/#6 两次独立读数 93.01s 与 91.07s，均为 216 执行 / 211 通过 / 5 失败），这既是"平台受限"的凭据也是豁免清单的来源；(2) 确认注入点——读生成器 test 目标的规则原文（Unix Makefiles 为 ctest $(ARGS)），据此用 cmake.test(build_tool_args=[ARGS=--output-on-failure -E 锚定正则])，不要自写 cmake --build 拼串，更不要用 ignore_errors=True 把整道门软化（那会让后续新增失败一起过关）；(3) 引号按设备壳选——单引号形态在本设备失败（no closing quote / Error 2），双引号加 make 的双美元号转义才是可行写法，落配方前先做零执行预验；(4) 正则必须锚定全名，并用 --show-only 的 Total Tests 读数与保留的同族兄弟清单自证只排掉了这 N 项；(5) 保留"不删用例"的证据——被豁免项在构建日志里仍应出现 Built target；(6) 账本对齐——用 ctest 自己的 Label Time Summary 反查（静态 executable 数减逐项豁免数应等于本次 executable 计数，加 script 计数等于本次执行总数），并与 notes/manifest/正文四处同源；(7) 交付口径把"执行 N / 通过 N / 注册 M / 逐项 test_skipped K"三档分开写，不得把本次执行写成注册数。
+
+rec_command:            cmake.test(build_tool_args=['ARGS=--output-on-failure -E "^eckit_test_(container_sharedmemarray|filesystem_filemode|log|maths_floating_point_exceptions|safe_casts)$$"'])
+
+rec_auto_fix:           false
+
+fallback_2_command:     补回首尾锚点，逐名列出被保留的同族兄弟（本案 log_channels/callback/threads/colour/json/tcp 与 maths_floating_point_exception_FE_*）后再进 create
+
+conflicts_with:
+caused_by:
+
+prescan_pattern:        cmake\.test\(|--target test|ctest \$\(ARGS\)|no closing quote|ignore_errors=True
+prescan_globs:          archives/*/*/*/conanfile.py
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+# PR 交付后回填（与仓内绝大多数草稿同阶段做法一致）
+source_pr:
+source_commit:
+rec_impl:               manual
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E3539.md

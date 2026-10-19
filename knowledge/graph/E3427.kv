@@ -1,0 +1,79 @@
+#====================================================================
+# DRAFT-13369-autotools-snapshot-without-configure-direct-clang-build
+# 上游只有 configure.ac/Makefile.am（无 configure），而 OHOS 主机没有
+# automake/aclocal/libtoolize → autoreconf 直接失败；上游又无 release tarball。
+# 这类"autotools 快照"库需要配方内直编（clang 直连）复现 autotools 产物。
+# 触发事件: libosmo-cc 0.0-git20240818.7864594 适配（archives/l/libosmo-cc）
+#====================================================================
+
+id:                     E3427
+trigger_tool:           autotools|autoreconf|aclocal|clang|conan
+phase:                  build|source
+error_signature:        Can't exec \"aclocal\"|
+                        autoreconf: error: aclocal failed|
+                        BadZipFile: File is not a zip file|
+                        incomplete type 'struct timeval'|
+                        undefined reference due to --no-allow-shlib-undefined
+severity:               2
+category:               musl, autotools, direct-build, missing-tools
+                        pkg-config, shared-library, portability
+match_keywords:         configure.ac, Makefile.am, 没有 configure, autoreconf, aclocal,
+        automake, libtoolize, Can't exec aclocal, 快照, snapshot.debian.org,
+        tar.xz, BadZipFile, filename=, -include sys/time.h, struct timeval,
+        --no-undefined, -no-undefined, libosmocore, libs 缺主体库, pkg-config, soname
+
+title:                  上游只有 configure.ac/Makefile.am 且 OHOS 无 automake/aclocal 时：
+                        配方内用 clang 直编复现 autotools 产物（.so + 头 + .pc），
+                        并处理 snapshot URL、musl 头包含与依赖包缺主体库
+
+root_cause: autotools bootstrap requires aclocal/automake/libtoolize; this snapshot has neither configure nor a release tarball, and the simple source set instead needs a direct clang build that reproduces libtool artifacts.
+affected_scope: >
+  所有"只有 configure.ac/Makefile.am 的 Debian 快照"类包（Autotools 原生项目），
+  尤其在没有 automake/aclocal 的构建机（OHOS）上；以及任何直编/手工链接需要复现
+  libtool 产物（soname、符号链接、.pc、-no-undefined）的场景。
+
+verification_cmd: >
+  autoreconf -fi                          # 预期失败: Can't exec aclocal
+  conan list "libtool/2.4.7" -r=ohpcd     # 预期为空: libtoolize 不可用
+  conan create archives/l/libosmo-cc/<ver> -pr:h/-pr:b=ci/conan/profiles/ohos-aarch64
+  llvm-nm -D --defined-only <pkg>/lib/libosmocc.so.2.0.0 | head
+  LD_LIBRARY_PATH=<pkg>/lib:<core>/lib <test_package>/test_cc
+
+rec_priority:           1
+rec_approach:           recipe-side-direct-clang-build-reproducing-autotools-artifacts
+rec_description: >
+  ```python
+  # source(): snapshot 内容地址必须给 filename
+  get(self, **self.conan_data["sources"], filename="libosmo-cc.tar.xz", strip_root=True)
+  # build(): 从依赖图收集 include/lib（含传递依赖），显式补主体库
+  incs, libdirs, libs = ..., (libosmocore + talloc + mnl + pcsclite + usb-1.0)
+  libs.append("osmocore")          # cpp_info.libs 不含主体库
+  clang -shared -fPIC -O2 -include sys/time.h -I<src>/include -I<deps> \
+        src/*.c -Wl,-soname,libosmocc.so.2 -Wl,--no-undefined \
+        -L<deps> -losmocore -ltalloc ... -o libosmocc.so.2.0.0
+  # package(): .so.2/.so 符号链接（失败回退复制）+ 按上游 .pc.in 生成 libosmocc.pc
+  ```
+  直编只适用于"源码简单、无 config.h/生成头"的库；有 configure 逻辑（特性探测/生成头）的
+  仍应优先找带 configure 的 release tarball。
+rec_command: >
+  conan create archives/l/libosmo-cc/0.0-git20240818.7864594 -pr:h/-pr:b=ci/conan/profiles/ohos-aarch64
+rec_auto_fix:           false
+rec_impl:               recipe
+
+fallback_priority:      2
+fallback_approach:      bootstrap-on-linux-vendor-generated-files
+fallback_description: >
+  在带 automake 的 Linux 机器上 autoreconf，把生成的 configure/Makefile.in 作为补丁带进配方。
+  缺点：生成物上百 KB 文本、补丁臃肿；打成压缩包又违反"制品目录不放二进制归档"的闸。
+fallback_command:       autoreconf -fi && git diff --no-index ...
+fallback_auto_fix:      false
+fallback_impl:          patch
+
+forbid_1_pattern:       直编时不加 -Wl,--no-undefined 就交付 .so
+forbid_1_reason:        共享库允许未定义符号，构建"成功"但消费者链接/加载才失败
+forbid_1_consequence:   制品带隐性缺陷，CI 的消费者阶段才炸，排查成本高
+
+principles:             P004
+doc_file:               knowledge/drafts/DRAFT-13369-autotools-snapshot-without-configure-direct-clang-build.md
+last_updated:           2026-10-17
+authors:                Lee-BX

@@ -1,0 +1,47 @@
+# ═══ Draft knowledge entry — conan 制品仓的构建期 ELF 工具在 OHOS 构建机上双向不可执行 ⇒ 从上游源码静态重建 ═══
+# Timestamp: 2026-10-16
+# Software: gammastep 2.0.9（消费方）；被测工具 = ohpcd 制品仓 wayland/1.24.0 的 bin/wayland-scanner
+# Gate: 真机一手复现（OHOS aarch64 / clang 15.0.4 / nproc=8）
+# Status: 新建（B=create；机制族已有 DRAFT-ohos-static-tool-bypass-dlopen-limit，但那条只记 dlopen 一种签名；
+#         本条的增量 = ①「未签名 ⇒ 执行 EPERM」这一段 ②根因「NEEDED 写死构建机 Conan 缓存绝对路径」③
+#         autotools 消费方的 .pc 接法（PKG_CHECK_VAR 变量顶到 PKG_CONFIG_PATH））
+# Issue: 见同 PR 正文「知识库扩展 Issue」行
+# 用法：通用机制条目（谁真撞上谁取名即用）；本包细节见 archives/g/gammastep/2.0.9/notes.md。
+# 硬规则：每个字段顶格 + 同行单物理行 + 带引号标量，禁用 |-/> 块标量与缩进续行。
+
+id:                     E3408
+title: "conan 制品仓提供的构建期 ELF 工具在 OHOS 构建机上双向不可执行：①未签名 ⇒ 执行报 EPERM（Operation not permitted，rc=126）；②binary-sign-tool sign -selfSign 1 自签后越过 EPERM，却因 NEEDED 里记录的是构建机的 Conan 缓存绝对路径（不是 soname）而 dlopen 失败、加 LD_LIBRARY_PATH 也无效 ⇒ 唯一稳定处方是从上游源码静态重建该工具，并把工具路径写进一份 .pc 顶到 PKG_CONFIG_PATH 最前"
+trigger_tool: "conan|configure|make|wayland-scanner|ld"
+phase: "configuration|build"
+error_signature: "Operation not permitted|/bin/sh: [0-9]+: .*/bin/wayland-scanner: Operation not permitted|Error loading shared library /.*conan2?/p/[^ ]*\\.so|Error relocating .*?: .*symbol not found|cannot execute binary file|wayland-scanner: not found"
+severity:               2
+category:               build-system, autotools, linking, cross-compile, conan
+match_keywords: "wayland-scanner, wayland_scanner, 构建期工具, build-time tool, 协议代码生成器, 代码生成器, EPERM, Operation not permitted, rc=126, binary-sign-tool, selfSign, codesign, NEEDED, DT_NEEDED, 绝对路径, LD_LIBRARY_PATH, dlopen, Error loading shared library, Error relocating, symbol not found, 静态重建, static link, pkg-config, PKG_CHECK_VAR, wayland-scanner.pc, conan 缓存, 制品仓工具"
+prescan_pattern: "wayland-scanner|wayland_scanner|wayland-scanner\\.pc|PKG_CHECK_VAR\\([^)]*wayland"
+prescan_globs: "**/configure.ac, **/configure.in, **/Makefile.am, **/meson.build, **/*.mk, conanfile.py"
+root_cause: "两条独立的平台约束叠加。①OHOS 对可执行 ELF 有签名闸：制品仓里由别的构建机产出的二进制没有本机认可的签名 ⇒ 内核/加载器直接 EPERM（这不是文件权限，chmod 无效、换目录无效）。②制品的 DT_NEEDED 里存的是**构建期**Conan 缓存中的依赖绝对路径（`/…/.cache/conan2/p/expat<hash>/p/lib/libexpat.so` 一类），而非 soname；该路径在本机不存在，且因为不是 soname，LD_LIBRARY_PATH/ld.so.conf 都无处插入 ⇒ 即使签了名也无法加载。两者叠加 ⇒ 该工具在本机**没有可用路径**。"
+affected_scope: "任何『由 conan 制品仓提供、又必须在构建机上执行』的工具型依赖（协议/IDL 代码生成器、代码生成器、构建辅助 CLI），其消费方为交叉编译配方时。本包实证工具是 wayland 协议族核心生成器 wayland-scanner（wayland/wayland-protocols 生态所有客户端/合成器都要它）；同族还有其它协议生成器与构建期 CLI。判别信号：configure/meson 阶段一切正常，失败点落在『生成 xxx-protocol.c』这类自定义规则上，且报的是加载器错误而不是找不到命令。"
+verification_cmd: "现场三步：printf 'int main(void){return 0;}\\n' > t.c && clang t.c -o t && ./t; echo rc=$?（对照，应 0）；<工具> --version; echo rc=$?（未签名，应 126 + Operation not permitted）；cp <工具> u && chmod +x u && binary-sign-tool sign -inFile u -outFile s -selfSign 1 && ./s --version（应报 Error loading shared library <绝对路径> / Error relocating）；再 LD_LIBRARY_PATH=<真实 libdir> ./s --version（若仍报同一绝对路径 ⇒ NEEDED 非 soname、动态不可救）；重建后：<自编译工具> --version 应正常输出，且 configure 日志里 PKG_CHECK_VAR 解析到的路径指向自编译目录。"
+rec_priority: "1"
+rec_approach: "static-rebuild-buildtime-tool-and-prepend-its-pc"
+rec_description: "在配方的 build() 里、早于 configure 之前，从上游同版本源码手工命令行静态编译该生成器（只编 scanner.c + wayland-util.c 这类真正需要的翻译单元，第三方依赖取宿主 SDK 的静态库；版本头由 *.h.in 模板手工替换），产出放到 build_folder/<tool>-bin/；同时写一份同名 .pc（写入工具变量，如 wayland_scanner=${bindir}/<tool>）到 generators_folder/fixed_pkgconfig/，并在 AutotoolsToolchain 的 env 里 prepend_path('PKG_CONFIG_PATH', 该目录)。meson 消费方（find_program(dependency('wayland-scanner').get_variable(pkgconfig:'wayland_scanner'))）同款可用（lavalauncher/2.1.1 先例）。⛔ 不要用 stub/空实现糊过去，也不要直接改制品仓包。"
+rec_command: "见 archives/g/gammastep/2.0.9/conanfile.py 的 _build_static_scanner() + _write_scanner_pc() + generate() 第 (4) 步；meson 版见 archives/l/lavalauncher/2.1.1/conanfile.py 的 _build_static_scanner()"
+rec_auto_fix:          false
+rec_impl: "conan-recipe-static-tool + pkgconfig-override"
+fallback_priority: "2"
+fallback_approach: "sign-tool-and-rewrite-needed-or-use-host-sdk-copy"
+fallback_description: "若该工具不必由制品仓提供（宿主 SDK/系统里已有一份可执行的同款工具），直接指向宿主那份最省事（本包实测宿主 /data/service/hnp/bin 下**没有** wayland-scanner，故走不通）。若必须用制品仓那份，可尝试 binary-sign-tool 自签 + 用 patchelf 把 DT_NEEDED 的绝对路径改回 soname（本包未采用：patchelf 自身也是外来二进制、同一签名闸同样适用，风险更高）。⛔ 不要靠 LD_PRELOAD 假库或 stub .so 制造『能跑』的假绿。"
+fallback_command: "which wayland-scanner || ls /data/service/hnp/bin/wayland-scanner；binary-sign-tool sign -inFile <tool> -outFile <tool>.signed -selfSign 1；patchelf --replace-needed <绝对路径> libexpat.so.1 <tool>.signed"
+fallback_auto_fix: "false"
+fallback_impl: "prebuilt-tool-signing+patchelf"
+principles:               
+doc_file: "knowledge/drafts/DRAFT-gammastep-2.0.9-wayland-scanner-exec-denied-static-rebuild.md"
+last_updated: "2026-10-16"
+source_event: "gammastep 2.0.9 适配（2026-10-16，B 机一手）：ohpcd wayland/1.24.0 的 bin/wayland-scanner → 未签名执行 EPERM(rc=126)、自签后 Error loading shared library /storage/Users/currentUser/.cache/conan2/p/expat9fb72708ad085/p/lib/libexpat.so + Error relocating XML_ParserCreate symbol not found、加 LD_LIBRARY_PATH 仍报同一绝对路径；同机 clang 现场编译二进制 rc=0 作对照。逐条读数与命令见本包 notes.md「运行期/构建期能力面与 B 证据」节"
+authors: "主理-5 <主理-5@local>"
+source_pr: "(本 PR)"
+source_commit: "(本 PR 内提交)"
+metrics_success_count: "1"
+metrics_fail_count: "0"
+metrics_confidence: "1.0"
+metrics_last_used: "2026-10-16"

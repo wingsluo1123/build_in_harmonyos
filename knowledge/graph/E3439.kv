@@ -1,0 +1,66 @@
+# ═══ Draft knowledge entry — 种子采样算法测试漂移：OHOS/musl rand 序列 ≠ glibc 参考环境 ═══
+# Timestamp: 2026-10-15
+# Software: libpillowfight 0.2.4（知识可跨库复用：任何用 rand()/srand() 做种子采样的 C 算法）
+# Task: libpillowfight-0.2.4-r04-upstream-pytest-full-pass-env-alignment-pc1-35-20261015T093500Z
+# Status: DRAFT — 同 stem 配对 knowledge/drafts/DRAFT-libpillowfight-0.2.4-rand-sequence-shim.md
+#
+# 查重差异: 检索 graph/ 与 drafts/ 未见等价条目（命中项 DRAFT-libsgutils-drand48-r 是
+# drand48_r 符号缺失/结构体不完整，与本条 rand() 序列语义差异不同；E531 是 qsort_r 符号缺失
+# 的 shim 委托，机制相近但符号与语义不同——本条是"序列差异而非符号缺失"）。
+
+id:                     E3439
+trigger_tool:           pytest|conan|binding|rand|srand
+phase:                  testing|runtime
+error_signature:        byte.*assert.*seed|srand.*rand.*%|seed=.*FAILED|AssertionError.*seed|采样点.*不同|rand 序列
+severity:               2
+category:               ohos, libc, musl, testing, byte-equality
+match_keywords:         rand, srand, musl, glibc, RAND_MAX, seed, ACE, sampling, byte equality,
+                        reference image, LD_PRELOAD, 12345, 0xDEADBEE, _ace.c, libpillowfight
+title:                  种子采样 C 算法（srand/rand）在 OHOS/musl 与 glibc 参考环境 rand() 序列不同 → 算法输出整体漂移致字节级测试失败；以 glibc 语义 rand/srand LD_PRELOAD shim 对齐
+root_cause:             >
+  libpillowfight _ace.c:414 srand(seed)、:133/134 rand()%max_x/%max_y 用 rand() 序列决定 ACE
+  采样点集合。设备 libc（OHOS/musl）与参考环境（glibc）的 rand()/srand() 实现不同
+  （musl 与 glibc TYPE_3 加性生成器序列不一致，实测 srand(12345) 前 20 项 mod 1000 完全不同），
+  同一 seed 下采样点集合不同 → ACE 输出全局漂移（无损输出 vs 期望图 639 万像素差异，
+  TEST_DIFF 592 万像素）。此为"序列语义差异"而非符号缺失，不报错、不改接口，只在
+  字节级测试中显现。
+affected_scope:         >
+  用 rand()/srand() 做种子采样/噪声/随机化的 C/C++ 算法（图像、音频、ML、仿真），其测试以
+  字节/位图等值断言比对"参考环境生成产物"；OHOS/musl 设备端运行。典型触发：上游 pytest/
+  单元测试带 seed 参数的确定性随机算法。
+verification_cmd:       |
+  # 1) 复现序列差异（设备 rand 前 20 项 vs glibc 参考语义实现）
+  python3 - <<'PY'
+  import ctypes
+  libc=ctypes.CDLL("libc.so"); libc.srand.argtypes=[ctypes.c_uint]; libc.rand.restype=ctypes.c_int
+  libc.srand(12345); print([libc.rand()%1000 for _ in range(20)])
+  PY
+  # 2) shim 忠实性：C 程序 LD_PRELOAD shim 后 srand(12345)+rand()x20 与 glibc random_r 精确移植一致
+  # 3) 端到端：shim 下重跑带 seed 的测试，漂移像素数量化下降
+rec_priority:           1
+rec_approach:           glibc-rand-semantics-shim
+rec_description:        >
+  在测试运行环境用 LD_PRELOAD 提供 glibc 语义的 srand()/rand()（TYPE_3 加性生成器，
+  忠实移植 glibc random_r.c：srandom_r 表填充 + 310 次预热；random_r 前/后指针加和取
+  val>>1），不改上游源码；若参考环境确为 glibc，采样点集合即复原。实现要点：RAND_MAX
+  同为 2^31-1；seed==0 归一为 1；预热 10*deg 次必须与 glibc 一致。
+rec_command:            |
+  LD_PRELOAD=/path/to/glibc-rand-shim.so python3 -m pytest tests/tests_X.py -v
+rec_auto_fix:           false
+rec_impl:               pillowfight-glibc-rand-shim
+fallback_priority:      2
+fallback_approach:      reference-env-adjudication
+fallback_description:   >
+  若参考环境 rand 语义不可知/非 glibc，残余漂移需在终态报告附完整证据链（序列对照、shim
+  忠实性校验、对齐后量化）交分析端裁决，不得自行改测试或弱化断言。
+forbid_1_pattern:       改 srand/rand 调用或 seed 值使测试通过
+forbid_1_reason:        修改上游源码算法/测试语义属禁止事项；正确路径是运行环境对齐
+forbid_2_pattern:       把序列差异当未尝试/环境不可达而跳过取证
+forbid_2_reason:        必须先取证序列差异并量化对齐效果，再谈残余裁决
+principles:             P012
+doc_file:               knowledge/drafts/DRAFT-libpillowfight-0.2.4-rand-sequence-shim.md
+last_updated:           2026-10-15
+source_event:           archives/l/libpillowfight/0.2.4（feat/libpillowfight-0.2.4，R04 设备端 pytest 对齐）
+prescan_pattern:        srand\(.*\)|rand\(\) *%|seed=[0-9A-Fa-fx]+
+prescan_globs:          **/*.c, **/*.cpp, **/*.py
+authors:               unknown

@@ -1,0 +1,62 @@
+id:                     E3538
+trigger_tool:           pip|pytest|runtime
+phase:                  build, testing
+error_signature:        No module named 'pkg_resources'|env: exec python: No such file or directory|缺少命令产物|\d+ errors during collection
+
+severity:               2
+category:               ohos, portability, python, packaging, testing
+match_keywords:         pip --target, pkg_resources, setuptools<81, console_scripts, python shim, PYTHONWARNINGS, 验收测试, 前缀断言
+title:                  老项目在新 Python 环境下的三处打包/测试坑：pkg_resources、命令脚本不落盘、告警污染输出断言
+
+root_cause:             老项目（本例 vint 0.3.21，2018 年）的打包与验收测试依赖当时的工具链假设，换到新环境后
+                        在三处失配：①代码里 `import pkg_resources`（来自 setuptools）却未在 requirements 声明，
+                        而**新版 setuptools 已移除 pkg_resources**；②`pip install --target` 把 console script 写到
+                        目标根目录，若那里已有**同名包目录**（如 `vint/`）则脚本**静默不生成**；③验收测试断言
+                        CLI 输出**以固定前缀开头**，而 setuptools deprecation 警告与 py3.12 的 SyntaxWarning
+                        会混入同一输出流 → 断言必挂。
+affected_scope:         所有用 `pip install --target` 打包的命令行工具；所有"直接跑仓库内启动脚本 + 断言输出前缀"
+                        的老验收测试；所有在 py3.12+ 上跑 2018 年前后代码的场景。
+verification_cmd:       PYTHONPATH=<pkg>/python python3 -c "import pkg_resources, <mod>" && <pkg>/bin/<cmd> --version
+
+rec_priority:           1
+rec_approach:           pin-setuptools-and-generate-console-script
+rec_description:        ①运行时依赖显式钉 `setuptools<81`（才有 pkg_resources）；②本体用 `--no-deps` 安装
+                        （躲开 setup.py 里 enum34/pathlib/typing 等 py2 backport）；③若 pip 未生成启动脚本，
+                        按上游 `entry_points`（如 `console_scripts: vint = vint:main`）自建 `<包>/bin/<cmd>`；
+                        ④注意没有 `__main__` 的包 `python -m <mod>` 不可用。
+rec_command:            pip install --target <pkg> "setuptools<81" <deps>; pip install --no-deps --target <pkg> .
+rec_auto_fix:           false
+rec_impl:               manual
+
+fallback_priority:      2
+fallback_approach:      sanitize-test-env-not-upstream
+fallback_description:   老验收测试失败时，先做**环境适配**而不是改用例：①补回仓库启动脚本可执行位
+                        （chmod 755）；②shebang 是 `#!/usr/bin/env python` 而环境只有 python3 →
+                        造 `python` shim 并前置 PATH；③`PYTHONWARNINGS=ignore` 静音会污染输出流的警告。
+fallback_command:       chmod +x bin/<cmd>; ln -s $(command -v python3) <tmp>/python; export PATH=<tmp>:$PATH PYTHONWARNINGS=ignore
+fallback_auto_fix:      false
+fallback_impl:          manual
+
+forbid_1_pattern:       weaken-or-delete-upstream-tests
+forbid_1_reason:        这些失败多由环境（解释器/依赖版本）造成，改用例会掩盖真实行为差异
+forbid_1_consequence:   失去对新环境真实兼容性的观测，且无法向上游反馈
+
+forbid_2_pattern:       assume-pip-target-writes-console-scripts
+forbid_2_reason:        同名包目录会与脚本名冲突导致脚本静默不生成，构建"成功"却没有命令
+forbid_2_consequence:   交付一个没有可执行入口的包
+
+principles:
+
+doc_file:               doc/E429.md
+last_updated:           2026-10-17
+source_event:           vint 0.3.21 适配（pkg_resources 缺失 / 命令脚本未生成 / 验收测试告警污染）
+
+authors:
+source_pr:
+source_commit:
+
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+authors:               58D2

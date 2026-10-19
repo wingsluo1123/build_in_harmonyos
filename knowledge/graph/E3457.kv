@@ -1,0 +1,33 @@
+id:                     E3457
+trigger_tool: clang|make|conan|runtime|test
+phase: testing|runtime
+error_signature: long.double.*(lazy|basic.block).*(wrong|zero)|DIRECTED_BB total=5 passed=4|code = 141, expected code = 142|CASE_FAIL.*(20020413-1|20030914-1|regstack-1|issue186-2|long-double-compare)
+severity:               3
+category:               platform, compat, portability
+match_keywords: AAPCS64, lazy JIT, basic block callback, transparent callback, v8-v15, q8-q15, upper 64 bits, 128-bit long double, cold first call, full-width register preservation
+title: ARM64透明懒编译回调必须保存完整SIMD宽度，并同时覆盖首次调用与基本块边界
+root_cause: AAPCS64的C调用只保证v8-v15的低64位不变；JIT内部活跃的128位值或更强的内部callee契约不能靠C ABI得到保护。隐藏的基本块生成回调和首次调用生成回调都是独立破坏边界，漏掉任意一个都可能把long double的高半部清零。
+affected_scope: 使用AArch64代码生成、lazy compilation、FFI或透明instrumentation回调的软件；前提是回调对被插入的程序不可见而边界上有128位SIMD状态，或JIT内部callee保存契约强于外部C ABI。不适用于仅有64位标量、HFA签名错位、软浮点字序错误或SVE可伸缩向量状态。
+verification_cmd: 先从真实编译命令确认条件后端未因能力探测错误而关闭；在原生AArch64分别执行解释器、预编译整函数、首次冷调用和lazy-BB模式，比较同一long double数值及stdout/退出码，再运行不删减的上游所有模式与安装包消费者。限制Make并发不能替代或关闭运行时并行模式验证。
+rec_priority: 1
+rec_approach: preserve-full-width-transparent-callback-state
+rec_description: 按真实内部活跃状态确定保存集合；对C ABI只保低半部的寄存器也使用完整Q寄存器push/pop，逆序恢复并保持16字节SP对齐；同时检查首次函数编译和基本块生成两个入口，保留回调返回分支寄存器。
+rec_command: 阅读目标ABI的SIMD preservation条款，核对每个隐藏回调的成对Q寄存器保存/恢复与堆栈偏移，然后执行原样数值回归；不存在跨实现通用的一键替换命令。
+rec_auto_fix: false
+rec_impl: manual-source-edit
+fallback_priority: 2
+fallback_approach: explicit-typed-state-spill
+fallback_description: 若生成器能够精确证明边界活跃类型，也可在隐藏回调前按完整类型宽度spill并在返回后restore；仍必须覆盖每个回调入口，不能通过整函数回退取消lazy-BB功能。
+fallback_auto_fix: false
+forbid_1_pattern: 只保存d8-d15|仅补基本块回调|排除long.double测试|修改expectrc为141|把lazy.BB强制回退整函数|short.long.double
+forbid_1_reason: 低半部保存不足；首次函数调用与基本块回调不是同一入口；删测试、改期望或关闭后端只隐藏ABI缺陷。
+forbid_1_consequence: 冷调用后活跃数值可能从22.5变为0，比较/算术静默错误，消费者虽可启动却结果不可信。
+principles:             P001
+doc_file: knowledge/drafts/E550-draft-MR10.md
+last_updated: 2026-10-15
+source_event: MIR1.0.0原生OHOS ARM64回归：r15五项lazy-BB失败；只补BB回调的r16为4/5，r18明确第二次参数22.5变0；r19生成器IR定位首次调用入口；两个入口都补全后的r20定向5/5、完整7544/7544、消费者1/1且12回执收尾，原始日志SHA256=a5e604b19cc53f55b20bfa1880beb98745816d460e2dc8583f996ac3c7979ecd；正式Conan和平台CI另由版本报告绑定。
+authors: 2501_91199785
+metrics_success_count: 1
+metrics_fail_count: 1
+metrics_confidence: 0.5
+metrics_last_used: 2026-10-15

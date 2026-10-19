@@ -1,0 +1,29 @@
+id:                     E3421
+trigger_tool: conan|make|test
+phase: build|test
+error_signature: ConanException: Error while running cmd|\[Errno 11\] Resource temporarily unavailable|fork: retry: Resource temporarily unavailable|somagic-init --skip-check.*rc=139
+severity:               3
+category:               ohos, kernel, syscall, network, build-system
+match_keywords: compile_error, compiler error, hmbs_repair_method, fork eagain, deactivation_mode, libusb_init, no_tests, conan, make, Resource temporarily unavailable
+title: conan 反激活脚本切 function 形态消除共享 worker fork EAGAIN，make 加指纹门控有界重试
+root_cause: conan 默认反激活模式（tools.env:deactivation_mode 未设）在 conanbuildenv/conanrunenv 脚本顶部逐变量 fork printenv（每次 self.run 前十余次 fork），共享 worker 的 fork/进程资源瞬时耗尽，报 Errno 11 Resource temporarily unavailable（与源码、工具链、依赖无关）；同配方上游四个程序（somagic-init/somagic-capture/somagic-both/somagic-audio-capture）在调用 libusb_init(NULL) 后忽略返回值，OHOS 沙箱 netlink/sysfs 不可用致 init 失败，随即用未初始化句柄 find_device/libusb_open 触发 SIGSEGV（exit 139 = Signal 11）
+affected_scope: conan 1.x 配方在共享/受限 worker 上的构建（env 反激活需切 function 形态）；OHOS 下调用 libusb 系外设库且忽略 init 返回值、复用全局句柄的 C 程序（test_package 须断言 exit 1 且非信号）
+verification_cmd: 查真机预检日志：conf 注入 tools.env:deactivation_mode=function 后反激活前导块呈 function 形态、不再逐变量 fork printenv；make 命中 fork 指纹时仅做有界退避重试且真实错误立即抛出；test_package 断言 exit 1 且非信号、临时目录探测通过；no_tests 审计与 MANIFEST（upstream_test_total: 0、count_method: none）对齐
+rec_priority: 1
+rec_approach: conan-function-deactivation-plus-fork-retry
+rec_description: generate()/configure() 注入 tools.env:deactivation_mode=function 消除逐变量 fork EAGAIN；build() 中 make 以 fork 指纹门控做有界退避重试（真实编译错误立即抛出）；新增 0001-guard-libusb-init-failure.patch 为四个 libusb_init(NULL) 调用点补返回值守卫（失败打印 Failed to initialize libusb 并退出）；test.sh 断言改 exit 1 且非信号；no_tests 标记与 MANIFEST 审计对齐
+rec_command: archives/s/somagic/1.1/conanfile.py 新增 generate() 注入 tools.env:deactivation_mode=function；test_package/conanfile.py 在 configure() 注入同一 conf（显式 VirtualRunEnv 早于 generate 运行）；build() 的 make 改走 _make_with_fork_retry()；新增 archives/s/somagic/1.1/patches/0001-guard-libusb-init-failure.patch 并经 export_sources()/source() 应用；test_package/test.sh 断言 exit 1 且非信号并强化临时目录探测；MANIFEST.yml 填 upstream_test_total: 0、count_method: none（计数口径不动）
+rec_auto_fix: false
+rec_impl: conan-recipe-plus-test-package
+fallback_priority: 2
+fallback_approach: reduced-parallelism-series-build
+fallback_description: 若 conan 版本不支持 deactivation_mode=function 注入，退化为串行构建（make -j1）+ 提高进程 rlimit 上限，仍须保留 fork 指纹门控的有界重试；若补丁无法应用，在 test.sh 预检 libusb 可用性并跳过对应断言，但须保留审计记录，不得以跳过代替修复
+fallback_auto_fix: false
+forbid_1_pattern: somagic-init --skip-check.*(rc=139|Signal 11).*core dumped|ConanException: Error while running cmd
+forbid_1_reason: 禁止两处根因复发时被假修复掩盖：libusb_init 返回值守卫未生效、仍以未初始化句柄 SIGSEGV（rc=139）通过测试，或反激活逐变量 fork EAGAIN 期间以无指纹、无界重试吞掉真实编译错误；修复必须同时闭环 function 形态、指纹门控有界重试、返回值守卫三件事
+forbid_1_consequence: 真机预检 compile/evidence 门禁复现 Errno 11 或 rc=139，修复轮证据作废，任务退回修复循环
+doc_file: knowledge/drafts/DRAFT-somagic-1.1-conan-env-deactivation-function-fork-retry.md
+last_updated: 2026-10-17
+source_event: somagic/1.1 真机预检 libusb_init SIGSEGV（rc=139）与共享 worker 场景 fork EAGAIN 构建失败（CI #95906），attempt 59401/60977 两轮修复后门禁全部通过
+authors: hmbs-executor
+source_pr: 16294

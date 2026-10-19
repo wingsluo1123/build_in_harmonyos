@@ -1,0 +1,91 @@
+#====================================================================
+# DRAFT-SOCK-MACRO — 知识库扩展草稿（按 knowledge/graph/_template.kv 书写）
+# 主题：BSD 兼容层把 SOCK_CLOEXEC / SOCK_NONBLOCK 兜底成 0，覆盖 OHOS 系统真值
+# 来源：sndio 1.10.0 适配（PR #16451）
+# 工具：knowledge/tools/kb-sock-macro/
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E3509
+trigger_tool:           clang|gcc|cc|make|conan
+phase:                  compilation
+error_signature:        'SOCK_CLOEXEC' macro redefined|'SOCK_NONBLOCK' macro redefined|macro redefined \[-Wmacro-redefined\]|redefinition of 'SOCK_CLOEXEC'|previous definition is here
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               2
+category:               compat, ohos, portability, libc, socket
+prescan_pattern:        #[ \t]*define[ \t]+(SOCK_CLOEXEC|SOCK_NONBLOCK)[ \t]+0[ \t]*$
+prescan_globs:          *.h, *.c, *.cc, *.cpp
+match_keywords:         SOCK_CLOEXEC, SOCK_NONBLOCK, HAVE_SOCK_CLOEXEC, HAVE_SOCK_NONBLOCK, bsd-compat, bsd-compat.h, compat/, portable/, macro redefined, FD_CLOEXEC, O_NONBLOCK, F_GETFD, F_GETFL, 02000000, 04000, musl, OHOS, fd 泄漏, 静默违规
+title:                  BSD 兼容层的 #ifndef HAVE_SOCK_CLOEXEC 兜底把 SOCK_CLOEXEC/SOCK_NONBLOCK 定义成 0，覆盖 OHOS musl 真值 02000000/04000 —— 编译期 -Wmacro-redefined（-Werror 下红），运行期 socket() 的 CLOEXEC/NONBLOCK 位静默丢失；修法为给兜底定义补 #ifndef 硬守卫
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             >
+  1) OHOS 的 libc 是 musl，sysroot 的 <sys/socket.h> 已提供 socket 扩展位。实测 clang -dM -E 得到
+  SOCK_CLOEXEC=02000000(524288)、SOCK_NONBLOCK=04000(2048)、SOCK_SEQPACKET=5、MSG_NOSIGNAL=0x4000、
+  MSG_CMSG_CLOEXEC=0x40000000、SO_REUSEPORT=15。
+  2) BSD 移植层（bsd-compat/、compat/、portable/ 一类目录）为兼容老系统写兜底：
+  #ifndef HAVE_SOCK_CLOEXEC / #define SOCK_CLOEXEC 0 / #endif。当上游 configure 不探测
+  HAVE_SOCK_CLOEXEC（交叉编译与新增平台分支时常缺该项探测）时兜底生效，把系统真值覆盖成 0。
+  实测 sndio 1.10.0 的 bsd-compat/bsd-compat.h:58 即此形态（原始值为 TAB 分隔的 0）。
+  3) 后果两级：(a) 编译期同名宏两次定义且值不同 -> warning: 'SOCK_CLOEXEC' macro redefined
+  [-Wmacro-redefined] + note 指回 sys/socket.h:99 的 02000000；-Werror / -Werror=macro-redefined
+  （发行构建与 CI 常态）下直接 error。(b) 运行期宏被覆盖为 0 后
+  socket(AF_UNIX, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK, 0) 的 type 只剩 SOCK_STREAM：
+  socket() 返回成功，但 fcntl(fd, F_GETFD) 无 FD_CLOEXEC、F_GETFL 无 O_NONBLOCK —— fd 泄漏给 exec
+  的子进程、非阻塞语义丢失。编译通过 != 行为正确。
+  4) 覆盖方向取决于 include 顺序：兼容层头在系统头之前 include 时系统会再覆盖回来（仅告警），
+  在之后 include 时兜底值胜出（告警 + 语义丢失）。顺序是偶然的，重构/头整理会翻转结果，
+  不能靠"运行没问题"忽略告警。
+
+affected_scope:         >
+  带 bsd-compat/、compat/、portable/ 目录的 BSD 系代码与 OpenBSD ports（sndio、tmux、openssh、mtree 等），
+  以及 configure 未探测 HAVE_SOCK_CLOEXEC / HAVE_SOCK_NONBLOCK 的交叉编译配方；
+  以 socket(AF_*, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK, 0) 传扩展位的库均可能命中。
+  不覆盖：目标平台确实没有该宏时的合法兜底（判据必须带"平台已定义"前提）；
+  MSG_NOSIGNAL / SO_REUSEPORT 等"语义不同但值非 0"的情形需逐条人工判断，不走守卫机械修。
+
+verification_cmd:       >
+  bash knowledge/tools/kb-sock-macro/reproduce.sh --json
+  bash knowledge/tools/kb-sock-macro/detect.sh --src <source-dir> --log <build.log> --cc <clang>
+
+# ═══ Layer 3: 方案层 (Solution Space) ═══
+rec_priority:           1
+rec_approach:           patch-ifndef-guard
+rec_description:        给兼容层兜底定义补 #ifndef <MACRO> 硬守卫：系统已提供时以系统真值为准，平台真没有时兜底照旧生效
+rec_command:            bash knowledge/tools/kb-sock-macro/fix.sh --src ${SRC} --cc ${CC}
+rec_auto_fix:           true
+rec_impl:               kb-sock-macro/fix.sh
+
+fallback_priority:      2
+fallback_approach:      suppress-warning-with-runtime-assert
+fallback_description:   源码不可改（vendored/生成代码）时，仅在构建侧抑制该告警，并且必须在 test_package 里用 FD_CLOEXEC/O_NONBLOCK 断言收口，同时在 notes/PR 显式披露为降级方案
+fallback_command:       CFLAGS+=" -Wno-macro-redefined" 并在 test_package 断言 fcntl(fd, F_GETFD) & FD_CLOEXEC 与 fcntl(fd, F_GETFL) & O_NONBLOCK
+fallback_auto_fix:      false
+fallback_impl:          knowledge/tools/kb-sock-macro/sample/sockcloexec-demo/test/check_cloexec.c
+
+forbid_1_pattern:       -Wno-macro-redefined(?!.*FD_CLOEXEC)
+forbid_1_reason:        该告警是编译期唯一能发现"平台宏真值被覆盖"的信号；无行为断言就压制它会把缺陷推到运行期（fd 泄漏），属粉饰
+forbid_1_consequence:   socket() 静默丢失 CLOEXEC/NONBLOCK 位，子进程继承不该继承的 fd，安全与并发语义双错
+forbid_2_pattern:       -DSOCK_CLOEXEC=|DHAVE_SOCK_CLOEXEC
+forbid_2_reason:        把平台值或平台探测结论煮进构建命令，换平台/换 SDK 即错，且掩盖兼容层本应自带守卫的问题
+forbid_2_consequence:   换 SDK 版本或换目标架构后宏值与平台再次不一致，缺陷复发且更难定位
+
+# ═══ Layer 4: 原则引用 ═══
+principles:               
+# ═══ 关系图 (Relations) ═══
+# ═══ 元数据 ═══
+doc_file:               drafts/DRAFT-SOCK-MACRO.md
+last_updated:           2026-10-17
+source_event:           sndio 1.10.0 适配（bsd-compat/bsd-compat.h:58 SOCK_CLOEXEC 兜底为 0）
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:                weijiapan <weijiapan@noreply.gitcode.com>
+source_pr:              16451
+source_commit:          a17f738ef1
+
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:

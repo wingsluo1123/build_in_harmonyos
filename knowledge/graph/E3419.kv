@@ -1,0 +1,93 @@
+#====================================================================
+# E591-draft-4BC5.kv — OHOS musl 未导出 pthread_setcanceltype
+# 导致运行期 relocating 失败（wdfs 1.4.2 适配实证）
+#====================================================================
+
+id:                     E3419
+trigger_tool:           runtime|ld|clang
+phase:                  runtime
+error_signature:        Error relocating .*: pthread_setcanceltype: symbol not found|
+                         pthread_setcanceltype: symbol not found|
+                         Error relocating .*: (pthread_[a-z_]+): symbol not found
+
+severity:               3
+category:               compat, libc, musl, linking
+title:                  OHOS musl 未导出 pthread_setcanceltype 导致二进制运行期重定位失败
+match_keywords:         pthread_setcanceltype, symbol not found,
+                         Error relocating, musl, OHOS, libc 未导出符号,
+                         unresolved-symbols, ignore-all, 运行期符号解析,
+                         pthread_setcancelstate, BIND_NOW
+
+root_cause:             OHOS musl libc 动态符号表只导出 pthread_cancel(T) 与
+                         pthread_setcancelstate(W)，未导出 pthread_setcanceltype
+                         （nm -D --defined-only /system/lib64/libc.so 核实）。
+                         源码直接调用该 API 时（本例 src/cache.c 缓存回收线程
+                         用它设置 PTHREAD_CANCEL_ASYNCHRONOUS），若配方为规避
+                         libfuse.a 对 pthread_cancel/pthread_setcancelstate 的
+                         引用而使用 -Wl,--unresolved-symbols=ignore-all，链接期
+                         不再报错，缺符号被推迟到运行期；BIND_NOW 使动态加载器
+                         在启动前完成全部重定位并因强符号无处解析而拒绝加载，
+                         进程 rc=127，main() 中没有任何输出。
+affected_scope:         OHOS/HarmonyOS(aarch64) 上调用 POSIX 线程取消 API 的
+                         C/C++ 程序，尤其是 autotools/FUSE 类工具链（libfuse.a
+                         静态引用 pthread_cancel/pthread_setcancelstate）与任何
+                         已用 --unresolved-symbols=ignore-all 掩盖链接错误的配方；
+                         同族风险：其它 musl 未导出的 libc API。
+verification_cmd:       nm -D -u <包路径>/bin/<exe> | grep -c pthread_setcanceltype
+                         （期望 0：不再有未定义引用；修复后该符号被链入目标文件
+                         解析，通常不进 .dynsym 导出集合）;
+                         再以运行环境执行 LD_LIBRARY_PATH=<依赖包 lib 目录> <包路径>/bin/<exe> --version
+                         （期望 rc=0，stderr 不再出现 Error relocating ...: pthread_setcanceltype）
+rec_priority:           1
+rec_approach:           recipe-libc-compat-shim-linked-into-exe
+rec_description:        在 conanfile.py 的 generate() 中生成语义兼容实现并编译为
+                         目标文件（编译器取自 tools.build:compiler_executables，遵守
+                         R33），再用 env.append("LDFLAGS", <obj>) 随可执行文件静态
+                         链入：显式目标文件不受链接顺序限制（不同于静态库），即使
+                         位于 LDFLAGS（先于 objects）也能被全体目标文件解析。
+                         兼容实现按 POSIX 校验取消类型、按线程记录当前类型并返回
+                         旧值。必须如实声明语义边界：无法写回 libc 内部取消类型
+                         状态，故本平台保持缺省 PTHREAD_CANCEL_DEFERRED，取消仍由
+                         pthread_setcancelstate 使能并在下一个取消点（本例缓存线程
+                         的 sleep()）生效，退出时 pthread_cancel + pthread_join 仍可
+                         终止线程；若业务依赖异步取消即时性则本方案不适用。
+rec_command:            conan create <pkg_dir> -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 '--build=<name>/*'
+rec_auto_fix:           false
+rec_impl:               archives/w/wdfs/1.4.2/conanfile.py — generate() 中 _write_libc_compat()
+                         生成 wdfs_libc_compat.c 并编译为 .o，经 env.append("LDFLAGS", obj) 链入
+
+fallback_priority:      2
+fallback_approach:      source-capability-guard
+fallback_description:   在源码层用 autoconf 能力宏（AC_CHECK_FUNCS 生成的
+                         HAVE_PTHREAD_SETCANCELTYPE）把调用编译掉，避免向链接器注入
+                         目标文件；但当上游 tarball 自带旧版 configure 且源码树无法
+                         重新 bootstrap（如 AM_CONFIG_HEADER 已被 automake 1.13+ 移除）时，
+                         需同时改动 configure 生成物，维护成本更高。
+fallback_command:       autoreconf -fi && ./configure  # 需上游源码树可重新 bootstrap
+fallback_auto_fix:      false
+fallback_impl:
+
+forbid_1_pattern:       pragma weak pthread_setcanceltype|pthread_setcanceltype.*weak
+forbid_1_reason:        musl 加载器只对强引用要求重定位，弱符号声明无法让缺符号通过；
+                        链接期仍会因强引用失败或运行期仍报 relocating。
+forbid_1_consequence:   问题在原位复发，且掩盖真实缺失范围。
+
+forbid_2_pattern:       --unresolved-symbols=ignore-all$|unresolved-symbols=ignore-all.*修复
+forbid_2_reason:        ignore-all 只隐藏链接期未定义错误，正是本问题漏检根因；
+                        单独使用会把缺符号推迟到运行期，二进制在目标机上不可启动。
+forbid_2_consequence:   构建"成功"但目标机 rc=127，浪费整轮 CI 与真机验证。
+
+forbid_3_pattern:       LD_PRELOAD=.*pthread|dlopen.*pthread_setcanceltype
+forbid_3_reason:        以预加载库绕过会引入部署期依赖，与 conan 制品自包含原则冲突，
+                        且无法随包分发。
+forbid_3_consequence:   下游消费者在未设置 LD_PRELOAD 的环境仍不可用。
+
+principles:
+doc_file:               knowledge/drafts/E591-draft-4BC5.md
+last_updated:           2026-10-16
+source_event:           wdfs 1.4.2 OHOS conan create：二进制打包成功但运行期
+                         "Error relocating .../bin/wdfs: pthread_setcanceltype: symbol not found"（rc=127）
+authors:                HouYuxuan <f24011422@st.sandau.edu.cn>
+source_pr:
+source_commit:
+

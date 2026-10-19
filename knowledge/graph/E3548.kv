@@ -1,0 +1,36 @@
+# ═══ Draft knowledge entry — 老式 C 库 pth 线程包装层剥离：头文件/API/链接三层批量移植到 pthread ═══
+# Timestamp: 2026-10-16
+# Software: unicon 3.0.4（1990s 中文输入法框架，依赖 pth 线程包装库）
+# Gate: 手动 make 编译期 — 头文件缺失 + 链接 undefined reference
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E3548
+title: 依赖 pth（Portable Threads）包装库的老 C 代码移植到现代平台：#include<Pth头>→<pthread.h>、Pth_*→pthread_* 前缀批量替换、构建层摘 -lpth，三层同改一次过
+trigger_tool: clang|make|ld
+phase: compilation
+error_signature: pth/pthread\.h: *No such file or directory|fatal error: *pth/|undefined reference to 'Pth_|cannot find -lpth|No such file or directory.*-lpth
+severity:               2
+category:               compat, portability, headers, threading, build-system
+match_keywords: pth, Pth_, pth/pthread.h, Portable Threads, -lpth,
+  pthread, Pth_mutex, Pth_cond, Pth_thread, No such file or directory
+root_cause: 1990s 代码依赖的 pth 线程包装库在现代发行版/OHOS 中不存在（依赖链
+  断裂），而 pth API 与 pthread 是前缀级一一映射——包装层本身无独立语义，可整层
+  剥离到系统 pthread。
+affected_scope: 所有依赖 pth 或同型"系统 API 前缀映射薄包装库"的老 C 包在
+  OHOS/现代平台的编译
+verification_cmd: grep -rn "Pth_\|<pth/" --include='*.c' --include='*.h' . || echo "零残留 OK"
+rec_priority: 1
+rec_approach: strip-thin-wrapper-three-layers
+rec_description: 头文件替换（pth/pthread.h→pthread.h）+ API 前缀批量替换
+  （Pth_→pthread_）+ 构建层摘 -lpth，三层各改后 grep 验证零残留，最后 make 全量
+  复验。
+rec_command: sed -i 's|#include <pth/pthread.h>|#include <pthread.h>|' <files>
+  # sed -i 's/Pth_/pthread_/g' <files>
+  # grep -rn "Pth_\|<pth/" .  # 必须零残留
+  # Makefile.in: 摘除 -lpth
+rec_auto_fix: false
+source_pr: unicon 3.0.4 适配（本 PR，路径 B 知识库扩展）
+rec_impl:               manual
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E3548.md
