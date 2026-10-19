@@ -3,11 +3,11 @@
 ## 简介
 libxmlb 是一个高效的 XML 二进制 blob 查询库，主要用于 fwupd 等项目的快速 XML 解析。它将 XML 文件编译成二进制格式，提供极速查询能力。
 
-## OHOS 适配（conan，0.3.19）
+## OHOS 适配（conan，0.3.19 / 0.3.19.1）
 
 ### 依赖（ohpcd 制品仓已发布）
-- glib/2.88.3（共享构建，GObject 类型系统一致性；内嵌 proxy-libintl，
-  历史 g_libintl_* 链接问题不复存在）
+- 0.3.19：glib/2.88.3（共享构建）
+- 0.3.19.1：glib/2.84.0.1.1（共享构建，与 GTK4/libpanel 依赖图一致）
 - liblzma/5.8.1、zstd/1.5.7.1（lzma/zstd 压缩支持，上游 auto 特性显式启用）
 
 ### 关键适配点
@@ -22,7 +22,7 @@ libxmlb 是一个高效的 XML 二进制 blob 查询库，主要用于 fwupd 等
   覆盖 lzma/zstd 特性
 
 ## 依赖
-- glib/2.88.3、liblzma/5.8.1、zstd/1.5.7.1
+- 0.3.19.1：glib/2.84.0.1.1、liblzma/5.8.1、zstd/1.5.7.1
 
 ## 功能验证
 ```
