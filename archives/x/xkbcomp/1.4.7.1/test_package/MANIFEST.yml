@@ -1,0 +1,55 @@
+# 上游测试来源声明（CI L0e 门禁要求）
+package: xkbcomp/1.4.7.1
+homepage: "https://gitlab.freedesktop.org/xorg/app/xkbcomp"
+
+# 上游测试框架探测命令与结论
+# 探测命令：
+#   grep -rn "enable_testing\|add_test\|TESTS *=\|check_PROGRAMS" Makefile.am configure.ac
+#   find . -maxdepth 2 -name "test*"
+#   ls test/ tests/
+# 命中项核实：以上命令命中 0 —— xkbcomp 是 X.Org 的单一可执行程序
+# （Autotools），Makefile.am 只有 bin_PROGRAMS = xkbcomp，
+# 没有 TESTS/check_PROGRAMS，也没有 test/ 或 tests/ 目录。
+upstream_check_command: "make check（上游无 TESTS 定义，等价于空检查）"
+
+# conanfile.py 的 build() 是否集成了上游测试：上游无测试可集成。
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游 0 个测试用例（已按上方探测命令逐一核实命中项）
+upstream_tests: []
+
+# 本 test_package 自带的完整消费者用例（CI L0c 要求独立测试源文件）
+test_package_tests:
+  - file: test_xkbcomp.py
+    description: >-
+      完整消费者用例：按 X 服务器（Xvfb/Xorg）的调用方式端到端跑通 xkbcomp 的
+      「编译 + 反编译」流程，而不是只做存在性/退出码断言——
+      ① 包内 bin/xkbcomp 存在（断言绑定 package_folder，产物被移走即失败）；
+      ② `xkbcomp -version` 成功退出，且报告版本与包版本一致（带 R37 后缀时按
+         上游版本为前缀判定）；
+      ③ 键盘布局文本经 stdin 交给 `xkbcomp - <out.xkm>`（X 服务器的真实调用
+         方式）成功产出非空 .xkm；
+      ④ `xkbcomp -xkb <out.xkm> <back.xkb>` 把编译结果反编译回文本成功；
+      ⑤ 往返无损核对：反编译文本中 `<AE01>` 键码、`1/exclam` 两档符号、
+         compat 的 `SetMods` 解释逐项保留。
+      全程不依赖 X server 与 xkeyboard-config 数据，度量的是被测包自身的功能。
+    command: "xkbcomp -version；xkbcomp -w 1 - <out.xkm> < keymap.xkb；xkbcomp -xkb <out.xkm> <back.xkb>"
+  - file: conanfile.py
+    description: "以 conanrun 环境（LD_LIBRARY_PATH 指向 libx11/libxkbfile）调用 test_xkbcomp.py"
+    command: "python3 test_xkbcomp.py <package_folder> <ref> <target_os>"
+
+assertion_count: 10
+# 计数口径（真机实测 failures=0）：
+#   ① 包内 bin/xkbcomp 存在                        1
+#   ② xkbcomp -version 成功退出                    1
+#   ③ 版本号与包版本一致                           1
+#   ④ stdin 方式编译成功退出（X server 用法）       1
+#   ⑤ 产出非空 .xkm                                1
+#   ⑥ .xkm 反编译回文本成功退出                     1
+#   ⑦ 反编译文本非空                                1
+#   ⑧ 键码映射保留（<AE01>）                        1
+#   ⑨ 两档符号保留（1/exclam）                      1
+#   ⑩ compat 解释保留（SetMods）                    1
+# 实测证据：
+#   xkbcomp_test: assertions=10 failures=0
