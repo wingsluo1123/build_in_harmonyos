@@ -1,0 +1,21 @@
+# conandata.yml — evemu 2.7.0
+# 源宿主更换（2026-10-16）：原 www.freedesktop.org 发布页对 CI Worker 返回 403
+#   （Anubis 反爬拦截非浏览器客户端），两轮 CI 复现；改用同项目官方 GitLab
+#   实例（gitlab.freedesktop.org）的 tag 归档 —— 本仓既有同案先例
+#   archives/d/desktop-file-utils/0.28，其 conandata 注释逐字记
+#   「www.freedesktop.org 发布页对 CI Worker 返回 403 不可达；
+#    gitlab.freedesktop.org CI 实测可达」。
+# 2026-10-16 实测 HTTP 200 / 539053 bytes / application/octet-stream。
+# 该归档是 git 快照：不含 autoreconf 生成件（configure、Makefile.in、
+#   config-aux/ 等），故 conanfile.py 内自举 `autoreconf -fi`（见 notes.md）。
+sources:
+  url: "https://gitlab.freedesktop.org/libevdev/evemu/-/archive/v2.7.0/evemu-v2.7.0.tar.gz"
+  sha256: "b4ba7458ccb394e9afdb2562c9809e9e90fd1099e8a028d05de3f12349ab6afa"
+
+patches:
+  - patch_file: "patches/0001-portable-program-name-and-scandir-sort.patch"
+    patch_description: "Replace glibc-only versionsort()/program_invocation_short_name() with ISO C equivalents and include <limits.h> for PATH_MAX"
+    patch_type: "portability"
+  - patch_file: "patches/0002-test-drop-static-link-for-shared-build.patch"
+    patch_description: "Drop -static from test-evemu-create link so upstream make check runs against the shared libevemu this package builds"
+    patch_type: "portability"
