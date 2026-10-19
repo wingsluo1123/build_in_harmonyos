@@ -1,0 +1,51 @@
+#====================================================================
+# DRAFT-cpdb-libs-1.2.0-autotools-git-archive-tool-requires-bootstrap — git-archive 型 autotools 包无 configure 时用 conan tool_requires 注入 automake/libtool 自举
+# 触发事件: cpdb-libs 1.2.0 适配（conan create 首跑 apply patches 后 build() 自举）
+# 路径: Path B（知识库扩展）
+#====================================================================
+
+id:                     E2517
+trigger_tool:           conan|autoreconf|configure|make
+phase:                  conan_build|autoreconf|bootstrap
+error_signature:        Can't exec "libtoolize"|libtoolize failed|configure: No such file|
+                         automake: command not found|aclocal: command not found
+
+severity:               2
+category:               ohos, autotools, conan
+match_keywords:         git archive, release asset, dist tarball, configure, Makefile.in,
+                         autoreconf, tool_requires, automake/1.18, libtool/2.5.4,
+                         libtoolize missing, bootstrap, autogen.sh, CI sandbox
+title:                  git-archive 型 autotools 库（tag 无 release dist 资产）必须用 conan tool_requires automake+libtool 在 build() 内自举 autoreconf，而不是依赖环境或手改生成文件
+
+root_cause:             上游未为 tag 生成 dist 资产，git archive 不含 autotools 生成文件；
+  CI 沙箱仅装 autoconf 家族，无 automake/libtoolize，且 $HOME 手工安装对
+  沙箱不可见；沿用 2.0-b5 的"补丁生成文件+刷新时间戳"方案没有可补的
+  configure/Makefile.in（文件根本不存在）。
+
+verification_cmd: >
+  cd archives/c/cpdb-libs/1.2.0 && conan create . -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64
+
+rec_priority:           1
+rec_approach:           autotools-bootstrap-via-tool-requires（conan tool_requires automake+libtool 自举 git-archive autotools 包）
+rec_description: >
+  build_requirements() 声明 tool_requires("automake/1.18") +
+  tool_requires("libtool/2.5.4")，build() 内对无 configure 的源码包跑
+  autogen.sh/autoreconf -fi（env="conanbuild"）自举，再走 Autotools
+  configure/make；autoconf 依赖 SDK 提供，不声明。
+rec_command:            tool_requires automake/1.18 + libtool/2.5.4; build(): autogen.sh (autoreconf -fi) 若无 configure
+rec_auto_fix:           false
+rec_impl:               conan-recipe-autotools-bootstrap-tool-requires
+
+doc_file:               knowledge/drafts/DRAFT-cpdb-libs-1.2.0-autotools-git-archive-tool-requires-bootstrap.md
+last_updated:           2026-09-25
+source_event:           cpdb-libs 1.2.0 适配，git-archive 源码包无 configure 且本机无 libtoolize
+authors:                atomcode-executor
+source_pr:
+source_commit:
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     0.9
+metrics_last_used:      2026-09-25
+
+affected_scope:         git-archive 型 autotools 库（tag 无 release dist 资产）必须用 conan to

@@ -1,0 +1,59 @@
+# ═══ Draft knowledge entry — approval/快照类测试的 checkout 布局与 git 元数据隐含前提 ═══
+# Timestamp: 2026-09-25
+# Software: snitch 1.2.3（任何 approval/snapshot 快照比对套件，ApprovalTests 风格）
+# Gate: 上游测试（approval 快照比对）
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E2597
+title: "approval/快照测试的归一化正则硬编码 checkout 目录名与 4 段 git 版本号——tag 归档解包直接跑会整套失配，须按上游 CI 布局物化源码（目录名 + git init）"
+trigger_tool: "conan|ctest|upstream-tests|clang"
+phase: "testing"
+error_signature: "expected more output|unexpected extra output|== starting test with snitch v\\*|catch2-version=\"[^\"]+\\.snitch\"|line_actual.*line_expected|test cases: +3 .*0 passed"
+prescan_pattern: "approval_tests|approved"
+severity:               3
+category:               approval-snapshot, checkout-layout, path-normalization, snitch, test
+match_keywords: "snitch, approval_tests, approval test, snapshot test, approved, received, 快照测试, 归一化, normalization, regex_blank, CHECK_FOR_DIFFERENCES, catch2-version, SNITCH_FULL_VERSION, git log -1, tag 归档, 解包, 目录名, checkout layout, testing_reporters.cpp, expected vs actual, doctest 3 failed"
+root_cause: |-
+  approval/snapshot 类测试用「实际输出 → 归一化正则抹掉易变字段 → 与 expected
+  逐行比对」实现跨机器稳定比对，而归一化正则通常**把上游 CI 的 checkout 布局写死
+  进字面量**。snitch 1.2.3 实测两族前提缺失（tag 归档解包后直接跑，3/3 套件失败、
+  734/2782 断言失配）：
+  ① 路径前提：ignores 正则是 `(.+/snitch/tests/approval_tests/)` 这类**要求源码
+    路径含字面 `/snitch/tests/`** 的模式（上游 actions/checkout 的 workspace 目录名
+    就是仓库名 `snitch`）。解包目录 `snitch-1.2.3.work/tests/...` 不含 `/snitch/tests/`
+    → 归一化完全不生效，绝对路径+行号逐行失配（形态：期望 `*testing_reporters.cpp:*`、
+    实测完整绝对路径）。
+  ② 版本前提：snitch 的 CMakeLists 用 `git log -1 --format=%h` 拼
+    `SNITCH_FULL_VERSION=1.2.3.<githash>`（4 段），归一化正则要求
+    `([0-9]+\.[0-9]+\.[0-9]+\.[0-9a-z]+)` 正好 4 段；tag 归档无 .git → 版本是
+    3 段 `1.2.3` → 正则不匹配（形态：期望 `v*`、实测 `v1.2.3`；期望
+    `*.snitch`、实测 `1.2.3.snitch`），修完路径前提后仍剩 11/2782 断言失配。
+  两族前提都满足后 3/3 套件全过（2782+3809+4574 断言 0 failed）。
+affected_scope: |-
+  所有 approval/snapshot 快照比对型上游测试（ApprovalTests 风格 .approved./.expected.
+  基线文件 + 正则归一化）在「非上游 CI 环境」的执行：解包 tarball/tag 归档跑测试、
+  稀疏检出/自定义目录名跑测试、浅克隆或导出包（无 .git）跑测试。凡是归一化正则里
+  出现字面路径段（仓库名/tests/）或版本号段数假设的套件都命中本模式。
+rec_approach: |-
+  1) 判定：approval 套件失败且差异全是「实际=绝对路径/3 段版本，期望=`*` 通配」→
+     命中本模式，是**测量装置前提缺失**，不是产品/平台 bug；先读测试源里的
+     ignores/normalization 正则，提取它硬编码的（a）目录名字面量（b）版本段数。
+  2) 处置（不改上游测试代码、不动 expected 基线）：按上游 CI 预期物化源码——
+     a) 源码路径满足正则：把源复制到 `…/<仓库名>/tests/…` 形态的目录
+        （snitch 即目录名 `snitch`；通用化：正则里 `.+/REPO/tests/` 的 REPO）；
+     b) git 元数据：源码根 `git init && git add -A && git commit`，让
+        `git log -1 --format=%h` 成功产出 4 段版本号（hash 具体值会被归一化成
+        `*`，无关紧要）。
+  3) 交叉自证：重跑后 approval 套件 3/3 过、断言 0 failed；再故意改名目录回退
+     可复现失败（可选）。
+  4) 免重蹈：跑 approval/snapshot 套件前先 grep 归一化正则里的字面路径段与
+     版本格式（`snitch/tests`、`[0-9]+\.[0-9]+\.[0-9]+\.` 之类），对照当前
+     源码布局与 git 可用性；「tag 归档解包即测」对这类套件是高危动作。
+last_updated: "2026-09-25"
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E2597.md
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        |-

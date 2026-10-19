@@ -1,0 +1,34 @@
+# ═══ Draft knowledge entry — GNU sed `I`（大小写不敏感）修饰符在 OHOS toybox sed 报 bad pattern，字符类改写免装 GNU sed ═══
+# Timestamp: 2026-09-21
+# Software: iwnet 1.3.1（上游测试 harness src/http/tests/*-tests-run.sh；适用于任何用
+#           sed -E /re/Id 过滤响应的上游测试在 OHOS 构建）
+# Gate: build() 测试 harness
+# Status: PARTIAL_MATCH (E010 trigger 大类相同，本候选症状与解法新增) — needs review
+
+id:                     E2529
+title: GNU sed 专有 `I` 修饰符（大小写不敏感地址）在 OHOS toybox sed 报 bad pattern；改写为字符类 [cC] 后不装 GNU sed 亦可等价过滤
+trigger_tool: sed
+phase: testing|runtime
+error_signature: sed: bad pattern '/.*/I'|sed: bad pattern '/[^']*I'|bad pattern .* \(d\)
+severity:               2
+category:               compat, toolchain, testing
+match_keywords: sed, bad pattern, I flag, 大小写不敏感, case-insensitive, GNU sed, toybox,
+  toybox sed, FILTER, response filter, curl -isk, diff, success.log
+root_cause: 上游测试 harness 用 GNU sed 扩展 `I` 修饰符（地址正则大小写不敏感匹配）
+  过滤响应头（date/user-agent/trying/tcp/sessionid/etag/boundary 等易变头）后再与期望
+  日志 diff。OHOS 默认 toybox sed 0.8.12 不支持地址的 `I` 修饰符，直接报
+  "bad pattern '...'@N (d)"，导致 FILTER 管道整段失败（在 set -e 脚本中 rc=1）。
+  toybox sed -E 的 POSIX 扩展正则本身可用，仅 `I` 修饰符缺失。
+rec_approach: sed-char-class-rewrite
+verification_cmd:
+  bad pattern、脚本 rc=1；改写为字符类后 toybox 实测过滤正确（date/Date/USER-Agent/
+  Trying/tcp 均被删，X-test 保留），复跑 rc=0。
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E2529.md
+affected_scope:         GNU sed 专有 `I` 修饰符（大小写不敏感地址）在 OHOS toybox sed 报 bad pattern；
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        sed-char-class-rewrite

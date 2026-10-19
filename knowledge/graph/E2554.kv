@@ -1,0 +1,22 @@
+id:                     E2554
+trigger_tool:           make|conan
+phase:                  compilation|linking
+error_signature:        ld\.lld: error: unknown argument '-dead_strip'|dead_strip.*unknown argument|linker command failed with exit code 1
+
+severity:               2
+category:               ohos, build-system, make, linking, cross-compile
+match_keywords:         Makefile, uname, UNAME_S, ifeq, Darwin, dead_strip, ld.lld, HarmonyOS, platform branch, gc-sections, as-needed, raw makefile, linker flag
+
+root_cause:             raw GNU Makefile 用 `ifeq ($(UNAME_S),Linux)` 二分支区分平台，else 分支堆入 macOS 专属 `-Wl,-dead_strip`；HarmonyOS 的 `uname -s` 返回 `HarmonyOS` 而非 `Linux`，落入 else 分支吃到 macOS 专属链接参数，ld.lld 不识别报 unknown argument。上游把平台假设建模为"Linux / 其他"，而"其他"分支隐含 macOS 专属 flag。
+
+affected_scope:         一切以 uname -s 做 ifeq 平台分支、且"非 Linux 即 macOS"假设的 raw GNU Makefile 项目（C/C++）。不适用：带 $(origin X) 守卫的探测段（走 make 变量注入方案）、autotools（config.guess，E007/E160）、CMake（CMAKE_SYSTEM_NAME 原生支持）。
+
+rec_priority:           1
+rec_approach:           invert-platform-branch-darwin-whitelist
+rec_auto_fix:               false
+rec_impl:               manual
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E2554.md
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        invert-platform-branch-darwin-whitelist
