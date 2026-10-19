@@ -1,0 +1,12 @@
+sources:
+  url:
+    - "https://ccp4forge.rc-harwell.ac.uk/ccp4/clipper/-/archive/2.1/clipper-2.1.tar.gz"
+  sha256: "7e00a954b1501c28ad82ab17b53a9e01d98077f390d32f761810a9e3bcd43857"
+
+patches:
+  - patch_file: "patches/0001-ohos-fftw-prefix.patch"
+    patch_description: "OHOS: fix fftw_real type mismatch in fftmap/fftmap_sparse and ensure FFTW2_PREFIX_S is defined (source-level fix, complements CMAKE_CXX_FLAGS injection)."
+    patch_type: "portability"
+  - patch_file: "patches/0002-ohos-fftw-double-abi.patch"
+    patch_description: "OHOS: the registry fftw/2.1.5 package exports double-precision FFTW2 symbols despite its s-prefixed file names (sfftw.h has FFTW_ENABLE_FLOAT undef'd, exported symbols are unprefixed double), while clipper::ffttype is float - float buffers passed to the double FFTW API read garbage and corrupt data (upstream m4/fftw.m4 SINGLE_FFTW2 check rejects such a package; the CMake build lacks that check). Insert double-precision scratch buffers at every rfftw/fftw transform call site in fftmap.cpp and fftmap_sparse.cpp (dense in-place 3D and sparse row-wise paths) so all transforms execute at the actual FFTW ABI; clipper's float API, storage layout and scaling conventions are unchanged. Verified numerically against an independent double-precision DFT reference and against the upstream test.log session output."
+    patch_type: "portability"

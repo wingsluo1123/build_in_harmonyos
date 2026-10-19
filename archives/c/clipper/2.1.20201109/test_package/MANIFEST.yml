@@ -1,0 +1,119 @@
+# test_package/MANIFEST.yml — clipper/2.1.20201109
+# 上游官方测试声明文件
+
+package: clipper/2.1.20201109
+homepage: "https://ccp4forge.rc-harwell.ac.uk/ccp4/clipper"
+
+# 上游测试入口：examples/Makefile.am check_PROGRAMS 共 18 个测试程序；
+# 运行方式由上游 examples/test.csh 定义（rfltest/symtest 喂空间群编号 stdin、
+# mtztest 读 testfile.mtz），参考输出记录在上游 examples/test.log；
+# maketestdata 无参运行内嵌自测试（Test_core + Test_contrib）。
+# 上游 automake 未定义 TESTS（make check 仅构建这 18 个程序），
+# 故 upstream_test_in_build = false，运行级验证按 test.csh + 无参自测试执行。
+upstream_check_command: "examples/test.csh (rfltest x2 + symtest x3 + mtztest) + bare self-test programs"
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 18 个上游用例清单（examples/Makefile.am check_PROGRAMS）及真实执行结果
+# 运行环境：HarmonyOS PC (aarch64 OHOS)，链接本包 conan 产物 + fftw/2.1.5 + libccp4/8.0.0 + mmdb/2.0.22
+upstream_tests:
+  # ---- 运行级执行（10 次运行 / 7 个程序），输出与上游 test.log 参考输出逐行比对 ----
+  - name: rfltest (sg=1)
+    invoked: "echo 1 | ./rfltest  (per upstream test.csh)"
+    exit_code: 0
+    verification: "输出 1007 行与上游 test.log L1-1007 行数一致，数值等价（仅 libm/显示精度级差异，如 1e-33 垃圾位、0.338 vs 0.337 末位舍入）"
+    result: pass
+  - name: rfltest (sg=146)
+    invoked: "echo 146 | ./rfltest  (per upstream test.csh)"
+    exit_code: 0
+    verification: "输出 267 行与上游 test.log L1008-1274 一致，数值等价（同上，容差比对 4 处显示舍入差异）"
+    result: pass
+  - name: symtest (sg=1)
+    invoked: "echo 1 | ./symtest  (per upstream test.csh)"
+    exit_code: 0
+    verification: "输出 160 行与上游 test.log L1275-1434 逐行一致（0 差异）"
+    result: pass
+  - name: symtest (sg=19)
+    invoked: "echo 19 | ./symtest  (per upstream test.csh)"
+    exit_code: 0
+    verification: "输出 163 行与上游 test.log L1435-1597 逐行一致（0 差异）"
+    result: pass
+  - name: symtest (sg=210)
+    invoked: "echo 210 | ./symtest  (per upstream test.csh)"
+    exit_code: 0
+    verification: "输出 255 行与上游 test.log L1598-1852 逐行一致（0 差异）"
+    result: pass
+  - name: mtztest
+    invoked: "./mtztest (cwd 含上游分发的 examples/testfile.mtz)"
+    exit_code: 0
+    verification: "容器/列导入导出、NaN 语义、分辨率函数（BasisFn_binner/gaussian/expcubic）全部执行；产出 junk.mtz(2.7MB)/junk2.mtz 与上游流程一致（上游 test.log 该段为 CCP4 mtzdump 程序输出，非本程序输出）"
+    result: pass
+  - name: sgtest
+    invoked: "./sgtest (无参，遍历 530 个 Hall 符号)"
+    exit_code: 0
+    verification: "530 个空间群设置全部通过，无 AssertionError 输出"
+    result: pass
+  - name: ccad
+    invoked: "./ccad (无参自测试)"
+    exit_code: 0
+    verification: "Container/HKL_data 构造-析构链完整执行"
+    result: pass
+  - name: sktest
+    invoked: "./sktest (无参自测试)"
+    exit_code: 0
+    verification: "采样定理/坐标变换/Euler/Quaternion 数值输出正常"
+    result: pass
+  - name: maketestdata
+    invoked: "./maketestdata (无参 = 内嵌自测试模式)"
+    exit_code: 0
+    verification: "输出 'Test core: OK' + 'Test contrib: OK'（覆盖 Test_core 全部断言：FTYPE/NaN/Sim/HL<->abcd/Xmap FFT 往返/分辨率序数/分辨率函数/原子形状函数导数，及 Test_contrib）"
+    result: pass
+  # ---- 仅构建级验证（9 个）：上游未随源码分发其运行所需输入数据 ----
+  # （全树仅 examples/testfile.mtz 一个数据文件，均为 map/pdb/cns/cif/含 PHIB-FOM 的 mtz 输入依赖；
+  #   上游 automake 对这些程序同样只做构建验证）
+  - name: cmaplocal
+    result: build_only
+    reason: "需要 -mapin 输入 map 文件，上游未分发；上游 make check 仅构建"
+  - name: diffmap
+    result: build_only
+    reason: "需要 mtz + Fo/Fc 两列（testfile.mtz 无 FC/PHIC 列），上游未分发对应数据"
+  - name: maptest
+    result: build_only
+    reason: "需要 CCP4 map 输入文件，上游未分发"
+  - name: ffttest
+    result: build_only
+    reason: "需要 stdin 脚本 + 含 F_phi 列的 mtz（testfile.mtz 无相位列），上游未分发"
+  - name: cnstest
+    result: build_only
+    reason: "需要含 FP/SIGFP/PHIB/FOM 列的 mtz（testfile.mtz 无 PHIB/FOM），上游未分发"
+  - name: cns2mtz
+    result: build_only
+    reason: "CNS->MTZ 转换工具，需要 CNS .hkl 输入，上游未分发"
+  - name: sftest
+    result: build_only
+    reason: "需要 PDB 输入（mmdb.ReadPDBASCII(argv[1])），上游未分发"
+  - name: phstest
+    result: build_only
+    reason: "需要含 FP/SIGFP/PHIB/FOM 列的 mtz（testfile.mtz 无 PHIB/FOM），上游未分发"
+  - name: ciftophs
+    result: build_only
+    reason: "需要 CIF 输入文件，上游未分发"
+  # ---- 工具链/依赖排除（2 个）----
+  - name: ftndemo
+    result: excluded
+    reason: "OHOS 无 Fortran 编译器，无法构建（含 .f 源）"
+  - name: cctbxtest
+    result: excluded
+    reason: "cctbx 依赖不在 OHOS 依赖仓库，无法构建"
+
+# 汇总：18 个上游用例 = 运行级通过 7 程序 10 次运行（含 test.csh 全部 6 个调用 +
+# 4 个无参自测试）+ 构建级验证 9（上游未分发输入数据，与上游 make check 验证级别一致）
+# + 工具链/依赖排除 2。运行级用例输出与上游参考输出 test.log 数值等价。
+
+# test_package 消费者测试（rule12 鸿蒙特有非断言测试）
+test_package_tests:
+  - file: test_clipper.cpp
+    description: "消费者测试：Cell 构造 + Coord_orth 运算"
+    command: "./test_clipper"
+
+assertion_count: 0

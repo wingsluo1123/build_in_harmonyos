@@ -1,0 +1,53 @@
+# 版本级 manifest for clipper 2.1.20201109
+# 文件位置: archives/c/clipper/2.1.20201109/manifest.yaml
+
+# ============================================================
+# 必须字段
+# ============================================================
+version: "2.1.20201109"
+software: "clipper"
+status: built
+build_date: "2026-10-18"
+build_system: cmake
+
+# ============================================================
+# 源码信息
+# ============================================================
+source:
+  url: "https://ccp4forge.rc-harwell.ac.uk/ccp4/clipper/-/archive/2.1/clipper-2.1.tar.gz"
+  sha256: "7e00a954b1501c28ad82ab17b53a9e01d98077f390d32f761810a9e3bcd43857"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_SYSTEM_NAME=Linux"
+    - "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+    - "-DBUILD_SHARED_LIBS=OFF"
+    - "-DCMAKE_CXX_FLAGS=-DFFTW2_PREFIX_S"
+  dependencies:
+    - "fftw/2.1.5"
+    - "libccp4/8.0.0"
+    - "mmdb/2.0.22"
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+patches_applied:
+  - "0001-ohos-fftw-prefix.patch"
+  - "0002-ohos-fftw-double-abi.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+knowledge_gained:
+  - "Clipper 的 fftmap/fftmap_sparse 中 fftw_real 类型在 sfftw.h 中被覆盖为 double，需用 nullptr 代替 (fftw_real*) NULL"
+  - "CMakeLists.txt 中 FFTW2_DEFINTIONS 少写 I 导致宏未注入，需补丁补定义 FFTW2_PREFIX_S"
+  - "依赖仓库 fftw/2.1.5 是『s 前缀文件名的 double 构建』：sfftw.h 中 FFTW_ENABLE_FLOAT 未定义、导出无前缀 double 符号，与上游 autotools 的 SINGLE_FFTW2 链接检测（m4/fftw.m4）不兼容；CMake 构建缺此检测导致 float 缓冲直传 double FFTW 静默损坏数据"
+  - "修复模式：保持包 API 的 float 类型不变，在 fftmap/fftmap_sparse 全部 rfftw/fftw 变换调用点插入 double 精度临时缓冲转换层（稠密 in-place 3D 与稀疏按行路径），使变换在真实 FFTW ABI 上执行；已用独立 double DFT 参考实现与上游 test.log 会话输出做数值等价验证"
+  - "Xmap::fft_from/fft_to 默认走 Sparse 后端（Xmap_base::default_type_=Sparse），验证 FFT 修复必须覆盖 FFTmap_sparse_p1_hx/xh；上游 automake 无 TESTS，examples/Makefile.am 的 18 个 check_PROGRAMS + test.csh + test.log 构成其事实测试体系"
