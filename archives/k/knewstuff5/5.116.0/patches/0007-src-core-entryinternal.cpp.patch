@@ -1,0 +1,63 @@
+--- a/src/core/entryinternal.cpp
++++ b/src/core/entryinternal.cpp
+@@ -6,21 +6,27 @@
+ 
+     SPDX-License-Identifier: LGPL-2.1-or-later
+ */
+ 
+ #include "entryinternal.h"
+ 
+ #include <QStringList>
+ #include <QXmlStreamReader>
+ #include <knewstuffcore_debug.h>
+ 
+-#include "../entry_p.h" // For Entry::Status ONLY!
++// For Entry::Status ONLY! In scoped builds the KNS3/Entry header
++// (included through entryinternal.h) already provides the Status
++// enumeration, while the widgets-layer entry_p.h cannot compile
++// (EntryPrivate/the real KNS3::Entry do not exist).
++#ifndef KNEWSTUFF_OHOS_SCOPED
++#include "../entry_p.h"
++#endif
+ #include "xmlloader.h"
+ 
+ using namespace KNSCore;
+ 
+ class KNSCore::EntryInternalPrivate : public QSharedData
+ {
+ public:
+     EntryInternalPrivate()
+         : mReleaseDate(QDate::currentDate())
+         , mRating(0)
+@@ -739,21 +745,31 @@
+     }
+     if (d->mStatus == KNS3::Entry::Updateable) {
+         (void)addElement(doc, el, QStringLiteral("status"), QStringLiteral("updateable"));
+     }
+ 
+     return el;
+ }
+ 
+ KNSCore::EntryInternal EntryInternal::fromEntry(const KNS3::Entry &entry)
+ {
++#if KNEWSTUFF_OHOS_SCOPED
++    // Scoped build: the KNS3::Entry header present is the scoped stand-in
++    // carrying only the Status enum; the widgets library (and therefore a
++    // real KNS3::Entry with its internal data) does not exist, so callers
++    // from the widgets layer are themselves absent. Return a default
++    // EntryInternal; this path is unreachable in scoped builds.
++    (void)entry;
++    return KNSCore::EntryInternal();
++#else
+     return entry.d->e;
++#endif
+ }
+ 
+ QString KNSCore::replaceBBCode(const QString &unformattedText)
+ {
+     QString text(unformattedText);
+     text.replace(QLatin1String("[b]"), QLatin1String("<b>"));
+     text.replace(QLatin1String("[/b]"), QLatin1String("</b>"));
+     text.replace(QLatin1String("[i]"), QLatin1String("<i>"));
+     text.replace(QLatin1String("[/i]"), QLatin1String("</i>"));
+     text.replace(QLatin1String("[u]"), QLatin1String("<i>"));

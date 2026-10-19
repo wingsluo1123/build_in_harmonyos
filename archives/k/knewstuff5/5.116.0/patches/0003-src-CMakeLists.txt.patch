@@ -1,0 +1,157 @@
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -1,15 +1,28 @@
+ # SPDX-FileCopyrightText: KDE Contributors
+ # SPDX-License-Identifier: BSD-2-Clause
+ 
++# In scoped mode a source-level guard (KNEWSTUFF_OHOS_SCOPED=1, not a
++# platform macro) selects scoped-only sections in core sources. Define it at
++# directory level before adding subdirectories so it reaches every target.
++if(KNEWSTUFF_OHOS_SCOPED)
++    add_compile_definitions(KNEWSTUFF_OHOS_SCOPED=1)
++endif()
++
+ add_subdirectory(core)
+ 
++# KNEWSTUFF_OHOS_SCOPED (option declared in the top-level CMakeLists.txt):
++# when ON the KF5NewStuff widgets library is skipped because its dependency
++# closure (KF5XmlGui/KF5Service/KF5KIO/KF5Completion/KF5IconThemes/
++# KF5ItemViews/KF5WidgetsAddons) is not available; the package then ships
++# KF5NewStuffCore + knewstuff-dialog only.
++if(NOT KNEWSTUFF_OHOS_SCOPED)
+ set(KNewStuff_SRCS
+     entry.cpp
+     button.cpp
+     knewstuffaction.cpp
+     kmoretools/kmoretools.cpp
+     kmoretools/kmoretoolsconfigdialog_p.cpp
+     kmoretools/kmoretoolsmenufactory.cpp
+     kmoretools/kmoretoolspresets.cpp
+     ui/widgetquestionlistener.cpp
+     uploaddialog.cpp
+@@ -111,21 +124,21 @@
+         DESTINATION ${KDE_INSTALL_INCLUDEDIR_KF}/KNewStuff3/KNS3
+         COMPONENT Devel
+     )
+     install(
+         FILES ${KMoreTools_HEADERS}
+         DESTINATION ${KDE_INSTALL_INCLUDEDIR_KF}/KNewStuff3/kns3
+         COMPONENT Devel
+     )
+ endif()
+ 
+-# In KF6 all KMoreTools headers will be only in ${KDE_INSTALL_INCLUDEDIR_KF}/KMoreTools
++# In KF6 all KF5MoreTools headers will be only in ${KDE_INSTALL_INCLUDEDIR_KF}/KMoreTools
+ ecm_generate_headers(KMoreTools_CamelCase_HEADERS
+     HEADER_NAMES
+     KMoreTools
+     KMoreToolsMenuFactory
+     KMoreToolsPresets
+ 
+     RELATIVE kmoretools
+     REQUIRED_HEADERS KMoreTools_HEADERS
+ )
+ install(
+@@ -163,21 +176,21 @@
+         ${KNewStuff_CamelCase_HEADERS}
+         ${KNewStuff_HEADERS}
+         ${CMAKE_CURRENT_BINARY_DIR}/knewstuff_export.h
+     DESTINATION ${KDE_INSTALL_INCLUDEDIR_KF}/KNewStuff3/KNS3
+     COMPONENT Devel
+ )
+ 
+ install(TARGETS KF5NewStuff EXPORT KF5NewStuffTargets ${KF_INSTALL_TARGETS_DEFAULT_ARGS})
+ 
+ # Kept for backwards compatibility, in KF6 all headers will be in KNewStuff3/KNS3 only
+-if(QT_MAJOR_VERSION STREQUAL "5")
++if(${QT_MAJOR_VERSION} STREQUAL "5")
+     install(FILES
+         ${CMAKE_CURRENT_BINARY_DIR}/knewstuff_export.h
+         ${KNewStuff_HEADERS}
+         DESTINATION ${KDE_INSTALL_INCLUDEDIR_KF}/KNewStuff3/kns3 COMPONENT Devel
+     )
+ endif()
+ 
+ if(BUILD_QCH)
+     ecm_add_qch(
+         KF5NewStuff_QCH
+@@ -210,18 +223,79 @@
+     )
+ endif()
+ 
+ # after ecm_add_qch, due to KF5NewStuffWidgets_QCH dependency on KF5NewStuff_QCH being declared
+ add_subdirectory(widgets)
+ 
+ include(ECMGeneratePriFile)
+ ecm_generate_pri_file(BASE_NAME KNewStuff LIB_NAME KF5NewStuff DEPS "widgets KXmlGui KNewStuffCore" FILENAME_VAR PRI_FILENAME INCLUDE_INSTALL_DIR ${KDE_INSTALL_INCLUDEDIR_KF}/KNewStuff)
+ install(FILES ${PRI_FILENAME} DESTINATION ${ECM_MKSPECS_INSTALL_DIR})
+ 
++endif() # NOT KNEWSTUFF_OHOS_SCOPED
++
++# The QML plugin (org.kde.newstuff) is built in both modes: in scoped mode its
++# dependency closure is fully available (Qt5::Qml/Quick from qtdeclarative,
++# KAuthorized from KF5ConfigCore since KF 5.88, KF5::I18n, KF5::NewStuffCore),
++# so it would be wrong to drop it - knewstuff-dialog's QML loads it at runtime.
+ add_subdirectory(qtquick)
++
++if(KNEWSTUFF_OHOS_SCOPED)
++# Core's entryinternal.h includes "KNS3/Entry" - in a full build this is the
++# CamelCase header generated here (${CMAKE_CURRENT_BINARY_DIR}/KNS3/Entry) by
++# ecm_generate_headers while configuring the widgets library. Core only needs
++# the KNS3::Entry::Status enum (upstream moved it to KNSCore in KF6, see the
++# note in entryinternal.h). Write the header at the exact build-tree location
++# where upstream puts it, with every real enumerator from src/entry.h.
++set(_kns3_entry_shim "${CMAKE_CURRENT_BINARY_DIR}/KNS3/Entry")
++file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/KNS3")
++file(WRITE "${_kns3_entry_shim}" [=[
++#ifndef KNEWSTUFF_SCOPED_KNS3_ENTRY_H
++#define KNEWSTUFF_SCOPED_KNS3_ENTRY_H
++/*
++ * Scoped-build stand-in for the KNS3::Entry CamelCase header the widgets
++ * library generates through ecm_generate_headers (this same build-tree
++ * location). KNSCore depends on this header only for the Entry::Status
++ * enumeration; upstream moved the enum to KNSCore for Frameworks 6 (see the
++ * TODO note in src/core/entryinternal.h). The enumerators below are identical
++ * to the ones declared in src/entry.h.
++ */
++namespace KNS3
++{
++class Entry
++{
++public:
++    enum Status {
++        Invalid,
++        Downloadable,
++        Installed,
++        Updateable,
++        Deleted,
++        Installing,
++        Updating
++    };
++};
++}
++#endif
++]=])
++
++# Install the same stand-in header next to the other KNS3 headers: the
++# installed EntryInternal header includes "KNS3/Entry", so without this an
++# installed-package consumer could not compile against KNewStuffCore.
++install(FILES "${_kns3_entry_shim}"
++    DESTINATION "${KDE_INSTALL_INCLUDEDIR_KF}/KNewStuff3/KNS3"
++    COMPONENT Devel
++)
++
++# The widgets library is not built in scoped mode; install a qmake .pri that
++# points at the core library so the module is still discoverable by qmake.
++include(ECMGeneratePriFile)
++ecm_generate_pri_file(BASE_NAME KNewStuff LIB_NAME KF5NewStuffCore DEPS "KNewStuffCore" FILENAME_VAR PRI_FILENAME INCLUDE_INSTALL_DIR ${KDE_INSTALL_INCLUDEDIR_KF}/KNewStuff)
++install(FILES ${PRI_FILENAME} DESTINATION ${ECM_MKSPECS_INSTALL_DIR})
++endif()
++
+ add_subdirectory(tools)
+ 
+ ecm_qt_install_logging_categories(
+     EXPORT KNEWSTUFF
+     FILE knewstuff.categories
+     DESTINATION ${KDE_INSTALL_LOGGINGCATEGORIESDIR}
+ )
