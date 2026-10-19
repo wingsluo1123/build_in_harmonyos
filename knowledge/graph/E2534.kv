@@ -1,0 +1,51 @@
+# ═══ Draft knowledge entry — ledmon 0.97 实证：/dev/shm "只写虚拟目录"——数据面可用，文件上的 flock/fcntl 锁仍属被拒的控制面 ═══
+# Timestamp: 2026-09-24
+# Software: ledmon 0.97（成套配送：通用机制 M10 的包侧实例，蓝本 DRAFT-PKG-VER-dev-shm-write-only-virtual-dir）
+# Gate: 真机运行（OHOS aarch64 / clang 15，探针逐字复现上游 amd_sgpio.c 调用序列）
+# Status: 灰区（蓝本 draft-review 实测 score=0.48 → E303，review-similar）——本实例补充"文件级 flock 被拒"
+#         与"上游未检查 flock 返回值 ⇒ 静默互斥失效"两条增量
+
+id:                     E2534
+title: OHOS 的 /dev/shm 只开放"数据面"：open/write/shm_open/mmap/unlink 可用，但对 /dev/shm 上的文件 flock/fcntl 加锁、枚举、建子目录、改时间戳、inotify 一律 EACCES(13)——"只用文件"不等于不受影响
+trigger_tool: runtime / autotools / tests
+phase: runtime|testing
+error_signature: "flock.*(Permission denied|EACCES)|fcntl.*F_SETLK.*(Permission denied|EACCES)|mkdir.*dev/shm.*(Permission denied|EACCES)|opendir.*dev/shm.*(Permission denied|EACCES)|mkdtemp.*dev/shm.*(EACCES|Permission denied)|create_directories.*dev/shm|futimens|utimensat|inotify_add_watch"
+severity:               2
+category:               platform, hmdfs, posix, tmpdir
+match_keywords: /dev/shm,flock,fcntl F_SETLK,文件锁,shm_open,EACCES,Permission denied,mkdir,opendir,mkdtemp,create_directories,utimensat,futimens,inotify,静默互斥失效
+prescan_pattern: /dev/shm|shm_open|flock|LOCK_EX|LOCK_SH|fcntl.*F_SETLK|mkdtemp|create_directories|inotify|utimensat|futimens
+prescan_globs: conanfile.py, **/*.c, **/*.cpp, **/CMakeLists.txt
+root_cause: 推断（**未取证内核/namefs 实现**）：OHOS 的 /dev/shm 由 namefs 管理，对本进程呈"只写虚拟目录"——
+  允许创建条目与按 fd 读写，但锁/枚举/时间戳等控制面操作在 namefs 层被拒。实测事实以矩阵 errno 为准，
+  不要据此断言内核实现细节
+affected_scope: 一切在 /dev/shm 上使用**文件锁**（flock/fcntl OFD）守护共享数据的包——即使它"只用文件不碰目录"；
+  以及在 /dev/shm 下建目录/枚举/mkdtemp 的实现（蓝本 osrm-backend 26.5.0 先例，本库 §12.8）。
+  **不适用**：纯数据面用法（不依赖锁的 shm_open+mmap / sem_open / 普通文件读写）——实测全部可用
+verification_cmd: clang --sysroot=... -o probe probe_ledmon_shm.c && ./probe（设备 ~/tmp/uc2/hw-5/probe/probe_ledmon_shm.c；逐字复现 amd_sgpio.c:229-241 与 config_file.c:283 序列）
+rec_priority: 1
+rec_approach: route-shm-locks-and-dir-ops-off-dev-shm
+rec_description: ①"在 /dev/shm 下建目录/枚举"的代码路径改到可写目录（TMPDIR/XDG_RUNTIME_DIR）；
+  ②"用 /dev/shm 文件当锁载体"的包：若锁仅用于同机协作且失败可容忍，显式检查返回值并留 warning 日志
+  （禁止像上游那样静默吞掉）；若锁是正确性必需，改锁载体（文件放可写目录、或命名 sem_open——实测可用）。
+  禁止用"跳过整个测试"掩盖
+rec_command: 补丁在 flock 失败处检查返回值并降级/改道锁文件路径后重跑探针与 make check
+rec_auto_fix: false
+rec_impl: 配方侧补丁或 notes 申报（按包对锁的正确性依赖定）
+fallback_priority: 2
+fallback_approach: use-posix-shm-sem-files-at-root
+fallback_description: 若该路径需要"按名跨进程共享"语义：`shm_open`+`ftruncate`+`mmap(MAP_SHARED)` 承载数据、
+  命名 `sem_open` 承载同步——本机探针实测在 OHOS 上全部可用（ledmon 的数据面即依赖此，无需改动）
+fallback_command: 见 DRAFT-E577（SysV IPC 被 SIGSYS 杀后迁到 POSIX shm/sem 的同族做法）
+fallback_auto_fix: false
+fallback_impl: 上游用法迁移（配方 notes/补丁说明）
+principles:               
+conflicts_with:
+prerequisite_of:
+doc_file: knowledge/drafts/DRAFT-ledmon-0.97-dev-shm-write-only-virtual-dir.md
+last_updated: 2026-09-24
+source_event: 2026-09-24 hw-5 于 ledmon 0.97 适配实机探针（设备 ~/tmp/uc2/hw-5/probe/{probe_ledmon_shm.c,out.log}，
+  EXIT=0）：flock(LOCK_EX|LOCK_NB) r=-1 errno=13、flock(LOCK_SH|LOCK_NB) r=-1 errno=13；
+  shm_open/ftruncate/mmap/写读/fsync/shm_unlink 与 open("/dev/shm/ledmon.conf") 读写删全部 OK；
+  mkdir(/var/tmp/...) errno=2（/var/tmp 整机不存在，mknod 候选就此证伪）。
+  上游取证：src/amd_sgpio.c:229-241（shm_open+flock 未查返回值）、src/config_file.c:283、src/ledctl.c:895-905
+authors:               unknown

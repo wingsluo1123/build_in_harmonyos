@@ -1,0 +1,62 @@
+# ═══ Draft knowledge entry — LP64 上「指针经 int 中转存放」：编译链接零告警，只在表里第一条记录被解引用时 SIGSEGV
+# isoqlog 2.2.1 的排序表把 user* 当 int 存（Data.h 里 struct SortDomain 的元素类型是 int*、
+# Data.c 里 allusers[n] = (int)usr、Html.c 里 u = (user *)allusers[i] 后直接解引用）。
+# aarch64 LP64 + musl 下 sizeof(int)=4 而指针 8 字节，设备 jemalloc 堆地址两次取样均在
+# 0x63_xxxxxxxx 量级（6377001000 / 6386a01000，远超 32 位），截断后符号扩展成非法地址
+# ⇒ 解引用即 SIGSEGV(rc=139)。
+# 决定性判别特征：空数据集跑通、只要有一条记录就必崩（崩溃与内容无关、与条数强相关），
+# 编译期与链接期零告警，因为窄化是显式 (int) 写出来的。
+# Software: isoqlog 2.2.1（2026-09-24 HarmonyOS PC 真机实测，conan 2.29.1 + clang 15）
+# Gate: conan create（ohos-aarch64）G0-G4 全绿 → test_package 消费者测试 12/12
+# Status: DRAFT
+
+id:                     E2592
+severity:               2
+category:               portability, runtime, memory, 'lp64, consumer-test'
+trigger_tool: 'clang|ld.lld|malloc|realloc|make'
+phase: runtime
+
+error_signature: 'rc=139|Segmentation fault \(core dumped\)|signal 11 \(SIGSEGV\)|analysis run failed rc=139'
+match_keywords: 空数据集通过单条记录崩溃, 指针经 int 中转存放, 显式 int 窄化零告警, 按数据量二分定位段错误, 排序表元素类型 int 装指针, LP64 堆地址超 32 位, isoqlog, 无 lldb 时定位 SIGSEGV
+
+root_cause: 'LP64 上 sizeof(int)=4 而 sizeof(指针)=8，老代码把指针当整数搬运会在解引用时命中未映射地址；窄化若写成显式 (int) 则编译器不报（1) 2000 年前后的自建数据结构（排序表、索引数组、哈希桶）常把元素声明成 int*/long*，写入时 (int)ptr、读回时 (T*)value，两步都是"合法"的强制转换，-Wall 与 -Wextra 都不告警（能被编译器拦下的是另一类形态：隐式转换或指针与整数的有序比较，如 DRAFT-gli-0.8.2.0-strstr-pointer-compare-clang15 的 int p = strstr(...) 后 p > 0，clang 15 直接拒绝编译，两者形态与可发现性完全不同）。 (2) aarch64/musl 设备上 malloc 返回的堆地址量级远超 32 位：真机 /proc/self/maps 两次取样 native_heap:jemalloc 段为 6377001000-6377201000 与 6386a01000-6386c01000，恒在 0x63_xxxxxxxx 量级（ASLR 让每次具体值不同，但从未回到 32 位以内；取证日志 ~/tmp/uc2/hw-2/isoqlog-2.2.1/heapaddr-evidence.log）。 (3) 截断只剩低 32 位（以 6377001000 那次为例：0x77001000），int → 指针按符号扩展成 0xFFFFFFFF_77001000，该地址未映射，解引用第一个字段即 SIGSEGV，进程没有任何输出可 grep。 (4) 触发条件是"表里至少有一条记录"：容器为空时排序循环一次都不执行、不解引用任何指针，所以空输入必跑通——这既是判别特征，也是"用空数据做冒烟测试会假绿"的坑。 (5) ILP32（32 位 x86/ARM）两型同宽，同一份代码永不触发，故上游可能几十年都没发现。'
+
+rec_approach: retype-container-to-real-pointer-and-follow-all-sizes
+rec_description: '把容器元素类型改成它真正承载的类型，并让所有 sizeof 与交换变量跟着变；逐个消灭窄化点，改一处不够。 (1) 字段声明：int *allusers → user **allusers（或 void **，若能确定统一类型则优先真实类型，可读性更好）。 (2) 写入点：allusers[n] = (int)usr → allusers[n] = usr，同时 malloc/realloc 的 sizeof(int *) → sizeof(user *)。 (3) **排序/交换过程的临时变量同样在 int 里搬指针**（本例 8 个 sort*() 的 int tmp），漏改则症状一模一样（swap 中二次窄化）。 (4) 读回点的 (T*) 强转可以保留（类型已一致，无害），但必须逐个确认没有别处再经 int 中转。 (5) 验证必须用真实数据集（≥1 条记录），空数据集验证会给出假绿。'
+rec_command: '见 archives/i/isoqlog/2.2.1/patches/0001-isoqlog-Data.h.patch 与 0002-isoqlog-Data.c.patch（逐文件、a/ b/ 前缀、10 行上下文，由框架自身差分函数 ohc.refresh_patch._diff_files 对 pristine/已改两份树生成；conandata.yml 两条均显式 strip: 1，依据=在 pristine 树上实测 patch -p1 --dry-run rc=0 而 -p0 与 -p2 均 rc=1，取证 ~/tmp/uc2/hw-2/isoqlog-2.2.1/strip-evidence.log） # 要点（isoqlog 2.2.1）： # Data.h:  - int *allusers;              + user **allusers; # Data.c:  - int *u;                     + user **u; #          - (int *)malloc(NVINIT * sizeof(int *))   + (user **)malloc(NVINIT * sizeof(user *)) #          - (int *)realloc(..., NVGROW*max*sizeof(int *)) + (user **)realloc(..., NVGROW*max*sizeof(user *)) #          - allusers[nval] = (int)usr;            + allusers[nval] = usr; #          - int tmpnval, i, j, max, tmp;          + int tmpnval, i, j, max; 加 user *tmp;（8 个 sort*()）'
+rec_auto_fix: false
+
+fallback_priority: 2
+fallback_approach: intptr_t-mediated-storage-when-type-change-is-too-invasive
+fallback_description: '确需保留 int 字段布局时改用 intptr_t（不要用 long），并逐个改掉所有中转点 若某处结构体布局不能动（如序列化/共享内存），可把元素类型改为 intptr_t 并把所有 (int) 与 (T*) 中转改成 (intptr_t)。**不要用 long 当指针宽度**：LLP64（Windows x64）上 long 仍是 32 位，假设照样失效。此法仍须逐个消灭窄化点，改动量与正解相同，故仅作退路。另一条退路是彻底改为"存索引不存指针"（表里放下标，需要时回查真正的对象数组），语义最干净但重写量大。'
+fallback_command: 'include <stdint.h> 后 intptr_t *allusers; allusers[n] = (intptr_t)usr; u = (user *)(intptr_t)allusers[i];'
+fallback_auto_fix: false
+fallback_impl: source-patch
+
+prescan_pattern: '\(\s*int\s*\)\s*(usr|ptr|p|q|node|entry|item|sym|tmp)\w*|int\s*\*\s*\w*(allusers|items|entries|heads|nodes|ptrs)\s*;|\(user\s*\*\)\s*\w+Tab\.\w+\[|\(void\s*\*\)\s*\w*\[i\]\s*\)'
+prescan_globs: '**/*.c,**/*.h,**/*.cpp'
+
+verification_cmd:
+
+affected_scope: 凡 ILP32→LP64 迁移、自建数据结构把指针塞进整型的包都适用；判别口诀见正文 任何在 LP64 目标上运行、且把指针经 int/long 中转存放的老 C/C++ 代码。判别口诀： 段错误**与输入条数强相关、与内容无关**（0 条必过、1 条必崩），且编译链接零告警 ⇒ 先查 "指针住在 int 里"，不要先查解析逻辑；验证时**必须喂至少一条真实记录**， 空数据集冒烟会给出假绿。
+
+conflicts_with: 
+caused_by: 
+
+doc_file: knowledge/drafts/DRAFT-isoqlog-2.2.1-pointer-stored-through-int-lp64.md
+last_updated: 2026-09-24
+source_event: archives/i/isoqlog/2.2.1 HarmonyOS PC 适配（任务号 7534）
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors: hw-2
+source_pr: (本 PR)
+source_commit: 97f58011
+
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count: 0
+metrics_fail_count: 0
+metrics_confidence: 0.0
+metrics_last_used:
+rec_impl:               manual
+rec_priority:               1
+verification_cmd:       # 以 source_pr CI 门禁为准（PR (本 PR)）

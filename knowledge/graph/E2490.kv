@@ -1,0 +1,27 @@
+# DRAFT-weborf-1.6-autotools-shell-http-tests-ohos.kv
+# weborf 1.6 实证：autotools TESTS 的 shell 本机 HTTP 测试套件在 OHOS 真跑
+# 字段值一律单行加引号——draft_review._parse_simple_fields 会跳过缩进行，块标量会被读成空值
+
+id:                     E2490
+title: autotools TESTS 驱动的 shell 本机 HTTP 测试套件在 OHOS 真跑的三处平台偏差（换解释器只能注 LOG_COMPILER、curl/bash 不在非交互 PATH、静态 libmagic 缺 magic.mgc 会造成进程存活但端口从不应答）
+trigger_tool: automake check-TESTS / build-aux/test-driver / curl
+phase: testing
+error_signature: test-driver.*No such file or directory; exit status：126; /bin/sh：cannot execute binary file; curl：command not found; http_code 000; Support for MIME is not available; duplicate symbol：buffer_init
+severity:               2
+category:               platform, ohos, autotools, testing
+match_keywords: LOG_COMPILER, TESTS_ENVIRONMENT, am__check_pre, test-driver, automake harness, bin/bash shebang, curl, 127.0.0.1 loopback, 非交互 PATH, magic.mgc, MAGIC, static libmagic, duplicate symbol, buffer_init, http 000, 活进程不监听
+root_cause: automake 串行 harness 的 recipe 形如 `$(am__check_pre) $(LOG_DRIVER) … -- $(LOG_COMPILE) $tst`，而 am__check_pre 的末项是 $(AM_TESTS_ENVIRONMENT) $(TESTS_ENVIRONMENT)，它在整个驱动之前展开、语义是环境变量赋值序列而非命令前缀；用它当解释器注入点会变成 `bash /bin/sh build-aux/test-driver` 并报 cannot execute binary file。真正的解释器注入点是 LOG_COMPILE 所引用的 LOG_COMPILER。其二是 OHOS 无 /bin/bash 而上游 shell 测试普遍写＃!/bin/bash（bashism 如 [[ ]]、function、jobs -p、set -mex），driver 直接 exec 得 ENOENT 即 exit 126。其三是 Conan 的 libmagic 制品仅有静态 .a，其编译期写死的 magic 数据库路径在本机不存在，magic_open/magic_load 失败使程序停在 listen() 之前，表现为进程存活、banner 已打印、端口从未应答，极易被误判为沙箱或回环限制
+affected_scope: 所有『上游测试 = autotools TESTS + shell 脚本 + curl/wget 打自己起的本机服务』的包（各类 http/ftp/mail/daemon 的 testsuite/），以及 testsuite 依赖 bashism 的包；不适用 ctest / meson test / pytest 驱动（各有独立的环境与解释器注入通道）
+rec_priority: 1
+rec_approach: make-check-LOG_COMPILER-plus-PATH-prepend-plus-MAGIC-inject
+rec_description: 给 automake 串行 harness 换解释器时注 LOG_COMPILER 而非 TESTS_ENVIRONMENT；显式把 curl/bash 目录 prepend 进 PATH；把静态依赖的运行时数据文件路径注入环境并由包内登记传播；并用『进程存活 + 端口从不应答』这一组合征象反查数据文件缺失，而非直接归因网络限制
+rec_command: make check -j1 LOG_COMPILER=bash; grep -n -A 20 '^TESTS' Makefile.am; grep -n 'LOG_COMPILE|LOG_DRIVER|am__check_pre' Makefile; llvm-nm -g --defined-only *.o | sort -u > o.txt; llvm-nm -g --defined-only <pkg>/lib/libmagic.a | sort -u > l.txt; comm -12 o.txt l.txt
+principles:             P004
+verification_cmd:
+doc_file: knowledge/drafts/DRAFT-weborf-1.6-autotools-shell-http-tests-ohos.md
+last_updated: 2026-09-24
+source_event: archives/w/weborf/1.6
+rec_auto_fix:               false
+rec_impl:               manual
+authors:               unknown
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）

@@ -1,0 +1,49 @@
+#====================================================================
+# DRAFT-cpdb-libs-1.2.0-getpwuid-null-home-fallback — get_absolute_path 对 getpwuid() NULL 未判空解引用导致 Signal 11，需判空并 fallback $HOME
+# 触发事件: cpdb-libs 1.2.0 适配（conan create 消费端测试 Signal 11 崩溃）
+# 路径: Path B（知识库扩展）
+#====================================================================
+
+id:                     E2515
+trigger_tool:           conan|test|runtime
+phase:                  testing|runtime
+error_signature:        Signal 11|Segmentation fault|core dumped|getpwuid.*NULL|
+                         passwdEnt->pw_dir
+
+severity:               3
+category:               libc, musl, posix, runtime, environment
+match_keywords:         getpwuid, pw_dir, getpwnam, passwd, HOME, getenv,
+                         tilde expansion, ~ path, HMDFS, no passwd entry,
+                         NULL dereference, Segmentation fault, Signal 11,
+                         get_absolute_path
+title:                  OHOS/沙箱无 passwd 库条目时 getpwuid() 返回 NULL，展开 ~ 路径的代码必须判空并 fallback $HOME，否则解引用 pw_dir 即崩溃
+
+root_cause:             getpwuid() 在无 passwd 库条目的 OHOS/沙箱环境返回 NULL，
+  上游代码未判空即解引用 passwdEnt->pw_dir，任何路径含 "~" 的调用
+  （如设置文件读写）都会段错误。
+
+verification_cmd: >
+  cd archives/c/cpdb-libs/1.2.0 && conan create . -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64
+
+rec_priority:           1
+rec_approach:           getpwuid-null-check-with-home-fallback（getpwuid 判空 + getenv("HOME") fallback）
+rec_description: >
+  对 getpwuid()/getpwnam() 返回值先判空，空时 fallback getenv("HOME")，
+  再空时返回 NULL；适用于所有展开 "~" 路径的库。
+rec_command:            struct passwd *p = getpwuid(getuid()); char *home = p ? p->pw_dir : NULL; if (!home) home = getenv("HOME"); if (!home) return NULL;
+rec_auto_fix:           false
+rec_impl:               patch-getpwuid-null-home-fallback
+
+doc_file:               knowledge/drafts/DRAFT-cpdb-libs-1.2.0-getpwuid-null-home-fallback.md
+last_updated:           2026-09-25
+source_event:           cpdb-libs 1.2.0 适配，消费端测试 Signal 11 崩溃
+authors:                atomcode-executor
+source_pr:
+source_commit:
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     0.9
+metrics_last_used:      2026-09-25
+
+affected_scope:         OHOS/沙箱无 passwd 库条目时 getpwuid() 返回 NULL，展开 ~ 路径的代码必须判空并 fall

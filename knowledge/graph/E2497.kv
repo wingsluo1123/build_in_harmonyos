@@ -1,0 +1,52 @@
+# ═══ Draft knowledge entry — 上游测试入口存在但自身不可构建（rule4 少报的两类合法解释） ═══
+# Software: mrboom 5.5
+# Gate: 官方 release tarball 实测构建报错（逐入口）
+# Status: DRAFT — same-stem .md/.kv pair
+
+id:                     E2497
+severity:               2
+category:               packaging, review, rule4, upstream-test
+trigger_tool: grep|make|conan
+phase: adaptation
+
+match_keywords:
+
+error_signature: 上游实测 N=[0-9]+ > 声明 N=0|少报|测试入口.*无法构建|submodule.*missing|too few arguments to function call
+
+root_cause: |
+  赛题审查按**源码树清点测试入口**得到 N（测试目录 / Makefile.test / 含 main 的 *_test.c），
+  但不检验这些入口在**当前源码包**下能否构建。于是出现两类"入口存在但不可执行"：
+  ①入口依赖 git 子模块，而官方 release tarball 不含子模块内容（已入库 E150）；
+  ②上游自带测试与自身源码**签名漂移**（测试未随 API 更新），编译期直接失败（本条新增）。
+  两者都是上游自身缺陷，但不在 PR 正文逐项取证时，审查侧只能按"声明 N < 实测 N"判少报 FAIL。
+
+rec_approach: enumerate-test-entries-then-prove-each-unbuildable-one
+rec_description: |
+  ①先把 N 数对：列出所有可清点到的测试入口，N_static=入口数（不要写"上游无测试套件"一句带过）；
+  ②能构建的全部接进 build() 真实执行，结果写入"适配后测试用例统计"；
+  ③不能构建的在正文单列「未执行测试」表，逐项给：入口路径 + 原因分类 + 官方源码包下的**实测报错原文**；
+  ④子模块类引用 E150（单独取子模块再执行），签名漂移类按本条口径（证明是上游自身问题，不改上游测试）。
+rec_command: |
+  grep -rl "int main" --include="*_test.c" --include="test_*.c" . | sort
+  find . -name "Makefile.test" -o -type d -name test | sort
+  # 逐项试构建（官方 tarball 原样）：保留第一条真实报错作为「未执行测试」的证据
+rec_auto_fix: false
+prescan_pattern: 'Makefile\.test|_test\.c|test_[a-z_]+\.c'
+prescan_globs: ['**/Makefile.test', '**/*_test.c', '**/test/**/*.c']
+
+affected_scope: |
+  所有"上游自带测试套件"的包；尤其从 GitHub release tarball / archive 取源的（子模块内容通常不在包内），
+  以及长期未维护、测试随源码一同漂移的老库。也适用于任何被 rule4 判"少报"的 PR。
+  边界：优先按 E150 取子模块后真实执行；只有确认无法取得或按 §9 不允许捎带第三方源码时才记未执行。
+
+authors:
+  - CIW
+source_pr: 11296
+source_commit: 961ce046c9
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-19
+authors:               
+doc_file:               doc/E2497.md
+match_keywords:         上游实测, 测试入口, 无法构建, submodule, missing, arguments
+verification_cmd:       # 以 source_pr CI 门禁为准（PR 11296）
