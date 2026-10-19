@@ -1,0 +1,45 @@
+# test_package/MANIFEST.yml
+# Upstream test declaration file
+# CI script (build_and_test.sh L0e) requires this file
+
+package: kodi-vfs-libarchive/21.0.2
+homepage: "https://github.com/xbmc/vfs.libarchive"
+
+# Upstream vfs.libarchive 21.0.2-Omega ships no test suite:
+# no tests/ directory (the only tree-wide '*test*' hit is
+# depends/common/lzo2/01-disable-tests.patch, a patch file name of a bundled
+# dependency), no enable_testing()/add_test() in CMakeLists.txt; the upstream
+# CI configurations (.github/workflows/build.yml "Build and run tests" builds
+# only, .travis.yml, appveyor.yml, azure-pipelines.yml, Jenkinsfile) have no
+# test execution step. Evidence chain: run scout report §3 (2026-10-02,
+# verified against the unpacked source tree).
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# Upstream has no test programs
+upstream_tests: []
+
+# test_package consumer-side tests
+test_package_tests:
+  - file: test_vfs_libarchive.cpp
+    description: "dlopen()s the packaged vfs.libarchive.so on the musl OHOS target (validates the recipe's explicit DT_NEEDED closure over libarchive/zstd — knowledge E004 BIND_NOW), verifies the Kodi 21 binary add-on entry points (ADDON_Create, ADDON_GetTypeVersion, ADDON_GetTypeMinVersion) resolve, runs ADDON_GetTypeVersion()/ADDON_GetTypeMinVersion() for the VFS instance (type 110) expecting 3.0.1 / 3.0.1 (xbmc 21.3-Omega SDK kodi/versions.h), then functionally smokes the linked libarchive/3.7.7 closure in-process (archive_version_number()==3007007, version-string prefix, archive_read_new/free roundtrip)"
+    command: "./test_vfs_libarchive <libdir>/vfs.libarchive.so"
+    assertion_count: 9
+
+assertion_count: 9
+
+notes: |
+  上游 vfs.libarchive 21.0.2-Omega 无任何测试注册（无 tests/ 目录，全树
+  '*test*' 唯一命中为依赖补丁文件名 depends/common/lzo2/01-disable-tests.patch，
+  CMakeLists 无 enable_testing/add_test，上游 CI 仅构建，workflow 名
+  "Build and run tests" 名不副实）。test_package 为消费者侧真实检查：
+  dlopen 打包产物（musl 下 dlopen 成功本身即证明配方显式 DT_NEEDED
+  libarchive 闭包完整，E004 BIND_NOW）、dlsym 三个入口符号、实际调用
+  ADDON_GetTypeVersion/MinVersion(110) 校验 VFS 实例 API 3.0.1/3.0.1
+  （xbmc 21.3-Omega SDK kodi/versions.h 口径，同时实证未定义
+  BUILD_KODI_ADDON/ADDON_*_USED 时 versions.h 全量版本表生效）、并直接链接
+  libarchive 闭包做进程内功能冒烟（版本号 3007007、版本串前缀、
+  archive_read 实例建立/释放往返）。headless 无 Kodi 宿主，archive:// 的
+  Open/Read/Seek 主功能由宿主回调驱动（CInstanceVFS），无法在无宿主环境
+  诚实执行（P013 收缩到契约层，同 imagedecoder 先例口径）。
