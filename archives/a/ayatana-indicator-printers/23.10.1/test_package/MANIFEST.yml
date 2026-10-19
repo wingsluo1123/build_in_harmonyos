@@ -1,0 +1,38 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# 上游测试来源: test/CMakeLists.txt（CMake/CTest，ENABLE_TESTS=ON 时构建）
+#   - add_test(mock-cups-notifier ...) -> test/mock-cups-notifier.c
+# 上游仅此 1 个注册测试；本配方 ENABLE_TESTS=ON，在 conan create 的
+# build() 中通过 ctest 实际执行（见 notes.md 的上游测试实测记录）。
+
+package: ayatana-indicator-printers/23.10.1
+homepage: "https://github.com/AyatanaIndicators/ayatana-indicator-printers"
+
+# 上游测试命令 (用于 ctest -N / make check 分析)
+upstream_check_command: "ctest"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "ctest --output-on-failure"
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: test/mock-cups-notifier.c
+    source: ayatana-indicator-printers-23.10.1/test/mock-cups-notifier.c
+    description: "GDBus 模拟 CUPS 通知服务：导出 /org/cups/cupsd/Notifier 并发出 PrinterStateChanged 信号（无系统总线时提前退出，退出码 0）"
+    command: "ctest -R mock-cups-notifier"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.sh
+    description: "鸿蒙特有功能测试：以 dbus 包提供的 dbus-daemon 启动私有 system/session 总线，运行安装后的守护进程，验证其占用 org.ayatana.indicator.printers 并导出 org.gtk.Actions/org.gtk.Menus，且在收到 CUPS PrinterStateChanged 信号后仍存活"
+    command: "bash test.sh"
+  - file: ohos-dbus-check.c
+    description: "D-Bus 对端工具（probe/notify 两种模式），供 test.sh 探测指示器 D-Bus 接口并扮演 org.cups.cupsd.Notifier 发出信号"
+    command: "./ohos-dbus-check probe <bus-address> <name> <path>"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 2

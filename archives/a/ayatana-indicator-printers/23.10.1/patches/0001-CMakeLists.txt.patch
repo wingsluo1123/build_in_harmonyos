@@ -1,0 +1,57 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -31,36 +31,48 @@
+     add_definitions ("-Weverything")
+ else ()
+     add_definitions ("-Wall")
+ endif ()
+ 
+ # Check for prerequisites
+ include (GNUInstallDirs)
+ find_package (PkgConfig REQUIRED)
+ include (FindPkgConfig)
+ pkg_check_modules (SERVICE REQUIRED glib-2.0>=2.36 gio-2.0>=2.36 gio-unix-2.0>=2.36 libayatana-common)
+-find_program (CUPS_CONFIG cups-config REQUIRED)
+-execute_process (COMMAND ${CUPS_CONFIG} --cflags OUTPUT_VARIABLE CUPS_CFLAGS)
+-execute_process (COMMAND ${CUPS_CONFIG} --libs OUTPUT_VARIABLE CUPS_LIBS)
++# CUPS is resolved through pkg-config instead of the installed cups-config
++# helper: cups-config reports the prefix it was built with (e.g. /usr), which
++# does not match the relocatable package layout used on HarmonyOS.
++pkg_check_modules (CUPS REQUIRED cups>=2.4)
+ list (APPEND SERVICE_CFLAGS ${CUPS_CFLAGS})
+-list (APPEND SERVICE_LDFLAGS ${CUPS_LIBS})
+-list (APPEND SERVICE_LIBRARIES "cups")
++list (APPEND SERVICE_INCLUDE_DIRS ${CUPS_INCLUDE_DIRS})
++list (APPEND SERVICE_LIBRARIES ${CUPS_LIBRARIES})
++# pkg_check_modules keeps the -L directories in *_LIBRARY_DIRS; propagate them
++# so every target (service, static library and tests) links against
++# dependencies that live outside the default linker search path.
++link_directories (${SERVICE_LIBRARY_DIRS} ${CUPS_LIBRARY_DIRS})
+ 
+ # Custom targets
+ set (ARCHIVE_NAME ${CMAKE_PROJECT_NAME}-${PROJECT_VERSION})
+ add_custom_target (dist COMMAND bzr export --root=${ARCHIVE_NAME} ${CMAKE_BINARY_DIR}/${ARCHIVE_NAME}.tar.gz WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+ add_custom_target (cppcheck COMMAND cppcheck --enable=all -q --error-exitcode=2 --inline-suppr ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/test)
+ 
+ # Build
+ add_subdirectory (src)
+ add_subdirectory (data)
+-add_subdirectory (po)
++
++# Translations require the Intltool CMake module (Ubuntu cmake-extras), which is
++# not shipped on HarmonyOS; skip po/ when the module is unavailable instead of
++# failing the configure step.
++find_package (Intltool QUIET)
++if (INTLTOOL_FOUND)
++    add_subdirectory (po)
++endif ()
+ 
+ if (ENABLE_TESTS)
+     include (CTest)
+     enable_testing ()
+     add_subdirectory (test)
+     if (ENABLE_COVERAGE)
+         find_package (CoverageReport)
+         ENABLE_COVERAGE_REPORT (TARGETS "ayatanaindicatorprintersservice" "ayatana-indicator-printers-service" TESTS "mock-cups-notifier" FILTER /usr/include ${CMAKE_BINARY_DIR}/*)
+     endif ()
+ endif ()
