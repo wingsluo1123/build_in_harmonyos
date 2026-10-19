@@ -1,0 +1,22 @@
+# Created by official graph add --draft; preparation only, not indexed.
+id:                     E3391
+trigger_tool: test|runtime|solvate
+phase: testing|runtime
+severity:               2
+category: runtime, testing, filesystem, api
+title: 必需checkpoint header前的EOF必须传播为错误，并保留fscanf遗留LF消费合同
+error_signature: Could not read required checkpoint header.
+match_keywords: solvate, gaussians.lis, boundary.lis, skip_line, checkpoint, fscanf, EOF
+root_cause: skip_line只等待LF且不检查EOF或读错，空/截断checkpoint进入无限循环；普通skip-line替换会在fscanf遗留LF处过早返回，下一次数值读取撞到header。
+affected_scope: 混用fscanf与先丢一字节再跳header的老式科学计算checkpoint reader；只在必需结构或字段缺失时失败。非OHOS专属，不用于合法末尾无LF或普通逐行文本读取。
+verification_cmd: python3 archives/s/solvate/1.0/test_package/verify_checkpoint.py --binary "$SOLVATE_PACKAGE_ROOT/bin/solvate" --data "$SOLVATE_PACKAGE_ROOT/share/solvate" --output "$SOLVATE_TEST_OUTPUT" --environment OHOS-native
+rec_priority: 1
+rec_approach: reject-required-checkpoint-eof-preserve-fscanf-header-contract
+rec_description: 初次fgetc及找LF循环都检查EOF并沿原terminate非0退出；两个reader只增加fscanf成功字段数为1的检查，保留消费顺序和合法末数值后EOF。
+rec_command: 在固定原源仅修改solvate.c，使用官方refresh-patch生成交付补丁，再通过实际Conan包运行原发行命令与checkpoint回归。
+rec_auto_fix: false
+rec_impl: source-patch
+doc_file: knowledge/drafts/E429-draft-1306.md
+last_updated: 2026-10-16
+source_event: orrkri任务10798；固定Debian原源SHA562201246040b6fc66c1240e437737349ef01d062aa3eb72b6b86f5e1510768f；OHOS6/armv8/clang15原版4个真实超时缺陷及官方补丁应用有效；004未修改官方W3单次RC0，真实包12场景(原发行2+新增10)/60断言PASS，ELF183/二进制SHA804636f4...；L2真实skip(--version/--help不支持)保留，旧finish1/失败/超时不改。未发布/有效提审/知识接受/积分。
+authors: orrkri

@@ -1,0 +1,63 @@
+#====================================================================
+# Draft knowledge entry — lang-preflight 对"发行包顶层无源码、源码嵌套在
+# jar/内层压缩包中"的包误判任意语言（weka 实测误判 nodejs）
+# 来源: weka 3.6.14 适配评估 (2026-10-16)
+# 关联同类: roffit-0.17-lang-preflight-makefile-mixed-false-positive,
+#           kde-app-android-gradle-lang-misjudge（manifest 优先级类，根因不同）
+#====================================================================
+
+id:                     E3373
+trigger_tool:           lang-preflight|conan
+phase:                  preflight
+error_signature:        '语言不匹配.*任务标记 cpp.*实测源码为 \w+（none）|source_stats.*源文件 1 个.*主体占比 100%|detected_language=(nodejs|\w+) 但顶层无 .*\.java/\.cpp/\.c 源文件'
+match_keywords:         lang-preflight, env_unsupported, 误判, nodejs, 发行包, release zip, weka-src.jar, 源码嵌套, jar, 嵌套压缩包, tarball-in-tarball, 顶层无源码, source_stats, detected_language, R47, weka
+category:               detection, packaging, tooling
+severity:               2
+title:                  发行包（release zip/tar）顶层只有 jar/文档/数据文件、真实源码嵌套在 *.jar/*.egg/内层压缩包里时，lang-preflight 扫顶层把非源文件当语言证据误判任意语言（weka 3.6.14 顶层被误判 nodejs，真实语言为 java）：先定位/解出内层源码归档，对源码主体根目录重跑预检，再按真实语言下终态
+root_cause: >
+  lang-preflight 的三级判定（manifest > 构建系统 > 源码统计）以 --src 指向的目录
+  为扫描根。Java/Python 等语言的官方发行包（如 weka-3-6-14.zip、SourceForge
+  发行 zip）顶层往往是 jar/whl/egg 成品、PDF 手册、数据文件，源码打包在
+  weka-src.jar 这类内层归档里——jar 本身就是 zip，但预检不递归解包。此时：
+  (1) manifest 与构建系统两级均落空（build: none）；
+  (2) 源码统计只在顶层找到极少数散落脚本（weka 案例命中 1 个被归为 nodejs
+      的文件），主体占比 100% 的结论来自 1 个文件，统计显著性为零；
+  (3) 判定输出 detected_language 为随机噪声（nodejs），与真实语言（java，
+      jar 内 1357 个 .java 文件 + build.xml + pom.xml）完全无关。
+  根因共性：预检假定"解包根=源码根"，对"发行包→内层源码归档"的两层结构
+  不成立，导致 env_unsupported 终态携带错误 detected_language，误导平台
+  语言迁移方向。
+affected_scope: >
+  一切"发行包内嵌源码归档"的上游打包形态：Java 库（*-src.jar）、Python 库
+  （sdist 外再套 zip/tar）、tarball 套 tarball、monorepo 发行子包等。后果形态：
+  ①真实非 C/C++ 库被误判为第三种语言，语言迁移平台分流错误；②真实 C/C++
+  库源码藏在 src/ 内层归档时被误终止（假阴性止损）。
+verification_cmd:       find <src> -maxdepth 1 -name "*.jar" -o -maxdepth 1 -name "*.zip" -o -maxdepth 1 -name "*.egg" && unzip -l <src>/<内层归档> | head -20 && 解包后 find <src_root> -name "*.java" | wc -l   # weka 案例: weka-src.jar 内 1357 个 .java + build.xml + pom.xml
+rec_priority:           1
+rec_approach:           extract-inner-archive-then-repreflight
+rec_description: >
+  (1) 预检前先做"发行包体检"：顶层若存在 *.jar/*.egg/*.whl/*.tar.*/*.zip 内层
+      归档且顶层无成规模源文件（.java/.c/.cpp/.py 计数≈0），先解包内层归档
+      （jar=zip，unzip/python zipfile 均可）到独立目录；
+  (2) 对解出的源码根目录重跑 lang-preflight，以第二次判定为准；
+  (3) 两次判定均 env_unsupported 且证据一致（如 java: 1357 .java + build.xml
+      + pom.xml）→ 按真实语言上报 env_unsupported + detected_language（R47
+      激励：lang_hold 挂起等生态，非失败）；
+  (4) 若解包后是 C/C++ 源码 → 正常进入适配主流程；
+  (5) 不修改源码、不伪造语言证据迎合检测器（R8/R10 口径同 kde 草稿）。
+rec_command: >
+  python3 -c "import zipfile; zipfile.ZipFile('weka-src.jar').extractall('src-root')"  # jar=zip
+  python3 ohc-run.py lang-preflight <sw> <ver> --src <src-root>   # 对源码根重跑，以该结果为准
+rec_auto_fix:           false
+forbid_1_pattern:       rm\s+-rf.*\.jar|git\s+rm.*build\.gradle.*迎合|伪造
+forbid_1_reason:        禁止删除/改名发行包内嵌归档或伪造 language_evidence 来"通过"预检。
+forbid_1_consequence:   违反 R8/R10（伪造证据），预检通过但产物与上游不符，CI/评审一票否决。
+doc_file:               knowledge/drafts/weka-3.6.14-langpreflight-nested-archive-source-hidden.md
+authors:                li_shuo <ls.fr@qq.com>
+source_pr:
+source_commit:
+last_updated:           2026-10-16
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+rec_impl:               manual

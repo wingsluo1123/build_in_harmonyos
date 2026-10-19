@@ -1,0 +1,70 @@
+#====================================================================
+# DRAFT-kcachegrind-26.04.0-kf6-relative-needed-cwd-load
+# KF6 消费包测试期加载失败：相对 DT_NEEDED `../../bin/<lib>.so` 按 CWD 解析
+# 来源: kcachegrind 26.04.0 适配 / 远端 CI 构建 #92573 (2026-10-15)
+#====================================================================
+
+id:                     E3334
+title:                  KF6 依赖库的坏 DT_NEEDED（相对 `../../bin/<lib>.so` / 指向构建方 conan home 的绝对路径）导致消费包 test_package 在 CI 加载失败而在本机通过 —— 用 <cache>/bin + recon CWD 重建解析路径
+trigger_tool:           conan create|conan test|readelf|ld.so|musl loader
+phase:                  testing|runtime|linking
+error_signature:        "Error loading shared library ../../bin/libKF6ConfigCore.so: (needed by .*/libKF6ConfigGui.so)|Error loading shared library ../../bin/libKF6IconThemes.so|Error loading shared library ../../../bin/|rc=127 且本地同级 test_package 全过"
+match_keywords:         KF6, DT_NEEDED, ../../bin, 相对路径, CWD, readelf, NEEDED absolute path, conan home, package_id 字节不一致, test_package, kconfigwidgets, kiconthemes, kcoreaddons, KF6ConfigGui, KF6ConfigCore, KF6IconWidgets, KF6IconThemes, recon, _reconstruct_kf6_rpaths, LD_LIBRARY_PATH 不生效, DT_RPATH 不生效
+category:               portability, linking, runtime, kf6, qt6
+severity:               2
+forbid_1_pattern:       "patchelf 重写缓存内 .so 的 NEEDED"
+forbid_1_reason:        HMDFS 对改写后的 .so 有 W^X/隔离标签风险（E537/kgraphviewer 实证：patchelf 产物在运行时被拒载），改写应在链接期或用代理副本解决，不要在运行期改已发布产物。
+forbid_2_pattern:       "只把依赖 lib 目录塞进 LD_LIBRARY_PATH 就当作修复"
+forbid_2_reason:        含 '/' 的 NEEDED 被加载器当成路径直接打开，**不查** DT_RPATH/LD_LIBRARY_PATH；因此追加搜索路径对此类条目完全无效，必须让该相对路径落在 CWD 上。
+root_cause: "两类坏 DT_NEEDED 在 KF6 生态里同时存在：
+  (1) **相对形式** `../../bin/<lib>.so`：动态加载器对**含 '/' 的名字**不查
+      DT_RPATH/DT_RUNPATH/LD_LIBRARY_PATH，而是当作相对 **进程 CWD** 的路径直接
+      open(2) ⇒ 只有把 CWD 放到能让该相对路径命中真实文件的位置才行。
+  (2) **绝对形式** `<某机器的 conan home>/p/<pkg>/p/lib/<lib>.so`：指向构建方
+      的缓存布局（本仓 E537 族），跨机器/跨 cache home 即失效。
+  为什么『本地全过、CI 才挂』：Conan 只按 package_id 索引二进制，**不校验同名
+  package_id 的字节一致性**。CI worker 的持久缓存里，kconfigwidgets/kiconthemes 等
+  是上游配方在该 worker 上**本地重建**出来的副本（链接行用了相对路径，故 intra-package
+  的 DT_NEEDED 记成 `../../bin/<lib>.so`）；而开发机 `~/.cache/conan2` 恰好存在、
+  副本来自发布方构建（绝对路径且路径真实存在）⇒ 本地掩盖了缺陷。"
+rec_approach: "在消费方 test_package 里重建解析路径（kteatime/ktimer 26.04.0 已合并先例）：
+  1) 从任一依赖的 package_folder 反推 conan cache home：
+     `cache_home = dirname(dirname(dirname(dep.package_folder)))`（对 `~/.conan2/p/<h>/p`
+     与 CI 的 `~/.cache/conan2/p/<h>/p` 两种布局都成立）；
+  2) 把**所有依赖** `lib/*.so` 复制（follow symlink，落地为真实文件）到
+     `cache_home/bin`，并顺手把源缓存里的 symlink .so 原地实体化（HMDFS 加载器对
+     symlink .so 不稳定，见 E537/清单 #29）；
+  3) 兜底绝对形式：确保 `<dirname(dirname(cache_home))>/.conan2 -> cache_home` 软链存在；
+  4) 测试进程的 CWD 设为 `cache_home/recon/<pkg>`，这样 `../../bin/<lib>.so` 命中
+     `cache_home/bin/<lib>.so`；测试脚本内部**不得**再覆盖 CWD（例如别把被测程序
+     `cwd=` 到 TMPDIR）。
+  5) 若出现的相对前缀不是 `../../bin`（历史上有 `../../../bin/`），按前缀深度在对应
+     层级补一个 bin 目录即可（ctypes/dlopen 报错里的相对路径就是深度证据）。"
+rec_command: >
+  R="${TMPDIR:-/data/storage/el2/base/cache}/relneeded"; mkdir -p $R/bin $R/recon/kcg $R/other
+  printf 'int a(void){return 1;}\n' > $R/bin/a.c
+  (cd $R/bin && /data/service/hnp/bin/clang -shared -fPIC -o libA.so a.c)
+  printf 'extern int a(void); int b(void){return a();}\n' > $R/recon/kcg/b.c
+  (cd $R/recon/kcg && /data/service/hnp/bin/clang -shared -fPIC -o libB.so b.c ../../bin/libA.so)
+  readelf -d $R/recon/kcg/libB.so | grep NEEDED      # [../../bin/libA.so]
+  cd $R/other && python3 -c "import ctypes;ctypes.CDLL('$R/recon/kcg/libB.so')"  # FAIL
+  cd $R/recon/kcg && python3 -c "import ctypes;ctypes.CDLL('$R/recon/kcg/libB.so')"  # OK
+verification_cmd: >
+  conan create archives/k/kcachegrind/26.04.0 -pr:h=ci/conan/profiles/ohos-aarch64 \
+  -pr:b=ci/conan/profiles/ohos-aarch64 --build=missing
+  - "CI 构建 #92573 日志：`Error loading shared library ../../bin/libKF6ConfigCore.so: (needed by /storage/Users/currentUser/.cache/conan2/p/kconfa2f42dbf978cc/p/lib/libKF6ConfigGui.so)`（26/31）"
+  - "同一配方在本机 `conan create` 为 31/31（本地 `~/.cache/conan2` 存在且副本为发布方构建）"
+  - "本机 readelf 对照：本机该 package_id 的 libKF6IconWidgets.so 记的是**裸名** `libKF6IconThemes.so` + 4 条指向 `/storage/…/.cache/conan2/p/…` 的绝对条目；CI 侧同一 package_id 记的是 `../../bin/libKF6IconThemes.so` ⇒ 同一 package_id 的两份字节 NEEDED 不同（Conan 不校验）"
+  - "自造 ELF 实验（见 rec_command）在本机复现同款报错与修复后成功"
+  - "先例：archives/k/ktimer/26.04.0/test_package/conanfile.py `_reconstruct_kf6_rpaths`；kteatime 26.04.0 同源"
+  - "任何在 OHOS 上消费 ohpcd KF6 预编译包、且 test_package 真实运行二进制的 KDE/Qt 配方（尤其 CI worker 缓存中混有本地重建副本时）"
+  - "任何依赖库出现含 '/' 的 DT_NEEDED 的场景（相对或绝对）—— 通用判据：含 '/' 的名字不查搜索路径，只按路径打开"
+principles:             P005, P011
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E3334.md
+affected_scope:         KF6 依赖库的坏 DT_NEEDED（相对 `../../bin/<lib>.so` / 指向构建方 conan ho
+rec_description:        "在消费方 test_package 里重建解析路径（kteatime/ktimer 26

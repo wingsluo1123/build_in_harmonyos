@@ -1,0 +1,35 @@
+#====================================================================
+# Draft: rpcgen 2.6.4 --
+#        OHOS 无 /etc/netconfig：libtirpc 旧式 clnttcp_create() 报
+#        "RPC: Unknown protocol"，需改用 clnt_vc_create()/svc_vc_create()
+#====================================================================
+
+id:                     E3375
+trigger_tool:           conan|clang|ld|runtime
+phase:                  testing|runtime
+error_signature:        RPC: Unknown protocol|RPC_UNKNOWNPROTO|clnttcp_create.*Unknown protocol|clnt_create.*Unknown protocol|getnetconfigent.*NULL|no such file.*netconfig
+
+severity:               2
+category:               ohos, portability, libc, network, conan
+match_keywords:         libtirpc, TI-RPC, netconfig, NETCONFIG, /etc/netconfig, clnttcp_create, clnt_create, clnt_vc_create, svc_vc_create, svc_register, rpcbind, portmapper, RPC_UNKNOWNPROTO, __rpc_getconfip, getnetconfigent, OHOS, HarmonyOS, test_package, 消费者用例, RPC 往返
+
+title:                  OHOS 不提供 /etc/netconfig，libtirpc 旧式 clnttcp_create()/clnt_create() 必然失败（RPC: Unknown protocol）；传输层构造器 clnt_vc_create()/svc_vc_create() 可完全绕开
+
+root_cause:            libtirpc 的旧式客户端构造器 clnttcp_create()（以及在其之上的 clnt_create()）先用 __rpc_getconfip("tcp") 把 netid "tcp" 解析成 struct netconfig，成功后才进入传输层构造。该解析走 getnetconfigent() → 读取 netconfig 文件，而 libtirpc 把该路径编译成常量（include/tirpc/netconfig.h: #define NETCONFIG "/etc/netconfig"），实测环境变量 NETCONFIG 无法覆盖（设置后仍报同一错误）。OHOS 既没有 /etc/netconfig（/etc 只读，无法补文件），也没有 rpcbind/portmapper 服务，于是：①客户端 clnttcp_create/clnt_create 立刻返回 NULL 并置 RPC_UNKNOWNPROTO（打印 "RPC: Unknown protocol"）；②服务端若沿用 rpcgen 生成的服务端 main（pmap_unset + svc_register(..., IPPROTO_TCP)）同样无法注册。对照实验：同一份生成代码把客户端换成 clnt_vc_create(fd, &netbuf, prog, vers, 0, 0)、服务端换成 svc_vc_create(fd, 0, 0) + svc_register(..., protocol=0)（仅本地注册、不联系 portmapper），在鸿蒙 PC 上立刻跑通真实 TCP RPC 往返。即：**netconfig 依赖只存在于旧式 API 外壳，传输层构造器（*_vc_create）用 fd+地址直接工作**。
+affected_scope:        所有在 HarmonyOS 上使用 libtirpc 的消费者：任何调用 clnt_create()/clnttcp_create()/clntudp_create() 或 rpcgen 生成的服务端 main（svc_register 带 IPPROTO_*）的程序；用 TI-RPC 做 RPC 往返验证的 test_package/消费者用例；把"能编译链接"当作验收口径的流程（该缺陷只在运行期暴露，编译与链接全绿）。
+verification_cmd:       grep -rn 'define NETCONFIG' "$(conan cache path libtirpc/*/ 2>/dev/null | head -1)"/include/tirpc/netconfig.h 2>/dev/null ; ls -l /etc/netconfig ; ls -l /etc 2>/dev/null | head -3
+
+rec_priority:           1
+rec_approach:           use-tirpc-transport-level-constructors-and-local-svc-register
+rec_description:        (1) 客户端：自行 socket()+connect() 后调用 clnt_vc_create(fd, &addr, prog, vers, 0, 0)（addr 为 struct netbuf{maxlen,len,buf}，buf 指向已填充的 sockaddr_in），不要用 clnttcp_create/clnt_create。(2) 服务端：监听 fd（bind+listen）交给 svc_vc_create(fd, 0, 0)，然后用 svc_register(transp, PROG, VERS, dispatch, 0) —— protocol 参数给 0 = 只做本地注册、不联系 portmapper，随后 svc_run()。(3) 端口传递：bind 到端口 0 后 getsockname() 取实际端口，通过 pipe 交给客户端进程（无 rpcbind 可查询）。(4) rpcgen 生成的服务端文件（*_svc.c）自带依赖 portmapper 的 main()，其 dispatcher 是 static：复用它的办法是在消费者 TU 内 `#define main <renamed>/#include "foo_svc.c"/#undef main`，这样生成的分发器参与真实调用，被重命名的 main 不会被调用；生成文件本身不修改。(5) 验收口径：必须在目标机做真实 RPC 往返并断言业务结果（本例断言结构体入参的 sum/product 与标量入参的 square 共 3 项），仅编译链接或仅断言非空指针抓不到该缺陷。(6) 若确实需要 netid 解析或 portmapper 语义，必须先在 OHOS 侧提供 netconfig 与 rpcbind（当前制品仓均无），不能靠环境变量绕过。
+rec_command:            clnt = clnt_vc_create(sock, &addr, PROG, VERS, 0, 0);   /* 代替 clnttcp_create/ clnt_create */  |  svc_register(transp, PROG, VERS, dispatch, 0);   /* 0 = 本地注册，不经 portmapper */
+rec_auto_fix:           false
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+# PR 交付后回填（与仓内绝大多数草稿同阶段做法一致）
+source_pr:
+source_commit:
+rec_impl:               manual
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E3375.md

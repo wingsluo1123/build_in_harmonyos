@@ -1,0 +1,112 @@
+#====================================================================
+# Draft: Upstream test entries using windows.h host header are not
+#        unrunnable - POSIX single-path host compat + controlled run
+#====================================================================
+
+id:                     E3307
+trigger_tool:           clang|cmake|conan|windows.h|Sleep|GetTickCount64|while (1)|localtime|harness|review rule 4
+phase:                  compile|run|review
+error_signature:        fatal error: 'windows.h' file not found|undefined symbol: main|Test failed: cron:|Total tick:|Press CTRL\+C|while \(1\)|Sleep\(100\)|rule4.*验证结果.*少报|实测 N > 声明 N
+
+severity:               3
+category:               ohos, testing, host-compat, review
+match_keywords:         windows.h, host header, Sleep, GetTickCount64, nanosleep, clock_gettime,
+                        POSIX single path, single-path compat, dev/main.c, test vector harness,
+                        while(1) infinite example, controlled completion, SIGINT, localtime timezone
+                        prerequisite, UTC+2, underscore underreport, rule 4, upstream test entry,
+                        example entry, runner, -DENTRY, placeholder 待办标记 return 1
+
+title:                  上游测试入口的 windows.h 宿主头不可直接判"不可运行"：POSIX 单一路径兼容头 + 受控运行真实执行全部入口
+
+root_cause:             lwdtc 等库的 dev/ 与 examples/ 宿主代码 #include <windows.h>
+                        仅使用 Sleep(ms) 与 GetTickCount64() 计时原语，库发布物
+                        （lwdtc/src/** 与安装头/库）零依赖它；把"示例用了
+                        windows.h"等价于"库不可运行"是归因错误，导致规则 4
+                        「验证结果」少报 FAIL（实测 N > 声明 N）。伴生三个陷阱：
+                        ①示例文件无 main()（入口函数 cron_xxx()），独立编译报
+                        undefined symbol: main；②3 个示例为 while(1) 无限循环，
+                        无退出条件/参数，不可能自然 exit 0；③dev/main.c 用
+                        localtime() 格式化并与硬编码期望串比较，期望串按作者
+                        本地时区（UTC+2）撰写，默认时区（如 CST）下全部断言
+                        偏移失败，易误判为库缺陷。
+
+affected_scope:         MaJerle 系库（lwdtc/lwbtn/lwmem/lwow 等）及任何上游
+                        dev/examples 用 windows.h 宿主头而库发布物不依赖它的 C 库；
+                        任何含 while(1) 无限示例/测试入口、或用 localtime()+硬编码
+                        期望串断言（期望串隐含作者时区）的库。已验证实例：
+                        lwdtc 1.0.0 R02（task lwdtc-1.0.0-r02-upstream-test-vector-
+                        and-example-execution-pc2-9-20260927T050718Z）。
+
+verification_cmd:       TZ=UTC-2 <harness_bin> ; sh <controlled_run.sh> <entry> <bin> <log> 60
+
+rec_priority:           1
+rec_approach:           posix-single-path-host-compat-plus-controlled-run
+rec_description:        不修改任何上游逻辑，按"宿主兼容 + 受控完成"真实执行全部入口：
+                        ①POSIX 单一路径兼容头（Sleep→nanosleep 含 EINTR 重试、
+                        GetTickCount64→clock_gettime(CLOCK_MONOTONIC)），命名为
+                        windows.h 独立 include 注入 -I，禁平台条件编译宏；
+                        ②示例无 main() 时用 -DENTRY=cron_xxx 单入口宏版 runner
+                        提供调用点（一二进制一符号）；③harness 期望串按 UTC+2
+                        撰写，运行设 TZ=UTC-2（POSIX 环境变量，不改期望值/不裁剪
+                        向量），默认时区失败如实记为 harness 隐式时区前提；
+                        ④无限入口运行 ≥60s 由后台编排器发 SIGINT（禁 timeout/
+                        SIGKILL/改源码/伪造 exit 0），记录原始信号退出态（130）
+                        与输出类别；⑤worktree 外临时副本篡改期望值实证可失败
+                        （rc=255 + Test failed）后恢复交付态（sha256 对照）；
+                        ⑥占位入口（待办标记 + return 1 无断言）真实运行如实记 rc=1，
+                        不计通过、不写成不可运行、不自行实现 待办标记。
+rec_command:            TZ=UTC-2 "$TMPDIR/lwdtc-harness-r02" && sh "$TMPDIR/lwdtc-r02-controlled-run.sh" cron_basic "$TMPDIR/lwdtc-example-cron_basic" "$TMPDIR/lwdtc-r02-logs/example_cron_basic_run.log" 60
+rec_auto_fix:           true
+rec_impl:               reports/r02_*.log 随 PR 交付（唯一绝对路径 + sha256）
+
+fallback_priority:      2
+fallback_approach:      upstream-parameterized-run
+fallback_description:   若上游入口提供官方测试数/时长/种子参数，用官方参数化方式
+                        运行并记录参数；仅在无任何官方参数时才用受控完成（SIGINT）。
+fallback_command:
+fallback_auto_fix:      false
+fallback_impl:
+
+forbid_1_pattern:       把 windows.h 宿主头写成"不可运行/外部阻塞"
+forbid_1_reason:        归因错误导致规则 4 少报（实测 N > 声明 N）FAIL；必须先审计
+                        windows.h 是否仅宿主代码使用、库发布物是否零依赖。
+forbid_1_consequence:   少报核验不通过，Review 规则 4 拒绝。
+
+forbid_2_pattern:       timeout 包无限入口并当 124 为成功|SIGKILL|改源码删 while(1)
+forbid_2_reason:        R34/R51 禁伪造行为；受控完成必须由后台编排器向原始子进程发
+                        SIGINT，记录原始信号退出状态，不得伪造自然 exit 0。
+forbid_2_consequence:   恒绿/伪造证据被审核拒绝，知识判定与交付均不成立。
+
+forbid_3_pattern:       把 return 1 占位入口写成通过|自行实现 待办标记 算法凑通过|把示例运行写成断言通过
+forbid_3_reason:        上游占位实现（待办标记 + 无条件 return 1）无断言，如实分类"已运行/
+                        上游占位无断言"，不计通过率；示例运行事实可作为"已实际执行"
+                        计入合计，但不得计为断言通过。
+forbid_3_consequence:   统计造假被规则 4 / prohibited_markers 命中，本轮不合格。
+
+forbid_4_pattern:       兼容头含 #ifdef __OHOS__ 平台条件编译宏
+forbid_4_reason:        R8/PF5 口径：平台差异必须走 POSIX 单一路径；兼容头/脚本不得
+                        引入平台宏。
+forbid_4_consequence:   平台宏被 CI 拦截，兼容头与运行态一致性（sha256）无法核验。
+
+# Layer 4: 原则引用
+principles:
+
+# 关系图
+causes:
+caused_by:
+conflicts_with:
+prerequisite_of:
+
+# 元数据
+doc_file:               drafts/DRAFT-lwdtc-1.0.0-windows-host-compat-rerun.md
+last_updated:           2026-09-27
+source_event:           lwdtc 1.0.0 R02 Review 规则 4 修复轮（task lwdtc-1.0.0-r02-upstream-test-vector-and-example-execution-pc2-9-20260927T050718Z）
+
+authors:                tianyi_wang <tianyi@noreply.gitcode.com>
+source_pr:
+source_commit:
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     0.9
+metrics_last_used:      2026-09-27

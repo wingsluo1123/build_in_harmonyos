@@ -1,0 +1,18 @@
+error_signature: "QStandardPaths: runtime directory .* is not owned by UID|Runtime directory.*not matched|system: exit=35|Failed to create wl_display|Could not ensure runtime directory"
+root_cause: "TWO independent traps make QStandardPaths::RuntimeLocation unresolvable in conan test_package runs on HarmonyOS shared storage: (1) conan's test() executes the test driver with env='conanrun', which REPLACES the host environment wholesale — an XDG_RUNTIME_DIR exported in the launching shell never reaches the test process, so QStandardPaths falls back to scanning $HOME and /tmp for pre-existing stale directories; (2) on hmdfs (the FUSE-style shared storage under /storage/Users), every created directory reports a FIXED owner UID (20001006, the shared-storage service) regardless of which UID created it — a test process running as UID 20020085 can never satisfy Qt's runtime-dir ownership check (owned by current UID + permissions 0700), so mkdir+chmod alone is futile and the check fails with exit 35 on every real filesystem path available (/, /data/local/tmp is inaccessible, /dev/shm unavailable)."
+rec_approach: "Fix at the test layer, keep FAIL semantics on real filesystems: (1) in the test_package conanfile, create the runtime dir under the build folder and inject it ON THE COMMAND LINE ('env XDG_RUNTIME_DIR=...' prefix) because env='conanrun' discards inherited variables; (2) in the test driver, apply the ownership check to whatever XDG_RUNTIME_DIR ended up effective — stat() it and, when st_uid differs from os.getuid(), treat the filesystem as shared-storage-style and degrade the system case to a SKIP with an explicit reason; on CI/real device filesystems the ownership check passes and the case still runs and fails hard if broken. Do NOT special-case the hmdfs UID value — detect the invariant (st_uid mismatch) instead."
+match_keywords: ["runtime directory", "is not owned by UID", "XDG_RUNTIME_DIR", "conanrun", "QStandardPaths", "RuntimeLocation", "hmdfs", "exit=35", "test_package"]
+severity:               1
+category: platform
+last_updated: 2026-10-03
+id:                     E3339
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E3339.md
+trigger_tool:           make
+phase:                  build
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        "Fix at the test layer, keep FAIL semantics on real filesystems: (1) in the test_package conanfile, 

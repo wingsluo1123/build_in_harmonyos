@@ -1,0 +1,23 @@
+id:                     E3350
+title: 共享对象重新bless后的每引用重载状态刷新
+trigger_tool: perl|conan|make
+phase: runtime-validation|testing
+error_signature: SvAMAGIC reference versus referent|overloaded alias rebless state
+severity:               2
+category:               compat, perl, runtime
+match_keywords: SvAMAGIC|rebless|overload.{0,40}alias|重载.{0,30}别名|重新bless
+root_cause: Perl重载标志是引用的属性，修改共享对象的blessing不能据此推断每个别名引用缓存的重载状态已经同步。
+affected_scope: 共享对象重新bless后的每引用重载状态刷新
+verification_cmd: 同源未改模块与完整原make test，实际Conan安装消费者和目标运行语义分别核验。
+rec_priority: 1
+rec_approach: preserve-original-language-runtime-contract
+rec_description: 保留原overload.t所有12断言和上游重新bless步骤；分别核对实际字符串化值、对象类型、第二引用刷新及最终引用地址，不删掉重载场景或仅用标量相等替代。
+rec_command: make test TEST_VERBOSE=1
+rec_auto_fix: false
+rec_impl: original module and full upstream test source with real installed package binding
+doc_file: knowledge/drafts/E2026101515312-draft-A139.md
+last_updated: 2026-10-15
+source_event: perl-freezethaw-0.5001.1-official-20261015-r383; two independent creates each2 programs/47TAP zeroSkipTodoFail C2H1 unique1 own0 release; W3log d782f5b9ea8ee568e212167a81242c4eef65b8b1345f143663550a786f84e18d
+authors: 2301_80739235
+source_pr:
+source_commit:

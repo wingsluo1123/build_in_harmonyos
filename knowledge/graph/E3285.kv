@@ -1,0 +1,86 @@
+#====================================================================
+# DRAFT-fbset-2.1-device-face-absent-cli-deliverable -
+# 设备面缺失型 CLI 工具（framebuffer/netlink/i2c/gpio…）的可交付判定与四段
+# 配方口径：① 先分「编译墙 vs 运行期墙」② 构建面 make 变量覆盖 + 手工安装
+# ③ L2 smoke 的信息型退出码 ④ 消费者测试双态断言 + 运行期墙如实披露。
+#
+# 实证: fbset 2.1（FB ioctl 族 FBIOGET_VSCREENINFO，源码 2 个 .c，裸 Makefile）
+#       OHOS aarch64 / clang 15.0.4 实测 2026-10-15：编译全过、W3 本地 CI 模拟
+#       RC=0、消费者 6 断言 6 过；设备查询报 open /dev/fb0: No such file or
+#       directory，属运行期墙 ⇒ 披露后照常交付，不停手。
+#
+# 查重（组合型知识不判重，§6.2「组合型知识不判重」）：
+#   组分 A = E503（CLI 工具 --help/--version 非 0 ⇒ L2 smoke 失败，解法=信息型
+#           退出码补丁）——本包沿用其解法，故组分 A 单独看是 hit；
+#   组分 B = 池件 M18/M13（裸 Makefile 烧死 CC=gcc / INSTALL=install ⇒ make
+#           变量覆盖 + package() 手工安装；本仓已有
+#           DRAFT-lisgd-0.3.7-suckless-baked-paths-makevar-override 与
+#           DRAFT-lzip-1.24.1-makefile-install-cmd-absent-makevar-override）；
+#   组分 C = DRAFT-ohos-peripheral-lib-failed-open-footgun（无硬件外设库的
+#           消费者测试设计与披露义务，但对象是"库"且结论是"只测错误路径"）；
+#   组分 D = 本包新增：fbset.h 把 <asm/types.h> 放在 #ifdef __GLIBC__ 内 ⇒
+#           musl/OHOS 下 __u32 未定义（E580 是 defined(linux)+严格 ISO 方言，
+#           触发条件与解法均不同，不算覆盖）。
+#   组合后新增的解题路径 = 「设备面缺失 CLI 工具的 go/no-go 判据 + 四段交付面」：
+#   本工作区 constype/ddccontrol/appres 等同族任务此前均未沉淀这条端到端口径，
+#   平台审查（rule4 上游测试如实申报、L2 smoke、设备能力披露）要的正是它。
+#
+# 本文件字段均为单行值（value 到行尾），避免 kv 解析器差异。
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E3285
+trigger_tool:           clang|make|conan create
+phase:                  runtime
+error_signature:        open /dev/fb0.*No such file or directory|ioctl FBIOGET_VSCREENINFO.*|unknown type name '__u32'|make.*gcc.*No such file or directory
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               2
+category:               platform, headers, build-system, runtime, testing
+match_keywords:         framebuffer, /dev/fb, FBIOGET_VSCREENINFO, device node, no hardware, headless, runtime wall, 运行期墙, 编译墙, deliverable, dual-state, 双态断言, L2 smoke, --help exit 0, make variable override, CC=gcc, INSTALL=install, flex bison tool_requires, glibc guard, asm/types.h, __u32, musl, disclosure, 披露
+title:                  设备面缺失型 CLI 工具的可交付判定与四段配方口径（fbset 2.1 实证）：编译墙/运行期墙分界 + make 变量覆盖 + L2 信息型退出码 + 双态消费者断言
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             设备面缺失（本平台无可访问 /dev/fb*）本身不是停手理由，停手判据只有"编译墙"（头文件不可得/汇编或私有工具链无法跨平台补齐）。fbset 的真实阻塞有四段且互不相同：① fbset.h 把 #include <asm/types.h> 包在 #ifdef __GLIBC__ 内，musl/OHOS 不定义 __GLIBC__ ⇒ __u32 未定义（编译错 14 处，一行级可移植性修复）；② 上游裸 Makefile 写死 CC = gcc -Wall -O2 -I. 且 INSTALL = install（本平台均不存在）⇒ 只能 make 命令行覆盖 CC/CFLAGS/LDFLAGS，安装改 package() 手工 copy（上游 install 目标写 /sbin、/usr/man 并 mknod /dev/fb*，在包内不可执行）；③ 上游 Usage() 经 Die() 恒 exit(1) ⇒ L2 smoke 判定 --help/--version 非 0 即失败；④ 设备查询失败信息（open /dev/fb0 …）若被当成"测试失败"则无法交付。
+affected_scope:         所有"编译期可得、运行期依赖设备节点/内核接口"的命令行工具与外设库族（framebuffer、i2c/spi/gpio、netlink、perf、drm…），以及裸 Makefile 且 install 目标不可用的三方包；判定结论决定链主"继续交付"还是"停手放弃"，配方口径决定 W3/L2/rule4 三道门是否同时过。
+verification_cmd:       make CC="clang -Wall -O2 -I." 2>&1 | head -5（修复前首错 fbset.h:41:5 error unknown type name __u32；修复后 make rc=0；./fbset --help 后 $? 为 0；./fbset -s -fb /dev/null 报 ioctl FBIOGET_VSCREENINFO Not a tty；conan create 消费者测试输出 6 assertion(s), 0 failure(s)）
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           compile-vs-runtime-wall-split-then-four-surface-delivery
+rec_description:        分四段：① 先证明"不是编译墙"——头文件内置/可补即继续（glibc 条件包含去条件化，如 #ifdef __GLIBC__ 包 <asm/types.h>），只有头文件不可得、私有汇编或私有工具链才停手；② 构建面零补丁变量化——make CC=<conf 中 tools.build:compiler_executables:c> CFLAGS/LDFLAGS 命令行覆盖写死值，flex/bison 未预生成则 tool_requires( flex/2.6.4 + bison/3.8.2 )，不用上游 install 目标、由 package() 手工安装并按需自签；③ L2 smoke 保信息型请求退出 0——用文件级状态变量让 -h/--help 分支 exit(Die_status=0)，错误路径仍 1（先例 E503 的解法，本例签名不同：工具本有长选项，只是经 Die() 退出）；④ 消费者测试双态断言——设备在则断言真实输出（模式/版本横幅），设备不在则断言"诊断信息指名设备或裁决点"，两个分支都判真，同时把运行期墙写进 notes/README/PR 披露（rule4/R51 的 N_static=0 与设备能力一并如实申报）。
+rec_command:            make CC="clang -O2 -Wall -fPIE -I." LDFLAGS="-pie -Wl,-z,relro,-z,now" LDLIBS="" -j1  （配方内由 conf 取编译器，R33）
+rec_auto_fix:           false
+rec_impl:               source-patch + makevar-override + consumer-test-design
+
+fallback_priority:      2
+fallback_approach:      declare-env-unsupported-stop
+fallback_description:   若连编译面都过不去（头文件不可得且无法补、私有汇编/私有工具链、上游只支持该私有接口），按 R47/§9 保留"声明语言 vs 实测主语言"与首条真实错误原文，由主理判 env_unsupported 或放弃；不得为了让流程跑下去改用下游重打包源或伪造测试。
+fallback_command:       ohc-run.py result <pkg> <ver> --status env_unsupported --failed-reason ... --detected-language ... --ev-build-system ... --ev-manifest ... --ev-source-stats ...
+fallback_auto_fix:      false
+fallback_impl:          stop-and-report
+
+forbid_1_pattern:       对设备缺失报错直接当测试通过|把 rc=1 的查询静默改成 0
+forbid_1_reason:        掩盖设备能力缺失等于欺骗性申报（R34/R40）；正确的做法是消费者测试分双态断言 + notes/PR 披露，而不是改写查询路径的退出码。
+forbid_1_consequence:   审查按欺骗类 P0/P1 打回，整轮提审作废
+forbid_2_pattern:       conandata 改用 Debian 池或个人镜像以规避站点不稳
+forbid_2_reason:        PF7 黑名单与 R39 禁止下游重打包/非官方源；下载不稳应以 sha256 预置下载缓存 + IPv4 单栈重试解决。
+forbid_2_consequence:   PF7 硬拦、CI 取源失败，PR 无法出厂
+
+principles:             P004
+# ═══ Layer 4: 关系图 (Relations) ═══
+# ═══ 元数据 ═══
+doc_file:               knowledge/drafts/DRAFT-fbset-2.1-device-face-absent-cli-deliverable.md
+last_updated:           2026-10-15
+source_event:           fbset 2.1 OHOS aarch64 适配：首错 __u32 未定义（fbset.h glibc 条件包含）→ make CC 覆盖后 rc=0 → --help 退出码 0 补丁 → 消费者 6 断言 6 过，设备查询 open /dev/fb0 ENOENT 如实披露
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:                主理-4
+source_pr:              (本 PR)
+source_commit:          (待提交后回填)
+
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-15

@@ -1,0 +1,64 @@
+#====================================================================
+# DRAFT-mapsforge-0.20.0-gradle-jvm-ohos
+# JVM/Gradle 多模块库在 OHOS PC 的 Conan 打包：排除 Android 模块 +
+# 移除 google() 仓库 + 四项 settings + library 的 shared 选项 +
+# gradle -p source_folder + tool_requires gradle + BiSheng JDK
+# 触发/来源: mapsforge 0.20.0 适配（2026-09-30）；G2/W3 逐条实证
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E3366
+trigger_tool:           conan create|conan-verify|gradle|conan|w3
+phase:                  configuration|build|packaging|verify
+error_signature:        Environment variable ANDROID_HOME needs to be set|
+                        Could not GET .*dl\.google\.com/dl/android/maven2/.*\.pom.*Connect timed out|
+                        Package type is 'library', but no 'shared' option declared|
+                        Project directory .* is not part of the build defined by settings file|
+                        missing_setting_compiler missing_setting_build_type|
+                        OperatingSystem.*ExceptionInInitializerError.*HarmonyOS
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               2
+category:               ohos, build-system, java, conan, packaging
+match_keywords:         gradle multi-module, AGP, com.android.application, google() maven,
+                        ANDROID_HOME, android.jar, java-library, shared option,
+                        basic_layout, gradle -p, tool_requires gradle, bishengjdk,
+                        os.name=Linux, L0p settings, JVM package
+title:                  JVM/Gradle 多模块库 OHOS 适配：排除 Android 模块 + 去 google() + 四项 settings + shared 选项 + gradle -p source_folder
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause: >
+  OHOS PC 无 Android SDK，Gradle 工程的 Android 模块在配置阶段即失败（ANDROID_HOME 断言、
+  AGP 插件）；同时 settings.gradle 常把 google() 与 mavenCentral() 并列，Gradle 先查
+  google()，对*连接超时*（非 404）直接中断依赖解析而非回退。Conan 侧另有三处契约：
+  (a) package_type="library" 必须声明 shared 选项，否则 conan create 报错；
+  (b) 本地 CI 门禁 L0p 要求 settings 含全部四项 os/compiler/build_type/arch；
+  (c) basic_layout 下 self.run() 的 cwd 是 build_folder，而 Gradle 项目根在
+  source_folder，直接 `gradle build` 会报 “Project directory … is not part of the build”。
+  另：Gradle 的 OperatingSystem 不识别 HarmonyOS，需给构建 JVM 注入 -Dos.name=Linux。
+affected_scope: >
+  OHOS armv8 上所有 Java/Kotlin/Gradle 多模块库（含 Android 子模块的桌面库）的
+  Conan 配方；纯 JVM 包不需要 C/C++ 工具链，但需 JDK + Gradle 两个 JVM 工具。
+verification_cmd:       conan create archives/m/mapsforge/0.20.0 -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 --build=missing
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           gradle-jvm-ohos-recipe
+rec_description: >
+  (1) 补丁（仅构建系统层面）：settings.gradle 去掉 Android 模块 include 与 google() 仓库；
+      root build.gradle 去掉 AGP 插件块（无 Android 模块后无用）；
+  (2) 配方：package_type="library" + settings 四项 + options {"shared":[True,False]}；
+      build_requirements() 用 tool_requires("gradle/8.12")（ohpcd 已发布，免系统 Gradle）；
+      source() 用官方 tag tarball + sha256；
+  (3) build()：按 vecmath 先例定位/自举 BiSheng JDK 17，设置 JAVA_HOME/PATH/
+      GRADLE_USER_HOME(置于 source_folder 内)/JAVA_TOOL_OPTIONS=-Dos.name=Linux，
+      再 `gradle -p "<source_folder>" clean build --no-daemon --console=plain`；
+  (4) package()：收集各模块 build/libs/*.jar 到 lib/jar/；package_info() 暴露
+      MAPSFORGE_JAR_DIR / MAPSFORGE_CLASSPATH（cpp_info dirs 置空）；
+  (5) test_package：javac+java 编译运行真实 API 断言；含 ≥1 鸿蒙特有断言（BiSheng JDK）。
+# ═══ Layer 4: 元数据 ═══
+rec_auto_fix:               false
+rec_impl:               manual
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E3366.md

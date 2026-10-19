@@ -1,0 +1,20 @@
+id:                     E3281
+title: rest-0.7 缺件时以 libsoup 2.4 重建固定 URL 表单 POST 调用簇——制品仓 librest/0.10.2 属 rest-1.0/libsoup3 世代，对 libsoup2.4 的 GTK3 栈不可消费
+category:               ohos, portability, conan, gnome, libsoup
+phase: configure|build
+match_keywords: rest-0.7, librest, RestProxy, RestProxyCall, oauth2-proxy.h, rest_proxy_call, libsoup-2.4, libsoup3, soup2+soup3 同进程冲突, pkg-config, dependency not found, gnome-recipes, todoist, form POST, x-www-form-urlencoded, g_string_append_uri_escaped, soup_session_queue_message
+error_signature: "Dependency \"rest-0\.7\" not found|rest-0\.7.*not found|dependency\('rest-0\.7'\)"
+affected_scope: 依赖 rest-0.7（libsoup 2.4 世代的 librest API：RestProxy/RestProxyCall、rest-0.7.pc）的应用；第一个命中为 gnome-recipes 2.0.4（Todoist 购物清单导出，5 处调用簇）。判定特征：上游 meson/configure 里出现 dependency('rest-0.7')（或 autotools 的 REST_CHECK），源码 include <rest/rest.h>。制品仓里同名的 librest/0.10.2 只提供 rest-1.0.pc + libsoup3，不解决 rest-0.7 缺件。
+root_cause: OHOS 制品仓没有 rest-0.7 世代（librest 0.8/0.9，libsoup 2.4 系）的包；仓内的 librest/0.10.2 是重命名后的 rest-1.0 API 世代，且链接 libsoup3。gnome-recipes 这类 GTK3 应用整个进程栈建立在 libsoup 2.4 上，libsoup2 与 libsoup3 在同一进程内共用会导致符号冲突（两代导出同名符号），GNOME 明确不支持混链——所以"就近消费 librest/0.10.2"这条捷径不成立。实际调用面通常是"固定 URL 的 x-www-form-urlencoded POST"（RestProxyCall 的 set_form_data 族），与 OAuth 逻辑无关（头文件带 oauth2-proxy.h 不代表用到），因此把这层薄封装直接落回 libsoup 2.4 是代价最小、语义最可控的路线。
+rec_approach: 先对调用面做穷举清单（grep rest_proxy/rest_proxy_call/oauth），确认全部是固定 URL 表单 POST 后整文件移植到 libsoup 2.4；只删上游 meson 的 rest-0.7 依赖行，不动其它源码。
+prescan_pattern: "rest-0\\.7"
+doc_file: knowledge/drafts/DRAFT-2670-gnome-recipes-2.0.4-rest07-absent-libsoup-form-post-port.md
+severity:               2
+last_updated: 2026-10-14
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+trigger_tool:           conan
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        先对调用面做穷举清单（grep rest_proxy/rest_proxy_call/oauth），确认全部是固定 URL 表单 POST 后整文件移植到 libsoup 2

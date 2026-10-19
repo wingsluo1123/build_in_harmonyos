@@ -1,0 +1,91 @@
+#====================================================================
+# DRAFT-two-ms-5.2.4-upstream-tests-require-external-network.kv
+# 上游测试依赖外部网络（api.github.com）导致 CI/本地间歇失败：
+# 按“输出网络特征 + 显式清单”分类为 environment-network-limited
+#====================================================================
+
+id:                     E3245
+trigger_tool:           go|go test|conan
+phase:                  testing
+error_signature:        Failed to validate secret.*dial tcp: lookup|
+                         lookup .*:53: read udp .*i/o timeout|
+                         no route to host.*validate
+
+severity:               2
+category:               ohos, network, go, testing
+match_keywords:         go test, validate, api.github.com, dial tcp, i/o timeout,
+                         no route to host, validationStatus, Unknown, Invalid,
+                         flaky, environment-network-limited, conan, gate
+title:                  Go 项目上游测试依赖外部网络（api.github.com 等）导致间歇失败：门禁应按“网络输出特征 + 显式清单”分类，而非一刀切失败
+
+root_cause:             部分上游用例带 --validate 或断言 validationStatus/
+                         severity/CvssScore，运行期访问 https://api.github.com/
+                         校验植入凭据。有公网时返回 401 → validationStatus=
+                         "Invalid"、severity=Medium（与期望报告一致）；无外网/
+                         DNS 超时（如 `lookup api.github.com on 8.8.8.8:53:
+                         read udp … i/o timeout`）→ "Unknown"/High → 断言必然失败。
+                         上游 CI（ubuntu-latest）有公网，故其本地 gate 从不暴露此问题
+affected_scope:         任何其上游测试会发起真实外部 HTTP 请求的 Go 项目在
+                         离线/受限网络环境执行 `go test ./...`（实例: two-ms 5.2.4，
+                         engine/pkg/tests 三包共 6 个子用例）
+verification_cmd:       # 有网（预期断言通过）:
+                         go test -count=1 ./tests/ -run 'TestSecretsScans/run_only_default_rules_by_ignoring_custom_rules_in_json'
+                         # 断网/DNS 不可达（预期 validationStatus 由 Invalid 变 Unknown → FAIL）:
+                         #   观察输出 `Failed to validate secret … i/o timeout`
+
+rec_priority:           1
+rec_approach:           classify-env-network-limited-cases
+rec_description:        conan 配方的测试门禁不再“一刀切”判负：解析 `go test -json`
+                         的 output 事件，凡失败用例的输出中出现网络特征
+                         （Failed to validate secret / dial tcp / i/o timeout /
+                         no route to host / Temporary failure in name resolution）
+                         即归类 environment-network-limited；对不打印网络日志但
+                         断言 validationStatus 的用例用显式清单登记。分类命中的
+                         用例如实打印（WARN，含具体名与原因）但不计入门禁；其余
+                         失败仍硬阻塞。粒度取“叶子失败”（父用例仅因子用例失败而
+                         失败时不重复计数），并单独校验 build 失败（FailedBuild 或
+                         output 以 '# ' 开头）
+rec_command:            conanfile.py _enforce_gates():
+                         fails = {(pkg,test)} ; leaves = 无同包子用例前缀者 ;
+                         env = [f for f in leaves if f in _ENV_NETWORK_LIMITED_SUBTESTS
+                                or test in pkgs[pkg]["net_tests"]] ;
+                         gated = leaves - env ;
+                         raise if gated or broken or passed < floor
+rec_auto_fix:           false
+rec_impl:               manual
+
+fallback_priority:      2
+fallback_approach:      skip-network-dependent-cases
+fallback_description:   若无法读取 -json 输出，退化为按用例名显式排除（跳过）网络
+                         依赖用例；须在 PR/notes 中如实列出被排除用例与原因（R51）
+fallback_command:       go test -count=1 -skip '<regex>' ./...（Go 1.20+ 支持 -skip）
+fallback_auto_fix:      false
+fallback_impl:          manual
+
+forbid_1_pattern:       因网络用例失败而整体判负（一刀切）
+forbid_1_reason:        失败原因是环境外网而非配方/软件缺陷；上游 CI 有公网故通过，
+                         一刀切会把环境差异误报成适配失败
+forbid_1_consequence:   本地/W3 反复红，或被误导去“修”本无问题的配方
+forbid_2_pattern:       静默忽略失败用例（不打印、不记录）
+forbid_2_reason:        掩盖真实回归；违反 R51“如实回填实测 N/N′/通过率”
+forbid_2_consequence:   门禁形同虚设，且无法审计
+
+principles:             P017
+causes:
+caused_by:
+conflicts_with:
+prerequisite_of:
+
+doc_file:               knowledge/drafts/DRAFT-two-ms-5.2.4-upstream-tests-require-external-network.md
+last_updated: 2026-10-13
+source_event:           two-ms-5.2.4 W3 复验时 tests/engine/pkg 共 6 个 validate 用例因
+                        api.github.com DNS 超时间歇失败（06:28–06:33 连续 i/o timeout）
+
+authors:                OpenDesk
+source_pr:
+source_commit:
+
+metrics_success_count: 1
+metrics_fail_count: 0
+metrics_confidence: 0.8
+metrics_last_used: 2026-10-13

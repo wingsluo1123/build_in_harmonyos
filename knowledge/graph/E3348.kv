@@ -1,0 +1,80 @@
+#====================================================================
+# DRAFT-minicsv-ec11134f7f-harmonyos-test-shipped-e2e-consumer-case
+# 赛事规则的鸿蒙特有测试必须是随 PR 交付的端到端消费者用例
+# 来源: minicsv ec11134f7f R02（赛事 Review 规则 12 FAIL 处置，OHOS aarch64）
+#====================================================================
+
+id:                     E3348
+trigger_tool:           review|pr|conan|clang|test|runtime
+phase:                  review|testing|runtime
+error_signature:        规则 ?12|鸿蒙特有测试.*不通过|不算完整消费者用例|纯断言不行|harmonyos_test_not_shipped_in_pr|assertion_only_test_counted_as_harmonyos_specific
+
+severity:               2
+category:               ohos, consumer-case, contest, end-to-end, specific-test
+match_keywords:         赛事, 规则 12, 鸿蒙特有测试, 端到端, 消费者用例, e2e, 随 PR 交付,
+                         shipped, reports 断言, assertion only, test_package 顶替, failcap,
+                         minicsv, compile_level_only, PR 文件列表
+title:                  赛事规则的鸿蒙特有测试必须是随 PR 交付的端到端消费者用例（纯断言集合不构成）
+
+root_cause: >
+  赛事口径（规则 12）要求鸿蒙特有测试是「完整消费者用例（真正跑通功能/流程的端到端用例）」，
+  与本地门禁（R34/E472 仅要求真实运行的断言）是两套标准。常见 FAIL 直接成因：
+  (1) 唯一支撑物是 reports/ 下 clang 直链打包产物运行的断言集合（如 12 项 ok），
+      被判定为断言而非端到端用例；(2) reports/ 被 .gitignore:96 排除，测试源码与运行日志
+      不随 PR 文件列表交付，远端评审无法复核该项。
+
+affected_scope: >
+  所有赛事（积分赛/知识库扩展/高难度挑战）任务的鸿蒙特有测试；凡 PR 正文
+  「鸿蒙特有测试」行的支撑物需要随 PR 可复核的场景。不覆盖本地门禁/CI
+  仅要求真实断言的非赛事场景。
+
+verification_cmd: >
+  clang -O2 -I<conan_pkg>/include <e2e_src> <conan_pkg>/lib/libminicsv.a -o <bin> &&
+  <bin>                    # rc=0, PASS (0 failures)
+  clang -O2 -DEXPECTED_*=错误值 ... -o <failcap_bin> && <failcap_bin>   # rc=1, FAIL
+  git show <head>:<e2e_src> | sha256sum        # 确认源码随 PR 交付
+
+rec_priority:           1
+rec_approach:           harmonyos-e2e-shipped-consumer-case
+rec_description: >
+  端到端消费者用例源码放白名单内非 reports 路径（如 harmonyos-e2e/minicsv_consumer_e2e.c），
+  形态=输入数据集 → minicsv_parse_line 逐行解析 → minicsv_trim_cols 清洗 → 分类/聚合流转 →
+  汇总断言；编译期 -DEXPECTED_* 注入可制造受控失败（failcap 非恒绿）；源码 commit 进 PR
+  （文件列表可见），编译/运行/failcap 日志放 reports/ 作证据（SHA-256）；PR 正文
+  鸿蒙特有测试行取值 1 且说明支撑物为该 e2e 源文件；test_package 断言计单元测试不计入。
+rec_command:            参考 archives/m/minicsv/ec11134f7f/harmonyos-e2e/minicsv_consumer_e2e.c（本 PR）
+rec_auto_fix:           false
+rec_impl:               conanfile-edit
+
+fallback_priority:      2
+fallback_approach:      compile_level_only (显式标注)
+fallback_description:   若真机运行确不可行，可显式标注 compile_level_only，但不得宣称规则 12 已闭合。
+fallback_command:
+fallback_auto_fix:      false
+fallback_impl:
+
+forbid_1_pattern:       (R01.*断言集合|12 项 ok).*鸿蒙特有测试
+forbid_1_reason:        把既有断言集合直接改名/复用为鸿蒙特有测试会被判规则 12 FAIL
+forbid_1_consequence:   赛事 Review 不通过，需返工轮处置
+
+forbid_2_pattern:       test_package.*计入鸿蒙特有测试
+forbid_2_reason:        test_package 是 Conan L1 消费者测试，不得顶替鸿蒙特有测试
+forbid_2_consequence:   统计口径造假/范围混淆，prohibited_markers 命中
+
+forbid_3_pattern:       printf-only|always.?green|恒真
+forbid_3_reason:        恒绿/仅打印测试不构成可失败用例
+forbid_3_consequence:   failcap 无法证明，规则 12 判定不通过
+
+principles:             P016
+doc_file:               knowledge/drafts/DRAFT-minicsv-ec11134f7f-harmonyos-test-shipped-e2e-consumer-case.md
+last_updated:           2026-09-29
+source_event:           archives/m/minicsv/ec11134f7f (R02 规则 12 修复，PR #13611 update)
+
+authors:                pc3-42 <noreply@atomgit.com>
+source_pr:
+source_commit:
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-09-29

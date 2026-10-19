@@ -1,0 +1,116 @@
+#====================================================================
+# _template.kv — 知识图谱条目模板
+# 用法: 复制此文件为 E16332.kv，填写各字段
+# 对应的人类文档: doc/E16332.md
+#
+# 格式规则:
+#   - key: value（冒号后一个空格，value 到行尾）
+#   - 多行值: 下一行以空格开头 = 续行
+#   - 列表值: 逗号分隔
+#   - 正则值: | 分隔多个模式
+#   - 以 # 开头的行为注释
+#   - 空行忽略
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+# trigger_tool: 出错的工具 (configure/cmake/meson/make/gcc/clang/ld/python/pip/install/test/runtime)
+# phase:         出错阶段 (configuration/compilation/linking/installation/testing/runtime)
+# error_signature: 正则表达式(|分隔), 用于精确匹配日志文本
+id:                     E3263
+trigger_tool: meson|pytest
+phase: testing
+error_signature: symbol not found|assert -11|scandir|paths == NULL
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+# severity:      3=🔴blocking  2=🟡medium  1=🟢minor  0=✅resolved
+# category:      分类标签（受控词表 64 词，逗号分隔，最多 5 个；add/promote 自动归一化）
+# prescan_pattern: （可选）预编译源码扫描正则——写入后 PreScanner 运行时自动派生
+#                   PSCAN-KB-{id} 规则，无需改 pre-scan-rules.yaml（知识增长即扫描能力增长）
+# prescan_globs:   （可选）扫描范围 glob 列表，默认 '*.c, *.h, *.cc, *.cpp, *.sh, Makefile*, *.mk'
+# 词表: platform, compat, limitation, detection, hmdfs, ohos, selinux, kernel, portability, libc, musl, posix, syscall, headers, threading, socket, network, build-system, cmake, autotools ...（全表见 scripts/ohc/kb_taxonomy.py）
+# match_keywords: 纯文本关键词(逗号分隔), 用于粗筛(固定字符串匹配F)
+# title:         简短标题(一句话描述错误模式)
+severity:               2
+category:               portability, runtime, testing
+match_keywords: symbol not found, assert -11, scandir, paths == NULL
+title: 原生工具测试的同 SONAME 依赖污染与空设备列表错误路径
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+# root_cause:       一句话根因描述(逗号可分行)
+# affected_scope:   影响范围
+# verification_cmd: 验证诊断是否正确的命令
+root_cause: 原生测试图为另一软件获取已发布 libinput/1.26.2，其相同 SONAME 被 LD_LIBRARY_PATH 优先加载，当前1.28.1工具子进程出现缺符号。修正加载路径后，record --all 的真实错误路径暴露：scandir 无可用目录返回NULL，主循环解引用空列表。 实际GUI首次共享映射写失败与/dev/shm容量耗尽同时出现；保留失败，在有真实空间的设备重跑全部原GUI。配置遵守GTK回调返回值和realize前事件掩码；安装CLI使用真实包图生成的runenv，并保留冷运行错误及真实签名私有inode加载专项。
+affected_scope: 使用原生 Meson/Autotools 测试、发布依赖以及特权输入设备的 C/C++ 库与 CLI 工具。
+verification_cmd: 核对精确发行源码与候选补丁，执行原测试框架及独立签名 HMDFS 探针，保全进程 RC 和回执链。
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+# 推荐方案 (priority 越小越优先, 从 1 开始)
+rec_priority: 1
+rec_approach: source-bound-native-test-and-runtime-closure
+rec_description: 把当前源码构建目录优先加入所有相关子进程的 LD_LIBRARY_PATH，保留依赖精确 revision；pytest 使用任务私有 --basetemp，避免 HMDFS owner 与进程 UID 不同的默认缓存检查。生产代码在遍历 paths 前检查NULL，输出诊断并沿原 out 清理路径返回已有失败状态，不修改原 pytest 断言或绕过设备权限。 实际GUI首次共享映射写失败与/dev/shm容量耗尽同时出现；保留失败，在有真实空间的设备重跑全部原GUI。配置遵守GTK回调返回值和realize前事件掩码；安装CLI使用真实包图生成的runenv，并保留冷运行错误及真实签名私有inode加载专项。
+rec_command: 设置任务私有 TEMP/TMPDIR 与运行库查找路径；运行原框架，不改断言；按入口与轮次回读 RC。
+rec_auto_fix: false
+rec_impl: native-test-controller
+
+# 回退方案 (当推荐方案不可用时尝试)
+fallback_priority:      2
+fallback_approach:
+fallback_description:
+fallback_command:
+fallback_auto_fix:      false
+fallback_impl:
+
+# ★ 禁止策略 (与推荐方案同等重要) ★
+# forbid_N_pattern:     正则(|分隔), 匹配则拒绝/警告
+# forbid_N_reason:      为什么禁止
+# forbid_N_consequence: 违反后的后果
+forbid_1_pattern: SKIP.*PASS|0/0.*100%|跨轮次.*整套PASS
+forbid_1_reason: 跳过、无测试以及独立轮次不构成整套通过；旧证据不可改写。
+forbid_1_consequence: 虚假测试覆盖率与平台能力声明。
+# forbid_2_pattern:
+# forbid_2_reason:
+# forbid_2_consequence:
+
+# ═══ Layer 4: 原则引用 ═══
+# principles:    适用的原则 ID 列表(逗号分隔), 在 graph/principles.kv 中定义
+principles:
+
+# ═══ 关系图 (Relations) ═══
+# causes:          本模式是这些模式的根因 (修好本模式可能同时解决它们)
+# caused_by:       本模式的根因是这些模式 (应先修它们)
+# similar_to:      特征相似可能混淆的模式
+# conflicts_with:  解决方案互相冲突的模式
+# prerequisite_of: 本模式是修复这些模式的前置条件
+# ═══ 元数据 ═══
+doc_file: knowledge/drafts/E16332-draft-D310.md
+last_updated: 2026-10-13
+source_event: PR13634 exact source native SSH upstream test and runtime verification
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+# authors: 作者列表 (格式: Name <email>, Name2 <email2>)
+#          草稿生成时自动从 git config 填入；主编合入时保留原作者
+#          合并到已有条目时追加为第二/第三作者
+# source_pr:            添加该条目的 PR 编号
+# source_commit:        添加时的 commit SHA (短)
+authors: 2301_80739235
+source_pr: 13634
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics, 方案 D) ═══
+# metrics_success_count: 该修复方案成功次数
+# metrics_fail_count:    该修复方案失败次数
+# metrics_confidence:    置信度 = success / (success + fail)
+# metrics_last_used:     最后使用时间
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+
+
+# Current original GUI and production verification are separate immutable transactions.
+
+
+# 2026-10-14 Actual nonprivileged source cases and native runtime closure
+
+Actual source-confirmed context cases can be deviceless without altering assertions or disabling root/uinput checks. Shared-memory allocation and Python/GTK runtime graph are separate prerequisites; deploy actual signed SDK and matching Python runtime in own task root, with real version/sys.prefix/maps and ABI-compatible ELF loader paths. Retain GNU linker scripts only for link search, not runtime search. Same-run original282 and separate formalC4/H1 preserve the original1124 denominator and842 unexecuted device definitions.
+Official log SHA256: 335dfacc2c83f365354d2577bde899d50b1d6b1f1329931669eecac1f81727f7
