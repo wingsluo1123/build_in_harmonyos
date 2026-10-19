@@ -1,0 +1,56 @@
+# =====================================================================
+# Draft: coinor 族 autotools 包在 OHOS 上的四连坑与正解（libtool .la / 归档合并 /
+#        coin m4 误判 MSVC / HMDFS mktemp 假绿）
+# 软件: coinor-bonmin 1.8.9（同族 cbc/2.10.13、clp、coinor-ipopt 实测互证）
+# 取号: E715（knowledge_id.py --claim，2026-09-24）
+# =====================================================================
+
+id:                     E2637
+trigger_tool:          conan|autotools|libtool
+phase:                 configure|build|link|testing
+
+severity:               1
+category:               ohos, portability, build-system, packaging
+error_signature:       "is not a valid libtool archive|Required package Cbc or Ipopt not available|can't create ./confstat.*Permission denied|Error relocating .* symbol not found|Overruling autoconf; cl does not recognise -g"
+prescan_pattern:       "libtool: link: .*is not a valid libtool archive|coin_cc_is_cl|confstatXXXXXX|Error relocating"
+match_keywords:        coinor, bonmin, cbc, clp, osi, libtool .la, //lib/libCbc.la, 依赖归档合并, coin m4 MSVC 误判, config.status confstat, HMDFS mktemp, dep-libs, osi-clp.pc
+
+title:                 coinor 族 autotools 在 OHOS：依赖 .la 无效要用「本地无 .la 目录 + -L 重定向」而非绝对 .a 路径（否则本包静态库被合并膨胀 1.7GB）；CC 必须裸名避开 coin m4 的 */cl* 误判；config.status 临时目录改 mkdir
+
+root_cause: |
+  四个独立机制叠加，任一未处理都会以 rc=0 假绿或硬错收场：
+  (1) ohpcd 上游 coinor 族包用 --prefix=/ + DESTDIR 安装，其 libtool .la 内 libdir='//lib'，
+      本包链接时 libtool 经 -L 解析到这些 .la 直接报错；
+  (2) 但把 -l* 换成绝对 .a 路径（cbc「方案 B」先例）会让 libtool 把 file-arg 归档
+      **合并进正在创建的静态库**：libbonmin.a 由 2.8MB 膨胀到 1,718,842,488B，成员内嵌
+      18 个依赖 .a 且重复（cbc 包 250MB 即同机制产物）；
+  (3) coin BuildTools m4 的 `case "$CC" in clang*) ;; cl* | */cl* …` 对**绝对路径**
+      /data/service/hnp/bin/clang 命中 `*/cl*` ⇒ coin_cc_is_cl=true ⇒
+      `--enable-pkg-config` 默认被关、pkg-config 探测整体跳过 ⇒ configure 以
+      `Required package Cbc or Ipopt not available` 硬错收场（C++ 侧的 case 有
+      `*/clang*` 豁免、C 侧没有，属上游不对称）；
+  (4) config.status 用 `umask 077 && mktemp -d` 建 ./confstatXXXXXX（0700），HMDFS 落盘
+      `drwx--S---` 且目录内写文件 Permission denied ⇒ `config.status: creating Makefile`
+      之后紧跟 `mv … Permission denied`，configure **rc=0 却一个文件都没生成**。
+affected_scope:        一切消费 ohpcd coinor 族静态依赖的 autotools/libtool 下游包；
+  一切用绝对 CC 路径跑 coin BuildTools 生成的 configure 的配方；
+  一切在 HMDFS 上用 autoconf 2.5x config.status 的包（E678 同族）
+
+rec_approach:          三步定位 + 一条正解：
+  ① 先按「.la 无效」判：链接行里出现 `-L<conan pkg>/lib` 且报 `is not a valid libtool archive`
+    ⇒ 该依赖包 lib/ 下有 .la（conan list 那个包的 lib/ 即可确认）；
+  ② **禁止**改成绝对 .a 路径（先例 cbc 方案 B 会把依赖归档合并进本包静态库，包体爆炸）；
+  ③ 正解：把所有「带 .la 的依赖包」的 .a 用符号链接汇到 build 内 dep-libs/（只放 .a、无 .la），
+    再把 Makefile 里这些包的 -L 重定向到 dep-libs/：.la 找不到、-l 语义保留、不触发合并；
+  ④ CC/CXX 一律裸名 clang/clang++（或给 configure 显式 --enable-pkg-config 兜底）；
+  ⑤ config.status 临时目录按 E678 改 mkdir -p conftmp + umask 022，并在 configure 之后
+    **断言关键产物真存在**（Makefile/config.h/…）才允许进 make。
+
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E2637.md
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        三步定位 + 一条正解：
