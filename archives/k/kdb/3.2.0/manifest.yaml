@@ -1,0 +1,40 @@
+software: kdb
+version: "3.2.0"
+status: built
+build_system: cmake
+created_at: 2026-10-17
+build_date: 2026-10-17
+dependencies:
+  required:
+    - qt5-qtbase/5.15.2.2
+    - kcoreaddons5/5.116.0.1
+    - icu/76.1
+    - sqlite3/3.49.1
+  build:
+    - ecm/6.26.0
+patches_applied:
+  - patches/0001-SetKDbCMakePolicies-cmake4-cmp0059.patch
+  - patches/0002-CMakeLists-static-icu-link-order.patch
+  - patches/0003-CMakeLists-scanner-wno-register.patch
+  - patches/0004-autotests-headers-shell-wrapper.patch
+test_results:
+  type: passed
+  upstream: "passed: 14/14 upstream CTest entries (12 KDb API test targets + SqlParserTest + the HeadersTest installed-header self-containment compile test building 120 TUs) with BUILD_TESTING=ON inside conan create"
+  test_package: "passed: 45/45 assertions (sqlite driver plugin discovery, connection lifecycle, DDL/insertRecord/queries/transaction API, teardown, plus the OHOS ELF checks: bare DT_SONAME, DT_RUNPATH, .codesign section)"
+  package_id: "841b5c3ec3eeb4bbf3fbcfa1534cc2ef7dbc3a36"
+  ohos_run: "conan-verify clean full build 2026-10-17 (rc=0, ci/conan/profiles/ohos-aarch64 on both sides, --user=ohpcd --channel=stable) — Verdict PASS (G0/G1/G2/G3/G4 ✅; L2/L4/L5 device-side skip, no cache path; report shipped in reports/conan-verify-report.md)"
+  l0: "pass"
+  l1: "pass: upstream tests + test_package executed (14/14 ctest + 45/45 consumer checks)"
+  l2: "pass: device-side skip (no cache path)"
+  l4: "pass: device-side skip (no cache path); patches carry no platform macros"
+  l5: "pass: device-side skip (no cache path); bare DT_SONAME + DT_RUNPATH + .codesign confirmed by test_package ELF checks"
+source_url: https://download.kde.org/Attic/kdb/src/kdb-3.2.0.tar.xz
+source_sha256: 8f8983bc8d143832dc14bc2003ba6af1af27688e477c0c791fd61445464f2069
+knowledge_gained:
+  - "kdb 3.2.0 is the Attic-hosted standalone KDb project (Qt5/KF5 era, shared with Kexi): SOVERSION is special-cased (a stable 3.x major maps to SOVERSION 4), the export name is a plain `KDb` target (no namespace) from lib/cmake/KDb3, and the sqlite3 driver ships as Qt MODULE plugins under lib/plugins/kdb3{,/sqlite3} discovered through the Qt library-path mechanism (QT_PLUGIN_PATH)."
+  - "★ The CMake *environment* variable CMAKE_PREFIX_PATH is split on the platform path separator (`:` on unix), NOT on ';': a semicolon-joined multi-entry value is taken as a single invalid prefix and every find_package fails. Recipe test-env composition must use os.pathsep.join() (verified on the image's CMake 4.1.2 with an A/B matrix: env single entry OK, env ';' multi FAIL, env ':' multi OK, -DCMAKE_PREFIX_PATH list OK). Environment-initialized CMAKE_PREFIX_PATH is not written to CMakeCache."
+  - "KF5-era KDE trees need CMAKE_SYSTEM_NAME=Linux on OHOS: the toolchain's HarmonyOS platform has no CMake module (UNIX undefined, build flagged cross-compiling), which silently disables ECM's upstream ctest registration and KDECMakeSettings' POSIX RPATH handling."
+  - "The kdb-3.2.0 release tarball ships no metainfo.yaml, and KDEFrameworkCompilerSettings' KDEMetaInfoPlatformCheck file(STRINGS)s it at include time — KF_IGNORE_PLATFORM_CHECK=TRUE is mandatory (skips both the file read and the platform comparison)."
+  - "The in-tree cmake/modules/FindICU.cmake (first entry of CMAKE_MODULE_PATH) creates bare imported libraries without inter-component edges; with a static icu package an explicit i18n -> uc -> data link chain is required or the link dies on icudt76_dat under -Wl,--no-undefined."
+  - "CMake 4.1.2 hard-errors on the tree's unconditional cmake_policy(SET CMP0059 OLD) and on the HeadersTest nested project's cmake_minimum_required(2.8.12): a CMAKE_VERSION guard patch and CMAKE_POLICY_VERSION_MINIMUM=3.5 (env for the nested configure + toolchain cache variable for the main tree) are both needed."
+  - "The target image refuses execve() of shebang scripts living on /storage (Permission denied with executable bits set; chmod is absorbed by the FS, files read back 770), while ELF binaries from the same tree run — ctest script tests must be wrapped as 'sh <script>'."

@@ -1,0 +1,15 @@
+--- a/cmake/modules/SetKDbCMakePolicies.cmake
++++ b/cmake/modules/SetKDbCMakePolicies.cmake
+@@ -8,7 +8,11 @@
+ cmake_policy(SET CMP0053 NEW) # TODO remove, temporary fix for a bug in Qt 5.8's Qt5ModuleLocation.cmake
+                               # "Simplify variable reference and escape sequence evaluation"
+ 
+-if(POLICY CMP0059) # Don’t treat DEFINITIONS as a built-in directory property.
++# CMake 4.0 removed the OLD behavior of CMP0059 entirely; setting it on
++# such versions is a hard error. Every add_definitions() call site in this
++# tree runs in the directory that also creates its targets, so the NEW
++# behavior (plain COMPILE_DEFINITIONS inheritance) is equivalent.
++if(POLICY CMP0059 AND CMAKE_VERSION VERSION_LESS "4.0") # Don’t treat DEFINITIONS as a built-in directory property.
+     cmake_policy(SET CMP0059 OLD)
+ endif()
+ if(POLICY CMP0063) # Honor visibility properties for all target types (since cmake 3.3)

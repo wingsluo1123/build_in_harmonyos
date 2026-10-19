@@ -1,0 +1,28 @@
+software: kdb
+display: "KDb"
+description: "KDE KDb database connectivity library (driver plugins, connections, transactions, table/field schemas, SQL parser) with the sqlite3 driver and kdb3_sqlite3_dump CLI"
+category: library
+homepage: "https://invent.kde.org/office/kdb"
+license: LGPL-2.0-or-later
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "CMAKE_SYSTEM_NAME=Linux: os=OHOS maps to a platform CMake has no module for and the build is flagged cross-compiling; Linux restores UNIX=1 and upstream ctest registration"
+    - "KF_IGNORE_PLATFORM_CHECK=TRUE required: the 3.2.0 tarball ships no metainfo.yaml and ECM's platform check reads the missing file at include time"
+    - "HeadersTest nested project CMAKE_PREFIX_PATH: entries joined with os.pathsep — CMake splits this environment variable on the platform path separator, so a ';'-joined multi-entry value is one invalid prefix"
+    - "Static icu package: explicit i18n -> uc -> data link chain for the in-tree FindICU module (patch 0002)"
+    - "Pre-generated flex sqlscanner.cpp uses 'register' with cppstd=17 -> -Wno-register (patch 0003)"
+    - "HeadersTest script runs via 'sh <script>': the target image refuses execve of shebang scripts (patch 0004)"
+  common_dependencies:
+    - qt5-qtbase
+    - kcoreaddons5
+    - icu
+    - sqlite3
+    - ecm
+
+versions:
+  "3.2.0":
+    status: built
+    build_date: "2026-10-17"
+    conan_ref: "kdb/3.2.0"
