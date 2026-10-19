@@ -1,0 +1,119 @@
+# nfdump 1.7.6 manifest
+# File location: archives/n/nfdump/1.7.6/manifest.yaml
+# Follows ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "1.7.6"
+software: "nfdump"
+
+# 编译状态: built | published | failed | archived
+status: built
+
+# 编译日期
+build_date: "2026-10-15"
+build_system: "HarmonyOS PC (aarch64, musl libc, clang 15)"
+
+# Conan 引用
+conan_ref: "nfdump/1.7.6@ohpcd/stable"
+
+# ============================================================
+# 源码信息 (与 conandata.yml 一致)
+# ============================================================
+
+source:
+  url:
+    - "https://codeload.github.com/phaag/nfdump/tar.gz/refs/tags/v1.7.6"
+    - "https://github.com/phaag/nfdump/archive/refs/tags/v1.7.6.tar.gz"
+  sha256: "2d25220d7a48f57ba65f228fb5d2eb4d2a0ab2b352a037ed6249b39cf68c1b9a"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: autotools
+
+  configure_options:
+    - "--disable-influxdb"
+    - "--disable-nfprofile"
+    - "--disable-nftrack"
+    - "--disable-nfpcapd"
+    - "--disable-sflow"
+    - "--disable-readpcap"
+    - "--disable-ftconv"
+    - "--disable-shared"
+    - "--enable-static"
+    - "--build=aarch64-unknown-linux-ohos"
+    - "--host=aarch64-unknown-linux-ohos"
+
+  dependencies: []
+
+  build_requirements:
+    - "automake/1.18 (tool)"
+    - "libtool/2.5.4 (tool)"
+    - "pkgconf/3.0.6 (tool)"
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-configure.ac.patch"
+  - "0002-src-libnfdump-filter-ipconv.c.patch"
+  - "0003-src-libnffile-conf-nfconf.c.patch"
+  - "0004-src-collector-bookkeeper.h.patch"
+  - "0005-src-collector-bookkeeper.c.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "musl libc (OpenHarmony) 不导出 glibc 的 _res 全局解析器状态; configure.ac 增加 AC_LINK_IFELSE 特性探测生成 HAVE_RES_GLOBAL, 源码据此守卫 set_nameserver()/SetNameserver(), 不使用平台宏 __OHOS__"
+  - "OpenHarmony 禁止非特权进程使用 System V IPC: shmget 返回 EACCES, semget/msgget 直接以 SIGSYS(Signal 31) 杀死进程 (最小探针复现); nfcapd 的 bookkeeper 改为 POSIX shm_open/ftruncate/mmap + 命名信号量 sem_open 后, 采集器可正常起停"
+  - "上游 tarball 中 COPYING/NEWS/README/bootstrap 是符号链接, FUSE 后端缓存上建链/utimensat 会 EACCES 导致 conan 复制源码失败; 在 source() 中把它们物化为常规文件"
+  - "release tarball 不含生成的 configure, build() 需先 autoreconf -fi; 构建机只有 autoconf 家族, automake/libtool/pkgconf 必须由 tool_requires 提供, 并把 pkgconf 的 share/aclocal 挂到 ACLOCAL_PATH 才能展开 PKG_CHECK_MODULES"
+  - "config.guess 不识别 HarmonyOS (uname 返回 HarmonyOS/HongMeng Kernel); 显式传 --build/--host=aarch64-unknown-linux-ohos 绕开"
+  - "nfdump 必须在源码目录内构建 (Conan folders.build='.'): src/libnffile/Makefile.am 用相对路径 ./gen_version.sh 生成 vcs_track.h, 外部构建目录下必然失败"
+  - "OHOS 基线无 liblz4/libbz2/libzstd; configure 检出 LZ4EMBEDDED 走 nfdump 内嵌 LZ4 实现, bzip2/zstd 用例由上游自动不注册"
+  - "codeload.github.com/<owner>/<repo>/tar.gz/refs/tags/<tag> 路径以 tag 结尾无扩展名, conan get() 无法判定解压器; 需在 conandata.yml 显式声明 filename"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_hash: 0163813f907c1d9b
+  source_work_hash: a80265fa2df49ae9
+  generated_at: '2026-10-15T16:26:00'
+  patches_count: 5
+
+patch_classification:
+  # 0001-0003 是 musl/glibc 的通用可移植性修补 (glibc 有 _res, musl 没有),
+  # 与 OHOS 平台本身无关, 上游同样可以接受: platform_only = false。
+  # 0004-0005 才是真正的 OHOS 适配: OpenHarmony 禁用 SysV IPC, 只能改用 POSIX IPC。
+  # 五个补丁都用特性探测/无条件改写, 没有任何平台宏, 故 guard 一律为 none。
+  - file: 0001-configure.ac.patch
+    type: portability
+    platform_only: false
+    guard: 'none'
+  - file: 0002-src-libnfdump-filter-ipconv.c.patch
+    type: portability
+    platform_only: false
+    guard: 'none'
+  - file: 0003-src-libnffile-conf-nfconf.c.patch
+    type: portability
+    platform_only: false
+    guard: 'none'
+  - file: 0004-src-collector-bookkeeper.h.patch
+    type: platform
+    platform_only: true
+    guard: 'none'
+  - file: 0005-src-collector-bookkeeper.c.patch
+    type: platform
+    platform_only: true
+    guard: 'none'

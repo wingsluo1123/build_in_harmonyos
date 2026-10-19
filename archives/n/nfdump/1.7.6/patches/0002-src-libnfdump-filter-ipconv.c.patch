@@ -1,0 +1,25 @@
+--- a/src/libnfdump/filter/ipconv.c
++++ b/src/libnfdump/filter/ipconv.c
+@@ -169,6 +169,7 @@
+ }  // End of lookup_host
+ 
+ int set_nameserver(char *ns) {
++#ifdef HAVE_RES_GLOBAL
+     struct hostent *host;
+ 
+     res_init();
+@@ -180,6 +181,14 @@
+     (void)memcpy((void *)&_res.nsaddr_list[0].sin_addr, (void *)host->h_addr_list[0], (size_t)host->h_length);
+     _res.nscount = 1;
+     return 1;
++#else
++    /* The C library does not export the _res global resolver state (musl
++     * libc, used by OpenHarmony), so a custom nameserver can not be
++     * installed here. Report the unsupported operation instead of failing
++     * to build. */
++    (void)fprintf(stderr, "Setting a custom nameserver is not supported by this C library: %s\n", ns);
++    return 0;
++#endif
+ 
+ }  // End of set_nameserver
+ 

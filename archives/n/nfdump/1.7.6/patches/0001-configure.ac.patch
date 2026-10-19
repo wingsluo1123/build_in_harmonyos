@@ -1,0 +1,30 @@
+--- a/configure.ac
++++ b/configure.ac
+@@ -561,6 +561,27 @@
+  ]) 
+ ])
+ 
++dnl ---------------------------------------------------------------------------
++dnl The glibc resolver publishes its global resolver state through the struct
++dnl __res_state object named _res. Other C libraries - musl libc, which
++dnl OpenHarmony uses - provide res_init()/gethostbyname() but do not export
++dnl that global variable. Probe for the global instead of relying on a
++dnl platform specific define, so the sources stay portable.
++dnl ---------------------------------------------------------------------------
++AC_MSG_CHECKING([whether the _res global resolver state is available])
++AC_LINK_IFELSE(
++    [AC_LANG_PROGRAM(
++        [[#include <sys/types.h>
++#include <netinet/in.h>
++#include <arpa/inet.h>
++#include <resolv.h>]],
++        [[res_init();
++_res.nscount = 1;]])],
++    [AC_MSG_RESULT([yes])
++AC_DEFINE([HAVE_RES_GLOBAL], [1],
++          [Define to 1 if the C library exposes the _res global resolver state])],
++    [AC_MSG_RESULT([no])])
++
+ # lzo compression requirements
+ AC_CHECK_TYPE(ptrdiff_t, long)
+ AC_TYPE_SIZE_T

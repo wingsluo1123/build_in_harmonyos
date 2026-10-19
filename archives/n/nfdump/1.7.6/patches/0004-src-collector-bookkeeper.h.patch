@@ -1,0 +1,32 @@
+--- a/src/collector/bookkeeper.h
++++ b/src/collector/bookkeeper.h
+@@ -32,6 +32,7 @@
+ #ifndef _BOOKKEEPER_H
+ #define _BOOKKEEPER_H 1
+ 
++#include <semaphore.h>
+ #include <stdint.h>
+ #include <sys/types.h>
+ #include <time.h>
+@@ -61,15 +62,18 @@
+ 
+ } bookkeeper_t;
+ 
+-// All bookkeepers are put into a linked list, to have all the shm_id,sem_id
++// All bookkeepers are put into a linked list, to keep the POSIX IPC handles
++// of every shared record together with the record itself.
+ typedef struct bookkeeper_list_s {
+     struct bookkeeper_list_s *next;
+ 
+     bookkeeper_t *bookkeeper;
+ 
+     // shared parameters
+-    int sem_id;
+-    int shm_id;
++    char shm_name[64];  // name of the shared memory object
++    char sem_name[64];  // name of the guarding semaphore
++    size_t shm_size;    // size of the mapped region
++    sem_t *sem;         // handle of the guarding semaphore
+ 
+ } bookkeeper_list_t;
+ 
