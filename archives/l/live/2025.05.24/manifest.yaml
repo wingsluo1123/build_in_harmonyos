@@ -1,0 +1,29 @@
+version: "2025.05.24"
+software: live
+status: built
+build_date: "2026-10-17"
+build_system: makefile
+
+source:
+  url: "https://download.videolan.org/contrib/live555/live.2025.05.24.tar.gz"
+  sha256: "e6185902c4bfe9235067a0bc80ec9a5f8a95956d9d07525ce169f3f9753afb0a"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options:
+    - "C++20"
+    - "static libraries"
+    - "OpenSSL enabled"
+  dependencies:
+    - "openssl/3.5.8.1"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-basic-scheduler-active-event-trigger-wakeup.patch"
+
+knowledge_gained:
+  - "A cross-thread event flag publishes state but cannot wake a thread blocked in select(); a nonblocking readiness channel must be paired with the enumerable pending state."
+  - "When notifications coalesce or reach EAGAIN, the event loop must drain readiness, dispatch a pending bit, and rearm while any pending bit remains; one un-rearmed byte per API call can strand combined EventTriggerId bits."
+  - "The active wakeup channel removes the default 10 ms polling tick while preserving an explicit positive granularity and a 10 ms liveness fallback if the channel cannot be registered."
