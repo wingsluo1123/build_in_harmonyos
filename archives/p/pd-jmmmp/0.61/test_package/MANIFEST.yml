@@ -1,0 +1,43 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for the CI L0/L1 quality gates.
+
+package: pd-jmmmp/0.61
+homepage: "https://puredata.info"
+
+# jmmmp 0.61 ships no C/C++ source, no Makefile and therefore no check/test
+# target: the release is 141 Pd patches, 12 data files and 38 example images.
+# The -help.pd patches are interactive documentation, not automated assertions,
+# so there is no upstream test suite that build() could run.
+upstream_check_command: "(none: upstream ships no build system and no test target)"
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# The consumer test is the whole gate.  verify_jmmmp.py reports one combined
+# result for two layers:
+#   * data layer (always): exact 191-file inventory, structural validity of all
+#     141 patches, the libdir meta file, and a complete class dependency map -
+#     every referenced class must be Pd vanilla, another shipped abstraction or
+#     a documented external Pd-library class, and the libraries named in the
+#     upstream [declare] lines must match the documented set.
+#   * runtime layer (needs puredata/0.56.5): the 49 abstractions whose class
+#     closure is pure vanilla are instantiated in a headless Pd (-batch), nine
+#     deterministic ones are driven with known inputs and the printed values are
+#     compared exactly, the "jmmmp/<name>" namespace form is exercised, and both
+#     patches are re-run without the package on the search path to prove the
+#     assertions cannot pass vacuously.
+test_package_tests:
+  - file: verify_jmmmp.py
+    description: "Data layer: 191-file inventory, patch structure, meta file, class dependency map, closure vs instantiate patch"
+    command: "python3 verify_jmmmp.py --jmmmp-dir <pkg>/lib/pd-externals/jmmmp"
+  - file: jmmmp_instantiate.pd
+    description: "Runtime: create one instance of the 49 vanilla-only abstractions and print a done sentinel"
+    command: "pd -batch -nogui -noaudio -noprefs -nostdpath -path <pkg>/lib/pd-externals/jmmmp -path <pkg>/lib/pd-externals -open jmmmp_instantiate.pd -send \"; pd quit\""
+  - file: jmmmp_smoke.pd
+    description: "Runtime: 9 expected result sets from appent/prepent/f+/change-symbol/jp.symbol-expand/expr_scale/scale/lbang/sguigot"
+    command: "pd -batch -nogui -noaudio -noprefs -nostdpath -path <pkg>/lib/pd-externals/jmmmp -path <pkg>/lib/pd-externals -open jmmmp_smoke.pd -send \"; pd quit\""
+  - file: jmmmp_smoke.pd
+    description: "Runtime negative control: both patches without -path must fail to resolve every library object and leak no expected value"
+    command: "pd -batch -nogui -noaudio -noprefs -nostdpath -open jmmmp_instantiate.pd -open jmmmp_smoke.pd -send \"; pd quit\""
+
+assertion_count: 173

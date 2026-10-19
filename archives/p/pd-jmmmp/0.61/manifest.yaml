@@ -1,0 +1,115 @@
+# AI metadata for pd-jmmmp 0.61 (task type A: pre-adaptation + device validation).
+#
+# status=built: the package was built and its consumer test executed on the
+# HarmonyOS PC through the isolated shadow-CI runner (Total 1 / Success 1, L0,
+# L1, L4, L5 pass, L2 skip).  It has not been uploaded / published yet.
+software: pd-jmmmp
+version: "0.61"
+status: built
+build_date: "2026-10-18"
+build_system: "none (pure Pd data package: no Makefile, no sources, nothing to compile)"
+task_type: "A + B (pre-adaptation with device validation + knowledge-base expansion: 2 drafts)"
+
+source:
+  url: "https://mirrors.tuna.tsinghua.edu.cn/debian/pool/main/p/pd-jmmmp/pd-jmmmp_0.61.orig.tar.xz"
+  url_fallback: "https://deb.debian.org/debian/pool/main/p/pd-jmmmp/pd-jmmmp_0.61.orig.tar.xz"
+  sha256: "d7d50ee9d95297735d2fd70fae4d23ac22d3a512ad00627fd9efe9225764e002"
+  tar_format: tar.xz
+  bytes: 413952
+  provenance: >-
+    Upstream 0.61 is distributed through Pd's package manager (deken) as
+    jmmmp-v0.61--externals.zip; the SourceForge file area named by Debian's
+    copyright only carries jmmmp-0.1.1, and deken itself is behind an Anubis
+    proof-of-work challenge that CI cannot pass.  The Debian source package
+    repacks the deken release as pd-jmmmp_0.61.orig.tar.xz and Debian's
+    pd-jmmmp.install defines the installed file set.  Two mirrors serve the
+    identical file (sha256 cross-checked) and the Debian binary package
+    pd-jmmmp_0.61-2_all.deb installs exactly the same 191 files: 178
+    byte-identical, 13 PNGs differing only in the tIME timestamp chunk
+    (pixel data identical).
+
+build:
+  system: none
+  compile_step: false
+  configure_options: []
+  dependencies: []
+  artifacts:
+    - "lib/pd-externals/jmmmp/*.pd (141: 72 abstractions, 68 help patches, jmmmp-meta.pd)"
+    - "lib/pd-externals/jmmmp/*.txt (12 data files)"
+    - "lib/pd-externals/jmmmp/examples/ (38 images: 28 png, 9 gif, 1 ppm)"
+  total_files: 191
+
+patches_applied: []
+
+w0_dependency_check:
+  method: "conan list <name>/* -r=ohpcd"
+  conan_build_dependencies: []
+  conan_runtime_dependencies: []
+  runtime_host:
+    package: "puredata"
+    versions_in_registry: ["0.54.1", "0.56.5"]
+    binary_for_ohos_profile: "puredata/0.56.5"
+    role: "test-only requirement of test_package; the library itself needs no Conan dependency"
+  referenced_pd_libraries:
+    published_in_ohpcd: ["pd-ggee/0.28", "pd-maxlib/1.6.0"]
+    recipe_only_not_published: ["pd-zexy/2.4.4", "pd-iemlib/1.22.3"]
+    no_recipe_at_all: ["cyclone", "ext13", "iemmatrix", "list-abs", "mrpeach", "Gem", "ceammc", "else", "pd-ableton-link"]
+    decision: >-
+      none of them is declared as a Conan requirement: they are runtime
+      prerequisites of a Pd installation (Debian expresses them as Recommends).
+      49 of the 72 abstractions work on vanilla Pd alone; the other 23 need at
+      least one of those libraries.  See notes.md for the per-abstraction map.
+
+test_results:
+  type: "consumer (upstream ships no test suite and no build system)"
+  upstream: "0 automated tests: no Makefile, no check/test target, 68 -help.pd patches are interactive documentation"
+  test_package: "verify_jmmmp.py: 173 assertions = 156 data + 17 runtime/negative-control"
+  layers:
+    - "data: exact 191-file inventory; structural validity of all 141 patches with Pd record wrapping; meta file NAME/LICENSE/VERSION; complete class dependency map (129 vanilla / 75 external / internal); declared Pd-library set; instantiate patch == static vanilla closure"
+    - "runtime: 49 vanilla-only abstractions instantiated in headless pd -batch; 9 deterministic abstractions with exact expected values; the jmmmp/<name> namespace form"
+    - "negative control: both patches re-run without -path; exactly 58 creation errors and no leaked expected value, so no class name is shadowed by Pd vanilla"
+  local_host_verification:
+    date: "2026-10-18"
+    host: "Windows x86_64 (host-only, not the OHOS target)"
+    conan_create: "EXIT=0; 'data layer: 191 files, 72 abstractions, 49 vanilla-only, 23 external-dependent, 75 external classes'; 'jmmmp checks: 156 assertions, 0 failed'"
+    pd_functional: "EXIT=0; 'jmmmp checks: 173 assertions, 0 failed'; run with a locally built Pd 0.56.5 (upstream tag 0.56-5, the source puredata/0.56.5 builds)"
+  device_or_shadow_ci:
+    date: "2026-10-18"
+    environment: "HarmonyOS PC aarch64, HarmonyOS 6.0, clang 15, isolated shadow-CI run"
+    run_id: "74c30a1c1d5e-20261018T062918Z-46194"
+    command: "sh validation/run-ohos-shadow-ci-local-pdjmmmp.sh archives/p/pd-jmmmp/0.61"
+    gates: "L0 pass, L1 pass (test_package executed), L2 skip (no bin/), L4 pass (no patches), L5 pass (lib/ has content)"
+    summary: "Total: 1, Success: 1, Failed: 0"
+    consumer_test: "puredata/0.56.5 (rev a97a815779545da8139a95c4a7ce8791) downloaded and its bin/pd executed on the device; 'jmmmp checks: 173 assertions, 0 failed'"
+    harness_notes: >-
+      two device-harness obstacles were worked around outside the repository:
+      /tmp is read-only so TMPDIR/TMP/TEMP/TMPPREFIX must point at a writable
+      directory before the runner starts, and the runner's minimal settings.yml
+      omits 'Windows', which makes automake/1.18's `os == "Windows"` comparison
+      raise under Conan 2 (fixed with a runner copy carrying the full os list).
+
+known_limitations:
+  - "23 of the 72 abstractions cannot be exercised without zexy/iemlib/iemmatrix/cyclone/ggee/list-abs/maxlib/mrpeach/Gem/ceammc/else/pd-ableton-link installed in the Pd used for testing; they are covered by the static class map instead of by a runtime run."
+  - "upstream jmmmp-meta.pd declares VERSION 0.48 in the 0.61 tarball; shipped unchanged and asserted as-is (see notes.md)."
+  - "the namespaced jmmmp/<name> form needs <pkg>/lib/pd-externals on Pd's search path in addition to the libdir itself."
+
+knowledge_ref:
+  - "knowledge/drafts/DRAFT-pd-jmmmp-0.61-pd-patch-record-wrapping.kv"
+  - "knowledge/drafts/DRAFT-pd-jmmmp-0.61-shadow-ci-settings-os-windows.kv"
+
+knowledge:
+  path: "B (knowledge-base expansion)"
+  drafts:
+    - id: "DRAFT-pd-jmmmp-0.61-pd-patch-record-wrapping"
+      topic: "Pd 补丁按未转义分号结束 record；折行与消息框内嵌子 patch 让行式解析器误报；测试补丁文本必须转义 ; 与 ,"
+      evidence: "multiarray.pd 行式解析约 280 条 malformed connect 与 101/98 canvas 不配对，record 解析 0 错误；未转义时正跑日志出现 'verify_jmmmp.py: no such object'，转义后 9 组断言逐值一致"
+    - id: "DRAFT-pd-jmmmp-0.61-shadow-ci-settings-os-windows"
+      topic: "精简 settings.yml 只声明 OHOS/Linux 时，Conan 2 对 `os == \"Windows\"` 的右值校验会让 automake/1.18 在 config_options 阶段硬失败"
+      evidence: "原版 runner 复现 Invalid setting 'Windows'；补全 os 列表后同一包 Total 1 / Success 1"
+  related_existing:
+    - "适配共性问题与首次真机启动避坑指南 第 13 条（/tmp 只读导致 heredoc 失败）——本次真机运行再次命中，draft 里作为附带前置记录"
+    - "仓库内 23 个既有 pd-* 适配：lib/pd-externals 布局、无头 Pd 加载、负向对照的既有做法"
+
+next_steps:
+  - "push feat/pd-jmmmp-0.61 and open the PR (device shadow CI is green)"
+  - "optional: adapt/publish pd-zexy + pd-iemlib, then pd-cyclone/pd-iemmatrix/pd-list-abs, to move the 23 external-dependent abstractions from static coverage to runtime coverage"
