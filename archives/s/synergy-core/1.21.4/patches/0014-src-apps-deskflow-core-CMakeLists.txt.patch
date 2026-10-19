@@ -1,0 +1,28 @@
+--- a/src/apps/deskflow-core/CMakeLists.txt
++++ b/src/apps/deskflow-core/CMakeLists.txt
+@@ -40,11 +40,20 @@
+   Qt6::Widgets
+   ${libs})
+ 
+-install(
+-  TARGETS ${target}
+-  RUNTIME_DEPENDENCY_SET coreDeps
+-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+-)
++if(WIN32)
++  install(
++    TARGETS ${target}
++    RUNTIME_DEPENDENCY_SET coreDeps
++    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
++  )
++else()
++  # OHOS: RUNTIME_DEPENDENCY_SET is not supported on this platform; the
++  # runtime dependency set is only consumed by the WIN32 DLL deploy below.
++  install(
++    TARGETS ${target}
++    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
++  )
++endif()
+ 
+ if(BUILD_OSX_BUNDLE)
+   set_target_properties(${target} PROPERTIES

@@ -1,0 +1,62 @@
+package: synergy-core/1.21.4
+homepage: "https://symless.com/synergy"
+
+upstream_check_command: "grep -rn 'create_test(' src/unittests/*/CMakeLists.txt | wc -l -> 31 registrations (Qt Test framework, BUILD_TESTS gate in src/CMakeLists.txt)"
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir build/Release/src/unittests -V with QT_QPA_PLATFORM=minimal"
+
+upstream_tests:
+  - file: src/unittests/base (6 executables)
+    description: "StringTests, UnicodeTests, LogTests, FileLogOutputterTests, BaseExceptionTests, EventQueueTests — built and run"
+    command: "ctest (direct execution, QT_QPA_PLATFORM=minimal)"
+    status: "passed"
+  - file: src/unittests/client (1 executable)
+    description: "ServerProxyTests — built and run"
+    command: "ctest (direct execution, QT_QPA_PLATFORM=minimal)"
+    status: "passed"
+  - file: src/unittests/common (2 of 3 executables)
+    description: "SettingsTests, LogLevelTests — built and run; I18NTests excluded via SKIP_I18N_TESTS (the suite copies the compiled deskflow_*.qm catalogues and this toolchain provides no Qt LinguistTools/lrelease to produce them)"
+    command: "ctest (direct execution, QT_QPA_PLATFORM=minimal)"
+    status: "passed"
+  - file: src/unittests/deskflow (7 executables)
+    description: "ClipboardTests, ClipboardChunksTests, IKeyStateTests, KeyMapTests, KeyStateTests, KeyboardLayoutManagerTests, X11LayoutParserTests (BUILD_X11_SUPPORT gated) — built and run"
+    command: "ctest (direct execution, QT_QPA_PLATFORM=minimal)"
+    status: "passed"
+  - file: src/unittests/net (3 executables)
+    description: "SecureUtilsTests, FingerprintTests, FingerprintDatabaseTests — built and run (TLS fingerprint generation uses the openssl dependency)"
+    command: "ctest (direct execution, QT_QPA_PLATFORM=minimal)"
+    status: "passed"
+  - file: src/unittests/platform (1 executable)
+    description: "XWindowsClipboardTests (BUILD_X11_SUPPORT gated) — built and run; initTestCase QSKIPs itself on hosts with no X display (upstream behavior, not a recipe-side skip), defaultCtor runs and passes"
+    command: "ctest (direct execution, QT_QPA_PLATFORM=minimal)"
+    status: "passed"
+  - file: src/unittests/server (2 executables)
+    description: "ServerConfigTests, ServerTests — built and run"
+    command: "ctest (direct execution, QT_QPA_PLATFORM=minimal)"
+    status: "passed"
+  - file: src/unittests/gui (4 executables, trimmed)
+    description: "LoggerTests, KeySequenceTests, config/ScreenTests, core/NetworkMonitorTests — link the trimmed src/lib/gui library and are excluded together with the desktop GUI application (BUILD_GUI=OFF)"
+    status: "excluded"
+  - file: src/unittests/platform (3 executables, platform-inapplicable)
+    description: "MSWindowsClipboardTests, OSXClipboardTests, OSXKeyStateTests — upstream if(WIN32)/elseif(APPLE) branches, never registered on Unix"
+    status: "excluded"
+  - file: src/unittests/platform (1 executable, libei-gated)
+    description: "EiKeyStateTests — upstream if(LIBEI_FOUND) branch; libei is an optional input backend not selected in this X11-only delivery"
+    status: "excluded"
+
+test_package_tests:
+  - file: test.sh
+    description: "Installed CLI contract: --version prints the 1.21.4 version string plus protocol v1.8, --help prints the usage text with the coremode positional argument, and the no-mode invocation prints usage and exits 0"
+    command: "sh test.sh <synergy-core> 1.21.4"
+
+upstream_test_count: 31
+upstream_test_built_count: 22
+test_package_test_count: 1
+assertion_count: 4
+
+test_modifications:
+  - "Gate the gui test subdirectory behind BUILD_GUI (4 gui suites link the trimmed src/lib/gui library)"
+  - "Exclude I18NTests through SKIP_I18N_TESTS when no Qt LinguistTools (lrelease) exists to compile the deskflow_*.qm catalogues the suite copies"
+  - "Resolve the Qt Test package through the version-agnostic QT_VERSION_MAJOR name in create_test()"
+  - "Include <QRegularExpression> explicitly in SettingsTests/LogTests (Qt5 headers do not transitively provide it)"
+  - "Replace std::ranges algorithm calls with classic std:: equivalents (8 files) — OHOS clang 15 libc++ lacks the C++20 ranges algorithms"

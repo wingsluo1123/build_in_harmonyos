@@ -1,0 +1,14 @@
+--- a/src/lib/arch/unix/ArchNetworkBSD.cpp
++++ b/src/lib/arch/unix/ArchNetworkBSD.cpp
+@@ -48,7 +48,10 @@
+ 
+ std::shared_ptr<struct pollfd[]> ArchNetworkBSD::Deps::makePollFD(nfds_t n)
+ {
+-  return std::make_shared<struct pollfd[]>(n);
++  // OHOS: clang 15's libc++ lacks make_shared for array types (P0970);
++  // value-initialize through new[] which the shared_ptr array deleter
++  // handles, matching the zero-initialization make_shared provides.
++  return std::shared_ptr<struct pollfd[]>(new struct pollfd[n]());
+ }
+ 
+ ssize_t ArchNetworkBSD::Deps::read(int fd, void *buf, size_t len)

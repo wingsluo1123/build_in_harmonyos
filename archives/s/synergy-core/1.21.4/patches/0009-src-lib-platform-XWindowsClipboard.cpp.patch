@@ -1,0 +1,16 @@
+--- a/src/lib/platform/XWindowsClipboard.cpp
++++ b/src/lib/platform/XWindowsClipboard.cpp
+@@ -1038,11 +1038,11 @@
+       LOG_VERBOSE("  %s: <can't read property>", name);
+     } else {
+       // convert to hex if contains non ascii symbols
+-      if (std::ranges::find_if(data, [](const unsigned char &c) { return c < 32 || c > 126; }) != data.end()) {
++      if (std::find_if(data.begin(), data.end(), [](const unsigned char &c) { return c < 32 || c > 126; }) != data.end()) {
+         const std::string hex_digits = "0123456789abcdef";
+         std::string tmp;
+         tmp.reserve(data.length() * 3);
+-        std::ranges::for_each(data, [&hex_digits, &tmp](const unsigned char &c) {
++        std::for_each(data.begin(), data.end(), [&hex_digits, &tmp](const unsigned char &c) {
+           tmp += hex_digits[c >> 16];
+           tmp += hex_digits[c & 15];
+           tmp += ' ';
