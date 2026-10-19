@@ -1,0 +1,23 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: libaudclient/3.5-rc2.2
+homepage: "https://www.audacious-media-player.org/"
+
+# 上游源码审计：3.5-rc2 官方发布包确认无任何自动化测试（与 3.5-rc2 审计一致，同一上游 tarball）
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "buildsys.mk.in"
+    reason: "audacious 自研 buildsys（非 automake）整体未定义 check 目标；build()/install()/clean() 之外无任何测试挂钩。"
+  - source: "Makefile / src/*/Makefile"
+    reason: "顶层与 src/、src/audacious/、src/libaudclient/ 四个 Makefile 均无 TESTS/check_PROGRAMS/check-local 声明。"
+  - source: "configure.ac"
+    reason: "仅 AC_PROG_CC/AC_CHECK_HEADERS/PKG_CHECK_MODULES/AC_PATH_PROG(dbus-binding-tool)；无测试宏。"
+  - source: "源码树"
+    reason: "发布包无 tests/、test/ 目录；src/libaudclient/ 仅 audctrl.c/audctrl.h；src/audacious/ 仅有 objects.xml 与预生成的 dbus-client-bindings.h。"
+  - conclusion: "上游未提供自动化测试套件；由 test_package 执行消费者视角验证：链接 KF5 风格 DBusGProxy 调用链，运行时验证 D-Bus 错误路径优雅处理（3 检查点），链接级 ELF 符号解析验证。"
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
