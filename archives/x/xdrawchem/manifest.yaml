@@ -1,0 +1,32 @@
+# 软件级 manifest — xdrawchem
+software: xdrawchem
+display: "XDrawChem"
+description: "二维分子结构绘制与分析程序（Qt5 + Open Babel）：MDL Molfile / CML / CDX / SMILES 读写，2D↔3D 转换，NMR/IR 图谱工具（同 ChemDraw 定位的自由软件）"
+category: chemistry
+homepage: "https://gitlab.com/yamanq/xdrawchem"
+upstream_mirror: "https://github.com/bryanherger/xdrawchem"
+license: GPL-3.0-or-later
+build_system: qmake
+
+ohos_adaptation:
+  key_points:
+    - "Qt5 桌面 GUI 应用（TEMPLATE=app），依赖 qt5-qtbase/5.15.2.2（Core/Gui/Widgets/Network/Xml/PrintSupport）+ qt5-qtsvg/5.15.2（QT += svg）+ openbabel/3.2.1（PKGCONFIG += openbabel-3）"
+    - "qt5-qtsvg/5.15.2 精确 requires qt5-qtbase/5.15.2（该版 -no-widgets，无 Qt5Widgets）→ 配方 override 到 5.15.2.2"
+    - "qt5-qtbase / qt5-qtsvg 包内 mkspecs/{modules,modules-inst}/*.pri 与 bin/qt.conf 记录构建期 conan 私有前缀（.../p/b/<hash>/b）→ 复制并整体改写为真实 package 目录，经 QMAKEMODULES 暴露；另生成修正 qt.conf 以 qmake -qtconf 加载，并显式钉住 QMAKE_RCC/QMAKE_MOC/QMAKE_UIC（qconf 2.5 / baka 2.0.4 先例）"
+    - "openbabel 包内 openbabel-3.pc 的 prefix 失效 → 用 PkgConfigDeps 重新生成（pkg_config_name=openbabel-3）并注入 PKG_CONFIG_PATH"
+    - "上游 .pro 硬编码 CONFIG += debug（-O0 -g3，命令行无法覆盖）→ 补丁移除，配方按 conan build_type 传 CONFIG"
+    - "http.cpp 用 qDebug() << 流式输出但未包含 <QDebug>（Qt 5.15 qlogging.h 仅前置声明）→ 补丁补 include"
+    - "PREFIX=<package_folder> 交给上游 INSTALLS：二进制装 bin/，运行期数据（ring/ + doc/）装 share/xdrawchem/，包自包含（RINGHOME 编译期固定指向此处）"
+    - "make -j>1 在本环境报 jobserver mkfifo 错误 → -j1；qmake 命令行传 QMAKE_STRIP=true（使 Makefile STRIP=true，install 期不 strip——OHOS 加载器拒绝 stripped ELF）"
+  common_dependencies:
+    - "qt5-qtbase (published 5.15.2.2)"
+    - "qt5-qtsvg (published 5.15.2)"
+    - "openbabel (published 3.2.1)"
+    - "zlib / dbus / expat / libxml2 / eigen / rapidjson（传递，均已发布）"
+
+versions:
+  "1.11.1":
+    status: built
+    build_date: "2026-10-16"
+    conan_ref: "xdrawchem/1.11.1"
+    note: "conan create + conan-verify 全绿（G0-G4；其 L2/L4/L5 因无 cache 路径而跳过，非实跑），W3 本地 CI：L0/L1/L5 pass、L2 skip（non-blocking，未注入 conanrun 的 LD_LIBRARY_PATH）、L4 warn；test_package 5/5 PASS（等价覆盖 L2 的 --version/--help 断言）；上游无自动化测试（R51 三步法申报见版本级 MANIFEST.yml / notes.md）；尚未 upload 到制品仓"

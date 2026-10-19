@@ -1,0 +1,23 @@
+# conandata.yml — xdrawchem 1.11.1
+# 上游: https://gitlab.com/yamanq/xdrawchem tag v1.11.1（2024-05-29，Qt5 + Open Babel）
+# R39: 仅官方源 URL（上游 GitLab 官方 tag 归档），镜像 fallback 由 CI 自动添加
+
+sources:
+  url: "https://gitlab.com/yamanq/xdrawchem/-/archive/v1.11.1/xdrawchem-v1.11.1.tar.gz"
+  sha256: "4e90e37e713dbd45f53c545c4adedb41154bb6881515c850c1af9c7979f8224b"
+
+patches:
+  "1.11.1":
+    # 上游 .pro 无条件 `CONFIG += debug`（并把 -O0 -g3 追加进 CXXFLAGS），
+    # 与 conan build_type=Release 冲突：产物为 -O0 带调试信息的 12MB 二进制。
+    # 该指令在 qmake 命令行无法覆盖（.pro 在命令行赋值之后求值），故从工程文件移除。
+    - patch_file: "patches/0001-xdrawchem.pro.patch"
+      patch_description: "Drop the hard-coded `CONFIG += debug` from xdrawchem.pro so the build honours the requested configuration (Release: -O2) instead of always producing an -O0 -g3 binary"
+      patch_type: "portability"
+    # http.cpp 大量使用 `qDebug() << ...` 流式输出却未包含 <QDebug>；Qt 5.15 的
+    # qlogging.h 只前置声明 QDebug（"In order to use the qDebug() stream, you must
+    # #include<QDebug>"），该 TU 又不经其他 Qt 头间接引入 qdebug.h，clang 15 下报
+    # "calling 'debug' with incomplete return type 'QDebug'"（10 处），编译中断。
+    - patch_file: "patches/0002-xdrawchem-http.cpp.patch"
+      patch_description: "Include <QDebug> in xdrawchem/http.cpp: the translation unit streams qDebug() output but Qt 5.15's qlogging.h only forward-declares QDebug, so clang reports 'incomplete return type' and the build stops"
+      patch_type: "portability"
