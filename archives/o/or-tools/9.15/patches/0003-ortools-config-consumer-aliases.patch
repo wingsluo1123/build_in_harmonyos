@@ -1,0 +1,73 @@
+diff --git a/cmake/ortoolsConfig.cmake.in b/cmake/ortoolsConfig.cmake.in
+index 30d294c..bcdf223 100644
+--- a/cmake/ortoolsConfig.cmake.in
++++ b/cmake/ortoolsConfig.cmake.in
+@@ -40,7 +40,10 @@ if(NOT TARGET re2::re2)
+ endif()
+ 
+ if(@USE_COINOR@)
+-  # COIN-OR packages don't provide CMake config files
++  # COIN-OR packages don't provide CMake config files; the Conan packages
++  # export clp::clp / cbc::cbc so the lowercase configs are found here and
++  # the Coin::* names referenced by the installed or-tools targets are
++  # bridged in the alias block below.
+   if(NOT TARGET Coin::ClpSolver)
+     find_dependency(Clp REQUIRED)
+   endif()
+@@ -49,6 +52,56 @@ if(@USE_COINOR@)
+   endif()
+ endif()
+ 
++# ---------------------------------------------------------------------------
++# Conan CMakeDeps exposes dependencies under their recipe target names
++# (zlib::zlib, bzip2::bzip2, coinutils::coinutils, coin-or::coin-or,
++# clp::clp, cgl::cgl, cbc::cbc) while the installed or-tools targets are
++# linked against the conventional ZLIB::ZLIB / BZip2::BZip2 / Coin::* names.
++# Bridge them so consumers (e.g. test_package) can link ortools::ortools.
++# ---------------------------------------------------------------------------
++
++if(TARGET zlib::zlib AND NOT TARGET ZLIB::ZLIB)
++  add_library(ZLIB::ZLIB ALIAS zlib::zlib)
++endif()
++
++if(TARGET bzip2::bzip2 AND NOT TARGET BZip2::BZip2)
++  add_library(BZip2::BZip2 ALIAS bzip2::bzip2)
++endif()
++
++if(@USE_COINOR@)
++  if(TARGET coinutils::coinutils AND NOT TARGET Coin::CoinUtils)
++    add_library(Coin::CoinUtils ALIAS coinutils::coinutils)
++  endif()
++  if(TARGET coin-or::coin-or AND NOT TARGET Coin::Osi)
++    add_library(Coin::Osi ALIAS coin-or::coin-or)
++  endif()
++  if(TARGET clp::clp)
++    if(NOT TARGET Coin::ClpSolver)
++      add_library(Coin::ClpSolver ALIAS clp::clp)
++    endif()
++    if(NOT TARGET Coin::Clp)
++      add_library(Coin::Clp ALIAS clp::clp)
++    endif()
++    if(NOT TARGET Coin::OsiClp)
++      add_library(Coin::OsiClp ALIAS clp::clp)
++    endif()
++  endif()
++  if(TARGET cgl::cgl AND NOT TARGET Coin::Cgl)
++    add_library(Coin::Cgl ALIAS cgl::cgl)
++  endif()
++  if(TARGET cbc::cbc)
++    if(NOT TARGET Coin::CbcSolver)
++      add_library(Coin::CbcSolver ALIAS cbc::cbc)
++    endif()
++    if(NOT TARGET Coin::Cbc)
++      add_library(Coin::Cbc ALIAS cbc::cbc)
++    endif()
++    if(NOT TARGET Coin::OsiCbc)
++      add_library(Coin::OsiCbc ALIAS cbc::cbc)
++    endif()
++  endif()
++endif()
++
+ if(@USE_GLPK@)
+   if(NOT TARGET GLPK::GLPK)
+     find_dependency(GLPK REQUIRED)

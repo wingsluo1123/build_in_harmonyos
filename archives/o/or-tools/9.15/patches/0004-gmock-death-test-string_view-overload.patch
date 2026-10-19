@@ -1,0 +1,23 @@
+diff --git a/ortools/base/gmock.h b/ortools/base/gmock.h
+index 9003a2b..ffeee6c 100644
+--- a/ortools/base/gmock.h
++++ b/ortools/base/gmock.h
+@@ -18,6 +18,18 @@
+ #include "ortools/base/gmock.h"
+ #include "protobuf-matchers/protocol-buffer-matchers.h"
+ 
++namespace testing {
++namespace internal {
++// googletest v1.17.0 ships no MakeDeathTestMatcher overload for
++// absl::string_view; or-tools' math_opt tests pass constexpr
++// absl::string_view death-test matchers. Provide the missing overload
++// (regex converted to std::string; assertion semantics unchanged).
++inline Matcher<const ::std::string&> MakeDeathTestMatcher(absl::string_view regex) {
++  return ContainsRegex(std::string(regex));
++}
++}  // namespace internal
++}  // namespace testing
++
+ namespace testing {
+ using ::protobuf_matchers::EqualsProto;
+ using ::protobuf_matchers::EquivToProto;

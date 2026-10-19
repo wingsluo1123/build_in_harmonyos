@@ -1,0 +1,87 @@
+diff --git a/cmake/check_deps.cmake b/cmake/check_deps.cmake
+index 15dd1f2..ac71590 100644
+--- a/cmake/check_deps.cmake
++++ b/cmake/check_deps.cmake
+@@ -12,6 +12,82 @@
+ # limitations under the License.
+ 
+ # Check dependencies
++
++# ---------------------------------------------------------------------------
++# Target-name bridging for Conan CMakeDeps (HarmonyOS PC adapt).
++#
++# Conan CMakeDeps exports every dependency under its recipe target name
++# (zlib::zlib, bzip2::bzip2, coinutils::coinutils, coin-or::coin-or,
++# clp::clp, cgl::cgl, cbc::cbc) while or-tools expects the conventional
++# ZLIB::ZLIB / BZip2::BZip2 / Coin::* names.  Bridge them so the FATAL
++# checks below and the sat/linear_solver CMakeLists links all resolve.
++# ---------------------------------------------------------------------------
++
++if(TARGET zlib::zlib AND NOT TARGET ZLIB::ZLIB)
++  add_library(ZLIB::ZLIB ALIAS zlib::zlib)
++endif()
++
++if(TARGET bzip2::bzip2 AND NOT TARGET BZip2::BZip2)
++  add_library(BZip2::BZip2 ALIAS bzip2::bzip2)
++endif()
++
++if(TARGET coinutils::coinutils AND NOT TARGET Coin::CoinUtils)
++  add_library(Coin::CoinUtils ALIAS coinutils::coinutils)
++endif()
++
++if(TARGET coin-or::coin-or AND NOT TARGET Coin::Osi)
++  add_library(Coin::Osi ALIAS coin-or::coin-or)
++endif()
++
++if(TARGET clp::clp)
++  if(NOT TARGET Coin::ClpSolver)
++    add_library(Coin::ClpSolver ALIAS clp::clp)
++  endif()
++  if(NOT TARGET Coin::Clp)
++    add_library(Coin::Clp ALIAS clp::clp)
++  endif()
++  if(NOT TARGET Coin::OsiClp)
++    add_library(Coin::OsiClp ALIAS clp::clp)
++  endif()
++endif()
++
++if(TARGET cgl::cgl AND NOT TARGET Coin::Cgl)
++  add_library(Coin::Cgl ALIAS cgl::cgl)
++endif()
++
++if(TARGET cbc::cbc)
++  if(NOT TARGET Coin::Cbc)
++    add_library(Coin::Cbc ALIAS cbc::cbc)
++  endif()
++  if(NOT TARGET Coin::CbcSolver)
++    add_library(Coin::CbcSolver ALIAS cbc::cbc)
++  endif()
++  if(NOT TARGET Coin::OsiCbc)
++    add_library(Coin::OsiCbc ALIAS cbc::cbc)
++  endif()
++endif()
++
++# The Conan abseil-cpp package ships every absl header (including
++# absl/status/status_matchers.h) and 91 libraries, but its testing components
++# are not built (ABSL_BUILD_TESTING=OFF) so libabsl_status_matchers.a and the
++# absl::status_matchers target are missing. The or-tools upstream test
++# binaries (49 *_test.cc under ortools/) use ::testing::status::StatusIs etc.,
++# whose implementation lives in absl/status/internal/status_matchers.cc.
++# Build that one translation unit from the official abseil source tree
++# (OR_TOOLS_ABSEIL_SRC, provided by the Conan recipe generate()) into a real
++# static library; the upstream tests remain byte-for-byte unchanged.
++# NOTE: a "::" target name can only be created via ALIAS, hence the two-step.
++if(NOT TARGET absl::status_matchers)
++  add_library(ortools_status_matchers STATIC
++    "${OR_TOOLS_ABSEIL_SRC}/absl/status/internal/status_matchers.cc")
++  target_include_directories(ortools_status_matchers PUBLIC
++    "${absl_INCLUDE_DIR}" "${gtest_INCLUDE_DIR}")  # provided by the recipe generate()
++  target_compile_features(ortools_status_matchers PRIVATE cxx_std_17)
++  set_target_properties(ortools_status_matchers PROPERTIES POSITION_INDEPENDENT_CODE ON)
++  target_link_libraries(ortools_status_matchers PUBLIC absl::status absl::strings GTest::gmock)
++  add_library(absl::status_matchers ALIAS ortools_status_matchers)
++endif()
++
+ if(NOT TARGET ZLIB::ZLIB)
+   message(FATAL_ERROR "Target ZLIB::ZLIB not available.")
+ endif()
