@@ -1,0 +1,93 @@
+--- a/launchy/singleapplication.cpp
++++ b/launchy/singleapplication.cpp
+@@ -1,73 +1,77 @@
+ #include "singleapplication.h"
+ #include <QCoreApplication>
++#include <QDir>
+ #include <QString>
+ #include <QMutex>
+ #include <QDebug>
+ 
+ SingleApplication* SingleApplication::_instance = NULL;
+-QSharedMemory SingleApplication::_appLock;
++QLockFile* SingleApplication::_appLock = NULL;
+ 
+ SingleApplication* SingleApplication::instance()
+ {
+     static QMutex mutex;
+     if(_instance==NULL)
+     {
+         mutex.lock();
+         _instance = new SingleApplication();
+         mutex.unlock();
+     }
+     return _instance;
+ }
+ 
+ bool SingleApplication::isRunning()
+ {
+-    QSharedMemory sharedMemory;
+-    sharedMemory.setKey(applicationKey());
+-    if(sharedMemory.attach())
++    QLockFile probe(QDir::temp().filePath(applicationKey() + ".lock"));
++    if(probe.tryLock(0))
+     {
+-        sharedMemory.detach();
+-        return true;
++        probe.unlock();
++        return false;
+     }
+-    return false;
++    return true;
+ }
+ 
+ bool SingleApplication::start()
+ {
+-      qDebug() << "Could not create shared mem: " << _appLock.errorString();
+-    return true;
+-    if(!_appLock.create(1))
++    // QLockFile 无 errorString()；直接以 tryLock 返回值为准
++    if(!_appLock->tryLock(0))
+     {
+-        qDebug() << "Could not create shared mem: " << _appLock.errorString();
++        qDebug() << "Could not acquire lock (another instance running?)";
+         return false;
+     }
+     _creator = true;
+     return true;
+ }
+ 
+ void SingleApplication::release()
+ {
+     static QMutex mutex;
+     mutex.lock();
+     if(_instance!=NULL)
+     {
+-        _instance->_appLock.detach();
++        if(_appLock)
++        {
++            _appLock->unlock();
++            delete _appLock;
++            _appLock = NULL;
++        }
+         delete _instance;
+     }
+     _instance = NULL;
+     mutex.unlock();
+ }
+ 
+ SingleApplication::SingleApplication()
+     : _creator(false)
+ {
+-    _appLock.setKey(applicationKey());
++    _appLock = new QLockFile(QDir::temp().filePath(applicationKey() + ".lock"));
+ }
+ 
+ SingleApplication::~SingleApplication()
+ {
+     if(_creator) release();
+ }
+ 
+ QString SingleApplication::applicationKey()
+ {
+     return qApp->applicationName() + "@singleapp";

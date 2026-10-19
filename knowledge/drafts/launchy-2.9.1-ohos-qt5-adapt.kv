@@ -1,0 +1,73 @@
+#====================================================================
+# DRAFT — launchy 2.9.1 OHOS Qt5 适配（QLockFile / QT5_INCLUDE_DIRS / X11 宏污染）
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     DRAFT-launchy-2.9.1-ohos-qt5-adapt
+trigger_tool:           cmake|conan|conan_create|conan-verify
+phase:                  configuration|compilation|linking
+error_signature:        unknown type name 'QSharedMemory'|QTableWidget file not found|undefined symbol: QObject|qdir.h.*expected identifier.*Unsorted|qjsonvalue.h.*expected identifier.*Bool
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               2
+category:               ohos, cmake, conan, qt5, x11, porting
+match_keywords:         QSharedMemory, QLockFile, sharedmemory, -no-feature-sharedmemory, CMakeDeps, Qt5Config, QT5_INCLUDE_DIRS, override, qt5-qtbase, QX11Info, QPlatformNativeInterface, X11, AUTOMOC, mocs_compilation, Bool, Unsorted
+title:                  launchy 2.9.1 OHOS Qt5 适配：单实例锁 / CMakeDeps 聚合降级 / X11 宏污染
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause: |
+  (1) qt5-qtbase/5.15.2.2 配方 configure 含 -no-feature-sharedmemory -no-feature-systemsemaphore，
+  QtCore 的 QSharedMemory 类型按 QT_CONFIG(sharedmemory) 守卫不导出，编译期 unknown type name；
+  (2) qt5-qtbase 以 override=True（非直接依赖）进入依赖图时，CMakeDeps 只生成聚合
+  Qt5Config.cmake，组件 INTERFACE_INCLUDE_DIRECTORIES 与 LIBS 为空，编译期找不到
+  QTableWidget 等头、链接期 undefined QObject 符号；
+  (3) X11/X.h 与 X11/Xlib.h 定义 #define Bool int、#define Unsorted 0 等宏；CMake AUTOMOC
+  将多个 Q_OBJECT 头并入单个 mocs_compilation.cpp TU，x11_keytrigger.h 先引入 X11 宏后，
+  同一 TU 后续首次解析的 Qt 头（qdir.h/qjsonvalue.h）被宏污染报 expected identifier。
+affected_scope: 消费 qt5-qtbase（-no-feature-sharedmemory 构建）的 Qt5 应用/库；Qt5+CMakeDeps+
+  OHOS 交叉编译；Qt5 + X11 头文件混编 + AUTOMOC 合并 TU 场景
+verification_cmd: conan create archives/l/launchy/2.9.1 -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 --build=missing
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           qt5-ohos-qlockfile-plus-direct-dep-plus-qt-include-inject-plus-x11-preparse
+rec_description: |
+  (1) 单实例锁：singleapplication 的 QSharedMemory 静态成员/attach/create 逻辑改为
+  QLockFile（QtCore 自带、基于文件锁、不依赖 sharedmemory 特性）；
+  (2) 依赖图：qt5-qtbase 改为直接依赖 5.15.2.2（消除 qt5-qtx11extras 链 5.15.2 冲突，
+  并让 CMakeDeps 生成完整组件配置）；不依赖 qt5-qtx11extras，QX11Info::display() 改用
+  Qt5Gui QPlatformNativeInterface 获取 Display*（libqxt 先例）；
+  (3) CMakeDeps 兜底：conanfile generate() 注入 QT5_INCLUDE_DIRS（include 根 + 全部
+  Qt* 模块目录 + Qt*/<version>/Qt* 私有头目录），顶层 CMakeLists
+  include_directories(${QT5_INCLUDE_DIRS}) 消费；
+  (4) X11 宏污染：x11_keytrigger.h 在引入 X11 头之前先完整 #include <QtCore>/<QtGui>/
+  <QtWidgets>（include guard 保证后续不再重解析），X11 宏只影响本 TU X11 代码；
+  x11 相关 moc 头移出 add_library 源列表（.cpp 内 include .moc 分隔 TU）。
+rec_command: |
+  # singleapplication.h/.cpp: QSharedMemory -> QLockFile
+  # conanfile.py: self.requires("qt5-qtbase/5.15.2.2")（直接依赖，不 override、不 qtx11extras）
+  # conanfile.py generate(): tc.variables["QT5_INCLUDE_DIRS"] = qtbase include 根+模块+私有目录
+  # CMakeLists.txt: include_directories(${QT5_INCLUDE_DIRS})
+  # common/x11_keytrigger.h: X11 include 前先 #include <QtCore> <QtGui> <QtWidgets>
+rec_auto_fix:           false
+rec_impl:               manual-conanfile-plus-source-patch
+
+fallback_priority:      2
+fallback_approach:      override-qtbase-with-include-inject
+fallback_description:   baka 先例用 override=True 统一 qtbase 版本；若必须保留 qtbase 为
+  override 依赖，仍需注入 QT5_INCLUDE_DIRS 解决组件 includes 为空，但组件 libs 仍空
+  （本包因此弃用 override 改直接依赖）。保留此兜底仅作版本冲突极端场景参考。
+fallback_command:       self.requires("qt5-qtbase/5.15.2.2", override=True) + QT5_INCLUDE_DIRS 注入
+fallback_auto_fix:      false
+fallback_impl:          manual
+
+principles:             P012, P013, P014
+causes:                 []
+caused_by:              []
+similar_to:             ["E216"]
+conflicts_with:         []
+prerequisite_of:        []
+doc_file:               knowledge/drafts/launchy-2.9.1-ohos-qt5-adapt.md
+last_updated:           2026-10-02
+source_event:           launchy 2.9.1 R02 返工修复验证 run（patches 0001-0013 清理后；conan create RC=0 + ctest 100% + test_package 消费者 offscreen 真实执行：QLockFile 锁文件创建、第二实例退出码 1、--version 输出 Launchy 3.0）
+metrics_success_count:  1
