@@ -1,0 +1,53 @@
+# 版本级 manifest — scst 2.2.1
+
+version: "2.2.1"
+software: "scst"
+
+# 编译状态
+# published | built | failed | archived
+# 本地 conan create + conan-verify 通过，未 upload（制品仓 upload 由 CI release 流水线执行）
+status: built
+
+build_date: "2026-10-03"
+build_system: "custom"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://downloads.sourceforge.net/project/scst/older_versions/2.2.1/scst-2.2.1.tar.bz2"
+  sha256: "1e3e887a8b915f6945ad168cdf7e8f506a050a05e9969e0e0f4098e2b25cdd93"
+  tar_format: tar.bz2
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 无构建/打包族（header-only）：源码头文件直通打包，无编译步骤
+  system: custom
+  configure_options: []
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - knowledge_ref: DRAFT-SCST-221-KERNEL-BOUNDARY-HEADER-DELIVERY
+    note: "SCST 是 Linux 内核 SCSI target 框架：核心产物是内核模块，脱离 Linux 内核构建树不可构建；OHOS 侧只能交付用户态可消费子集（头文件）"
+  - knowledge_ref: DRAFT-SCST-221-UAPI-HEADER-USABILITY-AUDIT
+    note: "scst include/ 5 头中仅 scst_const.h / scst_user.h 用户态可用；scst.h / scst_debug.h / scst_sgv.h 依赖 linux/blkdev.h、linux/autoconf.h 等内核树头，排除出 conan 包"
+  - knowledge_ref: DRAFT-SCST-221-UAPI-HEADER-USABILITY-AUDIT
+    note: "OHOS SDK sysroot 自带 linux/version.h 与 scsi/scsi.h，scst_const.h 在用户态 clang 编译零修改通过"
+  - knowledge_ref: DRAFT-SCST-221-KERNEL-BOUNDARY-HEADER-DELIVERY
+    note: "scst/2.2.1 是 iscsi-scst 2.2.1 用户态构建的唯一外部依赖（event.c 消费 SCST_SYSFS_KEY_MARK 等）——R36 拓扑序：先发 scst 再发 iscsi-scst"
