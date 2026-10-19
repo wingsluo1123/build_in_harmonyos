@@ -1,0 +1,48 @@
+# test_package/MANIFEST.yml — mar 0.5
+
+package: mar/0.5
+homepage: "https://cgit.freebsd.org/ports/tree/archivers/mar"
+
+# Upstream test inventory (R51), taken from mar-0.5-src.tar.gz (sha256 8ee7612a...): no tests/ directory
+# and no ctest/pytest registration; the src/Makefile `check` target builds src/mar_test from
+# src/mar_test_cpp.cpp (C++ wrappers on top of libmar.a) and runs ./mar_test, which has 8 named cases:
+# meta functions, user functions, insert function, extract function, copy function, opencopy function,
+# iterator class, stream class.  N = 8; conanfile.py build() builds it through the same make rules
+# (-static-pie) and runs it natively on AArch64 / through qemu-aarch64: 8/8 OK, "All tests PASSED".
+# Without patches 0001/0002 it does not compile (clang/libc++ two-phase lookup).
+upstream_tests_exist: true
+upstream_check_command: "make check  (src/Makefile: build src/mar_test, run ./mar_test)"
+upstream_test_in_build: true
+upstream_test_command: "make -j1 -C src mar_test <overrides>; qemu-aarch64 src/mar_test   (conanfile.py build())"
+upstream_tests:
+  - file: src/mar_test_cpp.cpp
+    source: mar-0.5/src/mar_test_cpp.cpp
+    description: "8 named cases: meta/user/insert/extract/copy/opencopy functions, iterator class, stream class"
+    command: "./mar_test"
+
+test_package_tests:
+  - file: consumer.c
+    category: "harmonyos-specific consumer use case 1/2 (C API + packaged CLI round trip)"
+    description: "conanfile.py test() runs the packaged static-pie bin/mar (natively on AArch64, via qemu-aarch64 on x86) to create cli.mar from four key=value pairs (one UTF-8 value) and a 3000-byte binary payload; CMake with the OHOS toolchain builds consumer.c against the packaged mar_c.h and libmar.a (MAR_STATIC from cpp_info.defines); mar_consumer_c reads cli.mar through mar_open()/mmap (pairs by key and ordinal, MAR_NOMATCH cases, user data through the mapping and through seek/read, raw big-endian header bytes), writes lib.mar (ABI probe pairs for pointer size, plain-char signedness and page size, four 3000-byte payload copies spanning several pages through mar_write()/mar_sync()) and re-reads it; bin/mar then lists the keys, queries the pairs, measures and extracts the 12000 bytes, and still rejects an unknown option, a missing key and a missing archive. With the unpatched utility (plain char is unsigned on AArch64) the very first bin/mar call exits 1 with 'Unknown option'."
+    command: "bin/mar -s ... -i payload.bin cli.mar; mar_consumer_c cli.mar payload.bin lib.mar; bin/mar -k/-m/-l/-x lib.mar"
+  - file: consumer_cpp.cpp
+    category: "harmonyos-specific consumer use case 2/2 (C++ wrappers + packaged CLI)"
+    description: "CMake builds consumer_cpp.cpp (C++17, libc++) against the installed C++ headers, which only compile with the patched stream classes and need mar_string_c.h; mar_consumer_cpp walks cli.mar with mar::index (forward, reverse, find), reads its user data with mar::istream (read() then istreambuf_iterator), copies it into a memory archive with mar::copy(), then writes 400 report lines (22400 bytes, about 22 flushes of the 1024-byte stream buffer) through a file-backed mar::iostream, reads them back through the same stream and closes it; bin/mar then reads the pairs, measures and extracts the text byte for byte."
+    command: "mar_consumer_cpp cli.mar payload.bin cpp.mar; bin/mar -m/-l/-x cpp.mar"
+
+test_files:
+  - path: "test_package/consumer.c"
+    test_type: "R34 / harmonyos-specific consumer use case"
+    build: "test_package/CMakeLists.txt + conanfile.py build()"
+    assertion_count: 47
+  - path: "test_package/consumer_cpp.cpp"
+    test_type: "R34 / harmonyos-specific consumer use case"
+    build: "test_package/CMakeLists.txt + conanfile.py build()"
+    assertion_count: 34
+  - path: "test_package/conanfile.py"
+    test_type: "R34 (drives bin/mar and checks its output byte for byte)"
+    assertion_count: 17
+
+harmonyos_specific_test_count: 2
+test_package_test_count: 2
+assertion_count: 98
