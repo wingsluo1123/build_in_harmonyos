@@ -1,0 +1,34 @@
+version: "0.26.1-gtk3"
+software: "xmedcon"
+status: built
+build_date: "2026-10-16"
+build_system: autotools
+
+source:
+  url: "https://master.dl.sourceforge.net/project/xmedcon/XMedCon-Source/0.26.1/xmedcon-0.26.1-gtk3.tar.gz?viasf=1"
+  sha256: "4bc81e014b56873fe9a8e942f97fd0565dc891cf216f817de92647bf0285f40f"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--with-pic"
+    - "--disable-static"
+  dependencies:
+    - "zlib/1.3.1.1"
+    - "libpng/1.6.58"
+    - "gtk/3.24.43"
+  build_requirements:
+    - "autotools-dev/20240727.1-nmu1"
+    - "pkgconf/3.0.5"
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "Upstream tree is a self-contained Autotools snapshot: ships config.guess/config.sub/ltmain.sh and generated configure; bundled dicom/ljpg/nifti/tpc libs live under libs/ so no external format dependencies."
+  - "Configure probes via pkg-config: libpng >= 1.6.0, glib-2.0 >= 2.48.0 (medcon CLI, --enable-glib default), gtk+-3.0 >= 3.22.0 + gdk-pixbuf-2.0 (GUI, --enable-gui default); zlib is hard-required when PNG or NIFTI is on."
+  - "Source archive is XMedCon-Source/<ver>/xmedcon-<ver>-gtk3.tar.gz on SourceForge (not xmedcon/<ver>/xmedcon-<ver>.tar.bz2); direct mirror downloads hit a Cloudflare challenge with Invoke-WebRequest, plain curl.exe works."
+  - "No gettext/libintl usage in sources, so unlike xsane no intl stub is needed on OHOS."
+  - "Produces libmdc (LGPL-2.1+, include_HEADERS m-*.h) plus medcon CLI (headless-safe, prints usage without a display) and xmedcon GTK+3 GUI; GUI smoke follows the l3afpad pattern (assert failure only at display init)."

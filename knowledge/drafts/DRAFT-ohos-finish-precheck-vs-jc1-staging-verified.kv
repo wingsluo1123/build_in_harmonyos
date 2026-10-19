@@ -1,0 +1,58 @@
+#====================================================================
+# DRAFT knowledge entry - finish Step10 预检要求 .staging-verified 与 JC1"被跟踪即垃圾"矛盾：设备端创建、绝不提交
+# Source: xmedcon/0.26.1-gtk3 真机 shadow CI r3-r6、r14-r16（2026-10-13/16）
+#====================================================================
+
+id: DRAFT-ohos-finish-precheck-vs-jc1-staging-verified
+trigger_tool: junk_check|junk_check.sh|ohc-run|finish
+phase: shadow-ci|finish|submit
+error_signature: 需创建 \.staging-verified|运行时状态文件被跟踪|JC1.*staging-verified|未登记的隐藏文件.*staging-verified
+severity: 2
+category: shadow-ci, junk-check, finish, workflow-contradiction
+match_keywords: .staging-verified, Step10, submit 就绪预检, JC1, JC5, git ls-files, git rm --cached, 被跟踪, junk_check, finish 预检
+
+title: finish Step10 预检要求包目录存在 .staging-verified，JC1 却把被 git 跟踪的它判垃圾——设备端/本地 touch、绝不 git add；repo-source 继承的需 git rm --cached
+
+root_cause: >
+  两个门禁对同一文件要求相反：finish 的 Step10 submit 就绪预检把包目录的
+  .staging-verified 当必需交付标记；junk_check.sh JC1/JC5 把"被 git 跟踪的
+  .staging-verified"当运行时状态垃圾（且 JC1 读 git ls-files 索引，工作区删除
+  无效）。repo-source 快照常带着上游 job 已跟踪的 .staging-verified，形成
+  "预检要它存在、JC 要它不在提交树"的矛盾。
+
+affected_scope: 所有走 ohc-run finish（Step10）+ build_and_test.sh（JC）的真机/
+  本地流程；使用 --repo-source 继承旧仓库快照的隔离 job。
+
+verification_cmd: >
+  git status --short | grep staging-verified   # 应无输出
+  grep -n "git ls-files" ci/scripts/junk_check.sh
+
+rec_priority: 1
+rec_approach: device-side-marker-never-commit-git-rm-cached-for-inherited
+rec_description: >
+  设备端/本地 touch 该文件满足预检；绝不 git add（本地无 .gitignore 覆盖时靠
+  纪律，提交前 git status 复核）。repo-source 快照继承的已跟踪同名文件用
+  git rm --cached 清索引再删工作区（光 rm 无效，JC 读索引）。无 .git 的干净
+  导出 repo（git archive）无此问题。
+rec_command: >
+  touch archives/<首字母>/<库名>/<版本>/.staging-verified
+  git -C <job>/repo rm --cached --quiet <继承的 .staging-verified 路径>
+  rm -f <同路径>
+rec_auto_fix: false
+rec_impl: manual
+fallback_priority: 3
+fallback_approach: skip-marker
+fallback_description: >
+  若预检为软警告（仅 ⚠️）可暂缓创建先跑 W3；但 submit 前必须补齐，属硬门槛。
+conflicts_with: []
+notes: >
+  查重边界：DRAFT-13618 讲 G0e 根目录白名单读 git 索引（根目录暂存文件继承）；
+  本条是 JC1/JC5 对包内标记文件的同一机理增量，并首次记录"Step10 预检要求 vs
+  JC1 禁止"的流程矛盾与双门禁都绿的处置组合。jc-fullmode-baseline-isolation
+  系列是基线噪声豁免，非本问题。
+verify_builds: >
+  xmedcon/0.26.1-gtk3：r5→r6 git rm --cached 后 JC 放行；r15→r16 设备端 touch
+  后 Step10 四项全 ✅；PR #16199 提交树无该文件，CI 无 JC 告警。
+authors: codex
+source_pr: "16199"
+source_commit: pending
