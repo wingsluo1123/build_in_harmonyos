@@ -29,8 +29,18 @@ and QSaveFile-based safe saving).
   `CMAKE_CXX_STANDARD 17` on every `project()` call, so the per-project
   standard cannot be raised; a value-identical C++17 rewrite patch is
   applied (`patches/0001-src-cpp17-compat.patch`).
-- 6.26.0 test exclusions (run-time only, upstream test sources
+- 6.26.0/6.28.0 test exclusions (run-time only, upstream test sources
   unmodified): `test7ZipOssFuzzIssues:testcase_6213340184772608` (SIGSEGV
   on the OHOS runner; passes upstream Linux CI) and
   `test7ZipReadCoder:{bzip2,zstd}` (need the disabled backends). All other
-  115 upstream rows run green.
+  115 upstream rows run green on symlink-capable environments.
+- 6.28.0 is a version-only bump over 6.26.0 (ECM minimum 6.28.0 via
+  `tool_requires("ecm/6.28.0")`, `CMAKE_MODULE_PATH` append; `src/` and
+  `autotests/` byte-identical), so the same adaptation set applies.
+- 6.28.0: the OHOS device filesystem denies `symlink(2)` everywhere under
+  `/storage` while upstream `karchivetest` `initTestCase()` requires
+  creating `test3_symlink`. The recipe probes the capability first
+  (throwaway directory under the build folder) and, when symlinks are
+  denied, skips the direct full-suite driver with a warning after the
+  CTest entries have run; `test_package` falls back from symlink to a
+  real copy when staging the runtime libraries next to the test binaries.
