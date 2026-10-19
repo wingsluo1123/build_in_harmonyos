@@ -1,0 +1,79 @@
+#====================================================================
+# DRAFT-ethtool-7.1-siocethtool-genetlink-eacces-capability-split -
+# OHOS 上 SIOCETHTOOL ioctl 与 NETLINK_GENERIC(genetlink) socket 双双
+# EACCES(13)（进程 CapEff=000000000000002a 无 CAP_NET_ADMIN/CAP_NET_RAW、
+# Seccomp=2）：编译全通、网卡查询/配置功能面运行期全不可达；上游唯一降级
+# 开关 --disable-netlink 只在 netlink 与 ioctl 两面之间互退，源码穷举无
+# 非特权/文件替代路径（no_dev=true 仅 -h|--help 与 --version 两条）⇒
+# 交付口径 = 信息面断言（--version/-h 真实输出特征串、非空、含版本与用法
+# 特征串）+ 能力面三机差分读数全量披露，⛔ 不写平台级"不可用"定性。
+# 场景: ethtool 7.1（autotools + C，84 个 .c）HarmonyOS PC aarch64 实测；
+#       本机 + A 机 + B 机三处独立执行读数一致（A/B 经 sshd 起进程）。
+# 适用: 一切以 SIOCETHTOOL / genetlink / netlink 族为核心功能面的网络工具
+#       与库（ethtool 族、iw/nl80211、libnl、iproute2 类），以及"内核接口
+#       本体存在、但被权限策略拦死"的交付定性与测试设计问题。
+# 注: 本文件所有字段均为单行值（value 到行尾），避免 kv 解析器差异。
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     DRAFT-ethtool-7.1-siocethtool-genetlink-eacces-capability-split
+source_lib:             ethtool 7.1
+trigger_tool:           runtime
+phase:                  runtime
+error_signature:        SIOCETHTOOL.*Permission denied|SIOCETHTOOL.*EACCES|NETLINK_GENERIC.*Permission denied|genetlink.*Permission denied|AF_NETLINK.*GENERIC.*errno=13|/sys/class/net.*Permission denied
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               2
+category:               platform, runtime, capability, network, netlink, testing
+match_keywords:         SIOCETHTOOL, ETHTOOL_GDRVINFO, genetlink, NETLINK_GENERIC, EACCES, errno=13, CAP_NET_ADMIN, CAP_NET_RAW, Seccomp=2, capability wall, netlink, ethtool, positive control, SIOCGIFFLAGS, SIOCGIFINDEX, RTM_GETLINK, rtnetlink, /sys/class/net, /proc/net/dev, informational option, --version, --help, disclosure, differential probe, capability-split, 网卡 ioctl, 能力面, 信息面断言
+title:                  OHOS 上 SIOCETHTOOL/genetlink 双双 EACCES：功能面不可达，以信息面断言 + 差分能力探针全量披露交付
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             进程态 CapEff=000000000000002a（无 CAP_NET_ADMIN/CAP_NET_RAW）、Seccomp=2：同套接字上 SIOCGIFFLAGS(0x8913)/SIOCGIFINDEX(0x8933) rc=0（正对照），而 SIOCETHTOOL(0x8946) 连只读 ETHTOOL_GDRVINFO 也 errno=13，NETLINK_GENERIC socket 创建即 errno=13，/sys/class/net listdir errno=13 ⇒ 被拦的恰是 ethtool 两面而非整个网络栈（NETLINK_ROUTE socket 可用、修正版 RTM_GETLINK dump 收 17916B/8 块/NLMSG_DONE）。上游源码穷举：args[] 表 no_dev=true 仅 -h|--help 与 --version 两条，功能命令全走 ETHTOOL_G/S ioctl（94 处）或 genetlink，--disable-netlink 只是两面互退，fopen 落盘路径都要先 send_ioctl ⇒ 无非特权替代路径。
+affected_scope:         以 SIOCETHTOOL / genetlink / netlink 为核心功能面的网络工具与库（ethtool 族、iw/nl80211、libnl、iproute2、SocketCAN 之外的 netlink 工具），以及一切"内核接口本体存在但被权限策略拒绝"的受限进程域交付场景；对照族：PF_CAN 是 errno=97 EAFNOSUPPORT（内核不提供，can-utils 型直接墙）。
+verification_cmd:       python3 差分探针：同一 AF_INET SOCK_DGRAM 套接字依次 ioctl(0x8913)=rc0、ioctl(0x8946)=errno13；socket(16,SOCK_RAW,16)=errno13；os.listdir(/sys/class/net)=errno13；/proc/self/status 读 CapEff/Seccomp；对照 socket(AF_CAN)=errno97。三机（本机/A/B）读数一致为准。
+rec_priority:           1
+rec_approach:           capability-split-differential-probe-with-informational-assertions
+rec_description:        ① 用差分探针把"能力面被拦"与"整个栈不可用"分开：同一 fd 上基础 ioctl 正对照 rc=0、目标 ioctl/genetlink EACCES，并跨机复测排除会话沙箱伪影；② 穷举上游 no_dev/文件替代路径，得出"无非特权替代"结论并把枚举行号写进披露；③ test_package 只断言信息面真实输出（退出码 + 非空 + 版本/用法特征串 grep -q），⛔ 不断言任何功能面可用、⛔ 不用 || true 兜底；④ notes 与 PR 正文披露三机 errno 读数与进程态（CapEff、Seccomp），措辞统一为"本平台测试进程无相应 capability，功能面未能实测；已实测 -h/--version 与构建产物完整"，⛔ 不写平台级"不可用"定性。
+rec_command:            probe SIOCETHTOOL+NETLINK_GENERIC+sysfs on 3 hosts with SIOCGIFFLAGS positive control; grep no_dev=true in args[]; test_package asserts ethtool --version and -h output feature strings via grep -q
+rec_auto_fix:           false
+rec_impl:               test-and-disclosure
+
+fallback_priority:      2
+fallback_approach:      compile-verify-with-runtime-degradation
+fallback_description:   若信息面断言也不足以自证（如二进制连 --version 都受环境限制），退回 E237 的交付模式：编译期与产物完整性验证为准、运行期降级如实披露，不改上游语义、不加平台宏守卫。
+fallback_command:       ethtool --version && ethtool -h | grep -q "Usage:" && test -x <prefix>/bin/ethtool
+fallback_auto_fix:      true
+fallback_impl:          disclosure
+
+forbid_1_pattern:       \|\|\s*true
+forbid_1_reason:        断言链用 || true 兜底会把功能面/信息面失败静默成通过，属于降 N 凑数
+forbid_1_consequence:   测试假绿，审查按伪证打回且连带信任其他读数
+forbid_2_pattern:       #ifdef __OHOS__|#if defined\(__OHOS__\)
+forbid_2_reason:        补丁/源码禁引入平台宏（iron-rules R8、PF5 fail-closed），能力差异属环境事实不应写进上游源码
+forbid_2_consequence:   PF5 fail-closed 直接打回，且污染上游可移植性
+
+principles:             P013, P015, P004
+
+# ═══ 关系图 (Relations) ═══
+causes:                 []
+caused_by:              []
+similar_to:             [E008, E303, E237, E357, E287, E240, E223, E246]
+conflicts_with:         []
+prerequisite_of:        []
+
+# ═══ 元数据 ═══
+doc_file:               knowledge/drafts/DRAFT-ethtool-7.1-siocethtool-genetlink-eacces-capability-split.md
+last_updated:           2026-10-08
+source_event:           ethtool 7.1 OHOS arm64 三机差分探针：SIOCETHTOOL/NETLINK_GENERIC 均 errno=13，正对照 SIOCGIFFLAGS rc=0
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:                主理-N <主理-N@local>
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     0.8
+metrics_last_used:      2026-10-08
