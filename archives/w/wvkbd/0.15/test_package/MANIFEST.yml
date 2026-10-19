@@ -1,0 +1,56 @@
+package: wvkbd/0.15
+test_item_counting_policy: >-
+  Count each unique C01-C04 or D01-D04 case ID once; repeated execution on
+  different build/device targets does not add items. Harness pytest checks are
+  reported separately from product test items.
+homepage: https://github.com/jjsullivan5196/wvkbd
+upstream_test_inventory:
+  source_directory: wvkbd-0.15
+  make_check_target: false
+  registered_test_count: 0
+  test_files: []
+  explanation: >-
+    Official v0.15 release Makefile declares all, clean, format and install;
+    no check/test target, tests directory, or test source files are shipped.
+    The HarmonyOS core items are supplementary adaptation coverage, not an
+    upstream suite result.
+test_package_tests:
+  source: test_consumer.c
+  shared_case_source: harmonyos/core/tests/core_cases.c
+  installed_test_resources: share/wvkbd/0.15/test-support
+  installed_test_resource_files:
+    - core_cases.c
+    - core_cases.h
+  reuse: Standalone CTest and installed-package consumer compile the same test-only case implementation; product HAP excludes it
+  entrypoint: "int wvkbd_test_consumer_run(char *report, size_t report_capacity)"
+  report_contract: >-
+    Four newline-terminated synthetic markers C01=pass through C04=pass;
+    each marker represents one independently counted test item, and fail
+    replaces pass for a failed item. Return 0 only when all four items
+    pass and the complete report fits; 1 on API failure; -1 for an invalid
+    or undersized report buffer. The caller supplies at least 256 bytes.
+  cases:
+    - id: C01
+      item: Enumerate and activate default letter, space, Backspace and Enter
+    - id: C02
+      item: Shift labels and one-shot reset, control reset, Caps persistence, Caps-XOR-Shift, punctuation, Shift toggle and session reset
+    - id: C03
+      item: Invalid row/column/extreme coordinates, null pointers, output clearing and state preservation
+    - id: C04
+      item: Enumerate every key in four modifier states, validate UTF-8 labels and text, termination and non-ASCII Shift label
+  compile_link_result: "passed: Conan OHOS armv8/clang15, AArch64 archive objects and consumer ELF verified"
+  host_execution_result: "passed: Linux x86_64 supplementary CTest, C01-C04 all passed"
+  device_execution_result: "not accepted until the signed runner reports C01-C04=1; compile/skip is never a device pass"
+  device_consumer: "ohos_test_app imports the exact Conan-built PIC wvkbd_test_consumer archive"
+  numeric_entrypoint: "int wvkbd_test_consumer_results(int *results, size_t count)"
+harmonyos_specific_tests:
+  runner: run_harmonyos_device_test.py
+  host_tests: tests/test_device_runner.py
+  cases:
+    D01: Separate TextInput equals the expected synthetic sequence after Shift, Space, Caps and Backspace
+    D02: Enter invokes the separate TextInput Done callback with the expected contents
+    D03: Component-only HarmonyOS snapshot recognizes the rendered Shift arrow glyph, distinguishing it from tofu/missing glyphs
+    D04: Restarted input session inserts plain d after pending Shift
+  lifecycle: Actual Shift-on UI and old token destruction plus ordered stop callback (when emitted), or HarmonyOS 6.1 TextInput handoff focus evidence; distinct new input_start may precede old panel_destroyed, but replacement panel create/show must follow old destruction and actual Shift-off UI; D04 follows that restart boundary
+  cleanup: Both newly installed task bundles removed and absence verified in finally
+  privacy: Numeric bounded markers only; no serial, signing material or raw editor contents in output
