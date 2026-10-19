@@ -1,0 +1,41 @@
+id: E550
+draft: true
+contributor_id: LD65
+title: 已知 PATCHES 大小写碰撞的无损替代：隔离源码与导出根并保留全部成员
+trigger_tool: conan|python|tar
+phase: source|unpack
+error_signature: IsADirectoryError.*PATCHES|IsADirectoryError.*[Pp]atches|FileExistsError.*unpack
+severity: 2
+category: filesystem, conan, portability
+match_keywords: case-insensitive, casefold, exports_sources, source_folder, src_folder, PATCHES, strip_root, IsADirectoryError, source extraction
+root_cause: Conan 将 exports_sources 内容复制到缓存源码根；默认 source_folder 同为根时，strip_root 解包会把上游根文件与 recipe 导出目录合并。大小写不敏感的 worker 中，PATCHES 文件与 patches/ 目录是同一名字；下载和 SHA256 通过后仍会在文件写入时报 IsADirectoryError。仅在大小写敏感设备的私有目录验证无法暴露此问题。
+affected_scope: 下载第三方归档、同时导出 patches/cmake/tools 等辅助目录的 Conan recipe；适用于根目录或父子路径大小写别名冲突，不解决上游归档自身内部两个必需成员的大小写冲突。
+verification_cmd: 在大小写不敏感文件系统使用真实 conan source 重现旧布局失败并验证子目录布局成功；随后从干净 Conan home 执行 native conan create、全部上游测试和安装包消费者，并在原 CI worker 复验。
+rec_priority: 1
+rec_approach: isolate-upstream-source-from-recipe-export-root
+rec_description: 用标准 cmake_layout(self, src_folder="upstream") 或等价 self.folders.source 子目录隔离下载树。source() 的 get 仍使用官方 URL、原 SHA256 和 strip_root；构建、许可证复制与 apply_conandata_patches 使用 self.source_folder，patch_file 仍由 export_sources_folder 定位。保留所有上游文件及已验证补丁表示。
+rec_command: cmake_layout(self, src_folder="upstream")
+rec_auto_fix: false
+rec_impl: recipe-layout
+forbid_1_pattern: delete.*PATCHES|rename.*patches.*ignore|skip.*sha256
+forbid_1_reason: 删除上游文件、丢失补丁或绕过哈希并未隔离两个输入命名空间。
+forbid_1_consequence: 源码完整性和可复现性下降；其他同类目录名会再次冲突。
+forbid_2_pattern: catch.*IsADirectoryError.*pass|assume.*Permission.denied
+forbid_2_reason: 解包目录/文件冲突不同于签名、chmod 或下载失败；吞掉异常会留下不完整源码。
+forbid_2_consequence: 后续构建可能使用残留文件并误报成功。
+principles: P005
+causes: []
+caused_by: []
+similar_to: []
+conflicts_with: []
+prerequisite_of: []
+doc_file: drafts/E550-draft-LD65.md
+last_updated: 2026-10-15
+source_event: libdispatch 6.4.1 PR15756 CI91435/buildid105045，worker CI-010，首个失败 source() IsADirectoryError './PATCHES'。补充现有 DRAFT-liboggz-1.1.1-hmdfs-patches-collision 的排除/改名方案：标准 src_folder 隔离保留全部源文件和原补丁表示；Windows实际Conan source旧失败/新成功2/2，真机r3 shared/static各37/37+1/1，finish r6 RC0。本条新增无损处方与errno13/21的跨平台边界，不重复申报已知碰撞根因。
+authors: 2501_91199785 (队伍：诶，云朵)
+source_pr: https://atomgit.com/OpenHarmonyPCDeveloper/build_in_harmonyos/merge_requests/15756
+source_commit: 48e4ded0c756b37f29de5ecdc101335e61f8a176 (失败基线)
+metrics_success_count: 1
+metrics_fail_count: 1
+metrics_confidence: 0.9
+metrics_last_used: 2026-10-15

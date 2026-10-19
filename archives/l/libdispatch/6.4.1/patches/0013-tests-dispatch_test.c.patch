@@ -1,0 +1,35 @@
+--- a/tests/dispatch_test.c
++++ b/tests/dispatch_test.c
+@@ -40,20 +40,32 @@
+ #endif
+ #elif defined(_WIN32)
+ #include <Windows.h>
+ #include <bcrypt.h>
+ #endif
+ #include <assert.h>
+ 
+ #include <dispatch/dispatch.h>
+ 
+ void test_start(const char* desc);
++
++void
++dispatch_test_tmp_path(char *buffer, size_t capacity, const char *suffix)
++{
++	const char *directory = getenv("TMPDIR");
++	if (!directory || !directory[0]) directory = "/tmp";
++	int length = snprintf(buffer, capacity, "%s/%s", directory, suffix);
++	if (length < 0 || (size_t)length >= capacity) {
++		test_long("temporary path fits buffer", 0, 1);
++		test_stop();
++	}
++}
+ 
+ void
+ dispatch_test_start(const char* desc)
+ {
+ #if defined(__OBJC_GC__) && MAC_OS_X_VERSION_MIN_REQUIRED < 1070
+ 	objc_startCollectorThread();
+ #endif
+ 	test_start(desc);
+ }
+ 

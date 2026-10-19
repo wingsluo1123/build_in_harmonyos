@@ -1,0 +1,53 @@
+--- a/tests/dispatch_readsync.c
++++ b/tests/dispatch_readsync.c
+@@ -14,20 +14,21 @@
+  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+  *
+  * @APPLE_APACHE_LICENSE_HEADER_END@
+  */
+ 
+ #include <dispatch/dispatch.h>
+ #include <dispatch/private.h>
+ #include <stdlib.h>
++#include <stdio.h>
+ #if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
+ #include <unistd.h>
+ #ifdef __ANDROID__
+ #include <linux/sysctl.h>
+ #else
+ #if !defined(__linux__)
+ #include <sys/sysctl.h>
+ #endif
+ #endif /* __ANDROID__ */
+ #endif
+@@ -152,20 +153,28 @@
+ 	wq_max_threads = activecpu * NTHREADS + 2;
+ #else
+ 	size_t s = sizeof(uint32_t);
+ 	sysctlbyname("hw.activecpu", &activecpu, &s, NULL, 0);
+ 	s = sizeof(uint32_t);
+ 	sysctlbyname("kern.wq_max_threads", &wq_max_threads, &s, NULL, 0);
+ #endif
+ 
+ 	// cap at wq_max_threads - one wq thread for dq - one wq thread for manager
+ 	size_t n = MIN(activecpu * NTHREADS, wq_max_threads - 2);
++#ifdef DISPATCH_TEST_PTHREAD_POOL_CAPACITY
++	// All workers rendezvous before submitting reads. They must fit in the
++	// actual internal pool; otherwise queued workers can never join them.
++	assert(DISPATCH_TEST_PTHREAD_POOL_CAPACITY > 2);
++	n = MIN(n, DISPATCH_TEST_PTHREAD_POOL_CAPACITY - 2);
++#endif
++	fprintf(stdout, "readsync workers: %zu\n", n);
++	fflush(stdout);
+ 
+ 	g = dispatch_group_create();
+ 	dispatch_queue_attr_t qattr = NULL;
+ #if DISPATCH_API_VERSION >= 20100518 // rdar://problem/7790099
+ 	qattr = DISPATCH_QUEUE_CONCURRENT;
+ #endif
+ 	dispatch_queue_t dq = dispatch_queue_create("readsync", qattr);
+ 	assert(dq);
+ 	if (!qattr) {
+ 		dispatch_queue_set_width(dq, LONG_MAX); // rdar://problem/7919264

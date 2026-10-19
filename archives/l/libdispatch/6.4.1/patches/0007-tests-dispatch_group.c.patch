@@ -1,0 +1,33 @@
+--- a/tests/dispatch_group.c
++++ b/tests/dispatch_group.c
+@@ -136,28 +136,28 @@
+ 	dispatch_group_t group = dispatch_group_create();
+ 	dispatch_queue_t qa[n];
+ 
+ 	dispatch_group_enter(group);
+ 	for (int i = 0; i < n; i++) {
+ 		char buf[48];
+ 		sprintf(buf, "T%ld-%d", cycle, i);
+ 		qa[i] = dispatch_queue_create(buf, 0);
+ 	}
+ 
+-	__block float eh = 0;
+ 	for (int i = 0; i < n; i++) {
+ 		dispatch_queue_t q = qa[i];
+ 		dispatch_group_async(group, q, ^{
+ 			// Seems to trigger a little more reliably with some work being
+ 			// done in this block
+ 			assert(cycle && "cycle must be non-zero");
+-			eh = (float)sin(M_1_PI / cycle);
++			volatile float eh = (float)sin(M_1_PI / (double)cycle);
++			(void)eh;
+ 		});
+ 	}
+ 	dispatch_group_leave(group);
+ 
+ 	dispatch_group_notify(group, nq, ^{
+ 		completed = cycle;
+ 		dispatch_group_leave(tested);
+ 	});
+ 
+ 	// Releasing qa's queues here seems to avoid the race, so we are arranging
