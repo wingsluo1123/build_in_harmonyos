@@ -1,0 +1,24 @@
+software: threadweaver
+display: "ThreadWeaver"
+description: "KDE Frameworks 6 job scheduling and multithreading framework (KF6ThreadWeaver)"
+category: library
+homepage: "https://invent.kde.org/frameworks/threadweaver"
+license: LGPL-2.0-or-later
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "KF_IGNORE_PLATFORM_CHECK=TRUE bypasses the KDE platform allowlist (OHOS not listed)"
+    - "OHOS shared-library rules are SONAME-only: CMAKE_PLATFORM_NO_VERSIONED_SONAME=TRUE + user make-rules override (HMDFS has no symlink support)"
+    - "ECM 6.28 KDEInstallDirs6 runs the qtbase qtpaths tool at configure time; /system/lib64 must be prepended to LD_LIBRARY_PATH so the compatible libc++_shared.so wins"
+    - "Upstream builds examples/ unconditionally; the Qt6 Widgets/Network/Xml/Test modules and uic/moc tools all ship inside the qtbase package (verified in the device package cache)"
+    - "Upstream autotests are QCoreApplication-level and run headless on device (7 CTest cases)"
+  common_dependencies:
+    - qtbase
+    - ecm
+
+versions:
+  "6.28.0":
+    status: built
+    build_date: "2026-10-17"
+    conan_ref: "threadweaver/6.28.0"

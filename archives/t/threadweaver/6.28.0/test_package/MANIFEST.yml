@@ -1,0 +1,40 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for threadweaver/6.28.0.
+
+package: threadweaver/6.28.0
+homepage: https://invent.kde.org/frameworks/threadweaver
+
+upstream_check_command: "ctest --output-on-failure"
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error"
+
+# Counting convention (same as the PR-review side): upstream test targets = 8
+# -> autotests/ 7 (all CTest-registered via ecm_add_test) + benchmarks/ 1
+# (ThreadWeaverQueueBenchmarks; upstream keeps its add_test commented out, so
+# it is validated by linking + building, not by execution).
+upstream_test_target_count: 8
+upstream_ctest_registered_count: 7
+upstream_tests:
+  - file: autotests/JobTests.cpp
+    description: "ThreadWeaverJobTests (ecm_add_test; Qt6::Test + KF6::ThreadWeaver); QCoreApplication-level, headless"
+  - file: autotests/SequencesTests.cpp
+    description: "ThreadWeaverSequencesTests (ecm_add_test)"
+  - file: autotests/QueueTests.cpp
+    description: "ThreadWeaverQueueTests (ecm_add_test)"
+  - file: autotests/DeleteTest.cpp
+    description: "ThreadWeaverDeleteTest (ecm_add_test)"
+  - file: autotests/LifecycleTests.cpp
+    description: "ThreadWeaverLifecycleTest (ecm_add_test)"
+  - file: autotests/ShutdownOnQApplicationQuitTests.cpp
+    description: "ThreadWeaverShutdownOnQApplicationQuitTest (ecm_add_test; QTEST_APPLESS_MAIN, headless)"
+  - file: autotests/QueueFactoryTests.cpp
+    description: "ThreadWeaverQueueFactoryTest (ecm_add_test)"
+  - file: benchmarks/QueueBenchmarks.cpp
+    description: "ThreadWeaverQueueBenchmarks executable: built (BUILD_TESTING=ON adds benchmarks/), never registered with add_test upstream (commented out)"
+
+test_package_tests:
+  - file: test_package/test.cpp
+    description: "Consumer end-to-end executor, 3 cases: (1) global queue runs 4 blocking functors in parallel + release + finish()/isIdle(), (2) Sequence strict add-order execution, (3) make_collection() parallel map over 20 items with atomic accumulators. Per case TEST PASS/TEST FAIL, final TEST SUMMARY, non-zero exit on any failure."
+    command: "conan create (test_package builds and runs test_threadweaver)"
+
+assertion_count: 15

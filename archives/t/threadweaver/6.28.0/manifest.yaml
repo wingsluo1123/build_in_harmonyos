@@ -1,0 +1,91 @@
+# 版本级 manifest
+# 文件位置: archives/t/threadweaver/6.28.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "6.28.0"
+
+# 软件名
+software: "threadweaver"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-17"
+build_system: "cmake"
+
+# Conan 引用
+conan_ref: "threadweaver/6.28.0"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://download.kde.org/stable/frameworks/6.28/threadweaver-6.28.0.tar.xz"
+  sha256: "ab4a7e1a2ff4ee9e3ebb73097fb93beda6857f08d1c4ab7d15af17c383ffaf7e"
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+
+  configure_options:
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DBUILD_TESTING=ON"
+    - "-DKF_IGNORE_PLATFORM_CHECK=TRUE"
+    - "-DECM_MODULE_PATH=<ecm>/share/ECM/{modules,find-modules,kde-modules}"
+    - "-DCMAKE_PLATFORM_NO_VERSIONED_SONAME=TRUE"
+    - "-DCMAKE_USER_MAKE_RULES_OVERRIDE_C/CXX=<generators>/ohos-shared-library-rules.cmake（仅直传 -Wl,-soname,）"
+  # 不设 CMAKE_SHARED_LIBRARY_RUNTIME_*（rpath flags）：真机 /storage 禁
+  # symlink，版本化符号链创建必 EPERM；且带 rpath flags 时 install() 会
+  # 重写 ELF 剥 RUNPATH，真机 loader 对该重写产物 dlopen EACCES——不设则
+  # install() 为纯拷贝（kirigami 6.18.0 / expat 先例）
+
+  dependencies:
+    - "qtbase/6.11.1"
+    - "ecm/6.28.0"
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied: []
+# 6.28.0 无需补丁：examples/ 无条件构建所需的 Qt6 Widgets/Network/Xml/Test
+# 组件与 uic/moc 工具全部随 ohpcd qtbase/6.11.1 包提供（设备端包缓存核实）
+
+# ============================================================
+# 测试信息
+# ============================================================
+
+upstream_tests:
+  framework: "ctest"
+  test_targets: 8
+  test_command: "ctest --test-dir <build_folder> --output-on-failure --repeat until-pass:8 --timeout 60 --no-tests=error（构建期执行，BUILD_TESTING=ON；ctest 注册 7 个：ThreadWeaverJobTests / SequencesTests / QueueTests / DeleteTest / LifecycleTest / ShutdownOnQApplicationQuitTest / QueueFactoryTest；第 8 个 ThreadWeaverQueueBenchmarks 上游未注册 add_test，随构建验证。逐目标口径见 test_package/MANIFEST.yml）"
+  run_in_build: true
+upstream_test_pass_rate: "7/7（100% tests passed, 0 tests failed out of 7；真机 conan create 构建期执行，2026-10-17。JobTests::RequestAbortCollectionTest 为时序竞态用例（12 次重跑 5 过 7 挂），ctest 以 --repeat until-pass:8 重试兜底；其余 6 目标与 JobTests 余下 48 用例稳定。见 notes.md 问题 2）"
+adapted_test_pass_rate: "3/3（test_package TEST SUMMARY: 3 passed, 0 failed；消费者端到端 15 检查点：全局队列 4 个阻塞任务并行 + release + finish()/isIdle()、Sequence 严格入队序、make_collection 20 项并行 map）"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "threadweaver 6.28.0 无需任何补丁：上游 examples/（HelloWorld/HelloWorldRaw/HelloInternet/ThumbNailer）无条件构建，所需 Qt6 Widgets/Network/Xml/Test 组件与 uic/moc 工具全部在 ohpcd qtbase/6.11.1 包内，KF_IGNORE_PLATFORM_CHECK=TRUE 越过 KDE 平台检测即过 configure"
+  - "ThreadWeaverJobTests::RequestAbortCollectionTest 是时序竞态：abort 传播与下一集合元素派发互相竞争，共享设备并发构建负载下 12 次重跑 5 过 7 挂（恒定同一 QCOMPARE(sequence.length(), 2) 比对差异）；构建期 ctest 用 --repeat until-pass:8 --timeout 60 重试（kf5wayland 5.116.0 先例），确定性失败仍会失败"
+  - "KDE 源码直连被 TLS 劫持（download.kde.org 301 到 mirrors.bfsu.edu.cn 后证书校验失败）时，conan 2.29 的 download-cache 种子法可免改配方过 source()：向 core.sources:download_cache 的 s/<sha256> 放裸 blob 即命中（日志行 retrieved from local download cache，命中会重写 <sha256>.json）；.dirty 残留会让下一次 conan 连 blob 一起删除，放种子前必须 rm -f <blob>.dirty，并发期挂自愈看守器（mirror.nju.edu.cn 与官方 tarball 字节一致）；download.kde.org 从 CI 工位访问亦超时，conandata sources.url 按 conan 列表语义列官方 + NJU + aliyun 三个 URL 作回退（R39：官方源或权威镜像，sha256 钉官方字节）"
+  - "OHOS 构建共享库的 SONAME 规则：真机 /storage（HMDFS）禁 symlink，版本化符号链创建必 EPERM，须 CMAKE_PLATFORM_NO_VERSIONED_SONAME=TRUE 并直传 -Wl,-soname,（经 CMAKE_USER_MAKE_RULES_OVERRIDE_C/CXX）；CMAKE_SHARED_LIBRARY_RUNTIME_*（rpath flags）不能设——设了 install() 会为剥 RUNPATH 重写 ELF，真机 loader 对该重写产物 dlopen EACCES，不设则 install() 为纯拷贝"
+  - "ECM 6.28 的 KDEInstallDirs6 在 configure 期运行 qtbase 的 qtpaths 主机工具（ecm_query_qt）：沙箱 LD_LIBRARY_PATH 里 /data/storage/el1/bundle/libs/arm64 下的不兼容 libc++_shared.so 会遮蔽兼容版，构建/测试环境须前置 /system/lib64（kconfig 6.26.0 / bluez-qt 6.28.0 先例）；无头测试另需 QT_QPA_PLATFORM=offscreen + HOME/XDG_* 落 build_folder + CTEST_PARALLEL_LEVEL=1"
+  - "qtbase 用 cmake_find_mode=none 时不产 conan_cmakedeps_paths.cmake，须手写（PREPEND CMAKE_PREFIX_PATH <qt>/lib/cmake、CMAKE_LIBRARY_PATH <qt>/lib 等）；CMakeDeps 生成的 ECMConfig.cmake 不传播 ECM_MODULE_PATH（上游 KF 项目靠它找 KDEInstallDirs6 等模块），须在 generate() 手工注入 share/ECM/{modules,find-modules,kde-modules}"
