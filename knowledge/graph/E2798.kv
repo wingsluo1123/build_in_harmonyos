@@ -1,0 +1,19 @@
+id:                     E2798
+category:               testing, codec, consumer-api, libtiff
+phase: testing|runtime
+match_keywords: libtiff, JBIG, TIFFWriteScanline, TIFFReadScanline, TIFFWriteEncodedStrip, TIFFReadEncodedStrip, ROWSPERSTRIP, scanline encoding is not implemented, scanline decoding is not implemented, encoderow, decoderow, JPEGCOLORMODE, pseudo-tag, Unknown pseudo-tag 65538, COMPRESSION
+error_signature: "ISO JBIG scanline encoding is not implemented|ISO JBIG scanline decoding is not implemented|Unknown pseudo-tag 65538|Unknown pseudo-tag.*JPEGCOLORMODE"
+root_cause: "libtiff's JBIG codec registers only strip-level entry points: tif_jbig.c installs encodestrip/decodestrip but leaves encoderow NULL, so TIFFWriteScanline falls into the _TIFFNoRowEncode fallback (tif_compress.c); decoderow keeps the _TIFFNoRowDecode stub from TIFFDefaultDirectory. The JBIG encoder additionally requires the whole image in exactly ONE strip (JBIGSetupEncode checks rowsperstrip==height). JPEG's JPEGCOLORMODE is a pseudo-tag registered by the JPEG codec itself, so it is unknown to the directory machinery until the codec is attached (write) or the directory is read (read); the error string is 'Unknown %stag' (tif_dir.c), so the literal tag number never appears in the message."
+rec_approach: "Use strip-level APIs for JBIG both ways: set TIFFTAG_ROWSPERSTRIP=height (single strip), allocate rowbytes*height, write with TIFFWriteEncodedStrip(t, 0, buf, n) and read with TIFFReadEncodedStrip(t, 0, buf, n). Set TIFFTAG_JPEGCOLORMODE AFTER TIFFTAG_COMPRESSION on write, and after the first TIFFGetField (which triggers the directory read) on read."
+prescan_pattern: "JBIG|TIFFWriteScanline|TIFFReadScanline|JPEGCOLORMODE|pseudo-tag"
+severity:               2
+last_updated: 2026-09-26
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E2798.md
+trigger_tool:           ctest
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        "Use strip-level APIs for JBIG both ways: set TIFFTAG_ROWSPERSTRIP=height (single strip), allocate r

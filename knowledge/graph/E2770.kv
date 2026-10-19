@@ -1,0 +1,19 @@
+error_signature: "openssl/ssl.h: No such file or directory|OPENSSL_INCLUDE_DIR.*empty|pkg_check_modules.*OPENSSL|Select OpenSSL as the SSL backend.*fatal error"
+root_cause: "上游 CMake 用 pkg_check_modules(OPENSSL openssl) 探测 OpenSSL 时, pkg-config 只设置复数变量 OPENSSL_INCLUDE_DIRS/OPENSSL_LIBRARIES, 但代码/子模块读取单数变量 OPENSSL_INCLUDE_DIR/OPENSSL_LIBRARIES（FindOpenSSL.cmake 风格）, 单数变量始终为空 → 编译缺头文件。"
+rec_approach: "Conan 配方 generate() 中从 self.dependencies['openssl'].cpp_info 显式注入单数变量: tc.variables['OPENSSL_INCLUDE_DIR']=include 目录, 同时注入 OPENSSL_LIBRARIES 指向 lib 目录, 再配合 CMAKE_INCLUDE_PATH/CMAKE_LIBRARY_PATH 供模块查找器使用。"
+match_keywords: ["pkg_check_modules", "OPENSSL_INCLUDE_DIR", "openssl/ssl.h", "plural vs singular", "FindOpenSSL"]
+severity:               2
+category:               build-system, cmake, conan
+trigger_tool: conan
+verification_cmd:
+last_updated: 2026-09-27
+id:                     E2770
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E2770.md
+phase:                  build
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        "Conan 配方 generate() 中从 self

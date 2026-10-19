@@ -1,0 +1,19 @@
+id:                     E2910
+category:               compat, build-system, packaging
+phase: packaging
+match_keywords: static const char *Version, getVersion, PROJECT_VERSION, version string, embedded version, tag version, upstream did not bump, stale version, version mismatch tag
+error_signature: "static const char [*]Version[ ]*=[ ]*\"[0-9]+\\.[0-9]+\\.[0-9]+\" differs from the official release tag that the archive was fetched from"
+root_cause: "The upstream project keeps its version number in a source-level string constant (static const char *Version) exposed through a runtime getVersion() API, but releases new tags without bumping that constant (openddl-parser v0.5.2 still contains 0.4.0). CMake projects that regex-parse the version from this cpp then carry the stale number into build metadata and any generated versioned artifacts."
+rec_approach: "1) Treat the official release tag as the authoritative version for the recipe/archive (conandata url+sha256 pinned to the tag tarball, conanfile version = tag). 2) Do NOT patch the embedded version string - it is an upstream fact; state it in notes.md and the PR body instead of forcing a diff against the official tag. 3) If the project uses PROJECT_VERSION to generate file names or header macros, explicitly override with the tag version in generate(); if it only affects an informational runtime API (getVersion), no override is needed. 4) Consumer/test asserts must not hard-assert the version string equals the tag version - assert the API is callable and non-empty, so an upstream versioning fact never reads as an adaptation failure."
+prescan_pattern: "static const char [*]Version[ ]*=[ ]*\"[0-9]+\\.[0-9]+\\.[0-9]+\""
+severity:               2
+last_updated: 2026-09-29
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E2910.md
+trigger_tool:           make
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        "1) Treat the official release tag as the authoritative version for the recipe/archive (conandata ur
