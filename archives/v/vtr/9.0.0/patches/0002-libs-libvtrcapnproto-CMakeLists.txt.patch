@@ -1,0 +1,43 @@
+--- a/libs/libvtrcapnproto/CMakeLists.txt	2026-10-01 05:07:26.445774447 +0800
++++ b/libs/libvtrcapnproto/CMakeLists.txt	2026-10-01 05:07:26.465774302 +0800
+@@ -39,14 +39,33 @@
+     find_package(ZLIB REQUIRED)
+ 
+     # Add Java schema
++    #
++    # Upstream fetches this single file from capnproto-java's default branch at
++    # build time.  That makes the build depend on the network and, because the
++    # URL tracks `master`, on whatever that branch happens to contain.  A build
++    # that must stay offline and reproducible can pass
++    # -DVTR_JAVA_CAPNP_SCHEMA=<file> to use a pinned local copy; when the
++    # variable is not set the original download path is used unchanged.
++    set(VTR_JAVA_CAPNP_SCHEMA "" CACHE FILEPATH
++        "Pinned local copy of capnproto-java's java.capnp; if set, no download is performed")
+     set(JAVA_SCHEMA ${CMAKE_CURRENT_BINARY_DIR}/schema/capnp/java.capnp)
+-    add_custom_command(
+-        OUTPUT ${JAVA_SCHEMA}
+-        COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/schema/capnp/
+-        COMMAND ${WGET}
+-            https://raw.githubusercontent.com/capnproto/capnproto-java/master/compiler/src/main/schema/capnp/java.capnp
+-            -O ${JAVA_SCHEMA}
+-    )
++    if(VTR_JAVA_CAPNP_SCHEMA)
++        add_custom_command(
++            OUTPUT ${JAVA_SCHEMA}
++            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/schema/capnp/
++            COMMAND ${CMAKE_COMMAND} -E copy_if_different
++                ${VTR_JAVA_CAPNP_SCHEMA}
++                ${JAVA_SCHEMA}
++        )
++    else()
++        add_custom_command(
++            OUTPUT ${JAVA_SCHEMA}
++            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/schema/capnp/
++            COMMAND ${WGET}
++                https://raw.githubusercontent.com/capnproto/capnproto-java/master/compiler/src/main/schema/capnp/java.capnp
++                -O ${JAVA_SCHEMA}
++        )
++    endif()
+ 
+     add_custom_target(
+         get_java_capnp_schema
