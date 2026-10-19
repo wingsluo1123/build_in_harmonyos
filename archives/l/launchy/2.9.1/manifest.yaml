@@ -1,0 +1,110 @@
+# launchy 2.9.1 版本级 manifest
+version: "2.9.1"
+software: "launchy"
+status: built
+build_date: "2026-10-02"
+build_system: cmake
+
+source:
+  # 上游 = Slesa/launchy tag v2.9.1-pre.1（Arch Linux 打包 launchy 2.9.1 的权威源；
+  # 任务头声明 URL github.com/launchy/launchy 已下线 404。sha512 与 Arch PKGBUILD
+  # 声明值一致：54d27e39a86f4b9c3d7a2770d06ef6a6bcdc5dee770e523c9fcb9dd3c25c7de1705c9f0d0b5452a9b7d20b607a998ad7faa713aa6566dc3f406cacb14a84f8bd）
+  url: "https://github.com/Slesa/launchy/archive/refs/tags/v2.9.1-pre.1.tar.gz"
+  sha256: "26a27f4cf895cb345a277aac49b153bd3adf0ccee0d4f8716f737438bcf7c4e7"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_SYSTEM_NAME=Linux (E092：CMake 不识别 HarmonyOS，走 Linux 平台分支；编译器仍为 OHOS clang)"
+    - "-DQT5_INCLUDE_DIRS 注入 qt5-qtbase include（CMakeDeps 聚合配置组件 includes 为空）"
+  dependencies:
+    - qt5-qtbase/5.15.2.2
+    - libx11/6.4.0
+    - libxcb/1.16
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-CMakeLists.txt.patch"
+  - "0002-common-CMakeLists.txt.patch"
+  - "0003-common-x11_keytrigger.cpp.patch"
+  - "0004-common-x11_keytrigger.h.patch"
+  - "0005-common-x11_platform.cpp.patch"
+  - "0006-launchy.specs-CMakeLists.txt.patch"
+  - "0007-launchy-CMakeLists.txt.patch"
+  - "0008-launchy-singleapplication.cpp.patch"
+  - "0009-launchy-singleapplication.h.patch"
+  - "0010-libqxt-CMakeLists.txt.patch"
+  - "0011-plugins-runner-CMakeLists.txt.patch"
+  - "0012-plugins-verby-CMakeLists.txt.patch"
+  - "0013-plugins-weby-CMakeLists.txt.patch"
+
+knowledge_gained:
+  - "qt5-qtbase 配方以 -no-feature-sharedmemory 构建，QSharedMemory 不可用：单实例锁改用 QLockFile"
+  - "qt5-qtbase 无聚合 Qt5Config 分模块配置（CMakeDeps 聚合模式组件 includes/libs 为空）：直接依赖 + QT5_INCLUDE_DIRS 注入"
+  - "X11 头文件宏（Bool/Unsorted/Time 等）污染 AUTOMOC 合并 TU 中后续 Qt 头解析：X11 include 前先完整解析 Qt 头（include guard 防重解析）"
+  - "AUTOMOC 合并 TU 与 qmake 逐文件 moc 的行为差异：x11 相关头需预解析 Qt 或拆出合并"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/launchy-2.9.1.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/launchy-2.9.1.work
+  source_orig_hash: ff9100f86b7dfa7d
+  source_work_hash: e67a90ebef004f53
+  generated_at: '2026-10-18T09:48:50'
+  patches_count: 13
+
+patch_classification:
+  - file: 0001-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-common-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-common-x11_keytrigger.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-common-x11_keytrigger.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0005-common-x11_platform.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0006-launchy.specs-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0007-launchy-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0008-launchy-singleapplication.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0009-launchy-singleapplication.h.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0010-libqxt-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0011-plugins-runner-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0012-plugins-verby-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0013-plugins-weby-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

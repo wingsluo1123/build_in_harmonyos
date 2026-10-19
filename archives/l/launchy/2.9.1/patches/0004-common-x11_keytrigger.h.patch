@@ -1,0 +1,81 @@
+--- a/common/x11_keytrigger.h
++++ b/common/x11_keytrigger.h
+@@ -1,26 +1,54 @@
+ #ifndef X11KEYTRIGGER_H
+ #define X11KEYTRIGGER_H
+ 
++// OHOS 适配：AUTOMOC 把本头并入合并 TU（mocs_compilation.cpp），而 X11/Xlib.h
++// 会定义 Bool/Unsorted/None/True/False 等宏，污染后续首次解析的 Qt 头
++// （qjsonvalue.h 的 Bool、qdir.h 的 Unsorted 枚举）。在引入 X11 头之前先完整
++// 解析 QtCore/QtGui/QtWidgets（include guard 保证之后不再重解析），使 X11 宏
++// 只影响本 TU 中 X11 相关代码，不影响 Qt 头。
++#include <QtCore>
++#include <QtGui>
++#include <QtWidgets>
++
+ #include <QWidget>
+-#include <QX11Info>
++#include <QGuiApplication>
++#include <QByteArray>
++#include <qpa/qplatformnativeinterface.h>
+ #include <QKeyEvent>
+ //#include <QCoreApplication>
+ #include <QDebug>
+ #include <QApplication>
+ 
+ #include "globalshortcutmanager.h"
+ #include "globalshortcuttrigger.h"
+ 
+ #include <X11/X.h>
+ #include <X11/Xlib.h>
+ #include <X11/keysym.h>
++
++// OHOS 适配：qt5-qtbase 未装 qt5-qtx11extras，无 QX11Info；改用 Qt5Gui 的
++// QPlatformNativeInterface 获取 Display*（与 libqxt/qxtglobalshortcut_x11.cpp
++// 既有做法一致）。
++inline Display* launchyDisplay()
++{
++    QPlatformNativeInterface* native = QGuiApplication::platformNativeInterface();
++    if (!native)
++        return nullptr;
++    return reinterpret_cast<Display*>(native->nativeResourceForScreen(
++        QByteArray("display"), QGuiApplication::primaryScreen()));
++}
++
++inline Window launchyRootWindow()
++{
++    return DefaultRootWindow(launchyDisplay());
++}
+ 
+ 
+ #ifdef KeyPress
+ // defined by X11 headers
+ const int XKeyPress   = KeyPress;
+ const int XKeyRelease = KeyRelease;
+ #undef KeyPress
+ #endif
+ 
+ 
+@@ -118,21 +146,21 @@
+     static long hyper_mask;
+     static long numlock_mask;
+     static bool haveMods;
+ 
+     // adapted from qapplication_x11.cpp
+     static void ensureModifiers()
+     {
+         if (haveMods)
+             return;
+ 
+-        Display* appDpy = QX11Info::display();
++        Display* appDpy = launchyDisplay();
+         XModifierKeymap* map = XGetModifierMapping(appDpy);
+         if (map) {
+             // XKeycodeToKeysym helper code adapeted from xmodmap
+             int min_keycode, max_keycode, keysyms_per_keycode = 1;
+             XDisplayKeycodes (appDpy, &min_keycode, &max_keycode);
+             XFree(XGetKeyboardMapping (appDpy, min_keycode, (max_keycode - min_keycode + 1), &keysyms_per_keycode));
+                         
+             int i, maskIndex = 0, mapIndex = 0;
+             for (maskIndex = 0; maskIndex < 8; maskIndex++) {
+                 for (i = 0; i < map->max_keypermod; i++) {

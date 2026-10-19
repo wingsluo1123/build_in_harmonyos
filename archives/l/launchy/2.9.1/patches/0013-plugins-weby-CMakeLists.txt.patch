@@ -1,0 +1,55 @@
+--- a/plugins/weby/CMakeLists.txt
++++ b/plugins/weby/CMakeLists.txt
+@@ -1,16 +1,14 @@
+ cmake_minimum_required (VERSION 3.5.1)
+ project (weby)
+ 
+-find_package(Qt5Core)
+-find_package(Qt5 COMPONENTS Gui Widgets Network)
+-find_package(Qt5LinguistTools)
++find_package(Qt5 COMPONENTS Core Gui Widgets Network)
+ 
+ #include_directories(${Qt5Gui_PRIVATE_INCLUDE_DIRS})
+ 
+ set(launchy_weby_trans
+     ../../../translations/weby_fr.ts
+     ../../../translations/weby_nl.ts
+     ../../../translations/weby_zh.ts
+     ../../../translations/weby_es.ts
+     ../../../translations/weby_de.ts
+     ../../../translations/weby_ja.ts
+@@ -32,29 +30,31 @@
+     ../../launchy/plugin_interface.h
+     ../../common/DropTableWidget.h
+    )
+ set(weby_pngs
+    weby.png)
+ 
+ include_directories(${CMAKE_SOURCE_DIR})
+ include_directories(${CMAKE_SOURCE_DIR}/common)
+ include_directories(${CMAKE_SOURCE_DIR}/launchy)
+ 
+-QT5_WRAP_UI(launchy_weby_form dlg.ui)
+-QT5_ADD_TRANSLATION(launchy_weby_qms ${launchy_weby_trans})
++# qt5-tools/linguist 未发布，翻译不参与编译（launchy_weby_qms 置空）
++set(launchy_weby_qms "")
++
++set(launchy_weby_form dlg.ui)
+ 
+ add_library(weby SHARED ${launchy_weby_srcs} ${launchy_weby_hdrs} ${launchy_weby_form} ${launchy_weby_qms})
+ set_target_properties(weby PROPERTIES 
+     LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/../../${BIN_INSTALL_DIR}/plugins
+     RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/../../${BIN_INSTALL_DIR}/plugins
+     )
+-qt5_use_modules(weby Core Gui Widgets Network)
++target_link_libraries(weby PRIVATE Qt5::Core Qt5::Gui Qt5::Widgets Qt5::Network)
+ if(EXISTS "${PROJECT_BINARY_DIR}/weby_fr.qm")
+     file(COPY ${launchy_weby_qms} DESTINATION ${PROJECT_BINARY_DIR}/../../${BIN_INSTALL_DIR}/tr)
+ endif()
+ 
+ 
+ # *** Installation ***
+ install(TARGETS weby DESTINATION ${PREFIX_PLUGINS}/plugins COMPONENT plugins)
+ install(FILES ${weby_pngs} DESTINATION ${PREFIX_ICONS}/icons COMPONENT plugins)
+ if(__WIN__ OR __MAC__)
+     install(FILES ${launchy_weby_qms} DESTINATION ${PREFIX_PLUGINS}/tr COMPONENT plugins)

@@ -1,0 +1,78 @@
+--- a/launchy/CMakeLists.txt
++++ b/launchy/CMakeLists.txt
+@@ -1,22 +1,21 @@
+ cmake_minimum_required (VERSION 3.5.1)
+ project (launchy)
+ 
+-find_package(Qt5Core)
+-find_package(Qt5 COMPONENTS Gui Widgets Network)
+-find_package(Qt5LinguistTools)
++find_package(Qt5 COMPONENTS Core Gui Widgets Network)
+ if(__LIN__)
+-    find_package(X11 REQUIRED)
++    find_package(libx11 CONFIG REQUIRED)
++    find_package(libxcb CONFIG REQUIRED)
+ elseif(__MAC__)
+-    find_package(X11 REQUIRED)
++    find_package(libx11 CONFIG REQUIRED)
+ elseif(__BSD__)
+-    find_package(X11 REQUIRED)
++    find_package(libx11 CONFIG REQUIRED)
+ endif()
+ 
+ set(launchy_trans
+     ../../translations/launchy_fr.ts
+     ../../translations/launchy_nl.ts
+     ../../translations/launchy_zh.ts
+     ../../translations/launchy_es.ts
+     ../../translations/launchy_de.ts
+     ../../translations/launchy_ja.ts
+     ../../translations/launchy_zh_TW.ts
+@@ -49,41 +48,36 @@
+ 		win_launchywidget.cpp
+ 		win_launchywidget.h
+ 		../../win/launchy.rc
+ 	)
+     find_package(Qt5 COMPONENTS winextras)
+     set(launchy_mods
+         WinExtras
+     )
+ endif()
+ 
+-QT5_WRAP_UI(launchy_form_hdr options.ui)
+-QT5_ADD_TRANSLATION(launchy_qms ${launchy_trans})
+-QT5_ADD_RESOURCES(launchy_qrcs launchy.qrc)
++# qt5-tools/linguist 未发布，翻译不参与编译（launchy_qms 置空）
++set(launchy_qms "")
+ 
+ include_directories(${CMAKE_SOURCE_DIR})
+ include_directories(${CMAKE_SOURCE_DIR}/common)
+ include_directories(${CMAKE_SOURCE_DIR}/libqxt)
+-#if (__LIN__)
+-	find_package(X11 REQUIRED)
+-    include_directories(${X11_INCLUDE_DIR})
+-#endif(__LIN__)
+ 
+-add_executable(launchy ${launchy_srcs} ${launchy_form_hdr} ${launchy_common_hdrs} ${launchy_hdr_moc} ${launchy_qms} ${launchy_win_srcs} ${launchy_qrcs})
++add_executable(launchy ${launchy_srcs} ${launchy_common_hdrs} ${launchy_hdr_moc} ${launchy_qms} ${launchy_win_srcs} launchy.qrc options.ui)
+ 
+-qt5_use_modules(launchy Core Gui Widgets Network ${launchy_mods})
++target_link_libraries(launchy Qt5::Core Qt5::Gui Qt5::Widgets Qt5::Network)
+ 
+ target_link_libraries(launchy common libqxt)
+ if(__LIN__)
+-    target_link_libraries(launchy ${X11_LIBRARIES})
++    target_link_libraries(launchy libx11::x11 libxcb::xcb)
+ elseif (__BSD__)
+-    target_link_libraries(launchy ${X11_LIBRARIES})
++    target_link_libraries(launchy libx11::x11 libxcb::xcb)
+ elseif (__MAC__)
+ 	target_link_libraries(launchy ${CARBON_FRAMEWORK})
+ endif()
+ 
+ set_target_properties(launchy PROPERTIES 
+     LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/../${BIN_INSTALL_DIR}
+     RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/../${BIN_INSTALL_DIR}
+     )
+ 
+ if(EXISTS ${PROJECT_BINARY_DIR}/launchy_fr.qm)

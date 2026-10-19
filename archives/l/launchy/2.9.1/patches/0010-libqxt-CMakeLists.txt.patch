@@ -1,0 +1,41 @@
+--- a/libqxt/CMakeLists.txt
++++ b/libqxt/CMakeLists.txt
+@@ -1,15 +1,18 @@
+ cmake_minimum_required (VERSION 3.5.1)
+ project (libqxt)
+ 
+-find_package(Qt5Core)
+-find_package(Qt5 COMPONENTS Gui Widgets)
++find_package(Qt5 COMPONENTS Core Gui Widgets)
++if(__LIN__ OR __BSD__)
++    find_package(libx11 CONFIG REQUIRED)
++    find_package(libxcb CONFIG REQUIRED)
++endif()
+ include_directories(${Qt5Gui_PRIVATE_INCLUDE_DIRS})
+ 
+ add_definitions(-DQXT_STATIC)
+ 
+ 
+ set(launchy_qxt_srcs
+ 	qxtglobalshortcut.cpp
+ 	)
+ if(__WIN__)
+ set(launchy_qxt_extras
+@@ -23,11 +26,16 @@
+ set(launchy_qxt_extras
+ 	qxtglobalshortcut_x11.cpp
+ 	)
+ elseif(__BSD__)
+ set(launchy_qxt_extras
+ 	qxtglobalshortcut_x11.cpp
+ 	)
+ endif()
+ 
+ add_library(libqxt STATIC ${launchy_qxt_srcs} ${launchy_qxt_extras})
+-qt5_use_modules(libqxt Core Gui Widgets)
++target_link_libraries(libqxt PUBLIC Qt5::Core Qt5::Gui Qt5::Widgets)
++if(__LIN__)
++    target_link_libraries(libqxt PUBLIC libx11::x11 libxcb::xcb)
++elseif(__BSD__)
++    target_link_libraries(libqxt PUBLIC libx11::x11 libxcb::xcb)
++endif()
