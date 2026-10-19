@@ -1,0 +1,23 @@
+software: mar
+display: "mar"
+description: "MAR 元档案（meta archive）：单个二进制文件同时保存键值元数据和用户数据；C 库、C++ 流封装与 mar 命令行工具"
+category: library
+homepage: "https://cgit.freebsd.org/ports/tree/archivers/mar"
+license: MIT
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "OHOS aarch64 的 plain char 无符号：mar 工具把 mar_getopt() 的 int 返回值存进 char，选项解析结束时的 EOF(-1) 变成 255，`-1 != ch` 恒真，除 -h（提前返回）外每条真实命令都以 `Unknown option` 退出 1。选项表被扫描两遍（main 与 mar_run），有两处接收变量，补丁 0003 都改为 int；clang 默认就会对这两处报 -Wtautological-constant-out-of-range-compare，但只是告警、构建照常成功，配方把这一条告警单独提升为 -Werror= 作回归护栏"
+    - "C++ 流封装（mar_stream_cpp.h、mar_streambuf_cpp.h）对依赖基类的成员 rdbuf/setg/sputc 不加限定，clang+libc++ 的两阶段名字查找拒绝编译，上游自带的 make check 也编不过；补丁 0001/0002 共 9 处加 base_type::"
+    - "上游 make install 不可用：头文件清单漏掉 mar_string_c.h（mar_key_cpp.h 包含它，12 个 C++ 头里 8 个装完后无法包含）、不创建 $(MANDIR)/man1、没有 DESTDIR；package() 自行安装 17 个头文件"
+    - "mar_storage_c.h 在未定义 MAR_STATIC/MAR_SHARED 时 #error，package_info() 导出 MAR_STATIC"
+    - "bin/mar 以 -static-pie（带 RELRO、BIND_NOW）链接：同一交付产物在 AArch64 原生运行，在 x86 运行器经 qemu-aarch64 运行，build() 与 test_package 实跑的就是它"
+    - "原始上游站点已下线；源码包取自 FreeBSD ports archivers/mar 所用的 distfiles（critical.ch 302 到 distcache.FreeBSD.org），sha256 与 FreeBSD distinfo、Wayback 2006 年快照一致"
+  common_dependencies: []
+
+versions:
+  "0.5":
+    status: built
+    build_date: "2026-10-04"
+    conan_ref: "mar/0.5"

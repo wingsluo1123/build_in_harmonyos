@@ -1,0 +1,117 @@
+--- a/include/mar_stream_cpp.h
++++ b/include/mar_stream_cpp.h
+@@ -74,32 +74,32 @@
+ 
+         typedef std::basic_istream<char_type, char_traits_type> base_type;
+         streambuf_type streambuf_;
+ 
+     public:
+         explicit
+         MAR_BASIC_ISTREAM(const handle& h, std::streamsize size = bufsize)
+             : base_type(0),
+               streambuf_(h, std::ios_base::in, bufsize)
+         {
+-            rdbuf(&streambuf_);
++            base_type::rdbuf(&streambuf_);
+             if (!streambuf_.is_open())
+                 base_type::setstate(std::ios_base::failbit);
+         }
+         explicit
+         MAR_BASIC_ISTREAM(const char* path, int flags = rdonly,
+                           mode_t mode = 0444, std::streamsize size = bufsize)
+             : base_type(0),
+               streambuf_(archive::open(path, flags, mode),
+                          std::ios_base::in, bufsize)
+         {
+-            rdbuf(&streambuf_);
++            base_type::rdbuf(&streambuf_);
+             if (!streambuf_.is_open())
+                 base_type::setstate(std::ios_base::failbit);
+         }
+         int
+         close()
+         {
+             return streambuf_.close();
+         }
+         bool
+         is_open() const
+@@ -131,32 +131,32 @@
+ 
+         typedef std::basic_ostream<char_type, char_traits_type> base_type;
+         streambuf_type streambuf_;
+ 
+     public:
+         explicit
+         MAR_BASIC_OSTREAM(const handle& h, std::streamsize size = bufsize)
+             : base_type(0),
+               streambuf_(h, std::ios_base::out, bufsize)
+         {
+-            rdbuf(&streambuf_);
++            base_type::rdbuf(&streambuf_);
+             if (!streambuf_.is_open())
+                 base_type::setstate(std::ios_base::failbit);
+         }
+         explicit
+         MAR_BASIC_OSTREAM(const char* path, int flags = wronly | creat,
+                           mode_t mode = 0664, std::streamsize size = bufsize)
+             : base_type(0),
+               streambuf_(archive::open(path, flags, mode),
+                          std::ios_base::out, bufsize)
+         {
+-            rdbuf(&streambuf_);
++            base_type::rdbuf(&streambuf_);
+             if (!streambuf_.is_open())
+                 base_type::setstate(std::ios_base::failbit);
+         }
+         int
+         close()
+         {
+             return streambuf_.close();
+         }
+         bool
+         is_open() const
+@@ -189,41 +189,41 @@
+         typedef std::basic_iostream<char_type, char_traits_type> base_type;
+         streambuf_type streambuf_;
+ 
+     public:
+         explicit
+         MAR_BASIC_IOSTREAM(const memory_type&, std::streamsize size = bufsize)
+             : base_type(0),
+               streambuf_(archive::create(), std::ios_base::in
+                          | std::ios_base::out, size)
+         {
+-            rdbuf(&streambuf_);
++            base_type::rdbuf(&streambuf_);
+             if (!streambuf_.is_open())
+                 base_type::setstate(std::ios_base::failbit);
+         }
+         explicit
+         MAR_BASIC_IOSTREAM(const handle& h, std::streamsize size = bufsize)
+             : base_type(0),
+               streambuf_(h, std::ios_base::in | std::ios_base::out, size)
+         {
+-            rdbuf(&streambuf_);
++            base_type::rdbuf(&streambuf_);
+             if (!streambuf_.is_open())
+                 base_type::setstate(std::ios_base::failbit);
+         }
+         explicit
+         MAR_BASIC_IOSTREAM(const char* path, int flags = rdwr | creat,
+                            mode_t mode = 0664, std::streamsize size = bufsize)
+             : base_type(0),
+               streambuf_(archive::open(path, flags, mode),
+                          std::ios_base::in | std::ios_base::out, size)
+         {
+-            rdbuf(&streambuf_);
++            base_type::rdbuf(&streambuf_);
+             if (!streambuf_.is_open())
+                 base_type::setstate(std::ios_base::failbit);
+         }
+         int
+         close()
+         {
+             return streambuf_.close();
+         }
+         bool
+         is_open() const
