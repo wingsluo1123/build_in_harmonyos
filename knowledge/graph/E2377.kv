@@ -1,0 +1,51 @@
+# ═══ Draft knowledge entry — Conan 环境下直编上游源码并 -l 系统库名的测试目录必然链接失败 ═══
+# Timestamp: 2026-09-21
+# Software: mustach 1.2.10 test6（任何"消费者示例目录直接 $(CC) ... -l<dep>"形态的上游测试）
+# Gate: conan build() 内上游测试（make test 于子目录）
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E2377
+title: "上游消费者形态测试直编源码并 -l<dep> 链接系统库，Conan 环境下报 fatal error（dep 头文件不存在）或 cannot find -l<dep>（注入 CPATH/LIBRARY_PATH 修复）"
+trigger_tool: make / clang
+phase: testing
+error_signature: fatal error:\s+\S+\.(h|hh)\s+No such file or directory|cannot find\s+-l\S+
+severity:               2
+category:               build-system, dependency, test-framework
+match_keywords: cannot find -l,fatal error No such file or directory,LIBRARY_PATH,CPATH,
+  直编源码,消费者测试,-ljson-c,test-custom-write,make test
+root_cause: Conan 依赖的头文件与库文件位于 conan cache 的 package_folder，不进入
+  编译器内建搜索路径；裸 `-l<name>` 与裸 `#include <...>` 只在系统前缀下可解析。
+  上游该形态测试假定发行版安装环境，Conan 下属环境差异而非上游缺陷
+affected_scope: 所有"子目录直编源码 + 裸 -l 依赖库"的上游测试目录（mustach
+  test6 实测）；同样适用于示例/工程目录在 build() 内被 make 递归驱动的场景
+verification_cmd: env CPATH=<dep-include> LIBRARY_PATH=<dep-lib> make -C test6 test  # 注入后 rc=0 即修复
+rec_priority: 2
+rec_approach: env-inject-cpath-library-path
+rec_description: 在配方 build() 调用该 make 前注入 CPATH/LIBRARY_PATH（冒号分隔
+  多路径），不改上游任何文件；路径来源用 self.dependencies 取 cpp_info（相对
+  路径拼 package_folder），不要硬编码 .conan2 下的分片目录
+rec_command: env CPATH="$(pkg-config --cflags-only-I json-c | tr -d -I)" LIBRARY_PATH="$(pkg-config --libs-only-L json-c | sed s/-L//g)" make -C test6 test
+rec_auto_fix: false
+rec_impl: recipe-side（conanfile build() 内 env 注入），不改上游测试
+fallback_priority: 2
+fallback_approach: patch-makefile-add-flags
+fallback_description: 若注入环境变量无效（如上游清空环境），用补丁向该 Makefile
+  的编译行追加 -I/-L/-Wl,-rpath，补丁进 patches/ 并在 PR 说明
+fallback_command: sed -i "s|-ljson-c|-I<inc> -L<lib> -ljson-c|g" test6/Makefile && make -C test6 test
+fallback_auto_fix: false
+fallback_impl: 包补丁（最后一选择，增加维护面）
+principles:               
+conflicts_with:
+prerequisite_of:
+doc_file: knowledge/drafts/DRAFT-E651-conan-cpath-library-path-bare-link.md
+last_updated: 2026-09-21
+source_event: mustach 1.2.10 设备适配：build() 内 test6 make test 报
+  fatal error（json-c 头不可见），按 cpp_info 注入 CPATH/LIBRARY_PATH 后 8/8
+  工具测试全绿
+authors: Awstme
+source_pr: (本 PR)
+source_commit: (待提交后回填)
+metrics_success_count: 1
+metrics_fail_count: 0
+metrics_confidence: 1.0
+metrics_last_used: 2026-09-21

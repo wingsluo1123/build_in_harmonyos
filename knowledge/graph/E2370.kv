@@ -1,0 +1,51 @@
+#====================================================================
+# DRAFT-raw-makefile-shared-lib-soname-patch — 纯 Makefile 手写链接行缺少 DT_SONAME，应在 Makefile 链接规则内补 -Wl,-soname（补丁形态）
+# 触发事件: complete-striped-smith-waterman 1.2.5 适配（W3 本地 CI 的 L5 SONAME 门禁失败）
+# 路径: Path B（知识库扩展）
+#====================================================================
+
+id:                     E2370
+trigger_tool:           build_and_test.sh|L5|readelf -d|conan create
+phase:                  ci_gate|packaging|linking
+error_signature:        L5a: .*缺少 DT_SONAME.*|SONAME quality gate failed|readelf -d.*无.*SONAME
+
+severity:               2
+category:               make, linking, packaging, ci-gate
+match_keywords:         SONAME, DT_SONAME, soname_gate_failed, Makefile, makefile, 手写链接行, -Wl,-soname, shared, .so, L5, readelf, raw makefile, 纯 Makefile
+
+title:                  Raw-Makefile shared libs need an explicit -Wl,-soname in the hand-written link rule (patch form) to pass the L5 SONAME gate on OHOS
+
+root_cause: >
+  纯 Makefile（无 configure/CMake/Meson）上游的手写共享库链接行
+  不带 soname 参数，LLD/clang 默认不写 DT_SONAME；L5 门禁对任何
+  可链接共享库生效，与 CMake 平台模块（E383/DRAFT-cmake 场景）
+  完全无关——是 Makefile 自身链接行缺项。
+
+verification_cmd:
+  readelf -d $PKG_CACHE/lib/libssw.so | grep SONAME  →  [libssw.so]
+  W3 build_and_test.sh L5_RESULT=pass（complete-striped-smith-waterman 1.2.5，2026-09-21）
+
+rec_priority:           2
+rec_approach:           patch-makefile-link-rule-with-soname
+rec_description: >
+  纯 Makefile 共享库链接规则内追加 -Wl,-soname,<libname>.so（补丁形态），
+  通过 L5 SONAME 门禁；与 CMake 场景（E383 conan flag 注入）区分触发面。
+
+rec_command:            readelf -d lib/libssw.so | grep SONAME
+rec_auto_fix:           false
+rec_impl:               makefile-link-rule-soname-patch
+
+doc_file:               knowledge/drafts/DRAFT-raw-makefile-shared-lib-soname-patch.md
+last_updated:           2026-09-21
+source_event:           complete-striped-smith-waterman 1.2.5 适配，W3 L5 SONAME 门禁失败后补丁修复
+authors:                pc1-6
+source_pr:
+source_commit:
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     0.9
+metrics_last_used:      2026-09-21
+
+affected_scope:         Raw-Makefile shared libs need an explicit -Wl,-soname in the
+verification_cmd:       # 以 source_pr CI 门禁为准（PR ）
