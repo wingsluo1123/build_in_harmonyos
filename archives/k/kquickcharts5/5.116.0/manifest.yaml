@@ -1,0 +1,48 @@
+software: kquickcharts5
+build_system: cmake
+
+# 版本级 manifest
+# 文件位置: archives/k/kquickcharts5/5.116.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "5.116.0"
+status: built
+build_date: "2026-10-17"
+
+source:
+  url: "https://download.kde.org/stable/frameworks/5.116/kquickcharts-5.116.0.tar.xz"
+  sha256: "d20c11e514b5d20e16d7054d3e56c8c7c91cc80aaa58ee460126caebef04a2ad"
+  tar_format: tar.xz
+
+build:
+  system: cmake
+  notes:
+    - "CMake + Ninja 交叉编译；产出静态支撑库 + 两个 QML 模块（org.kde.quickcharts / .controls）。"
+
+dependencies:
+  build:
+    - ecm/6.26.0
+  runtime:
+    - qt5-qtbase/5.15.2.2
+    - qt5-qtdeclarative/5.15.2
+    - qt5-qtquickcontrols2/5.15.2
+
+platform_differences:
+  - "KF_IGNORE_PLATFORM_CHECK=TRUE 绕过 KDE 平台检测（OHOS 不在 KDE 平台列表）。"
+  - "BUILD_TESTING=ON：上游 autotests（4 个 QTEST_GUILESS_MAIN C++ 套件 + qmltest 驱动的 3 个 QML 图表套件）交叉构建后在 QT_QPA_PLATFORM=offscreen 下经 ctest 真跑（QT_TESTING 环境含 VirtualRunEnv 前置全部依赖 lib；QtTest QML 模块从 qt5-qtdeclarative 的 src/imports/testlib 源码补齐 staging——kirigami2 5.116.0 先例）。BUILD_EXAMPLES 关闭。"
+  - "Qt5QuickTest 桥接：qt5-qtdeclarative 以 cmake_file_name=Qt5Qml 单配置发布，上游 find_package(Qt5 COMPONENTS QuickTest) 需手写 Qt5QuickTestConfig.cmake shim（链 Qt5Qml + qtbase 的 Qt5::Test，QUICK_TEST_MAIN 的 QTest 符号来自后者）。"
+  - "ECM_MODULE_PATH 手动设置（CMakeDeps 生成的 ECMConfig.cmake 不传播该变量）。"
+  - "conan_cmakedeps_paths.cmake 手写：逐依赖前置 lib/cmake（KF5 包均以 cmake_find_mode=none 发布）。"
+  - "OHOS CMake 平台模块未定义 SONAME flag，设置 CMAKE_SHARED_LIBRARY_SONAME_*=-Wl,-soname,。"
+
+test_results:
+  upstream_ctest: "7/7 suites Passed（ArraySourceTest/MapProxySourceTest/HistoryProxySourceTest/ItemBuilderTest/tst_BarChart.qml/tst_LineChart.qml/tst_PieChart.qml）；QTest Totals 合计 34 passed 0 failed（含 initTestCase/cleanupTestCase 与 data 行展开）"
+
+patches_count: 1
+
+patch_classification:
+  - file: 0001-add-QColor-include.patch
+    type: code_fix
+    platform_only: False
+    guard: 'none'
+    note: "BarChart.h/LineChart.h/PieChart.h 成员字段使用 QColor 但未 #include <QColor>；上游依赖传递包含，发布版 Qt5 Conan 链不提供，导致 'field has incomplete type QColor'。"
