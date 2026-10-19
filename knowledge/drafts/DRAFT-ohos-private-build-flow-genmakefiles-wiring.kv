@@ -1,0 +1,31 @@
+# Maintainer-review candidate; no automatic Path B grade or points claim.
+id:                     DRAFT-ohos-private-build-flow-genmakefiles-wiring
+draft:                  true
+trigger_tool:           genMakefiles|make|clang|conan
+phase:                  build
+severity:               2
+category:               ohos-nonstandard-build-systems
+error_signature:        Invalid configuration .*OS .*not recognized|fatal error: 'sys/types\.h' file not found|No rule to make target 'install'|fatal error: 'openssl/ssl\.h' file not found
+match_keywords:         genMakefiles, 私有构建流程, 非 autotools/cmake, config.<platform>, --target=aarch64-linux-ohos, sysroot 头找不到, 不走上游 install, recipe 侧收集产物, cpp_info.defines, NO_OPENSSL, include/<subdir> 布局, live555
+title:                  非 autotools/cmake 的私有 makefile 流程在 OHOS 上的接线范式（以 live555 的 genMakefiles 为例）
+root_cause:             live555 的构建入口是 `./genMakefiles <platform>`——把 `$subdir/Makefile.head` + `config.<platform>` + `$subdir/Makefile.tail`
+                        拼成各子目录 Makefile，再 `make`。它**没有任何自动探测**：编译器、归档器、目标三元组、功能宏都必须写进自造的 config 文件。
+                        本轮踩到四类：①三元组必须写 **`--target=aarch64-linux-ohos`**——写成 `aarch64-linux` 时 clang 找不到 OHOS sysroot，
+                        报 `fatal error: 'sys/types.h' file not found`；②上游顶层 `install:` 会遍历**全部**子目录（未构建的子目录直接 make 失败）
+                        → 不能走上游 install，改由 recipe 侧收集产物；③打包头依赖的宏必须导出（`liveMedia.hh`/`TLSState.hh` 用
+                        `#ifndef NO_OPENSSL` 守卫 `<openssl/ssl.h>`，消费者不带同一宏时**一 include 就失败**）；
+                        ④头文件布局要按上游 `include/<subdir>/`（消费者的 `liveMedia/liveMedia.hh` 探测）导出，
+                        同时把子目录也加入 includedirs 以兼容非限定 include。
+affected_scope:         所有使用私有 makefile 流程（非 autotools/cmake/meson）的库在 OHOS 上的适配
+verification_cmd:       <build log> | grep -E "fatal error: 'sys/types.h'|No rule to make target 'install'|fatal error: 'openssl/ssl.h'"
+rec_priority:           2
+rec_approach:           generate-platform-config-trim-subdirs-and-collect-artifacts-in-recipe
+rec_description:        ①构建期生成 `config.<platform>`：编译器/归档器取 profile 的 `tools.build:compiler_executables`（含同目录 `llvm-ar`），
+                        三元组用 `--target=aarch64-linux-ohos`，按需加 `-fPIC`、`-DNO_OPENSSL=1`；
+                        ②**只驱动消费者需要的子目录**（live555 只构建 liveMedia/groupsock/UsageEnvironment/BasicUsageEnvironment，
+                        跳过 testProgs/mediaServer/proxyServer/hlsProxy）；
+                        ③**不走上游 install**，recipe 侧收集：静态库 → `lib/`，各子目录 `include/*.hh|*.h` → `include/<subdir>/`（与上游 install 布局一致）；
+                        ④把打包头所依赖的宏经 `cpp_info.defines` 导出（如 `NO_OPENSSL=1`）；
+                        ⑤以消费者**真实 API 调用**验收（live555：包含 `liveMedia/liveMedia.hh` + 构造 `BasicTaskScheduler`/`BasicUsageEnvironment` 并打印，全程离线）。
+rec_command:            'conan create archives/l/live555/2026.08.14 -pr:h=ci/conan/profiles/ohos-aarch64 --build=missing'
+evidence_ref:           archives/l/live555/2026.08.14/conanfile.py（_write_config/build/package/package_info）; archives/l/live555/2026.08.14/notes.md; archives/l/live555/2026.08.14/reports/pr-body.md
