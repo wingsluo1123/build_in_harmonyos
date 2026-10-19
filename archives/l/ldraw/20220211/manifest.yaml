@@ -1,0 +1,37 @@
+# 版本级 manifest — ldraw 20220211（纯数据资源包）
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "20220211"
+software: ldraw
+status: built
+build_date: "2026-10-02"
+# 纯数据包：上游无任何构建系统（无 Makefile/CMakeLists/configure/meson.build），
+# 取 custom 如实标注（code-style §14 枚举 cmake|autotools|makefile|meson 不含该场景）
+build_system: custom
+
+source:
+  # 官方源：LDraw.org 零件库（任务头声明的 github.com/ldraw/library 404，官方站点
+  # www.ldraw.org 已迁移至 library.ldraw.org；complete.zip 为官方滚动完整库快照）
+  url: "https://library.ldraw.org/library/updates/complete.zip"
+  # 提交时实测下载核验的官方制品 SHA-256（2026-10-02 官方快照，146,075,744 字节）；
+  # 历史 20220211 快照权威 SHA-256=632bff…（FreeBSD cad/ldraw distinfo）见 notes.md
+  sha256: "f3e496d0ede69ca7942fa4aa198e661ee2d22723906101e2e339d8917a4dd5f2"
+  tar_format: zip
+
+build:
+  system: custom
+  configure_options: []
+  dependencies: []
+  # 纯数据包，无编译步骤，不涉及编译器
+  cc: n/a
+  cxx: n/a
+
+patches_applied: []
+
+knowledge_gained:
+  - "ldraw 是纯数据资源库（LDraw 零件数据）：无构建系统、无编译产物、无 CLI、无自动化测试（complete.zip 37,261 文件全量枚举 0 测试命中）"
+  - "任务头声明上游 github.com/ldraw/library 不存在（404，GitHub API 权威确认）；LDraw 官方零件库真实官方源是 library.ldraw.org（www.ldraw.org 已迁移）"
+  - "官方 complete.zip 是滚动快照：版本号按发布日期（20220211=2022-02-11）；FreeBSD cad/ldraw 端口 distinfo 记录了 20220211 快照的权威 SHA-256（632bff…，59,422,832 字节），但官方站点现已不单独提供该历史快照"
+  - "纯数据资源库无编译步骤：conanfile.py source() 用 get() 拉官方 zip，package() 复制 parts/p/models/LDConfig 到 share/ldraw，package_id 单包（info.clear()），cpp_info 显式置空 + resdirs 指向 share/ldraw"
+  - "lang-preflight 对纯数据资源库以默认 cpp 判定返回 other→env_unsupported；以 --lang other 复检通过（detected=other==expected）——纯数据包语言类别应为 other 而非默认 cpp"
+  - "消费者验证：test_package 不是空壳，test_ldraw.py 以第三方消费者视角读取安装后零件库（规模>30000、抽检 .dat 首行 LDraw 元命令、LDConfig.ldr 颜色定义、models 样例）"

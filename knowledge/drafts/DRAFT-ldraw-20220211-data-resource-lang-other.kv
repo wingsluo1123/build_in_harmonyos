@@ -1,0 +1,55 @@
+# ═══ Draft knowledge entry — 纯数据/资源库 lang-preflight 语言类别（--lang other 复检） ═══
+# Timestamp: 2026-10-02
+# Software: ldraw 20220211（LDraw.org 官方零件库，纯数据资源包）
+# Gate: ohc-run.py lang-preflight（R47）
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id: DRAFT-ldraw-20220211-data-resource-lang-other
+severity: 2
+category: preflight|language|data-resource
+trigger_tool: ohc-run.py lang-preflight
+phase: bootstrap|preflight
+approach: ①对无任何 C/C++ 源码的纯数据/资源库（零件库/字体/数据文件/配置模板），
+  lang-preflight 默认任务语言 cpp → 源码统计 0 → detected=other → 误写终态
+  env_unsupported；②以 `--lang other` 复检（detected=other == expected=other，
+  exit 0）确认数据资源库语言类别（协议 §4.6 枚举含 other），继续 Conan 适配；
+  ③终态 result 以真实适配结果覆盖误判草稿（result --force，终态校验器允许）。
+
+keywords: lang-preflight, detected_language, other, 纯数据包, 数据资源库, 资源包,
+  env_unsupported, R47, 语言预检, data resource, no source files, LDraw, 零件库
+
+error_signature: 语言不匹配: task=cpp, detected=other|无可统计源文件|detected_language: other|env_unsupported
+
+root_cause: SKILL 语言计数扩展名表只认 .c/.cpp/.rs/.py/.go/.pl/.lua/.js/.java/.sh 等；
+  纯数据/资源库（.dat/.ldr/.png/.ttf/.db 等）源码统计为 0 → detected=other；任务默认
+  语言 cpp（OHPCD_LANG 未注入时）→ 语言不匹配 → lang-preflight 自动写 env_unsupported
+  终态。这是"语言类别判定缺失"，不是"语言不匹配的硬错误"——数据资源库本就无 C/C++ 源码。
+
+affected_scope: 所有无 C/C++ 源码的纯数据/资源包在 OHOS 赛事任务中的判定与适配：
+  LDraw 零件库、字体包、位置数据库、固件/资源包等（仓库既有先例：adobe-source-han-sans-*、
+  libloc-database 均为 build_system: custom 纯数据包）
+
+rec_priority: 1
+rec_approach: data-resource-lang-other-preflight
+rec_description: 纯数据/资源库（source_stats=0、无 manifest/构建系统）在 lang-preflight
+  默认 cpp 下必然 detected=other → env_unsupported；正确做法是识别数据资源库类别，
+  以 `--lang other` 复检（detected==other 匹配，exit 0，写 lang_checked 里程碑），
+  然后按数据资源包模式（E255/E241）继续 Conan 适配。终态 result 用真实适配结果
+  （success/build_failed 等）覆盖误判的 env_unsupported 草稿（result 命令 --force 允许
+  终态覆盖；校验器对语言字段仅要求 detected_language 枚举合法，不阻断数据包终态）。
+rec_command: |
+  # 复检（关键）:
+  python3 scripts/ohc-run.py lang-preflight <pkg> <ver> --src <src> --lang other
+  # 适配（数据资源包模式，见 E255）:
+  conan create archives/<首字母>/<pkg>/<ver> -pr:h=ohos-aarch64 -pr:b=ohos-aarch64 --build=missing
+rec_auto_fix: false
+
+fallback_priority: 2
+fallback_approach: 照报 env_unsupported
+fallback_description: 若任务明确只允许 c/cpp 且平台无数据包类别支持，照报 env_unsupported +
+  detected_language=other 交平台迁移；但仓库数据资源包先例（E255/E241/adobe 字体/
+  libloc-database）表明该类别受支持，应优先 --lang other 复检后继续适配。
+fallback_auto_fix: false
+
+principles: R47 语言预检对纯数据/资源库应判 other 而非硬报 env_unsupported；
+  数据资源包（E255 家族）是合法适配类别，--lang other 复检是协议内路径（§4.6 枚举含 other）。
