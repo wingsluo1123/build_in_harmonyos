@@ -1,0 +1,104 @@
+# 版本级 manifest — ayatana-indicator-printers 23.10.1
+# 遵循 ARCHIVE-SPEC v2.0
+
+# 版本号
+version: "23.10.1"
+
+# 软件名
+software: ayatana-indicator-printers
+
+# 编译状态
+# published | built | failed | archived
+# 本地 conan create 构建 + 门禁验证通过（OHOS aarch64 交叉编译 + 上游测试 + test_package）
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-16"
+build_system: cmake
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（官方源）
+  url: "https://github.com/AyatanaIndicators/ayatana-indicator-printers/archive/23.10.1.tar.gz"
+  upstream_url: "https://github.com/AyatanaIndicators/ayatana-indicator-printers/archive/23.10.1.tar.gz"
+
+  # 源码校验和
+  sha256: "f622b831ea6e90d7fc3240f3322cba1a260d8f2490878f0a82c554aa58c2b0d4"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表
+  configure_options:
+    - "ENABLE_TESTS=ON"
+    - "ENABLE_WERROR=OFF"
+    - "CMAKE_INSTALL_LIBEXECDIR=libexec"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - glib/2.84.0.1
+    - ayatana-common/0.9.11
+    - cups/2.4.19
+
+  # 缺失依赖（阻塞，W0/R36）
+  missing_dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "patches/0001-CMakeLists.txt.patch"
+  - "patches/0002-data-CMakeLists.txt.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "依赖包内的 cups-config 报告构建期前缀（prefix=/、includedir=/usr/include、libdir=/lib），CUPS_CFLAGS 为空且 -L 缺失，OHOS 可重定位包布局下探测失效 → 改用 pkg-config（cups.pc）(knowledge_ref: DRAFT-ohos-libxml2-xml2-config-prefix-stale)"
+  - "pkg_check_modules 只把 -l 放进 *_LIBRARIES，-L 目录在 *_LIBRARY_DIRS；上游只用 *_LIBRARIES 时链接报 unable to find library，需补 link_directories (knowledge_ref: E278)"
+  - "po/CMakeLists.txt 的 find_package(Intltool REQUIRED) 依赖 Ubuntu cmake-extras，OHOS 无该 CMake 模块 → QUIET 降级后按需跳过 po/ (knowledge_ref: DRAFT-ayatana-accountsservice-required-dep-optional-stub)"
+  - "data/CMakeLists.txt 硬编码 DESTINATION \"/etc/xdg/autostart\" 会导致安装逃逸 package 目录 → 改用 ${CMAKE_INSTALL_FULL_SYSCONFDIR} (knowledge_ref: E273)"
+  - "SDK 的 /data/service/hnp/bin/gdbus-codegen 是悬空符号链接，find_program 优先命中导致 Error 126 → CMakeToolchain 用 CMAKE_PROGRAM_PATH 钉死依赖包 bin (knowledge_ref: DRAFT-ayatana-accountsservice-required-dep-optional-stub)"
+  - "守护进程初始化时系统总线不可达会 g_error() 直接 abort（rc=133）：无系统 D-Bus 总线的环境无法直接冒烟运行，测试必须提供私有系统总线 (knowledge_ref: E461)"
+  - "glib 配方未导出 gio-unix-2.0 组件，PkgConfigDeps 不生成 gio-unix-2.0.pc → 从 glib 包内复制该 .pc 并改写 prefix (knowledge_ref: E547)"
+  - "glib 包内 libintl.so 提供 g_libintl_* 符号，但 glib-2.0.pc 的 Libs 缺 -lintl → generate() 追加 -lintl (knowledge_ref: E027)"
+  - "cups/2.4.19 依赖 zlib/1.3.1.1 与 glib/2.88.0.1 的 zlib/1.3.1.1.1.1 冲突 → 选同一 track 的 glib/2.84.0.1 + ayatana-common/0.9.11 收敛依赖图 (knowledge_ref: E538)"
+  - "鸿蒙沙箱拒绝在 HMDFS 上 bind AF_UNIX socket → 私有 D-Bus 总线改用 TCP transport（tcp:127.0.0.1 + ANONYMOUS 认证）(knowledge_ref: E024)"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/ayatana-indicator-printers-23.10.1.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/ayatana-indicator-printers-23.10.1.work
+  source_orig_hash: 3d5231f334e1a950
+  source_work_hash: 96901daa8ba16099
+  generated_at: '2026-10-16T14:35:36'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-data-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
