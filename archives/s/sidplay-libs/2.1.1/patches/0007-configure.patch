@@ -1,0 +1,31 @@
+--- a/configure
++++ b/configure
+@@ -1712,7 +1712,12 @@
+ 
+ hardsid=false
+ case "$host" in
+-    *linux*) hardsid=true
++    *linux*)
++        # OHOS 无 HardSID 硬件且 hardsid-builder 构造段错误，禁用
++        case "$host" in
++            *-ohos*) hardsid=false ;;
++            *)       hardsid=true ;;
++        esac
+         ;;
+ esac
+ 
+@@ -2366,12 +2371,12 @@
+ # Create a (secure) tmp directory for tmp files.
+ 
+ {
+-  tmp=`(umask 077 && mktemp -d -q "./confstatXXXXXX") 2>/dev/null` &&
++  tmp=`(umask 022 && mktemp -d -q "./confstatXXXXXX") 2>/dev/null` &&
+   test -n "$tmp" && test -d "$tmp"
+ }  ||
+ {
+   tmp=./confstat$$-$RANDOM
+-  (umask 077 && mkdir $tmp)
++  (umask 022 && mkdir $tmp)
+ } ||
+ {
+    echo "$me: cannot create a temporary directory in ." >&2
