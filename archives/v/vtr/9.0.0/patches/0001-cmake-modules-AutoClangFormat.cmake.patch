@@ -1,0 +1,16 @@
+--- a/cmake/modules/AutoClangFormat.cmake	2026-09-30 23:21:29.834575540 +0800
++++ b/cmake/modules/AutoClangFormat.cmake	2026-09-30 23:21:29.858575366 +0800
+@@ -1,7 +1,12 @@
+ include(ProcessorCount)
+ ProcessorCount(CPU_COUNT)
++# ProcessorCount() returns 0 when the CPU count cannot be determined; CMake
++# documents this for constrained or sandboxed build hosts.  The value is only
++# used to parallelise the *code-formatting* helper targets defined below, so an
++# unknown count must not abort configuration of the whole project -- fall back
++# to serial formatting instead.  Where the CPU count is known this is a no-op.
+ if(CPU_COUNT EQUAL 0)
+-    message(FATAL_ERROR "Unknown number of CPUs!?")
++    set(CPU_COUNT 1)
+ endif()
+ 
+ #

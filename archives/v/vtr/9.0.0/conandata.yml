@@ -1,0 +1,162 @@
+# conandata.yml — vtr 9.0.0 (Verilog-to-Routing)
+#
+# NOTE ON SHAPE: `sources` is a LIST here, not a single mapping, because this
+# package needs three archives (the VTR release asset plus two pure-Python
+# modules the flow imports).  A list is the form the build pipeline's prefetch
+# step understands: it walks `sources` and stages every {url, sha256} entry, so
+# all three arrive through the same reproducible, checksum-verified channel.
+# Order matters — source() indexes this list.
+
+sources:
+  # -------------------------------------------------------------------------
+  # [0] VTR itself.
+  #
+  # WHY THE RELEASE ASSET AND NOT THE TAG ARCHIVE (measured, not assumed):
+  #   The repository declares exactly two git submodules at v9.0.0 (.gitmodules):
+  #       libs/EXTERNAL/libcatch2   -> https://github.com/catchorg/Catch2.git
+  #       libs/EXTERNAL/sockpp      -> https://github.com/w0lek/sockpp.git
+  #   The GitHub auto-generated tag tarball (codeload .../tar.gz/refs/tags/v9.0.0,
+  #   107,425,921 B) contains those directories as EMPTY placeholders:
+  #       libs/EXTERNAL/libcatch2 : 1 entry   (dir only)
+  #       libs/EXTERNAL/sockpp    : 1 entry   (dir only)
+  #   The OFFICIAL release asset (468,148,819 B) contains them fully materialised:
+  #       libs/EXTERNAL/libcatch2 : 639 entries
+  #       libs/EXTERNAL/sockpp    : 153 entries
+  #   Catch2 is the unit-test framework that every VTR unit-test target links
+  #   (Catch2::Catch2WithMain).  Building from the tag tarball would therefore
+  #   silently drop the entire unit-test suite - a functional deletion, not a
+  #   build fix.  BUILDING.md states this explicitly: "If you cloned the
+  #   repository you will need to set up the git submodules ... (if you downloaded
+  #   and extracted a release, you can skip this step)".
+  #   => The official release asset is the only self-contained, reproducible
+  #      source for 9.0.0.
+  # -------------------------------------------------------------------------
+  # Reachability: the CI worker cannot reach github.com directly, and its
+  # curl-based pre-download does not exist there either, so a single github.com
+  # URL leaves conan to fetch ~468 MB over a link that drops mid-transfer
+  # (IncompleteRead at 31,457,280 B).  The same mirror prefix the CI's own
+  # mirror-fallback lists first ("实测: 仅 gh-proxy.com 可用") is therefore put
+  # in the list explicitly, with the canonical URL kept as the second entry so
+  # conan retries the origin if the mirror is unavailable.  Conan walks the
+  # list in order and verifies the sha256 below on whatever it downloads, so a
+  # mirror that served different bytes could not be accepted silently.
+  # Prior art in this archive: archives/a/absl/20260526.0/conandata.yml.
+  - url:
+      - "https://gh-proxy.com/https://github.com/verilog-to-routing/vtr-verilog-to-routing/releases/download/v9.0.0/vtr-verilog-to-routing-9.0.0.tar.gz"
+      - "https://github.com/verilog-to-routing/vtr-verilog-to-routing/releases/download/v9.0.0/vtr-verilog-to-routing-9.0.0.tar.gz"
+    sha256: "bebbfac162630a2bea7403f2b2102200c31709dfea26bac85626ee7327a2881c"
+
+  # -------------------------------------------------------------------------
+  # [1] prettytable — runtime Python module of the VTR flow.
+  #
+  # `vtr_flow/scripts/python_libs/vtr/__init__.py:4` does `from .util import ...`
+  # and `util.py:18` is a *module-level*
+  #     from prettytable import PrettyTable
+  # so `import vtr` — which run_vtr_flow.py, run_vtr_task.py and run_reg_test.py
+  # all do — fails outright without it.  Upstream lists it in requirements.txt and
+  # relies on `make env` / pip; a Conan package has to be self-contained.
+  # Official PyPI file host (R39); sha256 matches
+  # https://pypi.org/pypi/prettytable/json exactly.
+  # -------------------------------------------------------------------------
+  - url: "https://files.pythonhosted.org/packages/81/74/ba08d81e668ccfe8658d7520a307e63c19862c08eb4ccb26f356c5239a7a/prettytable-3.18.0.tar.gz"
+    sha256: "439217116152244369caf3d9f1caf2f9fe29b03bd79e88d2928c8e718c95d680"
+
+  # -------------------------------------------------------------------------
+  # [2] wcwidth — prettytable renders tables through it.
+  #
+  # Measured, not assumed: importing prettytable succeeds without wcwidth, but
+  # calling str(table) raises ModuleNotFoundError from prettytable.py:3078
+  # (`import wcwidth` inside _str_block_width).  wcwidth 0.9.1 has no further
+  # dependencies (PyPI requires_dist = None).
+  # -------------------------------------------------------------------------
+  - url: "https://files.pythonhosted.org/packages/dc/ac/3a943d2792c9bb368aaa8b50121c0f778460ba2d7fbdc0a0366201d9e761/wcwidth-0.9.1.tar.gz"
+    sha256: "5823209b0d43af322ce698c689380d7c15ca31fa8e6e3be8459f27031bef0af5"
+
+  # -------------------------------------------------------------------------
+  # [3] java.capnp — build-time download, pinned.
+  #
+  # libs/libvtrcapnproto/CMakeLists.txt:43-49 has a custom command that fetches
+  # this single Cap'n Proto schema with wget *during the build*, from
+  #     https://raw.githubusercontent.com/capnproto/capnproto-java/master/...
+  # Two problems: the build needs the network at compile time, and the URL
+  # tracks a floating branch, so the same recipe would compile different input
+  # over time.  The file is therefore declared here at a pinned commit and
+  # handed to CMake through patch 0002 (which leaves the download path intact
+  # for anyone who does not pass -DVTR_JAVA_CAPNP_SCHEMA).
+  # Upstream project: capnproto/capnproto-java (MIT).
+  # -------------------------------------------------------------------------
+  - url: "https://raw.githubusercontent.com/capnproto/capnproto-java/1a0ac9d2e0e607ccae7ca83cb3aacce93b065dd7/compiler/src/main/schema/capnp/java.capnp"
+    sha256: "abc48d859ffa06ac26c7dfe6020374fb0ee5efa4936707abc35bdac2233aefab"
+
+# NOTE: the `vtr` python package imports NO other third-party module.  lxml /
+# pandas / numpy / scipy from upstream requirements.txt are not imported by it
+# (pandas appears only in the standalone, optional qor_compare.py), so they are
+# deliberately not vendored.
+
+patches:
+  # Root cause: BUILD:configure:AutoClangFormat-ProcessorCount.
+  # vtr/9.0.0's configure aborted with
+  #     CMake Error at cmake/modules/AutoClangFormat.cmake:4 (message):
+  #       Unknown number of CPUs!?
+  # because ProcessorCount() returned 0.  CMake documents that ProcessorCount()
+  # returns 0 when it cannot determine the count; upstream turns "unknown" into
+  # a FATAL_ERROR even though the value is used *only* to parallelise the
+  # clang-format helper targets.  The change makes an unknown count fall back to
+  # serial formatting instead of aborting configuration; where the count is
+  # known the behaviour is unchanged.  No algorithm, feature or test is touched.
+  - patch_file: "patches/0001-cmake-modules-AutoClangFormat.cmake.patch"
+    patch_description: "Do not abort configuration when ProcessorCount() cannot determine the CPU count; fall back to serial code-formatting targets"
+    patch_type: "portability"
+  # Root cause: BUILD:libvtrcapnproto:build-time-network-fetch-of-unpinned-master
+  # Adds -DVTR_JAVA_CAPNP_SCHEMA so the java.capnp schema can come from the
+  # pinned copy in sources[3] instead of a wget against a floating branch.
+  # Without the variable the original download behaviour is unchanged.
+  # Root cause: BUILD:capnp-tool:open(root,O_RDONLY|O_DIRECTORY)-EACCES
+  # This platform's / (and /storage, /data, /system, /usr) is mode 0711:
+  # searchable but not readable by non-root.  kj::newDiskFilesystem() opens "/"
+  # with O_RDONLY|O_DIRECTORY and each path component the same way, so every
+  # capnp schema compile aborted with
+  #     Fatal uncaught kj::Exception: ... open(dir, O_RDONLY | ... | O_DIRECTORY): Permission denied
+  # kj only uses those handles as a base for openat()/fstatat(), which needs
+  # search permission alone, so both sites now fall back to O_PATH on EACCES.
+  # Measured on the device: O_PATH is defined (0x200000), open("/",O_PATH|
+  # O_DIRECTORY) and openat(rootfd,"storage",O_PATH|O_DIRECTORY) both succeed
+  # where the O_RDONLY forms return EACCES.
+  # Root cause: BUILD:libarchfpga:missing-sstream-include (libc++ vs libstdc++)
+  # read_xml_arch_file_noc_tag.cpp:521 declares `std::stringstream` but the file
+  # never includes <sstream>.  libstdc++ (upstream CI) pulls <sstream> in
+  # transitively through other standard headers; OHOS's libc++ does not, so the
+  # translation unit fails with
+  #     error: implicit instantiation of undefined template 'std::basic_stringstream<char>'
+  # 15 translation units in the tree share this defect, so the whole class is
+  # fixed at once rather than one 85-minute build per occurrence.  Adding a
+  # missing standard header is include-what-you-use and changes no behaviour.
+  # Root cause: BUILD:vpr:partition_tree.cpp-missing-<stack>
+  # Observed on the device: after the <sstream> fix (0004) let libarchfpga and
+  # the other libs build, the compiler stopped here with a real error:
+  #     vpr/src/route/partition_tree.cpp:209: std::stack<PartitionTreeNode*> stack;
+  #     vpr/src/route/partition_tree.cpp:210:5: error: use of undeclared identifier 'stack'
+  # The file includes <cmath>/<memory>/<unordered_set> but not <stack>; libstdc++
+  # supplies it transitively, libc++ (OHOS) does not.
+  #
+  # SCOPE: exactly this one file, one include.  An earlier heuristic sweep
+  # proposed 119 files / 167 includes; it was rejected and reverted (see
+  # notes.md 5.10) because a heuristic scan is not evidence that those
+  # translation units actually fail -- only the compiler can show that.  Any
+  # further include is added only after a real compile error names the missing
+  # header, and each such fix is recorded against its error log in notes.md.
+  - patch_file: "patches/0005-vpr-route-partition_tree.cpp.patch"
+    patch_description: "Add the missing <stack> include to vpr/src/route/partition_tree.cpp"
+    patch_type: "portability"
+
+  - patch_file: "patches/0004-missing-sstream-includes.patch"
+    patch_description: "Add the missing <sstream> include to 15 translation units that use stringstream types"
+    patch_type: "portability"
+
+  - patch_file: "patches/0003-libs-external-capnproto-kj-filesystem-disk-unix.c++.patch"
+    patch_description: "kj filesystem: fall back to O_PATH when a directory handle cannot be opened O_RDONLY (hardened 0711 root)"
+    patch_type: "portability"
+
+  - patch_file: "patches/0002-libs-libvtrcapnproto-CMakeLists.txt.patch"
+    patch_description: "Allow the java.capnp schema to be supplied from a pinned local file instead of downloading it from capnproto-java's master branch during the build"
+    patch_type: "portability"

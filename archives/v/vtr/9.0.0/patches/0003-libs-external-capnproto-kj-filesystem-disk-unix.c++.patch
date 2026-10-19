@@ -1,0 +1,44 @@
+--- a/libs/EXTERNAL/capnproto/c++/src/kj/filesystem-disk-unix.c++	2026-10-01 09:53:11.714050153 +0800
++++ b/libs/EXTERNAL/capnproto/c++/src/kj/filesystem-disk-unix.c++	2026-10-01 09:53:11.742049752 +0800
+@@ -785,6 +785,17 @@
+         fd, path.toString().cStr(), O_RDONLY | MAYBE_O_CLOEXEC | MAYBE_O_DIRECTORY)) {
+       case ENOENT:
+         return nullptr;
++      case EACCES:
++        // Same hardened-directory case as openDir(): a path component that is
++        // searchable but not readable.  The handle is only used as a base for
++        // openat()/fstatat(), so O_PATH is sufficient.
++#ifdef O_PATH
++        KJ_SYSCALL(newFd = openat(fd, path.toString().cStr(),
++                                  O_PATH | MAYBE_O_CLOEXEC | MAYBE_O_DIRECTORY));
++        break;
++#else
++        KJ_FALLTHROUGH;
++#endif
+       case ENOTDIR:
+         // Could mean that a parent is not a directory, which we treat as "doesn't exist".
+         // Could also mean that the specified file is not a directory, which should throw.
+@@ -1702,7 +1713,22 @@
+ 
+   static AutoCloseFd openDir(const char* dir) {
+     int newFd;
+-    KJ_SYSCALL(newFd = open(dir, O_RDONLY | MAYBE_O_CLOEXEC | MAYBE_O_DIRECTORY));
++    // Some systems ship a hardened root directory that is searchable but not
++    // readable (mode 0711).  Opening it O_RDONLY then fails with EACCES even
++    // though kj only uses this handle as a base for openat()/fstatat(), which
++    // requires search permission alone.  O_PATH needs no permission on the
++    // directory itself, so fall back to it in that case.
++    KJ_SYSCALL_HANDLE_ERRORS(newFd = open(dir, O_RDONLY | MAYBE_O_CLOEXEC | MAYBE_O_DIRECTORY)) {
++      case EACCES:
++#ifdef O_PATH
++        KJ_SYSCALL(newFd = open(dir, O_PATH | MAYBE_O_CLOEXEC | MAYBE_O_DIRECTORY));
++        break;
++#else
++        KJ_FALLTHROUGH;
++#endif
++      default:
++        KJ_FAIL_SYSCALL("open(dir, O_RDONLY | O_DIRECTORY)", error, dir);
++    }
+     AutoCloseFd result(newFd);
+ #ifndef O_CLOEXEC
+     setCloexec(result);
