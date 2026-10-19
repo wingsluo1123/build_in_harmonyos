@@ -1,0 +1,51 @@
+id: DRAFT-asterisk-opus-22.10.1-format-attribute-module-contract
+status: pending-editor-review
+title: "Asterisk 的 Opus 任务目标是格式属性模块，不是编解码器：按模块 ABI 打包 res_format_attr_opus.so"
+category: asterisk, module-packaging, autotools, opus, ohos
+trigger_tool: configure|make|menuselect|asterisk-module
+phase: configuration|compilation|packaging|runtime
+error_signature: res_format_attr_opus.so not found|codec_opus.*not found|undefined reference.*opus_|module.*format.*attribute
+match_keywords: >
+  asterisk-opus, res_format_attr_opus, codec_opus, ast_format_interface,
+  AST_MODULE_INFO, Opus Format Attribute Module, MENUSELECT_RES,
+  format attribute, SDP fmtp, module ABI
+root_cause: >
+  Asterisk 22.10.1 的 Opus 支持分成不同职责：res/res_format_attr_opus.c
+  只注册 Opus 格式属性接口，解析/生成 SDP fmtp 并管理格式属性；它使用
+  Asterisk 内部 ast_format/astobj2/module API，不调用 libopus 编码器符号。
+  真正的 codec_opus 编解码实现是另一个模块/可选组件。把任务名
+  asterisk-opus 直接解释成 libopus 依赖，会导致错误的 requires、错误的
+  产物清单和错误的运行时成功标准。
+affected_scope: >
+  Asterisk 22.x 及同类按 res_*/codec_* 拆分功能的模块化构建；Conan
+  变体只交付一个内部模块而非完整 Asterisk 时尤其需要先确认源文件和
+  AST_MODULE_INFO 的职责。
+solution: |
+  1. 从上游树确认目标源文件为 res/res_format_attr_opus.c，并以
+     res_format_attr_opus.so 作为唯一交付物。
+  2. 使用 Asterisk 的 OHOS autotools/menuselect 构建流程，启用该 res 模块，
+     不把 libopus 作为该模块的链接依赖；只补齐 Asterisk configure 本身的
+     必需依赖。
+  3. test_package 验证模块存在、是 ELF ET_DYN，并检查产物保留
+     "Opus Format Attribute Module" 模块描述字符串；不要把“能编码/解码
+     Opus”写成该包的能力声明。
+  4. 若消费者需要实际编解码，另行安装/适配 codec_opus，并在运行时按
+     Asterisk 模块加载顺序同时加载两个模块。
+verification_cmd: >
+  conan create archives/a/asterisk-opus/22.10.1 --build=missing
+  -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64
+rec_priority: 1
+rec_approach: source-module-contract-first
+rec_auto_fix: false
+fallback: >
+  如果目标版本把格式属性代码合并到其他源文件，重新从 MODULEINFO、
+  AST_MODULE_INFO 和 Makefile/menuselect 条目推导交付文件；不能按包名猜测。
+similar_to: []
+conflicts_with: []
+doc_file: knowledge/drafts/DRAFT-asterisk-opus-22.10.1-format-attribute-module-contract.md
+last_updated: 2026-10-03
+source_event: asterisk-opus/22.10.1 积分赛任务
+metrics_success_count: 0
+metrics_fail_count: 0
+metrics_confidence: 0.85
+draft: true
