@@ -1,0 +1,29 @@
+#====================================================================
+# Draft: scst 2.2.1 -- Linux kernel-framework packages on OHOS: deliver
+#        the userspace-consumable header subset as a conan package and
+#        declare the kernel boundary honestly (2nd case after jool)
+#====================================================================
+
+id:                     DRAFT-SCST-221-KERNEL-BOUNDARY-HEADER-DELIVERY
+trigger_tool:           conan|make|clang
+phase:                  packaging|architecture
+error_signature:        /lib/modules/.*build.*No such file|Module.symvers|kbuild|CONFIG_MODULE|insmod.*not found
+
+severity:               2
+category:               architecture|ohos-platform|kernel-boundary
+match_keywords:         scst, kernel module, kbuild, jool, iSCSI, SCSI target, header-only, userspace subset, INSIDE_KERNEL_TREE, lldiv_t, linux/blkdev.h, /lib/modules, OHOS, HarmonyOS
+
+title:                  Linux 内核框架包（SCST/jool 类）在 OHOS 的分层交付模式：用户态可消费子集做成 conan 包 + 内核态边界如实申报，禁止把内核模块伪装成可交付物
+
+root_cause:             SCST 这类 Linux 内核框架的核心产物是内核模块（scst.ko 等），其构建入口是 kbuild（依赖 /lib/modules/$(uname -r)/build 的 Module.symvers、autoconf.h 与内联头如 linux/blkdev.h、scsi/scsi_cmnd.h）。HarmonyOS PC 不公开 Linux 内核构建树，内核模块在 OHOS 上永远不可构建；但这类项目往往附带"用户态可消费子集"（协议常量头、user-kernel ABI 头、管理工具），这些子集可在 OHOS 用户态独立交付。若把整包一刀切判为"无法适配"，会丢掉下游真正需要的用户态接口（如 iscsi-scst usr/event.c 只消费 scst_const.h）；若假装交付内核模块，则是虚标。
+affected_scope:         SCST、jool（jool-modules-lts 6.18.39 已合入先例）以及一切"核心是内核模块 + 附带用户态接口"的上游；判定信号 = 顶层 Makefile 出现 make -C /lib/modules/.../build 或 obj-m，同时存在独立用户态目录（usr/、tools/）或用户态可编译的头文件。
+verification_cmd:       find src -iname '*test*' | wc -l; grep -rn "obj-m\|/lib/modules" Makefile | head; find sysroot/usr/include/linux -name version.h
+rec_priority:           1
+rec_approach:           layered-delivery-header-subset-plus-honest-kernel-boundary
+rec_description:        (1) 审计 include/（或等价接口目录）逐头分类：用户态可用（仅依赖 uapi 头）vs 内核树专用（依赖 blkdev.h/autoconf.h 等）；(2) 用户态可用子集做成 header-library conan 包，test_package 用 _Static_assert 锁版本编码/ABI 序等契约；(3) 内核模块保持上游源码形态（conandata.yml 官方 URL 可复原），在 notes.md/PR 正文用专表逐头申报内核态边界，绝不放进包产物；(4) 下游包（如 iscsi-scst usr）通过 SCST_INC_DIR/依赖 include 路径消费头文件，形成 R36 拓扑序：先发 scst 再发 iscsi-scst。
+rec_command:            grep -n "#include <" include/*.h   # 逐头分类用户态可用性
+rec_auto_fix:           false
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+source_pr:
+source_commit:
