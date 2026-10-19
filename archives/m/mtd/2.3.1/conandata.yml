@@ -1,0 +1,20 @@
+# conandata.yml — mtd 2.3.1
+# mtd-utils 官方源（sigma-star 为官方维护者 GitHub 镜像，对应
+# 上游 https://git.infradead.org/mtd-utils.git tag v2.3.1）
+# Savannah tarball 发布目录已不可用(404)，GitHub codeload 为官方镜像源(R39)
+
+sources:
+  url: "https://codeload.github.com/sigma-star/mtd-utils/tar.gz/refs/tags/v2.3.1"
+  # codeload URL 以 tag 名(v2.3.1)结尾, conan get() 从 URL 推导的 filename 为
+  # "v2.3.1" 无 .tar.gz 后缀, unzip() 会按 zip 解压报 BadZipFile — 必须显式
+  # 指定 filename 使后缀为 .tar.gz
+  filename: "mtd-utils-2.3.1.tar.gz"
+  sha256: "f53cde04802439fa6ac2ffbd80955f2b790262c02bd6fa2f7783a19fdc33716d"
+
+patches:
+  - patch_file: "patches/0001-ubifs-utils-mkfs.ubifs-mkfs.ubifs.c.patch"
+    patch_description: >-
+      mkfs.ubifs.c #include <uuid.h> 改为 <uuid/uuid.h>：标准 libuuid
+      （e2fsprogs/conan libuuid 包）头文件位于 include/uuid/uuid.h，
+      上游直接 include <uuid.h> 在标准 libuuid 布局下找不到头文件。
+    patch_type: "portability"
