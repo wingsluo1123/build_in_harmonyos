@@ -1,0 +1,31 @@
+package: rtkit/0.14
+homepage: "https://gitlab.freedesktop.org/pipewire/rtkit/"
+
+# 上游测试口径 —— 2026-10-16 复核更正（前版记 N/N′ = 0/0，与上游文件树实测不符，属少报）。
+# 上游 meson.build 未定义任何 test() 目标（无自动化套件），但源码树内确实存在
+# 1 个测试程序：rtkit-test.c —— 对上游 tarball 做文件名扫描，含 test 的仅此 1 项。
+# 清点证据（在 0.14 源码树实测）：
+#   - $ tar tzf rtkit-v0.14.tar.gz | grep -i test   →   仅 rtkit-v0.14/rtkit-test.c
+#   - meson.build 全文无 test() 调用（仅以 installed_tests 安装该程序，未注册为测试）
+#   - 源码树无 tests/ 目录、无 *.test / *.py 测试脚本
+#   - 上游 .gitlab-ci.yml 仅做 meson setup + ninja，不跑测试
+# N′：本适配在鸿蒙真机上对该程序原样执行（device-test/run-device-test.sh 第 3 步，
+# rc=0），完整转录见 ../../reports/device-test.log。
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: "libexec/installed-tests/rtkit/rtkit-test（真机原样执行；需外部 D-Bus 系统总线，故不在 conan 构建内跑）"
+
+upstream_tests:
+  - file: rtkit-test.c
+    source: rtkit-v0.14/rtkit-test.c
+    description: "上游客户端库自测程序（N=1 的唯一来源）：经 D-Bus 系统总线读取 daemon 的 MaxRealtimePriority/MinNiceLevel/RTTimeUSecMax 三项属性，并尝试 MakeThreadHighPriority/MakeThreadRealtime 提权。上游无 test() 注册，无自动化驱动，本适配在真机上原样执行 rc=0"
+    command: "libexec/installed-tests/rtkit/rtkit-test"
+
+test_package_tests:
+  - file: test.sh
+    description: "执行安装后的 rtkit-daemon/rtkitctl：aarch64 ELF 可装载、CLI 契约完整、非 root 拒绝启动"
+    command: "./test.sh"
+
+assertion_count: 4
+assertion_note: "第 4 条（非 root 拒绝启动）在 root 环境下按设计跳过，此时实际执行 3 条；本机实测 uid=20020085，4 条全部执行。"
+coverage_note: "自动化路径覆盖契约层（可装载/CLI/特权门禁）；功能面（D-Bus 服务）由 device-test/run-device-test.sh 手工真机覆盖，需外部 dbus-daemon。"
