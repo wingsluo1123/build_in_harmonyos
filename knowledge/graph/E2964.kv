@@ -1,0 +1,57 @@
+#====================================================================
+# DRAFT-librtas-2.0.4-foreign-arch-syscall-lib-dual-delivery — 外架构 syscall 封装库：主库不可运行 + 副库架构中立时的双库交付与测试处置
+# 触发事件: librtas 2.0.4 适配 HarmonyOS PC（conan create 全通过后的适配完整性判断）
+# 路径: Path B（知识库扩展）
+#====================================================================
+
+id:                     E2964
+trigger_tool:           conan|configure|make
+phase:                  configuration|build
+error_signature:        __NR_rtas undefined|OS `ohos' not recognized|
+                        no such file or directory: /proc/device-tree/rtas|
+                        RTAS_KERNEL_INT|RTAS_PERM|Architecture: powerpc ppc64 ppc64el
+
+severity:               2
+category:               platform, limitation, api, adaptation-decision
+match_keywords:         foreign architecture, ppc64, powerpc, PAPR, RTAS, rtas syscall,
+                        __NR_rtas, device-tree, /proc/device-tree, arch-specific syscall,
+                        lib wrapping foreign ABI, dual library delivery, librtasevent,
+                        E237, E245, runtime degradation, do not crop software
+title:                  外架构 syscall 封装库（主库绑定他架构内核 ABI）应双库原样交付、只对架构中立副库做功能断言，禁止裁剪或造桩
+
+root_cause: >
+  librtas 主库 librtas.so 的每个公开入口最终都走
+  syscall(__NR_rtas=255, &args) 与 PowerPC RTAS firmware token（ibm,* 系列），
+  并从 /proc/device-tree/rtas（PowerPC OFDT 节点）取 token。Linux 仅在
+  arch/powerpc 实现 rtas syscall；OHOS aarch64 sysroot 中 __NR_rtas 出现 0 次，
+  实测 rtas_get_time() / rtas_delay_timeout() 一律返回 librtas 自有负码。
+  与 E245 的关键差异：E245 的 vhangup 在 aarch64 内核**存在**（SYS_vhangup=58），
+  只是 libc 未封装，故可 shim；此处 aarch64 内核无 rtas，**没有可 shim 的目标**，
+  任何 shim 都只能是伪造。Debian 打包 Architecture 仅 powerpc/ppc64/ppc64el 亦为佐证。
+
+forbid_1_pattern:   声称.*librtas.*(可运行|正常工作).*OHOS|为.*rtas.*加.*返回 0.*桩|
+                     删除.*librtas\.so.*只保留.*librtasevent
+forbid_1_reason:    aarch64 无 ppc64 rtas 内核接口，主库入口必然失败；造桩或裁剪
+                     会让下游集成方误以为功能完整（E237 forbid_1 同类）。
+
+verification_cmd: >
+  clang -target aarch64-linux-ohos -E -dM -x c /dev/null | grep -c __NR_rtas   # 期望 0
+  ls /proc/device-tree/rtas 2>&1 || echo "MISSING: /proc/device-tree/rtas"
+  cat /usr/share/doc/librtas*/copyright 2>/dev/null | head   # 或查 Debian dsc 的 Architecture 字段
+
+rec_priority:           1
+rec_approach:           dual-library-uncropped-delivery-with-tiered-assertions
+rec_auto_fix:           false
+rec_impl:               manual
+
+doc_file:               DRAFT-librtas-2.0.4-foreign-arch-syscall-lib-dual-delivery.md
+last_updated:           2026-09-30
+source_event:           librtas 2.0.4 HarmonyOS PC 适配，ppc64 syscall 能力缺口判定
+
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.9
+metrics_last_used:
+authors:               unknown
+affected_scope:         外架构 syscall 封装库（主库绑定他架构内核 ABI）应双库原样交付、只对架构中立副库做功能断言，禁止裁剪或造桩
+rec_description:        dual-library-uncropped-delivery-with-tiered-assertions

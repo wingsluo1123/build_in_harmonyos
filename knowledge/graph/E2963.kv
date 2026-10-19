@@ -1,0 +1,63 @@
+#====================================================================
+# DRAFT-librtas-2.0.4-ohos-no-ppctree-documented-failure-assertions — 缺平台能力时如何写不脆弱的测试：断言文档化失败集合 + 摸清返回值契约与 euid 依赖
+# 触发事件: librtas 2.0.4 适配，test_package 首跑 1 条断言失败 + 审计发现注释误述位域
+# 路径: Path B（知识库扩展）
+#====================================================================
+
+id:                     E2963
+trigger_tool:           conan|ctest|test
+phase:                  testing
+error_signature:        parse_rtas_event() renders the event|rtas_print_event() returns 0|
+                        20 checks, 1 failure(s)|RTAS_PERM|RTAS_KERNEL_INT
+
+severity:               2
+category:               platform, limitation, testing
+match_keywords:         non-fragile assertion, assert error set not single value,
+                        euid dependent return code, sanity_check, geteuid, root vs non-root,
+                        rtas_print_event character count, bitfield decode, data1 severity,
+                        documented failure path, tautological assertion, mutation test
+title:                  平台能力缺失时测试应断言「文档化失败集合」而非单一返回码，并先读源码摸清返回值契约与位域归属，否则写出脆弱/误述断言
+
+root_cause: >
+  ① rtas_print_event() 的返回契约被误当成状态码。其实现累计
+     print_scn_title() + rtas_print_scn() 的**打印字符数 len** 并 return len；
+     只有错误路径（stream 或 re 为 NULL）才 return 0 并置 errno=EFAULT。
+     首版 test 写 `== 0` → 1 条断言失败（conan create exit 1）。
+  ② sanity_check() 先查身份再查能力：
+         if (geteuid() != (uid_t)0) return RTAS_PERM;      /* -1003 */
+         if (!interface_exists())     return RTAS_KERNEL_INT; /* -1001 */
+     CI worker 可能以非 root 运行，硬编码 -1001 会在 root 机器上偶发红。
+  ③ 位域归属误述：parse_re_hdr() 实际为
+         severity    = (data1 & 0xE0) >> 5
+         disposition = (data1 & 0x1C) >> 3
+         extended    = (data1 & 0x04) >> 2
+         initiator   = (data2 & 0xF0) >> 4;  target = data2 & 0x0F
+     首版注释把 extended 归给 type/data2。data1=0 时恰好正确，但若后续为让
+     severity 非 0 而把 data1 改成 severity 值（4<<5=0x80 之外的取值），
+     极易误置 extended 位而走进需要合法扩展头的解析分支，解析失败导致
+     event_length / 节链表断言变红（实测 data1=0x1C -> 3 条断言失败、exit 1）。
+
+verification_cmd: >
+  # 确认返回值契约
+  sed -n '/^rtas_print_event(/,/^}/' librtasevent_src/print_rtas_event.c
+  # 确认位域归属
+  sed -n '/parse_re_hdr(/,/^}/' librtasevent_src/get_rtas_event.c
+  # 确认身份相关分支
+  sed -n '/^int sanity_check/,/^}/' librtas_src/syscall_calls.c
+
+rec_priority:           1
+rec_approach:           assert-documented-error-set-and-verify-return-contract
+rec_auto_fix:           false
+rec_impl:               source-patch
+
+doc_file:               DRAFT-librtas-2.0.4-ohos-no-ppctree-documented-failure-assertions.md
+last_updated:           2026-09-30
+source_event:           librtas 2.0.4 适配，test_package 首跑失败与 W4 审计 P2 修复
+
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.9
+metrics_last_used:
+authors:               unknown
+affected_scope:         平台能力缺失时测试应断言「文档化失败集合」而非单一返回码，并先读源码摸清返回值契约与位域归属，否则写出脆弱/误述断言
+rec_description:        assert-documented-error-set-and-verify-return-contract

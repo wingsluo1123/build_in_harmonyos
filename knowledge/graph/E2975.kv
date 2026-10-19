@@ -1,0 +1,33 @@
+# ═══ Draft knowledge entry — SourceForge 下载 CDN 整体不可达时用 Alpine distfiles 做字节级镜像兜底 ═══
+# Timestamp: 2026-10-01
+# Software: 通用（所有上游托管在 SourceForge 的包）
+# Gate: conan source() / CI 预下载
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E2975
+title: SourceForge 下载 CDN（downloads.sourceforge.net 及全部 *.dl.sourceforge.net 镜像）返回 522/DNS 失败时，用 distfiles.alpinelinux.org 兜底 —— conandata.yml 的 url 列表放「官方源 + 字节相同的官方镜像」，共用一个 sha256 前提是先 cmp+md5 验证
+trigger_tool: conan source() / get() / curl
+phase: build
+error_signature: curl: \(22\) The requested URL returned error: 522|Could not resolve host: .*\.dl\.sourceforge\.net|The requested URL returned error: 403 \(Forbidden\)|Checksum error|Unable to download
+severity:               3
+category:               network, build-system, source-fetch
+match_keywords: sourceforge, downloads.sourceforge.net, dl.sourceforge.net, 522, distfiles.alpinelinux.org,
+  mirror fallback, conandata.yml url list, sha256 identical, master.dl.sourceforge.net
+root_cause: SourceForge 的文件分发走 CloudFront/自建 CDN，部分网络（尤其本适配环境的出口）
+  被边缘节点以 522 拒绝或 DNS 污染，导致「官方源优先」的配方在本机完全拿不到源码 → W3 无法
+  执行。R39/PF7 又禁止把镜像前缀写进配方、禁止 Debian 重打包源，所以需要一个**域名不违规、
+  字节可验证**的权威镜像作为 URL 列表的第二项，而不是改写第一项。
+rec_approach: probe-sf-mirrors-then-conandata-url-list-with-alpine-distfiles
+verification_cmd:
+  `https://distfiles.alpinelinux.org/distfiles/edge/tanidvr-1.4.1.tar.bz2` 返回 200/175991 字节，
+  与上游 orig tarball `cmp` 逐字节一致、md5 相同；conandata.yml 用 url 列表后本地
+  `conan create`（官方源失败自动回退镜像）rc=0 并跑完全部 62 项断言。
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E2975.md
+affected_scope:         SourceForge 下载 CDN（downloads.sourceforge.net 及全部 *.dl.source
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        probe-sf-mirrors-then-conandata-url-list-with-alpine-distfiles

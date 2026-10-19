@@ -1,0 +1,30 @@
+# ═══ Draft knowledge entry — PackageBuilder Step9 相对 project-dir 导致 tar 输出路径错位 ═══
+# Timestamp: 2026-09-28
+# Software: hamlib 4.7.1（任何用相对 --project-dir 调用打包流水线的包）
+# Gate: submit / packaging_present（archives/<l>/<pkg>/<ver>/packaging/*.tar.gz）
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E2983
+title: PackageBuilder Step9 用相对 project-dir 时 tar 输出路径被 cwd 解析错位，报 No such file or directory 却仍写 .packaged
+trigger_tool: package_builder / ohc package
+phase: packaging
+error_signature: 打包失败: .*\.tar\.gz|tar: .*\.tar\.gz: No such file or directory
+severity:               2
+category:               toolchain, workflow
+match_keywords: package_builder, step9_tarball, tar czf, project-dir, relative path,
+  packaging, .packaged, No such file or directory
+root_cause: step9_tarball() 里 tar_gz = self.packaging_dir / name 是相对路径（project-dir
+  为 "." 时），而 subprocess.run(..., cwd=self.pkgdir) 已把工作目录切到
+  packaging/pkg-<name>/，相对输出路径被解析为 .../packaging/pkg-<name>/archives/...（不存在）。
+verification_cmd:
+rec_approach: PackageBuilder.__init__ 对 pdir 做 resolve()；step9 输出路径 resolve()；
+  tar 非 0 返回时不写 .packaged 且打印 stderr。
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E2983.md
+affected_scope:         PackageBuilder Step9 用相对 project-dir 时 tar 输出路径被 cwd 解析错位，报 
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        PackageBuilder

@@ -1,0 +1,64 @@
+# ═══ Draft knowledge entry — conan2 recipe module globals ═══
+# 主题: Conan 2 不把模块级常量映射到 self——内联 URL/SHA 策略的正确写法
+#       是直接引用模块级名，self._source_url 必然 AttributeError
+# 来源: randomio 1.4 真机 r1（2026-10-03）；避坑指南 §5.2 示例代码本身
+#       含此错误模板（self._source_url）
+# 状态: DRAFT — 需人工/AI 审核后 promote 为 E 条目
+#
+# To promote:
+#   1. Review evidence below
+#   2. Rename to E0XX.kv and move to knowledge/graph/
+#   3. Add a row to knowledge/graph/index.tsv
+#   4. Write knowledge/doc/E0XX.md
+
+id:                     E3034
+trigger_tool:           conan|conan create|conan source
+phase:                  source|export
+error_signature:        AttributeError: '\w+Conan\w*' object has no attribute '_\w+'|object has no attribute '_source_url'
+severity:               2
+category:               python, conan, packaging, recipe, source
+match_keywords:         AttributeError, _source_url, 模块级常量, conanfile self attribute,
+                        inline url sha256, conandata-less, 内联源码常量, Conan 2
+title:                  Conan 2 配方内联源码常量必须直接引用模块级名（self._xxx 必然 AttributeError）
+
+root_cause: >
+  conandata 规避策略（无补丁包把 URL/SHA256 内联进 conanfile.py）的常见
+  示例写 `get(self, url=self._source_url, ...)`。Conan 2 加载配方时，self
+  上只有类属性与方法，模块级全局名不会被挂到 self；`self._source_url`
+  在 source() 执行时抛 AttributeError。该错误本机 ast/语法检查不能发现
+  （语法合法），只有真正执行 source() 才暴露——因此最容易在真机首轮烧掉
+  排队窗口。
+
+affected_scope: >
+  所有采用"URL/SHA 内联进 conanfile.py"策略（规避 CI conandata 预下载
+  BUILD_DIR 缺陷）的纯下载无补丁包；包括照抄知识库指南 §5.2 示例代码的
+  新配方。与是否 OHOS 无关，任何 Conan 2.x 均复现。
+
+verification_cmd: >
+  # 本机 30 秒自检（无需真机）：
+  # 1) grep -n "self\._" conanfile.py   # 自定义下划线名全部嫌疑
+  # 2) python -c "import conan" 存在时可 exec 模块级导入验证（可选）
+  # 真机特征: conan create 在 source() 报 AttributeError ... no attribute '_source_url'
+
+rec_priority:           1
+rec_approach:           module-global-direct-reference
+rec_description: >
+  source() 内直接引用模块级名：get(self, url=_source_url,
+  sha256=_source_sha256, strip_root=True)（不带 self.）。提交前 grep
+  "self\._" 过一遍自定义下划线属性。知识库指南/避坑文档中的
+  self._source_url 示例应同步修正为模块级引用写法（文档级 bug）。
+
+rec_command: >
+  _source_url = "https://example.org/x-1.0.tar.gz"
+  _source_sha256 = "..."
+  def source(self):
+      get(self, url=_source_url, sha256=_source_sha256, strip_root=True)
+rec_auto_fix:           true
+rec_impl:               drop-self-prefix
+
+# 适用边界（何时使用本条目）
+# 反例（何时不适用）
+# 限制（已知局限）
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E3034.md

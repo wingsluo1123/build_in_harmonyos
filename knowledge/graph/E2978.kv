@@ -1,0 +1,34 @@
+# ═══ Draft knowledge entry — 测试 Pd 插件无 libpd 可链接：需自建 Pd 运行时 shim，gensym 必须驻留、sys_trytoopenone 的 dirresult 是「找到文件的目录」 ═══
+# Timestamp: 2026-10-01
+# Software: pd-libdir 1.11（适用于所有 Pd externals / Pd loader 插件的消费者测试）
+# Gate: conan create test_package (L1 / L1e / R34)
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E2978
+title: 测 Pd 插件无 libpd 可链接（Pd 以 -rdynamic 导出符号），须自建 Pd 运行时 shim 并 -rdynamic 导出；两个语义坑：gensym 必须驻留否则覆盖插件已存 atom，sys_trytoopenone 的 dirresult 是找到文件的目录而非传入的搜索条目
+trigger_tool: dlopen / dlsym / clang (test_package build)
+phase: testing
+error_signature: dlopen failed: undefined symbol: (sys_getversion|sys_register_loader|class_new|gensym|namelist_append|sys_trytoopenone)|incompatible integer to pointer conversion assigning to .const char \* from .int.|-Wint-conversion|dlsym\(setup\) failed
+severity:               3
+category:               toolchain, testing
+match_keywords: pd, puredata, pd_linux, externals, dlopen, dlsym, -rdynamic, export-dynamic,
+  sys_register_loader, sys_trytoopenone, namelist_append, gensym, class_new, t_symbol, t_atom, m_pd.h, libdir
+root_cause: Pd（puredata 包）是 `package_type = "application"` 的可执行文件，用 `-rdynamic` 链接把
+  Pd API 符号导出给自己的动态符号表；Pd externals（*.pd_linux）因此**不链接任何库**，其全部 Pd
+  符号在 dlopen 时从 Pd 进程映像解析。后果：制品仓里没有 libpd.so 可供消费者链接（本仓
+  archives/l/libpd/0.16.1 是另一条路线，它自建 libpd.so），想测 Pd 插件就不能「链接后调用」，
+  只能「导出同名符号 + dlopen」自造解析环境。三个坑都源于 shim 与 Pd 真实 ABI 语义的细微差异：
+  gensym 的驻留语义、sys_trytoopenone 的 dirresult 语义、以及 t_class/t_pd 的不完整类型。
+rec_approach: dlopen-rtldnow-with-exported-pd-symbol-shim + interning-gensym + faithful-sys-trytoopenone + opaque-storage-for-incomplete-types
+verification_cmd:
+  破坏性反向验证通过（移走 lib/ 后测试确实失败，证明测试真依赖被测包）；两个语义坑在开发中
+  100% 各复现一次（先读到 "add-to-path" 而非 "+<dir>"，再读到搜索根目录而非库目录）。
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E2978.md
+affected_scope:         测 Pd 插件无 libpd 可链接（Pd 以 -rdynamic 导出符号），须自建 Pd 运行时 shim 并 -r
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        dlopen-rtldnow-with-exported-pd-symbol-shim + interning-gensym + faithful-sys-trytoopenone + opaque-
