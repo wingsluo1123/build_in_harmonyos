@@ -1,0 +1,141 @@
+--- a/tests/dispatch_read2.c
++++ b/tests/dispatch_read2.c
+@@ -18,21 +18,20 @@
+  * @APPLE_APACHE_LICENSE_HEADER_END@
+  */
+ 
+ #include <sys/stat.h>
+ #include <sys/types.h>
+ #include <assert.h>
+ #include <fcntl.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
+-#include <fts.h>
+ #include <sys/param.h>
+ #include <unistd.h>
+ #endif
+ #include <errno.h>
+ #ifdef __APPLE__
+ #include <mach/mach.h>
+ #include <mach/mach_time.h>
+ #include <libkern/OSAtomic.h>
+ #include <TargetConditionals.h>
+ #endif
+@@ -204,21 +203,22 @@
+ 		test_errno("open", errno, 0);
+ 		test_stop();
+ 	}
+ 	dispatch_test_release_large_file(path_in);
+ 	free(path_in);
+ 
+ 	size_t siz_in = (size_t)dispatch_test_fd_lseek(in, 0, SEEK_END);
+ 	dispatch_test_fd_lseek(in, 0, SEEK_SET);
+ #else
+ 	const char *path_in = "/dev/urandom";
+-	char path_out[] = "/tmp/dispatchtest_io.XXXXXX";
++	char path_out[4096];
++	dispatch_test_tmp_path(path_out, sizeof(path_out), "dispatchtest_io.XXXXXX");
+ 	const size_t siz_in = 10240;
+ 
+ 	dispatch_fd_t in = dispatch_test_fd_open(path_in, O_RDONLY);
+ 	if (in == -1) {
+ 		test_errno("open", errno, 0);
+ 		test_stop();
+ 	}
+ #endif
+ 
+ 	dispatch_fd_t out = mkstemp(path_out);
+@@ -289,21 +289,22 @@
+ 
+ 	dispatch_fd_t in = dispatch_test_fd_open(path_in, O_RDONLY);
+ 	if (in == -1) {
+ 		test_errno("open", errno, 0);
+ 		test_stop();
+ 	}
+ 	dispatch_test_release_large_file(path_in);
+ 	free(path_in);
+ #else
+ 	const char *path_in = "/dev/urandom";
+-	char path_out[] = "/tmp/dispatchtest_io.XXXXXX";
++	char path_out[4096];
++	dispatch_test_tmp_path(path_out, sizeof(path_out), "dispatchtest_io.XXXXXX");
+ 
+ 	dispatch_fd_t in = dispatch_test_fd_open(path_in, O_RDONLY);
+ 	if (in == -1) {
+ 		test_errno("open", errno, 0);
+ 		test_stop();
+ 	}
+ #endif
+ 
+ 	dispatch_fd_t out = mkstemp(path_out);
+ 	if (out == -1) {
+@@ -393,58 +394,67 @@
+ 	if(pipe(fd) == -1) {
+ 		test_errno("pipe", errno, 0);
+ 		test_stop();
+ 	}
+ 	const size_t chunks = 320;
+ 	const size_t siz_chunk = 32, siz = siz_chunk * chunks;
+ 
+ 	dispatch_queue_t q = dispatch_get_global_queue(0,0);
+ 	dispatch_group_t g = dispatch_group_create();
+ 	__block size_t siz_acc = 0, deliveries = 0;
++	dispatch_semaphore_t delivered = dispatch_semaphore_create(0);
+ 	__block void (^b)(dispatch_data_t, int);
+ 	b = Block_copy(^(dispatch_data_t data, int err) {
+ 		if (err) {
+ 			test_errno("dispatch_read", err, 0);
+ 			test_stop();
+ 		}
+ 		deliveries++;
+ 		siz_acc += dispatch_data_get_size(data);
+ 		if (siz_acc < siz) {
+ 			dispatch_group_enter(g);
+ 			dispatch_read(*fd, siz, q, b);
+ 		}
++		dispatch_semaphore_signal(delivered);
+ 		dispatch_group_leave(g);
+ 	});
+ 	dispatch_group_enter(g);
+ 	dispatch_read(*fd, siz, q, b);
+ 	char *buf[siz_chunk];
+ 	size_t i;
+ 	for (i = 0; i < chunks; i++) {
+ 		ssize_t s = read(in, buf, siz_chunk);
+ 		if (s < (ssize_t)siz_chunk) {
+ 			test_errno("read", errno, 0);
+ 			test_stop();
+ 		}
+ 		s = write(*(fd+1), buf, siz_chunk);
+ 		if (s < (ssize_t)siz_chunk) {
+ 			test_errno("write", errno, 0);
+ 			test_stop();
+ 		}
+-		usleep(10000);
++		// Preserve one delivery per write without assuming that a 10ms sleep
++		// gives the reader time to run before the next pipe write.
++		if (dispatch_semaphore_wait(delivered,
++				dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC))) {
++			test_long("chunk delivered before next write", 1, 0);
++			test_stop();
++		}
+ 	}
+ 	close(in);
+ 	close(*(fd+1));
+ 	test_group_wait(g);
+ 	test_sizet("dispatch_read deliveries", deliveries, chunks);
+ 	test_sizet("dispatch_read data size", siz_acc, siz);
+ 	close(*fd);
+ 	Block_release(b);
++	dispatch_release(delivered);
+ 	dispatch_release(g);
+ }
+ #endif
+ 
+ #endif // DISPATCHTEST_IO
+ 
+ int
+ main(void)
+ {
+ 	dispatch_test_start("Dispatch IO Convenience Read/Write");

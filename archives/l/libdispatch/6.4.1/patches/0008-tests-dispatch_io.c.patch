@@ -1,0 +1,100 @@
+--- a/tests/dispatch_io.c
++++ b/tests/dispatch_io.c
+@@ -250,21 +250,22 @@
+ 	if (!temp_dir) {
+ 		temp_dir = getenv("TEMP");
+ 	}
+ 	if (!temp_dir) {
+ 		test_ptr_notnull("temporary directory", temp_dir);
+ 		test_stop();
+ 	}
+ 	char *path_out = NULL;
+ 	asprintf(&path_out, "%s\\dispatchtest_io.XXXXXX", temp_dir);
+ #else
+-	char path_out[] = "/tmp/dispatchtest_io.XXXXXX";
++	char path_out[4096];
++	dispatch_test_tmp_path(path_out, sizeof(path_out), "dispatchtest_io.XXXXXX");
+ #endif
+ 
+ 	dispatch_fd_t in = dispatch_test_fd_open(path_in, O_RDONLY);
+ 	if (in == -1) {
+ 		test_errno("open", errno, 0);
+ 		test_stop();
+ 	}
+ 	dispatch_test_release_large_file(path_in);
+ 	free(path_in);
+ 	const size_t siz_in =
+@@ -664,41 +665,72 @@
+ test_io_from_io(void) // rdar://problem/8388909
+ {
+ #if DISPATCH_API_VERSION >= 20101012
+ 	const size_t siz_in = 10240;
+ 	dispatch_queue_t q = dispatch_get_global_queue(0, 0);
+ 	dispatch_group_t g = dispatch_group_create();
+ 	dispatch_io_t io = NULL;
+ 
+ 	// Windows does not easily support immutable directories
+ #if !defined(_WIN32)
+-	char path[] = "/tmp/dispatchtest_io.XXXXXX/file.name";
++	char path[4096];
++	dispatch_test_tmp_path(path, sizeof(path), "dispatchtest_io.XXXXXX/file.name");
++#if defined(__OHOS__)
++	// HMDFS can accept chmod without enforcing directory mode bits. Use the
++	// native private temporary filesystem, not the Conan source/build cache.
++	const char *permission_tmp = getenv("DISPATCH_TEST_PERMISSION_TMPDIR");
++	if (!permission_tmp || permission_tmp[0] != '/') {
++		test_ptr_notnull("absolute permission fixture TMPDIR", NULL);
++		test_stop();
++	}
++	int path_length = snprintf(path, sizeof(path), "%s/%s", permission_tmp,
++			"dispatchtest_io.XXXXXX/file.name");
++	if (path_length < 0 || (size_t)path_length >= sizeof(path)) {
++		test_long("permission fixture path fits buffer", 0, 1);
++		test_stop();
++	}
++#endif
+ 	char *tmp = strrchr(path, '/');
+ 	*tmp = '\0';
+ 	if (!mkdtemp(path)) {
+ 		test_ptr_notnull("mkdtemp failed", path);
+ 		test_stop();
+ 	}
+ #ifdef UF_IMMUTABLE
+ 	// Make the directory immutable
+ 	if (chflags(path, UF_IMMUTABLE) == -1) {
+ 		test_errno("chflags", errno, 0);
+ 		test_stop();
+ 	}
+ #else
+ 	// Make the directory non-read/writeable
+ 	if (chmod(path, 0) == -1) {
+ 		test_errno("chmod", errno, 0);
+ 		test_stop();
+ 	}
+ #endif
+ 	*tmp = '/';
++#if defined(__OHOS__) && !defined(UF_IMMUTABLE)
++	// Check the kernel precondition before testing asynchronous propagation;
++	// never skip the assertion or accept a successful write on permissive FS.
++	int permission_fd = open(path, O_CREAT | O_EXCL | O_RDWR, 0600);
++	int permission_error = permission_fd == -1 ? errno : 0;
++	if (permission_fd != -1) {
++		close(permission_fd);
++		unlink(path);
++	}
++	test_errno("kernel enforces fixture directory permissions", permission_error,
++			EACCES);
++	if (permission_error != EACCES) {
++		test_stop();
++	}
++#endif
+ 	io = dispatch_io_create_with_path(DISPATCH_IO_RANDOM, path,
+ 			O_CREAT|O_RDWR, 0600, q, ^(int error) {
+ 				if (error) {
+ 					test_errno("channel cleanup called with error", error, 0);
+ 					test_stop();
+ 				}
+ 				test_errno("channel cleanup called", error, 0);
+ 			});
+ 
+ 	char *foo = malloc(256);

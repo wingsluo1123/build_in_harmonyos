@@ -1,0 +1,131 @@
+--- a/tests/dispatch_concur.c
++++ b/tests/dispatch_concur.c
+@@ -37,20 +37,22 @@
+ #include <bsdtests.h>
+ #include "dispatch_test.h"
+ 
+ static volatile size_t done, concur;
+ static int use_group_async;
+ static uint32_t activecpu;
+ static uint32_t min_acceptable_concurrency;
+ 
+ static dispatch_queue_t q;
+ static dispatch_group_t g, gw;
++static dispatch_semaphore_t submission_gate;
++static size_t submission_count, submission_width;
+ 
+ const size_t workers = 4;
+ 
+ static void
+ nop(void* ctxt __attribute__((unused)))
+ {
+ 	return;
+ }
+ 
+ static void
+@@ -60,20 +62,32 @@
+ 	__sync_add_and_fetch(&done, 1);
+ 
+ 	if (!use_group_async) dispatch_group_leave(gw);
+ }
+ 
+ static void
+ submit_work(void* ctxt)
+ {
+ 	size_t c = __sync_add_and_fetch(&concur, 1), *m = (size_t *)ctxt, i;
+ 	if (c > *m) *m = c;
++	// Observe the requested width before allowing the first batch to finish.
++	// A fixed sleep does not establish overlap on a loaded scheduler.
++	if (c == submission_width) {
++		for (i = 0; i < submission_count; ++i) {
++			dispatch_semaphore_signal(submission_gate);
++		}
++	}
++	if (dispatch_semaphore_wait(submission_gate,
++			dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC))) {
++		test_long("submission width reached before deadline", 1, 0);
++		test_stop();
++	}
+ 
+ 	for (i = 0; i < workers; ++i) {
+ 		if (use_group_async) {
+ 			dispatch_group_async_f(gw, q, NULL, work);
+ 		} else {
+ 			dispatch_group_enter(gw);
+ 			dispatch_async_f(q, NULL, work);
+ 		}
+ 	}
+ 
+@@ -81,20 +95,23 @@
+ 	__sync_sub_and_fetch(&concur, 1);
+ 
+ 	if (!use_group_async) dispatch_group_leave(g);
+ }
+ 
+ static void
+ test_concur_async(size_t n, size_t qw)
+ {
+ 	size_t i, max_concur = 0, *mcs = calloc(n, sizeof(size_t)), *mc;
+ 	done = concur = 0;
++	submission_count = n;
++	submission_width = MIN(n, qw);
++	submission_gate = dispatch_semaphore_create(0);
+ 
+ 	dispatch_suspend(q);
+ 	for (i = 0, mc = mcs; i < n; i++, mc++) {
+ 		if (use_group_async) {
+ 			dispatch_group_async_f(g, q, mc, submit_work);
+ 		} else {
+ 			dispatch_group_enter(g);
+ 			dispatch_async_f(q, mc, submit_work);
+ 		}
+ 	}
+@@ -119,20 +136,21 @@
+ 	free(mcs);
+ 
+ 	size_t expect = MIN(n, qw);
+ 	if (max_concur > min_acceptable_concurrency) {
+ 		test_sizet_less_than_or_equal("max submission concurrency", max_concur, expect);
+ 	} else {
+ 		test_sizet("max submission concurrency", max_concur, expect);
+ 	}
+ 
+ 	dispatch_group_wait(gw, DISPATCH_TIME_FOREVER);
++	dispatch_release(submission_gate);
+ 	usleep(1000);
+ }
+ 
+ static void
+ sync_work(void* ctxt)
+ {
+ 	size_t c = __sync_add_and_fetch(&concur, 1), *m = (size_t *)ctxt;
+ 	if (c > *m) *m = c;
+ 
+ 	usleep(10000);
+@@ -207,24 +225,24 @@
+ 		*qw = LONG_MAX;
+ 		*ql = "global";
+ 		return dispatch_get_global_queue(0, 0);
+ 	};
+ 	dispatch_queue_t queue;
+ 	dispatch_queue_attr_t qattr = NULL;
+ 
+ 	*qw = width;
+ 	*ql = width < LONG_MAX ? ( width == 1 ? "serial": "wide" ) : "concurrent";
+ #if DISPATCH_API_VERSION >= 20100518 // <rdar://problem/7790099>
+-	qattr = width < LONG_MAX ? NULL : DISPATCH_QUEUE_CONCURRENT;
++	qattr = width == 1 ? NULL : DISPATCH_QUEUE_CONCURRENT;
+ #endif
+ 	queue = dispatch_queue_create(*ql, qattr);
+-	if (!qattr) {
++	if (width > 1 && width < LONG_MAX) {
+ 		dispatch_queue_set_width(queue, width);
+ 	}
+ 	if (tq) {
+ 		dispatch_set_target_queue(queue, tq);
+ 	}
+ 	if (!qattr || tq) {
+ 		dispatch_barrier_sync_f(queue, NULL, nop); // wait for changes to take effect
+ 	}
+ 	return queue;
+ }

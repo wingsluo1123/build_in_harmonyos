@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.26)
+project(libdispatch_consumer C)
+find_package(libdispatch CONFIG REQUIRED)
+add_executable(test_libdispatch test.c)
+target_link_libraries(test_libdispatch PRIVATE libdispatch::libdispatch)
+target_compile_options(test_libdispatch PRIVATE -UNDEBUG)
+set_property(TARGET test_libdispatch PROPERTY C_STANDARD 11)
