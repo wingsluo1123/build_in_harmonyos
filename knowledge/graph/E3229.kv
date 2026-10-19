@@ -1,0 +1,29 @@
+id:                     E3229
+trigger_tool: conan|test
+phase: testing
+error_signature: failed to locate mcpp or gcc pre-processors|HMBS_UPSTREAM_TEST_RESULT=\{[^}]*"skipped":[1-9][^}]*"status":"passed"
+severity:               3
+category:               ohos, build-system, testing
+match_keywords: conan_run_trait, run=true, runtime_dependency_path, test_package_path, hmbs_test_package_result, hmbs_upstream_test_result, status=incomplete, mcpp, missing_test_package_evidence
+title: Conan 运行时工具依赖须 requires(run=True) 注入 test_package PATH 且上游跳过时标 status=incomplete
+root_cause: Conan 2 对普通 requires 默认 run=False，运行时工具包（如 mcpp/2.7.2 的 bin/mcpp）不会进入消费者 test_package 的 conanrun 环境 PATH；souffle CLI 默认未给 --no-preprocessor，运行时用 which("mcpp") 定位外部 C 预处理器，故已安装依赖图仍抛 failed to locate mcpp or gcc pre-processors。另一面，上游 ctest 存在 ohos_feature 缺口（skipped>0）时 _run_upstream_tests() 仍无条件标 status=passed，98.6% 未执行与 passed 自相矛盾。
+affected_scope: 配方 CLI 端到端 test_package 依赖运行时工具（C 预处理器/解释器/辅助可执行）的 Conan 2 三方库；以及上游测试存在 ohos_feature 缺口、skipped>0 的库
+verification_cmd: 真机日志保留 HMBS_TEST_PACKAGE_RESULT={"executed":true,"passed":true,"command":"sh test.sh","discovered":2,"passedCount":2} 与 HMBS_UPSTREAM_TEST_RESULT 的 status=incomplete + ohos_feature gaps，且 discovered-executed=skipped 恒等式成立
+rec_priority: 1
+rec_approach: conan-run-trait-plus-incomplete-status
+rec_description: 将运行时工具依赖声明为 requires("mcpp/2.7.2", run=True) 使其 bin 注入 test_package 的 conanrun PATH，which("mcpp") 命中后默认解释执行模式跑通端到端用例；上游 marker 在 skipped>0 时改标 status=incomplete 并附 ohos_feature gaps 与 reason，仅当 skipped==0 才标 passed，同时修正 manifest 的 upstream_test_total 与实测 discovered 一致
+rec_command: conanfile.py: self.requires("mcpp/2.7.2", run=True)；manifest.yaml: runtime: mcpp/2.7.2；_run_upstream_tests(): skipped>0 → status="incomplete" + gaps=discovered-executed
+rec_auto_fix: false
+rec_impl: conan-recipe-plus-test-package
+fallback_priority: 2
+fallback_approach: shell-preprocessor-fallback
+fallback_description: 若运行时工具包无法提供，可在 test_package 中显式传入 --no-preprocessor 或定位等价预处理器，保留失败审计记录；不得删除断言或伪造 passedCount
+fallback_auto_fix: false
+forbid_1_pattern: HMBS_UPSTREAM_TEST_RESULT=\{[^}]*"skipped":[1-9][0-9]*[^}]*"status":"passed"
+forbid_1_reason: 禁止 skipped>0 时标 status=passed，passed 与实际执行率自相矛盾
+forbid_1_consequence: 真机预检 evidence incomplete，任务退回修复循环
+doc_file: knowledge/drafts/DRAFT-souffle-2.5-conan-run-trait-runtime-path.md
+last_updated: 2026-10-14
+source_event: souffle/2.5 真机 test_package 缺 mcpp 预处理器且上游跳过仍标 passed 的修复
+authors: hmbs-executor
+source_pr: 15315

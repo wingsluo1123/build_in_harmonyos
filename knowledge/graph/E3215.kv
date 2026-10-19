@@ -1,0 +1,30 @@
+id:                     E3215
+title: include(ECMUninstallTarget) 需 ecm_uninstall.cmake.in → extra-cmake-modules 须 6.29.0+（6.19.0 缺文件）
+category:               cmake, build-failure, ecm, extra-cmake-modules, tool-requires
+severity:               2
+error_signature: "CMake Error: File <ECM>/modules/ecm_uninstall.cmake.in does not exist; configure_file Problem configuring file"
+match_keywords: ECMUninstallTarget, ecm_uninstall.cmake.in, extra-cmake-modules, ECM, configure_file, CMakeLists include
+root_cause: >
+  上游顶层 CMakeLists include(ECMUninstallTarget) 时，ECMUninstallTarget.cmake
+  会 configure_file 引用同目录 ecm_uninstall.cmake.in。extra-cmake-modules
+  6.19.0 的 conan 包未包含 ecm_uninstall.cmake.in（只有 .cmake 模块），
+  6.29.0 含该文件。fcitx5-utils 5.1.13 的 wrapper CMakeLists 未 include
+  ECMUninstallTarget 故 6.19.0 可用；fcitx5 顶层直接 include 时必须 6.29.0+。
+rec_approach: >
+  配方 tool_requires("extra-cmake-modules/6.29.0")（或含 ecm_uninstall.cmake.in
+  的更新版本）。任何 include(ECMUninstallTarget) 的 CMake 库在 OHOS conan
+  构建需同样处理。
+verification_cmd:
+  conan create + W3 build_and_test 全 pass（fcitx5/5.1.14 实测：6.19.0 报
+  ecm_uninstall.cmake.in 缺失，切 6.29.0 后通过）。
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E3215.md
+trigger_tool:           cmake
+phase:                  build
+affected_scope:         include(ECMUninstallTarget) 需 ecm_uninstall.cmake.in → extra
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        >

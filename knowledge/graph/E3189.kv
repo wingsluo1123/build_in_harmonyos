@@ -1,0 +1,52 @@
+id:                     E3189
+trigger_tool: 'clang|runtime|test'
+phase: 'linking|runtime|testing'
+error_signature: 'SIGSEGV\(SEGV_MAPERR\)@0+.*(pthread_join|thrd_detach)|#0 .*pthread_join\+88.*#0|#01 .*thrd_detach\+52|Error 139'
+severity:               3
+category:               portability, libc, threading, 'musl, runtime'
+match_keywords: 'pthread_detach, PTHREAD_CREATE_DETACHED, double detach, SIGSEGV, SEGV_MAPERR, pthread_join, cppcrash, Error 139, musl, glibc EINVAL'
+title: 'Redundant pthread_detach on a thread created PTHREAD_CREATE_DETACHED segfaults on musl (glibc only returns EINVAL)'
+root_cause: >-
+  The code creates worker threads with pthread_attr_setdetachstate(PTHREAD_CREATE_DETACHED)
+  and then calls pthread_detach() on them "to prevent hangs". glibc treats the redundant
+  second detach as a no-op returning EINVAL, so the pattern ships for years; OHOS musl
+  instead walks the already-invalid thread descriptor into pthread_join internals and
+  dereferences NULL, killing the whole process with SIGSEGV the first time the path runs.
+affected_scope: >-
+  Any library that defensively detaches threads it created in the detached state
+  (pappl 1.4.12 papplSystemRun raw-socket/USB gadget threads are the observed case).
+  The crash appears only at runtime, typically inside an upstream test that starts a
+  server thread pool, and the faultlog blames pthread_join, which misleads unless the
+  caller frame is symbolized.
+verification_cmd: >-
+  On the OHOS device compile a minimal reproducer: create a thread with
+  PTHREAD_CREATE_DETACHED, call pthread_detach on it, join the main thread - it dies
+  with signal 11 while the same program on glibc prints the EINVAL path and survives.
+  For the pappl case: /data/log/faultlog/faultlogger/cppcrash-*.log shows
+  #01 thrd_detach+52 -> #00 pthread_join+88 SEGV@0, and llvm-symbolizer resolves the
+  caller return address to papplSystemRun (system.c pthread_detach call site).
+rec_priority: 1
+rec_approach: 'drop-redundant-detach-keep-detached-create'
+rec_description: >-
+  Delete the second pthread_detach call and keep the threads created detached; the
+  worker loops already terminate on their own shutdown predicates. Do not change the
+  creation attributes - the detached state is what upstream intends.
+rec_command: 'grep -n "pthread_detach" pappl/*.c  # audit each site against how the thread was created'
+rec_auto_fix: false
+rec_impl: 'patch-source-drop-redundant-call'
+fallback_priority: 2
+fallback_approach: 'create-joinable-detach-once'
+fallback_description: >-
+  If the code genuinely needs a detach call (for example to reuse one creation path),
+  create the thread joinable and detach exactly once.
+fallback_auto_fix: false
+forbid_1_pattern: 'ignore SIGSEGV|signal\(SIGSEGV|pthread_detach wrapped in error tolerance'
+forbid_1_reason: 'Swallowing the crash hides the double detach and leaves the process running with a corrupted thread list.'
+forbid_1_consequence: 'Later thread operations crash unpredictably; test results are meaningless.'
+forbid_2_pattern: 'define pthread_detach as empty macro globally'
+forbid_2_reason: 'A global header-level stub also removes legitimate single detaches of joinable threads (job workers, DNS-SD thread).'
+forbid_2_consequence: 'Those threads leak; long test runs exhaust the thread table.'
+source_event: 'pappl 1.4.12 on HarmonyOS PC: make test crashed at papplPrinterCreate with Error 139; cppcrash backtrace + minimal reproducer confirmed; patch 0002 removed the two redundant detaches and the full upstream suite (1832 cases) then passed'
+last_updated:               2026-10-19
+authors:               frj__
+doc_file:               doc/E3189.md

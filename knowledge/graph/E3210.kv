@@ -1,0 +1,86 @@
+id:                     E3210
+title: OHOS 上 cargo 运行测试进程时把 sysroot 的 lib/rustlib/<target>/lib 前置到 LD_LIBRARY_PATH，其中未签名的 libstd-*.so 遮蔽已签名副本，导致 prefer-dynamic 链接的 proc-macro 测试 harness 报 Error loading shared library libstd-<hash>.so（exit 127）
+trigger_tool: cargo|rustc|conan|binary-sign-tool
+phase: testing|compilation
+error_signature: Error loading shared library libstd-.*\.so|Error relocating .*_RNvNt.*symbol not found|test failed, to rerun pass -p .* --lib|exit status: 127
+severity:               3
+category:               ohos, toolchain, rust, cargo, unsigned-elf
+match_keywords: libstd, rustlib, prefer-dynamic, proc-macro, test harness, LD_LIBRARY_PATH, unsigned ELF, binary-sign-tool, selfSign, Error loading shared library, exit status 127, cargo test, tool_requires, rust-toolchain, typeshare-annotation
+root_cause:             proc-macro crate 的单元测试 harness 由 rustc 以 prefer-dynamic 链接，
+                        其 DT_NEEDED 只有 libstd-<hash>.so 与 libc.so（无 RUNPATH）。cargo 启动
+                        测试进程时会把 sysroot 的 lib/rustlib/<target>/lib 目录前置进
+                        LD_LIBRARY_PATH 以便 harness 找到 libstd；但该目录属于只读工具链载荷
+                        （rust-toolchain/1.97.1 经 tool_requires 引入，配方通常以软链接接入），
+                        其中 libstd-<hash>.so 未带 OHOS code signature，而 HarmonyOS 拒绝加载
+                        未签名共享库，于是前置的未签名副本遮蔽了配方放进 toolchain/lib/ 的已签名
+                        副本：加载器报 Error loading shared library libstd-<hash>.so，并伴随大量
+                        symbol not found，测试进程 exit 127、cargo test rc=101。判据：同一 harness
+                        手工以 LD_LIBRARY_PATH=<签名目录> 运行可正常输出 "0 tests, 0 benchmarks"
+                        （既非路径缺失也非 noexec），而按 cargo 的搜索顺序指向
+                        rustlib/<target>/lib 则必现同一报错。
+affected_scope:         所有在 HarmonyOS 上以 conan 构建、且工作区含 proc-macro crate 的 Rust
+                        项目（如 typeshare 的 annotation crate）：cargo test --workspace 会为
+                        每个 proc-macro crate 生成 prefer-dynamic 的测试 harness。普通 lib/bin
+                        测试目标不受影响（静态链接 libstd，DT_NEEDED 仅 libc.so）。同型暴露面：
+                        任何 cargo 前置 sysroot 子目录的场景（cargo run/test），只要该子目录内的
+                        .so 未签名。
+verification_cmd: |
+  # 1) 确认 harness 动态依赖 libstd 且无 RUNPATH
+  readelf -d target/release/deps/<proc_macro_crate>-* | grep -E "NEEDED|RUNPATH"
+  #    -> NEEDED libstd-<hash>.so / libc.so，且无 RUNPATH 行
+  # 2) 复现根因：把搜索路径指向未签名副本
+  LD_LIBRARY_PATH=<toolchain>/lib/rustlib/aarch64-unknown-linux-ohos/lib \
+      target/release/deps/<proc_macro_crate>-* --list
+  #    -> Error loading shared library libstd-<hash>.so（复现）
+  # 3) 对照：指向自签名副本
+  LD_LIBRARY_PATH=<build_folder>/rust-toolchain/lib \
+      target/release/deps/<proc_macro_crate>-* --list
+  #    -> 0 tests, 0 benchmarks（正常，证明修复方向）
+  # 4) 签名标记判定（未签名 0，已签名 >=1）
+  strings -a <libstd.so> | grep -c codesign
+  # 5) 观察 cargo 实际传给测试进程的搜索顺序（runner 探针）
+  CARGO_TARGET_AARCH64_UNKNOWN_LINUX_OHOS_RUNNER=<探针脚本> cargo test -p <crate> --lib
+  #    探针脚本首行为 echo "PROBE LD_LIBRARY_PATH=[$LD_LIBRARY_PATH]"；实测输出中
+  #    lib/rustlib/<target>/lib 排在 toolchain/lib 之前
+rec_priority: 1
+rec_approach: sign-rustlib-dylibs-and-prepend-signed-dir-via-target-runner
+rec_description:        conanfile.py 的 _prepare_signed_toolchain() 除 cargo/rustc 与
+                        librustc_driver-*.so 外，再把 lib/rustlib/<target>/lib/*.so（含
+                        libstd-<hash>.so）复制到 build_folder/rust-toolchain/lib 并用
+                        binary-sign-tool sign -selfSign 1 逐个自签名（平铺，避免依赖加载器搜索
+                        子目录）；同时新增 _prepare_test_runner() 在 build_folder 内写一个 shell
+                        runner（路径必须无空格——cargo 以空白切分 runner 值），内容为
+                        export LD_LIBRARY_PATH="<已签名目录>:$LD_LIBRARY_PATH" 后 exec "$@"，并
+                        通过 CARGO_TARGET_<TRIPLE_UPPER>_RUNNER 注入。runner 把已签名目录前置到
+                        cargo 自身的搜索顺序之前，使已签名 libstd 优先命中。全部为构建环境适配，
+                        不改上游源码；交付二进制静态链接 libstd，不受影响。
+rec_command:            CARGO_TARGET_AARCH64_UNKNOWN_LINUX_OHOS_RUNNER=<build_folder>/ohos-test-runner.sh cargo test --release --locked --target aarch64-unknown-linux-ohos --workspace --all-features --tests --no-fail-fast
+rec_auto_fix:           false
+rec_impl:               conan-recipe
+fallback_priority:      2
+fallback_approach:      replace-rustlib-libstd-with-signed-copy-in-place
+fallback_description:   不使用 runner，而是把 build_folder/rust-toolchain/lib/rustlib 由软链接换成
+                        真实目录树，并在 rustlib/<target>/lib/ 内以已签名副本替换
+                        libstd-<hash>.so（其余 rlib/rmeta 仍软链），让 cargo 前置的那个目录本身
+                        可加载。代价是工具链布局改造更重，且需确认 rustc 用该 .so 参与
+                        prefer-dynamic 链接时仍接受签名后的 ELF；仅在前者不可用时采用。
+fallback_command:       ls -l <build_folder>/rust-toolchain/lib/rustlib/aarch64-unknown-linux-ohos/lib/libstd-*.so
+fallback_auto_fix:      false
+fallback_impl:          conan-recipe
+forbid_1_pattern:       --test-threads=1|cargo test.*--workspace.*exclude.*annotation
+forbid_1_reason:        通过串行化或排除 proc-macro crate 让 CI 变绿是掩盖而非修复：被测用例仍在，
+                        漏测不可接受（R51），真实用户跑 cargo test 仍会撞上。
+forbid_1_consequence:   该 crate 的单元测试长期不执行，测试覆盖虚高，上游缺陷无遮蔽。
+forbid_2_pattern:       chmod 777.*libstd|chmod \+x.*libstd-.*\.so
+forbid_2_reason:        失败根因是缺少 OHOS code signature，与 POSIX mode 位无关（未签名 .so
+                        即使 mode 0755 也被拒载）。
+forbid_2_consequence:   误判方向、反复调权限，问题依旧，浪费多轮构建。
+forbid_3_pattern:       LD_LIBRARY_PATH.*(/usr/lib|/system/lib).*libstd
+forbid_3_reason:        系统 lib 目录不含 Rust sysroot 的 libstd-<hash>.so，指过去只会把库找不到
+                        换成符号找不到。
+forbid_3_consequence:   错误形态改变但构建仍失败，排查方向被带偏。
+principles:             P013, P014
+doc_file:               DRAFT-rust-cargo-rustlib-libstd-unsigned-test-harness.md
+source_event:           archives/t/typeshare/1.13.4 HarmonyOS PC 适配：cargo test --workspace 时 typeshare-annotation（proc-macro）测试 harness exit 127；6 个测试目标仅此一个失败，runner 探针定位为 cargo 前置的未签名 libstd 遮蔽已签名副本
+authors:                7527 (OpenDesk agent)
+last_updated:               2026-10-19

@@ -1,0 +1,44 @@
+#====================================================================
+# DRAFT-retro-gtk-1.0.2-epoxy-egl-disabled-library-header-gap
+# 制品仓 libepoxy 以 egl=no 构建 → 包里没有 epoxy/egl.h，
+# 需要 EGL 的消费者用 compat 头暴露平台 EGL API + 链接 sysroot libEGL
+#====================================================================
+
+id:                     E3185
+trigger_tool:           meson|clang|pkg-config
+phase:                  configuration|compile
+error_signature:        epoxy/egl\.h file not found|fatal error: 'epoxy/egl\.h' file not found|egl\.h: No such file or directory
+
+severity:               3
+category:               platform, meson, display, graphics, gtk
+match_keywords:         epoxy/egl.h, libepoxy, -Dglx=no, -Degl=no, -Dx11=false, EGL, libEGL, sysroot, EGL/egl.h, OHOS 无窗口系统, retro-gtk, retro-runner, offscreen GL, packaging/compat, 兼容头
+title:                  libepoxy 制品仓以 egl=no 构建时不安装 epoxy/egl.h：需要 EGL 的包用 compat 头直连平台 EGL
+
+root_cause:             OHOS 无窗口系统（无 X11/Wayland），因此制品仓 libepoxy/1.5.10 以 -Dglx=no -Degl=no -Dx11=false 构建，安装的公开头只有 epoxy/gl.h、epoxy/common.h、epoxy/gl_generated.h —— 不含 epoxy/egl.h。GL 侧（epoxy/gl.h + libepoxy.a）可用，但任何直接 #include "epoxy/egl.h" 建离屏上下文的代码（如 retro-gtk 的 retro-runner/retro-gl-renderer.c）会在编译期缺头，且即使补头也没有 epoxy_egl* 转发实现的链接风险（本用例只调原生 egl* 函数，故无此问题）。
+affected_scope:         在 OHOS 上消费制品仓 libepoxy 且需要 EGL 头（epoxy/egl.h）的所有包：GTK3/GL 系前端、模拟器前端（retro-gtk/retro-runner）、离屏渲染类库。反之 libepoxy 自身不可修改（跨库修改违反 PR 原子性）。
+verification_cmd:       ls <libepoxy_pkg>/include/epoxy（只有 common.h/gl.h/gl_generated.h 即确认缺头）; 修复后 meson configure + compile 通过，且 ldd/readelf -d 产物出现 libEGL.so。
+
+rec_priority:           1
+rec_approach:           compat-header-expose-platform-egl
+rec_description:        配方内放 compat/epoxy/egl.h（内容：只 #include <EGL/egl.h> + <EGL/eglext.h>，不引入 epoxy_egl* 转发），meson 侧把该目录加入 include 路径并链接平台 libEGL（-lEGL）。依据：OHOS SDK sysroot 自带 EGL/egl.h、EGL/eglext.h 与 stub libEGL.so，裸 clang 默认可见；运行期由 /system/lib64/libEGL.so 提供实现。这与 blur/coin3/astromenace 直链平台 EGL/GLES 的做法同款；GL 侧仍走 libepoxy，未改写依赖。
+rec_command:            # generate(): tc.extra_cflags.append(f"-I{compat}"); tc.c_link_args.append("-lEGL")   # compat/epoxy/egl.h: #include <EGL/egl.h>
+rec_auto_fix:           false
+rec_impl:               conan-recipe-compat-header-plus-platform-lib
+
+fallback_priority:      2
+fallback_approach:      tool_requires-egl-conan-package
+fallback_description:   若需要 EGL 头/静态库的确定性来源（不依赖 sysroot 可见性），可 requires("egl/1.0.5")（制品仓已发布：EGL 头 + 静态 libEGL.a，cogl/1.22.8.1 先例）。注意静态 libEGL.a 是 C++ 实现，链接行需追加 -lc++_shared。
+fallback_command:      self.requires("egl/1.0.5")  # + 链接行 -lc++_shared
+fallback_auto_fix:      false
+fallback_impl:          conan-requires-egl-package
+
+principles:               
+doc_file:               knowledge/drafts/DRAFT-retro-gtk-1.0.2-epoxy-egl-disabled-library-header-gap.md
+last_updated:           2026-10-12
+source_event:           retro-gtk 1.0.2 HarmonyOS PC 适配（retro-runner 离屏 GL 上下文需要 epoxy/egl.h）
+source_pr:              ""
+source_commit:          ""
+
+metrics_success_count:  0
+metrics_fail_count:     0
+authors:               unknown
