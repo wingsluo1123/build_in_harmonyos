@@ -1,0 +1,25 @@
+# test_package manifest — xfaces 3.3
+# 记录 test_package 的测试策略与上游测试套件审计结论。
+
+upstream_tests_exist: false
+upstream_test_audit: "xfaces 3.3 上游无测试套件：tarball 无 tests/ 目录、无 test/check 目标（Makefile.noimake 仅 all/install/clean，imake Makefile 亦无；1994-03-08 上游快照审计）"
+
+test_type: "L1 无头真实执行被测二进制（R34）"
+
+upstream_test_audit_detail:
+  exists: false
+  evidence:
+    - "源码树无 tests/ 测试目录（tar tzf 实证）"
+    - "Makefile.noimake 目标仅 all/install/clean（grep 实证）"
+    - "imake 生成的 Makefile 无 check 目标（grep 实证）"
+  conclusion: "上游无自动化测试；test_package 以无效 DISPLAY 真实执行 xfaces，验证二进制可执行 + X11 全链路动态链接（libXaw/Xmu/Xt/Xpm/Xext/X11/compface）"
+
+test_commands:
+  - name: "xfaces (DISPLAY=:99 invalid)"
+    expectation: "XtInitialize 打印 Can't open display 后退出（main.c:485，无需 X server）；退出码非 127 且 stderr 不含 not found/symbol lookup——证明动态链接完整"
+
+runtime_library_strategy:
+  - "xfaces 的 X11 依赖全部来自 conan 包（libxaw/1.0.14 传递 libxt/libxmu/libxpm，libxext，libx11，compface）"
+  - "conanrun 环境 LD_LIBRARY_PATH + LD_PRELOAD 依赖序绝对路径双保险（HMBS [stale_runtime_library]，myman/xeyes 同款）"
+
+result_format: "HMBS_TEST_PACKAGE_RESULT JSON（discovered=1，passed 由 test_xfaces.sh 真实计数）"
