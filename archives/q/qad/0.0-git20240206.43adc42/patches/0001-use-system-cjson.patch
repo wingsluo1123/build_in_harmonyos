@@ -1,0 +1,34 @@
+--- a/meson.build
++++ b/meson.build
+@@ -8,6 +8,7 @@ config_h = configuration_data()
+ 
+ http_dep = dependency('libmicrohttpd', static: true)
+ png_dep = dependency('libpng', static: get_option('static'))
++cjson_dep = dependency('libcjson')
+ 
+ src_include = include_directories('include')
+ src_sources = [
+@@ -15,7 +16,6 @@ src_sources = [
+     'src/backends/input/evdev_input.c',
+     'src/backends/input/input_common.c',
+     'src/server.c',
+-    'src/cjson/cJSON.c',
+     'src/image/bmp.c',
+     'src/image/png.c',
+ ]
+@@ -23,6 +23,7 @@ src_sources = [
+ qad_deps = [
+         http_dep,
+         png_dep,
++        cjson_dep,
+ ]
+ 
+ link_args = []
+@@ -80,6 +81,7 @@ executable(
+     meson.project_name(),
+     src_sources,
+     include_directories: src_include,
++    install: true,
+     dependencies: qad_deps,
+     c_args: [
+         '-O3',
