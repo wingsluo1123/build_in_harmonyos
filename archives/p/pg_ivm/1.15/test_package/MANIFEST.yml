@@ -1,0 +1,49 @@
+# test_package/MANIFEST.yml
+package: pg_ivm/1.15
+homepage: "https://github.com/sraoss/pg_ivm"
+
+upstream_check_command: "make installcheck"
+upstream_test_in_build: true
+upstream_test_command: "make installcheck"
+
+upstream_tests_exist: true
+upstream_test_framework: pg_regress + pg_isolation_regress
+upstream_test_count: 13
+upstream_test_groups:
+  - pg_ivm
+  - create_immv
+  - refresh_immv
+  - outer_join
+  - create_insert
+  - refresh_insert
+  - insert_insert
+  - create_insert2
+  - refresh_insert2
+  - insert_insert2
+  - create_insert3
+  - refresh_insert3
+  - insert_insert3
+upstream_test_runner: "make installcheck (initdb cluster -> pg_ctl start -> copy packaged lib/pg_ivm.so + extension/* into staging -> createdb -> make installcheck)"
+upstream_test_dependency: "running PostgreSQL 18.3 server (postgres + initdb + pg_ctl + createdb binaries)"
+
+upstream_test_audit: |
+  Audited upstream v1.15 source tree. Upstream Makefile declares
+  REGRESS = pg_ivm create_immv refresh_immv outer_join (4 groups, each with
+  non-empty sql/<name>.sql and expected/<name>.out oracle) and
+  ISOLATION = create_insert refresh_insert insert_insert (+2/3 variants, 9
+  specs under specs/ with expected/<name>.out oracles). No upstream test was
+  modified, skipped or weakened: the harness runs the upstream Makefile's own
+  installcheck target against a throwaway PostgreSQL 18.3 cluster bootstrapped
+  from official sources and patched for HarmonyOS.
+
+test_package_tests:
+  - file: test_pg_ivm.c
+    description: "Smoke test: pg_ivm.so exists and is a valid 64-bit ELF shared object carrying .note.ohos.ident; control file declares default_version; pg_ivm--*.sql scripts are packaged"
+    command: "test_pg_ivm"
+    assertions: 5
+    executed: true
+    passed: true
+
+assertion_count: 18
+assertion_executed: 18
+assertion_skipped: 0

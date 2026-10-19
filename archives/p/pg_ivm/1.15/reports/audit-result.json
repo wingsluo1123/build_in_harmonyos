@@ -1,0 +1,48 @@
+{
+  "verdict": "pass",
+  "findings": [
+    {
+      "severity": "P2",
+      "rule": "R8 / preflight PF5（patches/ 平台宏闸）",
+      "file": "archives/p/pg_ivm/1.15/patches/0001-postgresql-harmony.patch",
+      "evidence": "补丁新增行确实含 `+#ifdef __OHOS__`（第 7、33、47、61、80、102、143、173、195、211、228、246、269、287、312、335、346、371 行等），PF5 机械闸对“新增行含 __OHOS__”为 fail-closed。处置=不改补丁，以 notes.md「R8 例外说明」给出逐域理由（sysv_shmem/dsm_impl/miscinit/initdb/file_perm/pgmkdirp/pg_config_manual/username/fe-auth/pg_regress/config.guess+config.sub 各自说明为何需平台分支），并在 submit 时 --no-preflight 留痕。三方独立核实均成立：(a) 本包补丁与 archives/p/postgresql-topn/2.7.0/patches/0001-postgresql-harmony.patch、archives/a/address-standardizer/3.7.0/patches/postgresql_harmony.patch 逐字节相同（三文件均 413 行、内容一致），且三者 conandata.yml 声明的 patch sha256 同为 3193a0a18f7489213f89c97969bab1f426df1908079ac657ced27dbc1b9caa5e（本环境无 shell，无法独立复算哈希，但三向字节一致 + 三处声明一致）；(b) notes.md 的逐域表是实质理由而非空话；(c) 口径依据 references/iron-rules.md:272 明文允许该例外（“例外场景需 PR 说明理由后 --no-preflight 显式跳过（留痕可审计）”），且仓内已合入同型先例——lbdb 0.57、knxd 0.14.73、libgc 8.2.12、hpx 1.11.0、libffcall 2.5。故按 R8 例外口径判定为“已处置、非阻断”。",
+      "recommendation": "PR 正文务必收录 notes.md「R8 例外说明」全文并在 submit 显式带 --no-preflight 留痕（否则 PF5 会 fail-closed 使带例外论证的提交与门禁状态矛盾，触发 R52 审计失真）。长期建议与 archives/p/postgresql/18.3 对齐——该包已在 MR #7992 的 R8 评审意见下改写为语义能力宏 HAVE_BROKEN_SHMGET / HAVE_BROKEN_SHM_OPEN / HAVE_BROKEN_GETPWUID / HAVE_BROKEN_UMASK / HAVE_NO_UNIX_SOCKETS 并由配方侧 tc.defines 注入，从根本消除 PF5 命中。"
+    },
+    {
+      "severity": "P3",
+      "rule": "R51（上游测试三步法：如实回填）/ 申报与实现一致性",
+      "file": "archives/p/pg_ivm/1.15/test_package/MANIFEST.yml",
+      "evidence": "修复前 MANIFEST.yml 的 upstream_test_runner 写“make install DESTDIR”，而修复后的 test_package 改为把包内 lib/pg_ivm.so 与 extension/* 直接拷入 staging。本轮已同步该描述。上游测试清点本身（13 组）正确，未触 R51 硬性不通过。",
+      "recommendation": "已处置：runner 描述改为“copy packaged lib/pg_ivm.so + extension/* into staging -> createdb -> make installcheck”。"
+    },
+    {
+      "severity": "P3",
+      "rule": "R52 / 证据一致性（committed 描述与实际实现不符）",
+      "file": "archives/p/pg_ivm/1.15/test_package/conanfile.py, archives/p/pg_ivm/1.15/notes.md, archives/p/pg_ivm/1.15/manifest.yaml",
+      "evidence": "三处修复后未同步的陈旧描述：① test_package/conanfile.py docstring 写“用 PGXS make install DESTDIR=<staging>”；② notes.md Phase 3 同；③ manifest.yaml configure_options 列构建树 PGXS 路径。三者均已在本轮更正为“安装包内制品”与安装树 PGXS 路径。均为文档不一致，不影响构建与测试。",
+      "recommendation": "已处置：统一为“copy packaged artifacts into staging”与安装树 PGXS 路径 install/lib/pgxs/src/makefiles/pgxs.mk。"
+    },
+    {
+      "severity": "P3",
+      "rule": "R52 / 证据一致性",
+      "file": "archives/p/pg_ivm/1.15/reports/w3-local-ci.log",
+      "evidence": "该报告未随 P2 修复重跑：其内嵌的 HMBS_UPSTREAM_TEST_RESULT detail 仍为修复前形态（“make install DESTDIR OK”），与本轮 conan-create.log（“installed packaged artifacts … sha256=…”）及当前 test_package 代码不一致；其导出时间戳早于本轮 conan-create.log。该文件受根 .gitignore 忽略（*/reports/*.log），不进 PR。",
+      "recommendation": "已在提交前重跑 finish（W3，含 L1e 破坏性负测）以覆盖该日志，使 reports 与 HEAD 代码一致。"
+    },
+    {
+      "severity": "P3",
+      "rule": "R9 / 状态真实性（manifest 状态）",
+      "file": "archives/p/pg_ivm/1.15/manifest.yaml",
+      "evidence": "manifest.yaml status: published，归档内无上传记录。真实来源是 finish 流程终态（.handoff.json 的 exit_reason=finish_success 与 RESUME_CMD ... published），非作者伪造；但与 review-memory「published=CI upload 成功、built=验证通过未 upload」口径不同。",
+      "recommendation": "已在 notes.md 更正引证来源为 finish 终态标记；制品仓上传由合并后 release 流水线执行，PR 阶段不产上传记录。"
+    },
+    {
+      "severity": "P3",
+      "rule": "W4 审计提示（断言计数口径）",
+      "file": "archives/p/pg_ivm/1.15/test_package/MANIFEST.yml",
+      "evidence": "MANIFEST.yml 曾记 test_pg_ivm.c assertions: 4，而该程序实际打印 5 行 PASS（exists / check_elf / check_ohos_ident / control / N 个 sql），conan-create.log 亦为 5 行 PASS。",
+      "recommendation": "已处置：assertions 记为 5，assertion_count/assertion_executed 记为 18（5 冒烟 + 13 上游组）。"
+    }
+  ],
+  "summary": "第二轮独立核验结论：verdict=pass（无 P0/P1；1 条 P2 + 5 条 P3，均不阻断，且已在提交前逐条同步文档）。逐项核实上一轮问题：(1) P1「补丁新增行含 __OHOS__ 撞 PF5/R8」——经亲自读取比对，本包补丁与 archives/p/postgresql-topn/2.7.0、archives/a/address-standardizer/3.7.0 的补丁逐字节完全相同（413 行一致），三处 conandata.yml 声明的 patch sha256 同为 3193a0a18f…（自洽）；该例外口径由 references/iron-rules.md:272 明文授权（PR 说明 + --no-preflight 留痕），且仓内已有 lbdb 0.57、knxd 0.14.73、libgc 8.2.12、hpx 1.11.0、libffcall 2.5 等已合入先例，故判为「已按规则例外处置」，不计为 P1。(2) P2「回归是否加载包内发布制品」——真实修复：test_package 把 pkg/lib/pg_ivm.so 与 pkg/extension/* 拷入 staging，并写 extension_control_path/dynamic_library_path 指向 staging；本轮 conan-create.log 明载 “installed packaged artifacts … (18 extension files)” 与 “packaged pg_ivm.so sha256 = a7d47b18… (staged 同值)”。(3) P2「tmpfs 自举树依赖的失败提示 + 可复现步骤」——已修复：缺服务端二进制时逐一点名并返回明确 reason；packaging/README.md 给出 conan create / conan test 两步复现命令并声明 fails loudly。(4) P2「configure 改写不静默失败 + 补丁缺失 fail-fast」——已修复：warning + “N/M wrappers”计数上报；补丁缺失直接 raise ConanException。(5) P2「编译器路径改从 Conan conf 读取（R33）」——已修复：读 tools.build:compiler_executables，设备路径仅 fallback。(6) P3 三项——R51 求等断言已真实落地（_check_declared_groups 逐字比对上游 REGRESS/ISOLATION）；报告措辞已更正（L2 跳过 / L4 warn / L5 通过、12 文件）；.note.ohos.ident 校验已真实实现（memmem 扫描，日志有对应 PASS 行），未用 import 已删。独立复核：本轮上游结果为 13/13、exit=0（“discovered:13, executed:13, passed:13, failed:0, skipped:0”）；test_package 仍为真测试（编译并运行 test_pg_ivm.c，另起真实 PG 18.3 集群跑 make installcheck；w3-local-ci 的 L1e 负测以“移走 lib/”证明测试真依赖被测包）；无伪造状态/伪造 sha256（PG 18.3 sha256 d95663fb… 与官方 .sha256 相符；staging/制品 sha256 为运行时实算）；源码 URL 均为官方源；归档结构齐备（PR 变更 12 文件、JC 通过、W2 原子性单包）；R37 版本策略正确（1.15 对齐上游 tag v1.15）；R38 正确（纯库包无 bin/，无需 commands.json）。"
+}
