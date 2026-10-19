@@ -1,0 +1,38 @@
+# ═══ Draft knowledge entry — 安装包环境上游 QtTest 多目标批量执行 + 私有符号隐藏补链 ═══
+# Timestamp: 2026-10-14
+# Software: qtconnectivity/6.11.1（模式适用多目标上游套件对着 conan 安装包执行的场合）
+# Gate: 积分赛 pc-pr-review rule4（上游用例真实执行）
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E3342
+title: 上游 QtTest 22 目标批量真实执行法（脚本生成统一 CMake 工程镜像
+  qt_internal_add_test + 安装包环境 + EGL/GLESv2 缓存变量）；安装库按 ELF 可见性隐藏
+  私有类 moc/虚分派符号时的补链（私有实现 cpp 编入测试本体，AUTOMOC 自包含，勿手挂 moc）
+trigger_tool: cmake|qt_internal_add_test|llvm-nm|QTest
+phase: upstream-test-execution
+error_signature: undefined symbol: Q.*Private::(qt_metacall|qt_metacast|
+  staticMetaObject)|duplicate symbol: Q.*Private::|Failed to find required Qt
+  component "Gui"|Could NOT find EGL|too many errors emitted
+severity:               3
+category:               linking, conan, elf-visibility, qt, test
+match_keywords: 批量执行, qt_internal_add_test 解析, 生成器, EGL_LIBRARY, GLESv2_LIBRARY,
+  SDK sysroot, 私有符号隐藏, globalize-symbol 无效, qnearfieldtarget_p.cpp, AUTOMOC
+  自包含, 手挂 moc 重复, nfccommons 仿真器, targetDetected 超时, QSKIP 分类
+root_cause: 上游树内测试链 build-tree 对象（私有符号可用），conan 安装库按 ELF 可见性
+  把私有类的 moc 符号与虚分派器隐藏（.dynsym 无、.symtab local t/d）——安装包环境独立
+  构建测试即缺符号；objcopy --globalize-symbol 只改 .symtab 改不了 .dynsym，单 moc 补不
+  齐虚分派实现体（在 *_p.cpp）；实现 cpp 自带尾部 moc include + AUTOMOC 使"编入实现源码"
+  自包含，额外手挂 moc 即重复定义。
+rec_approach: generated-cmake-batch-execution-plus-private-impl-link
+verification_cmd:
+  offscreen）；NFC 三目标补链后全部产物成型并出执行结果；commit fc4d7d21c3（MANIFEST
+  per-target 实测表，rule: none）。
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E3342.md
+affected_scope:         上游 QtTest 22 目标批量真实执行法（脚本生成统一 CMake 工程镜像
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        generated-cmake-batch-execution-plus-private-impl-link

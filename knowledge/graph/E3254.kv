@@ -1,0 +1,74 @@
+# DRAFT — 非阻塞发送队列保留短写尾部仍不足以保证活性
+
+id:                     E3254
+trigger_tool:           runtime|test
+phase:                  runtime|testing
+error_signature:        (?:queued|pending|outlen).*(?:bytes|data).*(?:timeout|stalled|never sent)|
+                        (?:short write|EAGAIN|EWOULDBLOCK).*(?:tail|queue).*(?:stalled|not resumed)|
+                        false_fix_wakeups=[1-9][0-9]*.*idle_wakeups=0
+
+severity:               2
+category:               portability, socket, network, runtime, testing
+match_keywords:         nonblocking TCP, short write, EAGAIN, EWOULDBLOCK, send queue,
+                        retained tail, POLLOUT, write fd set, backpressure, liveness,
+                        idle busy loop, final frame
+title:                  非阻塞发送队列保留短写尾部仍不足以保证活性：积压队列需要按需写就绪推进
+prescan_pattern:        (?:outlen|pending|queued).*(?:send|write)|(?:send|write).*(?:EAGAIN|EWOULDBLOCK)
+prescan_globs:          *.c, *.h, *.cc, *.cpp
+
+root_cause:             非阻塞 send() 短写或返回 EAGAIN 后，生产代码虽然把未发送尾部保存在
+                        buffer+length/offset 中，却只在新的业务 enqueue 路径再次调用发送器；
+                        事件循环没有在队列非空时注册 POLLOUT/write fd。若最后一帧后不再
+                        入队，即使接收端恢复读取也没有新的推进机会。无条件永久注册写事件
+                        又会因 socket 通常可写而在空队列形成忙轮询。
+affected_scope:         自研非阻塞 TCP/framed-stream 发送队列：短写后保存 offset/length，
+                        发送函数主要由入队路径调用，事件循环未按 pending length 注册写事件。
+                        阻塞 socket、外部框架已保证 write callback、或发送器有独立 one-shot
+                        调度的实现不适用。
+verification_cmd:       conan create archives/m/mvdsv/1.11 -pr:h=ci/conan/profiles/ohos-aarch64
+                        -pr:b=ci/conan/profiles/ohos-aarch64 --build=mvdsv/*;
+                        ctest --test-dir build/Release -R tcp_queue_liveness --output-on-failure
+
+rec_priority:           1
+rec_approach:           on-demand-writable-queue-drain
+rec_description:        入队时保留一次乐观发送；若短写或 EAGAIN 留下尾部，仅在队列非空
+                        时注册 POLLOUT/write fd，写就绪后从保存的 offset/length 继续，完整
+                        清空后立即取消监听。EINTR 原地重试，EAGAIN 保留队列，其他错误关闭
+                        连接；select 型循环还须拒绝越过 FD_SETSIZE 的描述符。回归必须覆盖
+                        “最后一帧后不再入队”、字节不丢失/不重复/不重排和空队列无持续唤醒。
+rec_command:            add pending-length-gated write interest and call the same queue flush routine
+                        from enqueue and writable-event paths; run the three-arm backpressure test
+rec_auto_fix:           false
+rec_impl:               source-event-loop-patch
+
+fallback_priority:      2
+fallback_approach:      schedule-deduplicated-one-shot-writer
+fallback_description:   若框架不暴露写事件集合，在短写/EAGAIN 后投递可去重的一次性 writer
+                        任务；任务未清空队列时继续等待框架写就绪，清空后不得重复调度。
+fallback_command:       on_pending_tail: schedule_once(queue_writer)
+fallback_auto_fix:      false
+fallback_impl:          event-loop-callback
+
+forbid_1_pattern:       while.*(?:EAGAIN|EWOULDBLOCK).*send|do.*send.*while.*(?:pending|outlen)
+forbid_1_reason:        EAGAIN 表示此刻不能推进；无等待的 send 重试循环会忙等。
+forbid_1_consequence:   单连接可持续占用 CPU，仍不保证对端恢复后的公平推进。
+forbid_2_pattern:       (?:FD_SET|POLLOUT|EPOLLOUT).*(?:always|unconditional|all sockets)|
+                        (?:always|unconditional).*(?:FD_SET|POLLOUT|EPOLLOUT)
+forbid_2_reason:        空队列 socket 通常可写，永久订阅会使事件循环持续立即返回。
+forbid_2_consequence:   空闲服务器忙轮询，连接数量增加时放大 CPU 消耗。
+
+principles:             P005
+doc_file:               knowledge/drafts/E549-draft-6F91.md
+last_updated:           2026-10-14
+source_event:           mvdsv/1.11 HarmonyOS PC 迁移；注入发送器确定性覆盖部分发送、EINTR、
+                        EAGAIN 和 fatal，真实非阻塞 socket 背压与 svtcpstream_t 链表证明原始
+                        尾部滞留、无条件写监听 128/128 次空闲唤醒、按需监听后 7000/7000
+                        字节有序送达且 0 次空闲唤醒。NET_Sleep 与测试复用生产流链表接线函数；
+                        调用点由源码审查和完整目标编译覆盖，实现位于 0002-0007 补丁。
+authors:                gcw_vbU49vcA <gcw_vbU49vcA@noreply.gitcode.com>
+source_pr:
+source_commit:
+metrics_success_count:  1
+metrics_fail_count:     2
+metrics_confidence:     0.9
+metrics_last_used:      2026-10-14

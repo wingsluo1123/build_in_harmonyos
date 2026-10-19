@@ -1,0 +1,51 @@
+#====================================================================
+# E14902 — 自动回复策略必须在有界展开后的逻辑邮件头上决策
+# Source event: vacation/3.3.3-nmu1 HarmonyOS PC migration
+#====================================================================
+
+id:                     E3365
+trigger_tool:           vacation|runtime|test
+phase:                  runtime|testing
+error_signature:        folded Auto-Submitted.*reply|folded Precedence.*reply|automatic response loop|policy header continuation bypass
+
+severity:               3
+category:               compat, portability, runtime, security
+match_keywords:         RFC 5322, RFC 3834, header unfolding, continuation line, Auto-Submitted, Precedence, vacation, automatic reply, fail closed, fgets, logical header
+title:                  自动回复循环抑制策略必须在有界展开后的逻辑邮件头上决策
+
+root_cause:             行式解析器在每次 fgets 返回的物理行上立即执行策略；当合法 RFC 5322 字段把值放到续行时，字段首行没有值而被提前忽略，续行也不会重新进入该字段分支，使 Auto-Submitted 或 Precedence 绕过自动回复抑制。单纯增大缓冲或特判某一个字段的一条续行没有建立统一逻辑字段边界，仍会被其他字段、多续行、CRLF 或越界输入绕过。
+affected_scope:         基于 RFC 5322 风格头字段执行循环抑制、鉴权、路由或内容策略的邮件工具；以及允许 continuation/folding、但实现按 read/fgets 物理块直接决策的文本协议解析器。不适用于明确禁止续行且每条物理记录独立的协议。
+verification_cmd:       Feed the installed responder equivalent single-line and folded Auto-Submitted/Precedence headers; observe the actual send side effect and throttle database; repeat with LF, CRLF and an over-limit logical header; then revert the unified unfold path and require the folded-policy cases to fail.
+
+rec_priority:           1
+rec_approach:           bounded-logical-header-before-policy
+rec_description:        先在固定上限内把字段首行及连续 FWS 续行重组为一个逻辑头，统一识别 LF/CRLF；只有完整逻辑头形成后才解析字段名和值并允许发送副作用。悬空续行、物理行截断和逻辑头溢出均失败关闭；Auto-Submitted 仅精确值 no 可继续，出站自动回复声明 Auto-Submitted: auto-replied。
+rec_command:            Run the installed-command consumer matrix for ordinary mail, inline/folded policy fields, CRLF, exact no, oversized logical headers, real database throttling, and fork/pipe/exec reply capture.
+rec_auto_fix:           false
+rec_impl:               source-patch
+
+fallback_priority:      2
+fallback_approach:      standards-aware-parser-library
+fallback_description:   若项目已有可靠的 RFC 5322 解析库，使用其有界字段展开接口并在解析完成事件上执行策略；仍须对溢出/畸形输入失败关闭，并验证真实发送副作用。
+fallback_command:
+fallback_auto_fix:      false
+fallback_impl:          source-patch
+
+forbid_1_pattern:       (fgets|read).*Auto-Submitted|Auto-Submitted.*fgets|if.*continuation.*Auto-Submitted
+forbid_1_reason:        在单个策略分支中特判一次物理续行只修复一个样本，未形成可由所有策略字段复用的逻辑头状态机。
+forbid_1_consequence:   其他字段、多续行、CRLF 或边界输入继续绕过策略；局部假修复在三臂实验中仍错误发送折叠 Precedence 邮件。
+forbid_2_pattern:       (MAXLINE|buffer).*(增大|increase)|strncasecmp\([^,]+,\s*"no",\s*2\)
+forbid_2_reason:        增大缓冲不能改变物理行与逻辑字段的语义错位；前缀比较还会把 nobody 等非 no 值误判为人工邮件。
+forbid_2_consequence:   解析在常见样本上看似通过，但循环抑制仍可被合法折叠或前缀值绕过。
+
+principles:               
+doc_file:               knowledge/drafts/E14902-draft-VAC1.md
+last_updated:           2026-10-15
+source_event:           vacation/3.3.3-nmu1 on HarmonyOS PC accepted folded Auto-Submitted and Precedence fields and entered the real reply path; a one-field continuation patch fixed only Auto-Submitted, while a bounded shared logical-header path suppressed both and preserved ordinary replies.
+authors:                 gcw_vbU49vcA <gcw_vbU49vcA@noreply.gitcode.com>
+source_pr:
+source_commit:
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-15

@@ -1,0 +1,23 @@
+id:                     E3377
+title: 模拟命令生成器保留同一Python与调用记录的入口适配
+trigger_tool: python|pytest
+phase: testing
+error_signature: MockCommand generated Python shebang command waits while same interpreter explicit execution succeeds
+severity:               2
+category:               portability, python, testing, shell
+match_keywords: MockCommand, testpath, generated command, shebang, same interpreter, argv recording, shell exec, original pytest
+root_cause: Testpath默认生成脚本直接以同一Python的shebang作为命令入口；目标中该路径等待，而同一解释器的二进制子进程和显式解释脚本可正常执行。入口路径的可执行性须独立验证，不能把原测试超时等同于整个Python提供者失效，或仅凭vfork标志推定根因。
+affected_scope: 需保持命令式调用与记录语义的Python默认模拟命令生成器
+verification_cmd: actual target pytest all original3 programs14 cases plus installed command stdout stderr exit and recorded argv
+rec_priority: 1
+rec_approach: preserve-generated-command-contract-through-same-interpreter-exec
+rec_description: 绑定官方commands.py与相同发布Python，分别比较裸命令、绝对脚本、显式解释器、关闭vfork和SDK对照；为实际HarmonyOS的默认生成内容采用系统Shell后exec同一sys.executable的单文件双语入口，用shlex.quote及原$0/$@保留解释器身份、参数和记录内容；自定义content与其他平台沿用原逻辑。全部原始测试与调用点不变，安装后再核对stdout/stderr、非零退出状态、单次记录和参数。
+rec_command: original verify_original.py pytest tests and installed MockCommand.fixed_output nonzero-exit consumer
+rec_auto_fix: false
+rec_impl: Keep original test call sites; adapt only default Harmony generator content; bind the actual interpreter and preserve script argv, recording and extra code.
+doc_file: knowledge/drafts/E2026101615368-draft-A139.md
+last_updated: 2026-10-16
+source_event: testpath-0.6.0-official-20261016-r1102; two native creates original3 programs14 cases C3H1; W3log 1ee26222da977218f7f5e86b6d9c07df52ce5db2eae874ef5cea8406e20b9734
+authors: 2301_80739235
+source_pr:
+source_commit:

@@ -1,0 +1,78 @@
+#====================================================================
+# DRAFT — bishengjdk17 libfontmanager 缺 libfreetype.so.6（问题类：平台运行库 NEEDED 供给缺口）
+# 层级: L1 平台/工具链语义层（musl/libc 与平台库供给差异）
+# 建议编号 Exxx 由知识库主编确认后回填，本稿不自编号
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E3274
+trigger_tool:           java|javac|conan
+phase:                  runtime|testing
+error_signature:        UnsatisfiedLinkError.*libfontmanager\.so|Error loading shared library libfreetype\.so\.6|ExceptionInInitializerError.*SunFontManager|NoClassDefFoundError.*sun\.font|NoClassDefFoundError.*java\.awt
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               2
+category:               platform, ohos, musl, java, runtime
+match_keywords:         libfontmanager, libfreetype.so.6, UnsatisfiedLinkError, SunFontManager, sun.font, java.awt.Font, AWT, headless, NEEDED, bishengjdk, freetype, font, Error loading shared library
+title:                  bishengjdk17 的 libfontmanager.so 按 ELF NEEDED 依赖 libfreetype.so.6 而 OHOS PC 设备不提供该库，任何触发 AWT/字体栈的 Java 代码运行必败（UnsatisfiedLinkError），消费者应走 headless-safe 路径
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             bishengjdk17 的 libfontmanager.so 的 ELF NEEDED 项含 libfreetype.so.6（工具实现证据：llvm-readelf -d 列出 NEEDED [libfreetype.so.6, libawt.so, libjava.so, libjvm.so, libc++_shared.so, libc.so]）→ musl 动态链接器按 NEEDED 逐项解析，设备运行库目录（/usr/lib、/system/lib64、HNP 目录）均无 libfreetype.so.6 → dlopen libfontmanager.so 失败，JVM 抛 java.lang.UnsatisfiedLinkError: ... Error loading shared library libfreetype.so.6: (needed by .../libfontmanager.so) → 该错误发生在 sun.font.SunFontManager 静态初始化（<clinit>）内，升级为 ExceptionInInitializerError → 之后任何触碰该类的消费者得到 NoClassDefFoundError 连锁（本库上游测试 15 项连锁失败留档，均同根因）→ 归类：平台运行库供给缺口（NEEDED 缺失是加载期硬失败），非移植缺陷、非上游依赖问题。
+affected_scope:         任何在 OHOS PC 上触发 Java AWT/字体栈的消费者——java.awt.Font 实例化、Swing 组件/菜单、JavaBean 编辑器、直接或间接引用 sun.font 的代码——无论被移植库是哪个；平台不提供 libfreetype.so.6，该缺口对所有 JDK 消费者同构复现。
+verification_cmd: |
+  设备开新 shell（自包含，不依赖任何 run 日志）：
+  1) 工具实现证据——NEEDED 项在位：
+     llvm-readelf -d ~/bishengjdk17/lib/libfontmanager.so | grep NEEDED
+     预期首行：NEEDED Shared library: [libfreetype.so.6]
+  2) 库缺失证据：
+     ls /usr/lib/libfreetype* /system/lib64/libfreetype* 2>/dev/null
+     预期：均无输出（exit 2）。
+  3) 加载期定向复现：
+     cd "$HOME" && printf 'public class FTProbe{public static void main(String[] a){System.out.println(new java.awt.Font("SansSerif",0,12).getFamily());}}' > FTProbe.java
+     ~/bishengjdk17/bin/javac FTProbe.java && ~/bishengjdk17/bin/java FTProbe 2>&1 | head -3
+     预期：Exception in thread "main" java.lang.UnsatisfiedLinkError: .../libfontmanager.so: Error loading shared library libfreetype.so.6: (needed by .../libfontmanager.so)
+  4) 对照（headless-safe 路径不受影响）：
+     cd "$HOME" && printf 'public class OKProbe{public static void main(String[] a){System.out.println("headless ok " + (6*7));}}' > OKProbe.java
+     ~/bishengjdk17/bin/javac OKProbe.java && ~/bishengjdk17/bin/java OKProbe
+     预期输出：headless ok 42
+  5) 清理：rm -f ~/FTProbe.java ~/FTProbe.class ~/OKProbe.java ~/OKProbe.class
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           headless-safe-consumer-path
+rec_description:        消费侧走 headless-safe 路径，绕开字体栈而非修补它：1) 类存在性断言一律用三参形式 Class.forName(name, false, classloader)——不触发静态初始化，避开 SunFontManager <clinit> 连锁；2) 只实例化确认无 GUI/字体依赖的契约类（引擎类、启动器类），实例化前用 -Djava.awt.headless=true 运行环境；3) 触碰上游测试中 AWT/字体路径的用例如实记录为平台缺口连锁，不修改测试 oracle、不预置答案、不整体跳过。本范式在 jakarta-jmeter 2.13 test_package 全量实证（纯 JDK 反射消费者，12 断言全过）。
+rec_command:            test_package 断言形如：Object engine = Class.forName("org.apache.jmeter.engine.StandardJMeterEngine").getConstructor().newInstance();（headless-safe 实例化断言）；类存在性用 Class.forName(name, false, cl)。运行环境 java -Djava.awt.headless=true。
+rec_auto_fix:           true
+rec_impl:               recipe-test-consumer
+
+fallback_priority:      2
+fallback_approach:      self-provision-freetype-soname
+fallback_description:  自供 libfreetype.so.6 实体并注入加载路径（LD_LIBRARY_PATH 指向自建库目录，或拷入 ~/bishengjdk17/lib/）。诚实权衡：HNP 无现成 freetype 包，需从源码自行构建；本 run 未验证该路径有效性；自编译 .so 还须过 ELF 签名门禁（与系统 JDK 同签名体系，见 P017/E083），且只是掩盖平台缺口而非修复供给——仅作确需 AWT 路径时的退路，并应同步向平台方提出库供给诉求。
+fallback_command:       export LD_LIBRARY_PATH=<自建freetype目录>:$LD_LIBRARY_PATH && ~/bishengjdk17/bin/java -Djava.awt.headless=false FTProbe
+fallback_auto_fix:      false
+fallback_impl:          manual-workaround
+
+forbid_1_pattern:       假设.*平台.*JDK.*字体栈可用|直接实例化.*java\.awt\.Font(?!.*probe)
+forbid_1_reason:        libfontmanager.so 的 NEEDED 缺失是加载期硬失败，与代码写法无关；设备不提供 libfreetype.so.6 是平台供给事实。
+forbid_1_consequence:   运行期 UnsatisfiedLinkError，SunFontManager <clinit> 失败后同进程所有字体栈消费者 NoClassDefFoundError 连锁。
+forbid_2_pattern:       Class\.forName\(name\)(?!.*false)|二参 forName.*断言.*存在性
+forbid_2_reason:        二参 forName 触发静态初始化；若目标类依赖链含 SunFontManager，会把加载期失败放大成 ExceptionInInitializerError/NoClassDefFoundError，把"类是否存在"误判为"类不可用"。
+forbid_2_consequence:   test_package 断言连锁误报，诊断被引向移植缺陷而非平台缺口。
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             P017, P013
+# ═══ 关系图 (Relations) ═══
+# ═══ 元数据 ═══
+doc_file:               drafts/DRAFT-bishengjdk-fontmanager-freetype-gap.md
+last_updated:           2026-10-13
+source_event:           jakarta-jmeter 2.13 run：上游测试 ant test-headless 真机全量执行中 15 项失败同根因（UnsatisfiedLinkError → SunFontManager ExceptionInInitializerError → NoClassDefFoundError 连锁），失败清单逐条留档；test_package 以 headless-safe 反射消费者范式 12 断言全过，证明推荐路径可行
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors: sea_crab
+source_pr:
+source_commit: 合并后回填
+# ═══ 质量指标 (Quality metrics) ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     0.9
+metrics_last_used:      2026-10-13

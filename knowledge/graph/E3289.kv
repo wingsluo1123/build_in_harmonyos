@@ -1,0 +1,95 @@
+#====================================================================
+# DRAFT-static-artifact-count-pinning — 静态产物校验套件必须把「产物数量」钉死：
+#   否则破坏性反向验证（L1e）删掉一个产物后所有检查仍然全绿（假绿）。
+#   来源：scikit-learn 1.6.1（OHOS aarch64，68 个扩展模块）test_package 实跑
+#
+# 对应的人类文档: knowledge/drafts/DRAFT-static-artifact-count-pinning.md
+#
+# 与 DRAFT-rapt-ble-0.1.2-native-wheel-closure-e212-probe-fallback 的关系：
+#   那条讲「E212 沙箱拒绝 dlopen 时要退回静态校验通道」——是对的，但没讲这个通道
+#   自身怎么变成假绿。本条补的正是这一步：静态通道的量词只有「每个产物都满足性质」，
+#   缺「产物总数等于已知值」，于是产物集合缩小不会被发现。
+#
+# 本条目为 draft（草稿），尚未由主编审核合入。正式编号由 graph promote 分配。
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E3289
+trigger_tool:           test|conan|python
+phase:                  testing
+error_signature:        failedCount": 0 .*"channel": "static-artifact-verification|
+                        67/67 全绿|[0-9]+/[0-9]+ all good.*extensionsVerified|
+                        expected .* compiled extensions.*found
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               2
+category:               limitation, detection, conan, packaging, testing
+match_keywords:         静态校验, static verification channel, E212, hmmac, dlopen 被拒, glob 发现产物,
+                        os.walk, 逐文件断言, 破坏性反向验证, L1e, reverse verification, false green, 假绿,
+                        EXPECTED_EXTENSIONS, 产物数量钉死, DT_NEEDED, .codesign, EM_AARCH64, ABI tag,
+                        partial install, HMBS_TEST_PACKAGE_RESULT
+title:                  「遍历所有产物逐个断言性质」的套件必须同时断言产物总数等于构建系统已知值——否则少装一个产物只是少跑一次循环，全绿照旧，反向验证失去判别力
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             这类套件的断言全是全称量词（for each artifact: EM_AARCH64 / .codesign 有效 /
+                        DT_NEEDED 含 libpython3.12 / 只链 musl libc.so / ABI tag == 本机 EXT_SUFFIX），却没有一条计数断言。
+                        产物集合由 os.walk/glob 现场发现，所以「装少了」只是让循环少跑一轮，不是让某一轮失败——
+                        分母跟着缩，通过率仍是 100%（scikit-learn 1.6.1 实测：68 个扩展移走 1 个，6 项静态检查全部 PASS，日志写 67/67 全绿）。
+                        CI 门禁（conan create 退出码、L0/L1 日志痕迹、L5 产物非空）只看「有没有」和「日志好不好」，
+                        同样不区分「68 个全在」与「68 个缺 1 个」。最坏的后果不是漏报一个包，而是 L1e 破坏性反向验证在最典型的
+                        缺陷形态（产物缺失/漏装/漏签名）上空转：注入缺陷不产生任何失败信号。
+affected_scope:         任何「枚举产物 + 逐文件断言」的验证：Conan test_package 的静态校验通道（E212 或运行期依赖不可得时唯一
+                        的证据面）、安装后 site-packages/include/lib 布局校验、插件与模块打包校验、签名与 ELF 批量校验，
+                        以及任何拿 glob 结果当分母算通过率的脚本；也包括上游测试计数聚合（collected 需等于 passed+failures+errors+skipped+xfailed 的可核对恒等式）。
+verification_cmd:       # 1) 看分母从哪来：来自 glob/walk 现场枚举而不是已知常量，即命中本模式
+                        grep -nE "glob\.glob|os\.walk" test_package/test_*.py
+                        # 2) 在产物副本上注入缺陷（不动原包）：移走 1 个扩展后复跑静态组
+                        mv <pkg>/site-packages/sklearn/utils/arrayfuncs*.so /tmp/ && python3 test_ohos_platform.py --site-dir <pkg>/site-packages --json out.json
+                        #    failed=0 即为假绿 → 数量未被钉住
+                        # 3) 钉住后应点名失败，且完整包复跑仍全绿
+                        grep -n "^EXPECTED_EXTENSIONS" test_package/test_*.py
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+# 推荐方案 (priority 越小越优先, 从 1 开始)
+rec_priority:           1
+rec_approach:           pin-artifact-count-in-discovery
+rec_description:        (a) 权威数量取自构建系统，不取自当前安装结果：scikit-learn 1.6.1 的 meson 声明 Build targets in project: 111，
+                        展开为 68 个扩展模块（ninja [251/251] 与产物树里 68 个 .so 对齐），写成测试脚本模块常量 EXPECTED_EXTENSIONS = 68。
+                        (b) 断言放进**发现函数内部**（_extensions() 里 assert len(sos) == EXPECTED_EXTENSIONS）而不是某一条检查里，
+                        这样所有依赖枚举的检查天然继承同一临界条件，不存在「只有一条会失败」的漏洞。
+                        (c) 让计数进证据链并与配方对账：脚本 --json 输出 discovered/passed/failed 与实际枚举数，
+                        test_package 的 conanfile 按通道校验 discovered == expected（live 12+9、静态 6），
+                        并把 extensionsVerified 写进 HMBS_TEST_PACKAGE_RESULT= marker，不符即 ConanException。
+                        (d) 让文档生成器读同一个常量再与真实 glob 数 assert 相等，MANIFEST/测试报告的数字不可能与产物漂移。
+                        (e) 用它反证自己：完整包复跑全绿（静态 6/6、--runtime 9/9）+ 注入缺陷必失败（移走 1 个 → 6 项静态全部 failed）。
+rec_command:            EXPECTED_EXTENSIONS = 68; sos = [walk site-packages/sklearn for *.so]; assert len(sos) == EXPECTED_EXTENSIONS, "expected %d compiled extensions, found %d"
+rec_auto_fix:           false
+rec_impl:               test-script
+
+fallback_priority:      2
+fallback_approach:      expect-file-list-from-build-system
+fallback_description:   若构建系统不便给出总数，改为对**完整文件清单**做集合相等校验（把 meson/ninja 的 install manifest 或
+                        pip install --dry-run 的文件列表当期望集），同样能让「缩小」变成失败。代价是清单需随版本维护，
+                        比单个常量更易漂移，只在拿不到可靠计数时使用。
+fallback_command:       ninja -C build --dry-run | grep -c '\.so'   # 或比对 meson install --dry-run 的文件清单
+fallback_auto_fix:      false
+fallback_impl:          test-script
+
+forbid_1_pattern:       f"\\{(ok|passed)\\}/\\{len\\((sos|artifacts|files)\\)\\} (all good|PASS)"|
+                        (passed|ok)\\s*/\\s*len\\(glob
+forbid_1_reason:        以现场枚举结果当分母，等于让被测对象自己决定通过标准；产物越少分母越小，通过率越高。
+forbid_1_consequence:   部分安装、漏签名的产物、被 install 规则丢掉的模块全部静默通过；反向验证空转，评审按「测试无判别力」判不通过。
+
+forbid_2_pattern:       EXPECTED_\\w+\\s*=\\s*len\\(|expected.*=.*glob\\.glob
+forbid_2_reason:        期望值取自实测枚举就变成恒等式，永远成立——看起来「钉了数量」，实际钉的是当前产物数。
+forbid_2_consequence:   与假绿同果且更难发现；换机器或换配置时该常量还会跟着产物一起漂移。
+
+principles:               
+doc_file:               knowledge/drafts/DRAFT-static-artifact-count-pinning.md
+last_updated:           2026-10-14
+source_event:           scikit-learn 1.6.1 OHOS aarch64 适配，test_package 静态通道 L1e 反向验证实跑
+
+authors: AtomCode <atomcode@atomgit.com>
+source_pr: feat/scikit-learn-1.6.1
+source_commit:
+

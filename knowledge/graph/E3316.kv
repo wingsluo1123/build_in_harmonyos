@@ -1,0 +1,69 @@
+#====================================================================
+# DRAFT — libkdumpfile 0.5.5: autotools 生成 libtool 缺 echo 定义与
+# tool_oldlib 未赋值导致编译/链接失败
+#====================================================================
+
+id:                     E3316
+title:                  autotools 项目在 OHOS 上 configure 生成的 libtool 脚本存在两个缺陷：小写 echo 变量未定义（X--tag=CC: inaccessible or not found）与 old_archive_cmds/old_postinstall_cmds 引用未赋值的 tool_oldlib（ranlib 无参调用），需在 build() 内联修补生成物
+error_signature:        X--tag=CC: inaccessible or not found|
+                         libtool: ignoring unknown tag : inaccessible or not found|
+                         libtool: cannot infer operation mode from .*inaccessible or not found|
+                         ranlib.*Usage: ranlib \[options\] archive|
+                         ar cr .*\.a.*~ranlib.*(无参数|no argument)
+trigger_tool:           libtool|make|autotools
+phase:                  build|link
+severity:               2
+category:               hmdfs, autotools, libtool
+match_keywords:         libtool, echo, tool_oldlib, X--tag, ranlib, old_archive_cmds,
+                         autotools, config.status, 生成物, print -r
+
+root_cause:             configure 生成的 libtool 脚本在 config 段只定义了大写 ECHO
+                         （如 ECHO="print -r --"），而脚本主体全部使用小写 $echo；
+                         $echo 展开为空字符串时，参数解析行 `$echo "X$opt"` 变成把
+                         字面量 `X--tag=CC` 当命令执行（"inaccessible or not found"）。
+                         此外 libtool.m4 在 RANLIB 非空时向 old_archive_cmds /
+                         old_postinstall_cmds 追加 `$RANLIB $tool_oldlib`，但本环境
+                         生成的 ltmain 路径从未给 tool_oldlib 赋值，ranlib 被无参调用
+                         打印 Usage 并失败。两者都发生在 configure 之后的生成物
+                         （libtool 脚本），不随 tarball 源码分发，无法用静态补丁覆盖。
+
+affected_scope:         所有 autotools 项目在本环境 configure 后生成的 libtool
+                         （libkdumpfile 0.5.5 实测；xz/tar/wget 等同类项目同构）
+
+verification_cmd:       grep -c "echo=\$ECHO" <build_dir>/libtool;
+                         grep -c "tool_oldlib" <build_dir>/libtool;
+                         ./libtool --tag=CC --mode=compile <cc> -c sample.c
+
+rec_priority:           1
+rec_approach:           patch-generated-libtool-inline
+rec_description:        conanfile.py build() 在 autotools.configure() 之后、make 之前
+                         对生成 libtool 做两处内联替换（正则，兼容转义形态）：
+                         ① 在 `^ECHO=.*$` 行后补 `echo=$ECHO`；
+                         ② 把 `$RANLIB $tool_oldlib` / `\$RANLIB \$tool_oldlib` 及其
+                         `-t` 变体改为引用 $oldlib（该路径下 $oldlib 有值）。
+                         修补对 source/build 两个候选路径都执行；找不到文件或模式时
+                         记录 warning 不阻断。补丁只改生成物，不入 patches/ 管线。
+
+rec_command:            # conanfile.py build() 内联（见 libkdumpfile 0.5.5 配方）：
+                        #   _patch_libtool(): re.sub(r"(^ECHO=.*$)", r"\1\necho=$ECHO", ...)
+                        #   text.replace("$RANLIB $tool_oldlib", "$RANLIB $oldlib")
+                        #   text.replace("\\$RANLIB \\$tool_oldlib", "\\$RANLIB \\$oldlib")
+rec_auto_fix:           true
+rec_impl:               build-inline-patch
+
+forbid_1_pattern:       --build=*|--host=*
+forbid_1_reason:         禁用交叉编译参数绕过；E007/E011 同类问题必须修生成物而非伪装交叉编译
+forbid_1_consequence:   configure 误判 cross_compiling 导致 AC_RUN_IFELSE 全跳过
+
+principles:             P004, P006
+last_updated:           2026-09-23
+source_event:           archives/l/libkdumpfile/0.5.5
+authors:
+source_pr:
+source_commit:
+metrics_success_count: 1
+metrics_fail_count: 0
+metrics_confidence: 0.9
+metrics_last_used: 2026-09-23
+authors:               
+doc_file:               doc/E3316.md

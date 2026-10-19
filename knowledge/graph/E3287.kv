@@ -1,0 +1,85 @@
+#====================================================================
+# DRAFT-ohos-cpu-topology-sysfs-core-siblings-list
+# OHOS sysfs 只暴露 *_list 兄弟文件（无 core_siblings），hwloc 静默退化为单 PU
+# 来源: likwid 5.5.1 适配 (2026-10-13, task 8470)
+#====================================================================
+
+id:                     E3287
+trigger_tool:           runtime|make|conan create
+phase:                  runtime|configuration
+error_signature:        failed to find sysfs cpu topology directory, aborting linux discovery|get_obj_by_type.*HWLOC_OBJ_SOCKET.*0|Failed to read cpuinfo|nbobjs_by_type.*PU.*=.*1
+match_keywords:         hwloc, sysfs, core_siblings, core_siblings_list, thread_siblings, thread_siblings_list, physical_package_id, package_cpus, core_cpus, CPU topology, /sys/devices/system/cpu, PU, Package, Socket, single PU fallback, OHOS, likwid
+category:               platform, compat, detection, ohos, kernel
+severity:               2
+forbid_1_pattern:       pthread_setaffinity_np|program_invocation_name|__progname
+forbid_1_reason:        本条目只讲 OHOS sysfs 兄弟文件的命名差异；glibc 专有符号属于 E211/E147/E094（affinity API）与 E493（progname）的领域，不是本类。
+forbid_2_pattern:       HWLOC_COMPONENTS|HWLOC_FSROOT|HWLOC_THISSYSTEM
+forbid_2_reason:        这些环境变量在本条实测中均无法恢复拓扑（linux 组件仍在 check_sysfs_cpu_path 处中止）；不要把它当成"配置即可"的假修复。
+root_cause: >
+  OHOS/HarmonyOS 的 /sys/devices/system/cpu/cpuN/topology/ 暴露的是
+  core_siblings_list / thread_siblings_list（cpulist 文本形式），以及只有
+  thread_siblings（cpumask 十六进制），但**没有 core_siblings**；同时也没有
+  较新内核的 package_cpus / core_cpus / die_cpus。hwloc 2.9.3 的
+  check_sysfs_cpu_path() 只接受两组文件名之一：
+    (a) core_siblings + thread_siblings，或
+    (b) package_cpus / core_cpus（新内核）
+  OHOS 两组都不满足 → 该函数返回 -1 → hwloc_linuxfs_look_cpu() 直接
+  "failed to find sysfs cpu topology directory, aborting linux discovery"，
+  linux 组件整体放弃 CPU 发现，回落到 no_os 组件，于是
+  hwloc_get_nbobjs_by_type(PU) == 1（不是 20）。**不报错、不崩溃，只是静默
+  给出一台"单核机器"**——依赖 hwloc 的程序会据此得到错误的拓扑/亲和性。
+  第二个同族现象：OHOS 不会因 physical_package_id=0 生成 Package/Socket 对象，
+  所以 hwloc_get_obj_by_type(HWLOC_OBJ_SOCKET, 0) == NULL；要求"必须有 Socket
+  对象"的代码（如 likwid 的 hwloc_init_cpuInfo）会直接返回 -EFAULT。
+  实测对比：同一份 OHOS sysfs，外部 hwloc 2.14.0 报 PU=20/CORE=10（它放宽了
+  文件名判断），而捆绑的 hwloc 2.9.3 报 PU=1；两者都报 SOCKET=0/PACKAGE=0。
+rec_approach: >
+  对 CPU 拓扑库做"最小可移植"修，不改平台宏、不依赖环境变量：
+  (1) 放宽兄弟文件名探测：check_sysfs_cpu_path() 除 core_siblings+thread_siblings
+      外，也接受 core_siblings_list+thread_siblings_list（OHOS 提供后者）；
+      命中后仍按 old_filenames 读取 thread_siblings（OHOS 有）即可拿到 core 划分。
+      ——注意 core_siblings 缺失只影响 Package 划分，不影响 PU/CORE。
+  (2) 容忍缺少 Package/Socket：把"必须有 Socket 对象"改成
+      "SOCKET → PACKAGE → PU 依次回退"，用 PU 对象承载 CPU 身份信息
+      （CPUModel 之类的 info 在 OHOS 上本就来自 /proc/cpuinfo，不在对象上）。
+  (3) 验证口径用"PU 计数"而不是"进程能跑"：打补丁前
+      hwloc_get_nbobjs_by_type(PU) == 1，打补丁后 == 20（本机实测），
+      同时 likwid-topology 打出 20 个 HWThread、6 个 socket。
+rec_command: >
+  conan create archives/l/likwid/5.5.1 -pr:h=$HOME/.conan2/profiles/ohos-aarch64 \
+  -pr:b=$HOME/.conan2/profiles/ohos-aarch64 --build=missing
+verification_cmd: >
+  cat > /tmp/hwdiag.c <<'EOF'
+  #include <stdio.h>
+  #include <hwloc.h>
+  int main(void){ hwloc_topology_t t; hwloc_topology_init(&t);
+    hwloc_topology_set_flags(t, HWLOC_TOPOLOGY_FLAG_INCLUDE_DISALLOWED);
+    hwloc_topology_load(t);
+    printf("PU=%d CORE=%d SOCKET=%d\n",
+      hwloc_get_nbobjs_by_type(t,HWLOC_OBJ_PU),
+      hwloc_get_nbobjs_by_type(t,HWLOC_OBJ_CORE),
+      hwloc_get_nbobjs_by_type(t,HWLOC_OBJ_SOCKET)); return 0; }
+  EOF
+  clang /tmp/hwdiag.c -I<hwloc>/include -L<hwloc>/lib -lhwloc -o /tmp/hwdiag && /tmp/hwdiag
+  - "archives/l/likwid/5.5.1/patches/0002-ohos-hwloc-sysfs.patch（check_sysfs_cpu_path 接受 *_list）"
+  - "archives/l/likwid/5.5.1/patches/0003-ohos-no-package-mempolicy.patch（SOCKET→PU 回退）"
+  - "archives/l/likwid/5.5.1/notes.md（实测 PU=1 → PU=20）"
+  - "真机 /sys/devices/system/cpu/cpu0/topology/ 目录列表：core_id, core_siblings_list, physical_package_id, thread_siblings, thread_siblings_list（无 core_siblings/package_cpus/core_cpus）"
+  - "对照：registry hwloc/2.14.0 同一 sysfs 报 PU=20 CORE=10 SOCKET=0"
+  - "graph 查重：hwloc / core_siblings / thread_siblings / cpu topology / physical_package_id / package_cpus 均 0 命中；E287 是无关的 fuzz/tftp 条目"
+  - "任何在 OHOS 上做 CPU/缓存/NUMA 拓扑发现的库：hwloc 及基于它的 OpenMPI、libnuma 封装、性能工具（likwid、perf 包装等）"
+  - "读取 /sys/devices/system/cpu/*/topology/ 判断 core/socket 划分的自研代码"
+  - "要求 hwloc 必须有 Package/Socket 对象才继续的消费者"
+principles:             P005, P011
+caused_by:
+similar_to:
+authors:                 frj__ <241250055@smail.nju.edu.cn>
+source_pr:
+source_commit:
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-19
+doc_file:               doc/E3287.md
+affected_scope:         general
+rec_description:        >

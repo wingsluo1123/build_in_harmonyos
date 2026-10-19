@@ -1,0 +1,62 @@
+# ═══ Draft knowledge entry — autotools 可选依赖 *_LIBS="no" 字面量泄漏进链接行：make 命令行变量覆盖 ═══
+# Software: 泛化（实证 xroar 1.11）
+# Gate: 真机 shadow conan create (ohos-aarch64, 2026-10-13, r4→r6)
+# Status: DRAFT — same-stem .md/.kv pair
+
+id:                     E3301
+severity:               2
+category:               build-system, autotools, link
+trigger_tool: make
+phase: build
+
+error_signature: "clang: error: no such file or directory: 'no'|cc: error: no such file or directory: 'no'"
+
+match_keywords: link fails literal no, makefile variable equals no, optlib detection failure leaks linker, GL_LIBS no, make VAR= fix link, undefined symbols after emptying libs
+
+root_cause: |
+  上游 configure/宏在可选依赖检测失败时把 AC_SUBST 的 <NAME>_LIBS 赋值为
+  字面量 "no"（而非空串），且消费该库的源文件无条件编入；make 展开时 "no"
+  成为链接行参数。两类连锁形态：
+  - 保留 "no" → clang: no such file or directory: 'no'
+  - 盲目置空 → 真正的 undefined symbol（说明消费代码并非纯 stub）
+
+rec_approach: make-cmdline-var-override-with-equivalent-system-lib
+rec_description: |
+  1) 识别：链接报 "no such file or directory: 'no'" 且编译全过。
+  2) 定位：grep -n '^[A-Za-z_][A-Za-z0-9_]* = no$' <build-dir>/**/Makefile
+  3) 处置（不打源码补丁）：
+     - 有等价系统库：make -j1 <VAR>=-l<lib>（如 GL_LIBS=-lGLESv3，
+       /system/lib64/libGLESv3.so 提供 GL 3.0 核心符号）
+     - 消费代码本应 stub：make -j1 <VAR>= 置空，但必须消费者测试确认
+       没有真实调用走到这些符号。
+  4) 验证：make V=1 <target> 目检链接行；grep 修复后日志 'no' 计数为 0。
+  5) 判别 jnoise 型（命令位置编译器名硬编码，make VAR= 无效）：报错参数在
+     命令名位置 vs 参数位置——见
+     DRAFT-jnoise-0.6.0-makefile-linkline-literal-cxx-name。
+  6) 运行期真的渲染/调用该库时，直连 GLESv3 符号是调度空桩，须按
+     DRAFT-ohos-gl-symbols-are-dispatcher-stubs 走 eglGetProcAddress 路线；
+     headless 包（不实际渲染）直连链接即可。
+
+rec_command: |
+  grep -n '^[A-Za-z_][A-Za-z0-9_]* = no$' <build-dir>/**/Makefile
+  make V=1 <target> 2>&1 | tail -1
+  # conan 配方内：self.run('CONFIG_SHELL=/bin/sh SHELL=/bin/sh make -j1 <VAR>=-l<lib>', env="conanbuild")
+
+rec_auto_fix: false
+
+affected_scope: |
+  全平台 autotools 项目（非 OHOS 特有）；凡可选依赖检测失败分支写了
+  VAR="no" 且消费源文件无条件编译的 configure.ac/m4 宏。CMake/Meson 不适用。
+
+verification_cmd: |
+  grep -c "directory: 'no'" <conan-create-log>   # 修复后为 0
+
+authors:
+  - codex
+source_pr:
+source_commit: pending
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-19
+authors:               
+doc_file:               doc/E3301.md

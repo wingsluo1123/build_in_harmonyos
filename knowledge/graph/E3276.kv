@@ -1,0 +1,33 @@
+#====================================================================
+# Draft: kcolorchooser 26.04.0 -- Qt/KF6 消费者测试在 OHOS 上必然报
+#        "Could not find the Qt platform plugin"：Conan Environment.append()
+#        把目录列表用空格（而非 os.pathsep）连接
+#====================================================================
+
+id:                     E3276
+trigger_tool:           conan
+phase:                  test|runtime
+error_signature:        Could not find the Qt platform plugin "offscreen" in ".* .*"|no Qt platform plugin could be initialized|qt.qpa.plugin: Could not find
+
+severity:               2
+category:               platform, ohos, conan, test-infra
+match_keywords:         Could not find the Qt platform plugin, QT_QPA_PLATFORM_PLUGIN_PATH, QT_PLUGIN_PATH, Environment.append, conan test_package, offscreen, Signal 6, core dumped, QT_DEBUG_PLUGINS, VirtualRunEnv
+
+title:                  Conan test_package 里用 Environment.append() 拼 QT_QPA_PLATFORM_PLUGIN_PATH 会得到空格分隔的"一个"目录，Qt 必然找不到 offscreen 插件（OHOS 上直接 Signal 6）
+
+root_cause:             Conan 2 的 Environment.append(var, value) 对普通变量默认用空格做分隔符（path 语义要用 prepend_path/append_path 或 define 一个已用 os.pathsep 连接好的值）。KF6/Qt6 应用（kblocks/kjumpingcube/kteatime 同款写法）在 test_package 中把每个依赖的 plugins/platforms 目录逐个 append，最终环境变量是 "/a/plugins/platforms /a/plugins/platforms" —— 对 Qt 来说这是**一个**目录名（含空格），于是 QFactoryLoader 在该目录里找不到 libqoffscreen.so，QApplication 构造失败并 abort：'This application failed to start because no Qt platform plugin could be initialized'（OHOS musl 上表现为 Signal 6 core dumped）。症状极易误判为"插件缺失/未打包/未签名"，实际插件就在正确路径下。
+affected_scope:         任何在 Conan test_package 中用 self.dependencies 组装 Qt 插件目录（QT_QPA_PLATFORM_PLUGIN_PATH/QT_PLUGIN_PATH/QML2_IMPORT_PATH）的 Qt/KF 配方；尤其无头验证（offscreen）必须构造 QApplication 的 --version/--help 元数据用例。glibc 桌面环境下若恰好也设了同名系统变量，同样中招；纯 Linux 下不一定暴露（Qt 还能落到系统插件路径），OHOS 上无系统 Qt 插件路径，必然失败。
+verification_cmd:       QT_DEBUG_PLUGINS=1 QT_QPA_PLATFORM=offscreen QT_QPA_PLATFORM_PLUGIN_PATH="<dirA> <dirB>" <app> --version 2>&1 | grep -A3 "factoryloader: checking directory path"
+rec_priority:           2
+rec_approach:           define-joined-path-not-append
+rec_description:        (1) test_package 里路径类变量一律 `env.define("QT_QPA_PLATFORM_PLUGIN_PATH", os.pathsep.join(platforms))`，不要对每个目录循环 env.append()；需要叠加既有值时用 `append_path()`（path 语义）而不是 `append()`；(2) 收集 plugin/platforms 目录时按目录去重（同一 qtbase 常被列出两次，便于定位）；(3) 定位手段：`QT_DEBUG_PLUGINS=1` 会逐行打印 Qt 实际检查的目录，"检查到 'A B' 一个含空格目录"即命中本模式；若目录正确但报同一句，才继续查插件自身 NEEDED/.codesign（那是另一个模式）；(4) 判据：把该变量打印出来确认只有一个路径、且用 os.pathsep 连接。
+rec_command:            python3 -c "import os;print(os.pathsep.join(['/a/plugins/platforms','/b/plugins/platforms']))"
+rec_auto_fix:           false
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+source_pr:
+source_commit:
+rec_impl:               manual
+last_updated:               2026-10-19
+authors:               DRAFT
+doc_file:               doc/E3276.md

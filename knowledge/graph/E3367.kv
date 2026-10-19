@@ -1,0 +1,57 @@
+#====================================================================
+# DRAFT-trimadap-0.1-4-ksw-sse2-scalar-fallback
+# SSE2-only Smith-Waterman kernel (ksw.c) cannot be compiled off x86: emmintrin.h is x86-only
+#====================================================================
+
+id:                     E3367
+trigger_tool:           make|clang|conan
+phase:                  build|compile
+error_signature:        "fatal error: 'emmintrin\\.h' file not found|emmintrin\\.h:[0-9]+:[0-9]+: (fatal )?error|cannot open source file \"emmintrin\\.h\"|use of undeclared identifier '_mm_[a-z0-9_]+'"
+severity:               1
+category:               platform, ohos, portability, make, aarch64
+match_keywords:         emmintrin.h, __m128i, _mm_adds_epu8, _mm_subs_epu8, _mm_adds_epi16, _mm_max_epu16, ksw.c, ksw2, ksw_u8, ksw_i16, ksw_qinit, striped SIMD, SWPS3, lh3, fresh, bwa, fermi-lite, trimadap, miniSSW, SSE2, aarch64, x86-only header, scalar fallback
+title:                  上游 SV 内核只有 SSE2 实现且无条件 include <emmintrin.h>（x86 专属头）——aarch64/OHOS 编译即失败；
+                        修复用 __SSE2__ 条件化整块 SIMD 实现 + 等价标量内核，且标量必须复刻两步饱和算术（不可合并为单次 clamp）
+
+root_cause:             >
+  1) lh3 系短读工具（ksw.c，出现于 fermi-lite / trimadap，与 bwa/miniSSW 同源）把条带化 Smith-Waterman 内核写成
+  "一条路径、一份实现"：文件顶部无条件 #include <emmintrin.h>，struct _kswq_t 的 qp/H0/H1/E/Hmax 直接声明为 __m128i*，
+  ksw_qinit/ksw_u8/ksw_i16 全程使用 _mm_* intrinsics。emmintrin.h 是 x86/x86-64 专属头，aarch64 的 clang/gcc 找不到它，
+  报 'emmintrin.h' file not found；即便头文件存在，aarch64 也没有 SSE2 指令可以映射这些 intrinsic。
+  2) 该内核的布局与算法强耦合硬件：query profile 按 slen=ceil(qlen/p)、p=16(size=1)/8(size=2) 做条纹（striped）存放，
+  H 向量的相邻 lane 相差 slen 列，跨 lane 的 F（插入）项靠 SWPS3 风格的 lazy-F 循环（最多 16 轮）补齐。
+  所以"删掉 SSE2 代码用普通 DP 顶上"不是等价改写——必须把条纹布局换成线性布局，并把 lazy-F 换成行内 F 传播。
+  3) 饱和算术是最易写错的地方：SSE2 版先用 _mm_adds_epu8 加 profile 再单独 _mm_subs_epu8 减 shift（两次饱和），
+  写成一次 clamp(h + S - shift) 只在 h+S ≤ 255 时才等价；i16 路径同理（_mm_adds_epi16 + _mm_subs_epu16，后者是无符号饱和）。
+  4) 同源文件还常带第二个非 glibc 坑：kthread.c 只 include <pthread.h>/<stdlib.h>/<limits.h> 却使用 int64_t——
+  glibc 会经 <pthread.h> 间接暴露该类型，OHOS/musl 不会，报 unknown type name 'int64_t'。
+
+affected_scope:         >
+  任何内嵌 lh3/SSW 系 SIMD 比对内核的 C/C++ 库（fermi-lite、trimadap、bwa 早期版本、miniSSW 衍生项目），
+  以及更一般地"上游只保留 x86 SIMD 分支、无标量/NEON 回退"的源码（例如自研 SSE2 点积、只写 _mm_* 的图像/信号处理）。
+  不覆盖：上游已提供 NEON/标量分支但被构建开关误关；不覆盖 SSE 头存在但用 __builtin_ia32 直写汇编的场景。
+  跨架构 oracle 可用于验收：若上游还有打包生态（Homebrew/FreeBSD ports）带着期望输出，用它当跨架构判据最省事。
+
+verification_cmd:       >
+  1) 结构判据：改动后 grep -c '^+#if defined(__SSE2__)' patches/*.patch 与上游 grep -n emmintrin 对照，
+     确认 SIMD 整块（qinit/u8/i16）都在守卫内、x86 分支代码逐字节未改；
+  2) 功能判据（关键）：用上游自带样本数据做端到端，与 x86 生态已公布的期望值比对。
+     trimadap 实测：上游 test.fa + Homebrew `brew test trimadap` 断言第 4 个默认接头
+     ATCTCGTATGCCGTCTTCTGCTTG 命中数=1，aarch64 标量路径 stderr 实测同样为 1（x86 SSE2 构建与标量构建结果一致）；
+     另外 -t 8 精确剪切、-p 4 与单线程逐字节一致（cmp 通过）作为交叉验证；
+  3) 回归判据：patches 从原始 tarball patch -p1 干净应用，且应用后源码与探索工作区 cmp 逐字节一致。
+
+rec_priority:           1
+rec_approach:           capability-guarded-simd-with-scalar-fallback
+rec_description:        在 patches/ 下加一个可移植性补丁：①用 #if defined(__SSE2__) 把 #include <emmintrin.h> 与整块 SIMD 实现
+                         （ksw_qinit/ksw_u8/ksw_i16）条件化，#else 给出线性布局 + 行内 F 传播的等价标量实现，
+                         x86 路径一字不改（对上游透明）；②标量内核按 SSE2 的运算顺序逐步饱和（ADDS_U8/SUBS_U8/ADDS_I16/SUBS_U16 一一对应 _mm_* 语义），
+                         不要合并成单个 clamp 表达式；③另行补齐 <stdint.h> 之类非 glibc 缺失的头部；
+                         ④在 notes.md/test-report 记录"标量无 SIMD 并行、吞吐低于 x86，但同一输入结果与 x86 oracle 一致"的证据。
+                         禁止用 #ifdef __OHOS__ 空壳/return 0 顶替（R8/R40：那会让功能静默丢失而测试仍绿）。
+                         先例：archives/f/fermi-lite/0.1/patches/0001-ksw.c.patch（同源 ksw.c，同一策略）。
+rec_auto_fix:               false
+rec_impl:               manual
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E3367.md

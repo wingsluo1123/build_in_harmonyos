@@ -1,0 +1,68 @@
+# ═══ Draft knowledge entry — 纯 Node.js/npm 包 prescan 前置识别（G0 自动拦截，堵 R47 人工调用漏网） ═══
+# Timestamp: 2026-10-14
+# Software: 通用（实证：imageoptim-cli 3.1.9，npm 包，lang-preflight 判 nodejs≠cpp）
+# Gate: lang-preflight (R47) + ohc-run.py prescan --json 实测
+# Status: DRAFT — 同 stem 配对 knowledge/drafts/DRAFT-npm-purejs-prescan-gate.md
+#
+# 与既有知识的差异（不重复性声明）：
+#   DRAFT-npm-purejs-conan-packaging-pattern —— 解决"判定为 nodejs 之后怎么打包"（下游模式条目）；
+#   DRAFT-libok-0.6.5-langpreflight-clib-packagejson-misdetect —— 解决"lang_detect 误判 C 库"（假阳性）；
+#   本条目解决"漏判"（假阴性）：R47 lang-preflight 依赖 AI 手动调用，v12.15 实证 9 例违规
+#   源于旧版/跳过调用。本条目通过 prescan_pattern 字段接入知识库动态派生机制（v12.5），
+#   使 build 管线 Step 2.5 的 G0 预扫描**无条件自动**命中纯 Node.js 包——不依赖 AI 自觉。
+
+id:                     E3364
+trigger_tool: prescan|ohc-run|lang-preflight|lang_detect
+phase: preflight|prescan|language-detection
+
+prescan_pattern: "(\"engines\"|\"bin\")\\s*:\\s*\{?[^}]*node"
+prescan_globs: "package.json"
+prescan_severity: medium
+
+error_signature: |
+  package.json 含 main/scripts/engines/bin|engines.*node|任务标记 cpp，实测源码为 nodejs|
+  detected_language.*nodejs|npm ci|yarn.lock|tsconfig.json|无 configure 无 CMake 无 C/C++ 源文件
+
+severity:               2
+category:               detection, build-system, npm, prescan, tooling
+
+match_keywords: prescan, G0, prescan_pattern, package.json, engines, nodejs, npm, R47,
+                 lang-preflight, 漏网, 假阴性, 自动拦截, 动态派生, 选型止损
+
+title: 纯 Node.js/npm 包 prescan 前置识别：package.json(bin/engines)+零 C/C++ 源文件
+       即判 nodejs 主体，G0 自动给出 env_unsupported 信号，堵 R47 lang-preflight
+       人工调用漏网（v12.15 实证 9 例违规）
+
+root_cause: R47 lang-preflight 是“AI 自觉调用”的软约束——协议 v0.8 附录 D 冻结后仍有 9 例违规
+  （反馈 0831 P1），根因是缺失机制化兜底：build 14 步管线中唯一无条件执行的静态扫描点是
+  Step 2.5 G0 预扫描（prescan），但其规则集没有 nodejs 语言主体识别规则。纯 npm 包
+  （package.json + engines node>=18 + 全 JS 依赖 + 零 C/C++ 源文件）因此可一路走到
+  conan create 才暴露，浪费整轮构建预算；imageoptim-cli 3.1.9 实测：src/ 全 TypeScript
+  + osascript/（macOS AppleScript），C/C++ 源文件 0 个，engines node>=18，任何 conan 配方均不可行。
+
+rec_approach: |
+  1. 本条目含 prescan_pattern 字段，按 v12.5 动态派生机制，知识库合入后 PreScanner
+     自动派生 PSCAN-KB-<id> 规则——知识库增长即扫描能力增长，无需改规则文件；
+  2. G0 命中后输出：detected=nodejs 主体 + "运行 lang-preflight 写 env_unsupported
+     终态"指引（衔接 R47 既有终态通道，不新造流程）；
+  3. 判定口径与 lang_detect 对齐：manifest(package.json) 优先，但须叠加
+     "零 C/C++ 源文件"条件以避免复刻 DRAFT-libok 类假阳性（clib/npm 双生态 C 库
+     的 package.json 仅含发布辅助 scripts 键，不算主体）；
+  4. 命中即止损：选型期 env_unsupported + detected_language=nodejs 上报
+     （平台 lang_hold 挂起等生态），禁止硬着头皮写 conan 配方。
+
+verification_cmd:
+  imageoptim-cli 3.1.9 端到端实证：lang-preflight exit 2，detected_language=nodejs，
+  evidence 三项（build_system=npm / manifest=package.json 含 engines+bin /
+  source_stats=nodejs 源 2 个主体占比 100%）。推导：满足本 pattern 的包与
+  lang_detect 三级判定的 manifest 分支结论一致（叠加零 C/C++ 条件后假阳性受控）。
+
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E3364.md
+affected_scope:         纯 Node.js/npm 包 prescan 前置识别：package.json(bin/engines)+零 C/C
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        |

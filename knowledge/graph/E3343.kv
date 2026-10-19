@@ -1,0 +1,56 @@
+#====================================================================
+# E430 — CMakeDeps 下 FindOpenSSL/FindZLIB 模块变量为空
+# 场景: ws 11.4.6 (IXWebSocket) 适配 — 模块变量路径改 imported target
+#====================================================================
+
+id:                     E3343
+trigger_tool:           cmake|configure
+phase:                  configuration|compilation
+error_signature:       'openssl/bio.h' file not found|OPENSSL_INCLUDE_DIR-NOTFOUND|Target "ZLIB::ZLIB" of type .* does not exist|Target "openssl::openssl" of type
+
+# ═══ Layer 1: 识别层 ═══
+severity:               2
+category:               ohos, build-system, cmake, conan
+match_keywords:         CMakeDeps, FindOpenSSL, FindZLIB, OPENSSL_LIBRARIES, ZLIB::ZLIB, openssl::openssl, zlib::zlib, imported target, BUILD_INTERFACE
+title:                  conan CMakeDeps 下 FindOpenSSL/FindZLIB 的模块变量为空、目标名不同，须按 imported target 分支并补 BUILD_INTERFACE 头传播
+
+# ═══ Layer 2: 诊断层 ═══
+root_cause:             conan 2 的 CMakeDeps 不执行 CMake 内置 Find 模块逻辑：${OPENSSL_LIBRARIES}/${OPENSSL_INCLUDE_DIR}/${ZLIB_LIBRARIES} 为空，且 zlib 的导出目标是 zlib::zlib（小写）而非 ZLIB::ZLIB；而 openssl 包提供 openssl::openssl imported target。沿用上游的模块变量写法会静默丢 include/lib，公共头（如 IXSocketOpenSSL.h 含 <openssl/*.h>）在消费方编译失败。
+affected_scope:         上游用 FindOpenSSL/FindZLIB 模块变量接线（变量而非 imported target）的 CMake 库。
+verification_cmd:       conan create archives/w/ws/11.4.6 -pr:h ci/conan/profiles/ohos-aarch64 --build=missing --user=ohpcd --channel=stable
+
+# ═══ Layer 3: 方案层 ★ ═══
+rec_priority:           1
+rec_approach:           imported-target-branch
+rec_description:        在上游 CMake 里加 if (TARGET openssl::openssl)（或检测 zlib::zlib）分支走 conan imported target，else 保留原模块变量路径；PRIVATE 链接的依赖若被公共头引用，用 $<BUILD_INTERFACE:$<TARGET_PROPERTY:dep,INTERFACE_INCLUDE_DIRECTORIES>> 传播头文件。
+rec_command:            if (TARGET openssl::openssl)\n  target_link_libraries(ixwebsocket PRIVATE openssl::openssl)\n  target_include_directories(ixwebsocket PUBLIC $<BUILD_INTERFACE:$<TARGET_PROPERTY:openssl::openssl,INTERFACE_INCLUDE_DIRECTORIES>>)\nelse()\n  # 原模块变量路径
+rec_auto_fix:           false
+
+fallback_priority:      2
+fallback_approach:      patch-module-vars
+fallback_description:   用 conanbuild env 变量强制填 OPENSSL_ROOT_DIR 让 Find 模块生效（对本仓 profile 不可靠）。
+fallback_auto_fix:      false
+
+forbid_1_pattern:        target_link_libraries\([^)]*ZLIB::ZLIB
+forbid_1_reason:         本仓 zlib 包导出的是 zlib::zlib（cmake_file_name=ZLIB 但 namespace 小写），ZLIB::ZLIB 在 CMakeDeps 下不存在。
+forbid_1_consequence:    configure 阶段直接报 "Target ZLIB::ZLIB of type UTILITY may not be linked into another target"。
+
+# ═══ Layer 4: 原则引用 ═══
+principles:
+
+# ═══ 关系图 ═══
+# ═══ 元数据 ═══
+doc_file:               doc/E430.md
+last_updated:           2026-10-13
+source_event:           ws 11.4.6 (IXWebSocket) 适配：OPENSSL_INCLUDE_DIR 空导致 'openssl/bio.h' file not found；ZLIB::ZLIB 不存在改 zlib::zlib；PRIVATE 链接后测试目标再报 openssl 头缺失，补 BUILD_INTERFACE 传播解决
+
+authors:
+source_pr:
+source_commit:
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-13
+rec_impl:               manual
+authors:               23D9

@@ -1,0 +1,62 @@
+#====================================================================
+# DRAFT-24651-dead-upstream-debian-orig-tarball-source-fallback
+# 上游官方源失效（OSDN 关站等）→ 权威发行版归档 pristine orig tarball 取源的 R39 合规策略
+# 来源: jlha-utils 0.1.6 适配评估 (2026-10-15)
+#====================================================================
+
+id:                     E3381
+trigger_tool:           curl|conandata.yml|conan download|sha256sum
+phase:                  source-acquisition|recipe-authoring
+error_signature:        curl.*\(rc=6\)|Could not resolve host|osdn\.net.*无法解析|404 Not Found.*releases|源码下载失败|sources list empty
+match_keywords:         OSDN, sourceforge 关站, 上游失效, dead upstream, orig.tar.gz, debian pool, pristine source, R39, 取源回退, source fallback, DNS failure
+category:               conandata, mirror, source-acquisition
+severity:               2
+forbid_1_pattern:       (gh-proxy\.com|ghfast\.top|cnb\.coola|个人网盘|不明 CDN)
+forbid_1_reason:        本条目只认可权威发行版归档（Debian/FreeBSD ports/openSUSE source RPM），镜像黑名单域仍按 PF7/R39 拦截。
+forbid_2_pattern:       apt-get|dpkg -x|\.deb
+forbid_2_reason:        只取 pristine orig tarball（未打发行版补丁的原始上游源），禁止解包 .deb 里的已修改源或引入 debian/patches。
+root_cause: 上游官方托管站点永久失效（OSDN 关站/SourceForge 403/域名死亡）时官方源消失，conandata.yml 立项被卡；知识库此前只覆盖“下载被拦”（E421），无“上游死亡后取源回退”策略。
+  一批日系/老牌开源库的官方托管站点已永久失效：
+  (1) OSDN.net（原 SourceForge.jp）于 2024 年前后停止运营，DNS 已不可解析
+  （curl rc=6 "Could not resolve host: osdn.net"），影响 jlha-utils 等
+  大批项目主页与发布包；
+  (2) SourceForge 个人项目页可能 403/404（Cloudflare 盾，参见 E421 的另一面）；
+  (3) 上游域名过期被抢注。此类"项目还在用、源已无处下载"的库在选型阶段即卡死
+  conandata.yml 的 sources URL。R39 要求 URL 必须指向官方正式源或权威镜像源，
+  黑名单镜像（gh-proxy/ghfast 等）被 PF7 拦截。
+rec_approach: >
+  上游站点不可达时的四级取源回退（每级都须 sha256 留档）：
+  (1) 确认上游死亡：curl DNS/rc=6 或连续 404/403，用 Wayback Machine
+  （web.archive.org）确认项目历史归属与最后版本号，作为立项证据；
+  (2) 首选权威发行版归档的 pristine 源——Debian pool
+  (http://deb.debian.org/debian/pool/main/<首字母>/<包名>/<包名>_<版本>.orig.tar.gz)
+  或 FreeBSD distfiles / openSUSE Source RPM：orig.tar.gz 是未打发行版补丁的
+  上游原始源，等价于官方 tarball，符合 R39"权威镜像源"口径；sources.debian.org
+  API 可交叉核对版本与文件哈希；
+  (3) 交叉验证完整性：sha256 与 Debian copyright/.dsc 中 Hashes 段比对
+  （或与 Wayback 快照中的上游发布页比对），确认与上游同字节；
+  (4) conandata.yml 声明：sources URL 直接写 Debian pool 的 orig.tar.gz 绝对
+  路径（https），notes.md 中说明"上游 OSDN 已关站，源取自 Debian pristine
+  orig tarball + sha256 交叉验证"——PF7 对 deb.debian.org 不在黑名单，可过闸；
+  若上游托管仍存活但单文件 404，才考虑 E421 的 301 直连法。
+  立项前语言预检（R47）不受取源方式影响：源拿到后仍须先跑 lang-preflight。
+rec_command: >
+  curl -sO http://deb.debian.org/debian/pool/main/j/jlha-utils/jlha-utils_0.1.6.orig.tar.gz
+  && sha256sum jlha-utils_0.1.6.orig.tar.gz
+verification_cmd: >
+  curl -s https://sources.debian.org/api/src/jlha-utils/0.1.6/ | python3 -m json.tool | grep -A3 sha256
+  - "osdn.net curl rc=6 (Could not resolve host)，2026-10-15 实测"
+  - "Debian pool: deb.debian.org/debian/pool/main/j/jlha-utils/ 含 jlha-utils_0.1.6.orig.tar.gz"
+  - "sha256 0bc81848a5dc7aa596e2f70aeaaa3cfcd261f57546709f69accbe2ba1459d883"
+  - "上游托管于 OSDN/SourceForge.jp 的日系库（OSDN 2024 关站后批量失效）"
+  - "上游域名过期/个人主页消失但发行版仍维护的老库"
+  - "选型/立项阶段 sources URL 无法确立的任何包"
+prescan_pattern: "Could not resolve host|rc=6"
+last_updated: 2026-10-15
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E3381.md
+affected_scope:         general
+rec_description:        >

@@ -1,0 +1,60 @@
+#====================================================================
+# E587-draft-8794.kv — Conan 2 未给 python-require 强制 run trait 导致传递依赖被 BINARY_SKIP
+# 来源任务: toot 0.52.1 HarmonyOS PC aarch64 适配
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E3305
+trigger_tool: conan create / conan install
+phase:                  testing|runtime
+error_signature: SKIPPED|BINARY_SKIP|ModuleNotFoundError: No module named '(requests|chardet|soupsieve|idna|urllib3|certifi)'|ERROR: Missing prebuilt package
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               2
+category: python, conan, dependency
+match_keywords:         python-require, BINARY_SKIP, SKIPPED, ModuleNotFoundError, run trait, transitive requires, runenv, PYTHONPATH, env_info
+title:                  Conan 2 未给 python-require 强制 run trait，传递 Python 依赖被 BINARY_SKIP 跳过
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             Conan 2 的 requires.process_package_type() 只对 application/shared-library/static-library/header-library/build-scripts 五类做 trait 强制（set_if_none），PackageType.PYTHON("python-require") 不在 if/elif 链中 → 该节点的 run trait 保持 None 即视为 False。graph_binaries._skip_binaries() 于是判定“本节点不在 root 的 run 可达集内”，把传递的 python-require 依赖标为 BINARY_SKIP、不拉取二进制也不生成其 runenv。表现：conan create 日志出现 SKIPPED，test_package 或下游 import 时 ModuleNotFoundError；若配方自身的直依赖是 python-require，同样可能因未显式声明 run=True 而丢失运行时环境。旧式 Conan 1.x 配方用 self.env_info.PYTHONPATH.append() 在 Conan 2 已完全失效（no-op），无法补救。
+affected_scope:         所有 package_type="python-require" 的依赖包，以及 requires 了这类包的 application/library 配方；跨越多层传递依赖（A→B→C，B/C 为 python-require）时必然触发。纯 Python CLI 打包场景高发。
+verification_cmd:       conan graph info --requires=<pkg>/<ver>@<user>/<channel> -pr:a <profile> -f json | python3 -c "import json,sys; d=json.load(sys.stdin); print([ (k,v.get('binary')) for k,v in d['graph']['nodes'].items() if 'SKIP' in str(v.get('binary'))])"
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           explicit-run-trait-and-direct-requires
+rec_description:        在消费者配方里双重补齐：①对每个 conan 直依赖显式写 self.requires("<name>/<ver>", run=True)，绕过 process_package_type 对 python-require 的 trait 缺口；②把传递的运行时依赖（那些只被依赖包 require、本配方不直接 import 的）逐条提升为本配方直依赖并同样标 run=True，让它们进入 root 的 run 可达集，不再被 BINARY_SKIP。修完用 conan graph info 确认 SKIPPED=0 且外部消费者 conan install 退出码 0。
+rec_command:            conan graph info --requires=toot/0.52.1@ohpcd/stable -pr:a ci/conan/profiles/ohos-aarch64 -f json | grep -o '"binary": "BINARY_SKIP"' | wc -l   # 期望 0
+rec_auto_fix:           false
+rec_impl:               requires-run-trait-patch
+
+fallback_priority:      2
+fallback_approach:      promote-per-package-type-in-conan
+fallback_description:   在 conan 内部给 PackageType.PYTHON 补上 process_package_type 分支（_run=True，_libs=False，_headers=False），从根上消除缺口；但这属于修改工具链而非本仓库配方的范围，需上游 conan 或社区适配版发版，短期内不能作为交付路径，仅作长期修复方向记录。
+fallback_command:       手动在 conan/internal/model/requires.py 的 process_package_type() if/elif 链加入 PackageType.PYTHON 分支后重跑 conan graph info
+fallback_auto_fix:      false
+fallback_impl:          upstream-conan-pkg-type-branch
+
+forbid_1_pattern:       test_package.*(print|pass)$|def test\(self\):\s*pass|env_info\.PYTHONPATH
+forbid_1_reason:        只靠 print/pass 的空壳测试掩盖不了 ModuleNotFoundError，靠 Conan 1.x env_info 打补丁在 Conan 2 已失效——两者都会让失败在发布后才暴露。
+forbid_1_consequence:   CI 看似通过（BINARY_SKIP 未被断言），用户 conan install 后运行时 ImportError，且 PR 因空壳测试被 PF3/CI L0c 拦截。
+forbid_2_pattern:       \.ci-result\.json|伪造|force.*success
+forbid_2_reason:        不得手改 .ci-result.json 或伪造验证结果来绕过 SKIPPED 断言。
+forbid_2_consequence:   CI 审计发现伪造痕迹直接判失败，工作全部作废。
+
+principles:             P003, P006
+# ═══ 元数据 ═══
+doc_file:               knowledge/drafts/E587-draft-8794.md
+last_updated:           2026-10-08
+source_event:           toot 0.52.1: 配方 requires beautifulsoup4/click/python-dateutil/requests/wcwidth（均为 python-require/application/static-library）；conan create 日志 SKIPPED 由 9 降至 6，补充 6 个传递运行时依赖（chardet/soupsieve/idna/urllib3/certifi 等）为直依赖并标 run=True 后 SKIPPED=0，外部消费者退出码 0。
+
+authors:                AtomCode AI <noreply@atomgit.com>
+source_pr:
+source_commit:          9b6aa2e046
+
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-08
+

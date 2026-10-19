@@ -1,0 +1,88 @@
+#====================================================================
+# DRAFT-10862-musl-tmpfile-tmppdir-truncation
+# musl 的 tmpfile() 静态缓冲区把 TMPDIR 截断为 7 字符，
+# 临时文件路径落到只读前缀下 → open EACCES (errno=13)
+# 来源: sox_ng 14.8.0.1 适配 (2026-10-13)
+#====================================================================
+
+id:                     E3388
+trigger_tool:           make check|conan create|runtime
+phase:                  runtime
+error_signature:        can't open channel output file|tmpfile|/storag/fileXXXXXX|EACCES|errno=13|Permission denied
+match_keywords:         tmpfile, mkstemp, TMPDIR, 7-char, truncation, static buffer, 16 bytes, /tmp/fileXXXXXX, EACCES, errno=13, musl, lsx_tmpfile, 8svx, gain, sox_ng, read-only root, erofs, bogus path
+category:               portability, libc, runtime
+severity:               2
+title:                  musl 的 tmpfile() 基于 16 字节固定静态缓冲区，长 TMPDIR 被截断为 7 字符 → 临时文件路径落到不存在的只读前缀下 → open EACCES (errno=13)；glibc 正确遵循 TMPDIR，Linux 开发机不可复现
+
+root_cause: >
+  OHOS（musl libc）的 tmpfile() 实现基于定长静态缓冲区
+  sizeof("/tmp/fileXXXXXX") = 16 字节：只取 TMPDIR 的前 7 个字符
+  （16 − 8(fileXXXXXX) − 1(NUL) = 7）再拼接 mkstemp 随机后缀。
+  当 TMPDIR 超过 7 字符（鸿蒙 PC 真机实测 /storage/Users/currentUser/tmp
+  被截断为 /storag）时，临时文件路径变成 /storag/fileXXXXXX ——
+  落在只读 erofs 根目录下（该设备上 /storag 不是可写路径），
+  open 返回 EACCES (errno=13)。
+  glibc 的 tmpfile() 正确遵循 TMPDIR，Linux 开发机完全不可复现、
+  编译期也无任何警告 —— 只在 OHOS 真机运行时暴露。
+  sox_ng 表现：8svx/gain 效果链经 lsx_tmpfile()→tmpfile() 建临时文件
+  → "can't open channel output file"，对应 make check 格式往返用例失败。
+
+rec_approach: >
+  非 WIN32 路径不要调用 tmpfile()，改用**完整 TMPDIR** 构造临时目录
+  （4096 字节静态缓冲、仅初始化一次、未设置时回退 /tmp、带长度自检
+  strlen < sizeof-1），再交给"mkstemp + close 即删"的 tmpfile 模拟
+  逻辑。模板（本条实测，见 0004 补丁）：
+      #ifndef _WIN32
+      if (!path) {
+        static char default_path[4096] = "";
+        if (default_path[0] == 0) {
+          char const *tmpdir = getenv("TMPDIR");
+          if (tmpdir && tmpdir[0] && strlen(tmpdir) < sizeof(default_path) - 1)
+            strcpy(default_path, tmpdir);
+          else
+            strcpy(default_path, "/tmp");
+        }
+        path = default_path;
+      }
+      #endif
+  随后让 path 进入工程现有的"mkstemp + 关闭后删除"模拟代码（sox_ng 的
+  后缀为 /libSoX.tmp.XXXXXX）；若工程无此类模拟，直接 mkstemp 完整
+  TMPDIR 模板，消费方读完手动 unlink，保留 tmpfile"关闭即消失"语义。
+  要点：
+  (1) 缓冲必须按完整 TMPDIR 定容（≥ PATH_MAX），不能复用 16 字节定长缓冲；
+  (2) 不引入平台宏（__OHOS__ 等）：#ifndef _WIN32 + getenv("TMPDIR")
+      运行时探测在全部 POSIX 平台有效，glibc 语义相同（遵循 TMPDIR），
+      行为不变，R8 合规；
+  (3) static 仅初始化一次（幂等、避免竞争）+ 长度检查防溢出（超长回退 /tmp）；
+  (4) 补丁注释写 "some libc implementations" 而非点名单一平台，可移植性表述。
+
+rec_command: >
+  (1) C 探针实证根因（OHOS 真机可编译运行）：
+      setenv("TMPDIR", "/storage/Users/currentUser/tmp", 1);
+      FILE *f = tmpfile();   // musl: NULL（路径被截断）
+      open("/storag/probe", O_WRONLY);                 // EACCES errno=13
+      open("/storage/Users/currentUser/tmp/probe", O_WRONLY);  // OK
+  (2) 按 rec_approach 模板修复（tmpfile 换成完整 TMPDIR 路径 + mkstemp 模拟）；
+  (3) 重跑 make check（或相关用例），确认 fail 转 ok。
+
+verification_cmd: >
+  cd sox_ng-14.8.0.1.work && TMPDIR=/storage/Users/currentUser/tmp make check
+  - "archives/s/sox_ng/14.8.0.1/patches/0004-src-libsox_i.c.patch（lsx_tmpfile 非 WIN32 分支）"
+  - "archives/s/sox_ng/14.8.0.1/notes.md（踩坑与解决 §2，含探针实证）"
+  - "本地 make check：/storage/Users/currentUser/tmp/sox_ng-14.8.0.1.make-check-release.log（release 源基线全绿）"
+
+  - "所有在 OHOS 上调用 tmpfile() 且 TMPDIR 长于 7 字符的程序"
+  - "带效果链的音频工具（sox/sox_ng 的 8svx/gain 等）及一切基于临时文件的效果链"
+  - "任何假定 tmpfile() 遵循 TMPDIR 的代码（musl 实现违反该假定）"
+  - "邻近但不同：DRAFT-10005（musl strtol EINVAL，同 musl 主题不同根因）；DRAFT-10767（HMDFS tmp Permission denied，同权限主题不同机制）"
+
+principles:             P005, P011
+source_pr:                PRE_CREATE
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E3388.md
+affected_scope:         musl 的 tmpfile() 基于 16 字节固定静态缓冲区，长 TMPDIR 被截断为 7 字符 → 临时文件路径
+rec_description:        >
