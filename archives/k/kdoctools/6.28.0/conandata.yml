@@ -1,0 +1,38 @@
+# conandata.yml — kdoctools 6.28.0
+# 官方源 + 权威镜像（R39）。download.kde.org 会 302 到区域镜像（如
+# mirrors.bfsu.edu.cn），该目标在部分网络（真机在网环境实测）下 TLS 证书
+# 校验失败、无法下载；可达的权威镜像放首位，官方源保留为权威回退。
+# 四个 URL 的内容相同：nju、funet、aliyun 三个镜像已各自完整下载并逐一
+# 核对 sha256，与官方 tarball 完全一致（461,212 字节）。
+
+sources:
+  url:
+    - "https://mirrors.nju.edu.cn/kde/stable/frameworks/6.28/kdoctools-6.28.0.tar.xz"
+    - "https://download.kde.org/stable/frameworks/6.28/kdoctools-6.28.0.tar.xz"
+    - "https://ftp.funet.fi/pub/mirrors/ftp.kde.org/pub/kde/stable/frameworks/6.28/kdoctools-6.28.0.tar.xz"
+    - "https://mirrors.aliyun.com/kde/stable/frameworks/6.28/kdoctools-6.28.0.tar.xz"
+  sha256: "024914031fba7a9b79982d02736b21399d9a0d09ad81323d58e17d6b2216c7b0"
+
+patches:
+  "6.28.0":
+    - patch_file: "patches/0001-uriencode-perlmodules-optional.patch"
+      patch_description: "Allow the Perl URI::Escape module to be absent on HarmonyOS while retaining the Perl path-encoding branch when it is available"
+      patch_type: "portability"
+    - patch_file: "patches/0002-docbook-data-optional.patch"
+      patch_description: "Treat the system DocBook XML 4.5 DTD and DocBook XSL data as optional build-time components"
+      patch_type: "portability"
+    - patch_file: "patches/0003-lower-kf-dep-version.patch"
+      patch_description: "Lower KF_DEP_VERSION 6.28.0 -> 6.26.0: the ohpcd registry publishes karchive only up to the 6.26.0 line and the KF6Archive find is its only consumer (kbookmarks 6.28.0 precedent)"
+      patch_type: "portability"
+    - patch_file: "patches/0004-l10n-helper-without-docbook-xsl.patch"
+      patch_description: "Generate a minimal all-l10n.xml catalog instead of running docbookl10nhelper when the DocBook XSL data is absent"
+      patch_type: "portability"
+    - patch_file: "patches/0005-docs-optional.patch"
+      patch_description: "Skip the docs/handbook subdirectory, which needs the full KDE documentation toolchain (kdoctools 6.19.0 precedent)"
+      patch_type: "portability"
+    - patch_file: "patches/0006-upstream-tests-guard.patch"
+      patch_description: "Register the upstream DocBook transformation tests only when the system DTD and XSL data are available (capability guard)"
+      patch_type: "portability"
+    - patch_file: "patches/0007-include-xsl-without-docbook-xsl.patch"
+      patch_description: "Configure the kde-include XSL templates without the literal DocBookXSL_DIR-NOTFOUND sentinel when the DocBook XSL data is absent; drop only the unavailable xsl:import elements"
+      patch_type: "portability"

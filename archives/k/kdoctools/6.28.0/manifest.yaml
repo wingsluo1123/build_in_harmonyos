@@ -1,0 +1,45 @@
+software: kdoctools
+version: "6.28.0"
+status: built
+build_system: cmake
+created_at: 2026-10-17
+build_date: 2026-10-17
+dependencies:
+  required:
+    - qtbase/6.11.1
+    - karchive/6.26.0
+    - openssl/3.5.6.1
+    - libxml2/2.15.3
+    - libxslt/1.1.45.1
+  build:
+    - ecm/6.28.0
+  optional: []
+patches_applied:
+  - "0001-uriencode-perlmodules-optional.patch"
+  - "0002-docbook-data-optional.patch"
+  - "0003-lower-kf-dep-version.patch"
+  - "0004-l10n-helper-without-docbook-xsl.patch"
+  - "0005-docs-optional.patch"
+  - "0006-upstream-tests-guard.patch"
+  - "0007-include-xsl-without-docbook-xsl.patch"
+test_results:
+  type: conan_create_ohos_aarch64
+  upstream: "passed: 2/2 (100%) upstream CTest autotests inside conan create with official DocBook XML 4.5 + XSL 1.79.2 data (meinproc_template 0.52s, kdoctools_install 18.82s; 100% tests passed, 0 tests failed out of 2)"
+  test_package: "passed: 7/7 (100%) on-device checks of the installed package (meinproc6/checkXML6 executable, meinproc6 --version, installed customization data, all-l10n.xml 7415 bytes, DocBook->HTML transform marker, checkXML6 valid/malformed)"
+  full_reference: "kdoctools/6.28.0@ohpcd/stable#4927962a22977af7e68661b6d754c9f4:8520c4091aa82da3d16c9abbddc271bbf66f32a4#5d47dd4f3ff8685bdf0adc695566268b"
+  l0: "pass"
+  l1: "pass"
+  l2: "skip: runner could not resolve the package cache path (G4 warning); bin/ ships meinproc6/checkXML6 and test_package exercises them on the device"
+  l4: "skip: runner could not resolve the package cache path; manually verified SONAME-only and no RUNPATH via readelf"
+  l5: "skip: runner could not resolve the package cache path"
+source_url: https://download.kde.org/stable/frameworks/6.28/kdoctools-6.28.0.tar.xz
+source_sha256: 024914031fba7a9b79982d02736b21399d9a0d09ad81323d58e17d6b2216c7b0
+knowledge_gained:
+  - "kdoctools 自带 cmake/FindDocBookXML4.cmake 与 FindDocBookXSL.cmake（ECM 缓存包不含 DocBook 模块），两模块只扫描 CMAKE_SYSTEM_PREFIX_PATH 与 PATH_SUFFIXES；OHOS 无 DocBook 系统树时 FOUND=FALSE，但两者都以结果变量 DocBookXML4_DTD_DIR / DocBookXSL_DIR 判 FOUND，配置期 -D 直给即生效，无需伪造系统树"
+  - "DocBook 数据齐备时上游两个 autotests（meinproc_template / kdoctools_install）真实注册并运行：前者用 meinproc6 转换上游 template.docbook，后者配置一个下游 CMake 消费者生成 man page 与 HTML handbook（capability guard 见补丁 0006）"
+  - "KF_DEP_VERSION 6.28.0 降 6.26.0（补丁 0003）：ohpcd 制品仓只发布 karchive 到 6.26.0 线，KF6Archive 是该变量的唯一消费者（kbookmarks 6.28.0 先例）"
+  - "HMDFS 拒 symlink：libKF6DocTools 上游 VERSION/SOVERSION 的版本化软链链无法物化，采用 NO_VERSIONED_SONAME + SONAME-only 规则（kitemviews/kconfig 先例）"
+  - "docbookl10nhelper 是 POST_BUILD 运行的宿主工具，产出 all-l10n.xml；补丁 0004 在 XSL 数据缺席时写入最小 catalog，保证 install(FILES all-l10n.xml) 不失败，数据齐备时走真实生成本路径"
+  - "DocBook XSL 缺席不只影响 autotests：src/CMakeLists.txt 无条件 configure_file() 会把 @DOCBOOKXSL_DIR@ 替换为字面量 DocBookXSL_DIR-NOTFOUND 写入安装的 kde-include-common.xsl / kde-include-man.xsl，运行期 meinproc6 --check 导入该样式表即 I/O warning 并 exit 1；补丁 0007 在 DocBookXSL_FOUND 为假时移除三个不可用 xsl:import，数据齐备时保持上游原 configure_file 路径"
+  - "项目在配置期要求 xmllint 二进制（LIBXML2_XMLLINT_EXECUTABLE），配方用 shutil.which 从 PATH 探测（libxml2 包 bin/ 由 runtime env 注入）"
+  - "G2 内层消费者（ctest kdoctools_install 的 cmake --build-and-test 干净缓存工程）找不到 ECM 的根因：设备 CMake 将【环境变量】CMAKE_PREFIX_PATH 按平台 pathsep 拆分，分号连接的串被整体当作单个不存在的前缀；内层其它包（Qt6/KF6DocTools）走显式 -D*_DIR 不受影响，唯 ECM 纯靠该环境变量。修复=配方以 os.pathsep.join 拼接；探针矩阵（六根分号 FAIL/单根 PASS/两根冒号 PASS/六根冒号完整通过）实证"
