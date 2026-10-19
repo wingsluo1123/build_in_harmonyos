@@ -1,0 +1,32 @@
+# ═══ Draft knowledge entry — lang-preflight 递归文件名导致 Makefile.PL 假阳性 perl 指纹 ═══
+# Timestamp: 2026-09-28
+# Software: hamlib 4.7.1（任何带 bindings/Makefile.PL 等子目录的多语言 autotools 工程）
+# Gate: lang-preflight / 环境预检
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E2984
+title: lang-preflight 把递归子目录中的 Makefile.PL 当作构建入口，纯 C/C++ 工程被判 mixed 并以 env_unsupported 结终
+trigger_tool: lang_detect / ohc-run lang-preflight
+phase: preflight
+error_signature: detected: mixed|perl module-build|env_unsupported
+severity:               3
+category:               toolchain, workflow
+match_keywords: lang-preflight, mixed, Makefile.PL, perl module-build, env_unsupported,
+  bindings, 语言误判, recursive filename
+root_cause: scripts/ohc/lang_detect.py 把递归遍历到的所有文件名放进指纹匹配集合，导致
+  SWIG/Perl 绑定目录里的 Makefile.PL 命中 "perl module-build" 强指纹；而该文件不在默认
+  ./configure && make 路径中，C/C++ 又属兼容族，本应判 cpp（或 c/cpp 兼容）。
+rec_approach: 指纹只在浅层（顶层 + 一层构建入口）匹配；Makefile.PL 降级为弱指纹（需附带
+  lib/*.pm 或 MANIFEST，且顶层无 configure.ac/CMakeLists.txt）；第三方语言仅在顶层构建入口
+  命中时才升级为 mixed。
+verification_cmd:
+  复原后 conan-verify G0-G4 PASS、上游 make check 11/11 PASS（2026-09-28）。
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E2984.md
+affected_scope:         lang-preflight 把递归子目录中的 Makefile.PL 当作构建入口，纯 C/C++ 工程被判 mixe
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        指纹只在浅层（顶层 + 一层构建入口）匹配
