@@ -1,0 +1,38 @@
+#====================================================================
+# Draft: greetd 族 greeter 客户端的构建期依赖判定 + meson i18n 工具注入
+#        + clang15 -Wextra 撞上游 werror 的 GOptionEntry 终止项
+#        gtkgreet 0.8（平台任务 15435）
+# 说明：全字段单行，同时满足真实 YAML 解析器与 draft-review 的简单字段解析。
+#====================================================================
+
+id:                     E3493
+trigger_tool:           meson|clang|msgfmt|i18n.gettext|gtk+-3.0|json-c|GOptionEntry
+phase:                  configuration|compile
+error_signature:        "Program msgfmt found: NO|error: missing field 'short_name' initializer|-Werror,-Wmissing-field-initializers|Unable to find 'gettext' in remotes"
+severity:               2
+category:               ohos, portability, meson, dependency, i18n
+match_keywords:         greetd, greeter, i18n.gettext, msgfmt, gettext, VirtualBuildEnv, build PATH, werror, GOptionEntry, missing field initializer, clang15, json-c, AF_UNIX, IPC, gtk-layer-shell
+title:                  greetd greeter 客户端的真构建依赖与 meson i18n 工具注入、werror 终止项补全
+root_cause:             三处独立机制。其一 greetd 族 greeter 客户端（gtkgreet）自带 greetd IPC 协议实现（json-c 编解码 AF_UNIX socket），不链接也不包含 greetd 头文件，所以构建期真依赖只有 gtk+-3.0 与 json-c，greetd 只是运行期配套。其二 meson 的 i18n.gettext 在配置阶段要求 PATH 上有 msgfmt 与 xgettext，而 gettext 放在 host requires 时其 bin 不进 VirtualBuildEnv 的 build PATH，配置阶段即找不到工具。其三上游 meson.build 设 werror=true，clang15 的 -Wextra 含 -Wmissing-field-initializers，GOptionEntry 数组用 { NULL } 收尾被判缺 short_name 字段，警告升级为硬错误。
+rec_priority:           1
+rec_approach:           deps-audit-and-build-tooling-injection
+rec_description:        配方只声明 gtk 与 json-c 为构建依赖，gettext 仅作构建期工具包并在 generate() 里把它的 bin 前置进 PATH，同时给 meson 传 -Dlayershell=disabled -Dman-pages=disabled 固化可选特性，并用补丁把 GOptionEntry 终止项补全为全部字段而非全局压制警告。
+rec_command:            conan create . -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64
+rec_auto_fix:           false
+rec_impl:               patch
+affected_scope:         用自行实现的 greetd IPC 协议做 greeter 客户端的包；meson 项目里 i18n.gettext 需要 msgfmt 而 gettext 只在 host requires 的包；上游 werror=true 且以 { NULL } 收尾 GOptionEntry 数组的 C 程序
+verification_cmd:       meson setup 日志出现 Program msgfmt found YES 与 Run-time dependency gtk+-3.0 found YES，随后 meson compile 无 missing field 报错；制品内 bin 可执行 --help 退出码 0
+forbid_1_pattern:       __OHOS__
+forbid_1_reason:        这三处都与平台无关，是依赖声明与工具链 PATH 的通用问题
+forbid_1_consequence:   用平台宏包住会挡住其他平台的复用，也会掩盖真正的依赖声明错误
+principles:               
+doc_file:               knowledge/drafts/DRAFT-gtkgreet-0.8-greetd-ipc-client-build-deps-and-werror-gooptionentry.md
+last_updated:           2026-10-16
+source_event:           gtkgreet 0.8 conan create。首轮 meson 不在 PATH 报 127，加 tool_requires meson 1.11.0 后 meson setup 打印 Program msgfmt found YES 并找到 gtk+-3.0 3.24.43 与 json-c 0.18，随后 meson compile 停在 main.c 的 missing field 报错，补丁补全终止项后编译与 test_package 冒烟全部通过。
+authors:                wanderlust_0823
+source_pr:
+source_commit:          226837519a9d472e01702097e87a52ab0d23c05e
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-16

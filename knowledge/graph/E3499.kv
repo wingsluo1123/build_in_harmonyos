@@ -1,0 +1,100 @@
+#====================================================================
+# Draft knowledge entry — 设备缺失构建工具时应以 conandata build_tools.*
+# 钉源自供给（先探测复用、后下载校验），勿依赖预装或人工安装
+#====================================================================
+# Timestamp: 2026-10-14
+# Software: 通用模式（本 run 触发库：纯 Java/Maven 单模块，无上游 wrapper）
+# Gate: conan create build()（配方内工具供给链）
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E3499
+title: 设备缺失构建工具时应以 conandata build_tools.* 钉源自供给（先探测复用、后下载校验），勿依赖预装或人工安装
+trigger_tool:         conan|mvn|gn|automake|ply
+phase:                configuration|build
+error_signature:      mvn.*command not found|No usable Maven|Could not execute mvn from|Maven at .* reports version .* expected|gn.*command not found|aclocal.*command not found
+severity:               2
+category:               build-system, toolchain, conan, environment, self-supply
+match_keywords:       build_tools, conandata, pinned, sha256, self-supply, MAVEN_HOME,
+                      M2_HOME, JAVA_HOME, bisheng_jdk, repo1.maven.org, version probe,
+                      rejected candidates, wrapper missing, tool supply chain
+root_cause:           目标执行环境（OHOS 真机/权威 CI worker）不提供 Maven/gn/automake 等
+                      构建工具的可用安装（E184：未预装、cmd-pkgs 无包、无 apt/yum/brew），
+                      上游 tarball 又不携带 wrapper（无 mvnw/.mvn/wrapper，jline3 的
+                      wrapper 路线不可照搬）时，构建在工具探测阶段失败。既有知识止步于
+                      "人工手动安装"（E184 rec_impl=manual, rec_auto_fix=false），把人工
+                      步骤留给每台 worker 每轮环境，CI 可复现性差。真实机理补充（环境
+                      作用域表述）：权威 CI 执行环境的 PATH 不解析 curl（/usr/bin/curl
+                      本体存在，8.8.0-DEV；ci-run1.log 预下载段 15 处 FileNotFoundError:
+                      'curl'，L85-116）且该环境 python3 无 CA bundle——任何"配方外先手工
+                      下载好"或"shell 单通道下载"都依赖执行环境 PATH/CA 状态，不可依赖；
+                      conan 内部下载器与这两项环境状态无关。
+
+affected_scope:       任何在 OHOS 真机/CI 上构建、且目标环境缺失其构建工具、上游又不携带
+                      wrapper 的项目（Java/Maven、C++/gn、autotools 的 automake/libtool、
+                      Python 生成器 ply 等同模式；配方树内 9 处在库先例横跨 Java 与 C/C++
+                      双域）。
+
+verification_cmd:     command -v mvn || echo NO_MAVEN; command -v java || echo NO_JAVA  # 平台事实探针，新 shell 可复跑；
+                      grep -n "No usable Maven" <任一新run>/logs/ci-run1.log  # 权威失败→钉源下载实证（本 run 实测 L194）；
+                      grep -n "Using verified Apache Maven" <同run>/logs/ci-run1.log  # 下载后版本实测校验成功（本 run 实测 L197）；
+                      sed -n '/^build_tools:/,/^[a-z_]*:/p' <repo>/archives/j/jline3/3.3.1/conandata.yml  # 模式实例（bisheng_jdk 钉源段）；
+                      grep -rl "build_tools:" <repo>/archives --include=conandata.yml | wc -l  # 在库同模式计数（本 run 实测 9）
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:         1
+rec_approach:         conandata-build-tools-declarative-pin-self-supply
+rec_description:      四段式配方内自供给：①conandata.yml build_tools.<tool> 声明式钉源
+                      （url+filename+sha256+version 四元组）；②配方内先探测复用（环境变量
+                      MAVEN_HOME/M2_HOME/JAVA_HOME → 常见安装位 → PATH，每候选实测版本，
+                      拒绝品进 rejected 清单；预置命中免下载、缓存友好）；③全部缺失时用
+                      conan 内部下载器按钉源下载（get(url, filename, sha256,
+                      strip_root=True, keep_permissions=True)——PATH 与 CA 状态无关）；
+                      ④下载后版本实测校验（如 mvn -v 解析 3.8+，不符即抛错），失败信息
+                      携带 rejected 候选全量清单定位诊断。
+rec_command:          conandata.yml: "build_tools: { maven: { url:
+                      https://repo1.maven.org/maven2/org/apache/maven/apache-maven/3.8.6/apache-maven-3.8.6-bin.tar.gz,
+                      filename: apache-maven-3.8.6-bin.tar.gz, sha256: c7047a48…b5a9,
+                      version: 3.8.6 } }" ; conanfile.py: tool=self.conan_data["build_tools"]["maven"];
+                      get(self, url=tool["url"], filename=tool["filename"], sha256=tool["sha256"],
+                      destination=os.path.join(self.build_folder, "apache-maven-3.8.6"),
+                      strip_root=True, keep_permissions=True); 校验=subprocess.run([mvn, "-v"]) 后
+                      正则解析 3.8+，不符 raise ConanException(rejected 清单)
+rec_auto_fix:         false
+rec_impl:             conan-recipe
+
+# 回退方案
+fallback_priority:    2
+fallback_approach:    prestage-tarball-for-probe + manual-install (E184) + prebuilt-jar
+fallback_description: ①把工具 tarball 预置到 ~/ 等探测位供②②段探测命中（免下载；注意
+                      权威 CI 八门禁重跑会清环境，不可作为唯一依赖）；②E184 人工手动安装
+                      （域内既有退路，rec_impl=manual）；③无源码构建诉求时直接用官方预
+                      构建 jar（E184 fallback_approach）。
+fallback_impl:        manual|conan-recipe
+
+# ★ 禁止策略 ★
+forbid_1_pattern:     self\.run\(['"].*curl|os\.system\(.*wget|subprocess.*['"]curl['"]
+forbid_1_reason:      配方内 shell 单通道外部下载依赖执行环境 PATH/CA 状态：权威 CI 执行
+                      环境 PATH 不解析 curl（/usr/bin/curl 存在但 FileNotFoundError，本
+                      run ci-run1.log L85-116 实证）、python3 无 CA bundle——单通道必挂
+                      且失败点随 worker 环境漂移（DRAFT-12609 forbid_1 同源，本条为其
+                      声明式上位替代）。
+forbid_1_consequence: FileNotFoundError: 'curl' 或 CERTIFICATE_VERIFY_FAILED，构建在
+                      下载阶段失败且不可复现
+forbid_2_pattern:     conandata\.yml.*url:.*(mirrors?\.|gh-proxy|ghfast)
+forbid_2_reason:      提交镜像 URL 进 conandata 违反官方 URL 纪律（R39）；镜像加速是 CI
+                      侧 mirror-fallback 的运行时改写职责，交付面保持官方 URL。
+forbid_2_consequence: R39 门禁拦截 / 上游身份漂移
+forbid_3_pattern:     get\(self, url=.*\)(?!.*sha256)|url=.*(?<!sha256=.{70})\n.*destination
+forbid_3_reason:      无校验和裸下载：sha256 钉校验是钉源自供给的完整性前提，缺校验的
+                      下载在镜像/网络异常时引入不可检的供应链风险。
+forbid_3_consequence: 损坏/被篡改工具进入构建，失败形态不可诊断
+
+# ═══ Layer 4: 原则引用 ═══
+principles:               
+# ═══ 查重与差异化证据（声明检索口径，防复检质疑）═══
+# ═══ L2 第二实例证据（配方树同模式）═══
+# ═══ 本 run 权威实证（佐证，非唯一依据）═══
+# ═══ 相邻条目第二实例注记（本 run 对既有草稿的补强，不另立条目）═══
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E3499.md

@@ -1,0 +1,55 @@
+id:                     E3513
+trigger_tool: conan|cmake|ninja
+phase: compilation
+error_signature: cmake --build.*-j[0-9]+.*-- -j[0-9]+|parallel limit silently overridden
+severity:               2
+category:               portability, build-system, cmake, conan
+match_keywords: CMake.build, cli_args, build_tool_args, tools.build:jobs, CMAKE_BUILD_PARALLEL_LEVEL, Ninja, parallel, resource limit
+title: Conan CMake.build 的前置并发限制会被后置 Ninja -j 覆盖
+root_cause: |
+  Conan CMake.build 将 cli_args 放在 cmake --build 一层，同时把 tools.build:jobs
+  生成的 -jN 放在 -- 后给 Ninja。CMake 把前置 -j1 也翻译给 Ninja，但后面的
+  -jN 最后生效。CMAKE_BUILD_PARALLEL_LEVEL 同样不能覆盖显式原生 -jN。
+  因此日志写着 -j1 或设置环境变量，不代表实际只有一个编译任务。
+affected_scope: |
+  使用 Conan CMake helper + Ninja，且外部配置 tools.build:jobs 大于配方预期并发度
+  的资源受限构建。此条只证明被测版本的参数优先级；不把资源风险等同于已发生 OOM。
+verification_cmd: |
+  python3 archives/v/viskores/1.1.1/reports/verify-evidence.py --extract <新绝对证据目录>
+  sh <新绝对证据目录>/parallel/run-repro.sh <独立工作目录> <OHOS-profile>
+  检查各 mode.log 的 cmake --build 命令与 results.json 的 max_compiler_launchers。
+rec_priority: 1
+rec_approach: constrain-native-build-tool-arguments
+rec_description: |
+  若使用 helper，传 cmake.build(build_tool_args=["-j1"])，使限制位于原生参数末端。
+  本次实际得到 -- -j2 -j1，独立上游 zlib 的最大编译 launcher 并发从 2 降为 1。
+  要求独立于 helper 自动参数时，显式 self.run("cmake --build . --parallel 1",
+  env="conanbuild")；Viskores 主库以同样方式限制为 4，消费者限制为 1。
+rec_command: cmake.build(build_tool_args=["-j1"])
+rec_auto_fix: false
+rec_impl: manual-conan-recipe-edit
+fallback_priority: 2
+fallback_approach: explicit-cmake-build-command
+fallback_description: 在真实 build_folder 中显式执行 cmake --build . --parallel 1，并保留 conanbuild 环境。
+fallback_command: self.run("cmake --build . --parallel 1", env="conanbuild")
+fallback_auto_fix: false
+fallback_impl: manual
+forbid_1_pattern: cmake.build(cli_args=["-j1"])
+forbid_1_reason: 前置 CMake 并发参数会被 -- 后的显式 Ninja -jN 覆盖。
+forbid_1_consequence: 预期串行却仍出现多个并行编译进程，资源预算与日志表面参数不一致。
+forbid_2_pattern: CMAKE_BUILD_PARALLEL_LEVEL=1 plus CMake.build with native -jN
+forbid_2_reason: 环境默认值不能压过显式的原生构建器参数。
+forbid_2_consequence: 同一 zlib 语料在 tools.build:jobs=2 时仍实测到 2 个并行 launcher。
+forbid_3_pattern: infer compiler failure cause from the mere presence of -j1
+forbid_3_reason: 必须检查完整命令，必要时测量真实并发，并独立定位 EAGAIN/OOM 根因。
+forbid_3_consequence: 错将未生效的资源限制视为修复完成，或把未发生的 OOM 写成既定原因。
+principles:               
+doc_file: knowledge/drafts/DRAFT-conan-cmake-ninja-parallel-limit-precedence.md
+last_updated: 2026-10-17
+source_event: viskores 1.1.1 原生适配；zlib v1.3.1 四组独立参数对照，34 次翻译单元编译/组，上游 CTest 2/2/组。
+authors: frj__
+source_pr: https://atomgit.com/OpenHarmonyPCDeveloper/build_in_harmonyos/merge_requests/16489
+metrics_success_count: 2
+metrics_fail_count: 0
+metrics_confidence: 1.0
+metrics_last_used: 2026-10-17

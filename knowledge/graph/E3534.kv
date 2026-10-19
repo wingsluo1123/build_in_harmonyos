@@ -1,0 +1,33 @@
+#====================================================================
+# Draft: OHOS 上跑老 autotools 项目 —— config.guess 太老要不要给三元组、
+#        config.status 的临时 helper 在 hmdfs 上无法 chmod/执行、
+#        以及上游只 AC_CHECK_LIB 时依赖的头/库不会自动进路径
+#====================================================================
+
+id:                     E3534
+trigger_tool:           configure|autoconf|make|conan
+phase:                  configuration|compilation|link
+error_signature:        cannot guess build type; you must specify one|could not setup config files machinery|subs1\.awk: Permission denied|fatal error: 'alsa/asoundlib\.h' file not found|undefined symbol: snd_mixer_|Permission denied
+
+severity:               2
+category:               platform, ohos, build-system, autotools
+match_keywords:         autotools, configure, config.status, config.guess, mktemp, confXXXXXX, subs1.awk, hmdfs, chmod, ext2, musl triplet, --build, --host, AC_CHECK_LIB, pkg-config, Cflags, Libs, extra_cflags, extra_ldflags, include_paths, AM_GNU_GETTEXT, disable-nls
+
+title:                  老 autotools 项目在 OHOS/hmdfs 上常见三连：`config.guess` 认不出三元组（显式给 musl triplet）、`config.status` 的临时 awk helper 因 hmdfs 忽略 chmod 而无法执行（把 configure 内嵌的临时目录改到 ext2）、上游只用 AC_CHECK_LIB 时依赖的 <头>/库不会自动进路径（显式 -I/-L）
+
+root_cause:             三个都属于「老 autotools + 非 glibc 平台 + hmdfs 文件系统」的组合坑。(1) 随包发布的 `config.guess` 往往比平台新，`configure` 直接失败在 `cannot guess build type` ⇒ 必须显式 `--build=<triplet>`（本仓约定用 **musl** 三元组，`--host` 交给交叉 toolchain）。(2) `config.status` 会造一个临时目录并在其中生成**可执行**的 awk 助手（`subs1.awk`）来把 `.in` 展开成文件；这份老 autoconf 用的是**相对路径** `mktemp -d "./confXXXXXX"`（**与 TMPDIR 无关** ✗），而构建目录落在 **hmdfs** 上 —— **hmdfs 忽略 chmod** ⇒ 助手拿不到可执行位，报 `Permission denied` 与 `could not setup config files machinery`，看上去像"configure 坏了"。(3) 上游若只做 `AC_CHECK_LIB([asound], …)` 而没走 `PKG_CHECK_MODULES`，则 conan 提供的依赖 **只被当成"-lxxx"**，其头目录与库目录都不进搜索路径 ⇒ 编译期 `'alsa/asoundlib.h' file not found`、链接期连到 **sysroot 里的 stub** 而报一串 `undefined symbol`。
+affected_scope:         一切随包发布 configure 的老 autotools 项目（多数 2010—2020 年代的 GNU/第三方工具），尤其在 OHOS 上、构建目录位于 /storage（hmdfs）时；也包括只 AC_CHECK_LIB 而不取 pkg-config 的依赖用法。
+verification_cmd:       grep -n 'mktemp -d' configure | head; sh -c 'cd $(mktemp -d) && touch a && chmod +x a && test -x a && echo chmod-works || echo chmod-ignored'; df -h . | tail -1; grep -n 'AC_CHECK_LIB\|PKG_CHECK_MODULES' configure.ac
+rec_priority:           2
+rec_approach:           autotools-on-ohos-triplet-ext2-tempdir-and-explicit-dep-paths
+rec_description:        (1) **先判 configure 能否认出构建机**：报 `cannot guess build type` 就显式 `--build=aarch64-unknown-linux-musl`（本仓约定 musl；`--host` 由 toolchain 处理）。(2) **测一下构建目录是否还讲 chmod**：在两个候选目录各写个文件 `chmod +x` 再 `test -x`，哪边生效就把 config.status 的临时目录指到哪边 —— 做法是把 `configure` 内嵌的那行 `mktemp -d "./confXXXXXX"` 替换成**ext2 绝对路径**（如 `/data/storage/el2/base/cache/confXXXXXX`）。注意：**给 TMPDIR 没用**（老 config.status 不看它）。(3) **上游只 AC_CHECK_LIB 时，依赖的头/库要显式给**：用 `tc.extra_cflags.append("-I<dep>/include")` + `tc.extra_ldflags.append("-L<dep>/lib")`（`AutotoolsToolchain` **没有** `include_paths` ✗，加了会 AttributeError）；否则编译期缺头、链接期连到 sysroot stub。(4) NLS：上游 `AM_GNU_GETTEXT` 常是硬前置，缺完整 gettext 时传 `--disable-nls`。
+rec_command:            ./configure --build=aarch64-unknown-linux-musl --disable-nls CPPFLAGS="-I$DEP/include" LDFLAGS="-L$DEP/lib"; sed -i 's|mktemp -d "./confXXXXXX"|mktemp -d "/data/storage/el2/base/cache/confXXXXXX"|' configure
+rec_auto_fix:           false
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+source_pr:              !16429
+source_commit:          4fb5d2662e
+rec_impl:               manual
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E3534.md

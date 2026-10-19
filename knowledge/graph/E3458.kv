@@ -1,0 +1,29 @@
+id:                     E3458
+trigger_tool: test
+phase: testing
+error_signature: bundling ended prematurely after 0 bundles
+severity:               2
+category:               testing, api
+match_keywords: heaviest_bundle,poa,consensus
+title: POA consensus fixture must meet upstream minimum path length
+root_cause: generate_lpo_bundles rejects path_length below 10; an 8-residue fixture cannot produce a consensus even for identical sequences.
+affected_scope: POA 2.0-20060928 CLI and library consensus tests
+verification_cmd: Read heaviest_bundle.c path_length<10 and run the 12-residue consumer.
+rec_priority: 1
+rec_approach: use-valid-consensus-fixture
+rec_description: Use identical 12-residue sequences and retain exact consensus and graph assertions.
+rec_command: python3 scripts/ohc-run.py conan-verify poa 2.0-20060928 --profile qemu-ohos7
+rec_auto_fix: false
+rec_impl: manual
+fallback_priority:      2
+fallback_auto_fix:      false
+forbid_1_pattern: remove.*consensus.*assert
+forbid_1_reason: Deleting assertions would hide lack of consensus coverage.
+forbid_1_consequence: False positive test result.
+doc_file: drafts/E429-draft-A103.md
+last_updated: 2026-10-03
+source_event: POA task9621 native OHOS7 QEMU conan-verify r2
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+authors:               A103

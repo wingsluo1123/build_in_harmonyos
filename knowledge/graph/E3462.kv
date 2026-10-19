@@ -1,0 +1,26 @@
+id:                     E3462
+title: Validate filename-bearing CLI envelopes separately from exact structured payloads
+trigger_tool: test|runtime
+phase: testing
+severity:               2
+category:               portability, testing, shell
+match_keywords: filename banner, stdout envelope, CSV delimiter, Unicode path, exact payload, CLI end-to-end
+error_signature: UTF-8 path conversion output differs|XLS conversion geometry mismatch
+root_cause: A converter can include the input filename in a diagnostic stdout prefix and use a separator differing from its help text. Comparing complete stdout across renamed paths or parsing by the help-text separator misidentifies unchanged data as a portability failure.
+affected_scope: C/C++ data-conversion tools whose documented or source-proven stdout protocol includes a filename-bearing envelope before structured records; especially installed-tool checks under Chinese paths containing spaces.
+verification_cmd: Run the installed converter against identical input bytes at ordinary and Unicode/space paths; validate each exact filename envelope, compare only the source-proven payload boundary byte-for-byte, parse with the real separator, and assert independent API-derived dimensions and missing-input rejection.
+rec_priority: 1
+rec_approach: exact-envelope-plus-payload-oracle
+rec_description: Locate the actual output boundary and separator in the upstream source, inventory the selected sheet or record stream, strictly verify the changing filename envelope, and retain exact payload and independent structural assertions. Never broadly strip text until an expected result appears.
+rec_command: Verify the exact first-line filename prefix, then partition once at the proven newline boundary and parse the remaining bytes with the actual delimiter.
+rec_auto_fix: false
+rec_impl: consumer-test
+forbid_1_pattern: ignore.*all.*(prefix|banner)|replace.*payload.*help
+forbid_1_reason: Dropping arbitrary lines or replacing conversion with help/version can conceal corruption or failure.
+forbid_1_consequence: A package may pass without producing the required data.
+doc_file: knowledge/drafts/E552-draft-XLS4.md
+last_updated: 2026-10-15
+source_event: Native libxls 1.6.4 installed-tool tests exposed FILE filename prefixes and actual semicolon output despite comma wording in help. Corrected shared/static native Conan run passed upstream 3/3 and consumers 2/2 per mode; full log SHA256 98c1c44e0aaa297b8dec4f8425538a0e167a403f1d88514bc4d215dfca103e9b.
+authors: 2501_91199785; team 诶，云朵
+source_pr:
+source_commit:

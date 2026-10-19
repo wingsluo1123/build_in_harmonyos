@@ -1,0 +1,87 @@
+#====================================================================
+# E600（草稿）— Conan 2 传递依赖未标 run=True → "Skipped binaries"
+#              纯 Python 包的 PYTHONPATH 注入必须遍历可见 host 依赖闭包
+#
+# 草稿态，未进正式索引（正式 E 编号待 graph promote 时分配）
+# 来源适配: synadm/0.49.2（本仓库首个在配方里直接 requires("requests/...") 的 Python 包）
+# 既有未晋升草稿（同机制，晋升时请合并去重）:
+#   DRAFT-pytest-9.1.1-application-dep-skip  application 包传递依赖落入 Skipped binaries
+#   DRAFT-souffle-2.5-conan-run-trait-runtime-path / DRAFT-scanmem-0.17-l1e-can-run-false-under-single-pr
+# 本条新增部分: 纯 Python 包的**导入闭包**必须整串声明 run=True，且 package_info() 要遍历
+# 可见 host 依赖逐个发现两种产物布局（flat / lib/pythonX.Y/site-packages）后逆序 prepend PYTHONPATH
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E3473
+trigger_tool:           python|conan
+phase:                  runtime
+error_signature:        ModuleNotFoundError: No module named 'chardet'|ModuleNotFoundError: No module named 'urllib3'|ModuleNotFoundError: No module named 'idna'|ModuleNotFoundError: No module named 'certifi'|Skipped binaries|ERROR: synadm/.*: Error in package_info\(\)
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               3
+category:               compat, portability, python, conan, runtime
+match_keywords:         run=True, Skipped binaries, dependencies.host, package_info, PYTHONPATH, site-packages, 传递依赖, requests, chardet, 纯 Python, conan 2, import 闭包
+title:                  纯 Python Conan 包的依赖闭包漏标 run=True 时，传递依赖被 Conan 归为 "Skipped binaries"，对下游 package_info() 完全不可见，消费端 import 直接崩溃
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause: Conan 2 的 `ConanFileDependencies.host` 属性按 `{"build": False, "test": False, "skip": False}` 过滤依赖。
+ 上游 registry 里的 Python 配方（本项目实测 `requests/2.22.0`）对自身的运行时依赖写成
+ `self.requires("chardet/...")` 等**不带 `run=True`** 的形式 → 这些件在下游包里被标记为 skip，
+ 只出现在 `conan install` 的 "Skipped binaries" 列表里。因此下游 `package_info()` 遍历
+ `self.dependencies`（默认即 host）时**根本看不到它们**，无法把它们的 site-packages 追加进
+ PYTHONPATH；`import synadm.api` → `import requests` → `ModuleNotFoundError: No module named 'chardet'`。
+ 症状极易被误读成"chardet 没发布/没装"，实际是**依赖可见性（context）问题，不是存在性问题**。
+ 第二个坑：即使件在图上，各 Python 配方的产物布局也不统一——`lib/pythonX.Y/site-packages/<pkg>`
+ 与顶层平铺 `<pkg>` 两种都在本仓库出现过，硬编码任一种都会漏路径；且部分件（如 tabulate/requests
+ 现有配方）几乎不发布 PYTHONPATH，必须下游自行拼。
+affected_scope: 所有用 Conan 2 适配纯 Python 包（尤其依赖 registry 中 C/C++-centric 或老配方 Python 件）者；凡 package_info() 需要为消费端组装 PYTHONPATH 的场景
+verification_cmd: conan install --requires=synadm/0.49.2 -r=ohpcd --build=missing 2>&1 | grep -A5 "Skipped binaries"；
+  以及在 recipe 的 package_info() 里打印 `print(sorted(self.dependencies.host.keys()))` —— 若期望的件不在其中，即为可见性问题（而非未发布）；
+  再用 `python3 -c "import requests"` 在 conanrun 环境下复现 ModuleNotFoundError
+
+# ═══ Layer 3: 方案层 (Solution Space) ═══
+rec_priority:           1
+rec_approach:           declare-import-closure-run-true-and-walk-host-deps
+rec_description:        把被测包的完整**导入闭包**逐项声明为 `self.requires(<ref>, run=True)`（含被 skip 的传递依赖），并在 package_info() 遍历 `self.dependencies.host.values()` 收集各依赖的可导入根，逆序 prepend 进 buildenv_info/runenv_info 的 PYTHONPATH
+rec_command:            self.requires("certifi/2026.7.22", run=True)  # 对 chardet/idna/urllib3 同理
+rec_auto_fix:           false
+rec_impl:               none-manual-recipe-edit
+
+fallback_priority:      2
+fallback_approach:      vendor-missing-pure-python-deps
+fallback_description:   registry 确实无该件时，钉版官方 PyPI sdist（URL+sha256）vendor 进本包 site-packages，并写 PEP-427 归一化的 .dist-info（见 E601）
+fallback_command:       conan download <ref> -r=ohpcd --only-recipe   # 先实证是否真缺，勿凭推断
+fallback_auto_fix:      false
+fallback_impl:          none-manual-recipe-edit
+
+# ★ 禁止策略 ★
+forbid_1_pattern:       self\.dependencies(?!\.host|\.build|\.test)
+forbid_1_reason:        默认 `self.dependencies` 只含可见 host 件，skip/build/test 上下文一律拿不到；用它收集 PYTHONPATH 会静默漏路径
+forbid_1_consequence:   包能 create 成功但消费端 import 崩，或测试假绿（只测了打印语句时更隐蔽）
+forbid_2_pattern:       os\.path\.join\(.*package_folder.*"lib",\s*"python
+forbid_2_reason:        硬编码单一 site-packages 布局；registry 里同时存在顶层平铺件
+forbid_2_consequence:   部分依赖进不了 PYTHONPATH，报错表现为随机 ModuleNotFoundError
+forbid_3_pattern:       为绕过依赖缺失而 (dummy 包顶替|伪造 \.ci-result\.json|跳过 W3)
+forbid_3_reason:        R41/W3 硬规则：外部依赖阻塞只能止损上报，不能造假绕过
+forbid_3_consequence:   431 个编译失败流入 CI 的历史根因（CI 审计）
+
+# ═══ Layer 4: 原则引用 ═══
+principles:
+
+# ═══ 关系图 ═══
+# ═══ 元数据 ═══
+doc_file:               doc/E600.md
+last_updated: 2026-10-15
+source_event:           synadm/0.49.2 适配（OHOS aarch64，conan create 首跑 test_package 全红）
+
+# ═══ 知识协作 ═══
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-15
+authors:               A14E

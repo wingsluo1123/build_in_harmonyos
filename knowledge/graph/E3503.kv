@@ -1,0 +1,107 @@
+#====================================================================
+# _template.kv — 知识图谱条目模板
+# 用法: 复制此文件为 E511.kv，填写各字段
+# 对应的人类文档: doc/E511.md
+#
+# 格式规则:
+#   - key: value（冒号后一个空格，value 到行尾）
+#   - 多行值: 下一行以空格开头 = 续行
+#   - 列表值: 逗号分隔
+#   - 正则值: | 分隔多个模式
+#   - 以 # 开头的行为注释
+#   - 空行忽略
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+# trigger_tool: 出错的工具 (configure/cmake/meson/make/gcc/clang/ld/python/pip/install/test/runtime)
+# phase:         出错阶段 (configuration/compilation/linking/installation/testing/runtime)
+# error_signature: 正则表达式(|分隔), 用于精确匹配日志文本
+id:                     E3503
+trigger_tool:           test
+phase:                  testing
+error_signature:        concurrency.*SIGABRT|THREAD_COUNT 500|rc=134
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+# severity:      3=🔴blocking  2=🟡medium  1=🟢minor  0=✅resolved
+# category:      分类标签（受控词表 64 词，逗号分隔，最多 5 个；add/promote 自动归一化）
+# prescan_pattern: （可选）预编译源码扫描正则——写入后 PreScanner 运行时自动派生
+#                   PSCAN-KB-{id} 规则，无需改 pre-scan-rules.yaml（知识增长即扫描能力增长）
+# prescan_globs:   （可选）扫描范围 glob 列表，默认 '*.c, *.h, *.cc, *.cpp, *.sh, Makefile*, *.mk'
+# 词表: platform, compat, limitation, detection, hmdfs, ohos, selinux, kernel, portability, libc, musl, posix, syscall, headers, threading, socket, network, build-system, cmake, autotools ...（全表见 scripts/ohc/kb_taxonomy.py）
+# match_keywords: 纯文本关键词(逗号分隔), 用于粗筛(固定字符串匹配F)
+# title:         简短标题(一句话描述错误模式)
+severity:               2
+category:               portability, musl, threading, testing
+match_keywords:         libpg_query, concurrency, THREAD_COUNT, musl, SIGABRT, pthread, 500, 100
+title:                  上游测试 concurrency 500 线程在 OHOS musl 偶发 SIGABRT，降为 100 线程（源码 #define 重编译）
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+# root_cause:       一句话根因描述(逗号可分行)
+# affected_scope:   影响范围
+# verification_cmd: 验证诊断是否正确的命令
+root_cause:            OHOS musl pthread 在 500 线程规模行为差异导致 abort；非库缺陷。THREAD_COUNT 为源码 #define（test/concurrency.c 第 12-16 行），不是环境变量，须改源码 + 重新编译测试二进制才生效。历史笔记"运行时参数调整"表述不精确，应纠正为"测试源码宏调整（需重编译）"。配方零耦合（conanfile 只 make build 静态库，不构建/不跑上游测试）
+affected_scope:        libpg_query 18.0.0 test/concurrency；同类 musl 线程测试可参考
+verification_cmd:      sed -i 's/#define THREAD_COUNT 500/#define THREAD_COUNT 100/' test/concurrency.c && make test/concurrency && ./test/concurrency
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+# 推荐方案 (priority 越小越优先, 从 1 开始)
+rec_priority:          1
+rec_approach:          test-source-edit
+rec_description:       把 concurrency.c 的 THREAD_COUNT 从 500 改为 100 后重新编译测试二进制，运行稳定 rc=0
+rec_command:           sed -i 's/#define THREAD_COUNT 500/#define THREAD_COUNT 100/' test/concurrency.c; make test/concurrency; ./test/concurrency
+rec_auto_fix:          false
+rec_impl:               test-source-edit
+
+# 回退方案 (当推荐方案不可用时尝试)
+fallback_priority:     2
+fallback_approach:     build-with-valgrind-def
+fallback_description:  定义 USE_VALGRIND 时 THREAD_COUNT 降为 50，可作为替代下调值（需重新编译）
+fallback_command:      make test/concurrency CFLAGS="-DUSE_VALGRIND"
+fallback_auto_fix:     false
+fallback_impl:
+
+# ★ 禁止策略 (与推荐方案同等重要) ★
+# forbid_N_pattern:     正则(|分隔), 匹配则拒绝/警告
+# forbid_N_reason:      为什么禁止
+# forbid_N_consequence: 违反后的后果
+forbid_1_pattern:      setenv.*THREAD_COUNT|export THREAD_COUNT
+forbid_1_reason:       THREAD_COUNT 是编译期源码宏不是环境变量，设 env 完全无效（易误判为已修复实则未生效）
+forbid_1_consequence:  测试仍以 500 线程运行并偶发 SIGABRT，CI 抖动误判失败
+forbid_2_pattern:      THREAD_COUNT.*conanfile
+forbid_2_reason:       上游测试不属于配方职责（配方只 make build 静态库，不构建/不跑测试）
+forbid_2_consequence:  污染产物与 CI 语义，配方与上游测试产生不必要耦合
+
+# ═══ Layer 4: 原则引用 ═══
+# principles:    适用的原则 ID 列表(逗号分隔), 在 graph/principles.kv 中定义
+principles:             P012
+# ═══ 关系图 (Relations) ═══
+# causes:          本模式是这些模式的根因 (修好本模式可能同时解决它们)
+# caused_by:       本模式的根因是这些模式 (应先修它们)
+# similar_to:      特征相似可能混淆的模式
+# conflicts_with:  解决方案互相冲突的模式
+# prerequisite_of: 本模式是修复这些模式的前置条件
+# ═══ 元数据 ═══
+doc_file:              doc/E511.md
+last_updated: 2026-10-15
+source_event:          libpg_query 18.0.0 HarmonyOS PC 复现验证（2026-10-15）
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+# authors: 作者列表 (格式: Name <email>, Name2 <email2>)
+#          草稿生成时自动从 git config 填入；主编合入时保留原作者
+#          合并到已有条目时追加为第二/第三作者
+# source_pr:            添加该条目的 PR 编号
+# source_commit:        添加时的 commit SHA (短)
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics, 方案 D) ═══
+# metrics_success_count: 该修复方案成功次数
+# metrics_fail_count:    该修复方案失败次数
+# metrics_confidence:    置信度 = success / (success + fail)
+# metrics_last_used:     最后使用时间
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-15
+authors:               F08F

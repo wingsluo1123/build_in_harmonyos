@@ -1,0 +1,47 @@
+id:                     E3500
+title: OHOS libc++15 ranges 算法被 _LIBCPP_HAS_NO_INCOMPLETE_RANGES 宏隐藏、C++23 std::ranges::contains 缺失、std::format 运行库无符号（C1-C3 组合，durak 2.1.1 实证）
+category:               ohos, portability, toolchain, conan, c++20
+severity:               2
+error_signature: >
+  "no member named 'find_if' in namespace 'std::ranges'|
+   no member named 'contains' in namespace 'std::ranges'|
+   undefined symbol: vtable for std::__n1::format_error|
+   undefined symbol: std::__n1::__throw_format_error"
+match_keywords: >
+  _LIBCPP_HAS_NO_INCOMPLETE_RANGES, _LIBCPP_ENABLE_EXPERIMENTAL,
+  std::ranges, ranges::contains, std::format, libc++, clang 15,
+  OHOS SDK 26, undefined symbol format_error, __throw_format_error
+root_cause: >
+  C1: OHOS SDK 26 配套 libc++ 15.0.4 的 __config 在非实验模式默认定义
+  _LIBCPP_HAS_NO_INCOMPLETE_RANGES；__algorithm/ranges_*.h 实现文件实际
+  存在（find_if/count_if/sort/binary_search/transform/copy_if/find），但被
+  该宏守卫而不可见，导致 C++20 ranges 算法 "no member named X in namespace
+  'std::ranges'" 编译失败。
+  C2: std::ranges::contains 是 C++23 特性，libc++ 15 头文件无
+  __algorithm/ranges_contains.h，任何标志下都不存在。
+  C3: libc++ 15 的 <format> 头声明可用（解锁后），但运行时库 libc++.so
+  未编译 format 部分（INCOMPLETE_FORMAT），头声明 → 运行库缺符号 → 链接失败
+  （undefined symbol: vtable for std::__n1::format_error）。
+rec_approach: >
+  C1: 编译标志 -D_LIBCPP_ENABLE_EXPERIMENTAL 解锁 incomplete ranges
+  （无需改源码）；conan 配方 generate() 注入 CMAKE_CXX_FLAGS，并需通过
+  cpp_info.defines 传导给消费者（durak 即如此，package_info.defines =
+  ["_LIBCPP_ENABLE_EXPERIMENTAL"]）。
+  C2: 改写为 C++20 等价 std::ranges::find(r, v) != std::ranges::end(r)
+  （语义完全一致）。
+  C3: 改写为 ostream 流式输出（os << "Card: {" << v << " , " << name <<
+  "}"），输出格式与上游一致。
+prescan_pattern: >
+  std::ranges::(find_if|count_if|transform|binary_search|copy_if|find|
+  contains)|std::format\(|_LIBCPP_HAS_NO_INCOMPLETE_RANGES
+last_updated: 2026-10-04
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown, gcw_eQ4VpLdf
+doc_file:               doc/E3500.md
+trigger_tool:           conan
+phase:                  packaging
+affected_scope:         OHOS libc++15 ranges 算法被 _LIBCPP_HAS_NO_INCOMPLETE_RANGES 宏隐
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        >

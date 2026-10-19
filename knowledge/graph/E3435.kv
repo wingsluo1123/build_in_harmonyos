@@ -1,0 +1,50 @@
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E3435
+trigger_tool:           clang
+phase:                  compilation
+error_signature:        unknown type name 'fd_set'|use of undeclared identifier 'FD_SETSIZE'|call to undeclared function 'select'|use of undeclared identifier 'FD_ISSET'|incomplete type 'struct timeval'
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               2
+category:               compat, portability, libc, musl, headers
+match_keywords:         fd_set, FD_SETSIZE, FD_ISSET, select, sys/select.h, sys/types.h, musl, unknown type name, implicit function declaration
+title:                  musl 下 fd_set/FD_SETSIZE/select 需显式 #include <sys/select.h>（glibc 经 sys/types.h 传递可见）
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             glibc 的 <sys/types.h>（以及 <sys/socket.h> 等）会顺带定义 fd_set / FD_SETSIZE 并声明 select()，上游代码因此长期只包含 sys/types.h 或依赖其他系统头的传递包含；musl（OHOS SDK）不再提供这层传递可见性，编译期直接报 unknown type name 'fd_set'，且 select()/FD_ISSET 退化为隐式声明（C99 起为错误）。
+affected_scope:         BSD socket / select() 事件循环代码；只 include <sys/types.h>、<sys/socket.h>、<unistd.h> 而未显式 include <sys/select.h> 的源文件。uqm 0.8.0 src/libs/network/netmanager/netmanager_bsd.c 即典型（18 个 error）。
+verification_cmd:       printf '#include <sys/types.h>\nint main(void){fd_set s; FD_ZERO(&s); return 0;}\n' > $TMPDIR/t.c && clang -c $TMPDIR/t.c -o /dev/null && echo GLIBC_OK || echo MUSL_NEEDS_SYS_SELECT_H
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           source-patch
+rec_description:        在缺少该头的源文件里显式 #include <sys/select.h>（POSIX 标准头，glibc/BSD/macOS 同样存在，改动零风险）
+rec_command:            # 补丁示例: +#include <sys/select.h>（加在现有系统头区块内）
+rec_auto_fix:           false
+rec_impl:               manual
+
+fallback_priority:      2
+fallback_approach:      add-cflags
+fallback_description:   若上游不接受源码改动，可用 -include sys/select.h 强制预包含；可读性差、影响面大，仅在无法打补丁时使用
+fallback_command:       CFLAGS="-include sys/select.h" ./configure ...
+fallback_auto_fix:      false
+fallback_impl:          add-cflags
+
+forbid_1_pattern:       #define\s+fd_set\s+int|typedef\s+\w+\s+fd_set
+forbid_1_reason:        自行 typedef/宏定义 fd_set 绕过——与 libc 真实定义冲突，且 select() 的 ABI 由 libc 决定
+forbid_1_consequence:   编译期可能通过，运行期位宽/布局不匹配导致 select() 行为未定义
+
+principles:             P001
+doc_file:               doc/E757.md
+last_updated:           2026-10-16
+source_event:           uqm/0.8.0 适配：netmanager_bsd.c 在 OHOS 上报 unknown type name 'fd_set' 等 18 个 error
+
+authors:                ohc-agent <ohc-agent@local>
+source_pr:
+source_commit:
+
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+

@@ -1,0 +1,21 @@
+error_signature: "not ok [0-9]+ - |^1\\.\\.([0-9]+)$|TAP version 1[0-9]|meson test.*protocol.*tap|tap_not_ok|tap_plan\\(\\)"
+root_cause: "上游自带的手写 TAP harness 把『断言结果』与『进程退出码』彻底解耦：tap.c 里的 tap_ok()/tap_not_ok() 只往 stdout 打 `ok N -` / `not ok N -`，tap_plan() 只打 `1..N`，而测试 main() 结尾一律 `return EXIT_SUCCESS;`（tofi test/config.c、test/utf8.c 实测如此，退出码与断言无关）。于是任何『跑被测二进制、看 rc 是否为 0』的集成方式都会 100% 假绿：断言全挂时 rc 仍是 0。判定权只在 TAP 解析器手里——meson 的 `test(name, exe, protocol: 'tap')` 会把 `not ok` 行计入 Fail 并让 `meson test` 返回非零；同理 conan 侧若不用 meson.test() 而用 self.run('<test_bin>') 就是假绿。"
+rec_approach: "对手写 TAP 套件：①配方 build() 里用 meson.test()（对应 meson 的 protocol: 'tap' 注册）而不是 self.run('<test_bin>')，把判定权交给 TAP 解析器；②同一套件的 test_package 消费者测试若要自己跑用例，必须解析 TAP 流（匹配 `^not ok` 与 `^1\\.\\.(\\d+)` 的 plan 行，或统计 `ok`/`not ok` 条数）而不是看退出码；③清点原子用例时按 tap_is/tap_isnt 等断言宏的调用点计数（tofi：config.c 39+29、utf8.c 4×2+1×2+1+1=12 ⇒ N_static=80），不要用可执行文件个数当用例数；④`tap_待办标记()` 只影响输出注释（`# 待办标记`），既不改退出码也不一定被 harness 记为失败，报告里要如实单列。"
+rec_command: "python3 scripts/ohc-run.py conan-verify <pkg> <ver>   # G2 内 meson.test() 真跑；日志中 meson 汇总行 `Ok: N / Fail: M` 才是判据\nreadelf-free 最小复现：clang -std=c2x -D_GNU_SOURCE -o repro repro.c tap.c && ./repro; echo rc=$?   # 输出 'not ok 1' 而 rc=0"
+match_keywords: ["TAP", "protocol: tap", "tap_not_ok", "tap_plan", "TAP version", "meson test", "not ok", "exit code", "假绿", "false green", "upstream tests", "N_static", "test accounting", "rule4", "hand-rolled test harness", "conan build meson.test"]
+severity:               1
+category:               meson, testing, gate-integrity, tap, upstream-tests
+prescan_pattern: "(tap_not_ok\\(|tap_is\\(|tap_isnt\\(|TAP version|protocol:\\s*'tap')"
+prescan_globs: ["test/**/*.c", "test/**/*.h", "test/meson.build", "**/meson.build", "**/meson_options.txt"]
+last_updated: 2026-10-18
+id:                     E3530
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E3530.md
+trigger_tool:           meson
+phase:                  build
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        "对手写 TAP 套件：①配方 build() 里用 meson

@@ -1,0 +1,22 @@
+---
+error_signature: "config.status: error: could not setup config files machinery|subs1.awk: Permission denied|failed to load external entity.*docbookx.dtd|install-sh.*can't execute: Permission denied|make.*Error 126"
+root_cause:             四个独立机制叠加：(1) /usr/bin/awk 是指向 toybox 的坏符号链接（exec 被拒），configure 把它缓存进 config.status 的 $AWK，subs1.awk 处理直接 Permission denied——E060 的 tmpfs 方案解决不了这一层；(2) 上游 `%: %.in %.txt` 生成规则是 `awk | sed > $@` 与 `sh ./$@ --help | grep | sed -e '$d' >> $@.txt` 的管道链，并行 make（-jN）下 sed 进入自读自写循环，KB 级脚本文件膨胀至 ~35GB（xdg-utils 2026-10-14 实证，10 个 sed 并行，合计 ~350GB）；(3) scripts/Makefile 的 all 目标含 html/man，xmlto 联网拉 docbookx.dtd 在沙箱不可达；(4) make install 走上游 install-sh，其复制的新建可执行文件触发 hishell_hap MAC "can't execute: Permission denied"（G17 同源）。
+rec_approach:           tmpfs-plus-tool-pins-plus-offline-shims-plus-copy-install
+affected_scope:         所有含脚本/文档生成链的 autotools 包（Makefile 出现 %: %.in、xmlto/asciidoc/pod2man、install-sh 的），OBS 观测到 sed 进程数 ≈ make -j 并行度且文件持续增长即为命中
+match_keywords: ["config.status", "subs1.awk", "Permission denied", "sed", "make -j", "docbookx.dtd", "xmlto", "install-sh", "tmpfs", "el2/base", "offline shim"]
+severity:               2
+category:               platform
+source_pr:              ""
+source_commit:          ""
+last_updated:           2026-10-14
+---
+id:                     E3432
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E3432.md
+trigger_tool:           make
+phase:                  install
+verification_cmd:       # 以 source_pr CI 门禁为准（PR ""）
+rec_description:        tmpfs-plus-tool-pins-plus-offline-shims-plus-copy-install

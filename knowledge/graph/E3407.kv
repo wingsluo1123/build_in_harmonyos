@@ -1,0 +1,64 @@
+# DRAFT — 固定宽度样本流必须跨 read() 保存残余字节
+
+id:                     E3407
+trigger_tool:           runtime|test
+phase:                  runtime|testing
+error_signature:        noninteger number of samples read|truncated 16-bit sample|fragmented pipe changed the decoded sequence
+
+severity:               2
+category:               portability, runtime, testing, io, multimedia
+match_keywords:         short read, partial sample, residual byte, PCM, FIFO, pipe,
+                        fixed-width record, sample boundary, clean EOF, truncated EOF
+title:                  固定宽度样本流的读取边界不是记录边界：跨 read() 保存残余字节
+prescan_pattern:        read\(.*sizeof.*\)|fread\(.*sizeof.*\).*(?:sample|frame)|noninteger number of samples
+prescan_globs:          *.c, *.cc, *.cpp
+
+root_cause:             流式 read() 只保证返回当前可用字节数，不保证停在 16 位样本或其他固定宽度
+                        记录边界。把每次读取长度向下取整并丢弃尾字节，会使下一次读取从样本中间开始，
+                        后续所有记录永久错位；把 EOF 和读取错误合并又会把截断输入伪装成成功。
+affected_scope:         从 FIFO、管道、socket 或其他字节流读取 16/24/32 位 PCM、定宽传感器记录、
+                        像素或二进制结构，并在每次 read() 内独立按记录宽度取整的解析器。
+                        上层已经提供完整记录、显式消息边界或按字节语义处理的代码不适用。
+verification_cmd:       conan create archives/m/multimon/1.0 -pr:h=ci/conan/profiles/ohos-aarch64
+                        -pr:b=ci/conan/profiles/ohos-aarch64 --build=multimon/*
+
+rec_priority:           1
+rec_approach:           carry-incomplete-record-across-reads
+rec_description:        读取到字节缓冲；只把 floor(total/record_width)*record_width 个字节交给解析器，
+                        将不足一个记录的尾部移到下一次读取前缀。EINTR 保留状态重试；真正读取错误失败；
+                        非阻塞 EAGAIN/EWOULDBLOCK 保留状态并等待可读事件；EOF 时残余为零才是干净结束，
+                        仍有残余则报告截断。回归用安装后的生产命令，
+                        将同一输入按奇数边界分片，并要求输出与规则文件完全一致。
+rec_command:            preserve total % record_width bytes before the next read and compare regular-file and fragmented-stream outputs
+rec_auto_fix:           false
+rec_impl:               source-stream-parser-patch
+
+fallback_priority:      2
+fallback_approach:      exact-record-reader
+fallback_description:   若调用点必须一次消费一个记录，封装 read_exact(record_width)，在内部循环处理短读和
+                        EINTR；仍须让 EOF-before-any-byte 与 EOF-after-partial-record 返回不同结果。
+fallback_command:       replace single read with an exact-record helper that reports clean EOF, truncated EOF, and I/O error separately
+fallback_auto_fix:      false
+fallback_impl:          source-read-helper
+
+forbid_1_pattern:       (?:len|count|nread).*-.*(?:len|count|nread).*%.*(?:sample|record|sizeof)|(?:len|count|nread).*&.*~1
+forbid_1_reason:        仅向下取整会永久丢弃当前读取的尾部字节。
+forbid_1_consequence:   下一次读取从记录中间开始，后续全部样本错位且错误可能不再显性。
+forbid_2_pattern:       if.*read.*(?:<=|==).*0.*break|read.*(?:EOF|error).*same
+forbid_2_reason:        零返回、EINTR、真正错误和带残余的 EOF 具有不同状态语义。
+forbid_2_consequence:   截断或设备错误被伪装成成功结束，消费者无法判断输出完整性。
+
+principles:             P005
+doc_file:               knowledge/drafts/E202610160200-draft-6F91.md
+last_updated:           2026-10-16
+source_event:           multimon/1.0 原始生产 raw/管道路径把奇数短读的最后一个字节丢弃；同一 DTMF
+                        输入作为规则文件解码 4/4，在首字节后分片写入继承匿名管道时原实现与仅告警/重试的
+                        错误修复不能保持序列。残余字节修复后，规则文件与管道输出逐字一致；空输入成功，
+                        半样本 EOF 非零失败。测试调用安装后的 gen 和 multimon。
+authors:                gcw_vbU49vcA <gcw_vbU49vcA@noreply.gitcode.com>
+source_pr:              https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos/merge_requests/16165
+source_commit:          c0b2671a2413cc54cf899da43ef7dce2258fc661
+metrics_success_count:  1
+metrics_fail_count:     2
+metrics_confidence:     0.9
+metrics_last_used:      2026-10-16

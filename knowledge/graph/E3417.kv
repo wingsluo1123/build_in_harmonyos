@@ -1,0 +1,139 @@
+#====================================================================
+# DRAFT-24661-conan-transitive-header-only-deps-not-in-traversal-explicit-require
+# Conan 的 header-only/data 传递依赖不进消费方依赖遍历与编译路径，
+# 消费方配方必须显式 require
+# 来源: xfractint 20.4.10 适配 (2026-10-16)；同根因先例 xworld 2.0 适配
+#====================================================================
+
+id:                     E3417
+trigger_tool:           conan create|clang|make
+phase:                  compilation
+error_signature:        fatal error: 'X11/.*\.h' file not found|fatal error: .*\.h' file not found
+match_keywords:         xorgproto, header-only, 传递依赖, transitive headers, explicit require, requirements, 依赖遍历, self.dependencies.host, Xlib.h, Xatom.h, X11/X.h, 协议头, libx11, xfractint, xworld
+category:               conan, dependency, compilation
+severity:               2
+title:                  Conan 的 header-only/data 传递依赖不进消费方配方的依赖遍历与编译路径，消费方必须显式 require（X11 协议头包 xorgproto 类）
+
+root_cause: >
+  Conan 2 图语义下，消费方配方在 build() 里对 self.dependencies.host
+  遍历拼 -I/-L 时，**链接轴**的传递依赖（libxcb/libxau/libxdmcp 等带
+  .so 的包）会浮现进遍历；**header-only/data 轴**的传递依赖
+  （xorgproto、xtrans、xcb-proto 等纯协议头/数据包）不会浮现到消费方
+  的编译路径。典型断链: 消费方只 require libx11，而 libX11 头文件
+  Xlib.h 第 44 行 #include <X11/X.h>——X11/X.h 归属 xorgproto 包、
+  libx11 包内并无此文件，且 libx11 配方确实 require 了 xorgproto
+  （传递依赖真实存在）——但该传递头包不出现在消费方 -I 序列，编译
+  报 fatal error: 'X11/X.h' file not found。修复: 消费方配方显式
+  self.requires("xorgproto/2025.1")，其 include 目录即进入编译路径。
+  注意限定: 并非"一切传递依赖都不进遍历"（不带限定的表述会被本 run
+  自身 PASS 构建证伪——同图链接轴传递依赖均在 -I 序列中），限定为
+  header-only/data 轴。
+
+affected_scope: >
+  任何以 header-only 包（协议头/SDK 数据包）为传递依赖的 Conan 配方:
+  全部 X11 客户端应用/库（消费 libx11 → xorgproto 链），以及同构的
+  "生产配方声明了但消费方看不见"的头文件传递闭包场景。
+
+verification_cmd: >
+  # 机理级核验（全新 shell 可复跑，仓库内自包含）:
+  # (1) 图检索去重——"消费方须显式 require xorgproto"无覆盖条目，
+  #     命中的 E307/E308/E309 均为 xorgproto 作为被移植对象的条目、
+  #     E468 为 pkg-config 名映射，均非本轴:
+  grep -ri 'xorgproto' knowledge/graph/ | cut -d: -f1 | sort -u
+  # (2) 近邻排查——transitive_headers 生产方轴精确词命中 E480/E348；
+  #     宽词族 transitive|传递依赖 另命中 E307/E358/E363/E420/E447/
+  #     E449/E498/E499/E522/E541 等其他轴条目，逐一裁决均不覆盖
+  #     "消费方须显式 require 传递头包"轴:
+  grep -rli 'transitive_headers' knowledge/graph/
+  # (3) 传递依赖真实性——已发布 libx11 配方确有该 require:
+  grep -n 'xorgproto' archives/l/libx11/1.8.13.1/conanfile.py
+  # (4) 头文件归属——X11/X.h 在 xorgproto 包、不在 libx11 包
+  #     （包目录以 conan cache path 'libx11/1.8.13.1:<pkg_id>' 与
+  #     'xorgproto/2025.1:<pkg_id>' 查询后代入）:
+  find <libx11_pkg>/include/X11 -maxdepth 1 -name 'X.h'; echo "libx11_exit=$?"
+  find <xorgproto_pkg>/include/X11 -maxdepth 1 -name 'X.h'; echo "xorgproto_exit=$?"
+  # 标准验证路径（双轮 create 循环，任何持有 X11 客户端配方者可执行）:
+  # 去掉显式 xorgproto require → conan create 观察
+  # fatal error: 'X11/X.h' file not found；恢复 require → conan create PASS。
+
+rec_priority:           1
+rec_approach:           explicit-require-for-transitive-header-only-deps
+rec_description: >
+  消费方配方在 requirements() 显式声明头文件级传递依赖
+  （self.requires("xorgproto/2025.1")），使其 include 目录进入消费方
+  依赖遍历与编译路径；依赖闭包的 -I/-L 仍由 self.dependencies.host
+  遍历动态拼接，不硬编码路径。版本以生产配方（libx11）实际 require
+  的版本为准并保持图内一致。
+rec_command: >
+  def requirements(self):
+      self.requires("libx11/1.8.13.1")
+      self.requires("xorgproto/2025.1")  # header-only 传递依赖显式声明
+rec_auto_fix:           false
+rec_impl:               conan-recipe
+
+fallback_priority:      2
+fallback_approach:      pin-transitive-closure-and-document-bet
+fallback_description: >
+  不显式声明而收紧 libx11 版本区间，并在 notes.md 明确记录"本配方
+  依赖 libx11 当前配方携带 xorgproto 闭包且其头文件恰好经其它途径
+  可见"这一对传递闭包的赌注。诚实定位: 过渡性赌注而非修复——上游
+  libx11 配方重构（拆分/更名/去 require）即碎，仅作临时兼容手段。
+fallback_command:
+fallback_auto_fix:      false
+fallback_impl:          notes-documentation
+
+forbid_1_pattern:       -I.*\.conan2/p/|-I.*<CONAN_HOME>
+forbid_1_reason: >
+  把 conan 缓存中 xorgproto 包的绝对路径硬编码进 -I（而非走显式
+  require + 依赖遍历）：缓存包目录在构建暂存与定稿间会迁移、且随
+  缓存重建变化，绑定绝对路径等于绑定一次性构建现场。
+forbid_1_consequence: >
+  包目录迁移或缓存重建后头文件路径失效，构建不可复现；绕过 Conan
+  图的依赖声明也使依赖审计与传递闭包分析失真。
+
+principles:             P014
+causes:
+caused_by:
+conflicts_with:
+prerequisite_of:
+
+# 留档 - "本 run 实例: 消费配方仅 require libx11 时 fatal error: 'X11/X.h'
+# 留档 file not found（xorgproto 不在任何 -I）；显式
+# 留档 requires(\"xorgproto/2025.1\") 后 CI 全绿。r2 失败日志路径
+# 留档 worktree/.ci_logs/conan_build_xfractint_20.4.10.log 已被 PASS 轮
+# 留档 覆盖，轮次记录见 builder 报告第 5 节"
+# 留档 - "PASS 轮 -I 序列（机理限定证据）: 含 libx11 + libxcb + libxau +
+# 留档 libxdmcp（链接轴传递依赖全部浮现），不含 xorgproto/xtrans/
+# 留档 xcb-proto（header-only/data 轴不浮现）——本条标题的 header-only
+# 留档 限定由此而来"
+# 留档 - "传递依赖真实性与头归属: archives/l/libx11/1.8.13.1/conanfile.py
+# 留档 requirements 含 xorgproto/2025.1；libx11 包内无 X11/X.h、
+# 留档 xorgproto 包 include/X11/X.h 存在"
+# 留档 - "同根因第二实例: archives/x/xworld/README.md（'Xatom.h lives in
+# 留档 xorgproto, not libx11 — must require xorgproto explicitly'）与
+# 留档 archives/x/xworld/manifest.yaml ohos_adaptation 同义条目——错误类
+# 留档 signature 同为 fatal error: X11/*.h（xworld 缺 Xatom.h、本 run 缺
+# 留档 X11/X.h，头文件名不同、根因相同）"
+# 留档 - "graph 检索记录: grep -ri xorgproto → E307/E308/E309/E468（均为
+# 留档 xorgproto 作为被移植对象或 pkg-config 名映射轴，非消费方 require
+# 留档 轴）；grep -rli transitive_headers → E480（生产方 transitive_
+# 留档 headers 直接消费轴，近邻非覆盖）与 E348（同用 transitive_
+# 留档 headers=True 声明，主轴为 meson .pc 转发，非本轴）；transitive/
+# 留档 传递依赖 宽词族另命中 10 个其他轴条目，逐一裁决均不覆盖消费方
+# 留档 require 轴"
+
+# 留档 - "X11 客户端应用/库配方（libx11 → xorgproto 传递头链）"
+# 留档 - "任何以协议头/SDK 数据包为传递依赖的 Conan 消费配方"
+
+source_event: >
+  xfractint 20.4.10 HarmonyOS PC 适配 round 2: fatal error: 'X11/X.h'
+  file not found → 显式 require xorgproto/2025.1 → round 3 CI 全绿。
+  与 xworld 2.0 适配同根因（同错误类 signature、不同头文件名），双
+  实例达 L2 门槛。检索补记: Curator 首轮查重未检 transitive 词族，
+  Auditor 补检命中 E480 并裁决为互补轴（生产方 transitive_headers vs
+  消费方显式 require），已入 similar_to 并写明轴差。
+
+doc_file:               knowledge/drafts/DRAFT-24661-conan-transitive-header-only-deps-not-in-traversal-explicit-require.md
+last_updated:           2026-10-16
+
+authors: builder(xfractint-20.4.10) <noreply.gitcode.com>

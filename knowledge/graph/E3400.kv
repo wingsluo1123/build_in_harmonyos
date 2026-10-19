@@ -1,0 +1,155 @@
+#====================================================================
+# E754.kv — aws-lc-sys 在 OHOS/aarch64 上不产出 perlasm 汇编对象
+#              ⇒ 链接期数百个 aws_lc_<ver>_* 未定义符号
+# 来源: overtls 0.3.12 适配（Rust/Cargo，reqwest 的 `rustls` feature 硬编码 aws-lc-rs）
+# 状态: 草稿（待主编审核 promote；取号 E754 经 knowledge_id.py --claim 三面扫描）
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+# 辨别性指纹 = 符号名里带 aws_lc_<版本>_ 前缀（符号前缀由 aws-lc 的 CMake 按
+# AWS_LC_SYS_NO_PREFIX 生成，默认 "aws_lc_<x_y_z>"），且都来自 rlib/静态库内部
+# 引用而非用户代码；同时伴生 CMake「找不到 OHOS 工具链」告警。
+id:                     E3400
+trigger_tool:           cmake|make|clang|ld|rust
+phase:                  compilation|linking
+# 注：本字段与 root_cause 用 YAML `|` 块标量承载（值内含 `undefined symbol: ` /
+# `ld.lld: error: ` 等「冒号+空格」序列，纯量会触发 YAML mapping 解析错误）。块标量
+# 保留逐行内容，`.kv` 行式解析器（scripts/ohc/models.parse_kv_file，按 `|` split 取正则）
+# 与本文件 YAML 回读结果一致。
+error_signature:        |
+                        undefined symbol: aws_lc_[0-9_]+_|
+                        undefined symbol: aws_lc_[0-9_]+_[A-Za-z0-9_]+|
+                        aws_lc_[0-9_]+_[A-Za-z0-9_]+.*in archive.*libaws_lc_sys|
+                        libaws_lc_sys-[0-9a-f]+\.rlib
+# 注：CMake 侧的判别线索（`Building with: CMake` / `Symbol Prefix: Some("aws_lc_…")` /
+# `Neither OHOS_NDK_HOME nor OHOS_SDK_NATIVE are set! No toolchain found.` / 产物
+# `libaws_lc_<ver>_crypto.a`）**不在** cargo 的构建日志里，只在该 crate 自己的
+# build-script 输出文件里（`<target>/release/build/aws-lc-sys-*/output`）——2026-10-06
+# 实测 conan create 日志对这几串命中数为 0。故它们写进 root_cause 供人工定位，
+# **不**写进 error_signature（死模式只会稀释签名）。
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               3
+category:               cmake, linking, asm, rust, dependency
+match_keywords:         aws-lc-sys, aws_lc_0_45_0, aws_lc_rs, aws-lc-rs,
+                        rustls, ring, rustls-no-provider, reqwest,
+                        tokio-rustls, hyper-rustls, rustls-platform-verifier,
+                        cargo, Cargo.toml, perlasm, 汇编对象, asm,
+                        undefined symbol, ld.lld, libaws_lc_0_45_0_crypto.a,
+                        OHOS_NDK_HOME, OHOS_SDK_NATIVE, cross-compile,
+                        HarmonyOS PC, aarch64, Rust
+title:                  aws-lc-sys 在 OHOS/aarch64 上不产出 perlasm 汇编对象 ⇒ 链接期数百个 aws_lc_* 未定义符号（Rust 包应改用 ring provider）
+prescan_pattern:        aws-lc-rs|aws_lc_rs|features\s*=\s*\[[^]]*"rustls"|"rustls-tls"|"rustls-no-provider"
+prescan_globs:          Cargo.toml, */Cargo.toml, **/Cargo.toml
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             |
+                        aws-lc-sys 用 CMake 构建其捆绑的 aws-lc。在 OHOS/aarch64 目标上
+                        它的 CMake 探测不到 OHOS NDK（逐字告警 `Neither OHOS_NDK_HOME nor
+                        OHOS_SDK_NATIVE are set! No toolchain found.`；即使 CMake 已把
+                        `CMAKE_ASM_COMPILER` 识别为 `/data/service/hnp/bin/clang` 并给出
+                        `--target=aarch64-unknown-linux-ohos` 的 ASM flags），构建实际编译
+                        的只有 C 源——`Building ASM object` 计数 = 0，产出的
+                        `libaws_lc_0_45_0_crypto.a` 257 个成员里 0 个 aarch64 perlasm
+                        目标（`llvm-ar t … | grep -iE 'armv8|neon|vpaes|aesv8'` 无命中）。
+                        而同一批 C 源（bcm.c / chacha.c / e_chacha20poly1305.c /
+                        e_aesgcmsiv.c）仍按「有汇编」编译，于是它们的 extern 声明
+                        （`ChaCha20_ctr32_neon`、`aes_hw_*`、`vpaes_*`、`bcm.c` 里的
+                        `bn_add_words`/`bn_mul_mont`/`bignum_copy_row_from_table*` 等）
+                        在链接期全部悬空 ⇒ `ld.lld: error: undefined symbol:
+                        aws_lc_0_45_0_*`（默认 --error-limit 下「too many errors
+                        emitted, stopping now」）。
+                        触发面**不是**直接依赖：Rust 的 Cargo feature 是**全图并集**，
+                        上游在 `rustls`/`tokio-rustls` 上写 `default-features = false` +
+                        `features = ["ring"]` 并不能阻止别的 crate 打开 `rustls/aws_lc_rs`。
+                        典型硬编码源是 `reqwest` 0.13.x：
+                        `rustls = ["__rustls-aws-lc-rs", "dep:rustls-platform-verifier", "__rustls"]`，
+                        `__rustls-aws-lc-rs = ["hyper-rustls?/aws-lc-rs",
+                        "tokio-rustls?/aws-lc-rs", "rustls?/aws-lc-rs", "quinn?/rustls-aws-lc-rs"]`。
+                        故「Cargo.toml 里 grep 不到 aws-lc-rs」不能证明它不在构建图里，
+                        必须用 `cargo tree -i aws-lc-rs` 反查。
+affected_scope:         OHOS/aarch64（armv8）上的所有 cargo 工程，只要依赖图里出现
+                        aws-lc-rs：直接依赖它，或经 reqwest 的 `rustls`/`default-tls`
+                        feature、hyper-rustls 默认 feature（default 含 aws-lc-rs）、
+                        tokio-tungstenite 的 `rustls-tls-*`（视版本）、quinn 的
+                        `rustls-aws-lc-rs` 间接启用。x86_64 上因 perlasm/nasm 正常而不复现，
+                        属「只在 aarch64 交叉目标上暴露」的坑。
+verification_cmd:       |
+                        cargo tree -i aws-lc-rs   # 期望: error: package ID specification `aws-lc-rs` did not match any packages
+                        cargo tree | grep -E 'aws-lc|ring'   # 期望只剩 ring
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           switch-tls-provider-to-ring
+rec_description:        把「谁来提供 rustls 的 CryptoProvider」改回 ring：把硬编码
+                        aws-lc-rs 的那个依赖的 feature 换掉，而不是去修 aws-lc-sys 的
+                        汇编。对 reqwest 0.13.x 就是把 `"rustls"` 换成
+                        `"rustls-no-provider"`（= `dep:rustls-platform-verifier` + `__rustls`，
+                        不启用任何 provider）；此时由应用自己安装 ring 默认 provider。
+                        判别三行：
+                        ① `cargo tree -i aws-lc-rs`（改前有命中，改后 did not match）
+                        ② `cargo tree -e features -i aws-lc-rs`（可逐级看出是哪个 feature
+                           把 `rustls/aws-lc-rs` 打开的，本案例是 `reqwest feature "rustls"`）
+                        ③ `grep -rn 'CryptoProvider\|install_default\|default_provider' src/`
+                           —— 确认应用自己会安装 provider（否则 reqwest/rustls 会在
+                           **运行期** 以 "no process-level CryptoProvider available"
+                           panic/报错，错误形态从链接期挪到运行期，更难查）
+                        overtls 0.3.12 实测：`src/lib.rs:36 ensure_rustls_crypto_provider()`
+                        安装 `rustls::crypto::ring::default_provider()`，`src/tls.rs:30/46`
+                        显式用 ring 密码套件建 ClientConfig；唯一的全局默认 provider
+                        消费者是 server 侧 `reqwest::Client`（`src/panel_sync.rs:32`），
+                        它在 `run_server` 里紧跟 `src/server.rs:42` 的 provider 安装之后创建
+                        ⇒ 换用 rustls-no-provider 无功能损失、无运行期风险。
+# 补丁（conandata.yml patches: + strip: 1）
+rec_command:            |
+                        -    "rustls",
+                        +    "rustls-no-provider",
+rec_auto_fix:           false
+rec_impl:               source-patch
+
+fallback_priority:      2
+fallback_approach:      aws-lc-sys-no-asm
+fallback_description:   若无法改依赖图（例如 aws-lc-rs 由多层上游硬编码、或必须用
+                        aws-lc 的 FIPS 面），退而用官方开关关掉汇编：
+                        `AWS_LC_SYS_NO_ASM=1` 让 aws-lc 的 CMake 给 C 源加
+                        `-DOPENSSL_NO_ASM`，那些 perlasm extern 引用随之消失，
+                        纯 C 回退实现补上同名符号。代价是加密性能下降、且仍依赖
+                        aws-lc 的 CMake 在 OHOS 上能跑通（本案例 C 面确实是编过一半的，
+                        故这条大概率可行，但未实测——只作回退登记）。
+                        另：`AWS_LC_SYS_PREBUILT_NASM` 只对 x86 有效，OHOS/aarch64 无用。
+fallback_command:       AWS_LC_SYS_NO_ASM=1 cargo build --release
+fallback_auto_fix:      false
+fallback_impl:          env-var
+
+# ★ 禁止策略 ★
+forbid_1_pattern:       --unresolved-symbols=ignore-all|--allow-shlib-undefined|-Wl,--warn-unresolved-symbols|--error-limit=0
+forbid_1_reason:         链接器「忽略未解析符号」类开关只是把链接期错误推成运行期
+                        dlopen/首次调用时崩溃（或 TLS 握手静默失败），并且 `--error-limit=0`
+                        只会让同一份失败日志变长，不改变结论。aws-lc 缺失的是密码学
+                        原语（ChaCha20/Poly1305/AES/bignum），绕过等于交付一个不可用的
+                        TLS 栈。
+forbid_1_consequence:   产物表面可执行、真实 TLS 路径必然崩；属「平台限制必须降级而非绕过」
+                        （P013）的反面，赛后审查按 P0 计。
+# forbid_2_pattern:
+# forbid_2_reason:
+# forbid_2_consequence:
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             P005, P013, P014
+# ═══ 关系图 (Relations) ═══
+# ═══ 元数据 ═══
+doc_file:               doc/E754.md
+last_updated: 2026-10-06
+source_event:           overtls/0.3.12 conan create G2 链接失败（$TASK_DIR/conan-create-1.log）
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics, 方案 D) ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-06
+authors:               49EF
