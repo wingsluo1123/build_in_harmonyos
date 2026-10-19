@@ -1,0 +1,37 @@
+package: lcmaps-plugins-verify-proxy/1.5.13
+homepage: "https://github.com/Nikhef-lcaae/lcmaps"
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+discovery:
+  status: EVIDENCE_COMPLETE
+upstream_tests: []
+
+upstream_discovery_evidence:
+  checked_files:
+    - "Makefile.am"
+    - "src/Makefile.am"
+    - "src/verify-proxy/Makefile.am"
+    - "doc/Makefile.am"
+    - "configure.ac"
+  conclusion: "No TESTS, check_PROGRAMS, or check target are registered; upstream has no automated test suite."
+
+test_package_tests:
+  - file: test.c
+    description: >
+      Installs the generic plugin harness, dlopen()s lcmaps_verify_proxy.mod
+      with RTLD_NOW, resolves plugin_initialize, plugin_introspect, plugin_run,
+      plugin_verify, and plugin_terminate, and asserts the delivered .so/.mod/CLI
+      artifacts are present (11 assertions).
+    command: "./test_lcmaps_plugins_verify_proxy <package_root> <framework_root>"
+  - file: conanfile.py
+    description: >
+      Runs the installed verify-proxy-tool with an explicit dependency
+      LD_LIBRARY_PATH and asserts that -h output names verify-proxy-tool and
+      contains Usage: (1 assertion).
+    command: "verify-proxy-tool -h"
+
+test_package_assertion_count: 12
+assertion_count: 12
