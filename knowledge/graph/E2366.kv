@@ -1,0 +1,35 @@
+id:                     E2366
+title: OHOS 动态加载器拒载未签名共享库（dlopen 报 Permission denied），构建目录件因带 RUNPATH 可加载而掩盖问题
+trigger_tool: runtime|meson|cmake
+phase: runtime
+category:               platform, ohos, linking, conan, runtime
+severity:               2
+error_signature: "Error loading shared library .*: Permission denied|Signal 5 \\(core dumped\\)"
+match_keywords: Permission denied, Error loading shared library, dlopen, codesign, binary-sign-tool, 签名, 未签名, soname, RUNPATH, meson install, test_package, SIGTRAP
+root_cause: >
+  OHOS 内核/加载器对 ELF（可执行文件与共享库）有签名门禁：meson install 落地后
+  未用 binary-sign-tool 签名的 libgexiv2.so.2.14.6 会被 dlopen 直接拒绝，报
+  "Error loading shared library <名>: Permission denied"（不是常见的
+  "No such file or directory"，极易误判为路径/LD_LIBRARY_PATH 问题）。
+  迷惑点：构建目录里的同一份库可正常 dlopen —— 因为 meson 构建件带 RUNPATH
+  指向依赖目录、且未被签名工具改写；install 时 meson 会重链接以剥离 build
+  rpath，两次产物除 .codesign/RUNPATH 外字节级仅有 ~230 字节差异，于是
+  "本地 meson test 全过、test_package 却加载失败"。
+  同理，test_package 自己编译出的测试二进制若未签名，执行时内核 exec 门禁直接
+  抛 SIGTRAP（signal 5 / exit 133）。
+rec_approach: >
+  在 conanfile.py 的 package() 内对安装后的 ELF 统一自签名，并把 soname 链接
+  落为真实文件副本；test_package 在 build() 里对自己编译出的测试二进制同样签名。
+  判据：dlopen 报 Permission denied（而非 not found）即指向签名，而非搜索路径。
+affected_scope: >
+  任何在 OHOS 上产出共享库、且 test_package/消费端会在运行时 dlopen 或链接执行的
+  Conan 配方（尤其 meson 工程：meson install 必然重链接剥离 build rpath）。
+prescan_pattern: "binary-sign-tool"
+last_updated: 2026-09-21
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E2366.md
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        >

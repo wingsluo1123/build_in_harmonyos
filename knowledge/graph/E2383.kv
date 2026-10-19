@@ -1,0 +1,65 @@
+# ═══ Draft knowledge entry — meson dependency('<name>') 按 .pc 文件名解析,conan 包缺 pkg_config_name 时需别名桥接 ═══
+# Timestamp: 2026-09-21
+# Software: libaudec 0.3.4(所有 meson+pkg-config 依赖组合,尤其 ohpcd 包名不等于上游 pc 名时)
+# Gate: conan create build() / meson setup
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E2383
+title: >-
+  meson dependency 报 not found tried pkgconfig——PkgConfigDeps 产物名与上游 pc 名
+  错位，用 pkg_config_aliases 桥接并显式注入 PKG_CONFIG_PATH
+trigger_tool: meson / pkg-config / conan PkgConfigDeps
+phase: configuration|dependency-resolve
+error_signature: Dependency "[^"]+" not found, tried pkgconfig|Dependency "[^"]+" not found
+severity:               2
+category:               platform, build-system, meson
+match_keywords: Dependency,not found,tried pkgconfig,PkgConfigDeps,pkg_config_name,pkg_config_aliases,PKG_CONFIG_PATH
+root_cause: >-
+  meson 的 pkg-config 依赖解析按 .pc 文件名精确匹配；Conan 不会自动把 generators
+  目录加进 PKG_CONFIG_PATH（实测 conanbuildenv 无该变量），PkgConfigDeps 的命名默认
+  取 cpp_info 的 pkg_config_name 属性、缺省回落 conan 包名——两者与上游
+  dependency('<名>') 的检索名任一错位都会报 not found。libaudec 实况是上游要
+  samplerate/sndfile，conan 包名是 libsamplerate/libsndfile：后者恰好设了
+  pkg_config_name 为 sndfile 故解析成功，前者缺省生成 libsamplerate.pc 故失败
+affected_scope: >-
+  全部 meson + conan 包；特别是上游 pc 名与 conan 包名不一致的依赖
+  （libsamplerate 到 samplerate、mpg123 到 libmpg123 等）；audiowmark 用 copyfile 补
+  libmpg123.pc、at-spi2-core 用手写兼容 .pc，均属同一错位的替代修法
+verification_cmd: |-
+  cd "$TASK_DIR" && printf 'prefix=/usr\nlibdir=${prefix}/lib\nName: samplerate\nDescription: probe\nVersion: 0.2.2\n' > samplerate-probe.pc && PKG_CONFIG_PATH="$TASK_DIR" pkg-config --modversion samplerate && rm -f samplerate-probe.pc
+rec_priority: 1
+rec_approach: pkgconfig-alias-bridge
+rec_description: >-
+  generate() 内实例化 PkgConfigDeps，对缺 pkg_config_name 的依赖调
+  set_property("<依赖名>","pkg_config_aliases",["<上游检索名>"]) 后 generate()；
+  同时用 Environment 显式 prepend PKG_CONFIG_PATH=self.generators_folder，在
+  build() 里以 env.vars(self).apply() 上下文包住 meson.configure() 与 build()
+rec_command: (见 rec_description——两处都在 conanfile.py 的 generate()/build() 内)
+rec_auto_fix: false
+rec_impl: >-
+  官方别名机制生成 Alias 条目的薄 .pc，依赖传递语义保留；避免手抄 .pc（可用，
+  但包升级后变量易漂移）
+fallback_priority: 2
+fallback_approach: handwritten-compat-pc
+fallback_description: >-
+  手写兼容 .pc 文件放进 generators 目录（at-spi2-core 的 dbus-1.pc 与
+  gobject-2.0.pc 先例）；alias 机制覆盖不到的变量级修补才用它
+fallback_command: (无通用命令——按依赖缺的变量逐个补)
+fallback_auto_fix: false
+fallback_impl: 变量级修补用,纯改名场景优先 pkg_config_aliases
+principles:               
+conflicts_with:
+prerequisite_of:
+doc_file: knowledge/drafts/DRAFT-E645-meson-pkgconfig-alias-pkgconfigpath.md
+last_updated: 2026-09-21
+source_event: >-
+  libaudec 0.3.4 适配——conan install 实测 PkgConfigDeps 生成 libsamplerate.pc 与
+  sndfile.pc 而 meson 要 samplerate.pc；别名加 PKG_CONFIG_PATH 注入后第 2 轮采信轮
+  G2 通过（日志行 Run-time dependency samplerate found 为 YES 0.2.2）
+authors: Awstme
+source_pr: (本 PR)
+source_commit: 1ec1f3408f2167c230ba3dfdd6f0757d348a494a
+metrics_success_count: 1
+metrics_fail_count: 0
+metrics_confidence: 0.95
+metrics_last_used: 2026-09-21

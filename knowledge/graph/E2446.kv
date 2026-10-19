@@ -1,0 +1,19 @@
+id:                     E2446
+category:               portability, build-system, recipe
+phase: build
+match_keywords: bootstrap compiler, scheme to c, generated c file, wget in Makefile, git clone in Makefile, OWLURL, can't find file to patch, patch generated file, apply_conandata_patches fails, build-time network, self-hosting build, radamsa, owl lisp, two-stage build, determinism of generated source
+error_signature: "conan/CI build fails on 'Can't find file to patch' for a file that the upstream Makefile generates mid-build, or the build stalls/fails at a wget/curl/git clone step embedded in the upstream Makefile (OWLURL-style bootstrap downloads)"
+root_cause: "Self-hosting projects compile a bootstrap tool first (here: Owl Lisp from a pinned precompiled C source), use it to generate the real source file (rad/*.scm -> radamsa.c), then compile the artifact. Package metadata systems assume all patched inputs exist before the build, so registering a patch against the generated file and applying it up front always fails; and upstream Makefiles that fetch the bootstrap/library over the network during build break hermetic CI builds."
+rec_approach: "Vendor every build input in conandata.yml as separate keys (main tarball via sources:, bootstrap via e.g. owl_bootstrap:, library archive via hex_library:) and download them as raw files with sha256 verification; recreate the upstream layout in build() before compiling the bootstrap tool; run the generation step, then apply the platform patch to the just-generated file with 'patch -p1' from build(), and only then run the final compile. Keep the conandata patches: entry for metadata visibility but document why apply_conandata_patches() must NOT be called at build start. Prove determinism by building twice and comparing sha256 of the generated file before relying on the patch applying cleanly."
+prescan_pattern: "git clone.*Makefile|wget.*Makefile|Can't find file to patch"
+severity:               2
+last_updated: 2026-09-22
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E2446.md
+trigger_tool:           conan
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        "Vendor every build input in conandata
