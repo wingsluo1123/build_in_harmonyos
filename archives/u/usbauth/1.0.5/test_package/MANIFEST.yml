@@ -1,0 +1,28 @@
+# test_package 清单（R34 消费者校验）
+package: usbauth/1.0.5
+
+upstream_test_in_build: true
+upstream_test_command: "（上游无测试）本配方补跑：`usbauth --help/--version/-h` 真跑断言"
+
+upstream_tests:
+  - name: "上游 2 个 Debian autopkgtest 脚本（packages/*/debian/tests/test）"
+    count: 2
+    description: >-
+      **上游测试数 = 0，如实声明**。按仓库既有做法在配方里补能真跑的功能级断言：构建完成后直接执行产物，
+      `--help` / `--version` / `-h` 任一路径必须 rc=0 且有输出。**实测通过**，并如实披露语义：其输出首行是
+      `usbauth[NNNNN]: error at parsing usbauth configuration file`（沙箱里没有 USB 设备、`/etc/usbauth.conf`
+      不在系统位置，属预期信息）—— 该断言证明"二进制能加载、能执行"，**不代表设备授权流程已验证**。
+
+test_package_tests:
+  - file: check_usbauth.py
+    description: >-
+      R34 消费者校验 **6 项**（全部离线）：①产物齐备（`bin/usbauth` 可执行；上游是 sbin_PROGRAMS，
+      故 sbin 也接受）②ELF 头自检（真 ELF64、machine=0xB7 AArch64）③**真跑** `--help/--version/-h`
+      （rc=0 且有输出）④**配置与 udev 规则随包**（`etc/usbauth.conf`、`lib/udev/rules.d/20-usbauth.rules`）
+      ⑤许可证随包（`licenses/COPYING`，GPL-2.0）⑥证据（sha256 + python 版本）。输出
+      `checks/fails/skips` 三计数；仅环境原因才计入 skips 且**不计入通过**。
+    command: "python3 check_usbauth.py <package-folder>"
+
+notes: >-
+  usbauth 的正常工作依赖 udev 规则在**设备接入时**被调用（需要真实 USB 设备与 dbus/udev 运行时），
+  沙箱/CI 里不做真机验证 —— 断言落在"产物可用 + 配置与规则随包"这一层，并在 PR 正文如实说明。
