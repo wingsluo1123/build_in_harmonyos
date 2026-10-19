@@ -1,0 +1,19 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -36,7 +36,15 @@
+ # TODO move Widgets-dependent part to a libKDbWidgets
+ find_package(Qt5 ${REQUIRED_QT_VERSION} NO_MODULE REQUIRED Core Widgets Xml)
+ find_package(KF5 ${REQUIRED_KF5_VERSION} REQUIRED CoreAddons)
+-find_package(ICU REQUIRED i18n uc)
++find_package(ICU REQUIRED i18n uc data)
++# FindICU only searches the requested components and creates bare imported
++# libraries without inter-component dependencies, which only resolves at
++# link time when ICU ships as shared libraries.  With static archives the
++# link order must be explicit: i18n -> uc -> data.
++if(TARGET ICU::i18n AND TARGET ICU::uc AND TARGET ICU::data)
++    set_property(TARGET ICU::i18n APPEND PROPERTY INTERFACE_LINK_LIBRARIES ICU::uc ICU::data)
++    set_property(TARGET ICU::uc APPEND PROPERTY INTERFACE_LINK_LIBRARIES ICU::data)
++endif()
+ set_package_properties(ICU PROPERTIES
+                        PURPOSE "Required by KDb for unicode-aware string comparisons")
+ 
