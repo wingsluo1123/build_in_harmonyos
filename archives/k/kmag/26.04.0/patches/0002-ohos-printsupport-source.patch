@@ -1,0 +1,52 @@
+--- a/src/kmag.h
++++ b/src/kmag.h
+@@ -11,7 +11,9 @@
+ #include "focustrackconfig.h"
+ 
+ // include files for Qt
++#ifndef QT_NO_PRINTER
+ #include <QPrinter>
++#endif
+ 
+ // include files for KF5
+ #include <KSharedConfig>
+--- a/src/kmag.cpp
++++ b/src/kmag.cpp
+@@ -14,7 +14,9 @@
+ #include <QImageWriter>
+ #include <QMenuBar>
+ #include <QPainter>
++#ifndef QT_NO_PRINTER
+ #include <QPrintDialog>
++#endif
+ #include <QScreen>
+ #include <QTemporaryFile>
+ 
+@@ -120,8 +122,10 @@
+   m_pSnapshot->setWhatsThis(i18n("Saves the zoomed view to an image file."));
+   m_pSnapshot->setToolTip(i18n("Save image to a file"));
+ 
++#ifndef QT_NO_PRINTER
+   m_pPrint = actionCollection()->addAction(KStandardAction::Print, this, SLOT(slotFilePrint()));
+   m_pPrint->setWhatsThis(i18n("Click on this button to print the current zoomed view."));
++#endif
+ 
+   m_pQuit = actionCollection()->addAction(KStandardAction::Quit, this, SLOT(slotFileQuit()));
+   m_pQuit->setToolTip(i18n("Quits the application"));
+--- a/src/kmagui.rc
++++ b/src/kmagui.rc
+@@ -25,7 +25,6 @@
+   <Menu name="file"><text>&amp;File</text>
+    <Action name="new_window"/>
+    <Action name="snapshot"/>
+-   <Action name="file_print"/>
+    <Separator />
+    <Action name="file_quit"/>
+   </Menu>
+@@ -99,6 +98,5 @@
+   </Menu>
+   <Separator />
+   <Action name="snapshot"/>
+-  <Action name="file_print"/>
+  </Menu>
+ </gui>
