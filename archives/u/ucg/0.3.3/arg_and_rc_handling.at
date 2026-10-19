@@ -1,0 +1,150 @@
+# arg_and_rc_handling.at for UniversalCodeGrep
+#
+# Copyright 2016 Gary R. Van Sickle (grvs@users.sourceforge.net).
+#
+# This file is part of UniversalCodeGrep.
+#
+# UniversalCodeGrep is free software: you can redistribute it and/or modify it under the
+# terms of version 3 of the GNU General Public License as published by the Free
+# Software Foundation.
+#
+# UniversalCodeGrep is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License along with
+# UniversalCodeGrep.  If not, see <http://www.gnu.org/licenses/>.
+
+AT_BANNER([UniversalCodeGrep CLI arg and .ucgrc file checks])
+
+#
+# Check that "-- --noenv" does not treat --noenv as an option, but as a non-option argument.
+#
+AT_SETUP(['--' vs. '--noenv'])
+
+AT_DATA([.ucgrc],
+[--ignore-case
+])
+
+AT_DATA([file_to_search.cpp],
+[--NOENV
+])
+
+AT_CHECK([ucg --test-noenv-user -- --noenv], [0], 
+[file_to_search.cpp:1:--NOENV
+], [stderr])
+
+AT_CLEANUP
+
+
+#
+# Prefix matching for --TYPE options.
+#
+AT_SETUP([prefix matching for --TYPE options])
+
+AT_DATA([file_to_search.py],
+[from somewhere import something
+class whatever(object):
+    pass
+])
+
+# We don't have an explicit '--py' option, but we do have '--python'.
+AT_CHECK([ucg --noenv --py 'class'], [0],
+[file_to_search.py:2:class whatever(object):
+], [stderr])
+
+AT_CLEANUP
+
+#
+# Prefix matching for --noTYPE options.
+#
+AT_SETUP([prefix matching for --noTYPE options])
+
+AT_DATA([file_to_search.py],
+[from somewhere import something
+class whatever(object):
+    pass
+])
+
+AT_DATA([file_to_search.cpp],
+[// Comment
+class whatever : public base
+{
+}
+])
+
+# We don't have an explicit '--nopy' option, but we do have '--nopython'.
+AT_CHECK([ucg --noenv --nopy 'class'], [0],
+[file_to_search.cpp:2:class whatever : public base
+], [stderr])
+
+AT_CLEANUP
+
+#
+# Ambiguous parameters on --TYPE options.
+#
+AT_SETUP([ambiguous option handling, --TYPE options])
+
+# @note 255 is the same as what ack returns in this situation.  ag returns 1.
+AT_CHECK([ucg --noenv --c 'class'], [255], [stdout], [stderr])
+AT_CHECK([$EGREP -i '^.*ucg.+option.+--c.+ambiguous.+possibilities:.*--c.+--c.+$' stderr], [0], [stdout], [stderr])
+
+AT_CLEANUP
+
+
+#
+# Ambiguous parameters on --noTYPE options.
+#
+AT_SETUP([ambiguous option handling, --noTYPE options])
+
+# @note 255 is the same as what ack returns in this situation.  ag returns 1.
+AT_CHECK([ucg --noenv --nocs 'class'], [255], [stdout], [stderr])
+AT_CHECK([$EGREP -i '^.*ucg.+option.+--nocs.+ambiguous.+possibilities:.*--nocs.+--nocs.+$' stderr], [0], [stdout], [stderr])
+
+AT_CLEANUP
+
+
+#
+# Check that non-options in the rc files are properly rejected.
+#
+AT_SETUP([Reject non-options in .ucgrc files])
+
+AT_DATA([.ucgrc],
+[--ignore-case
+endif
+# The endif should be rejected
+])
+
+AT_DATA([file_to_search.cpp],
+[some text
+some more text
+#endif
+])
+
+# If .ucgrc above isn't rejected, the 'endif' on its second line will result
+# in one match with the command line below.
+AT_CHECK([ucg --test-noenv-user file_to_search.cpp], [255], [stdout], [stderr])
+AT_CHECK([cat stderr | grep 'ucg: error: Error during arg parsing: Non-option argument "endif" is not allowed in rc file ".*/\.ucgrc"\.'], [0], [stdout], [stderr])
+
+AT_CLEANUP
+
+AT_SETUP([Reject '--' in .ucgrc files])
+
+AT_DATA([.ucgrc],
+[--ignore-case
+--
+# The -- should be rejected
+])
+
+AT_DATA([file_to_search.cpp],
+[some text
+some more text
+--test-noenv-user
+])
+
+# If .ucgrc above isn't rejected, the '--' on its second line will result
+# in '--test-noenv-user' being treated as the pattern to match, and one match will result with the command line below.
+AT_CHECK([ucg --test-noenv-user file_to_search.cpp], [255], [stdout], [stderr])
+AT_CHECK([cat stderr | grep 'ucg: error: Error during arg parsing: Double-dash "--" is not allowed in rc file ".*/\.ucgrc"\.'], [0], [stdout], [stderr])
+
+AT_CLEANUP
