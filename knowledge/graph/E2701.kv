@@ -1,0 +1,18 @@
+error_signature: "fft_backward.*FFT_SCALED_OUTPUT|roundtrip.*maxerr|forward.*backward.*n \\*|y\\[0\\]=1024"
+root_cause: "FFTPACK rfftb 是非归一逆变换（rfftb(rfftf(x))==n*x），上游 fft-c 的 fft_backward 又在 SCALED 模式对结果乘 n，与前向除 n 叠加成双重缩放，往返放大 n 倍"
+rec_approach: "删除 fft_backward 中 SCALED 分支的 input[i]*=n；反向不做缩放（rfftb(rfftf(x)/n)==x），并加注释记录 FFTPACK 非归一约定"
+match_keywords: ["fft_backward", "FFT_SCALED_OUTPUT", "rfftb", "roundtrip", "往返", "FFTPACK", "double scaling"]
+severity:               3
+category: math
+last_updated: 2026-09-27
+id:                     E2701
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E2701.md
+trigger_tool:           make
+phase:                  build
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        "删除 fft_backward 中 SCALED 分支的 input[i]*=n

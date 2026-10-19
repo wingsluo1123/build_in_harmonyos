@@ -1,0 +1,52 @@
+#====================================================================
+# DRAFT-ohos-sdk-lld-libxml2-loader-path-hijack — OHOS SDK lld 自身链接 libxml2，构建期设 LD_LIBRARY_PATH 指向 conan 包目录会让 lld 加载到不兼容的 libxml2，导致所有链接失败（configure 报 C compiler cannot create executables）
+# 触发事件: libodfgen 0.1.8 / libetonyek 0.1.13 / libabw 0.1.4 适配（CI 健康机上 configure 编译器自检稳定失败）
+# 路径: Path B（知识库扩展）
+#====================================================================
+
+id:                     E2624
+trigger_tool:           conan create|configure|clang/lld
+phase:                  build|configure_compiler_sanity_test
+error_signature:        Error relocating .*llvm/bin/lld: xml[A-Z][a-zA-Z]*: symbol not found|
+                         checking whether the C compiler works\.\.\. no|
+                         C compiler cannot create executables
+
+severity:               1
+category:               musl, toolchain, conan, ld-library-path, libxml2
+match_keywords:         LD_LIBRARY_PATH, lld, libxml2.so.16, xmlCopyNamespace,
+                        xmlNewDoc, relocating, symbol not found, musl, RUNPATH,
+                        DT_RUNPATH, -Wl,-rpath, conan package_folder, compiler sanity
+title:                  Never put conan package lib dirs on LD_LIBRARY_PATH during OHOS builds; bake -Wl,-rpath into test executables instead
+
+root_cause:             SDK lld 链接 libxml2 + musl 先查 LD_LIBRARY_PATH 后查 DT_RUNPATH + conan libxml2 缺 LLVM 内部符号，三者叠加
+  1) OHOS SDK lld 是动态链接 llvm 工具，NEEDED libxml2.so.16；
+  2) musl 加载顺序：DT_RPATH > LD_LIBRARY_PATH > DT_RUNPATH > 默认路径；
+     SDK 工具用的是 rpath 指向 llvm/lib，优先级低于 LD_LIBRARY_PATH；
+  3) conan 的 libxml2 包按消费者需求裁剪/隐藏了符号导出，恰好缺 lld
+     需要的内部子集；消费者符号（xmlReadDoc 等）反而齐全，所以
+     "运行自编测试程序" 与 "链接器加载" 的需求互斥，单靠 LD 满足不了。
+
+verification_cmd: >
+  env -i HOME=$HOME TMPDIR=$HOME/tmp PATH=$PATH LD_LIBRARY_PATH=<conan libxml2 包>/lib /data/service/hnp/bin/clang -x c conftest.c -o /dev/null; 期望出现 Error relocating .../lld: xml...: symbol not found；去掉 LD_LIBRARY_PATH 后期望 rc=0
+
+rec_priority:           1
+rec_approach:           no-ld-during-build-plus-rpath-on-test-exes
+rec_description: >
+  构建期（configure/make）不设置 LD_LIBRARY_PATH；需要运行自编程序时把
+  -Wl,-rpath,<包lib> 放进 *_LIBS/LDFLAGS 烧 RUNPATH；消费者测试走
+  conanrun。
+rec_command:            grep -n "LD_LIBRARY_PATH" archives/*/*/*/conanfile.py
+rec_auto_fix:           false
+rec_impl:               ohos-build-env-no-ld-use-rpath
+
+doc_file:               knowledge/drafts/DRAFT-ohos-sdk-lld-libxml2-loader-path-hijack.md
+last_updated:           2026-09-14
+source_event:           libodfgen/libetonyek/libabw CI 健康机 configure 编译器自检失败，#47165 诊断定位
+authors:                sunjunyang
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     0.95
+metrics_last_used:      2026-09-14
+
+affected_scope:         Never put conan package lib dirs on LD_LIBRARY_PATH during O

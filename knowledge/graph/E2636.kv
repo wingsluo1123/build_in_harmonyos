@@ -1,0 +1,42 @@
+#====================================================================
+# DRAFT-meson-runtest-env-printf-q-ohos — meson 启用 tests 时 custom
+# command 包装 printf %q 失败（OHOS /system/bin/printf 缺 %q 支持）
+# 触发事件: systemd 261.1 上游测试构建（tests=true 重建 libshared）
+# 路径: Path B（知识库扩展）
+#====================================================================
+
+id:                     E2636
+trigger_tool:           meson|ninja|meson test
+phase:                  configure|testing
+error_signature:        printf: bad %q|bad %q@20|systemd-runtest\.env|meson_exe_printf_|custom command .*newlines
+
+severity:               2
+category:               ohos, meson, toolchain, testing
+match_keywords:         printf, %q, runtest.env, meson, custom command, newlines,
+                         /system/bin/printf, coreutils, env file, tests=true
+
+title:                  Replace the %q-capable printf used by meson-wrapped custom commands on OHOS
+
+root_cause:             meson configure 时 find_program('printf') 在 OHOS 默认 PATH 中
+                         命中 /system/bin/printf（busybox 版，无 %q）。meson 对含多行
+                         custom command 的输出捕获（newlines 包装）会以解析到的程序路径
+                         序列化到 meson_exe_*.dat，ninja 重放即失败。coreutils 的 printf
+                         支持 %q，但需显式安装在 PATH 更前位置或由 find_program 命中。
+
+verification_cmd:       /system/bin/printf 'A=%q\n' "x y" ; echo rc=$?
+                         # → "A=rc=1"（bad %q）
+                         /storage/Users/currentUser/usr/local/bin/printf 'A=%q\n' "x y"
+                         # → "A='x y'" rc=0
+
+affected_scope:         所有在 OHOS 上启用 tests 且含 printf-%q 多行 custom command /
+                         生成 env 文件的 meson 项目（systemd 为首个实测载体）
+
+rec_priority:           2
+rec_approach:           path-priority-coreutils-printf
+rec_description:        configure 前把 coreutils printf 目录置于 PATH 前端（或显式
+                         改写 .dat/手工重放），使 meson 包装命令使用支持 %q 的 printf
+rec_auto_fix:               false
+rec_impl:               manual
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E2636.md

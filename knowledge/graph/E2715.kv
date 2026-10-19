@@ -1,0 +1,18 @@
+error_signature: "can't open input file.*ci/conan/build_and_test|exit-code.txt: 127|zsh.*can't open input file"
+root_cause: "ohos-prepare-isolated-conan-job.sh --repo-source copies the source repo AS-IS into the new job. If the chosen source job's repo was pruned (some device jobs keep only root md files + archives/, without ci/ scripts/ knowledge/ etc.), the new job's repo lacks ci/conan/build_and_test.sh. The runner then fails before doing any real work: run-conan-heavy.sh → zsh ci/conan/build_and_test.sh <package> → 'can't open input file' → exit 127 with empty client stdout, after the device lock was already acquired."
+rec_approach: "Precheck right after job creation and before the first run: 'ls <ci_repo_root>/ci/conan/build_and_test.sh'. If missing, copy the missing top-level dirs (ci config docs knowledge references scripts templates) device-side with cp -r from a job whose repo is known-complete, without touching archives/<own package>, then rerun the same run-conan-heavy.sh. Related ops traps: background device loops via 'nohup ... >/dev/null 2>&1 &' still hold the ssh channel open unless stdin is redirected with </dev/null; after pkill the ssh client may return 255 with no output even though the kill succeeded — confirm with a fresh ps instead of re-killing."
+match_keywords: ["repo-source", "isolated conan job", "隔离 job", "exit 127", "can't open input file", "build_and_test.sh missing", "pruned repo", "裁剪仓库", "run-conan-heavy.sh", "ohos-prepare-isolated-conan-job", "shadow CI", "nohup ssh hang", "pkill 255"]
+severity:               1
+category:               conan\, device-ci\, shadow-ci\, workflow
+last_updated: 2026-09-27
+id:                     E2715
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E2715.md
+trigger_tool:           conan
+phase:                  packaging
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        "Precheck right after job creation and before the first run: 'ls <ci_repo_root>/ci/conan/build_and_t

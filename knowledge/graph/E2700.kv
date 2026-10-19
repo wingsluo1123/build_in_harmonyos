@@ -1,0 +1,18 @@
+error_signature: "rfftf|rfft.*packing|out\\[2k-1\\].*R_k|Nyquist.*out\\[N-1\\]|谱线错位|bin.*read.*0"
+root_cause: "FFTPACK 变体移植的 rfftf 输出排布为 out[0]=R0(DC)、out[N-1]=R_{N/2}(Nyquist)、1<=k<=N/2-1 时 R_k=out[2k-1]、I_k=out[2k]，与 netlib 标准排布不同且上游未文档化，按 out[2k]/out[2k+1] 取谱线会错位"
+rec_approach: "消费方按实测排布取 bin：DC=fabs(out[0])、Nyquist=fabs(out[N-1])、1<=k<=N/2-1 时 re=out[2k-1]、im=out[2k]；用 impulse 探针（out[0..4]=1,1,0,1,-0 且 out[N-1]=1）实测确认排布后再写断言"
+match_keywords: ["rfftf", "rfft packing", "FFTPACK", "Nyquist", "fft-c", "谱线", "bin"]
+severity:               2
+category: math
+last_updated: 2026-09-27
+id:                     E2700
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E2700.md
+trigger_tool:           make
+phase:                  build
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        "消费方按实测排布取 bin：DC=fabs(out[0])、Nyquist=fabs(out[N-1])、1<=k<=N/2-1 时 re=out[2k-1]、im=out[2k]

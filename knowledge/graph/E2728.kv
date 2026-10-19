@@ -1,0 +1,19 @@
+id:                     E2728
+category: ohos, testing, shell, test-infrastructure
+phase: testing|verification
+match_keywords: bash, process substitution, <(...), /dev/fd, Permission denied, diff, sha256sum, test.sh, test_package, OHOS, hmdfs, 进程替换, 管道描述符
+error_signature: "cat: /dev/fd/[0-9]+: Permission denied|/dev/fd/[0-9]+: Permission denied|diff: .*No such file or directory"
+root_cause: "bash 进程替换 <(...) 依赖重开 /dev/fd/N 匿名管道描述符；OHOS 的 /dev/fd 仅 0/1/2 等常规描述符可重开，高编号管道 fd 的重开被沙箱/文件系统拒绝（Permission denied 而非 ENOENT）。这与 operations/filesystem-analysis.md 中 '/dev/stdin, /dev/fd | ✅ | 一致' 的记录矛盾——该结论未覆盖进程替换产生的高编号管道 fd 场景。"
+rec_approach: "test_package 等 shell 测试脚本避免一切进程替换：哈希比对改为「命令替换取哈希列 + 纯字符串比较」——ACTUAL=$( (cd \"$D\" && sha256sum f1 f2 ...) | awk '{print $1}' )；[ \"$ACTUAL\" = \"$EXPECTED\" ]，不依赖 diff、不依赖 <(...)（临时文件可写入可写 cwd 亦可，但字符串比较最简）。Windows GNU sha256sum 的 * 前缀与 OHOS 无前缀差异均经 awk '{print $1}' 归一。"
+prescan_pattern: "diff <\\(|grep <\\(|<\\\\(printf|/dev/fd/[0-9]|process substitution"
+severity:               2
+last_updated: 2026-09-26
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E2728.md
+trigger_tool:           ctest
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        "test_package 等 shell 测试脚本避免一切进程替换：哈希比对改为「命令替换取哈希列 + 纯字符串比较」——ACTUAL=$( (cd \"$D\" && sha256sum f1 f

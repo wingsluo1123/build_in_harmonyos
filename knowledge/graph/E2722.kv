@@ -1,0 +1,18 @@
+error_signature: "ld.lld: error: duplicate symbol: rle_auxtab"
+root_cause: "A header file declares a non-static const array as a tentative definition (`const uint8_t rle_auxtab[8];` in rle.h). Every translation unit that includes the header emits its own common symbol; with modern Clang's default -fno-common the linker sees multiple strong definitions and fails with `duplicate symbol`. In fermi-lite 0.1 the symbols collide when linking fml-asm (misc.o/rope.o/rle.o all include rle.h)."
+rec_approach: "Change the header to a pure declaration (`extern const uint8_t rle_auxtab[8];`) and keep the single definition in exactly one .c file (rle.c). No ABI or behavior change; the object layout stays identical."
+match_keywords: ["duplicate symbol", "rle_auxtab", "tentative definition", "extern declaration", "-fno-common", "header global", "link error"]
+severity:               2
+category: headers, linking, c
+last_updated: 2026-09-26
+id:                     E2722
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E2722.md
+trigger_tool:           make
+phase:                  build
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        "Change the header to a pure declaration (`extern const uint8_t rle_auxtab[8]

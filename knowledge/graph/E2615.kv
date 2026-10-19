@@ -1,0 +1,19 @@
+id:                     E2615
+error_signature: undefined symbol: gcvt|call to undeclared function 'gcvt'|implicit declaration of function 'gcvt'|implicit-function-declaration.*gcvt
+match_keywords: gcvt, glibc legacy, musl, OHOS, undefined symbol, double to string, float string, __toFloatString, object_toString, snprintf, %.17g, libc missing, ANSI C, no build system
+category: portability, libc, musl, gnu-extensions
+severity:               2
+trigger_tool: clang|ld.lld|conan
+phase: link|compilation
+root_cause: gcvt() 是 glibc 遗留扩展函数（SVID/XPG，非 C 标准），musl/OHOS libc 不声明也不导出该符号。上游 jsonParse (liufeigit/jsonParse v1.00) 在 object.c 的 __toFloatString() 中用 gcvt(d, 30, str) 做 double→字符串，OHOS aarch64 下编译产生 implicit-function-declaration 警告、链接直接 undefined symbol: gcvt 失败。
+rec_approach: replace-gcvt-with-portable-snprintf
+rec_description: 用 C99 标准 snprintf 无条件替换 gcvt：snprintf(str, 30, "%.17g", d)。"%.17g" 是 double 往返保真（round-trip）的 C 标准最短可靠格式，任何 libc 通用，无需平台条件编译（符合 R8：补丁默认禁止 __OHOS__ 宏；本方案为纯可移植替换，无平台宏）。若上游 gcvt 依赖其 30 位有效数字语义，可用 "%.*g" 保留有效位需求，但 %.17g 已满足 IEEE-754 double 无损往返。
+verification_cmd:
+last_updated: 2026-09-26
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E2615.md
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
