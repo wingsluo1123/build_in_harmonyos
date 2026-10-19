@@ -1,0 +1,16 @@
+sources:
+  url: "https://deb.debian.org/debian/pool/main/i/indi-starbook/indi-starbook_0.8+20221222163625.orig.tar.gz"
+  sha256: "eda4f9aa1a8cfee2183462c6a6808829d61a726f8eb3f515de70c9d600dc5cde"
+patches:
+  - patch_file: "patches/0001-FindINDI-version-regex.patch"
+    patch_description: "FindINDI.cmake 版本正则回移上游 indi-3rdparty master 修复：兼容 INDI 2.x indiversion.h 的 INDI_VERSION \"2.2.2\" 引号形式（否则 find_package(INDI) 报 FATAL_ERROR failed to detect INDI version）；与已合并 libfli/2.0-20221221182632 的 0001 补丁逐字一致"
+    patch_type: "portability"
+  - patch_file: "patches/0002-CMakeCommon-cxx17.patch"
+    patch_description: "CMakeCommon.cmake 将 CMAKE_CXX_STANDARD 由 14 提至 17：libindi 2.x 头文件使用 std::any（C++17），该目录级普通变量会遮蔽 conan toolchain 注入的 cppstd=17 cache 变量，必须就地修正"
+    patch_type: "portability"
+  - patch_file: "patches/0003-telescope-time-property.patch"
+    patch_description: "回移上游 indi-3rdparty master 的 libindi 2.x Property 迁移（updateLocation() 内两处）：TimeT[1].text 改为 TimeTP[1].getText()——libindi 2.2.2 中 Telescope::TimeTP 已为 INDI::PropertyText（原始 IText 数组成员 TimeT 已移除，2022 快照源码无法编译）；上游 master 除该两处外与本快照逐字一致，此补丁即完整 master 同步"
+    patch_type: "backport"
+  - patch_file: "patches/0004-cmdres-ltrim.patch"
+    patch_description: "starbook_types.cpp CommandResponse 构造器在 OK/ERROR/payload 判定前跳过前导空白：上游官方测试 test_starbook.cpp（StarbookDriver.cmd_res）断言 \"    OK\" 解析为 starbook::OK，而快照实现要求响应从第 0 列开始——上游从未构建该测试（CMakeLists 中 INDI_BUILD_UNITTESTS 选项整段注释，属死代码 bit-rot），不修则官方测试 1/2 失败；含 ERROR 子类三处内层判断同步改用 ltrim 后输入（否则前导空白时静默退化为 ERROR_UNKNOWN）。WSL x86_64 实测修复后官方测试 2/2 PASSED"
+    patch_type: "bugfix"
