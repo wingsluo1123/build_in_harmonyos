@@ -1,0 +1,56 @@
+# conandata.yml - knewstuff5 5.116.0 (KDE Frameworks 5 / Qt5)
+#
+# 源码 URL 采用「国内镜像在前 + 官方源兜底」列表形态（R39：官方源必须保留）。
+# 5.116 已归档到 KDE Attic/：https://download.kde.org/stable/frameworks/5.116/
+# 会经 stable -> Attic -> 境外镜像两跳 302，受限 Worker 下载超时（karchive5/
+# kconfig5 同款先例）；mirrors.ustc.edu.cn 的 Attic 路径直返 200，
+# SHA256 与官方归档一致。
+sources:
+  "5.116.0":
+    url:
+      - "https://mirror.nju.edu.cn/kde/Attic/frameworks/5.116/knewstuff-5.116.0.tar.xz"
+      - "https://mirrors.ustc.edu.cn/kde/Attic/frameworks/5.116/knewstuff-5.116.0.tar.xz"
+      - "https://download.kde.org/Attic/frameworks/5.116/knewstuff-5.116.0.tar.xz"
+    sha256: "82303927f60c7a3dbdc049e468f760f003a4358129af9ce6fadecf469320c70a"
+
+patches:
+  "5.116.0":
+    - patch_file: "patches/0001-CMakeLists.txt.patch"
+      patch_type: portability
+      patch_description: "新增KNEWSTUFF_OHOS_SCOPED选项(默认OFF)；scoped下移除未发布KF5组件(Completion/IconThemes/KIO/ItemViews/Service/XmlGui/WidgetsAddons)的REQUIRED查找，收缩到KF5NewStuffCore+qtquick+knewstuff-dialog"
+    - patch_file: "patches/0002-autotests-CMakeLists.txt.patch"
+      patch_type: portability
+      patch_description: "autotests按收缩范围链接KNSCore，跳过widgets专属用例(entry/kmoretools)；core/子目录用例保持不变；scoped下测试助手补链KF5::ConfigCore(core将其设为PRIVATE不传递，而installation.h公开包含KConfigGroup、installationtest.cpp用KSharedConfig)"
+    - patch_file: "patches/0003-src-CMakeLists.txt.patch"
+      patch_type: portability
+      patch_description: "scoped下跳过widgets库、保留qtquick插件与tools；在build/src/KNS3/Entry写入仅含Status枚举的shim并安装到KNewStuff3/KNS3，使安装后的EntryInternal消费者可编译；pri对齐KF5NewStuffCore"
+    - patch_file: "patches/0004-src-core-CMakeLists.txt.patch"
+      patch_type: portability
+      patch_description: "scoped下为core导出头追加DEPRECATION_VERSIONS 5.79(DownloadManager的弃用标注在scoped下改由core导出头生成，需要_5_79宏)"
+    - patch_file: "patches/0005-src-core-downloadmanager.cpp.patch"
+      patch_type: portability
+      patch_description: "DownloadManager弃用标注移到实现文件内(仅OHOS scoped需要，不改变上游公共头文件语义)"
+    - patch_file: "patches/0006-src-core-downloadmanager.h.patch"
+      patch_type: portability
+      patch_description: "DownloadManager头文件弃用宏适配scoped导出头宏(与0004配套)"
+    - patch_file: "patches/0007-src-core-entryinternal.cpp.patch"
+      patch_type: portability
+      patch_description: "EntryInternal对attica5 Provider字段访问的兼容处理"
+    - patch_file: "patches/0008-src-core-installation.cpp.patch"
+      patch_type: portability
+      patch_description: "Installation对OHOS路径/签名校验的适配"
+    - patch_file: "patches/0009-src-core-jobs-httpworker.cpp.patch"
+      patch_type: portability
+      patch_description: "HttpWorker对OHOS网络栈兼容处理"
+    - patch_file: "patches/0010-src-qtquick-quickengine.cpp.patch"
+      patch_type: portability
+      patch_description: "QuickEngine对OHOS scoped构建的适配"
+    - patch_file: "patches/0011-src-qtquick-quickengine.h.patch"
+      patch_type: portability
+      patch_description: "QuickEngine头文件对OHOS scoped构建的适配"
+    - patch_file: "patches/0012-src-upload-atticahelper.cpp.patch"
+      patch_type: portability
+      patch_description: "AtticaHelper对OHOS scoped构建的适配"
+    - patch_file: "patches/0013-skip-ki18n-install.patch"
+      patch_type: portability
+      patch_description: "scoped下跳过ki18n_install(po)翻译目录生成(qt5-qtbase无LinguistTools、msgfmt未接入KF5构建，同kconfig5先例)"
