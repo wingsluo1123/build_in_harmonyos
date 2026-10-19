@@ -1,0 +1,24 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for kmag/26.04.0.
+
+package: kmag/26.04.0
+homepage: https://invent.kde.org/accessibility/kmag
+
+upstream_check_command: "grep -rnE 'add_test|QTEST_' .  # 0 hits in the 26.04.0 tarball"
+upstream_test_in_build: false
+upstream_test_command: "上游 tarball 无 tests/ 目录、无 add_test/enable_testing/ecm_add_test 注册、无 QTEST_*_MAIN 程序"
+
+upstream_tests: []
+
+test_package_tests:
+  - file: test_package/test.sh
+    description: "消费者用例执行器：(1) 安装产物 bin/kmag 可执行；(2) kmag --version 输出 26.04.0（KAboutData/KLocalizedString/QApplication 初始化路径）；(3) kmag --help 输出 KAboutData 横幅（QCommandLineParser 路径，主窗口创建之前）；(4) offscreen 无参数启动，构造 KXmlGui 主窗口（kmagui.rc 编入 Qt 资源，覆盖补丁 0002 的动作表），进程存活且无链接器/平台插件/XMLGUI 资源错误；(5) qimage_smoke 复现 saveZoomPixmap() 的 Qt 侧快照导出链路（QImage -> QPainter -> QImageWriter PNG 落盘 -> QImageReader 回读 -> 尺寸/像素一致）。逐例 TEST PASS/TEST FAIL，汇总 TEST SUMMARY，任一失败退出码 1；另核对用例总数等于声明的 11。"
+    command: "conan create (test_package runs test.sh against the installed bin/kmag and the compiled qimage_smoke)"
+
+test_package_files:
+  - test_package/conanfile.py
+  - test_package/CMakeLists.txt
+  - test_package/qimage_smoke.cpp
+  - test_package/test.sh
+
+check_count: 11
