@@ -1,0 +1,26 @@
+# 软件级 manifest — evemu
+# 遵循 ARCHIVE-SPEC v3.0 §2.1
+
+software: evemu
+display: "Evemu (Event Emulator)"
+description: "用户态输入事件工具集：描述/录制/回放 evdev 输入事件，含 libevemu 库与 5 个命令行工具"
+category: utility
+homepage: "https://www.freedesktop.org/wiki/Evemu/"
+license: "LGPL-3.0-or-later"
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "显式 --build/--host=aarch64-unknown-linux-musl，绕开发布归档内 2012 年快照 config.guess（不识别本平台）"
+    - "generate() 注入依赖库 LD_LIBRARY_PATH，否则 configure 自带的 conftest 因缺 libevdev.so.2 报 cannot run C compiled programs"
+    - "关闭上游自带开关 --disable-python-bindings：automake py-compile 依赖 Python 3.12 起移除的 imp 模块，且 AM_PATH_PYTHON 解析出前缀之外的安装路径"
+    - "两条 portability 补丁以 ISO C/POSIX 等价实现替换 glibc 专属 versionsort 与 program_invocation_short_name，不引入平台条件宏"
+    - "运行期打开 /dev/input/* 与 /dev/uinput 需相应权限；无权限时测试面收窄到信息面 + 设备无关 API，并如实披露功能面未实测"
+  common_dependencies:
+    - libevdev
+
+versions:
+  "2.7.0":
+    status: built
+    build_date: "2026-10-09"
+    source_url: "https://gitlab.freedesktop.org/libevdev/evemu/-/archive/v2.7.0/evemu-v2.7.0.tar.gz"
