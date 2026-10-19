@@ -1,0 +1,27 @@
+# ODB 2.4.0 is published as three source packages (official
+# codesynthesis.com download directory). Each component is downloaded and
+# verified independently by its own sha256.
+sources:
+  odb:
+    url: "https://codesynthesis.com/download/odb/2.4/odb-2.4.0.tar.gz"
+    sha256: "169103a7829b9d8b2fdf5c267d18acc3d47c964d355c7af335d75c63b29c52b5"
+  libodb:
+    url: "https://codesynthesis.com/download/odb/2.4/libodb-2.4.0.tar.gz"
+    sha256: "bfb9c398a6fdec675e33b320a1f80bdf74d8fbb700073bf17062f5b3ae1a2d5c"
+  libodb-sqlite:
+    url: "https://codesynthesis.com/download/odb/2.4/libodb-sqlite-2.4.0.tar.gz"
+    sha256: "cd687c882a8dc14ded4eb160e82de57e476b1feef5c559c5a6a5c7e671a10cf4"
+
+patches:
+  - patch_file: "patches/0001-config-guess-sub-ohos.patch"
+    patch_description: "config.guess/config.sub: accept aarch64-linux-ohos and guess HarmonyOS hosts (autoconf 2.69 predates OpenHarmony)"
+    patch_type: "portability"
+  - patch_file: "patches/0002-drop-version-file.patch"
+    patch_description: "Remove the top-level 'version' text file (and its dist_doc_DATA entry): with -I$(top_srcdir) on the include path it shadows the C++ standard library <version> header required by libc++ <cstddef>"
+    patch_type: "portability"
+  - patch_file: "patches/0003-disable-gcc-plugin.patch"
+    patch_description: "Disable the GCC plugin build: the plugin includes GCC internal headers (gcc-plugin.h, gmp.h, tree.h, ...) that do not exist on the OpenHarmony clang toolchain"
+    patch_type: "portability"
+  - patch_file: "patches/0004-stdio-filebuf-libcxx.patch"
+    patch_description: "Replace the libstdc++-only __gnu_cxx::stdio_filebuf used by the ODB driver with a minimal portable streambuf shim"
+    patch_type: "portability"
