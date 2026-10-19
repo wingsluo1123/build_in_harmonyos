@@ -1,0 +1,23 @@
+software: pd-jmmmp
+display: "pd-jmmmp"
+description: "Pure Data GUI/utility abstraction library by Joao Pais (72 abstractions, 68 help patches, pure Pd data, no compiled code)"
+category: audio
+homepage: "https://puredata.info"
+license: BSD-3-Clause
+build_system: none
+
+ohos_adaptation:
+  key_points:
+    - "纯 Pd 数据包：上游没有 Makefile、没有 C/C++ 源码、没有 check/test 目标，配方无 build()，打包到 lib/pd-externals/jmmmp（与 Debian pd-jmmmp.install 的 *.pd + *.txt + examples/ 三组一致）"
+    - "架构无关内容：package_type=header-library + package_id().clear()，一份二进制服务所有 profile；无 .so，R26/R38 不适用"
+    - "jmmmp-meta.pd 是 libdir 标记，上游 0.61 里仍写 VERSION 0.48（stale），按上游原样发布并用断言锁住该值，不做静默修改"
+    - "72 个 abstraction 中 49 个类闭包纯 vanilla Pd，23 个依赖 zexy/iemlib/iemmatrix/cyclone/ggee/list-abs/maxlib/mrpeach/Gem/ceammc/else/pd-ableton-link 等外部 Pd 库；这些是 Pd 安装的运行时前提（Debian 用 Recommends 表达），不是 Conan 依赖"
+    - "消费者测试用真机 puredata/0.56.5 无头加载：实例化 49 个 vanilla-only abstraction、9 组确定性数值断言、jmmmp/<name> 命名空间、以及去掉 -path 的反向对照（58 个 couldn't create，确保断言非空转）"
+    - "Pd 会把超长 record 折行，multiarray.pd/jp.garble.pd 的消息框内还嵌了整段子 patch：验证器先按未转义分号重组逻辑 record 再解析，行式解析会误报 ~280 个非法 connect"
+  common_dependencies: []
+
+versions:
+  - version: "0.61"
+    status: built
+    build_date: "2026-10-18"
+    note: "配方 + test_package 完成；本机与 HarmonyOS 真机（隔离 shadow CI）均通过 173 断言，L0/L1/L4/L5 pass；尚未 upload"

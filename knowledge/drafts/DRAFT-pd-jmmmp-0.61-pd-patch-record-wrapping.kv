@@ -1,0 +1,58 @@
+#====================================================================
+# DRAFT-pd-jmmmp-0.61-pd-patch-record-wrapping - Pd patch record wrapping and box escaping
+#====================================================================
+
+id:                     DRAFT-pd-jmmmp-0.61-pd-patch-record-wrapping
+trigger_tool:           pd|python|conan
+phase:                  testing
+error_signature:        malformed connect line|unbalanced subpatches|[0-9]+ '#N canvas' vs [0-9]+ '#X restore'|no such object|canvas: no method for
+
+severity:               2
+category:               puredata, data-package, testing, parser, encoding
+match_keywords:         Pd patch, #N canvas, #X connect, #X restore, record wrapping, escape semicolon, escape comma, couldn't create, no such object, lib/pd-externals, test_package
+title:                  Pd 补丁以「未转义分号」结束一条 record，折行与消息框内嵌子 patch 会让行式解析器误报；测试补丁文本必须转义 ; 与 ,
+
+root_cause:             Pd 写盘时会把超长 record 折行成多条物理行，节点终止符是「未被转义的分号」；消息框（#X msg）里可以内嵌整段子 patch，内部的分号与逗号写作 \; 与 \,。按物理行解析的验证器会把续行当成新 record，于是把消息文本里的 #X connect 当成真实连接，报出大量「malformed connect」与「#N canvas 与 #X restore 不配对」。同一机制作用在测试补丁上：说明文本（#X text）里的 ; 或 , 若未转义，record 会被提前截断，后半句被当成对象执行，Pd 打印 `xxx: no such object` / `canvas: no method for 'xx'`，看起来像库坏了，其实是测试补丁自己写错。
+affected_scope:         任何对 .pd 文件做静态校验的数据包（pd-* 系列）；任何用 .pd 补丁驱动 test_package 的适配；尤其是携带子 patch 的大抽象对象（multiarray.pd / jp.garble.pd 这类）。
+verification_cmd:       对同一批 141 个 .pd：行式解析在 multiarray.pd 上报约 280 条 "malformed connect line" 与 "101 '#N canvas' vs 98 '#X restore'"；改为按未转义分号重组 record 后 0 错误。测试补丁侧：未转义时正跑日志出现 "verify_jmmmp.py: no such object"；转义后正跑日志 0 条 couldn't create / no such object，9 组断言值与预期完全一致。
+
+rec_priority:           1
+rec_approach:           record-oriented-parse-and-escape-box-text
+rec_description:        验证器按「未被转义的分号」把物理行重组成逻辑 record 再解析（数分号前的反斜杠奇偶性）；生成测试补丁时统一转义说明文本与消息内容里的 ; , 和反斜杠。
+rec_command:            def _ends_record(line): s=line.rstrip(); return s.endswith(';') and len(s[:-1])-len(s[:-1].rstrip('\\')) % 2 == 0  # 记录结束判定；escape_box(text) = text.replace('\\','\\\\').replace(';','\\;').replace(',','\\,')
+rec_auto_fix:           false
+rec_impl:               conan-recipe-test
+
+fallback_priority:      2
+fallback_approach:      avoid-embedded-patches-in-static-checks
+fallback_description:   若一时无法实现 record 重组，至少跳过含内嵌子 patch 的文件并把它们单列为「未做结构校验」，同时保证测试补丁文本不含未转义的 ; 与 ,。
+fallback_command:       记录 skipped_files 并在测试汇总里显式写出，不把它们计为通过
+fallback_auto_fix:      false
+fallback_impl:          conan-recipe-test
+
+forbid_1_pattern:       (?i)text.*;.*verify_.*\.py
+forbid_1_reason:        测试补丁的说明文本里保留未转义的裸分号，会把后半句变成对象名。
+forbid_1_consequence:   正跑日志出现 "xxx: no such object"，容易被误判成库缺陷或依赖缺失，实际是补丁写错，浪费整轮真机排查。
+
+forbid_2_pattern:       couldn't create in positive_log  # 无条件把该串判为失败
+forbid_2_reason:        上游抽象对象自身会打印 error:（如 receive~ 无匹配 send、expr 读表失败），与「对象创建失败」不是一回事。
+forbid_2_consequence:   把上游的运行噪音当成适配失败，或反过来为了消音而放宽断言，导致负向对照失去意义。
+
+principles:             []
+causes:                 []
+caused_by:              []
+similar_to:             []
+conflicts_with:         []
+prerequisite_of:        []
+
+doc_file:               knowledge/drafts/DRAFT-pd-jmmmp-0.61-pd-patch-record-wrapping.md
+last_updated:           2026-10-18
+source_event:           pd-jmmmp 0.61 HarmonyOS PC 适配（141 个 Pd 补丁的静态校验 + 无头 Pd 运行时验证）
+authors:                gcw_hL6s3dcK
+source_pr:              16741
+source_commit:          a223c3febf
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     0.9
+metrics_last_used:      2026-10-18
