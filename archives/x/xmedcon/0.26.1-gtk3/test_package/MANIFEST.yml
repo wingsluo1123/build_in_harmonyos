@@ -1,0 +1,32 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: xmedcon/0.26.1-gtk3
+homepage: "https://xmedcon.sourceforge.io"
+
+# 上游测试命令：上游无自动化测试套件（无 tests/、无 make check 目标）
+upstream_check_command: "make check (no-op: 上游未提供测试)"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: "none"
+
+# 上游实际运行的测试程序
+upstream_tests: []
+
+# 豁免声明 (TEST_QUALITY_SPEC.md 3.3 / 平台限制)
+exemptions:
+  - rule: "upstream_has_no_test_suite"
+    reason: "xmedcon 上游归档无 tests/ 目录、无 make check 目标——功能覆盖改由 test_package 的消费者测试提供"
+  - rule: "gui_requires_display"
+    reason: "xmedcon GUI 需要 GTK 显示栈；headless 断言到 GTK display 初始化（完整动态闭包解析）为止，medcon CLI 部分完整执行"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_package/test_xmedcon.py
+    description: "① medcon/xmedcon 均为 aarch64 ELF（e_machine=0xB7）；② medcon 无参数 usage 路径 headless 完整执行（验证 libmdc+glib 动态闭包）；③ medcon -V 选项解析路径无链接错误；④ xmedcon GUI 整个 GTK+3 闭包解析成功且仅在 display 初始化处失败"
+    command: "conan create . (test_package)"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 9
