@@ -1,0 +1,40 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: libdisplay-info/0.4.0
+homepage: "https://gitlab.freedesktop.org/emersion/libdisplay-info"
+
+# 上游测试清单（meson test --list：34 个 EDID 样本 × decode/print 两个 harness = 68 项）
+upstream_check_command: "meson test --list"
+
+# 上游测试是否在 conanfile.py build() 中执行
+# 上游 harness 依赖 meson 自建的两个可执行文件 + 可写的 TMPDIR，
+# 由适配方在本地/真机执行并记录结果（见 notes.md / reports/test-report.md）
+upstream_test_in_build: false
+upstream_test_command: "meson test -C build"
+
+upstream_tests:
+  - file: test/edid-print-check.sh
+    source: libdisplay-info-0.4.0/test/edid-print-check.sh
+    description: "di-edid-print 输出与 test/data/*.print 参考输出逐行比对（34 项）"
+    command: "meson test -C build 'print-*'"
+  - file: test/edid-decode-check.sh
+    source: libdisplay-info-0.4.0/test/edid-decode-check.sh
+    description: >-
+      di-edid-decode 输出与 test/data/*.ref（先套用 *.diff）比对（34 项）。
+      配方补丁 0002 仅把夹具应用方式改为可移植形式（sed 改写头部 + `patch -p0 -i`），
+      断言/夹具/参考输出未变；修前 2/34、修后 34/34
+    command: "meson test -C build 'decode-*'"
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: test.c
+    description: >-
+      解析真实 EDID（上游 acer-p1276 样本）：校验 di_info_parse_edid 接受合法数据、
+      拒绝非法/截断数据，校验 vendor/product 标识、hwdata 厂商名（make）与
+      model/serial 字符串（后三者走 memory-stream 路径）
+    command: "./test_libdisplay_info"
+
+# 测试断言总数
+assertion_count: 10

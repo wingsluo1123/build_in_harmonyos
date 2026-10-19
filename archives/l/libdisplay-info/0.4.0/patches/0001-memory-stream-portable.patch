@@ -1,0 +1,392 @@
+diff --git a/di-edid-decode/edid.c b/di-edid-decode/edid.c
+index 6806a07..72ffcf8 100644
+--- a/di-edid-decode/edid.c
++++ b/di-edid-decode/edid.c
+@@ -3,6 +3,7 @@
+ #include <math.h>
+ #include <stdio.h>
+ #include <stdlib.h>
++#include <string.h>
+ 
+ #include <libdisplay-info/dmt.h>
+ #include <libdisplay-info/edid.h>
+@@ -99,23 +100,32 @@ print_standard_timing(const struct di_edid_standard_timing *t)
+ static char *
+ join_str(const char *l[])
+ {
+-	char *out = NULL;
+-	size_t out_size = 0, i;
+-	FILE *f;
++	size_t out_size = 1, out_len = 0, i;
++	char *out;
+ 
+-	f = open_memstream(&out, &out_size);
+-	if (!f) {
++	/* Measure first, then fill the buffer in one pass. Collecting the
++	 * string through a memory stream would be shorter, but open_memstream()
++	 * is not usable everywhere: some C libraries fail fclose() on such a
++	 * stream (EBADF) and hand back an empty buffer. */
++	for (i = 0; l[i] != NULL; i++) {
++		out_size += strlen(l[i]) + (i > 0 ? 2 : 0);
++	}
++
++	out = malloc(out_size);
++	if (!out) {
+ 		return NULL;
+ 	}
+ 
+ 	for (i = 0; l[i] != NULL; i++) {
+ 		if (i > 0) {
+-			fprintf(f, ", ");
++			memcpy(&out[out_len], ", ", 2);
++			out_len += 2;
+ 		}
+-		fprintf(f, "%s", l[i]);
++		out_len += strlen(l[i]);
++		memcpy(&out[out_len - strlen(l[i])], l[i], strlen(l[i]));
+ 	}
++	out[out_len] = '\0';
+ 
+-	fclose(f);
+ 	return out;
+ }
+ 
+diff --git a/edid.c b/edid.c
+index c6d21a8..9ee2a27 100644
+--- a/edid.c
++++ b/edid.c
+@@ -1230,7 +1230,7 @@ parse_ext(struct di_edid *edid, const uint8_t data[static EDID_BLOCK_SIZE])
+ }
+ 
+ struct di_edid *
+-_di_edid_parse(const void *data, size_t size, FILE *failure_msg_file)
++_di_edid_parse(const void *data, size_t size, struct memory_stream *failure_msg)
+ {
+ 	struct di_edid *edid;
+ 	struct di_logger logger;
+@@ -1268,7 +1268,7 @@ _di_edid_parse(const void *data, size_t size, FILE *failure_msg_file)
+ 	}
+ 
+ 	logger = (struct di_logger) {
+-		.f = failure_msg_file,
++		.f = failure_msg,
+ 		.section = "Block 0, Base EDID",
+ 	};
+ 	edid->logger = &logger;
+diff --git a/include/edid.h b/include/edid.h
+index 0971f6e..77e327b 100644
+--- a/include/edid.h
++++ b/include/edid.h
+@@ -143,7 +143,7 @@ struct di_edid_ext {
+  * di_edid_destroy().
+  */
+ struct di_edid *
+-_di_edid_parse(const void *data, size_t size, FILE *failure_msg_file);
++_di_edid_parse(const void *data, size_t size, struct memory_stream *failure_msg);
+ 
+ /**
+  * Destroy an EDID data structure.
+diff --git a/include/log.h b/include/log.h
+index b9f696c..9c0f09b 100644
+--- a/include/log.h
++++ b/include/log.h
+@@ -7,10 +7,11 @@
+ 
+ #include <stdarg.h>
+ #include <stdbool.h>
+-#include <stdio.h>
++
++#include "memory-stream.h"
+ 
+ struct di_logger {
+-	FILE *f;
++	struct memory_stream *f;
+ 	const char *section;
+ 	bool initialized;
+ };
+diff --git a/include/memory-stream.h b/include/memory-stream.h
+index 21dc03a..31eaa5a 100644
+--- a/include/memory-stream.h
++++ b/include/memory-stream.h
+@@ -3,16 +3,22 @@
+ 
+ /**
+  * Utility functions for memory streams.
++ *
++ * Collects text into a growable buffer and hands back an allocated
++ * NUL-terminated string. The buffer is grown in-process so the library does
++ * not depend on open_memstream(): some C libraries ship a broken
++ * implementation whose fclose() fails with EBADF, drops the collected string
++ * and aborts the process while exiting.
+  */
+ 
+-#include <stdio.h>
+-#include <stddef.h>
++#include <stdarg.h>
+ #include <stdbool.h>
++#include <stddef.h>
+ 
+ struct memory_stream {
+-	FILE *fp;
+ 	char *str;
+ 	size_t str_len;
++	size_t str_cap;
+ };
+ 
+ bool
+@@ -29,4 +35,17 @@ memory_stream_close(struct memory_stream *m);
+ void
+ memory_stream_cleanup(struct memory_stream *m);
+ 
++bool
++memory_stream_is_empty(const struct memory_stream *m);
++
++void
++memory_stream_puts(struct memory_stream *m, const char *str);
++
++void
++memory_stream_printf(struct memory_stream *m, const char fmt[], ...)
++	__attribute__((format(printf, 2, 3)));
++
++void
++memory_stream_vprintf(struct memory_stream *m, const char fmt[], va_list args);
++
+ #endif
+diff --git a/info.c b/info.c
+index 08ef31b..f7d98f2 100644
+--- a/info.c
++++ b/info.c
+@@ -228,7 +228,7 @@ di_info_parse_edid(const void *data, size_t size)
+ 	if (!memory_stream_open(&failure_msg))
+ 		return NULL;
+ 
+-	edid = _di_edid_parse(data, size, failure_msg.fp);
++	edid = _di_edid_parse(data, size, &failure_msg);
+ 	if (!edid)
+ 		goto err_failure_msg_file;
+ 
+@@ -278,7 +278,7 @@ di_info_get_failure_msg(const struct di_info *info)
+ }
+ 
+ static void
+-encode_ascii_byte(FILE *out, char ch)
++encode_ascii_byte(struct memory_stream *out, char ch)
+ {
+ 	uint8_t c = (uint8_t)ch;
+ 
+@@ -288,13 +288,13 @@ encode_ascii_byte(FILE *out, char ch)
+ 	 * UTF-8.
+ 	 */
+ 	if (c < 0x20 || c >= 0x7f)
+-		fprintf(out, "\\x%02x", c);
++		memory_stream_printf(out, "\\x%02x", c);
+ 	else
+-		fputc(c, out);
++		memory_stream_printf(out, "%c", c);
+ }
+ 
+ static void
+-encode_ascii_string(FILE *out, const char *str)
++encode_ascii_string(struct memory_stream *out, const char *str)
+ {
+ 	size_t len = strlen(str);
+ 	size_t i;
+@@ -322,13 +322,13 @@ di_info_get_make(const struct di_info *info)
+ 
+ 	manuf = pnp_id_table(pnp_id);
+ 	if (manuf) {
+-		encode_ascii_string(m.fp, manuf);
++		encode_ascii_string(&m, manuf);
+ 		return memory_stream_close(&m);
+ 	}
+ 
+-	fputs("PNP(", m.fp);
+-	encode_ascii_string(m.fp, pnp_id);
+-	fputs(")", m.fp);
++	memory_stream_puts(&m, "PNP(");
++	encode_ascii_string(&m, pnp_id);
++	memory_stream_puts(&m, ")");
+ 
+ 	return memory_stream_close(&m);
+ }
+@@ -357,12 +357,12 @@ di_info_get_model(const struct di_info *info)
+ 		str = di_edid_display_descriptor_get_string(desc[i]);
+ 		if (str[0] == '\0')
+ 			continue;
+-		encode_ascii_string(m.fp, str);
++		encode_ascii_string(&m, str);
+ 		return memory_stream_close(&m);
+ 	}
+ 
+ 	evp = di_edid_get_vendor_product(info->edid);
+-	fprintf(m.fp, "0x%04" PRIX16, evp->product);
++	memory_stream_printf(&m, "0x%04" PRIX16, evp->product);
+ 
+ 	return memory_stream_close(&m);
+ }
+@@ -391,13 +391,13 @@ di_info_get_serial(const struct di_info *info)
+ 		str = di_edid_display_descriptor_get_string(desc[i]);
+ 		if (str[0] == '\0')
+ 			continue;
+-		encode_ascii_string(m.fp, str);
++		encode_ascii_string(&m, str);
+ 		return memory_stream_close(&m);
+ 	}
+ 
+ 	evp = di_edid_get_vendor_product(info->edid);
+ 	if (evp->serial != 0) {
+-		fprintf(m.fp, "0x%08" PRIX32, evp->serial);
++		memory_stream_printf(&m, "0x%08" PRIX32, evp->serial);
+ 		return memory_stream_close(&m);
+ 	}
+ 
+diff --git a/log.c b/log.c
+index 3fb7578..0a0d39c 100644
+--- a/log.c
++++ b/log.c
+@@ -4,16 +4,16 @@ void
+ _di_logger_va_add_failure(struct di_logger *logger, const char fmt[], va_list args)
+ {
+ 	if (!logger->initialized) {
+-		if (ftell(logger->f) > 0) {
+-			fprintf(logger->f, "\n");
++		if (!memory_stream_is_empty(logger->f)) {
++			memory_stream_puts(logger->f, "\n");
+ 		}
+-		fprintf(logger->f, "%s:\n", logger->section);
++		memory_stream_printf(logger->f, "%s:\n", logger->section);
+ 		logger->initialized = true;
+ 	}
+ 
+-	fprintf(logger->f, "  ");
+-	vfprintf(logger->f, fmt, args);
+-	fprintf(logger->f, "\n");
++	memory_stream_puts(logger->f, "  ");
++	memory_stream_vprintf(logger->f, fmt, args);
++	memory_stream_puts(logger->f, "\n");
+ }
+ 
+ /**
+diff --git a/memory-stream.c b/memory-stream.c
+index ba72eb1..0fe67af 100644
+--- a/memory-stream.c
++++ b/memory-stream.c
+@@ -1,31 +1,56 @@
++#include <stdarg.h>
++#include <stdio.h>
+ #include <stdlib.h>
++#include <string.h>
+ 
+ #include "memory-stream.h"
+ 
++#define MEMORY_STREAM_INITIAL_CAP 64
++
++static bool
++memory_stream_reserve(struct memory_stream *m, size_t extra)
++{
++	size_t needed, cap;
++	char *str;
++
++	if (extra > SIZE_MAX - m->str_len - 1)
++		return false;
++
++	needed = m->str_len + extra + 1;
++	if (needed <= m->str_cap)
++		return true;
++
++	cap = m->str_cap > 0 ? m->str_cap : MEMORY_STREAM_INITIAL_CAP;
++	while (cap < needed) {
++		if (cap > SIZE_MAX / 2)
++			return false;
++		cap *= 2;
++	}
++
++	str = realloc(m->str, cap);
++	if (!str)
++		return false;
++
++	m->str = str;
++	m->str_cap = cap;
++	m->str[m->str_len] = '\0';
++
++	return true;
++}
++
+ bool
+ memory_stream_open(struct memory_stream *m)
+ {
+ 	*m = (struct memory_stream){ 0 };
+-	m->fp = open_memstream(&m->str, &m->str_len);
+-
+-	return m->fp != NULL;
++	return memory_stream_reserve(m, 0);
+ }
+ 
+ char *
+ memory_stream_close(struct memory_stream *m)
+ {
+-	char *str;
+-	int ret;
++	char *str = m->str;
+ 
+-	ret = fclose(m->fp);
+-	str = m->str;
+ 	*m = (struct memory_stream){ 0 };
+-
+-	if (ret != 0) {
+-		free(str);
+-		str = NULL;
+-	}
+-
+ 	return str;
+ }
+ 
+@@ -34,3 +59,48 @@ memory_stream_cleanup(struct memory_stream *m)
+ {
+ 	free(memory_stream_close(m));
+ }
++
++bool
++memory_stream_is_empty(const struct memory_stream *m)
++{
++	return m->str_len == 0;
++}
++
++void
++memory_stream_puts(struct memory_stream *m, const char *str)
++{
++	size_t len = strlen(str);
++
++	if (!memory_stream_reserve(m, len))
++		return;
++
++	memcpy(&m->str[m->str_len], str, len + 1);
++	m->str_len += len;
++}
++
++void
++memory_stream_vprintf(struct memory_stream *m, const char fmt[], va_list args)
++{
++	va_list args_copy;
++	int len;
++
++	va_copy(args_copy, args);
++	len = vsnprintf(NULL, 0, fmt, args_copy);
++	va_end(args_copy);
++
++	if (len < 0 || !memory_stream_reserve(m, (size_t)len))
++		return;
++
++	vsnprintf(&m->str[m->str_len], (size_t)len + 1, fmt, args);
++	m->str_len += (size_t)len;
++}
++
++void
++memory_stream_printf(struct memory_stream *m, const char fmt[], ...)
++{
++	va_list args;
++
++	va_start(args, fmt);
++	memory_stream_vprintf(m, fmt, args);
++	va_end(args);
++}
