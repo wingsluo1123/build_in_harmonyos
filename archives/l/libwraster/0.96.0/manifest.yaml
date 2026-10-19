@@ -1,0 +1,120 @@
+# 版本级 manifest
+# 文件位置: archives/l/libwraster/0.96.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "0.96.0"
+
+# 软件名
+software: "libwraster"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-15"
+build_system: "autotools"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（WindowMaker 官方 release；libwraster 即其 wrlib/ 子目录）
+  url: "https://github.com/window-maker/wmaker/releases/download/wmaker-0.96.0/WindowMaker-0.96.0.tar.gz"
+
+  # 源码校验和
+  sha256: "4fe130ba23cf4aa21c156ec8f01f748df537d0604ec06c6bbcec896df1926f6d"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表（顶层 configure；实际编译只进入 wrlib/ 子目录）
+  configure_options:
+    - "--host=aarch64-linux-ohos"
+    - "--disable-debug"
+    - "--disable-pango"
+    - "--disable-magick"
+    - "--disable-png"
+    - "--disable-jpeg"
+    - "--disable-gif"
+    - "--disable-tiff"
+    - "--disable-webp"
+    - "--enable-xpm"
+    - "--disable-animations"
+    - "--disable-mwm-hints"
+    - "--disable-boehm-gc"
+    - "--disable-xdnd"
+    - "--disable-wmreplace"
+    - "--disable-res"
+    - "--disable-shm"
+    - "--disable-xinerama"
+    - "--disable-randr"
+    - "--disable-shared"
+    - "--enable-static"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - libx11/6.4.0
+    - libxext/6.4.0
+    - libxpm/3.5.17
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-config.guess.patch"
+  - "0002-config.sub.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "WindowMaker 顶层 configure 对 xft.pc 是硬探针（只服务 WINGs）；只构建 wrlib 时用 XFT_CFLAGS/XFT_LIBS 旁路该探针即可，不应引入 libxft 依赖（假依赖会经 cpp_info.requires 把 NEEDED libXft.so.2 带进下游产物，违反 R26）"
+  - "config.h 末尾 #include \"config-paths.h\"，其 BUILT_SOURCES 规则只存在于顶层 Makefile，必须先 make config-paths.h 再 make -C wrlib"
+  - "libxmu 非必需：唯一调用 XmuLookupStandardColormap 被 #ifdef HAVE_LIBXMU 保护"
+  - "设置了 cpp_info.requires 时，所有直接依赖都必须列于其中（否则 Conan 报 package_info() 错误）"
+  - "ROperateRectangle 的快速路径（color->alpha == 255 || operation == RCopyOperation，wrlib/draw.c:334）把 alpha 强制为 255，RCopyOperation 产不出透明像素；需真正透明像素须用 RClearOperation"
+  - "关闭 PNG/JPEG 后离线唯一可产出格式是 XPM；RSaveImage 不接收 RContext，save_xpm.c 无任何 Display 引用，故无 X server 也能让库自身写出真实 XPM 文件"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/libwraster-0.96.0.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/libwraster-0.96.0.work
+  source_orig_hash: 86bfb019dda2f81c
+  source_work_hash: dd9f013e54a347db
+  generated_at: '2026-10-16T21:33:20'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-config.sub.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
