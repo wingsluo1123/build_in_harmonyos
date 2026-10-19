@@ -1,0 +1,18 @@
+error_signature: "glib.h not found.*CMakeDeps|find_package.*GLIB2.*variable empty|glib2-config.*intercept"
+root_cause: "CMakeDeps config package (glib2-config.cmake) intercepts find_package(GLIB2); the upstream old-style Find-module variables (GLIB2_INCLUDE_DIR/GLIB2_LIBRARIES) stay empty, so the build fails with glib.h not found."
+rec_approach: "In recipe generate(), explicitly bridge the old-style variables from the dependency cpp_info: aggregate glib include dirs into GLIB2_INCLUDE_DIR, set GLIB2_LIBRARIES=glib2::glib2 (INTERFACE target); for static deps set full archive paths (DB_INCLUDE_DIR/DB_LIBRARY=libdb.a). Same pattern applies to any upstream using old-style Find modules with CMakeDeps."
+match_keywords: ["CMakeDeps", "find_package", "GLIB2", "glib2-config", "old-style variables", "glib.h not found", "variable bridge", "cpp_info"]
+severity:               2
+category: build-system
+last_updated: 2026-09-28
+id:                     E2797
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E2797.md
+trigger_tool:           cmake
+phase:                  build
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        "In recipe generate(), explicitly bridge the old-style variables from the dependency cpp_info: aggre

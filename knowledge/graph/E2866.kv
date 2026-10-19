@@ -1,0 +1,39 @@
+# ═══ Draft knowledge entry — 运行期版本号 API 断言：先读实现确认打包语义，勿按直觉推值 ═══
+# Timestamp: 2026-09-27
+# Software: libwebp 1.6.0.1
+# Gate: L0/test_package (R34)
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+#
+# To promote:
+#   1. Review the error excerpt below
+#   2. Rename to E0XX.kv and move to knowledge/graph/
+#   3. Add a row to knowledge/graph/index.tsv
+
+id:                     E2866
+severity:               2
+category:               api, methodology, test
+trigger_tool: libwebp
+phase: test_package
+error_signature: 版本断言 FAIL，但 [dbg] 打印 0x00010600 与预期 0x01060000 只差一个字节的零；
+  或断言"通过"但阈值与文档语义对不上（ABI 与发行版号混用）
+
+match_keywords: version, ABI, release, packing, getter, assert
+
+root_cause: 库的版本号体系常有多套数：发行版号（打包/字符串形式不一）、ABI/SONAME 版本、
+  协议版本等。getter 返回哪一套由实现决定，且打包位宽各不相同（libwebp 三字节打包；
+  SDL 三版本函数分离；OpenSSL OPENSSL_VERSION_NUMBER 与 zlib ZLIB_VERNUM 是
+  0xMNNFFPPS 五段打包）。按"直觉"推阈值（把 1.6.0 展开成 0x01060000）或按 ABI
+  文档值断言发行版号，都会在编解码器完全正确的情况下报 FAIL
+
+affected_scope: 任何含运行期版本号 getter 的库（libwebp/SDL/OpenSSL/zlib/libpng 等）
+  的 test_package 版本断言；断言前须打印实值 + 核对实现源码
+rec_approach: 断言前 printf 打印 getter 实值并与实现源码打包公式核对（libwebp 为
+  三字节打包发行版号，1.6.0→0x010600）；勿按 ABI 版本或直觉展开的 0x01060000 推值
+rec_priority: 2
+rec_auto_fix:               false
+rec_impl:               manual
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E2866.md
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        断言前 printf 打印 getter 实值并与实现源码打包公式核对（libwebp 为
