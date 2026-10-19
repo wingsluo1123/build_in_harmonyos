@@ -1,0 +1,55 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: pnc/0.9.5
+homepage: "https://git.sr.ht/~anjan/pnc"
+
+# 上游测试命令
+upstream_check_command: "ctest"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "cmake.test() → ctest 驱动上游 tests.sh"
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: tests.sh
+    source: pnc-0.9.5/tests.sh
+    description: >-
+      上游自带 shell 测试（CTest 注册为 tests_sh）：valid 的判定与退出码、
+      format 的 e164/nat/int 三种输出、find 从法文/英文文本中抽取号码，
+      共 11 项断言，全部通过。
+    expected: "11 assertions pass (ctest tests_sh 1/1)"
+    command: "ctest (tests_sh)"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.sh
+    description: >-
+      只使用安装后的 bin/pnc：help（版本/DESCRIPTION）、format 三种输出、
+      find 文本抽取、dialout 国际拨号串、valid 的三条退出码语义、info 的
+      离线地理编码结果，共 12 项断言。
+    command: "./test.sh"
+  - file: consumer-e2e.sh
+    description: >-
+      鸿蒙真机端到端消费用例（非断言型）：把 data/contacts.raw.txt 这份
+      「通讯录导出原文」（法/英/德混合自由文本 + 无效噪声）规范化成联系人表，
+      五步串联 find -c FR → valid → info → format -f nat → dialout -c US，
+      产物 contacts.sheet.tsv 与 data/expected.sheet.tsv 逐行比对（5 行），
+      并校验噪声 'poste 1234' 被 valid 拒绝。
+    command: "./consumer-e2e.sh"
+
+# 鸿蒙特有测试（针对鸿蒙平台的端到端消费用例）
+harmony_specific_tests:
+  count: 1
+  tests:
+    - file: consumer-e2e.sh
+      description: >-
+        真机（HarmonyOS PC aarch64）端到端消费流程：文件进 → 联系人表出，
+        判据是生成物本身；仅使用安装后的产物，不依赖源码树/构建目录。
+      expected: "端到端消费用例: PASSED（产物与期望逐行一致）"
+
+# 本文件自身的断言数（仅 test_package/test.sh，不含上游 11 项与消费用例 1 项；
+# 三者合计 24 项与 manifest.yaml:test_results.total 对应）
+assertion_count: 12

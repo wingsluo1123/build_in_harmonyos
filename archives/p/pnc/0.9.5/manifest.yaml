@@ -1,0 +1,70 @@
+# 版本级 manifest
+# 文件位置: archives/p/pnc/0.9.5/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "0.9.5"
+software: "pnc"
+conan_ref: "pnc/0.9.5"
+status: built
+build_date: "2026-10-15"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://git.sr.ht/~anjan/pnc/archive/0.9.5.tar.gz"
+  sha256: "48fc76cf1c74ed542278be677f527397f4928e835f819869473f6f32a3cea720"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+  configure_options: []
+  shell_override: "SH_PROG 由 generate() 注入（profile 的 CONFIG_SHELL，回退固定候选路径），用于上游 tests.sh 经 ctest 启动"
+  dependencies:
+    - libphonenumber/8.13.51
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-CMakeLists.txt.patch"
+  - "0002-gawkext-CMakeLists.txt.patch"
+
+# ============================================================
+# 测试结果
+# ============================================================
+
+test_results:
+  type: functional
+  total: 24
+  passed: 24
+  failed: 0
+  skipped: 0
+  status: built
+  note: >-
+    上游 tests.sh 11 项断言（ctest tests_sh 1/1 通过，在 build() 内真跑）+
+    test_package 消费者 12 项（help×2 / format×3 / find / dialout 共 7 项；
+    valid 退出码语义 3 项；info 离线地理编码 2 项）+
+    鸿蒙特有测试 1 项（真机端到端消费用例 test_package/consumer-e2e.sh：
+    通讯录导出原文 → 规范化联系人表，find/valid/info/format/dialout 五步串联，
+    产物与黄金文件 data/expected.sheet.tsv 逐行比对）。gawk 扩展未纳入本包，
+    原因与实测数据见 notes.md。
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "protobuf 配方设 cmake_find_mode=none：消费 libphonenumber 这类静态依赖链时 CMakeDeps 会在 find_dependency(protobuf) 断链，只能用 pkg-config"
+  - "protobuf 33.6 包内 libutf8_validity.a/libutf8_range.a 未列入 cpp_info.libs，需补写 protobuf.pc 才能链接"
+  - "CMakeToolchain 把 generators 目录前置进 PKG_CONFIG_PATH，修复 .pc 必须就地覆盖该目录"
+  - "gawk 扩展在 OHOS 上于进程退出阶段随机崩溃（SIGTRAP/SIGABRT，输出已产出），仅 ICU 地理编码路径触发；gawk 自带扩展同环境 40/40 正常"

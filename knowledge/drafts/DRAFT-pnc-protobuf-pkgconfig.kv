@@ -1,0 +1,53 @@
+# DRAFT-pnc-protobuf-pkgconfig: libphonenumber 系静态依赖链在 CMake 工程里只能用 pkg-config（CMakeDeps 必断链）
+
+- 条目主题：CMake 工程消费 `libphonenumber`（静态库 + 静态传递依赖 protobuf/abseil-cpp/icu4c）时，CMakeDeps 不可用，必须走 pkg-config，外加两处必须的 .pc 补齐。
+- 状态：草稿（待知识库主编审核，拟提升编号 Exxx）
+- 关联任务：pnc 0.9.5（archives/p/pnc/0.9.5）、mmsd-tng 2.6.4（同为 libphonenumber 消费方，meson 路线）
+
+## 适用场景
+
+CMake 工程（上游用 `find_library(phonenumber/geocoding/icuuc)` 或 `find_package`）
+链接 libphonenumber 时，出现下列任一类失败：
+
+- `find_dependency(protobuf)`：`Could not find a package configuration file provided by "protobuf"`
+  （`find_package(libphonenumber CONFIG)` → libphonenumber-config.cmake:24 断链）
+- `ld.lld: error: undefined symbol: utf8_range_IsValid`
+- `ld.lld: error: undefined symbol: utf8_range_ValidPrefix`
+
+## 根因
+
+1. **protobuf 配方设了 `cpp_info cmake_find_mode=none`**，CMakeDeps 不为其生成
+   `protobuf-config.cmake`，而 libphonenumber-config.cmake 里 `find_dependency(protobuf)`
+   是硬依赖 → `find_package(libphonenumber)` 必失败。
+2. **protobuf 33.6 包内有 `libutf8_validity.a` / `libutf8_range.a` 却没列进
+   `cpp_info.libs`**，PkgConfigDeps 生成的 `protobuf.pc` 因此缺这两个静态库，
+   静态链接 libphonenumber 时 utf8 符号未定义。
+3. **CMakeToolchain 会把 generators 目录前置进 `PKG_CONFIG_PATH`**
+   （`set(ENV{PKG_CONFIG_PATH} "${CMAKE_CURRENT_LIST_DIR}:$ENV{PKG_CONFIG_PATH}")`），
+   因此修复版 `.pc` 放外置目录会被压过去，**必须就地覆盖 generators 目录里的那一份**。
+
+## 推荐做法
+
+1. 构建系统改为优先 pkg-config（保留上游回退）：
+
+   ```cmake
+   find_package(PkgConfig QUIET)
+   if(PkgConfig_FOUND)
+     pkg_check_modules(PNC_PHONENUMBER IMPORTED_TARGET libphonenumber)
+   endif()
+   if(NOT PNC_PHONENUMBER_FOUND)
+     # 回退上游 find_library(/usr/local)
+   endif()
+   target_link_libraries(... ${PNC_PHONENUMBER_LIBS})
+   ```
+
+2. 配方 `generators = "PkgConfigDeps"`；`generate()` 里先 `PkgConfigDeps(self).generate()`，
+   再覆写 `os.path.join(self.generators_folder, "protobuf.pc")`，`Libs:` 补上
+   `-lutf8_validity -lutf8_range`（先探测包内 `.a`/`.so` 是否存在）。
+
+## 验证要点
+
+- `pkg-config --libs libphonenumber` 输出里应能看到 `-lprotobuf`、absl 一族、`-licu*`
+  以及补齐的 utf8 库；链接不再报 utf8 符号未定义。
+- 参考实现：`archives/p/pnc/0.9.5/conanfile.py::_override_protobuf_pc`
+  （同结论在 `archives/m/mmsd-tng/2.6.4` 的 meson 路线得到过）。

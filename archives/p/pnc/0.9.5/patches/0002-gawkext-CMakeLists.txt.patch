@@ -1,0 +1,38 @@
+--- a/gawkext/CMakeLists.txt
++++ b/gawkext/CMakeLists.txt
+@@ -5,17 +5,27 @@
+ 
+ set_target_properties(gawkpn PROPERTIES PREFIX "")
+ 
++# gawk 扩展由 gawk 在运行时加载，不链接 libgawk；这里只需要 gawkapi.h。
++# PkgConfig::PNC_GAWK 只在父目录的 pkg_check_modules(PNC_GAWK ...) 命中时存在，
++# 因此显式判断目标是否存在（默认 include 路径里恰有 gawkapi.h 的场景）。
+ target_link_libraries(gawkpn
+-	${LIBICUUC} ${LIBPHONENUMBER} ${LIBGEOCODING}
++	PRIVATE ${PNC_PHONENUMBER_LIBS}
+ )
++if(TARGET PkgConfig::PNC_GAWK)
++	target_link_libraries(gawkpn PRIVATE PkgConfig::PNC_GAWK)
++endif()
+ 
+-execute_process(
+-	COMMAND
+-		gawk "BEGIN {print ENVIRON[\"AWKLIBPATH\"]}"
+-	OUTPUT_VARIABLE
+-		AWKLIBPATH
+-	OUTPUT_STRIP_TRAILING_WHITESPACE
+-)
++# 打包时由构建系统显式给出安装目录（相对 prefix），避免探测宿主 gawk 的
++# AWKLIBPATH 而把插件装到 prefix 之外。
++if(NOT AWKLIBPATH)
++	execute_process(
++		COMMAND
++			gawk "BEGIN {print ENVIRON[\"AWKLIBPATH\"]}"
++		OUTPUT_VARIABLE
++			AWKLIBPATH
++		OUTPUT_STRIP_TRAILING_WHITESPACE
++	)
++endif()
+ install(
+ 	TARGETS gawkpn
+ 	DESTINATION ${AWKLIBPATH}

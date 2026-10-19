@@ -1,0 +1,71 @@
+{
+  "verdict": "pass",
+  "package": "pnc",
+  "version": "0.9.5",
+  "branch": "feat/pnc-0.9.5",
+  "audit_date": "2026-10-15",
+  "audit_rounds": 4,
+  "incremental_review": {
+    "round": 4,
+    "scope": "conanfile.py::_cmake_step（EAGAIN 签名退避重试）+ notes.md 对应章节",
+    "verdict": "pass",
+    "raised": "1×P2 + 3×P3",
+    "resolved": [
+      "P2：特征匹配只看步骤日志，顶层 spawn 失败（日志为空、EAGAIN 只在异常正文）会漏判 → 改为同时匹配 f\"{log}\\n{exc}\" 并始终回显异常正文",
+      "P3：attempts<1 时循环不执行会静默放行 → 入口校验 + 循环后兜底 raise",
+      "P3：重试掉的失败原文从不回放 → 重试分支回放失败输出尾部（最后 20 行）并打印日志路径",
+      "P3：notes 复验口径过强、L1c 定性不准 → 补「退避分支本机不可复现，仅验证未破坏正常路径」+ 桩注入自检表；L1c 改为「信息级判定、非硬门禁」",
+      "P3：归档未同步本次改动 → 本文件与 pr-body.md 补记第 8 条/EAGAIN 加固"
+    ],
+    "verification": "桩注入自检 4/4：日志含 EAGAIN→重试到上限才抛；仅异常正文含 EAGAIN→同样重试；非 EAGAIN 真实错误→首次即抛；成功→正常返回并回放输出。加固后本机 conan create 复验：三步均首次尝试成功，ctest tests_sh 1/1、test_package 12/12。"
+  },
+  "issues": [],
+  "findings": [
+    {
+      "severity": "P3",
+      "status": "fixed",
+      "file": "archives/p/pnc/0.9.5/manifest.yaml",
+      "description": "版本级 manifest 注释写 ARCHIVE-SPEC v2.0（现行 v3.0）且缺 conan_ref。",
+      "fix_suggestion": "已改为 v3.0 并补 conan_ref: pnc/0.9.5。"
+    },
+    {
+      "severity": "P3",
+      "status": "fixed",
+      "file": "archives/p/pnc/0.9.5/manifest.yaml",
+      "description": "build.shell_override 保留 <...> 占位外观，且机制描述不准（实为 CMakeToolchain 变量）。",
+      "fix_suggestion": "已改为说明性文字。"
+    },
+    {
+      "severity": "P3",
+      "status": "fixed",
+      "file": "archives/p/pnc/README.md",
+      "description": "产物表许可写 GPL-3.0，与 conanfile.py/软件级 manifest/README 头部的 GPL-3.0-only 不一致。",
+      "fix_suggestion": "已统一为 GPL-3.0-only。"
+    },
+    {
+      "severity": "P3",
+      "status": "fixed",
+      "file": "archives/p/pnc/0.9.5/reports/test-report.md",
+      "description": "reports/ 被 .gitignore 整体忽略，测试报告不会随 PR 入库。",
+      "fix_suggestion": "已按仓库惯例（tcping/protomol/diaspora-installer/caph 先例）在 .gitignore 补 pnc 的 reports/ 白名单例外（*.md 入库、*.log 不入库）。"
+    },
+    {
+      "severity": "P3",
+      "status": "fixed",
+      "file": "archives/p/pnc/0.9.5/conandata.yml",
+      "description": "patch 0002 的 patch_description 把由 0001 负责的 gawkapi.h 探测混入。",
+      "fix_suggestion": "已改述为「允许显式指定 AWKLIBPATH 安装目录，并同步 phonenumber 依赖变量与 gawk 导入目标（0001 的配套）」。"
+    }
+  ],
+  "fixed_in_earlier_rounds": [
+    "P1: commands.json description 曾宣称交付 GNU AWK 扩展（本包只构建 CLI）",
+    "P2: README 崩溃率 60-80% 与 notes/test-report/草稿 不一致",
+    "P3: license 曾写 GPL-3.0-or-later（上游源码头为 version 3 → GPL-3.0-only）",
+    "P3: 方法顺序 layout 曾写 requirements 之前",
+    "P3: test.sh 缺 pipefail",
+    "P3: MANIFEST.yml 缺 upstream_tests.expected / assertion_count 口径不清",
+    "P3: 缺软件级 archives/p/pnc/manifest.yaml",
+    "P3: patches/0002 的 PkgConfig::PNC_GAWK 导入目标缺存在性判断"
+  ],
+  "summary": "三轮独立审计（子任务、上下文隔离）后判定 PASS，无 P0/P1 遗留。配方经真实构建日志核对可复现：conan create 成功、上游 ctest tests_sh 1/1 在 build() 内真跑、test_package 12/12 全绿（L1e 反向破坏测试证明测试确实依赖 bin/pnc，非空壳）；sha256 与官方 sr.ht 源一致且经 conan 校验；license GPL-3.0-only 与上游源码头一致；settings 四项齐全；requires libphonenumber/8.13.51 存在；两个补丁均无平台宏；commands.json 与 package_type=application 一致。四处测试数字（manifest.yaml 23 / MANIFEST.yml 12+11 / notes.md 11+12 / reports/test-report.md 23）互相自洽。gawk 扩展未纳入本包，原因与实测数据在 notes.md 有完整取证。"
+}
