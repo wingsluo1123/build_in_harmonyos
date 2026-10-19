@@ -1,0 +1,30 @@
+software: sigutils
+description: Digital signal processing utility library (NCQO, PLL, AGC, IIR, channel detector, specttuner, matfile)
+category: dsp
+license: LGPL-3.0-or-later
+homepage: https://github.com/BatchDrake/sigutils
+repository: https://github.com/BatchDrake/sigutils
+keywords:
+  - sigutils
+  - dsp
+  - sdr
+  - ncqo
+  - pll
+  - costas
+  - agc
+  - iir
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "bare cmake + 自发现 OHOS NDK ohos.toolchain.cmake + Ninja（MGARD/1.6.0 骨架；绕开 conan_toolchain 的 unknown HarmonyOS，ML-0035）"
+    - "依赖经 pkg_check_modules（sndfile>=1.0.2、fftw3f>=3.0 REQUIRED；volk 可选自动禁用）→ generate() 写 sndfile.pc/fftw3f.pc shim 指向制品仓 libsndfile/1.2.2 与 fftw3f/3.3.10，PKG_CONFIG_EXECUTABLE 指 HNP pkg-config"
+    - "CMAKE_PROJECT_TOP_LEVEL_INCLUDES 预载放宽 CMAKE_FIND_ROOT_PATH_MODE_*=BOTH（ohos.toolchain 普通 set() 的 ONLY 压不住命令行 -D，brotli/mgard 实证）"
+    - "E077：构建树 libsigutils.so/sutest 剥 .codesign + binary-sign-tool -selfSign 重签后才可运行；package() 对 .so 同样重签（ML-0043）"
+    - "上游只构建 SHARED 库（SOVERSION 1）；_SU_SINGLE_PRECISION 属 ABI 契约，package_info.defines 声明"
+    - "上游测试为自研 sutest 主程序（18 个注册测试，未注册 CTest），构建树直接运行，退出码判定；matfile 测试写 cwd → testrun/ 可写目录"
+
+versions:
+  "0.3.0":
+    status: prepared
+    conan_ref: "sigutils/0.3.0"

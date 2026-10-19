@@ -1,0 +1,22 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 6fccbbf..2c07379 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -74,9 +74,14 @@ endif()
+ set(CMAKE_C_FLAGS          "${CMAKE_C_FLAGS} ${SIGUTILS_CONFIG_CFLAGS}")
+ 
+ # The following hack exposes __FILENAME__ to source files as the relative
+-# path of each source file.
+-set(CMAKE_C_FLAGS
+-  "${CMAKE_C_FLAGS} -D__FILENAME__='\"$(subst ${CMAKE_SOURCE_DIR}/,,$(abspath $<))\"'")
++# path of each source file. The $(subst ...)/$(abspath ...) forms are GNU
++# make functions: the Ninja generator copies them verbatim into build.ninja
++# FLAGS, which ninja cannot parse (bad $-escape). Skip the hack under Ninja
++# and rely on the built-in fallback definition in sigutils/log.h.
++if(NOT CMAKE_GENERATOR STREQUAL "Ninja")
++  set(CMAKE_C_FLAGS
++    "${CMAKE_C_FLAGS} -D__FILENAME__='\"$(subst ${CMAKE_SOURCE_DIR}/,,$(abspath $<))\"'")
++endif()
+ 
+ #
+ # If you are building sigutils for your own software distribution, you may want

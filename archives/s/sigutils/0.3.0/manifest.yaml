@@ -1,0 +1,32 @@
+package: sigutils
+version: "0.3.0"
+
+homepage: "https://github.com/BatchDrake/sigutils"
+license: LGPL-3.0-or-later
+status: prepared
+build_system: cmake
+build_date: ''
+
+source:
+  url: "https://github.com/BatchDrake/sigutils/archive/refs/tags/v0.3.0.tar.gz"
+  sha256: "f39686bf78d7773f6e0305c27d7b5db7950b96dd40f89eefb307331daf49b0e9"
+
+patches_applied:
+  - "0001-cmake-filename-ninja.patch (portability)：Ninja 生成器下跳过上游
+    CMakeLists.txt __FILENAME__ make 语法 hack（$(subst ...) 原样进 build.ninja
+    FLAGS 致 bad $-escape，真机第 1 轮实证），走 sigutils/log.h 自带回退定义；
+    非 Ninja 生成器行为与上游逐字一致"
+
+upstream_tests:
+  command: "run upstream sutest (all registered tests) from the build tree"
+  test_count: 18
+  notes: "sutest 为上游自带测试主程序（src/main.c 注册 18 个 SU_TEST_ENTRY：ncqo 1 + butterworth_lpf 1 + agc 3 + pll 1 + costas 4 + clock_recovery 2 + channel_detector 3 + specttuner 1 + matfile 2），上游未注册 CTest，配方直接运行构建树 sutest，以进程退出码判定（18 项全过才 0）；样本文件缺失时 su_test_channel_detector_real_capture 按上游源码语义自跳过（本轮真机样本在位，未触发）。真机实测（MateBook 鸿蒙 PC aarch64，2026-10-17）：18/18 全过、失败 0、跳过 0，退出码 0，通过率 100%。"
+
+dependencies:
+  - "libsndfile/1.2.2 (conan, cnb 制品仓；默认 fPIC=True 静态)"
+  - "fftw3f/3.3.10 (conan, cnb 制品仓；默认共享 .so)"
+  - "volk>=1.0 可选：制品仓无 volk 包，上游 VOLK_FOUND=0 自动禁用"
+
+test_package:
+  assertion_count: 6
+  description: "直接 CC 链接已安装的 libsigutils：ABI 握手、版本串精确等于 0.3.0、NCQO 常量/单位音调行为（对齐上游 ncqo.c 断言）、Butterworth 低通（5 阶 fc=0.25）通带/阻带实测选择性。"

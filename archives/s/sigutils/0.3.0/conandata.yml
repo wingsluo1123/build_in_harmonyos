@@ -1,0 +1,30 @@
+# R39/PF7：只写官方原始 URL，不手写镜像前缀（CI 运行时自动注入镜像 fallback；
+# 同类问题在 isa-l 2.32.0 真机第 1 轮审计中被判 P1，此处主动整改）。
+sources:
+  url: "https://github.com/BatchDrake/sigutils/archive/refs/tags/v0.3.0.tar.gz"
+  sha256: "f39686bf78d7773f6e0305c27d7b5db7950b96dd40f89eefb307331daf49b0e9"
+
+# 真机第 1 轮（2026-10-16）实证：上游 CMakeLists.txt 的 __FILENAME__ hack
+# 使用 GNU make 函数 $(subst ...)/$(abspath ...)，Ninja 生成器原样写入
+# build.ninja FLAGS → ninja: error: build.ninja:56: bad $-escape（任何
+# ninja 版本皆然）；Makefiles 生成器受 E074（jobserver fifo EPERM）阻断，
+# 事后 sed 改 build.ninja 违反 R6 → 以源码补丁在 Ninja 下跳过该 hack，
+# 走 sigutils/log.h:73-75 自带 __FILENAME__ 回退定义（仅日志域名失去
+# 文件名区分，外观性；非 Ninja 生成器行为与上游逐字一致）。
+patches:
+  - patch_file: "patches/0001-cmake-filename-ninja.patch"
+    patch_type: portability
+    patch_description: "Ninja 生成器下跳过上游 __FILENAME__ make 语法 hack（bad $-escape），走 log.h 自带回退；非 Ninja 行为零变化"
+    sha256: "657b02a3ade454ad085542603160500f48418b854da560b4c0db87a3902b5e69"
+  - patch_file: "patches/0002-ncqo-setphase-cache-refresh.patch"
+    patch_type: bugfix
+    patch_description: "su_ncqo_set_phase 刷新缓存的 cos/sin（上游 set_phase 后首次 read 返回旧相位陈旧值，sutest t0 必失败的库侧根因；库内无其他 set_phase 调用方）"
+    sha256: "282bd406c14db0f1f49d62a21b67822f5dc06c3fa6595bffc54740b017606b83"
+  - patch_file: "patches/0003-sutest-single-precision-fixes.patch"
+    patch_type: bugfix
+    patch_description: "上游 sutest 三处自身缺陷（上游 CI 从不运行 sutest）：ncqo 容差 1e-15 超出单精度下限改为 1e-6f、agc steady_falling 检查 output 而非原始 input、channel detector 补 mode=DISCOVERY（SPECTRUM 模式下 find_channels 永不执行）；不改库行为"
+    sha256: "5f3b8544fb08311b10e2727da0a5e14795c1135a7586eb2dfcb1b53b164b62d2"
+  - patch_file: "patches/0004-specttuner-fftw-estimate.patch"
+    patch_type: portability
+    patch_description: "specttuner.c 8 处 FFTW_MEASURE→ESTIMATE（OHOS fftw3f 构建上 MEASURE 规划满核空转，真机 t15 挂死；detect.c 既有选择即 ESTIMATE，规划质量对本用例正确性无影响）"
+    sha256: "b43dd79d2f3bf55255757415391c03fbc159180b8b81421cf5d277e3e09e3b28"

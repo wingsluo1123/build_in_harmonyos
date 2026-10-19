@@ -1,0 +1,20 @@
+diff --git a/sigutils/ncqo.c b/sigutils/ncqo.c
+index 65830d6..34674de 100644
+--- a/sigutils/ncqo.c
++++ b/sigutils/ncqo.c
+@@ -103,6 +103,15 @@ SU_METHOD(su_ncqo, void, set_phase, SUFLOAT phi)
+ #endif /* SU_NCQO_USE_PRECALC_BUFFER */
+ 
+   self->phi = phi - 2 * PI * SU_FLOOR(phi / (2 * PI));
++
++  /* Refresh cached sine/cosine values: su_ncqo_read_i/q return the value
++   * computed in the previous step, so a forced phase change must be
++   * reflected immediately. Otherwise the first read after set_phase
++   * returns a stale value belonging to the old phase. */
++  self->cos = SU_COS(self->phi);
++  self->sin = SU_SIN(self->phi);
++  ++self->cos_updated;
++  ++self->sin_updated;
+ }
+ 
+ SU_METHOD(su_ncqo, SUFLOAT, get_i)
