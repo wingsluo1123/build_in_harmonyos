@@ -1,0 +1,77 @@
+#====================================================================
+# DRAFT-nanojsonc-1.3.0-cmake-install-directory-header-double-nest
+# 上游 CMake install(DIRECTORY include/ DESTINATION include/${PROJECT_NAME})
+# 导致公共头双嵌套 include/<lib>/<lib>/xxx.h，与 INSTALL_INTERFACE=include
+# 不一致，消费者 #include <lib/xxx.h> 找不到头
+# 来源: nanojsonc 1.3.0 适配 (2026-10-19, pc3-2)
+#====================================================================
+
+id:                     DRAFT-nanojsonc-1.3.0-cmake-install-directory-header-double-nest
+source_lib:             nanojsonc 1.3.0
+trigger_tool:           conan|cmake|conan create|conan-verify
+phase:                  packaging|installation
+error_signature:        install\(DIRECTORY .*include/ DESTINATION .*INCLUDEDIR.*PROJECT_NAME|nanojsonc/nanojsonc/parser\.h|include/.*/.*/.*\.h|INSTALL_INTERFACE.*includedir|consumer .*#include.*not found.*installed header
+match_keywords:         CMake, install(DIRECTORY, DESTINATION include/${PROJECT_NAME}, include/<lib>/<lib>/, double-nested header, INSTALL_INTERFACE, BUILD_INTERFACE, include dir mismatch, nanojsonc/parser.h, consumer compile, header not found, INSTALL_INCLUDEDIR, GNUInstallDirs, package config
+category:               build-system, cmake, conan, packaging, headers
+severity:               2
+status:                 draft
+agent_id:               atomcode-nanojsonc-r01-pc3-2
+
+root_cause: >
+  上游 CMakeLists 用 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}) 安装公共头。
+  当源码树 include/ 下本身已有 <lib>/ 子目录（include/nanojsonc/parser.h）时，
+  DIRECTORY 安装会把整个 include/ 内容装进 include/<lib>/，落盘为
+  include/nanojsonc/nanojsonc/parser.h（双嵌套）。而同一 CMakeLists 的
+  target_include_directories INSTALL_INTERFACE=${CMAKE_INSTALL_INCLUDEDIR}
+  与 install(EXPORT) 的 INCLUDES DESTINATION include 都指向 include/ 根，
+  两者不一致：Conan 打包后 CMakeDeps 生成 INTERFACE_INCLUDE_DIRECTORIES=include，
+  消费者 #include <nanojsonc/parser.h> 在 test_package / 下游编译必失败；
+  而 conan create 本身（只装库）可能不报错，错误在消费者阶段才暴露。
+  正确安装目标是 include/ 根（让 include/nanojsonc/parser.h 落到 include 根下），
+  与 INSTALL_INTERFACE 对齐。
+affected_scope:         所有源码树 include/ 下已带 <lib>/ 子目录、又用
+                        install(DIRECTORY .../include/ DESTINATION
+                        include/${PROJECT_NAME}) 的 CMake 工程：装出
+                        include/<lib>/<lib>/ 双嵌套，消费者编译缺头。
+                        区别于 E217（install(FILES ... DESTINATION
+                        include/<subdir>) 单层子目录 + recipe includedirs
+                        对齐修复）与 E1759（recipe package() copy() pattern
+                        保留目录导致 include/include/）。
+verification_cmd:       grep -n 'install(DIRECTORY' <src>/CMakeLists.txt ;
+                        grep -n 'INSTALL_INTERFACE' <src>/CMakeLists.txt ;
+                        conan create 后检查 package folder 布局：
+                        find <pkg>/include -name 'parser.h' 应落在
+                        include/<lib>/ 而非 include/<lib>/<lib>/
+
+rec_priority:           1
+rec_approach:           cmake-install-directory-dest-root-fix
+rec_description:        最小 source patch 把 install(DIRECTORY) 的 DESTINATION
+                        从 ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME} 改为
+                        ${CMAKE_INSTALL_INCLUDEDIR}（即 include/ 根），使
+                        include/<lib>/xxx.h 正确落到 include/ 根下，与
+                        INSTALL_INTERFACE=${CMAKE_INSTALL_INCLUDEDIR} 一致；
+                        补丁同时保留 upstream 的目录命名（include/<lib>/）。
+                        配方 package() 继续用 cmake.install()，无需手工 copy。
+rec_command:            # 示例见 nanojsonc 1.3.0 patches/0001-CMakeLists.txt.patch：
+                        # install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/
+                        #   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+rec_auto_fix:           false
+rec_impl:               source-patch
+
+forbid_1_pattern:       package_info.*includedirs.*include/<lib>/<lib>
+forbid_1_reason:        用 includedirs 指向双嵌套目录只是掩盖上游布局缺陷，
+                        且与上游 INSTALL_INTERFACE 语义冲突，下游 find_package
+                        仍不可靠；应修 install 目标而非迁就错误布局。
+forbid_2_pattern:       copy\(self, .*include.*dst="include"
+forbid_2_reason:        手工 copy 会偏离上游安装布局（E217/E1759 教训），
+                        应让 cmake.install() 应用修正后的 install 规则。
+
+principles:             P005, P010, P012
+
+similar_to:             E217（install(FILES) 单层子目录、recipe includedirs 对齐）、
+                        E1759（recipe copy pattern 目录导致 include/include/ 双嵌套）、
+                        E1141（cmake --install 安装清单引用缺失生成物）
+caused_by:              []
+conflicts_with:         []
+prerequisite_of:        []
