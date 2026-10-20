@@ -1,0 +1,42 @@
+# test_package/MANIFEST.yml
+# 上游官方测试与消费者视角测试声明（CI L0e 强制要求存在）。
+
+package: glib2/2.80.0
+homepage: https://gitlab.gnome.org/GNOME/glib
+
+upstream_check_command: "meson test"
+upstream_test_in_build: true
+upstream_test_command: "meson test -v --timeout-multiplier=16 --no-suite=failing"
+
+upstream_tests:
+  - file: glib/tests/atomic.c
+    source: glib-2.80.0.tar.xz/glib/tests/atomic.c
+    description: "GLib 原子操作测试"
+    command: "meson test glib:atomic"
+  - file: glib/tests/string.c
+    source: glib-2.80.0.tar.xz/glib/tests/string.c
+    description: "GLib 字符串工具测试"
+    command: "meson test glib:string"
+  - file: gobject/tests/reference.c
+    source: glib-2.80.0.tar.xz/gobject/tests/reference.c
+    description: "GObject 引用计数测试"
+    command: "meson test gobject:references"
+
+test_package_tests:
+  - file: test_glib.c
+    description: "消费者调用字符串、哈希表、GVariant 和 GObject API"
+    command: "./test_glib2"
+  - file: test_glib_harmonyos.c
+    description: "鸿蒙用户存储中创建并重命名文件，验证 GFileMonitor 收到真实文件事件并校验文件内容"
+    command: "./test_glib_harmonyos"
+
+# Test-item counts (individual cases/checks, not Meson targets).
+upstream_test_count: 6538
+upstream_executed_test_count: 5432
+upstream_passed_test_count: 5400
+upstream_skipped_test_count: 30
+upstream_failed_test_count: 2
+upstream_excluded_test_count: 1106
+consumer_test_count: 4
+harmonyos_test_count: 4
+assertion_count: 6546
