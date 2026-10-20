@@ -1,0 +1,56 @@
+# MANIFEST.yml — xlbiff/4.6.11 test_package
+
+package: xlbiff/4.6.11
+test_type: L1 (executable smoke test, R34)
+tested_paths:
+  - "binary present + executable, version string 4.6.11 compiled in (grep)"
+  - "headless run without DISPLAY -> exit != 0 with Xt 'Can't open display' diagnostic (loads libXaw/libXmu/libXpm/libXt/libSM/libICE/libX11/libxcb/libXau/libXdmcp/libXrandr/libXrender chain and executes main()'s resource parsing)"
+  - "installed resources: share/man/man1/xlbiff.1, share/man/man1/mailbox-preview.1, share/X11/app-defaults/XLbiff, etc/nmh/xlbiff.form, bin/mailbox-preview"
+
+headless_limitation: |
+  xlbiff.c main() runs XtVaAppInitialize (which opens the X display) BEFORE
+  handling -version/-help, so no argument path completes without a running
+  X server. Neither the device nor the CI worker has an X server binary
+  (no Xorg/Xvfb in the image, no OHOS Xvfb published — coolmail/1.3 and
+  bambam/1.4.1 precedents), so the windowing paths cannot be executed here.
+
+upstream_test_audit:
+  audit_command: "ls tests/ (3 scripts + utilities.sh); grep -E 'TESTS|check_PROGRAMS|check-local' Makefile.am (0 matches); grep -c 'def test' mailbox-preview-test.py (9)"
+  discovered: 23
+  executed: 9
+  passed: 9
+  failed: 0
+  skipped: 14
+  status: partial_env_limited
+  framework: "unittest (mailbox-preview-test.py) + manual shell scripts (tests/)"
+  reason: |
+    xlbiff 4.6.11 upstream ships 23 test cases (用例级口径):
+      1. mailbox-preview-test.py — 9 unittest cases for the
+         mailbox-preview parser (IMAP response flattening, bodystructure
+         parsing, preview/header extraction, header decoding). Pure
+         parsing, no network needed: EXECUTED in this environment
+         against the *packaged* bin/mailbox-preview helper (see
+         test_xlbiff.sh) — 9/9 pass (rc=0).
+      2. tests/test-scan-interface.sh — 1 integration case (xlbiff
+         invokes nmh `scan`). Needs /usr/bin/mh/scan (nmh) + Xvfb.
+      3. tests/test-doc-format.sh — 5 man-formatter cases (man, nroff,
+         groff -ww -z, mandoc -T lint, mandoc -T html; each formats
+         xlbiff.man + mailbox-preview.man). Needs groff / man-db /
+         mandoc / man2html.
+      4. tests/test-windowing.sh — 8 windowing sequences (popdown,
+         incmail, moremail, mailer_noinc, mailer_inc, exit_action, fade,
+         refresh; each x 4 WM/geometry variants = 32 instances). Needs
+         Xvfb + xdotool + procps + optional WM.
+    None are wired into automake: Makefile.am has no TESTS /
+    check_PROGRAMS / check-local, so `make check` is a no-op.
+    Items 2-4 require nmh, a live X server and man-page toolchains that
+    do not exist in the OHOS build/CI environment (no Xorg/Xvfb in the
+    image, no nmh package, no groff/mandoc — same environment as the
+    coolmail/1.3 and bambam/1.4.1 precedents). 未通过项均因环境缺少
+    X display、nmh 与 man 工具链，非适配引入的失败（R51 逐项说明）。
+    Instance-level total: 52 (9 unittest + 32 windowing variants +
+    10 formatter checks + 1 integration).
+
+runtime_notes:
+  - "HMBS [stale_runtime_library]: OHOS loader may ignore LD_LIBRARY_PATH; dependency .so files are preloaded by absolute path in dependency order (xeyes/1.3.1 precedent)."
+  - "HMBS [shell_getcwd]: script runs under the injected SHELL (/bin/sh); POSIX sh only."

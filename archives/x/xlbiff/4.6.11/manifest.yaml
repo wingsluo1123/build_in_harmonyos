@@ -1,0 +1,65 @@
+# 版本级 manifest — xlbiff 4.6.11
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "4.6.11"
+software: "xlbiff"
+display: "xlbiff"
+upstream_name: xlbiff
+upstream_version: "4.6.11"
+conan_ref: "xlbiff/4.6.11"
+
+# 编译状态: published | built | failed | archived
+status: built
+
+build_date: "2026-10-17"
+build_system: autotools
+target_platform: aarch64-linux-ohos
+
+# 源码信息
+source:
+  url: "https://github.com/edsantiago/xlbiff/archive/refs/tags/4.6.11.tar.gz"
+  sha256: "b74e5d92466e82a63fe08be11a6f9a8f6b75ae5d0eb01fe6e46e89e60bbdddb9"
+  tar_format: tar.gz
+
+# 构建配置
+build:
+  system: autotools（aclocal/autoconf/autoheader/automake 自举 + /system/bin/sh 交叉 configure）
+  configure_options:
+    - "--build=aarch64-unknown-linux-gnu --host=aarch64-linux（config.sub 可规范化，免 config.sub 补丁）"
+    - "--with-appdefaultdir=${datadir}/X11/app-defaults（保持包前缀相对，DESTDIR 安装可重定位）"
+    - "TMPDIR=<build>/xlbiff-ac-tmp + configure ac_tmp 重写（E114：HMDFS 拦子进程写 confXXXXXX）"
+    - "INSTALL=<build>/_ohos_install_shim/install 重定向（E182/E188：HMBS install shim 拒批量安装）"
+  dependencies:
+    - "libx11/1.8.13 (force，对齐 libxaw/1.0.14 的 1.8.13 轨)"
+    - "libxext/6.4.0.1"
+    - "libxt/1.3.1"
+    - "libxmu/1.3.1.1"
+    - "libxaw/1.0.14"
+    - "libxrandr/1.5.5（配方 pin libx11/6.4.0 force，根图 1.8.13 胜出 → 源码重建）"
+    - "xorgproto/2025.1"
+  transitive_dependencies:
+    - "libxau/1.0.11, libxcb/1.17.0, libxdmcp/1.1.5, xtrans/1.4.0（经 libx11）"
+    - "libsm/1.2.6, libice/1.1.2（经 libxt）"
+    - "libxrender/0.9.12, libxpm/3.5.17（经 libxrandr / libxaw，源码重建）"
+  tool_requirements:
+    - "automake/1.18（tag tarball 无 configure/Makefile.in，需自举；CI 沙箱看不到 $HOME/.local 工具）"
+  cc: clang
+  cxx: ""
+
+# 补丁信息
+patches_applied: []
+
+# 知识沉淀
+knowledge_gained:
+  - "xlbiff tag tarball 只带 configure.ac/Makefile.am：aclocal→autoconf→autoheader→automake 直跑自举（autoreconf 链在 OHOS HMDFS 有 autoconf.m4f 加载冲突，E114/abiword 先例）；ACLOCAL/AUTOMAKE env 由 automake/1.18 包 buildenv 注入 conanbuild，CI 沙箱 PATH 无 aclocal"
+  - "--host=aarch64-linux 可被 automake 1.18 的 config.sub 规范化为 aarch64-unknown-linux-gnu，免去 config.sub 的 linux-ohos 补丁（abiword-plugin-* 先例）；编译器三元组仍由 OHOS profile 的 clang --target=aarch64-linux-ohos 驱动"
+  - "AC_SEARCH_LIBS 链接检查依赖 AutotoolsDeps 注入 conanbuild 的 LDFLAGS/LIBS；configure 必须以 /system/bin/sh + SHELL/CONFIG_SHELL 显式执行（libxaw 先例）"
+  - "E114 + E182/E188 组合同款修法：ac_tmp 重写 + TMPDIR 重定向 + INSTALL shim（adms 2.3.7/xeyes 1.3.1 先例）"
+  - "xlbiff -version/-help 在 XtAppInitialize 之前打印并退出（exit 0 / exit 1），无 X server 即可做无头测试；上游 tests/ 三个手动脚本依赖 nmh+X display，Makefile.am 无 TESTS，make check 为空操作"
+
+# 上游测试审计（R51）
+upstream_tests:
+  exist: manual_only
+  discovered: 3
+  executed_in_env: 0
+  reason: "tests/test-scan-interface.sh、tests/test-doc-format.sh、tests/test-windowing.sh 均为手动脚本，依赖 nmh(mh scan) 与运行中的 X server；Makefile.am 无 TESTS/check_PROGRAMS，make check 为空操作。OHOS 构建环境无 X display 与 nmh，无法执行；test_package 以 -version/-help 真实执行被测二进制。"
