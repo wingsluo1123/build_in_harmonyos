@@ -4,10 +4,10 @@ libest 是 Cisco 的 EST（Enrollment over Secure Transport, RFC 7030）库，
 以 C 语言实现，用于安全证书签发流程，兼容 Suite B 及 RSA/DSA 证书。
 
 - 上游仓库: https://github.com/cisco/libest
-- 适配版本: 1.0.0 (tag v1.0.0)
-- 适配路径: `archives/l/libest/1.0.0/`
+- 适配版本: 1.0.0 (tag v1.0.0)、3.2.0 (tag r3.2.0)
+- 适配路径: `archives/l/libest/1.0.0/`、`archives/l/libest/3.2.0/`
 - 构建系统: autotools (configure + make, libtool)
-- 依赖: openssl/3.5.6.1 (ohpcd 制品仓)
+- 依赖: openssl/3.5.6.1（1.0.0）、openssl/1.1.1w（3.2.0）(ohpcd 制品仓)
 - 平台: HarmonyOS PC (aarch64, aarch64-unknown-linux-ohos)
 
 ## 版本索引
@@ -15,6 +15,7 @@ libest 是 Cisco 的 EST（Enrollment over Secure Transport, RFC 7030）库，
 | 版本 | 状态 | 说明 |
 |------|------|------|
 | 1.0.0 | published | OpenSSL 3.5.x 公开 API 迁移适配；知识路径 B（OpenSSL3 私有 API/结构迁移草稿） |
+| 3.2.0 | built | 上游官方支持 OpenSSL 1.1.1，依赖 openssl/1.1.1w；55 个 CUnit 套件；首轮工作树待真机验证 |
 
 ## 说明
 

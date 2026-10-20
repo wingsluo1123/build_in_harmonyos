@@ -1,0 +1,30 @@
+id: DRAFT-libest-3.2.0-vendored-noinst-pki-renew-suite-isolation
+trigger_tool: make|conan|test
+phase: building|testing
+error_signature: /data/service/hnp/bin/bash: inaccessible or not found|ld\.lld: error: undefined symbol: .*_s|duplicate symbol: client_cert|CUnit suites total=.*ran=.*|subject name is expected to be in the format
+severity: 3
+category: autotools, testing, build-system, ohos
+match_keywords: noinst_libraries, safe_lib, config_shell inaccessible, pki renewal v3_ca, cunit suite isolation
+title: Autotools vendored noinst归档静态悬空补交付与过期测试PKI保扩展续期加单套件隔离计数
+root_cause: vendored safe_c_stub以noinst_LIBRARIES构建不被make install交付致静态libest.a的*_s符号悬空，叠加OHOS profile注入不可执行HNP bash致configure重exec失败、OpenSSL 3.x移除FIPS_mode_set、库侧--enable-brski与测试侧-DENABLE_BRSKI失配、测试PKI于2026-06-14过期且裸续签丢失v3_ca扩展致链断裂崩溃
+verification_cmd: 真机conan create全绿并保留lib/libsafe_lib.a交付与HMBS_TEST_PACKAGE_RESULT passed及HMBS_UPSTREAM_TEST_RESULT单套件隔离计数恒等式校验
+affected_scope: 含vendored noinst静态归档并自带CUnit TLS测试PKI的Autotools类C库
+rec_priority: 1
+rec_approach: vendor-noinst-deliver-plus-pki-renew-isolate
+rec_description: package补拷safe_c_stub归档为lib/libsafe_lib.a并libs追加safe_lib，改写conanbuild.sh硬编码SHELL并用/bin/sh显式驱动configure，测试域预编译FIPS桩，保持v3_ca扩展同密钥续期PKI并单套件隔离运行CUnit
+rec_command: archives/l/libest/3.2.0/conanfile.py: package补交付safe_lib与FIPS stub、build显式SHELL驱动与--enable-brski对齐、_renew_upstream_test_pki保扩展续期与run_one_suite隔离；test_package/: ctest单源计数
+rec_auto_fix: false
+rec_impl: conan-recipe-plus-test-package
+fallback_priority: 2
+fallback_approach: tiered-build-with-honest-gate
+fallback_description: 若全集仍无法链接则保留分级回退与诚实状态门，仅executed==55且failed==0才passed，CoAP缺编记ohos_feature
+fallback_auto_fix: false
+forbid_1_pattern: HMBS_UPSTREAM_TEST_RESULT=\{[^}]*"status": "passed"[^}]*"skipped": 54
+forbid_1_reason: 禁止54 skipped下仍标记passed的自相矛盾放行；须executed==55且failed==0才passed
+forbid_1_consequence: 真机证据门禁incomplete，掩盖单进程崩溃致后续套件零执行
+similar_to: [DRAFT-ccrtp-1.0.0-demo-as-upstream-regression]
+doc_file: knowledge/drafts/DRAFT-libest-3.2.0-vendored-noinst-pki-renew-suite-isolation.md
+last_updated: 2026-10-20
+source_event: libest/3.2.0 真机预检noinst悬空与HNP SHELL失效与过期PKI崩溃修复链
+authors: hmbs-executor
+source_pr: 16798
