@@ -1,0 +1,48 @@
+# 软件级 manifest — fonttosfnt
+# 文件位置: archives/f/fonttosfnt/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+software: fonttosfnt
+display: "fonttosfnt"
+description: "X.Org 位图字体封装工具：把 BDF/PCF 点阵字体包进 sfnt（TrueType/OpenType）外壳，产出 .otb 的 OpenType 位图字体"
+category: utility
+homepage: "https://gitlab.freedesktop.org/xorg/app/fonttosfnt"
+license: MIT
+build_system: autotools
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "config.guess 不识 uname -s = HarmonyOS ⇒ 补 *:HarmonyOS:*:* 分支输出 aarch64-unknown-linux-ohos（E007/E072）。⚠ 分清新老写法：新版 config.guess（如本包 2024-07-27）用 `GUESS=` 变量、分支不 exit；2017 老版每分支是 `echo <tuple>; exit ;;`（bdftopcf 1.1 属后者）——两者不可互抄"
+    - "本包 config.sub 已是新版，**自带** `ohos*` 与 `linux-ohos*` 两处 ⇒ 只需 patch config.guess 一件；补前先 `config.sub aarch64-unknown-linux-ohos` 自测，别照抄 bdftopcf 的三件套"
+    - "`umask 077 && mktemp -d` 在 HMDFS 上得 700 不可写目录：config.guess 的 set_cc_for_build（3 处）与 configure 的 config.status 临时目录（2 处）都要放宽到 022，否则先报 `can't create .../dummy.c: Permission denied`、再报 `cannot guess build type; you must specify one`（E011/E114）"
+    - "⚠ 不要图省事用 --build/--host 绕 config.guess：那会把 autoconf 切进 cross 模式，改变 AC_CHECK_FUNC(setenv) / AC_CHECK_FUNCS(vasprintf) / AC_CHECK_DECLS(va_copy) 三个探针的语义，写出的 config.h 是错的（本包 NEED_SETENV 条件编译 env.c 就挂在 setenv 探针上）"
+    - "configure.ac 用 PKG_CHECK_MODULES 要三个 pkg-config 模块（xproto >= 7.0.33 / freetype2 / fontenc）⇒ generate() 里 PkgConfigDeps 与 AutotoolsDeps 都要有；三个模块分别来自 xorgproto / freetype / libfontenc"
+    - "libfontenc 钉 1.1.7：仓内 1.1.9 已归档但未发布到 ohpcd（`conan download --only-recipe` 对未发布版本与 bogus 名返回同一条远程报错，必须做控制探针才能区分'网络错'与'未发布'）"
+    - "纯 CLI、无库无头文件 ⇒ package_type=application + cpp_info.bindirs=['bin']，并配软件级 commands.json（R38/PF8）"
+    - "fonttosfnt 的 -o 目标用 fopen(\"wb+\") 打开并 fseek 回填校验和 ⇒ 消费者测试不能像 bdftopcf 那样用 -o /dev/null，必须写进 $TMPDIR 下的 mktemp -d 并在退出时删除（OHOS /tmp 只读，且 §12.71② 目录级 git add 会扫走落盘产物）"
+  common_dependencies:
+    - xorgproto
+    - freetype
+    - libfontenc
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "1.2.5":
+    status: published
+    build_date: "2026-10-18"
+    source_url: "https://www.x.org/releases/individual/app/fonttosfnt-1.2.5.tar.xz"
+    sha256: "2e251e66e8753c08aa280b26fd4a10d0d88e7d9bba5c8aac3d3fb36705e5918e"
+    dependencies:
+      - xorgproto/2025.1
+      - freetype/2.14.3.2.1
+      - libfontenc/1.1.7
+    tests:
+      upstream: 0
+      after_adapt: 16
