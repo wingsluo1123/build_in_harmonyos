@@ -1,0 +1,57 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: karchive5/5.116.0.1
+homepage: "https://invent.kde.org/frameworks/karchive"
+
+# 上游测试命令 (ctest, CMake 项目)
+upstream_check_command: "ctest --test-dir build --output-on-failure --no-tests=error"
+
+# conanfile.py build() 中是否已集成上游测试
+# 说明: build() 配置 BUILD_TESTING=ON 编译 autotests，并内嵌 ctest 执行
+# (_run_upstream_tests, 含压缩 tar 的测试用 MIME 库准备)。实际 N/N′/通过率
+# 待 CI 回填 (R51 三步法, 见 notes.md)。test_package 在 conan create 的 test
+# 阶段真实执行消费者校验 (R34)。
+upstream_test_in_build: true
+
+# 上游实际运行的测试程序 (autotests/CMakeLists.txt: ecm_add_tests 3 项 +
+# ecm_add_test 2 项；kcompressiondevicetest 仅当 Qt5Network 可用，qt5-qtbase
+# 5.15.2.2 提供 Qt5Network)
+upstream_tests:
+  - file: autotests/karchivetest.cpp
+    source: karchive-5.116.0/autotests/karchivetest.cpp
+    description: "KArchive/KTar/KZip/KAr 通用归档读写测试"
+    command: "./bin/karchivetest"
+  - file: autotests/kfiltertest.cpp
+    source: karchive-5.116.0/autotests/kfiltertest.cpp
+    description: "KCompressionDevice 过滤器测试 (gzip/bzip2/xz/zstd)"
+    command: "./bin/kfiltertest"
+  - file: autotests/deprecatedtest.cpp
+    source: karchive-5.116.0/autotests/deprecatedtest.cpp
+    description: "已弃用 API 兼容性测试"
+    command: "./bin/deprecatedtest"
+  - file: autotests/klimitediodevicetest.cpp
+    source: karchive-5.116.0/autotests/klimitediodevicetest.cpp
+    description: "KLimitedIODevice 限长读取测试"
+    command: "./bin/klimitediodevicetest"
+  - file: autotests/kcompressiondevicetest.cpp
+    source: karchive-5.116.0/autotests/kcompressiondevicetest.cpp
+    description: "KCompressionDevice 对 tar.gz/tar.bz2/tar.xz(/tar.zst) 的读写测试"
+    command: "./bin/kcompressiondevicetest"
+  # 说明: tests/ 目录下的 kartest/ktartest/krcctest/kziptest/k7ziptest 由
+  # ecm_mark_as_test() 标记为测试目标并随 BUILD_TESTING=ON 构建，但该宏只
+  # 设置 EXCLUDE_FROM_ALL 并加入 buildtests 目标，并不调用 add_test()，
+  # 因此不进入 CTest 测试清单，也不被 _run_upstream_tests() 执行。
+
+# test_package 中自带的测试 (消费者视角验证, R34 实质 API 调用)
+test_package_tests:
+  - file: test.cpp
+    description: "消费者测试: KTar 写入/读取往返 + KZip Deflate 往返 + KCompressionDevice GZip 写入/读取往返 (校验 gzip 魔数与解压内容, 覆盖非 PIC zlib 静态库链接后的运行期行为)"
+    command: "./test_karchive5"
+
+# 测试校验点总数 = 静态 QTest 函数 68（autotests/ 五个程序，Q_SLOTS
+# 花括号感知计数，排除 init/cleanup 与 *_data）+ test_package 的 20 个
+# check() 校验点 = 88
+assertion_count: 88
