@@ -1,0 +1,31 @@
+id:                     E3649
+title: "OHOS conan 工具链缺 CMake 平台模块致 UNIX 变量为空：Linux 分支全跳过 + clang15/libc++ 兼容补丁族"
+severity:               2
+category: build-system
+error_signature: "CMAKE_SYSTEM_NAME=HarmonyOS.*UNIX is empty|X11 detection skipped|fatal error: 'ranges'|no member named 'partial_sort' in namespace 'std::ranges'|using value_type = Container::"
+root_cause: "OHOS conan 工具链设 CMAKE_SYSTEM_NAME=HarmonyOS，但 CMake 无 HarmonyOS 平台模块——UNIX 变量为空，所有 Linux 分支（X11 探测、XWindows 平台源、Unix arch 源）被跳过；同时 OHOS 目标为 clang 15 + libc++，缺 std::ranges 若干算法（partial_sort/find/fill/find_if/for_each）、缺 P0970 make_shared 数组支持、pthread_setcancelstate/type 未声明、且 cppstd 需从 17 提到 20（toolchain 追加 -std=c++17 在 CMAKE_CXX_FLAGS 之后、尾随标志获胜）。"
+rec_approach: "1) 用 Linux 平台语义桥接：使 UNIX 分支在 HarmonyOS 下生效（等价 Linux 语义），X11 后端经 BUILD_X11_SUPPORT=ON 对接 conan 发布 X11 客户端库（barrier/2.4.0 同源先例）；2) libc++15 兼容补丁族：std::ranges 算法全量替换为迭代器对经典算法（<algorithm> 显式 include）、make_shared 数组改 new[]+value-init+shared_ptr 数组删除器、pthread cancellation 相关调用改协作式取消；3) C++20 提升：configure() 设 settings.compiler.cppstd=20（仅 toolchain 变量不够，须走 profile/configure 层）；4) Qt 版本无关解析：QT_VERSION_MAJOR 名解析 Qt Test 包 + gui 测试子目录门控 BUILD_GUI；5) AUToMOC 工具路径注入 + LD_LIBRARY_PATH 解析 libc++_shared.so。"
+match_keywords: ["CMAKE_SYSTEM_NAME HarmonyOS", "UNIX empty", "std::ranges partial_sort", "P0970 make_shared array", "pthread_setcancelstate", "cppstd 20", "QT_VERSION_OVERRIDE"]
+category: build-system
+last_updated: 2026-10-16
+rec_command: "settings.compiler.cppstd=20; BUILD_X11_SUPPORT=ON; QT_VERSION_OVERRIDE=5.15; 打 clang15/libc++ 兼容补丁族（ranges→迭代器对/P0970/pthread）"
+fallback_approach: "若 X11 库缺失则关 XWindows 源走纯 core-lib+cli 交付（BUILD_GUI=OFF + 裁剪 extra gui 子目录）"
+fallback_command: "cmake -DBUILD_GUI=OFF -DBUILD_X11_SUPPORT=OFF ...  # 核心 CLI 仍可交付"
+prescan_pattern: "CMAKE_SYSTEM_NAME.*HarmonyOS|if\\(UNIX\\)|std::ranges::|make_shared<.*\\[\\]>"
+prescan_globs: "**/cmake/**|**/CMakeLists.txt"
+affected_scope: "所有在 OHOS conan 工具链（CMake 无 HarmonyOS 平台模块）下交叉编译、依赖 UNIX/Linux 分支探测，或使用 clang15/libc++ + std::ranges/P0970 的项目"
+verification_cmd: "grep -n 'CMAKE_SYSTEM_NAME' conan_toolchain.cmake; grep -c 'std::ranges' <src>/*.cpp  # 替换后应为 0"
+doc_file: ""
+authors: j669539
+source_pr: "#16077"
+source_commit: "af84000675"
+metrics_success_count: 1
+metrics_fail_count: 0
+metrics_confidence: 0.8
+metrics_last_used: 2026-10-16
+rec_auto_fix: false
+rec_impl: manual
+rec_priority: 1
+trigger_tool:           cmake
+phase:                  build
+rec_description:        "1) 用 Linux 平台语义桥接：使 UNIX 分支在 HarmonyOS 下生效（等价 Linux 语义），X11 后端经 BUILD_X11_SUPPORT=ON 对接 conan 发布 X1

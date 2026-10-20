@@ -1,0 +1,61 @@
+#====================================================================
+# DRAFT-xine-0.99.14-extra-programs-upstream-denominator
+# 上游零自动化测试时的分母口径：程序级入口清点（bin_PROGRAMS/EXTRA_PROGRAMS/bin_SCRIPTS）+ 只编译不执行
+#====================================================================
+
+id:                     E3595
+trigger_tool:           make|configure|test_package|ci
+phase:                  test
+error_signature:        make check: Nothing to be done for `check'|no TESTS= no check_PROGRAMS|EXTRA_PROGRAMS not built|测试用例少报|L1e 测试空壳
+severity:               3
+category:               platform, syscall, autotools, make, testing
+match_keywords:         make check, Nothing to be done, TESTS, check_PROGRAMS, EXTRA_PROGRAMS,
+                         bin_PROGRAMS, bin_SCRIPTS, 上游测试分母, 入口清点, 少报, session_ctrl,
+                         SIGSYS, 只编译不执行, 交互式程序, 适用性判定
+title:                  上游没有自动化测试（make check 全为 Nothing to be done）时，测试分母必须按“程序级入口清点”给出（bin_PROGRAMS/EXTRA_PROGRAMS/bin_SCRIPTS 全覆盖 + 逐个适用性判定），否则 PR 侧被判定少报；EXTRA_PROGRAMS 默认不构建、被平台策略 SIGSYS 的入口只能编译不能执行
+
+root_cause:          xine-ui 0.99.14 的 release tarball 不含任何自动化测试：`grep -l "TESTS=\|check_PROGRAMS" */**/Makefile.am`无命中，`make check` 在全部 20 个递归 check 目录输出 `Nothing to be done for 'check'`，执行用例数 0。此时若把“上游测试”写成“0 个”，在 PR 口径上等于放弃分母；而真正存在可验证行为的是**入口程序**，它们分散在 `bin_PROGRAMS`（xine、条件性 xine-remote、fbxine/aaxine/cacaxine/dfbxine）、`EXTRA_PROGRAMS`（session_ctrl、test）与 `bin_SCRIPTS`（xine-check、xine-bugreport）三类声明里。三个陷阱叠加：(1) `EXTRA_PROGRAMS` **不被 `make all` 构建**，必须显式 `make -C <dir> <prog>` 才存在，极易被漏数；(2) 部分入口在 OHOS 上**能被平台策略终止**——`session_ctrl` 的 `connect_to_session()` 无条件调用`setreuid()`，OHOS 以不可捕获的 SIGSYS 结束进程（rc=159，无任何输出），所以只能验证“交叉编译+链接”这一半，运行半边必须如实标注不适用；(3) `xine-bugreport` 是交互式程序（菜单 `please select (1..16):`），实测会一直阻塞（420s timeout rc=124），纳入自动化只会造成假红，必须“实测但不入自动化”。分母只有按“入口 × 调用次数 × 适用性”三层写清，才既满足全量测试要求，又不夸大结果。
+
+affected_scope:      所有上游无自动化套件（无 TESTS/check_PROGRAMS/ctest/pytest）的 autotools 包，尤其是2015 年前后发布、以“程序本身即测试面”的 CLI/GUI 工具。
+
+verification_cmd: >
+  grep -rn "bin_PROGRAMS\|noinst_PROGRAMS\|EXTRA_PROGRAMS\|bin_SCRIPTS" --include=Makefile.am .
+  grep -rln "TESTS=\|check_PROGRAMS" --include=Makefile.am .        # 空 = 无自动化套件
+  make check 2>&1 | grep -c "Nothing to be done for 'check'"         # 递归 check 目录数
+  make -j1 -C src/xitk session_ctrl && file -b src/xitk/session_ctrl # EXTRA_PROGRAMS 需显式构建
+  timeout 420 ./xine-bugreport >/dev/null 2>&1; echo "rc=$?"         # 124 = 交互式，不入自动化
+
+rec_priority:           1
+rec_approach:           program-level-entry-census-with-applicability-and-compile-only-entries
+rec_description:     分母写成三层并全文一致（MANIFEST.yml / test-report.md / PR 正文 / notes.md 同一组数字）：①上游入口总数 = 三类声明程序 + 脚本（本例 10）；②实测入口与调用次数（本例 4 个程序 / 9 次调用）；③不适用入口 + 逐个**实测证据**（构建输出、configure 探测行、链接探针），不许只写“环境不支持”。对平台策略终止的入口：配方 `build()` 里**只编译不执行**（保留交叉编译与链接验证），并在三处文档一致声明。对交互式入口：实测量出阻塞点后排除于自动化，改由 test_package 的端到端消费者用例覆盖同段行为。
+rec_command: >
+  # conanfile.py build()：把只编译不执行的入口固化进配方
+  self.run("make -j1 -C src/xitk session_ctrl", env="conanbuild")   # 不 self.run 该二进制
+rec_auto_fix:           false
+rec_impl:               compile-only-entry-in-build
+
+forbid_1_pattern:       declare_zero_upstream_tests
+forbid_1_reason:        “0 个自动化用例”只是套件维度，入口程序维度并非 0；只报 0 会被判少报（实测 N > 声明 N）。
+forbid_1_consequence:   PR 审查按 rule4 判 FAIL，需要重算分母并补测试报告，返工一轮。
+
+forbid_2_pattern:       execute_entries_killed_by_platform_policy
+forbid_2_reason:        SIGSYS 类终止（E051）不可捕获、无输出，把它当“测试失败”去改源码或跳过构建都会失真。
+forbid_2_consequence:   要么误报适配失败，要么为通过测试而 stub 掉上游代码（违反 R40 适配完整性）。
+
+fallback_priority:      2
+fallback_approach:      synthesize-consumer-tests-in-test-package
+fallback_description:   入口实在无法运行（无 X display、图形程序）时，把可验证面转移到 test_package：
+                         以打包后的二进制为对象做端到端消费者用例（构造输入→真实执行→产出结果→校验内容），
+                         并在 MANIFEST.yml 的 test_package_tests 里给出断言数与鸿蒙特有用例数。
+                         本例即 27 条断言、其中 3 条鸿蒙特有端到端消费者用例。
+fallback_command:       bash test_package/test.sh        # ASSERTIONS=27 PASSED=27 FAILED=0
+fallback_auto_fix:      false
+fallback_impl:          test-package-consumer-assertions
+
+doc_file:               knowledge/drafts/DRAFT-xine-0.99.14-extra-programs-upstream-denominator.md
+last_updated:           2026-10-17
+source_event:           xine/0.99.14 上游测试清点：0 套件 / 10 入口（实测 4·9 次调用 + 不适用 6）/ 27 断言 / 3 鸿蒙特有用例
+authors:                Qoder
+source_pr:
+source_commit:
+

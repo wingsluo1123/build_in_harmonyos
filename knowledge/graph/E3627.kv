@@ -1,0 +1,37 @@
+id:                     E3627
+title: 有界线程池的全员集合测试必须绑定实际容量，而不是 CPU 数推算
+trigger_tool: ctest|test|runtime
+phase: testing
+severity:               2
+category:               portability, threading, cmake, testing
+match_keywords: all-workers rendezvous, bounded thread pool, worker capacity, workers < n, thread pool size, 测试超时, 全员集合, 线程池容量
+error_signature: dispatch_readsync.*Timeout|all.workers.*rendezvous|workers < n
+root_cause: 测试用在线 CPU 数乘经验系数推算并发线程数，并让已经启动的任务等全部任务就绪；当请求任务数超过库内真实线程池容量时，已有线程占满线程池且不返回，排队任务永远无法运行，因此形成夹具死锁而非被测读写锁语义失败。
+affected_scope: 在有界执行器或线程池中先提交 N 个任务、每项在第一阶段等待全部 N 项到达的测试；不适用于有意验证容量耗尽或超额并发拒绝行为的测试。
+verification_cmd: ctest --show-only=json-v1 && ctest --output-on-failure --no-tests=error --parallel 1 --output-junit upstream-junit.xml
+rec_priority: 1
+rec_approach: bind-rendezvous-to-real-executor-capacity
+rec_description: 追踪实际执行器后端和容量定义，拒绝无证据的 CPU 数推算；对常规互斥测试按实际可同时运行容量扣除必要管理线程后配置 N，保留总迭代数、所有独立测试项和随 N 定义的完整并发及互斥断言，并回读真实清单和结果。
+rec_command: 对内部工作队列从实际源码容量定义生成测试编译常量；令 n=min(原先工作量估算, 实际容量-必要保留线程)，保留 LAPS 和读写互斥断言。
+rec_auto_fix: false
+fallback_priority: 2
+fallback_approach: retain-real-failure-until-capacity-is-proven
+fallback_description: 若无法证明后端容量或该项本来就测试超额并发，则保留 FAIL 并定位调度/资源边界；不得以减少 N 或延长超时冒充修复。
+fallback_auto_fix: false
+forbid_1_pattern: disable.*readsync|exclude.*readsync|timeout.*increase.*only
+forbid_1_reason: 删除入口或只延长超时不能让超过池容量的全员集合完成。
+forbid_1_consequence: 失去互斥覆盖或把不可满足的等待条件隐藏在更长超时中。
+forbid_2_pattern: hardcode.*workers|claim.*1280.*pass
+forbid_2_reason: 仅为通过而任意缩小工作量，或用容量内验证宣称超额线程能力，超出证据范围。
+forbid_2_consequence: 失真测试结论及错误的执行器扩展性声明。
+principles:             P010, P014
+doc_file: knowledge/drafts/E549-draft-LD64.md
+last_updated: 2026-10-14
+source_event: libdispatch 6.4.1 原生 r11 readsync 120.06 秒超时；20 CPU*64=1280，而内部池容量255。r13 保留全部37项后通过37/37，readsync 8.58秒；该证据是原生探索，不是正式Conan通过。
+source_commit: 6425af51453d8c62913265f9a65a252499e0c42e
+metrics_success_count: 1
+metrics_fail_count: 0
+metrics_confidence: 1.0
+metrics_last_used: 2026-10-14
+rec_impl:               manual
+authors:               LD64

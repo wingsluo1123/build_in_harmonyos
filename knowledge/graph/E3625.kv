@@ -1,0 +1,34 @@
+id:                     E3625
+title: 权限拒绝测试必须绑定实际执行 DAC 的文件系统并验证内核前提
+trigger_tool: test|ctest
+phase: testing
+error_signature: error from write to write protected directory|kernel enforces fixture directory permissions
+severity:               2
+category:               detection, hmdfs, portability, posix
+match_keywords: chmod, EACCES, permission fixture, write protected directory, TMPDIR, HMDFS, O_EXCL, directory mode
+root_cause: HMDFS 缓存目录可接受 chmod(0) 却仍允许当前用户创建文件；以 chmod 返回0推断内核必定拒绝写入，会把夹具前提不成立误判为异步IO未传递EACCES。worker原始TMPDIR也可能在HMDFS，保存环境变量并不能证明权限能力。
+affected_scope: 依赖目录DAC拒绝的同步或异步IO负向测试，尤其缓存/源码根在HMDFS而原生私有TMPDIR在执行DAC的本地文件系统；不适用于签名拒绝、SELinux拒绝、具有DAC覆盖权限的用户或只读文件系统EROFS。
+verification_cmd: 对唯一mkdtemp目录chmod(0)，同步open(O_CREAT|O_EXCL|O_RDWR)必须精确返回EACCES；随后完整运行原异步错误及未写入数据断言和成功读回测试，核对所有注册CTest ID。
+rec_priority: 1
+rec_approach: capability-proven-private-permission-fixture
+rec_description: 对原始TMPDIR及应用沙箱temp/cache候选逐项使用唯一mkdtemp夹具，chmod(0)后独占open必须精确EACCES，恢复0700后同一路径必须创建成功，清理后才选定临时根；不合格根不能因可写或名称而接受。随后原C测试再次独立验证同步EACCES、异步回调同一errno和完整未写入数据。所有候选不合格必须fail closed，不能跳过或放宽断言。
+rec_command: ctest --output-on-failure --no-tests=error --parallel 1
+rec_auto_fix: false
+rec_impl: test-fixture
+forbid_1_pattern: accept.*EACCES.*0|skip.*permission.*test|chmod.*success.*assume
+forbid_1_reason: 修改期望errno、跳过测试或只看chmod返回值无法验证异步权限错误传播。
+forbid_1_consequence: 权限测试成为假阳性，真正错误会被掩盖。
+forbid_2_pattern: use.*shared.*/tmp|change.*system.*permissions
+forbid_2_reason: 只能操作本任务唯一私有夹具，不得修改系统目录或他人文件权限。
+forbid_2_consequence: 引入共享路径竞争或破坏其他任务。
+principles:             P005
+doc_file: drafts/E551-draft-LD66.md
+last_updated: 2026-10-15
+source_event: PR15756 CI92608与CI93083分别证实build缓存及原始worker TMPDIR都可能不执行DAC，内核探测实际0/预期13。新能力选择经Conan r12 shared/static各37/37及消费者1/1验证，独立finish r9 RC0；完整证据见同名MD及reports/worker-dac-ci-repair.md，旧r10/r11仍为FAIL。
+authors: 2501_91199785 (队伍：诶，云朵)
+source_pr: https://atomgit.com/OpenHarmonyPCDeveloper/build_in_harmonyos/merge_requests/15756
+source_commit: e17863811e36d7b3c6efe5ca0de80f7e2469368d (失败基线)
+metrics_success_count: 1
+metrics_fail_count: 1
+metrics_confidence: 0.5
+metrics_last_used: 2026-10-15

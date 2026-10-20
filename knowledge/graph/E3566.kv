@@ -1,0 +1,23 @@
+id:                     E3566
+trigger_tool: "runtime|configure|conan"
+phase: "runtime|build"
+error_signature: "RNDADDENTROPY ioctl on /dev/random returns ENOTSUP (errno 95) on HarmonyOS PC"
+severity:               2
+category:               ohos, libc, capability-boundary, ioctl
+match_keywords: ["RNDADDENTROPY", "RNDGETENTCNT", "ENOTSUP", "haveged", "entropy daemon", "dev/random"]
+root_cause: "The tested HarmonyOS PC device permits a read-only RNDGETENTCNT query but rejects even a zero-entropy RNDADDENTROPY request with ENOTSUP. A successful generator build is therefore not evidence that an entropy daemon can inject into the kernel pool."
+affected_scope: "Programs that inject entropy into /dev/random via Linux RNDADDENTROPY; observed with haveged 1.9.26 on HarmonyOS PC aarch64. Other OHOS versions and privileges require their own probe."
+rec_approach: "Probe RNDGETENTCNT and a zero-length/zero-entropy RNDADDENTROPY request before enabling an entropy-injection daemon. If ADD returns ENOTSUP, disable the daemon and expose only independently tested file/stream generation and library APIs. State that kernel injection is unverified/unsupported for this environment."
+rec_command: "python3 rng-ioctl-probe.py  # O_RDWR|O_NONBLOCK /dev/random; GET before, ADD(0,0), GET after"
+verification_cmd: "python3 rng-ioctl-probe.py; conan create archives/h/haveged/1.9.26 -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 --build=missing"
+doc_file: knowledge/drafts/DRAFT-haveged-1.9.26-rndaddentropy-enotsup.md
+prescan_pattern: "RNDADDENTROPY.*ENOTSUP|RNDGETENTCNT.*RNDADDENTROPY|/dev/random.*ENOTSUP|errno 95.*random"
+prescan_globs: "**/rng-ioctl-probe.py,**/*entropy*,*/*haveged*"
+fallback_command: "python3 rng-ioctl-probe.py  # zero-entropy ADD probe; if ENOTSUP, keep the daemon disabled"
+last_updated: "2026-10-17"
+source_event: "haveged 1.9.26 HarmonyOS PC adaptation; GET=4038, ADD errno=95, GET=4038"
+authors: "主理-6"
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+rec_description:        "Probe RNDGETENTCNT and a zero-length/zero-entropy RNDADDENTROPY request before enabling an entropy-

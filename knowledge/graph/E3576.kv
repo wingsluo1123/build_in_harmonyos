@@ -1,0 +1,98 @@
+#====================================================================
+# DRAFT-jdim-0.10.1-aclocal-path-libtool-m4-clobber
+#   define_path 覆盖 append_path：autoconf-archive 顶掉 libtool 的 ACLOCAL_PATH，
+#   导致 LT_INIT 不进 aclocal.m4、automake 报 RANLIB undefined
+#====================================================================
+
+id:                     E3576
+trigger_tool:           conan|autoreconf|aclocal|automake|libtool|autoconf-archive
+phase:                  configuration|build
+error_signature:        library used but 'RANLIB' is undefined|The usual way to define 'RANLIB' is to add 'AC_PROG_RANLIB'|autoreconf: error: .*automake failed with exit status|syntax error near unexpected token `GTKMM,'|AC_DEFUN\(\[LT_INIT\]
+severity:               2
+category:               ohos, autotools, toolchain, conan, m4
+match_keywords:         RANLIB, LT_INIT, AC_PROG_RANLIB, noinst_LIBRARIES, ACLOCAL_PATH, define_path, append_path, autoconf-archive, libtool.m4, aclocal.m4, autoreconf, PKG_CHECK_MODULES, pkg.m4, buildenv_info
+title:                  tool_requires 里 autoconf-archive 的 ACLOCAL_PATH define_path 覆盖 libtool 的 append_path，令 aclocal.m4 缺 libtool.m4、automake 全线报 RANLIB undefined
+
+root_cause: >
+  Conan 2 的 Environment 合并语义不对称：buildenv_info.define_path("ACLOCAL_PATH", X)
+  是**赋值**，append_path 是**追加**。ohpcd 的 autoconf-archive/2024.10.16 在
+  package_info() 里用 define_path 声明 ACLOCAL_PATH 指向自己的 share/aclocal，
+  而 libtool/2.5.4 用 append_path 追加自己的 share/aclocal。两者同为 build 上下文的
+  buildenv_info 时，最终 conanbuildenv-<build_type>-<arch>.sh 里 ACLOCAL_PATH
+  **只剩 autoconf-archive 一项**（实测该文件第 20 行），libtool 的 m4 目录被顶掉。
+  后果是 aclocal 生成的 aclocal.m4 里没有 libtool.m4：实测
+  ACL_DEFUN([LT_INIT] 计数 = 0，而 AX_CXX_COMPILE_STDCXX = 34。automake 通过
+  aclocal.m4 里的宏定义来判定 configure.ac 用了 LT_INIT（等价于 AC_PROG_RANLIB
+  的 RANLIB 供给方），宏缺失即判"RANLIB 未定义"，于是上游每一个
+  noinst_LIBRARIES / lib*_a_SOURCES 目录都报
+  "library used but 'RANLIB' is undefined" 并让 autoreconf 以
+  "automake failed with exit status: 1" 中止。
+  同一个 ACLOCAL_PATH 缺陷还有第二张面孔：pkg-config 的 pkg.m4 不在 Conan 工具图里
+  （它在 SDK 前缀的 share/aclocal），漏了它则 PKG_CHECK_MODULES 不展开，生成的
+  configure 直接报 `syntax error near unexpected token 'GTKMM,'`。
+
+affected_scope: >
+  任何 build_requirements() 同时声明 tool_requires("autoconf-archive/...") 与
+  tool_requires("libtool/...")、且上游 configure.ac 用 LT_INIT（而非显式
+  AC_PROG_RANLIB）做 autotools 自举的包；OHOS/Conan 2.29.1 组合下 100% 复现。
+  环境侧无解（不是网络、不是权限、不是 SDK），只与 recipe 里 ACLOCAL_PATH 的
+  合并方式有关。
+
+verification_cmd: >
+  grep -n 'ACLOCAL_PATH' <conan build>/build-release/conan/conanbuildenv-*.sh;
+  grep -c 'AC_DEFUN(\[LT_INIT\]' aclocal.m4; grep -c 'AX_CXX_COMPILE_STDCXX' aclocal.m4;
+  autoreconf -fi -I <libtool pkg>/share/aclocal -I <autoconf-archive pkg>/share/aclocal
+
+rec_priority:           1
+rec_approach:           merge-aclocal-path-with-explicit-I
+rec_description:        >
+  配方侧两件事同时做（双保险，不依赖 env 合并顺序）：
+  (1) 在 generate() 里自行收集 libtool / automake / autoconf-archive 三个
+      tool_requires 包的 share/aclocal（再加上 pkg-config 的 pkg.m4 目录，
+      用 shutil.which("pkg-config") 反推前缀 + glob <prefix>/pkg-config.org/*/share/aclocal，
+      不硬编码路径），用**一次** buildenv_info.define_path("ACLOCAL_PATH", <冒号连接>)
+      写全量，避免被包内 define_path 覆盖成单项；
+  (2) build() 里给 autoreconf 显式传 -I <dir>（每个收集到的目录一个），
+      这样即使 conanbuild env 的合并顺序在别的版本里再变，aclocal 也一定能找到
+      libtool.m4 与 pkg.m4。
+  修完判据：autoreconf 返回 0，aclocal.m4 中 AC_DEFUN([LT_INIT] >= 1，
+  生成的 configure 中 PKG_CHECK_MODULES 字面量计数为 0（全部展开）。
+rec_command:            >
+  autoreconf --force --install -fi -I <libtool>/share/aclocal -I <autoconf-archive>/share/aclocal -I <pkg-config>/pkg-config.org/<ver>/share/aclocal
+rec_auto_fix:           false
+rec_impl:               conan-recipe
+
+fallback_priority:      2
+fallback_approach:      vendor-m4-into-recipe
+fallback_description:   >
+  把 libtool.m4 / pkg.m4 等宏作为配方 exports_sources 的一部分（m4/ 目录）随包提交，
+  generate() 里把该目录注入 ACLOCAL_PATH。缺点是把第三方 m4 复制进归档、
+  PR diff 变大，且宏版本要人工跟进；仅在 tool_requires 路径不可用时使用。
+fallback_command:       export_sources() 里 copytree(recipe_folder/m4, export_sources_folder/m4); ACLOCAL_PATH += <src>/m4
+fallback_auto_fix:      false
+fallback_impl:          conan-exports-sources
+
+forbid_1_pattern:       append_path\("ACLOCAL_PATH", .*autoconf-archive
+forbid_1_reason:        >
+  autoconf-archive 包自身已经 define_path 覆盖该变量；消费侧再 append 也会被
+  它之前/之后的 define 吃掉。必须一次性 define 全量。
+forbid_1_consequence:   继续出现 aclocal.m4 缺 libtool.m4 -> automake RANLIB undefined。
+
+forbid_2_pattern:       autoreconf -fi\s*$
+forbid_2_reason:        只靠 env 里的 ACLOCAL_PATH 时，合并顺序一变就复现；autoreconf 不带 -I 没有第二道保险。
+forbid_2_consequence:   本地偶然过、CI 复现同类红（同一根因换个包再踩一次）。
+
+forbid_3_pattern:       sed.*AC_PROG_RANLIB.*configure.ac
+forbid_3_reason:        往上游 configure.ac 加 AC_PROG_RANLIB 是改上游构建语义掩盖环境缺陷，且会让"到底谁该提供 RANLIB"永久错位。
+forbid_3_consequence:   与 libtool 化上游的真实配置分叉，后续 refresh-patch/上游比对产生假补丁。
+
+principles:             P014, P020
+doc_file:               knowledge/drafts/DRAFT-jdim-0.10.1-aclocal-path-libtool-m4-clobber.md
+last_updated:           2026-10-18
+source_event:           archives/j/jdim/0.10.1
+authors:                主理-7
+source_pr:              TBD
+source_commit:          TBD
+
+metrics_success_count:  0
+metrics_fail_count:     0

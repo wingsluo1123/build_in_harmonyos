@@ -1,0 +1,63 @@
+#====================================================================
+# DRAFT-xine-0.99.14-ac-check-readline-hard-prefix-ncursesw
+# 自研 AC_CHECK_* 宏只遍历硬编码前缀（不读 CPPFLAGS/LDFLAGS）+ 只试 -lncurses，Conan 依赖必然探测失败
+#====================================================================
+
+id:                     E3598
+trigger_tool:           configure|m4|pkg-config|conan
+phase:                  configure
+error_signature:        checking for readline.h... not found|no readline found.*disabled|AC_CHECK_LIB.*ncurses.*no|configure: disabling .* optional feature
+severity:               3
+category:               compat, detection, libc, autotools, configure
+match_keywords:         AC_CHECK_READLINE, readline.m4, 硬编码前缀, CPPFLAGS 不读, LDFLAGS 不读,
+                         with-readline, libncursesw, -lncurses, ncurses 命名, 可选功能静默关闭,
+                         test -f 探测, PkgConfigDeps, 假阴性探测, xine-remote
+title:                  上游自研 m4 宏用 `for i in <硬编码前缀列表>` + `test -f` 探测依赖，完全不看 CPPFLAGS/LDFLAGS/PKG_CONFIG_PATH，Conan 交付的依赖目录必然探测失败；其后续 `-lncurses` 命名假设又与 OHOS 只发布 libncursesw.a 冲突，导致可选功能被静默关闭（假阴性）
+
+root_cause:          xine-ui 的 `m4/readline.m4`（自研宏 AC_CHECK_READLINE，非 autoconf 标准宏）分两道门：第一道是纯文件系统探测：`for i in $with_arg /usr/include: /usr/local/include:-L/usr/local/lib /usr/freeware/include:… /sw/… /cw/…/net/caladium/… /boot/home/config/…; do incl=…; if test -f $incl/readline/readline.h ; then …`—— 命中与否只取决于**这几个字面路径是否存在文件**，既不使用 `$CPPFLAGS`，也不使用 `$PKG_CONFIG_PATH`。因此 Conan 通过 `AutotoolsDeps/PkgConfigDeps` 交付的 `readline/8.3`（位于 build_folder 私有 prefix，R49 要求如此）对这段探测完全不可见。实测：generators 目录里 `readline.pc` 存在、`PKG_CONFIG_PATH` 已注入，configure 仍输出`checking for readline.h... not found` + `*** no readline found, xine network interface will be disabled ***`。第二道门是命名假设：命中 readline 后宏会用`AC_CHECK_LIB([readline],[cbreak])`，若 `LIBS` 仍为空则 `AC_CHECK_LIB([ncurses],[cbreak])`，两次都空就 `have_readline=no`。OHOS 侧 ncurses 包只发布 `libncursesw.a`/`libncurses++w.a`（无 `libncurses.a`、无 `libtinfo`），`-lncurses` 必失败。两道门叠加使“上游可选功能”在 OHOS + Conan 组合下呈**假阴性**：不是依赖不存在，是探测机制看不见它。这类失败不会报错、只会静默关掉功能（`xine-remote` 不构建），因此极易被误记为“OHOS 不支持”。
+
+affected_scope:      所有含上游自研 `m4/*.m4` 探测宏（AC_CHECK_* 变体、硬编码 `/usr/*` 前缀遍历、`*-config` 探测）的autotools 包，在 Conan 私有 prefix 交付依赖时的可选功能判定；同型机制另见`AM_PATH_AALIB`（用 `aalib-config|aainfo`，故 aalib 即使已发布也可能探不到）。
+
+verification_cmd: >
+  grep -n "for i in\|test -f\|/usr/local/include" m4/readline.m4        # 确认硬编码前缀 + 不读 CPPFLAGS
+  ls <generators_folder>/readline.pc                                     # 依赖模块确实存在
+  ./configure … 2>&1 | grep -A1 "checking for readline.h"                # not found + disabled 行
+  find ~/.conan2/p -maxdepth 5 -name "libncurses*" | sed 's|.*/lib/||' | sort -u   # 仅 libncursesw.a / libncurses++w.a
+
+rec_priority:           1
+rec_approach:           classify-as-not-applicable-with-probe-evidence-do-not-patch-m4
+rec_description:     先判定该功能是否属于本次交付面：非核心的可选前端/附加程序（本例 xine-remote REPL）→**不改上游 m4**（属上游探测缺陷、且改动会影响其在 Linux 上的行为），而是登记为“不适用入口”，并附上面两条实测证据（configure 行 + 库命名清单），让“为什么没有这个程序”在 PR 里可核。若该功能属于核心交付面，则优先级从下往上选：①在配方显式传该宏认识的入口（本例 `--with-readline=<dir>`，其 `with_arg` 会被放到遍历列表**首位**，从而让第一道门通过）；②传 `LIBS="-lncursesw"`/`ac_cv_lib_ncurses_cbreak=yes` 之类 autoconf 缓存变量越过第二道命名门（需实测）；③最后才考虑补丁 m4，且必须可向上游提交（R8/P005）。禁止为了“功能开着”而把依赖装进共享 `/usr/local`（违反 R49，且 CI worker 与本机结果分叉）。
+rec_command: >
+  # 判据式做法（不改动上游 m4 时的登记口径）
+  configure 实测行: checking for readline.h... not found
+                   *** no readline found, xine network interface will be disabled ***
+  OHOS ncurses 发布名: libncursesw.a / libncurses++w.a（无 libncurses.a）
+  → 归类“不适用入口”，根因写“探测机制假阴性”，不写“平台不支持”
+rec_auto_fix:           false
+rec_impl:               document-as-not-applicable-with-evidence
+
+forbid_1_pattern:       assume_empty_probe_means_dependency_missing
+forbid_1_reason:        自研宏的 `test -f` 硬编码前缀探测对 Conan 私有 prefix 天生失明，探不到 ≠ 没有。
+forbid_1_consequence:   误判为 env_unsupported / 依赖缺失，或为“让它探到”而往 /usr/local 注入共享文件（E524 根因同族）。
+
+forbid_2_pattern:       patch_upstream_m4_for_optional_feature
+forbid_2_reason:        为非核心可选功能重写上游探测宏会改变其在 Linux 上的行为，补丁不可上游化。
+forbid_2_consequence:   PR 审阅被质疑侵入性；后续升级该包时补丁冲突，收益却只是多一个 REPL 程序。
+
+fallback_priority:      2
+fallback_approach:      pass-macro-known-prefix-plus-autoconf-cache-var
+fallback_description:   核心功能必须交付时：`--with-readline=<依赖目录>` 让第一道门命中；
+                         第二道命名门用 autoconf 缓存变量（如 `ac_cv_lib_ncurses_cbreak=yes`）或
+                         追加 `LIBS="-lncursesw"` 越过。两者都需在 conanfile 的 `configure_args` 里显式声明
+                         （可复现），不能靠 shell 环境变量（R33）。本包未采纳：xine-remote 非核心播放路径。
+fallback_command:       ./configure --with-readline=<readline_dependency_folder> LIBS='-lncursesw'
+fallback_auto_fix:      false
+fallback_impl:          configure-args-explicit
+
+doc_file:               knowledge/drafts/DRAFT-xine-0.99.14-ac-check-readline-hard-prefix-ncursesw.md
+last_updated:           2026-10-17
+source_event:           xine/0.99.14 适配：readline.pc 已就位但 configure 报 readline.h not found，xine-remote 未构建
+authors:                Qoder
+source_pr:
+source_commit:
+

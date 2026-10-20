@@ -1,0 +1,33 @@
+#====================================================================
+# Draft: scst 2.2.1 -- usability audit for multi-header upstream include/
+#        trees: classify per-header userspace safety by include closure,
+#        verify against the OHOS sysroot, lock contracts in test_package
+#====================================================================
+
+id:                     E3616
+trigger_tool:           conan|clang
+phase:                  packaging
+error_signature:        fatal error: linux/blkdev.h: No such file or directory|fatal error: linux/autoconf.h: No such file|fatal error: scsi/scsi_cmnd.h: No such file
+
+severity:               2
+category:               platform, ohos, portability, packaging
+match_keywords:         header-library, header-only, userspace, kernel header, blkdev, autoconf, uapi, sysroot, INSIDE_KERNEL_TREE, include closure, header audit, scst
+
+title:                  多头文件上游 include/ 树做 header-library 打包前必须逐头审计"用户态可用性"：include 闭包分类 + sysroot 头存在性验证 + test_package 静态断言锁契约
+
+root_cause:             内核框架类上游的 include/ 目录混装两类头：用户态可用（闭包只含 uapi 头）与内核树专用（含 linux/blkdev.h、linux/autoconf.h、scsi/scsi_cmnd.h 等，这些头只存在于内核构建树生成的 include 集合，musl sysroot 没有）。整目录打包会把用户态必然编译失败的头伪装成可用产物；只挑一个头又不利于其他消费者。判定必须基于每头的 #include 闭包，而非文件名猜测；sysroot 头存在性要用 ls 实证，跨发行版/SDK 有差异。
+affected_scope:         scst（scst_const.h/scst_user.h 用户态可用；scst.h/scst_debug.h/scst_sgv.h 内核树专用）及一切 header-library 化的多头上游（内核 ABI 头、协议常量头类项目）。
+verification_cmd:       grep -n "#include <" include/*.h; ls $SYSROOT/usr/include/linux/version.h $SYSROOT/usr/include/scsi/scsi.h
+rec_priority:           1
+rec_approach:           per-header-include-closure-classification-plus-sysroot-check
+rec_description:        (1) 对每个头跑 grep '#include <' 列出闭包；凡引用 musl sysroot 缺失的内核树头即判"内核树专用"，在 notes.md 逐头列排除理由；(2) 用户态可用候选头先在 OHOS clang 下单独编译冒烟（echo '#include "x.h"' | clang -fsyntax-only -）再进包；(3) 双分支头（#ifdef INSIDE_KERNEL_TREE）核对用户态分支的实际依赖；(4) test_package 对版本编码宏做 _Static_assert、对字符串常量做 strcmp 断言，锁住 ABI/契约防上游静默漂移；(5) 打包布局对齐消费方的引用方式（上游 make install 装到 $prefix/include/scst/，conan 包平铺 include/，下游用 -I<conan include> 等价对齐）。
+rec_command:            for h in include/*.h; do echo "#include \"$h\"" | clang -fsyntax-only - && echo "USERSPACE-OK: $h"; done
+rec_auto_fix:           false
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+source_pr:
+source_commit:
+rec_impl:               manual
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E3616.md

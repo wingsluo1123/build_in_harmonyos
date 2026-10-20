@@ -1,0 +1,44 @@
+# E14735 collaborator draft; formal ID subject to editor review.
+id:                     E3655
+trigger_tool: clang|make|test|runtime
+phase: runtime
+error_signature: Unknown option .-[A-Za-z]'.*Try .[a-z]+ -h|Unexpected option '-[A-Za-z]'|comparison of constant -1 with expression of type 'char' is always true
+severity:               2
+category:               portability, testing, abi, c-language, signedness
+match_keywords: getopt, EOF, plain char, unsigned char, char ch, int ch, aarch64, AAPCS64, __CHAR_UNSIGNED__, CHAR_MIN, Unknown option, valid option rejected, exit status 1, -h works, option scan, optind rescan, tautological-constant-out-of-range-compare, half fix, mar, ntp_getopt
+title: getopt() result stored in a plain char: where char is unsigned the EOF that ends option scanning becomes 255, so the CLI rejects every valid invocation ("Unknown option" naming a valid option, exit 1) while -h and library-level tests stay green; a rescanned option list has one receiver per scan and fixing only one is a half-fix
+root_cause: On a target whose plain char is unsigned (OHOS aarch64: CHAR_MIN 0, __CHAR_UNSIGNED__ 1; every AAPCS64 Linux target; x86 Linux is signed) a CLI that keeps the int result of getopt() in `char ch` can never see EOF: -1 is stored as 255, `while (-1 != (ch = getopt(...)))` never ends, and once the last option has been handled the next call's EOF falls into the `default:` branch of the switch. The program then prints its unknown-option diagnostic and exits 1; vendored getopts that set optopt on every call (mar 0.5's ntp_getopt) make the message name the last option parsed, which is perfectly valid, e.g. "Unknown option `-s'" for `mar -s name=hello a.mar`. Options that return before the scan finishes (-h) and library-level test programs never reach the faulty loop, so smoke checks and `make check` stay green. mar 0.5 scans its option list twice (main() pre-scan, then mar_run() after `mar_optind = 0`) and has a `char ch` in each: fixing only main() lets mar_run() perform the write and then fail ("Unexpected option '-s'", exit 1, data already stored); fixing only mar_run() fails in the pre-scan before anything is written (no archive file is created). clang 15 does report -Wtautological-constant-out-of-range-compare for the comparison by default, but it is only a warning and the build succeeds.
+affected_scope: C and C++ command-line programs that keep the result of getopt(), getopt_long() or a vendored getopt in a `char`/`unsigned char` and compare it with -1/EOF, built for a plain-char-unsigned target (OHOS aarch64, other ARM, RISC-V and PowerPC Linux targets). Typical of 1990s-2000s code written on x86: mar 0.5 (src/mar_main_c.c, two receivers). E6401-draft-1687 and DRAFT-cyrus-sasl-digestmd5 record the same getopt-into-char defect in a test harness (utils/testsuite.c: usage + `Failed with: Invalid parameter`, zero cases executed); the same sentinel problem for getc/fgetc/getchar stored in char is covered by E419, DRAFT-8543, DRAFT-E713, DRAFT-kevlar and wise-2.4.1. This entry is a supplement to E6401: it adds the delivered-CLI symptom (a valid option reported as unknown), the two-receiver half-fix states and the test-design consequence; merging it into E6401 is a reasonable outcome.
+verification_cmd: clang -c <prog>.c 2>&1 | grep "constant -1 with expression of type 'char'"   # source side: a hit inside an option loop is the bug; then run ONE valid invocation with the delivered binary: qemu-aarch64 ./<static-pie prog> <valid option and argument> ...; echo rc=$?   # rc=1 plus "Unknown option" naming a valid option confirms it; `<prog> -h` still returns 0 and proves nothing
+rec_priority: 1
+rec_approach: widen-getopt-receiver-to-int-at-every-scan
+rec_description: Declare every variable that receives the getopt() result as int and leave the comparison with -1/EOF alone: one line per receiver, no platform macro, upstreamable. Grep all call sites (`grep -n getopt src/*.c`) because a rescanned option list (optind reset to 0, as mar and NTP's getopt are designed to allow) has one receiver per scan. Turn the compiler's existing warning into a guard by promoting just that group in the recipe's CFLAGS. Prove it with a consumer test that drives the packaged CLI with valid options and asserts exit status 0 and empty stderr, then reads the result back through the library; a -h/--version smoke check or a library-only `make check` cannot detect the defect. Link the CLI -static-pie so that test executes the delivered binary under qemu-aarch64 on x86 runners.
+rec_command: sed -i 's/^    char ch;$/    int ch;/' src/<prog>.c   # after grepping that every `char ch;` is a getopt receiver; recipe: CFLAGS='-O2 -fPIC -Werror=tautological-constant-out-of-range-compare'
+rec_auto_fix: false
+rec_impl: manual-source-fix
+fallback_priority: 2
+fallback_approach: toolchain-signed-char-isolation
+fallback_description: -fsigned-char isolates the cause (unpatched mar + -fsigned-char: exit 0, pair stored) and is acceptable as a diagnostic switch, not as the delivered fix: it only pulls the target back to the x86 assumption, the source stays wrong, and a hand-written Makefile that ignores or replaces CFLAGS silently drops it. Use it to prove signedness is the single variable, then fix the declarations.
+fallback_command: make CFLAGS='-O2 -fPIC -fsigned-char'
+fallback_auto_fix: false
+fallback_impl: toolchain-compile-flag
+forbid_1_pattern: smoke test only .*(-h|--help|--version)|(-h|--help|--version) works so the (tool|cli|binary) works|make check (is )?green so the cli works
+forbid_1_reason: Options that return before the scan ends and library-level tests never execute the faulty loop, so they pass on every target; the defect only shows on a valid invocation that has to reach end-of-options.
+forbid_1_consequence: The package ships with a CLI that exits 1 on every real command while CI and local smoke tests are green.
+forbid_2_pattern: #ifdef __OHOS__.*(char|getopt|EOF)|__OHOS__.*signed
+forbid_2_reason: Plain-char signedness is a property of the target ABI, not of the operating system, and the fix (int) is correct on every target; a platform macro keeps the bug alive elsewhere and the patch cannot go upstream.
+forbid_2_consequence: Patch rejected by R8/PF5 review and the same defect reappears on the next unsigned-char target.
+forbid_3_pattern: only (the first|one) (loop|variable|receiver)|fix(ed)? (just )?main\(\) only
+forbid_3_reason: With a rescanned option list one fixed receiver leaves the other broken in a different way (data written but exit 1, or nothing written), which is harder to diagnose than the original failure.
+forbid_3_consequence: A half-fixed CLI reports failure after performing the operation, so callers retry or roll back work that already happened.
+principles:             P005, P013
+doc_file: knowledge/drafts/E14735-draft-1370.md
+last_updated: 2026-10-04
+source_event: archives/m/mar/0.5
+authors: nyaco3 <aqjCItYW1QmEJQuF.gcw_XDpqZ8sO@noreply.gitcode.com>
+source_pr:
+source_commit:
+metrics_success_count: 0
+metrics_fail_count: 0
+metrics_confidence: 0.0
+metrics_last_used:

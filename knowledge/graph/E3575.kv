@@ -1,0 +1,76 @@
+#====================================================================
+# DRAFT-lsh-utils-2.1-nettle3-dsa-compat - nettle 2.x 时代的消费者代码在
+# nettle 3.x 上编译：DSA 密钥接口已被搬进官方 <nettle/dsa-compat.h>，
+# 补 include + 一处形参适配即可，不要重写 DSA 层（lsh-utils 2.1 案例）
+#====================================================================
+
+id:                     E3575
+trigger_tool:           clang|make|conan
+phase:                  compilation
+error_signature:        variable has incomplete type 'struct dsa_public_key'|
+                        variable has incomplete type 'struct dsa_private_key'|
+                        implicit declaration of function 'dsa_public_key_init'|
+                        implicit declaration of function 'dsa_sha1_verify_digest'|
+                        implicit declaration of function 'dsa_generate_keypair'|
+                        too few arguments to function call, expected 6, have 5|
+                        implicit declaration of function 'dsa_keypair_from_sexp_alist'
+
+severity:               2
+category:               compat, portability, libc, linking, security
+match_keywords:         nettle, nettle 2, nettle 3, dsa_public_key, dsa_private_key,
+                        dsa_sha1_verify_digest, dsa_sha1_sign_digest, dsa_generate_keypair,
+                        dsa_keypair_from_sexp_alist, dsa-compat.h, libhogweed,
+                        incomplete type, GNU MP, 老加密代码, 头文件搬家, 结构体不透明化
+
+title:                  nettle 2.x 消费者代码在 nettle 3.x 上编译：DSA 密钥接口已搬进官方 <nettle/dsa-compat.h>，include + 一处形参适配即可，勿重写 DSA 层
+
+root_cause: nettle 3.0 起把 DSA 的"整键"接口从公开头里搬走： `struct dsa_public_key` / `struct dsa_private_key` 的定义、 `dsa_public_key_init` / `dsa_public_key_clear` / `dsa_private_key_init` / `dsa_private_key_clear`、`dsa_sha1_sign_digest` / `dsa_sha1_verify_digest` （以及 sha256 版）与按键生成 `dsa_generate_keypair`，在 nettle 3 的公开头 `<nettle/dsa.h>` 里**都不再存在**（3.10.2.1 的 dsa.h 只剩 `struct dsa_params`、 `struct dsa_signature`、`dsa_sign/dsa_verify(params, mpz_t, ...)` 与 sexp/DER 解析）。 这些旧接口被整体挪进官方兼容头 `<nettle/dsa-compat.h>`，该头同时 `#define dsa_generate_keypair nettle_dsa_compat_generate_keypair` 并给出旧结构体布局。 写于 nettle 2.x 时代的消费者代码（本案例是 lsh-utils 2.1，2013 年）只 include `<nettle/dsa.h>`，于是： * `struct dsa_public_key dsa;` → `error：variable has incomplete type`（编译期就死）； * `dsa_public_key_init(&dsa)` / `dsa_sha1_verify_digest(...)` → 隐式声明（返回 int）， 在 aarch64 上还会把指针截断； * 补上 include 后，`dsa_keypair_from_sexp_alist(pub, [priv,] p_max_bits, q_bits, i)` 这 4/5 参调用与 nettle 3 的 6 参原型不符 → `too few arguments to function call, expected 6, have 5`。 关键判断：**compat 头不是空壳**。3.10.2.1 的 libhogweed.a 里 `nettle_dsa_public_key_init` / `nettle_dsa_compat_generate_keypair` / `nettle_dsa_sha1_verify_digest` 都是已定义的 T 符号（实测，见 verification_cmd）， 所以这是一条"补 include + 对齐新形参"的路，不需要自己实现 DSA 或降级到别的版本。
+
+affected_scope: 所有"针对 nettle 2.x 编写、直接用到 dsa_public_key/dsa_private_key 或 dsa_sha1_*_digest / dsa_generate_keypair"的消费者（老版 lsh、老版 spki 派生代码、 其它 2010 年代 ssh/公钥工具），在只提供 nettle 3.x 的制品仓上构建时。 不含：只用对称算法/mpz/sexp 的代码（那部分 nettle 3 兼容）； 不含 RSA——nettle 3 的 `<nettle/rsa.h>` **仍然公开** `struct rsa_public_key` / `struct rsa_private_key`，`rsa_keypair_from_sexp_alist(pub, priv, limit, i)` 也是 4 参， 所以 RSA 侧不需要 compat、也不需要改调用点（本案例实测 RSA 路径零改动即通过）。 边界提示：nettle 4.0 已删除 `dsa-compat.h`，本方案只适用于 nettle 3.x 系列。
+
+verification_cmd: nm -g <pkg>/lib/libhogweed.a | grep -E 'T (_?nettle_)?(dsa_public_key_init|dsa_compat_generate_keypair|dsa_sha1_verify_digest)$' —— 实测 nettle/3.10.2.1 三个都命中（T=已定义），证明 compat 头有真实现； —— 对照：struct dsa_public_key 在 include/nettle/dsa.h 里 grep 0 命中， ——       只在 include/nettle/dsa-compat.h 里有定义。
+
+rec_priority:           1
+rec_approach:           use-official-compat-header-and-align-signature
+rec_description:        在用到旧 DSA 接口的翻译单元里，紧跟 `#include <nettle/dsa.h>` 之后
+                        加 `#include <nettle/dsa-compat.h>`（该头自己会再包含 dsa.h），然后用
+                        兼容头里给出的结构体布局接住新形参：
+                        `dsa_keypair_from_sexp_alist((struct dsa_params *) &pub, pub.y, priv,
+                        p_max_bits, q_bits, i)`——compat 头自述
+                        "Layout must be identical, since this is cast to a struct dsa_param
+                        pointer for calling _dsa_sign and _dsa_verify"，即
+                        `struct dsa_public_key{p,q,g,y}` 的前三个成员就是 `struct dsa_params`，
+                        所以这个 cast 是官方认可的用法（priv 为空传 NULL 即"只解析公钥"）。
+                        不要动 RSA 路径，也不要重写 DSA 层。
+rec_command:            patch(src/<file>.c) 在 —— include <nettle/dsa.h> 后加 —— include <nettle/dsa-compat.h>；dsa_keypair_from_sexp_alist 调用点补 params/y/x 形参
+rec_auto_fix:           false
+rec_impl:               source-patch
+
+fallback_priority:      2
+fallback_approach:      reimplement-dsa-layer-against-nettle3-params-api
+fallback_description:   若上游代码深度依赖旧 DSA 结构体（例如自己做键序列化/内存布局假设），
+                        或目标 nettle 版本已删 compat 头（nettle 4.x），才改为按 nettle 3 的
+                        `struct dsa_params` + `mpz_t pub` + `mpz_t priv` 重写该层；此时改动量与
+                        回归面都明显变大，应单独立项评估。
+fallback_command:       rewrite DSA call sites onto dsa_params + mpz_t pub/priv (nettle 3 native API)
+fallback_auto_fix:      false
+fallback_impl:          source-patch
+
+forbid_1_pattern:       自己写一份 struct dsa_public_key / dsa_private_key 定义
+forbid_1_reason:        与 nettle 头里的不透明声明冲突，且 compat 头已提供官方布局；
+                        自造结构体会在链接期对不上 compat 实现的对象布局。
+forbid_1_consequence:   编译错误从"缺类型"变成"重定义/布局不一致"，同时丢掉官方兼容路径。
+
+forbid_2_pattern:       -Ddsa_public_key=... / 宏改名绕过
+forbid_2_reason:        只是骗过编译器的名字，符号与结构体布局都没对齐，链接期必炸。
+forbid_2_consequence:   把编译期错误推迟到链接期，且掩盖真正的两处差异（include + 新形参）。
+
+principles:             P005, P006
+doc_file:               knowledge/drafts/DRAFT-lsh-utils-2.1-nettle3-dsa-compat.md
+last_updated:           2026-10-18
+source_event:           lsh-utils 2.1 HarmonyOS PC 适配（nettle 2.x 时代的 DSA 接口 vs 仓内唯一可用的 nettle/3.10.2.1）
+authors:                wanderlust_0823
+source_commit:          e52fd432b2
+
+metrics_success_count:  0
+metrics_fail_count:     0

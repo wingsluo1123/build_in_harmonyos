@@ -1,0 +1,81 @@
+#====================================================================
+# E4310 — /dev/shm（tmpfs）写满时 POSIX shm 的 mmap 首次访问以 SIGSEGV 呈现
+#          （掩盖 ENOSPC/SIGBUS），且信号被屏蔽的线程里不可捕获
+# 草稿（draft: true），经主编审核后 promote 为正式条目
+# 对应人类文档：knowledge/drafts/E4310-draft-8CAA.md
+#
+# 格式规则：
+#   - key: value（冒号后一个空格，value 到行尾）
+#   - 多行值：下一行以空格开头 = 续行（续行内不要再出现 ASCII 冒号+空格）
+#   - 列表值：逗号分隔；正则值：| 分隔多个模式
+#   - 以 # 开头的行为注释；空行忽略（多行值里不要留空行）
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E3605
+trigger_tool:           runtime|test
+phase:                  runtime|testing
+error_signature: SIGSEGV|Segmentation fault|terminated by signal 11|exited with status 139|core dumped
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               3
+category:               platform, ohos, posix, memory, ipc
+prescan_pattern: shm_open\s*\(
+prescan_globs: '*.c, *.h, *.cc, *.cpp, *.sh, Makefile*, *.mk'
+match_keywords: shm_open, mmap, MAP_SHARED, ftruncate, POSIX shared memory, /dev/shm, shmfs, tmpfs, No space left on device, ENOSPC, SIGBUS, SIGSEGV, signal 11, rc=139, ust_listener, wait_for_sessiond, lttng-ust, pthread_sigmask, memfd_create, MAP_POPULATE
+title: OHOS 上 /dev/shm（tmpfs）写满时，POSIX shm 的 mmap 首次访问以 SIGSEGV 呈现（掩盖 ENOSPC/SIGBUS），且信号被屏蔽的线程里不可捕获
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause: /dev/shm（tmpfs）**写满**时，POSIX 共享内存的 mmap 映射在**首次访问尚未分配的那一页**时无法分配页，本机以 **SIGSEGV** 呈现（rc=139），把真正的 ENOSPC/SIGBUS 完全掩盖掉。
+ 完整证据链（本机实测、不依赖第三方包）：df -h /dev/shm 报 `tmpfs 1.0G 1.0G 0 100%`；对新建 shm 对象 `write(fd, buf, 4096)` 返回 **-1 / errno=28 ENOSPC**（空间问题在 fd 路径上是可见的）；而 `shm_open()` 返回合法 fd、`ftruncate(fd,4096)` 返回 0、`fstat()` 报 `st_size=4096`、`mmap()` 返回非 MAP_FAILED 的合法地址——**申请链路全绿**，失败只发生在第一次读写那一页。
+ 五种组合全部复现（rc=139）：MAP_SHARED+PROT_READ(读)、MAP_SHARED+PROT_READ|WRITE(读/写)、MAP_PRIVATE+PROT_READ(读)、MAP_PRIVATE+PROT_READ|WRITE(写)；`MAP_POPULATE` 也**不会**让 mmap 提前报错（本机 mmap 仍成功、随后读仍 SIGSEGV）。
+ 对照组全部正常（rc=0），说明不是"映射机制本身坏了"，而是"这个 tmpfs 没空间"：匿名 `mmap(MAP_SHARED|MAP_ANONYMOUS)` 读写、普通文件 `mmap(MAP_SHARED)` 读、`memfd_create()+ftruncate()+mmap()` 读写（memfd 走内核内部 tmpfs，有空间）、`liburcu-bp` 注册/注销 + `call_rcu`、以及不链接相关库的 `nanosleep(3)`。
+ 因为 mmap 阶段不报错，任何"申请成功即认为可用"的库都会在其后第一次访问时崩。多线程程序尤其难查：若该访问发生在 `pthread_sigmask(SIG_SETMASK, sigfillset())` 的线程里，同步 SIGSEGV 无法被用户态 handler 捕获（内核按默认动作终止），现场只有 rc=139 与一行 `Segmentation fault (core dumped)`；实测 main 线程里安装的 handler 永不触发，而同参数下 `*(int*)0=1` 的 handler 正常触发（rc=77）。
+ 触发面不限于本仓库：`/dev/shm` 是**全设备共享**的 1GiB tmpfs，任一并发任务把共享内存写满，就会让所有正在用 POSIX shm 的进程在加载后数毫秒内静默死亡，而它们的日志里不会出现任何 ENOSPC。
+affected_scope: 所有在 OHOS 上用 POSIX 共享内存（`shm_open` + `ftruncate` + `mmap`）做运行时通信的库与程序——用户态追踪器（已实证 lttng-ust 2.12.10 与**已发布**的 lttng-ust/2.15.1 消费者程序同形）、数据库/缓存、IPC 中间层，以及按既有条目 E1940/E2070 建议「把 SysV 共享内存替换为 POSIX shm_open+mmap」的一切移植改造对象。Java/Go/Python 等运行时的 shm 调用面同样命中。**判据是 `df -h /dev/shm` 是否为 0 Avail，而不是包本身**。
+verification_cmd: 三步取证——① df -h /dev/shm（期望看到 Avail=0、Use%=100）；② 对新建 shm 对象 write()（期望 -1/errno=28 ENOSPC，证明是空间而非映射）；③ mmap 后首次访问（期望先打印 mmap 成功再 Segmentation fault、rc=139）。探针源码与逐字读数见 $TASK_DIR/w0/probe/{shm1.c,shm2.c,shm3.c} 与本条 source_event。
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           free-dev-shm-then-retry
+rec_description: 先确认 `/dev/shm` 有空间（`df -h /dev/shm` 的 Avail 非 0），再运行依赖 POSIX shm 的程序/测试。这是**环境面**问题，不是包的问题：不要改配方、不要判配方失败；把它当成与「内存耗尽/槽位不可用」同级的可重试环境条件（本仓库口径：等同 conan_verify_round 的 rc=3「环境暂时耗尽」），记录逐字读数后等窗口重跑。
+ 若必须在空间受限时前进，可用的替代通道（本机实测均 rc=0）：① 同进程/父子进程共享改用 `memfd_create()` + `ftruncate` + `mmap`（可 fork 继承），跨无关进程经 Unix 域套接字 SCM_RIGHTS 传 fd；② 只需一个可 futex 的共享字/小状态时用匿名 `mmap(MAP_SHARED|MAP_ANONYMOUS)`；③ 库侧在初始化阶段做一次"写入+读回"可用性探针，用只覆盖探针区间的 SIGSEGV handler + sigsetjmp/siglongjmp 兜住，判定不可用后降级到不依赖 shm 的路径（如 poll/pipe）。
+rec_command: df -h /dev/shm && python3 -c "import shutil;d=shutil.disk_usage('/dev/shm');print('avail_bytes=',d.free)"   # 先看空间再跑重型用例
+rec_auto_fix:           false
+rec_impl:               manual-review
+
+fallback_priority:      2
+fallback_approach:      degrade-to-poll-pipe-or-memfd
+fallback_description: 库内部若已有"无 shm 时的降级分支"（如 lttng-ust 的 poll 模式），在 shm 不可用时显式打开；不要用"跳过初始化"绕过——跳过会让功能静默失效，比崩溃更难发现。
+fallback_command: df -h /dev/shm   # 恢复空间后应重跑一次以确认非环境性失败
+fallback_auto_fix:      false
+fallback_impl:          manual-review
+
+# ★ 禁止策略 ★
+forbid_1_pattern: signal\s*\(\s*SIGSEGV|sigaction\s*\([^)]*SIGSEGV
+forbid_1_reason: 想在**被屏蔽了全部信号**的线程里用 SIGSEGV handler 兜住该现象——同步 SIGSEGV 在信号被屏蔽时由内核直接按默认动作终止，handler 不会运行。
+forbid_1_consequence: 加了 handler 仍 rc=139，浪费排查时间并误判为"handler 写错"。
+forbid_2_pattern: mmap\s*\([^;]*MAP_SHARED
+forbid_2_reason: 按"mmap 返回非 MAP_FAILED 即认为映射可用"的直觉放行——空间耗尽时 mmap 一定成功，失败只发生在后续访问；MAP_POPULATE 也不改变这一点。
+forbid_2_consequence: 进程在任意时刻被 SIGSEGV 终止（rc=139），现场无任何 ENOSPC 提示，容易误判为包/编译器/内核缺陷（本任务首版就误判为"平台映射缺陷"）。
+
+# ═══ Layer 4: 原则引用 ═══
+principles:
+
+# ═══ 关系图 (Relations) ═══
+# ═══ 元数据 ═══
+doc_file:               knowledge/drafts/E4310-draft-8CAA.md
+last_updated:           2026-10-18
+source_event: lttng-ust 2.12.10 适配（feat/lttng-ust-2.12.10）——上游 TAP 用例 ust-elf/test_ust_elf 在 7–12 条断言后以 status 139 终止；定位到 liblttng-ust 构造函数创建的 ust_listener 线程在 wait_for_sessiond()（liblttng-ust/lttng-ust-comm.c:1471）读 shm 映射时 SIGSEGV。同一消费者程序链接**已发布**的 lttng-ust/2.15.1 复现相同形态。随后由编排方预警"本机 /dev/shm 已 100% 满"入手复测：df -h /dev/shm 报 `1.0G 1.0G 0 100%`、write() 报 ENOSPC，确认真因是 tmpfs 写满而非映射缺陷。探针见 $TASK_DIR/w0/probe/（shm1.c、shm2.c、shm3.c、mm1.c、mm2.c、u1.c、u3.c、s7.c），日志见 $TASK_DIR/w0/check-ustelf.log。
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:                Awstme <awstme@qq.com>
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+

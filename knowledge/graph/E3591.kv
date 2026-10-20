@@ -1,0 +1,55 @@
+# KF6/Qt6 module-matrix gap: pick the version set the repository can deliver
+#
+# Companion human doc: knowledge/drafts/E545-draft-2301.md
+# Sample library: archives/j/juk/26.04.0 (KDE Gear 26.04 music player)
+id:                     E3591
+trigger_tool:           cmake|conan|ld|clang|find_package|pkg-config
+phase:                  configuration|linking|runtime
+error_signature:        Version conflict: Conflict between qtbase/|NOT COMPATIBLE|KF6_MIN_VERSION|KIOWidgets|KIOFileWidgets|KX11Extras|DocBook|ZLIB::ZLIB|Taglib::Taglib|relocation R_AARCH64_.*can not be used when making a shared object
+
+severity:               2
+category:               ohos, conan, dependency-graph, kf6, qt6
+prescan_pattern:        set\(KF6_MIN_VERSION|find_package\(KF6 [0-9]|find_package\(KF6 (REQUIRED )?COMPONENTS|find_package\(Taglib|#include <KX11Extras>
+prescan_globs:          CMakeLists.txt, *.cmake, *.cpp, *.h
+match_keywords:         KF6_MIN_VERSION, Version conflict, qtbase/6.11.1, qtbase/6.11.1.1, KIOWidgets, KIOCORE_ONLY, kio, kdbusaddons, Qt6::DBus, qtbase-sql-dbus, Taglib::Taglib, ZLIB::ZLIB, KX11Extras, DocBook, zlib PIC
+title:                  KF6/Qt6 module matrix gap - choose the version set the repository can actually deliver before adapting
+
+root_cause:             The OHOS artifact repository splits KF6/Qt6 across two mutually exclusive qtbase ecosystems (qtbase/6.11.1 without DBus, qtbase/6.11.1.1 with it) and its per-module coverage is uneven: kio exists at 6.14.0 (full widgets) and 6.26.0 (KIOCORE_ONLY, no KIOWidgets) while kdbusaddons/kjobwidgets/kconfigwidgets have no 6.26 build at all. A consumer is first adapted, then configured, and only then discovers that one requested module is missing at the required version, that two modules demand different qtbase revisions (graph Version conflict), or that the upstream KF6_MIN_VERSION gate rejects the only module version the chosen ecosystem provides. Each of those is a hard stop after a long build.
+affected_scope:         KDE Gear 26.04 / KF6 CMake consumers on OHOS PC: any recipe whose CMakeLists binds a Qt6+KDE Frameworks component set, and transitively the KF6 libraries themselves. Measured on juk 26.04.0 (KF6_MIN_VERSION 5.240.0, KIOWidgets+KIOFileWidgets requested, Taglib::Taglib, DocBook handbook chain, X11 KX11Extras include).
+verification_cmd:       archives/j/juk/26.04.0/reports/kf6-matrix-gate-check.sh <src-dir>   # source signatures + repository matrix; exit 1 when a risk item is found\nconan graph info <recipe-dir> -pr:h <ohos-aarch64> -pr:b default 2>&1 | grep -E "Version conflict|Missing binary"   # graph-level confirmation
+
+rec_priority:           1
+rec_approach:           matrix-first-pinning-and-target-wrappers
+rec_description:        Before writing the recipe, enumerate the consumer's KF6/Qt6 component set and read the live repository matrix for every component; choose ONE qtbase ecosystem, then pin each module to the newest revision that both exists and belongs to that ecosystem (juk: kio/6.14.0 for widgets, the 6.18 line for the shared base, kwindowsystem/6.26.0, zlib/1.3.2 for PIC). Then close the three remaining CMake gaps locally instead of patching upstream: alias the taglib target (Taglib::Taglib -> TagLib::tag) plus an UNKNOWN IMPORTED ZLIB::ZLIB in generate(); drop the DocBook handbook chain by patch; guard the X11-only KX11Extras include with __has_include.
+rec_command:            archives/j/juk/26.04.0/reports/kf6-matrix-gate-check.sh <src-dir> && conan create . --build=missing -pr:h <ohos-aarch64> -pr:b default
+rec_auto_fix:           false
+rec_impl:               recipe-generate-hooks-plus-refresh-patch
+
+fallback_priority:      2
+fallback_approach:      cross-ecosystem-migration
+fallback_description:   When a module the consumer cannot do without (e.g. a 6.19+ KF6 API) only exists in the second ecosystem, the whole KF6 family has to be released on that qtbase revision first and the consumer migrated in one step; until then the correct terminal signal is env_unsupported for the consumer, not a partial pin that leaves two qtbase revisions in the graph.
+fallback_command:       conan graph info <recipe-dir> -pr:h <ohos-aarch64> -pr:b default 2>&1 | grep -c "Version conflict"
+fallback_auto_fix:      false
+fallback_impl:          dependency-release-order
+
+forbid_1_pattern:       conan list .* -r=.*(\s|$)(?!.*--only-recipe)|No packages found
+forbid_1_reason:        The repository search API under-reports package binaries (it answers "No packages found" for packages that are in fact uploaded), so binary availability must be probed with "conan download <pkg>/<ver> --only-recipe" (R35).
+forbid_1_consequence:   A module is judged missing, the recipe is re-pinned around a wrong assumption, and the adaptation is restarted for nothing.
+forbid_2_pattern:       KF6_MIN_VERSION[^\n]*6\.26[^\n]*&&|patch.*KF6_MIN_VERSION
+forbid_2_reason:        Relaxing the upstream version gate without checking the API surface silently links a module version the sources were never tested against.
+forbid_2_consequence:   The build succeeds and the binary fails later at runtime, which is worse than a configure-time stop. Relax only with the API-stability argument recorded in notes.md (juk: gate is 5.240.0, no relaxation needed).
+
+principles:
+doc_file:               doc/E545.md
+last_updated:           2026-10-02
+source_event:           juk/26.04.0 OHOS adaptation: KIOWidgets/KIOFileWidgets requirement forced kio/6.14.0 (6.26.0 is KIOCORE_ONLY); kwindowsystem pinned to 6.26.0; zlib/1.3.2 chosen over 1.3.1 (PIC); Taglib::Taglib/ZLIB::ZLIB resolved by generate() wrappers; DocBook handbook chain and the X11-only KX11Extras include resolved by patches 0001/0002; final conan create green with test_package executing bin/juk.
+
+authors:                bbzl <bbzl@noreply.gitcode.com>
+source_pr:
+source_commit:
+
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+

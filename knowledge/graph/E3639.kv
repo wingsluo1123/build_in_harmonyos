@@ -1,0 +1,47 @@
+#====================================================================
+# DRAFT-evemu-2.7.0-devnode-eacces-info-face-test-surface
+# 设备节点 EACCES 时把测试面收窄到「信息面 + 设备无关 API」而非判放弃
+#====================================================================
+
+id:                     E3639
+trigger_tool:           conan|autotools|ctest|shell
+phase:                  testing
+error_signature:        open\(.*/dev/(input/event\d+|uinput|i2c-\d+)\).*errno=13|Permission denied.*(input|uinput)|EACCES.*/dev/input
+
+severity:               2
+category:               conan, testing, permissions, capability-wall, device-node
+match_keywords:         /dev/input, /dev/uinput, evdev, evemu, uinput, EACCES, errno=13, CapEff, CAP_SYS_ADMIN, CAP_SYS_RAWIO, Seccomp, info-face, device-independent, test_package, capability wall, appres
+
+title:                  运行期设备节点 EACCES 时：先三档判档，编译可过就收窄到信息面 + 设备无关 API 测试，如实披露「功能面未能实测」
+
+root_cause:             测试进程（非 root、CapEff 无 CAP_SYS_ADMIN(21)/CAP_SYS_RAWIO(17)、Seccomp=2）打开硬件设备节点被 DAC/LSM 拒绝，返回 EACCES(13)；节点本身存在（ls /dev 可见），只是当前进程无相应权限。这是「运行期权限面」问题，与「编译/归档期」无关，也与「内核特性缺失」（如 AF_CAN 协议族不存在）性质不同。
+affected_scope:         一切核心功能面绑定硬件设备节点的命令行工具与库：/dev/input/*（evdev 族 evemu/libevdev/evtest）、/dev/i2c-*（ddccontrol/i2c-tools）、/dev/fuse（bindfs）、AF_CAN（can-utils）等；以及任何需要验证「运行期 I/O」的 Conan test_package。
+verification_cmd:       正对照 open("/dev/null") 与 open("/proc/self/status") 应 OK、listdir("/dev") 应有结果；反对照 open("/dev/input/event0") 与 open("/dev/uinput") 应报 errno=13 EACCES；再取 grep -E 'CapEff|Seccomp' /proc/self/status 与 os.getuid() 判定是否缺能力。正反对照必须同时给，否则无法区分「节点不存在」与「有节点但无权限」。
+
+rec_priority:           1
+rec_approach:           narrow-test-to-info-face-and-device-independent-api
+rec_description:        ① 三档判档：编译/归档期过不去、交不出二进制 = 直接墙（停下上报，放弃是用户终局裁定）；编译过、二进制交得出而只有运行期设备节点被限 = 本档，继续；唯一功能面被拦且上游无替代又不满足本档 = 真乙，停下上报，不得自行定性「等价交付」。② 继续时把测试面收窄到「信息面」（--help/--version/非法选项触发的 usage 横幅，getopt_long default 分支在任何 open() 之前就返回）与「设备无关 API」（只分配结构体、不 open 节点的入口，如 evemu_new()/evemu_get_name()/evemu_delete()）。③ 断言必须是真实输出匹配 + 显式退出码断言，⛔ 不得写「可录制/可回放事件」类断言，⛔ 不得用 || true 吞错。④ notes 与 PR 正文如实披露，措辞只用「本平台测试进程无相应权限，功能面未能实测」，⛔ 不得写「在某平台上不可用」。
+rec_command:            p = subprocess.run([exe, "--bogus-option"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT); assert p.returncode == 1; grep -q "Usage:" out
+rec_auto_fix:           false
+rec_impl:               conan-recipe-build-test
+
+fallback_priority:      2
+fallback_approach:      device-independent-upstream-regression
+fallback_description:   若信息面也不够断言，转跑上游自带的设备无关回归（evemu 的 test/test-c-compile.c、test-cxx-compile.c、test-evemu-create.c 只用 mkstemp + evemu_new/evemu_read 回环，不 open 任何设备节点），在 build() 里 make check 后按「文档化基线」核对 PASS 计数，把设备无关用例作为质量证据。
+fallback_command:       make check -j4   # 期望 PASS: test-c-compile / test-cxx-compile / test-evemu-create，TOTAL 3 PASS 3 FAIL 0
+fallback_auto_fix:      false
+fallback_impl:          conan-recipe-build-test
+
+forbid_1_pattern:       \|\|\s*true
+forbid_1_reason:        用 || true 吞掉设备访问失败的退出码，会把「权限受限」伪装成「测试通过」，属欺骗性行为（P0）。
+forbid_1_consequence:   独立审计与外部审查按空壳测试判 P0，PR 被打回并取消提审。
+
+forbid_2_pattern:       可录制事件|可回放事件|能够录制|events? (can|could) be (captured|replayed)
+forbid_2_reason:        运行期设备节点实测 EACCES，任何「能录制/能回放」的断言或文案都是未被证据支持的声明。
+forbid_2_consequence:   与 notes/读数自相矛盾，rule「欺骗性行为检测」判 P0。
+
+principles:             P005
+doc_file:               knowledge/drafts/DRAFT-evemu-2.7.0-devnode-eacces-info-face-test-surface.md
+last_updated:           2026-10-09
+source_event:           evemu 2.7.0 HarmonyOS PC 适配（/dev/input 与 /dev/uinput 运行期 EACCES(13)，测试面收窄到信息面 + 设备无关 API）
+authors:               unknown

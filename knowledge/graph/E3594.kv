@@ -1,0 +1,46 @@
+#====================================================================
+# DRAFT-xine-0.99.14-hmdfs-mount-semantics-local-green-ci-red
+# 同一份配方本机 W3 全绿、远端 CI 红：conan home 落在两个权限语义不同的挂载上
+# 来源: xine/0.99.14 适配 PR #16499（2026-10-17，CI #97241/#97272 红 → #97351/#97427/#97445 绿）
+#====================================================================
+
+id:                     E3594
+trigger_tool:           conan create|configure|config.status|mktemp
+phase:                  configure
+error_signature:        config\.status: line \d+: \./conf[A-Za-z0-9]{6}/subs1\.awk: Permission denied|could not setup config files machinery|Error in build\(\) method.*autotools\.configure
+severity:               3
+category:               hmdfs, autotools, filesystem, permissions, ci-vs-local
+match_keywords:         本地绿 CI 红, 挂载点语义不同, conan home, HMDFS, 私有应用挂载, uid 映射,
+                         owner 分支, group 分支, drwx--S---, drwxr-s--x, drwxrws---, toybox mktemp,
+                         umask 受 umask 影响, GNU mktemp 固定 0700, confXXXXXX, subs1.awk,
+                         构建路径站点筛选, set_cc_for_build, distcheck dc_destdir, 生成物 config.status
+title:                  同一配方本机全绿、远端 CI 在 config.status 写 subs1.awk 时 EACCES——根因是本机 conan home 在应用私有挂载（同一命令得 drwx------ 且可写）而 CI worker 在 HMDFS 挂载（同一命令得 drwx--S--- 且被拒）；附带实测：鸿蒙的 toybox mktemp -d 确实受 umask 影响（GNU coreutils 恒 0700），所以 sed 改 umask 不是空操作
+
+root_cause:             两侧 conan home 落在权限语义不同的挂载上（本机 /data/storage/el2/base/files/home/.conan2 属应用私有挂载，(umask 077 && mktemp -d) 得到 drwx------ 且可写；CI worker 用 /storage/Users/currentUser/.cache/conan2 属 HMDFS，同一命令得到 drwx--S--- 并在 config.status 写 subs1.awk 时被拒），于是同一份配方本机全绿、远端红。本条只记这个“同命令两侧结果相反”的实测差异；至于 worker 为什么拒写（属主 uid ≠ 进程 uid 使检查落 group 分支）是 DRAFT-10863 的机理假设，本机既证实不了也证伪不了，不要当事实引用
+
+affected_scope:         所有由本机 W3/conan-verify 判定绿、再交远端 CI 的 autotools 包；凡构建脚本里存在 umask>=070 的临时目录（configure/config.status/config.guess/meson/老 GNU 工具）都适用同一归因法
+
+verification_cmd:       for u in 077 022 007 002; do d=$( (umask $u; mktemp -d "./c${u}XXXXXX") ); ls -ld "$d"; ( cd "$d" && : > f ) && echo WRITABLE || echo DENIED; done; grep -c "umask 077" <build_folder>/config.status; grep -rn "umask 077" configure config.guess Makefile.in misc/xine-check misc/xine-bugreport
+
+rec_priority:           1
+rec_approach:           mount-diff-diagnosis-then-fix-with-remote-green-record
+rec_description:        三步归因，不要先怀疑配方：(1) 比对两侧 conan home 的挂载语义（本机私有挂载 vs CI HMDFS），并在**同一目录**里分别用 umask 077/022/007/002 跑 mktemp -d + 写文件，把 mode 字符串列成表；(2) 检查**生成物**而不是本地结论——复验构建目录里 config.status 的 umask 行，确认补丁到 configure 再到 config.status 的传导链；(3) 修复取值优先找“同族兄弟包在同一站点是否已如此修”（本包即引擎依赖 xine-lib/1.2.13 的 patches/0003-configure.patch 对同一 autoconf configure 的同一站点改成 umask 022，两处替换逐字同形），其次取知识图谱 rec 原值（E129 rec 1 = 022），再次才是仓库内出现频次（按 archives/*/*/*/patches/*.patch 复算：含 -umask 077 删除行的补丁 1382 个，+umask 022 共 2117 行、636 个不同包名，000 为 377/136，002 为 78/30，007 为 49/18）；不要拿“本机也能过”或“本机静态分析看起来更严格”当取值依据。修复动作本体归 E129/E114，本条只记归因法与挂载差异
+rec_command:            for u in 077 022 007 002; do d=$( (umask $u; mktemp -d "./c${u}XXXXXX") ); ls -ld "$d"; ( cd "$d" && : > f ) && echo WRITABLE || echo DENIED; done
+rec_auto_fix:           false
+rec_impl:               diagnosis-procedure
+
+fallback_priority:      2
+fallback_approach:      scope-umask-sites-by-build-path-reachability
+fallback_description:   全树 grep 到的 umask 077 站点不能一视同仁地改：先判定它是否在构建路径上。普查按整树逐行做而不是按印象列举（本包 .orig 树实测 9 行 / 6 个文件）：configure 与 config.status 的 mktemp 块必在（config.status 是 configure 生成的，改 configure 即够，tarball 内不存在 config.status）；config.guess 的三行只在 set_cc_for_build() 内，被“直接赋值 GUESS、不调用该函数”的平台分支绕开——实测 sh config.guess 不产生 cgXXXXXX 目录即证明不触达；Makefile.in 的一行位于 distcheck 的 $$dc_destdir 规则，make 与 make install 不触达；misc/xine-check、misc/xine-check.sh.in、misc/xine-bugreport 各一行属**运行期**脚本（不在构建路径，但它们是交付出去的命令，运行期语义要单列为未验证面而不是当成“无关文件”忽略）。判据用可达性而不是文本命中数，可避免把补丁面积铺到无关文件、引起补丁集重排
+fallback_command:       grep -rn "umask 077" . ; sh config.guess ; ls -d "${TMPDIR:-/tmp}"/cg* 2>/dev/null   # 整树普查，别只 grep 三个熟悉的名字
+fallback_auto_fix:      false
+fallback_impl:          reachability-scoping
+
+principles:               
+doc_file:               knowledge/drafts/DRAFT-xine-0.99.14-hmdfs-mount-semantics-local-green-ci-red.md
+last_updated:           2026-10-17
+source_event:           xine/0.99.14 远端 CI build #97272 在 autotools.configure() 失败（config.status: line 655: ./confhGIGfN/subs1.awk: Permission denied），而同一配方本机 W3 与 conan-verify 均绿
+authors:                Qoder
+source_pr:              16499
+source_commit:            57eae489da
+
