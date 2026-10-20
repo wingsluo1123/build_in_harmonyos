@@ -1,0 +1,45 @@
+--- a/src/kws/kws-functions.cc
++++ b/src/kws/kws-functions.cc
+@@ -168,21 +168,21 @@
+   bool success = false;
+   std::vector<double> alpha;
+   std::vector<double> beta;
+   success = ComputeCompactLatticeAlphas(clat, &alpha);
+   success = success && ComputeCompactLatticeBetas(clat, &beta);
+   if (!success)
+     return false;
+ 
+   // Now we map the CompactLattice to VectorFst<KwsProductArc>. We drop the
+   // alignment information and only keep the negated log-probs
+-  Map(clat, factor_transducer, CompactLatticeToKwsProductFstMapper());
++  ArcMap(clat, factor_transducer, CompactLatticeToKwsProductFstMapper());
+ 
+   // Now do the weight pushing manually on the CompactLattice format. Note that
+   // the alphas and betas in Kaldi are stored as the log-probs, not the negated
+   // log-probs, so the equation for weight pushing is a little different from
+   // the original algorithm (pay attention to the sign). We push the weight to
+   // initial and remove the total weight, i.e., the sum of all the outgoing
+   // transitions and final weight at any state is equal to One() (push only the
+   // negated log-prob, not the alignments)
+   for (StateIterator<KwsProductFst>
+        siter(*factor_transducer); !siter.Done(); siter.Next()) {
+@@ -359,18 +359,18 @@
+   if (second_best_cost < -0.01) {
+     KALDI_WARN << "Negative second-best cost found " << second_best_cost;
+   }
+ }
+ 
+ 
+ void MaybeDoSanityCheck(const KwsProductFst &product_transducer) {
+   if (GetVerboseLevel() < 2) return;
+   KwsLexicographicFst index_transducer;
+ 
+-  Map(product_transducer,
++  ArcMap(product_transducer,
+       &index_transducer,
+       KwsProductFstToKwsLexicographicFstMapper());
+ 
+   MaybeDoSanityCheck(index_transducer);
+ }
+ 
+ }  // end namespace kaldi

@@ -1,0 +1,83 @@
+--- a/src/fstext/lattice-weight.h
++++ b/src/fstext/lattice-weight.h
+@@ -389,32 +389,32 @@
+ inline bool ApproxEqual(const LatticeWeightTpl<FloatType> &w1,
+                         const LatticeWeightTpl<FloatType> &w2,
+                         float delta = kDelta) {
+   if (w1.Value1() == w2.Value1() && w1.Value2() == w2.Value2()) return true;  // handles Zero().
+   return (fabs((w1.Value1() + w1.Value2()) - (w2.Value1() + w2.Value2())) <= delta);
+ }
+ 
+ template <class FloatType>
+ inline std::ostream &operator <<(std::ostream &strm, const LatticeWeightTpl<FloatType> &w) {
+   LatticeWeightTpl<FloatType>::WriteFloatType(strm, w.Value1());
+-  CHECK(FLAGS_fst_weight_separator.size() == 1);
+-  strm << FLAGS_fst_weight_separator[0]; // comma by default;
++  CHECK(FST_FLAGS_fst_weight_separator.size() == 1);
++  strm << FST_FLAGS_fst_weight_separator[0]; // comma by default;
+   // may or may not be settable from Kaldi programs.
+   LatticeWeightTpl<FloatType>::WriteFloatType(strm, w.Value2());
+   return strm;
+ }
+ 
+ template <class FloatType>
+ inline std::istream &operator >>(std::istream &strm, LatticeWeightTpl<FloatType> &w1) {
+-  CHECK(FLAGS_fst_weight_separator.size() == 1);
++  CHECK(FST_FLAGS_fst_weight_separator.size() == 1);
+   // separator defaults to ','
+-  return w1.ReadNoParen(strm, FLAGS_fst_weight_separator[0]);
++  return w1.ReadNoParen(strm, FST_FLAGS_fst_weight_separator[0]);
+ }
+ 
+ 
+ 
+ // CompactLattice will be an acceptor (accepting the words/output-symbols),
+ // with the weights and input-symbol-seqs on the arcs.
+ // There must be a total order on W.  We assume for the sake of efficiency
+ // that there is a function
+ // Compare(W w1, W w2) that returns -1 if w1 < w2, +1 if w1 > w2, and
+ // zero if w1 == w2, and Plus for type W returns (Compare(w1,w2) >= 0 ? w1 : w2).
+@@ -721,39 +721,39 @@
+ 
+   } else {
+     KALDI_ERR << "Cannot divide CompactLatticeWeightTpl with DIVIDE_ANY";
+   }
+   return CompactLatticeWeightTpl<WeightType,IntType>::Zero(); // keep compiler happy.
+ }
+ 
+ template <class WeightType, class IntType>
+ inline std::ostream &operator <<(std::ostream &strm, const CompactLatticeWeightTpl<WeightType, IntType> &w) {
+   strm << w.Weight();
+-  CHECK(FLAGS_fst_weight_separator.size() == 1);
+-  strm << FLAGS_fst_weight_separator[0]; // comma by default.
++  CHECK(FST_FLAGS_fst_weight_separator.size() == 1);
++  strm << FST_FLAGS_fst_weight_separator[0]; // comma by default.
+   for(size_t i = 0; i < w.String().size(); i++) {
+     strm << w.String()[i];
+     if (i+1 < w.String().size())
+       strm << kStringSeparator; // '_'; defined in string-weight.h in OpenFst code.
+   }
+   return strm;
+ }
+ 
+ template <class WeightType, class IntType>
+ inline std::istream &operator >>(std::istream &strm, CompactLatticeWeightTpl<WeightType, IntType> &w) {
+   std::string s;
+   strm >> s;
+   if (strm.fail()) {
+     return strm;
+   }
+-  CHECK(FLAGS_fst_weight_separator.size() == 1);
+-  size_t pos = s.find_last_of(FLAGS_fst_weight_separator); // normally ","
++  CHECK(FST_FLAGS_fst_weight_separator.size() == 1);
++  size_t pos = s.find_last_of(FST_FLAGS_fst_weight_separator); // normally ","
+   if (pos == std::string::npos) {
+     strm.clear(std::ios::badbit);
+     return strm;
+   }
+   // get parts of str before and after the separator (default: ',');
+   std::string s1(s, 0, pos), s2(s, pos+1);
+   std::istringstream strm1(s1);
+   WeightType weight;
+   strm1 >> weight;
+   w.SetWeight(weight);

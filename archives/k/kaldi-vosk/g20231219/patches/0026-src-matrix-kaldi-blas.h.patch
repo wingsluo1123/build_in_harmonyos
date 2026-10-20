@@ -1,0 +1,29 @@
+--- a/src/matrix/kaldi-blas.h
++++ b/src/matrix/kaldi-blas.h
+@@ -108,21 +108,25 @@
+   #undef dmin
+   #undef dmax
+   #undef bit_test
+   #undef bit_clear
+   #undef bit_set
+ #else
+   #error "You need to define (using the preprocessor) either HAVE_CLAPACK or HAVE_ATLAS or HAVE_MKL (but not more than one)"
+ #endif
+ 
+ #ifdef HAVE_OPENBLAS
+-typedef int KaldiBlasInt; // try int.
++typedef lapack_int KaldiBlasInt;
++static_assert(sizeof(KaldiBlasInt) == sizeof(int32_t),
++              "Kaldi requires the LP64 LAPACK integer ABI");
++static_assert(sizeof(blasint) == sizeof(KaldiBlasInt),
++              "CBLAS and LAPACK integer widths must agree");
+ #endif
+ #ifdef HAVE_CLAPACK
+ typedef integer KaldiBlasInt;
+ #endif
+ #ifdef HAVE_MKL
+ typedef MKL_INT KaldiBlasInt;
+ #endif
+ 
+ #ifdef HAVE_ATLAS
+ // in this case there is no need for KaldiBlasInt-- this typedef is only needed
