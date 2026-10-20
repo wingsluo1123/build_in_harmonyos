@@ -1,0 +1,29 @@
+--- a/lib/PDL/Core/pdlmagic.c
++++ b/lib/PDL/Core/pdlmagic.c
+@@ -501,8 +501,26 @@
+ pdl_error pdl_magic_thread_cast(pdl *it,pdl_error (*func)(pdl_trans *),pdl_trans *t, pdl_broadcast *broadcast) {pdl_error PDL_err = {0,NULL,0}; return PDL_err;}
+ int pdl_magic_thread_nthreads(pdl *it,PDL_Indx *nthdim) {return 0;}
+ int pdl_pthreads_enabled() {return 0;}
+ int pdl_pthread_barf_or_warn(const char* pat, int iswarn, va_list *args){ return 0;}
++void pdl_pthread_realloc_vsnprintf(char **p, size_t *len, size_t extralen, const char *pat, va_list *args, char add_newline) {
++#ifdef WIN32
++#undef realloc
++#endif
++  if (add_newline) extralen += 1;
++  extralen += 1; /* +1 for '\0' at end */
++  *p = realloc(*p, *len + extralen);
++  vsnprintf(*p + *len, extralen, pat, *args);
++  *len += extralen;
++  if (add_newline) (*p)[*len-2] = '\n';
++  (*p)[*len-1] = '\0';
++}
++void pdl_pthread_free(void *p) {
++#ifdef WIN32
++#undef free
++#endif
++  free(p);
++}
+ int pdl_online_cpus() {return 1;}
+ #endif
+ 
+ /***************************
