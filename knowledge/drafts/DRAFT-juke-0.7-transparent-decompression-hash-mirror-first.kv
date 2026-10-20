@@ -1,0 +1,31 @@
+id: DRAFT-juke-0.7-transparent-decompression-hash-mirror-first
+trigger_tool: conan|curl|download
+phase: downloading
+error_signature: sha256 hash failed for 'juke-0\.7\.tar\.gz'|Provided hash.*Computed hash|Computed hash 9a5eb5cf
+severity: 3
+category: build-system, autotools, network, ohos
+match_keywords: autotools_configure, hmbs_repair_method, no_tests, sha256, transparent-decompression, mirror-first
+title: 官方小众源透明解压致哈希失配时前置字节一致镜像
+root_cause: 官方小众源 moll.no 经传输链路透明解压返回 266240 字节 tar（仍命名 .tar.gz），与 64103 字节 gzip 原件字节不同，致真机 source() sha256 期望 b19d6bb46ece9f47b07bcd52e371b447fbef580ffb9ded59257305962f47cae0 实算 9a5eb5cf4a2e523d8859a0f590867d91c331bd3151a1bf1a3593946839a9af68；本地 curl 复现同尺寸同哈希，证实非偶发截断
+fixed_scope: 官方小众 distfiles 源经代理链路透明解压致字节变化且权威镜像可提供同尺寸同哈希原件的 autotools 类小众源包
+affected_scope: 官方小众 distfiles 源经代理链路透明解压致字节变化且权威镜像可提供同尺寸同哈希原件的 autotools 类小众源包
+verification_cmd: 本地 curl 双验证尺寸与哈希一致（镜像 64103 字节 sha256 b19d6bb4 gzip 魔数 1f8b，官方 266240 字节 sha256 9a5eb5cf 文件头为 tar）+ 真机 conan source() 校验通过
+rec_priority: 1
+rec_approach: mirror-first-byte-identical-fallback
+rec_description: 保持 sha256 不变，将 conandata.yml url 改为有序列表（本地验证字节一致的 pkgsrc distfiles 镜像在前、官方 moll.no 在后回退），同步版本 manifest 与 notes 记录
+rec_command: conandata.yml: url 有序列表（pkgsrc 镜像在前、官方 URL 在后）；manifest.yaml: 同步 source.url 与 mirror_note；notes.md: 新增记录
+rec_auto_fix: false
+rec_impl: conan-recipe
+fallback_priority: 2
+fallback_approach: keep-official-url-as-fallback-only
+fallback_description: 若镜像不可用则保留官方 URL 单源并如实记录哈希失配审计，不为迎合修改 sha256
+fallback_auto_fix: false
+forbid_1_pattern: sha256:\s*9a5eb5cf4a2e523d8859a0f590867d91c331bd3151a1bf1a3593946839a9af68|sha256.*迎合修改
+forbid_1_reason: 禁止为迎合透明解压后字节修改 sha256 为错误实算值；镜像必须本地验证尺寸与哈希双一致
+forbid_1_consequence: 掩盖上游传输链路异常，后续真机与本地字节分叉，source 校验失信且无法回退
+similar_to: [DRAFT-jamnntpd-1.3-compiler-path-fallback, DRAFT-dhex-0.69-ncurses-compat-symlink, DRAFT-libofa-no-tests-wiring]
+doc_file: knowledge/drafts/DRAFT-juke-0.7-transparent-decompression-hash-mirror-first.md
+last_updated: 2026-10-19
+source_event: juke/0.7 真机预检 source() sha256 失配并修复为镜像前置
+authors: hmbs-executor
+source_pr: 16262
