@@ -1,0 +1,35 @@
+package: adns/1.7.0
+homepage: "https://www.chiark.greenend.org.uk/~ian/adns/"
+
+upstream_test_in_build: true
+upstream_test_command: "make check"
+upstream_test_count: 102
+upstream_test_count_command: "find regress -maxdepth 1 -type f -name 'case-*.sys' | wc -l"
+upstream_tests:
+  - file: "regress/case-*.sys"
+    count: 102
+    description: "102 recorded resolver regression cases executed by regress/r1test"
+    command: "make check"
+
+test_package_tests:
+  - file: test_adns.c
+    description: "Network-independent public API and negative-path consumer validation"
+    command: "./test_adns"
+    count: 8
+
+test_package_test_count: 8
+assertion_count: 8
+
+upstream_test_modifications:
+  - file: "regress/case-2ndservtcp.out"
+    reason: "OHOS strerror(EHOSTUNREACH) is 'Host is unreachable'; upstream fixture recorded 'No route to host'. Only expected text changes; syscall trace is unchanged."
+    original: "No route to host"
+    adapted: "Host is unreachable"
+  - file: "regress/case-connfail.out"
+    reason: "OHOS strerror(ENOTSOCK) is 'Not a socket'; upstream fixture recorded 'Socket operation on non-socket'. Only expected text changes; syscall trace is unchanged."
+    original: "Socket operation on non-socket"
+    adapted: "Not a socket"
+  - file: "regress/case-tcpautosysmissingserv.out"
+    reason: "OHOS strerror(EHOSTUNREACH) is 'Host is unreachable'; upstream fixture recorded 'No route to host'. Only expected text changes; syscall trace is unchanged."
+    original: "No route to host"
+    adapted: "Host is unreachable"
