@@ -1,0 +1,50 @@
+diff --git a/util/mm-common-get.in b/util/mm-common-get.in
+index e843dd8..13cc41d 100644
+--- a/util/mm-common-get.in
++++ b/util/mm-common-get.in
+@@ -23,7 +23,17 @@ import argparse
+ import shutil
+ import filecmp
+ 
+-pkgdatadir = os.path.join('@datadir_py@', '@PACKAGE_TARNAME@')
++# Derive the data directory from the location of this script instead of using
++# the build-time @datadir_py@.  A staged or relocated installation (package
++# manager "--prefix=/ plus DESTDIR" staging, or a Conan package folder) would
++# otherwise look for the build support files under a prefix that does not
++# exist after relocation.
++if os.sep in sys.argv[0] or (os.altsep and os.altsep in sys.argv[0]):
++  script_path = os.path.realpath(sys.argv[0])
++else:
++  script_path = os.path.realpath(shutil.which(sys.argv[0]) or sys.argv[0])
++pkgdatadir = os.path.join(os.path.dirname(os.path.dirname(script_path)),
++                          'share', '@PACKAGE_TARNAME@')
+ progname = os.path.basename(sys.argv[0])
+ 
+ parser = argparse.ArgumentParser(
+diff --git a/util/mm-common-prepare.in b/util/mm-common-prepare.in
+index 3a0a7de..1cc00f2 100644
+--- a/util/mm-common-prepare.in
++++ b/util/mm-common-prepare.in
+@@ -17,9 +17,19 @@
+ # You should have received a copy of the GNU General Public License
+ # along with mm-common.  If not, see <http://www.gnu.org/licenses/>.
+ 
+-prefix="@prefix@"
+-datarootdir="@datarootdir@"
+-datadir="@datadir@"
++# Derive the installation prefix from the location of this script instead of
++# using the configure-time @prefix@.  A staged or relocated installation
++# (package manager "--prefix=/ plus DESTDIR" staging, or a Conan package
++# folder) would otherwise look for the build support files under the value of
++# the configure-time prefix, which does not exist after relocation.
++self=$0
++case $self in
++*/*) ;;
++*) self=`command -v "$self"` || self=$0 ;;
++esac
++prefix=`cd "${self%/*}/.." && pwd`
++datarootdir="${prefix}/share"
++datadir="${datarootdir}"
+ pkgdatadir="${datadir}/@PACKAGE_TARNAME@"
+ 
+ progname=${0##*/}
