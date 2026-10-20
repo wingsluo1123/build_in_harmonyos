@@ -1,0 +1,56 @@
+--- a/libkywc/meson.build
++++ b/libkywc/meson.build
+@@ -19,6 +19,44 @@
+   'kywc-workspace-manager-v1',
+ ]
+ 
++if get_option('libkywc_only')
++  # In the compositor build protocols/meson.build generates these protocol
++  # sources. The libkywc-only build never enters that directory, so generate
++  # the four client-side protocol files here instead. The outputs land in
++  # this sub-directory's build directory, which Meson puts on the include
++  # path of the kywc target.
++  protocol_xml = {
++    'kywc-capture-manager-v1': 'kywc-capture-v1.xml',
++    'kywc-output-manager-v1': 'kywc-output-v1.xml',
++    'kywc-toplevel-manager-v1': 'kywc-toplevel-v1.xml',
++    'kywc-workspace-manager-v1': 'kywc-workspace-v1.xml',
++  }
++  scanner_path = get_option('wayland_scanner_path')
++  if scanner_path == ''
++    wayland_scanner = find_program('wayland-scanner')
++  else
++    wayland_scanner = find_program(scanner_path)
++  endif
++  protocols_code = {}
++  protocols_client_header = {}
++  foreach p : protos
++    code = custom_target(
++      p.underscorify() + '_protocol_c',
++      input: '../protocols/' + protocol_xml[p],
++      output: '@BASENAME@-protocol.c',
++      command: [wayland_scanner, 'private-code', '@INPUT@', '@OUTPUT@'],
++    )
++    client_header = custom_target(
++      p.underscorify() + '_client_protocol_h',
++      input: '../protocols/' + protocol_xml[p],
++      output: '@BASENAME@-client-protocol.h',
++      command: [wayland_scanner, 'client-header', '@INPUT@', '@OUTPUT@'],
++    )
++    protocols_code += { p: code }
++    protocols_client_header += { p: client_header }
++  endforeach
++endif
++
+ foreach p : protos 
+   files_libkywc += protocols_code[p]
+   files_libkywc += protocols_client_header[p]
+@@ -36,7 +74,7 @@
+   link_depends : link_depends,
+   dependencies: wayland_client,
+   install : true,
+-  version : meson.project_version(),
++  install_rpath : get_option('kywc_install_rpath'),
+ )
+ 
+ libkywc = declare_dependency(
