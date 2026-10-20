@@ -1,0 +1,27 @@
+package: lskat/26.04.0
+homepage: https://apps.kde.org/lskat
+
+# lskat 26.04.0 ships NO upstream test suite (R51 inventory).
+# Evidence (extracted tarball lskat-v26.04.0/):
+#   - no tests/, autotests/ or test/ directory (find . -maxdepth 2 -type d
+#     \( -name test -o -name tests -o -name autotests \) -> empty)
+#   - no enable_testing()/add_test()/ecm_add_test()/BUILD_TESTING in any
+#     CMakeLists.txt or cmake module
+#     (grep -rn over the tree -> no match, exit 1)
+#   - .kde-ci.yml only declares Options: require-passing-tests-on:
+#     ['Linux', 'FreeBSD', 'Windows'] — i.e. upstream QA runs KDE CI source
+#     builds, the release tarball carries no test entry point at all.
+# Upstream QA for this module runs through KDE CI source builds only, so the
+# consumer verification below is the verification path for this package.
+upstream_test_in_build: false
+upstream_tests: []
+
+upstream_check_command: "none (no upstream test suite in 26.04.0)"
+
+test_package_tests:
+  - file: test.sh
+    description: "Consumer cases: 6 cases / 8 assertions, incl. 2 HarmonyOS-specific cases — (0) [前置断言, now printed explicitly] packaged bin/lskat exists and is executable; (1) --version reports 1.50.26040 (KDE Gear 26.04.0); (2) --help identifies lskat (Qt/KDE runtime link complete); (3a) --author lists the upstream author (KAboutData metadata); (3b) --license prints the GPL license; (4) [OHOS-specific, non-assertion] shared-library closure load: launches the shipped lskat binary so the OHOS dynamic linker resolves the whole DT_NEEDED closure (relative \"../../bin/libX.so\" / build-machine absolute entries of the published KF6 libraries fail on OHOS musl without normalization); (5) [OHOS-specific] ELF64 AArch64 e_machine=183 assertion + .codesign section presence (OHOS refuses to exec unsigned/modified ELFs with EACCES)"
+    command: "sh test.sh <lskat-bin>"
+    summary_line: "ALL CONSUMER CASES PASSED (6 用例 / 8 断言，0 失败)"
+
+assertion_count: 8
