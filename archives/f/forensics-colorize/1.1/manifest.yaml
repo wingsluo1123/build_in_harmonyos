@@ -1,0 +1,68 @@
+# 版本级 manifest — forensics-colorize 1.1
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "1.1"
+software: forensics-colorize
+
+# 编译状态: published | built | failed | archived
+# built: conan-verify 通过（G2 conan create + 测试通过），尚未经 CI release 上传制品仓
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-18"
+build_system: autotools
+
+# ============================================================
+# 源码信息
+# ============================================================
+source:
+  # 上游 jessek/colorize，tag release-1.1（2015-05-16）
+  # 注：codeload 的 URL 末段是 tag 名，conanfile 里必须显式给 filename，
+  #     否则 Conan 按 URL 猜扩展名 -> BadZipFile: File is not a zip file
+  url: "https://codeload.github.com/jessek/colorize/tar.gz/refs/tags/release-1.1"
+  sha256: "00394a490418495758d40a18a759e64b1d1d4b5f36fb6f2174bc4a534a2ecd98"
+  size: 26808
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+build:
+  system: autotools
+  # 本机不跑 autoconf/automake（属构建机工具，CI worker 不保证具备），
+  # 改为直接用 profile 注入的 OHOS clang 逐 TU 编译 + 链接，与 autotools 产物等价
+  method: direct-clang
+  configure_options: []
+  dependencies: []
+  cc: clang
+  cxx: clang++
+  targets:
+    - name: colorize
+      sources: [ui.c, helpers.c, colorize.c]
+    - name: filecompare
+      sources: [ui.c, helpers.c, filecompare.c]
+  defines:
+    - "HAVE_INTTYPES_H=1"      # configure.ac 缺它会 AC_MSG_ERROR
+    - "HAVE_LIBGEN_H=1"        # OHOS sysroot 有 libgen.h，basename()
+    - "HAVE_FSEEKO=1"          # 必须定义；否则上游 main.h 走 Windows 的 _fseeki64 替换
+    - "__progname=__fc_progname__"
+  include_headers:
+    - config-defs.h            # 等价于 autoconf 生成的 config.h
+    - config-shim.h            # 非 glibc 下 __progname 的唯一强定义
+
+# ============================================================
+# 补丁信息
+# ============================================================
+# 源码零修改：不生成任何 patch，全部改动在 ohos-compat/ 头文件 + 编译参数里
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+knowledge_gained:
+  - "非 glibc 平台 (OHOS) 上上游 main.h 的 `#ifdef __GLIBC__ ... #else char *__progname; #endif` 会在每个 TU 各定一个强符号 -> ld.lld 报 duplicate symbol: __progname。解法：-D__progname=__fc_progname__ 改名（仍保持 TU 内强定义形态，源码零修改），再用 -include 的 shim 头把非 helpers.c 的 TU 降为 __attribute__((weak))，链接期只留 helpers.c 的强定义"
+  - "未定义 HAVE_FSEEKO 时上游 main.h 会 `#define fseeko _fseeki64` / `#define ftello _ftelli64`（Windows/MSVC 的 64 位替换），OHOS 上这两个符号不存在 -> 隐式声明 + 链接失败。configure.ac 的 AC_FUNC_FSEEKO 只在 libc 没有 fseeko 时才不定 它，OHOS musl 有 fseeko，所以应定义 HAVE_FSEEKO=1"
+  - "codeload.github.com/<o>/<r>/tar.gz/refs/tags/<tag> 的 URL 末段是 tag 而不是 .tar.gz，Conan 2 会按 URL 猜扩展名交给解压器 -> BadZipFile: File is not a zip file；必须在 get() 里显式 filename="
+  - "上游 colorize 的像素布局：每像素 3 字节按 RGBQUAD 声明顺序 (rgbBlue,rgbGreen,rgbRed) 写出，值分别取 lookup_color(c+128)/lookup_color(c)/lookup_color(c-128)，c=0x00 与 c=0xFF 是两个特判（整条写 0 / 整条 0xFF）"
+  - "上游行尾补齐 pad_image(val) 追加的字节数是 **val % 4**（落空 switch），不是 (val%4)*3；因此行距 = 3*W + (W%4)，且只有 direction=TRUE 时才补"
+  - "上游 write_vertical_file 的 direction=FALSE 支是按行正序顺序读取（location = i*W + j），不是写死常数；-d 的效果是把行序从「数据末尾在前」翻成「数据开头在前」"

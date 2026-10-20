@@ -1,0 +1,35 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: forensics-colorize/1.1
+homepage: "https://github.com/jessek/colorize"
+
+# 上游测试命令 — forensics-colorize 没有官方自动化测试套件
+# (Autotools 工程, src/Makefile.am 只有 bin_PROGRAMS, 无 TESTS/check 目标;
+#  根目录只有 bootstrap.sh + configure.ac, 无 tests/ 目录;
+#  src/test.c 不是测试, 是把 0x00..0xFF 各打印 27 次的样本数据生成器)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序 (上游无测试程序)
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证)
+# 必须实质调用被测包的二进制, 且 fail-closed (解析不到 RESULT 行即判失败)
+test_package_tests:
+  - file: test_forensics_colorize.c
+    description: >-
+      消费者端到端测试: 在真机上直接运行 bin/colorize 与 bin/filecompare,
+      覆盖 CLI (-V/-h/-v/错误参数/退出码)、纵向方向 (-w/-d/-w 7/-w 10) 的
+      BMP 头字段+文件长度+行距+逐像素颜色、横向方向 (-o/-o -d) 的宽高对调与
+      补齐、filecompare 的等长/不等长/块大小/标记字节、以及错误路径 fail-closed。
+      输出 "RESULT: PASS (N checks, M failures)" 供 conanfile.py 正则判读。
+    command: "./test_forensics_colorize <package_folder>/bin"
+
+# 测试断言总数 (本配方实测值, 与 RESULT 行一致)
+assertion_count: 216
