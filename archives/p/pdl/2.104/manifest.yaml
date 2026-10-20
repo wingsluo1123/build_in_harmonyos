@@ -1,0 +1,48 @@
+# 版本级 manifest — 遵循 ARCHIVE-SPEC v2.0
+version: "2.104"
+software: pdl
+status: built
+build_system: custom
+build_date: "2026-10-01"
+
+source:
+  url: "https://cpan.metacpan.org/authors/id/E/ET/ETJ/PDL-2.104.tar.gz"
+  sha256: "3d646ce3e1caac50c878639406ac27e5283e554daf9021ed86436314b21bf1e4"
+  tar_format: tar.gz
+
+build:
+  system: custom
+  configure_options: []
+  dependencies:
+    - "perl/5.42.2.3（已发布到 ohpcd，OHOS/armv8）—— CI worker 本身就是 OHOS 机器，因此该解释器在构建期可直接执行，XS 构建才成立"
+    - "perl-file-which/1.27、perl-test-exception/0.43（已发布，走 conan requires）"
+    - "4 个未发布的非核心依赖（Devel::CheckLib 1.16 / File::Map 0.71 / Test::Deep 1.205 / Test::Warn 0.37）以 url+sha256 固定在 conandata.yml，构建期装入包内 lib/perl5（路线 A，与 jekyll 的 gem 闭包同构）"
+  cc: "OHOS clang（XS 编译；由 conanfile 的 _cc() 探测）"
+  cxx: N/A
+  package_layout:
+    - "package/lib/perl5/: PDL 本体 + 4 个 vendored 依赖的 Perl 模块与 XS 共享库"
+    - "package/bin/: PDL 脚本（pdl / perldl / pdldoc，若上游 install 产出）"
+    - "package/licenses/: Artistic、Copying"
+
+patches_applied: []
+
+upstream_tests:
+  framework: "Perl Test::More / Test::Harness（sdist t/*.t）"
+  declared_files: 82
+  declared_cases: 1510
+  declared_scope: "sdist t/ 目录下全部 *.t（另有 Basic/ 等子模块测试未纳入声明）"
+  in_build: true
+  command: "perl -MTest::Harness -e 'runtests @ARGV' -- <subset>（build() 内 _run_tests）"
+  executed_files: 8
+  executed_note: "跑 conanfile _TEST_SUBSET 声明的 6 个核心文件（t/core.t、t/basic.t、t/slice.t、t/matrixops.t、t/reduce.t、t/ufunc.t），Test::Harness 实跑 1510 项全通过；其余 76 个未跑，理由见 test_package/MANIFEST.yml。"
+
+known_limitations:
+  - "本仓没有 XS 版 Perl 模块的先例：已发布的 perl-* 配方均为『纯 Perl——无编译』。PDL 是第一个真跑 Makefile.PL + 编译 XS 的包，XS 通路（perl 配方的 0004-extutils-xs-needed-on-ohos.patch）在 CI 上首验。"
+  - "OHOS 拒绝『先进 Conan 包缓存、后签名』的 XS ELF，故必须在构建树里用 /data/service/hnp/bin/binary-sign-tool + llvm-objcopy 签名后再 make install。"
+  - "PGPLOT / OpenGL / Inline / Term::ReadKey 等可选依赖未启用（不阻断编译与核心测试）。"
+  - "82 个 t/*.t 中执行 6 个（1510 项全过），其余 76 个未跑：CI 单包 3600s 预算 + 首次 XS 构建成本；子集与理由如实申报，未执行不等于通过。"
+
+knowledge_gained:
+  - "PDL 的 Makefile.PL 在 configure 阶段硬依赖 Devel::CheckLib，这是 Perl 世界最常见的『探测库』门槛；OHOS 上要确认它认 clang 与工具链三元组。"
+  - "Perl XS 在 OHOS 的完整链路：OHOS 版 perl（构建期可直接执行）+ 工具链 + 构建树内 ELF 签名。"
+  - "消费约定：perl 包通过 buildenv/runenv 的 PERL5LIB 暴露 lib/perl5/{version,site_perl/version,vendor_perl/version}[/archname]；模块包必须把自己的对应目录 prepend 进 PERL5LIB 才能被 require 到。"

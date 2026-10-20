@@ -1,0 +1,55 @@
+# conandata.yml — PDL 2.104（Perl Data Language）
+# 上游：CPAN，作者 ETJ，发行版 PDL-2.104（PDLPorters/pdl）
+# 平台任务：id=9406  name=pdl  version=2.104  lang=cpp（实为 Perl 发行版 + XS/C 核心）
+#
+# 说明：PDL 的 Makefile.PL 依赖 4 个「未发布到制品仓」的 CPAN 模块，
+# 按仓内 R36（依赖须先发布后使用）本应各自单独提 PR；本包采用与 jekyll 的
+# gem 闭包同构的「路线 A」：把它们与本体的 CPAN tarball 一起在本文件里以
+# url+sha256 固定，构建期依序安装进包内 site_perl，避免为一堆小模块各开一轮 PR。
+# 另有两个依赖（File::Which 1.27 / Test::Exception 0.43）已在制品仓，走 conan requires。
+
+sources:
+  # ── 本体 ───────────────────────────────────────────────────────────
+  PDL-2.104.tar.gz:
+    url: "https://cpan.metacpan.org/authors/id/E/ET/ETJ/PDL-2.104.tar.gz"
+    sha256: "3d646ce3e1caac50c878639406ac27e5283e554daf9021ed86436314b21bf1e4"
+
+  # ── 未发布的非核心依赖（vendored closure，安装顺序即依赖顺序）──────────
+  # Module::Build：File::Map 是 Module::Build 发行版（只有 Build.PL，没有
+  # Makefile.PL），而 Module::Build 自 5.22 起不再是 Perl 核心模块，必须随包提供。
+  # 它自身仍带传统的 Makefile.PL 引导，所以能先用 MakeMaker 装上，再驱动 File::Map。
+  Module-Build-0.4234.tar.gz:
+    url: "https://cpan.metacpan.org/modules/by-module/Module/Module-Build-0.4234.tar.gz"
+    sha256: "66aeac6127418be5e471ead3744648c766bd01482825c5b66652675f2bc86a8f"
+  # File::Map 的 test 期前置（./Build 缺前置会 rc=255 直接中止；CI 实测）
+  Sub-Exporter-Progressive-0.001013.tar.gz:
+    url: "https://cpan.metacpan.org/modules/by-module/Sub/Sub-Exporter-Progressive-0.001013.tar.gz"
+    sha256: "d535b7954d64da1ac1305b1fadf98202769e3599376854b2ced90c382beac056"
+  # configure 阶段硬门槛：PDL 的 Makefile.PL 用它探测 libm/libpgplot
+  Devel-CheckLib-1.16.tar.gz:
+    url: "https://cpan.metacpan.org/modules/by-module/Devel/Devel-CheckLib-1.16.tar.gz"
+    sha256: "869d38c258e646dcef676609f0dd7ca90f085f56cf6fd7001b019a5d5b831fca"
+  # runtime 依赖，含 XS（依赖仓内 perl 的 0004-extutils-xs-needed-on-ohos 补丁）
+  File-Map-0.71.tar.gz:
+    url: "https://cpan.metacpan.org/modules/by-module/File/File-Map-0.71.tar.gz"
+    sha256: "c8e26933804e870d4aba92623b7886ac8b3c760c98fbfcd3bdc4b2305c464759"
+  # 上游测试套件依赖（纯 Perl）
+  Test-Deep-1.205.tar.gz:
+    url: "https://cpan.metacpan.org/modules/by-module/Test/Test-Deep-1.205.tar.gz"
+    sha256: "42781e9943a7a215e662c4973b9feafdc019fd16469bdb849a8537ee58956273"
+  Test-Warn-0.37.tar.gz:
+    url: "https://cpan.metacpan.org/modules/by-module/Test/Test-Warn-0.37.tar.gz"
+    sha256: "98ca32e7f2f5ea89b8bfb9a0609977f3d153e242e2e51705126cb954f1a06b57"
+
+patches:
+  # File::Map 的两个 test 期前置（Test::Fatal / Test::Warnings）在 OHOS 上会连累
+  # 核心 warnings/Test2 加载（CI 实测：Test::Warnings 安装后核心 Test2 模块集体报
+  # "Attempt to call undefined unimport method ... via package warnings"）。
+  # 本包不运行 File::Map 的测试，故按 test 期前置移除；File::Map 真正的 runtime
+  # 依赖 Sub::Exporter::Progressive 仍然安装。仅改测试元数据，源码零改动。
+  - patch_file: "patches/0001-file-map-drop-test-prereqs.patch"
+    patch_description: "Drop File::Map test-phase prereqs Test::Fatal/Test::Warnings (they break core warnings/Test2 loading on OHOS). Test-metadata only; File::Map sources untouched; its runtime dep Sub::Exporter::Progressive is still built."
+    patch_type: "portability"
+  - patch_file: "patches/0002-pdl-nopthread-dummy-versions.patch"
+    patch_description: "Add the two missing dummy versions of the pthread-only helpers to the pdlmagic.c no-pthread #else block: upstream shims only pdl_pthread_main_thread and pdl_pthread_barf_or_warn, while pdl_pthread_realloc_vsnprintf and pdl_pthread_free are still called from unguarded code and stay undefined, so Core.so fails to load with Error relocating Core.so: pdl_pthread_free: symbol not found. Both callers are unreachable when pthreading is off (pdl_pthread_main_thread returns 1), so behaviour is unchanged."
+    patch_type: "portability"
