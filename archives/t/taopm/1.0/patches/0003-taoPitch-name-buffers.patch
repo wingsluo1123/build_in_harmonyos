@@ -1,0 +1,83 @@
+diff --git a/libtao/TaoPitch.cc b/libtao/TaoPitch.cc
+index 1912d55..9c8db52 100644
+--- a/libtao/TaoPitch.cc
++++ b/libtao/TaoPitch.cc
+@@ -59,7 +59,13 @@ extern "C"
+ //////////////////////////////////////////////////////////////////////////////
+ 
+ 
+-TaoPitch::TaoPitch() {}
++TaoPitch::TaoPitch()
++    {
++    name=NULL;
++    pitchVersion=0.0;
++    octaveVersion=0.0;
++    frequencyVersion=0.0;
++    }
+ 
+ TaoPitch::TaoPitch(const char *pitchName)
+     {
+@@ -140,7 +146,7 @@ TaoPitch::TaoPitch(const char *pitchName)
+ 
+     frequency = pow(2, value - 8.0) * 261.6;
+ 
+-    this->name=new char[nameLength];
++    this->name=new char[nameLength+1];
+     strcpy(this->name, pitchName);
+     this->frequencyVersion=frequency;
+     this->pitchVersion=octave+semitone;
+@@ -152,6 +158,8 @@ TaoPitch::TaoPitch(float pitch)
+     {
+     double octave, semitone;
+ 
++    name=NULL;
++
+     if (pitch==0.0)
+ 	{
+ 	this->name=new char[4];
+@@ -177,6 +185,8 @@ TaoPitch::TaoPitch(float value, TaoPitchFormat format)
+     {
+     double octave, semitone, frequency, fraction;
+ 
++    name=NULL;
++
+     if (format==pch)
+ 	{    
+ 	this->pitchVersion=value;
+@@ -228,6 +238,8 @@ TaoPitch::~TaoPitch()
+ 
+ TaoPitch &TaoPitch::operator=(const TaoPitch &p)
+     {
++    if (this==&p) return *this;
++    delete [] name;
+     name = new char[strlen(p.name)+1];
+     
+     strcpy(name, p.name);
+@@ -256,10 +268,10 @@ void TaoPitch::createName()
+     wholesemi=(int)(semitone*100.0+0.5);
+     fractsemi=(int)((semitone-(wholesemi/100.0))*10000.0);
+     
+-    name=new char[12];
+-    
+-    //ostrstream nameStream(name, 12);
+-    std::ostringstream nameStream(name, std::ostringstream::out);
++    // The C++98 out-of-line stream constructor that used to write
++    // into a fixed buffer is gone; build the name in a std::string and
++    // copy it out instead.
++    std::ostringstream nameStream(std::ostringstream::out);
+     
+     switch(wholesemi)
+ 	{
+@@ -279,5 +291,11 @@ void TaoPitch::createName()
+ 
+     nameStream << octave;
+     if (fractsemi>0) nameStream << "+" << fractsemi << "/100";
+-    nameStream << std::ends;
++
++    // <sstream> guarantees std::string, and this file already uses the
++    // C string functions, so no extra include is needed here.
++    const std::string result=nameStream.str();
++    delete [] name;
++    name=new char[result.size()+1];
++    strcpy(name, result.c_str());
+     }
