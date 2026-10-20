@@ -1,0 +1,28 @@
+Use umask 022 for the config.status temporary directory.
+
+The upstream autoconf-generated bootstrap creates its temporary
+directory with umask 077.  On HMDFS-backed CI workers every directory
+inherits the setgid bit from the parent, which combines with umask 077
+into group-unwritable directories that break subsequent config.status
+runs ("Something went wrong bootstrapping makefile fragments").
+Relaxing to umask 022 matches what the a52dec 0.7.4 recipe already
+ships for the same worker quirk; mktemp-created directories are still
+private to their owner.
+
+--- a/configure
++++ b/configure
+@@ -15850,12 +15850,12 @@
+ # Create a (secure) tmp directory for tmp files.
+ 
+ {
+-  tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null` &&
++  tmp=`(umask 022 && mktemp -d "./confXXXXXX") 2>/dev/null` &&
+   test -d "$tmp"
+ }  ||
+ {
+   tmp=./conf$$-$RANDOM
+-  (umask 077 && mkdir "$tmp")
++  (umask 022 && mkdir "$tmp")
+ } || as_fn_error $? "cannot create a temporary directory in ." "$LINENO" 5
+ ac_tmp=$tmp
+ 
