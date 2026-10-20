@@ -1,0 +1,39 @@
+package: taopm/1.0
+homepage: "https://sourceforge.net/projects/taopm/"
+
+# 上游没有自动化测试框架：没有任何 Makefile.am 声明 TESTS，`make check' 为空，
+# 源码包里也没有 tests/ 目录。上游可执行的验证资产是 examples/ 里的 20 个
+# `.tao' 示例乐谱，全部已在真机做 parse -> build -> run 验证（20/20，14 个输出流）。
+upstream_test_in_build: false
+upstream_tests:
+  - file: examples
+    description: >-
+      The release ships 20 example scores instead of a test suite.  All of them
+      were translated with the packaged taoparse, compiled against libtao and
+      executed on the OHOS device: 20/20 parse, 20/20 build, 20/20 run.
+    command: "taoparse <name>.tao && clang++ -DTAO_NO_GRAPHICS <name>.cc -ltao -lm && ./<name>"
+    cases: 20
+
+test_package_tests:
+  - file: test_tao.cpp
+    description: >-
+      Real libtao consumer: builds a 220 Hz TaoString, plucks it, renders
+      0.25 s through a TaoOutput device and checks the .dat container plus the
+      waveform (energy, finiteness, zero-crossing pitch).
+    command: "./test_tao_api tao_api_test_out1"
+    cases: 11
+  - file: test_script.tao
+    description: >-
+      taoparse translates the score to C++ at build time; the generated
+      program then runs tao.main() headless and must write both declared
+      output streams.
+    command: "./test_tao_script"
+    cases: 1
+  - file: check_wav.cpp
+    description: >-
+      Walks the RIFF chunks of the file produced by tao2wav / taosf and checks
+      the PCM fmt chunk (44100 Hz, 16 bit) and a non-silent data payload.
+    command: "./check_wav test_script_out1.wav"
+    cases: 14
+
+assertion_count: 40

@@ -1,0 +1,49 @@
+software: taopm
+version: "1.0"
+# 配方、补丁、本机验证（编译 + AddressSanitizer + API 功能测试）与真机单包验证
+# （conan create + test_package 全绿，exit 0，2026-10-18）均已完成；
+# 尚未 conan upload，按 R29 口径为 built。
+status: built
+build_date: "2026-10-18"
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/t/taopm/taopm_1.0.orig.tar.gz"
+  sha256: "ff0af736ba991d7965be2ab6441c6f5010618f5de648d05ca3f4d56adef0d794"
+  tar_format: tar.gz
+  # 同一份上游 release 的官方地址（SourceForge 对本构建宿主返回 403）：
+  # https://sourceforge.net/projects/taopm/files/Tao/tao-1.0-beta-10May2006.tar.gz
+
+build:
+  # 上游是 2006 年的 autoconf-2.13 / libtool-1.3 树，其 configure 强制要求
+  # 桌面 GL/GLU/GLUT + X11，且 config.guess 不支持 aarch64/ohos；
+  # 配方按上游 Makefile.am 的源码清单显式编译（详见 conanfile.py 模块注释）。
+  system: custom
+  configure_options:
+    - "-DTAO_NO_GRAPHICS"
+    - "-O2 -fPIC"
+    - "-std=c++<profile cppstd>"
+  dependencies:
+    - audiofile/0.3.6
+    - bison/3.8.2 (tool_requires)
+    - flex/2.6.4.2 (tool_requires)
+    - m4/1.4.19 (tool_requires; flex 运行期需要 m4)
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-ohos-build-without-gl-graphics.patch"
+  - "0002-cxx11-and-later.patch"
+  - "0003-taoPitch-name-buffers.patch"
+
+knowledge_gained:
+  - "OHOS 只有 EGL/GLES：已发布的 freeglut/3.6.0 是 EGL-pbuffer/GLES2 版，GLES 驱动不导出 glBegin/glEnd 等立即模式入口，TaoGraphicsEngine 只能重写不能链接"
+  - "configure.in 强制检查 MesaGL/GL、MesaGLU/GLU、glut 与 X11，且 config.guess 不支持 aarch64，autoconf 2.13/libtool 1.3 宏已被现代 autotools 移除 => 不可再生 configure"
+  - "2006 年代码在 C++17 下的典型阻塞：register 关键字、隐式 int main()、非 const 的 yyerror(char*)、缺 <cstring>、非 void 函数无 return"
+  - "C++98 的 ostringstream(char*, openmode) 在 C++11 变成 ostringstream(const std::string&)，会让老代码读取未初始化缓冲区（ASAN: heap-buffer-overflow）"
+  - "taodefs.h 定义 min/samples/secs/msecs 等单位宏，标准库头在其后 include 会被宏改写；生成程序必须把标准库头放前面"
+  - "OHOS bison 包 prefix=/，运行期要用 BISON_PKGDATADIR 指向包内 share/bison"
+  - "OHOS flex 二进制写死构建期 m4 绝对路径，需要显式 tool_requires m4 并导出 M4=<path>"
+  - "bison/flex/m4 的工具与数据目录必须从 Conan 包目录解析，不能用 command -v 反推：CI worker 的 /data/service/hnp/bin 会同名抢 PATH（PR #16744 构建 #98634 实测）"
+  - "taoparse 用 strtok(argv[0], '.') 推导输出流名：必须以裸相对文件名调用，绝对路径会把目录里的点当成后缀分隔"
+  - "Conan 2 的 self.run 会把绝对命令路径缩短成 basename，配合 cd 时要用复制到运行目录的相对名调用"
+  - "TaoOutput 写 .dat 的 ofstream 未以 binary 打开：Windows 宿主会插入 CR，OHOS/Linux 文本模式与二进制一致，不受影响"
