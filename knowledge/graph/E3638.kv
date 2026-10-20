@@ -1,0 +1,54 @@
+#====================================================================
+# DRAFT knowledge entry - 共享真机 ~/usr/local/lib 遗留 .la/.a：持全局锁窗口隔离、跑完恢复
+# Source: xmedcon/0.26.1-gtk3 真机 shadow CI r11-r13（2026-10-13/16）
+#====================================================================
+
+id:                     E3638
+trigger_tool: libtool|ld.lld|clang|make
+phase: build|shadow-ci
+error_signature: no such file or directory.*usr/local/lib.*\.(so|la)|undefined symbol.*in archive.*usr/local/lib.*\.a|is not a valid libtool archive
+severity:               2
+category:               ohos, linking, libtool, shadow-ci, shared-device
+match_keywords: usr/local/lib, .la, libtool archive, dependency_libs, 静态库 shadow, libglib-2.0.a, libtiff.so, 共享设备, 隔离, quarantine, 设备全局锁
+
+title: 共享真机 ~/usr/local/lib 的遗留 .la/.a 被 libtool/ld 命中——持设备全局锁窗口整类隔离、跑完恢复、零删除
+
+root_cause: >
+  共享真机的 ~/usr/local/lib 常有历史实验遗留的 .la（Debian libtool 生成，
+  dependency_libs 全绝对路径指向已不存在/未签名的 .so）和静态 .a（如 glib-2.88
+  的 libglib-2.0.a，无 pcre2）。conan 依赖包不带 .la 时，libtool 解析 -ltiff 等
+  会回落到这些坏 .la 展开出绝对路径；即使 .la 隔离后，ld 仍会把 -lglib-2.0
+  解析到同目录的静态 .a（静态 shadow），符号全缺。
+
+affected_scope: 共享真机（多任务共用、有历史遗留 usr/local 环境）上的
+  autotools/libtool 包 shadow CI 或本地构建；交叉构建宿主不适用。
+
+verification_cmd: >
+  # 链接期报错里的路径是否落在 ~/usr/local/lib：
+  grep -n "usr/local/lib" <build-log>
+  # 隔离前后文件集合一致性（跑前跑后各跑一次，diff 为空才算恢复完整）:
+  ls /storage/Users/*/usr/local/lib | sort > /tmp/before; ... ; ls ... | sort > /tmp/after; diff /tmp/before /tmp/after
+
+rec_priority: 1
+rec_approach: lock-scoped-quarantine-and-restore
+rec_description: >
+  在持有设备全局锁（mkdir 原子锁）的窗口内，把 ~/usr/local/lib 的 *.la 与报错
+  涉及的 .a 家族 mv 进隔离目录；构建结束原样 mv 回来。按报错逐轮扩隔离面
+  （先 .la 后 .a），隔离清单落盘留痕，零删除。
+rec_command: >
+  QUAR=~/usr/local/lib/.la-quarantine-<pkg>-r<N>; mkdir -p "$QUAR";
+  for f in ~/usr/local/lib/*.la ~/usr/local/lib/libglib-2.0.a ...; do [ -e "$f" ] && mv "$f" "$QUAR/"; done;
+  <build>;
+  mv "$QUAR"/* ~/usr/local/lib/ && rmdir "$QUAR"
+rec_auto_fix: false
+rec_impl: manual
+fallback_priority: 3
+fallback_approach: full-static-build
+fallback_description: >
+  对纯 CLI 包可考虑 --disable-shared 绕开 libtool 共享解析；有 GUI/多产物的包
+  不适用，仍走隔离方案。
+authors: codex
+source_pr: "16199"
+source_commit: pending
+last_updated:               2026-10-19
+doc_file:               doc/E3638.md

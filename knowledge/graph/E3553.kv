@@ -1,0 +1,49 @@
+id:                     E3553
+trigger_tool:           interpreter|lisp|prolog|scheme|make|autotools|wrapper|test_package
+phase:                  building|testing|consumer-run
+error_signature:        Signal 11 \(core dumped\)|SIGSEGV.*deep recursion|Error 139|stack overflow
+severity:               2
+category:               hmdfs, ohos, interpreter, shell-capability, stack
+match_keywords:         ulimit, mksh, hnp bash, stack, Signal 11, GC, recursion, wrapper, no-op, 跳板
+title:                  OHOS shell ulimit capability differs (mksh silent no-op); stack escalation must land on every exec hop via a capability-tested shell
+root_cause:             OHOS device default main-thread stack (8MB) is too small for
+                        deep C recursion inside old interpreters (GC mark phase,
+                        compiler recursion). ulimit is a process attribute that only
+                        inherits downward, so raising it once is insufficient; and
+                        /system/bin/sh (mksh) implements ulimit -s as a silent no-op
+                        (empty query output, rc=0), while hnp bash applies it for real.
+rec_priority:           1
+rec_approach:           capability-probe each candidate shell for ulimit -s, then land
+                        the raise on every exec hop: build step scripts, the installed
+                        wrapper script, and the consumer test harness; validate by
+                        repeat-count crash rate (>=10 runs) on exit codes, not on
+                        captured output (SEGV drops stdio buffers).
+rec_command:            ulimit -s unlimited 2>/dev/null || ulimit -s 65536 2>/dev/null || true
+rec_auto_fix:           false
+rec_impl:               conan-recipe-step-scripts-and-wrapper-patch-and-test-harness
+fallback_priority:      2
+fallback_approach:      skip-if-no-capability
+fallback_description:   If no capable shell exists on the device, record the crash as a
+                        platform hard limit with the 20/20-vs-N/N evidence pair; do not
+                        claim a fix from a silent no-op.
+forbid_1_pattern:       ulimit -s unlimited 2>/dev/null \|{1,2} true
+forbid_1_reason:        The `|| true` fallback hides the mksh silent no-op; the raise
+                        looks applied but the limit is unchanged.
+forbid_1_consequence:   Intermittent/deterministic SIGSEGV survives every "fixed" run;
+                        the failure gets misattributed to the wrong root cause.
+forbid_2_pattern:       grep.*Signal 11.*\|\| (ok|pass)
+forbid_2_reason:        Counting crashes by absence of captured "Signal 11" text is
+                        unreliable: SEGV drops buffered stdio, and instrumented inputs
+                        (polluted .orig restore chains) produce false negatives.
+forbid_2_consequence:   False pass evidence; polluted shared inputs keep being re-tested.
+affected_scope:         OHOS/HarmonyOS PC native builds and consumer tests of deep-C-
+                        recursion programs (Lisp/Prolog/Smalltalk interpreters, macro
+                        expanders, recursive-descent parsers, self-hosting compilers);
+                        any ulimit escalation under multi-shell environments (mksh + hnp bash).
+verification_cmd:       run the failing input >=10 times via each candidate shell with
+                        `ulimit -s` query before/after; count nonzero exits by pipeline
+                        exit code only
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E3553.md
+rec_description:        capability-probe each candidate shell for ulimit -s, then land

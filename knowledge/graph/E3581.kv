@@ -1,0 +1,38 @@
+id:                     E3581
+trigger_tool: python
+phase: testing
+error_signature: No module named .test.|PermissionError.*Operation not permitted|context has already been set
+severity:               3
+category:               platform, compat, detection, testing
+match_keywords: CPython,test.support,PYTHONPATH,stdlib,origin,shadowing,multiprocessing,vendor
+title: Isolate CPython test support namespaces to preserve vendor-adapted standard library behavior
+root_cause: A complete upstream CPython Lib on PYTHONPATH silently replaces vendor-adapted runtime modules even when the installed third-party package origin is correct. Its fork may also retain stale capability and address-selection policies.
+affected_scope: Python packages reusing CPython regression tests on vendor-adapted or slim interpreters; especially stdlib forks spawning fresh processes
+verification_cmd: Record __file__ for test.support, subprocess, multiprocessing.context and multiprocessing.util in parent and fresh children; compare default context and actual AF_UNIX bind capabilities
+rec_priority: 1
+rec_approach: isolate-cpython-test-support-and-verify-runtime-origins
+rec_description: Extract the matching official CPython test namespace alone into a build-private support root. Keep runtime stdlib outside that root; test the installed package from another cwd and trace parent and child origins. Apply vendor capability decisions without freezing global context and ensure address producers consume those decisions.
+rec_command: Copy only Lib/test to test-support/test; inherit test-support plus installed site on PYTHONPATH; python -s -P -m multiprocess.tests
+rec_auto_fix: false
+rec_impl: Private test namespace, version-pinned interpreter, installed-origin guard, behavior probes and fresh-child regressions
+fallback_priority: 2
+fallback_approach: use-interpreter-supplied-test-support
+fallback_description: If matching test.support is already present, validate its interpreter version and runtime origins before reuse
+fallback_auto_fix: false
+forbid_1_pattern: PYTHONPATH=.*Python-.*/Lib
+forbid_1_reason: Full upstream Lib shadows vendor runtime adaptations and can create false package failures
+forbid_1_consequence: Correct installed package path coexists with wrong standard-library policies in parents and children
+forbid_2_pattern: set_start_method.*force=True
+forbid_2_reason: Do not force process-global stdlib state to hide a third-party import side effect
+forbid_2_consequence: Consumers lose their ability to select a process start policy
+principles:
+doc_file: knowledge/drafts/E429-draft-M019.md
+last_updated: 2026-10-15
+source_event: multiprocess 0.70.19 task15170; missing support, full-Lib shadow failure, namespace-only control, import-side-effect RED/GREEN and real IPC consumers
+authors: chenicia
+source_pr:
+source_commit:
+metrics_success_count: 0
+metrics_fail_count: 0
+metrics_confidence: 0.0
+metrics_last_used:

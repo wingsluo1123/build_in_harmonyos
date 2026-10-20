@@ -1,0 +1,37 @@
+#====================================================================
+# DRAFT-xeus-zmq-4.0.0-cmakedeps-consumer-view-mismatch.kv
+# Conan 2 库消费链上 CMakeDeps 生成视图与上游 CMakeLists 期望不匹配
+# 完整叙事与证据见同目录 .md
+#====================================================================
+
+id:                     E3590
+trigger_tool:           conan|cmake
+phase:                  package|generate|configure
+error_signature:        .*in version range .* is not a valid option|Could not find a package configuration file provided by "xeus"|The following configuration files were considered but not accepted.*version: 6.0.5|The link interface of target "OpenSSL::Crypto" contains.*but the target was not found
+severity:               2
+category:               cmake, conan, packaging, c++-libraries
+match_keywords:         conan, CMakeDeps, ConfigVersion, version range, major alignment, find_package, namespaced target, alias, header-only, cppzmq, libzmq, openssl, OpenSSL::Crypto, shim, generators, binary-sign-tool, conan create, configure
+title:                  Conan 2 库消费链上 CMakeDeps 生成的 CMake 视图（版本 major 对齐、命名空间 target、header-only 链接传播、无 config 库 shim）与上游 CMakeLists 期望不匹配，conan create 主包 configure 阶段逐层失败
+root_cause:             CMakeDeps 在消费端生成的 CMake 视图与上游 CMakeLists 假设不同：(1) *-config-version.cmake 强制 PACKAGE_FIND_VERSION_MAJOR 与 PACKAGE_VERSION 的 major 相等才 COMPATIBLE，上游 CMakeLists 中残留的旧 major 最低版本声明（xeus-zmq 的 find_package(xeus 5.0.0) vs 实际配套 xeus 6.0.5）被拒；(2) CMakeDeps 生成命名空间 IMPORTED target（xeus::xeus/libzmq::libzmq），上游链接无命名空间 xeus/libzmq 需 alias 桥接；(3) header-only 包装库（cppzmq）不传播底层库（libzmq），私实现链接需显式再链接 libzmq；(4) openssl 配方无 CMake config，消费端 shim 引用 CMakeDeps target 必须先 include openssl-config.cmake 否则生成阶段 target 不存在；(5) 主配方缺 generators="CMakeDeps" 类属性时依赖 config 完全不生成；(6) Conan 2.31 版本范围不接受逗号分隔（[>=6.0,<7.0]），需空格分隔
+affected_scope:         任何 Conan 2 library 配方消费多个已发布 Conan 库、上游 CMakeLists 直接链接无命名空间 target / 依赖 header-only 包装库 / 依赖无 CMake config 的库（openssl 等）时；CMake 项目走 CMakeDeps 消费链；OHOS/Linux 还需处理二进制签名工具双路径
+verification_cmd:       conan create archives/x/xeus-zmq/4.0.0 -pr:h ohos-aarch64 -pr:b ohos-aarch64 --build=missing -c tools.build:jobs=2；修复前 configure 逐层失败（版本范围 → find_package → major 拒绝 → OpenSSL target 未定义），修复后 configure/编译/安装/签名/package/test_package 全部通过（真机 frp-tip.com:56267，OHOS 6.0 aarch64 clang15）
+rec_priority:           1
+rec_approach:           consumer-view-alignment
+rec_description:        主配方类属性声明 generators="CMakeDeps"；版本范围用空格分隔；patch 上游 CMakeLists 将 xeus_REQUIRED_VERSION 对齐实际 major 并加命名空间→无命名空间 alias（xeus、libzmq），私实现显式链接 libzmq；无 config 依赖（openssl）生成 shim 时先 include CMakeDeps config 再暴露约定 target；签名工具用 shutil.which + 真机双路径 fallback；真机构建设 TMPDIR 并限 -c tools.build:jobs=2
+rec_command:            generators = "CMakeDeps"\nself.requires("xeus/[>=6.0 <7.0]", ...)\n# patch: set(xeus_REQUIRED_VERSION 6.0.0) + alias xeus/libzmq + PRIVATE libzmq\n# shim: include("${CMAKE_CURRENT_LIST_DIR}/openssl-config.cmake") 再暴露 OpenSSL::Crypto\n# sign: shutil.which("binary-sign-tool") or "/storage/Users/currentUser/usr/local/bin/binary-sign-tool"
+rec_auto_fix:           false
+rec_impl:               manual-conan-recipe
+forbid_1_pattern:       xeus/\[>=6.0,<7.0\]|find_package\(xeus 5\.0\.0\)|INTERFACE_INCLUDE_DIRECTORIES.*\.conan2.*/include|binary-sign-tool\"\s*$|generators\s*=\s*"CMakeToolchain"$
+forbid_1_reason:        逗号版本范围报 invalid option；残留旧 major 最低版本声明导致 CMakeDeps major 拒绝；shim 硬编码 package 路径会随目录漂移；签名工具写死单目录在裸 SSH 找不到；只声明 CMakeToolchain 不声明 CMakeDeps 则依赖 config 不生成
+forbid_1_consequence:   configure 阶段失败且错误信息误导（find_package 路径 vs 版本兼容 vs target 未定义）；真机与 CI 环境行为分叉
+principles:
+doc_file:               DRAFT-xeus-zmq-4.0.0-cmakedeps-consumer-view-mismatch.md
+last_updated:           2026-10-15
+source_event:           xeus-zmq 4.0.0 OHOS PC 适配（conan create run1→run5 主包 configure 逐层失败定位）
+authors:                gcw_6YxinkyD
+source_pr:              (本 PR 提交后回填)
+source_commit:          (本 PR 合并后回填)
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-15

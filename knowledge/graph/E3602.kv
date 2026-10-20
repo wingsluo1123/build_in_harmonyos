@@ -1,0 +1,126 @@
+#====================================================================
+# _template.kv — 知识图谱条目模板
+# 用法: 复制此文件为 E2296.kv，填写各字段
+# 对应的人类文档: doc/E2296.md
+#
+# 格式规则:
+#   - key: value（冒号后一个空格，value 到行尾）
+#   - 多行值: 下一行以空格开头 = 续行
+#   - 列表值: 逗号分隔
+#   - 正则值: | 分隔多个模式
+#   - 以 # 开头的行为注释
+#   - 空行忽略
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+# trigger_tool: 出错的工具 (configure/cmake/meson/make/gcc/clang/ld/python/pip/install/test/runtime)
+# phase:         出错阶段 (configuration/compilation/linking/installation/testing/runtime)
+# error_signature: 正则表达式(|分隔), 用于精确匹配日志文本
+id:                     E3602
+trigger_tool:           make|test
+phase:                  testing
+error_signature:        test_nua test_event_fetch\(\) FAILED|Responding to a Non-Existing Request|nua_r_subscribe status 500 Internal Server Error
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+# severity:      3=🔴blocking  2=🟡medium  1=🟢minor  0=✅resolved
+# category:      分类标签（受控词表 64 词，逗号分隔，最多 5 个；add/promote 自动归一化）
+# prescan_pattern: （可选）预编译源码扫描正则——写入后 PreScanner 运行时自动派生
+#                   PSCAN-KB-{id} 规则，无需改 pre-scan-rules.yaml（知识增长即扫描能力增长）
+# prescan_globs:   （可选）扫描范围 glob 列表，默认 '*.c, *.h, *.cc, *.cpp, *.sh, Makefile*, *.mk'
+# 词表: platform, compat, limitation, detection, hmdfs, ohos, selinux, kernel, portability, libc, musl, posix, syscall, headers, threading, socket, network, build-system, cmake, autotools ...（全表见 scripts/ohc/kb_taxonomy.py）
+# match_keywords: 纯文本关键词(逗号分隔), 用于粗筛(固定字符串匹配F)
+# title:         简短标题(一句话描述错误模式)
+severity:               2
+category:               compat, ohos, network, testing
+match_keywords:         Sofia-SIP, NUA, event-fetch, SUBSCRIBE, NOTIFY, NUA-11.6.2, Non-Existing Request, 500 Internal Server Error
+title:                  终止态 NOTIFY 不得提前销毁待回应的 SUBSCRIBE
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+# root_cause:       一句话根因描述(逗号可分行)
+# affected_scope:   影响范围
+# verification_cmd: 验证诊断是否正确的命令
+root_cause: >
+  NUA 在发送终止态 NOTIFY 时发现关联的初始 SUBSCRIBE 仍待应用回应，于是将 sr_terminating 设为 1，
+  以便 SUBSCRIBE 最终回应后再结束 usage。但 nua_notify_client_request() 没有同时清除 NOTIFY 的
+  cr_terminating 标志；NOTIFY 收到 200 后，nua_client_response() 将 cr_terminated 设为 1，随后的
+  nua_client_report() 立即移除 notifier usage，并销毁关联的 pending SUBSCRIBE server request。
+  测试随后延迟回应该 SUBSCRIBE 时，nua_stack_respond() 找不到请求并报
+  "Responding to a Non-Existing Request"；客户端收到 500。若直接删掉延迟回应，请求也会因没有最终
+  响应而以 500 结束。
+affected_scope: >
+  Sofia-SIP 1.13.18 的 NUA-11.6.2 event-fetch，以及终止态 NOTIFY 在初始 SUBSCRIBE 最终回应前
+  完成的 notifier 流程。
+verification_cmd: |
+  cd "$BUILD_FOLDER"
+  . conan/conanbuild.sh
+  make -j2
+  make -C tests test_nua
+  SOFIA_OHOS_TEST_NUA_NO_NAT=1 SOFIA_OHOS_TEST_NUA_EXTENDED_TIMEOUT=1 ./tests/test_nua -e
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+# 推荐方案 (priority 越小越优先, 从 1 开始)
+rec_priority:           1
+rec_approach:           defer-notifier-usage-termination
+rec_description: >
+  nua_notify_client_request() 找到仍 pending 的 SUBSCRIBE 时，标记 sr_terminating 以便最终回应后
+  移除 usage，并调用 nua_client_set_terminating(cr, 0)，避免终止态 NOTIFY 的成功响应提前清理 usage。
+rec_command:            clear NOTIFY termination while pending SUBSCRIBE exists
+rec_auto_fix:           false
+rec_impl:               retain-pending-subscribe-until-final-response
+
+# 回退方案 (当推荐方案不可用时尝试)
+fallback_priority:      2
+fallback_approach:      inspect-nua-usage-cleanup-order
+fallback_description: >
+  沿 cr_terminating、cr_terminated、nua_client_report() 和 nua_dialog_usage_remove() 的状态变化检查，
+  确认 pending sr 在 SUBSCRIBE 最终回应前仍留在 dialog state 中；不要放宽 202/200 断言。
+fallback_command:       trace notifier usage and pending server request lifetime
+fallback_auto_fix:      false
+fallback_impl:
+
+# ★ 禁止策略 (与推荐方案同等重要) ★
+# forbid_N_pattern:     正则(|分隔), 匹配则拒绝/警告
+# forbid_N_reason:      为什么禁止
+# forbid_N_consequence: 违反后的后果
+forbid_1_pattern:       remove.*delayed.*RESPOND|accept.*500.*event.fetch
+forbid_1_reason:        删除合法的延迟 SUBSCRIBE 最终回应会掩盖 usage 生命周期错误并留下 500。
+forbid_1_consequence:   event-fetch 客户端仍收不到 202/200，且 NUA-11.6.2 与复用它的检查失败。
+# forbid_2_pattern:
+# forbid_2_reason:
+# forbid_2_consequence:
+
+# ═══ Layer 4: 原则引用 ═══
+# principles:    适用的原则 ID 列表(逗号分隔), 在 graph/principles.kv 中定义
+principles:
+
+# ═══ 关系图 (Relations) ═══
+# causes:          本模式是这些模式的根因 (修好本模式可能同时解决它们)
+# caused_by:       本模式的根因是这些模式 (应先修它们)
+# similar_to:      特征相似可能混淆的模式
+# conflicts_with:  解决方案互相冲突的模式
+# prerequisite_of: 本模式是修复这些模式的前置条件
+# ═══ 元数据 ═══
+doc_file:               doc/E2296.md
+last_updated: 2026-10-18
+source_event:           Sofia-SIP 1.13.18 HarmonyOS aarch64 test_nua: terminated NOTIFY cleanup destroyed the pending event-fetch SUBSCRIBE before its final response
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+# authors: 作者列表 (格式: Name <email>, Name2 <email2>)
+#          草稿生成时自动从 git config 填入；主编合入时保留原作者
+#          合并到已有条目时追加为第二/第三作者
+# source_pr:            添加该条目的 PR 编号
+# source_commit:        添加时的 commit SHA (短)
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics, 方案 D) ═══
+# metrics_success_count: 该修复方案成功次数
+# metrics_fail_count:    该修复方案失败次数
+# metrics_confidence:    置信度 = success / (success + fail)
+# metrics_last_used:     最后使用时间
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-18
+authors:               7880

@@ -1,0 +1,49 @@
+#====================================================================
+# DRAFT — 本平台 C 库的内存流不可用：open_memstream()/fmemopen() 建立的流
+#         fclose() 返回 EBADF、丢弃已写内容，进程随后在退出阶段崩溃
+# Timestamp: 2026-10-16
+# Software: libdisplay-info 0.4.0（meson，纯 C；上游用 open_memstream 拼字符串）
+# Status: DRAFT — 待复审提升为正式 E 条目
+#
+# 现场证据（OHOS 设备）：
+#   最小复现（12 行 C）：
+#     FILE *f = open_memstream(&buf, &len); fputs("hello world", f);
+#     int rc = fclose(f);   → rc = -9 (EBADF), len = 0, buf = ""
+#     进程返回后 → SIGTRAP (exit 133) / SIGILL (exit 132)，core dumped
+#   同一程序里 fclose() 普通文件流 rc=0 正常；fmemopen() 同样 fclose 失败。
+#   在 libdisplay-info 上的表现：
+#     di_info_get_make/model/serial 返回 NULL（memory_stream_close 里 fclose 失败→丢弃）
+#     di-edid-decode 输出 "MHz ()"（join_str 也走 open_memstream）
+#     修掉这两处后：meson test 的 34 个 print 用例从 0/34 SIGTRAP → 34/34 通过
+#
+# To promote:
+#   1. Review the evidence below
+#   2. Rename to Ennn.kv and move to knowledge/graph/
+#   3. Add a row to knowledge/graph/index.tsv
+#   4. Write knowledge/doc/Ennn.md
+#====================================================================
+
+id:                     E3634
+trigger_tool:           gcc|clang|make|meson|test|runtime
+phase:                  compilation|linking|runtime|testing
+error_signature:        open_memstream|fmemopen|Trace/breakpoint trap|SIGTRAP|exit status 133|Illegal instruction|exit status 132|Invalid extension checksum|\(\)|== NULL|fclose.*-9|EBADF
+severity:               2
+category:               limitation, portability, libc, musl, memory
+match_keywords:         open_memstream, fmemopen, fclose, EBADF, errno 9, memory stream, SIGTRAP, SIGILL, trace/breakpoint trap, core dumped, exit 133, exit 132, __stdio_close, F_MEM, string API returns NULL, join_str, growable buffer, realloc, atexit crash
+title:                  本平台 C 库内存流不可用（fclose 返回 EBADF 且丢内容，进程退出时 SIGTRAP）：不要用 open_memstream/fmemopen 收集字符串，改为进程内自增长缓冲
+root_cause:             open_memstream() 返回的 FILE* 看起来可用（写入正常、fflush 后缓冲区可见），但 fclose() 走的是该 libc 的内存流关闭路径，实测返回 -9（EBADF）、把 *sizeloc 归零并丢掉缓冲区；同一个进程里普通文件流的 fclose() 正常。流对象没有被正确注销，进程退出时 libc 的清理路径踩到残留状态，于是返回用户代码后立刻 SIGTRAP（有时 SIGILL）并 core dump。后果有两层：(a) 依赖 fclose() 取回字符串的代码拿到 NULL/空串（libdisplay-info 的 di_info_get_make/model/serial、CLI 的 join_str）；(b) 即使不取回内容，只要建立过内存流，进程退出就可能崩溃——表现为"库调用成功但进程退出码 133"，极易被误判为"沙箱 exit 清理问题"而放过。
+affected_scope:         所有用 open_memstream()/fmemopen() 拼字符串的 C/C++ 代码：C 库 API（厂商名/型号/序列号拼接）、CLI 输出拼接、日志聚合、配置生成器。纯读写文件的 stdio 不受影响。C++ 侧 std::stringstream 不受影响（纯内存实现）。
+verification_cmd:       最小复现（12 行）：printf '#define _POSIX_C_SOURCE 200809L\n#include <stdio.h>\n#include <errno.h>\nint main(void){char*b=0;size_t l=0;FILE*f=open_memstream(&b,&l);fputs("abc",f);errno=0;int r=fclose(f);fprintf(stderr,"rc=%d errno=%d len=%zu buf=%s\\n",r,errno,l,b?b:"(null)");return 0;}' > t.c && cc t.c -o t && ./t; echo "exit=$?"   # 期望 rc=-9 errno=9 len=0，进程退出码 133/132
+rec_priority:           1
+rec_approach:           avoid-libc-memory-stream-use-growable-buffer
+rec_description:        把"用 FILE* 收集字符串"改成进程内自增长缓冲：struct { char *str; size_t len, cap; } + puts/printf/vprintf（vprintf 用 vsnprintf(NULL,0,...) 量长度再写），close 只返回缓冲并重置结构。上游若把 FILE* 当接口（如把失败信息汇传进解析器），把该参数类型一起换掉（比伪造一个 FILE* 更省事）。
+rec_command:            见 rec_description；实现参考 archives/l/libdisplay-info/0.4.0/patches/0001-memory-stream-portable.patch
+rec_auto_fix:           false
+rec_impl:               replace-open-memstream-with-growable-buffer
+principles:             
+doc_file:               drafts/DRAFT-libdisplay-info-0.4.0-musl-memstream-fclose-ebadf.md
+last_updated:           2026-10-16
+source_event:           libdisplay-info 0.4.0 适配：di_info_get_make/model/serial 返回 NULL + 进程退出 SIGTRAP，补丁改为进程内缓冲后 print 用例 34/34 通过
+source_pr:              
+source_commit:          
+authors:                agent-B48D

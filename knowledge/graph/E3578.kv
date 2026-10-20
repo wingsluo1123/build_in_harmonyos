@@ -1,0 +1,84 @@
+#====================================================================
+# E4300-draft — 大小写不敏感文件系统上，构建目录里的 VERSION 文件顶替 libc++ 的
+#               C++20 <version> 头（automake DEFAULT_INCLUDES 把 .. 放在系统头之前）
+# 来源: lirc 0.10.2 适配 (2026-10-16)
+#====================================================================
+
+id:                     E3578
+trigger_tool:           clang|make|autotools|configure
+phase:                  compilation
+error_signature:        "^\\.\\./version:[0-9]+:[0-9]+: error: a type specifier is required|^version:[0-9]+:[0-9]+: error: a type specifier is required|^VERSION=\"|no type named 'size_t' in namespace 'std'|no type named 'nothrow_t' in namespace 'std'|no type named 'align_val_t' in namespace 'std'"
+
+severity:               3
+category:               portability, headers, autotools, c++, filesystem
+prescan_pattern:        "AC_CONFIG_FILES[\\s\\S]{0,400}\\bVERSION\\b"
+prescan_globs:          "configure.ac, configure.in, configure, Makefile.am, Makefile.in"
+match_keywords:         VERSION, version header, cstddef, libcxx-ohos, DEFAULT_INCLUDES, idirafter, top_builddir, case-insensitive, HMDFS, type specifier is required, nothrow_t, align_val_t, autotools, out-of-tree
+title:                  HMDFS 大小写不敏感 + 构建目录 VERSION 文件顶替 C++20 version 标准头
+
+root_cause: >-
+  HMDFS 是大小写不敏感文件系统（os.path.samefile('MAN','man') 为 True）。
+  Autotools 项目用 AC_CONFIG_FILES([VERSION ...]) 在构建根目录生成 VERSION 文件；
+  libc++ 的 C++20 头（cstddef / string / new / type_traits 等 70 个头文件）无条件
+  写 #include <version>。automake 给每个子目录的编译单元注入
+  DEFAULT_INCLUDES = -I. -I$(top_builddir)，即构建根目录排在 C++ 标准库之前，
+  于是 <version> 被解析成 VERSION 文件，clang 报
+  "a type specifier is required for all declarations" 并级联出
+  "no type named 'size_t' / 'nothrow_t' / 'align_val_t' in namespace 'std'"。
+  只有 C++ 编译单元中招，C 文件全部正常，因此报错面看起来像 libc++ 自身损坏。
+affected_scope: >-
+  任何 automake/autotools 且 AC_CONFIG_FILES 里含 VERSION 的项目，只要在大小写
+  不敏感文件系统（HMDFS）上编译含 libc++ 标准头的 .cpp 就会命中；out-of-tree
+  构建里若 AM_CPPFLAGS 又写了 -I$(top_srcdir)（绝对路径），仅改 DEFAULT_INCLUDES
+  不够，还要处理源树副本。
+verification_cmd: >-
+  printf '#include <version>\nint main(){return 0;}\n' > "$TASK_DIR/probe_ver.cpp" &&
+  clang++ -c -I. -I.. -o /dev/null "$TASK_DIR/probe_ver.cpp"; echo rc=$?
+
+rec_priority:           1
+rec_approach:           build-system-path-order
+rec_description: >-
+  双管齐下：① 删掉源树里 tarball 自带的 VERSION（config.status 会在构建目录重新生成，
+  make install 的 dist_doc_DATA 先用构建目录的同名文件，删源树副本不影响安装）；
+  ② 把 make 的 DEFAULT_INCLUDES 改成 "-I. -idirafter .."，让构建根目录排到系统头
+  之后（config.h / paths.h 这类唯一名字仍可解析）。
+rec_command:            make "DEFAULT_INCLUDES='-I. -idirafter ..'"
+rec_auto_fix:           false
+rec_impl:               manual-edit
+
+fallback_priority:      2
+fallback_approach:      generated-file-rename
+fallback_description: >-
+  把 AC_CONFIG_FILES 里的 VERSION 改名（例如 LIRC_VERSION），同步 Makefile.am /
+  Makefile.in / configure 的引用。改动面更大，仅在 DEFAULT_INCLUDES 无法覆盖时使用。
+fallback_command:
+fallback_auto_fix:      false
+fallback_impl:
+
+forbid_1_pattern:       "-std=c\\+\\+11|-std=c\\+\\+17|Wno-error=register"
+forbid_1_reason: >-
+  本错误与 C++ 标准版本无关：换标准或关掉 -Werror 都不会消失，因为 <version> 是被
+  -I 路径里的 VERSION 文件抢走的。知识图谱引擎实测常把它误判为 E130（libcxx 头
+  需要 C++17）。
+forbid_1_consequence:   改了标准仍报同样的 type specifier is required，浪费一轮构建
+forbid_2_pattern:       "rm -f VERSION|git rm VERSION"
+forbid_2_reason: >-
+  只删文件不改包含顺序时，out-of-tree 构建里构建目录的 VERSION 仍会通过
+  -I$(top_builddir) 命中；反过来在 in-tree 构建里删掉构建目录的 VERSION 会让
+  make install 的 dist_doc_DATA 找不到文件。
+forbid_2_consequence:   构建或 install 阶段随机失败
+
+principles:             P005, P011
+doc_file:               doc/E4300.md
+last_updated:           2026-10-16
+source_event:           "lirc 0.10.2 conan create: line_buffer.cpp 编译失败（libcxx new:192 no type named size_t）"
+
+authors:
+source_pr:
+source_commit:
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-16
+authors:               "0533"

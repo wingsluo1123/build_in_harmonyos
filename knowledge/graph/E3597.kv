@@ -1,0 +1,62 @@
+#====================================================================
+# DRAFT-xine-0.99.14-conan-pc-missing-plugindir-variable
+# Conan 合成的依赖 .pc 不带上游自定义 pkg-config 变量 → configure 把空值拼成绝对路径
+#====================================================================
+
+id:                     E3597
+trigger_tool:           conan|pkg-config|configure|make
+phase:                  build|configure
+error_signature:        pkg-config --variable=.*returning empty|No rule to make target '/|XINE_MIME|make: \*\*\* \[.*\] Error 1.*desktops
+severity:               2
+category:               build-system, configure, conan, pkg-config, packaging
+match_keywords:         plugindir, pkg-config --variable, libxine.pc, XINE_MIME, mime.types,
+                         No rule to make target, Conan PkgConfigDeps, cpp_info.set_property,
+                         合成 pc, 空变量展开, desktops, Makefile 引号前置条件
+title:                  Conan 为依赖包合成的 .pc 只带标准字段，上游 configure 读取的自定义 pkg-config 变量取到空串后被拼成绝对路径，make 以“No rule to make target '/x'”中断
+
+root_cause:          xine-ui 的 configure 用 `$PKG_CONFIG --variable=plugindir libxine` 求插件目录，再拼成 `XINE_MIME="<plugindir>/mime.types"` 作为 misc/desktops 里 xine.desktop 的前置条件。上游发布的 libxine.pc 由 libxine.pc.in 生成、确实带 plugindir；但本仓库里 libxine 由Conan 的 PkgConfigDeps 依据 xine-lib 配方的 cpp_info **合成**，只输出标准字段（prefix/libdir/includedirs/libs/Cflags），不携带上游自定义变量 plugindir。于是 `--variable=plugindir` 返回空串（且退出码为 0，`|| xine-config` 回落分支不触发），shell 拼接结果为绝对路径 `/mime.types`，make 把它当成必须存在的目标文件而报`No rule to make target '/mime.types'`。关键机制在于 pkg-config 对“变量不存在”与“变量值为空”不加区分：两者都输出空串且 rc=0，所以 `cmd || fallback` 形式的短路回落失效，必须显式判空。
+
+affected_scope:      所有「configure/Makefile 用 pkg-config --variable=<自定义变量> <依赖> 取路径」且该依赖由 Conan 配方提供（.pc 为 Conan 合成而非上游 .pc.in 生成）的 autotools 包。自定义变量在 Conan 合成 pc 中一律缺失：plugindir、moduledir、datadir 之外的包专有变量、gtk_update_icon_cache 之类脚本变量等。
+
+verification_cmd: >
+  pkg-config --variable=plugindir libxine; echo "rc=$?"        # 期望：空行 + rc=0（陷阱所在）
+  grep -n "plugindir" <Conan generators_folder>/libxine.pc     # 期望：无匹配
+  grep -n "^prefix=\|^libdir=" <Conan generators_folder>/libxine.pc  # 期望：仅标准字段
+  ./configure --prefix=... 2>&1 | grep XINE_MIME ; grep -n "XINE_MIME" config.log
+
+rec_priority:           1
+rec_approach:           explicit-empty-check-with-in-tree-fallback
+rec_description:     不要指望 `a || b` 短路回落：`pkg-config --variable=` 在变量缺失时返回空串且 rc=0。把取值与拼接拆成两步，显式 `test -n` 判空，空值时让上游 Makefile 里已有的“取不到就用树内默认数据”守卫生效（本例 `cat "$(XINE_MIME)" 2>/dev/null || cat "$(srcdir)/mime.default"`），而不是去伪造一个 plugindir。同时保持 .pc 由 Conan 管理，不把依赖路径硬编码进配方。
+rec_command: >
+  # configure（0003-configure.patch）
+  -XINE_MIME="`$PKG_CONFIG --variable=plugindir libxine 2>/dev/null || xine-config --plugindir 2>/dev/null`"/mime.types
+  +xine_plugindir=`$PKG_CONFIG --variable=plugindir libxine 2>/dev/null || xine-config --plugindir 2>/dev/null`
+  +if test -n "$xine_plugindir"; then XINE_MIME="$xine_plugindir/mime.types"; else XINE_MIME=""; fi
+rec_auto_fix:           false
+rec_impl:               patch-configure-plus-keep-makefile-guard
+
+forbid_1_pattern:       pkgconfig_variable_empty_means_failure
+forbid_1_reason:        pkg-config 对“变量不存在”返回空串且 rc=0，`|| fallback` 永不触发。
+forbid_1_consequence:   空串被拼成绝对路径 /x，make 以 “No rule to make target '/x'” 失败，
+                         且错误信息指向 Makefile 而非 configure，容易被误判为补丁缺失。
+
+forbid_2_pattern:       hardcode_plugindir_into_conanfile
+forbid_2_reason:        在配方里替上游 pc 造一个 plugindir 值（或写死 /usr/local/lib/xine-plugin）
+                         会把依赖树的真实布局写进包元数据，R49 禁止向共享 prefix 注入。
+forbid_2_consequence:   本地通过、CI 与消费方路径不符；且污染下游对 libxine 的 pkg-config 语义。
+
+fallback_priority:      2
+fallback_approach:      declare-variable-via-cpp-info-set-property
+fallback_description:   若该变量确实被下游需要（不只是可选数据文件路径），可在依赖配方里用
+                         cpp_info.set_property("pkg_config_custom_content", ...) 补出变量定义。
+fallback_command:       self.cpp_info.set_property("pkg_config_custom_content", "plugindir=${libdir}/xine-plugin")
+fallback_auto_fix:      false
+fallback_impl:          conan-recipe-property
+
+doc_file:               knowledge/drafts/DRAFT-xine-0.99.14-conan-pc-missing-plugindir-variable.md
+last_updated:           2026-10-17
+source_event:           xine/0.99.14 HarmonyOS PC 适配：misc/desktops 报 No rule to make target '/mime.types'
+authors:                Qoder
+source_pr:
+source_commit:
+

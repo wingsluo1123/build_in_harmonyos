@@ -1,0 +1,75 @@
+# ═══ Draft knowledge entry — /dev/shm 满导致 conan 并行下载 ThreadPool 起不来 ═══
+# conan create 在"Downloading binary packages in N parallel threads"处秒退，
+# 报 OSError: [Errno 28] No space left on device（栈顶是 multiprocessing 的
+# SemLock）。真凶不是磁盘：工作区还有几百 GB，而是 /dev/shm（1G tmpfs）被占满，
+# POSIX 信号量就是 /dev/shm 里的文件；沙箱对 /dev/shm 连 ls 都是 Permission denied，
+# 清不掉。绕过方式是把 conan 的下载并行度关掉——注意只能 -cc 传给子命令。
+# Software: gdcm 3.0.24（环境类知识，任意 conan 包适用）
+# Status: DRAFT
+
+id:                     E3550
+trigger_tool:           conan|python
+phase:                  install|package
+severity:               2
+category:               conan, environment, dev-shm, enospc, multiprocessing
+error_signature:        \[Errno 28\] No space left on device|_multiprocessing\.SemLock|Downloading binary packages in \d+ parallel threads|core\.\*.{0,40}configurations are not allowed in profiles
+
+match_keywords:         shm, ENOSPC, No space left, SemLock, parallel threads, core.download, -cc, conan create, 秒退
+
+root_cause:             |
+  conan 的 installer._download_bulk() 用 multiprocessing.pool.ThreadPool(parallel)
+  并行拉二进制；ThreadPool 构造要 SimpleQueue→ctx.Lock()→_multiprocessing.SemLock，
+  而 CPython 的 POSIX 信号量落在 /dev/shm。本机 /dev/shm 是 1G tmpfs 且 100% 占满，
+  sem_open 直接 ENOSPC。conan 因此在 source/build 之前、仅几秒内退出，
+  日志里唯一线索是 "Downloading binary packages in 20 parallel threads" 后紧跟 traceback。
+  排查陷阱：df 工作区/数据盘显示数百 GB 可用，容易误判为"磁盘满"或 conan 缓存坏；
+  TMPDIR 改到可写大目录也无效（信号量不走 TMPDIR）。
+
+affected_scope:         |
+  本机所有需要并行下载 conan 二进制/配方的命令（conan create/install/upload 的
+  _download_bulk/_upload_bulk 分支），以及任何在此设备上调 multiprocessing.pool 的
+  Python 工具。CI worker 无此现象（其 /dev/shm 正常），属本地设备环境问题，
+  不要因此改配方或把 file:// 路径写进 conandata（见同类"本地环境泄漏"教训）。
+
+verification_cmd:       |
+  df -h /dev/shm                                   # Use% 100% 即命中
+  python3 -c "import multiprocessing as mp; mp.Lock(); print('ok')"   # OSError 28 即命中
+  ls /dev/shm                                      # 沙箱下 Permission denied，无法自行清理
+
+rec_priority:           1
+rec_approach:         disable-conan-download-parallelism
+rec_description:        |
+  把下载并行度设为 0，让 _download_bulk 走串行分支（for node in downloads），
+  完全不创建线程池 → 不再需要信号量。该 conf 必须以 `-cc` 形式传给**子命令**：
+  `conan create ... -cc core.download:parallel=0`。
+rec_command:            conan create archives/g/gdcm/3.0.24 -cc core.download:parallel=0 -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 --build=missing --build="gdcm/*"
+rec_auto_fix:           true
+rec_impl:               ci-env-only
+
+fallback_priority:      2
+fallback_approach:      prepopulate-cache-then-build
+fallback_description:   先用 `conan download <ref>` 把依赖二进制单独拉进缓存（不走批量线程池），
+  使 _download_bulk 的 downloads 列表为空、直接 return；或请设备侧清理 /dev/shm
+  （需更高权限，本沙箱做不到）。
+fallback_command:       conan download expat/2.8.4:01d92cf349a0dd98ff915f4bd99a04430171517f -r=ohpcd && conan create ...
+fallback_auto_fix:      false
+fallback_impl:          ci-env-only
+
+forbid_1_pattern:       conan create[^\n]*-c[[:space:]]+core\.download:parallel
+forbid_1_reason:        -c 是 profile conf，core.* 被显式拒绝：ERROR: [conf] 'core.*' configurations are not allowed in profiles。
+forbid_1_consequence:   命令立刻失败，误以为该 conf 不存在，转而去改配方或删缓存。
+
+forbid_2_pattern:       conan[[:space:]]+-cc[[:space:]]
+forbid_2_reason:        -cc 不是顶层选项，放在子命令前会被当成命令名："'-cc' is not a Conan command"。
+forbid_2_consequence:   同样的假象——参数被误判为不受支持。
+
+principles:               
+doc_file:               knowledge/drafts/gdcm-3.0.24-devshm-enospc-conan-download-pool.md
+last_updated:           2026-10-18
+source_event:           gdcm 3.0.24 适配本地 W3：conan create 秒败于 SemLock ENOSPC，确认 /dev/shm 1G tmpfs 100% 满且沙箱无权清理，改 -cc core.download:parallel=0 后构建正常启动
+authors:                Qoder
+source_pr:              pending
+source_commit:          pending
+
+metrics_success_count:  0
+metrics_fail_count:     0
