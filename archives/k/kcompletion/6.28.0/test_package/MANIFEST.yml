@@ -1,0 +1,28 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for kcompletion/6.28.0.
+
+package: kcompletion/6.28.0
+homepage: https://invent.kde.org/frameworks/kcompletion
+
+upstream_check_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error --timeout 120 -E \"^(kcomboboxtest|kcompletionuitest|klineedittest)$\""
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error --timeout 120 -E \"^(kcomboboxtest|kcompletionuitest|klineedittest)$\""
+
+upstream_tests:
+  - file: autotests/
+    source: kcompletion-6.28.0/autotests/
+    description: "KCompletion upstream QTest suite: kcompletioncoretest (13 test functions: insertion/sorted/weighted order, substring and allMatches variants, match cycling), klineedit_unittest (5), kcombobox_unittest (8), kemailvalidatortest (1 data-driven function, 7 data rows), plus ksortablelisttest (plain main, no QTest functions)"
+    command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error --timeout 120 -E \"^(kcomboboxtest|kcompletionuitest|klineedittest)$\""
+    condition: "run in the Conan build with BUILD_TESTING=ON and Qt6Test available in qtbase/6.11.1"
+  - file: tests/
+    source: kcompletion-6.28.0/tests/
+    description: "Three interactive GUI demo programs (kcomboboxtest, kcompletionuitest, klineedittest); their main() runs QApplication::exec() and only returns on a button click, so ctest cannot time them out into a pass"
+    command: "excluded from ctest; each binary is launched offscreen under a 15 s timeout and must still be running when the timeout fires (launch-alive smoke, kglobalaccel 6.28.0 precedent)"
+    condition: "smoke run inside the Conan build; a loader/plugin failure aborts immediately with a non-zero code and fails the build"
+
+test_package_tests:
+  - file: test_package/test.cpp
+    description: "Consumer end-to-end, 6 cases: KCompletion prefix matching/cycling, sorted+case-insensitive lookup, weighted items() round-trip, KLineEdit inline completion, KComboBox editable completion, KEmailValidator states"
+    command: "conan create (test_package builds and runs test_kcompletion)"
+
+assertion_count: 29
