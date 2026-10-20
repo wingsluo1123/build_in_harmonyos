@@ -1,0 +1,28 @@
+diff -ruN a/src/libpgagroal/utils.c b/src/libpgagroal/utils.c
+--- a/src/libpgagroal/utils.c	2026-03-22 06:42:56.000000000 +0800
++++ b/src/libpgagroal/utils.c	2026-10-16 23:36:25.041700313 +0800
+@@ -1522,7 +1522,9 @@
+ int
+ pgagroal_resolve_path(char* orig_path, char** new_path)
+ {
+-#if defined(HAVE_DARWIN) || defined(HAVE_OSX)
++/* secure_getenv() is a glibc extension; libcs such as musl only provide
++ * getenv(). */
++#if defined(HAVE_DARWIN) || defined(HAVE_OSX) || !defined(__GLIBC__)
+ #define GET_ENV(name) getenv(name)
+ #else
+ #define GET_ENV(name) secure_getenv(name)
+diff -ruN a/src/admin.c b/src/admin.c
+--- a/src/admin.c	2026-03-22 06:42:56.000000000 +0800
++++ b/src/admin.c	2026-10-16 23:36:25.277699688 +0800
+@@ -417,7 +417,9 @@
+       goto error;
+    }
+ 
+-#if defined(HAVE_OSX)
++/* secure_getenv() is a glibc extension; libcs such as musl only provide
++ * getenv(). */
++#if defined(HAVE_OSX) || !defined(__GLIBC__)
+ #define PGAGROAL_GETENV(name) getenv(name)
+ #else
+ #define PGAGROAL_GETENV(name) secure_getenv(name)

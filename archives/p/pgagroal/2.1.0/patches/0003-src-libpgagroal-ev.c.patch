@@ -1,0 +1,18 @@
+diff -ruN a/src/libpgagroal/ev.c b/src/libpgagroal/ev.c
+--- a/src/libpgagroal/ev.c	2026-04-27 21:44:11.000000000 +0800
++++ b/src/libpgagroal/ev.c	2026-10-16 23:35:21.037698282 +0800
+@@ -141,8 +141,12 @@
+ /* context globals */
+ 
+ static struct event_loop* loop = NULL;
+-static _Atomic(struct signal_watcher*) signal_watchers[PGAGROAL_NSIG] = {0};
+-static _Atomic(signal_cb) signal_callbacks[PGAGROAL_NSIG] = {0};
++/* Objects with static storage duration are zero initialized by the language
++ * itself; the explicit initializer is dropped because clang 15 rejects
++ * `_Atomic(T) arr[N] = {0}` with "initializer element is not a compile-time
++ * constant" and "incompatible integer to pointer conversion". */
++static _Atomic(struct signal_watcher*) signal_watchers[PGAGROAL_NSIG];
++static _Atomic(signal_cb) signal_callbacks[PGAGROAL_NSIG];
+ 
+ #if HAVE_LINUX
+ 
