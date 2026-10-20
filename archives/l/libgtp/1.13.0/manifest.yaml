@@ -1,0 +1,31 @@
+version: "1.13.0"
+software: "libgtp"
+status: built
+build_date: "2026-10-17"
+build_system: "custom (recipe-side clang)"
+
+source:
+  url: "https://snapshot.debian.org/file/6269c1f0f6d3528f2ddd82ad8334ee86ae11e9a3"
+  sha256: "77310ac4dcf07fc578131c893d31108e71bd51f8bc80efcdfdb761f83399dffd"
+  tar_format: tar.xz
+  note: "Debian snapshot 的 osmo-ggsn 1.13.0 官方 orig 归档"
+
+build:
+  system: custom
+  configure_options:
+    - "clang -shared -fPIC -O2 -std=gnu11 -fno-emulated-tls -fno-builtin -I<include> gtp/*.c -Wl,-soname,libgtp.so.11 -Wl,--no-undefined"
+  dependencies:
+    - "libosmocore/1.11.0"
+
+upstream_tests:
+  framework: autotest
+  test_sources: 6
+  test_command: "tests/lib/{ippool,in46a} and tests/gtp/{gtpie,queue}"
+  run_in_build: false
+  evidence: "6/6 实际运行通过；gtpie/queue 将上游库源文件静态编入测试程序，未修改测试源码。"
+
+upstream_test_pass_rate: "6/6（100%）"
+adapted_test_pass_rate: "test_package 6/6 PASS"
+
+knowledge_gained:
+  - "libosmocore 使用原生 TLS 时，libgtp 库和消费者也必须统一使用 -fno-emulated-tls。"
