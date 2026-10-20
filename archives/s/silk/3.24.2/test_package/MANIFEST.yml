@@ -1,0 +1,64 @@
+package: silk/3.24.2
+homepage: "https://tools.netsa.cert.org/silk/"
+
+upstream_check_command: "make check -k per-suite sequential (light -j4 except libsilk/rwconvert -j1, heavies -j1, upstream default timeouts)"
+upstream_test_in_build: true
+upstream_test_command: "make check -k per-suite sequential (light -j4 except libsilk/rwconvert -j1, heavies -j1, upstream default timeouts)"
+
+upstream_test_total: 1574
+upstream_test_count_method: autotools_tests
+
+upstream_tests:
+  - file: src/libsilk/tests/*.pl
+    source: silk-3.24.2/src/libsilk/tests/
+    description: "libsilk unit tests (hashlib, heap, mempool, parse, bitmap: 15 perl tests)"
+    command: "make check -k per-suite"
+  - file: src/rwcut/tests/*.pl
+    source: silk-3.24.2/src/rwcut/tests/
+    description: "rwcut flow-print tests (67 perl tests)"
+    command: "make check -k per-suite"
+  - file: src/rwfilter/tests/*.pl
+    source: silk-3.24.2/src/rwfilter/tests/
+    description: "rwfilter/rwfglob partition tests (116 perl tests)"
+    command: "make check -k per-suite"
+  - file: src/rwset/tests/*.pl
+    source: silk-3.24.2/src/rwset/tests/
+    description: "IPset build/cat/tool tests (230 perl tests, largest suite)"
+    command: "make check -k per-suite"
+  - file: src/rwbag/tests/*.pl
+    source: silk-3.24.2/src/rwbag/tests/
+    description: "bag build/cat/tool tests (171 perl tests)"
+    command: "make check -k per-suite"
+  - file: src/rwstats/tests/*.pl
+    source: silk-3.24.2/src/rwstats/tests/
+    description: "rwstats aggregation tests (172 perl tests)"
+    command: "make check -k per-suite"
+  - file: src/rw*/tests/*.pl (remaining)
+    source: silk-3.24.2/src/
+    description: "All other tool suites (rwcount/rwsort/rwgroup/rwmatch/rwpmap/rwflowpack/flowcap/sendrcv etc.); total 1574 perl TESTS across 40 automake suites"
+    command: "make check -k per-suite"
+
+test_package_tests:
+  - file: test_silk.sh
+    description: "Packaged rwcut/rwcount/silk_config --version report 3.24.2, 3 assertions"
+    command: "./test_silk.sh <pkg>/bin"
+
+assertion_count: 3
+
+upstream_tests_exist: true
+upstream_test_audit: >
+  Checked silk-3.24.2 official tarball (tools.netsa.cert.org/releases,
+  sha256 9ea9c1391f9c1ba14394af68b2bd7e66bf73b664c3cee342c5a39e5b13e45398).
+  Upstream tests are perl scripts under src/*/tests/*.pl, registered in each
+  src/*/Makefile.am TESTS variable (automake parallel-tests). Counted 1574
+  TESTS .pl files under src/ (1577 total .pl minus 3 top-level helpers
+  tests/make-data.pl, make-scandata.pl, make-sendrcv-data.pl which generate
+  fixtures and are not TESTS; 8 daemon .py files are EXTRA_DIST helpers, not
+  TESTS). Recipe build() runs make check -k per-suite on the real device
+  (light suites -j4 except libsilk/rwconvert -j1, daemon heavies -j1)
+  and aggregates
+  every test-suite.log # TOTAL/# PASS/# FAIL/# SKIP/# XFAIL/# XPASS/# ERROR
+  summary for the HMBS_UPSTREAM_TEST_RESULT marker. SKIP entries come from
+  configure auto-disabled optional features (no pcap/IPFIX/gnutls/
+  maxminddb/ipa) and unbuilt rwp* suites; each is recorded as an
+  environment gap with configure evidence.
