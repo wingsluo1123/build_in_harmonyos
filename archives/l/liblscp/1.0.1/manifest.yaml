@@ -1,0 +1,163 @@
+software: liblscp
+version: 1.0.1
+status: built
+category: library
+description: LinuxSampler Control Protocol (LSCP) client API library
+
+build_system:
+  type: cmake
+  configure_command: "cmake -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake -DCMAKE_BUILD_TYPE=Release <source>"
+  build_command: "cmake --build . -- -j2"
+  install_command: "cmake --install ."
+
+configure_options:
+  - CMAKE_INSTALL_LIBDIR=lib
+  - CMAKE_INSTALL_INCLUDEDIR=include
+
+dependencies:
+  runtime: []
+  build: []
+
+patches:
+  - name: 0001-ohos-thread-cancel-guarded-signal-exit.patch
+    description: >-
+      现场绑定：4024 B / 107 行，sha256
+      bbcf6b83ff92dc968566595940dcdd4a3a9ac998fc299d8a1c4c99769f5398f8（tip
+      09a123cac 首次实测，构建 tip 4327f6e14 于 2026-10-13 22:41 与 2026-10-15 13:1x 现场复核逐字相同）。OHOS NDK libc.so 不导出 pthread cancellation 家族
+      （pthread_cancel 与
+      pthread_setcanceltype 只在静态 libc.a 里有定义，共享 libc.so 为 0 命中），
+      上游 lscp_thread_cancel() 的非 WIN32 分支因此留下未定义符号；库本体可带
+      未定义符号通过链接，但任何链接 liblscp.so 的可执行文件都被 ld.lld
+      --no-allow-shlib-undefined 拒绝。补丁为 __OHOS__ 实现 knowledge/doc/E513.md
+      「推荐方案」的 guarded-signal-thread-exit：lscp_thread_create() 在
+      pthread_create() 之前用 sigaction() 安装一个只调用 pthread_exit(NULL) 的
+      SIGUSR1 处理器（sa_flags=0，不设 SA_RESTART），安装失败则 free() 并返回
+      NULL；lscp_thread_cancel() 改为 pthread_kill(pThread->pthread, SIGUSR1)
+      使线程定向退出并保留句柄，由 lscp_thread_destroy() 的 lscp_thread_join()
+      正常回收。初版 0001-ohos-thread-cancel-cooperative-join.patch（872 B，
+      WIN32 式空桩）经独立 W4 判 P1 已删除。Linux/其它平台分支逐字不变。
+    files_modified:
+      - src/thread.c
+
+test_results:
+  type: test_package-consumer
+  upstream_total: 0
+  total: 76
+  passed: 76
+  failed: 0
+  note: >-
+    上游 tarball 无任何注册测试（add_test/enable_testing/ctest/BUILD_TESTING 命中
+    0），故 upstream_total=0 且 build() 不调用 cmake.test()（不为凑数造分母）；
+    官方 W3 日志同轮 `L1c: No upstream make check/ctest in log` 与该项同源。
+    行为证据由 test_package/test_liblscp.c 承担：真机 conan create 内实际执行
+    76 条断言、0 失败，输出 "liblscp consumer test: 76 assertions, 0 failures"
+    与 "RESULT: PASS"。当前绑定读数出自 tip 151a1dcc7 之上的工作树（conanfile.py
+    sha 6f551642… → e743c223…，仅 :28 url 一行）于 2026-10-15 20:24:57 至 20:27:41
+    的恰 1 次官方 finish（其 step35 即 W3；CONAN_PROFILE=ohos-aarch64-15461B
+    2757 B / 67404bc1…，非仓库默认 profile）：载体 archives/l/liblscp/1.0.1/
+    reports/w3-local-ci.log 21525 B / 377 行，sha256
+    a53c19a8e35b67cff6aeafc7b1d522de10dede2dfb5c6625734370efab99053e，断言行第
+    345/346 行，L5 判决第 355 行 [ok] L5: lib/ has content 与第 367 行
+    L5_RESULT=pass: lib/ has content，全日志 L5a/soname_gate_failed 命中 0；
+    该载体是 gitignore 覆盖的本地件、不入库，读数绑该 tip 与**运行态** recipe
+    revision 0cb035c666cf01a1730c4a3e166b2f41（该 rrev 的导出面是 Pre-download 临时注入
+    file:// 后的 conandata 字节，非交付面）。交付面（conandata.yml 1870 B / c809b959…，
+    :7 为官方 https）的 recipe revision 是 b1944ed936b9c777954acb4c85a9125f，本窗 r30
+    只读重算实测该 rrev 在 conan 自有索引 packages 表零行＝自身未构建，不得写成已构建
+    并通过；两值并列、不合并。W3 官方两件互绑成立：同目录 .ci-result.json
+    364 B / 61df0c25984fac61758b5b6668c379eb2bec04d27ca63f8b378e3552d505e542，
+    exit_code=0、integrity_hash 5b4281c248ee825e、log_sha256 即上述 a53c19a8…；
+    因框架写版本目录而 pre_pr_audit 读仓根，另以 cp -p 逐字转存同 sha 副本到仓根
+    （未手编、未改框架、未用 --force）。
+    本体真重编：载体第 106 行真实重新导出（运行态 rrev 0cb035c6…，其导出面的
+    conandata 正是被 Pre-download 临时换成 file:// 本地缓存的那一份）、第 157 行 Forced
+    build from source、第 159 行标记 "- Build"、第 209-224 行编译 6 个 C 目标、
+    第 225 行链接 liblscp.so、第 240/253 行 package() 打包 1 个 .so、第 257 行
+    package revision 339399f757bd0746705e89fa602ce12c；缓存复用只发生在
+    Pre-download 的 tarball（第 94 行 [cached]，sha 仍为官方 db54a33c…）。
+    消费者侧第 278 行删除旧 build folder、第 332/333 行真实重编译与链接、第 339 行
+    实运行；第 356-359 行 L1e 破坏性反向验证 pass（移走 lib/ 与 include/ 后测试
+    即失败）⇒ 断言实质依赖被测包。
+    产物 ELF 判据：readelf -d 显示 p/b/libls008a56c021d75/p/lib/liblscp.so
+    （88384 B / 4fc43378512cd0c145e747d91671bf0cbae90522e3153f7d1fe08c13325c4f3a）
+    含 "0x000000000000000e (SONAME) Library soname: [liblscp.so]"，包内仍是单一
+    扁平 liblscp.so（另有 pkgconfig/，无版本化符号链接），消费者 NEEDED 为
+    [liblscp.so]；该产物与上一回合 rrev 3475dd5e… 下产物逐字相同（填 url 只改
+    元数据不改输出）。改前对照：旧产物 p/b/libls6bc27c8dec250/p/lib/liblscp.so
+    （84288 B / sha256 20eab619…）readelf -d 无 SONAME 条目。
+    更早读数：tip 94712c5ff/151a1dcc7 19:10（conan-create.log 18597 B /
+    743a46df…，76/0，同一份 88384 B / 4fc43378… 产物，该载体已被本轮 finish 的
+    step3 默认 profile 红跑原地覆盖，逐字副本存 ~/tmp/uc2/QDR-1009-E05/r29-pre/）、
+    tip 09a123cac 19:27（18520 B / e5d91396…，76/0）、tip 4327f6e14 2026-10-15
+    13:17（8614 B / d86beb00…，76/0，库二进制包命中私有缓存未重编）。
+    修复前 tip e13eadc29 的同一程序读数为 65 断言 0 失败（载体 reports/w3-local-ci.log
+    第 339/340 行，21141 B / 267f5ec6…，mtime 2026-10-12 22:28，其内含已删除的旧补丁名
+    cooperative-join，且其第 350/365 行是当时 L5a 缺 DT_SONAME 的 fail 判决，属历史件），
+    差值 11 条 = P1-1 整改新增的 E513 反悬置断言组（三条可达路径 + 时间上界）。
+platform_compatibility:
+  ohos_kernel: compatible
+  notes: >-
+    clang 15.0.4 / aarch64-unknown-linux-ohos，musl 工具链。唯一平台缺口为
+    pthread cancellation API（见 patches）；pthread_create/join/mutex 均可用。
+    上游 configure 阶段的 12 项 check_function_exists 与 5 项 check_include_files
+    在本 sysroot 全部命中，无 FATAL_ERROR。
+
+artifacts:
+  package: liblscp/1.0.1 (conan, os=OHOS arch=armv8 compiler=clang/15 build_type=Release shared=True)
+  binaries: none (library package; upstream examples 参与编译但不安装，故无需 commands.json)
+  libraries: lib/liblscp.so
+
+build_date: 2026-10-15
+
+compiler: clang 15.0.4 (Target aarch64-unknown-linux-ohos)
+
+conan:
+  # revision/package_id 现值出自 tip 151a1dcc7 之上的工作树（conanfile.py :28 url 填写后
+  # sha e743c223…）的恰 1 次官方 finish→step35 W3（2026-10-15 20:24:57 至 20:27:41；
+  # CONAN_PROFILE=ohos-aarch64-15461B；载体 w3-local-ci.log 21525 B / a53c19a8…：
+  # :106 Exported 行 recipe revision 0cb035c666cf01a1730c4a3e166b2f41（＝运行态导出面：
+  # 其 conandata 是 Pre-download 注入后的 1926 B / 8fb39be4…，:7 为 file:// 且 https 命中 0；
+  # 索引目录 p/liblsc91c31145bc33，reference liblscp/1.0.1 无 user/channel）、:157 Forced build
+  # from source、:159 "- Build"、:257 Created package revision 339399f757bd0746705e89fa602ce12c、
+  # :259 完整引用 liblscp/1.0.1#0cb035c6…:01d92cf3…#339399f7…、:367 L5_RESULT=pass）。
+  # 交付面（conandata 1870 B / c809b959… 官方 https + 同一 conanfile e743c223…）的 rrev 是
+  # b1944ed936b9c777954acb4c85a9125f（reference liblscp/1.0.1@ohpcd/stable、目录
+  # p/libls421116f79ad15、导出 epoch 1792067121.94）；与上面运行态相差 31.01 s
+  # （运行态 1792067152.96 折 UTC 即载体 :106 的 2026-10-15 12:25:52）。本窗 r30 只读重算
+  # 实测：索引 packages 表本包共 8 行，其中运行态 0cb035c6… 只有 1 行（pkgid 01d92cf3…
+  # / prev 339399f7… / b/libls008a56c021d75），其余 7 行属于历史 rrev；b1944ed9… 零行。
+  # 因此交付 rrev 自身未构建，不得写成已构建并通过。
+  # 重算载体 .temp/QDR-1009-E05/liblscp-r30/r30_stepA_verify.out（10213 B / 3a92df05…；
+  # cache.sqlite3 28672 B / ad60935e… 的 cp -p 副本 + 离线 mode=ro SQL + 逐文件 sha256，
+  # 零构建零占槽零清理）。
+  # 同轮官方 .ci-result.json 364 B / 61df0c25…（exit_code=0，log_sha256↔a53c19a8…），
+  # 框架写版本目录、pre_pr_audit 读仓根 ⇒ 仓根那份是 cp -p 的同 sha 逐字转存，非手编。
+  # 旧 recipe revision 073c3327…/3475dd5e… 与旧 package revision dda9f48f…/be46b018… 作废。
+  # r30 归因更正：3475dd5e… 侧的 conanfile 是填 url 前那版（4729 B / 6f551642…），故上一轮
+  # "填 url 使 rrev 由 3475dd5e… 轮换为 0cb035c6…"的说法不完整——0cb035c6… 的真因是
+  # Pre-download 注入改变了导出 conandata 的字节，而不是填 url 这一动作本身。
+  # 披露：finish 的 step3 用仓库默认 profile（conan_verify.py:77 默认值，本机该 profile 的
+  # clang 路径不存在）故 step3 红、FINISH_RC=2，并原地覆盖了 reports/conan-create.log
+  # （现 7794 B / 9a25e123…）；上一回合绿载体 743a46df… 的逐字副本在
+  # ~/tmp/uc2/QDR-1009-E05/r29-pre/。W3/L5 与本键值均出自官方 W3 绿载体，未为此重跑构建。
+  # [settings] 与仓库 profile 等价（SETTINGS_DIFF_RC=0）⇒ package_id 历次逐字相同，属实测非预期。
+  recipe_revision: b1944ed936b9c777954acb4c85a9125f
+  recipe_revision_runstate: 0cb035c666cf01a1730c4a3e166b2f41
+  recipe_revision_runstate_cause: >-
+    官方 W3 的 Pre-download（载体 w3-local-ci.log :92-95）把 conandata.yml 临时换为
+    file:// 本地缓存那一份、结束时 :377 才还原官方 URL，因此真正被 conan create 导出、
+    构建并打包的配方面是 conandata 1926 B / sha256
+    8fb39be4ba6a4d920ab9e40c2b4337eeb688fe5d52cd250c646211886f498cb4（https 命中 0），
+    其 rrev 记为运行态值 0cb035c6…；交付面 conandata 1870 B / c809b959… 的 rrev
+    b1944ed9… 在索引中无 packages 行＝未构建。两值并列申报、不合并；官方 URL 与注入 URI
+    对应同一源码 tarball db54a33c…，conanfile.py 与补丁字节未变。88384 B / 4fc43378…
+    （DT_SONAME=liblscp.so）只指运行态实测产物；交付 rrev 未构建，无该侧产物可作二进制比较。
+    本轮纯文本改证据标识、零重建依靠上述构建输入等价性论证，不冒称交付 rrev 已构建通过。
+  package_id: 01d92cf349a0dd98ff915f4bd99a04430171517f
+  package_revision: 339399f757bd0746705e89fa602ce12c
+  conan_home: ~/tmp/ch/home-QDR-1009-E05-liblscp
+  profile_host_and_build: ~/tmp/ch/home-QDR-1009-E05-liblscp/profiles/ohos-aarch64-15461B
+  create_rc: 0
+  gate: "sh ~/tmp/uc2/gate.sh 8000 → GATE_RC=0（GATE_PASS:probe=clang MemAvailable=11155MB MemFree=1040MB Cached=14745MB swap余=48755MB load=20.850 21.190 21.037 PSI_full=avg10=53.62 编译器进程=1 RSS=133MB）; build-slot 本窗私有快照与仓库 canonical（build-slot.repo-20261015.sh）逐字相同（8894B / 9771c729…，diff IDENTICAL；锁路径 $HOME/tmp/uc2/.build-slots，SLOTS=2/MAX_SLOTS=3）= SLOT_OK 20:24:57 --wait 1800 --mem 8000 一次拿到，只占 1 槽，MemAvailable≈11.4GB < 2×--mem ⇒ 未请求第 3 槽扩容; 影子 profile 先回读 2757B / 67404bc1…，仓库 profile 2101B / 7ebd43d2… 一字节未动; jobs=2（MAKEFLAGS=-j2）; memcap-run --mb 2000 实测 peak=110MB rc=1 用时163.7s（rc=1 为 finish 自身退出码，见 notes 披露）; 消费者程序上一轮 --probe peak=4MB rc=0 ⇒ max_rss_mb 记 8"
+  consumer_test_peak_rss_mb: 4
+  log: archives/l/liblscp/1.0.1/reports/w3-local-ci.log

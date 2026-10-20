@@ -1,0 +1,107 @@
+--- a/src/thread.c
++++ b/src/thread.c
+@@ -22,7 +22,11 @@
+ 
+ #include "lscp/thread.h"
+ 
++#if !defined(WIN32)
++#include <signal.h>
++#endif
+ 
++
+ //-------------------------------------------------------------------------
+ // Threads.
+ 
+@@ -39,6 +43,42 @@
+ };
+ 
+ 
++#if !defined(WIN32) && defined(__OHOS__)
++//-------------------------------------------------------------------------
++// OHOS fallback cancellation.
++//
++// The OHOS NDK dynamic libc exports none of the pthread cancellation family:
++// llvm-nm -D --defined-only libc.so gives 0 hits for pthread_cancel,
++// pthread_testcancel and pthread_setcanceltype (the first and the third exist
++// only in the static libc.a, which is not what an executable links against),
++// while pthread_create() and pthread_join() are present.  Stubbing the
++// cancellation out is not an option: knowledge/doc/E513.md records that a no-op
++// stub, or merely returning an error, changes the lifecycle of a joinable
++// worker - the caller keeps waiting in pthread_join() and cannot reclaim the
++// thread.  A fallback must preserve both targeted exit and join semantics, so
++// what is used here is E513's own recipe, 方法=guarded-signal-thread-exit: an
++// async-signal-safe thread-exit handler is installed for a reserved signal
++// before the joinable worker is created, lscp_thread_cancel() delivers that
++// signal to the worker with pthread_kill(), and the untouched
++// lscp_thread_join() then reclaims it.
++//
++// Application-side condition, same as the one E513 states: the process must not
++// block the reserved signal, otherwise the request stays pending forever and
++// cancellation cannot terminate the worker.
++
++#define LSCP_THREAD_CANCEL_SIGNAL	SIGUSR1
++
++static void _lscp_thread_cancel_handler ( int iSignal )
++{
++	(void) iSignal;
++	// Runs on the targeted worker's own stack and never returns, which is why
++	// the handler needs nothing but pthread_exit() and is installed without
++	// SA_RESTART.
++	pthread_exit(NULL);
++}
++#endif
++
++
+ #if defined(WIN32)
+ static DWORD WINAPI _lscp_thread_start ( LPVOID pvThread )
+ #else
+@@ -65,7 +105,10 @@
+ 	lscp_thread_t *pThread;
+ #if !defined(WIN32)
+ 	pthread_attr_t attr;
++#if defined(__OHOS__)
++	struct sigaction sa;
+ #endif
++#endif
+ 
+ 	if (pfnProc == NULL) {
+ 		fprintf(stderr, "lcsp_thread_create: Invalid thread function.\n");
+@@ -93,6 +136,20 @@
+ 		return NULL;
+ 	}
+ #else
++#if defined(__OHOS__)
++	// E513: the handler goes in place while this (still single) thread creates
++	// the joinable worker, so the reserved signal can never hit its default
++	// disposition - which would tear down the whole process instead of the
++	// worker.  sigaction() is process-wide and this call is idempotent.
++	sigemptyset(&sa.sa_mask);
++	sa.sa_flags   = 0;	// no SA_RESTART: the handler never returns
++	sa.sa_handler = _lscp_thread_cancel_handler;
++	if (sigaction(LSCP_THREAD_CANCEL_SIGNAL, &sa, NULL) != 0) {
++		fprintf(stderr, "lscp_thread_create: Failed to install cancellation handler.\n");
++		free(pThread);
++		return NULL;
++	}
++#endif
+ 	pthread_attr_init(&attr);
+ 	if (iDetach)
+ 		pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+@@ -146,6 +203,17 @@
+ 	/*  pThread->hThread = NULL; */
+ 		ret = LSCP_OK;
+ 	}
++#elif defined(__OHOS__)
++	// E513 fallback cancellation: this libc has no pthread_cancel(), so the
++	// reserved signal is delivered to the worker itself, whose handler -
++	// installed by lscp_thread_create() before the worker existed - converts it
++	// into pthread_exit().  The handle is deliberately kept, unlike the
++	// upstream !WIN32 branch below (whose pthread_cancel() request is followed
++	// by no reclaiming join): pthread_kill() only *requests* the targeted exit,
++	// so lscp_thread_destroy() must still reach lscp_thread_join() to wait for
++	// it and reclaim the joinable worker.
++	if (pThread->pthread && pthread_kill(pThread->pthread, LSCP_THREAD_CANCEL_SIGNAL) == 0)
++		ret = LSCP_OK;
+ #else
+ 	if (pThread->pthread && pthread_cancel(pThread->pthread) == 0) {
+ 		pThread->pthread = 0;
