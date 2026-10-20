@@ -1,0 +1,45 @@
+# manifest.yaml — vde 2.3.3（版本级）
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: vde
+version: "2.3.3"
+
+# 编译状态：published | built | failed | archived
+# 真机预检通过前保持 built；由最终验证结果确认后由 HMBS 统一维护终态。
+status: built
+
+build_date: "2026-10-18"
+
+build_system: autotools
+
+conan_ref: "vde/2.3.3"
+
+source:
+  url: "https://github.com/virtualsquare/vde-2/archive/refs/tags/v2.3.3.tar.gz"
+  sha256: "a7d2cc4c3d0c0ffe6aff7eb0029212f2b098313029126dcd12dc542723972379"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--build=aarch64-unknown-linux-ohos"
+    - "--host=aarch64-unknown-linux-ohos"
+    - "--disable-cryptcab"
+    - "--disable-pcap"
+    - "--disable-tuntap"
+    - "--disable-router"
+    - "--enable-static"
+    - "--disable-shared"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-configure.ac-pthread-probe-and-clobber.patch" 
+
+knowledge_gained:
+  - "GitHub tag 归档不含预生成 configure，需 tool_requires automake/1.18 + libtool/2.5.4 并 autoreconf -fi 自举"
+  - "OHOS musl libc：-D__MUSL__ 让 sys/socket.h 跳过 sockaddr_storage 定义，避免与 linux/socket.h（经 linux/if.h）重定义（E091，同 audispd）"
+  - "可选依赖 wolfssl/libpcap/TUN-TAP 在 OHOS 缺失，--disable-cryptcab/--disable-pcap/--disable-tuntap 显式关闭"
+  - "上游无 in-tree 测试套件，按守则显式声明 upstream_tests_exist: false 并记录审计证据，test_package 提供 13 项完整消费者断言"
+  - "OHOS musl libc 未实现 POSIX 线程取消（pthread_cancel，E085/E127），且平台缺少底层虚拟路由所需的 TAP 支持，配置 --disable-router 显式裁剪依赖组件 vde_router"
