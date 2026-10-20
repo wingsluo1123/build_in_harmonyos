@@ -1,0 +1,205 @@
+--- a/meson.build
++++ b/meson.build
+@@ -53,47 +53,14 @@
+ endif
+ add_project_arguments('-DKYWC_VERSION=@0@'.format(version), language: 'c')
+ 
+-wlroots = dependency(
+-  'wlroots-0.20',
+-  default_options: ['default_library=static', 'examples=false', 'renderers=vulkan',
+-                    'backends=x11'],
+-  version: ['>=0.20.0', '<0.21.0'],
+-  fallback: 'wlroots'
+-)
+-
+-add_project_arguments('-DWLR_USE_UNSTABLE', language: 'c')
+-wlroots_has_xwayland = wlroots.get_variable('have_xwayland') == 'true'
+-
+-xcb = dependency('xcb')
+-have_xwayland = xcb.found() and wlroots_has_xwayland
+-add_project_arguments(
+-  '-DHAVE_XWAYLAND=@0@'.format(have_xwayland.to_int()),
+-  language: 'c',
+-)
++have_compositor = get_option('compositor')
+ 
+-wayland_server = dependency('wayland-server', version: '>=1.23.0')
++# libkywc (client library) requirements: Wayland client library, protocol XML
++# definitions and libm.  Kept outside the compositor gate so that
++# -Dcompositor=false still produces libkywc.
+ wayland_protos = dependency('wayland-protocols', version: '>=1.36')
+-xkbcommon = dependency('xkbcommon')
+-drm = dependency('libdrm')
+-input = dependency('libinput', version: '>=1.19')
+-pixman = dependency('pixman-1')
+ math = cc.find_library('m')
+-jsonc = dependency('json-c', version: '>=0.13')
+-sdbus = dependency('libsystemd')
+-dl = cc.find_library('dl')
+-rt = cc.find_library('rt')
+-thread = dependency('threads')
+-cairo = dependency('cairo')
+-pango = dependency('pango')
+-pangocairo = dependency('pangocairo')
+-rsvg  = dependency('librsvg-2.0', version: '>=2.46')
+-jpeg = dependency('libjpeg')
+-png = dependency('libpng')
+-udev = dependency('libudev')
+ unwind = dependency('libunwind', required : get_option('libunwind'))
+-gbm = dependency('gbm', version: '>=21.1')
+-
+-dispinfo = dependency('libdisplay-info')
+ 
+ plugindir = get_option('plugin_directory')
+ if plugindir == ''
+@@ -101,20 +68,63 @@
+ endif
+ add_project_arguments('-DPLUGIN_DIR="@0@"'.format(plugindir), language: 'c')
+ 
+-have_raw_tap = cc.has_header_symbol('libinput.h', 'LIBINPUT_EVENT_RAW_TAP', dependencies: [input])
+-add_project_arguments('-DHAVE_LIBINPUT_RAW_TAP=@0@'.format(have_raw_tap.to_int()), language: 'c')
++if have_compositor
+ 
+-wlcom_sources = []
++  wlroots = dependency(
++    'wlroots-0.20',
++    default_options: ['default_library=static', 'examples=false', 'renderers=vulkan',
++                      'backends=x11'],
++    version: ['>=0.20.0', '<0.21.0'],
++    fallback: 'wlroots'
++  )
++
++  add_project_arguments('-DWLR_USE_UNSTABLE', language: 'c')
++  wlroots_has_xwayland = wlroots.get_variable('have_xwayland') == 'true'
++
++  xcb = dependency('xcb')
++  have_xwayland = xcb.found() and wlroots_has_xwayland
++  add_project_arguments(
++    '-DHAVE_XWAYLAND=@0@'.format(have_xwayland.to_int()),
++    language: 'c',
++  )
++
++  wayland_server = dependency('wayland-server', version: '>=1.23.0')
++  xkbcommon = dependency('xkbcommon')
++  drm = dependency('libdrm')
++  input = dependency('libinput', version: '>=1.19')
++  pixman = dependency('pixman-1')
++  jsonc = dependency('json-c', version: '>=0.13')
++  sdbus = dependency('libsystemd')
++  dl = cc.find_library('dl')
++  rt = cc.find_library('rt')
++  thread = dependency('threads')
++  cairo = dependency('cairo')
++  pango = dependency('pango')
++  pangocairo = dependency('pangocairo')
++  rsvg  = dependency('librsvg-2.0', version: '>=2.46')
++  jpeg = dependency('libjpeg')
++  png = dependency('libpng')
++  udev = dependency('libudev')
++  gbm = dependency('gbm', version: '>=21.1')
++
++  dispinfo = dependency('libdisplay-info')
++
++  have_raw_tap = cc.has_header_symbol('libinput.h', 'LIBINPUT_EVENT_RAW_TAP', dependencies: [input])
++  add_project_arguments('-DHAVE_LIBINPUT_RAW_TAP=@0@'.format(have_raw_tap.to_int()), language: 'c')
++
++  wlcom_deps = [
++    wayland_server, wayland_protos,
++    wlroots, xkbcommon, drm, input, udev, dispinfo,
++    pixman, xcb, jsonc, sdbus,
++    math, dl, rt, thread, unwind,
++    cairo, pango, pangocairo, rsvg, jpeg, png,
++  ]
+ 
+-wlcom_deps = [
+-  wayland_server, wayland_protos,
+-  wlroots, xkbcommon, drm, input, udev, dispinfo,
+-  pixman, xcb, jsonc, sdbus,
+-  math, dl, rt, thread, unwind,
+-  cairo, pango, pangocairo, rsvg, jpeg, png,
+-]
++  wlcom_inc = include_directories('include')
++
++endif
+ 
+-wlcom_inc = include_directories('include')
++wlcom_sources = []
+ 
+ have_examples = get_option('examples')
+ have_tools = get_option('tools')
+@@ -196,7 +206,7 @@
+   subdir('po')
+ endif
+ 
+-if get_option('tracy')
++if have_compositor and get_option('tracy')
+   tracy = dependency(
+     'tracy',
+     default_options: ['default_library=static'],
+@@ -205,23 +215,27 @@
+   wlcom_deps += tracy
+ endif
+ 
+-subdir('data')
++if have_compositor
++  subdir('data')
++endif
+ subdir('protocols')
+-subdir('src')
++if have_compositor
++  subdir('src')
++endif
+ 
+ if have_libkywc
+   subdir('libkywc')
+ endif
+ 
+-if have_examples
++if have_compositor and have_examples
+   subdir('examples')
+ endif
+ 
+-if have_tools
++if have_compositor and have_tools
+   subdir('tools')
+ endif
+ 
+-if have_portal
++if have_compositor and have_portal
+   subdir('portal')
+ endif
+ 
+@@ -268,17 +282,19 @@
+   },
+   section: 'Configuration', bool_yn: true)
+ 
+-symbols_file = 'wlcom.syms'
+-symbols_flag = '-Wl,--version-script,@0@/@1@'.format(
+-  meson.current_source_dir(), symbols_file)
+-
+-executable(
+-  'kylin-wlcom',
+-  wlcom_sources,
+-  include_directories: wlcom_inc,
+-  dependencies: wlcom_deps,
+-  install: true,
+-  export_dynamic: true,
+-  link_args: symbols_flag,
+-  link_depends: symbols_file,
+-)
++if have_compositor
++  symbols_file = 'wlcom.syms'
++  symbols_flag = '-Wl,--version-script,@0@/@1@'.format(
++    meson.current_source_dir(), symbols_file)
++
++  executable(
++    'kylin-wlcom',
++    wlcom_sources,
++    include_directories: wlcom_inc,
++    dependencies: wlcom_deps,
++    install: true,
++    export_dynamic: true,
++    link_args: symbols_flag,
++    link_depends: symbols_file,
++  )
++endif
