@@ -1,0 +1,34 @@
+software: qmf
+version: "5.0-git20250326.d27f464"
+status: built
+build_date: "2026-10-18"
+build_system: cmake
+
+source:
+  url: "https://github.com/qt-labs/messagingframework/archive/d27f4646df066a6f5a8cc4b8761b710c26ea797c.tar.gz"
+  sha256: "f6508161a1dd19362dc19797ccfcc51f6d561c94416866aa88d8dbf7ce318db5"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DBUILD_SHARED_LIBS=ON"
+    - "-DBUILD_WIDGETS=OFF"
+    - "-DUSE_HTML_PARSER=OFF"
+    - "-DBUILD_MESSAGESERVER_PLUGINS=ON"
+    - "-DCMAKE_PREFIX_PATH=<qtbase-sql-dbus package_folder>;<qtcore5compat package_folder>;<icu package_folder>;<zlib package_folder>"
+  dependencies:
+    - qtbase-sql-dbus/6.11.1
+    - qtcore5compat/6.11.1
+    - icu/76.1
+    - zlib/1.3.1.1
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "QMF at d27f464 is Qt6/CMake-only for this recipe (project 4.0.4); examples are guarded by BUILD_WIDGETS so OFF skips them, benchmarks always build tst_messageserver."
+  - "Upstream registers 29 ctest targets unconditionally in tests/CMakeLists.txt; tst_crypto needs gpgme-config and is absent on OHOS."
+  - "QmfClient links Qt6 Sql/Network/Core5Compat (PRIVATE) and Core/DBus (PUBLIC); ICU is optional but enabled via icu/76.1 for charset detection."
+  - "The recipe consumes Qt from qtbase-sql-dbus/6.11.1 (Sql+DBus on) plus qtcore5compat/6.11.1; plain qtbase/6.11.1 lacks Sql/DBus and cannot configure QMF."

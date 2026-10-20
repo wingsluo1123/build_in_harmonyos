@@ -1,0 +1,31 @@
+package: qmf/5.0-git20250326.d27f464
+homepage: "https://github.com/qt-labs/messagingframework"
+
+upstream_check_command: "ctest"
+upstream_test_in_build: true
+upstream_test_command: "recipe build() runs ctest --output-on-failure --timeout 300"
+
+upstream_tests:
+  - file: tests/
+    source: messagingframework-d27f4646df066a6f5a8cc4b8761b710c26ea797c/tests/
+    description: "QMF upstream CTest suite: 29 test dirs built unconditionally via add_subdirectory(tst_*) in tests/CMakeLists.txt at commit d27f464; upstream ships no add_test() calls so the recipe registers each built tst_* exe with CTest add_test (harness only, no test-source change); tst_crypto is conditional on gpgme-config and not registered without GPGME."
+    command: "ctest --output-on-failure --timeout 300"
+    status: enabled
+    case_count: 29
+
+# HMBS rule4 machine-evidence fields: official total uses the upstream
+# registration口径, not the runnable subset on the current machine.
+upstream_test_total: 30
+upstream_test_count_method: ctest_entries
+upstream_enabled_case_count: 29
+upstream_total_case_count: 30
+upstream_conditional_case_count: 1
+upstream_conditional_note: "tst_crypto is registered only when gpgme-config is found (find_program GPGME_CONFIG in tests/CMakeLists.txt); GPGME is absent on OHOS so the suite runs 29 targets."
+upstream_excluded_case_count: 0
+
+test_package_tests:
+  - file: test_qmf.cpp
+    description: "Consumer test linking QmfClient: CHECK 1 constructs QMailAddress and verifies address/isEmailAddress, CHECK 2 verifies toString round-trip."
+    command: "./test_qmf"
+
+assertion_count: 2
