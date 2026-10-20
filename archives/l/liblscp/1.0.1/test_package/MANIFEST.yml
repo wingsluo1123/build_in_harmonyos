@@ -1,0 +1,70 @@
+# test_package/MANIFEST.yml — 上游官方测试声明（CI build_and_test.sh L0e 要求）
+package: liblscp/1.0.1
+homepage: "https://linuxsampler.org/"
+
+# 上游无测试命令：tarball 内 enable_testing / add_test / ctest / BUILD_TESTING
+# 命中数为 0（2026-10-12 全树 grep 实测，见 ../notes.md「上游测试分析」）
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# 消费者测试（test_package）——本包唯一的可执行行为证据
+test_package_tests:
+  - file: test_liblscp.c
+    description: >-
+      以库使用者身份编译链接 liblscp.so，断言五组真实行为：configure_file 生成的
+      版本字符串（package/version/build）、src/event.c 的 17 项事件枚举与文本互转
+      （含 strcasecmp 大小写路径与 NULL/未知回退）、客户端 API 的 NULL 句柄契约、
+      对本进程内 loopback 假 LSCP 服务端的一次真实事务（OK[0.85] 解析、
+      纯 OK 累积、ERR:400 转 LSCP_ERROR/errno=500）、以及按 knowledge/doc/E513.md
+      「推荐方案」guarded-signal-thread-exit 新增的反悬置组：对活线程走
+      lscp_thread_cancel()+lscp_thread_join()、自然退出后的 destroy、以及库自身
+      可达路径 lscp_socket_agent_start()/lscp_socket_agent_free()（即
+      lscp_client_destroy() 实际调用的一条），三条都带
+      TEARDOWN_BUDGET_MS=5000 时间上界，退出码由断言结果决定。
+    command: "./test_liblscp"
+
+# 真机 conan create 实测读数（当前绑定：tip 151a1dcc7 之上的工作树＝conanfile.py :28 url
+#   填写后的 sha e743c223…，2026-10-15 20:24:57 至 20:27:41 的恰 1 次官方 finish→step35 W3，
+#   运行态 recipe revision 0cb035c666cf01a1730c4a3e166b2f41 / package_id 01d92cf349a0dd98ff915f4bd99a04430171517f
+#   （0cb035c6… 的导出面是 Pre-download 临时注入后的 conandata 1926 B / 8fb39be4…，:7 file://、https 命中 0；
+#    交付面 conandata 1870 B / c809b959… 官方 https + 同一 conanfile e743c223… 的 rrev 是
+#    b1944ed936b9c777954acb4c85a9125f，本窗 r30 只读重算实测其在索引 packages 表零行＝自身未构建，
+#    不得写成已构建并通过；两次导出相差 31.01 s，运行态折 UTC 即载体第 106 行的 2026-10-15 12:25:52。
+#    两值并列、不合并。重算载体 .temp/QDR-1009-E05/liblscp-r30/r30_stepA_verify.out 10213 B / 3a92df05…）
+#   / package revision 339399f757bd0746705e89fa602ce12c；输入为私有影子 profile ohos-aarch64-15461B
+#   2757 B / 67404bc17c0beae386d56bcae21d9002388e095e82210e2f8d02a886891ff19e，非仓库默认 profile）：
+#   "liblscp consumer test: 76 assertions, 0 failures"（第 345 行）+ "RESULT: PASS"（第 346 行）
+#   载体 archives/l/liblscp/1.0.1/reports/w3-local-ci.log 21525 B / 377 行，sha256
+#   a53c19a8e35b67cff6aeafc7b1d522de10dede2dfb5c6625734370efab99053e，mtime 2026-10-15 20:27；
+#   该载体是 gitignore 覆盖的本地件、不入库，读数绑上述 tip 与 revision，复核按行号加 sha256 比对。
+#   官方 W3 两件互绑：同目录 .ci-result.json 364 B / 61df0c25984fac61758b5b6668c378e3552d505e542 的
+#   exit_code=0、integrity_hash 5b4281c248ee825e、log_sha256 即上面的 a53c19a8…；框架写版本目录而
+#   pre_pr_audit 读仓根，故仓根另存一份 cp -p 同 sha 逐字转本副本（未手编、未改框架、未用 --force）。
+#   第 339 行是本消费者程序的真实运行；第 278 行删除旧 test_package build folder、第 332/333 行
+#   真实重编译与链接；第 209-224 行编译 6 个 C 目标、第 225 行链接 liblscp.so、第 240/253 行
+#   package()，第 157 行 Forced build from source、第 159 行标记 "- Build" 即库本体本轮真从源码
+#   重建（第 106 行为真实重新导出的 Exported 行），不是缓存复用；缓存复用只发生在 Pre-download
+#   的源码 tarball（第 94 行 [cached]，sha 仍为官方 db54a33c…）。
+#   官方 SONAME 门禁同轮判决：第 355 行 [ok] L5: lib/ has content (library package)、第 367 行
+#   L5_RESULT=pass: lib/ has content，且全日志对 L5a / 缺少 DT_SONAME / soname_gate_failed 的
+#   grep 命中为 0（修复前 tip e13eadc29 的同一门在第 350/365 行是 fail）。
+#   产物 ELF 一手读数（readelf -d）：p/b/libls008a56c021d75/p/lib/liblscp.so 88384 B / sha256
+#   4fc43378512cd0c145e747d91671bf0cbae90522e3153f7d1fe08c13325c4f3a 含
+#   "0x000000000000000e (SONAME) Library soname: [liblscp.so]"，NEEDED 仅 [libc.so]；lib/ 下仅此
+#   一个 .so 加 pkgconfig/，包内仍是单一扁平 liblscp.so。该产物与上一回合 rrev 3475dd5e… 下的
+#   产物逐字相同（同 88384 B、同 sha256）⇒ 填 url 只改配方元数据、不改编译输出。改前原件
+#   p/b/libls6bc27c8dec250/p/lib/liblscp.so 84288 B / sha256
+#   20eab61966906c1cfec7e612d4841fb16debe5958d49104e1c83bdae8a4c6f9b 的 SONAME 命中为 0。
+#   消费者程序按 SONAME 名可重定位寻址成立（本机无 ldd，判据为 readelf -d 加真实运行退出码）。
+#   另：第 356-359 行 L1e 破坏性反向验证 pass——把包内 lib/ 与 include/ 移走后本测试即失败，
+#   证明断言实质依赖被测包（非只链接/只打印）。
+#   历史对照：修复前 tip e13eadc29 同一程序读数 = 65 assertions, 0 failures，其载体
+#   w3-local-ci.log（21141 B / 267f5ec6a6ddd7e55bf12a9a371d6818a9d8b8117a7da4a2e37851e0e3e30ede，
+#   mtime 2026-10-12 22:28）内含已删除的旧补丁名 cooperative-join，属历史件，仅作历史签名引用；
+#   上一回合（rrev 3475dd5e…，19:10）绿载体 conan-create.log 18597 B / 743a46df… 已被本轮 finish
+#   step3 的仓库默认 profile 红跑原地覆盖，其逐字副本存 ~/tmp/uc2/QDR-1009-E05/r29-pre/。
+#   memcap-run.py --probe 对本消费者程序实测 peak=4MB rc=0（用时 0.6s），故 max_rss_mb 记 8（2 倍预算）。
+assertion_count: 76
+max_rss_mb: 8
