@@ -1,0 +1,18 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Demote format warning for musl gettext
+
+---
+diff --git a/meson.build b/meson.build
+--- a/meson.build
++++ b/meson.build
+@@ -562,7 +562,9 @@
+     '-Wno-format-zero-length',
+     # We explicitly require variadic macros
+     '-Wno-variadic-macros',
+-    '-Werror=format=2',
++    # musl gettext lacks glibc's __attribute_format_arg, which can trigger
++    # -Wformat-security on translated format strings. Keep this warning non-fatal.
++    '-Wformat=2',
+     '-Werror=init-self',
+     '-Werror=missing-include-dirs',
+     '-Werror=pointer-arith',

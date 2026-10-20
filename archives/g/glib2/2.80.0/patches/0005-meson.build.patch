@@ -1,0 +1,38 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Build vendored libffi through the Meson fallback
+
+---
+diff --git a/meson.build b/meson.build
+--- a/meson.build
++++ b/meson.build
+@@ -2221,7 +2221,9 @@
+ gvdb_dep = dependency('gvdb')
+ 
+ libm = cc.find_library('m', required : false)
+-libffi_dep = dependency('libffi', version : '>= 3.0.0')
++libffi_dep = dependency('libffi', version : '>= 3.0.0',
++  # Use the vendored WrapDB subproject when libffi is absent from Conan.
++  default_options: {'werror': false, 'tests': false}, allow_fallback: true)
+ 
+ libz_dep = dependency('zlib')
+ 
+diff --git a/subprojects/libffi.wrap b/subprojects/libffi.wrap
+--- a/subprojects/libffi.wrap
++++ b/subprojects/libffi.wrap
+@@ -1,5 +1,5 @@
+ [wrap-git]
+-directory=libffi
++directory=libffi-3.5.2
+ url=https://gitlab.freedesktop.org/gstreamer/meson-ports/libffi.git
+ revision=meson
+ depth=1
+diff --git a/subprojects/proxy-libintl.wrap b/subprojects/proxy-libintl.wrap
+--- a/subprojects/proxy-libintl.wrap
++++ b/subprojects/proxy-libintl.wrap
+@@ -1,5 +1,5 @@
+ [wrap-git]
+-directory = proxy-libintl
++directory = proxy-libintl-0.5
+ url = https://github.com/frida/proxy-libintl.git
+ revision = 0.4
+ depth=1

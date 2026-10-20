@@ -1,0 +1,66 @@
+sources:
+  url:
+    - "https://mirror.nju.edu.cn/gnome/sources/glib/2.80/glib-2.80.0.tar.xz"
+    - "https://download.gnome.org/sources/glib/2.80/glib-2.80.0.tar.xz"
+    - "https://ftp.gnome.org/pub/gnome/sources/glib/2.80/glib-2.80.0.tar.xz"
+  sha256: "8228a92f92a412160b139ae68b6345bd28f24434a7b5af150ebe21ff587a561d"
+
+# libffi is not published in the OHOS conan registry, so glib builds it from
+# source as a meson subproject. These populate subprojects/libffi-3.5.2/ in
+# source(); meson then builds libffi offline (no wrap download). The source URL
+# uses the `url:` key form so CI's mirror fallback rewrites the github URL to a
+# mirror list (CI workers can't reach github.com directly). wrapdb (patch) is
+# reachable and left single-valued.
+libffi_subproject:
+  source:
+    url: "https://github.com/libffi/libffi/releases/download/v3.5.2/libffi-3.5.2.tar.gz"
+    sha256: "f3a3082a23b37c293a4fcd1053147b371f2ff91fa7ea1b2a52e335676bac82dc"
+  patch:
+    # Direct github release URL (wrapdb.mesonbuild.com only redirects here and
+    # is itself unreachable on CI). Ends in .zip so conan get() extracts it;
+    # github host -> CI mirror fallback rewrites it to a mirror list.
+    url: "https://github.com/mesonbuild/wrapdb/releases/download/libffi_3.5.2-1/libffi_3.5.2-1_patch.zip"
+    sha256: "1ee3035d92e4df3541d0b2b8d192d2fa183b46e4a3d68c00d8f71ede354bee74"
+
+# glib unconditionally requires gettext/intl ("We require gettext to always be
+# present", meson.build:2360); musl has no gettext, so it falls back to the
+# proxy-libintl subproject. Vendor it (like libffi) so wrap_mode=nodownload works.
+proxy_libintl:
+  source:
+    url: "https://github.com/frida/proxy-libintl/archive/refs/tags/0.5.tar.gz"
+    sha256: "f7a1cbd7579baaf575c66f9d99fb6295e9b0684a28b095967cfda17857595303"
+
+patches:
+  - patch_file: "patches/0001-meson.build.patch"
+    patch_description: "0001 add harmonyos to host system checks"
+    patch_type: "portability"
+  - patch_file: "patches/0002-meson.build.patch"
+    patch_description: "0002 disable netlink on harmonyos"
+    patch_type: "portability"
+  - patch_file: "patches/0003-meson.build.patch"
+    patch_description: "0003 find pcre2 via conan pkg-config name"
+    patch_type: "portability"
+  - patch_file: "patches/0004-meson.build.patch"
+    patch_description: "0004 demote werror format for musl gettext"
+    patch_type: "portability"
+  - patch_file: "patches/0005-meson.build.patch"
+    patch_description: "0005 build libffi via subproject fallback"
+    patch_type: "portability"
+  - patch_file: "patches/0006-tools-meson.build.patch"
+    patch_description: "0006 run visibility macro generator via python"
+    patch_type: "portability"
+  - patch_file: "patches/0007-gio-tests-meson.build.patch"
+    patch_description: "0007 enable upstream meson tests and mark HarmonyOS-only unsupported cases"
+    patch_type: "portability"
+  - patch_file: "patches/0008-meson.build.patch"
+    patch_description: "0008 detect getpass before building gio tls console tests"
+    patch_type: "portability"
+  - patch_file: "patches/0009-gio-tests-meson.build.patch"
+    patch_description: "0009 mark remaining HarmonyOS upstream test gaps"
+    patch_type: "portability"
+  - patch_file: "patches/0010-gio-tests-meson.build.patch"
+    patch_description: "0010 skip upstream tests requiring a D-Bus daemon unavailable to the HarmonyOS shell user"
+    patch_type: "portability"
+  - patch_file: "patches/0011-glib-tests-meson.build.patch"
+    patch_description: "0011 mark shell environment, debugger, and system MIME database tests as HarmonyOS failing-suite cases"
+    patch_type: "portability"
