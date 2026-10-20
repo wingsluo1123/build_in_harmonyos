@@ -1,0 +1,46 @@
+# pop-sound 5.5.1.r7.g25ea85d — 测试状态（口径唯一：总计 51 条 = 自检 38 + 消费者 13）
+#
+# pop-os/gtk-theme 是 Pop 主题 monorepo（gtk/ + gnome-shell/ + sounds/）。sounds/
+# 子目录只有音效资源、index.theme.in 模板与 12 行 meson 安装脚本：
+#   - 无 tests/ 目录
+#   - meson.build 里没有 test() 注册（meson test 实测 "No tests defined."）
+#   - 仓库 TESTING.md 是 GTK/Shell 主题的人工 QA 清单，无任何 sound 相关条目
+# 因此上游测试用例数 N=0（清点证据见 notes.md「上游测试」一节）。
+upstream_tests:
+  total: 0
+  passed: 0
+  failed: 0
+  skipped: 0
+  type: "none"
+
+# 适配后新增用例（全部由 test_package 的 test() 实跑）
+#
+# 分组（合计 51 = 38 + 13）：
+#   A1-A8   交付结构与元数据（index.theme 语义/目录/许可/无源稿泄漏/无 ELF）      8
+#   B01-B25 上游样例逐条：21 个实体 .oga + 4 个别名，容器 + 编码逐条校验          25
+#   H1-H5   鸿蒙特有验收：主题路径约定、Context 映射、Vorbis-only 编解码、
+#           share 只读数据（无 ELF/可执行位）、大小写折叠安全                     5
+#   C0-C12  消费者端到端（另有 consumer_case 详述）：主题定位 1 + 事件解析 12     13
+added_tests:
+  framework: "python scripts (test_package/test_pop_sound.py + test_package/consumer_soundtheme.py)"
+  total: 51
+  breakdown:
+    self_check: 38
+    consumer: 13
+  passed: 51
+  failed: 0
+  skipped: 0
+  type: "resource-integrity"
+
+# 完整消费者用例（平台 rule12：鸿蒙特有测试不能只有断言，必须有真正跑通流程的
+# 端到端用例）。consumer_soundtheme.py 把 package_folder/share 当 XDG_DATA_DIRS，
+# 按 freedesktop Sound Theme 规范定位 <datadir>/sounds/<theme> → 解析 index.theme
+# 的 Directories/Context/OutputProfile → 按事件名解析到 stereo/<context>/<event>.oga
+# 并实际读取容器头（"播放"路径的最小可用替代）。
+consumer_case:
+  file: "test_package/consumer_soundtheme.py"
+  kind: "end-to-end consumer (freedesktop sound theme lookup over the installed theme)"
+  theme: "Pop"
+  cases: 13                    # C0 主题定位 + C1-C12 事件解析（8 实体 + 4 别名）
+  events_resolved: 12
+  declared_dirs: 3
