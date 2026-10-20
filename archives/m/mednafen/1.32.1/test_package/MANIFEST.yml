@@ -1,0 +1,61 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI 脚本 build_and_test.sh L0e 要求它存在）。
+#
+# ⚠ mednafen 的上游测试**不是**构建系统注册的临时程序，而是「编进二进制、运行时执行」
+#    的两处注册入口 —— 所以这里 `upstream_check_command: make check` 只是如实写出
+#    上游的 check 目标名（顶层 Makefile.am 只有 SUBDIRS = po intl src，无 TESTS /
+#    check_PROGRAMS ⇒ `make check` 是 0 用例空跑），真正的 72 项断言见下面的
+#    `upstream_tests` 与 ../notes.md 的五维账本。
+
+package: mednafen/1.32.1
+homepage: "https://mednafen.github.io/"
+
+# 上游测试命令（用于 make -n check 分析；实测该目标下无任何用例注册）
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+# true —— build() 里 autotools.make(target="check") 真跑（虽为空跑，保留以对齐 CI L1c 口径）；
+#         两个真实断言面一个在程序启动路径上（--help/任何调用都跑），一个由 -exptests 触发，
+#         都由 test_package/test.sh 真跑二进制执行。
+upstream_test_in_build: true
+upstream_test_command: "make check"
+
+# 上游实际运行的两处断言注册入口（不是独立测试程序，是函数体逐条调用）
+upstream_tests:
+  - file: src/tests.cpp
+    source: mednafen-1.32.1/src/tests.cpp
+    description: "MDFN_RunCheapTests()：60 项内置断言，src/mednafen.cpp:1457 在 MDFNI_Init() 里无条件调用（任何一次运行都会执行）"
+    command: "./src/mednafen --help   # 走到参数解析即已跑完 60 项"
+  - file: src/testsexp.cpp
+    source: mednafen-1.32.1/src/testsexp.cpp
+    description: "MDFNI_RunExpensiveTests()：12 项扩展断言，由上游调试开关 -exptests <dir> 触发（src/drivers/main.cpp:920 注册）"
+    command: "./src/mednafen -exptests <writable-dir>"
+
+# 上游人工回归语料（tests/ 目录，31 个文件，无自动化入口；逐项未执行原因见 ../notes.md 与 PR 补充说明）
+upstream_manual_assets:
+  - dir: tests/apple2
+    files: 10
+    description: "Apple II CRC 表与 decimal 磁盘镜像语料 + 宿主工具 bintodsk.cpp/gencrctab.cpp"
+  - dir: tests/pce/decimal
+    files: 8
+    description: "Hudson Soft decimal 测试 ROM（adc.pce/sbc.pce）与其期望结果生成器 gen-results.cpp + make.sh"
+  - dir: tests/pce/vcectdump
+    files: 3
+    description: "VCE 测试 ROM vcectdump.pce + 汇编源 + make.sh"
+  - dir: tests/pce
+    files: 1
+    description: "font.bin 字模语料"
+  - dir: tests/psx
+    files: 4
+    description: "4 个 PS1 可执行测试程序（gpuprec/linefuzz/multires-newgpu/triorder.exe），需 PS1 BIOS 才能跑"
+
+# test_package 中自带的测试（消费者视角验证）
+# 真跑的是 test.sh；conanfile.py 的 test() 只执行 `bash test.sh` 一条命令，
+# 包内不存在第二条测试入口（无 conan-init 遗留的空壳 test.c / CMakeLists.txt）。
+test_package_tests:
+  - file: test.sh
+    description: "安装出的 bin/mednafen 真跑：--help 路径（内含 60 项 MDFN_RunCheapTests 断言）+ 依赖链接版本三条（zlib 1.3.1 / SDL2 2.30.10 / libFLAC 1.5.0）+ 模拟模块表 + -exptests 的 12 项扩展断言与 cfgtest.cfg/streamtest.bin 落盘 + 无参数与非法选项两条负控制"
+    command: "/data/service/hnp/bin/bash test.sh"
+
+# 断言总数（= test_package/test.sh 里 run_help/run/grep_check/grep_absent/file_check 调用行数）
+assertion_count: 21

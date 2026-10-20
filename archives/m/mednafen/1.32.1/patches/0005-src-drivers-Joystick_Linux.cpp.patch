@@ -1,0 +1,34 @@
+--- a/src/drivers/Joystick_Linux.cpp
++++ b/src/drivers/Joystick_Linux.cpp
+@@ -29,20 +29,31 @@
+ #include <sys/stat.h>
+ #include <unistd.h>
+ #include <fcntl.h>
+ #include <sys/ioctl.h>
+ #include <linux/joystick.h>
+ #include <linux/input.h>
+ #include <sys/types.h>
+ #include <dirent.h>
+ #include <limits.h>
+ 
++#ifdef __OHOS__
++/*
++ * OHOS 的 musl 系 <dirent.h> 不声明 GNU versionsort(3)（整棵 sysroot include 树
++ * grep 命中 0 次；本 TU 的编译行已带 -D_GNU_SOURCE 仍报 undeclared），
++ * 回退到 POSIX alphasort(3)：枚举集合由 evdev_filter/jsdev_filter 决定，比较器
++ * 只决定列出次序，故设备可用性不变、排序语义降级为字典序
++ * （/dev/input 下 event2/event10 这类混排时次序与上游不同）。
++ */
++#define versionsort alphasort
++#endif
++
+ class Joystick_Linux : public Joystick
+ {
+  public:
+ 
+  Joystick_Linux(const char *jsdev_path, const char *evdev_path, const uint64 bvpv) MDFN_COLD;
+  ~Joystick_Linux() MDFN_COLD;
+ 
+  virtual unsigned HatToAxisCompat(unsigned hat) override;
+ 
+  void UpdateInternal(void);
