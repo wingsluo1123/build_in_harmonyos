@@ -1,0 +1,33 @@
+# test_package/MANIFEST.yml
+# Test declaration for the Conan L1 consumer test.
+
+package: pam_script/1.1.9
+homepage: "https://github.com/jeroennijhof/pam_script"
+
+# Upstream 1.1.9 ships no test suite at all: the tag archive contains only
+# pam_script.c, the autotools files, the man page template and the example
+# scripts under etc/. There is no tests/ directory, no check target and the
+# upstream CI (.travis.yml) only runs `autoreconf -i && ./configure && make`.
+# The upstream case count is therefore 0 and the whole verification weight
+# rests on the OpenHarmony specific consumer test below.
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_mode: "no upstream test suite in the 1.1.9 tag archive"
+upstream_test_command: "conan create archives/p/pam_script/1.1.9"
+upstream_tests: []
+upstream_test_count: 0
+
+test_package_tests:
+  - file: test_pam_script.c
+    description: >-
+      OpenHarmony specific consumer test: dlopen()s the installed
+      lib/security/pam_script.so, resolves the six pam_sm_* entry points and
+      drives the module through a real linux-pam stack built with
+      pam_start_confdir(). It verifies the documented onerr= semantics
+      (onerr=success returns PAM_SUCCESS, the upstream default returns
+      PAM_AUTH_ERR) and that the module obtained the user name and requested
+      the password through the PAM conversation with the upstream
+      "Password: " prompt.
+    command: "test_pam_script <pam_script.so> <pam conf dir>"
+
+assertion_count: 18
