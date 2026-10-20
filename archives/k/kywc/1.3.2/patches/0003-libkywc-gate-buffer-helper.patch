@@ -1,0 +1,50 @@
+--- a/libkywc/meson.build
++++ b/libkywc/meson.build
+@@ -25,27 +25,29 @@
+   files_libkywc += protocols_client_header[p]
+ endforeach
+ 
+-egl = dependency('egl')
+-glesv2 = dependency('glesv2')
+-wayland_egl = dependency('wayland-egl')
++if have_compositor and (have_examples or have_tools)
++  egl = dependency('egl')
++  glesv2 = dependency('glesv2')
++  wayland_egl = dependency('wayland-egl')
+ 
+-buffer_sources = ['buffer.c', 'buffer.h']
+-foreach p : ['xdg-shell', 'xdg-decoration']
+-  if p in protocols_code and p in protocols_client_header
+-    buffer_sources += [protocols_code[p], protocols_client_header[p]]
+-  endif
+-endforeach
++  buffer_sources = ['buffer.c', 'buffer.h']
++  foreach p : ['xdg-shell', 'xdg-decoration']
++    if p in protocols_code and p in protocols_client_header
++      buffer_sources += [protocols_code[p], protocols_client_header[p]]
++    endif
++  endforeach
+ 
+-buffer_static = static_library(
+-  'kywc_buffer',
+-  buffer_sources,
+-  dependencies: [egl, glesv2, wayland_egl, png],
+-  build_by_default : false, 
+-)
++  buffer_static = static_library(
++    'kywc_buffer',
++    buffer_sources,
++    dependencies: [egl, glesv2, wayland_egl, png],
++    build_by_default : false, 
++  )
+ 
+-kywc_buffer = declare_dependency(
+-  link_with: buffer_static,
+-)
++  kywc_buffer = declare_dependency(
++    link_with: buffer_static,
++  )
++endif
+ 
+ ld_args = '-Wl,--version-script,@0@/@1@'.format(
+   meson.current_source_dir(), 'kywc.syms')

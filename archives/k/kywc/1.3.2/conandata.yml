@@ -1,0 +1,31 @@
+# conandata.yml — kywc 1.3.2
+# 源码：Debian pool 的 kylin-wayland-compositor 1.3.2 orig tar（R39 合规）。
+# 上游 gitee 仓库只发布 upstream/1.3.0 与 upstream/1.3.1 两个 tag，1.3.2 是
+# Debian 打包修订版（源包 kylin-wayland-compositor，二进制包 libkywc1 /
+# libkywc1-dev / kylin-wayland-compositor），故按 Debian pool 源取包
+# （units-filter / userinfo / uucpsend 的 Debian pool 先例）。
+# 站点实测可下载，sha256 为本地实测值。
+
+sources:
+  url: "https://mirrors.aliyun.com/debian/pool/main/k/kylin-wayland-compositor/kylin-wayland-compositor_1.3.2.orig.tar.xz"
+  sha256: "d5169a9c943337d226c436d4b2cfa5107921a7f24d3cb2fbdcf5580d6eeb3e20"
+
+# wayland 1.24.0 源码，用于编译静态 wayland-scanner。
+# HMDFS 禁止执行链接了缓存共享库的二进制，wayland 包自带的 scanner 在本环境
+# 无法运行；protocols/meson.build 的 find_program('wayland-scanner') 需要一个
+# 只依赖 libc 的静态 scanner（wayland-protocols/1.48 先例）。
+scanner_sources:
+  url: "https://gitlab.freedesktop.org/wayland/wayland/-/archive/1.24.0/wayland-1.24.0.tar.gz"
+  sha256: "7800858844751fc7113d7df3678dc6b58b26a056176a65c49a059763045bffd5"
+
+patches:
+  "1.3.2":
+    - patch_file: "patches/0001-meson-options-add-compositor-switch.patch"
+      patch_description: "meson_options.txt 新增 compositor 布尔开关（默认 true，保持上游完整构建行为），供只打包 libkywc 的目标关闭合成器侧构建"
+      patch_type: "conan"
+    - patch_file: "patches/0002-meson-gate-compositor-and-keep-libkywc.patch"
+      patch_description: "根 meson.build 以 have_compositor 门控 wlroots-0.20/xcb/wayland-server/xkbcommon/libdrm/libinput/pixman/json-c/libsystemd/cairo/pango/pangocairo/librsvg/libjpeg/libpng/libudev/gbm/libdisplay-info 探测及 data、src、examples、tools、portal 子目录与 kylin-wlcom 可执行文件；protocols 与 libkywc 子目录保持无条件构建"
+      patch_type: "conan"
+    - patch_file: "patches/0003-libkywc-gate-buffer-helper.patch"
+      patch_description: "libkywc/meson.build 中仅供 examples/tools 使用的 buffer 辅助（egl/glesv2/wayland-egl/libpng）移入 have_compositor and (have_examples or have_tools) 门控，使 libkywc 本身只链接 wayland-client 与 libm"
+      patch_type: "conan"
