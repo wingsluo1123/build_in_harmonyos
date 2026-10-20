@@ -1,0 +1,47 @@
+# test_package/MANIFEST.yml
+# Upstream test declaration for sniffit 0.7 (tag sniffit-0.7).
+# Upstream ships no automated tests; the consumer test below validates the
+# packaged application instead.
+
+package: sniffit/0.7
+homepage: "https://github.com/resurrecting-open-source-projects/sniffit"
+
+# ---- Upstream test audit ---------------------------------------------------
+# Audited the sniffit-0.7 source tree and build files (no tests exist):
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "sniffit-0.7 source tree (root and src/)"
+    reason: "There is no tests/, test/ or *test*/*check* file at any level; src/ holds only sn_*.c/.h, sniffit.c/.h and two .plug plugin examples, plus examples/ and docs/ with usage samples only."
+  - source: "Top-level Makefile.am and src/Makefile.am"
+    reason: "Neither file defines TESTS or check_PROGRAMS; the top level only declares SUBDIRS = src plus man_MANS, and src/ only declares sbin_PROGRAMS = sniffit with its source list."
+  - source: "configure.ac"
+    reason: "Contains only feature probes (AC_CHECK_LIB/HEADERS/FUNCS/SIZEOF for pcap, ncurses, shmget, atexit); no test enablement, no test target, no test framework macros."
+  - source: "Debian/Ubuntu packaging of 0.7 (debian.tar.xz)"
+    reason: "Carries only packaging smoke handling, not an upstream test suite; it is not part of the upstream source tree and offers no接入able test entry."
+  - conclusion: "Upstream 0.7 provides no automated tests; the adaptation's test_package validates the installed sniffit binary as a runtime consumer check and does not claim upstream coverage."
+
+# rule4 强制字段：upstream_test_total 必须显式声明。
+# sniffit 0.7 经完整审计确认确实没有任何自动化测试（见上方审计），
+# 官方注册总数即 0，口径为 autotools_tests（automake 无测试注册）。
+upstream_test_total: 0
+upstream_test_count_method: autotools_tests
+upstream_test_passed: 0
+upstream_test_failed: 0
+upstream_test_skipped: 0
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# ---- Consumer tests (test_package) -----------------------------------------
+# test_package/conanfile.py runs test_sniffit.sh against the packaged
+# bin/sniffit, parses its deterministic "RESULT: P passed, F failed" trailer
+# into HMBS_TEST_PACKAGE_RESULT, and emits HMBS_UPSTREAM_TEST_RESULT
+# (status=no_tests, 0 counts).
+test_package_tests:
+  - file: test_sniffit.sh
+    description: "Drive the packaged `sniffit` binary through 5 real assertions needing no privileges and no network device: (1) binary present/executable/non-empty, (2) `-v` exits 0, (3) `-v` output is non-empty and carries the exact 'Sniffit Version 0.7' contract, (4) bare invocation prints usage (root) or the privilege notice (non-root), (5) negative control — `-t <invalid-host>` is rejected with a real app error and non-zero exit. Emits a machine-readable RESULT trailer parsed by test_package/conanfile.py."
+    command: "sh test_sniffit.sh <package>/bin/sniffit <workdir>"
+
+assertion_count: 5

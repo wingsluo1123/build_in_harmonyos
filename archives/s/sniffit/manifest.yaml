@@ -1,0 +1,24 @@
+software: sniffit
+display: "sniffit"
+description: "历史抓包与监控工具：基于 libpcap 嗅探 IPv4 TCP/UDP/ICMP，展示 SEQ/ACK/TTL/Window 等包细节与载荷，支持 ncurses 交互模式"
+category: network
+homepage: "https://github.com/resurrecting-open-source-projects/sniffit"
+license: BSD-3-Clause
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "GitHub tag 快照无 configure/Makefile.in，但 build() 不在设备端跑 autoreconf（无 automake/autoconf/libtool 依赖，直编 7 个 TU + 生成 config.h），以消除 conancenter m4 构建边（HNP-bash Error 127；aldo/0.7.8 先例变体）"
+    - "config.h 按 configure.ac 探针的 OHOS 确定答案在构建时生成（HAVE_LIBNCURSES/HAVE_NCURSES_H/HAVE_SHMGET/HAVE_ATEXIT/USE_32_INT），写构建目录隔离区，不进 patches/"
+    - "固定 requires libpcap/1.10.6（configure 硬性要求）与 ncurses/6.6（交互模式确定性），经 AutotoolsDeps 注入"
+    - "上游无测试套件（无 TESTS/check 注册、无 tests/ 目录），test_package 以 5 条二进制消费端校验补足"
+  common_dependencies:
+    - libpcap
+    - ncurses
+
+versions:
+  "0.7":
+    status: built
+    build_date: 2026-10-12
+    source_url: "https://github.com/resurrecting-open-source-projects/sniffit/archive/refs/tags/sniffit-0.7.tar.gz"
+    source_sha256: "9a8c3472414e105479296b6ca83be419cfd37551982e6ddaca34dfa4916a4c47"
