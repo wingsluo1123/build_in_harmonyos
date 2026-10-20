@@ -1,0 +1,17 @@
+--- CMakeLists.txt
++++ CMakeLists.txt
+@@ -5,5 +5,13 @@
+ string(REGEX MATCH "VERSION = ([0-9\.]+)" _ ${MAKE_FILE})
+ 
++# The v0.8.8 tag still embeds 0.8.0 in Make.inc. Allow downstream package
++# revisions to provide accurate installed CMake and pkg-config metadata while
++# preserving upstream's default when no override is supplied.
++set(OPENLIBM_SOURCE_VERSION "${CMAKE_MATCH_1}")
++if(DEFINED OPENLIBM_PACKAGE_VERSION)
++    set(OPENLIBM_SOURCE_VERSION "${OPENLIBM_PACKAGE_VERSION}")
++endif()
++
+ project(openlibm
+-        VERSION ${CMAKE_MATCH_1}
++        VERSION ${OPENLIBM_SOURCE_VERSION}
+         LANGUAGES C ASM)

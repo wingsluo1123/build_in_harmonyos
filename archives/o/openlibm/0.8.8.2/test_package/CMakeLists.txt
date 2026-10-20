@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.25)
+project(openlibm_consumer LANGUAGES C)
+find_package(openlibm CONFIG REQUIRED)
+add_executable(openlibm_consumer consumer.c)
+target_compile_options(openlibm_consumer PRIVATE -fno-builtin)
+target_link_libraries(openlibm_consumer PRIVATE openlibm::openlibm)
