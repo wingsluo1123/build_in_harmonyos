@@ -1,0 +1,30 @@
+id: DRAFT-profanity-0.18.2-vendored-embed-synthetic-pc-forced-shell
+trigger_tool: conan|meson|configure
+phase: building
+error_signature: Main binary package .* missing|Unknown compiler\(s\)|unable to find library -lstrophe
+severity: 3
+category: autotools, build-system, ohos, portability
+match_keywords: hmbs_repair_method, compile_error, vendored_build, synthetic_pc
+title: 远端依赖配方不可达时消费者侧静态内嵌：make-dist免自举+合成缺失pc+命令行强制可用shell重建
+root_cause: 远端libstrophe无OHOS二进制需源码重建但其配方缺自举且预检仅同步消费者单包目录致依赖侧改写不可达，消费者无法向依赖构建上下文注入工具，叠加openssl/zlib无pc与毒化SHELL及过期clang路径共同阻塞
+verification_cmd: 真机conan create全链通过且日志显示内嵌libstrophe已编完装完、meson主构建与unittests显式目标构建成功，HMBS_TEST_PACKAGE_RESULT与上游计数口径一致
+affected_scope: 依赖远端autotools库且该依赖在OHOS远端无可用二进制、预检仅同步消费者单包目录的消费者库
+rec_priority: 1
+rec_approach: vendored-static-embed-with-synthetic-pc
+rec_description: 删除对远端失效依赖的requires改为消费者侧静态内嵌，用上游make-dist发布包免除autoreconf自举，缺失openssl/zlib时按包目录递归搜索合成pc走标准PKG_CHECK_MODULES，configure与make命令行强制可用shell，重定位过期clang并显式构建meson非默认测试目标
+rec_command: conanfile.py删除requires-libstrophe改requires-expat与tool_requires-pkgconf加meson保留；conandata增加make-dist URL与sha；build内文本替换移植加合成pc加命令行强制shell加编译器重定位加meson显式目标构建
+rec_auto_fix: false
+rec_impl: conan-recipe-plus-test-package
+fallback_priority: 2
+fallback_approach: dependency-rrev-pin-or-version-switch
+fallback_description: 若内嵌源不可达则回退同版本RREV钉住或切换到有OHOS二进制的专有版本，并收敛到已发布二进制原生依赖版本以避免源码重建
+fallback_auto_fix: false
+forbid_1_pattern: unable to find library -lstrophe
+forbid_1_reason: 禁止手写pc时将libdir写成安装前缀根导致链接找不到内嵌静态库
+forbid_1_consequence: meson链接报找不到内嵌库致主构建失败，需以归档所在lib目录为准
+similar_to: [DRAFT-ccrtp-1.0.0-demo-as-upstream-regression]
+doc_file: knowledge/drafts/DRAFT-profanity-0.18.2-vendored-embed-synthetic-pc-forced-shell.md
+last_updated: 2026-10-20
+source_event: profanity/0.18.2真机预检远端libstrophe自举死结改消费者侧静态内嵌后全部门禁通过
+authors: hmbs-executor
+source_pr: 17170
