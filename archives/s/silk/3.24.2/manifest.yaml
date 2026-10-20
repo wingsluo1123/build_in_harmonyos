@@ -1,0 +1,30 @@
+version: "3.24.2"
+software: "silk"
+status: built
+build_date: "2026-10-13"
+build_system: "autotools"
+
+source:
+  url: "https://tools.netsa.cert.org/releases/silk-3.24.2.tar.gz"
+  sha256: "9ea9c1391f9c1ba14394af68b2bd7e66bf73b664c3cee342c5a39e5b13e45398"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--enable-static --disable-shared (shared=False default)"
+    - "--with-python=no (no PySiLK, avoids Python-dev dependency)"
+    - "--enable-ipv6 (IPv6 flow support, same flag as Homebrew)"
+    - "make -j1 (single job; HMDFS jobserver fifo limited)"
+    - "make check -j1 (1574 automake TESTS, test-suite.log aggregation)"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "SiLK 3.24.2 is CERT NetSA traffic analysis suite (not Skype audio codec); autotools with libsilk/libsilk-thrd/libflowsource plus rw* CLI tools"
+  - "config.guess/config.sub need OHOS mapping to linux-ohos triplet (E007); applied in-recipe by string replacement"
+  - "configure mktemp umask 077 must relax to 022 for HMDFS (E011)"
+  - "Upstream has 1574 automake TESTS (src/*/tests/*.pl); 3 top-level make-*.pl are helpers, 8 daemon .py are EXTRA_DIST helpers"
