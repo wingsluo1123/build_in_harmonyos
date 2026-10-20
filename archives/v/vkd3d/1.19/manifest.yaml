@@ -1,0 +1,121 @@
+---
+software: vkd3d
+version: 1.19
+build_date: "2026-10-18"
+build_system: autotools
+status: built
+compiler: clang
+platform: ohos-aarch64
+
+build:
+  system: autotools
+  configure_options:
+    - "--host=aarch64-linux-ohos"
+    - "--build=aarch64-linux-ohos"
+    - "--disable-maintainer-mode"
+    - "--without-ncurses"
+    - "--without-xcb"
+    - "--without-opengl"
+    - "--without-spirv-tools"
+    - "SONAME_LIBVULKAN=libvulkan.so.1"
+  dependencies: [vulkan-headers/vulkan-sdk-1.4.357.0, spirv-headers/vulkan-sdk-1.3.290.0]
+  tool_requires: [swiftshader/0_git20260921]
+  cc: clang
+  cxx: clang++
+
+archive:
+  source_url: https://dl.winehq.org/vkd3d/source/vkd3d-1.19.tar.xz
+  source_hash: 034613605baab8ba84674f8d272cf22b5e86bc6bc03fc5728ef9bce07308baa6
+  source_size: 1421856
+  source_format: tar.xz
+  upstream_repo: https://gitlab.winehq.org/wine/vkd3d
+  upstream_tag: vkd3d-1.19
+  upstream_tag_commit: 5c355b5963ef7a51eb152a8f1544542bf5b25610
+
+patches_applied:
+  - "0001-bin-config-guess-harmonyos.patch"
+  - "0002-perl-json-pp-portability.patch"
+
+patch_classification:
+  - file: 0001-bin-config-guess-harmonyos.patch
+    type: platform_detection
+    platform_only: true
+    guard: none
+    note: >-
+      bin/config.guess (timestamp 2024-07-27) does not recognise HarmonyOS.
+      Minimal E1092 patch: add a *:HarmonyOS:*:*) case branch emitting
+      ${MACHINE}-unknown-linux-ohos. No platform macro is introduced, so the PF5
+      platform-macro gate is not triggered.
+  - file: 0002-perl-json-pp-portability.patch
+    type: portability
+    platform_only: false
+    guard: none
+    note: >-
+      use JSON; -> use JSON::PP; in the two upstream perl helper scripts. JSON is
+      not part of core Perl while JSON::PP is (core since 5.14) and exposes the
+      same interface the JSON distribution falls back to.
+
+runtime_rewrites_not_in_patches:
+  - file: configure
+    reason: >-
+      E114 / E1016(b): the generated configure creates its scratch directory with
+      (umask 077 && mktemp -d ./confXXXXXX). On HMDFS that lands as drwx--S---,
+      so config.status cannot write ./confXXXXXX/subs1.awk and configuration dies
+      with "could not setup config files machinery". configure is a generated
+      file, so the two umask 077 prefixes are stripped at build time (with
+      assertions) instead of being patched.
+
+deliverables:
+  libraries:
+    - lib/libvkd3d.so.1.19.0
+    - lib/libvkd3d-shader.so.1.17.0
+    - lib/libvkd3d-utils.so.1.6.5
+  programs:
+    - bin/vkd3d-compiler
+    - bin/vkd3d-dxbc
+  headers: include/vkd3d/*.h
+  pkgconfig:
+    - lib/pkgconfig/libvkd3d.pc
+    - lib/pkgconfig/libvkd3d-shader.pc
+    - lib/pkgconfig/libvkd3d-utils.pc
+  commands_json: archives/v/vkd3d/commands.json
+
+tests:
+  upstream_runner: automake (make check)
+  n_static: 293
+  n_static_breakdown:
+    vkd3d_tests: 3
+    vkd3d_cross_tests: 3
+    vkd3d_shader_tests: 287
+  n_registered: 293
+  n_entries_with_real_execution: 292
+  n_atomic_cases_executed: 18097
+  n_atomic_failures: 0
+  n_not_executed: 1
+  not_executed_detail: >-
+    tests/vkd3d_api ran but reported "0 tests executed (0 failures, 1 skipped)";
+    vkd3d_api.c:1298 -> "Test skipped: D3D12 device cannot be created." The
+    SwiftShader (CPU Vulkan) software device does not satisfy the device
+    capabilities that program requires. This is an environment limitation, not
+    introduced by the adaptation: in the same run d3d12 (2521 cases) and
+    hlsl_d3d12 (5357 cases) both created devices successfully.
+  automake_summary: "TOTAL 293 / PASS 293 / FAIL 0 / ERROR 0 / SKIP 0 / XFAIL 0 / XPASS 0"
+  executed_in_build: true
+  device_required: true
+  device_substrate: swiftshader/0_git20260921 (CPU Vulkan 1.3, test-only tool_requires)
+  fake_pass_guard: >-
+    shader_runner_vulkan.c:2142 returns early when no Vulkan device is present and
+    vkd3d_test.h:328 only fails on failure_count, so an absent device would make
+    automake report all 287 shader_test entries as PASS with zero executed. The
+    recipe raises instead of running make check without the substrate, and the
+    per-log "N tests executed (...)" lines are the hard evidence of real execution.
+  consumer_test_package:
+    programs: 1
+    assertions: 7
+    api: vkd3d_shader_compile (HLSL -> DXBC/TPF -> SPIR-V)
+
+knowledge_gained:
+  - "货源等价性判据：make dist release tarball 自带 widl 生成物；用 .idl 与 .shader_test 逐字节 identical 可证明其与 git-archive 等价（ref: notes.md 货源）"
+  - "HMDFS config.status 暂存目录 umask 077 权限坑：生成文件不可落补丁，须构建期运行时改写并先断言后替换（ref: E114 / E1016）"
+  - "Conan 2.29 AutotoolsToolchain 不注入依赖 -I/-L/-l；sysroot 同名头会掩盖该缺失，使症状只暴露在另一个头上（ref: E1361 / E2186）"
+  - "无 Vulkan 设备时 shader_runner 会「全 PASS 零执行」；测试期 substrate 缺失必须硬失败（ref: notes.md 测试口径）"
