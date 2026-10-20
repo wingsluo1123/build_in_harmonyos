@@ -1,0 +1,90 @@
+# 版本级 manifest — rarcrack 0.2-20240214-413ea3a
+# 文件位置: archives/r/rarcrack/0.2-20240214-413ea3a/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "0.2-20240214-413ea3a"
+software: rarcrack
+
+# 编译状态: published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-04"
+build_system: makefile（上游纯 Makefile：`make` 直出单二进制 rarcrack；无 configure、无 check/test 目标；仅 all/debug/clean/install/uninstall）
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/jaredsburrows/rarcrack/archive/413ea3a549f9ac1e5c1f4d7913881047bfaa71a6.tar.gz"
+  sha256: "a4713c5e8a55f863e0c590566f2f68b0a867f5cbfa75ced0a21fbd1443a95cd0"
+  tar_format: tar.gz
+  commit: "413ea3a549f9ac1e5c1f4d7913881047bfaa71a6"
+  commit_date: "2024-02-14"
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: makefile
+  configure_options: []
+  dependencies:
+    - libxml2/2.15.3.1
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - patches/0001-Makefile.patch
+
+patch_classification:
+  - patch: patches/0001-Makefile.patch
+    type: portability
+    target: Makefile（CC 定义行与 all 目标编译行）
+    reason: >-
+      上游 Makefile 把编译器写死为 `CC=gcc` 且用宿主机反引号
+      `` `xml2-config --libs --cflags` `` 内联 libxml2 旗标，在 OHOS
+      原生构建下会混入宿主路径。补丁把 `CC=gcc` 改为 `CC?=` 并引入
+      `$(CFLAGS)` / `$(XML2_CFLAGS)` / `$(LDFLAGS)` / `$(XML2_LIBS)`
+      变量，配方从 Conan 的 libxml2 依赖包目录显式传值
+      （juise/3.0.0 同型做法）；不含任何 `__OHOS__` 平台宏。
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "rarcrack 官方上游是 github.com/jaredsburrows/rarcrack（Jared Burrows 维护的 David Zoltan Kedves 原作分支，GPL-2.0-only，Debian d/watch 同源）；0.2-20240214-413ea3a 为 2024-02-14 commit 413ea3a 快照，tarball sha256 经本机实下验证（a4713c5e…1443a95cd0）"
+  - "上游构建形态为裸 Makefile（仅 all/debug/clean/install/uninstall 目标）：单文件 rarcrack.c + `-pthread` + libxml2；OHOS 移植以 make 命令行变量传 CC/XML2_* 为工具链（命令行变量优先级高于 Makefile 内定义），-j1"
+  - "上游无任何自动化测试（源码树无 tests/、Makefile 无 check/test 目标、CI 仅为手动启动破解）；test_package 以 6 项 CLI 契约断言做安装后功能验证，不冒充上游覆盖；实际破解需目标机具备 unrar/7z/unzip 外部程序，真机测试刻意不启动 crack_start（缺 helper 时会空转）"
+  - "libxml2/2.15.3.1 默认 shared 且无三方 requirements（zlib/lzma 均 OFF、iconv 走 musl 内建），链接只需 -lxml2 -lm；其 threads.h 仍保留 xmlMutex 旧 API，本配方无需 libxml2 适配补丁"
+
+patch_generation:
+  method: self-made（OHOS 工具链隔离所需最小 Makefile 变量化，无上游等价补丁）
+  patches_count: 1
+
+# ============================================================
+# 测试信息（与 PR 正文/reports 口径一致；机器 evidence 待 HMBS 真机预检回填）
+# ============================================================
+
+upstream_tests:
+  entry: "无（上游未注册任何测试，见 test_package/MANIFEST.yml 审计）"
+  total: 0
+  total_scope: "源码树 + Makefile + 上游 CI workflow 三源审计，确认零测试"
+  ran: 0
+  passed: 0
+  failed: 0
+  skipped: 0
+
+ohos_specific_tests:
+  count: 6
+  location: "test_package/test_rarcrack.sh（5 项 CLI 契约验证 + 1 项反向对照）"
