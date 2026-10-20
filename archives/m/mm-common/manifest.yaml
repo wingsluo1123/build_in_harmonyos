@@ -1,0 +1,22 @@
+﻿software: mm-common
+display: "mm-common"
+description: "GNOME C++ 绑定（libsigc++/glibmm/gtkmm/pangomm）共享的构建脚本、Autoconf 宏与文档工具数据"
+category: build-tool
+homepage: "https://gtkmm.gnome.org/"
+license: GPL-2.0-or-later
+build_system: meson
+
+ohos_adaptation:
+  key_points:
+    - "上游 1.0.8 tarball 是 meson dist 产物（无 configure），Autotools 维护模式不可用，必须走 Meson"
+    - "Conan 的 Meson 前端固定 --prefix=/ + DESTDIR，安装脚本的数据目录需补丁改为按自身位置推导"
+    - "Meson pkgconfig 模块写死 prefix=/，package() 里统一改写为 ${pcfiledir}/../.."
+    - "构建全程离线：-Duse-network=false，libstdc++.tag 从源码树复制"
+    - "上游没有测试套件，build() 校验项目自身产物，consumer 行为由 test_package 覆盖"
+    - "Meson combo 选项（use-network）必须传字符串，传 bool 会被 Meson >= 1.12 拒绝"
+  common_dependencies: []
+
+versions:
+  "1.0.8":
+    status: built  # 真机 shadow CI 全绿（L0/L1/L2/L4/L5 + L1e，test_package 14/14）
+    build_date: "2026-10-19"
