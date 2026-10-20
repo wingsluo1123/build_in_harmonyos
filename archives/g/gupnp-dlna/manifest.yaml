@@ -1,0 +1,37 @@
+# gupnp-dlna 包级 manifest
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: gupnp-dlna
+
+display: "gupnp-dlna"
+
+description: "GUPnP DLNA — DLNA profile 定义与基于媒体元数据的 profile 识别库（含 GStreamer 元数据后端）"
+
+category: multimedia
+
+homepage: "https://gitlab.gnome.org/GNOME/gupnp-dlna"
+
+license: LGPL-2.1-or-later
+
+build_system: meson
+
+ohos_adaptation:
+  key_points:
+    - "meson 构建；default_library=shared —— gstreamer 元数据后端是 shared_module（libgstreamer.so），由 GModule 运行时加载，静态构建会产生多份 glib/gst 副本"
+    - "glib2/gstreamer/gst-plugins-base 均为制品仓静态包：静态 glib/gst 归档嵌入本包共享对象，ELF 符号插入（interposition）保证运行时单一 gobject 副本；gst-plugins-bad 1.28.3 已验证该形态"
+    - "PkgConfigDeps 只产出 glib-2.0.pc / libxml-2.0.pc / pcre2.pc / zlib.pc；配方补写 gobject-2.0/gio-2.0/gmodule-2.0 与 gstreamer-1.0/gstreamer-pbutils-1.0 等 wrapper .pc（pbutils 的 Libs 携带完整静态 gst 链，满足 meson 默认 -Wl,--no-undefined）"
+    - "编译期 DATA_DIR/metadata_backend_dir 为 configure-time prefix（/）：runenv_info 注入 GUPNP_DLNA_PROFILE_DIR 与 GUPNP_DLNA_METADATA_BACKEND_DIR"
+    - "zlib 经根级 override 钉在 PIC 变体 1.3.1.1（静态 glib 嵌入共享对象，非 PIC zlib 会触发 R_AARCH64 重定位错误）"
+    - "meson install 改写 DT_RUNPATH 会破坏 OHOS ELF .codesign 内嵌哈希：安装后用 build 目录原始产物覆盖（lib/、lib/gupnp-dlna/、bin/）"
+    - "introspection/vapi/gtk_doc disable（g-ir-scanner 不可用）；上游 tests 随 meson test 真机执行，discoverer 脚本测试因缺外部媒体集按上游设计 exit 77 跳过"
+  common_dependencies:
+    - "glib2"
+    - "libxml2"
+    - "gstreamer"
+    - "gst-plugins-base"
+    - "zlib(PIC 变体 1.3.1.1)"
+
+versions:
+  "0.12.0":
+    status: built
+    build_date: "2026-10-19"

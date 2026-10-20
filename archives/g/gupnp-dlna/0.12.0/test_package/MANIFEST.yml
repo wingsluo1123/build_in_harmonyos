@@ -1,0 +1,41 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI L0e 强制要求存在；详见 docs/TEST_QUALITY_SPEC.md）
+#
+# gupnp-dlna 0.12.0 上游测试位于 tests/，由 meson test 驱动：
+#   - test-sets : tests/sets.c 编译的 GLib g_test 单元测试（9 个
+#                 g_test_add_func 用例，覆盖 value-type/value-list/
+#                 restriction/info-set）
+#   - discoverer: tests/test-discoverer.sh.in 生成的脚本型 CTest 目标，
+#                 需要外部 gupnp-dlna-media 媒体集（本包不随源码分发）；
+#                 媒体目录不存在时 upstream 脚本以 exit 77 跳过。
+# 上游测试在配方 build() 中真机运行（OHOS 原生环境）：test-sets 经
+# meson test；discoverer 为脚本型目标，OHOS 无 binfmt_script 且无
+# /bin/bash，meson 的 shebang/--wrapper 前缀都不可用，改为设备 bash
+# 直接解释执行（环境变量与 meson 提供的一致），exit 77 记 SKIP。
+
+package: gupnp-dlna/0.12.0
+homepage: https://gitlab.gnome.org/GNOME/gupnp-dlna
+
+upstream_check_command: "meson test"
+
+upstream_test_in_build: true
+upstream_test_command: "meson test -v -C <build_folder> test-sets --timeout-multiplier=16 --no-rebuild; MEDIA_DIR=<src>/tests/gupnp-dlna-media FILE_LIST=<src>/tests/gupnp-dlna-media/media-list.txt GUPNP_DLNA_PROFILE_DIR=<src>/data GUPNP_DLNA_METADATA_BACKEND_DIR=<build_folder>/libgupnp-dlna/metadata-backends/gstreamer <bash> <build_folder>/tests/test-discoverer.sh（exit 77 记 SKIP）"
+
+upstream_tests:
+  - file: tests/sets.c
+    source: gupnp-dlna-0.12.0.tar.xz/tests/sets.c
+    description: "GLib g_test 单元测试：value-type/value-list/restriction/info-set（9 用例）"
+    command: "meson test test-sets"
+  - file: tests/test-discoverer.sh.in
+    source: gupnp-dlna-0.12.0.tar.xz/tests/test-discoverer.sh.in
+    description: "脚本型 CTest 目标：用 gupnp-dlna-info 对比外部媒体集的期望 profile（缺媒体集时 exit 77 跳过）；OHOS 无 binfmt_script 且无 /bin/bash，meson 的 shebang/--wrapper 前缀不可用，由配方以设备 bash 直接解释执行"
+    command: "bash tests/test-discoverer.sh（配方直跑；meson --wrapper bash 在 OHOS 不可用）"
+
+test_package_tests:
+  - file: test_gupnp_dlna.c
+    description: "消费者端到端：profile XML 加载与目录枚举、MP3 profile/mime 查询、relaxed+extended 模式、安装布局与后端模块 ELF 校验（.codesign + 导出入口；不 dlopen，静态 glib 平台限制）（3 个 case）"
+    command: "./test_gupnp_dlna"
+
+# 上游测试计数口径（rule4）：
+#   9 个 g_test_add_func 用例（test-sets）+ 1 个脚本型 CTest 目标（discoverer）
+assertion_count: 10
