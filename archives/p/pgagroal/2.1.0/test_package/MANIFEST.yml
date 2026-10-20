@@ -1,0 +1,41 @@
+package: pgagroal/2.1.0
+homepage: "https://pgagroal.github.io/pgagroal/"
+upstream_check_command: "ctest --test-dir build"
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests:
+  - file: test/testcases/*.c
+    source: pgagroal-2.1.0/test/
+    description: >-
+      Upstream MCTF suite: 10 modules / 96 cases (aes 12, alias 4, art 16,
+      configuration 31, connection 2, deque 11, json 6, pgbench_init 2,
+      startup_validation 10, utf8 2) compiled into the pgagroal_test runner.
+      Executed on HarmonyOS PC / aarch64 against the recipe-built libpgagroal.so
+      and a live PostgreSQL 16.10: 96/96 PASS, exit code 0. Evidence:
+      reports/upstream-test-run.log, reports/upstream-test-report.md.
+    command: "./pgagroal_test <project> myuser mydb"
+    executed_cases: 96
+    passed_cases: 96
+  - file: test/check.sh
+    source: pgagroal-2.1.0/test/
+    description: >-
+      Upstream end-to-end suite (container_test) starts PostgreSQL inside a
+      docker/podman container and drives pgagroal against it. test/CMakeLists.txt
+      registers it only under if(container), so the OHOS worker (no docker/podman)
+      gets no ctest entry. Its container-free branch (check.sh ci) is also
+      unusable here: start_postgresql() needs root to copy a prebuilt PostgreSQL
+      into / and to chown to the postgres user, while the worker runs as a
+      non-root uid on a read-only erofs root.
+    command: "ctest -R container_test"
+    executed_cases: 0
+    passed_cases: 0
+test_package_tests:
+  - file: test_pgagroal.c
+    description: >-
+      Links pgagroal::pgagroal and calls the public version API
+      (pgagroal_version_number / pgagroal_version_as_number), then executes the
+      five shipped tools (pgagroal, pgagroal-cli, pgagroal-admin,
+      pgagroal-config --version and pgagroal-vault --help) and checks their
+      version banners.
+    command: "./test_pgagroal"
+assertion_count: 7
