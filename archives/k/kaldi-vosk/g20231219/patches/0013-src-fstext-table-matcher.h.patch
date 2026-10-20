@@ -1,0 +1,48 @@
+--- a/src/fstext/table-matcher.h
++++ b/src/fstext/table-matcher.h
+@@ -208,21 +208,21 @@
+     } else
+       return backoff_matcher_.Value();
+   }
+ 
+   virtual TableMatcherImpl<FST> *Copy(bool safe = false) const {
+     assert(0);  // shouldn't be called.  This is not a "real" matcher,
+     // although we derive from MatcherBase for convenience.
+     return NULL;
+   }
+ 
+-  virtual uint64 Properties(uint64 props) const { return props; } // simple matcher that does
++  virtual uint64_t Properties(uint64_t props) const { return props; } // simple matcher that does
+   // not change its FST, so properties are properties of FST it is applied to
+ 
+  private:
+   virtual void SetState_(StateId s) { SetState(s); }
+   virtual bool Find_(Label label) { return Find(label); }
+   virtual bool Done_() const { return Done(); }
+   virtual const Arc& Value_() const { return Value(); }
+   virtual void Next_() { Next(); }
+ 
+   MatchType match_type_;
+@@ -276,21 +276,21 @@
+   void Next() { return impl_->Next(); }
+ 
+   bool Done() const { return impl_->Done(); }
+ 
+   const Arc &Value() {  return impl_->Value(); }
+ 
+   virtual TableMatcher<FST, BackoffMatcher> *Copy(bool safe = false) const {
+     return new TableMatcher<FST, BackoffMatcher> (*this, safe);
+   }
+ 
+-  virtual uint64 Properties(uint64 props) const { return impl_->Properties(props); } // simple matcher that does
++  virtual uint64_t Properties(uint64_t props) const { return impl_->Properties(props); } // simple matcher that does
+   // not change its FST, so properties are properties of FST it is applied to
+  private:
+   std::shared_ptr<Impl> impl_;
+ 
+   virtual void SetState_(StateId s) { impl_->SetState(s); }
+   virtual bool Find_(Label label) { return impl_->Find(label); }
+   virtual bool Done_() const { return impl_->Done(); }
+   virtual const Arc& Value_() const { return impl_->Value(); }
+   virtual void Next_() { impl_->Next(); }
+ 

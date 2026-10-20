@@ -1,0 +1,25 @@
+--- a/src/kws/kws-functions2.cc
++++ b/src/kws/kws-functions2.cc
+@@ -85,21 +85,21 @@
+   // which will cause problem in the factor disambiguation stage (we will not
+   // be able to add disambiguation symbols for both paths). We do a final step
+   // optimization anyway so commenting this out shouldn't matter too much.
+   // KALDI_VLOG(2) << "DoFactorMerging: minimization...";
+   // Minimize(&dest_transducer);
+ 
+   MaybeDoSanityCheck(dest_transducer);
+ 
+   Decode(&dest_transducer, encoder);
+ 
+-  Map(dest_transducer, index_transducer, KwsProductFstToKwsLexicographicFstMapper());
++  ArcMap(dest_transducer, index_transducer, KwsProductFstToKwsLexicographicFstMapper());
+ }
+ 
+ void DoFactorDisambiguation(KwsLexicographicFst *index_transducer) {
+   using namespace fst;
+   typedef KwsLexicographicArc::StateId StateId;
+ 
+   StateId ns = index_transducer->NumStates();
+   for (StateId s = 0; s < ns; s++) {
+     for (MutableArcIterator<KwsLexicographicFst>
+          aiter(index_transducer, s); !aiter.Done(); aiter.Next()) {

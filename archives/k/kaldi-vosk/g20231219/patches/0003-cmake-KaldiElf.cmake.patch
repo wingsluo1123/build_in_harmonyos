@@ -1,0 +1,23 @@
+--- /dev/null
++++ b/cmake/KaldiElf.cmake
+@@ -0,0 +1,20 @@
++# Some native CMake distributions detect ELF but have no platform module.
++# Probe the linker instead of assigning a different operating-system identity.
++if(CMAKE_EXECUTABLE_FORMAT STREQUAL "ELF" AND
++   NOT CMAKE_SHARED_LIBRARY_SONAME_CXX_FLAG)
++    include(CMakePushCheckState)
++    include(CheckCXXSourceCompiles)
++    cmake_push_check_state(RESET)
++    set(CMAKE_REQUIRED_LIBRARIES "-Wl,-soname,libkaldi-probe.so" "-Wl,-rpath,$ORIGIN")
++    check_cxx_source_compiles("int main() { return 0; }" KALDI_LINKER_HAS_ELF_TAGS)
++    cmake_pop_check_state()
++    if(NOT KALDI_LINKER_HAS_ELF_TAGS)
++        message(FATAL_ERROR "ELF linker lacks SONAME/RPATH support required by shared Kaldi libraries")
++    endif()
++    foreach(lang C CXX)
++        set(CMAKE_SHARED_LIBRARY_SONAME_${lang}_FLAG "-Wl,-soname,")
++        set(CMAKE_SHARED_LIBRARY_RUNTIME_${lang}_FLAG "-Wl,-rpath,")
++        set(CMAKE_SHARED_LIBRARY_RUNTIME_${lang}_FLAG_SEP ":")
++        set(CMAKE_SHARED_LIBRARY_RPATH_LINK_${lang}_FLAG "-Wl,-rpath-link,")
++    endforeach()
++endif()
