@@ -1,0 +1,67 @@
+software: lskat
+version: "26.04.0"
+status: built
+package_type: application
+build_system: cmake
+created_at: 2026-10-18
+language: cpp
+description: "KDE Lieutenant Skat card game (Offiziersskat) - Qt6/KF6 QGraphics application built on KDEGames6/libkdegames"
+homepage: https://invent.kde.org/games/lskat
+upstream_source: https://invent.kde.org/games/lskat/-/archive/v26.04.0/lskat-v26.04.0.tar.gz
+source_sha256: 229960a95bb4f8ad80086fe6e44b28ab20c816e095f3a03a5d0863fc81613563
+license: "GPL-2.0-or-later AND GFDL-1.2-only"
+
+dependencies:
+  required:
+    - qtbase/6.11.1
+    - qtsvg/6.11.1
+    - kconfig/6.18.0
+    - kconfigwidgets/6.18.0
+    - kcoreaddons/6.18.0
+    - kcrash/6.18.0
+    - kdbusaddons/6.18.0
+    - kdnssd/6.29.0
+    - kguiaddons/6.18.0
+    - ki18n/6.18.0
+    - kwidgetsaddons/6.18.0
+    - kxmlgui/6.18.0
+    - kiconthemes/6.18.0.1
+    - libkdegames/26.04.0.1
+  build:
+    - ecm/6.26.0
+  forced:
+    - karchive/6.18.0 (override=True: libkdegames/26.04.0.1 graph precedent - knewstuff/6.18.0 needs the karchive 6.18.Z line)
+    - kiconthemes/6.18.0.1 (override=True: the published kiconthemes/6.18.0 binary was rebuilt against karchive/6.19.0 and is not installable together with the karchive 6.18.Z line; 6.18.0.1 is the karchive/6.18.Z-built revision)
+
+patches_applied:
+  - patches/0001-ohos-skip-kdoctools.patch
+
+test_results:
+  type: no_upstream_tests_consumer_verified
+  upstream: "none (N=0): the 26.04.0 release tarball has no tests/, autotests/ or test/ directory and no enable_testing()/add_test()/ecm_add_test()/BUILD_TESTING in any CMakeLists.txt (find + grep evidence in the batch analysis log: exit 1 / empty result); .kde-ci.yml only declares require-passing-tests-on: ['Linux','FreeBSD','Windows'], i.e. upstream QA runs KDE CI source builds and the tarball ships no test entry point"
+  test_package: "passed 6/6 consumer cases (8 assertions / 8 passed, 0 failed, 0 skipped on OHOS): (0) packaged bin/lskat exists and is executable; (1) --version -> 'lskat 1.50.26040'; (2) --help identifies lskat (Qt/KDE runtime link complete); (3a) --author -> 'Martin Heni'; (3b) --license -> GPL; (4) [OHOS-specific, non-assertion] shared-library closure load - the shipped binary is launched and the OHOS dynamic linker resolves all 23 DT_NEEDED entries (no 'cannot open shared object file' / 'undefined symbol'); (5a) [OHOS-specific] ELF64 AArch64 e_machine=183; (5b) [OHOS-specific] .codesign section present (OHOS rejects unsigned ELFs). Log: buildb/logs/b7-conan-create.log ('ALL CONSUMER CASES PASSED')"
+  package_id: "ac5276d55c3fca47213d6f673f344b2c917d75f9"
+  package_revision: "259c9f753446d73fbf5d6e7f7fbf473a"
+  artifact_checks: "llvm-readelf -d bin/lskat -> 23 NEEDED entries, all plain basenames (0 containing '/'; E537 normalization applied in package(): 11 path-form entries rewritten); .codesign section present after re-sign; 4 LOAD segments (4K page layout via -Wl,-z,max-page-size=0x1000); 1 ELF signed"
+  ohos_run: "passed: conan create + test_package executed natively on the HarmonyOS PC device (OHOS aarch64 profile, clang 15 / libc++)"
+
+platform_adaptations:
+  - "KF6 DocTools dropped from the REQUIRED component list plus add_subdirectory(doc) and kdoctools_install(po) removed (patch 0001): the DocBook handbook is not a runtime requirement of the game and every published KDEGames6 consumer in this repository drops it the same way (kblocks / kfourinline / kbreakout 26.04.0 precedent)"
+  - "KF_IGNORE_PLATFORM_CHECK=TRUE (KDE platform detection does not know OHOS)"
+  - "KF_SKIP_PO_PROCESSING=ON (translation catalog generation skipped; no gettext msgfmt toolchain needed for the deliverable)"
+  - "libkdegames/26.04.0.1 instead of 26.04.0: the 26.04.0 artifact is the known SONAME/DT_NEEDED-defective release, 26.04.0.1 is the SONAME-fixed re-release already consumed by kbreakout/kjumpingcube"
+  - "karchive/6.18.0 override=True + kiconthemes/6.18.0.1 override=True: registry currently publishes kiconthemes/6.18.0 built against karchive/6.19.0, which cannot coexist with the knewstuff/6.18.0 karchive 6.18.Z requirement; 6.18.0.1 is the karchive 6.18.Z-built revision and the only combination with a complete binary closure"
+  - "-Wl,-z,max-page-size=0x1000 appended to CMAKE_EXE_LINKER_FLAGS: the OHOS musl loader refuses the lld default 0x10000 multi-RW-LOAD layout (audiocd 26.04.3 / kbreakout 26.04.0 precedent)"
+  - "ECM_MODULE_PATH + conan_cmakedeps_paths.cmake written manually (qtbase/KF6/libkdegames packages use cmake_find_mode=none)"
+  - "package(): path-form DT_NEEDED entries normalized to bare basenames in place (.dynstr only, same length) and the ELF re-signed (llvm-objcopy --remove-section .codesign + binary-sign-tool -selfSign 1) - 11 entries normalized on this build"
+  - "7Zip stays optional and absent: theme SVGZ generation uses the gzip -9 -n -c fallback of cmake/InternalMacros.cmake"
+
+known_issues:
+  - "R40 适配完整性：本包未对渲染/输入路径做任何 stub 或裁剪；本次验证覆盖「可执行文件加载 + 完整 DT_NEEDED closure 解析 + KAboutData/命令行接口 + OHOS 签名/架构门禁」。卡牌渲染、鼠标/键盘输入、音频输出需真机人工确认（本机无显示/音频环境），编译通过 + 消费者用例通过不等于交互适配已完整验证"
+  - "lskat 是 GUI 游戏：headless 下元数据用例需 QT_QPA_PLATFORM=offscreen；完整对局需要显示/启动器环境，且需要 D-Bus session（KDBusService 初始化失败时进程退出码为 1，属环境缺失而非链接失败）"
+  - "上游 sounds/*.ogg 未被上游任何 CMakeLists 安装（grep 'sounds' 在 CMakeLists 中 0 命中），本配方保持上游行为，不额外打包"
+
+knowledge_gained:
+  - "ohpcd 中 kiconthemes/6.18.0 的二进制已被重建为依赖 karchive/6.19.0，与 knewstuff/6.18.0 的 karchive 6.18.Z 需求互斥：必须在配方里 kiconthemes/6.18.0.1 + override=True（6.18.0.1 是 karchive 6.18.Z 构建的修订），否则 conan graph 报 'Missing packages: kiconthemes'。该缺口同样影响已合入的 kbreakout/kfourinline/kgoldrunner/knavalbattle/kjumpingcube 配方（当前 registry 状态下 graph info 均报缺 kiconthemes）"
+  - "lskat 26.04.0 的上游 CMake 总依赖面是 ECM + Qt6(Gui/Svg/Widgets) + KF6(Config/CoreAddons/Crash/DBusAddons/DocTools/GuiAddons/I18n/WidgetsAddons/XmlGui/IconThemes) + KDEGames6；DocTools 是唯一需要裁剪的组件"
+  - "lskat 26.04.0 无上游测试套件（无 tests/autotests 目录、无 add_test/ecm_add_test/enable_testing），消费者验证是唯一验证路径（R51 清点证据）"
