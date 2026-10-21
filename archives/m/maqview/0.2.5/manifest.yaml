@@ -1,0 +1,44 @@
+version: "0.2.5"
+status: built
+build_date: "2026-10-19"
+conan_ref: "maqview/0.2.5"
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/m/maqview/maqview_0.2.5.orig.tar.gz"
+  sha256: "2d01495bb03fe108d87a348432bdc9c81e93c6f765ccba8f88fc94a979a7eba2"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--build=aarch64-unknown-linux-gnu"
+    - "--host=aarch64-unknown-linux-gnu"
+    - "--prefix=<package_folder>"
+    - "--disable-dependency-tracking"
+  dependencies:
+    - mesa/24.3.4.1
+    - glu/9.0.3
+    - freeglut/3.6.0
+  build_requirements:
+    - automake/1.18
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-ohos-gl-stack-and-modern-autotools.patch"
+  - "0002-stdhash-dependent-base-clang.patch"
+  - "0003-ohos-glut-font-ids.patch"
+
+knowledge_gained:
+  - "OHOS 只交付 OpenGL ES（libGLESv2 不导出 glBegin/glVertex3f/glMatrixMode/glOrtho/选择模式入口）；maqview 渲染层是桌面 GL 立即模式，必须链接 mesa/24.3.4.1 的桌面 GL 入口（libOSMesa+libglapi，实测联合导出全部所需符号）"
+  - "制品仓 mesa/24.3.4.1 不含独立 libGL.so；带 libGL 的 mesa/24.3.4.1.1.1 与 glu/9.0.3 的 mesa/24.3.4.1 pin 直接版本冲突，故 GLLIBS 用 -lOSMesa -lglapi"
+  - "mesa/24.3.4.1 同时交付 libOSMesa.so，可在无 X display 时用离屏上下文做真实立即模式渲染验证"
+  - "mesa/26.1.5 起上游已移除 OSMesa（mesa 25.1.0 relnotes），只交付 EGL/GLES；桌面 GL 需要 24.3.4.x"
+  - "OHOS freeglut 制品库名为 libfreeglut-gles.so（GLES/EGL 版），configure 的 -lglut 探测需改为 -lfreeglut-gles"
+  - "autotools 工程 tarball 只带 configure.ac 时，构建前必须 autoreconf -fi；automake >= 1.13 已移除 AM_CONFIG_HEADER，须换 AC_CONFIG_HEADERS"
+  - "conan autoconf/2.72 与 conan automake/1.18 的 perl shebang 不同（前者 conan perl 5.42.2、后者系统 perl 5.42.0），XS 模块 ABI 不兼容，不能同时使用；只取 automake，autoconf/m4/perl 用设备 hnp 工具链，并让 PATH 前置设备目录以压过 conan perl"
+  - "生成的 configure 里 umask 077 在 hmdfs 上会造出不可遍历的临时目录（chmod 是 no-op），须改回 022"
+  - "上游 configure.ac 把任何 --prefix 都当作静态链接 libglut 并覆盖 CPPFLAGS/LDFLAGS，会清空 conan 注入的依赖路径"
+  - "上游无测试套件（Makefile.am 无 TESTS/check_PROGRAMS）；test_razf.c 是未引用的孤儿基准且 include 不存在的 razf.h"
+  - "stdhash.hh 里派生模板类对基类成员 direct_insert_aux 的非限定调用在 clang 下报 dependent-base 查找错误，需改为 this-> 限定（GCC 容忍）"
+  - "freeglut 的 FREEGLUT_GLES 构建用 src/gles_stubs.c 顶替 fg_font.c（字体 API 是空实现），且不编译 src/x11/fg_glutfont_definitions_x11.c，于是 GLUT_BITMAP_* 宏引用的 glutBitmap8By13/glutBitmap9By15 全局量不存在，消费者链接报 undefined symbol；需改用 GLUT 数字字体 ID"

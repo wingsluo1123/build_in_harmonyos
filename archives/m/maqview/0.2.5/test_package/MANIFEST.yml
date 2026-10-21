@@ -1,0 +1,62 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI build_and_test.sh L0e 强制要求存在）
+
+package: maqview/0.2.5
+homepage: "https://maq.sourceforge.net/maqview.shtml"
+
+# 上游测试命令：无。上游 autotools 工程没有注册任何测试目标。
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游测试清点（N_upstream = 0，附证据）
+#
+#   1. Makefile.am 无 `TESTS` / `check_PROGRAMS` / `check_*` 目标
+#      （`grep -nE 'TESTS|check_PROGRAMS' Makefile.am` → 无输出）。
+#      bin_PROGRAMS 只有 maqview / maqindex / zrio / maqindex_socks 四个程序。
+#   2. configure.ac 无 AC_CONFIG_TESTDIR / AM_PATH_* 测试脚手架。
+#   3. 源码树里的 test_razf.c 是**未被引用的孤儿**：不在任何 _SOURCES 里，
+#      且 `#include "razf.h"` 指向树中不存在的头（树里是 zrio.h），
+#      本身也只是计时基准（无断言、恒 return 0），不是测试用例。
+#
+# 结论：N_upstream=0，无 `make check` 可跑；消费者验证全部由 test_package 承担。
+upstream_tests: []
+
+# test_package 中的消费者测试
+test_package_tests:
+  - file: test_gl_headless.cpp
+    description: >-
+      无头桌面 GL 消费者：用 mesa 的 OSMesa 离屏上下文（OSMesaCreateContextExt +
+      OSMesaMakeCurrent）在无窗口/无 display 下跑 maqview 同款固定管线入口
+      （glMatrixMode/glLoadIdentity/glOrtho/glColor3f/glBegin/glVertex2f/glEnd），
+      并对视口中心像素做**具体数值断言**（红通道>200 且绿/蓝<60），另计数非背景
+      像素 > 0、glGetString(GL_VERSION) 非 NULL。
+    command: "./test_gl_headless"
+
+  - file: conanfile.py (test 阶段：真实执行打包二进制)
+    description: >-
+      在显式 LD_LIBRARY_PATH 下真实执行打包出的可执行文件：
+      ① `bin/maqindex`（无参数）→ 断言退出码 1 且输出含 `Usage`
+         （maqmap_index_main.c:118 `if (optind == argc) return usage();`，
+         usage() 返回 1）；
+      ② `bin/maqview`（无参数）→ 断言进程**加载**了完整 GL/GLUT 栈（不得出现
+         loader 的缺库/缺符号报错）并进入 freeglut 初始化或 usage 分支。
+         maqview 的 main() 第一句是 `glutInit(&argc, argv)`（MainFrame.c:190）。
+         无 X 显示时若 EGL 拿不到 display（fg_init_egl.c 的 eglGetDisplay()
+         返回 EGL_NO_DISPLAY），freeglut 报 `<No display available>` 后退出、
+         rc=1——按「无显示仅链接/测试」口径这是允许的结果；EGL 可用时则打印
+         `Usage`（MainFrame.c:201）。
+      ③ 对每个打包 ELF 断言 `readelf -S` 恰好 1 个 `.codesign` 段，且
+         `readelf -d` 的 DT_NEEDED 无绝对路径/`../`。
+    command: "conan test (self.run)"
+
+verify_points:
+  - "test_gl_headless 编译通过（消费者侧链接 mesa 的 libOSMesa/libglapi）"
+  - "test_gl_headless 实际执行并返回 0"
+  - "无头离屏上下文创建成功（OSMesaCreateContextExt/OSMesaMakeCurrent 非 NULL）"
+  - "立即模式渲染真实发生：非背景像素 > 0"
+  - "中心像素为红（R>200, G<60, B<60）——具体数值，非恒真"
+  - "maqindex 无参数运行：退出码 1 且打印 Usage"
+  - "maqview 无参数运行：GL/GLUT 栈动态加载成功（无缺库/缺符号），进程进入 freeglut 初始化或 usage 分支，退出码 1"
+  - "每个打包 ELF 恰有 1 个 .codesign 段"
+  - "每个打包 ELF 的 DT_NEEDED 不含绝对/相对路径"
