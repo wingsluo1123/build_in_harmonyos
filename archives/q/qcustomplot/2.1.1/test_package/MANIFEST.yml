@@ -1,0 +1,21 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for qcustomplot/2.1.1.
+
+package: qcustomplot/2.1.1
+homepage: https://www.qcustomplot.com/
+
+# Upstream publishes only qcustomplot.cpp / qcustomplot.h / GPL.txt /
+# changelog.txt. There is no build system, no test suite and no test target.
+upstream_check_command: "none (upstream 2.1.1 ships no test suite)"
+upstream_test_in_build: false
+upstream_test_command: "none"
+
+upstream_tests: []
+
+test_package_tests:
+  - file: test_package/test_qcustomplot_e2e.cpp
+    description: "Consumer executor, 16 cases over the installed libQCustomPlot.so and the packaged QCustomPlotConfig.cmake: version macros; widget construction (axis rect, primary/secondary axes, layout); graph creation and data storage; axis ranges; time ticker; legend items; plot items; colour map data and ranges; offscreen replot; toPixmap; PNG export with pixel-variance check; scaled PNG export dimensions; removeGraph; data-container trim (removeBefore); QCP enum metatype reflection; savePdf capability branch (QT_NO_PRINTER stub on OHOS)."
+    command: "conan create (test_package builds and runs test_qcustomplot_e2e through CTest, then reruns it directly for the per-case log)"
+    condition: "always (runs under QT_QPA_PLATFORM=offscreen); exits non-zero if any named case fails"
+
+assertion_count: 16

@@ -1,0 +1,20 @@
+qcustomplot.h includes the whole QtPrintSupport module unconditionally on
+Qt 5/6. QCustomPlot uses QPrinter only in QCustomPlot::savePdf, and the
+upstream implementation of savePdf is already wrapped in
+#ifdef QT_NO_PRINTER. Apply the same capability guard to the include so the
+library builds against a Qt that was configured without PrintSupport
+(OHOS qtbase is built with FEATURE_printsupport=OFF); nothing else changes.
+
+--- a/qcustomplot.h
++++ b/qcustomplot.h
+@@ -94,7 +94,9 @@
+ #else
+ #  include <QtNumeric>
+ #  include <QtWidgets/QWidget>
+-#  include <QtPrintSupport/QtPrintSupport>
++#  ifndef QT_NO_PRINTER
++#    include <QtPrintSupport/QtPrintSupport>
++#  endif
+ #endif
+ #if QT_VERSION >= QT_VERSION_CHECK(4, 8, 0)
+ #  include <QtCore/QElapsedTimer>
