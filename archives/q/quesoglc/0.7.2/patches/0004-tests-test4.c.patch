@@ -1,0 +1,37 @@
+--- a/tests/test4.c
++++ b/tests/test4.c
+@@ -25,6 +25,7 @@
+  */
+ 
+ #include "GL/glc.h"
++#include <stdlib.h>
+ #include <stdio.h>
+ 
+ #define TestErrorCode(func) \
+@@ -99,7 +100,13 @@
+ 
+     /* Master commands */
+ 
+-    glcAppendCatalog("/");
++    {
++        /* HarmonyOS: "/" is not readable in the app sandbox (access("/") -> EACCES),
++           so the catalog root is taken from the environment when set.  The upstream
++           default ("/") is preserved when the variable is absent. */
++        const char* testCatalog = getenv("QUESOGLC_TEST_CATALOG");
++        glcAppendCatalog(testCatalog ? testCatalog : "/");
++    }
+     TestErrorCode(glcAppendCatalog);
+ 
+     glcGetMasterListc(0, GLC_CHAR_LIST, 0);
+@@ -114,7 +121,10 @@
+     glcGetMasteri(0, GLC_CHAR_COUNT);
+     TestErrorCode(glcGetMasteri);
+ 
+-    glcPrependCatalog("/");
++    {
++        const char* testCatalog = getenv("QUESOGLC_TEST_CATALOG");
++        glcPrependCatalog(testCatalog ? testCatalog : "/");
++    }
+     TestErrorCode(glcPrependCatalog);
+ 
+     glcRemoveCatalog(0);

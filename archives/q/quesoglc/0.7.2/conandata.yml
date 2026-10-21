@@ -1,0 +1,17 @@
+sources:
+  url: "https://downloads.sourceforge.net/project/quesoglc/0.7.2/quesoglc-0.7.2-free.tar.gz"
+  sha256: "fa47582cac5a0ac98d24b462d0cdba8d0c7a2f0aded6220b05d907b598f06571"
+
+patches:
+  - patch_file: "patches/0001-build-config.guess.patch"
+    patch_description: "Teach the shipped config.guess about HarmonyOS (uname -s reports 'HarmonyOS'), emitting the standard aarch64-unknown-linux-gnu triplet so configure stops failing with 'cannot guess build type'. Only a new operating-system arm is added; the existing branches are untouched (E007)."
+    patch_type: "portability"
+  - patch_file: "patches/0002-configure.patch"
+    patch_description: "Drop 'umask 077' from the two places configure creates its config.status temporary directory: on HMDFS (HarmonyOS) that directory is not writable even by its owner, so config.status aborts with 'cannot create a temporary directory' (E114)."
+    patch_type: "portability"
+  - patch_file: "patches/0003-src-glew.c.patch"
+    patch_description: "Gate the bundled GLEW's GLX section behind GLEW_NO_GLX: on a platform without X11 (OHOS) GL/glxew.h's X11/Xlib.h/Xutil.h/Xmd.h includes do not exist, and no GLX symbol is used at runtime. Upstream GLEW 2.x introduced GLEW_NO_GLX for exactly this; the guards keep the default (GLX enabled) behaviour on every other platform."
+    patch_type: "portability"
+  - patch_file: "patches/0004-tests-test4.c.patch"
+    patch_description: "Let test4 pick its catalog root from the QUESOGLC_TEST_CATALOG environment variable: inside the HarmonyOS app sandbox the filesystem root is not readable (access and opendir on it both return EACCES), so the upstream glcAppendCatalog/glcPrependCatalog calls with the root path failed and the single upstream test could never execute. The upstream default (the root path) is preserved whenever the variable is unset, and no assertion or test logic is altered."
+    patch_type: "portability"
