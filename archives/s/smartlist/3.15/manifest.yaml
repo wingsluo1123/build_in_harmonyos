@@ -1,0 +1,34 @@
+software: smartlist
+version: "3.15"
+status: built
+build_system: makefile
+build_date: "2026-10-18"
+
+source:
+  url: "https://github.com/procmail-org/SmartList/archive/refs/heads/master.tar.gz"
+  sha256: "c2580efb2ae6bbbf079986695f5243f7d33ce8867be68e6d2cda318effc3023f"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options:
+    - "CC=clang (from Conan tools.build:compiler_executables)"
+    - "AR=llvm-ar (from Conan tools.build:compiler_executables)"
+    - "CFLAGS=-std=gnu17 -O2 -fPIC"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "SmartList 3.15 standalone tarball equals GitHub master HEAD (HISTORY ends at v3.15 2000/09/03)."
+  - "Full flist/multigram binary requires blending with the procmail source tree (upstream README design); only hsort/gethome are standalone-buildable."
+  - "hsort.c and gethome.c use K&R definitions; they need -std=gnu17 on clang 15 (C23 removes K&R)."
+  - "Upstream ships no test suite; test_package validates hsort() API, gethome execution and script-suite integrity."
+
+conan_adaptation:
+  recipe: conanfile.py
+  test_package: test_package/
+  package_type: application
+  commands_json: true

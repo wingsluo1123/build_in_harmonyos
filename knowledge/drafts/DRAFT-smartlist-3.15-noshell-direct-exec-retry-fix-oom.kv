@@ -1,0 +1,30 @@
+id: DRAFT-smartlist-3.15-noshell-direct-exec-retry-fix-oom
+trigger_tool: conan
+phase: compile
+error_signature: /bin/sh: Out of memory|can't fork|Out of memory
+severity: 3
+category: build-system, ohos, limitation
+match_keywords: out of memory, can't fork, noshell, hmbs_repair_method
+title: 低内存真机报/bin/sh Out of memory时免sh直调降fork治构建OOM
+root_cause: 配方build()三次self.run(shell字符串)每次多fork一次/bin/sh，内存紧张时fork失败报OOM；smartlist仅编译hsort.c/gethome.c两个小文件，编译器内存非瓶颈
+affected_scope: 低内存真机上仅需少量编译/归档调用却经shell字符串转调的小型C/C++库
+verification_cmd: 真机compile日志无/bin/sh: Out of memory且os.path进程内产物校验通过；仅Out of memory/can't fork/EAGAIN/ENOMEM做1/2/4s有界重试，真编译错误立即失败
+rec_priority: 1
+rec_approach: noshell-argv-direct-exec-bounded-retry
+rec_description: 新增_run_noshell以argv数组直调subprocess不经shell，去掉每次编译/归档多余/bin/sh fork，产物检查改为os.path进程内调用，仅对fork资源特征做有界退避重试
+rec_command: archives/s/smartlist/3.15/conanfile.py: 新增_run_noshell并将三次编译/归档改argv直调加os.path.isfile/getsize校验；test_package/conanfile.py: 同样改造test_hsort编译并做产物校验
+rec_auto_fix: false
+rec_impl: conan-recipe-plus-test-package
+fallback_priority: 2
+fallback_approach: serial-build-with-extended-backoff-retry
+fallback_description: 若直调后仍偶发fork失败，保持jobs=1串行并延长退避间隔重试，不扩大重试面，真实编译错误仍立即失败
+fallback_auto_fix: false
+forbid_1_pattern: /bin/sh: Out of memory.*passed|can't fork.*passed
+forbid_1_reason: 禁止在仍报OOM/fork失败时伪造通过或对真实编译错误做重试掩盖；仅fork资源特征允许有界重试
+forbid_1_consequence: 真机预检compile仍报OOM/fork失败，门禁不通过并退回修复循环，扩大重试会掩盖真实编译错误
+similar_to: [E3211-compiler-path-missing-fallback]
+doc_file: knowledge/drafts/DRAFT-smartlist-3.15-noshell-direct-exec-retry-fix-oom.md
+last_updated: 2026-10-20
+source_event: smartlist/3.15 真机预检/bin/sh Out of memory并修复为免sh直调降fork
+authors: hmbs-executor
+source_pr: 16821
