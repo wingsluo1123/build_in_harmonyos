@@ -486,6 +486,9 @@ PYEOF
             REGISTRY_ERRORS=""
             while IFS= read -r dep_ref; do
                 [ -z "$dep_ref" ] && continue
+                # v12.24 (反馈 00802fed): 每个依赖一行进度——conan download 静默
+                # 重定向曾致 15 分钟无日志输出，被误判卡死而重跑
+                echo "  [dep] ${dep_ref%%$'\n'*} ..."
                 # R35: 用 conan download 验证 (禁止用 conan list 判断)
                 # 健壮化: 保留 stderr 区分"真未发布"与"网络/认证错误"; 瞬时错误重试 3 次
                 dep_status="fail"
@@ -906,8 +909,11 @@ PYEOF
 
     # L0o: 禁止使用外部网络命令下载源码 (防 uses_external_curl)
     # conanfile.py 的 build() 方法禁止调用 curl/wget 下载
+    # v12.24 (反馈 git256): 收窄为真实调用形态——self.run/subprocess/os.system
+    # 携带 curl/wget 才算外部下载；self.dependencies[...] / self.options["curl"]
+    # 等引号依赖名索引为合法代码，白名单放行（原正则误判依赖名遍历）
     if [ -f "$CONANFILE" ]; then
-        EXT_CURL=$(grep -nE '(subprocess|os\.system).*?(curl|wget)|"curl"|"wget"|'"'"'curl'"'"'|'"'"'wget'"'"'' "$CONANFILE" 2>/dev/null | grep -v '^\s*#' | grep -v 'tools\.\|conan_data\|self\.run\|#.*curl\|#.*wget' || true)
+        EXT_CURL=$(grep -nE '(self\.run|subprocess|os\.system)[^#\n]*\b(curl|wget)\b' "$CONANFILE" 2>/dev/null | grep -v '^\s*#' | grep -v 'tools\.files\|conan_data\|#.*curl\|#.*wget' || true)
         if [ -n "$EXT_CURL" ]; then
             echo "[fail] L0o: conanfile.py 使用外部命令 (curl/wget) 下载源码 — CI 环境可能无 curl"
             echo "       ${EXT_CURL%%$'\n'*}"

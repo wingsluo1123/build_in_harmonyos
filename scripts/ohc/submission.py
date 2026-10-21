@@ -1700,11 +1700,16 @@ def _monitor_ci(gitcode_pr: str, repo: str, pr_number: int,
             continue
 
         output = result.stdout
-        if "PASSED" in output:
+        # ⚠️ 只看"CI 最新状态"行：ci-status 输出还含"CI 历史摘要"，
+        #    历史上的 PASSED/FAILED 字样会污染子串判定（#42997 根因：
+        #    最新 FAILED 但历史有绿构建 → 被误判 PASSED → submit 放行）
+        m_status = re.search(r'CI 最新状态[:：]\s*(\S.*)', output)
+        latest_line = m_status.group(1).strip() if m_status else output
+        if "PASSED" in latest_line:
             return "PASSED"
-        elif "FAILED" in output:
+        elif "FAILED" in latest_line:
             return "FAILED"
-        elif "RUNNING" in output or "QUEUED" in output or "未找到" in output or "排队" in output:
+        elif "RUNNING" in latest_line or "QUEUED" in latest_line or "未找到" in latest_line or "排队" in latest_line:
             log_info(f"  CI 进行中... ({elapsed}s/{timeout}s)")
             _time.sleep(interval)
             elapsed += interval

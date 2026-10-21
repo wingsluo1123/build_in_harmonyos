@@ -99,6 +99,15 @@ def finalize_archive(software: str, version: str, pdir: str | None = None) -> in
         log_warn("  ⚠️ 版本级缺失: notes.md")
         missing += 1
 
+    # v12.24 (反馈 01f55f48): manifest 占位符残留校验——{software}/{BUILD_SYSTEM}
+    # 等模板变量原样留档此前无门禁，init-archive 渲染修复后此处兜底拦截
+    if manifest.exists():
+        import re as _re
+        _ph = _re.search(r'\{[A-Za-z_][A-Za-z_0-9]*\}', manifest.read_text(encoding="utf-8", errors="replace"))
+        if _ph:
+            log_warn(f"  ⚠️ manifest.yaml 含未渲染占位符: {_ph.group(0)}")
+            missing += 1
+
     for f in ["manifest.yaml"]:
         p = ver_dir / f
         if not p.exists() or len(p.read_text(encoding="utf-8", errors="replace").splitlines()) < 5:
