@@ -1,0 +1,49 @@
+diff -ruN a/maqview.h b/maqview.h
+--- a/maqview.h	2026-10-19 13:33:01.462653750 +0800
++++ b/maqview.h	2026-10-19 13:33:01.658653593 +0800
+@@ -10,6 +10,19 @@
+ #include "GL/freeglut_ext.h"
+ #endif
+ #endif
++/*
++ * OHOS/GLES 适配：freeglut 的 FREEGLUT_GLES 构建用 src/gles_stubs.c
++ * 顶替 fg_font.c —— 其中 glutBitmapCharacter()/glutStrokeCharacter()
++ * 是空实现（忽略 font 参数），并且**不定义** freeglut_std.h 非 Windows
++ * 分支所引用的 glutBitmap8By13 / glutBitmap9By15 等全局量（那些量在
++ * src/x11/fg_glutfont_definitions_x11.c，GLES 构建不编译它）。
++ * 因此 `GLUT_BITMAP_8_BY_13` 这类宏（展开为 `&glutBitmap8By13`）会
++ * 链接失败。这里改用 freeglut_std.h 在 Windows 分支使用的 **GLUT 数字
++ * 字体 ID**（与 GLUT 二进制兼容、freeglut 文档化）；在 OHOS 的空实现下
++ * 与指针形式语义等价（该构建下位图字体会被忽略、不渲染）。
++ */
++#define GLUT_BITMAP_ID_8_BY_13  ((void *)0x0003)
++#define GLUT_BITMAP_ID_9_BY_15  ((void *)0x0002)
+ #include <unistd.h>
+ #include <sys/types.h>
+ #include <stdint.h>
+diff -ruN a/view_goto.c b/view_goto.c
+--- a/view_goto.c	2026-10-19 13:33:01.510654375 +0800
++++ b/view_goto.c	2026-10-19 13:33:01.658653593 +0800
+@@ -43,8 +43,8 @@
+ 	view->map_file    = (char*)malloc(strlen(map_file) + 1);
+ 	strcpy(view->map_file, map_file);
+ 	view->style       = style;
+-	view->font        = GLUT_BITMAP_8_BY_13;
+-	view->big_font    = GLUT_BITMAP_9_BY_15;
++	view->font        = GLUT_BITMAP_ID_8_BY_13;
++	view->big_font    = GLUT_BITMAP_ID_9_BY_15;
+ 	view->width       = width;
+ 	view->height      = height;
+ 	view->font_width  = 8;
+diff -ruN a/view_panel.c b/view_panel.c
+--- a/view_panel.c	2026-10-19 13:33:01.566653906 +0800
++++ b/view_panel.c	2026-10-19 13:33:01.658653593 +0800
+@@ -330,7 +330,7 @@
+ 			y -= 15;
+ 			glRasterPos3f(x, y, 0);
+ 		} else {
+-			glutBitmapCharacter(GLUT_BITMAP_8_BY_13, *c);
++			glutBitmapCharacter(GLUT_BITMAP_ID_8_BY_13, *c);
+ 		}
+ 	}
+ }

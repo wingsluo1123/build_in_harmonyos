@@ -1,0 +1,54 @@
+# conandata.yml — maqview 0.2.5
+#
+# R39 / PF7：只写官方原始 URL，禁止任何镜像代理前缀或本地路径前缀。
+# 镜像由 CI 自动注入。
+#
+# 来源说明：maqview 0.2.5 无 GitHub/GitLab release；上游发布页为
+#   https://maq.sourceforge.net/maqview.shtml （SourceForge，无稳定直链归档）。
+# 因此采用 **Debian 主池的 orig 源包**——它是当前可获取、且带官方校验和的
+# 上游原始 tarball（Debian `3.0 (quilt)` 格式的 orig 必须与上游逐字节一致）。
+# 校验方式：与同版本 `maqview_0.2.5-12.dsc` 的 Checksums-Sha256 逐字比对，
+#   sha256 / md5 / size 三项均一致（见 notes.md「源码核验」）。
+#   解包后 `configure.ac` 的 `AC_INIT(MAQVIEW, 0.2.5)` 与任务 version 一致。
+
+sources:
+  url: "https://deb.debian.org/debian/pool/main/m/maqview/maqview_0.2.5.orig.tar.gz"
+  sha256: "2d01495bb03fe108d87a348432bdc9c81e93c6f765ccba8f88fc94a979a7eba2"
+  # 实测 188,833 字节；顶层目录 maqview-0.2.5/（strip_root=True 后去掉）
+
+patches:
+  - patch_file: "patches/0001-ohos-gl-stack-and-modern-autotools.patch"
+    patch_description: >-
+      OHOS 适配（configure.ac）：(1) AM_CONFIG_HEADER → AC_CONFIG_HEADERS
+      （automake >= 1.13 已移除旧宏，autoreconf 才能干净生成）；(2) 取消
+      “任何 --prefix 即静态链接 libglut 并覆盖 CPPFLAGS/LDFLAGS”的分支
+      （conan 必传 --prefix=<包目录>，会清空依赖 include/lib 路径并请求
+      OHOS 上不存在的静态 libglut）；(3) GLUT 探测改用 OHOS 制品仓 freeglut
+      的库名 libfreeglut-gles；(4) GLLIBS 改为
+      `-lOSMesa -lglapi -lfreeglut-gles -lGLU -lm`——制品仓 mesa/24.3.4.1
+      （glu/9.0.3 所 pin 的版本）交付的桌面 GL 入口在 libOSMesa/libglapi，
+      该包没有独立 libGL，且升级 mesa 会与 glu 的 pin 冲突。
+    patch_type: "portability"
+    sha256: "a30c211e94689d3286c1e28192889656334769de1ccbedddf445023c93f82690"
+  - patch_file: "patches/0002-stdhash-dependent-base-clang.patch"
+    patch_description: >-
+      clang 两阶段名字查找修复（stdhash.hh）：`hash_map_misc` / `hash_set_misc`
+      从模板基类 `__lh3_hash_base_class<keytype_t>` 继承，派生类里对
+      `direct_insert_aux(...)` 的**非限定**调用在 clang 下报
+      “explicit qualification required to use member 'direct_insert_aux'
+      from dependent base class”（GCC 容忍）。改为 `this->direct_insert_aux(...)`，
+      语义不变（3 处：hash_set_misc::insert、hash_map_misc::insert ×2）。
+    patch_type: "portability"
+    sha256: "6bc129b5d27d65a14a166ba7ca5d518977a28385161195140bcdd2b19fbe599f"
+  - patch_file: "patches/0003-ohos-glut-font-ids.patch"
+    patch_description: >-
+      GLUT 字体标识符适配（maqview.h / view_goto.c / view_panel.c）：
+      freeglut 的 FREEGLUT_GLES 构建用 src/gles_stubs.c 顶替 fg_font.c
+      （glutBitmapCharacter 等是忽略 font 参数的空实现），且**不编译**
+      src/x11/fg_glutfont_definitions_x11.c —— 于是 freeglut_std.h 非 Windows
+      分支里 `GLUT_BITMAP_8_BY_13`（= `&glutBitmap8By13`）引用的全局量不存在，
+      链接报 `undefined symbol: glutBitmap8By13 / glutBitmap9By15`。
+      改用 freeglut_std.h 在 Windows 分支使用的 GLUT **数字字体 ID**
+      （8_BY_13=0x0003、9_BY_15=0x0002），在 OHOS 空实现下语义等价。
+    patch_type: "portability"
+    sha256: "9abf4318e71e133ee16dcd7352efc5bd683128ff0083c25e76e8149b84ab10b1"
