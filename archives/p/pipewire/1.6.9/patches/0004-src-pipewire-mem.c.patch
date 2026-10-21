@@ -1,0 +1,28 @@
+--- a/src/pipewire/mem.c
++++ b/src/pipewire/mem.c
+@@ -401,8 +401,23 @@
+ 		return NULL;
+ 	}
+ 
+-	if (fstat(b->this.fd, &sb) != 0)
+-		return NULL;
++	if (fstat(b->this.fd, &sb) != 0) {
++		/* HarmonyOS memfd denies fstat() with EACCES/EPERM; only for
++		 * those errors derive the size without stat. Other errors
++		 * (EBADF/EINTR/EIO) keep the original failure semantics.
++		 * lseek(SEEK_END) also covers fds imported from a peer, for
++		 * which b->this.size is never set; fall back to the local
++		 * size when the fd is not seekable. */
++		off_t cur, end;
++		if (errno != EACCES && errno != EPERM)
++			return NULL;
++		memset(&sb, 0, sizeof(sb));
++		cur = lseek(b->this.fd, 0, SEEK_CUR);
++		end = (cur < 0) ? (off_t)-1 : lseek(b->this.fd, 0, SEEK_END);
++		if (cur >= 0)
++			(void)lseek(b->this.fd, cur, SEEK_SET);
++		sb.st_size = (end >= 0) ? end : b->this.size;
++	}
+ 
+ 	const bool valid = (int64_t) offset + size <= (int64_t) sb.st_size;
+ 	pw_log(valid ? SPA_LOG_LEVEL_DEBUG : SPA_LOG_LEVEL_ERROR,

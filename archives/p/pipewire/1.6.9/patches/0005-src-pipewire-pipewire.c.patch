@@ -1,0 +1,37 @@
+--- a/src/pipewire/pipewire.c
++++ b/src/pipewire/pipewire.c
+@@ -395,20 +395,34 @@
+ static const char *i18n_text(void *object, const char *msgid)
+ {
+ 	struct support *support = object;
++#ifdef HAVE_DGETTEXT
+ 	return dgettext(support->i18n_domain, msgid);
++#else
++	(void)support;
++	return msgid;
++#endif
+ }
+ 
+ static const char *i18n_ntext(void *object, const char *msgid, const char *msgid_plural,
+ 		unsigned long int n)
+ {
+ 	struct support *support = object;
++#ifdef HAVE_DNGETTEXT
+ 	return dngettext(support->i18n_domain, msgid, msgid_plural, n);
++#else
++	(void)support;
++	return n == 1 ? msgid : msgid_plural;
++#endif
+ }
+ 
+ static void init_i18n(struct support *support)
+ {
++#ifdef HAVE_BINDTEXTDOMAIN
+ 	bindtextdomain(GETTEXT_PACKAGE, LOCALEDIR);
++#endif
++#ifdef HAVE_BIND_TEXTDOMAIN_CODESET
+ 	bind_textdomain_codeset(GETTEXT_PACKAGE, "UTF-8");
++#endif
+ 	pw_set_domain(GETTEXT_PACKAGE);
+ }
+ 

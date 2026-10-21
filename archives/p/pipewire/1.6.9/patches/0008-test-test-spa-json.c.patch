@@ -1,0 +1,24 @@
+--- a/test/test-spa-json.c
++++ b/test/test-spa-json.c
+@@ -899,6 +899,10 @@ static int validate_strict_json(struct spa_json *it, int depth, FILE *f)
+ 	}
+ 
+ done:
++	/* musl (OHOS) open_memstream only reflects buffered writes in the
++	 * returned buffer after an explicit flush; fclose alone is not
++	 * guaranteed to sync the overwriting writes above. */
++	fflush(f);
+ 	if (spa_json_get_error(it, NULL, NULL))
+ 		return -1;
+ 
+@@ -1031,6 +1035,10 @@ PWTEST(json_data)
+ 
+ 		while ((res = validate_strict_json(&it, 0, fres)) > 0);
+ 
++		/* musl (OHOS) open_memstream does not sync buffered writes on
++		 * fclose alone; flush explicitly so f_ptr holds the final
++		 * content and the buffer is safe to free. */
++		fflush(fres);
+ 		fclose(fres);
+ 
+ 		SPA_FOR_EACH_ELEMENT_VAR(extra_success, suc) {

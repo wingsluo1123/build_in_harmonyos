@@ -1,0 +1,18 @@
+--- a/spa/plugins/support/logger.c
++++ b/spa/plugins/support/logger.c
+@@ -161,8 +161,14 @@
+ 
+ 		if (spa_system_eventfd_write(impl->system, impl->source.fd, 1) < 0)
+ 			fprintf(impl->file, "error signaling eventfd: %s\n", strerror(errno));
+-	} else
++	} else {
+ 		fputs(location, impl->file);
++		/* Upstream calls setlinebuf() on this stream, but musl (OHOS)
++		 * still does not make the data visible to a reader before the
++		 * buffer fills; flush explicitly so file log output is visible
++		 * immediately (logger tests read the file right after logging). */
++		fflush(impl->file);
++	}
+ 
+ #undef RESERVED_LENGTH
+ }

@@ -1,0 +1,71 @@
+# 版本级 manifest — pipewire 1.6.9
+# 文件位置: archives/p/pipewire/1.6.9/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "1.6.9"
+software: "pipewire"
+status: built
+build_date: "2026-10-18"
+build_system: "meson"
+
+source:
+  url: "https://gitlab.freedesktop.org/pipewire/pipewire/-/archive/1.6.9/pipewire-1.6.9.tar.gz"
+  sha256: "dbc3624cf71215c26a22fc98f6f71f7b8599f5f6b415eab4a5c90ca96c170c7c"
+  tar_format: tar.gz
+
+build:
+  system: meson
+  configure_options:
+    - "-Dtests=enabled"
+    - "-Dspa-plugins=enabled"
+    - "-Dexamples=disabled"
+    - "-Ddocs=disabled"
+    - "-Dman=disabled"
+    - "-Dsession-managers=[]"
+    - "-Dpipewire-jack=disabled"
+    - "-Dpipewire-alsa=disabled"
+    - "-Dpipewire-v4l2=disabled"
+    - "-Dalsa=disabled"
+    - "-Dbluez5=disabled"
+    - "-Djack=disabled"
+    - "-Ddbus=disabled"
+    - "-Dsndfile=disabled"
+    - "-Dffmpeg=disabled"
+    - "-Dvulkan=disabled"
+    - "-Dgstreamer=disabled"
+    - "-Dlibsystemd=disabled"
+    - "-Dudev=disabled"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-meson.build.patch"
+  - "0002-spa-plugins-support-logger.c.patch"
+  - "0003-src-pipewire-data-loop.c.patch"
+  - "0004-src-pipewire-mem.c.patch"
+  - "0005-src-pipewire-pipewire.c.patch"
+  - "0006-src-pipewire-thread.c.patch"
+  - "0007-test-test-config.c.patch"
+  - "0008-test-test-spa-json.c.patch"
+  - "0009-daemon-no-symlink-aliases.patch"
+  - "0010-libpipewire-no-versioned-soname.patch"
+  - "0011-test-test-loop.c.patch"
+
+knowledge_gained:
+  - "OHOS libc (musl) 无 pthread_cancel：cancel 分支改用 pw_loop_invoke(do_stop) 唤醒停止，无信号、线程正常 cleanup（信号处理器 pthread_exit 在 musl 上间歇崩溃）"
+  - "OHOS libc 无 pthread_setaffinity_np：能力探测 HAVE_* 守卫后忽略亲和性"
+  - "OHOS libc 无 gettext 实现：dgettext/dngettext 回退为 msgid"
+  - "OHOS memfd 拒绝 fstat：mem.c 回退 block size 做边界校验"
+  - "musl open_memstream 需显式 fflush 才同步外部缓冲"
+  - "HMDFS 拒绝 symlink 创建（EPERM）：守护进程别名改用 cp 物化，install_symlink 改为安装脚本复制"
+  - "HMDFS 拒绝 symlink 创建（EPERM）：libpipewire 去掉 version/soversion，安装单文件无版本 SONAME"
+  - "OHOS 对已签名 ELF 做完整性校验：meson 安装期改写 rpath 后 execve 返回 EPERM；package() 用构建树原始产物覆盖安装副本恢复可执行性"
+  - "HMDFS 拒绝 AF_UNIX bind(2)：守护进程测试需探测可绑定目录（/data/storage/el2/base），否则改用 pw_context_connect_self() 进程内消费者流程"
+  - "无 pthread_cancel 时上游 cancel_thread_while_dispatching 用例无法中断阻塞在 dispatch 的线程：按上游 ABI 用例同款写法在 HAVE_PTHREAD_CANCEL 缺失时返回 PWTEST_SKIP"
+
+patch_generation:
+  method: per-file-difflib-upstream-tag
+  base_tag: "1.6.9"
+  generated_at: "2026-10-18"
+  patches_count: 11
