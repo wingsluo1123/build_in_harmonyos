@@ -1,0 +1,55 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: modemmanager-qt/6.28.0
+homepage: "https://invent.kde.org/frameworks/modemmanager-qt"
+
+# modemmanager-qt 6.28.0 上游带 autotests/，由 ecm_add_test 注册为 10 个
+# CTest 测试程序（bearerpropertiestest、modemtest、modempropertiestest、
+# modem3gpppropertiestest、modem3gppussdpropertiestest、
+# modemcdmapropertiestest、modemmessagingpropertiestest、
+# modemlocationpropertiestest、modemtimepropertiestest、
+# modemomapropertiestest，最后一项要求 ModemManager >= 1.2）。测试通过
+# src/fakemodem 的 FakeModem 在会话总线上注册 org.kde.fakemodem 并挂载
+# 伪 ModemManager1 对象；测试程序链接 KF6ModemManagerQt_static
+# （-DMMQT_STATIC=1），因此库在测试态使用会话总线而非系统总线。
+upstream_check_command: "ctest -N"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build> --output-on-failure --no-tests=error --timeout 120"
+
+# 上游 CTest 程序与 QTest 用例函数（rule4 N=11：10 个程序，
+# modemtest 含 testModems 与 testModemAdded 两个用例函数）
+upstream_tests:
+  - name: bearerpropertiestest
+    description: "上游 autotest：BearerProperties 属性读写与 QVariantMap 序列化"
+  - name: modemtest
+    description: "上游 autotest：Modem 构造与 modemAdded 通知（testModems、testModemAdded）"
+  - name: modempropertiestest
+    description: "上游 autotest：Modem 通用属性与枚举映射"
+  - name: modem3gpppropertiestest
+    description: "上游 autotest：Modem3gpp 属性读写"
+  - name: modem3gppussdpropertiestest
+    description: "上游 autotest：Modem3gppUssd USSD 状态与响应"
+  - name: modemcdmapropertiestest
+    description: "上游 autotest：ModemCdma 属性读写"
+  - name: modemmessagingpropertiestest
+    description: "上游 autotest：ModemMessaging 消息列表与已读标记"
+  - name: modemlocationpropertiestest
+    description: "上游 autotest：ModemLocation 定位能力与位置更新"
+  - name: modemtimepropertiestest
+    description: "上游 autotest：ModemTime 网络时间"
+  - name: modemomapropertiestest
+    description: "上游 autotest：ModemOma OMA 设备管理会话（需 ModemManager >= 1.2）"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_modemmanagerqt.cpp
+    description: "消费者用例：链接 KF6::ModemManagerQt，校验 notifier 单例、modemDevices 空列表、Modem/Sim/Bearer 的 uni() 往返、无服务时 Sms::uni() 为空、Modem::isValid()、系统总线连通性，以及注册/释放 org.freedesktop.ModemManager1 触发的 serviceAppeared/serviceDisappeared 信号"
+    command: "./test_modemmanagerqt"
+
+# 测试校验点总数 (近似值, 用于质量评估)
+assertion_count: 12
