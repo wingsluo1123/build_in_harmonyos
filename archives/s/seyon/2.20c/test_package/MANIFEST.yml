@@ -1,0 +1,50 @@
+# test_package/MANIFEST.yml
+# seyon 2.20c - upstream test declaration.
+
+package: seyon/2.20c
+homepage: "https://www.seyon.org/"
+
+upstream_tests_exist: false
+upstream_test_audit: >-
+  seyon 2.20c (1993-1999, X11R5 contrib era) ships only an Imakefile whose
+  targets are version/version.h/AllTarget/ComplexProgramTarget/Install*/
+  clean (Imakefile, lines 40-71). There is no test suite: no `make check`,
+  no `make test`, no ctest, no tests/ directory, no .sh/.py test harness.
+  The only in-tree "test" is a `#ifdef TEST` demo main() inside SeParse.y
+  (never built). Hence N=0 upstream tests.
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+test_package_tests:
+  - file: test_seyon.c
+    description: >-
+      Links the packaged static library libseyon.a and calls seyon's yacc
+      script parser ParseThis() (SeParse.h) on a mutable buffer, asserting the
+      parsed function name ("dial"), argument count (2) and completed-call
+      count (1). Headless: no X display required.
+    command: "test_seyon"
+  - file: test_seyon.sh
+    description: >-
+      Runs the installed seyon binary with -noemulator and no DISPLAY, which
+      must reach libXt's display-open failure path ("Can't open display",
+      exit 1) -- a full dynamic-link/run smoke test; plus packaged-artifact
+      checks (libseyon.a, seyon headers, seyon.help), a DT_NEEDED check
+      (libXaw/libXt/libX11) and a fail-closed .codesign section assertion on
+      every packaged ELF. Runtime X11 .so come from conan deps
+      (LD_LIBRARY_PATH via VirtualRunEnv + absolute-path LD_PRELOAD fallback).
+    command: "sh test_seyon.sh"
+
+test_files:
+  - path: "test_package/test_seyon.c"
+    test_type: "R34"
+    assertion_count: 4
+  - path: "test_package/test_seyon.sh"
+    test_type: "R34"
+    assertion_count: 8
+
+test_package_test_count: 2
+consumer_assertion_count: 12
+upstream_test_cases: 0
+assertion_count: 12
