@@ -1,0 +1,71 @@
+From dd3f993e8035caa1464f79bc12ff6c9814c4797a Mon Sep 17 00:00:00 2001
+From: p <p@p>
+Date: Mon, 5 Oct 2026 11:46:23 +0800
+Subject: [PATCH] gcr downgrade
+
+---
+ meson.build                     | 1 -
+ src/ka-pwdialog.c               | 3 ---
+ src/meson.build                 | 1 -
+ src/resources/ui/ka-pwdialog.ui | 2 +-
+ 4 files changed, 1 insertion(+), 6 deletions(-)
+
+diff --git a/meson.build b/meson.build
+index fcb3322..2f1469d 100644
+--- a/meson.build
++++ b/meson.build
+@@ -87,7 +87,6 @@ gio_dep = dependency('gio-2.0', version: '>=2.58')
+ gtk_dep = dependency('gtk+-3.0', version: '>=3.14')
+ gobject_dep = dependency('gobject-2.0', version: '>=2.50.0')
+ gmodule_dep = dependency('gmodule-2.0')
+-gcr_dep = dependency('gcr-3', version: '>= 3.5.5')
+ 
+ meson.add_install_script(
+   join_paths('build-aux', 'post_install.py'),
+diff --git a/src/ka-pwdialog.c b/src/ka-pwdialog.c
+index 606cbe5..8eee58a 100644
+--- a/src/ka-pwdialog.c
++++ b/src/ka-pwdialog.c
+@@ -25,8 +25,6 @@
+ #include "ka-kerberos.h"
+ #include "ka-pwdialog.h"
+ 
+-#define GCR_API_SUBJECT_TO_CHANGE
+-#include <gcr/gcr.h>
+ 
+ struct _KaPwDialog {
+     GtkDialog parent;
+@@ -115,7 +113,6 @@ ka_pwdialog_class_init (KaPwDialogClass * klass)
+ 
+     /* Bind class to template
+      */
+-    g_type_ensure (GCR_TYPE_SECURE_ENTRY_BUFFER);
+     gtk_widget_class_set_template_from_resource (widget_class,
+                                                  "/org/gnome/krb5-auth-dialog/ui/ka-pwdialog.ui");
+ 
+diff --git a/src/meson.build b/src/meson.build
+index f7b3f18..e65346f 100644
+--- a/src/meson.build
++++ b/src/meson.build
+@@ -57,7 +57,6 @@ krb5_auth_dialog_sources = [
+ ]
+ 
+ krb5_auth_dialog_deps = [
+-  gcr_dep,
+   gio_dep,
+   gmodule_dep,
+   gobject_dep,
+diff --git a/src/resources/ui/ka-pwdialog.ui b/src/resources/ui/ka-pwdialog.ui
+index 5023112..aa56fa1 100644
+--- a/src/resources/ui/ka-pwdialog.ui
++++ b/src/resources/ui/ka-pwdialog.ui
+@@ -158,5 +158,5 @@
+     </action-widgets>
+   </template>
+ 
+-  <object class="GcrSecureEntryBuffer" id="pw_entry_buffer"/>
++  <object class="GtkEntryBuffer" id="pw_entry_buffer"/>
+ </interface>
+-- 
+2.45.2
+

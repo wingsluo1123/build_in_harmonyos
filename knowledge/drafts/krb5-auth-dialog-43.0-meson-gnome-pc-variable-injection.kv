@@ -1,0 +1,49 @@
+# ═══ Draft knowledge entry — meson gnome module locates glib-compile-*
+# through pkg-config variables, not PATH: inject wrappers into BOTH
+# glib-2.0.pc and gio-2.0.pc (observed query paths differ from docs)
+# Software: krb5-auth-dialog 43.0
+# Gate: conan-verify G2 (conan create, ohos-aarch64) + test_package 4/4（三层含 CLI 合同）
+# Status: DRAFT
+
+id: krb5-auth-dialog-43.0-meson-gnome-pc-variable-injection
+severity: 2
+category: build-system|meson|gnome|pkg-config|ohos
+trigger_tool: meson|ninja|clang
+phase: build
+
+keywords: gnome.compile_resources, gnome.compile_schemas, glib-compile-resources, glib-compile-schemas, pkg-config variable, glib_compile_resources, glib_compile_schemas, PkgConfigDeps, LD_LIBRARY_PATH wrapper, RPATH-less ELF, EPERM, XPM, staging re-sign
+error_signature: Could not get pkg-config variable and no default provided for <PkgConfigDependency gio-2.0|glib-2.0>|operation not permitted.*glib-compile-schemas
+match_keywords: gnome module, compile_resources, compile_schemas, pkg-config variable, glib-compile, wrapper, pc file, gio-2.0.pc, glib-2.0.pc, meson, conan
+
+root_cause: |
+  (1) meson 的 gnome 模块定位 glib-compile-resources / glib-compile-schemas
+  不走 PATH——从 pkg-config 变量读取（glib-2.0.pc 的 glib_compile_resources、
+  gio-2.0.pc 的 glib_compile_schemas），而 conan PkgConfigDeps 生成的 pc
+  文件里没有这些变量 → "Could not get pkg-config variable"。
+  (2) 实测查询路径与文档不一致：本件中 compile_schemas 从 gio-2.0.pc 查、
+  compile_resources 同样从 gio-2.0.pc 查（文档称 glib-2.0.pc）——单一文件
+  注入会漏。
+  (3) glib 包 bin/ 下的工具是无 RPATH ELF，直接 exec 报库找不到；且 conan
+  cache 包目录只读 + 下载件签名 XPM 拒执（EPERM）——wrapper 必须指向
+  staging 副本并强制重签。
+
+solution: |
+  三件套（缺一不可）：
+  (a) wrapper 脚本：LD_LIBRARY_PATH=<glib包lib>:... exec <staged工具> "$@"
+  (b) staging 副本 + 强制重签：copy2 到 build 目录 → objcopy --remove-section
+      .codesign → binary-sign-tool selfSign → 校验恰好 1 个 .codesign 段
+  (c) pc 变量双文件双变量注入：向 glib-2.0.pc 与 gio-2.0.pc 两个文件都追加
+      glib_compile_resources=<wrapper路径> 与 glib_compile_schemas=<wrapper路径>
+      （覆盖任一查询路径）。
+  另：meson setup 探测 ninja --version 同样走 PATH 且 VirtualBuildEnv 会重置
+  PATH——registry ninja/1.12.1 包缓存无可执行二进制时，把宿主 ninja wrapper
+  放进同一 toolbin 目录（与 glib wrapper 同通道，已验证 meson 可见）。
+
+fallback: |
+  meson 0.56+ 可在 gnome.compile_resources(..., gresource_bundle:) 无工具路径
+  参数可传；只能靠 pc 注入。若 glib 包 bin/ 有可用 wrapper（部分配方带），
+  可直接复用其路径注入 pc。
+
+verify_builds: krb5-auth-dialog/43.0
+draft: true
+status: DRAFT
