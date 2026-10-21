@@ -1,0 +1,35 @@
+From 0fdbe6fabd3e74cff0f08f759802adba9146920b Mon Sep 17 00:00:00 2001
+From: p <p@p>
+Date: Mon, 5 Oct 2026 11:48:06 +0800
+Subject: [PATCH] headless version
+
+---
+ src/ka-applet.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/src/ka-applet.c b/src/ka-applet.c
+index ceed36c..7dd06ca 100644
+--- a/src/ka-applet.c
++++ b/src/ka-applet.c
+@@ -851,6 +851,18 @@ main (int argc, char *argv[])
+     g_set_prgname (KA_APP_ID);
+     g_set_application_name (KA_NAME);
+ 
++    /* OHOS: headless --version — handled before gtk_init() so the CLI
++     * contract stays verifiable on display-less systems. */
++    {
++        int i;
++        for (i = 1; i < argc; i++) {
++            if (g_strcmp0 (argv[i], "--version") == 0) {
++                g_print ("%s %s\n", PACKAGE, PACKAGE_VERSION);
++                return 0;
++            }
++        }
++    }
++
+     gtk_init (&argc, &argv);
+     applet = ka_applet_create ();
+     if (!applet)
+-- 
+2.45.2
+
