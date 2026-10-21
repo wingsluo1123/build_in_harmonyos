@@ -1,0 +1,39 @@
+software: modemmanager-qt
+version: "6.28.0"
+status: built
+build_date: "2026-10-18"
+conan_ref: "modemmanager-qt/6.28.0"
+source:
+  url: "https://download.kde.org/stable/frameworks/6.28/modemmanager-qt-6.28.0.tar.xz"
+  sha256: "742891c3c1dfcd6c9eaa2b1664cfe7e9b311187eec7ecd9d8812829dce8485c9"
+  tar_format: tar.xz
+build:
+  system: cmake
+  configure_options:
+    - "BUILD_SHARED_LIBS=ON"
+    - "BUILD_TESTING=ON"
+    - "KF_IGNORE_PLATFORM_CHECK=TRUE"
+    - "CMAKE_INSTALL_LIBDIR=lib"
+    - "CMAKE_CXX_STANDARD=20 + CMAKE_CXX_FLAGS=-std=c++20"
+    - "CMAKE_SHARED_LIBRARY_SONAME_CXX_FLAG/CMAKE_SHARED_LIBRARY_SONAME_C_FLAG=-Wl,-soname, (DT_SONAME 注入)"
+    - "CMAKE_PLATFORM_NO_VERSIONED_SONAME=TRUE (裸 SONAME 单文件)"
+    - "CMAKE_SKIP_RPATH=TRUE (不写 RPATH, 安装不重写, 包内库与链接器输出逐字节一致)"
+  dependencies:
+    - "qtbase/6.11.1.1"
+    - "modemmanager/1.24.2 (头文件 + 配方生成 ModemManager.pc)"
+    - "extra-cmake-modules/6.29.0 (tool)"
+    - "dbus/1.14.10.3 (build tool: 上游 autotest 的私有会话总线 dbus-daemon + Qt6DBus 运行期 dlopen 的 libdbus-1.so.3)"
+  cc: clang
+  cxx: clang++
+patches_applied: []
+knowledge_gained:
+  - "KDE 框架依赖只给头文件而不带 pkg-config 文件时，按上游 FindModemManager.cmake 的 PKG_SEARCH_MODULE 契约在 generate() 生成 ModemManager.pc（Cflags 同时含 include 与 include/ModemManager），比打补丁改查找逻辑更贴近上游"
+  - "OHOS 沙箱 UID 无 /etc/passwd、/etc/group 条目：dbus-daemon 在 bus_policy_allow_unix_user 阶段解析对端 UID 失败会直接断开 EXTERNAL 客户端（Hello 前），测试期需用 LD_PRELOAD 合成当前 UID 的账户条目；TCP+ANONYMOUS 只能救 libdbus 客户端，QtDBus 只实现 EXTERNAL"
+  - "AF_UNIX bind 仅在应用沙箱 tmpfs (/data/storage/el2/base) 可用，HMDFS 用户卷返回 EPERM；启动私有总线前用 bind(2) 探测而非假定"
+  - "无 Platform/HarmonyOS 模块时须注入 CMAKE_SHARED_LIBRARY_SONAME_C/CXX_FLAG=-Wl,-soname, 并置 CMAKE_PLATFORM_NO_VERSIONED_SONAME=TRUE，产出裸 SONAME 单文件（kcoreaddons/kservice 先例）"
+  - "Qt6DBus 不在 NEEDED 里依赖 libdbus：qdbus_symbols 用 QLibrary 在运行期 dlopen libdbus-1.so.3，缺库时 QDBusConnection 直接报 Not connected to D-Bus server 且守护进程收不到任何 AUTH；测试环境必须把共享 libdbus 的 lib 目录放进 LD_LIBRARY_PATH"
+  - "dbus 配方 1.14.10/.1/.2 把客户端库钉成 STATIC，只有 1.14.10.3 保留共享库并打包 libdbus-1.so.3 + SONAME 链接；工具依赖必须选 .3，否则 QtDBus 无库可加载"
+  - "CMake 的安装步骤会就地重写它给构建树写入的 DT_RUNPATH；在 OHOS 用户卷上被重写过的共享库 dlopen 报 Permission denied（EACCES），而构建树原始字节与从未写 RPATH 的库都正常。置 CMAKE_SKIP_RPATH=TRUE 后安装无字节可改，包内库与构建产物逐字节一致"
+upstream_test_pass_rate: "10/10（100%）"
+adapted_test_pass_rate: "12/12（100%）"
+test_command: "conan create . --build=missing"
