@@ -776,17 +776,17 @@ def cmd_report(decisions, batch_no, date, out_path):
     L.append(f'# 草稿知识入库（{len(acc)} 条接纳 / {len(rej)} 条拒绝 / {len(rev)} 条待复核）—— 主编批次 {batch_no}')
     L.append('')
     L.append(f'> 审核日期：{date} ｜ 审核人：主编（OpenDesk editor 会话） ｜ 工具：scripts/kb_editor.py')
-    L.append('> 原始 PR 编号及标题由草稿 git 添加记录反查自动填充；正式 PR 编号/邮箱由管理员补填。')
+    L.append('> 原始 PR 编号及标题由草稿 git 添加记录反查自动填充；邮箱由管理员补填。')
     L.append('')
     L.append(f'## 接纳清单（{len(acc)} 条）')
     L.append('')
-    L.append('| 草稿原名称 | 接纳后编号 | 正式 PR 编号 | 原始 PR 编号及标题 | 作者 | 邮箱 | 状态 |')
-    L.append('|-----------|-----------|-------------|-------------|------|------|------|')
+    L.append('| 草稿原名称 | 接纳后编号 | 原始 PR 编号及标题 | 作者 | 邮箱 | 状态 |')
+    L.append('|-----------|-----------|-------------------|------|------|------|')
     for p in acc:
         v = m.get(p[0]) or {}
         eid = pmap.get(p[0], '')
         mark = '✅(merged)' if eid == '（并入相邻条目）' else '✅'
-        L.append(f"| {p[0]} | {eid} |  | {pr_cell(p[0])} | {v.get('author','')} | {v.get('email','')} | {mark} |")
+        L.append(f"| {p[0]} | {eid} | {pr_cell(p[0])} | {v.get('author','')} | {v.get('email','')} | {mark} |")
     L.append('')
     if rej:
         L.append('')
