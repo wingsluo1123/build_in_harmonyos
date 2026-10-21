@@ -1,0 +1,29 @@
+# 版本级 manifest — libvolatilestream 1.0.2
+
+version: "1.0.2"
+software: libvolatilestream
+status: built
+build_date: "2026-10-18"
+build_system: cmake
+
+source:
+  url: "https://github.com/rd235/libvolatilestream/archive/refs/tags/1.0.2.tar.gz"
+  sha256: "5439a56b4ac08191c8e2cab33d8851db7ad251947bf4dfd1b742970e596048db"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options: []
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "libvolatilestream 是纯 C 的 fopencookie(3) 封装：volatilestream.c 用 cookie read/write/seek/close 回调维护内存缓冲，对外只有 volstream_open / volstream_trunc / volstream_getbuf 三个 API；CMake 工程只构建共享库，无第三方依赖、无上游测试目录。"
+  - "上游 tag 1.0.2 的 CMakeLists.txt project(VERSION) 仍为 1.0.1（tag 未同步版本字段），包版本按 tag 1.0.2 声明；共享库 SOVERSION=1。"
+  - "HMDFS 不支持 symlink()（EPERM），VERSION/SOVERSION 的 .so.1 -> .so 链接链无法创建；配方设 CMAKE_PLATFORM_NO_VERSIONED_SONAME=ON 并显式补 CMAKE_SHARED_LIBRARY_SONAME_C_FLAG=-Wl,-soname,（variable+cache 双通道），输出带 DT_SONAME 的无版本号共享库（E330 家族做法）。"
+  - "fopencookie/off64_t 属于 _GNU_SOURCE 扩展；上游 CMakeLists.txt 已全局 add_definitions(-D_GNU_SOURCE)，真机 clang 15.0.4 编译运行探针通过（sizeof(off64_t)=8），无需源码补丁。"
+  - "运行环境缺陷（E1807/E302 同根因）：OHOS 运行时 musl 的 fclose 在 fflush 与 close 回调之前有 `if (!f || f->fd < 0) { errno = EBADF; return -EBADF; }` 保护，而 fopencookie 按设计把 FILE 的 fd 置为 -1，因此 cookie 流的 fclose 返回 -EBADF(-9)，volstream 的 close 回调（volstream_close）不会执行，缓冲区与注册表项只能等进程退出回收；纯 libc 的 fopencookie / fmemopen / open_memstream 对照均可复现（普通 /dev/null 流 fclose 正常返回 0）。这是运行环境缺陷，不是 libvolatilestream 缺陷；consumer 测试用纯 libc 对照 + 库流同行为校验显式记录该平台偏差。"
+  - "man 页自定义目标调用 man/Makefile：无 pandoc 时仅打印提示并退出 0；归档自带 volstream_open.3，安装到 share/man/man3 不受影响。"
