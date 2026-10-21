@@ -1,0 +1,53 @@
+#====================================================================
+# DRAFT-libskia-146.20260602-git.3476902-nonprestaged-elf-exec-denied - OHOS HMDFS refuses to exec non-prestaged ELF; pre-generate build graph on host
+#====================================================================
+
+id:                     E3674
+trigger_tool:           conan|gn|ninja|make|cmake
+phase:                  build|configure|generate
+error_signature:        Permission denied|not executable|cannot execute.*binary|exec format error|Failed to exec
+severity:               2
+category:               hmdfs, ohos, build-system, toolchain, cross-compile
+match_keywords:         Permission denied, hmdfs, SELinux, exec, ELF, prebuilt, gn, ninja, clang, 非预置, 预置, host pre-generation, build graph, cmake codegen, bison, flex, yacc, protoc, 代码生成器, chmod, 755, file_manager
+title:                  OHOS 真机拒绝执行"非预置 ELF"（chmod 后仍 Permission denied）；工具/代码生成器类依赖改为本机预生成构建图/产物再上传
+
+root_cause:             HarmonyOS 真机 /storage 为 HMDFS 文件系统，且叠加 SELinux/域标签策略：只有"预置/受信"的 ELF（如 usr/local/bin 下 owner=file_manager 的 clang-15/ninja/python3 等）被允许 execve；用户在会话中拷贝、上传或新放置的 ELF（无论 chmod 755/777、无论放 $HOME/tmp、$HOME/.local/bin、conan cache 目录）都会被 exec 策略拒绝，报 Permission denied。现象与文件权限无关（st_mode 正确、可读），是执行策略层拦截。libskia(146.20260602-git.3476902) 适配中 gn 二进制在真机任何落点均无法执行，成为死路。
+affected_scope:         在 HarmonyOS PC 真机上构建/适配任何需要"在构建机运行额外二进制工具"的三方库：gn/ninja 之外的代码生成器（bison/flex/yacc、protoc、cmake codegen、gperf、autoconf 生成器、构建期下载的工具 ELF）。libskia 146 实测受影响（gn）。
+verification_cmd:       libskia: 真机 conan create（out/ 为本机预生成图）1213/1213 通过 + test_package 冒烟 OK。对照：真机 os.chmod(gn, 0o777) + cp 到 $HOME/tmp/.local/bin/cache 后执行均 Permission denied；同目录预置 clang-15 ELF 可执行。
+
+rec_priority:           1
+rec_approach:           host-pregenerated-build-artifacts
+rec_description:        凡真机侧需要运行"非预置 ELF"才能推进的构建步骤，改为在宿主（Windows/Linux 开发机）预生成对应产物再随源码包上传：GN 项目用本机 gn 生成 out/ ninja 构建图（工具链路径直接写成真机绝对路径），真机配方检测到 out/build.ninja 存在即跳过工具调用直接跑预置 ninja；其他构建系统同理（本机跑 bison/flex/protoc 生成 .c/.h/.pb.cc，真机只编译）。真机只执行预置工具链（ninja/clang/ar/ld.lld/python3）。
+rec_command:            本机: gn gen out --args='cc="/storage/Users/currentUser/usr/local/bin/clang" cxx=".../clang++" target_os="linux" target_cpu="arm64" ...'；打包前对图做真机化 rewrite（见 .md 附节）；真机: 配方 build() 检测 out/build.ninja -> 跳过 gn gen，直接 ninja -C out -j2 skia。
+rec_auto_fix:           false
+rec_impl:                conan-recipe-source-patch|pre-generated-artifacts
+
+fallback_priority:      2
+fallback_approach:      prestage-into-trusted-paths
+fallback_description:   若能获得平台侧协助，将工具 ELF 放入系统预置/受信路径（预置工具目录，owner=file_manager）使其获得可执行域标签；否则不尝试（实测 hnp/bin 下 clang 亦不可达/inaccessible）。
+fallback_command:       （需平台权限）将工具放入预置可执行目录并设置受信 owner；或向平台申请白名单。
+fallback_auto_fix:      false
+fallback_impl:          infra-only
+
+forbid_1_pattern:       chmod.*755|os\.chmod\(.*0o7
+forbid_1_reason:         反复 chmod 对 HMDFS 执行策略无效（st_mode 正确但 execve 仍被拒），浪费真机轮次。
+forbid_1_consequence:    真机窗口被空耗，结论仍为 Permission denied。
+
+forbid_2_pattern:       真机.*下载|curl.*-o.*\$HOME.*ELF|wget.*bin
+forbid_2_reason:         在真机直接下载/放置新 ELF 同样落入非预置域，必然执行失败。
+forbid_2_consequence:    与 forbid_1 相同的死路；且占用真机网络/磁盘。
+
+forbid_3_pattern:       #ifdef __OHOS__|#if defined\(__OHOS__\)
+forbid_3_reason:         用平台宏改上游源码不符合配方侧最小替换约定，且污染上游源码树。
+forbid_3_consequence:    违背 P010，评审可能要求回退。
+
+principles:             P010, P020
+doc_file:               knowledge/DRAFT-libskia-146.20260602-git.3476902-nonprestaged-elf-exec-denied.md
+last_updated:           2026-10-15
+source_event:           libskia 146.20260602-git.3476902 HarmonyOS PC 适配（真机 gn 不可执行 → 本机预生成 out/ 构建图）
+authors:                gcw_6YxinkyD
+source_pr:              ""
+source_commit:          ""
+
+metrics_success_count:  0
+metrics_fail_count:     0

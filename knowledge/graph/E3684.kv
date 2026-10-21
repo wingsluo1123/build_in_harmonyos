@@ -1,0 +1,29 @@
+id:                     E3684
+trigger_tool: conan|make|test
+phase: building|testing
+error_signature: configure\[147\]: /data/service/hnp/bin/bash: inaccessible or not found|configure: error: C compiler cannot create executables|HMBS_UPSTREAM_TEST_RESULT=\{[^}]*"discovered": 15|FAIL: tests/rwflowappend-append-bad.pl
+severity:               3
+category:               ohos, build-system, autotools, testing
+match_keywords: autotools_configure, configure failed, hmbs_upstream_test_result, hmbs_platform_capabilities, CONFIG_SHELL, daemon, per-suite, undiscovered
+title: profile钉死SHELL/CONFIG_SHELL下configure脚本内自净与daemon分套件串行回收及声明发现差值归因
+root_cause: ci/conan/profiles/ohos-aarch64以[buildenv]把SHELL/CONFIG_SHELL钉死为沙箱不可执行的/data/service/hnp/bin/bash，每次run()经conanbuild重聚合覆盖配方进程env与generate()覆盖层，autoconf configure经$CONFIG_SHELL重执行故在147行以127失败；单一顶层make check使daemon孤儿累积致末段SIGKILL/exit137与install期EAGAIN fork失败；configure自动关闭可选特性致声明1574与发现1521差53未被覆盖
+verification_cmd: 真机conan create核对configure越过147行且HMBS_UPSTREAM_TEST_RESULT以test-suite.log聚合discovered/executed/passed/failed/skipped加environment gaps覆盖skipped加undiscovered并满足declared-minus-passed恒等式；对照HMBS_PLATFORM_CAPABILITIES shell=/bin/sh与jobs=1
+rec_priority: 1
+rec_approach: configure-script-selfclean-plus-per-suite-reap
+rec_description: 不抢环境层而改configure脚本内容自净CONFIG_SHELL为可执行shell；分套件串行make check加套间daemon回收并以轻重分级并发压缩墙钟；声明与发现差值以undiscovered environment缺口补齐并放行被覆盖的SKIP
+rec_command: conanfile.py: _patch_configure_shell改写全部configure并同步SHELL，_run_upstream_tests逐套make -C check -j1/-j4加_cleanup_test_daemons，marker追加undiscovered environment gap；test_package/conanfile.py: 门禁改为gaps合计==failed+skipped+undiscovered且environment覆盖skipped+undiscovered
+rec_auto_fix: false
+rec_impl: conan-recipe-plus-test-package
+fallback_priority: 2
+fallback_approach: upstream-default-timeout-with-evidence-only
+fallback_description: 若daemon时序敏感失败仍存则unset全部SK_TESTS旋钮回归上游缺省并仅做suite result与faillog取证，不再加码耐心或并发
+fallback_auto_fix: false
+forbid_1_pattern: CONFIG_SHELL=/data/service/hnp/bin/bash
+forbid_1_reason: 禁止把CONFIG_SHELL/SHELL指向沙箱不可执行的hnp bash；仅用isfile或access判可执行会被内核exec证伪，必须经真实执行探测或脚本内自净回退到/bin/sh
+forbid_1_consequence: configure在147行经$CONFIG_SHELL重执行即报inaccessible or not found以127失败，真机预检compile失败
+doc_file: knowledge/drafts/DRAFT-silk-3.24.2-profile-shell-selfclean-per-suite-reap-undiscovered-gap.md
+last_updated: 2026-10-18
+source_event: silk/3.24.2真机预检configure147失败与daemon套件SIGKILL及声明发现差值修复并通过门禁
+authors: hmbs-executor
+source_pr: 15693
+affected_scope: profile以buildenv钉死SHELL/CONFIG_SHELL且含automake daemon集成测试的autotools类C库

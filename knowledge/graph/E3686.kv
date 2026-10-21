@@ -1,0 +1,45 @@
+#====================================================================
+# DRAFT-taopm-1.0-cxx98-ostringstream-buffer-ctor - C++98 ostringstream(char*,openmode) 在 C++11+ 变成 ostringstream(string)：老代码读未初始化缓冲（ASAN heap-buffer-overflow）
+#====================================================================
+
+id:                     E3686
+trigger_tool:           clang|clang\+\+|cc|c\+\+
+phase:                  runtime
+error_signature:        AddressSanitizer: heap-buffer-overflow.*strlen|READ of size .*strlen|std::_Narrow_char_traits.*length|basic_string.*\{ctor\}|ostringstream\(name, std::ostringstream::out\)|ostrstream .*\(.*, *[0-9]+\)
+
+severity:               2
+category:               compat, portability, cpp11, cxx, memory-safety
+match_keywords:         ostringstream, ostrstream, std::ends, C++98, char buffer, openmode, heap-buffer-overflow, ASAN, libc++, 未初始化, 越界读, TaoPitch, taopm
+
+title:                  C++98 的 `std::ostringstream(char*, openmode)` 在 C++11 被移除：同名调用改选 `ostringstream(const std::string&)`，于是对未初始化定长缓冲做 strlen（堆越界读），且结果根本没写回缓冲区
+root_cause:             C++98 允许 `std::ostringstream(char *buf, openmode)`：把流写进调用者提供的定长缓冲区，末尾 `<< std::ends` 落一个 '\0'，是当年常见的"零分配"拼串写法。C++11 删除了这一重载，同一个调用会匹配 `explicit basic_ostringstream(const basic_string&, openmode)`：`char*` 被隐式构造成 `std::string` → 对那块**尚未初始化**（或未终止）的缓冲区调用 `traits::length()` → 堆越界读；同时后续 `<<` 全部写进流自己的内部缓冲，`buf` 里仍是垃圾，之后 `strlen(buf)`/`delete []` 还会再次踩到。
+                        这类代码在 C++17 下**能编译**（不报错），只在运行/ASAN 下暴露，极易被当作"编译通过=适配完成"放过。
+affected_scope:         所有把 1990/2000 年代 C++ 代码按 C++11+（OHOS 默认 libc++ / -std=gnu++17，MSVC /std:c++17）编译的库，尤其是用 `ostringstream(buf, len)` / `ostrstream` + `std::ends` 拼定长字符串的老代码。taopm 的 `TaoPitch::createName()` 是命中样例；grep 特征：`ostringstream\s*\(\s*[A-Za-z_]\w*\s*,`、`ostrstream`、`<< std::ends`。
+verification_cmd:       taopm 1.0 主机侧（Windows，MSVC 19.40 /fsanitize=address）：
+                        仅 `TaoString s(TaoPitch(220.0f, TaoPitch::frq), 10.0f);` 即触发
+                        `ERROR: AddressSanitizer: heap-buffer-overflow / READ of size 13 ... 12-byte region`
+                        `  #2 TaoPitch::createName() libtao/TaoPitch.cc:262`
+                        `  #3 TaoPitch::TaoPitch(float) libtao/TaoPitch.cc:172`
+                        修复后同一路径 ASAN 无报告；真机 conan create（r7/r8）test_package 全绿。
+rec_priority:           1
+rec_approach:          build-in-std-string-then-copy-out
+rec_description:        把"往用户缓冲区写流"改成"先用普通 ostringstream 拼 std::string，再按长度 new[] + 拷贝"：
+                        - 去掉 `name=new char[12]` 与 `ostringstream(name, out)`
+                        - 用 `std::ostringstream nameStream(std::ostringstream::out);`
+                        - 结尾 `const std::string result=nameStream.str(); delete [] name; name=new char[result.size()+1]; strcpy(name, result.c_str());`
+                        同时顺手修掉同一处的两个传统内存缺陷：`new char[len]` 却 `strcpy` 了 `len+1`（越界写）、默认构造函数不初始化指针却在析构里 `delete[]`。
+rec_command:            nameStream << octave;
+                        if (fractsemi>0) nameStream << "+" << fractsemi << "/100";
+                        const std::string result=nameStream.str();
+                        delete [] name;
+                        name=new char[result.size()+1];
+                        strcpy(name, result.c_str());
+rec_auto_fix:           false
+rec_impl:               source-patch
+
+fallback_priority:      2
+fallback_description:   若不想改语义（确实要给外部缓冲区），改用 `snprintf`/`std::string` + `memcpy` 显式补齐长度，或 `%option`-style `char buf[N]{}; std::snprintf(buf, N, ...)`；不要用 `-fpermissive` 或关掉 ASAN 掩盖。
+
+last_updated:           2026-10-18
+authors:               unknown
+doc_file:               doc/E3686.md
