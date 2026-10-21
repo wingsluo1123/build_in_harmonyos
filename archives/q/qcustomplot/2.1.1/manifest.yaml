@@ -1,0 +1,90 @@
+# 版本级 manifest
+# 文件位置: archives/q/qcustomplot/2.1.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "2.1.1"
+software: "qcustomplot"
+status: built
+build_date: "2026-10-18"
+build_system: "cmake"
+conan_ref: "qcustomplot/2.1.1"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://www.qcustomplot.com/release/2.1.1/QCustomPlot-source.tar.gz"
+  sha256: "5e2d22dec779db8f01f357cbdb25e54fbcf971adaee75eae8d7ad2444487182f"
+  tar_format: tar.gz
+  note: "上游只发布 qcustomplot.cpp / qcustomplot.h / GPL.txt / changelog.txt 四个文件，没有构建系统与测试套件；CMakeLists.txt、cmake/QCustomPlotConfig.cmake.in 与 test_package/ 均为本配方提供（export_sources 导出）。"
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+
+  configure_options:
+    - "QCUSTOMPLOT_VERSION=2.1.1（CMakeToolchain 变量；project() 参数展开时工具链尚未加载，版本在 project() 之后读取）"
+    - "BUILD_SHARED_LIBS=ON / CMAKE_POSITION_INDEPENDENT_CODE=ON（默认 shared=True）"
+    - "-DCMAKE_INSTALL_LIBDIR=lib（单前缀布局）"
+    - "find_package(Qt6 QUIET OPTIONAL_COMPONENTS PrintSupport)：OHOS qtbase 以 FEATURE_printsupport=OFF 构建，组件缺失时 target 定义 QT_NO_PRINTER，savePdf 走上游自带存根（能力探测，无平台宏，R8）"
+    - "CMAKE_SHARED_LIBRARY_SONAME_C/CXX_FLAG=-Wl,-soname,（OHOS CMake 无 Platform/HarmonyOS 模块，默认不产 SONAME）"
+    - "CMAKE_PLATFORM_NO_VERSIONED_SONAME=ON（HMDFS 禁 symlink：单文件无版本 libQCustomPlot.so + 裸 DT_SONAME，E330）"
+    - "Qt6_DIR=<qtbase>/lib/cmake/Qt6，conan_cmakedeps_paths.cmake（qtbase 为 cmake_find_mode=none，CMakeDeps 不生成配置）"
+    - "QCUSTOMPLOT_COMPILE_LIBRARY（PRIVATE）/ QCUSTOMPLOT_USE_LIBRARY（INTERFACE）：上游 QCP_LIB_DECL 的共享库导入导出开关"
+
+  dependencies:
+    - "qtbase/6.11.1（Core/Gui/Widgets；运行期 DT_NEEDED = libQt6Widgets.so.6 / libQt6Gui.so.6 / libQt6Core.so.6；不带 Qt6PrintSupport）"
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - patches/0001-guard-qt-print-support-include.patch
+
+# ============================================================
+# 测试信息
+# ============================================================
+
+upstream_tests:
+  framework: "无（上游 2.1.1 不含构建系统与测试套件，仅有 qcustomplot.cpp / qcustomplot.h / GPL.txt / changelog.txt）"
+  test_targets: 0
+  test_command: "none"
+  run_in_build: false
+upstream_test_pass_rate: "0/0（上游无测试用例，不存在可运行的上游套件）"
+adapted_test_pass_rate: "16/16（100%，test_package/test_qcustomplot_e2e.cpp 消费者 E2E；conan create 内 CTest 1/1 通过）"
+
+device_verify:
+  date: "2026-10-18"
+  profile: "ohos-aarch64"
+  result: "PASS（G0–G3 全 PASS；G4 报告头部 PASS 但明细为「⚠️ 无法找到程序包 ID」，该门禁未实际解析出包 ID；L2/L4/L5 纯库包无 cache 路径跳过；Verdict=PASS）"
+  package_id: "b84c7be85f787668946d2ebcfa1dd2e2a692d9cd"
+  package_id_source: "设备 conan list qcustomplot/2.1.1@ohpcd/stable#*:*#* 实测（报告 G4 未能解析包 ID）"
+  recipe_revision: "97ee6128d94ce3e92592f03301204325"
+  package_revision: "06254fb0c0f887f2b4639a1a24ab1ead"
+  report: "reports/conan-verify-report.md"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "qcustomplot 2.1.1 是单翻译单元 Qt 部件库（qcustomplot.cpp 35,529 行 + qcustomplot.h 7,774 行），上游只发布源码与 GPL.txt/changelog.txt，没有构建系统、没有安装规则、没有任何测试；配方的 CMakeLists.txt 与 QCustomPlotConfig.cmake.in 必须由归档提供，并通过 export_sources() 复制进 Conan 源目录。"
+  - "OHOS qtbase/6.11.1 以 FEATURE_printsupport=OFF 构建，不带 Qt6PrintSupport 模块；公共 qconfig.h 不定义 QT_NO_PRINTER，因此 CMake 必须用 find_package(Qt6 QUIET OPTIONAL_COMPONENTS PrintSupport) 做能力探测并在缺失时显式 target_compile_definitions(QCustomPlot PUBLIC QT_NO_PRINTER)（R8：能力探测而非平台宏）。补丁 0001 给 qcustomplot.h 的 QtPrintSupport 头包含加上同一 QT_NO_PRINTER 守卫；savePdf 的实现上游本就带该守卫，缺了模块会返回 false 且不写文件（E2E save_pdf_capability 用例实证）。"
+  - "CMakeToolchain 变量在第一个 project() 命令执行期间才被加载，project(QCustomPlot VERSION ${QCUSTOMPLOT_VERSION}) 的参数展开发生在工具链加载之前，VERSION 为空会让 write_basic_package_version_file 报 No VERSION specified；正确写法是先 project(QCustomPlot LANGUAGES CXX)，再读取 QCUSTOMPLOT_VERSION 并用于 target VERSION/SOVERSION 与包版本文件。"
+  - "Conan test_package 若未定义 build()，conan create 不会执行 cmake configure/build，test() 里的 cmake.test() 会因缺少 CMakeCache.txt 报 not a CMake build directory；test_package 必须显式 build()（cmake.configure + cmake.build）。"
+  - "conan-verify G1 要求 test_package/MANIFEST.yml 存在（CI L0e 门禁）；即使上游没有任何测试，也要用 upstream_tests: [] 与逐文件 test_package_tests 声明消费者用例。"
+  - "E330：HMDFS 用户卷拒绝 symlink()，CMake 的 VERSION/SOVERSION 软链无法落地——运行期 symlink 探测失败时设置 CMAKE_PLATFORM_NO_VERSIONED_SONAME=ON，产出单文件 libQCustomPlot.so，DT_SONAME 为裸基名；OHOS CMake 走 Generic 平台模块，必须注入 CMAKE_SHARED_LIBRARY_SONAME_{C,CXX}_FLAG 才会记录 SONAME。"
+  - "包导出面：QCustomPlotConfig.cmake（find_dependency Qt6 Core/Gui/Widgets，PrintSupport 仅在构建时存在才转发）+ QCustomPlot::QCustomPlot 目标 + include/qcustomplot.h；package_info 使用 cmake_find_mode=none 防止 CMakeDeps 遮蔽真实配置，builddirs=lib/cmake。"
+  - "测试口径：上游 0 个测试函数，按 rule4「补全测试用例说明=是」；test_package 的 16 个具名消费者用例覆盖版本宏、部件构造、图元与数据、坐标轴范围、时间 ticker、图例、绘图项、颜色图、离屏 replot、toPixmap、PNG 导出（含像素方差）、缩放导出、removeGraph、数据裁剪、QCP 枚举元类型反射与 savePdf 能力分支，真机 16/16 通过。"
