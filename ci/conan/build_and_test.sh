@@ -161,13 +161,13 @@ fi
 
 # G0e: 仓库根目录文件白名单检查
 # 贡献者不应在根目录放置临时文件（ISSUE/PR草稿/笔记等）
-G0_ROOT_ALLOWED=".gitignore|.gitattributes|BUILD.gn|CONTRIBUTING.md|KNOW_YOUR_WHY.md|LICENSE|README.md|SKILL.md|SUMMARY.md|oh-package.json"
+G0_ROOT_ALLOWED=".gitignore|.gitattributes|BUILD.gn|CONTRIBUTING.md|CHANGELOG.md|KNOW_YOUR_WHY.md|LICENSE|README.md|SKILL.md|SUMMARY.md|oh-package.json"
 echo "[step] G0e: Root directory whitelist check..."
 G0_ROOT_VIOLATIONS=""
 for f in $(git ls-files --full-name | grep -v '/'); do
     if ! echo "$G0_ROOT_ALLOWED" | grep -qFx "$f" 2>/dev/null; then
         case "$f" in
-            .gitignore|.gitattributes|BUILD.gn|CONTRIBUTING.md|KNOW_YOUR_WHY.md|LICENSE|README.md|SKILL.md|SUMMARY.md|oh-package.json)
+            .gitignore|.gitattributes|BUILD.gn|CONTRIBUTING.md|CHANGELOG.md|KNOW_YOUR_WHY.md|LICENSE|README.md|SKILL.md|SUMMARY.md|oh-package.json)
                 ;;
             *)
                 G0_ROOT_VIOLATIONS="${G0_ROOT_VIOLATIONS} ${f}"
@@ -175,6 +175,28 @@ for f in $(git ls-files --full-name | grep -v '/'); do
         esac
     fi
 done
+
+# G0e-2 (v12.24): 顶层目录白名单——协作者私搭目录（code/ probes/ skills/ temp/
+# config/）此前绕过 G0e（旧逻辑只查文件不查目录，2026-10-21 审计发现 5 个非标目录）
+G0_TOPDIR_VIOLATIONS=""
+for d in $(ls -d */ 2>/dev/null | tr -d '/'); do
+    case "$d" in
+        archives|ci|docs|feedback|knowledge|references|scripts|templates|tests)
+            ;;
+        *)
+            G0_TOPDIR_VIOLATIONS="${G0_TOPDIR_VIOLATIONS} ${d}/"
+            ;;
+    esac
+done
+if [ -n "${G0_TOPDIR_VIOLATIONS}" ]; then
+    echo "[fail] G0e: 顶层存在非白名单目录（仅允许 archives ci docs feedback knowledge references scripts templates tests）:"
+    for d in ${G0_TOPDIR_VIOLATIONS}; do
+        echo "       ${d}"
+    done
+    echo "[hint]  私人工具/技能/探针不应提交到仓库顶层——知识草稿放 knowledge/drafts/，脚本合入 scripts/ 需主编审核"
+    G0_ROOT_VIOLATIONS="${G0_ROOT_VIOLATIONS} ${G0_TOPDIR_VIOLATIONS}"
+fi
+
 if [ -n "$G0_ROOT_VIOLATIONS" ]; then
     echo "[fail] G0e: 根目录存在非白名单文件（仅允许 ${G0_ROOT_ALLOWED}）:"
     for f in $G0_ROOT_VIOLATIONS; do
