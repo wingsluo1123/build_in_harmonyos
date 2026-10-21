@@ -1,0 +1,51 @@
+# 版本级 manifest — spread-sheet-widget 0.10
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "0.10"
+software: "spread-sheet-widget"
+status: built
+build_date: "2026-10-18"
+build_system: autotools
+
+source:
+  url: "https://alpha.gnu.org/gnu/ssw/spread-sheet-widget-0.10.tar.gz"
+  sha256: "80692ec350271995e147dc759929cdd79d3b645e6b5efaa6b57f4d2d05e847e5"
+  tar_format: tar.gz
+
+build:
+  system: autotools
+  configure_options:
+    - "--enable-shared"
+    - "--disable-static"
+  dependencies:
+    - "gtk/3.24.43"
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "E160: config.guess (2022) 不识别 HarmonyOS。在 `case $UNAME_SYSTEM in` 之后插入 `HarmonyOS|HongMeng) UNAME_SYSTEM=Linux; LIBC=musl;;`——shell 的 case 只执行第一个命中的分支，所以后续 Linux 分支的 LIBC 探测（需要 features.h，musl 环境必然失败）被整体跳过，机器判定直接得到 aarch64-unknown-linux-musl（gtksourceview3/3.24.11 同法）"
+  - "E011: configure 内嵌的 config.status 模板用 `umask 077 && mktemp -d ./confXXXXXX` 建 0700 临时目录；HMDFS 的 SGID 语义把目录映射成组不可写，随后 `./confXXXXXX/subs1.awk: Permission denied`。构建期把两处 umask 剥离即可（babeltrace 同款）"
+  - "glib-genmarshal 是 `#!/usr/bin/env python3` 脚本，HMDFS 拒绝脚本直接 exec；Makefile.am 的 BUILT_SOURCES 规则直接写 `glib-genmarshal`（没有 configure 变量可覆盖），因此不能用 PATH wrapper。做法是在 make 之前用 `python3 <glib>/bin/glib-genmarshal --body/--header --prefix=ssw_cclosure_marshal src/marshall-list` 预生成 build/src/ssw-marshaller.{c,h} 并 touch，make 判定目标新于 src/marshall-list 后不再触发规则"
+  - "上游 info_TEXINFOS 依赖 makeinfo，OHOS 无此工具；tarball 自带 doc/spread-sheet-widget.info（与 .texi 同为 1970-01-01 时间戳），构建与安装时传 `INFO_DEPS=` 即可整体跳过 info 目标，不影响库/头文件/.pc 的安装"
+  - "libspread-sheet-widget.la 用 `-no-undefined` 链接，源码调用 fabs()（ssw-sheet-axis.c/ssw-sheet-body.c）；aarch64 上 clang 把 fabs 降为浮点指令，不需要 libm，链接无未定义符号"
+  - "上游 tarball 没有 TESTS/check_PROGRAMS/check_SCRIPTS，也没有 tests/ 目录 → `make check` 是 automake 生成的 no-op；上游用例数为 0，测试覆盖只能由 test_package 的消费者端到端测试提供（broadwayd 无头后端真实建窗）"
+  - "GTK3 broadway 客户端忽略 DISPLAY、读 BROADWAY_DISPLAY；`:tcpN` 走 TCP 127.0.0.1:(9090+N)，避开 HMDFS 上 AF_UNIX bind 变成 abstract socket 后 path connect ENOENT 的问题（gtksourceview3/gspell 同款）"
+  - "HMDFS 拒绝 execve 任何脚本（不只是 glib-genmarshal）：configure 直接执行报 126 Permission denied，shebang 改成 #!/system/bin/sh 也无效。autotools 工程的 configure 必须用 `/system/bin/sh <configure>` 显式解释，参数从 conanbuild.conf 的 configure_args 取（alsa-lib 同法）"
+  - "config.status 的 depfiles 引导在 HMDFS 上失败（'Something went wrong bootstrapping makefile fragments'）→ configure 加 --disable-dependency-tracking 即可；仓库内 203 个 autotools 包用同一处理"
+  - "Makefile 的 MKDIR_P/INSTALL* 默认是裸 install-sh（脚本），make/install 时同样被 HMDFS 拒绝。设备自带 toybox 的 /system/bin/install（ELF）可用：MKDIR_P=/system/bin/mkdir -p、INSTALL*=/system/bin/install -c [...]。注意 libtool --mode=install 只接受单命令+选项形式，`sh install-sh -c` 会被 libtool 解析错（'no input file specified'），必须换成 install 二进制"
+  - "libtool 的 `.la` 归档记录构建机绝对路径（libdir 等），消费方不需要（.pc 已提供元数据）→ package() 内删除 lib/*.la（gspell/1.14.4 同法）"
+
+test_evidence:
+  upstream:
+    framework: none
+    command: "make check（automake no-op：Makefile.am 无 TESTS/check_PROGRAMS/check_SCRIPTS）"
+    total_cases: 0
+    executed_cases: 0
+    skipped_cases: 0
+    result: "上游没有测试用例"
+  consumer:
+    command: "test_package: pkg-config spread-sheet-widget 链接 test_spread_sheet_widget，broadwayd :tcp66 下真实建窗运行"
+    assertions: 17
+    result: "17/17 通过（2026-10-19 真机 conan create：TEST SUMMARY: 17 passed, 0 failed，exit 0）"
