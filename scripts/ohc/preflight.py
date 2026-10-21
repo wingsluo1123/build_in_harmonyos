@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 import re
 import subprocess
 import sys
@@ -70,14 +71,30 @@ def log_ok(msg: str) -> None:
 # ── 变更文件采集 ──────────────────────────────────────────────
 
 def changed_files(repo_dir: Path, base: str, head: str) -> list[str]:
-    """base...head 三点 diff 的变更文件清单。"""
-    r = subprocess.run(
-        ["git", "-C", str(repo_dir), "diff", "--name-only", f"{base}...{head}"],
-        capture_output=True, text=True, encoding="utf-8", errors="replace",
-        timeout=120)
-    if r.returncode != 0:
-        raise RuntimeError(f"git diff 失败: {(r.stderr or '').strip()[:200]}")
-    return [ln.strip() for ln in (r.stdout or "").splitlines() if ln.strip()]
+    """base...head 三点 diff 的变更文件清单。
+
+    PF0 fork 容错（反馈 00c67f2e：fork 分支的 base 常为 upstream 引用，
+    本地未 fetch 时 `main...HEAD` 解析失败 → PF0 假故障，协作者每次需
+    三步绕过）：base 解析失败时自动回退 origin/main / origin/HEAD。
+    """
+    def _try(b: str) -> list[str]:
+        r = subprocess.run(
+            ["git", "-C", str(repo_dir), "diff", "--name-only", f"{b}...{head}"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=120)
+        if r.returncode != 0:
+            raise RuntimeError(f"git diff 失败: {(r.stderr or '').strip()[:200]}")
+        return [ln.strip() for ln in (r.stdout or "").splitlines() if ln.strip()]
+
+    try:
+        return _try(base)
+    except RuntimeError:
+        for fallback in ("origin/main", "origin/HEAD", "upstream/main"):
+            try:
+                return _try(fallback)
+            except RuntimeError:
+                continue
+        raise
 
 
 def _pkg_dirs(files: list[str]) -> set[str]:
@@ -567,7 +584,12 @@ def check_branch_and_paths(repo_dir: Path, files: list[str]) -> list[str]:
     if not arch:
         return []
     findings: list[str] = []
-    bad = [f for f in arch if len(f.split("/")) < 5]
+    # PF9 软件级白名单（反馈 00802fed/980d4d44：R38/L0p 要求工具包提交
+    # 软件级 commands.json，manifest.yaml/README.md 亦为归档规范 v3.0
+    # 软件级文件——三者天然为 4 段路径，显式放行，与 PF8 语义对齐）
+    _SOFTWARE_LEVEL = {"commands.json", "manifest.yaml", "README.md"}
+    bad = [f for f in arch
+           if len(f.split("/")) < 5 and os.path.basename(f) not in _SOFTWARE_LEVEL]
     if bad:
         findings.append(
             "PF9 分支/路径闸: 变更路径缺版本目录层（须 "

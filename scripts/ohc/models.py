@@ -286,7 +286,7 @@ class Principle:
 
 def parse_index_tsv(filepath: str) -> list[IndexEntry]:
     """Parse knowledge/graph/index.tsv into IndexEntry list.
-    
+
     Supports both 6-column (original) and 11-column (extended) formats:
       6-col: id, severity, category, trigger_tool, phase, keywords
       11-col: id, severity, category, trigger_tool, phase, keywords,
@@ -347,6 +347,27 @@ def _parse_principle_forbid_rules(kv_data: dict[str, str]) -> list[ForbidRule]:
     return rules
 
 
+def _sev_to_int(val: str) -> int:
+    """severity 宽容解析（v12.24 引擎升级）：接受数字/文本混合格式。
+
+    旧条目遗留 'P1（阻塞编译...）' / 'P0' / 'true' / 'HIGH' 等文本格式
+    导致 parse_error_entry 静默失败（52/3656 条不可检索）。"""
+    v = str(val).strip().strip('"').strip("'")
+    m = re.match(r'^[Pp]?([0-3])', v)
+    if m:
+        # P0(致命)→3, P1→2, P2→1, P3→1 (对齐 BLOCKING/MEDIUM/MINOR)
+        n = int(m.group(1))
+        return 3 if n == 0 else max(1, 4 - n) if n <= 2 else 1
+    if v.lower() in ('true', 'high', 'blocking', 'critical'):
+        return 3
+    if v.lower() in ('medium', 'normal'):
+        return 2
+    try:
+        return min(3, max(0, int(v)))
+    except ValueError:
+        return 2  # 默认 MEDIUM
+
+
 def parse_error_entry(filepath: str) -> ErrorEntry:
     """Parse an E*.kv file into an ErrorEntry."""
     raw = parse_kv_file(filepath)
@@ -355,13 +376,13 @@ def parse_error_entry(filepath: str) -> ErrorEntry:
         trigger_tool=_parse_pipe_list(raw.get("trigger_tool", "")),
         phase=_parse_pipe_list(raw.get("phase", "")),
         error_signature=_parse_pipe_list(raw.get("error_signature", "")),
-        severity=Severity(int(raw.get("severity", "1"))),
+        severity=Severity(_sev_to_int(raw.get("severity", "1"))),
         category=_parse_pipe_list(raw.get("category", "")),
         match_keywords=_parse_comma_list(raw.get("match_keywords", "")),
         root_cause=raw.get("root_cause", ""),
         affected_scope=raw.get("affected_scope", ""),
         verification_cmd=raw.get("verification_cmd", ""),
-        rec_priority=int(raw.get("rec_priority", "1")),
+        rec_priority=_sev_to_int(raw.get("rec_priority", "1")),
         rec_approach=raw.get("rec_approach", ""),
         rec_description=raw.get("rec_description", ""),
         rec_command=raw.get("rec_command") or None,
@@ -369,7 +390,7 @@ def parse_error_entry(filepath: str) -> ErrorEntry:
         rec_impl=raw.get("rec_impl", ""),
         forbid_rules=_parse_forbid_rules(raw),
         fallback=Solution(
-            priority=int(raw.get("fallback_priority", "2")),
+            priority=_sev_to_int(raw.get("fallback_priority", "2")),
             approach=raw.get("fallback_approach", ""),
             description=raw.get("fallback_description", ""),
             command=raw.get("fallback_command") or None,

@@ -204,4 +204,7 @@ check("T13b gitignore 含遗留兜底", "**/.feedback-state.json" in gi)
 check("T14 SKILL 含 v12.10.1", "v12.10.1" in skill)
 
 print(f"\n===== {len(PASS)} passed, {len(FAIL)} failed =====")
-sys.exit(1 if FAIL else 0)
+# v12.24: sys.exit 收进 __main__ 守卫——被 unittest discover 加载时
+# 模块级 sys.exit(0) 触发 SystemExit 使 loader 误报 ImportError
+if __name__ == "__main__":
+    sys.exit(1 if FAIL else 0)

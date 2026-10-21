@@ -204,6 +204,37 @@ def cmd_pr_info(numbers, as_json=False, fix_map=False):
                 print(f"!{n}: [{d.get('state','')}] {d.get('author','')}{em} | {d.get('title','')}")
 
 
+def cmd_claim(draft_ids):
+    """主编单条草稿复核通道（反馈聚类 P3：73 份协作者反馈请求主编复核转正）。
+
+    对指定草稿做四维快速审核并输出证据（不入库——入库仍走批处理 promote），
+    供主编在批次间隙响应单条复核请求。
+    """
+    rv_path = STATE_DIR / 'draft-review-full.json'
+    if rv_path.exists():
+        rv = {r['draft']: r for r in json.loads(rv_path.read_text(encoding='utf-8'))['reports']}
+    else:
+        rv = {}
+    for d in draft_ids:
+        kv = parse_kv(DRAFTS / f'{d}.kv')
+        ok = {f: bool(kv.get(f, '').strip()) for f in ('error_signature', 'root_cause', 'rec_approach')}
+        md = (DRAFTS / f'{d}.md').exists()
+        r = rv.get(d, {})
+        similar = r.get('similar', [])
+        top = similar[0] if similar else None
+        print(f'── {d} ──')
+        print(f'  三字段: {ok} | md配对: {md}')
+        print(f'  draft-review: {r.get("verdict", "未扫描")} | 最相似: {top["id"] if top else "无"}'
+              f' ({top["score"] if top else 0})')
+        print(f'  sig: {kv.get("error_signature", "")[:70]}')
+        if not all(ok.values()) or not md:
+            print('  → 建议: 拒绝（空壳/缺配对）')
+        elif top and top.get('score', 0) >= 0.7:
+            print(f'  → 建议: 拒绝（与 {top["id"]} 高相似）')
+        else:
+            print('  → 建议: 可接纳（入库走批处理: batch → audit → promote）')
+
+
 def cmd_pr_map(refresh=False, limit=0, batch_file=None):
     """草稿 → 来源 PR 映射（增量缓存）。
 
@@ -283,6 +314,8 @@ def cmd_pr_map(refresh=False, limit=0, batch_file=None):
                                 'author': an, 'email': ae, 'merged': False,
                                 'last_activity': act[:10], 'note': '来源PR未合入main'}
         n_new += 1
+        if n_new % 20 == 0:                    # 检查点: 中间保存防分段执行丢进度
+            PR_MAP_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding='utf-8')
 
     PR_MAP_PATH.write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding='utf-8')
     merged = sum(1 for v in result.values() if v.get('merged'))
@@ -390,6 +423,38 @@ def jaccard(a, b):
     return len(sa & sb) / len(sa | sb) if sa and sb else 0.0
 
 
+
+
+def _formal_sig(eid):
+    """读正式条目 error_signature（容错）。"""
+    try:
+        return parse_kv(GRAPH / f"{eid}.kv").get("error_signature", "")
+    except Exception:
+        return ""
+
+
+_STOP = {"error", "undefined", "symbol", "not", "found", "file", "implicit",
+         "declaration", "function", "identifier", "undeclared", "failed",
+         "fatal", "permission", "denied", "loading", "shared", "library",
+         "of", "the", "in", "to", "use", "member", "named", "no", "cannot",
+         "version", "conflict", "invalid", "unable", "missing", "required",
+         "dependency", "package", "module", "warning"}
+
+
+def _precedent_overrule(sig_a, sig_b):
+    """裁定先例规则（editor-adjudication-precedents.md 归纳，v12.24 规则化）：
+
+    签名前缀相似但实体名（头文件/函数/结构体/宏）完全不同 → 推翻重复判定。
+    批次 5-25 实测：灰区 ~30% 为误判，其中大多数可由本规则机械识别。"""
+    import re as _re
+    if not sig_a or not sig_b:
+        return False
+    ea = set(_re.findall(r"[a-z_][a-z0-9_.]*", sig_a.lower())) - _STOP
+    eb = set(_re.findall(r"[a-z_][a-z0-9_.]*", sig_b.lower())) - _STOP
+    if not ea or not eb:
+        return False
+    return not (ea & eb)
+
 def cmd_audit(batch_file):
     """四维审核 → 决策表。需要先运行 ohc-run.py draft-review --json 生成全量预审。"""
     bf = Path(batch_file)
@@ -457,7 +522,11 @@ def cmd_audit(batch_file):
         if r['best_s'] >= 0.8:
             return 'REJECT', f"dup_formal_selfcheck_{r['best_f']}_{r['best_s']}"
         if r['verdict'] == 'merge-into' or 0.5 <= r['top_score'] < 0.7:
-            return 'REVIEW', f"similar_{r['top_id']}_{r['top_score']}"   # 人工裁定(批次1教训: 误判存在)
+            # v12.24: 先例规则机械推翻（实体名不同→ACCEPT，详见
+            # knowledge/operations/editor-adjudication-precedents.md）
+            if _precedent_overrule(kv.get('error_signature', ''), _formal_sig(r['top_id'])):
+                return 'ACCEPT', f"precedent_overrule(differs_{r['top_id']})"
+            return 'REVIEW', f"similar_{r['top_id']}_{r['top_score']}"   # 先例未覆盖→人工裁定
         return 'ACCEPT', ''
 
     for r in rows:
@@ -780,6 +849,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest='cmd', required=True)
     p0 = sub.add_parser('pr-info'); p0.add_argument('numbers', nargs='+'); p0.add_argument('--json', action='store_true'); p0.add_argument('--fix-map', action='store_true')
+    pc = sub.add_parser('claim'); pc.add_argument('draft_ids', nargs='+')
     p1 = sub.add_parser('pr-map'); p1.add_argument('--refresh', action='store_true'); p1.add_argument('--limit', type=int, default=0); p1.add_argument('--batch-file')
     p2 = sub.add_parser('batch'); p2.add_argument('--size', type=int, default=100); p2.add_argument('--start-offset', type=int, default=0)
     p3 = sub.add_parser('audit'); p3.add_argument('--batch-file', required=True)
@@ -789,6 +859,7 @@ def main():
     p7 = sub.add_parser('publish'); p7.add_argument('--branch', required=True); p7.add_argument('--push', action='store_true'); p7.add_argument('--batch', default='N')
     a = ap.parse_args()
     {'pr-info': lambda: cmd_pr_info(a.numbers, a.json, a.fix_map),
+     'claim': lambda: cmd_claim(a.draft_ids),
      'pr-map': lambda: cmd_pr_map(a.refresh, a.limit, a.batch_file),
      'batch': lambda: cmd_batch(a.size, a.start_offset),
      'audit': lambda: cmd_audit(a.batch_file),

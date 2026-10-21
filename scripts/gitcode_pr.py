@@ -1013,6 +1013,18 @@ def cmd_monitor_review(args):
     classified = []
     summary_content = None
     review_opinions = []
+    unreplied_opinions = []
+
+    # 人类（非 bot）回复过的 discussion 集合：用于判定检视意见闭环
+    human_replied_discussions = set()
+    for c in all_comments:
+        if not c.get("body", ""):
+            continue
+        author_login = str((c.get("author") or {}).get("login", ""))
+        if author_login and not any(b in author_login.lower() for b in ("atomgit-bot", "atomgit_bot", "bot")):
+            did = c.get("discussion_id") or c.get("in_reply_to")
+            if did:
+                human_replied_discussions.add(did)
 
     for c in bot_comments:
         body = c.get("body", "")
@@ -1038,6 +1050,13 @@ def cmd_monitor_review(args):
 
     # 判断整体状态
     categories = [c["category"] for c in classified]
+    # 检视意见闭环：discussion 未见人类回复即视为未回复
+    for op in review_opinions:
+        did = op.get("discussion_id")
+        if did and did not in human_replied_discussions:
+            unreplied_opinions.append(op)
+        elif not did:
+            unreplied_opinions.append(op)
     has_summary = "summary_ready" in categories
     has_opinions = len(review_opinions) > 0
 

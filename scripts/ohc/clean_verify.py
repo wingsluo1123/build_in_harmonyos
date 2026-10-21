@@ -12,7 +12,7 @@ from .utils import find_project_dir, log_info, log_ok, log_warn, log_fail
 def clean_verify(software: str, version: str, pdir: str | None = None) -> int:
     """
     G0 clean build verification.
-    
+
     Steps:
     1. Locate original tarball, patches, manifest
     2. Extract tarball to temp dir
@@ -22,17 +22,17 @@ def clean_verify(software: str, version: str, pdir: str | None = None) -> int:
     6. Run make install DESTDIR=...
     7. Check product integrity
     8. Cleanup
-    
+
     Returns: 0=PASS, 1=FAIL
     """
     project = Path(pdir) if pdir else Path(find_project_dir())
     letter = software[0].lower()
     ver_dir = project / "archives" / letter / software / version
-    
+
     # Locate resources
     patch_dir = ver_dir / "patches"
     manifest = ver_dir / "manifest.yaml"
-    
+
     # Find original tarball — check .build-context for BUILD_SRC_ORIG_DIR and tarball path
     tarball = None
     ctx_files = list(project.glob(f".build-context-{software}-{version}*"))
@@ -44,13 +44,13 @@ def clean_verify(software: str, version: str, pdir: str | None = None) -> int:
                 val = m.group(2).strip().strip('"').strip("'")
                 if val:
                     ctx_vars[m.group(1)] = val
-    
+
     # Find tarball from BUILD_TARBALL or search common locations
     if "BUILD_TARBALL" in ctx_vars:
         p = Path(ctx_vars["BUILD_TARBALL"])
         if p.exists():
             tarball = p
-    
+
     if not tarball:
         # Search for tarball
         for pattern in [f"{software}-{version}.tar.*", f"{software}*{version}*.tar.*"]:
@@ -58,11 +58,11 @@ def clean_verify(software: str, version: str, pdir: str | None = None) -> int:
             if matches:
                 tarball = matches[0]
                 break
-    
+
     if not tarball or not tarball.exists():
         log_fail(f"G0: 找不到原始 tarball")
         return 1
-    
+
     # Read configure_options from manifest
     # Use CONFIG_SHELL if available (OHOS has no /bin/sh)
     config_shell = os.environ.get("CONFIG_SHELL", "/data/service/hnp/bin/bash")
@@ -74,14 +74,14 @@ def clean_verify(software: str, version: str, pdir: str | None = None) -> int:
         if m:
             # Strip YAML list marker, quotes, and whitespace
             configure_options = m.group(1).strip().lstrip('-').strip().strip('"\'').strip()
-    
+
     # Get DEFAULT_PREFIX from context
     default_prefix = ctx_vars.get("DEFAULT_PREFIX", os.path.expanduser("~/usr/local"))
-    
+
     # Step 1: Extract tarball to temp dir
     tmpdir = Path(tempfile.mkdtemp(prefix=f"ohc-verify-{software}-"))
     log_info(f"G0: 解压 {tarball.name} 到 {tmpdir}")
-    
+
     try:
         r = subprocess.run(
             ["tar", "xf", str(tarball)],
@@ -91,7 +91,7 @@ def clean_verify(software: str, version: str, pdir: str | None = None) -> int:
             log_fail(f"G0: tar xf 失败: {r.stderr.decode()[:200]}")
             shutil.rmtree(tmpdir, ignore_errors=True)
             return 1
-        
+
         # Find extracted directory (usually tarball-name without extension)
         extracted = list(tmpdir.iterdir())
         if len(extracted) == 1 and extracted[0].is_dir():
@@ -107,7 +107,7 @@ def clean_verify(software: str, version: str, pdir: str | None = None) -> int:
                 log_fail(f"G0: 无法确定解压目录")
                 shutil.rmtree(tmpdir, ignore_errors=True)
                 return 1
-        
+
         # Step 2: Apply patches
         patches = sorted(patch_dir.glob("*.patch"))
         if patches:
@@ -125,64 +125,89 @@ def clean_verify(software: str, version: str, pdir: str | None = None) -> int:
             log_ok(f"G0: {len(patches)} 个补丁全部应用成功")
         else:
             log_info("G0: 无补丁")
-        
+
         # Ensure configure script is executable (patch doesn't preserve mode)
         configure_script = src_dir / "configure"
+        _g0_configure_skipped = False
         if configure_script.exists():
             configure_script.chmod(0o755)
             log_info("G0: 设置 configure 可执行权限")
-        
-        # Step 3: Configure
-        log_info("G0: 运行 configure...")
-        # Use shlex.quote() to prevent command injection from manifest.yaml
-        full_cmd = f"{configure_cmd} --prefix={shlex.quote(str(default_prefix))} {shlex.quote(configure_options)}" if configure_options else f"{configure_cmd} --prefix={shlex.quote(str(default_prefix))}"
-        log_file = tmpdir / "g0-configure.log"
-        g0_env = os.environ.copy()
-        # v12.6: 验证期无条件禁用 ccache（社区红线：本地缓存不得影响 G0 结果，保证 CI 可复现）
-        from .utils import ccache_disable_env
-        g0_env.update(ccache_disable_env())
-        g0_env["TMPDIR"] = str(tmpdir)
-        default_prefix = ctx_vars.get("DEFAULT_PREFIX", os.path.expanduser("~/usr/local"))
-        g0_env["PKG_CONFIG_PATH"] = f"{default_prefix}/lib/pkgconfig:{default_prefix}/share/pkgconfig:{g0_env.get('PKG_CONFIG_PATH', '')}"
-        g0_env["LD_LIBRARY_PATH"] = f"{default_prefix}/lib:{g0_env.get('LD_LIBRARY_PATH', '')}"
-        g0_env["PCRE2_CFLAGS"] = f"-I{default_prefix}/include"
-        g0_env["PCRE2_LIBS"] = f"-L{default_prefix}/lib -lpcre2-8"
-        # Ensure CC/CXX are set for Makefile projects
-        if "CC" not in g0_env:
-            g0_env["CC"] = "clang"
-        if "CXX" not in g0_env:
-            g0_env["CXX"] = "clang++"
-        with open(log_file, "w") as lf:
-            r = subprocess.run(
-                full_cmd, shell=True,
-                executable=config_shell,
-                cwd=str(src_dir), stdout=lf, stderr=subprocess.STDOUT,
-                env=g0_env,
-                timeout=600  # 10 minutes for configure
-            )
-        if r.returncode != 0:
-            # Check if conanfile.py has runtime fixes (expected G0 failure)
-            conanfile = ver_dir / "conanfile.py"
-            is_expected = False
-            if conanfile.exists():
-                cf_content = conanfile.read_text(encoding="utf-8", errors="replace")
-                if "replace_in_file" in cf_content:
-                    is_expected = True
+        elif not (src_dir / "configure.ac").exists():
+            # P1 反馈 00802fed/01f55f48：无 configure 项目（手写 Makefile/无构建族）
+            # 曾被通用步骤执行 exit 127、形似编译失败。按构建系统分流跳过（非阻塞）。
+            _g0_configure_skipped = True
+            log_warn("G0: 源码无 configure——跳过 configure 步骤（构建系统分流，非失败）")
+            mf = any((src_dir / n).exists() for n in ("Makefile", "makefile", "GNUmakefile"))
+            if mf:
+                try:
+                    pre = subprocess.run(["make", "-C", str(src_dir), "-n"],
+                                         capture_output=True, text=True, timeout=120)
+                    log_info(f"G0: make -n 预检 exit={pre.returncode}（Makefile 存在性探测）")
+                except Exception as _e:
+                    log_info(f"G0: make -n 预检不可用（{_e}），继续")
 
-            if is_expected:
-                log_warn(f"G0: configure 失败 (exit {r.returncode}) — 预期行为")
-                log_info("  检测到 conanfile.py build() 包含运行时修复 (replace_in_file)")
-                log_info("  G0 不执行 build() 方法，因此运行时修复不会应用")
-                log_info("  此失败为预期行为，不阻塞后续步骤")
-                log_info("  conan-verify (G2) 将通过 conan create 验证完整构建")
-                # Still emit handoff but with expected=true
-                _emit_handoff("configure", str(log_file), src_dir, tmpdir, expected=True)
-            else:
-                log_fail(f"G0: configure 失败 (exit {r.returncode})")
-                _emit_handoff("configure", str(log_file), src_dir, tmpdir)
-            return 1
-        log_ok("G0: configure 成功")
-        
+        # Step 3: Configure
+        if _g0_configure_skipped:
+            class _Skipped:
+                returncode = 0
+                args = ["(skipped)"]
+            r = _Skipped()
+            full_cmd = "__G0_CONFIGURE_SKIPPED__"
+            log_file = tmpdir / "g0-configure.log"
+            with open(log_file, "w") as lf:
+                lf.write("[G0] 无 configure：按构建系统分流跳过 configure 步骤\n")
+            log_ok("G0: configure 成功（跳过——无 configure 项目）")
+        else:
+            log_info("G0: 运行 configure...")
+            # Use shlex.quote() to prevent command injection from manifest.yaml
+            full_cmd = f"{configure_cmd} --prefix={shlex.quote(str(default_prefix))} {shlex.quote(configure_options)}" if configure_options else f"{configure_cmd} --prefix={shlex.quote(str(default_prefix))}"
+            log_file = tmpdir / "g0-configure.log"
+            g0_env = os.environ.copy()
+            # v12.6: 验证期无条件禁用 ccache（社区红线：本地缓存不得影响 G0 结果，保证 CI 可复现）
+            from .utils import ccache_disable_env
+            g0_env.update(ccache_disable_env())
+            g0_env["TMPDIR"] = str(tmpdir)
+            default_prefix = ctx_vars.get("DEFAULT_PREFIX", os.path.expanduser("~/usr/local"))
+            g0_env["PKG_CONFIG_PATH"] = f"{default_prefix}/lib/pkgconfig:{default_prefix}/share/pkgconfig:{g0_env.get('PKG_CONFIG_PATH', '')}"
+            g0_env["LD_LIBRARY_PATH"] = f"{default_prefix}/lib:{g0_env.get('LD_LIBRARY_PATH', '')}"
+            g0_env["PCRE2_CFLAGS"] = f"-I{default_prefix}/include"
+            g0_env["PCRE2_LIBS"] = f"-L{default_prefix}/lib -lpcre2-8"
+            # Ensure CC/CXX are set for Makefile projects
+            if "CC" not in g0_env:
+                g0_env["CC"] = "clang"
+            if "CXX" not in g0_env:
+                g0_env["CXX"] = "clang++"
+            with open(log_file, "w") as lf:
+                r = subprocess.run(
+                    full_cmd, shell=True,
+                    executable=config_shell,
+                    cwd=str(src_dir), stdout=lf, stderr=subprocess.STDOUT,
+                    env=g0_env,
+                    timeout=600  # 10 minutes for configure
+                )
+            if r.returncode != 0:
+                # Check if conanfile.py has runtime fixes (expected G0 failure)
+                conanfile = ver_dir / "conanfile.py"
+                is_expected = False
+                if conanfile.exists():
+                    cf_content = conanfile.read_text(encoding="utf-8", errors="replace")
+                    if "replace_in_file" in cf_content:
+                        is_expected = True
+
+                if is_expected:
+                    log_warn(f"G0: configure 失败 (exit {r.returncode}) — 预期行为")
+                    log_info("  检测到 conanfile.py build() 包含运行时修复 (replace_in_file)")
+                    log_info("  G0 不执行 build() 方法，因此运行时修复不会应用")
+                    log_info("  此失败为预期行为，不阻塞后续步骤")
+                    log_info("  conan-verify (G2) 将通过 conan create 验证完整构建")
+                    # Still emit handoff but with expected=true
+                    _emit_handoff("configure", str(log_file), src_dir, tmpdir, expected=True)
+                else:
+                    log_fail(f"G0: configure 失败 (exit {r.returncode})")
+                    _emit_handoff("configure", str(log_file), src_dir, tmpdir)
+                return 1
+            log_ok("G0: configure 成功")
+
         # Step 4: Make
         log_info("G0: 运行 make...")
         log_file = tmpdir / "g0-make.log"
@@ -207,7 +232,7 @@ def clean_verify(software: str, version: str, pdir: str | None = None) -> int:
             _emit_handoff("make", str(log_file), src_dir, tmpdir)
             return 1
         log_ok("G0: make 成功")
-        
+
         # Step 5: Make install
         log_info("G0: 运行 make install...")
         destdir = tmpdir / "g0-install"
@@ -224,7 +249,7 @@ def clean_verify(software: str, version: str, pdir: str | None = None) -> int:
             log_fail(f"G0: make install 失败 (exit {r.returncode})")
             _emit_handoff("make_install", str(log_file), src_dir, tmpdir)
             return 1
-        
+
         # Step 6: Check product integrity
         bins = list(destdir.rglob("bin/*"))
         libs = list(destdir.rglob("lib/*"))
@@ -232,9 +257,9 @@ def clean_verify(software: str, version: str, pdir: str | None = None) -> int:
             log_fail("G0: 安装产物为空！")
             _emit_handoff("make_install", "empty staging", src_dir, tmpdir)
             return 1
-        
+
         log_ok(f"G0: 安装产物正常 ({len(bins)} bin, {len(libs)} lib)")
-        
+
         # PASS
         # Create G0 marker
         (ver_dir / ".g0-verified").write_text(
@@ -246,7 +271,7 @@ def clean_verify(software: str, version: str, pdir: str | None = None) -> int:
         log_ok("✅ G0 干净构建验证通过")
         shutil.rmtree(tmpdir, ignore_errors=True)
         return 0
-        
+
     except Exception as e:
         log_fail(f"G0: 异常: {e}")
         print(f"[DEBUG] 保留临时目录: {tmpdir}")

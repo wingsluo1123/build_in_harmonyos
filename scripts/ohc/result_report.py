@@ -784,9 +784,16 @@ def write_lifecycle_draft(software: str, version: str, milestone: str,
                 prev = None
             if prev is not None and _looks_tool_generated(prev) \
                     and prev.get("draft") is False:
-                log_info(f"R46: 终态 result.json 已上报（draft:false），"
-                         f"跳过里程碑草稿 {milestone}")
-                return False
+                # R46 反馈 01f55f48：比对 software/version——不同任务的残留
+                # 终态不得误伤本任务草稿（应覆盖而非静默跳过）
+                prev_sw = str(prev.get("pkg") or prev.get("software") or "")
+                prev_ver = str(prev.get("ver") or prev.get("version") or "")
+                if prev_sw == software and prev_ver == version:
+                    log_info(f"R46: 终态 result.json 已上报（draft:false），"
+                             f"跳过里程碑草稿 {milestone}")
+                    return False
+                log_warn(f"R46: 残留终态属他任务（{prev_sw}/{prev_ver} ≠ "
+                         f"{software}/{version}），覆盖为本任务草稿")
         argv = [
             software, version,
             "--status", "partial",

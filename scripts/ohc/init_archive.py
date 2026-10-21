@@ -360,6 +360,9 @@ def _manifest_template(name: str, version: str, bs: str, url: str) -> str:
     today = datetime.now().strftime("%Y-%m-%d")
 
     # 替换占位符
+    # v12.24 (反馈 01f55f48)：{software}/{BUILD_SYSTEM} 原样留档无门禁校验
+    content = content.replace("{software}", name)
+    content = content.replace("{BUILD_SYSTEM}", bs)
     content = content.replace("{version}", version)
     content = content.replace("{YYYY-MM-DD}", today)
     content = content.replace("system: cmake", f"system: {bs}")
