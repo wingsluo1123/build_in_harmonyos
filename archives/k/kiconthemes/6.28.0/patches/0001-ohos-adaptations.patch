@@ -1,0 +1,39 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,7 +1,7 @@
+ cmake_minimum_required(VERSION 3.29)
+ 
+ set(KF_VERSION "6.28.0") # handled by release scripts
+-set(KF_DEP_VERSION "6.28.0") # handled by release scripts
++set(KF_DEP_VERSION "6.26.0") # ohpcd KF6 dependency ceiling # handled by release scripts
+ project(KIconThemes VERSION ${KF_VERSION})
+ 
+ # ECM setup
+@@ -24,7 +24,7 @@
+ include(ECMQtDeclareLoggingCategory)
+ include(ECMDeprecationSettings)
+ include(CMakeDependentOption)
+-include(ECMQmlModule)
++# include(ECMQmlModule)  # disabled: requires Qt6Qml (not published to ohpcd)
+ include(ECMGenerateQDoc)
+ 
+ set(EXCLUDE_DEPRECATED_BEFORE_AND_AT 0 CACHE STRING "Control the range of deprecated API excluded from the build [default=0].")
+--- a/autotests/CMakeLists.txt
++++ b/autotests/CMakeLists.txt
+@@ -22,10 +22,12 @@
+   kpixmapsequenceloadertest
+ )
+ 
+-find_package(Qt6 COMPONENTS Quick)
+-if (TARGET Qt6::Quick)
+-  kiconthemes_tests(kquickiconprovidertest)
+-  target_link_libraries(kquickiconprovidertest Qt6::Quick)
++if (KICONTHEMES_USE_QTQUICK)
++  find_package(Qt6 ${REQUIRED_QT_VERSION} CONFIG QUIET COMPONENTS Quick)
++  if (TARGET Qt6::Quick)
++    kiconthemes_tests(kquickiconprovidertest)
++    target_link_libraries(kquickiconprovidertest Qt6::Quick)
++  endif()
+ endif()
+ 
+ set_tests_properties(kiconloader_unittest PROPERTIES RUN_SERIAL TRUE)

@@ -27,10 +27,16 @@ KIconWidgets add-on library. Ships `libKF6IconThemes.so` and
   `/data/storage/el1/bundle/libs/arm64`); the 6.18-line recipes do not set
   that entry and configure/`qtpaths` succeed without it.
 - Upstream autotests run headless under `QT_QPA_PLATFORM=offscreen`:
-  5/5 CTest targets plus the kiconloader_unittest subset (29/29 checks; one
-  shared-mime-info data row is unavailable in the current OHOS baseline)
-  and the kiconengine_unittest subset (8/8 checks; testMode needs
-  BreezeIcons) pass on OHOS.
+  6/6 CTest targets (6.28.0 adds the upstream kiconbutton_unittest) plus
+  the kiconloader_unittest subset (29/29 checks; one shared-mime-info data
+  row is unavailable in the current OHOS baseline) and the
+  kiconengine_unittest subset (8/8 checks; testMode needs BreezeIcons) pass
+  on OHOS.
+- For 6.28.0 the recipe lowers `KF_DEP_VERSION` to the published 6.26.0
+  KF6 baseline and keeps `ecm/6.28.0` as the tool requirement.
+- test_package stages dependency runtimes next to the test binary with
+  hardlinks and falls back to file copies, because the OHOS user volume
+  rejects `symlink(2)`.
 - **6.18-line karchive pin (`6.18.0.2`)**: the published `kiconthemes/6.18.0`
   recipe revision `f82185f3` pinned the static `karchive/6.19.0`, which
   conflicts with the `karchive/6.18.0` closure that the rest of the 6.18 line
@@ -42,7 +48,7 @@ KIconWidgets add-on library. Ships `libKF6IconThemes.so` and
 
 ## Dependencies
 
-- Build: ecm (extra-cmake-modules), CMake >= 3.29 (for 6.26.0)
+- Build: ecm (extra-cmake-modules), CMake >= 3.29
 - Runtime/compile: qtbase (Qt6Widgets/Qt6Gui/Qt6GuiPrivate), qtsvg,
   karchive, ki18n, kwidgetsaddons, kcolorscheme
 
