@@ -1,0 +1,41 @@
+--- a/external/pflash/test/tests/05-bad-numbers
++++ b/external/pflash/test/tests/05-bad-numbers
+@@ -29,34 +29,32 @@
+ 
+ one_start_decimal=$(printf "%d" $one_start);
+ one_len_decimal=$(printf "%d" $one_len);
+ yes yes | run_binary "./pflash" \
+ 	"-F $DATA_DIR/$CUR_TEST.pnor -e -a $one_start_decimal \
+ 	-s $one_len_decimal -p $DATA_DIR/random"
+ if [ "$?" -ne 0 ] ; then
+ 	fail_test;
+ fi
+ 
+-cmp --ignore-initial="$one_start:0" --bytes="$one_len" \
+-	"$DATA_DIR/$CUR_TEST.pnor" "$DATA_DIR/random"
++cmp -n "$one_len" "$DATA_DIR/$CUR_TEST.pnor" "$DATA_DIR/random" "$one_start" 0
+ if [ "$?" -ne 0 ] ; then
+ 	fail_test;
+ fi
+ 
+-cmp --bytes="$one_start" "$DATA_DIR/$CUR_TEST.pnor" "$DATA_DIR/$CUR_TEST.bk";
++cmp -n "$one_start" "$DATA_DIR/$CUR_TEST.pnor" "$DATA_DIR/$CUR_TEST.bk";
+ if [ "$?" -ne 0 ] ; then
+ 	fail_test;
+ fi
+ 
+-cmp --ignore-initial="$one_end" \
+-	--bytes="$(expr $(stat --printf="%s" "$DATA_DIR/$CUR_TEST.pnor") - "$one_end")" \
+-	"$DATA_DIR/$CUR_TEST.pnor" "$DATA_DIR/$CUR_TEST.bk"
++cmp -n "$(expr $(stat -c %s "$DATA_DIR/$CUR_TEST.pnor") - "$one_end")" \
++	"$DATA_DIR/$CUR_TEST.pnor" "$DATA_DIR/$CUR_TEST.bk" "$one_end" "$one_end"
+ if [ "$?" -ne 0 ] ; then
+ 	fail_test;
+ fi
+ sed -i "s|$DATA_DIR/random|FILE|" "$STDOUT_OUT"
+ 
+ # The test infrastructure will clean up but lets no chew unnecessarily
+ # though disk space
+ rm "$DATA_DIR/$CUR_TEST.pnor" "$DATA_DIR/$CUR_TEST.bk" "$DATA_DIR/random"
+ 
+ strip_version_from_result "pflash"

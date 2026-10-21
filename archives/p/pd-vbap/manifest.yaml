@@ -1,0 +1,26 @@
+software: pd-vbap
+display: "pd-vbap"
+description: "VBAP (Vector Base Amplitude Panning) external object set for Pure Data: vbap / rvbap / define_loudspeakers, from Ville Pulkki's original implementation"
+category: library
+homepage: "https://github.com/pure-data/vbap"
+license: MIT
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "上游随源码 vendored pd-lib-builder（Makefile.pdlibbuilder 0.6.0）会在编译任何源码之前硬失败：它用 `cc -dumpmachine` 探测三元组，而 OHOS 的 clang 不接受裸 `gcc` 名 / 该探测在本平台无输出，故构建期必须经 tools.build:compiler_executables 注入 CC"
+    - "编译 Pd 外部库必须用 puredata 包的 include/pd（含 s_stuff.h 等内部头）；libpd 包只装 include/libpd，不能作为 header source"
+    - "musl 下 dlopen 的 Pd 外部对象无法解析 Pd 引擎符号（pd_error/gensym/class_new）——消费者测试须在运行步 LD_PRELOAD=libpd.so，或由 libpd 宿主显式提供符号"
+    - "产物为 dlopen 插件（vbap.pd_linux），不是可链接库：cpp_info.libs 为空、无 bin 产物，故不需要 commands.json；验收靠真实宿主 dlopen + DSP 数值断言（能量守恒、最近扬声器增益集中）"
+  common_dependencies:
+    - "puredata/0.54.1"
+  test_dependencies:
+    - "libpd/0.16.1"
+  knowledge_refs:
+    - "knowledge/operations/pd-externals-ohos/SKILL.md"
+
+versions:
+  "1.2.1":
+    status: published
+    build_date: "2026-10-01"
+    conan_ref: "pd-vbap/1.2.1"

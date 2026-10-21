@@ -1,0 +1,30 @@
+# 版本级 manifest — imap 2007f（遵循 ARCHIVE-SPEC v2.0）
+
+version: "2007f"
+software: "imap"
+
+status: built
+build_date: "2026-10-15"
+build_system: "makefile"
+
+source:
+  url: "https://mirrorservice.org/sites/ftp.cac.washington.edu/imap/imap-2007f.tar.gz"
+  sha256: "53e15a2b5c1bc80161d42e9f69792a3fa18332b7b771910131004eb520004a28"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options:
+    - "make an SSLTYPE=none && make OSTYPE rebuild rebuildclean BUILDTYPE=lnx PASSWDTYPE=nul SSLTYPE=none IP=4 (c-client only, skip bundled mtest/daemons)"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "UW IMAP 使用顶层 Makefile 三字母 OSTYPE，传统 Linux 非 shadow 口令选 lnx（os_lnx.c 无 shadow/crypt/PAM 引用；OHOS 无 shadow.h，用 slx 必在 osdep.o 报 getspnam 未声明）"
+  - "SSLTYPE=none 关闭仅兼容 OpenSSL 0.9/1.0 的 ssl_unix.c，避免与 OpenSSL 3.x 不兼容"
+  - "产物为静态 c-client，包内重命名为 libc-client.a 以符合 -lc-client 链接约定"
+  - "PASSWDTYPE=nul 选 ckp_nul.c（checkpw 恒返 NIL，仅服务端本机鉴权路径；打包的客户端 API 不受影响），并经 lnxnul 跳过 lnxok 交互确认"
+  - "只构建 c-client 静态库：跳过顶层 bundled（mtest 用已废弃 getpass(3)，OHOS 无声明致 mtest.o 硬错误；imapd/ipopd 不打包），经 an + OSTYPE/rebuild 得到同样 c-client.a"

@@ -1,0 +1,132 @@
+diff -ruN a/clipper/core/fftmap.cpp b/clipper/core/fftmap.cpp
+--- a/clipper/core/fftmap.cpp	2026-10-18 02:31:03.505700938 +0800
++++ b/clipper/core/fftmap.cpp	2026-10-18 02:31:03.545701563 +0800
+@@ -164,7 +164,17 @@
+ 			 FFTW_COMPLEX_TO_REAL, flags );
+   mutex.unlock();
+ 
+-  rfftwnd_one_complex_to_real(plan, (fftw_complex*)data_c, NULL);
++  /* OHOS: the FFTW2 library available in the dependency registry is
++     double-precision, while clipper::ffttype is float. Transform through
++     a double scratch buffer so the FFTW ABI matches, then copy back. */
++  {
++    int nr = grid_real_.size();
++    std::vector<std::complex<double> > tmp( n );
++    for ( int i = 0; i < n; i++ ) tmp[i] = std::complex<double>( data_c[i] );
++    rfftwnd_one_complex_to_real(plan, (fftw_complex*)&tmp[0], NULL);
++    const double* tr = (const double*)&tmp[0];
++    for ( int i = 0; i < nr; i++ ) data_r[i] = ffttype( tr[i] );
++  }
+ 
+   mutex.lock();
+   rfftwnd_destroy_plan(plan);
+@@ -192,7 +202,16 @@
+ 			 FFTW_REAL_TO_COMPLEX, flags );
+   mutex.unlock();
+ 
+-  rfftwnd_one_real_to_complex(plan, (fftw_real*)data_r, NULL);
++  /* OHOS: double-precision FFTW2 scratch conversion (see fft_h_to_x). */
++  {
++    int n = grid_reci_.size();
++    int nr = grid_real_.size();
++    std::vector<std::complex<double> > tmp( n );
++    double* tr = (double*)&tmp[0];
++    for ( int i = 0; i < nr; i++ ) tr[i] = double( data_r[i] );
++    rfftwnd_one_real_to_complex(plan, (fftw_real*)tr, NULL);
++    for ( int i = 0; i < n; i++ ) data_c[i] = tmp[i];
++  }
+ 
+   mutex.lock();
+   rfftwnd_destroy_plan(plan);
+diff -ruN a/clipper/core/fftmap_sparse.cpp b/clipper/core/fftmap_sparse.cpp
+--- a/clipper/core/fftmap_sparse.cpp	2026-10-18 02:31:03.537710625 +0800
++++ b/clipper/core/fftmap_sparse.cpp	2026-10-18 02:31:03.545701563 +0800
+@@ -159,7 +159,10 @@
+   // prep fftw
+   const int nmax =
+     Util::max(Util::max(grid_real_.nu(),grid_real_.nv()),grid_real_.nw());
+-  std::vector<std::complex<ffttype> > in(nmax), out(nmax);
++  /* OHOS: double-precision FFTW2 scratch buffers (see fftmap.cpp). */
++  std::vector<std::complex<double> > in(nmax), out(nmax);
++  std::vector<std::complex<double> > rowd( grid_real_.nu() );
++  std::vector<double> roww( grid_real_.nw() );
+   ffttype zero_real = 0.0;
+   std::complex<ffttype> zero( zero_real, zero_real );
+   fftw_plan planu, planv; rfftw_plan planw;
+@@ -201,8 +204,11 @@
+   for ( w = 0; w < grid_reci_.nw(); w++ )
+     for ( v = 0; v < grid_reci_.nv(); v++ ) {
+       ptr = row_kl( v, w );
+-      if ( ptr != NULL )
+-        fftw_one( planu, (fftw_complex*)ptr, (fftw_complex*)&out[0] );
++      if ( ptr != NULL ) {
++        for ( int i = 0; i < grid_real_.nu(); i++ ) rowd[i] = ptr[i];
++        fftw_one( planu, (fftw_complex*)&rowd[0], NULL );
++        for ( int i = 0; i < grid_real_.nu(); i++ ) ptr[i] = rowd[i];
++      }
+     }
+ 
+   // copy, transform along k->v, and copy
+@@ -227,8 +233,11 @@
+   for ( v = 0; v < grid_real_.nv(); v++ )
+     for ( u = 0; u < grid_real_.nu(); u++ ) {
+       rptr = row_uv( u, v );
+-      if ( rptr != NULL )
+-	rfftw_one( planw, (fftw_real*)rptr, (fftw_real*)&out[0] );
++      if ( rptr != NULL ) {
++	for ( int i = 0; i < grid_real_.nw(); i++ ) roww[i] = double( rptr[i] );
++	rfftw_one( planw, &roww[0], NULL );
++	for ( int i = 0; i < grid_real_.nw(); i++ ) rptr[i] = ffttype( roww[i] );
++      }
+     }
+ 
+   mutex.lock();
+@@ -296,7 +305,10 @@
+   // prep fftw
+   const int nmax =
+     Util::max(Util::max(grid_real_.nu(),grid_real_.nv()),grid_real_.nw());
+-  std::vector<std::complex<ffttype> > in(nmax), out(nmax);
++  /* OHOS: double-precision FFTW2 scratch buffers (see fftmap.cpp). */
++  std::vector<std::complex<double> > in(nmax), out(nmax);
++  std::vector<std::complex<double> > rowd( grid_real_.nu() );
++  std::vector<double> roww( grid_real_.nw() );
+   ffttype zero_real = 0.0;
+   std::complex<ffttype> zero( zero_real, zero_real );
+   fftw_plan planu, planv; rfftw_plan planw;
+@@ -338,8 +350,11 @@
+   for ( v = 0; v < grid_real_.nv(); v++ )
+     for ( u = 0; u < grid_real_.nu(); u++ ) {
+       rptr = row_uv( u, v );
+-      if ( rptr != NULL )
+-	rfftw_one( planw, (fftw_real*)rptr, (fftw_real*)&out[0] );
++      if ( rptr != NULL ) {
++	for ( int i = 0; i < grid_real_.nw(); i++ ) roww[i] = double( rptr[i] );
++	rfftw_one( planw, &roww[0], NULL );
++	for ( int i = 0; i < grid_real_.nw(); i++ ) rptr[i] = ffttype( roww[i] );
++      }
+     }
+ 
+   // copy, transform along k->v, and copy
+@@ -359,7 +374,7 @@
+       fftw_one( planv, (fftw_complex*)&in[0], (fftw_complex*)&out[0] );
+       for ( v = 0; v < grid_real_.nv(); v++ ) {
+ 	ptr = row_kl( v, w );
+-	if ( ptr != NULL ) ptr[u] = s * out[v];
++	if ( ptr != NULL ) ptr[u] = double(s) * out[v];
+       }
+     }
+ 
+@@ -367,8 +382,11 @@
+   for ( w = 0; w < grid_reci_.nw(); w++ )
+     for ( v = 0; v < grid_reci_.nv(); v++ ) {
+       ptr = row_kl( v, w );
+-      if ( ptr != NULL )
+-        fftw_one( planu, (fftw_complex*)ptr, (fftw_complex*)&out[0] );
++      if ( ptr != NULL ) {
++        for ( int i = 0; i < grid_real_.nu(); i++ ) rowd[i] = ptr[i];
++        fftw_one( planu, (fftw_complex*)&rowd[0], NULL );
++        for ( int i = 0; i < grid_real_.nu(); i++ ) ptr[i] = rowd[i];
++      }
+     }
+ 
+   mutex.lock();

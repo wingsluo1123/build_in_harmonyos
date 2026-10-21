@@ -1,0 +1,84 @@
+--- a/sircbot-send.c
++++ b/sircbot-send.c
+@@ -1,32 +1,77 @@
+ #include <sys/stat.h>
+ #include <sys/socket.h>
+ #include <sys/un.h>
+ 
+ #include <err.h>
+ #include <fcntl.h>
++#include <stddef.h>
+ #include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
+ #include <unistd.h>
++
++/*
++ * Must match the directory used by the sircbot daemon; the daemon accepts a
++ * run-time override so this one has to follow it.
++ */
++#ifndef DEFAULT_RUNDIR
++#define DEFAULT_RUNDIR "/var/run/sircbot"
++#endif
++
++static const char *rundir(void)
++{
++	const char *value = getenv("SIRCBOT_RUNDIR");
++
++	return (value != NULL && value[0] != '\0') ? value : DEFAULT_RUNDIR;
++}
++
++/* Abstract-namespace address; mirrors abstract_addr() in sircbot.c. */
++static socklen_t abstract_addr(struct sockaddr_un *sun, const char *name)
++{
++	size_t len = strlen(name);
++
++	if (len > sizeof(sun->sun_path) - 1)
++		len = sizeof(sun->sun_path) - 1;
++	memset(sun, 0, sizeof(*sun));
++	sun->sun_family = AF_UNIX;
++	sun->sun_path[0] = '\0';
++	memcpy(sun->sun_path + 1, name, len);
++	return (socklen_t) (offsetof(struct sockaddr_un, sun_path) + 1 + len);
++}
+ 
+ int connect_channel(const char *channel_name)
+ {
++	char path[sizeof(struct sockaddr_un)];
+ 	struct sockaddr_un sun;
+-	int fd = socket(PF_UNIX, SOCK_STREAM, 0);
++	socklen_t alen;
++	int fd;
++
++	snprintf(path, sizeof(path), "%s/%s", rundir(), channel_name);
++
++	fd = socket(PF_UNIX, SOCK_STREAM, 0);
+ 	if (fd < 0)
+ 		return fd;
+ 
++	/* the daemon prefers a pathname socket, so try that one first */
++	memset(&sun, 0, sizeof(sun));
+ 	sun.sun_family = AF_UNIX;
+-	snprintf(sun.sun_path, sizeof(sun.sun_path), "/var/run/sircbot/%s",
+-		channel_name);
++	strncpy(sun.sun_path, path, sizeof(sun.sun_path));
+ 	if (connect(fd, (struct sockaddr *) &sun, sizeof(sun)) == 0)
+ 		return fd;
+-	perror(sun.sun_path);
++
++	/* the daemon falls back to the abstract namespace when bind is refused */
++	alen = abstract_addr(&sun, path);
++	if (connect(fd, (struct sockaddr *) &sun, alen) == 0)
++		return fd;
++
++	perror(path);
+ 	close(fd);
+ 	return -1;
+ }
+ 
+ int main(int argc, char *argv[])
+ {
+ 	int fd = connect_channel(argv[1]);
+ 	char buf[2048];
+ 
+ 	if (fd < 0)

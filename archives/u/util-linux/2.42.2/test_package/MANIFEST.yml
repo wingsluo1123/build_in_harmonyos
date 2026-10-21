@@ -1,0 +1,57 @@
+# test_package/MANIFEST.yml
+# 上游测试来源与断言统计
+# CI 门禁 (build_and_test.sh L0e) 需要此文件存在
+
+package: util-linux/2.42.2
+homepage: "https://www.kernel.org/pub/linux/utils/util-linux/"
+
+# 上游测试（tests/ 下的 ts 脚本套件）—— **已实跑**（2026-10-18 干净重跑）
+#
+# 运行方式：配方裁剪构建（--disable-all-programs + 三个库）不产出 CLI，
+# 故 ts 套件在**完整构建树**中运行（同一份 2.42.2 源码、同一套 OHOS clang 工具链）：
+#   cd <build>/tests && PATH=<gnu-xargs-shim>:$PATH TMPDIR=<可写目录> ./run.sh
+# 需要的 3 项环境适配（完整构建才触发，裁剪配方不涉及）：
+#   ① tools/ 与 ts 脚本里的 `#!/bin/bash` → OHOS 实际 bash 路径（无 /bin/bash 时
+#      errnos.h 生成报 Error 126，E165）
+#   ② toybox xargs 不支持 -I，需 GNU 语义 shim（run.sh:254 依赖）
+#   ③ TMPDIR 指向可写目录
+#
+# 实测结果（完整日志：reports/upstream-ts-run.log，随工作区留档）：
+#   run.sh 汇总：注册测试 367 项 → **17 项 FAILED**
+#   子测试展开：**820 项 = 773 通过 / 41 失败 / 6 项上游 KNOWN FAILED（预期失败）**
+#               通过率 **94.3%**（773/820，分母含 6 项 KNOWN FAILED；剔除则为 95.0%）
+#   SKIPPED 224 条：无 root 权限 112、相关工具未构建 89（lsfd/ipcs/lsns/col/setpriv 等）、
+#                   其余 23（ncurses/statmount/sqlite3/mkfs.ext2/pylibmount 等）
+#   失败分布（run.sh 明细行）：lsblk 14、hardlink 7、mkswap 7、getopt 6、script 4、
+#             fallocate 3、lscpu 3、kill 3、logger 2，fadvise/flock/ionice/misc/setarch/
+#             swaplabel/uuidd/chrt 各 1 —— 均为完整构建下工具行为与环境差异（无 root、
+#             无设备、toybox sed 无 --in-place 导致文本比对偏差），
+#             **与交付的 libblkid/libuuid/libmount 无关**
+#   注：上表为按组件归并的近似分布（明细行合计 57 条，含 KNOWN FAILED 与组内重复计数），
+#       组汇总口径以 41 + 6 = 47 为准
+#
+# 与交付库直接相关的组件实测：
+#   blkid 组件 11 项 → 3 项实跑通过（superblocks probing 134 子测试、partitions probing 7、
+#                       output formatting 12），8 项 SKIPPED（7 项无 root、1 项缺 mkfs.ext2）
+#   uuidgen          → 4/4 子测试通过
+upstream_check_command: "cd <build>/tests && PATH=<gnu-xargs-shim>:$PATH TMPDIR=<可写目录> ./run.sh（需完整构建 + 上述环境适配）"
+
+# 配方构建中不运行上游 ts（裁剪构建只编库，CLI 不产出）
+upstream_test_in_build: false
+upstream_test_command: "cd <build>/tests && ./run.sh（完整构建树）"
+upstream_test_result: "367 项注册测试 17 项失败；子测试 820 项 = 773 通过 / 41 失败 / 6 KNOWN FAILED，通过率 94.3%（2026-10-18 实测）"
+
+# 上游测试来源
+upstream_tests: []
+
+# test_package 中新增的测试（消费者冒烟验证，真实调用三库 API）
+test_package_tests:
+  - file: test_util_linux.cpp
+    description: >-
+      消费者探针：libblkid（blkid_new_probe_from_filename + blkid_do_safeprobe）、
+      libuuid（uuid_generate + uuid_unparse_upper + uuid_parse 往返）、
+      libmount（mnt_new_context + mnt_free_context）
+    command: "clang++ -std=c++17 test_util_linux.cpp -o probe -lmount -lblkid -luuid && ./probe"
+
+# 断言总数（blkid 2 + uuid 4 + mount 1 + 三库总结 1）
+assertion_count: 8

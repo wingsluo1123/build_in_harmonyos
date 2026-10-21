@@ -1,0 +1,21 @@
+sources:
+  url: "https://github.com/ecmwf/eckit/archive/refs/tags/2.0.7.tar.gz"
+  sha256: "376aa865b317d9533c1c88e1a7d15ca248420cc8a048570f3fe216e123991b51"
+patches:
+  "2.0.7.1":
+    - patch_file: "patches/0001-musl-uid_t.patch"
+      patch_description: "PathName.h 显式包含 sys/types.h（musl 不间接引入 uid_t）"
+      patch_type: "portability"
+    - patch_file: "patches/0002-musl-strerror_r.patch"
+      patch_description: "strerror_r 判据改为 _GNU_SOURCE && __GLIBC__（musl 只有 POSIX 版）"
+      patch_type: "portability"
+    - patch_file: "patches/0003-ohos-no-pthread-cancel.patch"
+      patch_description: "ThreadControler::kill() 在 OHOS 上降级为 no-op（libc 无线程取消机制）"
+      patch_type: "portability"
+    - patch_file: "patches/0004-ohos-systeminfo-linux.patch"
+      patch_description: "makeSystemInfo() 的 Linux 分支同时接受 OHOS/HarmonyOS（ecbuild 的 OS_NAME 取原始 CMAKE_SYSTEM，未归一化）"
+      patch_type: "portability"
+    - patch_file: "patches/0005-geo-unzip-libzip-gate.patch"
+      patch_description: "src/eckit/geo/CMakeLists.txt: cache/Unzip.cc/.h 与 libzip 依赖从 GEO_AREA_SHAPEFILE(需 shapelib) 块拆到 eckit_HAVE_ZIP 块, 使 tests/geo 的 ZIP_FILE 代码路径可链接"
+      patch_type: "portability"
+      strip: 1

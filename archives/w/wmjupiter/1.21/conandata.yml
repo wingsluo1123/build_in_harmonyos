@@ -1,0 +1,19 @@
+# conandata.yml — wmjupiter 1.21
+# 上游：engerim42/wmjupiter（Thomas Kuiper 的 Window Maker dockapp）
+# R39：只登记官方正式源。codeload.github.com 是 GitHub 官方归档下载端点
+# （github.com/<owner>/<repo>/archive/refs/tags/<tag>.tar.gz 会 302 到该端点），
+# 非第三方镜像；仓库内同类官方归档源有 533 处先例（3proxy/0.9.5、abcmidi 等）。
+# 说明：CI 的镜像 fallback 注入只覆盖 https://github.com/... 形态，故此处直接使用
+# 可达的官方端点。HTTPS 镜像域名不得写入本文件（PF7 源 URL 闸）。
+sources:
+  url: "https://codeload.github.com/engerim42/wmjupiter/tar.gz/refs/tags/1.21"
+  filename: "wmjupiter-1.21.tar.gz"
+  sha256: "435f494737c61339536d5d47225685a29787ba62691ccdf1ad5ce1d17ef2942c"
+
+patches:
+  - patch_file: "patches/0001-xutils.c.patch"
+    patch_description: "xutils.c 增加 7 个全局变量（display / Root / iconwin / win / screen / DisplayDepth / NormalGC，跨 6 行 extern 声明）的唯一定义，与 0002 的头文件化改动配套。上游在头文件中写试探性定义（tentative definition），两个翻译单元 wmJupiter.c 与 xutils.c 各自 include 后各产生一份定义；1998 年的编译器会按 common symbol 合并，而 clang 15 默认 -fno-common，链接期报 duplicate symbol（ld.lld: error: duplicate symbol: display / win / NormalGC ...）。按知识条目 E491 rec_priority 1 的修法，改为『extern 声明 + 单一定义』；E491 forbid_1 明确排除以 -fcommon 全局放开兼容的方式。纯声明/定义关系修正，不引入平台宏、不引入条件编译。"
+    patch_type: "portability"
+  - patch_file: "patches/0002-xutils.h.patch"
+    patch_description: "xutils.h 中 7 个全局变量（跨 6 行 extern 声明）由试探性定义改为 extern 声明（与 0001 的唯一定义配套）。同上，纯 C 声明语义修正，无平台宏、无条件编译。"
+    patch_type: "portability"

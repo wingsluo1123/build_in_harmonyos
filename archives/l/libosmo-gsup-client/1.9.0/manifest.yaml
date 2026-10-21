@@ -1,0 +1,32 @@
+version: "1.9.0"
+software: "libosmo-gsup-client"
+status: built
+build_date: "2026-10-17"
+build_system: "custom (recipe-side clang)"
+
+source:
+  url: "https://snapshot.debian.org/file/dd579edc7efe5c7191b42b37c59aad866deb0156"
+  sha256: "587694532da70fe0b24000b6e5aa7225ecd4f5d3ba90762084957287f8b1e8b7"
+  tar_format: tar.xz
+  note: "Debian snapshot 的 osmo-hlr 1.9.0+dfsg1 官方 orig 归档"
+
+build:
+  system: custom
+  configure_options:
+    - "clang -shared -fPIC -O2 -std=gnu11 -fno-emulated-tls -I<include> src/gsupclient/*.c -Wl,-soname,libosmo-gsup-client.so.0 -Wl,--no-undefined"
+  dependencies:
+    - "libosmocore/1.11.0"
+    - "libosmo-abis/2.0.0"
+
+upstream_tests:
+  framework: autotest
+  test_sources: 9
+  test_command: "osmo-hlr testsuite: auc, auc_ts_55_205, gsup, db, db_upgrade, mDNS, mslookup and clients"
+  run_in_build: false
+  evidence: "9/9 实际运行通过，stdout/stderr 与上游期望文件一致"
+
+upstream_test_pass_rate: "9/9（100%）"
+adapted_test_pass_rate: "test_package 5/5 PASS"
+
+knowledge_gained:
+  - "GSUP client 需要同时显式链接 libosmocore、libosmogsm 与 libosmoabis，组件 cpp_info 不会自动补齐所有主体库。"

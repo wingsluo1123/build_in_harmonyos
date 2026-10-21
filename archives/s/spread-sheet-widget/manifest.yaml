@@ -1,0 +1,25 @@
+software: spread-sheet-widget
+display: "GNU Spread Sheet Widget"
+description: "GTK+ 3 表格控件库（SswSheet/SswSheetAxis/SswVirtualModel；GNU PSPP 数据编辑器的底层表格视图）"
+category: library
+homepage: "https://www.gnu.org/software/ssw/"
+license: GPL-3.0-or-later
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "tarball 自带 configure/Makefile.in，无需 autoreconf；libtool 工程直接 configure + make"
+    - "config.guess (2022) 不识别 HarmonyOS → 运行时补 `HarmonyOS|HongMeng) UNAME_SYSTEM=Linux; LIBC=musl;;` 分支（E160），产物三元组 aarch64-unknown-linux-musl"
+    - "configure 的 config.status 用 umask 077 建临时目录，HMDFS 的 SGID 语义使其不可写 → 剥离两处 umask（E011）"
+    - "src/ssw-marshaller.{c,h} 由 glib-genmarshal 生成；该工具是 python 脚本、HMDFS 拒绝直接 exec → 构建期用 python3 预生成并刷新 mtime，make 不再触发规则"
+    - "上游 info_TEXINFOS 需要 makeinfo，设备无此工具 → make/install 传 `INFO_DEPS=` 跳过 texinfo 文档安装"
+    - "libspread-sheet-widget.la 带 -no-undefined；fabs() 在 aarch64 上是浮点指令，不需要 libm"
+    - "消费者测试用 gtk 包自带 broadwayd 起 `:tcp66` 无头后端（TCP 9156），真实建窗、驱动 active-cell/selection/scroll 全链路"
+  common_dependencies:
+    - gtk
+
+versions:
+  "0.10":
+    status: built
+    build_date: "2026-10-18"
+    conan_ref: "spread-sheet-widget/0.10"

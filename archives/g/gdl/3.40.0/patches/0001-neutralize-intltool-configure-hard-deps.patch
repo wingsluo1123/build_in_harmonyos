@@ -1,0 +1,66 @@
+# 0001: neutralize IT_PROG_INTLTOOL hard dependencies in the shipped
+# generated `configure` (gdl-3.40.0 GNOME dist tarball).
+#
+# Upstream expands IT_PROG_INTLTOOL([0.40.4]) into unconditional configure
+# probes for: intltool-update/merge/extract, GNU gettext tools (xgettext,
+# msgmerge, msgfmt), perl >= 5.8.1 and the perl XML::Parser module, each
+# backed by a hard as_fn_error. The OHOS build environment has none of
+# intltool / XML::Parser / msgmerge and cannot run a perl-XML toolchain.
+# This port builds with the upstream-supported --disable-nls switch: with
+# USE_NLS=no the intltool po/Makefile.in.in evaluates the empty all-no and
+# install-data-no rules, so none of the intltool/gettext machinery is
+# ever invoked at make or install time. The patch therefore only relaxes
+# the five configure-time hard errors into no-op ':' markers; the probes
+# still run and report their findings. po/Makefile.in.in itself is not
+# patched (its INTLTOOL_MAKEFILE marker check in config.status is a plain
+# grep and passes against the shipped file).
+#
+# R8 note: build-system neutralization only, no source macros added.
+
+--- a/configure
++++ b/configure
+@@ -17662,8 +17662,8 @@
+ $as_echo_n "checking for intltool >= 0.40.4... " >&6; }
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: $INTLTOOL_APPLIED_VERSION found" >&5
+ $as_echo "$INTLTOOL_APPLIED_VERSION found" >&6; }
+-    test "$INTLTOOL_APPLIED_VERSION_AS_INT" -ge "$INTLTOOL_REQUIRED_VERSION_AS_INT" ||
+-	as_fn_error $? "Your intltool is too old.  You need intltool 0.40.4 or later." "$LINENO" 5
++	test "$INTLTOOL_APPLIED_VERSION_AS_INT" -ge "$INTLTOOL_REQUIRED_VERSION_AS_INT" ||
++	: "intltool not present on this build environment; NLS disabled for this port"
+ fi
+ 
+ # Extract the first word of "intltool-update", so it can be a program name with args.
+@@ -17787,7 +17787,7 @@
+ 
+ 
+ if test -z "$INTLTOOL_UPDATE" -o -z "$INTLTOOL_MERGE" -o -z "$INTLTOOL_EXTRACT"; then
+-    as_fn_error $? "The intltool scripts were not found. Please install intltool." "$LINENO" 5
++    : "intltool scripts not present; NLS is disabled for this port, po/ stays inert"
+ fi
+ 
+ if test -z "$AM_DEFAULT_VERBOSITY"; then
+@@ -18092,13 +18092,13 @@
+ 
+ 
+ if test -z "$XGETTEXT" -o -z "$MSGMERGE" -o -z "$MSGFMT"; then
+-    as_fn_error $? "GNU gettext tools not found; required for intltool" "$LINENO" 5
++    : "GNU gettext tools incomplete; NLS is disabled for this port, po/ stays inert"
+ fi
+ xgversion="`$XGETTEXT --version|grep '(GNU ' 2> /dev/null`"
+ mmversion="`$MSGMERGE --version|grep '(GNU ' 2> /dev/null`"
+ mfversion="`$MSGFMT --version|grep '(GNU ' 2> /dev/null`"
+ if test -z "$xgversion" -o -z "$mmversion" -o -z "$mfversion"; then
+-    as_fn_error $? "GNU gettext tools not found; required for intltool" "$LINENO" 5
++    : "GNU gettext tool versions unverifiable; NLS is disabled for this port"
+ fi
+ 
+ # Extract the first word of "perl", so it can be a program name with args.
+@@ -18161,7 +18161,7 @@
+        { $as_echo "$as_me:${as_lineno-$LINENO}: result: ok" >&5
+ $as_echo "ok" >&6; }
+    else
+-       as_fn_error $? "XML::Parser perl module is required for intltool" "$LINENO" 5
++       : "XML::Parser absent; intltool is unused without NLS for this port"
+    fi
+ fi
+ 

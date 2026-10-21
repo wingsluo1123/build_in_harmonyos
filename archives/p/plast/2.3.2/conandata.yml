@@ -1,0 +1,50 @@
+# conandata.yml - plast 2.3.2
+#
+# Source: official upstream repository of the Inria PLAST project (the GitHub
+# organisation PLAST-software, linked from the PLAST developer guide on
+# plast.inria.fr).  The historical gforge download host no longer resolves, so
+# the GitHub tag archive of the same release is used.
+sources:
+  url: "https://github.com/PLAST-software/plast-library/archive/refs/tags/v2.3.2.tar.gz"
+  sha256: "9068b4904fa638c57e427eedd1682cd74eba0e1478f9256ecf1768bc538f08d6"
+
+patches:
+  - patch_file: "patches/0001-cmake-minimum-required.patch"
+    patch_description: "0001 declare cmake_minimum_required 3.10 before project(); CMake 4 rejects compatibility below 3.5"
+    patch_type: "portability"
+  - patch_file: "patches/0002-cmake-optional-jni.patch"
+    patch_description: "0002 make the JNI Java binding optional so the C++ library and the CLI build without a JDK (OHOS has none)"
+    patch_type: "portability"
+  - patch_file: "patches/0003-cmake-portable-cpu-flags.patch"
+    patch_description: "0003 pass -msse3 only on x86 targets instead of unconditionally"
+    patch_type: "portability"
+  - patch_file: "patches/0004-simde-portable-simd-kernels.patch"
+    patch_description: "0004 compile the three SSE hit iterator kernels through SIMDe so they build on aarch64 with unchanged semantics"
+    patch_type: "portability"
+  - patch_file: "patches/0005-test-in-tree-db-fixtures.patch"
+    patch_description: "0005 run the upstream CppUnit suite against the in-tree FASTA fixtures instead of the dead plast.gforge.inria.fr download and the wrong binary path"
+    patch_type: "portability"
+  - patch_file: "patches/0006-cxx17-drop-register.patch"
+    patch_description: "0006 drop the removed register storage class specifier from StatisticsPlastn.cpp (clang rejects it under C++17, the cppstd of the OHOS profile)"
+    patch_type: "portability"
+  - patch_file: "patches/0007-systemcommand-tmpdir.patch"
+    patch_description: "0007 build the SystemCommand temporary file under TMPDIR instead of the hard coded /tmp (read only filesystem on OHOS)"
+    patch_type: "portability"
+  - patch_file: "patches/0008-unit-tests-tmpdir.patch"
+    patch_description: "0008 let the upstream CppUnit tests write their scratch files under TMPDIR instead of the hard coded /tmp"
+    patch_type: "portability"
+  - patch_file: "patches/0009-fgetc-eof-unsigned-char.patch"
+    patch_description: "0009 keep the fgetc result in an int so the end of file sentinel is detected where char is unsigned (infinite loop on aarch64)"
+    patch_type: "portability"
+  - patch_file: "patches/0010-test-runner-report-failures.patch"
+    patch_description: "0010 make PlastLibraryTest print the failing assertions and return a non zero status so a failing suite fails the build"
+    patch_type: "portability"
+  - patch_file: "patches/0011-skip-unavailable-fixture-tests.patch"
+    patch_description: "0011 skip the eight unit tests whose test/db fixtures are not shipped in the release archive (upstream fetches them from a dead host)"
+    patch_type: "portability"
+  - patch_file: "patches/0012-reading-frame-unsigned-char.patch"
+    patch_description: "0012 build the reading frame direction as an int: as a char, -1 becomes 255 where char is unsigned, which turns the reverse strand indexing into an out of bounds access (wrong plastx results and a segfault)"
+    patch_type: "portability"
+  - patch_file: "patches/0013-install-generated-version-header.patch"
+    patch_description: "0013 install the generated misc/api/version.hpp at its canonical path instead of include/os/api so the package does not advertise the unstable-master placeholder"
+    patch_type: "portability"

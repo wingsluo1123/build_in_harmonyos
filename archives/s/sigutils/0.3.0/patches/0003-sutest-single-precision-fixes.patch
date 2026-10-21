@@ -1,0 +1,103 @@
+diff --git a/src/tests/agc.c b/src/tests/agc.c
+index bcdc039..cb87c33 100644
+--- a/src/tests/agc.c
++++ b/src/tests/agc.c
+@@ -270,7 +270,9 @@ su_test_agc_steady_falling(su_test_context_t *ctx)
+   /* TODO: Improve levels */
+   SU_TEST_ASSERT(su_test_check_peak(
+       ctx,
+-      input,
++      output, /* check the AGC output; the raw input amplitude ranges up
++                 to 1.0 by construction and can never fit the expected
++                 rescale band */
+       ctx->params->buffer_size,
+       2 * SU_TEST_AGC_WINDOW,
+       SU_AGC_RESCALE * 0.9,
+diff --git a/src/tests/detect.c b/src/tests/detect.c
+index 9e06ecf..3657396 100644
+--- a/src/tests/detect.c
++++ b/src/tests/detect.c
+@@ -82,6 +82,10 @@ __su_test_channel_detector_qpsk(su_test_context_t *ctx, SUBOOL noisy)
+   params.samp_rate = 250000;
+   params.alpha = 1e-1;
+   params.window_size = 4096;
++  /* Channel discovery (find_channels) only runs in DISCOVERY mode; with
++   * the default SPECTRUM mode the detector never populates its channel
++   * list and lookup_valid_channel always fails. */
++  params.mode = SU_CHANNEL_DETECTOR_MODE_DISCOVERY;
+ 
+   /* Initialize buffers */
+   SU_TEST_ASSERT(input = su_test_ctx_getc(ctx, "x"));
+diff --git a/src/tests/ncqo.c b/src/tests/ncqo.c
+index 734555e..7d2cef7 100644
+--- a/src/tests/ncqo.c
++++ b/src/tests/ncqo.c
+@@ -30,6 +30,16 @@
+ #include "test_list.h"
+ #include "test_param.h"
+ 
++/*
++ * Single-precision floor: with the default single-precision build SUFLOAT is
++ * float, and the mean of a sampled sinusoid cannot cancel below
++ * |sin(pi_f)| / 2 ~= 4.4e-8 (pi is inexact in single precision). The
++ * original SUFLOAT_THRESHOLD (1e-15) predates the single-precision default
++ * and is unattainable in float builds, so these assertions use a
++ * float-appropriate tolerance instead.
++ */
++#define SU_TEST_NCQO_EPS 1e-6f
++
+ SUBOOL
+ su_test_ncqo(su_test_context_t *ctx)
+ {
+@@ -59,12 +69,13 @@ su_test_ncqo(su_test_context_t *ctx)
+   for (p = 0; p < SU_TEST_SIGNAL_BUFFER_SIZE; ++p)
+     buffer[p] = su_ncqo_read_q(&ncqo);
+ 
+-  SU_TEST_ASSERT(SUFLOAT_EQUAL(
+-      su_test_buffer_mean(buffer, SU_TEST_SIGNAL_BUFFER_SIZE),
+-      0));
++  SU_TEST_ASSERT(
++      SU_ABS(su_test_buffer_mean(buffer, SU_TEST_SIGNAL_BUFFER_SIZE) - 0)
++      <= SU_TEST_NCQO_EPS);
+ 
+   SU_TEST_ASSERT(
+-      SUFLOAT_EQUAL(su_test_buffer_pp(buffer, SU_TEST_SIGNAL_BUFFER_SIZE), 0));
++      SU_ABS(su_test_buffer_pp(buffer, SU_TEST_SIGNAL_BUFFER_SIZE) - 0)
++      <= SU_TEST_NCQO_EPS);
+ 
+   /* Modify phase */
+   su_ncqo_set_phase(&ncqo, PI / 2);
+@@ -73,23 +84,25 @@ su_test_ncqo(su_test_context_t *ctx)
+   for (p = 0; p < SU_TEST_SIGNAL_BUFFER_SIZE; ++p)
+     buffer[p] = su_ncqo_read_i(&ncqo);
+ 
+-  SU_TEST_ASSERT(SUFLOAT_EQUAL(
+-      su_test_buffer_mean(buffer, SU_TEST_SIGNAL_BUFFER_SIZE),
+-      0));
++  SU_TEST_ASSERT(
++      SU_ABS(su_test_buffer_mean(buffer, SU_TEST_SIGNAL_BUFFER_SIZE) - 0)
++      <= SU_TEST_NCQO_EPS);
+ 
+   SU_TEST_ASSERT(
+-      SUFLOAT_EQUAL(su_test_buffer_pp(buffer, SU_TEST_SIGNAL_BUFFER_SIZE), 0));
++      SU_ABS(su_test_buffer_pp(buffer, SU_TEST_SIGNAL_BUFFER_SIZE) - 0)
++      <= SU_TEST_NCQO_EPS);
+ 
+   /* Test quadrature signal */
+   for (p = 0; p < SU_TEST_SIGNAL_BUFFER_SIZE; ++p)
+     buffer[p] = su_ncqo_read_q(&ncqo);
+ 
+-  SU_TEST_ASSERT(SUFLOAT_EQUAL(
+-      su_test_buffer_mean(buffer, SU_TEST_SIGNAL_BUFFER_SIZE),
+-      0));
++  SU_TEST_ASSERT(
++      SU_ABS(su_test_buffer_mean(buffer, SU_TEST_SIGNAL_BUFFER_SIZE) - 0)
++      <= SU_TEST_NCQO_EPS);
+ 
+   SU_TEST_ASSERT(
+-      SUFLOAT_EQUAL(su_test_buffer_pp(buffer, SU_TEST_SIGNAL_BUFFER_SIZE), 2));
++      SU_ABS(su_test_buffer_pp(buffer, SU_TEST_SIGNAL_BUFFER_SIZE) - 2)
++      <= SU_TEST_NCQO_EPS);
+ 
+   /* Test constant signal */
+   su_ncqo_set_phase(&ncqo, 0);

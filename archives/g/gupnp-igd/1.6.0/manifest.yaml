@@ -1,0 +1,75 @@
+# gupnp-igd 1.6.0 版本级 manifest
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "1.6.0"
+
+software: gupnp-igd
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-15"
+build_system: meson
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（主镜像 NJU，备选 GNOME 官方源）
+  url: "https://mirror.nju.edu.cn/gnome/sources/gupnp-igd/1.6/gupnp-igd-1.6.0.tar.xz"
+
+  # 源码校验和
+  sha256: "4099978339ab22126d4968f2a332b6d094fc44c78797860781f1fc2f11771b74"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: meson
+
+  # 配置选项列表
+  configure_options:
+    - "-Dintrospection=false"
+    - "-Dgtk_doc=false"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - glib2/2.88.0
+    - libsoup3/3.6.5-r1
+    - gssdp/1.6.6
+    - gupnp/1.6.10
+    - libxml2/2.15.3.1
+    - zlib/1.3.1.1
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "gupnp-igd 1.6.0 直接依赖 glib2(glib/gobject/gthread) + gupnp-1.6 + gssdp-1.6；源码不含 netlink 调用（仅 arpa/inet.h/netinet/in.h/sys/socket.h），无需 gupnp/gssdp 那样的 netlink 探测加固补丁"
+  - "meson introspection 选项默认 true（上游 meson_options.txt），交叉编译必须显式 -Dintrospection=false，否则 configure 阶段探测 gobject-introspection 失败"
+  - "源码所用 glib API（g_log/g_main_*/g_object_*/g_signal_* 等）全部由已发布 libsoup-3.0.so 导出（nm 实证 4086 个 g_* 符号），无需 gupnp 1.6.10 的 glib-min 最小补链归档——GObject 单副本教义直接适用"
+  - "tarball 携带 subprojects/gupnp-1.6.wrap（[wrap-git] 无 [provide]），meson 正常不会回退子项目，但配方在 source() 阶段删除该目录以杜绝 CI Worker 运行时 git clone"
+  - "GObject 单副本（继承 gssdp 1.6.6/gupnp 1.6.10）：GLib 系 .pc Libs 全部剔除静态 glib，libgupnp-igd-1.6.so 对 g_* 保持 UND，运行时统一解析到 libsoup-3.0.so 导出的唯一 gobject 副本"
+  - "产物 libgupnp-igd-1.6.so.0.0.0（meson library version '0.0.0'）；pkg-config 名 gupnp-igd-1.6（上游 filebase，非旧系列 gupnp-igd-1.0）"

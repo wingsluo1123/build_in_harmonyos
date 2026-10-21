@@ -1,0 +1,24 @@
+--- a/test/test-loop.c
++++ b/test/test-loop.c
+@@ -386,6 +386,13 @@
+ 
+ PWTEST(cancel_thread_while_dispatching)
+ {
++	/* HarmonyOS libc does not provide pthread_cancel(): the loop thread
++	 * cannot be interrupted while the event handler is dispatching, so
++	 * the cancellation semantics this test verifies cannot be exercised.
++	 * Report SKIP like the platform-gated ABI size tests. */
++#ifndef HAVE_PTHREAD_CANCEL
++	return PWTEST_SKIP;
++#else
+ 	static const struct spa_dict_item data_loop_props_items[] = {
+ 		{ PW_KEY_LOOP_CANCEL, "true" },
+ 	};
+@@ -433,6 +440,7 @@
+ 	pw_deinit();
+ 
+ 	return PWTEST_PASS;
++#endif
+ }
+ 
+ PWTEST_SUITE(support)

@@ -1,0 +1,52 @@
+# DRAFT-scanbd-1.5.1-out-of-tree-noinst-data-vpath.kv
+
+id:                     E3236
+trigger_tool:           conan|autotools|make|patch
+phase:                  build
+error_signature:        Makefile\.conf\.in: No such file or directory|make.*\*\*\* \[Makefile:.*: Makefile\.conf\] Error 1|No rule to make target 'Makefile\.conf\.in'
+
+severity:               2
+category:               build-system, autotools, conan, out-of-tree, vpath
+match_keywords:         Makefile.conf.in, Makefile.include.in, noinst_DATA, $@.in, out-of-tree, VPATH, automake, scanbd, Conan 构建目录
+title:                  Autotools noinst_DATA 规则用 $@.in 读模板，out-of-tree（Conan 构建目录）构建失败
+
+root_cause:             Automake 生成的规则把模板文件写成 $@.in（= 构建目录下的目标名），而模板实际位于 $(srcdir)。Shell 不会跟随 VPATH，因此只在源码树内（srcdir=.）构建可行；Conan 的 build folder 与 source folder 分离（out-of-tree），规则找不到 Makefile.conf.in 直接失败。
+affected_scope:         使用 autotools 且 Makefile.am 里自定义规则引用源码侧文件的配方；上游历史上只在 in-tree 构建过的项目（tarball 发布、无 CI）高发。本例 scanbd 1.5.1 的 noinst_DATA（Makefile.conf / Makefile.include）规则。
+verification_cmd:       在 Conan build folder（≠ source folder）执行 make，观察 Makefile.conf: No such file or directory；打补丁后同一命令通过，且 in-tree 构建仍正常。
+
+rec_priority:           1
+rec_approach:           patch-rule-to-srcdir-template
+rec_description:        把规则的输入与前置条件都改成 $(srcdir)/$@.in 与 $(srcdir)/Makefile.conf.in（Makefile.in 与 Makefile.am 同步改），并登记为 conandata patch。$(srcdir) 在 in-tree 构建下为 "."，两种构建方式同时成立。
+rec_command:            |
+  # patches/0004-vpath-makefile-conf.patch
+  -Makefile.conf: Makefile.conf.in configure
+  +Makefile.conf: $(srcdir)/Makefile.conf.in configure
+  -	     -e 's|@PACKAGENAME@|$(PACKAGE)|g' $@.in  >$@
+  +	     -e 's|@PACKAGENAME@|$(PACKAGE)|g' $(srcdir)/$@.in  >$@
+rec_auto_fix:           false
+rec_impl:               conandata-patch-srcdir-template-reference
+
+fallback_priority:      2
+fallback_approach:      in-source-directory-build
+fallback_description:   让构建在源码目录内执行（srcdir=.）绕过该规则；但 Conan 配方应保持 build/source 分离，且源码目录被并发复用时不可靠，故仅作最后手段。
+fallback_command:
+fallback_auto_fix:      false
+fallback_impl:
+
+forbid_1_pattern:       cp .* Makefile\.conf|touch Makefile\.conf|skip.*noinst_DATA|disable.*Makefile\.conf
+forbid_1_reason:        手工在构建目录伪造模板会把上游内容钉死，丢失 @PACKAGEVERSION@/@PACKAGENAME@ 替换。
+forbid_1_consequence:   产物中的版本/包名错误，后续升级时静默不一致。
+forbid_2_pattern:       sed -i.*\$@\.in.*Makefile|perl .* \$@\.in
+forbid_2_reason:        Conan 配方禁止在 build() 中用 shell 改写源文件/生成文件，且绕过补丁登记（R6/R16）。
+forbid_2_consequence:   补丁不可追溯，升级上游后改动丢失，W4/审计无法复核。
+forbid_3_pattern:       in-tree.*only|VPATH.*ignore|srcdir.*not needed
+forbid_3_reason:        把 out-of-tree 失败当成平台限制会掩盖上游可修复的规则缺陷。
+forbid_3_consequence:   CI 干净构建（独立 build folder）仍会失败，PR 反复红。
+
+doc_file:               knowledge/drafts/DRAFT-scanbd-1.5.1-out-of-tree-noinst-data-vpath.md
+last_updated:           2026-10-03
+source_event:           scanbd 1.5.1 适配（autotools out-of-tree 构建，feat/scanbd-1.5.1）
+authors:                AtomCode (deepseek-v4-flash) <noreply@atomgit.com>
+source_pr:
+source_commit:
+

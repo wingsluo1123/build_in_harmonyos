@@ -1,0 +1,52 @@
+--- a/analitzawidgets/CMakeLists.txt
++++ b/analitzawidgets/CMakeLists.txt
+@@ -6,10 +6,15 @@
+ 
+ set(analitzaplot_SRCS
+     plotsview2d.cpp
+-    plotsview3d_es.cpp
+     expressionedit.cpp
+ )
+ 
++# PlotsView3DES derives from QOpenGLWidget; build it only when the Qt build
++# ships the OpenGLWidgets module.
++if(TARGET Qt6::OpenGLWidgets)
++    list(APPEND analitzaplot_SRCS plotsview3d_es.cpp)
++endif()
++
+ add_library(AnalitzaWidgets ${analitzaplot_SRCS})
+ target_link_libraries(AnalitzaWidgets
+     PUBLIC
+@@ -19,20 +24,29 @@
+         AnalitzaGui
+     PRIVATE
+         Qt::Svg
+-        Qt6::OpenGLWidgets
+ )
+ 
++if(TARGET Qt6::OpenGLWidgets)
++    target_link_libraries(AnalitzaWidgets PRIVATE Qt6::OpenGLWidgets)
++endif()
++
+ set_target_properties(AnalitzaWidgets PROPERTIES VERSION ${ANALITZA_VERSION} SOVERSION ${ANALITZA_SOVERSION} )
+ 
+ generate_export_header(AnalitzaWidgets)
+ 
+ install(TARGETS AnalitzaWidgets EXPORT AnalitzaTargets ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
+ 
+-install(FILES
++set(analitzawidgets_HEADERS
+     ${CMAKE_CURRENT_BINARY_DIR}/analitzawidgets_export.h
+     plotsview2d.h
+     expressionedit.h
+-    plotsview3d_es.h
++)
++if(TARGET Qt6::OpenGLWidgets)
++    list(APPEND analitzawidgets_HEADERS plotsview3d_es.h)
++endif()
++
++install(FILES
++    ${analitzawidgets_HEADERS}
+ 
+     DESTINATION ${ANALITZA_INCLUDE_INSTALL_DIR}/analitzagui/ COMPONENT Devel
+ )

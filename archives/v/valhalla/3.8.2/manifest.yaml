@@ -1,0 +1,52 @@
+# 版本级 manifest
+# 文件位置: archives/v/valhalla/3.8.2/manifest.yaml
+
+version: "3.8.2"
+software: "valhalla"
+status: built
+build_date: "2026-10-13"
+build_system: "cmake"
+
+source:
+  url: "https://github.com/valhalla/valhalla/archive/refs/tags/3.8.2.tar.gz"
+  sha256: "8f38dc30771401bebf89939658adbad08020474612018322144fb8fe50b31ae5"
+  tar_format: tar.gz
+  submodules: >-
+    上游 GitHub release tarball 不含 third_party/ 下的 git 子模块；source() 按 3.8.2 tag
+    记录的 commit 逐个下载并解包到 third_party/<name>（rapidjson/date/googletest/
+    libosmium/protozero/microtar/cpp-statsd-client/cxxopts/just_gtfs/tz/unordered_dense/vtzero）。
+
+build:
+  system: cmake
+  configure_options:
+    - "CMAKE_CXX_STANDARD=20（profile 为 cppstd=17，配方 configure() 强制 20）"
+    - "ENABLE_SERVICES=OFF（需 libprime_server，制品仓无）"
+    - "ENABLE_PYTHON_BINDINGS=OFF / ENABLE_NODE_BINDINGS=OFF"
+    - "ENABLE_GEOTIFF=OFF / ENABLE_CCACHE=OFF / ENABLE_SINGLE_FILES_WERROR=OFF"
+    - "ENABLE_DATA_TOOLS=ON / ENABLE_HTTP=ON / ENABLE_LZ4=ON / ENABLE_TESTS=ON"
+    - "-D_LIBCPP_ENABLE_EXPERIMENTAL（OHOS libc++ 默认关闭 C++20 ranges/format）"
+  dependencies:
+    - boost/1.84.0
+    - protobuf/21.12
+    - geos/3.13.1
+    - sqlite3/3.49.1
+    - libspatialite/5.1.0.2
+    - curl/8.15.0.1
+    - zlib/1.3.1.1
+    - lz4/1.10.0
+    - expat/2.8.5
+    - openssl/3.5.6.1
+    - luajit-openresty/2.1-20260311
+  cc: clang
+
+patches_applied:
+  - "0001-cmake-soften-spatialite-tools-check.patch"
+  - "0002-gurka-drop-build-timezones-dependency.patch"
+  - "0003-cmake-force-module-protobuf.patch"
+  - "0004-cmake-load-config-zlib-before-boost.patch"
+  - "0005-logging-strftime-timestamp.patch"
+
+knowledge_gained:
+  - "OHOS libc++ 默认定义 _LIBCPP_HAS_NO_INCOMPLETE_RANGES / _LIBCPP_HAS_NO_INCOMPLETE_FORMAT，std::views / std::format 不可见；-D_LIBCPP_ENABLE_EXPERIMENTAL 打开后 <format> 仍无 chrono formatter（std::formatter<time_point> 被 delete）→ 时间戳改用 strftime"
+  - "valhalla 的 pkg_check_modules(ZLIB) 会设置 ZLIB_FOUND，使 CMakeDeps 生成的 BoostConfig 跳过 find_dependency(ZLIB)，而 Boost 的 iostreams 组件链接 ZLIB::ZLIB → 需显式 find_package(ZLIB CONFIG)"
+  - "上游 tarball 缺 git 子模块：需按 tag 内 gitlink commit 逐个下载"

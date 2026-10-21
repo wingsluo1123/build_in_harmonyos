@@ -1,0 +1,94 @@
+--- a/library/widgets/CMakeLists.txt
++++ b/library/widgets/CMakeLists.txt
+@@ -19,7 +19,9 @@
+ set(CMAKE_INCLUDE_CURRENT_DIR ON)
+ 
+ find_package(Qt${QT_VERSION_MAJOR}Widgets REQUIRED)
+-find_package(Qt${QT_VERSION_MAJOR}LinguistTools REQUIRED)
++if(NOT CMAKE_SYSTEM_NAME STREQUAL "HarmonyOS")
++    find_package(Qt${QT_VERSION_MAJOR}LinguistTools REQUIRED)
++endif()
+ 
+ set(drumstick-widgets_HEADERS
+     ../include/drumstick/pianokeybd.h
+@@ -151,28 +153,33 @@
+     translations/drumstick-widgets_zh_CN.ts
+ )
+ 
+-if (QT_VERSION VERSION_LESS 5.15.0)
+-    qt5_add_translation(QM_FILES ${TS_FILES})
+-else()
+-    qt_add_translation(QM_FILES ${TS_FILES})
+-endif()
+-
+-add_custom_target( update-widget-translations
+-    COMMAND Qt${QT_VERSION_MAJOR}::lupdate ${CMAKE_CURRENT_SOURCE_DIR}
+-        -I ${PROJECT_SOURCE_DIR}/library/include
+-        -I ${CMAKE_CURRENT_SOURCE_DIR}
+-        -I ${CMAKE_CURRENT_BINARY_DIR}
+-        -ts ${TS_FILES}
+-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+-    COMMENT "Updating widget translations"
+-)
++# HarmonyOS: the qttools host tools (lrelease/lupdate) are cross-built ELF
++# binaries that cannot run on the OHOS build host, so skip the .qm
++# translations (Qt falls back to the embedded source strings at runtime).
++if(NOT CMAKE_SYSTEM_NAME STREQUAL "HarmonyOS")
++    if (QT_VERSION VERSION_LESS 5.15.0)
++        qt5_add_translation(QM_FILES ${TS_FILES})
++    else()
++        qt_add_translation(QM_FILES ${TS_FILES})
++    endif()
++
++    add_custom_target( update-widget-translations
++        COMMAND Qt${QT_VERSION_MAJOR}::lupdate ${CMAKE_CURRENT_SOURCE_DIR}
++            -I ${PROJECT_SOURCE_DIR}/library/include
++            -I ${CMAKE_CURRENT_SOURCE_DIR}
++            -I ${CMAKE_CURRENT_BINARY_DIR}
++            -ts ${TS_FILES}
++        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
++        COMMENT "Updating widget translations"
++    )
+ 
+-add_custom_target( drumstick-widgets-translations ALL DEPENDS ${QM_FILES} )
++    add_custom_target( drumstick-widgets-translations ALL DEPENDS ${QM_FILES} )
+ 
+-if (UNIX)
+-    install( FILES ${QM_FILES}
+-             DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/drumstick )
+-endif ()
++    if (UNIX)
++        install( FILES ${QM_FILES}
++                 DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/drumstick )
++    endif ()
++endif()
+ 
+ if(STATIC_DRUMSTICK)
+     set_target_properties(drumstick-widgets PROPERTIES
+--- a/library/CMakeLists.txt
++++ b/library/CMakeLists.txt
+@@ -27,7 +27,10 @@
+     add_subdirectory(rt-backends)
+     if (BUILD_WIDGETS)
+         add_subdirectory(widgets)
+-        if (NOT STATIC_DRUMSTICK)
++        # HarmonyOS: the Qt6UiPlugin module comes from qttools, whose host
++        # tools cannot run on the OHOS build host; the designer-style plugin
++        # is not needed for the library-only package (see patch 0004).
++        if (NOT STATIC_DRUMSTICK AND NOT CMAKE_SYSTEM_NAME STREQUAL "HarmonyOS")
+             add_subdirectory(vpiano-plugin)
+         endif()
+     endif()
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -304,7 +304,9 @@
+ # translations
+ add_custom_target( update-translations COMMENT "Updating translations" )
+ 
+-if (BUILD_WIDGETS)
++# HarmonyOS: the update-widget-translations target is not created
++# (patch 0004 skips lrelease/lupdate host tools).
++if (BUILD_WIDGETS AND NOT CMAKE_SYSTEM_NAME STREQUAL "HarmonyOS")
+     add_dependencies( update-translations update-widget-translations )
+ endif()
+ 

@@ -1,0 +1,61 @@
+# 版本级 manifest — kmag 26.04.0
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "26.04.0"
+software: "kmag"
+
+# 编译状态: built (本地 conan create 全量通过 + conan-verify 通过，未上传远端)
+status: built
+build_date: "2026-10-18"
+build_system: cmake
+
+source:
+  url: "https://download.kde.org/stable/release-service/26.04.0/src/kmag-26.04.0.tar.xz"
+  sha256: "4e38f67cf82797095fcab49fc8a0093c65e4948e15cbebded242288f28615b55"
+  tar_format: tar.xz
+  git_tag_peeled: "v26.04.0 (KDE Gear 26.04.0)"
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_SYSTEM_NAME=Linux"
+    - "-DCMAKE_SYSTEM_PROCESSOR=aarch64"
+    - "-DBUILD_TESTING=OFF"
+    - "-DBUILD_DOC=OFF"
+    - "-DKF_IGNORE_PLATFORM_CHECK=TRUE"
+    - "-DKF_SKIP_PO_PROCESSING=ON"
+    - "-DCMAKE_EXE_LINKER_FLAGS_INIT=-Wl,-z,max-page-size=0x1000"
+  dependencies:
+    - qtbase/6.11.1
+    - kio/6.26.0
+    - kxmlgui/6.26.0
+    - kcrash/6.26.0
+    - ki18n/6.26.0
+    - kconfig/6.26.0
+    - kcoreaddons/6.26.0
+    - kguiaddons/6.26.0
+    - kwidgetsaddons/6.26.0
+    - kconfigwidgets/6.18.0
+    - kcolorscheme/6.26.0
+    - kcodecs/6.26.0
+    - kiconthemes/6.26.0
+    - kitemviews/6.26.0
+    - karchive/6.26.0
+    - kservice/6.26.0
+    - openssl/3.5.6.1
+    - zstd/1.5.7
+  tool_dependencies:
+    - ecm/6.26.0
+  cc: clang
+  cxx: clang++
+
+package_id: "242b20bd6d8ed51e479359ec9c03675395da5866"
+
+patches_applied:
+  - "0001-ohos-printsupport-cmake.patch"
+  - "0002-ohos-printsupport-source.patch"
+
+knowledge_gained:
+  - "发布的 qtbase/6.11.1 以 FEATURE_printsupport=OFF 构建，不提供 Qt6PrintSupport 模块与库；kmag 上游已用 QT_NO_PRINTER 守卫打印实现，只需在 find_package/链接行移除组件、给目标加 QT_NO_PRINTER 并删掉 .rc 中两个 file_print 动作（ref: ksystemlog 26.04.0 同类处理）"
+  - "QT_QPA_PLATFORM_PLUGIN_PATH 是单个目录而非路径列表：写成 a:b 时 Qt 把整串当目录导致 offscreen 插件找不到（qt.core.plugin.factoryloader 显示扫描的是 'a b' 这一不存在的路径）；test_package 中应去重后只指向实际含 libqoffscreen.so 的目录，其余插件根走 QT_PLUGIN_PATH 路径列表"
+  - "kconfigwidgets/6.18.0 在 6.26 override 图下 package_id 变化（be43a923...），本地需从源码重建；源 tarball 走 download.kde.org 会被重定向到 bfsu（TLS 自签证书失败），须用 NJU 镜像的 kconfigwidgets-6.18.0.tar.xz（sha256 aa5a7be6278a19733f77e6a435f84c3e71926b28f1ac3766313778890d640813）种子进 srccache-isc/s 并用 --build=kconfigwidgets/6.18.0 强制构建以跳过 compatible configurations 远程扫描"

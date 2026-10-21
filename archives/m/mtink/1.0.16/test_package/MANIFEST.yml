@@ -1,0 +1,77 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（R51 上游测试三步法 + 积分赛测试用例对比口径）
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: mtink/1.0.16
+homepage: "http://xwtools.automatix.de/mtink/"
+
+# ── 上游测试清点（R51 / 积分赛口径）────────────────
+# mtink 1.0.16（2007-08-29，最后一次发行）发布包不含任何自动化测试（上游 N = 0）：
+#   - 源码树子目录只有 chooser/ detect/ etc/ html/ mainSrc/ pyink/ server/ utils/ xpm/，
+#     无 tests/ 目录
+#   - find . -iname '*test*' -o -iname '*check*' → 3 命中，全部非测试：
+#       ./checkMotifVersion.sh   （Configure 调用的 Motif 版本构建期探针）
+#       ./mainSrc/checkenv.c     （运行期环境自检模块，编译进 mtink）
+#       ./mainSrc/checkenv.h
+#   - grep -nE '^(check|test)' Makefile.ORG → 0 命中（无 check/test 目标）
+#   - 无 ctest / pytest / cmocka / 其他框架注册（纯 C + 手写 Configure，无测试框架依赖）
+#   - 实测 `make check` → rc=2，`make: *** No rule to make target 'check'.  Stop.`
+# 故上游测试统计：单元测试 0 / 集成测试 0 / 其他测试 0，合计 N = 0。
+# 四种候选口径（源码宏数 / 框架注册数 / assertion 数 / 消费者断言数）上游全部为 0，
+# 不存在需要归因的差额。
+
+upstream_check_command: "make check"
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# ── 适配后测试（鸿蒙侧新增，分栏统计，不并入上游分母）────
+# 上游 N=0 → 由本包补全 30 条实断言，随 conan create 执行（HMBS_TEST_PACKAGE_RESULT
+# {"discovered":30,"passed":30}）。全部断言都真正执行被测二进制（R34），覆盖：
+#   A01-A03 产物     : bin/ttink、bin/mtinkd、bin/askPrinter 存在且可执行
+#   A04-A10 CLI 契约 : -v/版本横幅、-h/用法、无参 fail-closed（退出码 1 + stderr 用法）
+#   A11-A17 型号库   : -l 退出码 0、90 行（91 条记录减上游 off-by-one）、首记录、
+#                      真末行（第 90 行 Stylus Scan 2500，非 R2400——R2400 在第 78 行）、
+#                      与 share/mtink/printer.desc.bldin 的 91 个 .PRINTER 块交叉核对
+#   A18-A23 设备面   : /dev/lp0 ABSENT 与 /dev/null PRESENT 两条真实路径都以
+#                      确定的退出码 1 + 同一句上游失败措辞收口；askPrinter 的并口
+#                      （PPCLAIM/PPNEGOT）与 USB（LPIOC_GET_DEVICE_ID）两条路径
+#                      无设备节点时均非零退出
+#   A24-A25 守护进程 : mtinkd 在无 /var 的鸿蒙上以 rc=0 退出并打 stderr
+#                      `mkdir : No such file or directory`（不起后台服务）
+#   A26-A28 自签不变式: 三个 ELF 各带 1 个 .codesign 节
+#   A29-A30 libusb 面 : ttink/mtinkd 的**动态**符号表（llvm-nm -D -u）非空且含
+#                      __libc_start_main（正控，证明符号表真被读到）且无 usb_/libusb
+#                      符号。交付 ELF 是 stripped 的（无 .symtab），`llvm-nm -u` 的
+#                      stdout 恒为空 ⇒ 只用它做「符号不存在」断言会恒真（不可证伪）；
+#                      故必须 -D 且带正控。
+test_package_tests:
+  - file: test_mtink.sh
+    description: >
+      30 条消费者断言：产物 3；ttink -v 2（rc + "V 1.0.16"）；ttink -h 3
+      （rc + usage 头 + -d device_file 行）；无参 fail-closed 2（rc=1 + stderr 用法）；
+      ttink -l 5（rc + 90 行 + 首记录 Stylus C20SX + 真末行 Stylus Scan 2500 +
+      中段记录 Stylus Photo R2400）；数据文件 2（printer.desc.bldin 91 块 + 91-1==90）；
+      设备路径 6（/dev/lp0 退出码 + 措辞、/dev/null 退出码 + 措辞、askPrinter 并口与
+      USB 各一条退出码）；mtinkd 2（rc=0 + 缺 /var 的 perror 文本）；自签不变式 3
+      （三个 ELF 各 1 个 .codesign 节）；libusb 面 2（ttink/mtinkd 各一条：动态符号表
+      非空 + 含 __libc_start_main + 无 usb_/libusb 符号）。
+      3+2+3+2+5+2+6+2+3+2 = 30。
+    command: "bash test_mtink.sh <pkg-folder> <result-file> <work-dir>（由 test_package/conanfile.py 以 CONFIG_SHELL 调用）"
+
+# 测试断言总数（鸿蒙侧新增，上游 0 条）
+assertion_count: 30
+upstream_assertion_count: 0
+
+# 不可证伪性自证（审计 P1 修复的正面证据）：把 harness 的 llvm-nm 换成**不输出**的
+# 桩（PATH 前置一个 `llvm-nm` → exit 1、无 stdout），A29/A30 必须由 PASS 转 FAIL：
+#   `PATH=<stub>:$PATH bash test_mtink.sh <pkg> <res> <work>`
+#   → [FAIL] ...(nm rc=1 rows=0 positive_control=no ...)；passed 28/30
+# 修复前该形态恒为 PASS（假绿），修复后确证可失败。
+falsifiability_probe: "PATH=<no-output llvm-nm stub>:$PATH bash test_mtink.sh <pkg> <res> <work> → passed 28/30（A29/A30 转 FAIL）"
+
+# 替代验证边界（如实声明）：本机无任何打印机设备节点（/dev/lp0、/dev/lp1、
+# /dev/parport0、/dev/usb/lp0、/dev/usblp0 全 ABSENT），因此并口/ppdev 与 usblp
+# 的真实数据通路（LPIOC_GET_DEVICE_ID 返回的 device-id 字符串、IEEE1284 协商后的
+# 实际读取）**无法在本机验证**，只验证到「真实代码路径已执行并以确定的退出码与
+# 措辞收口」。GUI 面（Motif 版 mtink/mtinkc）未交付，见 notes.md 的依赖面实测。

@@ -1,0 +1,38 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -48,23 +48,32 @@
+ if (NOT DEFINED wxWidgets_COMPONENTS)
+     if (UNIX)
+       set(wxWidgets_COMPONENTS gl xrc xml net media propgrid richtext aui stc html adv core base)  # complete set for static lib/dll
+     else()
+       set(wxWidgets_COMPONENTS webview gl xrc xml net media propgrid richtext aui stc html adv core base)  # complete set for static lib/dll
+     endif()
+     #set(wxWidgets_COMPONENTS webview gl xrc xml net media propgrid richtext aui stc html adv core base) # for multilib/dll
+     #set(wxWidgets_COMPONENTS stc mono) # for monolithic
+ endif()
+ 
+-FIND_WXWIDGETS(wxWidgets_COMPONENTS) # Ok to call multiple times
+-# CMake's wxWidgets include that will configure the build in this dir and sub-dirs
+-include( "${wxWidgets_USE_FILE}" )
++# Config packages preserve transitive include paths and static link dependencies.
++if(wxLua_WX_CONFIG_PACKAGE)
++    find_package(${wxLua_WX_CONFIG_PACKAGE} CONFIG REQUIRED)
++    if(NOT TARGET ${wxLua_WX_CONFIG_TARGET})
++        message(FATAL_ERROR "Missing wxWidgets imported target")
++    endif()
++    set(wxWidgets_LIBRARIES ${wxLua_WX_CONFIG_TARGET})
++    set(wxWidgets_FOUND TRUE)
++else()
++    FIND_WXWIDGETS(wxWidgets_COMPONENTS)
++    include("${wxWidgets_USE_FILE}")
++endif()
+ 
+ # ---------------------------------------------------------------------------
+ # Setup the location of the customizable wxluasetup.h file
+ # ---------------------------------------------------------------------------
+ 
+ if (NOT DEFINED wxLuaBind_WXLUASETUP_DIR)
+     set(wxLuaBind_WXLUASETUP_DIR "${wxLua_ROOT_DIR}/modules/wxbind/setup")
+ endif()
+ set(wxLuaBind_WXLUASETUP_DIR ${wxLuaBind_WXLUASETUP_DIR} CACHE PATH
+     "Path to wxLua's wxWidgets binding wxluasetup.h setup file." FORCE)

@@ -1,0 +1,60 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: sinfo/0.0.48
+homepage: "http://www.ant.uni-bremen.de/whomes/rinas/sinfo/"
+
+# 上游测试命令（用于 make -n check / ctest -N / meson test --list 分析）
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "make check（check_DATA: libmessage/testmessage 运行 testmessage 并与 
+  testmessage.out.approved 逐字 diff；配方 build() 内以同判据、同二进制、同黄金文件执行，
+  只是用 Python subprocess 直接跑真 ELF 并自行比对，避免依赖 worker 上不保证存在的 sh/tee/diff）"
+
+# 上游测试程序清单（评审 2026-10-15 实测 N=3；此前本文件只申报 1 个，属少报，现改正）
+# sinfo 0.0.48 无 automake TESTS 目标（各 Makefile.am 均未声明 TESTS /
+# check_PROGRAMS / check-local），但有两处 noinst_PROGRAMS 共 3 个测试程序：
+#   libmessage/testmessage/Makefile.am:2  noinst_PROGRAMS = testmessage testmessage2
+#   libsinfotypes/Makefile.am:5          noinst_PROGRAMS = teststringandnumericcomparison
+# 其中只有 testmessage 被 check_DATA 消费（与黄金文件 diff），另两个没有黄金文件；
+# 顶层 SUBDIRS 中其余目录（sinfo/ sinfod/ librpc/ 等）无可执行测试。
+# R51 清点证据：
+#   - grep -rn "TESTS\|check_PROGRAMS\|check-local" Makefile.am */Makefile.am
+#     → 无结果
+#   - libmessage/testmessage/Makefile.am: noinst_PROGRAMS = testmessage
+#     testmessage2；check_DATA = testmessage.out（运行 testmessage 并与
+#     testmessage.out.approved 黄金文件 diff）
+#   - tarball 内无 tests/ 目录、无 .sh/.py 测试脚本、无 CI 配置目录
+upstream_tests:
+  - file: libmessage/testmessage/testmessage
+    source: sinfo-0.0.48/libmessage/testmessage/
+    description: "libmessage 消息序列化回归：make check 经 check_DATA 规则构建并运行 noinst_PROGRAMS testmessage，输出 tee 到 testmessage.out 后与 testmessage.out.approved 黄金文件 diff"
+    command: "make check"
+    note: "已在配方 build() 内集成并真实执行（upstream_test_in_build: true）：跑构建出的 ELF，stdout 与黄金文件逐字一致方判通过（本地实测 rc=0 / 626 bytes / 逐字一致）"
+  - file: libmessage/testmessage/testmessage2
+    source: sinfo-0.0.48/libmessage/testmessage/
+    description: "同目录第二个 noinst_PROGRAMS：testmessage2（上游无黄金文件，check_DATA 不消费它）"
+    command: "make check（该程序由 all 目标构建）"
+    note: "已在 build() 内集成并真实执行：按「退出码 0 且输出非空」判定（本地实测 rc=0 / 170 bytes）。上游没有给它配黄金文件，这是上游能给的全部判据"
+  - file: libsinfotypes/teststringandnumericcomparison
+    source: sinfo-0.0.48/libsinfotypes/
+    description: "libsinfotypes 的 noinst_PROGRAMS：字符串/数值比较回归（上游无黄金文件）"
+    command: "make check（该程序由 all 目标构建）"
+    note: "已在 build() 内集成并真实执行：按「退出码 0 且输出非空」判定（本地实测 rc=0 / 451 bytes）"
+
+# 上游 N 的计数口径（评审 2026-10-15 实测 N=3）
+upstream_tests_declared: 3
+
+# test_package 中自带的测试（消费者视角验证，真实执行 sinfo/sinfod 二进制）
+test_package_tests:
+  - file: test_sinfo.sh
+    description: "真实运行 sinfo/sinfod：双二进制版本横幅（-V，rc=0，含 0.0.48）、帮助文本（-?/-h，rc=1）、sinfod 前台守护（-F -q -b 127.0.0.1，广播收窄到环回）启动存活、sinfo 客户端经 UDP(60002) 与 TCP(60002) 直连查询 -H（主机名）/ -L（负载）输出非空、守护进程响应 SIGTERM 干净退出"
+    command: "sh test_sinfo.sh <sinfo-bin> <sinfod-bin>"
+
+# 测试用例数与断言数（test_sinfo.sh 实际统计：每个 assert_*/存活/退出检查各计 1）
+case_count: 9
+assertion_count: 9

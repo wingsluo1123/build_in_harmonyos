@@ -1,0 +1,52 @@
+#====================================================================
+# DRAFT-12592-ohos-pathname-unix-socket-bind-denied-gtest-filter
+# — OHOS 上路径式 AF_UNIX socket 对非特权进程全面禁止（bind EPERM/EACCES）
+#   的实测边界与上游 gtest 套件的 GTEST_FILTER 环境限制排除方案
+#   （isc-kea 3.0.3 服务器套件实测，六类根因归类）
+# 触发事件: isc-kea 3.0.3 适配（kea-{config,asiolink,dhcp4,dhcp6,d2,agent}-tests
+#           六套件 SIGSEGV，探针定位 Sandbox 夹具 mkdtemp(只读 /tmp) NULL 传染）
+# 路径: Path B（知识库扩展）
+#====================================================================
+
+id:                     E3087
+trigger_tool:           meson|conan|gtest
+phase:                  testing|runtime
+error_signature:        killed by signal 11 SIGSEGV$|Error loading shared library libc\+\+_shared\.so|
+                         bind: Operation not permitted|bind: Permission denied|
+                         Filename too long \[system:36\]|unable to open '/tmp/leasefile[46]_[0-9]+\.csv'|
+                         Result: failed to die|it throws nothing|Non-matching addresses on the detected interface ip6_vti0
+
+severity:               2
+category:               ohos, portability, testing, environment-limits, gtest
+match_keywords:         AF_UNIX, pathname unix socket, sockaddr_un, bind EPERM, bind EACCES, abstract namespace, mkdtemp, P_tmpdir, read-only /tmp, Sandbox fixture, GTEST_FILTER, meson test inherited environment, sun_path, ENAMETOOLONG, death test, chmod S_IRUSR, ip6_vti0, control channel, kea, unix domain socket test
+
+title:                  OHOS denies pathname AF_UNIX bind(2) for unprivileged processes on every writable filesystem (tmpfs EPERM / hmfs EACCES; abstract namespace works), which crashes server-suite gtest fixtures through the Sandbox mkdtemp(P_tmpdir="/tmp" read-only) NULL → std::string(NULL) → loader strlen(0) path; exclude the environment-limited cases with GTEST_FILTER propagated through "meson test" inherited environment instead of patching upstream tests
+
+root_cause:             OHOS (verified on HarmonyOS PC 6.0 aarch64, 2026-10) blocks bind(2) of a pathname UNIX domain socket for an unprivileged process on every filesystem the process may write: tmpfs (/storage/Users/...) returns EPERM, hmfs (/data/service/hnp, /data/app) returns EACCES, /dev and /dev/shm also deny; only the abstract namespace (sun_path[0]=='\0') succeeds. Kea (and any server suite using pathname control sockets) therefore cannot run its control-channel tests. Compounding it, the upstream test Sandbox fixture builds its directory with mkdtemp(P_tmpdir "/kea-XXXXXX") where /tmp is READ-ONLY on OHOS, so mkdtemp returns NULL and std::string(NULL) crashes inside the musl loader (SIGSEGV addr=0, PC=strlen+0x10 — verified with a ucontext SIGSEGV backtrace probe since ptrace/gdb is denied). Deeper Conan build trees additionally exceed sockaddr_un::sun_path (107 chars) giving ENAMETOOLONG in parser/config-write tests, and four more OHOS semantic deltas (read-only /tmp CSV open, death-test message not relayed to parent, chmod(S_IRUSR) not blocking owner writes, virtual interface inventory ip6_vti0/ip6tnl0) fail individual cases.
+
+affected_scope:         any package whose upstream gtest suites exercise pathname AF_UNIX sockets, /tmp scratch files, long socket paths, death tests, permission-denied expectations or interface inventories. Verified: isc-kea 3.0.3 (29 suites, 168 of 7294 cases). Expected: any DHCP/DNS/HTTP server suite with a unix control channel (kea family already delivered: kea-hooks/kea-perfdhcp/kea-hook-* were unaffected only because their suites contain no unix-socket fixtures).
+
+verification_cmd: >
+  conan create . -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64
+  （build() 内 meson test 29 套件 Ok: 29 / Fail: 0；对照实验：去掉
+  GTEST_FILTER 后 10 套件失败——6 SIGSEGV + 4 exit 1，根因同上）
+
+rec_priority:           1
+rec_approach:           gtest-filter-env-injection-for-ohos-unix-socket-limits
+rec_description:        OHOS 上路径式 AF_UNIX bind 被全面禁止（实测 tmpfs EPERM/hmfs EACCES、抽象命名空间可用），服务器类 gtest 套件经 Sandbox mkdtemp(只读 /tmp) NULL → std::string(NULL) → musl 加载器 strlen(0) 崩溃；用 GTEST_FILTER 环境注入（meson test 透传父环境）按 fixture 粒度排除六类环境限制用例，零上游改动，非 OHOS 平台全量执行
+rec_command:            grep -n "GTEST_FILTER" archives/i/isc-kea/3.0.3/conanfile.py && grep -n "_ohos_gtest_filter" archives/i/isc-kea/3.0.3/conanfile.py
+rec_auto_fix:           false
+rec_impl:               archives/i/isc-kea/3.0.3/conanfile.py (_ohos_gtest_filter + build() test_env 注入)
+
+doc_file:               knowledge/drafts/DRAFT-12592-ohos-pathname-unix-socket-bind-denied-gtest-filter.md
+last_updated:           2026-10-08
+source_event:           isc-kea 3.0.3 适配，29 套件首跑 19 过 10 败（6 SIGSEGV + 4 exit 1），SIGSEGV ucontext 探针 + AF_UNIX 最小复现双路定位
+authors:                atomcode-executor
+source_pr:
+source_commit:
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     0.9
+metrics_last_used:      2026-10-08
+

@@ -1,0 +1,77 @@
+# 版本级 manifest — xcalc 1.1.3
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "1.1.3"
+software: "xcalc"
+
+# 编译状态: published | built | failed | archived
+# PR 阶段尚未由 release 流水线 upload 到制品仓，真实状态为 built
+status: built
+
+build_date: "2026-10-20"
+build_system: autotools
+
+# 源码信息
+source:
+  # 两条均为 xorg.freedesktop.org 官方原始发布件（无第三方代理前缀）。
+  # pub/ 在前：不命中框架预下载的 archive/releases 镜像改写正则 ⇒ 直连官方取真包；
+  # archive/ 兜底（详见 conandata.yml 头注与 notes.md）。
+  url:
+    - "https://xorg.freedesktop.org/pub/individual/app/xcalc-1.1.3.tar.xz"
+    - "https://xorg.freedesktop.org/archive/individual/app/xcalc-1.1.3.tar.xz"
+  sha256: "86e157b6174678675a4a912995dccd0ff4e2ce32b01bdd6f91bfe93333324980"
+  tar_format: tar.xz
+
+# 构建配置
+build:
+  system: autotools
+  # 原生 build=host（铁律 #0：不使用 --build/--host/--target）。
+  # config.guess 经补丁 0001 识别 HarmonyOS → aarch64-unknown-linux-ohos，
+  # configure 以原生方式判定 build==host。
+  configure_options:
+    - "--with-appdefaultdir=/share/X11/app-defaults"
+  dependencies:
+    - "libx11/1.8.13"
+    - "libxext/6.4.0.1"
+    - "libxt/1.3.1"
+    - "libxmu/1.3.1.1"
+    - "libxaw/1.0.14"
+    - "xorgproto/2025.1"
+    - "libxcb/1.17.0 (run)"
+    - "libxau/1.0.11 (run)"
+    - "libxdmcp/1.1.5 (run)"
+  cc: clang
+  cxx: ""
+
+# 补丁信息
+patches_applied:
+  - "patches/0001-config.guess.patch: config.guess 识别 HarmonyOS/aarch64 → aarch64-unknown-linux-ohos（原生 build=host，铁律 #0；tarball 自带 config.sub 2024-05-27 已接受 linux-ohos），并把编译探针临时目录 umask 077→022（E007/E205/E011）"
+  - "patches/0002-configure.patch: autoconf 2.72 生成的 configure 在 HMDFS 下 getcwd/pwd 不可用时报 'working directory cannot be determined'——加 $PWD 回退（2 处）；config.status 的 ./confXXXXXX 临时目录 umask 077→022（2 处，E011/E114）"
+
+# 知识沉淀
+knowledge_gained:
+  - "X.Org 小 X 客户端（autotools，xaw7/xt/x11/xproto）可直接用 ohpcd 已发布的 libxaw/1.0.14 + libxt/1.3.1 + libxext/6.4.0.1 + libx11/1.8.13 + xorgproto/2025.1 作依赖，无需在配方内 vendored 构建 X11 库（xfontsel/1.1.2 同款，libxmu/libxpm/libice/libsm 由 libxaw 传递引入）"
+  - "PkgConfigDeps 生成的 .pc 名取自 Conan 的 pkg_config_name：libxmu 的 Xmu 组件发布名为 'libxmu'、xorgproto 无 pkg_config_name（默认 'xorgproto'）；消费端需 set_property 重命名为 xmu / xproto（libxaw/1.0.14、xfontsel/1.1.2 同款）"
+  - "xcalc main() 在 XtAppInitialize 之前处理 -help/-version（单双横线均接受）：-version 打印 PACKAGE_STRING 'xcalc 1.1.3' 退出 0；-help 调 Syntax(1, argv) 打印 Usage 到 stderr 也退出 0（argc==1 分支）。无 X server 即可无头验证"
+  - "上游无测试套件：Makefile.am 无 TESTS/check_PROGRAMS/check-local、meson.build 无 test()、发布包无 tests/ 目录；构建仍显式跑 make check（0 用例）"
+  - "原生 build=host 下 tarball 自带 config.guess（2024-07-27）不识别 uname -s HarmonyOS，且用编译探针写 $TMPDIR（HMFS 上失败）——须补丁教它输出 aarch64-unknown-linux-ohos；tarball 自带 config.sub（2024-05-27）已含 ohos*/linux-ohos*，无需 config.sub 补丁"
+  - "框架 CI 预下载对 xorg.freedesktop.org 的 archive/releases 路径走镜像优先重试且成功判据只有 size>100B（不校验 HTTP 状态码/sha256）——2026-02 后发布的 x.org 包在三条镜像上均 404，会被 162B 错误页顶替 ⇒ 源码 URL 用同一官方主机的 pub/ 路径在前、archive/ 兜底（xdriinfo/xev 同款）"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/ohpc-porting/builds/xcalc-1.1.3.orig
+  source_work_dir: /storage/Users/currentUser/tmp/ohpc-porting/builds/xcalc-1.1.3.work
+  source_orig_hash: 544e404eb71bb347
+  source_work_hash: 2aedc2dc412784cd
+  generated_at: '2026-10-20T12:49:05'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-config.guess.patch
+    type: portability
+    platform_only: True
+    guard: 'OHOS config detection'
+  - file: 0002-configure.patch
+    type: portability
+    platform_only: True
+    guard: 'HMDFS getcwd/tempdir'

@@ -1,0 +1,64 @@
+--- a/libsofia-sip-ua-glib/su-glib/su_source.c
++++ b/libsofia-sip-ua-glib/su-glib/su_source.c
+@@ -387,25 +387,23 @@
+ 
+   enter;
+ 
+   if (self->sup_base->sup_head) {
+     *return_tout = 0;
+     return TRUE;
+   }
+ 
+   if (self->sup_base->sup_timers || self->sup_base->sup_deferrable) {
+     su_time_t now;
+-    gint64 tv;
+-
+-    tv = g_source_get_time(gs);
+-    now.tv_sec = tv / G_USEC_PER_SEC + 2208988800UL;
+-    now.tv_usec = tv % G_USEC_PER_SEC;
++
++    /* g_source_get_time() is monotonic, while su_timer uses su_now(). */
++    now = su_now();
+ 
+     tout = su_timer_next_expires(&self->sup_base->sup_timers, now);
+ 
+     if (self->sup_base->sup_deferrable) {
+       su_duration_t tout_defer;
+ 
+       tout_defer = su_timer_next_expires(&self->sup_base->sup_deferrable, now);
+ 
+       if (tout_defer < self->sup_base->sup_max_defer)
+         tout_defer = self->sup_base->sup_max_defer;
+@@ -453,29 +451,27 @@
+   SuSource *ss = (SuSource *)gs;
+   su_port_t *self = ss->ss_port;
+ 
+   enter;
+ 
+   if (self->sup_base->sup_head)
+     su_base_port_getmsgs(self);
+ 
+   if (self->sup_base->sup_timers || self->sup_base->sup_deferrable) {
+     su_time_t now;
+-    gint64 tv;
+     su_duration_t tout;
+ 
+     tout = SU_DURATION_MAX;
+ 
+-    tv = g_source_get_time(gs);
+-
+-    now.tv_sec = tv / G_USEC_PER_SEC + 2208988800UL;
+-    now.tv_usec = tv % G_USEC_PER_SEC;
++
++    /* g_source_get_time() is monotonic, while su_timer uses su_now(). */
++    now = su_now();
+ 
+     su_timer_expire(&self->sup_base->sup_timers, &tout, now);
+     su_timer_expire(&self->sup_base->sup_deferrable, &tout, now);
+   }
+ 
+ #if SU_HAVE_POLL
+   {
+     su_root_t *root;
+     su_wait_t *waits = self->sup_waits;
+     unsigned i, n = self->sup_n_waits;

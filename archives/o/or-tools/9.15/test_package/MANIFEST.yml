@@ -1,0 +1,22 @@
+package: or-tools/9.15
+homepage: "https://github.com/google/or-tools"
+
+upstream_check_command: "ctest --output-on-failure"
+upstream_test_in_build: true
+upstream_test_command: "ctest --output-on-failure"
+upstream_test_reason: "BUILD_TESTING=ON registers the 262 upstream *_test.cc files as cxx_* CTest entries; the sat suite sets 5 long-running tests DISABLED upstream (2d_rectangle_presolve, cp_model_presolve_random, cp_model_presolve, cp_model_search, integer_expr). conanfile.py build() runs ctest and records failures in reports/test-report.md."
+upstream_tests:
+  - file: ortools/sat/CMakeLists.txt
+    source: or-tools-9.15/ortools/sat/CMakeLists.txt
+    description: "GLOB *_test.cc -> ortools_cxx_test() -> add_test(NAME cxx_sat_*); 5 long tests marked DISABLED TRUE upstream; ctest registration count is filled after the real build"
+    command: "ctest --output-on-failure"
+
+test_package_tests:
+  - file: test.cpp
+    description: "MPSolver(CLP) LP solve asserts OPTIMAL + objective 42.0; CpModelBuilder/CpSolver asserts OPTIMAL solution x=10 y=0; OHOS-specific platform-feature detection (procfs + uname aarch64) and static-link assertion (no libortools.so in /proc/self/maps)"
+    command: "./test_ortools (via ctest --output-on-failure)"
+  - file: CMakeLists.txt
+    description: "find_package(ortools CONFIG REQUIRED) + target_link_libraries(ortools::ortools) exercises the installed ortoolsConfig.cmake consumer-side Coin::*/ZLIB::* aliases"
+    command: "cmake configure + build + ctest"
+
+assertion_count: 8

@@ -1,0 +1,106 @@
+#====================================================================
+# DRAFT-10718-autotools-make-args-multiword-value-splitting
+# Conan 的 Autotools.make(args=[...]) 把参数以空格拼接进命令行、无引号：
+#   含空格的变量值（LIBS="-la -lb"）被拆成多个词 → make 把 -l* 当选项，报 usage
+# 触发事件: slurm-wlm 25.11.4 适配（archives/s/slurm-wlm/25.11.4）——
+#           需要把垫片静态库 + -lncursesw 追加到 configure 算出的 LIBS 尾部
+#====================================================================
+
+id:                     E3521
+trigger_tool:           conan|make|autotools
+phase:                  build|configuration
+error_signature:        usage: make|
+                        make: unrecognized option|
+                        make: \*\*\* No rule to make target '-l\w+'|
+                        Nothing to be done for '?check'?
+severity:               2
+category:               portability, autotools, make, conan, build-helper
+match_keywords:         Autotools.make, args, str_extra_args, join_arguments, 多词值,
+        "含空格的变量值", LIBS="-la -lb", 命令行变量覆盖, make 命令行变量,
+        make VAR=value, usage: make, -lncursesw, 静态垫片库, 生成的 Makefile,
+        replace_in_file, LIBS 行, make install, R6 生成文件
+
+title:                  Conan 的 Autotools.make(args=[...]) 会把 args 用空格原样拼进命令行（不引号）：含空格的多词变量值会被拆成 make 的选项/目标（报 usage）；要给 make 传多词库列表，应自行拼 shell 引号，或改用「改写生成的 Makefile 变量行」
+
+root_cause: >
+  conan.tools.gnu.Autotools.make() 的实现是
+      str_extra_args = " ".join(args)
+      command = join_arguments([make_program, str_makefile, target, str_args, str_extra_args, jobs])
+      self._conanfile.run(command)
+  而 join_arguments() 就是 `" ".join(filter(None, args))` —— **没有任何 shell 引号**。
+  于是 autotools.make(args=['LIBS=-lfoo -lbar']) 生成的命令行是
+      make LIBS=-lfoo -lbar
+  三个词：make 看到 -lbar 会当**选项**处理（报 usage / unrecognized option），
+  或者把 -lfoo 当成**目标**去构建（No rule to make target）。而用户的本意只是
+  "把一个含空格的变量值传给 make"。
+
+  为什么这个坑在"追加库列表"场景特别常见：configure 已经算出了一长串 LIBS
+  （-lhwloc -lmunge ... -lc -ldl），我们只想在其**尾部**再追加几个库
+  （垫片静态库、-lncursesw）。用命令行变量就得把整串原值**重放一遍**（脆弱、
+  且在 configure 结果变化时会失效），而多词值又恰好过不了 Autotools.make 的拼接。
+
+affected_scope: >
+  所有用 conan.tools.gnu.Autotools（或任何"把参数列表 join 成命令行"的助手）
+  向 make 传含空格变量值的配方；尤其常见于"要在 configure 算出的 CFLAGS/LIBS/CPPFLAGS
+  尾部追加多个库/开关"的适配场景（交叉编译垫片库、termcap/ncurses 顺序修正等）。
+
+verification_cmd: >
+  # 1) 复现拼接行为（Conan 侧）
+  python3 -c "from conan.tools.gnu.autotools import join_arguments as j; print(j(['make','LIBS=-la -lb']))"
+  #    → make LIBS=-la -lb        （引号不存在）
+  # 2) 直跑对比
+  make LIBS="-la -lb"        # 报 usage / 把 -lb 当选项
+  make "LIBS=-la -lb"        # 正确：单引号由 shell 保
+  # 3) 适配侧验收：生成的 Makefile 里该变量行是否已带上追加项
+  grep -m1 "^LIBS = " <build>/Makefile
+
+rec_priority:           1
+rec_approach:           rewrite-the-generated-makefile-variable-lines-appending-a-tail
+rec_description: >
+  配方内用一个自有方法遍历 build 目录下所有**生成的** Makefile，把追加项挂到
+  `LIBS = ` 行的**尾部**（并做"已含 tail 就跳过"的幂等判断）：
+
+  ```python
+  def _patch_makefile_libs(self):
+      tail = self._shim_tail()          # 例: "<build>/libmusl_account_shim.a -L<ncurses>/lib -lncursesw"
+      for base, _dirs, files in os.walk(self.build_folder):
+          if "Makefile" not in files: continue
+          ...
+          if line.startswith("LIBS = ") and tail not in line:
+              line = line + " " + tail
+  ```
+
+  优点：①追加而不是覆盖 configure 的探测结果；②覆盖所有子目录 Makefile，
+  `make` 与 `make install` 都生效（`make install` 会重新链接）；③幂等，可重复执行。
+  注意这是**构建期**对生成物的后处理，不写回源码树、不进仓库（与 R6"只改源文件"不冲突：
+  源文件零改动，生成物只在本机 build 目录里被加工）。
+rec_command: >
+  make -j1 && make -j1 install      # LIBS 行已被追加 tail
+rec_auto_fix:           false
+rec_impl:               recipe
+
+fallback_priority:      2
+fallback_approach:      build-the-multi-word-value-into-one-shell-quoted-argument
+fallback_description: >
+  若坚持用命令行变量：不要走 Autotools.make(args=[...])，而是自己拼一条带引号的
+  命令并交给 self.run()（保证整个 `VAR=value` 是一个 shell 词）：
+
+  ```python
+  self.run('make -j1 LIBS="%s"' % libs, env="conanbuild", cwd=self.build_folder)
+  ```
+
+  代价：要自己处理引号/转义，且命令行变量是**覆盖**语义 —— 必须把 configure
+  算出的原值一起重放，configure 结果一变就会失效。
+fallback_command:       self.run('make -j1 LIBS="%s"' % libs, env="conanbuild")
+fallback_auto_fix:      false
+fallback_impl:          recipe
+
+forbid_1_pattern:       autotools.make(args=["LIBS=-lfoo -lbar"])（把含空格的多词变量值塞进 args）
+forbid_1_reason:        Conan 以空格 join 且不加引号，值会被拆成多个 make 词
+forbid_1_consequence:   make 报 usage / 把 -l* 当选项、把库名当目标，
+                        构建在"看起来与库无关的"位置失败，且错误信息不指向配方代码
+
+principles:             P004
+doc_file:               knowledge/drafts/DRAFT-10718-autotools-make-args-multiword-value-splitting.md
+last_updated:           2026-10-14
+authors:                Lee-BX

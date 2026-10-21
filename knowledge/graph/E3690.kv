@@ -1,0 +1,98 @@
+#====================================================================
+# DRAFT knowledge entry — 无 GPU 构建机上跑 Vulkan/D3D 上游测试套件：
+#   「零执行默认 PASS」假绿识别 + 用 ICD 直接当 libvulkan.so.1 的软件 Vulkan 底衬
+# Source package: vkd3d/1.19（Wine 的 Direct3D 12 → Vulkan 翻译层）
+# 可推广到：任何自带 Vulkan/GL 渲染测试框架、且测试器在找不到设备时"提前返回"的包
+#====================================================================
+
+id:                     E3690
+trigger_tool: automake|make|conan|ld|runtime
+phase: testing
+error_signature: No such file or directory.*libvulkan|libvulkan\.so\.1|VK_ERROR_INCOMPATIBLE_DRIVER|vkCreateInstance|vkEnumeratePhysicalDevices|0 tests executed|tests executed \(0 failures
+severity:               3
+category:               portability, conan, runtime, testing, graphics
+match_keywords: Vulkan, vkd3d, D3D12, SPIR-V, shader_test, shader_runner, make check, VK_ICD_FILENAMES, VK_DRIVER_FILES, libvulkan.so.1, libvk_swiftshader.so, swiftshader, ICD, SONAME_LIBVULKAN, tool_requires, no GPU, headless, CI worker, false green, zero executed, 假绿, 零执行, 测试底衬
+
+title: 无 GPU 的构建机上跑 Vulkan 测试套件的两个必答点：先识破「找不到设备就提前 return ⇒ automake 全记 PASS 而实际零执行」的假绿，再用已发布的 CPU Vulkan 实现（swiftshader）把 ICD 直接命名成 libvulkan.so.1 充当 loader
+
+root_cause: 两个独立机制叠加：测试器在找不到设备时"提前 return"使 automake 把零执行记成全部 PASS（假绿）；同时运行期 dlopen 型 Vulkan 消费者在没有 loader / 没有 ICD 的机器上无法建立实例，需要一个真能提供设备的底衬。
+  机制一（假绿）：vkd3d 的 tests/shader_runner_vulkan.c:2142 在
+  `if (!init_vulkan_runner(&runner)) return;` 处早退（只是从被调函数返回，**不经 exit**），
+  而 include/private/vkd3d_test.h:316 在 vkd3d_test_main 返回后【无条件】printf 计数行，
+  :328 的退出码只看 `failure_count || todo_success_count`——跳过项与零执行项都不算失败。
+  于是无设备环境下 287 个 *.shader_test 由 automake 全部记成 PASS，
+  注释：**计数行仍会打印**，只是 N=0 —— 形如一份 `shader_runner` 日志里的
+  `0 tests executed (0 failures, …)`，`make check` 仍退 0。
+  ⇒ 真执行判据必须是 **N>0**（即 `<runner>` 行的 `N tests executed` 中 N>0）；
+  「计数行存在」**不是**真执行证据
+  （无设备时该行照样出现、N=0，实测唯一 N=0 的条目是 vkd3d_api）。
+  这属于"分母被环境悄悄抽空"，把 0 执行当通过率是禁止的形态。
+  机制二（缺设备）：构建机无 GPU（无 /dev/dri、无 GPU 节点）、无 libvulkan、无 ICD json，
+  而 vkd3d 是 dlopen(SONAME_LIBVULKAN) 取函数指针（不链接 loader）。
+
+affected_scope: 所有上游测试依赖真实图形设备、而设备查找失败被实现成"静默跳过/提前返回"的项目（Vulkan、OpenGL、EGL、D3D 系测试框架；依赖 Xvfb 的 GL 套件同理）。
+  不适用边界：测试框架在找不到设备时显式失败（非零退出）的包——那种包会自然红，
+  不需要本条的假绿识破步骤，但仍可用本条的底衬方案让它真正跑起来。
+  也适用于"测试期需要某个运行期 .so，但该 .so 的包未发布"的情形：ICD 可直接顶替 loader。
+
+verification_cmd: >
+  # ① 假绿判据：统计「N>0 的真执行计数行」条数，**不是**「计数行是否存在」——
+  #    无设备时 include/private/vkd3d_test.h:316 仍会无条件打印
+  #    "<runner>: 0 tests executed (0 failures, …)"（行存在 ⇏ 真执行），
+  #    故 `grep -c "tests executed"` 在无设备时返回 293 而非 0，不能当判据。
+  grep -rhoE '[0-9]+ tests executed' build/tests --include='*.log' | awk '$1>0' | wc -l
+  #    （N>0 的条目数；实测 292/293 ⇒ 真执行成立；= 0 ⇒ 零执行却全 PASS，不可当通过率）
+  grep -rhoE ': 0 tests executed' build/tests --include='*.log' | wc -l
+  #    （零执行条目数，逐项披露；实测唯一 1 条 = vkd3d_api，其日志含
+  #     "D3D12 device cannot be created." 的 skipped 说明）
+  # ② 底衬是否真的提供了设备（30 行探针，实测原文应形如）
+  #   DLOPEN_OK / vkCreateInstance rc=0 / vkEnumeratePhysicalDevices rc=0 count=1
+  #   DEVICE[0]=SwiftShader Device (LLVM 10.0.0) api=1.3.0 type=4
+  # ③ 对照组：不设 LD_LIBRARY_PATH 时同探针必须 dlopen 失败（证明设备真来自底衬）
+
+rec_priority: 1
+rec_approach: icd-as-loader-test-substrate-with-zero-execution-guard
+rec_description: 三步：先跑一次 make check 识破"零执行默认 PASS"假绿；再把已发布的 swiftshader 声明为 tool_requires 并把 libvk_swiftshader.so 复制成 libvulkan.so.1 前置进 LD_LIBRARY_PATH 充当 loader（另设 VK_ICD_FILENAMES/VK_DRIVER_FILES）；最后在取不到底衬时直接抛异常，从结构上消除假绿。
+  (1) 识破假绿：先跑一次 make check，若"全 PASS"但日志里没有任何 **N>0** 的
+  "tests executed (N …)" 计数（注意：无设备时该行仍会以 N=0 形态出现，行存在 ≠ 真执行）、
+  且被测二进制在无设备时走早退分支，则这些 PASS 无效。
+  (2) 装软件 Vulkan：把 ohpcd 已发布的 swiftshader（package_type=shared-library，
+  含 lib/libvk_swiftshader.so 与 res/vk_swiftshader_icd.json）声明为 **tool_requires**
+  （测试期专用，不进消费者依赖图）。Vulkan 的 ICD 会导出全部**全局**入口点
+  （vkCreateInstance / vkGetInstanceProcAddr / vkEnumerateInstanceVersion /
+  vkEnumeratePhysicalDevices / vkEnumerateInstanceExtensionProperties），而 dlopen 型
+  调用方只需要 vkGetInstanceProcAddr 就能取到 instance/device 级函数，因此
+  **把 libvk_swiftshader.so 复制成 libvulkan.so.1（同时留 libvulkan.so）并前置进
+  LD_LIBRARY_PATH 即可，不需要 Khronos loader 包**；再复制 ICD json 并设
+  VK_ICD_FILENAMES / VK_DRIVER_FILES。
+  (3) 假绿守卫：配方在取不到 substrate 时**直接抛异常**而不是照常跑 make check。
+  附加要点：若被测库把 loader 的 SONAME 编译进产物（如 vkd3d 的 SONAME_LIBVULKAN，
+  由 AC_ARG_VAR 提供），必须**显式传生产值**（libvulkan.so.1），否则链接期
+  AC_CHECK_LIB 会探到测试替身并把它自己的 SONAME 烤进成品 —— 测试底衬污染生产语义。
+
+rec_command: |
+  # generate()：底衬 + 环境
+  pkg = self.dependencies.build["swiftshader"].package_folder
+  substrate = os.path.join(self.build_folder, "vk-substrate"); os.makedirs(substrate, exist_ok=True)
+  shutil.copy2(os.path.join(pkg, "lib", "libvk_swiftshader.so"),
+               os.path.join(substrate, "libvulkan.so.1"))
+  shutil.copy2(os.path.join(pkg, "lib", "libvk_swiftshader.so"),
+               os.path.join(substrate, "libvulkan.so"))
+  icd = os.path.join(substrate, "vk_swiftshader_icd.json")
+  shutil.copy2(os.path.join(pkg, "res", "vk_swiftshader_icd.json"), icd)
+  env.prepend_path("LD_LIBRARY_PATH", substrate)
+  env.define("VK_ICD_FILENAMES", icd); env.define("VK_DRIVER_FILES", icd)
+  env.define("SONAME_LIBVULKAN", "libvulkan.so.1")   # 保住生产语义，勿让替身 SONAME 进产物
+  # 取不到 pkg 时 raise（禁静默跑 make check ⇒ 禁零执行假绿）
+
+fallback_priority: 2
+fallback_approach: report-zero-executed-with-readings
+fallback_description: 底衬确实起不来（ICD 加载失败、缺 EGL/shm、包不可得）时如实报读数：真执行数、零执行项数、以及"环境受限"的具体首条错误原文；不得把 automake 的"全 PASS"当通过率写进正文。
+  此时应把该情形作为限制项披露，并考虑按依赖未就绪转手。
+
+source_event: vkd3d 1.19（Wine 的 D3D12→Vulkan 翻译层，287 个 *.shader_test）在 HarmonyOS PC aarch64 构建机上适配：本机无任何 Vulkan（全盘无 libvulkan*、无 ICD json、/dev/dri 不存在），swiftshader/0_git20260921 作 tool_requires 顶替 libvulkan.so.1 后 make check 真实执行；自建 dlopen 探针实测 DEVICE[0]=SwiftShader Device (LLVM 10.0.0) api=1.3.0 type=4，对照组 dlopen 失败。
+rec_auto_fix:               false
+rec_impl:               manual
+last_updated:               2026-10-21
+authors:               unknown
+doc_file:               doc/E3690.md

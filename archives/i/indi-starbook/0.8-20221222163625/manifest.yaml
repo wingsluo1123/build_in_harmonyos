@@ -1,0 +1,79 @@
+# 版本级 manifest — indi-starbook 0.8-20221222163625
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "0.8-20221222163625"
+software: indi-starbook
+status: built
+build_date: "2026-10-14"
+build_system: cmake
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/i/indi-starbook/indi-starbook_0.8+20221222163625.orig.tar.gz"
+  sha256: "eda4f9aa1a8cfee2183462c6a6808829d61a726f8eb3f515de70c9d600dc5cde"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - CMAKE_SYSTEM_NAME=Linux
+    - CMAKE_SYSTEM_PROCESSOR=aarch64
+    - CMAKE_POLICY_VERSION_MINIMUM=3.5
+  dependencies:
+    - libindi/2.2.2.1
+    - libnova/0.16
+    - curl/8.15.0.1
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - category: L1
+    content: "indi-starbook 是 Vixen StarBook 赤道仪（Ten 代以前）的 INDI 驱动可执行程序（非库），HTTP 协议（响应藏 HTML 注释 <!--KEY=VAL-->，std::regex 解析），传输层 libcurl（connectioncurl.cpp，Connection::Curl 插件）——与同族 indi-starbook-ten 同协议族但传输不同（后者 bundled cpp-httplib）"
+    reason: "实测 CMakeLists：find_package(INDI/CURL/Nova 全 REQUIRED)，add_executable(indi_starbook_telescope)；command_interface.cpp 全部命令经 curl_easy_perform 发 http://host:port/CMD"
+  - category: L1
+    content: "本驱动 find_package(CURL REQUIRED) 零注入解析：conan 2 conan create 主包只跑配方 generate() 声明的生成器（本配方仅 CMakeToolchain 不跑 CMakeDeps），conan_toolchain.cmake 已把依赖包根纳入 CMAKE_PREFIX_PATH，CMake 内建 FindCURL 模块按标准前缀搜索即命中 conan curl 包（lib/libcurl.so + include/），CMakeLists（CMake>=3.12 分支）据此获得 CURL::libcurl 导入目标——配方无需任何 CURL_* 注入、conanfile 不含引号依赖字面量，CI L0o grep 结构性 clean（下标式可跑但触发 L0o 硬闸误报；属性式在 conan 2.29 不存在）。CMAKE_FIND_PACKAGE_PREFER_CONFIG=ON 仅消费者侧兜底（CMakeDeps config 家族只生成于消费端 generators；INDI/Nova 无同名 config 仍回退驱动 Find 模块）"
+    reason: "MateBook 第 4 轮真机取证（2026-10-15）：Found CURL: <curlpkg>/lib/libcurl.so (found version \"8.15.0\")，connectioncurl.cpp.o 编译链接全过，W3 L0 三标签（L0c/L0k/L0o）全过；对比组：下标式触发 L0o 误报（GitCode CI 硬闸），属性式 generate() AttributeError（conan 2.29 依赖模型无 __getattr__）"
+  - category: L1
+    content: "FindNova.cmake 第 14 行 if (NOVA_INCLUDE_DIR AND NOVA_LIBRARIES) 短路采信不校验：双注入 NOVA_INCLUDE_DIR=<包>/include（驱动 <libnova/utility.h> 带前缀引用，指 include 根非子目录）+ NOVA_LIBRARIES=<包>/lib/libnova.a 即可"
+    reason: "快照 FindNova.cmake 源码实测；与 rtklib/starbook-ten 注入口径一致"
+  - category: L1
+    content: "雷4（驱动源码 libindi 1.x API）在本包极轻：上游 master 与 2022 快照逐文件对比仅 indi_starbook.cpp 两处 TimeT[1].text→TimeTP[1].getText()（libindi 2.2.2 的 Telescope::TimeTP 已 INDI::PropertyText 化，原始 IText 数组移除）+ CMakeLists cmake_minimum_required 3.0→3.16（按仓内惯例走 cache 变量不动源码）；0003 两 hunk 打完与 master 逐字节一致"
+    reason: "api.github.com 拉取 master 全树逐文件 cmp + 真 OHOS libindi 2.2.2 头验证（TimeTP {2} 为 PropertyText，callHandshake/CONNECTION_CUSTOM/DEBUGFDEVICE/SCOPE_IDLE/TrackState 均仍存在）双重实证"
+  - category: L1
+    content: "Layer1 官方测试（test_starbook.cpp 两 TEST：cmd_res 4 断言 + DateTime 3 断言）只需 starbook_types.cpp+libnova——被测源码不含 libindi/curl 引用；链接侧因 starbook_types.cpp 的 Equ/LnLat 方法引用 ln_equ_to_hequ/ln_lnlat_to_hlnlat 必须链 libnova.a（被测路径 cmd_res/DateTime 本身不调 ln_*）"
+    reason: "test_starbook.cpp 仅 #include \"starbook_types.h\"；starbook_types.h 仅 #include <libnova/utility.h>；WSL x86_64 彩排用 ln stub 链接可复现（真机由依赖图提供真 libnova）"
+  - category: L1
+    content: "上游官方测试 test_starbook.cpp 是死代码：CMakeLists 的 INDI_BUILD_UNITTESTS 选项整段注释从未启用，cmd_res 断言 \"    OK\"（前导空白）解析为 OK 而快照实现要求第 0 列起始——官方测试对自身实现 1/2 必败（上游 master 与快照逐字一致可证 bit-rot 至今）；0004 给 CommandResponse 判定前加最小 ltrim（含 ERROR 子类三处内层判断同步改 ltrim 后输入），官方测试按上游字面意图 2/2 真实通过"
+    reason: "WSL x86_64 彩排实测：未修时 cmd_res 抛 \"parsing error, could not parse any field\"（res4 \"    OK\"）；修后 [ PASSED ] 2 tests；属本包首例外加 bugfix（非平台适配、非纯回移），conandata/notes/PR 全程如实声明"
+  - category: L1
+    content: "executable-only 包的 test_package 必须对 bin/<驱动> 做存在性硬断言（L1e 破坏性负测只移 bin/lib/include 不碰 src/），--help 探测 best-effort 但须捕获并报告返回码——沿用 indi-starbook-ten 第 3 轮 / indi-maxdomeii 第 1 轮验证生效的修复模式"
+    reason: "starbook-ten 真机 L1e 误判教训（第 2 轮 FAIL→修复后 sabotage 重跑正确判定放行）直接复用"
+
+notes: |
+  indi-starbook 是 Vixen StarBook 赤道仪（Ten 代以前）的 INDI 驱动，
+  纯 C++，HTTP/curl 协议，无 GUI/媒体/内核依赖。
+
+  适配要点：
+  - CMake 构建，强制 CMAKE_SYSTEM_NAME=Linux（E092，CMake 不识别 HarmonyOS）。
+  - 上游 cmake_minimum_required(VERSION 3.0) → 注入 cache 变量
+    CMAKE_POLICY_VERSION_MINIMUM=3.5（CMake 4.x 移除 <3.5 兼容）。
+  - 用驱动自带 FindINDI 模块：INDI_INCLUDE_DIR 指 include/libindi 子目录、
+    库解析靠 INDI_ROOT（注入 INDI_LIBRARIES 会被模块覆盖）。
+  - FindNova 双注入短路：NOVA_INCLUDE_DIR=<nova>/include + NOVA_LIBRARIES=<nova>/lib/libnova.a。
+  - FindCURL 零注入：conan 工具链前缀路径已含 curl 包根，内建 FindCURL
+    模块直接命中（主包不跑 CMakeDeps）；conanfile 零注入、零引号字面量
+    （CI L0o clean）。
+  - patches 0001-0004 修 libindi 2.x 迁移四雷（正则/cxx17/master 两处 Property 回移）
+    + 0004 修上游死测试（CommandResponse ltrim，官方测试 2/2 真实通过）。
+  - 产出为可执行程序 indi_starbook_telescope（R38：软件级 commands.json 声明）。
+
+  test_package（R34）：
+  - Layer 1：编译 test_package/ 内置 vendored test_starbook.cpp（上游官方
+    GTest 单测）+ starbook_types.cpp（0004 后版本；CI L0c 要求测试源在
+    test_package/ 树内），CMakeDeps 链 libnova::libnova+GTest::gtest；
+    断言 cmd_res 解析（"OK"/"ERROR"/空白变体）与 DateTime 格式化
+    （"2018+10+05+12+30+04"）。上游有测试（INDI_BUILD_UNITTESTS 分支），
+    不适用 R51 无测试声明。
+  - Layer 2：bin/indi_starbook_telescope 存在性硬断言（L1e 依赖锚点）
+    + --help best-effort（捕获返回码 warn；EPERM/126 属环境限制）。

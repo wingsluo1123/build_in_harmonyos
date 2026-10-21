@@ -1,0 +1,32 @@
+--- a/iflib/trap.c
++++ b/iflib/trap.c
+@@ -1,6 +1,7 @@
+ #ifdef NEED_TRAP
+ 
+ #include <stdio.h>
++#include <stdlib.h>
+ #include "lutil.h"
+ #include "trap.h"
+ 
+@@ -11,16 +12,11 @@
+ #endif
+ 
+ #if defined(linux)
+-# ifndef __GLIBC__
+-#  define ASC_LINUX_VERSION(V, P, S)      (((V) * 65536) + ((P) * 256) + (S))
+-#  include <linux/version.h>
+-#  if LINUX_VERSION_CODE < ASC_LINUX_VERSION(2,1,0)
+-#   define sigcontext	sigcontext_struct
+-#  endif
+-#  define __KERNEL__
+-#  include <linux/signal.h>
+-#  undef __KERNEL__
+-# endif /* __GLIBC__ */
++/* The pre-glibc kernel-header detour is dropped: <linux/version.h> plus
++ * <linux/signal.h> under __KERNEL__ redeclare sigset_t, sigaltstack and
++ * sigval, which collide with the userspace <signal.h> included below.
++ * glibc builds never took this branch, and musl-based targets already
++ * provide struct sigcontext from <signal.h>. */
+ # ifdef __i386__
+ #  define iBCS2
+ # else

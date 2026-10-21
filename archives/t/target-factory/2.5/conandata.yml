@@ -1,0 +1,17 @@
+sources:
+  url:
+    - "https://mirrors.tuna.tsinghua.edu.cn/ubuntu/pool/universe/t/target-factory/target-factory_2.5.orig.tar.xz"
+    - "https://mirrors.aliyun.com/ubuntu/pool/universe/t/target-factory/target-factory_2.5.orig.tar.xz"
+    - "https://archive.ubuntu.com/ubuntu/pool/universe/t/target-factory/target-factory_2.5.orig.tar.xz"
+  sha256: "57851a0049d928947e55b82c5b41c7d384750bdd794838ed4017a6a5bb3dfdd8"
+patches:
+  "2.5":
+    - patch_file: "patches/0001-relax-upstream-warnings.patch"
+      patch_description: "Drop -Werror and the hard-coded -std=gnu++14 from VitisCommon so the profile's cppstd applies and clang 15 warnings do not fail the build"
+      patch_type: "portability"
+    - patch_file: "patches/0002-fix-no-git-metadata.patch"
+      patch_description: "Define PROJECT_GIT_* macros unconditionally: the Debian orig tar has no .git, so #cmakedefine leaves them undefined and target_factory.cpp does not compile"
+      patch_type: "portability"
+    - patch_file: "patches/0003-src-CMakeLists-link-libs-by-name.patch"
+      patch_description: "Link unilog/glog/gflags by name (-L<dir> -l<name>) instead of through CMakeDeps' imported targets: those packages ship no DT_SONAME, so path linking writes their absolute package paths into DT_NEEDED and fails the CI L5b gate"
+      patch_type: "portability"

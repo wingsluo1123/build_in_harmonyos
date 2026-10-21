@@ -1,0 +1,22 @@
+--- a/src/xcb_util.c
++++ b/src/xcb_util.c
+@@ -251,6 +251,18 @@
+     static const char unix_base[] = "/usr/spool/sockets/X11/";
+ #else
+     static const char unix_base[] = "/tmp/.X11-unix/X";
+ #endif
+-    const char *base = unix_base;
++    static char unix_base_env[sizeof(unix_base) + 256];
++    const char *base = unix_base;
++    {
++        /* OHOS: /tmp is read-only on this platform, so the compiled-in
++           socket directory cannot be created; allow an override. */
++        const char *env_dir = getenv("X_UNIX_SOCKET_DIR");
++        if (env_dir && *env_dir) {
++            size_t env_len = strlen(env_dir);
++            snprintf(unix_base_env, sizeof(unix_base_env), "%s%sX", env_dir,
++                     (env_dir[env_len - 1] == '/') ? "" : "/");
++            base = unix_base_env;
++        }
++    }
+     size_t filelen;

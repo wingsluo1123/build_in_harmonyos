@@ -1,0 +1,37 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: kdesu/6.26.0
+homepage: "https://invent.kde.org/frameworks/kdesu"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: 'ctest --test-dir <build> --output-on-failure --no-tests=error -E "^kdesutest$"'
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: 'ctest --test-dir <build> --output-on-failure --no-tests=error -E "^kdesutest$" ; ctest --test-dir <build> --output-on-failure -R "^kdesutest$"'
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: src/kdesud/autotests/kdesudtest.cpp
+    source: kdesu-6.26.0.tar.xz/src/kdesud/autotests/kdesudtest.cpp
+    description: "kdesudtest (QTest) - CTest 目标 kdesudtest，槽 commandWithDoubleQuotes 复刻 KDESu::Client::escape 的词法往返，链接 ../lexer.cpp"
+    command: "ctest -R kdesudtest --output-on-failure"
+    result: "实测通过：1/1 目标 PASS（0.03s）"
+  - file: autotests/kdesutest.cpp
+    source: kdesu-6.26.0.tar.xz/autotests/kdesutest.cpp
+    description: "kdesutest (QTest) - CTest 目标 kdesutest，6 个功能槽 sudoGoodPassword / sudoBadPassword / doasBadPassword / doasGoodPassword / suGoodPassword / suBadPassword，驱动 SuProcess 经 pty 对 autotests/sudo|su 夹具脚本提权"
+    command: "ctest -R kdesutest --output-on-failure"
+    result: "实测失败：initTestCase PASS 后 6 个功能槽全部 FAIL!，首个失败点 kf.pty: Can't open a pseudo teletype（KPty::open 失败，ptyprocess.cpp:136），测试在拉起 su/sudo 前退出；QTest 汇总 2 passed / 6 failed"
+    exemption_note: "设备沙箱禁止 pty 分配（openpty 被拒），且设备无 su/sudo/doas 可执行文件、当前 uid 20020084 无 passwd 条目，端到端提权路径不可行；按 R51 如实申报、不宣称通过，断言级覆盖由 test_package/ 承担"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.cpp
+    description: "消费者用例：find_package(KF6Su) + KF6::Su/KF6::ConfigCore 链接；SuProcess 默认 su / sudo / doas / 未知值回退、sudo+root useUsersOwnPassword 语义、SshProcess 空提示；并经 QProcess 真实执行安装的 kdesu_stub，完成 stop 安装检查协议（退出码 0 + end 标记）"
+    command: "./test_kdesu"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 10

@@ -1,0 +1,31 @@
+package: palabos/2.3.01
+homepage: "https://palabos.unige.ch"
+
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "palabos-v2.3.0 source tree root"
+    reason: "No tests/ or test/ directory present; file list has src, examples, utility, coupledSimulators, no test harness."
+  - source: "palabos-v2.3.0/CMakeLists.txt"
+    reason: "No enable_testing() or add_test() calls; CI option only adds example/utility subdirectories."
+  - source: "palabos-v2.3.0/.gitlab-ci.yml"
+    reason: "CI script runs only cmake + make in build dir (compiles library and examples); no test command is executed."
+  - conclusion: "Upstream provides no automated tests; adaptation validates via test_package LBM smoke test instead of upstream coverage."
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+test_package_tests:
+  - file: test_palabos.cpp
+    description: "D2Q9 32x32 BGK lattice smoke test: descriptor, size, 5 collideAndStream steps, density and energy observables"
+    command: "./test_palabos"
+
+upstream_test_total: 0
+upstream_test_count_method: "ctest_entries"
+
+test_scenario_count: 1
+assertion_count: 4
+assertion_count_basis:
+  descriptor_and_geometry: 2
+  observables_after_streaming: 2

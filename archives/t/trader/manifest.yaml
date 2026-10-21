@@ -1,0 +1,24 @@
+software: trader
+display: "Star Traders（trader）"
+description: "基于 ncurses 的星际贸易终端游戏：创建公司、买卖股票、借贷还款，目标是成为最富有的玩家"
+category: games
+homepage: "https://www.zap.org.au/projects/trader/"
+license: GPL-3.0-or-later
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "使用 Autotools 构建（configure + make），tarball 自带 configure，无需 autoreconf"
+    - "依赖宽字符 Curses（NcursesW + colour）；以 conan ncurses/6.6 静态库提供，经 PkgConfigDeps 暴露 ncursesw.pc"
+    - "上游 AM_GNU_GETTEXT([external]) 引入外部 gettext 链，OHOS 无该工具链；--disable-nls 使 po/ 与 data/ 生成目标变为 no-op，规避外部 gettext 依赖"
+    - "OHOS libc 为 musl 系，缺 POSIX strfmon()；补丁提供 !__GLIBC__ 守卫的自包含实现（勿用 __OHOS__，部分 OHOS clang 目标不预定义该宏）"
+    - "autoconf 生成的 configure/config.status 用 umask 077 建临时目录，在 setgid 的 HMDFS 挂载上产生 owner 不可写目录；需就地改 umask 022"
+    - "官方源码站 ftp.zap.org.au 在 CI 网络下连接超时；Debian 源码仓库的 .orig.tar.xz 与官方发布位级相同，用镜像列表回退"
+  common_dependencies:
+    - ncurses
+
+versions:
+  "7.21":
+    status: built
+    build_date: "2026-10-14"
+    conan_ref: "trader/7.21"

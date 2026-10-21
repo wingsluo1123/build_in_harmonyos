@@ -161,13 +161,13 @@ fi
 
 # G0e: 仓库根目录文件白名单检查
 # 贡献者不应在根目录放置临时文件（ISSUE/PR草稿/笔记等）
-G0_ROOT_ALLOWED=".gitignore|.gitattributes|BUILD.gn|CONTRIBUTING.md|KNOW_YOUR_WHY.md|LICENSE|README.md|SKILL.md|SUMMARY.md|oh-package.json"
+G0_ROOT_ALLOWED=".gitignore|.gitattributes|BUILD.gn|CONTRIBUTING.md|CHANGELOG.md|KNOW_YOUR_WHY.md|LICENSE|README.md|SKILL.md|SUMMARY.md|oh-package.json"
 echo "[step] G0e: Root directory whitelist check..."
 G0_ROOT_VIOLATIONS=""
 for f in $(git ls-files --full-name | grep -v '/'); do
     if ! echo "$G0_ROOT_ALLOWED" | grep -qFx "$f" 2>/dev/null; then
         case "$f" in
-            .gitignore|.gitattributes|BUILD.gn|CONTRIBUTING.md|KNOW_YOUR_WHY.md|LICENSE|README.md|SKILL.md|SUMMARY.md|oh-package.json)
+            .gitignore|.gitattributes|BUILD.gn|CONTRIBUTING.md|CHANGELOG.md|KNOW_YOUR_WHY.md|LICENSE|README.md|SKILL.md|SUMMARY.md|oh-package.json)
                 ;;
             *)
                 G0_ROOT_VIOLATIONS="${G0_ROOT_VIOLATIONS} ${f}"
@@ -175,6 +175,28 @@ for f in $(git ls-files --full-name | grep -v '/'); do
         esac
     fi
 done
+
+# G0e-2 (v12.24): 顶层目录白名单——协作者私搭目录（code/ probes/ skills/ temp/
+# config/）此前绕过 G0e（旧逻辑只查文件不查目录，2026-10-21 审计发现 5 个非标目录）
+G0_TOPDIR_VIOLATIONS=""
+for d in $(ls -d */ 2>/dev/null | tr -d '/'); do
+    case "$d" in
+        archives|ci|docs|feedback|knowledge|references|scripts|templates|tests)
+            ;;
+        *)
+            G0_TOPDIR_VIOLATIONS="${G0_TOPDIR_VIOLATIONS} ${d}/"
+            ;;
+    esac
+done
+if [ -n "${G0_TOPDIR_VIOLATIONS}" ]; then
+    echo "[fail] G0e: 顶层存在非白名单目录（仅允许 archives ci docs feedback knowledge references scripts templates tests）:"
+    for d in ${G0_TOPDIR_VIOLATIONS}; do
+        echo "       ${d}"
+    done
+    echo "[hint]  私人工具/技能/探针不应提交到仓库顶层——知识草稿放 knowledge/drafts/，脚本合入 scripts/ 需主编审核"
+    G0_ROOT_VIOLATIONS="${G0_ROOT_VIOLATIONS} ${G0_TOPDIR_VIOLATIONS}"
+fi
+
 if [ -n "$G0_ROOT_VIOLATIONS" ]; then
     echo "[fail] G0e: 根目录存在非白名单文件（仅允许 ${G0_ROOT_ALLOWED}）:"
     for f in $G0_ROOT_VIOLATIONS; do
@@ -486,6 +508,9 @@ PYEOF
             REGISTRY_ERRORS=""
             while IFS= read -r dep_ref; do
                 [ -z "$dep_ref" ] && continue
+                # v12.24 (反馈 00802fed): 每个依赖一行进度——conan download 静默
+                # 重定向曾致 15 分钟无日志输出，被误判卡死而重跑
+                echo "  [dep] ${dep_ref%%$'\n'*} ..."
                 # R35: 用 conan download 验证 (禁止用 conan list 判断)
                 # 健壮化: 保留 stderr 区分"真未发布"与"网络/认证错误"; 瞬时错误重试 3 次
                 dep_status="fail"
@@ -906,8 +931,11 @@ PYEOF
 
     # L0o: 禁止使用外部网络命令下载源码 (防 uses_external_curl)
     # conanfile.py 的 build() 方法禁止调用 curl/wget 下载
+    # v12.24 (反馈 git256): 收窄为真实调用形态——self.run/subprocess/os.system
+    # 携带 curl/wget 才算外部下载；self.dependencies[...] / self.options["curl"]
+    # 等引号依赖名索引为合法代码，白名单放行（原正则误判依赖名遍历）
     if [ -f "$CONANFILE" ]; then
-        EXT_CURL=$(grep -nE '(subprocess|os\.system).*?(curl|wget)|"curl"|"wget"|'"'"'curl'"'"'|'"'"'wget'"'"'' "$CONANFILE" 2>/dev/null | grep -v '^\s*#' | grep -v 'tools\.\|conan_data\|self\.run\|#.*curl\|#.*wget' || true)
+        EXT_CURL=$(grep -nE '(self\.run|subprocess|os\.system)[^#\n]*\b(curl|wget)\b' "$CONANFILE" 2>/dev/null | grep -v '^\s*#' | grep -v 'tools\.files\|conan_data\|#.*curl\|#.*wget' || true)
         if [ -n "$EXT_CURL" ]; then
             echo "[fail] L0o: conanfile.py 使用外部命令 (curl/wget) 下载源码 — CI 环境可能无 curl"
             echo "       ${EXT_CURL%%$'\n'*}"

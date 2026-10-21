@@ -1,0 +1,135 @@
+diff --git a/test/unit/src/TestDesignPattern.cpp b/test/unit/src/TestDesignPattern.cpp
+index d5e31d6..f9f54a0 100644
+--- a/test/unit/src/TestDesignPattern.cpp
++++ b/test/unit/src/TestDesignPattern.cpp
+@@ -617,6 +617,8 @@ public:
+     /** */
+     void testXmlFilterReader ()
+     {
++        if (plastFixtureAvailable ("filter1.xml", "testXmlFilterReader") == false)  {  return;  }
++
+         ifstream is(getPath("filter1.xml"), ios::binary);
+         if ( ! is.good() ) {
+             is.close ();
+@@ -716,6 +718,8 @@ public:
+         const char* filename = "uniprot_sprot.fa";
+         const char* tag      = "line";
+ 
++        if (plastFixtureAvailable (filename, "testFileLineIterator2") == false)  {  return;  }
++
+         u_int64_t nbLines   = 0;
+         u_int64_t dataSize = 0;
+ 
+@@ -848,6 +852,11 @@ public:
+     /********************************************************************************/
+     void testFileLineIterator3 ()
+     {
++        static const char* required[] = {
++            "panda.fa", "yeast.fa", "uniprot_sprot.fa", "chr10.fa", "CionaIntestinalis.fa"
++        };
++        if (plastFixturesAvailable ("testFileLineIterator3", required, 5) == false)  {  return;  }
++
+         vector<string> files;
+ 
+         files.push_back ("tursiops.fa");            testFileLineIterator_aux (files);
+diff --git a/test/unit/src/TestSequenceDatabase.cpp b/test/unit/src/TestSequenceDatabase.cpp
+index 909f3f2..c052d2e 100644
+--- a/test/unit/src/TestSequenceDatabase.cpp
++++ b/test/unit/src/TestSequenceDatabase.cpp
+@@ -419,6 +419,11 @@ public:
+         const char* fileTable[] = { "tursiops.fa", "panda.fa", "Fee5ab_All_non_rRNA.fasta", "uniprot_sprot.fa"};
+         size_t      sizeTable[] = { 1000, 10*1000, 100*1000, 1000*1000, 10*1000*1000, 100*1000*1000};
+ 
++        static const char* required[] = {
++            "panda.fa", "Fee5ab_All_non_rRNA.fasta", "uniprot_sprot.fa"
++        };
++        if (plastFixturesAvailable ("testFastaQuickReader2", required, 3) == false)  {  return;  }
++
+         for (size_t i=0; i<sizeof(fileTable)/sizeof(fileTable[0]); i++)
+         {
+             for (size_t j=0; j<sizeof(sizeTable)/sizeof(sizeTable[0]); j++)
+diff --git a/test/unit/src/TestSequenceIterator.cpp b/test/unit/src/TestSequenceIterator.cpp
+index 3e9e787..5379f25 100644
+--- a/test/unit/src/TestSequenceIterator.cpp
++++ b/test/unit/src/TestSequenceIterator.cpp
+@@ -177,6 +177,8 @@ public:
+         const char* tag      = "fasta";
+         TimeInfo info;
+ 
++        if (plastFixtureAvailable (filename, "testFastaBigFile") == false)  {  return;  }
++
+         info.addEntry (tag);
+ 
+         ISequenceIterator* itSeq = new FastaSequenceIterator (getPath (filename));
+@@ -467,6 +469,11 @@ public:
+     /********************************************************************************/
+     void testFilesList (void)
+     {
++        static const char* required[] = {
++            "panda.fa", "yeast.fa", "uniprot_sprot.fa", "chr10.fa"
++        };
++        if (plastFixturesAvailable ("testFilesList", required, 4) == false)  {  return;  }
++
+         vector<string> files;
+ 
+         files.push_back ("tursiops.fa");        testFilesList_aux (files);
+@@ -484,6 +491,8 @@ public:
+     {
+         const char* filename = "bugs/15202/hugecomment.fa";
+ 
++        if (plastFixtureAvailable (filename, "testFastaHugeFile") == false)  {  return;  }
++
+         size_t maxLineSize = 1000;
+         ISequenceIterator* itSeq = new FastaSequenceIterator (getPath (filename), maxLineSize);
+         LOCAL (itSeq);
+diff --git a/test/unit/src/TestSequenceMask.cpp b/test/unit/src/TestSequenceMask.cpp
+index c4c7f7b..8af49e4 100644
+--- a/test/unit/src/TestSequenceMask.cpp
++++ b/test/unit/src/TestSequenceMask.cpp
+@@ -96,6 +96,8 @@ public:
+     {
+         const char* file = "aphid_10000.fa" ;
+ 
++        if (plastFixtureAvailable (file, "test_maskdb") == false)  {  return;  }
++
+         ISequenceIterator* seqIter = new FastaSequenceIterator (getPath (file), 100);
+         CPPUNIT_ASSERT (seqIter != 0);
+ 
+diff --git a/test/unit/src/cppunit.h b/test/unit/src/cppunit.h
+index 92fe7c7..b5fd1dc 100644
+--- a/test/unit/src/cppunit.h
++++ b/test/unit/src/cppunit.h
+@@ -57,4 +57,33 @@ static inline std::string plastTmpPath (const char* name)
+     return result;
+ }
+ 
++/** Provided by main.cpp: builds the path of a fixture of the test/db corpus. */
++extern const char* getPath (const char* file);
++
++/** Tells whether a fixture of the test/db corpus is available.
++ *
++ *  Upstream downloads the full corpus from plast.gforge.inria.fr, a host that
++ *  no longer resolves, and the release archive only ships a subset of it.
++ *  Tests that need one of the missing files are skipped with an explicit
++ *  message instead of failing on a file that cannot be obtained.
++ */
++static inline bool plastFixtureAvailable (const char* file, const char* testName)
++{
++    FILE* probe = fopen (getPath (file), "r");
++    if (probe != 0)  {  fclose (probe);  return true;  }
++
++    printf ("[skip] %s: fixture '%s' is not shipped in the release archive\n", testName, file);
++    return false;
++}
++
++/** Same as plastFixtureAvailable() for a whole list of fixtures. */
++static inline bool plastFixturesAvailable (const char* testName, const char* const* files, size_t nb)
++{
++    for (size_t i = 0; i < nb; i++)
++    {
++        if (plastFixtureAvailable (files[i], testName) == false)  {  return false;  }
++    }
++    return true;
++}
++
+ #endif /* CPPUNIT_H_ */

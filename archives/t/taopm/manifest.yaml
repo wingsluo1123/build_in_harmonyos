@@ -1,0 +1,26 @@
+software: taopm
+display: "Tao"
+description: "Sound synthesis with physical models: virtual acoustic instruments built from masses and springs, rendered to sample streams and converted to WAVE/AIFF"
+category: library
+homepage: "https://sourceforge.net/projects/taopm/"
+license: GPL-2.0-or-later
+build_system: custom
+
+ohos_adaptation:
+  key_points:
+    - "Headless build: -DTAO_NO_GRAPHICS compiles the OpenGL/GLUT instrument viewer out; OHOS only ships EGL/GLES and the GLES driver has no immediate-mode entry points"
+    - "Upstream 2006 autoconf-2.13/libtool-1.3 configure hard-requires desktop GL/GLU/GLUT + X11 and cannot be regenerated (obsolete macros, config.guess without aarch64) => the recipe compiles the documented source lists explicitly"
+    - "C++11+ fixes: removed register specifier, implicit-int main() in taoparse/tao2wav/tao2aiff/generated programs, const-correct yyerror(), missing <cstring>, missing return in TaoInstrument::resetDamping()"
+    - "TaoPitch name buffers fixed (C++98 stream constructor removed in C++11 caused a heap over-read; ASAN confirmed)"
+    - "taoparse needs bison/flex at build time and they need BISON_PKGDATADIR / M4 pointing into the Conan cache; m4 is an explicit tool_requires"
+    - "taoparse derives its output stream names from the first '.' of the script argument, so it must be invoked with a bare relative script name"
+  common_dependencies:
+    - audiofile
+    - bison
+    - flex
+    - m4
+
+versions:
+  "1.0":
+    status: built
+    build_date: "2026-10-18"

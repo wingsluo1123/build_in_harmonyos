@@ -1,0 +1,124 @@
+# 版本级 manifest — vtable 1.2（上游项目 vtable-dumper 1.2）
+version: "1.2"
+software: "vtable"
+conan_ref: "vtable/1.2"
+status: built
+build_date: "2026-10-16"
+build_system: makefile
+
+source:
+  url: "https://github.com/lvc/vtable-dumper/archive/1.2/vtable-dumper-1.2.tar.gz"
+  sha256: "6993781b6a00936fc5f76dc0db4c410acb46b6d6e9836ddbe2e3c525c6dd1fd2"
+  tar_format: tar.gz
+  note: >
+    上游 tag 1.2 官方 tarball（16033 字节，6 个文件：INSTALL / LICENSE /
+    Makefile / README / dump-vtable.c / dump-vtable.h）。许可证 LGPL-2.1-or-later
+    （上游 LICENSE 为 GPL/LGPL 双授权文本，源码头注释同为双授权）。
+    平台任务 slug 为 vtable，上游项目名为 vtable-dumper；按 PF9/PF8 以 slug
+    作为包名与目录名，构建/安装出的可执行文件保持上游真名 vtable-dumper。
+
+build:
+  system: makefile
+  target: "make -j1 CC=<conf> CFLAGS/LDFLAGS=<conan 依赖路径> CXXLIB=-lc++（上游 Makefile 直接目标 vtable-dumper）"
+  configure_options:
+    - 'CFLAGS="-fPIC -O2 -I<elfutils/deps include>"'
+    - 'LDFLAGS="-L<elfutils/deps lib> -Wl,--disable-new-dtags -Wl,-rpath,<deps lib>"  # DT_RPATH 使可执行文件 rpath 继承到 libelf.so.1 的传递依赖 libzstd.so.1'
+    - 'CXXLIB="-lc++"  # 上游默认 -lstdc++；OHOS 只提供 libc++（补丁 0001 参数化）'
+  dependencies:
+    - elfutils/0.195.1
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "patches/0001-Makefile.patch  # Makefile 新增 CXXLIB ?= -lstdc++ 变量并在链接行引用；上游默认值不变，OHOS 以 CXXLIB=-lc++ 覆盖"
+
+# 扁平汇总键（仓内既有约定：submission 的 PR body 生成器与部分门禁读这三个键）
+test_total: 0               # 上游无测试套件（Makefile 无 check 目标）
+test_passed: 0
+test_failed: 0
+upstream_test_total: 0
+test_package_total: 13      # 鸿蒙特有断言（对安装出来的 bin/vtable-dumper 实测）
+test_package_passed: 13
+test_package_failed: 0
+
+package_contents:
+  - "bin/vtable-dumper"
+  - "licenses/LICENSE"
+
+test_results:
+  upstream:
+    type: official
+    total: 0
+    passed: 0
+    failed: 0
+    command: "make -n check"
+    note: >
+      上游无测试套件：tarball 仅 6 个文件，Makefile 只有 all / install /
+      uninstall / clean 四个目标，实测 `make -n check` 报
+      "make: *** No rule to make target 'check'.  Stop."，
+      树内无 tests/ 目录、无 test*.c、无测试框架依赖。上游官方测试 = 0 项。
+  test_package:
+    type: ohos_extra
+    total: 13
+    passed: 13
+    failed: 0
+    command: "conan create（test_package/test.sh，解释器取 $CONFIG_SHELL，否则按固定候选清单探测 bash）"
+    case_id: "E2E-VTABLE-1"
+    note: >
+      消费者端到端用例：C1 -dumpversion == 1.2；C2 用工具链真实编译
+      vtable_consumer.cpp 成 libvtable_consumer.so；C3/C6 两个多态类的 vtable
+      被识别；C4/C7 槽位数与逐行打印的槽位数一致（7 / 6）；C5/C8 虚函数名
+      demangle 正确；C9 typeinfo 槽位正确；C10 -mangled 输出改名符号；
+      C11/C12 非 ELF 输入被判失败且不产生 vtable 输出。
+      断言基于输出内容而非退出码（该工具失败时亦返回 0）。脚本以 set -euo pipefail 开头。
+
+validation:
+  native_build:
+    status: built
+    command: "conan create archives/v/vtable/1.2 -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 --build=missing --user=ohpcd --channel=stable"
+    note: "本机为 HarmonyOS PC（OHOS/aarch64）原生构建，build = host = 目标机；产物 bin/vtable-dumper"
+  upstream_tests:
+    status: built
+    command: "make -n check"
+    note: "上游无测试套件（No rule to make target 'check'）"
+  conan_verify:
+    status: built
+    command: "ohc-run.py conan-verify vtable 1.2"
+    levels:
+      G0: pass
+      G1: pass
+      G2: pass
+      G3: pass
+      G4: pass
+      L2: pass
+      L4: pass
+      L5: pass
+    verdict: "以 conan-verify 实际报告为准"
+    supplement: "reports/conan-verify-report.md"
+  w3_local_ci:
+    status: built
+    command: "ohc-run.py finish vtable 1.2 built（内含 ci/conan/build_and_test.sh vtable/1.2）"
+    exit_code: 0
+    note: "Build Summary: Total 1 / Success 1 / Failed 0 (100%)；产物 .ci-result.json"
+    supplement: "reports/w3-local-ci.log"
+
+knowledge_gained:
+  - "只提供 libc++ 的工具链上，链接 C++ 运行时的第三方 Makefile 若硬编码 -lstdc++ 会直接失败；把库名参数化（保留上游默认值）比改写成 -lc++ 更符合 R8，配方侧用 make 命令行变量覆盖即可"
+
+knowledge_ref: []
+issue: TBD
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/vtable-1.2.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/vtable-1.2.work
+  source_orig_hash: 3b15af7591bbf00b
+  source_work_hash: 7cebf550551be34e
+  generated_at: '2026-10-16T01:02:47'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-Makefile.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

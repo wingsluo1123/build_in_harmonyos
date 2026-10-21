@@ -1,0 +1,18 @@
+error_signature: "undefined (reference|symbol).*_Znwm|undefined (reference|symbol).*_Zdl"
+root_cause: "OHOS SDK 的 libc++.so 是 20 字节 linker-script 桩（INPUT(-lc++_shared)），非真实实现。裸 clang++ 会自动链接 libc++_shared.so，但 CMake/ccache 链接行不会自动带上，C++ 目标出现 undefined _Znwm/_Zdl（operator new/delete）。"
+rec_approach: "链接行显式加全路径 $OHOS_SDK/llvm/lib/aarch64-linux-ohos/libc++_shared.so（conan 配方：extra_exelinkflags + extra_sharedlinkflags）；先验证运行时可解析（实测：链接它的 trivial 程序无 LD_LIBRARY_PATH 可运行，用于 configure 探测程序也安全）。"
+match_keywords: ["libc++.so", "libc++_shared.so", "linker script", "20 byte", "_Znwm", "_Zdl", "OHOS", "C++"]
+severity:               2
+category: platform
+last_updated: 2026-09-28
+id:                     E3052
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E3052.md
+trigger_tool:           make
+phase:                  build
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        "链接行显式加全路径 $OHOS_SDK/llvm/lib/aarch64-linux-ohos/libc++_shared

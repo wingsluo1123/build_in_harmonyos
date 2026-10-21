@@ -1,0 +1,69 @@
+# test_package/MANIFEST.yml — libuser 0.64-git20241106-dfsg 上游测试声明
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见 docs/TEST_QUALITY_SPEC.md
+
+package: libuser/0.64-git20241106-dfsg
+homepage: "https://pagure.io/libuser/"
+
+# 上游测试套件存在性（已审计 Makefile.am，见下方 upstream_test_audit）
+upstream_tests_exist: true
+
+# rule4：官方注册总数（非可运行子集）。上游 Makefile.am 的 TESTS 官方总数
+# 共 7 项：tests/config_test.sh tests/fs_test tests/files_test
+# tests/pwhash_test tests/utils_test（常驻 5 项）+ tests/default_pw_test
+# tests/ldap_test（仅 `if LDAP` / `--with-ldap` 时注册）。本配方 --without-ldap，
+# 故 `make check` 实际注册并运行常驻 5 项；总数仍按官方口径声明 7。
+upstream_test_total: 7
+upstream_test_count_method: autotools_tests
+
+# 上游测试审计（依据上游 configure.ac / Makefile.am 文本，见 notes.md 上游调研）
+upstream_test_audit: "Upstream tests exist: 7 automake TESTS in Makefile.am (base 5 always registered: tests/config_test.sh, tests/fs_test, tests/files_test, tests/pwhash_test, tests/utils_test; plus tests/default_pw_test and tests/ldap_test registered only under `if LDAP` (AM_CONDITIONAL LDAP, i.e. --with-ldap), audited against upstream configure.ac/Makefile.am which this snapshot matches). This recipe builds --without-ldap (OHOS has no LDAP/slapd runtime), so `make check` registers/runs the base 5; the 2 LDAP-conditional entries are carried as explicit ohos_feature gaps (tests/ldap_test exits 77 without /usr/sbin/slapd by upstream design). Entry point is `make check`; build() runs it best-effort and parses test-suite.log for real counts."
+
+# 上游测试命令
+upstream_check_command: "make check -j1 PYTHON=<worker python3>（python 绑定已启用 --with-python）"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "make check -j1 PYTHON=<worker python3>（best-effort；计数解析自 test-suite.log 的 # TOTAL/# PASS/# FAIL/# SKIP 汇总块；PYTHON 同时用于 configure 的 AM_PATH_PYTHON 以构建 python/.libs/libuser.so，4 项 python 驱动测试经 PYTHONPATH 加载该绑定）"
+
+# 上游实际运行的测试程序（automake TESTS 全量接入）
+upstream_tests:
+  - file: tests/config_test.sh
+    source: libuser-0.64-git20241106/tests/config_test.sh
+    description: "automake TESTS：配置读写测试（驱动 tests/config_test 二进制与 config_test.py）"
+    command: "make check"
+  - file: tests/fs_test
+    source: libuser-0.64-git20241106/tests/fs_test
+    description: "automake TESTS：文件系统属性测试（二进制 + fs_test.py 驱动）"
+    command: "make check"
+  - file: tests/files_test
+    source: libuser-0.64-git20241106/tests/files_test
+    description: "automake TESTS：files 后端测试（二进制 + files_test.py 驱动）"
+    command: "make check"
+  - file: tests/pwhash_test
+    source: libuser-0.64-git20241106/tests/pwhash_test
+    description: "automake TESTS：密码哈希测试（二进制 + pwhash.py 驱动）"
+    command: "make check"
+  - file: tests/utils_test
+    source: libuser-0.64-git20241106/tests/utils_test
+    description: "automake TESTS：工具函数测试（二进制 + conf fixtures）"
+    command: "make check"
+  - file: tests/default_pw_test
+    source: libuser-0.64-git20241106/tests/default_pw_test
+    description: "automake TESTS（仅 if LDAP/--with-ldap 注册）：默认口令回归测试；本配方 --without-ldap 未注册，以 ohos_feature 缺口如实说明（OHOS 无 LDAP/slapd 运行时）"
+    command: "make check"
+  - file: tests/ldap_test
+    source: libuser-0.64-git20241106/tests/ldap_test
+    description: "automake TESTS（仅 if LDAP/--with-ldap 注册）：LDAP 回归测试，需 /usr/sbin/slapd；本配方 --without-ldap 未注册，以 ohos_feature 缺口如实说明"
+    command: "make check"
+
+# test_package 中自带的测试（消费者视角验证，真实调用库 API）
+test_package_tests:
+  - file: test_libuser.c
+    description: "6 组真实 API 调用：context_start（lu_start 真实 dlopen files/shadow 后端）/ modules_loaded / user_default / group_default / ent_id_roundtrip / config_moduledir（LIBUSER_CONF 生效证明）"
+    command: "./test_libuser"
+
+harmonyos_specific_tests: []
+
+# 测试断言总数（6 个消费者组；上游 7 项由 HMBS_UPSTREAM_TEST_RESULT 单独计数）
+assertion_count: 6

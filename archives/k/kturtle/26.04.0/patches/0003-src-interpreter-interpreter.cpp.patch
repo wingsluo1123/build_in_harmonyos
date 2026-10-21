@@ -1,0 +1,38 @@
+--- a/src/interpreter/interpreter.cpp
++++ b/src/interpreter/interpreter.cpp
+@@ -1,31 +1,35 @@
+ /*
+     SPDX-FileCopyrightText: 2003-2006 Cies Breijs <cies AT kde DOT nl>
+ 
+     SPDX-License-Identifier: GPL-2.0-or-later
+ */
+ 
+ #include "interpreter.h"
++#ifdef KTURTLE_HAVE_DBUS
+ #include "interpreteradaptor.h"
++#endif
+ 
+ #include <QtDebug>
+ 
+ #include <QDebug>
+ 
+ Interpreter::Interpreter(QObject *parent, bool testing)
+     : QObject(parent)
+     , m_testing(testing)
+ {
+     if (testing) {
++#ifdef KTURTLE_HAVE_DBUS
+         new InterpreterAdaptor(this);
+         QDBusConnection dbus = QDBusConnection::sessionBus();
+         dbus.registerObject(QStringLiteral("/Interpreter"), this);
++#endif
+     }
+ 
+     errorList = new ErrorList();
+     tokenizer = new Tokenizer();
+     parser = new Parser(testing);
+     executer = new Executer(testing);
+ 
+     m_state = Uninitialized;
+ }
+ 

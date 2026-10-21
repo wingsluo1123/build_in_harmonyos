@@ -1,0 +1,100 @@
+--- a/fc-solve/source/t/CMakeLists.txt
++++ b/fc-solve/source/t/CMakeLists.txt
+@@ -43,6 +43,8 @@
+     )
+ ENDMACRO ()
+ 
++option (FCS_SKIP_PERL_GENERATED_TESTS "Do not generate the Perl-based .t test scripts (requires CPAN test modules)" OFF)
++
+ IF (FCS_WITH_TEST_SUITE)
+ 
+     SET (MODULE "Task::FreecellSolver::Testing")
+@@ -59,11 +61,11 @@
+         ASSERT_PYTHON3_MODULE_PRESENCE("${mod_}" " It is needed by the test suite which was enabled.")
+     ENDFOREACH()
+ 
+-    FIND_PACKAGE (PkgConfig REQUIRED)
+-    pkg_check_modules(CMOCKA REQUIRED cmocka)
+-    include_directories (${CMOCKA_INCLUDE_DIRS})
+-    link_directories (${CMOCKA_LIBRARY_DIRS})
+-    add_definitions (${CMOCKA_CFLAGS_OTHER})
++    # OHOS does not provide a pkg-config entry for the Conan-packaged cmocka,
++    # so consume cmocka through its CMake package (exported by the recipe as
++    # the cmocka::cmocka target) instead of pkg_check_modules().
++    FIND_PACKAGE (cmocka CONFIG REQUIRED)
++    SET (CMOCKA_LIBRARIES cmocka::cmocka)
+     MY_FIND_GMP ("to run the test suite." "FCS_WITH_TEST_SUITE")
+ 
+     INCLUDE_DIRECTORIES (BEFORE "${CMAKE_BINARY_DIR}")
+@@ -147,28 +149,50 @@
+         )
+     TARGET_LINK_LIBRARIES (${EXE_FILE} ${CMOCKA_LIBRARIES})
+ 
+-    GEN_INDIVIDUAL_TESTS(
+-        "generate_valgrind_tests"
+-        "${PROJECT_SOURCE_DIR}/scripts/gen-individual-valgrind-test-scripts.pl"
+-        "${CMAKE_CURRENT_BINARY_DIR}/t/valgrind--range_parallel_solve__11982_opt.t"
+-        "${CMAKE_CURRENT_SOURCE_DIR}/lib/FC_Solve/Test/Valgrind.pm"
+-        "${CMAKE_CURRENT_SOURCE_DIR}/lib/FC_Solve/Test/Valgrind/Data.pm"
+-    )
+-    GEN_INDIVIDUAL_TESTS(
+-        "generate_verify_tests"
+-        "${PROJECT_SOURCE_DIR}/scripts/gen-individual-verify-test-scripts.pl"
+-        "${CMAKE_CURRENT_BINARY_DIR}/t/verify--id24.t"
++    IF (NOT FCS_SKIP_PERL_GENERATED_TESTS)
++        GEN_INDIVIDUAL_TESTS(
++            "generate_valgrind_tests"
++            "${PROJECT_SOURCE_DIR}/scripts/gen-individual-valgrind-test-scripts.pl"
++            "${CMAKE_CURRENT_BINARY_DIR}/t/valgrind--range_parallel_solve__11982_opt.t"
++            "${CMAKE_CURRENT_SOURCE_DIR}/lib/FC_Solve/Test/Valgrind.pm"
++            "${CMAKE_CURRENT_SOURCE_DIR}/lib/FC_Solve/Test/Valgrind/Data.pm"
++        )
++        GEN_INDIVIDUAL_TESTS(
++            "generate_verify_tests"
++            "${PROJECT_SOURCE_DIR}/scripts/gen-individual-verify-test-scripts.pl"
++            "${CMAKE_CURRENT_BINARY_DIR}/t/verify--id24.t"
++
++            "${CMAKE_CURRENT_SOURCE_DIR}/lib/FC_Solve/Test/Verify.pm"
++            "${CMAKE_CURRENT_SOURCE_DIR}/lib/FC_Solve/Test/Verify/Data.pm"
++        )
++        GEN_INDIVIDUAL_TESTS(
++            "generate_cmp_digest_tests"
++            "${PROJECT_SOURCE_DIR}/scripts/gen-individual-compare-digests-test-scripts.pl"
++            "${CMAKE_CURRENT_BINARY_DIR}/t/cmpdigest--id24.t"
++            "${CMAKE_CURRENT_SOURCE_DIR}/lib/FC_Solve/Test/CheckResults.pm"
++            "${CMAKE_CURRENT_SOURCE_DIR}/lib/FC_Solve/CheckResults/Data.pm"
++        )
++    ENDIF ()
+ 
+-        "${CMAKE_CURRENT_SOURCE_DIR}/lib/FC_Solve/Test/Verify.pm"
+-        "${CMAKE_CURRENT_SOURCE_DIR}/lib/FC_Solve/Test/Verify/Data.pm"
+-    )
+-    GEN_INDIVIDUAL_TESTS(
+-        "generate_cmp_digest_tests"
+-        "${PROJECT_SOURCE_DIR}/scripts/gen-individual-compare-digests-test-scripts.pl"
+-        "${CMAKE_CURRENT_BINARY_DIR}/t/cmpdigest--id24.t"
+-        "${CMAKE_CURRENT_SOURCE_DIR}/lib/FC_Solve/Test/CheckResults.pm"
+-        "${CMAKE_CURRENT_SOURCE_DIR}/lib/FC_Solve/CheckResults/Data.pm"
+-    )
++    # Register the C (cmocka) test programs with CTest directly.  Upstream only
++    # registers the Perl run-tests.pl harness; on OHOS the CPAN modules that
++    # harness needs are unavailable, so the same upstream test programs are
++    # registered one by one instead (no test code is changed).
++    ADD_TEST(NAME card-test-render
++        COMMAND "${CMAKE_CURRENT_BINARY_DIR}/card-test-render.t.exe")
++    ADD_TEST(NAME card-test-parse
++        COMMAND "${CMAKE_CURRENT_BINARY_DIR}/card-test-parse.t.exe")
++    ADD_TEST(NAME bit-reader-and-writer
++        COMMAND "${CMAKE_CURRENT_BINARY_DIR}/bit-reader-and-writer-test.t.exe")
++    IF ("${DEBONDT_DELTA_STATES}")
++        ADD_TEST(NAME delta-states-debondt
++            COMMAND "${CMAKE_CURRENT_BINARY_DIR}/delta-states-debondt-test.t.exe")
++    ELSE ()
++        ADD_TEST(NAME delta-states
++            COMMAND "${CMAKE_CURRENT_BINARY_DIR}/delta-states-test.t.exe")
++    ENDIF ()
++    ADD_TEST(NAME dbm-kaztree-compare-records
++        COMMAND "${CMAKE_CURRENT_BINARY_DIR}/dbm-kaztree-compare-records-test.t.exe")
+ ENDIF ()
+ 
+ SET (test_tags )

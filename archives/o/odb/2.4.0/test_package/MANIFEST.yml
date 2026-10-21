@@ -1,0 +1,28 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+
+package: odb/2.4.0
+homepage: "https://www.codesynthesis.com/products/odb"
+
+# The upstream test suite (make check in each component) requires a
+# reachable database server for most tests and a full GCC development
+# toolchain for the compiler tests; it is not executed in this CI.
+# Instead, test_package runs a consumer-level C++ program that opens an
+# in-memory SQLite database through the packaged runtime, creates a
+# table, inserts and reads back a row and asserts the roundtrip value.
+upstream_check_command: "make check (per component: odb/, libodb/, libodb-sqlite/)"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.cpp
+    description: "Consumer C++ test: opens in-memory SQLite DB via odb::sqlite::database/connection, creates table, inserts and queries a row, asserts the roundtrip value"
+    command: "./test_odb"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 6

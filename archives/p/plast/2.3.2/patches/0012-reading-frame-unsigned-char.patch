@@ -1,0 +1,33 @@
+diff --git a/src/database/impl/ReadingFrameSequenceIterator.cpp b/src/database/impl/ReadingFrameSequenceIterator.cpp
+index 7cfc008..ad5010c 100644
+--- a/src/database/impl/ReadingFrameSequenceIterator.cpp
++++ b/src/database/impl/ReadingFrameSequenceIterator.cpp
+@@ -166,7 +166,7 @@ void ReadingFrameSequenceIterator::udpateItem ()
+     /** We parse the current data of the reference sequence. */
+     const IWord& refData = refSeq->data;
+ 
+-    char direction = getDirection();
++    int direction = getDirection();
+     size_t i0, i1, offset;
+ 
+     /** We determine parameters according to the frame. */
+diff --git a/src/database/impl/ReadingFrameSequenceIterator.hpp b/src/database/impl/ReadingFrameSequenceIterator.hpp
+index bdcc84a..9c9b0a0 100644
+--- a/src/database/impl/ReadingFrameSequenceIterator.hpp
++++ b/src/database/impl/ReadingFrameSequenceIterator.hpp
+@@ -128,8 +128,14 @@ private:
+ 
+     /** Returns the direction of the current frame.
+      * \return 1 for strands 1,2,3 and -1 for strands 4,5,6
++     *
++     * Note that the type is 'int' and not 'char': the value is used as an
++     * arithmetic operand (and as an array index offset) in udpateItem(), where
++     * a plain 'char' holding -1 is read as 255 on architectures where char is
++     * unsigned (arm64 for instance), which turns the indexing into an out of
++     * bounds access.
+      */
+-    char getDirection()  { return (_frame==misc::FRAME_1 || _frame==misc::FRAME_2 ||_frame==misc::FRAME_3  ?  1 : -1); }
++    int getDirection()  { return (_frame==misc::FRAME_1 || _frame==misc::FRAME_2 ||_frame==misc::FRAME_3  ?  1 : -1); }
+ };
+ 
+ /********************************************************************************/

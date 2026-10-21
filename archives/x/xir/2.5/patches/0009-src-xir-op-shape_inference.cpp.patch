@@ -1,0 +1,47 @@
+--- a/src/xir/op/shape_inference.cpp
++++ b/src/xir/op/shape_inference.cpp
+@@ -731,21 +731,21 @@
+                "feature "
+                "maps "
+                "of concat op should be same."
+             << " But here one of the shapes is "
+             << xir::to_string(ins[i]->get_shape()) << ", one of the shape is "
+             << xir::to_string(ins[0]->get_shape()) << ", and the axis is "
+             << axis;
+   auto out = cur->get_output_tensor();
+   auto o_axis = static_cast<int32_t>(
+       std::accumulate(ins.begin(), ins.end(), 0,
+-                      [out, axis](std::int32_t o_axis, xir::Tensor* t) {
++                      [axis](std::int32_t o_axis, xir::Tensor* t) {
+                         return o_axis + t->get_shape().at(axis);
+                       }));
+   std::vector<std::int32_t> out_shape;
+   for (auto i = 0; i < static_cast<std::int32_t>(ins[0]->get_shape().size());
+        i++) {
+     if (i == axis)
+       out_shape.push_back(o_axis);
+     else
+       out_shape.push_back(ins[0]->get_shape().at(i));
+   }
+@@ -1547,20 +1547,21 @@
+           final_shape_gather_indices.push_back(full_index);
+         }
+         full_index++;
+       }
+     }
+   }
+   // Step 3: Make implicit ranges (non-zero begin_masks and end_masks)
+   // explicit
+   //         and bounds check!
+   bool is_simple_slice = true;
++  (void)is_simple_slice;  // clang -Wunused-but-set-variable: never read
+   for (auto i = 0; i < in_shape_num; ++i) {
+     auto& begin_i = begin[i];
+     auto& end_i = end[i];
+     auto& stride_i = strides[i];
+     auto dim_i = in_dims[i];
+     if (stride_i == 0) {
+       UNI_LOG_FATAL(XIR_INVALID_ARG_OCCUR)
+           << cur->to_string() << "'s strides[" << i << "] must be non-zero";
+     }
+     bool shrink_i = (dense_shrink_axis_mask & (1 << i));

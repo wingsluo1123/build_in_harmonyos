@@ -1,0 +1,66 @@
+# ═══ Draft knowledge entry — 构建子进程 user.home 回退 '?' 时本地状态目录散射 ═══
+# Timestamp: 2026-09-30（修订自 DRAFT-14402-bishengjdk-user-home-qmark-maven-repo，按 Curator 审计去版本化并对齐 _template.kv）
+# Software 规则化：所有按 ${user.home} 落状态目录的 JVM 生态工具（案例：zt-exec 1.12 的 Maven .m2）
+# Gate: conan create build()/package()
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E3198
+trigger_tool:           java|maven|gradle|runtime
+phase:                  compilation|testing|runtime
+error_signature:        \?/\.m2/repository|\?/\.gradle|not found in local Maven repo|user\.home[^\n]*\?
+
+# ═══ Layer 1: 识别层 ═══
+severity:               2
+category:               ohos, portability, build-system, java, environment
+match_keywords:         user.home, .m2/repository, .gradle, maven.repo.local,
+                        GRADLE_USER_HOME, bishengjdk, HarmonyOS, conanbuild,
+                        本地仓库散射, HOME unset
+title: 构建子进程取不到 HOME 且无 passwd 条目时 user.home 回退字面 '?'，工具状态目录散射进构建目录：显式 HOME + 工具原生仓库旗标钉绝对路径（Maven .m2，zt-exec 1.12 案例）
+
+# ═══ Layer 2: 诊断层 ═══
+root_cause: OpenJDK 系 unix 实现 user.home 取 HOME 环境变量，取不到时回退字面
+  字符串 '?'（同族原因：设备 uid 无 passwd 条目）；Maven/Gradle 等按
+  ${user.home} 推导状态目录（~/.m2/repository、~/.gradle），于是整个仓库
+  建进 <cwd>/?/ 下，随构建目录生灭、路径不可预测；而外层编排进程（如 conan）
+  的 HOME 正常，两侧对"家目录"认知不一致导致产物回收失败。
+affected_scope: 所有在 OHOS 真机或净化环境 CI 的构建子进程内运行、且按
+  ${user.home}/~ 落状态或缓存目录的 JVM 生态工具（Maven/Gradle/javac 附属
+  缓存等）；与具体库无关——任何 conan/CI 包装的 Java 构建都可能命中，症状
+  是"构建成功但产物收集/依赖回收报 not found"，仓库实际落在 <builddir>/?/ 下。
+verification_cmd: env -u HOME ~/bishengjdk17/bin/java -XshowSettings:properties -version 2>&1 | grep user.home
+# ═══ Layer 3: 方案层 ═══
+rec_priority:           1
+rec_approach: explicit-home-env-plus-tool-native-repo-pin
+rec_description: 配方 build() 内显式 os.environ["HOME"]=os.path.expanduser("~")
+  并同时用工具原生机制钉绝对路径——Maven 用 -Dmaven.repo.local=<绝对路径>，
+  Gradle 用 --gradle-user-home 或 GRADLE_USER_HOME；
+  产物收集用同一 Python/脚本常量路径，不依赖 ~ 在子进程环境成立。
+rec_command: bash -c "cd {src} && sh {maven_home}/bin/mvn -B clean package -Dmaven.repo.local={home}/.m2/repository"
+rec_auto_fix:           false
+rec_impl:               manual
+
+fallback_priority:      2
+fallback_approach: scatter-recovery-after-build
+fallback_description: 构建后从构建目录内扫描 '*/?/.m2/repository' 等散射目录，
+  整体拷回固定路径再回收产物。仅救急：路径含字面 '?'、随 conan build 目录
+  生灭，且多构建并发时不可区分归属。
+fallback_command: find {build_dir} -maxdepth 6 -path '*/?/.m2/repository' -type d
+fallback_auto_fix:      false
+fallback_impl:          manual
+
+forbid_1_pattern:       bin/mvn(?!.*-Dmaven\.repo\.local)|mvn -B(?!.*-Dmaven\.repo\.local)
+forbid_1_reason: bisheng JDK 在 OHOS 上 user.home 可解析为字面 '?'，Maven 默认
+  仓库位置不可控；不带 -Dmaven.repo.local 的 mvn 构建在真机/净化 CI 上属于
+  未定义行为。
+forbid_1_consequence: 构建全绿但 package() 报 not found in local Maven repo，
+  或仓库随 conan build 目录被回收后反复全量下载。
+
+# ═══ Layer 4: 原则挂钩 ═══
+principles:               
+# ═══ 关系图 ═══
+# ═══ 元数据 ═══
+doc_file:               knowledge/drafts/DRAFT-java-user-home-unset-scatters-tool-state-dirs.md
+last_updated:           2026-09-30
+source_event:           zt-exec/1.12 真机 CI run4（package() slf4j-api not found，
+  仓库实测落在 .conan2/p/b/<pkg>/b/?/.m2）→ run5 修复后 PASS
+authors:               unknown

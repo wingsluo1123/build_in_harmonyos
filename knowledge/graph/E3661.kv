@@ -1,0 +1,34 @@
+#====================================================================
+# DRAFT-apt-pkg-2.7.14-cmake-trycompile-make-eagain-worker
+# CMake try-compile 阶段 make EAGAIN（worker 资源压力，非配方缺陷）
+#====================================================================
+
+id:                     E3661
+trigger_tool:           cmake|make|conan
+phase:                  configure|build
+error_signature:        Check for working C compiler.*broken|is not able to compile a simple test program|resource temporarily unavailable|Problem parsing /proc/meminfo|Generator: build tool execution failed|cmTC_[0-9a-f]+/fast|ConanException: Error 1 while executing|L1_RESULT=fail: conan create failed
+
+severity:               3
+category:               platform, ohos, cmake, make, ci-infra
+match_keywords:         EAGAIN, Resource temporarily unavailable, /proc/meminfo, try_compile, cmTC, CMakeTestCCompiler, compiler broken, fork, posix_spawn, apt-pkg, 90161, conan create failed, worker
+title:                  CMake 编译器探测试编译（try-compile）阶段 make 报 resource temporarily unavailable（EAGAIN）：worker 资源压力，非配方缺陷
+
+root_cause:             worker 处于 fd/内存/进程数压力下，CMake 探测试编译阶段用 make -f Makefile cmTC_*/fast 派生 clang 编译子进程时 fork()/posix_spawn() 返回 EAGAIN（errno 11, "resource temporarily unavailable"），CMake 将其误报为 "The C compiler ... is not able to compile a simple test program" / "compiler - broken"，掩盖资源根因。与 libfprint meson EAGAIN、DRAFT-ci-worker-gate-fork-oom、DRAFT-11327-cannot-fork 同型；本日志 Conan toolchain 已正确注入 -stdlib=libc++（排除 E455），错误文本为 EAGAIN 而非 /bin/sh Permission denied（排除 E346），失败点在 make 启动子进程即 EAGAIN 而非 clang 编译输出错误。
+affected_scope:         在共享/受限 CI worker 上走 CMake（Unix Makefiles 默认生成器）的适配，cmake.configure() 编译器探测试编译（try_compile/cmTC_*）阶段失败并报 resource temporarily unavailable / Problem parsing /proc/meminfo；apt-pkg/2.7.14（PR #14901, 构建 #90161, CI-022）实测受影响。
+verification_cmd:       本地同命令复跑：CI_PACKAGES="archives/a/apt-pkg/2.7.14" CI_BRANCH="feat/apt-pkg-2.7.14" CI_PR_NUMBER="14901" CONAN_PROFILE=ohos-aarch64-local zsh ci/conan/build_and_test.sh → 期望 EXIT=0、G0/L0/L1/L5_RESULT=pass、test_package 全 PASS、All packages built and tested successfully。
+
+rec_priority:           1
+rec_approach:           rebuild-on-idle-worker-no-recipe-change
+rec_description:        环境性资源失败：不改配方/源码/测试，对同一 SHA 发起 /rebuild 换 worker；本地用与 CI 完全相同的 ci/conan/build_and_test.sh 复跑全绿即证明配方无问题（E491 forbid_3：改包代码前必须先有设备资源证据）。
+rec_command:            /rebuild（CI 评论触发）；本地: CONAN_PROFILE=ohos-aarch64-local zsh ci/conan/build_and_test.sh（本机 profile 工具链路径已适配，直用 repo 内 CI profile 会报 CMAKE_C_COMPILER is not a full path）
+rec_auto_fix:           false
+rec_impl:               ci-infra-rebuild
+
+fallback_priority:      2
+fallback_approach:      ninja-generator-to-skip-make-fork
+fallback_description:   若同一 worker 多次稳定复现 EAGAIN 且无法换 worker，可考虑将 CMake 生成器换为 Ninja（直接 exec 编译器，不经 make 的 /bin/sh 派生层，fork 开销更低）；但需先确认是 make 层 fork 压力而非设备整体内存耗尽（后者仍应先换 worker / 协调调度窗口）。
+fallback_command:       tc.generator = "Ninja"（conanfile.py generate() 中 CMakeToolchain 设置）
+fallback_auto_fix:      false
+last_updated:               2026-10-21
+authors:               unknown
+doc_file:               doc/E3661.md

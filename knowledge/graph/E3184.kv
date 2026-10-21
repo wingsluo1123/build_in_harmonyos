@@ -1,0 +1,56 @@
+#====================================================================
+# DRAFT-retro-gtk-1.0.2-glib-subprocess-argv-appname-null-truncation
+# GLib 库把 g_get_application_name() 作为子进程 argv 元素：
+# 未设置应用名时 NULL 会让 argv 提前截断（子进程断言/参数错乱）
+#====================================================================
+
+id:                     E3184
+trigger_tool:           glib|gdbus|runtime
+phase:                  runtime|testing
+error_signature:        assertion failed: \(argc >= 3\)|RetroRunner:ERROR.*argc|usage: .*<core>.*missing|Gtk-WARNING.*cannot open display.*SIGTRAP
+
+severity:               2
+category:               runtime, testing, glib, gtk
+match_keywords:         g_get_application_name, g_set_application_name, g_subprocess_launcher_spawn, argv 截断, argc 断言, RetroCore, retro-runner, gtk_test_init, g_test_init, 消费者测试, display, 隐藏前提
+title:                  库以 g_get_application_name() 作为子进程 argv 元素时，未设置应用名会让 argv 提前截断
+
+root_cause:             retro-gtk 的 RetroCore 在启动 retro-runner 时执行
+`g_subprocess_launcher_spawn (launcher, &err, runner_path, g_get_application_name(), self->filename, NULL)`；
+`g_get_application_name()` 在调用方未显式设置时返回 NULL，GLib 的 spawn 以 NULL 结束 argv，
+于是子进程只收到 runner 路径 → retro-runner 的 `g_assert (argc >= 3)` 直接失败
+（Bail out!）。上游测试没暴露该前提：GTK/GApplication 与 g_test/gtk_test_init 会顺带设置
+应用名；纯 GLib 消费者（以及把上游 reftest 从 gtk_test_init 改成 g_test_init 的 headless 适配）
+必须自己 `g_set_application_name()`。
+affected_scope:         使用 GLib 子进程 API 且把 g_get_application_name() 直接当 argv 元素的库
+（retro-gtk/RetroCore 是实测样本）；以及从 GTK 环境迁到 headless 测试路径的所有消费者。
+verification_cmd:       消费者最小程序：不调用 g_set_application_name() 时 retro-runner 报
+`assertion failed: (argc >= 3)`；加上调用后 `retro_core_boot()` 正常返回，视频输出信号按帧到达。
+
+rec_priority:           1
+rec_approach:           consumer-sets-application-name
+rec_description:        消费者侧在创建对象前调用 g_set_application_name("...")（真实应用通常由 GTK/GApplication
+自动设置，纯 GLib/headless 消费者需显式）；配方 notes/README 把该前提写进"使用注意"。
+若在被测库内兜底（`g_get_application_name() ?: "fallback"`）需与上游协商，属行为变更，默认不做。
+rec_command:            g_set_application_name ("my-frontend");  // 之后再做 retro_core_new/boot
+rec_auto_fix:           false
+rec_impl:               consumer-side-initialization
+
+fallback_priority:      2
+fallback_approach:      null-safe-argv-in-library-patch
+fallback_description:   若必须让库自身健壮（无法改所有消费者），可用补丁在库内对 argv 元素做空值兜底
+（例如 `g_get_application_name() ? g_get_application_name() : "retro-runner"`）；这属上游行为变更，
+需在 PR 的"上游测试/源码修改说明"里单列并说明理由。
+fallback_command:       (补丁级方案，需评审)
+fallback_auto_fix:      false
+fallback_impl:          upstream-behavior-patch
+
+principles:               
+doc_file:               knowledge/drafts/DRAFT-retro-gtk-1.0.2-glib-subprocess-argv-appname-null-truncation.md
+last_updated:           2026-10-12
+source_event:           retro-gtk 1.0.2 HarmonyOS PC 适配（消费者测试暴露 runner argv 前提）
+source_pr:              ""
+source_commit:          ""
+
+metrics_success_count:  0
+metrics_fail_count:     0
+authors:               unknown

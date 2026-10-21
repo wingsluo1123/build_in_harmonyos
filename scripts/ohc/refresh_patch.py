@@ -45,7 +45,7 @@ def _should_ignore(rel_path: Path) -> bool:
 
 def _is_likely_generated(mod_file: Path) -> bool | None:
     """Is this file a build-system generated artifact?
-    
+
     Returns:
         True  → definitely generated (skip it)
         False → definitely source code (keep it)
@@ -106,10 +106,10 @@ def _is_likely_generated(mod_file: Path) -> bool | None:
 def _ai_classify_uncertain(uncertain_files: list[tuple[Path | None, Path]],
                            work_dir: Path, orig_dir: Path) -> set[str]:
     """Use AI to classify uncertain files as source (keep) or generated (skip).
-    
+
     Outputs a classification report to stdout for the AI agent to consume,
     and reads back the AI decision from a temporary file.
-    
+
     Returns set of relative paths that are SOURCE (should be kept).
     """
     if not uncertain_files:
@@ -524,15 +524,37 @@ def auto_mode(software: str, version: str, pdir: str | None = None) -> int:
     log_ok(f"✅ 生成 {len(new_patches)} 个补丁")
 
     # Patch classification annotation
+    # ⚠️ 保留人工分类（反馈 01f55f48）：补丁内容未变时沿用已有分类，只对新增补丁写 pending
+    existing_cls = {}
+    if manifest.exists():
+        try:
+            import yaml
+            _m = yaml.safe_load(manifest.read_text(encoding="utf-8")) or {}
+            for pc in (_m.get("patch_classification") or []):
+                if isinstance(pc, dict) and pc.get("file"):
+                    existing_cls[pc["file"]] = pc
+        except Exception:
+            pass
+
     patch_list = []
     for p in sorted(patch_dir.glob("*.patch")):
-        patch_list.append({
-            "file": p.name,
-            "type": "auto",  # AI should classify later
-            "platform_only": True,  # default assumption for OHOS patches
-            "guard": "pending"  # AI should fill: __OHOS__ / $^O / none
-        })
-    
+        prev = existing_cls.get(p.name)
+        if prev and prev.get("guard") not in (None, "", "pending"):
+            # 已有人工分类且补丁仍在：原样保留
+            patch_list.append({
+                "file": p.name,
+                "type": prev.get("type", "auto"),
+                "platform_only": prev.get("platform_only", True),
+                "guard": prev.get("guard", "pending"),
+            })
+        else:
+            patch_list.append({
+                "file": p.name,
+                "type": "auto",  # AI should classify later
+                "platform_only": True,  # default assumption for OHOS patches
+                "guard": "pending"  # AI should fill: __OHOS__ / $^O / none
+            })
+
     if patch_list and manifest.exists():
         import yaml
         # Read existing manifest

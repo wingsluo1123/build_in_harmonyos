@@ -1,0 +1,49 @@
+# 版本级 manifest — sg3_utils 1.49（ARCHIVE-SPEC v2.0）
+
+version: "1.49"
+software: sg3_utils
+status: built
+build_date: "2026-10-17"
+build_system: cmake
+
+source:
+  url: "https://github.com/doug-gilbert/sg3_utils/archive/refs/tags/release-1.49.tar.gz"
+  sha256: "b1eac8f50cf588fb777a1fb615598d8d70bef1adb15a14148761035a9a43a847"
+  tar_format: tar.gz
+  note: >-
+    官网 sg.danny.cz 的 https 证书于 2026-10-01 过期且主机名不匹配（实测不可用），
+    改用上游作者官方 GitHub 仓库 tag release-1.49（同源发布，满足 R39 官方源要求）。
+
+build:
+  system: cmake
+  configure_options:
+    - "-DBUILD_SHARED_LIBS=OFF"
+    - "-DENABLE_PT_DUMMY=OFF"
+    - "-DCMAKE_POSITION_INDEPENDENT_CODE=ON"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+  note: >-
+    官方 tag 归档不含预生成 configure，构建机与 CI 均无 automake/libtool，
+    故走上游自带的 CMake 构建（上游自 1.44 起同时维护 Autotools 与 CMake 两套）。
+
+patches_applied:
+  - "0001-CMakeLists.txt.patch"
+
+knowledge_gained:
+  - "上游 CMake 用 CMAKE_SYSTEM_NAME STREQUAL \"Linux\" 判定 Linux 专属 pass-through 实现：HarmonyOS 会落入 PT_DUMMY 降级分支，PT 全部空转且 14 个可执行文件不构建（SG3_UTILS_LINUX_ONLY 的 13 个 + sg_scan，示例 sg_map/sg_scan/sg_rbuf/sg_emc_trespass；其中 sg_* 前缀 11 个，另含 sginfo/sgm_dd/sgp_dd 三个别名），必须把 HarmonyOS/OHOS 并入该分支"
+  - "OHOS sysroot 已具备 scsi/sg.h、linux/bsg.h、linux/nvme_ioctl.h，sg v4/bsg 真实 PT 可直接编译，无需打桩（R40 检查通过）"
+  - "上游 libsgutils2 的 OUTPUT_NAME 内嵌版本（libsgutils2-1.49.a），且 install(TARGETS) 只声明 LIBRARY DESTINATION —— 静态库根本不会被安装，需 package() 从构建目录补齐并归一为 libsgutils2.a"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_hash: d3eca89838937443
+  source_work_hash: 6cfbd90c34fc6964
+  generated_at: '2026-10-17T18:39:55'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'cmake_system_name'

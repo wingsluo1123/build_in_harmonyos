@@ -1,0 +1,38 @@
+version: "0.8"
+software: "gtkgreet"
+# ⚠ 本字段由 finish/W3 裁定后生效；当前值为待 W3 确认的预填值
+status: built
+build_date: "2026-10-16"
+conan_ref: "gtkgreet/0.8"
+build_system: "meson"
+
+source:
+  url: "https://git.sr.ht/~kennylevinsen/gtkgreet/archive/0.8.tar.gz"
+  sha256: "e5c70219da191a60e2e009412603e05c36cee15bbbf7657dbbeaa1d21a692873"
+  tar_format: tar.gz
+
+build:
+  system: meson
+  configure_options:
+    - "-Dlayershell=disabled"
+    - "-Dman-pages=disabled"
+    - "-Dwrap_mode=nodownload"
+  dependencies:
+    - gtk/3.24.43
+    - json-c/0.18
+    - gettext/0.22.5.1
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "patches/0001-fix-GOptionEntry-terminator-missing-field-init.patch"
+
+knowledge_gained:
+  - "gtkgreet 上游为 meson；init-build 按 URL 误判 autotools，需手写 meson 配方（同 gtk/glade 先例）"
+  - "greetd 不是构建期依赖：gtkgreet 自带 greetd IPC 协议实现（proto.c，JSON over unix socket），运行期才连 greetd daemon。构建期真依赖是 gtk+-3.0 + json-c"
+  - "gtk-layer-shell 与 scdoc 制品仓未发布，而上游 meson_options.txt 的 layershell/man-pages 默认 auto ⇒ 显式 -Dlayershell=disabled -Dman-pages=disabled 固化"
+  - "po/ 的 i18n.gettext 需要构建期 msgfmt；host requires 的 bin 不进 VirtualBuildEnv 的 PATH ⇒ 在 generate() 里把 gettext 包 bin 前置进 PATH"
+  - "制品仓 gtk/3.24.43 的 glib-2.0.pc 缺 -lintl（glib 2.84 的 g_libintl_* 在 libintl.so），链接期 undefined symbol ⇒ generate() 补 -lintl"
+  - "OHOS HMFS 未签名 ELF 不可执行 ⇒ package() 对 bin/ 逐个两轮 remove-section .codesign + selfSign"
+  - "上游 werror=true + clang 15 -Wextra ⇒ main.c 的 GOptionEntry 终止项 { NULL } 触发 missing field short_name initializer 硬错误，补丁补全全部字段"
+  - "构建期需 meson：本机 PATH 无 meson（rc=127），remote 实测 meson/1.11.0 已发布 ⇒ tool_requires(meson/1.11.0)，ninja 1.13.1 在 /data/service/hnp/bin"

@@ -1,0 +1,69 @@
+--- a/common/CMakeLists.txt
++++ b/common/CMakeLists.txt
+@@ -1,35 +1,34 @@
+ cmake_minimum_required (VERSION 3.5.1)
+ project (common)
+ 
+-set (CMAKE_AUTOMOC OFF)
++set (CMAKE_AUTOMOC ON)
+ 
+ 
+-find_package(Qt5Core)
+-find_package(Qt5Widgets)
++find_package(Qt5 COMPONENTS Core Widgets)
++find_package(libx11 CONFIG REQUIRED)
++find_package(libxcb CONFIG REQUIRED)
+ 
+ #  include_directories(${Qt5Widgets_INCLUDES})
+ #  add_definitions(${Qt5Widgets_DEFINITIONS})
+ #  set(CMAKE_CXX_FLAGS "${Qt5Widgets_EXECUTABLE_COMPILE_FLAGS}")
+ 
+ if(__LIN__)
+-	find_package(Qt5 COMPONENTS X11Extras)
++	find_package(libx11 CONFIG REQUIRED)
++	find_package(libxcb CONFIG REQUIRED)
+ 	set(launchy_common_mods
+-		X11Extras
+ 	)
+-	get_target_property(QtExtras_location Qt5::X11Extras LOCATION)
+ elseif(__BSD__)
+-	find_package(Qt5 COMPONENTS X11Extras)
++	find_package(libx11 CONFIG REQUIRED)
++	find_package(libxcb CONFIG REQUIRED)
+ 	set(launchy_common_mods
+-		X11Extras
+ 	)
+-	get_target_property(QtExtras_location Qt5::X11Extras LOCATION)
+ elseif(__WIN__)
+ 	find_package(Qt5 COMPONENTS winextras)
+ 	set(launchy_common_mods
+ 		WinExtras
+ 	)
+ 	get_target_property(QtExtras_location Qt5::WinExtras LOCATION)
+ elseif(__MAC__)
+ 	find_package(Qt5 COMPONENTS macextras)
+ 	set(launchy_common_mods
+ 		MacExtras
+@@ -111,20 +110,18 @@
+ 	)
+ 	set(launchy_common_extras
+ 		x11.cpp
+ 		x11_iconprovider.cpp
+ 		x11_iconprovider.h
+ 		x11_keytrigger.cpp
+ 		x11_platform.cpp
+ 	)
+ endif()
+ 
+-qt5_wrap_cpp(launchy_common_mocs ${launchy_common_moc_hdrs} ${launchy_common_extra_moc_hdrs})
+-
+-add_library(common STATIC ${launchy_common_srcs} ${launchy_common_hdrs} ${launchy_common_extras} ${launchy_common_mocs} ${launchy_common_mochdrs} ${launchy_common_extra_mochdrs})
+-qt5_use_modules(common Core Widgets ${launchy_common_mods})
++add_library(common STATIC ${launchy_common_srcs} ${launchy_common_hdrs} ${launchy_common_extras} ${launchy_common_moc_hdrs})
++target_link_libraries(common PUBLIC Qt5::Core Qt5::Widgets ${launchy_common_mods} libx11::x11 libxcb::xcb)
+ target_compile_features(common PRIVATE cxx_range_for)
+ 
+ if(__WIN__ OR __MAC__)
+ 	install(FILES ${QtExtras_location} DESTINATION . COMPONENT PKG_MAIN)
+ endif()
+ 

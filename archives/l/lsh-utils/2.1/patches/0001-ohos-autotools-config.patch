@@ -1,0 +1,154 @@
+diff --git a/config.guess b/config.guess
+index c3bae20..2c75f8d 100755
+--- a/config.guess
++++ b/config.guess
+@@ -139,6 +139,12 @@ UNAME_VERSION=`(uname -v) 2>/dev/null` || UNAME_VERSION=unknown
+ # Note: order is significant - the case branches are not exclusive.
+ 
+ case "${UNAME_MACHINE}:${UNAME_SYSTEM}:${UNAME_RELEASE}:${UNAME_VERSION}" in
++    aarch64:HarmonyOS:*:*)
++	# HarmonyOS PC (OpenHarmony).  This 2005 vintage script has no
++	# uname branch for it, and its mktemp/umask-077 fallback cannot
++	# create a usable directory on HMDFS.  Emit the OHOS tuple here.
++	echo ${UNAME_MACHINE}-unknown-linux-ohos
++	exit 0 ;;
+     *:NetBSD:*:*)
+ 	# NetBSD (nbsd) targets should (where applicable) match one or
+ 	# more of the tupples: *-*-netbsdelf*, *-*-netbsdaout*,
+diff --git a/config.sub b/config.sub
+index ba33103..990c870 100755
+--- a/config.sub
++++ b/config.sub
+@@ -118,7 +118,7 @@ esac
+ # Here we must recognize all the valid KERNEL-OS combinations.
+ maybe_os=`echo $1 | sed 's/^\(.*\)-\([^-]*-[^-]*\)$/\2/'`
+ case $maybe_os in
+-  nto-qnx* | linux-gnu* | linux-dietlibc | linux-uclibc* | uclinux-uclibc* | uclinux-gnu* | \
++  nto-qnx* | linux-gnu* | linux-ohos* | linux-dietlibc | linux-uclibc* | uclinux-uclibc* | uclinux-gnu* | \
+   kfreebsd*-gnu* | knetbsd*-gnu* | netbsd*-gnu* | storm-chaos* | os2-emx* | rtmk-nova*)
+     os=-$maybe_os
+     basic_machine=`echo $1 | sed 's/^\(.*\)-\([^-]*-[^-]*\)$/\1/'`
+@@ -1191,6 +1191,8 @@ case $os in
+ 	-mac*)
+ 		os=`echo $os | sed -e 's|mac|macos|'`
+ 		;;
++	-linux-ohos*)
++		;;
+ 	-linux-dietlibc)
+ 		os=-linux-dietlibc
+ 		;;
+diff --git a/configure b/configure
+index 22438bd..71576fb 100755
+--- a/configure
++++ b/configure
+@@ -10711,12 +10711,12 @@ $debug ||
+ # Create a (secure) tmp directory for tmp files.
+ 
+ {
+-  tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null` &&
++  tmp=`(umask 022 && mktemp -d "./confXXXXXX") 2>/dev/null` &&
+   test -d "$tmp"
+ }  ||
+ {
+   tmp=./conf$$-$RANDOM
+-  (umask 077 && mkdir "$tmp")
++  (umask 022 && mkdir "$tmp")
+ } || as_fn_error $? "cannot create a temporary directory in ." "$LINENO" 5
+ ac_tmp=$tmp
+ 
+diff --git a/src/argp/configure b/src/argp/configure
+index f074cb2..b3faab3 100755
+--- a/src/argp/configure
++++ b/src/argp/configure
+@@ -6549,12 +6549,12 @@ $debug ||
+ # Create a (secure) tmp directory for tmp files.
+ 
+ {
+-  tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null` &&
++  tmp=`(umask 022 && mktemp -d "./confXXXXXX") 2>/dev/null` &&
+   test -d "$tmp"
+ }  ||
+ {
+   tmp=./conf$$-$RANDOM
+-  (umask 077 && mkdir "$tmp")
++  (umask 022 && mkdir "$tmp")
+ } || as_fn_error $? "cannot create a temporary directory in ." "$LINENO" 5
+ ac_tmp=$tmp
+ 
+diff --git a/src/sftp/configure b/src/sftp/configure
+index ff2eb4f..fe562b3 100755
+--- a/src/sftp/configure
++++ b/src/sftp/configure
+@@ -7027,12 +7027,12 @@ $debug ||
+ # Create a (secure) tmp directory for tmp files.
+ 
+ {
+-  tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null` &&
++  tmp=`(umask 022 && mktemp -d "./confXXXXXX") 2>/dev/null` &&
+   test -d "$tmp"
+ }  ||
+ {
+   tmp=./conf$$-$RANDOM
+-  (umask 077 && mkdir "$tmp")
++  (umask 022 && mkdir "$tmp")
+ } || as_fn_error $? "cannot create a temporary directory in ." "$LINENO" 5
+ ac_tmp=$tmp
+ 
+diff --git a/src/spki/config.guess b/src/spki/config.guess
+index c3bae20..2c75f8d 100755
+--- a/src/spki/config.guess
++++ b/src/spki/config.guess
+@@ -139,6 +139,12 @@ UNAME_VERSION=`(uname -v) 2>/dev/null` || UNAME_VERSION=unknown
+ # Note: order is significant - the case branches are not exclusive.
+ 
+ case "${UNAME_MACHINE}:${UNAME_SYSTEM}:${UNAME_RELEASE}:${UNAME_VERSION}" in
++    aarch64:HarmonyOS:*:*)
++	# HarmonyOS PC (OpenHarmony).  This 2005 vintage script has no
++	# uname branch for it, and its mktemp/umask-077 fallback cannot
++	# create a usable directory on HMDFS.  Emit the OHOS tuple here.
++	echo ${UNAME_MACHINE}-unknown-linux-ohos
++	exit 0 ;;
+     *:NetBSD:*:*)
+ 	# NetBSD (nbsd) targets should (where applicable) match one or
+ 	# more of the tupples: *-*-netbsdelf*, *-*-netbsdaout*,
+diff --git a/src/spki/config.sub b/src/spki/config.sub
+index ba33103..990c870 100755
+--- a/src/spki/config.sub
++++ b/src/spki/config.sub
+@@ -118,7 +118,7 @@ esac
+ # Here we must recognize all the valid KERNEL-OS combinations.
+ maybe_os=`echo $1 | sed 's/^\(.*\)-\([^-]*-[^-]*\)$/\2/'`
+ case $maybe_os in
+-  nto-qnx* | linux-gnu* | linux-dietlibc | linux-uclibc* | uclinux-uclibc* | uclinux-gnu* | \
++  nto-qnx* | linux-gnu* | linux-ohos* | linux-dietlibc | linux-uclibc* | uclinux-uclibc* | uclinux-gnu* | \
+   kfreebsd*-gnu* | knetbsd*-gnu* | netbsd*-gnu* | storm-chaos* | os2-emx* | rtmk-nova*)
+     os=-$maybe_os
+     basic_machine=`echo $1 | sed 's/^\(.*\)-\([^-]*-[^-]*\)$/\1/'`
+@@ -1191,6 +1191,8 @@ case $os in
+ 	-mac*)
+ 		os=`echo $os | sed -e 's|mac|macos|'`
+ 		;;
++	-linux-ohos*)
++		;;
+ 	-linux-dietlibc)
+ 		os=-linux-dietlibc
+ 		;;
+diff --git a/src/spki/configure b/src/spki/configure
+index 0c15d0d..f8bc8d3 100755
+--- a/src/spki/configure
++++ b/src/spki/configure
+@@ -6036,12 +6036,12 @@ $debug ||
+ # Create a (secure) tmp directory for tmp files.
+ 
+ {
+-  tmp=`(umask 077 && mktemp -d "./confXXXXXX") 2>/dev/null` &&
++  tmp=`(umask 022 && mktemp -d "./confXXXXXX") 2>/dev/null` &&
+   test -d "$tmp"
+ }  ||
+ {
+   tmp=./conf$$-$RANDOM
+-  (umask 077 && mkdir "$tmp")
++  (umask 022 && mkdir "$tmp")
+ } || as_fn_error $? "cannot create a temporary directory in ." "$LINENO" 5
+ ac_tmp=$tmp
+ 

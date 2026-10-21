@@ -1,0 +1,67 @@
+software: clutter
+display: "clutter"
+description: "GNOME scene graph / interactive canvas library (OpenGL)"
+category: library
+homepage: "https://gitlab.gnome.org/GNOME/clutter"
+license: LGPL-2.1-or-later
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "GNOME 桌面场景图库：x11/gdk/wayland/quartz/win32/mir/cex100/evdev/tslib 后端全禁，仅 generic EGL 后端（--enable-egl-backend）——OHOS 无显示服务与输入子系统"
+    - "EGL 经 cogl 封装（libclutter NEEDED 无 libEGL），egl 头由系统默认路径解析，无需直连 egl/gles2 包"
+    - "cogl 制品仓包三缺陷构建期就地修补：.pc prefix 构建机残留路径重写 / .la libdir 固化路径正则重写 / cogl-pango 组件+cogl-egl.h 缺失（stub 头+8 符号 stub 实现源替代——全部为 PangoCairoFontMap 直传或 GL glyph-cache no-op）"
+    - "cairo 包二进制缺 cairo-gobject 组件（无 libcairo-gobject.so 与 .pc，CI worker 上连 cairo-gobject.h 头都没有——#66493 实锤）——stub 实现源+stub 头替代（上游 CAIRO_GOBJECT_BOILERPLATE 逐行等价的 2 个 GType 注册符号+原样两宏两声明，nm -D 实锤 libclutter 仅引用 context/surface_get_type 两枚；stub pc Cflags 指向 src 保证本机/CI 确定性一致）"
+    - "HMDFS：touch 关键 autotools 文件防重生成（本机无 aclocal-1.16/automake/autoconf 链）——须固定递增时间戳分四层排序 configure.ac<aclocal.m4<Makefile.in<configure，乱序/亚秒 touch 会判 stale 触发重生成失败；configure confstat umask 077→000；make -j1（jobserver mkfifo 不可用）"
+    - "上游 conform 83 用例：纯 CPU 17 例 test_package 实跑通过；其余 66 例需 EGL 显示服务（系统级阻塞省略）"
+  common_dependencies:
+    - cogl
+    - glib
+    - pango
+    - cairo
+    - atk
+    - json-glib
+
+versions:
+  "1.26.4.1":
+    status: built
+    build_date: "2026-09-30"
+    source:
+      url: "https://download.gnome.org/sources/clutter/1.26/clutter-1.26.4.tar.xz"
+      sha256: "8b48fac159843f556d0a6be3dbfc6b083fc6d9c58a20a49a6b4919ab4263c4e6"
+      tar_format: tar.xz
+    build:
+      system: autotools
+      cc: clang
+      configure_options:
+        - "--disable-glibtest"
+        - "--disable-gtk-doc"
+        - "--disable-introspection"
+        - "--disable-docs"
+        - "--disable-examples"
+        - "--disable-x11-backend"
+        - "--disable-gdk-backend"
+        - "--disable-wayland-backend"
+        - "--disable-quartz-backend"
+        - "--disable-win32-backend"
+        - "--disable-mir-backend"
+        - "--disable-cex100-backend"
+        - "--disable-evdev-input"
+        - "--disable-tslib-input"
+        - "--enable-egl-backend"
+        - "--disable-gdk-pixbuf"
+        - "--enable-debug=no"
+        - "--disable-Bsymbolic"
+      dependencies:
+        - "cogl/1.22.8"
+        - "glib/2.84.0.1"
+        - "pango/1.50.14"
+        - "cairo/1.18.4"
+        - "atk/2.38.0.1.1"
+        - "json-glib/1.10.6"
+    patches_applied: []
+    runtime_modifications: []
+    knowledge_gained:
+      - "clutter（GNOME 场景图库）仅 generic EGL 后端可在无显示服务平台构建；X11 系后端全禁后 configure 不再检查 xcomposite/xrandr"
+      - "cogl 制品包禁用 cogl-pango 组件时，clutter 硬依赖的 8 个 cogl_pango_* 符号可由 stub 替代（fontmap 系列是 PangoCairoFontMap 直传、glyph-cache/render 是 GL 渲染路径 no-op）"
+      - "conan 缓存包 .pc/.la 的 prefix/libdir 固化构建机路径（.cache/conan2 残留）——消费方构建期须重写，libtool 报 not a valid libtool archive 为典型症状"

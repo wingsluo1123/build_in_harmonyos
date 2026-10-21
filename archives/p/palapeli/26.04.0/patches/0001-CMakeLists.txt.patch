@@ -1,0 +1,32 @@
+From: palapeli OHOS adaptation
+Subject: [PATCH 1/2] CMakeLists.txt: make the DocTools handbook pipeline optional
+
+The KF6 documentation tool chain (kdoctools) is not published in the ohpcd
+registry at any version, while upstream lists DocTools in the REQUIRED
+component set of find_package(KF6 ...) and runs kdoctools_install(po).
+The handbook is a documentation-only artifact: dropping it keeps every
+runtime feature of the game intact.
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -38,7 +38,6 @@ find_package(KF6 ${KF_MIN_VERSION} REQUIRED COMPONENTS
+     CoreAddons
+     Crash
+     DBusAddons
+-    DocTools
+     I18n
+     ItemViews
+     KIO
+@@ -62,11 +61,9 @@ add_subdirectory(pics)
+ add_subdirectory(src)
+ add_subdirectory(mime)
+ add_subdirectory(puzzles)
+-add_subdirectory(doc)
+ 
+ ecm_qt_install_logging_categories(EXPORT PALAPELI FILE palapeli.categories DESTINATION ${KDE_INSTALL_LOGGINGCATEGORIESDIR})
+ 
+ ki18n_install(po)
+-kdoctools_install(po)
+ 
+ feature_summary(WHAT ALL FATAL_ON_MISSING_REQUIRED_PACKAGES)

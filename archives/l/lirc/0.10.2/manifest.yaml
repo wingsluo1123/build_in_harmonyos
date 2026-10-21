@@ -1,0 +1,36 @@
+# 版本级 manifest — archives/l/lirc/0.10.2/manifest.yaml
+version: "0.10.2"
+software: "lirc"
+status: built
+build_date: "2026-10-16"
+build_system: autotools
+
+source:
+  url: "https://downloads.sourceforge.net/project/lirc/LIRC/0.10.2/lirc-0.10.2.tar.bz2"
+  sha256: "3d44ec8274881cf262f160805641f0827ffcc20ade0d85e7e6f3b90e0d3d222a"
+  tar_format: tar.bz2
+
+build:
+  system: autotools
+  configure_options:
+    - "--build=aarch64-unknown-linux-ohos"
+    - "--host=aarch64-unknown-linux-ohos"
+    - "--disable-dependency-tracking"
+  dependencies:
+    - cppunit/1.15.1 (test-only)
+    - automake/1.18 (tool, used only for its modern config.sub/config.guess)
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-portability-musl-ohos-cxx17.patch"
+
+knowledge_gained:
+  - "OHOS/musl has no rindex(3): lib/lirc_client.c must use strrchr(); the link fails with `undefined reference due to --no-allow-shlib-undefined: rindex` while linking lircrcd."  # knowledge_ref: E014
+  - "The OHOS sysroot <pthread.h> does not declare pthread_cancel() although the runtime libc exports it; implicit declarations in the three plugins that call it are silenced by an explicit prototype."  # knowledge_ref: E4301 (knowledge/drafts/E4301-draft-5EC2.kv)
+  - "musl's pthread_t is a pointer, so the `pthread_t tid = -1` sentinel in plugins/mplay.c does not compile; it becomes 0."  # knowledge_ref: E4301 (knowledge/drafts/E4301-draft-5EC2.kv)
+  - "The generated top level file VERSION shadows libc++'s C++20 <version> header on the case-insensitive device filesystem; the tarball copy has to be dropped and automake's DEFAULT_INCLUDES has to demote `..` to -idirafter."  # knowledge_ref: E4300 (knowledge/drafts/E4300-draft-0533.kv)
+  - "The tarball ships a release-machine generated lib/lirc/config.h (HAVE_LIBUDEV_H/HAVE_USB_H/HAVE_LINUX_DEVINPUT/HAVE_SOUNDCARD); `#include \"config.h\"` in lib/lirc/curl_poll.h resolves to it first in an out-of-tree build, so it must be deleted to let the freshly generated one win."  # knowledge_ref: E4302 (knowledge/drafts/E4302-draft-24AC.kv)
+  - "configure's `umask 077 && mktemp -d` cannot create a usable private directory on HMDFS (mode survives as 2700, owner denied), so the umask is normalised to 022."  # knowledge_ref: E129
+  - "C++17 removes the `register` storage class, which lircd.cpp/lircrcd.cpp still use; the conan profile pins compiler.cppstd=17 so clang rejects it."  # knowledge_ref: E293
+  - "AF_UNIX bind() is denied (EPERM) on the HMDFS workspace but works under the app private directory /data/storage/el2/base; abstract sockets and TCP loopback are unaffected, so the 9 ClientTest cases that need a lircd socket cannot run in the workspace."  # knowledge_ref: E024

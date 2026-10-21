@@ -1,0 +1,29 @@
+software: fstobdf
+name: X Font Server font-to-BDF export tool
+description: Read a font from an X Font Server through the FS protocol client library and print the equivalent BDF file
+category: x11
+license: MIT
+website: https://www.x.org/
+
+versions:
+  - version: "1.0.8"
+    status: built
+    compiled_at: 2026-10-16
+    notes: |
+      - X.Org app 包，4 个 C 源文件 + 1 个头文件 + 1 个手册页，autotools 构建
+      - 依赖 libFS（libfs）+ libX11（libx11）+ xorgproto 的 pkg-config 视图；
+        chars.c 直接 include X11/Xlib.h，故与只依赖 libfs 的 fslsfonts 不同，必须带 libx11
+      - config.guess 补丁识别 HarmonyOS（E007）；configure 两处 HMDFS 降级：ac_pwd 失败回退 $PWD（E386）
+        与 config.status 临时目录 umask 077→022 + mkdir（E129/E110/E112）
+      - 同族三补丁模板对本代 tarball 不适用：config.sub 实测已接受
+        aarch64-unknown-linux-ohos，故本包只带两件补丁
+      - 上游无自动化测试（TESTS/check_PROGRAMS 命中 0），测试全部由 test_package 自造：
+        9 条无头断言全过，另附 2 组负向对照实测（注入故障 ⇒ conan create rc=1）
+      - 主功能路径（导出字体）需可达的 X font server（FONTSERVER 环境变量或 -server），
+        构建/CI 环境不可达属运行期能力墙，已如实披露
+    dependencies:
+      - libfs
+      - libx11
+      - xorgproto
+    provides:
+      - fstobdf

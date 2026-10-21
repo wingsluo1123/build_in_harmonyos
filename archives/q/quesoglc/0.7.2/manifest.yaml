@@ -1,0 +1,66 @@
+version: "0.7.2"
+software: quesoglc
+status: built
+build_date: "2026-10-18"
+conan_ref: "quesoglc/0.7.2"
+build_system: autotools
+
+source:
+  url: "https://downloads.sourceforge.net/project/quesoglc/0.7.2/quesoglc-0.7.2-free.tar.gz"
+  sha256: "fa47582cac5a0ac98d24b462d0cdba8d0c7a2f0aded6220b05d907b598f06571"
+  tar_format: tar.gz
+  upstream_release: "quesoglc-0.7.2-free.tar.gz (SourceForge release of QuesoGLC 0.7.2; the '-free' variant is the LGPL-only tarball and is byte-identical to Debian's quesoglc_0.7.2.orig.tar.gz)"
+
+build:
+  system: autotools
+  in_source: true
+  configure_options:
+    - "--without-fribidi"
+    - "--with-glew=no"
+    - "ax_cv_check_gl_libgl=-lOSMesa"
+    - "ax_cv_check_glu_libglu=-lGLU"
+  dependencies:
+    - freetype/2.14.3
+    - fontconfig/2.18.1.1
+    - mesa/24.3.4.1
+    - glu/9.0.3
+  transitive_dependencies:
+    - expat/2.8.2.1
+  cc: clang
+  extra_cflags:
+    - "-DGLEW_NO_GLX"
+
+patches_applied:
+  - "0001-build-config.guess.patch"
+  - "0002-configure.patch"
+  - "0003-src-glew.c.patch"
+  - "0004-tests-test4.c.patch"
+
+knowledge_gained:
+  - "OHOS has no desktop libGL/GLX; QuesoGLC's own sources make zero glX* calls, so Mesa's offscreen OSMesa (libOSMesa.so + include/GL/gl.h from mesa/24.3.4.1) is a valid GL implementation (same route as the glu recipe)."
+  - "configure's AX_CHECK_GL/AX_CHECK_GLU only probe -lopengl32/-lGL and -lglu32/-lGLU, neither of which exists on OHOS; the providers are seeded through the autoconf cache (ax_cv_check_gl_libgl=-lOSMesa, ax_cv_check_glu_libglu=-lGLU) so no generated configure is edited."
+  - "Upstream's --with-glew=no does NOT drop GLEW: it embeds the bundled src/glew.c and compiles it with -DGLEW_MX. QuesoGLC is written against the GLEW multi-context API, and the ohpcd glew package is an EGL/GLEW_EGL build without GLEW_MX, so the bundled copy is the only one that works."
+  - "The bundled GLEW's GLX section pulls in X11/Xlib.h, X11/Xutil.h and X11/Xmd.h through GL/glxew.h; OHOS ships no X11 headers. Patch 0003 gates that section behind GLEW_NO_GLX (the opt-out macro later added by upstream GLEW 2.x) AND routes glewGetProcAddress through dlGetProcAddress, otherwise glXGetProcAddressARB is an undeclared identifier; no GLX symbol is used at runtime."
+  - "quesoglc's generated Makefiles put source headers on the compiler line via $(top_builddir) (DEFAULT_INCLUDES -I$(top_builddir)/include, libGLC_la_CFLAGS -I$(top_builddir)/src), which only holds for an in-source build; out-of-tree the build fails with \"'internal.h' file not found\". The recipe therefore builds in-source (self.folders.build = '.') instead of editing the generated Makefiles."
+  - "mesa/24.3.4.1 requires expat/2.8.2.1.1 while fontconfig/2.18.1.1 requires expat/2.8.2.1, and the two releases are NOT interchangeable at runtime: expat/2.8.2.1.1 ships only libexpat.so (SONAME libexpat.so) while fontconfig's DT_NEEDED asks for libexpat.so.1. The diamond is unified on fontconfig's pin (expat/2.8.2.1, which carries libexpat.so -> libexpat.so.1 -> libexpat.so.1.12.2); libOSMesa.so.8 has no expat in DT_NEEDED so it is unaffected."
+  - "fontconfig and FreeType are both mandatory (configure AC_MSG_ERROR otherwise) and are located through PKG_CHECK_MODULES, so PkgConfigDeps must generate their .pc files."
+  - "A parallel make jobserver creates a FIFO under $TMPDIR that HMDFS rejects with EPERM; the build runs make -j1 (E074)."
+  - "OHOS confines the process to a restricted domain where access()/opendir() on '/' and system directories fail with EACCES while stat() succeeds (E303). tests/test4 asserts the GLC_STATE_ERROR contract through glcAppendCatalog('/'), so with the upstream root path it could not execute; patch 0004 makes the catalog root configurable via $QUESOGLC_TEST_CATALOG (the upstream default is preserved whenever the variable is unset) and the recipe passes a writable build-folder path on the make command line, so the single upstream test executes and passes 1/1. No assertion or test logic is altered (see notes.md / test_package/MANIFEST.yml)."
+
+patch_classification:
+  - file: 0001-build-config.guess.patch
+    type: portability
+    platform_only: True
+    guard: "runtime uname -s == HarmonyOS"
+  - file: 0002-configure.patch
+    type: portability
+    platform_only: True
+    guard: "none"
+  - file: 0003-src-glew.c.patch
+    type: portability
+    platform_only: True
+    guard: "GLEW_NO_GLX"
+  - file: 0004-tests-test4.c.patch
+    type: portability
+    platform_only: True
+    guard: "QUESOGLC_TEST_CATALOG (upstream default preserved when unset)"

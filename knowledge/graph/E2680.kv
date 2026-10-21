@@ -1,0 +1,33 @@
+# ═══ Draft knowledge entry — 上游 golden/参考数据过期导致 compare 测试失败（重采样/信号处理类库）═══
+# Timestamp: 2026-09-25
+# Software: clownresampler 3.24（上游固定 commit 12adf868）
+# Gate: ctest compare 用例 / make check golden 比对
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E2680
+title: 上游参考数据（golden 文件）在算法变更后未重新生成，compare/字节比对测试全平台失败：以 git 历史证明参考数据生成时点早于算法修改，归档为上游数据过期而非适配缺陷
+trigger_tool: ctest / make check / compare_files
+phase: testing
+error_signature: (compare_files|cmp|diff).*(test-output|expected).*differ|tests? passed.*(\d+).*failed.*compare|Regenerate test data|reference file.*stale|golden.*mismatch
+severity:               3
+category:               portability, testing, upstream-integrity
+match_keywords: compare_files, golden file, reference data, test-output, Regenerate test data,
+  stale, expected output, byte compare, ctest compare, upstream test data
+root_cause: 上游在生成 golden/参考数据之后继续修改了被测算法（修复 hissing 等行为变更），
+  但未重新生成参考文件。compare 类测试把当前算法输出与过期参考数据做字节比对，必然失败。
+  该失败与目标平台（OHOS/原生）无关，是所有平台共有的上游测试数据一致性问题。
+rec_approach: upstream-golden-staleness-diagnosis（git 历史时点证明 + 原生复现 + 双口径统计）
+verification_cmd:
+  8 个 compare 用例 Failed（test1-test4 与输出 byte 差异 203895~1910879 字节）；git 证明
+  test1-test4 生成于 413f3ee（"Regenerate test data"），其后 bf9669f "Fix the hissing for
+  real this time" 等提交修改了 clownresampler.h 的算法（413f3ee..HEAD 之间参考文件 sha256
+  不变）；原生 aarch64（非 OHOS 交叉）同样 8 个 compare 失败——平台无关性成立。
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E2680.md
+affected_scope:         上游参考数据（golden 文件）在算法变更后未重新生成，compare/字节比对测试全平台失败：以 git 历史证明参
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        upstream-golden-staleness-diagnosis（git 历史时点证明 + 原生复现 + 双口径统计）

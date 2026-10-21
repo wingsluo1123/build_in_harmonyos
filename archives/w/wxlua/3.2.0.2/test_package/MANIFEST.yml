@@ -1,0 +1,21 @@
+package: wxlua/3.2.0.2
+homepage: https://github.com/pkulchenko/wxlua
+upstream_check_command: wxLua -e 'dofile("samples/unittest.wx.lua")'
+upstream_test_in_build: true
+upstream_test_command: private Broadway display + upstream unittest.wx.lua + strict 98/0 result assertion
+upstream_tests:
+  - file: samples/unittest.wx.lua
+    source: wxLua/samples/unittest.wx.lua
+    description: Unmodified wxLua upstream suite; 98 runtime assertions, all executed.
+    command: wxLua -e 'dofile("samples/unittest.wx.lua"); assert(tests_run == 98 and failed_tests == 0)'
+test_package_tests:
+  - file: consumer.lua
+    description: Version, string, frame, button, callback, Unicode, mapping, image, invalid argument, destroyed userdata.
+    command: wxLua consumer.lua
+  - file: consumer.cpp
+    description: Public C++ state creation, Lua execution, global value retrieval, syntax-error rejection (4 checks).
+    command: consumer
+  - file: module_host.c
+    description: Lua 5.4 require("wx") through LUA_CPATH and a wxString API assertion (1 check).
+    command: module_host
+assertion_count: 15

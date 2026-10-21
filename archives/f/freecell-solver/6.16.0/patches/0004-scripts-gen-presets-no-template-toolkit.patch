@@ -1,0 +1,40 @@
+--- a/fc-solve/source/scripts/gen-presets.pl
++++ b/fc-solve/source/scripts/gen-presets.pl
+@@ -4,7 +4,6 @@
+ use warnings;
+ 
+ use Getopt::Long qw/ GetOptions /;
+-use Template     ();
+ use FindBin      ();
+ use lib "$FindBin::Bin/../t/lib";
+ use FC_Solve::MoveFuncs ();
+@@ -118,12 +117,6 @@
+     return;
+ }
+ 
+-my $c_template = Template->new(
+-    {
+-        STRICT => 1,
+-    },
+-);
+-
+ my $C_TEMPLATE_INPUT = <<"EOF";
+     {
+         [% allowed_moves %],
+@@ -223,8 +216,14 @@
+     my %vars;
+     @vars{qw(preset fc s d sbb sm esf moves_order allowed_moves)} = @lines;
+ 
+-    my $ret;
+-    $c_template->process( \$C_TEMPLATE_INPUT, \%vars, \$ret );
++    # The template above is a fixed block with plain [% name %] placeholders;
++    # substitute them directly instead of pulling in Template Toolkit (not
++    # shipped on OHOS).  Unknown placeholders are still a hard error, matching
++    # the STRICT => 1 behaviour of the original Template invocation.
++    my $ret = $C_TEMPLATE_INPUT;
++    $ret =~ s{\[%\s*(\w+)\s*%\]}{
++        exists $vars{$1} ? $vars{$1} : die "Unknown template variable $1\n"
++    }ge;
+     $ret =~ s{\s+\z}{}ms;
+     return $ret;
+ }

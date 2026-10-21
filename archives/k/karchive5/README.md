@@ -1,80 +1,59 @@
 # karchive5
 
-KDE Frameworks 5 archive library — the `libKF5Archive.so` shared library
-providing the `KArchive` / `KZip` / `KTar` / `KAr` / `KRcc` archive classes,
-the `KArchiveDirectory` / `KArchiveFile` entry model, and the
-`KCompressionDevice` / `KFilterBase` transparent compression filters
-(gzip, bzip2, xz/LZMA and zstd).
+KDE Frameworks 5 的归档库（Qt5 轨道，包名 karchive5）。上游交付
+libKF5Archive.so，提供 KArchive / KZip / KTar / KAr / KRcc 归档类，以及
+KCompressionDevice 透明压缩过滤器（gzip、bzip2、xz/LZMA、zstd）。
 
-This is the **KF5 (Qt5) line**, tracking the 5.116.0 release under the
-`karchive5` package name, distinct from the KF6 `karchive` archives
-(6.x, Qt6).
+- 上游主页：https://invent.kde.org/frameworks/karchive
+- 上游源码：https://download.kde.org/Attic/frameworks/5.116/karchive-5.116.0.tar.xz
+- 许可证：LGPL-2.0-or-later
 
-## Versions
+## 版本
 
-- 5.116.0 — KF5 line, depends on qt5-qtbase/5.15.2.2.
+- 5.116.0：仓库中已存在的 KF5 归档版本，版本级 manifest 状态 built；
+  source_url 使用国内镜像
+  https://mirrors.bfsu.edu.cn/kde/Attic/frameworks/5.116/karchive-5.116.0.tar.xz。
+- 5.116.0.1：R37 打包修复版本，上游源码与 sha256 不变（二者相同），仅配方
+  变更。版本级 manifest 状态 built（配方定稿，设备回线后执行本轮
+  conan create 并回填实测数字）。
 
-## OHOS adaptation
+## 依赖链
 
-- `QT_MAJOR_VERSION=5` keeps the project on the Qt5 code paths;
-  `KF_IGNORE_PLATFORM_CHECK=TRUE` bypasses the KDE platform allowlist
-  (HarmonyOS is not in the upstream list).
-- `KF_SKIP_PO_PROCESSING=ON`: the published qt5-qtbase ships no
-  LinguistTools, so `ecm_install_po_files_as_qm(poqm)` must not run.
-- SONAME emission: HarmonyOS is not mapped to the Linux CMake platform, so
-  `CMAKE_SHARED_LIBRARY_SONAME_<lang>_FLAG` is undefined and the produced
-  `.so` would lack `DT_SONAME` (W3 CI L5 gate). The recipe sets the soname
-  flag plus `CMAKE_PLATFORM_NO_VERSIONED_SONAME`.
-- All four compression backends are enabled (no functionality is compiled
-  out): zlib (upstream `TYPE REQUIRED`), bzip2 (`TYPE RECOMMENDED`), xz via
-  LibLZMA, and zstd via `pkg_config`. `config-compression.h` ends up with
-  `HAVE_BZIP2_SUPPORT=1`, `HAVE_XZ_SUPPORT=1`, `HAVE_ZSTD_SUPPORT=1`.
-- `zlib/1.3.1.1` is pulled in with `force=True`: qt5-qtbase pins
-  `zlib/1.3.1`, whose published `libz.a` is a **non-PIC** static archive and
-  cannot be linked into the shared `libKF5Archive.so` on AArch64
-  (`relocation R_AARCH64_ADR_PREL_PG_HI21 ... recompile with -fPIC`).
-  `1.3.1.1` is the same upstream version rebuilt with `-fPIC`
-  (as recorded by E541 / E533).
-- The compression backends are resolved by CMake's own `FindZLIB` /
-  `FindBZip2` / `FindLibLZMA` modules. Because `conan_toolchain.cmake`
-  force-sets `CMAKE_FIND_PACKAGE_PREFER_CONFIG=ON`, a generated
-  `CMAKE_PROJECT_INCLUDE` file flips it back to `OFF` so the Find modules
-  (which define the canonical `ZLIB::ZLIB` / `BZip2::BZip2` /
-  `LibLZMA::LibLZMA` targets and the uppercase `*_FOUND` variables upstream
-  reads) win over the CMakeDeps configs.
-- The published `zstd/1.5.7` ships a non-relocatable `libzstd.pc`
-  (`prefix=/usr/local`). The recipe defines the `PkgConfig::LibZstd` imported
-  target and `LibZstd_FOUND` against the Conan package before the project's
-  probe runs.
-- ECM 6.26 is a `tool_requires`; `ecm/6.26.0` satisfies
-  `find_package(ECM 5.116.0)` (minimum-version semantics, same as the
-  sibling ki18n5 / kimageformats5 recipes).
+- qt5-qtbase/5.15.2.2：Qt5Core（已发布二进制绑定 zlib/1.3.1）
+- zlib/1.3.1（5.116.0.1）或 zlib/1.3.1.1（5.116.0）：ZLib REQUIRED
+- bzip2/1.0.8、xz/5.6.2、zstd/1.5.7：可选压缩后端，全部启用
+- ecm/6.26.0：tool_requires
 
-## Upstream tests
+## 平台适配要点
 
-`BUILD_TESTING=ON` builds and runs the upstream autotest suite:
+- QT_MAJOR_VERSION=5 与 KF_IGNORE_PLATFORM_CHECK=TRUE：保持 Qt5 代码路径并
+  绕过 KDE 平台白名单；KF_SKIP_PO_PROCESSING=ON 跳过翻译目录生成。
+- OHOS 平台模块不定义 SONAME 标志：手动设置
+  CMAKE_SHARED_LIBRARY_SONAME_C/CXX_FLAG=-Wl,-soname, 与
+  CMAKE_PLATFORM_NO_VERSIONED_SONAME，避免 .so 缺少 DT_SONAME（W3/L5）。
+- 压缩后端按 Conan 包消费；注入的 CMAKE_PROJECT_INCLUDE 把
+  CMAKE_FIND_PACKAGE_PREFER_CONFIG 翻回 OFF，让上游 FindZLIB / FindBZip2 /
+  FindLibLZMA 提供规范的 ZLIB::ZLIB、BZip2::BZip2、LibLZMA::LibLZMA 目标
+  以及大写 *_FOUND 变量。
+- zstd/1.5.7 的 libzstd.pc 硬编码 prefix=/usr/local：配方在探测前自行定义
+  PkgConfig::LibZstd / LibZstd_FOUND，并用 pkg-config 包装器重定位 .pc。
+- 非 PIC 链接墙：5.116.0 用 zlib/1.3.1.1（force=True）；5.116.0.1 改回
+  zlib/1.3.1 并加 -Wl,--exclude-libs,ALL，避免改变 qt5-qtbase 的 package id。
+- ECM_MODULE_PATH 手动注入；AUTOMOC/AUTORCC 指向 qtbase 的 bin/moc、bin/rcc；
+  复制完整 mkspec 树，使 qplatformdefs.h 的 ../common/posix 相对包含可解析。
+- 5.116.0.1 增加 portability 补丁 0001：沙箱拒绝 symlink()（EACCES）时跳过
+  karchivetest 的 symlink 专项校验，其余归档读写照常执行；测试期还通过
+  XDG_DATA_DIRS 注入含 zstd 条目的 shared-mime-info 数据库。
 
-| # | CTest case | Result |
-|---|-----------|--------|
-| 1 | `karchivetest` | Passed |
-| 2 | `kfiltertest` | Passed |
-| 3 | `deprecatedtest` | Passed |
-| 4 | `klimitediodevicetest` | Passed |
-| 5 | `kcompressiondevicetest` | Passed |
+## 测试摘要
 
-5/5 passed, 0 failed, 0 skipped.
-
-The upstream `tests/` directory (`kartest`, `ktartest`, `krcctest`,
-`kziptest`, `k7ziptest`) contains **standalone helper executables**: its
-`CMakeLists.txt` only calls `ecm_mark_as_test()` and registers no
-`add_test()`, so upstream itself does not run them under CTest. They were
-executed manually against real archives on the target and all exit 0.
-
-A test-only shared-mime-info database is generated under the build folder and
-exposed through `XDG_DATA_DIRS` for the test run. `KTar` selects its
-compression filter via `QMimeDatabase`; the OHOS system MIME database knows
-`application/x-compressed-tar`, `application/x-bzip-compressed-tar` and
-`application/x-xz-compressed-tar` but has **no zstd entry**, so `.tar.zst`
-would resolve to `application/octet-stream` and `KTar` would silently write
-an uncompressed tar. The generated database adds the compressed-tar types
-(zstd included) without touching the packaged library.
+- 5.116.0：版本级 manifest 记录上游 CTest 5/5 通过（karchivetest、
+  kfiltertest、deprecatedtest、klimitediodevicetest、
+  kcompressiondevicetest），0 失败/0 跳过；test_package 覆盖 KZip 往返与
+  GZip/BZip2/Xz/Zstd 过滤器，26/26 校验点通过。
+- 5.116.0.1：2026-10-20 真机实测（记录见
+  `5.116.0.1/manifest.yaml` 的 `test_results` 与
+  `build-deps-wave2.log`）：CTest 实际注册 5 项，100% tests passed，
+  0 failed out of 5；test_package 为 KTar/KZip/KCompressionDevice GZip
+  往返测试，20 项断言全 PASS（TEST SUMMARY: 0 failure(s)），
+  真机 `conan create` RC=0；l0/l1/l2/l4/l5 全部 pass。

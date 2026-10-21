@@ -1,0 +1,63 @@
+# manifest.yaml — rfdump 1.6 (version-level)
+software: rfdump
+version: "1.6"
+status: built
+build_date: "2026-10-18"
+build_system: autotools
+
+source:
+  url: "https://www.rfdump.org/dl/rfdump-1.6.tar.gz"
+  sha256: "5b1ec066d28905df8526862c77629c8cecb6f3ea2462021a0b30d8c44d7b30dc"
+  tar_format: tar.gz
+  # 官方站发布归档，与 Debian 源码包 rfdump_1.6-9.1 的 .orig.tar.gz 逐字节一致
+  # （151954 B，两渠道互证）
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=/"
+  dependencies:
+    - gtk/3.24.43
+    - expat/2.8.2.1
+  cc: clang
+  # 不跑 autoreconf：直接补丁化发布包自带的 configure/Makefile.in（见 patches_applied 0004）
+
+patches_applied:
+  - "0001-port-gtk2-to-gtk3-builder.patch"
+  - "0002-modern-toolchain-fixes.patch"
+  - "0003-packaging-paths.patch"
+  - "0004-shipped-autotools-gtk3.patch"
+  - "0005-ohos-runtime-paths.patch"
+  - "0006-headless-cli-and-reader-probe.patch"
+
+test_results:
+  # 上游 N=0：发布包无任何测试设施（无 tests/ 目录、Makefile.am 无 TESTS/check_PROGRAMS、
+  # 无 ctest/pytest 注册；`make check` 实测 rc=0 且 "Nothing to be done for 'check'"）。
+  type: upstream
+  total: 0
+  passed: 0
+  failed: 0
+  skipped: 0
+  not_run: 0
+  status: built
+  evidence: "make check → rc=0, 'Nothing to be done for 'check''；find -iname '*test*' -o -iname 'check*' → 0 命中"
+
+consumer_test_results:
+  # 鸿蒙侧新增（分栏，不并入上游分母）：conan test_package 19 条实断言
+  type: test_package
+  total: 19
+  passed: 19
+  failed: 0
+  status: built
+  evidence: "HMBS_TEST_PACKAGE_RESULT {\"discovered\":19,\"passed\":19}"
+
+knowledge_gained:
+  - "HarmonyOS 没有 /var（进而没有 /var/lock），传统串口互斥锁 /var/lock/LCK..<tty> 会让 termios 串口 bring-up 在碰到设备节点之前就失败，错误措辞指向读写器/驱动；降级为提示后继续，才能把失败点归因到真正缺失的设备节点"
+  - "本机串口设备节点整片缺失（/dev/ttyUSB0、/dev/ttyS0、/dev/input 均 ABSENT，只有 /dev/tty）：串口类包必须提供可在无设备环境下自报结果的无头探测入口，否则「串口配置是否正确」结构性不可验证"
+  - "OHOS clang 三元组是 aarch64-linux-ohos，__linux__ 仍被定义，因此 #if defined(__linux__) 的 /var/lock 串口锁分支在鸿蒙上照常编入并生效"
+  - "lld 不像 GNU ld 默认 --as-needed：configure 注入的 -lexpat 即使 conftest 从不调用也会留下 DT_NEEDED，于是 autoconf 的 int main(){} 探针加载失败并报假的 'cannot run C compiled programs'；解法是给 configure 环境注入依赖 libdir 的 LD_LIBRARY_PATH"
+  - "2008 年 autoconf 2.61 生成产物存在恒真的 maintainer 规则（aclocal.m4/configure/Makefile.in/config.h.in）：一旦 configure.in/Makefile.am 比生成产物新就会触发；设备上 autoconf 2.73 会重写 configure 并重新引入 umask 077 的 AS_TMPDIR（HMDFS 落盘后目录不可写 → config.status 报 subs1.awk: Permission denied）。补丁化生成产物时必须同时在 build() 里给它们盖章"
+  - "鸿蒙 GTK3 只有 broadway 后端：最小 GTK3 程序可正常运行，但 rfdump 主窗口的 GtkTreeView 触发 'infinite surface size not supported' 后 GDK 断言 abort（_gdk_broadway_server_window_update data != NULL），GUI 只能交付到编译/链接/资源加载级"
+
+knowledge_ref:
+  - "E2296: HarmonyOS 无 /var/lock 且无串口设备节点——termios 串口 bring-up 的失败点与降级取证（knowledge/drafts/E2296-draft-ohos-serial-lockfile-no-device-node.kv）"

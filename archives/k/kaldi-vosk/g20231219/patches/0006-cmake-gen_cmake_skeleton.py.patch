@@ -1,0 +1,28 @@
+--- a/cmake/gen_cmake_skeleton.py
++++ b/cmake/gen_cmake_skeleton.py
+@@ -259,20 +259,25 @@
+         if self.is_shared:
+             add_lib_line += " SHARED"
+         ret.append(add_lib_line)
+         for f in self.source_list:
+             ret.append("    " + f)
+         ret.append(")\n")
+         ret.append("target_include_directories(" + self.target_name + " PUBLIC ")
+         ret.append("     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>")
+         ret.append("     $<INSTALL_INTERFACE:include/kaldi>")
+         ret.append(")\n")
++
++        ret.append("target_compile_definitions(" + self.target_name + " PUBLIC KALDI_NO_PORTAUDIO=1)")
++        ret.append("if(MATHLIB STREQUAL \"OpenBLAS\")")
++        ret.append("    target_compile_definitions(" + self.target_name + " PUBLIC HAVE_OPENBLAS=1)")
++        ret.append("endif()")
+ 
+         if len(self.depends) > 0:
+             ret.append("target_link_libraries(" + self.target_name + " PUBLIC")
+             for d in self.depends:
+                 ret.append("    " + d)
+             ret.append(")\n")
+ 
+         def get_test_exe_name(filename):
+             exe_name = os.path.splitext(f)[0]
+             if self.dir_name.startswith("nnet") and exe_name.startswith("nnet"):

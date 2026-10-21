@@ -1,0 +1,28 @@
+# test_package/MANIFEST.yml
+#
+# libgfbgraph 0.2.5
+#
+# 上游测试（tests/Makefile.am：TESTS = gtestutils autoptr）：
+#   - 活动用例 4 个：autoptr.c 的 4 个 g_test_add_func，全部实际通过
+#   - gtestutils.c 的 2 个 g_test_add 位于上游 #if 0，不是活动用例；程序 TAP 1..0
+#   - 原始源码宏 grep 总数为 6；2 个 #if 0 调用单独披露，不计入活动套件 N=4
+#   - make check 两个测试程序均通过，SKIP 0；未关闭或跳过任何活动上游用例
+#
+# 鸿蒙特有测试（test_package/test_package.c，10 个断言）：
+#   1. gfbgraph_node_new 得到 GFBGraphNode
+#   2. gfbgraph_node_set_id / get_id 往返
+#   3. gfbgraph_album_new 同时是 Album 和 Node
+#   4. album 名称往返
+#   5. album 描述往返
+#   6. 新建 album 的 count 为 0
+#   7. gfbgraph_photo_new 得到 GFBGraphPhoto
+#   8. gfbgraph_user_new 得到 GFBGraphUser
+#   9. 未联网时 user 名称为 NULL
+#  10. gfbgraph_simple_authorizer_new 得到 GFBGraphAuthorizer
+#
+# 真机 conan create（2026-10-15，ohos-aarch64，退出码 0；独立 CONAN_HOME，tools.build:jobs=2；下载版 json-glib 依赖）：
+#   make check：TOTAL 2 / PASS 2 / FAIL 0 / SKIP 0 / ERROR 0
+#   ./tests/autoptr：TAP 1..4，Album Node Photo User 均为 ok
+#   ./tests/gtestutils：TAP 1..0，退出码 0（2 个 g_test_add 在上游 #if 0，未注册）
+#   上游活动用例通过率：4/4；SKIP 0。gtestutils.c 中的 2 个 #if 0 调用不是活动用例。
+#   消费者：CONSUMER_RESULT 10/10

@@ -1,0 +1,42 @@
+version: "2.42.2"
+software: mcookie
+status: built
+build_date: "2026-10-17"
+build_system: autotools
+
+source:
+  url:
+    - "https://mirrors.edge.kernel.org/pub/linux/utils/util-linux/v2.42/util-linux-2.42.2.tar.xz"
+    - "https://cdn.kernel.org/pub/linux/utils/util-linux/v2.42/util-linux-2.42.2.tar.xz"
+  sha256: "03a05d3adf9602ef128f2da05b84b3205ce60c351e5737c0370f74000679ce8a"
+  tar_format: tar.xz
+
+build:
+  system: autotools
+  configure_options:
+    - "--disable-all-programs"
+    - "--enable-mcookie"
+    - "--disable-libblkid"
+    - "--disable-libmount"
+    - "--disable-libsmartcols"
+    - "--disable-libfdisk"
+    - "--without-python"
+    - "--without-systemd"
+    - "--without-udev"
+    - "--disable-makeinstall-chown"
+    - "--disable-makeinstall-setuid"
+    - "--enable-static"
+    - "--disable-shared"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-config-guess-ohos-detection.patch"
+  - "0002-ohos-register-enable-mcookie.patch"
+
+knowledge_gained:
+  - "The mcookie command can be built independently from util-linux by enabling only mcookie; it needs no external Conan dependency (internal lib/md5.c + libcommon)."
+  - "mcookie is a util-linux default-on tool (UL_BUILD_INIT(mcookie, yes), no AC_ARG_ENABLE): the stock focused recipe --disable-all-programs --enable-mcookie silently yields an empty package. Patch 0002 registers the option in configure and makes the build-state block honor $enable_mcookie (real failure evidence captured)."
+  - "Upstream mcookie test is a single ts script tests/ts/mcookie/mcookie with one deterministic 32-hex output check."
+  - "New generic knowledge contributed: DRAFT-util-linux-default-on-tools-enable-option (covers all 12 default-on tools: isosize/mkswap/look/mcookie/namei/getopt/renice/setpgid/setsid/colcrt/colrm/rev)."

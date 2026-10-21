@@ -1,0 +1,37 @@
+# 版本级 manifest — yorick-gl 1.1-cvs20070922
+# 遵循 ARCHIVE-SPEC v3.0
+version: "1.1-cvs20070922"
+software: "yorick-gl"
+status: built
+build_date: "2026-10-19"
+build_system: makefile
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/y/yorick-gl/yorick-gl_1.1+cvs20070922+dfsg.orig.tar.gz"
+  sha256: "211a27ae3791ec09b26f724cc50354d303a3a7ad3efbe4c41b8fa41810011eef"
+  tar_format: tar.gz
+  note: >-
+    上游为 CVS 快照（Debian 源版本 1.1+cvs20070922），无正式 release tarball；
+    采用 Debian 主池 orig 源码包（DFSG 清洗版），sha256/md5/size 与
+    yorick-gl_1.1+cvs20070922+dfsg-7.dsc 公布值逐字一致。
+
+build:
+  system: makefile
+  # 上游 README 明确支持：OpenGL 不可用时仍构建 yiso3d（或显式 --no-opengl）。
+  # 本机 GL/GLX 半边无法在已发布 yorick/2.2.04（NO_XLIB）上加载，见 notes.md。
+  configure_options:
+    - "--yorick=<yorick package>/bin/yorick"
+    - "--no-opengl"
+  dependencies:
+    - "yorick/2.2.04"
+  cc: clang
+  artifact: "yorgl.so"
+  scope_note: >-
+    yiso3d 半边（等值面/切片引擎）。GL/GLX 半边（yorgl）需要 X11 版 yorick 的
+    play/x11 + gist/xbasic 内部符号（p_window/p_wincount/p_flush/p_destroy/
+    g_connect/g_disconnect/x_rgb_palette），已发布 yorick/2.2.04 为 NO_XLIB
+    构建、不含这些符号，musl 在 dlopen 时一次性重定位故无法加载。
+
+patches_applied: []
+
+knowledge_gained: []

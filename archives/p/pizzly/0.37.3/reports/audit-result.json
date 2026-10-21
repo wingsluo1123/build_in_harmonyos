@@ -1,0 +1,23 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "R34",
+      "file": "archives/p/pizzly/0.37.3/reports/conan-create.log",
+      "line": 0,
+      "description": "规则12/R34 的实质在代码中完整（test_package/test_pizzly.sh 含真实业务输出断言），但审计时仓库内两份目标机证据日志产生于 base64 承载改动之前，缺少最终修订版 test_pizzly.sh 的 `[fixture] ... decoded, sha256=...` 输出行，无法证明最终修订的新代码路径已在鸿蒙 PC 上跑通。因 E2E 输入改版前后逐字节相同且解码结果被运行时 sha256 强制校验，判非阻断。",
+      "fix_suggestion": "在鸿蒙 PC 目标机以最终修订重跑 conan create / 本地 CI，刷新 reports/ 证据日志。",
+      "resolution": "已修复：在最终修订上重跑 finish（其内嵌 W3 本地 CI），reports/w3-local-ci.log:671-672 与 reports/conan-create.log:98-99 已含两条 `[fixture] ... decoded, sha256=...`（sha256 与 MANIFEST.yml 的 decoded.sha256 一致），并含 `pizzly consumer E2E: PASS (E2E-PIZZLY-001, E2E-PIZZLY-002)`（w3-local-ci.log:690）。conan create 退出码 0。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R51",
+      "file": "archives/p/pizzly/0.37.3/test_package/MANIFEST.yml",
+      "line": 82,
+      "description": "assertion_count 自洽成立（自述分解式 2(fixture 完整性)+15(E2E-PIZZLY-001)+6(E2E-PIZZLY-002)=23，与 assertion_count: 23 一致），但 E2E-001 的「15」为近似口径：python 块内逐条 assert 实际多于分解式中并入「自洽循环」的行数。模板本身注明该值为近似值（用于质量评估），故不阻断。",
+      "fix_suggestion": "如需精确对账，可采用逐 assert 计数口径重新分解，或措辞明确为近似值。"
+    }
+  ],
+  "summary": "W4 独立审计（共 4 轮，均由上下文隔离的独立审计子任务执行；第 1、2、3、4 轮分别为首审、修复复审、终审、b64 修订复验，每轮均实际打开仓库真实文件核验，不只读审计输入 JSON）。最终判定：verdict=pass，P0=0，P1=0。\n\n【审计输入说明】本次改动尚未提交（未获 commit 授权），而官方 `pre_pr_audit.py generate` 仅以 `git diff --name-only origin/main...HEAD` 取变更文件（HEAD 与 origin/main 同点，故看不到这些改动）。因此审计输入按该工具的同一 JSON schema（metadata / changed_files / file_hashes / diff_stat / rules / file_contents / omitted_file_contents）由**工作区实际改动**构造，并交由独立子任务审计；审计结论不受影响，且不依赖工具的空 diff 通过。\n\n【规则 12 明确结论：满足】test_package/test_pizzly.sh 是完整消费者端到端用例，实测在被测目标机（HarmonyOS PC aarch64，clang 15.0.4，OHOS/aarch64 原生构建）跑通 2/2：被测对象为 conan 安装后的 package_folder/bin/pizzly（非源码构建目录产物，OHOS 上无同名系统程序），输入为真实 kallisto 0.52.0 `quant --fusion` 输出（fixtures/fusion.txt，366 条记录）+ 上游参考 GTF/FASTA；E2E-PIZZLY-001 断言真实业务结果（保留 308/366、output.json 中 9 对融合基因含 EML4-ALK(paircount=4)、146 条组装融合转录本、json↔fasta 记录集合一致、抽样序列长度等于声明区间跨度）；E2E-PIZZLY-002 断言 GTF 缓存命中且二次运行结果与冷启动逐字节一致。`--version` 冒烟行被显式排除在 E2E 用例计数之外，未被当作唯一证据。CI 的 L1e 破坏性反向验证（移走 bin/ 后测试失败）进一步证明测试实质依赖被测二进制。\n\n【各轮发现与闭环】第 1 轮 pass + 5 项 P2/P3（陈旧 patch_generation 读数、配方方法顺序、assertion_count 算术、`|| true` 缺说明、configure_options 机制描述）→ 全部修复。第 2 轮 pass + 2 项 P3（notes.md 与软件级 manifest 的一处陈旧描述）→ 全部修复。第 3 轮 pass + 1 项 P2（两个 fixture 以裸 `.gz` 会被 preflight PF2 制品闸 fail-closed 拦截）+ 2 项 P3 → P2 按仓库既有约定（test_package 内以 base64 承载压缩输入，先例 archives/b/blur、archives/b/bozohttpd）改为 `*.gz.b64` 并在测试运行时解码 + sha256 校验，已用 `check_no_binaries` 实证不再命中；P3 保留。第 4 轮 pass，唯一 P2（证据日志早于 b64 改动）已在最终修订上重跑 finish 闭合。\n\n【阻断项逐条结论】PF7 源 URL 闸通过（conandata.yml 仅官方 https://github.com 单 URL，无 file://、无镜像黑名单域；构建期 gh-proxy 改写只出现在被 gitignore 的日志中且已还原）；PF2 制品闸通过（13 个变更文件无一命中 _ARCHIVE_EXT）；PF8 配方静态闸通过（commands.json 存在且 name=pizzly/type=tool/versions.0.37.3.ref 对齐、settings 四项齐全、slug/version 一致）；W2 原子性通过（变更全部位于 archives/p/pizzly/ 单一软件目录）；R51 通过（上游 0 有清点证据，消费者 2/2，三处计数一致，无占位符）；R33/R32/R37/R26/R49(PF6)/R8 通过；欺骗性行为逐项排除（无伪造 sha256/状态、无空壳 stub、无 __OHOS__ 或 -D__OHOS__ 注入、无 replace 注入、无 BUILD_TESTING=OFF 空跑、无吞退出码改断言、fixture 未缩小）。\n\n【无法核实事项（如实声明）】审计子任务无 shell/哈希执行能力，故：① 所有声明的 sha256 未由审计方重算（仅核对多处声明互相一致；fixture 另有「解码字节数与上游 GitHub tag 文件大小精确相等 + base64 载体尺寸与 76 列折行算术结果吻合」作为独立旁证）；② OHOS 上 base64/sha256sum/python3 的可用性由脚本 `command -v` 兜底断言，未在审计中独立验证；③ 上游 tag 归档 tarball 的 sha256 未复算（GitHub 自动归档不可复现）。上述均由本任务的 W3 实跑（conan create 退出码 0，包含 fixture 解码哈希校验与两个 E2E 用例 PASS）与 sha256 计算作为人工侧证据补齐。"
+}

@@ -1,0 +1,33 @@
+# 软件级 manifest — ply-probe
+# 遵循 ARCHIVE-SPEC v2.0（文件位置: archives/{letter}/{name}/manifest.yaml）
+
+software: ply-probe
+display: "ply (dynamic tracer)"
+description: "轻量级 BPF 动态追踪工具（kprobe/tracepoint 前端 + 内嵌 BPF 编译器，基于 libply）"
+category: utility
+homepage: "https://github.com/iovisor/ply"
+license: GPL-2.0-only
+
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "上游不发布 configure（autogen.sh = autoreconf），配方按其生成链逐步执行 libtoolize→aclocal→autoconf→autoheader→automake；config.guess/config.sub 由 automake --add-missing 落地，故 OHOS 三元组补丁必须在 automake 之后、configure 之前应用（E007）"
+    - "configure.ac 的 AC_INIT 版本取自 `git describe`，tarball 无 .git → 版本为空，须补丁钉住 2.4.0（GMP/pkg-config 版本校验依赖它）"
+    - "autoconf 生成的 config.status 用 `mktemp -d ./confXXXXXX`，OHOS/HMDFS 下该目录不可写（drwx--S---）→ subs1.awk Permission denied，须禁用 mktemp 分支走 mkdir 回退（E114）"
+    - "OHOS libc 不导出 legacy BSD index()/rindex()，链接期 --no-allow-shlib-undefined 报 undefined reference（src/libply/provider/tracepoint.c）→ 改 POSIX strchr()/strrchr()"
+    - "内核追踪能力整体缺失（平台限制，非适配缺陷）：bpf() 以 SIGSYS 杀死进程（rc=159，非 ENOSYS）；perf_event_open() 返回 EACCES；/proc/kallsyms 地址被 kptr_restrict 抹零导致 kallsyms cache 无法创建（kprobe 脚本编译期即失败）；/sys/kernel/debug/tracing 无后端"
+    - "可用路径仅 ply -v / ply -h 与脚本解析器；ply -e 因 kallsyms 受限静默 rc=1，ply -S / ply -T 下沉到 bpf() 被 SIGSYS 杀死 → test_package 仅断言可执行性 + 解析器真实性 + 边界确定性"
+  common_dependencies: []
+
+# 知识图谱扩展（本软件适配同时交付）：E545 描述 OHOS 内核追踪特性整体缺失，
+# 附 prescan_pattern 供预扫描阶段识别同类软件（BPF/kprobe/perf_event/tracefs 族）。
+knowledge_extensions:
+  - id: E545
+    topic: "Linux 内核追踪特性（BPF/kprobe/perf_event/tracefs）在 OHOS 不可用"
+    evidence: "reports/probe-output.log（探针实测）+ reports/test-report.md（4/4 边界断言）"
+
+versions:
+  "2.4.0":
+    status: built
+    build_date: "2026-10-02"

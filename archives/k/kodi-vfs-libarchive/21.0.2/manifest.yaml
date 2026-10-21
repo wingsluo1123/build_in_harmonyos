@@ -1,0 +1,36 @@
+name: kodi-vfs-libarchive
+version: "21.0.2"
+status: built
+build_date: "2026-10-02"
+source:
+  url: https://github.com/xbmc/vfs.libarchive/archive/refs/tags/21.0.2-Omega.tar.gz
+  sha256: aab35cb6b03191609a7e97df02f2f102659c12e414f7b95595f9bb2047554daf
+  tar_format: tar.gz
+build:
+  system: cmake
+  configure_options: []
+  dependencies:
+    - libarchive/3.7.7
+    - "kodi add-on SDK headers from xbmc 21.3-Omega tarball (kodi-dev-kit include subtree, sha256 a60afcb556e4a00cb19fc35b7e77758107c9a8096c6ce9b66af5f92396be31aa)"
+  cc: clang
+  cxx: clang++
+patches_applied: []
+knowledge_gained:
+  - Upstream build needs find_package(Kodi)+build_addon() (kodi-addon-dev);
+    recipe supplies its own CMake entry under recipe-cmake/ consumed via
+    build_script_folder, building the unmodified upstream source
+    (single translation unit src/ArchiveFile.cpp) — module target
+    vfs.libarchive with PREFIX "" produces vfs.libarchive.so
+  - Kodi add-on SDK headers are extracted selectively (kodi-dev-kit include
+    only) from the xbmc 21.3-Omega tarball via conandata sources.sdk
+  - Upstream requires lz4/lzo2/openssl/liblzma/bzip2/zlib only as the closure
+    of the static libarchive bundled under depends/common (3.4.3, built
+    statically); against the registry shared libarchive/3.7.7 those are
+    absorbed by libarchive itself (zlib/bzip2/xz statically, zstd as dynamic
+    NEEDED) and the add-on source only calls the libarchive public API
+  - Module keeps an explicit DT_NEEDED entry on libarchive (musl dlopen
+    resolves only the module's own DT_NEEDED closure, E004 BIND_NOW);
+    test_package prepends the libarchive/zstd package libdirs to
+    LD_LIBRARY_PATH for the dlopen() check
+software: kodi-vfs-libarchive
+build_system: cmake

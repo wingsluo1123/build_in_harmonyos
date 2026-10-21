@@ -1,0 +1,104 @@
+# test_package/MANIFEST.yml
+# 测试声明文件（CI L0e 要求存在）
+
+package: sg3_utils/1.49
+homepage: "https://sg.danny.cz/sg/sg3_utils.html"
+
+# 上游 1.49 的测试套件在 ttesting/ 目录，由独立 Makefile 构建，未接入 CMake 或
+# `make check`（顶层无 check 目标、无 ctest 注册）。
+# 清点口径：ttesting/Makefile 的 EXECS 变量（上游权威清单）——
+#   共 20 个测试程序：12 个 .c + 8 个 .cpp
+#   （ttesting/ 目录另有 sg_json_builder_test.c、sg_scat_gath.cpp 等不在 EXECS 内的示例）
+# 注意：ttesting/Makefile 固定 CXXFLAGS=-std=c++23，OHOS clang 15 不支持；
+# 且其 LD 默认为 g++、LIBFILESNEW 依赖 autotools 树内 ../lib/*.o，CMake 构建下 make 不可用。
+# 实测按文件手工编译（未走 make 全量），命令如下：
+#   C:   clang   -std=c99  -DSG_LIB_LINUX -DHAVE_NVME -I include ttesting/<t>.c   libsgutils2.a -lpthread -o <out>
+#   C++: clang++ -std=c++20 -DSG_LIB_LINUX -DHAVE_NVME -I include ttesting/<t>.cpp libsgutils2.a -lpthread -o <out>
+#   sg_mrq_dd.cpp 需额外追加 ttesting/sg_scat_gath.cpp
+upstream_check_command: "clang -std=c99 -DSG_LIB_LINUX -DHAVE_NVME -I include ttesting/<t>.c libsgutils2.a -lpthread -o <out>  # C++ 用 clang++ -std=c++20；sg_mrq_dd 追加 sg_scat_gath.cpp"
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 实测汇总（20 = 4 通过 + 2 数据漂移 + 14 缺设备）
+#   - 4 项无硬件依赖，实跑通过
+#   - 2 项是 t10.org 码表比对，1.49 码表较旧 → 数据漂移（纯码表内容比对，不涉及平台相关代码）
+#   - 14 项需 /dev/sg* / /dev/bsg / /dev/nvme* 设备节点，构建机与鸿蒙 PC 均无
+upstream_tests_pass: 4
+upstream_tests_data_drift: 2
+upstream_tests_no_device: 14
+upstream_tests_total: 20
+# 通过率：4/20 = 20%；排除 14 项缺设备后的可运行项 6 项中 4 项通过 = 66.7%
+upstream_tests_pass_rate: "4/20 = 20%（可运行 6 项中 4 项通过 = 66.7%）"
+
+upstream_tests:
+  - file: ttesting/sg_sense_test.c
+    description: "fixed 格式 sense 缓冲区解码自测"
+    result: PASS
+  - file: ttesting/tst_sg_lib.c
+    description: "sg_lib 公开函数自测：-s/-e/-u/-p/-H/-b16/-b32/-b64/-B5 共 9 个选项"
+    result: PASS
+  - file: ttesting/sg_tst_json_builder.c
+    description: "JSON 输出构建自测"
+    result: PASS
+  - file: ttesting/sgs_dd.c
+    description: "文件模式 dd（if=/of= 为普通文件，bs=512 count=4）"
+    result: PASS
+  - file: ttesting/sg_chk_asc.c
+    description: "ASC/ASCQ 码表与 t10.org asc-num.txt 比对"
+    result: "FAIL(数据漂移)：1.49 码表落后于 t10 当前清单，非平台问题"
+  - file: ttesting/sg_chk_inq_vd.c
+    description: "version descriptor 码表与 t10.org stds-num.txt 比对"
+    result: "FAIL(数据漂移)：同上"
+  - file: ttesting/sg_queue_tst.c
+    description: "sg 队列/异步测试"
+    result: SKIP_NO_DEVICE
+  - file: ttesting/bsg_queue_tst.c
+    description: "bsg 队列测试"
+    result: SKIP_NO_DEVICE
+  - file: ttesting/sg_tst_nvme.c
+    description: "NVMe 透传测试"
+    result: SKIP_NO_DEVICE
+  - file: ttesting/sg_tst_ioctl.c
+    description: "ioctl/迭代器测试"
+    result: SKIP_NO_DEVICE
+  - file: ttesting/sg_tst_bidi.c
+    description: "双向命令测试"
+    result: SKIP_NO_DEVICE
+  - file: ttesting/sg_tst_excl.cpp
+    description: "O_EXCL 独占打开测试"
+    result: SKIP_NO_DEVICE
+  - file: ttesting/sg_tst_excl2.cpp
+    description: "O_EXCL 独占打开测试（多进程）"
+    result: SKIP_NO_DEVICE
+  - file: ttesting/sg_tst_excl3.cpp
+    description: "O_EXCL 独占打开测试（长时）"
+    result: SKIP_NO_DEVICE
+  - file: ttesting/sg_tst_context.cpp
+    description: "sg_io_hdr 重入/并发测试"
+    result: SKIP_NO_DEVICE
+  - file: ttesting/sg_tst_async.cpp
+    description: "异步 ioctl 测试"
+    result: SKIP_NO_DEVICE
+  - file: ttesting/sg_iovec_tst.cpp
+    description: "iovec 版本测试"
+    result: SKIP_NO_DEVICE
+  - file: ttesting/sgh_dd.cpp
+    description: "hsgj 版 dd"
+    result: SKIP_NO_DEVICE
+  - file: ttesting/sg_mrq_dd.cpp
+    description: "多请求队列版本 dd（依赖 sg_scat_gath 辅助类）"
+    result: SKIP_NO_DEVICE
+  - file: ttesting/sg_take_snap.c
+    description: "快照/独占测试"
+    result: SKIP_NO_DEVICE
+
+# test_package 自带测试（消费者视角 + 鸿蒙专项；W3/CI 自动执行）
+test_package_tests:
+  - file: test.c
+    description: "消费者用例：sg_lib_version / ASC-ASCQ 码表 / fixed sense 解码 / hex2str（5 断言）"
+  - file: ohos_test.c
+    description: "鸿蒙专项：描述符格式 sense(0x72) 解码、fixed 格式 NOT READY 解码、错误类别映射、空 sense 边界（4 断言）"
+  - file: conanfile.py
+    description: "CLI 实测：sg_inq/sg_vpd/sg_turs --version（RC=0 自检）；sg_dd/sg_copy_results --version（真实 PT 分支守门，属 SG3_UTILS_LINUX_ONLY，PT_DUMMY 下不构建）"
+
+assertion_count: 9

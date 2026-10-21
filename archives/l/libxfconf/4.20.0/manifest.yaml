@@ -1,0 +1,87 @@
+software: libxfconf
+# 版本级 manifest
+# 文件位置: archives/l/libxfconf/4.20.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "4.20.0"
+description: "Xfce 配置存储系统：libxfconf-0 客户端库 + xfconf-query 命令行 + xfconfd 配置守护进程（GDBus 后端，XFCE 4.20 起不再依赖 dbus-glib）"
+license: "GPL-2.0-or-later"
+category: foundation
+build_system: autotools
+status: built
+build_date: "2026-10-17"
+
+homepage: "https://gitlab.xfce.org/xfce/xfconf"
+source_url: "https://archive.xfce.org/src/xfce/xfconf/4.20/xfconf-4.20.0.tar.bz2"
+source_sha256: "8bc43c60f1716b13cf35fc899e2a36ea9c6cdc3478a8f051220eef0f53567efd"
+
+# 软件级 commands.json 声明的 CLI（bin/xfconf-query）；xfconfd 位于
+# lib/xfce4/xfconf/xfconfd（libexec 语义，不参与 PATH 查找）。
+commands:
+  - xfconf-query
+
+build:
+  system: autotools
+  build_system: autotools
+  configure_options:
+    - "--disable-nls"
+    - "--disable-introspection"
+    - "--disable-vala"
+    - "--disable-gtk-doc"
+    - "GDBUS_CODEGEN=<glib 依赖包>/bin/gdbus-codegen"
+  dependencies:
+    - glib/2.84.0.1
+    - libxfce4util/4.20.1
+  cc: clang
+  cxx: clang++
+
+package_products:
+  - path: "lib/libxfconf-0.so.3.0.0"
+    kind: library
+    note: "SONAME libxfconf-0.so.3（version-info 3:0:0）"
+  - path: "include/xfce4/xfconf-0/xfconf/*.h"
+    kind: headers
+  - path: "lib/pkgconfig/libxfconf-0.pc"
+    kind: pkgconfig
+  - path: "bin/xfconf-query"
+    kind: executable
+  - path: "lib/xfce4/xfconf/xfconfd"
+    kind: executable
+    note: "HELPER_PATH_PREFIX 默认 $libdir；D-Bus 会话服务 org.xfce.Xfconf 的激活目标"
+  - path: "share/dbus-1/services/org.xfce.Xfconf.service"
+    kind: data
+  - path: "lib/gio/modules/libxfconfgsettingsbackend.so"
+    kind: gio-module
+  - path: "share/bash-completion/completions/xfconf-query"
+    kind: data
+
+patches_applied:
+  - "0001-config.guess-config.sub-ohos.patch"
+  - "0002-configure-drop-umask-077.patch"
+
+knowledge_gained:
+  - ref: "notes.md §3.1 / patches/0001-config.guess-config.sub-ohos.patch"
+    detail: "xfconf 4.20.0 的发行 tarball 仍是 Autotools（config.guess/config.sub 不认识 ohos）→ configure 报 OS `ohos' not recognized；补丁只做三元组识别，不动编译单元"
+  - ref: "notes.md §3.1"
+    detail: "本机 uname -s=HarmonyOS / uname -m=aarch64，且 profile 的 host==build 被视为原生构建，AutotoolsToolchain 不会注入 --host，因此 config.guess 打补丁是必需项而非可选"
+  - ref: "notes.md §3.3 / conanfile.py:_write_gio_unix_pc"
+    detail: "configure.ac 依赖 gio-unix-2.0 pkg-config 模块；glib 的 conan 包只把 gio-unix-2.0 暴露为头文件子目录（include/gio-unix-2.0）且没有对应组件，PkgConfigDeps 无法生成该 .pc，须在 generate() 内自行落一个"
+  - ref: "notes.md §3.3 / conanfile.py:_dependency_bin"
+    detail: "设备镜像里的 gdbus-codegen 是指向 glib 2.38.2 的软链，shebang 为 #!/usr/bin/python3（本机不存在）→ AC_PATH_PROG 拿到也用不了；改用 glib conan 包内版本匹配的 bin/gdbus-codegen 并用 GDBUS_CODEGEN= 显式指定"
+  - ref: "notes.md §3.2 / patches/0002-configure-drop-umask-077.patch"
+    detail: "hmdfs 会把目录权限改写成 setgid（0o2771），而 (umask 077 && mktemp -d) 得到 0o2700：挂载属主是 hmdfs 账户 uid 而非调用者 uid，other 类权限为 0 → 自家临时目录不可写；configure 内置的 config.status 临时目录因此失败（E114 同族），须去掉 umask 077"
+  - ref: "notes.md §3.4"
+    detail: "glib/2.84.0.1 的 glib-2.0.pc 已自带 -lintl（proxy-libintl 独立包提供 libintl.so.8），故本包无需像 libxfce4util 那样在 generate() 里增强 .pc"
+  - ref: "notes.md §3.4 / conanfile.py:_sign_installed_elfs"
+    detail: "make install 重写 ELF 会丢弃链接器自签的 .codesign 段 → package() 用 llvm-objcopy --remove-section .codesign + binary-sign-tool selfSign 重签（实测 4 个 ELF 全部带 .codesign）"
+  - ref: "notes.md §5.2 / test_package/test.c"
+    detail: "上游 4.20.0 的 XFCONF_TYPE_UINT16/INT16 GValue transform 在 register_transforms() 里把 (src,dest) 两个回调注册反了，g_value_type_transformable() 返回 TRUE 但实际转换是 no-op（上游缺陷，本适配不修，测试只断言注册存在）"
+
+patch_generation:
+  method: manual
+  patches_count: 2
+  generated_at: "2026-10-17"
+
+patch_classification:
+  - "0001-config.guess-config.sub-ohos.patch: host 工具三元组识别（可移植性）"
+  - "0002-configure-drop-umask-077.patch: 文件系统权限语义（hmdfs setgid/umask）"

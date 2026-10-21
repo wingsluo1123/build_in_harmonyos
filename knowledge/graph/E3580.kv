@@ -1,0 +1,60 @@
+#====================================================================
+# DRAFT-conan-test-package-artifacts-pollute-workspace
+# `conan create <recipe>` 时 test_package 的 build_folder 就是 test_package
+# 目录本身 → 测试写出的产物直接落进工作区，极易被误提交
+#====================================================================
+
+id:                     E3580
+trigger_tool:           conan|git
+phase:                  test|commit
+error_signature:        Test package build folder: .*test_package|^\?\? .*test_package/.*\.(cc|cpp|h|hpp|qm)$|only track changes|JC.*杂项文件
+severity:               1
+category:               conan, ci-junk, git, repo-hygiene
+match_keywords:         test_package, build_folder, conan create, 产物污染, git status, JC 杂项检查, generated, tempfile, mkdtemp, git add 整目录, --amend
+title:                  `conan create <recipe>` 时 **test_package 的 build_folder 就是 test_package 目录本身**，测试产物直接落进工作区，`git add <整目录>` 会把它一起提交（CI 的 JC 杂项检查正是拦这个）
+
+root_cause:             本地运行 `conan create archives/…/<pkg>` 时，test_package 的构建目录被设为
+                        recipe 的 test_package 目录（实测日志：
+                        `Test package build folder: …/archives/k/kdevelop-pg-qt/1.90.92/test_package`），
+                        而不是缓存里的临时目录。因此测试里任何写文件行为 —— 生成器输出、
+                        `.qm` 产物、中间 `.cc/.h` —— 都会出现在 `git status` 中；
+                        而提交时习惯用的 `git add archives/<组>/<pkg>`（整目录）会连产物一起入库。
+                        这些正是 CI 的 JC（杂项文件拦截：二进制产物 / 源码 tarball / 临时构建产物）
+                        要拦的对象 —— 判据是 PR diff，所以**历史里已提交的产物必须在合并前清掉**。
+
+affected_scope:         所有带 test_package 且测试会写文件的配方。本仓实测两例：
+                        · kdevelop-pg-qt/1.90.92 —— 生成器输出 9 个文件（factparser.cpp/h、
+                          factast.h、factvisitor.cpp/h …）被误提交，经 `git rm -r --cached` +
+                          `--amend` + `--force-with-lease`（自己的 fork 分支）订正；
+                        · qt5-qttools/5.15.2 —— 消费测试的 hello_zh_CN.ts/.qm 同类。
+                        不写文件的 test_package 不受影响（但只要将来加一个真实性验证就容易中招）。
+
+verification_cmd:       git status --porcelain | grep test_package
+                        # 提交前自查：test_package 下不该出现未跟踪的产物
+
+rec_priority:           1
+rec_approach:           write-test-artifacts-to-tempdir
+rec_description:        测试产物一律写到**系统临时目录**，不要写 `self.build_folder`：
+                        `out_dir = tempfile.mkdtemp(prefix="<pkg>-test-")`（标准库、随进程可清理），
+                        并把路径 `self.output.info()` 打出来便于排查。
+                        （注：conan 官方文档语境里 build_folder 是"构建目录"，但 `conan create` 的
+                        test_package 阶段实际落在 recipe 的 test_package 目录 —— 实测如此，
+                        不要按文档直觉假设它是缓存临时目录。）
+                        提交前用 `git status --porcelain | grep test_package` 自查；
+                        尽量逐文件 `git add`，避免 `git add <整目录>`。
+                        若已误提交：`git rm -r --cached <产物目录>` + `git commit --amend`，
+                        自己 fork 的分支可 `--force-with-lease` 推送（他人分支严禁强推）。
+rec_command:            git status --porcelain | grep test_package
+rec_auto_fix:           false
+rec_impl:               kdevelop-pg-qt-recipe
+
+fallback_priority:      2
+fallback_approach:      explicit-add-and-gitignore
+fallback_description:   不便改测试写法时：① 提交改用手写文件列表（`git add <具体文件>`）而非整目录；
+                        ② 在配方目录放 `.gitignore`（如 `test_package/generated/`）作双保险；
+                        ③ 仍要清理历史里已提交的产物 —— CI 按 PR diff 判 JC，残留即被拦。
+fallback_command:       git status --porcelain
+fallback_auto_fix:      false
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E3580.md

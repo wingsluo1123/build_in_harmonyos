@@ -1,0 +1,41 @@
+package: profanity/0.18.2
+homepage: "https://profanity-im.github.io"
+
+# Upstream tests run inside conanfile.py build() by executing the cmocka
+# `unittests` binary from the meson build tree. Counted harness is the
+# single offline `unit tests` entry only (discovered=1/executed=1 on pass,
+# skipped=0 per HMBS no-skipped gate, radcli/1.2.11 R6 precedent); the
+# `functional tests` entry (stabber+libutil) is an excluded_case, so
+# discovered(1)+excluded(1)==total(2).
+upstream_test_in_build: true
+upstream_test_command: "./unittests (counted meson entry 'unit tests'; functional tests excluded: needs stabber+libutil)"
+
+# Official registered test entries (meson.build `test()` calls).
+# Method: count of test() registrations in the upstream meson.build.
+upstream_test_total: 2
+upstream_test_count_method: "ctest_entries"
+upstream_test_count_source: "meson.build test() registrations (tag 0.18.2: 'unit tests' + 'functional tests')"
+upstream_test_case_count: 2
+upstream_test_excluded_count: 1
+upstream_tests_exist: true
+upstream_tests:
+  - file: tests/unittests/unittests.c
+    source: profanity-0.18.2/tests/unittests/unittests.c
+    description: "cmocka unit tests, meson test entry 'unit tests' (needs cmocka)"
+    command: "./unittests"
+  - file: tests/functionaltests/functionaltests.c
+    source: profanity-0.18.2/tests/functionaltests/functionaltests.c
+    description: "live-XMPP functional tests, meson test entry 'functional tests' (needs stabber server + libutil; excluded_case on OHOS, not counted in discovered)"
+    command: "./functionaltests"
+    status: "excluded"
+
+test_package_tests:
+  - file: test.c
+    description: "installed bin/profanity is a valid 64-bit AArch64 ELF (static, no exec: device EPERM gate)"
+    command: "./test_profanity"
+  - file: test.c
+    description: "installed bin/profanity image embeds version string 0.18.2 (static, no exec)"
+    command: "./test_profanity"
+
+test_package_test_count: 2
+assertion_count: 2

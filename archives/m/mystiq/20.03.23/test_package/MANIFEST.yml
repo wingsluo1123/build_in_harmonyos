@@ -1,0 +1,56 @@
+# test_package MANIFEST — mystiq 20.03.23（Qt5 + ffmpeg 转码 GUI）
+# R34 反空壳：test() 实质启动被测二进制，验证 Qt5 运行时链 + headless GUI 初始化。
+
+package: mystiq/20.03.23
+homepage: "https://github.com/swl-x/MystiQ"
+
+# 上游测试入口（R51 清点）
+# tests/run-tests.sh 遍历 tests/*/ 目录，对每个 qmake 工程执行 qmake && make && ./<dir>
+upstream_check_command: "tests/run-tests.sh"
+upstream_test_in_build: false
+upstream_test_command: "./tests/run-tests.sh"
+upstream_tests:
+  - name: tests/testversioncompare
+    cases: 3
+    case_names:
+      - testVersionEquality
+      - testVersionInequality
+      - testVersionSingleRange
+  - name: tests/testupdateinfoparser
+    cases: 1
+    case_names:
+      - testParseXml
+
+upstream_test_count: 4
+upstream_test_executed: 4
+upstream_test_passed: 4
+upstream_test_failed: 0
+upstream_test_skipped: 0
+
+# 鸿蒙适配新增测试（补全测试用例）
+ohos_test_included: true
+ohos_test_path: "tests/testohosplatform"
+ohos_test_count: 3
+ohos_test_case_names:
+  - testPlatformBackendIsHeadless
+  - testNotificationFallbackWithoutNotifySend
+  - testExternalProgramProbe
+ohos_test_executed: 3
+ohos_test_passed: 3
+ohos_test_failed: 0
+ohos_test_skipped: 0
+
+test_package_count: 2
+test_package_assertions:
+  - "mystiq 二进制存在且可执行"
+  - "offscreen QPA 下启动并存活 6s（Qt5 运行时链闭合）"
+  - "desktop/icon/appdata 元数据随包交付"
+
+executed: true
+notes: >
+  mystiq 20.03.23 = Qt5 GUI ffmpeg 前端（qmake 工程）。上游自动化测试为
+  Qt Test 单测两个工程（tests/testversioncompare 3 例、tests/testupdateinfoparser 1 例），
+  本次在 OHOS aarch64 上真实执行 4/4 通过（日志见任务工作区 logs/w4-*）。
+  另补充鸿蒙特有测试 tests/testohosplatform 3 例（QPA 后端必须为 headless、
+  notify-send 缺失时通知后端必须回退、QProcess 能启动原生二进制），3/3 通过。
+  test_package 只做包级冒烟，不替代上游测试统计。

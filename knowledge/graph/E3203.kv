@@ -1,0 +1,33 @@
+#====================================================================
+# DRAFT-uefitool-0.28.0-a73-qt6-gui-subdir-hard-coupling
+# 上游 CMakeLists 用无条件 ADD_SUBDIRECTORY 把 Qt6 GUI 目标耦合进整棵构建树
+# ——无 Qt6 平台上零 Qt 依赖的 CLI 也被连带阻断在 configure 阶段
+#====================================================================
+
+id:                     E3203
+trigger_tool:           cmake|conan
+phase:                  configuration
+error_signature:        By not providing "FindQt6\.cmake".*|Could not find a package configuration file provided by "Qt6".*|Qt6_DIR.*NOTFOUND|Qt6Config\.cmake.*not found|FIND_PACKAGE\(Qt6 REQUIRED
+severity:               2
+category:               limitation, build-system, cmake, dependency, qt6
+match_keywords:         ADD_SUBDIRECTORY, add_subdirectory, unconditional subdirectory, Qt6, FIND_PACKAGE, REQUIRED COMPONENTS, Qt6Widgets, GUI target, headless, CLI-only, optional target, configure abort, package surface trimming
+title:                  上游 CMakeLists 用无条件 ADD_SUBDIRECTORY 把 Qt6 GUI 目标耦合进整棵构建树 —— 无 Qt6 平台上零 Qt 依赖的 CLI 也被连带阻断
+root_cause:             上游根 CMakeLists.txt 里 GUI 子目录与 CLI 子目录是**平级且都无任何条件保护**的 ADD_SUBDIRECTORY；而 GUI 子目录内第一件事就是 FIND_PACKAGE(Qt6 REQUIRED COMPONENTS Widgets)。CMake 处理 ADD_SUBDIRECTORY 时立即展开该子目录 ⇒ REQUIRED 依赖找不到即 FATAL_ERROR，整个 configure 中止。此时尚未进入任何语言编译阶段，所以「GUI 不需要」这个事实救不了同级的 CLI。本质是**可选目标被硬编码进必需路径**，不是"少了一个开关"。
+affected_scope:         在同一个 CMake 树里同时提供 GUI 与 CLI 目标、且用 REQUIRED 声明 GUI 依赖的上游项目（本例 LongSoft/UEFITool，GUI=Qt6 Widgets，CLI=UEFIExtract/UEFIFind 纯 C++ 零 Qt）；平台侧 Qt 大版本不匹配时必然触发（OHOS PC 的 Qt 是 qt5-qtbase 5.15，无 Qt6）
+verification_cmd:       grep -n "ADD_SUBDIRECTORY" CMakeLists.txt; grep -n "FIND_PACKAGE(Qt6" UEFITool/CMakeLists.txt; cmake -S . -B /tmp/probe-b -G Ninja 2>&1 | grep -B1 -A3 "FindQt6"
+rec_priority:           P1
+rec_approach:           新增一个**适配侧**薄 CMakeLists，只装载那些零 Qt 依赖的子工程；用构建系统自带的"指定构建脚本目录"入口把配置指向它。上游一个字节都不改。
+rec_command:            cmake.configure(build_script_folder="cmake")   # conan CMake helper；配合自带的 cmake/CMakeLists.txt
+principles:             P013
+doc_file:               knowledge/drafts/DRAFT-uefitool-0.28.0-a73-qt6-gui-subdir-hard-coupling.md
+last_updated:           2026-10-04
+source_event:           uefitool 0.28.0-a73 适配：上游根工程因 Qt6 Widgets 为 REQUIRED 而在 configure 阶段中止，改用适配侧薄 CMakeLists 只装载两个零 Qt 依赖的 CLI 子工程
+authors:                uefitool-adapter
+source_pr:
+source_commit:
+
+metrics_success_count:  0
+metrics_fail_count:     0
+rec_auto_fix:               false
+rec_impl:               manual
+rec_description:        新增一个**适配侧**薄 CMakeLists，只装载那些零 Qt 依赖的子工程

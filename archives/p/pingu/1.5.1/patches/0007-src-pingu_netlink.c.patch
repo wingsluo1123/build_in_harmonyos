@@ -1,0 +1,40 @@
+--- a/src/pingu_netlink.c
++++ b/src/pingu_netlink.c
+@@ -7,25 +7,37 @@
+  * This program is free software; you can redistribute it and/or modify it
+  * under the terms of the GNU General Public License version 2 or later as
+  * published by the Free Software Foundation.
+  *
+  * See http://www.gnu.org/ for details.
+  */
+ 
+ #include <arpa/inet.h>
+ #include <asm/types.h>
+ #include <sys/socket.h>
++/* musl-derived sysroots (e.g. OpenHarmony) do not guard the kernel UAPI
++ * definition of struct sockaddr_storage the way glibc does, so a TU that also
++ * sees the libc headers fails with "redefinition of 'sockaddr_storage'".
++ * Rename the kernel-side definition while the UAPI headers are parsed. */
++#if defined(__linux__) && !defined(__GLIBC__)
++#define sockaddr_storage __uapi_sockaddr_storage
++#define PINGU_RESTORE_SOCKADDR_STORAGE 1
++#endif
+ #include <linux/netlink.h>
+ #include <linux/rtnetlink.h>
+ #include <linux/ip.h>
+ #include <net/if.h>
+ #include <linux/fib_rules.h>
++#ifdef PINGU_RESTORE_SOCKADDR_STORAGE
++#undef sockaddr_storage
++#undef PINGU_RESTORE_SOCKADDR_STORAGE
++#endif
+ #include <netinet/in.h>
+ 
+ #include <time.h>
+ #include <stdio.h>
+ #include <fcntl.h>
+ #include <errno.h>
+ #include <unistd.h>
+ #include <stdlib.h>
+ #include <malloc.h>
+ #include <string.h>

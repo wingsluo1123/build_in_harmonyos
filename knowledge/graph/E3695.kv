@@ -1,0 +1,81 @@
+# ═══ Draft knowledge entry — 构建系统在构建期「运行」自产的目标二进制来探测平台：交叉编译必然失败，且上游的显式覆盖开关往往同时门控 ABI 检查 ═══
+# Timestamp: 2026-09-17
+# Software: duckdb 1.5.5
+# Gate: HarmonyOS PC conan create（configure/build 阶段）
+# Status: DRAFT — 需人工/AI 审核后 promote 为 E-entry
+#
+# To promote:
+#   1. 审核 error_excerpt 与实际验证
+#   2. 改名为 E0XX.kv 并移动到 knowledge/graph/
+#   3. 在 knowledge/graph/index.tsv 添加一行
+#   4. 编写 knowledge/doc/E0XX.md
+
+id:                     E3695
+trigger_tool:           cmake|make|ninja|conan
+phase:                  configuration|build
+error_signature:        Exec format error|
+cannot execute binary file|
+Error [0-9]+.*(platform|duckdb_platform)|
+duckdb_platform_binary
+
+severity:               3
+category:               platform, detection, build-system, cross-compile, abi
+match_keywords:         cross compile, target binary execution, build-time probe, platform detection, DUCKDB_EXPLICIT_PLATFORM, DUCKDB_CUSTOM_PLATFORM, add_executable, add_custom_command, TARGET_FILE generator expression, ALL target, add_dependencies, ABI namespace, libc++, musl, Exec format error, explicit override, platform.hpp
+title:                  构建系统在构建期「运行」自产的目标二进制来探测平台：交叉编译必然失败，且上游的显式覆盖开关往往同时门控 ABI 检查
+
+root_cause: >
+  上游 `CMakeLists.txt:872-895` 用「运行一个刚构建出的可执行文件」来探测平台字符串：
+  
+    if(NOT DUCKDB_EXPLICIT_PLATFORM)
+      add_executable(duckdb_platform_binary ${VERSION_SOURCES})
+      add_custom_command(
+        OUTPUT ${PROJECT_BINARY_DIR}/duckdb_platform_out
+        DEPENDS duckdb_platform_binary
+        COMMAND $<TARGET_FILE:duckdb_platform_binary> > ...   # ← 运行目标二进制
+        ...)
+    else()
+      add_custom_command(... COMMAND ${CMAKE_COMMAND} -E echo_append
+                           "${DUCKDB_EXPLICIT_PLATFORM}" > ...) # ← 仅 echo
+    endif()
+  
+  该二进制是**面向目标平台**的可执行文件（本例 aarch64-linux-ohos），构建主机无法执行它，
+  因此在交叉编译且未指定 `DUCKDB_EXPLICIT_PLATFORM` 时，构建必然在探测处失败。
+  
+  它并非孤立目标：`extension/extension_build_tools.cmake:88-94` 的
+  `duckdb_local_extension_repo`（一个 `ALL` 目标）与每个 loadable extension（同文件 :214）
+  都 `add_dependencies(... duckdb_platform)`，所以**默认 `all` 路径上就会被触发**——
+  即便你不构建任何扩展。
+  
+  第二层隐蔽性：这个"只是个平台名"的变量同时被 `CMakeLists.txt:143-145` 转定义为
+  `DUCKDB_CUSTOM_PLATFORM`，而 `src/include/duckdb/common/platform.hpp:38-39` 会因它命中
+  `#if defined(DUCKDB_CUSTOM_PLATFORM)` 分支，从而**绕过** `platform.hpp:70-74` 的 legacy
+  C++ ABI `#error`。对该平台尤其关键：OHOS 走 musl + libc++，其 ABI 命名空间判定基于
+  `_LIBCPP_ABI_NAMESPACE` 而非 glibc 的 `__GLIBCXX__` 探测，上游那条 `#error` 的判定前提不成立。
+  换言之，这个开关既解决"能不能构建"，又顺带决定"ABI 分支走哪条"。
+
+verification_cmd:
+    1. 正向：设置 `DUCKDB_EXPLICIT_PLATFORM=linux_arm64` 后 `conan create` 全程通过；
+       与 `platform.hpp:37-88` 在本平台的推演结果一致（即探测程序本来也会得到同一字符串）。
+    2. 反向（负控）：不设置该变量时，构建在探测处失败——目标二进制无法在构建主机执行。
+    3. ABI 分支：该变量经 `CMakeLists.txt:143-145` 转定义为 `DUCKDB_CUSTOM_PLATFORM`，
+       命中 `platform.hpp:38-39`，绕过 `platform.hpp:70-74` 的 legacy ABI `#error`；撤掉后该 `#error` 复现。
+
+doc_file:               knowledge/draft/DRAFT-duckdb-1.5.5-build-time-target-binary-platform-probe.md
+last_updated:           2026-09-17
+source_event:           duckdb 1.5.5 HarmonyOS PC 适配 (PR #9852)
+
+authors:                ohos-farm
+source_pr:              9852
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-09-17
+
+rec_approach: 设置上游提供的显式覆盖变量，走 `else()` 分支（仅 `echo_append`，不执行任何目标二进制）：  tc.variables["DUCKDB_EXPLICIT_PLATFORM"] = "linux_arm64"  取值不能拍脑袋——必须与探测程序**本来会算出的那个字符串**一致。本例依据 `src/include/duckdb/common/platform.hpp:37-88
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+affected_scope:         构建系统在构建期「运行」自产的目标二进制来探测平台：交叉编译必然失败，且上游的显式覆盖开关往往同时门控 ABI 检查
+verification_cmd:       # 以 source_pr CI 门禁为准（PR 9852）
+rec_description:        设置上游提供的显式覆盖变量，走 `else()` 分支（仅 `echo_append`，不执行任何目标二进制）：  tc

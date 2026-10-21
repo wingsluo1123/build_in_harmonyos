@@ -1,0 +1,58 @@
+software: live555
+version: "2026.08.14"
+status: built
+build_date: "2026-10-13"
+build_system: genMakefiles
+
+source:
+  # 上游官方发布位在本沙箱不可用（见下「换源」），改用 Fedora lookaside 的 pristine 上游 tarball
+  url: "https://src.fedoraproject.org/repo/pkgs/live555/live.2026.08.14.tar.gz/sha512/1fc21b675b128dae47713b59b81ab2845f416f30a2dfa46efe60d966fb6fff22433aad14a90e46cd7b020abf595c3242358bbf6344c66729d3eb69760c9ed897/live.2026.08.14.tar.gz"
+  sha256: "85848fb28df98a77a6e745959cc3ecf5f541f34c8ffef9021b9f1c2e682edee0"
+  sha512_upstream: "1fc21b675b128dae47713b59b81ab2845f416f30a2dfa46efe60d966fb6fff22433aad14a90e46cd7b020abf595c3242358bbf6344c66729d3eb69760c9ed897"
+  upstream_version: "2026.08.14"
+  tar_format: tar.gz
+
+build:
+  system: genMakefiles
+  configure_options:
+    - "config.ohos-aarch64（构建期生成：clang/clang++ from profile + --target=aarch64-linux + -DNO_OPENSSL=1）"
+  subdirs_built:
+    - liveMedia
+    - groupsock
+    - UsageEnvironment
+    - BasicUsageEnvironment
+  subdirs_skipped:
+    - testProgs
+    - mediaServer
+    - proxyServer
+    - hlsProxy
+  dependencies: []
+  note: >-
+    上游 install 规则按 8 个子目录遍历，未构建的子目录会让 `make install` 报错，故本配方不走上游 install，
+    由 recipe 显式收集产物：4 个静态库进 lib/，各子目录 include/*.hh|*.h 按上游布局进 include/<subdir>/。
+
+test:
+  test_package: "CMake 消费者测试（包含 liveMedia.hh + 构造 BasicTaskScheduler/BasicUsageEnvironment 并打印，验证符号与生命周期）"
+
+tests:
+  upstream_tests: 0
+  added_consumer_scenarios: 1
+  added_consumer_assertions: 3
+
+# 路径评估（按仓内口径：A=基础适配、B=知识库扩展、C=高难度挑战）
+paths:
+  path_a:
+    status: "已完成"
+    evidence: "conan create rc=0；test_package 输出 `live555 basic usage environment ok` 与通过行"
+  path_b:
+    status: "可申报（候选）"
+    rationale: >-
+      两条可迁移经验：① **非 autotools/cmake 的私有构建流程**（genMakefiles + 每子目录 Makefile 拼接）在 OHOS 上的
+      接线法——构建期生成 `config.<platform>`（编译器/归档器取自 profile）、按消费者需要裁剪子目录、
+      并因上游 install 遍历全部子目录而改为 recipe 侧显式收集产物；② **上游发布位不可用时的换源判据**：
+      官方 301 畸形/TLS 失败 → 改用 Fedora lookaside 缓存的 pristine tarball，并以 Fedora 记录的 sha512
+      逐字核验（与 libcddb 用 Debian pristine orig 的处置构成同一模式的两个样本）。
+    artifacts: ["notes.md", "conandata.yml（换源理由与双哈希）"]
+  path_c:
+    status: "不主张"
+    rationale: "单体库 + 私有 makefile 流程适配，无 bundled 依赖自举与大规模回归矩阵。"

@@ -1,0 +1,59 @@
+--- a/isbnlib/dev/vias.py
++++ b/isbnlib/dev/vias.py
+@@ -45,42 +45,43 @@
+             )
+             results[name] = None
+ 
+     for name, task in named_tasks:
+         t = Thread(target=_worker, args=(name, task, arg))
+         t.start()
+         t.join(options.get('THREADS_TIMEOUT'))
+     return results
+ 
+ 
++def _multi_worker(name, task, arg, q):
++    try:  # pragma: no cover
++        q.put((name, task(arg)))
++    except Exception:  # pragma: no cover
++        LOGGER.debug(
++            "No result in 'multi' for %s[%s](%s)",
++            task,
++            name,
++            arg,
++        )
++        q.put((name, None))
++
++
+ # pylint: disable=broad-except
+ def multi(named_tasks, arg):
+     """Use several cores (if available)."""
+     from multiprocessing import Process, Queue
+ 
+     results = {}
+     q = Queue()
+ 
+-    def _worker(name, task, arg, q):
+-        try:  # pragma: no cover
+-            q.put((name, task(arg)))
+-        except Exception:  # pragma: no cover
+-            LOGGER.debug(
+-                "No result in 'multi' for %s[%s](%s)",
+-                task,
+-                name,
+-                arg,
+-            )
+-            q.put((name, None))
+-
+     for name, task in named_tasks:
+-        p = Process(target=_worker, args=(name, task, arg, q))
++        p = Process(target=_multi_worker, args=(name, task, arg, q))
+         p.start()
+         p.join(options.get('THREADS_TIMEOUT'))
+     q.put('STOP')
+ 
+     while True:
+         el = q.get()
+         if el == 'STOP':
+             break
+         results[el[0]] = el[1]
+     return results

@@ -1,0 +1,40 @@
+version: "1.3.16"
+software: paho.mqtt.c
+status: built
+build_date: "2026-10-15"
+build_system: cmake
+conan_ref: "paho.mqtt.c/1.3.16@ohpcd/stable"
+
+source:
+  url: "https://github.com/eclipse/paho.mqtt.c/archive/refs/tags/v1.3.16.tar.gz"
+  sha256: "8b960f51edc7e03507637d987882bc486d8f4be6e79431bf99e2763344fd14c5"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DPAHO_WITH_SSL=OFF (default; optional OpenSSL 3.5.8.1 support)"
+    - "-DPAHO_BUILD_STATIC=TRUE"
+    - "-DPAHO_BUILD_SHARED=$shared"
+    - "-DPAHO_BUILD_DOCUMENTATION=FALSE"
+    - "-DPAHO_BUILD_SAMPLES=FALSE"
+    - "OHOS static libraries use CMAKE_POSITION_INDEPENDENT_CODE=TRUE"
+
+validation:
+  target: "HarmonyOS 6.0 / AArch64"
+  device: "PASS: HarmonyOS 6.0/AArch64 tests ran over wireless HDC at 10.53.45.8:8710. Signed HAPs linked the exact Conan package libraries for the default and TLS variants."
+  mqtt: "PASS: 4 distinct HarmonyOS test items; default variant ran 2/2 and TLS variant ran 4/4 (6 executions total, with the platform probe and plain MQTT scenario shared across variants)"
+  tls: "PASS: OpenSSL 3.5.8.1; exact Conan TLS package negotiated TLSv1.2 and TLSv1.3 on device"
+  conan: "PASS: on HarmonyOS 6.0/AArch64 with Conan 2.29.1, finish G2 conan create and test_package passed; G3 system-library isolation passed. W3 ran the package test on the device; the generated local CI result was verified against its log. Validation used the default shared=False static package; the shared=True package variant was not built or device-tested."
+  upstream_tests: "The upstream test/ tree contains 25 C source files and 9 Python scripts. On HarmonyOS AArch64, the full static+shared+SSL configuration registered 279 CTest case items: static 127 (99 non-WebSocket, 28 WebSocket) and shared 152 (99 non-WebSocket, 53 WebSocket). The 277 count is lower by the two separately registered static/shared CTest items for test_connect_destroy-1-execute-destroy-during-connect (#278 and #279); the session-present items are #276 and #277 and are already included in 277. Both connect-destroy registrations passed in their respective device runs. Across initial and focused runs, all 279 registrations have passing evidence: 263 have a CTest Passed record and the remaining 16 MQTT v5 registrations (8 scenarios x static/shared) passed through focused runs of the upstream protocol driver with 0 failures. The full 279-item suite was not rerun as one batch. mTLS/WSS used a temporary test bridge because the device Mosquitto/libwebsockets listener completed TLS but did not return HTTP 101. Existing device logs are in /storage/Users/currentUser/tmp/paho-upstream-ctest-20261016 and are not included in the archive."
+  finish_gate: "PARTIAL: device-side finish G2/G3/W3 passed; the generated local CI result had exit_code=0 and its SHA256 matched the W3 log. G0 clean verify warned because the sparse device checkout lacks the upstream tarball. Finish finalize/submit readiness still reports missing packaging release/debug tarballs and .staging-verified; W5 knowledge check was corrected afterward and passes locally."
+
+patches_applied:
+  - "0001-src-SSLSocket.c.patch"
+
+knowledge_ref:
+  - E429
+knowledge_gained:
+  - "On HarmonyOS, include pthread.h before Paho Heap.h when compiling OpenSSL SSLSocket.c, because Heap.h macro-rewrites free and can corrupt the sched.h declaration pulled in by pthread headers (knowledge_ref: E429)."
+
+notes: "Default and TLS Conan AArch64 builds and exact-package device tests passed. On 2026-10-16, device-side finish G2/G3/W3 passed and produced a valid local .ci-result.json tied to the W3 log; overall finish remains partial because packaging/submit-readiness artifacts are absent. Knowledge draft E429 is referenced and the local knowledge-gap check passes. The upstream test/ tree contains 25 C source files and 9 Python scripts. The full static+shared+SSL CTest registry contains 279 case items: static 127 (99 non-WebSocket, 28 WebSocket) and shared 152 (99 non-WebSocket, 53 WebSocket). A 277 count is lower by the two separately registered CTest items for test_connect_destroy-1-execute-destroy-during-connect: static #278 and shared #279; the two session-present items are #276/#277 and already included. The static and shared connect-destroy items both passed in their respective non-WebSocket runs. Of the 279 registrations, 263 have direct CTest Passed records; the remaining 16 entries are eight MQTT v5 scenarios (test10-2/3/5/6, test11-2/3, test45-1/4) for each static/shared link configuration. All 16 targeted runs of the upstream protocol driver report passed with 0 failures. Therefore each registered item has at least one successful execution across initial and focused runs; this was not a single 279-item rerun. Initial failures were resolved through focused TLS-chain, MQTT v5, and WebSocket fixture reruns. Device evidence is retained at /storage/Users/currentUser/tmp/paho-upstream-ctest-20261016 (full list: ctest-list-full.log; static runs: ctest-run.log, ctest-ws-run.log, ctest-ws-followup.log, ctest-ws-tcpbackend-followup.log and retest-*.log; shared runs: ctest-shared-nonws.log, ctest-shared-tls-retest.log, shared-test*.log, ctest-shared-ws-final.log and ctest-shared-ws-rerun-failed-final.log). mTLS/WSS used a temporary bridge because the device Mosquitto/libwebsockets listener did not return HTTP 101 after TLS. Raw logs are not included in the archive."

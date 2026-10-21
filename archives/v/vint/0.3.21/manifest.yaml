@@ -1,0 +1,74 @@
+# 版本级 manifest — vint 0.3.21
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "0.3.21"
+software: vint
+status: built
+build_date: "2026-10-17"
+build_system: pip
+
+source:
+  url: "https://codeload.github.com/Vimjas/vint/tar.gz/refs/tags/v0.3.21"
+  sha256: "ebbb4ffd790324331aabf82d0b8777db8ce41d72d7c4c1c328bc099359ae06d6"
+  filename: "vint-0.3.21.tar.gz"
+  note: >-
+    上游 `Vimjas/vint` 的 v0.3.21 tag 归档（版本与平台清单 `vint 0.3.21` 一致）。
+    本地实测 96,747 字节、349 个文件、单层根目录 `vint-0.3.21/`，仓库自带 49 个 `test_*.py`。
+
+build:
+  system: pip
+  install_steps:
+    - "pip install --target <包>/python PyYAML ansicolor chardet \"setuptools<81\"（运行时依赖，走平台 pip 镜像）"
+    - "pip install --no-deps --target <包>/python .（本体；排除 setup.py 里 append 的 enum34/pathlib/typing 等 py2 backport）"
+    - "按上游入口 console_scripts: vint = vint:main 生成 <包>/bin/vint 启动脚本"
+  dependencies: ["PyYAML", "ansicolor", "chardet", "setuptools<81（提供 pkg_resources）"]
+  build_requirements: []
+  language: "Python（pip 轮子安装，无 C 扩展编译步骤）"
+  conan_side_adaptations:
+    - "运行时依赖钉 setuptools<81：vint 直接 import pkg_resources 却未声明该依赖，而 setuptools 84 已移除 pkg_resources"
+    - "本体用 --no-deps 安装：setup.py 里 append 的 enum34/pathlib/typing 是 py2 backport，装上会在 py3.12 下遮蔽标准库"
+    - "命令脚本自建：pip --target 会因 <target>/vint 与包目录同名而静默不生成脚本；且 vint 没有 __main__（python -m vint 不可用）"
+    - "测试环境造 python shim 并把 bin/vint 补回可执行位：验收测试以 ['bin/vint', …] 调用仓库内启动脚本，其 shebang 是 #!/usr/bin/env python"
+    - "测试环境静音 Python 警告：验收测试断言输出以 vint ERROR:/DEBUG: 开头，而 setuptools/py3.12 的告警会混入同一输出流"
+
+upstream_tests:
+  framework: "pytest（上游 tox 里 pin 的是 pytest 3.3.2，py3.12 下无法安装 → 用现代 pytest 跑同一套用例）"
+  test_path: "test/（unit / integration / acceptance，共 49 个 test_*.py）"
+  test_command: "python -m pytest -q test"
+  test_count: 272
+  run_in_build: true
+  verified: true
+upstream_test_pass_rate: >-
+  **271/271（100%）** —— 本地实跑 `271 passed, 1 skipped`（另有 1 个用例是上游自身标注的 skip，
+  非适配引入）。这是用**现代 pytest 跑上游同一套用例**得到的结果：上游 tox.ini 把 pytest 钉在 3.3.2
+  （2018 年版本，py3.12 上无法安装），故改用现代 pytest，其余未改任何用例。
+adapted_test_pass_rate: >-
+  test_package/check_vint.py **7 项消费者校验（全部离线）**，本地实测
+  `checks=7 fails=0 skips=0 / RESULT: PASS`：①命令产物齐备（bin/vint）②模块随包（python/vint/）
+  ③运行时依赖随包（yaml / ansicolor / chardet）④**真跑** `vint --version`（rc=0，输出 `0.3.21`）
+  ⑤**真实 lint 行为**：故意写坏的 vim script 被报出（rc=1，输出 `unexpected token`）
+  ⑥许可证随包（licenses/LICENSE.txt）⑦证据（sha256 + python 版本）。
+
+deviations:
+  - "运行时依赖钉 setuptools<81（见 conan_side_adaptations 第 1 条）"
+  - "上游 tox 的 pytest 3.3.2 无法在 py3.12 安装 → 用现代 pytest 跑同一套用例"
+  - "测试环境做 3 处环境适配（python shim / 可执行位 / 静音警告），均不改上游源码与用例"
+
+knowledge_gained:
+  - category: L1
+    content: >-
+      **`pip install --target` 的两个坑**：①目标根目录若存在与 console script 同名的**包目录**（如
+      `vint/`），pip 会**静默不生成**该脚本（其余脚本照常生成）→ 需要按 `setup.py` 的 `entry_points`
+      自行生成启动脚本；②`--target` 不会装 `setuptools`，而老项目常在代码里 `import pkg_resources`
+      却没在 requirements 里声明它 —— 且**新版 setuptools 已移除 `pkg_resources`**，
+      必须钉 `setuptools<81` 才有。
+    reason: "vint 0.3.21 适配实测——命令产物缺失与 pkg_resources 报错"
+  - category: L1
+    content: >-
+      **老 Python 项目的验收测试在新解释器上常因"输出流被警告污染"而失败**：这类测试常断言 CLI 输出
+      **以固定前缀开头**（如 `vint ERROR:`），而 `setuptools` 的 deprecation 警告、py3.12 的
+      `SyntaxWarning: invalid escape sequence` 会混进同一输出流 → 断言必然落空。
+      处置是**在测试环境静音警告**（`PYTHONWARNINGS=ignore`），而不是改上游用例。
+      另一条同源坑：仓库内启动脚本 shebang 常写 `#!/usr/bin/env python`，而新环境只有 `python3`
+      → 需要造 `python` shim（并补回解包后丢失的可执行位）。
+    reason: "vint 0.3.21 适配实测——验收测试的 8 个失败逐项归因"

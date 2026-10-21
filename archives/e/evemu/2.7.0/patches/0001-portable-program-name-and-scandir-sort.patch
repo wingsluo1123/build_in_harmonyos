@@ -1,0 +1,167 @@
+diff -urN a/tools/evemu-event.c b/tools/evemu-event.c
+--- a/tools/evemu-event.c	2016-02-25 17:01:05.000000000 +0800
++++ b/tools/evemu-event.c	2026-10-09 14:41:30.372409843 +0800
+@@ -31,6 +31,14 @@
+ #include <linux/input.h>
+ #include <libevdev/libevdev.h>
+ 
++/*
++ * glibc publishes the basename of argv[0] as
++ * program_invocation_short_name(); the OHOS libc does not provide
++ * that symbol, so keep our own copy, filled in from argv[0] at the
++ * top of main().
++ */
++static const char *program_name = "evemu";
++
+ static struct option opts[] = {
+ 	{ "type", required_argument, 0, 't'},
+ 	{ "code", required_argument, 0, 'c'},
+@@ -69,7 +77,7 @@
+ 
+ static void usage(void)
+ {
+-	fprintf(stderr, "Usage: %s [--sync] <device> --type <type> --code <code> --value <value>\n", program_invocation_short_name);
++	fprintf(stderr, "Usage: %s [--sync] <device> --type <type> --code <code> --value <value>\n", program_name);
+ }
+ 
+ int main(int argc, char *argv[])
+@@ -82,6 +90,11 @@
+ 	const char *path = NULL;
+ 	const char *code_arg = NULL, *type_arg = NULL;
+ 
++	if (argc > 0 && argv[0] != NULL) {
++		const char *slash = strrchr(argv[0], '/');
++		program_name = slash ? slash + 1 : argv[0];
++	}
++
+ 	if (argc < 5) {
+ 		usage();
+ 		goto out;
+diff -urN a/tools/evemu-play.c b/tools/evemu-play.c
+--- a/tools/evemu-play.c	2016-07-01 17:25:37.000000000 +0800
++++ b/tools/evemu-play.c	2026-10-09 14:41:30.368410156 +0800
+@@ -49,6 +49,14 @@
+ #include <sys/stat.h>
+ #include <unistd.h>
+ 
++/*
++ * glibc publishes the basename of argv[0] as
++ * program_invocation_short_name(); the OHOS libc does not provide
++ * that symbol, so keep our own copy, filled in from argv[0] at the
++ * top of main().
++ */
++static const char *program_name = "evemu";
++
+ static int open_evemu_device(struct evemu_device *dev)
+ {
+ 	int fd;
+@@ -253,7 +261,13 @@
+ 
+ int main(int argc, char *argv[])
+ {
+-	const char *prgm_name = program_invocation_short_name;
++	const char *prgm_name;
++
++	if (argc > 0 && argv[0] != NULL) {
++		const char *slash = strrchr(argv[0], '/');
++		program_name = slash ? slash + 1 : argv[0];
++	}
++	prgm_name = program_name;
+ 
+ 	if (prgm_name &&
+ 	    (strcmp(prgm_name, "evemu-device") == 0 ||
+diff -urN a/tools/evemu-record.c b/tools/evemu-record.c
+--- a/tools/evemu-record.c	2017-09-25 20:01:20.000000000 +0800
++++ b/tools/evemu-record.c	2026-10-09 14:41:30.368410156 +0800
+@@ -57,6 +57,14 @@
+ 
+ #define INFINITE -1
+ 
++/*
++ * glibc publishes the basename of argv[0] as
++ * program_invocation_short_name(); the OHOS libc does not provide
++ * that symbol, so keep our own copy, filled in from argv[0] at the
++ * top of main().
++ */
++static const char *program_name = "evemu";
++
+ static FILE *output;
+ static bool autorestart = false;
+ 
+@@ -110,7 +118,7 @@
+ static inline void usage()
+ {
+ 	fprintf(stderr, "Usage: %s [--autorestart=s] <device> [output file]\n",
+-		program_invocation_short_name);
++		program_name);
+ 	fprintf(stderr, "Options:\n");
+ 	fprintf(stderr, "    --autorestart=s\n");
+ 	fprintf(stderr, "	Terminate the current recording after <s> seconds\n"
+@@ -236,7 +244,13 @@
+ 	enum mode mode = EVEMU_RECORD;
+ 	int fd = -1;
+ 	struct sigaction act;
+-	char *prgm_name = program_invocation_short_name;
++	const char *prgm_name;
++
++	if (argc > 0 && argv[0] != NULL) {
++		const char *slash = strrchr(argv[0], '/');
++		program_name = slash ? slash + 1 : argv[0];
++	}
++	prgm_name = program_name;
+ 	char *device = NULL;
+ 	int timeout = INFINITE;
+ 	struct option opts[] = {
+diff -urN a/tools/find_event_devices.c b/tools/find_event_devices.c
+--- a/tools/find_event_devices.c	2017-06-02 16:01:30.000000000 +0800
++++ b/tools/find_event_devices.c	2026-10-09 14:41:30.368410156 +0800
+@@ -25,6 +25,9 @@
+ #define _GNU_SOURCE
+ #include <linux/input.h>
+ #include <dirent.h>
++/* PATH_MAX: glibc pulls <limits.h> in transitively, the OHOS
++ * libc does not. */
++#include <limits.h>
+ #include <string.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+@@ -41,6 +44,30 @@
+ 	return strncmp(EVENT_DEV_NAME, dir->d_name, 5) == 0;
+ }
+ 
++/*
++ * scandir() ordering for /dev/input/eventNN.
++ *
++ * Upstream passes glibc's versionsort() here, a GNU extension that
++ * the OHOS libc does not provide.  The entries are always named
++ * "event<NN>", so compare the numeric suffix directly: that is the
++ * ordering versionsort() would give (event2 before event10) and it
++ * needs nothing beyond ISO C.
++ */
++static int eventdev_cmp(const struct dirent **a, const struct dirent **b)
++{
++	const char *na = (*a)->d_name + strlen(EVENT_DEV_NAME);
++	const char *nb = (*b)->d_name + strlen(EVENT_DEV_NAME);
++	char *end_a, *end_b;
++	long va = strtol(na, &end_a, 10);
++	long vb = strtol(nb, &end_b, 10);
++
++	if (end_a == na || end_b == nb)
++		return strcmp((*a)->d_name, (*b)->d_name);
++	if (va != vb)
++		return va < vb ? -1 : 1;
++	return strcmp((*a)->d_name, (*b)->d_name);
++}
++
+ char* find_event_devices(void)
+ {
+ 	struct dirent **namelist;
+@@ -49,7 +76,7 @@
+ 	int max_device = 0;
+ 	int rc;
+ 
+-	ndev = scandir(DEV_INPUT_EVENT, &namelist, is_event_device, versionsort);
++	ndev = scandir(DEV_INPUT_EVENT, &namelist, is_event_device, eventdev_cmp);
+ 	if (ndev <= 0)
+ 		return NULL;
+ 

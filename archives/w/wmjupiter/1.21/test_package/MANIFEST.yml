@@ -1,0 +1,33 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: wmjupiter/1.21
+homepage: "https://github.com/engerim42/wmjupiter"
+
+# 上游源码审计（发布包一手清点，非推断）：wmjupiter 1.21 无任何自动化测试
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "发布包 tarball 清单"
+    reason: "wmjupiter-1.21.tar.gz 实测 9 个条目：`wmjupiter-1.21/`、LICENSE、Makefile、README.md、wmJupiter.c、wmJupiter_mask.xbm、wmJupiter_master.xpm、xutils.c、xutils.h（tar tzf | wc -l = 9）。无 tests//test//t/ 目录，无 test_*.c 或 *_test.* 文件。"
+  - source: "Makefile"
+    reason: "全文 34 行，目标只有 `all:` `clean:` `install:` 三个（grep -o '^[a-z][a-z0-9.-]*:' 实测），`grep -c 'check\\|test' Makefile` 实测 0 —— 无 check/test/check-local 目标，无 `make check` 入口；Makefile 里也没有任何第三方测试框架（Unity/CMocka/CUnit）的写法。"
+  - source: "源码构成"
+    reason: "只有 2 个翻译单元 wmJupiter.c + xutils.c（外加 xutils.h 与两个被 #include 进源码的位图资源）；不存在可分层的库接口供测试挂钩 —— 上游把全部逻辑写在 wmJupiter.c 的 main()/事件回调（KeyPressEvent :521、StringToUpper :529）与 xutils.c 的 initXwindow()/openXwindow() 里，且 openXwindow() 必须先拿到真实 X display 才能返回（本品无 X server 时的消费者验证正是针对这一点构造，见 test_package_tests 第 2 条）。"
+  - conclusion: "上游未提供自动化测试套件（清点证据见上三条），故本包上游测试数 N = 0、可运行测试数 N' = 0，通过率不适用（0/0）。消费者验证由 test_package 真实执行被测二进制承担：共 24 条断言，其中 7 条为失败路径断言（A 类），17 条为端到端消费者用例（B 类，见 assertion_count 与 test_package_tests）。"
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests: []
+
+test_package_tests:
+  - file: test_wmjupiter.sh
+    description: "消费者用例驱动脚本，真实执行打包后的 bin/wmJupiter，共 24 条断言，分两类。A 类 7 条（失败路径，无需 display 即可稳定判定）：(A1) 交付物存在且非空；(A2) `-display :<N>` 退出码恰为 1（initXwindow 的 exit(1) 分支，wmJupiter.c:319 起 main 第一步即调用；N 由脚本按 PID 分散取 300 段 = TCP 6300-6399，与对端自用的 20-219 段不相交，避开可能有残留监听的号）；(A3) stderr 含上游固定短语 \"can't open display\"；(A4) stderr 原样回显 \":<N>\" —— 该串由 initXwindow 的 argv 扫描循环取出后送 XDisplayName() 得到，可判定参数处理真实执行而非脚本回显；(A5) 输出中无 \"shared libraries\"/\"cannot open shared object\"，即 NEEDED 的 libXpm.so.4/libX11.so.6/libXext.so.6 全部由 loader 解析成功（任一条缺失都会在进入 main 之前报错，A2-A4 便不可能成立）；(A6) 无参（DISPLAY 未设置）形态退出码为 1；(A7) 无参形态同样打印同一条错误短语（默认 display 查找路径）。B 类 17 条（鸿蒙特有测试 / 端到端消费者用例，真实跑通绘制流程）：脚本先拉起 headless X11 显示对端（x11_headless.py，见下条）并以 DISPLAY 指向它，再真实运行 wmJupiter -22，逐条断言**服务端按协议真实累积**的状态 —— 连接握手完成（setup=True）、记录到 2 个窗口、两个窗口几何均为 64x64/depth=24、形状掩码位图 64x64/depth=1、XPM 主图 134x148/depth=24 且解码出 10 种像素颜色、SHAPE 扩展可见（major opcode 128）、收到 2 次 ShapeMask 请求、5 条 WM 属性全部到达且 WM_COMMAND 内容含参数 -22、拷贝到窗口帧数 ≥60（动画主循环真实运行）、对端注入协议错误后客户端非零退出且 stderr 报出 X 错误。实测 `RESULT: 24 passed, 0 failed`。POSIX sh 写法，经注入的 SHELL=/bin/sh 执行（不用 bash）；报告解析为纯 shell 逐行匹配，不依赖 grep -o 等可选选项（CI 最小 PATH 下由另一 grep 实现承担时会静默返回空）。"
+    command: "$SHELL test_wmjupiter.sh <package>/bin/wmJupiter"
+  - file: x11_headless.py
+    description: "B 类端到端消费者用例的被驱动载体：纯 Python stdlib 实现的 headless X11 协议对端（不使用 Xvfb、不设 DISPLAY=:0、不 dlopen 任何被测二进制）。按 xcb/libX11 权威线格式（Xproto.h）实现连接握手（setup 请求解析与应答）、请求解码与应答（QueryExtension/ListExtensions 报 SHAPE、AllocColor/QueryColors、CreatePixmap/CreateGC/PutImage、CreateWindow/MapWindow/ChangeProperty、CopyArea 等），并把服务端真实累积的状态（窗口与位图几何/深度、PutImage 解码出的像素颜色、属性类型与内容、ShapeMask 计数、拷贝帧数）写入报告供断言；在累计 60 次「拷贝到窗口」后注入一个 BadImplementation 协议错误并关闭连接，作为可判定的终止信号。由 test_wmjupiter.sh 内部以 `python3 x11_headless.py <显示号> <注入阈值> <超时秒>` 拉起，不单独执行（该脚本自身不消费被测包产物，仅为被驱动环境）。"
+    command: "python3 x11_headless.py <display-number> 60 45  # 由 test_wmjupiter.sh 内部调用"
+
+assertion_count: 24

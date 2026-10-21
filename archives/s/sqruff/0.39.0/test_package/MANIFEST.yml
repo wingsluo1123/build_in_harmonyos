@@ -1,0 +1,116 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: sqruff/0.39.0
+homepage: "https://github.com/quarylabs/sqruff"
+
+# 上游测试命令 (cargo test for Rust projects)
+upstream_check_command: "cargo test --locked"
+
+# 上游测试在主配方 build() 内执行（workspace 全量；计数从真实
+# "test result:" 行解析并硬门禁，随包携带 res/upstream_test_result.json）；
+# test_package 重发 HMBS_UPSTREAM_TEST_RESULT 标记并对计数硬校验
+# （hmbs 预检只从 test_package 阶段 stdout 采集该标记，tlsx/1.2.2 先例；
+# tracexec/0.17.0 范式）。工具链为 ohpcd 制品仓 rust-toolchain/1.97.1
+# 基础设施包（tool_requires）。
+upstream_test_in_build: true
+upstream_test_command: "SQRUFF_SKIP_UNSUPPORTED_TEMPLATERS=1 cargo test --locked -j 4 --no-fail-fast --workspace --exclude sqruff-cli-python --exclude sqruff-wasm --tests（build() 内执行；test_package 重发计数）"
+
+# 上游测试存在性审计（hmbs 硬门禁要求）
+upstream_tests_exist: true
+upstream_test_audit: |
+  审计结论：上游 sqruff 0.39.0 存在完整测试套件，已接入并在 HarmonyOS
+  aarch64 真机完整执行：libtest 全绿 159 passed / 0 failed（4 个 upstream
+  自带 ignore：3 个 lineage Oracle/TODO 标记 + 1 个 sqruff-lib upstream
+  ignore），全部 harness=false 集成测试二进制 rc=0 通过。
+  1. 执行口径（真机 2026-10-15，SQRUFF_SKIP_UNSUPPORTED_TEMPLATERS=1）：
+     主配方 build() 内执行（计数硬门禁并写 res/upstream_test_result.json，
+     test_package 重发 HMBS 标记）：
+     cargo test --locked -j 4 --no-fail-fast --workspace --exclude
+     sqruff-cli-python --exclude sqruff-wasm --tests
+     libtest "test result:" 行对账（159 = 16 lineage(+3 ignored) + 0 cli bin
+     + 3 ignore_data_directory + 5 verbose_logging_ignore + 8 cli-lib
+     + 77 sqruff-lib(+1 ignored) + 30 lib-core + 2 lib-dialects + 5 lsp
+     + 13 sqlinference；0 filtered）。test_package/conanfile.py 内置
+     注册数硬校验（159），任何目标缺失/漂移即 raise。
+  2. harness=false 测试目标（无 "test result:" 行，按退出码判定，全部 0）：
+     crates/cli/tests 9 个（ui / ui_github / ui_json / fix_return_code /
+     fix_parse_errors / config_not_found / configure_rule / dialect_override /
+     none_format）+ crates/lib/tests 2 个（rules 规则 fixture 套件 /
+     templaters 模板器套件）+ crates/lib-dialects/tests 1 个（dialects）。
+  3. 环境差异说明（三处，均为上游设计或平台边界，非伪造通过，不含 --skip）：
+     a) doc-tests 阶段：OHOS 工具链（rust-toolchain/1.97.1 基础设施包）不含
+        rustdoc（cargo spawn rustdoc 即 ENOENT；argc/1.24.0、martin/1.13.0、
+        millet/0.15.2、alacritty/0.17.0 已合入先例一致），--tests 显式限定目标
+        集排除该阶段。静态核对：sqruff crates/*.rs（src+tests）文档代码块共
+        5 对，全部为 ```ignore（1 对）与 ```sql（4 对），无可执行的 rust/无
+        标记 doctest；且 sqruff-lib [lib] 显式 doctest = false。
+     b) jinja 模板器用例（68 例）：上游 jinja templater 由 pyo3 调用 Python
+        包 sqruff.templaters.jinja_templater 实现（crates/lib/src/templaters/
+        jinja.rs:22），上游 Makefile 先 `uv run maturin develop` 安装该
+        Python 绑定；OHOS CLI 运行时不含 Python 绑定。此类用例按 panic
+        信息自带的官方开关 SQRUFF_SKIP_UNSUPPORTED_TEMPLATERS=1 跳过
+        （逐条打印 "Skipping case ..."），未修改任何上游测试源、未伪造
+        通过。
+     c) sqruff-cli-python（pyo3/cdylib，需 Python 开发环境 + maturin）与
+        sqruff-wasm（wasm-bindgen，需 wasm32 目标）为平台绑定 crate，
+        不属于 OHOS CLI 运行时组件，以 --exclude 排除（上游 x 86_64 发布
+        物同样不含它们）。
+  4. 无在线数据集/外部服务依赖，全部用例离线执行；上游测试在主配方
+     build() 内对 conan 下载的源码树直接执行（即打包所用同一源码）。
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: crates/lib/tests/rules.rs
+    source: sqruff-0.39.0/crates/lib/tests/rules.rs
+    description: "规则 fixture 套件（harness=false；68 例 jinja 模板器用例按上游开关跳过，其余逐 case 真机通过）"
+    command: "SQRUFF_SKIP_UNSUPPORTED_TEMPLATERS=1 cargo test --locked --workspace --exclude sqruff-cli-python --exclude sqruff-wasm --tests"
+  - file: crates/lib/src
+    source: sqruff-0.39.0/crates/lib/src
+    description: "sqruff-lib 单元测试 77 个（+1 upstream ignore）"
+    command: "cargo test --locked --workspace --exclude sqruff-cli-python --exclude sqruff-wasm --tests"
+  - file: crates/cli/tests
+    source: sqruff-0.39.0/crates/cli/tests
+    description: "CLI 集成测试 9 个 harness=false 二进制（ui 快照矩阵 / fix / config / dialect 等）+ 2 个 libtest（8 例：ignore_data_directory 3 + verbose_logging_ignore 5）"
+    command: "cargo test --locked --workspace --exclude sqruff-cli-python --exclude sqruff-wasm --tests"
+  - file: crates/lib-core/src
+    source: sqruff-0.39.0/crates/lib-core/src
+    description: "sqruff-lib-core 单元测试 30 个"
+    command: "cargo test --locked --workspace --exclude sqruff-cli-python --exclude sqruff-wasm --tests"
+  - file: crates/lsp/src
+    source: sqruff-0.39.0/crates/lsp/src
+    description: "sqruff-lsp 单元测试 5 个"
+    command: "cargo test --locked --workspace --exclude sqruff-cli-python --exclude sqruff-wasm --tests"
+  - file: crates/lineage/src
+    source: sqruff-0.39.0/crates/lineage/src
+    description: "lineage 单元测试 16 个（+3 upstream ignore）"
+    command: "cargo test --locked --workspace --exclude sqruff-cli-python --exclude sqruff-wasm --tests"
+  - file: crates/sqlinference/src
+    source: sqruff-0.39.0/crates/sqlinference/src
+    description: "sqlinference 单元测试 13 个"
+    command: "cargo test --locked --workspace --exclude sqruff-cli-python --exclude sqruff-wasm --tests"
+  - file: crates/lib-dialects/tests/dialects.rs
+    source: sqruff-0.39.0/crates/lib-dialects/tests/dialects.rs
+    description: "dialects 集成套件（harness=false）+ lib-dialects 单测 2 个 + 2 个 inherit fixture"
+    command: "cargo test --locked --workspace --exclude sqruff-cli-python --exclude sqruff-wasm --tests"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.sh
+    description: "消费者测试 6 用例：sqruff --version / --help / 干净文件 lint rc=0 / 违规文件 lint(LT01+LT12) rc=1 / fix 回环(re-lint 干净) / sqruff lsp initialize 握手(stdio)"
+    command: "/bin/sh test.sh"
+  - file: conanfile.py
+    description: "重发 build() 内真实执行的上游测试计数（HMBS_UPSTREAM_TEST_RESULT），并对 failed==0、passed==159 硬校验"
+    command: "conan test_package（test() 内 print 标记）"
+
+test_files:
+  - path: "test_package/test.sh"
+    test_type: "R34"
+    assertion_count: 6
+
+test_package_test_count: 1
+consumer_assertion_count: 6
+upstream_test_cases: 159
+assertion_count: 165

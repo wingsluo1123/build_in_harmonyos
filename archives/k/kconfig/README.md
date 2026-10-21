@@ -5,16 +5,28 @@ KConfig/KConfigGroup for INI-style persistent configuration,
 KDesktopFile for freedesktop.org desktop entry files, KCoreConfigSkeleton /
 KConfigSkeleton for typed settings classes, and the kconfig_compiler code
 generator (KConfig XT) that turns `.kcfg` XML descriptions into C++ setting
-classes.
+classes. Since KF 6.21 it also ships the `org.kde.config` QML module
+(KAuthorized singleton, WindowStateSaver, KConfigPropertyMap) used by
+Plasma/KWin-style QML consumers.
 
 ## OHOS adaptation
 
 - `KF_IGNORE_PLATFORM_CHECK=TRUE` bypasses the KDE platform allowlist
   (OHOS/HarmonyOS is not in the upstream list).
-- `KCONFIG_USE_QML=OFF`, `USE_DBUS=OFF` keep the initial Akonadi KF baseline
-  minimal (no qtdeclarative / Qt6DBus requirement).
-- `ecm_install_po_files_as_qm(poqm)` is patched out: Qt6LinguistTools is not
-  part of the qtbase package in this repository.
+- `USE_DBUS=OFF` disables KConfig DBus integration.
+- From 6.28.0, `KCONFIG_USE_QML=ON` (the upstream default) builds and ships
+  the `org.kde.config` QML module at `lib/qml/org/kde/config` with
+  `qtdeclarative/6.11.1`; `qtshadertools/6.11.1` is also required because
+  Qt6Quick links Qt6::ShaderTools. `CMAKE_INSTALL_QMLDIR=lib/qml` pins the
+  module tree next to the libraries.
+- From 6.28.0, the upstream poqm translation step runs with
+  `qt6linguisttools/6.11.1` (patched out in earlier revisions because Qt
+  Linguist tools were not available); ECM >= 6.28.0 is required upstream,
+  provided by `extra-cmake-modules/6.29.0`.
+- `DT_SONAME` is restored via `CMAKE_SHARED_LIBRARY_SONAME_CXX_FLAG` /
+  `_C_FLAG` (OHOS CMake has no `Platform/HarmonyOS` module); without it the
+  libraries and the QML plugin record build-tree relative paths in
+  `DT_NEEDED`.
 - ECM 6.26+ `KDEInstallDirs6` executes the qtbase `qtpaths` host tool at
   configure time; the recipe prepends `/system/lib64` to `LD_LIBRARY_PATH`
   so `qtpaths` resolves the compatible `libc++_shared.so` (the sandbox
@@ -29,11 +41,21 @@ classes.
   `kconfigcore-test_kconf_update`, `kconfiggui-kstandardshortcutwatchertest`,
   `kconfigcompiler-basic-test`).
 
+## Shipped tools
+
+- `bin/kreadconfig6`, `bin/kwriteconfig6` (hicmd 真机验证通过),
+  `bin/kf6/kconf_update`
+- `bin/kf6/kconfig_compiler_kf6` (KConfig XT generator; consumed through
+  the installed `kconfig_add_kcfg_files` CMake function and the
+  `KF6::kconfig_compiler` imported target)
+
 ## Dependencies
 
-- Build: ecm (extra-cmake-modules), CMake >= 3.29 (for 6.26.0), ninja/make
-- Runtime/compile: qtbase (Qt6Core, Qt6Xml; Qt6Gui for ConfigGui;
-  Qt6CorePrivate only for the upstream autotests)
+- Build: ecm (extra-cmake-modules), CMake >= 3.29 (for 6.26.0+), ninja/make
+- 6.28.0: qtbase (Qt6Core/Qt6Xml/Qt6Gui), qtdeclarative (Qt6Qml/Qt6Quick),
+  qtshadertools (Qt6ShaderTools for Qt6Quick); build tools
+  extra-cmake-modules/6.29.0 and qt6linguisttools/6.11.1
+- 6.26.0.1 and older: qtbase only; ecm build tool
 
 ## References
 

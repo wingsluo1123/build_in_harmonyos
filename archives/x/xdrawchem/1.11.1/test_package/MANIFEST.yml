@@ -1,0 +1,41 @@
+# test_package/MANIFEST.yml — xdrawchem 1.11.1
+# R51 上游测试三步法申报：上游测试清点证据见下方 upstream_* 字段与 notes.md。
+
+package: xdrawchem/1.11.1
+homepage: "https://gitlab.com/yamanq/xdrawchem"
+
+# 上游测试命令：xdrawchem 无自动化测试（无 tests/ 目录、无 check/test 目标、
+# 无 CTest/pytest/qmake 测试注册），故为空串（非空会被判定为上游有测试而要求清点）。
+upstream_check_command: ""
+upstream_tests_exist: false
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游测试清点证据（R51）：解压 v1.11.1 官方归档后
+#   find . -iname "*test*"            -> 0 命中
+#   顶层目录                          -> SPECS/ doc/ icons/ ring/ ring_cml/ translation/ xdrawchem/
+#   xdrawchem.pro                     -> 仅 TEMPLATE=app + INSTALLS，无 check/test 目标
+#   构建系统                          -> qmake（无 ctest/meson/pytest 注册）
+upstream_tests: []
+
+# test_package 自带测试（消费者视角，实质执行被测包二进制）
+test_package_tests:
+  - file: test_package/test_xdrawchem.sh
+    description: >
+      xdrawchem --version / --help 实质执行包内二进制；断言 OHOS aarch64 ELF
+      (e_machine=0xB7) 可在本机执行、DT_NEEDED 含 Qt5Widgets 与 libopenbabel、
+      上游运行期数据（share/xdrawchem/xdrawchemrc + doc/index.html）已随包安装。
+    command: "bash test_package/test_xdrawchem.sh <bin_dir> <share/xdrawchem>"
+
+upstream_test_count: 0
+test_package_count: 5
+assertion_count: 5
+executed: true
+notes: >
+  xdrawchem 1.11.1 = XDrawChem（gitlab.com/yamanq/xdrawchem，tag v1.11.1，
+  2024-05-29），Qt5 + Open Babel 3 的 qmake 工程。上游确无自动化测试套件：
+  归档内 find -iname "*test*" 零命中，顶层无 tests/，xdrawchem.pro 无
+  check/test 目标，亦无 CTest/pytest/meson 注册——故 upstream_test_count=0，
+  不做"上游测试用例修改/补全"。test_package 5 条用例均为实质执行被测包
+  （TC-01/02 运行二进制，TC-03 校验 ELF 架构并在本机执行，TC-04 校验真实
+  动态链接，TC-05 校验 INSTALLS 安装的运行期数据），非 print-only 空壳。

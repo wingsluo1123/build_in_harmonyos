@@ -1,0 +1,32 @@
+# ═══ Draft knowledge entry — KDE/Qt 上游测试"零 CTest 注册"的真相口径与 DISPLAY/环境变量守卫 ═══
+# Timestamp: 2026-09-20
+# Software: kio-kwallet 6.28.0（通用：ecm_mark_as_test() 系上游测试 + QApplication 型用例 + conan test_env）
+# Gate: conan create build() 测试执行 / conan test
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E2642
+title: ecm_mark_as_test() 目标没有 add_test() → ctest -N 注册 0 是上游本态（如实记录，非缺陷）；QApplication 型测试在无头机残留 DISPLAY 时 SIGSEGV，须 pop 而非置空（conan Environment.unset() 实为 set-but-empty，Qt qEnvironmentVariableIsSet 视为已设置）
+trigger_tool: ctest -N / kwallettest / QApplication / conan Environment
+phase: testing
+error_signature: No tests were found|Segmentation fault.*QApplication|qEnvironmentVariableIsSet
+severity:               3
+category:               testing, conan2, qt6
+match_keywords: ecm_mark_as_test, add_test, ctest -N, No tests were found, DISPLAY,
+  QT_QPA_PLATFORM, offscreen, Environment.unset, qEnvironmentVariableIsSet
+root_cause: KDE ECM 的测试双轨制（add_test 进入 CTest；ecm_mark_as_test 仅作标记，
+  常用于需要 daemon/会话总线的目标）使部分上游测试天然不在 CTest 注册表内；Qt 平台
+  探测对 DISPLAY 的"存在即连接"语义与 conan Environment.unset() 的置空实现（非删除）
+  相互作用，导致无头机守卫失效。
+rec_approach: ctest-n-inventory + assert-binary-and-direct-run + display-pop-not-unset
+verification_cmd:
+  kwallettest 直跑 2 passed/0 failed/1 skipped（skip=kioslave/passwords 需
+  kwalletd+D-Bus）；残留 DISPLAY 下 SIGSEGV 与 pop 后稳定通过均实测复现。
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E2642.md
+affected_scope:         ecm_mark_as_test() 目标没有 add_test() → ctest -N 注册 0 是上游本态（如实记
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        ctest-n-inventory + assert-binary-and-direct-run + display-pop-not-unset

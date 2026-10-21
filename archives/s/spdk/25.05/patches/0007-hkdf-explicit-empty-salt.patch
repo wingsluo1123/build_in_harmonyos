@@ -1,0 +1,28 @@
+From: OHOS SPDK port
+Subject: [PATCH] Pass a non-null zero-length HKDF salt to OpenSSL
+
+OpenSSL 3.5.6 rejects the NULL,0 representation of an empty salt. Use an
+explicit zero-length buffer, preserving the HKDF inputs and expected output.
+The unchanged upstream PSK known-answer tests cover both derivations.
+Reference: https://github.com/openssl/openssl/issues/31067
+
+--- a/include/spdk_internal/nvme_tcp.h
++++ b/include/spdk_internal/nvme_tcp.h
+@@ -685,7 +685,7 @@
+ 		rc = -ENOBUFS;
+ 		goto end;
+ 	}
+-	if (EVP_PKEY_CTX_set1_hkdf_salt(ctx, NULL, 0) != 1) {
++	if (EVP_PKEY_CTX_set1_hkdf_salt(ctx, (const unsigned char *)"", 0) != 1) {
+ 		SPDK_ERRLOG("Unable to set salt for HKDF!\n");
+ 		rc = -EINVAL;
+ 		goto end;
+@@ -776,7 +776,7 @@
+ 		rc = -ENOBUFS;
+ 		goto end;
+ 	}
+-	if (EVP_PKEY_CTX_set1_hkdf_salt(ctx, NULL, 0) != 1) {
++	if (EVP_PKEY_CTX_set1_hkdf_salt(ctx, (const unsigned char *)"", 0) != 1) {
+ 		SPDK_ERRLOG("Unable to set salt for HKDF!\n");
+ 		rc = -EINVAL;
+ 		goto end;

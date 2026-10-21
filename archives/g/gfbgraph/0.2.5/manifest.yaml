@@ -1,0 +1,36 @@
+version: "0.2.5"
+software: "gfbgraph"
+status: built
+build_date: "2026-10-16"
+build_system: "autotools"
+
+source:
+  url: "https://download.gnome.org/sources/gfbgraph/0.2/gfbgraph-0.2.5.tar.xz"
+  sha256: "9cb381b3f78ba1136df97af3f06e3b11dcc2ab339ac08f74eda0f8057d6603e3"
+  tar_format: tar.xz
+
+build:
+  system: autotools
+  configure_options:
+    - "--enable-shared"
+    - "--disable-static"
+    - "--disable-introspection"
+    - "--disable-gtk-doc"
+  dependencies:
+    - glib/2.84.0.1.1
+    - json-glib/1.10.6.1
+    - librest/0.10.2
+    - libsoup3/3.6.5-r3
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+porting:
+  method: "in-code _port_to_soup3_rest1 (no patch file)"
+  scope: "rest-0.7->rest-1.0, libsoup-2.4->libsoup-3.0, SoupURI->GUri, SoupRequester->SoupSession send"
+
+knowledge_gained:
+  - "上游 0.2.5 依赖 rest-0.7 + libsoup-2.4，制品仓仅有 rest-1.0/libsoup3 世代（librest/0.10.2 soup2=false），soup2 与 soup3 不可同进程共存，需整体移植到 rest-1.0 + libsoup-3.0"
+  - "RestProxy/RestProxyCall 在 rest-0.7 与 rest-1.0 间同名同参，仅改 pkg-config 名即可复用全部 Graph 调用代码"
+  - "soup-requester/soup-request 在 soup3 已删除，photo 下载改用 SoupMessage + soup_session_send；authorizer 的 SoupURI 改为 GUri 重建 query"
+  - "上游 tests/ 共 2 个程序：gtestutils 网络用例被上游 #if 0 禁用（需 Facebook credentials.ini），空跑退出 0；autoptr 为 4 个纯 GObject 构造用例"

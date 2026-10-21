@@ -1,0 +1,98 @@
+# 版本级 manifest — sidplay-libs 2.1.1
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "2.1.1"
+
+# 软件名
+software: "sidplay-libs"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-17"
+build_system: autotools
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://downloads.sourceforge.net/sidplay2/sidplay2/sidplay-libs-2.1.1.tar.gz"
+
+  # 源码校验和
+  sha256: "e9a24ada48215a46d2c232a70c5601bc9505e997f120e8f2ba3713e09e28d1f9"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表
+  configure_options:
+  - "--enable-static"
+  - "--disable-shared"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+- "0001-builders-hardsid-builder-configure.patch"
+- "0002-builders-hardsid-builder-unix-config.guess.patch"
+- "0003-builders-hardsid-builder-unix-config.sub.patch"
+- "0004-builders-resid-builder-configure.patch"
+- "0005-builders-resid-builder-unix-config.guess.patch"
+- "0006-builders-resid-builder-unix-config.sub.patch"
+- "0007-configure.patch"
+- "0008-libsidplay-configure.patch"
+- "0009-libsidplay-include-sidplay-SmartPtr.h.patch"
+- "0010-libsidplay-src-xsid-xsid.cpp.patch"
+- "0011-libsidplay-src-xsid-xsid.h.patch"
+- "0012-libsidplay-unix-config.guess.patch"
+- "0013-libsidplay-unix-config.sub.patch"
+- "0014-libsidutils-configure.patch"
+- "0015-libsidutils-include-sidplay-utils-SidUsage.h.patch"
+- "0016-libsidutils-unix-config.guess.patch"
+- "0017-libsidutils-unix-config.sub.patch"
+- "0018-resid-config.guess.patch"
+- "0019-resid-config.sub.patch"
+- "0020-resid-configure.patch"
+- "0021-unix-config.guess.patch"
+- "0022-unix-config.sub.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+- "config.guess/config.sub: 2004 年老版本不认识 HarmonyOS，需打 E007 补丁输出 aarch64-unknown-linux-ohos"
+- "configure/config.status: mktemp umask 077 在 HMDFS setgid 目录不可写，需改 umask 022 (E112)"
+- "C++11 窄化错误：老代码 int8_t 数组用 '\x80' 等字面量溢出，改 int 或加 -Wno-c++11-narrowing"
+- "模板两阶段查找：派生类访问依赖基类成员需 this-> 前缀 (SmartPtr.h)"
+- "extra qualification：老代码 operator= 带类名限定需去掉 (SidUsage.h)"
+- "顶层 configure 是自定义递归脚本硬编码相对路径，conan 需 in-source 构建 (folders.build='.')"

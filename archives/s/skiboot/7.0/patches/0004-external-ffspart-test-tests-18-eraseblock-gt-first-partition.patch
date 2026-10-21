@@ -1,0 +1,23 @@
+--- a/external/ffspart/test/tests/18-eraseblock-gt-first-partition
++++ b/external/ffspart/test/tests/18-eraseblock-gt-first-partition
+@@ -1,16 +1,19 @@
+ #! /bin/sh
+ 
+ EXPECTED="ID=01           FIRST 0x00000400..0x00000500 (actual=0x00000100) [----------]"
+ FFSIMG=$DATA_DIR/$CUR_TEST.gen
+ 
+-command -v pflash > /dev/null || echo "skipping test: pflash required but not found in PATH" && exit 0
++if ! command -v pflash > /dev/null; then
++	echo "skipping test: pflash required but not found in PATH"
++	exit 0
++fi
+ 
+ 
+ # https://github.com/open-power/skiboot/issues/205
+ touch $FFSIMG
+ 
+ # Use a block size that works with the existing codebase
+ run_binary "./ffspart" "-s 0x100 -c 10 -i $DATA_DIR/$CUR_TEST.in -p $FFSIMG"
+ if [ "$?" -ne 0 ] ; then
+ 	fail_test
+ fi

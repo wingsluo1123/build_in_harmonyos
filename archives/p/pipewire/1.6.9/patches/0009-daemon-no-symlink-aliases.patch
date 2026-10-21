@@ -1,0 +1,50 @@
+--- a/src/daemon/meson.build
++++ b/src/daemon/meson.build
+@@ -108,7 +108,7 @@
+   dependencies : [ spa_dep, pipewire_dep, ],
+ )
+ 
+-ln = find_program('ln')
++cp = find_program('cp')
+ 
+ pipewire_aliases = [
+   'pipewire-pulse',
+@@ -120,28 +120,31 @@
+  pipewire_aliases += 'pipewire-vulkan'
+ endif
+ 
++# HMDFS on OpenHarmony rejects symlink creation (EPERM); materialise the
++# daemon aliases as copies instead, both in the build tree and at install time.
+ foreach alias : pipewire_aliases
+   custom_target(
+     alias,
+     build_by_default: true,
+     install: false,
+-    command: [ln, '-sf', meson.project_build_root() + '/@INPUT@', '@OUTPUT@'],
++    command: [cp, '-f', meson.project_build_root() + '/@INPUT@', '@OUTPUT@'],
+     input: pipewire_exec,
+     output: alias,
+   )
+-  install_symlink(
+-    alias,
+-    pointing_to: pipewire_exec.name(),
+-    install_dir: pipewire_bindir,
+-  )
+ endforeach
++
++bindir_sub = get_option('bindir')
++meson.add_install_script('sh', '-c',
++  'for a in @0@; do '.format(' '.join(pipewire_aliases)) +
++  'if [ -x "${MESON_INSTALL_DESTDIR_PREFIX}/@0@/pipewire" ]; then '.format(bindir_sub) +
++  'cp -f "${MESON_INSTALL_DESTDIR_PREFIX}/@0@/pipewire" "${MESON_INSTALL_DESTDIR_PREFIX}/@0@/$a"; fi; done'.format(bindir_sub))
+ 
+ custom_target('pipewire-uninstalled',
+   build_by_default: true,
+   install: false,
+   input: pipewire_exec,
+   output: 'pipewire-uninstalled',
+-  command: [ln, '-fs', meson.project_build_root() + '/@INPUT@', '@OUTPUT@'],
++  command: [cp, '-f', meson.project_build_root() + '/@INPUT@', '@OUTPUT@'],
+ )
+ 
+ #desktop_file = i18n.merge_file(

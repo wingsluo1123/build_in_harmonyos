@@ -1,0 +1,52 @@
+software: "xeus-zmq"
+version: "4.0.0"
+status: built
+build_date: "2026-10-15"
+build_system: cmake
+
+source:
+  url: "https://github.com/jupyter-xeus/xeus-zmq/archive/refs/tags/4.0.0.tar.gz"
+  sha256: "6a87c0edeefae1350743071cd78c825d6ab21e771b52610ef7e41c434af20db6"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DXEUS_ZMQ_BUILD_SHARED_LIBS=ON"
+    - "-DXEUS_ZMQ_BUILD_STATIC_LIBS=OFF"
+    - "-DXEUS_ZMQ_STATIC_DEPENDENCIES=OFF"
+    - "-DXEUS_ZMQ_BUILD_TESTS=OFF"
+    - "-DXEUS_ZMQ_BUILD_WITHOUT_LIBSODIUM=ON"
+  dependencies:
+    - "xeus/[>=6.0 <7.0]"
+    - "nlohmann_json/3.12.0"
+    - "cppzmq/4.10.0"
+    - "zeromq/4.3.5"
+    - "openssl/3.0.16"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-CMakeLists.patch"
+
+verified:
+  build_verified: true
+  conan_create: true
+  test_package_ohos: 7
+  upstream_tests_ohos: 1
+  upstream_tests_total: 4
+  upstream_tests_detail: "ctest 注册 4 项（test_kernel/test_kernel_control/test_kernel_shell 为 pytest 驱动 + test_handshake 为 C++ 集成测试）；真机真实执行 test_handshake 1/1 通过（0.11s）；pytest 3 项未执行（真机 Python 3.12 无 jupyter_client/pyzmq，pyzmq 无 OHOS wheel 需源码编译 libzmq 绑定，超出适配范围）"
+
+knowledge_draft:
+  - "knowledge/drafts/DRAFT-xeus-zmq-4.0.0-cmakedeps-consumer-view-mismatch.{md,kv}"
+
+knowledge_gained:
+  - "xeus-zmq 4.0.0 实际配对 xeus >=6,<7（environment-dev.yml）；CMakeLists 残留的最低 5.0.0 需提升到 6.0.0，因为 CMakeDeps 的 ConfigVersion 强制 major 对齐"
+  - "Conan 2.31 版本范围必须空格分隔（[>=6.0 <7.0]），逗号写法报 invalid option"
+  - "主配方必须声明 generators = \"CMakeDeps\"，否则依赖 CMake config（xeus-config.cmake 等）不生成"
+  - "cppzmq header-only 不传播 libzmq；xeus 的 target 是 xeus::xeus 命名空间形式，需 patch 建 alias（xeus、libzmq）供上游 CMakeLists 链接"
+  - "openssl 配方不导出 CMake config：生成 OpenSSLConfig.cmake shim include CMakeDeps 的 openssl-config.cmake 再暴露 OpenSSL::Crypto"
+  - "真机签名工具路径为 /storage/Users/currentUser/usr/local/bin/binary-sign-tool（llvm-objcopy 在 /data/service/hnp/bin）；配方用 shutil.which + fallback 兼容两处"
+  - "真机 /tmp 只读：conan 构建需 TMPDIR 指向可写目录；构建限 -c tools.build:jobs=2 防内存打满关机"
+  - "上游测试可真实执行：配方 tests option（-o xeus-zmq/*:tests=True）构建 XEUS_ZMQ_BUILD_TESTS=ON 上游测试二进制（test_kernel/test_kernel_control/test_kernel_shell/test_handshake 全编译通过），ctest -R test_handshake 真机通过 1/1；pytest 驱动的 3 项需 jupyter_client+pyzmq，真机缺失（pyzmq 无 OHOS wheel）"
+  - "Conan 2.31 无 conan.tools.cmake.CTest helper（ImportError），ctest 需 self.run('ctest ...', cwd=self.build_folder) 直接调用；CMake 对象无 build_folder 属性"

@@ -1,0 +1,14 @@
+--- a/modules/juce_core/native/juce_Threads_linux.cpp	2026-09-28 16:01:33.000000000 +0800
++++ b/modules/juce_core/native/juce_Threads_linux.cpp	2026-10-18 01:57:44.879009844 +0800
+@@ -60,7 +60,11 @@
+ void Thread::killThread()
+ {
+     if (threadHandle != nullptr)
++#if defined (__ANDROID__) || defined (__OHOS__)
++        jassertfalse; // pthread_cancel is not available on OHOS/musl (same as Android).
++#else
+         pthread_cancel ((pthread_t) threadHandle.load());
++#endif
+ }
+ 
+ // Until we implement Nice awareness, these don't do anything on Linux.

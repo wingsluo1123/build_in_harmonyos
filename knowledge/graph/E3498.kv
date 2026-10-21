@@ -1,0 +1,32 @@
+id:                     E3498
+title: pkg_check_modules 的 <PREFIX>_FOUND 变量令 CMakeDeps 生成的依赖配置跳过 find_dependency，导致 <Pkg>::<target> 未定义
+category:               ohos, cmake, toolchain, conan, pkg-config
+severity:               2
+error_signature: "The link interface of target .* contains: .*::.* but the target was not found|but the target was not found. Possible reasons include"
+match_keywords: pkg_check_modules, ZLIB_FOUND, find_dependency, BoostConfig, CMakeDeps, imported target, ZLIB::ZLIB, OHOS
+root_cause: >
+  项目用 pkg_check_modules(ZLIB REQUIRED zlib) 找 zlib，会设置普通变量
+  ZLIB_FOUND=1。稍后 find_package(Boost) 命中 Conan CMakeDeps 生成的
+  BoostConfig.cmake：它遍历 boost_FIND_DEPENDENCY_NAMES 并在
+  `if(NOT ${_DEPENDENCY}_FOUND)` 为真时才 find_dependency(ZLIB)。由于
+  ZLIB_FOUND 已被 pkg_check_modules 置真，find_dependency(ZLIB) 被跳过，
+  而 Boost 的 iostreams 组件（DEPS target）链接 ZLIB::ZLIB → 该 imported
+  target 从未被定义，CMake generate 阶段报「target was not found」。
+  这是「pkg-config 前缀名 == CMake 包名」时的变量命名空间冲突。
+rec_approach: >
+  在 find_package(Boost) 之前显式加载 config 模式的目标：
+  find_package(ZLIB CONFIG REQUIRED)（定义 ZLIB::ZLIB），或 unset(ZLIB_FOUND)
+  让 BoostConfig 自己去 find_dependency。对任何与 CMake 包同名的 pkg-config
+  前缀（ZLIB/CURL/OpenSSL/EXPAT）都适用。
+prescan_pattern: "pkg_check_modules\\((ZLIB|CURL|OpenSSL|EXPAT)\\b"
+last_updated: 2026-10-13
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E3498.md
+trigger_tool:           cmake
+phase:                  build
+affected_scope:         pkg_check_modules 的 <PREFIX>_FOUND 变量令 CMakeDeps 生成的依赖配置跳过 f
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        >

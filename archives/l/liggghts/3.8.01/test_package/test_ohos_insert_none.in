@@ -1,0 +1,63 @@
+# LIGGGHTS insertion deck for the OHOS regression test of patch 0004.
+#
+# Purpose: drive ``Region::reset_random()`` at runtime.  That function is called
+# from the insertion fixes (``fix insert/pack``) when the region's RNG is reset;
+# upstream wrote to ``screen`` there without a NULL check, so running with
+# ``-screen none`` (screen == NULL) dereferenced a NULL FILE* and segfaulted.
+# Patch 0004 guards it.  This deck is run by ``test_ohos_runtime.sh`` with
+# ``-screen none``: a crash means the guard regressed.
+#
+# Kept intentionally tiny (100 steps; the particle count follows from
+# volumefraction_region below - 120 particles in this box size) so the test
+# costs seconds.  Syntax follows upstream's own
+# examples/LIGGGHTS/Tutorials_public/packing deck.
+
+atom_style      granular
+atom_modify     map array
+boundary        m m m
+newton          off
+communicate     single vel yes
+units           si
+
+region          reg block -0.025 0.025 -0.025 0.025 0.0 0.1 units box
+create_box      1 reg
+
+neighbor        0.002 bin
+neigh_modify    delay 0
+
+# material properties required by the gran pair style
+fix             m1 all property/global youngsModulus peratomtype 5.e6
+fix             m2 all property/global poissonsRatio peratomtype 0.45
+fix             m3 all property/global coefficientRestitution peratomtypepair 1 0.3
+fix             m4 all property/global coefficientFriction peratomtypepair 1 0.5
+
+pair_style      gran model hertz tangential history
+pair_coeff      * *
+
+timestep        0.00001
+
+# confining walls
+fix             xw1 all wall/gran model hertz tangential history primitive type 1 xplane -0.025
+fix             xw2 all wall/gran model hertz tangential history primitive type 1 xplane  0.025
+fix             yw1 all wall/gran model hertz tangential history primitive type 1 yplane -0.025
+fix             yw2 all wall/gran model hertz tangential history primitive type 1 yplane  0.025
+fix             zw1 all wall/gran model hertz tangential history primitive type 1 zplane  0.0
+fix             zw2 all wall/gran model hertz tangential history primitive type 1 zplane  0.1
+
+# insertion machinery -> this is what resets the region RNG
+fix             pts all particletemplate/sphere 15485863 atom_type 1 &
+                density constant 2500 radius constant 0.005
+fix             pdd all particledistribution/discrete 32452843 1 pts 1.0
+
+group           nve_group region reg
+fix             ins nve_group insert/pack seed 32452867 distributiontemplate pdd &
+                maxattempt 200 insert_every once overlapcheck yes all_in yes &
+                vel constant 0. 0. 0. region reg volumefraction_region 0.25
+
+fix             integrate nve_group nve/sphere
+fix             grav all gravity 9.81 vector 0. 0. -1.
+
+thermo          25
+thermo_style    custom step atoms ke
+
+run             100

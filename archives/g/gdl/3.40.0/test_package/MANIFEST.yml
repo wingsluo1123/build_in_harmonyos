@@ -1,0 +1,47 @@
+# test_package/MANIFEST.yml
+# Upstream official test declaration file
+# CI script (build_and_test.sh L0e) mandates this file
+
+package: gdl/3.40.0
+homepage: "https://gitlab.gnome.org/Archive/gdl"
+
+# Upstream test command: automake hook. NOTE — upstream carries NO automated
+# test suite in the 3.40.0 dist tarball:
+#   - No tests/ directory exists (source tree has only docs/ gdl/ m4/ po/).
+#   - Top-level Makefile.am:1 defines `SUBDIRS = gdl docs po` and NO
+#     TESTS/check_PROGRAMS anywhere in any Makefile.am (grep evidence,
+#     2026-10-15: zero matches for `^TESTS|^check_PROGRAMS` in Makefile.am
+#     and gdl/Makefile.am). No test cases are registered: the gdl/ and
+#     docs/ subtrees report Nothing to be done during make check; the
+#     po/ directory is the only one doing real work (the intltool .pot
+#     regeneration — build hygiene, not a test — which fails Error
+#     127 without intltool; see upstream_check_command below).
+#   - The only check-like program is gdl/test-dock.c, wired as
+#     `noinst_PROGRAMS=test-dock` (gdl/Makefile.am:71): an INTERACTIVE GTK
+#     demo whose main() (test-dock.c:184) builds a window and enters
+#     gtk_main() (test-dock.c:313). g_test_*/g_assert count in the file: 0.
+#     It has no headless assertion path and requires a display server.
+#   - docs/reference/Makefile.am:105 has the gtk-doc `#TESTS` line commented
+#     out upstream. The js files (test-dock-gjs.js/test-dock-seed.js) are
+#     noinst_SCRIPTS binding examples, not tests.
+upstream_check_command: "make check -j1 (automake hook; zero test cases exist by upstream design; the po/ .pot regen rule fails Error 127 without intltool and is captured by design, see upstream_test_command)"
+
+# Whether conanfile.py build() integrates upstream tests: the check hook is
+# executed, but there are no upstream cases to run (NO_UPSTREAM_TESTS,
+# discovery.status=EVIDENCE_COMPLETE — evidence recorded in
+# test_package/MANIFEST.yml and archives/g/gdl/3.40.0/notes.md).
+upstream_test_in_build: false
+upstream_test_command: "make check -j1 (zero upstream cases; exits Error 1 from the po/ .pot intltool regen — build hygiene, not a test — captured by ignore_errors; HMBS_UPSTREAM_TEST_RESULT status=no_upstream_tests)"
+
+# Upstream test programs: none runnable (no TESTS/check_PROGRAMS; the only
+# noinst program is the interactive GUI demo test-dock).
+upstream_tests: []
+
+# test_package bundled tests (consumer perspective, real OHOS execution)
+test_package_tests:
+  - file: test.c
+    description: "Consumer test: check1 GdlDock instantiation headless (typebuiltins registration path); check2 gdl_dock_add_item with a GdlDockItem at GDL_DOCK_TOP (dock master/item machinery); check3 gdl_dock_layout save_to_file/load_from_file XML roundtrip containing a <dock-layout root (proves the libxml-2.0 dependency link end to end); check4 GdlDockBar construction on the dock master; check5 GdlDockPlaceholder attached to a dock. Widget checks run under gtk_init on the headless broadway backend served by broadwayd from the gtk package. No dlsym negative guard applies: this port disables no exported symbol surface (NLS/introspection/gtk-doc are build-switch level only) — the libxml2 roundtrip in check3 is the ported-dependency proof."
+    command: "./test_gdl"
+
+# Total test assertions (5 consumer checks; 0 upstream cases by upstream design)
+assertion_count: 5

@@ -1,0 +1,25 @@
+--- a/src/CMakeLists.txt	2026-07-03 19:00:45.000000000 +0800
++++ b/src/CMakeLists.txt	2026-10-17 01:03:22.720176800 +0800
+@@ -69,9 +69,21 @@
+ 
+ target_link_libraries(KF6UnitConversion PUBLIC  Qt6::Core
+                                         PRIVATE Qt6::Network
+-                                                KF6::I18n
+ )
+ 
++# ohpcd: ki18n 6.26.0 publishes libKF6I18n.so without DT_SONAME, so
++# linking the KF6::I18n imported target would record its absolute
++# conan-cache path in DT_NEEDED (E537). Keep the include
++# directories, but link the library by bare name through its
++# package lib directory; the linker records a relocatable basename.
++target_include_directories(KF6UnitConversion PRIVATE
++    "$<TARGET_PROPERTY:KF6::I18n,INTERFACE_INCLUDE_DIRECTORIES>"
++)
++target_link_directories(KF6UnitConversion PRIVATE
++    "$<TARGET_LINKER_FILE_DIR:KF6::I18n>"
++)
++target_link_libraries(KF6UnitConversion PRIVATE -lKF6I18n)
++
+ ecm_generate_headers(KUnitConversion_CamelCase_HEADERS
+     HEADER_NAMES
+     Converter

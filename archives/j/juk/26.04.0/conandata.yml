@@ -1,0 +1,23 @@
+# conandata.yml — juk 26.04.0
+# KDE Gear 26.04 application (music player), CMake + ECM + KF6 + Qt6.
+# Source pinned to the official KDE release-service tarball (R39: 官方源).
+sources:
+  # download.kde.org times out from CI workers (network-restricted).
+  # mirrors.nju.edu.cn is an authoritative KDE mirror hosting the byte-identical
+  # tarball (sha256 verified equal to download.kde.org's).
+  url: "https://mirrors.nju.edu.cn/kde/stable/release-service/26.04.0/src/juk-26.04.0.tar.xz"
+  sha256: "dd0e6bab880be130b4f594712174ab9080800afcb99527f4f152168b946e8cae"
+
+# 上游平台闸是 KF6_MIN_VERSION "5.240.0"（等价 KF6 >= 6.0），制品仓的
+# 6.18/6.26 线满足该闸，无需放宽；真正的阻塞在 conan 依赖矩阵
+# （见 conanfile.py 的 _KF6_GAP_REQUIRES 与 notes.md）。两个补丁处理的是
+# OHOS 不具备的构建期能力：0001 裁掉依赖 DocBook 4.5 DTD 的 kdoctools 文档链，
+# 0002 用 __has_include 守卫 X11 专用 KX11Extras。
+patches:
+  "26.04.0":
+    - patch_file: "patches/0001-CMakeLists.txt.patch"
+      patch_description: "Drop the kdoctools handbook chain (add_subdirectory(doc) + kdoctools_install(po)), which requires the DocBook 4.5 DTDs absent on OHOS."
+      patch_type: "portability"
+    - patch_file: "patches/0002-systemtray.cpp.patch"
+      patch_description: "Guard the X11-only KX11Extras include and compositingActive() call with __has_include so the build works on platforms without X11 extension headers."
+      patch_type: "portability"

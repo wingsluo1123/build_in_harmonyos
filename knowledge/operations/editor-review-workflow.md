@@ -1,6 +1,6 @@
 # 主编知识草稿审核工作流（Editor Review Workflow）
 
-> 版本：v1.1（2026-10-16，v1.0 随批次 1 PR 建立，v1.1 工具固化至 scripts/kb_editor.py 并更新 SKILL §0.5）
+> 版本：v1.2（2026-10-21，v1.1 工具固化；v1.2 新增 claim 单条复核通道与裁定先例集引用）
 > 适用角色：主编（`OHC_ROLE=editor`）
 > 目标：将协作者提交的知识草稿（`knowledge/drafts/`）按可追溯、可复现的流程审核入库，产出正式条目（`knowledge/graph/E*.kv` + `knowledge/doc/E*.md` + `index.tsv`）。
 
@@ -95,6 +95,7 @@ python3 scripts/kb_editor.py fix                         # P3 后置字段修复
 python3 scripts/ohc-run.py graph validate --fix          # P4 校验直至 0 error
 python3 scripts/kb_editor.py report --decisions <F> --batch N --date D --out <报告路径>
 python3 scripts/kb_editor.py publish --branch editor/kb-promote-batch-N --push
+python3 scripts/kb_editor.py claim <草稿名...>              # v12.24: 主编单条复核通道(四维证据快查)
 python3 scripts/kb_editor.py pr-info <PR号...> [--fix-map]   # 辅助: 按PR号核对标题/作者/状态, 可回写校正缓存
 ```
 
@@ -102,7 +103,7 @@ python3 scripts/kb_editor.py pr-info <PR号...> [--fix-map]   # 辅助: 按PR号
 
 ### 与 ohc-run.py 的关系
 
-`kb_editor.py` 是主编专用独立脚本（不依赖技能运行时路径）；`graph promote`/`graph validate`/`draft-review` 仍由 `scripts/ohc-run.py` 提供，kb_editor 以子进程调用。
+`kb_editor.py` 是主编专用独立脚本（不依赖技能运行时路径）；`graph promote`/`graph validate`/`draft-review` 仍由 `scripts/ohc-run.py` 提供，kb_editor 以子进程调用。灰区裁定（similar 0.5-0.7）参照 `knowledge/operations/editor-adjudication-precedents.md` 先例集。
 
 ## 已知框架问题（待框架 PR 修复）
 

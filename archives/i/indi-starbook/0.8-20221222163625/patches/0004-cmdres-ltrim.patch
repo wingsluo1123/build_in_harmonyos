@@ -1,0 +1,45 @@
+diff --git a/starbook_types.cpp b/starbook_types.cpp
+--- a/starbook_types.cpp
++++ b/starbook_types.cpp
+@@ -147,18 +147,27 @@ std::ostream &starbook::operator<<(std::ostream &os, const starbook::LnLat &obj)
+ starbook::CommandResponse::CommandResponse(const std::string &url_like) : status(OK), raw(url_like)
+ {
+     if (url_like.empty()) throw runtime_error("parsing error, no payload");
+-    if (url_like.rfind("OK", 0) == 0)
++    /* Tolerate leading whitespace: the upstream official test
++       (test_starbook.cpp, StarbookDriver.cmd_res) asserts "    OK" parses as
++       starbook::OK, but the snapshot implementation required the response at
++       column 0 -- upstream never builds this test (INDI_BUILD_UNITTESTS is
++       commented out), so the dead check rotted. Skip leading blanks before
++       the OK/ERROR/payload checks. */
++    const std::string::size_type first_non_blank = url_like.find_first_not_of(" \t");
++    if (first_non_blank == std::string::npos) throw runtime_error("parsing error, no payload");
++    const std::string str_input = url_like.substr(first_non_blank);
++    if (str_input.rfind("OK", 0) == 0)
+     {
+         status = OK;
+         return;
+     }
+-    else if (url_like.rfind("ERROR", 0) == 0)
++    else if (str_input.rfind("ERROR", 0) == 0)
+     {
+-        if (url_like.rfind("ERROR:FORMAT", 0) == 0)
++        if (str_input.rfind("ERROR:FORMAT", 0) == 0)
+             status = ERROR_FORMAT;
+-        else if (url_like.rfind("ERROR:ILLEGAL STATE", 0) == 0)
++        else if (str_input.rfind("ERROR:ILLEGAL STATE", 0) == 0)
+             status = ERROR_ILLEGAL_STATE;
+-        else if (url_like.rfind("ERROR:BELOW HORIZONE", 0) == 0) /* it's not a typo */
++        else if (str_input.rfind("ERROR:BELOW HORIZONE", 0) == 0) /* it's not a typo */
+             status = ERROR_BELOW_HORIZON;
+         else
+             status = ERROR_UNKNOWN;
+@@ -166,7 +175,7 @@ starbook::CommandResponse::CommandResponse(const std::string &url_like) : status
+     }
+     else
+     {
+-        std::string str_remaining = url_like;
++        std::string str_remaining = str_input;
+         std::regex param_re(R"((\w+)=(\-?[\w\+\.]+))");
+         std::smatch sm;
+ 

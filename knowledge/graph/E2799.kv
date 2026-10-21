@@ -1,0 +1,19 @@
+id:                     E2799
+category:               platform, hmdfs, cmake, shared-library
+phase: build|link
+match_keywords: hmdfs, symlink, 符号链接, EPERM, Operation not permitted, versioned shared library, SOVERSION, VERSION, libtiff.so.6, CMAKE_PLATFORM_NO_VERSIONED_SONAME, cmake -E create_symlink, os.symlink, ln -s, unversioned soname, bare .so
+error_signature: "Operation not permitted.*(symlink|create_symlink|ln -s)|EPERM.*(symlink|link)|cmake.*create_symlink.*(libtiff|\\.so\\.[0-9])|cannot create symbolic link"
+root_cause: "libtiff sets VERSION/SOVERSION unconditionally in cmake/AutotoolsVersion.cmake (plain set() with no platform gate), so every shared build generates a versioned symlink chain. On the HarmonyOS PC device the build tree and package dir live on hmdfs, which lacks symlink support (EPERM), while the Linux farm needs the upstream-identical versioned layout. The two environments require opposite outputs, and upstream offers no switch a plain Linux build would not also trip."
+rec_approach: "Capability probe, not platform branch: at the top of build(), attempt os.symlink() inside the build folder; on OSError append -DCMAKE_PLATFORM_NO_VERSIONED_SONAME=ON (CMake then ignores VERSION/SOVERSION and emits a bare libtiff.so with unversioned SONAME and no symlinks). The Linux farm passes the probe, so its layout stays upstream-identical; zero source patches, one recipe behaves correctly in both environments."
+prescan_pattern: "create_symlink|ln -s|SOVERSION|\\.so\\.[0-9]+|NO_VERSIONED_SONAME"
+severity:               2
+last_updated: 2026-09-26
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E2799.md
+trigger_tool:           cmake
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        "Capability probe, not platform branch: at the top of build(), attempt os

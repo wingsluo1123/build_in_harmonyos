@@ -1,0 +1,27 @@
+software: libuv
+version: "1.53.0"
+status: built
+build_date: "2026-10-16"
+build_system: cmake
+
+source:
+  url: "https://dist.libuv.org/dist/v1.53.0/libuv-v1.53.0.tar.gz"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options: "-DCMAKE_INSTALL_PREFIX=$DEFAULT_PREFIX"
+
+patches_applied:
+  - "none (zero patch files; all OHOS adaptations via build() code injection)"
+  - "CMake OHOS mapping via build() _fix_cmake_for_ohos (replaces 0001 patch)"
+  - "unix OHOS guards via build() _fix_unix_ohos_guards (replaces truncated 0002/0003/0004 patches)"
+  - "OHOS account fallback via build() _fix_ohos_account_fallback (replaces mismatched 0005 patch)"
+
+knowledge_gained:
+  - "OHOS lacks Linux-specific CPU affinity APIs (CPU_SETSIZE, cpu_set_t, sched_getaffinity, CPU_COUNT)"
+  - "OHOS lacks Linux-specific mmsg APIs (struct mmsghdr, recvmmsg, sendmmsg)"
+  - "Need to exclude OHOS from __linux__ conditionals for these APIs"
+  - "CMakeLists.txt needs to treat HarmonyOS as Linux-like platform for compilation"
+  - "OHOS app UID not in /etc/passwd, uv_os_get_passwd needs OH_OsAccount fallback"
+  - "Upstream 1.53.0 has 463 TEST_DECLARE + 72 TEST_FS_DECLARE (144 on Linux/OHOS), TAP header 1..527 on HarmonyOS aarch64 (2026-10-16 preflight), runner outputs TAP (1..N/ok/not ok/# SKIP)"

@@ -1,0 +1,26 @@
+--- a/ifgate/Makefile
++++ b/ifgate/Makefile
+@@ -59,7 +59,7 @@
+ 	${INSTALL} -s -o ${OWNER} -g ${GROUP} -m ${MODE} iftoss ${BINDIR}/iftoss
+ 	${INSTALL} -s -o ${OWNER} -g ${GROUP} -m ${SMODE} ifmail ${BINDIR}/ifmail
+ 	rm -f ${BINDIR}/ifnews
+-	ln ${BINDIR}/ifmail ${BINDIR}/ifnews
++	cp ${BINDIR}/ifmail ${BINDIR}/ifnews
+ 
+ tryt:	iftoss
+ 	./iftoss -I../misc/config -N -xch <pkt
+@@ -89,7 +89,13 @@
+ 
+ ifnews:	ifmail
+ 	rm -f ifnews
+-	ln ifmail ifnews
++	# HMDFS ($HOME and the conan cache live on it) has no hard links: a bare
++	# `ln ifmail ifnews` dies with "cannot create hard link ... Operation not
++	# permitted" and aborts the whole build. ifnews is the same program under a
++	# different argv[0] (setmyname() drives the banner and the news-mode
++	# defaults), so a plain copy is equivalent - and it is what the conan
++	# package ends up holding anyway.
++	cp ifmail ifnews
+ 
+ iftoss:	${OBJTOSS} ${UTLIB}
+ 	${CC} ${LDFLAGS} ${OBJTOSS} ${UTLIB} -o iftoss ${LIBS}

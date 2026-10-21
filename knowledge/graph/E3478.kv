@@ -1,0 +1,82 @@
+#====================================================================
+# E552-draft-PMD1.kv — musl libc 不传递包含 pthread 类型 / PATH_MAX，
+#                      老 C 代码编译报 unknown type name
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E3478
+trigger_tool:           clang|gcc
+phase:                  compilation
+error_signature:        unknown type name 'pthread_mutex_t'|unknown type name 'pthread_cond_t'|unknown type name 'pthread_t'|use of undeclared identifier 'PATH_MAX'|use of undeclared identifier 'PTHREAD_MUTEX_INITIALIZER'|storage size of '.*' isn't known
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               1
+category:               portability, libc, musl, posix, headers
+match_keywords:         pthread_mutex_t, pthread_cond_t, pthread_t, PTHREAD_MUTEX_INITIALIZER,
+                        PATH_MAX, unknown type name, musl, 传递包含, 隐式包含,
+                        sys/types.h, limits.h
+title:                  musl libc 不传递包含 pthread 类型与 PATH_MAX，glibc 上能编的老 C 代码需要显式 include
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             glibc 的头文件会顺带引入 pthread 类型与 PATH_MAX，musl 严格按 POSIX 拆分头文件不做传递包含，导致 glibc 上能编的老 C 代码在 OHOS 上报 unknown type name。
+                        glibc 的某些头文件（如 <sys/types.h>、<unistd.h>、<syslog.h>
+                        的部分组合）会**顺带**引入 <pthread.h> 的类型定义与
+                        <limits.h> 的 PATH_MAX；musl（OHOS 使用的 C 库）严格按 POSIX
+                        拆分头文件，不做这种传递包含。
+                        于是只在 .h 里用了 pthread_mutex_t/pthread_cond_t 而没 include
+                        <pthread.h>，或用了 PATH_MAX 而没 include <limits.h> 的旧代码，
+                        在 glibc 上编译正常、在 OHOS 上直接 "unknown type name"。
+affected_scope:         2010 年前后的 C 代码、依赖 glibc 隐式包含习惯的项目；
+                        任何以 musl（OHOS、Alpine 等）为 C 库的移植场景。
+verification_cmd:       1) 编译报 unknown type name 'pthread_mutex_t' / use of undeclared identifier 'PATH_MAX';
+                        2) grep -n '#include <pthread.h>' <出问题的 .h> 确认缺失;
+                        3) grep -n '#include <limits.h>' <出问题的 .c> 确认缺失;
+                        4) 对照 glibc 机器上同一文件可编译通过
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           add-explicit-include-via-patch
+rec_description:        在缺头文件的文件里补上显式 include：pthread 类型补 <pthread.h>，
+                        PATH_MAX 补 <limits.h>。属于最干净的可移植性修复，
+                        不影响 glibc 平台（重复 include 有保护宏）。
+rec_command:            # 在 beep.h 的 include guard 内加 #include <pthread.h> ;
+                        # 在 ambient.c 的 include 区加 #include <limits.h>
+rec_auto_fix:           false
+rec_impl:               conan-patch
+
+fallback_priority:      2
+fallback_approach:      pass-extra-include-dir-or-macro
+fallback_description:   若不宜改源码（例如头文件由生成器产出），可用编译期强包含：
+                        CPPFLAGS="-include pthread.h -include limits.h" 或定义
+                        -D_POSIX_C_SOURCE / -D_DEFAULT_SOURCE，但可读性差、易遗漏。
+fallback_command:       CPPFLAGS="-include pthread.h -include limits.h"
+fallback_auto_fix:      false
+fallback_impl:          conan-recipe-build-flags
+
+# ★ 禁止策略 ★
+forbid_1_pattern:       #include <bits/pthreadtypes\.h>|#include <bits/local_lim\.h>
+forbid_1_reason:        直接包含 glibc 的内部 bits/ 头文件，musl 无此路径，且属未定义接口。
+forbid_1_consequence:   编译报 No such file or directory，问题依旧且更不可移植。
+forbid_2_pattern:       #define\s+PATH_MAX\s+\d+
+forbid_2_reason:        手写 PATH_MAX 常量绕过头文件，掩盖真实的头文件缺失，且数值可能与平台不符。
+forbid_2_consequence:   埋下缓冲区大小不一致的隐患。
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             P012
+# ═══ 关系图 (Relations) ═══
+# ═══ 元数据 ═══
+doc_file:               doc/E552.md
+last_updated:           2026-10-16
+source_event:           pommed 1.39-dfsg 适配：beep.h 缺 <pthread.h>、mactel/ambient.c 缺 <limits.h>，musl 下编译失败
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics, 方案 D) ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-16
+authors:               PMD1

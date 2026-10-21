@@ -1,0 +1,23 @@
+# conandata.yml — iw 6.17
+# 上游官方源：kernel.org 网络工具目录（R39：官方正式源）。
+# ⚠ 本文件的注释里**不要**写出"目录页"那种独立 URL：W3 预下载步骤按正则扫原始
+# 文本抽 URL，会把注释里的目录页也当成一个 source 拉下来（拿到 HTML 索引页），
+# 并把 url: 改写成该 HTML 的 file:// 缓存路径 ⇒ source() FileNotFoundError。
+# 官方目录在 kernel.org 的 pub/software/network/iw/ 下，实测 6.17 为其中最新版。
+sources:
+  url: "https://www.kernel.org/pub/software/network/iw/iw-6.17.tar.xz"
+  sha256: "7d182e498289ab39b257da6780d562e415377107f50358ee5b55b8cfe40b1e33"
+
+patches:
+  # E119/E1604：OHOS musl 派生 sysroot 上 <linux/socket.h> 无条件重定义
+  # struct sockaddr_storage（glibc 的同名 UAPI 头用 #ifndef __GLIBC__ 屏蔽）。
+  # libnl 的 <netlink/netlink.h> 先引入 <sys/socket.h> 再引入
+  # <linux/netlink.h> -> <linux/socket.h>，于是**每一个** iw 编译单元都报
+  # "redefinition of 'sockaddr_storage'"。
+  # 处置与仓内 batctl / babeld / blockdomains 同族：预锁 _UAPI_LINUX_SOCKET_H
+  # 跳过冲突头 + 补 __kernel_sa_family_t 这一个 typedef。差异是**不新增头文件**、
+  # 也不使用平台宏：两个宏直接在 Makefile 的 CFLAGS 里定义，glibc 环境下 guard
+  # 只是冗余、行为逐字不变（避免引入新文件补丁）。
+  - patch_file: "patches/0001-Makefile.patch"
+    patch_description: "E119/E1604: CFLAGS 追加 -D_UAPI_LINUX_SOCKET_H -D__kernel_sa_family_t=\"unsigned short\"，令全部编译单元跳过冲突的 linux/socket.h 并补上 netlink UAPI 需要的 typedef（不使用平台宏 __OHOS__）"
+    patch_type: "portability"

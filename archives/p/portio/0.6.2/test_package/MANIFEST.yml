@@ -1,0 +1,42 @@
+# test_package/MANIFEST.yml
+# 上游测试声明（CI build_and_test.sh L0e 强制要求存在）
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# 上游清点结论（证据见 ../../0.6.2/notes.md「上游测试入口清点」）：
+#   portio 0.6.2 tag 全量文件仅 10 个（MANIFEST.in / Makefile / README.rst /
+#   build_dist.sh / conf.py / portio.c / portio.c.in / pyproject.toml /
+#   setup.py / toggle.py），无 tests/、无 test_*.py、无 pytest/unittest/ctest
+#   注册；Makefile 仅用于 Sphinx 文档。唯一可执行样例是 toggle.py。
+
+package: portio/0.6.2
+homepage: "http://portio.inrim.it"
+
+# 上游测试命令：不存在（无自动化测试入口）
+upstream_check_command: ""
+
+# conanfile.py build() 是否集成上游测试：否（上游无测试）
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序：无
+upstream_tests: []
+
+# 上游样例（唯一可执行样例，build() 内真实执行两条路径）
+upstream_samples:
+  - file: toggle.py
+    source: portio-0.6.2/toggle.py
+    description: "上游 README 的并行口示例：非 root 前置检查 + ioperm/inb/outb 循环"
+    command: "<conan python> toggle.py"
+    runs:
+      - "原样执行（非 root，走上游 root 前置检查分支）"
+      - "getuid 桩为 root，进入 portio API 路径（aarch64 上 ioperm 返回 ENOSYS）"
+
+# test_package 中自带的测试（消费者视角验证，独立统计，不计入上游）
+test_package_tests:
+  - file: test_portio.py
+    description: "5 个上游 API 契约 + 5 个鸿蒙/aarch64 特有语义用例"
+    command: "<conan python> test_portio.py"
+
+# test_package 用例数（不是 assert 语句数；上游用例为 0）
+test_package_case_count: 10
+assertion_count: 10

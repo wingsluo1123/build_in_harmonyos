@@ -1,0 +1,103 @@
+From: OHOS SPDK port
+Subject: [PATCH] Use per-test working directories for temporary fixtures
+
+The recipe runner supplies an isolated writable cwd for every executable.
+Use it for the file and NVMe reservation fixtures instead of a shared /tmp.
+Test registrations, inputs, expected values, and assertions are unchanged.
+
+--- a/test/unit/lib/util/file.c/file_ut.c
++++ b/test/unit/lib/util/file.c/file_ut.c
+@@ -13,7 +13,7 @@
+ 	/* Don't try to use real sysfs paths for the unit test. Instead
+ 	 * simulate sysfs attributes with some temporary files.
+ 	 */
+-	const char *path = "/tmp/spdk_file_ut_2024";
++	const char *path = "spdk_file_ut_2024";
+ 	const char *setup = "spdk_unit_tests\n";
+ 	char *attr = NULL;
+ 	FILE *f;
+@@ -28,13 +28,13 @@
+ 	rc = fclose(f);
+ 	CU_ASSERT(rc == 0);
+ 
+-	rc = spdk_read_sysfs_attribute(&attr, "/tmp/spdk_file_ut_%d", 2024);
++	rc = spdk_read_sysfs_attribute(&attr, "spdk_file_ut_%d", 2024);
+ 	CU_ASSERT(rc == 0);
+ 	SPDK_CU_ASSERT_FATAL(attr != NULL);
+ 	CU_ASSERT(strncmp(setup, attr, strlen(setup) - 1) == 0);
+ 	free(attr);
+ 
+-	rc = spdk_read_sysfs_attribute(&attr, "/tmp/some_non_existent_file");
++	rc = spdk_read_sysfs_attribute(&attr, "some_non_existent_file");
+ 	CU_ASSERT(rc == -ENOENT);
+ }
+ 
+@@ -44,7 +44,7 @@
+ 	/* Don't try to use real sysfs paths for the unit test. Instead
+ 	 * simulate sysfs attributes with some temporary files.
+ 	 */
+-	const char *path = "/tmp/spdk_file_ut_2024";
++	const char *path = "spdk_file_ut_2024";
+ 	const char *setup = "111\n";
+ 	uint32_t attr;
+ 	FILE *f;
+@@ -57,7 +57,7 @@
+ 	rc = fclose(f);
+ 	CU_ASSERT(rc == 0);
+ 
+-	rc = spdk_read_sysfs_attribute_uint32(&attr, "/tmp/spdk_file_ut_%d", 2024);
++	rc = spdk_read_sysfs_attribute_uint32(&attr, "spdk_file_ut_%d", 2024);
+ 	CU_ASSERT(rc == 0);
+ 	CU_ASSERT(attr == 111);
+ 
+@@ -69,7 +69,7 @@
+ 	rc = fclose(f);
+ 	CU_ASSERT(rc == 0);
+ 
+-	rc = spdk_read_sysfs_attribute_uint32(&attr, "/tmp/spdk_file_ut_%d", 2024);
++	rc = spdk_read_sysfs_attribute_uint32(&attr, "spdk_file_ut_%d", 2024);
+ 	CU_ASSERT(rc == 0);
+ 	CU_ASSERT(attr == UINT32_MAX);
+ 
+@@ -82,7 +82,7 @@
+ 	rc = fclose(f);
+ 	CU_ASSERT(rc == 0);
+ 
+-	rc = spdk_read_sysfs_attribute_uint32(&attr, "/tmp/spdk_file_ut_%d", 2024);
++	rc = spdk_read_sysfs_attribute_uint32(&attr, "spdk_file_ut_%d", 2024);
+ 	CU_ASSERT(rc == -EINVAL);
+ 
+ 	/* Write a negative number */
+@@ -94,10 +94,10 @@
+ 	rc = fclose(f);
+ 	CU_ASSERT(rc == 0);
+ 
+-	rc = spdk_read_sysfs_attribute_uint32(&attr, "/tmp/spdk_file_ut_%d", 2024);
++	rc = spdk_read_sysfs_attribute_uint32(&attr, "spdk_file_ut_%d", 2024);
+ 	CU_ASSERT(rc == -EINVAL);
+ 
+-	rc = spdk_read_sysfs_attribute_uint32(&attr, "/tmp/some_non_existent_file");
++	rc = spdk_read_sysfs_attribute_uint32(&attr, "some_non_existent_file");
+ 	CU_ASSERT(rc == -ENOENT);
+ }
+ 
+--- a/test/unit/lib/nvmf/subsystem.c/subsystem_ut.c
++++ b/test/unit/lib/nvmf/subsystem.c/subsystem_ut.c
+@@ -1097,7 +1097,7 @@
+ 	SPDK_CU_ASSERT_FATAL(reg == NULL);
+ 
+ 	/* TEST CASE: Enable PTPL */
+-	g_ns.ptpl_file = "/tmp/Ns1PR.cfg";
++	g_ns.ptpl_file = "Ns1PR.cfg";
+ 	ut_reservation_build_register_request(req, SPDK_NVME_RESERVE_REGISTER_KEY, 0,
+ 					      SPDK_NVME_RESERVE_PTPL_PERSIST_POWER_LOSS, 0, 0xa1);
+ 	update_sgroup = nvmf_ns_reservation_register(&g_ns, &g_ctrlr1_A, req);
+@@ -1222,7 +1222,7 @@
+ 	SPDK_CU_ASSERT_FATAL(req != NULL);
+ 
+ 	/* TEST CASE: Enable PTPL */
+-	g_ns.ptpl_file = "/tmp/Ns1PR.cfg";
++	g_ns.ptpl_file = "Ns1PR.cfg";
+ 	ut_reservation_build_register_request(req, SPDK_NVME_RESERVE_REGISTER_KEY, 0,
+ 					      SPDK_NVME_RESERVE_PTPL_PERSIST_POWER_LOSS, 0, 0xa1);
+ 	update_sgroup = nvmf_ns_reservation_register(&g_ns, &g_ctrlr1_A, req);

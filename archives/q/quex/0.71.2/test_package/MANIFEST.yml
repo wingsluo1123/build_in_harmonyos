@@ -1,0 +1,40 @@
+package: quex/0.71.2
+homepage: "https://quex.sourceforge.net/"
+
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "quex-0.71.2.zip top level (quex-exe.py, quex/, demo/, manpage/, unit_test_results.txt)"
+    reason: "No tests/ or test/ directory and no make check/ctest/pytest entry; unit_test_results.txt is 0 bytes in the 0.71.2 zip (empty log, verified by getsize), not a runnable harness."
+  - source: "quex/engine/analyzer/examine/TEST-later/ (11 test-*.py + helper.py + hwut-info.dat + GOOD/)"
+    reason: "Upstream-disabled by directory suffix '-later': hwut only scans dirs named TEST, so TEST-later is never picked up by a plain hwut run. Each driver needs the external hwut runner (not shipped in the zip) plus a shape argument and GOOD/ reference diff; not runnable as pytest/ctest/make check. Recipe build() walks the tree and logs all 11 drivers as machine evidence."
+  - source: "quex/engine/state_machine/algebra/TESTS/ (essay-pickled-dfas.py + helper.py + hwut-info.dat)"
+    reason: "No runnable driver: essay-pickled-dfas.py is a helper fragment (undefined names, no test entry); helper.py is a library. hwut-info excludes test-cut_in.py which is absent from the zip."
+  - source: "quex/code_base/TESTS/ (code_base_instatiation.py, generate-TestAnalyzer.py, test_c fixtures)"
+    reason: "Generator scripts plus C fixtures for manual code-base instantiation; no test drivers or assertion summary."
+  - source: "demo/C and demo/Cpp (00-Minimalist .. plus Cpp examples, 430 files)"
+    reason: "Each demo ships Makefile/CMakeLists that build a pre-generated lexer.c/lexer.cpp example; no TESTS/ctest/pytest registration or assertion summary. Homebrew test runs one demo generation (quex -i easy.qx -o tiny_lexer) as a smoke, not an upstream suite; adaptation covers the same path in test_package."
+  - conclusion: "Upstream 0.71.2 provides hwut developer material but no runnable automated suite out of the box; adaptation validates via packaged-binary generation checks without presenting them as upstream coverage."
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_test_total: 0
+upstream_test_count_method: "auto"
+upstream_tests: []
+
+test_package_tests:
+  - file: test_quex.py
+    description: "quex --help runs (entry point on PATH)"
+    command: "quex --help"
+  - file: test_quex.py
+    description: "quex --version reports 0.71.2"
+    command: "quex --version"
+  - file: test_quex.py + tiny.qx
+    description: "Generate C lexer from minimal spec (token NUMBER/IDENTIFIER)"
+    command: "cd TMP && quex -i tiny.qx -o tiny_lexer --language C"
+  - file: test_quex.py
+    description: "Generated lexer tree is non-empty and mentions NUMBER/IDENTIFIER"
+    command: "walk tiny_lexer + content check"
+
+test_package_test_count: 4
+assertion_count: 4

@@ -1,0 +1,27 @@
+--- /dev/null
++++ b/cmake/KaldiDependencies.cmake
+@@ -0,0 +1,24 @@
++# Resolve published Conan targets or a native installation. Never download here.
++if(NOT TARGET openfst::openfst)
++    find_package(openfst CONFIG QUIET)
++    if(NOT TARGET openfst::openfst)
++        find_path(KALDI_OPENFST_INCLUDE_DIR fst/fst.h REQUIRED)
++        find_library(KALDI_OPENFST_LIBRARY NAMES fst REQUIRED)
++        add_library(openfst::openfst UNKNOWN IMPORTED)
++        set_target_properties(openfst::openfst PROPERTIES
++            IMPORTED_LOCATION "${KALDI_OPENFST_LIBRARY}"
++            INTERFACE_INCLUDE_DIRECTORIES "${KALDI_OPENFST_INCLUDE_DIR}")
++    endif()
++endif()
++if(MATHLIB STREQUAL "OpenBLAS" AND NOT TARGET openblas::openblas)
++    find_package(openblas CONFIG QUIET)
++    if(NOT TARGET openblas::openblas)
++        find_path(KALDI_OPENBLAS_INCLUDE_DIR cblas.h PATH_SUFFIXES openblas openblas-pthread REQUIRED)
++        find_path(KALDI_LAPACKE_INCLUDE_DIR lapacke.h REQUIRED)
++        find_library(KALDI_OPENBLAS_LIBRARY NAMES openblas REQUIRED)
++        add_library(openblas::openblas UNKNOWN IMPORTED)
++        set_target_properties(openblas::openblas PROPERTIES
++            IMPORTED_LOCATION "${KALDI_OPENBLAS_LIBRARY}"
++            INTERFACE_INCLUDE_DIRECTORIES "${KALDI_OPENBLAS_INCLUDE_DIR};${KALDI_LAPACKE_INCLUDE_DIR}")
++    endif()
++endif()

@@ -1,0 +1,45 @@
+# ═══ Draft knowledge entry — /dev/fuse 在 OHOS 上 EACCES（存在但不可访问）⇒ FUSE 用户态栈的运行期能力墙与验证面判据 ═══
+# Timestamp: 2026-10-16
+# Software: fuse 2.9.9（FUSE 2.x / Libfuse2 legacy ABI）
+# Gate: 真机 errno 实测 + 已构建产物运行期探针（OHOS aarch64 / clang 15.0.4）
+# Status: 新建（B=create；四范围查重 0 命中：knowledge/graph + knowledge/doc + 经验库 + OHOS行为探针清单均无 /dev/fuse 条目）
+# Issue: 见 PR 正文「关联 Issue」行（同 PR 内回填）
+# 用法：通用机制条目（所有 FUSE 消费者族共享同一堵墙与同一套验证判据）；本包细节见 archives/f/fuse/2.9.9/notes.md 能力墙段。
+# 硬规则：每个字段顶格 + 同行单物理行 + 带引号标量，禁用 |-/> 块标量与缩进续行。
+
+id:                     E3411
+title: "OHOS 上 /dev/fuse 存在但不可访问（open 返回 EACCES=13，不是 ENOENT）⇒ libfuse/fuse 的 mount 面（fuse_mount/fuse_loop/fusermount）运行期不可用；且 os.path.exists()/access(F_OK) 因 stat 失败返回 False（假阴性），能力面判别必须用 errno 而不能用存在性 API"
+trigger_tool: "runtime|make|conan|python"
+phase: "runtime"
+error_signature: "fuse: failed to open /dev/fuse.*Permission denied|Permission denied.*/dev/fuse|cannot open /dev/fuse.*EACCES|fusermount.*Permission denied|fuse_mount.*NULL|ls: /dev/fuse: Permission denied"
+severity:               3
+category:               platform, detection, runtime, permissions, device-node
+match_keywords: "/dev/fuse, EACCES, Permission denied, errno 13, ENODEV, fuse_mount, fuse_loop, fusermount, mount.fuse, libfuse, fuse2, fuse3, os.path.exists, access F_OK, 假阴性, stat 失败, /proc/modules, setuid, chmod u+s, E046, 运行期能力墙"
+prescan_pattern: "/dev/fuse|fuse_mount\\(|fuse_session_mount|fusermount|mount\\.fuse|/proc/fs/fuse/version"
+prescan_globs: "**/*.c, **/*.h, **/*.cpp, **/*.sh, **/*.py, conanfile.py, test_package/**"
+root_cause: "OHOS 用户态未向本进程开放 /dev/fuse 字符设备（节点存在但 open 返回 EACCES，内核亦未加载 fuse 模块）；平台按 SELinux/权限策略拒绝访问，与被适配包代码无关。叠加两个次生事实：存在性 API 在 EACCES 下返回 False（假阴性），以及 OHOS 忽略 chmod u+s（E046）使 fusermount 无法获得 setuid root。"
+affected_scope: "全部 FUSE 用户态消费者：libfuse/fuse 2.x 与 3.x 本体、以及依赖它们的文件系统实现（sshfs、mtpfs、mhddfs、ifuse、bindfs、s3fs-fuse、ext4fuse、zfs-fuse、securefs、winregfs、tmfs、owfs、telemetry 等）；任何运行期 open('/dev/fuse') 或 exec fusermount 的用户态程序。编译期不受影响（头文件与静态库完好）。"
+verification_cmd: "python3 -c \"import os,errno\ntry:\n os.open('/dev/fuse',os.O_RDWR)\nexcept OSError as e:\n print('errno',e.errno,errno.errorcode.get(e.errno))\nprint('exists',os.path.exists('/dev/fuse'))\"; ls -l /dev/fuse; grep -i fuse /proc/modules; ls -l <pkg>/bin/fusermount"
+rec_priority: "1"
+rec_approach: "errno-probe-and-consistency-assert-runtime-capability"
+rec_description: "以 open() errno 实测落运行期能力墙结论（EACCES/ENOENT 均记『打不开』），库面离线 API 照常交付并真断言；test_package 用『裸探针 + fuse_mount 一致性断言 + 两条负向对照（/dev/null 必成功、不存在路径必 ENOENT）』，CLI 只断言参数解析文本路径；notes.md/MANIFEST/PR 正文三处同源披露能力墙与未执行项，⛔ 不 mock 设备、⛔ 不谎称可挂载"
+rec_command: "真机: open('/dev/fuse',O_RDWR) 取 errno + os.path.exists 对照 + ls -l /dev/fuse + grep -i fuse /proc/modules + ls -l <pkg>/bin/fusermount（看 setuid 位）；test_package: 探针+一致性断言+负向对照；库面: fuse_version/fuse_opt_parse/fuse_parse_cmdline/fuse_lowlevel_new 离线真断言"
+rec_auto_fix:          false
+rec_impl: "配方 test_package（C 消费者 + CLI 真跑）+ notes.md 能力墙披露 + 软件级 README 关键适配点"
+fallback_priority: "2"
+fallback_approach: "report-platform-gap-and-keep-offline-verification-only"
+fallback_description: "若任务的核心价值就在真实挂载（端到端文件系统读写），本机无法补齐：按平台能力缺口上报（Issue/需求图谱），等待期只交付『编译 + 库面离线验证 + CLI 文本路径验证 + 全量披露』；⛔ 不要用 mock /dev/fuse、伪造挂载成功或把能力墙写成『通过』来制造假绿；有真实 FUSE 设备的环境再补跑上游/端到端脚本并回填 N'"
+fallback_command: "上报缺口后维持 rec_approach 的交付形态；在放开 /dev/fuse 权限或加载 fuse 模块的环境复跑一致性断言即可自动改判"
+fallback_auto_fix: "false"
+fallback_impl: "平台能力缺口上报（Issue/req 图谱）"
+principles:               
+doc_file: "knowledge/drafts/DRAFT-fuse-2.9.9-dev-fuse-eacces-mount-capability-wall.md"
+last_updated: "2026-10-16"
+source_event: "fuse 2.9.9 适配实测（2026-10-16 B 机）：ls -l /dev/fuse => Permission denied；open('/dev/fuse',O_RDWR) => errno=13 EACCES；os.path.exists('/dev/fuse') => False（假阴性）；grep -i fuse /proc/modules => 无命中；/etc -> /system/etc；bin/fusermount mode=0o770 setuid=False；test_package 25/25 通过，其中 fuse_mount()==NULL 与裸探针 errno=13 一致"
+authors: "主理-5 <主理-5@local>"
+source_pr: "(本 PR)"
+source_commit: "(本 PR 内提交)"
+metrics_success_count: "1"
+metrics_fail_count: "0"
+metrics_confidence: "1.0"
+metrics_last_used: "2026-10-16"

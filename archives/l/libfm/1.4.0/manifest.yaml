@@ -1,0 +1,68 @@
+software: libfm
+version: "1.4.0"
+status: published
+build_date: "2026-10-15"
+build_system: cmake
+
+source:
+  url: "https://github.com/lxde/libfm/archive/refs/tags/1.4.0.tar.gz"
+  sha256: "7d7b616411992389a4b7f35796109d605f30bc2ceab84d4081d1665254ebbf82"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DGLIB_ROOT=$PREFIX"
+    - "-DCMAKE_INSTALL_PREFIX=$PREFIX"
+  dependencies:
+    - "glib/2.88.0"
+    - "pcre2/10.45"
+    - "zlib/1.3.1"
+    - "menu-cache/1.1.0"
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "E528: upstream autotools 缺 configure 与 m4 macros；改用 CMake 绕过"
+  - "本包交付 libfm 完整核心（base+job+extra，无 GTK）+ 独立 libfm-extra 子库"
+  - "fm-marshal.h/.c 与 config.h 为 autotools 生成文件：glib-genmarshal 预生成放配方 generated/ 目录，避免 CI 工具依赖"
+  - "上游 fm.h 平铺 include（#include \"fm-app-info.h\" 无 base/ 前缀）：install 头文件须全平铺到 include/libfm-4/"
+  - "GETTEXT_PACKAGE 为 fm-xml-file.c 内 _() 宏所需"
+  - "E529: 静态链接 glib 必须显式链接其传递依赖（pcre2/zlib/ffi/intl/m），.a 链接期不报未定义符号，dlopen 运行时才重定位失败"
+  - "E530: conan zlib/pcre2 等 .a 非 PIC，链入 .so 全局符号模式被 lld 拒绝 → --exclude-libs 选择性隐藏无 GType 需求的库"
+  - "E531: 双 glib 实例分裂 GType 系统——libfm.so 藏 glib + 消费者再链静态 glib 时 GObject 信号失效（instance of type '(null)'）；glib/gobject/gio/gthread/gmodule 符号必须从 so 全局导出，消费者只链 -lfm"
+  - "fm-file-info.c:41 无条件 include menu-cache.h；核心库不编 modules/ 时 menu-cache 仅作头与静态闭包"
+
+runtime_requirements:
+  notes: "libfm.so.4/libfm-extra.so.4 运行时 NEEDED 仅 libc.so（glib/zlib/pcre2/ffi/intl/menu-cache 均静态闭合于包内，glib 符号经 libfm.so 全局导出供消费者共享单实例）"
+
+test_results:
+  library_integrity: PASS
+  header_integrity: PASS
+  symbol_export: PASS
+  pkg_config: PASS
+  elf_signature: PASS
+  runtime_loading: PASS
+  upstream_test_fm_path: PASS (4/4 子用例 ok，RC=0)
+  upstream_file_search_cli_demo: PASS (finished，RC=0)
+  consumer_xml_roundtrip: PASS
+  consumer_attr_extraction: PASS
+  consumer_error_handling: PASS
+  consumer_ohos_runtime_usability: PASS
+  overall: PASS
+
+packaging:
+  delivery: "conan 包（本地缓存已验证；CI 侧由制品仓分发）"
+  contents:
+    - "lib/libfm.so.4.0.2 (~4.2MB, SONAME libfm.so.4, base+job+extra 核心)"
+    - "lib/libfm-extra.so.4.1.3 (~55KB, SONAME libfm-extra.so.4)"
+    - "include/libfm-4/{fm.h,fm-seal.h,base/*.h,job/*.h,fm-marshal.h,fm-extra.h,fm-xml-file.h,fm-version.h}"
+    - "lib/pkgconfig/libfm.pc"
+    - "lib/pkgconfig/libfm-extra.pc"
+
+notes:
+  - "构建 libfm 完整核心（无 GTK 部分）+ 独立 libfm-extra；不含 libfm-gtk/modules/udisks/dbus/exif"
+  - "上游 4 个测试/demo：test-fm-path 与 file-search-cli-demo 真实执行 PASS；libfm-demo 与 gtk/exo/test.c 需 GTK3（PC 鸿蒙无 GTK 栈）不可执行，已在 PR 描述按 rule2/3 说明"
+  - "CMakeLists.txt 与 generated/{config.h,fm-marshal.*} 从配方目录复制进源码树（上游 tarball 无 CMake 支持）"

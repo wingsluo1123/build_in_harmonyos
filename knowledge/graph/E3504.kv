@@ -1,0 +1,23 @@
+id:                     E3504
+title: 命令值编译器的实际路径与必需参数分别绑定
+trigger_tool: cmake|conan
+phase: configuration|testing
+error_signature: CMAKE_C_COMPILER is not a full path to an existing compiler tool; command-valued compiler_executables
+severity:               2
+category: cmake, toolchain, consumer
+match_keywords: CMAKE_C_COMPILER_ARG1, compiler_executables, mandatory wrapper arguments, CMakeToolchain, native consumer, absolute build bindir
+root_cause: CMake把整段Python加wrapper命令当作一个编译器路径，导致真实编译器识别失败；必需参数必须独立保留。公开头依赖和消费者可执行文件路径又分别属于传播与运行合同，原多进程测试通过不能替代安装消费者验证。
+affected_scope: 通过解释器和真实wrapper启动编译器的Conan原生profile及CMake消费者
+verification_cmd: original eight GLib entries plus actual CMake test_package and official Finish35
+rec_priority: 1
+rec_approach: bind-physical-compiler-and-mandatory-arguments
+rec_description: 读取实际profile的compiler_executables，验证解释器为真实绝对文件；仅对命令值分离首个可执行文件与剩余必需参数，交给CMakeToolchain编译器块和CMAKE_C_COMPILER_ARG1。公开GLib类型通过真实requires的transitive_headers/transitive_libs传递；两个消费者统一使用实际build_folder/bindir绝对路径签名并运行。保留原8入口、15编译程序及严格警告，另验完整API消费者和Harmony UID私有存储。
+rec_command: CMakeToolchain compiler executable plus CMAKE_C_COMPILER_ARG1; actual native conan create
+rec_auto_fix: false
+rec_impl: Validate the actual executable, preserve mandatory arguments in ARG1, propagate real public dependencies and sign/execute the same absolute build artifact.
+doc_file: knowledge/drafts/E2026101613119-draft-A139.md
+last_updated: 2026-10-16
+source_event: libdbusmenu-glib-16.04.0-official-20261016-r1289; two native creates original8 entries15 compiled programs C6H1; W3log ca1ea00d3a0f87985927093eead87bfd3a81c01152d264707cef0ae405d231b7
+authors: 2301_80739235
+source_pr: 14388
+source_commit:

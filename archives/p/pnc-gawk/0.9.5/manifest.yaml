@@ -1,0 +1,61 @@
+version: "0.9.5"
+software: "pnc-gawk"
+status: built
+build_date: "2026-10-17"
+build_system: cmake
+
+source:
+  url: "https://git.sr.ht/~anjan/pnc/archive/0.9.5.tar.gz"
+  sha256: "48fc76cf1c74ed542278be677f527397f4928e835f819869473f6f32a3cea720"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DPNC_CONAN_PACKAGE_MODE=ON"
+    - "-DGAWK_INCLUDE_DIR=<gawk package>/include"
+    - "-DAWKLIBPATH=lib/gawk"
+  dependencies:
+    - libphonenumber/8.13.51
+    - icu4c/78
+    - gawk/5.3.0
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-CMakeLists.txt.patch"
+  - "0002-gawkext-CMakeLists.txt.patch"
+
+knowledge_gained:
+  - "libphonenumber/8.13.51 已随包提供同源 libgeocoding.a；再叠加 libgeocoding/9.0.34 会造成 9.0.34 归档 × 8.13.51 头文件/归档的 ABI/ODR 错配"
+  - "上游 gawkext 把函数注册在 'phonenumber' AWK 命名空间（dl_load_func 第三参数），gawk 5.x 下必须 phonenumber::pn_format() 或 @namespace \"phonenumber\""
+  - "上游 CMake 在 configure 期 execute_process(gawk ...) 取 AWKLIBPATH，交叉编译会得到构建机绝对路径，必须改为相对前缀 lib/gawk"
+  - "上游硬编码 /usr/local/include 与 find_library(PATHS /usr/local/lib)，需改为由构建驱动注入 include/链接闭包"
+  - "gawkpn.so 运行期 NEEDED libc++_shared.so + libc.so；OHOS 系统自带 /system/lib64/libc++_shared.so，clean env 加载实测通过"
+  - "libphonenumber/8.13.51 的地理编码为国家级精度（location=France），属依赖数据粒度限制，不是本配方问题"
+  - "上游 tests.sh 经 ctest 注册（1 个 CTest 用例，11 条断言）覆盖 pnc CLI；上游无 gawkpn.so 自动化加载测试"
+
+tests:
+  upstream: 11
+  upstream_framework: "ctest (tests_sh) / sh tests.sh"
+  test_package: 15
+  harmony_specific: 4
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/pnc-gawk-0.9.5.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/pnc-gawk-0.9.5.work
+  source_orig_hash: 5d8a233e61cc2f6c
+  source_work_hash: fd77b2810f57f3dd
+  generated_at: '2026-10-17T20:35:46'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-gawkext-CMakeLists.txt.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

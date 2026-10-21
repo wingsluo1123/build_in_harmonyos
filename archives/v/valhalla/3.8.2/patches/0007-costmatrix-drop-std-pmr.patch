@@ -1,0 +1,40 @@
+diff --git a/src/thor/costmatrix.cc b/src/thor/costmatrix.cc
+index c5aceb1..9c8883a 100644
+--- a/src/thor/costmatrix.cc
++++ b/src/thor/costmatrix.cc
+@@ -76,17 +76,18 @@ struct CostMatrix::LocationStatus {
+ 
+ class CostMatrix::ReachedMap {
+ public:
+-  using PmrVector = std::vector<uint32_t, std::pmr::polymorphic_allocator<uint32_t>>;
++  // OHOS libc++ does not provide <memory_resource> / std::pmr at all (only the
++  // experimental namespace, without unsynchronized_pool_resource), so use the
++  // default allocator.  This only gives up the pool allocation optimisation;
++  // the map's contents and semantics are unchanged.
++  using PmrVector = std::vector<uint32_t>;
+ 
+-  ReachedMap()
+-      : pool_(std::pmr::new_delete_resource()), vec_alloc_(&pool_),
+-        storage_(std::pmr::polymorphic_allocator<std::pair<const uint64_t, PmrVector>>(&pool_)) {
+-  }
++  ReachedMap() = default;
+ 
+   void add(uint64_t key, uint32_t value) {
+     auto it = storage_.find(key);
+     if (it == storage_.end()) {
+-      it = storage_.emplace(key, PmrVector(vec_alloc_)).first;
++      it = storage_.emplace(key, PmrVector{}).first;
+     }
+     it->second.push_back(value);
+   }
+@@ -104,9 +105,7 @@ public:
+   }
+ 
+ private:
+-  std::pmr::unsynchronized_pool_resource pool_;
+-  std::pmr::polymorphic_allocator<uint32_t> vec_alloc_;
+-  ankerl::unordered_dense::pmr::map<uint64_t, PmrVector> storage_;
++  ankerl::unordered_dense::map<uint64_t, PmrVector> storage_;
+ };
+ 
+ // Constructor with cost threshold.

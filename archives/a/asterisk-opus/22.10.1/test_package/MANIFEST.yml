@@ -1,0 +1,28 @@
+# test_package/MANIFEST.yml — asterisk-opus 22.10.1
+# CI L0e 强制要求此文件存在（上游测试声明文件）
+
+package: asterisk-opus/22.10.1
+homepage: "https://www.asterisk.org/"
+
+# 上游测试：Asterisk 的 C 单元测试在 test/ 目录（main/ 各模块 test_*.c）。
+# res_format_attr_opus 模块无专属 .c 测试——上游无对应单测。
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游测试程序（如实声明：Opus 格式属性模块无专属上游测试）
+upstream_tests:
+  - file: test/
+    source: asterisk-22.10.1/test/*.c
+    description: "Asterisk 主程序 C 单测（test/），Opus 格式属性模块无专属测试"
+    command: ""
+
+test_package_tests:
+  - file: test_asterisk_opus.py
+    description: "Verifies res_format_attr_opus.so exists under lib/asterisk/modules/ and is a valid Asterisk ELF module"
+    command: "python3 test_asterisk_opus.py"
+  - file: test_opus_sdp.py
+    description: "Real Asterisk 22.10.1 loads the installed Opus module and validates SDP attribute parsing, generation and roundtrip; does not test audio encoding"
+    command: "python3 test_opus_sdp.py <plugin_package> <core_package> --sign"
+
+assertion_count: 4

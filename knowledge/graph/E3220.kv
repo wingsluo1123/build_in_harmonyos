@@ -1,0 +1,78 @@
+# ═══ Draft knowledge entry — conan 2 的 self.dependencies.*.items() 键是 Requirement 对象，不可直接 sorted ═══
+# Timestamp: 2026-10-02
+# Software: greenlet 3.5.6（PR #10408，第 1 轮红）
+# Gate: CI conan-build-test → conan create → build() → 遍历 build 上下文依赖
+# Status: DRAFT — needs human/AI review to promote to E-entry
+#
+# To promote:
+#   1. Review the error excerpt below
+#   2. Rename to E0XX.kv and move to knowledge/graph/
+#   3. Add a row to knowledge/graph/index.tsv
+
+id:                     E3220
+trigger_tool:           conan
+phase:                  build
+error_signature:        TypeError: '<' not supported between instances of 'Requirement' and 'Requirement'|
+                         TypeError.*not supported between instances of .*Requirement
+severity:               2
+category:               python, conan, api, recipe
+match_keywords:         conan 2, self.dependencies, dependencies.build, items(), Requirement,
+                         sorted, require.ref.name, UserRequirementsDict, TypeError, recipe API
+title:                  conan 2 的 self.dependencies.<context>.items() 返回的键是 Requirement
+                        对象而非字符串：直接 sorted() 会抛
+                        TypeError: '<' not supported between instances of 'Requirement'
+
+root_cause:             conan 2 的 UserRequirementsDict（conan/internal/model/dependencies.py）
+                        以 Requirement 对象为内部 dict 的键，items() 原样吐出
+                        (Requirement, ConanFileInterface) 对；包名要经 `require.ref.name` 取。
+                        Requirement **未实现 __lt__**，故 `sorted(self.dependencies.build.items())`
+                        直接崩在排序上——与依赖内容无关，属于纯 API 误用。
+                        迷惑性：报错信息里只有 "Requirement"，看不出是"conan 依赖对象的键"
+                        还是业务代码里的某个自定义类；且报错发生在 build() 早期，
+                        容易误判为依赖图/环境问题。
+affected_scope:         所有在 conanfile.py 里遍历 self.dependencies（.build/.host/.direct_host
+                        等）并对其 items()/keys() 做排序、min/max、或当字符串比较的配方。
+                        凡"把 Requirement 当 str 用"的写法都会踩。
+verification_cmd:       python3 -c "import conan,os;print(conan.__file__)"
+                        # 再查 conan/internal/model/dependencies.py 的 UserRequirementsDict.items()
+rec_priority:           1
+rec_approach:           sort-by-require-ref-name
+rec_description:        需要确定性顺序时，先取出重名再排：
+                          _items = []
+                          for _req, _dep in self.dependencies.build.items():
+                              _name = getattr(getattr(_req, "ref", None), "name", None) or str(_req)
+                              _items.append((_name, _dep))
+                          for _name, _dep in sorted(_items, key=lambda kv: kv[0]): ...
+                        即以 `require.ref.name` 作为排序键；不要直接把 Requirement 丢给 sorted()。
+rec_command:            sorted(((r.ref.name, d) for r, d in self.dependencies.build.items()), key=lambda kv: kv[0])
+rec_auto_fix:           true
+rec_impl:               recipe-pattern
+
+fallback_priority:      2
+fallback_approach:      avoid-sorting-entirely
+fallback_description:   若顺序无关，直接遍历 self.dependencies.build.items()，不做任何排序；
+                        conan 内部用 OrderedDict，本身有稳定顺序。
+fallback_command:       for _req, _dep in self.dependencies.build.items(): ...
+fallback_auto_fix:      true
+fallback_impl:          recipe-pattern
+
+forbid_1_pattern:       对 self.dependencies.*.items()/keys()/values() 直接 sorted()/min()/max()
+forbid_1_reason:        键为 Requirement 对象，无比较运算符；排序必然抛 TypeError
+forbid_1_consequence:   build() 在遍历依赖处即失败，整轮 CI 报错，且报错文本易于误判
+forbid_2_pattern:       把 Requirement 当字符串比较或拼接（如 if _name == "pytest" 而 _name 实为对象）
+forbid_2_reason:        静默逻辑错误：比较恒为 False，依赖筛选形同失效（不抛异常，更难发现）
+forbid_2_consequence:   依赖注入/筛选静默失效，与"依赖缺失"症状混淆
+
+principles:               
+conflicts_with:
+prerequisite_of:
+doc_file:               knowledge/drafts/DRAFT-conan-dependencies-keys-are-requirement-objects.md
+last_updated:           2026-10-02
+source_event:           archives/g/greenlet/3.5.6（PR #10408 第 1 轮 CI：sorted(dependencies.build.items()) 抛 TypeError）
+authors:                AtomCode <noreply@atomgit.com>
+source_pr:              10408
+source_commit:          6e950b428
+metrics_success_count:  0
+metrics_fail_count:     1
+metrics_confidence:     0.95
+

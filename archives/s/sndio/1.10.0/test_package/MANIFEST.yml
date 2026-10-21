@@ -1,0 +1,30 @@
+# test_package/MANIFEST.yml
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: sndio/1.10.0
+homepage: "https://sndio.org"
+
+# 上游测试：sndio 1.10.0 的 tarball 不含 regress/ 目录，没有任何上游测试
+# 入口 —— 0/0 如实。OHOS CI 执行本 test_package：
+#   test_sndio.c      C 消费者契约测试（24 个公开符号 + sio_initpar 哨兵 +
+#                     sio_open/sioctl_open/mio_open 对缺失设备的 NULL 返回）
+#   conanfile.py      构建期包校验（安装布局 / ELF 动态段纯 Python 解析验
+#                     裸 soname 与 DT_SONAME / sndio.pc 可重定位 /
+#                     aucat -n 离线真实数据通路 / 四个 CLI 实跑）
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests: 0
+
+test_package_tests:
+  - file: test_sndio.c
+    description: "C 消费者：链接 sndio::sndio 后 24 个公开入口符号全部解析；sio_initpar() 全字段 ~0u 且 __magic 真实写入；sio_open/sioctl_open/mio_open 对不存在设备返回 NULL；公开 mode 常量与 sndio.h 一致"
+    command: "由 CMakeLists.txt 构建为 test_sndio，由 conanfile.py 执行"
+  - file: conanfile.py
+    description: "构建期校验：安装布局（头文件/pkg-config/4 个 CLI/3 个 .so）；ELF DT_NEEDED=libsndio.so.7 无构建路径；libsndio.so.7.3 的 DT_SONAME=libsndio.so.7；sndio.pc 可重定位且 -lsndio；aucat -n 离线 raw s16 播放→录制（16000 B 进/出、非静音）；四个 CLI 执行并打印 usage"
+    command: "conan create . --user=ohpcd --channel=stable -pr:h=ohos-aarch64"
+
+# 7 条 C 断言 + 24 条构建期断言；另 1 条环境相关检查（pkg-config 版本查询）
+# 在无该二进制的 worker 上显式记为 SKIP，不计入通过
+assertion_count: 31

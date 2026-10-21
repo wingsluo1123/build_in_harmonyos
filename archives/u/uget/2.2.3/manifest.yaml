@@ -1,0 +1,90 @@
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/2.2.3/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "2.2.3"
+
+# 软件名
+software: "uget"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-17"
+build_system: autotools
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://downloads.sourceforge.net/project/urlget/uget%20%28stable%29/2.2.3/uget-2.2.3-1.tar.gz"
+
+  # 源码校验和
+  sha256: "11356e4242151b9014fa6209c1f0360b699b72ef8ab47dbeb81cc23be7db9049"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表
+  configure_options:
+    - "--disable-nls"
+    - "--disable-notify"
+    - "--disable-gstreamer"
+    - "--disable-appindicator"
+    - "--disable-rss-notify"
+    - "(pkg-config deps via PkgConfigDeps: gtk+-3.0, glib-2.0, libcrypto; curl via curl-config wrapper)"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - glib/2.84.0.1
+    - gtk/3.24.43
+    - curl/8.15.0
+    - openssl/3.5.6.1
+    - zlib/1.3.1.1
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-configure-l10n-tools-optional.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "官方 tarball 自带 configure 且无 AC_CANONICAL_HOST，--host 仅供工具前缀查找，config.guess/sub 不参与"
+  - "AC_PROG_INTLTOOL/AM_GLIB_GNU_GETTEXT 在 --disable-nls 下仍硬性探测 intltool/gettext/perl，需补丁降级为告警"
+  - "AM_GLIB_GNU_GETTEXT 宏内嵌无条件 USE_NLS=yes 会覆盖 --disable-nls（glib-gettext 宏 bug），po/Makefile 走 all-yes 在 GMSGFMT 为空时报 '-o: command not found' Error 127；补丁移除该行后 po/ 走 all-no 空目标"
+  - "uget 以 curl-config 探测 libcurl（非 pkg-config），需从 curl cpp_info 合成 wrapper（castget 先例）"
+  - "ohpcd openssl 只发 openssl.pc，uget 查询 libcrypto 需手写 libcrypto.pc overlay（gcli 先例）"
+  - "uget/Makefile.am 的 libuget_a_CFLAGS 缺 @CURL_CFLAGS@/@LIBCRYPTO_CFLAGS@（上游假定系统头在默认路径），用 generate() 全局 tc.extra_cflags 注入 curl/openssl include"
+  - "ui-gtk/UgtkBanner.h 的 struct UgtkBanner {...} banner; 在每个包含它的 TU 泄漏全局变量定义，clang 15 默认 -fno-common 报 17 处 duplicate symbol，加 -fcommon（aris/2.2 先例）"
+  - "交叉容器 guest libc 是 stock musl，缺 OHOS 特有 fortified 符号（__fd_chk/__memcpy_chk），执行 aarch64 二进制报 relocation 错误；上游测试用 can_run() 门控：原生 CI 真机真跑、交叉容器如实记 SKIP（lcdproc/0.5.9 §8 先例）"
+  - "uget-gtk --version/--help 在 gtk_init 之前处理，可无头运行（ui-gtk/UgtkApp-main.c:253-289）"

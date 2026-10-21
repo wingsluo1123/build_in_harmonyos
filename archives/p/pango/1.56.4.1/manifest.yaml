@@ -1,0 +1,25 @@
+software: pango
+version: "1.56.4.1"
+build_system: meson
+status: published
+build_date: "2026-10-18"
+source:
+  url: "https://download.gnome.org/sources/pango/1.56/pango-1.56.4.tar.xz"
+  sha256: "17065e2fcc5f5a5bdbffc884c956bfc7c451a96e8c4fb2f8ad837c6413cb5a01"
+knowledge_gained:
+  - "pango xft 后端开启需要 libxft/2.3.8 + fontconfig override"
+  - "pangoxft 的 alias-pc 版本回退为 0（pango.pc 不在 generators 目录），不影响构建"
+  - "OHOS 本机即 arm64 运行环境：交叉编译产物原生可运行，测试不应跳过；运行失败的真因需实验定位而非推断"
+  - "OHOS 加载器对缓存路径 so 要求有效 .codesign 签名：签名无效报 EACCES；无签名段与 selfSign 均可通过；无效签名库可复制后剥旧签名再 binary-sign-tool selfSign 修复"
+  - "libxft 预编译包二进制 DT_NEEDED libxml2.so.16 但零 xml 符号引用（构建污染）且 conan 图无 libxml2，需 patchelf --remove-needed 修复后方可运行"
+  - "libthai conan 包 prefix 空导致内嵌 //share/libthai 不可达，运行时需 LIBTHAI_DICTDIR 指向包内 share/libthai"
+  - "conan 依赖 cpp_info.libdirs 可能是相对路径（lib）或空（components 结构），运行时闭包需绝对化并展开 components"
+dependencies:
+  - "glib/2.84.0.1"
+  - "harfbuzz/14.4.0.1"
+  - "fribidi/1.0.16"
+  - "cairo/1.18.4"
+  - "fontconfig/2.18.3.3"
+  - "freetype/2.14.3"
+  - "libthai/0.1.29"
+  - "libxft/2.3.8"

@@ -1,0 +1,57 @@
+# conandata.yml — freecell-solver 6.16.0
+# 源码与补丁的唯一事实来源；conanfile.py 通过 self.conan_data 读取。
+
+sources:
+  url: "https://downloads.sourceforge.net/project/fc-solve/fc-solve/freecell-solver-6.16.0.tar.xz"
+  filename: "freecell-solver-6.16.0.tar.xz"
+  sha256: "71b8882e68f1be62529069018d0c732b75078669077c96348279575849f34313"
+
+# 发行 tarball 不附带 rinutils；上游 cmake/rinutils_bootstrap.cmake 期望
+# 头文件位于 <源码根>/rinutils/rinutils/include，由 source() 定点铺设。
+additional_sources:
+  rinutils:
+    url: "https://codeload.github.com/shlomif/rinutils/tar.gz/refs/tags/0.6.0"
+    # codeload 直链无压缩后缀，显式给 filename 否则 conan 按 zip 误判
+    # （fdm/2.2 同款坑）。
+    filename: "rinutils-0.6.0.tar.gz"
+    sha256: "81966e7f73a9a8e095dd06c159cfb8dd0da2b78942ba83b323d7ff59f74800cf"
+
+patches:
+  # 补丁均在 self.source_folder 用 -p1 应用（补丁头为 a/fc-solve/source/...，
+  # 即上游仓库中 CMake 工程的真实位置）。
+  - patch_file: "patches/0001-cmake-relax-moo-python-build-requirements.patch"
+    patch_description: >-
+      Drop the build-time Moo CPAN requirement, downgrade the optional
+      Python module checks to warnings and add an option to skip the
+      Perl test harness (its CPAN modules are absent on OHOS)
+    patch_type: "portability"
+  - patch_file: "patches/0002-t-build-cmocka-tests-via-cmake-package.patch"
+    patch_description: >-
+      Find cmocka through its CMake package (cmocka::cmocka) instead of
+      pkg-config and register the five upstream C test programs with CTest
+    patch_type: "portability"
+  - patch_file: "patches/0003-scripts-gen-c-lookup-files-plain-perl.patch"
+    patch_description: >-
+      Replace the Moo-based emitter in gen-c-lookup-files.pl with a
+      plain-Perl class (Moo is not available on OHOS)
+    patch_type: "portability"
+  - patch_file: "patches/0004-scripts-gen-presets-no-template-toolkit.patch"
+    patch_description: >-
+      Generate the presets header with strict string substitution instead
+      of Template Toolkit (not available on OHOS)
+    patch_type: "portability"
+  - patch_file: "patches/0005-t-generate-card-tests-no-template-toolkit.patch"
+    patch_description: >-
+      Generate the card-test C sources without Template Toolkit, probing
+      the implicit_t feature from the generated fcs_back_compat.h
+    patch_type: "portability"
+  - patch_file: "patches/0006-cmake-find-libm-in-compiler-sysroot.patch"
+    patch_description: >-
+      Search libm in the compiler implicit link directories (the OHOS
+      sysroot libm.a lives outside CMake's default prefixes)
+    patch_type: "portability"
+  - patch_file: "patches/0007-cmake-skip-git-submodule-for-vendored-rinutils.patch"
+    patch_description: >-
+      Skip the git clone of rinutils when the packaged headers are already
+      vendored next to the sources (release tarball is not a git checkout)
+    patch_type: "portability"

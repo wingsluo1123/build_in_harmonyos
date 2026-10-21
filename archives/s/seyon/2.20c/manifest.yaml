@@ -1,0 +1,33 @@
+# 版本级 manifest — seyon 2.20c（ARCHIVE-SPEC v3.0，交叉校验元数据，CI 不依赖）
+
+version: "2.20c"
+status: built
+build_date: "2026-10-19"
+conan_ref: "seyon/2.20c"
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/s/seyon/seyon_2.20c.orig.tar.gz"
+  sha256: "f221699ac420e55f0d769d4c50699a7e1552132cafe2a65192c3f3f090ca9048"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options: []
+  dependencies:
+    - libx11/1.8.13
+    - libxaw/1.0.14
+    - libxmu/1.3.1.1
+    - libxt/1.3.1
+    - libxext/6.4.0.1
+  cc: clang
+
+patches_applied:
+  - "0001-separse-y-bison-multiline-strings.patch"
+  - "0002-getline-rename-and-usleep-decl.patch"
+
+knowledge_gained:
+  - "bison>=3.0 会解析 yacc 文件尾声；SeParse.y 的 #ifdef TEST 尾声含多行字符串字面量会导致 'missing quote' 报错，需用续行符拼接（Debian 同款修法）"
+  - "OHOS libc 的 <unistd.h>/<stdio.h> 已声明 usleep()/getline()，与 SeDecl.h 的 K&R 原型冲突；本地 getline 需重命名为 seyon_getline"
+  - "1993 年代码依赖 -fcommon：SeDial.c 与 SeTrans.c 都有 mlw 的暂定定义，clang/lld 默认 -fno-common 会报重复符号"
+  - "上游只有 Imakefile，配方需生成 Makefile 重写编译/链接命令行"
+  - "OHOS ELF 需 binary-sign-tool 自签，llvm-readelf -SW 断言恰 1 个 .codesign 段"

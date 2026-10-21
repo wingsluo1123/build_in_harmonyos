@@ -1,0 +1,57 @@
+# test_package/MANIFEST.yml
+# Upstream test declaration for juke 0.7 (verified against source tarball)
+
+package: juke/0.7
+homepage: "https://freshports.org/audio/juke"
+
+# Upstream has no executable test suite: only the automake default empty
+# check target exists (check: check-recursive / check-am: all-am).
+# Intentionally NOT wired into build(): empty commands + in-build false
+# (libofa/0.9.3 no-tests wiring). Audit below documents the dry-run probe.
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# No upstream test programs (upstream_tests_exist: false)
+upstream_tests: []
+
+# Consumer end-to-end flows in test_package (each HC-N case runs setup ->
+# execute -> verify against the packaged bin/juke with real fixtures)
+test_package_tests:
+  - file: test.c
+    category: "harmonyos-specific consumer use case"
+    description: "Compiled consumer driver test_juke (POSIX fork/pipe/select, no ncurses): builds HOME/.juke.conf + multi-level music library fixtures, then runs 4 named end-to-end flows against bin/juke -- HC-1 usage_flow (no args -> usage, non-zero exit), HC-2 invalid_dir_flow (bad dir -> No valid directories), HC-3 library_scan_flow (real library with 3 audio formats + 1 decoy passes config/scan/queue stages), HC-4 multi_tree_flow (library dir + empty dir, both trees accepted)"
+    command: "test_juke <package>/bin/juke (HC-1..HC-4)"
+  - file: conanfile.py
+    description: "Conan test() compiles test_juke by invoking the resolved CC directly (no CMake: stock CMake cannot consume the HarmonyOS platform file) then runs it through self.run (lITERAL self.run gate), re-executes bin/juke via self.run, and emits HMBS evidence markers (test_package discovered=4 + upstream no_tests/0)"
+    command: "conan test test_package"
+
+# 4 named HarmonyOS-specific end-to-end consumer flows (HC-1..HC-4),
+# 9 assertions total (HC-1:2 + HC-2:3 + HC-3:2 + HC-4:2)
+harmonyos_specific_test_count: 4
+test_package_test_count: 4
+assertion_count: 9
+
+# HMBS preflight gate fields: upstream test audit conclusion
+upstream_tests_exist: false
+upstream_test_audit:
+  source_tarball: "juke-0.7.tar.gz"
+  source_sha256: "b19d6bb46ece9f47b07bcd52e371b447fbef580ffb9ded59257305962f47cae0"
+  source_size: 64103
+  top_level_files:
+    - configure.in    # AC_INIT + AM_INIT_AUTOMAKE + AC_CHECK_LIB(ncurses); no test macros
+    - Makefile.am     # SUBDIRS = src doc; no TESTS / check_PROGRAMS / check-local
+    - src/Makefile.am # bin_PROGRAMS = juke + juke_SOURCES; no TESTS / check_PROGRAMS
+    - src/*.c         # conf/dir/err/juke/mem/player/queue/tui; no TEST()/TEST_F, no test sources
+    - doc/Makefile.am # installs juke.1 man page only
+  scanned_for:
+    - "TESTS / check_PROGRAMS / check-local targets in Makefile.am files"
+    - "tests/ / test/ directories"
+    - "test/check source files (find . -name '*test*' / '*check*')"
+    - "configure.in test macros"
+    - "make -n check expansion"
+  scan_result: "0 matches: no tests/ dir (45 files total, see tarball listing); no TESTS/check_PROGRAMS in Makefile.am/src/Makefile.am; no test sources; make -n check expands to automake default empty target only"
+  make_check_output: "make -n check expands to automake default empty target (check: check-recursive / check-am: all-am); make check executes 0 cases, exit 0"
+  reason: "juke 0.7 is a curses jukebox tool; pkgsrc audio/juke Makefile has no check/test target, Debian juke_0.7 has no test records, FreeBSD port has no test declaration; tarball audit confirms no executable test suite, only the automake default empty check target"
+upstream_test_total: 0
+upstream_test_count_method: autotools_tests

@@ -1,0 +1,61 @@
+software: krunner5
+version: "5.116.0"
+status: built
+build_system: cmake
+created_at: 2026-10-16
+build_date: "2026-10-16"
+dependencies:
+  required:
+    - qt5-qtbase/5.15.2.2
+    - qt5-qtdeclarative/5.15.2
+    - kconfig5/5.116.0
+    - kcoreaddons5/5.116.0.1
+    - ki18n5/5.116.0
+    - threadweaver5/5.116.0
+  build:
+    - ecm/6.26.0
+  optional: []
+patches_applied: []
+test_results:
+  type: passed
+  upstream: >-
+    passed: ctest registers 6 upstream test targets (autotests/ via ECM
+    ecm_add_tests: runnermatchmethodstest, runnermanagerhistorytest,
+    testmetadataconversion, dbusrunnertest, runnermanagersinglerunnermodetest,
+    runnermanagertest) holding 27 QTest slots at the
+    EXCLUDE_DEPRECATED_BEFORE_AND_AT=5.91.0 tier; runnercontexttest is not
+    registered (VERSION_LESS 5.76.0 guard, links KF5::KIOCore). Images that
+    provide dbus-run-session + dbus-daemon run all 6 suites under a private
+    session bus; the validation image provides neither, so the 3 bus-free
+    suites (runnermatchmethodstest 4 slots, runnermanagerhistorytest 4 slots,
+    testmetadataconversion 1 slot) ran 3/3 targets (100%, 9 slots), and the 3
+    session-bus suites (dbusrunnertest 9 slots,
+    runnermanagersinglerunnermodetest 6 slots, runnermanagertest 3 slots — 18
+    slots total) were excluded with ctest -E and are declared as NOT executed
+    on this image.
+  test_package: >-
+    passed: 31/31 assertions in test_package/test.cpp — KPluginMetaData-driven
+    AbstractRunner subclass, the full match() -> RunnerContext::addMatch() ->
+    matches() round trip, QueryMatch value semantics (isValid, copy, operator<
+    by relevance) including the upstream setId() "<runnerId>_<id>" composition
+    for default runners, RunnerContext::matchesChanged, addMatches() bulk add,
+    and RunnerSyntax construction (including the upstream ":q:" ->
+    term-description rewrite at storage time) — plus the HarmonyOS-specific
+    checks (unversioned DT_SONAME, DT_RUNPATH present,
+    .codesign section on the packaged ELF).
+  full_reference: "krunner5/5.116.0@ohpcd/stable"
+  l0: "pass: all checks passed"
+  l1: "pass: upstream tests + test_package executed"
+  l2: "pass: skip (no bin/ dir — pure library package)"
+  l4: "pass: skip (no cache path)"
+  l5: "pass: skip (no cache path)"
+source_url: https://download.kde.org/stable/frameworks/5.116/krunner-5.116.0.tar.xz
+source_sha256: b87fb29e4354acb21f085b7978c7f1f49f41766a1d4f98fc86781fb9884a0841
+knowledge_gained:
+  - "EXCLUDE_DEPRECATED_BEFORE_AND_AT=5.91.0 is the load-bearing knob for krunner5 on a KF5 chain without KF5::Service/Plasma/KIOCore: the KF5-5.116 source guards both the find_package(KF5KIO/KF5Service/KF5Plasma) calls (root CMakeLists.txt) and the KF5::Service/Plasma/KIOCore link block (src/CMakeLists.txt) with EXCLUDE_DEPRECATED_BEFORE_AND_AT VERSION_LESS 5.91.0, and the generated export header flips the KRUNNER_ENABLE_DEPRECATED_SINCE(5, 91) header guards to the KPluginFactory branch, so kservice never enters the dependency graph."
+  - "The Qt5 Quick supply on this chain is a split: qt5-qtdeclarative ships the Qt5Qml/Qt5Quick libraries and headers but no lib/cmake. The fix is an aggregate hand-written Qt5Config.cmake shim (first on CMAKE_PREFIX_PATH) that preloads the native qt5-qtbase per-module configs with NO_DEFAULT_PATH, plus a CMakeDeps entry naming the generated qt5-qtdeclarative config Qt5Qml (cmake_file_name) with Qt5::Quick forwarded to Qt5::Qml as an INTERFACE target."
+  - "Upstream gap: src/CMakeLists.txt links KF5::I18n PUBLIC into KF5::Runner, but the installed KF5RunnerConfig.cmake does not find_dependency(KF5I18n) (upstream applications find I18n themselves), so every consumer must find_package(KF5I18n) explicitly to resolve the link interface."
+  - "QueryMatch::setId() composes the runner id with the given id (\"<runnerId>_<givenId>\") unless the runner enables the unique-results property (querymatch.cpp); the consumer-visible id therefore carries the runner-id prefix for default runners."
+  - "RunnerSyntax rewrites the \":q:\" placeholder into the localized term description (\"<search term>\") at storage time (runnersyntax.cpp addExampleQuery), so exampleQueries() never returns \":q:\" verbatim."
+  - "KRunner's 3 session-bus test suites must be excluded with ctest -E using the REGISTERED ctest names — note runnermanagersinglerunnermodetest (single+runnermode), not any shorthand; on images with dbus-run-session + dbus-daemon the suites instead run under a private bus (dbus-run-session -- ctest). The OHOS PC validation image has neither tool, so the bus-free branch is the real-device path."
+  - "The OHOS toolchain maps os=OHOS to CMAKE_SYSTEM_NAME=HarmonyOS (no UNIX, cross-compiling); forcing CMAKE_SYSTEM_NAME=Linux restores UNIX=1 and ECM's non-cross test registration (chain-wide convention, threadweaver5/kcoreaddons5 precedent)."

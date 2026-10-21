@@ -1,0 +1,98 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,19 +1,23 @@
+ # CMake configuration for ECOS
+ 
+ cmake_minimum_required(VERSION 3.5)
+ 
+ project(ecos
+-        VERSION 2.0.8
++        VERSION 2.0.10
+         LANGUAGES C)
+ 
++include(GNUInstallDirs)
++
+ # Options
++option(BUILD_SHARED_LIBS "Build shared libraries" ON)
++option(ECOS_BUILD_TESTS "Build upstream tests" ON)
+ option(USE_LONG "Whether to use Long or Int for index type." ON)
+ 
+ # Set compiler flags
+ set(DEBUG_OPTIONS "")
+ set(RELEASE_OPTIONS "")
+ 
+ if(MSVC)
+     list(APPEND DEBUG_OPTIONS "/Od" "/Wall")
+     list(APPEND RELEASE_OPTIONS "/O2")
+ else()
+@@ -70,42 +74,42 @@
+     "${CMAKE_CURRENT_SOURCE_DIR}/src/splamm.c"
+     "${CMAKE_CURRENT_SOURCE_DIR}/src/timer.c"
+     "${CMAKE_CURRENT_SOURCE_DIR}/src/wright_omega.c"
+ 
+     # ECOS BB
+     "${CMAKE_CURRENT_SOURCE_DIR}/ecos_bb/ecos_bb.c"
+     "${CMAKE_CURRENT_SOURCE_DIR}/ecos_bb/ecos_bb_preproc.c"
+ )
+ 
+ # ECOS library
+-add_library(ecos SHARED ${ecos_headers} ${ecos_sources})
++add_library(ecos ${ecos_headers} ${ecos_sources})
+ 
+ # Set compiler options and definitions
+ target_compile_options(ecos PRIVATE "$<$<CONFIG:DEBUG>:${DEBUG_OPTIONS}>")
+ target_compile_options(ecos PRIVATE "$<$<CONFIG:RELEASE>:${RELEASE_OPTIONS}>")
+ target_compile_definitions(ecos PUBLIC CTRLC=1)
+ if(USE_LONG)
+     target_compile_definitions(ecos PUBLIC LDL_LONG DLONG)
+ endif()
+ 
+ # Link math library
+ if(NOT MSVC)
+     target_link_libraries(ecos PRIVATE m)
+ endif()
+ 
+ target_include_directories(ecos
+     PUBLIC 
+     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/amd/include>"
+     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/ldl/include>"
+     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/external/SuiteSparse_config>"
+-    "$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${CMAKE_INSTALL_INCLUDEDIR}/ecos>"
++    "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ecos>"
+ )
+ 
+ # Installation
+ include(GNUInstallDirs)
+ 
+ install(TARGETS ecos
+         EXPORT  ${PROJECT_NAME}
+         ARCHIVE       DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+         LIBRARY       DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+         RUNTIME       DESTINATION "${CMAKE_INSTALL_BINDIR}"
+@@ -128,10 +132,25 @@
+ 
+ install(EXPORT ${PROJECT_NAME}
+         FILE ecos-targets.cmake
+         NAMESPACE ecos::
+         DESTINATION ${ConfigPackageLocation}
+ )
+ 
+ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/ecos-config.cmake
+         DESTINATION ${ConfigPackageLocation}
+ )
++
++# Preserve and run both upstream suites; never install test binaries.
++if(ECOS_BUILD_TESTS)
++    enable_testing()
++    add_executable(ecostester test/ecostester.c
++        test/generated/qcml_utils.c test/generated/norm/norm.c
++        test/generated/sq_norm/sq_norm.c test/generated/sum_sq/sum_sq.c
++        test/generated/quad_over_lin/quad_over_lin.c test/generated/inv_pos/inv_pos.c)
++    target_include_directories(ecostester PRIVATE test test/generated)
++    target_link_libraries(ecostester PRIVATE ecos)
++    add_test(NAME upstream-core COMMAND ecostester)
++    add_executable(ecos_bb_test test/bb_test.c)
++    target_link_libraries(ecos_bb_test PRIVATE ecos)
++    add_test(NAME upstream-bb COMMAND ecos_bb_test)
++endif()

@@ -1,0 +1,49 @@
+software: rtkit
+version: "0.14"
+homepage: "https://gitlab.freedesktop.org/pipewire/rtkit/"
+license: GPL-3.0-or-later
+status: built
+build_system: meson
+build_date: "2026-10-15"
+
+source:
+  url: "https://gitlab.freedesktop.org/pipewire/rtkit/-/archive/v0.14/rtkit-v0.14.tar.gz"
+  sha256: "55dd379b11f52b81655e2dc676de9d602d050cb0beb18ef01f0f65569f0a5e59"
+
+patches_applied: []
+
+requires:
+  - dbus/1.14.10
+  - libcap/2.69
+
+# 上游测试口径 —— 2026-10-16 复核更正（前版记 N=0，与上游文件树实测不符，属少报）。
+# 对上游 tarball rtkit-v0.14.tar.gz 逐项清点，文件名含 test 的测试程序恰好 1 个：
+#   $ tar tzf rtkit-v0.14.tar.gz | grep -i test
+#   rtkit-v0.14/rtkit-test.c          ← 仅此 1 项
+# 上游 meson.build 未注册任何 test() 目标（无自动化套件、无 meson test/ctest 驱动），
+# 但该测试程序本身是上游用例 → N = 1，不取 0。
+# N′ = 1：-Dinstalled_tests=true（上游默认）把它安装到
+#   libexec/installed-tests/rtkit/rtkit-test，本适配在鸿蒙真机上对其原样执行
+#   （device-test/run-device-test.sh 第 3 步，rc=0），完整转录见 reports/device-test.log。
+test_results:
+  type: upstream
+  upstream_command: "libexec/installed-tests/rtkit/rtkit-test（上游无 test() 注册、无 meson test 驱动，真机原样执行）"
+  total: 1
+  passed: 1
+  failed: 0
+  timeout: 0
+  skipped: 0
+  note: "N=1 = 上游源码树唯一测试程序 rtkit-test.c（上游 meson.build 无 test() 目标、无 tests/ 目录；installed_tests 只安装该程序，故上游无自动化套件）。N′=1：真机原样执行 rc=0，其中 3 项 daemon 属性读取全部通过且与 daemon 默认值逐字一致（MaxRealtimePriority=20 / MinNiceLevel=-15 / RTTimeUSecMax=200000ns）。程序内 2 项提权调用返回 I/O error，属环境限制而非实现缺陷：本机无 org.freedesktop.PolicyKit1 授权服务，且进程无 CAP_SYS_NICE、RLIMIT_RTPRIO 硬限为 0（rtkit-daemon.c:1322 在无 polkit owner 时即返回 -ENOENT，先于内核能力检查；见 notes.md §5.1/§5.2）。"
+  test_package_assertions: 4
+
+device_test:
+  script: "device-test/run-device-test.sh"
+  description: "鸿蒙 PC 真机端到端：rtkit 客户端库 → 私有 D-Bus 系统总线 → rtkit-daemon → 回包"
+  scope: "D-Bus 服务端到端链路（daemon 启动并注册服务名 + 3 项属性读取 + rtkitctl 4 个控制命令）"
+  not_verified: "SCHED_RR / 负 nice 提升的实际生效——本机无 org.freedesktop.PolicyKit1 授权服务、进程无 CAP_SYS_NICE、RLIMIT_RTPRIO 硬限为 0（详见 notes.md §5.1/§5.2）"
+  result: "passed"
+
+test_package:
+  assertion_count: 4
+  description: "执行安装后的二进制：aarch64 ELF 可装载、rtkit-daemon/rtkitctl 的 CLI 契约、非 root 启动门禁生效。"
+  note: "第 4 条（非 root 拒绝）在 root 环境下按设计跳过；本机实测 uid=20020085，4 条全部执行。自动化路径仅覆盖契约层，功能面覆盖见 device_test（需外部 dbus-daemon）。"

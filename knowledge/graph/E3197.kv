@@ -1,0 +1,68 @@
+# ═══ Draft knowledge entry — 上游测试断言写死 JDK 厂商版本串/平台名致 OpenJDK 系假失败 ═══
+# Timestamp: 2026-09-30（修订自 DRAFT-14403-junit-oracle-version-string-vendor-assumption，按 Curator 审计去版本化并对齐 _template.kv）
+# Software 规则化：所有在 OpenJDK 系 JDK 上执行"Oracle JDK 时代"上游测试的 Java 工程（案例：zt-exec 1.12）
+# Gate: conan create build() surefire
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E3197
+trigger_tool:           java|maven|junit
+phase:                  testing
+error_signature:        AssertionError: Expected exception|openjdk version|os\.name[^\n]*(HarmonyOS|Linux)
+
+# ═══ Layer 1: 识别层 ═══
+severity:               3
+category:               ohos, portability, java, testing, jdk
+match_keywords:         java version, openjdk version, oracle jdk, junit,
+                        Expected exception, Assume, SystemUtils, os.name,
+                        HarmonyOS, bishengjdk, surefire, 测试可移植性
+title: 上游测试断言/分支写死 Oracle JDK 版本串或平台名时 OpenJDK 系 JDK（BiSheng）假失败：厂商中性扩展匹配补丁修复 + Assume 平台守卫跳过按设计内辨析（openjdk version / os.name=HarmonyOS，zt-exec 1.12 案例）
+
+# ═══ Layer 2: 诊断层 ═══
+root_cause: 两类厂商假设——①版本串：Oracle JDK `java -version` 首行输出
+  "java version"，OpenJDK 系（BiSheng/Temurin 等）输出 "openjdk version"，
+  测试以字面 "java version" 作触发条件/断言时条件永假（预期异常不触发、
+  字符串断言失败）；②平台名：bisheng JDK 在 OHOS 上 os.name=HarmonyOS
+  （非 Linux/Mac/Windows），SystemUtils.IS_OS_LINUX 等分支与 JUnit Assume
+  守卫走向与上游 CI 不同的路径。
+affected_scope: 所有在 OpenJDK 系 JDK（BiSheng/Temurin/Dragonwell 等）上执行
+  2013-2021 年代（Oracle 主导期）上游测试套件的 Java 工程；凡 surefire 用例
+  中 grep/contains 版本串前缀、或按 os.name 做分支/守卫的用例均受影响，症状
+  是"Expected exception ... AssertionError 类假失败 + 少量设计内 skip"。
+verification_cmd: java -version 2>&1 | head -1
+# ═══ Layer 3: 方案层 ═══
+rec_priority:           1
+rec_approach: vendor-neutral-version-string-broaden-patch
+rec_description: 最小测试可移植性补丁：把写死的厂商字面量扩展为厂商中性匹配
+  （"java version" || "openjdk version"），不改测试意图（异常传播/输出断言
+  语义在任何厂商下一致）；补丁以 patch_type: portability 进 conandata 可审阅；
+  Assume 守卫类 skip 如实报告为设计内跳过，不算失败也不算 NOT_RUN。
+rec_command: patch_ng.apply(0002-listener-throw-test-openjdk-version-string.patch)
+rec_auto_fix:           false
+rec_impl:               manual
+
+fallback_priority:      2
+fallback_approach: surefire-exclude-with-record
+fallback_description: 对无法厂商中性的用例用 surefire excludes/@Ignore 排除，
+  并在 manifest/交付报告逐条记录排除理由与上游用例数差值。弱化验证，仅在
+  扩展匹配不可行时使用。
+fallback_command: mvn -B package '-Dtest=!ProcessListenerThrowTest'
+fallback_auto_fix:      false
+fallback_impl:          manual
+
+forbid_1_pattern:       sed -i.*src/test|rm -r.*src/test
+forbid_1_reason: 对上游测试的就地 sed 修改/删除不经可审阅补丁，违反 P-PATCH-001
+  同源原则（测试也是"生成后不可再生"的受保护文件，修改必须以 portability
+  patch 呈现并记录理由）。
+forbid_1_consequence: 重新解包/换源后修改丢失，测试静默变弱或被删除且交付
+  报告与实际执行面不一致。
+
+# ═══ Layer 4: 原则挂钩 ═══
+principles:               
+# ═══ 关系图 ═══
+# ═══ 元数据 ═══
+doc_file:               knowledge/drafts/DRAFT-jdk-vendor-version-string-breaks-upstream-test-assertions.md
+last_updated:           2026-09-30
+source_event:           zt-exec/1.12 真机 CI run3（surefire 96 run / 2 failures
+  ProcessListenerThrowTest / 1 skipped InputRedirectTest）→ 补丁后 run4 起
+  96/0/1 + BUILD SUCCESS
+authors:               unknown

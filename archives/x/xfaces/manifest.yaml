@@ -1,0 +1,29 @@
+# 软件级 manifest — xfaces
+# 遵循 ARCHIVE-SPEC v2.0
+
+software: xfaces
+display: "xfaces"
+description: "X11 faces/mail 监视器：以图像网格显示邮箱变化（faces/X-Face/XBM/XPM 图像），支持 POP3 与邮件注记"
+category: utility
+homepage: "https://snapshot.debian.org/package/xfaces/"
+license: MIT
+
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "imake/Makefile.noimake 均不可用：配方按编译单元自写编译命令（myman 同款模式）"
+    - "X11 链接库全部来自制品仓 conan 包（libxaw 传递 libxt/libxmu/libxpm），无 vendored 库"
+    - "netaudio 音频后端裁剪（OHOS 无 libaudio）；XPM/SHAPE/XFACE/POP3 保留"
+    - "产物为单个 GUI 可执行文件，ELF 签名后入 bin/"
+  common_dependencies:
+    - libxaw
+    - libx11
+    - libxext
+    - compface
+
+versions:
+  "3.3":
+    status: published
+    build_date: "2026-10-17"
+    notes: "首次适配；上游无测试套件，test_package 以无效 DISPLAY 真实执行验证动态链接"

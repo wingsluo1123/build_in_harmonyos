@@ -1,0 +1,38 @@
+--- a/include/mar_streambuf_cpp.h
++++ b/include/mar_streambuf_cpp.h
+@@ -313,33 +313,33 @@
+             if (base_type::gptr() < base_type::egptr())
+                 return char_traits_type::to_int_type(*base_type::gptr());
+ 
+             char_type* pback = savepback();
+             char_type* gbase = buffer_.gbase();
+             ssize_type len(ioread(gbase, buffer_.gsize()));
+ 
+             if (-1 == len || 0 == len)
+                 return char_traits_type::eof();
+ 
+-            setg(pback, gbase, gbase + len);
++            base_type::setg(pback, gbase, gbase + len);
+             return char_traits_type::to_int_type(*base_type::gptr());
+         }
+         int_type
+         overflow(int_type c = char_traits_type::eof())
+         {
+             if (!setout() || -1 == syncout())
+                 return char_traits_type::eof();
+ 
+             if (char_traits_type::eq_int_type(c, char_traits_type::eof()))
+                 return char_traits_type::not_eof(c);
+ 
+-            return sputc(c);
++            return base_type::sputc(c);
+         }
+         pos_type
+         seekoff(off_type off, std::ios_base::seekdir way,
+                 std::ios_base::openmode which)
+         {
+             int whence;
+             switch (way) {
+             case std::ios_base::beg:
+                 whence = MAR_SET;
+                 break;

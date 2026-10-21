@@ -1,0 +1,41 @@
+#====================================================================
+# DRAFT — GitLab 仓库主页 URL 返回 HTML，须用 /-/archive/<tag> 归档地址
+#====================================================================
+
+id:                     E2464
+trigger_tool:           conan|curl|download
+phase:                  bootstrap|download|configuration
+error_signature:        下载内容是 HTML|<!DOCTYPE.*html|404 Not Found.*archive
+
+severity:               3
+category:               download, gitlab, source, url
+match_keywords:         gitlab, archive, /-/archive, download, HTML, tarball,
+                         sources.url, conandata, tag, v 前缀, init-build
+
+title:                  GitLab 源：仓库主页 URL 不能直接下载，须用 /-/archive/<tag> 归档地址（tag 常带 v 前缀）
+
+root_cause: |
+  GitLab 仓库主页 https://gitlab.com/<owner>/<repo> 返回 HTML 渲染页面，
+  不是压缩包；直接把它当 sources.url 会得到 "下载内容是 HTML"（init-build exit 3），
+  conan source() 也会失败。可下载的归档地址格式为
+  https://gitlab.com/<owner>/<repo>/-/archive/<tag>/<repo>-<tag>.tar.gz 。
+  且很多仓库的 release tag 带 v 前缀（如 v0.1.3）：不带 v 的 <tag> 探测返回 404，
+  带 v 的返回 200——版本号≠tag 名，不能想当然拼接。
+
+rec_approach: |
+  ①先用 GitLab API 拉 tag 列表确认真实 tag 名：
+  curl https://gitlab.com/api/v4/projects/<owner>%2F<repo>/repository/tags；
+  ②归档 URL 用 tag 全名（含 v 前缀）：
+  https://gitlab.com/<owner>/<repo>/-/archive/<tag>/<repo>-<tag>.tar.gz；
+  ③conandata.yml sources.url 必须用该归档地址（官方源、HTTPS，R39），
+  并在 sha256 核验通过后再进入下载/构建（gitlab 官方镜像已由 CI 自动加 fallback）。
+
+doc_file:               knowledge/drafts/DRAFT-ctd_cli-0.1.3-gitlab-archive-url.md
+last_updated:           2026-09-22
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               pc4-35
+affected_scope:         GitLab 源：仓库主页 URL 不能直接下载，须用 /-/archive/<tag> 归档地址（tag 常带 v 前
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        |

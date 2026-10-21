@@ -1,0 +1,24 @@
+id:                     E3315
+error_signature: kdump_open_fdset 成功后 checkattr/dumpdata 在 FUTEX 永久等待|test: 4: unexpected operator/operand 等伪失败后仍挂起|r03 45 项 wchan=do_rt_sigsuspend/FUTEX
+root_cause: src/kdumpfile 使用 pthread_rwlock（context.c rwlock_init），open.c uts_name_from_init_uts_ns()/update_linux_utsname() 采用"持锁->unlock->回调(get_symbol_val 内部 rdlock 同一把锁)->重取 wrlock"的放锁-重取模式；musl rwlock 的写者-读者唤醒顺序使同线程重入永久等待（父 sh do_rt_sigsuspend、子 checkattr FUTEX）。src/addrxlat 零锁，故未打开 dump 的 116 项全过、打开 dump 的 76 项全挂。
+rec_approach: rwlock-demote-to-recursive-mutex
+rec_command: |
+  # 在 src/threads.h 将 rwlock_* 退化为 PTHREAD_MUTEX_RECURSIVE 递归互斥锁：
+  #   typedef pthread_mutex_t rwlock_t; rwlock_rdlock=rwlock_wrlock=pthread_mutex_lock;
+  #   rwlock_unlock=pthread_mutex_unlock; rwlock_init 用 PTHREAD_MUTEX_RECURSIVE 属性。
+  # 效果：保留互斥语义、消除 musl rwlock 读写唤醒顺序依赖；A 配置(USE_PTHREAD=1)下
+  # 打开 dump 的 76 项全部转为通过（make check TOTAL 206/PASS 206/FAIL 0/ERROR 0/SKIP 0）。
+severity:               2
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E3315.md
+trigger_tool:           ctest
+phase:                  test
+category:               ohos, packaging
+match_keywords:         kdump_open_fdset, checkattr/dumpdata, FUTEX, 永久等待, test, unexpected
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        rwlock-demote-to-recursive-mutex

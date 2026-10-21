@@ -1,0 +1,89 @@
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 6c5af4a..001e4a5 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -25,6 +25,9 @@ install (FILES ${PROJECT_BINARY_DIR}/include/misc/api/version.hpp DESTINATION in
+ # We add the compilation options for the library
+ add_definitions (${plast-flags})
+ 
++# SIMDe ships the portable SSE intrinsics headers used by the x86 kernels.
++include_directories (${SIMDE_INCLUDE_DIR})
++
+ file (GLOB_RECURSE  LibraryFiles  ./*)
+ 
+ if (JNI_FOUND)
+diff --git a/src/algo/hits/gap/SmallGapHitIteratorSSE8.cpp b/src/algo/hits/gap/SmallGapHitIteratorSSE8.cpp
+index deb090f..bf3d8a1 100644
+--- a/src/algo/hits/gap/SmallGapHitIteratorSSE8.cpp
++++ b/src/algo/hits/gap/SmallGapHitIteratorSSE8.cpp
+@@ -19,15 +19,11 @@
+ 
+ #include <algo/hits/gap/SmallGapHitIteratorSSE8.hpp>
+ 
+-#if __SSE3__
+-    #include <pmmintrin.h>
+-#else
+-    #if __SSE2__
+-        #include <emmintrin.h>
+-    #else
+-        #warning error undefined __SSE3__ or __SSE2__
+-    #endif
+-#endif
++/* SIMDe provides the SSE intrinsics used below on every architecture (NEON on
++   aarch64, wasm SIMD, portable fallbacks, ...). Native aliases keep the _mm_*
++   names used by this file unchanged. */
++#define SIMDE_ENABLE_NATIVE_ALIASES
++#include <simde/x86/sse3.h>
+ 
+ using namespace std;
+ using namespace misc;
+diff --git a/src/algo/hits/ungap/UngapHitIteratorSSE16.cpp b/src/algo/hits/ungap/UngapHitIteratorSSE16.cpp
+index af1ec1c..14b8cb1 100644
+--- a/src/algo/hits/ungap/UngapHitIteratorSSE16.cpp
++++ b/src/algo/hits/ungap/UngapHitIteratorSSE16.cpp
+@@ -21,15 +21,11 @@
+ 
+ #include <algo/hits/ungap/UngapHitIteratorSSE16.hpp>
+ 
+-#if __SSE3__
+-    #include <pmmintrin.h>
+-#else
+-#if __SSE2__
+-    #include <emmintrin.h>
+-#else
+-    #warning error undefined __SSE3__ or __SSE2__
+-#endif
+-#endif
++/* SIMDe provides the SSE intrinsics used below on every architecture (NEON on
++   aarch64, wasm SIMD, portable fallbacks, ...). Native aliases keep the _mm_*
++   names used by this file unchanged. */
++#define SIMDE_ENABLE_NATIVE_ALIASES
++#include <simde/x86/sse3.h>
+ 
+ using namespace std;
+ using namespace misc;
+diff --git a/src/algo/hits/ungap/UngapHitIteratorSSE8.cpp b/src/algo/hits/ungap/UngapHitIteratorSSE8.cpp
+index dac0c44..49d07df 100644
+--- a/src/algo/hits/ungap/UngapHitIteratorSSE8.cpp
++++ b/src/algo/hits/ungap/UngapHitIteratorSSE8.cpp
+@@ -20,15 +20,11 @@
+ 
+ #include <algo/hits/ungap/UngapHitIteratorSSE8.hpp>
+ 
+-#if __SSE3__
+-    #include <pmmintrin.h>
+-#else
+-#if __SSE2__
+-    #include <emmintrin.h>
+-#else
+-    #warning error undefined __SSE3__ or __SSE2__
+-#endif
+-#endif
++/* SIMDe provides the SSE intrinsics used below on every architecture (NEON on
++   aarch64, wasm SIMD, portable fallbacks, ...). Native aliases keep the _mm_*
++   names used by this file unchanged. */
++#define SIMDE_ENABLE_NATIVE_ALIASES
++#include <simde/x86/sse3.h>
+ 
+ using namespace std;
+ using namespace misc;

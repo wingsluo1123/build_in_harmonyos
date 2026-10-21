@@ -1,0 +1,37 @@
+id:                     E3644
+title: "Asterisk 的 Opus 任务目标是格式属性模块，不是编解码器：按模块 ABI 打包 res_format_attr_opus.so"
+category:               ohos, autotools, asterisk, module-packaging, opus
+trigger_tool: configure|make|menuselect|asterisk-module
+phase: configuration|compilation|packaging|runtime
+error_signature: res_format_attr_opus.so not found|codec_opus.*not found|undefined reference.*opus_|module.*format.*attribute
+match_keywords: >
+  asterisk-opus, res_format_attr_opus, codec_opus, ast_format_interface,
+  AST_MODULE_INFO, Opus Format Attribute Module, MENUSELECT_RES,
+  format attribute, SDP fmtp, module ABI
+root_cause: >
+  Asterisk 22.10.1 的 Opus 支持分成不同职责：res/res_format_attr_opus.c
+  只注册 Opus 格式属性接口，解析/生成 SDP fmtp 并管理格式属性；它使用
+  Asterisk 内部 ast_format/astobj2/module API，不调用 libopus 编码器符号。
+  真正的 codec_opus 编解码实现是另一个模块/可选组件。把任务名
+  asterisk-opus 直接解释成 libopus 依赖，会导致错误的 requires、错误的
+  产物清单和错误的运行时成功标准。
+affected_scope: >
+  Asterisk 22.x 及同类按 res_*/codec_* 拆分功能的模块化构建；Conan
+  变体只交付一个内部模块而非完整 Asterisk 时尤其需要先确认源文件和
+  AST_MODULE_INFO 的职责。
+verification_cmd: >
+  conan create archives/a/asterisk-opus/22.10.1 --build=missing
+  -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64
+rec_priority: 1
+rec_approach: source-module-contract-first
+rec_auto_fix: false
+doc_file: knowledge/drafts/DRAFT-asterisk-opus-22.10.1-format-attribute-module-contract.md
+last_updated: 2026-10-03
+source_event: asterisk-opus/22.10.1 积分赛任务
+metrics_success_count: 0
+metrics_fail_count: 0
+metrics_confidence: 0.85
+severity:               2
+rec_impl:               manual
+authors:               unknown
+rec_description:        source-module-contract-first

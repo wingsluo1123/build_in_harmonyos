@@ -1,0 +1,38 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -3,6 +3,12 @@
+ set(KF_VERSION "6.28.0")
+ project(KSyntaxHighlighting VERSION ${KF_VERSION})
+ 
++# OHOS: the Conan/CMake toolchain may carry a lower C++ standard (profile
++# cppstd=17) that shadows library-only cache settings; indexer code uses
++# std::strong_ordering (C++20), so force the project standard here.
++set(CMAKE_CXX_STANDARD 20)
++set(CMAKE_CXX_STANDARD_REQUIRED ON)
++
+ find_package(ECM 6.28.0 REQUIRED NO_MODULE)
+ set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
+ 
+@@ -75,7 +81,6 @@
+ #
+ # Translations
+ #
+-ecm_install_po_files_as_qm(poqm)
+ 
+ # tell the framework if it shall use the syntax files from the resource
+ if (QRC_SYNTAX)
+@@ -95,10 +100,13 @@
+ # Actually build the stuff
+ #
+ include_directories(${CMAKE_CURRENT_BINARY_DIR})
++option(BUILD_EXAMPLES "Build example applications" ON)
+ add_subdirectory(data)
+ add_subdirectory(src)
+ if(TARGET Qt6::Gui)
+-    add_subdirectory(examples)
++    if(BUILD_EXAMPLES)
++        add_subdirectory(examples)
++    endif()
+     if (BUILD_TESTING)
+         add_subdirectory(autotests)
+     endif()

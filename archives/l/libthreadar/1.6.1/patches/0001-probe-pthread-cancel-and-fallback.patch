@@ -1,0 +1,37 @@
+--- a/build/configure.ac
++++ b/build/configure.ac
+@@ -108,7 +108,7 @@ AC_C_INLINE
+ AC_PROG_GCC_TRADITIONAL
+ AC_HEADER_MAJOR
+ 
+-AC_CHECK_FUNCS([strerror_r])
++AC_CHECK_FUNCS([strerror_r pthread_cancel])
+ 
+ AC_MSG_CHECKING([for strerror_r flavor])
+ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[extern "C"
+diff --git a/src/thread.cpp b/src/thread.cpp
+index 4993ae2..66faefe 100644
+--- a/src/thread.cpp
++++ b/src/thread.cpp
+@@ -270,8 +270,9 @@ namespace libthreadar
+ 	if(is_running(dyn_tid))
+ 	{
+ 	    thread *me = const_cast<thread *>(this);
+-	    int ret;
+ 
++#if HAVE_PTHREAD_CANCEL
++	    int ret;
+ 	    ret = pthread_cancel(dyn_tid);
+ 	    if(ret != ESRCH && ret != 0)
+ 		throw exception_system("Failed killing thread: ", errno);
+@@ -279,6 +280,10 @@ namespace libthreadar
+ 	    if(me == nullptr)
+ 		throw THREADAR_BUG;
+ 	    me->running = false;
++#else
++	    // Fall back to the library's documented cooperative cancellation API.
++	    me->cancel();
++#endif
+ 	}
+     }
+ 

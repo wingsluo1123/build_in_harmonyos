@@ -1,0 +1,39 @@
+# test_package/MANIFEST.yml
+# Upstream official test declaration file
+# CI script (build_and_test.sh L0e) requires this file to exist
+# See: docs/TEST_QUALITY_SPEC.md
+
+package: libxfce4util/4.20.0
+homepage: "https://docs.xfce.org/xfce/libxfce4util/start"
+
+# NO_UPSTREAM_TESTS discovery (libxfce4util 4.20.0 release tarball):
+#  - the tarball contains no tests/ directory (top-level SUBDIRS:
+#    libxfce4util, docs, po, xfce4-kiosk-query)
+#  - no Makefile.am/Makefile.in in the tarball defines TESTS; the top-level
+#    Makefile.in only carries the generic automake check-recursive plumbing,
+#    so "make check" is a verifiable no-op (also executed in build())
+#  - the parallel meson.build build files define no test() either
+#  - configure offers no test-enabling switch (po/ only carries gettext
+#    catalog plumbing, docs/ only gtk-doc)
+# The package is therefore recorded as NO_UPSTREAM_TESTS and validated by
+# the self-built consumer cases below (including one OHOS-specific case).
+upstream_check_command: "make check (verifiable no-op: no TESTS defined upstream)"
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# test_package tests (consumer perspective verification)
+test_package_tests:
+  - file: test.c
+    description: "Consumer binary linked against the packaged shared library: version identity (header macros 4.20.0, exported libxfce4util_*_version globals 4.20.0, xfce_version_string series 4.20); OHOS-specific guard case (asserts the __OHOS__ branch is live and the running kernel identity matches the platform patch 0001-config.guess adapts to); xfce_mkdirhier + xfce_rc INI write/close/reopen/read roundtrip on the OHOS filesystem"
+    cases:
+      - version
+      - ohos-guard
+      - fileutils-roundtrip
+    command: "./libxfce4util_consumer <case>"
+  - file: conanfile.py
+    description: "Installed-face checks: lib/pkgconfig/libxfce4util-1.0.pc exists and declares Version 4.20.0; shipped sbin/xfce4-kiosk-query -v executes under the OHOS dynamic loader (exercises libxfce4util.so.7 + glib DT_NEEDED closure)"
+    command: "python assertions + xfce4-kiosk-query -v"
+
+# Assertion count (approximate, for quality assessment)
+assertion_count: 13

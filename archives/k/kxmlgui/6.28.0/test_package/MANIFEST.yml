@@ -1,0 +1,23 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for kxmlgui/6.28.0.
+
+package: kxmlgui/6.28.0
+homepage: https://invent.kde.org/frameworks/kxmlgui
+
+upstream_check_command: "ctest --output-on-failure"
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error"
+
+upstream_tests:
+  - file: autotests/
+    source: kxmlgui-6.28.0/autotests/
+    description: "KXmlGui upstream CTest/autotests suite"
+    command: "ctest --output-on-failure"
+    condition: "run in the Conan build with BUILD_TESTING=ON; the two QLocale application-language rows are marked QEXPECT_FAIL(Continue) only when $LANGUAGE was updated as requested but QLocale::system() did not follow; a broken language update or an unexpected pass (XPASS) still fails the test"
+
+test_package_tests:
+  - file: test_package/test.cpp
+    description: "Consumer executor drives six public API cases (window construction/title, action collection add+lookup, action category registration, createGUI/factory, toolbar auto-creation, auto-save settings group); each case reports TEST PASS/FAIL and the process exits 1 on any failure."
+    command: "conan create (test_package builds and runs test_kxmlgui)"
+
+assertion_count: 6

@@ -1,0 +1,57 @@
+--- a/fc-solve/source/CMakeLists.txt
++++ b/fc-solve/source/CMakeLists.txt
+@@ -237,14 +237,9 @@
+     LIST(APPEND _gen_c_files ${ARGV})
+ ENDMACRO ()
+ 
+-SET (CPAN_MODULE "Moo")
+-EXECUTE_PROCESS (
+-    COMMAND "${PERL_EXECUTABLE}" "-M${CPAN_MODULE}=" "-e" "exit(0)"
+-    RESULT_VARIABLE "RESULT"
+-)
+-IF (NOT RESULT EQUAL 0)
+-    MESSAGE(FATAL_ERROR "You need the Perl 5/CPAN distribution ${CPAN_MODULE} to build Freecell Solver. See http://perl-begin.org/topics/cpan/ for installing from CPAN (perhaps \"cpan ${CPAN_MODULE}\" will work for you).")
+-ENDIF ()
++# The Moo CPAN distribution used to be required by scripts/gen-c-lookup-files.pl.
++# That script now uses a plain-Perl class, so the build no longer depends on Moo
++# (which is not available on OHOS).
+ 
+ SET (MOVE_FUNCS_GEN_MOD "${CMAKE_CURRENT_SOURCE_DIR}/t/lib/FC_Solve/MoveFuncs.pm")
+ SET (presets_gen "${CMAKE_CURRENT_SOURCE_DIR}/scripts/gen-presets.pl")
+@@ -1016,7 +1011,12 @@
+ FUNCTION(ASSERT_PYTHON3_MODULE_PRESENCE mod_ msg_)
+     EXECUTE_PROCESS(COMMAND "python3" "-c" "import ${mod_}; import sys; sys.exit(0);" RESULT_VARIABLE _exit_code)
+     IF (NOT ("${_exit_code}" STREQUAL "0"))
+-        MESSAGE (FATAL_ERROR "Could not find the python3's ${mod_} module - please install it.${msg_}")
++        # These modules are only required by the optional "boards" target and
++        # by the Perl-driven test suite.  The C library and its C test programs
++        # build without them, so treat a missing module as a warning instead of
++        # aborting the whole configure step (needed on OHOS, where the Python
++        # packages six / pysol_cards / cffi / freecell_solver are not shipped).
++        MESSAGE (WARNING "Could not find the python3's ${mod_} module - the optional boards target and the Perl test suite will be unavailable.${msg_}")
+     ENDIF ()
+ ENDFUNCTION()
+ 
+@@ -1218,14 +1218,18 @@
+     )
+ ENDIF ()
+ 
++option (FCS_SKIP_PERL_TEST_HARNESS "Do not register the upstream Perl test harness as a CTest test" OFF)
++
+ IF (FCS_WITH_TEST_SUITE)
+ 
+     ENABLE_TESTING()
+ 
+-    ADD_TEST(
+-        NAME perl_run_tests
+-        COMMAND "perl" "${CMAKE_CURRENT_SOURCE_DIR}/run-tests.pl"
+-    )
++    IF (NOT FCS_SKIP_PERL_TEST_HARNESS)
++        ADD_TEST(
++            NAME perl_run_tests
++            COMMAND "perl" "${CMAKE_CURRENT_SOURCE_DIR}/run-tests.pl"
++        )
++    ENDIF ()
+ 
+     ADD_CUSTOM_TARGET(
+         "check"

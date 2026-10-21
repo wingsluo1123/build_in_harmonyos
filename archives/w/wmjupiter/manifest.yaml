@@ -1,0 +1,29 @@
+# archives/w/wmjupiter/manifest.yaml — 软件级元数据
+software: wmjupiter
+display: "wmjupiter"
+description: "WindowMaker 系 X11 dockapp：64x64 桌面小部件，绘制木星四大伽利略卫星（I/E/G/C）位置与木星大红斑（GRS）过中天时刻"
+category: utility
+homepage: "https://github.com/engerim42/wmjupiter"
+license: BSD-3-Clause
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "裸手写 Makefile（无 configure/automake），产物是单个可执行文件 wmJupiter；源码只有 wmJupiter.c + xutils.c 两个翻译单元 + xutils.h + 两个 #include 进源码的位图资源"
+    - "上游 Makefile 的编译规则与链接规则都不含 $(CPPFLAGS)/$(LDFLAGS)（`.c.o: $(CC) $(CFLAGS) -D$(shell uname -s) -c $< -o $*.o $(INCDIR)`、`wmJupiter: $(CC) $(CFLAGS) $(SYSTEM) -o wmJupiter $^ $(INCDIR) $(LIBDIR) $(LIBS)`），依赖目录没有环境变量入口 —— 与 wmcube/1.0.2 那类『CPPFLAGS/LDFLAGS 当自由通道』的 Makefile 不同，只能走 make 命令行变量覆盖"
+    - "make 命令行同名变量是**替换**而非追加 Makefile 内部赋值：配方只接管 CC（覆盖硬编码 gcc）与两条陈旧 X11R6 路径（INCDIR/LIBDIR 换成依赖真实目录）；CFLAGS 故意不覆盖以保留上游 -O2 -Wall，LIBS 保留上游 -lXpm -lX11 -lXext -lm（三者均被源码真实引用：XpmCreatePixmapFromData / XShapeCombineMask / XOpenDisplay）"
+    - "clang 15 默认 -fno-common 暴露上游 1998 年的试探性定义（tentative definition）缺陷：xutils.h 里 7 个全局变量（跨 6 行 extern 声明）被两个 TU 各定义一份 → 链接期 duplicate symbol。按知识条目 E491 rec_priority 1 修为『extern 声明 + 单一定义』（0001/0002 补丁对）；E491 forbid_1 排除以 -fcommon 全局放开的捷径"
+    - "make install 不调用：上游 install 规则为 `install -c -s -m 0755 wmJupiter $(DESTDIR)/bin`（就地 strip，且 Makefile 把 DESTDIR 赋成 /usr/X11R6），package() 用显式 copy 复现安装布局（bin/ + licenses/ + share/doc/）"
+    - "上游无自动化测试（tarball 9 条目、Makefile 仅 all/clean/install 三个目标、无 check/test 目标）；test_package 以 24 条断言真实执行二进制：A 类失败路径 7 条 + B 类端到端消费者用例 17 条（headless X11 协议对端驱动完整绘制流程）"
+    - "鸿蒙 PC 与 CI 均无 X display：test_package 以 headless X11 协议对端（x11_headless.py，纯 Python stdlib，按 xcb/libX11 权威线格式实现；不用 Xvfb、不设 DISPLAY=:0、不 dlopen —— E530 禁止的三条路线）驱动被测二进制跑通 openXwindow() 之后的完整绘制流程（XPM 像素上传、窗口/位图/形状遮罩、5 条 WM 属性、XCopyArea 动画循环），以对端按协议累积的服务端状态作断言（B 类 17 条）；仍不覆盖绘制结果的画面语义、需窗口管理器配合的 dock 停靠、鸿蒙 PC 真机桌面显示效果"
+  common_dependencies:
+    - "libx11/6.4.0"
+    - "libxext/6.4.0"
+    - "libxpm/3.5.17"
+    - "xorgproto/2025.1"
+
+versions:
+  "1.21":
+    status: published
+    build_date: "2026-10-15"
+    source_url: "https://codeload.github.com/engerim42/wmjupiter/tar.gz/refs/tags/1.21"

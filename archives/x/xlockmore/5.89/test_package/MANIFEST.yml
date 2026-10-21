@@ -1,0 +1,32 @@
+# test_package/MANIFEST.yml
+# CI script (build_and_test.sh L0e) requires this file to exist.
+
+package: xlockmore/5.89
+homepage: "https://www.sillycycle.com/xlockmore.html"
+
+# xlockmore has no automated test suite (no `make check` target).
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# test_package consumer verification (R34 anti-stub)
+# Structural: bin/xlock exists + non-empty + AArch64 ELF
+# Runtime: bounded `xlock -help` launch forces the dynamic loader to
+#   resolve all DT_NEEDED (libX11, libXext, libXmu, libXt, libSM, libICE)
+#   before main(); the usage banner proves the binary ran; loader errors
+#   are rejected. Emulated (x86_64 + qemu) teardown SIGSEGV after the
+#   complete banner is tolerated; a native SIGSEGV is not.
+test_package_tests:
+  - file: test_xlock.sh
+    description: >-
+      Bounded -help launch asserting the usage banner and full dynamic
+      dependency resolution under the conanrun environment
+    command: "sh test_xlock.sh"
+  - file: conanfile.py
+    description: >-
+      Structural ELF check (bin/xlock AArch64, non-empty) plus
+      orchestration of test_xlock.sh through the conanrun environment
+    command: "conan test"
+
+assertion_count: 6

@@ -1,0 +1,37 @@
+#====================================================================
+# DRAFT-libint-2.13.1-pre-generated-library-tarball.kv
+# 候选：libint 类"编译器+预生成库"双态架构应使用官方 release 预生成库 tarball
+#====================================================================
+
+id:                     E2674
+title:                  libint 等"编译器+预生成库"双态架构：用官方 release 预生成库 tarball 而非 git tag 源码包
+severity:               2
+category:               build-system, source-selection
+trigger_tool:           cmake|conan-create|init-build
+phase:                  configuration|bootstrap
+error_signature:        libint.*build_libint|libint.*generator|configure.*No such file or directory.*libint|
+                         libint.*export.*slow|LIBINT2_LIBRARY_CXX_SRC|7887.*source files
+
+match_keywords:         libint, libint2, build_libint, generator, export, pre-generated,
+                         release asset, tarball, GitHub archive, cmake, quantum chemistry,
+                         molecular integrals, source selection, tag archive
+
+root_cause:             libint 仓库是"编译器 + 库"双态架构：GitHub tag 源码 tarball 是完整仓库，
+                         含 libint 编译器（src/bin/libint）与 export 机制；若直接用该源码包走 CMake
+                         默认构建，需要先编译 build_libint 再运行导出生成库源码（串行、极慢、依赖
+                         生成器配置），不适合 Conan 干净构建。官方 release 提供预生成 lmax=6 标准库
+                         tarball（libint-2.13.1.tgz），内含完整可直接构建的 CMake 库工程（约 7887
+                         个库源文件 + tests/unit + python 测试），这才是配方应选用的官方源。
+
+rec_approach:           source-selection
+rec_command:            cmake -S . -B build -DCMAKE_PREFIX_PATH=<eigen> && cmake --build build -j<N>
+rec_auto_fix:           false
+rec_impl:               conan-recipe-source-selection
+
+verification_cmd:       conan create ... -pr:h=ci/conan/profiles/ohos-aarch64 --build=missing
+last_updated:           2026-09-22
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E2674.md
+affected_scope:         libint 等"编译器+预生成库"双态架构：用官方 release 预生成库 tarball 而非 git tag 源
+rec_description:        source-selection

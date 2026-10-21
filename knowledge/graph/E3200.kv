@@ -1,0 +1,59 @@
+#====================================================================
+# DRAFT-config-sub-ohos-hunk-shape-tiering.kv
+# config.sub 年代决定 ohos 补丁形状与失败模式：2013 系响亮失败、同代目标行
+# （118/126-129/1368）字节同一，三 hunk 添加模板可跨库逐字节复用；2018 系
+# rc=0 静默改写、必须替换对+os 归一化大表 hunk。
+# 定位：E072（点位清单）的"年代选型 + 模板形状"细化；2018 系行级机理归
+# DRAFT-autotools-config-sub-ohos-table-hunk-tiering。完整叙事与查重表见同目录 .md
+#====================================================================
+
+id:                     E3200
+trigger_tool:           configure|config.sub
+phase:                  configuration
+error_signature:        Invalid configuration.*linux-ohos|unknown operating system .ohos.|checking host system type\.\.\..*linux-gnu
+severity:               3
+category:               platform, autotools, configure, detect
+match_keywords:         config.sub, config.guess, linux-ohos, triplet, maybe_os, os 归一化, 2013-04-24, 2018-05-05, hunk shape, addition patch, replacement pair, toybox patch, silent rewrite, rc=0, autotools, 年代选型, 模板复用
+title:                  config.sub 年代决定 ohos 补丁形状与失败模式：2013 系响亮失败、同代目标行（118/126-129/1368）字节同一，三 hunk 添加模板可跨库逐字节复用；2018 系 rc=0 静默改写、必须替换对+os 归一化大表 hunk；先 head -3 查年代选型，终判以 config.sub 输出断言为准
+root_cause:             GNU config.sub 的年代（版权年，head -3 可见）同时决定失败模式与补丁形状。2013-04-24 版（autoconf 2.69 / automake 1.11 世代；globus-callout 4.3、globus-gsi-openssl-error 4.4、globus-openssl-module 5.2 三例实测）：对 *-linux-ohos 输入响亮失败（Invalid configuration / unknown operating system），三处目标行（maybe_os 列表 118 行、linux-ohos 子分支 126-129 行、os 归一化大表 1368 行）在三库逐字节同一，一份三 hunk 添加型模板可跨库原样复用（dry-run 零偏移命中）。2018-05-05 版无 kernel-os 校验门，os 归一化大表缺 -linux-ohos* 时 4 段三元组被 -linux* 兜底 sed 静默改写为 <machine>-unknown-linux-gnu-ohos 且 rc=0（行级机理与 hunk 必要性分级见 DRAFT-autotools-config-sub-ohos-table-hunk-tiering），必须换用替换对模板并必补大表 hunk。跨代际不可复制：2013→2018 三 hunk 上下文/行号全漂移，dry-run 全不匹配；toybox patch 对纯插入 hunk 兼容性差，插入写成相邻 -/+ 替换对（细节见 DRAFT-toybox-patch-pure-insert-hunk-unappliable）
+affected_scope:         自带 GNU config 的 autotools 包做 linux-ohos 适配；同族不同版本之间复制 config.sub 补丁的场景。选型依据是 config.sub 年代（head -3 版权年），不是项目家族；2014-2017 代际边界未实测，套用前先定年并 dry-run 收口
+verification_cmd:       # 自包含序列（以 globus-openssl-module 5.2 为例，补丁随仓 archives/g/globus-openssl-module/5.2/patches/，在仓根执行）
+                        mkdir /tmp/probe && cd /tmp/probe
+                        curl -fsSLO https://deb.debian.org/debian/pool/main/g/globus-openssl-module/globus-openssl-module_5.2.orig.tar.gz
+                        echo 6dfcbe4af7a23d16745946131da938181cee3adfe08504df4bb4ab3160c23467 globus-openssl-module_5.2.orig.tar.gz | sha256sum -c   # 与 conandata.yml 一致
+                        tar xzf globus-openssl-module_5.2.orig.tar.gz
+                        head -3 globus_openssl_module-5.2/build-aux/config.sub   # 断言①：含 2013 → 年代选型 2013 系
+                        sh globus_openssl_module-5.2/build-aux/config.sub aarch64-unknown-linux-ohos   # 断言②：pristine 预期 Invalid configuration 且 rc!=0（响亮失败证据）
+                        patch -p1 --dry-run -d globus_openssl_module-5.2 < archives/g/globus-openssl-module/5.2/patches/0001-config.sub-ohos.patch   # 断言③：rc=0
+                        patch -p1 -d globus_openssl_module-5.2 < archives/g/globus-openssl-module/5.2/patches/0001-config.sub-ohos.patch
+                        sh globus_openssl_module-5.2/build-aux/config.sub aarch64-unknown-linux-ohos | grep -qx aarch64-unknown-linux-ohos   # 断言④：4 段输入原样输出
+                        sh globus_openssl_module-5.2/build-aux/config.sub aarch64-linux-ohos         | grep -qx aarch64-unknown-linux-ohos   # 断言⑤：3 段输入归一为 4 段
+rec_priority:           1
+rec_approach:           vintage-tiered-patch-templates
+rec_description:        按 config.sub 年代选模板：2013 系用三 hunk 添加型（maybe_os 列表行加 linux-ohos*、android-linux 块后插 linux-ohos 子分支、os 归一化大表行尾追加 -linux-ohos*），同代跨库直接复用、不改一字（三例实证）；2018 系用替换对模板且必补 os 归一化大表 hunk（形状与行级依据见 DRAFT-autotools-config-sub-ohos-table-hunk-tiering）。插入一律写成相邻 -/+ 替换对以兼容设备 toybox patch；交付前以 pristine 响亮失败基线 + dry-run + 4 段/3 段双输出断言收口，任何一步不过即停
+rec_command:            head -3 build-aux/config.sub && sh build-aux/config.sub aarch64-unknown-linux-ohos && sh build-aux/config.sub aarch64-linux-ohos   # 年代先行；后两条都必须原样输出 aarch64-unknown-linux-ohos
+rec_auto_fix:           false
+rec_impl:               conandata-patch-template-per-vintage
+fallback_priority:      2
+fallback_approach:      regenerate-autotools
+fallback_description:   若无匹配模板且仅三元组识别阻塞构建，用带 ohos 感知 config.sub 的新版 autoconf 重生成——代价高且有无关 autotools 漂移风险，仅作最后手段；优先模板复用
+fallback_command:       autoreconf -fi
+fallback_auto_fix:      false
+fallback_impl:          full-regeneration-last-resort
+forbid_1_pattern:       只看 rc=0（或"checking host system type"打印了任意值）就认定 config.sub 接受了 ohos 三元组
+forbid_1_reason:        2018-05-05 版缺 os 归一化大表 hunk 时把 aarch64-unknown-linux-ohos 静默改写为 aarch64-unknown-linux-gnu 且 rc=0（机理见 DRAFT-autotools-config-sub-ohos-table-hunk-tiering）
+forbid_1_consequence:   configure 通过但构建目标实际是通用 linux-gnu，OHOS 专属分支与元数据全错，日志中无任何失败信号
+forbid_2_pattern:       跨代际复制模板（2013→2018）且以单一路径 dry-run 下结论
+forbid_2_reason:        三 hunk 上下文全漂移必败、即使应用成功缺大表 hunk 仍被兜底 sed 静默改写
+forbid_2_consequence:   响亮返工或全绿假阳性传播错误身份
+principles:               
+doc_file:               knowledge/drafts/DRAFT-config-sub-ohos-hunk-shape-tiering.md
+last_updated:           2026-09-26
+source_event:           archives/g/globus-openssl-module/5.2（2013 系模板复用 + pristine/dry-run/双断言实测）, archives/g/globus-gsi-openssl-error/4.4（2013 系同模板）, archives/g/globus-gsi-proxy-ssl/6.6（2018 系反例形状）
+authors:                why6666666 <why6666666@noreply.atomgit.com>
+source_pr:              pending（feat/globus-openssl-module-5.2 交付 PR）
+source_commit:          pending（随 PR 交付后回填）
+metrics_success_count:  3
+metrics_fail_count:     0
+metrics_confidence:     0.8
+metrics_last_used:      2026-09-26

@@ -1,0 +1,95 @@
+# Version manifest for GNU Mailutils 3.20
+# ARCHIVE-SPEC v2.0
+
+version: "3.20"
+software: "mailutils"
+status: adapted
+build_date: "2026-10-16"
+build_system: "autotools"
+
+source:
+  url: "https://ftp.gnu.org/gnu/mailutils/mailutils-3.20.tar.xz"
+  sha256: "a8f3faab1edda5188bb5ca3e4e9c0c5bc72cd0dadf4e1f4799d27fa75c6ae829"
+  tar_format: tar.xz
+  signature: "mailutils-3.20.tar.xz.sig downloaded from ftp.gnu.org; not verified because gpg/gpgv is unavailable"
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=/usr/local"
+    - "--disable-python"
+    - "--disable-pam"
+    - "--without-readline"
+    - "--without-gsasl"
+    - "--without-gssapi"
+    - "--without-tcp-wrappers"
+    - "--without-fribidi"
+    - "--without-dbm"
+    - "--without-gdbm"
+    - "--without-berkeley-db"
+    - "--without-ndbm"
+    - "--without-tokyocabinet"
+    - "--without-kyotocabinet"
+    - "--without-mysql"
+    - "--without-postgres"
+    - "--without-odbc"
+    - "--without-ldap"
+    - "--without-guile"
+  dependencies:
+    - "gnutls/3.8.10"
+    - "libunistring/1.0"
+    - "libtool/2.5.4"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-build-aux-config.guess.patch"
+  - "0002-build-aux-config.sub.patch"
+  - "0003-comsat-comsat.c.patch"
+  - "0004-config.h.in.patch"
+  - "0005-configure.patch"
+  - "0006-doc-texinfo-Makefile.in.patch"
+  - "0007-libmailutils-auth-system.c.patch"
+  - "0008-libmailutils-base-locker.c.patch"
+  - "0009-sieve-uidnew-requires-dbm.patch"
+  - "0010-testsuite-cwdrepl-handle-missing-pwd.patch"
+  - "0011-libmailutils-auth-system-user-fallback.patch"
+  - "0012-mailtools-current-user-fallback.patch"
+  - "0013-maildir-linkat-rename-fallback.patch"
+  - "0014-testsuite-fsaf-hardlink-fallback.patch"
+  - "0015-mh-tests-ali-group-id-path.patch"
+  - "0016-testsuite-fsaf-hmdfs-owner-mapping.patch"
+  - "0017-comsat-test-mode-user-bypass.patch"
+  - "0018-testsuite-fsaf-hmdfs-owner-check.patch"
+  - "0019-comsat-test-mode-passwd-guard.patch"
+
+knowledge_gained:
+  - "config.guess/config.sub need HarmonyOS and linux-ohos triplet support."
+  - "HMDFS temporary directories require umask 022 because ownership is mapped."
+  - "OHOS libc lacks getspnam() and getutxent(); use function probes and portable fallbacks."
+  - "HMDFS rejects hard links with EPERM; the dotlock path needs an O_EXCL fallback."
+  - "Toybox ls output can break mdate-sh and trigger unavailable makeinfo; preserve generated release docs."
+  - "When DBM is disabled, the Sieve uidnew extension must also be excluded because its upstream target still links libmu_dbm unconditionally."
+  - "The upstream cwdrepl test helper must tolerate an unset PWD and a failed getcwd() in the isolated HarmonyOS test environment."
+  - "Do not rewrite the OHOS ELF after linking: patchelf/signing tools are unavailable on this device, and Conan's run environment supplies the packaged library path."
+  - "GnuTLS and libunistring are enabled so the TLS and unistring cases run. Python, PAM, GSSAPI, database, LDAP, Guile, readline, and FriBidi stay disabled; SQL stays off because no module is selected by default."
+
+upstream_tests:
+  command: "make -j2 -k check"
+  source_testsuite_at_files: 22
+  executed_autotest_suites: 21
+  result:
+    total: 1389
+    passed: 1389
+    failed: 0
+    skipped: 0
+  count_note: "Earlier reports used 1387. Summing the 21 Autotest summaries gives 1389: imap4d/tests is 107 and mh/tests is 270, one more each than the old tally."
+  not_run:
+    - "libmu_scm suite: optional Guile integration is not part of the 21 make-check suites"
+    - "mail and pop3d DejaGNU harnesses: runtest is unavailable on the device; not part of the 1389"
+  details: "reports/test-report.md"
+
+consumer_tests:
+  - "test_package/test_mailutils.c exercises mu_list, mu_url, mu_locker, and file-safety public APIs (14 checks)."
+  - "test_package/test_ohos_mailutils.sh checks HarmonyOS executables, server files, version, and library files (24 checks)."
+  - "test_package/test_mail_flow.sh creates a mailbox with putmail, then reads it with mail and readmsg (6 checks)."

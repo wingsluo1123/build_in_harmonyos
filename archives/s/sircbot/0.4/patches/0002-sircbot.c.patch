@@ -1,0 +1,374 @@
+--- a/sircbot.c
++++ b/sircbot.c
+@@ -1,41 +1,55 @@
+ /* Small daemon that connects to IRC server and joins given channel
+ and sends whatever is written to the FIFO
+ 
+ Intended usage is git hook that sends commits, etc.
+ */
+ 
+ #define _GNU_SOURCE
+ 
+ #include <sys/socket.h>
++#include <sys/stat.h>
+ #include <sys/un.h>
+ #include <sys/wait.h>
+ 
++#include <dirent.h>
+ #include <err.h>
+ #include <errno.h>
+ #include <fcntl.h>
+ #include <limits.h>
+ #include <poll.h>
+ #include <signal.h>
++#include <stddef.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <syslog.h>
+ #include <time.h>
+ #include <unistd.h>
+ 
+ #include "irc.h"
+ 
+ #define PROGNAME "sircbot"
+ 
+-#if !defined(DEFAULT_PIDFILE_PREFIX)
+-#define DEFAULT_PIDFILE_PREFIX "/var/run/" PROGNAME "/" PROGNAME
++/*
++ * The channel socket directory and the hook directory used to be fixed at
++ * build time.  Systems that do not provide a writable /var/run or a writable
++ * /etc need to relocate them, so both are overridable at run time.  The
++ * historical paths remain the defaults, which keeps the upstream behaviour
++ * unchanged wherever those paths are usable.
++ */
++#if !defined(DEFAULT_RUNDIR)
++#define DEFAULT_RUNDIR "/var/run/" PROGNAME
++#endif
++
++#if !defined(DEFAULT_HOOKSDIR)
++#define DEFAULT_HOOKSDIR "/etc/" PROGNAME ".d"
+ #endif
+ 
+ struct tq_string {
+ 	char *value;
+ 	struct tq_string *next;
+ };
+ 
+ struct sircbot_channel {
+ 	char *name;
+ 	char *socket_path;
+@@ -114,20 +128,38 @@
+         freopen(logfile, "w", stdout);
+ 	freopen(logfile, "w", stderr);
+ 	return 0;
+ }
+ 
+ static void log_err(const char *msg)
+ {
+ 	syslog(LOG_ERR, "%s: %s", msg, strerror(errno));
+ }
+ 
++/* Run-time override for a location, falling back to the historical default. */
++static const char *env_str(const char *name, const char *dflt)
++{
++	const char *value = getenv(name);
++
++	return (value != NULL && value[0] != '\0') ? value : dflt;
++}
++
++/*
++ * The socket directory has to exist before bind(2); create it on demand so
++ * that the daemon works on systems whose init scripts do not do it for us.
++ */
++static void ensure_dir(const char *path)
++{
++	if (mkdir(path, 0755) < 0 && errno != EEXIST)
++		log_err(path);
++}
++
+ struct tq_string *tq_stringlist_add(struct tq_string *head, const char *data)
+ {
+ 	struct tq_string *n = head;
+ 	struct tq_string *item = malloc(sizeof(struct tq_string));
+ 
+ 	if (item == NULL) {
+ 		log_err("malloc");
+ 		return NULL;
+ 	}
+ 	memset(item, 0, sizeof(struct tq_string));
+@@ -137,37 +169,65 @@
+ 	}
+ 	item->next = NULL;
+ 
+ 	while (n->next != NULL)
+ 		n = n->next;
+ 	n->next = item;
+ 	return item;
+ }
+ 
+ 
++/*
++ * A pathname AF_UNIX socket is not allowed in every environment: some
++ * kernels refuse to bind one outside of privileged directories (HarmonyOS
++ * answers EPERM for user directories).  The abstract namespace, where
++ * available, carries the very same name and has no such restriction.  The
++ * historical pathname address is therefore tried first, and the abstract
++ * address is used only when that first bind(2) is rejected.
++ */
++static socklen_t abstract_addr(struct sockaddr_un *sun, const char *name)
++{
++	size_t len = strlen(name);
++
++	if (len > sizeof(sun->sun_path) - 1)
++		len = sizeof(sun->sun_path) - 1;
++	memset(sun, 0, sizeof(*sun));
++	sun->sun_family = AF_UNIX;
++	sun->sun_path[0] = '\0';
++	memcpy(sun->sun_path + 1, name, len);
++	return (socklen_t) (offsetof(struct sockaddr_un, sun_path) + 1 + len);
++}
++
+ int init_channel_socket(struct sircbot_channel *chan)
+ {
+ 	struct sockaddr_un sun;
++	socklen_t alen;
+ 
+ 	unlink(chan->socket_path);
++
++	chan->listen_fd = socket(AF_UNIX, SOCK_STREAM, 0);
++	if (chan->listen_fd < 0)
++		return -1;
++
++	fcntl(chan->listen_fd, F_SETFD, FD_CLOEXEC);
+ 
+ 	memset(&sun, 0, sizeof(sun));
+ 	sun.sun_family = AF_UNIX;
+ 	strncpy(sun.sun_path, chan->socket_path, sizeof(sun.sun_path));
+-	chan->listen_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+-	if (chan->listen_fd < 0)
+-		return -1;
+-
+-	fcntl(chan->listen_fd, F_SETFD, FD_CLOEXEC);
+-	if (bind(chan->listen_fd, (struct sockaddr *) &sun, sizeof(sun)) < 0)
++	if (bind(chan->listen_fd, (struct sockaddr *) &sun, sizeof(sun)) == 0)
++		goto bound;
++
++	alen = abstract_addr(&sun, chan->socket_path);
++	if (bind(chan->listen_fd, (struct sockaddr *) &sun, alen) < 0)
+ 		goto err_close;
+ 
++bound:
+ 	if (listen(chan->listen_fd, 8) < 0)
+ 		goto err_close;
+ 
+ 	return 0;
+ 
+ err_close:
+ 	log_err(chan->socket_path);
+ 	close(chan->listen_fd);
+ 	return -1;
+ }
+@@ -196,48 +256,114 @@
+ 	int i;
+ 	time_t now = time(NULL);
+ 	printf("got kicked from %s\n", name);
+ 	for (i = 0; i < sb->numchan; i++) {
+ 		if (strcmp(sb->chan[i].name, name) == 0)
+ 			return close_channel_socket(&sb->chan[i], now);
+ 	}
+ 	return 0;
+ }
+ 
++/*
++ * Portable fallback for systems that ship no run-parts(8): run every
++ * executable regular file in dir, passing the same arguments that
++ * "run-parts -a user -a data -a rcpt" would pass.  POSIX only, so it also
++ * covers busybox/toybox systems where run-parts is not installed as a
++ * command of its own.
++ */
++static void run_hook_dir(const char *dir, const char *user,
++			 const char *data, const char *rcpt)
++{
++	DIR *d = opendir(dir);
++	struct dirent *ent;
++
++	if (d == NULL) {
++		log_err(dir);
++		return;
++	}
++	while ((ent = readdir(d)) != NULL) {
++		char path[PATH_MAX];
++		struct stat st;
++		pid_t pid;
++
++		if (ent->d_name[0] == '.')
++			continue;
++		snprintf(path, sizeof(path), "%s/%s", dir, ent->d_name);
++		if (stat(path, &st) < 0 || !S_ISREG(st.st_mode))
++			continue;
++		if ((st.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) == 0)
++			continue;
++
++		pid = fork();
++		if (pid < 0)
++			continue;
++		if (pid == 0) {
++			execl(path, path, user, data, rcpt, (char *) NULL);
++			exit(127);
++		}
++		while (waitpid(pid, NULL, 0) < 0 && errno == EINTR)
++			;
++	}
++	closedir(d);
++}
++
+ int run_hooks(char *user, char *rcpt, char* data)
+ {
+ 	int pid = fork();
+ 	int status;
+ 	char dir[PATH_MAX];
++	const char *runner;
+ 	if (pid < 0) {
+ 		log_err("fork");
+ 		return -1;
+ 	}
+ 	if (pid == 0) {
+ 		/* detatch to controling terminal */
+ 		setsid();
+ 
+ 		pid = fork();
+ 		if (pid < 0) {
+ 			perror("fork");
+ 			exit(1);
+ 		}
+ 		/* exit parent */
+ 		if (pid > 0)
+ 			exit(0);
+ 
+-		snprintf(dir, sizeof(dir), "/etc/" PROGNAME ".d/%s", rcpt);
++		/*
++		 * A PRIVMSG line without a ":sender" prefix, or with no space in its
++		 * parameters, reaches here with NULL parts.  execl() stops at the
++		 * first NULL argument, which would silently truncate the hook's
++		 * argument list instead of passing an empty string.
++		 */
++		if (user == NULL)
++			user = "";
++		if (data == NULL)
++			data = "";
++		if (rcpt == NULL)
++			rcpt = "";
++
++		snprintf(dir, sizeof(dir), "%s/%s",
++			 env_str("SIRCBOT_HOOKSDIR", DEFAULT_HOOKSDIR), rcpt);
+ 		printf("DEBUG: running scripts in %s\n", dir);
+-		execlp("/bin/run-parts", "/bin/run-parts", "-a", user,
+-			   "-a", data, "-a", rcpt, dir, NULL);
+-		log_err("run-parts");
+-		exit(1);
++
++		runner = getenv("SIRCBOT_RUNPARTS");
++		if (runner != NULL && runner[0] != '\0')
++			execl(runner, runner, "-a", user, "-a", data,
++			      "-a", rcpt, dir, NULL);
++		execl("/bin/run-parts", "run-parts", "-a", user, "-a", data,
++		      "-a", rcpt, dir, NULL);
++		execlp("run-parts", "run-parts", "-a", user, "-a", data,
++		       "-a", rcpt, dir, NULL);
++		/* no run-parts(8) anywhere: walk the directory ourselves */
++		run_hook_dir(dir, user, data, rcpt);
++		exit(0);
+ 	}
+ 	wait(&status);
+ 	return 0;
+ }
+ 
+ int handle_response(struct sircbot_session *sb, char *user, char *cmd,
+ 		    char *data)
+ {
+ 	printf("DEBUG: handling response: user=%s, cmd=%s, data=%s\n",
+ 		   user ? user : "(null)", cmd, data ? data : "(null)");
+@@ -601,24 +727,26 @@
+ 
+ int main(int argc, char *argv[])
+ {
+ 	char pidfile_suffix[64] = ".pid";
+ 	static char pidfile[PATH_MAX] = "";
+ 	const char *server = "irc.freenode.org";
+ 	const char *nick = "sircbot";
+ 	const char *username = "sircbot";
+ 	const char *pass = NULL;
+ 	const char *logfile = "/dev/null";
++	const char *rundir = env_str("SIRCBOT_RUNDIR", DEFAULT_RUNDIR);
+ 	struct sircbot_session sb;
+ 	int i, c, port = 6667, multimode = 0;
+ 
+ 	sb.runhooks = 1;
++	sb.last_ping = time(NULL);
+ 	while ((c = getopt(argc, argv, "fl:mn:Np:P:r:s:u:")) != -1) {
+ 		switch (c) {
+ 		case 'f':
+ 			foreground = 1;
+ 			break;
+ 		case 'l':
+ 			logfile = optarg;
+ 			break;
+ 		case 'm':
+ 			multimode = 1;
+@@ -652,42 +780,51 @@
+ 	argv += optind;
+ 	argc -= optind;
+ 	if (argc <= 0)
+ 		usage_exit(1);
+ 
+ 	/* init channel strucs */
+ 	sb.numchan = argc;
+ 	sb.chan = malloc(argc * sizeof(struct sircbot_channel));
+ 	if (sb.chan == NULL)
+ 		err(1, "malloc");
++	ensure_dir(rundir);
+ 	for (i = 0; i < argc; i++) {
+ 		sb.chan[i].listen_fd = -1;
+ 		sb.chan[i].name = strdup(argv[i]);
++		/*
++		 * Both timestamps are read before they are first written: the
++		 * rate limiter in send_fifo_queue() compares against
++		 * last_data_sent, and the keep-alive compares against
++		 * last_ping.  They live in malloc'd/stack memory, so leaving
++		 * them unset lets stale garbage decide when data may be sent.
++		 */
+ 		sb.chan[i].last_closetime = 0;
++		sb.chan[i].last_data_sent = 0;
+ 		if (multimode) {
+ 			asprintf(&sb.chan[i].socket_path,
+-				 "/var/run/sircbot/%s-%s", argv[i], nick);
++				 "%s/%s-%s", rundir, argv[i], nick);
+ 		} else {
+ 			asprintf(&sb.chan[i].socket_path,
+-				 "/var/run/sircbot/%s", argv[i]);
++				 "%s/%s", rundir, argv[i]);
+ 		}
+ 		unlink(sb.chan[i].socket_path);
+ 		sb.chan[i].indata_head.next = NULL;
+ 		sb.chan[i].fd_array = NULL;
+ 		sb.chan[i].fd_array_size = 0;
+ 	}
+ 
+ 	if (multimode)
+ 		snprintf(pidfile_suffix, sizeof(pidfile_suffix),
+ 			 "-%s.pid", nick);
+-	snprintf(pidfile, sizeof(pidfile_suffix), "%s%s",
+-		 DEFAULT_PIDFILE_PREFIX, pidfile_suffix);
++	snprintf(pidfile, sizeof(pidfile), "%s/%s%s",
++		 rundir, PROGNAME, pidfile_suffix);
+ 	/* daemonize */
+ 	if (!foreground) {
+ 		if (daemonize(pidfile, logfile) < 0)
+ 			return 1;
+ 	}
+ 	signal(SIGTERM, sighandler);
+ 	openlog("sircbot",0, LOG_DAEMON);
+ 
+ 	while (1) {
+ 		sb.authed = 0;

@@ -1,0 +1,43 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: hmbs <hmbs@local>
+Date: Tue, 14 Oct 2026 00:00:00 +0000
+Subject: [PATCH 3/3] Drop -lboost_unit_test_framework from test link lines
+
+Companion to the testAll.cc header-only entry point change: linking
+the (nonexistent on OHOS) compiled Boost.Test library would fail and,
+were it present, would clash with the header-only runner (duplicate
+symbols). All other upstream link flags are untouched.
+
+--- a/core/test/Makefile
++++ b/core/test/Makefile
+@@ -4,7 +4,7 @@
+ -include $(OSL_HOME)/makefile.conf
+ 
+ LDFLAGS += -L../osl 
+-LOADLIBES += -losl_core $(BOOST_LIBS) -lboost_unit_test_framework $(LDLIBS)
++LOADLIBES += -losl_core $(BOOST_LIBS) $(LDLIBS)
+ 
+ PROGRAMS = testAll
+ 
+--- a/std/test/Makefile
++++ b/std/test/Makefile
+@@ -4,7 +4,7 @@
+ -include $(OSL_HOME)/makefile.conf
+ 
+ LDFLAGS += -L../osl -L../../core/osl
+-LOADLIBES += -losl_std -losl_core $(BOOST_LIBS) -lboost_unit_test_framework $(LDLIBS)
++LOADLIBES += -losl_std -losl_core $(BOOST_LIBS) $(LDLIBS)
+ INCLUDES += -I.. -I../../core
+ 
+ PROGRAMS = testAll
+--- a/full/test/Makefile
++++ b/full/test/Makefile
+@@ -4,7 +4,7 @@
+ -include $(OSL_HOME)/makefile.conf
+ 
+ LDFLAGS += -L../osl -L../../std/osl -L../../core/osl
+-LOADLIBES += -losl_full -losl_std -losl_core $(BOOST_LIBS) -lboost_unit_test_framework $(LDLIBS)
++LOADLIBES += -losl_full -losl_std -losl_core $(BOOST_LIBS) $(LDLIBS)
+ INCLUDES += -I.. -I../../std -I../../core
+ 
+ PROGRAMS = testAll

@@ -1,0 +1,49 @@
+--- a/tests/test_proxy.c
++++ b/tests/test_proxy.c
+@@ -268,20 +268,23 @@
+ 
+ static auth_challenger_t registrar_challenger[1];
+ static auth_challenger_t proxy_challenger[1];
+ 
+ /* Proxy entry point */
+ static int
+ test_proxy_init(su_root_t *root, struct proxy *proxy)
+ {
+   struct proxy_tr *t;
+   struct client_tr *c;
++  char const *proxy_url = getenv("SOFIA_OHOS_TEST_PROXY_NO_WS")
++    ? "sip:0.0.0.0:*;transport=udp,tcp"
++    : "sip:0.0.0.0:*";
+ 
+   auth_challenger_t _proxy_challenger[1] =
+   {{
+       SIP_407_PROXY_AUTH_REQUIRED,
+       sip_proxy_authenticate_class,
+       sip_proxy_authentication_info_class
+     }};
+ 
+   auth_challenger_t _registrar_challenger[1] =
+   {{
+@@ -289,21 +292,21 @@
+       sip_www_authenticate_class,
+       sip_authentication_info_class
+     }};
+ 
+   *proxy_challenger = *_proxy_challenger;
+   *registrar_challenger = *_registrar_challenger;
+ 
+   proxy->root = root;
+ 
+   proxy->agent = nta_agent_create(root,
+-				  URL_STRING_MAKE("sip:0.0.0.0:*"),
++				  URL_STRING_MAKE(proxy_url),
+ 				  NULL, NULL,
+ 				  NTATAG_UA(0),
+ 				  NTATAG_CANCEL_487(0),
+ 				  NTATAG_SERVER_RPORT(1),
+ 				  NTATAG_CLIENT_RPORT(1),
+ 				  TAG_NEXT(proxy->tags));
+ 
+   if (!proxy->agent)
+     return -1;
+ 

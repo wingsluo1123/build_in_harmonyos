@@ -1,0 +1,68 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: nfdump/1.7.6
+homepage: "https://github.com/phaag/nfdump"
+
+# 上游测试入口: src/test/Makefile.am 的 automake check 目标
+upstream_check_command: "make check"
+
+# conanfile.py 的 build() 中是否集成上游测试
+# false —— build() 只负责编译与打包; 上游套件在 OHOS 真机上按 R51 三步法独立实测,
+#          结果见下方 measured_results。
+upstream_test_in_build: false
+upstream_test_command: "cd src/test && make check"
+
+# 上游实际注册的用例 (automake TESTS = 5; nftest 为 C 用例集, 其余为 shell 回归)
+upstream_tests:
+  - file: src/test/nftest.c
+    source: nfdump-1.7.6/src/test/nftest.c
+    description: "过滤器编译器用例集: 逐条表达式编译校验 (Compiled ok / compiled failed) + 协议名表 + 未知协议负例"
+    command: "src/test/nftest"
+    result: "472 条 Compiled ok, 0 条 compiled failed, 结束打印 DONE."
+  - file: src/test/runprepare.sh
+    source: nfdump-1.7.6/src/test/runprepare.sh
+    description: "nfgen 生成 dummy_flows.nf, nfdump -v 校验卷头/记录数, 与 nftest.1.out 逐字节 diff"
+    command: "src/test/runprepare.sh"
+    result: "Records: 37 校验通过, diff 无差异"
+  - file: src/test/runlzo.sh
+    source: nfdump-1.7.6/src/test/runlzo.sh
+    description: "LZO 压缩读写往返 (nfdump -z=lzo -w / -r) 与 raw 输出比对"
+    command: "src/test/runlzo.sh"
+    result: "通过"
+  - file: src/test/runlz4.sh
+    source: nfdump-1.7.6/src/test/runlz4.sh
+    description: "LZ4 压缩读写往返; OHOS 基线无 liblz4, 由 nfdump 内嵌 LZ4 实现提供 (configure 置 LZ4EMBEDDED)"
+    command: "src/test/runlz4.sh"
+    result: "通过"
+  - file: src/test/runtest.sh
+    source: nfdump-1.7.6/src/test/runtest.sh
+    description: "端到端采集回归: 压缩读写与排序、nfcapd 起停/pidfile/AppendRename、nfreplay 回放采集、nfanon 匿名化、nfdump -X 校验"
+    command: "src/test/runtest.sh"
+    result: "All tests successful."
+
+# 本次适配对上游套件的实测结果 (2026-10-15, HarmonyOS PC aarch64 / HarmonyOS HongMeng Kernel 1.12.0)
+measured_results:
+  command: "cd src/test && make check"
+  registered: 5
+  passed: 5
+  failed: 0
+  skipped: 0
+  internal_checks: "nftest 内部 472 条表达式编译校验全部通过"
+  not_registered: "runbz2.sh / runzstd.sh —— configure 未检出 bzip2/zstd (HAVE_BZIP2/HAVE_ZSTD 为 no), 上游据此不注册这两个用例; 与平台适配无关"
+  log: "reports/upstream-make-check.log (含各用例日志 upstream-runtest.sh.log)"
+
+# test_package 自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_nfdump.c
+    description: "消费者用例: 执行包内 nfdump/nfcapd/nfreplay -V 与 nfanon/nfexpire -h, 校验 libnfdump.a / libnffile.a / nfdump.conf.dist / man1 已安装"
+    command: "./test_nfdump <package folder>"
+    assertion_count: 0
+  - file: test_nfdump_ohos.c
+    description: "鸿蒙特有用例 (非断言, assert 计数 = 0): 平台探测 + 消费者程序以 netflow v5/UDP 导出流量 + nfcapd 采集落盘 + nfdump 读回校验 src/dst/port/NETFLOW v5"
+    command: "./test_nfdump_ohos <package folder> <work folder>"
+    assertion_count: 0
+
+assertion_count: 0

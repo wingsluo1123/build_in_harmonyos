@@ -1,0 +1,19 @@
+--- a/misc/desktops/Makefile.am
++++ b/misc/desktops/Makefile.am
+@@ -34,15 +34,15 @@
+ # xine input plugins dont tell their mime types yet, assume defaults.
+ # fortunately, these sort well to the end of list.
+ INPUT_MIME_TYPES = x-content/audio-cdda;x-content/video-dvd;x-content/video-svcd;x-content/video-vcd;
+ 
+ if XINE_LIST
+ xine.desktop: xine.desktop.in @XINE_LIST@
+ 	$(AM_V_GEN)cat $< > $@; \
+ 	@XINE_LIST@ | perl -ne 'print join(";",sort(split(";")))' >> $@; \
+ 	echo ';$(INPUT_MIME_TYPES)' >> $@
+ else
+-xine.desktop: xine.desktop.in $(XINE_MIME) "$(srcdir)/mime.default"
++xine.desktop: xine.desktop.in $(XINE_MIME) $(srcdir)/mime.default
+ 	$(AM_V_GEN)cat $< > $@; \
+ 	(cat "$(XINE_MIME)" 2>/dev/null || cat "$(srcdir)/mime.default" 2>/dev/null) | awk '{ printf "%s;", $$1 }' >> $@; \
+ 	echo '$(INPUT_MIME_TYPES)' >> $@
+ endif

@@ -1,0 +1,59 @@
+software: "libircclient"
+version: "1.10"
+status: "built"
+build_date: "2026-10-17"
+build_system: "autotools"
+
+source:
+  url: "https://downloads.sourceforge.net/project/libircclient/libircclient/1.10/libircclient-1.10.tar.gz"
+  sha256: "bbb26f3af348b252c5204917a7f91cfdf172f1b6afbf4df1e561b03e20503c2d"
+
+dependencies: []
+
+build:
+  configure_options:
+    - "--disable-shared"
+    - "--enable-threads"
+  cc: clang
+  cxx: clang++
+  in_source_build: true
+  make_targets:
+    - "-C src"
+
+patches_applied:
+  - "configure: 'umask 077' -> 'umask 002' (2 occurrences; config.status inherits
+     the change because it is emitted from a heredoc inside configure)"
+
+tests:
+  upstream_independent_total: 0
+  harmony_specific_consumer_cases: 2
+  target_passed: 19
+  target_status: "pass (19 consumer checks: 8 API conformance + 11 end-to-end protocol flow)"
+
+validation:
+  official_source_hash: "pass (sha256 pinned in conandata.yml, re-downloaded and verified during create)"
+  host_upstream: "not run (no host build; the library is only ever built for OHOS/armv8)"
+  ohos_static: "pass (conan create rc=0, package created, src/libircclient.a 38980 B, 19/19 consumer checks)"
+  ohos_shared: "not built (default_options shared=False); the shared path keeps the
+    existing OHOS self-signing branch but was not exercised in this round"
+
+knowledge_gained:
+  - "config.status fails on OHOS with \"can't create ./confXXXXXX/subs1.awk:
+     Permission denied\" because it creates its private tmp dir under
+     'umask 077' (mode 0700) and the same process is then refused writes into
+     it. The filesystem is NOT noexec: a mode 0755 script runs fine, only a
+     mode 0600 one fails. Patching configure's two umask 077 occurrences to 002
+     fixes the generated config.status as well, since config.status is emitted
+     from a heredoc inside configure."
+  - "Conan's Autotools helper execs ./configure directly, which OHOS rejects
+     with EACCES (Error 126) even at mode 0755. Invoking it as 'sh ./configure'
+     with the toolchain flags passed through CFLAGS works and keeps every
+     probe intact."
+  - "AutotoolsToolchain in this Conan version has no cppflags attribute; -D
+     macros live in toolchain.defines and must be folded into CFLAGS by hand."
+  - "cpp_info.libs must carry the bare stem ('ircclient'), not the file stem
+     ('libircclient'), otherwise CMakeDeps looks for liblibircclient.a and the
+     consumer fails with 'Library ... not found in package'."
+  - "libircclient's configure only appends to CFLAGS (CFLAGS=\"${CFLAGS} -O3\"),
+     so -D_GNU_SOURCE survives from the environment into src/Makefile; without
+     it gethostbyname_r and inet_ntoa have no prototypes and clang errors out."

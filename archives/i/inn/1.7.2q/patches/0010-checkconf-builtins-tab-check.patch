@@ -1,0 +1,46 @@
+--- a/config/checkconf.sh
++++ b/config/checkconf.sh
+@@ -13,21 +13,31 @@
+ ##  Get the lines we care about.
+ CONF="$1"
+ shift
+-sed -e '/^#/d' -e '/^$/d' "${CONF}" >config.x$$
+-
+-##  Find the lines with tabs.
+-grep '	' <config.x$$ >config.y$$
+-
+-##  If the lines we care about don't all have tabs, complain.
+-diff config.x$$ config.y$$ >config.z$$
+-if [ -s config.z$$ ] ; then
++##  Portable TAB check: the historical sed+grep+diff pipeline needs GNU
++##  extensions missing from HarmonyOS toybox userland, so the same rule
++##  is implemented with shell builtins only (no sed, grep, diff, rm or
++##  temp files).  Every non-comment, non-empty line must contain a TAB.
++##  The assignment below holds a literal TAB byte; no escape sequences.
++TAB="	"
++fail=0
++while IFS= read -r line || [ -n "$line" ]; do
++    case "$line" in
++    "#"*|"") ;;
++    *"$TAB"*) ;;
++    *) fail=1; break ;;
++    esac
++done <"${CONF}"
++if [ "$fail" -ne 0 ] ; then
+     echo The following config parameters have no tabs:
+-    ##  Work around lack of "-n" in some sed's.
+-    grep '<' config.z$$ | sed -e 's/</    /'
+-    rm config.[xyz]$$
++    while IFS= read -r line || [ -n "$line" ]; do
++        case "$line" in
++        "#"*|"") ;;
++        *"$TAB"*) ;;
++        *) echo "    $line" ;;
++        esac
++    done <"${CONF}"
+     exit 1
+ fi
+ 
+ ##  Everything's cool.
+-rm config.[xyz]$$
+ exit 0

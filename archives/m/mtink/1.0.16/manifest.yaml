@@ -1,0 +1,76 @@
+# manifest.yaml — mtink 1.0.16 (version-level)
+software: mtink
+version: "1.0.16"
+status: built
+build_date: "2026-10-18"
+# 上游不是 autotools：发布包自带手写 `Configure` + `Makefile.ORG` 模板，
+# Configure 只做环境探测与 sed 展开（无 configure.ac/Makefile.am）。
+build_system: makefile
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/m/mtink/mtink_1.0.16.orig.tar.gz"
+  sha256: "187e8d145e818b4b56be203403f5fe28c02f899d30d92c58e82bcef311555ba2"
+  tar_format: tar.gz
+  # Debian 官方池上的**原始上游归档**（916315 B）；与本批 scout 独立下载的同名归档
+  # sha256 逐字节一致，另有 salsa refs/tags/upstream/1.0.16 佐证版本真实性。
+  # 上游作者站点 xwtools.automatix.de 已不响应（curl (52) Empty reply from server）。
+
+build:
+  system: makefile
+  # 上游 Configure 的关键开关：-x|--no-x = 只构建 tty 版（GUI 的 Motif/X11
+  # 编译与链接规则整段退出构建面），-p = 安装前缀。
+  configure_options:
+    - "-x"
+    - "-p /"
+  dependencies: []
+  # 零硬依赖：Motif/X11 面在 ohpcd 上闭包不完整（实测 conan install
+  # --requires=motif/2.3.8 --build=never → Missing prebuilt package
+  # 'libxext/6.4.0.1'），libusb 面在 Linux/OHOS 上整体位于 #ifdef MACOS 内
+  # （usbHlp.c 编译为空 TU，llvm-nm 实测 0 个 usb_* 未定义符号），二者都不声明。
+  cc: clang
+  cflags: "-O2 -fPIC -fcommon"
+  # -fcommon 是唯一需要的编译开关：上游 2007 年代码大量使用暂定定义
+  # （int firstConfig; 等），clang 15 默认 -fno-common ⇒ ld.lld duplicate symbol。
+
+patches_applied: []
+# 零补丁：GUI 裁剪走上游自带的 `Configure -x`，不需改任何源文件。
+
+test_results:
+  # 上游 N=0：发布包无任何测试设施。
+  #   清点证据：`find . -iname '*test*' -o -iname '*check*'` → 3 命中且全部非测试
+  #   （./checkMotifVersion.sh 构建期探针、./mainSrc/checkenv.c/.h 运行期环境自检模块）；
+  #   `grep -nE '^(check|test)' Makefile.ORG` → 0 命中；
+  #   `make check` → rc=2，`make: *** No rule to make target 'check'.  Stop.`
+  # 四种候选口径（源码宏 / 框架注册 / assertion / 消费者断言）上游全部为 0。
+  type: upstream
+  total: 0
+  passed: 0
+  failed: 0
+  skipped: 0
+  not_run: 0
+  status: built
+  evidence: "make check → rc=2 'No rule to make target check'; find test/check → 3 命中全部非测试；无 tests/ 目录、无 ctest/pytest/cmocka 注册"
+
+consumer_test_results:
+  # 鸿蒙侧新增（分栏，不并入上游分母）：conan test_package 30 条实断言
+  # （3 个可执行文件的 CLI 契约 / 91 条内建型号表 / 真实设备路径退出码 /
+  #   OHOS .codesign 自签 + 「无 libusb 引用」——后者读 llvm-nm -D -u 的**动态**
+  #   符号表并带 __libc_start_main 正控；交付 ELF 是 stripped，单用 llvm-nm -u
+  #   得到空表、会让「符号不存在」类断言恒真（不可证伪），故必须 -D 且带正控）
+  type: test_package
+  total: 30
+  passed: 30
+  failed: 0
+  status: built
+  evidence: "HMBS_TEST_PACKAGE_RESULT {\"discovered\":30,\"passed\":30}；不可证伪性自证：把 llvm-nm 换成不输出桩后 A29/A30 由 PASS 转 FAIL（passed 28/30）"
+
+knowledge_gained:
+  - "鸿蒙 PC 的并口/打印机设备面整片缺失（/dev/lp0、/dev/lp1、/dev/parport0、/dev/usb/lp0、/dev/usblp0 全 ABSENT），而 sysroot 有 linux/lp.h、linux/ppdev.h、linux/parport.h ⇒ LPIOC_GET_DEVICE_ID / PPCLAIM / PPNEGOT 这些 ioctl 编译能过、链接能过、运行期一次都执行不到真语义；必须用无头入口（-v/-h/-l）+ 真实设备路径的退出码取证，不能用「跑不起来」当结论"
+  - "clang 15 默认 -fno-common 会把 2007 年 C 代码的暂定定义（int firstConfig; 等）变成重复强符号，ld.lld 报 duplicate symbol；本例用 -fcommon 一个开关解决、零源码改动（知识库既有条目 E1490/E705 已覆盖）"
+  - "HarmonyOS 无 /var ⇒ mtinkd 的 pid 文件 /var/run/mtink/<pid> 与 FIFO /var/mtink/<dev> 都建不了，上游 perror 后继续并 rc=0 退出；该失败是确定性的、可作消费者断言（知识库既有条目 E816 已覆盖）"
+  - "mtink 1.0.16 的 mainSrc/usbHlp.c 整体位于 #ifdef MACOS 内，且上游 Configure -m（libusb under Linux）会定义 MACOS 而 rw.c 整体在 #ifndef MACOS 内 ⇒ 该模式自相矛盾；Linux/OHOS 面 libusb 是死代码，libusb-compat/0.1.7 不是本包依赖（llvm-nm -D -u 实测 ttink 72 / mtinkd 68 个未定义动态符号，usb_/libusb 命中 0；注意交付 ELF 已 stripped，裸 llvm-nm -u 恒为空表、不足以作证）"
+  - "ohpcd 上 motif/2.3.8 的闭包不完整：motif 要 libx11/1.8.Z 而 libxext/6.4.0.1 的发布二进制按 libx11/6.4.Z 构建，conan install --requires=motif/2.3.8 --build=never 报 Missing prebuilt package 'libxext/6.4.0.1' ⇒ 依赖 motif 的 GUI 面在 CI（--build=<pkg>/*，依赖必须预编译可得）结构性不可交付；上游 Configure -x 正好提供免补丁的裁剪路径"
+  - "上游 Configure 用 `uname = Linux` 判断是否把 mtinkd/askPrinter 加入 PRG，而鸿蒙 uname 是 HarmonyOS ⇒ 默认 make 不构建这两个目标，配方必须显式点名；且上游所有 install-* 目标都被 `id | grep '=0(root)'` 包住并写 /etc、/usr/lib/cups，无法用于 Conan 打包"
+
+knowledge_ref:
+  - "E4312: 鸿蒙 PC 无并口/打印机设备节点——编译能过的 linux/lp.h+linux/ppdev.h 面运行期无物可测，须用无头探针取退出码 (knowledge/drafts/E4312-draft-D066.kv)"

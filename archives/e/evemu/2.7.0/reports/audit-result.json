@@ -1,0 +1,46 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "R6",
+      "file": "archives/e/evemu/2.7.0/conanfile.py",
+      "line": 105,
+      "description": "build() 在构建期对 tarball 自带的生成文件 configure 做就地字符串替换（mktemp -d → mkdir 回退分支）。R6 要求生成产物应通过 generate() 或 patches/ 处理，该内联改写两者都不是。有 notes.md 一手依据与 4ti2/1.6.10 同类先例背书，且模式未命中时显式 warning 不静默，故未升级为 P1/P0。",
+      "fix_suggestion": "在 PR 正文补充说明该内联改写属已披露先例，或改在 generate() 阶段（apply_conandata_patches 之后、configure 之前）处理，保留未命中时的显式 warning。"
+    },
+    {
+      "severity": "P2",
+      "rule_id": "DOC-AUDIT-TRAIL",
+      "file": "archives/e/evemu/2.7.0/notes.md",
+      "line": 176,
+      "description": "notes.md 宣称「2026-10-15 补件后以同一基准重跑独立审计，新判决覆盖 reports/audit-result.json（其 changed_files 与 issues 为准）」，但入库的 audit-result.json 的 summary 明确写「14 个变更文件逐条核对完毕」，且未覆盖补件新增的软件级 README.md / 软件级 manifest.yaml / 该判决件自身 —— 文件实为 14 文件口径的旧判决，与 notes 的「已覆盖（17 文件口径）」表述不符（变更文件数 17 的本次审计输入可证实此差异）。属审计留痕自洽性问题，不是测试结果伪造。",
+      "fix_suggestion": "以本 17 文件口径审计结果重写 reports/audit-result.json 后入库，或将 notes.md 表述改为「旧判决留档、新判决见 PR 审核」，保证 notes 与文件内证据逐字自洽。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R34-adjacent",
+      "file": "archives/e/evemu/2.7.0/test_package/MANIFEST.yml",
+      "line": 56,
+      "description": "assertion_count=10 的组分注释与实际代码不符：注释写「test.c 的 5 条 API 断言 + CLI 信息面的 2 条 grep 断言」，实际 test.c 为 4 条断言（evemu_new 非空 / get_name 匹配 / set_name round-trip / C++ probe），CLI 面为 3 条（rc==1 显式断言 + 2 条 grep）。3+4+3=10 总数自洽但组分口径错误；且 test.c 条目 description 把 CLI 断言归到 test.c 名下，实际在 test_package/conanfile.py 的 test() 内。",
+      "fix_suggestion": "把组分注释改为「3 个上游测试程序 + test.c 的 4 条 API 断言 + CLI 面 3 条断言（rc==1 + 2 grep）」，并把 CLI 断言归属移到 test_package/conanfile.py 条目，同步 notes.md 口径。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R38",
+      "file": "archives/e/evemu/commands.json",
+      "line": 9,
+      "description": "versions.\"2.7.0\" 标注 binary: true，但版本级 manifest.yaml status=built（验证通过、未 upload 制品仓）。若 binary 语义为「制品仓已发布可用二进制」则与状态不一致，接近状态真实性边界；R38 示例在未发布场景用 binary: false。",
+      "fix_suggestion": "核实 binary 字段判据：若指制品仓已发布则改为 false 并在发布后更新；若指本地已构建产物，在 notes.md 写明该字段语义。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R33-adjacent",
+      "file": "archives/e/evemu/2.7.0/conanfile.py",
+      "line": 80,
+      "description": "configure_args 硬编码 --build/--host=aarch64-unknown-linux-musl，不随 self.settings.arch 变化，非 aarch64 目标会得到错误三元组。当前工作区目标仅为 HarmonyOS aarch64 且有同仓约 788 个同款 autotools 配方先例，仅作建议级改进。",
+      "fix_suggestion": "按 self.settings.arch 映射三元组，或在注释中显式声明本配方仅支持 aarch64 目标。"
+    }
+  ],
+  "summary": "17 个变更文件逐条对照 rules 核对完毕，重点四项均通过：① test_package 无欺骗性 —— test.c/test_cpp.cpp 真实调用 libevemu API（evemu_new/get_name/set_name/delete + C++ probe），CLI 面仅断言信息面（--bogus-option 走 getopt_long default 分支在 open() 之前返回 usage 横幅，rc==1 为显式 raise 断言 + 2 条真实串 grep），全程无「可录制/可回放事件」断言、无 || true、无吞错；② 读数自洽 —— sha256 78c9400d…379（64 位 hex、非全零/全 f）在 conandata.yml 与版本级 manifest.yaml 逐字一致，status=built 未虚报 published，make check 3/3 与 MANIFEST 上游 3 条一致，能力墙读数（CapEff=0x2a 无 CAP_SYS_ADMIN/RAWIO、/dev/input EACCES）与测试面收窄口径互相印证，README 与软件级 manifest 的适配要点与 conanfile/patches 实际内容一致；③ 两份补丁均为 a/…/b/… 相对路径，仅注释提及 OHOS libc，未引入任何 #ifdef __OHOS__ 平台宏（versionsort→自写数值比较、program_invocation_short_name→argv[0] basename，均为 POSIX/ISO C 等价实现）；④ 版本 2.7.0 在 conandata.yml/conanfile.py/版本级 manifest/软件级 manifest/commands.json/test_package/MANIFEST.yml/目录路径全链一致。conanfile.py 有 shebang+docstring、类名 PascalCase、方法顺序合规、package_info 设 cpp_info.libs，commands.json 合法 JSON 且 type/name 合规。无 P0、无 P1。2 条 P2（build() 内联改写生成文件 configure 的 R6 字面偏离属已披露先例；notes 宣称 audit-result.json 已被 17 文件新判决覆盖但入库件仍是 14 文件旧口径）、3 条 P3（assertion_count 组分口径、commands.json binary 字段语义、三元组硬编码）按披露口径处理即可，判定通过。"
+}

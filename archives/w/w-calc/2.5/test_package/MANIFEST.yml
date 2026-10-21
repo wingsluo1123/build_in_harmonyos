@@ -1,0 +1,46 @@
+# test_package/MANIFEST.yml
+# w-calc 2.5 — 上游官方测试声明文件
+# CI (build_and_test.sh L0e) 强制要求此文件存在。
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: w-calc/2.5
+homepage: "https://wcalc.sourceforge.net/"
+
+# 上游测试口径：automake 并行测试框架，test/Makefile.am 的 TESTS 变量登记
+# 12 个 POSITIVE_TESTS + 9 个 XFAIL_TESTS，共 21 个测试。
+upstream_tests_exist: true
+upstream_test_total: 21
+upstream_test_count_method: "autotools_tests"
+
+upstream_check_command: "make check"
+upstream_test_in_build: true
+upstream_test_command: "make check"
+
+upstream_tests:
+  - {file: test/basic_ints.test, source: wcalc-2.5.tar.bz2/test/basic_ints.test, description: "整数/各进制字面量解析与断言"}
+  - {file: test/basic_float.test, source: wcalc-2.5.tar.bz2/test/basic_float.test, description: "浮点字面量解析与断言"}
+  - {file: test/basic_vars.test, source: wcalc-2.5.tar.bz2/test/basic_vars.test, description: "基本变量与 last-answer 变量"}
+  - {file: test/basic_math.test, source: wcalc-2.5.tar.bz2/test/basic_math.test, description: "基本算术、模、位运算"}
+  - {file: test/implicit_mult.test, source: wcalc-2.5.tar.bz2/test/implicit_mult.test, description: "隐式乘法与函数调用"}
+  - {file: test/precision_guard.test, source: wcalc-2.5.tar.bz2/test/precision_guard.test, description: "精度保护"}
+  - {file: test/conversion.test, source: wcalc-2.5.tar.bz2/test/conversion.test, description: "单位换算"}
+  - {file: test/website_math.test, source: wcalc-2.5.tar.bz2/test/website_math.test, description: "官网示例表达式"}
+  - {file: test/factorial.test, source: wcalc-2.5.tar.bz2/test/factorial.test, description: "阶乘与精度切换"}
+  - {file: test/formatting.test, source: wcalc-2.5.tar.bz2/test/formatting.test, description: "输出格式化"}
+  - {file: test/active_variable.test, source: wcalc-2.5.tar.bz2/test/active_variable.test, description: "活动变量（延迟求值）"}
+  - {file: test/vars.test, source: wcalc-2.5.tar.bz2/test/vars.test, description: "变量组合与函数"}
+  - {file: test/err.assert.test, source: wcalc-2.5.tar.bz2/test/err.assert.test, description: "断言失败路径（上游 XFAIL）"}
+  - {file: test/err.question.test, source: wcalc-2.5.tar.bz2/test/err.question.test, description: "问号语法（上游 XFAIL）"}
+  - {file: test/err.assign.test, source: wcalc-2.5.tar.bz2/test/err.assign.test, description: "保留变量赋值（上游 XFAIL）"}
+  - {file: test/err.conv_category1.test, source: wcalc-2.5.tar.bz2/test/err.conv_category1.test, description: "非法单位换算 1（上游 XFAIL）"}
+  - {file: test/err.conv_category2.test, source: wcalc-2.5.tar.bz2/test/err.conv_category2.test, description: "非法单位换算 2（上游 XFAIL）"}
+  - {file: test/err.recursion1.test, source: wcalc-2.5.tar.bz2/test/err.recursion1.test, description: "递归变量 1（上游 XFAIL）"}
+  - {file: test/err.recursion2.test, source: wcalc-2.5.tar.bz2/test/err.recursion2.test, description: "递归变量 2（上游 XFAIL）"}
+  - {file: test/err.recursion3.test, source: wcalc-2.5.tar.bz2/test/err.recursion3.test, description: "递归变量 3（上游 XFAIL）"}
+  - {file: test/err.recursion4.test, source: wcalc-2.5.tar.bz2/test/err.recursion4.test, description: "递归变量 4（上游 XFAIL）"}
+
+test_package_tests:
+  - {file: test.c, description: "编译消费者程序并真实执行安装产物 bin/wcalc，8 项确定性断言：①可执行 ②--version 含 2.5 ③1+2=3 ④-P10 1/3=0.3333333333 ⑤-h 255=0xff ⑥变量跨参数持久 ⑦stdin 求值 ⑧语法错误诊断", command: "./test_wcalc <bindir>/wcalc"}
+
+# 消费者断言总数（与 test.c 实际断言数、HMBS_TEST_PACKAGE_RESULT.discovered 一致）
+assertion_count: 8

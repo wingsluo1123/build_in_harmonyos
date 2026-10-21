@@ -1,0 +1,20 @@
+--- a/libgweather/gweather-private.h
++++ b/libgweather/gweather-private.h
+@@ -5,9 +5,17 @@
+  */
+
+ #pragma once
+
+ #include <time.h>
+ #include <libintl.h>
++#if !defined(__GLIBC__)
++/* OHOS (musl): the SDK sysroot's libintl.h does not declare
++ * bindtextdomain(), but the OHOS musl libc exports the symbol at link
++ * and run time (the same dynamic contract geocode-glib already relies
++ * on). Keep the prototype explicit: libgweather builds with
++ * -Werror=implicit-function-declaration. */
++extern char *bindtextdomain (const char *domainname, const char *dirname);
++#endif
+ #include <math.h>
+ #include <gio/gio.h>
+ #include <libsoup/soup.h>

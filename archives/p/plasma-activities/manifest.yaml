@@ -1,0 +1,30 @@
+software: plasma-activities
+display: "Plasma Activities"
+description: "KDE Plasma activities library: Consumer/Controller/Info C++ API over D-Bus, the org.kde.activities QML module and the plasma-activities-cli6 diagnostic tool"
+category: library
+homepage: "https://invent.kde.org/plasma/plasma-activities"
+license: LGPL-2.1-or-later
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "KF_IGNORE_PLATFORM_CHECK=TRUE bypasses the KDE platform allowlist (OHOS not listed)"
+    - "Qt provider is qtbase-sql-dbus/6.11.1: the plain qtbase/6.11.1 package ships FEATURE_dbus=OFF and no Sql module, while the top level needs Qt6 Core+DBus and src/imports needs Gui/Qml/Quick/Sql (kactivitymanagerd 6.7.2 precedent)"
+    - "plain qtbase/6.11.1 stays in the graph for qtdeclarative/kconfig/kcoreaddons; qtbase-sql-dbus is prepended last in CMAKE_PREFIX_PATH and LD_LIBRARY_PATH so it wins the Qt6 lookup"
+    - "QT_ADDITIONAL_PACKAGES_PREFIX_PATH points at the qtdeclarative prefix so find_package(Qt6 COMPONENTS Qml Quick) resolves (analitza 26.04.0 precedent)"
+    - "Shared libraries are emitted unversioned (CMAKE_PLATFORM_NO_VERSIONED_SONAME=ON + explicit -soname flags): HMDFS rejects symlink() with EPERM, so CMake's versioned .so chain cannot be created on device (E330 family)"
+    - "ECM 6.26 KDEInstallDirs runs qtpaths at configure time; /system/lib64 and the SDK llvm/lib are prepended to LD_LIBRARY_PATH so the compatible libc++_shared.so is found"
+    - "Only QFlatSetTest is registered with CTest upstream; PlasmaActivitiesTest (6 further QTest functions) is built but has no add_test and needs kactivitymanagerd + a session D-Bus, unavailable on OHOS"
+  common_dependencies:
+    - qtbase-sql-dbus
+    - qtbase
+    - qtdeclarative
+    - kconfig
+    - kcoreaddons
+    - ecm
+
+versions:
+  "6.7.2":
+    status: built
+    build_date: "2026-10-18"
+    conan_ref: "plasma-activities/6.7.2"

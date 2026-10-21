@@ -1,0 +1,27 @@
+package: levmar/2.6
+homepage: "https://www.ics.forth.gr/~lourakis/levmar/"
+
+upstream_check_command: "./lmdemo"
+upstream_test_in_build: true
+upstream_test_command: "./lmdemo"
+upstream_test_note: >-
+  Upstream 2.6 registers no automated test suite: its CMakeLists.txt defines no
+  enable_testing()/add_test() entry and the tarball has no tests/ directory, so
+  N_static = 0 and ctest reports "No tests were found!!!". The single executable
+  upstream ships is the example program lmdemo, which the recipe runs from
+  build() and whose printed Levenberg-Marquardt result is asserted (expected
+  stop reason 1-4 and Meyer's problem minimum).
+
+upstream_tests: []
+
+test_package_tests:
+  - file: test_levmar.c
+    description: >-
+      Consumes the packaged header and static library: solves a synthetic
+      exponential fit with dlevmar_dif (finite-difference Jacobian) and with
+      the box-constrained dlevmar_bc_dif, and asserts convergence, residual
+      norm, recovered parameters and the public header constants.
+    command: "./levmar_test"
+
+assertion_count: 7
+max_rss_mb: 32

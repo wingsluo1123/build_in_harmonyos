@@ -1,0 +1,328 @@
+diff --git a/include/Tao.h b/include/Tao.h
+index 7a96c09..bc00514 100644
+--- a/include/Tao.h
++++ b/include/Tao.h
+@@ -26,7 +26,10 @@ extern "C"
+ }
+ 
+ #include "TaoSynthEngine.h"
++#ifndef TAO_NO_GRAPHICS
++// OHOS exposes no desktop GL/GLUT: the instrument viewer is optional.
+ #include "TaoGraphicsEngine.h"
++#endif
+ 
+ extern char *optarg;
+ extern int optind, opterr, optopt;
+@@ -86,7 +89,9 @@ public:
+     float newStart, newEnd; 
+ 
+     TaoSynthEngine synthesisEngine;
++#ifndef TAO_NO_GRAPHICS
+     TaoGraphicsEngine graphicsEngine;
++#endif
+ 
+ private:
+     void (*scoreFunctionPtr)(void);    // User supplied functions
+diff --git a/include/taodefs.h b/include/taodefs.h
+index 08b5728..1d96522 100644
+--- a/include/taodefs.h
++++ b/include/taodefs.h
+@@ -18,7 +18,9 @@
+ 
+ #include "Tao.h"
+ #include "TaoSynthEngine.h"
++#ifndef TAO_NO_GRAPHICS
+ #include "TaoGraphicsEngine.h"
++#endif
+ #include "TaoAccessPoint.h"
+ #include "TaoInstrument.h"
+ #include "TaoString.h"
+diff --git a/libtao/Tao.cc b/libtao/Tao.cc
+index 84130bb..3a5808e 100644
+--- a/libtao/Tao.cc
++++ b/libtao/Tao.cc
+@@ -117,6 +117,7 @@ void Tao::masterTick()
+ 
+     synthesisEngine.calculateInstrumentForces();
+ 
++#ifndef TAO_NO_GRAPHICS
+     if (graphicsEngine.active &&
+ 	(synthesisEngine.tick%graphicsEngine.refreshRate==0))
+ 	{
+@@ -124,6 +125,7 @@ void Tao::masterTick()
+ 	graphicsEngine.pushModelViewMatrix();
+ 	graphicsEngine.rotateAndTranslate();
+ 	}
++#endif
+ 
+     if (synthesisEngine.isActive()) executeScore();
+ 
+@@ -131,6 +133,7 @@ void Tao::masterTick()
+     synthesisEngine.calculateInstrumentPositions();
+     synthesisEngine.Tick();
+ 
++#ifndef TAO_NO_GRAPHICS
+     if (graphicsEngine.active &&
+        (synthesisEngine.tick%graphicsEngine.refreshRate==0))
+ 	{
+@@ -139,6 +142,7 @@ void Tao::masterTick()
+ 	graphicsEngine.swapBuffers();
+ 	graphicsEngine.flushGraphics();
+ 	}
++#endif
+     }
+ 
+ void taoMasterTick()
+@@ -158,8 +162,13 @@ void Tao::main(int argc, char *argv[])
+ 	switch(option)
+ 	    {
+ 	    case 'g':
++#ifndef TAO_NO_GRAPHICS
+ 		graphicsEngine.activate();
+ 		synthesisEngine.pause();
++#else
++		std::cerr << "tao: this build has no graphics support; "
++			     "ignoring -g and synthesising headless" << std::endl;
++#endif
+ 		break;
+ 	    case 's':
+ 		audioRate=atoi((char *)optarg);
+@@ -170,10 +179,12 @@ void Tao::main(int argc, char *argv[])
+ 	    }
+ 	}
+ 
++#ifndef TAO_NO_GRAPHICS
+     if (graphicsEngine.active)
+         {
+ 	graphicsEngine.init(argc, argv);
+ 	}
++#endif
+     	
+     setAudioSampleRate();   // These overloaded functions with no arguments only
+     setScoreDuration();	    // have an effect if Tao is used in script mode
+@@ -194,13 +205,15 @@ void Tao::main(int argc, char *argv[])
+     seedRandomNumGen();
+     initInstrumentsAndDevices();
+ 
++#ifndef TAO_NO_GRAPHICS
+     if (graphicsEngine.active)
+         {
+ 	graphicsEngine.calculateOriginForRotations();
+ 	graphicsEngine.mainLoop();
+         }
+-
+-    else while(1)
++    else
++#endif
++    while(1)
+ 	{
+ 	masterTick();
+ 	}
+diff --git a/libtao/TaoAccessPoint.cc b/libtao/TaoAccessPoint.cc
+index 25b4d7c..4c7ad45 100644
+--- a/libtao/TaoAccessPoint.cc
++++ b/libtao/TaoAccessPoint.cc
+@@ -111,8 +111,10 @@ float TaoAccessPoint::getForce()
+ 	    break;
+ 	}
+ 
++#ifndef TAO_NO_GRAPHICS
+     if (tao.graphicsEngine.active)
+         tao.graphicsEngine.displayAccessPoint(*this);
++#endif
+ 
+     return a*X*Y + b*X_*Y + c*X*Y_ + d*X_*Y_;	
+     }
+@@ -192,8 +194,10 @@ float TaoAccessPoint::getVelocity()
+             break;
+   	}
+ 
++#ifndef TAO_NO_GRAPHICS
+     if (tao.graphicsEngine.active)
+         tao.graphicsEngine.displayAccessPoint(*this);
++#endif
+ 
+     return a*X*Y + b*X_*Y + c*X*Y_ + d*X_*Y_;	
+     }
+diff --git a/libtao/TaoBow.cc b/libtao/TaoBow.cc
+index 3a79109..814ef72 100644
+--- a/libtao/TaoBow.cc
++++ b/libtao/TaoBow.cc
+@@ -115,6 +115,7 @@ void TaoBow::update()
+ 
+ void TaoBow::display()
+     {
++#ifndef TAO_NO_GRAPHICS
+     if (!active || !targetInstrument || !tao.graphicsEngine.active) return;
+     if (tao.synthesisEngine.tick%tao.graphicsEngine.refreshRate!=0) return;
+ 
+@@ -134,4 +135,5 @@ void TaoBow::display()
+ 
+         tao.graphicsEngine.displayCharString(x,y,z,this->name,1.0,1.0,1.0);
+ 	}
++#endif
+     }
+diff --git a/libtao/TaoConnector.cc b/libtao/TaoConnector.cc
+index 7dd4910..1976a63 100644
+--- a/libtao/TaoConnector.cc
++++ b/libtao/TaoConnector.cc
+@@ -348,6 +348,7 @@ void TaoConnector::updateAnchorToAccess()
+ 
+ void TaoConnector::display()
+     {
++#ifndef TAO_NO_GRAPHICS
+     if (!tao.graphicsEngine.active) return;
+     if (tao.synthesisEngine.tick%tao.graphicsEngine.refreshRate!=0) return;
+ 
+@@ -387,4 +388,5 @@ void TaoConnector::display()
+ 	    }
+ 	tao.graphicsEngine.displayAccessPoint(accessPoint2);
+ 	}
++#endif
+     }
+diff --git a/libtao/TaoHammer.cc b/libtao/TaoHammer.cc
+index f8e5bad..13b570a 100644
+--- a/libtao/TaoHammer.cc
++++ b/libtao/TaoHammer.cc
+@@ -150,6 +150,7 @@ int TaoHammer::getMaxImpacts()			{return maxImpacts;}
+ 
+ void TaoHammer::display()
+     {
++#ifndef TAO_NO_GRAPHICS
+     if (!tao.graphicsEngine.active || !active || !targetInstrument) return;
+     if (tao.synthesisEngine.tick%tao.graphicsEngine.refreshRate!=0) return;
+ 
+@@ -171,4 +172,5 @@ void TaoHammer::display()
+ 
+         tao.graphicsEngine.displayCharString(x,y,z,this->name,1.0,1.0,1.0);
+ 	}
++#endif
+     }
+diff --git a/libtao/TaoInstrument.cc b/libtao/TaoInstrument.cc
+index 910dbea..86dca07 100644
+--- a/libtao/TaoInstrument.cc
++++ b/libtao/TaoInstrument.cc
+@@ -108,7 +108,9 @@ TaoAccessPoint &TaoInstrument::operator()(float x, float y)
+     TaoAccessPoint &p = currentAccess;
+ 
+     point(x,y);
++#ifndef TAO_NO_GRAPHICS
+     tao.graphicsEngine.displayAccessPoint(p);
++#endif
+     
+     return p;
+     }
+diff --git a/libtao/TaoOutput.cc b/libtao/TaoOutput.cc
+index 477bedd..23bd6c3 100644
+--- a/libtao/TaoOutput.cc
++++ b/libtao/TaoOutput.cc
+@@ -58,14 +58,22 @@ TaoOutput::TaoOutput(const char *filename, int channels)
+     index=0;
+     first_write=1;
+     numChannels=channels;
++#ifndef TAO_NO_GRAPHICS
+     displayString=new char[50];
++#else
++    displayString=NULL;
++#endif
+     buffer=new float[buffersize];
+     next=NULL;
+     samples=new float[numChannels];
+     maxSample=0.0;
+     outputfile=new std::ofstream;
+     //why are we initialising the stream with an empty string?
++#ifndef TAO_NO_GRAPHICS
+     displayStream=new std::ostringstream(displayString, std::ostringstream::out);
++#else
++    displayStream=NULL;
++#endif
+     
+     std::ostringstream tempname(std::ostringstream::out);
+     tempname << filename << ".dat" << std::ends;
+@@ -88,14 +96,22 @@ TaoOutput::TaoOutput(const char *outputName, const char *filename, int channels)
+     index=0;
+     first_write=1;
+     numChannels=channels;
++#ifndef TAO_NO_GRAPHICS
+     displayString=new char[50];
++#else
++    displayString=NULL;
++#endif
+     buffer=new float[buffersize];
+     next=NULL;
+     samples=new float[numChannels];
+     maxSample=0.0;
+     outputfile=new std::ofstream;
+     //why are we initialising the stream with an empty string?
++#ifndef TAO_NO_GRAPHICS
+     displayStream=new std::ostringstream(displayString, std::ostringstream::out);
++#else
++    displayStream=NULL;
++#endif
+ 
+     std::ostringstream tempname(std::ostringstream::out);
+     tempname << filename << ".dat" << std::ends;
+@@ -155,6 +171,7 @@ void TaoOutput::update()
+     
+ void TaoOutput::display()
+     {
++#ifndef TAO_NO_GRAPHICS
+     if (!tao.graphicsEngine.active) return;
+     if (tao.synthesisEngine.tick%tao.graphicsEngine.refreshRate!=0) return;
+     
+@@ -181,4 +198,5 @@ void TaoOutput::display()
+     //    Could display a list of outputs and their positions in text
+     //    form at top left of graphics window. Could also display current
+     //    sample value and max sample value.
++#endif
+     }
+diff --git a/libtao/TaoStop.cc b/libtao/TaoStop.cc
+index 6227817..3f275e4 100644
+--- a/libtao/TaoStop.cc
++++ b/libtao/TaoStop.cc
+@@ -99,6 +99,7 @@ void TaoStop::update()
+ 
+ void TaoStop::display()
+     {
++#ifndef TAO_NO_GRAPHICS
+     if (!tao.graphicsEngine.active || !active || !targetInstrument) return;
+     if (tao.synthesisEngine.tick%tao.graphicsEngine.refreshRate!=0) return;
+ 
+@@ -116,4 +117,5 @@ void TaoStop::display()
+ 
+         tao.graphicsEngine.displayCharString(x,y,z,this->name,1.0,1.0,1.0);
+         }
++#endif
+     }
+diff --git a/taoparse/taoparser.yy b/taoparse/taoparser.yy
+index 90e028d..bf9f377 100644
+--- a/taoparse/taoparser.yy
++++ b/taoparse/taoparser.yy
+@@ -2851,11 +2851,13 @@ label_statement	    : LABEL '(' variable ',' expr ',' expr ',' expr ','
+ 			 {
+ 
+ /*******************************************************************************/
++std::cout << "\n#ifndef TAO_NO_GRAPHICS" << std::endl;
+ std::cout << "\n" << indent << "tao.graphicsEngine.label("
+      << "\n" << indent << "    " << $3.s << "," << $5.s
+      << "," << $7.s << "," << $9.s << "," << $11.s << "," << $13.s 
+      << "," << $15.s << "," << $17.s << ");"
+      << std::endl;
++std::cout << "\n#endif" << std::endl;
+ /*******************************************************************************/
+ 
+ 			 delete [] $1.s;
+@@ -2883,11 +2885,13 @@ std::cout << "\n" << indent << "tao.graphicsEngine.label("
+ 			 {
+ 
+ /*******************************************************************************/
++std::cout << "\n#ifndef TAO_NO_GRAPHICS" << std::endl;
+ std::cout << "\n" << indent << "tao.graphicsEngine.label("
+      << "\n" << indent << "    " << $3.s << "," << $5.s
+      << "," << $7.s << "," << $9.s << "," << $11.s << "," << $13.s 
+      << "," << $15.s << "," << $17.s << "," << $19.s << ");"
+      << std::endl;
++std::cout << "\n#endif" << std::endl;
+ /*******************************************************************************/
+ 
+ 			 delete [] $1.s;

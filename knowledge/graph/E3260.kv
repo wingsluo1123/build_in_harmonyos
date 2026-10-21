@@ -1,0 +1,86 @@
+# ═══ Draft knowledge entry — 经典 Autotools termcap/tgetent 库搜索链不含 -lncursesw ═══
+# Software: xaric 0.13.9（同类面：任何用 AC_CHECK_LIB 嵌套链逐项探测
+#   termcap/termlib/curses/xtermcap 的老式 TUI/IRC 客户端，如 ircII 家族）
+# Gate: conan create / finish W2（configure 阶段硬失败）
+# Status: DRAFT — 与 cdcd-0.6.6-legacy-autotools-ohos-detection-mismatches 同族，
+#   增量为「嵌套 AC_CHECK_LIB 链」而非单层检测的修复模式与 fi 闭合坑
+id:                     E3260
+trigger_tool:           configure
+phase:                  configuration
+error_signature:       i can not find tgetent|checking for tgetent in -l(termcap|termlib|curses|xtermcap)\.\.\. no|cannot find the curses library
+severity:               3
+category:               detection, ohos, portability, build-system, autotools
+prescan_pattern:       AC_CHECK_LIB\((termcap|termlib|curses|xtermcap|tinfo)\s*,\s*tgetent
+prescan_globs:         configure.ac, configure.in, aclocal.m4, configure
+match_keywords:        tgetent, tgetstr, tputs, tgoto, termcap, termlib, curses, xtermcap, tinfo, ncursesw, libncursesw.a, AC_CHECK_LIB, 嵌套, 搜索链, 检测链, fi 闭合, bash -n, sh -n, ac_cv_lib_, i can not find tgetent, ircII, xaric, R26
+title:                 经典 Autotools 用嵌套 AC_CHECK_LIB 链逐项探测 termcap/termlib/curses/xtermcap 的 tgetent，链中没有 -lncursesw；OHOS 的 ncurses/6.6 包只交付 libncursesw.a（tgetent/tinfo 已并入），configure 四项全 miss 后 AC_MSG_ERROR "i can not find tgetent" 硬失败
+root_cause: |
+  1990–2000 年代 autotools 工程普遍用 AC_CHECK_LIB 嵌套链（每一层的
+  action-if-not-found 是下一层 AC_CHECK_LIB）依次探测 termcap → termlib →
+  curses → xtermcap，在全部失败时 AC_MSG_ERROR。该链的库名清单定型于
+  termcap/tinfo 独立成库的时代，不含 -lncursesw。
+  OHOS 制品仓 ncurses/6.6 是 --enable-widec 静态包，只发布
+  libncursesw.a（formw/menuw/panelw/ncursesw），tgetent/tgetnum/tgetstr/
+  tgoto/tputs 等 termcap 符号均已并入 libncursesw.a，不存在独立的
+  libtermcap/libtinfo/libcurses/libxtermcap。于是链上四个 conftest 全部
+  链接失败 → configure 报 "i can not find tgetent. you need to help me"
+  退出，Makefile 不生成。
+  与单层 AC_CHECK_LIB(curses, func) 不同（见 cdcd 草稿），嵌套链不能把
+  curses 直接改名为 ncursesw 了事：必须在链中保持原顺序「插入」一层
+  AC_CHECK_LIB(ncursesw, tgetent, ...)，插入点在 -lcurses 失败分支、
+  -lxtermcap 之前。
+affected_scope:        任何 configure.ac 中出现 AC_CHECK_LIB(termcap/termlib/curses/xtermcap, tgetent/tputs/tgetstr) 嵌套链的 Autotools 软件；ircII 家族终端 IRC 客户端（xaric 等）、老式 TUI 程序、仅在传统 termcap 库名下找 tgetent 的程序均受影响；现代 CMake/meson 项目不受影响
+verification_cmd:      bash -n configure && sh -n configure && grep -q "tgetent in -lncursesw" configure && ./configure ac_cv_lib_termcap_tgetent=no ac_cv_lib_termlib_tgetent=no ac_cv_lib_curses_tgetent=no ac_cv_lib_xtermcap_tgetent=no LDFLAGS="-L<ncurses>/lib" 2>&1 | grep "checking for tgetent in -lncursesw... yes"
+rec_priority:          1
+rec_approach:          patch-autotools-chain-insert-ncursesw
+rec_description: |
+  以 portability patch 同时修改 configure.ac 与 tarball 内生成的
+  configure（conan 构建不跑 autoreconf，只改 configure.ac 不生效）：
+  1) configure.ac：在 -lcurses 与 -lxtermcap 两层之间插入
+     AC_CHECK_LIB(ncursesw, tgetent, [LIBS="-lncursesw $olibs"],
+     [AC_CHECK_LIB(xtermcap, ...)])；AC_CHECK_LIB 嵌套宏每增加一层，
+     最内层 AC_MSG_ERROR 行尾必须多一个闭合括号（N 个库 → N 个闭合）。
+  2) 生成的 configure：在对应 if/else 嵌套栈中插入完整的
+     -lncursesw 检测块（checking 行 + ac_cv_lib_ncursesw_tgetent
+     缓存判断 + conftest 链接测试 + result + if xyes 分支），并在
+     xtermcap 失败分支（as_fn_error "i can not find tgetent..."）之后
+     的闭合 fi 序列中补一个 fi——链上库数从 4 变 5，闭合 fi 必须为 5。
+  3) conanfile generate() 注入 -I<ncurses>/include 与
+     -L<ncurses>/lib（用 self.dependencies["ncurses"].package_folder，
+     遵循 R49），使 -lncursesw 的 conftest 能链接到 libncursesw.a。
+  4) 补丁完成后必须 bash -n configure 与 sh -n configure 双验证：
+     macOS 自带 bash 3.2 的 sh POSIX 模式会漏报部分 fi 不匹配
+     （sh -n 可能通过而真实执行在 config.status 阶段 exit 258），
+     只有 bash -n 能在解析期捕获嵌套未闭合；再用 4 个
+     ac_cv_lib_*_tgetent=no 缓存变量强走各分支，确认探测顺序为
+     termcap→termlib→curses→ncursesw→xtermcap 且 ncursesw 能 yes。
+rec_command:          patch -p1 < patches/0001-tgetent-ncursesw.patch && bash -n configure && sh -n configure && ./configure ac_cv_lib_termcap_tgetent=no ac_cv_lib_termlib_tgetent=no ac_cv_lib_curses_tgetent=no ac_cv_lib_xtermcap_tgetent=no LDFLAGS="-L<ncurses>/lib"
+rec_auto_fix:          false
+rec_impl:
+fallback_priority:     2
+fallback_approach:    cache-vars-only-for-ci
+fallback_description: 临时绕过：向 configure 传 ac_cv_lib_termcap_tgetent=yes（或命中链上任意一项）并在 LIBS/LDFLAGS 显式给 -lncursesw 让 conftest 链接通过；仅可用于 CI 排障，不改变上游检测链，属技术债务，须在 notes 记录
+fallback_command:     ./configure ac_cv_lib_termcap_tgetent=yes LIBS="-lncursesw" LDFLAGS="-L<ncurses>/lib"
+fallback_auto_fix:    false
+fallback_impl:
+forbid_1_pattern:     sed -i .*configure(?!\s*--)|只改 configure\.ac 不改生成的 configure
+forbid_1_reason:      conan 直接消费 release tarball 内已生成的 configure，构建时不运行 autoreconf；只改 configure.ac 不会进入实际构建，且对生成文件的任何就地修改都必须固化为 patches/ 下的 .patch
+forbid_1_consequence: CI 上仍按旧检测链报 "i can not find tgetent"，本地不易察觉
+forbid_2_pattern:     ln -s .*libncursesw\.a .*(libtermcap|libcurses|libtinfo)|ln -s .*libncursesw\.so
+forbid_2_reason:      在依赖目录伪造 libtermcap/libcurses 软链是库名假象，绕过包管理边界、违反 R26 静态链接规范，换机器/换包 revision 即失效，且后续维护者无法从配方看出依赖真实形态
+forbid_2_consequence: 构建不可复现、链接到非预期库、升级 ncurses 包后静默断裂
+forbid_3_pattern:     ac_cv_lib_curses_tgetent=yes(?!.*ncursesw)|LDFLAGS=.*-lncursesw(?!.*patch)
+forbid_3_reason:      缓存变量声称 curses 检测成功但 LIBS 仍被置为 -lcurses（该库不存在），链接阶段失败；仅在 LDFLAGS 加 -lncursesw 无法让 configure 越过 AC_MSG_ERROR——检测点本身不通过就退出
+forbid_3_consequence: 把 configure 阶段硬失败转成链接阶段 undefined/找不到库的二次故障，定位更难
+principles:             P002, P003, P005, P012
+doc_file:             knowledge/drafts/DRAFT-xaric-0.13.9-autotools-tgetent-chain-ncursesw.md
+last_updated:         2026-10-14
+source_event:         xaric 0.13.9 configure 在仅含 libncursesw.a 的 OHOS 依赖面下报 "i can not find tgetent.  you need to help me"（本地以 ac_cv_lib_* 缓存变量 + stub libncursesw.a 完整复现）
+authors:              songzhenyan <apVBMI1DvwCqWTll.songzhenyan@noreply.gitcode.com>
+source_pr:
+source_commit:
+metrics_success_count: 1
+metrics_fail_count:   0
+metrics_confidence:   1.0
+metrics_last_used:    2026-10-14
+rec_impl:               manual

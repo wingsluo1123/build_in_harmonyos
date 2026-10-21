@@ -1,0 +1,18 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Find PCRE2 through Conan pkg-config metadata
+
+---
+diff --git a/meson.build b/meson.build
+--- a/meson.build
++++ b/meson.build
+@@ -2175,6 +2175,10 @@
+ # Pick up pcre from the system, or if "--force-fallback-for libpcre2-8" was specified
+ pcre2 = dependency('libpcre2-8', version: pcre2_req, required: false, default_options: ['default_library=static'])
+ if not pcre2.found()
++  # Conan exports PCRE2 as pkg-config module 'pcre2'.
++  pcre2 = dependency('pcre2', version: pcre2_req, required: false)
++endif
++if not pcre2.found()
+   if cc.get_id() == 'msvc' or cc.get_id() == 'clang-cl'
+   # MSVC: Search for the PCRE2 library by the configuration, which corresponds
+   # to the output of CMake builds of PCRE2.  Note that debugoptimized

@@ -1,0 +1,38 @@
+# 版本级 manifest — libdisplay-info 0.4.0
+software: libdisplay-info
+version: "0.4.0"
+status: built
+build_date: "2026-10-16"
+build_system: meson
+
+source:
+  url: "https://gitlab.freedesktop.org/emersion/libdisplay-info/-/archive/0.4.0/libdisplay-info-0.4.0.tar.gz"
+  sha256: "787b58aec473830b0030251ba2b880560b4b3853dc5d6961a6e9701abae29b55"
+  tar_format: tar.gz
+
+build:
+  system: meson
+  configure_options:
+    - "-Ddefault_library=shared"
+    - "-Dwrap_mode=nodownload"
+  dependencies:
+    - hwdata/0.411
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-memory-stream-portable.patch"
+  - "0002-meson-test-harness-portable.patch"
+
+knowledge_ref:
+  - "DRAFT-libdisplay-info-tools-0.3.0-build-time-data-dependency-hwdata"
+  - "DRAFT-libdisplay-info-0.4.0-musl-memstream-fclose-ebadf"
+  - "DRAFT-libdisplay-info-0.4.0-hwdata-pc-pkgdatadir"
+  - "DRAFT-libdisplay-info-0.4.0-toybox-patch-meson-harness"
+
+knowledge_gained:
+  - "OHOS 平台 C 库的内存流不可用：open_memstream()/fmemopen() 建立的流 fclose() 返回 EBADF、丢弃已写入内容，进程在退出阶段触发 SIGTRAP/SIGILL；依赖它的上游代码表现为字符串 API 返回 NULL + 调用方崩溃，应改为进程内自增长缓冲（knowledge_ref: DRAFT-libdisplay-info-0.4.0-musl-memstream-fclose-ebadf）"
+  - "上游 dependency('hwdata', native: true) 无法靠 conan 的 PkgConfigDeps 生成物满足：conan 合成的 hwdata.pc 不含 pkgdatadir，而 hwdata 包内自带的 .pc 把打包机绝对路径写死；应在 generate() 里按 self.dependencies[\"hwdata\"].package_folder 现写 .pc，并给 MesonToolchain 设 build_pkg_config_path（knowledge_ref: DRAFT-libdisplay-info-0.4.0-hwdata-pc-pkgdatadir）"
+  - "上游 meson 测试 harness 用 GNU 形式的 `patch <目标文件> <diff>`：本平台只有 toybox patch（不支持目标文件参数），会静默返回 0 且不修改文件，decode 类参考比对因此假失败，须用可应用 diff 的工具独立复核输出（knowledge_ref: DRAFT-libdisplay-info-0.4.0-toybox-patch-meson-harness）"
+  - "上游 harness 用 `patch <目标文件> <diff>`（GNU 专属位置参数）时，本平台的 toybox patch 会套错目标（它取 +++ 名）且 GNU patch 取 --- 名；把 diff 头部路径改写为目标文件并改用 `patch -p0 -i` 可同时兼容两者，decode 用例随之 68/68（knowledge_ref: DRAFT-libdisplay-info-0.4.0-toybox-patch-meson-harness）"
+  - "OHOS 沙箱下 meson 交叉/native 文件必须给出编译器与 ar/ranlib/strip 的绝对路径，裸名探测会失败（ref: archives/l/libdisplay/0.3.0/notes.md）"

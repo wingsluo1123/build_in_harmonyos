@@ -1,0 +1,20 @@
+# conandata.yml — esmtp 1.2
+#
+# 上游 = SourceForge 项目 esmtp（1.2 发布于 2009-12-24，上游已冻结）。
+# 设备侧实测（2026-10-08，curl 默认 UA，跟随 302 到 master.dl）：
+#   HTTP 200 / 127921 B / md5 79a9c1f9023d53f35bb82bf446150a72
+#   （与 SF 官方 API 记录的 tar.bz2 127921B / md5 一致）
+#   sha256 a0d26931bf731f97514da266d079d8bc7d73c65b3499ed080576ab606b21c0ce
+# ⚠ 路径含三段 project/esmtp/esmtp/1.2/ —— 写成 project/esmtp/… 会 404。
+
+sources:
+  url: "https://downloads.sourceforge.net/project/esmtp/esmtp/1.2/esmtp-1.2.tar.bz2"
+  sha256: "a0d26931bf731f97514da266d079d8bc7d73c65b3499ed080576ab606b21c0ce"
+
+patches:
+  - patch_file: "patches/0001-add-informational-long-options.patch"
+    patch_description: "esmtp 1.2 只实现 sendmail 短选项，--version/--help 会落进选项 switch 的 default 分支并以 EX_USAGE 退出；补上两个约定的信息型长选项"
+    patch_type: "portability"
+  - patch_file: "patches/0002-skip-noop-setregid.patch"
+    patch_description: "drop_sgids() 无条件调用 setregid，而 real_gid==effective_gid 时该调用本就是空操作；本平台不实现 setregid，调用即 SIGSYS(31) 终止进程（exit 159），使真实投递一律跑不完。加等值守卫后语义不变"
+    patch_type: "portability"

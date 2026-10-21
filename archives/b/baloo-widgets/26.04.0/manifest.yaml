@@ -1,0 +1,71 @@
+version: 26.04.0
+software: baloo-widgets
+status: published
+build_date: '2026-10-18'
+build_system: cmake
+version_mapping:
+  project_index_version: 26.04.0
+  upstream_version: 26.04.0
+  note: 首次适配，上游 release-service 26.04.0 tarball 原样构建
+source:
+  url: https://download.kde.org/stable/release-service/26.04.0/src/baloo-widgets-26.04.0.tar.xz
+  tar_format: xz
+build:
+  system: cmake
+  configure_options:
+    - -DBUILD_TESTING=ON
+    - -DCMAKE_BUILD_TYPE=Release
+    - -DBUILD_SHARED_LIBS=ON
+  dependencies:
+    - baloo/26.04.3
+    - kcoreaddons/6.14.0
+    - kconfig/6.14.0
+    - ki18n/6.14.0
+    - kfilemetadata/6.14.0
+    - kio/6.14.0
+    - kservice/6.14.0
+    - kwidgetsaddons/6.14.0
+    - qtbase/6.11.1.1
+  cc: /data/service/hnp/bin/clang      # profile ci/conan/profiles/ohos-aarch64 (tools.build:compiler_executables)
+  cxx: /data/service/hnp/bin/clang++
+patches_applied: []
+  # 初稿曾计划 0001-ohos-disable-ki18n-install.patch 禁用 ki18n_install(po)，
+  # 实测未打补丁即产出 share/locale/*/LC_MESSAGES/baloowidgets5.mo（源码 CMakeLists.txt
+  # 本就有 ki18n_install(po) 且 OHOS 下正常），补丁无必要 → 已删除，本包零补丁。
+tests:
+  registered: 6
+  executed: 6
+  passed: 3
+  failed: 3
+  declared_not_run: []
+  declared_not_run_details: []
+  sandbox_dbus: none
+knowledge_gained:
+  - 'KF6 6.14 制品仓包缺 SONAME：kconfig/kbookmarks/kiconthemes 等的 DT_NEEDED 记录构建期相对路径（如 ../../bin/libKF6ConfigCore.so），loader 按工作目录解析，需在构建/测试目录祖先铺设 ../../bin 镜像软链'
+  - 'kfilemetadata/6.14.0 未随包发布 taglib 音频抽取器（lib/plugins/kf6/kfilemetadata/ 只有文档与图像抽取器），依赖音频元数据的 3 个上游用例在本环境必然失败'
+  - 'baloo-widgets TagWidget 构造函数解引用 parent（setForegroundRole(parent->foregroundRole())），parent 为 nullptr 时段错误；消费者必须传 parent'
+  - '禁止在 package() 里改写产物 DT_NEEDED 路径（patchelf/dd/Python 改 .dynstr）：readelf 显示已归一化，但改写后的 .so 在本平台 dlopen 直接 Permission denied（同一文件原样副本只报缺 LD_LIBRARY_PATH），与 E537 禁止项一致 → 已回退该方案'
+  - 'CI L5b（DT_NEEDED 禁绝对/relative 路径）只打印 [fail] 并写入 ci-metadata.json，L5_RESULT 不参与 FAILED 计数（致命项为 L0/KC/JC/conan create/L1），绝对路径 NEEDED 不阻断构建；已合入的 KF6 包（kbookmarks 6.28.0 等）同样带此类条目'
+knowledge_pack:
+  path: knowledge/tools/kf6-relative-needed
+  entry: E2296
+  scope: 依赖包 DT_NEEDED 携带构建期路径（相对 ../ 或绝对缓存路径）导致消费方运行时加载失败
+  artifacts:
+    - detect-relative-needed.py
+    - apply-compat-shim.py
+    - README.md
+    - strategy.md
+    - reproduce.sh
+    - test_relative_needed.py
+    - fixtures/
+  recipe_hook: option kb_compat_shim（默认 True；False 用于复现原始 loader 报错）
+patch_generation:
+  method: refresh-patch --auto
+  source_orig_dir: baloo-widgets-26.04.0
+  source_work_dir: baloo-widgets-26.04.0
+  generated_at: '2026-10-18'
+  patches_count: 0
+patch_classification:
+  type: none
+  platform_only: false
+  guard: none

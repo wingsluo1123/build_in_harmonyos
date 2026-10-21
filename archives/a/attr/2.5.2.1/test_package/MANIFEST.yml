@@ -1,0 +1,406 @@
+device_build:
+  device: HarmonyOS aarch64 device reached through amax two-hop SSH
+  command: conan create archives/a/attr/2.5.2.1 -pr:h=ohos-aarch64 -pr:b=ohos-aarch64 --build=missing
+  jobs: 2
+  conan_home: ~/work/psj/ch-attr
+  create_exit: 0
+upstream_tests:
+  command: PATH=<build_folder>:<source_folder>:$PATH make check VERBOSE=1 TEST_LOG_COMPILER='perl -U -w $(srcdir)/test/run -v'
+  count_method: rg -n '^\s*\$' test/attr.test test/root/getfattr.test; 119 + 30 = 149
+  total: 149
+  breakdown:
+  - suite: test/attr.test
+    registered: 119
+    pass: 87
+    fail: 32
+    notrun: 0
+  - suite: test/root/getfattr.test
+    registered: 30
+    pass: 0
+    fail: 0
+    notrun: 30
+  pass: 87
+  fail: 32
+  notrun: 30
+  pass_rate: 87/149 (58.4%; 32 failed, 30 not run)
+  make_check_exit: 2
+  result: completed_with_failures_and_notrun
+  log: ~/work/psj/ch-attr/p/b/attr7a8eb4136d86e/b/build-release/attr-upstream-make-check.log; per-suite logs under test/
+  test_runner_note: The upstream Perl test/run compares combined stdout/stderr with expected lines and does not retain each child exit status. For the output
+    mismatches below, ~ marks no actual output; raw errno was not emitted. Do not interpret these mismatches as a measured errno.
+  failures:
+  - suite: test/attr.test
+    line: 10
+    command: cd d
+    raw_output: 'chdir: d: No such file or directory   != ~'
+    cause: 'The upstream runner could not enter d: chdir returned ENOENT after the preceding mkdir d case produced no output. Standalone mkdir/cd probes
+      in both Conan build and source test directories succeeded; the failure is isolated to the upstream runner''s stateful work-directory setup.'
+  - suite: test/attr.test
+    line: 13
+    command: setfattr -n user -v value f
+    raw_output: '~                                     != setfattr: f: Operation not supported'
+    cause: The upstream expected this bare xattr name to emit the Operation not supported diagnostic, but the device run emitted no combined stdout/stderr.
+      The Perl runner compares output only and omits child exit status, so no actual errno was recorded.
+  - suite: test/attr.test
+    line: 16
+    command: setfattr -n user. -v value f
+    raw_output: '~                                     != setfattr: f: Invalid argument'
+    cause: The upstream expected the Invalid argument diagnostic for this malformed xattr name, but the device run emitted no combined stdout/stderr. The
+      Perl runner compares output only and omits child exit status, so no actual errno was recorded.
+  - suite: test/attr.test
+    line: 20
+    command: getfattr -d f
+    raw_output: '~                                     != # file: f'
+    cause: getfattr emitted no output where the test expected the file header and user.name value. This is an observed HMDFS upstream-suite output mismatch;
+      the runner emitted no syscall errno. The independent consumer xattr checks passed 6/6.
+  - suite: test/attr.test
+    line: 26
+    command: sh -c 'getfattr -n user.name f && echo zero exit code'
+    raw_output: '~                                     != f: user.name: No such attribute'
+    cause: The expected no-such-attribute diagnostic was absent from combined stdout/stderr. The Perl runner does not record child exit status or errno.
+  - suite: test/attr.test
+    line: 39
+    command: getfattr -d f
+    raw_output: '~                                     != # file: f'
+    cause: getfattr emitted no output for the attributes set immediately beforehand in the upstream suite work directory; the device runner logged no errno.
+      Consumer xattr checks passed 6/6.
+  - suite: test/attr.test
+    line: 47
+    command: getfattr -d f
+    raw_output: '~                                     != # file: f'
+    cause: getfattr emitted no output for the expected updated user.* values in the upstream suite work directory; the device runner logged no errno. Consumer
+      xattr checks passed 6/6.
+  - suite: test/attr.test
+    line: 55
+    command: getfattr -d f
+    raw_output: '~                                     != # file: f'
+    cause: getfattr emitted no output for the expected updated user.* values in the upstream suite work directory; the device runner logged no errno. Consumer
+      xattr checks passed 6/6.
+  - suite: test/attr.test
+    line: 70
+    command: getfattr -d -e hex f
+    raw_output: '~                                     != # file: f'
+    cause: getfattr emitted no output where the test expected the file header and hex-formatted xattrs; the device runner logged no errno.
+  - suite: test/attr.test
+    line: 77
+    command: getfattr -d -e base64 f
+    raw_output: '~                                     != # file: f'
+    cause: getfattr emitted no output where the test expected the file header and base64-formatted xattrs; the device runner logged no errno.
+  - suite: test/attr.test
+    line: 96
+    command: getfattr -d f
+    raw_output: '~                                     != # file: f'
+    cause: getfattr emitted no output where the test expected five user.* values in the upstream suite work directory; the device runner logged no errno.
+  - suite: test/attr.test
+    line: 106
+    command: getfattr -d f
+    raw_output: '~                                     != # file: f'
+    cause: getfattr emitted no output where the test expected updated user.* values in the upstream suite work directory; the device runner logged no errno.
+  - suite: test/attr.test
+    line: 115
+    command: setfattr -x user.noname f
+    raw_output: '~                                     != setfattr: f: No such attribute'
+    cause: The upstream expected the no-such-attribute diagnostic when removing an absent xattr, but the device run emitted no combined stdout/stderr. The
+      Perl runner omits child exit status and errno.
+  - suite: test/attr.test
+    line: 120
+    command: getfattr -d f
+    raw_output: '~                                     != # file: f'
+    cause: getfattr emitted no output where the test expected the remaining user.* values in the upstream suite work directory; the device runner logged
+      no errno.
+  - suite: test/attr.test
+    line: 138
+    command: getfattr f g h | sort-getfattr-output
+    raw_output: '~                                     != # file: f'
+    cause: The command emitted no output where the multi-file test expected file headers and user.novalue names; the device runner logged no errno.
+  - suite: test/attr.test
+    line: 150
+    command: getfattr f g h | sort-getfattr-output
+    raw_output: '~                                     != # file: f'
+    cause: The command emitted no output where the multi-file test expected file headers and user.name/user.novalue names; the device runner logged no errno.
+  - suite: test/attr.test
+    line: 162
+    command: getfattr -d f g h | sort-getfattr-output
+    raw_output: '~                                     != # file: f'
+    cause: The command emitted no output where the multi-file test expected file headers and xattr values; the device runner logged no errno.
+  - suite: test/attr.test
+    line: 175
+    command: getfattr f g h | sort-getfattr-output
+    raw_output: '~                                     != # file: f'
+    cause: The command emitted no output where the multi-file test expected file headers and xattr names; the device runner logged no errno.
+  - suite: test/attr.test
+    line: 189
+    command: getfattr f g h | sort-getfattr-output
+    raw_output: '~                                     != # file: f'
+    cause: The command emitted no output where the multi-file test expected file headers and xattr names; the device runner logged no errno.
+  - suite: test/attr.test
+    line: 207
+    command: setfattr -h -n user.filename -v l l
+    raw_output: '~                                     != setfattr: l: Operation not permitted'
+    cause: The upstream expected Operation not permitted when setting a user xattr on a symlink, but the device run emitted no combined stdout/stderr. The
+      Perl runner omits child exit status and errno.
+  - suite: test/attr.test
+    line: 210
+    command: getfattr -d f l | sort-getfattr-output
+    raw_output: '~                                     != # file: f'
+    cause: The command emitted no output where the test expected xattrs on the regular file and symlink; the device runner logged no errno.
+  - suite: test/attr.test
+    line: 232
+    command: getfattr -d "f "
+    raw_output: '~                                     != # file: f'
+    cause: getfattr emitted no output where the quoted-filename test expected the file header and user.name value; the device runner logged no errno.
+  - suite: test/attr.test
+    line: 243
+    command: getfattr -d f
+    raw_output: '~                                     != # file: f'
+    cause: getfattr emitted no output where the test expected the empty user.name value; the device runner logged no errno.
+  - suite: test/attr.test
+    line: 254
+    command: getfattr f
+    raw_output: '~                                     != # file: f'
+    cause: getfattr emitted no output where the test expected the file header and special-character xattr names; the device runner logged no errno.
+  - suite: test/attr.test
+    line: 260
+    command: getfattr -d f
+    raw_output: '~                                     != # file: f'
+    cause: getfattr emitted no output where the test expected the special-character xattr values; the device runner logged no errno.
+  - suite: test/attr.test
+    line: 285
+    command: getfattr -h -L -R -m '.' -e hex 1 | grep -v selinux | sort-getfattr-output
+    raw_output: '~                                     != # file: 1'
+    cause: Recursive getfattr emitted no output where the test expected xattrs on the directory tree; the device runner logged no errno.
+  - suite: test/attr.test
+    line: 299
+    command: getfattr -h -P -R -m '.' -e hex 1/2 | grep -v selinux | sort-getfattr-output
+    raw_output: '~                                     != # file: 1/2'
+    cause: Recursive getfattr emitted no output where the test expected xattrs on 1/2 and 1/2/3; the device runner logged no errno.
+  - suite: test/attr.test
+    line: 323
+    command: getfattr -P -R 1 | sort-getfattr-output
+    raw_output: '~                                     != # file: 1'
+    cause: Recursive getfattr emitted no output where the test expected xattrs on files, directories, and symlinks; the device runner logged no errno.
+  - suite: test/attr.test
+    line: 343
+    command: getfattr -R -P 1/sub | sort-getfattr-output
+    raw_output: '~                                     != # file: 1/sub'
+    cause: Recursive getfattr emitted no output where the test expected xattrs under 1/sub; the device runner logged no errno.
+  - suite: test/attr.test
+    line: 354
+    command: getfattr -L -R 1 | sort-getfattr-output
+    raw_output: '~                                     != # file: 1'
+    cause: Recursive dereference mode emitted no output where the test expected xattrs across the directory tree; the device runner logged no errno.
+  - suite: test/attr.test
+    line: 377
+    command: getfattr -R 1/sub/link | sort-getfattr-output
+    raw_output: '~                                     != # file: 1/sub/link'
+    cause: Recursive getfattr emitted no output where the test expected xattrs through the symlink subtree; the device runner logged no errno.
+  - suite: test/attr.test
+    line: 385
+    command: getfattr -L -R 1/sub/link | sort-getfattr-output
+    raw_output: '~                                     != # file: 1/sub/link'
+    cause: Recursive dereference mode emitted no output where the test expected xattrs through the symlink subtree; the device runner logged no errno.
+  unrun_cases:
+  - suite: test/root/getfattr.test
+    line: 3
+    command: require_root
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 5
+    command: mkdir d
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 6
+    command: cd d
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 8
+    command: touch f
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 9
+    command: setfattr -n user.test -v test f
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 10
+    command: ln -s f l
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 11
+    command: setfattr -h -n trusted.test -v test l
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 14
+    command: getfattr -m- -d f
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 20
+    command: getfattr -m- -d l
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 26
+    command: getfattr -m- -hd l
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 32
+    command: getfattr -m- -Rd . | sort-getfattr-output
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 40
+    command: getfattr -m- -Rhd . | sort-getfattr-output
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 49
+    command: ln -s . here
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 50
+    command: getfattr -m- -Rd here | sort-getfattr-output
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 58
+    command: getfattr -m- -Rhd here
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 60
+    command: getfattr -m- -RLhd here | sort-getfattr-output
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 68
+    command: getfattr -m- -RPhd here
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 71
+    command: mkdir sub
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 72
+    command: mv f l sub
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 73
+    command: getfattr -m- -Rd . | sort-getfattr-output
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 81
+    command: getfattr -m- -Rhd . | sort-getfattr-output
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 90
+    command: mkdir sub2
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 91
+    command: ln -s ../sub sub2/to-sub
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 92
+    command: getfattr -m- -Rhd sub2
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 94
+    command: getfattr -m- -RLhd sub2 | sort-getfattr-output
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 102
+    command: getfattr -m- -RPhd sub2
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 105
+    command: ln -s .. sub/up
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 106
+    command: getfattr -m- -RLhd . | sort-getfattr-output
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 119
+    command: cd ..
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+  - suite: test/root/getfattr.test
+    line: 120
+    command: rm -rf d
+    raw_output: 'FAIL test/root/getfattr.test (exit status: 159); sudo -n true: open /dev/tty for write failed (exit 1)'
+    cause: This command requires effective UID 0. The SSH device user could not run sudo non-interactively because /dev/tty was unavailable; upstream require_root
+      terminated the group before this command.
+consumer_tests:
+  command: Conan test_package on HarmonyOS device
+  total: 6
+  pass: 6
+  fail: 0
+  notrun: 0
+  result: passed
+  checks:
+  - C consumer attr_set stores an xattr on a temporary file in the build folder
+  - C consumer attr_get reads and verifies the value
+  - package PATH setfattr writes a user xattr
+  - package PATH getfattr reads the value
+  - package PATH attr -s writes an xattr
+  - package PATH attr -g reads the value
+  package_tool_path: Resolved from the tested Conan package's package_folder/bin
+  filesystem_boundary: All six xattr consumer checks passed; no raw xattr errno was generated.
+privilege_boundary:
+  root_probe_command: sudo -n true
+  raw_output: open /dev/tty for write failed
+  exit: 1
+  root_suite_raw: 'Possible precedence issue with control flow operator (exit) at .../test/run line 150.\nFAIL test/root/getfattr.test (exit status: 159)'
+  cause: Effective UID 0 was unavailable to the SSH device user, so upstream require_root terminated before the first root-only command; all 30 registered
+    root cases are listed as not run.
+upstream_tests_modified: false

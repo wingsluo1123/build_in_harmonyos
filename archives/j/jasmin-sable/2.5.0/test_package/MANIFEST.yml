@@ -1,0 +1,40 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI build_and_test.sh L0e 强制要求存在）
+#
+# 上游测试清点（R51）：上游包内**不含任何测试**——
+#   `find -name '*Test*.java'` 为空、`build.xml` 无 test 目标、
+#   `lib/jas/tests/all.java` 只是 lib/jas 的示例程序。
+#   → 如实声明 N/A，**不宣称任何上游通过率**。
+#   消费者侧的端到端验证由 test_package/check_jasmin.py 承担。
+
+package: jasmin-sable/2.5.0
+homepage: "https://github.com/Sable/soot/tree/develop/jasmin"
+
+upstream_check_command: "find . -name '*Test*.java' | wc -l    # 期望 0（上游确无测试套件）"
+
+upstream_test_in_build: false
+upstream_test_command: "（上游无测试可跑——已附清点证据，不宣称通过率）"
+
+upstream_tests:
+  - file: "（无）"
+    source: "jasmin-sable 2.5.0 上游发布树"
+    description: "上游不含任何测试套件：`*Test*.java` 为空、`build.xml` 无 test 目标、`lib/jas/tests/all.java` 仅为示例程序"
+    count: 0
+
+release_smoke_tests:
+  - file: "libexec/jasmin-sable-2.5.0.jar + libexec/java-cup-11b-20160615-3.jar + bin/jasmin"
+    source: "包产物（javac 编译 86 个 .java；java-cup 为**运行期**依赖，随包提供）"
+    description: "产物齐备 / jar 布局 / 端到端真跑（Hello.jas → Hello.class(magic CAFEBABE) → java 执行输出 JASMIN_OK）"
+    command: "python3 check_jasmin.py <package-folder>"
+
+test_package_tests:
+  - file: check_jasmin.py
+    description: >-
+      消费者校验 4 项：①产物齐备（`bin/jasmin` 可执行 + 两个 jar）②jar 布局
+      （`jasmin/Main.class`、`jasmin/parser.class`、`jas/ClassEnv.class`）③**端到端真跑**：
+      写一段真实 Jasmin 汇编 → `bin/jasmin Hello.jas` 汇编出 magic `CAFEBABE` 的 `Hello.class`
+      → `java Hello` 断言输出 `JASMIN_OK`（同时证明 java-cup 运行期可用 + 包装脚本 classpath 正确）
+      ④证据（两个 jar 的大小与 sha256、所用 JDK）
+    command: "python3 check_jasmin.py <package-folder>"
+
+assertion_count: 4

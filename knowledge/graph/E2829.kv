@@ -1,0 +1,18 @@
+error_signature: "os.mkfifo.*PermissionError.*EPERM.*HMDFS|mkfifo.*Operation not permitted.*storage"
+root_cause: "HMDFS does not support POSIX named pipes (FIFO): os.mkfifo() raises EPERM on /storage HMDFS paths regardless of mode/permissions; upstream tools using mkfifo for inter-process streaming crash at startup."
+rec_approach: "Runtime capability probe (PF5-compliant, no platform macro): wrap mkfifo in try/except EPERM->fallback to plain temp files with equivalent data flow (extract fully first, then feed consumer); probe once per run and cache the decision. Reference impl: megahit 1.2.9 patch 0003 wrapper script."
+match_keywords: ["mkfifo", "EPERM", "PermissionError", "HMDFS", "named pipe", "FIFO", "fallback"]
+severity:               2
+category: platform
+last_updated: 2026-09-28
+id:                     E2829
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E2829.md
+trigger_tool:           make
+phase:                  build
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        "Runtime capability probe (PF5-compliant, no platform macro): wrap mkfifo in try/except EPERM->fallb

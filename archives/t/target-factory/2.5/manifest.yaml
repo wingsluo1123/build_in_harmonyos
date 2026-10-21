@@ -1,0 +1,46 @@
+version: "2.5"
+software: "target-factory"
+status: built
+build_date: "2026-10-17"
+build_system: "cmake"
+
+source:
+  url: "https://mirrors.tuna.tsinghua.edu.cn/ubuntu/pool/universe/t/target-factory/target-factory_2.5.orig.tar.xz"
+  sha256: "57851a0049d928947e55b82c5b41c7d384750bdd794838ed4017a6a5bb3dfdd8"
+  tar_format: tar.xz
+
+build:
+  system: cmake
+  configure_options:
+    - "-DBUILD_TEST=ON"
+    - "-DBUILD_PYTHON=OFF"
+    - "-Dprotobuf_MODULE_COMPATIBLE=ON"
+    - "-DCMAKE_SKIP_RPATH=ON"
+    - "-DCMAKE_PLATFORM_NO_VERSIONED_SONAME=TRUE"
+    - "-DCMAKE_SHARED_LIBRARY_SONAME_C_FLAG=-Wl,-soname,"
+    - "-DCMAKE_SHARED_LIBRARY_SONAME_CXX_FLAG=-Wl,-soname,"
+    - "-DTARGET_FACTORY_SONAME_LIBS=unilog;glog;gflags;pthread"
+    - "-DTARGET_FACTORY_SONAME_LIBDIRS=<unilog;glog;gflags 包的 lib 目录，构建期由配方从依赖包路径拼出>"
+  dependencies:
+    - "unilog/2.5"
+    - "protobuf/21.12"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - file: "patches/0001-relax-upstream-warnings.patch"
+    description: "Drop -Werror (and the hard-coded -std=gnu++14) from VitisCommon: clang 15 warns in unmodified upstream code, and the Conan toolchain provides C++17"
+  - file: "patches/0002-fix-no-git-metadata.patch"
+    description: "Define PROJECT_GIT_BRANCH_NAME/PROJECT_GIT_COMMIT_ID unconditionally: the Debian orig tar has no .git so #cmakedefine leaves them undefined and target_factory.cpp does not compile"
+  - file: "patches/0003-src-CMakeLists-link-libs-by-name.patch"
+    description: "Link unilog/glog/gflags by name (-L<dir> -l<name>) instead of through CMakeDeps imported targets, whose absolute package paths land in DT_NEEDED and fail the CI L5b gate"
+
+knowledge_gained:
+  - "Debian orig tar extracts at the archive root (no top-level directory); conan get() must not use strip_root"
+  - "The OHOS protobuf package sets cmake_find_mode=none and ships upstream's config; protobuf_generate_cpp only exists when protobuf_MODULE_COMPATIBLE=ON is set before find_package()"
+  - "test/CMakeLists.txt builds three executables without add_test; test_factory needs a target name and prints the fingerprint only through UniLog (stderr), which test_fingerprint consumes"
+  - "Upstream test binaries have no usable rpath in the build tree; LD_LIBRARY_PATH must point at the build library and the dependency package lib dirs"
+  - "The OHOS CMake platform module defines no soname flag: set CMAKE_SHARED_LIBRARY_SONAME_{C,CXX}_FLAG=-Wl,-soname, plus CMAKE_PLATFORM_NO_VERSIONED_SONAME so the library gets a DT_SONAME and install(EXPORT) writes IMPORTED_SONAME instead of IMPORTED_NO_SONAME (CI L5a/L5c)"
+  - "Dependencies published without DT_SONAME are linked by CMake through their absolute package path, which is copied verbatim into DT_NEEDED (CI L5b); patch the CMakeLists to target_link_directories()+bare library names and keep the imported target only for its include/compile-definition interface"
+  - "patchelf --replace-needed rewrites the ELF but produces a library musl cannot load (DT_NEEDED resolves, symbols missing); do not post-process DT_NEEDED, fix the link line instead"
+  - "protobuf's registry recipe sets cmake_find_mode=none; listing it in cpp_info.requires produces an unresolvable find_dependency(protobuf) for CMakeDeps consumers, so it stays visible=False and consumers needing target.pb.h inject protobuf_DIR themselves"

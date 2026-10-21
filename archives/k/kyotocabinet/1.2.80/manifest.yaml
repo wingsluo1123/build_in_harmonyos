@@ -1,35 +1,22 @@
-software: kyotocabinet
-# 版本级 manifest 模板
-# 文件位置: archives/{letter}/{name}/1.2.80/manifest.yaml
+# 版本级 manifest
+# 文件位置: archives/k/kyotocabinet/1.2.80/manifest.yaml
 # 遵循 ARCHIVE-SPEC v2.0
 
-# ============================================================
-# 必须字段
-# ============================================================
-
-# 版本号
 version: "1.2.80"
-
-# 编译状态
-# published | built | failed | archived
-status: published
-
-# 编译日期（YYYY-MM-DD）
-build_date: "2026-05-29"
+software: kyotocabinet
+status: built
+build_date: "2026-10-14"
+build_system: autotools
 
 # ============================================================
 # 源码信息
 # ============================================================
 
 source:
-  # 源码下载 URL
-  url: "file:///storage/Users/currentUser/tmp/downloads/kyotocabinet-1.2.80.tar.gz"
-
-  # 源码校验和
+  # 官方源：fallabs.com 已下线，dbmx.net 为官方权威镜像
+  # （Gentoo/Ubuntu ebuild 均以 dbmx.net 的 kyotocabinet/pkg 目录为 SRC_URI）
+  url: "https://dbmx.net/kyotocabinet/pkg/kyotocabinet-1.2.80.tar.gz"
   sha256: "4c85d736668d82920bfdbdb92ac3d66b7db1108f09581a769dd9160a02def349"
-
-  # 压缩格式
-  # tar.gz | tar.xz | tar.bz2 | zip
   tar_format: tar.gz
 
 # ============================================================
@@ -37,24 +24,13 @@ source:
 # ============================================================
 
 build:
-  # 构建系统类型
-  # cmake | autotools | makefile | meson | custom
   system: autotools
-  build_system: autotools
-
-  # 配置选项列表
-  configure_options: []
-  # 例如:
-  # - "-DCMAKE_BUILD_TYPE=Release"
-  # - "-DCMAKE_SYSTEM_NAME=OHOS"
-
-  # 编译依赖列表（格式: name/version）
-  dependencies: []
-  # 例如:
-  # - openssl/1.1.1w
-  # - curl/8.19.0
-
-  # 编译器
+  configure_options:
+    - "--prefix=$DEFAULT_PREFIX"
+    - "--enable-static --disable-shared"
+    - "--enable-zlib --disable-lzma --disable-lzo"
+  dependencies:
+    - zlib/1.3.1
   cc: clang
   cxx: clang++
 
@@ -62,50 +38,30 @@ build:
 # 补丁信息
 # ============================================================
 
-# 应用的补丁列表
 patches_applied:
-  - "0003-configure-umask.patch"
-# 例如:
-# - "0001-bootstrap-ohos-toolchain.patch"
+  - "0001-configure-umask-hmdfs.patch"
 
 # ============================================================
 # 知识沉淀
 # ============================================================
 
-# 编译中学到的知识
 knowledge_gained:
-  - "configure 脚本中的 umask 077 会导致临时目录权限问题，需要修改为 umask 022"
-  - "测试套件执行时间较长（540秒），部分测试可能超时"
+  - "configure 临时目录 umask 077 → 022（HMDFS 兼容） ref: E011"
+  - "上游 Makefile 无 VPATH，必须源内构建 ref: E041"
+  - "make check 512 条命令共享 casket* 测试库文件，须 -j1 串行 ref: E011"
+  - "zlib 压缩默认开启（上游默认），lzma/lzo 关闭（无已发布依赖） ref: E011"
 
 patch_generation:
   method: per-file-difflib
   source_orig_dir: /storage/Users/currentUser/tmp/builds/kyotocabinet-1.2.80.orig
   source_work_dir: /storage/Users/currentUser/tmp/builds/kyotocabinet-1.2.80.work
   source_orig_hash: 86f60701db679f59
-  source_work_hash: 068b8ec61db9e931
-  generated_at: '2026-05-30T13:26:25'
-  patches_count: 4
+  source_work_hash: 24f354f091f6ea76
+  generated_at: '2026-10-14T17:05:56'
+  patches_count: 1
 
 patch_classification:
-  - file: 0001-.patch-ai-review.txt.patch
+  - file: 0001-configure.patch
     type: auto
-    platform_only: true
+    platform_only: True
     guard: 'pending'
-  - file: 0002-check.in.patch
-    type: auto
-    platform_only: true
-    guard: 'pending'
-  - file: 0003-check.out.patch
-    type: auto
-    platform_only: true
-    guard: 'pending'
-  - file: 0004-configure-umask.patch
-    type: manual
-    platform_only: true
-    guard: 'none'
-    description: "修复 configure 脚本中的 umask 设置（077→022），解决临时目录权限问题"
-e-umask.patch
-    type: manual
-    platform_only: true
-    guard: 'none'
-    description: "修复 configure 脚本中的 umask 设置（077→022），解决临时目录权限问题"

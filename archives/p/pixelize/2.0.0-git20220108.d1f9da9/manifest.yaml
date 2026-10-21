@@ -1,0 +1,76 @@
+software: pixelize
+# 版本级 manifest — 遵循 ARCHIVE-SPEC v3.0
+version: "2.0.0-git20220108.d1f9da9"
+
+# 编译状态: published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-16"
+
+conan_ref: pixelize/2.0.0-git20220108.d1f9da9
+
+# ============================================================
+# 源码信息
+# ============================================================
+source:
+  # GitHub 官方 commit 归档（上游无 release tag；与 Debian
+  # 2.0.0~git20220108.d1f9da9 打包同一上游快照点 d1f9da9）
+  url: "https://github.com/jcdubois/pixelize/archive/d1f9da98ed4074f55db7c5ab4f701d70437810a3.tar.gz"
+  sha256: "4c4db285fe2c2a45ee629106320b6bc844df15f707cbbec2fc81da7cb14c6832"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+build:
+  # 构建系统类型: cmake | autotools | makefile | meson | custom
+  system: makefile
+
+  configure_options:
+    - "(pkg-config deps via PkgConfigDeps: gtk+-3.0, gmodule-2.0)"
+
+  dependencies:
+    - "gtk/3.24.43"
+  # 构建工具（tool_requires）
+  build_tools:
+    - "pkgconf/3.0.5"
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+knowledge_gained:
+  - "上游纯 Makefile 无 install 目标：package() 手工拷贝 bin/{pixelize,make_db} + man/man1/*.1 + LICENSE；产物二进制生成在 Makefile 同级（$(CC) -o $@），obj/、depend 亦在源码树 → in-source（folders.build 置空，vimpc 同款）"
+  - "include/pixelize_model.h 由 tools/glade2c（Python2/3 兼容，xml.dom.minidom，-i/-o 参数）从 glade/pixelize.glade 生成：构建环境无 clang-format → build() 用 conan 自带解释器（sys.executable）预生成 + 补丁移除 Makefile 的 clang-format 步骤；生成物 mtime 新于 glade 输入，Makefile 生成规则不再触发"
+  - "-Werror 移除（Debian patches/Don-t-build-with-Werror 同源决策）：上游按 GCC 开发期基线编码，clang 15 的 -Wall -Wextra 告警基线不同"
+  - "Makefile 的 depend 目标在首次 make 时经 include depend 自动重建（$(CC) -MM + 反引号 pkg-config）→ conanbuild env 必须同时有 PKG_CONFIG_PATH（PkgConfigDeps）与 pkg-config 可执行文件（tool_requires pkgconf + VirtualBuildEnv PATH）"
+  - "上游 Makefile 有 CLFLAS 拼写错误（应为 CFLAGS 的 GDK/GTK_DISABLE_DEPRECATED 行）——该行从未生效，保持上游原样不改"
+  - "pixelize/make_db 的失败路径集中且可断言：GOption 解析（--help 在显示初始化前 exit(0)；未知选项 parse 失败）与 gtk_init_with_args 返回 FALSE（含 broadway 无 broadwayd 的显示打开失败）都走 main() else 分支 g_printerr(Error: in parameters) + exit(1) → 无头负向断言点（almanah/0.12.4 同款）"
+  - "gtk 在本制品仓为 broadway 后端（适配鸿蒙无原生显示系统）：GUI 运行时需 broadwayd + 浏览器；--help/参数错误路径不触显示，可在无头环境真实执行"
+
+# ============================================================
+# 测试
+# ============================================================
+test:
+  upstream_cases: 0
+  upstream_suite: "无测试套件：Makefile 无 check/TESTS 目标，无 test_* 源文件，无 CI 配置"
+  runnable: 0
+  runnable_note: "上游无测试可执行"
+  pass_rate: "N/A（上游无 make check 可运行用例；消费者测试 7/7 断言通过）"
+  consumer_test: "test.sh：--help ×2（rc=0 + usage 断言）+ 未知选项负向 ×2 + 无显示启动负向 ×2（Error: in parameters + exit(1)）；conanfile.py ELF e_machine 门禁 ×1；执行模型按产物 ELF 判定（本机 qemu 仿真 + fortify/compat shims 预载，CI OHOS worker 原生直跑）"
+
+# ============================================================
+# 补丁生成与分类
+# ============================================================
+patch_generation:
+  method: "difflib.unified_diff（对上游 Makefile 两处行级修改生成，a/ b/ 前缀，patch -p1 应用）"
+  generated_at: "2026-10-16"
+  patches_count: 1
+
+patch_classification:
+  - file: "patches/0001-makefile-drop-werror-and-clang-format.patch"
+    type: "portability"
+    reason: "① 移除 -Werror（clang 15 与 GCC 告警基线不同，Debian 同源决策）② 移除生成规则里的 clang-format -i（构建环境无 clang-format；pixelize_model.h 由配方用上游 tools/glade2c 预生成）"

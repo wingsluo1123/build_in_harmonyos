@@ -1,0 +1,65 @@
+# 软件级 manifest
+# 文件位置: archives/r/rofi/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 软件名称（小写，与目录名一致）
+software: rofi
+
+# 显示名
+display: "Rofi"
+
+# 一句话描述
+description: "快速应用启动器与窗口切换器（GNOME 桌面，Wayland 后端）"
+
+# 分类标签
+# foundation|build-tool|compress|crypto|db|network|system|doc|gfx|data|library|utility
+category: gfx
+
+# 官网 URL
+homepage: "https://github.com/davatorium/rofi"
+
+# 开源许可证（SPDX 标识）
+license: GPL-3.0-only
+
+# ============================================================
+# 构建信息
+# ============================================================
+
+# 常用构建系统（可被版本级覆盖）
+# cmake | autotools | makefile | meson | custom
+build_system: meson
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  # 关键适配要点
+  key_points:
+  - "Wayland 后端优先（xcb 路线被未发布依赖阻塞：xcb/xcb-aux/xcb-xkb/xcb-ewmh/xcb-icccm）→ -Dxcb=disabled -Dwayland=enabled"
+  - "conan 包内宿主工具（wayland-scanner/glib-compile-resources）需有效 .codesign 方可在包树执行 → llvm-objcopy 移除失效签名段 + binary-sign-tool 自签 + LD_LIBRARY_PATH wrapper（appstream/aravis 先例）"
+  - "部分已发布包 .pc 不完整（gio-unix-2.0/gmodule-no-export-2.0/pangocairo/pangoft2/wayland-cursor/wayland-protocols pkgdatadir）→ generate() 手写补全"
+  - "check 0.15.2 临时目录 P_tmpdir 编译期固定 /tmp（OHOS 只读）→ build() 注入 TEMP=<构建私有目录>"
+  - "OHOS worker 裸名 AR/AS/STRIP/NM/RANLIB 经 posix_spawn 不走 PATH → generate() 按绝对路径固定"
+  # 跨版本通用依赖
+  common_dependencies:
+  - glib
+  - cairo
+  - pango
+  - gdk-pixbuf
+  - libxkbcommon
+  - wayland
+  - wayland-protocols
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "2.0.0":
+    status: built
+    build_date: 2026-10-16

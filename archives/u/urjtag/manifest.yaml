@@ -1,0 +1,25 @@
+# 软件级 manifest（ARCHIVE-SPEC v2.0）
+software: urjtag
+display: "UrJTAG"
+description: "Universal JTAG library, server and tools (JTAG debugging / flash programming)"
+category: utility
+homepage: "http://urjtag.org"
+license: GPL-2.0-or-later
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "纯 C autotools 项目（188 .c / 91 .h），tarball 自带预生成 configure（autoconf 2.64 时代 / libtool），无需 bootstrap；configure 只需 --disable-nls --disable-python 与 Conan 包提供的 libusb/readline 依赖"
+    - "SVF/BSDL player 靠 tarball 自带的 flex/bison 生成产物构建（生成 .c 的 mtime 新于 .l/.y，configure 显式回退 svf_bison.h / bsdl_bison.h），零再生成，构建机不需要 flex/bison"
+    - "configure 的 `umask 077 && mktemp -d` 临时目录陷阱（E011/E114/E129/E136）：patches/0001 去掉两处 umask，与 tanidvr/1.4.1 同款修复"
+    - "上游没有任何测试（全部 Makefile.am 无 TESTS/check_PROGRAMS）；test_package 做真实的消费者 + 鸿蒙平台验证（含 jtag -n 真跑 JTAG 脚本）"
+  common_dependencies:
+    - "libusb/1.0.29"
+    - "readline/8.3"
+    - "ncurses/6.6"
+
+versions:
+  "2021.03":
+    status: built
+    build_date: "2026-10-17"
+    conan_ref: "urjtag/2021.03"

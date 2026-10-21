@@ -1,0 +1,36 @@
+--- a/src/fstext/trivial-factor-weight-test.cc
++++ b/src/fstext/trivial-factor-weight-test.cc
+@@ -135,31 +135,31 @@
+ 
+     printf("Converting gallic back to regular\n");
+     TrivialFactorWeightFst< GallicArc<Arc, GALLIC_LEFT>, GallicFactor<typename Arc::Label,
+         typename Arc::Weight, GALLIC_LEFT> > fwfst(gallic_fst);
+     {
+       std::cout <<" printing factor-weight FST\n";
+       FstPrinter<GallicArc<Arc> >  fstprinter(fwfst, sptr, sptr, NULL, false, true, "\t");
+       fstprinter.Print(std::cout, "standard output");
+     }
+ 
+-    Map(fwfst, &ofst_star, FromGallicMapper<Arc, GALLIC_LEFT>());
++    ArcMap(fwfst, &ofst_star, FromGallicMapper<Arc, GALLIC_LEFT>());
+ 
+     {
+       std::cout <<" printing after converting back to regular FST\n";
+       FstPrinter<Arc> fstprinter(ofst_star, sptr, sptr, NULL, false, true, "\t");
+       fstprinter.Print(std::cout, "standard output");
+     }
+ 
+ 
+     VectorFst<GallicArc<Arc> > new_gallic_fst;
+-    Map(ofst_star, &new_gallic_fst, ToGallicMapper<Arc, GALLIC_LEFT>());
++    ArcMap(ofst_star, &new_gallic_fst, ToGallicMapper<Arc, GALLIC_LEFT>());
+ 
+     assert(RandEquivalent(gallic_fst, new_gallic_fst, 5/*paths*/, 0.01/*delta*/, kaldi::Rand()/*seed*/, 100/*path length-- max?*/));
+ 
+   }
+ 
+   delete fst;
+ }
+ 
+ 
+ template<class Arc, class inttype> void TestStringRepository() {

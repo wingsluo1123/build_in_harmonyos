@@ -1,0 +1,30 @@
+version: "1.14.4"
+software: "libsmpp34"
+status: built
+build_date: "2026-10-17"
+build_system: "custom (recipe-side clang)"
+
+source:
+  url: "https://snapshot.debian.org/file/bfab3c32baf40c5be750bc79b9fbc0a37e65d892"
+  sha256: "b53c5be8ae7354e37ef5daf9f3a5671b0d35b7a3ad57fb13949b79877de21468"
+  tar_format: tar.xz
+  note: "Debian snapshot 的 libsmpp34 1.14.4 官方 orig 归档"
+
+build:
+  system: custom
+  configure_options:
+    - "clang -shared -fPIC -O2 -D_REENTRANT -DBSD_COMP -D_POSIX_PTHREAD_SEMANTICS -I<src root> -I<src> src/*.c -Wl,-soname,libsmpp34.so.1 -Wl,--no-undefined -lpthread -lrt"
+  dependencies: []
+
+upstream_tests:
+  framework: standalone
+  test_sources: 27
+  test_command: "test_pdu/*_test.c + test_pdu/core.c"
+  run_in_build: false
+  evidence: "27/27 个 PDU 测试程序实际编译运行通过"
+
+upstream_test_pass_rate: "27/27（100%）"
+adapted_test_pass_rate: "test_package 5/5 PASS"
+
+knowledge_gained:
+  - "libsmpp34 的公开 smpp34_structs.h 通过 #include 引入 def_frame/*.frame，因此除 4 个头文件外还必须安装 include/def_frame 数据文件。"

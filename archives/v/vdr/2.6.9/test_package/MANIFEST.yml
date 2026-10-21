@@ -1,0 +1,27 @@
+# test_package/MANIFEST.yml — vdr 2.6.9
+# CI L0e requires this file to exist.
+
+package: vdr/2.6.9
+homepage: "https://www.tvdr.de/"
+
+# Upstream ships no test suite at all: no `make check` target, no test/
+# directory, no test_*.c / *_test.* file in the 2.6.9 tarball (N = 0).
+upstream_check_command: "make check"
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests: []
+
+# test_package tests (consumer perspective)
+test_package_tests:
+  - file: test.sh
+    description: >-
+      Runs the installed vdr binary: (1) `vdr --version` must exit 0 and
+      report "vdr (2.6.9/2.6.9)", (2) `vdr --help` must exit 0 and list
+      --video=DIR / --config=DIR, (3) an inaccessible video directory must be
+      rejected (rc != 0) with the "can't access video directory" diagnostic.
+    command: "bash test.sh <package_folder>/bin/vdr"
+
+# 3 个消费者用例组 = 6 处显式可失败断言（L13 可执行性、L22 版本串、L29 --video、
+# L33 --config、L45 rc!=0、L49 诊断串）；不含由 set -e 兜底的 rc=0。
+assertion_count: 6

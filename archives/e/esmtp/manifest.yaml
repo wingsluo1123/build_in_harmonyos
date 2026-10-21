@@ -1,0 +1,23 @@
+software: esmtp
+display: "esmtp"
+description: "sendmail 兼容的 SMTP 中继客户端（STARTTLS + SASL 认证，协议能力由 libESMTP 提供）"
+category: network
+homepage: "https://esmtp.sourceforge.net/"
+license: GPL-2.0-or-later
+build_system: autotools
+status: built
+
+ohos_adaptation:
+  key_points:
+    - "autotools（configure 随 tarball 预生成），requires libesmtp/1.1.0；上游 configure 无条件调 libesmtp-config，而 libESMTP>=1.0（meson）不再安装该脚本 ⇒ 配方侧生成中性 helper 注入 PATH"
+    - "configure 建临时目录用 umask 077，在本文件系统得 drwx--S--- ⇒ 按 E011/E114 受控方案 replace_in_file 改 022"
+    - "drop_sgids() 无条件调 setregid，本平台不实现该 syscall（SIGSYS/31、exit 159）⇒ 等价守卫 real_gid != effective_gid 才调用，不含 __OHOS__"
+    - "上游零测试资产（四类目录 + 八类标记全 0 命中）；test_package 在回环非特权 TCP 端口起本地 ESMTP 监听，跑完整 EHLO→MAIL FROM→RCPT TO→DATA→QUIT 会话"
+  common_dependencies:
+    - libesmtp/1.1.0
+
+versions:
+  "1.2":
+    status: built
+    build_date: "2026-10-08"
+    source_url: "https://downloads.sourceforge.net/project/esmtp/esmtp/1.2/esmtp-1.2.tar.bz2"

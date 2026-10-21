@@ -1,0 +1,49 @@
+# 软件级 manifest — ukopp
+# 位置: archives/u/ukopp/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+software: ukopp
+display: "ukopp"
+description: "disk-to-disk 备份：全量/增量复制 + 校验 + 按天/周/月版本保留（GTK3 GUI 与 -nogui 命令行模式，kornelix 系工具）"
+homepage: "https://kornelix.com/ukopp"
+license: GPL-3.0-or-later
+category: system
+languages: [c++]
+
+# ============================================================
+# 构建信息
+# ============================================================
+
+# 上游为裸 Makefile 工程（非 autotools）
+build_system: makefile
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "Makefile 未定义 CXX → make 命令行传 CXX（编译器从 tools.build:compiler_executables conf 获取，R33）"
+    - "上游 make install 依赖 xdg-desktop-menu（OHOS 无）→ package() 手工布局产物"
+    - "zfuncs zinitapp() 在 stdin 非 tty 时把 stdout/stderr freopen 到 $HOME/.ukopp/logfile（追加模式）；$HOME 必须设置且可写，否则 zappcrash"
+    - "-nogui 命令行模式不调 gtk_init()（headless 安全）；无 job 文件时干净退出 rc=0"
+    - "initfunc 按 getuid() 分支输出（非 root 打印版本+许可行，root 打印 root privileges）——版本断言两分支都接受"
+    - "PkgConfigDeps 生成 .pc（本机 conan 缓存绝对路径）+ 显式 PKG_CONFIG_PATH=generators 目录（gtk 包自带 .pc 的 prefix 是 CI worker 路径，本地不可用；bart-view 同款）"
+  common_dependencies:
+    - glib
+    - gtk
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "4.9":
+    status: built
+    build_date: "2026-10-16"
+    conan_ref: "ukopp/4.9"
+    source_url: "https://deb.debian.org/debian/pool/main/u/ukopp/ukopp_4.9.orig.tar.gz"

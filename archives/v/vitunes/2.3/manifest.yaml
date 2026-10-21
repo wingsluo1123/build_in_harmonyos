@@ -1,0 +1,85 @@
+# 版本级 manifest — vitunes 2.3
+# 文件位置: archives/v/vitunes/2.3/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "2.3"
+software: "vitunes"
+status: published
+build_date: "2026-10-17"
+build_system: makefile
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/ryanflannery/vitunes/archive/refs/tags/2.3.tar.gz"
+  sha256: "a78f79d08a3a0e83aa3f4aa406eca64747f0496a7b810a1f7bac3f620a2fc5f3"
+  tar_format: tar.gz
+  # 官方站 vitunes.org 仅提供 http（TLS 证书与主机名不匹配），内容与
+  # GitHub 官方仓库 tag 2.3（commit 01d19ea6）归档逐文件 sha256 完全一致
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: makefile
+  # 上游 Makefile.linux 无 configure；构建时显式传入
+  # CC/CFLAGS(-std=gnu99 -D_GNU_SOURCE)/LDFLAGS
+  build_command: "make -f Makefile.linux CC=<clang> CFLAGS=<...> LDFLAGS=<...> -j1"
+  configure_options: []
+  dependencies:
+    - taglib/1.13.1
+    - ncurses/6.6
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-e_commands.c.patch"
+  - "0002-medialib.c.patch"
+  - "0003-medialib.h.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "OHOS sysroot 无 fts.h/libfts：C 代码的 fts(3) 目录遍历需改用 POSIX dirent 递归（并自带 dev/inode 祖先表防符号链接环）—— knowledge_ref: E688"
+  - "aarch64 上 char 默认 unsigned：getopt(3) 返回值存进 char 时 -1 哨兵永不为真，带选项的 e-command 全部报 usage；须用 int —— knowledge_ref: E697"
+  - "vitunes 只用 taglib 的 C API（tag_c.h/libtag_c）：taglib/2.3 配方 BUILD_BINDINGS=OFF 无 C wrapper，须依赖 taglib/1.13.1 —— knowledge_ref: E699"
+  - "OHOS 上 C++ 运行时静态链：clang -static-libstdc++ 对 libc++ 不生效，需显式链接 clang -print-file-name=libc++.a/libc++abi.a/libunwind.a，产物仅依赖 libc.so —— knowledge_ref: E699"
+  - "上游 Makefile.linux 链接 -lncurses/-lutil：ncurses 包只提供 wide 静态库、源码不引用 libutil，链接行需由配方按依赖重组 —— knowledge_ref: E697"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_hash: c568c416e0de14d7
+  source_work_hash: 71ab98055c19e670
+  generated_at: '2026-10-17T17:25:23'
+  patches_count: 3
+
+patch_classification:
+  - file: 0001-e_commands.c.patch
+    type: portability
+    platform_only: false
+    guard: none
+    description: "getopt(3) 返回值必须为 int（aarch64 上 char 为 unsigned，-1 哨兵失效）——通用可移植性修复，无平台宏"
+  - file: 0002-medialib.c.patch
+    type: portability
+    platform_only: false
+    guard: none
+    description: "目录遍历改用 POSIX dirent（fts(3) 在 OHOS sysroot 缺失），附带 dev/inode 祖先表防符号链接环——纯 POSIX 实现，无平台宏"
+  - file: 0003-medialib.h.patch
+    type: portability
+    platform_only: false
+    guard: none
+    description: "头文件 <fts.h> 改为 <dirent.h>——通用可移植性修复，无平台宏"
+

@@ -1,0 +1,16 @@
+sources:
+  url: "https://deb.debian.org/debian/pool/main/i/indi-dsi/indi-dsi_0.4+20221223123028.orig.tar.gz"
+  sha256: "32c8ce7f3848abecebddc105567ab1875628a1c365c2a9981594927b44bae612"
+patches:
+  - patch_file: "patches/0001-FindINDI-version-regex.patch"
+    patch_description: "FindINDI.cmake 版本正则回移上游 indi-3rdparty master 修复：兼容 INDI 2.x indiversion.h 的 INDI_VERSION \"2.2.2\" 引号形式（否则 find_package(INDI) 报 FATAL_ERROR failed to detect INDI version）；与已合并 libfli/2.0-20221221182632 的 0001 补丁逐字一致"
+    patch_type: "portability"
+  - patch_file: "patches/0002-CMakeCommon-cxx17.patch"
+    patch_description: "CMakeCommon.cmake 将 CMAKE_CXX_STANDARD 由 14 提至 17：libindi 2.x 头文件使用 std::any（C++17），该目录级普通变量会遮蔽 conan toolchain 注入的 cppstd=17 cache 变量，必须就地修正"
+    patch_type: "portability"
+  - patch_file: "patches/0003-bayer-property.patch"
+    patch_description: "回移上游 indi-3rdparty master 的 libindi 2.x Property 迁移（UpdateCCDBin() 内两处）：IUSaveText(&BayerT[2], ...) 改为 BayerTP[2].setText(...)——libindi 2.2.2 中 CCD::BayerTP 已为 INDI::PropertyText（原始 IText 数组成员 BayerT 已移除，2022 快照源码无法编译）；上游 master 的 dsi_ccd.cpp 除该两处外与本快照逐字一致（DsiDevice.h 大重构为纯 USB 层自洽头、不含 INDI 引用，无需跟随），此补丁即全部所需 master 同步"
+    patch_type: "backport"
+  - patch_file: "patches/0004-cmakelists-install-guards.patch"
+    patch_description: "CMakeLists.txt install 路径双守卫: 上游无条件 set(RULES_INSTALL_DIR '/lib/udev/rules.d')/set(FIRMWARE_INSTALL_DIR '/lib/firmware') 以普通变量遮蔽 conan 注入的非 FORCE cache 变量, install 期写 /lib/udev/rules.d EPERM(CI #97093 package() 实测); 加 if(NOT DEFINED) 守卫——有注入用注入(share/ 相对路径), 无注入回退上游默认"
+    patch_type: "portability"

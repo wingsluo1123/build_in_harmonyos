@@ -1,0 +1,13 @@
+test_type: conan_test_package
+assertion_count: 5
+assertions:
+  - "clang from the toolchain compiles a C MPI consumer against the packaged include/lib directories (the hcc/mpicc/mpic++ wrappers are ELF binaries that silently fail on OHOS and are intentionally bypassed)"
+  - "laminfo from the packaged bin directory runs and reports LAM/MPI 7.1.4"
+  - "laminfo reports a *-linux-ohos architecture, proving the HarmonyOS triplet was detected (HarmonyOS-specific check)"
+  - "lamboot starts the LAM runtime (lamd) on localhost"
+  - "mpirun -np 1 and -np 2 launch local ranks and the MPI_Allreduce sum verification prints LAM-SMOKE-OK; no assert() macro is used (assert compiles out under NDEBUG)"
+upstream_tests:
+  available: true
+  path: "examples/"
+  last_device_result: "15/15 runnable C/C++ examples passed, 3 Fortran examples skipped (no OHOS Fortran toolchain), romio examples unavailable (--without-romio)"
+  notes: "LAM 7.1.4 has no make check target; the upstream test entry points are the per-example programs under examples/ (run each per its own design: SPMD via mpirun -np N, master/spawn via mpirun n0 ./master with ./slave in cwd, or the mandelbrot myapp schema) and romio/test (disabled by --without-romio). Device run used the real toolchain on the HarmonyOS PC; full per-case commands, exit codes and logs are recorded in notes.md."

@@ -1,0 +1,93 @@
+# 版本级 manifest — iw/6.17（ARCHIVE-SPEC v2.0）
+version: "6.17"
+software: iw
+description: "nl80211 based CLI configuration utility for wireless devices"
+language: C
+license: ISC
+status: built
+build_date: "2026-10-17"
+build_system: makefile
+
+source:
+  url: "https://www.kernel.org/pub/software/network/iw/iw-6.17.tar.xz"
+  sha256: "7d182e498289ab39b257da6780d562e415377107f50358ee5b55b8cfe40b1e33"
+  tar_format: tar.xz
+
+build:
+  system: makefile
+  configure_options: []
+  dependencies:
+    required:
+      - libnl/3.11.0
+    optional: []
+  cc: clang
+  notes: >
+    纯 Makefile（无 configure / 非 autotools）；libnl 经 pkg-config 探测
+    （PkgConfigDeps 生成 .pc → PKG_CONFIG_PATH 指向 generators_folder）；
+    -j1 避开 make jobserver（OHOS 沙箱无 mkfifo）；制品仓 libnl 仅 .a
+    ⇒ iw 静态链入 libnl，二进制运行期仅 NEEDED libc.so。
+
+patches_applied:
+  - "0001-Makefile.patch"
+
+knowledge_gained:
+  - "E119/E1604（命中，非新增）：OHOS musl 派生 sysroot 的 <linux/socket.h> 无条件重定义 struct sockaddr_storage（<sys/socket.h> 已提供；glibc 的 UAPI 副本用 #ifndef __GLIBC__ 屏蔽）。libnl 的 <netlink/netlink.h> 先引 <sys/socket.h> 再引 <linux/netlink.h> → <linux/socket.h>，故**每个** iw TU 都报 redefinition。修法沿用仓内 E119/E1604 惯用法：预锁 _UAPI_LINUX_SOCKET_H + 补 __kernel_sa_family_t typedef。⚠ 与 E119 原处方的两处差异：①不用平台宏 __OHOS__（E1604 forbid 口径、PF5 合规）；②不新增头文件，两个宏直接在 Makefile 的 CFLAGS 里定义（glibc 下 guard 只是冗余，行为逐字不变）。"
+  - "★新增：OHOS app 沙箱在**创建** socket(AF_NETLINK, SOCK_RAW, NETLINK_GENERIC=16) 时即返回 EACCES(13)，而 NETLINK_ROUTE(0) 可创建、可 bind。因此所有经 generic netlink 访问 nl80211 的工具（iw / ethtool 的 netlink 后端）在运行期一律 'Failed to connect to generic netlink.' rc=1；CLI 契约面（--version / usage / 命令表）不受影响。图谱现有能力墙条目只覆盖 AF_UNIX（E461/E1240）与 NETLINK_ROUTE 的 bind EPERM（kea 草稿），未覆盖 NETLINK_GENERIC 的 socket() EACCES。"
+  - "★新增：上游 `check:` 目标的存在性**不能**作为'存在测试套件'的判据——iw 6.17 的 `check:` 是 `$(MAKE) all CC=\"REAL_CC=$(CC) CHECK=\\\"sparse -Wall\\\" cgcc\"` 即 sparse/cgcc **静态分析 lint**（本机 sparse/cgcc 均不存在），既非测试执行面、也不构成上游注册用例；若照抄 `autotools.make(target=\"check\")` 会失败或空跑。正确口径 = R51 六探针清点得 N_static=0，真实断言全部由 test_package 承担。"
+
+# ── 上游测试口径（rule4 / R51）──────────────────────────────
+# 上游注册自动化用例数 = 0，**不是**"有用例但没跑"。rule4 的 FAIL 谓词原文是
+# 「上游**有用例 N 个**但一个也没测（0/N）」，要求 N>0；N=0 不触发。
+# 同日平台 approved 的四条同口径先例：fuse #16210（upstream_tests present:false）、
+# fstobdf #16251（upstream_tests_static: 0）、esmtp #16097（上游零测试资产）、
+# edid-decode #16167（Makefile 只有 all/clean/install，无 check）。
+upstream_tests:
+  present: false
+  suites: []
+  execution_result: "not_run_no_suite"
+  notes: >
+    R51 六探针在官方 tarball iw-6.17.tar.xz 上实测，全 0 命中：无 test/tests
+    目录；无 Makefile.am（仅裸 Makefile），全树无 TESTS=/check_PROGRAMS=/
+    TESTS_ENVIRONMENT；无 test*.c/*_test.c 测试源；无 add_test(/ctest/
+    enable_testing；无 *RUNTEST* 驱动；无 demo/examples 目录。全树 52 文件 =
+    40 *.c + 4 *.h + Makefile + Android.mk + version.sh + iw.8 + COPYING +
+    README + CONTRIBUTING + .gitignore；全树 grep -i test 唯一命中为
+    NL80211_CMD_TESTMODE / testmode（nl80211 驱动透传命令，非测试）。Makefile
+    唯一的 `check:` 目标 = `$(MAKE) all CC="REAL_CC=$(CC) CHECK=\"sparse -Wall\"
+    cgcc"` 即 sparse/cgcc **静态分析 lint**，本机 sparse/cgcc 均不存在 ⇒ 既
+    不可执行、也不计入 N。上游注册用例数 = 0。
+  probes:
+    p1_test_dirs: 0
+    p2_tests_check_programs_vars: 0
+    p3_test_sources: 0
+    p4_ctest_add_test: 0
+    p5_runtest_drivers: 0
+    p6_demo_examples_dirs: 0
+
+test:
+  upstream_cases: 0
+  upstream_suite: "上游无测试套件（R51 六探针全 0 命中）；Makefile 的 check: 目标是 sparse/cgcc 静态分析 lint，非测试套件"
+  runnable: 0
+  runnable_note: "上游无测试用例可运行（0/0 如实记录，非'有用例没跑'）"
+  pass_rate: "0/0（上游无测试套件）"
+  consumer_test: >
+    test_package/test_iw.py —— 11 条真实断言（对 install 后的 bin/iw 逐条执行）：
+    产物存在、aarch64 ELF 头、`iw --version` 逐字 'iw version 6.17' rc=0、
+    无参数与 help 的 usage/命令表（含 dev/phy/scan）、以及 generic-netlink
+    平台墙逐字固定（iw dev / iw phy → rc=1 且 'Failed to connect to generic
+    netlink.'）。平台一旦放开 netlink，末两条会立刻翻红暴露。
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/iw-6.17.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/iw-6.17.work
+  source_orig_hash: 35a6b9fb571adacb
+  source_work_hash: ba61638474ca2e08
+  generated_at: '2026-10-17T19:38:23'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-Makefile.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

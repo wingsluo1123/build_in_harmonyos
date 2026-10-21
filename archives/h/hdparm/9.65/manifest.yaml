@@ -1,0 +1,40 @@
+version: "9.65"
+software: "hdparm"
+status: built
+build_date: "2026-10-18"
+build_system: makefile
+
+source:
+  url: "https://sourceforge.net/projects/hdparm/files/hdparm/hdparm-9.65.tar.gz"
+  sha256: "d14929f910d060932e717e9382425d47c2e7144235a53713d55a94f7de535a4b"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options: []
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+# 补丁由 conanfile.py 的 export_sources() + build() 中 apply_conandata_patches() 真实应用，
+# 补丁条目声明于 conandata.yml 的 patches 段（base_path=hdparm-9.65, strip=1）。
+patches_applied:
+  - "0001-fix-getpass-musl-compat.patch"
+
+tests:
+  upstream_suite: none            # 上游 Makefile 无 check/test 目标（make -n check → exit 2）
+  upstream_cases: 0
+  test_package_assertions: 7      # conanfile.py 3 + test_hdparm_elf.py 4
+  ohos_specific_non_assertion_tests: 1   # readelf -hld：PT_INTERP=/lib/ld-musl-aarch64.so.1, NEEDED=libc.so
+  test_package_sources:           # CI L0c 要求的实质测试源文件
+    - "conanfile.py"
+    - "test_hdparm_elf.py"
+
+knowledge_gained:
+  - "OHOS musl libc 不提供 getpass() GNU 扩展，老 C 代码需 portability 补丁补局部实现 (knowledge_ref: E1403)"
+  - "hdparm 为手写 Makefile（非 autotools），conanfile 必须直接 self.run(make) 而非套用 Autotools helper (knowledge_ref: E1256)"
+  - "safe-delete shim 在 hmdfs 上拦截 tar/rm；沙箱内跑 conan 需 CONAN_HOME 迁本地盘 + 去 PYTHONPATH 才能完成删除 (knowledge_ref: E1247)"
+  - "E708: os.posix_spawn 不按 PATH 解析裸命令名，make/clang 必须传绝对路径 (knowledge_ref: E708)"
+  - "conan apply_conandata_patches 走 patch_ng（严格 hunk 行数），手工补丁必须由真实 diff 生成，GNU patch 的 fuzz 容错不适用 (knowledge_ref: E1178)"
+  - "OHOS 禁止执行未签名 ELF；CLI 包用 ELF 加载契约（PT_INTERP/NEEDED，且不对 loader 名硬断言）验证消费者可用性 (knowledge_ref: E1324)"
+  - "CI L0c no_test_sources 只在 conan create 前用 find 统计 test_package/ 内 .c/.cpp/.cc/.cxx/.sh/.py 文件；纯 conanfile 断言包必须补一个实质测试源，否则构建前即被拦 (knowledge_ref: E308)"

@@ -1,0 +1,64 @@
+# 版本级 manifest — vit 2.3.4
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "2.3.4"
+software: vit
+status: built
+build_date: "2026-10-17"
+build_system: pip
+
+source:
+  url: "https://pypi.cnb.cool/OpenHarmonyPCDeveloper/pypi/-/packages/packages/1c/11/5a62bb49c3f5086d0e3eb85cb66eae9c2cc49123b9eb9dadfa032ea9c67a/vit-2.3.4.tar.gz"
+  sha256: "346a210aa0de754cf7adaf73723bf7d2cc8ee754eeb785eb18370d33f74e5ce2"
+  filename: "vit-2.3.4.tar.gz"
+  note: >-
+    上游 `vit-project/vit` **2.3.4** 的 PyPI sdist（平台 pip 镜像直链），版本与平台清单一致。
+    本地实测 73,363 字节、187 个文件、单层根目录 `vit-2.3.4/`；仓库自带 `test/`（10 个用例），
+    版本在 `vit/version.py`（`VIT = '2.3.4'`）。
+
+build:
+  system: pip
+  steps:
+    - "打补丁 0001：vit/util.py 的导入期 curses.setupterm() 失败时降级为空序列"
+    - "pip install --target <包>/python tasklib>=2.4.3 urwid>=2.1.2（运行时依赖）"
+    - "pip install --no-deps --target <包>/python .（上游 setup.py，entry_points: vit=vit.command_line:main）"
+    - "按 entry_points 生成 <包>/bin/vit"
+  dependencies: ["tasklib", "urwid"]
+  build_requirements: []
+  conan_side_adaptations:
+    - "上游 vit/util.py 导入期无条件 curses.setupterm()：无 terminfo 环境（容器/CI/无终端）里连 import vit 都失败 → 补丁降级为空序列"
+    - "测试环境按属主挑 TMPDIR、清 XDG_CACHE_HOME/XDG_CONFIG_HOME、补 /system/bin 到 PATH"
+
+upstream_tests:
+  framework: "pytest（上游用例基于 unittest）"
+  test_path: "test/（test_color_mappings.py、test_list_batcher.py）"
+  test_command: "python -m pytest -q -p no:cacheprovider test"
+  test_count: 10
+  run_in_build: true
+  verified: true
+upstream_test_pass_rate: >-
+  **10/10（100%）** —— 本地实跑 `10 passed in 0.68s`。用例内容未做任何修改。
+adapted_test_pass_rate: >-
+  test_package/check_vit.py **6 项消费者校验（全部离线）**，本地实测
+  `checks=6 fails=0 skips=0 / RESULT: PASS`：①命令产物齐备（bin/vit）②模块可导入且版本正确
+  （`vit.version.VIT = 2.3.4`）③入口参数解析可用（`vit --help` 输出用法）④**核心组件真实调用**
+  （ListBatcher 分批 + 颜色映射）⑤许可证随包（licenses/LICENSE）⑥证据。
+
+deviations:
+  - "补丁 0001：vit/util.py 的导入期 curses.setupterm() 改为 try/except 降级（无 terminfo 环境必需，同时修复运行时）"
+
+knowledge_gained:
+  - category: L1
+    content: >-
+      **TUI 包常在导入期初始化 curses**：`vit/util.py` 在模块级直接 `curses.setupterm()` 并取清屏序列，
+      于是**无 terminfo 数据库**的环境（容器/CI/无终端）里连 `import vit` 都抛
+      `_curses.error: setupterm: could not find terminfo database`，上游测试在收集阶段就整批失败。
+      处置是把 setupterm 包进 try/except curses.error、失败时把序列降级为空 —— 只有真正清屏退化为无操作，
+      其余功能不受影响；这属于运行时修复，不是测试侧打补丁。
+    reason: "vit 2.3.4 适配实测——2 个 test 文件 collected error"
+  - category: L1
+    content: >-
+      **只做单元级消费者校验的包，也能给出有说服力的"真跑"**：vit 无法在无终端环境跑全屏界面，
+      但它把核心逻辑（`ListBatcher` 分批、`task_256_to_urwid_256` 颜色映射）暴露为纯函数 →
+      消费者校验直接调用这两条真实路径，而不是只断言文件存在或 `--version`。
+    reason: "vit 2.3.4 适配实测——消费者校验设计"

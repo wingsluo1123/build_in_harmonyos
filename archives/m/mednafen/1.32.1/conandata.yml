@@ -1,0 +1,50 @@
+# conandata.yml — mednafen 1.32.1（官方直链，R39 官方源）
+# 上游发布页：https://mednafen.github.io/releases/
+# ⚠ 本文件与 conanfile.py/test_package/* 一样是**手写交付物**：
+#    driver 的 `conan-init`（`scripts/ohc/conan_recipe.py::conan_init(force=True)`，
+#    由 `ohc-run.py build` 的 [9/14] 调用）会**无条件覆盖** conanfile.py /
+#    conandata.yml / test_package/{conanfile.py,MANIFEST.yml,test.c,CMakeLists.txt}。
+#    ⇒ 交付前禁止再跑 `build` 的 Step9 及以后；验证只走 `conan-verify` + `finish`。
+sources:
+  url: "https://mednafen.github.io/releases/files/mednafen-1.32.1.tar.xz"
+  sha256: "de7eb94ab66212ae7758376524368a8ab208234b33796625ca630547dbc83832"
+
+patches:
+  # 0001/0002：随包 config.guess/config.sub 是 2018-02-24 / 2018-02-22 版，不认
+  # `uname -s` = HarmonyOS（真机实测 uname -s=HarmonyOS、uname -m=aarch64），
+  # configure 报 `cannot guess build type; you must specify one`。
+  # 最小补丁按 E1092 口径注入 HarmonyOS 分支，产出 aarch64-unknown-linux-ohos，
+  # 不整文件替换、不用 --build/--host 绕过（E007 forbid_1）。
+  - patch_file: "patches/0001-config.guess.patch"
+    strip: 1
+    patch_description: "config.guess 增加 HarmonyOS/HongMeng 平台识别分支，输出 aarch64-unknown-linux-ohos（E007/E1092）"
+    patch_type: "portability"
+  - patch_file: "patches/0002-config.sub.patch"
+    strip: 1
+    patch_description: "config.sub 的 maybe_os 白名单与 OS 白名单接受 linux-ohos（否则 aarch64-unknown-linux-ohos 被判 invalid configuration，E072）"
+    patch_type: "portability"
+  # 0003：两处 HMDFS/链接器最小处置，都在上游随包生成的 `configure` 里：
+  #   (a) `umask 077 && mktemp -d ./confXXXXXX` 在 HMDFS 上建出 drwx--S--- 目录，
+  #       config.status 随后写 subs1.awk 报 Permission denied（E114）；仓内 1152
+  #       个包同款最小修法：umask 077 → 022。
+  #   (b) 上游会强制 -fno-pic/-fno-pie/-no-pie；OHOS SDK 的 clang15 + ld.lld + musl
+  #       上，非 PIC 目标文件对 libc 数据符号（stdout）产生
+  #       R_AARCH64_LDST64_ABS_LO12_NC，copy relocation 落点只有 4 字节对齐 ⇒
+  #       ld.lld 报 improper alignment 失败（3 行 fprintf(stdout,...) 最小复现）。
+  #       OHOS 上保留 SDK 的 PIE/PIC 默认值，其他平台行为不变。
+  - patch_file: "patches/0003-configure.patch"
+    strip: 1
+    patch_description: "configure：config.status 临时目录 umask 077→022（E114）；OHOS 主机不再强制 -fno-pic/-fno-pie/-no-pie（保留 SDK PIE/PIC 默认值）"
+    patch_type: "portability"
+  # 0004：gnulib intl/lock.h 的 pthread_in_use() 探测用未声明的 pthread_cancel
+  # （OHOS sysroot 的 pthread.h 没有该符号，PSCAN-MUSL-001 命中）。
+  - patch_file: "patches/0004-intl-lock.h.patch"
+    strip: 1
+    patch_description: "intl/lock.h 的 pthread_in_use() 探测改用已声明的 pthread_self，绕开 OHOS 缺失的 pthread_cancel"
+    patch_type: "portability"
+  # 0005：OHOS 的 musl 系 <dirent.h> 不声明 GNU versionsort(3)，
+  # src/drivers/Joystick_Linux.cpp 三处 scandir 比较器编译失败（E1574 同族）。
+  - patch_file: "patches/0005-src-drivers-Joystick_Linux.cpp.patch"
+    strip: 1
+    patch_description: "OHOS 下把 scandir 比较器 versionsort 回退为 POSIX alphasort（枚举集合由过滤器决定，仅列出次序降级为字典序）"
+    patch_type: "portability"

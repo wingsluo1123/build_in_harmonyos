@@ -1,0 +1,84 @@
+# 版本级 manifest
+# 文件位置: archives/l/libest/3.2.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "3.2.0"
+
+# 软件名
+software: "libest"
+
+# 编译状态
+# published | built | failed | archived
+# 首轮工作树：配方完整，待 HMBS 真机预检验证后按实测更新。
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-18"
+build_system: "autotools"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（上游 Release 3.2.0，tag r3.2.0）
+  url: "https://github.com/cisco/libest/archive/refs/tags/r3.2.0.tar.gz"
+
+  # 源码校验和（GitHub 官方归档实测）
+  sha256: "324b3a2b16cd14ea4234d75fa90f08b29509bac9cd3795c44268e22f906ee0ad"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表
+  configure_options:
+    - "--with-ssl-dir=<conan openssl 3.5.6.1 包目录>"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - "openssl/3.5.6.1"
+    - "cunit/2.1.3 (test-only, upstream test/UT runtest; dot version is ohpcd-only CMake recipe, avoids conancenter 2.1-3 autotools/m4 chain)"
+    - "curl/8.15.0 (test-only, upstream test/UT runtest)"
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表（均为 OHOS 平台适配，无上游功能改动）
+patches_applied:
+  - "0001-config-config.guess.patch"
+  - "0002-config-config.sub.patch"
+  - "0003-configure.patch"
+  - "0004-src-est-est_client.c.patch"
+  - "0005-src-est-est_server.c.patch"
+  - "0006-src-est-est_locl.h.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "3.2.0 新增 safe_c_stub 内嵌 stub（noinst 静态库 libsafe_lib.a）：src/est 链接 -lsafe_lib，配方须先 make -C safe_c_stub 再 make -C src；与 1.0.0 仅构建 src 不同"
+  - "Release 3.2.0 官方支持 OpenSSL 1.1.1：依赖选用 openssl/1.1.1w（制品仓已有配方），避开 1.0.0 式的 OpenSSL 3.x 私有 API 迁移补丁"
+  - "上游测试 test/UT 未纳入顶层 SUBDIRS，无 automake TESTS/make check 集成：runtest.c 注册 55 个 CUnit 套件，需 cunit+curl 开发库手工构建，配方内不触发"
+  - "example/ 演示程序与 java/jni 不进入配方交付：只构建安装 src/est（libest + include/est/est.h）"

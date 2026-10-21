@@ -1,0 +1,67 @@
+software: kolf
+version: "26.04.0"
+status: built
+package_type: application
+build_system: cmake
+created_at: 2026-10-16
+build_date: "2026-10-16"
+language: cpp
+description: "KDE 迷你高尔夫游戏（Kolf）——Qt6/KF6 QWidget 图形应用，2D 俯视球场，基于 KDEGames6（libkdegames），物理引擎 Box2D 静态内嵌"
+homepage: https://invent.kde.org/games/kolf
+upstream_source: https://download.kde.org/stable/release-service/26.04.0/src/kolf-26.04.0.tar.xz
+source_url: https://download.kde.org/stable/release-service/26.04.0/src/kolf-26.04.0.tar.xz
+source_sha256: "dfb88b8e44bfdfc2e06b9499a17561a97e31de839b1d788c564c3ea8e05e9386"
+license: GPL-2.0-or-later
+
+dependencies:
+  required:
+    - qtbase/6.11.1
+    - qtsvg/6.11.1
+    - kconfig/6.18.0
+    - kconfigwidgets/6.18.0
+    - kcoreaddons/6.18.0
+    - kdbusaddons/6.18.0
+    - kdnssd/6.29.0
+    - ki18n/6.18.0
+    - kwidgetsaddons/6.18.0
+    - kxmlgui/6.18.0
+    - kiconthemes/6.18.0.1
+    - kcompletion/6.18.0
+    - libkdegames/26.04.0.1
+  build:
+    - ecm/6.26.0
+  forced:
+    - "karchive/6.18.0 (override=True: libkdegames 26.04.0.1 graph precedent)"
+
+patches_applied:
+  - patches/0001-ohos-skip-kdoctools.patch
+  - patches/0003-ohos-no-crash-textwidgets.patch
+
+test_results:
+  type: no_upstream_tests_consumer_verified
+  upstream: "none (N=0): the 26.04.0 release tarball (405 entries) has no tests/, autotests/ or test/ directory and no enable_testing()/add_test()/ecm_add_test()/BUILD_TESTING call in any of the 7 CMakeLists.txt or cmake modules (grep -rn over the tree returns nothing outside po/); upstream QA runs through KDE CI source builds only (.kde-ci.yml)"
+  test_package: "pending HMBS preflight: 4 consumer assertions (binary exists + --version 26.04.0 + --help non-empty + --license non-empty, QT_QPA_PLATFORM=offscreen headless-safe)"
+  upstream_test_total: 0
+  upstream_test_count_method: ctest_entries
+
+platform_adaptations:
+  - "KF6 DocTools dropped from the REQUIRED component list plus add_subdirectory(doc) and kdoctools_install(po) removed (patch 0001): kdoctools is not part of the published KF6 6.18/6.26 closure and the DocBook handbook is not a runtime requirement (kbreakout 26.04.0 / ktuberling 26.04.0 precedent)"
+  - "KF_IGNORE_PLATFORM_CHECK=TRUE (KDE platform detection does not know OHOS)"
+  - "KF_SKIP_PO_PROCESSING=ON (translation catalog generation skipped; no gettext msgfmt toolchain needed for the deliverable)"
+  - "KIO 已移除（补丁 0002）：kolf 全树仅 KolfWindow::openUrl 一处 KIO::file_copy（命令行球场文件拷贝）+ KJobWidgets 进度窗；任何已发布 kio（6.14.0.1/6.26.0）都会因跨代 override 产生全新 package_id 并触发 KIO 源码重建，在沙箱编译器自检墙失败（三轮实测）。openUrl 已移植为 QFile::copy（本地）+ QtNetwork/QNetworkAccessManager（远程，同阻塞拉取 + mime 检查 + 失败关游戏流程），去掉 KF6::KIOCore/KF6::JobWidgets 链接并新增 Qt6::Network（qtbase/6.11.1 FEATURE_network=ON 提供）；全图回到已发布 KF6 6.18.0 闭包，全部命中二进制"
+  - "karchive/6.18.0 override=True pin (libkdegames 26.04.0.1 graph precedent)"
+  - "-Wl,--disable-new-dtags -Wl,-z,max-page-size=0x1000 via CMAKE_EXE_LINKER_FLAGS + CMAKE_BUILD_RPATH=$ORIGIN (kbreakout 26.04.0 precedent; _INIT variant is skipped when the toolchain sets a non-empty value): the OHOS musl loader refuses the lld default 0x10000 multi-RW-LOAD layout"
+  - "ECM_MODULE_PATH + conan_cmakedeps_paths.cmake written manually (qtbase/KF6 packages use cmake_find_mode=none)"
+  - "Ninja generator on OHOS (E346: sandbox denies make's hardcoded SHELL=/bin/sh; Ninja execs the compiler directly; tgui/1.13.0 oclgrind/26.03.1 ksystemstats/6.7.2 precedent; CMAKE_MAKE_PROGRAM pinned HMBS_NINJA -> system ninja -> PATH)"
+  - "MAKEFLAGS/MFLAGS cleared in buildenv (prison/6.28.0 precedent: exported MAKEFLAGS poisons TryCompile sub-make on constrained workers; serial still enforced via CMAKE_BUILD_PARALLEL_LEVEL=1 + hmbs tools.build:jobs=1)"
+  - "7Zip stays optional and absent: course theme SVGZ generation uses the gzip -9 -n -c fallback of cmake/InternalMacros.cmake (libkdegames precedent)"
+
+known_issues:
+  - "R40 适配完整性：本包未对渲染/输入路径做任何 stub 或裁剪，但冒烟验证只覆盖「可执行文件加载 + 共享库闭包解析 + KAboutData/命令行接口」；球场实际渲染、鼠标击球输入与音频输出需真机人工确认（无头环境无法覆盖），编译通过与消费者用例通过不等于渲染/交互适配已完整验证"
+  - "kolf is a GUI game: on a headless machine it needs QT_QPA_PLATFORM=offscreen for the metadata smoke; full gameplay requires a display/launcher environment"
+  - "帮助手册（doc/ DocBook）：kdoctools 不在发布闭包内，KHelpClient 在线手册路径为空；核心玩法（球场、球洞编辑器、计分板、存档球场）完整保留"
+
+knowledge_gained:
+  - "kolf 26.04.0 has no upstream test suite (no tests/autotests dir, no add_test/ecm_add_test in any CMakeLists) — consumer verification is the only verification path (same conclusion as kbreakout/ktuberling 26.04.0 in the same release-service batch)"
+  - "kolf links KF6::JobWidgets/KIOCore/TextWidgets (kolfprivate) but only find_package()s KIO at top level; KJobWidgets/TextWidgets configs resolve through the kio transitive closure, no extra find_package needed"
+  - "kolf needs no Qt PrintSupport/Multimedia patching (no QPrinter/QPrintDialog/QtMultimedia usage in src/; verified by grep over the 26.04.0 tarball) — simpler than ktuberling which required two printsupport patches"

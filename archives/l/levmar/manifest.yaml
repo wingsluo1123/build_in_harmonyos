@@ -1,0 +1,27 @@
+software: levmar
+display: "levmar"
+description: "Levenberg-Marquardt non-linear least squares solver (C/C++, pure numerical library)"
+category: science
+homepage: "https://www.ics.forth.gr/~lourakis/levmar/"
+license: GPL-2.0-or-later
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "旧版 CMake 工程（cmake_minimum_required 2.6）：CMake 4.x 直接拒绝配置，需注入 CMAKE_POLICY_VERSION_MINIMUM=3.5"
+    - "上游无 install() 规则，亦无 enable_testing()/add_test()：制品（静态库 + configure_file 生成的公共头 levmar.h + 许可证）由配方显式收集"
+    - "上游 CMake 默认 HAVE_LAPACK=1 且 LAPACKBLAS_DIR 硬编码 /usr/lib；OHOS sysroot 无 LAPACK/BLAS，配方显式 HAVE_LAPACK=0，改用自带 LU 线性求解器，包自包含"
+    - "HAVE_LAPACK=0 时公共头不再声明线性约束求解器（dlevmar_lec/blec/bleic/blic/leic/lic_*），消费者测试只使用无 LAPACK 也声明的 dlevmar_dif / dlevmar_bc_dif"
+    - "上游唯一可执行物是示例程序 lmdemo（无断言、恒返回 0），配方在 build() 中运行它并按其输出断言收敛，作为上游示例 smoke test"
+  common_dependencies: []
+
+versions:
+  "2.6":
+    status: built
+    build_date: "2026-10-18"
+    conan_ref: "levmar/2.6"
+    upstream_version: "2.6"
+    notes: |
+      - 上游最后一个正式版本（2011-11），官方 tarball levmar-2.6.tgz（81143 字节）
+      - 无外部依赖；LAPACK 关闭后完全自包含
+      - 0 个补丁（未修改任何上游源码/测试）

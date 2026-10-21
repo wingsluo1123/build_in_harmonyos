@@ -1,0 +1,76 @@
+# test_package/MANIFEST.yml — xir 2.5
+# 上游官方测试声明文件（R51 三步法申报表）
+#
+# 上游测试清点：test/ 目录 11 个自包含 main 程序（test/CMakeLists.txt
+# 逐个 add_executable 生成 <name>.bin，链接 protobuf::libprotobuf +
+# unilog::unilog + libxir；上游未注册 enable_testing/add_test，测试
+# 入口为直接执行 .bin）。上游无样例 xmodel 随源码分发。
+# 实际执行：conanfile.py build() 内 BUILD_TEST=ON 构建 + 构建树签名后
+# 逐项运行，结果写 reports/upstream-test.log 与 hmbs_upstream.json。
+
+package: xir/2.5
+homepage: "https://github.com/Xilinx/Vitis-AI/tree/v2.5/src/Vitis-AI-Runtime/xir"
+
+upstream_check_command: "cmake -DBUILD_TEST=ON && ./test/test_*.bin"
+upstream_test_in_build: true
+upstream_test_command: "./test/test_*.bin（配方内签名后逐项执行）"
+
+upstream_tests:
+  - file: "test/demo.cpp"
+    description: "建图（conv2d 链 + concat）→ 子图划分（DPU/CPU merge_children）→ 图/子图属性校验"
+    command: "./demo.bin"
+    result: passed
+  - file: "test/test_deserialize.cpp"
+    description: "反序列化外部 xmodel——上游硬编码开发者本机路径 /home/suilingzhi/resnet50.xmodel，无样例模型随源码分发"
+    command: "./test_deserialize.bin"
+    result: skipped
+  - file: "test/test_deserialize_model.cpp"
+    description: "反序列化外部 xmodel 并校验 DPU 子图 device/runner 属性——输入由配方附带 packaging/gen_xmodel.cpp fixture 生成（上游无样例模型）"
+    command: "./test_deserialize_model.bin fixture_dpu.xmodel"
+    result: passed
+  - file: "test/test_graph_impl.cpp"
+    description: "Graph 实现细节：create/add_op/tensor 绑定/属性读写"
+    command: "./test_graph_impl.bin"
+    result: passed
+  - file: "test/test_graph_iso.cpp"
+    description: "图同构判定（boost vf2_sub_graph_iso 封装）"
+    command: "./test_graph_iso.bin"
+    result: passed
+  - file: "test/test_graph_template.cpp"
+    description: "GraphTemplate 图模板匹配"
+    command: "./test_graph_template.bin"
+    result: passed
+  - file: "test/test_md5sum.cpp"
+    description: "MD5 摘要（3rd-party/hash-library）——运行期回读自身源文件校验"
+    command: "./test_md5sum.bin"
+    result: passed
+  - file: "test/test_subgraph.cpp"
+    description: "子图操作：create_children/merge_children/has_op/find_op"
+    command: "./test_subgraph.bin"
+    result: passed
+  - file: "test/test_subgraph_iso.cpp"
+    description: "子图同构判定"
+    command: "./test_subgraph_iso.bin"
+    result: passed
+  - file: "test/test_subgraph_tensors_sort.cpp"
+    description: "子图 tensor 排序"
+    command: "./test_subgraph_tensors_sort.bin"
+    result: passed
+  - file: "test/test_subgraph_topo.cpp"
+    description: "子图拓扑排序（children_topological_sort）——依赖外部 graphviz 'dot' 二进制（save_to_dot→dot 渲染），OHOS 设备无 graphviz"
+    command: "./test_subgraph_topo.bin"
+    result: skipped
+
+test_package_tests:
+  - file: test.cpp
+    description: "鸿蒙消费者用例（新增）：xir 建图（Graph/add_op）→ 序列化 xmodel → 反序列化回读 → 校验 op 数量与名称往返一致（真实链接 libxir + unilog，真机执行）"
+    command: "./test_xir hmbs_consumer.xmodel"
+    result: passed
+
+# 实测对齐（round 28，reports/upstream-test.log + conan-create.log）：
+# 上游 11 = 9 passed + 2 skipped；消费者用例 1 passed；合计 12 个校验点
+assertion_count: 12
+upstream_test_total: 11
+upstream_test_passed: 9
+upstream_test_skipped: 2
+upstream_test_count_method: "test/ dir aux_source_directory mains（上游未注册 add_test，直接执行 .bin）"

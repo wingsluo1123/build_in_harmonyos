@@ -1,0 +1,54 @@
+id:                     E3190
+trigger_tool: 'test|runtime'
+phase: 'testing|runtime'
+error_signature: 'Unable to connect.*Name does not resolve|getaddrinfo.*EAI_NONAME.*(localhost\.local|\.local)'
+severity:               2
+category:               ohos, portability, testing, 'network, mdns'
+match_keywords: 'localhost.local, .local, mDNS, mdns responder, avahi, nss-mdns, hostname, EAI_NONAME, Name does not resolve, loopback fallback'
+title: 'Framework-qualified ".local" hostname cannot resolve on hosts without an mDNS responder (loopback fallback for self-connect tests)'
+root_cause: >-
+  Network frameworks qualify the bare auto-detected hostname with the ".local"
+  mDNS domain by design (pappl appends ".local" in
+  _papplSystemSetHostNameNoLock when no domain is present). Resolution of such
+  names requires an mDNS responder plus nss-mdns; OHOS has neither, and the
+  resolver falls through to unicast DNS which NXDOMAINs the name. Clients that
+  connect to the system's own advertised hostname then fail with
+  "Name does not resolve" even though the service listens on loopback.
+affected_scope: >-
+  Libraries that advertise themselves via DNS-SD and then let clients connect
+  to the advertised hostname (pappl testpappl remote path: jpeg/png image
+  tests). Bare-hostname connects ("localhost") resolve via /etc/hosts and are
+  NOT affected - only the mDNS-qualified name is.
+verification_cmd: >-
+  Print the framework hostname: a papplSystemCreate + papplSystemGetHostName
+  probe returns "localhost.local" on the device while gethostname() and
+  gethostbyname() both return plain "localhost" (the qualification happens in
+  library code, not libc). /etc/hosts has "127.0.0.1 localhost" but no
+  localhost.local entry, and no mDNS responder is running.
+rec_priority: 1
+rec_approach: 'consumer-loopback-fallback'
+rec_description: >-
+  In the consumer or test harness, retry the connection against "localhost"
+  when the advertised hostname fails to resolve; keep the library's mDNS
+  naming convention untouched (it is correct where a responder exists).
+rec_command: 'if ((http = httpConnect(host, ...)) == NULL && strcmp(host, "localhost")) { retry with "localhost"; }'
+rec_auto_fix: false
+rec_impl: 'patch-testsuite-loopback-fallback'
+fallback_priority: 2
+fallback_approach: 'explicit-sethostname'
+fallback_description: >-
+  Have the application pin a resolvable hostname at startup
+  (papplSystemSetHostName(system, "localhost")). Note: a later reset to NULL
+  re-introduces the qualified name, so the fallback in the connect path is
+  more robust.
+fallback_auto_fix: false
+forbid_1_pattern: 'strip \.local|remove the .local suffix from DNS-SD names'
+forbid_1_reason: 'The mDNS domain suffix is required for correct service advertisement on responder-equipped networks; stripping it fixes the test and breaks the feature.'
+forbid_1_consequence: 'DNS-SD registration semantics change; on mDNS networks the service becomes unfindable.'
+forbid_2_pattern: 'echo .* >> /etc/hosts|recipe writing hosts entries'
+forbid_2_reason: '/etc/hosts needs root and the Conan recipe must not mutate system configuration.'
+forbid_2_consequence: 'Build fails or the environment is silently mutated for every other package.'
+source_event: 'pappl 1.4.12 on HarmonyOS PC: jpeg/png categories always failed with "Unable to connect: Name does not resolve" because papplSystemSetHostName(NULL) produced localhost.local; patch 0003 added the testsuite loopback fallback and the full -t all sweep (1821 cases incl. client-10x1000) then passed'
+last_updated:               2026-10-19
+authors:               frj__
+doc_file:               doc/E3190.md

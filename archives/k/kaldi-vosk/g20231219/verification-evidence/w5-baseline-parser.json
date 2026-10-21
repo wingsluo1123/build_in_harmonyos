@@ -1,0 +1,35 @@
+{
+  "original_check_rc": 1,
+  "baseline": "2446216757be20359617ac140c2e103fac6398f0",
+  "findings": [
+    {
+      "entry": "E219",
+      "field": "root_cause",
+      "parsed_characters": 316,
+      "value": "|\nci/conan/profiles/ohos-aarch64 的 [buildenv] 将 /data/service/hnp/bin 置于 PATH 首位。\nconan create 内使用 HNP python 做 pip 是预期行为。HNP 进程因 hmmac(E212) 无法\ndlopen 用户路径 .so；同时 /data/app/bin/python3 在 create 沙箱中常 inaccessible。\n将「必须找到非 HNP python」写成 required=True 会导致 CI 在签名/测试前失败，\n而早期无该门禁时 pip+package 本可成功（仅 test 阶段遇 E077/E212）。",
+      "baseline_sha256": "f4ff23a92a49d2aeaccc79d544c754a8534108572cacd89704cbf543cf712766"
+    },
+    {
+      "entry": "E253",
+      "field": "root_cause",
+      "parsed_characters": 513,
+      "value": "|\nOCaml 4.14.1.1 在 OHOS PC (aarch64) 上迁移需处理 4 类问题:\n1) config.guess 无法识别 OHOS 平台 (识别为 unknown-unknown-linux-gnu),\nconfigure 阶段主机三元组判定错误;\n2) configure 生成的 config.status 使用 mktemp -d 创建临时目录,\nOHOS /tmp 为 erofs 只读文件系统导致 Permission denied;\n3) upstream testsuite 入口为 make all (无 make check), 依赖 ocamltest 驱动;\n字节码版 ocamltest/ocamldebug 被 hmmac 拦截 (Operation not permitted),\nocamldebug 默认 UNIX socket bind 也被 hmmac 拒绝;\n4) Unix.create_process 调用 fork+exec 被 OHOS 安全策略禁止 (EPERM),\nposix_spawn 可替代但相对路径解析行为与 glibc 不同 (ENOENT).",
+      "baseline_sha256": "c86dd23ca4af59c88cb4e5e32259cfb07feb64dabcd1a6bca58d8963211b4ad8"
+    },
+    {
+      "entry": "E305",
+      "field": "root_cause",
+      "parsed_characters": 244,
+      "value": "|\n字体资源型数据包（如 OTF/TTF/woff2 字体）不同于传统 C/C++ 库，无 build 步骤、\n无 shared/static lib、无 include header；现有 Conan recipe 模板和知识库未完整覆盖\nOpenType metadata 的二进制解析验证（name table、cmap）、glyph/Unicode 覆盖抽样、\nlicense(OFL) 校验、sha256 固定、以及资源安装路径（share/fonts/OTF）的正确性验证方法",
+      "baseline_sha256": "278545c449c37cc7841da150ce0730c2dba04577bab3098210c16289d56dbfbf"
+    },
+    {
+      "entry": "E305",
+      "field": "rec_approach",
+      "parsed_characters": 806,
+      "value": "|\n字体资源型数据包的标准化适配方法：\n(1) conanfile.py: package_type=\"application\", settings=(\"os\",\"arch\")；build() 为空；\npackage() 安装 fonts/otf/*.otf → share/fonts/OTF/, license → licenses/；\npackage_info() 暴露 resdirs=[\"share/fonts/OTF\"] 和 user_info.font_dir。\n(2) conandata.yml: sources 包含 url 和 sha256。\n(3) test_package/conanfile.py: 用 Python struct 模块自实现轻量 OTF 解析器\n（无需依赖 otfinfo/ttx/fonttools），验证：\n- license 文件存在\n- 4 个 OTF 文件名与 sha256 精确匹配（版本固定）\n- OpenType name table: Family(1), Style(2), Full(4), Version(5), PS Name(6)\n- cmap 覆盖: ASCII 字母+数字+常用符号\n- 安装路径: share/fonts/OTF/ 存在且含 .otf 文件\n(4) fontconfig/fc-scan/otfinfo/ttx/fonttools/fontbakery 等工具可作为\n可选验证（环境中有则使用输出额外信息），不应作为 test_package 硬依赖。\n(5) 上游测试核验：字体项目通常无传统测试用例(0/0 N/A)。\n(6) 路径 B 知识库扩展候选：因为现有知识库未完整覆盖 OTF/OpenType metadata、\nglyph/Unicode 抽样、license/hash/安装路径验证的可复用方法。",
+      "baseline_sha256": "278545c449c37cc7841da150ce0730c2dba04577bab3098210c16289d56dbfbf"
+    }
+  ],
+  "explanation": "Unchanged original completeness parser treats YAML block indicator | as empty, without reading following block content. No knowledge files or gates changed."
+}

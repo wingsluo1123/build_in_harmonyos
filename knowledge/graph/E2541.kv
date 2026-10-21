@@ -1,0 +1,39 @@
+# ═══ Draft knowledge entry — 原始 Makefile ncurses CLI 的链接/运行验证三重适配 ═══
+# Timestamp: 2026-09-24
+# Software: 3d-ascii-viewer-c 1.4.0
+# Gate: conan-verify G2 / test_ohos / consumer / W3
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E2541
+title: 原始 Makefile ncurses CLI 适配：CC:=gcc 硬编码覆盖 / -lncurses→-lncursesw / test_package TERMINFO runenv 聚合
+trigger_tool: make / conan / ncurses
+phase: compilation|linking|testing
+error_signature: make: gcc: No such file or directory|-lncurses.*cannot find|-lncurses.*No such file|Error opening terminal: [a-z0-9-]+|failed to load file
+severity:               2
+category:               ohos, make, conan, cli, ncurses
+match_keywords: make, gcc, CC :=, -lncurses, -lncursesw, ncursesw, terminfo, TERMINFO, Error opening terminal, test_package, runenv_info, conanrun, raw makefile, cli
+root_cause: ①原始 POSIX Makefile 常用 `CC := gcc` 与 `LDFLAGS := -lm -lncurses`，
+  := 使命令行/环境 CC 被覆盖，交叉编译时调用系统 gcc 失败；②制品仓 ncurses 包为
+  宽字符构建（libncursesw.a），上游链接名 -lncurses 找不到库；③ncurses 程序
+  initscr() 需要 TERM + TERMINFO，headless 验证环境缺 terminfo 数据库路径导致
+  "Error opening terminal"（与 DRAFT-E568 系统 terminfo 路径问题同面异因）。
+
+affected_scope: 所有使用原始 POSIX Makefile（无 configure）构建、链接 ncurses、
+  产出 CLI 可执行文件的 Conan 配方（OHOS aarch64 + ohpcd ncurses/6.4）。CMake/
+  autotools 项目由 toolchain 管理编译链接，不受影响；纯库型（无 CLI 运行验证）只
+  涉及前两项。
+
+verification_cmd: python3 scripts/ohc-run.py conan-verify 3d-ascii-viewer-c 1.4.0 2>&1 | grep -E "G2: PASS|Error opening terminal"
+
+rec_approach: raw-makefile-ncursesw-cli-triple-adapt
+prescan_pattern: make: gcc: No such file|Error opening terminal: [a-z0-9-]+|failed to load file
+
+# 真实证据: 3d-ascii-viewer-c 1.4.0 (2026-09-24) — G2 两轮失败后修复
+# 日志: reports/conan-create.log (conan-verify)，test_ohos.log / consumer_use_case.log 运行验证
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E2541.md
+rec_description:        raw-makefile-ncursesw-cli-triple-adapt

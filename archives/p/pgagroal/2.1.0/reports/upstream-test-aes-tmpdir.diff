@@ -1,0 +1,18 @@
+--- a/test/testcases/test_aes.c
++++ b/test/testcases/test_aes.c
+@@ -80,10 +80,14 @@
+ setup_mock_master_key(void)
+ {
+    char path[MAX_PATH];
+    char dir[MAX_PATH];
+-   char template[] = "/tmp/pgagroal_test.XXXXXX";
++   char template[MAX_PATH];
++   const char* tmp_root = getenv("TMPDIR");
+ 
+    memset(mock_salt, 0xAA, sizeof(mock_salt));
++   pgagroal_snprintf(template, sizeof(template), "%s/pgagroal_test.XXXXXX",
++                     (tmp_root != NULL && tmp_root[0] != '\0') ? tmp_root : "/tmp");
++
+    pgagroal_set_master_salt(mock_salt);
+ 
+    original_home_set = false;

@@ -1,0 +1,39 @@
+From: OHOS SPDK port
+Subject: [PATCH] Gate the DIX encryption sequence on its ISA-L crypto dependency
+
+Like test_sequence_crypto, test_sequence_dix creates a software AES-XTS
+key. Without ISA-L crypto, initialization returns -ENOTSUP and its fatal
+assertion leaks an I/O channel, leaving suite cleanup spinning forever.
+Apply the existing feature gate to this case too. No assertion is changed;
+this disabled-feature case is excluded, not reported as passed. The separate
+DIX generation/verification sequence test remains enabled.
+
+--- a/test/unit/lib/accel/accel.c/accel_ut.c
++++ b/test/unit/lib/accel/accel.c/accel_ut.c
+@@ -4188,6 +4188,7 @@
+ 	poll_threads();
+ }
+ 
++#ifdef SPDK_CONFIG_ISAL_CRYPTO
+ static void
+ test_sequence_dix(void)
+ {
+@@ -4335,6 +4336,8 @@
+ 	spdk_put_io_channel(ioch);
+ 	poll_threads();
+ }
++
++#endif /* SPDK_CONFIG_ISAL_CRYPTO */
+ 
+ static int
+ test_sequence_setup(void)
+@@ -4427,7 +4430,9 @@
+ 	CU_ADD_TEST(seq_suite, test_sequence_same_iovs);
+ 	CU_ADD_TEST(seq_suite, test_sequence_crc32);
+ 	CU_ADD_TEST(seq_suite, test_sequence_dix_generate_verify);
++#ifdef SPDK_CONFIG_ISAL_CRYPTO /* DIX sequence creates a software AES-XTS key */
+ 	CU_ADD_TEST(seq_suite, test_sequence_dix);
++#endif
+ 
+ 	suite = CU_add_suite("accel", test_setup, test_cleanup);
+ 	CU_ADD_TEST(suite, test_spdk_accel_task_complete);

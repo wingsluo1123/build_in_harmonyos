@@ -1,0 +1,30 @@
+--- a/gio/tests/meson.build
++++ b/gio/tests/meson.build
+@@ -1091,6 +1091,27 @@
+   )
+ 
+   suite = ['gio'] + extra_args.get('suite', [])
++  # A HarmonyOS PC shell user cannot start a D-Bus daemon: /tmp is read-only,
++  # the account is absent from the POSIX user database, and filesystem-backed
++  # AF_UNIX binds are denied. Keep non-D-Bus GIO coverage enabled.
++  if host_system == 'harmonyos' and test_name in [
++    'actions', 'appinfo', 'debugcontroller', 'dbus-appinfo',
++    'defaultvalue', 'desktop-app-info', 'fdo-notification-backend',
++    'gapplication', 'gdbus-auth', 'gdbus-bz627724', 'gdbus-close-pending',
++    'gdbus-connection', 'gdbus-connection-loss', 'gdbus-connection-slow',
++    'gdbus-error', 'gdbus-exit-on-close', 'gdbus-export',
++    'gdbus-introspection', 'gdbus-method-invocation', 'gdbus-names',
++    'gdbus-proxy', 'gdbus-proxy-threads', 'gdbus-proxy-unique-name',
++    'gdbus-proxy-well-known-name', 'gdbus-test-codegen',
++    'gdbus-test-codegen-old', 'gdbus-test-codegen-min-required-2-64',
++    'gdbus-threading', 'gmenumodel', 'gnotification',
++  ]
++    suite += ['failing']
++  endif
++  # System MIME databases are not exposed to the HarmonyOS shell process.
++  if host_system == 'harmonyos' and test_name == 'contenttype'
++    suite += ['failing']
++  endif
+   timeout = suite.contains('slow') ? test_timeout_slow : test_timeout
+   local_test_env = test_env
+   depends = [extra_args.get('depends', [])]

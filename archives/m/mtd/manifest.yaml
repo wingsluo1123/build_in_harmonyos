@@ -1,0 +1,36 @@
+# 软件级 manifest — mtd (mtd-utils)
+# 遵循 ARCHIVE-SPEC v3.0 §2.1
+
+software: mtd
+name: mtd-utils (Memory Technology Device utilities)
+description: 内存技术设备（MTD/NAND/NOR Flash）用户空间工具集，包含 MTD、UBI/UBIFS 与 JFFS2 命令行工具
+category: system
+license: GPL-2.0-only
+website: https://www.linux-mtd.infradead.org/
+
+versions:
+  - version: "2.3.1"
+    status: built
+    compiled_at: 2026-10-17
+    notes: |
+      - mtd-utils 工具集：MTD 工具（flash_erase/nanddump/mtdinfo/flashcp）、
+        UBI/UBIFS 工具（ubiformat/ubinize/ubiattach/mkfs.ubifs/fsck.ubifs）、
+        JFFS2 工具（mkfs.jffs2/jffs2dump）
+      - 构建系统 autotools：git 源码无 configure，需先 autoreconf（autogen.sh）
+      - 依赖 zlib/lzo/zstd/libuuid/openssl（configure.ac 无 lz4 检查，不依赖 lz4）
+      - E011（HMDFS umask 077）：build() 内 autoreconf 后 Python 替换
+        umask 077→022（configure 为构建产物，不入 patches/）
+      - uuid 头补丁：patches/0001-ubifs-utils-mkfs.ubifs-mkfs.ubifs.c.patch
+        （#include <uuid.h> → <uuid/uuid.h>）
+    provides:
+      - flash_erase
+      - nanddump
+      - mtdinfo
+      - flashcp
+      - ubiformat
+      - ubinize
+      - ubiattach
+      - mkfs.ubifs
+      - fsck.ubifs
+      - mkfs.jffs2
+      - jffs2dump

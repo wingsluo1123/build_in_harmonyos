@@ -1,0 +1,60 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: vkd3d/1.19
+homepage: "https://gitlab.winehq.org/wine/vkd3d"
+
+# 上游测试命令（automake 测试驱动；TESTS 变量见 Makefile.am:535）
+upstream_check_command: "make check"
+
+# conanfile.py build() 中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "make check"
+
+# 上游测试由 automake 测试驱动运行，共三类：
+#   1) vkd3d_tests       —— tests/vkd3d_api, tests/vkd3d_common, tests/vkd3d_shader_api
+#   2) vkd3d_cross_tests —— tests/d3d12, tests/d3d12_invalid_usage, tests/hlsl_d3d12
+#   3) vkd3d_shader_tests —— 287 个 *.shader_test，由 tests/shader_runner 驱动
+# 第 1) 类里的 vkd3d_shader_api 与全部 287 个 shader_test 需要真实 Vulkan 设备；
+# 构建机上无 GPU / 无 libvulkan / 无 ICD，配方用 swiftshader（CPU Vulkan 1.3）
+# 作为测试期 substrate 提供设备（详见 notes.md「测试口径」）。
+upstream_tests:
+  - file: tests/shader_runner.c
+    source: vkd3d-1.19/tests/shader_runner.c
+    description: "shader_test 测试框架（287 个 .shader_test 的执行器，Vulkan/D3D12 后端）"
+    command: "tests/shader_runner <file>.shader_test"
+  - file: tests/vkd3d_shader_api.c
+    source: vkd3d-1.19/tests/vkd3d_shader_api.c
+    description: "DXBC/DXIL → SPIR-V 着色器编译器公开 API（无效着色器、扫描签名等）"
+    command: "./tests/vkd3d_shader_api"
+  - file: tests/vkd3d_api.c
+    source: vkd3d-1.19/tests/vkd3d_api.c
+    description: "libvkd3d 设备/资源公开 API（需要 Vulkan 设备）"
+    command: "./tests/vkd3d_api"
+  - file: tests/vkd3d_common.c
+    source: vkd3d-1.19/tests/vkd3d_common.c
+    description: "libvkd3d-common 内部工具（blob/rbtree/debug 等，无需设备）"
+    command: "./tests/vkd3d_common"
+  - file: tests/d3d12.c
+    source: vkd3d-1.19/tests/d3d12.c
+    description: "D3D12 交叉测试（需要 Vulkan 设备）"
+    command: "./tests/d3d12"
+  - file: tests/d3d12_invalid_usage.c
+    source: vkd3d-1.19/tests/d3d12_invalid_usage.c
+    description: "D3D12 非法用法检查（需要 Vulkan 设备）"
+    command: "./tests/d3d12_invalid_usage"
+  - file: tests/hlsl_d3d12.c
+    source: vkd3d-1.19/tests/hlsl_d3d12.c
+    description: "HLSL → D3D12 交叉测试（需要 Vulkan 设备）"
+    command: "./tests/hlsl_d3d12"
+
+# test_package 中自带的测试（消费者视角，真实调用 vkd3d_shader 公开 API）
+test_package_tests:
+  - file: test.c
+    description: "消费者测试：vkd3d_shader_compile(HLSL→DXBC/TPF) → vkd3d_shader_compile(DXBC/TPF→SPIR-V)，断言两级均返回 VKD3D_OK、DXBC magic 为 'DXBC'、SPIR-V magic 为 0x07230203，并断言畸形输入被拒绝；无需 Vulkan 设备；test() 真实执行该二进制"
+    command: "./test_vkd3d"
+
+# 测试断言总数（test_package 核心断言 7 项；上游全量台账见 notes.md）
+assertion_count: 7

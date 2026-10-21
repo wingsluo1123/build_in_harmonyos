@@ -1,0 +1,40 @@
+package: jsoncpp/1.9.5
+homepage: "https://github.com/open-source-parsers/jsoncpp"
+
+upstream_check_command: "ctest --test-dir build --output-on-failure --no-tests=error"
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir build --output-on-failure --no-tests=error"
+
+# Logical tests are counted once even though shared and static packages both
+# execute them. CTest wrappers, writer modes, and individual assertions are not
+# counted as additional cases.
+upstream_tests:
+  - file: src/test_lib_json/main.cpp
+    source: jsoncpp-1.9.5/src/test_lib_json/main.cpp
+    description: "Unit fixtures registered and executed on HarmonyOS via the jsoncpp_test executable"
+    command: "ctest --test-dir build -R '^jsoncpp_test$' --output-on-failure"
+    case_count: 121
+  - file: test/data/*.json
+    source: jsoncpp-1.9.5/test/data
+    description: "Distinct parser/writer JSON inputs exercised from jsoncpp_test"
+    command: "ctest --test-dir build -R '^jsoncpp_test$' --output-on-failure"
+    case_count: 63
+  - file: test/jsonchecker/*.json
+    source: jsoncpp-1.9.5/test/jsonchecker
+    description: "Runnable JSONChecker inputs exercised from jsoncpp_test"
+    command: "ctest --test-dir build -R '^jsoncpp_test$' --output-on-failure"
+    case_count: 27
+    excluded_count: 9
+
+test_package_tests:
+  - file: unit.cpp
+    description: "One consumer flow covering Json::Value object, array, scalar, and default-value APIs"
+    command: "ctest --test-dir build -R '^jsoncpp_unit_consumer$' --output-on-failure"
+  - file: integration.cpp
+    description: "One parse-modify-write-reparse integration flow using the installed CMake target"
+    command: "ctest --test-dir build -R '^jsoncpp_integration_consumer$' --output-on-failure"
+  - file: ohos_portability.cpp
+    description: "One HarmonyOS flow covering target identity, arm64 ABI, UInt64, and Unicode parsing"
+    command: "ctest --test-dir build -R '^jsoncpp_ohos_portability$' --output-on-failure"
+
+assertion_count: 26

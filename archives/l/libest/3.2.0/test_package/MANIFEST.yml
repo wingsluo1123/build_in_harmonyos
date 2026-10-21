@@ -1,0 +1,56 @@
+# test_package/MANIFEST.yml
+# libest 3.2.0 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: libest/3.2.0
+homepage: "https://github.com/cisco/libest"
+
+# 上游测试命令: libest 使用 autotools，但 test/UT 未纳入顶层 SUBDIRS，
+# 未注册 automake TESTS/make check 目标；上游测试为 test/UT 手工构建的
+# CUnit runtest（需 cunit + libcurl 开发库）。配方 build() 内以
+# test_requires(cunit/2.1.3, curl/8.15.0) 构建并运行 runtest
+#（upstream_test_in_build: true），从 test/UT 目录运行，解析 CUnit
+# Run Summary suites 行，落盘 build_folder/hmbs_upstream.json 并随包
+# 发布到 res/，由 test_package 重发 HMBS_UPSTREAM_TEST_RESULT。
+upstream_check_command: "make check"
+upstream_test_in_build: true
+upstream_test_command: "test/UT/runtest"
+
+# 上游测试存在性（HMBS 门禁字段）：存在，切勿按 no_tests 处理。
+upstream_tests_exist: true
+
+# 上游注册总数：在 HarmonyOS aarch64 环境实测口径待真机回填前，
+# 按官方同版本源码清点的注册数申报（runtest.c 的 *_add_suite 注册数）。
+upstream_test_total: 55
+upstream_test_count_method: "auto"
+
+# 上游测试审计（HMBS 门禁字段）：确认存在测试的源码级证据。
+upstream_test_audit: "test/UT/runtest.c 通过 extern *_add_suite 声明 + 注册调用共登记 55 个 CUnit 套件(30 个默认套件 + 5 个 ENABLE_BRSKI 套件US3646/US4710/US4778/US4784/US5418h + 19 个 HAVE_LIBCOAP 套件 + US1060 平台条件);test/UT/Makefile 为手写 Makefile(非 configure 生成,AC_CONFIG_FILES 未列入 test/),硬编码 CC=gcc + /usr/local* 默认路径,配方以 make 命令行覆盖 CC/OPENSSL_DIR/CURL_DIR/CUNIT_DIR(去内层引号,真机路径无空格) + ENABLE_BRSKI=1 + CFLAGS=-fcommon(测试runner作用域,US3646/4710/4778 tentative定义合并) 构建,日志落盘 libest_upstream_make.log;顶层 Makefile.am 的 SUBDIRS 未包含 test/，无 automake TESTS 集成;配方以 test_requires(cunit/2.1.3) + test_requires(curl/8.15.0) 在 build() 内构建 test/UT/runtest(优先 make,1b复用make原位对象手工补链接(safe归档在-lest后,静态顺序敏感),回退单FULL手工 cc 链接: 上游SRC全集54个UT源(含18个CoAP)+6个util共60个对象带-DENABLE_BRSKI(不带HAVE_LIBCOAP,与上游默认make一致;子集拆分会致跨TU未定义,见notes 14);19个纯CoAP套件(US5052/5139/5184/5213/5226/5230/5237/5240/5244/5246/5255/5282/5331/5357/5367/5394/5399/5418c,US5248除外)因无LIBCOAP_DIR恒缺,需 -DHAVE_CUNIT -DHAVE_LIBCURL -DNO_SSL_DL -fcommon(测试runner作用域) 及 -I test/util/test/UT/源根/src/est + -ldl -lpthread),从 test/UT 目录运行并解析 CUnit Run Summary suites 行 + verbose Suite:/Test:分组计数(须用 suites 行而非 tests 行,后者为用例数约150+ 永远不等于55);构建证据(失败TU+编译输出+make尾)落盘 libest_upstream_build_evidence.txt 随失败标记上报;未启用的 19 个 CoAP 套件为上游条件特性(需 LIBCOAP_DIR/—with-libcoap-dir),以 ohos_feature 诚实报 gaps,周期3改走坠毁隔离路线:配方在build()内生成run_one_suite单套件驱动(与runtest同启动/注册流程,逐套件独立进程运行,断言零触碰),35个非CoAP套件逐个取HMBS_SUITE_RESULT verdict(单源,崩溃套件记test_failure并附crash证据),单进程runtest保留为回退路径;19个CoAP恒为ohos_feature,残余1(US4747从未注册)为ohos_feature;CA续签改用上游openssl配置的v3_ca扩展续(无配置则跳过,杜绝v1证书),叶证书仅同公钥密钥匹配才续签;状态门诚实化:仅executed==55且failed==0才passed,否则failed,杜绝passed-with-skipped。"
+
+# 上游实际运行的测试程序（源码清点，R51）
+upstream_tests:
+  - file: runtest.c
+    source: libest-r3.2.0/test/UT/runtest.c
+    description: "CUnit 驱动的单元测试主程序，注册全部 55 个测试套件；配方 build() 内以 cunit+curl 构建运行"
+    command: "./runtest"
+  - file: US748/us748.c, US893/us893.c-US903/us903.c, US1005/us1005.c 等
+    source: libest-r3.2.0/test/UT/US748,US893-US903,US1005
+    description: "13 个基础客户端/服务端/代理测试套件（与 1.0.0 时代一致）"
+    command: "./runtest"
+  - file: US1060-US5418 各套件源文件
+    source: libest-r3.2.0/test/UT/US1060,US1159,US1190,US1864-US5418
+    description: "42 个 BRSKI/EST over CoAP/增强证书认证与回归测试套件（含 us1060c/us5418c/us5418h/us5248coap/us5248http 变体）"
+    command: "./runtest"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "消费者测试: 调用 est_get_version/est_get_api_level/est_init_logger 实质 API"
+    command: "./test_libest"
+
+# test_package 测试计数（HMBS 门禁字段）：ctest 注册 1 个测试
+test_package_test_count: 1
+
+# 测试断言总数 (test.c 内 3 个实质断言)
+assertion_count: 3

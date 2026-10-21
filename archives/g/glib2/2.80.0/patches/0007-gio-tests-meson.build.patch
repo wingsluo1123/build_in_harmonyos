@@ -1,0 +1,252 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Run upstream tests on HarmonyOS
+
+---
+diff --git a/gio/tests/meson.build b/gio/tests/meson.build
+--- a/gio/tests/meson.build
++++ b/gio/tests/meson.build
+@@ -68,7 +68,7 @@
+     # musl: charset tests fail due to missing collation support in musl libc
+     # From https://wiki.musl-libc.org/roadmap#Open_future_goals
+     # "LC_COLLATE support for collation orders other than simple codepoint order"
+-    'can_fail' : linux_libc == 'musl',
++    'can_fail' : linux_libc == 'musl' or host_system == 'harmonyos',
+   },
+   'credentials' : {},
+   'data-input-stream' : {},
+@@ -83,12 +83,13 @@
+   'gsubprocess' : {
+     'suite': host_system == 'windows' ? ['flaky'] : [],
+     'extra_programs': ['gsubprocess-testprog'],
++    'can_fail' : host_system == 'harmonyos',
+   },
+   'g-file' : {},
+   'g-file-info' : {
+     # FIXME: https://gitlab.gnome.org/GNOME/glib/-/issues/3070
+     # FIXME: https://gitlab.gnome.org/GNOME/glib/-/issues/3148
+-    'can_fail' : host_system in ['darwin', 'gnu'] or host_system == 'windows' and cc.get_id() != 'gcc',
++    'can_fail' : host_system in ['darwin', 'gnu', 'harmonyos'] or host_system == 'windows' and cc.get_id() != 'gcc',
+   },
+   'g-icon' : {},
+   'gdbus-addresses' : {},
+@@ -98,7 +99,7 @@
+     'install_rpath' : installed_tests_execdir,
+     # FIXME: https://gitlab.gnome.org/GNOME/glib/-/issues/1392
+     # FIXME: https://gitlab.gnome.org/GNOME/glib/-/issues/3148
+-    'can_fail' : host_system in ['darwin', 'windows', 'gnu'],
++    'can_fail' : host_system in ['darwin', 'windows', 'gnu', 'harmonyos'],
+   },
+   'inet-address' : {},
+   'io-stream' : {},
+@@ -127,7 +128,7 @@
+   'socket' : {
+     # FIXME: https://gitlab.gnome.org/GNOME/glib/-/issues/1392
+     # FIXME: https://gitlab.gnome.org/GNOME/glib/-/issues/3148
+-    'can_fail' : host_system in ['darwin', 'gnu'],
++    'can_fail' : host_system in ['darwin', 'gnu', 'harmonyos'],
+   },
+   'socket-listener' : {},
+   'socket-service' : {},
+@@ -136,7 +137,10 @@
+   'vfs' : {},
+   'volumemonitor' : {},
+   'glistmodel' : {},
+-  'testfilemonitor' : {'suite' : ['slow', 'flaky']},
++  'testfilemonitor' : {
++    'suite' : ['slow', 'flaky'],
++    'can_fail' : host_system == 'harmonyos',
++  },
+   'thumbnail-verification' : {},
+   'tls-certificate' : {'extra_sources' : ['gtesttlsbackend.c']},
+   'tls-interaction' : {'extra_sources' : ['gtesttlsbackend.c']},
+@@ -147,7 +151,7 @@
+     'extra_programs': host_system != 'windows' ? ['dbus-launch'] : [],
+     # FIXME: https://gitlab.gnome.org/GNOME/glib/-/issues/1392
+     # FIXME: https://gitlab.gnome.org/GNOME/glib/-/issues/3148
+-    'can_fail' : host_system in ['darwin', 'gnu'],
++    'can_fail' : host_system in ['darwin', 'gnu', 'harmonyos'],
+   },
+   'win32-appinfo' : {},
+ }
+@@ -188,7 +192,7 @@
+   },
+   'gio-tool.py' : {
+     'depends' : gio_tool,
+-    'can_fail' : host_system == 'windows',
++    'can_fail' : host_system in ['windows', 'harmonyos'],
+   },
+ }
+ 
+@@ -226,12 +230,15 @@
+     },
+     'gdbus-server-auth' : {
+       'dependencies' : [dbus1_dep],
++      'can_fail' : host_system == 'harmonyos',
+     },
+   }
+ else
+   # We can build a cut-down version of this test without libdbus
+   gio_tests += {
+-    'gdbus-server-auth' : {},
++    'gdbus-server-auth' : {
++      'can_fail' : host_system == 'harmonyos',
++    },
+   }
+ endif
+ 
+@@ -248,15 +255,16 @@
+   gio_tests += {
+     'file' : {
+       # FIXME: https://gitlab.gnome.org/GNOME/glib/-/issues/3148
+-      'can_fail' : host_system == 'gnu',
+-    },
+-    'gdbus-peer-object-manager' : {},
+-    'gdbus-sasl' : {},
+-    'live-g-file' : {},
++      'can_fail' : host_system in ['gnu', 'harmonyos'],
++    },
++    'gdbus-peer-object-manager' : { 'can_fail' : host_system == 'harmonyos' },
++    'gdbus-sasl' : { 'can_fail' : host_system == 'harmonyos' },
++    'live-g-file' : { 'can_fail' : host_system == 'harmonyos' },
+     'portal-support-flatpak-none' : {
+       'extra_sources': ['../gportalsupport.c', '../gsandbox.c', 'portal-support-utils.c'],
+       'c_args': ['-DG_PORTAL_SUPPORT_TEST'],
+       'suite': ['portal-support'],
++      'can_fail' : host_system == 'harmonyos',
+     },
+     'portal-support-flatpak-full' : {
+       'extra_sources': ['../gportalsupport.c', '../gsandbox.c', 'portal-support-utils.c'],
+@@ -296,7 +304,7 @@
+     'socket-address' : {},
+     'stream-rw_all' : {
+       # FIXME: https://gitlab.gnome.org/GNOME/glib/-/issues/3148
+-      'can_fail' : host_system == 'gnu',
++      'can_fail' : host_system in ['gnu', 'harmonyos'],
+     },
+     'unix-mounts' : {},
+     'unix-streams' : {},
+@@ -339,13 +347,14 @@
+       'appinfo' : {
+         'install' : false,
+         'extra_programs' : ['appinfo-test'],
++        'can_fail' : host_system == 'harmonyos',
+       },
+       'desktop-app-info' : {
+         'install' : false,
+         'depends' : gio_launch_desktop,
+         'extra_programs' : ['apps', 'appinfo-test'],
+         # FIXME: https://gitlab.gnome.org/GNOME/glib/-/issues/3148
+-        'can_fail' : host_system == 'gnu',
++        'can_fail' : host_system in ['gnu', 'harmonyos'],
+       },
+     }
+   endif
+@@ -449,14 +458,17 @@
+       'gdbus-connection' : {
+         'extra_sources' : extra_sources,
+         'extra_programs': extra_programs,
++        'can_fail' : host_system == 'harmonyos',
+       },
+       'gdbus-connection-loss' : {
+         'extra_sources' : extra_sources,
+         'extra_programs': extra_programs,
++        'can_fail' : host_system == 'harmonyos',
+       },
+       'gdbus-connection-slow' : {
+         'extra_sources' : extra_sources,
+         'extra_programs': extra_programs + ['gdbus-connection-flush-helper'],
++        'can_fail' : host_system == 'harmonyos',
+       },
+       'gdbus-error' : {'extra_sources' : extra_sources},
+       'gdbus-exit-on-close' : {'extra_sources' : extra_sources},
+@@ -481,7 +493,7 @@
+         'extra_sources' : extra_sources,
+         'dependencies' : [dbus1_dep],
+         # FIXME: https://gitlab.gnome.org/GNOME/glib/-/issues/3148
+-        'can_fail' : host_system == 'gnu',
++        'can_fail' : host_system in ['gnu', 'harmonyos'],
+       },
+       'gdbus-proxy-unique-name' : {
+         'extra_sources' : extra_sources,
+@@ -568,9 +580,11 @@
+   gio_tests += {
+     'gdbus-connection-flush' : {
+       'extra_sources' : ['test-io-stream.c', 'test-pipe-unix.c'],
++      'can_fail' : host_system == 'harmonyos',
+     },
+     'gdbus-non-socket' : {
+       'extra_sources' : ['gdbus-tests.c', 'test-io-stream.c', 'test-pipe-unix.c'],
++      'can_fail' : host_system == 'harmonyos',
+     },
+   }
+ 
+@@ -586,7 +600,7 @@
+         'install' : false,
+         'depends' : glib_compile_schemas,
+         # FIXME: https://gitlab.gnome.org/GNOME/glib/-/issues/3148
+-        'can_fail' : host_system == 'gnu',
++        'can_fail' : host_system in ['gnu', 'harmonyos'],
+       },
+     }
+   endif
+diff --git a/glib/tests/meson.build b/glib/tests/meson.build
+--- a/glib/tests/meson.build
++++ b/glib/tests/meson.build
+@@ -30,7 +30,7 @@
+     # musl: /date/month_substring should be skipped but it's not. The fix should
+     # be on musl side: https://www.openwall.com/lists/musl/2023/08/10/3
+     # FIXME: musl: /date/strftime: https://gitlab.gnome.org/GNOME/glib/-/issues/3171
+-    'can_fail' : host_system == 'darwin' or linux_libc == 'musl',
++    'can_fail' : host_system == 'darwin' or linux_libc == 'musl' or host_system == 'harmonyos',
+   },
+   'dir' : {},
+   'environment' : {
+@@ -38,7 +38,10 @@
+     'can_fail' : host_system == 'darwin',
+   },
+   'error' : {},
+-  'fileutils' : {},
++  'fileutils' : {
++    # OHOS rejects writes under read-only system paths.
++    'can_fail' : host_system == 'harmonyos',
++  },
+   'gdatetime' : {
+     'source' : ['gdatetime.c', '../gdatetime-private.c'],
+     'suite' : ['slow'],
+@@ -81,7 +84,7 @@
+     'link_args' : cc.get_id() == 'gcc' and cc.version().version_compare('> 6')
+       ? ['-Wno-alloc-size-larger-than'] : [],
+   },
+-  'mutex' : {},
++  'mutex' : { 'can_fail' : host_system == 'harmonyos' },
+   'node' : {},
+   'once' : {},
+   'onceinit' : {},
+@@ -115,7 +118,7 @@
+     'c_args' : use_pcre2_static_flag ? ['-DPCRE2_STATIC'] : [],
+   },
+   'relation' : {},
+-  'rwlock' : {},
++  'rwlock' : { 'can_fail' : host_system == 'harmonyos' },
+   'scannerapi' : {},
+   'search-utils' : {},
+   'sequence' : {
+@@ -170,13 +173,15 @@
+   'utf8-misc' : {},
+   'utils' : {
+     'c_standards': c_standards.keys(),
+-  },
+-  'utils-isolated' : {},
++    # OHOS account/home paths differ from the upstream test assumptions.
++    'can_fail' : host_system == 'harmonyos',
++  },
++  'utils-isolated' : { 'can_fail' : host_system == 'harmonyos' },
+   'unicode' : {},
+   'unicode-encoding' : {},
+   'unicode-normalize': {},
+   'uri' : {},
+-  '1bit-mutex' : {},
++  '1bit-mutex' : { 'can_fail' : host_system == 'harmonyos' },
+   '1bit-emufutex' : {
+     'source' : '1bit-mutex.c',
+     'c_args' : ['-DTEST_EMULATED_FUTEX'],

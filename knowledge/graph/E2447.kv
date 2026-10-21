@@ -1,0 +1,19 @@
+id:                     E2447
+category: platform, compat, runtime
+phase: runtime
+match_keywords: /dev/null hang, stdout redirect hang, poll POLLOUT, select never returns, EVENTPOLL, char device writability, /dev/zero hang, radamsa hang, fuzzer hangs with stdout redirected, poll then write, owl lisp, do_poll, write readiness
+error_signature: "process hangs (State=S, wchan=EVENTPOLL, CPU time frozen) exactly when stdout is redirected to /dev/null or /dev/zero; same command with stdout to a pipe or regular file completes normally"
+root_cause: "OHOS musl/kernel never reports POLLOUT (writability) for character devices: poll(fd=/dev/null or /dev/zero, POLLOUT) returns 0 revents at any finite timeout and select()/poll() with infinite timeout never return at all — while write(2) to the same fd succeeds and POLLIN on /dev/null as well as POLLOUT on pipes and regular files all behave correctly. Runtimes that implement non-blocking ports as poll-then-write (Owl Lisp VM do_poll using select(nfds,...,NULL); same pattern possible in other script-language VMs and event loops) therefore sleep forever as soon as stdout is redirected to /dev/null or /dev/zero."
+rec_approach: "Inside the runtime's poll/select wrapper, pre-check each fd in the WRITE set with fstat(): if S_ISCHR(st.st_mode), treat the fd as immediately writable and return without calling select/poll. Keep pipes, sockets and regular files on the native path (their POLLOUT reporting is correct on OHOS, and pipes need real backpressure). This is a ~14-line patch at the single choke point where the VM maps Scheme ports to poll(fd)."
+prescan_pattern: "dev/null.*hang|hangs.*dev/null|select.*never return|POLLOUT"
+severity:               1
+last_updated: 2026-09-22
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E2447.md
+trigger_tool:           make
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        "Inside the runtime's poll/select wrapper, pre-check each fd in the WRITE set with fstat(): if S_ISC

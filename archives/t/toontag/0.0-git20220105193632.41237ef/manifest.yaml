@@ -1,0 +1,36 @@
+# 版本级 manifest — toontag 0.0-git20220105193632.41237ef (HarmonyOS PC 适配)
+# 文件位置: archives/t/toontag/0.0-git20220105193632.41237ef/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "0.0-git20220105193632.41237ef"
+software: toontag
+status: built
+build_date: "2026-10-14"
+build_system: autotools
+conan_ref: "toontag/0.0-git20220105193632.41237ef"
+
+source:
+  url: "https://api.github.com/repos/edrosten/tag/tarball/41237efe686d286bc9009eae70d1758b7c6282c5"
+  sha256: "696ae1c0005fb70d2d6bce6f819ea78d96e4aa061747ca7671c652d2bb6d01eb"
+  tar_format: tar.gz
+  commit: "41237efe686d286bc9009eae70d1758b7c6282c5"
+  commit_date: "2022-01-05T19:36:32Z"
+
+build:
+  system: autotools
+  configure_options:
+    - "--with-TooN=<toon>/include (conan 包 toon/0.0-git20240623085717.2982ecc)"
+  cxxflags_extra:
+    - "-DNEWCPPSTD (上游 tag/*.h 在非 WIN32 且无 NEWCPPSTD 时引用已删除的 <tr1/tuple>/<tr1/array>；与 Debian 上游修复 #1133653 同方案)"
+  dependencies:
+    - "toon/0.0-git20240623085717.2982ecc"
+    - "lapack/3.12.1 (OHOS; SVD/dgesvd_ link, transitive)"
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+knowledge_gained:
+  - "toontag 是 TooN 的姊妹算法库（TaG），Autotools 构建，configure 只认 --with-TooN=目录；Conan 侧用 AutotoolsDeps 注入 -I + 显式 --with-TooN 指向 toon 包的 include"
+  - "41237ef 已把 src/*.cpp 的 tr1 引用清掉，但 tag/*.h 仍以 NEWCPPSTD 宏切换 <tuple>/<array> 与 <tr1/...>；OHOS 上必须 -DNEWCPPSTD 编译且经 package_info defines 传递给消费者（Debian #1133653 同因）"
+  - "上游无任何自动化测试套件：Makefile.am 无 TESTS/check_PROGRAMS，configure.in 无测试宏，test/ 下 4 个 .cpp 为手工演示程序；配方如实输出 no_tests，不跑空的 make check 冒充"

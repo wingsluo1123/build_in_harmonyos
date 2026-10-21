@@ -1,0 +1,114 @@
+#====================================================================
+# DRAFT-ifmail-2.14tx8.10-kr-varargs-clang-error-stub-stdarg
+# clang 的 <varargs.h> 是 #error 桩：K&R va_dcl/va_start(ap) 必须转 C99 stdarg
+# 来源: ifmail 2.14tx8.10 适配 (2026-10-16, PR 待建)
+#====================================================================
+
+id:                     E3532
+trigger_tool:           clang|cc|make|conan
+phase:                  compilation
+error_signature:        Please use <stdarg\.h> instead of <varargs\.h>|varargs\.h: No such file|expected function body after function declarator|too few arguments provided to function-like macro invocation|macro 'va_start' defined here|conflicting types for|incompatible integer to pointer conversion assigning to 'char \*' from 'int'
+match_keywords:         varargs.h, stdarg.h, va_dcl, va_alist, va_start, va_arg, va_end, too few arguments, function-like macro invocation, expected function body after function declarator, conflicting types, K&R, implicit function declaration, int-conversion, loginf, logerr, debug, printf-style
+category:               compat, libc, headers, compiler
+severity:               2
+title: 1990s 代码的 K&R 变参（<varargs.h> + va_dcl + 单参 va_start）在 clang 上是三条硬错误，必须逐个入口转成 C99 <stdarg.h>；CFLAGS 无法绕过
+
+root_cause: pre-ANSI 的变参机制（`#include <varargs.h>`、函数头写 `f(va_alist)` 后跟一行
+  裸 `va_dcl`、`va_start(ap)` 只给一个参数、再用 `fmt=va_arg(ap,char*)` 把格式串
+  取出来）在 C99 里已被彻底移除。clang 不是"警告"而是把 `<varargs.h>` 做成
+  **只含 #error 的桩头**（实测 clang 15 的 `include/varargs.h:11` 与 Apple clang 17
+  的 `include/varargs.h:14` 都是 `#error "Please use <stdarg.h> instead of
+  <varargs.h>"`），gcc 则干脆不提供该头（fatal error: No such file）。
+  于是一个 K&R 变参函数会同时炸出三条互相独立的硬错误，容易被误判成三个问题：
+  (1) `error: "Please use <stdarg.h> instead of <varargs.h>"`（桩头）；
+  (2) `error: expected function body after function declarator`（裸 `va_dcl`
+      不是合法声明）；
+  (3) `error: too few arguments provided to function-like macro invocation`
+      + `note: macro 'va_start' defined here`（`<stdarg.h>` 的 va_start 是两参宏，
+      而调用点是单参）。
+  转换时还有三个必踩的连带坑：
+  (a) **半现代化代码库**：头文件往往早就改成 ANSI 原型（ifmail 的
+      `iflib/lutil.h` 就写着 `void debug(unsigned long,char*,...)`），只有 .c 里
+      的定义还是 va_dcl —— 只改一边会得到 `conflicting types for 'logerr'`；
+  (b) **static 变参函数的前置声明**：`static void add_report();`（无原型）配上
+      转换后的 `static void add_report(char *fmt, ...)` 定义同样报
+      `conflicting types`，前置声明必须一起改；
+  (c) **插入位置**：如果把新的变参包装/shim 放在 `#include "lutil.h"` 之前，
+      包装里对 `logerr()` 的调用会先生成隐式声明（C99 下等价 `int logerr()`），
+      随后头文件的 `void logerr(char*,...)` 就变成 `conflicting types`。
+  顺带同一族的第四个硬错误：K&R 代码常漏 include 项目自己的工具头，导致
+  `xstrcpy()` 之类返回 `char *` 的函数被隐式声明成返回 int，clang 15 直接
+  `error: incompatible integer to pointer conversion assigning to 'char *'
+  from 'int'`（不是 warning，`-w` 压不掉）。
+
+affected_scope: 任何 1985-1998 年间写就、带自研 printf 风格日志函数的 C 项目（ifmail、
+  inn、nn、trn、tin、elm、pine、zmailer、sendmail 老版本、各类 FidoNet/UUCP/
+  BBS 软件），特征：源码里能 grep 到 `va_dcl`、`va_alist`、`#include <varargs.h>`，
+  或 `va_start(` 只有一个实参。ifmail 2.14tx8.10 实测两处：`iflib/lutil.c`
+  的 loginf/logerr/debug 三个入口，`ifcico/respfreq.c` 的 static add_report。
+
+rec_priority:           1
+rec_approach:           convert-varargs-entrypoints-to-c99-stdarg
+rec_description: 逐个变参入口做机械转换，纯 C、不加任何平台宏、glibc 下同样编译通过：
+    void f(va_alist)              →   void f(char *fmt, ...)
+    va_dcl                        →   （删除）
+    #include <varargs.h>          →   #include <stdarg.h>
+    va_list ap; char *fmt;        →   va_list ap;            （删掉 fmt 局部变量）
+    va_start(ap);                 →   va_start(ap, fmt);     （第二个实参 = 最后一个具名参数）
+    fmt = va_arg(ap, char *);     →   （删除）
+    vfprintf(stderr, fmt, ap);    →   原样保留
+    va_end(ap);                   →   原样保留
+  多参数入口同理，最后一个具名参数进 va_start：
+    void debug(va_alist) va_dcl { level=va_arg(...); fmt=va_arg(...); }
+    →  void debug(unsigned long level, char *fmt, ...) { va_start(ap, fmt); }
+  三件配套动作，缺一就会换一种错误继续失败：
+  ① 同步头文件/前置声明（含 static 函数的无原型声明）；
+  ② 转换后的代码块必须放在声明了它所调用函数（logerr/loginf/debug）的
+     include 之后；
+  ③ 顺手补齐同族缺失的 include（<string.h>/<stdlib.h>/项目工具头），
+     否则隐式声明会变成 int→pointer 硬错误。
+rec_command: >
+  grep -rn 'va_dcl\|va_alist\|<varargs\.h>' $SRC     # 清点入口数，逐个转换后重新 grep 应为 0
+rec_auto_fix:           false
+rec_impl:               manual-patch
+
+fallback_priority:      2
+fallback_approach:      provide-local-varargs-compat-header
+fallback_description: 只在"不允许改上游源码"（例如补丁预算被卡死）时考虑：随配方带一个本地
+  varargs.h，把 va_alist/va_dcl 定义成空、va_start(ap) 定义成
+  __builtin_va_start(ap, <最后一个具名参数>)。**但宏拿不到具名参数名**，
+  只能对单一签名硬编码，多入口项目无法通用，且极易与真实原型不一致而静默
+  错读参数。ifmail 未采用此路（3 个入口签名各不相同）。
+fallback_command:       CFLAGS="-I$RECIPE_FOLDER/varargs-compat $CFLAGS"
+fallback_auto_fix:      false
+fallback_impl:          manual-patch
+
+forbid_1_pattern:       -Wno-error=int-conversion|-Wno-int-conversion|-w\b.*varargs|-fpermissive
+forbid_1_reason:        本条的三条错误都是 clang 的**硬错误**，不是被 -Werror 升级上来的警告；关警告既不消除 #error 桩头，也修不了 va_dcl 语法。
+forbid_1_consequence:   浪费一轮 CI（20 分钟起）后仍是同一处失败，且把"源码需转换"误判成"编译选项问题"。E063（add-cflags-disable-werror）在此不适用。
+forbid_2_pattern:       #define va_start\(|#define va_alist|#define va_dcl|-Dvarargs_h
+forbid_2_reason:        自造单参 va_start 宏或伪造 varargs.h，等于手写变参 ABI。LP64/aarch64 上省略参数的寄存器与栈布局由编译器按具名参数个数决定，宏拿不到这个信息。
+forbid_2_consequence:   编译通过但运行时格式化取值错位（打印垃圾指针/串位），最坏是解引用错误地址直接 SIGSEGV——与 E585 家族（隐式声明导致指针截断）同一类"编译过、运行炸"的陷阱。
+forbid_3_pattern:       va_start\(ap\)\s*;
+forbid_3_reason:        转换后仍留单参 va_start（漏改）会在 <stdarg.h> 下继续报 too few arguments。
+forbid_3_consequence:   同一文件反复失败，误以为"转换无效"。
+
+prescan_pattern:        va_dcl|va_alist|#\s*include\s*<varargs\.h>
+principles:             P005, P006, P007, P011
+verification_cmd: printf '#include <varargs.h>\n#include <stdio.h>\nvoid f(va_alist)\nva_dcl\n{\n  va_list ap; char *fmt;\n  va_start(ap);\n  fmt = va_arg(ap, char *);\n  vfprintf(stderr, fmt, ap);\n  va_end(ap);\n}\nint main(void){ f("n=%%d s=%%s\\n", 42, "x"); return 0; }\n' > /tmp/vargs-kr.c; clang --target=aarch64-linux-ohos --sysroot=$SYSROOT -c /tmp/vargs-kr.c -o /dev/null; sed -e 's/<varargs.h>/<stdarg.h>/' -e 's/void f(va_alist)/void f(char *fmt, ...)/' -e '/^va_dcl$/d' -e 's/va_start(ap);/va_start(ap, fmt);/' -e '/fmt = va_arg/d' /tmp/vargs-kr.c > /tmp/vargs-c99.c; clang --target=aarch64-linux-ohos --sysroot=$SYSROOT -c /tmp/vargs-c99.c -o /dev/null && echo C99_OK
+  - "最小复现：/private/tmp/vargs-kr.c（OHOS clang 15 三条错误、Apple clang 17 两条）与 /private/tmp/vargs-c99.c（rc=0，宿主运行输出 n=42 s=x）"
+  - "桩头实测：/Users/metyierzhen/ohos-sdk/native/native/llvm/lib/clang/15.0.4/include/varargs.h:11 与 /Library/Developer/CommandLineTools/usr/lib/clang/17/include/varargs.h:14 均为 #error"
+  - "archives/i/ifmail/2.14tx8.10/patches/0008-iflib-lutil.c.patch（loginf/logerr/debug 三入口 + 补 xutil.h）"
+  - "archives/i/ifmail/2.14tx8.10/patches/0003-ifcico-respfreq.c.patch（static add_report + 前置声明改原型 + shim 放在 include 之后）"
+  - "连带坑 (c) 的实测：把 shim 放在 #include \"lutil.h\" 之前时得到 ../iflib/lutil.h:26:6: error: conflicting types for 'logerr'（本机日志 /private/tmp/ifmail-work/ifcico3.log）"
+  - "archives/i/ifmail/2.14tx8.10/test_package/test_ifmail_ohos.sh（OHOS-2 7 项，参考构建 11/12 全过，唯一未过项属 ndbm 布局，与本条无关）"
+  - "graph 引擎查重：`ohc-run.py engine \"varargs.h ... Please use <stdarg.h> ...\"` 命中 E301（Conan CMake.test/ctest 参数路由，完全无关，Phase B: 0）；index.tsv 全文 grep varargs/stdarg/va_dcl 零命中 ⇒ 本条为真实缺口"
+
+  - "任何 grep 得到 va_dcl / va_alist / #include <varargs.h> 的 C 项目"
+  - "自研 printf 风格日志函数（loginf/logerr/debug/verbose/msg/err 之类）的老代码"
+  - "同一 TU 里既有 ANSI 原型头又有 K&R 定义的半现代化代码库"
+  - "不适用于：已经用 <stdarg.h> 的代码；也不适用于 C++ 的 variadic template / 变参宏"
+  - "不适用于：只是被 -Werror 升级成错误的警告（那是 E063 的领域，可用编译选项处置）"
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E3532.md

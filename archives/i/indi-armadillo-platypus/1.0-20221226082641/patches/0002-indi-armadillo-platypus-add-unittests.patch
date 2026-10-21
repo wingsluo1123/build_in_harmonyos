@@ -1,0 +1,16 @@
+--- a/indi-armadillo-platypus/CMakeLists.txt	2026-10-13 14:00:00.000000000 +0800
++++ b/indi-armadillo-platypus/CMakeLists.txt	2026-10-13 14:00:01.000000000 +0800
+@@ -84,3 +84,13 @@
+ if (${CMAKE_SYSTEM_NAME} MATCHES "Linux" AND INDI_INSTALL_UDEV_RULES)
+ install(FILES 99-armadilloplatypus.rules DESTINATION ${RULES_INSTALL_DIR})
+ endif()
++
++########### Unit tests (guarded, same convention as indi-maxdomeii) ###########
++if (INDI_BUILD_UNITTESTS)
++    enable_testing()
++    find_package(GTest REQUIRED)
++    include_directories(${GTEST_INCLUDE_DIRS})
++    add_executable(test-armadillo-platypus ${CMAKE_CURRENT_SOURCE_DIR}/test_arm_plat_focuser.cpp)
++    target_link_libraries(test-armadillo-platypus ${INDI_LIBRARIES} ${GTEST_BOTH_LIBRARIES})
++    add_test(run-tests test-armadillo-platypus)
++endif()

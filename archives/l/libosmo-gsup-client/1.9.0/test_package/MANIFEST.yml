@@ -1,0 +1,19 @@
+package: libosmo-gsup-client/1.9.0
+homepage: "https://gitea.osmocom.org/cellular-infrastructure/osmo-hlr"
+
+upstream_check_command: "osmo-hlr testsuite (9 tests)"
+upstream_test_in_build: false
+upstream_test_command: "compile and run all osmo-hlr testsuite programs"
+upstream_tests:
+  - tests/auc
+  - tests/db
+  - tests/db_upgrade
+  - tests/gsup/gsup_test.c
+  - tests/mslookup
+
+test_package_tests:
+  - file: test_gsup_client.c
+    description: "构造 UPDATE_LOCATION 响应，校验响应类型、session ID 和 END 状态"
+    command: "clang test_gsup_client.c -fno-emulated-tls -I<install>/include -L<install>/lib -losmo-gsup-client <dependency flags>"
+
+assertion_count: 5

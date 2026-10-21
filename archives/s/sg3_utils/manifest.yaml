@@ -1,0 +1,22 @@
+software: sg3_utils
+display: "sg3_utils"
+description: "SCSI generic (sg) 工具集与 libsgutils2 库：72 个 sg_* 工具 + 12 个历史别名/脚本（共 84 个可执行文件），支持 sg v4 与 bsg pass-through、NVMe 透传、sense 解码"
+category: system
+homepage: "https://sg.danny.cz/sg/sg3_utils.html"
+license: GPL-2.0-or-later
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "上游 CMake 以 CMAKE_SYSTEM_NAME STREQUAL \"Linux\" 判定 Linux 专属 pass-through 实现，HarmonyOS 落入 PT_DUMMY 降级分支：PT 全部空转且 14 个可执行文件不构建（SG3_UTILS_LINUX_ONLY 的 13 个 + sg_scan，示例 sg_map/sg_scan/sg_rbuf/sg_emc_trespass）。补丁 0001 把 HarmonyOS/OHOS 并入 Linux 分支"
+    - "OHOS sysroot 具备 scsi/sg.h、linux/bsg.h、linux/nvme_ioctl.h、linux/major.h 等内核头，sg v4/bsg 真实 PT 可正常编译，属真实实现而非桩（R40）"
+    - "官方 GitHub tag 归档不含预生成 configure，构建机/CI 无 automake-libtool，故走上游自带 CMake（1.44 起双构建系统，功能等价）"
+    - "上游 OUTPUT_NAME 内嵌版本（libsgutils2-1.49.a）且 install(TARGETS) 未声明 ARCHIVE DESTINATION，静态库不会被安装；配方从构建目录补齐并归一为 libsgutils2.a"
+    - "上游 ttesting/ 有 20 个测试程序但未接入 CMake/check 目标；其中 4 项无硬件依赖实跑通过、2 项因 t10.org 数据漂移报差异（非平台问题）、14 项需 /dev/sg*、/dev/bsg 或 /dev/nvme* 设备节点，合计 20 项"
+  common_dependencies: []
+
+versions:
+  "1.49":
+    status: built
+    build_date: "2026-10-17"
+    conan_ref: "sg3_utils/1.49"

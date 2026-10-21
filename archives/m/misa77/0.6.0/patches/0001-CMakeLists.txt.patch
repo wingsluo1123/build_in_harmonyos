@@ -1,0 +1,29 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,18 +1,26 @@
+ cmake_minimum_required(VERSION 3.20)
+ project(misa77 LANGUAGES CXX)
+ 
+ # compile_commands.json for clangd / IDE tooling.
+ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+ 
+ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+     set(CMAKE_BUILD_TYPE Release CACHE STRING "Default build type" FORCE)
++endif()
++
++# HarmonyOS PC: cmake platform detection reports CMAKE_SYSTEM_PROCESSOR as
++# "unknown"; fall back to `uname -m` so the ISA-specific codec TUs are selected.
++if(CMAKE_SYSTEM_PROCESSOR STREQUAL "unknown")
++    execute_process(COMMAND uname -m OUTPUT_VARIABLE _misa77_host_arch
++                    OUTPUT_STRIP_TRAILING_WHITESPACE)
++    set(CMAKE_SYSTEM_PROCESSOR "${_misa77_host_arch}")
+ endif()
+ 
+ # Pass -DMISA77_MARCH=native for a maximal build run on the same machine.
+ if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|amd64")
+     set(MISA77_MARCH_DEFAULT "x86-64")
+ elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+     set(MISA77_MARCH_DEFAULT "armv8-a")
+ else()
+     set(MISA77_MARCH_DEFAULT "")
+ endif()

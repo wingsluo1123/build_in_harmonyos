@@ -1,0 +1,32 @@
+# test_package for pdl 2.104
+name: test_package
+version: "1.0"
+description: Consumer smoke test — 用包内 PDL 建 pdl、取 Perl 标量、读版本与维度并断言（只验包可用；数学正确性交给上游 1510 个 TAP 断言）
+test_targets:
+  - test_package
+
+upstream_tests_exist: true
+upstream_test_total: 82  # 单位是文件数（t/*.t），不是断言数；已核实上游 t/ 下无子目录 .t
+upstream_test_count_method: "上游 sdist t/ 目录下 *.t 文件数 = 82；用例数由 Test::Harness 实跑统计（本次执行的子集共 1510 项）"
+upstream_check_command: "perl -MTest::Harness -e 'runtests @ARGV' -- t/*.t"
+upstream_test_in_build: true
+upstream_test_command: "conan create（build() 内 _run_tests，仅跑 conanfile _TEST_SUBSET 声明的 6 个文件）"
+
+upstream_execution:
+  channel: "包内 vendored 依赖 + ohpcd 已发布的 perl/5.42.2.3（OHOS/armv8），在 CI worker（本身即 OHOS 机器）上直接执行"
+  command: "perl -MTest::Harness -e 'runtests @ARGV' -- <subset>"
+  programs: 6
+  test_cases_run: 1510
+  test_cases_passed: 1510
+  test_cases_failed: 0
+  test_cases_errors: 0
+  pass_rate: "1510/1510（100%）"
+  declared_files: 82
+  declared_cases: 1510  # 仅指已执行的 6 个文件的 TAP 断言数；上游 82 个文件未全量展开统计（未执行不等于通过）
+  executed_scope: "6 个核心测试文件：t/core.t t/basic.t t/slice.t t/matrixops.t t/reduce.t t/ufunc.t"
+  not_run_files:
+    - "其余 76 个 t/*.t 未跑：CI 单包 3600s 预算 + 首次 XS 构建成本；按已声明的核心子集执行，未执行不等于通过"
+    - "Basic/ 等子模块测试未纳入本次声明与执行"
+  test_only_patches: ["patches/0001-file-map-drop-test-prereqs.patch（仅改 File::Map 的测试期前置元数据，源码零改动）"]
+  known_limitations: "本仓首个 XS Perl 包；PGPLOT/OpenGL/Inline/Term::ReadKey 未启用。XS 共享库必须在构建树内签名（OHOS 要求）。CI 的 L2（bin 下脚本的 --version/--help）按 CI 自身设计为 non-blocking：它在脱离 conan 运行环境时直接执行，缺少 PERL5LIB 必然失败，不是打包缺陷。"
+  evidence: "CI 构建 #90914 全绿：All tests successful. Files=6, Tests=1510, Result: PASS；test_package [ok] L1a；Pass rate 100.0% (1/1)。提交后的最新构建号见 PR 正文。"

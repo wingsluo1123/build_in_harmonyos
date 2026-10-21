@@ -1,0 +1,43 @@
+--- a/lib/remopen.c
++++ b/lib/remopen.c
+@@ -10,6 +10,7 @@
+ #if	defined(DO_HAVE_UNIX_DOMAIN)
+ #include <sys/un.h>
+ #endif	/* defined(DO_HAVE_UNIX_DOMAIN) */
+ #include <netinet/in.h>
++#include <arpa/inet.h>
+ #include <netdb.h>
+ #include "nntp.h"
+--- a/lib/tempname.c
++++ b/lib/tempname.c
+@@ -37,6 +37,7 @@
+ 
+ 
+ #include <stdio.h>
++#include <time.h>
+ #include <sys/types.h>
+ #include "configdata.h"
+ #include "clibrary.h"
+--- a/innd/inndstart.c
++++ b/innd/inndstart.c
+@@ -10,6 +10,8 @@
+ #include <sys/stat.h>
+ #include <sys/socket.h>
+ #include <netinet/in.h>
++#include <arpa/inet.h>
+ #include <fcntl.h>
++#include <grp.h>
+ #include "paths.h"
+ #include "logging.h"
+--- a/innd/rc.c
++++ b/innd/rc.c
+@@ -26,7 +26,9 @@
+ #define COPYADDR(dest, src) \
+ 	    (void)memcpy((POINTER)dest, (POINTER)src, (SIZE_T)sizeof (INADDR))
+ 
++int	RCfix_options(int fd, struct sockaddr_in *remote);
++
+ /*
+ **  A remote host has an address and a password.
+ */
+ typedef struct _REMOTEHOST {

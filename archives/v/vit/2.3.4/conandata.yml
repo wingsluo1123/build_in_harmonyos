@@ -1,0 +1,16 @@
+sources:
+  url: "https://pypi.cnb.cool/OpenHarmonyPCDeveloper/pypi/-/packages/packages/1c/11/5a62bb49c3f5086d0e3eb85cb66eae9c2cc49123b9eb9dadfa032ea9c67a/vit-2.3.4.tar.gz"
+  sha256: "346a210aa0de754cf7adaf73723bf7d2cc8ee754eeb785eb18370d33f74e5ce2"
+  filename: "vit-2.3.4.tar.gz"
+  note: >-
+    上游 `vit-project/vit` **2.3.4** 的 PyPI sdist，版本与平台清单 `vit 2.3.4` 一致；
+    URL 用平台 pip 镜像直链。本地实测 73,363 字节、187 个文件、单层根目录 `vit-2.3.4/`；
+    仓库自带 `test/`（10 个用例），入口 `vit=vit.command_line:main`，版本在 `vit/version.py`（`VIT = '2.3.4'`）。
+patches:
+  - patch_file: "patches/0001-util-curses-setupterm-degrade.patch"
+    patch_description: >-
+      上游 `vit/util.py` 在**模块导入时**无条件调用 `curses.setupterm()`。无 terminfo 数据库的环境
+      （容器/CI/无终端；实测 `_curses.error: setupterm: could not find terminfo database`）会因此
+      连 `import vit` 都失败。补丁在 setupterm 失败时降级为空序列（仅真正清屏时退化为无操作），
+      语义不变，同时修复运行时在无终端环境下的可用性。
+    patch_type: "portability"

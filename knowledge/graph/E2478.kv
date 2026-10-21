@@ -1,0 +1,23 @@
+error_signature: "rc=143 [(]Signal 15 [)]|VmHWM=[0-9.]+GB|KILL pid=.* comm=|out of memory|std::bad_alloc"
+root_cause: "aarch64 上主流工具链（OHOS clang 等）把 plain char 默认实现为无符号（char != signed char，unsigned char 为默认）。以 `char ch;` 接收 getc()/fgetc()/getchar() 返回值的 C 代码，EOF(-1) 存入后变为 255，`while ((ch = getc(fp)) != EOF)` 永不成立 → 单字符读循环不终止、行缓冲 realloc 指数扩容直到内存耗尽或被止损。上游在有符号 char 平台（x86-64 glibc）开发测试，从不复现；aarch64 上 KB 级输入即可吃掉 GB 级内存（pullseq 实测 34 字节 FASTA → 6.4GB RSS，同根因可回溯解释此前 10.26GB 冒烟事故——当时被误判为'输入过大'）。"
+rec_approach: "接收 getc/fgetc/getchar/ungetc 返回值的变量一律声明为 int（C 标准：这些函数返回 int 以容纳 EOF）。修复点按 getc 站点定位：grep -n 'getc(' 排查每个读循环的接收变量类型。pullseq 实例：file_read.c:23 `char ch;` → `int ch;` 单行修复，全源码仅此一处站点。"
+fallback_approach: "若上游读循环庞大不便逐点修：编译期加 `-fsigned-char` 强制有符号 char（clang/GCC 均支持，aarch64 生效），可整包消除该类缺陷；代价是与上游 x86 构建的语义一致性更好但掩盖其它 char 符号性依赖，优先逐点修 int。"
+fallback_command: "grep -rn --include='*.c' --include='*.h' -E 'char[[:space:]]+[a-zA-Z_]*ch[a-zA-Z_]*[[:space:]]*;|=[[:space:]]*getc\\(|=[[:space:]]*fgetc\\(|getchar\\(\\)' src/ | head -20"
+prescan_pattern: "char[[:space:]]+ch[[:space:]]*;|char[[:space:]]+c[[:space:]]*;|= getc\\(|= fgetc\\(|getchar\\(\\)"
+prescan_globs: ["**/*.c", "**/*.h", "**/*.cc"]
+rec_command: "sed -i 's/^\\(\\s*\\)char ch;$/\\1int ch;/' src/file_read.c  # 逐站点：把接收 getc 返回值的 char 变量改 int"
+match_keywords: ["char", "unsigned char", "EOF", "getc", "fgetc", "getchar", "ungetc", "aarch64", "内存失控", "realloc", "read loop", "无限循环", "OOM", "rc=143", "SIGTERM"]
+severity:               2
+category:               portability, memory, c
+last_updated: 2026-09-21
+id:                     E2478
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E2478.md
+trigger_tool:           make
+phase:                  build
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        "接收 getc/fgetc/getchar/ungetc 返回值的变量一律声明为 int（C 标准：这些函数返回 int 以容纳 EOF）

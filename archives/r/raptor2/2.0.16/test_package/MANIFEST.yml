@@ -1,0 +1,39 @@
+package: raptor2/2.0.16
+homepage: https://librdf.org/raptor/
+
+# Upstream test suite: `make check` (autotools).
+#   src/          19 automake TESTS programs (src/Makefile.am)
+#   tests/*/      13 check-local sub-suites iterating over the RDF corpus
+#                 (rdfxml, turtle, turtle-2013, ntriples, ntriples-2013,
+#                  nquads-2013, trig, mkr, grddl, rdfa, rdfa11, json, feeds)
+upstream_check_command: "make check"
+upstream_test_in_build: true
+upstream_test_command: "make check"
+
+upstream_tests:
+  - command: "make check (src/)"
+    cases: 19
+    description: >-
+      19 unit test programs registered as automake TESTS; 19/19 PASS.
+  - command: "make check (tests/)"
+    cases: 1233
+    description: >-
+      1233 data-driven checks across the 13 tests/ sub-suites; 1205 PASS and 28
+      items that are exactly upstream's declared EXPECTED_FAILURES (rdfa 4,
+      rdfa11 24 - the harness prints "Ignoring expected failures" and returns 0).
+      Suite exit status 0.
+
+test_package_tests:
+  - file: test_raptor2.c
+    description: >-
+      R12-01: parses a real Turtle document and a real RDF/XML document with the
+      installed libraptor2, serializes both to N-Triples and asserts both syntaxes
+      produce the same 3 expected statements.
+    command: "./test_raptor2 <data-dir>"
+  - file: conanfile.py
+    description: >-
+      R12-02: runs the installed rapper CLI on the same RDF/XML document and
+      asserts the emitted N-Triples statements (real CLI business output).
+    command: "rapper -q -i rdfxml -o ntriples data/sample.rdf"
+
+assertion_count: 12

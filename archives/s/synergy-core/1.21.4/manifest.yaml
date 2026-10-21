@@ -1,0 +1,69 @@
+version: "1.21.4"
+software: "synergy-core"
+status: "built"
+build_date: "2026-10-15"
+conan_ref: "synergy-core/1.21.4"
+build_system: "cmake"
+source:
+  url: "https://github.com/symless/synergy-core/archive/refs/tags/v1.21.4.tar.gz"
+  sha256: "369d789ae5616e6e43b5eeb6feac644ab7d3384c138748a13ed9f7e1df7361a6"
+  tar_format: "tar.gz"
+build:
+  system: "cmake"
+  generator: "Ninja"
+  jobs: 2
+  cppstd: "20"
+  configure_options:
+    - "-DCMAKE_SYSTEM_NAME=Linux (cross to OHOS aarch64; CMake has no HarmonyOS platform module)"
+    - "-DBUILD_SHARED_LIBS=OFF"
+    - "-DBUILD_GUI=OFF"
+    - "-DBUILD_INSTALLER=OFF"
+    - "-DBUILD_TESTS=ON"
+    - "-DBUILD_X11_SUPPORT=ON"
+    - "-DSKIP_I18N_TESTS=ON"
+    - "-DSYNERGY_VERSION_RELEASE=ON"
+    - "-DSYNERGY_ENABLE_ACTIVATION=OFF"
+    - "-DSYNERGY_VERSION_CHECK=OFF"
+    - "-DCMAKE_SKIP_RPATH=ON"
+    - "-DQT_VERSION_OVERRIDE=5.15"
+  dependencies:
+    - "qt5-qtbase/5.15.2.2"
+    - "openssl/3.5.6.1"
+    - "libx11/6.4.0"
+    - "libxtst/6.1.0"
+    - "libxext/6.4.0"
+    - "libxi/6.1.0"
+    - "libxinerama/1.1.6"
+    - "libxkbfile/1.1.3"
+    - "libxkbcommon/1.8.0"
+    - "libsm/1.2.6"
+    - "libice/1.1.2"
+  build_requires:
+    - "pkgconf/3.0.6"
+  cc: "clang"
+  cxx: "clang++"
+test_results:
+  framework: "qtest"
+  type: "local-conan-create-run"
+  suites_registered_upstream: 31
+  suites_built_and_run: 22
+  suites_platform_inapplicable: 3
+  suites_libei_gated: 1
+  suites_gui_trimmed: 4
+  suites_i18n_excluded: 1
+  functions_passed: 148
+  functions_failed: 0
+  functions_skipped: 1
+  skipped_detail: "XWindowsClipboardTests::initTestCase QSKIPs itself on hosts with no X display (upstream behavior, not a recipe-side skip)"
+  test_package: "consumer checks passed (version/help/no-mode CLI contract)"
+notes: >-
+  Headless core delivery: the unified synergy-core CLI (server + client in one
+  binary) built against the conan-provided X11 client libraries, mirroring the
+  in-repo barrier/2.4.0 precedent. Qt resolves to 5.15 through the upstream
+  version-agnostic find_package(QT NAMES Qt6 Qt5) with the upstream Qt5->Qt6
+  target aliases; qt5-qtbase provides the moc host tool (AUTOMOC executable
+  injection, attica5 precedent) and the minimal platform plugin the Qt Test
+  suites need. glib is deliberately absent from the graph (only the libportal
+  sources consume it and they are not selected in this X11-only delivery; the
+  conan glib .pc drags a musl-specific -l:ld-musl-aarch64.so.1 flag lld cannot
+  resolve).

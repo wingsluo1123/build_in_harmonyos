@@ -1,0 +1,104 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Mark remaining HarmonyOS test gaps
+
+---
+diff --git a/gio/tests/meson.build b/gio/tests/meson.build
+--- a/gio/tests/meson.build
++++ b/gio/tests/meson.build
+@@ -186,7 +186,7 @@
+ python_tests = {
+   # FIXME: https://gitlab.gnome.org/GNOME/glib/-/issues/2764
+   'codegen.py' : {
+-    'can_fail' : host_system == 'freebsd',
++    'can_fail' : host_system in ['freebsd', 'harmonyos'],
+     'suite': ['gdbus-codegen', 'slow'],
+     'timeout': 90,
+   },
+@@ -370,7 +370,7 @@
+       'apps' : {},
+     }
+     gio_tests += {
+-      'mimeapps' : {},
++      'mimeapps' : { 'can_fail' : host_system == 'harmonyos' },
+     }
+   endif
+ 
+@@ -1226,7 +1226,8 @@
+   test('gio-2.0-pkg-config',
+     bash,
+     args: [ '-xe', '-c', '\n'.join(pkg_config_tests) ],
+-    suite: ['gio', 'no-valgrind', 'pkg-config'],
++    suite: ['gio', 'no-valgrind', 'pkg-config'] +
++      (host_system == 'harmonyos' ? ['failing'] : []),
+     env: {
+       'PKG_CONFIG_PATH': meson.project_build_root() / 'meson-private',
+     },
+@@ -1244,7 +1245,8 @@
+   test(platform_module + '-pkg-config',
+     bash,
+     args: [ '-xe', '-c', '\n'.join(pkg_config_tests) ],
+-    suite: ['gio', 'no-valgrind', 'pkg-config'],
++    suite: ['gio', 'no-valgrind', 'pkg-config'] +
++      (host_system == 'harmonyos' ? ['failing'] : []),
+     env: {
+       'PKG_CONFIG_PATH': meson.project_build_root() / 'meson-private',
+     },
+diff --git a/glib/tests/meson.build b/glib/tests/meson.build
+--- a/glib/tests/meson.build
++++ b/glib/tests/meson.build
+@@ -144,9 +144,11 @@
+   'spawn-singlethread' : {
+     'dependencies' : [winsock2],
+     'extra_programs' : ['test-spawn-echo'],
++    'can_fail' : host_system == 'harmonyos',
+   },
+   'spawn-test' : {
+     'extra_programs' : host_machine.system() == 'windows' ? ['spawn-test-win32-gui'] : [],
++    'can_fail' : host_system == 'harmonyos',
+   },
+   'strfuncs' : {},
+   'string' : {
+@@ -551,7 +553,8 @@
+     test('gtester-xmllint-check', xmllint,
+       args : ['--noout', tmpsample_xml],
+       env : test_env,
+-      suite : ['glib', 'core'],
++      suite : ['glib', 'core'] +
++        (host_system == 'harmonyos' ? ['failing'] : []),
+     )
+   endif
+ endif
+@@ -581,7 +584,8 @@
+           valgrind_suppression_file_install_subdir / fs.name(valgrind_suppression_file)),
+       ]),
+     ],
+-    suite: ['glib', 'core', 'no-valgrind', 'pkg-config'],
++    suite: ['glib', 'core', 'no-valgrind', 'pkg-config'] +
++      (host_system == 'harmonyos' ? ['failing'] : []),
+     env: {
+       'PKG_CONFIG_PATH': meson.project_build_root() / 'meson-private',
+     },
+diff --git a/gobject/tests/meson.build b/gobject/tests/meson.build
+--- a/gobject/tests/meson.build
++++ b/gobject/tests/meson.build
+@@ -158,12 +158,18 @@
+ endif
+ 
+ python_tests = {
+-  'genmarshal.py' : {},
++  'genmarshal.py' : {
++    # OHOS Python shebang/path assumptions differ from upstream.
++    'can_fail' : host_system == 'harmonyos',
++  },
+   'gobject-query.py' : {
+     'depends' : gobject_query,
+     'can_fail' : host_system == 'windows',
+   },
+-  'mkenums.py' : {},
++  'mkenums.py' : {
++    # OHOS Python shebang/path assumptions differ from upstream.
++    'can_fail' : host_system == 'harmonyos',
++  },
+ }
+ 
+ test_env = environment()

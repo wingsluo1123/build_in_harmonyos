@@ -1,0 +1,54 @@
+# conandata.yml — lsh-utils 2.1 (GNU lsh)
+#
+# R39/PF7: HTTPS only.  The upstream release lives on the maintainer's own
+# host and is served over both schemes; https is used so the source URL gate
+# (plain-http source) stays green.  Both schemes return the same 1540150-byte
+# file, verified by sha256.
+sources:
+  "2.1":
+    url: "https://www.lysator.liu.se/~nisse/archive/lsh-2.1.tar.gz"
+    sha256: "8bbf94b1aa77a02cac1a10350aac599b7aedda61881db16606debeef7ef212e3"
+
+patches:
+  "2.1":
+    - patch_file: "patches/0001-ohos-autotools-config.patch"
+      patch_description: >
+        Make the 2005-vintage autotools helpers recognise HarmonyOS PC and
+        make config.status' scratch directory writable on HMDFS:
+        config.guess gains an aarch64:HarmonyOS branch (its mktemp fallback
+        uses umask 077, which yields an unwritable directory on HMDFS),
+        config.sub learns the linux-ohos system, and the four generated
+        configure scripts relax (umask 077 && mktemp -d) to umask 022 while
+        keeping the real temporary-directory creation intact.
+      patch_type: "portability"
+    - patch_file: "patches/0002-nettle3-dsa-compat.patch"
+      patch_description: >
+        Pull in Nettle's official <nettle/dsa-compat.h> in the three
+        translation units that use the Nettle 2.x DSA key interface
+        (struct dsa_public_key / dsa_private_key, dsa_sha1_*_digest,
+        dsa_generate_keypair).  Nettle 3.x moved those definitions and
+        helpers behind that compatibility header; the objects themselves
+        still ship in libhogweed.  No other Nettle 2.x API used by lsh 2.1
+        was removed in 3.10.
+      patch_type: "compatibility"
+    - patch_file: "patches/0003-ohos-nettle3-and-portability.patch"
+      patch_description: >
+        Remaining Nettle 3.x and OHOS/musl gaps: the dummy stubs that let lshg
+        link without Nettle are aligned with the Nettle 3 prototypes
+        (size_t/char*/const void*/nettle_cipher_func); cast128_set_key loses
+        its removed length argument; unix_interact.c gets a local
+        /dev/tty+termios replacement for getpass(3), which OHOS/musl
+        neither declares nor implements; and the utmp/utmpx session
+        accounting code (compiled out with --disable-utmp) is left untouched.
+      patch_type: "portability"
+    - patch_file: "patches/0004-ohos-hmdfs-seed-file-ownership.patch"
+      patch_description: >
+        HMDFS reports neither the real owner nor the real mode bits through
+        fstat(): a file this process has just created with mode 0600 comes back
+        with a synthetic owner uid (measured 20001006 while getuid() returns
+        20020084) and with the group read/write bits set, and fchmod() cannot
+        clear them.  lsh's yarrow seed file therefore failed its own strict
+        ownership/permission checks ("Seed file not owned by you!"), which
+        aborted every key operation, including the whole testsuite setup.
+        Keep both conditions as warnings instead of refusing to start.
+      patch_type: "portability"

@@ -1,0 +1,98 @@
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/1.9-20221223184417/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.9-20221223184417"
+
+# 软件名
+software: "indi-apogee"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-03"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://deb.debian.org/debian/pool/main/i/indi-apogee/indi-apogee_1.9+20221223184417.orig.tar.gz"
+
+  # 源码校验和
+  sha256: "50819156e313a90346d01c99c888e339ee0fcff71271ca62397d49e79405ee80"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表
+  configure_options:
+  - "-DCMAKE_SYSTEM_NAME=Linux"
+  - "-DCMAKE_SYSTEM_PROCESSOR=aarch64"
+  - "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+  - "-DCMAKE_CXX_STANDARD=17"
+  - "-DCMAKE_CXX_STANDARD_REQUIRED=ON"
+  - "-DCMAKE_FIND_PACKAGE_PREFER_CONFIG=OFF"
+  - "-DCMAKE_CXX_FLAGS=-lc++ -lc++abi -I<libapogee3>/include"
+  - "-DINDI_DATA_DIR=<install_prefix>/share/indi"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+  - libindi/2.2.2.1
+  - libapogee3/3.2+20221221183454
+  - cfitsio/4.6.4
+  - zlib/1.3.1.1
+  # 显式声明（force=True）用于消解 libindi(8.15.0.1) 与 libapogee3(8.15.0) 的版本冲突
+  - curl/8.15.0.1
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+- "0001-cmake_modules-CMakeCommon.cmake.patch"
+- "0002-cmake_modules-FindINDI.cmake.patch"
+- "0003-apogee_ccd.cpp.patch"
+- "0004-apogee_cfw.cpp.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+- "indi_driver_main_from_libindi: INDI 3rdparty 驱动源码里没有 main() —— 入口由 libindi 的 libs/indibase/indidrivermain.c 提供并编进 libindidriver（即 INDI_LIBRARIES）。该 main 只认 -v（verbose），随后进入 eventLoop() 阻塞读 stdin，stdin EOF 时 exit(1)。因此『跑一次二进制看退出码』不是有效探针，正确探针是往 stdin 喂 <getProperties version=\"1.7\"/> 并检查 stdout 里的 <def...> 属性定义。"
+- "apogee_property_api_split: 必须区分『驱动自己声明的属性』与『从 libindi 基类继承的属性』。前者 indi-apogee 全用裸 C 结构体（INumberVectorProperty/ISwitchVectorProperty + IUFill*/IUSaveText/IUUpdate* + defineProperty(&Vec)），libindi 2.2.2 完整保留这套 C API（defineProperty 的裸指针重载带 INDI_DEPRECATED 但可用），无需改动；后者（INDI::CCD::TemperatureNP、INDI::FilterInterface::FilterSlotNP/FilterNameTP）在 libindi 2.x 已是 INDI::PropertyNumber/PropertyText 对象，且旧名 TemperatureN/FilterSlotN 已被删除，必须迁移。首轮真机编译的报错（apogee_ccd.cpp 20 个 + apogee_cfw.cpp 9 个，编译器中止于 -ferror-limit）全部落在这一类基类属性上，与驱动自身的 C API 用法无关。"
+- "elf_self_sign_required: 产物是 bin/ 下的可执行文件时，HarmonyOS 内核只执行带有效 .codesign 数据的 ELF，未签名时 execve 直接 EPERM（报 'Operation not permitted'）——此时构建与打包都已成功、文件 mode 是 0755、[ -x ] 亦为真，chmod 解决不了（知识条目 E077）。做法：package() 里 llvm-objcopy --remove-section .codesign（首次本无该段，非 0 退出属正常）+ binary-sign-tool sign -inFile ... -outFile ... -selfSign 1，回写后 chmod 0755；工具位于 /data/service/hnp/bin/。注意任何后续改 ELF 的操作（patchelf/strip）都会让签名失效，必须重签。另：工具类型包还需软件级 archives/i/indi-apogee/commands.json（R38/L0k 门禁）。"
+- "upstream_migration_reuse: indi-3rdparty 上游 master 早已完成这次迁移，且 apogee_ccd.cpp / apogee_cfw.cpp 从 Debian 快照（2022-12-23）到上游 master 的**唯一**差异就是该迁移（头文件与 CMakeLists 之外的其它文件逐字节一致）——因此补丁直接照搬上游 diff（经 gh-proxy 取 raw.githubusercontent），逐字节可信，避免手写迁移引入行为差异。上游同时把 CMakeLists 的 cmake_minimum_required 从 3.0 提到 3.16，本配方不改源码，改用 configure 命令行 -DCMAKE_POLICY_VERSION_MINIMUM=3.5。"
+- "libapogee3_flat_includedirs: libapogee3 的 cpp_info.includedirs 是 include/libapogee（因为其公有头互相用扁平 #include \"CameraInfo.h\"），但 indi-apogee 源码写的是 #include <libapogee/Alta.h>；在 Debian 上两种写法同时成立只因为 /usr/include 在隐式搜索路径里。交叉环境必须把 libapogee3 的 include 根显式加进编译参数。"
+- "indi_data_dir_notfound: indi-apogee 的 CMakeLists 用 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/indi_apogee.xml DESTINATION ${INDI_DATA_DIR})，而 INDI_DATA_DIR 来自 FindINDI.cmake 的 find_path(drivers.xml PATH_SUFFIXES share/indi)。制品仓的 libindi 不装 drivers.xml，find_path 失败会留下 <VAR>-NOTFOUND，XML 就会被装进名为 “INDI_DATA_DIR-NOTFOUND” 的目录；必须 -DINDI_DATA_DIR=<install_prefix>/share/indi 显式钉住。"
+- "apogee_two_binaries: 本包产出两个独立可执行文件 indi_apogee_ccd（CCD 相机，链 INDI+CFITSIO+Apogee）与 indi_apogee_wheel（独立滤光轮，链 INDI+Apogee），二者共享同一份 cmake_modules。"
+- "curl_version_conflict_libindi_vs_libapogee3: libindi/2.2.2.1 钉 curl/8.15.0.1 而 libapogee3 钉 curl/8.15.0，同时依赖二者必然触发 Conan 版本冲突。二者同源码（8.15.0.1 是 R37 适配修复，修 8.15.0 在 HMDFS 上的日志目录问题，ABI 一致），统一到 8.15.0.1；消解方式用 self.requires(\"curl/8.15.0.1\", force=True) 而非 override=True —— libapogee3 的 generate() 调 CMakeDeps，需要 curl 保持真实节点（有 package_folder），override-only 节点的 package_folder 为 None。"
+- "custom_cxxflags_kept: 以 CMAKE_CXX_FLAGS 传递 -lc++ -lc++abi 与额外 -I 时，会**整体替换** toolchain 计算出的默认 flags（不是追加），因此被替换掉的默认内容要自行补回。两半各有出处：-I 追加头文件根是归档内常见做法（archives/l/libktorrent/26.04.0、archives/c/castxml/0.7.0、archives/m/musikcube/3.0.5 均如此）；-lc++ -lc++abi 的依据是 libindi 自己声明的 OHOS system_libs（archives/l/libindi/2.2.2.1/conanfile.py：system_libs.extend([\"c++\", \"c++abi\"])），而 indi-apogee 的 CMakeLists 经 FindINDI.cmake 取库、不消费 conan 的 CMakeDeps 目标，故这两条链接项必须由配方显式传。同族 indi-eqmod 也这样做（其 0001/0002 补丁与本包逐字节相同），但它的冒烟测试只做到 test -x，不能算作运行期验证。"
+- "signed_staging_for_transitive_dep_so: 产物是 bin/ 下可执行文件、且动态链接依赖的**共享库**时，真机执行报 'Error loading shared library <so>: (needed by ...)' 并紧跟一大片 'symbol not found'（.so 没加载上、符号自然全缺，别误当成两个问题）。**根因不是路径没拼上**：HMDFS 上未签名（或签名失效）的 OHOS 共享库无法 mmap(PROT_EXEC)（E537/R49 收窄 + E077），而依赖包 libdir 里的 .so 都没有有效签名 —— 这条报错**不带 errno**，读起来像『搜索路径上找不到』，实际是候选被逐个否掉，极易误诊成环境变量问题。把依赖 libdir 挂进 LD_LIBRARY_PATH **解决不了**，只会让 loader 更早撞上坏候选。可行做法是**自包含 staging**：把产物二进制 + 全部 host 依赖 libdir 下的 .so（cp -L 语义解软链，使 DT_NEEDED 里每个 SONAME 都能命中）+ 缺失的 libc++_shared.so 复制进同一目录，逐个 llvm-objcopy --remove-section .codesign + binary-sign-tool sign -selfSign 1 + chmod 0755，再把这个目录**前置**到 LD_LIBRARY_PATH。前置必须由脚本自己用显式冒号拼接，不要用 conan 的 Environment.append —— 追加会把 staging 排到 conanrun 给的坏 libdir 之后，且实测追加拼出的值里出现过冒号后带空格的条目，使 staging 直接变成无效目录。staging 目录建在仓库树外（~/.cache/），避免污染工作树。相关 API 细节（仍在用，真机实测）：dep.cpp_info.libdirs 是**相对**路径（\"lib\"），须用 dep.package_folder 拼绝对；图里 'binary 被 skip' 的节点 package_folder 为 None，直接 join 会 TypeError，必须跳过；只取 dependencies.host（build 侧 tool_requires 与运行期无关）；apply() 在 EnvVars 上而不在 Environment 上，正确写法是 with env.vars(self).apply():。另注：libindi / libapogee3 两个上游配方**不签自己的 .so**，所以任何依赖它们的包在 OHOS 上做运行期探针，都得自己补这层 staging。推而广之：任何『产物是 bin/ 下可执行文件、且动态链接依赖的 .so』的包都适用。"
+- "cmake_policy_minimum_must_be_cmdline: 上游 CMakeLists.txt:1 是 cmake_minimum_required(VERSION 3.0)，CMake>=4 直接报 'Compatibility with CMake < 3.5 has been removed'。CMAKE_POLICY_VERSION_MINIMUM=3.5 能放行，但**必须用命令行 -D 传**：工具链文件要到 project() 才被 CMake 加载，而第 1 行的 cmake_minimum_required 早于它执行，tc.variables / tc.cache_variables 设的同名变量都读不到（真机构建实测；归档内 archives/a/amqp-cpp/4.3.27 有同款注释与做法）。写法：cmake.configure(variables={\"CMAKE_POLICY_VERSION_MINIMUM\": \"3.5\"})。"

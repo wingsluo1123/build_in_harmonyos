@@ -1,0 +1,32 @@
+# gcc-12-cross 12.4.0 — OHOS 非 PIE 可执行 stdout COPY 重定位崩溃（路径 B 草稿）
+
+# ═══ Layer 0: 错误面 ═══
+trigger_tool:           ld|gcc|runtime
+phase:                  linking|runtime
+error_signature:        R_AARCH64_COPY.*stdout|Signal 11|undefined reference.*stdout|fprintf.*SIGSEGV|copy relocation.*stdout
+
+# ═══ Layer 1: 识别层 ═══
+severity:               2
+category:               detection, hmdfs, ohos, libc, linking
+root_cause:             GCC 默认输出 ET_EXEC（非 PIE），链接器对 libc 数据符号 stdout/stderr
+                        生成 R_AARCH64_COPY 拷贝重定位；OHOS 加载器访问该 COPY 符号崩溃。
+                        printf 直接调用在 libc 内完成不受影响，fprintf/fputs/fwrite 等
+                        FILE* 引用路径全部 SIGSEGV。clang 默认 PIE 用 R_AARCH64_GLOB_DAT 正常。
+rec_approach:           add-fPIC-pie
+rec_command:            gcc -fPIC -pie <src> -o <bin>
+verification_cmd:
+                        家族全通过（gcc-12-cross 实测 2026-09-24）
+caused_by:
+prerequisite_of:
+conflicts_with:
+id:                     E2634
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E2634.md
+match_keywords:         R_AARCH64_COPY, stdout, Signal, undefined, reference, stdout
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        add-fPIC-pie

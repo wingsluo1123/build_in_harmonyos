@@ -1,0 +1,44 @@
+software: levmar
+version: "2.6"
+status: built
+build_system: cmake
+compile_date: "2026-10-18"
+
+source:
+  url: "http://users.ics.forth.gr/~lourakis/levmar/levmar-2.6.tgz"
+  sha256: "3bf4ef1ea4475ded5315e8d8fc992a725f2e7940a74ca3b0f9029d9e6e94bad7"
+  tar_format: tar.gz
+
+dependencies:
+  required: []
+  optional:
+    - "lapack/blas (upstream default; disabled with HAVE_LAPACK=0, not available in the OHOS sysroot)"
+
+build:
+  system: cmake
+  configure_options:
+    - "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+    - "-DHAVE_LAPACK=0"
+    - "-DNEED_F2C=0"
+    - "-DBUILD_DEMO=ON"
+  compiler: clang
+
+patches_applied: []
+
+test_results:
+  type: ohos-new-port-conan-create
+  upstream_static: 0
+  upstream_executed: 0
+  consumer_programs: 1
+  total: 1
+  passed: 1
+  failed: 0
+  environment: "HarmonyOS PC aarch64 real device (B build machine)"
+  command: "conan create archives/l/levmar/2.6 --user=ohpcd --channel=stable -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64"
+  note: >-
+    上游无自动化测试（无 enable_testing()/add_test()，tarball 内无 tests 目录）；上游唯一可执行物 lmdemo 在 build()
+    中运行并断言收敛。消费者测试 1 个程序、7 条断言，全部通过。
+
+known_issues:
+  - "官方源 www.ics.forth.gr 的服务端 TLS 证书链不完整（握手缺签发叶证书的中间 CA），一切标准校验客户端恒失败；改用作者官方下载页列出的同站点入口 users.ics.forth.gr 的 http 直链，内容以 sha256 逐字固定（完整性由内容哈希保证，不依赖传输层）。属 PF7/R39「官方托管例外」，已在 PR 正文说明。"
+  - "上游 CMake 声明 cmake_minimum_required(VERSION 2.6)，配方注入 CMAKE_POLICY_VERSION_MINIMUM=3.5；上游无 install()/无 CTest，制品由配方显式收集，上游自动化用例如实申报 0。"

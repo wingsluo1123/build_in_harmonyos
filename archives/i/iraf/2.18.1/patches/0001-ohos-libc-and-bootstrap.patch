@@ -1,0 +1,828 @@
+--- a/unix/f2c/src/main.c
++++ b/unix/f2c/src/main.c
+@@ -773,6 +773,7 @@
+ 	if( fp = fopen(fn, mode) )
+ 		return(fp);
+ 
++	perror(fn);
+ 	fatalstr("cannot open intermediate file %s", fn);
+ 	/* NOT REACHED */ return 0;
+ }
+--- a/unix/hlib/libc/iraf_kproto.h
++++ b/unix/hlib/libc/iraf_kproto.h
+@@ -13,7 +13,7 @@
+ /* zawset.c */
+ int ZAWSET (XINT *best_size, XINT *new_size, XINT *old_size, XINT *max_size);
+ /* zdojmp.c */
+-void ZDOJMP (XINT *jmpbuf, XINT *status);
++void ZDOJMP (XINT *jmpbuf, volatile XINT *status);
+ /* zfacss.c */
+ int ZFACSS (PKCHAR *fname, XINT *mode, XINT *type, XINT *status);
+ /* zfaloc.c */
+@@ -161,7 +161,10 @@
+ /* zraloc.c */
+ int ZRALOC (XINT *buf, XINT *nbytes, XINT *status);
+ /* zsvjmp.S */
+-void ZSVJMP (XINT *jmpbuf, XINT *status);
++#if defined(__GNUC__)
++__attribute__((returns_twice))
++#endif
++void ZSVJMP (XINT *jmpbuf, volatile XINT *status);
+ /* zwmsec.c */
+ int ZWMSEC (XINT *msec);
+ /* zxwhen.c */
+--- a/unix/hlib/libc/iraf_setjmp.h
++++ b/unix/hlib/libc/iraf_setjmp.h
+@@ -9,7 +9,7 @@
+ #include "iraf_kproto.h"
+ 
+ typedef	XINT	jmp_buf[LEN_JUMPBUF];
+-static	XINT	u_jmpstat;
++static	volatile XINT	u_jmpstat;
+ 
+ #define	setjmp(e)	(ZSVJMP((e),&u_jmpstat),u_jmpstat)
+ #define	longjmp(e,v)	(u_jmpstat=(v),ZDOJMP((e),&u_jmpstat))
+--- a/unix/os/zdojmp.c
++++ b/unix/os/zdojmp.c
+@@ -15,10 +15,10 @@
+  * as$zsvjmp.s, where most of the work is done.
+  */
+ void
+-ZDOJMP (XINT *jmpbuf, XINT *status)
++ZDOJMP (XINT *jmpbuf, volatile XINT *status)
+ {
+ 	register int stat = *status ? *status : 1;
+-        register XINT *status_ptr = ((XINT **)jmpbuf)[0];
++        register volatile XINT *status_ptr = ((volatile XINT **)jmpbuf)[0];
+         register void *jb = (XINT **)jmpbuf+1;
+ 
+         *status_ptr = stat;
+--- a/unix/os/zsvjmp.S
++++ b/unix/os/zsvjmp.S
+@@ -84,7 +84,11 @@
+ #if defined(__APPLE__)
+ 	b      _sigsetjmp		// call sigsetjmp
+ #else
++#if defined(IRAF_SIGSETJMP)
++	b      IRAF_SIGSETJMP		// link-probed libc symbol
++#else
+ 	b      __sigsetjmp		// call sigsetjmp
++#endif
+ #endif
+ 
+ #elif defined(__mips__) && (_MIPS_SIM == _ABI64)
+--- a/unix/os/zfprot.c
++++ b/unix/os/zfprot.c
+@@ -2,6 +2,7 @@
+  */
+ 
+ #include <stdio.h>
++#include <stdlib.h>
+ #include <unistd.h>
+ #include <string.h>
+ #include <sys/types.h>
+@@ -71,8 +72,12 @@
+ 	    *status = XOK;
+ 	    if (chk_prot ((char *)fname, link_name) == XNO) {
+ 		unlink (link_name);
+-		if (link ((char *)fname, link_name) == ERR)
+-		    *status = XERR;
++		if (link ((char *)fname, link_name) == ERR) {
++                    char *target = realpath((char *)fname, NULL);
++                    if (!target || symlink(target, link_name) == ERR)
++                        *status = XERR;
++                    free(target);
++                }
+ 	    }
+ 	    return (*status);
+ 
+--- a/unix/f2c/libf2c/uninit.c
++++ b/unix/f2c/libf2c/uninit.c
+@@ -231,7 +231,12 @@
+ 	}
+ #endif /* mips */
+ 
+-#ifdef __linux__
++#if defined(__has_include)
++# if __has_include(<fpu_control.h>)
++#  define F2C_HAVE_FPU_CONTROL_H 1
++# endif
++#endif
++#if defined(F2C_HAVE_FPU_CONTROL_H)
+ #define IEEE0_done
+ #include "fpu_control.h"
+ 
+--- a/unix/f2c/libf2c/f2c.h0
++++ b/unix/f2c/libf2c/f2c.h0
+@@ -198,6 +198,13 @@
+ typedef VOID Z_f;	/* double complex function */
+ typedef doublereal E_f;	/* real function with -R not specified */
+ 
++/* SPP context saves return again after ZDOJMP.  Preserve this compiler
++ * contract in generated C, which does not include iraf_kproto.h.
++ */
++#if defined(__GNUC__) && !defined(__cplusplus)
++extern int zsvjmp_() __attribute__((returns_twice));
++#endif
++
+ /* undef any lower-case symbols that your C compiler predefines, e.g.: */
+ 
+ #ifndef Skip_f2c_Undefs
+--- a/unix/hlib/f77.sh
++++ b/unix/hlib/f77.sh
+@@ -42,7 +42,7 @@
+ # https://bugs.mageia.org/show_bug.cgi?id=11507
+ set -e
+ 
+-s=/tmp/stderr_$$
++s=${TMPDIR:-/tmp}/stderr_$$
+ CC=${CC_f2c:-${CC:-cc}}
+ CFLAGS="-I${iraf}include ${XC_CFLAGS} -std=gnu11 -Wno-deprecated-non-prototype -Wno-maybe-uninitialized -Wno-strict-aliasing -Wno-unknown-warning-option -Wno-return-type -fcommon"
+ EFL=${EFL:-/v/bin/efl}
+@@ -52,7 +52,7 @@
+ keepc=0
+ xsrc=0
+ rc=0
+-trap 'rm -f $s ; exit $rc' 0
++trap 'status=$?; if [ "$status" -ne 0 ] && [ -s "$s" ]; then cat "$s" >&2; fi; rm -f "$s"' 0
+ OUTF=a.out
+ cOPT=1
+ G=
+@@ -216,19 +216,19 @@
+ 	*.F)
+ 		case "$1" in *.f) f=".f";; *.F) f=".F";; esac
+ 		b=$(basename "$1" "$f")
+-                trap 'rm -f f2ctmp_$b.* ; exit 4' 0
++                trap 'status=$?; if [ "$status" -ne 0 ] && [ -s "$s" ]; then cat "$s" >&2; fi; rm -f "$s" f2ctmp_"$b".*' 0
+                 sed 's/\\$/\\-/;
+                      s/^ *INCLUDE *'\(.*\)'.*$/#include "\1"/' "$1" |\
+ 		 $CPP $CPPFLAGS |\
+ 		 grep -E -v '^# ' > "f2ctmp_$b.f"
+-                trap 'rm -f f2ctmp_$b.* ; exit 4' 0
++                trap 'status=$?; if [ "$status" -ne 0 ] && [ -s "$s" ]; then cat "$s" >&2; fi; rm -f "$s" f2ctmp_"$b".*' 0
+ 		$F2C $F2CFLAGS "f2ctmp_$b.f"
+ 		case $? in 0);; *) rm f2ctmp_* ; exit 5;; esac
+                 rm -f "f2ctmp_$b.f"
+ 		mv "f2ctmp_$b.c" "$b.c"
+ 		if [ -f "f2ctmp_$b.P" ]; then mv "f2ctmp_$b.P" "$b.P"; fi
+ 		case $? in 0);; *) rm -f "$b.c" ; exit 5;; esac
+-                trap 'rm -f $s ; exit 4' 0
++                trap 'status=$?; if [ "$status" -ne 0 ] && [ -s "$s" ]; then cat "$s" >&2; fi; rm -f "$s"' 0
+                 $CC $CPPFLAGS -c $CFLAGS "$b.c" 2>$s
+ 		rc=$?
+ 		sed '/parameter .* is not referenced/d;/warning: too many parameters/d' $s 1>&2
+--- a/unix/boot/spp/xc.c
++++ b/unix/boot/spp/xc.c
+@@ -742,8 +742,17 @@
+ 	arglist[nargs++] = "-o";
+ 
+ 	if (link_nfs) {
+-	    sprintf (tempfile, "/tmp/T_%s.XXXXXX", outfile);
+-	    mkstemp (tempfile);
++	    const char *scratch = os_getenv("TMPDIR");
++            const char *name = strrchr(outfile, '/');
++            int fd, length;
++            if (!scratch || !*scratch) scratch = "/tmp";
++            length = snprintf(tempfile, sizeof tempfile, "%s/T_%s.XXXXXX",
++                              scratch, name ? name + 1 : outfile);
++            if (length < 0 || length >= sizeof tempfile)
++                fatalstr("Scratch path too long: %s", outfile);
++            if ((fd = mkstemp(tempfile)) < 0)
++                fatalstr("Cannot create scratch file: %s", tempfile);
++            close(fd);
+ 	} else
+ 	    sprintf (tempfile, "T_%s", outfile);
+ 	arglist[nargs++] = tempfile;
+@@ -814,13 +823,24 @@
+ 	    unlink (outfile);
+ 
+ 	    if (link_nfs) {
+-		char command[1024];
+-		sprintf (command, "/bin/cp -f %s %s", tempfile, outfile);
+-		if (debug)
+-		    printargs (command, NULL, 0);
+-		status = sys (command);
++                char buffer[32768];
++                size_t count;
++                FILE *input = fopen(tempfile, "rb"), *output = NULL;
++                status = 1;
++                if (input && (output = fopen(outfile, "wb"))) {
++                    status = 0;
++                    while ((count = fread(buffer, 1, sizeof buffer, input)) > 0)
++                        if (fwrite(buffer, 1, count, output) != count) {
++                            status = 1;
++                            break;
++                        }
++                    if (ferror(input)) status = 1;
++                }
++                if (input) fclose(input);
++                if (output && fclose(output)) status = 1;
++                if (status) unlink(outfile);
+ 	    } else
+-		link (tempfile, outfile);
++		status = rename (tempfile, outfile);
+ 
+ 	    /* Force the mode of the file. */
+ 	    chmod (outfile, 0755);
+--- a/pkg/ecl/main.c
++++ b/pkg/ecl/main.c
+@@ -585,7 +585,7 @@
+ 	static char *tmpfile, buf[SZ_LINE];
+ 
+ 
+-	strcpy (buf, "/tmp/envcl");
++	strcpy (buf, "tmp$envcl");
+ 	tmpfile = mktemp (buf);
+ 	if (c_access (tmpfile, 0, 0) == YES)
+ 	    c_delete (tmpfile);
+--- a/pkg/ecl/builtin.c
++++ b/pkg/ecl/builtin.c
+@@ -533,6 +533,8 @@
+ 	register struct	param *arg1, *arg2, *pp;
+ 	register struct pfile *pfp;
+ 	int	errcode;
++	int	trapped, keep_builtin;
++	struct task *error_task, *caller;
+ 	char	*errmsg;
+ 	extern  char *onerr_handler;
+ 	extern  ErrCom errcom;
+@@ -571,9 +573,15 @@
+ 	     */
+ 	}
+ 
+-	/* Pop the ERROR task, i.e., us.
+-	 */
+-	currentask = poptask();
++	/* Direct recoverable errors leave the ERROR builtin on the control
++	 * stack for execnewtask() to finish.  Errors from connected tasks
++	 * must also finish that external task, as in the abort path.
++	 */
++	error_task = currentask;
++	caller = prevtask;
++	trapped = (err_abort == NO || do_error == NO);
++	keep_builtin = trapped && (caller->t_flags & (T_SCRIPT | T_CL));
++	currentask = keep_builtin ? caller : poptask();
+ 
+ 	/* Log the error message if from a script or an executable.  Also, 
+ 	 * tell the CL error handler that we've already logged the error, by
+@@ -609,16 +617,13 @@
+ 	 * go through with the abort.  Simply clean up, print/save the message,
+ 	 * and return so we can continue execution.
+ 	 */
+-	if (err_abort == NO || do_error == NO) {
+-	    /* Note we don't properly check the stack before getting the
+-	     * calling frame.  Could be a problem if we weren't called in
+-	     * response to an error from a connected subprocess and using
+-	     * this trick to get the calling script.
+-	     */ 
+-	    struct task *script = (struct task *)&stack[topcs+TASKSIZ];
++	if (trapped) {
++	    struct task *script = caller;
++	    if (!(caller->t_flags & (T_SCRIPT | T_CL)) && caller != firstask)
++	        script = next_task(caller);
+ 	    extern ErrCom errcom;
+ 
+-	    iofinish (currentask);
++	    iofinish (keep_builtin ? error_task : currentask);
+ 	    if (err_beep)
+ 		clbeep();
+ 	    if (err_flpr)
+@@ -639,6 +644,8 @@
+ 		    errcom.task, errmsg);
+ 	    }
+ 
++	    if (keep_builtin)
++	        currentask = error_task;
+ 	    return;
+ 	}
+ 
+--- a/pkg/ecl/grammar.y
++++ b/pkg/ecl/grammar.y
+@@ -188,10 +188,15 @@
+ 			if (!errcnt)
+ 			    compile (END);
+ 			if (ifseen) {
+-			    /* Simulate an unput of what has been read
+-			     * from the current line.
++			    /* Return lookahead to its own input stream.  A
++			     * task switch must not consume the caller's line.
+ 			     */
+-			    ip_cmdblk = ifseen;
++			    if (strlen (ifseen) >= SZ_COMMAND ||
++			        c_ungetline (fileno (currentask->t_in), ifseen) == ERR)
++			        cl_error (E_IERR, "Cannot push back parser lookahead");
++			    if (*ifseen && !(currentask->t_flags & T_INTERACTIVE))
++			        currentask->t_scriptln--;
++			    ifseen = NULL;
+ 			}
+ 			YYACCEPT;
+ 		    }
+@@ -1371,10 +1376,18 @@
+ 		    }
+ 		} op_then opnl xstmt {
+ 		    in_iferr--;
++		    /* Like IF, IFERR needs one token of lookahead for ELSE.
++		     * Preserve that token's input for the next parser call.
++		     */
++		    if (currentask->t_flags & T_INTERACTIVE)
++		        ifseen = ip_cmdblk;
++		    else
++		        ifseen = cmdblk;
+ 		} 
+ 	;
+ 
+ iferr_else : 	iferr_stat Y_ELSE {
++		    ifseen = NULL;
+ 		    if (!errcnt) {
+ 			/* Pop and save BIFF address, compile and push addr 
+ 			 * of GOTO, and set BIFF branch to just after GOTO.
+--- a/pkg/utilities/nttools/tmerge/tmerge.x
++++ b/pkg/utilities/nttools/tmerge/tmerge.x
+@@ -87,7 +87,7 @@
+ 		otp, Memi[n_outcols])
+ 
+ 	# Copy contents of all input tables to output table.
+-	call tm_copy (list, otp, Memi[n_outcols], option, allcols)
++	call tmrcpy (list, otp, Memi[n_outcols], option, allcols)
+ 
+ 	call tbtclo (otp)
+ 	call tbnclose (list)
+@@ -212,12 +212,12 @@
+ end
+ 
+ 
+-# tm_copy -- copy contents of tables
++# tmrcpy -- copy contents of tables
+ # This routine opens each of the input tables one at a time, copies
+ # the header parameters to the output table, copies the data contents,
+ # and closes each input table.
+ 
+-procedure tm_copy (list, otp, n_outcols, option, allcols)
++procedure tmrcpy (list, otp, n_outcols, option, allcols)
+ 
+ pointer list			# i: filename template descriptor
+ pointer otp			# i: output table descriptor
+--- a/pkg/utilities/nttools/threed/tiimage/tmcopy.x
++++ b/pkg/utilities/nttools/threed/tiimage/tmcopy.x
+@@ -27,7 +27,7 @@
+ 
+ begin
+ 	# See if table and image pixel types match.
+-	if (tbcigi (tp, TBL_COL_DATATYPE) == IM_PIXTYPE(im))
++	if (tbcigi (cp, TBL_COL_DATATYPE) != IM_PIXTYPE(im))
+ 	    call error (1, "Pixel type mismatch.")
+ 
+ 	# Look for row information in image header.
+--- a/pkg/utilities/nttools/threed/tiimage/tiimage.x
++++ b/pkg/utilities/nttools/threed/tiimage/tiimage.x
+@@ -33,6 +33,7 @@
+ pointer	tbtopn(), tcs_column(), imtopen()
+ int	clgeti(), tbpsta(), tm_mode(), imtlen()
+ bool	clgetb(), streq()
++errchk tm_mode, tbtopn, tm_loop, tm_scan
+ 
+ begin
+ 	# Get task parameters.
+--- a/pkg/utilities/nttools/threed/tiimage/tmcp1.gx
++++ b/pkg/utilities/nttools/threed/tiimage/tmcp1.gx
+@@ -1,3 +1,5 @@
++
++include <imhdr.h>
+ 
+ #  TM_CP1  --  Fill pixel buffer and copy into table.
+ #
+@@ -24,18 +26,26 @@
+ int	undefi, i, len
+ short	undefs
+ 
+-pointer imgl1$t()
++long coordinates[IM_MAXDIM]
++int ncopy
++int imgnl$t()
+ 
+ begin
+-	# Read pixels into buffer.
+-	buf = imgl1$t (im)
+ 
+ 	# Choose the minimum between image and table array 
+ 	# lengths as the array size to be written to table.
+ 	len = min (lena, leni)
+ 
+ 	# Write buffer into array cell element.
+-	call tbapt$t (tp, cp, row, Mem$t[buf], 1, len)
++    call amovkl (long(1), coordinates, IM_MAXDIM)
++    i = 1
++    while (i <= len) {
++        if (imgnl$t (im, buf, coordinates) == EOF)
++            call error (1, "Unexpected end of image.")
++        ncopy = min (IM_LEN(im,1), len-i+1)
++        call tbapt$t (tp, cp, row, Mem$t[buf], i, ncopy)
++        i = i + ncopy
++    }
+ 
+ 	# If image is smaller than array, set
+ 	# remaining elements to INDEF.
+--- a/unix/hlib/irafcl.sh
++++ b/unix/hlib/irafcl.sh
+@@ -78,10 +78,10 @@
+ 	exit 0
+         ;;
+     e)
+-	cl_binary=${irafbin}ecl.e
++	cl_binary=${bin}ecl.e
+ 	;;
+     c)
+-	cl_binary=${irafbin}cl.e
++	cl_binary=${bin}cl.e
+ 	;;
+     x)
+ 	start_x="yes"
+--- a/Makefile
++++ b/Makefile
+@@ -173,9 +173,10 @@
+ 	cd $(DESTDIR)$(iraf)/noao && ../$(hostid)/bin/rmfiles.e -f lib/strip.noao
+ 
+ prefix ?= /usr/local
++sysconfdir ?= /etc/iraf
+ 
+ install: noao/bin/x_quad.e
+-	mkdir -p $(DESTDIR)$(prefix)/lib/iraf $(DESTDIR)$(prefix)/bin $(DESTDIR)$(prefix)/share/man/man1 $(DESTDIR)/etc/iraf
++	mkdir -p $(DESTDIR)$(prefix)/lib/iraf $(DESTDIR)$(prefix)/bin $(DESTDIR)$(prefix)/share/man/man1 $(DESTDIR)$(sysconfdir)
+ 	cp -a -f bin* dev extern include lib local math mkpkg noao pkg sys test unix \
+ 	         $(DESTDIR)$(prefix)/lib/iraf
+ 	$(MAKE) config binary_links strip iraf=$(prefix)/lib/iraf/ bindir=$(prefix)/bin
+@@ -188,4 +189,4 @@
+ 	cp -f $(host)boot/xyacc/xyacc.man $(DESTDIR)$(prefix)/share/man/man1/xyacc.1
+ 	cp -f $(host)boot/generic/generic.man $(DESTDIR)$(prefix)/share/man/man1/generic.1
+ 	cp -f $(host)gdev/sgidev/sgidispatch.man $(DESTDIR)$(prefix)/share/man/man1/sgidispatch.1
+-	echo $(prefix)/lib/iraf/ > $(DESTDIR)/etc/iraf/irafroot
++	echo $(prefix)/lib/iraf/ > $(DESTDIR)$(sysconfdir)/irafroot
+--- a/unix/os/zfioks.c
++++ b/unix/os/zfioks.c
+@@ -133,7 +133,12 @@
+ #define	KS_NO_RETRY	"KS_NO_RETRY"	/* env to override rexec retry    */
+ 
+ #define	KSRSH		"KSRSH"		/* set in env to override RSH cmd */
++#if defined(IRAF_USE_SSH_RCMD)
++extern int iraf_rcmd_ssh(char **, int, const char *, const char *, const char *, int *);
++#define RSH "ssh"
++#else
+ #define	RSH		"rsh"		/* typical names are rsh, remsh   */
++#endif
+ 
+ #define	IRAFKS_DIRECT		0	/* direct connection (via rexec)  */
+ #define	IRAFKS_CALLBACK		1	/* callback to client socket	  */
+@@ -1969,9 +1974,13 @@
+ rcmd_(char **ahost, int inport, const char *locuser, const char *remuser,
+          const char *cmd, int *fd2p)
+ {
++#if defined(IRAF_USE_SSH_RCMD)
++    return iraf_rcmd_ssh(ahost, inport, locuser, remuser, cmd, fd2p);
++#else
+     int res = 0;
+ #ifndef __APPLE__
+     res = rcmd (ahost, inport, locuser, remuser, cmd, fd2p);
+ #endif
+     return res;
+-}
++#endif
++}
+--- a/unix/f2c/Makefile
++++ b/unix/f2c/Makefile
+@@ -1,8 +1,8 @@
+ install: src/f2c libf2c/libf2c.a
+ 	mkdir -p $(includedir) $(bindir)
+-	cp libf2c/libf2c.a $(bindir)
+-	cp src/f2c $(bindir)f2c.e
+-	cp libf2c/f2c.h $(includedir)
++	cp -f libf2c/libf2c.a $(bindir)
++	cp -f src/f2c $(bindir)f2c.e
++	cp -f libf2c/f2c.h $(includedir)
+ 
+ clean:
+ 	$(MAKE) -C src -f makefile.u $@
+--- a/unix/os/Makefile
++++ b/unix/os/Makefile
+@@ -7,7 +7,7 @@
+     zfpoll.o zfxdir.o zgtpid.o zopdir.o zttyio.o zzsetk.o prwait.o	\
+     zfaloc.o zfiolp.o zfioty.o zfprot.o zgcmdl.o zintpr.o zopdpr.o	\
+     zwmsec.o zzstrt.o zfchdr.o zfiomt.o zflink.o zfrmdr.o zghost.o	\
+-    zlocpr.o zoscmd.o zxwhen.o
++    zlocpr.o zoscmd.o zxwhen.o rcmd_ssh.o
+ 
+ libos.a: $(OBJS)
+ 	ar r $@ $?
+@@ -16,7 +16,7 @@
+ 	$(CC) $(LDFLAGS) -o $@ alloc.o getproc.o
+ 
+ install: libos.a alloc.e
+-	cp -p $? $(bindir)
++	cp -f -p $? $(bindir)
+ 
+ clean:
+ 	rm -f $(OBJS) alloc.[eo] libos.a
+--- a/unix/gdev/sgidev/Makefile
++++ b/unix/gdev/sgidev/Makefile
+@@ -5,7 +5,7 @@
+ 	$(CC) $(LDFLAGS) -o $@ $? $(LIBS)
+ 
+ install: $(EXE)
+-	cp $? $(bindir)
++	cp -f $? $(bindir)
+ 
+ clean::
+ 	rm -f *.o $(EXE) $(EXE:.e=.o)
+--- a/unix/boot/bootlib/Makefile
++++ b/unix/boot/bootlib/Makefile
+@@ -10,7 +10,7 @@
+ 	ar r $@ $?
+ 
+ install: libboot.a
+-	cp $? $(bindir)
++	cp -f $? $(bindir)
+ 
+ clean:
+ 	rm -f $(OBJS) libboot.a
+--- a/unix/boot/generic/Makefile
++++ b/unix/boot/generic/Makefile
+@@ -4,7 +4,7 @@
+ 	$(CC) $(LDFLAGS) $? $(LIBS) -o $@
+ 
+ install: generic.e
+-	cp $? $(bindir)
++	cp -f $? $(bindir)
+ 
+ lexyy.c: tok.l
+ 	flex -o $@ $^
+--- a/unix/boot/mkpkg/Makefile
++++ b/unix/boot/mkpkg/Makefile
+@@ -4,7 +4,7 @@
+ 	$(CC) $(LDFLAGS) $? $(LIBS) -o $@
+ 
+ install: mkpkg.e
+-	cp $? $(bindir)
++	cp -f $? $(bindir)
+ 
+ clean:
+ 	rm -f $(OBJS) mkpkg.e
+--- a/unix/boot/rmbin/Makefile
++++ b/unix/boot/rmbin/Makefile
+@@ -4,7 +4,7 @@
+ 	$(CC) $(LDFLAGS) $? $(LIBS) -o $@
+ 
+ install: rmbin.e
+-	cp $? $(bindir)
++	cp -f $? $(bindir)
+ 
+ clean:
+ 	rm -f $(OBJS) rmbin.e
+--- a/unix/boot/rmfiles/Makefile
++++ b/unix/boot/rmfiles/Makefile
+@@ -4,7 +4,7 @@
+ 	$(CC) $(LDFLAGS) $? $(LIBS) -o $@
+ 
+ install: rmfiles.e
+-	cp $? $(bindir)
++	cp -f $? $(bindir)
+ 
+ clean:
+ 	rm -f $(OBJS) rmfiles.e
+--- a/unix/boot/rtar/Makefile
++++ b/unix/boot/rtar/Makefile
+@@ -4,7 +4,7 @@
+ 	$(CC) $(LDFLAGS) $? $(LIBS) -o $@
+ 
+ install: rtar.e
+-	cp $? $(bindir)
++	cp -f $? $(bindir)
+ 
+ clean:
+ 	rm -f $(OBJS) rtar.e
+--- a/unix/boot/spp/Makefile
++++ b/unix/boot/spp/Makefile
+@@ -4,7 +4,7 @@
+ 	$(CC) $(LDFLAGS) $? $(LIBS) -o $@
+ 
+ install: xc.e
+-	cp $? $(bindir)
++	cp -f $? $(bindir)
+ 	$(MAKE) -C xpp $@
+ 	$(MAKE) -C rpp $@
+ 
+--- a/unix/boot/wtar/Makefile
++++ b/unix/boot/wtar/Makefile
+@@ -4,7 +4,7 @@
+ 	$(CC) $(LDFLAGS) $? $(LIBS) -o $@
+ 
+ install: wtar.e
+-	cp $? $(bindir)
++	cp -f $? $(bindir)
+ 
+ clean:
+ 	rm -f $(OBJS) wtar.e
+--- a/unix/boot/xyacc/Makefile
++++ b/unix/boot/xyacc/Makefile
+@@ -4,7 +4,7 @@
+ 	$(CC) $(LDFLAGS) $? $(LIBS) -o $@
+ 
+ install: xyacc.e
+-	cp $? $(bindir)
++	cp -f $? $(bindir)
+ 
+ clean:
+ 	rm -f $(OBJS) xyacc.e
+--- a/unix/boot/spp/rpp/Makefile
++++ b/unix/boot/spp/rpp/Makefile
+@@ -4,7 +4,7 @@
+ 	$(CC) $(LDFLAGS) $? $(FLIBS) -o $@
+ 
+ install: rpp.e
+-	cp $? $(bindir)
++	cp -f $? $(bindir)
+ 
+ rppfor/librpp.a: rppfor
+ 	$(MAKE) -C rppfor librpp.a
+--- a/unix/boot/spp/xpp/Makefile
++++ b/unix/boot/spp/xpp/Makefile
+@@ -4,7 +4,7 @@
+ 	$(CC) $(LDFLAGS) $? $(LIBS) -o $@
+ 
+ install: xpp.e
+-	cp $? $(bindir)
++	cp -f $? $(bindir)
+ 
+ lexyy.c: xpp.l
+ 	flex -o $@ -l $^
+--- /dev/null
++++ b/unix/os/rcmd_ssh.c
+@@ -0,0 +1,117 @@
++/* POSIX stream transport for IRAF kernel servers on systems without rcmd.
++ * The peer is started with an SSH-compatible KSRSH command. */
++#include <errno.h>
++#include <fcntl.h>
++#include <stdlib.h>
++#include <sys/socket.h>
++#include <sys/types.h>
++#include <sys/wait.h>
++#include <unistd.h>
++
++static void
++exec_error(int fd)
++{
++    int code = errno;
++    while (write(fd, &code, sizeof code) < 0 && errno == EINTR) {}
++    _exit(127);
++}
++
++int
++iraf_rcmd_ssh(char **host, int port, const char *localuser,
++              const char *remoteuser, const char *command, int *stderr_fd)
++{
++    int stream[2] = {-1, -1}, errors[2] = {-1, -1}, exec_status[2] = {-1, -1};
++    int status = 0, saved_errno;
++    ssize_t received;
++    long fd_limit = sysconf(_SC_OPEN_MAX);
++    pid_t child, waited;
++    const char *transport = getenv("KSRSH");
++    (void)port;       /* SSH port/options may be supplied by a KSRSH wrapper. */
++    (void)localuser;  /* SSH performs authentication for remoteuser. */
++    if (stderr_fd)
++        *stderr_fd = -1;
++    if (!host || !*host || !**host || !remoteuser || !command) {
++        errno = EINVAL;
++        return -1;
++    }
++    if (!transport || !*transport)
++        transport = "ssh";
++    if (socketpair(AF_UNIX, SOCK_STREAM, 0, stream) < 0)
++        return -1;
++    if (stderr_fd && socketpair(AF_UNIX, SOCK_STREAM, 0, errors) < 0)
++        goto failed;
++    if (pipe(exec_status) < 0 || fcntl(exec_status[1], F_SETFD, FD_CLOEXEC) < 0)
++        goto failed;
++    child = fork();
++    if (child < 0)
++        goto failed;
++    if (child == 0) {
++        pid_t worker = fork();
++        if (worker < 0)
++            exec_error(exec_status[1]);
++        if (worker > 0)
++            _exit(0);
++        /* Detach the transport lifetime from the short bootstrap child;
++         * init reaps it after the channel/remote command terminates. */
++        close(stream[0]);
++        if (errors[0] >= 0)
++            close(errors[0]);
++        if (dup2(stream[1], STDIN_FILENO) < 0 ||
++            dup2(stream[1], STDOUT_FILENO) < 0 ||
++            dup2(stderr_fd ? errors[1] : stream[1], STDERR_FILENO) < 0)
++            exec_error(exec_status[1]);
++        /* Inherited IRAF pipes must not stay open in another transport. */
++        for (long fd = 3; fd < (fd_limit > 0 ? fd_limit : 1024); ++fd)
++            if (fd != exec_status[1])
++                close((int)fd);
++        execlp(transport, transport, "-T", "-l", remoteuser, "--",
++               *host, command, (char *)0);
++        exec_error(exec_status[1]);
++    }
++    close(exec_status[1]);
++    exec_status[1] = -1;
++    close(stream[1]);
++    stream[1] = -1;
++    if (errors[1] >= 0) {
++        close(errors[1]);
++        errors[1] = -1;
++    }
++    do {
++        waited = waitpid(child, &status, 0);
++    } while (waited < 0 && errno == EINTR);
++    /* A pre-existing SIGCHLD handler may already have reaped this child. */
++    if ((waited < 0 && errno != ECHILD) ||
++        (waited == child && (!WIFEXITED(status) || WEXITSTATUS(status)))) {
++        errno = EIO;
++        goto failed;
++    }
++    do {
++        received = read(exec_status[0], &status, sizeof status);
++    } while (received < 0 && errno == EINTR);
++    close(exec_status[0]);
++    exec_status[0] = -1;
++    if (received != 0) {
++        if (received > 0)
++            errno = received == sizeof status ? status : EIO;
++        goto failed;
++    }
++    if (fcntl(stream[0], F_SETFD, FD_CLOEXEC) < 0)
++        goto failed;
++    if (stderr_fd) {
++        if (fcntl(errors[0], F_SETFD, FD_CLOEXEC) < 0)
++            goto failed;
++        *stderr_fd = errors[0];
++    }
++    return stream[0];
++
++failed:
++    saved_errno = errno;
++    if (stream[0] >= 0) close(stream[0]);
++    if (stream[1] >= 0) close(stream[1]);
++    if (errors[0] >= 0) close(errors[0]);
++    if (errors[1] >= 0) close(errors[1]);
++    if (exec_status[0] >= 0) close(exec_status[0]);
++    if (exec_status[1] >= 0) close(exec_status[1]);
++    errno = saved_errno;
++    return -1;
++}
+--- a/sys/fio/vfntrans.x
++++ b/sys/fio/vfntrans.x
+@@ -34,7 +34,8 @@
+ # Size limiting definitions.
+ 
+ define	MAX_PUSHBACK	16	# determines length of pushback stack
+-define	SZ_PBBUF	255	# size of pushback buffer
++define	SZ_PBBUF	(MAX_PUSHBACK * (2 * SZ_PATHNAME + 2))
++				# bounded nested definitions and prefix substitutions
+ define	MAX_EXTENSIONS	20	# max filename extension pairs in EXTN_MAP
+ define	MAX_RESERVEXTN	20	# max reserved filename extensions
+ define	SZ_EXTNMAP	64	# storage for iraf/os extn pairs
+@@ -147,6 +148,7 @@
+ char	ch
+ pointer	pbbuf					# pushback buffer
+ pointer	pb_stack[MAX_PUSHBACK]			# pushback stack
++pointer	pb_free[MAX_PUSHBACK]			# allocation start of each child
+ int	n, op, op_node, op_env, pbsp, in
+ pointer	nextch, ip, sp
+ 
+@@ -227,6 +229,7 @@
+ 		    pbbuf + SZ_PBBUF - nextch)
+ 
+ 		if (n >= 0) {				# push back defn
++		    pb_free[pbsp] = nextch
+ 		    pb_stack[pbsp] = ip			# save ip on stk
+ 		    pbsp = pbsp + 1
+ 		    ip = nextch				# set ip to new input
+@@ -252,6 +255,7 @@
+ 		n = gstrcpy (outstr[op_node], Memc[nextch],
+ 		    pbbuf + SZ_PBBUF - nextch)
+ 
++		pb_free[pbsp] = nextch
+ 		pb_stack[pbsp] = ip			# save ip on stk
+ 		pbsp = pbsp + 1
+ 		ip = nextch				# set ip to new input
+@@ -271,6 +275,8 @@
+ 		}
+ 
+ 		nextch = nextch + n + 1
++		if (nextch-pbbuf >= SZ_PBBUF)
++		    call syserrs (SYS_FZMAPRECUR, Memc[pbbuf])
+ 		op = op_node
+ 
+ 	    } else if (ch == EOS) {
+@@ -282,6 +288,7 @@
+ 		if (pbsp == 0)				# --- all done
+ 		    break
+ 		ip = pb_stack[pbsp]
++		nextch = pb_free[pbsp]
+ 
+ 	    } else if (ch == ESCAPE) {
+ 		# Escaped characters are passed straight to the output.

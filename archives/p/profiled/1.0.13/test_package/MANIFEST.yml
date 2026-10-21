@@ -1,0 +1,28 @@
+package: profiled/1.0.13
+# 用例总数 8 = test_libprofile 内 5 个具名用例 + conanfile.test() 内 3 个鸿蒙专用用例
+# 运行时输出均以 "[CASE] <name>: PASS|FAIL" 打印，名称与此清单逐条一致。
+test:
+  - name: ohos_profile_pc_version
+    runner: "test_package/conanfile.py _case_pc_version"
+    description: "鸿蒙适配点：profile.pc 的 Version 为 1.0.13（VERS 覆盖 debian/changelog 的 1.0.12）"
+  - name: ohos_elf_aarch64
+    runner: "test_package/conanfile.py _case_elf"
+    description: "鸿蒙专用：bin/profiled、bin/profileclient、bin/profile-tracker、lib/libprofile.so.0 均为 ELF64/EM_AARCH64"
+  - name: ohos_dbus_session_roundtrip
+    runner: "test_package/conanfile.py _case_roundtrip"
+    description: "鸿蒙专用：自建 TCP D-Bus 会话总线并拉起 profiled，验证 com.nokia.profiled 注册"
+  - name: profiles_listed
+    runner: "test_package/test_libprofile.c"
+    description: "功能：profile_get_profiles() 返回 >=4 个内建 profile"
+  - name: has_profile_builtin
+    runner: "test_package/test_libprofile.c"
+    description: "功能：profile_has_profile(silent) == 1"
+  - name: has_profile_unknown
+    runner: "test_package/test_libprofile.c"
+    description: "功能：profile_has_profile(no-such-profile) == 0"
+  - name: switch_to_silent
+    runner: "test_package/test_libprofile.c"
+    description: "功能：profile_set_profile(silent) 后 profile_get_profile() == silent"
+  - name: switch_back_general
+    runner: "test_package/test_libprofile.c"
+    description: "功能：切回 general 成功（D-Bus 往返）"

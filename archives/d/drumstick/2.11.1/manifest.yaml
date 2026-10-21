@@ -1,0 +1,48 @@
+software: drumstick
+version: "2.11.1"
+status: built
+build_date: "2026-10-09"
+conan_ref: "drumstick/2.11.1"
+build_system: cmake
+
+source:
+  url: "https://github.com/pedrolcl/drumstick/archive/refs/tags/RELEASE_2_11_1.tar.gz"
+  sha256: "38b3d459a7e7dc4eeb12c6e42b1b6cfa6e28b1d3976fa61e83de2a56b830bae7"
+  tar_format: tar.gz
+
+build:
+  system: cmake
+  configure_options:
+    - "BUILD_ALSA=ON BUILD_FILE=ON BUILD_RT=ON BUILD_WIDGETS=ON"
+    - "BUILD_UTILS=OFF BUILD_DOCS=OFF BUILD_FRAMEWORKS=OFF"
+    - "USE_DBUS=OFF USE_NETWORK=ON"
+    - "USE_PULSEAUDIO=OFF USE_PIPEWIRE=OFF USE_FLUIDSYNTH=OFF USE_SONIVOX=OFF"
+    - "STATIC_DRUMSTICK=OFF (shared)"
+    - "BUILD_TESTING=ON (upstream CTest suite)"
+  dependencies:
+    - qtbase/6.11.1
+    - qt5compat/6.11.1
+    - alsa-lib/1.2.16.1
+  cc: clang
+  cxx: clang++
+  cxxstandard: "17"
+
+patches_applied:
+  - "patches/0001-alsa-harmonyos-linux-detection.patch"
+  - "patches/0002-alsa-include-dirs-global.patch"
+  - "patches/0003-rttest-gate-alsa-device.patch"
+  - "patches/0004-skip-translations-on-harmonyos.patch"
+
+notes: |
+  - 上游最新稳定版 2.11.1（tag RELEASE_2_11_1, 2026-08-22），kmetronome 需要 ≥2.10。
+  - W0 依赖全发布：qtbase/6.11.1、qt5compat/6.11.1（Qt6Core5Compat）、
+    alsa-lib/1.2.16.1。qttools 不再依赖：其 lrelease/lupdate host 工具是
+    OHOS ELF，无法在构建机运行（CI #84604 编译失败根因），patch 0004 在
+    HarmonyOS 下跳过 widgets 的 .qm translations（运行时回退源内字符串）。
+  - 多库产物：libdrumstick-alsa / -file / -rt / -widgets（共享库）+ RT 后端插件
+    (lib/drumstick2/*.so) + CMake 包文件 (lib/cmake/drumstick/*) + pkg-config 文件。
+  - CMake 包消费：cmake_find_mode="none"，builddirs=lib/cmake，上游
+    find_package(Drumstick COMPONENTS ALSA ...) 直达 Drumstick::* 目标。
+  - patch 0001 仅把 ALSA 检测从 ${CMAKE_SYSTEM} MATCHES "Linux" 扩展到同时接受
+    CMAKE_SYSTEM_NAME=HarmonyOS（构建系统移植条件，无 __OHOS__ 宏）。
+  - 上游 CTest：详见 test_package/MANIFEST.yml 与本次 W3 日志统计通过率。

@@ -1,0 +1,93 @@
+software: wlopm
+# 版本级 manifest
+# 文件位置: archives/w/wlopm/1.0.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "1.0.0"
+
+# 编译状态
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-14"
+
+# 构建系统类型 (顶层字段)
+build_system: make
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://git.sr.ht/~leon_plickat/wlopm/archive/v1.0.0.tar.gz"
+  sha256: "15f31bbd855131943397dded3a26003f2f5056e4c6a1a93d35ff7697b3f1e439"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  toolchain: "OHOS clang 15 (aarch64-linux-ohos)"
+  command: "make -j2 wlopm SCANNER=<wayland-scanner> CC=clang LDFLAGS=-L<wayland lib>"
+  parallel: 2
+  flags: ""
+  # 上游 Makefile 保留 -Werror 全套警告；wayland-scanner 来自
+  # wayland/1.22.0 conan 包 bin/（tool_requires 同包提供库与扫描器）。
+
+# ============================================================
+# 测试信息
+# ============================================================
+
+test:
+  framework: shell
+  command: "test_package/test.sh"
+  # 上游无测试套件（N=0，审计见 test_package/MANIFEST.yml）
+  total_cases: 5
+  passed_cases: 5
+  failed_cases: 0
+  skipped_cases: 0
+  notes: >-
+    上游 wlopm 1.0.0 无测试套件（单一 wlopm.c、无 test/ 目录、无
+    check/test make 目标，逐文件审计见 test_package/MANIFEST.yml）。
+    功能验证由消费者冒烟补全：--version/-v（wlopm v1.0.0 版本标识）、
+    --help/-h（usage 含 --json/--on/--off/--toggle）共 5 用例真执行真断言。
+
+# ============================================================
+# 产物信息
+# ============================================================
+
+artifacts:
+  - name: wlopm
+    type: binary
+    path: bin/wlopm
+  - name: wlopm.1
+    type: doc
+    path: share/man/man1/wlopm.1
+
+# ============================================================
+# 依赖信息
+# ============================================================
+
+dependencies:
+  runtime:
+    - name: wayland
+      version: "1.22.0"
+      reason: "libwayland-client 运行时链接（zwlr-output-power-management-v1 协议客户端）"
+  build:
+    - name: wayland
+      version: "1.22.0"
+      reason: "wayland-scanner 协议 XML → C 代码生成（构建期）"
+
+# ============================================================
+# 环境信息
+# ============================================================
+
+environment:
+  os: OHOS
+  arch: arm64
+  build_env: "OpenHarmony PC (aarch64), conan 2.29.1 OHOS-adapted"

@@ -1,0 +1,30 @@
+id:                     E3192
+severity:               2
+category:               headers, conan, packaging, khronos, versioning
+trigger_tool: conan|cmake|curl|init-build
+phase: configuration|source|packaging
+error_signature: 404.*archive/refs/tags/v3.0.tar.gz|Cannot find.*tag.*v[0-9.]+|任务版本.*无对应 tag|spec version.*no tag
+
+match_keywords: OpenCL, OpenCL-Headers, header-only, version, tag, 404, archive/refs/tags, project VERSION, date tag
+
+root_cause: Khronos 系列头文件库（OpenCL-Headers 等）的 git tag 采用日期型命名（v2026.05.29），而 OpenCL API 规范版本（3.0）是规范代号而非发布 tag。任务系统按规范版本命名任务（opencl 3.0）时，直接拼接 v3.0.tar.gz 会 404。若强行以规范版本号匹配 tag 会造成货源不可得；若直接丢弃任务版本号又违背任务身份。CMake 工程内 project(OpenCLHeaders VERSION 3.0) 恰好是任务版本号的官方佐证，可作为映射依据。
+
+rec_approach: 三层处理：
+  1) 确认上游 tag 列表（curl GitHub API /tags），若无与任务版本号同名 tag，取官方最新日期型 tag 的 archive tarball 为源，独立 sha256sum 核验并写入 conandata.yml。
+  2) Conan/归档版本号保持任务指定版本（如 3.0），在 notes.md 明确"任务版本号(规范版本)↔ 官方 tag"映射关系及其依据（CMake project VERSION）。
+  3) header-only 库按 headeronly 模板打包（package_type=header-library、copy CL/*.h 到 include/CL、package_info 仅 includedirs），test_package 必须真实 include 头文件并断言宏/类型（R34 反空壳），上游测试按 add_header_test 宏枚举规则清点（每头 ×8 版本 ×选项）；非 CLI 库不得伪造 commands.json。
+
+verification_cmd:
+
+caused_by: 
+conflicts_with: 
+prescan_pattern:
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E3192.md
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        三层处理：

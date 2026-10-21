@@ -1,0 +1,17 @@
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -245,7 +245,14 @@
+ set_target_properties(KPim6Libkleo PROPERTIES
+     VERSION ${LIBKLEO_VERSION}
+     SOVERSION ${LIBKLEO_SOVERSION}
+     EXPORT_NAME Libkleo
+ )
++# The OHOS CMake platform leaves the shared-library SONAME flag empty, so
++# dependents record the relative path passed to the linker
++# (../bin/libKPim6Libkleo.so). The loader then resolves that path against
++# the process working directory. Force the upstream SOVERSION soname.
++if(NOT WIN32)
++    target_link_options(KPim6Libkleo PRIVATE "LINKER:-soname,libKPim6Libkleo.so.${LIBKLEO_SOVERSION}")
++endif()
+ 
+ install(TARGETS

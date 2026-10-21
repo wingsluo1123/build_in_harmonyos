@@ -1,0 +1,116 @@
+--- a/daemons/lircd.cpp
++++ b/daemons/lircd.cpp
+@@ -317,7 +317,7 @@
+ 
+ static int oatoi(const char* s)
+ {
+-	register int i;
++	int i;
+ 
+ 	if (*s == 0)
+ 		return -1;
+--- a/daemons/lircrcd.cpp
++++ b/daemons/lircrcd.cpp
+@@ -142,7 +142,7 @@
+ 
+ static int oatoi(const char* s)
+ {
+-	register int i;
++	int i;
+ 
+ 	if (*s == 0)
+ 		return -1;
+--- a/lib/lirc_client.c
++++ b/lib/lirc_client.c
+@@ -1819,7 +1819,7 @@
+ 	char* pos;
+ 
+ 	my_code = strdup(code);
+-	pos = rindex(my_code, '\n');
++	pos = strrchr(my_code, '\n');
+ 	if (pos != NULL)
+ 		*pos = '\0';
+ 	ret = lirc_command_init(&cmd, "CODE %s\n", my_code);
+--- a/plugins/atwf83.c
++++ b/plugins/atwf83.c
+@@ -13,6 +13,11 @@
+ #include <poll.h>
+ #include <stdio.h>
+ #include <pthread.h>
++
++/* The OHOS/musl sysroot <pthread.h> omits the pthread_cancel()
++ * prototype even though the runtime libc exports the symbol;
++ * declare it here so the call is not an implicit declaration. */
++extern int pthread_cancel(pthread_t thread);
+ #include <sys/fcntl.h>
+ #include <signal.h>
+ 
+--- a/plugins/zotac.c
++++ b/plugins/zotac.c
+@@ -17,6 +17,11 @@
+ #include <stdio.h>
+ #include <poll.h>
+ #include <pthread.h>
++
++/* The OHOS/musl sysroot <pthread.h> omits the pthread_cancel()
++ * prototype even though the runtime libc exports the symbol;
++ * declare it here so the call is not an implicit declaration. */
++extern int pthread_cancel(pthread_t thread);
+ #include <sys/fcntl.h>
+ #include <signal.h>
+ #include <linux/hiddev.h>
+--- a/plugins/mplay.c
++++ b/plugins/mplay.c
+@@ -48,6 +48,11 @@
+ #include <stdio.h>
+ #include <stdint.h>
+ #include <pthread.h>
++
++/* The OHOS/musl sysroot <pthread.h> omits the pthread_cancel()
++ * prototype even though the runtime libc exports the symbol;
++ * declare it here so the call is not an implicit declaration. */
++extern int pthread_cancel(pthread_t thread);
+ #include <time.h>
+ #include <fcntl.h>
+ #include <termios.h>
+@@ -197,7 +202,7 @@
+ 	.latest_button			= MPLAY_CODE_ERROR,
+ 	.fd				= -1,
+ 	.pipefd				= { -1,	     -1	  },
+-	.tid				= -1
++	.tid				= 0
+ };
+ 
+ /**
+@@ -782,7 +787,7 @@
+ int mplayfamily_deinit(void)
+ {
+ 	log_trace("Entering mplayfamily_deinit()");
+-	if (mplayfamily_local_data.tid != -1) {
++	if (mplayfamily_local_data.tid != 0) {
+ 		if (pthread_cancel(mplayfamily_local_data.tid) < 0) {
+ 			log_perror_err("mplay could not cancel listener");
+ 			return 0;
+@@ -789,6 +794,6 @@
+ 		}
+ 		pthread_join(mplayfamily_local_data.tid, NULL);
+-		mplayfamily_local_data.tid = -1;
++		mplayfamily_local_data.tid = 0;
+ 	}
+ 	if (mplayfamily_local_data.pipefd[0] != -1) {
+ 		close(mplayfamily_local_data.pipefd[0]);
+
+--- a/plugins/default.c
++++ b/plugins/default.c
+@@ -27,6 +27,11 @@
+ #include <stdlib.h>
+ #include <sys/stat.h>
+ #include <sys/types.h>
++/* glibc >= 2.28 and the OHOS/musl sysroot no longer pull the
++ * sysmacros.h device macros in through <sys/types.h>; upstream
++ * default.c calls major() below and would otherwise get an
++ * implicit declaration + an undefined symbol in the .so. */
++#include <sys/sysmacros.h>
+ #include <sys/ioctl.h>
+ #include <sys/socket.h>
+ #include <sys/un.h>

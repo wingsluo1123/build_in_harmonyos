@@ -1,0 +1,39 @@
+diff --git a/src/dbusrunner.cpp b/src/dbusrunner.cpp
+index 84293ece27b49c28bed3e8194dfb0a07d848e992..a6961d416ee11124d4800626ccf5091151af82ed 100644
+--- a/src/dbusrunner.cpp
++++ b/src/dbusrunner.cpp
+@@ -17,7 +17,16 @@
+ #include <QIcon>
+ #include <set>
+ 
++#if __has_include(<KWaylandExtras>)
+ #include <KWaylandExtras>
++// Capability probe: kwindowsystem publishes the KWaylandExtras
++// activation-token API only when it is built with Wayland support. The
++// activation-token block below is gated on
++// KWindowSystem::isPlatformWayland() at run time, so where the header is
++// absent the block is compiled out and DBusRunner falls back to the same
++// plain run() path the non-Wayland branch already takes.
++#define KRUNNER_HAVE_KWAYLANDEXTRAS 1
++#endif
+ #include <KWindowSystem>
+ 
+ #include "dbusutils_p.h"
+@@ -288,6 +297,7 @@
+         QDBusConnection::sessionBus().call(runMethod, QDBus::NoBlock);
+     };
+ 
++#if defined(KRUNNER_HAVE_KWAYLANDEXTRAS)
+     if (KWindowSystem::isPlatformWayland() && qGuiApp->focusWindow()) {
+         auto tokenFuture = KWaylandExtras::xdgActivationToken(qGuiApp->focusWindow(), {});
+         tokenFuture.then(this, [this, service, matchId, actionId, run](const QString &token) {
+@@ -301,6 +311,9 @@
+     } else {
+         run();
+     }
++#else
++    run();
++#endif
+ }
+ 
+ QImage DBusRunner::decodeImage(const RemoteImage &remoteImage)

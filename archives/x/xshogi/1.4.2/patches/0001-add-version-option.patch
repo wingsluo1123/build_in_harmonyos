@@ -1,0 +1,49 @@
+--- a/xshogi.c
++++ b/xshogi.c
+@@ -1748,20 +1748,46 @@
+     for (global_argc = 0; global_argc < argc; global_argc++)
+         global_argv[global_argc] = argv[global_argc];
+ 
+     programName = strrchr(argv[0], '/');
+ 
+     if (programName == NULL)
+         programName = argv[0];
+     else
+         programName++;
+ 
++    /*
++     * Handle -version before the X connection is attempted: XtAppInitialize
++     * opens the display first, so on a host without an X server any option
++     * would abort with "Can't open display" before the version could be
++     * printed.  A single or double dash is accepted, as other X11 programs do.
++     */
++
++    {
++        int n;
++
++        for (n = 1; n < argc; n++)
++        {
++            const char *option = argv[n];
++
++            if (option[0] == '-' && option[1] == '-')
++                option++;
++
++            if (strcmp(option, "-version") == 0)
++            {
++                printf("xshogi version %s based on xboard version %s\n",
++                       PACKAGE_VERSION, XBOARD_VERSION);
++                exit(0);
++            }
++        }
++    }
++
+     localPlayer.shellWidget
+         = XtAppInitialize(&appContext, "XShogi", shellOptions,
+                           XtNumber(shellOptions), &argc, argv,
+                           xshogiResources, NULL, 0);
+ 
+     if (argc > 1)
+         Usage();
+ 
+     if ((shogiDir = (char *)getenv("SHOGIDIR")) == NULL)
+     {

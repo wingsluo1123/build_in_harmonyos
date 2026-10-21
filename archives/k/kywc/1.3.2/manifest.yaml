@@ -1,0 +1,49 @@
+software: kywc
+version: "1.3.2"
+status: built
+build_system: meson
+created_at: 2026-10-20
+
+source:
+  url: "https://mirrors.aliyun.com/debian/pool/main/k/kylin-wayland-compositor/kylin-wayland-compositor_1.3.2.orig.tar.xz"
+  sha256: "d5169a9c943337d226c436d4b2cfa5107921a7f24d3cb2fbdcf5580d6eeb3e20"
+  format: tar.xz
+  note: "Debian pool orig 源（上游 gitee 仅 1.3.0/1.3.1 tag）；tar 内 meson.build 版本仍写 1.3.0"
+
+dependencies:
+  required:
+    - wayland/1.24.0
+    - wayland-protocols/1.48
+  note: "wayland 1.24.0 源码另用于编译静态 wayland-scanner（HMDFS 禁止执行链接缓存共享库的二进制）"
+
+build:
+  system: meson
+  options:
+    - "compositor=false"
+    - "libkywc=true"
+    - "examples=false"
+    - "tools=false"
+    - "portal=false"
+    - "nls=disabled"
+    - "libunwind=disabled"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-meson-options-add-compositor-switch.patch"
+  - "0002-meson-gate-compositor-and-keep-libkywc.patch"
+  - "0003-libkywc-gate-buffer-helper.patch"
+
+test_results:
+  type: device
+  upstream_tests: 0
+  consumer_tests: "37/37（100%）"
+  harmony_tests: "1/1（100%）"
+  note: "2026-10-20 真机 conan create rc=0：TEST SUMMARY: 37 passed, 0 failed；私有 inode 重跑 37/37，HARMONY_TEST_PASS=1/1"
+
+knowledge_gained:
+  - "只打包 libkywc：compositor 侧依赖栈未在 OHOS 发布，三个补丁用 compositor 开关门控全部合成器目标，protocols/ 与 libkywc/ 保持无条件构建"
+  - "HMDFS 上必须自建静态 wayland-scanner（仅依赖 libc + 静态 expat），并把 generators 目录前置 PATH 供 find_program 解析"
+  - "protocols/meson.build 通过 pkg-config get_variable 读取 pkgdatadir，PkgConfigDeps 生成的 .pc 不含该变量，需手写 wayland-protocols.pc"
+  - "meson 子进程在 HMDFS 下解析不到 llvm-ar，需在 conan_meson_native.ini 的 [binaries] 注入 ar 并导出 AR/RANLIB"
+  - "meson install 重写 RUNPATH 使链接期 .codesign 失效，package() 内用 llvm-objcopy 去段 + binary-sign-tool 重签"

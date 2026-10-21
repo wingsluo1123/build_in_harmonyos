@@ -1,0 +1,45 @@
+# ═══ Draft knowledge entry — i2c-dev 设备节点在 OHOS 上不可用 ⇒ 依赖它的用户态工具运行期能力面判据 ═══
+# Timestamp: 2026-10-08
+# Software: ddccontrol 1.0.3
+# Gate: 真机运行（errno 方式实测；OHOS aarch64 / clang 15.0.4）
+# Status: 新建（B=create；四范围查重 0 命中 + OHOS行为探针清单 i2c/drm/smbus 0 命中 ⇒ 真空白区机制）
+# Issue: #3830 (https://gitcode.com/OpenHarmonyPCDeveloper/build_in_harmonyos/issues/3830)
+# 用法：通用机制条目（谁真撞上谁取名即用）；本包细节见 archives/d/ddccontrol/1.0.3/notes.md 能力面披露。
+# 硬规则：每个字段顶格 + 同行单物理行 + 带引号标量（§12.82 双加载器判据），禁用 |-/> 块标量与缩进续行。
+
+id:                     E3284
+title: "OHOS 上 /dev/i2c-* 与 /sys/class/i2c-dev 不存在（ENOENT）、内核无 i2c 模块 ⇒ 依赖 i2c-dev 的用户态工具（DDC/CI、i2c-tools 族）运行期打不开设备；这是 open() 期能力面、不是编译墙（linux/i2c-dev.h 头存在、编译照常通过）"
+trigger_tool: "runtime"
+phase: "runtime"
+error_signature: "/dev/i2c-[0-9]+.*No such file or directory|No such file or directory.*/dev/i2c|/sys/class/i2c-dev.*(No such file|ENOENT)|Unable to open i2c|No such device.*i2c|ddc.*device.*not found"
+severity:               2
+category:               platform, detection, runtime, device-node, i2c
+match_keywords: "/dev/i2c, i2c-dev, /sys/class/i2c-dev, ENOENT, No such file or directory, i2c-dev.h, I2C_RDWR, DDC/CI, ddccontrol, ddcutil, i2c-tools, i2cdetect, smbus, /dev/dri, /sys/class/drm, EACCES, 运行期能力面, errno 判据"
+prescan_pattern: "/dev/i2c|/sys/class/i2c-dev|/dev/dri|i2cdetect|i2c-dev\\.h|I2C_RDWR"
+prescan_globs: "**/*.c, **/*.h, **/*.cpp, **/*.sh, **/*.py, conanfile.py"
+root_cause: "OHOS 设备未启用/未暴露 i2c-dev 字符设备与 drm 设备节点，内核也未加载任何 i2c/drm/smbus 模块（/proc/modules 实测为无）；/sys/class/drm 目录虽存在但对本进程 EACCES。属平台运行期能力缺口，与被适配包的代码无关"
+affected_scope: "任何在运行期依赖 /dev/i2c-*（i2c-dev 用户态接口）或 drm 设备节点的用户态工具：DDC/CI 显示器控制族（ddccontrol、ddcutil、m1ddc 一类）、i2c-tools 族（i2cdetect/i2cget/i2cset）、走 /dev/dri 或 /sys/class/drm 的显示/渲染工具。编译期不受影响（头文件存在）；凡在参数解析/纯文本路径即返回的子命令（-h/-V）仍可断言"
+verification_cmd: "ls -l /dev/i2c-* /sys/class/i2c-dev /dev/dri /sys/class/drm; 以 open() 实测取 errno（⚠ 不要用 exists() 判）；grep -E 'i2c|drm|smbus' /proc/modules; 有 ddccontrol 时 ddccontrol -h（参数解析面、不碰设备）"
+rec_priority: "1"
+rec_approach: "errno-probe-declare-runtime-capability-and-test-text-paths"
+rec_description: "以 open() errno 实测落运行期能力面结论（ENOENT=不存在 / EACCES=存在不可访问，均记『打不开』），编译照常交付；test_package 断言 -h/-V 等文本路径（appres 模式），notes.md 逐条披露不可用节点与 errno；⛔ 不 mock 设备、不谎称可用；披露文字与测试口径三处同源（notes / test_package MANIFEST / PR 正文）"
+rec_command: "真机逐项: ls -l /dev/i2c-* /sys/class/i2c-dev /dev/dri /sys/class/drm + open() 看 errno + grep -E 'i2c|drm|smbus' /proc/modules；test_package 用 -h/-V 输出文本断言（不碰设备）"
+rec_auto_fix:          false
+rec_impl: "配方 test_package 文本断言 + notes 能力面披露（appres 先例同款）"
+fallback_priority: "2"
+fallback_approach: "report-platform-gap-and-keep-build-only"
+fallback_description: "若任务的核心价值就在设备读写（如 DDC/CI 寄存器访问本身），运行期能力面无法在本机补齐：按平台能力缺口上报（需求图谱/Issue），在等待期间只交付『编译 + 非设备路径验证 + 全量披露』；drm fallback 一支同理（/dev/dri ENOENT、/sys/class/drm EACCES），不要用 mock 设备节点制造『功能可用』的假绿"
+fallback_command: "上报缺口后维持 rec_approach 的交付形态；有真实设备的环境再补跑上游实测脚本并回填 N'"
+fallback_auto_fix: "false"
+fallback_impl: "平台能力缺口上报（Issue/req 图谱）"
+principles:               
+doc_file: "knowledge/drafts/DRAFT-ddccontrol-1.0.3-i2c-dev-device-node-unavailable.md"
+last_updated: "2026-10-08"
+source_event: "ddccontrol 1.0.3 适配实测（2026-10-08 B 机）：/dev/i2c-* glob=无、/dev/i2c-0 open=ENOENT、/sys/class/i2c-dev=ENOENT、/dev/dri=ENOENT、/sys/class/drm=EACCES、/proc/modules 无 i2c/drm/smbus 模块；编译期 linux/types.h 与 linux/i2c-dev.h 实测可编译 ⇒ 编译过、运行期全不可用。Issue #3830"
+authors: "主理-2 <主理-2@local>"
+source_pr: "(本 PR)"
+source_commit: "(本 PR 内提交)"
+metrics_success_count: "1"
+metrics_fail_count: "0"
+metrics_confidence: "1.0"
+metrics_last_used: "2026-10-08"

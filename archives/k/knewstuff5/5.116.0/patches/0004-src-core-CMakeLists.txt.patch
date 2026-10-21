@@ -1,0 +1,41 @@
+--- a/src/core/CMakeLists.txt
++++ b/src/core/CMakeLists.txt
+@@ -55,28 +55,37 @@
+     IDENTIFIER KNEWSTUFFCORE
+     CATEGORY_NAME kf.newstuff.core
+     OLD_CATEGORY_NAMES org.kde.knewstuff.core
+     DESCRIPTION "knewstuff (Core Lib)"
+     EXPORT KNEWSTUFF
+ )
+ 
+ add_library(KF5NewStuffCore ${KNewStuffCore_SRCS} ${KNewStuffCore_syndication_SRCS})
+ add_library(KF5::NewStuffCore ALIAS KF5NewStuffCore )
+ 
++# In scoped builds the deprecated DownloadManager API (deprecated at 5.79)
++# stays in the core library, and its deprecation annotation is emitted by
++# the core export header (upstream uses the main-lib header, which lists
++# 5.79 in its DEPRECATION_VERSIONS but is not generated in scoped mode),
++# so register 5.79 as a core deprecation version in that case.
++set(_knewstuffcore_deprecation_versions 5.31 5.36 5.53 5.71 5.74 5.77 5.83)
++if(KNEWSTUFF_OHOS_SCOPED)
++    list(APPEND _knewstuffcore_deprecation_versions 5.79)
++endif()
+ ecm_generate_export_header(KF5NewStuffCore
+     EXPORT_FILE_NAME knewstuffcore_export.h
+     BASE_NAME KNewStuffCore
+     GROUP_BASE_NAME KF
+     VERSION ${KF_VERSION}
+     DEPRECATED_BASE_VERSION 0
+     EXCLUDE_DEPRECATED_BEFORE_AND_AT ${EXCLUDE_DEPRECATED_BEFORE_AND_AT}
+-    DEPRECATION_VERSIONS 5.31 5.36 5.53 5.71 5.74 5.77 5.83
++    DEPRECATION_VERSIONS ${_knewstuffcore_deprecation_versions}
+ )
+ 
+ # The src/ dir is needed for the entry.h header. This only happens because some
+ # code in Core uses an enum from KNS3::Entry
+ set(KNewStuffCore_BUILD_INCLUDE_DIRS
+     ${KNewStuff_BINARY_DIR}
+     ${CMAKE_CURRENT_BINARY_DIR}
+     ${CMAKE_BINARY_DIR}/src
+     ${CMAKE_SOURCE_DIR}/src
+ )

@@ -1,0 +1,37 @@
+software: ispc
+display: "ISPC"
+description: "Intel Implicit SPMD Program Compiler：SPMD 语言前端 + LLVM 后端的编译器（aarch64/NEON codegen）"
+category: toolchain
+homepage: "https://ispc.github.io"
+license: "BSD-3-Clause"
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "硬依赖「同一包内提供 LLVM + Clang 前端库」的 llvm-project 包：ISPC 的 CMakeLists 无条件链接 clangFrontend/clangBasic/clangEdit/clangLex/clangSupport/clangASTMatchers"
+    - "LLVM 支持区间 18.1–21.1（src/ispc_version.h）；ohpcd 的 llvm/20.1.0 无 Clang 前端且仅 AArch64 后端，clang/20.1.8 二进制在制品仓缺损，clang/22.1.8 为 LLVM 22.1 超区间 ⇒ 依赖以独立任务交付 llvm-project/20.1.8"
+    - "依赖包 llvm-config --targets-built 必须含 AArch64 + ARM + X86：ARM 决定 FindLLVM.cmake 的 LLVM_SUPPORTS_ARM（否则 CMakeLists.txt:357 FATAL_ERROR），X86 覆盖 167 个 REQUIRES: X86_ENABLED 的 lit 用例"
+    - "补丁 0001：std::__libcpp_verbose_abort 的 noexcept 规格跟随宿主 libc++ 版本（OHOS SDK libc++ 15.0.4 无 noexcept，上游按 LLVM 版本判断会编译失败）"
+    - "须显式 -DISPC_STATIC_LINK=OFF：ISPC_PREPARE_PACKAGE=ON 默认静态链入 libc++，与动态链接 libc++_shared.so 的 libLLVM.so 冲突 ⇒ ispc 启动即 std::bad_cast"
+    - "builtins-c++ 位码：上游 GenerateBuiltins.cmake 写死 Debian multiarch 头路径且管道吞错 ⇒ 空位码/undefined symbol __do_print；配方用 CLANGPP_EXECUTABLE 包装脚本补宿主 C 头目录并硬校验位码非空"
+    - "鸿蒙 PC 真机原生编译：Platform/HarmonyOS.cmake stub（include Platform/Linux），不设 CMAKE_SYSTEM_NAME"
+    - "package() 后重签 .codesign（bin/ + lib/*.so），否则 OHOS 下 EPERM/EACCES"
+  common_dependencies:
+    - llvm-project
+  test_scope:
+    - "上游 lit（check-all，tests/lit-tests）647 用例 + func-tests（run_tests.py，tests/func-tests）1576 用例；候选最大 N=2223"
+    - "最终设备轮实测 PASS 2113 / FAIL 3 / SKIP 107 / NOT_RUN 0，通过率 95.05%；3 个 FAIL 均为上游测试的 host=x86 假设（非适配缺陷）"
+
+versions:
+  1.28.2:
+    status: built
+    build_date: "2026-10-11"
+    conan_ref: "ispc/1.28.2"
+    notes: "设备验证完成（conan create + test_package + 上游两套件）；依赖 llvm-project/20.1.8 尚未合入远端 ohpcd"
+
+tags:
+  - compiler
+  - ispc
+  - spmd
+  - simd
+  - build-tool

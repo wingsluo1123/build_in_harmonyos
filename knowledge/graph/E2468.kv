@@ -1,0 +1,27 @@
+# ═══ Draft knowledge entry — OHOS linux/prctl.h vs sys/prctl.h prctl_mm_map 重定义 ═══
+# Timestamp: 2026-09-22
+# Software: hashrat 1.25（libUseful-bundled 5.45）
+# Gate: conan create build() / make 编译
+# Status: UNMATCHED — 知识库（index.tsv/doc/graph/drafts）检索 0 命中，待 promote
+
+id:                     E2468
+title: OHOS sysroot linux/prctl.h 与 sys/prctl.h 重复定义 struct prctl_mm_map，删除冗余 include 解决
+trigger_tool: clang / gcc
+phase: compilation
+error_signature: redefinition of 'prctl_mm_map'|previous definition is here.*linux/prctl.h|redefinition of 'struct prctl_mm_map'
+severity:               3
+category:               headers, toolchain
+match_keywords: prctl_mm_map, linux/prctl.h, sys/prctl.h, redefinition, OHOS, OpenHarmony, musl
+root_cause: OHOS sysroot（musl + 内核 UAPI 头）中 linux/prctl.h 与 sys/prctl.h
+  均定义 struct prctl_mm_map；源码先 include linux/prctl.h 再 include
+  sys/prctl.h 时第二个头触发 redefinition
+rec_approach: drop-redundant-linux-header
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E2468.md
+affected_scope:         OHOS sysroot linux/prctl.h 与 sys/prctl.h 重复定义 struct prctl_m
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        drop-redundant-linux-header

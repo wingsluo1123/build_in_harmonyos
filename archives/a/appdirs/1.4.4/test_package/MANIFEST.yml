@@ -1,35 +1,36 @@
 # test_package/MANIFEST.yml
-# 上游官方测试声明文件
 # CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
-# 详见: docs/TEST_QUALITY_SPEC.md
 
 package: appdirs/1.4.4
-homepage: "https://github.com/ActiveState/appdirs"
+homepage: "https://github.com/activestate/appdirs"
 
 # 上游测试命令 — 唯一测试源 test/test_api.py（unittest 风格，Test_AppDir 3 用例）
-upstream_check_command: "python3 -m unittest -v test.test_api"
-
-# conanfile.py build() 方法中是否已集成上游测试
+upstream_check_command: "python3 -m pytest test/"
 upstream_test_in_build: true
 upstream_test_command: "PYTHONPATH=<src> python3 -m unittest -v test.test_api"
 
-# 上游实际运行的测试程序（2026-09-20 实测记录）：
-# - test/test_api.py（unittest，Test_AppDir 类 3 个用例：test_metadata /
-#   test_helpers / test_dirs）
-# - 实测结果：**3 passed**（无失败、无跳过）→ 3/3 = 100%
-# - 兼容性核验：appdirs.py 仅用 sys/os stdlib，py3.12 无 import 障碍，
-#   无需源码补丁
 upstream_tests:
-  - file: test/test_api.py
-    source: appdirs-1.4.4/test/test_api.py
-    description: "上游 unittest 套件（Test_AppDir 类 3 用例；实测 3 passed = 100%）"
-    command: "PYTHONPATH=<src> python3 -m unittest -v test.test_api"
+  - name: test/test_api.py（unittest，Test_AppDir 类）
+    count: 3
+    description: "双口径实测：(1) build() 内嵌 unittest（CI conan create 真实
+      执行）3/3 通过；(2) 2026-10-15 设备隔离 venv（pytest 9.1.1）对官方 tag
+      tarball 独立复跑 3 passed / 0 failed（0.03 秒，证据
+      reports/dep-upstream/appdirs-upstream-rerun.log）。上游已归档
+      （activestate/appdirs），套件仅依赖 stdlib，pytest 9.1.1 下无弃用兼容
+      问题，oracle 未改动。"
 
-# test_package 中自带的测试（消费者视角验证）
 test_package_tests:
   - file: test_appdirs.py
-    description: "消费者测试：真实 API（R34）——5 个函数式 helper + AppDirs 类 5 属性 + 版本元数据 + version 三元组，断言全部返回非空 str"
+    description: "消费者测试（R34，13 断言）：真实 API——5 个函数式 helper +
+      AppDirs 类 5 属性 + 版本元数据 + version 三元组，断言全部返回非空 str"
     command: "python3 test_appdirs.py <site-packages-dir>"
+  - file: test_ohos_appdirs.py
+    description: "OHOS 专项测试（9 断言，2026-10-15 入台账）：OHOS 沙箱路径
+      语义——user_cache_dir/user_log_dir 遵循 XDG_CACHE_HOME（OHOS 运行时
+      指向 app sandbox），全部目录 helper 返回绝对非空 str 路径，version
+      三元组生效。上游无此平台契约断言"
+    command: "python3 test_ohos_appdirs.py <site-packages-dir>"
 
-# 测试断言总数（近似值，用于质量评估）
-assertion_count: 15
+# 测试断言总数（test_appdirs 13 + test_ohos_appdirs 9，其中 2 条为
+# XDG_CACHE_HOME 条件断言）
+assertion_count: 22

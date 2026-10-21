@@ -1,0 +1,44 @@
+# 软件级 manifest
+# 文件位置: archives/l/libreadstat/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+#
+# 包名说明: conan 包名 = libreadstat（上游项目名 ReadStat，产物 libreadstat.a）；
+# 消费者可见标识保持上游原名：库 readstat、头 readstat.h、
+# CMake find_package(readstat)/readstat::readstat、pkg-config readstat、
+# 命令 readstat / extract_metadata。
+# 与仓库中既有的 readstat 归档（archives/r/readstat，main 存量）为同名上游的
+# 不同 conan 包标识，本包为其新标识版本。
+
+software: libreadstat
+display: "ReadStat"
+description: "读取与写入 SAS/Stata/SPSS 统计数据文件的 MIT 许可 C 库与命令行工具集"
+category: data
+homepage: "https://github.com/WizardMac/ReadStat"
+license: MIT
+
+# 常用构建系统（可被版本级覆盖）
+build_system: autotools
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "config.guess 不认识 uname=HarmonyOS，须显式 --build/--host=aarch64-unknown-linux-gnu"
+    - "GitHub tag 归档不含 configure，须 autoreconf -fi；ACLOCAL_PATH 必须含 gettext 的 share/aclocal（AM_ICONV/iconv.m4）与 libtool 的 _lt_pkgdatadir"
+    - "HMDFS 临时目录族：configure 内 umask 077 / mktemp -d ./confXXXXXX 归一为 022 / ${TMPDIR:-.}（E011 同族）"
+    - "clang 15 默认开启 -Wstrict-prototypes，叠加上游 -Werror 会拦下 foo() 形参空表声明，须 CFLAGS 追加 -Wno-strict-prototypes"
+    - "make check 覆盖 ZSAV 读写，必须启用 zlib，否则上游测试真实失败"
+  common_dependencies:
+    - zlib
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "1.1.9":
+    status: built
+    build_date: "2026-09-26"
+    conan_ref: "libreadstat/1.1.9"

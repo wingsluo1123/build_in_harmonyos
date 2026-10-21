@@ -1,0 +1,23 @@
+id:                     E2826
+title: 上游 find_package(googletest) 与 registry gtest 包 CMakeDeps 目标名不一致时用测试专用 INTERFACE shim 桥接
+severity:               2
+category:               cmake, conan, testing, gtest
+match_keywords: find_package(googletest), googletest::googletest, gtest::gtest, CMakeDeps, gtest-config.cmake, glbinding, registry gtest, 上游测试, TEST macro, target was not found, find_package 包名, cmake_file_name
+error_signature: "Tests skipped: googletest not found|googletest::googletest.*target.*not found|find_package(googletest)|CMakeDeps.*gtest-config"
+root_cause: registry 中 gtest 包的 cmake_file_name / 目标名由发版配方决定（gtest-config.cmake、gtest::gtest），而上游库测试目录往往按 GoogleTest 官方惯例写 find_package(googletest) 并链接 googletest::googletest。两处命名不一致时 CMakeDeps 无法自动对账：find_package(googletest) 找不到包 → 测试目标不注册（QUIET 静默跳过）或 REQUIRED 直接失败。
+rec_approach: 四步桥接（glbinding 3.5.0 实证，16/16 用例通过）：① conan install gtest（registry 已有）/glfw 等测试依赖到独立测试目录，-g=CMakeToolchain -g=CMakeDeps；② 写测试专用 shim 目录的 googletest-config.cmake：先 include(<testdeps>/cmakedeps_macros.cmake) 再 include(<testdeps>/gtestTargets.cmake)，然后 if(NOT TARGET googletest::googletest) add_library(googletest::googletest INTERFACE IMPORTED) + set_property(INTERFACE_LINK_LIBRARIES gtest::gtest) endif()——注意必须按此顺序 include cmakedeps_macros（其中定义 conan_find_apple_frameworks 等宏），否则 gtestTargets.cmake 直接 include 会报 Unknown CMake command；③ 配置测试工程时传 -Dgoogletest_DIR=<shim 目录> -DCMAKE_PREFIX_PATH=<testdeps>；④ gtest 包内 libgmock.a 与 libgtest.a 并列存在，main.cpp 用 InitGoogleMock 时需 find_library(gmock PATHS <gtest pkg lib>) 显式链接。
+rec_auto_fix: false
+caused_by:
+conflicts_with:
+prerequisite_of:
+last_updated: 2026-09-27
+authors: AtomCode <noreply@atomgit.com> (executor pc7-24)
+source_pr:
+rec_impl:               manual
+rec_priority:               1
+doc_file:               doc/E2826.md
+trigger_tool:           cmake
+phase:                  build
+affected_scope:         上游 find_package(googletest) 与 registry gtest 包 CMakeDeps 目标名
+verification_cmd:       # 以 source_pr CI 门禁为准（PR ）
+rec_description:        四步桥接（glbinding 3

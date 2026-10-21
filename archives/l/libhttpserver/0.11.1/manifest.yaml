@@ -1,0 +1,77 @@
+version: "0.11.1"
+software: libhttpserver
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-09-28"
+build_system: autotools
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/etr/libhttpserver/archive/refs/tags/v0.11.1.tar.gz"
+
+  # 源码校验和
+  sha256: "a5c3d2fb08cce842c0e9c900340260deb20b6fc4827fa0c94306aa34e50e5239"
+
+  # 压缩格式
+  tar_format: tar.gz
+
+build:
+  system: autotools
+
+  configure_options:
+    - "--build=x86_64-unknown-linux-gnu"
+    - "--host=aarch64-linux-ohos"
+    - "--disable-examples"
+    - "--disable-doc"
+
+  dependencies:
+    - libmicrohttpd/1.0.1
+
+  tool_dependencies:
+    - automake/1.18
+    - libtool/2.5.4
+
+  cc: clang (ohos-sdk)
+  cxx: clang++ (ohos-sdk)
+
+patches_applied:
+  - "0001-configure.ac.patch: configure.ac linux-ohos host_os 分支去掉 -lstdc++ 硬编码 + 保留外部 LDFLAGS（链接 libmicrohttpd 必需）"
+  - "0002-src-httpserver-details-http_endpoint.hpp.patch: http_endpoint 拷贝构造/operator</operator=/match 改 public（libc++ pair SFINAE）"
+  - "0003-src-httpserver-webserver.hpp.patch: webserver.hpp 回调声明 int->MHD_Result + include microhttpd.h"
+  - "0004-src-webserver.cpp.patch: webserver.cpp MHD 回调返回类型 int->MHD_Result"
+
+knowledge_gained:
+  - "release tarball 不带 configure，构建期 autoreconf -fi bootstrap（tool_requires automake/libtool）"
+  - "MHD 1.0.1（MHD_Result 枚举）要求 http_resource 回调返回 MHD_Result 而非 int：policy_callback/build_request_*/post_iterator/answer_to_connection 等签名全部改 MHD_Result"
+  - "0.11.1 http_endpoint 的拷贝构造/operator</operator= 在 libc++ 下因 SFINAE 不可用于 map 插入，需 public（上游 0.19.0 同样演进）"
+  - "0.19.0 所需 libcurl 头文件可通过 curl/8.15.0 制品仓获取（上游 test/integ/*.cpp 用 curl）"
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/builds/libhttpserver-0.11.1.orig
+  source_work_dir: /storage/Users/currentUser/builds/libhttpserver-0.11.1.work
+  source_orig_hash: 50e9c5e3bf635e1d
+  source_work_hash: 342aa019498465da
+  generated_at: '2026-10-16T13:16:56'
+  patches_count: 4
+
+patch_classification:
+  - file: 0001-configure.ac.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-src-httpserver-details-http_endpoint.hpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0003-src-httpserver-webserver.hpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0004-src-webserver.cpp.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

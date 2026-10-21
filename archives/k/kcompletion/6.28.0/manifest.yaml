@@ -1,0 +1,47 @@
+software: kcompletion
+version: "6.28.0"
+status: built
+build_system: cmake
+created_at: 2026-10-18
+build_date: "2026-10-18"
+dependencies:
+  required:
+    - qtbase/6.11.1
+    - kcodecs/6.26.0.1
+    - kconfig/6.26.0.1
+    - kwidgetsaddons/6.28.0
+  build:
+    - ecm/6.28.0
+patches_applied:
+  - patches/0001-CMakeLists.txt.patch
+test_results:
+  type: passed
+  upstream: "passed: 5/5 upstream CTest executables (kcompletioncoretest 15/15 checks, klineedit_unittest 9/9, kcombobox_unittest 11/11, kemailvalidatortest 7/7 data rows, ksortablelisttest plain-main exit 0); rule4 count 27 QTest functions across 4 files plus the ksortablelisttest script-type target"
+  gui_smoke: "passed: 3/3 launch-alive smoke (kcomboboxtest, kcompletionuitest, klineedittest; offscreen event loop reached, still running after the 15 s timeout), run inside the Conan build"
+  test_package: "passed: 1/1 consumer end-to-end (6 cases: prefix match/cycling, sorted case-insensitive, weighted items round-trip, KLineEdit inline completion, KComboBox editable completion, KEmailValidator states); 29/29 checks"
+local_ci:
+  tool: "python3 scripts/ohc-run.py conan-verify kcompletion 6.28.0"
+  report: reports/conan-verify-report.md
+  gates:
+    G0: pass
+    G1: pass
+    G2: pass
+    G3: pass
+    G4: pass_with_warning   # 无法找到程序包 ID（运行器无 cache 路径）
+    L2: skipped             # 无 cache 路径
+    L4: skipped             # 无 cache 路径
+    L5: skipped             # 无 cache 路径
+  note: "报告为工具原样输出；L2/L4/L5 的 ✅ PASS 表头是模板幻影，不得作为运行级凭据（kew 4.2.5 / klick 0.12.2 先例）。"
+source_url: https://download.kde.org/stable/frameworks/6.28/kcompletion-6.28.0.tar.xz
+source_mirrors:
+  - https://ftp.funet.fi/pub/mirrors/ftp.kde.org/pub/kde/stable/frameworks/6.28/kcompletion-6.28.0.tar.xz
+  - https://mirror.freedif.org/KDE/ftp/stable/frameworks/6.28/kcompletion-6.28.0.tar.xz
+  - https://mirrorservice.org/sites/download.kde.org/stable/frameworks/6.28/kcompletion-6.28.0.tar.xz
+source_sha256: 8aa9cbc36139adfa8e3b2c744cc94714afe154d21cef8a3a2d5f4d311be7cc3c
+knowledge_gained:
+  - "kcompletion 6.28.0 raises ECM to 6.28.0 and KF_DEP_VERSION to 6.28.0; ohpcd publishes kcodecs/kconfig only up to 6.26.0.1 while kwidgetsaddons is at 6.28.0, so patches/0001 lowers KF_DEP_VERSION to the 6.26.0 common floor that satisfies all three find_package() calls (kbookmarks 6.28.0 precedent)."
+  - "The 6.26.0 -> 6.28.0 delta is confined to the top-level CMakeLists.txt (KF_VERSION/KF_DEP_VERSION, ECM minimum 6.28.0, deprecation floor KF 6.23 -> 6.27) plus five poqm updates (ia, nb, nn, se, ug); src/, autotests/ and tests/ are byte-identical."
+  - "KLineEdit and KComboBox makeCompletion() overloads are protected; consumers drive completion through public KLineEdit::doCompletion() and, for an editable KComboBox, qobject_cast<KLineEdit *>(combo.lineEdit()) first (doCompletion is public since KDE 4.2.1)."
+  - "The three programs in tests/ (kcomboboxtest, kcompletionuitest, klineedittest) run QApplication::exec() and never return on their own, so a ctest timeout would be recorded as a failure; exclude them with -E and run each offscreen under a 15 s timeout, where still-running = launch-alive PASS (kglobalaccel 6.28.0 precedent)."
+  - "HMDFS rejects symlink() with EPERM, so CMake's versioned .so chain cannot be created on device: CMAKE_PLATFORM_NO_VERSIONED_SONAME=ON plus explicit -Wl,-soname, flags in both plain and cache variables keeps a real DT_SONAME with an unversioned file name (kwidgetsaddons/kbookmarks 6.28.0 precedent)."
+  - "KF_SKIP_PO_PROCESSING=ON skips po/qm catalog generation without a source patch (ECM's ecm_process_po_files_as_qm() returns early), avoiding Qt6LinguistTools; BUILD_DESIGNERPLUGIN=OFF avoids the unpublished Qt6UiPlugin."

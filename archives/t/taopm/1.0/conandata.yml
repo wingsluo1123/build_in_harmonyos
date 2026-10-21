@@ -1,0 +1,44 @@
+# taopm 1.0 sources and OHOS portability patches.
+#
+# R39: the tarball below is the unmodified upstream release
+# `tao-1.0-beta-10May2006.tar.gz' published by the Tao project on SourceForge
+# (https://sourceforge.net/projects/taopm/files/Tao/).  SourceForge answers
+# HTTP 403 for this build host, so the recipe fetches the identical bytes from
+# the Debian source mirror, whose quilt `orig' tarball is required to be the
+# upstream one: Debian's taopm_1.0-7.dsc records
+#   ff0af736ba991d7965be2ab6441c6f5010618f5de648d05ca3f4d56adef0d794  taopm_1.0.orig.tar.gz
+# for it, and the tarball's single top-level directory is still
+# `tao-1.0-beta-10May2006/', i.e. the SourceForge release layout.
+sources:
+  "1.0":
+    url: "https://deb.debian.org/debian/pool/main/t/taopm/taopm_1.0.orig.tar.gz"
+    sha256: "ff0af736ba991d7965be2ab6441c6f5010618f5de648d05ca3f4d56adef0d794"
+
+patches:
+  "1.0":
+    - patch_file: "patches/0001-ohos-build-without-gl-graphics.patch"
+      patch_description: >-
+        Make the instrument viewer optional (-DTAO_NO_GRAPHICS): OHOS has no
+        desktop GL/GLUT, only EGL + GLES, and the OHOS GLES driver has no
+        immediate-mode entry points, so TaoGraphicsEngine.cc cannot be linked
+        or ported by configuration.
+      patch_type: "portability"
+    - patch_file: "patches/0002-cxx11-and-later.patch"
+      patch_description: >-
+        Compile the 2006 sources with C++11 and later: drop the removed
+        `register' specifier, give every main()/function an explicit return
+        type, take yyerror()'s message as const char * (the grammar and the
+        generated parser pass string literals), include <cstring> where the C
+        string functions are used, return a value from
+        TaoInstrument::resetDamping(), emit `int main' from taoparse and let
+        generated programs include the standard headers first.
+      patch_type: "portability"
+    - patch_file: "patches/0003-taoPitch-name-buffers.patch"
+      patch_description: >-
+        Fix the TaoPitch name buffers: createName() used the C++98
+        ostringstream(char *, openmode) constructor, which in C++11 became an
+        ostringstream(const std::string &) that read the uninitialised 12-byte
+        buffer (heap over-read, AddressSanitizer confirmed); the pitch-name
+        constructor allocated strlen() bytes and strcpy()d strlen()+1; and the
+        default constructor left `name' uninitialised for ~TaoPitch().
+      patch_type: "portability"

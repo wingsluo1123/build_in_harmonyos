@@ -1,0 +1,76 @@
+# 版本级 manifest
+# 文件位置: archives/{letter}/{name}/2.0.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "2.0.0"
+
+# 软件名
+software: "erfa"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-15"
+build_system: "meson"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（官方 v2.0.0 tag 归档）
+  url: "https://github.com/liberfa/erfa/archive/refs/tags/v2.0.0.tar.gz"
+
+  # 源码校验和
+  sha256: "e40f5175604c50c46fded7f9f76565dd5879a7f4ee27fa4484c2af217b7dfeb4"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: meson
+
+  # 配置选项列表
+  configure_options:
+    - "--default-library=static"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "patches/0001-add-minimal-meson-build.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "上游 2.0.0 没有 meson.build（meson 是 2.0.1 才加入的），无法直接复用 2.0.1 配方的构建路线；本版以补丁形式新增最小 meson.build（根+src，逻辑照搬上游 v2.0.1 tag，仅改 version/libtool_version/SOFA_VERSION 三处）"
+  - "2.0.0 的 configure.ac 给出 ERFA_LIB_VERSION_INFO(9,0,8)、SOFA_VERSION=20210512，与 2.0.1 的 (9,1,8)/20231011 不同，补丁按 2.0.0 取值"
+  - "autotools 在 HMDFS 上 config.status 失败（E112/E114/E118：mktemp 临时目录 setgid 限制），必须走 meson 绕行"
+  - "erfaversion.c 依赖 config.h 的 PACKAGE_VERSION 宏，meson 路线由 configure_file 生成 config.h，eraVersion() 等函数正常工作；测试代码需同时 #include <erfa.h> 和 <erfaextra.h>"
+  - "ERFA 是纯 C 库，无外部依赖（仅 libm，由系统提供）"

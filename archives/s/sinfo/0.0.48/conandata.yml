@@ -1,0 +1,26 @@
+# conandata.yml — sinfo 0.0.48
+# Upstream: Jürgen Rinas <jrinas@gmx.de>,
+#           http://www.ant.uni-bremen.de/whomes/rinas/sinfo/  (dead since ~2016)
+# License: GPL-2.0
+#
+# 说明：上游主页已失效（302 → 大学院系页，无任何重定向目标）；Debian pool
+# 保留了与签名 .dsc 匹配的 pristine orig tarball（R39：官方分发渠道的原始
+# 归档，非发行版重打包），sha256 与 sources.sha256 一致。
+
+sources:
+  url: "https://deb.debian.org/debian/pool/main/s/sinfo/sinfo_0.0.48.orig.tar.gz"
+  sha256: "4b6360f863c408e96ca04092ea6bdd61ee14a9e9151b85f64e12ece541b1933f"
+
+patches:
+  - patch_file: "patches/0001-configure-umask.patch"
+    patch_description: "Use umask 022 instead of 077 for the config.status scratch directory (E011: on HMDFS the directory owner maps to a different UID than the running process, so a drwx------ temp dir stays unwritable and config.status cannot write subs1.awk)"
+    patch_type: "platform"
+  - patch_file: "patches/0002-config.guess-harmonyos.patch"
+    patch_description: "Teach the bundled 2014 config.guess to identify a native HarmonyOS host (aarch64-unknown-linux-ohos) via a self-terminating *:HarmonyOS:*:* branch (the 2014-generation script has no GUESS fallback after the main case, so the branch must echo and exit 0 itself)"
+    patch_type: "portability"
+  - patch_file: "patches/0003-config.sub-linux-ohos.patch"
+    patch_description: "Accept the linux-ohos kernel-OS pair in the bundled 2014 config.sub (both the maybe_os table and the OS list), so aarch64-linux-ohos normalizes to aarch64-unknown-linux-ohos"
+    patch_type: "portability"
+  - patch_file: "patches/0004-boost-bind-const-ref-slot.patch"
+    patch_description: "Let TCPMessageServerConnection::queueAndSendMessageSlot take const Message&: it is the only slot bound to the by-value signals2 signal ServerConnectorBase::sendMessageSignal (void (Message)); Boost 1.84 bind has no viable overload to invoke a member function taking a non-const lvalue reference from the rvalue signal argument (no matching call to boost::_mfi::mf1<void, TCPMessageServerConnection, Message&>); full-tree signal/slot audit shows every other combination is lvalue-ref-signal to ref/const-ref/by-value slot and compiles unchanged"
+    patch_type: "portability"

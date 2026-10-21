@@ -1,0 +1,14 @@
+sources:
+  url: "https://downloads.sourceforge.net/project/tgif/tgif/4.2.5/tgif-QPL-4.2.5.tar.gz"
+  sha256: "2f24e9fecafae6e671739bd80691a06c9d032bdd1973ca164823e72ab1c567ba"
+
+patches:
+  - patch_file: "patches/0001-Makefile.am.patch"
+    patch_description: "Move tgif's compile-time -D definitions out of CFLAGS into AM_CPPFLAGS so the toolchain's CFLAGS are no longer shadowed by the Makefile, and drop the dead -I/usr/X11R6/include path"
+    patch_type: "build"
+  - patch_file: "patches/0002-Makefile.in.patch"
+    patch_description: "Mirror the Makefile.am change into the shipped pre-generated Makefile.in (same CFLAGS shadowing) and prune the unresolvable vestigial tgif_LDADD entries (-L/usr/X11R6/lib -lXext -lSM -lICE -lXmu)"
+    patch_type: "build"
+  - patch_file: "patches/0003-configure.patch"
+    patch_description: "Drop 'umask 077' when configure creates its config.status temp directory: HMDFS forces setgid and a umask-077 dir is not writable even by its owner, so config.status fails with 'Permission denied' (E114)"
+    patch_type: "portability"

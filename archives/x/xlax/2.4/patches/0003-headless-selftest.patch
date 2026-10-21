@@ -1,0 +1,118 @@
+--- a/xlax.c
++++ b/xlax.c
+@@ -33,6 +33,8 @@
+ #include "xlax.h"
+ #include "vroot.h"
+ 
++#include <string.h>
++
+ XtAppContext
+   Appcon;
+ 
+@@ -79,6 +81,87 @@
+   } 
+ }
+ 
++/* ------------------------------------------------------------------ *
++ * Headless self test (OpenHarmony PC packaging, see notes.md)
++ *
++ * HarmonyOS PC has no X server, so the interactive window of xlax can
++ * never be created there.  This entry point exercises the code that the
++ * packaged executable links - the Xt toolkit initialisation, the Xt
++ * allocator, the seven Athena widget class records exported by libXaw and
++ * the Xmu helper used by Find_Window() - without opening a display.
++ * ------------------------------------------------------------------ */
++#define XLAX_VERSION "2.4"
++
++static void SelfTestCheck(int *checks, int *failures, int ok, const char *what)
++{
++  *checks += 1;
++  if (ok) {
++    printf("ok   %s\n", what);
++  } else {
++    printf("FAIL %s\n", what);
++    *failures += 1;
++  }
++}
++
++static int SelfTest(void)
++{
++  int checks = 0;
++  int failures = 0;
++  int i;
++  size_t n;
++  XtAppContext ctx;
++  char *blk;
++  char what[128];
++  WidgetClass classes[] = {
++    formWidgetClass,
++    commandWidgetClass,
++    labelWidgetClass,
++    asciiTextWidgetClass,
++    scrollbarWidgetClass,
++    toggleWidgetClass,
++    viewportWidgetClass
++  };
++  const char *names[] = {
++    "form", "command", "label", "asciiText", "scrollbar", "toggle", "viewport"
++  };
++
++  printf("xlax %s selftest\n", XLAX_VERSION);
++
++  SelfTestCheck(&checks, &failures, XtSpecificationRelease >= 6,
++                "libXt headers report XtSpecificationRelease >= 6");
++
++  XtToolkitInitialize();
++  ctx = XtCreateApplicationContext();
++  SelfTestCheck(&checks, &failures, ctx != NULL,
++                "XtToolkitInitialize()/XtCreateApplicationContext() execute");
++
++  blk = (char *)XtMalloc(64);
++  SelfTestCheck(&checks, &failures, blk != NULL,
++                "XtMalloc(64) returns memory from the libXt allocator");
++  if (blk != NULL) {
++    XtFree(blk);
++  }
++
++  n = sizeof(classes) / sizeof(classes[0]);
++  for (i = 0; i < (int)n; ++i) {
++    snprintf(what, sizeof what,
++             "libXaw exports the %s widget class record", names[i]);
++    SelfTestCheck(&checks, &failures, classes[i] != NULL, what);
++  }
++
++  SelfTestCheck(&checks, &failures, (void *)XmuClientWindow != NULL,
++                "libXmu exports XmuClientWindow()");
++  SelfTestCheck(&checks, &failures, XlibSpecificationRelease >= 6,
++                "libX11 headers report XlibSpecificationRelease >= 6");
++
++  if (ctx != NULL) {
++    XtDestroyApplicationContext(ctx);
++  }
++
++  printf("selftest: %d/%d checks passed\n", checks - failures, checks);
++  return failures == 0 ? 0 : 1;
++}
++
+ int main(int argc, char **argv)
+ {
+   int i, find=0;
+@@ -88,6 +171,18 @@
+   };
+ 
+   /* xlax [-find] [-prefix name] */
++
++  /* OpenHarmony PC packaging: the headless entry points must be handled
++     before XtAppInitialize(), which opens the X display. */
++  for (i = 1; i < argc; ++i) {
++    if (strcmp(argv[i], "-version") == 0 || strcmp(argv[i], "--version") == 0) {
++      printf("xlax %s\n", XLAX_VERSION);
++      return 0;
++    }
++    if (strcmp(argv[i], "-selftest") == 0 || strcmp(argv[i], "--selftest") == 0) {
++      return SelfTest();
++    }
++  }
+ 
+   /* initialize toolkit */
+   Toplevel = XtAppInitialize (&Appcon, TITLE, NULL, 0, &argc, argv,

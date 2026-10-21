@@ -1,0 +1,25 @@
+# conandata.yml — liblscp 1.0.1
+#
+# URL/SHA256 为 2026-10-12 实时双端取证读数（设备侧 + Windows 侧各一次 HTTP 200，
+# 98261 字节，逐字相同哈希），见 .temp/QDR-1009-E05/logs/liblscp-gate1-live.log。
+# 不使用 Debian orig 镜像哈希（e314c89691… 属另一份重打压缩包，非官方产物）。
+sources:
+  url: "https://download.linuxsampler.org/packages/liblscp-1.0.1.tar.gz"
+  sha256: "db54a33c0e5e98c44a11022e92183baf7b977e70721293641a109ea4dbb4f6c7"
+
+# OHOS 平台缺口补丁（1 条）：上游 lscp_thread_cancel() 的非 WIN32 分支调用
+# pthread_cancel()，而 OHOS NDK 的 libc.so 不导出 pthread cancellation 家族
+# （llvm-nm -D --defined-only libc.so 对 pthread_cancel/pthread_testcancel/
+# pthread_setcanceltype 均 0 命中；pthread_cancel/pthread_setcanceltype 只在
+# 静态 libc.a 里有定义）。库本体可带未定义符号通过链接，任何可执行文件链它时
+# 由 ld.lld --no-allow-shlib-undefined 拒绝。补丁实现 knowledge/doc/E513.md「推荐方案」
+# 的 guarded-signal-thread-exit：lscp_thread_create() 在 pthread_create() 之前用
+# sigaction() 安装一个只调 pthread_exit(NULL) 的 SIGUSR1 处理器，lscp_thread_cancel()
+# 改为 pthread_kill(pThread->pthread, SIGUSR1) 使线程定向退出并保留句柄，随后由
+# lscp_thread_destroy() 的 lscp_thread_join() 正常回收并 free()。
+# Linux/其它平台分支逐字不变。详见 notes.md「OHOS pthread_cancel 平台缺口」。
+patches:
+  - patch_file: "patches/0001-ohos-thread-cancel-guarded-signal-exit.patch"
+    patch_description: "OHOS: libc.so 无 pthread_cancel 家族；按 E513 推荐方案 guarded-signal-thread-exit——create 期 sigaction(SIGUSR1) 装 pthread_exit 处理器，cancel 改 pthread_kill 定向退出，由 lscp_thread_join 回收"
+    patch_type: "porting"
+    strip: 1

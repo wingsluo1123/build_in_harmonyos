@@ -1,0 +1,38 @@
+# conandata.yml — pnmixer 0.7.2
+# 官方源：GitHub tag archive（轻量 tag v0.7.2 → commit 9fcafbd292aa0e432f68587ef02448f90e5bd40f）
+# 本机实测：GET HTTP/1.1 200 OK / Content-Type: application/x-gzip / 237961 字节
+# sha256 为本机 sha256sum 复算值（未复用他人读数）。
+# ⚠ codeload 直链末段无扩展名（.../tar.gz/refs/tags/v0.7.2），必须显式给 filename，
+#   否则 conan 按 URL 末段猜格式（E276/E483：猜成 zip → BadZipFile）。
+sources:
+  url: "https://codeload.github.com/nicklan/pnmixer/tar.gz/refs/tags/v0.7.2"
+  sha256: "433487da386396f8d39244395220992ff73fe5191d0226febaead403a0cd6f2c"
+  filename: "pnmixer-0.7.2.tar.gz"
+
+# refresh-patch --auto 生成的是 a/ b/ 前缀补丁 ⇒ strip: 1
+# 本机实测 patch -p0 --dry-run 全部 FAIL / -p1 全部 OK。
+patches:
+  - patch_file: "patches/0001-src-alsa.c.patch"
+    patch_description: "Replace the GNU-only exp10() with pow(10, x): this platform's <math.h> does not declare exp10 and the shared libm does not export it (undefined symbol at link time)"
+    patch_type: "portability"
+    strip: 1
+  - patch_file: "patches/0002-src-hotkey.c.patch"
+    patch_description: "Guard the Xlib/XKBlib hotkey code with HAVE_GDK_X11 (a GDK built without the X11 backend installs no <gdk/gdkx.h>); no-op fallbacks when absent"
+    patch_type: "portability"
+    strip: 1
+  - patch_file: "patches/0003-src-hotkey.h.patch"
+    patch_description: "Detect <gdk/gdkx.h> at compile time (__has_include) instead of unconditionally including it; fall back to <gdk/gdk.h>"
+    patch_type: "portability"
+    strip: 1
+  - patch_file: "patches/0004-src-hotkeys.c.patch"
+    patch_description: "Compile out the X11 root-window key filter when GDK has no X11 backend; report hotkeys as unavailable instead of a bogus per-key grab failure"
+    patch_type: "portability"
+    strip: 1
+  - patch_file: "patches/0005-src-ui-popup-window.c.patch"
+    patch_description: "Drop the unused <gdk/gdkx.h> include (this file uses no gdk_x11_* symbol)"
+    patch_type: "portability"
+    strip: 1
+  - patch_file: "patches/0006-src-ui-prefs-dialog.c.patch"
+    patch_description: "Drop the unused <gdk/gdkx.h> include (this file uses no gdk_x11_* symbol)"
+    patch_type: "portability"
+    strip: 1

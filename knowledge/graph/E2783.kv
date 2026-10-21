@@ -1,0 +1,18 @@
+error_signature: "error: 'uint8_t' is not a member of 'std'; did you mean 'wint_t'?"
+root_cause: "shrinkwrap 1.2.0 头文件使用 std::uint8_t/std::uint64_t 但不 include <cstdint>；libc++（OHOS）经 <array>/<vector>/<iostream> 传递引入所以能编译，libstdc++（g++）无传递包含直接失败。"
+rec_approach: "OHOS 无需补丁（libc++ 不受影响）；libstdc++ 环境验证用 g++ -include cstdint 绕过；根治为 5 个头文件各加 #include <cstdint>（可直接上游）。"
+match_keywords: ["uint8_t is not a member of std", "cstdint", "libc++", "libstdc++", "header-only", "shrinkwrap"]
+severity:               1
+category: portability
+last_updated: 2026-09-27
+id:                     E2783
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E2783.md
+trigger_tool:           make
+phase:                  build
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        "OHOS 无需补丁（libc++ 不受影响）

@@ -1,0 +1,32 @@
+# ═══ Draft knowledge entry — aarch64 整数除零不陷阱：跨架构「测试通过」不可互相迁移 ═══
+# Timestamp: 2026-10-01
+# Software: 通用（所有把 x86_64 原生构建/复审结果当作 OHOS aarch64 结论的适配任务）
+# Gate: 编译期 UB / 测试期崩溃差异 / 审计复核
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E2976
+title: AArch64 的 UDIV/SDIV 除零按架构定义返回 0 而不产生陷阱，x86_64 idiv 除零则 SIGFPE，clang 对常量 0 直接折叠 —— 同一份含无保护整数除法的源码在 OHOS aarch64 上「不崩」而误判为测试数据/适配正确
+trigger_tool: any (cross-compilation + qemu/binfmt test run)
+phase: testing
+error_signature: Floating point exception \(core dumped\)|signal 4|SIGFPE|FPE on `\(v_width \* 1000\) / v_height`|quotient 非预期常数（编译期常量除零被折叠）
+severity:               3
+category:               portability, testing, architecture
+match_keywords: udiv, sdiv, idiv, divide by zero, 除零, SIGFPE, FPE, aarch64, x86_64,
+  clang -O3, undefined behaviour, UB, cross-arch
+root_cause: AArch64 架构手册规定 UDIV/SDIV 在除数为 0 时返回 0 而不触发异常，与 x86_64 的
+  #DE 陷阱语义不同；C 标准对此是 UB（除数为 0），编译器可任选结果 —— clang -O3 对常量 0 直接
+  折叠。任何「按 x86 行为判断正确性 / 按 aarch64 行为判断通过」的适配或复审都会因此得到相反
+  结论，进而把「测试数据非法」误判成「配方造假或测试造假」，或把真实缺陷当成通过放过。
+rec_approach: assert-dividend-valid + reverse-verify-output-field + cross-arch-divzero-note
+verification_cmd:
+  mctools.c:651）／aarch64 OHOS 产物 rc=0 且 MKV 头 PixelWidth=480 PixelHeight=0、输出 1009 字节；
+  修正扩展头为 80 00 50 3C 81 00 00 19 后两侧均正常，测试新增宽高断言长期防回归。
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E2976.md
+affected_scope:         AArch64 的 UDIV/SDIV 除零按架构定义返回 0 而不产生陷阱，x86_64 idiv 除零则 SIGFP
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        assert-dividend-valid + reverse-verify-output-field + cross-arch-divzero-note

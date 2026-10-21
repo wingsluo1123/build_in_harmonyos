@@ -1,0 +1,178 @@
+diff --git a/test/unit/src/TestAlignment.cpp b/test/unit/src/TestAlignment.cpp
+index 0f795a6..810ce94 100644
+--- a/test/unit/src/TestAlignment.cpp
++++ b/test/unit/src/TestAlignment.cpp
+@@ -95,7 +95,7 @@ public:
+     /********************************************************************************/
+     void test_alignment1 ()
+     {
+-        string uri = "/udd/edrezen/tmp/li/result.out";
++        string uri = plastTmpPath ("result.out");
+ 
+         IAlignmentContainer* container = AlignmentContainerFactory::singleton().createContainerFromUri (uri);
+         LOCAL (container);
+@@ -287,6 +287,11 @@ public:
+     {
+         srand (time(NULL));
+ 
++        std::string tmpCompare  = plastTmpPath ("compare.txt");
++        std::string tmpRef      = plastTmpPath ("fakeRef");
++        std::string tmpCmp      = plastTmpPath ("fakeCmp");
++        std::string tmpCompare2 = plastTmpPath ("compare2.txt");
++
+         ISequence fakeSeq ("stub");
+ 
+         IAlignmentContainer* ref = AlignmentContainerFactory::singleton().createContainer();
+@@ -315,7 +320,7 @@ public:
+         }
+ 
+         fstream file;
+-        file.open ("/tmp/compare.txt", fstream::out);
++        file.open (tmpCompare.c_str(), fstream::out);
+         size_t nbPoints = 300;
+         for (size_t n=0; n<nbPoints; n++)
+         {
+@@ -326,19 +331,19 @@ public:
+         }
+         file.close ();
+ 
+-        TabulatedOutputVisitor v1 ("/tmp/fakeRef");   ref->accept (&v1);
+-        TabulatedOutputVisitor v2 ("/tmp/fakeCmp");   cmp->accept (&v2);
++        TabulatedOutputVisitor v1 (tmpRef);   ref->accept (&v1);
++        TabulatedOutputVisitor v2 (tmpCmp);   cmp->accept (&v2);
+ 
+-        IAlignmentContainer* ref2 = AlignmentContainerFactory::singleton().createContainerFromUri ("/tmp/fakeRef");
++        IAlignmentContainer* ref2 = AlignmentContainerFactory::singleton().createContainerFromUri (tmpRef);
+         CPPUNIT_ASSERT (ref2 != 0);
+         LOCAL (ref2);
+ 
+-        IAlignmentContainer* cmp2 = AlignmentContainerFactory::singleton().createContainerFromUri ("/tmp/fakeCmp");
++        IAlignmentContainer* cmp2 = AlignmentContainerFactory::singleton().createContainerFromUri (tmpCmp);
+         CPPUNIT_ASSERT (cmp2 != 0);
+         LOCAL (cmp2);
+ 
+         fstream file2;
+-        file2.open ("/tmp/compare2.txt", fstream::out);
++        file2.open (tmpCompare2.c_str(), fstream::out);
+         for (size_t n=0; n<nbPoints; n++)
+         {
+             double x = (double)n/(double)nbPoints;
+@@ -390,7 +395,7 @@ public:
+         ShrinkContainerVisitor shrink;
+         container->accept (&shrink);
+ 
+-        TabulatedOutputVisitor v ("/tmp/output");
++        TabulatedOutputVisitor v (plastTmpPath ("output"));
+         container->accept (&v);
+     }
+ 
+diff --git a/test/unit/src/TestDesignPattern.cpp b/test/unit/src/TestDesignPattern.cpp
+index 788106e..d5e31d6 100644
+--- a/test/unit/src/TestDesignPattern.cpp
++++ b/test/unit/src/TestDesignPattern.cpp
+@@ -435,7 +435,8 @@ public:
+     /** */
+     void testSystemCommand ()
+     {
+-        IFile* file = DefaultFactory::file().newFile ("/tmp/plast_testSystemCommand", "w");
++        std::string tmpFile = plastTmpPath ("plast_testSystemCommand");
++        IFile* file = DefaultFactory::file().newFile (tmpFile.c_str(), "w");
+ 
+         list<ICommand*> commands;
+ 
+@@ -467,7 +468,7 @@ public:
+ 
+         props.add (1, "level_1_3", "%ld", 7);
+ 
+-        XmlDumpPropertiesVisitor v ("/tmp/plast_testProperties_progress.xml");
++        XmlDumpPropertiesVisitor v (plastTmpPath ("plast_testProperties_progress.xml"));
+         props.accept (&v);
+     }
+ 
+diff --git a/test/unit/src/TestPlast.cpp b/test/unit/src/TestPlast.cpp
+index 73fd734..8c2a6ee 100644
+--- a/test/unit/src/TestPlast.cpp
++++ b/test/unit/src/TestPlast.cpp
+@@ -99,14 +99,18 @@ public:
+         cout << "sequenceLen=" << sequenceLen << endl;
+ 
+         // we create a subject and a query FASTA files containing the same sequence
+-        FastaSequenceOutput (new StringSequenceIterator (1, sequence), "/tmp/subject.fa").dump ();
+-        FastaSequenceOutput (new StringSequenceIterator (1, sequence), "/tmp/query.fa").dump ();
++        std::string subjectFile = plastTmpPath ("subject.fa");
++        std::string queryFile   = plastTmpPath ("query.fa");
++        std::string outputFile  = plastTmpPath ("plast.out");
++
++        FastaSequenceOutput (new StringSequenceIterator (1, sequence), subjectFile.c_str()).dump ();
++        FastaSequenceOutput (new StringSequenceIterator (1, sequence), queryFile.c_str()).dump ();
+ 
+         // we create a IProperties instance holding the subject and query databases URIs
+         IProperties* props = new Properties ();
+-        props->add (0, "-d",     "/tmp/subject.fa");
+-        props->add (0, "-i",     "/tmp/query.fa");
+-        props->add (0, "-o",     "/tmp/plast.out");
++        props->add (0, "-d",     subjectFile.c_str());
++        props->add (0, "-i",     queryFile.c_str());
++        props->add (0, "-o",     outputFile.c_str());
+         props->add (0, "-a",     "1");
+         props->add (0, "-p",     "plastp");
+ 
+@@ -166,7 +170,8 @@ public:
+         IProperties* props = new Properties ();
+         props->add (0, "-d",     getPath("HalobacteriumSalinarum.fa"));
+         props->add (0, "-i",     getPath("query.fa"));
+-        props->add (0, "-o",     "/tmp/plast.out");
++        std::string outputFile = plastTmpPath ("plast.out");
++        props->add (0, "-o",     outputFile.c_str());
+         props->add (0, "-p",     "plastp");
+         props->add (0, "-a",     "1");
+ 
+diff --git a/test/unit/src/TestSequenceIterator.cpp b/test/unit/src/TestSequenceIterator.cpp
+index be05ed6..3e9e787 100644
+--- a/test/unit/src/TestSequenceIterator.cpp
++++ b/test/unit/src/TestSequenceIterator.cpp
+@@ -311,7 +311,8 @@ public:
+     /********************************************************************************/
+     void testFastaOutput ()
+     {
+-        const char* filename = "/tmp/output.fa";
++        std::string tmpOutput = plastTmpPath ("output.fa");
++        const char* filename = tmpOutput.c_str();
+ 
+         ISequenceIterator* itSeq = new StringSequenceIterator (3, "AAAIAAA", "KLAAA", "FAAA");
+         LOCAL (itSeq);
+diff --git a/test/unit/src/cppunit.h b/test/unit/src/cppunit.h
+index 2cbbe27..92fe7c7 100644
+--- a/test/unit/src/cppunit.h
++++ b/test/unit/src/cppunit.h
+@@ -31,5 +31,30 @@ using namespace CppUnit;
+ #include <stdio.h>
+ #define TRACE(format, args...)   //printf ("[%s] ", __PRETTY_FUNCTION__);  printf (format, args)
+ 
++#include <stdlib.h>
++#include <string>
++
++/** Builds the path of a file living in the process temporary directory.
++ *
++ *  The tests below need a writable directory for the files they produce.  They
++ *  used to hard code "/tmp"; on platforms where /tmp is mounted read only
++ *  (HarmonyOS for instance) the writable directory has to be provided through
++ *  the TMPDIR environment variable instead.
++ */
++static inline std::string plastTmpPath (const char* name)
++{
++    const char* dir = getenv ("TMPDIR");
++    if (dir == 0 || dir[0] == 0)  {  dir = "/tmp";  }
++
++    std::string result (dir);
++    while (result.empty() == false && result[result.size()-1] == '/')
++    {
++        result.erase (result.size()-1);
++    }
++
++    result += '/';
++    result += name;
++    return result;
++}
+ 
+ #endif /* CPPUNIT_H_ */

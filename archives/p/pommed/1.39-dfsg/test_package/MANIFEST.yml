@@ -1,0 +1,32 @@
+# test_package/MANIFEST.yml — pommed 1.39-dfsg
+# CI L0e requires this file to exist.
+
+package: pommed/1.39-dfsg
+homepage: "https://sources.debian.org/src/pommed/"
+
+# pommed has no upstream test suite: the recursive Makefile defines only
+# `all`, per-object targets and `clean` — there is no `check`/`test` target and
+# no test program anywhere in the tarball.
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# No upstream test programs exist in the tarball
+upstream_tests: []
+
+# test_package tests (consumer perspective)
+test_package_tests:
+  - file: test.sh
+    description: >
+      Locates the installed `pommed` binary on PATH and exercises it:
+      (1) `pommed -v` prints the v1.39 version banner and exits 0;
+      (2) an unknown option (`-Z`) is diagnosed with the usage text and exits 1;
+      (3) `pommed -f` aborts at a startup gate — the privilege gate on a
+      non-root runner, machine identification on a root runner — and exits 1;
+      (4) HarmonyOS/aarch64 assertion — the binary is a native AArch64 ELF;
+      (5) HarmonyOS-specific assertion — the x86-only NV8600MGT SMI backlight
+      driver was built with its non-x86 guard (probe() reports unsupported).
+    command: "bash test.sh"
+
+# Approximate assertion count (12 checks in test.sh)
+assertion_count: 12

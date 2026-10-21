@@ -1,0 +1,26 @@
+package: mrxvt/0.5.4
+homepage: "https://sourceforge.net/projects/materm/"
+
+# 上游测试清点（R51）：0.5.4 tarball 内没有 tests/ 目录，顶层与 src/ 的
+# Makefile.am 均无 check / test / TESTS 目标（make -n check 无对应规则），
+# doc/ 下只有 man page。上游为 2008 年的 X11 程序，除人工目视外没有可执行
+# 的测试资产。
+upstream_check_command: "make -n check"
+
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests: []
+
+# 消费者视角验证：test_package/test_mrxvt.sh 对打包出来的 bin/mrxvt 做
+# 8 条断言 + 1 个端到端完整消费者用例（X 显示可用时真实启动 mrxvt 并验证
+# 主循环存活；无 DISPLAY / 交叉宿主如实 SKIP 并注明原因，不伪造通过）。
+test_package_tests:
+  - file: conanfile.py
+    description: "Drives test_mrxvt.sh against the packaged bin/mrxvt"
+    command: "conan test"
+  - file: test_mrxvt.sh
+    description: "8 assertions plus 1 full end-to-end consumer case on the packaged program: (1) installed and executable, (2) ELF class ELF64, (3) ELF machine EM_AARCH64, (4) -h prints the Mrxvt v0.5.4 banner, (5) -h prints the Options table, (6) -h lists -display, (7) no DISPLAY prints Error opening display, (8) no DISPLAY exits 1, (9) end-to-end: really starts mrxvt against a reachable DISPLAY and verifies the main loop stays alive. Checks 4-9 are reported SKIP, never PASS, when the loader cannot start the program on a cross-build host; check 9 additionally needs DISPLAY."
+    command: "MRXVT_BIN=<pkg>/bin/mrxvt sh test_mrxvt.sh"
+
+assertion_count: 9

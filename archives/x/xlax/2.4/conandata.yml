@@ -1,0 +1,48 @@
+# conandata.yml — xlax 2.4
+#
+# Source: the author's own distribution (R39 official upstream).  The file is
+# byte identical to the Debian "orig" tarball of the same release:
+#   sha256 aae925379d15ccec6fa9f82b14096d14613c9d342820e515aa61052bbe9ad2dc
+# (deb.debian.org/debian/pool/main/x/xlax/xlax_2.4.orig.tar.gz carries the same
+# checksum, see reports/test-report.md §1 for the side by side verification.)
+# The http:// original URL redirects to this https one, so no plain http is
+# kept here.
+sources:
+  url: "https://hea-www.harvard.edu/~fine/Tech/xlax2.4.tar.gz"
+  sha256: "aae925379d15ccec6fa9f82b14096d14613c9d342820e515aa61052bbe9ad2dc"
+
+patches:
+  # 0001 + 0002 are the two code patches of the Debian packaging
+  # (debian/patches/fix-warnings.diff and debian/patches/protos.diff of
+  # xlax 2.4-3), applied in that order because protos.diff is written against
+  # the tree with fix-warnings.diff already applied.  The third Debian patch,
+  # use-libbsd.diff, is intentionally NOT applied: it exists only because
+  # glibc lacks strlcpy(); OHOS libc declares and exports strlcpy() in
+  # <string.h> (see reports/test-report.md §3), so no libbsd is needed and
+  # <bsd/string.h> does not even exist in the OHOS sysroot.
+  - patch_file: "patches/0001-fix-warnings.patch"
+    patch_description: >-
+      Type and format-specifier fixes from the Debian packaging: loop counters
+      over XQueryTree()/XGetWindowProperty() results become unsigned, the
+      Window id is printed with %lu, and the keyboard map lookup casts the
+      character to unsigned char.  Without them clang reports pointer sign and
+      integer width mismatches in the window discovery path.
+    patch_type: "portability"
+  - patch_file: "patches/0002-ansi-prototypes.patch"
+    patch_description: >-
+      K&R definitions converted to ANSI prototypes (Debian protos.diff): the
+      file predates C89 prototypes, so every function is defined as
+      "f(a, b) int a; char *b;" and clang 15 warns on each one and cannot
+      check the calls.  WindowIndex also becomes size_t, matching the
+      XGetWindowProperty() element count it is compared with.
+    patch_type: "portability"
+  - patch_file: "patches/0003-headless-selftest.patch"
+    patch_description: >-
+      Add the headless -version/--version and -selftest/--selftest entry points
+      used by the HarmonyOS PC package test, plus the <string.h> include the
+      file relies on (strcmp() and strlcpy()).  HarmonyOS PC has no X server,
+      so XtAppInitialize() can never open a display there; --selftest runs
+      before it and exercises the libXt initialisation, the libXt allocator,
+      the seven Athena widget class records exported by libXaw and the
+      XmuClientWindow() helper the program uses, without a display.
+    patch_type: "test"

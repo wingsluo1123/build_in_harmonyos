@@ -1,0 +1,31 @@
+--- a/Makefile
++++ b/Makefile
+@@ -13,20 +13,28 @@
+ 
+ CFLAGS_EVAL := $(call cc-option,-Wstringop-overflow=4)
+ 
+ CFLAGS ?= -O2 -g
+ CFLAGS += -Wall -Wextra -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing -fno-common
+ CFLAGS += -Werror-implicit-function-declaration -Wsign-compare -Wno-unused-parameter
+ CFLAGS += -Wdeclaration-after-statement
+ CFLAGS += -D__SANE_USERSPACE_TYPES__
+ CFLAGS += $(CFLAGS_EVAL)
+ CFLAGS += $(EXTRA_CFLAGS)
++# OHOS/HarmonyOS sysroot is musl-derived: its <linux/socket.h> defines struct
++# sockaddr_storage unconditionally, while <sys/socket.h> (reached first through
++# libnl's <netlink/netlink.h>) already provides it -- glibc's UAPI copy guards
++# that with #ifndef __GLIBC__, ours does not, so every TU fails with
++# "redefinition of 'sockaddr_storage'".  Latch the UAPI header guard and supply
++# the single typedef the netlink UAPI headers need from it; glibc builds are
++# unaffected because the guard is simply redundant there.
++CFLAGS += -D_UAPI_LINUX_SOCKET_H -D__kernel_sa_family_t="unsigned short"
+ 
+ _OBJS := $(sort $(patsubst %.c,%.o,$(wildcard *.c)))
+ VERSION_OBJS := $(filter-out version.o, $(_OBJS))
+ OBJS := $(VERSION_OBJS) version.o
+ 
+ ALL = iw
+ 
+ ifeq ($(NO_PKG_CONFIG),)
+ NL3xFOUND := $(shell $(PKG_CONFIG) --atleast-version=3.2 libnl-3.0 && echo Y)
+ ifneq ($(NL3xFOUND),Y)

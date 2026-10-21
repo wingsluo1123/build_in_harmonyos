@@ -1,0 +1,73 @@
+--- a/cmake/SiconosSetup.cmake
++++ b/cmake/SiconosSetup.cmake
+@@ -61,21 +61,21 @@
+ #  --> look for python framework when all other possibilities failed.
+ set(Python3_FIND_FRAMEWORK LAST)
+ if(WITH_PYTHON_WRAPPER)
+   find_package(Python3 COMPONENTS Development Interpreter NumPy REQUIRED)
+ else()
+   find_package(Python3 COMPONENTS Interpreter REQUIRED)
+ endif()
+ # For backward compat ...
+ set(PYTHON_EXECUTABLE ${Python3_EXECUTABLE})
+ include(FindPythonModule)
+-find_python_module(packaging REQUIRED) # for siconos runtime
++find_python_module(packaging) # for siconos runtime
+ 
+ get_filename_component(PYTHON_EXE_NAME ${PYTHON_EXECUTABLE} NAME)
+ if(WITH_PYTHON_WRAPPER OR WITH_DOCUMENTATION)
+   # --- xml schema. Used in tests. ---
+   if(WITH_XML)
+     set(SICONOS_XML_SCHEMA "${CMAKE_SOURCE_DIR}/kernel/swig/SiconosModelSchema-V3.7.xsd")
+     if(NOT NO_RUNTIME_BUILD_DEP)
+       find_python_module(lxml REQUIRED)
+     endif()
+   endif()
+@@ -156,20 +156,24 @@
+   # Set the list of required boost components
+   if(WITH_SERIALIZATION)
+     list(APPEND boost_required_components serialization filesystem)
+   endif()
+   if(boost_required_components)
+     set(boost_opts COMPONENTS ${boost_required_components})
+   endif()
+ 
+   # Search boost ...
+   find_package(Boost ${boost_min_version} ${boost_opts} REQUIRED)
++  if(NOT TARGET Boost::boost AND TARGET Boost::headers)
++    add_library(Boost::boost INTERFACE IMPORTED)
++    set_target_properties(Boost::boost PROPERTIES INTERFACE_LINK_LIBRARIES Boost::headers)
++  endif()
+ 
+   if(WITH_SERIALIZATION)
+     set(WITH_SYSTEM_BOOST_SERIALIZATION ON CACHE INTERNAL "Siconos uses boost serialization lib.")
+   endif()
+ endif()
+ 
+ # -- Open Cascade Community Edition --
+ if(WITH_OCE)
+   include(oce_setup)
+ endif()
+@@ -216,21 +220,21 @@
+   # File used to print tests setup messages.
+   set(TESTS_LOGFILE ${CMAKE_BINARY_DIR}/tests.log)
+ 
+   if(CMAKE_BUILD_TYPE STREQUAL Debug)
+     # mlcp enum and dr_iso1 (hairer) tests are quite long in debug mode ...
+     set(tests_timeout 700 CACHE INTERNAL "Limit time for tests (in seconds)")
+   else()
+     set(tests_timeout 200 CACHE INTERNAL "Limit time for tests (in seconds)")
+   endif()
+   if(HAVE_SICONOS_KERNEL)
+-    find_package(CPPUNIT REQUIRED)
++    find_package(CPPUNIT MODULE REQUIRED)
+     # File used as main driver for cppunit tests
+     set(SIMPLE_TEST_MAIN ${CMAKE_SOURCE_DIR}/kernel/tests-common/TestMain.cpp CACHE INTERNAL "")
+   endif()
+   if(WITH_PYTHON_WRAPPER)
+     find_python_module(pytest REQUIRED)
+     if(WITH_AGGRESSIVE_PYTHON_TESTS)
+       set(pytest_opt "-s -v -pep8" CACHE INTERNAL "extra options for py.test")
+     else()
+       set(pytest_opt "-v" CACHE INTERNAL "extra options for py.test")
+     endif()

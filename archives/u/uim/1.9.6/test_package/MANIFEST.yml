@@ -1,0 +1,72 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# 填写方法:
+#   1. 解压上游源码包
+#   2. 运行 make -n check (或 ctest -N / meson test --list) 查看测试列表
+#   3. 把实际运行的测试记录到下方
+#
+# uim 1.9.6 的上游测试**全部在 conanfile.py 的 build() 中真实执行**
+# （upstream_test_in_build: true），共三个套件：
+#   A. sigscheme/test/  —— sscm（sigscheme 自带解释器，随本包含源码一并构建）
+#   B. test2/           —— uim-sh（随本包构建）
+#   C. test/            —— Gauche 0.9.15 + GaUnit + SLIB。OHOS 无 Guile/Gauche，
+#                          故 test_requires gauche/0.9.15.2 提供解释器，GaUnit/SLIB
+#                          按 conandata.yml 的 test_sources 以 pinned sha256 取源码；
+#                          构建期就地重建 OHOS gauche 包缺失的 ext 模块。
+# 逐文件实测明细: <build_folder>/upstream-tests.log
+
+package: uim/1.9.6
+homepage: "https://github.com/uim/uim"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: >-
+  conanfile.py build() -> _run_upstream_tests():
+  A) sscm <sigscheme/test/Makefile 的 TESTS 列表>;
+  B) uim-sh <test2/Makefile 的 TESTS 列表>;
+  C) gosh test/run-test.scm <test/ 下 28 个 test-*.scm>
+
+# 上游实际存在的测试用例（清点口径见各条 comment；全部已实跑）
+upstream_tests:
+  - dir: test/
+    files: 28                # test/ 递归 34 个 .scm，其中 test-*.scm 28 个（另有 6 个支撑文件）
+    count: 214               # 静态清点 = test/ 递归 `(define (test…` 出现次数
+    runner: "Gauche 0.9.15 + GaUnit + SLIB（构建期由 conanfile.py 搭建，无需宿主 Guile）"
+    command: "gosh test/run-test.scm <test-*.scm>"
+    executed_in_build: true
+    measured: "28/28 文件全部执行（0 个加载中止）→ 305 个 test group / 291~292 通过 / 13~14 个失败+错误 / 4358~4373 断言（三轮实测：6+8 / 7+7 / 6+7，浮动仅发生在 test-im/test-custom 的 uim-sh 交互用例之间）；涉及文件固定为 test-im、test-custom、test-intl、util/test-misc，全部为上游环境依赖用例（uim-sh 交互时序、OHOS libc 无 gettext 导致 NLS 关闭、m17n 编码差异）"
+  - dir: sigscheme/test/
+    files: 84                # 目录内 .scm 总数（含 13 个 imported_tests 外来源测试与 3 个未注册脚本）
+    count: 68                # 上游 Makefile 的 TESTS = sscm_tests(64) + sscm_optional_tests(4)
+    runner: "sscm（sigscheme 自带解释器，随本包构建）"
+    command: "make -C sigscheme/test check"
+    executed_in_build: true
+    measured: "68/68 执行 → 65 PASS + 2 SKIP(rc=77) + 1 XFAIL(test-fail.scm，上游刻意失败) / 19175 断言 / 0 意外失败"
+  - dir: test2/
+    files: 6
+    count: 6
+    runner: "uim-sh（随本包构建）"
+    command: "make -C test2 check"
+    executed_in_build: true
+    measured: "6/6 执行 → 5 PASS + 1 XFAIL(test-fail.scm，上游刻意失败) / 415 断言 / 0 意外失败"
+
+# 上游用例总数（清点口径：各套件用例数之和 = 214 + 68 + 6）
+upstream_test_total: 288
+# 实际执行到的用例总数（= 305 + 68 + 6）
+upstream_test_executed: 379
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "端到端消费者用例：uim_init → uim_create_context → 输入法枚举/locale 查询 → 生命周期回收"
+    command: "./test_uim"
+
+# 测试断言总数 (近似值, 用于质量评估)
+# 下限口径 = A+B 19590 + C 4358；三轮实测 C 为 4358~4373，合计 23948~23963
+assertion_count: 23948

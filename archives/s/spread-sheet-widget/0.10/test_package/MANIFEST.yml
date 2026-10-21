@@ -1,0 +1,22 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI L0e 门禁要求）
+
+package: spread-sheet-widget/0.10
+homepage: "https://www.gnu.org/software/ssw/"
+
+# 上游为 autotools 工程，但发布包内没有任何测试注册：
+# Makefile.am 不含 TESTS / check_PROGRAMS / check_SCRIPTS，tarball 里也没有
+# tests/ 目录；make check 由 automake 生成，执行时无测试可跑（no-op）。
+upstream_check_command: "make check"
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests: []
+
+test_package_tests:
+  - file: test_spread_sheet_widget.c
+    description: "消费者端到端测试（pkg-config spread-sheet-widget 链接安装后的共享库，broadwayd 无头后端真实建窗）：SswVirtualModel 形状/单元格文本/行插入、SswSheet data-model 往返、editable 与 active-cell 上游契约、selection-changed 的 SswRange 载荷、角按钮、gridlines、ssw_sheet_scroll_to 双视口调整，共 17 个检查点"
+    command: "./test_spread_sheet_widget"
+    executed_by: "test_package/conanfile.py test() 通过 self.run 执行（L0d），逐条 TEST PASS/TEST FAIL + TEST SUMMARY"
+
+assertion_count: 17

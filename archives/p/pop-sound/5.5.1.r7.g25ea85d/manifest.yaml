@@ -1,0 +1,50 @@
+# pop-sound 5.5.1.r7.g25ea85d 编译元数据（ARCHIVE-SPEC v2.0）
+software: pop-sound
+version: "5.5.1.r7.g25ea85d"
+status: built
+build_system: meson
+build_date: "2026-10-19"
+compile_date: 2026-10-19
+conan_ref: "pop-sound/5.5.1.r7.g25ea85d"
+description: "Pop sound theme — freedesktop sound theme for Pop!_OS / GNOME (21 events + 4 aliases, Ogg Vorbis)"
+license: "GPL-3.0-or-later"
+homepage: "https://github.com/pop-os/gtk-theme"
+
+source:
+  url: "https://github.com/pop-os/gtk-theme/archive/25ea85d97126992024b03bfb4e4c3b0711c749ed.tar.gz"
+  sha256: "956897202a6e3543ad0f11b44fb49e2e4a8a6613be85e0850ca7024bf5b8a2f9"
+  tar_format: tar.gz
+
+build:
+  system: meson
+  configure_options:
+    - "-Dgtk=false"
+    - "-Dgnome-shell=false"
+    - "-Dsounds=true"
+  dependencies: []
+  cc: null
+  cxx: null
+
+# 音效资源为纯数据：无编译器、无链接、无 dependency()，不需要补丁
+patches_applied: []
+
+dependencies:
+  required: []
+  optional: []
+
+test_results:
+  # 上游 N=0（meson test → "No tests defined."），以下为适配新增用例
+  upstream_total: 0
+  added_total: 51          # 自检 38 + 消费者 13
+  added_passed: 51
+  added_failed: 0
+  type: "resource-integrity"
+
+knowledge_ref:
+  - E255    # 纯资源包配方形态：无编译、无 commands.json、符号链接/别名处理
+  - E1050   # 断言实际交付布局（install_dir vs packaged path）
+
+knowledge_gained:
+  - "gtk-theme monorepo 的三个组件由 meson_options.txt 独立开关控制，-Dgtk=false -Dgnome-shell=false -Dsounds=true 可只构建 sounds/ 子目录（knowledge_ref: E2925-draft-89BE）"
+  - "meson install_subdir 默认 follow_symlinks=True，上游 4 个 .oga 别名在安装结果里是实体文件（26 文件/0 链接）（knowledge_ref: E1050）"
+  - "OHOS 侧消费沿用 freedesktop Sound Theme 规范：<datadir>/sounds/<theme>/index.theme 的 Directories + Context + OutputProfile（knowledge_ref: E255）"

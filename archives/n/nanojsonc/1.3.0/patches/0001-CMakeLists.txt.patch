@@ -1,0 +1,28 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -41,21 +41,24 @@
+         INCLUDES DESTINATION include
+ )
+ 
+ # Install Export Set
+ install(EXPORT ${PROJECT_NAME}-targets
+         FILE ${PROJECT_NAME}-targets.cmake
+         NAMESPACE nanojsonc::
+         DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}) # lib/cmake/nanojsonc
+ 
+ # Install Headers
+-install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}) # include/
++# 修复：上游安装到 include/nanojsonc/ 使头文件变成 include/nanojsonc/nanojsonc/parser.h，
++# 与 target_include_directories 的 INSTALL_INTERFACE=${CMAKE_INSTALL_INCLUDEDIR} 不一致，
++# 导致 consumer 无法 #include <nanojsonc/parser.h>。改为直接装到 include/ 下。
++install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}) # include/
+ 
+ # Enable AddressSanitizer and UndefinedBehaviorSanitizer (Compiler and Linker)
+ option(ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+ if (ENABLE_SANITIZERS AND CMAKE_BUILD_TYPE STREQUAL "Debug" AND NOT WIN32)
+     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
+     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
+     set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsanitize=address")
+ 
+     target_compile_options(${PROJECT_NAME} PRIVATE -fsanitize=address,undefined -fno-sanitize-recover=all)
+     target_link_options(${PROJECT_NAME} PRIVATE -fsanitize=address,undefined)

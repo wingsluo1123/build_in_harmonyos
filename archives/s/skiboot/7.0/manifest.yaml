@@ -1,0 +1,179 @@
+# 版本级 manifest — skiboot 7.0
+version: "7.0"
+software: skiboot
+status: built
+build_date: "2026-10-18"
+build_system: makefile
+
+source:
+  url: "https://github.com/open-power/skiboot/archive/refs/tags/v7.0.tar.gz"
+  sha256: "0a5043f5b82ec0764c1e47ecee61aec345e9cad644026fc5ee003c8c026f6c90"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options:
+    - "make -C external/pflash -j1 CC=clang CROSS_COMPILE="
+    - "make -C external/gard -j1 CC=clang CROSS_COMPILE="
+    - "make -C external/ffspart -j1 CC=clang CROSS_COMPILE="
+    - "make -C external/xscom-utils -j1 CC=clang CROSS_COMPILE="
+    - "PFLASH_VERSION=pflash-7.0 GARD_VERSION=gard-7.0 FFSPART_VERSION=ffspart-7.0 XSCOM_VERSION=xscom-7.0"
+  dependencies: []
+  cc: clang
+  cxx: ""
+
+patches_applied:
+  - file: 0001-Makefile.main.patch
+    purpose: "make check 宿主机单测：HOSTEND 识别 aarch64/arm 为 LITTLE，避免 ccan/endian 报 Unknown endian"
+    lines_changed: 1
+  - file: 0002-ccan-endian-endian.h.patch
+    purpose: "musl alltypes.h 已定义字节序宏；加 #ifndef 保护，避免 clang -Werror 的宏重定义错误"
+    lines_changed: 8
+  - file: 0003-external-common-get_arch.sh.patch
+    purpose: "识别 __aarch64__ 为 ARM 闪存后端；交叉前缀无 cpp 时回退到 $CC"
+    lines_changed: 10
+  - file: 0004-external-ffspart-test-tests-18-eraseblock-gt-first-partition.patch
+    purpose: "修正 '|| echo skip && exit 0' 的 shell 优先级，使 pflash 在 PATH 中时用例真正执行"
+    lines_changed: 5
+  - file: 0005-external-gard-rules.mk.patch
+    purpose: "clang 不支持 -Wno-stringop-truncation；先探测再传入"
+    lines_changed: 4
+  - file: 0006-external-pflash-test-test-pflash.patch
+    purpose: "测试辅助函数改用 POSIX cmp -n（toybox 无 --bytes/--ignore-initial）"
+    lines_changed: 2
+  - file: 0007-external-pflash-test-tests-02-erase.patch
+    purpose: "stat --printf 改为 stat -c（toybox 兼容）"
+    lines_changed: 2
+  - file: 0008-external-pflash-test-tests-03-erase-parts.patch
+    purpose: "cmp --bytes/--ignore-initial 改为 cmp -n + 位置参数（两个文件偏移语义保持一致）"
+    lines_changed: 7
+  - file: 0009-external-pflash-test-tests-04-program-rand.patch
+    purpose: "同上，改为 POSIX stat/cmp 形式"
+    lines_changed: 10
+  - file: 0010-external-pflash-test-tests-05-bad-numbers.patch
+    purpose: "同上，改为 POSIX stat/cmp 形式"
+    lines_changed: 10
+  - file: 0011-libflash-file.c.patch
+    purpose: "readlink 缓冲改用 PATH_MAX：OHOS procfs 的 st_size 固定为 64，不能用于确定路径长度"
+    lines_changed: 4
+  - file: 0012-libflash-test-stubs.c.patch
+    purpose: "glibc 专有的 <sys/unistd.h> 改为 <unistd.h>（musl）"
+    lines_changed: 1
+  - file: 0013-libflash-test-test-ecc.c.patch
+    purpose: "显式包含 <endian.h> 以获取 be64toh（musl 不隐式提供）"
+    lines_changed: 1
+  - file: 0014-libflash-test-test-flash.c.patch
+    purpose: "显式包含 <endian.h> 以获取 be64toh（musl 不隐式提供）"
+    lines_changed: 1
+  - file: 0015-make_version.sh.patch
+    purpose: "OHOS 无 /bin/bash；shebang 改为 /usr/bin/env bash"
+    lines_changed: 1
+  - file: 0016-test-run.sh.patch
+    purpose: "OHOS 无 /bin/bash；测试 runner shebang 改为 /usr/bin/env bash"
+    lines_changed: 1
+
+patch_classification:
+  - file: 0001-Makefile.main.patch
+    type: portability
+    platform_only: false
+    guard: 'none'
+  - file: 0002-ccan-endian-endian.h.patch
+    type: portability
+    platform_only: false
+    guard: 'none'
+  - file: 0003-external-common-get_arch.sh.patch
+    type: portability
+    platform_only: false
+    guard: 'none'
+  - file: 0004-external-ffspart-test-tests-18-eraseblock-gt-first-partition.patch
+    type: portability
+    platform_only: false
+    guard: 'none'
+  - file: 0005-external-gard-rules.mk.patch
+    type: portability
+    platform_only: false
+    guard: 'none'
+  - file: 0006-external-pflash-test-test-pflash.patch
+    type: portability
+    platform_only: true
+    guard: 'none'
+  - file: 0007-external-pflash-test-tests-02-erase.patch
+    type: portability
+    platform_only: true
+    guard: 'none'
+  - file: 0008-external-pflash-test-tests-03-erase-parts.patch
+    type: portability
+    platform_only: true
+    guard: 'none'
+  - file: 0009-external-pflash-test-tests-04-program-rand.patch
+    type: portability
+    platform_only: true
+    guard: 'none'
+  - file: 0010-external-pflash-test-tests-05-bad-numbers.patch
+    type: portability
+    platform_only: true
+    guard: 'none'
+  - file: 0011-libflash-file.c.patch
+    type: portability
+    platform_only: false
+    guard: 'none'
+  - file: 0012-libflash-test-stubs.c.patch
+    type: portability
+    platform_only: false
+    guard: 'none'
+  - file: 0013-libflash-test-test-ecc.c.patch
+    type: portability
+    platform_only: false
+    guard: 'none'
+  - file: 0014-libflash-test-test-flash.c.patch
+    type: portability
+    platform_only: false
+    guard: 'none'
+  - file: 0015-make_version.sh.patch
+    type: portability
+    platform_only: true
+    guard: 'none'
+  - file: 0016-test-run.sh.patch
+    type: portability
+    platform_only: true
+    guard: 'none'
+
+test_results:
+  upstream:
+    framework: "upstream make check (external shell suites + host unit tests)"
+    discovered: 84
+    passed: 84
+    failed: 0
+    skipped: 0
+    executable_total_inventory: 103
+    not_executed_on_aarch64: 19
+    suites:
+      pflash: 7
+      gard: 12
+      ffspart: 18
+      host_unit: 47
+  consumer:
+    file: test_package/test_ohos.py
+    runtime_discovered: 38
+    runtime_passed: 38
+    static_fallback_discovered: 26
+    failed: 0
+
+knowledge_gained:
+  - "skiboot 固件本体为 ppc64 专属（-mcpu=power8/大端/PowerPC 汇编），aarch64/OHOS 只能适配 external/ 用户态工具；Debian/Raspbian 亦如此"
+  - "external/common/get_arch.sh 仅识别 __arm__，aarch64 会落到 ARCH_UNKNOWN 桩，需补 __aarch64__"
+  - "Makefile.main 的 HOSTEND 只识别 x86/ppc；aarch64 主机需补 LITTLE，否则 ccan/endian 报 Unknown endian"
+  - "上游 make check 的部分 core/libc/hdata 用例内嵌 PowerPC 汇编（include/cmpxchg.h 的 cr0），aarch64 无法编译"
+  - "OHOS procfs 的 /proc/self/fd/<n> lstat st_size 固定为 64；libflash 必须按 PATH_MAX 分配 readlink 缓冲，否则长路径被截断"
+  - "CI worker 的 /tmp 可能只读；测试临时目录应放在可写构建目录（self.build_folder）而非 /tmp"
+  - "部分 CI worker 的沙箱以 EPERM 拒绝执行 pflash/opal-gard 等硬件工具（同目录 hello 可执行）；上游测试应标记 skipped_sandbox，消费者测试降级为静态 ELF/符号校验"
+  - "libflash 测试使用 glibc 专有的 <sys/unistd.h>，musl 需改为 <unistd.h>；be64toh 需显式包含 <endian.h>"
+  - "toybox 的 stat/cmp 不支持 GNU 长选项 --printf/--bytes/--ignore-initial，上游 shell 测试需改用 -c/-n 与位置偏移参数"
+  - "ffspart 测试 18 的 'command -v pflash || echo skip && exit 0' 因 shell 优先级恒 exit 0，修正为 if 语句后才能覆盖该用例"
+  - "OHOS 无 /bin/bash，上游脚本与 test/run.sh 的 shebang 需用 /usr/bin/env bash"
+  - "部分 CI worker 的沙箱会以 EPERM 拒绝执行 pflash/opal-gard 等硬件工具（同目录的普通 hello、静态 hello 均可执行）；上游测试需在可执行环境运行，CI 侧降级为静态 ELF/符号校验并如实标记 skipped_sandbox"
+
+references:
+  - https://github.com/open-power/skiboot
+  - https://github.com/open-power/skiboot/issues/202
+  - https://github.com/open-power/skiboot/issues/205

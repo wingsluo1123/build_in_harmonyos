@@ -1,0 +1,107 @@
+#====================================================================
+# 上游 tarball 内符号链接头文件目录（如 <vendored>/samtools/* → ../<h>）
+# 在 HMDFS 解包后静默变空目录 → 编译期远隔报 'dir/header.h' not found。
+# source() 内按哨兵头存在性做幂等真实文件镜像。
+# Windows 本地对同一 tarball 报 Invalid argument——是同一批链接文件。
+#====================================================================
+
+id:                     E3570
+trigger_tool:           conan|clang|make|tar
+phase:                  source|build
+error_signature: |
+  fatal error: '<dir>/<header>.h' file not found
+  tar: Can't create '.../<name>': Invalid argument
+
+severity:               2
+category:               hmdfs, symlink, far-from-root-cause, header-not-found, source-extraction
+match_keywords:         HMDFS, symlink, symbolic link, tarball, empty directory,
+                        samtools, genometools, vendored, header not found,
+                        Invalid argument, strip_root, conan get, mirror,
+                        符号链接, 空目录, 头文件
+
+title:                  >-
+                        Tarball-internal symlink header directories unpack to empty
+                        dirs on HMDFS, breaking <dir/header.h> includes far from the
+                        root cause; mirror them as real files in source()
+
+prescan_pattern:        "fatal error: '[a-z_]+/[a-z_.]+\\.h' file not found"
+
+root_cause:             >
+                            Upstream tarballs sometimes organize vendored header aliases
+                            as in-directory symlinks (genometools bundles
+                            src/external/samtools-0.1.18/samtools/ whose entries link
+                            back to ../sam.h etc.). HMDFS does not support symlinks;
+                            conan's archive extraction silently skips them, leaving an
+                            empty directory. The failure only surfaces at compile time
+                            when a source file hits #include <samtools/sam.h>, far away
+                            from the extraction step. Windows locally shows the same
+                            entries as hard errors ("Invalid argument"), which misleads
+                            auditing into thinking the tarball is corrupt.
+
+affected_scope:         >
+                            Any package whose upstream tarball contains internal symlinks
+                            and which is extracted on HMDFS. Not applicable to ext4
+                            extraction (links materialize fine) or to package()-stage
+                            symlinks the recipe creates itself (handled by real-copy
+                            fallback per lrslib/E625 context). Note extraction behavior
+                            is inconsistent: some symlinked files (lpeg lua-lpeg.h)
+                            landed as real files on the same device - never assume the
+                            unpacker is uniform; gate the mirror on a sentinel file.
+
+verification_cmd:       >
+                            ls <src>/src/external/samtools-0.1.18/samtools/   # empty dir on HMDFS
+                            find <src>/src/external -type l                   # links that did land
+                            tar -tvf <tarball> | grep -e '^l' -e samtools     # see L-type entries
+
+rec_priority:           1
+rec_approach:           sentinel-gated-real-file-mirror
+rec_description:        >
+                            In source(), after get(), if the sentinel header is missing
+                            inside the symlinked directory, copy the referenced real
+                            headers from the link targets as regular files. Make the
+                            mirror idempotent (skip when sentinel exists) so behavior
+                            stays correct on environments where symlinks work. On
+                            Windows, treat "Invalid argument" extraction errors for
+                            such entries as the same root cause, not as tarball
+                            corruption.
+
+rec_command:            >
+                            # inside conanfile source() after get():
+                            # if not os.path.isfile(<dir>/<sentinel>.h):
+                            #     os.makedirs(<dir>, exist_ok=True)
+                            #     for f in os.listdir(<target>): copy *.h
+
+rec_auto_fix:           false
+rec_impl:               recipe-source-mirror
+
+fallback_priority:      2
+fallback_approach:      patch-the-includes
+fallback_description:   >
+                            If the mirror cannot be done generically (unknown link
+                            targets), patch the few consumer includes from
+                            <dir/header.h> to the direct path. Less robust: any new
+                            include of the alias form rebreaks the build.
+fallback_command:       >
+                            grep -rn "include <dir/" <src>/src | head
+fallback_auto_fix:      false
+fallback_impl:          include-path-patch
+
+forbid_1_pattern:       (tarball|archive).*(corrupt|损坏|损坏了).*(Invalid argument|Invalid)
+forbid_1_reason:        >
+                            Windows "Invalid argument" for these entries is the OS
+                            refusing to create symlinks, not archive corruption; the
+                            same tarball extracts fine on Linux/device.
+forbid_1_consequence:   >
+                            Auditors reject a healthy upstream source and waste rounds
+                            hunting a nonexistent packaging problem while the real
+                            defect (missing headers at compile time) goes unfixed.
+
+principles:             P010, P020
+doc_file:               knowledge/drafts/DRAFT-hmdfs-tarball-symlink-headers-mirror.md
+last_updated:           2026-10-04
+source_event:           genometools/1.6.2 shadow CI r3->r4 (samtools/sam.h fatal error; mirror fix confirmed)
+authors:                dsh-agent
+source_pr:
+source_commit:
+
+metrics_success_count:  1

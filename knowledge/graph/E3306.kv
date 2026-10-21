@@ -1,0 +1,51 @@
+#====================================================================
+# DRAFT-toot-0-52-1-upstream-integration-stub-server.kv
+# 上游集成测试被"外部服务"门控时，用配方自带 stdlib 桩服务把执行率提满
+# 来源任务: toot 0.52.1 HarmonyOS PC aarch64 适配（PR !15046 审核意见 193803344）
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E3306
+trigger_tool:           conan create / pytest / 审核规则4条件2
+phase:                  testing
+error_signature: SKIPPED|116 skipped|36 passed|上游测试用例通过率|Rule 4 condition 2|FAIL|TOOT_TEST_BASE_URL not set|ValueError: stderr not separately captured
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               3
+category:               python, conan, testing, review
+match_keywords:         上游测试执行率, integration tests, pytest.skip, 外部服务, stub server, loopback, Mastodon API, Link 分页, TOOT_TEST_BASE_URL, 分母口径, click mix_stderr
+title:                  上游集成测试需外部服务时以 skip 交差导致执行率不达标——用配方自带 stdlib 桩服务真实执行
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause:             上游 tests/integration/ 用 fixture 检查外部服务环境变量（如 TOOT_TEST_BASE_URL），缺失时 pytest.skip 整个目录。适配者把它当"上游既有设计、环境不具备"如实申报 skip，于是申报 152 条只执行 36 条（24%），触发审核规则 4 条件 2 FAIL。真实原因不是"跑不了"而是"没人给它搭环境"：无需 Rails/postgres/redis/es，只需要一个能按 Mastodon REST 语义应答的 loopback HTTP 服务。次生陷阱：click 8.1.x 的 CliRunner 默认 mix_stderr=True，取 Result.stderr 抛 ValueError，会让 7 条集成用例以"看似桩的问题"形式失败——测试框架版本问题会伪装成执行率问题。
+affected_scope:         所有自带"集成测试需外部服务"门控的上游包（HTTP API client、数据库客户端、消息队列客户端等）。本仓库已有先例把这类测试跑起来：restclient-cpp/0.5.3 的 loopback_httpbin.py、libetebase/0.5.8 的 etebase_stub_server.py。审核口径要求通过率分母为全量收集数，故此类问题一律影响 PR 结论。
+verification_cmd:       TOOT_TEST_BASE_URL=http://localhost:3000 python3 -m pytest tests -q -rs; python3 -m pytest tests --collect-only -q | tail -1
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           recipe-shipped-stateful-stdlib-api-stub
+rec_description:        在配方目录新增 test_support/<name>_api_stub.py：纯 stdlib（http.server/socketserver/json/re/struct/uuid/datetime）实现的有状态 REST 桩，ThreadingHTTPServer + HTTP/1.1 + Content-Length，覆盖上游测试所依赖的端点。export_sources() 用 copy(self,"test_support/**",src=recipe_folder,dst=export_sources_folder,keep_path=True) 导出（package() 不拷贝，不进包）。build() 里 Popen 启动 → HTTP 轮询就绪（20s，每轮先查 proc.poll()）→ 设 TOOT_TEST_BASE_URL → 跑 pytest → finally terminate()。桩以 --verbose 落访问日志，构建日志打印 served N request(s) 作为网络真实性留痕；起不来必须抛 ConanException 附日志尾部，禁止退化成 skip。分母口径改为：执行覆盖率=实际执行/收集，通过率=passed/收集。
+rec_command:            python3 test_support/mastodon_api_stub.py --host 127.0.0.1 --port 3000 --verbose &  TOOT_TEST_BASE_URL=http://localhost:3000 python3 -m pytest tests -q -rs
+rec_auto_fix:           false
+rec_impl:               recipe-test-support-stub-server
+
+fallback_priority:      2
+fallback_approach:      real-upstream-stack-when-obtainable
+fallback_description:   若平台/CI 上存在容器运行时且制品仓有 postgres/redis 等配方，起真实依赖更可信。本场景已实测穷举不可得：HarmonyOS PC 与 CI worker 均无 docker/podman/nerdctl，无 Ruby 运行时与未适配原生 gem，无 Node/yarn；公共实例不可复现且需凭据与外网。逐条把"为什么不能用真栈"写进报告，是桩方案被接受的前提。
+fallback_command:       command -v docker podman nerdctl; conan list "*" --remote=ohpcd 2>/dev/null | grep -Ei "postgres|redis|elasticsearch"
+fallback_auto_fix:      false
+fallback_impl:          real-dependency-stack-provisioning
+
+forbid_1_pattern:       monkeypatch.*(requests|toot\.http)|mock.*Session|unittest\.mock.*urlopen
+forbid_1_reason:        进程内 mock 掉 client 层等于不测 transport/序列化/分页/重试/超时，用例虽"执行"但未走网络，执行率口径上不算真实执行，也没有访问日志可举证。
+forbid_1_consequence:   审核方按"未真实执行"判 FAIL，且桩语义错误被 mock 掩盖，打包后首次真实调用即崩。
+
+forbid_2_pattern:       passed\s*/\s*(?:executed|已执行)|36/36（100%）|通过率.*实际执行
+forbid_2_reason:        用"已执行用例的通过率"冒充全量口径（36/36=100%）是本轮 FAIL 的直接表现，分母必须是收集数。
+forbid_2_consequence:   申报数字与 CI 日志可核对不一致，触发整轮返工并损害可信度。
+
+principles:             P003, P006
+# ═══ 元数据 ═══
+doc_file:               knowledge/drafts/DRAFT-toot-0-52-1-upstream-integration-stub-server.md
+last_updated:               2026-10-19
+authors:               unknown

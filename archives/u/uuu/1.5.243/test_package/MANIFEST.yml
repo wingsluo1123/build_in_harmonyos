@@ -1,0 +1,37 @@
+# test_package/MANIFEST.yml — uuu/1.5.243
+
+package: uuu/1.5.243
+homepage: "https://github.com/nxp-imx/mfgtools"
+
+# 上游测试审计：uuu 1.5.243（nxp-imx/mfgtools，tag uuu_1.5.243）不存在可执行测试套件——
+# 1) GitHub contents API（ref=uuu_1.5.243）根清单：CMakeLists.txt 仅 add_subdirectory(libuuu)
+#    + add_subdirectory(uuu)，无 tests/、test/ 目录，无 ctest 配置；
+# 2) libuuu/CMakeLists.txt 与 uuu/CMakeLists.txt 全文无 enable_testing/add_test/
+#    BUILD_TESTING/BUILD_TESTS/gtest/Catch（已逐行核对）；
+# 3) 发布包 uuu_source-uuu_1.5.243.tar.gz（sha256
+#    dee3be0f337c631bf93232f5ea42440f07782ce005c9219a14731d66bbe83658，
+#    1596 个文件）内 CTest 命中的 CMakeLists 仅属捆绑第三方子模块
+#    （tinyxml2/CMakeLists.txt、tinyxml2/test/CMakeLists.txt、zlib/CMakeLists.txt、
+#    zstd/build/cmake/CMakeLists.txt、zstd/build/cmake/tests/CMakeLists.txt），
+#    顶层构建从不 add_subdirectory 它们；
+# 4) 另有 wrapper/tests/test_basic.py（pytest，libuuu python wrapper）与
+#    webusb/src/*.test.js（JS），均不在 CMake 构建内；
+# 5) .travis.yml 的 script 仅为 cmake + make 编译验证（CI 编译门禁），非测试套件。
+# 结论：上游无测试，按 no_tests 处理（HMBS_UPSTREAM_TEST_RESULT status=no_tests）。
+upstream_tests_exist: false
+upstream_test_audit: "审计 nxp-imx/mfgtools tag uuu_1.5.243（GitHub contents API 根清单 + 发布包 uuu_source-uuu_1.5.243.tar.gz sha256 dee3be0f337c631bf93232f5ea42440f07782ce005c9219a14731d66bbe83658 全量核对）：1) 顶层 CMakeLists 仅 add_subdirectory(libuuu)+add_subdirectory(uuu)，无 tests/test 目录；2) libuuu 与 uuu 的 CMakeLists 全文无 enable_testing/add_test/BUILD_TESTING/BUILD_TESTS/gtest/Catch；3) 包内 CTest 命中仅属捆绑第三方子模块（tinyxml2/zlib/zstd，从不被顶层 add）；4) wrapper/tests 为 pytest（python wrapper）、webusb 为 JS 测试，均不在 CMake 构建内；5) .travis.yml 仅 cmake+make 编译验证。上游确实无可执行测试套件。HMBS_UPSTREAM_TEST_RESULT(status=no_tests) 标记由主配方 build() 与 test_package test() 双通道复发（包缓存命中时 build() 不执行，靠 test_package 保证标记必现，对标 jot 0.1.2/ndenv 0.4.0）。"
+upstream_test_reason: "nxp-imx/mfgtools uuu_1.5.243 顶层构建（libuuu + uuu）无任何 CTest/pytest 可执行测试；唯一测试属未构建的子模块与 wrapper JS/py，非上游测试套件"
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_test_total: 0
+upstream_test_count_method: auto
+upstream_tests: []
+
+test_package_tests:
+  - file: test_uuu.sh
+    description: "真实冒烟测试：bin/uuu 存在可执行、无参输出版本横幅、-h 输出帮助、-udev 输出 udev 规则（4 断言，均无需硬件）"
+    command: "sh test_uuu.sh <package bin dir>"
+
+assertion_count: 4

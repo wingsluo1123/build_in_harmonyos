@@ -1,0 +1,56 @@
+# conandata.yml — launchy 2.9.1
+# 来源核验（2026-10-18 R02 返工复核，去除手写镜像前缀，仅保留官方 HTTPS URL）：
+# - 官方仓库 github.com/launchy/launchy 已下线（GitHub API 实测 HTTP 404），
+#   官方项目最后发布为 2.5（2010），从未发布 2.9.1。
+# - launchy 2.9.1 的唯一可核验官方来源 = Arch Linux 官方打包源：
+#   gitlab.archlinux.org/archlinux/packaging/packages/launchy 的 PKGBUILD
+#   （2019-04 提交 456525）声明 source=https://github.com/Slesa/launchy/archive/v2.9.1-pre.1.tar.gz，
+#   sha512=54d27e39...（Arch 官方值，Arch 包 launchy 2.9.1pre.1 即由此构建）。
+# - 本声明使用 Arch 官方打包所用的同一官方 tag archive（github.com 官方托管 https
+#   URL，官方托管例外已随 PR 说明），sha256 已本地实测核验一致。
+sources:
+  url:
+    - "https://github.com/Slesa/launchy/archive/refs/tags/v2.9.1-pre.1.tar.gz"
+  sha256: "26a27f4cf895cb345a277aac49b153bd3adf0ccee0d4f8716f737438bcf7c4e7"
+
+patches:
+  "2.9.1":
+    - patch_file: "patches/0001-CMakeLists.txt.patch"
+      patch_description: "0001 顶层 CMakeLists：Qt5 组件收敛（Gui Widgets Network Test）+ AUTORCC + 安装前缀改相对 + QT5_INCLUDE_DIRS 消费"
+      patch_type: "portability"
+    - patch_file: "patches/0002-common-CMakeLists.txt.patch"
+      patch_description: "0002 common：qt5_use_modules/QT5_WRAP 宏改 Qt5:: 目标链接 + libx11/libxcb CONFIG + X11 宏隔离"
+      patch_type: "portability"
+    - patch_file: "patches/0003-common-x11_keytrigger.cpp.patch"
+      patch_description: "0003 x11_keytrigger.cpp：QX11Info::display/appRootWindow 改 QPlatformNativeInterface（无 qt5-qtx11extras）"
+      patch_type: "portability"
+    - patch_file: "patches/0004-common-x11_keytrigger.h.patch"
+      patch_description: "0004 x11_keytrigger.h：QX11Info 改 qpa 私有接口 + launchyDisplay/launchyRootWindow 内联辅助"
+      patch_type: "portability"
+    - patch_file: "patches/0005-common-x11_platform.cpp.patch"
+      patch_description: "0005 x11_platform.cpp：移除 QX11Info include"
+      patch_type: "portability"
+    - patch_file: "patches/0006-launchy.specs-CMakeLists.txt.patch"
+      patch_description: "0006 launchy.specs：qt5_use_modules 改 Qt5:: 目标链接（Qt5Test）"
+      patch_type: "portability"
+    - patch_file: "patches/0007-launchy-CMakeLists.txt.patch"
+      patch_description: "0007 launchy：翻译关闭、AUTOUIC/AUTORCC 接管 .ui/.qrc、X11 改 libx11/libxcb CONFIG"
+      patch_type: "portability"
+    - patch_file: "patches/0008-launchy-singleapplication.cpp.patch"
+      patch_description: "0008 singleapplication.cpp：QSharedMemory 改 QLockFile（qt5-qtbase 配方 -no-feature-sharedmemory，QSharedMemory 不可用）"
+      patch_type: "portability"
+    - patch_file: "patches/0009-launchy-singleapplication.h.patch"
+      patch_description: "0009 singleapplication.h：QSharedMemory 改 QLockFile 声明"
+      patch_type: "portability"
+    - patch_file: "patches/0010-libqxt-CMakeLists.txt.patch"
+      patch_description: "0010 libqxt：qt5_use_modules 改目标链接，X11 平台编译加 libx11/libxcb CONFIG"
+      patch_type: "portability"
+    - patch_file: "patches/0011-plugins-runner-CMakeLists.txt.patch"
+      patch_description: "0011 plugins/runner：Qt5 宏改目标链接 + AUTOUIC 接管 dlg.ui"
+      patch_type: "portability"
+    - patch_file: "patches/0012-plugins-verby-CMakeLists.txt.patch"
+      patch_description: "0012 plugins/verby：Qt5 宏改目标链接 + AUTOUIC 接管 dlg.ui"
+      patch_type: "portability"
+    - patch_file: "patches/0013-plugins-weby-CMakeLists.txt.patch"
+      patch_description: "0013 plugins/weby：Qt5 宏改目标链接 + AUTOUIC 接管 dlg.ui"
+      patch_type: "portability"

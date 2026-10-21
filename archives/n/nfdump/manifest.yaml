@@ -1,0 +1,40 @@
+# nfdump — 软件级元数据 + 版本索引
+# File location: archives/n/nfdump/manifest.yaml
+# Follows ARCHIVE-SPEC v2.0 §4.1
+# CI 不读取本文件（仅人工交叉校验）
+
+software: nfdump
+display: "nfdump"
+description: "netflow 采集与分析工具集（nfcapd 采集器 + nfdump 分析器 + nfanon/nfexpire/nfreplay），内置 libnffile / libnfdump 两个库"
+category: network-tools
+homepage: "https://github.com/phaag/nfdump"
+license: BSD-2-Clause
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "musl libc 不导出 glibc 的 _res 全局解析器状态：configure.ac 用 AC_LINK_IFELSE 做特性探测生成 HAVE_RES_GLOBAL，源码据此守卫 set_nameserver()/SetNameserver()；全程不使用平台宏 __OHOS__。"
+    - "OpenHarmony 禁止非特权进程使用 System V IPC：shmget 返回 EACCES，semget/msgget 被 SIGSYS(Signal 31) 直接杀进程（已用最小探针复现）。nfcapd 的 bookkeeper 共享记录改写为 POSIX shm_open + ftruncate + mmap，互斥改用命名信号量 sem_open；改后 nfcapd 可正常起停并落盘。"
+    - "上游 release tarball 中 COPYING/NEWS/README/bootstrap 为符号链接，在 FUSE 后端缓存上建链/改时间会 EACCES 导致 conan 复制源码失败；source() 中将其物化为常规文件。"
+    - "tarball 无生成的 configure：build() 先 autoreconf -fi；构建机只有 autoconf 家族，automake/libtool/pkgconf 经 tool_requires 提供，pkgconf 的 share/aclocal 挂入 ACLOCAL_PATH 以展开 PKG_CHECK_MODULES。"
+    - "config.guess 不识别 HarmonyOS（uname 返回 HarmonyOS / HongMeng Kernel）；显式传 --build/--host=aarch64-unknown-linux-ohos。"
+    - "必须在源码目录内构建（Conan folders.build='.'）：src/libnffile/Makefile.am 以相对路径 ./gen_version.sh 生成 vcs_track.h。"
+    - "OHOS 基线无 liblz4/libbz2/libzstd：configure 置 LZ4EMBEDDED 走内嵌 LZ4；bzip2/zstd 用例由上游自动不注册。"
+    - "codeload.github.com/.../tar.gz/refs/tags/<tag> 以 tag 结尾无扩展名，conan get() 无法判定解压器，需在 conandata.yml 显式声明 filename。"
+  common_dependencies: []
+  build_requirements:
+    - "automake/1.18 (tool)"
+    - "libtool/2.5.4 (tool)"
+    - "pkgconf/3.0.6 (tool)"
+
+versions:
+  "1.7.6":
+    status: built
+    build_date: "2026-10-15"
+    conan_ref: "nfdump/1.7.6@ohpcd/stable"
+    source_sha256: "2d25220d7a48f57ba65f228fb5d2eb4d2a0ab2b352a037ed6249b39cf68c1b9a"
+    patches: 5
+    upstream_tests: "5/5 (make check: nftest / runprepare.sh / runlzo.sh / runlz4.sh / runtest.sh)"
+    delivered: "bin/{nfdump,nfcapd,nfanon,nfexpire,nfreplay} (静态链接), lib/{libnfdump.a,libnffile.a}, etc/nfdump.conf.dist, share/man/man1/*.1"
+
+last_updated: "2026-10-15"

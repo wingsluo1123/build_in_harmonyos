@@ -1,0 +1,171 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "W2 原子性 / code-style §20-§21 (提交态=送审态)",
+      "file": "archives/s/shfs/0.35/reports/pr-body.md",
+      "line": 1,
+      "description": "本次审计的内容与「将被提交的仓库状态」并不完全一致：input JSON 的 diff_stat 是 \"22 files changed, 1657 insertions(+)\" 且 pr-body.md 记为 67 行，而工作树里该文件是 68 行——这一行改动尚未 commit（git status 显示 reports/pr-body.md 为 modified）。同时同一 worktree 里还残留与 shfs 无关的脏文件（archives/l/libXext/* 处于 modified 状态，且我在会话中途观察到其中一个被并发进程暂存为 \"M \"），而 .handoff.json 的 ai_next_actions 字面上写着 \"git add archives/ knowledge/drafts/ && git commit\"。若按该指令执行，libXext 的无关改动会被混入 shfs 提交，直接违反 W2/JC6「一个 PR 只动一个软件包目录」的原子性约束，也会让已送审的 22 文件集合与实际提交集合脱节（我核对过 diff 恰为 22 个文件、且只落在 archives/s/shfs/** 与 knowledge/drafts/E214{1,2,3}-draft-24E4.*，这是当前唯一的合规前提）。",
+      "fix_suggestion": "提交前显式按路径 add：git add archives/s/shfs knowledge/drafts/E2141-draft-24E4.kv knowledge/drafts/E2141-draft-24E4.md knowledge/drafts/E2142-draft-24E4.kv knowledge/drafts/E2142-draft-24E4.md knowledge/drafts/E2143-draft-24E4.kv knowledge/drafts/E2143-draft-24E4.md（含未 commit 的 pr-body.md），不要使用 git add archives/；并先 git restore/checkout 掉 archives/l/libXext/* 或把它们放到独立分支/提交。提交后用 git diff --stat origin/main..HEAD 复核文件集合仍是这 22 个。同时把 .handoff.json 的 ai_next_actions 改成具体路径，避免下一轮再出现 git add archives/ 这类过宽指令。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "文件规范 #17-#19 / code-style §21 (.gitignore 例外约定)",
+      "file": ".gitignore",
+      "line": 96,
+      "description": "作者刻意不修改 .gitignore，但本 PR 的三个报告 .md 是被 git add -f 强行加入索引的：.gitignore:96 的 reports/ 匹配任意深度，:98 的 reports/test-report.md 只是根锚定，因此 archives/s/shfs/0.35/reports/{test-report.md,pr-body.md,conan-verify-report.md} 现在处于「已跟踪但被忽略」状态。我实测的破坏面有限但确实存在：git add archives/s/shfs/0.35/reports/test-report.md 返回 rc=1（The following paths are ignored by one of your .gitignore files），也就是说后续任何修复轮次改这些报告时，常规 git add <报告路径> 会失败，必须记得 -f；而仓库其余包（例如 libretro da6223aaa2 那个提交）的做法是成对补 !archives/<pkg>/<ver>/reports/ 与 !archives/<pkg>/<ver>/reports/*.md 两行例外，本包没有跟随。git status 本身不会误报（忽略跟踪文件不再显示），CI 的 prdiff 取的是 git diff，也不会因此漏看报告。",
+      "fix_suggestion": "与仓库既有约定保持一致：在 .gitignore 的每包例外区追加两行 !archives/s/shfs/0.35/reports/ 与 !archives/s/shfs/0.35/reports/*.md（其它 archives/**/reports/*.log、*.ci-result.json 仍留在忽略内）。若坚持不动 .gitignore，则至少在 notes.md/PR 描述里写明「这三个报告需 git add -f」，以免后续轮次改完以为已提交。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code-style §5 (未完成字段 / 占位注释)",
+      "file": "archives/s/shfs/0.35/conanfile.py",
+      "line": 25,
+      "description": "url = \"\"  # CI fills this 是一个空字符串占位加一句「CI 会填」的注释。我在本仓库 CI（ci/conan/build_and_test.sh 与 ci/scripts/*.sh）里没有发现任何回填 conanfile.url 的机制，该注释因此不可复核；同时 conandata.yml 已经带官方下载 URL，recipe 里留空字段与 §5「禁止遗留占位/TODO 语义」的精神不符。属于风格/可追溯性问题，不影响 conan create 与测试结果（我实测 conan create 仍为 built，9/9 通过）。",
+      "fix_suggestion": "把 url 填成与 conandata.yml 同源的上游主页（https://sourceforge.net/projects/shfs/ 之类）并在描述里保留下载入口；如果确实希望由 CI 生成，就删掉这句无法证实的注释，改为在 manifest.yaml 里记录 URL 来源，避免读者误以为存在自动回填。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "知识条目质量 / R39 (证据与真实日志一致)",
+      "file": "knowledge/drafts/E2141-draft-24E4.md",
+      "line": 0,
+      "description": "两条草稿的「示意日志」与本机可复核日志不完全对应：E2141 写 Makefile:24: shfsmount，而 reports/conan-create.log 里的真实行是 Makefile:27: shfsmount.o；E2142 写 shfsmount.c:215:13，但 addmntent 的真实调用点在第 238 行附近（我用 grep -n 复核）。knowledge md 里其它引用行号（files.py:466-467/483-486、installer.py:87、shutil.py:522-523、finish.py:167、clean_verify.py:87）我逐条打开核对都是准确的，所以这是两处示意性数字未对齐真实产物，属于会影响后续读者按行号定位的小瑕疵，不构成伪造（结论与补丁正文一致）。",
+      "fix_suggestion": "把两处示意行号替换为 conan-create.log / shfsmount.c 里的真实行号，或明确标注「示意输出，非原始日志」；如果希望保留可复制粘贴的证据，直接从 reports/conan-create.log 摘录原行。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "知识条目质量 / R37 (符号清单与补丁正文一致)",
+      "file": "knowledge/drafts/E2142-draft-24E4.md",
+      "line": 0,
+      "description": "正文用「读侧四个符号」概括 mntent 相关依赖。我在 shfsmount.c 里 grep 到的实际使用面包含 getmntent/hasmntopt（读）与本轮被替换的 addmntent（写），即读侧符号不止四个；该表述会让后续移植者按四个符号去搜索而漏掉 hasmntopt。补丁正文本身正确（0002/0003 各自插入 static int shfs_addmntent(...) 的 fprintf shim，两处完全一致，按 mtab(5) 输出 6 字段），故这是描述精度问题而非实现问题。",
+      "fix_suggestion": "改成「读侧 getmntent/hasmntopt 等符号 + 写侧 addmntent」或直接列出实际 grep 结果（grep -n '\\(getmntent\\|hasmntopt\\|addmntent\\|endmntent\\|setmntent\\)' shfsmount.c），避免固定个数。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "复现性 (文档化命令必须可执行)",
+      "file": "archives/s/shfs/0.35/notes.md",
+      "line": 60,
+      "description": "notes.md:60 与三份草稿 md（E2141:64、E2142:82、E2143:118）给出的验证命令是 conan create ... --profile=<ohos-arm64> / --profile=ohos-arm64，但该 profile 在本仓库不存在：ls ci/conan/profiles/ 只有 ohos-aarch64，conan profile show -pr=ohos-arm64 返回 ERROR: Profile not found: ohos-arm64。统计上 ohos-arm64 是少数写法（10296 个 notes.md 中仅 1 个包使用，profile=ohos-aarch64 有 35 个），所以不是仓库惯例，只是这几处的笔误。用户照抄命令必然失败，属可复现性缺陷（非阻塞：真正的 conan create 我在本机用 ohos-aarch64 跑通了，status built、9/9）。",
+      "fix_suggestion": "把这四处 --profile=<ohos-arm64> 统一改为 --profile=ci/conan/profiles/ohos-aarch64（或与 main 一致的写法），并把 <ohos-arm64> 这种尖括号占位去掉，使命令可直接复制执行。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code-style §25 / SKILL_FEEDBACK 完整性",
+      "file": "feedback/SKILL_FEEDBACK_4e28a580.md",
+      "line": 0,
+      "description": "本轮反馈文档（未跟踪，git status 显示 ?? feedback/SKILL_FEEDBACK_4e28a580.md；根目录无同名文件）里仍有 14 处字面 (请填写) 未填写（grep -c \"(请填写)\" = 14），且该文件不在本 PR 的 22 个文件内。内容层面因此无法评估（既没有「本次踩坑」也没有「建议改进」），但按 §25 的写法这属于允许随 PR 补交的材料，缺失不会阻断 CI 闸门，也不构成欺骗。",
+      "fix_suggestion": "把 (请填写) 替换为真实条目（至少覆盖：manifest 与 conandata 分类漂移、reports/ 需 add -f、toybox tar 的 -m 位置约束、G0 autotools 误判这几条本轮实际发生的坑），并决定是否随 PR 提交；若不提交则明确说明。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code-style §20 (commit message 格式)",
+      "file": "archives/s/shfs/0.35/manifest.yaml",
+      "line": 12,
+      "description": "origin/main..HEAD 的三个提交里，两个 subject 与 §20 约定（<type>(<scope>): <摘要> 形式、scope 用包名）不一致，第三个（本轮修复提交）符合。这纯粹是可读性/检索性问题：我核对过三个提交的 diff 累加后确实等于送审的 22 文件集合，且 status 全部为 built、没有遗留 published。",
+      "fix_suggestion": "若尚在 PR 前，建议把两个不合格式的 subject 用 git rebase 改写为 shfs: 前缀的规范摘要；若不便改写历史，则在 PR 描述里说明三个提交各自对应的审计轮次，便于回溯。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R34/证据自洽 (术语碰撞) + 上轮 caveat 丢失",
+      "file": "knowledge/drafts/E2143-draft-24E4.md",
+      "line": 0,
+      "description": "两处小遗留：(a) 草稿里出现第三个「G0」——除 ci/conan/build_and_test.sh 的 G0 构建 flavor 判定、conan-verify-report.md 勘误块提到的 G0 外，W3 知识图谱完整性闸门也被写作 G0，文中未加区分说明，读者容易把「G0 误判 autotools」与「G0 图谱校验」当成同一件事（我已用脚本确认 scripts/ohc/graph.py 的 _TEMPLATE_FIELDS/_REQUIRED_FIELDS 与 clean_verify.py:87 的行为，结论本身正确：download() 只有 get()/unzip() 没有 excludes、fallback_3_* 已换成白名单内的 fallback_2_*、toybox tar xf <tarball> -m 的 -m 必须在 xf 之后）。(b) 第二轮报告里那句「/tmp 循环计时只在 HMDFS 之外的 tmpfs 上有意义（打包进 res 的 shell-code.in 探针会在 /tmp 建 10000 个目录）」这条 caveat 在最终 test-report.md/pr-body.md 里消失了，只剩 4:15.23 的裸数字，读者无法判断该测量的适用范围。",
+      "fix_suggestion": "(a) 在 E2143 草稿里把三个 G0 分别标注为「G0-flavor（构建体系判定）」「G0-knowledge（W3 知识图谱校验）」，或引用脚本/函数名代替裸编号。(b) 在 test-report.md 的 4:15.23 数字后补回一句限定：该计时来自 /tmp（tmpfs），受上游 shell-code.in s_init 建目录循环支配，不适用于 HMDFS 分区，且这是移植后的既有行为非本次引入。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "Round-2 遗留未采纳项（R33 test_package 环境 / R40 人工确认标注 / manifest 字段）",
+      "file": "archives/s/shfs/0.35/test_package/conanfile.py",
+      "line": 0,
+      "description": "第二轮提出的三条 P3 建议本轮未采纳，仍成立：(a) 候选 shell 的筛选只用 os.path.exists(c)，未做可执行性判断，因此若 /bin/sh 存在但不可执行（或反过来 CONFIG_SHELL 指向已删除的路径）会走到 self.run 才失败；(b) manifest.yaml 不含 conan_ref 字段（grep -c 为 0）——需要说明的是该字段在全仓 15874 个 manifest.yaml 中只出现在 2400 个里，属少数写法，所以这条只是可选补强而非违反约定；(c) pr-body.md 的 R40 披露段落没有 §一.7 要求的「需人工确认适配完整性」标签文本，披露内容存在但标记缺失，检索这条披露时无法用约定关键词命中。三者都不影响构建与 9/9 测试（我实测通过），属一致性/健壮性小项。",
+      "fix_suggestion": "(a) 改为 next((c for c in candidates if c and os.path.isfile(c) and os.access(c, os.X_OK)), None)，并在 raise ConanInvalidConfiguration 的文案里列出候选清单；(b) 可选：在 manifest.yaml 补 conan_ref: shfs/0.35（与 conan list 输出一致），不加也不违反现行约定；(c) 在 pr-body.md 的披露段加上约定的「需人工确认适配完整性」小标题。"
+    }
+  ],
+  "stats": {
+    "P0": 0,
+    "P1": 0,
+    "P2": 1,
+    "P3": 9,
+    "files_audited": 22
+  },
+  "summary": "Round-3 终审：pass（0×P0 / 0×P1 / 1×P2 / 9×P3，22 文件全量复审）。五项 Round-2 修复主张逐一以命令/文件内容复核：(1) 已修复——manifest.yaml:91-117 的说明注释已前移到 patch_generation 之前，patch_classification 三条均为 type: portability / platform_only: True / guard: 'none'，与 conandata.yml 的 patch_type: portability 及补丁正文一致（grep 确认 0001/0002/0003 无 #ifdef __OHOS__，命中项只是上下文里的 #ifndef SHFS_VERSION）。(2) 已修复——build_command 上方的漂移注释与 conanfile.py:build() 实际拼出的 'make -j1 -C shfsmount CC=\"clang\" LINKER=\"clang\" SHFS_VERSION=\"0.35\"' 及 ci/conan/profiles/ohos-aarch64 内容一致；w3-local-ci.log:181 的真实 CC 绝对路径也与注释描述吻合。(3) 已修复——test-report.md:45-59 与 reports/conan-create.log:90-104 逐行 byte 相等，含 conan 包 ID shfsa08540fa1f361/p 与带引号的 \"/data/service/hnp/bin/bash\" 调用，和 test_package/conanfile.py 的候选探测顺序（CONFIG_SHELL → shutil.which(bash) → /data/service/hnp/bin/bash → /bin/sh，取首个存在者）一致。(4) 基本修复，两处遗留——download() 缺 excludes 的说法已被改为只在 get()/unzip() 上讨论（与 conan 2.29 源码一致）、fallback_3_* 已换成 scripts/ohc/graph.py _TEMPLATE_FIELDS 白名单内的 fallback_2_*、toybox 'tar xf <tarball> -m' 的 -m 位置约束我在缓存 tarball 上实测确认、clean_verify.py 与 verify-report 的 G0 命名碰撞仍存在（见 P3）。(5) 无回归——status 全为 built（conan list -r ohpcd 显示未上传，故诚实）、无 published 残留；22 个文件全部 YAML/JSON 解析通过；我在当前包上重跑 test_shfs.sh 得到 9/9、断言数 self-lock 亦为 9，H1 现场复现 rc=159 且 /proc/mounts 无残留；五处计数（manifest、MANIFEST.yml、test-report.md、pr-body.md、脚本 echo）互相一致（上游 2/2 + 新增 7 = 9，断言 9）。欺骗类检查全部通过：sha256 0d48ffe4… 等于缓存官方 tarball，打包探针与上游 byte 一致，二进制尺寸/CLI 输出与 notes.md 一致，仓库内无 .log/.ci-result.json/状态标记泄漏（相关产物均被忽略且不在 PR 内），补丁可干净套用并完成一次独立构建。唯一 P2 是送审态与提交态不一致（pr-body.md 有 1 行未 commit，且同树存在无关的 archives/l/libXext 脏文件，而 HANDOFF 的下一步字面写作 'git add archives/'，会破坏 JC6/W2 单软件原子性），属流程卫生问题，修正提交范围即可，不影响产物正确性；其余 P3 全部是文档精度/仓库约定层面的可选项（含 Round-2 三条未采纳的遗留建议：test_package shell 探测缺 os.access(X_OK)、可选 conan_ref、pr-body.md 缺「需人工确认适配完整性」标签）。建议在 PR 前处理 P2 一项，其余可按作者判断留待后续。",
+  "audit_round": 3,
+  "rounds": [
+    {
+      "round": 1,
+      "verdict": "fail",
+      "p0": 0,
+      "p1": 2,
+      "p2": 4,
+      "p3": 6,
+      "note": "独立子任务审计 22 文件；2 个 P1（status 虚标 published / 软件级 manifest 非法 YAML）"
+    },
+    {
+      "round": 2,
+      "verdict": "pass",
+      "p0": 0,
+      "p1": 0,
+      "p2": 1,
+      "p3": 8,
+      "note": "P1 修复后复审通过；遗留 P2 = patch_classification 被 refresh-patch 回写"
+    },
+    {
+      "round": 3,
+      "verdict": "pass",
+      "p0": 0,
+      "p1": 0,
+      "p2": 1,
+      "p3": 9,
+      "note": "本文件即第 3 轮原始报告（issues 数组未改动一字）"
+    }
+  ],
+  "author_disposition": {
+    "agent_id": "24E4",
+    "handled_after_verdict": [
+      {
+        "severity": "P2",
+        "what": "送审状态 ≠ 已提交状态（pr-body.md 有 1 行未提交；同工作区还有 archives/l/libXext/* 的他人改动）",
+        "action": "本次提交只按显式路径 stage（archives/s/shfs/... 与 knowledge/drafts/E214x-...），绝不执行 git add archives/；libXext 的改动保持未跟踪状态不动"
+      },
+      {
+        "severity": "P3",
+        "what": "[9](b) 4:15.23 计时的适用范围未说明",
+        "action": "已改写 test-report.md 与 pr-body.md：计时对象是裸自增循环而非整条挂载链路；本机 /tmp 实测为 hmfs 上 drwxrws--- 1076:expert 实体目录（非 tmpfs），可写与否取决于运行 uid 是否在 expert 组"
+      },
+      {
+        "severity": "P3",
+        "what": "[9](a) 三个 G0 命名撞车",
+        "action": "E2143.md 已按脚本/函数名区分：finish.py:167 step25_g0_clean_verify（clean_verify.py:87 裸 tar）、conan-verify-report.md 的 G0 预构建风险评估（知识图谱预查询）、ci/conan/build_and_test.sh:162 的 G0e 根目录白名单"
+      },
+      {
+        "severity": "P3",
+        "what": "[10](c) pr-body.md 缺『需人工确认适配完整性』标记",
+        "action": "已在补充说明第 7 条补上 R40 标记与已证实/未证实能力面的分界"
+      },
+      {
+        "severity": "P3",
+        "what": "[7] feedback/SKILL_FEEDBACK_4e28a580.md 仍是 14 处 (请填写) 的骨架",
+        "action": "按 R45 由 feedback 命令在 submit 之后填写并随分支提交，本轮不假装已完成"
+      },
+      {
+        "severity": "P3",
+        "what": "[8] 两个 subject 不合 code-style §20 的 type(scope): 格式",
+        "action": "不改写历史（已推送流程中会丢审计轮次对应关系）；三个提交分别对应 适配 / 一轮审计修复 / 二轮审计处置，本条说明即审计轨迹"
+      }
+    ],
+    "declined": [
+      {
+        "severity": "P3",
+        "suggestion": "[10](a) shell 候选改用 os.access(c, os.X_OK)",
+        "reason": "R49 明令禁止用 os.access(X_OK) 探测沙箱内路径（HMDFS chmod 被忽略、权限固定 660，X_OK 会给出与实际能力不一致的答案）；现有 os.path.exists 探测 + self.run 硬失败已可定位。/bin/sh 在系统分区（0755），/data/service/hnp/bin/bash 是 hmfs 上的符号链接，用 X_OK 判定反而引入新的环境相关性"
+      },
+      {
+        "severity": "P3",
+        "suggestion": "[10](b) manifest.yaml 补 conan_ref 字段",
+        "reason": "审计者自己核过：该字段在全仓 15874 个 manifest.yaml 中仅 2400 个使用，属少数写法，不补不违反约定"
+      }
+    ]
+  },
+  "post_audit_edits_disclosure": "第 3 轮送审的 file_contents 取自工作区当时的文件内容；判 pass 之后又按本报告 P3 [9](a)/[9](b)/[10](c) 修改了 3 个已送审文件（reports/test-report.md、reports/pr-body.md、knowledge/drafts/E2143-draft-24E4.md），改动均为文字口径与证据限定，未触碰 conanfile.py / test_shfs.sh / MANIFEST.yml / patches / 两个 manifest.yaml 的可执行语义，因此 9/9 的实测结论与 W3 记录仍然有效。另：本文件 reports/audit-result.json 本身是审计之后的产物，必然不在送审的 22 文件清单内（第 23 个），这属于流程定义而非状态漂移。"
+}

@@ -1,0 +1,44 @@
+# test_package/MANIFEST.yml
+package: imap/2007f
+homepage: "https://www.washington.edu/imap/"
+
+upstream_tests_exist: true
+upstream_test_audit:
+  - source: "imap-2007f.tar.gz fossies file listing (607 entries, 1990304 bytes, 2011-07-23)"
+    reason: "No tests/ or test/ directory exists. The sole test-like unit is src/mtest/mtest.c (23292 bytes, header 'Program: Mail library test program'); no other *test* harness files, no ctest/gtest/pytest registration."
+  - source: "src/mtest/Makefile (all: mtest) + top-level Makefile (bundled builds mtest/ipopd/imapd, no check/test target)"
+    reason: "mtest builds via 'all: mtest' only; neither top-level nor src/osdep Makefiles define a check/test target. make -n check has no rule, so the countable upstream unit is N=1 (the mtest binary)."
+  - source: "src/mtest/mtest.c main loop (prompt Personal/Debug/Mailbox + MTest command loop) + true-device rounds"
+    reason: "mtest main() with empty Mailbox input exits cleanly with stream==NIL via mm(NIL) (prints date, returns 0) without opening any mailbox/server and without reaching mm_login/getpass; this offline startup/exit path is the automatable subset. Full mailbox commands need a live server + terminal. mtest.o needs obsolete getpass(3) (undeclared on OHOS, 2026-10-16 hard error) plus removed gets(3); test_package provides link-time shims, a synthetic passwd entry for uids without /etc/passwd (non-glibc only, fixes 2026-10-17 myusername fatal abort rc=-6), and an empty linkage.c fragment, then builds the genuine mtest.c against the packaged c-client and runs the empty-mailbox smoke."
+  - conclusion: "Upstream 2007f has exactly 1 countable test unit (mtest binary), executed offline in test_package as a startup smoke (discovered=1/executed=1); the adaptation additionally validates the packaged c-client with 4 offline consumer assertions."
+
+upstream_test_total: 1
+upstream_test_count_method: auto
+upstream_test_passed: 1
+upstream_test_failed: 0
+upstream_test_skipped: 0
+
+upstream_check_command: "audit src/mtest/mtest.c + src/mtest/Makefile (no check/test target)"
+upstream_test_in_build: true
+upstream_test_command: "build genuine src/mtest/mtest.c against packaged c-client (OHOS getpass/gets shims + gethostid fallback + synthetic passwd entry + empty linkage.c) and run offline empty-mailbox startup smoke: mtest_upstream < piped-newlines, expect banner + rc 0"
+upstream_tests:
+  - file: src/mtest/mtest.c
+    source: imap-2007f/src/mtest/mtest.c
+    description: "Upstream interactive c-client testbed; executed offline as empty-mailbox startup smoke (banner + clean exit via mm(NIL), no server)"
+    command: "mtest_upstream < piped-newlines (5x newline stdin, offline, no server)"
+
+test_package_tests:
+  - file: test_imap.c
+    description: "mail_newenvelope returns non-NULL offline allocation"
+    command: "./test_imap"
+  - file: test_imap.c
+    description: "mail_free_envelope clears the envelope pointer"
+    command: "./test_imap"
+  - file: test_imap.c
+    description: "mail_newbody returns non-NULL offline allocation"
+    command: "./test_imap"
+  - file: test_imap.c
+    description: "mail_free_body releases the body without crash"
+    command: "./test_imap"
+
+assertion_count: 4

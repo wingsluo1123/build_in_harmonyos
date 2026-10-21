@@ -1,0 +1,24 @@
+# conandata.yml — imv 5.0.1
+# 官方源：sourcehut 上游 tag archive（R39 合规；HTTP 200 / 72953 B，
+# sha256 由本机 curl + sha256sum 复算，并经 `git ls-remote --tags` 确认
+# refs/tags/v5.0.1 存在（annotated tag 3ef6039b…，deref bdec0e52…））。
+sources:
+  url: "https://git.sr.ht/~exec64/imv/archive/v5.0.1.tar.gz"
+  sha256: "8949c1df4b933b1d324e02ce49f1834a4b73dd25fa8103579e0ed105149e080e"
+
+# wayland 源码：仅用于静态编译 wayland-scanner。
+# 制品仓 wayland/1.24.0 包自带 bin/wayland-scanner 在本机不可执行
+# （实测 rc=126 Operation not permitted：DT_NEEDED 内嵌构建机 conan 缓存
+#  绝对路径 libexpat.so，且缺 libxml2.so.16）⇒ 与 chayang/0.1.0、
+# gammastep/2.0.9 同款处置：从源码静态编译仅依赖 libc 的 scanner。
+# 版本必须与 requires 的 wayland 版本一致（协议代码与运行库同源）。
+# sha256 与 archives/w/wayland-protocols/1.48/conandata.yml 的 scanner_sources
+# 一致（本机已复算）。
+scanner_sources:
+  url: "https://gitlab.freedesktop.org/wayland/wayland/-/archive/1.24.0/wayland-1.24.0.tar.gz"
+  sha256: "7800858844751fc7113d7df3678dc6b58b26a056176a65c49a059763045bffd5"
+
+# 源码零改动：GL（gl.pc→gl4es）、EGL（egl.pc→egl/1.0.5）、
+# wayland-scanner / wayland-protocols 全部通过配方自建 .pc 顶到
+# PKG_CONFIG_PATH 最前解决，不 patch 上游 meson.build。
+patches: {}

@@ -1,0 +1,30 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件 (nibbleandahalf 0.0-git-c3d5edba42)
+# 上游为纯 Makefile 项目，测试入口为 `make test` 生成的 ./test 程序
+# （由 main.c + testbase64.c 组成，运行 base64/unbase64 往返测试）。
+
+package: nibbleandahalf/0.0-git-c3d5edba42
+homepage: "https://github.com/superwills/NibbleAndAHalf"
+
+# 上游测试命令 (用于分析)
+upstream_check_command: "make test"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序
+upstream_tests:
+  - file: testbase64.c
+    source: nibbleandahalf-0.0-git-c3d5edba42/testbase64.c
+    description: "base64/unbase64 往返完整性自动化测试（含 0~128MB 多尺寸用例、坏 ASCII/坏长度用例）"
+    command: "./test"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "消费者测试：调用 base64()/base64integrity()/unbase64() 做往返校验"
+    command: "./test_nibbleandahalf"
+
+# 测试断言总数 (近似值, 用于质量评估)
+assertion_count: 8

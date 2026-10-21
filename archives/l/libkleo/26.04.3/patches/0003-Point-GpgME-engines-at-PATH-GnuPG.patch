@@ -1,0 +1,92 @@
+--- a/src/utils/gnupg.cpp
++++ b/src/utils/gnupg.cpp
+@@ -44,6 +44,9 @@
+ #include <gpgme++/engineinfo.h>
+ #include <gpgme++/error.h>
+ #include <gpgme++/key.h>
++#ifndef Q_OS_WIN
++#include <gpgme.h>
++#endif
+ 
+ #include <gpg-error.h>
+ 
+@@ -53,6 +56,10 @@
+ 
+ #include <algorithm>
+ #include <array>
++#ifndef Q_OS_WIN
++#include <cstdlib>
++#include <unistd.h>
++#endif
+ 
+ using namespace GpgME;
+ 
+@@ -73,8 +80,68 @@
+     return gpg_error(static_cast<gpg_err_code_t>(code));
+ }
+ 
++#ifndef Q_OS_WIN
++static QByteArray executableInDir(const char *dir, const char *name)
++{
++    if (!dir || !*dir || !name || !*name) {
++        return {};
++    }
++    const QString candidate = QString::fromLocal8Bit(dir) + QLatin1Char('/') + QString::fromLatin1(name);
++    const QByteArray native = QFile::encodeName(candidate);
++    if (::access(native.constData(), X_OK) == 0) {
++        return native;
++    }
++    return {};
++}
++
++// GpgME records the absolute engine path from the gnupg package and does not
++// consult PATH. Redirect only when LIBKLEO_GNUPG_BIN names the private prefix.
++// Searching PATH would retarget every process that loads this library.
++// A null home directory leaves GNUPGHOME to the process.
++static void pointGpgmeAtPathEngines()
++{
++    static bool done = false;
++    if (done) {
++        return;
++    }
++    const char *pinned = std::getenv("LIBKLEO_GNUPG_BIN");
++    if (!pinned || !*pinned) {
++        return;
++    }
++    done = true;
++    const QByteArray gpg = executableInDir(pinned, "gpg");
++    const QByteArray gpgsm = executableInDir(pinned, "gpgsm");
++    const QByteArray gpgconf = executableInDir(pinned, "gpgconf");
++    if (gpg.isEmpty() && gpgsm.isEmpty() && gpgconf.isEmpty()) {
++        return;
++    }
++    gpgme_check_version(nullptr);
++    if (!gpg.isEmpty()) {
++        gpgme_set_engine_info(GPGME_PROTOCOL_OpenPGP, gpg.constData(), nullptr);
++    }
++    if (!gpgsm.isEmpty()) {
++        gpgme_set_engine_info(GPGME_PROTOCOL_CMS, gpgsm.constData(), nullptr);
++    }
++    if (!gpgconf.isEmpty()) {
++        gpgme_set_engine_info(GPGME_PROTOCOL_GPGCONF, gpgconf.constData(), nullptr);
++    }
++}
++
++// test_cryptoconfig checks engineVersion() before it constructs
++// QCoreApplication, so a Q_COREAPP_STARTUP_FUNCTION would run too late.
++namespace {
++struct OhosGpgmeEngineInit {
++    OhosGpgmeEngineInit() { pointGpgmeAtPathEngines(); }
++};
++const OhosGpgmeEngineInit ohosGpgmeEngineInit;
++}
++#endif
++
+ static QString findGpgExe(GpgME::Engine engine, const QString &exe)
+ {
++#ifndef Q_OS_WIN
++    pointGpgmeAtPathEngines();
++#endif
+     const GpgME::EngineInfo info = GpgME::engineInfo(engine);
+     return info.fileName() ? QFile::decodeName(info.fileName()) : QStandardPaths::findExecutable(exe, {Kleo::gnupgInstallPath()});
+ }

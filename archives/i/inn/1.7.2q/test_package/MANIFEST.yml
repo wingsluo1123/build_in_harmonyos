@@ -1,0 +1,45 @@
+# test_package/MANIFEST.yml — inn/1.7.2q
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: inn/1.7.2q
+homepage: "https://www.eyrie.org/~eagle/software/inn/"
+
+# 上游测试命令：INN 1.7.2q 没有测试套件（见下方审计），故无上游测试命令。
+# 必须保持为空字符串：HMBS 清单检查把非空值视为“上游存在测试”，会直接
+# 拒绝 no_tests/0（先例见 archives/i/ifplugd/0.28 与 ifmetric/0.3，均用 ""）。
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游测试存在性（HMBS 真机门禁字段）
+upstream_tests_exist: false
+upstream_test_total: 0
+upstream_test_count_method: "manual_audit"
+upstream_test_audit: >-
+  inn_1.7.2q.orig.tar.gz (381 entries, top dir inn-1.7.2) contains no tests/
+  directory and no test sources; a scan of all 10 Makefiles
+  (top-level plus config, lib, frontends, innd, nnrpd, backends, expire,
+  doc, site) finds no check/test targets under the strict rule
+  ^(check|test)\s*: — the only test-adjacent strings anywhere are
+  lib/Makefile's `parsedate` debug helper (built with -DTEST as a manual
+  developer aid, never run by any target), config/Makefile's `sedtest`
+  (a sed-capability probe for subst, not a test suite), lib/checkart.c
+  (a library source file, article syntax checker) and samples/inncheck
+  (a runtime validation script, not a test harness). The recipe repeats
+  this scan on the real device in build() and records
+  HMBS_UPSTREAM_TEST_RESULT status no_tests with discovered/executed 0.
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_inn.c
+    description: "链接已打包的 libinn.a，调用 wildmat(9) / Radix32(6) / GetTimeInfo+parsedate(4) / INNVersion(1)，共 20 项断言"
+    command: "./test_inn"
+  - file: convdate
+    description: "运行已打包的 convdate 二进制：convdate -n 'Thu, 01 Jan 1970 00:00:00 GMT'（固定日期，退出码判定）"
+    command: "convdate -n \"Thu, 01 Jan 1970 00:00:00 GMT\""
+
+# 测试断言总数 (test_inn.c 内 CHECK 计数，用于质量评估)
+assertion_count: 20

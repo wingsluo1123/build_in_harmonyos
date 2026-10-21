@@ -1,0 +1,31 @@
+# 软件级 manifest — indi-starbook
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: indi-starbook
+display: "INDI StarBook Driver"
+description: "INDI 天文框架的 Vixen StarBook 赤道仪驱动（C++ 可执行程序，HTTP 命令协议，libcurl 传输）"
+category: library
+homepage: "https://github.com/indilib/indi-3rdparty"
+license: LGPL-2.1-or-later
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "E092：CMake 不识别 HarmonyOS → 强制 CMAKE_SYSTEM_NAME=Linux（同 libindi 配方）"
+    - "上游 cmake_minimum_required(VERSION 3.0) → 注入 cache 变量 CMAKE_POLICY_VERSION_MINIMUM=3.5"
+    - "OHOS libc++：C++ 驱动目标需链接 c++/c++abi（见 package_info system_libs）"
+    - "libindi 未安装 INDIConfig.cmake → 用驱动自带 FindINDI.cmake，配方注入 INDI_INCLUDE_DIR/INDI_ROOT"
+    - "FindNova.cmake 双注入短路（NOVA_INCLUDE_DIR+NOVA_LIBRARIES，模块第 14 行采信不校验）"
+    - "HTTP 传输走 libcurl（非 starbook-ten 的 bundled httplib）→ CMake 内建 FindCURL 注入 CURL_INCLUDE_DIR/CURL_LIBRARY"
+    - "产出为可执行驱动（非库）→ test_package vendor 上游官方 GTest 单测 test_starbook.cpp 做真实 API 测试（R34）"
+  common_dependencies:
+    - libindi
+    - libnova
+    - curl
+
+versions:
+  "0.8-20221222163625":
+    status: built
+    build_date: "2026-10-14"
+    conan_ref: "indi-starbook/0.8-20221222163625"
+    note: "INDI StarBook 赤道仪驱动（CMake，HTTP/curl 协议，依赖全已在制品仓）"

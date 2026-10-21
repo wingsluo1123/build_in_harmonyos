@@ -1,0 +1,38 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: perm/0.4.0
+homepage: "https://code.google.com/p/perm/"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "用「除 PerM.cpp 外的全部源」编出上游自带的 Source/PerMTest.cpp 并直接执行"
+
+upstream_tests:
+  - name: "上游自带测试：3 个用例入口（ColorSpaceRead.h 声明 testShift64Bit / testLongBases2Colors / testLongBases2ColorsCases；PerMTest.cpp 自带 main）"
+    count: 3
+    description: >-
+      **真编、真跑** ✓（rc=0）。**如实说明语义与计数**：上游共 **3 个用例入口**
+      （`testShift64Bit` / `testLongBases2Colors`（两参）/ `testLongBases2ColorsCases`（零参，内部用
+      固定用例调两参版本），与审核实测 N=3 一致）；`main()` 调用 `Cases()` → 实际覆盖 **2 个**，
+      第 3 个 `testShift64Bit` 在上游 `PerMTest.cpp` 里被注释掉（上游自己的选择）。其 `main()` 还
+      **固定 `return 0`**（无输出、不断言返回值）→ 本项只证明"可编、可跑通"，**不代表 N 条断言全过**，
+      也不作为跳过处理。为使它能编，配方对**过时的调用**做了一处最小修正（见 modified_upstream_tests）。
+    command: "conanfile.py 内 _run_added_tests()：clang++ -O2 -Wall $(除 PerM.cpp 外全部 .cpp) -lm -o PerMTest && ./PerMTest"
+
+test_package_tests:
+  - file: check_perm.py
+    description: >-
+      R34 消费者校验 **5 项**（全部离线）：①产物齐备（bin/perm 可执行）②ELF 头自检（真 ELF64、
+      machine=0xB7 AArch64）③真实运行 `perm`（无参）有输出 ④许可证（上游 orig 未附 → 如实记录）
+      ⑤证据（sha256 + python 版本）。
+    command: "python3 check_perm.py <package-folder>"
+
+assertion_count: 5
+modified_upstream_tests: >-
+  **是**——两处最小修正：①`MappingResult.h` 里 `char*` 与 `'\0'` 的比较改成 `(!p || p[0] == '\0')`
+  （等价，语义不变）；②`PerMTest.cpp` 里**过时**的零参调用 `testLongBases2Colors()` →
+  上游自己的零参入口 `testLongBases2ColorsCases()`（让自带测试真能编真能跑）。**未减少用例、未放宽断言。**
+added_tests_note: >-
+  本库**上游自带 3 个用例入口**（真编真跑、rc=0）；另加消费者校验 5 条。两者分开计数。

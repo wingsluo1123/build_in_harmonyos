@@ -1,0 +1,105 @@
+# 版本级 manifest — slurm-wlm 25.11.4
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "25.11.4"
+software: "slurm-wlm"
+status: built
+build_date: "2026-10-15"
+conan_ref: "slurm-wlm/25.11.4"
+build_system: autotools
+package_type: library
+
+source:
+  url: "https://download.schedmd.com/slurm/slurm-25.11.4.tar.bz2"
+  sha256: "237f515adcb37b99ff6cb3e1fa81691a5f7188e94c3b6b495858b4eaecf6531d"
+  tar_format: tar.bz2
+  upstream: "https://www.schedmd.com/"
+
+build:
+  system: autotools
+  configure_options:
+    - "--build=aarch64-linux-gnu --host=aarch64-linux-gnu（随包 config.sub 不认 ohos，见 patches/0001；CC/CXX/sysroot 仍为 OHOS）"
+    - "--with-munge=<pkg> --with-hwloc=<pkg> --with-json=<pkg> --with-http-parser=<pkg>（这几个后端只有 --with-<x>=PATH 探测，没有 pkg-config；--with-yaml 见下方说明）"
+    - "--without-rpath --disable-dependency-tracking"
+    - "--without-freeipmi --without-nvml --without-rsmi --without-mysql（OHOS 无对应能力）"
+    - "make -j1 && make -j1 install（R9 单 job）"
+    - "make -j1 -k check（上游 testsuite/slurm_unit，41 个 libcheck 用例）"
+  dependencies:
+    - munge/0.5.16
+    - hwloc/2.14.0
+    - json-c/0.18
+    - http-parser/2.9.4
+    - readline/8.3
+    - ncurses/6.6
+    - libcap/2.78
+    - libaio/0.3.112.1
+    - zlib/1.3.1.1
+  test_requirements:
+    - check/0.15.2（上游单元测试框架，test_requires，不进交付依赖）
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-config-sub-ohos.patch"
+  - "0002-configure-umask.patch"
+  - "0003-sys-unistd-musl.patch"
+  - "0004-musl-resolver-shim.patch"
+  - "0005-make-ref-binary-blob-objcopy.patch"
+
+artifacts:
+  - "bin/（24 个程序：slurmctld、slurmd、slurmdbd、sbatch、srun、squeue、sinfo、scontrol、sacct、sacctmgr、sreport ...）"
+  - "lib/libslurm.{a,so,so.44,so.44.0.0} 与 lib/slurm/*.so（sched/backfill、sched/priority、select/cons_tres、serializer/{json,url-encoded}、auth/munge、cred/munge、tls/none、hash/k12、certgen/script ...）"
+  - "include/slurm/*.h（slurm.h、slurm_version.h ...）"
+  - "share/（man、slurm 配置样例与脚本）、licenses/COPYING"
+
+libs:
+  - slurm
+
+requires:
+  - munge/0.5.16
+  - hwloc/2.14.0
+  - json-c/0.18
+  - http-parser/2.9.4
+  - readline/8.3
+  - ncurses/6.6
+  - libcap/2.78
+  - libaio/0.3.112.1
+  - zlib/1.3.1.1
+
+tests:
+  upstream_suite: >
+    testsuite/slurm_unit：41 个 libcheck(Check 0.15.2) 用例（common 13 + common/bitstring 2 +
+    common/hostlist 2 + common/slurm_protocol_defs 5 + common/slurm_protocol_pack 2 +
+    common/slurmdb_defs 1 + common/slurmdb_pack 14 + backfill 1 + topology 1），
+    由 configure 的 HAVE_CHECK（PKG_CHECK_MODULES([CHECK],[check >= 0.9.8])）门控
+  upstream_audit: >
+    build() 中以 CHECK_CFLAGS/CHECK_LIBS 短路 PKG_CHECK_MODULES 让 HAVE_CHECK 生效
+    （否则 make check 只跑 1 个 log-test，其余被静默排除，见 DRAFT-10251），
+    test_requires(check/0.15.2) 提供框架；清点证据随 conan create 日志留证
+  upstream_run: "build() 内 make -j1 -k check（TEMP 指向可写目录、CK_DEFAULT_TIMEOUT=120），逐条汇总输出 SLURM-UPSTREAM-* 行"
+  upstream_pass_rate: "37/41（90.2%）"
+  upstream_fail_reasons: >
+    4 条未通过，均非适配缺陷且已逐条给证据（详见 reports/test-report.md §3.2/§4）：
+    backfill-test（cb）—— 上游用例链接 $(top_builddir)/src/api/.libs 的 libslurmfull，
+    而该库不包含 slurmctld 目标文件（job_fail_qos/make_node_idle/acct_policy_* 等 40+ 符号），
+    运行期 ld 重定位失败；与 OHOS 无关（同源 glibc 构建同样缺这些符号）。
+    serializer-test（common）/ topology-test（topology）—— 用例要求 slurm.conf 夹具里
+    PluginDir 列出的插件目录都存在，其中 serializer/yaml/.libs 只在 configure 探测到 libyaml
+    （--with-yaml）时产出；设备上没有 libyaml（制品仓的 portable-libyaml/0.2.5 实测接上后
+    失败面下移到 dlopen 插件时的加载器作用域差异：slurm_get_log_level: symbol not found，
+    通过率不变，故本 PR 不引入该额外依赖，详见 test-report §4.3）。
+    slurm_addto_id_char_list-test（common/slurm_protocol_defs）—— 用例取
+    getpwuid(geteuid())/getpwuid(0) 的用户名做断言，设备 /etc/passwd 里没有当前 uid（20020083）的条目，
+    用例内 ck_abort_msg("No user name found") 在非测试上下文触发；平台环境限制
+    （同族知识：DRAFT-10175 getpwuid-null、DRAFT-mairix-0.24-getpwuid-app-uid-no-passwd）。
+  consumer_checks: 6
+  consumer_failures: 0
+  consumer_pass_rate: "6/6（100%）（test_package/test_slurm.c：slurm_api_version() 与版本宏的往返一致性、25.11 系列头文件）"
+  command: "conan create archives/s/slurm-wlm/25.11.4 -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64"
+
+knowledge_gained:
+  - "DRAFT-10718-slurm-wlm-libcheck-default-timeout-nameservice-test"
+  - "DRAFT-10718-slurm-wlm-optional-dep-plugin-dir-upstream-tests"
+  - "DRAFT-10718-autotools-make-args-multiword-value-splitting"
+  - "DRAFT-10718-conan-package-type-drives-autotools-shared-static-flags"
+  - "DRAFT-10718-gnu-ld-binary-input-format-vs-objcopy-llvm-objcopy"

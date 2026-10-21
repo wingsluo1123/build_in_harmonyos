@@ -1,0 +1,47 @@
+# 软件级 manifest — portio
+# 文件位置: archives/p/portio/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+software: portio
+
+display: "PortIO"
+
+description: "Python 低层端口 I/O 扩展模块（x86 in/out 指令的 CPython 封装）"
+
+category: library
+
+homepage: "http://portio.inrim.it"
+
+license: GPL-2.0-or-later
+
+# ============================================================
+# 构建信息
+# ============================================================
+
+build_system: custom   # 上游用 setuptools（setup.py build_ext），PEP 517 后端
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "x86 专有 API：aarch64 的系统头 <sys/io.h> 存在但 bits/io.h 为空，未适配源码会以隐式声明编译通过并留下未定义符号 outb/inb/ioperm...，musl BIND_NOW 下 dlopen 报 'symbol not found'"
+    - "适配口径：非 x86 下 18 个 I/O 入口抛 portio.error（明确失败，不伪造数据），ioperm/iopl 返回 ENOSYS（保持上游返回 errno 的契约）"
+    - "setuptools 不认三元组，交叉编译参数须经 CC/CFLAGS/C_INCLUDE_PATH/LDSHARED/LDFLAGS 环境变量注入"
+    - "conan python/3.12.9 的 EXT_SUFFIX 为 .cpython-312-aarch64-linux-ohos.so，与设备 python3 一致"
+    - "E004：扩展模块必须显式 -lpython3.12，否则 dlopen 时 Python C API 符号无法解析"
+    - "E077：产物 .so 必须 binary-sign-tool 自签，否则 import 报 Permission denied"
+    - "conan python 不自带 setuptools，构建期按 pinned sha256 解包 setuptools wheel"
+
+  common_dependencies:
+    - python
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "0.6.2":
+    status: built
+    build_date: "2026-10-17"

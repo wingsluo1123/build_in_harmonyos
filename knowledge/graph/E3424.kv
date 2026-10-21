@@ -1,0 +1,123 @@
+# ═══ Draft knowledge entry — Makefile 解析期的 $(shell) 发行版探测静默产出空串，
+#       并把空值编进二进制，导致运行期功能整体失效却零报错 ═══
+# Timestamp: 2026-10-15
+# Software: pacredir 0.7.10（tarball sha256
+#           fa73fb62dda010f20d85cfb8864ec993421641edde2cf999a91dd835c0fe36cc）
+# Gate: 无（构建 rc=0，属"静默正确构建出错误产物"类，任何门禁都不会拦）
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+# 撞库结论（详见同名 .md 的「相关既有条目」表）：E090/E205/E290/E302/E320 与
+#   DRAFT-smalt-0.7.6-pre2010-config-guess-sub-ohos-triplet 覆盖的是
+#   「探测给出**错误的肯定**（符号存在但语义不可用 / 探针机制与被探测物不匹配 /
+#   平台身份被判成别的值）」，且多数**伴随响亮的报错**（undefined symbol、
+#   FATAL_ERROR、链接失败）；本草稿增量 = 探测**静默产出空值**、构建 rc=0、
+#   日志零 error/warning，空值以字符串常量形态编进产物，只在运行期表现为
+#   功能整体失效——判据与验证手段完全不同（必须查产物，查日志恒为空）。
+
+id:                     E3424
+trigger_tool:           make
+phase:                  compilation
+error_signature:        /etc/makepkg\.conf: No such file or directory|/etc/os-release: No such file or directory|shopt: (command )?not found|source: /etc/|#define ARCH ""|#define ID ""|version \S+ / \(built:|does not match distribution and/or architecture
+severity:               2
+category:               platform, detection, portability, build-system, make
+match_keywords:         $(shell), makefile probe, /etc/os-release, /etc/makepkg.conf, CARCH, silent empty string, make rc=0, version.h, baked-in constant, ARCH, ID, distro detection, empty identity, no error in log, product inspection, pacredir, DNS SRV TXT, User-Agent
+title:                  Makefile 在解析期用 $(shell source /etc/<distro-file>) 探测发行版信息时，文件缺失只会往 stderr 打一行噪声、make 仍返回 0，空串经生成头编进二进制；运行期表现为功能整体静默失效（本例 mDNS peer 100% 被判不匹配），构建日志里没有任何 error/warning 可 grep
+
+root_cause:             GNU make 的 $(shell ...) 只捕获 **stdout**，且**丢弃退出码**；
+  子命令的 stderr 直接透传到 make 的 stderr。于是
+  `ARCH := $(shell shopt -u extglob && source /etc/makepkg.conf && echo $$CARCH)`
+  在缺文件的机器上：① `source /etc/makepkg.conf` 失败 → /bin/sh 打一行
+  "No such file or directory" 到 stderr；② `&&` 短路 → echo 不执行 → stdout 为空；
+  ③ make 拿到空串赋给 ARCH，**rc 仍为 0**（实测 make 整体退出码 0）。
+  该空值随后被 `printf '#define ARCH "%s"'` 写进生成头（本例 version.h），
+  编进二进制成为**编译期常量**，与运行环境再无关系。
+  下游消费点越多，危害越隐蔽。本例三处实测后果（pacredir 0.7.10）：
+  (a) `strncmp(txt_data, "arch=" ARCH, txt_len)` 的 needle 退化成裸 `"arch="`，
+      与任何真实 TXT 记录（如 `arch=aarch64`，txt_len=12）都在第 5 字节
+      （needle 的 NUL vs 'a'）就不等 → `DNS_SRV_TXT_MATCH_ARCH` 永不置位；
+      `id=` 同理 → `match` 恒为 0 → 命中 `if (match < DNS_SRV_TXT_MATCH_ALL)`
+      分支，**每一个** mDNS 发现到的 peer 都被 write_log(verbose,...) 记一条
+      "does not match distribution and/or architecture." 后丢弃。
+      注意该行是 verbose 级（LOG_INFO），默认 verbose=0 时**连日志都不打**；
+      最终现象是"守护进程正常起、状态页正常出、就是永远没有 peer"，
+      极易被误判成"局域网里没有 pacserve"。
+  (b) curl User-Agent 退化成 `pacredir/0.7.10 (/)`。
+  (c) 状态页的 Distribution / Architecture 两个单元格渲染成空。
+affected_scope: >
+  任何在 **Makefile/mk 解析期**用 `$(shell ...)` 探测宿主环境并把结果
+  **编进产物**的上游构建，尤其是发行版专有工具链：
+  `source /etc/os-release`、`source /etc/makepkg.conf`、`lsb_release`、
+  `dpkg-architecture`、`rpm --eval`、`uname -m` 派生、`git describe` 兜底缺失、
+  `date --utc --date=@N`（GNU date 专有，toybox/BSD date 不认）等。
+  跨发行版/跨 libc 移植（HarmonyOS PC、Alpine、非 Arch 的任意 Linux）都会命中；
+  在 CI 的 clean 容器里比在开发者机器上更容易命中，因为那些文件本来就不存在。
+  **不适用**：探测失败会**主动报错**的形态（autoconf 的 AC_CHECK_* 编译探针、
+  meson 的 dependency()/host_system 判定、config.guess 的 "unable to guess
+  system type" + exit 1）——那些按 E001/E090/E290 与 smalt 那条 pre-2010
+  config.guess/sub 草稿处理。判据见 verification_cmd 第 1 步。
+verification_cmd: >
+  # 1) 判形态：解析期 $(shell) 探测 + 结果进产物，且探测命令带 && 短路或 source
+  grep -nE '^\s*[A-Za-z_][A-Za-z0-9_]*\s*:?=\s*\$\(shell .*(/etc/|source |lsb_release|dpkg-|rpm --eval|uname |git describe|date --)' Makefile*
+  # 2) 复现"静默空值"（在没有这些文件的机器上，如 macOS / OHOS / clean 容器）
+  printf 'SHELL := /bin/sh\nARCH := $(shell shopt -u extglob && source /etc/makepkg.conf && echo $$CARCH)\nID := $(shell source /etc/os-release && echo $$ID)\nall:\n\t@printf "#define ARCH \\"%%s\\"\\n#define ID \\"%%s\\"\\n" "$(ARCH)" "$(ID)"\n' > Makefile.probe
+  make -f Makefile.probe; echo "make_rc=$?"     # → 两行都是 ""，且 make_rc=0
+  # 3) 判产物（唯一可靠判据；日志里 grep error/warning 恒为空）
+  strings <构建产物> | grep -E 'v[0-9.]+ +/ \(built:|^\s*/\s*$'   # 身份位为空即命中
+  # 4) 判运行期后果（本例）：verbose 起守护进程，看是否每个 peer 都被判不匹配
+  ./pacredir -v 2>&1 | grep -c 'does not match distribution and/or architecture'
+
+rec_priority:           1
+rec_approach:           build-var-override-from-conan-settings
+rec_description: >
+  不要试图在目标机上伪造那些发行版文件（属 P001 禁止的"伪装系统检测"），
+  也不要改上游源码。把这些变量的**权威来源换成构建系统已知的确定值**，
+  在 make 命令行显式传入（命令行变量优先级高于 Makefile 内的 `:=` 赋值，
+  且 make 会跳过被覆盖变量的右值展开，连那条 $(shell) 都不会执行）：
+  Conan 配方里从 settings 推导（arch=armv8 → aarch64；os=OHOS → ohos），
+  即 `make <target> ARCH="aarch64" ID="ohos" VERSION="<version>"`。
+  这样值来自任务的目标平台定义，与构建宿主是什么发行版彻底解耦，
+  且在 glibc/Arch 上同样正确（不会退化上游行为）。
+  收尾必须**验产物而不是验日志**：strings/读生成头断言身份位非空且等于预期。
+rec_command: >
+  make <target> CC="${CC}" ARCH="<由 settings.arch 推导>" ID="<由 settings.os 推导>" VERSION="<version>"
+  # 验收（必做，日志无任何信号）：
+  strings <产物> | grep -E "<version> <id>/<arch>"
+rec_auto_fix:           false
+rec_impl:               set-make-var
+
+fallback_priority:      2
+fallback_approach:      patch-makefile-probe-with-explicit-fallback
+fallback_description:   >
+  变量无法从命令行覆盖时（例如上游在 Makefile 内多处 `:=` 后再 `export`，
+  或用 `override` 指令），改上游 Makefile：给探测加显式兜底，形如
+  `ARCH := $(shell ... )` 后补 `ARCH := $(if $(ARCH),$(ARCH),aarch64)`，
+  或把 `source /etc/x && echo $$V` 换成 `[ -r /etc/x ] && . /etc/x; echo $${V:-<default>}`。
+  代价：产生 patch、需要按 P005 保持可向上游提交（兜底默认值要写成上游能接受的形式）。
+fallback_command:       make -f Makefile <target> ARCH= ID=   # 先验证空值确实是致病源
+fallback_auto_fix:      false
+fallback_impl:          patch-source
+
+forbid_1_pattern:       echo (ID|CARCH)=.*> */etc/(os-release|makepkg\.conf)|printf .*os-release
+forbid_1_reason:        在构建机上伪造 /etc/os-release、/etc/makepkg.conf 去骗过探测，属 P001 禁止的绕过系统检测；且污染共享构建环境、对同一 worker 上的其他包产生跨任务副作用。
+forbid_1_consequence:   编进二进制的身份值来自伪造文件而非真实目标平台；worker 复用后其他包读到假 os-release；PR 评审按 P001/E205 打回。
+forbid_2_pattern:       2>/dev/null.*\$\(shell|MAKEFLAGS.*--silent|\|\| *true
+forbid_2_reason:        把 $(shell) 的 stderr 重定向掉或吞掉退出码，只是把唯一的一线信号也抹掉——本来 stderr 那两行 "No such file or directory" 是唯一可 grep 的线索。
+forbid_2_consequence:   问题从"日志里有噪声但 rc=0"恶化成"完全无痕"，后续排障只能靠反查产物，成本大幅上升。
+forbid_3_pattern:       -DARCH=\\?""|-DID=\\?""|#define ARCH ""
+forbid_3_reason:        允许空身份常量进入产物（即"编译过了就算了"）。空 needle 会让 strncmp 类匹配逻辑整体失效，而编译与链接全绿。
+forbid_3_consequence:   本例实测：所有 mDNS peer 被判不匹配并丢弃，且该日志行是 verbose 级，默认配置下连一条日志都没有——交付一个"能跑但核心功能恒不生效"的包。
+
+principles:             P001, P005, P014
+prescan_pattern:        \$\(shell[^)]*(/etc/(os-release|makepkg\.conf)|lsb_release|dpkg-architecture|rpm --eval)
+prescan_globs:          Makefile*, *.mk, GNUmakefile*
+
+doc_file:               knowledge/drafts/DRAFT-pacredir-0.7.10-silent-shell-probe-bakes-empty-identity.md
+last_updated:           2026-10-15
+source_event:           pacredir 0.7.10 适配 HarmonyOS PC（本地 ohos-local profile 交叉编译 + 源码走查）
+authors:                songzhenyan <apVBMI1DvwCqWTll.songzhenyan@noreply.gitcode.com>
+source_pr:
+source_commit:
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-15

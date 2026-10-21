@@ -1,0 +1,18 @@
+# conandata.yml — karchive 6.28.0
+# Same OHOS adaptation set as 6.26.0.1 (DT_SONAME injection and the C++17
+# compatibility patch apply unchanged): upstream 6.28.0 only raises the ECM
+# minimum to 6.28.0 (provided by ecm/6.28.0) and appends to CMAKE_MODULE_PATH
+# instead of replacing it; src/k7zip.cpp is byte-identical to 6.26.0.
+
+sources:
+  # download.kde.org times out from CI workers (network-restricted).
+  # mirrors.nju.edu.cn is an authoritative KDE mirror hosting the byte-identical
+  # tarball (sha256 cross-verified against two independent mirrors).
+  url: "https://mirrors.nju.edu.cn/kde/stable/frameworks/6.28/karchive-6.28.0.tar.xz"
+  sha256: "ff36137e6b171906b4bde4006558739c5d7771dc30b9a037b65e62b2674a1b13"
+
+patches:
+  "6.28.0":
+    - patch_file: "patches/0001-src-cpp17-compat.patch"
+      patch_description: "src/k7zip.cpp: C++17 compatibility — std::ranges::any_of -> std::any_of, std::bit_cast -> static_cast (ohos-aarch64 conan profile pins compiler.cppstd=17 while upstream k7zip.cpp uses two C++20 library features; behavior-identical rewrites)"
+      patch_type: "portability"

@@ -1,0 +1,23 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for kpkpass/25.12.3.
+
+package: kpkpass/25.12.3
+homepage: https://invent.kde.org/pim/kpkpass
+
+upstream_check_command: "ctest --output-on-failure"
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error"
+
+upstream_tests:
+  - file: autotests/
+    source: kpkpass-25.12.3/autotests/
+    description: "kpkpass upstream CTest/autotests suite (pkpasstest, fieldtest)"
+    command: "ctest --output-on-failure"
+    condition: "run in the Conan build with BUILD_TESTING=ON; both tests execute unmodified and read the bundled boardingpass-v1.pkpass fixture"
+
+test_package_tests:
+  - file: test_package/consumer.cpp
+    description: "Installed consumer parses the embedded boardingpass-v1.pkpass fixture through KPim6::PkPass and imports the installed org.kde.pkpass QML module."
+    command: "conan create (test_package builds and runs the consumer)"
+
+assertion_count: 21

@@ -1,0 +1,59 @@
+#====================================================================
+# DRAFT-gzip-hpp-0.1.0-catch1-include-shim — 上游测试 Catch v1 单头
+#   include 在制品仓仅有 catch2/2.13.10 (v2 合并头) 时用 include shim
+#   目录转发适配, 不改上游源码与 CMake
+# 对应人类文档: knowledge/drafts/DRAFT-gzip-hpp-0.1.0-catch1-include-shim.md
+#
+# 本条目为 draft（草稿），尚未由主编审核合入。
+# 触发事件: gzip-hpp 0.1.0 适配 HarmonyOS PC（test/main.cpp 等
+#           #include <catch.hpp>, 制品仓无 catch/1.9.6 仅有 catch2/2.13.10）
+#====================================================================
+
+id:                     E2694
+trigger_tool:           clang/cmake/conan
+phase:                  testing
+error_signature:        catch\.hpp.*file not found|fatal error: 'catch\.hpp'|
+                         catch2/catch\.hpp.*file not found|Catch v1.*include
+
+# ═══ Layer 1: 识别层 ═══
+severity:               2
+category:               headers, build-system, conan, testing
+match_keywords:         catch.hpp, catch2, include shim, Catch v1, TEST_CASE,
+                         amalgamated header, header-only, upstream test
+title:                  上游测试 Catch v1 单头 include 用 include shim 目录转发到 catch2/2.13.10 合并头, 不改上游源码
+
+# ═══ Layer 2: 诊断层 ═══
+root_cause:             上游测试按 Catch v1 约定 include 顶层 catch.hpp,
+                         制品仓仅发布 catch2/2.13.10 (v2 合并头,
+                         包内头为 include/catch2/catch.hpp, 无顶层 catch.hpp);
+                         -I 指向 v2 包根时 <catch.hpp> 解析失败。Catch v1
+                         常用宏 (TEST_CASE/SECTION/REQUIRE/CHECK/
+                         CHECK_THROWS_WITH/Catch::Contains) 在 v2.13
+                         合并头全部保留, 仅 include 路径不同
+affected_scope:         上游测试主体为 Catch v1 单头 include 的库;
+                         制品仓只有 catch2 v2.13 合并头布局时
+verification_cmd:       见 md 文件: 编译 + 运行 (cwd 需为源码根以命中
+                         ./test/data 相对路径), gzip-hpp 实测
+                         "All tests passed (34 assertions in 7 test cases)" RC=0
+
+# ═══ Layer 3: 方案层 ═══
+rec_approach:           include-shim-forwarding: 建 shim/catch.hpp
+                         转发 #include <catch2/catch.hpp>, 编译时
+                         -I shim 置于 catch2 include 根之前; 上游源码/CMake
+                         零改动; 测试数据相对路径需从源码根 cwd 运行
+# ═══ Layer 4: 边界/反例 ═══
+# ═══ Layer 5: 查重/关系 ═══
+  exact_duplicate:       false
+  causal_duplicate:      false
+  trigger_overlap:       true
+  solution_overlap:      partial
+  combination_novelty:   true
+  boundary_novelty:      true
+  test_migration_novelty: true
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E2694.md
+rec_description:        include-shim-forwarding: 建 shim/catch

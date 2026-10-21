@@ -1,0 +1,49 @@
+#====================================================================
+# Draft: Qt5 包内 mkspecs/{modules,modules-inst}/*.pri 与 bin/qt.conf 记录
+#        构建期 conan 私有前缀（.../p/b/<hash>/b），qmake 消费者解析
+#        QT += <module> 全部 Unknown module(s) —— 复制+改写+QMAKEMODULES 修复
+#====================================================================
+
+id:                     E3651
+trigger_tool:           qmake|conan
+phase:                  build
+error_signature:        Project ERROR: Unknown module\(s\) in QT:|Cannot read .*/p/b/[^/]+/b/mkspecs/modules-inst/qt_lib_.*\.pri|QT_MODULE_LIB_BASE = .*\.conan2/p/b/
+
+severity:               2
+category:               build-system, qmake, conan, path, qt5
+match_keywords:         qmake, QMAKEMODULES, mkspecs/modules, modules-inst, Unknown module(s) in QT, qt.conf, QMAKE_RCC, QMAKE_MOC, QMAKE_UIC, QT_MODULE_LIB_BASE, qt5-qtbase, qt5-qtsvg, qconf, baka, qpdfview
+
+title:                  Qt5 包内 qmake 模块描述（mkspecs/modules/*.pri 与 bin/qt.conf）指向已消失的 conan 构建目录：QT += <module> 全部 Unknown module(s)，须复制改写并经 QMAKEMODULES 暴露
+
+root_cause:             qt5-qtbase / qt5-qtsvg 等 Qt5 模块包在 conan 中"就地安装"后被重新打包：包内 mkspecs/modules/qt_lib_*.pri 与 mkspecs/modules-inst/*.pri 里的 QT_MODULE_{BIN,INCLUDE,LIB,HOST_LIB}_BASE 以及 include(...) 语句写的是**构建期**的 conan 私有前缀 <home>/p/b/<hash>/b，随构建目录清理而失效；bin/qt.conf 的 [Paths] Prefix / HostPrefix 同样是构建期路径。消费方用 qmake 构建时，qmake 从 Qt 安装的 mkspecs/modules 读取这些条目：include 的目标不存在（每个模块一条 "Cannot read ..." 警告），QT.<module> 的 libs/includes 解析不出有效路径，于是 `QT += core gui widgets ...` 被判为 Unknown module(s)；同时 QT_INSTALL_BINS/LIBS 指向失效目录，QMAKE_RCC/QMAKE_MOC/QMAKE_UIC 生成 <stale>/bin/rcc（Makefile 把不存在的 rcc 写成 qrc 依赖，make 直接失败），产物 RUNPATH 也写入失效路径。
+affected_scope:         所有以 qmake 为构建系统、且依赖 Qt5 模块包（qt5-qtbase / qt5-qtsvg / qt5-qtx11extras / qt5-qtserialport …）的配方，尤其在"包是就地构建产物"的 conan 缓存布局下。实测：xdrawchem 1.11.1（qt5-qtbase/5.15.2.2 + qt5-qtsvg/5.15.2）报 `Unknown module(s) in QT: core gui xml network widgets printsupport` 与 48 条 Cannot read；仓内 qconf/2.5、baka/2.0.4、qpdfview/0.5.0 采用同一修法。
+verification_cmd:       qmake -qtconf <fixed>.conf <app>.pro -spec linux-clang; # 期望无 "Project ERROR: Unknown module(s)"；grep -n '^CXXFLAGS' Makefile 应含正确的 -I<package>/include/QtCore 而非 <stale>/include；make 后 readelf -d <bin> | grep RUNPATH 不应含 .conan2/p/b/ 构建期路径
+
+rec_priority:           1
+rec_approach:           copy-rewrite-pri-via-qmakemodules-plus-qtconf
+rec_description:        (1) 把**每个** Qt5 依赖包的 mkspecs/modules/*.pri 与 mkspecs/modules-inst/*.pri 复制到 <build_folder>/qmake-modules/{modules,modules-inst}，用正则 `/[^\s\"'()]*?/p/b/[^/\s\"'()]+/[bp](?=/|$|\s|\"|')` 把构建期前缀整体改写为对应包的 package_folder（必须以 `/` 起锚，否则 `include(/…` 的 `include(` 会被吞掉）；(2) `Environment().define("QMAKEMODULES", modules_dir)` —— QMAKEMODULES 目录中的同名 .pri 优先于 Qt 安装 mkspecs/modules 内失效条目（无需改动 conan 缓存包，比改包内文件更干净）；(3) 另写只含 [Paths] Prefix/HostPrefix=<qtbase package> 与空 Sysroot 的 qt.conf，用 `qmake -qtconf <file>` 加载（**不可**带 [EffectivePaths] Prefix=..，否则找不到 mkspec），修复 rcc/moc/uic 与产物 RUNPATH；(4) 仍以命令行 `QMAKE_RCC=… QMAKE_MOC=… QMAKE_UIC=…` 兜底（命令行赋值优先级最高）；(5) QT_MODULE_*_BASE 失效还会让 qmake 判定 svg 等外部模块缺失，故 qtbase 与 qtsvg 都要处理（只处理 qtsvg 不够）。残留的 "Cannot read" 警告来自 qmake 仍会遍历 Qt 安装内 modules 目录，非致命。
+rec_command:            python: shutil.copy2(<pkg>/mkspecs/modules/<x>.pri, modules_dir) + _STALE_PREFIX_RE.sub(pkg_root, content); build_env.define("QMAKEMODULES", modules_dir); qmake -qtconf <qt.conf> <pro> -spec linux-clang "QMAKE_RCC=<pkg>/bin/rcc" "QMAKE_MOC=<pkg>/bin/moc" "QMAKE_UIC=<pkg>/bin/uic"
+rec_auto_fix:           false
+
+fallback_priority:      2
+fallback_approach:      patch-package-in-cache
+fallback_description:   直接在 conan 缓存内改写 qt5-qtbase 包的 qt.conf 与 .pri（archives/q/qt5-qtsvg/5.15.2 的 _fix_qtbase_paths 做法）。可行但会修改依赖包内容，且只对当前机器缓存生效、并发构建互相影响，故仅作兜底。
+fallback_command:       sed -i "s#<stale>#<pkg>#g" <qtbase>/mkspecs/modules/*.pri
+fallback_auto_fix:      false
+
+forbid_1_pattern:       QMAKE_MKSPECS=/storage/Users/currentUser/\.conan2|/usr/local/lib/qt5
+forbid_1_reason:        硬编码本机 conan 缓存或系统 Qt 路径，CI clean 环境不存在。
+forbid_1_consequence:   配方在 CI 上必然失败，且把开发机状态写进配方。
+
+forbid_2_pattern:       CONFIG \+= debug\s*$[\s\S]{0,200}QMAKE_CXXFLAGS_DEBUG
+forbid_2_reason:        与本条同源的 .pro 硬编码调试配置问题，需单独处理（见姊妹草稿），不要用改 qmake 模块描述的方式掩盖。
+forbid_2_consequence:   误把配置问题当成模块解析问题，调参螺旋。
+
+principles:             P005
+# ═══ 知识协作 (Authorship & Provenance) ═══
+source_pr:
+source_commit:
+rec_impl:               manual
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E3651.md

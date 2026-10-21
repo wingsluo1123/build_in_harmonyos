@@ -1,0 +1,40 @@
+# 版本级 manifest — krb5-auth-dialog 43.0
+version: "43.0"
+software: krb5-auth-dialog
+status: built
+build_date: "2026-10-05"
+build_system: meson
+
+source:
+  url: "https://download.gnome.org/sources/krb5-auth-dialog/43/krb5-auth-dialog-43.0.tar.xz"
+  sha256: "0ebf108f0f4bc1247e8cbbfc7c9f4a50afdf7e79ceb4183ef37aec59d4365397"
+  tar_format: tar.xz
+
+build:
+  system: meson
+  configure_options:
+    - "pam-plugin=disabled"
+    - "pkinit=disabled"
+    - "etpo=disabled"
+  dependencies:
+    - glib/2.84.0.1
+    - gtk/3.24.43
+    - krb5/1.22.1
+  cc: clang
+
+patches_applied:
+  - "0001-gcr-to-gtkentrybuffer.patch"
+  - "0002-skip-help-and-fix-install-script-shebang.patch"
+  - "0003-headless-version.patch"
+
+knowledge_gained:
+  - "gcr-3 不可得时（registry 仅 gcr-base gtk=false 变体）以 GtkEntryBuffer 替换 GcrSecureEntryBuffer 的最小改动面：meson.build 依赖行 + ka-pwdialog.c 头/g_type_ensure + .ui 对象类三处"
+  - "GNOME meson app 的 headless 验证契约：--version 处理移到 gtk_init 之前，显示环境缺失时 CLI 合同仍可验证"
+  - "gnome.compile_resources/compile_schemas 所需 glib-compile-* 为无 RPATH ELF，须 LD_LIBRARY_PATH wrapper 注入 PATH"
+
+test_results:
+  type: consumer
+  total: 4
+  passed: 4
+  failed: 0
+knowledge_ref: []

@@ -1,0 +1,28 @@
+# 软件级 manifest — LIGGGHTS
+software: liggghts
+display: "LIGGGHTS"
+description: "离散元法（DEM）颗粒仿真引擎，用于颗粒流、粉体与颗粒-流体耦合的工业级数值模拟"
+category: utility
+homepage: "https://github.com/CFDEMproject/LIGGGHTS-PUBLIC"
+license: GPL-2.0-or-later
+
+build_system: makefile
+
+ohos_adaptation:
+  key_points:
+    - "上游是手写 Makefile（LAMMPS 风格 src/Makefile + src/MAKE/Makefile.<machine>），构建必须显式传入 CC/LINK/MPI_*/PKG_* 等变量"
+    - "src/Makefile 顶部把 SHELL 写死为 /bin/bash（OHOS 镜像无该路径）；配方优先使用 CONFIG_SHELL，未设置时按存在性挑选可用 shell，取不到则显式报错"
+    - "Makefile.mpi 默认 LIB=-lstdc++ 且默认开启 VTK 6.2 链接参数，OHOS 下需改为 libc++（LIB 置空）并清空 VTK_*"
+    - "VTK 输出依赖 VTK 的 ParallelMPI 模块（vtkMPIController），已发布的 OHOS vtk/9.4.1 未启用 MPI，因此本次不启用 VTK 输出（详见 3.8.01/notes.md）"
+    - "dump_mesh_vtk.{h,cpp} 是全库唯一未受 LAMMPS_VTK 开关保护的 VTK 源文件，需补上守卫才能编译"
+    - "旧版 C++ 在 libc++/clang 下有 2 处不兼容写法（临时流绑定、指针与 0 的有序比较），已用等价写法修复"
+  common_dependencies:
+    - mpich
+    - zlib
+    - boost
+
+versions:
+  "3.8.01":
+    status: built
+    build_date: 2026-10-15
+    published_as: liggghts

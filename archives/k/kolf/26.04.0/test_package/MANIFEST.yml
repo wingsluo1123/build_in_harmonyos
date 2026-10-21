@@ -1,0 +1,44 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for kolf/26.04.0.
+
+package: kolf/26.04.0
+homepage: https://invent.kde.org/games/kolf
+
+# 上游无测试套件（R51 清点，见 notes.md）：kolf-26.04.0.tar.xz 共 405 个条目，
+# 无 tests/、autotests/ 或 test/ 目录；全部 7 个 CMakeLists.txt 与 cmake 模块中
+# 无 enable_testing()/add_test()/ecm_add_test()/BUILD_TESTING 调用
+# （grep -rn 全树扫描仅 po/ 目录命中 i18n 相关文本，无测试注册）。
+# 上游 QA 仅经 KDE CI 源码构建（.kde-ci.yml）。
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "kolf-26.04.0.tar.xz（405 entries, sha256 dfb88b8e44bfdfc2e06b9499a17561a97e31de839b1d788c564c3ea8e05e9386）"
+    reason: "无 tests/、autotests/ 或 test/ 目录（find -iname '*test*' 全树零命中）；顶层仅 src/ sounds/ courses/ pics/ themes/ doc/ po/ 数据与源码目录。"
+  - source: "全部 7 个 CMakeLists.txt（顶层 + src/sounds/courses/pics/themes/doc）与 cmake/InternalMacros.cmake"
+    reason: "无 enable_testing、无 add_test、无 ecm_add_test、无 BUILD_TESTING 选项；默认目标仅 kolf 可执行文件与 kolfprivate 静态库；ctest -N 为空。"
+  - source: ".kde-ci.yml（上游 CI 声明）"
+    reason: "上游 QA 经 KDE CI 源码构建完成，无独立测试作业可引用；与 kbreakout/ktuberling 26.04.0（同 release-service 批次、同类 QWidget 游戏）结论一致。"
+  - conclusion: "上游 26.04.0 未提供自动化测试；由 test_package 对打包二进制做消费者视角冒烟验证（--version/--help/--license 真实执行，4 项断言）。"
+upstream_test_total: 0
+upstream_test_count_method: ctest_entries
+upstream_test_passed: 0
+upstream_test_failed: 0
+upstream_test_skipped: 0
+
+# HMBS evidence gate treats any non-empty check/command as "upstream has tests"
+# (codemadness-frontends/rtnppd precedent); kolf tarball audit proves zero tests,
+# so both stay empty and the audit below is the evidence.
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests: []
+
+test_package_tests:
+  - file: test_package/test.sh
+    description: "消费者冒烟：真实执行包内 bin/kolf 完成 4 项验证——二进制存在可执行；--version 输出 26.04.0 且退出 0（KAboutData 在 GUI 创建前处理，QT_QPA_PLATFORM=offscreen 下无头安全）；--help 输出非空且退出 0（Qt/KDE 运行时链接完整）；--license 输出非空且退出 0（KAboutData 元数据完整）。"
+    command: "conan create (test_package runs test.sh against the installed bin/kolf)"
+  - file: test_package/test.sh
+    description: "鸿蒙特有运行时闭包加载：被测二进制在 OHOS 动态链接器下启动并解析全部 DT_NEEDED 闭包（KF6/KDEGames6 的相对路径与构建机绝对路径 NEEDED 经 test_package 兼容链接层解决；/system/lib64 提供兼容 libc++_shared；执行前经 binary-sign-tool 重签）。"
+    command: "conan create (same test.sh run on OHOS aarch64)"
+
+assertion_count: 4

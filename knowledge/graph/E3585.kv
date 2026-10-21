@@ -1,0 +1,35 @@
+# DRAFT-15202: meson install rpath fixup 在 hmdfs 上 in-place 重写 .so 损坏 ELF
+id:                     E3585
+trigger_tool:           meson
+phase:                  installation
+error_signature:        dlopen.*EACCES|cannot open shared object.*Permission denied.*\.so|\.so.*sha256.*mismatch
+severity:               3
+category:               platform, hmdfs
+match_keywords:         meson, rpath, dlopen, EACCES, hmdfs, ELF corrupt, sha256, RUNPATH
+title:                  meson install rpath fixup 在 hmdfs 上 in-place 重写 .so 损坏 ELF，dlopen 返回 EACCES
+root_cause:             meson 安装阶段对 staging 目录中的 .so 执行 in-place rpath fixup（重写 RUNPATH 段）；在 hmdfs 文件系统上 in-place 重写损坏 ELF：包内 .so 比构建树小 306 字节、.dynstr/RUNPATH 区被 0x58 填充，dlopen 返回 EACCES（内核拒绝执行损坏 ELF，报权限错误）；ohpcd 下载与 shell cp 复制的 .so 完好，损坏只发生在 in-place 重写路径
+affected_scope:         hmdfs 底座设备上所有 meson 构建的共享库配方（凡 install rpath 场景）
+verification_cmd:       conan create 后比对包内 lib/*.so 与构建树同名文件 sha256sum（应一致），test_package 二进制 dlopen 应成功
+rec_priority:           1
+rec_approach:           package-sha256-verify-recopy
+rec_description:        recipe 的 package() 对共享库做 sha256 校验（包目录 vs 构建树），不一致时 shutil.copy2 从构建树重拷（重拷 .so 保留构建树 RUNPATH，本机有效、CI 无害）
+rec_auto_fix:           false
+rec_impl:
+fallback_priority:      2
+fallback_approach:
+fallback_description:
+fallback_command:
+fallback_auto_fix:      false
+fallback_impl:
+principles:
+doc_file:               drafts/DRAFT-15202-meson-rpath-fixup-hmdfs-elf-corrupt.md
+last_updated:           2026-10-16
+source_event:           totem-pl/3.26.7 OHOS 适配（2026-10-15~16，OHOS 真机 aarch64）
+authors:                gcw_Pp8UzTBn <2280277721@qq.com>
+source_pr:
+source_commit:
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+rec_impl:               manual

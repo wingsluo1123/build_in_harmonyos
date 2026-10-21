@@ -1,101 +1,21 @@
 software: libxfce4util
-# 版本级 manifest 模板
-# 文件位置: archives/{letter}/{name}/4.20.0/manifest.yaml
-# 遵循 ARCHIVE-SPEC v2.0
-
-# ============================================================
-# 必须字段
-# ============================================================
-
-# 版本号
 version: "4.20.0"
-
-# 编译状态
-# published | built | failed | archived
+build_system: autotools
 status: built
-
-# 编译日期（YYYY-MM-DD）
-build_date: "2026-06-16"
-
-# ============================================================
-# 源码信息
-# ============================================================
-
+build_date: "2026-10-15"
 source:
-  # 源码下载 URL
-  url: "file:///storage/Users/currentUser/tmp/downloads/libxfce4util-4.20.0.tar.bz2"
-
-  # 源码校验和
-  sha256: ""
-
-  # 压缩格式
-  # tar.gz | tar.xz | tar.bz2 | zip
-  tar_format: tar.gz
-
-# ============================================================
-# 构建配置
-# ============================================================
-
-build:
-  # 构建系统类型
-  # cmake | autotools | makefile | meson | custom
-  system: autotools
-  build_system: autotools
-
-  # 配置选项列表
-  configure_options: []
-  # 例如:
-  # - "-DCMAKE_BUILD_TYPE=Release"
-  # - "-DCMAKE_SYSTEM_NAME=OHOS"
-
-  # 编译依赖列表（格式: name/version）
-  dependencies: []
-  # 例如:
-  # - openssl/1.1.1w
-  # - curl/8.19.0
-
-  # 编译器
-  cc: clang
-  cxx: clang++
-
-# ============================================================
-# 补丁信息
-# ============================================================
-
-# 应用的补丁列表
-patches_applied: []
-# 例如:
-# - "0001-bootstrap-ohos-toolchain.patch"
-
-# ============================================================
-# 知识沉淀
-# ============================================================
-
-# 编译中学到的知识
-knowledge_gained: []
-# 例如:
-# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
-# - "内嵌 libuv 需要禁用，使用系统 libuv"
-
-patch_generation:
-  method: per-file-difflib
-  source_orig_dir: /storage/Users/currentUser/builds/libxfce4util-4.20.0.orig
-  source_work_dir: /storage/Users/currentUser/builds/libxfce4util-4.20.0.work
-  source_orig_hash: be63e5db46d4da00
-  source_work_hash: 08437a706e81f74a
-  generated_at: '2026-06-16T11:36:57'
-  patches_count: 3
-
-patch_classification:
-  - file: 0001-config.guess.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0002-config.sub.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
-  - file: 0003-configure.patch
-    type: auto
-    platform_only: True
-    guard: 'pending'
+  url: "https://archive.xfce.org/src/xfce/libxfce4util/4.20/libxfce4util-4.20.0.tar.bz2"
+  sha256: "21493f9c9995a282823db93839f6b9f06ae31edb094191ba9acf04d932a2b592"
+dependencies:
+  - glib/2.84.0.1
+patches_applied:
+  - "0001-config.guess.patch"
+  - "0002-config.sub.patch"
+  - "0003-configure.patch"
+  - "0004-disable-nls-i18n-guards.patch"
+knowledge_gained:
+  - "纯 autotools 发布包：无 glib host 工具需求（无 gdbus-codegen/mkenums/genmarshal），可见性工具随 tarball 自带"
+  - "--disable-nls 规避 AM_GNU_GETTEXT([external]) 的 host libintl 依赖（E015/E027）；但 xfce-i18n.c/libxfce4util-private.c 的 textdomain 调用上游无守卫，proxy-libintl 头会重绑为 g_libintl_*，须以 0004 补丁加 ENABLE_NLS 守卫，否则消费者 lld --no-allow-shlib-undefined 链接必失败（供给 DSO 在 glib 包内、链接行定位不到；绝对路径注入 LDFLAGS 又会打挂 configure conftest 运行检查）"
+  - "xfce4-kiosk-query 仅链接 libtool .la，依赖 glib libdir 经 .la dependency_libs 隐式传递；配方以显式 -L 注入满足 lld 链接闭包定律（build-chain-pitfalls 共享库链接闭包节）"
+  - "上游无测试套件：无 tests/ 目录、无 TESTS 变量、meson 无 test()；make check 为可验证 no-op（见 test_package/MANIFEST.yml NO_UPSTREAM_TESTS 申报）"
+  - "Conan 2 AutotoolsToolchain 默认注入 --sbindir=${prefix}/bin（bin 展平，E2167/E545 佐证注入机制）：上游 sbin_PROGRAMS 的 xfce4-kiosk-query 在 conan 包内实际位于 bin/，cpp_info.bindirs 与 test_package 断言按 bin/ 声明"

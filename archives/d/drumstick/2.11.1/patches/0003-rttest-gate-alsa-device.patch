@@ -1,0 +1,15 @@
+--- a/tests/rtTest/CMakeLists.txt
++++ b/tests/rtTest/CMakeLists.txt
+@@ -28,8 +28,10 @@
+     Qt${QT_VERSION_MAJOR}::Test
+     Drumstick::RT )
+ 
+-if (${CMAKE_SYSTEM} MATCHES "Linux")
+-    if (BUILD_ALSA AND ALSA_FOUND AND (EXISTS "/dev/snd/") AND (EXISTS "/dev/snd/seq"))
++if (BUILD_ALSA AND ALSA_FOUND)
++    # ALSA-based RT test needs the ALSA sequencer device; skip when absent
++    # (matches the upstream Linux gating on /dev/snd/seq, also on HarmonyOS).
++    if ((EXISTS "/dev/snd/") AND (EXISTS "/dev/snd/seq"))
+         add_test (rtTest ${PROJECT_BINARY_DIR}/bin/rtTest)
+     endif()
+ else()

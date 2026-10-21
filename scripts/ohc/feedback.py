@@ -354,6 +354,21 @@ def _collect_situation(ver_dir: Path, project_dir: str) -> dict:
             result["branch_name"] = state.get("branch_name", "")
         except (json.JSONDecodeError, OSError):
             pass
+    # v12.24 (反馈 00802fed): PR 号多级回退——.submit-state 缺失时从
+    # result.json 草稿与分支名恢复（pr_created 草稿带 pr_number）
+    if pr_number == "—":
+        try:
+            home = Path(os.environ.get("OHC_RESULT_OUT", "")).expanduser()
+            for cand in ([home] if str(home) else []) + [Path("~").expanduser() / "ohpcd-ai-worker-result.json"]:
+                p = Path(cand) if not isinstance(cand, Path) else cand
+                if p.is_file():
+                    rj = json.loads(p.read_text(encoding="utf-8"))
+                    if str(rj.get("pkg")) == software and str(rj.get("ver")) == version \
+                            and rj.get("pr_number"):
+                        pr_number = str(rj["pr_number"])
+                        break
+        except Exception:
+            pass
     result["pr_number"] = pr_number
     result["ai_review_phase"] = review_phase
     # Remote CI: since feedback is generated after submit success, CI passed

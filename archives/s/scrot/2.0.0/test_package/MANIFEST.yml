@@ -1,0 +1,64 @@
+# test_package/MANIFEST.yml
+# Upstream official test declaration file
+# CI script (build_and_test.sh L0e) requires this file to exist
+# See: docs/TEST_QUALITY_SPEC.md
+
+package: scrot/2.0.0
+homepage: "https://github.com/resurrecting-open-source-projects/scrot"
+
+# Upstream test command analysis (audited against scrot-2.0.0 release tarball)
+# No upstream test suite exists, so no check command applies. Keep empty so the
+# HMBS inventory does not treat this package as "upstream has tests" (wraplinux
+# 1.7 / codemadness-frontends 0.8 / bwm 0.6.3 precedent: only ""/null passes the
+# no_tests gate; any non-empty value forces discovery and rejects no_tests/0).
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# Upstream ships no test suite at all.
+upstream_tests_exist: false
+upstream_test_audit:
+  source_tarball: "scrot-2.0.0.tar.gz"
+  source_sha256: "1b4b3acadfe07bf89234838675d1d23508a9a6810cb64584f1d9610103d6cdfa"
+  source_origin: "https://github.com/resurrecting-open-source-projects/scrot/releases/download/2.0.0/scrot-2.0.0.tar.gz"
+  top_level_files:
+    - "Makefile.am  # SUBDIRS = src, no TESTS / check_PROGRAMS definition"
+    - "configure.ac  # PKG_CHECK_MODULES on deps.pc only; no test framework macros"
+    - "deps.pc  # Requires: x11 imlib2 >= 1.11.0 xcomposite xfixes xrandr; version floor only"
+    - "autogen.sh  # autoreconf bootstrap, no test entry"
+    - "src/Makefile.am  # only bin_PROGRAMS = scrot plus sources, no check programs"
+    - "src/*.c/*.h  # scrot.c scrot_selection.c options.c/util.c, no TEST()/TEST_F/def test_"
+    - "doc/  # documentation only"
+    - "etc/  # bash/zsh completion scripts only"
+    - "man/  # man page only"
+  scanned_for:
+    - "TEST(F / TEST_F (gtest)"
+    - "def test_ (pytest)"
+    - "Makefile.am TESTS / check_PROGRAMS / check target"
+    - "tests/ / test/ / spec/ / t/ directory"
+    - "CTest / ctest / meson test target"
+    - "configure.ac test framework macros"
+  scan_result: "0 matches -- upstream 2.0.0 tree has no tests/ directory, top-level Makefile.am SUBDIRS=src with no TESTS, src/Makefile.am only declares bin_PROGRAMS=scrot with its sources"
+  make_check_output: "no TESTS/check_PROGRAMS defined, so automake check target executes no tests (nothing to discover or execute)"
+  reason: "scrot 2.0.0 is a pure X11 CLI tool; upstream release tarball and GitHub file list (doc/ etc/ man/ src/ + Makefile.am/configure.ac/autogen.sh/deps.pc) contain no test suite, so build() does not invoke make check and evidence is produced by test_package CLI probes"
+upstream_test_total: 0
+upstream_test_count_method: autotools_tests
+
+upstream_tests: []
+
+# test_package tests (consumer perspective verification, headless-safe)
+# Real driver is test_scrot.py (L0c source file; sl/toybox precedent):
+# conanfile.py runs `python3 test_scrot.py <scrot_bin>` via self.run().
+test_package_tests:
+  - file: test_scrot.py
+    description: "Run scrot --version to verify the binary reports 2.0.0"
+    command: "python3 test_scrot.py (scrot --version)"
+  - file: test_scrot.py
+    description: "Run scrot --help to verify help text is produced (non-empty gate)"
+    command: "python3 test_scrot.py (scrot --help)"
+  - file: test_scrot.py
+    description: "Run scrot --list-options to verify the option list is produced (non-empty gate)"
+    command: "python3 test_scrot.py (scrot --list-options)"
+
+# Test assertion count (3 CLI probes)
+assertion_count: 3

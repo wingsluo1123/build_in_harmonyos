@@ -1,0 +1,32 @@
+id:                     E3497
+title: OHOS SDK libc++ 的 <format> 不完整：需 _LIBCPP_ENABLE_EXPERIMENTAL，libc++.so 未导出 std::format_error，且无 chrono formatter
+category:               ohos, portability, toolchain, c++20, libc++
+severity:               2
+error_signature: "no member named 'format' in namespace 'std'|undefined reference to .*format_error|no member named 'parse' in 'std::formatter<std::chrono::time_point"
+match_keywords: std::format, format_to, format_error, _LIBCPP_ENABLE_EXPERIMENTAL, _LIBCPP_HAS_NO_INCOMPLETE_FORMAT, chrono formatter, libc++, C++20
+root_cause: >
+  OHOS SDK（clang 15 配套）的 libc++ 是裁剪版：默认定义
+  _LIBCPP_HAS_NO_INCOMPLETE_FORMAT / _LIBCPP_HAS_NO_INCOMPLETE_RANGES，因此
+  <format> 与 <ranges> 的内容对消费者不可见（std::format 直接 "no member"）。
+  定义 _LIBCPP_ENABLE_EXPERIMENTAL 后头文件声明恢复，但预编译的 libc++.so
+  并未带 experimental 特性：它不导出 std::format_error 的关键符号
+  （~format_error 非 inline 析构 → vtable/typeinfo 由库发射），链接报
+  undefined reference；且其 <format> 未实现 chrono formatter，
+  std::formatter<std::chrono::time_point> 被 delete。
+rec_approach: >
+  三步：① 全库编译加 -D_LIBCPP_ENABLE_EXPERIMENTAL 打开 ranges/format；
+  ② 在一个已编译进共享库的 TU 内补定义 std::format_error::~format_error()
+  以发射 vtable/typeinfo（库未导出）；③ 对 std::format/format_to 的时间点
+  格式化改用 strftime（chrono formatter 缺失）。
+prescan_pattern: "_LIBCPP_HAS_NO_INCOMPLETE_FORMAT|std::format_to\\(|std::format\\(|std::formatter<"
+last_updated: 2026-10-13
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E3497.md
+trigger_tool:           make
+phase:                  build
+affected_scope:         OHOS SDK libc++ 的 <format> 不完整：需 _LIBCPP_ENABLE_EXPERIMENTAL
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        >

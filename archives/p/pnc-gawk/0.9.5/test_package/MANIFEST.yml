@@ -1,0 +1,30 @@
+# test_package MANIFEST — pnc-gawk 0.9.5
+# 上游官方测试入口（实测清点）：
+#   - CMakeLists.txt: enable_testing() + add_test(tests_sh ...)  -> 1 个 CTest 用例
+#   - tests.sh: 11 条断言（pnc CLI：valid / format / find）
+#   - gawkext/README.md: 1 个文档化样例（AWK 过滤 + 期望输出）
+# 本 test_package 另提供 2 个组：1 个 AWK 功能用例集（11 条断言，真实加载
+# gawkpn.so）+ 1 个鸿蒙特有 test_ohos（4 项检查）。
+
+package: pnc-gawk
+version: 0.9.5
+build_system: cmake
+
+upstream:
+  has_tests: true
+  test_framework: ctest+sh
+  test_entry: "tests.sh (registered by CMakeLists.txt add_test(tests_sh ...))"
+  case_count: 11
+  note: >-
+    Upstream ships tests.sh (11 assertions exercising the pnc CLI built from
+    the same gawkext implementation) and a documented gawkext/README.md
+    sample. There is no upstream automation that loads gawkpn.so itself.
+
+test_package:
+  framework: conan+custom
+  type: functional
+  count: 15
+  harmony_specific_count: 4   # test_ohos: OHOS identity + AArch64 ELF + dlopen/dl_load + HMDFS $HOME/tmp load, /tmp EROFS
+  files:
+    - test_gawkpn.awk   # 11 assertions: pn_set_country/pn_set_format/pn_format/pn_valid/pn_info/pn_find/pn_dialout through gawk -l gawkpn
+    - test_ohos.c       # 4 HarmonyOS-native checks on the packaged gawkpn.so

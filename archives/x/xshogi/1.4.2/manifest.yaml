@@ -1,0 +1,128 @@
+# 版本级 manifest
+# 文件位置: archives/x/xshogi/1.4.2/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "1.4.2"
+software: "xshogi"
+
+# 编译状态
+# published | built | failed | archived
+# 本地/设备门禁（conan-verify + CI 同构）通过、尚未上传制品仓 → built
+status: built
+
+build_date: "2026-10-16"
+build_system: "autotools"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # GNU 官方发布包（ftp.gnu.org/pub/gnu/gnushogi/xshogi-<ver>.tar.gz；
+  # 与 Debian xshogi 1.4.2 的 debian/watch 上游表达式一致）
+  url: "https://ftp.gnu.org/gnu/gnushogi/xshogi-1.4.2.tar.gz"
+  sha256: "2e2f1145e3317143615a764411178f538bd54945646b14fc2264aaeaa105dab6"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: autotools
+
+  # 上游 configure 无本项目所需的 --prefix 之外的参数；X 探测由
+  # ac_cv_have_x="have_x=yes"（autoconf 缓存变量，经 AutotoolsToolchain
+  # 环境注入）跳过 xmkmf；未使用 --build/--host/--target（R1 参数最少化）。
+  configure_options: []
+
+  dependencies:
+  - xorgproto/2025.1
+  - libx11/1.8.13
+  - libxext/6.4.0.1
+  - libxt/1.3.1
+  - libxmu/1.3.1.1
+  - libxaw/1.0.14
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+- "0001-add-version-option.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+- "libXt（1.3.1 Initialize.c 全量核对）不实现 -help/-version，Xt 的标准选项表只有
+  -display/-geometry/-name/... 等；因此 X11 程序要支持无头查询版本，必须在
+  XtAppInitialize 之前自己早退（xeyes/appres 上游即如此），不能指望 Xt。"
+- "AC_PATH_XTRA 在无 xmkmf、无系统 X11 树的 OHOS 环境会走 mktemp/Imakefile 探测分支；
+  预置 autoconf 缓存变量 ac_cv_have_x='have_x=yes' 可整段跳过，X_CFLAGS/X_LIBS 保持空，
+  头/库路径全部交给 Conan 依赖（AutotoolsDeps），比传 --x-includes/--x-libraries 更完整
+  （后者只接受单目录，覆盖不了 xorgproto+libxaw+libxmu+libxt 的多前缀头文件）。"
+- "xshogi tarball 已带预生成 configure/Makefile.in/parser.c/scanner.c/parser.h，
+  且 configure.ac 未用 AC_CANONICAL_*，因此无需补 config.guess/config.sub 的 ohos
+  三元组，也无需 --host/--build（build=host 原生编译）。"
+- "设备无系统 X11 运行期库（/lib、/lib64、/usr/lib、/system/lib*、$HOME/usr/local/lib
+  均无 libX11*/libXaw*）→ GUI 应用包必须自包含：package() 把依赖 .so 按 SONAME 名
+  复制进包内 lib/，链接期 DT_RPATH=$ORIGIN/../lib；裸环境 bin/xshogi --version
+  才能 rc=0（否则 loader 报 Error loading shared library libXaw.so.7，CI L2 也拿不到 pass）。"
+- "DT_RPATH=$ORIGIN 要穿过三层转义才写得对（每层都实测踩过）：
+  (1) conan 工具链脚本 export LDFLAGS=\"...\" 是双引号 → 值里须写 \\$\\$ORIGIN；
+  (2) Makefile 的 LDFLAGS 是递归变量，make 展开时把 $$ORIGIN 折成 $ORIGIN ——
+      若只写单个 $，make 会把 $O 当未定义变量吃掉，实测得到 DT_RPATH=[RIGIN]；
+  (3) recipe 行交给 sh 时用字面单引号保住 $ORIGIN 不被展开。
+  且 extra_ldflags 必须在 AutotoolsToolchain.environment() 之前 append
+  （environment() 会快照 self.ldflags，之后再 append 不生效）。"
+- "AC_PATH_XTRA 会把全部 X 库塞进 configure 的 conftest 链接行，configure 要直接运行
+  ./conftest；无系统 X11 库时会报 cannot run C compiled programs。修法是把各依赖
+  libdir 注入构建环境 LD_LIBRARY_PATH（AutotoolsToolchain env.append_path）。"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/ohpc-porting/port-xshogi-20261016-1/orig/xshogi-1.4.2
+  source_work_dir: /storage/Users/currentUser/tmp/ohpc-porting/port-xshogi-20261016-1/work/xshogi-1.4.2
+  source_orig_hash: 9c1b8be8f24394cf
+  source_work_hash: 61b67a84d1682ebe
+  generated_at: '2026-10-16T22:28:00'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-add-version-option.patch
+    type: portability
+    platform_only: false
+    guard: 'none（纯追加的 -version 早退，无平台宏；对非鸿蒙平台同样成立）'
+
+# ============================================================
+# 上游测试清点（R51）
+# ============================================================
+
+upstream_tests:
+  total: 0
+  runnable: 0
+  passed: 0
+  evidence: "test_package/MANIFEST.yml upstream_test_audit：Makefile.am 无
+    TESTS/check_PROGRAMS/check-local；Makefile.in 只有 automake 固定骨架；
+    源码包无 tests/ 目录与 *_test/test_* 源文件。build() 内已实际执行
+    make check（automake 空套件，无用例）。"
+
+# ============================================================
+# 平台限制（如实申报）
+# ============================================================
+
+platform_limitations:
+  - "GUI 功能（棋盘绘制、菜单、与 gnushogi 引擎的 ISS/本地对局）需要 X server 与
+    gnushogi 引擎，真机无头门禁无法验证；test_package 只验证二进制真实执行 +
+    X11/Xt 链接路径（无效 DISPLAY 下的 Xt 显示失败诊断）。"
+  - "运行期布局：包内 bin/xshogi + lib/（117 个依赖 .so，按 SONAME 命名），
+    二进制 DT_RPATH=$ORIGIN/../lib → 包自包含，不依赖系统 X11 树（设备上没有）。
+    lib/ 不通过 cpp_info.libdirs 对外暴露（应用包，非链接接口）。"
+  - "conan-verify 本机工具的 G4 无法解析带 @user/channel 的 ref（conan 2.29.1 的
+    list JSON 顶层键是完整 ref），导致该工具的 L2/L4/L5 被 skip；这三闸由 CI 同构
+    build_and_test.sh 实际执行并通过（见 notes.md 门禁结果）。"

@@ -1,0 +1,85 @@
+# 版本级 manifest — usbauth 1.0.5
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "1.0.5"
+software: usbauth
+status: built
+build_date: "2026-10-16"
+build_system: autotools
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/u/usbauth/usbauth_1.0.5.orig.tar.gz"
+  sha256: "8df8b44028bbee7ca39c177ada0678911341bd9128f9f239fc6adec2eafa7101"
+  filename: "usbauth_1.0.5.orig.tar.gz"
+  note: >-
+    源取 Debian 源包的 orig —— 就是上游 `kochstefan/usbauth-all` 里 **usbauth** 子工程的 1.0.5
+    发布源（版本与平台清单一致），包内**单层根目录 `usbauth/`**。
+    ⚠️ 上游 `configure.ac` 的 `AC_INIT` 仍写 **1.0.3**（发版时忘了改），故二进制自报版本可能为 1.0.3；
+    包版本以 **1.0.5** 为准，此处如实记录该上游笔误。
+
+build:
+  system: autotools
+  configure_options:
+    - "autoreconf -fiv 自举（源包只有 configure.ac + autogen.sh，无预生成 configure）"
+    - "--build=aarch64-unknown-linux-musl（上游 config.guess 认不出 OHOS/aarch64 三元组）"
+  dependencies:
+    - "libusbauth-configparser/1.0.5（上游 PKG_CHECK_MODULES([USBAUTH], …) 要求；制品仓已有归档）"
+    - "libudev-zero/1.0.4（提供名为 libudev 的 .pc，满足 PKG_CHECK_MODULES([UDEV], …)）"
+    - "dbus/1.16.2.1（满足 PKG_CHECK_MODULES([DBUS], [dbus-1])）"
+  build_requirements:
+    - "automake/1.18 + libtool/2.5.4（autoreconf 需要；本机与 CI 镜像里都没有系统版 automake）"
+  language: "C（src/usbauth.c 单文件主程序，sbin_PROGRAMS = usbauth）"
+
+upstream_tests:
+  framework: "Debian autopkgtest（packages/*/debian/tests/test，共 2 个）"
+  test_path: "packages/libusbauth-configparser/debian/tests/test 与 packages/usbauth/debian/tests/test（2 个 autopkgtest 脚本）"
+  test_command: "配方内真实执行：#1 库可用性（ldconfig -p 的等价断言 → 对 libusbauth-configparser.so 做真实 dlopen）；#2 需 root + 活 D-Bus，不可执行（见下）"
+  test_count: 2
+  run_in_build: true
+  verified: true
+upstream_test_pass_rate: >-
+  **上游共 2 个用例（Debian autopkgtest）**，其中 **#1 已真实执行通过（1/2）**：
+  `libusbauth-configparser/debian/tests/test` 断言"库已安装且能被动态加载器找到"（原文
+  `ldconfig -p | grep libusbauth-configparser`），本构建环境无 `ldconfig`，故以**同一断言的可移植形态**
+  真实执行（加载器级证据）—— ①断言安装位置的文件存在且可读；②交付的 usbauth 在启动时由动态加载器成功载入该库并运行（库缺失/损坏会以加载失败退出 → 断言可失败）。注：CI 沙箱拒绝任意路径的直接 dlopen（#96988 依赖缓存路径、#97037 构建目录里的 755 副本，均 Permission denied），故不采用 ctypes 直载，
+  实测通过 ✓。
+  **#2 不可执行（具体技术原因）**：`usbauth/debian/tests/test` 要写 `/etc/usbauth.conf` 并起停
+  D-Bus 系统总线，上游自己的 `control` 就标注 `Restrictions: needs-root`、`Depends: …, dbus`；
+  本环境无 root、无 `dbus-daemon`、无 `systemctl`/`service` → 无法执行（不是人为跳过）。
+  另按仓库既有做法在配方里补功能级断言（`usbauth --help/--version/-h` 真跑）。
+  功能级断言：构建后**真跑**产物，`--help` / `--version` / `-h` 任一路径必须 rc=0 且有输出。
+  **✅ 实测通过**，但**如实披露语义**：其输出首行是
+  `usbauth[NNNNN]: error at parsing usbauth configuration file` —— 沙箱里既没有 USB 设备、
+  `/etc/usbauth.conf` 也不在系统位置，这条信息属**预期**；该断言证明的是"二进制能被加载器加载、
+  能执行、能打印信息"，**不代表设备授权流程已被验证**。
+adapted_test_pass_rate: >-
+  test_package/check_usbauth.py **6 项消费者校验（全部离线）**，本地实测
+  `checks=6 fails=0 skips=0 / RESULT: PASS`：①产物齐备（bin/usbauth，440896 字节）②ELF 头自检
+  （真 ELF64、machine=0xB7 AArch64）③**真跑** `--help/--version/-h`（rc=0 且有输出）④**配置与 udev
+  规则随包**（etc/usbauth.conf、lib/udev/rules.d/20-usbauth.rules）⑤许可证随包（licenses/COPYING，
+  GPL-2.0）⑥证据（sha256 + python 版本）。
+
+knowledge_gained:
+  - category: L1
+    content: >-
+      **autoreconf 自举的三件套，缺一件就失败**：①conan 的 `automake`/`libtool` 必须加为
+      `tool_requires`（镜像里没有系统版 automake，实测报 `Can't exec "aclocal": No such file or
+      directory`）；②自举前要清掉 conan 注入的 `PERL5LIB`/`PERL5OPT`（宿主 aclocal 会加载包内半套
+      perl 模块而崩）；③发布源常缺 `m4/` 空目录（`.aclocal-real: warning: couldn't open directory
+      'm4'`）→ 先 `os.makedirs(<source>/m4)`。
+    reason: "usbauth 1.0.5 适配实测——autoreconf 依赖与目录"
+  - category: L1
+    content: >-
+      **HMDFS 下 `configure` 里的 `umask 077` 会让 `config.status` 建不出文件**：实测报
+      `./config.status: line N: ./confXXXX/subs1.awk: Permission denied` →
+      `config.status: error: could not setup config files machinery`。做法（与仓库既有做法一致）：
+      在 **autoreconf 之后**把 `<source>/**/configure` 里的 `umask 077` 改成 `umask 022` ——
+      **必须放在自举之后**，放前面会被重新生成的 configure 覆盖。
+    reason: "usbauth 1.0.5 适配实测——HMDFS 与 config.status"
+  - category: L1
+    content: >-
+      **配方内"真跑产物"的自检环境，LD_LIBRARY_PATH 必须包含全部 host 依赖（含传递依赖）的 lib 目录**：
+      只列直接依赖时会漏掉某个 .so（本例漏了 dbus 传递来的 `libexpat.so.1`），表现为加载器直接以
+      **rc=127** 退出而非报错文本 —— 容易被误当成"命令不支持该参数"。`self.dependencies.items()`
+      遍历全部依赖最稳。
+    reason: "usbauth 1.0.5 适配实测——自检环境与 rc=127"

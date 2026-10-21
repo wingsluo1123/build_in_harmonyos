@@ -1,0 +1,81 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# libhl ae3e64484b 上游测试入口: `make test`（test: tests → libut + static 后按键值
+# TEST_EXEC_ORDER 顺序执行单元测试）。断言计数由 support/libut 框架打印
+# （==> Summary: N tests, N succeeded）。
+# 上游单测依赖 git 子模块 support/libut（源码 tarball 不含该子模块内容），CI 环境不取
+# 子模块，故上游单测未集成进 conanfile.py build()；L1 消费者验证由 test_package/test.c 承担。
+
+package: libhl/ae3e64484b
+homepage: "https://github.com/xant/libhl"
+
+# 上游测试命令 (make test → tests: libut static，随后按 TEST_EXEC_ORDER 逐个执行)
+upstream_check_command: "make test"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（本地补全 support/libut 子模块后 `make test` 实跑结果：
+# TEST_EXEC_ORDER 共 13 个目标，其中 11 个编译运行成功，共 188 项断言全部 succeeded；
+# linklist_test / rqueue_test 编译失败——本机 libc 头未声明 pthread_testcancel /
+# pthread_cancel，叠加上游 tests 目标的 -Werror 报 implicit-function-declaration，
+# 属上游测试源码可移植性问题，与本次适配补丁无关，故未列入）
+upstream_tests:
+  - file: test/fbuf_test.c
+    source: libhl-ae3e64484bbee53b2868b68cd7b92bf1bdbc18d2/test/fbuf_test.c
+    description: "fbuf 环形缓冲 — 50 项断言"
+    command: "./fbuf_test"
+  - file: test/rbuf_test.c
+    source: libhl-ae3e64484bbee53b2868b68cd7b92bf1bdbc18d2/test/rbuf_test.c
+    description: "rbuf 引用计数环形缓冲 — 33 项断言"
+    command: "./rbuf_test"
+  - file: test/hashtable_test.c
+    source: libhl-ae3e64484bbee53b2868b68cd7b92bf1bdbc18d2/test/hashtable_test.c
+    description: "hashtable 线程安全哈希表 — 16 项断言"
+    command: "./hashtable_test"
+  - file: test/queue_test.c
+    source: libhl-ae3e64484bbee53b2868b68cd7b92bf1bdbc18d2/test/queue_test.c
+    description: "queue 队列 — 7 项断言"
+    command: "./queue_test"
+  - file: test/rbtree_test.c
+    source: libhl-ae3e64484bbee53b2868b68cd7b92bf1bdbc18d2/test/rbtree_test.c
+    description: "rbtree 红黑树 — 8 项断言"
+    command: "./rbtree_test"
+  - file: test/avltree_test.c
+    source: libhl-ae3e64484bbee53b2868b68cd7b92bf1bdbc18d2/test/avltree_test.c
+    description: "avltree AVL 树 — 8 项断言"
+    command: "./avltree_test"
+  - file: test/binheap_test.c
+    source: libhl-ae3e64484bbee53b2868b68cd7b92bf1bdbc18d2/test/binheap_test.c
+    description: "binheap 二叉堆 — 6 项断言"
+    command: "./binheap_test"
+  - file: test/pqueue_test.c
+    source: libhl-ae3e64484bbee53b2868b68cd7b92bf1bdbc18d2/test/pqueue_test.c
+    description: "pqueue 优先队列 — 13 项断言"
+    command: "./pqueue_test"
+  - file: test/skiplist_test.c
+    source: libhl-ae3e64484bbee53b2868b68cd7b92bf1bdbc18d2/test/skiplist_test.c
+    description: "skiplist 跳表 — 6 项断言"
+    command: "./skiplist_test"
+  - file: test/trie_test.c
+    source: libhl-ae3e64484bbee53b2868b68cd7b92bf1bdbc18d2/test/trie_test.c
+    description: "trie 前缀树 — 11 项断言"
+    command: "./trie_test"
+  - file: test/graph_test.c
+    source: libhl-ae3e64484bbee53b2868b68cd7b92bf1bdbc18d2/test/graph_test.c
+    description: "graph 有向图 — 30 项断言"
+    command: "./graph_test"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "消费者测试 — 真实调用 ht_create/ht_set/ht_get/ht_exists(命中与缺失) + list_create/list_push_value/list_count 并断言行为"
+    command: "./test_libhl"
+
+# 测试断言总数 (用于质量评估)：上游 11 程序 188 项 + test_package/test.c 的 9 条 CHECK
+# （其中 4 条位于 3 次循环内，运行期共 17 次断言检查）= 188 + 9 = 197
+assertion_count: 197

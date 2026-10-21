@@ -1,0 +1,25 @@
+software: qcustomplot
+display: "QCustomPlot"
+description: "Qt C++ plotting widget library for 2D charts: graphs, colour maps, bars, financial plots, legends, axis tickers, plot items and raster/PDF export"
+category: library
+homepage: "https://www.qcustomplot.com/"
+license: GPL-3.0-only
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "上游只发布 qcustomplot.cpp / qcustomplot.h / GPL.txt / changelog.txt，没有构建系统与测试；CMakeLists.txt 与 CMake 包配置由归档提供"
+    - "OHOS qtbase/6.11.1 以 FEATURE_printsupport=OFF 构建，不带 Qt6PrintSupport：CMake 用 OPTIONAL_COMPONENTS PrintSupport 能力探测，缺失时定义 QT_NO_PRINTER，savePdf 走上游存根；补丁 0001 给头文件包含加同一守卫（无平台宏）"
+    - "CMakeToolchain 变量在第一个 project() 内才加载：project() 不带 VERSION，之后读取 QCUSTOMPLOT_VERSION 设置库版本与包版本文件"
+    - "OHOS CMake 无 Platform/HarmonyOS 模块：注入 CMAKE_SHARED_LIBRARY_SONAME_{C,CXX}_FLAG"
+    - "HMDFS 拒绝 symlink(2)：运行期探测不可用时 CMAKE_PLATFORM_NO_VERSIONED_SONAME=ON，单文件 libQCustomPlot.so + 裸 DT_SONAME"
+    - "qtbase 为 cmake_find_mode=none：配方写 conan_cmakedeps_paths.cmake 指向真实 Qt6Config.cmake"
+    - "上游 0 个测试；test_package 提供 16 个具名消费者 E2E 用例（离屏 Qt，PNG/PDF 导出与像素校验）"
+  common_dependencies:
+    - qtbase
+
+versions:
+  "2.1.1":
+    status: built
+    build_date: "2026-10-18"
+    conan_ref: "qcustomplot/2.1.1"

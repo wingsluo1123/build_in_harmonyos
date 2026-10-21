@@ -1,0 +1,33 @@
+# 版本级 manifest — xkbcommon 1.13.2
+version: "1.13.2"
+software: "xkbcommon"
+status: published
+build_date: "2026-10-17"
+build_system: "meson"
+
+source:
+  url: "https://github.com/xkbcommon/libxkbcommon/archive/refs/tags/xkbcommon-1.13.2.tar.gz"
+  sha256: "acc4d5f7c3cbba5f9f8d08d8bdbeede84ecede46792f47929aa9321873385528"
+  tar_format: tar.gz
+
+build:
+  system: meson
+  configure_options:
+    - "-Denable-x11=false"
+    - "-Denable-wayland=false"
+    - "-Denable-tools=false"
+    - "-Denable-xkbregistry=false"
+    - "-Denable-bash-completion=false"
+    - "-Ddefault_library=static"
+  dependencies: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-meson-merge-modes-python-interpreter.patch"
+
+knowledge_gained:
+  - "xkbcommon 核心库 libxkbcommon 无强制外部依赖；x11(xcb)/xkbregistry 为可选附加库，OHOS 上关闭不影响 wlroots/wayfire 使用"
+  - "meson custom_target 直接执行 python 脚本依赖 shebang /usr/bin/env，OHOS 沙箱/精简环境无此路径；改用 find_installation('python3')+script 显式执行更可移植"
+  - "compose 表遍历在 OHOS 上丢失高值 Unicode keysym 条目（如 U1D1B9 音乐符号），仅影响 compose 输入法功能，wlroots/wayfire 不依赖"
+  - "上游测试 test-context 的 test_maketempdir 硬编码 mkdtemp(/tmp/...)，沙箱 /tmp 只读时必然 SIGABRT（环境问题，CI /tmp 可写不受影响）"

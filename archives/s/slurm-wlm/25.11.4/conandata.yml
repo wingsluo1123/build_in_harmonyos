@@ -1,0 +1,49 @@
+sources:
+  "25.11.4":
+    url: "https://download.schedmd.com/slurm/slurm-25.11.4.tar.bz2"
+    sha256: "237f515adcb37b99ff6cb3e1fa81691a5f7188e94c3b6b495858b4eaecf6531d"
+
+patches:
+  - patch_file: "patches/0001-config-sub-ohos.patch"
+    patch_description: >
+      The bundled 2022 config.sub does not know the ohos OS, so autoconf cannot
+      canonicalise the aarch64-linux-ohos triplet that the OHOS toolchain reports
+      (E007).  Add linux-ohos* to the maybe_os list of auxdir/config.sub
+    patch_type: "portability"
+  - patch_file: "patches/0002-configure-umask.patch"
+    patch_description: >
+      HMDFS marks new directories with the setgid bit, which makes the
+      config.status scratch directory that configure creates with umask 077
+      unusable ("config.status: error: could not setup config files machinery",
+      knowledge E129/E011); create it with umask 022 instead
+    patch_type: "portability"
+  - patch_file: "patches/0003-sys-unistd-musl.patch"
+    patch_description: >
+      sys/unistd.h is a glibc-only header; musl (and therefore OHOS) does not
+      provide it, so the namespace plugin failed with "'sys/unistd.h' file not
+      found". Replace the include with plain <unistd.h>, which is the POSIX
+      header that declares everything that was used
+    patch_type: "portability"
+  - patch_file: "patches/0004-musl-resolver-shim.patch"
+    patch_description: >
+      musl provides only the classic (non-reentrant) resolver entry points
+      (res_init/res_query/res_search/res_mkquery); the glibc-only res_n* family
+      (res_ninit/res_nclose/res_ndestroy/res_nquery/res_nsearch/res_nmkquery) is
+      absent, so linking sacct failed with "undefined reference: res_nclose".
+      Redirect the call sites to the musl equivalents
+    patch_type: "portability"
+  - patch_file: "patches/0005-make-ref-binary-blob-objcopy.patch"
+    patch_description: >
+      make_ref.include converts every embedded script (<name>.txt) into a
+      relocatable object with `$(LD) -r --format=binary`, a GNU-ld-only input
+      format.  The OHOS worker resolves $(LD) to ld.lld, which rejects it with
+      "target emulation unknown: -m or at least one .o file required" and
+      aborts the build of every target that inlines this file (certgen, sacct,
+      sacctmgr, sackd, scontrol, scrontab, scrun, sinfo, slurmctld, slurmd,
+      slurmrestd, sprio, squeue).  Emit the identical
+      _binary_<name>_start/_end/_size object with objcopy's binary input mode
+      (-I binary -O elf64-littleaarch64 -B aarch64, the OHOS PC target), which
+      GNU objcopy and llvm-objcopy both implement, and fold the section rename
+      into the same step.  automake is not available on the HarmonyOS host, so
+      the copy that automake inlined into each Makefile.in is patched as well
+    patch_type: "portability"

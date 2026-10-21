@@ -1,0 +1,23 @@
+id:                     E3283
+# 与已有条目关系: E492（zix 生产侧自我物化）与 DRAFT-kea-hook-ping-check-3.0.3
+#   （自家构建树/包内物化）同族；本条增量 = 消费侧对依赖包目录物化，
+#   触发点在构建期链接（unable to find library -lX），范围=host 全依赖集扫描。
+title: 消费者侧物化依赖包缺失的 soname 链接名（symlink(2) EPERM 的下游补偿；generate() 全依赖扫描、幂等）
+category:               ohos, meson, linking, conan, packaging
+phase: generate|link
+match_keywords: unable to find library, -lgoa-1.0, ld.lld, symlink EPERM, soname, libX.so.0, versioned shared library, conanmanifest, materialize, host dependencies libdir, idempotent
+error_signature: "unable to find library -l|ld\\.lld: error: unable to find library"
+affected_scope: OHOS 真机（存储沙箱拒绝 symlink(2)，ln -s 直接 Permission denied）上，消费者 conan 图内存在源码重编的共享库依赖节点（本例 libgoa 因 glib 向下统一重编）。制品仓下载包在同盘不显病（归档符号链接条目解包时物化为实体拷贝）；只有消费者图里新编的节点缺名字。判据：链接器报 unable to find library -lX，且依赖包 libdir 只有 libX.so.<全版本> 实体。
+root_cause: "meson install 的共享库正常形态 = 实体 libX.so.<全版本> + 两个链接名（libX.so.<major> / libX.so），链接器仅经无版本名解析 -lX。OHOS /storage 沙箱在文件系统层拒绝 symlink(2)，源码重编节点在真机 package() 时两个链接名根本没落盘；制品仓包因解包物化环节不显病——缺口只在『消费者图内有源码重编依赖』时出现，炸点在下游链接命令行（与 E492/kea 的运行期 dlopen 炸点不同）。"
+rec_approach: 在消费者配方 generate()（链接之前、依赖已解包）扫描全部 host 依赖包 libdir，对命中 ^lib.+\\.so\\.\\d+(\\.\\d+)*$ 的实体，用实体拷贝物化缺失的 libX.so.<major> 与 libX.so（os.path.lexists 判在位；非 OHOS 直接 return；幂等——名字齐全或有 symlink 的宿主零动作）。不写死包名：重编节点是哪个由图决定。
+prescan_pattern: "unable to find library -l|lexists.*so\\.\\d"
+doc_file: knowledge/drafts/DRAFT-2670-gnome-recipes-2.0.4-consumer-materialize-dep-soname-aliases.md
+severity:               2
+last_updated: 2026-10-14
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+trigger_tool:           meson
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        在消费者配方 generate()（链接之前、依赖已解包）扫描全部 host 依赖包 libdir，对命中 ^lib

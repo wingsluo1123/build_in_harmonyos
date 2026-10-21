@@ -1,0 +1,32 @@
+version: "3.01a"
+software: wit
+status: built
+build_date: "2026-10-18"
+build_system: makefile
+source:
+  url: "https://deb.debian.org/debian/pool/main/w/wit/wit_3.01a.orig.tar.gz"
+  sha256: "513a34cf97bbec6e1e04a2d9e02e4090cad77ea91a3f6d749f14e3bf7806358b"
+  upstream_version: "3.01a"
+build:
+  system: makefile
+  configure_options: []
+  dependencies:
+    - "zlib/1.3.1"
+    - "bzip2/1.0.8"
+    - "mhash/0.9.9.9"
+  cc: clang
+  cxx: clang++
+patches_applied:
+  - "0001-setup-sh-cross-compile-guard.patch"
+  - "0002-use-conan-bzip2-mhash.patch"
+  - "0003-dclib-color-musl-const-stdio.patch"
+knowledge_gained:
+  - "setup.sh is an interactive host detection script that writes Makefile.setup at build time; it cannot run while cross compiling, so a WIT_SETUP_SKIP=1 guard (patch 0001) plus a pre-written Makefile.setup with fixed revision 7464 is used instead."
+  - "WIT_SETUP_SKIP must be present in the make environment, not only on the make command line: setup.sh is invoked from a $(shell) context which does not inherit command line variables."
+  - "SYSTEM=linux in Makefile.setup keeps the build away from makefiles-local/Makefile.local.x86_64 (-march=x86-64) and matches what system.c detects for linux; there is no Makefile.local.linux."
+  - "All pre-generated UI sources ship in src/ui/, so no generator step is needed; gen-ui is compiled but never executed during the build."
+  - "XFLAGS is the Makefile injection point for CFLAGS (-fPIE plus dependency include paths); LDFLAGS takes -pie plus dependency library paths; STRIP=true keeps binaries unstripped."
+  - "musl based OHOS libc declares stdout/stderr as const FILE*, so dclib-color.c needs a set_std_stream() helper (patch 0003) instead of direct reassignment."
+  - "The bundled lzma decoder is kept (Debian drops it only because Debian bans embedded copies); bzip2 and SHA-1 are replaced by the conan bzip2 and mhash packages following the Debian patch."
+knowledge_ref:
+  - "archives/w/wit/3.01a/notes.md"

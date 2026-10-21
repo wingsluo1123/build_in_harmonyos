@@ -1,0 +1,41 @@
+--- a/src/main/java/com/pavelfatin/typometer/screen/ScreenAccessor.java
++++ b/src/main/java/com/pavelfatin/typometer/screen/ScreenAccessor.java
+@@ -18,26 +18,37 @@
+ 
+ import com.sun.jna.Platform;
+ 
+ import java.awt.*;
+ 
+ public interface ScreenAccessor {
+     Color getPixelColor(int x, int y);
+ 
+     void dispose();
+ 
++    static boolean isHarmonyOS() {
++        String os = System.getProperty("os.name", "").toLowerCase();
++        return os.contains("harmony") || os.startsWith("ohos");
++    }
++
+     static boolean isNativeApiSupported() {
++        // HarmonyOS is Linux-based, but ships neither the X11 client libraries
++        // used by LinuxScreenAccessor nor a JNA native dispatcher, so only the
++        // portable AWT Robot backend is available there.
++        if (isHarmonyOS()) {
++            return false;
++        }
+         return Platform.isWindows() || Platform.isLinux();
+     }
+ 
+     static ScreenAccessor create(boolean isNative) {
+-        if (isNative) {
++        if (isNative && !isHarmonyOS()) {
+             if (Platform.isWindows()) {
+                 return new WindowsScreenAccessor();
+             }
+             if (Platform.isLinux()) {
+                 return new LinuxScreenAccessor();
+             }
+         }
+         return new AwtRobotScreenAccessor();
+     }
+ }

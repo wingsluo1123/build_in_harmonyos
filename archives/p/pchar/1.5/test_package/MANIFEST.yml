@@ -1,0 +1,25 @@
+# test_package/MANIFEST.yml — pchar 1.5
+# CI L0e requires this file to exist.
+
+package: pchar/1.5
+homepage: "https://www.kitchenlab.org/www/bmah/Software/pchar/"
+
+# Upstream has no bundled test suite; build() runs a deterministic replay
+# regression against the upstream pchar executable and checks its path output.
+upstream_test_in_build: true
+upstream_test_command: "pchar -r replay_ipv4.txt -n"
+
+upstream_tests:
+  - file: replay_ipv4.txt
+    command: "pchar -r replay_ipv4.txt -n"
+    description: "Repository-added regression exercises saved-trace parsing and one-hop analysis without network access"
+    count: 1
+
+# test_package tests (consumer perspective)
+test_package_tests:
+  - file: test_pchar.py
+    method: test
+    description: "Replays a deterministic trace and asserts one-hop analysis; also checks --version and --help"
+    command: "pchar -r fixtures/replay_ipv4.txt -n"
+
+assertion_count: 3

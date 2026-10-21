@@ -1,0 +1,21 @@
+# Draft generated with ohc.graph.cmd_add; completed with verified evidence.
+id:                     E3261
+title: 共享包装库链接系统依赖先满足符号导致内置图像编解码 ABI 不匹配
+trigger_tool: ld|runtime
+phase: linking,runtime,testing
+severity:               3
+category:               linking, dependency, runtime, testing, static-library
+error_signature: Wrong JPEG library version.*library is 62.*caller expects 90|JPEG encoder failed|jpeg_CreateCompress.*LIBJPEG_6.2
+match_keywords: JPEG_LIB_VERSION, jpeg_CreateCompress, builtin codec, link order, wxcore, libwxjpeg.a, LIBJPEG_6.2, shared wrapper
+root_cause: 共享wxcore使用内置JPEG90头，但GTK依赖链接项先于libwxjpeg.a；系统JPEG62先满足未定义符号，静态归档成员没有被选入，产生编译头与运行实现ABI不一致。
+affected_scope: 共享包装库同时链接自带静态codec和导出相同API的系统依赖，限于本轮wxcore链接和验证过的加载顺序；不声称解决任意宿主先载库的ELF符号抢占。
+verification_cmd: 核对实际jpeglib.h JPEG_LIB_VERSION、link.txt库顺序和nm -D符号版本；执行真实JPEG编码/解码往返，比较RED1/GREEN0及尺寸。
+rec_approach: prefer-selected-builtin-codec-at-shared-link
+rec_description: 在共享wrapper目标链接时将明确选用的builtin JPEG/PNG归档移至toolkit依赖前，保留依赖闭包；核验shared产物和真实codec往返，不仅检查初始化符号。
+rec_impl: cmake-target-link-order+codec-regression
+rec_priority: 1
+rec_auto_fix: false
+authors: 2301_79503900 <3308319887@qq.com>
+last_updated: 2026-10-12
+source_event: wxwidgets-gtk3/3.2.10.1 native shared-mode validation
+doc_file: knowledge/drafts/E429-draft-6C2B.md

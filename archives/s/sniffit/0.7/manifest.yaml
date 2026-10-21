@@ -1,0 +1,30 @@
+software: sniffit
+version: "0.7"
+homepage: "https://github.com/resurrecting-open-source-projects/sniffit"
+license: "BSD-3-Clause"
+upstream_tag: "sniffit-0.7"
+build_system: autotools
+status: built
+build_date: "2026-10-12"
+package_type: application
+dependencies:
+  required:
+    - libpcap/1.10.6#e4d43bf9a29fdaabd60dee919243c781
+    - ncurses/6.6
+  optional: []
+  vendored: []
+patches_applied: []
+source:
+  url: "https://github.com/resurrecting-open-source-projects/sniffit/archive/refs/tags/sniffit-0.7.tar.gz"
+  sha256: "9a8c3472414e105479296b6ca83be419cfd37551982e6ddaca34dfa4916a4c47"
+test_results:
+  type: consumer
+  upstream_command: "not present (upstream ships no test suite)"
+  total: 0
+  passed: 0
+  failed: 0
+  test_package_assertions: 5
+knowledge_gained:
+  - "The GitHub refs/tags archive of sniffit 0.7 is a git snapshot: it carries configure.ac/Makefile.am/autogen.sh but no generated configure/Makefile.in; the recipe does NOT bootstrap it on-device (no automake/autoconf/libtool tool_requires) and instead direct-compiles the 7 TUs from src/Makefile.am SOURCES with a generated config.h, so the conancenter m4/1.4.19 build edge (configure[139] HNP-bash Error 127) is removed (aldo/0.7.8 vendoring precedent)."
+  - "configure.ac hard-requires libpcap (AC_CHECK_LIB fatal) and optionally uses ncurses; the recipe requires libpcap/1.10.6 pinned to ohpcd rrev e4d43bf9 (conancenter-first shadowing would pull the CCI autotools recipe and its bison/flex->m4 chain) plus ncurses/6.6 (absent from CCI) so the interactive mode (INCLUDE_INTERFACE) builds deterministically via AutotoolsDeps."
+  - "Upstream ships no automated tests: no tests/ or test/ directory, neither Makefile.am defines TESTS/check_PROGRAMS, and make check has no target; the adaptation validates the packaged binary through the consumer test_package instead."

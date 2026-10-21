@@ -1,0 +1,42 @@
+# 版本级 manifest — ulogd 2.0.9
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "2.0.9"
+software: "ulogd"
+
+status: built
+
+build_date: "2026-10-17"
+build_system: autotools
+
+source:
+  url: "https://netfilter.org/projects/ulogd/files/ulogd-2.0.9.tar.xz"
+  sha256: "523a651fe0a9f25b0cd87d5d35fc37d9382e7eecfcf61e48d5505ff3cf80eda5"
+  tar_format: tar.xz
+
+build:
+  system: autotools
+  configure_options:
+    - "--disable-nfct (libnetfilter_conntrack not on ohpcd)"
+    - "--disable-nfacct (libnetfilter_acct not on ohpcd)"
+    - "--disable-pgsql --disable-mysql --disable-sqlite3 --disable-dbi --disable-pcap --disable-json"
+    - "--build=aarch64-unknown-linux-gnu --host=aarch64-unknown-linux-ohos (OHOS)"
+  dependencies:
+    - "libnfnetlink/1.0.2"
+    - "libnetfilter_log/1.0.2"
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-config-sub-ohos.patch"
+
+patch_classification:
+  - file: 0001-config-sub-ohos.patch
+    type: manual
+    platform_only: True
+    guard: "pending"
+
+knowledge_gained:
+  - "nfct/nfacct modules disabled: libnetfilter_conntrack and libnetfilter_acct not yet published on ohpcd; nflog module enabled with available deps (libnfnetlink, libnetfilter_log)"
+  - "E007: config.sub patched for OHOS triples; E011/E114: HMDFS umask fix applied in-recipe"
+  - "PKG_CHECK_MODULES deps resolved via PkgConfigDeps; CPPFLAGS suppress conflicting OHOS sysroot uapi headers"

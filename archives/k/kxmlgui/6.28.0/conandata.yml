@@ -1,0 +1,31 @@
+# conandata.yml - kxmlgui 6.28.0
+# Based on the 6.26.0 recipe (same OHOS adaptation set plus the 6.28 family
+# SONAME/platform fixes).
+
+sources:
+  # 官方源 + 权威镜像（R39）。download.kde.org 会 302 到区域镜像
+  # （如 mirrors.bfsu.edu.cn），该目标在部分网络（含真机在网环境）下 TLS
+  # 证书校验失败、无法下载；此处显式给出权威镜像作为回退。
+  # 所列镜像 URL 的内容相同（sha256 已逐一核对）。
+  url:
+    - "https://download.kde.org/stable/frameworks/6.28/kxmlgui-6.28.0.tar.xz"
+    - "https://mirrors.nju.edu.cn/kde/stable/frameworks/6.28/kxmlgui-6.28.0.tar.xz"
+    - "https://ftp.funet.fi/pub/mirrors/ftp.kde.org/pub/kde/stable/frameworks/6.28/kxmlgui-6.28.0.tar.xz"
+    - "https://mirror.freedif.org/KDE/ftp/stable/frameworks/6.28/kxmlgui-6.28.0.tar.xz"
+    - "https://mirrorservice.org/sites/download.kde.org/stable/frameworks/6.28/kxmlgui-6.28.0.tar.xz"
+  sha256: "e40b86ebb9f1be00255cd4835ab0b0ac8650c47d0eb17a47d9df7d4b5658df58"
+
+patches:
+  "6.28.0":
+    - patch_file: "patches/0001-CMakeLists.txt.patch"
+      patch_description: "0001 lower KF_DEP_VERSION 6.28.0 -> 6.26.0 (the KF6 6.28 train is not published to ohpcd; 6.26.0 is the proven common floor and already provides the KKeySequenceRecorder::Pattern API used by kxmlgui 6.28); drop Qt6PrintSupport from the top-level find_package; lower the KF6ConfigWidgets dependency floor to the published 6.18.0 cap in both the project CMakeLists.txt and the exported KF6XmlGuiConfig.cmake.in template"
+      patch_type: "portability"
+    - patch_file: "patches/0002-src-CMakeLists.txt.patch"
+      patch_description: "0002 drop the private Qt6::PrintSupport link item from KF6XmlGui"
+      patch_type: "portability"
+    - patch_file: "patches/0003-src-kshortcutseditor.cpp.patch"
+      patch_description: "0003 remove the QPrinter/QPrintDialog based printShortcuts implementation and the KShortcutsDialog Print button (Qt6PrintSupport not published to ohpcd)"
+      patch_type: "portability"
+    - patch_file: "patches/0004-autotests-kxmlgui_unittest.cpp.patch"
+      patch_description: "0004 gate the QLocale application-language autotest rows: when $LANGUAGE was updated as requested but the runner's QLocale::system() does not re-read it (Qt internals), mark the row as an expected failure (QEXPECT_FAIL with Continue); if $LANGUAGE itself was not updated the original comparison still fails hard, and an unexpected pass (XPASS) also fails"
+      patch_type: "portability"

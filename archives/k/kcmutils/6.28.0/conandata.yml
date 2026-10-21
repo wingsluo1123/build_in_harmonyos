@@ -1,0 +1,23 @@
+# conandata.yml - kcmutils 6.28.0
+# First adaptation of the 6.28.0 upstream release; carries the OHOS
+# adaptation set proven on kcmutils/6.26.0 (merged, PR #12534): the KF6
+# dependency floor is aligned with the published 6.26.0 baseline, the
+# declarative QML plugin is cut and the klocalized-QML/iostream/ranges
+# fallbacks are re-based on the 6.28.0 sources.
+# download.kde.org is a Mirrorbits redirector; on some networks the mirror it
+# selects answers with a broken TLS certificate, so authoritative KDE mirrors
+# are listed as fallbacks (R39). The sha256 pins the identical official
+# tarball whichever mirror answers first.
+
+sources:
+  url:
+    - "https://download.kde.org/stable/frameworks/6.28/kcmutils-6.28.0.tar.xz"
+    - "https://mirrors.nju.edu.cn/kde/stable/frameworks/6.28/kcmutils-6.28.0.tar.xz"
+    - "https://mirrors.aliyun.com/kde/stable/frameworks/6.28/kcmutils-6.28.0.tar.xz"
+  sha256: "9afe5ca9d1c4bd06479b2619326ec6f1e3c3998859dceaae3da9a4b7318d5a21"
+
+patches:
+  "6.28.0":
+    - patch_file: "patches/0001-CMakeLists.txt.patch"
+      patch_description: "Lower KF_DEP_VERSION 6.28.0 -> 6.26.0 (published KF6 line) and the KF6ConfigWidgets floor to the published 6.18.0 cap, in the project and in the exported KF6KCMUtilsConfig.cmake.in; drop the kirigami qmldir build-time check; guard the declarative kcmutilsqmlplugin and its QML KCM fixture, loader autotest and QML smoke-test row behind KCMUTILS_BUILD_QML_PLUGIN (KF6::KIOGui is not published; kio 6.26.0 is KIOCORE_ONLY); KI18N_BUILD_WITH_QML fallback for the shared QML engine (ki18n built without QML); std::ranges -> std::sort for clang 15 / libc++"
+      patch_type: "portability"

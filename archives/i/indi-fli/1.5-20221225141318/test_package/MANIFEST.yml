@@ -1,0 +1,34 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+#
+# 上游测试清点（R51，证据见 notes.md「上游测试清点」一节）：
+#   indi-fli 1.5 快照共 16 个文件（CMakeLists.txt、fli_ccd.{cpp,h}、
+#   fli_cfw.{cpp,h}、fli_pdf.{cpp,h}、kepler.{cpp,h}、config.h.cmake、
+#   indi_fli.xml.cmake、indi_flipro.xml.cmake、cmake_modules/、README、AUTHORS、
+#   INSTALL）：
+#       CMakeLists.txt 无 enable_testing()/add_test()，只有 add_executable +
+#       install；整棵 indi-3rdparty 仓亦无该驱动的测试用例
+#   → 上游确无测试（故 upstream_tests 为空列表，非占位符）
+
+package: indi-fli/1.5-20221225141318
+homepage: "https://github.com/indilib/indi-3rdparty"
+
+# 上游测试命令：该驱动子项目未提供 check/test 目标
+upstream_check_command: ""
+
+# conanfile.py build() 方法中是否已集成上游测试（上游确无测试可集成）
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（清点结论：无）
+upstream_tests: []
+
+# test_package 中自带的测试（消费者视角验证，鸿蒙独有）
+test_package_tests:
+  - file: check_driver.py
+    description: "消费者校验：①bin/indi_fli_{ccd,focus,wheel} 均为 AArch64 ELF64 可执行文件；②share/indi/indi_fli.xml 声明 FLI CCD / FLI PDF / FLI CFW 三个设备且各自指向 bin/ 内真实存在的可执行文件；③三个驱动的 DT_NEEDED 静态审计（libindidriver/libindiAlignmentDriver 齐备、libusb-1.0 已被记录——证明静态 libfli.a 的 USB 运行期依赖被正确链接、全部为裸 soname、且都能在对应依赖包内找到）；④conanrun 下逐个启动驱动——**真实闭包/符号缺陷一律 FAIL**，仅**有证据**的宿主拒绝记 SKIP"
+    command: "python3 check_driver.py <pkg>/bin <pkg>/share/indi/indi_fli.xml <libindi-pkg>/lib <libusb-pkg>/lib"
+
+# 测试断言总数（近似值, 用于质量评估）
+assertion_count: 9

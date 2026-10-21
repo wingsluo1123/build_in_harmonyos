@@ -1,0 +1,58 @@
+software: mar
+version: "0.5"
+status: built
+build_date: "2026-10-04"
+build_system: makefile
+conan_ref: "mar/0.5"
+
+source:
+  url: "https://critical.ch/distfiles/mar-0.5-src.tar.gz"
+  sha256: "8ee7612ab7bdb55dc43619ae50113dad7bf669939b454573fcac0941c45829ab"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  build_command: "make -j1 -C src all CC=<OHOS clang> CXX=<OHOS clang++> AR=<llvm-ar> RANLIB=<llvm-ranlib> CFLAGS='-O2 -fPIC -Werror=tautological-constant-out-of-range-compare' CXXFLAGS=-std=gnu++17 LDFLAGS='-static-pie -Wl,-z,relro,-z,now'"
+  configure_options: []
+  dependencies: []
+  cc: clang
+
+test_results:
+  target: "OpenHarmony aarch64（本地 x86_64 构建机经 qemu-aarch64 执行交付产物）"
+  upstream_framework: "无 tests 目录、无 ctest/pytest；Makefile check 目标构建并运行 src/mar_test（C++，8 个命名用例）"
+  upstream_discovered: 8
+  upstream_passed: 8
+  upstream_failed: 0
+  test_package_passed: 2
+  test_package_failed: 0
+  test_package_assertions: 98
+  harmonyos_specific_tests: 2
+  execution: "conan create rc=0；build() 里上游 mar_test 8/8；鸿蒙特有消费者用例 mar_consumer_c（47 项）与 mar_consumer_cpp（34 项）加 conanfile.py 对 bin/mar 输出的 17 项逐字节断言，均实跑通过"
+
+test_passed: 10
+test_failed: 0
+
+patches_applied:
+  - "0001-include-mar_stream_cpp.h.patch"
+  - "0002-include-mar_streambuf_cpp.h.patch"
+  - "0003-src-mar_main_c.c.patch"
+
+patch_classification:
+  - file: 0001-include-mar_stream_cpp.h.patch
+    type: portability
+    platform_only: false
+    guard: none
+  - file: 0002-include-mar_streambuf_cpp.h.patch
+    type: portability
+    platform_only: false
+    guard: none
+  - file: 0003-src-mar_main_c.c.patch
+    type: portability
+    platform_only: false
+    guard: none
+
+knowledge_gained:
+  - "mar 工具把 mar_getopt() 的 int 返回值存进 char：OHOS aarch64 上 plain char 无符号，EOF(-1) 变 255，-1 != ch 恒真，选项扫描结束即落进 default，每条真实命令都以 Unknown option 退出 1，只有提前返回的 -h 正常；选项表扫描两遍（main/mar_run）有两处接收变量，只改一处时操作已执行仍退出 1，或什么都不执行；与已有草稿 E6401-draft-1687 同根因，本草稿是其补充（ref: knowledge/drafts/E14735-draft-1370）"
+  - "clang 默认就对 char 与 -1 的比较报 -Wtautological-constant-out-of-range-compare，但只是告警、构建成功，淹在日志里；把它单独提升为 -Werror= 是整类“EOF/-1 存进 plain char”缺陷的低成本回归护栏，对整库和 C++ 测试对象零误伤（ref: knowledge/drafts/E14735-draft-1370）"
+  - "2004 年的 C++ 流封装对依赖基类成员 rdbuf/setg/sputc 不加限定，clang+libc++ 拒绝编译，上游 make check 同样编不过；已有草稿 DRAFT-maq-0.7.1-stdhash-dependent-base-this-qualifier 覆盖同一诊断，未重复立条"
+  - "上游 make install 的头文件清单漏装 mar_string_c.h（mar_key_cpp.h 包含它），12 个 C++ 头里 8 个装完无法包含；已有草稿 DRAFT-delaunay-triangulation-2.1-install-headers-missing-referenced-header 覆盖同类问题，未重复立条；配方安装 17 个头文件并用逐头文件闭包检查验证"

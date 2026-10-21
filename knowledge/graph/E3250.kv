@@ -1,0 +1,73 @@
+#====================================================================
+# DRAFT-pox-musl-getlogin-empty-string-breaks-user-fallback
+# pox: musl 上 os.getlogin() 返回**空串**而非抛异常 —— 上游 try/except 回退
+# 逻辑永不触发, username() 报空; 另 walk(rootdir()) 在沙箱必然返回 0
+#====================================================================
+
+id:                     E3250
+trigger_tool:           python|conan|pytest
+phase:                  test
+error_signature:        AssertionError: assert False|
+                         IndexError: list index out of range|
+                         homedir().rstrip(sep()).endswith(username())|
+                         prepend_to_slang_load_path is undefined
+
+severity:               2
+category:               musl, python, api-semantics, test-design
+
+match_keywords:         pox, username, os.getlogin, getlogin empty,
+                        musl, OHOS, rootdir, walk, homedir,
+                        findpackage, pytest, uqfoundation,
+                        Noxrepo vs PyPI pox
+
+title:                  musl/OHOS 上 os.getlogin() 返回空串(不抛异常), 使 pox 的 username() 环境回退失效; 上游测试对 rootdir()/HOME 的断言在沙箱必然失败 —— 用受控 HOME+USER 运行
+
+root_cause:             (1) pox 的 shutils.username() 原本是
+                            try: return os.getlogin()
+                            except: uname = expandvars('$USER') ...
+                        在 musl(OHOS) 上 os.getlogin() **返回 '' 而不抛异常**,
+                        于是 except 分支永不执行, username() 直接返回 ''。
+                        连锁影响: 上游 test_shutils 的
+                          assert homedir().rstrip(sep()).endswith(username())
+                        以及 walk(homedir()+'/..', username(), ...)[0]
+                        全部落空(后者 IndexError)。
+                        修法: 把「空值」也纳入回退条件。
+                        (2) 沙箱的 rootdir() 是 '/' 且**拒绝列举**(EACCES), 故
+                          folders = walk(rootdir(),'*',folders=True)
+                          assert len(folders) > 0
+                        在任何环境都不可能成立 —— 改为 walk(可列目录)。
+                        (3) 真实 HOME 位于 /storage/Users/<user>, 而
+                        /storage/Users 本身不可列(EPERM); $USER 又可能是纯数字
+                        uid。findpackage() 会递归整个 HOME 导致挂起。
+                        解法: 跑上游套件时使用**受控可写 HOME**, 其 basename 即
+                        用户名, 并同步设 USER/LOGNAME —— 断言与真实取值一致,
+                        代码路径不变。
+
+affected_scope:         pox/0.3.7 及一切用 os.getlogin() 做用户名回退的
+                        Python 包在 musl/OHOS 上的运行; 任何断言依赖
+                        / 或 /storage/Users 可列的测试
+
+verification_cmd:       conan create archives/p/pox/0.3.7 \
+                          -pr:h=ci/conan/profiles/ohos-aarch64 \
+                          -pr:b=ci/conan/profiles/ohos-aarch64 --build=missing
+                        # 期望: 上游 pytest "2 passed" + 消费者
+                        # POX-CONSUMER-OK
+
+rec_priority:           2
+rec_approach:           controlled-home-and-empty-getlogin-fallback
+rec_description:        配方:
+                          user = "ohos"; home = <build>/test-home/<user>
+                          env HOME=home, USER=user, LOGNAME=user, TMPDIR=<build>/tmp
+                          with env.vars(self).apply(): run(pytest pox/tests -q)
+                        补丁(上游源码):
+                          - username(): if not uname: 再走 $USER/$USERNAME 回退
+                          - test_shutils: walk(os.getcwd()) 替代 walk(rootdir())
+                        注: 不要给补丁加 __OHOS__ 之类的平台宏。
+
+  - archives/p/pox/0.3.7/conanfile.py
+  - archives/p/pox/0.3.7/patches/0002-shutils-username-empty-getlogin-fallback.patch
+last_updated:           2026-09-29
+rec_auto_fix:               false
+rec_impl:               manual
+authors:               unknown
+doc_file:               doc/E3250.md

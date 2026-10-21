@@ -1,0 +1,27 @@
+# test_package 清单（R34 消费者校验）
+package: visidata/3.1.1
+
+upstream_test_in_build: true
+upstream_test_command: "python -m pytest -q -p no:cacheprovider visidata/tests"
+
+upstream_tests:
+  - name: "上游 visidata/tests/（含 conftest.py）"
+    count: 37
+    description: >-
+      本地实跑 **37 passed** → **37/37（100%）**，用例内容未做任何修改。
+
+test_package_tests:
+  - file: check_visidata.py
+    description: >-
+      R34 消费者校验 **6 项**（全部离线）：①命令齐备（bin/visidata + bin/vd）②模块可导入且版本正确
+      （`visidata.__version__ = 3.1.1`）③**真跑** `visidata --version`④**真实批处理**：
+      离线 CSV 经 `vd -b -o` 导出成功 ⑤许可证随包 ⑥证据（sha256 + python 版本）。
+      末行打印 `checks/fails/skips`；仅环境原因才计入 skips 且**不计入通过**。
+    command: "python3 check_visidata.py <package-folder>"
+
+notes: >-
+  上游同时提供 console_scripts（`visidata=visidata.main:vd_cli`）与 scripts（`bin/vd`、`bin/vd2to3.vdx`），
+  两者都由配方处理；运行时依赖 python-dateutil、importlib-metadata 随包装到 `<包>/python`。
+
+deviations:
+  - "测试环境按属主挑 TMPDIR、清 XDG 变量、补 /system/bin 到 PATH（均为环境适配，不改上游）"

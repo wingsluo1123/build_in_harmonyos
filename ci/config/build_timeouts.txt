@@ -55,6 +55,7 @@ mlton/20241230 10800
 librsvg/2.62.3 14400
 librsvg/2.62.3.1.1 14400
 scalapack/2.2.3 10800
+kaldi-vosk/g20231219 10800
 abiword-plugin-wikipedia/3.0.8 10800
 flow-control/0.7.2 7200
 goffice/0.10.57 10800
@@ -158,9 +159,15 @@ koreader/2026.03 57600
 # gcc/9.5.0.1: all-gcc + all-target-libgcc (-j2) + selftest + 100 次 torture 执行，
 # 本地 W3 实测约 6h；57600s 为 CI 慢速 runner 预算（对齐 16h 上限）
 gcc/9.5.0.1 57600
+# vtr/9.0.0：单包内含 VTR 全流程工具链 —— abc + yosys(parmys 前端) + parmys 插件
+# + odin_ii + vpr + ace2 + libs 各自独立编译，随后 install(含 1.2G vtr_flow 流程树)
+# 并执行上游 4 个 Catch2 单元测试目标。体量与 llvm/clang/vtk 同级，默认 3600s 必然
+# 在编译中途被 KILL。57600s 为本文件允许的上限，对齐 koreader/gcc 类大包。
+vtr/9.0.0 57600
+
 # adaptivecpp 25.10.0: clang 插件（链接 libclang-cpp/libLLVM）+ SSCP 运行时 +
 # 包内自带完整 libomp（LLVM 22 源码全量构建）在一次 conan create 内完成，
-# 真机实测约 8min；14400s 对齐 clang/llvm-class 条目，覆盖慢速 CI worker。
+# 真机实测约 8min；14400s 对齐 clang/llvm-class 条目，覆盖慢速 CI worker.
 adaptivecpp/25.10.0 14400
 # swiftshader: SwiftShader CPU Vulkan 1.3 ICD. Vendored LLVM-10 + SwiftShader
 # (1452 ninja targets) dominate the build; build() then runs the upstream unit
@@ -176,6 +183,14 @@ swiftshader/0_git20260921 21600
 # 二次编译），CI 冷环境含 bottle 下载（rust 190MB + fontconfig 闭包 35MB）
 # 与 crate 全量拉取，单 job 保守 10800s（对齐 scooter/aiken 同类 Rust 件）。
 alacritty/0.17.0 10800
+
+# sqruff 0.39.0: Rust workspace（240 crates，edition 2024；[profile.release]
+# lto=true + codegen-units=1）release 构建 + 上游全套测试（build() 内真实
+# 执行、计数硬门禁）真机负载下合计约 55min；CI 冷环境另含制品仓工具链
+# （rust-toolchain/1.97.1 + openssl/3.5.6.1.1）与 crate 全量拉取。
+# 单 job 保守 10800s（对齐 alacritty/scooter/aiken 同类 Rust 件）。
+# 条目置于中部锚点，避免与 main 尾部追加型条目冲突。
+sqruff/0.39.0 10800
 # thrax: Autotools 全量 C++ 编译 64 个 .cc（-j1，CI 同口径）+ 消费者测试全链路，
 # 本地 W3 conan create 实测约 100 分钟（含 openfst 依赖解析），默认 3600s 不够。
 thrax/1.3.10 7200
@@ -189,6 +204,9 @@ pcp/7.1.5 10800
 # + check-polly 全量测试（lit 1092 + gtest 26 + isl 80），CI 实测约 4700s，
 # 超默认 3600s；57600s 为本文件允许的上限（对齐 clang/llvm-class 包）。
 polly/22.1.8 57600
+# r-base 全量构建（R 源码 configure+make check+shlib）本地实测 ~65m，
+# 加 test_package 移动性验证；单 job 10800s。
+r-base/4.5.1.2 10800
 
 # syslog-ng: 大型 autotools 守护进程（40+ dlopen 模块，make -j1 因 HMDFS
 # jobserver 管道限制；上游 criterion 单元测试套件依仓库惯例不在 build() 内
@@ -216,3 +234,9 @@ mysql-8.4/8.4.11 14400
 # limits for package PRs, but this file is the only timeout channel CI offers
 # and the default 3600s window would KILL the build (elapsedTime > limit).
 erlang/28.5.0.7 14700
+# mednafen/1.32.1: 22 机种模拟器（autotools，740 个 C/C++ TU + 周期精确 CPU 核汇编）。
+# 证据：B 机（aarch64 HarmonyOS PC / HMDFS / conan 2.29.1 / 4 路）实测全量 conan create
+# 到 test_package 超过 conan-verify 的 3600s 上限（单文件 src/hw_cpu/m68k/m68k.cpp 峰值
+# 约 35min）；无争用环境原生 make -j4 亦需约 29min ⇒ 3600s 默认窗口 CI 必被 KILL。
+# 取 10800s（3h），与 clang/llvm 量级条目一致。
+mednafen/1.32.1 10800

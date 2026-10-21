@@ -1,0 +1,51 @@
+version: "0.8.0"
+software: "libosl"
+status: "built"
+build_date: "2026-10-14"
+build_system: "makefile"
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/libo/libosl/libosl_0.8.0.orig.tar.gz"
+  sha256: "96c888da70a7031468cf20f7762b667a7dd39ee33de95a085b09d0cf3875c1c0"
+  tar_format: "tar.gz"
+
+build:
+  system: "makefile"
+  cxx_standard: "14"
+  cpu_option: "-march=armv8-a"
+  dependencies:
+    - "boost1.84-filesystem/1.84.0"
+    - "boost1.84-serialization/1.84.0"
+    - "boost1.84-iostreams/1.84.0"
+    - "boost1.84-system/1.84.0"
+    - "boost1.84-date_time/1.84.0"
+    - "bzip2/1.0.8"
+    - "zlib/1.3.1"
+  cc: "clang"
+  cxx: "clang++"
+
+patches_applied:
+  - "0001-emmintrin-x86-guard.patch"
+  - "0003-test-makefile-drop-test-lib.patch"
+  - "0004-libcxx-std-hash.patch"
+  - "0005-lightmutex-aarch64.patch"
+
+knowledge_gained:
+  - "libosl 0.8.0 is OpenShogiLib (Shogi library), not the object-storage libosl; upstream site is dead, Debian pool orig tarball is the canonical source."
+  - "SSE use is already x86-guarded except two <emmintrin.h> includes under __clang__; a one-line arch guard fixes aarch64."
+  - "Boost.Test suites run via the header-only entry point (array-hash precedent); only testAll.cc and the -l flag change, all 577 cases run unmodified."
+
+homepage: "https://gps.tanaka.ecc.u-tokyo.ac.jp/gpsshogi/"
+license: "BSD-3-Clause"
+
+tests:
+  upstream:
+    command: "./testAll --report_level=detailed --log_level=test_suite --catch_system_errors=yes (in core/test, std/test, full/test; Boost.Test)"
+    cases: 577
+    passed: 0
+    note: "Case total audited from source snapshot; true-machine run pending, counts come from the framework report lines."
+  adapted:
+    command: "ctest --output-on-failure (3 cases: move_api/initial_state/platform_config)"
+    cases: 3
+    passed: 0
+    pass_rate: "pending true-machine verification"

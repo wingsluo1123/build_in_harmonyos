@@ -1,0 +1,29 @@
+--- a/src/pingu_iface.c
++++ b/src/pingu_iface.c
+@@ -1,14 +1,26 @@
+ 
+ #include <sys/socket.h>
+ #include <arpa/inet.h>
++/* musl-derived sysroots (e.g. OpenHarmony) do not guard the kernel UAPI
++ * definition of struct sockaddr_storage the way glibc does, so a TU that also
++ * sees the libc headers fails with "redefinition of 'sockaddr_storage'".
++ * Rename the kernel-side definition while the UAPI headers are parsed. */
++#if defined(__linux__) && !defined(__GLIBC__)
++#define sockaddr_storage __uapi_sockaddr_storage
++#define PINGU_RESTORE_SOCKADDR_STORAGE 1
++#endif
+ #include <linux/rtnetlink.h>
++#ifdef PINGU_RESTORE_SOCKADDR_STORAGE
++#undef sockaddr_storage
++#undef PINGU_RESTORE_SOCKADDR_STORAGE
++#endif
+ 
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <unistd.h>
+ 
+ 
+ #include <ev.h>
+ 
+ #include "list.h"

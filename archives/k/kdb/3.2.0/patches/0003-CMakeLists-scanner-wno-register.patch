@@ -1,0 +1,14 @@
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -46,7 +46,10 @@
+ endif()
+ 
+ if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_CLANG)
+-    set(EXTRA_SCANNER_COMPILE_FLAGS "${EXTRA_SCANNER_COMPILE_FLAGS} -Wno-sign-compare -Wno-unused-function -Wno-deprecated-register -Wno-zero-as-null-pointer-constant")
++    # The pre-generated flex scanner still uses the 'register' storage
++    # class: pre-C++17 clang reported it as -Wdeprecated-register, C++17
++    # language modes diagnose it as -Wregister instead.
++    set(EXTRA_SCANNER_COMPILE_FLAGS "${EXTRA_SCANNER_COMPILE_FLAGS} -Wno-sign-compare -Wno-unused-function -Wno-deprecated-register -Wno-register -Wno-zero-as-null-pointer-constant")
+ elseif(MSVC)
+     set(EXTRA_SCANNER_COMPILE_FLAGS "${EXTRA_SCANNER_COMPILE_FLAGS} /wd4018") # disable warning C4018: '<' : signed/unsigned mismatch
+ endif()

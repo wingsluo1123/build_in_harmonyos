@@ -1,0 +1,56 @@
+# test_package/MANIFEST.yml — vde 2.3.3
+# 上游测试声明 + 消费者测试清单（遵循 docs/TEST_QUALITY_SPEC.md 与 hmbs 硬门禁）
+
+package: vde/2.3.3
+homepage: "https://github.com/virtualsquare/vde-2"
+
+# ── 上游测试审计 ──────────────────────────────────────────────────────
+# vde 2.3.3 官方发布包无任何 in-tree 自动化测试套件：
+# 1. 逐个 Makefile.am 审计（根目录与 src/ 下全部 11 个 Makefile.am）：
+#    Makefile.am, src/Makefile.am, src/lib/Makefile.am,
+#    src/lib/vdemgmt/Makefile.am, src/common/Makefile.am,
+#    src/vde_switch/Makefile.am, src/vde_switch/plugins/Makefile.am,
+#    src/vdetaplib/Makefile.am, src/vde_cryptcab/Makefile.am,
+#    src/vde_over_ns/Makefile.am, src/vde_router/Makefile.am
+#    均无 TESTS、check_PROGRAMS、check-local、check_SCRIPTS 等测试目标；
+#    make check 仅执行 check-am: all-am，无任何测试用例执行。
+# 2. configure.ac 无 AC_CONFIG_TESTDIR，无 gtest/ctest/pytest 等框架宏。
+# 3. 源码树无 test/ 或 tests/ 目录；src/vdetaplib/test.c 仅作为 EXTRA_DIST
+#    分发，不参与任何构建目标，且硬依赖 /dev/net/tun（HarmonyOS 无此设备）。
+# 4. GitHub Actions 工作流仅包含一行 vde_switch --version 冒烟检查，不属于
+#    源码树内置测试套件。按守则显式声明 upstream_tests_exist: false。
+upstream_tests_exist: false
+upstream_test_total: 0
+upstream_test_count_method: autotools_tests
+upstream_test_audit:
+  - source: "Makefile.am (all 11 Makefile.am files across root and src/)"
+    reason: "No TESTS, check_PROGRAMS, check-local, or check_SCRIPTS targets declared in any Makefile.am"
+  - source: "configure.ac"
+    reason: "No AC_CONFIG_TESTDIR and no test framework macros present"
+  - source: "Source tree"
+    reason: "No tests/ or test/ directory in source archive; src/vdetaplib/test.c is only in EXTRA_DIST and not built"
+  - conclusion: "vde 2.3.3 release archive contains no automated test suite"
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests: []
+
+# ── 消费者测试（test_package，真实调用库 API）─────────────────────────
+test_package_tests:
+  - file: test_vde.c
+    description: >-
+      libvdeplug 真实数据通路：socketpair 上 vdestream_open/send/recv/close，
+      校验 2 字节大端长度头 + 载荷往返与 frecv 回调投递；
+      libvdehist 状态机：vdehist_new/getstatus/setstatus/gettermfd/getmgmtfd/free
+    command: 'bash -c ''"<build>/test_vde" "<build>/test_vde_result.txt"'''
+    assertions: 13
+
+# 计数来源：test_vde 将 discovered/passed/failed 写入 argv[1] 指定的结果文件，
+# conanfile.py test() 读取该文件（唯一数据源）后输出 HMBS_TEST_PACKAGE_RESULT；
+# 不对 stdout 做关键字计数或算术修补。上游测试按 audit 结论输出 status: no_tests
+# 的 HMBS_UPSTREAM_TEST_RESULT 标记。
+marker_emitter: "test_package/conanfile.py::test()"
+
+assertion_count: 13

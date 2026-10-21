@@ -1,0 +1,36 @@
+software: kdesu
+version: "6.26.0"
+status: built
+build_system: cmake
+created_at: 2026-10-17
+build_date: 2026-10-17
+dependencies:
+  required:
+    - qtbase/6.11.1
+    - kconfig/6.26.0.1
+    - kcoreaddons/6.26.0.1
+    - ki18n/6.26.0
+    - kpty/6.26.0
+  build:
+    - ecm/6.26.0
+  optional:
+    - X11   # find_package(X11) 可选，OHOS sysroot 未提供，HAVE_X11=0，Xauthority 相关代码编译剔除
+patches_applied: []
+test_results:
+  type: passed_with_exclusions
+  upstream: "W3 真机实测（2026-10-17）：CTest 注册 2 个目标，1 通过 / 1 失败 —— kdesudtest（词法往返，槽 commandWithDoubleQuotes）PASS；kdesutest（6 个功能槽 sudoGoodPassword/sudoBadPassword/doasBadPassword/doasGoodPassword/suGoodPassword/suBadPassword）initTestCase PASS 后 6 槽全部 FAIL!，首个失败点即 kf.pty: Can't open a pseudo teletype（KPty::open 失败，ptyprocess.cpp:136），测试在拉起 su/sudo 之前就退出；设备沙箱禁止 pty 分配，且设备无 su/sudo/doas 可执行文件、当前 uid 20020084 无 passwd 条目，端到端提权路径不可行。按 R51 如实申报，不宣称通过；断言级覆盖由 test_package/ 承担"
+  test_package: "实测通过：消费者 test_kdesu 10/10 检查点（SuProcess 默认 su / sudo / doas / 未知值回退、useUsersOwnPassword 语义、SshProcess 空提示，以及安装的 kdesu_stub stop 安装检查协议 4 项），ctest 1/1，failures=0"
+  package_id: "e886653ed482c51d724fb6dbbae64215e92ef341"
+  l0: "pass（结构四件套 + test_package/MANIFEST.yml 齐备）"
+  l1: "pass（conan create 内 test_package 实跑通过，test_kdesu 10/10）"
+  l2: "skip: bin/ 顶层无文件（kdesud/kdesu_stub 位于 bin/kf6/ 子目录，均非用户 CLI，无 smoke 对象）"
+  l4: "pass（bin/ 顶层无 ELF 文件；helpers 在 bin/kf6/ 子目录，L4 的 bin/ 扫描分支无对象）"
+  l5: "pass（实测 readelf：libKF6Su.so 有 DT_SONAME=libKF6Su.so 且非绝对路径，DT_NEEDED 全部为相对 soname；包内 *.cmake 无 IMPORTED_NO_SONAME TRUE）"
+source_url: https://download.kde.org/stable/frameworks/6.26/kdesu-6.26.0.tar.xz
+source_sha256: 37df33a1236850b6bebd773a1aeab56ca597e347432924ca5855369337d4be24
+knowledge_gained:
+  - "kdesu 6.26.0 是 KF6 提权抽象库（libKF6Su.so：SuProcess / SshProcess / StubProcess / Client），另装 kdesud 密码缓存守护与 kdesu_stub 提权辅助程序；spec 安装目标为 KDE_INSTALL_LIBEXECDIR_KF，本平台实测解析到 <prefix>/bin/kf6/（ECM 走 WIN32 分支的相对 BINDIR），包仍是 library 类型。"
+  - "本包被 CI L0k 判为库包（无 package_type=application、无 RUNTIME DESTINATION bin、无 cpp_info.bindirs），因此不需要 commands.json；kdesud/kdesu_stub 属内部辅助程序，不登记为用户命令。"
+  - "无需任何源码补丁：X11 上游可选（find_package(X11) 失败时 HAVE_X11=0，Xauthority 代码编译剔除）；pty 由 kpty/6.26.0 提供；OHOS sysroot 的 setpriority / initgroups / getpeereid / sys/select.h / struct ucred 探测全部成立，config-kdesu.h 生成的 HAVE_* 均为预期值。"
+  - "上游 kdesutest 在本设备不可用：沙箱禁止 pty 分配（kf.pty: Can't open a pseudo teletype），六个功能槽在启动 su/sudo 前即失败；此外设备无 su/sudo/doas 且 uid 20020084 无 passwd 条目。kdesudtest（纯词法）通过。"
+  - "设备构建由 profile 的 no-versioned-soname user_toolchain 按平台惯例产出去版本的 libKF6Su.so（/storage 下建符号链接 EPERM），其 DT_SONAME=libKF6Su.so，满足 CI L5a「有 DT_SONAME 且非绝对路径」；L5b 只扫 lib/ 一级，kdesud 对 ki18n 预编译库的绝对 DT_NEEDED 不在扫描面内（ki18n 包本身无 DT_SONAME，与 kpty 记录的存量遥测同源）。"

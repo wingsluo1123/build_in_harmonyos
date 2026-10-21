@@ -1,0 +1,58 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI L0e 强制要求存在）
+
+package: imv/5.0.1
+homepage: "https://sr.ht/~exec64/imv/"
+
+# 上游测试命令（配方 build() 内由 conan 的 Meson helper 真实执行）
+upstream_check_command: "meson test"
+upstream_test_in_build: true
+upstream_test_command: "meson test"
+
+# imv 5.0.1 上游测试清点（源码 tag v5.0.1 逐项数）
+#   注册入口 = meson.build 的 `foreach test : ['list','navigator','backends']`
+#              → 3 个 test() 目标，对应 test/list.c、test/navigator.c、
+#                test/backends.c + src/dummy_window.c
+#   原子用例 = test/*.c 里 6 条 `cmocka_unit_test(...)` 文本声明：
+#              list.c 1 条、backends.c 3 条、navigator.c 2 条，
+#              其中 navigator.c 的 test_navigator_add_remove 在上游源码里
+#              被注释掉（test/navigator.c:118）⇒ live 5 条
+#   实测 = meson test 输出 Ok: 3 / Fail: 0，三个测试二进制分别
+#          "tests: 1 test(s) run / PASSED 1"、"1 / PASSED 1"、"3 / PASSED 3"
+#          ⇒ 执行 5/5，N_executed = 5，未执行 1（上游源码注释，非删改）
+upstream_tests:
+  - file: test/list.c
+    cases: 1
+    runner: test_list
+  - file: test/navigator.c
+    cases: 1
+    note: "test_navigator_add_remove 在上游源码里被注释掉（第 118 行），未纳入分子也未从静态分母删除"
+    runner: test_navigator
+  - file: test/backends.c
+    cases: 3
+    runner: test_backends
+upstream_static_entries: 6
+upstream_live_entries: 5
+upstream_registered_targets: 3
+upstream_executed: 5
+upstream_not_executed: 1
+
+# test_package 自带的消费者测试
+test_package_tests:
+  - file: src/test_imv.sh
+    description: >-
+      三层消费者测试：① 真实运行安装后的 bin/imv-msg 并断言 argv/AF_UNIX 行为（主力，行为面）；
+      ② bin/imv 产物结构断言（存在/可执行/.codesign 非空/DT_NEEDED 六个关键 so，结构面）；
+      ③ 外部缺陷复现旁证（非交付物直接可运行性）：bin/imv 在无修复环境下因
+      wayland 制品 libwayland-cursor.so.0 的 .codesign 失效而不可执行（dlopen ⇒ EACCES），
+      脚本对该库做重签副本并 LD_PRELOAD 后再跑 imv -h，断言版本串与 9 个后端；
+      工具缺失时打 SKIP 且不计入通过数。
+    command: "bash src/test_imv.sh <pkg>/bin <wayland-dep>/lib"
+
+# 断言总数：
+#   行为面（group 1，计入通过率）          3  （imv-msg 可执行 / Usage rc=0 / Failed to connect rc=1）
+#   结构面（group 2，单独列）              9  （imv 可执行 + .codesign 非空 + 6 个 DT_NEEDED + imv-dir 可执行）
+#   旁证面（group 3，单独列、非交付物可运行性） 2（版本串 5.0.1 / 9 个后端）
+#   ⇒ 计入"消费者测试通过率"分子的是行为面 3 条；结构面与旁证面在报告里分列
+assertion_count: 14
+consumer_programs: 2

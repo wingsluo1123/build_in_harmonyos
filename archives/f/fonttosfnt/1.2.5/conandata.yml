@@ -1,0 +1,23 @@
+# conandata.yml — fonttosfnt 1.2.5
+# 货源（权威，勿改）：X.Org releases 个体目录（官方直链，PF7 通过）
+# 本机实测（2026-10-18）：curl --max-time 90 -fsSL 下载 144844 字节，
+#   HTTP 200，sha256 逐字如下。
+# ⛔ 不得用 Debian 池址（PF7 拉黑 deb.debian.org）；⛔ 不得手写任何镜像前缀
+#    （CI 会自动加镜像回退，手写即 R39 违规）。
+
+sources:
+  url: "https://www.x.org/releases/individual/app/fonttosfnt-1.2.5.tar.xz"
+  sha256: "2e251e66e8753c08aa280b26fd4a10d0d88e7d9bba5c8aac3d3fb36705e5918e"
+
+# 两件均为对 autotools 分发 shell 脚本的移植性修复，无平台预处理器宏（R8/PF5）；
+# 由 refresh-patch --auto（编辑追踪器精准模式）从 .orig/.work 差异生成（R7）。
+# conanfile.py 的 build() 先 apply_conandata_patches() 应用下列 2 件，
+# 再跑幂等的 _patch_autotools_scripts() 兜底（补丁已生效时为 no-op，两处 guard 均为
+# "已存在即跳过"）。
+patches:
+  - patch_file: "patches/0001-config.guess.patch"
+    patch_description: "Teach config.guess (timestamp 2024-07-27) to recognize uname -s = HarmonyOS and guess <machine>-unknown-linux-ohos; also relax its three umask 077 scratch-dir creations to 022 so HMDFS can write them (E007/E072, E011/E114)"
+    patch_type: "portability"
+  - patch_file: "patches/0002-configure.patch"
+    patch_description: "Create config.status's scratch dir with umask 022 instead of umask 077, which produces a 700 directory HMDFS refuses to write into (E011/E114)"
+    patch_type: "portability"

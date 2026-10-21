@@ -1,0 +1,32 @@
+sources:
+  url:
+    # github.com intermittently times out from CI workers (source download
+    # failed on #71103/#71148; one build #71104 got past the download).
+    # Alpine Linux distfiles is an authoritative distro mirror hosting the
+    # byte-identical upstream 2.4.0 tarball (sha256 verified equal to the
+    # GitHub archive's).
+    - "https://distfiles.alpinelinux.org/distfiles/v3.22/ply-2.4.0.tar.gz"
+  sha256: "f7c1461f3c570c91f28b1d33424846ead0d6e4429e4a9ce4429db8f2327283a5"
+
+# 注意：patches 字段只声明可在 apply_conandata_patches() 阶段安全应用的补丁。
+# 0002/0003（config.guess / config.sub 的 OHOS 三元组修复）目标文件由
+# `automake --add-missing` 在 autogen 生成链末端才落地，若在此声明会因目标文件
+# 不存在而失败，故由 conanfile.py::_patch_config_guess() 在 libtoolize 之后、
+# configure 之前内联应用（E007）。这一 ordering 是刻意设计，非声明遗漏。
+
+patches:
+  "2.4.0":
+    - patch_file: "patches/0001-configure-ac-pin-version.patch"
+      patch_description: >-
+        上游 AC_INIT 的版本号取自 `m4_esyscmd_s(git describe --always --dirty)`；
+        发布 tarball 内无 .git，git describe 报 "not a git repository" 失败，
+        导致 PACKAGE_VERSION 为空（ply -v 不输出 2.4.0，config.h/man 版本缺失）。
+        固定为发行版本号 2.4.0。
+      patch_type: "portability"
+    - patch_file: "patches/0004-tracepoint-use-posix-strchr-strrchr.patch"
+      patch_description: >-
+        tracepoint.c 使用 legacy BSD 的 rindex()/index()，OHOS libc 未导出这两个符号
+        （ld.lld: undefined reference due to --no-allow-shlib-undefined: rindex，
+        由 libply.so 引用），链接失败。改为 POSIX 等价函数 strrchr()/strchr()
+        （语义完全一致），不涉及平台宏与行为分支。
+      patch_type: "portability"

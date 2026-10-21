@@ -1,0 +1,79 @@
+# 版本级 manifest
+# 文件位置: archives/l/libvdeplug/4.0.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "4.0.1"
+
+# 软件名
+software: "libvdeplug"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-17"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（上游 rd235/vdeplug4 官方 tag 归档）
+  url: "https://github.com/rd235/vdeplug4/archive/refs/tags/v4.0.1.tar.gz"
+
+  # 源码校验和
+  sha256: "2299fb2f26508716b5c08d9fdae62c2516372d833540c8307d45634a2848d57a"
+
+  # 压缩格式
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  system: cmake
+
+  # 配置选项列表（CMakeToolchain 注入，见 conanfile.py generate()）
+  configure_options:
+    - "-DCMAKE_USER_MAKE_RULES_OVERRIDE_C=<ohos-cmake-rules.cmake> (E1013)"
+    - "-DCMAKE_BUILD_WITH_INSTALL_RPATH=ON"
+    - "-DCMAKE_INSTALL_RPATH=$ORIGIN;$ORIGIN/../lib"
+    - "-DCMAKE_C_FLAGS=-I<libexecs include>"
+    - "-DCMAKE_LIBRARY_PATH=<libexecs lib>"
+    - "-DCMAKE_SHARED_LINKER_FLAGS=-L<libexecs lib>"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - "libexecs/1.4"
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-libvdeplug-rtld-deepbind-musl.patch"
+  - "0002-libvdeplug4-cmake-remove-export-dynamic.patch"
+
+patch_classification:
+  - file: 0001-COPYING.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-COPYING.libvdeplug4.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

@@ -1,0 +1,66 @@
+# 版本级 manifest — vdr 2.6.9
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "2.6.9"
+software: "vdr"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-18"
+build_system: makefile
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 官方上游源：vdr-projects/vdr 仓库自身的 tag 归档
+  # （已与同版本 Debian .orig.tar.bz2 逐文件比对 311/311 一致）
+  url: "https://github.com/vdr-projects/vdr/archive/refs/tags/2.6.9.tar.gz"
+  sha256: "0ad16ed265db87dbbe933412985d6be335c47505901d0fecf8417d0de9b2099c"
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: makefile
+  configure_options: []
+  # 目标仅 `vdr`；`all` 另含 i18n（需 xgettext/msgfmt）与 PLUGINS/src 演示插件
+  # （skincurses 需 ncurses），不属于本包交付的录像机主程序。
+  build_target: "vdr"
+  dependencies:
+    - libjpeg-turbo/3.2.0
+    - libcap/2.78
+    - freetype/2.14.3
+    - fontconfig/2.18.1.1
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - "0001-vdr-2.6.9-ohos-libc-portability.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "VDR 是手写 GNU make 项目（Makefile + 可选 Make.config），无 configure/cmake/meson；编译全部 .c 也用 $(CXX)，因此必须显式传 CXX（Makefile 默认 gcc/g++）"
+  - "Make.config.template 里的 -m32 只在该模板被拷贝成 Make.config 且 make M32=1 时生效（ifdef M32 保护），默认路径不含 -m32；真正需要改写的是 CC=gcc/CXX=g++ 两个硬赋值默认值"
+  - "make 命令行传 CXXFLAGS 会顶掉 Makefile 内的 'CXXFLAGS += -fPIC' 追加（命令行变量优先，+= 被忽略）——仅传 CC/CXX/PKG_CONFIG/CINCLUDES/LIBS，不传 CXXFLAGS"
+  - "sysroot 有 linux/dvb/{frontend,version,dmx}.h 且 ioctl 面编译通过；坑在运行期：本机 /dev/dvb 与 /sys/class/dvb 双缺，dvbdevice.c 的 cReadDir(\"/sys/class/dvb\") 与 open(\"/dev/dvb/adapter%d/frontend%d\") 必然走失败分支（枚举 0 适配器）"
+  - "glibc 专属符号面是本次编译期主坑：__GLIBC_PREREQ / DEFFILEMODE / __compar_fn_t / __attribute_format_arg__ / malloc_trim 在 OHOS musl 头集里全缺，需在 tools.h 注入最小兜底（__attribute_format_arg__ 缺失会让 i18n.h:49 声明变成语法错，级联出 125 处 I18nTranslate 未声明）"
+  - "svdrp.c:76 'Set(INADDR_ANY, 0)'：INADDR_ANY 展开为 ((in_addr_t)0x00000000)，是 C++11 起不再承认的『非字面量空指针常量』；GCC 容忍而 clang 直接报错（-Wnon-literal-null-conversion 只在 gnu++03 下退化为警告），必须改文本形式 0.0.0.0"
+  - "OHOS 的 sys/capability.h 只有 capget/capset 系统调用，没有 libcap 的 cap_t/cap_from_text/cap_get_proc，必须引入 conan libcap/2.78（其 sys/capability.h 经 -I 先于 sysroot 命中）"
+  - "运行时依赖的共享库必须能被 OHOS 加载器接受：实测 conan 远端 fontconfig/2.18.3 的 .so 在本机 dlopen 报 EACCES（同 cache 内 libfreetype/libjpeg/libxml2 均可加载、文件 md5 与 conanmanifest 一致），改用本机构建且实测可加载的 fontconfig/2.18.1.1（连带 expat/2.8.2.1，其 libexpat.so.1 loadable）"
+  - "gettext 家族在 SDK 链接期 libc.so 桩里不存在，但运行期 musl 加载器 /lib/ld-musl-aarch64.so.1 导出；沿 glib/abr2gbr 先例以 -L/lib -l:ld-musl-aarch64.so.1 链接，并注入最小 libintl.h（SDK 的 libintl.h 是空桩，只定义 __USE_GNU_GETTEXT 不声明任何函数）"
+  - "同一『链接期桩缺、运行期有』的还有 adjtime 与 pthread_cancel（thread.c/eit.c 用），同样靠 ld-musl-aarch64.so.1 解析"
+  - "OHOS libc 无 pthread_rwlockattr_setkind_np 与 PTHREAD_RWLOCK_PREFER_*_NP / PTHREAD_MUTEX_ERRORCHECK_NP（后者改用 PTHREAD_MUTEX_ERRORCHECK）；osd.c 的 <sys/unistd.h> 与 vdr.c 对 stdin/stdout/stderr 的赋值（OHOS 声明为 FILE *const）也都需要条件化"

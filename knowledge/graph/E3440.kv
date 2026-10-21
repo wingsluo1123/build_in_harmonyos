@@ -1,0 +1,58 @@
+# ═══ Draft knowledge entry — 旧版 Pillow 时代 C 扩展在 python 3.12 上 ABI 运行期不可用 ═══
+# Timestamp: 2026-10-15
+# Software: libpillowfight 0.2.4（知识可跨库复用：任何旧版 C 扩展 sdist 在 python 3.12 的复现）
+# Task: libpillowfight-0.2.4-r06-historical-2018-stack-replication-pc1-35-20261015T120000Z
+# Status: DRAFT — 同 stem 配对 knowledge/drafts/DRAFT-libpillowfight-0.2.4-legacy-pillow-py312-abi.md
+#
+# 查重差异: 检索 graph/ 与 drafts/ 未见等价条目（E062/E065/E075/E113/E158 为头文件/CFLAGS/依赖类，
+# DRAFT-12801 为 py2 protobuf 迁移，均与本条"旧版 Pillow C 扩展 ABI 运行期崩溃"无关）。
+
+id:                     E3440
+trigger_tool:           pip|Pillow|python3.12|sdist
+phase:                  testing|build|runtime
+error_signature:        PY_SSIZE_T_CLEAN.*must be defined|Signal 11.*PIL|cannot identify image file.*jpg|collections.*MutableMapping.*has no attribute|Failed building wheel for Pillow
+severity:               2
+category:               ohos, python, runtime, abi, legacy
+match_keywords:         Pillow 5.0, Pillow 6.0, python 3.12, PY_SSIZE_T_CLEAN, collections.MutableMapping,
+                        sdist, C extension, ABI, segfault, Signal 11, cannot identify image file,
+                        libpillowfight, reference image, historical stack
+title:                  旧版 Pillow（5.0/6.0 时代）sdist 在 python 3.12 上可编译但运行期不可用（ABI 段错误/JPEG 解码失效）——历史环境复现前先验证运行期可用性，失败原文即已尝试证据
+root_cause:             >
+  2018 时代 Pillow（5.0.0/6.0.0）C 扩展按 python 3.6 时代 C-API 编写：在 python 3.12 上
+  ①编译期需 -DPY_SSIZE_T_CLEAN（旧 '#' 格式）且 collections.MutableMapping 已迁移
+  （需运行期 shim）；②即便编译+shim 通过，运行期仍崩溃——Pillow 5.0 解码路径 Signal 11
+  （ABI 不兼容），Pillow 6.0 JPEG 打开报 cannot identify image file（JPEG 解码器未生效）。
+  即"构建成功 ≠ 运行期可用"；参考图生成环境（2018 Pillow + python 3.6 时代）在 python 3.12
+  设备上结构性不可复现，字节等值链条无法建立。
+affected_scope:         >
+  历史版本栈复现/上游参考环境还原场景（字节等值图像测试返工）：目标设备为 python 3.12，
+  需运行 2018 前后旧版 Pillow/C 扩展。
+verification_cmd:       |
+  # 1) 编译期：CFLAGS=-DPY_SSIZE_T_CLEAN 构建 sdist；2) 运行期：venv python 实际解码 JPEG
+  #    （Pillow 5.0 -> Signal 11；6.0 -> cannot identify image file 均为运行期失败原文）
+rec_priority:           1
+rec_approach:           runtime-abi-verify-before-history-replication
+rec_description:        >
+  复现历史栈前先做"运行期可用性"验证（import + 实际解码一张 JPEG）：编译通过不足以判定可用；
+  ABI 崩溃/解码失效的失败原文记录即"已尝试"证据，据此按任务规则降级或转入证据链裁决，
+  不得把构建成功当作栈可用。
+rec_command:            |
+  venv/bin/python3 -c "import PIL, PIL.Image as I; I.open('x.jpg'); print('OK')"
+rec_auto_fix:           false
+rec_impl:               pillowfight-legacy-pillow-abi
+fallback_priority:      2
+fallback_approach:      env-semantics-cflags-not-cppflags
+fallback_description:   >
+  旧版 Pillow setup.py 仅从 CFLAGS/LDFLAGS（非 CPPFLAGS）解析 -I/-L 做依赖探测（5.0/6.0 时代）；
+  历史栈构建失败先核对所用环境变量语义（CFLAGS 而非 CPPFLAGS），再判断是否为 ABI 运行期问题。
+forbid_1_pattern:       把"构建成功"直接当作"栈可用"并据此下命中/未命中结论
+forbid_1_reason:        运行期 ABI 崩溃/解码失效必须单独取证（本条目即该教训）
+forbid_2_pattern:       历史栈复现失败时不记录失败原文就宣称参考环境不可达
+forbid_2_reason:        candidate_version_untested_without_evidence 禁止；失败原文即尝试证据
+principles:             P012
+doc_file:               knowledge/drafts/DRAFT-libpillowfight-0.2.4-legacy-pillow-py312-abi.md
+last_updated:           2026-10-15
+source_event:           archives/l/libpillowfight/0.2.4（feat/libpillowfight-0.2.4，R06 历史栈复现）
+prescan_pattern:        PY_SSIZE_T_CLEAN|MutableMapping|Signal 11.*PIL|cannot identify image file
+prescan_globs:          **/*.py, **/setup.py
+authors:               unknown

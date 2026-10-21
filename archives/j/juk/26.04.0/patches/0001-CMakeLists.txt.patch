@@ -1,0 +1,55 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -43,21 +43,25 @@
+     TextWidgets
+     XmlGui
+     Wallet
+     WidgetsAddons
+     WindowSystem
+     StatusNotifierItem
+ )
+ 
+ find_package(Taglib 1.6 REQUIRED)
+ 
+-add_subdirectory( doc )
++# OHOS: the handbook chain (kdoctools_create_handbook -> meinproc6 ->
++# xmllint) needs the DocBook XML 4.5 DTD, which the platform does not ship
++# and the ohpcd repository has no docbook-xml package for; the resulting
++# doc/index.cache.bz2 target fails. trim it (poxml 26.04.0 precedent).
++# add_subdirectory( doc )
+ add_subdirectory( tests )
+ add_subdirectory( pics )
+ 
+ #set_package_properties(FEATURE PROPERTIES DESCRIPTION "A library for developing MusicBrainz enabled tagging applications" URL "https://wiki.musicbrainz.org/History:libtunepimp" TYPE OPTIONAL PURPOSE "Provides MusicBrainz tagging in Juk.")
+ 
+ # TODO: tunepimp is fully unsupported, replace this when tunepimp is replaced
+ # with whatever is actually current this decade.
+ set(HAVE_TUNEPIMP 0)
+ 
+ ########### next target ###############
+@@ -207,21 +211,24 @@
+ install(
+     FILES juk.notifyrc
+     DESTINATION ${KDE_INSTALL_KNOTIFYRCDIR}
+ )
+ 
+ install( FILES org.kde.juk.metainfo.xml DESTINATION ${KDE_INSTALL_METAINFODIR} )
+ install( PROGRAMS jukservicemenu.desktop  DESTINATION ${KDE_INSTALL_DATADIR}/kio/servicemenus )
+ install( FILES org.kde.juk.collection.xml org.kde.juk.player.xml org.kde.juk.search.xml DESTINATION ${KDE_INSTALL_DBUSINTERFACEDIR} )
+ 
+ ki18n_install(po)
+-kdoctools_install(po)
++# OHOS: kdoctools_install(po) generates po/*/docs/juk/index.cache.bz2,
++# which runs the same meinproc6/xmllint DocBook chain and fails without the
++# DocBook XML 4.5 DTD (see the add_subdirectory(doc) note above).
++# kdoctools_install(po)
+ 
+ ecm_install_icons(ICONS
+     128-apps-juk.png
+     16-apps-juk.png
+     32-apps-juk.png
+     48-apps-juk.png
+     64-apps-juk.png
+     DESTINATION ${KDE_INSTALL_ICONDIR}
+     THEME hicolor
+ )

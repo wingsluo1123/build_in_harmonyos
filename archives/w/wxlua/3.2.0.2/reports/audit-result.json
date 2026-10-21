@@ -1,0 +1,34 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P3",
+      "rule": "信息泄漏（规则7弱相关）",
+      "file": "archives/w/wxlua/3.2.0.2/manifest.yaml",
+      "description": "patch_generation 元数据包含构建机内部绝对路径，且路径中含适配者用户名，泄露内部构建环境信息（非密钥/凭证，不构成 P0/P1）",
+      "evidence": "manifest.yaml:17-18 source_orig_dir: /storage/Users/currentUser/work/kasumizawa-miyuu/wxlua-wt/tmp/wxlua/builds/wxlua-3.2.0.2.orig 与 source_work_dir: /storage/Users/currentUser/work/kasumizawa-miyuu/wxlua-wt/tmp/wxlua/builds/wxlua-3.2.0.2.work"
+    },
+    {
+      "severity": "P3",
+      "rule": "元数据一致性（规则10相关）",
+      "file": "archives/w/wxlua/3.2.0.2/manifest.yaml",
+      "description": "manifest build_date（2026-10-03）与归档内其他时间戳（notes 收尾标记、补丁 generated_at、测试报告正式门禁均为 2026-10-06）不一致；patch_classification 标注 platform_only: True 且 guard: 'pending'，与 conandata.yml 中 patch_type: portability（补丁实际为通用 CMake config-target 逻辑，非平台专属）矛盾，分类字段疑似未完成；notes.md:33 残留中期表述『修复后的正式 Conan 验证仍在执行』与文末『最终状态: built』并存，靠 test-report.md 2026-10-06 门禁章节方可闭环",
+      "evidence": "manifest.yaml:4 build_date: \"2026-10-03\" vs notes.md:40 **编译结束**: 2026-10-06 13:35 与 manifest.yaml:21 generated_at: '2026-10-06T13:35:32'；manifest.yaml:26-27 platform_only: True / guard: 'pending' vs conandata.yml:12 patch_type: \"portability\""
+    },
+    {
+      "severity": "P3",
+      "rule": "code_style §3 方法顺序",
+      "file": "archives/w/wxlua/3.2.0.2/conanfile.py",
+      "description": "方法定义顺序与项目规范规定的标准顺序（export_sources → requirements）不符，requirements 与 export_sources 调换",
+      "evidence": "conanfile.py:22 def requirements 先于 conanfile.py:26 def export_sources；code_style 规定『标准顺序：export_sources → requirements → layout → … 不可随意调换』"
+    },
+    {
+      "severity": "P3",
+      "rule": "code_style §1 文件头",
+      "file": "archives/w/wxlua/3.2.0.2/test_package/conanfile.py",
+      "description": "test_package/conanfile.py 缺少规范要求的 shebang + docstring 文件头（主配方 conanfile.py:1-2 已具备）",
+      "evidence": "test_package/conanfile.py:1-8 直接以 import io/os/... 开头，无 #!/usr/bin/env python3 与模块 docstring"
+    }
+  ],
+  "summary": "审计结论：通过（pass）。13 条硬性规则逐条核查全部合规：补丁与配方无 __OHOS__ 宏注入（PF5）；无 SYS_PREFIX 读取或 /usr/local 共享前缀（PF6）；conandata.yml 与 manifest.yaml 源 URL 均为官方 https（codeload.github.com / github.com，PF7），notes 中镜像尝试仅为历史记录且未落入制品；无压缩包/二进制入库（PF2，132MB 打包物明确本地留存）；test_package test() 经 execute 闭包执行 self.run(\"timeout 120 …\") 并强制校验 WXLUA_CONSUMER_PASS 10 / WXLUA_CPP_PASS 4 / WXLUA_MODULE_PASS 标记（PF3）；settings 四项齐全、版本目录一致、commands.json name/type=tool/ref 对齐（R38）；无密钥凭证泄漏（规则7）；MANIFEST.yml assertion_count=15 与实际断言严格吻合（consumer.lua 10 项 check 且 assert(n==10)、consumer.cpp 4 项返回码检查、module_host.c 1 项 require+API 断言），上游 98 项有 notes 实测记录且配方以 assert(tests_run == 98 and failed_tests == 0) 强制执行（规则8）；license=wxWindows 与上游一致且 licence.txt 随包安装（规则9）；notes 有编译结束/最终状态收尾标记、manifest status=built（规则10）；补丁头 --- a/ +++ b/ 格式正确且 patch_description 存在（规则11）；sha256 为 64 位十六进制、无伪造状态（规则12）；gui_runner.py 为真实 Broadway 测试基础设施——动态端口绑定回环、TCP 就绪探测、超时包裹执行、退出码+标记双重校验、finally 中终止服务并清理（规则13）。发现 4 项 P3 建议（不阻断）：1) manifest patch_generation 含构建机绝对路径及用户名，建议脱敏；2) manifest build_date 与最终构建时间戳不一致、patch_classification 的 platform_only/guard 字段与实际补丁类型矛盾且疑似未完成，notes 残留中期『仍在执行』表述，建议收口修正；3) 主配方 requirements 与 export_sources 方法顺序与规范调换；4) test_package/conanfile.py 缺 shebang/docstring 文件头。另注：gui_runner.py executor 分支以 subprocess.CompletedProcess(command, 0, output) 固化返回码 0，当前依赖 Conan 2 self.run 非零退出即抛异常的语义方为安全，后续若复用该辅助库建议显式传递真实退出码。无 P0/P1/P2 问题，verdict=pass。"
+}

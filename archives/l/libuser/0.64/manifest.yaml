@@ -1,0 +1,84 @@
+software: libuser
+version: "0.64"
+status: built
+build_system: autotools
+build_date: "2026-10-19"
+language: C
+homepage: "https://pagure.io/libuser/"
+license: LGPL-2.0-or-later
+
+source:
+  url: "https://deb.debian.org/debian/pool/main/libu/libuser/libuser_0.64~dfsg.orig.tar.xz"
+  sha256: "87169b85d1c207b06b43a34aad7e4074ab211db2268744c1286afa75befbda58"
+  tar_format: tar.xz
+
+build:
+  system: autotools
+  configure_options:
+    - "--enable-shared"
+    - "--disable-static"
+    - "--with-python"
+    - "--without-sasl"
+    - "--without-ldap"
+    - "--without-selinux"
+    - "--without-audit"
+    - "--disable-nls"
+    - "--disable-dependency-tracking"
+  dependencies:
+    - "glib/2.88.3"
+    - "popt/1.19"
+    - "linux-pam/1.7.2"
+    - "proxy-libintl/0.5"
+  tool_requires:
+    - "m4/1.4.19"
+    - "autoconf/2.72"
+    - "automake/1.18"
+    - "libtool/2.5.4"
+    - "gettext/0.22.5.1"
+  cc: clang
+
+patches_applied: []
+
+test_results:
+  upstream:
+    registered: 7
+    audit: "Makefile.am TESTS 官方总数 7：常驻 5（tests/config_test.sh, tests/fs_test, tests/files_test, tests/pwhash_test, tests/utils_test）+ 仅 if LDAP 注册 2（tests/default_pw_test, tests/ldap_test，需 /usr/sbin/slapd；本配方 --without-ldap 未注册，以 ohos_feature 缺口说明）"
+    ran: "make check 实注册实跑常驻 4，SKIP 1（fs_test，fakeroot 缺，上游设计 exit 77）"
+    passed: "1/常驻5（tests/config_test.sh）；FAIL 3 —— files_test=worker python3.14 PEP594 已移除 crypt/crypt_r（ModuleNotFoundError: No module named 'crypt'）；pwhash_test/utils_test=HMDFS 工件目录锁 Operation not permitted（Cannot obtain lock …passwd.lock/group.lock）。缺口诚实分类见 HMBS_UPSTREAM_TEST_RESULT；另 LDAP 门控 2 未注册（--without-ldap）"
+    command: "make check -j1（conanfile.py build() 内 best-effort 执行，计数解析自 test-suite.log）"
+  test_package:
+    total: 7
+    description: "消费者视角 7 组：context_start / modules_loaded / user_default / group_default / ent_id_roundtrip / config_moduledir / e338_pwd_semantics（E338 族消费端探针）"
+    passed: "7/7（HMBS_TEST_PACKAGE_RESULT executed=true passed=true discovered=7 passedCount=7；E338 组 DIAG 读数：getpwnam(root) pw_uid=0 pw_dir=''；缺失行=NULL；musl pwd 静态区失败查找复写读数 root/0→kkbor_service_user20/9020；空转 lookup=FALSE 不设 error；passwd→lu_ent uid=0 往返 OK）"
+
+knowledge_ref: []
+
+configure_options:
+  - "--enable-shared"
+  - "--disable-static"
+  - "--with-python"
+  - "--without-sasl"
+  - "--without-ldap"
+  - "--without-selinux"
+  - "--without-audit"
+  - "--disable-nls"
+  - "--disable-dependency-tracking"
+
+artifacts:
+  - lib/libuser.so
+  - lib/libuser/libuser_files.so
+  - lib/libuser/libuser_shadow.so
+  - lib/pkgconfig/libuser.pc
+  - include/libuser/user.h
+  - bin/luseradd
+  - bin/lusermod
+  - bin/luserdel
+  - bin/lgroupadd
+  - bin/lgroupmod
+  - bin/lgroupdel
+  - bin/lpasswd
+  - bin/lchage
+  - bin/lchfn
+  - bin/lchsh
+  - bin/lid
+  - bin/lnewusers

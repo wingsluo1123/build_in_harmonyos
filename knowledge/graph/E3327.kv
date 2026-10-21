@@ -1,0 +1,22 @@
+id:                     E3327
+trigger_tool: conan|export
+phase: recipe|dependency
+error_signature: declaration-only change gives different recipe revision|settings AST equal RREV differs
+severity:               1
+category: conan, metadata, revision
+match_keywords: D-Bus, settings, RREV, package_id, export bytes
+root_cause: Conan实际配方修订受导出字节影响；settings AST值相同不能保证RREV相同，旧PID不能替代新精确发布身份。
+affected_scope: 格式型配方修复及其父库依赖闭包的真实身份。
+verification_cmd: 两个隔离CONAN_HOME同名同版本conan export，逐字节单变量比较并读取实际RREV；再核对精确下载图。
+rec_priority: 1
+rec_approach: semantic-and-byte-revision-separate-binding
+rec_description: 分别绑定settings语义、导出字节和实际RREV/PID/PREV，新制品接受独立证明。
+rec_command: conan export recipe; conan install --build=never
+rec_auto_fix: false
+rec_impl: actual same-name-version isolated exports and exact one-declaration byte difference
+doc_file: knowledge/drafts/E2026101515251-draft-A139.md
+last_updated: 2026-10-15
+source_event: dbus same1.16.2 export681974d62375e6f8db0f6400987cf1b3 to0179452950dc09f62b8e12805aaf8139; r26849 original groups retained capability limits, C4/H1; new publication not proven
+authors: 2301_80739235
+source_pr:
+source_commit:

@@ -15,12 +15,22 @@ ohos_adaptation:
     - "6.26.0: upstream uses std::ranges::any_of/std::bit_cast (C++20) in src/k7zip.cpp; ohos-aarch64 profile pins cppstd=17 and CMakeToolchain re-forces CMAKE_CXX_STANDARD 17 at every project(), so a value-identical C++17 rewrite patch is required"
     - "6.26.0: karchivetest has cross-function file dependencies and cleanupTestCase() deletes shared files per process; per-row exclusions must run in a single process"
     - "6.26.0: ossfuzz_testcase_6213340184772608.7z crashes K7Zip::open() with SIGSEGV on the OHOS runner (passes upstream Linux CI); excluded at run time with disclosure"
+    - "6.28.0: upstream only raises the ECM minimum to 6.28.0 (tool_requires ecm/6.28.0) and appends to CMAKE_MODULE_PATH instead of replacing it; src/ and autotests/ are byte-identical to 6.26.0, so the 6.26.0.1 adaptation set applies unchanged"
+    - "6.28.0: the karchivetest direct driver probes symlink(2) capability first (upstream initTestCase() creates test3_symlink); filesystems that deny symlink(2) (the OHOS device /storage mount returns EACCES) skip it with a warning while the CTest entries keep running; the test_package runtime-library staging falls back from symlink to a real copy the same way"
   common_dependencies:
     - qtbase
     - zlib
     - ecm
 
 versions:
+  "6.28.0":
+    status: built
+    build_date: "2026-10-17"
+    conan_ref: "karchive/6.28.0"
+  "6.26.0.1":
+    status: built
+    build_date: "2026-09-08"
+    conan_ref: "karchive/6.26.0.1"
   "6.26.0":
     status: built
     build_date: "2026-09-08"

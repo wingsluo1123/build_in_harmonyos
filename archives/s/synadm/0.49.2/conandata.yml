@@ -1,0 +1,74 @@
+sources:
+  url: "https://files.pythonhosted.org/packages/e4/6a/f0fabab5ec2ac65391c2e0289eb0e52e995e40adc62753f178eb1fcf7ae4/synadm-0.49.2.tar.gz"
+  sha256: "1cd4dc334aa8c3de58787ac945b405f0aa1d0b8cb9726ff08229d676ef37423f"
+
+# ---------------------------------------------------------------------------
+# Vendored runtime dependencies
+#
+# Three of synadm 0.49.2's seven declared runtime requirements are not
+# published in the OHOS Conan registry, and all three are imported at module
+# top level, so without them `import synadm.api` and every `synadm.cli.*`
+# submodule fail immediately -- the package would not load at all. They are
+# pulled in as pristine upstream sdists from the official PyPI (URL + SHA256
+# pinned) and laid into this package's site-packages, which is the closed
+# dependency pattern already merged here for registry-missing pure-Python
+# dependencies (archives/d/dehydrated-hook-ddns-tsig/0.1.4 -- dnspython;
+# archives/i/interrogate/1.7.0 -- py).
+#
+# Registry state at adaptation time (2026-10-15), probed with the PF4
+# dependency gate (conan.cnb.cool search API) and corroborated with
+# `conan download <ref> -r=ohpcd --only-recipe`:
+#   click/8.4.2, requests/2.22.0, tabulate/0.10.0, pyyaml/6.0.2 -> published,
+#     declared in requirements()
+#   dnspython, click-option-group, requests-unixsocket          -> 0 recipes,
+#     vendored below
+#
+# requests/2.22.0's own import closure (certifi, chardet, idna, urllib3) is
+# additionally declared here as direct requirements with run=True.  The
+# registry recipe lists them without run=True, so Conan treats them as
+# "Skipped binaries" and they are invisible to this recipe's package_info();
+# `import requests` then died with ModuleNotFoundError: chardet.  Measured and
+# fixed by declaring all four directly (they are published: certifi/2026.7.22,
+# chardet/5.2.0, idna/3.18, urllib3/2.7.0).
+#
+# None of the three carries further runtime requirements of its own beyond
+# packages this recipe already provides (requests-unixsocket -> requests>=1.1,
+# click-option-group -> click>=7.0, dnspython -> none), so the closure stops
+# here. Licences: dnspython MIT, click-option-group BSD-3-Clause,
+# requests-unixsocket Apache-2.0 -- all redistributed alongside synadm's
+# GPL-3.0-or-later under their own terms; see licenses/ in the package.
+# ---------------------------------------------------------------------------
+vendored_dnspython:
+  # dns/ package; provides dns.resolver for the "dns" server-discovery path
+  # in synadm/cli/_helper.py. 2.8.0 still ships the module-level
+  # dns.resolver.query() that upstream synadm calls (verified against the
+  # sdist), so no source patch is required.
+  url: "https://files.pythonhosted.org/packages/8c/8b/57666417c0f90f08bcafa776861060426765fdb422eb10212086fb811d26/dnspython-2.8.0.tar.gz"
+  sha256: "181d3c6996452cb1189c4046c61599b84a5a86e099562ffde77d26984ff26d0f"
+  version: "2.8.0"
+  package: "dns"
+  dist: "dnspython"
+  licence: "MIT"
+
+vendored_click_option_group:
+  # click_option_group/ package; optgroup + required/mutually-exclusive
+  # option groups imported by cli/_common.py, history.py, matrix.py,
+  # media.py, room.py and user.py. The sdist uses a src/ layout.
+  url: "https://files.pythonhosted.org/packages/ef/ff/d291d66595b30b83d1cb9e314b2c9be7cfc7327d4a0d40a15da2416ea97b/click_option_group-0.5.9.tar.gz"
+  sha256: "f94ed2bc4cf69052e0f29592bd1e771a1789bd7bfc482dd0bc482134aff95823"
+  version: "0.5.9"
+  package: "click_option_group"
+  dist: "click-option-group"
+  licence: "BSD-3-Clause"
+
+vendored_requests_unixsocket:
+  # requests_unixsocket/ package; the http+unix:// transport synadm uses to
+  # talk to a local Synapse over a unix socket (synadm/api.py). 0.4.1 is the
+  # release that targets urllib3 2.x, which is what the registry
+  # requests/2.22.0 recipe is paired with (urllib3/2.7.0).
+  url: "https://files.pythonhosted.org/packages/22/80/44636b363e75af7f5e6ac0571137466fec66e47016179139d0019a453ab7/requests_unixsocket-0.4.1.tar.gz"
+  sha256: "b2596158c356ecee68d27ba469a52211230ac6fb0cde8b66afb19f0ed47a1995"
+  version: "0.4.1"
+  package: "requests_unixsocket"
+  dist: "requests-unixsocket"
+  licence: "Apache-2.0"

@@ -1,0 +1,68 @@
+# conandata.yml — lsp-r3d-glx-lib 1.0.31
+#
+# 单一事实源：主源码 + 构建期内嵌依赖源码 + 内嵌依赖补丁清单 + 本包补丁。
+#
+# 上游 modules.mk pin 的内嵌依赖（*_TYPE 均为 src）：
+#   DEPENDENCIES      = LSP_COMMON_LIB, LSP_R3D_IFACE, LSP_R3D_BASE_LIB（生产）
+#   TEST_DEPENDENCIES = LSP_TEST_FW（测试）
+# 系统依赖 LIBX11 / LIBGL 为 pkg 型：OHOS 上不存在，新后端（EGL pbuffer）
+# 不依赖它们，其 pkg-config 查询结果为空、不参与链接。
+# 四个 *_TYPE=src 依赖由 src/Makefile 的 $(ARTIFACT_DEPS) 规则递归
+# `make -C modules/<dep> compile` 以 -D<NAME>_BUILTIN 内嵌编译；源码在此登记
+# 同版本 tarball，由 source() 预置到 modules/（替代上游联网的 make fetch）。
+
+sources:
+  "1.0.31":
+    filename: lsp-r3d-glx-lib-1.0.31.tar.gz
+    url: "https://codeload.github.com/lsp-plugins/lsp-r3d-glx-lib/tar.gz/refs/tags/1.0.31"
+    sha256: "3242dc2a7e927758d9de472cb4d026acb9c4bd97b8911629df2c04f8e9904cb6"
+
+# codeload.github.com 的 tar.gz 链接不带扩展名，conan 的 get() 会据 URL 误判为
+# zip：所有条目都必须显式给 filename（.tar.gz）。
+
+# ── 内嵌依赖源码（构建期，版本与上游 modules.mk 的 *_VERSION 严格一致）────
+lsp-common-lib:
+  "1.0.49":
+    filename: lsp-common-lib-1.0.49.tar.gz
+    url: "https://codeload.github.com/lsp-plugins/lsp-common-lib/tar.gz/refs/tags/1.0.49"
+    sha256: "6c6a582ee0dcca12f62ed960bf7492ce60b42c6c6847ed14fac797b05b99b636"
+
+lsp-r3d-iface:
+  "1.0.31":
+    filename: lsp-r3d-iface-1.0.31.tar.gz
+    url: "https://codeload.github.com/lsp-plugins/lsp-r3d-iface/tar.gz/refs/tags/1.0.31"
+    sha256: "718d31cd6a51011aad87c964736548c0264fd54ba596417755c0d18ad08c4c6b"
+
+lsp-r3d-base-lib:
+  "1.0.31":
+    filename: lsp-r3d-base-lib-1.0.31.tar.gz
+    url: "https://codeload.github.com/lsp-plugins/lsp-r3d-base-lib/tar.gz/refs/tags/1.0.31"
+    sha256: "fdd9ad6383c472f7dc22c1e547ebe72db4cf45eb29c4f51c5af6cacefec9430a"
+
+lsp-test-fw:
+  "1.0.35":
+    filename: lsp-test-fw-1.0.35.tar.gz
+    url: "https://codeload.github.com/lsp-plugins/lsp-test-fw/tar.gz/refs/tags/1.0.35"
+    sha256: "7a20dbffd2c4fbb36a8cfc6bd79ef72062daca08950681128096ba59eeb526ae"
+
+# ── 预置后的内嵌依赖补丁（不进 patches 表，由 source() 应用）──────────────
+# 预置到 modules/lsp-common-lib/ 的源码与 lsp-common-lib 1.0.49 归档同样缺
+# GNU qsort_r（musl），补丁内容与 lsp-common-lib/lsp-r3d-base-lib 归档的
+# 0001 补丁一致，仅应用基准路径不同（modules/lsp-common-lib）。
+module_patches:
+  - patch_file: "patches/modules/0001-lsp-common-lib-qsort_r-ohos.patch"
+    base_path: "modules/lsp-common-lib"
+    patch_description: "内嵌 lsp-common-lib 的 src/main/stdlib.cpp：OHOS libc(musl) 无 GNU qsort_r，改为 qsort + 线程局部比较器上下文（与 lsp-common-lib 1.0.49 归档的 0001 补丁内容一致，仅路径基准不同）"
+
+# ── 本包源码补丁（patches 表，build() 的 apply_conandata_patches 应用）───
+# 两者都作用于主源码树中真实存在的文件，对非 OHOS 平台是编译期等价改动：
+#   * 0001：公共头 X11/GLX include 用 __has_include 条件化（不引入平台宏，R8）
+#   * 0002：src/Makefile 按 make 变量 PLATFORM_OHOS=1 选择编译 src/ohos/*.cpp
+# OHOS 后端源码本身不在补丁里：ohos/backend.cpp 经 export_sources 导出、
+# source() 拷入 src/ohos/（上游文件零改动）。
+patches:
+  "1.0.31":
+    - patch_file: "patches/0001-ohos-public-header-glu-conditionalization.patch"
+      patch_description: "公共头 include/lsp-plug.in/r3d/glx/backend.h：X11/GLX include 用 __has_include 条件化，缺失时给占位 typedef；公共头不引入平台宏"
+    - patch_file: "patches/0002-ohos-makefile-build-ohos-backend.patch"
+      patch_description: "src/Makefile：make 变量 PLATFORM_OHOS=1 时编译 src/ohos/*.cpp（EGL 后端）替代 src/main/backend.cpp（X11/GLX 后端），平台标识由 make 命令行变量注入"

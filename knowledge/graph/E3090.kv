@@ -1,0 +1,46 @@
+#====================================================================
+# DRAFT: registry OCaml 包的 C 编译器死路径与 cmxs 链接契约 ——
+# `-cc` 覆盖后必须 `-ccopt -shared` 补回（xmlm 1.4.0，PR #14675）
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E3090
+trigger_tool:           ocamlopt|ocamlc|dune|conan
+phase:                  building|linking
+error_signature: >-
+  /data/service/hnp/bin/clang: inaccessible or not found|I/O error: /data/service/hnp/bin/clang -shared|ld.lld: error: undefined symbol: main|undefined symbol: caml_call_gc|undefined symbol: camlStdlib__
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               3
+category:               ohos, toolchain, ocaml
+match_keywords: ocamlopt,cmxs,shared,dune,registry ocaml package,native_c_compiler,cc,ccopt,endian data/service/hnp,clang,lld,undefined symbol,caml_call_gc,plugin
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+title: registry ocaml 包下游 ocamlopt 的 C 链接器死路径覆盖与 cmxs `-shared` 丢失补偿
+root_cause: >
+  registry ocaml/4.14.1.1.4 包的 Config 把 c_compiler / native_c_compiler /
+  bytecomp_c_compiler 烘焙为 CI worker 绝对路径 /data/service/hnp/bin/clang（真机不存在），
+  ocamlopt 任何需要 C 编译器的阶段（链接可执行/cmxs）都报
+  `/data/service/hnp/bin/clang: inaccessible or not found`。用 `-cc <OHOS clang>` 覆盖后，
+  OCaml 4.14 在 `-shared`（cmxs 插件）链接路径上不再向 C 编译器附加 `-shared`——链接行变成
+  普通可执行链接，lld 以 PIE 可执行语义链接（拉入 Scrt1.o）并报
+  `undefined symbol: main` / `caml_call_gc` / `camlStdlib__*`。
+affected_scope: >
+  一切用 registry ocaml 工具链做原生链接（可执行文件、cmxs 动态插件）的下游 OCaml 包；
+  纯字节码（ocamlc -a / ocamlrun）不受影响。
+verification_cmd: ocamlopt -cc /path/to/clang -shared -ccopt -shared -o xmlm.cmxs xmlm.cmx
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach: ocaml-downstream-native-link-cc-override-plus-ccopt-shared
+prescan_pattern: >-
+  data/service/hnp/bin/clang|undefined symbol: caml_call_gc|-shared.*cmxs|cmxs.*shared
+
+# ═══ Layer 4: 证据层 (Evidence) ═══
+source_commit: xmlm 1.4.0（registry ocaml/4.14.1.1.4 revision 1537a565）
+rec_auto_fix:               false
+rec_impl:               manual
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E3090.md
+rec_description:        ocaml-downstream-native-link-cc-override-plus-ccopt-shared

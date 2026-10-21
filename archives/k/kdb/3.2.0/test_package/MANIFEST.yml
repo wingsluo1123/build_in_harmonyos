@@ -1,0 +1,23 @@
+# test_package/MANIFEST.yml
+# Upstream and consumer test declaration for kdb/3.2.0.
+
+package: kdb/3.2.0
+homepage: https://invent.kde.org/office/kdb
+
+upstream_check_command: "ctest --output-on-failure"
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error"
+
+upstream_tests:
+  - file: autotests/
+    source: kdb-3.2.0/autotests/
+    description: "KDb upstream CTest suite, 14 registered entries: 12 KDb API test targets (ConnectionOptionsTest, ConnectionTest, DateTimeTest, DriverTest, ExpressionsTest, MissingTableTest, OrderByColumnTest, QuerySchemaTest, KDbTest, IdentifierTest, StaticSetOfStringsTest, UtilsTest), SqlParserTest and the HeadersTest installed-header self-containment compile test (120 TUs); ctest -N and the run log both report 14"
+    command: "ctest --output-on-failure"
+    condition: "run in the Conan build with BUILD_TESTING=ON; the in-tree helper library libkdbtestutils.so is found through LD_LIBRARY_PATH (build trees carry no build RPATH when built with the install RPATH)"
+
+test_package_tests:
+  - file: test_package/test.cpp
+    description: "Consumer smoke drives the exported `KDb` target end to end: sqlite driver plugin discovery, KDbConnection lifecycle, table DDL, insertRecord, queries, transaction API and teardown; plus the OHOS ELF checks (unversioned DT_SONAME, DT_RUNPATH, .codesign section)."
+    command: "conan create (test_package builds and runs test_kdb)"
+
+assertion_count: 45

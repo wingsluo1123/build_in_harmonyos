@@ -1,0 +1,34 @@
+# conandata.yml — urjtag 2021.03
+#
+# 上游官方发布渠道（按优先级）：
+#   1. SourceForge 官方项目托管（urjtag 项目页 urjtag.sourceforge.io 即在
+#      SourceForge，downloads.sourceforge.net 为其文件发布区）
+#   2. urjtag.org 的 release 页（项目官网）
+#   3. distfiles.macports.org（MacPorts 官方 distfiles，逐字保留上游
+#      release tarball）
+# 适配网络实测（2026-10-16）：urjtag.org 间歇性完全不可达（HEAD/GET 均
+# 连接超时）；downloads.sourceforge.net HEAD 稳定 HTTP 200 但 body 传输
+# 断流（多次重试未获完整文件）；distfiles.macports.org 一次成功取到完整
+# tarball。三个 URL 登记同一 sha256 —— 源码即官方 release tarball。
+# 证据：sha256 b0a2eaa2... 与官方 Debian 源包元数据 urjtag_2021.03-5.dsc
+# 公布的 urjtag_2021.03.orig.tar.xz 哈希+字节数（1208440）完全一致，
+# 源码身份由独立官方渠道（Debian 打包元数据）交叉验证。
+sources:
+  "2021.03":
+    url:
+      - "https://downloads.sourceforge.net/project/urjtag/urjtag/2021.03/urjtag-2021.03.tar.xz"
+      - "https://urjtag.org/releases/urjtag-2021.03.tar.xz"
+      - "https://distfiles.macports.org/urjtag/urjtag-2021.03.tar.xz"
+    sha256: "b0a2eaa245513af096dc4d770109832335c694c6c12aa5e92fefae8685416f1c"
+
+patches:
+  "2021.03":
+    - patch_file: "patches/0001-configure-umask-hmdfs-scratch-dir.patch"
+      patch_description: "OHOS HMDFS: drop `umask 077` from the configure/config.status scratch-directory creation (setgid + uid mapping makes the 0700 directory unwritable by its own creator; E011/E114/E129/E136, same fix as tanidvr/1.4.1)"
+      patch_type: "portability"
+    - patch_file: "patches/0002-tools-config-sub-ohos.patch"
+      patch_description: "Accept the aarch64-*-ohos host triples in the bundled 2018-02-22 tools/config.sub (no `ohos` system; OHOS host triplet is aarch64-linux-ohos, same fix as a52dec/0.7.4)"
+      patch_type: "portability"
+    - patch_file: "patches/0003-svf-ualarm-musl.patch"
+      patch_description: "Replace ualarm() with a one-shot setitimer(ITIMER_REAL) in the SVF RUNTEST max_time timer (ualarm is not provided by musl/OHOS libc; behaviour identical - single SIGALRM after the requested microseconds)"
+      patch_type: "portability"

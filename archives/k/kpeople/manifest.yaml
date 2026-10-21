@@ -1,0 +1,35 @@
+# 软件级 manifest — kpeople
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: kpeople
+display: "KPeople"
+description: "KDE Frameworks 6 联系人聚合框架：把多个数据源的联系人统一建模为 PersonData / PersonsModel，提供合并/拆分求解、变更通知、排序过滤代理模型与 Widgets/QML 视图组件"
+category: library
+homepage: "https://invent.kde.org/frameworks/kpeople"
+license: LGPL-2.0-or-later
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "KF_IGNORE_PLATFORM_CHECK=TRUE 绕过 KDE 平台白名单（不含 OHOS）；KF_SKIP_PO_PROCESSING=ON + 补丁删 ki18n_install(po)（无 Qt Linguist 工具）"
+    - "CMake 的 Platform/OHOS.cmake 全文是 include(Platform/Linux)，UNIX 为真 → 上游按 UNIX 默认自动把 USE_DBUS 置 ON；设备无会话总线时合并通知经 sessionBus().send() 回环静默丢失（数据库已提交、PersonsModel 不刷新）——配方显式钉 USE_DBUS=OFF 走进程内信号路径（KF5 姊妹包 kpeople5 同口径；草稿 DRAFT-cmake-ohos-unix-true-dbus-auto-enable-signal-loss）"
+    - "补丁 0001 把 KF_DEP_VERSION 从 6.28.0 降到 6.18.0 基线、ECM 探测降到 6.26.0（kcontacts 先例），影响面仅构建期版本门槛与语言目录安装"
+    - "HMDFS 拒符号链接（EPERM）：CMAKE_PLATFORM_NO_VERSIONED_SONAME=ON + 经 CMAKE_USER_MAKE_RULES_OVERRIDE 注入显式 -Wl,-soname 只产出单个 libKF6People.so，DT_SONAME 真实在位"
+    - "Conan 2.29 的 cache_variables 只写入 CMakePresets.json；手工 -DCMAKE_TOOLCHAIN_FILE 配置的配方必须用 toolchain.variables（进 conan_toolchain.cmake），否则变量静默丢失"
+    - "上游 QTest fatal 后进入 OHOS 崩溃处理循环（不响应 TERM）：ctest 统一带 --timeout 300，把挂死转换成失败"
+    - "post-install ELF 重签名（llvm-objcopy 去 .codesign + binary-sign-tool selfSign）；测试运行期依赖用符号链接（失败退化为拷贝）以保留签名"
+  common_dependencies:
+    - qtbase-sql-dbus
+    - qtdeclarative
+    - kcoreaddons
+    - kwidgetsaddons
+    - ki18n
+    - kitemviews
+    - kcontacts
+
+versions:
+  "6.28.0":
+    status: built
+    build_date: "2026-10-16"
+    conan_ref: "kpeople/6.28.0"
+    note: "首次适配（KF6/Qt6 线；KF5 线见 kpeople5）：USE_DBUS 静默丢失修复 + KF6 版本墙补丁；上游 ctest 3 目标 10/10 用例 + 消费者执行器 10/10 用例真机全绿；真机八门禁 Verdict PASS"

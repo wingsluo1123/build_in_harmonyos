@@ -1,0 +1,165 @@
+--- a/odb-2.4.0/odb/odb.cxx
++++ b/odb-2.4.0/odb/odb.cxx
+@@ -30,7 +30,7 @@
+ #include <sstream>
+ #include <fstream>
+ #include <iostream>
+-#include <ext/stdio_filebuf.h>
++#include "stdio_filebuf.hxx"
+ 
+ #include <cutl/fs/path.hxx>
+ 
+--- /dev/null
++++ b/odb-2.4.0/odb/stdio_filebuf.hxx
+@@ -0,0 +1,151 @@
++// file      : odb/stdio_filebuf.hxx
++// license   : GNU GPL v3; see accompanying LICENSE file
++//
++// Minimal replacement for the libstdc++-only __gnu_cxx::stdio_filebuf,
++// for targets whose standard library is not libstdc++ (e.g. OpenHarmony
++// with libc++).
++//
++// The ODB driver wraps pipe file descriptors (plain int fds, see the
++// process_info struct) with this class to stream the synthesized
++// translation unit into the child compiler's stdin and to read the
++// child's stdout/stderr. Ownership follows the libstdc++ original:
++// the streambuf owns the fd it wraps, close() flushes and closes it,
++// and the destructor calls close(). Closing the write end of the pipe
++// signals EOF to the child process, as the original does.
++//
++// Only the single-direction usage performed by the driver is
++// implemented: writing (overflow/sync) or reading (underflow), never
++// both on the same object.
++
++#ifndef ODB_STDIO_FILEBUF_HXX
++#define ODB_STDIO_FILEBUF_HXX
++
++#include <cstdio>
++#include <cstddef>
++#include <ios>
++#include <streambuf>
++
++namespace __gnu_cxx
++{
++  template <typename CharT>
++  class stdio_filebuf: public std::basic_streambuf<CharT>
++  {
++  public:
++    typedef std::basic_streambuf<CharT> streambuf;
++    typedef typename streambuf::traits_type traits_type;
++    typedef typename streambuf::int_type int_type;
++
++    stdio_filebuf (int fd, std::ios_base::openmode mode)
++    : fd_ (fd),
++      in_ ((mode & std::ios_base::in) != 0),
++      out_ ((mode & std::ios_base::out) != 0),
++      f_ (fdopen (fd, mode_string (mode))),
++      closed_ (f_ == 0)
++    {
++      if (f_ != 0)
++      {
++        if (in_)
++          this->setg (buf_, buf_, buf_);
++        if (out_)
++          this->setp (buf_, buf_ + (sizeof buf_ - 1));
++      }
++    }
++
++    ~stdio_filebuf ()
++    {
++      close ();
++    }
++
++    bool
++    close ()
++    {
++      if (closed_)
++        return false;
++      bool ok (true);
++      if (f_ != 0)
++      {
++        if (out_)
++          ok = sync () == 0;
++        ok = ok && fclose (f_) == 0;
++        f_ = 0;
++      }
++      closed_ = true;
++      return ok;
++    }
++
++    int_type
++    underflow ()
++    {
++      if (f_ == 0)
++        return traits_type::eof ();
++      if (this->gptr () == this->egptr ())
++      {
++        size_t n (fread (buf_, sizeof (CharT), sizeof (buf_), f_));
++        if (n == 0)
++          return traits_type::eof ();
++        this->setg (buf_, buf_, buf_ + n);
++      }
++      return traits_type::to_int_type (*this->gptr ());
++    }
++
++    int_type
++    overflow (int_type c)
++    {
++      if (f_ == 0 || !out_)
++        return traits_type::eof ();
++      if (!traits_type::eq_int_type (c, traits_type::eof ()))
++      {
++        if (this->pptr () == this->epptr ())
++          if (sync () != 0)
++            return traits_type::eof ();
++        *this->pptr () = traits_type::to_char_type (c);
++        this->pbump (1);
++      }
++      return traits_type::not_eof (c);
++    }
++
++    int
++    sync ()
++    {
++      if (f_ == 0 || !out_)
++        return 0;
++      if (this->pptr () != this->pbase ())
++      {
++        size_t n (static_cast <size_t> (this->pptr () - this->pbase ()));
++        this->setp (buf_, buf_ + (sizeof buf_ - 1));
++        if (fwrite (this->pbase (), sizeof (CharT), n, f_) != n)
++          return -1;
++      }
++      return fflush (f_) == 0 ? 0 : -1;
++    }
++
++  private:
++    static char const*
++    mode_string (std::ios_base::openmode mode)
++    {
++      // The driver only ever uses in or out (plus binary, which is a
++      // no-op for POSIX pipes/files).
++      //
++      if ((mode & std::ios_base::in) && (mode & std::ios_base::out))
++        return "r+";
++      if (mode & std::ios_base::out)
++        return "w";
++      return "r";
++    }
++
++    int
++      fd_;
++    bool
++      in_;
++    bool
++      out_;
++    std::FILE*
++      f_;
++    bool
++      closed_;
++    CharT
++      buf_[8192];
++  };
++}
++
++#endif // ODB_STDIO_FILEBUF_HXX

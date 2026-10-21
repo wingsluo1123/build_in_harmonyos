@@ -1,0 +1,46 @@
+software: kitemmodels
+version: "6.28.0"
+status: built
+build_date: "2026-10-16"
+
+source:
+  url: "https://download.kde.org/stable/frameworks/6.28/kitemmodels-6.28.0.tar.xz"
+  sha256: "e03c5dbfc97fa298de9be58bfeb686518a52ae1236389fbc2436ff84165e7e2b"
+  tar_format: tar.xz
+
+build:
+  system: cmake
+  configure_options:
+    - "BUILD_SHARED_LIBS=ON"
+    - "BUILD_TESTING=ON"
+    - "KF_IGNORE_PLATFORM_CHECK=TRUE"
+  dependencies:
+    - qtbase/6.11.1
+    - qtdeclarative/6.11.1
+  build_dependencies:
+    - ecm/6.28.0
+  cc: clang
+  cxx: clang++
+
+patches_applied: []
+
+validation:
+  target: "HarmonyOS PC 真机（aarch64，设备直连）"
+  mode: "conan-verify 全门禁（G0/G1/G2/G3/G4 PASS；L2/L4/L5 无 cache 路径跳过）"
+  date: "2026-10-16"
+  source: "官方源缓存命中（sha256 与上游一致；缓存经 mirrors.aliyun.com 预置）"
+  conan_create_exit_code: 0
+  upstream_ctest: "12/12"
+  installed_consumer_checks: "9/9"
+  signed_ohos_elf_files: 2
+  report_sha256: "9f3573d0bb7c767b5e693ff54066d65d41d7a0f3a2ddf4a40a9cae9032c96b16"
+  log_sha256: "1da8223f7686cda8334dfc4ab6540a6481cf835911cf56a4c1dd18a562940e7e"
+
+validation_pending:
+  - "平台 CI 全绿与平台侧 AI 检视结论"
+  - "赛事看板提审"
+
+unsupported_configuration:
+  name: "static core and QML module"
+  reason: "同族 6.26.0 线真机实证：静态包 QML 插件变为 libitemmodelsplugin.a，运行时 import org.kde.kitemmodels 失败。"
+  evidence: "6.26.0 线：上游 CTest 12/12，但安装包消费者仅 4/9；6.28.0 交付仅共享库。"

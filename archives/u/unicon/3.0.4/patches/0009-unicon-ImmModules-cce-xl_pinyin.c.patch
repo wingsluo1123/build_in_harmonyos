@@ -1,0 +1,92 @@
+--- a/unicon/ImmModules/cce/xl_pinyin.c
++++ b/unicon/ImmModules/cce/xl_pinyin.c
+@@ -227,34 +227,37 @@
+       printf ("Sorry, couldn't find your $HOME.\n");
+     }
+ }
+ 
+ /*  Reade the pinyin.map, fill the pytab structure */
+ 
+ static int
+ LoadPinyinTable (char *pathname)
+ {
+   FILE *stream;
+-  char str[250], strpy[15], strhz[241];
++  char str[512], strpy[15], strhz[400];
+   int i = 0, j = 0, lastpy = 0, curpy;
+ 
+   if ((stream = fopen (pathname, "r")) == NULL)
+     {
+       fatal ("%s file not found\n", pathname);
+       return -1;
+     }
+   while (!feof (stream))
+     {
+-      if (fgets (str, 250, stream) != NULL)
+-	{
+-	  sscanf (str, "%s %s", strpy, strhz);
++      if (fgets (str, 512, stream) != NULL)
++	{
++	  if (sscanf (str, "%6s %399s", strpy, strhz) < 2)
++	    continue;
+ 	  curpy = strpy[0] - 'a';
++	  if (curpy < 0 || curpy > 25)
++	    continue;
+ 	  if (curpy != lastpy)
+ 	    j = 0;
+ 	  strcpy (pytab[curpy][j].py, strpy);
+ 	  pytab[curpy][j].key = i + 1;
+ 	  lastpy = curpy;
+ 	  i++, j++;
+ 	}
+     }
+ #ifdef DEBUG
+   warn ("sizeof(pytab=%d\n", sizeof (pytab));
+@@ -412,21 +415,22 @@
+ 	      fatal ("Error in reading....1\n");
+ 	      return -1;
+ 	    }
+ 	  if (fread (&size, sizeof (size), 1, stream) != 1)
+ 	    {
+ 	      fatal ("Error in reading....2\n");
+ 	      return -1;
+ 	    }
+ 	  if (
+ 	      (kph =
+-	       (UsrPhrase *) malloc (6 + len + 1 + (2 * len + 1) * size)) ==
++	       (UsrPhrase *) malloc (sizeof (UsrPhrase) + len + 1 +
++				    (2 * len + 1) * size)) ==
+ 	      NULL)
+ 	    {
+ 	      fatal ("Not enough memory\n");
+ 	      return -1;
+ 	    }
+ 	  kph->len = len;
+ 	  kph->count = size;
+ 	  kph->next = NULL;
+ 	  if (fread (kph->key, sizeof (char), len + 1, stream) != len + 1)
+ 	    {
+@@ -514,21 +518,22 @@
+   UsrPhrase *kph, *tmp;
+   short ahead;
+ 
+   if (len < 1)
+     return;
+ 
+   ahead = (short) key[1];
+   ahead |= (key[0] & 0x01) << 8;
+ 
+   /* allocate a new one, not combine, will combine during saving */
+-  if ((kph = (UsrPhrase *) malloc (4 + SizeOfPhrase (len, 1))) == NULL)
++  if ((kph = (UsrPhrase *) malloc (sizeof (UsrPhrase) +
++				   SizeOfPhrase (len, 1) - 2)) == NULL)
+     fatal ("Not enough memory\n");
+ 
+   kph->len = len;
+   memcpy (kph->key, key, len + 1);
+   kph->count = 1;
+   kph->next = NULL;
+   memcpy (kph->key + len + 1, str, len * 2);
+   kph->key[len + 1 + 2 * len] = freq;
+ 
+   if (usrph[ahead] == NULL)

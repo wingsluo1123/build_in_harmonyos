@@ -1,0 +1,48 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# fonttosfnt 1.2.5 上游测试实测（2026-10-18，官方 tarball 解包树就地清点 + 本机实跑）：
+#   §12.72 四口径逐项为 0（命令与读数见下），上游**确无自动化测试套件**：
+#     ① test*/ 框架源码   : 0 —— `find . -type d` 全树只有 `.` 与 `./man` 两个目录；
+#                                `find . -iname '*test*'` → 0 行
+#     ② */res 语料        : 0 —— `find . -type d \( -name res -o -name tests -o -name test \)`
+#                                → 0 行
+#     ③ **/*RUNTEST*      : 0 —— `find . -iname '*runtest*'` → 0 行
+#     ④ src/demo|examples : 0 —— `find . -path '*demo*' -o -path '*example*'` → 0 行
+#   另有两条静态证据：
+#     * `grep -n 'TESTS\|check_PROGRAMS\|check-TESTS' Makefile.am man/Makefile.am`
+#       → 无命中（rc=1）：automake 没有注册任何测试目标；
+#     * `grep -n 'AC_CONFIG_TESTDIR\|AM_PATH\|TEST' configure.ac` → 无命中（rc=1）。
+#   `make check` 在配方 build() 中**真实执行**（不是跳过）：automake 递归进 man/ 后
+#   打印 "Nothing to be done for 'check'"，退出码 0 —— 属"已注册但上游无用例可跑"，
+#   与"0 执行"的差别在 notes.md「未执行 / 未覆盖的检查」里如实写明。
+#   源码树 26 个文件（6 个 .c + 1 个 .h = 7 个 C 源文件，其余为 autotools 分发脚本、
+#   man 页与 COPYING/ChangeLog/INSTALL/README.md），无任何测试资产。
+#
+# 因此本包的可执行断言全部来自消费者程序：test_package/test.sh 调用已安装的
+# `fonttosfnt` 二进制做**真实 BDF→.otb(sfnt) 转换**，并逐项解析产物结构（16 条断言）。
+
+package: fonttosfnt/1.2.5
+homepage: "https://gitlab.freedesktop.org/xorg/app/fonttosfnt"
+
+# 上游测试命令 (用于 make -n check / ctest -N / meson test --list 分析)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试
+# `make check` 已接入 build()（automake 空转，rc=0）；上游无用例，故无测试程序可列。
+upstream_test_in_build: true
+upstream_test_command: "make check"
+
+# 上游实际运行的测试程序 —— 无（四口径清点证据见文件头注释）
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证, 调用已安装二进制)
+test_package_tests:
+  - file: test.sh
+    description: "消费者测试 — 调用已安装 fonttosfnt 二进制，把自带 font.bdf（4 glyph：space/zero/A/B）真实转换成 .otb（sfnt 包装），解析产物断言 sfnt version 00010000、numTables=13、13 个表 tag 齐备、head magicNumber 5F0F3CF5；另覆盖 --version / --help / 缺 -o / 未知参数 / -g 缺参 / stdin 路径 / 选项组合 / -g0 -m0 差分 / 损坏输入 / 文件缺失 共 16 条断言"
+    command: "bash test.sh"
+
+# 测试断言总数 (test_package 实测断言数)
+assertion_count: 16

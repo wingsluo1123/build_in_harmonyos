@@ -1,0 +1,38 @@
+# conandata.yml — ghc-ohos 9.12.2
+#
+# GHC 工具链包（只交付编译器与运行时，不安装任何 Hackage 包）。
+#
+# 为什么选 alpine3_18 musl bindist：OHOS 是纯 musl，GHC 的 aarch64-deb10/deb12
+# 变体动态链接 glibc，缺 /lib/ld-linux-aarch64.so.1 解释器（E105/E172），只有
+# musl 变体能在此执行。bindist 的 musl 运行时依赖（gmp/libffi/ncursesw/terminfo）
+# 取自同版本 alpine v3.18 APK（与 bindist 构建环境一致）。
+#
+# downloads.haskell.org 单连接限速（约 20-60KB/s）且不在 CI 镜像域名清单内：
+# 601MB bindist 由配方内的分片并行下载器（HTTP Range）获取，官方 sha256 校验。
+# 注意：部分代理会无视 Range 直接回 200+整包，下载器需识别并当整包保留。
+#
+# 本包不安装 Hackage 包，也不需要 tcl（Bluetcl 才需要），故不列 tcl/tcl-dev。
+
+sources:
+  # 本包源码即 bindist 自身；conanfile.source() 走 ghc_bootstrap 的自定义下载器。
+  url: "https://downloads.haskell.org/~ghc/9.12.2/ghc-9.12.2-aarch64-alpine3_18-linux.tar.gz"
+  sha256: "1e7188253aceda41836242207c943c56d7fdaf1ebe83149b1dbb71bdc41fba7e"
+
+# GHC 工具链自举（制品仓无 ghc，上游无 linux-arm64 二进制）
+ghc_bootstrap:
+  url: "https://downloads.haskell.org/~ghc/9.12.2/ghc-9.12.2-aarch64-alpine3_18-linux.tar.gz"
+  sha256: "1e7188253aceda41836242207c943c56d7fdaf1ebe83149b1dbb71bdc41fba7e"
+  size: 601250114
+  topdir: "ghc-9.12.2-aarch64-unknown-linux"
+
+# bindist 的 musl 运行时依赖（alpine v3.18 aarch64）。lib/ 下的 .so 随包分发，
+# 供运行时 LD_LIBRARY_PATH 使用。
+ghc_runtime_libs:
+  - url: "https://dl-cdn.alpinelinux.org/alpine/v3.18/main/aarch64/gmp-6.2.1-r3.apk"
+    sha256: "13f042e07fe32b5487111d6dec4289f6e745cc950a6d64232be679f2435b715d"
+  - url: "https://dl-cdn.alpinelinux.org/alpine/v3.18/main/aarch64/libffi-3.4.4-r2.apk"
+    sha256: "87d1e17785b654351efa2aca7ee27c61453237690802cdc90b21f1feaa323793"
+  - url: "https://dl-cdn.alpinelinux.org/alpine/v3.18/main/aarch64/libncursesw-6.4_p20230506-r0.apk"
+    sha256: "a7a3c246e0f3aa7e0666bb8ecb2718cc544db430a14fb7691c01b687cc4d43d2"
+  - url: "https://dl-cdn.alpinelinux.org/alpine/v3.18/main/aarch64/ncurses-terminfo-base-6.4_p20230506-r0.apk"
+    sha256: "8db6be27304fc2a54c203b7835a46b0429bb4490e7574a9a2fd9c26b1a2e9074"

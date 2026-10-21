@@ -1,0 +1,10 @@
+# json-c/0.19 adaptation candidate
+
+- Upstream: official json-c release tag json-c-0.19-20260627, source archive SHA-256 37ad0249902e301bd9052bf712e511fcc6acff4ecaad4b5900aad9ce564e26de (downloaded and independently hashed on 2026-10-14).
+- License: the upstream COPYING file contains two MIT-style grants (Eric Haszlakiewicz and Metaparadigm). The library sources and public headers retain their own copyright notices, including Yahoo and Hewlett-Packard notices; no upstream source was edited. The recipe now installs COPYING into licenses/, and the consumer checks that it exists. This review does not cover optional bundled test tools as separately distributed components.
+- Base: official archives/j/json-c/0.18 recipe and test_package, copied to this isolated candidate, version-specific references updated to 0.19. No upstream code patch in this candidate.
+- Target native private Conan create RC0 and installed-package consumer CTest 2/2 passed again in fresh a725 root after adding the license check; raw log SHA-256 d138be8070d496c5856c172e81bbaecb3bb6ab5967d1e23a75a159fd0e268dd1.
+- Separate fresh a726 root extracted the same digest-pinned upstream archive on the target, configured a static library plus apps and the full upstream suite, built with target Clang, and ran CTest 28/28 RC0. Raw CTest log SHA-256 aa1700983c99812b7c6cc8bd72dc9978bccd62dcde971a49a97168f9b9613f60. This is a separate private upstream build, not a claim that the Conan recipe enables upstream tests or that formal W3/platform CI passed.
+- Platform CI, formal W3, review, merge, and points are pending.
+- Windows tar extraction reported failures creating upstream .test link entries; Conan extracted and built the same verified archive successfully on the target.
+- On OHOS the compiler wrapper supplies link-only -Wl,--code-sign during compilation. Upstream -Werror promotes its unused-argument warning to a failure. The candidate narrows this one diagnostic with -Wno-error=unused-command-line-argument on OHOS; a723 failed before the change and fresh a724 passed after it.

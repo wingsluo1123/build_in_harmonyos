@@ -1,0 +1,20 @@
+id:                     E2457
+title: OHOS 上 /storage 以 0711 挂载，上游用 access(path, R_OK) 做"目录是否存在"探测时会对确实存在的目录返回 EACCES，导致随后的 mkdir 拿到 EEXIST 并被上游当致命错误中断
+trigger_tool: configure / make / conan
+phase: build
+error_signature: 'mkdir：File exists 且前置一行 access 判定为不存在（表现为"已存在的目录被判成需要创建、创建又报 EEXIST"）'
+severity:               3
+category:               platform, hmdfs, existence-probe, permission-model
+match_keywords: access,R_OK,F_OK,EACCES,EEXIST,0711,/storage,my_mkdir,mkdir,existence probe
+root_cause: OHOS 的 /storage 根以 0711（drwx--x--x）挂载，目录对非属主开放进入（x）但不开放读（r）。本包实证上游 util.c 的 my_mkdir() 在逐级构造路径前缀时，用 access(w0, R_OK) 作为"该前缀是否已存在"的判据，在该挂载点上对确实存在的前缀必然返回 -1/EACCES，于是走进"不存在→PortableMkDir"分支；而目录其实存在，mkdir 返回 EEXIST，上游把 EEXIST 当致命错误 exit(EXIT_FAILURE)。正确判据应为 F_OK（只测存在）。跨包普遍性未验证，本条只在本包源码实证。
+affected_scope: 任何在 OHOS 上运行、且上游源码用 access(...R_OK) 判断目录存在性后再 mkdir 的包（常见于日志/报告类工具自建输出目录的路径）。不适用于 HMDFS 上 umask 077 建目录后不可写的家族（那是另一条；本包为 0003 做的对照探针显示该机理在本机并未复现——新建目录模式被挂载点强制为 2771——故那条家族的普遍性也未在本包实证）。
+rec_approach: use-f-ok-for-existence-probe
+rec_description: 把上游的存在性判据从 access(path, R_OK) 改为 access(path, F_OK)（本包只实测 R_OK 与 F_OK 两种，其它判据未测），并在 mkdir 失败时把 EEXIST 视为成功；改动只落在探测与错误分支，不改语义、不放宽真实权限错误。落点优先配方补丁而非改挂载权限。
+rec_priority: 1
+rec_auto_fix: false
+rec_impl: 配方侧补丁
+verification_cmd: 'sh -c ''mkdir -p /storage/Users/currentUser/tmp/probe-d && access 判据对照：用最小 C 程序分别以 R_OK 与 F_OK 测试同一目录，比对返回值与 errno'''
+source_event: sarg 2.4.0 适配中补丁 0004（my_mkdir() 用 access 判存在、随后 mkdir 得 EEXIST 被当致命）
+authors: 主理-5
+last_updated: 2026-09-23
+doc_file: knowledge/drafts/DRAFT-sarg-2.4.0-access-r-ok-existence-probe-on-0711-storage.md

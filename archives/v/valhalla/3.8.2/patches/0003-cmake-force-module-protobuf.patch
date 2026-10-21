@@ -1,0 +1,18 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 6fd2ec7..c3e9a4e 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -206,7 +206,12 @@ endif()
+ # for protoc location in a platform agnostic manner
+ # newer protobuf versions require a compat bool
+ set(protobuf_MODULE_COMPATIBLE ON CACHE BOOL "")
+-find_package(Protobuf REQUIRED)
++# OHOS: force CMake's own FindProtobuf module.  In CONFIG mode the protobuf
++# package's config file does not provide protobuf_generate_cpp() (used by
++# proto/CMakeLists.txt), and the module also honours the explicit
++# Protobuf_INCLUDE_DIR / Protobuf_LIBRARY / Protobuf_PROTOC_EXECUTABLE hints
++# that the Conan recipe passes in.
++find_package(Protobuf MODULE REQUIRED)
+ # and turn it off again
+ message(STATUS "Using protoc from ${Protobuf_PROTOC_EXECUTABLE}")
+ message(STATUS "Using pbf headers from ${Protobuf_INCLUDE_DIRS}")

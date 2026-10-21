@@ -1,0 +1,61 @@
+# ═══ Draft knowledge entry — 遗留 netlink 工具固定小 replybuf：HarmonyOS PC 大 IFLA 属性接口致 dump 静默截断
+# ifmetric 的 netlink_request() 用栈上 `char replybuf[2048]` 收 netlink 数据报。
+# HarmonyOS PC 的华为无线接口（wlan0/wlan1/p2p0/chba0/nan0/ancowlan0/Hisilicon0）
+# 单条 RTM_NEWLINK 携带约 1.3KB IFLA 属性，整份 RTM_GETLINK dump 达 19276B/14 条，
+# 远超 2048 → recv() 静默截断（返回满 buflen）→ NLMSG_NEXT 走到半截头部
+# → "Packet too small or truncated!" 且 netlink_open/getifn 是这类工具的首个调用，
+# 表现为"程序一运行就失败"，极易误判为 OHOS 不支持 netlink。
+# Software: ifmetric 0.3（2026-09-24 HarmonyOS PC 真机实测，conan 2.29.1 + clang 15）
+# Gate: conan create（ohos-aarch64）G0-G4 全绿 → test_package 消费者测试 6/6
+# Status: DRAFT
+
+id:                     E2536
+severity:               3
+category:               libc, 'ohos, netlink, runtime'
+trigger_tool: 'netlink|recv|configure|make'
+phase: runtime
+
+error_signature: 'NETLINK: Packet too small or truncated! \d+!=\d+!=\d+|recv\(\): Inappropriate|Packet too small or truncated! \d+!=16!=\d+'
+match_keywords: netlink Packet too small, RTM_GETLINK dump truncated, fixed replybuf netlink, MSG_TRUNC peek, IFLA attributes large, ifmetric, bridge-utils dump, recv 静默截断
+
+root_cause: '固定 2KB 栈缓冲装不下本机 RTM_GETLINK dump（19276B/单条~1340B），recv 静默截断致遍历半截头部而报错 (1) 2004 年前后的独立 netlink 工具普遍把单次应答硬编码成小栈缓冲，如 ifmetric src/nlrequest.c netlink_request() 的 `char replybuf[2048]` + `recv(s, &replybuf, sizeof(replybuf), 0)`，随后用 `for (; bytes > 0; p = NLMSG_NEXT(p, bytes))` 在同一缓冲内遍历多消息。 (2) netlink 是**数据报**语义：内核把一个 skb 内打包的多条 nlmsghdr 作为**一个** 数据报投递；用户缓冲不足时 recv() **静默截断**并返回缓冲长度（不给 ENOBUFS、 不设 MSG_TRUNC 就无从得知），不报错。 (3) 截断后最后一个消息只剩半截头部：`p->nlmsg_len`（实测 1340）> 剩余 bytes （实测 728），NLMSG_OK/长度自检失败 → 打印 `NETLINK: Packet too small or truncated! 728!=16!=1340` 并 return -1。 (4) HarmonyOS PC 命中概率显著高于普通 Linux：真机 /proc/net/dev 有 14 个接口， 其中华为无线类接口（Hisilicon0/wlan0/wlan1/p2p0/chba0/nan0/ancowlan0）带大量 802.11 相关 IFLA_* 属性，单条 RTM_NEWLINK 约 1340B（普通以太网口约 76B）。 (5) 因为 getifn()/RTM_GETLINK 是这类工具的**第一个**调用，症状是"程序完全跑不起来" 而不是"某功能不可用"——最容易得出"OHOS 不支持 netlink"的**错误**结论。'
+
+rec_approach: peek-datagram-size-with-msg-trunc-then-recv
+rec_description: '先用 MSG_PEEK|MSG_TRUNC 窥探数据报真实长度（不出队），再按需 malloc 完整收取 不要用固定缓冲，也**不要**直接在收数据的 recv() 上加 MSG_TRUNC 后"读不到就重试" ——那种写法数据报已被**消费掉**，重试读到的是下一个数据报，会把整条消息静默丢掉 （dump 结果不完整，比报错更坏）。正确姿势是两步： 1) 先用 `recv(s, &probe, sizeof(probe), MSG_PEEK | MSG_TRUNC)` **窥探**： MSG_TRUNC 使返回值为数据报**真实长度**，MSG_PEEK 保证**不出队**； 2) 按真实长度（不小于一个下限，本例 4096）malloc，再用普通 recv() 完整收取， 然后照原逻辑遍历；每条退出路径记得 free()。 这样对任意接口数量/属性大小都成立，无需猜"多大够用"。 实测：本机 RTM_GETLINK dump 19276B/14 条（65536 缓冲时 truncated=0）， RTM_GETROUTE 仅 1708B/22 条（故只读路由表的工具可能不显现此 bug）。'
+rec_command: '见 patches/0001-netlink-dump-datagram-buf.patch（strip: 1，peek 长度后动态 malloc） # ifmetric 0.3 patches/0001-netlink-dump-datagram-buf.patch（strip: 1）： # #define NETLINK_REPLY_MIN 4096 # want = recv(s, &probe, sizeof(probe), MSG_PEEK | MSG_TRUNC); # buflen = want < NETLINK_REPLY_MIN ? NETLINK_REPLY_MIN : (size_t) want; # replybuf = malloc(buflen); # bytes = recv(s, replybuf, buflen, 0); # 参考: archives/i/ifmetric/0.3/conanfile.py + patches/0001-netlink-dump-datagram-buf.patch'
+rec_auto_fix: false
+
+fallback_priority: 2
+fallback_approach: enlarge-fixed-buffer-and-detect-truncation
+fallback_description: '不便动态分配时把缓冲放大到 64KB 量级并显式检测截断 若不想引入动态分配（例如工具在禁 malloc 的早期启动路径上），可把缓冲放大到 64KB 量级，**并且**在收完后可选地再用一次 MSG_PEEK|MSG_TRUNC 校验没有溢出； 仅"把 2048 改成 8192"是治不干净的——接口数与属性大小不受我们控制。'
+fallback_command: char replybuf[65536] + recv(MSG_TRUNC) 后比较返回长度 char replybuf[65536]; bytes = recv(s, replybuf, sizeof(replybuf), MSG_TRUNC); if (bytes > (int) sizeof(replybuf)) { /* 明确报错，勿继续遍历半截消息 */ }
+fallback_auto_fix: false
+fallback_impl: source-patch
+
+prescan_pattern: 'char\s+\w*(reply|buf|dump)\w*\s*\[\s*(2048|4096|8192)\s*\]|recv\s*\([^)]*sizeof\s*\('
+prescan_globs: '**/src/*.c,**/*.c'
+
+verification_cmd:
+
+affected_scope: 凡固定小缓冲收 netlink dump 的包均适用；判别口诀见正文 任何在 HarmonyOS PC 上用固定小缓冲收 netlink dump 的软件包。判别口诀： 报错里有 "Packet too small or truncated" 且三个数字形如 `剩余!=16!=声明长度`、 而 `socket/bind/send` 都没有报错 → 不是权限、不是内核不支持，而是**缓冲太小**。
+
+conflicts_with: 
+caused_by: 
+
+doc_file: knowledge/drafts/DRAFT-ifmetric-0.3-netlink-dump-replybuf-truncation.md
+last_updated: 2026-09-24
+source_event: archives/i/ifmetric/0.3 HarmonyOS PC 适配（任务号 7405）
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+authors: hw-2
+source_pr: 
+source_commit: 
+
+# ═══ 质量度量 (Quality Metrics) ═══
+metrics_success_count: 0
+metrics_fail_count: 0
+metrics_confidence: 0.0
+metrics_last_used: 
+rec_impl:               manual
+rec_priority:               1
+verification_cmd:       # 以 source_pr CI 门禁为准（PR ）

@@ -1,0 +1,33 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: indi-apogee/1.9-20221223184417
+homepage: "https://github.com/indilib/indi-3rdparty"
+
+# 上游测试命令
+# 本版本源码包（Debian orig）内不含任何测试目录（无 test/、无 ctest 用例），
+# 上游 indi-3rdparty 的 apogee 驱动同样未提供单元测试。
+upstream_check_command: ""
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（本包为空，如实申报）
+upstream_tests: []
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.sh
+    description: >-
+      冒烟测试：对 indi_apogee_ccd / indi_apogee_wheel 各做两步断言 ——
+      ① 二进制存在于 PATH 且可执行；② 往 stdin 喂 <getProperties version="1.7"/>，
+      stdout 必须回出 <def...> 属性定义（证明 ELF 可加载、依赖 so 可解析、libindi 链接正确、
+      驱动已注册到事件循环）。注意：INDI 驱动的 main() 来自 libindi 的 indidrivermain.c，
+      只认 -v 且随后阻塞在 eventLoop()，stdin EOF 时 exit(1)，故退出码不可作为断言。
+    command: "./test.sh"
+
+# 测试断言总数 (近似值, 用于质量评估)
+# 2 个二进制 × (存在性 1 + getProperties 往返 1) = 4
+assertion_count: 4

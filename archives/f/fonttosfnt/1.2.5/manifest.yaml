@@ -1,0 +1,135 @@
+# 版本级 manifest — fonttosfnt 1.2.5
+# 文件位置: archives/f/fonttosfnt/1.2.5/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.2.5"
+
+# 软件名
+software: "fonttosfnt"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-18"
+build_system: "autotools"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（X.Org releases 个体目录，官方直链；PF7 通过）
+  url: "https://www.x.org/releases/individual/app/fonttosfnt-1.2.5.tar.xz"
+
+  # 源码校验和（本机 curl --max-time 90 -fsSL + sha256sum 实测，144844 字节）
+  sha256: "2e251e66e8753c08aa280b26fd4a10d0d88e7d9bba5c8aac3d3fb36705e5918e"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表 —— 上游 configure.ac 无项目专属开关，只需 --prefix（R1 参数最少化）
+  configure_options: []
+
+  # 编译依赖列表（格式: name/version）
+  # configure.ac: PKG_CHECK_MODULES(FONTTOSFNT, [xproto >= 7.0.33 freetype2 fontenc])
+  #   三个 pkg-config 模块 ⇒ 三个 conan 包（另加 libfontenc 传递的 zlib，已发布）
+  #   libfontenc 钉 1.1.7：仓内 1.1.9 已归档但**未发布**到 ohpcd（conan download --only-recipe
+  #   实测报远程"未找到"，与 bogus 名/版本同款报错，控制探针区分），R35/R36
+  dependencies:
+    - "xorgproto/2025.1"
+    - "freetype/2.14.3.2.1"
+    - "libfontenc/1.1.7"
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 测试口径（三处同源：本件 / notes.md / test_package/MANIFEST.yml）
+# ============================================================
+tests:
+  # 上游测试资产 —— §12.72 四口径 2026-10-18 源码树（26 文件）就地实测
+  #   test*/ 框架源码 0 · */res 语料 0 · **/*RUNTEST* 0 · src/demo|examples *.c 0
+  #   Makefile.am / man/Makefile.am 无 TESTS、无 check_PROGRAMS；configure.ac 无测试宏
+  #   make check 实测（在配方 build() 内真实执行）：man/: "Nothing to be done for 'check'"，rc=0（空转）
+  upstream: 0
+  # 适配后合计 = 上游 0 + 消费者 16（消费者测试另列并计入适配后总数，§10.1）
+  # 口径：适配后按**可执行断言口径**（手册/04 §11.2 口径限定）；消费者 = 1 个消费者程序
+  # test_package/test.sh，含 **16 条可执行断言**（程序数 1、断言数 16 两个读数都在此注明）
+  after_adapt: 16
+  evidence: "reports/test-report.md"
+  # 五维数值字段（手册/04 §10.1）
+  N_static: 0                # 上游静态声明：无 TESTS / check_PROGRAMS / add_test
+  N_registered: 0            # 构建系统注册：grep '^TESTS|check-TESTS|check_PROGRAMS' → 0 行
+  N_executed: 0              # 实际执行：make check 空转 rc=0，无注册项可跑
+  not_executed_categories: 0 # 未执行分类数：无跳过/无预期失败/无条件注册
+  N_consumer: 16             # 新增消费者测试：test_package/test.sh，16 条断言，实测 16/16 PASS
+  N_consumer_programs: 1     # 消费者程序数（test.sh 一个），供"程序数"口径核对
+  N_assertion: 16            # 断言数（N_consumer 同值，括注）
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 两处修复全部落在 autotools 分发 shell 脚本（config.guess / configure），
+# 由 refresh-patch --auto 的**编辑追踪器精准模式**从 .orig/.work 差异生成（R7）；
+# conanfile.py 的 build() 先 apply_conandata_patches() 应用下列 2 件，
+# 再跑幂等的 _patch_autotools_scripts() 兜底（"已存在即跳过"，补丁已生效即 no-op）。
+# 五处同源：conandata.yml 的 patches: 2 件 · 本清单 2 件 · patch_generation.patches_count: 2
+# · patch_classification 2 件 · 磁盘 patches/ 实物 2 件。
+# 全文无 __OHOS__ 字面量（R8/PF5 不引入平台宏）——只按 uname -s 名字识别操作系统。
+patches_applied:
+  - "0001-config.guess.patch"
+  - "0002-configure.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识（每条须带 ref: —— 指向本次实际查用的知识条目）
+knowledge_gained:
+  - "config.guess 不识 uname -s=HarmonyOS（本包时间戳 2024-07-27）⇒ 补 *:HarmonyOS:*:* 分支输出 aarch64-unknown-linux-ohos；本包 config.sub 已是新版、**已自带** linux-ohos* 与 ohos* 两处（实测 config.sub aarch64-unknown-linux-ohos rc=0），只需 patch config.guess 一件、**不可照抄 bdftopcf 三件套** (ref: E007, E072)"
+  - "⚠ 新版（GUESS= 变量式）与 2017 老版（echo+exit 式）config.guess 补丁写法不可互抄：本包是 GUESS= 式，分支只赋值 GUESS 不 exit (ref: E007 变体)"
+  - "configure 的 config.status 临时目录用 umask 077 && mktemp -d，HMDFS 上得 700 不可写目录 ⇒ 改 022；config.guess 内 set_cc_for_build 的三处 umask 077 同因同修，否则先报 can't create .../dummy.c: Permission denied 再报 cannot guess build type (ref: E011, E114)"
+  - "AutotoolsDeps 把整图 -L/-l 注入 autoconf 首个 sanity 探针 ⇒ conftest 链接 conan 共享库、OHOS 加载器报 Error loading shared library libfontenc.so.1 (needed by ./conftest)、自动判成不能运行 C 程序（rc=127）。修法 = generate() 里把各依赖 cpp_info.libdirs 前置进 build scope 的 LD_LIBRARY_PATH，**保持 native 构建**（同签名既有先例 xdriinfo/1.0.8，另 aaphoto/0.45、dirb/2.22） (ref: E566, R49)"
+  - "PKG_CHECK_MODULES 工程需同时上 PkgConfigDeps（产出 xproto.pc/freetype2.pc/fontenc.pc）+ AutotoolsDeps（贡献全图 CPPFLAGS/LDFLAGS）(ref: 手册/07 §12.1, R36)"
+  - "本包**不用** --build/--host 绕 config.guess：那会把 autoconf 切进 cross 模式，改变 AC_CHECK_FUNC(setenv)/AC_CHECK_FUNCS(vasprintf)/AC_CHECK_DECLS(va_copy) 三个探针的语义，config.h 会错 (ref: R1, 适配检查清单 Autotools #4)"
+  - "⚠ 设备侧 CONAN_HOME（及一切会进 autoconf 替换值的构建路径）**不可含非 ASCII 字节**：OHOS 自带 sed 是 toybox 0.8.12，autoconf 2.72 的分隔符自检在 ac_delim 长 2184 字符时只匹配 125/127 行 ⇒ 循环 6 轮不收敛报 could not make ./config.status；即使放过，148 字节分行的 sed 也会切坏含多字节的替换值（config.status 里 S[\"FONTTOSFNT_LIBS!… 引号失配 → gawk: unterminated string → could not create Makefile）。A/B 实证：同一源码同一配方，含中文 home 必挂、纯 ASCII home 一次通过（LC_ALL=C 无效）。与源码/配方无关，**不要为此加补丁** (ref: 适配检查清单 通用#2/§12.61②)"
+  - "纯可执行无库产物（无人 include/链接）⇒ package_type=application + cpp_info.bindirs，并配软件级 commands.json（R38/PF8）"
+  - "libfontenc/1.1.9 已归档但未发布到 ohpcd：conan download --only-recipe 对不存在名/版本与未发布版本返回**同一条**远程报错，必须用控制探针（bogus 名）区分\"网络错\"与\"未发布\" (ref: R35)"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/fonttosfnt-1.2.5.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/fonttosfnt-1.2.5.work
+  source_orig_hash: 7b4d4c4805091419
+  source_work_hash: 9b5c875246b633ae
+  generated_at: '2026-10-18T03:59:25'
+  patches_count: 2
+
+patch_classification:
+  - file: 0001-config.guess.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0002-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

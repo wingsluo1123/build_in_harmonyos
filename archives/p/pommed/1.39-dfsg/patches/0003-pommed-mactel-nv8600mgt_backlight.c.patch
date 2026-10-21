@@ -1,0 +1,122 @@
+--- a/pommed/mactel/nv8600mgt_backlight.c
++++ b/pommed/mactel/nv8600mgt_backlight.c
+@@ -23,20 +23,28 @@
+  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+  *
+  *
+  * This driver triggers SMIs which cause the firmware to change the
+  * backlight brightness. This is icky in many ways, but it's impractical to
+  * get at the firmware code in order to figure out what it's actually doing.
+  */
+ 
+ #include <stdio.h>
+ #include <sys/io.h>
++
++/* This driver drives the firmware SMI backlight interface through x86 I/O
++ * ports (outb()/inb()/iopl()).  Those primitives exist on x86 only, so on
++ * other architectures the hardware cannot be driven and probe() reports it
++ * as unsupported. */
++#if !defined(__i386__) && !defined(__x86_64__)
++# define NV8600MGT_NO_PORT_IO 1
++#endif
+ #include <stdlib.h>
+ #include <string.h>
+ #include <sys/mman.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <fcntl.h>
+ #include <unistd.h>
+ 
+ #include <syslog.h>
+ 
+@@ -56,36 +64,42 @@
+ 
+ 
+ static unsigned char
+ nv8600mgt_backlight_get()
+ {
+   unsigned char value;
+ 
+   if (nv8600mgt_inited == 0)
+     return 0;
+ 
++#ifndef NV8600MGT_NO_PORT_IO
+   outb(0x03, bl_port + 1);
+   outb(0xbf, bl_port);
+ 
+   value = inb(bl_port + 1) >> 4;
++#else
++  value = 0;
++#endif
+ 
+   return value;
+ }
+ 
+ static void
+ nv8600mgt_backlight_set(unsigned char value)
+ {
+   if (nv8600mgt_inited == 0)
+     return;
+ 
++#ifndef NV8600MGT_NO_PORT_IO
+   outb(0x04 | (value << 4), bl_port + 1);
+   outb(0xbf, bl_port);
++#endif
+ }
+ 
+ 
+ void
+ nv8600mgt_backlight_step(int dir)
+ {
+   int val;
+   int newval;
+ 
+   if (nv8600mgt_inited == 0)
+@@ -171,20 +185,25 @@
+ 
+ 	lcd_bck_info.level = lcd_nv8600mgt_cfg.on_batt;
+ 	break;
+     }
+ }
+ 
+ 
+ int
+ nv8600mgt_backlight_probe(void)
+ {
++#ifdef NV8600MGT_NO_PORT_IO
++  logmsg(LOG_ERR, "nv8600mgt LCD backlight control requires x86 I/O port access, unavailable on this architecture");
++
++  return -1;
++#else
+   int ret;
+ 
+   /* Determine backlight I/O port */
+   switch (mops->type)
+     {
+       case MACHINE_MACBOOKPRO_3:
+       case MACHINE_MACBOOKPRO_4:
+ 	bl_port = 0xb2; /* 0xb2 - 0xb3 */
+ 	break;
+ 
+@@ -222,20 +241,21 @@
+    */
+   if (lcd_nv8600mgt_cfg.init > -1)
+     {
+       nv8600mgt_backlight_set((unsigned char)lcd_nv8600mgt_cfg.init);
+     }
+ 
+   lcd_bck_info.level = nv8600mgt_backlight_get();
+   lcd_bck_info.ac_lvl = lcd_bck_info.level;
+ 
+   return 0;
++#endif /* !NV8600MGT_NO_PORT_IO */
+ }
+ 
+ 
+ void
+ nv8600mgt_backlight_fix_config(void)
+ {
+   if (lcd_nv8600mgt_cfg.init < 0)
+     lcd_nv8600mgt_cfg.init = -1;
+ 
+   if (lcd_nv8600mgt_cfg.init > NV8600MGT_BACKLIGHT_MAX)

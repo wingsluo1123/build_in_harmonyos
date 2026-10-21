@@ -1,0 +1,48 @@
+software: ktextaddons
+version: "1.8.0"
+status: verified
+build_system: cmake
+created_at: 2026-08-27
+dependencies:
+  required:
+    - zstd/1.5.7.1
+    - zlib/1.3.2
+    - openssl/3.5.6.1
+    - qtbase/6.11.1.3
+    - kconfig/6.18.0.1
+    - kcolorscheme/6.18.0.3
+    - kguiaddons/6.18.0.1
+    - karchive/6.18.0
+    - kitemviews/6.18.0
+    - ktextwidgets/6.18.0
+    - kcoreaddons/6.18.0.1
+    - ki18n/6.18.0.2
+    - ksyntaxhighlighting/6.18.0
+    - kwidgetsaddons/6.18.0.1
+    - sonnet/6.18.0.1
+  build:
+    - ecm/6.26.0
+  optional:
+    - KIO web shortcut support
+    - text-to-speech, speech-to-text, grammar, translator, and generated-text plugin components
+    - Qt Quick
+    - Qt Designer plugin
+    - QCH
+patches_applied:
+  - patches/0001-Limit-license-scan-to-textutils.patch
+  - patches/0002-Require-only-textutils-dependencies.patch
+  - patches/0003-Build-only-textutils-subdir.patch
+  - patches/0004-Drop-translation-install-without-ki18n.patch
+  - patches/0005-Align-web-shortcut-tests-with-KIO-support.patch
+test_results:
+  type: passed
+  upstream: "passed: 32/32 registered upstream CTest cases executed (device run codex-a-ktextaddons-verify-7398-ktextaddons-20261010-20261011-012735-4620, exit=0; 32 of 32 built-component entries, no ctest -E exclusions). Current head only bumps kcolorscheme/6.18.0.2 -> 6.18.0.3 and awaits a post-publication CI re-run."
+  test_package: "passed: 1/1 Conan test_package CTest plus direct-run consumer smoke (consumer target includes KF6::TextAutoCorrectionWidgets)"
+  full_reference: "ktextaddons/1.8.0#0483052346bc04d5e1d8c63414a723d8:80c4ac0b7a3bd9351208a8256643d4769dbff1de#f0ba612a65f116fa00aa395b18f82b43"
+source_url: https://download.kde.org/stable/ktextaddons/ktextaddons-1.8.0.tar.xz
+source_sha256: 159c605d3d031bf818e164ea410150103c5f9f87cea35e2979e42d86c3318c99
+knowledge_gained:
+  - "Akonadi contacts consumes KF6::TextUtils; later PIM text-editing consumers also need TextAddonsWidgets, TextEmoticonsCore, TextEmoticonsWidgets, and TextCustomEditor."
+  - "The expanded build keeps the component set needed by the Akonadi downstream chain while leaving optional service/plugin families disabled."
+  - "Qt platform plugin lookup must point QT_QPA_PLATFORM_PLUGIN_PATH at the Qt platform plugin directory, not a path list, for Widgets tests to find the offscreen platform plugin."
+  - "When KIO support is disabled, TextCustomEditor web shortcut support is intentionally unavailable; upstream tests were patched to assert the configured feature state instead of assuming KIO is present."

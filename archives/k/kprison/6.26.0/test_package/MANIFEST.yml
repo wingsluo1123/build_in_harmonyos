@@ -1,0 +1,19 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: kprison/6.26.0
+homepage: "https://invent.kde.org/frameworks/prison"
+
+# 上游测试命令 (KDE Frameworks 为 CMake/CTest 工程)
+upstream_check_command: "ctest -N"
+
+# conanfile.py build() 中已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build> --output-on-failure --no-tests=error"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_kprison.cpp
+    description: "Prison::Barcode::create(Prison::QRCode) -> setData() -> toImage() 往返（qrencode 后端缺失时 create() 返回 nullopt，用例按可用性分支断言）；即 akonadi-contacts 依赖的 API 面"

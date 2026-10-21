@@ -1,0 +1,108 @@
+#====================================================================
+# DRAFT-scikit-learn-1.6.1-cython-pxd-vendoring — Cython 项目的跨包 cimport
+# 只需要**声明文件**：SciPy 不在 Conan 制品仓时，用逐字 vendored 的 .pxd +
+# --include-dir 满足编译期，运行时依赖仍由目标环境提供（scikit-learn 1.6.1 适配）
+#
+# 对应的人类文档: knowledge/drafts/DRAFT-scikit-learn-1.6.1-cython-pxd-vendoring.md
+#
+# 本条目为 draft（草稿），尚未由主编审核合入。正式编号由 graph promote 分配。
+#
+# 格式规则:
+#   - key: value（冒号后一个空格，value 到行尾）
+#   - 多行值: 下一行以空格开头 = 续行
+#   - 列表值: 逗号分隔
+#   - 正则值: | 分隔多个模式
+#   - 以 # 开头的行为注释
+#   - 空行忽略
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E3290
+trigger_tool: meson|ninja|cython|conan
+phase: configuration|compilation
+error_signature: sklearn/meson\.build.*ERROR: Command .*import (numpy|scipy).*returned non-zero exit status|
+                 'scipy/linalg/cython_blas\.pxd' not found|
+                 'scipy/special/cython_special\.pxd' not found|
+                 Error compiling Cython file.*cimport scipy|
+                 No .pyx->.c rule known|No such file or directory.*\.pxd
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               2
+category:               build-system, python, dependency, packaging, compilation
+match_keywords: Cython, cimport, .pxd, scipy.linalg.cython_blas, scipy.special.cython_special, numpy/__init__.pxd,
+                meson setup, run_command check true, --include-dir, declaration-only, vendored pxd,
+                scikit-learn, Conan 制品仓缺 scipy, ohos_aarch64 wheel, __Pyx_ImportFunction, DT_NEEDED
+title: Cython 跨包 cimport 只吃声明文件——构建期依赖（SciPy/numpy）缺失时 vendored .pxd + 把上游 run_command 版本探测改成非致命
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause: 两个独立的构建期陷阱，都源于把「运行期依赖」当成「构建期依赖」。
+  (a) 上游 `sklearn/meson.build` 用 `run_command(py, ['-c','import numpy; print(numpy.__version__)'], check: true)`
+      探测 numpy/scipy 版本：构建解释器导入不到就直接 `ERROR: Command ... returned non-zero exit status 1`，
+      configure 阶段 fatal，尽管这两个包在编译产物里一个符号都不链接。
+  (b) `cimport scipy.linalg.cython_blas` / `cimport scipy.special.cython_special` 需要的是 SciPy 发行包里的
+      **`.pxd` 声明文件**（生成 C 时的类型与函数签名来源），不是 SciPy 的可执行代码。OHOS 侧 SciPy 没有发布到
+      Conan 制品仓（只有平台 pip 索引上的 ohos_aarch64 wheel，供目标 Python 运行期使用），构建 worker 的
+      解释器与目标解释器也不同，于是 ninja 报 `'scipy/special/cython_special.pxd' not found`。
+  判别关键：真正需要 SciPy 声明的只有 2 个 .pyx（`utils/_cython_blas.pyx` 的 11 组 BLAS 符号对、
+  `tree/_criterion.pyx` 的 `xlogy`），另有 6 个 .pyx 经 sklearn 自己的 `utils/_cython_blas` 包装间接使用同一批声明；
+  其余 .pyx 只做 **Python 级** `from scipy.sparse import issparse` / `from scipy.special import gammaln`，
+  不需要任何声明文件，由运行期 SciPy 满足。
+
+affected_scope: 任何用 Cython 且 `cimport` 另一个 Python 包声明的项目（SciPy 的 cython_blas/cython_special、
+  numpy 的 `numpy/__init__.pxd`、以及经由项目自身 .pxd 包装的间接 cimport），在目标平台的 Conan 制品仓没有该
+  Python 包、或构建期解释器与目标解释器不同因而装不上/不该装的情况下做交叉/原生构建。
+
+verification_cmd: grep -rn "^\s*from scipy.*cimport\|cimport scipy" sklearn/**/*.pyx       # 直接 cimport 的源文件清单
+  grep -rln "from sklearn.utils._cython_blas cimport" sklearn/**/*.pyx                      # 间接（经自有包装）使用者
+  grep -rn "^\s*from scipy" sklearn/**/*.pyx                                                 # 只是 Python 级 import，无需声明
+  ninja -C build 2>&1 | grep -E "cython_blas\.pxd|cython_special\.pxd"                       # 修复前：not found
+  readelf --dynamic <pkg>/site-packages/sklearn/linear_model/_cd_fast*.so | grep NEEDED      # 修复后：只有 libpython3.12.so.1.0/libc++_shared.so/libc.so
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+# 推荐方案 (priority 越小越优先, 从 1 开始)
+rec_priority:           1
+rec_approach: vendored-declaration-only-pxd
+rec_description: 把需要的那几个 `.pxd` 从与运行期同族的 SciPy 版本逐字取出来放进配方目录（scikit-learn 1.6.1 用
+  SciPy 1.14.1 的 `scipy/linalg/cython_blas.pxd` + `scipy/special/cython_special.pxd`），通过 Cython 的
+  `--include-dir <pxd_root>` 传给编译器；同时把上游 meson 的 numpy/scipy 版本探测改成 `check: false` +
+  `if probe.returncode() == 0`（能导入时仍是权威判据，导入不到退化为 `message()` 而不是 fatal）。
+  三条纪律决定它是否可信：(1) 配方对声明文件做**存在性硬校验**，缺任何一个直接 `ConanException`，避免「悄悄少编了」；
+  (2) **真实优先**——若目标解释器能 `import scipy`，就用它自带的 .pxd（零版本偏移），vendored 目录只作回退；
+  (3) 声明文件**绝不安装进包**（不进 package()、不进 site-packages、不写成 requires 编译依赖），并配 README 说明
+  许可证（SciPy BSD-3-Clause）与「declaration-only, never compiled, never linked, never installed」边界。
+  验证「没变成假链接」的手段是读扩展的 DT_NEEDED：应当只有 libpython/libc++_shared/libc，没有 BLAS——因为
+  Cython 生成的包装在 **import 时**通过 `__Pyx_ImportFunction` 去真实 SciPy 里取函数指针。
+rec_command: export CYTHON_INCLUDE="--include-dir $PWD/pxds"; cython --include-dir pxds sklearn/utils/_cython_blas.pyx
+  meson setup build --native-file ohos-native.ini -Dnumpy-include-dir=<numpy pkg>/numpy/include
+rec_auto_fix:           false
+rec_impl:               conan-recipe
+
+fallback_priority:      2
+fallback_approach:      install-platform-wheel-into-build-interpreter
+fallback_description:   若上游 .pyx 需要的是**带实现**的构建期工具（例如代码生成要真的调用 SciPy/numpy 的 Python API，
+  而不只是读声明），再考虑用平台 pip 索引的 ohos_aarch64 wheel 把该包装进构建解释器。代价要明确：它会把运行期
+  numpy ABI 拖进构建机、与制品仓 numpy 版本产生偏移，并且把「构建期可用」和「产物可复现」绑到 worker 环境上，
+  所以只在声明-only 不成立时使用。
+fallback_command:       <target-py> -m pip install --index-url https://pypi.cnb.cool/OpenHarmonyPCDeveloper/pypi/-/packages/simple scipy==1.14.1
+fallback_auto_fix:      false
+fallback_impl:          environment-prep
+
+forbid_1_pattern:       (mkdir|touch).*/scipy/__init__\.py|echo *__version__.*scipy/__init__\.py|stub.*scipy.*__init__\.py
+forbid_1_reason:        造一个空的 scipy stub 包去骗过 meson 的 `import scipy` 探测，只是把 configure 的错误往下游推：
+                        Cython 仍然找不到 .pxd；更坏的情况是 stub 随产物进入 site-packages，遮蔽目标机上真实的 SciPy。
+forbid_1_consequence:   编译期继续报 'scipy/...pxd' not found，或运行期 ImportError/属性错误，且根因被 stub 掩盖、极难定位。
+
+forbid_2_pattern:       copy.*\.pxd.*site-packages|install_scipy_headers|scipy.*\.pxd.*package_folder
+forbid_2_reason:        vendored 的目的只是喂给 Cython 编译器。把 .pxd 打进发布包会与运行期真实 SciPy 的声明树同名并存，
+                        等于在用户环境里植入第二份声明来源。
+forbid_2_consequence:   包体污染，后续 Cython/numpy 版本升级时产生声明遮蔽与难以解释的 import 顺序问题。
+
+principles:               
+doc_file:               knowledge/drafts/DRAFT-scikit-learn-1.6.1-cython-pxd-vendoring.md
+last_updated:           2026-10-14
+source_event:           scikit-learn 1.6.1 OHOS aarch64 适配（meson + Cython 3.3.0，68 个扩展模块）
+
+authors: AtomCode <atomcode@atomgit.com>
+source_pr: feat/scikit-learn-1.6.1
+source_commit:
+

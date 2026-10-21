@@ -1,0 +1,30 @@
+diff --git a/test/CMakeLists.txt b/test/CMakeLists.txt
+index 29c7a5d..8a8f49f 100644
+--- a/test/CMakeLists.txt
++++ b/test/CMakeLists.txt
+@@ -8,6 +8,15 @@ ADD_SUBDIRECTORY(unit)
+ ################################################################################
+ ADD_SUBDIRECTORY(benchmark EXCLUDE_FROM_ALL)
+ 
++# The upstream "test" target runs test/runTest.sh, which
++#   * looks for the FASTA fixtures in "<script dir>/db" and downloads them from
++#     plast.gforge.inria.fr when they are missing - that host no longer resolves;
++#   * hardcodes "<build>/bin/PlastLibraryTest", which is wrong for single-config
++#     generators where the binary lands in bin/<build type>/.
++# Copy the in-tree fixtures next to the script and run the test binary through
++# its real path so the upstream unit tests stay runnable offline.
++file (COPY ${PROJECT_SOURCE_DIR}/test/db DESTINATION ${PROJECT_BINARY_DIR}/test)
++
+ # We add a custom target for delivery binaries
+ add_custom_target (test 
+ 
+@@ -16,6 +25,7 @@ add_custom_target (test
+     COMMAND echo " Starting tests..."
+     COMMAND echo ""
+     COMMAND echo "================================================================"
+-    COMMAND echo "Running: ${PROJECT_BINARY_DIR}/test/runTest.sh"
+-    COMMAND ${PROJECT_BINARY_DIR}/test/runTest.sh 
++    COMMAND $<TARGET_FILE:PlastLibraryTest> ${PROJECT_SOURCE_DIR}/test/db
++
++    DEPENDS PlastLibraryTest
+ )

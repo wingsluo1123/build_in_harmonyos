@@ -1,17 +1,23 @@
+# 版本级 manifest - libnetfilter_acct 1.0.3
 version: "1.0.3"
-status: published
-build_date: "2026-05-29"
+software: "libnetfilter_acct"
+status: built
+build_date: "2026-10-18"
+build_system: "autotools"
 
 source:
   url: "https://www.netfilter.org/projects/libnetfilter_acct/files/libnetfilter_acct-1.0.3.tar.bz2"
-  sha256: ""
+  sha256: "4250ceef3efe2034f4ac05906c3ee427db31b9b0a2df41b2744f4bf79a959a1a"
   tar_format: tar.bz2
 
 build:
   system: autotools
-  configure_options: ["--prefix=/data/data/com.example.term/usr/local"]
+  configure_options:
+    - "--enable-static --disable-shared（上游 configure.ac 调 AC_DISABLE_STATIC；libmnl 制品为 static-only 且 OHOS 无导入共享库 RPATH）"
+    - "--prefix=（Conan AutotoolsToolchain 生成；不烧死绝对 prefix）"
+    - "依赖经 PkgConfigDeps 生成的 libmnl.pc 由 PKG_CHECK_MODULES 发现"
   dependencies:
-    - libmnl
+    - libmnl/1.0.5
   cc: clang
   cxx: clang++
 
@@ -20,20 +26,18 @@ patches_applied:
   - "0002-build-aux-config.sub.patch"
   - "0003-configure.patch"
   - "0004-src-libnetfilter_acct.c.patch"
+  - "0005-examples-sockaddr-guard.patch"
 
 knowledge_gained:
-  - "E007: config.guess/config.sub 需更新以识别 aarch64-linux-ohos"
-  - "configure 中需添加 LIBM 库依赖"
-  - "源码中需添加 <stdint.h> 头文件以修复编译错误"
+  - "ref: E007 —— config.guess/config.sub 需补 HarmonyOS/linux-ohos 分支，否则 configure 报 cannot guess build type（输出 aarch64-unknown-linux-ohos）"
+  - "ref: E011 —— configure 内 umask 077 在 HMDFS 上产出不可写临时目录，须改 022，否则 config.status/subs1.awk 报 Permission denied"
+  - "ref: E091 / E119 —— sysroot uapi <linux/socket.h> 与 musl <sys/socket.h> 对 struct sockaddr_storage 双定义且不共用守卫宏，任何 include 顺序都重定义；须预定义 _UAPI_LINUX_SOCKET_H 并补 __kernel_sa_family_t typedef（只调序或只给 -D 均不足，实测）"
+  - "ref: E1044 —— 上游无 TESTS runner 时 make check 只编译+链接 check_PROGRAMS（本例 nfacct-get/add/del 三个），计数按注册目标"
+  - "ref: 经验文档/B草稿库/DRAFT-PKG-VER-non-ascii-conan-home-pc-prefix-toybox-sed —— 非 ASCII CONAN_HOME 使 .pc prefix 带高位字节，autoconf ac_delim 计数恒差 2，configure 全部探测通过后仍 could not make ./config.status（本次第 3 例独立复现；CI 不复现）"
 
 patch_generation:
   method: per-file-difflib
-  source_orig_dir: /storage/Users/currentUser/builds/libnetfilter_acct-1.0.3.orig
-  source_work_dir: /storage/Users/currentUser/builds/libnetfilter_acct-1.0.3.work
-  source_orig_hash: 5b57d984f025fdce
-  source_work_hash: 2a30bdda94fde6ec
-  generated_at: '2026-05-29T15:17:31'
-  patches_count: 4
+  patches_count: 5
 
 patch_classification:
   - file: 0001-build-aux-config.guess.patch
@@ -49,6 +53,10 @@ patch_classification:
     platform_only: True
     guard: 'pending'
   - file: 0004-src-libnetfilter_acct.c.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'
+  - file: 0005-examples-sockaddr-guard.patch
     type: auto
     platform_only: True
     guard: 'pending'

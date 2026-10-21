@@ -1,0 +1,44 @@
+software: swupdate
+version: "2026.05.1"
+status: built
+build_date: "2026-10-16"
+conan_ref: "swupdate/2026.05.1"
+source:
+  url: "https://github.com/sbabic/swupdate/archive/refs/tags/2026.05.1.tar.gz"
+  sha256: "26236a354e8cf21806d20a76728b3805ae49c23cfb2eb794fe91d1f0b280298e"
+  tar_format: tar.gz
+build:
+  system: makefile
+  configure_options:
+    - "ohos_defconfig"
+  dependencies:
+    - "openssl/3.5.8.1"
+    - "libconfig/1.8.2"
+    - "json-c/0.18"
+    - "libcurl/8.5.0"
+    - "libarchive/3.8.7"
+    - "lua/5.4.8"
+    - "zlib/1.3.1.1"
+    - "libmtd/2.3.1-3"
+    - "libubi/2.3.1-3"
+    - "cmocka/2.0.2"
+  cc: clang
+  cxx: clang++
+patches_applied:
+  - "0001-ubootenv-optional-when-libubootenv-missing.patch"
+  - "0002-ohos-no-pthread-cancellation-sigterm.patch"
+  - "0003-test-makefile-keep-buildtime-ld-library-path.patch"
+  - "0004-add-ohos-defconfig.patch"
+  - "0005-makefile-harmonyos-uses-linux-mtd-abi.patch"
+  - "0006-test-hash-backport-upstream-return-fix.patch"
+knowledge_gained:
+  - "Kbuild 工程在 OHOS 上必须显式声明 HAVE_*：上游 Makefile.deps 只给默认 y、真正判据是配方/构建系统导出的环境变量（Kconfig option env= 读取），不声明就会把缺失库的代码面打开；相反地 uname=HarmonyOS 使 HAVE_LINUX=n，MTD/systemd 面自动收敛"
+  - "Makefile 用 set_if_default_or_unset(LD,$(CROSS_COMPILE)cc) 时 LD 默认是 cc（不是 ld），OHOS 无 cc 别名 → 链接期 '/bin/sh: cc: inaccessible or not found'，必须与 CC 一起显式给 LD/hostcc"
+  - "OHOS libc 无 POSIX 线程取消：pthread_cancel/testcancel/setcanceltype 三符号在 libc.so 计数为 0（pthread_create/kill 为 1，libpthread.a 仅 8 字节占位）；上游在 SIGTERM 处理器里用它收线程 ⇒ 链接期 undefined symbol"
+  - "libubootenv 在 swupdate 2026.05.1 是硬依赖而非可选：core/Makefile 恒编译 swupdate_vars.o、include/swupdate_vars.h 顶层 include <libuboot.h>、Makefile.flags 恒链接 -lubootenv；OHOS 制品仓 '*uboot*' 0 命中（u-boot-tools 只装 bin 工具）"
+  - "lld 链接期自签的 .codesign 对本工程不可用：签名字段内嵌的文件长度恒为 0x53740≠实际长度 ⇒ execve 报 Operation not permitted（EXIT=126）、.so 亦 dlopen 失败；须 llvm-objcopy --remove-section .codesign + binary-sign-tool sign -selfSign 1 重签（即使产物完全没有被后链接修改）"
+  - "上游只认 uname -s == Linux 来决定 HAVE_LINUX；HarmonyOS 上该判据为假会把 CONFIG_MTD/CFI/UBIVOL 整体静默收敛（连带丢掉 39 例 test_flash_handler），Linux ioctl 同源时应把 HarmonyOS 并入 Linux 分支"
+  - "conan 静态包（shared=False）若同时安装 .so，链接器会优先取 .so 生成 DT_NEEDED，而 VirtualRunEnv 不导出静态包的 libdir（require.run=False）⇒ 运行期 Error loading shared library；修法=为 require.run=False 的依赖建“只含 .a 的影子目录”并置于 -L 最前（知识草稿 E760）"
+  - "验收套件的 SWU_CLEAN=rm -f /tmp/sw-description 在只读 /tmp 上必失败；且 6 个目标里 5 个是“必须失败”，二进制不可运行会假通过 ⇒ 需 SWU_CLEAN=true + ./swupdate --version 前置守卫 + 重签后重跑"
+knowledge_ref:
+  - "E760-draft-3B6E"

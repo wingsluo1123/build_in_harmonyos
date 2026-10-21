@@ -1,0 +1,80 @@
+# ============================================================
+# 版本级 manifest — archives/p/pg_ivm/1.15
+# 遵循 ARCHIVE-SPEC v2.0
+# ============================================================
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.15"
+
+# 软件名
+software: "pg_ivm"
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-17"
+build_system: "makefile"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（官方源，R39）
+  url: "https://github.com/sraoss/pg_ivm/archive/refs/tags/v1.15.tar.gz"
+
+  # 源码校验和
+  sha256: "31d8248e68fdfc8c47c8571435da8529395d680637218e5178e9e94ecba0e22c"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: makefile
+
+  # 配置选项列表（PGXS 扩展无 configure；PG_* 供自举的 PostgreSQL 使用）
+  configure_options:
+    - "PG_CONFIG=<bootstrap>/postgresql-18.3/aarch64-build/src/bin/pg_config/pg_config"
+    - "PGXS=<bootstrap>/postgresql-18.3/install/lib/pgxs/src/makefiles/pgxs.mk"
+    - "PG_LDFLAGS=-Wl,--unresolved-symbols=ignore-all -Wl,--allow-shlib-undefined"
+
+  # 编译依赖列表（格式: name/version）
+  # 无 Conan 依赖：扩展编译所需的 PostgreSQL 18.3 由配方在 tmpfs 自举
+  # （制品仓已发布的 postgresql/18.3 只含客户端面，无 PGXS/服务端头）。
+  dependencies: []
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表（作用于配方自举的 PostgreSQL 源码树，非 pg_ivm 源码）
+patches_applied:
+  - "0001-postgresql-harmony.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "制品仓已发布的 postgresql/18.3 包只交付客户端面（bin/psql、lib/libpq），不含 include/server、lib/pgxs、pg_regress —— 所有 PostgreSQL 扩展类包必须自举一份完整 PG 源码树（PGXS + 服务端头 + 服务端二进制），不能 requires 已发布的 postgresql 包"
+  - "PostgreSQL 源码在 hmdfs 上必须先打 HarmonyOS 补丁（SysV shm 跳过、文件权限放宽、initdb/username 兼容）并把生成的 configure 里 umask 077 改为 067，否则 postgres 无法起集群"
+  - "PGXS 编译扩展时 PG 服务端符号在链接期是未定义的（CREATE EXTENSION 时由 postgres 进程提供），必须给 PG_LDFLAGS 加 -Wl,--unresolved-symbols=ignore-all -Wl,--allow-shlib-undefined，否则链接失败"
+  - "扩展回归必须在 TCP 回环集群上跑：OHOS/hmdfs 上 Unix socket 不可用，且需用 extension_control_path + dynamic_library_path 把 staging 目录（make install DESTDIR 的产物）挂进服务端搜索路径"
+  - "pg_ivm 的 control default_version=1.15 而全量 SQL 脚本基线是 pg_ivm--1.10.sql，1.10→1.15 由更新链补齐，CREATE EXTENSION 可自动按更新路径安装 —— 无需自行拼接全量脚本"

@@ -1,0 +1,100 @@
+#====================================================================
+# DRAFT-scribus-166-crlf-source-patch — CRLF 行尾源文件补丁生成失败
+# （refresh-patch 生成 LF 补丁，dry-run 应用到 CRLF 源文件失败被删）
+# 触发事件: scribus 1.6.6 适配（上游 scribus/text/textshaper.cpp 为
+#   CRLF 行尾；refresh-patch 每轮 dry-run 失败并 unlink 补丁，conan
+#   create export_sources 报 Patch file does not exist）。
+#====================================================================
+
+id:                     E3188
+trigger_tool:           refresh-patch|patch|conan|cmake
+phase:                  patch-generation|packaging|configuration
+error_signature:        different line endings|Hunk #[0-9]+ FAILED at [0-9]+ \(different line endings\)|
+                         Patch file does not exist: .*\.patch|ConanException: Patch file does not exist|
+                         refresh-patch.*dry-run 失败|⚠️ .*\.patch: dry-run 失败
+severity:               2
+category:               portability, build-system, conan, patch, crlf
+match_keywords:         CRLF, line endings, different line endings, refresh-patch, difflib,
+                         read_text, universal newlines, dry-run, patch, textshaper, SB_UTF8,
+                         CRLF 源文件, 行尾, LF 补丁, conan create, export_sources,
+                         patch_file, conandata.yml
+title:                  CRLF 行尾源文件的补丁生成失败：refresh-patch 产 LF 补丁 dry-run 不匹配 CRLF 源文件，须改手动 CRLF 补丁置独立目录
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause: refresh_patch._diff_files() 用 Path.read_text()（默认 universal newlines，
+            把 CRLF 统一转为 LF）读取 orig 与 work 两侧文本，经 difflib 生成行尾为 LF
+            的补丁；而磁盘上的上游源文件仍是 CRLF 行尾。refresh-patch 的 dry-run 用
+            `patch --dry-run -p1` 把 LF 补丁应用到 CRLF 源文件，patch 检测到
+            "different line endings" 使 Hunk FAILED，dry-run 失败 → refresh-patch
+            unlink 该 staging 补丁，最终原子替换后 patches/ 目录缺失对应补丁；
+            随后 conan create 的 export_conandata_patches() 校验 conandata.yml 声明
+            的 patch_file 文件不存在，报 ConanException: Patch file does not exist。
+            手动 diff -u（按字节比较、保留 CRLF）生成的行尾为 CRLF 的补丁，
+            patch --dry-run 应用成功（RC=0）——证明问题在补丁/源文件行尾不匹配，
+            而非补丁内容错误。
+affected_scope:         含有 CRLF 行尾源文件的 CMake/C++ 软件在 HarmonyOS 上经
+                        refresh-patch --auto 生成补丁的适配流程（同理适用于任意
+                        含 Windows 行尾源文件的仓库）
+verification_cmd:       1) git ls-files ... 检查源文件是否含 \\r；2) refresh-patch
+                        --auto 观察 "dry-run 失败"；3) conan create 观察
+                        "Patch file does not exist: .../patches/000N-*.patch"；
+                        4) 手动 diff -u（无 --strip-trailing-cr 等）生成补丁后
+                        patch --dry-run -p1 RC=0
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+rec_priority:           1
+rec_approach:           crlf-patch-in-separate-dir
+rec_description:        手动用 diff -u（保留 CRLF）生成补丁，置于 refresh-patch 不
+                        管理的独立目录（如 patches-crlf/），conandata.yml 的
+                        patch_file 指向该目录；后续 refresh-patch 原子替换只动
+                        patches/，不再删除 CRLF 补丁
+rec_command: |
+  # 1) 手动生成 CRLF 行尾补丁（注意必须用 diff -u 而非 refresh-patch）
+  diff -u --label a/scribus/text/textshaper.cpp --label b/scribus/text/textshaper.cpp \
+      scribus-1.6.6.orig/scribus/text/textshaper.cpp \
+      scribus-1.6.6.work/scribus/text/textshaper.cpp \
+      > archives/s/scribus/1.6.6/patches-crlf/0009-scribus-text-textshaper.cpp.patch
+  # 2) conandata.yml 声明
+  #   - patch_file: patches-crlf/0009-scribus-text-textshaper.cpp.patch
+  #     patch_type: portability
+  #     patch_description: "上游源文件 CRLF 行尾，补丁须保持 CRLF，置独立目录避开 refresh-patch LF 规范化"
+  # 3) 提交包含 patches-crlf/ 目录（含该补丁）与 conandata.yml
+rec_auto_fix:           false
+rec_impl:               manual-recipe
+
+fallback_priority:      2
+fallback_approach:      unify-line-endings
+fallback_description:   将源文件在 work 目录统一转为 LF 行尾后生成补丁（仅当不改变
+                        语义且仓库行尾风格稳定时适用；diff 会扩大，谨慎）
+fallback_command:       sed -i 's/\\r$//' scribus/.../*.cpp
+fallback_auto_fix:      false
+fallback_impl:          manual-recipe
+
+# ★ 禁止策略 ★
+forbid_1_pattern:       refresh-patch --auto.*未手动复核 0009|（CRLF 补丁）置于 patches/
+forbid_1_reason:        refresh-patch 每轮原子替换会删除 dry-run 失败的 CRLF 补丁，
+                        导致 conan create patch file does not exist 或补丁静默丢失
+forbid_1_consequence:   W3 conan create 反复失败；补丁丢失后行为与源码不符
+forbid_2_pattern:       patch --dry-run.*--ignore-whitespace|patch.*-l.*dry-run
+forbid_2_reason:        宽松匹配掩盖行尾不匹配，无法保证 conan（patch_ng）与签名
+                        流水线按相同语义应用补丁
+forbid_2_consequence:   本地 dry-run 通过但 conan create 应用失败，验证失真
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             P012
+# ═══ 关系图 (Relations) ═══
+# ═══ 元数据 ═══
+doc_file:               drafts/DRAFT-scribus-166-crlf-source-patch.md
+last_updated:           2026-10-02
+source_event:           scribus 1.6.6 适配 W3 conan create（0007 补丁反复被 refresh-patch 删除）
+
+# ═══ 知识协作 ═══
+authors:                OpenDesk Agent
+source_pr:
+source_commit:
+
+# ═══ 质量度量 ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-02

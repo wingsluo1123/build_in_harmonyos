@@ -1,0 +1,98 @@
+# 版本级 manifest 模板
+# 文件位置: archives/{letter}/{name}/1.15.1/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "1.15.1"
+
+# 软件名
+software: "osmin"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-16"
+build_system: "cmake"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL
+  url: "https://github.com/janbar/osmin/archive/refs/tags/1.15.1.tar.gz"
+
+  # 源码校验和
+  sha256: "282ca72f44acf5bea52041ad10d60cb8826a32a7b848411ab87147a58b784619"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表
+  configure_options:
+  - "-DCMAKE_BUILD_TYPE=Release"
+  - "-DUNIX=ON（tc.cache_variables；HarmonyOS 下 CMake 不定义 UNIX，否则 src/signalhandler.cpp 被 if(UNIX) 静默丢弃）"
+  - "-D_LIBCPP_ENABLE_EXPERIMENTAL（tc.extra_cxxflags；OHOS libc++ 15.0.4 C++20 下 __cpp_lib_ranges 未定义）"
+  - "-DZLIB_ROOT/-DZLIB_LIBRARY/-DZLIB_INCLUDE_DIR（generate() 注入，指向 conan zlib/1.3.2，避开上游内置 zlib ExternalProject 兜底）"
+  - "-DOSMSCOUT_BUILD_MAP_QT=ON / -DOSMSCOUT_BUILD_CLIENT_QT=ON（backend/libosmscout 地图与 Qt 客户端）"
+  # 例如:
+  # - "-DCMAKE_BUILD_TYPE=Release"
+  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - qtbase/6.11.1
+    - qtdeclarative/6.11.1
+    - qtsvg/6.11.1
+    - qtmultimedia/6.11.1
+    - qtremoteobjects/6.11.1
+    - qtpositioning/6.11.1.1
+    - qtcore5compat/6.11.1
+    - qtsensors/6.11.1
+    - zlib/1.3.2
+    - libxml2/2.15.3
+  # 例如:
+  # - openssl/1.1.1w
+  # - curl/8.19.0
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-libosmscout-client-qt-guard-no-opengl.patch"
+# 例如:
+# - "0001-bootstrap-ohos-toolchain.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "KB-NO-OPENGL: OHOS qtbase 未构建 QtOpenGL（QT_NO_OPENGL 1）导致消费方 GL 头文件空内容 / use of undeclared identifier，检测脚本+门控补丁模板+复现脚本见 knowledge/tools/kb-no-opengl/"
+  - "HarmonyOS 下 CMake 不定义 UNIX，上游 if(UNIX) 分支的源文件被静默丢弃（链接期符号缺失），配方注入 UNIX=ON（草稿 knowledge/drafts/ohos-cmake-unix-undefined.kv）"
+# 例如:
+# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
+# - "内嵌 libuv 需要禁用，使用系统 libuv"

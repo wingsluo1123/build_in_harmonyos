@@ -1,0 +1,57 @@
+#====================================================================
+# DRAFT-E724-libmng-2.0.3-autotoolsdeps-turbojpeg-false-needed — AutotoolsDeps 双组件包把未用组件内联进 NEEDED：手拼 flags + unset LIBS 让 configure 自行探测
+# 触发事件: libmng 2.0.3 适配（libmng.so.2 出现假 NEEDED libturbojpeg.so.0）
+# 路径: Path B（知识库扩展）
+#====================================================================
+
+id:                     E2433
+trigger_tool:           configure|make|ld
+phase:                  build
+error_signature:        readelf -d.*NEEDED.*turbojpeg|
+                         NEEDED \[libturbojpeg\.so\.0\]|
+                         libturbojpeg.*not found.*runtime
+
+severity:               2
+category:               ohos, autotools, toolchain, conan, loading
+match_keywords:         AutotoolsDeps, LIBS 污染, 假依赖, turbojpeg,
+                         libjpeg-turbo 双组件, NEEDED, AC_CHECK_LIB,
+                         conftest, unset LIBS, transitive_headers,
+                         elfutils 先例, pkg-config 组件展开
+title:                  AutotoolsDeps 把 libjpeg-turbo 的 turbojpeg 组件展开进 LIBS，上游 AC_CHECK_LIB 原样接受，成品 .so 带假 NEEDED——不用 AutotoolsDeps，手拼 -I/-L 并 unset LIBS 让 configure 探测出干净闭包
+
+root_cause: >
+  1) AutotoolsDeps 按 pkg-config 组件名展开 LIBS，多组件包
+     （libjpeg-turbo 提供 libjpeg + turbojpeg 两个组件）整体内联；
+  2) AC_CHECK_LIB 探测函数链接时 LIBS 前缀已带 -lturbojpeg，任何
+     函数探测"成功"都被假依赖兜底，探测结果无法反映真实闭包；
+  3) LIBS 进入 Makefile 后 libtool 逐个 -l 链接，假依赖固化进
+     NEEDED，运行期要求目标机存在 libturbojpeg.so.0（体积+攻击面+
+     部署风险，且 OHOS musl loader 会真实尝试加载）。
+
+verification_cmd: >
+  conan create archives/l/libmng/2.0.3 -pr:h=ohos-aarch64 -pr:b=ohos-aarch64 --build=missing && readelf -d $(conan cache path libmng/2.0.3 -p ohos-aarch64)/lib/libmng.so.2 | grep NEEDED
+
+rec_priority:           1
+rec_approach:           manual-flags-unset-libs（手拼 -I/-L 路径 + unset LIBS，configure 自行探测）
+rec_description: >
+  generate() 阶段：遍历 self.dependencies 拼 CPPFLAGS/LDFLAGS（仅
+  -I/-L 路径），os.environ.pop("LIBS")，LD_LIBRARY_PATH 指向依赖包
+  lib/（本机即目标机时供 conftest 加载）。configure 用 AC_CHECK_LIB
+  自行探测出真实闭包。构建后 readelf -d 验证 NEEDED。
+rec_command:            conan create archives/l/libmng/2.0.3 -pr:h=ohos-aarch64 -pr:b=ohos-aarch64 --build=missing 2>&1 | grep -cE "NEEDED.*turbojpeg" # 期望 0
+rec_auto_fix:           false
+rec_impl:               conan-recipe-manual-dep-flags
+
+doc_file:               knowledge/drafts/DRAFT-E724-libmng-2.0.3-autotoolsdeps-turbojpeg-false-needed.md
+last_updated:           2026-09-11
+source_event:           libmng 2.0.3 适配，libmng.so.2 出现假 NEEDED libturbojpeg.so.0
+authors:                 atomcode-executor
+source_pr:
+source_commit:
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     0.9
+metrics_last_used:      2026-09-11
+
+affected_scope:         AutotoolsDeps 把 libjpeg-turbo 的 turbojpeg 组件展开进 LIBS，上游 AC_C

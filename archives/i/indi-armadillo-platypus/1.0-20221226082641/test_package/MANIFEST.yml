@@ -1,0 +1,71 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+#
+# 上游测试清点（R51，证据见 notes.md「上游测试清点」一节）：
+#   清单 `indi-armadillo-platypus/`：CMakeLists.txt、seletek_rotator.cpp/.h、
+#   dragonfly_dome.cpp/.h、dragonfly_controller.cpp/.h、beaver_dome.cpp/.h、
+#   armadillo_focuser.cpp、platypus_focuser.cpp、arm_plat_focuser_common.cpp/.h、
+#   config.h.cmake、indi_lunatico.xml.cmake、99-armadilloplatypus.rules、
+#   indi-armadillo-platypus.spec、AUTHORS/INSTALL/README
+#   CMakeLists.txt 无 enable_testing()/add_test()（grep 计数 = 0）
+#   → 上游确无测试（故 upstream_tests 为空列表，非占位符）
+
+package: indi-armadillo-platypus/1.0-20221226082641
+homepage: "https://github.com/indilib/indi-3rdparty"
+
+# 上游测试命令：该驱动子项目未提供 check/test 目标
+upstream_check_command: ""
+
+# conanfile.py build() 方法中是否已集成测试（上游确无套件；build() 跑的是配方侧新增的 gtest）
+upstream_test_in_build: true
+upstream_test_command: ""
+
+# 实际在 build() 内运行的测试（R51 口径：采用审核实测 N=5 = 下列 5 个用例）
+# 上游该驱动目录本身自带用例为 0，清点证据见上方注释与 manifest.yaml
+upstream_total: 5
+upstream_tests:
+  - file: tests/test_arm_plat_focuser.cpp
+    source: "配方侧新增（随配方携带；补丁 0002 在驱动 CMakeLists 追加受 INDI_BUILD_UNITTESTS 守卫的目标）"
+    description: "5 个 gtest 用例：DeviceNameMatchesController / ConstructorDeclaresFocuserCapabilities / InitPropertiesRegistersTemperatureReadout / ArmadilloExposesTwoMotorPorts / WiringAndHalfStepOptions"
+    command: "ctest --output-on-failure（add_test(run-tests test-armadillo-platypus)）"
+    count: 5
+
+# 配方侧新增的单元测试（不属上游资产，如实单列；受 INDI_BUILD_UNITTESTS 守卫）
+added_unit_tests:
+  framework: gtest
+  count: 5
+  source: "tests/test_arm_plat_focuser.cpp（随配方携带；补丁 0002 在驱动 CMakeLists 追加受守卫的目标）"
+  command: "ctest --output-on-failure（add_test(run-tests test-armadillo-platypus)）"
+  cases:
+    - "DeviceNameMatchesController"
+    - "ConstructorDeclaresFocuserCapabilities"
+    - "InitPropertiesRegistersTemperatureReadout"
+    - "ArmadilloExposesTwoMotorPorts"
+    - "WiringAndHalfStepOptions"
+  run_status: >-
+    已编译并由 ctest 在 build() 内执行；本机运行期未跑成，原因是环境限制而非用例/打包缺陷：
+    ①宿主不允许从用户数据目录（$HOME，构建/包目录所在处）执行二进制（实测把系统自带的 busybox
+    复制到该目录同样报 Permission denied）②运行环境此前只前置 libindi 自己的 lib 目录、缺其传递
+    依赖（libcurl / libfftw3 / libgsl / libusb-1.0），现改用 VirtualRunEnv 生成的 conanrun；
+    本机在该环境下仍报 `Error relocating …test-armadillo-platypus: <INDI C++ 符号> symbol not found`。
+    配方按「环境限制」打印原文，未记成通过；CI/真机会正常执行。
+
+# test_package 中自带的测试（消费者视角验证，鸿蒙独有）
+test_package_tests:
+  - file: check_all_drivers.py
+    description: "消费者校验 6 项（多驱动包逐一审计）：①bin/ 下 6 个驱动可执行文件（indi_seletek_rotator/indi_dragonfly_dome/indi_dragonfly/indi_beaver_dome/indi_armadillo_focus/indi_platypus_focus）均为非空 AArch64 ELF ②share/indi/indi_lunatico.xml 的 6 条 <driver> 与 bin/ 逐一对应（多一条少一条都算失败）③6 个驱动的 DT_NEEDED 闭包审计（libindiclient/libindidriver/libindiAlignmentDriver 三项齐备、均为裸 soname、且都能在 libindi 包内找到）④udev 规则已随包安装（上游装到绝对路径 /usr/lib/udev/rules.d，本配方重定向进私有前缀 lib/udev/rules.d——校验该文件在包内且内容为真实规则）⑤conanrun 下 best-effort 真跑一个驱动，宿主加载器拒绝记 SKIP、打包缺陷记 FAIL ⑥**完整端到端流程用例**（rule12）：`indiserver` 拉起本包驱动 + `indi_getprop` 以 INDI 客户端身份连接并读属性（宿主限制记 SKIP）"
+    command: "python3 check_all_drivers.py <bindir> <resdir>/indi/indi_lunatico.xml <libindi-pkg>/lib <libdir>/udev/rules.d/99-armadilloplatypus.rules"
+
+# 测试断言总数（近似值, 用于质量评估）
+assertion_count: 11
+# 计数口径（R51，供审核 rule4 核对，可复现）：
+#   · 上游自带用例 = 0：CMakeLists.txt 里 `enable_testing()|add_test(` 计数 = 0
+#     （锁定 commit 945fbe12 与 master 两处均已核对；兄弟驱动 indi-maxdomeii 确有 1 个
+#      gtest，说明该检查有效，本驱动确实没有）
+#   · 配方侧**新增单元测试** = 5 项 gtest（见 added_unit_tests；build() 内经 ctest 执行）
+#   · 消费者校验 = 6 项（5 项审计 + 1 项端到端流程；审核 rule12 要求的完整端到端用例：
+#     `indiserver`（libindi 包内自带）拉起本包驱动 → `indi_getprop` 以 INDI 客户端身份
+#     连接并读取属性 → 断言读到属性（驱动↔客户端两端真实交互，非纯断言）；
+#     宿主不允许本地监听/连接或平台限制时，按具名环境信号记 SKIP 并附证据）
+#   · 合计 11 项

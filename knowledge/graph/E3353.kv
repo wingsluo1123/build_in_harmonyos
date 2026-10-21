@@ -1,0 +1,30 @@
+#====================================================================
+# Draft: build_timeouts.txt 出现重复包条目时，CI 在 "Validating
+#        package build timeout overrides" 阶段 0.3s 秒死（exit 1），
+#        conan-build-test 从未执行到构建。报错只给行号不给包名，
+#        须对照 main 最新基线才能看到真实重复来源（merge 视角）。
+#        实证链：mysql-8.4 #11358 R40 排查（CI #92185 九轮同签名）。
+#====================================================================
+
+id:                     E3353
+trigger_tool:           conan|ci
+phase:                  configure
+error_signature:        Invalid build timeout config at line [0-9]+: duplicate package reference|duplicate package reference|Validating package build timeout overrides[^e]*exit code 1
+severity:               2
+category:               configure, conan, ci-gate
+match_keywords:         build_timeouts, duplicate package reference, Invalid build timeout config, conan-build-test, Validating package build timeout overrides, 秒死, timeout override, 大件超时, 14400, rebase 去重, merge 视角
+title:                  build_timeouts.txt 重复条目使 CI 在超时配置校验阶段 0.3 秒退出（exit 1，构建从未开始）——修法是以 origin/main 最新版重置文件后仅追加目标条目，而非在旧基线上手改
+root_cause:             ci/conan/build_and_test.sh 在 conan create 之前对 ci/config/build_timeouts.txt 做严格校验，发现 duplicate package reference（同一包名条目出现 2+ 次）立即 exit 1。典型成因：①配方分支基线早于 main 合入同名条目——远端 PR diff 看是纯新增（+2/-0），但 CI checkout 的是"main+diff"合并视角，实际文件里同名条目出现 3 条（分支自带 2 条 + main 带入 1 条）；②两个 PR（基建件+配方件）各自携带同一条目先后合入，后合的一件触发；③人工追加疏忽。特征：elapsedTime=0.3 秒级、报错只给行号不给包名清单，极易误判为"网络/超时类"问题（mysql-8.4 曾被误判为 3600s 超时耦合，实为秒死）。
+affected_scope:         所有在 ci/config/build_timeouts.txt 为同一包名添加超时条目的 PR；尤其是分支基线早于 main 合入同名条目的场景、基建件+配方件两 PR 并行携带同条目的场景。
+verification_cmd:       grep -cE '^syslog-ng/4\.8\.1' ci/config/build_timeouts.txt   # >1 即命中本条；修复后 =1（或走 fallback 时 =0 由基建件承载）
+rec_priority:           2
+rec_approach:           reset-to-main-baseline-then-append
+rec_description:        (1) 修复前先 git fetch origin main 并读取 main 版文件——重复可能来自 merge 视角而非肉眼 diff，远端 diff 显示纯新增也会触发；(2) 用 git show origin/main:... 整文件重置而非手动删行（保证与 main 完全一致、无残留旧基线内容）；(3) 仅追加自己的目标条目+一行注释说明大件原因；(4) 提交前 grep|sort|uniq -d 自检；(5) 若有并行基建 PR 携带同条目，盯守其合入动态，后合入的一件主动 rebase 去重；(6) 判定红因时先看 elapsedTime——0.3 秒级失败是配置校验秒死而非构建超时（后者是 3600s+ 的 TIMED OUT）。
+rec_command:            git fetch origin main && git show origin/main:ci/config/build_timeouts.txt | grep -c '<pkg>/<ver>'
+rec_auto_fix:           false
+source_pr:              #12517, #11358
+source_commit:          3581361ac0
+rec_impl:               manual
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E3353.md

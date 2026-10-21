@@ -1,0 +1,28 @@
+--- a/mergedeep/mergedeep.py
++++ b/mergedeep/mergedeep.py
+@@ -67,20 +67,25 @@
+ 
+ def _is_recursive_merge(a, b):
+     both_mapping = isinstance(a, Mapping) and isinstance(b, Mapping)
+     both_counter = isinstance(a, Counter) and isinstance(b, Counter)
+     return both_mapping and not both_counter
+ 
+ 
+ def _deepmerge(dst, src, strategy=Strategy.REPLACE):
+     for key in src:
+         if key in dst:
++            if strategy in (Strategy.TYPESAFE, Strategy.TYPESAFE_REPLACE, Strategy.TYPESAFE_ADDITIVE):
++                if type(dst[key]) is not type(src[key]):
++                    raise TypeError(
++                        f'destination type: {type(dst[key])} differs from source type: {type(src[key])} for key: "{key}"'
++                    )
+             if _is_recursive_merge(dst[key], src[key]):
+                 # If the key for both `dst` and `src` are both Mapping types (e.g. dict), then recurse.
+                 _deepmerge(dst[key], src[key], strategy)
+             elif dst[key] is src[key]:
+                 # If a key exists in both objects and the values are `same`, the value from the `dst` object will be used.
+                 pass
+             else:
+                 _handle_merge.get(strategy)(dst, src, key)
+         else:
+             # If the key exists only in `src`, the value from the `src` object will be used.

@@ -1,0 +1,113 @@
+#====================================================================
+# _template.kv — 知识图谱条目模板
+# 用法: 复制此文件为 E548.kv，填写各字段
+# 对应的人类文档: doc/E548.md
+#
+# 格式规则:
+#   - key: value（冒号后一个空格，value 到行尾）
+#   - 多行值: 下一行以空格开头 = 续行
+#   - 列表值: 逗号分隔
+#   - 正则值: | 分隔多个模式
+#   - 以 # 开头的行为注释
+#   - 空行忽略
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+# trigger_tool: 出错的工具 (configure/cmake/meson/make/gcc/clang/ld/python/pip/install/test/runtime)
+# phase:         出错阶段 (configuration/compilation/linking/installation/testing/runtime)
+# error_signature: 正则表达式(|分隔), 用于精确匹配日志文本
+id:                     E3494
+trigger_tool: python|pip|runtime|test
+phase: runtime
+error_signature: <module ._ssl. from .*/_ssl\.cpython-312[^ ]*\.so.>|undefined symbol: ffi_prep_closure_loc|ImportError: libffi\.so|sqlite3_initialize: symbol not found|SSL_CTX_set_msg_callback: symbol not found
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+# severity:      3=🔴blocking  2=🟡medium  1=🟢minor  0=✅resolved
+# category:      分类标签（受控词表 64 词，逗号分隔，最多 5 个；add/promote 自动归一化）
+# prescan_pattern: （可选）预编译源码扫描正则——写入后 PreScanner 运行时自动派生
+#                   PSCAN-KB-{id} 规则，无需改 pre-scan-rules.yaml（知识增长即扫描能力增长）
+# prescan_globs:   （可选）扫描范围 glob 列表，默认 '*.c, *.h, *.cc, *.cpp, *.sh, Makefile*, *.mk'
+# 词表: platform, compat, limitation, detection, hmdfs, ohos, selinux, kernel, portability, libc, musl, posix, syscall, headers, threading, socket, network, build-system, cmake, autotools ...（全表见 scripts/ohc/kb_taxonomy.py）
+# match_keywords: 纯文本关键词(逗号分隔), 用于粗筛(固定字符串匹配F)
+# title:         简短标题(一句话描述错误模式)
+severity:               2
+category:               ohos, musl, linking, python, dependency
+match_keywords: _ssl, _sqlite3, _ctypes, ffi_prep_closure_loc, libffi, symbol not found, DT_NEEDED, site-packages
+title: OHPCD CPython 的 stdlib 扩展 _ssl/_sqlite3/_ctypes 无 DT_NEEDED，任何消费者 import 即 symbol not found
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+# root_cause:       一句话根因描述(逗号可分行)
+# affected_scope:   影响范围
+# verification_cmd: 验证诊断是否正确的命令
+root_cause: OHPCD 制品仓 / 平台提供的 CPython 发行包把 stdlib 的 _ssl/_sqlite3/_ctypes 编成完全不链原生库的扩展（DT_NEEDED 只有 libc.so），运行时符号靠进程已有映射解析；OHOS musl 不导出解释器符号、且这些 .so 也没把 libssl/libcrypto/libsqlite3/libffi 写进 NEEDED，于是任何 Python 消费者 import 它们都会 symbol not found，与下游库本身无关
+affected_scope: 所有 import ssl / sqlite3 / ctypes（含 requests/urllib3/pandas/numpy.ctypeslib 等间接依赖）的 OHOS Python 任务；诊断一次即可定位，属平台级系统性坑
+verification_cmd: python3 - <<PY
+import struct,glob,sysconfig,os
+pat=os.path.join(sysconfig.get_paths()["stdlib"],"lib-dynload","_ssl.*.so")
+f=sorted(glob.glob(pat))[0]; d=open(f,"rb").read()
+print(f, [b for b in d.split(b"\\0") if b.startswith(b"lib") and b.endswith(b".so")][:8])
+PY
+
+# ═══ Layer 3: 方案层 (Solution Space) ★ ═══
+# 推荐方案 (priority 越小越优先, 从 1 开始)
+rec_priority: 1
+rec_approach: ld-preload-host-native-libs
+rec_description: 优先用『带依赖的 wheel/解释器』替换：设备 HNP 解释器与平台 pip 索引的 cp312 ohos wheel 自带 libssl/libsqlite3/libffi 映射；无法替换时把设备上已有的原生 .so 通过 LD_PRELOAD 注入进程（libffi.so / libsqlite3.so.0 在 /data/service/hnp 下）
+rec_command: LD_PRELOAD="/data/service/hnp/python.org/python_3.12/lib/libffi.so:/data/service/hnp/python.org/python_3.12/lib/libsqlite3.so.0" python3 -c "import ctypes, sqlite3"
+rec_auto_fix: false
+rec_impl:               impl-name                   # 内置实现名 (见 DESIGN §5)
+
+# 回退方案 (当推荐方案不可用时尝试)
+fallback_priority: 2
+fallback_approach: static-archive-whole-archive-shim
+fallback_description: 制品仓只有静态 openssl/1.1.1w 时 _ssl 无法在仓内修复：用 --whole-archive 把静态 libssl/libcrypto 打成一个诊断用共享库并 LD_PRELOAD，补齐 _ssl 需要的 OpenSSL 1.1.1 符号（该库仅用于本机诊断/测试环境，不作为制品交付）
+fallback_command: cc -shared -o libsslcompat.so -Wl,--whole-archive libssl.a libcrypto.a -Wl,--no-whole-archive -ldl -pthread
+fallback_auto_fix: false
+fallback_impl:
+
+# ★ 禁止策略 (与推荐方案同等重要) ★
+# forbid_N_pattern:     正则(|分隔), 匹配则拒绝/警告
+# forbid_N_reason:      为什么禁止
+# forbid_N_consequence: 违反后的后果
+forbid_1_pattern: .*
+forbid_1_reason: 把 symbol not found 归因为下游库自身缺陷、去给下游打补丁或 vendor 一份 OpenSSL
+forbid_1_consequence: 下游库被无谓修改，问题在其它消费者上继续复现；且一旦平台升级 CPython 发行包，补丁变成纯负债
+# forbid_2_pattern:
+# forbid_2_reason:
+# forbid_2_consequence:
+
+# ═══ Layer 4: 原则引用 ═══
+# principles:    适用的原则 ID 列表(逗号分隔), 在 graph/principles.kv 中定义
+principles:
+
+# ═══ 关系图 (Relations) ═══
+# causes:          本模式是这些模式的根因 (修好本模式可能同时解决它们)
+# caused_by:       本模式的根因是这些模式 (应先修它们)
+# similar_to:      特征相似可能混淆的模式
+# conflicts_with:  解决方案互相冲突的模式
+# prerequisite_of: 本模式是修复这些模式的前置条件
+# ═══ 元数据 ═══
+doc_file:               knowledge/drafts/DRAFT-ohpcp-cpython-stdlib-extensions-missing-native-dt-needed.md
+last_updated: 2026-10-15
+source_event: refnx 0.1.62 适配：构造 live 测试通道时 import ssl/sqlite3/ctypes 全部 symbol not found
+
+# ═══ 知识协作 (Authorship & Provenance) ═══
+# authors: 作者列表 (格式: Name <email>, Name2 <email2>)
+#          草稿生成时自动从 git config 填入；主编合入时保留原作者
+#          合并到已有条目时追加为第二/第三作者
+# source_pr:            添加该条目的 PR 编号
+# source_commit:        添加时的 commit SHA (短)
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 (Quality Metrics, 方案 D) ═══
+# metrics_success_count: 该修复方案成功次数
+# metrics_fail_count:    该修复方案失败次数
+# metrics_confidence:    置信度 = success / (success + fail)
+# metrics_last_used:     最后使用时间
+metrics_success_count:  0
+metrics_fail_count:     0
+metrics_confidence:     0.0
+metrics_last_used:
+authors:               352D

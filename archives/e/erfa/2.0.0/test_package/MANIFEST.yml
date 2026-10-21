@@ -1,0 +1,41 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: erfa/2.0.0
+homepage: "https://github.com/liberfa/erfa"
+
+# 上游测试命令 (conanfile.py build() 内经 conan.tools.meson.Meson.test()
+# 执行，等价于 "meson test -v -C ."，CI 日志含该命令行与逐用例结果)
+upstream_check_command: "meson test -v -C ."
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "Meson(self).test()  # -> meson test -v -C ."
+
+# 上游实际运行的测试程序（由 patches/0001-add-minimal-meson-build.patch
+# 注册为 meson test 目标；测试代码 include erfaextra.h）
+upstream_tests:
+  - file: t_erfa_c.c
+    source: erfa-2.0.0/src/t_erfa_c.c
+    description: "ERFA core library test suite（独立复核 tarball：246 个测试组函数，1398 个 vvd + 95 个 viv = 1493 断言调用点）"
+    command: "./t_erfa_c"
+  - file: t_erfa_c_extra.c
+    source: erfa-2.0.0/src/t_erfa_c_extra.c
+    description: "ERFA extra functions test（t_versions + t_leap_seconds，2 个测试组，5 个显式检查）"
+    command: "./t_erfa_c_extra"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.c
+    description: "消费者测试: eraEpb2jd, eraDat, eraEra00, eraVersion API 调用"
+    command: "./test_erfa"
+  - file: test_ohos.c
+    description: "OHOS 专有测试: __OHOS__ 工具链标识、LP64/musl 数据模型、meson 路线 PACKAGE_VERSION/SOFA_VERSION 配置传递、静态库内嵌闰秒表链接闭包"
+    command: "./test_erfa_ohos"
+
+# 测试断言总数 (近似值, 用于质量评估)
+# 口径: t_erfa_c.c 1493 断言调用点 + t_erfa_c_extra.c 5 个显式检查
+#       + test_package 11 项检查 ≈ 1509
+assertion_count: 1509

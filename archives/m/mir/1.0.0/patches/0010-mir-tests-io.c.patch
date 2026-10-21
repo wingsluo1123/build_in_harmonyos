@@ -1,0 +1,61 @@
+--- a/mir-tests/io.c
++++ b/mir-tests/io.c
+@@ -1,29 +1,54 @@
+ #include "../mir.h"
+ 
+ #include "scan-sieve.h"
++#include <stdlib.h>
++#include <string.h>
++#ifndef _WIN32
++#include <unistd.h>
++#endif
+ 
+ int main (void) {
+   FILE *f;
+ #ifndef _WIN32
+-  const char *fname = "/tmp/__tmp.mirb";
++  const char *tmpdir = getenv ("TMPDIR");
++  if (tmpdir == NULL || *tmpdir == '\0') tmpdir = ".";
++  size_t size = strlen (tmpdir) + sizeof ("/mir-io-XXXXXX");
++  char *fname = malloc (size);
++  if (fname == NULL) return 1;
++  snprintf (fname, size, "%s/mir-io-XXXXXX", tmpdir);
++  int fd = mkstemp (fname);
++  if (fd < 0) { perror ("mkstemp"); free (fname); return 1; }
++  f = fdopen (fd, "wb");
++  if (f == NULL) { perror ("fdopen"); close (fd); remove (fname); free (fname); return 1; }
+ #else
+   const char *fname = "__tmp.mirb";
++  f = fopen (fname, "wb");
++  if (f == NULL) { perror ("fopen write"); return 1; }
+ #endif
+   MIR_context_t ctx = MIR_init ();
+ 
+   create_mir_func_sieve (ctx, NULL, NULL);
+   MIR_output (ctx, stderr);
+-  f = fopen (fname, "wb");
+   mir_assert (f != NULL);
+   MIR_write (ctx, f);
+   fclose (f);
+   f = fopen (fname, "rb");
++  if (f == NULL) {
++    perror ("fopen read"); remove (fname); MIR_finish (ctx);
++#ifndef _WIN32
++    free (fname);
++#endif
++    return 1;
++  }
+   mir_assert (f != NULL);
+   MIR_read (ctx, f);
+   fclose (f);
+   fprintf (stderr, "+++++++++++++After reading:\n");
+   MIR_output (ctx, stderr);
+-  remove (fname);
++  int remove_rc = remove (fname);
++#ifndef _WIN32
++  free (fname);
++#endif
+   MIR_finish (ctx);
+-  return 0;
++  return remove_rc != 0;
+ }

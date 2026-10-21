@@ -1,0 +1,63 @@
+#====================================================================
+# DRAFT-libtool-so-deplibs-dropped-closure-link.kv
+# libtool 2.4.x link mode 丢弃 .so 形式 deplibs——产物 DT_NEEDED 仅
+# libltdl+libc、不带任何兄弟库；消费者必须链接全闭包，musl 全局符号域
+# 完成跨库重定位；编译链接全绿不构成可用性证据。
+# 定位：".la dependency_libs 陷阱"（-l token 换 .so 绝对路径）手法的伴生
+# 结果与平台级收尾约定；单库远古 libtool 自持 NEEDED 需求走 E429。完整
+# 叙事与探针见同目录 .md
+#====================================================================
+
+id:                     E3199
+trigger_tool:           libtool|clang-link|musl-loader
+phase:                  build|runtime
+error_signature:        Error relocating .*: .*: symbol not found|error while loading shared libraries.*cannot open shared object
+severity:               2
+category:               toolchain, conan, link, runtime-loader
+match_keywords:         libtool, deplibs, .so 绝对路径, DT_NEEDED, NEEDED, soname, musl, Error relocating, symbol not found, 全局符号域, LD_LIBRARY_PATH, 闭包链接, cpp_info.requires, .la dependency_libs, 惰性绑定, test_package
+title:                  libtool 2.4.x link mode 丢弃 .so 形式 deplibs——产物 DT_NEEDED 仅 libltdl+libc、不带任何兄弟库；消费者必须链接全闭包、musl 全局符号域完成跨库重定位；编译链接全绿不构成可用性证据，终判以真机运行消费者探针为准
+root_cause:             本平台工具链（libtool 2.4.x ltmain + clang→musl）下，库的 LIBADD 含 .so 绝对路径（".la dependency_libs 陷阱"的标准规避手法）时，libtool link mode 会把这些 .so deplibs 从最终驱动命令中丢弃；产物共享库 DT_NEEDED 仅剩 libltdl.so.7/libc.so，不带它实际调用的任何兄弟库。musl 无惰性绑定、重定位只在全局符号域进行——只要可执行文件（消费者/test）直接链接完整依赖闭包且各依赖 lib 目录在 LD_LIBRARY_PATH 中，跨库符号即可在运行期绑定。GSI 链既有产物（globus-common 18.15 / globus-gsi-openssl-error 4.4 / globus-openssl-module 5.2 实测）DT_NEEDED 一致仅 libltdl.so.7+libc.so，属平台级家族约定而非单包 bug
+affected_scope:         本平台 autotools 构建共享库的一切消费者与 test_package；多库互链家族（如 GSI 链）尤甚。单库、远古 libtool 且确需自持 NEEDED 的场景不在本条范围（见 E429 边界衔接）
+verification_cmd:       # 自包含探针（设备端执行；工具 llvm-readelf，无则退回 readelf；conan 已在 PATH）
+                        RE=$(command -v llvm-readelf || command -v readelf)
+                        mkdir /tmp/probe && cd /tmp/probe
+                        conan install --requires=globus-openssl-module/5.2 --deployer=full_deploy --deployer-folder=/tmp/probe -pr:h=ci/conan/profiles/ohos-aarch64
+                        LD=
+                        for d in $(find /tmp/probe/full_deploy -type d -name lib); do LD=$LD:$d; done        # 探针目录=全部依赖包 lib 拼接
+                        $RE -d "$(find /tmp/probe/full_deploy -name 'libglobus_openssl.so.0' | head -1)" | grep NEEDED   # 证据①：仅 libltdl.so.7/libc.so，无兄弟库
+                        printf '#include <globus_openssl.h>\nint main(void){return globus_module_activate(GLOBUS_OPENSSL_MODULE)!=GLOBUS_SUCCESS;}\n' > consumer.c
+                        INC=$(for d in $(find /tmp/probe/full_deploy -type d -name include); do printf -- "-I%s " $d; done)
+                        LLP=$(for d in $(find /tmp/probe/full_deploy -type d -name lib); do printf -- "-L%s " $d; done)
+                        clang $INC $LLP consumer.c -o consumer-bare -lglobus_openssl -lglobus_common -lssl -lcrypto   # 故意缺两个兄弟库
+                        LD_LIBRARY_PATH=$LD ./consumer-bare   # 证据②：Error relocating ... PROXYCERTINFO_OLD_x509v3_ext_meth: symbol not found（rc=127）
+                        clang $INC $LLP consumer.c -o consumer-full -lglobus_openssl -lglobus_common -lglobus_proxy_ssl -lglobus_openssl_error -lssl -lcrypto
+                        LD_LIBRARY_PATH=$LD ./consumer-full   # 证据③：rc=0——闭包补齐后运行恢复
+rec_priority:           1
+rec_approach:           consumer-closure-link
+rec_description:        不要试图给每个库强行制造 DT_NEEDED（与平台全部既有产物不一致）。配方 cpp_info.requires 全量声明依赖（pkg::pkg + system_libs），下游自然拿到完整链接行；test_package/消费者显式链接全闭包（-lpkg -ldep1 -ldep2 ... -lssl -lcrypto），运行期 LD_LIBRARY_PATH 覆盖全部依赖包 lib 目录；适配完成的终判是真机跑通消费者级运行探针，不是编译链接全绿。适用边界：本条适用于多库互链家族、且平台既有产物一致不带兄弟 DT_NEEDED 的场景（本仓 GSI 链等）；单个远古 libtool（如 1.3.3 old_deplibs 机制）库需自持 NEEDED 时按 E429 的重建产物方案处理，勿混用
+rec_command:            cd /tmp/probe && clang $(for d in $(find full_deploy -type d -name include); do printf -- -I%s $d; done) $(for d in $(find full_deploy -type d -name lib); do printf -- -L%s $d; done) consumer.c -o t -lglobus_openssl -lglobus_common -lglobus_proxy_ssl -lglobus_openssl_error -lssl -lcrypto && LD_LIBRARY_PATH=$(for d in $(find full_deploy -type d -name lib); do printf %s: $d; done) ./t
+rec_auto_fix:           false
+rec_impl:               conan-recipe-cpp-info-requires-plus-test-link-closure
+fallback_priority:      2
+fallback_approach:      per-package-manufacture-needed
+fallback_description:   用 -Wl,--no-as-needed 附加兄弟 -l 或补丁后 patchelf 制造 DT_NEEDED——与平台全部既有产物分歧，且 .la 解析回归时被打回；仅限个别有硬运行期加载需求的包
+fallback_command:       patchelf --add-needed libglobus_proxy_ssl.so.1 libglobus_openssl.so.0   # 最后手段
+fallback_auto_fix:      false
+fallback_impl:          per-package-link-hack-discouraged
+forbid_1_pattern:       消费者/test 只链顶层库，期望其跨库符号在运行期自动解析
+forbid_1_reason:        libtool 丢弃 .so deplibs 后产物不带兄弟库 DT_NEEDED；musl 无惰性绑定、只绑定已加载全局符号域内的符号
+forbid_1_consequence:   编译链接全绿，运行即 Error relocating libX.so: symbol: not found（rc=127）——排障点远离根因的不透明加载器报错
+forbid_2_pattern:       以编译链接全绿判定适配完成、不在真机跑消费者级运行验证
+forbid_2_reason:        该缺陷仅运行期重定位暴露
+forbid_2_consequence:   缺陷以绿姿态漏到下游、排障点远离根因
+principles:               
+doc_file:               knowledge/drafts/DRAFT-libtool-so-deplibs-dropped-closure-link.md
+last_updated:           2026-09-26
+source_event:           archives/g/globus-openssl-module/5.2（test_package L1 排障 + globus-common/gsi-openssl-error/gsi-proxy-ssl 三产物 readelf 审计）
+authors:                why6666666 <why6666666@noreply.atomgit.com>
+source_pr:              pending（feat/globus-openssl-module-5.2 交付 PR）
+source_commit:          pending（随 PR 交付后回填）
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     0.8
+metrics_last_used:      2026-09-26

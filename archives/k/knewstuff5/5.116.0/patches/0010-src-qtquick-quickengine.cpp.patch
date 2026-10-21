@@ -1,0 +1,71 @@
+--- a/src/qtquick/quickengine.cpp
++++ b/src/qtquick/quickengine.cpp
+@@ -27,21 +27,21 @@
+         , searchPresetModel(nullptr)
+     {
+     }
+     KNSCore::Engine *engine;
+     bool isLoading{false};
+     bool isValid{false};
+     CategoriesModel *categoriesModel;
+     SearchPresetModel *searchPresetModel;
+     QString configFile;
+ 
+-#if KNEWSTUFF_BUILD_DEPRECATED_SINCE(5, 82)
++#if KNEWSTUFFQUICK_BUILD_DEPRECATED_SINCE(5, 82)
+     KNSCore::EntryInternal::List changedEntries;
+     static KNSCore::EntryWrapper *getChangedEntry(QQmlListProperty<KNSCore::EntryWrapper> *property, int i)
+     {
+         KNSCore::EntryWrapper *entry{nullptr};
+         if (property) {
+             auto d = static_cast<EnginePrivate *>(property->data);
+             if (d) {
+                 if (i >= 0 && i < d->changedEntries.count()) {
+                     // Lifetime management for these objects should be done by the consumer,
+                     // but are also parented for auto-delete on application shutdown
+@@ -132,21 +132,21 @@
+                                 Q_EMIT entryEvent(wrappedEntry, (EntryEvent)event);
+                                 return;
+                             }
+ 
+                             // We do not want to emit the entries changed signal for intermediate changed
+                             // this would cause the KCMs to reload their view unnecessarily, BUG: 431568
+                             if (entry.status() == KNS3::Entry::Installing || entry.status() == KNS3::Entry::Updating) {
+                                 return;
+                             }
+                             Q_EMIT entryEvent(wrappedEntry, (EntryEvent)event);
+-#if KNEWSTUFF_BUILD_DEPRECATED_SINCE(5, 82)
++#if KNEWSTUFFQUICK_BUILD_DEPRECATED_SINCE(5, 82)
+                             if (d->changedEntries.contains(entry)) {
+                                 d->changedEntries.removeAll(entry);
+                             }
+                             d->changedEntries << entry;
+                             Q_EMIT changedEntriesChanged();
+ #endif
+                         });
+                 Q_EMIT engineChanged();
+                 KNewStuffQuick::QuickQuestionListener::instance();
+                 d->categoriesModel = new CategoriesModel(this);
+@@ -287,21 +287,21 @@
+ QObject *Engine::searchPresetModel() const
+ {
+     return d->searchPresetModel;
+ }
+ 
+ void Engine::resetSearchTerm()
+ {
+     setSearchTerm(QString{});
+ }
+ 
+-#if KNEWSTUFF_BUILD_DEPRECATED_SINCE(5, 82)
++#if KNEWSTUFFQUICK_BUILD_DEPRECATED_SINCE(5, 82)
+ QQmlListProperty<KNSCore::EntryWrapper> Engine::changedEntries()
+ {
+     return QQmlListProperty<KNSCore::EntryWrapper>(this, d.get(), &EnginePrivate::getChangedEntriesCount, &EnginePrivate::getChangedEntry);
+ }
+ 
+ int Engine::changedEntriesCount() const
+ {
+     return d->changedEntries.count();
+ }
+ 

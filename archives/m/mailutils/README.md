@@ -42,3 +42,12 @@ PAM/Guile/readline/fribidi/SQL/DBM）保持关闭。
 - 新增鸿蒙特有测试：`3.19/test_package/test_ohos_mailutils.sh`（平台身份、
   CLI/服务端冒烟、版本号）+ `test_mailutils.c`（消费者 API，含 dotlock 无硬
   链接路径验证）。
+
+## 3.20 适配（主赛任务 #8661）
+
+- 上游源码只取 GNU 官方 HTTPS 地址：`https://ftp.gnu.org/gnu/mailutils/mailutils-3.20.tar.xz`；SHA-256 为 `a8f3faab1edda5188bb5ca3e4e9c0c5bc72cd0dadf4e1f4799d27fa75c6ae829`。签名文件已下载，但设备与本机均无 `gpg`/`gpgv`，无法验证。
+- 通过 HarmonyOS aarch64 的 Conan 配方构建 11 个共享库、客户端与服务器程序。3.20 配方显式声明 GnuTLS 3.8.10、libunistring 1.0、libtool 2.5.4，以运行上游 TLS/Unicode 测试并构建对应扩展；PAM、数据库、LDAP、Guile、readline、FriBidi 和 Python 集成保持关闭。
+- 新增补丁处理 HarmonyOS triplet、HMDFS 临时目录权限与硬链接限制、OHOS libc 接口缺失、Texinfo 重生成问题，以及关闭 DBM 时 Sieve `uidnew` 的错误依赖。
+- `testsuite/cwdrepl.c` 的测试辅助程序增加 `PWD`/`getcwd()` 错误处理；上游 `.at` 测试用例本身未改。
+- 包装时保留链接器产生的 OHOS ELF 字节；真机没有 `patchelf`、签名器或 `llvm-objcopy`，Conan runenv 提供包内库目录。
+- Mailutils 3.20 的真机 `make -j2 -k check` 与 test_package 真实测试结果见 `3.20/reports/test-report.md`。

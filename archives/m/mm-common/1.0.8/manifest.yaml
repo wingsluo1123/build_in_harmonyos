@@ -1,0 +1,69 @@
+software: mm-common
+version: "1.0.8"
+status: built  # 真机 shadow CI 全绿（G0/KC/JC/L0/L1/L2/L4/L5 + L1e），未上传制品仓
+build_date: "2026-10-19"
+build_system: meson
+
+source:
+  url: "https://download.gnome.org/sources/mm-common/1.0/mm-common-1.0.8.tar.xz"
+  sha256: "b189ee636e839d12c00dabefae099fd488ab2358dec24d264761c011950b02a9"
+  tar_format: tar.xz
+  note: "上游 meson dist 归档：只含 configure.ac，不含 configure；Autotools 路线需要 autoreconf + maintainer mode"
+
+build:
+  system: meson
+  meson_options:
+    - "-Duse-network=false"
+  required_tools:
+    - "meson >= 0.62.0 (NEWS 1.0.8 明确要求；历史 worker 记录里预装/安装的是 meson 1.11.1)"
+    - "ninja"
+    - "python3 >= 3.5 (meson 与 mm-common-get 都用 python3)"
+  dependencies: []
+  disabled_features:
+    - "use-network：默认 if-no-local-tag-file，CI 强制 false，离线从源码树复制 doctags/libstdc++.tag (3.6 MB)"
+    - "Autotools 构建路线：tarball 无 configure，需 autoconf/automake/libtool maintainer mode，本配方不启用"
+    - "文档生成 (doxygen/dot/xsltproc)：本包只安装样式表与脚本，不生成文档"
+
+patches_applied:
+  - "0001-relocatable-install-prefix.patch"
+
+artifacts:
+  bin:
+    - "mm-common-get"
+    - "mm-common-prepare"
+  share:
+    - "aclocal/mm-*.m4 (8 个 Autoconf 宏)"
+    - "mm-common/build (4 个 .am + 5 个 .py)"
+    - "mm-common/doctool (7 个文档工具)"
+    - "mm-common/doctags/libstdc++.tag"
+    - "doc/mm-common (README.md, OVERVIEW.md, skeletonmm.tar.xz)"
+    - "man/man1 (2 个手册页)"
+    - "pkgconfig/mm-common-util.pc, pkgconfig/mm-common-libstdc++.pc"
+  libraries: []
+  headers: []
+
+verification:
+  summary: "本地：真实 Meson 1.11.1 + Ninja + gcc 12.2 复现 --prefix=/ + DESTDIR，34 个安装文件，test_package 14/14；真机：shadow CI 全绿"
+  device:
+    runner: "run-ohos-shadow-ci-local.sh（shadow CI，单包）"
+    profile: "ohos-local (os=OHOS 6.0 / armv8 / clang 15 / libc++ / cppstd17 / Release)"
+    commit: "f2d58bf1a79e27845e27bb08710efbcd6aa35c6d"
+    run_root: "$HOME/ohpc-ci-shadow/runs/f2d58bf1a79e-20261019T065234Z-41991"
+    build_summary: "Total 1 / Success 1 / Failed 0"
+    gates: "G0 pass, KC pass, JC pass, L0 pass, L1 pass, L2 pass, L4 pass, L5 pass, L1e negative-test confirmed"
+    test_package: "14/14 checks passed"
+    toolchain: "conan 2.31.1, meson 1.12.1, ninja 1.12.1, python3 3.12.9, clang 15.0.4 wrapper (sysroot + --code-sign)"
+    artifacts_check: "34 payload files；bin/ 两个脚本直接可执行；.pc 首行为 prefix=${pcfiledir}/../.."
+  evidence: "notes.md 第 0/6/7/8 节（reports/ 按仓库 .gitignore 规则不入库；本地另有 TEST_REPORT.md、verification-logs.txt、device-shadow-ci-build.log）"
+
+knowledge_gained:
+  - "上游 1.0.8 release tarball 是 meson dist 产物，没有 configure，Autotools 维护模式不可用，必须走 Meson"
+  - "Conan 的 Meson 前端固定 --prefix=/ + meson install --destdir，会把 @prefix@/@datadir_py@ 烤成 /share，需补丁改为从脚本自身位置推导"
+  - "Meson pkgconfig 模块同样生成 prefix=/，.pc 内所有变量会指到 /share；package() 里用 ${pcfiledir}/../.. 改写"
+  - "MesonToolchain.project_options 传 bool 会写成裸布尔，Meson >= 1.12 的 combo 选项直接报错；必须传字符串 'true'/'false'"
+  - "mm-common-get 只复制 5 个 Meson 构建脚本 + 5 个 Python doctool 文件；mm-common-prepare 复制 4 个 .am + 5 个 Perl doctool 文件，两条路线的文件名不同"
+  - "mm-common-prepare 用 sed 解析 configure.ac，只 mkdir 一级目录，MM_CONFIG_DOCTOOL_DIR 的父目录必须已存在（真实模块都自带 doc/）"
+  - "upstream 没有测试套件（meson.build 无 test target，tarball 无 tests/），所以 build() 校验项目自身产物（skeletonmm 归档、libstdc++.tag、生成的 CLI）而不是假装跑 meson test"
+  - "真机镜像上 pip 安装的 meson 只在真实 HOME 的用户 site 可导入；shadow runner 的隔离 HOME/PYTHONUSERBASE 会看不到，需要把 meson 装进 PYTHONUSERBASE"
+  - "真机镜像的裸名 exec（curl/ls/sh via subprocess）会 ENOENT/EACCES，只有绝对路径可靠；CI pre-download 因此告警但不致命"
+  - "CI 的 GNOME 镜像重写里 USTC/TUNA 的 /gnome/ 路径 404，只有 mirror.nju.edu.cn 命中"

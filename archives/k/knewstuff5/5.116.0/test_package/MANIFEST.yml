@@ -1,0 +1,48 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+package: knewstuff5/5.116.0
+homepage: "https://invent.kde.org/frameworks/knewstuff"
+
+# 上游测试命令 (ctest -N 分析: 5 个测试程序，见 upstream_tests)
+upstream_check_command: "ctest"
+
+# conanfile.py build() 方法中已集成上游测试 (_run_upstream_tests -> ctest)
+upstream_test_in_build: true
+upstream_test_command: "ctest --output-on-failure"
+
+# 上游实际存在的测试程序
+# scoped 构建下 core/ 3 个运行并通过；widgets 层 2 个因依赖未发布排除。
+upstream_tests:
+  - file: knewstuffauthortest.cpp
+    source: knewstuff-5.116.0/autotests/core/knewstuffauthortest.cpp
+    description: "KNSCore::Author 作者记录属性/拷贝/赋值 (5 断言)"
+    command: "./knewstuffauthortest"
+  - file: knewstuffenginetest.cpp
+    source: knewstuff-5.116.0/autotests/core/knewstuffenginetest.cpp
+    description: "KNSCore::Engine 属性读取与 provider 文件加载 (4 断言)"
+    command: "./knewstuffenginetest"
+  - file: installationtest.cpp
+    source: knewstuff-5.116.0/autotests/core/installationtest.cpp
+    description: "安装/卸载命令、归档顶层文件、拷贝错误 (9 断言)"
+    command: "./installationtest"
+  - file: knewstuffentrytest.cpp
+    source: knewstuff-5.116.0/autotests/knewstuffentrytest.cpp
+    description: "KNS3::Entry widgets 层测试；scoped 排除：依赖未发布的 NewStuff widgets/KIO"
+    command: "./knewstuffentrytest"
+    excluded_in_scoped: true
+  - file: kmoretools
+    source: knewstuff-5.116.0/autotests/kmoretools
+    description: "KMoreTools widgets 层测试；scoped 排除：依赖未发布的 KIO/Service/XmlGui"
+    command: "./kmoretools"
+    excluded_in_scoped: true
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test.cpp
+    description: "L1 消费者测试: KNSCore EntryInternal/Author/Engine API 往返"
+    command: "./test_knewstuff5"
+
+# 测试断言总数: 上游 core 3 程序 18 个 QtTest 断言
+assertion_count: 18

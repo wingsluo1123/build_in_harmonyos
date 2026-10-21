@@ -1,0 +1,23 @@
+diff -ruN a/src/CMakeLists.txt b/src/CMakeLists.txt
+--- a/src/CMakeLists.txt	2026-04-27 21:44:11.000000000 +0800
++++ b/src/CMakeLists.txt	2026-10-16 23:29:25.197696094 +0800
+@@ -6,7 +6,19 @@
+ 
+ set(SOURCES ${SOURCE_FILES} ${HEADER_FILES})
+ 
++#
++# Some distributions only provide static builds of the third party libraries
++# (zlib, bzip2, lz4, OpenSSL).  Linking them into libpgagroal works as long as
++# they were built position independent.  The upstream guard stays the default;
++# it can be relaxed explicitly when the consumed packages are known to be PIC.
++#
++option(PGAGROAL_ALLOW_STATIC_DEPS "Permit dependencies that only ship static libraries" OFF)
++
+ function(pgagroal_require_shared_libs)
++  if (PGAGROAL_ALLOW_STATIC_DEPS)
++    return()
++  endif()
++
+   foreach(lib_var IN LISTS ARGN)
+     if (NOT DEFINED ${lib_var})
+       continue()

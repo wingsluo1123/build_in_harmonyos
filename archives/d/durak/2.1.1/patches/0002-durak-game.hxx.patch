@@ -1,0 +1,48 @@
+--- a/durak/game.hxx
++++ b/durak/game.hxx
+@@ -155,21 +155,21 @@
+     });
+     std::for_each (players.begin (), players.end (), [this] (Player &player) { playerDrawsCardsFromDeck (player, numberOfCardsPlayerShouldHave); });
+     setNewRoundInformation ();
+   }
+ 
+   bool
+   vectorIsSubVectorOf (std::vector<Card> const &vector, std::vector<Card> const &subVector)
+   {
+     for (auto const &card : vector)
+       {
+-        if (not std::ranges::contains (subVector, card)) return false;
++        if (std::ranges::find (subVector, card) == std::ranges::end (subVector)) return false;
+       }
+     return true;
+   }
+ 
+   Game (GameState gameState) : cardDeck{ gameState.cardDeck }, players{ gameState.players }, table{ gameState.table }, trump{ gameState.trump }, attackStarted{ gameState.attackStarted }, gameOver{ gameState.gameOver }, round{ gameState.round }, numberOfCardsPlayerShouldHave{ gameState.numberOfCardsPlayerShouldHave } { setNewRoundInformation (); }
+ 
+   // attack starts round and can only be used by player with role attack
+   bool
+   playerStartsAttack (std::vector<Card> const &cards)
+   {
+@@ -254,21 +254,21 @@
+         return false;
+       }
+   }
+ 
+   // defending player can try to beat card on the table
+   bool
+   playerDefends (Card const &cardToBeat, Card const &card)
+   {
+     if (auto defendingPlayer = getDefendingPlayer ())
+       {
+-        if (not std::ranges::contains (defendingPlayer->getCards (), card)) return false;
++        if (std::ranges::find (defendingPlayer->getCards (), card) == std::ranges::end (defendingPlayer->getCards ())) return false;
+         if (auto cardToBeatItr = std::ranges::find_if (table, [&cardToBeat] (auto const &cardAndOptionalCard) { return cardAndOptionalCard.first == cardToBeat; }); cardToBeatItr != table.end () && not cardToBeatItr->second && beats (cardToBeatItr->first, card, trump))
+           {
+             if (defendingPlayer.value ().dropCard (card))
+               {
+                 cardToBeatItr->second = card;
+               }
+             auto defend = Defend{};
+             defend.cardToBeat = cardToBeat;
+             defend.card = card;
+             history.emplace_back (defend);

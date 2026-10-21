@@ -1,0 +1,19 @@
+package: gtkgreet/0.8
+homepage: "https://sr.ht/~kennylevinsen/gtkgreet"
+
+# 上游无测试套件：源码树无 test/ 目录、无 meson test 用例、
+# meson.build 未注册任何 test()/i18n.merge_file 之外的检查目标。
+upstream_check_command: "meson test -C build（实测无用例：上游仓库无 test/ 目录与 test() 注册）"
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests: []
+
+test_package_tests:
+  - file: test_gtkgreet.sh
+    description: "消费者视角冒烟：校验制品 bin/gtkgreet 存在；非交叉构建时执行 OHOS aarch64 产物的 --help（上游唯一不依赖运行中 greetd daemon 的入口，选项解析发生在 gtk_init 之前，故无显示后端也可退出 0）"
+    command: "bash test_gtkgreet.sh <package_folder>/bin/gtkgreet"
+    assertion_count: 2
+
+assertion_count: 2
+assertion_count_basis: "两条显式断言：①制品 bin/gtkgreet 存在（conanfile.py 硬校验）②--help 退出码 0；上游无自带用例，故上游侧断言数计 0"

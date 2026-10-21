@@ -1,0 +1,25 @@
+# osmin 1.15.1 源码声明
+#
+# sources   : osmin 主源码（GitHub 官方 tag 归档）
+# libosmscout: osmin 通过 git submodule 引入的地图后端库，固定 commit acb1e4b6
+#              （osmin-1.15 分支）。该 commit 在官方上游 Framstag/libosmscout
+#              与 osmin 声明的 fork janbar/libosmscout 中 tarball 字节一致
+#              （sha256 已核验相同），故 URL 取官方上游仓库。
+#              源码由本配方放入 backend/libosmscout/，随后由上游
+#              backend/CMakeLists.txt 施加 libosmscout_4.patch 并树内编译。
+sources:
+  url: "https://github.com/janbar/osmin/archive/refs/tags/1.15.1.tar.gz"
+  sha256: "282ca72f44acf5bea52041ad10d60cb8826a32a7b848411ab87147a58b784619"
+
+libosmscout:
+  url: "https://github.com/Framstag/libosmscout/archive/acb1e4b6d1daf786059a24691d4b116a485dc1cd.tar.gz"
+  sha256: "cf4d09d532b2af4db156a534b3fcb9d7cc66adab1363faeb7ff7070711986d27"
+
+# 补丁由本配方在 build() 里先施打（base_path = 源码根，路径含 backend/libosmscout/
+# 前缀），随后上游 backend/CMakeLists.txt 在 configure 阶段再施打它自带的
+# libosmscout_4.patch（该补丁改同一文件的 445 行附近，与本补丁 29/205 行区域不
+# 重叠，以偏移方式应用）。
+patches:
+  - patch_file: "patches/0001-libosmscout-client-qt-guard-no-opengl.patch"
+    patch_description: "Guard QOpenGLContext/QOpenGLFunctions use with QT_NO_OPENGL (OHOS qtbase builds without OpenGL)"
+    patch_type: "portability"

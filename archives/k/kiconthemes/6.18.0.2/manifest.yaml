@@ -1,0 +1,60 @@
+software: kiconthemes
+version: "6.18.0.2"
+status: built
+build_system: cmake
+created_at: 2026-10-16
+dependencies:
+  required:
+    - qtbase/6.11.1
+    - qtsvg/6.11.1
+    - karchive/6.18.0
+    - openssl/3.5.6.1
+    - zstd/1.5.7
+    - ki18n/6.18.0
+    - kwidgetsaddons/6.18.0
+    - kcolorscheme/6.18.0
+  build:
+    - ecm/6.26.0
+  optional:
+    - qtdeclarative
+    - qtdbus
+    - breeze-icons
+    - qttools
+dep_line_fix:
+  problem: >-
+    the published kiconthemes/6.18.0 ref has a single recipe revision
+    (f82185f3a6daed7a2bae8d5f14a6e773) that pins the static karchive/6.19.0,
+    which conflicts with the karchive/6.18.0 closure carried by the rest of the
+    6.18 line (knewstuff/6.18.0, libkdegames/26.04.0, kxmlgui/6.18.0, ...):
+    "Version conflict: Conflict between karchive/6.18.0 and karchive/6.19.0 in
+    the graph"
+  repair: >-
+    require the shared karchive/6.18.0 published for the same generation line,
+    so the 6.18 graph stays single-version without a consumer-side override
+  api_check: >-
+    no karchive-6.19-only API is used: the only KArchive path is
+    KCompressionDevice (src/kiconloader.cpp:34,669), upstream requires
+    KF6Archive >= KF_DEP_VERSION = 6.18.0, and
+    karchive 6.18.0/6.19.0 src/kcompressiondevice.h are byte-identical
+patches_applied:
+  - patches/0001-CMakeLists.txt.patch
+test_results:
+  type: passed
+  upstream: "passed: 5/5 CTest targets plus kiconloader_unittest 29/29 and kiconengine_unittest 8/8 QtTest checks; kquickiconprovidertest is not registered because Qt6Qml/Qt6Quick are unpublished"
+  test_package: "passed: 1/1 KIconLoader consumer compile/link/runtime smoke (PASS: KIconLoader::global() OK)"
+  local_create: "conan create -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 -> exit 0 on 2026-10-16"
+  full_reference: "kiconthemes/6.18.0.2#556eb8f9c411ccdceecf049c46327dc0:5937e6fd91b6589196a15790f369a1328a4907fb#bc27539c4ba7d3212820cdd8a8712c33"
+  l0: "pass (W4 audit + junk/preflight self-check locally)"
+  l1: "pass (conan create build + package/sign succeeded)"
+  l2: "skip: kiconfinder6 version/help unavailable in this baseline"
+  l4: "pass (test_package consumer smoke)"
+  l5: "pass (upstream CTest + QtTest subsets measured above)"
+source_url: https://download.kde.org/stable/frameworks/6.18/kiconthemes-6.18.0.tar.xz
+source_sha256: b971460949fafc98e7ae293f35635c2fd6101a6fc46b2f4fce64bb21440ece04
+knowledge_gained:
+  - "kiconthemes 6.18.0 requires Qt6Widgets, Qt6Svg, KF6Archive, KF6I18n, KF6WidgetsAddons, and KF6ColorScheme."
+  - "The published kiconthemes/6.18.0 revision f82185f3 pulled the static karchive/6.19.0 into the 6.18 line and conflicted with knewstuff/6.18.0 (karchive/6.18.0); pinning the shared karchive/6.18.0 keeps the graph single-version."
+  - "KArchive is only used through KCompressionDevice for .svgz icons; its public header is identical in karchive 6.18.0 and 6.19.0, so lowering the requirement is API-safe."
+  - "KICONTHEMES_USE_QTQUICK=OFF, USE_DBUS=OFF, USE_BreezeIcons=OFF, and BUILD_DESIGNERPLUGIN=OFF keep unavailable optional integrations out of the OHOS baseline."
+  - "The unconditional ECMQmlModule include is patched out for the Qt6Qml-free baseline."
+  - "The package ships the kiconfinder6 CLI tool: package_info() declares bindirs=[\"bin\"] and the software-level commands.json must register every shipped version (R38 / PF8 / CI L0k)."

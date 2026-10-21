@@ -1,0 +1,34 @@
+# SPDK 25.05: upstream CUnit cases and installed-package consumer.
+package: spdk/25.05
+homepage: "https://github.com/spdk/spdk"
+upstream_tests_exist: true
+upstream_test_audit: >-
+  v25.05 test/unit has 122 executable targets, 1376 CU_ADD_TEST and 8 CU_add_test
+  registration sites. Parameterized suites expand these at runtime. Under the
+  recipe configuration 103 programs register 1636 cases before the DIX crypto
+  feature gate, and 1635 after it. All 1635 configured cases run and pass.
+  One test_sequence_dix case requires the disabled ISA-L crypto backend and is
+  explicitly excluded, not passed (1635/1636 = 99.94% baseline coverage).
+  The other 19 targets (144 source registration sites) belong to disabled
+  optional RDMA/FC/vhost/io_uring/idxd/compression/crypto/CUSE/vfio-user modules.
+  Their exclusion is listed separately in res/summary.json. Real block-device
+  integration tests are outside the CUnit suite. Consumer assertions are separate.
+upstream_test_in_build: true
+upstream_test_command: "python run_unit_tests.py <spdk source> (after --enable-unit-tests and make)"
+upstream_test_cases: 1636
+upstream_configured_cases: 1635
+upstream_excluded_cases: 1
+upstream_unbuilt_optional_programs: 19
+test_package_tests:
+  - file: test_spdk.c
+    description: >-
+      Installed-package C consumer: CRC-32C/IEEE known answers and incremental
+      consistency, Base64 standard-alphabet encode and decode round trip.
+    command: "./test_spdk"
+test_files:
+  - path: "test_package/test_spdk.c"
+    test_type: "R34"
+    assertion_count: 6
+test_package_test_count: 1
+consumer_assertion_count: 6
+assertion_count: 6

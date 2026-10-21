@@ -1,0 +1,116 @@
+# Version-level manifest — gdl 3.40.0
+# Follows ARCHIVE-SPEC v2.0
+
+# ============================================================
+# Required fields
+# ============================================================
+
+# Version
+version: "3.40.0"
+
+# Software name
+software: gdl
+
+# Build status
+# published | built | failed | archived
+# (pending preflight confirmation; backend updates after real-device gates pass)
+status: built
+
+# Build date (YYYY-MM-DD)
+build_date: "2026-10-15"
+build_system: autotools
+
+# ============================================================
+# Source info
+# ============================================================
+
+source:
+  # Source download URL (official GNOME distribution server, R39).
+  # 3.40.0 is the upstream final stable release (top series 3.40 on
+  # download.gnome.org, tag GDL_3_40_0 2021-08-26, no later tag).
+  url: "https://download.gnome.org/sources/gdl/3.40/gdl-3.40.0.tar.xz"
+
+  # Source checksum (official tarball, equals the published
+  # gdl-3.40.0.sha256sum)
+  sha256: "3641d4fd669d1e1818aeff3cf9ffb7887fc5c367850b78c28c775eba4ab6a555"
+
+  # Archive format
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.xz
+
+# ============================================================
+# Build configuration
+# ============================================================
+
+build:
+  # Build system type
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # Configure option list
+  configure_options:
+    - "--build=aarch64-unknown-linux-gnu"
+    - "--host=aarch64-unknown-linux-gnu"
+    - "--disable-static"
+    - "--enable-shared"
+    - "--disable-nls"
+    - "--disable-introspection"
+    - "--disable-gtk-doc"
+
+  # Build dependency list (format: name/version) — same proven gtk/3.24.43
+  # closure as the CI-passed libido3/13.10.0 recipe (RREV pins keep the
+  # graph on the ohpcd published binaries and eliminate CCI tool edges; see
+  # libido3 conanfile for per-pin rationale). libxml2 is gdl's second direct
+  # dependency (layout persistence, gdl-3.0.pc Requires.private).
+  dependencies:
+    - glib/2.84.0.1
+    - gtk/3.24.43
+    - libxml2/2.15.3.1
+    - pixman/0.46.4#09f648ede446f6abf85a98da455c7562
+    - fontconfig/2.18.1.1
+    - freetype/2.14.3#7e95a2b2401fd12dcbdd2bf748f56b19
+    - zlib/1.3.1.1
+    - libpng/1.6.58#d25df07aba0399181f60ee377e83d701
+    - expat/2.8.2.1
+    - libepoxy/1.5.10#92f7e70c459ed2e6a96cd82549e82391
+    - libffi/3.4.4#ca8b0eb4102edbca48730e504e3afbdc
+    - libjpeg-turbo/3.2.0#5ed08e7ff848da8fdf6b7bca74354560
+    - cairo/1.18.4#3894814f2279392f808090c9f3d8f200
+    - libtiff/4.7.2#f386d7b671befab127228dbcfc6fe1bf
+    - libdeflate/1.25#2346ca4f797e19d8d553b6f698dd8982
+    - zstd/1.5.7#83364ff4f4ab63fae26fbfb89f89fefe
+    - libwebp/1.6.0#8b273a5128ee70c508671933b61288ec
+    - lerc/4.1.1#9c8297567326e560407157395590b2f8
+    - jbigkit/2.1#872f3b26b5921c9156cb3aa4675b20c5
+    - xz/5.6.2#66ce4bbd966830b5a11768474be4b259
+
+  # Build tools (the tarball ships the generated build system — no
+  # automake/libtool bootstrap; pkgconf is the guaranteed pkg-config
+  # fallback)
+  tool_dependencies:
+    - pkgconf/3.0.5
+
+  # Compiler
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# Patch info
+# ============================================================
+
+# Applied patch list
+patches_applied:
+  - "patches/0001-neutralize-intltool-configure-hard-deps.patch"
+
+# ============================================================
+# Knowledge gained
+# ============================================================
+
+knowledge_gained:
+  - "GNOME dist tarball ships a pre-generated configure with IT_PROG_INTLTOOL expanded into five unconditional hard-error probes (intltool-update/-merge/-extract, gettext xgettext/msgmerge/msgfmt, perl >= 5.8.1, perl XML::Parser) — none provisionable on the OHOS worker; patch 0001 relaxes exactly those five as_fn_error sites into ':' markers in the generated configure"
+  - "--disable-nls makes the intltool po/Makefile.in.in evaluate the empty all-no and install-data-no targets, so no intltool/gettext/perl machinery runs at make/install time; gdl library code has zero gettext runtime calls (bindtextdomain/dgettext grep count 0), so NLS is inert at runtime too"
+  - "gdl's configure resolves its dev tools with `pkg-config --variable=glib_genmarshal glib-2.0` (resp. glib_mkenums) — conan PkgConfigDeps mirrors carry no custom variables, so the recipe appends the absolute glib package tool paths as variables to the generated glib-2.0.pc mirror; without this the typebuiltins/marshal generation at make time gets empty tool paths"
+  - "No-regen mtime guard is mandatory for dist tarballs on this worker (no automake/aclocal): normalize mtimes so every generated file (aclocal.m4, configure, config.h.in, Makefile.in, aux scripts) is newer than its input, else make runs the `missing automake` regen path (enchant precedent)"
+  - "E179: introspection disabled (g-ir-scanner cannot run target binaries under OHOS ELF signing); gtk-doc disabled (default no); upstream has NO automated tests (no tests/ dir, no TESTS/check_PROGRAMS anywhere; gdl/test-dock.c is a noinst interactive GTK demo with zero assertions) -> NO_UPSTREAM_TESTS with evidence; make check still runs and emits an honest zero-case HMBS_UPSTREAM_TEST_RESULT"
+  - "Explicit link closure: all dep libdirs get -L/-Wl,-rpath/-Wl,-rpath-link and glib lib/libintl.so is appended as an absolute input before the toolchain env snapshot (build-chain-pitfalls lld rules)"
+  - "libgdl-3.so.5 must hold real file content (HMDFS symlinks unreliable at runtime): package() copies the libtool real file onto the SONAME name and self-signs installed ELFs with binary-sign-tool (glib/libido3 precedent)"

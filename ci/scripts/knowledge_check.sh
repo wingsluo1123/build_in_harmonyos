@@ -16,6 +16,7 @@ set -u
 
 REPO_ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 GRAPH_DIR="${REPO_ROOT}/knowledge/graph"
+KB_ROOT="${REPO_ROOT}/knowledge"
 DOC_DIR="${REPO_ROOT}/knowledge/doc"
 ERRORS=0
 
@@ -54,6 +55,19 @@ if [ -d "${DRAFT_SUBDIR}" ]; then
     if [ "${LEAKED}" -gt 0 ]; then
         fail "KC1a: knowledge/graph/draft/ 存在 ${LEAKED} 个 .kv — 草稿应在 knowledge/drafts/"
     fi
+fi
+
+# KC1e (v12.24): DRAFT 文件只允许存在于 knowledge/drafts/ —
+# 根目录/draft 单数目录等位置的散落草稿此前无人管（2026-10-21 收容 30 对）
+STRAY_DRAFTS=$(find "${KB_ROOT}" -maxdepth 2 -name 'DRAFT-*' -not -path '*/drafts/*' 2>/dev/null | head -5)
+if [ -n "${STRAY_DRAFTS}" ]; then
+    STRAY_COUNT=$(find "${KB_ROOT}" -maxdepth 2 -name 'DRAFT-*' -not -path '*/drafts/*' 2>/dev/null | wc -l | tr -d ' ')
+    fail "KC1e: knowledge/ 下（drafts/ 之外）存在 ${STRAY_COUNT} 个散落 DRAFT 文件: ${STRAY_DRAFTS} — 草稿只能提交到 knowledge/drafts/"
+fi
+
+# KC1f (v12.24): knowledge/draft/ 单数目录不应存在（协作者常见误拼）
+if [ -d "${KB_ROOT}/draft" ]; then
+    fail "KC1f: knowledge/draft/（单数）目录存在 — 应为 knowledge/drafts/（复数），请移动文件"
 fi
 
 # KC1b+1c: 用一次 grep 批量检测 draft:true 和 contributor_id

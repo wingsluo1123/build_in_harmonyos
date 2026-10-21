@@ -1,0 +1,49 @@
+# 软件级 manifest
+# 文件位置: archives/l/libnetfilter_acct/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# 软件名称（小写，与目录名一致）
+software: libnetfilter_acct
+
+# 显示名
+display: "libnetfilter_acct"
+
+# 一句话描述
+description: "Userspace library for the netfilter extended accounting infrastructure"
+
+# 分类标签
+category: networking
+
+# 官网 URL
+homepage: "https://www.netfilter.org/projects/libnetfilter_acct/"
+
+# 开源许可证（SPDX 标识）
+license: LGPL-2.1-or-later
+
+# 常用构建系统（可被版本级覆盖）
+build_system: autotools
+
+# 顶层状态字段（presubmit 硬门要求，与版本级 status 独立）
+status: built
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "release tarball 自带 configure；上游 config.guess 不认识 OHOS 三元组，需补 HarmonyOS 分支（E007）"
+    - "configure 内 umask 077 会在 HMDFS 上产出不可写临时目录，须改 022（E011）"
+    - "本库自身 TU 经 <libmnl/libmnl.h> 同时引入 musl <sys/socket.h> 与内核 uapi <linux/socket.h>，两者对 struct sockaddr_storage 双定义（E091/E119），须预定义 _UAPI_LINUX_SOCKET_H 并补 __kernel_sa_family_t"
+    - "上游无 TESTS runner；make check 仅编译+链接 examples/ 的 3 个 check_PROGRAMS"
+  common_dependencies:
+    - libmnl
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "1.0.3":
+    status: built
+    build_date: "2026-10-18"

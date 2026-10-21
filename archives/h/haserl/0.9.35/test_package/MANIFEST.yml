@@ -1,0 +1,25 @@
+# Upstream test inventory and consumer test declaration for haserl 0.9.35.
+
+package: haserl/0.9.35
+homepage: "https://haserl.sourceforge.net/"
+
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "Official haserl-0.9.35.tar.gz archive"
+    reason: "Archive file inventory contains only src/ and doc/ subdirectories; no test/, tests/ directory or upstream test source files."
+  - source: "configure / generated Makefiles"
+    reason: "configure generates only src/Makefile and doc/Makefile; Automake declares no TESTS, check_PROGRAMS or check-local targets, so the generic 'make check' registers zero upstream cases."
+  - conclusion: "The upstream 0.9.35 release ships no automated tests. test_package exercises the installed binary through real CGI request simulations."
+
+upstream_check_command: "make check"
+upstream_test_in_build: true
+upstream_test_command: "make check (0 registered tests)"
+upstream_tests: []
+
+test_package_tests:
+  - file: run_consumer_tests.sh
+    description: "Invokes the installed haserl binary as a CGI/1.1 handler: GET with QUERY_STRING, POST application/x-www-form-urlencoded via stdin, and POST multipart/form-data, verifying FORM_* variable parsing and the rfc2388 decoder."
+    command: "sh run_consumer_tests.sh <installed-bin/haserl>"
+    assertions: 5
+
+assertion_count: 5

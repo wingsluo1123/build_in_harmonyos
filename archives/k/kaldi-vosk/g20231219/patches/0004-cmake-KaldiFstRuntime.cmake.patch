@@ -1,0 +1,26 @@
+--- /dev/null
++++ b/cmake/KaldiFstRuntime.cmake
+@@ -0,0 +1,23 @@
++# A static OpenFST archive must have exactly one owner in a shared Kaldi
++# process. Repeating it in individual DSOs registers multiple destructors for
++# preempted global flags (notably FST_FLAGS_tmpdir).
++set(KALDI_OPENFST_STATIC_LIBRARY "" CACHE FILEPATH "PIC libfst.a for the shared OpenFST runtime")
++set(KALDI_FST_TARGET openfst::openfst)
++if(BUILD_SHARED_LIBS AND KALDI_OPENFST_STATIC_LIBRARY)
++    if(NOT CMAKE_EXECUTABLE_FORMAT STREQUAL "ELF")
++        message(FATAL_ERROR "The static OpenFST runtime requires an ELF linker")
++    endif()
++    if(NOT EXISTS "${KALDI_OPENFST_STATIC_LIBRARY}")
++        message(FATAL_ERROR "Missing static OpenFST archive: ${KALDI_OPENFST_STATIC_LIBRARY}")
++    endif()
++    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/kaldi-fst-runtime.cc"
++        "// OpenFST objects are linked from the published PIC archive.\n")
++    add_library(kaldi-fst-runtime SHARED "${CMAKE_CURRENT_BINARY_DIR}/kaldi-fst-runtime.cc")
++    target_link_libraries(kaldi-fst-runtime PRIVATE
++        "-Wl,--whole-archive" "${KALDI_OPENFST_STATIC_LIBRARY}" "-Wl,--no-whole-archive")
++    target_include_directories(kaldi-fst-runtime PUBLIC
++        "$<TARGET_PROPERTY:openfst::openfst,INTERFACE_INCLUDE_DIRECTORIES>")
++    install(TARGETS kaldi-fst-runtime EXPORT kaldi-targets
++        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT kaldi)
++    set(KALDI_FST_TARGET kaldi-fst-runtime)
++endif()

@@ -1,0 +1,79 @@
+package: gdcm/3.0.24
+homepage: "https://github.com/malaterre/GDCM"
+
+# 上游测试命令（用于 ctest -N 分析注册清单）
+upstream_check_command: "ctest --test-dir <build-ohos> -N"
+
+# conanfile.py build() 已集成上游测试：编译测试二进制 + can_run() 时本机执行 ctest
+upstream_test_in_build: true
+upstream_test_command: "ctest --test-dir <build-ohos> --output-on-failure -E '^TestEcho$|^TestFind$|^TestSCUValidation$|^gdcmscu-.*-dicomserver$|^DCM(DUMP|DJPEG|DRLE)$' (OHOS PC aarch64 真机, 2026-10-18, 签名后执行)"
+
+# ── 上游测试：199 项注册 / 豁免 5 / 实跑 194 / 通过 194（100%）──────────────────
+# 上游用 create_test_sourcelist 按模块聚合成 6 个驱动二进制 + 2 项 CLI 直调；
+# 每项的注册名由构建日志里的 `ctest -N` 清单给出，下表计数取自 build 树各
+# Testing/**/CTestTestfile.cmake 的 add_test 条目（96+43+23+18+9+8+2 = 199）。
+upstream_tests:
+  - file: Testing/Source/MediaStorageAndFileFormat/Cxx
+    source: gdcm-3.0.24/Testing/Source/MediaStorageAndFileFormat/Cxx
+    description: "gdcmMSFFTests 驱动：图像读写/传输语法转换/Rescaler/编解码器/像素格式等最高层用例（含被 patch 修好的 TestRescaler2）"
+    command: "./build-ohos/bin/gdcmMSFFTests -C <TestName>"
+    result: "PASS 96/96（注册 96、豁免 0）"
+  - file: Testing/Source/DataStructureAndEncodingDefinition/Cxx
+    source: gdcm-3.0.24/Testing/Source/DataStructureAndEncodingDefinition/Cxx
+    description: "gdcmDSEDTests 驱动：DataElement/DataSet/ByteValue/流编码器（Explicit/Implicit VR LE、RLE、压缩封装流）等结构与编码层用例"
+    command: "./build-ohos/bin/gdcmDSEDTests -C <TestName>"
+    result: "PASS 43/43"
+  - file: Testing/Source/Common/Cxx
+    source: gdcm-3.0.24/Testing/Source/Common/Cxx
+    description: "gdcmCommonTests 驱动：VR 语义/填充、Tag、Type、编码基元、TestMD5 等公共层用例"
+    command: "./build-ohos/bin/gdcmCommonTests -C <TestName>"
+    result: "PASS 23/23"
+  - file: Testing/Source/InformationObjectDefinition/Cxx
+    source: gdcm-3.0.24/Testing/Source/InformationObjectDefinition/Cxx
+    description: "gdcmIODTests 驱动：IOD/Macro/Module 装配与字典表读取（走 conan expat）"
+    command: "./build-ohos/bin/gdcmIODTests -C <TestName>"
+    result: "PASS 18/18"
+  - file: Testing/Source/DataDictionary/Cxx
+    source: gdcm-3.0.24/Testing/Source/DataDictionary/Cxx
+    description: "gdcmDICTTests 驱动：数据字典条目查询/UUID 生成等"
+    command: "./build-ohos/bin/gdcmDICTTests -C <TestName>"
+    result: "PASS 9/9"
+  - file: Testing/Source/MessageExchangeDefinition/Cxx
+    source: gdcm-3.0.24/Testing/Source/MessageExchangeDefinition/Cxx
+    description: "gdcmMEXDTests 驱动：DICOM Upper Layer / PresentationContext / SCU 网络栈用例"
+    command: "./build-ohos/bin/gdcmMEXDTests -C <TestName>"
+    result: "PASS 5/5（注册 8，豁免 3：TestEcho、TestFind、TestSCUValidation —— 源码逐处硬编码外网 DICOM 服务器 www.dicomserver.co.uk:11112 / 51.75.171.41:11112 的真实网络往返，沙箱无出站 DICOM 端口；二进制照常编译）。TestFindStudyRootQuery、TestFindPatientRootQuery 虽以 TestFind 开头，但全文件 0 处服务器地址、只是查询请求构造用例，`-E` 分支加 ^…$ 锚后照常执行并通过"
+  - file: Applications/Cxx
+    source: gdcm-3.0.24/Applications/Cxx
+    description: "gdcmscu CLI 集成用例：直接调用打包出的 gdcmscu 对外网 DICOM server 做 C-ECHO / C-FIND"
+    command: "./build-ohos/bin/gdcmscu <aet> --host ... --echo/--find"
+    result: "EXEMPTED 2/2（同上外网依赖：gdcmscu-echo-dicomserver、gdcmscu-find-dicomserver，未执行）"
+
+# 上游测试语料 gdcmData 未接入（配方按上游发布 tarball 形态构建）：
+# v3.0.24 的 Testing/Data 是 gitlink，固定在 a0bba51684aa0cc929186ebc8870a27ce1930996，
+# 而 SourceForge 只有不可按修订取用的 gdcmData.tar.gz 快照。实测把快照解进 Testing/Data
+# 后 `ctest -N` 从 199 涨到 232（+33 项数据驱动用例），但 `89% tests passed, 25 tests
+# failed out of 232`、单轮 1223.78 s，失败是"语料修订 ≠ 代码修订"（TestMD5 报语料文件
+# 自身哈希与代码内参考表不符；TestCleaner4 报快照里 JPEGInvalidSecondFrag.dcm 本版本读
+# 不动），与 OHOS 无关。完整证据见 notes.md 与
+# knowledge/drafts/gdcm-3.0.24-test-corpus-revision-skew.kv。
+corpus_exclusion_note: "不挂语料 = 注册 199（非 232）；这 33 项数据驱动用例在本形态下不注册，因此不计入分母"
+
+# ── test_package 自带测试（消费者视角，端到端真实 DICOM 生成→写盘→读回→CLI 消费）──
+test_package_tests:
+  - file: test_gdcm.cpp
+    description: "库消费者程序：字典查询（(0002,0010)/(7fe0,0010)）；PS3.5 6.2 填充语义（奇数长 UI 补 0x00、奇数长 CS 补空格、偶数长不补）；组装合法 Secondary Capture 数据集并 Writer::Write 写盘（另写一份 pixels[0]+1 的对照文件）；Reader 读回传输语法/PatientName/Rows/PixelData 逐字节比对；ImageReader 高层接口校验维度、BitsAllocated=16、HighBit=15（(0028,0102)）、PixelRepresentation=0 与解码缓冲逐字节一致，并要求对照文件解码结果必须不同（非空洞断言）"
+    command: "./test_gdcm"
+    result: "PASS — 输出 'gdcm test_package: ALL OK'，并产出 ohos_gdcm_consumer.dcm / ohos_gdcm_tampered.dcm"
+  - file: conanfile.py
+    description: "打包产物 → 命令行消费者链路（鸿蒙特有端到端用例：制品包内 CLI 同样由本包静态库链出、需 OHOS ELF 自签才能在本机 execve）：gdcminfo 读元数据 9 条；gdcminfo --md5sum 与 hashlib 离线复算真值互证 3 条（主文件 ecb281eb…、对照文件 8aa2bebb…，两者必须不同）；gdcmdump 数据集元素 9 条；gdcmconv --raw 重编码后像素摘要不变 + 产物存在 + gdcmdump 复核 5 条；gdcmdiff 正例空输出/反例报 (7fe0,0010) OW [elem differ] 2 条；gdcmxml 的 PS3.19 NativeDicomModel 导出 8 条；两个 .dcm 产物存在性 2 条"
+    command: 'gdcminfo / gdcminfo --md5sum / gdcmdump / gdcmconv --raw / gdcmdiff / gdcmxml'
+    result: "PASS — 'gdcm test_package: ALL OK (library consumer + packaged CLI, 38 assertions)'"
+
+assertion_count: 67
+# 计数口径：test_gdcm.cpp 的 CHECK 断言 29 条（字典 2 + 填充语义 6 + 写盘 2 + Reader
+# 往返 6 + ImageReader 解码 8 + 对照文件负控 5）+ test_package/conanfile.py test() 里
+# 实际执行的断言 38 条（产物存在性 2 + gdcminfo 9 + md5 真值互证 3 + gdcmdump 9 +
+# gdcmconv --raw 5 + gdcmdiff 正/反例 2 + gdcmxml 8）= 67。
+# 上游侧不计入 assertion_count（由 ctest 逐条判定），其口径见上方 upstream_tests 表：
+# 注册 199、豁免 5、实跑 194、通过 194。

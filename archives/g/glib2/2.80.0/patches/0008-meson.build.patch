@@ -1,0 +1,38 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Detect getpass before building tests
+
+---
+diff --git a/meson.build b/meson.build
+--- a/meson.build
++++ b/meson.build
+@@ -677,6 +677,7 @@
+   'getfsstat',
+   'getgrgid_r',
+   'getmntent_r',
++  'getpass',
+   'getpwuid_r',
+   'getresuid',
+   'getvfsstat',
+diff --git a/gio/tests/gtlsconsoleinteraction.c b/gio/tests/gtlsconsoleinteraction.c
+--- a/gio/tests/gtlsconsoleinteraction.c
++++ b/gio/tests/gtlsconsoleinteraction.c
+@@ -40,8 +40,8 @@
+ 
+ G_DEFINE_TYPE (GTlsConsoleInteraction, g_tls_console_interaction, G_TYPE_TLS_INTERACTION)
+ 
+-#if defined(G_OS_WIN32) || defined(__BIONIC__)
+-/* win32 doesn't have getpass() */
++#ifndef HAVE_GETPASS
++/* This fallback is used when Meson cannot find getpass(). */
+ #include <stdio.h>
+ #ifndef BUFSIZ
+ #define BUFSIZ 8192
+@@ -57,7 +57,7 @@
+ 
+   for (i = 0; i < BUFSIZ - 1; ++i)
+     {
+-#ifdef __BIONIC__
++#ifndef G_OS_WIN32
+       buf[i] = getc (stdin);
+ #else
+       buf[i] = _getch ();

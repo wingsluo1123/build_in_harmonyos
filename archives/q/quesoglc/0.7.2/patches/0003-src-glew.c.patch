@@ -1,0 +1,151 @@
+--- a/src/glew.c
++++ b/src/glew.c
+@@ -25,21 +25,21 @@
+ ** SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ ** INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ ** CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ ** ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+ ** THE POSSIBILITY OF SUCH DAMAGE.
+ */
+ 
+ #include <GL/glew.h>
+ #if defined(_WIN32)
+ #  include <GL/wglew.h>
+-#elif !defined(__APPLE__) || defined(GLEW_APPLE_GLX)
++#elif (!defined(__APPLE__) && !defined(GLEW_NO_GLX)) || defined(GLEW_APPLE_GLX)
+ #  include <GL/glxew.h>
+ #endif
+ 
+ /*
+  * Define glewGetContext and related helper macros.
+  */
+ #ifdef GLEW_MX
+ #  define glewGetContext() ctx
+ #  ifdef _WIN32
+ #    define GLEW_CONTEXT_ARG_DEF_INIT GLEWContext* ctx
+@@ -85,21 +85,21 @@
+   symbolName[0] = '_';
+   symbol = NULL;
+   /* if (NSIsSymbolNameDefined(symbolName))
+ 	 symbol = NSLookupAndBindSymbol(symbolName); */
+   symbol = image ? NSLookupSymbolInImage(image, symbolName, NSLOOKUPSYMBOLINIMAGE_OPTION_BIND | NSLOOKUPSYMBOLINIMAGE_OPTION_RETURN_ON_ERROR) : NULL;
+   free(symbolName);
+   return symbol ? NSAddressOfSymbol(symbol) : NULL;
+ }
+ #endif /* __APPLE__ */
+ 
+-#if defined(__sgi) || defined (__sun)
++#if defined(__sgi) || defined (__sun) || defined(GLEW_NO_GLX)
+ #include <dlfcn.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+ 
+ void* dlGetProcAddress (const GLubyte* name)
+ {
+   static void* h = NULL;
+   static void* gpa;
+ 
+   if (h == NULL)
+@@ -117,21 +117,21 @@
+ 
+ /*
+  * Define glewGetProcAddress.
+  */
+ #if defined(_WIN32)
+ #  define glewGetProcAddress(name) wglGetProcAddress((LPCSTR)name)
+ #else
+ #  if defined(__APPLE__)
+ #    define glewGetProcAddress(name) NSGLGetProcAddress(name)
+ #  else
+-#    if defined(__sgi) || defined(__sun)
++#    if defined(__sgi) || defined(__sun) || defined(GLEW_NO_GLX)
+ #      define glewGetProcAddress(name) dlGetProcAddress(name)
+ #    else /* __linux */
+ #      define glewGetProcAddress(name) (*glXGetProcAddressARB)(name)
+ #    endif
+ #  endif
+ #endif
+ 
+ /*
+  * Define GLboolean const cast.
+  */
+@@ -1016,21 +1016,21 @@
+   if (glewExperimental || WGLEW_ARB_extensions_string|| crippled) CONST_CAST(WGLEW_ARB_extensions_string)= !_glewInit_WGL_ARB_extensions_string(GLEW_CONTEXT_ARG_VAR_INIT);
+ #endif /* WGL_ARB_extensions_string */
+ #ifdef WGL_EXT_extensions_string
+   CONST_CAST(WGLEW_EXT_extensions_string) = wglewGetExtension("WGL_EXT_extensions_string");
+   if (glewExperimental || WGLEW_EXT_extensions_string|| crippled) CONST_CAST(WGLEW_EXT_extensions_string)= !_glewInit_WGL_EXT_extensions_string(GLEW_CONTEXT_ARG_VAR_INIT);
+ #endif /* WGL_EXT_extensions_string */
+ 
+   return GLEW_OK;
+ }
+ 
+-#elif !defined(__APPLE__) || defined(GLEW_APPLE_GLX)
++#elif (!defined(__APPLE__) && !defined(GLEW_NO_GLX)) || defined(GLEW_APPLE_GLX)
+ 
+ PFNGLXGETCURRENTDISPLAYPROC __glewXGetCurrentDisplay = NULL;
+ 
+ PFNGLXCHOOSEFBCONFIGPROC __glewXChooseFBConfig = NULL;
+ PFNGLXCREATENEWCONTEXTPROC __glewXCreateNewContext = NULL;
+ PFNGLXCREATEPBUFFERPROC __glewXCreatePbuffer = NULL;
+ PFNGLXCREATEPIXMAPPROC __glewXCreatePixmap = NULL;
+ PFNGLXCREATEWINDOWPROC __glewXCreateWindow = NULL;
+ PFNGLXDESTROYPBUFFERPROC __glewXDestroyPbuffer = NULL;
+ PFNGLXDESTROYPIXMAPPROC __glewXDestroyPixmap = NULL;
+@@ -1201,31 +1201,31 @@
+ }
+ 
+ /* ------------------------------------------------------------------------ */
+ 
+ GLboolean glewExperimental = GL_FALSE;
+ 
+ #if !defined(GLEW_MX)
+ 
+ #if defined(_WIN32)
+ extern GLenum wglewContextInit (void);
+-#elif !defined(__APPLE__) || defined(GLEW_APPLE_GLX) /* _UNIX */
++#elif (!defined(__APPLE__) && !defined(GLEW_NO_GLX)) || defined(GLEW_APPLE_GLX) /* _UNIX */
+ extern GLenum glxewContextInit (void);
+ #endif /* _WIN32 */
+ 
+ GLenum glewInit ()
+ {
+   GLenum r;
+   if ( (r = glewContextInit()) ) return r;
+ #if defined(_WIN32)
+   return wglewContextInit();
+-#elif !defined(__APPLE__) || defined(GLEW_APPLE_GLX) /* _UNIX */
++#elif (!defined(__APPLE__) && !defined(GLEW_NO_GLX)) || defined(GLEW_APPLE_GLX) /* _UNIX */
+   return glxewContextInit();
+ #else
+   return r;
+ #endif /* _WIN32 */
+ }
+ 
+ #endif /* !GLEW_MX */
+ #ifdef GLEW_MX
+ GLboolean glewContextIsSupported (GLEWContext* ctx, const char* name)
+ #else
+@@ -1351,21 +1351,21 @@
+           continue;
+         }
+ #endif
+       }
+     }
+     ret = (len == 0);
+   }
+   return ret;
+ }
+ 
+-#elif !defined(__APPLE__) || defined(GLEW_APPLE_GLX)
++#elif (!defined(__APPLE__) && !defined(GLEW_NO_GLX)) || defined(GLEW_APPLE_GLX)
+ 
+ #if defined(GLEW_MX)
+ GLboolean glxewContextIsSupported (GLXEWContext* ctx, const char* name)
+ #else
+ GLboolean glxewIsSupported (const char* name)
+ #endif
+ {
+   GLubyte* pos = (GLubyte*)name;
+   GLuint len = _glewStrLen(pos);
+   GLboolean ret = GL_TRUE;

@@ -1,0 +1,28 @@
+0002-ohos-makefile-build-ohos-backend.patch
+
+Patch src/Makefile so that, when the make variable PLATFORM_OHOS=1 is passed
+in by the build system, the EGL-based OHOS backend in src/ohos/*.cpp is
+compiled instead of the X11/GLX backend src/main/backend.cpp. The platform
+identity reaches the sources through the make variable only - no bare
+platform macro is used in any source file (R8). Upstream files are not
+modified; on other platforms the build is byte-for-byte identical.
+
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -65,7 +65,16 @@
+ ARTIFACT_TARGETS        = $(ARTIFACT_LIB) $(ARTIFACT_SLIB) $(ARTIFACT_PC)
+ 
+ # Source code
++# OpenHarmony adaptation: the platform identity is passed in by the build
++# system as the make variable PLATFORM_OHOS=1 (never as a bare platform macro
++# in the sources, R8). When set, compile the EGL-based OHOS backend in
++# src/ohos/ instead of the X11/GLX backend in src/main/backend.cpp. Upstream
++# files stay untouched; the OHOS sources are injected by the recipe.
++ifeq ($(PLATFORM_OHOS),1)
++CXX_SRC_MAIN            = $(filter-out main/backend.cpp,$(call rwildcard, main, *.cpp)) $(call rwildcard, ohos, *.cpp)
++else
+ CXX_SRC_MAIN            = $(call rwildcard, main, *.cpp)
++endif
+ CXX_SRC_EXPORT          = $(call rwildcard, export, *.cpp)
+ CXX_SRC_TEST            = $(call rwildcard, test, *.cpp)
+ CXX_SRC_NOTEST          =

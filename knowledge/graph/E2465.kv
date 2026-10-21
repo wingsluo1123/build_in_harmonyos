@@ -1,0 +1,48 @@
+# DRAFT-simbody-3.8-libcxx-n1-typeid-canonicalize.kv — libc++ ABI 命名空间 __n1 的类型名规范化
+#====================================================================
+
+id:                     E2465
+category:               platform, compat, libcxx-stdlib, type-name
+phase:                  runtime|testing
+match_keywords:         typeid, __cxa_demangle, NiceTypeName, __n1, libc++, ABI namespace,
+                         std::vector, canonicalize, type name, OHOS, HarmonyOS,
+                         Assertion.*failed, namestr, allocator
+error_signature:        Assertion '.*namestr\(\).*== "std::vector<int,std::allocator<int>>"' failed|
+                         std::__n1::vector<int, std::__n1::allocator<int>>|
+                         NiceTypeName.*FAIL|canonicalize.*__n1
+
+# ═══ 识别层 ═══
+severity:               2
+title:                  libc++ ABI 命名空间 __n1 出现在 typeid 反解类型名中，类型名规范化需剥离
+
+root_cause:             "OHOS SDK 的 clang15/libc++ 使用 __n1 作为 ABI 内联命名空间。
+                        typeid(std::vector<int>).name() 返回
+                        NSt4__n16vectorIiNS_9allocatorIiEEEE，
+                        经 abi::__cxa_demangle 反解为
+                        std::__n1::vector<int, std::__n1::allocator<int>>。
+                        依赖 typeid 反解做类型名规范化/序列化的库（如 Simbody 的
+                        NiceTypeName）只剥离 OSX clang 的 __[0-9]+::（__1），
+                        未覆盖 __n1，导致规范化结果含 __n1 前缀，断言失败。"
+
+rec_approach:           "在类型名规范化函数中，除 __[0-9]+:: 外再增加
+                        \\b__n[0-9]+:: 剥离规则（libc++ ABI 内联命名空间通用形态
+                        __n<n>）。适用于任何基于 typeid().name()/__cxa_demangle
+                        的类型名规范化、反射或序列化工具。"
+
+rec_command:            "edit SimTKcommon/src/NiceTypeName.cpp: subs 数组增加
+                        SPair(std::regex(\"\\\\b__n[0-9]+::\"), \"\")，并将数组长度 7 改为 8"
+
+verification_cmd:       "clang++ -std=c++17 probe.cpp（typeid 反解 + namestr 对比）；
+                        ctest -R TestNiceTypeName；全套 ctest"
+
+affected_scope:         "运行在 OHOS/HarmonyOS（clang15/libc++，ABI 命名空间 __n1）上、
+                        依赖 typeid 反解类型名并做字符串规范化的 C++ 库。"
+prescan_pattern:        "__n1|__n[0-9]+::|typeid\\(.*\\)\\.name"
+last_updated:           2026-09-24
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E2465.md
+trigger_tool:           make
+rec_description:        "在类型名规范化函数中，除 __[0-9]+:: 外再增加

@@ -1,0 +1,217 @@
+Add an OHOS/AArch64 system-dependent port to SACLIB.
+
+SACLIB keeps everything that is not portable C in sysdep/.  The shipped ports
+cover x86/x86_64 Linux, macOS and SPARC Solaris; aarch64 Linux and OpenHarmony
+are not covered at all:
+  * mksysdep.pl cannot classify the processor (`uname -mp` reports aarch64) nor
+    the OS (`uname -s` reports HarmonyOS), so `bin/sconf` silently installs no
+    system-dependent files and the build fails on the missing GC();
+  * the x86_64 Linux port defines _X86_LINUX_, which makes hfloats.h include the
+    glibc-only <ieee754.h>.  On OpenHarmony the C library is musl-based and has
+    no such header, and the enum-style ieee_rep bitfield layout it stands for is
+    not the AArch64 one anyway;
+  * that port's GC() spills 16 dummy integers to force the registers onto the
+    stack, which is the System V AMD64 calling convention (16 argument
+    registers in play).  AArch64/AAPCS64 has 8 argument registers plus x8-x18,
+    so the same construction has to be re-derived.
+
+The new port therefore uses its own sysdep.h (little endian, 64-bit, no
+ieee754.h) and an AAPCS64 GC().  Two further fix-ups in bin/ make the generated
+makefile usable on a toolchain that is not the GNU/Linux one:
+
+  * bin/mkmake hard-codes `AFLAGS = -I${saclib}/include -P`, i.e. the GNU `as -P`
+    (pre-process) option the old Linux ports relied on for their .s files.
+    AArch64 `as` has no -P; mklib now passes an AFLAG the same way it already
+    passes SACFLAG, and the recipe sets it to -ansi.  (SACLIB 2.2.8's src/ has
+    no .s files left, and the Debian package drops the option as well.)
+  * bin/mklib passed only CC to the generated makefile, which hard-codes
+    `AR = ar` and `RANLIB = ranlib`.  The OHOS clang toolchain ships ar and
+    llvm-ar but no plain ranlib, so the archiver and its indexer have to be
+    overridable too — AR and RANLIB are now forwarded from the environment.
+
+Measured on device (HarmonyOS, clang 15, shipped test_package unchanged):
+a GC() that only spills argument registers passed 6/6 at -O0 and failed 18/18
+at -O1/-O2/-Os, while the setjmp() version below passed 24/24 over the same
+matrix.  Removing GC() from the test made every build pass, which is what
+isolated the collector.
+diff --git a/bin/mksysdep.pl b/bin/mksysdep.pl
+index 0000000..d640e6b 100644
+--- a/bin/mksysdep.pl
++++ b/bin/mksysdep.pl
+@@ -5,7 +5,7 @@
+ if ($#ARGV == 0 && ($ARGV[0] eq "-h" || $ARGV[0] eq "--help"))
+ {
+     print "sconf/mksysdep.pl\n".
+-"sconf [x86linux|sparcsolaris|x86_64linux|x86macos|x86_64macos]\n\n".
++"sconf [x86linux|sparcsolaris|x86_64linux|x86macos|x86_64macos|ohosAarch64]\n\n".
+ "This script installs system dependent files for\n".
+ "saclib.  It attempts to diagnose architecture and\n".
+ "processor type and install the proper files.  You\n".
+@@ -32,6 +32,10 @@
+ {
+     $ptype = "x86_64";
+ }
++elsif ($uname =~ /aarch64|arm64|ARM64/)
++{
++    $ptype = "aarch64";
++}
+ elsif ($uname =~ /Sun|sun|SUN|Sparc|sparc|SPARC/)
+ {
+     $ptype = "sparc";
+@@ -51,6 +55,10 @@
+ elsif ($uname =~ /Sun|sun|SUN|solaris|Solaris/)
+ {
+     $ostype = "solaris";
++}
++elsif ($uname =~ /OpenHarmony|OHOS|ohos|HarmonyOS/)
++{
++    $ostype = "ohos";
+ }
+ elsif ($uname =~ /Darwin|darwin|DARWIN/)
+ {
+@@ -85,6 +93,11 @@
+     print "SACLIB Warning: Installing x86_64linux system dependent files!\n";
+     system("bash -c \"pushd >/dev/null $ENV{'saclib'}/sysdep/linuxX86_64 ; ./install ; popd >/dev/null\"");
+ }
++elsif ($#ARGV == 1 && $ARGV[0] eq "ohosAarch64")
++{
++    print "SACLIB Warning: Installing ohosAarch64 system dependent files!\n";
++    system("bash -c \"pushd >/dev/null $ENV{'saclib'}/sysdep/ohosAarch64 ; ./install ; popd >/dev/null\"");
++}
+ elsif ($#ARGV == 1 && $ARGV[0] eq "sparcsolaris")
+ {
+     print "SACLIB Warning: Installing sparcsolaris system dependent files!\n";
+diff --git a/bin/mkmake b/bin/mkmake
+index 0000000..bc7d431 100644
+--- a/bin/mkmake
++++ b/bin/mkmake
+@@ -37,7 +37,7 @@
+ SRCDIR   = ${saclib}/src
+ TARGET   = ${saclib}/lib/saclib${EXTENSION}.a
+ CFLAGS   = -I${saclib}/include -c ${SACFLAG}
+-AFLAGS   = -I${saclib}/include -P
++AFLAGS   = -I${saclib}/include ${AFLAG}
+ AS       = as
+ AR       = ar
+ RANLIB   = ranlib
+diff --git a/bin/mklib b/bin/mklib
+index 0000000..ec029da 100644
+--- a/bin/mklib
++++ b/bin/mklib
+@@ -70,18 +70,18 @@
+   echo "This option no longer exists!"
+ elif [ $1 = "deb" ]; then
+   pushd >/dev/null  $saclib/lib/objd
+-  make  CC=$CC "SACFLAG=-g -DNO_SACLIB_MACROS" EXTENSION=d
++  make  CC=$CC "AR=$AR" "RANLIB=$RANLIB" "SACFLAG=-g -DNO_SACLIB_MACROS" "AFLAG=-ansi" EXTENSION=d
+   popd >/dev/null
+ elif [ $1 = "opt" ]; then
+   pushd >/dev/null  $saclib/lib/objo
+-  make  CC=$CC "SACFLAG=" EXTENSION=o
++  make  CC=$CC "AR=$AR" "RANLIB=$RANLIB" "SACFLAG=" "AFLAG=-ansi" EXTENSION=o
+   popd >/dev/null
+ elif [ $1 = "all" ]; then
+   pushd >/dev/null  $saclib/lib/objd
+-  make  CC=$CC "SACFLAG=-g -DNO_SACLIB_MACROS" EXTENSION=d
++  make  CC=$CC "AR=$AR" "RANLIB=$RANLIB" "SACFLAG=-g -DNO_SACLIB_MACROS" "AFLAG=-ansi" EXTENSION=d
+   popd >/dev/null
+   pushd >/dev/null  $saclib/lib/objo
+-  make  CC=$CC "SACFLAG=" EXTENSION=o
++  make  CC=$CC "AR=$AR" "RANLIB=$RANLIB" "SACFLAG=" "AFLAG=-ansi" EXTENSION=o
+   popd >/dev/null
+ else
+   echo "USAGE:"
+diff --git a/sysdep/ohosAarch64/GC.c b/sysdep/ohosAarch64/GC.c
+new file mode 100644
+index 0000000..b67e975
+--- /dev/null
++++ b/sysdep/ohosAarch64/GC.c
+@@ -0,0 +1,56 @@
++/*======================================================================
++                           GC()  --  OpenHarmony / AArch64 port
++
++Garbage collection entry-point.
++
++GCSI() (the collector proper) finds its roots by treating every aligned word in
++[EACSTACK, BACSTACK] as a potential SACLIB object, so GC() must make sure that
++every register and stack slot holding a live object is inside that range by the
++time GCSI() runs.  That is the system- and compiler-dependent part, and on
++AArch64/AAPCS64 it needs two things that the x86_64 port does not provide.
++
++1. Every callee-saved register has to be written into the frame.  The upstream
++   x86_64 port declares 16 dummy integer locals and passes them to gc_dummy(),
++   relying on the System V AMD64 convention to spill them; measured on device
++   with clang 15 for aarch64-linux-ohos, that construction lets the collector
++   reclaim live objects at -O1 and later (the shipped test_package passed at -O0
++   and dumped core deterministically at -O1/-O2/-Os, with GC() removed from the
++   test the very same builds passed everywhere).  AAPCS64 gives the calling
++   function callee-saved registers x19-x28, and it is free to keep live Words
++   there across the call, where a stack scan cannot see them.
++
++   setjmp() is therefore used to force the spill: the ABI requires every
++   callee-saved register to survive a setjmp(), so a compiler must store each
++   one it uses into the frame first — exactly the registers that can still hold
++   a live Word here.  This is the same technique the classic conservative
++   collectors use to capture register roots.
++
++2. GCSI() must scan down to the lowest slot that can hold a caller's live data.
++   AAPCS64 grants a leaf function a 16-byte red zone below sp and compilers keep
++   spill slots there, so the address of GC()'s own local — which lies below any
++   red-zone slot of its caller — is passed as EACSTACK.  The volatile array
++   keeps that frame real and stops the local from being optimised away.
++
++The jmp_buf is deliberately not restored: the setjmp() result is ignored and
++control simply continues, which is what makes the spill observable.
++======================================================================*/
++
++#include "saclib.h"
++
++#include <setjmp.h>
++
++void GC(void)
++{
++     jmp_buf regs;
++     volatile Word frame_reserve[8];
++     Word top_of_stack;
++     int i;
++
++     for (i = 0; i < 8; i++)
++	  frame_reserve[i] = 0;
++
++     /* force every live callee-saved register into the frame */
++     (void)setjmp(regs);
++
++     GCSI(sizeof(Word),(char *)&top_of_stack);
++}
+diff --git a/sysdep/ohosAarch64/cleanup b/sysdep/ohosAarch64/cleanup
+new file mode 100644
+index 0000000..aebe151
+--- /dev/null
++++ b/sysdep/ohosAarch64/cleanup
+@@ -0,0 +1,4 @@
++#!/bin/bash
++echo "Removing any ohosAarch64 system dependent files ..."
++'rm' -f $saclib/src/GC.c
++'rm' -f $saclib/include/sysdep.h
+diff --git a/sysdep/ohosAarch64/install b/sysdep/ohosAarch64/install
+new file mode 100644
+index 0000000..97ca1de
+--- /dev/null
++++ b/sysdep/ohosAarch64/install
+@@ -0,0 +1,4 @@
++#!/bin/bash
++echo "Installing ohosAarch64 system dependent files ..."
++'cp' -f GC.c $saclib/src/
++'cp' -f sysdep.h $saclib/include
+diff --git a/sysdep/ohosAarch64/sysdep.h b/sysdep/ohosAarch64/sysdep.h
+new file mode 100644
+index 0000000..affad33
+--- /dev/null
++++ b/sysdep/ohosAarch64/sysdep.h
+@@ -0,0 +1,6 @@
++#ifndef _LITTLE_ENDIAN_
++#define _LITTLE_ENDIAN_
++#endif
++#undef _BIG_ENDIAN_
++#define _OHOS_AARCH64_
++#define __WORDSIZE 64

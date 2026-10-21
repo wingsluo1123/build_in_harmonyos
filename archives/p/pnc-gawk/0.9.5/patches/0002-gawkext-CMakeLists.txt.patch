@@ -1,0 +1,32 @@
+--- a/gawkext/CMakeLists.txt
++++ b/gawkext/CMakeLists.txt
+@@ -2,21 +2,22 @@
+ 	SHARED
+ 		gawkpnwrap.c gawkpnimpl.cc
+ )
+ 
+ set_target_properties(gawkpn PROPERTIES PREFIX "")
+ 
+ target_link_libraries(gawkpn
+ 	${LIBICUUC} ${LIBPHONENUMBER} ${LIBGEOCODING}
+ )
+ 
+-execute_process(
+-	COMMAND
+-		gawk "BEGIN {print ENVIRON[\"AWKLIBPATH\"]}"
+-	OUTPUT_VARIABLE
+-		AWKLIBPATH
+-	OUTPUT_STRIP_TRAILING_WHITESPACE
+-)
++# The extension is installed into the AWKLIBPATH of the GNU Awk that loads
++# it.  Querying the awk binary at configure time does not survive
++# cross-compilation: it returns the absolute AWKLIBPATH of the build machine
++# awk, which is unrelated to the target installation prefix.  Default to a
++# prefix-relative directory, override with -DAWKLIBPATH=<dir>.
++if(NOT AWKLIBPATH)
++	set(AWKLIBPATH "lib/gawk")
++endif()
+ install(
+ 	TARGETS gawkpn
+ 	DESTINATION ${AWKLIBPATH}
+ )

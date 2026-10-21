@@ -1,0 +1,84 @@
+#====================================================================
+# DRAFT-minicsv-ec11134f7f-no-build-single-file-c-recipe
+# 无构建系统单文件 C 库的 Conan 配方模式（build() 注入最小 CMakeLists）
+# 来源: minicsv ec11134f7f HarmonyOS PC（aarch64-linux-ohos）适配
+#====================================================================
+
+id:                     E3347
+trigger_tool:           conan|conan-verify|finish|cmake
+phase:                  recipe|verify|compilation|installation
+error_signature:        conanfile\.py 缺少: export_sources\(\) 方法|缺少: 补丁应用调用|CLI tool detected but commands\.json missing|stub_test_method|commands_json_r38
+
+severity:               2
+category:               conan, packaging, no-build-system, single-file-library
+match_keywords:         无构建系统, single-file, 单文件 C 库, no build system, 注入 CMakeLists,
+                         save(CMakeLists.txt), export_sources, apply_conandata_patches,
+                         RUNTIME DESTINATION bin, L0k, commands.json, L0d, self.run, static library,
+                         minicsv, no Makefile, no configure
+title:                  无构建系统单文件 C 库的 Conan 配方模式：build() 注入最小 CMakeLists +
+                         G1 要求 export_sources/补丁调用 + 静态库不写 RUNTIME DESTINATION bin 防 L0k 误判
+
+root_cause: >
+  上游仅交付 .c/.h（无 Makefile/configure/CMakeLists/Meson）的单文件 C 库，
+  conan-init 模板路由无法选择构建族，需手写配方并注入构建文件。三类门禁：
+  (1) G1 配方完整性把 export_sources() 与补丁应用调用列为必填（即使 patches:{} 为空）；
+  (2) L0k/R38 用源码级静态扫描判定 CLI（grep RUNTIME DESTINATION bin / dst="bin"），
+      注入的 CMakeLists 若声明 RUNTIME DESTINATION bin，纯静态库被误判为命令行工具
+      从而要求 commands.json（E424 只覆盖 CLI 正向，不覆盖静态库反向）；
+  (3) L0d 要求 test() 含 self.run 实际执行逻辑，仅 cmake.test() 被判 stub_test_method。
+
+affected_scope: >
+  所有完全没有构建系统（无 Makefile/configure/CMakeLists/Meson）的单文件 C/C++ 库的
+  OHOS(arm64) Conan 适配；与 E392（有 raw Makefile）互补，与 E257（header-only 无编译）、
+  E271（单文件可执行资产）、E424（CLI 工具正向）相互区分。
+
+verification_cmd: >
+  conan create . -pr:h=ci/conan/profiles/ohos-aarch64 -pr:b=ci/conan/profiles/ohos-aarch64 &&
+  finish minicsv ec11134f7f published → W3 build_and_test.sh L0/L1/L2/L4/L5 全绿；
+  G1 不再报缺失 export_sources/补丁调用；L0k 不再报 commands_json_r38；L0d 不再报 stub_test_method。
+
+rec_priority:           1
+rec_approach:           no-build-single-file-c-inject-cmake-recipe
+rec_description: >
+  conanfile.py 声明 export_sources()（export_conandata_patches）+ build() 内
+  apply_conandata_patches（无补丁时空操作）满足 G1；build() 用 save() 向 source_folder
+  注入最小 CMakeLists.txt（add_library + install ARCHIVE/LIBRARY，纯静态库不写
+  RUNTIME DESTINATION bin 防 L0k 误判 CLI）；CMakeToolchain 设 BUILD_SHARED_LIBS；
+  package_info 只导 cpp_info.libs。test_package 的 test() = cmake.test() + self.run(消费者二进制)
+  满足 L0d。完整配方见配对 .md。
+rec_command:            参考 archives/m/minicsv/ec11134f7f/conanfile.py（本 PR）
+rec_auto_fix:           false
+rec_impl:               conanfile-edit
+
+fallback_priority:      2
+fallback_approach:      header-only-copy (仅当库确为 header-only)
+fallback_description:   若单文件库确无 .c 编译产物（纯头文件），改走 E257 no-op build + copy 头文件模式。
+fallback_command:
+fallback_auto_fix:      false
+fallback_impl:
+
+forbid_1_pattern:       install\(TARGETS.*RUNTIME[[:space:]]+DESTINATION[[:space:]]+bin\)
+forbid_1_reason:        纯静态库注入 CMakeLists 声明 RUNTIME DESTINATION bin 会被 L0k 静态扫描误判为 CLI 工具
+forbid_1_consequence:   L0k 报 CLI tool detected but commands.json missing (R38)，W3 阻塞
+
+forbid_2_pattern:       (省略 export_sources|省略 apply_conandata_patches)
+forbid_2_reason:        G1 配方完整性要求 export_sources() 与补丁应用调用（即使无补丁）
+forbid_2_consequence:   conan-verify G1 FAIL，无法进入 G0-G5/L2/L4/L5
+
+forbid_3_pattern:       test\(\).*cmake\.test\(\)(?!.*self\.run)
+forbid_3_reason:        L0d 要求 test() 内含 self.run 实际执行逻辑
+forbid_3_consequence:   L0d 判 stub_test_method，W3 阻塞
+
+principles:             P016
+doc_file:               knowledge/drafts/DRAFT-minicsv-ec11134f7f-no-build-single-file-c-recipe.md
+last_updated:           2026-09-28
+source_event:           archives/m/minicsv/ec11134f7f (minicsv ec11134f7f，OHOS aarch64)
+
+authors:                pc3-42 <noreply@atomgit.com>
+source_pr:
+source_commit:
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-09-28

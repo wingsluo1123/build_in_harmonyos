@@ -1,0 +1,36 @@
+# test_package/MANIFEST.yml
+
+package: swift-toolchain-ohos/6.0.3
+homepage: "https://www.swift.org/"
+
+# 上游测试统计说明：
+# 本包是**平台基础设施包**（预编译工具链快照），载荷是 OHOS 自建产物，
+# 上游没有对应的发行物、也没有配套的测试套件可跑：
+#   * swift.org 不为 OHOS 发行工具链（官方 swift-6.0.3-RELEASE-ubuntu22.04-aarch64
+#     在 OHOS 上裸执行失败：缺 /lib/ld-linux-aarch64.so.1）；
+#   * 真正的上游测试面在 Foundation 轮（swift-corelibs-foundation 的 XCTest 案例集），
+#     不在 driver 轮。
+# ⇒ 上游用例数 = 0；driver 的可用性以本目录的 test_swift_toolchain.sh 覆盖。
+upstream_check_command: ""
+
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests: []
+
+# test_package 自带的验证（工具链可用性验证）—— 11 项断言，分四层：
+#   S 层 静态 5 项：包根 wrapper / 交付编译器可执行 / ring 本体与模块 /
+#                   sysroot + resource-dir / Swift 运行时闭包 + libc++_shared
+#   D 层 破坏性反向 2 项：摘掉 instrument/bin/swiftc 的执行位后 S2 判据必须失败，
+#                        恢复后必须再通过（L1e 口径：证明 S2 有判别力，不是恒真）
+#   E 层 运行 3 项：swiftc.sh --version 退出 0 / 版本串含 6.0.3 /
+#                   真编译一个 import Foundation 的 Swift 程序
+#   R 层 运行时自证 1 项：编译产物在 env -u LD_LIBRARY_PATH 下仍能运行
+#                        （环 RUNPATH 契约的可执行形式）
+test_package_tests:
+  - file: test_swift_toolchain.sh
+    description: "工具链可用性 11 项：静态构成 5 + 破坏性反向 2 + 运行 3 + 运行时自证 1"
+    command: "sh test_swift_toolchain.sh"
+
+# 断言数：5 + 2 + 3 + 1 = 11 项（与脚本汇总行 TEST_RESULTS total=11 一致）
+assertion_count: 11

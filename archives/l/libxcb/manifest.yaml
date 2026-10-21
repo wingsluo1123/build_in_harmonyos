@@ -35,3 +35,10 @@ versions:
       - X11 C Binding (libxcb) 1.17.0 HarmonyOS PC 适配（R37: 制品仓已存在 1.17.0 依赖链配方 → 后缀递增为 1.17.0.1）
       - 继承自 1.16（status=published）的全部 OHOS 适配方案，仅升级上游版本 + libxau 依赖版本
       - 下游链：xcb-proto -> libxcb -> libX11 / xcb-util-* 系列
+  "1.17.0.2":
+    status: built
+    build_date: "2026-10-18"
+    notes: |
+      - 在 1.17.0.1 之上新增补丁 0003：unix socket 目录可由环境变量 X_UNIX_SOCKET_DIR 覆盖（未设置时仍用 /tmp/.X11-unix，行为不变）
+      - 动机（实测）：本平台 /tmp 为只读 erofs，X11 客户端无法连接；AF_UNIX 路径型 socket 在可写目录可用 ✓，在 hmdfs(/storage) 与 /dev/shm 被拒 ✗
+      - 用途：让 xwayland 的上游测试（Xvfb + simple-xinit）指向可写目录后能真跑通

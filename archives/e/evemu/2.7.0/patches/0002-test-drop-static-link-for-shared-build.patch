@@ -1,0 +1,19 @@
+--- a/test/Makefile.am	2026-10-16 20:38:38.516171094 +0800
++++ b/test/Makefile.am	2026-10-16 20:38:38.648180000 +0800
+@@ -12,7 +12,15 @@
+ 
+ test_evemu_create_SOURCES = test-evemu-create.c
+ test_evemu_create_LDADD = $(top_builddir)/src/libevemu.la
+-test_evemu_create_LDFLAGS = -static
++# -static dropped: this package is built shared (conan default
++# shared=True), libtool therefore never produces libevemu.a, and the
++# test itself only reads/writes a mkstemp() file - it does not need a
++# statically linked binary.
++#
++# Patched in Makefile.am (not the generated Makefile.in) because the
++# source is now the official GitLab git archive, which ships no
++# pre-generated makefiles: build() bootstraps with `autoreconf -fi`,
++# which regenerates test/Makefile.in from this file.
+ endif
+ 
+ CLEANFILES = evemu.tmp.*

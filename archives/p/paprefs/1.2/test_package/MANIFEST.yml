@@ -1,0 +1,34 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: paprefs/1.2
+homepage: "https://freedesktop.org/software/pulseaudio/paprefs/"
+
+# 上游测试命令
+upstream_check_command: "meson test --list"
+
+# conanfile.py build() 方法中是否已集成上游测试
+upstream_test_in_build: true
+upstream_test_command: "meson test -C <build_folder> --print-errorlogs"
+
+# 上游实际运行的测试程序
+# 上游 doc/meson.build 在 tidy 可用时注册 1 个用例：
+#   test('XHTML documentation uses correct mark-up', tidy, args: ['-e', readme_html])
+# 配方以 build_requirements 引入 tidy-html5/5.8.0，使该用例在 OHOS 上真实
+# 执行（1/1 通过，非 SKIP）。
+upstream_tests:
+  - file: doc/meson.build
+    source: doc/meson.build
+    description: "XHTML documentation uses correct mark-up (tidy -e doc/README.html, upstream meson test)"
+    command: "meson test -C <build_folder> --print-errorlogs"
+
+# test_package 中自带的测试 (消费者视角验证)
+test_package_tests:
+  - file: test_paprefs.cpp
+    description: "Drive gtkmm-3.0/giomm-2.4/sigc++-2.0/libpulse exactly as paprefs does: widget topology, Builder load of packaged glade, 3 s headless run of the packaged binary, pa_context round-trip"
+    command: "./test_paprefs"
+
+# 测试断言总数（与 test_paprefs 的 TAP 输出 "# total=9 failed=0" 一致；
+# CI 沙箱无法分配 broadway surface 时第 6 项标 TAP SKIP，仍计入 9 项）
+assertion_count: 9

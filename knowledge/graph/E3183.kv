@@ -1,0 +1,70 @@
+#====================================================================
+# DRAFT-slrn-1.0.3-runenv-override-prefix-root-resource-dir
+# conan --prefix=/ 固化资源路径 → 上游官方环境变量 runenv 覆盖
+#
+# 本条目为 draft，不预占正式 E 编号，禁止直接 promote。
+# 触发事件: slrn 1.0.3 HarmonyOS PC 适配（PR #14088, CI #65953 失败实证）
+#====================================================================
+
+id:                     E3183
+trigger_tool:           runtime|test|conan
+phase:                  testing|runtime
+error_signature:        hardcoded .* (path|dir).*//(share|lib)|Unable to locate .* on load path|//(share|lib)/[a-z].*No such file
+severity:               3
+category:               autotools, conan, packaging, runtime, environment
+match_keywords:         prefix=/, //share, //lib, compiled-in path, hardcoded load path, resource dir, runenv_info, SLRN_SLANG_DIR, relocatable
+title:                  conan --prefix=/ 把资源目录固化为 //share/... 绝对路径；用上游官方环境变量经 runenv_info.define 覆盖
+root_cause:             conan 打包约定 configure --prefix=/（DESTDIR 分离打包根），
+                        autotools 把 ${prefix}/share/<pkg> 之类路径固化为编译期绝对
+                        路径宏（如 -DSLRN_SLANG_DIR=\"//share/slrn/slang\"，注意双斜杠）。
+                        包移动安装到消费机后该路径不存在，依赖脚本/数据资源的程序
+                        在运行时初始化即失败（slrn 的 S-Lang 解释器找不到 slrn.sl，
+                        "Unable to locate slrn.sl on load path"）。机制链：
+                        prefix=/ → 编译期固化 //share/... → 包移动 → 运行时查找失败。
+affected_scope:         所有带 share/ 下脚本/数据资源（解释器脚本库、locale、模块）的
+                        autotools 应用包；编译能过、--version 能跑，但任何进入功能
+                        初始化的路径都会在真实使用时报错（CI test_package 才暴露）。
+verification_cmd:       conan create 后在 test_package（env="conanrun"）中执行进入
+                        功能初始化的子命令（如 slrn -i rc --show-config），断言成功；
+                        不设覆盖变量时应能复现 "Unable to locate" 失败。
+
+rec_priority:           1
+rec_approach:           upstream-envvar-runenv-override
+rec_description:        上游官方文档化的资源路径环境变量（slrn: SLRN_SLANG_DIR）在
+                        package_info() 用 runenv_info.define 指向包内资源目录
+                        （self.package_folder/share/...），消费者经 VirtualRunEnv
+                        自动获得；零补丁，不改动上游行为，原生运行不受影响。
+rec_command:            self.runenv_info.define("SLRN_SLANG_DIR", os.path.join(self.package_folder, "share", "slrn", "slang"))
+rec_auto_fix:           false
+rec_impl:               conan-recipe-package-info
+
+fallback_priority:      2
+fallback_approach:      install-time-path-repair
+fallback_description:   上游无环境变量覆盖时，按 E317 方式在 install 阶段对固化的
+                        脚本/Makefile 做范围限定 sed，或补丁源码支持相对可执行文件
+                        的资源定位（$ORIGIN 相对寻址）。
+fallback_command:       见 E317 sed-range-limited-replace
+fallback_auto_fix:      false
+fallback_impl:          apply-conandata-patch
+
+forbid_1_pattern:       只在 test_package 里 export 资源路径变量
+forbid_1_reason:        掩盖配方缺陷：真实消费者环境没有该变量，包依然不可用。
+forbid_1_consequence:   测试假绿，用户运行即失败（本条目在 CI #65953 的原始形态）。
+forbid_2_pattern:       configure --prefix 改为非 / 的猜测路径
+forbid_2_reason:        破坏 conan 包布局约定，且无法预知消费机安装根。
+forbid_2_consequence:   路径同样错误，只是从 //share 变成另一个不存在的绝对路径。
+
+principles:             P005, P013
+doc_file:               drafts/DRAFT-slrn-1.0.3-runenv-override-prefix-root-resource-dir.md
+last_updated:           2026-10-02
+source_event:           slrn 1.0.3 HarmonyOS PC adaptation, PR #14088
+
+authors:                songzhenyan
+source_pr:              14088
+source_commit:          af3a690cca
+
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-02
+

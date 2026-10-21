@@ -1,0 +1,19 @@
+id:                     E2420
+category:               ohos, portability, testing, shell
+phase: testing
+match_keywords: NUL byte, null byte, command substitution, $(...), binary stream, ttyrec, ttyrec header, ansi2txt, ansi2html, ttyrec2ansi, pipetty, pipe I/O, OHOS, mksh, truncated output, File was truncated
+error_signature: "File was truncated|ttyrec2ansi.*output.*missing tail byte|command substitution.*NUL byte|ttyrec.*header.*len field"
+root_cause: "OHOS system shell (mksh) and bash both strip NUL bytes from the byte stream during $(...) command substitution (NUL cannot be represented in the result string), while the upstream testsuite writes binary inputs to temp files and compares output files with cmp. Any upstream test or consumer harness that round-trips binary data (ttyrec headers, termios sequences, escape payloads) through command substitution gets silently corrupted data."
+rec_approach: "Always transport binary test data (headers with \\x00, escape sequences, ttyrec frames) via temp files (printf > file, then tool < file > outfile, compare with cmp/cat) instead of $(...) command substitution. This matches the upstream testsuite technique (stdin.$id / stdout.$id) and keeps NUL bytes intact. For pty-based tools (pipetty), also invoke the child through a script FILE (pipetty </dev/null sh script.sh) rather than `pipetty sh -c '...'`, which fails on OHOS mksh."
+prescan_pattern: "ttyrec|\\$(.*ansi2|command substitution"
+severity:               2
+last_updated: 2026-09-23
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+authors:               unknown
+doc_file:               doc/E2420.md
+trigger_tool:           ctest
+affected_scope:         general
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        "Always transport binary test data (headers with \\x00, escape sequences, ttyrec frames) via temp fi

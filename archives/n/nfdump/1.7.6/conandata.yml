@@ -1,0 +1,30 @@
+# conandata.yml for nfdump 1.7.6
+# Source: https://github.com/phaag/nfdump
+
+sources:
+  # The codeload URL is the host github.com redirects release archives to; it is
+  # listed first because it answers directly. Its path ends with the tag name
+  # and therefore carries no file extension, so the file name is stated
+  # explicitly - otherwise get() cannot tell which decoder to use.
+  url:
+    - "https://codeload.github.com/phaag/nfdump/tar.gz/refs/tags/v1.7.6"
+    - "https://github.com/phaag/nfdump/archive/refs/tags/v1.7.6.tar.gz"
+  filename: "nfdump-1.7.6.tar.gz"
+  sha256: "2d25220d7a48f57ba65f228fb5d2eb4d2a0ab2b352a037ed6249b39cf68c1b9a"
+
+patches:
+  - patch_file: "patches/0001-configure.ac.patch"
+    patch_description: "Probe for the _res global resolver state instead of assuming glibc"
+    patch_type: "portability"
+  - patch_file: "patches/0002-src-libnfdump-filter-ipconv.c.patch"
+    patch_description: "Guard set_nameserver() with HAVE_RES_GLOBAL (musl libc has no _res)"
+    patch_type: "portability"
+  - patch_file: "patches/0003-src-libnffile-conf-nfconf.c.patch"
+    patch_description: "Guard SetNameserver() with HAVE_RES_GLOBAL (musl libc has no _res)"
+    patch_type: "portability"
+  - patch_file: "patches/0004-src-collector-bookkeeper.h.patch"
+    patch_description: "Store the POSIX IPC handles of a bookkeeping record instead of the SysV ids"
+    patch_type: "portability"
+  - patch_file: "patches/0005-src-collector-bookkeeper.c.patch"
+    patch_description: "Keep the collector bookkeeping record in a POSIX shared memory object guarded by a named semaphore (shmget is denied and semget is killed with SIGSYS)"
+    patch_type: "portability"

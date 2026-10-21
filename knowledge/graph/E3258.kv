@@ -1,0 +1,37 @@
+id:                     E3258
+trigger_tool: conan|cmake|ctest|qml
+phase: target_build|installed_consumer
+error_signature: 'module "org.kde.kitemmodels" plugin "itemmodelsplugin" not found'
+severity:               2
+category:               ohos, packaging, api, plugin, qml
+match_keywords: kitemmodels, Qt6, QML, static plugin, libitemmodelsplugin.a, runtime import, conan, BUILD_SHARED_LIBS
+title: Upstream CTest success does not prove an installed static Qt QML plugin can be imported
+root_cause: With BUILD_SHARED_LIBS=OFF, the kitemmodels QML plugin was installed as libitemmodelsplugin.a. The installed consumer used an ordinary runtime import of org.kde.kitemmodels, which does not load that static archive automatically. The upstream 12-case CTest suite still passed, so its result alone did not establish the package's advertised QML behavior.
+affected_scope: Conan packages exposing Qt QML modules where a shared/static option changes the plugin artifact type and consumers rely on runtime QML import without explicit static-plugin registration.
+verification_cmd: 'On the authorized OHOS PC, compare full native conan create with shared and static configurations; require upstream CTest N/N and an installed-package C++/QML consumer including ordinary QML import.'
+rec_priority: 1
+rec_approach: ship-verified-shared-qml-module
+rec_description: When static QML plugin registration is not implemented and verified, do not advertise a static package option. Set package_type to shared-library, build with BUILD_SHARED_LIBS=ON, retain upstream CTest and an installed-package QML import consumer, and rerun the final shared-only candidate on the target.
+rec_command: 'conan create <recipe> -pr:h=<native-ohos-profile> -pr:b=<native-ohos-profile> -c tools.build:jobs=2'
+rec_auto_fix: false
+rec_impl: recipe-and-package-contract
+fallback_priority: 2
+fallback_approach: implement-static-qml-registration
+fallback_description: If static packaging is required, add explicit static-plugin registration and linkage for every supported consumer and verify the installed package. The present kitemmodels candidate has not implemented or validated this path.
+fallback_command: 'Build and run an installed static-package QML import consumer after explicit plugin registration.'
+fallback_auto_fix: false
+fallback_impl: future-work
+forbid_1_pattern: 'shared=False without an installed QML import test'
+forbid_1_reason: A static library and static QML plugin can compile while ordinary runtime import remains unavailable.
+forbid_1_consequence: Conan create may appear to pass upstream tests, but downstream QML consumers fail after installation.
+principles:             P003, P007
+doc_file: knowledge/drafts/E14063-draft-tank_you.md
+last_updated: 2026-10-04
+source_event: kitemmodels/6.26.0 OHOS PC native static attempt passed 12/12 upstream CTest but only 4/9 installed consumer checks; shared-only candidate then passed 12/12 and 9/9.
+source_pr:
+source_commit:
+metrics_success_count: 1
+metrics_fail_count: 1
+metrics_confidence: 0.95
+metrics_last_used: 2026-10-04
+authors:               tank_you

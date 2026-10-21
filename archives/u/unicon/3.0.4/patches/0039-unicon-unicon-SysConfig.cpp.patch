@@ -1,0 +1,121 @@
+--- a/unicon/unicon/SysConfig.cpp
++++ b/unicon/unicon/SysConfig.cpp
+@@ -19,22 +19,23 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+  *
+  * See the file COPYING directory of this archive
+  * Author: see CREDITS
+  */
+ 
+ #include <stdlib.h>
+ #include <string.h>
+ #include <stdio.h>
+-#include <iostream.h>
+-#include <fstream.h>
++#include <iostream>
++using namespace std;
++#include <fstream>
+ #include <SysConfig.hpp>
+ 
+ /* CSysConfigGroup Implementation */
+ 
+ CSysConfigGroup::CSysConfigGroup (const char *szGroupName0)
+ {
+    szGroupName = NULL;
+    if (szGroupName0 != NULL)
+        szGroupName = strdup (szGroupName0);
+    pOurCap = NULL;
+@@ -105,46 +106,65 @@
+ }
+ 
+ char *CSysConfigGroup::szGetItemValue (const char *szItemName)
+ {
+     SysConfigCap *p = pFindItem (szItemName);
+     if (p == NULL)
+         return NULL;
+     return p->szValue;
+ }
+ 
++/* Read one line into szLine (null-terminated, newline stripped).
++ * Returns szLine on success, NULL at EOF of an empty line.
++ * (Replaces the C++98 member gets(), removed in C++11; the char*
++ * overloads of std::getline are not offered by the OHOS libc++ header
++ * set, so use the always-present istream::get(char*) member.) */
++static char *ReadConfigLine (std::istream &a, char *szLine, int n)
++{
++    int i = 0;
++    int c = a.get ();
++    while (c != EOF && c != '\n' && i < n - 1) {
++        szLine [i++] = (char) c;
++        c = a.get ();
++    }
++    szLine [i] = '\0';
++    if (c == EOF && i == 0)
++        return NULL;
++    return szLine;
++}
++
+ ifstream & operator >> (ifstream &a, CSysConfigGroup &b)
+ {
+    char *p, szTemp[128];
+-   char szItemName[128], szValue[128];
++   char szItemName[128], szValue[128], szLine[128];
+    int i;
+    char *buf;
+    /* read the name */
+    do
+    {
+-       a.gets (&buf);
++       buf = ReadConfigLine (a, szLine, sizeof (szLine));
+    }
+    while (buf != NULL && buf[0] == '\0');
+ 
+    if (buf == NULL)
+        return a;
+ 
+    for (p = buf; *p != '['; p++)
+        ;
+    for (p++, i = 0; *p != ']' && *p; p++, i++)
+        szTemp[i] = *p;
+    szTemp[i] = '\0';
+    b.SetGroupName (szTemp);
+ 
+    do
+    {
+-       a.gets (&buf);
++       buf = ReadConfigLine (a, szLine, sizeof (szLine));
+ 
+        if (buf == NULL)
+            break;
+ 
+        if (buf[0] == '\0')
+            break; 
+        for (i = 0, p = buf; *p != '='; p++, i++)
+             szItemName[i] = *p;
+        szItemName[i] = '\0';
+ 
+@@ -268,21 +288,22 @@
+     return p->szGetItemValue (szCapName);
+ }
+ 
+ CSysConfigGroup *CSysConfig::pCreateNewGroup (const char *szGroup)
+ {
+     CSysConfigGroup *p = new CSysConfigGroup (szGroup);
+     return AddGroup (p);
+ }
+ 
+ #ifdef __SYSCONFIG_DEBUG__
+-#include <iostream.h>
++#include <iostream>
++using namespace std;
+ int main (int argc, char **argv)
+ {
+     CSysConfig MyConfig ("test.ini");
+     cout << MyConfig.szReadCapItem ("test", "me") << "\n";
+     MyConfig.bWriteCapItem ("test", "mywife", "jinqing");
+     MyConfig.bWriteCapItem ("john", "job", "programmer");
+     MyConfig.bSave ("temp.ini");
+ }
+ #endif
+ 

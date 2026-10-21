@@ -1,0 +1,34 @@
+--- a/mir-tests/hello.c
++++ b/mir-tests/hello.c
+@@ -61,29 +61,29 @@
+                   MIR_new_insn(ctx, MIR_ADD, MIR_new_reg_op(ctx, ret),
+                                MIR_new_reg_op(ctx, ret),
+                                MIR_new_reg_op(ctx, temp)));
+   MIR_append_insn(ctx, func,
+                   MIR_new_ret_insn(ctx, 1, MIR_new_reg_op(ctx, ret)));
+   MIR_finish_func(ctx);
+   MIR_finish_module(ctx);
+   // MIR_output(ctx, stderr);
+   MIR_load_module(ctx, mir_module);
+   // MIR_output(ctx, stderr);
+-  MIR_gen_init(ctx, 1);
++  MIR_gen_init(ctx);
+   typedef int (*Callback)(const char*);
+   int (*boo) (const char *, Callback, unsigned) = NULL;
+   if (interp_p) {
+     MIR_link(ctx, MIR_set_interp_interface, NULL);
+     boo = func->addr;
+   } else if (gen_p) {
+     MIR_link(ctx, MIR_set_gen_interface, NULL);
+-    boo = MIR_gen(ctx, 0, func);
++    boo = MIR_gen(ctx, func);
+   } else {
+     MIR_output(ctx, stderr);
+     goto cleanup;
+   }
+   printf("%s: %d\n", interp_p ? "interpreted" : "compiled",
+          boo("hello", puts, 0) + boo("goodbye", puts, 1));
+ cleanup:
+   MIR_gen_finish(ctx);
+   MIR_finish(ctx);
+   return 0;

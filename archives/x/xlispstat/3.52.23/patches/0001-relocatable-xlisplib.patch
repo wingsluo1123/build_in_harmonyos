@@ -1,0 +1,17 @@
+--- a/setup.shell
++++ b/setup.shell
+@@ -1,7 +1,12 @@
+ #!/bin/sh
+ cat > $1 <<+++
+-#!/bin/sh
++#!/system/bin/sh
+-XLISPLIB=$2 export XLISPLIB
++if test -z "$XLISPLIB"; then
++  XLISPLIB=$2
++fi
++export XLISPLIB
++# xlisp GC mark recursion needs a stack larger than the device default
++ulimit -s unlimited 2>/dev/null || ulimit -s 65536 2>/dev/null || true
+ if test -f xlisp.wks; then WKS="xlisp.wks";
+ else WKS="\${XLISPLIB}/xlisp.wks";
+ fi

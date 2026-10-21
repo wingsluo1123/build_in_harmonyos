@@ -1,0 +1,65 @@
+--- a/unicon/server/TLS_PthSocket.cpp
++++ b/unicon/server/TLS_PthSocket.cpp
+@@ -23,21 +23,20 @@
+  * Author: see CREDITS
+  */
+ 
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+ #include <unistd.h>
+ #include <sys/time.h>
+ #include <assert.h>
+ #include <TLS_PthSocket.hpp>
+-#include <pth.h>
+ 
+ TLS_CPthSocket::TLS_CPthSocket (int fd): fd(fd)
+ {
+ }
+ 
+ TLS_CPthSocket::~TLS_CPthSocket ()
+ {
+ }
+ 
+ int TLS_CPthSocket::PollRead (char *buf, int len)
+@@ -49,38 +48,38 @@
+ 
+     do
+     {
+         FD_ZERO (&readset);
+         FD_SET (fd, &readset);
+         timeout.tv_sec = 120;
+         timeout.tv_usec = 0;
+ 
+         if (select (fd+1, &readset, NULL, NULL, &timeout) <= 0)
+            continue;
+-        t = pth_read_ev(fd, p, len, NULL);
++        t = ::read(fd, p, len);
+         if (t < 0)
+            continue;
+         p += t;
+         len -= t;
+     }
+     while (len != 0);
+     return b;
+ }
+ 
+ int TLS_CPthSocket::PollWrite (char *buf, int len)
+ {
+     char *p = buf;
+     int b = len, t;
+ 
+     do
+     {
+-        t = pth_write_ev(fd, p, len, NULL);
++        t = ::write(fd, p, len);
+         if (t < 0)
+            continue;
+         p += t;
+         len -= t;
+     }
+     while (len != 0);
+     return b;
+ }
+ 
+ int TLS_CPthSocket::read (void *buf, int buflen)

@@ -1,0 +1,25 @@
+--- a/src/lat/kaldi-lattice.cc
++++ b/src/lat/kaldi-lattice.cc
+@@ -107,21 +107,21 @@
+   */
+   static std::pair<Lattice*, CompactLattice*> ReadText(
+       std::istream &is) {
+     typedef std::pair<Lattice*, CompactLattice*> PairT;
+     using std::string;
+     using std::vector;
+     Lattice *fst = new Lattice();
+     CompactLattice *cfst = new CompactLattice();
+     string line;
+     size_t nline = 0;
+-    string separator = FLAGS_fst_field_separator + "\r\n";
++    string separator = FST_FLAGS_fst_field_separator + "\r\n";
+     while (std::getline(is, line)) {
+       nline++;
+       vector<string> col;
+       // on Windows we'll write in text and read in binary mode.
+       SplitStringToVector(line, separator.c_str(), true, &col);
+       if (col.size() == 0) break; // Empty line is a signal to stop, in our
+       // archive format.
+       if (col.size() > 5) {
+         KALDI_WARN << "Reading lattice: bad line in FST: " << line;
+         delete fst;

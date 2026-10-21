@@ -1,0 +1,68 @@
+# conandata.yml — inn/1.7.2q
+# 源码唯一真相源：源码 URL + SHA256 + 补丁声明。
+# conanfile.py 通过 self.conan_data["sources"] 与 apply_conandata_patches() 读取。
+#
+# 版本说明：上游 ISC 从未发布 "1.7.2q" 命名的压缩包（其历史归档只有
+# inn-1.7.2.tar.gz，见 https://downloads.isc.org/isc/inn/OLD/1.7/）。
+# "1.7.2q" 是 Debian/Ubuntu 发行版线对 INN 1.x 的 canonical 版本号
+# （Debian 源码包 inn_1.7.2q.orig.tar.gz，经 pristine-tar 在 Debian 与
+# Ubuntu 间共享同一字节流）。因此 conandata 指向发行版官方归档，
+# 而非 ISC 历史目录（后者字节与本版本号不对应，sha256 必然失配）。
+# sha256 下方值为 2026-10-15 实测 Ubuntu 官方归档，仅作交叉记录；
+# CI 以 conan 实际下载校验为准。
+
+sources:
+  url:
+    - "https://launchpad.net/ubuntu/+archive/primary/+files/inn_1.7.2q.orig.tar.gz"
+    - "https://deb.debian.org/debian/pool/main/i/inn/inn_1.7.2q.orig.tar.gz"
+  sha256: "5573ece29352ad2a90de39b5a7d3e91d47e7b8b94bd46e18187686313b9e1354"
+
+patches:
+  - patch_file: "patches/0001-parsedate-yacc-prototype.patch"
+    patch_description: "Backport Debian parsedate_gcc4: date_lex global plus prototype for modern yacc/bison output"
+    patch_type: "portability"
+    strip: 1
+  - patch_file: "patches/0002-use-system-prototypes.patch"
+    patch_description: "Backport Debian use_system_prototypes: drop conflicting own declarations, use system headers"
+    patch_type: "portability"
+    strip: 1
+  - patch_file: "patches/0003-implicit-declarations.patch"
+    patch_description: "Adapted from Debian implicit_decls: missing includes and static int fixes for modern compilers"
+    patch_type: "portability"
+    strip: 1
+  - patch_file: "patches/0004-inet-addr-return-type.patch"
+    patch_description: "Backport Debian inet_addr_is_int: inet_addr returns int, not long (LP64 correctness)"
+    patch_type: "bugfix"
+    strip: 1
+  - patch_file: "patches/0005-overlapping-strcpy-memmove.patch"
+    patch_description: "Backport Debian overlapping_strcpy: overlapping copy in nnrpd post path uses memmove"
+    patch_type: "bugfix"
+    strip: 1
+  - patch_file: "patches/0006-makefile-destdir-support.patch"
+    patch_description: "Backport Debian misc_makefiles: DESTDIR aware frontends install and makedirs, toolchain flags for subst build"
+    patch_type: "portability"
+    strip: 1
+  - patch_file: "patches/0007-loadave-linux-proc.patch"
+    patch_description: "Select proc loadavg branch on linux or __linux__ (musl has no nlist.h, clang may not define bare linux)"
+    patch_type: "portability"
+    strip: 1
+  - patch_file: "patches/0008-subst-strerror-portable.patch"
+    patch_description: "subst xstrerror uses POSIX strerror directly instead of legacy sys_errlist fallback"
+    patch_type: "portability"
+    strip: 1
+  - patch_file: "patches/0009-lib-makefile-ar-knob.patch"
+    patch_description: "Wire lib Makefile archiver to an AR knob so the recipe can inject the toolchain ar"
+    patch_type: "portability"
+    strip: 1
+  - patch_file: "patches/0010-checkconf-builtins-tab-check.patch"
+    patch_description: "config/checkconf.sh TAB check with shell builtins only (toybox userland lacks the GNU sed/grep/diff extensions the historical pipeline needs)"
+    patch_type: "portability"
+    strip: 1
+  - patch_file: "patches/0011-subst-use-rename.patch"
+    patch_description: "subst in-place replacement via rename() instead of link()+unlink() (preflight filesystem reports hardlink unsupported, link() fails EPERM)"
+    patch_type: "portability"
+    strip: 1
+  - patch_file: "patches/0012-byteorder-system-prototypes.patch"
+    patch_description: "Drop stale K&R ntohs/htons declarations, use system arpa/inet.h prototypes (musl uint16_t conflict)"
+    patch_type: "portability"
+    strip: 1

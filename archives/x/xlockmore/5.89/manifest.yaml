@@ -1,0 +1,60 @@
+# version-level manifest
+# archives/x/xlockmore/5.89/manifest.yaml
+# ARCHIVE-SPEC v2.0
+
+version: "5.89"
+software: "xlockmore"
+status: built
+build_date: "2026-10-18"
+build_system: autotools
+
+source:
+  url: "https://www.sillycycle.com/xlock/xlockmore-5.89.tar.xz"
+  sha256: "525597aca0a06486798be925b6f04146bb595643248690f45807b6fa3a0ded5d"
+  tar_format: tar.xz
+
+build:
+  system: autotools
+  configure_options:
+    - "--host=aarch64-linux-gnu"
+    - "--build=aarch64-unknown-linux-gnu"
+    - "--without-motif"
+    - "--without-athena"
+    - "--without-xaw"
+    - "--without-xpm"
+    - "--without-opengl"
+    - "--without-mesa"
+    - "--without-gltt"
+    - "--without-ttf"
+    - "--without-ftgl"
+    - "--without-freetype"
+    - "--without-magick"
+    - "--without-rplay"
+    - "--without-nas"
+    - "--without-esound"
+    - "--without-gtk"
+    - "--without-gtk2"
+    - "--without-dpms"
+    - "--without-xinerama"
+    - "--without-dtsaver"
+    - "--disable-gtktest"
+  dependencies:
+    - "libx11/1.8.13"
+    - "libxext/6.4.0.1"
+    - "libxmu/1.3.1.1"
+  cc: clang
+  cxx: clang++
+  extra_env:
+    - "HMDFS umask fix: configure + config.status umask 077 -> umask 022"
+    - "make -j1 (parallel make fails on HMDFS workers)"
+
+patches_applied: []
+
+test_status: pending
+
+knowledge_gained:
+  - "config.guess/config.sub do not recognise OHOS; must give --host=aarch64-linux-gnu and --build=aarch64-unknown-linux-gnu explicitly"
+  - "HMDFS umask fix required (umask 077 -> umask 022) in configure and config.status"
+  - "Parallel make fails on HMDFS workers (jobserver mkfifo denied); use -j1"
+  - "libcrypt linked but provided by musl on OHOS; no separate conan package needed"
+  - "libpng appears in link line but not a runtime dependency when XPM disabled"

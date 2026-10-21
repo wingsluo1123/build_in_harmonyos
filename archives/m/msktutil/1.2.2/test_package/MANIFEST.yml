@@ -1,0 +1,46 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+
+package: msktutil/1.2.2
+homepage: "https://github.com/msktutil/msktutil"
+
+# ---- Upstream test audit ---------------------------------------------------
+# Audited the msktutil-1.2.2 release source tree and build files (no tests exist):
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "msktutil-1.2.2 release tree (root, 23 files)"
+    reason: "There is no tests/, test/ or *test* harness directory at any level; the only sources are the msktutil application (krb5wrap/msktutil/msktkrb5/msktldap/msktname/msktpass/msktconf/ldapconnection/strtoll) plus docs."
+  - source: "Makefile.in (all/clean/distclean/install/dist/distcheck)"
+    reason: "No check, TESTS or check_PROGRAMS target is defined; distcheck merely echoes @PACKAGE_VERSION@, it runs no test."
+  - source: "configure.ac"
+    reason: "Registers no test program or test target (AC_CONFIG_FILES only lists Makefile and msktutil.1); dependency probes (krb5/ldap/sasl/udns) are build requirements, not tests."
+  - conclusion: "Upstream 1.2.2 provides no automated tests; the adaptation's test_package validates the installed msktutil binary as a runtime consumer check and does not claim upstream coverage."
+
+# rule4 强制字段：upstream_test_total 必须显式声明。
+# msktutil 1.2.2 上游经完整审计确认确实没有任何自动化测试，
+# 官方注册总数即 0，口径为 autotools_tests（无 TESTS 注册）。
+upstream_test_total: 0
+upstream_test_count_method: autotools_tests
+upstream_test_passed: 0
+upstream_test_failed: 0
+upstream_test_skipped: 0
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+# ---- Consumer tests (test_package) -----------------------------------------
+# test_package/conanfile.py runs test.sh against the packaged
+# bin/msktutil, parses its deterministic "RESULT: P passed, F failed" trailer
+# into HMBS_TEST_PACKAGE_RESULT, and emits HMBS_UPSTREAM_TEST_RESULT
+# (status=no_tests, 0 counts).
+test_package_tests:
+  - file: test.sh
+    description: "Run the packaged `msktutil` offline through 6 real assertions: (1) `--version` exits 0, (2) `--version` prints exactly 'msktutil version 1.2.2' (proving the binary executes and reports its version), (3) `--help` exits 0, (4) `--help` output contains the usage text, (5) negative control - `--service` without an argument exits nonzero, (6) the missing-argument 'Error:' message is present (proving the harness observes real failures)."
+    command: "sh test.sh <package>/bin/msktutil <workdir>"
+
+test_package_test_count: 6
+assertion_count: 6

@@ -1,0 +1,31 @@
+#====================================================================
+# Draft: CMake 无 Platform/HarmonyOS 模块时 SONAME 缺失 → 下游 DT_NEEDED
+#        烙死构建机绝对路径；package() 阶段剥离 DT_NEEDED 后必须重签
+#        .codesign，否则产物在 HMDFS 上加载期 Permission denied
+#====================================================================
+
+id:                     E3546
+trigger_tool:           cmake|conan|patchelf|readelf|codesign
+phase:                  package
+error_signature:        libKF6.*\.so.*DT_NEEDED.*/storage/Users|DT_SONAME.*missing|Permission denied.*codesign|dlopen.*Permission denied
+severity:               1
+category:               platform, hmdfs, ohos, cmake
+match_keywords:         SONAME, Platform/HarmonyOS, DT_NEEDED, 绝对路径, .codesign, 重签名, CMAKE_SHARED_LIBRARY_SONAME, 版本化 soname, 路径剥离, conan package
+
+title:                  OHOS 上 CMake 无 Platform/HarmonyOS 平台模块，CMAKE_SHARED_LIBRARY_SONAME_{C,CXX}_FLAG 未定义导致链接时不带 -Wl,-soname；下游消费方（Conan CMakeDeps 生成文件、test_package 链接命令）把发布库的位置烙成构建机绝对路径进 DT_NEEDED，换机即断链
+
+root_cause:             CMake 平台模块（Platform/Linux 等）负责定义 CMAKE_SHARED_LIBRARY_SONAME_{C,CXX}_FLAG 与版本化 soname 行为；OHOS 目标三元组没有对应模块，CMake 退化为「System is unknown to cmake」，SONAME 相关变量为空——链接命令里根本没有 -Wl,-soname。后果链：①本库 .so 无 SONAME；②下游 link 时 readelf 取不到 soname，就把当时库文件的完整路径（/storage/Users/.../p/lib/libKDEGames6.so）写进下游的 DT_NEEDED；③下游拷到别的机器/沙箱后 NEEDED 解析必然失败。即使上游在 package() 阶段剥离自己产物的 DT_NEEDED 绝对路径（只动 tag=1 条目，保留 DT_SONAME/DT_RPATH/DT_RUNPATH 原值），如果改写后不做 .codesign 重签名，HMDFS 在 mmap-exec 装载时校验签名失败，直接 dlopen Permission denied——修好了路径却炸了签名，等于白修。
+
+affected_scope:         一切用 CMake 交叉编译到 OHOS 的共享库包（尤其 KDE/ECM 系），以及任何对发布库 ELF 做内容级修补（DT_NEEDED 路径剥离、等长字符串替换）后直接交付的流程。libkdegames 24.12.3 适配中实测：不设 soname flag 时 libKDEGames6.so 无 SONAME、下游 DT_NEEDED 烙死绝对路径；剥离后不重签名时 HMDFS 拒载。
+
+verification_cmd:       /data/service/hnp/bin/readelf -d libKDEGames6.so | grep -E 'SONAME|NEEDED'; /data/service/hnp/bin/readelf -S libXF86*.so 2>/dev/null | grep -c codesign; python3 -c "import ctypes,sys; sys.stderr=open('/tmp/t-err.log','w'); ctypes.CDLL(sys.argv[1])" <改写后未重签的so> 2>/tmp/t-err.log; cat /tmp/t-err.log
+
+rec_priority:           1
+rec_approach:           soname-flag-plus-rewrite-and-codesign
+rec_description:        (1) 配方 generate()/configure 阶段显式补齐平台缺口：-DCMAKE_PLATFORM_NO_VERSIONED_SONAME=ON（关闭版本化 soname，与上游 Linux 行为解耦）+ 注入 -DCMAKE_SHARED_LIBRARY_SONAME_C_FLAG=-Wl\,-soname 与 CXX 同名变量，让链接命令恢复 -Wl,-soname；(2) package() 阶段只对 DT_NEEDED（tag=1）做路径剥离，DT_SONAME/DT_RPATH/DT_RUNPATH 保持原值——动了 SONAME 会破坏库查找语义；(3) 剥离改写属于内容级修补，会使 .codesign 失效（见 DRAFT-HMDFS-SIGNED-ELF-BYTE-REWRITE），改写后必须立即用 CI 同源签名工具重签；签名工具不可用时报错并回滚原文件，禁止产出「已改写但未签名」的库；(4) 验收口径：readelf -d 应看到 SONAME=lib<Name>.so 且 DT_NEEDED 无绝对路径。
+rec_command:            /data/service/hnp/bin/readelf -d <pkg>/lib/lib*.so | grep -E 'SONAME|NEEDED'
+rec_auto_fix:               false
+rec_impl:               manual
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E3546.md

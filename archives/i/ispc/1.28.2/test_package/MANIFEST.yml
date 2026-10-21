@@ -1,0 +1,59 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件（CI L0e 强制要求存在）
+# 详见 docs/TEST_QUALITY_SPEC.md
+package: ispc/1.28.2
+homepage: https://ispc.github.io/
+
+# 上游测试命令（本配方 build() 中真实运行；见 conanfile.py::_run_upstream_tests）
+upstream_check_command: >-
+  cmake --build <build> --target check-all   （lit，tests/lit-tests）
+  ;  cd <src> && ISPC_HOME=<build>/bin python3 scripts/run_tests.py -t neon-i32x4 -a aarch64
+  -o O2 -c clang++ -j N --non-interactive --time --fail_db tests/fail_db.txt   （tests/func-tests）
+upstream_test_in_build: true
+upstream_test_command: >-
+  cmake --build <build> --target check-all && cd <src> && ISPC_HOME=<build>/bin python3
+  scripts/run_tests.py -t neon-i32x4 -a aarch64 -o O2 -c clang++ -j N --non-interactive --time
+  --fail_db tests/fail_db.txt
+
+# 上游测试套件清点（静态清点脚本与逐用例归类见
+# $HOME/tmp/ispc-1.28.2/testlists/ 与 upstream-tests-inventory.md）
+upstream_tests:
+  - name: lit (check-all, tests/lit-tests)
+    command: "cmake --build <build> --target check-all"
+    cases: 647          # 639 *.ispc + 5 *.ll + 3 *.cpp，一个文件 = 一个 lit 用例
+    expected: >-
+      本平台（LLVM 20.1.8，targets-built = AArch64 ARM X86）最终设备轮（conan create）实测：
+      Passed 546 / Failed 3 / Unsupported 94 / Expectedly Failed 4。
+      UNSUPPORTED（XE/WASM/macOS/Windows/SDE/ASan/ISPC_LIBRARY_JIT，以及 8 个因 conan buildenv 选中的
+      OHOS python3.12 使 lit 的 LINUX_HOST 特性不成立的 REQUIRES: LINUX_HOST 用例）与 Expectedly Failed
+      计入 SKIP，不计 PASS；3 个 Failed 均为上游测试的 host=x86 假设（math-lib-value.ispc /
+      2780-1.ispc / 3571.ispc），逐条原因见 reports/test-report.md。
+  - name: func-tests (scripts/run_tests.py)
+    command: "cd <src> && ISPC_HOME=<build>/bin python3 scripts/run_tests.py -t neon-i32x4 -a aarch64 -o O2 -c clang++ -j N --fail_db tests/fail_db.txt"
+    cases: 1576         # tests/func-tests/*.ispc，一个文件 = 一个用例（上游 aarch64 CI 的测试路径）
+    expected: >-
+      本平台原生执行 aarch64 NEON 代码；实测 PASSED 1567 / FAILED compilation 0 /
+      FAILED execution 0 / SKIPPED 9（9 个均为上游测试文件内的 `// rule: skip on ...` 自声明）。
+
+# test_package 自带测试（真实 codegen + 链接 + 执行的数值断言）
+test_package_tests:
+  - file: test.ispc
+    description: "SPMD 内核（add_arrays / dot_product），由被测 ispc 以 neon-i32x4 编译为对象文件"
+    command: "ispc test.ispc --arch=aarch64 --target=neon-i32x4 --pic -o test.o -h ispc_probe.h"
+  - file: test.cpp
+    description: "链接 ispc 产出的对象并执行，逐元素断言 add_arrays 与 dot_product 的数值结果"
+    command: "clang++ test.cpp test.o -I . -o ispc_probe && ./ispc_probe"
+  - file: conanfile.py
+    description: "ispc --version 冒烟 + neon codegen + --target=host asm 生成 + 产物执行"
+
+# 实测结果（2026-10-11 设备真机，conan create 自动执行 test_package）
+test_package_result: "PASS — ispc --version / neon-i32x4 codegen / --target=host asm / clang++ 链接执行 全部通过；数值断言（add_arrays 逐元素 64 项 + dot_product 容差比较）全部成立，实测输出 `ispc probe ok: add_arrays(64) + dot_product = 43680.000000`"
+assertion_count: 66   # test.cpp: add_arrays 64 项逐元素 + dot_product 1 项容差 + 程序退出码；conanfile.py 另有 4 个 self.run 阶段
+
+# 上游四分项（TOTAL = PASS + FAIL + SKIP + NOT_RUN；test_package 不计入上游分母）
+upstream_total: 2223
+upstream_pass: 2113
+upstream_fail: 3
+upstream_skip: 107
+upstream_not_run: 0
+upstream_pass_rate: "95.05%"

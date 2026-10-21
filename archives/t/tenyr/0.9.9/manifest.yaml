@@ -1,0 +1,59 @@
+version: "0.9.9"
+software: "tenyr"
+status: "built"
+build_date: "2026-10-12"
+build_system: "makefile"
+
+source:
+  url: "https://github.com/kulp/tenyr/archive/refs/tags/v0.9.9.tar.gz"
+  sha256: "29010e3df8449e9210faf96ca5518d573af4ada4939fe1e7cfbc169fe9179224"
+  tar_format: "tar.gz"
+  upstream_tag: "v0.9.9"
+
+build:
+  system: "makefile"
+  configure_options: []
+  build_flags: "JIT=0 SDL=0 PEDANTIC=0 (software simulation core; JIT/SDL default on and pull in GNU Lightning/SDL2)"
+  dependencies: []
+  tool_dependencies:
+    - "flex/2.6.4"
+    - "bison/3.8.2"
+  # tools.build:compiler_executables.c (clang) is passed to make as CC
+  cc: "clang"
+  make_flags: "-j1 (E074: HMDFS jobserver fifo EPERM)"
+
+patches_applied:
+  - "0001-fix-sextend32-long-to-int32-cast.patch"
+  - "0002-fix-disabled-macro-expansion-stdin-stdout.patch"
+knowledge_gained:
+  - "tenyr Makefile enables SDL and JIT by default via `ifneq ($(VAR),0)` (undefined == unequal to 0) -> must pass JIT=0 SDL=0 for the software core."
+  - "-Werror=shorten-64-to-32 in src/common.h SEXTEND32 fires on LP64 with clang (mk/compiler/clang.mk always adds -Weverything + -Werror=shorten-64-to-32); fix with a portable (int32_t) cast."
+  - "mk/compiler/clang.mk adds -Weverything + -Werror=disabled-macro-expansion UNCONDITIONALLY (independent of PEDANTIC). OHOS sysroot stdio.h defines stdin/stdout as self-referential macros (#define stdin (stdin)), so any direct `in = stdin;` expands to a recursive macro and clang's -Weverything/-Werror=disabled-macro-expansion turns it into a hard error even with PEDANTIC=0. Fix: downgrade with -W$(PEDANTRY_EXCEPTION)disabled-macro-expansion (= -Wno-error=...) on tas.o/tsim.o/tld.o/serial.o, matching upstream's lexer.o/parser.o treatment."
+  - "make check_sw test-program registry = 112: 44 check_sim programs (16 op + 25 run + 3 demo, each run in 2 simulator flavours interp/interp_prealloc = 88 executions) + 66 check_compile programs (41 pass_compile + 25 fail_compile) + 2 SDL-gated run tests (led, bm_mults; only registered when SDL!=0). SDL=0 software core executes 110, passes 110; 2 SDL device tests skipped (environment gap, same config as upstream CI wine job). check_hw needs iverilog+VPI (not on OHOS)."
+
+homepage: "https://github.com/kulp/tenyr"
+license: "MIT"
+
+tests:
+  upstream:
+    command: "make check_sw JIT=0 SDL=0 PEDANTIC=0"
+    cases: 112
+    executed: 110
+    passed: 110
+    failed: 0
+    skipped: 2
+    note: >
+      上游测试程序登记 112 = check_sim 44（16 op + 25 run + 3 demo，每个程序在
+      interp/interp_prealloc 两种模拟器风格下执行，88 次执行）+ check_compile 66
+      （41 pass_compile 正汇编 + 25 fail_compile 负汇编）+ 2 个 SDL 门控运行用例
+      （led、bm_mults，mk/misc.mk SDL_RUNS，仅 SDL!=0 时注册）。真机执行 110
+      （44 sim + 66 compile）全部通过，2 个 SDL 设备用例在 SDL=0 软件核心下不
+      注册/不执行（environment gap，与上游 CI wine job 的 SDL=0/JIT=0 配置一致）。
+      check_hw（iverilog/VPI 硬件仿真）不纳入统计，OHOS 无 Icarus Verilog 工具链。
+      实际通过数以真机 conan create 的 make check_sw 日志为准。
+  adapted:
+    command: "test_package/test_tenyr.sh"
+    cases: 6
+    notes: >
+      消费者测试真实执行 tas/tld/tsim：组装->链接->模拟一条最小程序，并校验
+      三个工具均输出 version（6 项确定性断言）。

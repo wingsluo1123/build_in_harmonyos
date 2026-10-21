@@ -1,0 +1,30 @@
+{
+  "verdict": "pass",
+  "issues": [
+    {
+      "severity": "P2",
+      "rule_id": "notes-doc",
+      "file": "archives/l/libwraster/0.96.0/notes.md",
+      "line": 71,
+      "description": "notes.md (lines 71-72) claims test_package/test.c exercises the wraster API via 'RLoadImage / RCreateImage / RPutPixel / RConvertImage / RReleaseImage'. In reality test.c never calls RLoadImage (0 occurrences) and RConvertImage appears only in the leading comment stating it is NOT exercised (needs a Display). The real API calls are RCreateImage/RClearImage/RGetPixel/RPutPixel/RScaleImage/RMessageForError/RReleaseImage. This is a documentation/claim inconsistency (declaration vs. evidence); it does NOT affect recipe correctness and the test still genuinely exercises the library, so it is non-blocking.",
+      "fix_suggestion": "Reword notes.md line 71-72 to list only the functions test.c actually calls (RCreateImage/RClearImage/RGetPixel/RPutPixel/RScaleImage/RMessageForError/RReleaseImage) and keep RLoadImage/RConvertImage in the 'consumers (wmglobe/wmjupiter)' list only."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "code-style",
+      "file": "archives/l/libwraster/0.96.0/conandata.yml",
+      "line": 8,
+      "description": "Style/advisory (non-blocking). code-style section 12 suggests patch_description be short space-separated words (e.g. \"0001 config guess\"); here the values are sentence-style ('Recognize HarmonyOS aarch64 as aarch64-unknown-linux-ohos', 'Accept the linux-ohos kernel-OS combination'). Understandable and consistent; no functional impact.",
+      "fix_suggestion": "Optional: shorten patch_description to the recommended '{NNNN} {space separated path/topic}' form to match code-style section 12. Not required."
+    },
+    {
+      "severity": "P3",
+      "rule_id": "R40",
+      "file": "archives/l/libwraster/0.96.0/test_package/test.c",
+      "line": 6,
+      "description": "Non-blocking observation (R40 depth-adaptation). libwraster is an X11/XPM raster image library; adaptation is build-system level only (config.guess/config.sub POSIX patches, no platform macro, no stubs) and test_package genuinely exercises the core public API (R34 satisfied). The X11-bound entry points (RGetImageFromXPMData / RConvertImage / RCreateXImage) are intentionally not exercised (need a Display) and are deferred to the downstream wmglobe dockapp. Per R40 this class should be annotated 'needs manual confirmation of adaptation completeness'; recorded as observation, not a blocker.",
+      "fix_suggestion": "No change required for this PR; ensure the downstream dockapp (wmglobe) build covers the X11-bound entry points during integration."
+    }
+  ],
+  "summary": "W4 SECOND-ROUND independent pre-PR audit of libwraster 0.96.0. Verified from scratch against on-disk files (not the input JSON alone). The three previously-flagged P1 defects are ALL RESOLVED: (1) R39 - conandata.yml sources url is now a single official HTTPS URL 'https://github.com/window-maker/wmaker/releases/download/wmaker-0.96.0/WindowMaker-0.96.0.tar.gz' with no gh-proxy/ghfast/cnb.cool mirror prefix and no http://; (2) manifest.yaml - no template placeholders remain; it now carries real values (software: libwraster, version: 0.96.0, build_system: autotools, status: built, real url/sha256/configure_options/dependencies); (3) notes.md - no template placeholders remain (no {cmake|...}, {2026-10-15}, {按需添加行} or brace-only lines). Deception class re-checked clean: R34 satisfied (test_package/conanfile.py test() runs the built executable via self.run, which fails loudly on non-zero exit; test.c really calls the packaged public API), R9 not hit (no 'pass', no commented cmake.test(), no os.system exit 0), R8 not hit (no #ifdef __OHOS__ added by patches - patches only extend config.guess/config.sub OS lists via POSIX means), R19 not hit (no prebuilt .so/.a/.o in the PR - only the 10 tracked text files), no '-D__OHOS__' injection anywhere in the recipe. Additional facts verified: (a) wrlib/Makefile.am links 'libwraster_la_LIBADD = @LIBRARY_SEARCH_PATH@ @GFXLIBS@ @MAGICKLIBS@ @XLIBS@ @LIBXMU@ -lm' - no Xft - and no wrlib source references xft (grep 0 hits); the libxft dependency exists solely to satisfy the top-level configure probe (declared transitive_headers=False/transitive_libs=False), consistent with notes.md; (b) the claimed sha256 4fe130ba23cf4aa21c156ec8f01f748df537d0604ec06c6bbcec896df1926f6d matches sha256sum of /storage/Users/currentUser/tmp/wmaker-0.96.0.tar.gz exactly (not forged), and the tarball has a single root dir WindowMaker-0.96.0 (strip_root=True valid); (c) notes.md is consistent with conanfile.py on dependencies (libx11/6.4.0 force, libxext/6.4.0, libxpm/3.5.17, libxft/2.3.9), configure options, the config-paths.h step (conanfile runs 'make -j1 config-paths.h' before 'make -j1 -C wrlib'; upstream configure has exactly the required 2 'umask 077' occurrences), and the chmod 0o755 step (configure/config.guess/config.sub/install-sh/missing/ltmain.sh), EXCEPT the one P2 documentation inconsistency above. VERDICT=pass: zero P0 and zero P1. Out-of-scope advisory only: the working tree also has unrelated modifications archives/l/libXext/README.md and archives/l/libXext/manifest.yaml from a DIFFERENT task (plus untracked feedback/SKILL_FEEDBACK_*.md); these are NOT part of this libwraster PR and are not counted as issues of this package."
+}

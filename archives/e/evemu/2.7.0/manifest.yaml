@@ -1,0 +1,74 @@
+# 版本级 manifest — evemu 2.7.0
+
+version: "2.7.0"
+software: "evemu"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-09"
+build_system: autotools
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（官方 GitLab 归档，2026-10-16 实测 HTTP 200 / 539053 bytes）
+  # 换宿主原因：原 www.freedesktop.org 对 CI Worker 返回 403（见 conandata.yml / notes.md）
+  url: "https://gitlab.freedesktop.org/libevdev/evemu/-/archive/v2.7.0/evemu-v2.7.0.tar.gz"
+
+  # 源码校验和（与 conandata.yml 逐字相同）
+  sha256: "b4ba7458ccb394e9afdb2562c9809e9e90fd1099e8a028d05de3f12349ab6afa"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: autotools
+
+  # 配置选项列表
+  # 钉死 canonical 三元组以免调用 tarball 自带的 2012 版 config.guess
+  # （详见 notes.md 构建取舍第 1 条）
+  configure_options:
+    - "--build=aarch64-unknown-linux-musl"
+    - "--host=aarch64-unknown-linux-musl"
+    # 上游自带开关：automake py-compile 依赖 Python 3.12 起移除的 imp 模块，
+    # 且 AM_PATH_PYTHON 解析出的 pythondir 在前缀之外（详见 notes.md 第 4 条）
+    - "--disable-python-bindings"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies:
+    - libevdev/1.13.7
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied:
+  - "0001-portable-program-name-and-scandir-sort.patch"
+  - "0002-test-drop-static-link-for-shared-build.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "OHOS 构建机上 mktemp -d 产出 0700 目录而进程仅凭组权限访问，config.guess/configure 的暂存目录写入会 EACCES；显式 --build/--host 或退回 mkdir 分支即可绕开"
+  - "OHOS loader 无 Conan 缓存默认搜索路径，configure 的 conftest 也会因缺 libevdev.so.2 报 cannot run C compiled programs，需在 generate() 注入 LD_LIBRARY_PATH"
+  - "evemu 上游三条 test 用例全部设备无关，去掉 test-evemu-create 的 -static 后 make check 3/3 通过"

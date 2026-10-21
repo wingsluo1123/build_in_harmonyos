@@ -1,0 +1,41 @@
+# 版本级 manifest — lddtreepax 1.3.9
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "1.3.9"
+software: "lddtreepax"
+status: built
+build_date: "2026-10-14"
+build_system: none
+
+source:
+  url: "https://codeload.github.com/gentoo/pax-utils/tar.gz/refs/tags/v1.3.9"
+  sha256: "d8db28f8f55d03b1f302b719857e9ffd6574ecade0c3b762ebd1c215e0a68754"
+  tar_format: tar.gz
+
+build:
+  system: none
+  configure_options: []
+  dependencies:
+    - "pyelftools/0.33（requires 显式 run=True，见 conanfile 注释）"
+  cc: null
+  cxx: null
+
+runtime_dependencies:
+  - "python3（设备 PATH 解释器，CI worker 保证存在；非 conan 包依赖，同 pax-utils/1.3.10、pyelftools/0.33 先例）"
+
+patches_applied:
+  - "patches/0001-lddtree-py-portable-python3-shebang.patch（portability：交付文件 lddtree.py shebang python→python3；无平台宏，R8 合规）"
+
+knowledge_gained:
+  - "lddtreepax 不是独立上游库：gentoo/pax-utils 的 python 实现 lddtree（lddtree.py），Alpine 重命名为 lddtreepax 的 noarch 子包；C 工具（scanelf 等）属 pax-utils 子包，由 pax-utils/1.3.10 独立适配。（knowledge_ref: DRAFT-13619-lddtreepax-pax-utils-python-subpackage）"
+  - "conan 2.29 python-require 依赖的 skip 机制：_skip_binaries 以 files=(headers|libs|run|build) 判定，python-require 无 C 头/库且 run 默认 False → BINARY_SKIP（package_folder=None、runenv 不聚合，conan graph info 实测）；requires 必须显式 run=True。（knowledge_ref: DRAFT-13620-conan2-python-require-run-true-binary-skip）"
+  - "上游 lddtree-py 冒烟用例（lddtree.py /bin/bash | grep -i 'none'，负向断言）在 OHOS 上双空跑：fixture /bin/bash 缺失（/bin 只读）+ 设备无裸 python 解释器；修复等价探针（python3+pyelftools+真实 /bin/sh）FAIL 于 musl 无 libc.so soname 链 → lddtree.py:649 打印 None 命中 grep -i none（上游断言为 glibc 而写，alpine musl CI 是 -Dtests=false，musl 路径上游从未测过）。（knowledge_ref: DRAFT-13621-lddtree-py-musl-libc-soname-none-assertion）"
+  - "musl/OHOS 布局下 lddtree.py 对无法解析的库打印 None（如 /bin/sh 的 libc.so => None）：上游算法平台边界，工具 rc=0 不崩溃，不修改上游行为。（knowledge_ref: DRAFT-13621-lddtree-py-musl-libc-soname-none-assertion）"
+  - "conan.tools.env 在该 conan 构建导出 VirtualRunEnv（大写 E）；dotest-sfx 依赖 $0 带路径（${0%/*} 定位 lib.sh），须以 'bash ./dotest-py' 启动。（knowledge_ref: DRAFT-13623-conan-virtualrunenv-dotest-sfx-dollar0）"
+
+verification:
+  w0_dependency_check: "pass（2026-10-13 conan download --only-recipe：pyelftools/0.33 rc=0 rev 3075bf33；python/3.12.9(.1) rc=0；日志 _analysis/lddtreepax-1.3.9/12,13-*.log）"
+  local_source_check: "pass_sha256_d8db28f8f55d03b1f302b719857e9ffd6574ecade0c3b762ebd1c215e0a68754"
+  lang_preflight: "pass_detected_python（组件范围 lddtree.py+tests/lddtree，--lang python；整树为 pax-utils 多工具项目判 mixed，不属本包，见 _analysis/lddtreepax-1.3.9/14-*.log）"
+  upstream_tests: "本包适用 1/6 条（lddtree-py）：实跑 1，raw 1/1 PASS（空跑：OHOS 无 /bin/bash fixture 且 /bin 只读，E363 边界同 pax-utils/1.3.10 notes）；修复等价探针 FAIL（musl 无 libc.so soname 链，上游负向断言 glibc-only，非适配缺陷）；真实行为由 test_package 5 条断言覆盖。详见 notes.md R51 申报表"
+  conan_verify: "pass（2026-10-14 ohc-run.py conan-verify --profile ohos-aarch64：G1 配方完整性 / G2 conan create 干净构建（@ohpcd/stable）/ G3 系统同名库隔离 R26 / G4 产物完整性 + L2 平台功能矩阵 / L4 静态安全扫描 / L5 产物基线对比，RC=0；报告 archives/l/lddtreepax/1.3.9/reports/conan-verify-report.md）"

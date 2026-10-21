@@ -1,0 +1,25 @@
+--- a/tests/dispatch_read.c
++++ b/tests/dispatch_read.c
+@@ -76,21 +76,21 @@
+ 	dispatch_queue_t main_q = dispatch_get_main_queue();
+ 	test_ptr_notnull("dispatch_get_main_queue", main_q);
+ 
+ 	dispatch_source_t reader = dispatch_source_create(DISPATCH_SOURCE_TYPE_READ, (uintptr_t)infd, 0, main_q);
+ 	test_ptr_notnull("dispatch_source_create", reader);
+ 	assert(reader);
+ 
+ 	dispatch_source_set_event_handler(reader, ^{
+ 		size_t estimated = dispatch_source_get_data(reader);
+ 		fprintf(stderr, "bytes available: %zu\n", estimated);
+-		test_double_less_than_or_equal("estimated", estimated, bytes_total - bytes_read);
++		test_double_less_than_or_equal("estimated", (double)estimated, (double)(bytes_total - bytes_read));
+ 		const ssize_t bufsiz = 1024*500; // 500 KB buffer
+ 		static char buffer[1024*500];	// 500 KB buffer
+ 		ssize_t actual = dispatch_test_fd_read(infd, buffer, sizeof(buffer));
+ 		bytes_read += (size_t)actual;
+ 		printf("bytes read: %zd\n", actual);
+ 		if (actual < bufsiz) {
+ 			actual = dispatch_test_fd_read(infd, buffer, sizeof(buffer));
+ 			bytes_read += (size_t)actual;
+ 			// confirm EOF condition
+ 			test_long("EOF", actual, 0);

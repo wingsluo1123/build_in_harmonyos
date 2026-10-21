@@ -1,0 +1,96 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+
+package: pipewire/1.6.9
+homepage: "https://gitlab.freedesktop.org/pipewire/pipewire"
+
+# 上游测试命令 (用于 meson test 分析)
+upstream_check_command: "meson test"
+upstream_test_in_build: true
+upstream_test_command: "meson test -C build-release"
+
+# 上游实际运行的测试（真机 meson test --list 共 50 项，全部通过）
+upstream_tests:
+  # spa audioconvert 插件测试（7 项）
+  - file: spa/plugins/audioconvert/test-audioadapter.c,test-audioconvert.c,test-channelmix.c,test-fmt-ops.c,test-peaks.c,test-resample.c,test-resample-delay.c
+    source: pipewire-1.6.9/spa/plugins/audioconvert/
+    description: "SPA audioconvert 采样率/声道/峰值/重采样测试"
+    command: "meson test test-audioadapter test-audioconvert test-channelmix test-fmt-ops test-peaks test-resample test-resample-delay"
+  # spa audiomixer / control 插件测试（2 项）
+  - file: spa/plugins/audiomixer/test-mix-ops.c
+    source: pipewire-1.6.9/spa/plugins/audiomixer/
+    description: "SPA audiomixer SIMD 混音算子测试"
+    command: "meson test test-mix-ops"
+  - file: spa/plugins/control/test-mixer-ump-sort.c
+    source: pipewire-1.6.9/spa/plugins/control/
+    description: "SPA control UMP 排序测试"
+    command: "meson test test-mixer-ump-sort"
+  # 配置 JSON 校验（26 项，src/daemon/meson.build 逐文件注册）
+  - file: src/daemon/*.conf
+    source: pipewire-1.6.9/src/daemon/
+    description: "spa-json-dump 校验全部发行版/测试配置文件"
+    command: "meson test validate-json-*.conf"
+  # pipewire 模块/协议测试（7 项）
+  - file: src/modules/module-protocol-native/test-connection.c
+    source: pipewire-1.6.9/src/modules/module-protocol-native/
+    description: "native 协议连接测试"
+    command: "meson test pw-test-protocol-native"
+  - file: src/tests/test-endpoint.c,test-interfaces.c,test-stream.c,test-filter.c,test-security-context.c,test-cpp.cpp
+    source: pipewire-1.6.9/src/tests/
+    description: "endpoint/interfaces/stream/filter/security-context/cpp 绑定测试"
+    command: "meson test pw-test-endpoint pw-test-interfaces pw-test-stream pw-test-filter pw-test-security-context pw-test-cpp"
+  # 库与工具单元测试（8 项，test/meson.build）
+  - file: test/test-pwtest.c
+    source: pipewire-1.6.9/test/
+    description: "pwtest 框架自测"
+    command: "meson test test-pwtest"
+  - file: test/test-properties.c,test-array.c,test-map.c,test-mempool.c,test-utils.c
+    source: pipewire-1.6.9/test/
+    description: "properties/array/map/mempool/utils 单元测试"
+    command: "meson test test-pw-utils"
+  - file: test/test-lib.c
+    source: pipewire-1.6.9/test/
+    description: "pipewire 库核心测试"
+    command: "meson test test-lib"
+  - file: test/test-client.c
+    source: pipewire-1.6.9/test/
+    description: "client 测试"
+    command: "meson test test-client"
+  - file: test/test-loop.c
+    source: pipewire-1.6.9/test/
+    description: "loop/data-loop 测试（含 OHOS cancel 回退；pthread_cancel 依赖用例能力缺失时 SKIP）"
+    command: "meson test test-loop"
+  - file: test/test-context.c,test/test-config.c
+    source: pipewire-1.6.9/test/
+    description: "context/config 测试"
+    command: "meson test test-context"
+  - file: test/test-support.c,test/test-logger.c
+    source: pipewire-1.6.9/test/
+    description: "support/logger 测试（含 OHOS 显式 flush）"
+    command: "meson test test-support"
+  - file: test/test-spa-buffer.c,test-spa-control.c,test-spa-format.c,test-spa-json.c,test-spa-utils.c,test-spa-log.c,test-spa-node.c,test-spa-pod.c
+    source: pipewire-1.6.9/test/
+    description: "SPA buffer/control/format/json/pod/utils 测试"
+    command: "meson test test-spa"
+
+# 真机结果（2026-10-18，OHOS aarch64，conan create 构建树内执行 meson test）
+upstream_test_result:
+  ok: 50
+  fail: 0
+  skipped_tests: 0
+  subtest_pass: 198
+  subtest_skip: 10  # journal 日志 2 项 + ABI 尺寸 7 项 + pthread_cancel 取消用例 1 项（平台能力/环境条件，源码内跳过）
+  subtest_fail: 0
+
+# test_package 中自带的测试 (消费者视角验证，共 7 个测试用例)
+test_package_tests:
+  - file: test.c
+    description: "消费者测试（1 个测试用例 library_version）：公开 API pw_init/pw_get_library_version/pw_deinit"
+    command: "./test_pipewire"
+  - file: test_ohos.c
+    description: "鸿蒙消费者测试（6 个测试用例）：mempool_memfd_map、mempool_import_map、data_loop_cancel、consumer_self_connect、daemon_exec_smoke（执行打包 bin/pipewire --version，不可 SKIP）、daemon_client_e2e（探测 AF_UNIX 可绑定目录后启动打包守护进程，经 protocol-native 完成 client 连接与 sync 往返）"
+    command: "./test_ohos"
+
+# 上游子测试状态总数（meson test -v 日志中 status 条目：198 PASS + 10 SKIP）
+assertion_count: 208

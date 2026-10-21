@@ -1,0 +1,51 @@
+software: imv
+display: "imv"
+description: "X11/Wayland 图像查看器（OHOS PC 取 wayland-only；桌面 GL 固定管线经 gl4es 翻译到 GLES2/EGL）"
+category: image
+homepage: "https://sr.ht/~exec64/imv/"
+license: MIT
+build_system: meson
+
+# 顶层 status 是 presubmit 硬门（libgff/libmeshb 实证：只有 versions.<ver>.status 不够）
+status: built
+
+ohos_adaptation:
+  key_points:
+    - "窗口系统：上游 meson_options.txt 只有 windows（all|wayland|x11），**没有 x11 布尔选项**；本配方取 -Dwindows=wayland。依据：(a) 本机 /system/lib64 只有 libEGL.so+libGLESv3.so，X11/Wayland 运行环境都不存在；(b) X11 路本仓结构性不可行——libxkbcommon/1.6.0 配方禁用 x11 模块（无 xkbcommon-x11.pc），而 deps_for_x11 硬需 dependency('xkbcommon-x11')。wayland-only 使 target_single_ws=true ⇒ 可执行名就是 imv"
+    - "GL：ohpcd 无 opengl/4.6（W0 实测 MISS）⇒ 用本仓既定替代 gl4es/1.1.6（桌面 GL 1.x 固定管线→GLES2）。imv 画布用 glBegin/glVertex2i/glOrtho/glPushMatrix，GLES2 头无这些符号，故不能用 gles2。gl4es 不装 .pc ⇒ 配方自建 gl.pc，上游 meson.build 零改动"
+    - "EGL：实测 gl4es 的 libGL.so 不导出 EGL API（llvm-nm -D 里 T egl* = 0）⇒ EGL 由 egl/1.0.5（静态 libEGL.a 转发 /system/lib64/libEGL.so）提供，同样自建 egl.pc"
+    - "gl4es 的 libGL.so 在构造函数里初始化，缺 LIBGL_GLES/LIBGL_EGL 时加载期 SIGSEGV ⇒ package_info() 用 runenv_info 导出这两个变量（gl4es 自身 test_package 同款）"
+    - "wayland-scanner：制品仓 wayland 包自带 bin/wayland-scanner 本机不可执行（rc=126 Operation not permitted；DT_NEEDED 内嵌构建机 conan 缓存绝对路径 libexpat.so）⇒ 从 wayland 1.24.0 源码静态编译只依赖 libc 的 scanner（chayang/gammastep 先例）"
+    - "pkg-config 闭包：conan 2 把纯传递依赖标 Skipped binary ⇒ 其 .pc 不安装，而 pkg-config --cflags 会解析 Requires.private。实测把 pcre2/libpcre2-8、harfbuzz→graphite2、libtiff→liblzma(xz)、libx11→xorgproto 提升为直接 requires"
+    - ".pc 修正：制品 .pc prefix 可能是 '/'、'/usr/local'、'/opt/libjpeg-turbo'，icu-uc.pc 甚至写作 'prefix = /'（= 带空格）；freetype2.pc 把 libdir 展开成字面量 '-L//lib'。配方复制改写 prefix/libdir/includedir 并修复失效 -L，置顶 PKG_CONFIG_PATH，并新增落盘自检（指向不存在目录即硬失败）"
+    - "静态归档闭包：librsvg 制品是静态 librsvg-2.a，其 .pc 把闭包放在 Requires.private，pkg-config --libs 不展开 ⇒ 本配方把该行提升为 Requires（否则首错 undefined symbol: cairo_gobject_line_join_get_type / xmlParseDocument）"
+    - "icu4c 只有静态 .a 且是 C++ 实现 ⇒ C 消费者需 -lc++，在 icu-uc.pc 的 Libs 追加（cif-api/0.4.2 先例）"
+    - "OHOS 无 POSIX 线程取消（三层缺失）⇒ imv 的 cancel→join 关闭路径（src/imv.c:1242）必须自建兼容 TU：SIGUSR1 handler 内 pthread_exit(PTHREAD_CANCELED)，-include 强制声明 + 编 .o 挂链接行；零上游补丁（机制取自配送池 DRAFT-spiped-1.6.4-pthread-cancel-ohos-nonRT-signal-shim）"
+    - "OHOS 的 /usr/bin/xxd 是 toybox applet（无 -n/-i），而上游用 xxd -n NAME -i 内嵌测试图 ⇒ tool_requires tinyxxd/1.3.16 并经 meson machine file [binaries] 注入 xxd"
+    - "测试：-Dtest=enabled，build() 内 meson.test() 真跑 3 个测试目标 / 5 条 live cmocka 用例（test_navigator.c 的 test_navigator_add_remove 上游自注释，未删改）⇒ 5/5 通过"
+    - "传递共享库 rpath：meson 只为直接依赖生成 -rpath ⇒ 追加每个依赖 libdir 的 -Wl,-rpath；不能用 LD_LIBRARY_PATH（conan 的 libintl 代理会打挂 python3/meson）"
+    - "E077 签名：meson install 就地改写 ELF 使 .codesign 失效 ⇒ package() 末尾对 bin/imv、bin/imv-msg 重新 binary-sign-tool sign -selfSign 1"
+    - "外部缺陷（非本配方，已留证）：出厂 wayland 包的 libwayland-cursor.so.0 的 .codesign 失效（dlopen ⇒ EACCES；1.24.0 与 1.22.0.1 两版均复现），导致 bin/imv 在无修复环境下不可直接运行；消费者测试第 3 组明确标注为「外部缺陷复现旁证」"
+  common_dependencies:
+    - pango/1.50.14.1.1
+    - gl4es/1.1.6
+    - egl/1.0.5
+    - libxkbcommon/1.6.0
+    - icu4c/77
+    - inih/r58
+    - wayland/1.24.0
+    - wayland-protocols/1.36
+    - libpng/1.6.58
+    - libtiff/4.7.2
+    - libjpeg-turbo/3.2.0
+    - librsvg/2.62.3.1.1
+    - libnsgif/1.0.0
+    - libnsbmp/0.1.7
+    - libheif/1.22.2
+    - libwebp/1.6.0
+    - cmocka/2.0.2
+
+versions:
+  - version: "5.0.1"
+    status: built
+    build_date: "2026-10-18"

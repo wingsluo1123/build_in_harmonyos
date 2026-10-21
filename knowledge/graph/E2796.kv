@@ -1,0 +1,33 @@
+# ═══ Draft knowledge entry — conanbuild PATH 缺 hnp 工具目录，ar/ranlib 探测失败退化为 link -lib ═══
+# Timestamp: 2026-09-27
+# Software: libyubikey 1.13（所有需要静态库的 autotools 包）
+# Gate: conan create build() / configure libtool 探测
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+
+id:                     E2796
+title: checking for ar... no → checking the archiver (link -lib) interface... unknown → could not determine link -lib interface
+trigger_tool: autoconf / configure / libtool
+phase: configuration
+error_signature: checking for ar\.\.\. no|checking the archiver \(link -lib\) interface\.\.\. unknown|configure: error: could not determine link -lib interface
+severity:               2
+category:               autotools, toolchain, conan
+match_keywords: checking for ar, link -lib, could not determine link -lib interface,
+  checking for ranlib, archiver interface
+root_cause: profile 以绝对路径注入 CC/CXX（hnp clang），configure 的编译器探测
+  直接通过；但 conanbuild 聚合 PATH 不含 hnp bin（有 make/awk，来自 ~/usr/local/bin
+  与系统目录），裸名 ar/ranlib 无法解析。autoconf 探测不到 ar 时回退到 MSVC 风格
+  `link -lib` archiver 探测，在 OHOS 上 interface 探测必然 unknown 而 abort。
+  编译器探测通过不代表 binutils 可达，两者是独立失败点。
+rec_approach: prepend-toolchain-bin-to-path
+verification_cmd:
+  r4 shadow CI 全绿（L0/L1/L2/L5 pass，exit 0，run
+  codex-1.13-libyubikey-1.13-20260927-conan-20260927-150715-23005）。
+rec_auto_fix:               false
+rec_impl:               manual
+rec_priority:               1
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E2796.md
+affected_scope:         checking for ar... no → checking the archiver (link -lib) in
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        prepend-toolchain-bin-to-path

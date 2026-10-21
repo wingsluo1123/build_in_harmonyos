@@ -1,0 +1,24 @@
+diff --git a/Makefile b/Makefile
+index 25410fe..2d40eba 100644
+--- a/Makefile
++++ b/Makefile
+@@ -119,6 +119,19 @@ lexer.o parser.o: CFLAGS += -Wno-sign-compare -Wno-unused -Wno-unused-parameter
+ # flex-generated code needs POSIX source for fileno()
+ lexer.o: CPPFLAGS += -D_POSIX_SOURCE
+ 
++# OHOS sysroot declares stdin/stdout/stderr and ctype helpers (isprint/isspace/
++# isdigit/... via ctype.h) as self-referential or recursive macros, so plain uses
++# such as `in = stdin;`, `fprintf(stderr, ...)` or `isprint(ch)` expand to
++# non-expanding recursive macros.  mk/compiler/clang.mk appends -Weverything and
++# -Werror=disabled-macro-expansion to PEDANTIC_FLAGS unconditionally (independent
++# of PEDANTIC), promoting -Wdisabled-macro-expansion to a hard error for any
++# object that references such a macro (common.c uses stderr, tas.c/tsim.c/tld.c/
++# serial.c use stdin/stdout, asm.c uses isprint(), and so on).  Downgrade this
++# diagnostic to a warning globally (all objects) using the same
++# -W$(PEDANTRY_EXCEPTION)disabled-macro-expansion mechanism upstream already
++# applies to the flex/bison-generated lexer.o and parser.o (portable fix).
++CFLAGS += -W$(PEDANTRY_EXCEPTION)disabled-macro-expansion
++
+ lexer.o asmif.o tas.o: parser.h
+ parser.h parser.c: lexer.h
+ 

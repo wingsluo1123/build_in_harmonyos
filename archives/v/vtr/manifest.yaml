@@ -1,0 +1,35 @@
+software: vtr
+display: "VTR (Verilog-to-Routing)"
+description: "VTR 是开源 FPGA 完整 CAD 流程：从 Verilog/SystemVerilog 与 FPGA 架构文件出发，完成展开、逻辑综合与技术映射（ABC）、打包、布局、布线、时序分析与功耗估计。内含 ODIN II、Yosys+Parmys、ABC、VPR、ACE 2 五个工具与驱动全流程的 vtr_flow 脚本树，是 FPGA 架构研究的标准工具链"
+category: build-tool
+homepage: "https://github.com/verilog-to-routing/vtr-verilog-to-routing"
+license: MIT
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "源码必须用官方 release asset：自动 tag tarball 的 libs/EXTERNAL/{libcatch2,sockpp} 是空子模块（各 1 条目），而 Catch2 是所有单元测试目标的链接依赖，用错归档等于静默砍掉整套单元测试（release asset 内联 639/153 条目）"
+    - "打包的是“一棵树”而非只有 bin/：paths.py 由自身位置反推安装根，按 root/{vpr/vpr,abc/abc,ace2/ace,build/bin/yosys} 定位工具；上游靠源码树提交的软链接满足，包内必须重建同样布局"
+    - "GUI 走上游官方 headless 路径：VPR_USE_EZGL=auto 在 GTK3/X11 缺失时上游自己关闭 GUI；需注意上游耦合——EZGL 关闭时 VPR server 模式一并关闭（vpr/CMakeLists.txt:38-52）"
+    - "WITH_PARMYS 默认 ON，会驱动 Yosys 自己的 Makefile（而非 CMake）；tcl/readline/libffi/zlib 只能通过环境（CXXFLAGS/LIBS/PKG_CONFIG_PATH）注入，CMake toolchain 管不到"
+    - "VPR 本代不再依赖 Tcl（全树 find_package(TCL) 为 0）；Boost 也不需要（yosys ENABLE_PYOSYS := 0，Boost.Python 硬错误不可达）"
+    - "Eigen3 是功能门控而非普通可选依赖：缺失时上游静默关闭解析布局（-DEIGEN_INSTALLED 不定义），故显式声明"
+    - "bison/flex 为始终必需（libvqm/libsdcparse/libblifparse/libtatumparse），WITH_ODIN=ON 时 odin_ii 另需一套"
+    - "构建体量大：单次 conan create 独立编译 abc+yosys+parmys+odin_ii+vpr+ace2+libs 并安装约 1.2 GB 流程树，默认 3600s 超时必然中断，需 ci/config/build_timeouts.txt 申请上限"
+  common_dependencies:
+    - zlib
+    - openssl
+    - eigen
+    - tcl
+    - readline
+    - libffi
+    - bison
+    - flex
+    - pkg-config
+
+versions:
+  "9.0.0":
+    status: failed
+    build_date: "2026-09-30"
+    conan_ref: "vtr/9.0.0"
+    source_url: "https://github.com/verilog-to-routing/vtr-verilog-to-routing/releases/download/v9.0.0/vtr-verilog-to-routing-9.0.0.tar.gz"

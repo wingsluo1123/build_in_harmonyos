@@ -1,0 +1,83 @@
+# 版本级 manifest
+# 文件位置: archives/l/lwgps/2.4.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "2.4.0"
+
+# 软件名
+software: lwgps
+
+# 编译状态
+# published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-09-28"
+build_system: cmake
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 源码下载 URL（官方 tag 归档，R39 官方源）
+  url: "https://github.com/MaJerle/lwgps/archive/refs/tags/v2.4.0.tar.gz"
+
+  # 源码校验和（tarball SHA-256，实测）
+  sha256: "4390b633be518015d0411137ede7038f98a121efc10bee0ec0d05ed0f077d088"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: cmake
+
+  # 配置选项列表
+  configure_options: []
+  # 例如:
+  # - "-DCMAKE_BUILD_TYPE=Release"
+  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+  # 例如:
+  # - openssl/1.1.1w
+  # - curl/8.19.0
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+# 例如:
+# - "0001-bootstrap-ohos-toolchain.patch"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+- "顶层 CMakeLists 会把 tests/test_parse_sat_det 的 lwgps_opts.h（LWGPS_CFG_STATEMENT_GPGSV_SAT_DET=1）经 add_subdirectory 注入库编译，造成库与消费者头文件结构体布局错位（test_package Signal 11）；配方只构建 lwgps 库子目录（默认 opts）解决"
+- "上游顶层 CMakeLists 未调用 enable_testing()，上游官方枚举器 tests/test.py 递归枚举 4 个测试入口（beidou/ext_time/sat_det/standard），需在各入口 __build__ 子目录运行 ctest（上游缺陷）；r02 逐入口真实运行 4/4 通过"
+- "上游 CMake 无 install 规则，配方 package() 手工复制 include/lwgps/*.h 与 liblwgps.a；默认 lwgps_opts.h 由官方模板复制产出"
+# 例如:
+# - "Bootstrap 需要 -- -DCMAKE_SYSTEM_NAME=OHOS"
+# - "内嵌 libuv 需要禁用，使用系统 libuv"

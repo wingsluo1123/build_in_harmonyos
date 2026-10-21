@@ -1,0 +1,107 @@
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 0c10e32..72e7a44 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -46,16 +46,98 @@ ecm_generate_export_header(KF6ColorScheme
+ 
+ target_include_directories(KF6ColorScheme INTERFACE "$<INSTALL_INTERFACE:${KDE_INSTALL_INCLUDEDIR_KF}/KColorScheme>")
+ 
++# 0002: relocatable basename SONAME linkage (krunner 6.28.0 /
++# kscreenlocker 6.7.2 0008 precedent, device-proven). The published KF6
++# dependency libraries carry no DT_SONAME (their installed targets set
++# IMPORTED_NO_SONAME), so linking them by their absolute Conan cache
++# paths bakes machine-private paths into libKF6ColorScheme.so's
++# DT_NEEDED (non-relocatable, E537). lld records the name as given on
++# the command line, so the KF6 components the sources actually consume
++# are linked by exact-file-name -l: flags (bare basenames) with the
++# dependency directories attached PRIVATE to this target: KConfig /
++# KSharedConfig / KConfigGroup (kconfig), KColorUtils (kguiaddons) and
++# KLocalizedString (ki18n). KF6::ConfigGui stays linked because KConfig
++# loads it for QColor I/O. KF6::ConfigCore additionally remains on the
++# link INTERFACE because the public headers (kcolorscheme.h,
++# kcolorschememanager.h, kstatefulbrush.h) include <KSharedConfig>:
++# consumers need its usage requirements, and the installed
++# KF6ColorSchemeConfig.cmake already find_dependency(KF6Config) from
++# upstream. It is exported by NAME only, never by absolute path, so
++# KF6ColorSchemeTargets.cmake stays relocatable. The KDE-installed
++# targets files set only the per-config IMPORTED_LOCATION_RELEASE, and
++# get_target_property returns the "<var>-NOTFOUND" sentinel string for
++# an unset property, so every lookup must be sentinel-guarded (a plain
++# if(NOT var) misreads the non-empty sentinel as "set" and silently
++# skips the fallback -- kscreenlocker round 23).
+ target_link_libraries(KF6ColorScheme
+   PUBLIC
+-    KF6::ConfigCore
+     Qt6::Gui
+   PRIVATE
+     Qt6::GuiPrivate
+-    KF6::ConfigGui # ### this one is not directly used but has to be loaded in order for QColor I/O from KConfig to work!
+-    KF6::GuiAddons # KColorScheme uses KColorUtils
+-    KF6::I18n # For action and widget texts
+ )
++target_link_libraries(KF6ColorScheme INTERFACE KF6::ConfigCore) # KSharedConfig, for the public headers
++set(_kcs_direct_deps
++    KF6::ConfigCore KF6::ConfigGui KF6::GuiAddons KF6::I18n
++)
++set(_kcs_kf6_dirs "")
++set(_kcs_kf6_libs "")
++foreach(_kcs_t IN LISTS _kcs_direct_deps)
++    set(_kcs_loc "")
++    get_target_property(_kcs_loc ${_kcs_t} IMPORTED_LOCATION_RELEASE)
++    if(NOT _kcs_loc OR _kcs_loc MATCHES "-NOTFOUND$")
++        get_target_property(_kcs_loc ${_kcs_t} IMPORTED_LOCATION)
++    endif()
++    if(_kcs_loc AND NOT _kcs_loc MATCHES "-NOTFOUND$")
++        get_filename_component(_kcs_dir "${_kcs_loc}" DIRECTORY)
++        get_filename_component(_kcs_base "${_kcs_loc}" NAME)
++        list(APPEND _kcs_kf6_dirs "${_kcs_dir}")
++        list(APPEND _kcs_kf6_libs "-l:${_kcs_base}")
++    endif()
++endforeach()
++if(_kcs_kf6_dirs)
++    list(REMOVE_DUPLICATES _kcs_kf6_dirs)
++    list(REMOVE_DUPLICATES _kcs_kf6_libs)
++    target_link_directories(KF6ColorScheme PRIVATE ${_kcs_kf6_dirs})
++    target_link_libraries(KF6ColorScheme PRIVATE ${_kcs_kf6_libs})
++endif()
++# Usage requirements (include dirs/definitions) of the KF6 deps no
++# longer arrive through the link line; walk the transitive closure of
++# the direct KF6 deps and copy them (KSharedConfig/KConfigGroup from
++# kconfig, KColorUtils from kguiaddons and KLocalizedString from ki18n
++# arrive through this walk; the KF6 targets also reach the Qt6
++# interface directories through their INTERFACE_LINK_LIBRARIES).
++# krunner 6.28.0 / kscreenlocker 6.7.2 0008 rounds 25/26 precedent.
++set(_kcs_walk KF6::ConfigCore KF6::ConfigGui KF6::GuiAddons KF6::I18n)
++set(_kcs_seen "")
++while(_kcs_walk)
++    list(GET _kcs_walk 0 _kcs_cur)
++    list(REMOVE_AT _kcs_walk 0)
++    list(FIND _kcs_seen "${_kcs_cur}" _kcs_idx)
++    if(_kcs_idx EQUAL -1 AND TARGET ${_kcs_cur})
++        list(APPEND _kcs_seen "${_kcs_cur}")
++        get_target_property(_kcs_inc ${_kcs_cur} INTERFACE_INCLUDE_DIRECTORIES)
++        if(_kcs_inc AND NOT _kcs_inc MATCHES "-NOTFOUND$")
++            target_include_directories(KF6ColorScheme SYSTEM PRIVATE ${_kcs_inc})
++        endif()
++        get_target_property(_kcs_defs ${_kcs_cur} INTERFACE_COMPILE_DEFINITIONS)
++        if(_kcs_defs AND NOT _kcs_defs MATCHES "-NOTFOUND$")
++            target_compile_definitions(KF6ColorScheme PRIVATE ${_kcs_defs})
++        endif()
++        get_target_property(_kcs_ll ${_kcs_cur} INTERFACE_LINK_LIBRARIES)
++        foreach(_kcs_item IN LISTS _kcs_ll)
++            if(TARGET ${_kcs_item})
++                list(APPEND _kcs_walk "${_kcs_item}")
++            endif()
++        endforeach()
++    endif()
++endwhile()
++# The OHOS platform module defines no soname flag, so without this the
++# shared library would be linked without DT_SONAME. Pass the basename
++# soname explicitly (krunner 6.28.0 0002 precedent). Gated on the
++# platform soname flag so Linux keeps the versioned SOVERSION chain.
++if(NOT CMAKE_SHARED_LIBRARY_SONAME_CXX_FLAG)
++    target_link_options(KF6ColorScheme PRIVATE "-Wl,-soname,libKF6ColorScheme.so")
++endif()
+ 
+ ecm_generate_headers(KColorScheme_HEADERS
+   HEADER_NAMES

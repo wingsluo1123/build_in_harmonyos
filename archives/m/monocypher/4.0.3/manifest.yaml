@@ -1,0 +1,80 @@
+# 版本级 manifest — monocypher 4.0.3
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+# 版本号
+version: "4.0.3"
+
+# 软件名
+software: "monocypher"
+
+# 编译状态
+# published | built | failed | archived
+status: built
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-18"
+build_system: makefile
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # 官方 release 分发物（含 tests/vectors.h 与正确版本标识）
+  url: "https://github.com/LoupVaillant/Monocypher/releases/download/4.0.3/monocypher-4.0.3.tar.gz"
+
+  # 源码校验和（官方 release tarball，与 GitHub Releases API asset digest 一致）
+  sha256: "8cc9bc341a66249016db9bd70e9142d8d0aef9945973744b1ac05dbc55d8ee66"
+
+  # 官方 tag 核验（轻量 tag，直接指向 commit）
+  tag: "4.0.3"
+  tag_commit: "ab2b16dd619ad5f6979a4fbe69cfa324a6fcc35f"
+
+  # 压缩格式
+  # tar.gz | tar.xz | tar.bz2 | zip
+  tar_format: tar.gz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  # 构建系统类型
+  # cmake | autotools | makefile | meson | custom
+  system: makefile
+
+  # 配置选项列表
+  configure_options: []
+  # 例如:
+  # - "-DCMAKE_BUILD_TYPE=Release"
+  # - "-DCMAKE_SYSTEM_NAME=OHOS"
+
+  # 编译依赖列表（格式: name/version）
+  dependencies: []
+  # monocypher 为自包含纯 C 库，无第三方依赖
+
+  # 编译器
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 应用的补丁列表
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 编译中学到的知识
+knowledge_gained:
+  - "官方 GitHub release tarball 与 tag 归档内容不同（4.0.3 实测复核仍成立）：release 含 tests/vectors.h 且版本字符串为 4.0.3（tag 归档为 __git__ 占位符且无测试向量）；构建与测试必须使用官方 release 分发物"
+  - "上游默认 CFLAGS 含 -march=native（不可移植），配方必须显式传入便携 CFLAGS"
+  - "monocypher 4.0 已移除 crypto_sha512，哈希以 crypto_blake2b 为主"
+  - "4.0.3 相对 4.0.2 为维护性发布：修复 EdDSA/Ed25519 签名时序泄漏漏洞（timing leak）+ 文档/构建/编译警告小修；src/tests/test.c 与 4.0.2 逐字节一致（diff 为空），测试口径完全可比"

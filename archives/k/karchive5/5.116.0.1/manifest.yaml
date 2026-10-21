@@ -1,0 +1,65 @@
+software: karchive5
+version: "5.116.0.1"
+# 5.116.0.1 = 打包修复版本 (R37): 上游源码不变, 仅配方变更 —
+# 1) zlib 要求从被 force 的 1.3.1.1 改回 1.3.1 (与 qt5-qtbase/5.15.2.2
+#    已发布二进制所用版本一致, 避免改动 qtbase 的 package id);
+# 2) 以 -Wl,--exclude-libs,ALL 把 zlib/1.3.1 的非 PIC libz.a 链入共享库.
+# published | built | failed | archived
+# 配方已定稿；真机 conan create 已通过，数字与日志见 test_results。
+status: built
+build_system: cmake
+created_at: 2026-10-19
+updated_at: 2026-10-20
+build_date: "2026-10-20"
+dependencies:
+  required:
+    - qt5-qtbase/5.15.2.2
+    - zlib/1.3.1
+    - bzip2/1.0.8
+    - xz/5.6.2
+    - zstd/1.5.7
+  build:
+    - ecm/6.26.0
+patches_applied:
+  - file: "patches/0001-karchivetest-symlink-eacces.patch"
+    type: "portability"
+    description: "karchivetest: 运行期探测 symlink() 可用性, 沙箱拒绝 (EACCES) 时跳过 symlink 专项校验而非判整个测试程序失败"
+test_results:
+  type: upstream
+  # 真机（HarmonyOS PC aarch64）conan create 实测；日志可直接 grep 复算。
+  # PR head 若在本文件之后改动配方，则以改动后的新 head 复验为准。
+  verified_head: "bae948ffc9c4b3e4fc2d717f6e751543eb77cec0"
+  verified_on: "HarmonyOS PC (aarch64), 2026-10-20"
+  log: "/storage/Users/currentUser/kstars-deps/build-deps-wave2.log"
+  upstream: >-
+    上游 BUILD_TESTING=ON: CTest 实际注册 5 项 (autotests/karchivetest,
+    kfiltertest, deprecatedtest, klimitediodevicetest, kcompressiondevicetest;
+    设备真机 ctest 输出 1/5..5/5 核实)。tests/ 下 kartest/ktartest/krcctest/
+    kziptest/k7ziptest 仅为 ecm_mark_as_test 标记并被构建, 未调用 add_test(),
+    不进入 CTest 清单。按 rule4 全树 QTest 函数口径 (Q_SLOTS 声明, 排除
+    init/cleanup 与 *_data) N=68: karchivetest 44 + kfiltertest 13 +
+    kcompressiondevicetest 8 + klimitediodevicetest 2 + deprecatedtest 1 = 68
+    (deprecatedtest 的 1 个用例受 KARCHIVE_ENABLE_DEPRECATED_SINCE(5, 0)
+    条件编译控制)。非 Q_SLOTS 的辅助函数与 *_data 数据提供者不计入 N。
+    build() 内嵌 ctest 执行: 真机实测 100% tests passed, 0 tests failed out of 5
+    （karchivetest 的 symlink 专项按运行期能力探测跳过）。
+  test_package: "消费者测试: KTar 写入/读取往返 + KZip Deflate 往返 + KCompressionDevice GZip 写入/读取往返 (gzip 魔数与内容比对), 覆盖非 PIC zlib 静态库链接后的运行期行为。真机实测 20 项断言全 PASS，TEST SUMMARY: 0 failure(s)；conan create 03:24:14 START → 03:29:23 END RC=0（日志同上）。"
+  package_id: "81ca3b457e7215ade9df4c2cc42526eea0af0142"
+  recipe_revision: "38f3e1698ace082e6ebc5fc60eed672e"
+  l0: "pass（本地 preflight 结构自检）"
+  l1: "pass（真机 conan create RC=0）"
+  l2: "pass（真机 ctest 5/5 程序，100% tests passed）"
+  l4: "pass（补丁为可移植性改动，无危险函数）"
+  l5: "pass（真机加载与执行）"
+source_url: https://download.kde.org/Attic/frameworks/5.116/karchive-5.116.0.tar.xz
+source_sha256: 1663e3c970b84063ece7f28548a87c97bc7592e79da0a0afaa4f6354f8dea30a
+knowledge_gained:
+  - "zlib/1.3.1 的 ohpcd 二进制包内 libz.a 非 PIC: 链入共享库报 relocation R_AARCH64_ADR_PREL_PG_HI21 cannot be used against symbol 'z_errmsg'。修复不必重建 zlib: 给共享库链接加 -Wl,--exclude-libs,ALL 隐藏静态归档符号即可 (OHOS clang 15 实测)。"
+  - "qt5-qtbase/5.15.2.2 的 package id 绑定 zlib/1.3.1; 其 profile 无 tools.build:compiler_executables, 一旦图里换成 zlib/1.3.1.1 就会触发 qtbase 源码重建并失败。保持 zlib/1.3.1 是整条 KF5 5.116 链的前提。"
+  - "karchive5 原 5.116.0 配方用 self.requires('zlib/1.3.1.1', force=True) 绕非 PIC 链接墙, 但该 force 会污染所有消费者的 zlib 解析并拖垮 qtbase 二进制复用 (R37 版本递增后改回 1.3.1)。"
+  - "KArchive 的上游测试: autotests/ 的 ecm_add_tests 3 项 + ecm_add_test 2 项共 5 项进入 CTest; tests/ 下 5 个可执行文件只被 ecm_mark_as_test() 标记(不调用 add_test), 会被构建但不会被执行, 数测试时不能把它们算进 CTest。"
+  - "OHOS 应用沙箱拒绝 symlink() (errno 13 EACCES, $HOME 与应用数据目录实测均如此); 依赖真实符号链接的测试需做运行期能力探测, 否则上游 initTestCase 的 QVERIFY(false) 会直接判整个测试程序失败。"
+patch_generation:
+  method: "manual unified diff (portability)"
+  notes: "0001-karchivetest-symlink-eacces.patch 仅改 autotests/karchivetest.cpp: 增加 s_symlinksAvailable 运行期标志, initTestCase 中 symlink 失败改为告警+置 false, 并条件化 writeTestFilesToArchive/testFileData/testCopyTo/testReadTar/testReadZip/testRead7Zip 中所有 symlink 专项校验与列表计数。其余适配仍经由 CMake 选项/工具链变量与链接标志完成 (KF_IGNORE_PLATFORM_CHECK / KF_SKIP_PO_PROCESSING / SONAME / CMAKE_FIND_PACKAGE_PREFER_CONFIG / --exclude-libs,ALL)。"
+patch_classification: []

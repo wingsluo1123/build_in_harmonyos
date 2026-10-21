@@ -1,0 +1,20 @@
+package: krb5-auth-dialog/43.0
+homepage: "https://gitlab.gnome.org/GNOME/krb5-auth-dialog"
+
+upstream_check_command: "grep -r 'test(' meson.build */meson.build (none)"
+upstream_test_in_build: false
+
+# Upstream registers no meson test()/add_test suite: the project is a GUI
+# applet with no test directory (rule4 N=0, build-system registration).
+upstream_tests: []
+
+expected_skips:
+  - "Upstream has no registered test suites (GUI applet, no tests/ dir, no add_test anywhere in meson build files); N=0 per rule4 registration semantics"
+
+test_package_tests:
+  - file: conanfile.py
+    description: "Consumer smoke on the packaged applet: artifact layer (AArch64 ELF, basename DT_NEEDED, no /usr/local leak), staging layer (writable copy of binary + full runtime closure, each ELF re-signed to exactly one .codesign), CLI contract (staged krb5-auth-dialog --version prints 'krb5-auth-dialog 43.0' — handled before gtk_init by patch 0003 so it works on display-less OHOS)"
+    command: "./staged/krb5-auth-dialog --version"
+    result: "krb5-auth-dialog 43.0"
+
+assertion_count: 4

@@ -1,0 +1,83 @@
+--- a/tests/suite_for_nua.c
++++ b/tests/suite_for_nua.c
+@@ -29,20 +29,22 @@
+  * @author Pekka Pessi <Pekka.Pessi@nokia.com>
+  *
+  * @copyright (C) 2007 Nokia Corporation.
+  */
+ 
+ #include "config.h"
+ 
+ #include "test_nua.h"
+ #include "check_sofia.h"
+ 
++#include <stdlib.h>
++
+ int print_headings = 0;
+ struct context ctx[1] = {{{ SU_HOME_INIT(ctx) }}};
+ 
+ SOFIAPUBVAR su_log_t nua_log[];
+ SOFIAPUBVAR su_log_t soa_log[];
+ SOFIAPUBVAR su_log_t nea_log[];
+ SOFIAPUBVAR su_log_t nta_log[];
+ SOFIAPUBVAR su_log_t tport_log[];
+ SOFIAPUBVAR su_log_t su_log_default[];
+ 
+@@ -56,20 +58,26 @@
+   endpoint_init(ctx, &ctx->a, 'a');
+   endpoint_init(ctx, &ctx->b, 'b');
+   endpoint_init(ctx, &ctx->c, 'c');
+ 
+   su_log_soft_set_level(nua_log, level);
+   su_log_soft_set_level(soa_log, level);
+   su_log_soft_set_level(su_log_default, level);
+   su_log_soft_set_level(nea_log, level);
+   su_log_soft_set_level(nta_log, level);
+   su_log_soft_set_level(tport_log, level);
++}
++
++static int nua_check_timeout(int default_timeout)
++{
++  return getenv("SOFIA_OHOS_TEST_NUA_EXTENDED_TIMEOUT")
++    ? 300 : default_timeout;
+ }
+ 
+ static void clean_context(void)
+ {
+   test_deinit(ctx);
+   su_home_deinit(ctx->home);
+   memset(ctx, 0, sizeof ctx);
+   su_deinit();
+ }
+ 
+@@ -162,27 +170,27 @@
+   tcase_add_test(tc, check_tag_filter);
+   tcase_add_test(tc, check_params);
+   tcase_add_test(tc, check_destroy);
+   tcase_add_test(tc, check_stack_errors);
+   tcase_set_timeout(tc, 5);
+   suite_add_tcase(suite, tc);
+ 
+   tc = tcase_create("without-proxy");
+   tcase_add_unchecked_fixture(tc, init_context, clean_context);
+   tcase_add_test(tc, without_proxy);
+-  tcase_set_timeout(tc, 60);
++  tcase_set_timeout(tc, nua_check_timeout(60));
+   suite_add_tcase(suite, tc);
+ 
+   tc = tcase_create("with-proxy");
+   tcase_add_unchecked_fixture(tc, init_context, clean_context);
+   tcase_add_test(tc, with_proxy);
+-  tcase_set_timeout(tc, 120);
++  tcase_set_timeout(tc, nua_check_timeout(120));
+   suite_add_tcase(suite, tc);
+ 
+   tc = tcase_create("with-proxy-and-nat");
+   tcase_add_unchecked_fixture(tc, init_context, clean_context);
+   tcase_add_test(tc, with_proxy_and_nat);
+-  tcase_set_timeout(tc, 120);
++  tcase_set_timeout(tc, nua_check_timeout(120));
+   suite_add_tcase(suite, tc);
+ 
+   return suite;
+ }

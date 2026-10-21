@@ -1,0 +1,40 @@
+# ═══ Draft knowledge entry — 图像编解码 lossless roundtrip 探针图案设计：alpha=0 与 q=100 两坑 ═══
+# Timestamp: 2026-09-27
+# Software: libwebp 1.6.0.1
+# Gate: L0/test_package (R34)
+# Status: UNMATCHED — needs human/AI review to promote to E-entry
+#
+# To promote:
+#   1. Review the error excerpt below
+#   2. Rename to E0XX.kv and move to knowledge/graph/
+#   3. Add a row to knowledge/graph/index.tsv
+
+id:                     E2865
+severity:               2
+category:               codec, methodology, test
+trigger_tool: libwebp
+phase: test_package
+error_signature: 逐字节比对失败但均为小整数均匀偏差（±7）；RGB 差值关系保持（R-G/B-G 不变）；
+  alpha 通道本身精确；首错位像素的 alpha 恰为 0；真机与 x86 本机（PIL 独立构建）错位逐字节一致
+
+match_keywords: alpha cleanup, transparent, lossless, roundtrip, pixel-exact, q100, VP8L, image
+
+root_cause: 误以为"无损编码 + 无损解码 = 任意输入逐字节保真"。实际 VP8L 编码器对 alpha=0
+  像素做 alpha cleanup（透明像素不可见，编码器为压缩率改写其 RGB，属文档明示行为，
+  exact=1 才保留）；VP8 q=100 是有损编码的极限档而非无损。两坑叠加导致探针在编解码器
+  完全正确的情况下报 FAIL，消耗一轮跨平台调试（真机 NEON 嫌疑 → Windows 本机 PIL
+  逐字节复现同错位 → 定位为图案设计错误）
+
+affected_scope: 所有图像编解码库（libwebp/libpng/libjpeg-turbo/OpenEXR 等）的
+  lossless/near-lossless roundtrip 探针；任何含 alpha 通道的测试图案生成器
+rec_approach: 把测试图案 alpha 通道改为永不为 0（如 ((x*7+y*13)&0x7f)|0x80）；
+  逐字节无损断言只用 VP8L 专属 API；"近无损"断言改用平滑渐变 + 小容差；
+  真机 roundtrip 首轮 FAIL 先在本机（PIL 等独立构建）复现同错位再怀疑工具链
+rec_priority: 2
+rec_auto_fix:               false
+rec_impl:               manual
+last_updated:               2026-10-19
+authors:               unknown
+doc_file:               doc/E2865.md
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）
+rec_description:        把测试图案 alpha 通道改为永不为 0（如 ((x*7+y*13)&0x7f)|0x80）

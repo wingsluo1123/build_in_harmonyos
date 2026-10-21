@@ -1,0 +1,30 @@
+--- a/adriconf/CMakeLists.txt
++++ b/adriconf/CMakeLists.txt
+@@ -33,20 +33,27 @@
+ target_include_directories(adriconf PUBLIC ${PCILIB_INCLUDE_DIRS})
+ 
+ target_link_libraries(adriconf ${OPENGL_gl_LIBRARY})
+ if (OpenGL_GLX_FOUND)
+     target_link_libraries(adriconf ${OPENGL_glx_LIBRARY})
+ endif ()
+ 
+ target_link_libraries(adriconf ${EGL_LIBRARIES})
+ target_include_directories(adriconf PUBLIC ${EGL_INCLUDE_DIRS})
+ 
++# libglib-2.0.so 以 UND 引用 g_libintl_*，符号由 glib 包内 lib/libintl.so
++# 提供（glib-2.0.pc 未引用它）；ADRICONF_GLIB_INTL 由 conanfile 传入全路径，
++# 直接链接该库解析 g_libintl_* 符号。
++if(ADRICONF_GLIB_INTL)
++    target_link_libraries(adriconf ${ADRICONF_GLIB_INTL})
++endif()
++
+ target_compile_options(adriconf PRIVATE -Wall -Wextra -pedantic)
+ 
+ add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/adriconf/resources.c
+         COMMAND glib-compile-resources ${CMAKE_SOURCE_DIR}/adriconf/adriconf.gresource.xml --target=resources.c --generate-source
+         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/adriconf
+         DEPENDS ${CMAKE_SOURCE_DIR}/adriconf/DriConf.glade ${CMAKE_SOURCE_DIR}/adriconf/DarkTheme.css
+         COMMENT "Generate resources"
+         )
+ 
+ set_source_files_properties(${CMAKE_SOURCE_DIR}/adriconf/resources.c PROPERTIES

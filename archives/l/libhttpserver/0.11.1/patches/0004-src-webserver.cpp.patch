@@ -1,0 +1,271 @@
+--- a/src/webserver.cpp
++++ b/src/webserver.cpp
+@@ -82,21 +82,21 @@
+     ~daemon_item()
+     {
+         MHD_stop_daemon (this->daemon);
+     }
+ };
+ 
+ }
+ 
+ using namespace http;
+ 
+-int policy_callback (void *, const struct sockaddr*, socklen_t);
++MHD_Result policy_callback (void *, const struct sockaddr*, socklen_t);
+ void error_log(void*, const char*, va_list);
+ void* uri_log(void*, const char*);
+ void access_log(webserver*, string);
+ size_t unescaper_func(void*, struct MHD_Connection*, char*);
+ size_t internal_unescaper(void*, char*);
+ 
+ struct compare_value
+ {
+     bool operator() (const std::pair<int, int>& left,
+             const std::pair<int, int>& right
+@@ -455,57 +455,57 @@
+ void webserver::unban_ip(const string& ip)
+ {
+     this->bans.erase(ip);
+ }
+ 
+ void webserver::disallow_ip(const string& ip)
+ {
+     this->allowances.erase(ip);
+ }
+ 
+-int webserver::build_request_header (
++MHD_Result webserver::build_request_header (
+         void *cls,
+         enum MHD_ValueKind kind,
+         const char *key,
+         const char *value
+ )
+ {
+     http_request* dhr = static_cast<http_request*>(cls);
+     dhr->set_header(key, value);
+     return MHD_YES;
+ }
+ 
+-int webserver::build_request_cookie (
++MHD_Result webserver::build_request_cookie (
+         void *cls,
+         enum MHD_ValueKind kind,
+         const char *key,
+         const char *value
+ )
+ {
+     http_request* dhr = static_cast<http_request*>(cls);
+     dhr->set_cookie(key, value);
+     return MHD_YES;
+ }
+ 
+-int webserver::build_request_footer (
++MHD_Result webserver::build_request_footer (
+         void *cls,
+         enum MHD_ValueKind kind,
+         const char *key,
+         const char *value
+ )
+ {
+     http_request* dhr = static_cast<http_request*>(cls);
+     dhr->set_footer(key, value);
+     return MHD_YES;
+ }
+ 
+-int webserver::build_request_args (
++MHD_Result webserver::build_request_args (
+         void *cls,
+         enum MHD_ValueKind kind,
+         const char *key,
+         const char *arg_value
+ )
+ {
+     details::modded_request* mr = static_cast<details::modded_request*>(cls);
+     char* value = (char*) ((arg_value == NULL) ? "" : arg_value);
+     {
+         char buf[strlen(key) + strlen(value) + 3];
+@@ -518,21 +518,21 @@
+         {
+             snprintf(buf, sizeof buf, "&%s=%s", key, value);
+             mr->dhr->querystring += string(buf);
+         }
+     }
+     size_t size = internal_unescaper((void*) mr->ws, value);
+     mr->dhr->set_arg(key, string(value, size));
+     return MHD_YES;
+ }
+ 
+-int policy_callback (void *cls, const struct sockaddr* addr, socklen_t addrlen)
++MHD_Result policy_callback (void *cls, const struct sockaddr* addr, socklen_t addrlen)
+ {
+     if(!(static_cast<webserver*>(cls))->ban_system_enabled) return MHD_YES;
+ 
+     if((((static_cast<webserver*>(cls))->default_policy == http_utils::ACCEPT) &&
+        ((static_cast<webserver*>(cls))->bans.count(addr)) &&
+        (!(static_cast<webserver*>(cls))->allowances.count(addr))
+     ) ||
+     (((static_cast<webserver*>(cls))->default_policy == http_utils::REJECT)
+        && ((!(static_cast<webserver*>(cls))->allowances.count(addr)) ||
+        ((static_cast<webserver*>(cls))->bans.count(addr)))
+@@ -579,21 +579,21 @@
+     webserver* dws = static_cast<webserver*>(cls);
+     if(dws->unescaper != 0x0)
+     {
+         dws->unescaper(s);
+         return strlen(s);
+     }
+ 
+     return http_unescape(s);
+ }
+ 
+-int webserver::post_iterator (void *cls, enum MHD_ValueKind kind,
++MHD_Result webserver::post_iterator (void *cls, enum MHD_ValueKind kind,
+     const char *key,
+     const char *filename,
+     const char *content_type,
+     const char *transfer_encoding,
+     const char *data, uint64_t off, size_t size
+     )
+ {
+     struct details::modded_request* mr = (struct details::modded_request*) cls;
+     mr->dhr->set_arg(key, mr->dhr->get_arg(key) + std::string(data, size));
+     return MHD_YES;
+@@ -631,31 +631,31 @@
+         details::modded_request* mr,
+         bool force_our
+ )
+ {
+     if(internal_error_resource != 0x0 && !force_our)
+         internal_error_resource(*mr->dhr, dhrs);
+     else
+         *dhrs = new http_response(http_response_builder(GENERIC_ERROR, http_utils::http_internal_server_error).string_response());
+ }
+ 
+-int webserver::bodyless_requests_answer(
++MHD_Result webserver::bodyless_requests_answer(
+     MHD_Connection* connection, const char* method,
+     const char* version, struct details::modded_request* mr
+     )
+ {
+     http_request req;
+     mr->dhr = &(req);
+     return complete_request(connection, mr, version, method);
+ }
+ 
+-int webserver::bodyfull_requests_answer_first_step(
++MHD_Result webserver::bodyfull_requests_answer_first_step(
+         MHD_Connection* connection,
+         struct details::modded_request* mr
+ )
+ {
+     mr->second = true;
+     mr->dhr = new http_request();
+     mr->dhr->set_content_size_limit(content_size_limit);
+     const char *encoding = MHD_lookup_connection_value (
+             connection,
+             MHD_HEADER_KIND,
+@@ -688,21 +688,21 @@
+                 mr
+         );
+     }
+     else
+     {
+         mr->pp = NULL;
+     }
+     return MHD_YES;
+ }
+ 
+-int webserver::bodyfull_requests_answer_second_step(
++MHD_Result webserver::bodyfull_requests_answer_second_step(
+     MHD_Connection* connection, const char* method,
+     const char* version, const char* upload_data,
+     size_t* upload_data_size, struct details::modded_request* mr
+ )
+ {
+     if (0 == *upload_data_size) return complete_request(connection, mr, version, method);
+ 
+ #ifdef DEBUG
+     cout << "Writing content: " << upload_data << endl;
+ #endif //DEBUG
+@@ -771,21 +771,21 @@
+     {
+         mr->dhr->set_pass(pass);
+         mr->dhr->set_user(user);
+     }
+     if(digested_user != 0x0)
+     {
+         mr->dhr->set_digested_user(digested_user);
+     }
+ }
+ 
+-int webserver::finalize_answer(
++MHD_Result webserver::finalize_answer(
+         MHD_Connection* connection,
+         struct details::modded_request* mr,
+         const char* method
+ )
+ {
+     int to_ret = MHD_NO;
+     http_response* dhrs = 0x0;
+ 
+     map<string, http_resource*>::iterator fe;
+ 
+@@ -927,24 +927,24 @@
+         }
+     }
+     catch(...)
+     {
+         internal_error_page(&dhrs, mr, true);
+         dhrs->get_raw_response(&raw_response, this);
+     }
+     dhrs->decorate_response(raw_response);
+     to_ret = dhrs->enqueue_response(connection, raw_response);
+     MHD_destroy_response (raw_response);
+-    return to_ret;
+-}
+-
+-int webserver::complete_request(
++    return (MHD_Result) to_ret;
++}
++
++MHD_Result webserver::complete_request(
+         MHD_Connection* connection,
+         struct details::modded_request* mr,
+         const char* version,
+         const char* method
+ )
+ {
+     char* pass = 0x0;
+     char* user = 0x0;
+     char* digested_user = 0x0;
+ 
+@@ -960,24 +960,24 @@
+ 
+     int to_ret = finalize_answer(connection, mr, method);
+ 
+     if (user != 0x0)
+         free (user);
+     if (pass != 0x0)
+         free (pass);
+     if (digested_user != 0x0)
+         free (digested_user);
+ 
+-    return to_ret;
+-}
+-
+-int webserver::answer_to_connection(void* cls, MHD_Connection* connection,
++    return (MHD_Result) to_ret;
++}
++
++MHD_Result webserver::answer_to_connection(void* cls, MHD_Connection* connection,
+     const char* url, const char* method,
+     const char* version, const char* upload_data,
+     size_t* upload_data_size, void** con_cls
+     )
+ {
+     struct details::modded_request* mr =
+         static_cast<struct details::modded_request*>(*con_cls);
+ 
+     if(mr->second != false)
+     {

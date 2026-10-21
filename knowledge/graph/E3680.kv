@@ -1,0 +1,47 @@
+#====================================================================
+# DRAFT-pdl-2.104-ohos-perl-xs-module-packaging
+# OHOS 上打包 XS 版 Perl 模块：构建期可执行的 perl / 构建树内 ELF 签名 /
+# 未发布 CPAN 依赖随包闭包 / PERL5LIB 消费约定
+#
+# 本条目为 draft，不预占正式 E 编号，禁止直接 promote。
+# 触发事件: pdl 2.104（task #9406，开源鸿蒙PC专项积分赛目标库；本仓首个 XS 版 Perl 包）
+#====================================================================
+
+id:                     E3680
+trigger_tool:           perl|cpan|make|conan
+phase:                  configuration|build|packaging|testing
+error_signature:        Can.t locate [A-Za-z_:]+ in @INC|Could not find .* among .* total .*|Devel::CheckLib|binary-sign-tool|make.* Error [0-9]|invalid ELF|cannot open shared object file
+severity:               2
+category:               portability, build-system, dependency, packaging, testing
+match_keywords:         Build.PL, Module::Build, INSTALL_BASE, PERL5LIB archname, Dist::Zilla warnings 版本错配, ExtUtils::CBuilder, no compiler detected, Config.pm cc, /bin/sh 前缀, ENV CC, Perl XS, CPAN, Makefile.PL, ExtUtils::MakeMaker, Devel::CheckLib, site_perl, PERL5LIB, INSTALL_BASE, PATHRUN, 构建树内签名, binary-sign-tool, llvm-objcopy, OHOS worker 条件, perl 未发布, 闭包随包, Test::Harness, prove, 纯 Perl 先例
+title:                  OHOS 上适配 XS 版 Perl 模块的范式：构建期可执行的 OHOS perl、进包缓存前的构建树内 ELF 签名、未发布 CPAN 依赖随包闭包、PERL5LIB 消费约定
+prescan_pattern:        Makefile\.PL|PERL5LIB|site_perl|ExtUtils::MakeMaker|\.xs\b
+prescan_globs:          conanfile.py|conandata.yml|Makefile.PL|*.xs
+
+# Layer 2: Diagnosis
+root_cause:             在 OHOS 上适配 Perl 模块要先分清两类，本仓此前只有第一类范式：纯 Perl 模块（如 perl-file-which/1.27）的配方注释写着"纯 Perl——无编译"，只把 lib/*.pm 拷进 site-lib，甚至不 require perl，因此不存在构建期执行问题；XS 模块（PDL 的核心）必须真跑 Makefile.PL 并编译 C，于是三个连环节点同时成立。①构建期必须有一个"能执行"的 perl：制品仓里的 perl 是 OHOS/armv8 二进制，在 Linux 构建机上跑不起来；本仓的关键事实是 CI worker 本身就是 OHOS 机器（日志里 /data/service/hnp/bin/ruby 可直接执行），所以 OHOS 版 perl 在构建期可直接执行，XS 构建才成立——若 worker 与目标不同 OS，此路不通，必须另找 host 解释器或交叉方案。②编出的 XS 共享库在 OHOS 上必须签名，且签名必须发生在进入 Conan 包缓存之前、于构建树内完成：OHOS 拒绝"先进包缓存后签名"的 ELF（perl 配方注释原话），工具是 /data/service/hnp/bin/binary-sign-tool 配合 /data/service/hnp/bin/llvm-objcopy，顺序反了则设备上加载失败。③模块可见性依赖隐式契约：perl 包通过 buildenv/runenv prepend PATH(bin)、define PERL、prepend PERL5LIB(lib/perl5/{version,site_perl/version,vendor_perl/version}[/archname])；模块包必须把自己的对应目录 prepend 进 PERL5LIB，否则 require 报 Can.t locate ... in @INC。此外 PDL 的 Makefile.PL 在 configure 阶段硬依赖 Devel::CheckLib（探测 libm/libpgplot），这是"依赖未发布到制品仓"的典型：未发布的 CPAN 依赖要么各提一个 perl-* PR（周期长），要么按路线 A 与本体一起以 url+sha256 固定随包 vendor，后者与 Ruby 的 gem 闭包范式同构。 另五关实测（均有 CI 日志）：①Build.PL 发行版必须走 Module::Build 分支；②INSTALL_BASE 的模块在 <base>/lib/perl5，PERL5LIB 只放 <base> 会 Can't locate Module/Build.pm；③Dist::Zilla 生成的 Makefile.PL 会撞核心 warnings 版本错配（undefined &warnings::register_categories），纯 Perl 模块应直接拷 lib/；④Module::Build 的前置读自 Build.PL（不是 META），test 期前置要用补丁从 Build.PL 的 test_requires 与 %fallback_build_requires 去掉；⑤XS 编译报 no compiler detected，根因是 perl Config.pm 的 cc 为 /bin/sh /data/service/hnp/bin/clang，CBuilder 按 shell 拆分后执行 sh <ELF> 必然失败，而 CBuilder/Base.pm:40 认 ENV CC，规范化成单个真实编译器路径即可（CI 的 PATH 不含 /data/service/hnp/bin，须绝对路径）。 本条 2026 年已在本仓 CI 全绿（构建 #90914：L0/L1/L4/L5 全 pass，上游 6 个测试文件 1510 用例全过，test_package 通过，Pass rate 100%）。十条实测坑：①Build.PL 发行版要走 Module::Build 分支；②INSTALL_BASE 的模块在 <base>/lib/perl5，PERL5LIB 必须含它；③PERL5LIB 绝不能把 encoding/ 这类一级子目录当模块根，否则 require warnings 命中 encoding/warnings.pm 使核心 warnings 失效；④Module::Build 前置读自 Build.PL；⑤perl 的 Config.pm 里 cc 带 /bin/sh 前缀，CBuilder 试编译必失败，需用 $ENV{CC} 覆盖；⑥本仓 perl 包不可重定位（archlibexp 写死 /lib/perl5/...），须在 stage 放修正版 Config 并用 CPATH 兜底；⑦sysroot 的 libpthread.a 是空占位导致 pthread 探测假阳性，PDL 会引用 OHOS libc 不导出的 pthread_setcanceltype，应置空 POSIX_THREADS_LIBS；⑧上游 pdlmagic.c 的 no-pthread dummy 缺两个函数，需补丁补齐；⑨binary-sign-tool 须用 -inFile/-outFile/-selfSign 且先清旧 .codesign；⑩package_info 的 PERL5LIB 必须含所有依赖包。
+affected_scope:         一切含 XS 的 CPAN 模块在 OHOS 上的适配（JSON::XS、DBI/DBD::*、Text::CSV_XS、File::Map、PDL 等），以及一切需要"构建期执行被适配解释器来编译扩展"的语言生态类比（Ruby 的 mkmf、Python 的 C 扩展）。尤其当 ① 制品仓的解释器只有目标平台二进制而构建机不同 OS；② 依赖未发布；③ 产物含 ELF 需要签名。与通用 ELF 签名条目（DRAFT-cronutils-1.1-raw-makefile-ohos-cli-signing、DRAFT-7640-jkmeter、DRAFT-E077B）的区别：那几条讲签名机制本身，本条讲"Perl 模块从解释器可执行性到闭包到 PERL5LIB 消费"的整体范式，并给出纯 Perl 与 XS 的分野。
+rec_priority:           1
+rec_approach:           buildable-ohos-perl-at-build-time-plus-build-tree-elf-signing
+rec_description:        六步：①先判定模块类型——纯 Perl 走仓内既有范式（拷 lib/*.pm 即可）；XS 才需要本范式。②在 conanfile 里从依赖包取解释器（self.dependencies["perl"].package_folder + bin/perl），并复刻 perl 包的 PERL5LIB 目录枚举（lib/perl5 下的 version / site_perl/version / vendor_perl/version 及其 archname 子目录）。③未发布的 CPAN 依赖按路线 A：conandata.yml 逐条固定 url+sha256，用 INSTALL_BASE=<私有 stage> 依序 perl Makefile.PL && make && make install 装进 stage。④本体 perl Makefile.PL INSTALL_BASE=<stage> && make。⑤在构建树内对产出的 .so 逐个签名（binary-sign-tool sign -i x.so -o x.so.signed 后替换），再 make install，保证进包的 ELF 已是签名件；同时若构件需要运行才能测试，签完名再跑测试。⑥package() 合并各 stage 的 lib/perl5 与 bin/，package_info() 里 prepend PATH 与 PERL5LIB。
+rec_command:            conandata: https://cpan.metacpan.org/modules/by-module/<Top>/<Dist>-<ver>.tar.gz + sha256; perl Makefile.PL INSTALL_BASE=<stage>; make; /data/service/hnp/bin/binary-sign-tool sign -i foo.so -o foo.so.signed; perl -MTest::Harness -e 'runtests @ARGV' -- t/core.t; make install
+rec_auto_fix:           false
+rec_impl:               conan-recipe（XS 模块闭包随包 + 构建树内签名 + PERL5LIB 暴露）
+fallback_priority:      2
+fallback_approach:      pure-perl-subset-or-unadaptable-with-evidence
+fallback_description:   若 XS 通路在 worker 上确实不可行（无可用 C 编译器，或构建树内签名不被接受），退路是：① 只交付纯 Perl 部分（若上游发行版含）；② 按【无法适配】出根因报告，附 perl -V:cc、which clang、ls -l /data/service/hnp/bin/binary-sign-tool、以及失败日志，而不是硬凑通过。
+fallback_command:       perl -V:cc; which clang; ls -l /data/service/hnp/bin/binary-sign-tool
+fallback_auto_fix:      false
+fallback_impl:          report（根因与实测证据）
+forbid_1_pattern:       先 make install 进包、再签名|用宿主 Linux perl 编译出的 .so 直接当 OHOS 产物交付
+forbid_1_reason:        OHOS 拒绝"先进 Conan 包缓存后签名"的 ELF；宿主 perl 编出的扩展与 OHOS perl 的 ABI/archname 不匹配，进了包也无法 require。
+forbid_1_consequence:   设备上 require XS 模块失败；评审按 rule4/rule12 判 FAIL。
+forbid_2_pattern:       把未发布的 CPAN 依赖当作已发布直接 requires|宣称跑了上游测试但只跑 test_package 自写用例
+forbid_2_reason:        未发布依赖直接 requires 会卡在 R36/解析失败；自写用例冒充上游用例属虚报（细则禁止）。
+forbid_2_consequence:   CI 直接失败或上游覆盖率虚报，评审判 FAIL。
+principles:             P014, P016
+# Metadata
+doc_file:               knowledge/drafts/DRAFT-pdl-2.104-ohos-perl-xs-module-packaging.md
+last_updated:               2026-10-21
+authors:               unknown
+verification_cmd:       # 以 source_pr CI 门禁为准（PR n/a）

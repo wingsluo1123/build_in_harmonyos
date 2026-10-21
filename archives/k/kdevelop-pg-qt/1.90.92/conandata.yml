@@ -1,0 +1,42 @@
+# conandata.yml - kdevelop-pg-qt 1.90.92（KDE / Qt5 解析器生成器）
+#
+# 源码 URL 采用「可达镜像在前 + 官方源兜底」列表形态（R39：官方源必须保留）。
+# Conan 2 的 get() 原生支持 url 列表：按序尝试，失败回退下一条。
+#
+# 为什么需要镜像：
+#   1) 官方 download.kde.org 不在 CI 的 mirror-fallback 白名单内
+#      （ci/conan/build_and_test.sh 只覆盖 github/gnu/gnome/kernel.org 等域名）；
+#   2) 1.90.92 已归档到 Attic/：stable/ -> Attic/ -> 境外镜像的多跳重定向
+#      在受限 Worker 上会超时 —— 同款现象与处置见
+#      archives/k/karchive5/5.116.0/conandata.yml 与 libkdepim/25.12.3。
+#
+# 本机实测（2026-10-16）：下列三个镜像对 Attic 路径**直接返回 200**，
+# 且三源 sha256 逐字节一致（636696 字节）：
+#   ftp.kaist.ac.kr / mirrors.mit.edu / mirrors.dotsrc.org
+# 国内镜像 bfsu/ustc/nju 沿用本仓既有写法（karchive5 用量最大），CI 侧可达。
+#
+# 版本说明：上游 KDE 下载站上 1.90.x 线只有 1.90.91 / 1.90.92（1.90.90 仅存在
+# 于 git tag，无发行包）。本包取 **1.90.92**：同 1.90.x 线的最新发行版，
+# 满足消费方（KDevelop 的 QMake 构建器插件）对 KDevPGQt >= 1.90.90 的要求。
+sources:
+  "1.90.92":
+    url:
+      - "https://mirrors.bfsu.edu.cn/kde/Attic/kdevelop-pg-qt/1.90.92/src/kdevelop-pg-qt-1.90.92.tar.xz"
+      - "https://mirrors.ustc.edu.cn/kde/Attic/kdevelop-pg-qt/1.90.92/src/kdevelop-pg-qt-1.90.92.tar.xz"
+      - "https://mirror.nju.edu.cn/kde/Attic/kdevelop-pg-qt/1.90.92/src/kdevelop-pg-qt-1.90.92.tar.xz"
+      - "https://ftp.kaist.ac.kr/kde/Attic/kdevelop-pg-qt/1.90.92/src/kdevelop-pg-qt-1.90.92.tar.xz"
+      - "https://mirrors.mit.edu/kde/Attic/kdevelop-pg-qt/1.90.92/src/kdevelop-pg-qt-1.90.92.tar.xz"
+      - "https://mirrors.dotsrc.org/kde/Attic/kdevelop-pg-qt/1.90.92/src/kdevelop-pg-qt-1.90.92.tar.xz"
+      - "https://download.kde.org/Attic/kdevelop-pg-qt/1.90.92/src/kdevelop-pg-qt-1.90.92.tar.xz"
+    sha256: "a522adc9f77727197dcfcf7e68c3602fa0c6447d4d41156a6d954a1e22f8c5b1"
+
+patches:
+  "1.90.92":
+    - patch_file: "patches/0001-guard-std-hash-qbitarray-qt515.patch"
+      patch_type: "portability"
+      patch_description: >-
+        Qt 5.15 的 qhashfunctions.h(204-209) 已自带 std::hash 对 QString/
+        QStringRef/QByteArray/QBitArray 的特化且无可关闭守卫，上游本地特化
+        （kdev-pg/kdev-pg-regexp.cpp:54 的 q_Hash_to_tr1_hash(QBitArray)）
+        会重定义报错 → 按 QT_VERSION < 5.15 守卫本地定义；5.15 上行为不变
+        （Qt 自带特化同样是 qHash 实现）。

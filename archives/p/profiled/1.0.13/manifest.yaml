@@ -1,0 +1,54 @@
+version: "1.0.13"
+software: profiled
+status: built
+build_date: "2026-10-17"
+build_system: makefile
+
+source:
+  url: "https://github.com/sailfishos/profiled/archive/refs/tags/1.0.13.tar.gz"
+  sha256: "6345ac55e25afb568fcf7b4f7faf5e0b36d68d9fb724e2de47796439fb7d2f67"
+  tar_format: tar.gz
+
+build:
+  system: makefile
+  configure_options:
+    - "VERS=1.0.13"
+    - "CC=<conan profile tools.build:compiler_executables:c>"
+    - "AR=<conan profile tools.build:compiler_executables:ar | llvm-ar>"
+  dependencies:
+    - dbus/1.14.10.2
+    - glib/2.88.3
+    - pkgconf/3.0.6
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "patches/0001-unique-move-nested-cmp-to-file-scope.patch"
+
+# 上游无自动化测试套件（无 tests/、无 test/check 目标、无 CI 配置）。
+# 可运行的真实入口是 examples/ 下 3 个示例程序，全部实际运行。
+test_results:
+  type: upstream-examples
+  total: 3
+  passed: 3
+  failed: 0
+  skipped: 0
+
+test_package:
+  total: 8
+  passed: 8
+  failed: 0
+  ohos_specific: 3
+
+knowledge_gained:
+  - "dbus-gmain 是 submodule，归档包不含内容：必须按 tag 记录的 commit 单独取 dbus-gmain.{c,h}"
+  - "VERS 来自 debian/changelog（停在 1.0.12），交叉构建须 make VERS=<版本> 覆盖"
+  - "dbus conan 包无 dbus-1.pc，上游 pkg-config 名对不上，需补同义 .pc"
+  - "OHOS 无 install(1)，Makefile 的 install-* 规则不可用，改由 recipe 落盘"
+  - "shared-library 包要通过 transitive_headers=True 暴露 dbus 头文件（libprofile.h 含 <dbus/dbus.h>）"
+  - "OHOS 上自建 D-Bus 会话总线用 TCP 监听可稳定运行 profiled/profileclient"
+
+knowledge_ref:
+  - E1215
+  - E1404
+  - E050

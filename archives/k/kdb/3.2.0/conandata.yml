@@ -1,0 +1,32 @@
+# conandata.yml — kdb 3.2.0 (KDE KDb database connectivity library)
+#
+# 源码 = KDE 官方 release tarball（download.kde.org/Attic，KDb 属 Attic 托管
+# 的独立仓库）。SHA256 为本地实测值（与官方发布一致）：
+#   8f8983bc8d143832dc14bc2003ba6af1af27688e477c0c791fd61445464f2069  kdb-3.2.0.tar.xz
+# tarball 内不含 metainfo.yaml（见 conanfile.py 中 KF_IGNORE_PLATFORM_CHECK 说明）。
+#
+# URL 顺序：国内镜像优先（nju 实测可用），官方源兜底。
+
+sources:
+  "3.2.0":
+    url:
+      - "https://mirror.nju.edu.cn/kde/Attic/kdb/src/kdb-3.2.0.tar.xz"
+      - "https://mirrors.ustc.edu.cn/kde/Attic/kdb/src/kdb-3.2.0.tar.xz"
+      - "https://mirrors.bfsu.edu.cn/kde/Attic/kdb/src/kdb-3.2.0.tar.xz"
+      - "https://download.kde.org/Attic/kdb/src/kdb-3.2.0.tar.xz"
+    sha256: "8f8983bc8d143832dc14bc2003ba6af1af27688e477c0c791fd61445464f2069"
+
+patches:
+  "3.2.0":
+    - patch_file: "patches/0001-SetKDbCMakePolicies-cmake4-cmp0059.patch"
+      patch_description: "Guard cmake_policy(SET CMP0059 OLD) with a CMAKE_VERSION check: CMake 4.x removed the OLD behavior entirely and hard-errors on the unconditional set (hit on the image's CMake 4.1.2); all add_definitions() call sites in this tree run in the directory that also creates their targets, so the forced NEW behavior is equivalent"
+      patch_type: "portability"
+    - patch_file: "patches/0002-CMakeLists-static-icu-link-order.patch"
+      patch_description: "Request the ICU 'data' component and append the static link chain (i18n -> uc -> data) onto the imported targets: the FindICU module bundled in this tree (cmake/modules, first in CMAKE_MODULE_PATH) creates bare imported libraries without inter-component dependencies, which only resolves when ICU is linked as shared libraries, while the icu package here ships static archives and the sqlite ICU extension links with -Wl,--no-undefined"
+      patch_type: "portability"
+    - patch_file: "patches/0003-CMakeLists-scanner-wno-register.patch"
+      patch_description: "Add -Wno-register to the flex scanner's compile flags: the pre-generated sqlscanner.cpp still uses the 'register' storage class, which C++17 language modes (cppstd=17) diagnose as the -Wregister error (the tree's -Wno-deprecated-register covers only the pre-C++17 wording)"
+      patch_type: "portability"
+    - patch_file: "patches/0004-autotests-headers-shell-wrapper.patch"
+      patch_description: "Register the HeadersTest script through the POSIX shell: ctest execve()s it directly, which the target image refuses (the script carries executable bits, yet spawning it fails with 'Permission denied', while ELF executables from the same tree run); 'sh <script>' is equivalent and portable"
+      patch_type: "portability"

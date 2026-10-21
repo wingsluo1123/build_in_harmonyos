@@ -1,0 +1,46 @@
+software: kdevelop-pg-qt
+version: "1.90.92"
+status: built
+build_date: "2026-10-16"
+build_system: cmake
+# ECM 以 tool_requires 提供（ecm/6.26.0），Qt5 由 qt5-qtbase/5.15.2.2 提供；
+# 上游为 find_package(ECM 1.1.0 REQUIRED NO_MODULE) +
+# find_package(Qt5 5.2.0 CONFIG REQUIRED Core Test)。
+configure_options:
+  - "-DBUILD_TESTING=ON（注册上游 CTest 测试）"
+  - "-DCMAKE_FIND_PACKAGE_PREFER_CONFIG=ON（命中 qtbase 自带聚合 Qt5Config）"
+  - "-DFLEX_EXECUTABLE=FLEX_EXECUTABLE-NOTFOUND（用源码包自带的生成文件，避免宿主工具漂移）"
+  - "-DBISON_EXECUTABLE=BISON_EXECUTABLE-NOTFOUND（同上）"
+compiler: clang++
+platform: aarch64-linux-ohos
+dependencies:
+  build:
+    - ecm 6.26.0
+  runtime:
+    - qt5-qtbase 5.15.2.2（Qt5Core + Qt5Test + moc/rcc + 聚合 Qt5Config）
+# 交付形态为 Conan 包，安装前缀即 package_folder（运行期由 Conan 解析）。
+install_prefix: "<conan package_folder>"
+products:
+  - bin/kdev-pg-qt（解析器生成器可执行）
+  - include/kdevelop-pg-qt/*.h（生成代码依赖的运行时头）
+  - lib/cmake/KDevelop-PG-Qt/KDevelop-PG-QtConfig.cmake（含 KDEVPGQT_GENERATE 宏）
+  - lib/cmake/KDevelop-PG-Qt/KDevelop-PG-QtConfigVersion.cmake
+# 上游测试：tests/ 下 3 个 CTest 用例（testlocationtable / testmemorypool /
+# benchmarks），只依赖 Qt5::Core 与 Qt5::Test，本配方在 build() 内**实际执行**，
+# 结果见 notes.md 与 test_package/MANIFEST.yml。
+tests:
+  framework: "CTest（ecm_add_test）"
+  count: 3
+  executed_in_build: true
+  notes: >-
+    执行前对构建目录内的测试 ELF 做 E318 自签（OHOS 拒绝 exec 用户可写路径下
+    未签名的 ELF），再以 QT_QPA_PLATFORM=offscreen 运行 ctest。
+patches:
+  - "patches/0001-guard-std-hash-qbitarray-qt515.patch"
+patch_generation:
+  method: "manual"
+  reason: >-
+    唯一补丁：Qt 5.15 已自带 std::hash<QBitArray> 特化（qhashfunctions.h:209，
+    无可关闭守卫），上游本地特化重定义 → 按 QT_VERSION < 5.15 守卫。属移植性
+    修改，非功能性改动。
+  patches_count: 1

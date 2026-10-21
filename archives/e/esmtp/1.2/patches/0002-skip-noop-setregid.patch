@@ -1,0 +1,15 @@
+--- a/main.c
++++ b/main.c
+@@ -31,7 +31,11 @@
+ 	real_gid = getgid();
+ 	effective_gid = getegid();
+ 
+-	if( setregid(real_gid,real_gid) != 0 )
++	/* Only run the setgid drop when there is a setgid to drop: for an
++	 * unprivileged process real_gid == effective_gid, the call would be a
++	 * no-op, and kernels that do not implement setregid terminate the
++	 * process with SIGSYS instead of returning an error. */
++	if( real_gid != effective_gid && setregid(real_gid,real_gid) != 0 )
+ 	{
+ 		fprintf (stderr, "Could not drop setgid: %s\n", strerror(errno));
+ 		exit(EX_DROPPERM);

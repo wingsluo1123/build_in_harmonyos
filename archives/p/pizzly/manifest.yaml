@@ -1,0 +1,22 @@
+software: pizzly
+display: "pizzly"
+description: "基于 kallisto 伪比对的 RNA-Seq 融合基因检出（fusion detection）命令行工具"
+category: bioinformatics
+homepage: "https://github.com/pmelsted/pizzly"
+license: "BSD-2-Clause"
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "上游 cmake_minimum_required(VERSION 3.0.0) 被 CMake 4.x 拒绝，用 CMAKE_POLICY_VERSION_MINIMUM=3.5 保留上游声明"
+    - "内置 SeqAn 2.2.0 是 C++14 代码，必须固定 compiler.cppstd=14，否则 libc++ 的 std::empty 与 seqan::empty 二义性"
+    - "OHOS <aio.h> 只有 aiocb 结构与 AIO_*/LIO_* 常量、不含任何 aio_* 函数，SeqAn 的 __has_include 探针假阳性，需 SEQAN_ASYNC_IO=0"
+    - "只用 CMakeToolchain、不引入 CMakeDeps：其注入的 CMAKE_LIBRARY_PATH/CMAKE_INCLUDE_PATH 让上游 find_package(ZLIB) 走 FindZLIB 模块模式直接命中 Conan 的 libz.a，无需补丁"
+    - "上游 v0.37.3 的 CMakeLists 没有 install() 规则，须由配方从构建目录安装 bin/pizzly"
+  common_dependencies:
+    - zlib
+
+versions:
+  "0.37.3":
+    status: built
+    build_date: "2026-10-15"

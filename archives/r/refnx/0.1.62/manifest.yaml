@@ -1,0 +1,163 @@
+# 版本级 manifest — archives/r/refnx/0.1.62/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "0.1.62"
+software: "refnx"
+
+# 编译状态：published | built | failed | archived
+status: published
+
+# 编译日期（YYYY-MM-DD）
+build_date: "2026-10-15"
+build_system: meson
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  # conanfile.py source() 实际下载的 URL（conandata.yml 为唯一真值）
+  url: "https://pypi.tuna.tsinghua.edu.cn/packages/0f/fe/de64aff9325ca9b24b7a890bd12a5dd0696472b43b3c22d6585fd2dac56b/refnx-0.1.62.tar.gz"
+  sha256: "3e21751662cf675df569ce637c36ae8431cfaf6e08743edeca64b8489972280d"
+  tar_format: tar.gz
+  # 说明：官方 PyPI sdist 的同一份字节（pypi.org/files.pythonhosted.org 同 sha256，
+  # 两端下载后逐字节比对一致）。CI worker 网络策略阻断 files.pythonhosted.org，
+  # 清华镜像是唯一可达端点——与 numpy/2.5.2（PR #5882）、scikit-learn/1.6.1 同一结论。
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: meson
+  configure_options:
+    - "PYTHONPATH=<shim>:<meson-sitepath>:<cython-sitepath>:<numpy-sitepath> LD_LIBRARY_PATH=<pylib>:<sdk-llvm-libdir> <target-python> <meson.py> setup <builddir> <src> --prefix=<package_folder> --buildtype=release --native-file=ohos-native.ini"
+    - "ninja -j1 -C <builddir>（-j1：CI 共享 worker 上默认并发耗尽进程沙箱，报 ninja: fatal: posix_spawn: Resource temporarily unavailable，EAGAIN）"
+    - "meson install --no-rebuild -C <builddir>（--no-rebuild 规避 E428：conan 的 env wrapper 会重置 PATH，meson 找不到 ninja）"
+    - "--native-file: [binaries] cython = <由 tool_requires cython/3.3.0 生成的 wrapper>、ninja = tool_requires ninja/1.12.1;python = <tool_requires python/3.12.9>;c/cpp/ar/... = OHOS SDK (ohos-sdk_26.0.0.18) clang 工具链"
+    - "--native-file: [properties] numpy-include-dir = <numpy/2.5.2 package_folder>/include/numpy（refnx 的 4 个 .pyx 均 cimport numpy）"
+    - "--native-file: [built-in options] c/cpp_link_args = ['-L<pylib>', '-lpython3.12']（musl E004：解释器符号不导出给 dlopen 对象）"
+    - "--native-file: [host_machine] system=Linux / cpu_family=aarch64 / cpu=aarch64；build 与 host 相同（本机编译），另配 exe_wrapper 以通过 meson 的 python 校验"
+  dependencies:
+    - "numpy/2.5.2"        # host requires：C 头 + numpy/__init__.pxd + 运行期同一份 numpy
+    - "python/3.12.9"      # tool_requires：构建解释器，EXT_SUFFIX 为 .cpython-312-aarch64-linux-ohos
+    - "meson/1.11.0"       # tool_requires
+    - "ninja/1.12.1"       # tool_requires
+    - "cython/3.3.0"       # tool_requires
+  cc: "clang (OHOS SDK aarch64-linux-ohos)"
+  cxx: "clang++ (OHOS SDK aarch64-linux-ohos)"
+
+# 构建产物规模（本配方在真机构建）
+build_output:
+  ninja_targets: 18
+  extension_modules: 4
+  extension_names: ["_cutil", "_creflect", "_cyreflect", "_cevent"]
+  openmp: "found: YES 5.0（refnx/reflect/meson.build 以 dependency('openmp', required: false) 门控 _cyreflect，OHOS clang 提供）"
+
+# ============================================================
+# 运行期依赖（不是 Conan requires；由目标 Python 环境提供）
+# ============================================================
+
+runtime_dependencies:
+  - "numpy>=2.0（上游 pyproject 声明；制品仓已有 numpy/2.5.2，本配方直接 requires）"
+  - "scipy（上游 pyproject 硬依赖；不是编译依赖——refnx 的 4 个 .pyx 只 cimport numpy/cython，无 SciPy .pxd 需要 vendor。OHPCD Conan 制品仓未发布，由平台 OHOS wheel 提供：scipy-1.18.1-cp312-cp312-ohos_aarch64.whl @ pypi.cnb.cool/OpenHarmonyPCDeveloper/pypi，其 numpy 约束 >=2.0,<2.8 与本配方 numpy/2.5.2 相容）"
+  - "orsopy（硬依赖，refnx.dataset/reflectdataset.py 模块级 import orsopy.fileio；同索引 py2.py3-none-any）"
+  - "pandas（`import refnx.reduce` 的非条件依赖；同索引 pandas-3.0.5-cp312-cp312-ohos_aarch64.whl）"
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 无补丁：refnx 的 meson 构建无需 OHOS 适配。
+#   - 版本探测 tools/gitversion.py 读 pyproject.toml 而非 git，sdist 中可用；
+#   - 无 .pyx cimport 其它三方包（只 cimport numpy/cython），因此不存在 sklearn 那样的
+#     跨包声明文件 vendor 问题。
+patches_applied: []
+
+# ============================================================
+# 上游测试真实运行结果
+# ============================================================
+# upstream_test_in_build=false（见 test_package/MANIFEST.yml 中的原因说明），
+# 全量套件在真机离线执行，且是对**将要交付的产物**执行：直接对 conan create 产出的
+# package 目录（site-packages/refnx，含 4 个已签名扩展）运行。
+# refnx 的数据依赖测试需要上游 refnx-testdata 归档（conftest 从 github.com 下载），
+# CI/设备沙箱不可达，故用本地镜像 zip + 一个 12 行的 pytest 插件
+# （monkeypatch urllib.request.urlopen）供给，使这些用例真正执行而不是整体 skip。
+upstream_test_run:
+  date: "2026-10-15"
+  command: "python3 -m pytest refnx -q -p ohos_testdata --ignore=refnx/reflect/_app/tests/test_app.py --junitxml=<OUT>"
+  workdir: "<package_folder>/lib/python3.12/site-packages"
+  collected: 386
+  passed: 386
+  failed: 0
+  errors: 0
+  skipped: 0
+  xfailed: 0
+  xpassed: 0
+  pass_rate: "100.00%（386/386，无 fail/error/skip）"
+  run_time_seconds: 746.46        # 对 conan package 目录的正式运行（当时机器上还有其它并发构建，故比空载慢）
+  evidence: "reports/upstream-junit.xml"
+  cross_check: "同条件空载复核运行得到完全相同的 386 passed / 0 failed / 0 errors / 0 skipped（314.01 s）——计数一致，差异只在机器负载"
+  run_environment: "HarmonyOS PC aarch64 (HongMeng Kernel 1.13.0)；CPython 3.12.9 musl 端口；numpy 2.5.2（Conan 制品仓）+ scipy 1.18.1 + pandas 3.0.5 + orsopy 1.2.3（平台 OHOS wheel）；被测的 refnx 目录树由本配方 meson+ninja+Cython 构建产出"
+  excluded_modules:
+    - "refnx/reflect/_app/tests/test_app.py —— 4 个 Qt GUI 测试函数，OHOS 无 qtpy/Qt 绑定（平台 pip 索引与制品仓均未发布），结构上不可运行。收集阶段即 1 error: ModuleNotFoundError: No module named 'qtpy'。证据命令：python3 -m pytest refnx/reflect/_app/tests/test_app.py --collect-only -q -o addopts=''"
+  # 逐目录计数见 test_package/MANIFEST.yml::upstream_tests（由同一份 JUnit XML 生成）
+
+# ============================================================
+# test_package 验证结果
+# ============================================================
+
+test_package_run:
+  consumer_checks: 17          # test_refnx.py（真实消费者，公开 API）
+  ohos_checks_live: 9          # test_ohos_platform.py：6 静态 + 3 运行期
+  ohos_checks_static_only: 6   # E212 沙箱（AppSpawn 拒绝 dlopen 用户路径 .so）下的静态回退通道
+  live_total: 26               # 真机/带 scipy 环境：17 + 9
+  markers: "REFNX_CONSUMER_RESULT / OHOS_PLATFORM_RESULT / HMBS_TEST_PACKAGE_RESULT（discovered/passed 由脚本 --json 输出，配方校验后透传）"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "OHOS E004（musl）：dlopen 的扩展拿不到解释器符号，必须显式 -lpython3.12；本配方通过 meson native file 的 c/cpp_link_args 给全部 4 个扩展补上 DT_NEEDED libpython3.12.so。用纯 stdlib 解析 ELF 即可批量验证（E212 沙箱里连 readelf/dlopen 都不可用）。"
+  - "OHOS E077：DevBox lld 会自动写 .codesign 段，CI lld 不会，故 package() 必须对每个打包 .so 执行 llvm-objcopy --remove-section .codesign → binary-sign-tool -selfSign 1 -signAlg SHA256withECDSA → chmod 755，且重复执行幂等。"
+  - "OHOS E428：conan 的 env wrapper 会重置 PATH，使 meson install 找不到 ninja；改为 `meson install --no-rebuild` 后彻底绕开 PATH 查找。"
+  - "4 个扩展的链接契约可精确断言（本配方 test_ohos_platform.py 即按此校验）：_cutil/_cevent（纯 C）= libpython + libc.so；_creflect/_cyreflect（C++）追加 libc++_shared.so；仅 _cyreflect 追加 libomp.so（OpenMP）。"
+  - "conan-generated conanrunenv-*.sh 追加 `${PYTHONPATH:+:$PYTHONPATH}`，因此设备上既有的 scipy/pandas/orsopy 覆盖层能存活——这正是 live 通道（26 项）可达的原因，无需把平台 wheel 塞进 Conan 制品仓。"
+  - "目标解释器必须显式 tool_requires 平台 CPython（python/3.12.9）：设备 PATH 上的 /data/service/hnp/bin/python3 EXT_SUFFIX 是 '.cpython-312.so'，用它驱动 meson 会给扩展打上错误 ABI 标签；静态通道若改用它做基线，又会把 4 个正确命名的 .so 全判成缺陷——校验顺序应为『先验证候选解释器 EXT_SUFFIX，再拿它当基线』。"
+  - "meson install 不产出 wheel 的 *.dist-info/METADATA，包完整性校验改用 refnx/__init__.py（`from refnx.version import version as __version__`）与 meson 生成的 refnx/version.py（^version = \"0.1.62\"）加子包存在性。"
+  - "上游 conftest 从 github.com 下载 refnx-testdata，设备/CI 沙箱不可达会导致数据相关用例整体 skip（386→约 250）；用一个 12 行 pytest 插件 monkeypatch urllib.request.urlopen 指向本地镜像 zip，可让这些用例真正执行。"
+  - "pytest 必须以 `pytest refnx` 的形式在 site-packages 目录内运行；逐目录分派会破坏 conftest fixture 与 resources.files(refnx.reflect.tests) 的解析。"
+  - "小整数计数陷阱：ReflectDataset(np.c_[q,y,err]) 会把二维数组当作『行的元组』，静默造出 3 点数据集（表现为所有拟合 chi2 ≈ 1e6），必须传元组 ReflectDataset((q, y, err))。这属于上游 API 语义，不是平台差异。"
+  - "平台 pip 索引 pypi.cnb.cool/OpenHarmonyPCDeveloper/pypi 提供 ohos_aarch64 wheel（scipy/pandas/refnx 自身的 C 依赖族）。判断 Python 库能否适配 OHOS 时不能只看 Conan 制品仓，必须同时查该索引，否则会把 scipy/pandas 误判为『依赖不可得』。"
+  - "OHPCD 的 CPython 包把 stdlib _ssl/_sqlite3/_ctypes 编译成无 DT_NEEDED 的扩展（不链 libssl/libcrypto/libsqlite3/libffi），任何 Python 消费者 import ssl/sqlite3/ctypes 都会 'symbol not found'；_ssl 在制品仓内无法修复（只有静态 openssl/1.1.1w），实测用 --whole-archive 把静态库打成诊断用共享库并 LD_PRELOAD，即可让 ssl 恢复可用。此条目独立归档为知识草稿（路径 B）。"
+
+# ============================================================
+# 本 PR 随附的知识草稿（路径 B：适配 + 知识条目同 PR）
+# ============================================================
+
+knowledge_ref:
+  - "knowledge/drafts/DRAFT-ohpcp-cpython-stdlib-extensions-missing-native-dt-needed.kv"
+  - "knowledge/drafts/DRAFT-ohos-two-cpython-abi-tag-ext-suffix.kv"
+
+knowledge_drafts:
+  # 采用 DRAFT-<slug> 命名（而非 E###-draft-<agentid>）：本分支的 index.tsv 已到 E549，
+  # 而并发适配任务会各自占用后续编号，数字 ID 存在冲突风险；DRAFT-<slug> 无编号语义，
+  # 由主编 promote 时统一分配 E 号（graph promote 同时接受两种命名）。
+  - id: "DRAFT-ohpcp-cpython-stdlib-extensions-missing-native-dt-needed"
+    files:
+      - "knowledge/drafts/DRAFT-ohpcp-cpython-stdlib-extensions-missing-native-dt-needed.kv"
+      - "knowledge/drafts/DRAFT-ohpcp-cpython-stdlib-extensions-missing-native-dt-needed.md"
+    summary: "OHPCD 制品仓/平台的 CPython 发行包把 stdlib 的 _ssl/_sqlite3/_ctypes 编成不链原生库的扩展（DT_NEEDED 里没有 libssl/libcrypto/libsqlite3/libffi），于是任何 Python 消费者 import ssl/sqlite3/ctypes 都报 symbol not found；这不是单个下游库的问题，而是 Python 生态适配的系统性坑。给出诊断（纯 stdlib 读 ELF DT_NEEDED）与三级 workaround（换用带依赖的 wheel / LD_PRELOAD 设备自带 .so / 静态库 --whole-archive 打诊断共享库）。"
+  - id: "DRAFT-ohos-two-cpython-abi-tag-ext-suffix"
+    files:
+      - "knowledge/drafts/DRAFT-ohos-two-cpython-abi-tag-ext-suffix.kv"
+      - "knowledge/drafts/DRAFT-ohos-two-cpython-abi-tag-ext-suffix.md"
+    summary: "OHOS 上并存两套 CPython：Conan registry 的 python/3.12.9（EXT_SUFFIX=.cpython-312-aarch64-linux-ohos.so）与设备 HNP 的 /data/service/hnp/bin/python3（EXT_SUFFIX=.cpython-312.so）。谁驱动构建谁决定扩展的文件名标签，而校验通道若拿错解释器会把正确命名的扩展全判成缺陷。协议：先验证候选解释器 EXT_SUFFIX 再拿它当基线，且必须显式 tool_requires 目标解释器而非依赖 PATH。"
+  # 注：『静态通道必须钉住产物总数（EXPECTED_EXTENSIONS）』这一条已有同族草稿
+  # DRAFT-static-artifact-count-pinning（scikit-learn 1.6.1 PR 携带，尚未合入 main），
+  # 本 PR 的 test_ohos_platform.py 沿用同一做法，不重复新建条目。

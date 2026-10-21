@@ -1,0 +1,30 @@
+#====================================================================
+# DRAFT-conan2-option-variant-no-fallback-publish-new-version.kv
+# 主题: conan 2 兼容性回退只放宽 settings、不放宽 options——缺失变体只能靠新版本号发布
+# 来源: libfuse 3.18.2.1（PR #15754）× saunafs #14023 联合诊断
+#====================================================================
+
+id:                     E3336
+title:                  conan 2 对不可用二进制的兼容性回退只放宽 settings（如 cppstd）、不放宽 options：制品仓缺某个 options 变体时消费方只能每轮源码重编；发布该变体的唯一合规途径是新版本号（R37）
+trigger_tool:           conan|conan create|conan graph info
+phase:                  build
+error_signature:        Forced build from source|posix_spawn: Resource temporarily unavailable|No compatible configuration found
+severity:               2
+category:               conan, artifact-registry, options, package-id
+match_keywords:         package_id, shared, options, 变体, variant, 兼容性回退, fallback, 新版本号, R37, conan list "ref:*"
+root_cause:             package_id 由 settings+options+依赖闭包共同决定；ohpcd 上 libfuse/3.18.2 只发布过默认变体（shared=False → 21b17f8b…），消费方 saunafs 显式 "libfuse/*:shared=True" 解析出 0726937e… 从未上传。conan 的回退不构造不同 options 的替代变体，于是每轮 Forced build from source；其中一轮死于 ninja posix_spawn EAGAIN（CI 机器资源耗尽），表象像偶发环境失败，实为"该变体缺制品"的确定性结果。版本级 conan list 显示"有制品"与此并不矛盾——有的是静态变体。
+affected_scope:         任何消费方用 -o <pkg>/*:xxx=… 收窄 options 的 conan 2 工程；判定"某包有没有制品"必须按 package_id 级（conan list "<ref>:*"）而非版本级。
+verification_cmd:       conan list "libfuse/3.18.2:*" -r=ohpcd; conan graph info --requires=libfuse/3.18.2 -o "libfuse/*:shared=True" -pr:h=<profile> -pr:b=<profile> --format=json（两取值 package_id 对照）
+rec_priority:           1
+rec_approach:           publish-missing-variant-as-new-version
+rec_description:        为缺失变体发新版本号（libfuse/3.18.2.1：源码与 4 个补丁和 3.18.2 完全相同，唯一差异 default_options.shared=True）；本地 conan create 产出的 package_id 恰为缺失的 0726937e…。制品发布后消费方把 require 改指新版本即命中制品。不要改消费方选型（退回 shared=False）来"绕开"——那是语义变更；也不要在消费方 PR 里顺手建依赖包（JC6 原子性）。
+rec_command:            conan create archives/l/libfuse/3.18.2.1 -pr:h=<profile> -pr:b=<profile> --build=missing && conan list "libfuse/3.18.2.1:*" -r=ohpcd  # 合入发布后核对出现 0726937e…
+rec_auto_fix:           false
+rec_impl:               manual-conan-recipe
+forbid_1_pattern:       (制品仓不可取|没有制品)|conan\s+list\s+"[^"]*"\s+-r=\S+\s*(#.*)?$
+forbid_1_reason:        版本级 conan list 代替 package_id 级核对会双向误判——"有制品"只覆盖默认变体，"没制品"可能只是没这个变体；R35 禁版本级判可用性正是此因
+forbid_1_consequence:   把确定性缺制品误诊为网络/环境抖动（EAGAIN 当偶发），或把"有制品"当成全部变体可用，多绕数轮
+principles:
+last_updated:           2026-10-14
+authors:               unknown
+doc_file:               doc/E3336.md

@@ -1,0 +1,31 @@
+--- /dev/null
++++ b/CMakeLists.txt
+@@ -0,0 +1,28 @@
++cmake_minimum_required(VERSION 3.15)
++project(poa VERSION 2.0 LANGUAGES C)
++include(GNUInstallDirs)
++add_library(lpo STATIC
++    align_score.c black_flag.c seq_util.c fasta_format.c msa_format.c
++    align_lpo2.c align_lpo_po2.c buildup_lpo.c lpo.c heaviest_bundle.c
++    lpo_format.c create_seq.c remove_bundle.c numeric_data.c stringptr.c)
++target_include_directories(lpo PUBLIC
++    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
++    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/poa>)
++target_compile_definitions(lpo PUBLIC USE_WEIGHTED_LINKS USE_PROJECT_HEADER)
++set_target_properties(lpo PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED ON)
++if(UNIX OR CMAKE_SYSTEM_NAME STREQUAL "HarmonyOS")
++    target_link_libraries(lpo PUBLIC m)
++endif()
++add_executable(poa main.c)
++target_compile_definitions(poa PRIVATE PROGRAM_VERSION="2.0-20060928")
++target_link_libraries(poa PRIVATE lpo)
++if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
++    target_link_options(poa PRIVATE -Wl,-z,relro,-z,now)
++endif()
++install(TARGETS lpo poa ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
++    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
++install(FILES align_score.h black_flag.h default.h lpo.h msa_format.h
++    poa.h project.h seq_util.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/poa)
++install(FILES blosum80.mat blosum80_trunc.mat multidom.seq multidom.pscore
++    DESTINATION ${CMAKE_INSTALL_DATADIR}/poa)
++install(FILES README make_pscores.pl DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/poa)

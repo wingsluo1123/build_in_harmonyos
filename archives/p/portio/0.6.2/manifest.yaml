@@ -1,0 +1,60 @@
+# 版本级 manifest
+# 文件位置: archives/p/portio/0.6.2/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+version: "0.6.2"
+
+software: "portio"
+
+# published | built | failed | archived
+status: built
+
+build_date: "2026-10-17"
+build_system: "setuptools"
+
+source:
+  url: "https://github.com/fabriziop/portio/archive/refs/tags/0.6.2.tar.gz"
+  sha256: "fc58078c617c924fec3cd44766137ff1b5b15a5f63a02aee7d7f995b40f2f3f3"
+  tar_format: tar.gz
+
+build:
+  # 上游构建入口为 setuptools（setup.py build_ext），非 autotools/cmake/meson
+  system: custom
+
+  configure_options:
+    - "python3.12 setup.py build_ext --inplace   # 经 CC/CFLAGS/C_INCLUDE_PATH/LDSHARED/LDFLAGS 注入交叉参数"
+
+  dependencies:
+    - "python/3.12.9"
+
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-portio.c.patch"
+# 补丁分类
+# type: portability
+# guard: 架构宏 __i386__/__x86_64__（非平台专用宏，Linux x86 与其它 x86 系统同路径）
+
+knowledge_gained:
+  - "OHOS aarch64 sysroot 的 <sys/io.h> 存在但 bits/io.h 为空：缺端口指令时编译只报隐式声明告警，链接不报错（.so 允许未定义符号），故障延后到 dlopen 的 'symbol not found'（musl BIND_NOW） (knowledge_ref: E2141)"
+  - "非 x86 适配口径：I/O 入口抛 portio.error（显式失败），ioperm/iopl 返回 ENOSYS（保持返回 errno 契约），避免伪造数据 (knowledge_ref: E2141)"
+  - "setuptools 交叉编译：只认环境变量，CC/CFLAGS/C_INCLUDE_PATH/LDSHARED/LDFLAGS 必须显式注入；sysconfig INCLUDEPY 在本环境解析为 //include/python3.12，不可用 (knowledge_ref: knowledge/operations/build-systems.md §14)"
+  - "conan python/3.12.9 的 EXT_SUFFIX=.cpython-312-aarch64-linux-ohos.so 与设备 python3 一致，扩展模块两侧通用 (knowledge_ref: E004)"
+  - "E077：扩展模块 .so 必须 binary-sign-tool 自签 + chmod 755，否则 import 报 Permission denied；package() 复制后须重新签名 (knowledge_ref: E077)"
+  - "构建期 setuptools 需按 pinned sha256 从 PyPI 解包（conan python 不自带） (knowledge_ref: archives/g/gpgmepy/2.0.0/conanfile.py)"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/tmp/builds/portio-0.6.2.orig
+  source_work_dir: /storage/Users/currentUser/tmp/builds/portio-0.6.2.work
+  source_orig_hash: 945c35a93278ccf8
+  source_work_hash: 98f2726da97696ef
+  generated_at: '2026-10-17T22:01:48'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-portio.c.patch
+    type: portability
+    platform_only: False
+    guard: "__i386__/__x86_64__（通用架构宏，非平台专用宏；x86 分支保留上游原逻辑）"

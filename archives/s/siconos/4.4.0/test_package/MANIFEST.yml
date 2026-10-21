@@ -1,0 +1,63 @@
+package: siconos/4.4.0
+homepage: https://github.com/siconos/siconos
+upstream_tests_exist: true
+upstream_test_in_build: true
+upstream_check_command: "ctest --show-only=json-v1"
+upstream_test_command: "ctest -T Test --no-compress-output --output-on-failure --no-tests=error --timeout 200 --parallel 1 --output-junit upstream-raw.xml"
+upstream_test_unit: "CTest registered native test groups; CppUnit methods and solver records are separate nested units"
+upstream_test_cases: 110
+upstream_cppunit_cases: 234
+upstream_test_audit: >-
+  Six native C/C++/Fortran components, all applicable registered tests run.
+  Original configuration registers 111 containers; testAVI has zero cases
+  without HAS_EXTREME_POINT_ALGO, so the CMake registration now uses the same
+  capability guard and the common runner rejects empty suites. No runnable
+  case is removed. Seven conditional CppUnit declarations remain inactive:
+  AVI1, SMC2 and Twisting4; 241 declarations yield 234 active methods.
+  The two independently reproduced Linux Lsodar reference failures remain FAIL
+  and CTest retains exit8; validation/reference-policy.json permits only the
+  exact methods, ordinary exit1, complete case counts and bounded finite
+  original reference observations. All other failures block package creation.
+  Local analytical trajectory validation does not convert a reference FAIL.
+  Reports retain XFAIL/XPASS/UNSTABLE outcomes separately from ordinary PASS.
+  Optional MUMPS, FCLIB and unstable NCP collections retain their upstream
+  default OFF setting. Python bindings, Bullet/OCE mechanisms and serialization are outside
+  this native package configuration; no claim of unavailable NumPy is made.
+upstream_tests:
+  - file: externals/externals_tests.cmake
+    source: siconos-4.4.0/externals/externals_tests.cmake
+    description: "18 groups: 9 ODEPACK Fortran, 1 C++ wrapper, 8 Hairer solver-status demos"
+    command: "ctest -T Test"
+  - file: numerics/numerics_tests.cmake
+    source: siconos-4.4.0/numerics/numerics_tests.cmake
+    description: "66 groups; 34 solver collections emit complete individual result statuses"
+    command: "ctest -T Test"
+  - file: kernel/kernel_tests.cmake
+    source: siconos-4.4.0/kernel/kernel_tests.cmake
+    description: "21 nonempty CppUnit groups; original TestPlugin callbacks are built"
+    command: "ctest -T Test"
+  - file: control/control_tests.cmake
+    source: siconos-4.4.0/control/control_tests.cmake
+    description: "4 control CppUnit groups; original tolerances and golden files retained"
+    command: "ctest -T Test"
+  - file: mechanics/mechanics_tests.cmake
+    source: siconos-4.4.0/mechanics/mechanics_tests.cmake
+    description: "1 native MultiBody CppUnit group"
+    command: "ctest -T Test"
+test_package_tests:
+  - file: test_siconos.c
+    description: "14 actual C checks: dense LAPACK/BLAS, sparse CXSparse and Lemke/PGS/FortranQL0001 LCP branches"
+    command: ./test_siconos
+  - file: test_dynamics.cpp
+    description: "15 actual C++ checks: ownership, affine dynamics, sensor, impact, mechanics and IO on TIDS/Diagonal systems"
+    command: ./test_dynamics
+test_files:
+  - path: test_package/test_siconos.c
+    test_type: R34
+    assertion_count: 14
+  - path: test_package/test_dynamics.cpp
+    test_type: R34
+    assertion_count: 15
+test_package_test_count: 2
+consumer_assertion_count: 29
+assertion_count: 29

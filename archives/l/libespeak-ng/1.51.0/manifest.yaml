@@ -1,0 +1,46 @@
+# 版本级 manifest — libespeak-ng 1.51.0
+
+version: "1.51.0"
+software: libespeak-ng
+status: built
+build_date: "2026-10-15"
+build_system: autotools
+
+source:
+  url: "https://github.com/espeak-ng/espeak-ng/archive/refs/tags/1.51.tar.gz"
+  sha256: "f0e028f695a8241c4fa90df7a8c8c5d68dcadbdbc91e758a97e594bbb0a3bdbf"
+  tar_format: tar.gz
+  note: >
+    使用 GitHub 官方 git archive tarball（14MB 完整源码，含 phsource/dictsource/
+    espeak-ng-data 数据源）。上游 releases/download 的 espeak-ng-1.51.tar.gz
+    打包件（1MB）缺少 src/libespeak-ng/*.h 内部头文件与全部数据源，不可完整构建。
+
+build:
+  system: autotools
+  configure_options:
+    - "--build=x86_64-unknown-linux-gnu"
+    - "--host=aarch64-unknown-linux-ohos"
+    - "--without-sonic"
+    - "--without-mbrola"
+    - "--without-speechplayer"
+    - "ac_cv_func_malloc_0_non=yes"
+    - "ac_cv_func_realloc_0_non=yes"
+  dependencies:
+    - pcaudiolib/1.3
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - patches/0001-fix-std-sample-ambiguity.patch
+
+knowledge_gained:
+  - "espeak-ng 1.51 上游 release tarball 打包缺陷：缺内部头文件与数据源；必须用官方 git archive tarball"
+  - "automake 1.16.5 自带 config.guess/sub（2023-08-22）原生识别 HarmonyOS，无需 config.guess 补丁"
+  - "git archive tarball 不含 configure，需 libtoolize+aclocal+autoheader+automake --foreign+autoconf 生成"
+  - "automake 严格要求 ChangeLog.md（上游只有 CHANGELOG.md），需复制生成"
+  - "E114：configure/config.status umask 077+mktemp 在 HMDFS 权限被拒，改写 umask 022"
+  - "字典数据由 espeak-ng 自身 --compile-phonemes/--compile=<lang> 编译生成（非外部 sonata 工具）"
+  - "make check 21 项：18 通过，3 项失败（ssml/language-phonemes 音频哈希平台浮点差异、bom 上游自带）"
+  - "espeak-ng 1.51 speak_lib.h 无 espeak_GetAudioData API，需用 espeak_SetSynthCallback 收集音频（R34 测试）"
+  - "E2141：libc++ C++17 std::sample 与全局 struct sample 同名歧义，patch ::sample 全限定修复"
+  - "E1033：package_type=application 导致 CMakeDeps INCLUDE_DIRS 空，库+CLI 混合包必须 library 类型"

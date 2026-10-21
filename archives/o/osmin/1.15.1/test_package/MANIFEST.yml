@@ -1,0 +1,42 @@
+# test_package/MANIFEST.yml
+# osmin 1.15.1 上游测试声明（CI 脚本 build_and_test.sh L0e 强制要求此文件）
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# 上游测试清点结论：上游不含任何测试。
+#   - 根 CMakeLists.txt 定义了 option(INSTALL_TESTS ...)，但全仓库无
+#     add_test() / enable_testing() / QtTest / QTest:: 引用，也没有 test/
+#     tests/ 目录（find . -maxdepth 3 -type d -name 'test*' 空结果）。
+#   - 该 option 只被 backend/（内嵌 libosmscout 子模块）使用；osmin 本体没有测试目标。
+#   - 补充说明：内嵌 vendor 树 backend/libosmscout 自带测试目标，但被上游
+#     backend/CMakeLists.txt 强制关闭（INSTALL_TESTS=False + OSMSCOUT_BUILD_TESTS=OFF）；
+#     且它属第三方内嵌依赖而非 osmin 本体测试，故不计入上游测试清点。
+# 因此 upstream_tests 如实登记为空，消费者侧验证放在 test_package_tests。
+
+package: osmin/1.15.1
+homepage: "https://github.com/janbar/osmin"
+
+# 上游测试命令（用于 make -n check / ctest -N / meson test --list 分析）
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+# 上游实际运行的测试程序（清点结果：无）
+upstream_tests: []
+
+# test_package 中自带的测试（消费者视角验证）
+test_package_tests:
+  - file: run_osmin_service_test.sh
+    description: >-
+      消费者测试：① 校验 bin/osmin 为 OHOS/aarch64 的 64 位 ELF；
+      ② 以可写 HOME 真实执行无头服务分支 `osmin -service`
+      （QCoreApplication + QRemoteObjectHost 本地套接字，不依赖显示设备/DBus），
+      要求进程完成 Qt6 运行库加载与对象初始化后进入事件循环存活到超时
+      （rc=0/124/143），启动日志无动态库加载失败/崩溃标记
+      （已登记的启动告警：qt.remoteobjects 本地套接字 `local:osmin90` 绑定失败 +
+      QSensorBackend::setDataRates 无效传感器，二者均不在致命标记列表、不影响断言项，
+      详见 notes.md「运行时告警」小节）；
+      ③ 校验服务真实创建了自身数据目录（PlatformExtras::getDataDir 的
+      HomeLocation 分支 + mkpath(APP_NAME)/mkpath(GPX)）。
+    command: "sh run_osmin_service_test.sh <bin/osmin> <log> <HOME>"
+
+assertion_count: 6

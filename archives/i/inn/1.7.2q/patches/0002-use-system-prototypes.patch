@@ -1,0 +1,71 @@
+--- a/include/configdata.h
++++ b/include/configdata.h
+@@ -39,7 +39,7 @@ typedef char		*CSTRING;
+ #else
+ #if	defined(__GNUC__)
+     /* GCC */
+-#define NORETURN	volatile void
++#define NORETURN	__attribute__((noreturn)) void
+ #else
+     /* Everyone else */
+ #define NORETURN	void
+--- a/include/clibrary.h
++++ b/include/clibrary.h
+@@ -96,6 +96,7 @@ typedef struct _FDSET {
+ /* =()<#define FREEVAL @<FREEVAL>@>()= */
+ #define FREEVAL void
+ 
++#ifdef THIS_IS_2004_AND_I_HAVE_BROKEN_HEADERS
+ extern int		optind;
+ extern char		*optarg;
+ #if	!defined(__STDC__)
+@@ -149,3 +150,4 @@ extern void	_exit();
+ #if defined(DO_HAVE_SETPROCTITLE)
+ extern void	setproctitle();
+ #endif	/* defined(DO_HAVE_SETPROCTITLE) */
++#endif /* THIS_IS_2004_AND_I_HAVE_BROKEN_HEADERS */
+--- a/innd/innd.h
++++ b/innd/innd.h
+@@ -31,6 +31,7 @@
+ #include <sys/time.h>
+ #include <sys/socket.h>
+ #include <netinet/in.h>
++#include <arpa/inet.h>
+ #include <fcntl.h>
+ #include "nntp.h"
+ #include "paths.h"
+--- a/nnrpd/nnrpd.h
++++ b/nnrpd/nnrpd.h
+@@ -16,6 +16,7 @@
+ #include <fcntl.h>
+ #include <sys/socket.h>
+ #include <netinet/in.h>
++#include <arpa/inet.h>
+ #if	defined(DO_NEED_TIME)
+ #include <time.h>
+ #endif	/* defined(DO_NEED_TIME) */
+--- a/config/subst.c
++++ b/config/subst.c
+@@ -3,6 +3,9 @@
+ **  A C version of Henry Spencer's "subst" script.
+ */
+ #include <stdio.h>
++#include <stdlib.h>
++#include <unistd.h>
++#include <string.h>
+ #include <errno.h>
+ #include <signal.h>
+ 
+@@ -33,9 +36,11 @@ static char	*argv0;
+ extern char	*optarg;
+ extern int	optind;
+ 
++#ifdef THIS_IS_2004_AND_I_HAVE_BROKEN_HEADERS
+ extern void	exit();
+ extern char	*malloc();
+ extern char	*strcpy();
++#endif
+ 
+ 
+ 
+

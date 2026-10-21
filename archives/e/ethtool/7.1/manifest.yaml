@@ -1,0 +1,60 @@
+# 版本级 manifest —— ethtool/7.1（ARCHIVE-SPEC v2.0）
+version: "7.1"
+software: ethtool
+description: "Utility for examining and tuning network interface parameters"
+language: C
+license: GPL-2.0
+
+# 编译状态: published | built | failed | archived
+# 口径（ARCHIVE-SPEC）: built = conanfile.py 就位 + conan verify 通过、未 upload
+# 第 3 轮 conan-verify 全绿（G0-G4 PASS）后按 ARCHIVE-SPEC 改 built（未 upload 故非 published）。
+# ★2026-10-17 rule4 返修：configure_options 追加 --disable-netlink（出厂配置 == 上游测试矩阵），
+#   改动后重跑 conan-verify G0-G4 全 PASS，状态维持 built。
+status: built
+build_date: "2026-10-08"
+build_system: autotools
+
+source:
+  url: "https://www.kernel.org/pub/software/network/ethtool/ethtool-7.1.tar.xz"
+  sha256: "4d78c26edc0255bc92f4b995b5fd66108d75ff966ed4694f6025a6d370bc2496"
+  tar_format: tar.xz
+
+build:
+  system: autotools
+  configure_options:
+    - "--prefix=${CONAN_PREFIX}"
+    # 出厂即关闭 netlink：本平台 AF_NETLINK socket 创建 100% EACCES，netlink 路径为死路径。
+    # 关闭后「出厂配置 == 上游测试矩阵」：TESTS = test-cmdline + test-features，上游 make check 2/2 PASS。
+    - "--disable-netlink"
+  dependencies:
+    required:
+      - libmnl/1.0.5
+    optional: []
+  cc: clang
+  cxx: clang++
+
+patches_applied:
+  - "0001-configure.patch"
+
+knowledge_gained:
+  - "HMDFS 上 configure 的 umask 077 临时目录不可写，导致 config.status 写 subs1.awk 报 Permission denied（E011 家族）；受控方案 = 移除 umask 077 包裹并 chmod 755，与同包 6.15 先例一致"
+  - "libmnl 依赖经 PkgConfigDeps 注入：conan 生成的 libmnl.pc（generators 目录）prefix 正确；libmnl 包自带的 pc prefix=/ 不可用，PKG_CONFIG_PATH 必须指向 conan 生成目录"
+  - "运行期能力面：SIOCETHTOOL ioctl 与 NETLINK_GENERIC socket 均 EACCES（进程无 CAP_NET_ADMIN、Seccomp=2），消费者测试改用信息面断言（--version/-h 真实输出特征串）"
+  - "netlink 是本平台的死路径：LD_PRELOAD 探针实测 ./test-cmdline 一次运行内 socket(AF_NETLINK=16,type=3,proto=16) 出现 125 次、125 次全 errno=13（EACCES）；因果链 nlsock.c:405 mnl_socket_open → netlink.c:420 netlink_init 负返回 → netlink.c:492-495 → :514 no_support 静默回落 ioctl。⇒ 出厂 --disable-netlink 无功能损失，且使出厂配置与上游测试矩阵一致（上游 make check 2/2 PASS，TESTS = test-cmdline + test-features）"
+  - "上游注册用例口径 = Makefile.am 的 TESTS（2 个：test-cmdline 恒注册 + test-features 仅 !ETHTOOL_ENABLE_NETLINK 注册）；test-common.c 只在 *_SOURCES（Makefile.am:83/:88）里，不是用例。旧版把 3 个源文件当 3 个用例，是平台「0/3」口径的来源"
+  - "上游套件在 conan create 内真实执行（rule4 最强形态，对齐 DRAFT-332）：conanfile.py build() 末尾 autotools.make(target=\"check\", args=[\"-j1\"]) ⇒ 实跑 `make check -j1`，fail-closed（无 || true）；G2 内逐字读数 reports/conan-create.log:612 RUN、:1365 PASS: test-cmdline、:1366 PASS: test-features、:1370-1374 # TOTAL: 2 / # PASS: 2 / # FAIL: 0；无需额外环境变量"
+
+patch_generation:
+  method: per-file-difflib
+  source_orig_dir: /storage/Users/currentUser/builds/ethtool-7.1.orig
+  source_work_dir: /storage/Users/currentUser/builds/ethtool-7.1.work
+  source_orig_hash: bfdd2641b08f4b82
+  source_work_hash: 029aa0fb6d09d6a8
+  generated_at: '2026-10-08T22:21:59'
+  patches_count: 1
+
+patch_classification:
+  - file: 0001-configure.patch
+    type: auto
+    platform_only: True
+    guard: 'pending'

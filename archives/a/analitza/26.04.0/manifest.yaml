@@ -1,0 +1,98 @@
+# 版本级 manifest
+# 文件位置: archives/a/analitza/26.04.0/manifest.yaml
+# 遵循 ARCHIVE-SPEC v3.0
+
+# ============================================================
+# 必须字段
+# ============================================================
+
+version: "26.04.0"
+software: "analitza"
+status: built
+build_date: "2026-10-17"
+build_system: "cmake"
+conan_ref: "analitza/26.04.0"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://download.kde.org/stable/release-service/26.04.0/src/analitza-26.04.0.tar.xz"
+  sha256: "2fd1803bcc011515716ed802265e63dc4d34ee6fccbdf6d523f39475eb64431f"
+  tar_format: tar.xz
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: cmake
+
+  configure_options:
+    - "-DCMAKE_SYSTEM_NAME=Linux / -DCMAKE_SYSTEM_PROCESSOR=aarch64（OHOS 强制 Linux 平台模块，E092 链式约定）"
+    - "-DBUILD_SHARED_LIBS=ON（libAnalitza / AnalitzaPlot / AnalitzaGui / AnalitzaWidgets 四库）"
+    - "-DBUILD_TESTING=ON（构建内 ctest 实跑上游 18 项用例）"
+    - "-DKF_IGNORE_PLATFORM_CHECK=TRUE（OHOS 不在 KDE 平台白名单）"
+    - "-DCMAKE_INSTALL_LIBDIR=lib、-DKDE_INSTALL_USE_QT_SYS_PATHS=OFF（KDEInstallDirs 单前缀布局）"
+    - "-DCMAKE_EXE_LINKER_FLAGS_INIT / -DCMAKE_SHARED_LINKER_FLAGS_INIT=-Wl,-z,max-page-size=0x1000（OHOS 加载器要求 4K 段布局）"
+    - "CMAKE_USER_MAKE_RULES_OVERRIDE_C/CXX 注入 rules 文件：-Wl,-soname, 与 -Wl,-rpath,（OHOS CMake 无 Platform/HarmonyOS，默认不产 SONAME；E1582 同源）"
+    - "-DCMAKE_PLATFORM_NO_VERSIONED_SONAME=TRUE（HMDFS 禁 symlink：单文件无版本 .so + 裸 DT_SONAME，E330；package() 对 install 重写 RUNPATH 后的 ELF 重签 .codesign）"
+    - "-DECM_MODULE_PATH=<ecm/share/ECM 的 modules;find-modules;kde-modules>（CMakeDeps 生成的 ECMConfig 不带模块路径，手工注入）"
+    - "-DQt6LinguistTools_DIR=<qt6linguisttools>/lib/cmake/Qt6LinguistTools（ECMPoQmTools 需要 lrelease/lconvert；kdbusaddons 6.29.0 先例）"
+    - "-DQT_ADDITIONAL_PACKAGES_PREFIX_PATH=<qtbase;qtsvg;qtdeclarative 前缀>（Qt6 拆包组件查找：Svg 在 qtsvg、Qml/Quick 在 qtdeclarative）"
+    - "conan_cmakedeps_paths.cmake（CMAKE_FIND_PACKAGE_PREFER_CONFIG=ON + CMAKE_PREFIX_PATH/LIBRARY_PATH/INCLUDE_PATH/MODULE_PATH 注入；qtbase/qtsvg/qtdeclarative 为 cmake_find_mode=none）"
+
+  dependencies:
+    - "qtbase/6.11.1（Core/Gui/Widgets/Xml；Test 供上游 QTest 程序）"
+    - "qtsvg/6.11.1（AnalitzaWidgets 以 PRIVATE 链接 Qt6::Svg）"
+    - "qtdeclarative/6.11.1（Qml/Quick，org.kde.analitza QML 模块）"
+    - "ecm/6.26.0 (tool_requires)"
+    - "qt6linguisttools/6.11.1 (tool_requires)"
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+patches_applied:
+  - patches/0001-cmake-optional-qt-modules.patch
+  - patches/0002-analitzaplot-optional-links.patch
+  - patches/0003-analitzawidgets-conditional-openglwidgets.patch
+  - patches/0004-declarative-conditional-graph3d.patch
+  - patches/0005-examples-conditional-plots3ddemo.patch
+  - patches/0006-plotter3des-capability-guards.patch
+
+# ============================================================
+# 测试信息
+# ============================================================
+
+upstream_tests:
+  framework: "QtTest（QTest）+ 脚本型导出用例"
+  test_targets: 18
+  test_command: "ctest --test-dir <build_folder> --output-on-failure --no-tests=error"
+  run_in_build: true
+upstream_test_pass_rate: "18/18（100%，真机 conan create 内 BUILD_TESTING=ON 实跑：14 个 QTest 程序（45 个测试函数）+ 4 个脚本型导出用例全部 Passed）"
+adapted_test_pass_rate: "16/16（100%，test_package 两个消费者可执行：test_analitza 10/10 + test_ohos_soname 6/6；reports/conan-verify-report.md Verdict=PASS）"
+
+device_verify:
+  date: "2026-10-17"
+  profile: "ohos-aarch64"
+  result: "PASS（G0–G4 全 PASS；L2/L4/L5 纯库包无 cache 路径跳过）"
+  package_id: "15806506deabc0764ecddd8d5b489caf0fafa188"
+  report: "reports/conan-verify-report.md"
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+knowledge_gained:
+  - "analitza 26.04.0（kalgebra 26.04.0 的 find_package(Analitza6 REQUIRED) 依赖）：OHOS qtbase/6.11.1 未启用 PrintSupport / OpenGL / OpenGLWidgets 三组件——顶层 find_package(Qt6) 将三者移入 OPTIONAL_COMPONENTS（补丁 0001），AnalitzaPlot / AnalitzaWidgets / declarative / examples 的每一处链接与源文件均以 if(TARGET) 或 __has_include 能力探测守卫生效（补丁 0002–0006），全仓无平台宏（R8 合规）。"
+  - "E330：HMDFS 用户卷拒绝 symlink()（EPERM），上游 VERSION/SOVERSION 的 libAnalitza.so.9.0.0→.so.9→.so 链无法落地——以 CMAKE_PLATFORM_NO_VERSIONED_SONAME=TRUE 产出单文件无版本 .so，DT_SONAME 为裸基名（ki18n/attica 先例）；CMake install() 重写 RUNPATH 会破坏 OHOS 构建期 .codesign 封印，package() 以 llvm-objcopy --remove-section .codesign + binary-sign-tool -selfSign 1 全树重签。"
+  - "plotter3d_es.h 消费 AnalitzaPlot target 导出的 PUBLIC 编译定义 ANALITZA_HAVE_OPENGL（0/1，随 Analitza6Targets.cmake 传播，保证库与消费者类布局一致；非 CMake 消费者保留 __has_include(<QOpenGLFunctions>) 兜底），plotter3d_es.cpp 用 __has_include(<QPrinter>) 定义 ANALITZA_HAVE_PRINTSUPPORT：GPU 场景与 PDF 保存分支编译排除，而 3D 绘图模型与 X3D/STL 导出路径保持完整——上游 4 个 export-test-{sin,fancy}-{stl,x3d} CTest 用例因此在无 OpenGL 的 qtbase 线上照常运行（补丁 0002 + 0006）。"
+  - "QML 模块 org.kde.analitza 的 Graph3D（QQuickFramebufferObject）依赖 Qt6::OpenGL，缺失时 declarative/ 只编译并安装 Graph2D.qml（补丁 0004）；模块其余部分正常安装到 lib/qml/org/kde/analitza（qmldir + Graph2D.qml），package_info() 导出 QML2_IMPORT_PATH/QML_IMPORT_PATH。"
+  - "上游 ctest 从各测试自己的 binary dir 启动，构建树的 lib*.so 需要镜像到每个测试工作目录（HMDFS symlink EPERM → shutil.copy2 回退）；运行环境隔离 HOME/XDG_RUNTIME_DIR/XDG_CACHE_HOME 等并设 QT_QPA_PLATFORM=offscreen（无头）；LD_LIBRARY_PATH 前置 /system/lib64 规避沙箱 libc++_shared.so 不兼容。"
+  - "包导出面：上游自带 Analitza6Config.cmake（find_dependency(Qt6Core 6.5.2) + find_dependency(Qt6Xml)，target 命名空间 KF6::Analitza*），配方以 cmake_find_mode=none 防止 CMakeDeps 遮蔽；AnalitzaWidgets 的公共头被上游安装到 include/Analitza6/analitzagui/（无 analitzawidgets 目录），消费者按 analitzagui/expressionedit.h、analitzagui/plotsview2d.h 引用；AnalitzaWidgets 以 PRIVATE Qt6::Svg 进入运行期 DT_NEEDED（qtsvg 必须在运行环境）。"
+  - "Qt6LinguistTools 用 tool_requires qt6linguisttools/6.11.1 + 显式 Qt6LinguistTools_DIR 钉法（Qt6Config 按 Qt6_DIR 相对查找组件，qtbase 制品不含该组件）——kdbusaddons 6.29.0 先例。"

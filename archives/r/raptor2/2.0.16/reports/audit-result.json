@@ -1,0 +1,75 @@
+{
+  "verdict": "pass",
+  "package": "raptor2",
+  "version": "2.0.16",
+  "round": 2,
+  "audit_date": "2026-10-16",
+  "mode": "independent-subtask (W4 派发独立审计子任务)",
+  "scope_note": "工作区未提交，官方 pre_pr_audit.py generate 的 get_changed_files() 走 `git diff origin/main...HEAD`，无 commit 时回退整树扫描（实测 changed_files=47630），不构成本任务范围；故按实际工作区 diff 明确圈定 23 个变更文件（archives/r/raptor2/**、knowledge/drafts/E550/E551、.gitignore 新增 7 行）交独立子任务审计。",
+  "audited_files": [
+    "archives/r/raptor2/README.md",
+    "archives/r/raptor2/commands.json",
+    "archives/r/raptor2/manifest.yaml",
+    "archives/r/raptor2/2.0.16/conanfile.py",
+    "archives/r/raptor2/2.0.16/conandata.yml",
+    "archives/r/raptor2/2.0.16/manifest.yaml",
+    "archives/r/raptor2/2.0.16/notes.md",
+    "archives/r/raptor2/2.0.16/patches/0001-build-config.guess.patch",
+    "archives/r/raptor2/2.0.16/patches/0002-build-config.sub.patch",
+    "archives/r/raptor2/2.0.16/patches/0003-configure.patch",
+    "archives/r/raptor2/2.0.16/patches/0004-configure.ac.patch",
+    "archives/r/raptor2/2.0.16/patches/0005-src-raptor_libxml.c.patch",
+    "archives/r/raptor2/2.0.16/reports/test-report.md",
+    "archives/r/raptor2/2.0.16/test_package/conanfile.py",
+    "archives/r/raptor2/2.0.16/test_package/CMakeLists.txt",
+    "archives/r/raptor2/2.0.16/test_package/MANIFEST.yml",
+    "archives/r/raptor2/2.0.16/test_package/test_raptor2.c",
+    "archives/r/raptor2/2.0.16/test_package/data/sample.ttl",
+    "archives/r/raptor2/2.0.16/test_package/data/sample.rdf",
+    "knowledge/drafts/E550-draft-A1EE.kv",
+    "knowledge/drafts/E550-draft-A1EE.md",
+    "knowledge/drafts/E551-draft-03BF.kv",
+    "knowledge/drafts/E551-draft-03BF.md",
+    ".gitignore"
+  ],
+  "issues": [
+    {
+      "severity": "P3",
+      "rule_id": "KC2",
+      "file": "knowledge/drafts/E550-draft-A1EE.kv",
+      "line": 53,
+      "status": "fixed",
+      "description": "草稿 .kv 残留模板默认字面值 rec_impl: impl-name（同 E551-draft-03BF.kv 第 53 行）。",
+      "fix_suggestion": "置空或填真实实现名。",
+      "fix_applied": "两份草稿均改为空的 rec_impl:，已复核无 impl-name 残留。"
+    },
+    {
+      "severity": "P3",
+      "rule_id": "JC3",
+      "file": ".gitignore",
+      "line": 61,
+      "status": "fixed",
+      "description": "W3 预下载缓存的仓库根 .build-cache/ 未被任何 ignore 规则覆盖（trap 只还原 conandata.yml，不清理缓存目录），若提交时误用 git add -A 会把 1.7MB tarball 带入 PR 并触发 JC3。",
+      "fix_suggestion": "提交前删除 .build-cache 或在 .gitignore 增列。",
+      "fix_applied": "已 rm -rf .build-cache（未改框架 .gitignore 的通用规则），并在本报告记录该框架层风险供后续单独处置。"
+    }
+  ],
+  "first_round": {
+    "verdict": "fail",
+    "p0_found": 1,
+    "p0_detail": "conandata.yml 第 6 行源码 URL 为 file://…/.build-cache/predl_cache/…（W3 本地 CI 预下载步骤运行期临时改写）。该状态为瞬态：W3 脚本 trap EXIT 会在退出时还原为官方 URL，第二轮复审确认磁盘现状已是 https://download.librdf.org/source/raptor2-2.0.16.tar.gz，故 P0 关闭。"
+  },
+  "category_conclusions": {
+    "deception": "无（R34 test_package 真实调用 raptor2 API 并断言业务三元组集合；test() 另实跑包内 rapper CLI 断言业务输出；R9 无软通过；R8/PF5 补丁新增行无 __OHOS__；R19 无预编译二进制）",
+    "recipe_quality": "通过（R26 非系统同名库；R32 用 os in (\"Linux\",\"OHOS\")；R33 走 AutotoolsToolchain 无裸 shell 变量；R37 首次适配用上游版本；R38 软件级 commands.json 存在且 schema 正确、binary=false 与 status=built 一致；R39 官方 https 源）",
+    "file_spec": "通过（双层结构完整、必填文件齐全、清单内无 PR 禁止文件）",
+    "pr_compliance": "通过（W2 仅 raptor2 单配方 + 对应知识草稿，未改框架文件）",
+    "evidence_consistency": "通过（src 19/19；tests 语料 1233 = 1205 PASS + 28 上游 EXPECTED_FAILURES；消费者用例 2；test-report 合计 1252 = 1224 + 28；conandata/manifest/notes/test-report 的 URL 与 sha256 五处一致；无 [N]/待补/请填写/TODO 占位符）"
+  },
+  "not_verifiable_in_environment": [
+    "sha256 089db78d… 未与官方公布值独立核对（本机对外检索受限），但已与下载所得 tarball 实测一致，且 W3/conan create 的 source 校验均通过",
+    "上游 make check 的 19/19 与 1233/1205/28 计数、2 个消费者用例 PASS 结论由本机既有运行证据（reports/test-report.md、conan create 日志）支撑，审计方未独立复跑",
+    "依赖在制品仓的发布状态由 notes.md 记录，未联网复核"
+  ],
+  "summary": "W4 第二轮独立审计 verdict=pass，P0=0 / P1=0 / P2=0 / P3=0（两条 P3 已修复并复核）。第一轮 1 个 P0（conandata.yml file:// 瞬态改写）经第二轮确认已由 W3 trap 还原为官方 URL，关闭。"
+}

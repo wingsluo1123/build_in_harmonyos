@@ -1,0 +1,19 @@
+package: wavetral/g20210517
+homepage: "https://github.com/jeanette-c/wavetral"
+
+upstream_check_command: "find . -maxdepth 3 -type f | grep -E '(test|Test)' && grep -nE 'enable_testing|add_test|check' CMakeLists.txt"
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+upstream_tests_absent_evidence:
+  - "上游官方提交归档共 47 个文件，没有 tests/ 或 test/ 目录"
+  - "根 CMakeLists.txt 只有 add_executable(wavetral ...)，没有 enable_testing()、add_test() 或 check 目标"
+  - "上游 README 的安装步骤只包含 cmake、make 和 make install，没有测试命令"
+  - "因此上游自动化测试数为 0"
+
+test_package_tests:
+  - file: test_wavetral.cpp
+    description: "消费者测试：执行打包后的 wavetral，验证版本横幅；把提交的正弦波文本夹具转换为 4 条频谱并断言基波归一化为 1、高次谐波低于阈值；再转换为 16 帧单声道 16-bit WAV 并解析 RIFF/fmt/data 块；最后验证缺输入文件必须失败"
+    command: "./test_wavetral"
+
+assertion_count: 15

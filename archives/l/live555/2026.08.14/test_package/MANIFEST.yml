@@ -1,0 +1,22 @@
+package: live555/2026.08.14
+homepage: "http://www.live555.com/liveMedia/"
+
+upstream_check_command: "ls testProgs >/dev/null 2>&1 && echo present"
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_test_note: >-
+  上游自带示例位于 testProgs/（需要真实网络与媒体流），本包按消费者需要只构建
+  liveMedia / groupsock / UsageEnvironment / BasicUsageEnvironment 四个子目录，不构建 testProgs，
+  故不执行上游示例；平台能力由本包 test_package 的离线消费者可用性测试覆盖。
+upstream_tests: []
+
+test_package_tests:
+  - file: test.cpp
+    description: >-
+      离线消费者测试（3 条断言）：包含 <liveMedia/liveMedia.hh> 等聚合头（验证头布局完整）；
+      构造 BasicTaskScheduler::createNew() 与 BasicUsageEnvironment::createNew()（真实 API、无网络）；
+      经 UsageEnvironment 输出流打印后按上游要求 reclaim() + 析构
+    command: "./test_live555"
+
+logical_test_count: 1
+assertion_count: 3

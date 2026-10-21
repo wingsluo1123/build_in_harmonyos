@@ -1,0 +1,30 @@
+id:                     E3683
+trigger_tool: conan|cmake
+phase: building
+error_signature: KeyError: 'OHOS'|cmake/4\.4\.4.*build\(\).*line ?35
+severity:               3
+category:               ohos, build-system, cmake
+match_keywords: dual_remote_collision, cci_cmake_keyerror_ohos, libxml2_suffix_version, hmbs_repair_method
+title: 双远端共存下裸依赖命中CCI cmake边时切换仓内独有后缀版本切断失败边
+root_cause: requires裸libxml2/2.15.3在conancenter与ohpcd双远端共存，真机预检conancenter优先命中CCI配方，其tool_requires cmake的conandata无OHOS条目，从源码构建cmake/4.4.4 build() line35报KeyError OHOS，本体尚未进入编译
+affected_scope: requires裸版本在conancenter与ohpcd双远端共存且CCI配方带cmake tool_requires、仓内有同源后缀独有版本可切换的C/C++库
+affected_scope: requires裸版本在conancenter与ohpcd双远端共存且CCI配方带cmake tool_requires、仓内有同源后缀独有版本可切换的C/C++库
+verification_cmd: 真机conan create依赖图仅命中仓内libxml2/2.15.3.1零tool_requires，不再拉起CCI cmake失败边且真机门禁全部通过
+rec_priority: 1
+rec_approach: switch-to-suffixed-inhouse-version
+rec_description: 将裸依赖切换到仓内同上游源码的适配后缀独有版本，切断CCI配方经tool_requires拉起无OHOS条目cmake的失败边并同步两级manifest与注释
+rec_command: conanfile.py: self.requires("libxml2/2.15.3.1")并注释CCI边依据；同步archives/r/rarcrack/manifest.yaml、版本manifest.yaml、notes.md
+rec_auto_fix: false
+rec_impl: conan-recipe
+fallback_priority: 2
+fallback_approach: pin-ohpcd-remote-or-patch-cmake
+fallback_description: 若后缀版本尚未发布到制品仓无二进制可供下载，则显式约束ohpcd远端修订或为CCI cmake补OHOS条目，以后端conan download实证为准
+fallback_auto_fix: false
+forbid_1_pattern: libxml2/2\.15\.3["'\)]|requires\(.*libxml2/2\.15\.3"
+forbid_1_reason: 禁止保留裸版本依赖，双远端下仍会优先命中CCI配方并经tool_requires拉起无OHOS条目cmake
+forbid_1_consequence: 真机预检再次在cmake build()报KeyError OHOS并连带拉取libiconv/zlib，任务退回修复循环
+doc_file: knowledge/drafts/DRAFT-rarcrack-0.2-20240214-413ea3a-switch-suffix-version-cut-cci-cmake-edge.md
+last_updated: 2026-10-19
+source_event: rarcrack/0.2-20240214-413ea3a真机预检cmake/4.4.4 build() line35 KeyError OHOS并切换后缀版本修复
+authors: hmbs-executor
+source_pr: 15035

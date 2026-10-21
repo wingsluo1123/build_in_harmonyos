@@ -1,0 +1,185 @@
+--- a/Makefile.am	2021-10-30 10:42:16.000000000 +0800
++++ b/Makefile.am	2026-10-09 12:40:39.200913900 +0800
+@@ -1,4 +1,4 @@
+-SUBDIRS = gfbgraph docs tests
++SUBDIRS = gfbgraph tests
+ ACLOCAL_AMFLAGS = -I m4
+ 
+ libgfbgraphdocdir = ${prefix}/doc/libgfbgraph
+--- a/configure.ac	2021-10-30 10:42:16.000000000 +0800
++++ b/configure.ac	2026-10-09 12:40:39.200913900 +0800
+@@ -40,10 +40,12 @@
+ 
+ GOBJECT_INTROSPECTION_CHECK([1.30.0])
+ 
+-PKG_CHECK_MODULES(LIBGFBGRAPH, [glib-2.0 gio-2.0 gobject-2.0 rest-0.7 json-glib-1.0])
++PKG_CHECK_MODULES(LIBGFBGRAPH, [glib-2.0 gio-2.0 gobject-2.0 rest-1.0 json-glib-1.0])
+ 
+-PKG_CHECK_MODULES(SOUP, [libsoup-2.4])
+-SOUP_UNSTABLE_CPPFLAGS=-DLIBSOUP_USE_UNSTABLE_REQUEST_API
++# 制品仓 librest 0.10.2 的 pkg-config 名是 rest-1.0，且该二进制按 libsoup-3.0
++# 构建。rest 0.7 与 libsoup-2.4 不能和 rest-1.0 同时链接（Soup 类型 ABI 不同）。
++PKG_CHECK_MODULES(SOUP, [libsoup-3.0])
++SOUP_UNSTABLE_CPPFLAGS=
+ AC_SUBST(SOUP_UNSTABLE_CPPFLAGS)
+ 
+ PKG_CHECK_MODULES(GOA, [goa-1.0])
+@@ -53,9 +55,5 @@
+ AC_OUTPUT([
+ Makefile
+ libgfbgraph.pc
+-docs/Makefile
+-docs/reference/Makefile
+-docs/reference/apiversion.xml
+-docs/reference/version.xml
+ gfbgraph/Makefile
+ tests/Makefile])
+--- a/gfbgraph/Makefile.am	2021-10-30 10:42:16.000000000 +0800
++++ b/gfbgraph/Makefile.am	2026-10-09 12:40:39.200913900 +0800
+@@ -60,9 +60,9 @@
+ 	GLib-2.0 	\
+ 	Gio-2.0		\
+ 	GObject-2.0	\
+-	Rest-0.7	\
++	Rest-1.0	\
+ 	Json-1.0	\
+-	Soup-2.4
++	Soup-3.0
+ 
+ GFBGraph_@API_MAJOR@_@API_MINOR@_gir_CFLAGS = \
+ 	$(GOA_API_CHANGE_CPPFLAGS)	\
+--- a/gfbgraph/gfbgraph-goa-authorizer.c	2021-10-30 10:42:16.000000000 +0800
++++ b/gfbgraph/gfbgraph-goa-authorizer.c	2026-10-09 12:40:39.200913900 +0800
+@@ -172,7 +172,8 @@
+ gfbgraph_goa_authorizer_process_message (GFBGraphAuthorizer *iface, SoupMessage *message)
+ {
+         gchar *auth_value;
+-        SoupURI *uri;
++        GUri *uri;
++        GUri *updated;
+         GFBGraphGoaAuthorizerPrivate *priv;
+ 
+         priv = GFBGRAPH_GOA_AUTHORIZER_GET_PRIVATE (GFBGRAPH_GOA_AUTHORIZER (iface));
+@@ -181,7 +182,9 @@
+ 
+         uri = soup_message_get_uri (message);
+         auth_value = g_strconcat ("access_token=", priv->access_token, NULL);
+-        soup_uri_set_query (uri, auth_value);
++        updated = soup_uri_copy (uri, SOUP_URI_QUERY, auth_value, SOUP_URI_NONE);
++        soup_message_set_uri (message, updated);
++        g_uri_unref (updated);
+ 
+         g_free (auth_value);
+ 
+--- a/gfbgraph/gfbgraph-photo.c	2021-10-30 10:42:16.000000000 +0800
++++ b/gfbgraph/gfbgraph-photo.c	2026-10-09 12:40:39.201437800 +0800
+@@ -32,9 +32,6 @@
+ 
+ #include <json-glib/json-glib.h>
+ #include <libsoup/soup.h>
+-#include <libsoup/soup-request.h>
+-#include <libsoup/soup-request-http.h>
+-#include <libsoup/soup-requester.h>
+ 
+ enum {
+         PROP_0,
+@@ -410,8 +407,6 @@
+ {
+         GInputStream *stream = NULL;
+         SoupSession *session;
+-        SoupRequester *requester;
+-        SoupRequest *request;
+         SoupMessage *message;
+         GFBGraphPhotoPrivate *priv;
+ 
+@@ -420,25 +415,24 @@
+ 
+         priv = GFBGRAPH_PHOTO_GET_PRIVATE (photo);
+ 
+-        session = soup_session_sync_new ();
+-        requester = soup_requester_new ();
+-        g_object_set (G_OBJECT (session), "ssl-use-system-ca-file", TRUE, NULL);
+-        soup_session_add_feature (session, SOUP_SESSION_FEATURE (requester));
+-
+-        request = soup_requester_request (requester, priv->source, error);
+-        if (request != NULL) {
+-                message = soup_request_http_get_message (SOUP_REQUEST_HTTP (request));
+-
+-                stream = soup_request_send (request, NULL, error);
+-                if (stream != NULL) {
+-                        g_object_weak_ref (G_OBJECT (stream), (GWeakNotify) g_object_unref, session);
+-                }
+-
+-                g_clear_object (&message);
+-                g_clear_object (&request);
++        /* libsoup 3 删除了 SoupRequester / soup_session_sync_new。
++           上游这里只校验 authorizer，并未把令牌写进请求，行为保持不变。 */
++        session = soup_session_new ();
++        message = soup_message_new ("GET", priv->source);
++        if (message == NULL) {
++                g_set_error (error, G_IO_ERROR, G_IO_ERROR_INVALID_ARGUMENT,
++                             "Invalid photo source URI");
++                g_object_unref (session);
++                return NULL;
+         }
+ 
+-        g_clear_object (&requester);
++        stream = soup_session_send (session, message, NULL, error);
++        if (stream != NULL) {
++                g_object_weak_ref (G_OBJECT (stream), (GWeakNotify) g_object_unref, session);
++        } else {
++                g_object_unref (session);
++        }
++        g_object_unref (message);
+ 
+         return stream;
+ }
+--- a/gfbgraph/gfbgraph-simple-authorizer.c	2021-10-30 10:42:16.000000000 +0800
++++ b/gfbgraph/gfbgraph-simple-authorizer.c	2026-10-09 12:40:39.200913900 +0800
+@@ -169,7 +169,8 @@
+ gfbgraph_simple_authorizer_process_message (GFBGraphAuthorizer *iface, SoupMessage *message)
+ {
+         gchar *auth_value;
+-        SoupURI *uri;
++        GUri *uri;
++        GUri *updated;
+         GFBGraphSimpleAuthorizerPrivate *priv;
+ 
+         priv = GFBGRAPH_SIMPLE_AUTHORIZER_GET_PRIVATE (GFBGRAPH_SIMPLE_AUTHORIZER (iface));
+@@ -178,7 +179,10 @@
+ 
+         uri = soup_message_get_uri (message);
+         auth_value = g_strconcat ("access_token=", priv->access_token, NULL);
+-        soup_uri_set_query (uri, auth_value);
++        /* libsoup 3 的 GUri 不可变，不能再调用已删除的 soup_uri_set_query。 */
++        updated = soup_uri_copy (uri, SOUP_URI_QUERY, auth_value, SOUP_URI_NONE);
++        soup_message_set_uri (message, updated);
++        g_uri_unref (updated);
+ 
+         g_free (auth_value);
+ 
+--- a/libgfbgraph.pc.in	2021-10-30 10:42:16.000000000 +0800
++++ b/libgfbgraph.pc.in	2026-10-09 12:40:39.200913900 +0800
+@@ -9,6 +9,6 @@
+ Name: libgfbgraph
+ Description: GObject library for Facebook Graph API
+ Version: @VERSION@
+-Requires: gio-2.0 glib-2.0 goa-1.0 json-glib-1.0 libsoup-2.4 rest-0.7
++Requires: gio-2.0 glib-2.0 goa-1.0 json-glib-1.0 libsoup-3.0 rest-1.0
+ Libs: -L${libdir} -lgfbgraph-${apiversion}
+ Cflags: -I${includedir}/gfbgraph-@API_VERSION@
+--- a/tests/gtestutils.c	2021-10-30 10:42:16.000000000 +0800
++++ b/tests/gtestutils.c	2026-10-09 12:40:39.201437800 +0800
+@@ -188,7 +188,11 @@
+         smessage = soup_message_new ("DELETE", function_path);
+         gfbgraph_authorizer_process_message (GFBGRAPH_AUTHORIZER (fixture->authorizer), smessage);
+ 
+-        status = soup_session_send_message (ssession, smessage);
++        {
++                GInputStream *response_body = soup_session_send (ssession, smessage, NULL, NULL);
++                status = soup_message_get_status (smessage);
++                g_clear_object (&response_body);
++        }
+         g_assert_cmpint(status, ==, 200);
+ 
+         g_free (fixture->user_id);

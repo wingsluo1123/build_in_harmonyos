@@ -1,0 +1,26 @@
+# 软件级 manifest
+# 文件位置: archives/p/pnc/manifest.yaml
+# 遵循 ARCHIVE-SPEC v2.0
+
+software: pnc
+display: "pnc (libphonenumber CLI)"
+description: "libphonenumber 命令行封装：号码校验/格式化/文本抽取/离线归属地/国际拨号串"
+category: utility
+homepage: "https://git.sr.ht/~anjan/pnc"
+license: GPL-3.0-only
+build_system: cmake
+
+ohos_adaptation:
+  key_points:
+    - "上游用 find_library(PATHS /usr/local/lib) + include_directories(/usr/local/include) 找依赖，打包环境下必须改为 pkg-config"
+    - "libphonenumber 是静态库，protobuf 配方 cmake_find_mode=none 使 CMakeDeps 在 find_dependency 处断链，只能用 .pc 表达依赖链"
+    - "protobuf 33.6 包内 libutf8_validity.a/libutf8_range.a 未列入 cpp_info，需补写 protobuf.pc"
+    - "gawk 扩展未纳入本包（OHOS 上 dlopen 场景退出期随机崩溃，见 0.9.5/notes.md）"
+  common_dependencies:
+    - libphonenumber/8.13.51
+
+versions:
+  "0.9.5":
+    status: built
+    build_date: "2026-10-15"
+    conan_ref: "pnc/0.9.5"

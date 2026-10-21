@@ -1,0 +1,14 @@
+--- a/py3.12/multiprocess/managers.py
++++ b/py3.12/multiprocess/managers.py
+@@ -1346,8 +1346,9 @@
+             BaseManager.__init__(self, *args, **kwargs)
+             util.debug(f"{self.__class__.__name__} created by pid {getpid()}")
+ 
+-        def __del__(self):
+-            util.debug(f"{self.__class__.__name__}.__del__ by pid {getpid()}")
++        def __del__(self, _debug=util.debug, _getpid=getpid):
++            # Module globals may already be cleared during interpreter shutdown.
++            _debug(f"{self.__class__.__name__}.__del__ by pid {_getpid()}")
+ 
+         def get_server(self):
+             'Better than monkeypatching for now; merge into Server ultimately'

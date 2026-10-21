@@ -1,0 +1,544 @@
+--- a/src/collector/bookkeeper.c
++++ b/src/collector/bookkeeper.c
+@@ -36,10 +36,8 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+-#include <sys/ipc.h>
++#include <sys/mman.h>
+ #include <sys/param.h>
+-#include <sys/sem.h>
+-#include <sys/shm.h>
+ #include <sys/stat.h>
+ #include <sys/types.h>
+ #include <time.h>
+@@ -47,14 +45,6 @@
+ 
+ #include "config.h"
+ 
+-#ifndef HAVE_SEMUN
+-union semun {
+-    int val;               // value for SETVAL
+-    struct semid_ds *buf;  // buffer for IPC_STAT & IPC_SET
+-    u_short *array;        // array for GETALL & SETALL
+-};
+-#endif
+-
+ #include "bookkeeper.h"
+ #include "util.h"
+ 
+@@ -64,9 +54,13 @@
+ 
+ static key_t hash(char *str, int flag);
+ 
+-static void sem_lock(int sem_set_id);
++static int shm_object_name(char *name, size_t len, char *path);
++
++static int sem_object_name(char *name, size_t len, char *path);
++
++static void sem_lock(sem_t *sem);
+ 
+-static void sem_unlock(int sem_set_id);
++static void sem_unlock(sem_t *sem);
+ 
+ static inline bookkeeper_list_t *Get_bookkeeper_list_entry(bookkeeper_t *bookkeeper);
+ 
+@@ -94,31 +88,45 @@
+ 
+ }  // End of hash
+ 
+-// locks the semaphore, for exclusive access to the bookkeeping record
+-static void sem_lock(int sem_set_id) {
+-    struct sembuf sem_op;
++/* The collector keeps its bookkeeping record in a shared memory segment and
++ * guards it with a semaphore. Both are named objects here: the record is
++ * identified by the hash of the flow directory, which keeps the same two
++ * records (one per directory) separate the System V keys did. */
++static int shm_object_name(char *name, size_t len, char *path) {
++    key_t key = hash(path, 0);
++
++    if (key == -1) return -1;
++
++    snprintf(name, len, "/nfdump-shm-%08x", (unsigned int)(uint32_t)key);
++
++    return 0;
++
++}  // End of shm_object_name
++
++static int sem_object_name(char *name, size_t len, char *path) {
++    key_t key = hash(path, 1);
+ 
+-    /* wait on the semaphore, unless it's value is non-negative. */
+-    sem_op.sem_num = 0;
+-    sem_op.sem_op = -1;
+-    sem_op.sem_flg = 0;
+-    if (semop(sem_set_id, &sem_op, 1) == 0) return;
++    if (key == -1) return -1;
+ 
+-    LogError("semop() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
++    snprintf(name, len, "/nfdump-sem-%08x", (unsigned int)(uint32_t)key);
++
++    return 0;
++
++}  // End of sem_object_name
++
++// locks the semaphore, for exclusive access to the bookkeeping record
++static void sem_lock(sem_t *sem) {
++    if (sem_wait(sem) == 0) return;
++
++    LogError("sem_wait() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
+ 
+ }  // End of sem_lock
+ 
+ // sem_unlock. un-locks the semaphore.
+-static void sem_unlock(int sem_set_id) {
+-    struct sembuf sem_op;
+-
+-    /* signal the semaphore - increase its value by one. */
+-    sem_op.sem_num = 0;
+-    sem_op.sem_op = 1;
+-    sem_op.sem_flg = 0;
+-    if (semop(sem_set_id, &sem_op, 1) == 0) return;
++static void sem_unlock(sem_t *sem) {
++    if (sem_post(sem) == 0) return;
+ 
+-    LogError("semop() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
++    LogError("sem_post() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
+ 
+ }  // End of sem_unlock
+ 
+@@ -135,26 +143,30 @@
+ }  // End of Get_bookkeeper_list_entry
+ 
+ int InitBookkeeper(bookkeeper_t **bookkeeper, char *path, pid_t nfcapd_pid) {
+-    int sem_key, shm_key, shm_id, sem_id;
+-    union semun sem_val;
++    char shm_name[64], sem_name[64];
++    sem_t *sem;
++    size_t shm_size = sizeof(bookkeeper_t);
+     bookkeeper_list_t **bookkeeper_list_entry;
++    int fd;
+ 
+     *bookkeeper = NULL;
+ 
+-    shm_key = hash(path, 0);
+-    if (shm_key == -1) return ERR_PATHACCESS;
++    if (shm_object_name(shm_name, sizeof(shm_name), path) == -1) return ERR_PATHACCESS;
++    if (sem_object_name(sem_name, sizeof(sem_name), path) == -1) return ERR_PATHACCESS;
+ 
+     // check if the shared memory is already allocated
+-    shm_id = shmget(shm_key, sizeof(bookkeeper_t), 0600);
++    fd = shm_open(shm_name, O_RDWR, 0600);
+ 
+-    if (shm_id >= 0) {
++    if (fd >= 0) {
+         // the segment already exists. Either a running process is active
+         // or an unclean shutdown happened
+ 
+         // map the segement and check the record
+-        *bookkeeper = (bookkeeper_t *)shmat(shm_id, NULL, 0);
+-        if (*bookkeeper == (bookkeeper_t *)-1) {
+-            LogError("shmat() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
++        *bookkeeper = (bookkeeper_t *)mmap(NULL, shm_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
++        close(fd);
++        if (*bookkeeper == MAP_FAILED) {
++            *bookkeeper = NULL;
++            LogError("mmap() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
+             return ERR_FAILED;
+         }
+         if ((*bookkeeper)->nfcapd_pid <= 0) {
+@@ -174,16 +186,22 @@
+                         // A process exists, but we are not allowed to signal this process
+                         LogError("Another collector with pid %i but different user ID is already running, and configured for '%s'",
+                                  (*bookkeeper)->nfcapd_pid, path);
++                        munmap((void *)(*bookkeeper), shm_size);
++                        *bookkeeper = NULL;
+                         return ERR_EXISTS;
+                         break;
+                     default:
+                         // This should never happen, but catch it anyway
+-                        LogError("semop() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
++                        LogError("kill() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
++                        munmap((void *)(*bookkeeper), shm_size);
++                        *bookkeeper = NULL;
+                         return ERR_FAILED;
+                 }
+             } else {
+                 // process exists;
+                 LogError("Another collector with pid %i is already running, and configured for '%s'", (*bookkeeper)->nfcapd_pid, path);
++                munmap((void *)(*bookkeeper), shm_size);
++                *bookkeeper = NULL;
+                 return ERR_EXISTS;
+             }
+             // if we pass this point, we have recycled an existing record
+@@ -202,19 +220,28 @@
+                 break;
+             default:
+                 // This should never happen, but catch it anyway
+-                LogError("semop() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
++                LogError("shm_open() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
+                 return ERR_FAILED;
+         }
+         // we now create a new segment, this should not fail now
+-        shm_id = shmget(shm_key, sizeof(bookkeeper_t), IPC_CREAT | 0600);
+-        if (shm_id == -1) {
++        fd = shm_open(shm_name, O_RDWR | O_CREAT, 0600);
++        if (fd == -1) {
+             // but did anyway - give up
+-            LogError("shmget() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
++            LogError("shm_open() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
++            return ERR_FAILED;
++        }
++        if (ftruncate(fd, (off_t)shm_size) == -1) {
++            LogError("ftruncate() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
++            close(fd);
++            shm_unlink(shm_name);
+             return ERR_FAILED;
+         }
+-        *bookkeeper = (bookkeeper_t *)shmat(shm_id, NULL, 0);
+-        if ((*bookkeeper) == (bookkeeper_t *)-1) {
+-            LogError("shmget() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
++        *bookkeeper = (bookkeeper_t *)mmap(NULL, shm_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
++        close(fd);
++        if ((*bookkeeper) == MAP_FAILED) {
++            *bookkeeper = NULL;
++            LogError("mmap() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
++            shm_unlink(shm_name);
+             return ERR_FAILED;
+         }
+         memset((void *)(*bookkeeper), 0, sizeof(bookkeeper_t));
+@@ -224,42 +251,19 @@
+     (*bookkeeper)->sequence++;
+ 
+     // create semaphore
+-
+-    sem_key = hash(path, 1);
+-    // this should never fail, as we already got a key for the shared memory
+-    if (sem_key == -1) {
+-        // .. but catch it anyway .. and release shared memory. something is fishy
+-        struct shmid_ds buf;
+-        shmdt((void *)(*bookkeeper));
+-        shmctl(shm_id, IPC_RMID, &buf);
+-        return ERR_FAILED;
+-    }
+-
+-    // get the semaphore
+-    sem_id = semget(sem_key, 1, IPC_CREAT | 0600);
+-    if (sem_id == -1) {
+-        struct shmid_ds buf;
+-
+-        // this should not have failed
+-        LogError("semget() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
+-
+-        // release shared memory
+-        shmdt((void *)(*bookkeeper));
+-        shmctl(shm_id, IPC_RMID, &buf);
+-        return ERR_FAILED;
+-    }
+-
+-    // initialize the semaphore
+-    sem_val.val = 1;
+-    if (semctl(sem_id, 0, SETVAL, sem_val) == -1) {
+-        struct shmid_ds buf;
+-
++    // A semaphore which is created here always starts with the value 1.
++    // Dropping a leftover name first also resets a lock which a collector that
++    // did not shut down properly may have left behind.
++    sem_unlink(sem_name);
++    sem = sem_open(sem_name, O_CREAT | O_EXCL, 0600, 1);
++    if (sem == SEM_FAILED) {
+         // this should not have failed
+-        LogError("semctl() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
++        LogError("sem_open() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
+ 
+         // release shared memory
+-        shmdt((void *)(*bookkeeper));
+-        shmctl(shm_id, IPC_RMID, &buf);
++        munmap((void *)(*bookkeeper), shm_size);
++        *bookkeeper = NULL;
++        shm_unlink(shm_name);
+         return ERR_FAILED;
+     }
+ 
+@@ -268,18 +272,20 @@
+ 
+     (*bookkeeper_list_entry) = (bookkeeper_list_t *)malloc(sizeof(bookkeeper_list_t));
+     if (!*bookkeeper_list_entry) {
+-        struct shmid_ds buf;
+-
+         LogError("malloc() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
+-        shmdt((void *)(*bookkeeper));
+-        shmctl(shm_id, IPC_RMID, &buf);
+-        semctl(sem_id, 0, IPC_RMID);
++        munmap((void *)(*bookkeeper), shm_size);
++        *bookkeeper = NULL;
++        sem_close(sem);
++        sem_unlink(sem_name);
++        shm_unlink(shm_name);
+         return ERR_FAILED;
+     }
+     memset((void *)*bookkeeper_list_entry, 0, sizeof(bookkeeper_list_t));
+ 
+-    (*bookkeeper_list_entry)->shm_id = shm_id;
+-    (*bookkeeper_list_entry)->sem_id = sem_id;
++    strncpy((*bookkeeper_list_entry)->shm_name, shm_name, sizeof((*bookkeeper_list_entry)->shm_name) - 1);
++    strncpy((*bookkeeper_list_entry)->sem_name, sem_name, sizeof((*bookkeeper_list_entry)->sem_name) - 1);
++    (*bookkeeper_list_entry)->shm_size = shm_size;
++    (*bookkeeper_list_entry)->sem = sem;
+     (*bookkeeper_list_entry)->bookkeeper = *bookkeeper;
+     (*bookkeeper_list_entry)->next = NULL;
+ 
+@@ -290,17 +296,20 @@
+ 
+ int AccessBookkeeper(bookkeeper_t **bookkeeper, char *path) {
+     bookkeeper_list_t **bookkeeper_list_entry;
+-    int sem_key, shm_key, shm_id, sem_id;
++    char shm_name[64], sem_name[64];
++    size_t shm_size = sizeof(bookkeeper_t);
++    sem_t *sem;
++    int fd;
+ 
+     *bookkeeper = NULL;
+ 
+-    shm_key = hash(path, 0);
+-    if (shm_key == -1) return ERR_PATHACCESS;
++    if (shm_object_name(shm_name, sizeof(shm_name), path) == -1) return ERR_PATHACCESS;
++    if (sem_object_name(sem_name, sizeof(sem_name), path) == -1) return ERR_PATHACCESS;
+ 
+     // check if the shared memory is already allocated
+-    shm_id = shmget(shm_key, sizeof(bookkeeper_t), 0600);
++    fd = shm_open(shm_name, O_RDWR, 0600);
+ 
+-    if (shm_id < 0) {
++    if (fd < 0) {
+         // the segment does not exists. Check why
+ 
+         switch (errno) {
+@@ -316,34 +325,30 @@
+                 break;
+             default:
+                 // This should never happen, but catch it anyway
+-                LogError("semop() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
++                LogError("shm_open() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
+                 return ERR_FAILED;
+         }
+         // not reached
+     }
+     // at this point we now have a valid record and can proceed
+ 
+-    // create semaphore
+-    sem_key = hash(path, 1);
+-    // this should never fail, as we already got a key for the shared memory
+-    if (sem_key == -1) {
+-        // .. but catch it anyway .. and release shared memory. something is fishy
+-        return ERR_FAILED;
+-    }
+-
+     // get the semaphore
+-    sem_id = semget(sem_key, 1, 0600);
+-    if (sem_id == -1) {
++    sem = sem_open(sem_name, 0);
++    if (sem == SEM_FAILED) {
+         // this should not have failed
+-        LogError("semget() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
++        LogError("sem_open() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
+ 
++        close(fd);
+         return ERR_FAILED;
+     }
+ 
+     // map the shared segment
+-    *bookkeeper = (bookkeeper_t *)shmat(shm_id, NULL, 0);
+-    if (*bookkeeper == (bookkeeper_t *)-1) {
+-        LogError("shmat() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
++    *bookkeeper = (bookkeeper_t *)mmap(NULL, shm_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
++    close(fd);
++    if (*bookkeeper == MAP_FAILED) {
++        *bookkeeper = NULL;
++        LogError("mmap() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
++        sem_close(sem);
+         return ERR_FAILED;
+     }
+ 
+@@ -355,13 +360,18 @@
+         (*bookkeeper_list_entry) = (bookkeeper_list_t *)malloc(sizeof(bookkeeper_list_t));
+         if (!*bookkeeper_list_entry) {
+             LogError("malloc() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
++            munmap((void *)*bookkeeper, shm_size);
++            *bookkeeper = NULL;
++            sem_close(sem);
+             return ERR_FAILED;
+         }
+         memset((void *)*bookkeeper_list_entry, 0, sizeof(bookkeeper_list_t));
+     }
+ 
+-    (*bookkeeper_list_entry)->shm_id = shm_id;
+-    (*bookkeeper_list_entry)->sem_id = sem_id;
++    strncpy((*bookkeeper_list_entry)->shm_name, shm_name, sizeof((*bookkeeper_list_entry)->shm_name) - 1);
++    strncpy((*bookkeeper_list_entry)->sem_name, sem_name, sizeof((*bookkeeper_list_entry)->sem_name) - 1);
++    (*bookkeeper_list_entry)->shm_size = shm_size;
++    (*bookkeeper_list_entry)->sem = sem;
+     (*bookkeeper_list_entry)->bookkeeper = *bookkeeper;
+     (*bookkeeper_list_entry)->next = NULL;
+ 
+@@ -371,7 +381,6 @@
+ 
+ void ReleaseBookkeeper(bookkeeper_t *bookkeeper, int destroy) {
+     bookkeeper_list_t *bookkeeper_list_entry;
+-    struct shmid_ds buf;
+ 
+     if (!bookkeeper) return;
+ 
+@@ -383,38 +392,44 @@
+     }
+ 
+     // detach from my process addr space memory
+-    if (shmdt((void *)bookkeeper) == -1) {
++    if (munmap((void *)bookkeeper, bookkeeper_list_entry->shm_size) == -1) {
+         // ups ..
+-        LogError("shmdt() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
++        LogError("munmap() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
+     }
+     bookkeeper = NULL;
+ 
+     if (destroy == 0) {
+         // Entry no longer valid
++        sem_close(bookkeeper_list_entry->sem);
+         bookkeeper_list_entry->bookkeeper = NULL;
+-        bookkeeper_list_entry->shm_id = 0;
+-        bookkeeper_list_entry->sem_id = 0;
++        bookkeeper_list_entry->sem = NULL;
++        bookkeeper_list_entry->shm_name[0] = '\0';
++        bookkeeper_list_entry->sem_name[0] = '\0';
++        bookkeeper_list_entry->shm_size = 0;
+         return;
+     }
+ 
+     // prevent other proceeses to access the share memory, while we are removing it
+     // try to clean up.
+-    sem_lock(bookkeeper_list_entry->sem_id);
+-    if (shmctl(bookkeeper_list_entry->shm_id, IPC_RMID, &buf)) {
++    sem_lock(bookkeeper_list_entry->sem);
++    if (shm_unlink(bookkeeper_list_entry->shm_name)) {
+         // ups ..
+-        LogError("shmctl() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
++        LogError("shm_unlink() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
+     }
+-    sem_unlock(bookkeeper_list_entry->sem_id);
++    sem_unlock(bookkeeper_list_entry->sem);
+ 
+-    if (semctl(bookkeeper_list_entry->sem_id, 0, IPC_RMID) == -1) {
++    if (sem_unlink(bookkeeper_list_entry->sem_name) == -1) {
+         // ups ..
+-        LogError("semctl() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
++        LogError("sem_unlink() error in %s line %d: %s", __FILE__, __LINE__, strerror(errno));
+     }
++    sem_close(bookkeeper_list_entry->sem);
+ 
+     // Entry no longer valid
+     bookkeeper_list_entry->bookkeeper = NULL;
+-    bookkeeper_list_entry->shm_id = 0;
+-    bookkeeper_list_entry->sem_id = 0;
++    bookkeeper_list_entry->sem = NULL;
++    bookkeeper_list_entry->shm_name[0] = '\0';
++    bookkeeper_list_entry->sem_name[0] = '\0';
++    bookkeeper_list_entry->shm_size = 0;
+ 
+ }  // End of ReleaseBookkeeper
+ 
+@@ -430,7 +445,7 @@
+         return 1;
+     }
+ 
+-    sem_lock(bookkeeper_list_entry->sem_id);
++    sem_lock(bookkeeper_list_entry->sem);
+ 
+     return 0;
+ 
+@@ -448,7 +463,7 @@
+         return 1;
+     }
+ 
+-    sem_unlock(bookkeeper_list_entry->sem_id);
++    sem_unlock(bookkeeper_list_entry->sem);
+ 
+     return 0;
+ 
+@@ -466,7 +481,7 @@
+         return;
+     }
+ 
+-    sem_lock(bookkeeper_list_entry->sem_id);
++    sem_lock(bookkeeper_list_entry->sem);
+     // backup copy
+     if (tmp_books != NULL) {
+         memcpy((void *)tmp_books, (void *)bookkeeper, sizeof(bookkeeper_t));
+@@ -476,7 +491,7 @@
+     bookkeeper->numfiles = 0;
+     bookkeeper->filesize = 0;
+     bookkeeper->sequence++;
+-    sem_unlock(bookkeeper_list_entry->sem_id);
++    sem_unlock(bookkeeper_list_entry->sem);
+ 
+ }  // End of ClearBooks
+ 
+@@ -493,9 +508,9 @@
+         return 0;
+     }
+ 
+-    sem_lock(bookkeeper_list_entry->sem_id);
++    sem_lock(bookkeeper_list_entry->sem);
+     seq = bookkeeper->sequence;
+-    sem_unlock(bookkeeper_list_entry->sem_id);
++    sem_unlock(bookkeeper_list_entry->sem);
+ 
+     return seq;
+ 
+@@ -513,14 +528,14 @@
+         return;
+     }
+ 
+-    sem_lock(bookkeeper_list_entry->sem_id);
++    sem_lock(bookkeeper_list_entry->sem);
+     if (bookkeeper->first == 0) bookkeeper->first = when;
+ 
+     bookkeeper->last = when;
+     bookkeeper->numfiles++;
+     bookkeeper->filesize += size;
+     bookkeeper->sequence++;
+-    sem_unlock(bookkeeper_list_entry->sem_id);
++    sem_unlock(bookkeeper_list_entry->sem);
+ 
+ }  // End of UpdateBooks
+ 
+@@ -536,11 +551,11 @@
+         return;
+     }
+ 
+-    sem_lock(bookkeeper_list_entry->sem_id);
++    sem_lock(bookkeeper_list_entry->sem);
+     bookkeeper->max_lifetime = lifetime;
+     bookkeeper->max_filesize = maxsize;
+     bookkeeper->sequence++;
+-    sem_unlock(bookkeeper_list_entry->sem_id);
++    sem_unlock(bookkeeper_list_entry->sem);
+ 
+ }  // End of UpdateBooksParam
+ 
+@@ -562,7 +577,7 @@
+         return;
+     }
+ 
+-    sem_lock(bookkeeper_list_entry->sem_id);
++    sem_lock(bookkeeper_list_entry->sem);
+     printf("Collector process: %lu\n", (unsigned long)bookkeeper->nfcapd_pid);
+     printf("Record sequence  : %llu\n", (unsigned long long)bookkeeper->sequence);
+ 
+@@ -581,6 +596,6 @@
+     printf("Total file size : %llu\n", (unsigned long long)bookkeeper->filesize);
+     printf("Max file size   : %llu\n", (unsigned long long)bookkeeper->max_filesize);
+     printf("Max life time   : %llu\n", (unsigned long long)bookkeeper->max_lifetime);
+-    sem_unlock(bookkeeper_list_entry->sem_id);
++    sem_unlock(bookkeeper_list_entry->sem);
+ 
+ }  // End of PrintBooks

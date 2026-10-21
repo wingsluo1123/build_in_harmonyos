@@ -1,0 +1,88 @@
+#====================================================================
+# E610（草稿）— CI worker 沙箱 ≠ 设备原生：测试写死的环境假设必然翻车
+#              （sys.platform 取值 / chmod 保真度 / AF_UNIX bind EPERM）
+#
+# 草稿态，未进正式索引（正式 E 编号待 graph promote 时分配）
+# 来源适配: synadm/0.49.2（PR 首轮 CI 红：2 failures + 1 error，全部为断言假设而非产品缺陷）
+# 既有未晋升草稿（晋升时合并去重）: DRAFT-10004-qtwayland-qt-tests-deep-path-socket-tmpdir-qpa
+#   （深路径下 socket/tmpdir 的测试环境问题）；
+#   本条增量 = "同一份用例在设备原生与 CI 沙箱必须都成立" 的判定口径：能力用运行时探针，断言只锁安全属性
+#====================================================================
+
+# ═══ Layer 0: 错误面 (Error Surface) ═══
+id:                     E3471
+trigger_tool:           python|conan
+phase:                  test
+error_signature:        AssertionError: False is not true|sys\.platform\.startswith|chmod 0600 produced 0o640|PermissionError: \[Errno 1\] Operation not permitted|socket\.socket\.bind|AF_UNIX
+
+# ═══ Layer 1: 识别层 (Recognition) ═══
+severity:               2
+category:               ohos, python, conan, test-design
+match_keywords:         CI worker 沙箱, 设备原生, sys.platform, os.name, chmod 保真度, 0640, 0600, AF_UNIX, EPERM, bind, setUpClass, skipTest, 环境假设, 探针
+title:                  在设备原生实测到的环境结论（sys.platform=linux / chmod 0600 / AF_UNIX 可 bind）写死进测试断言，远端 CI worker 沙箱三项都不成立 → 用例红，但被测软件毫无问题
+
+# ═══ Layer 2: 诊断层 (Diagnosis) ═══
+root_cause: **把"本机实测"当成"跨沙箱不变量"**。设备原生与 CI worker 是两套不同的运行时/文件系统，
+  三处典型差异（本次实测）：
+  ① `sys.platform`：设备原生 `linux`，CI worker 非 linux 前缀——但被测软件（synadm）全量源码
+     **0 处**读 `sys.platform`，真正的前提是 `os.name == "posix"`。断言错误的东西 → 假失败。
+  ② `chmod 0600` 落地：设备私有 home 得 `0o600`，CI worker 的 buildbot 挂载追加 group 位得 `0o640`
+     （`AssertionError: 416 != 384`）。权限断言应锁**安全属性**（other 无可访问位 + owner 可读写），
+     而不是锁具体八进制数——后者由挂载/ACL 决定，不是软件行为。
+  ③ `AF_UNIX bind()`：设备允许，CI worker 返回 `EPERM`（沙箱安全策略），
+     导致 `setUpClass` 里起 stub server 直接 `PermissionError`，整个测试类 error。
+  共同点：三者都是**环境能力**，不是产品契约。要跑"同一份用例"，能力必须运行时探测。
+affected_scope: 所有平台特性测试（跨设备/CI 双环境执行）；凡断言里出现 sys.platform 取值、具体 chmod 八进制数、bind/listen 权限的用例
+verification_cmd: python3 -c "import os,sys,socket;print(sys.platform, os.name); s=socket.socket(socket.AF_UNIX);s.bind('$HOME/probe.sock')"   # CI worker 期望 EPERM
+  python3 -m unittest -v <ohos_suite>   # 期望 rc=0（能力不足的用例 skip，不是 fail）
+
+# ═══ Layer 3: 方案层 (Solution Space) ═══
+rec_priority:           1
+rec_approach:           runtime-capability-probe-and-property-assertions
+rec_description:        ①平台前提改锁软件真实依赖的那一项（`os.name`），并用静态断言证明包内不读 `sys.platform`；取值只进失败信息
+  ②权限改锁安全属性（`mode & 0o037 == 0`：other 无访问位 + group 无写/执行位，+ owner rw），挂载追加的 group 读位只记录不判负
+  ③需要监听器的用例在 `setUpClass` 里对候选目录逐个试 `bind()`，全失败则该类用例 `skipTest(<实测 errno>)`，套件保持 rc=0
+rec_command:            if not probe_af_unix_bindable(): raise unittest.SkipTest(f"no AF_UNIX bind in this sandbox: {errno}")
+rec_auto_fix:           false
+rec_impl:               none-manual-test-edit
+
+fallback_priority:      2
+fallback_approach:      declare-environment-matrix-in-report
+fallback_description:   若无法在运行时探测（例如能力缺失表现为整个解释器不可用），则在测试报告里显式声明"设备原生 N/N 通过 / CI worker M 通过 + K 跳过"的环境矩阵，避免用单一数字掩盖差异
+fallback_command:       reports/test-report.md §3.4 环境矩阵表
+fallback_auto_fix:      false
+fallback_impl:          none-manual-doc
+
+# ★ 禁止策略 ★
+forbid_1_pattern:       assertTrue\(sys\.platform\.startswith\(|assertEqual\(sys\.platform
+forbid_1_reason:        断言某个平台字符串前缀；同一平台的不同沙箱取值不同，被测软件通常根本不读它
+forbid_1_consequence:   假失败：CI 红而软件无问题，浪费一轮 CI 预算并误导审查
+forbid_2_pattern:       assertEqual\(os\.stat\([^)]*\)\.st_mode & 0o777, 0o600\)|0o640 !=\s*0x1a0
+forbid_2_reason:        把具体 chmod 八进制数当契约；挂载/ACL 会改写落地位（0600 → 0640）
+forbid_2_consequence:   在共享挂载的 worker 上必红；换成放宽到"任意权限"又丢掉安全校验
+forbid_3_pattern:       setUpClass[\s\S]{0,200}socket\.socket\.bind\(
+forbid_3_reason:        未经能力探测就在 setUpClass 里 bind；EPERM 会让整个测试类连同非 socket 用例一起 error
+forbid_3_consequence:   一个环境能力缺失吞掉整类覆盖（本次 6 个用例全 error，其中 1 个与 socket 无关）
+forbid_4_pattern:       except (OSError|Exception)[\s\S]{0,80}pass\s*#.*socket
+forbid_4_reason:        用吞异常把"起不了服务端"伪装成"传输验证通过"（R34 禁止的假通过）
+forbid_4_consequence:   绿灯但零覆盖，比红更危险
+
+# ═══ Layer 4: 原则引用 ═══
+principles:             P016, P013
+# ═══ 关系图 ═══
+# ═══ 元数据 ═══
+doc_file:               doc/E610.md
+last_updated: 2026-10-15
+source_event:           synadm/0.49.2 PR #15991 首轮 CI 红（2 failures + 1 error）
+
+# ═══ 知识协作 ═══
+authors:
+source_pr:
+source_commit:
+
+# ═══ 质量度量 ═══
+metrics_success_count:  1
+metrics_fail_count:     0
+metrics_confidence:     1.0
+metrics_last_used:      2026-10-15
+authors:               A14E

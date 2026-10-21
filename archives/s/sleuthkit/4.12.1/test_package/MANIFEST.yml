@@ -1,0 +1,61 @@
+# test_package/MANIFEST.yml
+# 上游官方测试声明文件
+# CI 脚本 (build_and_test.sh L0e) 强制要求此文件存在
+# 详见: docs/TEST_QUALITY_SPEC.md
+#
+# 填写方法:
+#   1. 解压上游源码包
+#   2. 运行 make -n check (或 ctest -N / meson test --list) 查看测试列表
+#   3. 把实际运行的测试记录到下方
+
+package: sleuthkit/4.12.1
+homepage: "https://www.sleuthkit.org/"
+
+# 上游测试命令 (tests/Makefile.am: check_PROGRAMS 4 个测试程序 + TESTS 2 个脚本)
+upstream_check_command: "make check"
+
+# conanfile.py build() 方法中是否已集成上游测试:
+# 已集成且真实执行——tests/ 下全部 4 个 check_PROGRAMS 在 build() 中以
+# make -j1 编译链接后,用配方自带 gen_upstream_fixtures.py 在构建期生成的
+# 6 个合成 FAT12/16/32 + NTFS 镜像真实运行(任一失败即 create 失败)。
+# release tarball 不含磁盘镜像(tests/Makefile.am 预期 data/ 下的镜像未随
+# 包发布),合成镜像由纯 Python 标准库生成器按各测试的断言构造。
+# make check 的 TESTS 两个脚本按上游设计仍离线不可运行,如实记录:
+#   runtests.sh       需要 $HOME/from_brian 非公开镜像夹具(上游注释明言
+#                     "not public",上游发布包不含)
+#   test_libraries.sh 运行时需联网从 Google Drive 下载磁盘镜像,且
+#                     mmls 子测试依赖 libvmdk/libvhdi/libewf(本配方按
+#                     确定性要求 --without-* 关闭)为空转
+upstream_test_in_build: true
+upstream_test_command: "make -j1 <4 个 check_PROGRAMS> && gen_upstream_fixtures.py <fixdir> && ./read_apis <fixdir> && ./fs_fname_apis <fixdir> && ./fs_attrlist_apis <fixdir> && fs_thread_test -f fat/-f ntfs 确定性协议 (tests/, 全部真实执行;TESTS 两个脚本不可离线运行,未执行)"
+
+# 上游实际运行的测试程序(check_PROGRAMS 4/4 真实执行)
+upstream_tests:
+  - file: read_apis.cpp
+    source: sleuthkit-4.12.1.tar.gz/tests/read_apis.cpp
+    description: "TSK 读取 API 接口测试:6 个子测试全部执行——fat12(read@33)、fat slack(inode10/631B/offset512→119B、\"3slack3\"@897)、fat recover(fe 镜像 FAT16 分区 fragmented.html@1162、\"appear\"@2048)、ntfs fe(31 非驻留/32 驻留)、ntfs comp(34 LZNT1 压缩+32 稀疏)、ntfs slack+ADS(inode36 \"n-slack\"@2021、inode37 DATA id3/id5)"
+    command: "./read_apis <upstream_fixtures>"
+  - file: fs_fname_apis.cpp
+    source: sleuthkit-4.12.1.tar.gz/tests/fs_fname_apis.cpp
+    description: "文件名 API 测试:fat12 根目录 dir_open/walk 一致性 + fe NTFS /allocated 目录(2 个子测试;ntfs_comp 子测试上游 #if 0 不编译)"
+    command: "./fs_fname_apis <upstream_fixtures>"
+  - file: fs_attrlist_apis.cpp
+    source: sleuthkit-4.12.1.tar.gz/tests/fs_attrlist_apis.cpp
+    description: "属性列表 API 测试:fat12 inode47(1 属性)、fe NTFS inode35(3 属性)、fe NTFS inode9(7 属性 SI/FNAME/DATA/IDXROOT/IDXALLOC/BITMAP)(3 个子测试)"
+    command: "./fs_attrlist_apis <upstream_fixtures>"
+  - file: fs_thread_test.cpp
+    source: sleuthkit-4.12.1.tar.gz/tests/fs_thread_test.cpp
+    description: "多线程并发访问测试(fat32.dd FAT 与 ntfs-comp-1.img NTFS 各一组):单线程基准存 base.log 后重跑并 diff 确定性校验(fat: 1x1 两次;ntfs: 1x1 基准 + 4 线程 x 3 轮),日志逐字节一致(上游 runtests.sh 同型协议)"
+    command: "./fs_thread_test -f fat <fixdir>/fat32.dd 1 1 && mv thread-0.log base.log && ./fs_thread_test -f fat <fixdir>/fat32.dd 1 1 && diff base.log thread-0.log;./fs_thread_test -f ntfs <fixdir>/ntfs-comp-1.img 1 1 && mv thread-0.log base.log && ./fs_thread_test -f ntfs <fixdir>/ntfs-comp-1.img 4 3 && diff base.log thread-0.log"
+
+# test_package 中自带的测试 (消费者视角验证, R34: 真实执行 TSK 工具链)
+test_package_tests:
+  - file: test_sleuthkit.sh
+    description: "消费者视角: 10 个 TSK CLI 工具 -V 自识别 + img_stat 打开自生成 raw 镜像真实解析 + srch_strings 对镜像内容做标记检索"
+    command: "TSK_BIN=<package>/bin sh test_sleuthkit.sh"
+
+# 测试断言总数 (近似值, 用于质量评估)
+# 上游:read_apis 6 子测试 + fs_fname_apis 2 + fs_attrlist_apis 3 +
+# fs_thread_test 2 组确定性 diff = 13 个执行单元;
+# test_package 消费者测试 12 断言。合计 25。
+assertion_count: 25

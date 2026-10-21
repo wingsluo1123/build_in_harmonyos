@@ -1,0 +1,17 @@
+sources:
+  url: "https://download.kde.org/stable/release-service/26.04.0/src/kmplot-26.04.0.tar.xz"
+  sha256: "46ca9b478e0ec7ff92298e1c9fc9a79d4caa74ff2781bd6c34ac93087e89c01c"
+patches:
+  "26.04.0":
+    - patch_file: "patches/0001-CMakeLists-drop-PrintSupport.patch"
+      patch_description: "Drop PrintSupport from the required Qt6 components: the published qtbase line is built with FEATURE_printsupport=OFF and ships no Qt6PrintSupport module (kapow 1.7.0 / kcron 26.04.1 / kdiagram 3.0.1 precedent); the plot print action is re-targeted to a QPdfWriter PDF export flow (patch 0004)."
+      patch_type: "portability"
+    - patch_file: "patches/0002-kmplot-CMakeLists-drop-PrintSupport.patch"
+      patch_description: "Link kmplotpart and kmplot against Qt6::Widgets/Qt6::Gui instead of the unpublished Qt6::PrintSupport; rendering now goes through QPdfWriter (QtGui)."
+      patch_type: "portability"
+    - patch_file: "patches/0003-maindlg-h-drop-QPrinter.patch"
+      patch_description: "Replace QPrinter include with QPaintDevice and retarget setupPrinter() to QPaintDevice: QPrinter (Qt PrintSupport) is not published while QPdfWriter (QtGui) is a QPaintDevice subclass and View::draw() only needs paint-device API."
+      patch_type: "portability"
+    - patch_file: "patches/0004-maindlg-cpp-qpdfwriter-export.patch"
+      patch_description: "Re-target slotPrint()/slotPrintPreview() from QPrinter/QPrintDialog/QPrintPreviewDialog to a QPdfWriter (QtGui) + QFileDialog PDF export flow (kcron 26.04.1 precedent); KPrinterDlg options page is kept and still feeds setupPrinter()."
+      patch_type: "portability"

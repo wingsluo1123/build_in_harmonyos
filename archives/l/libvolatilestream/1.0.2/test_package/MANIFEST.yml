@@ -1,0 +1,21 @@
+# test_package/MANIFEST.yml
+# 上游与消费者测试声明（CI L0e 强制要求）
+
+package: libvolatilestream/1.0.2
+homepage: "https://github.com/rd235/libvolatilestream"
+
+# 上游无测试：源码树没有 tests/ 目录，CMakeLists.txt 未定义任何测试目标，
+# 也没有 ctest/add_test/enable_testing 调用。
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests: []
+
+test_package_tests:
+  - file: test.c
+    description: "消费者测试：只用公开 API（volstream_open / volstream_trunc / volstream_getbuf）与普通 stdio 操作（fwrite/fread/fseek/fprintf/fgets），13 个用例：新建空流、写读回绕、1 MiB 增长、NULL 输出参数、trunc 缩小、trunc 扩零、SEEK_END 空洞补零、多流隔离、普通 stdio 流 EBADF、负偏移拒绝、stdio 混用、64 轮开闭，外加平台 fclose 契约特征化（纯 libc fopencookie 对照 + 库流同行为校验，复现 E1807/E302 同根因的 OHOS musl「fd<0 内存流 fclose 返回 EBADF」环境缺陷）。每个用例独立输出 TEST PASS/TEST FAIL，末尾 TEST SUMMARY: N passed, M failed，任一用例失败进程退出 1。"
+    command: "conan create（test_package 构建并运行 test_libvolatilestream）"
+
+# 消费者测试检查点数量（test.c 中 check() 调用点）
+assertion_count: 109
