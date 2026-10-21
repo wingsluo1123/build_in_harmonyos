@@ -1001,6 +1001,10 @@ python3 $SKILL_ROOT/scripts/ohc-run.py dispatch script zlib bzip2 openssl wget
 | `scripts/pre_pr_audit.py` | ⭐ W4: Pre-PR 审计工具 (generate/report/check 子命令，由 submit 内部调用) |
 | `scripts/gitcode_pr.py` | ⭐ GitCode PR 管理 (创建PR/获取评论/CI状态/回复评论/monitor-review AI检视监控) |
 | `scripts/kb_editor.py` | ⭐ 主编知识草稿审核 (pr-map/batch/audit/promote/fix/report/publish/pr-info/claim，§0.5；v12.24 claim=单条复核通道) |
+| `scripts/ohc/dep_binary_probe.py` | 依赖二进制三态探测（可用/配方在/全缺 + --build=missing 可行性，R35 自动化，v12.24 从私搭 SKILL 合入） |
+| `scripts/ohc/fuse_tmp_write_guard.py` | E046/E002 族可执行修复（umask wrapper + config.status 补丁，v12.24 从私搭 SKILL 合入） |
+| `scripts/ohc/meson_cross_pkgconfig_guard.py` | meson 交叉配方五坑检测（E3231 族工具化，v12.24 合入） |
+| `scripts/ohc/detect_absent_service_crash.py` | 运行期服务缺失→清理路径崩溃检测（E3551 族工具化，v12.24 合入） |
 
 ### Pre-commit Hook（⭐ 建议安装）
 

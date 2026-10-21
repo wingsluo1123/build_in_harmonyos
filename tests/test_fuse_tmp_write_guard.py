@@ -8,7 +8,7 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts", "ohc"))
 
 import fuse_tmp_write_guard as g  # noqa: E402
 

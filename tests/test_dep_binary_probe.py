@@ -21,8 +21,8 @@ import tempfile
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SKILL_DIR = os.path.dirname(HERE)
-SCRIPT = os.path.join(SKILL_DIR, "scripts", "dep_binary_probe.py")
+# v12.24: 从 ohc-skills 迁入主 SKILL 后的路径
+SCRIPT = os.path.join(os.path.dirname(HERE), "scripts", "ohc", "dep_binary_probe.py")
 SHIM = os.path.join(HERE, "fake_conan.py")
 
 
