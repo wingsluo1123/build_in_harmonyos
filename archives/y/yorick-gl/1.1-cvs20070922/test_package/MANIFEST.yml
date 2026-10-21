@@ -1,0 +1,40 @@
+# test_package/MANIFEST.yml — upstream test declaration (yorick-gl 1.1-cvs20070922, OHOS/aarch64)
+package: yorick-gl/1.1-cvs20070922
+homepage: "https://software.llnl.gov/yorick-doc/"
+
+# 上游测试清点（源码目录，`yorick-gl-1.1+cvs20070922+dfsg.orig/`）：
+#   - testgl.i        —— 交互式 OpenGL 演示（win3d / draw3d / palette3d）
+#   - testisotree.i   —— 八叉树等值面/切片演示（同样需要 win3d/draw3d/palette3d）
+# 上游没有 check.i，`make check`（Makepkg: `check-dll` -> `yorick -batch check.i`）
+# 在 yorick-gl 上不成立（无 check.i 文件）。两个测试脚本都依赖交互式 OpenGL 窗口，
+# 而 OHOS 目标没有 X server / display，故本平台**无可运行的上游测试**（N = 0）。
+upstream_check_command: "make check   (upstream has no check.i — target cannot run)"
+upstream_test_in_build: false
+upstream_test_command: "(none runnable)"
+
+# 上游测试逐项：TOTAL = 0 = PASS 0 + FAIL 0 + SKIP 0 + NOT_RUN 2
+upstream_tests:
+  - file: testgl.i
+    source: yorick-gl-1.1+cvs20070922+dfsg.orig/testgl.i
+    description: "交互式 OpenGL 3D 演示（testall3d/demo3d/mak_sphere/... — 需 win3d 窗口）"
+    command: "yorick -batch testgl.i"
+    status: NOT_RUN
+    reason: "需要交互式 OpenGL 窗口（win3d -> glXCreateContext / X display）；OHOS 无 X server，无 display"
+  - file: testisotree.i
+    source: yorick-gl-1.1+cvs20070922+dfsg.orig/testisotree.i
+    description: "八叉树等值面/切片演示（sho_slicecrv/slice_movie/isotree_movie — 需 win3d/draw3d/palette3d）"
+    command: "yorick -batch testisotree.i"
+    status: NOT_RUN
+    reason: "同上：require dlist3d.i + palette3d/clear3d/draw3d，全部依赖交互式 OpenGL 窗口"
+
+# test_package 自带消费者测试（真实加载插件并调用编译函数）
+test_package_tests:
+  - file: test_yorick_gl.i
+    description: "plug_in,\"yorgl\" 加载 yorgl.so；断言编译内建存在；调用 PrepIsoTet 并断言返回 0；经上游 mak_isotree 调用编译 MakeContourTree 建八叉树并断言 maxdepth>=1"
+    command: "yorick -batch test_yorick_gl_final.i"
+  - file: test_yorick_gl.sh
+    description: "包装脚本 — 断言退出码 0 且输出含 YORICKGL_CONSUMER_OK"
+    command: "bash test_yorick_gl.sh <yorick> test_yorick_gl_final.i"
+
+# 消费者测试断言数（test_yorick_gl.i 内 6 条 if 断言 + 1 个成功标记）
+assertion_count: 6
