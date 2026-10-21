@@ -1,0 +1,79 @@
+# 版本级 manifest — xwiimote 2
+# 遵循 ARCHIVE-SPEC v3.0
+
+version: "2"
+software: "xwiimote"
+
+# published | built | failed | archived
+status: built
+
+build_date: "2026-10-18"
+build_system: "autotools"
+
+# ============================================================
+# 源码信息
+# ============================================================
+
+source:
+  url: "https://github.com/xwiimote/xwiimote/archive/refs/tags/xwiimote-2.tar.gz"
+  sha256: "2e893e2899ec6c688df60092b6d88c911b45bc6ce9b4850030d72944873975cb"
+  tar_format: tar.gz
+  upstream_tag: "xwiimote-2"
+  upstream_commit: "2bc2942a"
+
+# ============================================================
+# 构建配置
+# ============================================================
+
+build:
+  system: autotools
+
+  # 上游发行包未包含预生成 configure，build() 先 autoreconf -i 生成构建文件
+  bootstrap:
+    - "mkdir -p m4 && autoreconf -i"
+
+  configure_options:
+    - "--enable-shared"
+    - "--disable-static"
+
+  # 依赖经 pkg-config .pc 注入（generate() 按 cpp_info 生成）
+  dependencies:
+    required:
+      - libudev-zero/1.0.4
+      - ncurses/6.6
+
+  cc: clang
+  cxx: clang++
+
+# ============================================================
+# 补丁信息
+# ============================================================
+
+# 无源码补丁：适配通过配方内 generate()/build() 完成（见 notes.md）
+patches_applied: []
+
+# ============================================================
+# 知识沉淀
+# ============================================================
+
+# 复用的知识条目（E129：HMDFS 上 autoconf umask 077 导致 config.status 不可写）
+knowledge_ref:
+  - E129
+
+# ============================================================
+# 测试情况（R51：上游无测试套件，质量由 test_package 承担）
+# ============================================================
+
+test_results:
+  # 上游无 TESTS/check_PROGRAMS，make check 为空目标
+  type: skipped
+  total: 0
+  passed: 0
+  failed: 0
+
+knowledge_gained:
+  - "Conan 2 的 RecipeReference 拒绝单字符版本（'Invalid package version 2'），上游单字符版本按先例归档目录不动、set_version() 规范为 2.0"
+  - "AutotoolsToolchain.environment() 每次调用返回全新 Environment 对象，在其上 define 的变量会被 generate() 覆盖丢失；依赖注入改走 pkg-config .pc 文件"
+  - "HMDFS 上 configure/config.status 的 umask 077 临时目录不可写（E129），需 sed 放宽为 022"
+  - "HarmonyOS 上 config.guess 无法识别内核导致 cannot guess build type，需显式 --build=<arch>-unknown-linux-ohos"
+  - "上游 autogen.sh 会自行执行 ./configure --enable-debug，与 Conan 参数冲突，应直接 autoreconf -i"

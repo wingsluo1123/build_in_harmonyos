@@ -1,0 +1,24 @@
+# 软件级 manifest — xwiimote
+# 遵循 ARCHIVE-SPEC v3.0
+software: xwiimote
+display: "xwiimote"
+description: "Linux 下 Nintendo Wii Remote（wiimote）设备访问库与工具（libxwiimote + xwiishow），基于 udev 枚举与 uinput 访问"
+category: system
+homepage: "https://github.com/xwiimote/xwiimote"
+license: MIT
+
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "上游发行包不含预生成 configure（仅有 configure.ac/Makefile.am），build() 内 autoreconf -i 生成后再走 autotools"
+    - "udev 由 libudev-zero/1.0.4 提供；上游 PKG_CHECK_MODULES([libudev]) 与 Conan 包名不一致，generate() 按 cpp_info 生成 libudev.pc/ncurses.pc 注入"
+    - "HarmonyOS 上 config.guess 无法识别内核，需显式 --build=<arch>-unknown-linux-ohos"
+    - "E129：HMDFS 强制 setgid + autoconf 的 umask 077 导致 config.status 临时目录不可写，生成后 sed 放宽为 022"
+    - "版本口径：上游 tag/AC_INIT 为单字符 2（Conan 拒绝 <2 字符版本），目录保持 2，set_version() 规范制品为 xwiimote/2.0"
+    - "产物含 bin/xwiishow（ncurses 交互式工具），commands.json 按 tool 声明；ncurses 强制静态（R26/R4）"
+
+versions:
+  "2":
+    status: built
+    build_date: "2026-10-18"
