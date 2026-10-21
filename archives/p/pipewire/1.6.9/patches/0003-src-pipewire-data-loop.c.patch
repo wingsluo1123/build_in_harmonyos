@@ -1,0 +1,29 @@
+--- a/src/pipewire/data-loop.c
++++ b/src/pipewire/data-loop.c
+@@ -1,6 +1,8 @@
+ /* PipeWire */
+ /* SPDX-FileCopyrightText: Copyright © 2018 Wim Taymans */
+ /* SPDX-License-Identifier: MIT */
++
++#include "config.h"
+ 
+ #include <pthread.h>
+ #include <errno.h>
+@@ -282,7 +284,17 @@
+ 		struct spa_thread_utils *utils;
+ 		if (loop->cancel) {
+ 			pw_log_debug("%p cancel", loop);
++#ifdef HAVE_PTHREAD_CANCEL
+ 			pthread_cancel(loop->thread);
++#else
++			/* HarmonyOS libc does not provide pthread_cancel().
++			 * Use the same wake-and-stop invocation as the
++			 * non-cancel path: it is signal-free, so the loop
++			 * thread always exits through its normal cleanup
++			 * (a signal handler calling pthread_exit() is not
++			 * safe on musl and crashed intermittently). */
++			pw_loop_invoke(loop->loop, do_stop, 1, NULL, 0, false, loop);
++#endif
+ 		} else {
+ 			pw_log_debug("%p signal", loop);
+ 			pw_loop_invoke(loop->loop, do_stop, 1, NULL, 0, false, loop);

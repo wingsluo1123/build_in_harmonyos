@@ -1,0 +1,25 @@
+--- a/src/pipewire/thread.c
++++ b/src/pipewire/thread.c
+@@ -1,6 +1,8 @@
+ /* PipeWire */
+ /* SPDX-FileCopyrightText: Copyright © 2021 Wim Taymans */
+ /* SPDX-License-Identifier: MIT */
++
++#include "config.h"
+ 
+ #include <stdlib.h>
+ #include <unistd.h>
+@@ -82,7 +84,13 @@
+ {
+ 	cpu_set_t set;
+ 	parse_affinity(affinity, &set);
++#ifdef HAVE_PTHREAD_SETAFFINITY_NP
+ 	return -pthread_setaffinity_np(thread, sizeof(set), &set);
++#else
++	/* HarmonyOS libc does not provide pthread_setaffinity_np();
++	 * ignore the affinity request and continue without it. */
++	return 0;
++#endif
+ }
+ 
+ static struct spa_thread *impl_create(void *object,
