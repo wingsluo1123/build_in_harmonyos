@@ -1,0 +1,31 @@
+# Upstream test inventory and consumer test declaration for xcalc 1.1.3.
+
+package: xcalc/1.1.3
+homepage: "https://gitlab.freedesktop.org/xorg/app/xcalc"
+
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "Official X.Org xcalc-1.1.3.tar.xz archive"
+    reason: "Full file inventory (find) contains no tests/ or test/ directory and no upstream test source files; the tree is COPYING, ChangeLog, INSTALL, README.md, Makefile.am, Makefile.in, aclocal.m4, config.guess, config.sub, config.h.in, configure, configure.ac, compile, depcomp, install-sh, missing, actions.c, math.c, xcalc.c, xcalc.h, meson.build, meson.options, app-defaults/{XCalc,XCalc-color} and man/xcalc.man."
+  - source: "Makefile.am"
+    reason: "Declares SUBDIRS=man, bin_PROGRAMS=xcalc, the app-defaults data files and EXTRA_DIST; it has no TESTS, check_PROGRAMS or check-local declaration, so the Automake `make check` target registers zero tests."
+  - source: "man/Makefile.am"
+    reason: "Only installs the man page; no test targets."
+  - source: "meson.build"
+    reason: "Defines the executable, config header, app-defaults install and man page custom_target only; it contains no test() or test_suite() call."
+  - source: "configure.ac"
+    reason: "Contains AC_INIT, XORG_DEFAULT_OPTIONS, PKG_CHECK_MODULES and gettext/locale checks only; it declares no test suite or AC_CONFIG_TESTDIR."
+  - conclusion: "The upstream 1.1.3 release ships no automated test suite. The build runs `make check` (0 registered cases); test_package separately exercises the installed executable."
+
+upstream_check_command: "make check"
+upstream_test_in_build: true
+upstream_test_command: "make check (0 registered tests)"
+upstream_tests: []
+
+test_package_tests:
+  - file: test_xcalc.py
+    description: "Executes the installed xcalc binary directly (subprocess execve) over its no-server paths: -version and --version (PACKAGE_STRING 'xcalc 1.1.3', rc 0), -help and --help (usage text 'Usage:', rc 0 — main() calls Syntax(1, argv)), and a no-display launch with DISPLAY unset (XtAppInitialize must report a display failure and exit non-zero without hanging)."
+    command: "python test_xcalc.py <installed-bin/xcalc> <runtime-LD_PRELOAD>"
+    assertions: 5
+
+assertion_count: 5
