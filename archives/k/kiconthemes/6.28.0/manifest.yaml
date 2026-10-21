@@ -1,0 +1,43 @@
+software: kiconthemes
+version: "6.28.0"
+status: built
+build_system: cmake
+created_at: 2026-10-18
+build_date: 2026-10-18
+dependencies:
+  required:
+    - qtbase/6.11.1
+    - qtsvg/6.11.1
+    - karchive/6.26.0
+    - openssl/3.5.6.1
+    - zstd/1.5.7
+    - ki18n/6.26.0
+    - kwidgetsaddons/6.26.0.1
+    - kcolorscheme/6.26.0
+  build:
+    - ecm/6.28.0
+  optional:
+    - qtdeclarative
+    - qtdbus
+    - breeze-icons
+    - qttools
+patches_applied:
+  - "patches/0001-ohos-adaptations.patch"
+test_results:
+  type: passed
+  upstream: "passed: 6/6 upstream CTest tests (kiconloader_resourcethemetest, kicontheme_unittest, kiconengine_scaled_unittest, kiconbutton_unittest, kicondialog_unittest, kpixmapsequenceloadertest) plus kiconloader_unittest subset 29/29 and kiconengine_unittest subset 8/8; the kiconloader subset omits one shared-mime-info data row unavailable on OHOS and the kiconengine subset omits testMode (BreezeIcons disabled); kquickiconprovidertest is not registered because QtQuick is unavailable"
+  test_package: "passed: 9/9 consumer end-to-end checks against an isolated icon theme (KIconLoader::global/loadIcon, configured theme resolution, KIconTheme construction/enumeration, unknown icon, KIconEngine::pixmap) plus the test_package CTest entry 1/1"
+  package_id: "8935f3f60d62a98ae9eec680abcd71b2d6234b24"
+  l0: "pass"
+  l1: "pass: upstream CTest and qtest subsets executed in the package build; consumer test_package executed on the device"
+  l2: "skip: non-blocking; the platform runner resolves the cache path by package id two-level keys and conan 2.29.1 list JSON only keys by full reference, so the lookup missed (same behavior as kservice 6.28.0); equivalent smoke coverage comes from the 9/9 consumer test_package run"
+  l4: "skip: non-blocking; same cache-path lookup miss as l2; equivalent ELF checks (absolute DT_NEEDED normalization, .codesign removal, re-signing) run in the recipe package() step and the test_package execution"
+  l5: "skip: non-blocking; same cache-path lookup miss as l2; artifact baseline recorded by the verifier on the first run"
+source_url: https://mirrors.nju.edu.cn/kde/stable/frameworks/6.28/kiconthemes-6.28.0.tar.xz
+source_sha256: edf83069f25f8edf759d07502a6f8302c8c064cd562651deedefe6393fefcace
+knowledge_gained:
+  - "kiconthemes 6.28.0 is a small delta from 6.26.0: only the root CMakeLists (KF_DEP 6.28.0, ECM 6.28.0, deprecation baseline 6.27), a new kiconbutton_unittest, a shared accept-selected handler in kicondialog and a Q_OS_IOS guard around iconutil in ksvg2icns; all pre-existing autotest sources are byte identical, so the 6.26.0 adaptation set applies unchanged apart from the version-dependent bits."
+  - "KF_DEP_VERSION 6.28.0 must be lowered to 6.26.0 because the published KF6 stack stops there (kwidgetsaddons has a .1 fix release); the ECM 6.28.0 floor is separate and satisfied by ecm/6.28.0, the kservice 6.28.0 precedent."
+  - "KIconTheme::queryIcons() returns full file paths built by KIconThemeDir::constructFileName(), not bare icon names; a consumer check must match the installed file path (e.g. suffix /name.png) rather than compare against the icon name."
+  - "The OHOS user volume (HMDFS) rejects symlink(2) with EACCES for all writable directories; any test harness that stages libraries next to a binary must use hardlinks or copies. The kiconthemes test_package now tries os.link() first and falls back to shutil.copy2(), keeping the symlink-free CI path working unchanged."
+  - "The new upstream kiconbutton_unittest runs headless under QT_QPA_PLATFORM=offscreen without additional fixtures (KIconButton property defaults), so the existing offscreen test environment covers it."
