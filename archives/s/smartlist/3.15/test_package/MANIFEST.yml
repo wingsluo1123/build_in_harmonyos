@@ -1,0 +1,38 @@
+package: smartlist/3.15
+homepage: "https://github.com/procmail-org/SmartList"
+
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "SmartList-master tarball top level (SmartList/, src/, Artistic, COPYING)"
+    reason: "No tests/, test/, TESTS, check_PROGRAMS, ctest, meson-test or make-check target exists at top level."
+  - source: "SmartList/Manifest + SmartList/INSTALL + install.sh/install.sh2/install.sh3"
+    reason: "Install path is shell-script deployment plus compiling helpers from src/; no test driver, no check target, only Bourne-shell feature probes (test -f/-z) inside install scripts."
+  - source: "src/multigram.c, src/hsort.c, src/hsort.h, src/gethome.c"
+    reason: "C sources are production helpers (address parser, heapsort, home-dir probe); none is a test harness and none references a test framework."
+  - conclusion: "Upstream 3.15 provides no automated tests; the adaptation validates the packaged hsort() API, gethome binary and script suite from the consumer side without presenting it as upstream coverage."
+
+upstream_test_total: 0
+# No upstream framework exists, so no official caliber (python_def /
+# autotools_tests / gtest_macros / ctest_entries) applies; "auto" is
+# reserved for a single parseable framework and must not be used here.
+# The 0 total comes from manual audit of the tarball (see
+# upstream_test_audit), not from a runnable subset.
+upstream_test_count_method: "manual_audit"
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+upstream_tests: []
+
+test_package_tests:
+  - file: test_hsort.c
+    description: "Link libhsort.a and exercise hsort() on 6 deterministic arrays (mixed, sorted, reverse, duplicates, negatives, single); one PASS line per case."
+    command: "./test_hsort"
+  - file: test_smartlist.py
+    description: "Verify libhsort.a/hsort.h installed, gethome binary runs (Usage on bad args), script suite present (>=10 incl. subscribe/unsubscribe/digest), rc.main and examples installed, sh -n syntax clean; parse HSORT_CASE lines 1:1 and emit HMBS markers."
+    command: "python3 test_smartlist.py --package <pkg> --hsort-bin ./test_hsort"
+
+test_scenario_count: 18
+assertion_count: 18
+assertion_count_basis:
+  hsort_api_cases: 6
+  package_and_script_checks: 12
