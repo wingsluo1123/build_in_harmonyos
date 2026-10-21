@@ -1,0 +1,28 @@
+software: quesoglc
+display: "QuesoGLC"
+description: "OpenGL Character Renderer (GLC) 的自由实现：基于 FreeType 与 Fontconfig，为 OpenGL 应用提供 Unicode 文字渲染"
+category: graphics
+homepage: "https://sourceforge.net/projects/quesoglc/"
+license: LGPL-2.1
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "OHOS 无桌面 libGL/GLX；QuesoGLC 自身零 glX 引用，用 Mesa 的离屏 OSMesa（libOSMesa.so + GL/gl.h）作为 GL 实现"
+    - "configure 的 AX_CHECK_GL/AX_CHECK_GLU 只探 -lGL/-lGLU，OHOS 上不存在；通过 autoconf cache（ax_cv_check_gl_libgl=-lOSMesa、ax_cv_check_glu_libglu=-lGLU）播种，不改生成的 configure"
+    - "上游 --with-glew=no 表示内嵌自带 GLEW（并加 -DGLEW_MX），QuesoGLC 依赖 GLEW_MX 多上下文 API；ohpcd 的 glew 是不带 GLEW_MX 的 EGL 版，故必须内嵌"
+    - "补丁 0003 把内嵌 GLEW 的 GLX 段置于 GLEW_NO_GLX 之后，并让 glewGetProcAddress 改走 dlfcn；仅在 OHOS 定义该宏，其他平台行为不变"
+    - "上游生成 Makefile 用 $(top_builddir) 指向源码头文件，VPATH 构建下找不到 internal.h → 配方便地（in-source）构建"
+    - "mesa 与 fontconfig 对 expat 的版本菱形冲突统一到 expat/2.8.2.1（该包才提供 fontconfig DT_NEEDED 所需的 libexpat.so.1）"
+    - "受限域内 access(\"/\") 为 EACCES（E303）；补丁 0004 让 test4 的 catalog 根取自 $QUESOGLC_TEST_CATALOG（缺省回退原值），配方在 make check 命令行传入可写 build 目录，上游唯一用例 test4 因此在本平台真实执行并 1/1 PASS，未改断言或测试逻辑"
+  common_dependencies:
+    - freetype
+    - fontconfig
+    - mesa
+    - glu
+
+versions:
+  "0.7.2":
+    status: built
+    build_date: "2026-10-18"
+    conan_ref: "quesoglc/0.7.2"

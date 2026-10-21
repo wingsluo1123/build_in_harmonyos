@@ -1,0 +1,55 @@
+package: quesoglc/0.7.2
+homepage: "https://sourceforge.net/projects/quesoglc/"
+
+upstream_check_command: "make check"
+upstream_test_in_build: true
+upstream_test_command: "make check"
+
+upstream_test_census:
+  denominator: 1
+  usable: 1
+  executed: 1
+  passed: 1
+  tests_directories: 1
+  test_named_files: 21
+  registered_tests: 1
+  automake_TESTS_variable: true
+  automake_check_PROGRAMS: false
+  note: "tests/Makefile.am sets TESTS = $(noinst_PROGRAMS) and
+    noinst_PROGRAMS = test4 @DEBUG_TESTS@ @TESTS_WITH_GLUT@. DEBUG_TESTS is
+    only filled by --enable-debug and TESTS_WITH_GLUT only when GLUT is found;
+    OHOS has no (free)GLUT, so `make check` builds and runs exactly one program,
+    test4. The other 20 test*.c sources (test1..test16, testcontex, testfont,
+    testmaster, testrender) link against GLUT and a display and cannot be built
+    here.  test4 is executed by build() (make check) and PASSES 1/1 on this
+    platform: patch 0004 lets the test take its catalog root from
+    $QUESOGLC_TEST_CATALOG (the upstream default \"/\" is preserved whenever the
+    variable is unset) and build() passes a writable build-folder path on the
+    make command line, because the OHOS restricted domain denies
+    access(\"/\", R_OK)/opendir(\"/\") with EACCES while stat() succeeds (device
+    probe in notes.md; cf. knowledge E303).  No assertion, test case or upstream
+    logic is altered.  TOTAL = PASS+FAIL+SKIP+NOT_RUN = 1 = 1+0+0+0 (the 20 GLUT
+    tests are not built here and are outside the executed set)."
+
+upstream_tests:
+  - name: test4
+    command: "make check"
+    result: "pass (patch 0004 supplies a readable catalog root via $QUESOGLC_TEST_CATALOG; upstream default \"/\" preserved when unset)"
+
+test_package_tests:
+  - file: test_quesoglc.c
+    description: "Links libGLC and drives the real global commands: glcGetError,
+      glcGetCurrentContext, glcGetAllContexts, glcGenContext, glcIsContext,
+      glcDeleteContext; asserts the enumerated context list and the error state"
+    command: "./test_quesoglc"
+    result: "pass"
+  - file: conanfile.py
+    description: "Packaged libGLC.so.0.0.7 is an AArch64 ELF whose DT_NEEDED
+      carries libOSMesa.so/libGLU.so/libfontconfig.so/libfreetype.so — and (OHOS
+      only) its section table holds exactly 1 '.codesign' section — fail-closed"
+    command: "readelf -h -d -S lib/libGLC.so.0.0.7"
+    result: "pass"
+
+assertion_count: 19
+max_rss_mb: 512
+build_mem_budget_mb: 1000
