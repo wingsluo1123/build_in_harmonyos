@@ -1,0 +1,39 @@
+# 软件级 manifest — imaptool
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: imaptool
+display: "imaptool"
+description: "X11 图像映射制作工具 — 在 JPEG/GIF 图片上绘制矩形/圆形/多边形热区并导出 HTML <area> 图像映射"
+category: utility
+homepage: "http://www.sspitzer.org/imaptool/"
+license: GPL-2.0-or-later
+build_system: makefile
+
+# ============================================================
+# OHOS 适配知识（跨版本通用）
+# ============================================================
+
+ohos_adaptation:
+  key_points:
+    - "纯手写 GNU Makefile（2000 年发布）：无 configure、无 check/test 目标。Makefile 把 CC=gcc -I/usr/X11R6/include/、JPEG_INCLUDE=-I/usr/local/include/、LIBDIR=-L/usr/local/lib -L/usr/X11R6/lib 写死，配方在 make 命令行用同名 CC/JPEG_INCLUDE/LIBDIR 覆盖，不改 Makefile、不打补丁"
+    - "Athena 部件应用：窗口经 X Toolkit Intrinsics 构建（imaptool.c 的 XtVaAppInitialize/XtCreateManagedWidget + Xaw/* 头），依赖链 libxaw/1.0.14 + libxt/1.3.1 + libxmu/1.3.1.1 + libxext/6.4.0.1 + libx11/1.8.13 + xorgproto/2025.1（与 archives/x/xfontsel/1.1.2 同一 X11 图）"
+    - "JPEG 支持由 file2pixmap.c 在 -DUSE_JPEG_LIB 下编译（<jpeglib.h>/<jerror.h>），依赖制品仓静态 libjpeg/10；GIF 解码用上游内嵌 dgif_lib.c/gif_err.c/gifalloc.c，无外部 giflib 依赖"
+    - "GUI 工具在设备与 CI worker 都无 X server 可用（镜像内无 Xorg/Xvfb，制品仓未发布 OHOS xorg-server）；且 imaptool.c 在 parseparams() 之前调用 XtVaAppInitialize()（imaptool.c:171→:178），连 -h/-v 都需要 display。验证用无 DISPLAY / 伪造 DISPLAY 时 Xt 的 Can't open display 诊断（非零退出、不挂起），并断言 ELF 的 DT_NEEDED 与 .codesign"
+    - "OHOS 不预装任何 X 库：运行期依赖靠依赖包 libdir 经 LD_LIBRARY_PATH/LD_PRELOAD 解析（DT_NEEDED 链 libXaw7.so.7→libXmu/libXext/libXt、libX11.so.6→libxcb/libXau/libXdmcp）"
+  common_dependencies:
+    - libx11
+    - libxt
+    - libxaw
+    - libxmu
+    - libxext
+    - libjpeg
+
+# ============================================================
+# 版本索引
+# ============================================================
+
+versions:
+  "0.9":
+    status: built
+    build_date: "2026-10-19"
+    conan_ref: "imaptool/0.9"

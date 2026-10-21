@@ -1,0 +1,42 @@
+# test_package/MANIFEST.yml — imaptool 0.9
+# CI L0e requires this file to exist.
+
+package: imaptool/0.9
+homepage: "http://www.sspitzer.org/imaptool/"
+
+# 上游源码审计：imaptool 0.9 发布包确认无任何自动化测试
+upstream_tests_exist: false
+upstream_test_audit:
+  - source: "Makefile"
+    reason: "目标仅 imaptool / imaptool.o / file2pixmap.o / dgif_lib.o / gif_err.o / gifalloc.o / clean；grep -nE '^[a-zA-Z0-9_.]+:' Makefile 无 check/test 目标，make -n check 报 No rule to make target 'check' (rc=2)。"
+  - source: "imaptool_0.9.orig.tar.gz 清单"
+    reason: "解包后 13 个文件（LICENCE.TXT/Makefile/dgif_lib.c/file2pixmap.c/file2pixmap.h/gif_err.c/gif_hash.h/gif_lib.h/gifalloc.c/icon/iconmask/imaptool.c/imaptool.man）；无 test/、tests/ 目录，无 *_test 源文件。"
+  - source: "imaptool.man"
+    reason: "上游 man page 仅描述交互式用法（imaptool [options] file）与 -l/-u/-v/-h 选项，未提供任何自动化测试或自检程序。"
+  - conclusion: "上游未提供自动化测试套件；由 test_package 真实执行被测二进制（无 DISPLAY 的 Xt 初始化路径）并断言 ELF DT_NEEDED 与 .codesign 完成验证。"
+
+upstream_check_command: ""
+upstream_test_in_build: false
+upstream_test_command: ""
+
+upstream_tests: []
+
+test_package_tests:
+  - file: test_imaptool.py
+    description: >-
+      真实执行被测包二进制：① 二进制存在且可执行；② readelf -d 断言 DT_NEEDED
+      含 libXaw/libXt/libX11（证明链接到 Conan X11 依赖而非系统 X11）；
+      ③ readelf -SW 断言恰 1 个 .codesign 段（package() 的 OHOS 自签）；
+      ④ 无 DISPLAY 与伪造 DISPLAY=:9999 各跑一次，断言非零退出且输出含 Xt
+      'Can't open display' 诊断（证明整条动态链 libXaw7→libXmu/libXext/libXt→
+      libX11→libxcb→libXau/libXdmcp 已加载并执行到 Xt 显示初始化，且不挂起、
+      不静默成功）；⑤ 安装的 man page 存在。设备与 CI worker 均无 X server
+      （镜像内无 Xorg/Xvfb，制品仓未发布 OHOS xorg-server），且 imaptool.c
+      在 parseparams() 之前调用 XtVaAppInitialize()（imaptool.c:171→:178），
+      连 -h/-v 都需要 display，因此无 DISPLAY 路径是本环境唯一可运行路径。
+    command: "python3 test_imaptool.py <package_folder>/bin/imaptool <package_folder> <LD_PRELOAD>"
+
+# 11 checks: binary present/executable, DT_NEEDED libXaw/libXt/libX11,
+# .codesign count, (no DISPLAY rc + diagnostic) x2, (bogus DISPLAY rc + diagnostic) x2,
+# man page
+assertion_count: 11
