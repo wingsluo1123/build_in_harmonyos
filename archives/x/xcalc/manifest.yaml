@@ -1,0 +1,35 @@
+# 软件级 manifest — xcalc
+# 遵循 ARCHIVE-SPEC v3.0
+
+software: xcalc
+display: "xcalc"
+description: "X.Org X11 科学计算器（Athena/Xaw 小程序，中缀/RPN 两种模式）"
+category: gfx
+homepage: "https://gitlab.freedesktop.org/xorg/app/xcalc"
+license: X11
+build_system: autotools
+
+ohos_adaptation:
+  key_points:
+    - "X.Org 小 X 客户端：链接依赖用 ohpcd 已发布的 libxaw/1.0.14（xaw7）+ libxt/1.3.1 + libx11/1.8.13 + xorgproto/2025.1，无需 vendored 构建 X11 库"
+    - "原生 build=host（铁律 #0）：tarball 自带 config.guess（2024-07-27）不识别 HarmonyOS → 补丁 0001 输出 aarch64-unknown-linux-ohos；自带 config.sub 已接受 linux-ohos"
+    - "HMDFS getcwd 不可达 + config.status umask 077 → 补丁 0002 加 $PWD 回退并放宽 umask（E011/E114）"
+    - "PkgConfigDeps：libxmu 组件重命名 xmu、xorgproto 重命名 xproto；app-defaults 固定 --with-appdefaultdir=/share/X11/app-defaults"
+    - "无上游测试套件：test_package 以 xcalc -version/-help 无头真实执行（无需 X server），断言版本串 'xcalc 1.1.3' 与退出码"
+  common_dependencies:
+    - libxaw
+    - libxt
+    - libx11
+    - xorgproto
+
+versions:
+  "1.1.3":
+    status: built
+    build_date: "2026-10-20"
+    conan_ref: "xcalc/1.1.3"
+    # 两条均为 xorg.freedesktop.org 官方原始发布件（无第三方代理前缀），
+    # 与 conandata.yml / 版本级 manifest 同序：pub/ 在前（不命中框架预下载的
+    # archive/releases 镜像改写正则 ⇒ 直连官方取真包），archive/ 兜底。
+    source_url:
+      - "https://xorg.freedesktop.org/pub/individual/app/xcalc-1.1.3.tar.xz"
+      - "https://xorg.freedesktop.org/archive/individual/app/xcalc-1.1.3.tar.xz"
