@@ -43,9 +43,6 @@ class SraSdkConan(ConanFile):
     def layout(self):
         cmake_layout(self, src_folder="src")
 
-    def requirements(self):
-        self.requires("libxml2/2.15.3")
-
     def source(self):
         get(self, **self.conan_data["sources"][self.version],
             strip_root=True)
@@ -60,19 +57,6 @@ class SraSdkConan(ConanFile):
 
     def generate(self):
         tc = CMakeToolchain(self)
-        dep = self.dependencies["libxml2"]
-        cpp_info = dep.cpp_info.aggregated_components()
-        xml_inc = cpp_info.includedirs[0]
-        if not os.path.exists(os.path.join(xml_inc, "libxml", "xmlreader.h")):
-            nested = os.path.join(xml_inc, "libxml2")
-            if os.path.exists(os.path.join(nested, "libxml", "xmlreader.h")):
-                xml_inc = nested
-        xml_lib = os.path.join(cpp_info.libdirs[0], "libxml2.so")
-        if not os.path.exists(xml_lib):
-            xml_lib = os.path.join(cpp_info.libdirs[0], "libxml2.a")
-        # sra-tools looks for the legacy FindLibXml2 variables.
-        tc.variables["LIBXML2_INCLUDE_DIR"] = xml_inc
-        tc.variables["LIBXML2_LIBRARIES"] = xml_lib
         tc.generate()
 
     def _system_variables(self):
@@ -109,6 +93,9 @@ class SraSdkConan(ConanFile):
 
         variables = dict(self._system_variables())
         variables.update(self._dependencies_variables(vdb_build, vdb_src))
+        # libxml2 is optional upstream and only affects the (disabled) XML loaders;
+        # keep the build hermetic and dependency-free for CI.
+        variables["CMAKE_DISABLE_FIND_PACKAGE_LibXml2"] = "ON"
         cmake = CMake(self)
         cmake.configure(variables=variables, subfolder="sra")
         cmake.build(subfolder="sra")
