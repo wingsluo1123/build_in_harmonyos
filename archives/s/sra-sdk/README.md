@@ -22,7 +22,7 @@ NCBI SRA Toolkit and SDK — 用于访问 INSDC Sequence Read Archive 的工具�
 
 ## 依赖关系
 
-- 编译依赖：无外部 Conan 依赖；zlib/bzip2/zstd 由 ncbi-vdb 内置源码编译。libxml2 为上游可选项（仅 kxml/XML loader 使用），默认关闭。
+- 编译依赖：libxml2（制品仓 `libxml2/2.15.3`）；zlib/bzip2/zstd 由 ncbi-vdb 内置源码编译。
 - 运行依赖：标准 OHOS libc/libc++；工具均为自包含静态链接。
 
 ## 参考资料
