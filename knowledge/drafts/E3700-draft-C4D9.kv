@@ -1,0 +1,31 @@
+id: E3700
+trigger_tool: ld.lld
+phase: linking
+error_signature: undefined symbol: pthread_cancel|ld.lld: error: undefined symbol: pthread_cancel|pthread_cancel.*not found
+severity: 3
+category: platform,threading,musl
+match_keywords: pthread_cancel, pthread_setcancelstate, musl, OHOS, thread cancellation, undefined symbol
+title: OHOS musl 缺少 pthread_cancel，阻塞线程需改协作式取消
+root_cause: OHOS 使用 musl，未实现 POSIX 线程取消（pthread_cancel/pthread_setcancelstate/pthread_testcancel）；依赖取消来终止阻塞线程的代码在链接期缺符号，运行期也无法退出
+affected_scope: 所有依赖 pthread 取消终止后台线程的 C/C++ 项目；与 E1603 属于同一符号族，E1603 覆盖构建期特性探测与有界 poll，本条覆盖最小协作式取消改造
+verification_cmd: llvm-nm -D -u libncbi-vdb.so | grep pthread_cancel || echo 'no pthread_cancel dependency'
+rec_priority: 1
+rec_approach: 构建期探测 pthread_cancel（check_c_source_compiles 链接测试）并定义 HAVE_PTHREAD_CANCEL；有能力时保留原取消路径，无能力时工作线程用 cancel 标志 + 条件变量唤醒协作退出，通用 API 返回 rcUnsupported
+rec_description: 能力探测优先，协作式取消作为无 pthread_cancel 时的兜底；不要用空符号或平台宏
+rec_auto_fix: false
+causes: []
+caused_by: []
+similar_to: [E1603]
+conflicts_with: []
+prerequisite_of: []
+doc_file: doc/E3700.md
+last_updated: 2026-10-23
+source_pr: 16850
+source_commit: ef4d76d7
+authors: wingsluo <2906545455@qq.com>
+metrics_success_count: 0
+metrics_fail_count: 0
+metrics_confidence: 0.0
+metrics_last_used: ""
+draft: true
+contributor_id: C4D9

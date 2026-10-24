@@ -1,0 +1,31 @@
+id: E3699
+trigger_tool: bison
+phase: build
+error_signature: redefinition of .*error. as different kind of symbol|called object type .*tokentype is not a function
+severity: 2
+category: build-system,parser
+match_keywords: bison, yyerror, api.prefix, redefinition, AST_error, Schema_error
+title: Bison 3.8 error token 前缀与 yyerror 回调命名冲突
+root_cause: Bison 3.8 起把内建 error token 也纳入 api.prefix 的枚举（如 AST_error = 256），与上游语法文件里自定义的 AST_error/Schema_error 错误回调同名冲突
+affected_scope: 使用 bison >= 3.8 且自定义 yyerror 回调名的项目
+verification_cmd: bison --version | head -1; grep -n 'error_handler' libs/schema/schema-ast.y libs/schema/schema-grammar.y
+rec_priority: 1
+rec_approach: 在语法 prologue 中 #undef yyerror 并重定向到独立的 <Prefix>_error_handler，回调实现保持不变
+rec_description: 用 #undef yyerror + 独立 handler 保持回调实现不变，仅避开 bison 3.8 的 token 枚举前缀
+rec_auto_fix: false
+causes: []
+caused_by: []
+similar_to: []
+conflicts_with: []
+prerequisite_of: []
+doc_file: doc/E3699.md
+last_updated: 2026-10-23
+source_pr: 16850
+source_commit: ef4d76d7
+authors: wingsluo <2906545455@qq.com>
+metrics_success_count: 0
+metrics_fail_count: 0
+metrics_confidence: 0.0
+metrics_last_used: ""
+draft: true
+contributor_id: C4D9

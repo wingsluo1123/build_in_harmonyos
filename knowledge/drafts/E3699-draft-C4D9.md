@@ -1,4 +1,4 @@
-# E2296 — Bison 3.8 把内建 error token 纳入 `<prefix>error` 枚举，与 yyerror 回调同名冲突
+# E3699 — Bison 3.8 把内建 error token 纳入 `<prefix>error` 枚举，与 yyerror 回调同名冲突
 
 ## 错误特征
 
@@ -7,8 +7,8 @@ error: redefinition of 'AST_error' as different kind of symbol
 error: called object type 'AST_tokentype' is not a function or function pointer
 ```
 
-日志中同时出现：语法文件 prologue 里定义的回调名（如 `AST_error`/`Schema_error`）
-与生成头文件中的 `enum AST_tokentype { AST_error = 256, ... }` 冲突。
+语法文件 prologue 中定义的回调名（如 `AST_error`/`Schema_error`）与生成头文件中的
+`enum AST_tokentype { AST_error = 256, ... }` 冲突。
 
 ## 触发条件
 
@@ -18,9 +18,8 @@ error: called object type 'AST_tokentype' is not a function or function pointer
 
 ## 根因分析
 
-Bison 3.8 起将内建 `error` token 也按 `api.prefix` 命名并放入 token-kind 枚举。
-上游代码习惯把错误回调命名为 `<Prefix>error`，与枚举成员同名；C++ 不允许
-同一作用域内枚举成员与函数同名，因此编译失败。
+Bison 3.8 起将内建 `error` token 也按 `api.prefix` 命名并放入 token-kind 枚举；
+C++ 不允许同一作用域内枚举成员与函数同名，因此编译失败。
 
 ## 解决方案
 
@@ -39,7 +38,7 @@ Bison 3.8 起将内建 `error` token 也按 `api.prefix` 命名并放入 token-k
 ### 禁止做法
 
 - ❌ 修改生成文件 `zz_*.cpp/.hpp`（下次构建会被覆盖）
-- ❌ 把回调改名但仍让 bison 生成同名 token（如继续使用 `api.token.prefix` 冲突名）
+- ❌ 只改回调名但仍让 bison 生成同名 token
 
 ## 验证
 

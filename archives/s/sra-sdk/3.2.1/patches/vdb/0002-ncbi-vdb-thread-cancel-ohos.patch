@@ -72,21 +72,37 @@
              if ( GetRCObject( rc ) == (enum RCObject)rcData && GetRCState( rc ) == rcInsufficient )
                  work.buf = NULL;
              else if ( rc != 0 )
-@@ -611,7 +616,12 @@
+@@ -583,7 +588,8 @@
+             KConditionSignal(self->have_data);
+         }
+     }
+-    self->rc = rc;
++    if ( ! self->cancel )
++        self->rc = rc;
+     KLockUnlock(self->lock);
+     return 0;
+ }
+@@ -611,8 +617,19 @@
  
  static void BGZThreadFileWhack(BGZThreadFile *const self)
  {
--    KThreadCancel(self->th);
++#if HAVE_PTHREAD_CANCEL
++    /* libc implements POSIX thread cancellation: keep upstream behavior. */
+     KThreadCancel(self->th);
+     KThreadWait(self->th, NULL);
++#else
 +    KLockAcquire(self->lock);
 +    self->cancel = true;
 +    self->rc = RC(rcAlign, rcFile, rcReading, rcThread, rcCanceled);
 +    KConditionSignal(self->need_data);
 +    KConditionSignal(self->have_data);
 +    KLockUnlock(self->lock);
-     KThreadWait(self->th, NULL);
++    KThreadWait(self->th, NULL);
++#endif
      BGZFileWhack(&self->file);
      KConditionRelease(self->need_data);
-@@ -633,6 +643,7 @@
+     KConditionRelease(self->have_data);
+@@ -633,6 +650,7 @@
      };
  
      memset(self, 0, sizeof(*self));
