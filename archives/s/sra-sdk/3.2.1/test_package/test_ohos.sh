@@ -29,7 +29,7 @@ for tool in fasterq-dump vdb-dump vdb-config; do
     esac
 done
 
-# 2. OHOS musl does not implement pthread_cancel(); the SDK must not require it.
+# 2. OHOS musl implements none of the POSIX thread cancellation API.
 if [ ! -f "$LIB/libncbi-vdb.so" ]; then
     echo "FAIL: libncbi-vdb.so is missing from the package"
     fail=1
@@ -38,8 +38,8 @@ elif ! nm_out=$("$NM" -D -u "$LIB/libncbi-vdb.so" 2>&1); then
     fail=1
 else
     case "$nm_out" in
-        *pthread_cancel*)
-            echo "FAIL: libncbi-vdb.so references pthread_cancel (absent on OHOS musl)"
+        *pthread_cancel*|*pthread_setcancelstate*|*pthread_setcanceltype*|*pthread_testcancel*)
+            echo "FAIL: libncbi-vdb.so references pthread cancellation API (absent on OHOS musl)"
             fail=1
             ;;
     esac

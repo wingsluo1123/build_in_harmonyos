@@ -37,7 +37,7 @@ musl 未实现 POSIX 线程取消；依赖取消打断阻塞调用的设计在 O
 
 ### 禁止做法
 
-- ❌ 仅提供空的 `pthread_cancel` 符号（链接通过但 join 挂死）
+- ❌ 仅提供空的 `pthread_cancel` 符号（链接通过但 join 挂死；E085 的 stub 回退只用于构建期检测，不能当作取消实现）
 - ❌ 用 `pthread_kill` + 信号处理函数里 `pthread_exit`（非 async-signal-safe）
 - ❌ 删除后台线程但仍从它读取数据（数据竞争/悬垂指针）
 
@@ -48,7 +48,14 @@ llvm-nm -D -u libncbi-vdb.so | grep pthread_cancel || echo 'no pthread_cancel de
 # 运行使用 BGZF/BAM 读取路径的测试，确认销毁时线程及时退出
 ```
 
-## 关联条目
+## 关联条目与分工
 
-- 相似: E1603（musl 缺 pthread_cancel 的构建期特性探测 + 有界 poll 建立可打断等点）
-- 相关: E085（musl 线程取消 API 缺失）
+- 前置根因: E085（musl 未实现 pthread_cancel 系列；其 stub 回退只解决链接/检测，不提供取消语义）
+- 编译期守卫: E127（`pthread_cancel` undeclared 时禁用取消特性，如 libomp 的 `KMP_CANCEL_THREADS`）
+- 生命周期: E513（无取消能力时仍须保证 joinable 线程可回收；可用协作式停止，不必采用其信号方案）
+- 相似: E1603（meson `cc.has_function` + 有界 poll，在阻塞 `read()` 之前建立可打断等点）
+- 相似: E1078（无条件移除取消 API，改为协作式退出 + 有限超时等待）
+- 分工: E1603 建立可打断等点，本条把 BGZF 读线程改为协作式取消；两者叠加使用，不互相替代。
+  若线程阻塞在管道/FUSE/远端存储且标志无法唤醒，先按 E1603 加有界等点，再套用本条。
+- 与 E1078 的边界: 只面向 OHOS、可无条件删除取消路径时按 E1078；同一源码需兼容 glibc/musl
+  （本 PR）时按本条做能力探测，保留原生取消路径，仅在探测失败时走协作式取消。

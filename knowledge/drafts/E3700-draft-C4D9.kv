@@ -7,19 +7,19 @@ category: platform,threading,musl
 match_keywords: pthread_cancel, pthread_setcancelstate, musl, OHOS, thread cancellation, undefined symbol
 title: OHOS musl 缺少 pthread_cancel，阻塞线程需改协作式取消
 root_cause: OHOS 使用 musl，未实现 POSIX 线程取消（pthread_cancel/pthread_setcancelstate/pthread_testcancel）；依赖取消来终止阻塞线程的代码在链接期缺符号，运行期也无法退出
-affected_scope: 所有依赖 pthread 取消终止后台线程的 C/C++ 项目；与 E1603 属于同一符号族，E1603 覆盖构建期特性探测与有界 poll，本条覆盖最小协作式取消改造
-verification_cmd: llvm-nm -D -u libncbi-vdb.so | grep pthread_cancel || echo 'no pthread_cancel dependency'
+affected_scope: 所有依赖 pthread 取消终止后台线程的 C/C++ 项目。与既有条目的分工：E085 负责 libc 能力缺失识别与构建期检测/链接兜底，E127 负责编译期 undeclared 守卫，E513 负责无取消能力时的 joinable 线程回收，E1603 负责阻塞 read 前的有界 poll 等点；本条只覆盖「无 cancel 时把 BGZF 读线程改为协作式取消并保证 rc 不被覆盖」
+verification_cmd: llvm-nm -D -u libncbi-vdb.so | grep -E 'pthread_(cancel|setcancelstate|setcanceltype|testcancel)' || echo 'no pthread cancellation dependency'
 rec_priority: 1
-rec_approach: 构建期探测 pthread_cancel（check_c_source_compiles 链接测试）并定义 HAVE_PTHREAD_CANCEL；有能力时保留原取消路径，无能力时工作线程用 cancel 标志 + 条件变量唤醒协作退出，通用 API 返回 rcUnsupported
-rec_description: 能力探测优先，协作式取消作为无 pthread_cancel 时的兜底；不要用空符号或平台宏
+rec_approach: 构建期探测 pthread_cancel（check_c_source_compiles 链接测试）并在 build/env.cmake 全局定义 HAVE_PTHREAD_CANCEL；有能力时保留原取消路径，无能力时工作线程用 cancel 标志 + 条件变量唤醒协作退出，通用 API 返回 rcUnsupported。与 E1603 的分工：E1603 用 meson cc.has_function + 有界 poll 在阻塞 read 之前建立可打断等点，本条不重复实现 poll，只负责取消标志/条件变量与 rc 传播；两者叠加使用，阻塞在管道/FUSE/远端存储时应先按 E1603 加有界等点。E513 的信号方案与本条的条件变量方案二选一，优先复用项目已有的停止标志；E085 的 stub 回退只满足链接检测，不提供取消语义，不能替代本条。与 E1078 的边界：E1078 面向只上 OHOS/可无条件移除取消的项目（直接删 cancel + 有界超时）；本条面向同一源码需同时兼容 glibc 与 musl 的场景，保留原生取消路径，仅在探测失败时走协作式取消
+rec_description: 能力探测优先，协作式取消作为无 pthread_cancel 时的兜底；不要用空符号或平台宏。E085 的 stub 回退仅用于构建期检测，禁止当作取消实现（见 E513）
 rec_auto_fix: false
 causes: []
-caused_by: []
-similar_to: [E1603]
+caused_by: [E085]
+similar_to: [E1603, E127, E513, E1078]
 conflicts_with: []
 prerequisite_of: []
 doc_file: doc/E3700.md
-last_updated: 2026-10-23
+last_updated: 2026-10-25
 source_pr: 16850
 source_commit: ef4d76d7
 authors: wingsluo <2906545455@qq.com>

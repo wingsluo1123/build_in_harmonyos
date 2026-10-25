@@ -1,10 +1,11 @@
---- a/libs/kproc/CMakeLists.txt
-+++ b/libs/kproc/CMakeLists.txt
-@@ -67,6 +67,18 @@
+--- a/build/env.cmake
++++ b/build/env.cmake
+@@ -34,6 +34,19 @@
  
+ option( RUN_SANITIZER_TESTS "Run ASAN and TSAN tests" OFF )
  
- #GenerateStaticLibs( ksproc "${SPROC_SRC}" )
 +# Detect pthread cancellation at build time (musl does not implement it).
++# Directory scope so kproc and align compile against the same capability.
 +include( CheckCSourceCompiles )
 +set( CMAKE_REQUIRED_LIBRARIES pthread )
 +check_c_source_compiles(
@@ -16,9 +17,9 @@
 +    add_compile_definitions( HAVE_PTHREAD_CANCEL=1 )
 +endif()
 +
- GenerateStaticLibs( kproc "${PROC_SRC}" )
- GenerateStaticLibs( kq queue )
- 
+ # ===========================================================================
+ # include Conan setup
+ if(_NCBIVDB_CFG_PACKAGING)
 --- a/libs/kproc/unix/systhread.c
 +++ b/libs/kproc/unix/systhread.c
 @@ -227,6 +227,7 @@
